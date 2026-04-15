@@ -24,80 +24,143 @@
       height: 152px;
     }
 
-    /* Streifen-Hintergrund: doppelt breit für nahtlosen Loop */
-    .stripes-wrapper {
-      position: absolute;
-      inset: 0;
-      overflow: hidden;
-      border-radius: 4px;
-    }
-
+    /* Streifen-Bild, per clip-path schrittweise aufgedeckt */
     .stripes {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 800px; /* 2x Breite für seamless loop */
-      height: 152px;
-      background: url('../assets/Chrome_Streifen.png') repeat-x;
-      background-size: 400px 152px;
-      animation: slideStripes 3s linear infinite;
+      inset: 0;
+      background: url('../assets/Chrome_Streifen.png') no-repeat center center;
+      background-size: contain;
+      /* Blau → Purple umfärben via hue-rotate + saturate */
+      filter: hue-rotate(270deg) saturate(1.3) brightness(0.9);
+      /* Startet komplett unsichtbar */
+      clip-path: polygon(0 0, 0 0, 0 100%, 0 100%);
+      animation: revealStripes 1.4s steps(1, end) forwards;
     }
 
-    @keyframes slideStripes {
-      0% { transform: translateX(0); }
-      100% { transform: translateX(-400px); }
+    /*
+      7 Streifen, diagonal. Das Bild ist ca. 4200x1600.
+      Die Streifen laufen diagonal von links-unten nach rechts-oben.
+      Wir decken von links nach rechts auf, jeweils ~14% Breite pro Streifen.
+      Jeder Step zeigt einen Streifen mehr (diagonal geschnitten).
+
+      Timing: 0.2s pro Streifen = 1.4s total
+    */
+    @keyframes revealStripes {
+      0%    { clip-path: polygon(0 0, 0 0, 0 100%, 0 100%); }
+      /* Streifen 1 */
+      7.14% { clip-path: polygon(
+        0 0,
+        18% 0,
+        8% 100%,
+        0 100%
+      ); }
+      /* Streifen 2 */
+      14.28% { clip-path: polygon(
+        0 0,
+        30% 0,
+        20% 100%,
+        0 100%
+      ); }
+      /* Streifen 3 */
+      21.42% { clip-path: polygon(
+        0 0,
+        42% 0,
+        32% 100%,
+        0 100%
+      ); }
+      /* Streifen 4 */
+      28.56% { clip-path: polygon(
+        0 0,
+        55% 0,
+        45% 100%,
+        0 100%
+      ); }
+      /* Streifen 5 */
+      35.7% { clip-path: polygon(
+        0 0,
+        68% 0,
+        58% 100%,
+        0 100%
+      ); }
+      /* Streifen 6 */
+      42.84% { clip-path: polygon(
+        0 0,
+        80% 0,
+        70% 100%,
+        0 100%
+      ); }
+      /* Streifen 7 — alle da */
+      50% { clip-path: polygon(
+        0 0,
+        100% 0,
+        100% 100%,
+        0 100%
+      ); }
+      /* Bleibt sichtbar */
+      100% { clip-path: polygon(
+        0 0,
+        100% 0,
+        100% 100%,
+        0 100%
+      ); }
     }
 
-    /* Text-Overlay */
+    /* Text faded erst ein wenn alle Streifen da sind */
     .text {
       position: absolute;
       inset: 0;
       background: url('../assets/Chrome_Text.png') no-repeat center center;
       background-size: contain;
       z-index: 2;
+      opacity: 0;
+      animation: textFadeIn 0.6s ease-out 0.8s forwards;
+    }
+
+    @keyframes textFadeIn {
+      0%   { opacity: 0; transform: scale(0.95); }
+      100% { opacity: 1; transform: scale(1); }
     }
   </style>
 </head>
 <body>
   <div class="logo-container">
-    <div class="stripes-wrapper">
-      <div class="stripes"></div>
-    </div>
+    <div class="stripes"></div>
     <div class="text"></div>
   </div>
 
   <script>
-    /* URL-Parameter für Anpassungen:
-       ?speed=3    — Geschwindigkeit der Streifen-Animation in Sekunden (default: 3)
-       ?width=400  — Breite des Logos in px (default: 400)
+    /* URL-Parameter:
+       ?width=400   — Logo-Breite in px (default: 400)
+       ?delay=0     — Verzögerung vor Start in Sekunden (default: 0)
+       ?speed=1.4   — Dauer der Streifen-Animation in Sekunden (default: 1.4)
     */
     (function() {
       const params = new URLSearchParams(window.location.search);
 
-      const speed = parseFloat(params.get('speed')) || 3;
-      document.querySelector('.stripes').style.animationDuration = speed + 's';
-
       const width = parseInt(params.get('width'), 10);
       if (width && width !== 400) {
-        const ratio = 152 / 400; // Original-Seitenverhältnis beibehalten
+        const ratio = 152 / 400;
         const height = Math.round(width * ratio);
         document.body.style.width = width + 'px';
         document.body.style.height = height + 'px';
         document.querySelector('.logo-container').style.width = width + 'px';
         document.querySelector('.logo-container').style.height = height + 'px';
-        document.querySelector('.stripes').style.width = (width * 2) + 'px';
-        document.querySelector('.stripes').style.height = height + 'px';
-        document.querySelector('.stripes').style.backgroundSize = width + 'px ' + height + 'px';
+      }
 
-        // Update keyframes für neue Breite
-        const style = document.createElement('style');
-        style.textContent = `
-          @keyframes slideStripes {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-${width}px); }
-          }
-        `;
-        document.head.appendChild(style);
+      const delay = parseFloat(params.get('delay')) || 0;
+      if (delay > 0) {
+        const stripes = document.querySelector('.stripes');
+        const text = document.querySelector('.text');
+        stripes.style.animationDelay = delay + 's';
+        text.style.animationDelay = (delay + 0.8) + 's';
+      }
+
+      const speed = parseFloat(params.get('speed'));
+      if (speed) {
+        const stripes = document.querySelector('.stripes');
+        stripes.style.animationDuration = speed + 's';
+        const textDelay = parseFloat(stripes.style.animationDelay || '0') + speed * 0.57;
+        document.querySelector('.text').style.animationDelay = textDelay + 's';
       }
     })();
   </script>
