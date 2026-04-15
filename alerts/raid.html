@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Raid Alert</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: block;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --color-gold:        #f2b705;
+      --color-purple-glow: #5e2a79;
+      --color-bg-dark:     #0d0d1a;
+      --color-text:        #ffffff;
+    }
+
+    /* ─── Keyframes ─────────────────────────────────────────────── */
+
+    @keyframes flashFade {
+      0%   { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes bgFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    @keyframes bgFadeOut {
+      from { opacity: 1; }
+      to   { opacity: 0; }
+    }
+
+    @keyframes contentIn {
+      from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
+      to   { opacity: 1; transform: translate(-50%, -50%) scale(1);    }
+    }
+
+    @keyframes contentOut {
+      from { opacity: 1; transform: translate(-50%, -50%) scale(1);    }
+      to   { opacity: 0; transform: translate(-50%, -50%) scale(0.9);  }
+    }
+
+    @keyframes particleExplode {
+      0%   { transform: translate(-50%, -50%) translate(0, 0) scale(0); opacity: 1; }
+      60%  { opacity: 1; }
+      100% { transform: translate(-50%, -50%) translate(var(--tx), var(--ty)) scale(1); opacity: 0; }
+    }
+
+    @keyframes lineFade {
+      0%   { opacity: 0; transform: translate(-50%, -50%) rotate(var(--rot)) scaleX(0); }
+      20%  { opacity: 0.8; transform: translate(-50%, -50%) rotate(var(--rot)) scaleX(1); }
+      70%  { opacity: 0.5; }
+      100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--rot)) scaleX(1); }
+    }
+
+    /* ─── Base ───────────────────────────────────────────────────── */
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    /* ─── Flash overlay ──────────────────────────────────────────── */
+
+    .flash {
+      position: absolute;
+      inset: 0;
+      background: rgba(242, 183, 5, 0.3);
+      z-index: 10;
+      animation: flashFade 0.2s ease-out 0s forwards;
+    }
+
+    /* ─── Background ─────────────────────────────────────────────── */
+
+    .bg {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center,
+        rgba(94, 42, 121, 0.6) 0%,
+        rgba(13, 13, 26, 0.95) 60%
+      );
+      z-index: 1;
+      opacity: 0;
+      animation:
+        bgFadeIn 0.4s ease-out 0.2s forwards,
+        bgFadeOut 1s ease-in 4s forwards;
+    }
+
+    /* ─── Explosion lines ────────────────────────────────────────── */
+
+    .line {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(242, 183, 5, 0.6) 40%,
+        rgba(242, 183, 5, 0.9) 50%,
+        rgba(242, 183, 5, 0.6) 60%,
+        transparent 100%
+      );
+      transform-origin: center center;
+      z-index: 3;
+      opacity: 0;
+      animation: lineFade 1.2s ease-out 0.3s forwards;
+    }
+
+    .line-1 { --rot: 15deg; }
+    .line-2 { --rot: -20deg; }
+    .line-3 { --rot: 60deg; }
+
+    /* ─── Particles ──────────────────────────────────────────────── */
+
+    .particle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      border-radius: 50%;
+      z-index: 4;
+      animation: particleExplode var(--dur, 1.2s) ease-out var(--delay, 0.3s) forwards;
+    }
+
+    /* ─── Content ────────────────────────────────────────────────── */
+
+    .content {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 5;
+      opacity: 0;
+      white-space: nowrap;
+      animation:
+        contentIn  0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards,
+        contentOut 1s ease-in 4s forwards;
+    }
+
+    .event-type {
+      font-size: 18px;
+      color: var(--color-gold);
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      text-shadow:
+        0 0 12px rgba(242, 183, 5, 0.9),
+        0 0 30px rgba(242, 183, 5, 0.5);
+      margin-bottom: 18px;
+    }
+
+    .username {
+      font-size: 56px;
+      font-weight: 900;
+      color: var(--color-text);
+      text-shadow:
+        0 0 20px rgba(255, 255, 255, 0.6),
+        0 0 50px rgba(94, 42, 121, 0.8),
+        0 0 80px rgba(94, 42, 121, 0.4);
+      margin-bottom: 20px;
+    }
+
+    .divider {
+      width: 150px;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--color-gold), transparent);
+      margin: 0 auto 20px;
+    }
+
+    .viewers {
+      font-size: 22px;
+      color: var(--color-gold);
+      text-shadow: 0 0 10px rgba(242, 183, 5, 0.6);
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Flash overlay -->
+  <div class="flash"></div>
+
+  <!-- Background -->
+  <div class="bg"></div>
+
+  <!-- Explosion lines -->
+  <div class="line line-1" style="--rot: 15deg;"></div>
+  <div class="line line-2" style="--rot: -20deg;"></div>
+  <div class="line line-3" style="--rot: 60deg;"></div>
+
+  <!-- Particles (generated by JS) -->
+  <div id="particles"></div>
+
+  <!-- Content -->
+  <div class="content">
+    <div class="event-type">Incoming Raid</div>
+    <div class="username" id="username"></div>
+    <div class="divider"></div>
+    <div class="viewers" id="viewers"></div>
+  </div>
+
+  <script>
+    /* ─── URL params ─────────────────────────────────────────────── */
+    const params   = new URLSearchParams(window.location.search);
+    const username = params.get('username') || 'Raider';
+    const viewers  = params.get('viewers')  || '0';
+
+    document.getElementById('username').textContent = username;
+    document.getElementById('viewers').textContent  = '+' + viewers + ' Viewer';
+
+    /* ─── Particles ──────────────────────────────────────────────── */
+    const container = document.getElementById('particles');
+    const COUNT = 25;
+
+    // ~70% gold, ~30% purple for raid (gold theme)
+    const colors = [
+      '#f2b705', '#f2b705', '#f2b705', '#f2b705', '#f2b705',
+      '#f2b705', '#f2b705', '#f2b705', '#f2b705', '#f2b705',
+      '#f2b705', '#f2b705', '#f2b705', '#f2b705', '#f2b705',
+      '#f2b705', '#f2b705', '#f2b705',
+      '#5e2a79', '#5e2a79', '#5e2a79', '#5e2a79', '#5e2a79',
+      '#7b3fa0', '#9b55c0',
+    ];
+
+    for (let i = 0; i < COUNT; i++) {
+      const el = document.createElement('div');
+      el.className = 'particle';
+
+      const size   = 12 + Math.random() * 4;           // 12–16px
+      const angle  = Math.random() * 2 * Math.PI;
+      const dist   = 300 + Math.random() * 500;         // explode outward
+      const tx     = Math.cos(angle) * dist;
+      const ty     = Math.sin(angle) * dist;
+      const dur    = 0.9 + Math.random() * 0.6;         // 0.9–1.5s
+      const delay  = 0.3 + Math.random() * 0.15;        // 0.3–0.45s
+      const color  = colors[i % colors.length];
+
+      el.style.cssText = `
+        width: ${size}px;
+        height: ${size}px;
+        background: ${color};
+        box-shadow: 0 0 ${size}px ${color};
+        --tx: ${tx}px;
+        --ty: ${ty}px;
+        --dur: ${dur}s;
+        --delay: ${delay}s;
+      `;
+      container.appendChild(el);
+    }
+  </script>
+
+</body>
+</html>
