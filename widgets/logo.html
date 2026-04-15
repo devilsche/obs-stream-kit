@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=400, height=152" />
+  <title>Animiertes Logo</title>
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 400px;
+      height: 152px;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    .logo-container {
+      position: relative;
+      width: 400px;
+      height: 152px;
+    }
+
+    /* Streifen-Hintergrund: doppelt breit für nahtlosen Loop */
+    .stripes-wrapper {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      border-radius: 4px;
+    }
+
+    .stripes {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 800px; /* 2x Breite für seamless loop */
+      height: 152px;
+      background: url('../assets/Chrome_Streifen.png') repeat-x;
+      background-size: 400px 152px;
+      animation: slideStripes 3s linear infinite;
+    }
+
+    @keyframes slideStripes {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-400px); }
+    }
+
+    /* Text-Overlay */
+    .text {
+      position: absolute;
+      inset: 0;
+      background: url('../assets/Chrome_Text.png') no-repeat center center;
+      background-size: contain;
+      z-index: 2;
+    }
+  </style>
+</head>
+<body>
+  <div class="logo-container">
+    <div class="stripes-wrapper">
+      <div class="stripes"></div>
+    </div>
+    <div class="text"></div>
+  </div>
+
+  <script>
+    /* URL-Parameter für Anpassungen:
+       ?speed=3    — Geschwindigkeit der Streifen-Animation in Sekunden (default: 3)
+       ?width=400  — Breite des Logos in px (default: 400)
+    */
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+
+      const speed = parseFloat(params.get('speed')) || 3;
+      document.querySelector('.stripes').style.animationDuration = speed + 's';
+
+      const width = parseInt(params.get('width'), 10);
+      if (width && width !== 400) {
+        const ratio = 152 / 400; // Original-Seitenverhältnis beibehalten
+        const height = Math.round(width * ratio);
+        document.body.style.width = width + 'px';
+        document.body.style.height = height + 'px';
+        document.querySelector('.logo-container').style.width = width + 'px';
+        document.querySelector('.logo-container').style.height = height + 'px';
+        document.querySelector('.stripes').style.width = (width * 2) + 'px';
+        document.querySelector('.stripes').style.height = height + 'px';
+        document.querySelector('.stripes').style.backgroundSize = width + 'px ' + height + 'px';
+
+        // Update keyframes für neue Breite
+        const style = document.createElement('style');
+        style.textContent = `
+          @keyframes slideStripes {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-${width}px); }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    })();
+  </script>
+</body>
+</html>
