@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Latest Sub</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: block;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .widget-box {
+      position: absolute;
+      top: 50%;
+      left: 20px;
+      transform: translateY(-50%) translateX(-120%);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: rgba(13, 13, 26, 0.95);
+      border: 1px solid rgba(94, 42, 121, 0.3);
+      border-left: 3px solid #5e2a79;
+      border-radius: 0 8px 8px 0;
+      padding: 12px 24px;
+      max-width: 400px;
+      box-shadow: 0 0 20px rgba(94, 42, 121, 0.15);
+    }
+
+    .widget-content {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .widget-label {
+      font-size: 10px;
+      color: #c9a0dc;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .widget-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: #ffffff;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="widget-box">
+    <div class="widget-content">
+      <div class="widget-label">Latest Sub</div>
+      <div class="widget-name"></div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const name = params.get('name') || 'NightOwl';
+
+    document.querySelector('.widget-name').textContent = name;
+
+    function playEntrance() {
+      document.querySelector('.widget-box').animate([
+        { transform: 'translateY(-50%) translateX(-120%)' },
+        { transform: 'translateY(-50%) translateX(0)' }
+      ], { duration: 300, easing: 'ease-out', fill: 'forwards' });
+    }
+
+    if (document.visibilityState === 'visible') {
+      playEntrance();
+    } else {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') playEntrance();
+      });
+    }
+  </script>
+
+</body>
+</html>
