@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>BRB – LuCKoR_HD</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: block;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --color-purple:       #5e2a79;
+      --color-purple-light: #c9a0dc;
+      --color-gold:         #f2b705;
+      --color-bg-dark:      #0d0d1a;
+      --color-bg-purple:    #1a0d2e;
+      --color-text:         #ffffff;
+      --color-text-muted:   #888888;
+    }
+
+    /* ─── Keyframes ─────────────────────────────────────────────── */
+
+    @keyframes fadeInUp {
+      0%   { opacity: 0; transform: translateY(10px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulse {
+      0%   { opacity: 0.7; }
+      50%  { opacity: 1; }
+      100% { opacity: 0.7; }
+    }
+
+    @keyframes glowPulse {
+      0%, 100% {
+        text-shadow:
+          0 0 20px rgba(94, 42, 121, 0.8),
+          0 0 50px rgba(201, 160, 220, 0.4),
+          0 0 90px rgba(94, 42, 121, 0.2);
+      }
+      50% {
+        text-shadow:
+          0 0 30px rgba(94, 42, 121, 1),
+          0 0 70px rgba(201, 160, 220, 0.7),
+          0 0 120px rgba(94, 42, 121, 0.5);
+      }
+    }
+
+    @keyframes float1 {
+      0%   { transform: translateY(0px)   translateX(0px); }
+      25%  { transform: translateY(-28px) translateX(12px); }
+      50%  { transform: translateY(-14px) translateX(25px); }
+      75%  { transform: translateY(-36px) translateX(8px); }
+      100% { transform: translateY(0px)   translateX(0px); }
+    }
+    @keyframes float2 {
+      0%   { transform: translateY(0px)   translateX(0px); }
+      30%  { transform: translateY(-20px) translateX(-15px); }
+      60%  { transform: translateY(-40px) translateX(5px); }
+      100% { transform: translateY(0px)   translateX(0px); }
+    }
+    @keyframes float3 {
+      0%   { transform: translateY(0px)   translateX(0px); }
+      40%  { transform: translateY(-32px) translateX(18px); }
+      70%  { transform: translateY(-18px) translateX(-10px); }
+      100% { transform: translateY(0px)   translateX(0px); }
+    }
+    @keyframes float4 {
+      0%   { transform: translateY(0px)   translateX(0px); }
+      20%  { transform: translateY(-22px) translateX(-20px); }
+      55%  { transform: translateY(-45px) translateX(12px); }
+      80%  { transform: translateY(-30px) translateX(-5px); }
+      100% { transform: translateY(0px)   translateX(0px); }
+    }
+    @keyframes float5 {
+      0%   { transform: translateY(0px)   translateX(0px); }
+      35%  { transform: translateY(-38px) translateX(22px); }
+      65%  { transform: translateY(-20px) translateX(-8px); }
+      100% { transform: translateY(0px)   translateX(0px); }
+    }
+
+    /* ─── Layout ─────────────────────────────────────────────────── */
+
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'DM Sans', sans-serif;
+      background: linear-gradient(135deg, #0d0d1a 0%, #1a0d2e 50%, #0d0d1a 100%);
+      color: var(--color-text);
+      position: relative;
+      display: flex;
+      flex-direction: row;
+    }
+
+    /* ─── Bottom accent bar ──────────────────────────────────────── */
+
+    .bottom-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg,
+        transparent 5%,
+        var(--color-purple) 30%,
+        var(--color-gold) 50%,
+        var(--color-purple) 70%,
+        transparent 95%
+      );
+      z-index: 20;
+    }
+
+    /* ─── Particles ──────────────────────────────────────────────── */
+
+    .particle {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    /* Purple particles */
+    .particle--p1 {
+      width: 8px; height: 8px;
+      background: var(--color-purple);
+      box-shadow: 0 0 10px 3px rgba(94, 42, 121, 0.7);
+      top: 12%; left: 8%;
+      animation: float1 18s ease-in-out infinite;
+    }
+    .particle--p2 {
+      width: 6px; height: 6px;
+      background: var(--color-purple);
+      box-shadow: 0 0 8px 2px rgba(94, 42, 121, 0.6);
+      top: 68%; left: 14%;
+      animation: float3 22s ease-in-out infinite;
+      animation-delay: -4s;
+    }
+    .particle--p3 {
+      width: 10px; height: 10px;
+      background: var(--color-purple);
+      box-shadow: 0 0 14px 4px rgba(94, 42, 121, 0.65);
+      top: 35%; left: 55%;
+      animation: float2 26s ease-in-out infinite;
+      animation-delay: -8s;
+    }
+    .particle--p4 {
+      width: 7px; height: 7px;
+      background: var(--color-purple);
+      box-shadow: 0 0 10px 3px rgba(94, 42, 121, 0.6);
+      top: 82%; left: 38%;
+      animation: float4 20s ease-in-out infinite;
+      animation-delay: -12s;
+    }
+    .particle--p5 {
+      width: 5px; height: 5px;
+      background: var(--color-purple);
+      box-shadow: 0 0 7px 2px rgba(94, 42, 121, 0.55);
+      top: 22%; left: 70%;
+      animation: float5 17s ease-in-out infinite;
+      animation-delay: -3s;
+    }
+
+    /* Gold particles */
+    .particle--g1 {
+      width: 6px; height: 6px;
+      background: var(--color-gold);
+      box-shadow: 0 0 10px 3px rgba(242, 183, 5, 0.75);
+      top: 55%; left: 6%;
+      animation: float2 24s ease-in-out infinite;
+      animation-delay: -6s;
+    }
+    .particle--g2 {
+      width: 8px; height: 8px;
+      background: var(--color-gold);
+      box-shadow: 0 0 12px 3px rgba(242, 183, 5, 0.7);
+      top: 18%; left: 42%;
+      animation: float4 30s ease-in-out infinite;
+      animation-delay: -15s;
+    }
+    .particle--g3 {
+      width: 5px; height: 5px;
+      background: var(--color-gold);
+      box-shadow: 0 0 7px 2px rgba(242, 183, 5, 0.65);
+      top: 75%; left: 65%;
+      animation: float1 19s ease-in-out infinite;
+      animation-delay: -9s;
+    }
+    .particle--g4 {
+      width: 9px; height: 9px;
+      background: var(--color-gold);
+      box-shadow: 0 0 13px 4px rgba(242, 183, 5, 0.7);
+      top: 42%; left: 75%;
+      animation: float3 15s ease-in-out infinite;
+      animation-delay: -2s;
+    }
+    .particle--g5 {
+      width: 7px; height: 7px;
+      background: var(--color-gold);
+      box-shadow: 0 0 10px 3px rgba(242, 183, 5, 0.6);
+      top: 88%; left: 28%;
+      animation: float5 28s ease-in-out infinite;
+      animation-delay: -20s;
+    }
+
+    /* ─── LEFT: Clip Player Area ─────────────────────────────────── */
+
+    .clip-area {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 10;
+    }
+
+    .clip-container {
+      width: 90%;
+      aspect-ratio: 16 / 9;
+      background: #000000;
+      border: 2px solid var(--color-purple);
+      border-radius: 10px;
+      box-shadow: 0 0 40px rgba(94, 42, 121, 0.4);
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .clip-container iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    .clip-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      color: var(--color-text-muted);
+      text-align: center;
+    }
+
+    .clip-placeholder__icon {
+      width: 64px;
+      height: 64px;
+      border: 2px solid rgba(94, 42, 121, 0.5);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.6;
+    }
+
+    .clip-placeholder__icon svg {
+      width: 28px;
+      height: 28px;
+      fill: var(--color-purple-light);
+    }
+
+    .clip-placeholder__text {
+      font-size: 16px;
+      font-weight: 400;
+      letter-spacing: 2px;
+      opacity: 0.7;
+    }
+
+    /* ─── RIGHT: Sidebar ─────────────────────────────────────────── */
+
+    .sidebar {
+      width: 280px;
+      height: 100%;
+      background: rgba(13, 13, 26, 0.9);
+      border-left: 2px solid rgba(94, 42, 121, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      position: relative;
+      z-index: 10;
+      flex-shrink: 0;
+    }
+
+    .sidebar__content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      text-align: center;
+    }
+
+    .sidebar__brb {
+      font-size: 48px;
+      font-weight: 900;
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      color: var(--color-purple-light);
+      text-shadow:
+        0 0 20px rgba(94, 42, 121, 0.8),
+        0 0 50px rgba(201, 160, 220, 0.4),
+        0 0 90px rgba(94, 42, 121, 0.2);
+      animation: glowPulse 3s ease-in-out infinite;
+    }
+
+    .sidebar__divider {
+      width: 60px;
+      height: 3px;
+      margin: 24px 0 20px;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        var(--color-gold) 50%,
+        transparent 100%
+      );
+      border: none;
+      animation: pulse 3s ease-in-out infinite;
+    }
+
+    .sidebar__subtitle {
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      animation: fadeInUp 0.8s ease-out 0.5s both;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Bottom accent bar -->
+  <div class="bottom-bar"></div>
+
+  <!-- Floating particles – purple -->
+  <div class="particle particle--p1"></div>
+  <div class="particle particle--p2"></div>
+  <div class="particle particle--p3"></div>
+  <div class="particle particle--p4"></div>
+  <div class="particle particle--p5"></div>
+
+  <!-- Floating particles – gold -->
+  <div class="particle particle--g1"></div>
+  <div class="particle particle--g2"></div>
+  <div class="particle particle--g3"></div>
+  <div class="particle particle--g4"></div>
+  <div class="particle particle--g5"></div>
+
+  <!-- LEFT: Clip player area -->
+  <div class="clip-area">
+    <div class="clip-container" id="clipContainer">
+      <!-- Filled by JS: either an iframe or the placeholder -->
+      <div class="clip-placeholder" id="clipPlaceholder">
+        <div class="clip-placeholder__icon">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        </div>
+        <p class="clip-placeholder__text">Keine Clips verfügbar</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar__content">
+      <span class="sidebar__brb">BRB</span>
+      <div class="sidebar__divider"></div>
+      <p class="sidebar__subtitle">Bin gleich zurück</p>
+    </div>
+  </div>
+
+  <script>
+    /*
+     * HINWEIS: Twitch Embed funktioniert NICHT mit file://-URLs.
+     *
+     * Workarounds:
+     *  1. Datei über lokalen Server laden:
+     *       python3 -m http.server 8080
+     *     Dann in OBS Browser Source: http://localhost:8080/scenes/brb-pause.html
+     *
+     *  2. Streamer.bot kann einen lokalen HTTP-Server starten –
+     *     die Szene dann über diesen Server als URL einbinden.
+     *
+     *  3. Alternative: Direkte Video-URLs (.mp4 etc.) statt Twitch-Slugs
+     *     verwenden und per <video>-Element abspielen.
+     */
+
+    (function () {
+      // Ensure the page stays at exactly 1920×1080 regardless of OBS Browser Source scaling
+      const W = 1920;
+      const H = 1080;
+      document.documentElement.style.width  = W + 'px';
+      document.documentElement.style.height = H + 'px';
+      document.body.style.width  = W + 'px';
+      document.body.style.height = H + 'px';
+
+      // ── Clip Player ──────────────────────────────────────────────
+
+      const params   = new URLSearchParams(window.location.search);
+      const clipsSrc = params.get('clips');
+
+      if (!clipsSrc) {
+        // No clips param – placeholder is already shown by default
+        return;
+      }
+
+      // Parse clip slugs, remove blanks
+      const slugs = clipsSrc
+        .split(',')
+        .map(function (s) { return s.trim(); })
+        .filter(function (s) { return s.length > 0; });
+
+      if (slugs.length === 0) {
+        // Nothing usable – keep placeholder
+        return;
+      }
+
+      // Fisher-Yates shuffle
+      for (var i = slugs.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = slugs[i];
+        slugs[i] = slugs[j];
+        slugs[j] = tmp;
+      }
+
+      var currentIndex = 0;
+
+      function buildEmbedUrl(slug) {
+        return 'https://clips.twitch.tv/embed?clip=' + encodeURIComponent(slug)
+          + '&parent=localhost'
+          + '&autoplay=true'
+          + '&muted=false';
+      }
+
+      function loadClip(index) {
+        var slug = slugs[index % slugs.length];
+        var container = document.getElementById('clipContainer');
+
+        // Remove placeholder / previous iframe
+        container.innerHTML = '';
+
+        var iframe = document.createElement('iframe');
+        iframe.src = buildEmbedUrl(slug);
+        iframe.allow = 'autoplay; fullscreen';
+        iframe.allowFullscreen = true;
+
+        container.appendChild(iframe);
+      }
+
+      // Load first clip immediately
+      loadClip(currentIndex);
+
+      // Advance to next clip every 45 seconds
+      setInterval(function () {
+        currentIndex = (currentIndex + 1) % slugs.length;
+        loadClip(currentIndex);
+      }, 45000);
+
+    })();
+  </script>
+</body>
+</html>
