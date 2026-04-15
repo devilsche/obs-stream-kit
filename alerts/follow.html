@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Follow Alert</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: block;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --color-gold:       #f2b705;
+      --color-bg-dark:    #0d0d1a;
+      --color-bg-purple:  #1a0d2e;
+      --color-purple-glow: #5e2a79;
+      --color-text:       #ffffff;
+      --color-text-muted: #cccccc;
+    }
+
+    /* ─── Keyframes ─────────────────────────────────────────────── */
+
+    @keyframes bounceIn {
+      0%   { transform: scale(0);    opacity: 0; }
+      60%  { transform: scale(1.05); opacity: 1; }
+      80%  { transform: scale(0.95); }
+      100% { transform: scale(1);    opacity: 1; }
+    }
+
+    @keyframes bounceOut {
+      0%   { transform: scale(1); opacity: 1; }
+      100% { transform: scale(0); opacity: 0; }
+    }
+
+    @keyframes glowPulse {
+      0%, 100% {
+        box-shadow:
+          0 0 40px rgba(242, 183, 5, 0.2),
+          0 0 80px rgba(94, 42, 121, 0.15);
+      }
+      50% {
+        box-shadow:
+          0 0 60px rgba(242, 183, 5, 0.45),
+          0 0 120px rgba(94, 42, 121, 0.35);
+      }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    /* ─── Base ───────────────────────────────────────────────────── */
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    /* ─── Wrapper ────────────────────────────────────────────────── */
+
+    .wrapper {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ─── Alert Box ──────────────────────────────────────────────── */
+
+    .alert-box {
+      position: relative;
+      background: linear-gradient(135deg, rgba(13, 13, 26, 0.95), rgba(26, 13, 46, 0.95));
+      border: 2px solid rgba(242, 183, 5, 0.6);
+      border-radius: 14px;
+      padding: 32px 48px;
+      max-width: 50%;
+      text-align: center;
+
+      animation:
+        bounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+        bounceOut 0.4s ease-in 4s both;
+    }
+
+    .alert-box.pulsing {
+      animation:
+        bounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+        glowPulse 2s ease-in-out 0.6s infinite,
+        bounceOut 0.4s ease-in 4s both;
+    }
+
+    /* ─── Inner radial glow (::before) ──────────────────────────── */
+
+    .alert-box::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 12px;
+      background: radial-gradient(ellipse at center, rgba(242, 183, 5, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* ─── Gold corner accents ────────────────────────────────────── */
+
+    .alert-box::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 14px;
+      pointer-events: none;
+    }
+
+    .corner {
+      position: absolute;
+      background: var(--color-gold);
+    }
+
+    /* top-left */
+    .corner-tl-h { top: -2px;  left: -2px;  width: 20px; height: 2px; }
+    .corner-tl-v { top: -2px;  left: -2px;  width: 2px;  height: 20px; }
+
+    /* top-right */
+    .corner-tr-h { top: -2px;  right: -2px; width: 20px; height: 2px; }
+    .corner-tr-v { top: -2px;  right: -2px; width: 2px;  height: 20px; }
+
+    /* bottom-left */
+    .corner-bl-h { bottom: -2px; left: -2px;  width: 20px; height: 2px; }
+    .corner-bl-v { bottom: -2px; left: -2px;  width: 2px;  height: 20px; }
+
+    /* bottom-right */
+    .corner-br-h { bottom: -2px; right: -2px; width: 20px; height: 2px; }
+    .corner-br-v { bottom: -2px; right: -2px; width: 2px;  height: 20px; }
+
+    /* ─── Content ────────────────────────────────────────────────── */
+
+    .event-type {
+      font-size: 13px;
+      color: var(--color-gold);
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      text-shadow: 0 0 12px rgba(242, 183, 5, 0.7);
+      margin-bottom: 12px;
+    }
+
+    .username {
+      font-size: 36px;
+      font-weight: 900;
+      color: var(--color-text);
+      margin-bottom: 16px;
+      opacity: 0;
+      animation: fadeIn 0.4s ease 0.3s forwards;
+    }
+
+    .divider {
+      width: 80px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--color-gold), transparent);
+      margin: 0 auto 16px;
+    }
+
+    .alert-message {
+      font-size: 16px;
+      color: var(--color-text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="wrapper">
+    <div class="alert-box pulsing">
+      <!-- corner accents -->
+      <span class="corner corner-tl-h"></span>
+      <span class="corner corner-tl-v"></span>
+      <span class="corner corner-tr-h"></span>
+      <span class="corner corner-tr-v"></span>
+      <span class="corner corner-bl-h"></span>
+      <span class="corner corner-bl-v"></span>
+      <span class="corner corner-br-h"></span>
+      <span class="corner corner-br-v"></span>
+
+      <div class="event-type">New Follower</div>
+      <div class="username"></div>
+      <div class="divider"></div>
+      <div class="alert-message"></div>
+    </div>
+  </div>
+
+  <script>
+    const params   = new URLSearchParams(window.location.search);
+    const username = params.get('username') || 'Viewer';
+    const message  = params.get('message')  || 'Willkommen im Stream!';
+
+    document.querySelector('.username').textContent      = username;
+    document.querySelector('.alert-message').textContent = message;
+  </script>
+
+</body>
+</html>
