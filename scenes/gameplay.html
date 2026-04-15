@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Gameplay Overlay</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: swap;
+    }
+
+    :root {
+      --color-purple: #5e2a79;
+      --color-purple-light: #c9a0dc;
+      --color-gold: #f2b705;
+      --color-bg-dark: #0d0d1a;
+      --color-bg-purple: #1a0d2e;
+      --color-text: #ffffff;
+      --color-text-muted: #888888;
+    }
+
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'DM Sans', sans-serif;
+      background: transparent;
+    }
+
+    .cam-frame {
+      position: absolute;
+      bottom: 300px;
+      left: 10px;
+      width: 400px;
+      height: 225px;
+      border: 2px solid var(--color-purple);
+      border-radius: 6px;
+      box-shadow: 0 0 20px rgba(94, 42, 121, 0.4), 0 0 40px rgba(94, 42, 121, 0.15);
+      background: transparent;
+    }
+  </style>
+</head>
+<body>
+  <div class="cam-frame"></div>
+</body>
+</html>
