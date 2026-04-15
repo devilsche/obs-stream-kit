@@ -157,17 +157,34 @@
         next();
       }
 
+      function wobbleText(onDone) {
+        text.animate([
+          { transform: 'scale(1)' },
+          { transform: 'scale(1.08)' },
+          { transform: 'scale(0.97)' },
+          { transform: 'scale(1.04)' },
+          { transform: 'scale(0.99)' },
+          { transform: 'scale(1)' }
+        ], {
+          duration: 500,
+          easing: 'ease-in-out'
+        }).onfinish = onDone;
+      }
+
       function runLoop() {
         // Phase 1: Streifen diagonal aufbauen
         animateReveal(() => {
-          // Phase 2: Komplett sichtbar, 2s Pause
-          setTimeout(() => {
-            // Phase 3: Streifen diagonal abbauen
-            animateHide(() => {
-              // Phase 4: Pause, dann Loop
-              setTimeout(runLoop, PAUSE_S * 1000);
-            });
-          }, 2000);
+          // Phase 2: Text wobble wenn alle Streifen da sind
+          wobbleText(() => {
+            // Phase 3: Komplett sichtbar, 2s Pause
+            setTimeout(() => {
+              // Phase 4: Streifen diagonal abbauen
+              animateHide(() => {
+                // Phase 5: Pause, dann Loop
+                setTimeout(runLoop, PAUSE_S * 1000);
+              });
+            }, 2000);
+          });
         });
       }
 
