@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Stream Ending – LuCKoR_HD</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: block;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --color-purple:       #5e2a79;
+      --color-purple-light: #c9a0dc;
+      --color-gold:         #f2b705;
+      --color-bg-dark:      #0d0d1a;
+      --color-bg-purple:    #1a0d2e;
+      --color-text:         #ffffff;
+      --color-text-muted:   #888888;
+    }
+
+    /* ─── Keyframes ─────────────────────────────────────────────── */
+
+    @keyframes fadeIn {
+      0%   { opacity: 0; }
+      100% { opacity: 1; }
+    }
+
+    @keyframes fadeInUp {
+      0%   { opacity: 0; transform: translateY(10px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulse {
+      0%   { opacity: 0.7; }
+      50%  { opacity: 1; }
+      100% { opacity: 0.7; }
+    }
+
+    @keyframes glowPulse {
+      0%, 100% { text-shadow: 0 0 30px rgba(242, 183, 5, 0.4); }
+      50%       { text-shadow: 0 0 50px rgba(242, 183, 5, 0.6), 0 0 80px rgba(242, 183, 5, 0.3); }
+    }
+
+    @keyframes floatDown {
+      0%   { transform: translateY(0px)   translateX(0px); }
+      25%  { transform: translateY(28px)  translateX(10px); }
+      50%  { transform: translateY(55px)  translateX(-8px); }
+      75%  { transform: translateY(38px)  translateX(15px); }
+      100% { transform: translateY(0px)   translateX(0px); }
+    }
+    @keyframes floatDown2 {
+      0%   { transform: translateY(0px)   translateX(0px); }
+      30%  { transform: translateY(22px)  translateX(-12px); }
+      60%  { transform: translateY(48px)  translateX(6px); }
+      100% { transform: translateY(0px)   translateX(0px); }
+    }
+    @keyframes floatDown3 {
+      0%   { transform: translateY(0px)   translateX(0px); }
+      40%  { transform: translateY(35px)  translateX(20px); }
+      70%  { transform: translateY(60px)  translateX(-10px); }
+      100% { transform: translateY(0px)   translateX(0px); }
+    }
+    @keyframes floatDown4 {
+      0%   { transform: translateY(0px)   translateX(0px); }
+      20%  { transform: translateY(18px)  translateX(-18px); }
+      55%  { transform: translateY(44px)  translateX(10px); }
+      80%  { transform: translateY(30px)  translateX(-6px); }
+      100% { transform: translateY(0px)   translateX(0px); }
+    }
+    @keyframes floatDown5 {
+      0%   { transform: translateY(0px)   translateX(0px); }
+      35%  { transform: translateY(40px)  translateX(24px); }
+      65%  { transform: translateY(20px)  translateX(-8px); }
+      100% { transform: translateY(0px)   translateX(0px); }
+    }
+
+    /* ─── Layout ─────────────────────────────────────────────────── */
+
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'DM Sans', sans-serif;
+      background: linear-gradient(135deg, #0d0d1a 0%, #1a0d2e 50%, #0d0d1a 100%);
+      color: var(--color-text);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ─── Geometric accent lines ─────────────────────────────────── */
+
+    .accent-line {
+      position: absolute;
+      height: 1px;
+      width: 100%;
+      pointer-events: none;
+    }
+    .accent-line--top {
+      top: 180px;
+      background: linear-gradient(90deg, transparent 0%, var(--color-purple) 30%, var(--color-gold) 50%, var(--color-purple) 70%, transparent 100%);
+      opacity: 0.35;
+    }
+    .accent-line--mid {
+      top: 50%;
+      transform: translateY(-50%) scaleX(0.6);
+      background: linear-gradient(90deg, transparent 0%, var(--color-purple-light) 40%, var(--color-purple-light) 60%, transparent 100%);
+      opacity: 0.3;
+    }
+    .accent-line--bottom-inner {
+      bottom: 220px;
+      background: linear-gradient(90deg, transparent 0%, var(--color-gold) 35%, var(--color-purple) 65%, transparent 100%);
+      opacity: 0.4;
+    }
+
+    /* ─── Bottom accent bar ──────────────────────────────────────── */
+
+    .bottom-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg,
+        transparent 5%,
+        var(--color-purple) 30%,
+        var(--color-gold) 50%,
+        var(--color-purple) 70%,
+        transparent 95%
+      );
+    }
+
+    /* ─── Particles ──────────────────────────────────────────────── */
+
+    .particle {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    /* Purple particles */
+    .particle--p1 {
+      width: 8px; height: 8px;
+      background: var(--color-purple);
+      box-shadow: 0 0 10px 3px rgba(94, 42, 121, 0.7);
+      top: 12%; left: 8%;
+      animation: floatDown 28s ease-in-out infinite;
+    }
+    .particle--p2 {
+      width: 6px; height: 6px;
+      background: var(--color-purple);
+      box-shadow: 0 0 8px 2px rgba(94, 42, 121, 0.6);
+      top: 68%; left: 14%;
+      animation: floatDown3 32s ease-in-out infinite;
+      animation-delay: -4s;
+    }
+    .particle--p3 {
+      width: 10px; height: 10px;
+      background: var(--color-purple);
+      box-shadow: 0 0 14px 4px rgba(94, 42, 121, 0.65);
+      top: 35%; left: 78%;
+      animation: floatDown2 36s ease-in-out infinite;
+      animation-delay: -8s;
+    }
+    .particle--p4 {
+      width: 7px; height: 7px;
+      background: var(--color-purple);
+      box-shadow: 0 0 10px 3px rgba(94, 42, 121, 0.6);
+      top: 22%; left: 55%;
+      animation: floatDown4 30s ease-in-out infinite;
+      animation-delay: -12s;
+    }
+    .particle--p5 {
+      width: 5px; height: 5px;
+      background: var(--color-purple);
+      box-shadow: 0 0 7px 2px rgba(94, 42, 121, 0.55);
+      top: 55%; left: 88%;
+      animation: floatDown5 27s ease-in-out infinite;
+      animation-delay: -3s;
+    }
+
+    /* Gold particles */
+    .particle--g1 {
+      width: 6px; height: 6px;
+      background: var(--color-gold);
+      box-shadow: 0 0 10px 3px rgba(242, 183, 5, 0.75);
+      top: 18%; left: 6%;
+      animation: floatDown2 34s ease-in-out infinite;
+      animation-delay: -6s;
+    }
+    .particle--g2 {
+      width: 8px; height: 8px;
+      background: var(--color-gold);
+      box-shadow: 0 0 12px 3px rgba(242, 183, 5, 0.7);
+      top: 8%; left: 48%;
+      animation: floatDown4 40s ease-in-out infinite;
+      animation-delay: -15s;
+    }
+    .particle--g3 {
+      width: 5px; height: 5px;
+      background: var(--color-gold);
+      box-shadow: 0 0 7px 2px rgba(242, 183, 5, 0.65);
+      top: 42%; left: 85%;
+      animation: floatDown 29s ease-in-out infinite;
+      animation-delay: -9s;
+    }
+    .particle--g4 {
+      width: 9px; height: 9px;
+      background: var(--color-gold);
+      box-shadow: 0 0 13px 4px rgba(242, 183, 5, 0.7);
+      top: 15%; left: 92%;
+      animation: floatDown3 25s ease-in-out infinite;
+      animation-delay: -2s;
+    }
+    .particle--g5 {
+      width: 7px; height: 7px;
+      background: var(--color-gold);
+      box-shadow: 0 0 10px 3px rgba(242, 183, 5, 0.6);
+      top: 60%; left: 28%;
+      animation: floatDown5 38s ease-in-out infinite;
+      animation-delay: -20s;
+    }
+
+    /* ─── Main content ───────────────────────────────────────────── */
+
+    .content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      position: relative;
+      z-index: 10;
+      text-align: center;
+    }
+
+    .title-danke {
+      font-size: 48px;
+      font-weight: 900;
+      letter-spacing: 12px;
+      text-transform: uppercase;
+      color: var(--color-text);
+      line-height: 1.2;
+      animation: fadeIn 2s ease-out both;
+    }
+
+    .title-zuschauen {
+      font-size: 48px;
+      font-weight: 900;
+      letter-spacing: 12px;
+      text-transform: uppercase;
+      color: var(--color-gold);
+      line-height: 1.2;
+      animation: fadeIn 2s ease-out both, glowPulse 3s ease-in-out 2s infinite;
+    }
+
+    .divider {
+      width: 180px;
+      height: 3px;
+      margin: 28px 0 24px;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        var(--color-gold) 50%,
+        transparent 100%
+      );
+      border: none;
+      animation: pulse 3s ease-in-out infinite;
+    }
+
+    .subtitle {
+      font-size: 18px;
+      font-weight: 400;
+      letter-spacing: 5px;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      animation: fadeInUp 0.8s ease-out 0.5s both;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Geometric accent lines -->
+  <div class="accent-line accent-line--top"></div>
+  <div class="accent-line accent-line--mid"></div>
+  <div class="accent-line accent-line--bottom-inner"></div>
+
+  <!-- Bottom accent bar -->
+  <div class="bottom-bar"></div>
+
+  <!-- Floating particles – purple -->
+  <div class="particle particle--p1"></div>
+  <div class="particle particle--p2"></div>
+  <div class="particle particle--p3"></div>
+  <div class="particle particle--p4"></div>
+  <div class="particle particle--p5"></div>
+
+  <!-- Floating particles – gold -->
+  <div class="particle particle--g1"></div>
+  <div class="particle particle--g2"></div>
+  <div class="particle particle--g3"></div>
+  <div class="particle particle--g4"></div>
+  <div class="particle particle--g5"></div>
+
+  <!-- Main content -->
+  <div class="content">
+    <h1 class="title-danke">Danke fürs</h1>
+    <h1 class="title-zuschauen">Zuschauen</h1>
+    <div class="divider"></div>
+    <p class="subtitle">Bis zum nächsten Mal</p>
+  </div>
+
+  <script>
+    // Ensure the page stays at exactly 1920×1080 regardless of OBS Browser Source scaling
+    (function () {
+      const W = 1920;
+      const H = 1080;
+      document.documentElement.style.width  = W + 'px';
+      document.documentElement.style.height = H + 'px';
+      document.body.style.width  = W + 'px';
+      document.body.style.height = H + 'px';
+    })();
+  </script>
+</body>
+</html>
