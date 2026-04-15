@@ -95,20 +95,51 @@
       position: relative;
     }
 
-    /* Hintergrund mit Loch für die Kamera */
+    /* Hintergrund-Gradient als Pseudo auf einem Container,
+       mit clip-path Loch für die Kamera.
+       Cam: left 58px (3.02%), top 54px (5%), Breite 972px (50.625%), Höhe 972px (90%) */
     .bg {
       position: absolute;
       inset: 0;
-      background: linear-gradient(135deg, #0d0d1a 0%, #1a0d2e 50%, #0d0d1a 100%);
       z-index: 0;
-      /* SVG-Maske: weiß = sichtbar, schwarz = Cam-Loch (transparent) */
-      /* Cam: left 58px, top 54px, 972x972px (1:1, 90% Höhe), border-radius 10px */
-      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1920' height='1080'%3E%3Crect width='1920' height='1080' fill='white'/%3E%3Crect x='58' y='54' width='972' height='972' rx='10' fill='black'/%3E%3C/svg%3E");
-      -webkit-mask-size: 100% 100%;
-      -webkit-mask-repeat: no-repeat;
-      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1920' height='1080'%3E%3Crect width='1920' height='1080' fill='white'/%3E%3Crect x='58' y='54' width='972' height='972' rx='10' fill='black'/%3E%3C/svg%3E");
-      mask-size: 100% 100%;
-      mask-repeat: no-repeat;
+    }
+
+    /* Oberer Streifen: volle Breite, über dem Cam-Loch */
+    .bg-top {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 54px; /* 5% von 1080 */
+      background: linear-gradient(135deg, #0d0d1a 0%, #1a0d2e 50%, #0d0d1a 100%);
+    }
+
+    /* Unterer Streifen: volle Breite, unter dem Cam-Loch */
+    .bg-bottom {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 54px; /* 5% von 1080 */
+      background: linear-gradient(135deg, #0d0d1a 0%, #1a0d2e 50%, #0d0d1a 100%);
+      background-position: 0 -1026px; /* Gradient fortsetzen */
+    }
+
+    /* Links vom Cam-Loch: schmaler Streifen */
+    .bg-cam-left {
+      position: absolute;
+      top: 54px; left: 0;
+      width: 58px; /* 3% von 1920 */
+      height: 972px; /* 90% von 1080 */
+      background: linear-gradient(135deg, #0d0d1a 0%, #1a0d2e 50%, #0d0d1a 100%);
+      background-position: 0 -54px;
+    }
+
+    /* Rechts vom Cam-Loch: der große Bereich (Chat + Rest) */
+    .bg-right {
+      position: absolute;
+      top: 54px;
+      left: 1030px; /* 58px + 972px */
+      right: 0;
+      height: 972px;
+      background: linear-gradient(135deg, #0d0d1a 0%, #1a0d2e 50%, #0d0d1a 100%);
+      background-position: -1030px -54px; /* Gradient nahtlos fortsetzen */
     }
 
     /* ─── Animated border edges ──────────────────────────────────── */
@@ -414,8 +445,13 @@
 </head>
 <body>
 
-  <!-- Background mit Cam-Ausschnitt (Loch für Kamera dahinter) -->
-  <div class="bg"></div>
+  <!-- Background mit Cam-Ausschnitt (4 Teile um das Loch herum) -->
+  <div class="bg">
+    <div class="bg-top"></div>
+    <div class="bg-bottom"></div>
+    <div class="bg-cam-left"></div>
+    <div class="bg-right"></div>
+  </div>
 
   <!-- Animated border edges -->
   <div class="border-top"></div>
