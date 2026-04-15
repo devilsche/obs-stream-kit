@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Just Chatting – LuCKoR_HD</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: block;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --color-purple:     #5e2a79;
+      --color-gold:       #f2b705;
+      --color-bg-dark:    #0d0d1a;
+      --color-bg-purple:  #1a0d2e;
+      --color-text:       #ffffff;
+      --color-text-muted: #888888;
+    }
+
+    /* ─── Keyframes ─────────────────────────────────────────────── */
+
+    @keyframes borderSlide {
+      0%   { background-position: 0% 50%; }
+      100% { background-position: 200% 50%; }
+    }
+
+    @keyframes borderSlideReverse {
+      0%   { background-position: 200% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    @keyframes borderSlideV {
+      0%   { background-position: 50% 0%; }
+      100% { background-position: 50% 200%; }
+    }
+
+    @keyframes borderSlideVReverse {
+      0%   { background-position: 50% 200%; }
+      100% { background-position: 50% 0%; }
+    }
+
+    @keyframes float1 {
+      0%   { transform: translateY(0px)   translateX(0px); }
+      25%  { transform: translateY(-28px) translateX(12px); }
+      50%  { transform: translateY(-14px) translateX(25px); }
+      75%  { transform: translateY(-36px) translateX(8px); }
+      100% { transform: translateY(0px)   translateX(0px); }
+    }
+    @keyframes float2 {
+      0%   { transform: translateY(0px)   translateX(0px); }
+      30%  { transform: translateY(-20px) translateX(-15px); }
+      60%  { transform: translateY(-40px) translateX(5px); }
+      100% { transform: translateY(0px)   translateX(0px); }
+    }
+    @keyframes float3 {
+      0%   { transform: translateY(0px)   translateX(0px); }
+      40%  { transform: translateY(-32px) translateX(18px); }
+      70%  { transform: translateY(-18px) translateX(-10px); }
+      100% { transform: translateY(0px)   translateX(0px); }
+    }
+    @keyframes float4 {
+      0%   { transform: translateY(0px)   translateX(0px); }
+      20%  { transform: translateY(-22px) translateX(-20px); }
+      55%  { transform: translateY(-45px) translateX(12px); }
+      80%  { transform: translateY(-30px) translateX(-5px); }
+      100% { transform: translateY(0px)   translateX(0px); }
+    }
+    @keyframes float5 {
+      0%   { transform: translateY(0px)   translateX(0px); }
+      35%  { transform: translateY(-38px) translateX(22px); }
+      65%  { transform: translateY(-20px) translateX(-8px); }
+      100% { transform: translateY(0px)   translateX(0px); }
+    }
+
+    /* ─── Layout ─────────────────────────────────────────────────── */
+
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'DM Sans', sans-serif;
+      background: linear-gradient(135deg, #0d0d1a 0%, #1a0d2e 50%, #0d0d1a 100%);
+      color: var(--color-text);
+      position: relative;
+    }
+
+    /* ─── Animated border edges ──────────────────────────────────── */
+
+    .border-top,
+    .border-bottom,
+    .border-left,
+    .border-right {
+      position: absolute;
+      z-index: 11;
+      pointer-events: none;
+    }
+
+    .border-top {
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(
+        90deg,
+        #5e2a79, #f2b705, #5e2a79, #f2b705, #5e2a79
+      );
+      background-size: 200% 100%;
+      animation: borderSlide 4s linear infinite;
+    }
+
+    .border-bottom {
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(
+        90deg,
+        #f2b705, #5e2a79, #f2b705, #5e2a79, #f2b705
+      );
+      background-size: 200% 100%;
+      animation: borderSlideReverse 4s linear infinite;
+    }
+
+    .border-left {
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 3px;
+      background: linear-gradient(
+        180deg,
+        #5e2a79, #f2b705, #5e2a79, #f2b705, #5e2a79
+      );
+      background-size: 100% 200%;
+      animation: borderSlideV 4s linear infinite;
+    }
+
+    .border-right {
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 3px;
+      background: linear-gradient(
+        180deg,
+        #f2b705, #5e2a79, #f2b705, #5e2a79, #f2b705
+      );
+      background-size: 100% 200%;
+      animation: borderSlideVReverse 4s linear infinite;
+    }
+
+    /* ─── Cam cutout ─────────────────────────────────────────────── */
+
+    .cam-frame {
+      position: absolute;
+      top: 5%;
+      left: 3%;
+      height: 90%;
+      aspect-ratio: 1 / 1;
+      border: 2px solid rgba(94, 42, 121, 0.6);
+      border-radius: 10px;
+      box-shadow: 0 0 25px rgba(94, 42, 121, 0.3);
+      background: transparent;
+      z-index: 5;
+    }
+
+    /* Gold corner accents */
+    .cam-frame::before,
+    .cam-frame::after {
+      content: '';
+      position: absolute;
+      background: #f2b705;
+    }
+
+    /* top-left horizontal + vertical via pseudo + sibling divs */
+    .cam-frame .corner-tl-h {
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      width: 30px;
+      height: 2px;
+      background: #f2b705;
+      border-radius: 1px;
+    }
+    .cam-frame .corner-tl-v {
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      width: 2px;
+      height: 30px;
+      background: #f2b705;
+      border-radius: 1px;
+    }
+    .cam-frame .corner-tr-h {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 30px;
+      height: 2px;
+      background: #f2b705;
+      border-radius: 1px;
+    }
+    .cam-frame .corner-tr-v {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 2px;
+      height: 30px;
+      background: #f2b705;
+      border-radius: 1px;
+    }
+    .cam-frame .corner-bl-h {
+      position: absolute;
+      bottom: -2px;
+      left: -2px;
+      width: 30px;
+      height: 2px;
+      background: #f2b705;
+      border-radius: 1px;
+    }
+    .cam-frame .corner-bl-v {
+      position: absolute;
+      bottom: -2px;
+      left: -2px;
+      width: 2px;
+      height: 30px;
+      background: #f2b705;
+      border-radius: 1px;
+    }
+    .cam-frame .corner-br-h {
+      position: absolute;
+      bottom: -2px;
+      right: -2px;
+      width: 30px;
+      height: 2px;
+      background: #f2b705;
+      border-radius: 1px;
+    }
+    .cam-frame .corner-br-v {
+      position: absolute;
+      bottom: -2px;
+      right: -2px;
+      width: 2px;
+      height: 30px;
+      background: #f2b705;
+      border-radius: 1px;
+    }
+
+    /* ─── Chat area ──────────────────────────────────────────────── */
+
+    .chat-area {
+      position: absolute;
+      top: 5%;
+      right: 3%;
+      width: 38%;
+      bottom: 5%;
+      border-radius: 10px;
+      border: 1px solid rgba(242, 183, 5, 0.3);
+      box-shadow: 0 0 30px rgba(242, 183, 5, 0.1), inset 0 0 30px rgba(242, 183, 5, 0.05);
+      background:
+        linear-gradient(135deg, rgba(242, 183, 5, 0.25), rgba(242, 183, 5, 0.15) 50%, rgba(242, 183, 5, 0.05)),
+        radial-gradient(ellipse at center, rgba(242, 183, 5, 0.2), rgba(242, 183, 5, 0.08) 50%, transparent 80%);
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(242, 183, 5, 0.2);
+      flex-shrink: 0;
+    }
+
+    .chat-header-label {
+      font-size: 14px;
+      font-weight: 700;
+      color: #f2b705;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      text-shadow: 0 0 10px rgba(242, 183, 5, 0.5), 0 0 20px rgba(242, 183, 5, 0.2);
+    }
+
+    .chat-body {
+      flex: 1;
+      /* Chat widget placed on top by OBS — this area is just placeholder space */
+    }
+
+    /* ─── Geometric accent lines ─────────────────────────────────── */
+
+    .accent-line {
+      position: absolute;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .accent-line--1 {
+      bottom: 18%;
+      left: 8%;
+      width: 200px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #5e2a79, transparent);
+      opacity: 0.35;
+    }
+
+    .accent-line--2 {
+      top: 45%;
+      left: 55%;
+      width: 120px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #f2b705, transparent);
+      opacity: 0.2;
+      transform: rotate(-15deg);
+    }
+
+    .accent-line--3 {
+      top: 22%;
+      left: 50%;
+      width: 80px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #5e2a79, transparent);
+      opacity: 0.25;
+    }
+
+    /* ─── Particles ──────────────────────────────────────────────── */
+
+    .particle {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .particle--g1 {
+      width: 7px; height: 7px;
+      background: #f2b705;
+      box-shadow: 0 0 14px 3px rgba(242, 183, 5, 0.7);
+      top: 8%; left: 15%;
+      animation: float1 20s ease-in-out infinite;
+    }
+    .particle--p1 {
+      width: 8px; height: 8px;
+      background: #5e2a79;
+      box-shadow: 0 0 18px 4px rgba(94, 42, 121, 0.65);
+      top: 30%; left: 62%;
+      animation: float2 25s ease-in-out infinite;
+      animation-delay: -7s;
+    }
+    .particle--g2 {
+      width: 5px; height: 5px;
+      background: #f2b705;
+      box-shadow: 0 0 10px 2px rgba(242, 183, 5, 0.6);
+      top: 75%; left: 20%;
+      animation: float3 18s ease-in-out infinite;
+      animation-delay: -3s;
+    }
+    .particle--p2 {
+      width: 6px; height: 6px;
+      background: #5e2a79;
+      box-shadow: 0 0 14px 3px rgba(94, 42, 121, 0.6);
+      top: 55%; left: 80%;
+      animation: float4 28s ease-in-out infinite;
+      animation-delay: -12s;
+    }
+    .particle--g3 {
+      width: 5px; height: 5px;
+      background: #f2b705;
+      box-shadow: 0 0 10px 2px rgba(242, 183, 5, 0.55);
+      top: 90%; left: 50%;
+      animation: float5 15s ease-in-out infinite;
+      animation-delay: -5s;
+    }
+    .particle--p3 {
+      width: 7px; height: 7px;
+      background: #5e2a79;
+      box-shadow: 0 0 16px 3px rgba(94, 42, 121, 0.6);
+      top: 18%; left: 45%;
+      animation: float1 30s ease-in-out infinite;
+      animation-delay: -18s;
+    }
+    .particle--g4 {
+      width: 6px; height: 6px;
+      background: #f2b705;
+      box-shadow: 0 0 12px 3px rgba(242, 183, 5, 0.6);
+      top: 65%; left: 38%;
+      animation: float3 22s ease-in-out infinite;
+      animation-delay: -9s;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Animated border edges -->
+  <div class="border-top"></div>
+  <div class="border-bottom"></div>
+  <div class="border-left"></div>
+  <div class="border-right"></div>
+
+  <!-- Geometric accent lines -->
+  <div class="accent-line accent-line--1"></div>
+  <div class="accent-line accent-line--2"></div>
+  <div class="accent-line accent-line--3"></div>
+
+  <!-- Cam cutout (transparent — camera sits behind in OBS) -->
+  <div class="cam-frame">
+    <div class="corner-tl-h"></div>
+    <div class="corner-tl-v"></div>
+    <div class="corner-tr-h"></div>
+    <div class="corner-tr-v"></div>
+    <div class="corner-bl-h"></div>
+    <div class="corner-bl-v"></div>
+    <div class="corner-br-h"></div>
+    <div class="corner-br-v"></div>
+  </div>
+
+  <!-- Chat area -->
+  <div class="chat-area">
+    <div class="chat-header">
+      <div class="chat-header-label">Chat</div>
+    </div>
+    <div class="chat-body"></div>
+  </div>
+
+  <!-- Floating particles (z-index 10, over everything including cam) -->
+  <div class="particle particle--g1"></div>
+  <div class="particle particle--p1"></div>
+  <div class="particle particle--g2"></div>
+  <div class="particle particle--p2"></div>
+  <div class="particle particle--g3"></div>
+  <div class="particle particle--p3"></div>
+  <div class="particle particle--g4"></div>
+
+  <script>
+    // Ensure the page stays at exactly 1920×1080 regardless of OBS Browser Source scaling
+    (function () {
+      var W = 1920;
+      var H = 1080;
+      document.documentElement.style.width  = W + 'px';
+      document.documentElement.style.height = H + 'px';
+      document.body.style.width  = W + 'px';
+      document.body.style.height = H + 'px';
+    })();
+  </script>
+</body>
+</html>
