@@ -30,16 +30,16 @@
       background: url('../assets/Chrome_Streifen.png') no-repeat center center;
       background-size: contain;
       filter: hue-rotate(320deg) saturate(1.8) brightness(0.8);
-      clip-path: polygon(0 0, 0 0, 0 100%, 0 100%);
+      clip-path: polygon(0 100%, 0 0, 0 0, 0 100%);
     }
 
+    /* Text bleibt IMMER sichtbar */
     .text {
       position: absolute;
       inset: 0;
       background: url('../assets/Chrome_Text.png') no-repeat center center;
       background-size: contain;
       z-index: 2;
-      opacity: 0;
     }
   </style>
 </head>
@@ -52,13 +52,11 @@
   <script>
     /*
       Logo-Animation Loop:
-      1. Streifen bauen sich von links auf (7 Steps, ~1.4s)
-      2. Text faded ein (0.6s)
-      3. Komplett sichtbar (Pause)
-      4. Streifen lösen sich nach rechts auf (7 Steps, ~1.4s)
-      5. Text faded aus (0.3s)
-      6. 10s Pause
-      7. → Zurück zu 1
+      1. Streifen bauen sich diagonal auf (passend zum Streifen-Winkel)
+      2. Komplett sichtbar (2s Pause)
+      3. Streifen lösen sich diagonal auf
+      4. 10s Pause (Text bleibt immer sichtbar!)
+      5. → Loop
 
       URL-Parameter:
         ?width=400   — Logo-Breite in px (default: 400)
@@ -76,83 +74,99 @@
         const height = Math.round(width * ratio);
         document.body.style.width = width + 'px';
         document.body.style.height = height + 'px';
-        document.querySelector('.logo-container').style.width = width + 'px';
-        document.querySelector('.logo-container').style.height = height + 'px';
+        const c = document.querySelector('.logo-container');
+        c.style.width = width + 'px';
+        c.style.height = height + 'px';
       }
 
       const stripes = document.querySelector('.stripes');
-      const text = document.querySelector('.text');
 
-      // 7 Streifen-Positionen (diagonal, von links nach rechts aufdeckend)
-      const clipSteps = [
-        'polygon(0 0, 0 0, 0 100%, 0 100%)',           // unsichtbar
-        'polygon(0 0, 18% 0, 8% 100%, 0 100%)',         // Streifen 1
-        'polygon(0 0, 30% 0, 20% 100%, 0 100%)',        // + Streifen 2
-        'polygon(0 0, 42% 0, 32% 100%, 0 100%)',        // + Streifen 3
-        'polygon(0 0, 55% 0, 45% 100%, 0 100%)',        // + Streifen 4
-        'polygon(0 0, 68% 0, 58% 100%, 0 100%)',        // + Streifen 5
-        'polygon(0 0, 80% 0, 70% 100%, 0 100%)',        // + Streifen 6
-        'polygon(0 0, 100% 0, 100% 100%, 0 100%)',      // alle da
+      /*
+        Die Streifen sind diagonal (~65°).
+        clip-path schneidet mit diagonaler Kante, passend zum Winkel.
+
+        Aufbau: Rechte Kante ist diagonal (oben weiter rechts als unten).
+        polygon(links-unten, links-oben, rechts-oben, rechts-unten)
+        → polygon(0 100%, 0 0, topRight 0, bottomRight 100%)
+
+        Abbau: Linke Kante ist diagonal (oben weiter rechts als unten).
+        → polygon(bottomLeft 100%, topLeft 0, 100% 0, 100% 100%)
+      */
+
+      // Aufbau: von links nach rechts, diagonale rechte Kante
+      // Jeder Step: [topRight%, bottomRight%]
+      const revealEdges = [
+        [0,   0  ],  // unsichtbar
+        [18,  8  ],  // Streifen 1
+        [30,  20 ],  // + Streifen 2
+        [42,  32 ],  // + Streifen 3
+        [55,  45 ],  // + Streifen 4
+        [68,  58 ],  // + Streifen 5
+        [80,  70 ],  // + Streifen 6
+        [100, 100],  // alle da
       ];
 
-      // Abbau nach rechts: von links her abschneiden
-      const hideSteps = [
-        'polygon(0 0, 100% 0, 100% 100%, 0 100%)',      // alle da
-        'polygon(20% 0, 100% 0, 100% 100%, 10% 100%)',  // Streifen 1 weg
-        'polygon(32% 0, 100% 0, 100% 100%, 22% 100%)',  // + Streifen 2 weg
-        'polygon(45% 0, 100% 0, 100% 100%, 35% 100%)',  // + Streifen 3 weg
-        'polygon(58% 0, 100% 0, 100% 100%, 48% 100%)',  // + Streifen 4 weg
-        'polygon(70% 0, 100% 0, 100% 100%, 60% 100%)',  // + Streifen 5 weg
-        'polygon(82% 0, 100% 0, 100% 100%, 72% 100%)',  // + Streifen 6 weg
-        'polygon(100% 0, 100% 0, 100% 100%, 100% 100%)',// alles weg
+      // Abbau: von links verschwindend, diagonale linke Kante
+      // Jeder Step: [topLeft%, bottomLeft%]
+      const hideEdges = [
+        [0,   0  ],  // alle da
+        [20,  10 ],  // Streifen 1 weg
+        [32,  22 ],  // + Streifen 2 weg
+        [45,  35 ],  // + Streifen 3 weg
+        [58,  48 ],  // + Streifen 4 weg
+        [70,  60 ],  // + Streifen 5 weg
+        [82,  72 ],  // + Streifen 6 weg
+        [100, 100],  // alles weg
       ];
 
-      function animateSteps(steps, onDone) {
+      function setReveal(step) {
+        const [tr, br] = revealEdges[step];
+        stripes.style.clipPath =
+          `polygon(0 100%, 0 0, ${tr}% 0, ${br}% 100%)`;
+      }
+
+      function setHide(step) {
+        const [tl, bl] = hideEdges[step];
+        stripes.style.clipPath =
+          `polygon(${bl}% 100%, ${tl}% 0, 100% 0, 100% 100%)`;
+      }
+
+      function animateReveal(onDone) {
         let i = 0;
         function next() {
-          if (i >= steps.length) { onDone(); return; }
-          stripes.style.clipPath = steps[i];
+          if (i >= revealEdges.length) { onDone(); return; }
+          setReveal(i);
           i++;
           setTimeout(next, STEP_MS);
         }
         next();
       }
 
-      function fadeText(show, duration, onDone) {
-        text.style.transition = `opacity ${duration}ms ease-out, transform ${duration}ms ease-out`;
-        if (show) {
-          text.style.opacity = '1';
-          text.style.transform = 'scale(1)';
-        } else {
-          text.style.opacity = '0';
-          text.style.transform = 'scale(0.95)';
+      function animateHide(onDone) {
+        let i = 0;
+        function next() {
+          if (i >= hideEdges.length) { onDone(); return; }
+          setHide(i);
+          i++;
+          setTimeout(next, STEP_MS);
         }
-        setTimeout(onDone, duration);
+        next();
       }
 
       function runLoop() {
-        // Phase 1: Streifen aufbauen
-        animateSteps(clipSteps, () => {
-          // Phase 2: Text einblenden
-          fadeText(true, 600, () => {
-            // Phase 3: Pause (komplett sichtbar)
-            setTimeout(() => {
-              // Phase 4: Text ausblenden
-              fadeText(false, 300, () => {
-                // Phase 5: Streifen abbauen nach rechts
-                animateSteps(hideSteps, () => {
-                  // Phase 6: Pause, dann Loop
-                  setTimeout(runLoop, PAUSE_S * 1000);
-                });
-              });
-            }, 2000); // 2s komplett sichtbar bevor Abbau startet
-          });
+        // Phase 1: Streifen diagonal aufbauen
+        animateReveal(() => {
+          // Phase 2: Komplett sichtbar, 2s Pause
+          setTimeout(() => {
+            // Phase 3: Streifen diagonal abbauen
+            animateHide(() => {
+              // Phase 4: Pause, dann Loop
+              setTimeout(runLoop, PAUSE_S * 1000);
+            });
+          }, 2000);
         });
       }
 
-      // Start
-      text.style.opacity = '0';
-      text.style.transform = 'scale(0.95)';
       runLoop();
     })();
   </script>
