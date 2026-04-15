@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Stinger Transition</title>
+  <!-- <audio id="sfx" src="../assets/stinger-whoosh.mp3" preload="auto"></audio> -->
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: block;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --color-gold:   #f2b705;
+      --color-purple: #5e2a79;
+      --color-dark:   #0d0d1a;
+    }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    /* ─── Stinger wrapper ──────────────────────────────────────────── */
+
+    .stinger {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    /* ─── Background ───────────────────────────────────────────────── */
+
+    .stinger-bg {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        ellipse at center,
+        rgba(242, 183, 5, 0.9),
+        rgba(94, 42, 121, 0.95) 40%,
+        rgba(13, 13, 26, 1) 70%
+      );
+      opacity: 0;
+      transform: scale(0.2);
+      animation: bgExpand 1000ms linear forwards;
+    }
+
+    @keyframes bgExpand {
+      /*  0ms  */ 0%   { opacity: 0;    transform: scale(0.2); }
+      /* 150ms */ 15%  { opacity: 0;    transform: scale(0.5); }
+      /* 350ms */ 35%  { opacity: 1;    transform: scale(1);   }
+      /* 500ms */ 50%  { opacity: 1;    transform: scale(1);   }
+      /* 550ms */ 55%  { opacity: 1;    transform: scale(1);   }
+      /* 800ms */ 80%  { opacity: 0;    transform: scale(1.05);}
+      /* 1000ms*/ 100% { opacity: 0;    transform: scale(1.05);}
+    }
+
+    /* ─── Geometric shapes ─────────────────────────────────────────── */
+
+    .geo {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      border-style: solid;
+      border-color: transparent;
+      transform: translate(-50%, -50%) scale(0) rotate(0deg);
+      opacity: 0;
+    }
+
+    .geo-1 {
+      width: 300px;
+      height: 300px;
+      border-width: 2px;
+      border-color: rgba(242, 183, 5, 0.85);
+      animation: geoSpin1 1000ms linear forwards;
+      animation-delay: 200ms;
+    }
+
+    .geo-2 {
+      width: 220px;
+      height: 220px;
+      border-width: 2px;
+      border-color: rgba(94, 42, 121, 0.9);
+      animation: geoSpin2 1000ms linear forwards;
+      animation-delay: 250ms;
+    }
+
+    .geo-3 {
+      width: 140px;
+      height: 140px;
+      border-width: 2px;
+      border-color: rgba(242, 183, 5, 0.7);
+      animation: geoSpin3 1000ms linear forwards;
+      animation-delay: 300ms;
+    }
+
+    /* geo-1: delay 200ms, so keyframe 0% starts at 200ms real-time */
+    /* Phase 2 cover (200–500ms) → in animation time 0–300ms (0%–37.5% of 800ms remaining)  */
+    /* but total animation is 1000ms, delay=200ms, so keyframes span 0–800ms of animation = 200–1000ms real */
+    @keyframes geoSpin1 {
+      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0)    rotate(0deg);   }
+      /*  300ms real = 100ms in anim */ 12.5% { opacity: 1; transform: translate(-50%, -50%) scale(0.5)  rotate(22deg);  }
+      /*  500ms real = 300ms in anim */ 37.5% { opacity: 1; transform: translate(-50%, -50%) scale(1)    rotate(45deg);  }
+      /*  700ms real = 500ms in anim */ 62.5% { opacity: 0.5; transform: translate(-50%, -50%) scale(1.6)  rotate(80deg);  }
+      /*  800ms real = 600ms in anim */ 75%   { opacity: 0; transform: translate(-50%, -50%) scale(2)    rotate(100deg); }
+      100%  { opacity: 0; transform: translate(-50%, -50%) scale(2)    rotate(120deg); }
+    }
+
+    @keyframes geoSpin2 {
+      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0)    rotate(0deg);   }
+      12.5% { opacity: 1; transform: translate(-50%, -50%) scale(0.5)  rotate(-18deg); }
+      37.5% { opacity: 1; transform: translate(-50%, -50%) scale(1)    rotate(-36deg); }
+      62.5% { opacity: 0.5; transform: translate(-50%, -50%) scale(1.5)  rotate(-60deg); }
+      75%   { opacity: 0; transform: translate(-50%, -50%) scale(1.9)  rotate(-80deg); }
+      100%  { opacity: 0; transform: translate(-50%, -50%) scale(1.9)  rotate(-90deg); }
+    }
+
+    @keyframes geoSpin3 {
+      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0)    rotate(0deg);   }
+      12.5% { opacity: 1; transform: translate(-50%, -50%) scale(0.6)  rotate(30deg);  }
+      37.5% { opacity: 1; transform: translate(-50%, -50%) scale(1)    rotate(60deg);  }
+      62.5% { opacity: 0.4; transform: translate(-50%, -50%) scale(1.7)  rotate(100deg); }
+      75%   { opacity: 0; transform: translate(-50%, -50%) scale(2.1)  rotate(120deg); }
+      100%  { opacity: 0; transform: translate(-50%, -50%) scale(2.1)  rotate(130deg); }
+    }
+
+    /* ─── Explosion lines ──────────────────────────────────────────── */
+
+    .line {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100%;
+      height: 2px;
+      transform-origin: center center;
+      opacity: 0;
+    }
+
+    .line-1 {
+      background: linear-gradient(90deg,
+        transparent 5%,
+        rgba(242, 183, 5, 0.8) 50%,
+        transparent 95%
+      );
+      transform: translate(-50%, -50%) rotate(15deg);
+      animation: lineFlash 1000ms linear forwards;
+      animation-delay: 220ms;
+    }
+
+    .line-2 {
+      background: linear-gradient(90deg,
+        transparent 5%,
+        rgba(94, 42, 121, 0.9) 50%,
+        transparent 95%
+      );
+      transform: translate(-50%, -50%) rotate(-20deg);
+      animation: lineFlash 1000ms linear forwards;
+      animation-delay: 270ms;
+    }
+
+    .line-3 {
+      background: linear-gradient(90deg,
+        transparent 5%,
+        rgba(242, 183, 5, 0.6) 50%,
+        transparent 95%
+      );
+      transform: translate(-50%, -50%) rotate(60deg);
+      animation: lineFlash 1000ms linear forwards;
+      animation-delay: 320ms;
+    }
+
+    @keyframes lineFlash {
+      0%   { opacity: 0; }
+      15%  { opacity: 0; }
+      30%  { opacity: 1; }
+      50%  { opacity: 0.8; }
+      65%  { opacity: 0; }
+      100% { opacity: 0; }
+    }
+
+    /* ─── Particles container ──────────────────────────────────────── */
+
+    #particles {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stinger">
+    <div class="stinger-bg"></div>
+    <div class="geo geo-1"></div>
+    <div class="geo geo-2"></div>
+    <div class="geo geo-3"></div>
+    <div class="line line-1"></div>
+    <div class="line line-2"></div>
+    <div class="line line-3"></div>
+    <div id="particles"></div>
+  </div>
+
+  <script>
+    (function () {
+      const W = 1920;
+      const H = 1080;
+      const CX = W / 2;
+      const CY = H / 2;
+      const PARTICLE_COUNT = 25;
+      const TOTAL_MS = 1000;
+
+      const container = document.getElementById('particles');
+
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const size   = 8 + Math.random() * 8;          // 8–16px
+        const isGold = Math.random() > 0.45;
+        const color  = isGold ? '#f2b705' : '#5e2a79';
+        const glow   = isGold
+          ? '0 0 12px 3px rgba(242,183,5,0.9)'
+          : '0 0 12px 3px rgba(94,42,121,0.9)';
+
+        /* Random direction angle for gather phase */
+        const gatherAngle = Math.random() * 2 * Math.PI;
+        const gatherDist  = 500 + Math.random() * 600;   // 500–1100px from center
+        const startX = CX + Math.cos(gatherAngle) * gatherDist;
+        const startY = CY + Math.sin(gatherAngle) * gatherDist;
+
+        /* Explode in roughly opposite direction (±40°) with different distance */
+        const explodeAngle = gatherAngle + Math.PI + (Math.random() - 0.5) * 1.4;
+        const explodeDist  = 400 + Math.random() * 500;   // 400–900px from center
+        const endX = CX + Math.cos(explodeAngle) * explodeDist;
+        const endY = CY + Math.sin(explodeAngle) * explodeDist;
+
+        /* Slight random offset at center so they don't all clump exactly */
+        const centerJitterX = (Math.random() - 0.5) * 40;
+        const centerJitterY = (Math.random() - 0.5) * 40;
+
+        const el = document.createElement('div');
+        el.style.cssText = [
+          'position:absolute',
+          `width:${size}px`,
+          `height:${size}px`,
+          `background:${color}`,
+          'border-radius:50%',
+          `box-shadow:${glow}`,
+          /* start position (transform-origin default center of element) */
+          `left:${CX - size / 2}px`,
+          `top:${CY - size / 2}px`,
+          'opacity:0',
+          'will-change:transform,opacity',
+        ].join(';');
+        container.appendChild(el);
+
+        /*
+         * Keyframe breakdown (all offsets in 0–1 fraction of TOTAL_MS):
+         *   0%    (0ms)   – at edge, opacity 0
+         *   25%   (250ms) – at center, opacity 1  (gather complete)
+         *   50%   (500ms) – at center, opacity 1  (hold while background fades)
+         *   100%  (1000ms)– exploded outward, opacity 0
+         */
+        const dx_in  = startX - CX + centerJitterX;
+        const dy_in  = startY - CY + centerJitterY;
+        const dx_out = endX   - CX;
+        const dy_out = endY   - CY;
+
+        el.animate(
+          [
+            { transform: `translate(${dx_in}px,  ${dy_in}px)`,  opacity: 0,   offset: 0    },
+            { transform: `translate(${centerJitterX}px, ${centerJitterY}px)`, opacity: 1,   offset: 0.25 },
+            { transform: `translate(${centerJitterX}px, ${centerJitterY}px)`, opacity: 1,   offset: 0.50 },
+            { transform: `translate(${dx_out}px, ${dy_out}px)`,  opacity: 0,   offset: 1    },
+          ],
+          {
+            duration: TOTAL_MS,
+            delay: 0,
+            fill: 'forwards',
+            easing: 'linear',
+            composite: 'replace',
+          }
+        );
+      }
+    })();
+  </script>
+
+</body>
+</html>
