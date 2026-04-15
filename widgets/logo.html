@@ -94,15 +94,16 @@
       */
 
       // Aufbau: von links nach rechts, diagonale rechte Kante
+      // Streifen sind steil (~75°), Offset Top→Bottom ca. 18%
       // Jeder Step: [topRight%, bottomRight%]
       const revealEdges = [
         [0,   0  ],  // unsichtbar
-        [18,  8  ],  // Streifen 1
-        [30,  20 ],  // + Streifen 2
-        [42,  32 ],  // + Streifen 3
-        [55,  45 ],  // + Streifen 4
-        [68,  58 ],  // + Streifen 5
-        [80,  70 ],  // + Streifen 6
+        [22,  4  ],  // Streifen 1
+        [34,  16 ],  // + Streifen 2
+        [47,  29 ],  // + Streifen 3
+        [59,  41 ],  // + Streifen 4
+        [72,  54 ],  // + Streifen 5
+        [84,  66 ],  // + Streifen 6
         [100, 100],  // alle da
       ];
 
@@ -110,12 +111,12 @@
       // Jeder Step: [topLeft%, bottomLeft%]
       const hideEdges = [
         [0,   0  ],  // alle da
-        [20,  10 ],  // Streifen 1 weg
-        [32,  22 ],  // + Streifen 2 weg
-        [45,  35 ],  // + Streifen 3 weg
-        [58,  48 ],  // + Streifen 4 weg
-        [70,  60 ],  // + Streifen 5 weg
-        [82,  72 ],  // + Streifen 6 weg
+        [22,  4  ],  // Streifen 1 weg
+        [34,  16 ],  // + Streifen 2 weg
+        [47,  29 ],  // + Streifen 3 weg
+        [59,  41 ],  // + Streifen 4 weg
+        [72,  54 ],  // + Streifen 5 weg
+        [84,  66 ],  // + Streifen 6 weg
         [100, 100],  // alles weg
       ];
 
