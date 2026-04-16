@@ -219,14 +219,16 @@
     .clip-area {
       flex: 1;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       position: relative;
       z-index: 10;
+      padding: 0 5%;
     }
 
     .clip-container {
-      width: 90%;
+      width: 100%;
       aspect-ratio: 16 / 9;
       background: #000000;
       border: 2px solid var(--color-purple);
@@ -330,41 +332,41 @@
     .countdown__timer {
       font-size: 64px;
       font-weight: 900;
-      color: var(--color-purple-light);
-      text-shadow: 0 0 20px rgba(94, 42, 121, 0.6);
+      color: var(--color-gold);
+      text-shadow: 0 0 12px rgba(242, 183, 5, 0.3);
     }
 
     .countdown__timer.boom-3 {
-      color: var(--color-purple-light);
-      text-shadow: 0 0 12px rgba(94, 42, 121, 0.6), 0 0 30px rgba(94, 42, 121, 0.3);
+      color: var(--color-gold);
+      text-shadow: 0 0 10px rgba(242, 183, 5, 0.4), 0 0 25px rgba(242, 183, 5, 0.2);
       animation: boom3 0.4s cubic-bezier(0.22, 1.2, 0.36, 1);
     }
     .countdown__timer.boom-2 {
-      color: var(--color-purple-light);
-      text-shadow: 0 0 20px rgba(94, 42, 121, 0.8), 0 0 50px rgba(94, 42, 121, 0.5);
+      color: var(--color-gold);
+      text-shadow: 0 0 16px rgba(242, 183, 5, 0.6), 0 0 40px rgba(242, 183, 5, 0.3);
       animation: boom2 0.45s cubic-bezier(0.22, 1.2, 0.36, 1);
     }
     .countdown__timer.boom-1 {
       color: var(--color-gold);
-      text-shadow: 0 0 20px rgba(242, 183, 5, 0.8), 0 0 50px rgba(242, 183, 5, 0.4);
+      text-shadow: 0 0 24px rgba(242, 183, 5, 0.8), 0 0 60px rgba(242, 183, 5, 0.5);
       animation: boom1 0.5s cubic-bezier(0.22, 1.2, 0.36, 1);
     }
 
     @keyframes boom3 {
-      0%   { transform: scale(1.8); opacity: 0.4; }
-      50%  { transform: scale(0.92); opacity: 1; }
+      0%   { transform: scale(1.3); opacity: 0.5; }
+      50%  { transform: scale(0.95); opacity: 1; }
       100% { transform: scale(1); }
     }
     @keyframes boom2 {
-      0%   { transform: scale(2.4); opacity: 0.3; }
-      50%  { transform: scale(0.88); opacity: 1; }
-      70%  { transform: scale(1.06); }
+      0%   { transform: scale(1.6); opacity: 0.4; }
+      50%  { transform: scale(0.93); opacity: 1; }
+      70%  { transform: scale(1.03); }
       100% { transform: scale(1); }
     }
     @keyframes boom1 {
-      0%   { transform: scale(3); opacity: 0.2; }
-      45%  { transform: scale(0.85); opacity: 1; }
-      65%  { transform: scale(1.1); }
+      0%   { transform: scale(2); opacity: 0.3; }
+      45%  { transform: scale(0.9); opacity: 1; }
+      65%  { transform: scale(1.06); }
       100% { transform: scale(1); }
     }
 
@@ -476,6 +478,57 @@
       100% { opacity: 1; transform: scale(1); }
     }
 
+    /* ─── Clip Meta Bar ──────────────────────────────────────────── */
+
+    .clip-meta {
+      width: 100%;
+      padding: 14px 16px;
+      display: flex;
+      align-items: baseline;
+      gap: 20px;
+      opacity: 0;
+      transition: opacity 0.6s ease;
+      background: linear-gradient(180deg,
+        rgba(94, 42, 121, 0.12) 0%,
+        transparent 100%
+      );
+      border-bottom-left-radius: 10px;
+      border-bottom-right-radius: 10px;
+    }
+
+    .clip-meta--visible {
+      opacity: 1;
+    }
+
+    .clip-meta__title {
+      flex: 1;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--color-gold);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .clip-meta__detail {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--color-text-muted);
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .clip-meta__dot {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: rgba(94, 42, 121, 0.6);
+      flex-shrink: 0;
+    }
+
     .sidebar__divider {
       width: 60px;
       height: 3px;
@@ -535,6 +588,10 @@
         <span class="countdown__timer" id="countdownTimer"></span>
       </div>
     </div>
+    <div class="clip-meta" id="clipMeta">
+      <span class="clip-meta__title" id="clipMetaTitle"></span>
+      <span class="clip-meta__detail" id="clipMetaDetails"></span>
+    </div>
   </div>
 
   <!-- RIGHT: Sidebar -->
@@ -582,6 +639,9 @@
 
       var placeholder      = document.getElementById('clipPlaceholder');
       var container        = document.getElementById('clipContainer');
+      var clipMeta         = document.getElementById('clipMeta');
+      var clipMetaTitle    = document.getElementById('clipMetaTitle');
+      var clipMetaDetails  = document.getElementById('clipMetaDetails');
       var countdownOverlay = document.getElementById('countdownOverlay');
       var countdownTitle   = document.getElementById('countdownTitle');
       var countdownTimer   = document.getElementById('countdownTimer');
@@ -609,6 +669,30 @@
         placeholder.querySelector('.clip-placeholder__text').textContent = msg;
       }
 
+      function formatDate(isoString) {
+        if (!isoString) return '';
+        var d = new Date(isoString);
+        return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      }
+
+      function formatViews(n) {
+        if (!n && n !== 0) return '';
+        return n.toLocaleString('de-DE') + ' Views';
+      }
+
+      function showMeta(clip) {
+        clipMetaTitle.textContent = clip.title || '';
+        var parts = [];
+        if (clip.createdAt) parts.push(formatDate(clip.createdAt));
+        if (clip.views !== undefined) parts.push(formatViews(clip.views));
+        clipMetaDetails.innerHTML = parts.join(' <span class="clip-meta__dot"></span> ');
+        clipMeta.classList.add('clip-meta--visible');
+      }
+
+      function hideMeta() {
+        clipMeta.classList.remove('clip-meta--visible');
+      }
+
       // ── Clip-Player ────────────────────────────────────────────
 
       // clips = [{id, title, duration}, ...]
@@ -631,12 +715,16 @@
         iframe.allowFullscreen = true;
         container.appendChild(iframe);
 
+        // Meta anzeigen
+        showMeta(clip);
+
         // Timer startet erst wenn iframe geladen ist
         iframe.addEventListener('load', function () {
           var durationMs = Math.ceil(clip.duration) * 1000 + 700;
           clipTimer = setTimeout(function () {
             // Fade-Out starten, dann Countdown
             iframe.classList.add('fade-out');
+            hideMeta();
             setTimeout(function () {
               showCountdown(index);
             }, 800);
@@ -653,6 +741,7 @@
         if (oldIframe) oldIframe.remove();
 
         countdownTitle.textContent = nextClip.title || 'Clip ' + (nextIdx + 1);
+        countdownTimer.classList.remove('boom-3', 'boom-2', 'boom-1');
         countdownOverlay.classList.add('countdown-overlay--visible');
 
         var remaining = countdownSec;
@@ -747,7 +836,9 @@
             return {
               id: c.id,
               title: c.title || '',
-              duration: c.duration || 30
+              duration: c.duration || 30,
+              createdAt: c.created_at || '',
+              views: c.view_count || 0
             };
           });
 
