@@ -246,15 +246,56 @@
 
     /* ─── Main content ───────────────────────────────────────────── */
 
+    .main-layout {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 80px;
+      width: 100%;
+      padding: 0 120px;
+    }
+
     .content {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       gap: 0;
-      position: relative;
-      z-index: 10;
       text-align: center;
+      flex-shrink: 0;
+    }
+
+    /* ─── Mini Clip Player ───────────────────────────────────────── */
+
+    .clip-player {
+      width: 440px;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border: 2px solid var(--color-purple);
+      border-radius: 8px;
+      box-shadow: 0 0 30px rgba(94, 42, 121, 0.3);
+      overflow: hidden;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .clip-player iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    .clip-player .clip-placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--color-text-muted);
+      font-size: 13px;
+      letter-spacing: 1px;
     }
 
     @keyframes fadeOut {
@@ -328,12 +369,20 @@
   <div class="particle particle--g5"></div>
 
   <!-- Main content -->
-  <div class="content">
-    <h1 class="title">Starting Soon</h1>
-    <div class="divider"></div>
-    <p class="subtitle">Stream beginnt gleich</p>
+  <div class="main-layout">
+    <div class="content">
+      <h1 class="title">Starting Soon</h1>
+      <div class="divider"></div>
+      <p class="subtitle">Stream beginnt gleich</p>
+    </div>
+    <div class="clip-player" id="clipContainer">
+      <div class="clip-placeholder" id="clipPlaceholder">
+        <p class="clip-placeholder__text">Clips laden...</p>
+      </div>
+    </div>
   </div>
 
+  <script src="../js/clip-player.js"></script>
   <script>
     (function () {
       var W = 1920;
@@ -389,6 +438,9 @@
 
       runLoop();
     })();
+
+    // Clip-Player (stumm, läuft im Hintergrund)
+    ClipPlayer.init({ containerId: 'clipContainer', muted: true });
   </script>
 </body>
 </html>
