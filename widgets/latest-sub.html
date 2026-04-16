@@ -70,6 +70,33 @@
       color: #ffffff;
       white-space: nowrap;
     }
+
+    .widget-tier {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    .widget-tier--1 {
+      background: rgba(94, 42, 121, 0.5);
+      border: 1px solid #c9a0dc;
+      color: #ffffff;
+    }
+    .widget-tier--2 {
+      background: rgba(94, 42, 121, 0.6);
+      border: 1px solid #d4b0e8;
+      color: #e8d0f5;
+    }
+    .widget-tier--3 {
+      background: linear-gradient(135deg, rgba(242, 183, 5, 0.3), rgba(94, 42, 121, 0.4));
+      border: 1px solid #f2b705;
+      color: #f2b705;
+    }
   </style>
 </head>
 <body>
@@ -77,15 +104,27 @@
   <div class="widget-box">
     <div class="widget-content">
       <div class="widget-label">Latest Sub</div>
-      <div class="widget-name"></div>
+      <div class="widget-name"><span id="subName"></span><span class="widget-tier" id="tierBadge"></span></div>
     </div>
   </div>
 
   <script>
-    const params = new URLSearchParams(window.location.search);
-    const name = params.get('name') || 'NightOwl';
+    var params = new URLSearchParams(window.location.search);
+    var name = params.get('name') || 'NightOwl';
+    var tier = params.get('tier') || '1';
 
-    document.querySelector('.widget-name').textContent = name;
+    document.getElementById('subName').textContent = name;
+
+    var rawTier = tier.trim().toLowerCase().replace('tier', '').trim();
+    if (rawTier === '1000') rawTier = '1';
+    if (rawTier === '2000') rawTier = '2';
+    if (rawTier === '3000') rawTier = '3';
+    var tierNum = rawTier === 'prime' ? 'prime' : rawTier;
+
+    var badge = document.getElementById('tierBadge');
+    var tierNames = { '1': 'T1', '2': 'T2', '3': 'T3', 'prime': 'Prime' };
+    badge.textContent = tierNames[tierNum] || 'T' + tierNum;
+    badge.className = 'widget-tier widget-tier--' + (tierNum === 'prime' ? '1' : tierNum);
   </script>
 
   <div id="sparkle-wrap" style="position:absolute;top:0;left:0;width:500px;height:100px;overflow:visible;pointer-events:none;"></div>
