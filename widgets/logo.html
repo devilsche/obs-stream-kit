@@ -22,14 +22,17 @@
       position: relative;
       width: 400px;
       height: 152px;
+      animation: logoGlow 2.5s ease-in-out infinite;
     }
+
+    /* Glow wird per JS als dynamisches @keyframes injiziert */
 
     .stripes {
       position: absolute;
       inset: 0;
-      background: url('../assets/Chrome_Streifen.png') no-repeat center center;
+      background-repeat: no-repeat;
+      background-position: center center;
       background-size: contain;
-      filter: hue-rotate(40deg) saturate(2.0) brightness(0.65) contrast(1.2);
       clip-path: polygon(0 100%, 0 0, 0 0, 0 100%);
     }
 
@@ -37,7 +40,8 @@
     .text {
       position: absolute;
       inset: 0;
-      background: url('../assets/Chrome_Text.png') no-repeat center center;
+      background-repeat: no-repeat;
+      background-position: center center;
       background-size: contain;
       z-index: 2;
     }
@@ -45,29 +49,90 @@
 </head>
 <body>
   <div class="logo-container">
+    <div class="sparkle-container" style="position:absolute;inset:0;z-index:3;pointer-events:none;"></div>
     <div class="stripes"></div>
     <div class="text"></div>
   </div>
 
+  <script src="../js/sparkles.js"></script>
   <script>
     /*
-      Logo-Animation Loop:
-      1. Streifen bauen sich diagonal auf (passend zum Streifen-Winkel)
-      2. Komplett sichtbar (2s Pause)
-      3. Streifen lösen sich diagonal auf
-      4. 10s Pause (Text bleibt immer sichtbar!)
-      5. → Loop
-
       URL-Parameter:
-        ?width=400   — Logo-Breite in px (default: 400)
-        ?pause=10    — Pause zwischen Loops in Sekunden (default: 10)
-        ?speed=200   — ms pro Streifen-Step (default: 200)
+        ?width=400          — Logo-Breite in px (default: 400)
+        ?pause=10           — Pause zwischen Loops in Sekunden (default: 10)
+        ?speed=200          — ms pro Streifen-Step (default: 200)
+        ?lines=dateiname    — Streifen-Bild in assets/ (default: logo_lines_blue.png)
+        ?text=dateiname     — Text-Bild in assets/ (default: logo_text_luckor_hd.png)
+        ?glow=purple|gold   — Glow-Farbe (default: purple↔gold Wechsel)
     */
     (function() {
       const params = new URLSearchParams(window.location.search);
       const STEP_MS = parseInt(params.get('speed'), 10) || 200;
       const PAUSE_S = parseFloat(params.get('pause')) || 10;
 
+      // --- Bild-Parameter ---
+      const linesFile = params.get('lines') || 'logo_lines_blue.png';
+      const textFile = params.get('text') || 'logo_text_luckor_hd.png';
+
+      const stripes = document.querySelector('.stripes');
+      const text = document.querySelector('.text');
+
+      stripes.style.backgroundImage = "url('../assets/" + linesFile + "')";
+      text.style.backgroundImage = "url('../assets/" + textFile + "')";
+
+      // --- Glow-Farbe ---
+      var GLOW_PRESETS = {
+        purple: {
+          from: 'drop-shadow(0 0 8px rgba(94,42,121,0.8)) drop-shadow(0 0 20px rgba(94,42,121,0.4))',
+          to:   'drop-shadow(0 0 12px rgba(94,42,121,0.9)) drop-shadow(0 0 30px rgba(94,42,121,0.5))'
+        },
+        gold: {
+          from: 'drop-shadow(0 0 8px rgba(242,183,5,0.8)) drop-shadow(0 0 20px rgba(242,183,5,0.4))',
+          to:   'drop-shadow(0 0 12px rgba(242,183,5,0.9)) drop-shadow(0 0 30px rgba(242,183,5,0.5))'
+        }
+      };
+
+      // Hex-Farbe → rgba strings für Glow
+      function hexToGlow(hex) {
+        hex = hex.replace('#', '');
+        var r = parseInt(hex.substring(0, 2), 16);
+        var g = parseInt(hex.substring(2, 4), 16);
+        var b = parseInt(hex.substring(4, 6), 16);
+        return {
+          from: 'drop-shadow(0 0 8px rgba(' + r + ',' + g + ',' + b + ',0.8)) drop-shadow(0 0 20px rgba(' + r + ',' + g + ',' + b + ',0.4))',
+          to:   'drop-shadow(0 0 12px rgba(' + r + ',' + g + ',' + b + ',0.9)) drop-shadow(0 0 30px rgba(' + r + ',' + g + ',' + b + ',0.5))'
+        };
+      }
+
+      var glowParam = params.get('glow');
+      var glowFrom, glowTo;
+      if (glowParam === 'purple') {
+        glowFrom = GLOW_PRESETS.purple.from;
+        glowTo = GLOW_PRESETS.purple.to;
+      } else if (glowParam === 'gold') {
+        glowFrom = GLOW_PRESETS.gold.from;
+        glowTo = GLOW_PRESETS.gold.to;
+      } else if (glowParam && glowParam.match(/^#?[0-9a-fA-F]{6}$/)) {
+        // Custom Hex-Farbe: ?glow=#ff0000 oder ?glow=ff0000
+        var custom = hexToGlow(glowParam);
+        glowFrom = custom.from;
+        glowTo = custom.to;
+      } else {
+        // Default: lila↔gold Wechsel
+        glowFrom = GLOW_PRESETS.purple.from;
+        glowTo = GLOW_PRESETS.gold.to;
+      }
+
+      // Dynamisches @keyframes injizieren
+      var style = document.createElement('style');
+      style.textContent =
+        '@keyframes logoGlow {' +
+        '  0%, 100% { filter: ' + glowFrom + '; }' +
+        '  50% { filter: ' + glowTo + '; }' +
+        '}';
+      document.head.appendChild(style);
+
+      // --- Größe ---
       const width = parseInt(params.get('width'), 10);
       if (width && width !== 400) {
         const ratio = 152 / 400;
@@ -79,52 +144,41 @@
         c.style.height = height + 'px';
       }
 
-      const stripes = document.querySelector('.stripes');
-      const text = document.querySelector('.text');
+      // --- Sparkle Engine ---
+      const sparkleContainer = document.querySelector('.sparkle-container');
+      new SparkleEngine(sparkleContainer, {
+        count: 6,
+        speed: 0.25,
+        maxOpacity: 0.85,
+        sizeWeights: { big: 0, normal: 0.2, small: 0.5, tiny: 0.3 }
+      }).start();
 
-      /*
-        Die Streifen sind diagonal (~65°).
-        clip-path schneidet mit diagonaler Kante, passend zum Winkel.
-
-        Aufbau: Rechte Kante ist diagonal (oben weiter rechts als unten).
-        polygon(links-unten, links-oben, rechts-oben, rechts-unten)
-        → polygon(0 100%, 0 0, topRight 0, bottomRight 100%)
-
-        Abbau: Linke Kante ist diagonal (oben weiter rechts als unten).
-        → polygon(bottomLeft 100%, topLeft 0, 100% 0, 100% 100%)
-      */
-
-      // Aufbau: von links nach rechts, diagonale rechte Kante
-      // Exakt ausgemessen: 20% Offset top↔bottom, Schnitte in den Zwischenräumen
-      // Streifen-Gaps bei y=800: ~20%, ~30%, ~40%, ~50%, ~60%, ~70%, ~80%
-      // Diagonal-Offset: top +10%, bottom -10% (relativ zur Mitte)
-      // Jeder Step: [topRight%, bottomRight%]
-      const revealEdges = [
-        [0,   0  ],  // unsichtbar
-        [30,  10 ],  // Streifen 1
-        [40,  20 ],  // + Streifen 2
-        [50,  30 ],  // + Streifen 3
-        [60,  40 ],  // + Streifen 4
-        [70,  50 ],  // + Streifen 5
-        [80,  60 ],  // + Streifen 6
-        [90,  70 ],  // + Streifen 7
-        [100, 100],  // alle da
+      // --- Exakte Streifen-Polygone (aus Pixeldaten gemessen) ---
+      // [tl, bl, tr, br] → polygon(bl% 100%, tl% 0, tr% 0, br% 100%)
+      const STRIPES = [
+        [  0,  0, 31, 10],
+        [ 31, 10, 41, 20],
+        [ 41, 20, 51, 30],
+        [ 51, 30, 61, 40],
+        [ 61, 40, 71, 50],
+        [ 71, 50, 81, 60],
+        [ 81, 60, 91, 70],
+        [ 91, 70,101, 80],
       ];
 
-      // Abbau: von links verschwindend, diagonale linke Kante
-      // Gleicher Winkel, Schnitte in den gleichen Zwischenräumen
-      // Jeder Step: [topLeft%, bottomLeft%]
-      const hideEdges = [
-        [0,   0  ],  // alle da
-        [31,  11 ],  // Streifen 1 weg
-        [41,  21 ],  // + Streifen 2 weg
-        [51,  31 ],  // + Streifen 3 weg
-        [61,  41 ],  // + Streifen 4 weg
-        [71,  51 ],  // + Streifen 5 weg
-        [81,  61 ],  // + Streifen 6 weg
-        [91,  71 ],  // + Streifen 7 weg
-        [100, 100],  // alles weg
-      ];
+      // Reveal: kumulativ aufbauen — rechte Kante wandert nach rechts
+      const revealEdges = [[0, 0]];
+      for (var i = 0; i < STRIPES.length; i++) {
+        revealEdges.push([STRIPES[i][2], STRIPES[i][3]]);
+      }
+      revealEdges[revealEdges.length - 1] = [100, 100];
+
+      // Hide: kumulativ abbauen — linke Kante wandert nach rechts
+      const hideEdges = [[0, 0]];
+      for (var i = 0; i < STRIPES.length; i++) {
+        hideEdges.push([STRIPES[i][0], STRIPES[i][1]]);
+      }
+      hideEdges[hideEdges.length - 1] = [100, 100];
 
       function setReveal(step) {
         const [tr, br] = revealEdges[step];
@@ -138,57 +192,97 @@
           `polygon(${bl}% 100%, ${tl}% 0, 100% 0, 100% 100%)`;
       }
 
-      function animateReveal(onDone) {
-        let i = 0;
-        function next() {
-          if (i >= revealEdges.length) { onDone(); return; }
+      // Zeigt exakt einen einzelnen Streifen
+      function showSingleStripe(index) {
+        const [tl, bl, tr, br] = STRIPES[index];
+        stripes.style.clipPath =
+          `polygon(${bl}% 100%, ${tl}% 0, ${tr}% 0, ${br}% 100%)`;
+      }
+
+      function hideAll() {
+        stripes.style.clipPath = 'polygon(0 100%, 0 0, 0 0, 0 100%)';
+      }
+
+      // --- Helpers ---
+      function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+
+      async function animateReveal() {
+        for (let i = 0; i < revealEdges.length; i++) {
           setReveal(i);
-          i++;
-          setTimeout(next, STEP_MS);
+          await delay(STEP_MS);
         }
-        next();
       }
 
-      function animateHide(onDone) {
-        let i = 0;
-        function next() {
-          if (i >= hideEdges.length) { onDone(); return; }
+      async function animateHide() {
+        for (let i = 0; i < hideEdges.length; i++) {
           setHide(i);
-          i++;
-          setTimeout(next, STEP_MS);
+          await delay(STEP_MS);
         }
-        next();
       }
 
-      function wobbleText(onDone) {
-        text.animate([
-          { transform: 'scale(1)' },
-          { transform: 'scale(1.08)' },
-          { transform: 'scale(0.97)' },
-          { transform: 'scale(1.04)' },
-          { transform: 'scale(0.99)' },
-          { transform: 'scale(1)' }
-        ], {
-          duration: 500,
-          easing: 'ease-in-out'
-        }).onfinish = onDone;
+      async function knightRider(sweeps) {
+        const KR_MS = 84;
+        const n = STRIPES.length;
+        for (let s = 0; s < sweeps; s++) {
+          for (let i = 0; i < n; i++) {
+            showSingleStripe(i);
+            await delay(KR_MS);
+          }
+          for (let i = n - 2; i >= 0; i--) {
+            showSingleStripe(i);
+            await delay(KR_MS);
+          }
+        }
       }
 
-      function runLoop() {
-        // Phase 1: Streifen diagonal aufbauen
-        animateReveal(() => {
-          // Phase 2: Text wobble wenn alle Streifen da sind
-          wobbleText(() => {
-            // Phase 3: Komplett sichtbar, 2s Pause
-            setTimeout(() => {
-              // Phase 4: Streifen diagonal abbauen
-              animateHide(() => {
-                // Phase 5: Pause, dann Loop
-                setTimeout(runLoop, PAUSE_S * 1000);
-              });
-            }, 2000);
-          });
+      function wobbleText() {
+        return new Promise(resolve => {
+          text.animate([
+            { transform: 'scale(1)' },
+            { transform: 'scale(1.08)' },
+            { transform: 'scale(0.97)' },
+            { transform: 'scale(1.04)' },
+            { transform: 'scale(0.99)' },
+            { transform: 'scale(1)' }
+          ], {
+            duration: 500,
+            easing: 'ease-in-out'
+          }).onfinish = resolve;
         });
+      }
+
+      async function runLoop() {
+        while (true) {
+          // Phase 1: Streifen aufbauen
+          await animateReveal();
+
+          // Phase 2: Text wobble
+          await wobbleText();
+
+          // Phase 3: ALLE DA — 1.5s halten
+          await delay(1500);
+
+          // Phase 4: Einzeln WEG — links→rechts
+          await animateHide();
+
+          // Phase 5: Knight Rider — 3 sweeps
+          await knightRider(3);
+          hideAll();
+
+          // Phase 6: Einzeln HIN — links→rechts
+          await animateReveal();
+
+          // Phase 7: Kurze Pause 2s
+          await delay(2000);
+
+          // Phase 8: Wieder abbauen für Loop-Reset
+          await animateHide();
+
+          // Phase 9: Pause vor nächstem Loop
+          await delay(PAUSE_S * 1000);
+        }
       }
 
       runLoop();
