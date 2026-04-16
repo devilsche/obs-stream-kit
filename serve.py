@@ -13,7 +13,7 @@ import os
 import sys
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
-HOST = "127.0.0.1"
+HOST = "0.0.0.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # .secrets lesen
@@ -73,22 +73,22 @@ if inject_script:
     print("  .secrets geladen - Credentials werden automatisch injiziert!")
     print()
     print("  Szenen:")
-    print(f"  BRB:           http://{HOST}:{PORT}/scenes/brb-pause.html")
-    print(f"  Starting Soon: http://{HOST}:{PORT}/scenes/starting-soon.html")
-    print(f"  Stream Ending: http://{HOST}:{PORT}/scenes/stream-ending.html")
+    print(f"  BRB:           http://localhost:{PORT}/scenes/brb-pause.html")
+    print(f"  Starting Soon: http://localhost:{PORT}/scenes/starting-soon.html")
+    print(f"  Stream Ending: http://localhost:{PORT}/scenes/stream-ending.html")
 else:
     print()
     print("  WARNUNG: .secrets nicht gefunden oder unvollstaendig!")
     print("  Kopiere .secrets.example nach .secrets und trage deine Twitch-Daten ein.")
 
-print(f"  Gameplay:      http://{HOST}:{PORT}/scenes/gameplay.html")
-print(f"  Just Chatting: http://{HOST}:{PORT}/scenes/just-chatting.html")
+print(f"  Gameplay:      http://localhost:{PORT}/scenes/gameplay.html")
+print(f"  Just Chatting: http://localhost:{PORT}/scenes/just-chatting.html")
 print()
 print("  Widgets:")
-print(f"  Logo:          http://{HOST}:{PORT}/widgets/logo.html")
-print(f"  Webcam-Frame:  http://{HOST}:{PORT}/widgets/webcam-frame.html")
+print(f"  Logo:          http://localhost:{PORT}/widgets/logo.html")
+print(f"  Webcam-Frame:  http://localhost:{PORT}/widgets/webcam-frame.html")
 print()
-print(f"  Server: http://{HOST}:{PORT}")
+print(f"  Server: http://localhost:{PORT}")
 print(f"  Beenden mit Ctrl+C")
 print("=" * 60)
 print()
