@@ -257,6 +257,11 @@
       text-align: center;
     }
 
+    @keyframes fadeOut {
+      0%   { opacity: 1; }
+      100% { opacity: 0; letter-spacing: 20px; }
+    }
+
     .title {
       font-size: 52px;
       font-weight: 900;
@@ -267,8 +272,8 @@
         0 0 20px rgba(94, 42, 121, 0.9),
         0 0 50px rgba(201, 160, 220, 0.5),
         0 0 90px rgba(94, 42, 121, 0.3);
-      animation: fadeInGlow 2s ease-out both;
       line-height: 1.15;
+      opacity: 0;
     }
 
     .divider {
@@ -290,7 +295,11 @@
       letter-spacing: 5px;
       text-transform: uppercase;
       color: var(--color-text-muted);
-      animation: fadeInUp 0.8s ease-out 0.5s both;
+      opacity: 0;
+    }
+
+    .divider {
+      transition: opacity 0.8s ease;
     }
   </style>
 </head>
@@ -326,14 +335,59 @@
   </div>
 
   <script>
-    // Ensure the page stays at exactly 1920×1080 regardless of OBS Browser Source scaling
     (function () {
-      const W = 1920;
-      const H = 1080;
+      var W = 1920;
+      var H = 1080;
       document.documentElement.style.width  = W + 'px';
       document.documentElement.style.height = H + 'px';
       document.body.style.width  = W + 'px';
       document.body.style.height = H + 'px';
+
+      var params   = new URLSearchParams(window.location.search);
+      var HOLD_SEC = parseInt(params.get('hold'), 10) || 20;
+
+      var title    = document.querySelector('.title');
+      var subtitle = document.querySelector('.subtitle');
+      var divider  = document.querySelector('.divider');
+
+      function delay(ms) {
+        return new Promise(function (r) { setTimeout(r, ms); });
+      }
+
+      function animateIn() {
+        title.style.animation = 'fadeInGlow 2s ease-out forwards';
+        return delay(500).then(function () {
+          divider.style.opacity = '1';
+          subtitle.style.animation = 'fadeInUp 0.8s ease-out forwards';
+          return delay(2000);
+        });
+      }
+
+      function animateOut() {
+        subtitle.style.animation = 'fadeOut 0.8s ease-in forwards';
+        divider.style.opacity = '0';
+        return delay(400).then(function () {
+          title.style.animation = 'fadeOut 1.2s ease-in forwards';
+          return delay(1200);
+        });
+      }
+
+      async function runLoop() {
+        while (true) {
+          await animateIn();
+          await delay(HOLD_SEC * 1000);
+          await animateOut();
+          await delay(1500);
+          // Reset für nächsten Durchlauf
+          title.style.animation = 'none';
+          subtitle.style.animation = 'none';
+          title.style.opacity = '0';
+          subtitle.style.opacity = '0';
+          await delay(100);
+        }
+      }
+
+      runLoop();
     })();
   </script>
 </body>
