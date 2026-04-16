@@ -659,8 +659,12 @@
       }
 
       function buildEmbedUrl(slug) {
+        var host = window.location.hostname;
+        var parentParam = '&parent=' + host;
+        if (host === '127.0.0.1') parentParam += '&parent=localhost';
+        if (host === 'localhost') parentParam += '&parent=127.0.0.1';
         return 'https://clips.twitch.tv/embed?clip=' + encodeURIComponent(slug)
-          + '&parent=' + window.location.hostname
+          + parentParam
           + '&autoplay=true'
           + '&muted=false';
       }
@@ -683,6 +687,7 @@
       function showMeta(clip) {
         clipMetaTitle.textContent = clip.title || '';
         var parts = [];
+        if (clip.creator) parts.push('von ' + clip.creator);
         if (clip.createdAt) parts.push(formatDate(clip.createdAt));
         if (clip.views !== undefined) parts.push(formatViews(clip.views));
         clipMetaDetails.innerHTML = parts.join(' <span class="clip-meta__dot"></span> ');

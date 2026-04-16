@@ -24,8 +24,13 @@ var ClipPlayer = (function () {
   }
 
   function buildEmbedUrl(slug, muted) {
+    // parent muss sowohl localhost als auch 127.0.0.1 abdecken
+    var host = window.location.hostname;
+    var parentParam = '&parent=' + host;
+    if (host === '127.0.0.1') parentParam += '&parent=localhost';
+    if (host === 'localhost') parentParam += '&parent=127.0.0.1';
     return 'https://clips.twitch.tv/embed?clip=' + encodeURIComponent(slug)
-      + '&parent=' + window.location.hostname
+      + parentParam
       + '&autoplay=true'
       + '&muted=' + (muted ? 'true' : 'false');
   }
@@ -146,7 +151,8 @@ var ClipPlayer = (function () {
               title: c.title || '',
               duration: c.duration || 30,
               createdAt: c.created_at || '',
-              views: c.view_count || 0
+              views: c.view_count || 0,
+              creator: c.creator_name || ''
             };
           }));
         });
