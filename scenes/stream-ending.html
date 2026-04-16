@@ -556,7 +556,10 @@
       runLoop();
     })();
 
-    ClipPlayer.init({ containerId: 'clipContainer', muted: false });
+    // Kurz verzögert starten damit OBS die Source vollständig lädt
+    setTimeout(function () {
+      ClipPlayer.init({ containerId: 'clipContainer', muted: false });
+    }, 2000);
   </script>
 </body>
 </html>
