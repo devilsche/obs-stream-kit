@@ -24,11 +24,9 @@ var ClipPlayer = (function () {
   }
 
   function buildEmbedUrl(slug, muted) {
-    // parent muss sowohl localhost als auch 127.0.0.1 abdecken
     var host = window.location.hostname;
-    var parentParam = '&parent=' + host;
-    if (host === '127.0.0.1') parentParam += '&parent=localhost';
-    if (host === 'localhost') parentParam += '&parent=127.0.0.1';
+    var parents = [host, 'localhost', '127.0.0.1', 'absolute'];
+    var parentParam = parents.map(function (p) { return '&parent=' + p; }).join('');
     return 'https://clips.twitch.tv/embed?clip=' + encodeURIComponent(slug)
       + parentParam
       + '&autoplay=true'
