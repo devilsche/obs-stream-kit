@@ -241,10 +241,16 @@
     document.querySelector('.username').textContent      = username;
     document.querySelector('.alert-message').textContent = message;
 
+    var rawTier = tier.trim().toLowerCase().replace('tier', '').trim();
+    if (rawTier === '1000') rawTier = '1';
+    if (rawTier === '2000') rawTier = '2';
+    if (rawTier === '3000') rawTier = '3';
+    var tierNum = rawTier === 'prime' ? 'prime' : rawTier;
+
     var badge = document.getElementById('tierBadge');
     var tierNames = { '1': 'Tier 1', '2': 'Tier 2', '3': 'Tier 3', 'prime': 'Prime' };
-    badge.textContent = tierNames[tier] || 'Tier ' + tier;
-    badge.className = 'tier-badge tier-badge--' + (tier === 'prime' ? '1' : tier);
+    badge.textContent = tierNames[tierNum] || 'Tier ' + tierNum;
+    badge.className = 'tier-badge tier-badge--' + (tierNum === 'prime' ? '1' : tierNum);
   </script>
 
 </body>
