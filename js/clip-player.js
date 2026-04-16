@@ -49,8 +49,8 @@ var ClipPlayer = (function () {
 
     var params       = new URLSearchParams(window.location.search);
     var channel      = params.get('channel') || 'LuCKoR_HD';
-    var clientId     = params.get('client_id');
-    var clientSecret = params.get('client_secret');
+    var clientId     = params.get('client_id') || window.__TWITCH_CLIENT_ID__ || '';
+    var clientSecret = params.get('client_secret') || window.__TWITCH_CLIENT_SECRET__ || '';
     var manualClips  = params.get('clips');
     var clipCount    = parseInt(params.get('count'), 10) || 100;
 

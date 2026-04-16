@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Lokaler Server für obs-stream-kit.
-Liest .secrets und zeigt die fertigen URLs mit Credentials.
+Liest .secrets und injiziert Twitch-Credentials automatisch in HTML-Seiten.
+Keine URL-Parameter nötig.
 
 Usage:
   python serve.py          # Port 8080
@@ -27,35 +28,59 @@ if os.path.exists(secrets_path):
             elif line.startswith("Client-Secret:"):
                 secrets["client_secret"] = line.split(":", 1)[1].strip()
 
+# Script-Tag der in HTML-Seiten injiziert wird
+inject_script = ""
+if secrets.get("client_id") and secrets.get("client_secret"):
+    inject_script = (
+        '<script>'
+        'window.__TWITCH_CLIENT_ID__="' + secrets["client_id"] + '";'
+        'window.__TWITCH_CLIENT_SECRET__="' + secrets["client_secret"] + '";'
+        '</script>'
+    )
+
 os.chdir(ROOT)
 
+
 class Handler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        # Nur HTML-Dateien modifizieren
+        path = self.translate_path(self.path.split("?")[0])
+        if path.endswith(".html") and inject_script and os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+            # Script direkt nach <head> injizieren
+            content = content.replace("<head>", "<head>" + inject_script, 1)
+            data = content.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        else:
+            super().do_GET()
+
     def log_message(self, format, *args):
-        # Kompakteres Log
         sys.stderr.write(f"  {args[0]}\n")
+
 
 print()
 print("=" * 60)
 print("  obs-stream-kit Server")
 print("=" * 60)
 
-if secrets.get("client_id") and secrets.get("client_secret"):
-    qs = f"client_id={secrets['client_id']}&client_secret={secrets['client_secret']}"
+if inject_script:
     print()
-    print("  Szenen (mit Twitch Clips):")
-    print(f"  BRB:           http://{HOST}:{PORT}/scenes/brb-pause.html?{qs}")
-    print(f"  Starting Soon: http://{HOST}:{PORT}/scenes/starting-soon.html?{qs}")
-    print(f"  Stream Ending: http://{HOST}:{PORT}/scenes/stream-ending.html?{qs}")
+    print("  .secrets geladen - Credentials werden automatisch injiziert!")
+    print()
+    print("  Szenen:")
+    print(f"  BRB:           http://{HOST}:{PORT}/scenes/brb-pause.html")
+    print(f"  Starting Soon: http://{HOST}:{PORT}/scenes/starting-soon.html")
+    print(f"  Stream Ending: http://{HOST}:{PORT}/scenes/stream-ending.html")
 else:
     print()
     print("  WARNUNG: .secrets nicht gefunden oder unvollstaendig!")
     print("  Kopiere .secrets.example nach .secrets und trage deine Twitch-Daten ein.")
 
-print()
-print("  Szenen (ohne Clips):")
-print(f"  BRB:           http://{HOST}:{PORT}/scenes/brb-pause.html")
-print(f"  Starting Soon: http://{HOST}:{PORT}/scenes/starting-soon.html")
-print(f"  Stream Ending: http://{HOST}:{PORT}/scenes/stream-ending.html")
 print(f"  Gameplay:      http://{HOST}:{PORT}/scenes/gameplay.html")
 print(f"  Just Chatting: http://{HOST}:{PORT}/scenes/just-chatting.html")
 print()
@@ -63,7 +88,7 @@ print("  Widgets:")
 print(f"  Logo:          http://{HOST}:{PORT}/widgets/logo.html")
 print(f"  Webcam-Frame:  http://{HOST}:{PORT}/widgets/webcam-frame.html")
 print()
-print(f"  Server laeuft auf http://{HOST}:{PORT}")
+print(f"  Server: http://{HOST}:{PORT}")
 print(f"  Beenden mit Ctrl+C")
 print("=" * 60)
 print()
