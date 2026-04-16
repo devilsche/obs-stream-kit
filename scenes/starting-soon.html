@@ -286,7 +286,10 @@
       height: 100%;
       border: none;
       display: block;
+      opacity: 1;
+      transition: opacity 0.8s ease;
     }
+    .clip-player iframe.fade-out { opacity: 0; }
 
     .clip-player .clip-placeholder {
       display: flex;
@@ -297,6 +300,34 @@
       font-size: 13px;
       letter-spacing: 1px;
     }
+
+    .countdown-overlay {
+      position: absolute; inset: 0;
+      background: rgba(13, 13, 26, 0.92);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 14px; z-index: 15;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+    .countdown-overlay--visible { opacity: 1; }
+    .countdown__label { font-size: 11px; font-weight: 400; letter-spacing: 3px; text-transform: uppercase; color: var(--color-gold); }
+    .countdown__title { font-size: 15px; font-weight: 700; color: var(--color-text); text-align: center; max-width: 90%; line-height: 1.3; }
+    .countdown__timer { font-size: 48px; font-weight: 900; color: var(--color-gold); text-shadow: 0 0 12px rgba(242, 183, 5, 0.3); }
+
+    .countdown__timer.boom-3 { color: var(--color-gold); text-shadow: 0 0 10px rgba(242, 183, 5, 0.4); animation: boom3 0.4s cubic-bezier(0.22, 1.2, 0.36, 1); }
+    .countdown__timer.boom-2 { color: var(--color-gold); text-shadow: 0 0 16px rgba(242, 183, 5, 0.6); animation: boom2 0.45s cubic-bezier(0.22, 1.2, 0.36, 1); }
+    .countdown__timer.boom-1 { color: var(--color-gold); text-shadow: 0 0 24px rgba(242, 183, 5, 0.8); animation: boom1 0.5s cubic-bezier(0.22, 1.2, 0.36, 1); }
+
+    @keyframes boom3 { 0% { transform: scale(1.3); opacity: 0.5; } 50% { transform: scale(0.95); opacity: 1; } 100% { transform: scale(1); } }
+    @keyframes boom2 { 0% { transform: scale(1.6); opacity: 0.4; } 50% { transform: scale(0.93); opacity: 1; } 70% { transform: scale(1.03); } 100% { transform: scale(1); } }
+    @keyframes boom1 { 0% { transform: scale(2); opacity: 0.3; } 45% { transform: scale(0.9); opacity: 1; } 65% { transform: scale(1.06); } 100% { transform: scale(1); } }
+
+    .clip-meta { width: 660px; padding: 10px 12px; display: flex; align-items: baseline; gap: 14px; opacity: 0; transition: opacity 0.6s ease; }
+    .clip-meta--visible { opacity: 1; }
+    .clip-meta__title { flex: 1; font-size: 13px; font-weight: 700; color: var(--color-gold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .clip-meta__detail { font-size: 11px; color: var(--color-text-muted); white-space: nowrap; display: flex; align-items: center; gap: 5px; }
+    .clip-meta__dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(94, 42, 121, 0.6); }
 
     @keyframes fadeOut {
       0%   { opacity: 1; }
@@ -375,9 +406,20 @@
       <div class="divider"></div>
       <p class="subtitle">Stream beginnt gleich</p>
     </div>
-    <div class="clip-player" id="clipContainer">
-      <div class="clip-placeholder" id="clipPlaceholder">
-        <p class="clip-placeholder__text">Clips laden...</p>
+    <div>
+      <div class="clip-player" id="clipContainer">
+        <div class="clip-placeholder" id="clipPlaceholder">
+          <p class="clip-placeholder__text">Clips laden...</p>
+        </div>
+        <div class="countdown-overlay" id="countdownOverlay">
+          <span class="countdown__label">Nächster Clip</span>
+          <p class="countdown__title" id="countdownTitle"></p>
+          <span class="countdown__timer" id="countdownTimer"></span>
+        </div>
+      </div>
+      <div class="clip-meta" id="clipMeta">
+        <span class="clip-meta__title" id="clipMetaTitle"></span>
+        <span class="clip-meta__detail" id="clipMetaDetails"></span>
       </div>
     </div>
   </div>
@@ -440,7 +482,7 @@
     })();
 
     // Clip-Player (stumm, läuft im Hintergrund)
-    ClipPlayer.init({ containerId: 'clipContainer', muted: false });
+    ClipPlayer.init({ containerId: 'clipContainer', muted: false, countdown: 10 });
   </script>
 </body>
 </html>
