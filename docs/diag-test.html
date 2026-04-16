@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Exakte Streifen-Polygone</title>
+  <style>
+    body {
+      background: #111;
+      color: #fff;
+      font-family: system-ui, sans-serif;
+      padding: 20px;
+    }
+    h1 { font-size: 20px; margin-bottom: 6px; color: #f2b705; }
+    .hint { font-size: 12px; color: #888; margin-bottom: 20px; }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .row-label {
+      width: 100px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #c9a0dc;
+      flex-shrink: 0;
+    }
+    .stripe-box {
+      position: relative;
+      width: 140px;
+      height: 53px;
+      overflow: hidden;
+      border: 1px solid #333;
+      flex-shrink: 0;
+    }
+    .stripe-img {
+      position: absolute;
+      inset: 0;
+      background: url('../assets/logo_lines_blue.png') no-repeat center center;
+      background-size: contain;
+    }
+    .stripe-num {
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-size: 9px;
+      color: rgba(255,255,255,0.5);
+      z-index: 2;
+    }
+
+    h2 { font-size: 16px; color: #c9a0dc; margin: 30px 0 10px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Exakte Streifen-Polygone (aus Pixeldaten berechnet)</h1>
+  <p class="hint">Jeder Streifen mit seinem exakten clip-path Polygon. Passt das?</p>
+
+  <h2>Exakte Polygone (aus Bild gemessen + extrapoliert)</h2>
+  <div id="exact"></div>
+
+  <h2>Vergleich: Scan-Band mit offset=20, breite=8</h2>
+  <div id="scan20"></div>
+
+  <h2>Alle 8 gleichzeitig (exakt)</h2>
+  <div id="allExact"></div>
+
+  <script>
+    // Exakt gemessen und auf volle Container-Höhe extrapoliert
+    // [tl, bl, tr, br] → polygon(bl% 100%, tl% 0, tr% 0, br% 100%)
+    var EXACT = [
+      [21.3, 1.6, 29.1, 8.5],
+      [31.3, 11.7, 39.1, 18.5],
+      [41.4, 21.5, 49.1, 28.5],
+      [51.5, 31.2, 59.1, 38.5],
+      [61.6, 41.3, 69.2, 48.6],
+      [71.4, 51.7, 79.2, 58.6],
+      [81.4, 61.8, 89.2, 68.6],
+      [91.4, 71.8, 99.2, 78.6],
+    ];
+
+    function makeStripeBox(clipPath, label) {
+      var box = document.createElement('div');
+      box.className = 'stripe-box';
+      var img = document.createElement('div');
+      img.className = 'stripe-img';
+      img.style.clipPath = clipPath;
+      var num = document.createElement('div');
+      num.className = 'stripe-num';
+      num.textContent = label;
+      box.appendChild(img);
+      box.appendChild(num);
+      return box;
+    }
+
+    // --- Exakte Polygone ---
+    var exactDiv = document.getElementById('exact');
+    var row = document.createElement('div');
+    row.className = 'row';
+    var label = document.createElement('div');
+    label.className = 'row-label';
+    label.textContent = 'Exakt';
+    row.appendChild(label);
+    EXACT.forEach(function(s, i) {
+      var cp = 'polygon(' + s[1] + '% 100%, ' + s[0] + '% 0, ' + s[2] + '% 0, ' + s[3] + '% 100%)';
+      row.appendChild(makeStripeBox(cp, (i+1)));
+    });
+    exactDiv.appendChild(row);
+
+    // --- Scan-Band offset=20 ---
+    var scan20Div = document.getElementById('scan20');
+    var row2 = document.createElement('div');
+    row2.className = 'row';
+    var label2 = document.createElement('div');
+    label2.className = 'row-label';
+    label2.textContent = 'off=20 w=8';
+    row2.appendChild(label2);
+    var centers = [5, 15, 25, 35, 45, 55, 65, 75];
+    centers.forEach(function(c, i) {
+      var bl = c - 4, br = c + 4, tl = bl + 20, tr = br + 20;
+      var cp = 'polygon(' + bl + '% 100%, ' + tl + '% 0, ' + tr + '% 0, ' + br + '% 100%)';
+      row2.appendChild(makeStripeBox(cp, (i+1)));
+    });
+    scan20Div.appendChild(row2);
+
+    // --- Alle exakt gleichzeitig ---
+    var allDiv = document.getElementById('allExact');
+    var row3 = document.createElement('div');
+    row3.className = 'row';
+    var label3 = document.createElement('div');
+    label3.className = 'row-label';
+    label3.textContent = 'Alle 8';
+    row3.appendChild(label3);
+
+    var bigBox = document.createElement('div');
+    bigBox.className = 'stripe-box';
+    bigBox.style.width = '400px';
+    bigBox.style.height = '152px';
+    EXACT.forEach(function(s) {
+      var img = document.createElement('div');
+      img.className = 'stripe-img';
+      img.style.clipPath = 'polygon(' + s[1] + '% 100%, ' + s[0] + '% 0, ' + s[2] + '% 0, ' + s[3] + '% 100%)';
+      bigBox.appendChild(img);
+    });
+    row3.appendChild(bigBox);
+    allDiv.appendChild(row3);
+  </script>
+</body>
+</html>

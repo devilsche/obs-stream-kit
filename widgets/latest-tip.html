@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=1920, height=1080" />
+  <meta name="viewport" content="width=500, height=100" />
   <title>Latest Tip</title>
   <style>
     @font-face {
@@ -20,18 +20,23 @@
     }
 
     html, body {
-      width: 1920px;
-      height: 1080px;
+      width: 500px;
+      height: 100px;
       overflow: hidden;
       background: transparent;
       font-family: 'DM Sans', sans-serif;
     }
 
+    @keyframes widgetGlow {
+      0%, 100% { box-shadow: 0 0 8px rgba(242,183,5,0.2), 0 0 20px rgba(242,183,5,0.1); }
+      50% { box-shadow: 0 0 15px rgba(242,183,5,0.5), 0 0 35px rgba(242,183,5,0.2); }
+    }
+
     .widget-box {
       position: absolute;
       top: 50%;
-      left: 20px;
-      transform: translateY(-50%) translateX(-120%);
+      left: 10px;
+      transform: translateY(-50%);
       display: flex;
       align-items: center;
       gap: 16px;
@@ -42,6 +47,7 @@
       padding: 12px 24px;
       max-width: 400px;
       box-shadow: 0 0 20px rgba(242, 183, 5, 0.15);
+      animation: widgetGlow 3s ease-in-out infinite;
     }
 
     .widget-content {
@@ -81,21 +87,18 @@
     const amount = params.get('amount');
 
     document.querySelector('.widget-name').textContent = amount ? `${name} — ${amount}` : name;
+  </script>
 
-    function playEntrance() {
-      document.querySelector('.widget-box').animate([
-        { transform: 'translateY(-50%) translateX(-120%)' },
-        { transform: 'translateY(-50%) translateX(0)' }
-      ], { duration: 300, easing: 'ease-out', fill: 'forwards' });
-    }
-
-    if (document.visibilityState === 'visible') {
-      playEntrance();
-    } else {
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') playEntrance();
-      });
-    }
+  <div id="sparkle-wrap" style="position:absolute;top:0;left:0;width:500px;height:100px;overflow:visible;pointer-events:none;"></div>
+  <script src="../js/sparkles.js"></script>
+  <script>
+    new SparkleEngine(document.getElementById('sparkle-wrap'), {
+      count: 3,
+      speed: 0.15,
+      maxOpacity: 0.75,
+      sizeWeights: { big: 0, normal: 0.1, small: 0.5, tiny: 0.4 },
+      fixedColor: 'gold'
+    }).start();
   </script>
 
 </body>

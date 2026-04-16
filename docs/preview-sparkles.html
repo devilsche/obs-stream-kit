@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Vorschau — Sparkles & Glow Upgrade</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: swap;
+    }
+
+    *, *::before, *::after {
+      margin: 0; padding: 0; box-sizing: border-box;
+    }
+
+    :root {
+      --purple: #5e2a79;
+      --purple-light: #c9a0dc;
+      --gold: #f2b705;
+      --bg-dark: #0d0d1a;
+      --bg-purple: #1a0d2e;
+    }
+
+    body {
+      background: #09090f;
+      color: #fff;
+      font-family: 'DM Sans', system-ui, sans-serif;
+      padding: 40px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 28px;
+      margin-bottom: 10px;
+      background: linear-gradient(90deg, var(--purple-light), var(--gold));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 50px;
+      font-size: 14px;
+    }
+
+    section {
+      margin-bottom: 60px;
+    }
+
+    h2 {
+      font-size: 18px;
+      color: var(--gold);
+      margin-bottom: 6px;
+      letter-spacing: 1px;
+    }
+
+    .desc {
+      color: #888;
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+
+    .badge-new {
+      display: inline-block;
+      background: var(--gold);
+      color: #000;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 3px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    .badge-mod {
+      display: inline-block;
+      background: var(--purple);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 3px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    /* ─── Preview Containers ─────────────────────────────── */
+
+    .preview-box {
+      position: relative;
+      border: 1px solid #222;
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--bg-dark);
+    }
+
+    /* ─── 1. Webcam Frame Preview ────────────────────────── */
+
+    .webcam-preview {
+      width: 700px;
+      height: 420px;
+      background: #00b140;
+      margin: 0 auto;
+    }
+
+    .webcam-cutout {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 400px;
+      height: 225px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 4px;
+    }
+
+    /* SVG Lightning Arcs */
+    .webcam-preview svg.arc-svg {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 440px;
+      height: 265px;
+      pointer-events: none;
+    }
+
+    .arc-line {
+      fill: none;
+      stroke-width: 2;
+      filter: url(#arcGlow);
+    }
+
+    .arc-top, .arc-left { stroke: var(--purple-light); }
+    .arc-bottom, .arc-right { stroke: var(--gold); }
+
+    @keyframes arcFlicker1 {
+      0%, 100% { opacity: 0.3; }
+      15% { opacity: 1; }
+      30% { opacity: 0.5; }
+      50% { opacity: 0.9; }
+      70% { opacity: 0.4; }
+      85% { opacity: 1; }
+    }
+    @keyframes arcFlicker2 {
+      0%, 100% { opacity: 0.5; }
+      20% { opacity: 0.9; }
+      40% { opacity: 0.3; }
+      60% { opacity: 1; }
+      80% { opacity: 0.6; }
+    }
+    @keyframes arcFlicker3 {
+      0%, 100% { opacity: 0.4; }
+      25% { opacity: 1; }
+      50% { opacity: 0.6; }
+      75% { opacity: 0.2; }
+    }
+    @keyframes arcFlicker4 {
+      0%, 100% { opacity: 0.6; }
+      30% { opacity: 0.2; }
+      55% { opacity: 1; }
+      80% { opacity: 0.5; }
+    }
+
+    .arc-top    { animation: arcFlicker1 3.5s ease-in-out infinite; }
+    .arc-bottom { animation: arcFlicker2 4.2s ease-in-out infinite; }
+    .arc-left   { animation: arcFlicker3 3.8s ease-in-out infinite; }
+    .arc-right  { animation: arcFlicker4 5.0s ease-in-out infinite; }
+
+    /* Spark points — per JS animiert und repositioniert */
+    .spark-point {
+      fill: #fff;
+      filter: url(#arcGlow);
+    }
+
+    /* ─── 2. Logo Preview ────────────────────────────────── */
+
+    .logo-preview {
+      width: 500px;
+      height: 200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-demo {
+      position: relative;
+      width: 300px;
+      height: 114px;
+    }
+
+    .logo-img-wrap {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .logo-img-wrap .text-layer {
+      position: absolute;
+      inset: 0;
+      background: url('../assets/Chrome_Text.png') no-repeat center center;
+      background-size: contain;
+      z-index: 2;
+    }
+
+    .logo-img-wrap .stripes-layer {
+      position: absolute;
+      inset: 0;
+      background: url('../assets/Chrome_Streifen.png') no-repeat center center;
+      background-size: contain;
+      filter: hue-rotate(40deg) saturate(2.0) brightness(0.65) contrast(1.2);
+      z-index: 1;
+    }
+
+    /* (Knight Rider = Streifen selbst blinken einzeln) */
+
+    @keyframes logoGlow {
+      0%, 100% {
+        filter: drop-shadow(0 0 8px rgba(94, 42, 121, 0.8)) drop-shadow(0 0 20px rgba(94, 42, 121, 0.4));
+      }
+      50% {
+        filter: drop-shadow(0 0 12px rgba(242, 183, 5, 0.9)) drop-shadow(0 0 30px rgba(242, 183, 5, 0.5));
+      }
+    }
+
+    .logo-demo {
+      animation: logoGlow 2.5s ease-in-out infinite;
+    }
+
+    /* ─── 3. Gameplay Preview ────────────────────────────── */
+
+    .gameplay-preview {
+      width: 700px;
+      height: 300px;
+      margin: 0 auto;
+      background: linear-gradient(135deg, var(--bg-dark), var(--bg-purple) 50%, var(--bg-dark));
+      opacity: 0.5;
+    }
+
+    .gameplay-label {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #444;
+      font-size: 14px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ─── 4. Just Chatting Preview ───────────────────────── */
+
+    .jc-preview {
+      width: 700px;
+      height: 400px;
+      margin: 0 auto;
+      background: linear-gradient(135deg, var(--bg-dark), var(--bg-purple) 50%, var(--bg-dark));
+    }
+
+    .jc-cam {
+      position: absolute;
+      top: 5%;
+      left: 3%;
+      height: 90%;
+      aspect-ratio: 1/1;
+      border: 2px solid rgba(94, 42, 121, 0.6);
+      border-radius: 10px;
+      box-shadow: 0 0 25px rgba(94, 42, 121, 0.3);
+      background: rgba(0,0,0,0.2);
+    }
+
+    .jc-cam svg.jc-arc-svg {
+      position: absolute;
+      inset: -20px;
+      width: calc(100% + 40px);
+      height: calc(100% + 40px);
+      pointer-events: none;
+    }
+
+    .jc-chat {
+      position: absolute;
+      top: 5%;
+      right: 3%;
+      width: 38%;
+      bottom: 5%;
+      border-radius: 10px;
+      border: 1px solid rgba(242, 183, 5, 0.3);
+      background: rgba(242, 183, 5, 0.08);
+    }
+
+    .jc-chat-label {
+      padding: 12px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      border-bottom: 1px solid rgba(242, 183, 5, 0.2);
+    }
+
+    /* ─── 5. Info Widget Preview ─────────────────────────── */
+
+    .widgets-row {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .widget-demo {
+      position: relative;
+      width: 280px;
+      height: 70px;
+      background: rgba(13, 13, 26, 0.95);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      overflow: visible;
+    }
+
+    .widget-demo--gold {
+      border-left: 3px solid var(--gold);
+      animation: widgetGlowGold 3s ease-in-out infinite;
+    }
+
+    .widget-demo--purple {
+      border-left: 3px solid var(--purple);
+      animation: widgetGlowPurple 3s ease-in-out infinite;
+    }
+
+    @keyframes widgetGlowGold {
+      0%, 100% { box-shadow: 0 0 8px rgba(242, 183, 5, 0.2), 0 0 20px rgba(242, 183, 5, 0.1); }
+      50% { box-shadow: 0 0 15px rgba(242, 183, 5, 0.5), 0 0 35px rgba(242, 183, 5, 0.2); }
+    }
+
+    @keyframes widgetGlowPurple {
+      0%, 100% { box-shadow: 0 0 8px rgba(94, 42, 121, 0.2), 0 0 20px rgba(94, 42, 121, 0.1); }
+      50% { box-shadow: 0 0 15px rgba(94, 42, 121, 0.5), 0 0 35px rgba(94, 42, 121, 0.2); }
+    }
+
+    .widget-label {
+      font-size: 10px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .widget-value {
+      font-size: 16px;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    .widget-value--gold { color: var(--gold); }
+    .widget-value--purple { color: var(--purple-light); }
+
+    /* ─── Sparkle (shared) ───────────────────────────────── */
+
+    .sparkle {
+      position: absolute;
+      pointer-events: none;
+      font-family: serif;
+      z-index: 20;
+    }
+
+    .sparkle--gold   { color: var(--gold);         text-shadow: 0 0 6px rgba(242,183,5,0.8), 0 0 15px rgba(242,183,5,0.4); }
+    .sparkle--purple { color: var(--purple-light);  text-shadow: 0 0 6px rgba(201,160,220,0.8), 0 0 15px rgba(201,160,220,0.4); }
+    .sparkle--white  { color: #fff;                 text-shadow: 0 0 6px rgba(255,255,255,0.8), 0 0 15px rgba(255,255,255,0.4); }
+
+    .sparkle--big    { font-size: 20px; }
+    .sparkle--normal { font-size: 14px; }
+    .sparkle--small  { font-size: 9px; }
+    .sparkle--tiny   { font-size: 6px; }
+  </style>
+</head>
+<body>
+
+  <h1>Sparkles & Glow Upgrade — Vorschau</h1>
+  <p class="subtitle">Alle geplanten visuellen Änderungen auf einen Blick</p>
+
+  <!-- Shared SVG filter -->
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <filter id="arcGlow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+  </svg>
+
+  <!-- ════════ 1. Webcam Frame ════════ -->
+  <section>
+    <h2>widgets/webcam-frame.html <span class="badge-new">NEU</span></h2>
+    <p class="desc">Standalone Webcam-Widget mit Chroma-Key, SVG Blitz-Arcs und fliegenden Sparkles</p>
+    <div class="preview-box webcam-preview" id="webcamPreview">
+      <div class="webcam-cutout"></div>
+      <svg class="arc-svg" viewBox="0 0 440 265" fill="none">
+        <!-- Top arc -->
+        <polyline class="arc-line arc-top" points="5,5 50,8 110,3 160,7 220,4 280,8 330,3 390,7 435,5" />
+        <!-- Bottom arc -->
+        <polyline class="arc-line arc-bottom" points="5,260 60,257 120,262 180,258 240,261 300,257 360,262 400,258 435,260" />
+        <!-- Left arc -->
+        <polyline class="arc-line arc-left" points="5,5 8,40 3,80 7,120 4,160 8,200 3,230 5,260" />
+        <!-- Right arc -->
+        <polyline class="arc-line arc-right" points="435,5 432,45 437,90 433,130 436,170 432,210 437,240 435,260" />
+        <!-- Spark points — JS-gesteuert -->
+        <circle class="spark-point" cx="0" cy="0" r="3" opacity="0" data-arc="top" />
+        <circle class="spark-point" cx="0" cy="0" r="3" opacity="0" data-arc="top" />
+        <circle class="spark-point" cx="0" cy="0" r="3" opacity="0" data-arc="bottom" />
+        <circle class="spark-point" cx="0" cy="0" r="3" opacity="0" data-arc="left" />
+        <circle class="spark-point" cx="0" cy="0" r="3" opacity="0" data-arc="right" />
+        <circle class="spark-point" cx="0" cy="0" r="3" opacity="0" data-arc="bottom" />
+      </svg>
+    </div>
+  </section>
+
+  <!-- ════════ 2. Logo ════════ -->
+  <section>
+    <h2>widgets/logo.html <span class="badge-mod">UPGRADE</span></h2>
+    <p class="desc">Streifen einzeln WEG → Knight Rider Scan → Streifen einzeln HIN → Pause → Loop. Plus Glow + Sparkles.</p>
+    <div class="preview-box logo-preview" id="logoPreview">
+      <div class="logo-demo" id="logoDemoEl">
+        <div class="logo-img-wrap">
+          <div class="stripes-layer" id="logoStripes"></div>
+          <div class="text-layer"></div>
+          <!-- Knight Rider: Streifen selbst blinken -->
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════ 3. Gameplay ════════ -->
+  <section>
+    <h2>scenes/gameplay.html <span class="badge-mod">MODIFIZIERT</span></h2>
+    <p class="desc">Cam-Frame entfernt — nur noch dezente Sparkles auf transparentem Canvas</p>
+    <div class="preview-box gameplay-preview" id="gameplayPreview">
+      <div class="gameplay-label">Transparenter Hintergrund — nur Sparkles</div>
+    </div>
+  </section>
+
+  <!-- ════════ 4. Just Chatting ════════ -->
+  <section>
+    <h2>scenes/just-chatting.html <span class="badge-mod">MODIFIZIERT</span></h2>
+    <p class="desc">Bestehende Elemente + Blitz-Arcs um den Cam-Rahmen + fliegende Sparkles im Cam-Bereich</p>
+    <div class="preview-box jc-preview" id="jcPreview">
+      <div class="jc-cam">
+        <svg class="jc-arc-svg" viewBox="0 0 100 100" preserveAspectRatio="none" fill="none">
+          <polyline class="arc-line arc-top" points="2,2 15,4 30,1 45,3 60,1 75,4 90,2 98,2" vector-effect="non-scaling-stroke" stroke-width="1.5"/>
+          <polyline class="arc-line arc-bottom" points="2,98 18,96 35,99 50,97 65,99 80,96 95,98 98,98" vector-effect="non-scaling-stroke" stroke-width="1.5"/>
+          <polyline class="arc-line arc-left" points="2,2 4,15 1,30 3,50 1,70 4,85 2,98" vector-effect="non-scaling-stroke" stroke-width="1.5"/>
+          <polyline class="arc-line arc-right" points="98,2 96,20 99,40 97,55 99,75 96,90 98,98" vector-effect="non-scaling-stroke" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <div class="jc-chat">
+        <div class="jc-chat-label">Chat</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════ 5. Info Widgets ════════ -->
+  <section>
+    <h2>Info-Widgets <span class="badge-mod">MODIFIZIERT</span></h2>
+    <p class="desc">Pulsierender Neon-Glow + dezente Sparkles auf allen 4 Info-Widgets</p>
+    <div class="widgets-row" id="widgetsPreview">
+      <div class="widget-demo widget-demo--gold">
+        <div>
+          <div class="widget-label">Latest Follower</div>
+          <div class="widget-value widget-value--gold">StreamFan42</div>
+        </div>
+      </div>
+      <div class="widget-demo widget-demo--purple">
+        <div>
+          <div class="widget-label">Latest Sub</div>
+          <div class="widget-value widget-value--purple">NightOwl_99</div>
+        </div>
+      </div>
+      <div class="widget-demo widget-demo--gold">
+        <div>
+          <div class="widget-label">Latest Tip</div>
+          <div class="widget-value widget-value--gold">xGenPlayer · 5,00 €</div>
+        </div>
+      </div>
+      <div class="widget-demo widget-demo--purple">
+        <div>
+          <div class="widget-label">Sub Goal</div>
+          <div class="widget-value widget-value--purple">42 / 100</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    /* ─── Sparkle Engine ──────────────────────────────────── */
+
+    const COLORS = ['gold', 'purple', 'white'];
+    const COLOR_WEIGHTS = [0.35, 0.35, 0.30];
+    const SIZES = ['big', 'normal', 'small', 'tiny'];
+
+    function pickColor() {
+      const r = Math.random();
+      if (r < COLOR_WEIGHTS[0]) return 'gold';
+      if (r < COLOR_WEIGHTS[0] + COLOR_WEIGHTS[1]) return 'purple';
+      return 'white';
+    }
+
+    function pickSize(weights) {
+      const r = Math.random();
+      let sum = 0;
+      for (let i = 0; i < weights.length; i++) {
+        sum += weights[i];
+        if (r < sum) return SIZES[i];
+      }
+      return SIZES[SIZES.length - 1];
+    }
+
+    class Sparkle {
+      constructor(container, opts = {}) {
+        this.container = container;
+        const rect = container.getBoundingClientRect();
+        this.w = rect.width;
+        this.h = rect.height;
+
+        this.x = Math.random() * this.w;
+        this.y = Math.random() * this.h;
+        this.vx = (Math.random() - 0.5) * (opts.speed || 0.5);
+        this.vy = (Math.random() - 0.5) * (opts.speed || 0.5);
+        this.wobblePhase = Math.random() * Math.PI * 2;
+        this.wobbleSpeed = 0.005 + Math.random() * 0.01;
+        this.fadePhase = Math.random() * Math.PI * 2;
+        this.fadeCycle = 4000 + Math.random() * 4000;
+        this.maxOpacity = opts.maxOpacity || 1.0;
+
+        const color = opts.color || pickColor();
+        const sizeWeights = opts.sizeWeights || [0.15, 0.35, 0.35, 0.15];
+        const size = pickSize(sizeWeights);
+
+        this.el = document.createElement('span');
+        this.el.className = `sparkle sparkle--${color} sparkle--${size}`;
+        this.el.textContent = '✦';
+        this.el.style.position = 'absolute';
+        container.appendChild(this.el);
+      }
+
+      update(t) {
+        // Wobble
+        this.vx += Math.sin(this.wobblePhase + t * this.wobbleSpeed) * 0.01;
+        this.vy += Math.cos(this.wobblePhase + t * this.wobbleSpeed * 0.7) * 0.01;
+
+        // Random direction change
+        if (Math.random() < 0.003) {
+          this.vx += (Math.random() - 0.5) * 0.3;
+          this.vy += (Math.random() - 0.5) * 0.3;
+        }
+
+        // Damping
+        this.vx *= 0.999;
+        this.vy *= 0.999;
+
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Wrap around
+        if (this.x < -20) this.x = this.w + 10;
+        if (this.x > this.w + 20) this.x = -10;
+        if (this.y < -20) this.y = this.h + 10;
+        if (this.y > this.h + 20) this.y = -10;
+
+        // Fade
+        const fade = (Math.sin(this.fadePhase + t / this.fadeCycle * Math.PI * 2) + 1) / 2;
+        const opacity = (0.1 + fade * 0.9) * this.maxOpacity;
+
+        this.el.style.transform = `translate(${this.x}px, ${this.y}px)`;
+        this.el.style.opacity = opacity;
+      }
+    }
+
+    function createSparkles(container, count, opts = {}) {
+      const sparkles = [];
+      for (let i = 0; i < count; i++) {
+        sparkles.push(new Sparkle(container, opts));
+      }
+      return sparkles;
+    }
+
+    /* ─── Create all sparkles ─────────────────────────────── */
+
+    const allSparkles = [];
+
+    // 1. Webcam: 14 sparkles, full speed
+    allSparkles.push(...createSparkles(
+      document.getElementById('webcamPreview'), 14,
+      { speed: 0.5 }
+    ));
+
+    // 2. Logo: 6 small sparkles around logo
+    allSparkles.push(...createSparkles(
+      document.getElementById('logoPreview'), 6,
+      { speed: 0.25, sizeWeights: [0, 0.2, 0.5, 0.3], maxOpacity: 0.85 }
+    ));
+
+    // 3. Gameplay: 18 subtle sparkles
+    allSparkles.push(...createSparkles(
+      document.getElementById('gameplayPreview'), 18,
+      { speed: 0.3, maxOpacity: 0.7, sizeWeights: [0.05, 0.2, 0.4, 0.35] }
+    ));
+
+    // 4. Just Chatting: 10 sparkles in cam area
+    allSparkles.push(...createSparkles(
+      document.querySelector('.jc-cam'), 10,
+      { speed: 0.35, maxOpacity: 0.85 }
+    ));
+
+    // 5. Info Widgets: 3 small sparkles per widget
+    document.querySelectorAll('.widget-demo').forEach(w => {
+      allSparkles.push(...createSparkles(w, 3, {
+        speed: 0.15,
+        sizeWeights: [0, 0.1, 0.5, 0.4],
+        maxOpacity: 0.75,
+        color: w.classList.contains('widget-demo--gold') ? 'gold' : 'purple'
+      }));
+    });
+
+    /* ─── Spark Points auf Arc-Linien ────────────────────────
+       Glow an → Glow weg → neue Position auf der Linie → repeat
+    ──────────────────────────────────────────────────────── */
+
+    (function sparkPointsAnim() {
+      // Die Polyline-Punkte pro Kante (aus dem SVG)
+      const arcPaths = {
+        top:    [[5,5],[50,8],[110,3],[160,7],[220,4],[280,8],[330,3],[390,7],[435,5]],
+        bottom: [[5,260],[60,257],[120,262],[180,258],[240,261],[300,257],[360,262],[400,258],[435,260]],
+        left:   [[5,5],[8,40],[3,80],[7,120],[4,160],[8,200],[3,230],[5,260]],
+        right:  [[435,5],[432,45],[437,90],[433,130],[436,170],[432,210],[437,240],[435,260]],
+      };
+
+      // Zufälligen Punkt auf einer Polyline interpolieren
+      function randomPointOnArc(arcName) {
+        const pts = arcPaths[arcName];
+        // Zufälliges Segment wählen
+        const seg = Math.floor(Math.random() * (pts.length - 1));
+        const t = Math.random();
+        const x = pts[seg][0] + (pts[seg + 1][0] - pts[seg][0]) * t;
+        const y = pts[seg][1] + (pts[seg + 1][1] - pts[seg][1]) * t;
+        return [x, y];
+      }
+
+      const sparkCircles = document.querySelectorAll('.spark-point');
+
+      sparkCircles.forEach(circle => {
+        const arcName = circle.dataset.arc;
+        const initialDelay = Math.random() * 3000;
+
+        function cycle() {
+          // Neue Position auf der Linie
+          const [x, y] = randomPointOnArc(arcName);
+          circle.setAttribute('cx', x);
+          circle.setAttribute('cy', y);
+
+          // Sanft einblenden (800ms)
+          const fadeIn = circle.animate([
+            { opacity: 0, r: 2 },
+            { opacity: 1, r: 4 }
+          ], { duration: 800, easing: 'ease-in', fill: 'forwards' });
+
+          fadeIn.onfinish = () => {
+            // Kurz leuchten lassen (0.8–1.5s)
+            const holdDuration = 800 + Math.random() * 700;
+            setTimeout(() => {
+              // Sanft ausglühen (800ms)
+              const fadeOut = circle.animate([
+                { opacity: 1, r: 4 },
+                { opacity: 0, r: 2 }
+              ], { duration: 800, easing: 'ease-out', fill: 'forwards' });
+
+              fadeOut.onfinish = () => {
+                // Kurze Pause, dann neue Position
+                const pauseDuration = 400 + Math.random() * 800;
+                setTimeout(cycle, pauseDuration);
+              };
+            }, holdDuration);
+          };
+        }
+
+        setTimeout(cycle, initialDelay);
+      });
+    })();
+
+    /* ─── Logo Stripe Animation ─────────────────────────────
+       Sequence: ALLE DA → einzeln WEG → Knight Rider → einzeln HIN → Pause → Loop
+    ──────────────────────────────────────────────────────── */
+
+    (function logoAnim() {
+      const stripes = document.getElementById('logoStripes');
+      const STEP_MS = 200;
+      const KNIGHT_STEP_MS = 84;
+
+      // Knight Rider: exakt eine Streifen-Breite
+      const KR_BAND_WIDTH = 8;
+      const KR_DIAG_OFFSET = 8;
+
+      const revealEdges = [
+        [0,    0   ],
+        [23,   15  ],
+        [33,   25  ],
+        [43,   35  ],
+        [53,   45  ],
+        [63,   55  ],
+        [73,   65  ],
+        [83,   75  ],
+        [100,  100 ],
+      ];
+
+      const hideEdges = [
+        [0,    0   ],
+        [23,   15  ],
+        [33,   25  ],
+        [43,   35  ],
+        [53,   45  ],
+        [63,   55  ],
+        [73,   65  ],
+        [83,   75  ],
+        [100,  100 ],
+      ];
+
+      function setReveal(step) {
+        const [tr, br] = revealEdges[step];
+        stripes.style.clipPath = `polygon(0 100%, 0 0, ${tr}% 0, ${br}% 100%)`;
+      }
+
+      function setHide(step) {
+        const [tl, bl] = hideEdges[step];
+        stripes.style.clipPath = `polygon(${bl}% 100%, ${tl}% 0, 100% 0, 100% 100%)`;
+      }
+
+      function showScanBand(centerBottom) {
+        var bl = centerBottom - KR_BAND_WIDTH / 2;
+        var br = centerBottom + KR_BAND_WIDTH / 2;
+        var tl = bl + KR_DIAG_OFFSET;
+        var tr = br + KR_DIAG_OFFSET;
+        stripes.style.clipPath = `polygon(${bl}% 100%, ${tl}% 0, ${tr}% 0, ${br}% 100%)`;
+      }
+
+      function hideAll() {
+        stripes.style.clipPath = 'polygon(0 100%, 0 0, 0 0, 0 100%)';
+      }
+
+      function delay(ms) {
+        return new Promise(r => setTimeout(r, ms));
+      }
+
+      async function animateHide() {
+        for (let i = 0; i < hideEdges.length; i++) {
+          setHide(i);
+          await delay(STEP_MS);
+        }
+      }
+
+      async function animateReveal() {
+        for (let i = 0; i < revealEdges.length; i++) {
+          setReveal(i);
+          await delay(STEP_MS);
+        }
+      }
+
+      async function knightRider(sweeps) {
+        const KR_MS = 40;
+        const STEPS = 22;
+        const START = 6;
+        const END = 80;
+
+        for (let s = 0; s < sweeps; s++) {
+          for (let i = 0; i <= STEPS; i++) {
+            showScanBand(START + (END - START) * (i / STEPS));
+            await delay(KR_MS);
+          }
+          for (let i = STEPS; i >= 0; i--) {
+            showScanBand(START + (END - START) * (i / STEPS));
+            await delay(KR_MS);
+          }
+        }
+        hideAll();
+      }
+
+      async function runLoop() {
+        // Start: alle Streifen da
+        setReveal(revealEdges.length - 1);
+        await delay(1500);
+
+        // Phase 1: Streifen einzeln WEG
+        await animateHide();
+        await delay(400);
+
+        // Phase 2: Knight Rider — Streifen blinken hin und her
+        await knightRider(3);
+        await delay(400);
+
+        // Phase 3: Streifen einzeln HIN
+        await animateReveal();
+
+        // Phase 4: Kurze Pause
+        await delay(2000);
+
+        // Loop
+        runLoop();
+      }
+
+      runLoop();
+    })();
+
+    /* ─── Animation Loop ──────────────────────────────────── */
+
+    function animate(t) {
+      for (const s of allSparkles) s.update(t);
+      requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>

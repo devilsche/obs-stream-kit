@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=1920, height=1080" />
+  <meta name="viewport" content="width=500, height=120" />
   <title>Sub Goal</title>
   <style>
     @font-face {
@@ -20,18 +20,23 @@
     }
 
     html, body {
-      width: 1920px;
-      height: 1080px;
+      width: 500px;
+      height: 120px;
       overflow: hidden;
       background: transparent;
       font-family: 'DM Sans', sans-serif;
     }
 
+    @keyframes widgetGlow {
+      0%, 100% { box-shadow: 0 0 8px rgba(94,42,121,0.2), 0 0 20px rgba(94,42,121,0.1); }
+      50% { box-shadow: 0 0 15px rgba(94,42,121,0.5), 0 0 35px rgba(94,42,121,0.2); }
+    }
+
     .widget-box {
       position: absolute;
       top: 50%;
-      left: 20px;
-      transform: translateY(-50%) translateX(-120%);
+      left: 10px;
+      transform: translateY(-50%);
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -42,6 +47,7 @@
       padding: 12px 24px;
       min-width: 300px;
       box-shadow: 0 0 20px rgba(94, 42, 121, 0.15);
+      animation: widgetGlow 3s ease-in-out infinite;
     }
 
     .widget-header {
@@ -101,26 +107,19 @@
     const percentage = Math.min(100, Math.round((current / goal) * 100));
 
     document.querySelector('.widget-count').textContent = `${current} / ${goal}`;
+    document.querySelector('.progress-fill').style.width = `${percentage}%`;
+  </script>
 
-    function playEntrance() {
-      const box = document.querySelector('.widget-box');
-      const anim = box.animate([
-        { transform: 'translateY(-50%) translateX(-120%)' },
-        { transform: 'translateY(-50%) translateX(0)' }
-      ], { duration: 300, easing: 'ease-out', fill: 'forwards' });
-
-      anim.finished.then(() => {
-        document.querySelector('.progress-fill').style.width = `${percentage}%`;
-      });
-    }
-
-    if (document.visibilityState === 'visible') {
-      playEntrance();
-    } else {
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') playEntrance();
-      });
-    }
+  <div id="sparkle-wrap" style="position:absolute;top:0;left:0;width:500px;height:120px;overflow:visible;pointer-events:none;"></div>
+  <script src="../js/sparkles.js"></script>
+  <script>
+    new SparkleEngine(document.getElementById('sparkle-wrap'), {
+      count: 3,
+      speed: 0.15,
+      maxOpacity: 0.75,
+      sizeWeights: { big: 0, normal: 0.1, small: 0.5, tiny: 0.4 },
+      fixedColor: 'purple'
+    }).start();
   </script>
 
 </body>

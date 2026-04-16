@@ -36,20 +36,20 @@
       background: transparent;
     }
 
-    .cam-frame {
-      position: absolute;
-      bottom: 300px;
-      left: 10px;
-      width: 400px;
-      height: 225px;
-      border: 2px solid var(--color-purple);
-      border-radius: 6px;
-      box-shadow: 0 0 20px rgba(94, 42, 121, 0.4), 0 0 40px rgba(94, 42, 121, 0.15);
-      background: transparent;
-    }
   </style>
 </head>
 <body>
-  <div class="cam-frame"></div>
+  <div id="sparkle-container" style="position:absolute;inset:0;overflow:hidden;pointer-events:none;"></div>
+
+  <script src="../js/sparkles.js"></script>
+  <script>
+    new SparkleEngine(document.getElementById('sparkle-container'), {
+      count: 18,
+      speed: 0.3,
+      maxOpacity: 0.7,
+      colors: { gold: 0.35, purple: 0.35, white: 0.30 },
+      sizeWeights: { big: 0.05, normal: 0.2, small: 0.4, tiny: 0.35 }
+    }).start();
+  </script>
 </body>
 </html>

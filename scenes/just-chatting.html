@@ -441,9 +441,61 @@
       animation: float3 22s ease-in-out infinite;
       animation-delay: -9s;
     }
+
+    /* ─── Lightning arcs around cam frame ────────────────────────── */
+
+    .cam-arcs {
+      position: absolute;
+      inset: -15px;
+      width: calc(100% + 30px);
+      height: calc(100% + 30px);
+      pointer-events: none;
+      z-index: 6;
+    }
+
+    @keyframes flickerTop {
+      0%, 100% { opacity: 0.8; }
+      15%      { opacity: 1; }
+      30%      { opacity: 0.5; }
+      50%      { opacity: 0.9; }
+      70%      { opacity: 0.6; }
+      85%      { opacity: 1; }
+    }
+    @keyframes flickerBottom {
+      0%, 100% { opacity: 0.7; }
+      20%      { opacity: 1; }
+      40%      { opacity: 0.55; }
+      55%      { opacity: 0.85; }
+      75%      { opacity: 0.5; }
+      90%      { opacity: 1; }
+    }
+    @keyframes flickerLeft {
+      0%, 100% { opacity: 0.75; }
+      10%      { opacity: 0.5; }
+      35%      { opacity: 1; }
+      60%      { opacity: 0.6; }
+      80%      { opacity: 0.95; }
+    }
+    @keyframes flickerRight {
+      0%, 100% { opacity: 0.8; }
+      25%      { opacity: 0.55; }
+      45%      { opacity: 1; }
+      65%      { opacity: 0.7; }
+      90%      { opacity: 0.5; }
+    }
   </style>
 </head>
 <body>
+
+  <!-- SVG filter for arc glow -->
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <filter id="arcGlow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+  </svg>
 
   <!-- Background mit Cam-Ausschnitt (4 Teile um das Loch herum) -->
   <div class="bg">
@@ -474,6 +526,29 @@
     <div class="corner-bl-v"></div>
     <div class="corner-br-h"></div>
     <div class="corner-br-v"></div>
+
+    <!-- Lightning arcs -->
+    <svg class="cam-arcs" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <polyline id="arc-top" points="2,2 15,4 30,1 45,3 60,1 75,4 90,2 98,2"
+        fill="none" stroke="#c9a0dc" stroke-width="1.5"
+        vector-effect="non-scaling-stroke" filter="url(#arcGlow)"
+        style="animation: flickerTop 3.5s ease-in-out infinite" />
+      <polyline id="arc-bottom" points="2,98 18,96 35,99 50,97 65,99 80,96 95,98 98,98"
+        fill="none" stroke="#f2b705" stroke-width="1.5"
+        vector-effect="non-scaling-stroke" filter="url(#arcGlow)"
+        style="animation: flickerBottom 4s ease-in-out infinite" />
+      <polyline id="arc-left" points="2,2 4,15 1,30 3,50 1,70 4,85 2,98"
+        fill="none" stroke="#c9a0dc" stroke-width="1.5"
+        vector-effect="non-scaling-stroke" filter="url(#arcGlow)"
+        style="animation: flickerLeft 4.5s ease-in-out infinite" />
+      <polyline id="arc-right" points="98,2 96,20 99,40 97,55 99,75 96,90 98,98"
+        fill="none" stroke="#f2b705" stroke-width="1.5"
+        vector-effect="non-scaling-stroke" filter="url(#arcGlow)"
+        style="animation: flickerRight 3s ease-in-out infinite" />
+    </svg>
+
+    <!-- Sparkle container (clipped to cam area) -->
+    <div id="cam-sparkles" style="position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:7;"></div>
   </div>
 
   <!-- Chat area -->
@@ -503,6 +578,93 @@
       document.body.style.width  = W + 'px';
       document.body.style.height = H + 'px';
     })();
+  </script>
+
+  <!-- Spark points on arcs -->
+  <script>
+    (function () {
+      var SVG_NS = 'http://www.w3.org/2000/svg';
+      var arcs = [
+        { id: 'arc-top',    color: '#c9a0dc' },
+        { id: 'arc-bottom', color: '#f2b705' },
+        { id: 'arc-left',   color: '#c9a0dc' },
+        { id: 'arc-right',  color: '#f2b705' },
+        { id: 'arc-top',    color: '#c9a0dc' },
+        { id: 'arc-bottom', color: '#f2b705' }
+      ];
+
+      var svg = document.querySelector('.cam-arcs');
+
+      function getPointOnPolyline(polyline) {
+        var points = polyline.points;
+        var len = points.numberOfItems;
+        if (len < 2) return { x: 50, y: 50 };
+
+        var segIdx = Math.floor(Math.random() * (len - 1));
+        var t = Math.random();
+        var p1 = points.getItem(segIdx);
+        var p2 = points.getItem(segIdx + 1);
+        return {
+          x: p1.x + (p2.x - p1.x) * t,
+          y: p1.y + (p2.y - p1.y) * t
+        };
+      }
+
+      function createSpark(arcDef) {
+        var polyline = document.getElementById(arcDef.id);
+        if (!polyline) return;
+
+        var circle = document.createElementNS(SVG_NS, 'circle');
+        circle.setAttribute('r', '1.5');
+        circle.setAttribute('fill', arcDef.color);
+        circle.setAttribute('filter', 'url(#arcGlow)');
+        circle.style.opacity = '0';
+        svg.appendChild(circle);
+
+        function cycle() {
+          var pt = getPointOnPolyline(polyline);
+          circle.setAttribute('cx', pt.x);
+          circle.setAttribute('cy', pt.y);
+
+          var holdTime = 800 + Math.random() * 700; // 0.8 – 1.5s
+
+          var fadeIn = circle.animate(
+            [{ opacity: 0 }, { opacity: 1 }],
+            { duration: 800, fill: 'forwards' }
+          );
+
+          fadeIn.onfinish = function () {
+            setTimeout(function () {
+              var fadeOut = circle.animate(
+                [{ opacity: 1 }, { opacity: 0 }],
+                { duration: 800, fill: 'forwards' }
+              );
+              fadeOut.onfinish = function () {
+                circle.style.opacity = '0';
+                setTimeout(cycle, 100 + Math.random() * 400);
+              };
+            }, holdTime);
+          };
+        }
+
+        // stagger initial start
+        setTimeout(cycle, Math.random() * 3000);
+      }
+
+      arcs.forEach(createSpark);
+    })();
+  </script>
+
+  <!-- Flying sparkles limited to cam area -->
+  <script src="../js/sparkles.js"></script>
+  <script>
+    new SparkleEngine(document.getElementById('cam-sparkles'), {
+      count: 10,
+      speed: 0.35,
+      maxOpacity: 0.85,
+      colors: { gold: 0.35, purple: 0.35, white: 0.30 },
+      sizeWeights: { big: 0.15, normal: 0.35, small: 0.35, tiny: 0.15 }
+    }).start();
   </script>
 </body>
 </html>
