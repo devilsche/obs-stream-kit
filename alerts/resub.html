@@ -156,6 +156,32 @@
       margin-bottom: 12px;
     }
 
+    .tier-badge {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-bottom: 14px;
+    }
+
+    .tier-badge--1 {
+      background: rgba(94, 42, 121, 0.3);
+      border: 1px solid rgba(201, 160, 220, 0.5);
+      color: var(--color-accent);
+    }
+    .tier-badge--2 {
+      background: rgba(94, 42, 121, 0.4);
+      border: 1px solid rgba(201, 160, 220, 0.7);
+      color: #d4b0e8;
+    }
+    .tier-badge--3 {
+      background: linear-gradient(135deg, rgba(242, 183, 5, 0.2), rgba(94, 42, 121, 0.3));
+      border: 1px solid rgba(242, 183, 5, 0.6);
+      color: #f2b705;
+    }
+
     .username {
       font-size: 36px;
       font-weight: 900;
@@ -193,6 +219,7 @@
       <span class="corner corner-br-v"></span>
 
       <div class="event-type"></div>
+      <div class="tier-badge" id="tierBadge"></div>
       <div class="username"></div>
       <div class="divider"></div>
       <div class="alert-message"></div>
@@ -200,14 +227,20 @@
   </div>
 
   <script>
-    const params   = new URLSearchParams(window.location.search);
-    const username = params.get('username') || 'Viewer';
-    const months   = params.get('months')   || '1';
-    const message  = params.get('message')  || months + ' Monate dabei!';
+    var params   = new URLSearchParams(window.location.search);
+    var username = params.get('username') || 'Viewer';
+    var months   = params.get('months')   || '1';
+    var message  = params.get('message')  || months + ' Monate dabei!';
+    var tier     = params.get('tier') || '1';
 
     document.querySelector('.event-type').textContent    = 'Resub \u2014 ' + months + ' Monate';
     document.querySelector('.username').textContent      = username;
     document.querySelector('.alert-message').textContent = message;
+
+    var badge = document.getElementById('tierBadge');
+    var tierNames = { '1': 'Tier 1', '2': 'Tier 2', '3': 'Tier 3', 'prime': 'Prime' };
+    badge.textContent = tierNames[tier] || 'Tier ' + tier;
+    badge.className = 'tier-badge tier-badge--' + (tier === 'prime' ? '1' : tier);
   </script>
 
 </body>
