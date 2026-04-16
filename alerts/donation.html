@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Donation Alert</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: block;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --color-gold:        #f2b705;
+      --color-gold-light:  #ffd54f;
+      --color-bg-dark:     #0d0d1a;
+      --color-bg-purple:   #1a0d2e;
+      --color-purple:      #5e2a79;
+      --color-purple-light:#c9a0dc;
+      --color-text:        #ffffff;
+      --color-text-muted:  #cccccc;
+    }
+
+    /* ─── Keyframes ─────────────────────────────────────────────── */
+
+    @keyframes bounceIn {
+      0%   { transform: scale(0);    opacity: 0; }
+      50%  { transform: scale(1.08); opacity: 1; }
+      70%  { transform: scale(0.94); }
+      85%  { transform: scale(1.02); }
+      100% { transform: scale(1);    opacity: 1; }
+    }
+
+    @keyframes bounceOut {
+      0%   { transform: scale(1); opacity: 1; }
+      100% { transform: scale(0); opacity: 0; }
+    }
+
+    @keyframes glowPulse {
+      0%, 100% {
+        box-shadow:
+          0 0 50px rgba(242, 183, 5, 0.25),
+          0 0 100px rgba(94, 42, 121, 0.15);
+      }
+      50% {
+        box-shadow:
+          0 0 80px rgba(242, 183, 5, 0.5),
+          0 0 150px rgba(94, 42, 121, 0.35);
+      }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes amountPop {
+      0%   { transform: scale(0); opacity: 0; }
+      60%  { transform: scale(1.15); opacity: 1; }
+      80%  { transform: scale(0.92); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    @keyframes shimmer {
+      0%   { background-position: -200% center; }
+      100% { background-position: 200% center; }
+    }
+
+    /* ─── Base ───────────────────────────────────────────────────── */
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    /* ─── Wrapper ────────────────────────────────────────────────── */
+
+    .wrapper {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ─── Alert Box ──────────────────────────────────────────────── */
+
+    .alert-box {
+      position: relative;
+      background: linear-gradient(135deg, rgba(13, 13, 26, 0.95), rgba(26, 13, 46, 0.95));
+      border: 2px solid rgba(242, 183, 5, 0.7);
+      border-radius: 16px;
+      padding: 44px 64px;
+      max-width: 60%;
+      min-width: 500px;
+      text-align: center;
+
+      animation:
+        bounceIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+        glowPulse 2s ease-in-out 0.7s infinite,
+        bounceOut 0.4s ease-in 6s both;
+    }
+
+    /* ─── Inner radial glow ─────────────────────────────────────── */
+
+    .alert-box::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 14px;
+      background: radial-gradient(ellipse at center, rgba(242, 183, 5, 0.1) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* ─── Gold corner accents ────────────────────────────────────── */
+
+    .corner {
+      position: absolute;
+      background: var(--color-gold);
+    }
+
+    .corner-tl-h { top: -2px;    left: -2px;   width: 28px; height: 2px; }
+    .corner-tl-v { top: -2px;    left: -2px;   width: 2px;  height: 28px; }
+    .corner-tr-h { top: -2px;    right: -2px;  width: 28px; height: 2px; }
+    .corner-tr-v { top: -2px;    right: -2px;  width: 2px;  height: 28px; }
+    .corner-bl-h { bottom: -2px; left: -2px;   width: 28px; height: 2px; }
+    .corner-bl-v { bottom: -2px; left: -2px;   width: 2px;  height: 28px; }
+    .corner-br-h { bottom: -2px; right: -2px;  width: 28px; height: 2px; }
+    .corner-br-v { bottom: -2px; right: -2px;  width: 2px;  height: 28px; }
+
+    /* ─── Content ────────────────────────────────────────────────── */
+
+    .event-type {
+      font-size: 14px;
+      color: var(--color-gold);
+      letter-spacing: 5px;
+      text-transform: uppercase;
+      text-shadow: 0 0 14px rgba(242, 183, 5, 0.7);
+      margin-bottom: 16px;
+    }
+
+    .amount {
+      font-size: 56px;
+      font-weight: 900;
+      color: var(--color-gold);
+      margin-bottom: 8px;
+      opacity: 0;
+      animation: amountPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards;
+      background: linear-gradient(90deg, var(--color-gold) 40%, var(--color-gold-light) 50%, var(--color-gold) 60%);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: amountPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards,
+                 shimmer 3s linear 1s infinite;
+      text-shadow: none;
+      filter: drop-shadow(0 0 20px rgba(242, 183, 5, 0.5));
+    }
+
+    .username {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--color-text);
+      margin-bottom: 20px;
+      opacity: 0;
+      animation: fadeIn 0.4s ease 0.5s forwards;
+    }
+
+    .divider {
+      width: 100px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--color-gold), transparent);
+      margin: 0 auto 18px;
+      opacity: 0;
+      animation: fadeIn 0.3s ease 0.7s forwards;
+    }
+
+    .alert-message {
+      font-size: 18px;
+      color: var(--color-text-muted);
+      line-height: 1.5;
+      opacity: 0;
+      animation: fadeIn 0.4s ease 0.8s forwards;
+      max-width: 450px;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="wrapper">
+    <div class="alert-box">
+      <span class="corner corner-tl-h"></span>
+      <span class="corner corner-tl-v"></span>
+      <span class="corner corner-tr-h"></span>
+      <span class="corner corner-tr-v"></span>
+      <span class="corner corner-bl-h"></span>
+      <span class="corner corner-bl-v"></span>
+      <span class="corner corner-br-h"></span>
+      <span class="corner corner-br-v"></span>
+
+      <div class="event-type">Donation</div>
+      <div class="amount"></div>
+      <div class="username"></div>
+      <div class="divider"></div>
+      <div class="alert-message"></div>
+    </div>
+  </div>
+
+  <script>
+    var params   = new URLSearchParams(window.location.search);
+    var username = params.get('username') || params.get('name') || 'Jemand';
+    var amount   = params.get('amount') || '1,00 €';
+    var message  = params.get('message') || '';
+
+    document.querySelector('.amount').textContent = amount;
+    document.querySelector('.username').textContent = 'von ' + username;
+    document.querySelector('.alert-message').textContent = message || 'Danke für die Unterstützung!';
+  </script>
+
+</body>
+</html>
