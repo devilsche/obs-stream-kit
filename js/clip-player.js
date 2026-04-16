@@ -69,17 +69,29 @@ var ClipPlayer = (function () {
       if (clipTimer) clearTimeout(clipTimer);
 
       var oldIframe = container.querySelector('iframe');
-      if (oldIframe) oldIframe.remove();
 
       var iframe = document.createElement('iframe');
       iframe.src = buildEmbedUrl(clip.id, muted);
       iframe.allow = 'autoplay; fullscreen';
       iframe.allowFullscreen = true;
+      iframe.style.opacity = '0';
+      iframe.style.transition = 'opacity 0.6s ease';
+      iframe.style.position = 'absolute';
+      iframe.style.inset = '0';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
       container.appendChild(iframe);
 
       if (onClipLoad) onClipLoad(clip, index);
 
       iframe.addEventListener('load', function () {
+        // Neues iframe einblenden, altes entfernen
+        iframe.style.opacity = '1';
+        if (oldIframe) {
+          oldIframe.style.opacity = '0';
+          setTimeout(function () { oldIframe.remove(); }, 600);
+        }
+
         var durationMs = Math.ceil(clip.duration) * 1000 + extraDelay;
         clipTimer = setTimeout(function () {
           if (onClipEnd) onClipEnd(clip, index);
