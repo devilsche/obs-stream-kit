@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Resistance is Futile Stinger</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: block;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    @keyframes bgFadeIn   { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
+
+    @keyframes scanlineSweep {
+      0%   { transform: translateY(-100%); }
+      100% { transform: translateY(100%); }
+    }
+
+    @keyframes hexPulse {
+      0%, 100% { opacity: 0.2; }
+      50%      { opacity: 0.55; }
+    }
+
+    @keyframes textTypein {
+      0%   { width: 0; }
+      100% { width: 100%; }
+    }
+
+    @keyframes cursorBlink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    @keyframes subFadeIn {
+      from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+      to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+    }
+
+    .bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at center,
+          rgba(15, 50, 25, 0.6) 0%,
+          rgba(5, 20, 10, 0.9) 60%,
+          rgba(0, 5, 0, 0.98) 100%
+        );
+      z-index: 1;
+      opacity: 0;
+      animation: bgFadeIn 0.3s ease-out forwards;
+    }
+
+    /* Hex mesh pattern (Borg tech) */
+    .hex-bg {
+      position: absolute; inset: 0;
+      z-index: 2;
+      opacity: 0;
+      background-image:
+        repeating-linear-gradient(60deg, rgba(120, 255, 160, 0.18) 0 1px, transparent 1px 80px),
+        repeating-linear-gradient(-60deg, rgba(120, 255, 160, 0.18) 0 1px, transparent 1px 80px),
+        repeating-linear-gradient(0deg, rgba(120, 255, 160, 0.12) 0 1px, transparent 1px 80px);
+      animation: hexPulse 2.4s ease-in-out 0.3s infinite;
+    }
+
+    /* Scanline sweep */
+    .scanline {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 160px;
+      z-index: 3;
+      background: linear-gradient(180deg,
+        transparent 0%,
+        rgba(100, 255, 140, 0.08) 45%,
+        rgba(100, 255, 140, 0.25) 50%,
+        rgba(100, 255, 140, 0.08) 55%,
+        transparent 100%
+      );
+      mix-blend-mode: screen;
+      pointer-events: none;
+      animation: scanlineSweep 2.2s linear infinite;
+    }
+
+    /* Horizontal scanlines overlay (CRT effect) */
+    .crt {
+      position: absolute; inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        180deg,
+        transparent 0 3px,
+        rgba(0, 0, 0, 0.25) 3px 4px
+      );
+      mix-blend-mode: multiply;
+      opacity: 0;
+      animation: bgFadeIn 0.4s ease-out 0.2s forwards;
+    }
+
+    .title-wrap {
+      position: absolute;
+      top: 40%; left: 50%;
+      transform: translate(-50%, -50%);
+      white-space: nowrap;
+      overflow: hidden;
+      z-index: 5;
+    }
+
+    .title {
+      font-size: 140px;
+      font-weight: 900;
+      color: #7cff9d;
+      letter-spacing: 4px;
+      line-height: 1;
+      text-transform: uppercase;
+      font-family: 'Courier New', 'DM Sans', monospace;
+      text-shadow:
+        0 0 20px rgba(120, 255, 160, 0.9),
+        0 0 50px rgba(80, 200, 110, 0.7),
+        0 0 100px rgba(50, 160, 80, 0.5);
+      overflow: hidden;
+      display: inline-block;
+      width: 0;
+      animation: textTypein 1.6s steps(36) 0.5s forwards;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 20px;
+      height: 1.1em;
+      background: #7cff9d;
+      vertical-align: middle;
+      margin-left: 6px;
+      animation: cursorBlink 0.8s steps(2) infinite;
+      box-shadow: 0 0 20px rgba(120, 255, 160, 1);
+    }
+
+    .sub {
+      position: absolute;
+      top: calc(50% + 120px);
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      font-size: 36px;
+      font-weight: 400;
+      color: rgba(160, 255, 190, 0.85);
+      letter-spacing: 20px;
+      text-transform: uppercase;
+      font-family: 'Courier New', 'DM Sans', monospace;
+      z-index: 5;
+      opacity: 0;
+      text-shadow: 0 0 14px rgba(120, 255, 160, 0.6);
+      animation: subFadeIn 0.5s ease-out 2.3s forwards;
+    }
+
+    .kicker {
+      position: absolute;
+      top: calc(50% - 180px);
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      font-size: 28px;
+      font-weight: 700;
+      color: rgba(120, 255, 160, 0.7);
+      letter-spacing: 18px;
+      text-transform: uppercase;
+      font-family: 'Courier New', 'DM Sans', monospace;
+      z-index: 5;
+      opacity: 0;
+      animation: subFadeIn 0.4s ease-out 0.15s forwards;
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.6s ease-in 3.2s forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="bg"></div>
+    <div class="hex-bg"></div>
+    <div class="scanline"></div>
+    <div class="crt"></div>
+
+    <div class="kicker">&#62;&#62; Collective Signal Detected</div>
+
+    <div class="title-wrap">
+      <span class="title">Resistance is futile</span>
+      <span class="cursor"></span>
+    </div>
+
+    <div class="sub">We are the Borg</div>
+  </div>
+
+</body>
+</html>

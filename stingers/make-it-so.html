@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Make It So Stinger</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: block;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    @keyframes bgFadeIn   { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
+
+    @keyframes barSlideIn {
+      from { transform: translateX(-100%); }
+      to   { transform: translateX(0); }
+    }
+
+    @keyframes textFadeIn {
+      0%   { transform: translateX(-50%) translateY(30px); opacity: 0; }
+      100% { transform: translateX(-50%) translateY(0);    opacity: 1; }
+    }
+
+    @keyframes pillPulse {
+      0%, 100% { opacity: 0.55; }
+      50%      { opacity: 1; }
+    }
+
+    @keyframes sweepShine {
+      0%   { transform: translateX(-120%); opacity: 0; }
+      15%  { opacity: 1; }
+      85%  { opacity: 1; }
+      100% { transform: translateX(120%); opacity: 0; }
+    }
+
+    .bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at center,
+          rgba(15, 20, 45, 0.8) 0%,
+          rgba(5, 8, 20, 0.95) 70%,
+          rgba(0, 0, 0, 0.98) 100%
+        );
+      z-index: 1;
+      opacity: 0;
+      animation: bgFadeIn 0.3s ease-out forwards;
+    }
+
+    /* LCARS-style top bar */
+    .lcars-bar {
+      position: absolute;
+      top: 14%;
+      left: 0; right: 0;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      z-index: 2;
+      transform: translateX(-100%);
+      animation: barSlideIn 0.5s cubic-bezier(0.2, 1, 0.3, 1) 0.1s forwards;
+    }
+
+    .lcars-bar-segment {
+      height: 100%;
+      margin-right: 6px;
+    }
+
+    .lcars-bar .seg1 { background: #ff9624; width: 180px; border-radius: 0 40px 40px 0; }
+    .lcars-bar .seg2 { background: #e06a00; width: 320px; }
+    .lcars-bar .seg3 { background: #ffbe3c; width: 140px; }
+    .lcars-bar .seg4 { background: #c985ff; width: 620px; }
+    .lcars-bar .seg5 { background: #ff9624; flex: 1; }
+
+    /* Mirror bottom bar */
+    .lcars-bar.bottom {
+      top: auto;
+      bottom: 14%;
+      animation: barSlideIn 0.5s cubic-bezier(0.2, 1, 0.3, 1) 0.2s forwards;
+    }
+    .lcars-bar.bottom .seg1 { background: #c985ff; width: 260px; border-radius: 0 40px 40px 0; }
+    .lcars-bar.bottom .seg2 { background: #ff9624; width: 180px; }
+    .lcars-bar.bottom .seg3 { background: #ffbe3c; width: 400px; }
+    .lcars-bar.bottom .seg4 { background: #c985ff; width: 160px; }
+    .lcars-bar.bottom .seg5 { background: #ff9624; flex: 1; }
+
+    /* Status pills on the side */
+    .pills {
+      position: absolute;
+      top: 50%; right: 80px;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      z-index: 3;
+    }
+
+    .pill {
+      width: 180px;
+      height: 50px;
+      border-radius: 25px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #000;
+      opacity: 0;
+    }
+
+    .pill.p1 { background: #ff9624; animation: pillPulse 1.8s ease-in-out 0.8s infinite; }
+    .pill.p2 { background: #ffbe3c; animation: pillPulse 2.2s ease-in-out 1.0s infinite; }
+    .pill.p3 { background: #c985ff; animation: pillPulse 2.0s ease-in-out 1.2s infinite; }
+    .pill.p4 { background: #ff9624; animation: pillPulse 1.6s ease-in-out 1.4s infinite; }
+
+    .center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: left;
+      z-index: 5;
+      max-width: 1100px;
+    }
+
+    .kicker {
+      position: absolute;
+      top: calc(50% - 180px);
+      left: 50%;
+      transform: translateX(-50%) translateY(30px);
+      font-size: 34px;
+      font-weight: 700;
+      color: #ffbe3c;
+      letter-spacing: 18px;
+      text-transform: uppercase;
+      z-index: 5;
+      opacity: 0;
+      text-shadow: 0 0 14px rgba(255, 190, 60, 0.7);
+      animation: textFadeIn 0.5s ease-out 0.5s forwards;
+    }
+
+    .title {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translateX(-50%) translateY(30px);
+      font-size: 240px;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: -4px;
+      line-height: 1;
+      white-space: nowrap;
+      text-transform: none;
+      z-index: 5;
+      opacity: 0;
+      text-shadow:
+        0 0 30px rgba(255, 190, 60, 0.6),
+        6px 6px 0 rgba(0, 0, 0, 0.8);
+      animation: textFadeIn 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) 0.8s forwards;
+    }
+
+    .title .accent { color: #ffbe3c; }
+
+    .sub {
+      position: absolute;
+      top: calc(50% + 160px);
+      left: 50%;
+      transform: translateX(-50%) translateY(30px);
+      font-size: 32px;
+      font-weight: 400;
+      color: rgba(255, 200, 130, 0.9);
+      letter-spacing: 14px;
+      text-transform: uppercase;
+      font-style: italic;
+      z-index: 5;
+      opacity: 0;
+      animation: textFadeIn 0.5s ease-out 1.4s forwards;
+    }
+
+    /* Shine sweep over title */
+    .shine {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1100px;
+      height: 260px;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 6;
+    }
+
+    .shine::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 300px;
+      height: 100%;
+      background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+      transform: translateX(-120%);
+      animation: sweepShine 1.2s ease-in-out 1.2s forwards;
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.6s ease-in 2.6s forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="bg"></div>
+
+    <div class="lcars-bar">
+      <div class="lcars-bar-segment seg1"></div>
+      <div class="lcars-bar-segment seg2"></div>
+      <div class="lcars-bar-segment seg3"></div>
+      <div class="lcars-bar-segment seg4"></div>
+      <div class="lcars-bar-segment seg5"></div>
+    </div>
+
+    <div class="lcars-bar bottom">
+      <div class="lcars-bar-segment seg1"></div>
+      <div class="lcars-bar-segment seg2"></div>
+      <div class="lcars-bar-segment seg3"></div>
+      <div class="lcars-bar-segment seg4"></div>
+      <div class="lcars-bar-segment seg5"></div>
+    </div>
+
+    <div class="pills">
+      <div class="pill p1">Bridge</div>
+      <div class="pill p2">Warp</div>
+      <div class="pill p3">Shields</div>
+      <div class="pill p4">Ops</div>
+    </div>
+
+    <div class="kicker">Captain Jean-Luc Picard</div>
+    <div class="title">Make it <span class="accent">so.</span></div>
+    <div class="sub">NCC-1701-D — Enterprise</div>
+
+    <div class="shine"></div>
+  </div>
+
+</body>
+</html>

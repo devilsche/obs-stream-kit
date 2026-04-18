@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Engage Stinger</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: block;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    @keyframes bgFadeIn   { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
+
+    @keyframes warpStreak {
+      0%   { transform: translate(-50%, -50%) translate(var(--sx), var(--sy)) scale(0); opacity: 0; }
+      15%  { opacity: 1; }
+      100% { transform: translate(-50%, -50%) translate(var(--ex), var(--ey)) scale(1); opacity: 0; }
+    }
+
+    @keyframes engageIn {
+      0%   { transform: translate(-50%, -50%) scale(0.1); opacity: 0; letter-spacing: 80px; filter: blur(12px); }
+      60%  { transform: translate(-50%, -50%) scale(1.1); opacity: 1; letter-spacing: -2px; filter: blur(0); }
+      80%  { transform: translate(-50%, -50%) scale(0.96); }
+      100% { transform: translate(-50%, -50%) scale(1); opacity: 1; letter-spacing: 0; filter: blur(0); }
+    }
+
+    @keyframes blastForward {
+      0%   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(4); opacity: 0; }
+    }
+
+    @keyframes subIn {
+      from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+      to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+    }
+
+    .bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at center,
+          rgba(10, 20, 50, 0.35) 0%,
+          rgba(3, 5, 15, 0.95) 65%,
+          rgba(0, 0, 0, 0.98) 100%
+        );
+      z-index: 1;
+      opacity: 0;
+      animation: bgFadeIn 0.25s ease-out forwards;
+    }
+
+    /* Central vanishing point tunnel */
+    .tunnel {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 200px; height: 200px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle,
+        rgba(200, 240, 255, 0.9) 0%,
+        rgba(100, 180, 255, 0.6) 35%,
+        rgba(40, 100, 200, 0.3) 70%,
+        transparent 100%
+      );
+      z-index: 2;
+      opacity: 0;
+      box-shadow:
+        0 0 80px rgba(100, 200, 255, 0.7),
+        0 0 200px rgba(50, 150, 230, 0.4);
+      animation:
+        bgFadeIn 0.5s ease-out 0.1s forwards,
+        blastForward 0.7s cubic-bezier(0.4, 0, 0.2, 1) 1.5s forwards;
+    }
+
+    /* Warp streaks radiating outward from center */
+    .streaks {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 3;
+      width: 0; height: 0;
+      pointer-events: none;
+    }
+
+    .streak {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 6px;
+      height: 120px;
+      transform-origin: center top;
+      background: linear-gradient(180deg,
+        rgba(255, 255, 255, 1) 0%,
+        rgba(180, 230, 255, 0.85) 30%,
+        rgba(80, 180, 255, 0.5) 70%,
+        transparent 100%
+      );
+      box-shadow: 0 0 14px rgba(150, 220, 255, 0.9);
+      animation: warpStreak var(--dur) cubic-bezier(0.4, 0, 0.2, 1) var(--delay) infinite;
+    }
+
+    .engage {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0.1);
+      font-size: 280px;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: 80px;
+      line-height: 1;
+      white-space: nowrap;
+      text-transform: uppercase;
+      z-index: 6;
+      opacity: 0;
+      -webkit-text-stroke: 4px #082058;
+      text-shadow:
+        0 0 40px rgba(150, 220, 255, 1),
+        0 0 90px rgba(80, 180, 255, 0.8),
+        0 0 160px rgba(40, 120, 220, 0.5),
+        6px 6px 0 rgba(0, 0, 0, 0.8);
+      animation: engageIn 0.8s cubic-bezier(0.2, 0.9, 0.3, 1) 0.5s forwards;
+    }
+
+    .sub {
+      position: absolute;
+      top: calc(50% + 180px);
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      font-size: 32px;
+      font-weight: 700;
+      color: #a8e4ff;
+      letter-spacing: 16px;
+      text-transform: uppercase;
+      z-index: 6;
+      opacity: 0;
+      text-shadow:
+        0 0 18px rgba(100, 200, 255, 0.8),
+        3px 3px 0 #000;
+      animation: subIn 0.5s ease-out 1.3s forwards;
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.5s ease-in 2.6s forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="bg"></div>
+    <div class="tunnel"></div>
+
+    <div class="streaks" id="streaks"></div>
+
+    <div class="engage">Engage</div>
+    <div class="sub">&#151; Captain Picard</div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+      var layer = document.getElementById('streaks');
+      var COUNT = 40;
+      for (var i = 0; i < COUNT; i++) {
+        var el = document.createElement('div');
+        el.className = 'streak';
+        var angle = Math.random() * Math.PI * 2;
+        var startDist = 60 + Math.random() * 60;
+        var endDist = 1400 + Math.random() * 600;
+        var sx = (Math.cos(angle) * startDist).toFixed(0) + 'px';
+        var sy = (Math.sin(angle) * startDist).toFixed(0) + 'px';
+        var ex = (Math.cos(angle) * endDist).toFixed(0) + 'px';
+        var ey = (Math.sin(angle) * endDist).toFixed(0) + 'px';
+        var dur = (0.7 + Math.random() * 0.6) + 's';
+        var delay = (Math.random() * 1.4) + 's';
+        el.style.cssText =
+          'transform-origin: center center;' +
+          'transform: rotate(' + (angle * 180 / Math.PI + 90) + 'deg);' +
+          '--sx:' + sx + ';' +
+          '--sy:' + sy + ';' +
+          '--ex:' + ex + ';' +
+          '--ey:' + ey + ';' +
+          '--dur:' + dur + ';' +
+          '--delay:' + delay + ';';
+        layer.appendChild(el);
+      }
+    })();
+  </script>
+
+</body>
+</html>
