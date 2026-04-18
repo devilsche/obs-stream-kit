@@ -27,9 +27,9 @@
     @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
 
     @keyframes warpStreak {
-      0%   { transform: translate(-50%, -50%) translate(var(--sx), var(--sy)) scale(0); opacity: 0; }
+      0%   { transform: translateY(var(--startY)) scaleY(0.2); opacity: 0; }
       15%  { opacity: 1; }
-      100% { transform: translate(-50%, -50%) translate(var(--ex), var(--ey)) scale(1); opacity: 0; }
+      100% { transform: translateY(var(--endY)) scaleY(1); opacity: 0; }
     }
 
     @keyframes engageIn {
@@ -85,22 +85,28 @@
         blastForward 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.8s forwards;
     }
 
-    /* Warp streaks radiating outward from center */
+    /* Warp streaks radiating outward from center — via rotierte Wrapper */
     .streaks {
       position: absolute;
       top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 3;
       width: 0; height: 0;
+      z-index: 3;
       pointer-events: none;
+    }
+
+    .streak-wrap {
+      position: absolute;
+      top: 0; left: 0;
+      width: 0; height: 0;
+      /* Jeder Wrapper hat einen eigenen rotate-Transform via JS-Inline-Style */
     }
 
     .streak {
       position: absolute;
-      top: 50%; left: 50%;
+      top: 0; left: -3px;
       width: 6px;
       height: 120px;
-      transform-origin: center top;
+      transform-origin: top center;
       background: linear-gradient(180deg,
         rgba(255, 255, 255, 1) 0%,
         rgba(180, 230, 255, 0.85) 30%,
@@ -177,27 +183,25 @@
       var layer = document.getElementById('streaks');
       var COUNT = 40;
       for (var i = 0; i < COUNT; i++) {
-        var el = document.createElement('div');
-        el.className = 'streak';
-        var angle = Math.random() * Math.PI * 2;
-        var startDist = 60 + Math.random() * 60;
-        var endDist = 1400 + Math.random() * 600;
-        var sx = (Math.cos(angle) * startDist).toFixed(0) + 'px';
-        var sy = (Math.sin(angle) * startDist).toFixed(0) + 'px';
-        var ex = (Math.cos(angle) * endDist).toFixed(0) + 'px';
-        var ey = (Math.sin(angle) * endDist).toFixed(0) + 'px';
-        var dur = (0.7 + Math.random() * 0.6) + 's';
-        var delay = (Math.random() * 1.4) + 's';
-        el.style.cssText =
-          'transform-origin: center center;' +
-          'transform: rotate(' + (angle * 180 / Math.PI + 90) + 'deg);' +
-          '--sx:' + sx + ';' +
-          '--sy:' + sy + ';' +
-          '--ex:' + ex + ';' +
-          '--ey:' + ey + ';' +
+        var angle = Math.random() * 360;
+        var wrap = document.createElement('div');
+        wrap.className = 'streak-wrap';
+        wrap.style.transform = 'rotate(' + angle.toFixed(1) + 'deg)';
+
+        var streak = document.createElement('div');
+        streak.className = 'streak';
+        var startY = (50 + Math.random() * 80).toFixed(0) + 'px';
+        var endY   = (1100 + Math.random() * 700).toFixed(0) + 'px';
+        var dur    = (0.7 + Math.random() * 0.6).toFixed(2) + 's';
+        var delay  = (Math.random() * 1.4).toFixed(2) + 's';
+        streak.style.cssText =
+          '--startY:' + startY + ';' +
+          '--endY:' + endY + ';' +
           '--dur:' + dur + ';' +
           '--delay:' + delay + ';';
-        layer.appendChild(el);
+
+        wrap.appendChild(streak);
+        layer.appendChild(wrap);
       }
     })();
   </script>
