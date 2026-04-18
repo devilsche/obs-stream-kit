@@ -130,10 +130,10 @@
       transform: translate(-50%, calc(-50% + 24px)) scale(0.4) rotate(var(--tilt));
     }
 
-    .cool-word.w1 { --tilt: -3deg;  --offset: -600px; animation: wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 0.2s forwards, nervousJitter 0.35s ease-in-out 0.8s infinite; }
-    .cool-word.w2 { --tilt:  2deg;  --offset: -200px; animation: wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 0.38s forwards, nervousJitter 0.38s ease-in-out 1.0s infinite; }
-    .cool-word.w3 { --tilt: -1deg;  --offset:  200px; animation: wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 0.56s forwards, nervousJitter 0.33s ease-in-out 1.2s infinite; }
-    .cool-word.w4 { --tilt:  3deg;  --offset:  600px; animation: wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 0.74s forwards, nervousJitter 0.4s ease-in-out 1.4s infinite; }
+    .cool-word.w1 { --tilt: -3deg;  --offset: -600px; animation: wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 0.3s forwards, nervousJitter 0.35s ease-in-out 0.9s infinite; }
+    .cool-word.w2 { --tilt:  2deg;  --offset: -200px; animation: wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 0.75s forwards, nervousJitter 0.38s ease-in-out 1.35s infinite; }
+    .cool-word.w3 { --tilt: -1deg;  --offset:  200px; animation: wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 1.2s forwards, nervousJitter 0.33s ease-in-out 1.8s infinite; }
+    .cool-word.w4 { --tilt:  3deg;  --offset:  600px; animation: wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 1.65s forwards, nervousJitter 0.4s ease-in-out 2.25s infinite; }
 
     /* Shift each word horizontally after the pop */
     .cool-word.w1 { left: calc(50% - 600px); }
@@ -168,9 +168,9 @@
       white-space: nowrap;
     }
 
-    .nd-word.n1 { left: calc(50% - 420px); animation: subWordIn 0.3s ease-out 1.05s forwards, subJitter 0.3s ease-in-out 1.4s infinite; }
-    .nd-word.n2 { left: 50%;                animation: subWordIn 0.3s ease-out 1.25s forwards, subJitter 0.33s ease-in-out 1.6s infinite; }
-    .nd-word.n3 { left: calc(50% + 420px);  animation: subWordIn 0.3s ease-out 1.45s forwards, subJitter 0.28s ease-in-out 1.8s infinite; }
+    .nd-word.n1 { left: calc(50% - 420px); animation: subWordIn 0.3s ease-out 2.4s forwards, subJitter 0.3s ease-in-out 2.9s infinite; }
+    .nd-word.n2 { left: 50%;                animation: subWordIn 0.3s ease-out 2.9s forwards, subJitter 0.33s ease-in-out 3.4s infinite; }
+    .nd-word.n3 { left: calc(50% + 420px);  animation: subWordIn 0.3s ease-out 3.4s forwards, subJitter 0.28s ease-in-out 3.9s infinite; }
 
     .sweat {
       position: absolute;
@@ -180,12 +180,12 @@
       transform: translate(-50%, 0) scale(0.4);
       opacity: 0;
       z-index: 6;
-      animation: sweatDrop 1s ease-out 1.2s forwards;
+      animation: sweatDrop 1.2s ease-out 2.6s forwards;
     }
 
     .stage {
       position: absolute; inset: 0;
-      animation: fadeOutAll 0.4s ease-in 2.8s forwards;
+      animation: fadeOutAll 0.4s ease-in 4.7s forwards;
     }
   </style>
 </head>
@@ -211,6 +211,8 @@
 
     <div class="sweat">&#128166;</div>
   </div>
+
+  <audio autoplay src="../assets/stingers/cool.mp3"></audio>
 
 </body>
 </html>

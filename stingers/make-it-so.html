@@ -151,7 +151,7 @@
       z-index: 5;
       opacity: 0;
       text-shadow: 0 0 14px rgba(255, 190, 60, 0.7);
-      animation: textFadeIn 0.5s ease-out 0.5s forwards;
+      animation: textFadeIn 0.6s ease-out 0.9s forwards;
     }
 
     .title {
@@ -171,7 +171,7 @@
       text-shadow:
         0 0 30px rgba(255, 190, 60, 0.6),
         6px 6px 0 rgba(0, 0, 0, 0.8);
-      animation: textFadeIn 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) 0.8s forwards;
+      animation: textFadeIn 0.7s cubic-bezier(0.2, 0.8, 0.3, 1) 1.6s forwards;
     }
 
     .title .accent { color: #ffbe3c; }
@@ -189,7 +189,7 @@
       font-style: italic;
       z-index: 5;
       opacity: 0;
-      animation: textFadeIn 0.5s ease-out 1.4s forwards;
+      animation: textFadeIn 0.5s ease-out 2.7s forwards;
     }
 
     /* Shine sweep over title */
@@ -213,12 +213,12 @@
       height: 100%;
       background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.35), transparent);
       transform: translateX(-120%);
-      animation: sweepShine 1.2s ease-in-out 1.2s forwards;
+      animation: sweepShine 1.4s ease-in-out 2.2s forwards;
     }
 
     .stage {
       position: absolute; inset: 0;
-      animation: fadeOutAll 0.6s ease-in 2.6s forwards;
+      animation: fadeOutAll 0.6s ease-in 4.2s forwards;
     }
   </style>
 </head>
@@ -257,7 +257,13 @@
     <div class="shine"></div>
   </div>
 
-  <audio autoplay src="../assets/stingers/picard_make_it_so.mp3"></audio>
+  <audio id="picardAudio" src="../assets/stingers/picard_make_it_so.mp3"></audio>
+  <script>
+    setTimeout(function () {
+      var a = document.getElementById('picardAudio');
+      if (a && a.play) a.play().catch(function () {});
+    }, 1600);
+  </script>
 
 </body>
 </html>
