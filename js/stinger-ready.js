@@ -46,24 +46,24 @@
     started = true;
     html.classList.remove('stinger-loading');
 
-    // Autoplay-Audios abspielen (mit optionalem Delay)
-    var audios = document.querySelectorAll('audio[data-stinger-autoplay]');
-    Array.prototype.forEach.call(audios, function (a) {
-      var delay = parseInt(a.getAttribute('data-delay'), 10) || 0;
+    // Autoplay-Audios und -Videos abspielen (mit optionalem Delay)
+    var medias = document.querySelectorAll('audio[data-stinger-autoplay], video[data-stinger-autoplay]');
+    Array.prototype.forEach.call(medias, function (m) {
+      var delay = parseInt(m.getAttribute('data-delay'), 10) || 0;
       if (delay > 0) {
         setTimeout(function () {
-          try { a.play().catch(function () {}); } catch (e) {}
+          try { m.play().catch(function () {}); } catch (e) {}
         }, delay);
       } else {
-        try { a.play().catch(function () {}); } catch (e) {}
+        try { m.play().catch(function () {}); } catch (e) {}
       }
     });
   }
 
-  var ready = { fonts: false, audio: false };
+  var ready = { fonts: false, media: false };
 
   function maybeGo() {
-    if (ready.fonts && ready.audio) startAnimations();
+    if (ready.fonts && ready.media) startAnimations();
   }
 
   function waitForFonts() {
@@ -78,42 +78,42 @@
     }
   }
 
-  function waitForAudio() {
-    var audios = document.querySelectorAll('audio');
-    if (audios.length === 0) {
-      ready.audio = true;
+  function waitForMedia() {
+    var medias = document.querySelectorAll('audio, video');
+    if (medias.length === 0) {
+      ready.media = true;
       maybeGo();
       return;
     }
 
-    var total = audios.length;
+    var total = medias.length;
     var loaded = 0;
 
-    Array.prototype.forEach.call(audios, function (a) {
+    Array.prototype.forEach.call(medias, function (m) {
       var done = false;
       function check() {
         if (done) return;
         done = true;
         loaded++;
         if (loaded >= total) {
-          ready.audio = true;
+          ready.media = true;
           maybeGo();
         }
       }
-      a.addEventListener('canplaythrough', check);
-      a.addEventListener('error', check);
+      m.addEventListener('canplaythrough', check);
+      m.addEventListener('error', check);
 
       // Fallback falls canplaythrough nicht feuert (manche Browser/Codecs)
       setTimeout(check, 2500);
 
-      if (a.preload !== 'auto') a.preload = 'auto';
-      try { a.load(); } catch (e) {}
+      if (m.preload !== 'auto') m.preload = 'auto';
+      try { m.load(); } catch (e) {}
     });
   }
 
   function init() {
     waitForFonts();
-    waitForAudio();
+    waitForMedia();
     // Absolute Safety: max 4s Wartezeit
     setTimeout(startAnimations, 4000);
   }
