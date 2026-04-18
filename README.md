@@ -273,6 +273,7 @@ Fullscreen-Overlays zum manuellen Auslösen (z.B. per Streamer.bot Hotkey oder C
 | `stingers/nani.html` | Überraschender Move | ~3s | 1920×1080 |
 | `stingers/gg.html` | End-of-Match / Sieg | ~3.3s | 1920×1080 |
 | `stingers/noice.html` | Gelungener Play | ~2s | 1920×1080 |
+| `stingers/luke.html` | Hund im Bild / Shoutout | ~3.5s | 1920×1080 |
 
 ### Setup in Streamer.bot
 
