@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <script src="../js/stinger-ready.js"></script>
+  <title>Heart Stinger</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: block;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    @keyframes bgFadeIn   { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
+
+    @keyframes heartAppear {
+      0%   { transform: translate(-50%, -50%) scale(0) rotate(-8deg); opacity: 0; }
+      70%  { transform: translate(-50%, -50%) scale(1.15) rotate(2deg); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+    }
+
+    /* Heartbeat pattern: lub-DUB ... rest ... lub-DUB */
+    @keyframes heartbeat {
+      0%    { transform: translate(-50%, -50%) scale(1); }
+      8%    { transform: translate(-50%, -50%) scale(1.12); }  /* lub */
+      16%   { transform: translate(-50%, -50%) scale(1); }
+      22%   { transform: translate(-50%, -50%) scale(1.18); }  /* DUB (stronger) */
+      30%   { transform: translate(-50%, -50%) scale(1); }
+      60%   { transform: translate(-50%, -50%) scale(1); }    /* rest */
+      66%   { transform: translate(-50%, -50%) scale(1.10); }  /* lub 2 */
+      74%   { transform: translate(-50%, -50%) scale(1); }
+      80%   { transform: translate(-50%, -50%) scale(1.16); }  /* DUB 2 */
+      88%   { transform: translate(-50%, -50%) scale(1); }
+      100%  { transform: translate(-50%, -50%) scale(1); }
+    }
+
+    @keyframes heartGlow {
+      0%, 100% { filter: drop-shadow(0 0 30px rgba(255, 80, 130, 0.7)) drop-shadow(0 0 60px rgba(220, 40, 100, 0.4)); }
+      50%      { filter: drop-shadow(0 0 55px rgba(255, 120, 170, 1))  drop-shadow(0 0 100px rgba(255, 60, 130, 0.6)); }
+    }
+
+    @keyframes sparkleTwinkle {
+      0%, 100% { opacity: 0; transform: scale(0.4); }
+      25%      { opacity: 1; transform: scale(1.2); }
+      50%      { opacity: 0.6; transform: scale(1); }
+      75%      { opacity: 1; transform: scale(1.3); }
+    }
+
+    @keyframes floatUp {
+      0%   { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+      15%  { opacity: 1; }
+      100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; }
+    }
+
+    .bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at center,
+          rgba(80, 15, 35, 0.55) 0%,
+          rgba(35, 8, 20, 0.88) 60%,
+          rgba(15, 3, 10, 0.96) 100%
+        );
+      z-index: 1;
+      opacity: 0;
+      animation: bgFadeIn 0.4s ease-out forwards;
+    }
+
+    .heart-wrap {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 560px;
+      height: 500px;
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 0;
+      z-index: 3;
+      animation:
+        heartAppear 0.7s cubic-bezier(0.22, 1.5, 0.36, 1) 0.3s forwards,
+        heartbeat 2.4s ease-in-out 1.2s 2,
+        heartGlow 2.4s ease-in-out 1.2s 2;
+    }
+
+    .heart-wrap svg {
+      width: 100%; height: 100%;
+      overflow: visible;
+    }
+
+    /* Sparkles positioned along the heart path */
+    .sparkle-layer {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 700px;
+      height: 620px;
+      transform: translate(-50%, -50%);
+      z-index: 4;
+      pointer-events: none;
+    }
+
+    .sparkle {
+      position: absolute;
+      color: #fff;
+      font-size: 26px;
+      line-height: 1;
+      opacity: 0;
+      transform: scale(0.4);
+      text-shadow:
+        0 0 10px rgba(255, 255, 255, 0.95),
+        0 0 22px rgba(255, 150, 190, 0.85),
+        0 0 40px rgba(255, 80, 130, 0.5);
+      animation: sparkleTwinkle var(--dur) ease-in-out var(--delay) infinite;
+    }
+
+    .sparkle.gold {
+      color: #ffe080;
+      text-shadow:
+        0 0 10px rgba(255, 220, 120, 0.95),
+        0 0 22px rgba(242, 183, 5, 0.85),
+        0 0 40px rgba(255, 150, 30, 0.5);
+    }
+
+    .sparkle.pink {
+      color: #ffb8d0;
+      text-shadow:
+        0 0 10px rgba(255, 180, 210, 0.95),
+        0 0 22px rgba(255, 100, 160, 0.85),
+        0 0 40px rgba(220, 60, 130, 0.5);
+    }
+
+    /* Floating up sparkles (background atmosphere) */
+    .float-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .float-spark {
+      position: absolute;
+      color: #ffb8d0;
+      font-size: 22px;
+      opacity: 0;
+      text-shadow:
+        0 0 10px rgba(255, 180, 210, 0.8),
+        0 0 20px rgba(255, 100, 160, 0.5);
+      animation: floatUp var(--dur) ease-out var(--delay) infinite;
+    }
+
+    .whisper {
+      position: absolute;
+      top: calc(50% + 320px);
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 28px;
+      font-weight: 400;
+      color: rgba(255, 200, 220, 0.85);
+      letter-spacing: 14px;
+      text-transform: lowercase;
+      font-style: italic;
+      z-index: 5;
+      opacity: 0;
+      text-shadow: 0 0 14px rgba(255, 100, 160, 0.7);
+      animation: bgFadeIn 0.8s ease-out 1.2s forwards;
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.8s ease-in 4.6s forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="bg"></div>
+
+    <div class="float-layer" id="floatLayer"></div>
+
+    <div class="heart-wrap">
+      <svg viewBox="0 0 100 90" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <radialGradient id="heartGradient" cx="50%" cy="40%" r="60%">
+            <stop offset="0%"  stop-color="#ff88b0"/>
+            <stop offset="45%" stop-color="#e83a68"/>
+            <stop offset="80%" stop-color="#a61c44"/>
+            <stop offset="100%" stop-color="#6b0d2a"/>
+          </radialGradient>
+          <radialGradient id="heartShine" cx="35%" cy="30%" r="35%">
+            <stop offset="0%"  stop-color="rgba(255,255,255,0.7)"/>
+            <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+          </radialGradient>
+        </defs>
+        <!-- Heart path -->
+        <path d="M 50 20
+                 C 50 8  62 0  75 0
+                 C 90 0 100 10 100 25
+                 C 100 48  80 65  50 85
+                 C 20 65   0 48   0 25
+                 C  0 10  10 0  25 0
+                 C 38 0  50 8  50 20 Z"
+              fill="url(#heartGradient)"
+              stroke="rgba(255, 200, 220, 0.4)"
+              stroke-width="0.8"/>
+        <!-- Shine highlight -->
+        <ellipse cx="35" cy="22" rx="16" ry="12" fill="url(#heartShine)"/>
+      </svg>
+    </div>
+
+    <div class="sparkle-layer" id="sparkleLayer"></div>
+
+    <div class="whisper">&#9825; geheimer Lieblingsmoment &#9825;</div>
+  </div>
+
+  <audio data-stinger-autoplay preload="auto" src="../assets/stingers/heartbeat.mp3"></audio>
+
+  <script>
+    (function () {
+      'use strict';
+
+      /* Sparkles am Herz-Outline — Koordinaten relativ zum sparkle-layer (700×620) */
+      var HEART_POSITIONS = [
+        /* Oberer linker Bogen */
+        { x: 135, y: 120 }, { x: 115, y: 165 }, { x: 125, y: 210 },
+        /* Oberer rechter Bogen */
+        { x: 565, y: 120 }, { x: 585, y: 165 }, { x: 575, y: 210 },
+        /* Mitte oben (Einbuchtung) */
+        { x: 350, y: 110 }, { x: 310, y: 135 }, { x: 390, y: 135 },
+        /* Linke Außenseite */
+        { x: 140, y: 260 }, { x: 175, y: 320 }, { x: 220, y: 380 },
+        /* Rechte Außenseite */
+        { x: 560, y: 260 }, { x: 525, y: 320 }, { x: 480, y: 380 },
+        /* Untere Spitze */
+        { x: 275, y: 440 }, { x: 350, y: 470 }, { x: 425, y: 440 },
+        /* Innere Glitter */
+        { x: 280, y: 230 }, { x: 420, y: 230 }, { x: 350, y: 280 },
+        { x: 240, y: 330 }, { x: 460, y: 330 }, { x: 350, y: 360 }
+      ];
+      var STAR = '\u2726';
+      var COLORS = ['', '', 'gold', 'pink', 'pink', ''];
+
+      var layer = document.getElementById('sparkleLayer');
+      HEART_POSITIONS.forEach(function (p, i) {
+        var el = document.createElement('div');
+        var cls = 'sparkle';
+        var c = COLORS[i % COLORS.length];
+        if (c) cls += ' ' + c;
+        el.className = cls;
+        var size = (18 + Math.random() * 16) + 'px';
+        var dur = (1.4 + Math.random() * 1.6) + 's';
+        var delay = (Math.random() * 2.0) + 's';
+        el.textContent = STAR;
+        el.style.cssText =
+          'left:' + p.x + 'px;' +
+          'top:' + p.y + 'px;' +
+          'font-size:' + size + ';' +
+          '--dur:' + dur + ';' +
+          '--delay:' + delay + ';';
+        layer.appendChild(el);
+      });
+
+      /* Schwebende Sparkles im Hintergrund */
+      var floatLayer = document.getElementById('floatLayer');
+      var FLOAT_COUNT = 18;
+      for (var i = 0; i < FLOAT_COUNT; i++) {
+        var el = document.createElement('div');
+        el.className = 'float-spark';
+        el.textContent = STAR;
+        var startX = (Math.random() * 1920) + 'px';
+        var startY = (400 + Math.random() * 680) + 'px';
+        var dx = (Math.random() * 120 - 60) + 'px';
+        var dy = (-(200 + Math.random() * 300)) + 'px';
+        var rot = (Math.random() * 360 - 180) + 'deg';
+        var dur = (3.5 + Math.random() * 2.5) + 's';
+        var delay = (Math.random() * 4) + 's';
+        el.style.cssText =
+          'left:' + startX + ';' +
+          'top:' + startY + ';' +
+          'font-size:' + (14 + Math.random() * 14) + 'px;' +
+          '--dx:' + dx + ';' +
+          '--dy:' + dy + ';' +
+          '--rot:' + rot + ';' +
+          '--dur:' + dur + ';' +
+          '--delay:' + delay + ';';
+        floatLayer.appendChild(el);
+      }
+    })();
+  </script>
+
+</body>
+</html>
