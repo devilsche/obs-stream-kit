@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=600, height=140" />
+  <title>Welcome</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: block;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 600px;
+      height: 140px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .content {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 18px 20px;
+    }
+
+    .kicker {
+      font-size: 16px;
+      font-weight: 700;
+      color: #f2b705;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      text-shadow:
+        0 0 10px rgba(242, 183, 5, 0.8),
+        0 0 20px rgba(242, 183, 5, 0.4);
+      margin-bottom: 8px;
+    }
+
+    .name {
+      font-size: 44px;
+      font-weight: 900;
+      color: #ffffff;
+      line-height: 1;
+      max-width: 520px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-shadow:
+        0 0 20px rgba(255, 255, 255, 0.6),
+        0 0 50px rgba(94, 42, 121, 0.9),
+        0 0 80px rgba(155, 85, 192, 0.4);
+    }
+
+    .divider {
+      width: 120px;
+      height: 2px;
+      margin-top: 10px;
+      background: linear-gradient(90deg, transparent, #f2b705, transparent);
+    }
+
+    .badge {
+      position: absolute;
+      top: 12px;
+      right: 14px;
+      z-index: 3;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #c9a0dc;
+      padding: 4px 10px;
+      border: 1px solid #5e2a79;
+      border-radius: 4px;
+      background: rgba(94, 42, 121, 0.15);
+      transform: rotate(-8deg);
+      text-shadow: 0 0 6px rgba(155, 85, 192, 0.6);
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="badge">First Time</div>
+
+  <div class="content">
+    <div class="kicker">&#10022; Willkommen &#10022;</div>
+    <div class="name" id="name">NewViewer42</div>
+    <div class="divider"></div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+      var params = new URLSearchParams(window.location.search);
+      var name = params.get('name') || 'NewViewer42';
+      document.getElementById('name').textContent = name;
+    })();
+  </script>
+
+</body>
+</html>
