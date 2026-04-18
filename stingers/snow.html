@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <script src="../js/stinger-ready.js"></script>
+  <title>Snow Overlay</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    @keyframes snowFall {
+      0%   {
+        transform: translate(0, -80px) rotate(var(--startRot));
+        opacity: 0;
+      }
+      8%   { opacity: var(--maxOp); }
+      92%  { opacity: var(--maxOp); }
+      100% {
+        transform: translate(var(--drift), 1180px) rotate(var(--endRot));
+        opacity: 0;
+      }
+    }
+
+    .snow {
+      position: absolute;
+      top: 0;
+      color: #ffffff;
+      line-height: 1;
+      user-select: none;
+      will-change: transform, opacity;
+      text-shadow:
+        0 0 8px rgba(255, 255, 255, 0.8),
+        0 0 16px rgba(200, 230, 255, 0.5);
+      animation: snowFall var(--dur) linear var(--delay) infinite;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="snowLayer"></div>
+
+  <script>
+    (function () {
+      'use strict';
+      var params = new URLSearchParams(window.location.search);
+      var count = parseInt(params.get('count'), 10) || 80;
+
+      var SYMBOLS = ['\u2744', '\u2745', '\u2746', '\u2756'];  // ❄ ❅ ❆ ❖
+      var layer = document.getElementById('snowLayer');
+
+      for (var i = 0; i < count; i++) {
+        var el = document.createElement('div');
+        el.className = 'snow';
+
+        var leftPct = (Math.random() * 100) + '%';
+        var size = (14 + Math.random() * 40).toFixed(0) + 'px';
+        var drift = (Math.random() * 300 - 150).toFixed(0) + 'px';
+        var startRot = (Math.random() * 360) + 'deg';
+        var endRot   = (Math.random() * 720 - 360) + 'deg';
+        var dur = (7 + Math.random() * 9).toFixed(2) + 's';   // 7–16s Fallzeit
+        var delay = -(Math.random() * 16).toFixed(2) + 's';   // Negativer Delay startet mitten in der Animation
+        var maxOp = (0.6 + Math.random() * 0.4).toFixed(2);   // 0.6–1.0
+
+        el.textContent = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+        el.style.cssText =
+          'left:' + leftPct + ';' +
+          'font-size:' + size + ';' +
+          '--drift:' + drift + ';' +
+          '--startRot:' + startRot + ';' +
+          '--endRot:' + endRot + ';' +
+          '--dur:' + dur + ';' +
+          '--delay:' + delay + ';' +
+          '--maxOp:' + maxOp + ';';
+        layer.appendChild(el);
+      }
+    })();
+  </script>
+
+</body>
+</html>

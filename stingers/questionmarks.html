@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <script src="../js/stinger-ready.js"></script>
+  <title>Question Marks Stinger</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: sans-serif;
+    }
+
+    @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
+
+    @keyframes qmFloat {
+      0%   {
+        transform: translate(0, 40px) rotate(var(--startRot)) scale(0.2);
+        opacity: 0;
+      }
+      25%  {
+        transform: translate(calc(var(--dx) * 0.3), calc(-30px + var(--dy) * 0.3)) rotate(var(--midRot)) scale(1.1);
+        opacity: var(--maxOp);
+      }
+      60%  {
+        transform: translate(calc(var(--dx) * 0.7), calc(-80px + var(--dy) * 0.7)) rotate(var(--midRot)) scale(1);
+        opacity: var(--maxOp);
+      }
+      100% {
+        transform: translate(var(--dx), calc(-160px + var(--dy))) rotate(var(--endRot)) scale(0.9);
+        opacity: 0;
+      }
+    }
+
+    .qm {
+      position: absolute;
+      color: #ffffff;
+      font-size: 120px;
+      font-weight: 900;
+      line-height: 1;
+      font-family: 'Arial Black', 'Helvetica', sans-serif;
+      user-select: none;
+      will-change: transform, opacity;
+      text-shadow:
+        0 0 16px rgba(255, 255, 255, 0.85),
+        0 0 36px rgba(200, 220, 255, 0.5),
+        4px 4px 0 rgba(0, 0, 0, 0.55);
+      -webkit-text-stroke: 3px rgba(0, 0, 0, 0.5);
+      transform: translate(0, 40px) rotate(0deg) scale(0.2);
+      opacity: 0;
+      animation: qmFloat var(--dur) cubic-bezier(0.25, 0.6, 0.3, 1) var(--delay) forwards;
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.6s ease-in 3.6s forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <div id="qmLayer"></div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+      var params = new URLSearchParams(window.location.search);
+      var count = parseInt(params.get('count'), 10) || 18;
+
+      var layer = document.getElementById('qmLayer');
+
+      for (var i = 0; i < count; i++) {
+        var el = document.createElement('div');
+        el.className = 'qm';
+
+        // Grobe Verteilung über den Canvas (aber etwas Mitten-lastig)
+        var leftPct = (8 + Math.random() * 84) + '%';
+        var topPct  = (18 + Math.random() * 60) + '%';
+        var size = (70 + Math.random() * 110).toFixed(0) + 'px';
+        var dx = (Math.random() * 200 - 100).toFixed(0) + 'px';
+        var dy = (Math.random() * 80 - 40).toFixed(0) + 'px';
+        var startRot = (Math.random() * 50 - 25) + 'deg';
+        var midRot   = (Math.random() * 30 - 15) + 'deg';
+        var endRot   = (Math.random() * 80 - 40) + 'deg';
+        var dur = (2.2 + Math.random() * 1.4).toFixed(2) + 's';
+        var delay = (Math.random() * 0.9).toFixed(2) + 's';
+        var maxOp = (0.85 + Math.random() * 0.15).toFixed(2);
+
+        el.textContent = '?';
+        el.style.cssText =
+          'left:' + leftPct + ';' +
+          'top:' + topPct + ';' +
+          'font-size:' + size + ';' +
+          '--dx:' + dx + ';' +
+          '--dy:' + dy + ';' +
+          '--startRot:' + startRot + ';' +
+          '--midRot:' + midRot + ';' +
+          '--endRot:' + endRot + ';' +
+          '--dur:' + dur + ';' +
+          '--delay:' + delay + ';' +
+          '--maxOp:' + maxOp + ';';
+        layer.appendChild(el);
+      }
+    })();
+  </script>
+
+</body>
+</html>
