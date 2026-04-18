@@ -143,9 +143,9 @@ Die Browser-Source muss ca. **100px breiter** und **100px höher** als die Cam-G
 | | |
 |-|-|
 | **Datei** | `widgets/welcome.html` |
-| **Beschreibung** | Toast-Widget für Erstbesucher im Chat — Name + Gold-Kicker + `FIRST TIME`-Badge, Pop-Burst beim Einblenden |
-| **Interner Canvas** | 600×140 |
-| **OBS Browser-Source** | 600×140 (OBS skaliert proportional) |
+| **Beschreibung** | Fullscreen-Alert für Erstbesucher im Chat — Name-Box mittig, Sparkles über den gesamten Canvas, Pop-Burst beim Einblenden |
+| **Interner Canvas** | 1920×1080 |
+| **OBS Browser-Source** | 1920×1080 (Fullscreen) |
 
 **URL-Parameter:**
 
@@ -154,7 +154,7 @@ Die Browser-Source muss ca. **100px breiter** und **100px höher** als die Cam-G
 | `name` | `NewViewer42` | Angezeigter Username |
 
 **OBS-Setup:**
-1. Browser-Source hinzufügen → Größe **600×140**
+1. Browser-Source hinzufügen → Größe **1920×1080** (Fullscreen-Overlay)
 2. Source auf **unsichtbar** stellen (Auge-Icon aus)
 3. **Show Transition** einstellen: Rechtsklick → Show Transition → *Slide* oder *Fade*
 4. Per Streamer.bot bei First-Chat-Event die URL setzen (`?name=%user%`) und die Source einblenden
@@ -277,7 +277,7 @@ alerts/raid.html?username=BigStreamer&viewers=150
 | Szenen | **1920×1080** | Fullscreen |
 | Alerts | **1920×1080** | Fullscreen |
 | Info-Widgets | **500×100** (Subgoal: 500×120) | Kompakt, frei positionierbar, OBS-Transition |
-| Welcome-Widget | **600×140** | Kompakt, Pop-Burst beim Einblenden |
+| Welcome-Widget | **1920×1080** | Fullscreen, Name-Box mittig + Sparkles überall |
 | Logo | **400×152** (oder kleiner, z.B. 158×60) | OBS skaliert proportional |
 | Webcam-Rahmen | **Cam + 100×100** | Platz für Blitz-Arcs und Sparkles |
 

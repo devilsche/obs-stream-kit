@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=600, height=140" />
+  <meta name="viewport" content="width=1920, height=1080" />
   <title>Welcome</title>
   <style>
     @font-face {
@@ -20,8 +20,8 @@
     }
 
     html, body {
-      width: 600px;
-      height: 140px;
+      width: 1920px;
+      height: 1080px;
       overflow: hidden;
       background: transparent;
       font-family: 'DM Sans', sans-serif;
@@ -39,15 +39,18 @@
 
     .widget-box {
       position: relative;
-      background: rgba(13, 13, 26, 0.78);
-      border: 1px solid rgba(155, 85, 192, 0.45);
+      background: linear-gradient(135deg,
+        rgba(18, 10, 32, 0.92) 0%,
+        rgba(38, 20, 56, 0.92) 100%
+      );
+      border: 1px solid rgba(155, 85, 192, 0.35);
       border-radius: 12px;
-      padding: 16px 40px 18px;
+      padding: 18px 44px 20px;
       text-align: center;
-      max-width: 540px;
+      max-width: 560px;
       box-shadow:
-        0 0 22px rgba(94, 42, 121, 0.45),
-        inset 0 0 18px rgba(94, 42, 121, 0.18);
+        0 4px 24px rgba(0, 0, 0, 0.55),
+        0 0 18px rgba(94, 42, 121, 0.3);
     }
 
     .kicker {
@@ -71,10 +74,6 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      text-shadow:
-        0 0 20px rgba(255, 255, 255, 0.6),
-        0 0 50px rgba(94, 42, 121, 0.9),
-        0 0 80px rgba(155, 85, 192, 0.4);
     }
 
     .divider {
@@ -148,17 +147,17 @@
     (function () {
       'use strict';
       new SparkleEngine(document.getElementById('sparkle-container'), {
-        count: 14,
+        count: 32,
         speed: 0.4,
         maxOpacity: 1.0,
         colors: { gold: 0.4, purple: 0.4, white: 0.2 },
-        sizeWeights: { big: 0.15, normal: 0.35, small: 0.35, tiny: 0.15 }
+        sizeWeights: { big: 0.1, normal: 0.3, small: 0.4, tiny: 0.2 }
       }).start();
 
       /* ── Pop-Burst (einmalig beim Laden) ─────────────────── */
       var BURST_COUNT = 12;
-      var CANVAS_W = 600;
-      var CANVAS_H = 140;
+      var CANVAS_W = 1920;
+      var CANVAS_H = 1080;
       var EDGE_MARGIN = 40;
       var BURST_COLORS = ['#f2b705', '#f2b705', '#f2b705',
                           '#5e2a79', '#c9a0dc', '#9b55c0',
