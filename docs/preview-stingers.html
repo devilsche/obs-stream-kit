@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stinger Preview — mit Sound</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      min-height: 100vh;
+      font-family: system-ui, sans-serif;
+      background: #0d0d1a;
+      color: #fff;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 24px;
+      padding: 24px 0 12px;
+      background: linear-gradient(90deg, #c9a0dc, #f2b705);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hint {
+      text-align: center;
+      color: rgba(255,255,255,0.6);
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      padding: 0 24px 48px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, rgba(94,42,121,0.8), rgba(20,10,35,0.9));
+      border: 1px solid rgba(155,85,192,0.4);
+      color: #fff;
+      padding: 18px 20px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: left;
+      font-family: inherit;
+      transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      border-color: #f2b705;
+      box-shadow: 0 4px 18px rgba(242,183,5,0.3);
+    }
+
+    .btn .name { display: block; font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+    .btn .meta { display: block; font-size: 12px; color: rgba(255,255,255,0.55); font-weight: 400; }
+    .btn .sound { color: #f2b705; }
+
+    .stage {
+      position: fixed;
+      inset: 0;
+      display: none;
+      z-index: 100;
+    }
+
+    .stage.active { display: block; }
+
+    .stage iframe {
+      width: 100vw;
+      height: 100vh;
+      border: 0;
+      background: #000;
+    }
+
+    .close {
+      position: fixed;
+      top: 16px; right: 16px;
+      z-index: 101;
+      background: rgba(0,0,0,0.75);
+      color: #fff;
+      border: 1px solid #f2b705;
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .close:hover { background: rgba(242,183,5,0.3); }
+  </style>
+</head>
+<body>
+
+  <h1>Stinger Preview</h1>
+  <p class="hint">Klick auf einen Stinger startet ihn inkl. Sound (umgeht Browser-Autoplay-Block).</p>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="stage" id="stage">
+    <button class="close" id="close">× schließen (Esc)</button>
+    <iframe id="frame"></iframe>
+  </div>
+
+  <script>
+    const STINGERS = [
+      { file: 'trap.html',              name: "It's a Trap!",       sound: false, group: 'Meme' },
+      { file: 'crash.html',             name: 'Crash!',             sound: false, group: 'Meme' },
+      { file: 'nani.html',              name: 'NANI?!',             sound: true,  group: 'Anime' },
+      { file: 'gg.html',                name: 'GG!',                sound: true,  group: 'Meme' },
+      { file: 'noice.html',             name: 'Noice. (B99)',       sound: true,  group: 'B99' },
+      { file: 'smort.html',             name: 'Smort. (B99)',       sound: false, group: 'B99' },
+      { file: 'cool.html',              name: 'Cool cool cool (B99)', sound: false, group: 'B99' },
+      { file: 'luke.html',              name: 'Luke (Hund)',        sound: false, group: 'Custom' },
+      { file: 'over-9000.html',         name: "IT'S OVER 9000!",    sound: true,  group: 'DBZ' },
+      { file: 'kamehameha.html',        name: 'Kamehameha!',        sound: true,  group: 'DBZ' },
+      { file: 'super-saiyan.html',      name: 'Super Saiyan',       sound: true,  group: 'DBZ' },
+      { file: 'indeed.html',            name: 'Indeed. (Teal\'c)',  sound: false, group: 'Stargate' },
+      { file: 'chevron-locked.html',    name: 'Chevron 7 Locked',   sound: false, group: 'Stargate' },
+      { file: 'crying-out-loud.html',   name: 'For crying out loud!', sound: false, group: 'Stargate' },
+      { file: 'khan.html',              name: 'KHAAAAAAN!',         sound: true,  group: 'Star Trek' },
+      { file: 'make-it-so.html',        name: 'Make it so',         sound: true,  group: 'Star Trek' },
+      { file: 'engage.html',            name: 'Engage',             sound: true,  group: 'Star Trek' },
+      { file: 'resistance-futile.html', name: 'Resistance is futile', sound: false, group: 'Star Trek' },
+    ];
+
+    const grid = document.getElementById('grid');
+    STINGERS.forEach(s => {
+      const btn = document.createElement('button');
+      btn.className = 'btn';
+      btn.innerHTML =
+        '<span class="name">' + s.name + '</span>' +
+        '<span class="meta">' + s.group + (s.sound ? ' · <span class="sound">🔊 Sound</span>' : ' · stumm') + '</span>';
+      btn.addEventListener('click', () => launch(s.file));
+      grid.appendChild(btn);
+    });
+
+    const stage = document.getElementById('stage');
+    const frame = document.getElementById('frame');
+    const close = document.getElementById('close');
+
+    function launch(file) {
+      frame.src = '../stingers/' + file;
+      stage.classList.add('active');
+    }
+
+    function hide() {
+      stage.classList.remove('active');
+      frame.src = 'about:blank';
+    }
+
+    close.addEventListener('click', hide);
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') hide();
+    });
+  </script>
+
+</body>
+</html>

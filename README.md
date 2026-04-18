@@ -97,7 +97,7 @@ Widgets sind kleinere Elemente, die unabhängig positioniert werden können. Die
 | `width` | `400` | Interner Canvas-Breite in px (ändert Rendering-Auflösung, nicht OBS-Größe) |
 | `pause` | `10` | Pause zwischen Loops in Sekunden |
 | `speed` | `200` | Millisekunden pro Streifen-Step |
-| `lines` | `logo_lines_blue.png` | Streifen-Bild in `assets/` — austauschbar für andere Logos |
+| `lines` | `logo_lines_blue_t.png` | Streifen-Bild in `assets/` — austauschbar für andere Logos |
 | `text` | `logo_text_luckor_hd.png` | Text-Bild in `assets/` — austauschbar für andere Logos |
 | `glow` | *(lila↔gold)* | Glow-Farbe: `purple`, `gold`, oder Hex-Code (`#ff0000`) |
 

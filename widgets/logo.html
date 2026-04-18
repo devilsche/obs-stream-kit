@@ -65,7 +65,7 @@
         ?width=400          — Logo-Breite in px (default: 400)
         ?pause=10           — Pause zwischen Loops in Sekunden (default: 10)
         ?speed=200          — ms pro Streifen-Step (default: 200)
-        ?lines=dateiname    — Streifen-Bild in assets/ (default: logo_lines_blue.png)
+        ?lines=dateiname    — Streifen-Bild in assets/ (default: logo_lines_blue_t.png)
         ?text=dateiname     — Text-Bild in assets/ (default: logo_text_luckor_hd.png)
         ?glow=purple|gold   — Glow-Farbe (default: purple↔gold Wechsel)
     */
@@ -75,7 +75,7 @@
       const PAUSE_S = parseFloat(params.get('pause')) || 10;
 
       // --- Bild-Parameter ---
-      const linesFile = params.get('lines') || 'logo_lines_blue.png';
+      const linesFile = params.get('lines') || 'logo_lines_blue_t.png';
       const textFile = params.get('text') || 'logo_text_luckor_hd.png';
 
       const stripes = document.querySelector('.stripes');
