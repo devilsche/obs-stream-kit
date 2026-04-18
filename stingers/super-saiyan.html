@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Super Saiyan Stinger</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: block;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    @keyframes bgFadeIn   { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
+
+    @keyframes screamGrow {
+      0%   { transform: translate(-50%, -50%) scale(0.2); opacity: 0; }
+      60%  { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1);   opacity: 1; }
+    }
+
+    @keyframes auraBurst {
+      0%   { transform: translate(-50%, -50%) scale(0.1); opacity: 0; }
+      20%  { opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(3);   opacity: 0; }
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translate(0, 0); }
+      20% { transform: translate(-12px, 10px); }
+      40% { transform: translate(10px, -8px); }
+      60% { transform: translate(-8px, -10px); }
+      80% { transform: translate(12px, 8px); }
+    }
+
+    @keyframes rayRise {
+      0%   { transform: translate(-50%, 50vh) scaleY(0); opacity: 0; transform-origin: bottom center; }
+      20%  { opacity: 1; transform-origin: bottom center; }
+      100% { transform: translate(-50%, -50vh) scaleY(1.2); opacity: 0; transform-origin: bottom center; }
+    }
+
+    @keyframes titleIn {
+      0%   { transform: translate(-50%, calc(-50% + 40px)) scale(0.7); opacity: 0; }
+      55%  { transform: translate(-50%, calc(-50% - 10px)) scale(1.1); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    }
+
+    .bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at center,
+          rgba(255, 230, 80, 0.75) 0%,
+          rgba(255, 150, 20, 0.6) 30%,
+          rgba(80, 30, 5, 0.92) 70%,
+          rgba(10, 5, 0, 0.98) 100%
+        );
+      z-index: 1;
+      opacity: 0;
+      animation: bgFadeIn 0.3s ease-out 0.15s forwards;
+    }
+
+    /* Central aura burst */
+    .aura {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 800px; height: 800px;
+      border-radius: 50%;
+      background: radial-gradient(circle,
+        #fff9d0 0%,
+        #ffe74c 30%,
+        rgba(255, 180, 40, 0.6) 60%,
+        transparent 90%
+      );
+      transform: translate(-50%, -50%) scale(0.1);
+      opacity: 0;
+      z-index: 3;
+      mix-blend-mode: screen;
+      animation: auraBurst 1.4s ease-out 0.15s 2;
+    }
+
+    /* Vertical energy rays — Goku's iconic aura flames going up */
+    .rays {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 4;
+      pointer-events: none;
+    }
+
+    .ray {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 14px;
+      height: 380px;
+      border-radius: 10px;
+      background: linear-gradient(180deg,
+        rgba(255, 255, 220, 0) 0%,
+        rgba(255, 230, 100, 0.9) 40%,
+        rgba(255, 180, 40, 1) 100%
+      );
+      box-shadow: 0 0 24px rgba(255, 200, 60, 0.9);
+      transform: translate(-50%, 50vh) scaleY(0);
+      opacity: 0;
+      animation: rayRise 1.4s ease-out var(--delay) infinite;
+      filter: blur(1px);
+    }
+
+    .shaker {
+      position: absolute; inset: 0;
+      z-index: 5;
+      animation: shake 0.13s linear 0.3s 18;
+    }
+
+    .scream {
+      position: absolute;
+      top: 42%; left: 50%;
+      transform: translate(-50%, -50%) scale(0.2);
+      font-size: 280px;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: -8px;
+      line-height: 1;
+      white-space: nowrap;
+      text-transform: uppercase;
+      z-index: 6;
+      opacity: 0;
+      -webkit-text-stroke: 6px #3a1500;
+      text-shadow:
+        0 14px 0 #6b2a00,
+        0 0 40px rgba(255, 200, 60, 1),
+        0 0 80px rgba(255, 140, 20, 0.7),
+        8px 8px 0 #2a0a00;
+      animation: screamGrow 0.5s cubic-bezier(0.22, 1.6, 0.36, 1) 0.3s forwards;
+    }
+
+    .title {
+      position: absolute;
+      top: 68%; left: 50%;
+      transform: translate(-50%, calc(-50% + 40px)) scale(0.7);
+      font-size: 84px;
+      font-weight: 900;
+      color: #ffe74c;
+      letter-spacing: 14px;
+      line-height: 1;
+      white-space: nowrap;
+      text-transform: uppercase;
+      z-index: 6;
+      opacity: 0;
+      -webkit-text-stroke: 3px #3a1500;
+      text-shadow:
+        0 0 24px rgba(255, 200, 60, 0.9),
+        4px 4px 0 #2a0a00;
+      animation: titleIn 0.5s cubic-bezier(0.22, 1.5, 0.36, 1) 0.9s forwards;
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.5s ease-in 3s forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="bg"></div>
+    <div class="aura"></div>
+
+    <div class="rays" id="rays"></div>
+
+    <div class="shaker">
+      <div class="scream">AAAAAAAH!</div>
+      <div class="title">Super Saiyan</div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+      var rays = document.getElementById('rays');
+      var COUNT = 28;
+      for (var i = 0; i < COUNT; i++) {
+        var el = document.createElement('div');
+        el.className = 'ray';
+        var leftPct = (5 + (i / COUNT) * 90 + Math.random() * 4 - 2) + '%';
+        var delay = (Math.random() * 1.4) + 's';
+        el.style.cssText =
+          'left:' + leftPct + ';' +
+          'width:' + (10 + Math.random() * 10) + 'px;' +
+          'height:' + (300 + Math.random() * 250) + 'px;' +
+          '--delay:' + delay + ';';
+        rays.appendChild(el);
+      }
+    })();
+  </script>
+
+</body>
+</html>

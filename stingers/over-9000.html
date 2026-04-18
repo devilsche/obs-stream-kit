@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Over 9000 Stinger</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: block;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    @keyframes flashWhite { 0% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes bgFadeIn   { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
+
+    @keyframes scannerSweep {
+      0%   { transform: translateX(-100%); opacity: 0; }
+      10%  { opacity: 0.9; }
+      90%  { opacity: 0.9; }
+      100% { transform: translateX(100%); opacity: 0; }
+    }
+
+    @keyframes numberTick {
+      0%   { opacity: 0; transform: translateY(-20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes titleSlam {
+      0%   { transform: translate(-50%, -50%) scale(0)    rotate(-6deg); opacity: 0; }
+      45%  { transform: translate(-50%, -50%) scale(1.25) rotate(2deg);  opacity: 1; }
+      65%  { transform: translate(-50%, -50%) scale(0.92) rotate(-1deg); }
+      100% { transform: translate(-50%, -50%) scale(1)    rotate(0deg);  opacity: 1; }
+    }
+
+    @keyframes shakeHeavy {
+      0%, 100% { transform: translate(0, 0); }
+      10% { transform: translate(-14px, 10px); }
+      20% { transform: translate(12px, -8px); }
+      30% { transform: translate(-10px, -12px); }
+      40% { transform: translate(14px, 8px); }
+      50% { transform: translate(-8px, 10px); }
+      60% { transform: translate(10px, -8px); }
+      70% { transform: translate(-12px, 8px); }
+      80% { transform: translate(8px, -10px); }
+      90% { transform: translate(-6px, 6px); }
+    }
+
+    @keyframes auraPulse {
+      0%, 100% { transform: translate(-50%, -50%) scale(1);   opacity: 0.8; }
+      50%      { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+    }
+
+    @keyframes auraFadeIn {
+      from { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+      to   { opacity: 0.8; transform: translate(-50%, -50%) scale(1); }
+    }
+
+    @keyframes crackIn {
+      0%, 100% { opacity: 0; }
+      60%      { opacity: 0; }
+      65%      { opacity: 1; transform: scale(1.05); }
+      100%     { opacity: 0.9; transform: scale(1); }
+    }
+
+    @keyframes sparkRise {
+      0%   { transform: translate(calc(-50% + var(--sx)), 100vh) rotate(0deg); opacity: 0; }
+      15%  { opacity: 1; }
+      100% { transform: translate(calc(-50% + var(--sx) + var(--dx)), -20vh) rotate(360deg); opacity: 0; }
+    }
+
+    .flash {
+      position: absolute; inset: 0;
+      background: #fff;
+      z-index: 20;
+      animation: flashWhite 0.12s ease-out forwards;
+    }
+
+    .bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at center,
+          rgba(255, 200, 60, 0.6) 0%,
+          rgba(230, 100, 20, 0.55) 30%,
+          rgba(80, 20, 10, 0.92) 75%,
+          rgba(10, 5, 5, 0.98) 100%
+        );
+      z-index: 1;
+      opacity: 0;
+      animation: bgFadeIn 0.2s ease-out 0.1s forwards;
+    }
+
+    /* Aura rings expanding from center */
+    .aura {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 1600px; height: 1600px;
+      border-radius: 50%;
+      background: radial-gradient(circle,
+        rgba(255, 220, 80, 0.55) 0%,
+        rgba(255, 140, 30, 0.4) 35%,
+        rgba(200, 60, 10, 0.2) 65%,
+        transparent 85%
+      );
+      mix-blend-mode: screen;
+      transform: translate(-50%, -50%) scale(0.4);
+      opacity: 0;
+      z-index: 2;
+      animation:
+        auraFadeIn 0.5s ease-out 0.15s forwards,
+        auraPulse 1.4s ease-in-out 0.65s infinite;
+    }
+
+    /* Scouter HUD scan sweep */
+    .scanner {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(100, 255, 140, 0.15) 48%,
+        rgba(100, 255, 140, 0.4) 50%,
+        rgba(100, 255, 140, 0.15) 52%,
+        transparent 100%
+      );
+      mix-blend-mode: screen;
+      z-index: 3;
+      animation: scannerSweep 1s ease-in-out 0.2s 2;
+    }
+
+    /* Number countup before the slam */
+    .number {
+      position: absolute;
+      top: 22%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 88px;
+      font-weight: 700;
+      color: #7cff9d;
+      letter-spacing: 6px;
+      text-shadow:
+        0 0 14px rgba(120, 255, 150, 0.9),
+        0 0 28px rgba(80, 200, 100, 0.7),
+        3px 3px 0 #000;
+      z-index: 7;
+      opacity: 0;
+      animation: numberTick 0.15s ease-out 0.3s forwards;
+    }
+
+    .shaker {
+      position: absolute; inset: 0;
+      z-index: 4;
+      animation: shakeHeavy 0.14s linear 0.9s infinite;
+    }
+
+    .title {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0) rotate(-6deg);
+      font-size: 260px;
+      font-weight: 900;
+      color: #ffe74c;
+      letter-spacing: -6px;
+      line-height: 1;
+      white-space: nowrap;
+      text-transform: uppercase;
+      z-index: 6;
+      opacity: 0;
+      -webkit-text-stroke: 5px #3a1500;
+      text-shadow:
+        0 12px 0 #6b2a00,
+        0 20px 30px rgba(0, 0, 0, 0.6),
+        0 0 40px rgba(255, 180, 40, 0.8),
+        0 0 80px rgba(255, 140, 20, 0.6);
+      animation: titleSlam 0.55s cubic-bezier(0.22, 1.6, 0.36, 1) 0.9s forwards;
+    }
+
+    .sub {
+      position: absolute;
+      top: calc(50% + 200px);
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 46px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: 10px;
+      text-transform: uppercase;
+      z-index: 6;
+      opacity: 0;
+      text-shadow:
+        3px 3px 0 #000,
+        0 0 18px rgba(255, 180, 40, 0.9);
+      animation: bgFadeIn 0.4s ease-out 1.3s forwards;
+    }
+
+    /* Cracked scouter overlay */
+    .crack {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1000px;
+      z-index: 8;
+      opacity: 0;
+      animation: crackIn 0.4s ease-out 1.5s forwards;
+      pointer-events: none;
+    }
+
+    .crack svg { width: 100%; }
+
+    /* Rising sparks */
+    .spark {
+      position: absolute;
+      top: 0; left: 50%;
+      width: 8px; height: 22px;
+      border-radius: 4px;
+      background: linear-gradient(180deg, #fff5a0, #ff9624);
+      box-shadow: 0 0 12px #ffb547, 0 0 28px rgba(255, 150, 40, 0.7);
+      z-index: 5;
+      opacity: 0;
+      animation: sparkRise var(--dur) linear var(--delay) forwards;
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.5s ease-in 3s forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="flash"></div>
+    <div class="bg"></div>
+    <div class="aura"></div>
+
+    <div class="scanner"></div>
+
+    <div class="number">POWER LVL: 9001</div>
+
+    <div id="spark-layer"></div>
+
+    <div class="shaker">
+      <div class="title">It's over 9000!!!</div>
+      <div class="sub">Vegeta, what does the scouter say?</div>
+    </div>
+
+    <div class="crack">
+      <svg viewBox="0 0 1000 400" preserveAspectRatio="xMidYMid meet">
+        <g stroke="rgba(255,255,255,0.85)" stroke-width="3" fill="none">
+          <polyline points="100,80 260,150 190,220 360,280 280,340 440,390"/>
+          <polyline points="900,60 780,140 860,200 720,280 830,340"/>
+          <polyline points="500,30 460,130 540,190 470,260 520,340"/>
+          <polyline points="260,150 320,140 310,170 350,155"/>
+          <polyline points="780,140 740,130 760,160 720,150"/>
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+      var layer = document.getElementById('spark-layer');
+      var COUNT = 28;
+      for (var i = 0; i < COUNT; i++) {
+        var el = document.createElement('div');
+        el.className = 'spark';
+        var sx = (Math.random() * 1700 - 850) + 'px';
+        var dx = (Math.random() * 200 - 100) + 'px';
+        var dur = (1.4 + Math.random() * 1.0) + 's';
+        var delay = (Math.random() * 1.2) + 's';
+        var w = (5 + Math.random() * 6) + 'px';
+        var h = (16 + Math.random() * 18) + 'px';
+        el.style.cssText =
+          'width:' + w + ';' +
+          'height:' + h + ';' +
+          '--sx:' + sx + ';' +
+          '--dx:' + dx + ';' +
+          '--dur:' + dur + ';' +
+          '--delay:' + delay + ';';
+        layer.appendChild(el);
+      }
+    })();
+  </script>
+
+</body>
+</html>
