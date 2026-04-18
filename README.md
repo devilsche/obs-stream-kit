@@ -262,6 +262,31 @@ alerts/raid.html?username=BigStreamer&viewers=150
 
 ---
 
+## Stingers / Meme-Overlays
+
+Fullscreen-Overlays zum manuellen Auslösen (z.B. per Streamer.bot Hotkey oder Chat-Command). Spielen einmal ab, blenden sich selbst aus.
+
+| Datei | Trigger-Idee | Dauer | OBS Browser-Source |
+|-------|--------------|-------|--------------------|
+| `stingers/trap.html` | Hotkey bei Bait-Situation | ~3s | 1920×1080 |
+| `stingers/crash.html` | Ingame-Unfall / Tod | ~2s | 1920×1080 |
+| `stingers/nani.html` | Überraschender Move | ~3s | 1920×1080 |
+| `stingers/gg.html` | End-of-Match / Sieg | ~3.3s | 1920×1080 |
+| `stingers/noice.html` | Gelungener Play | ~2s | 1920×1080 |
+
+### Setup in Streamer.bot
+
+1. Pro Stinger eine Browser-Source in OBS anlegen (1920×1080), **unsichtbar**
+2. Streamer.bot Action pro Stinger:
+   - **OBS Set Source Visibility** → Source sichtbar
+   - **Delay** → Dauer des Stingers (siehe Tabelle)
+   - **OBS Set Source Visibility** → Source unsichtbar
+3. Action per **Hotkey** oder **Chat-Command** (`!trap`, `!crash`, etc.) triggern
+
+> **Tipp:** Für Sound-Effekte lege entsprechende Audio-Files in `assets/stingers/` (z.B. `trap.mp3`) und spiele sie per Streamer.bot parallel zum Stinger ab. Die HTML-Dateien enthalten bewusst keine Audio-Tags — so kannst du Sound frei tauschen.
+
+---
+
 ## Transition
 
 | Datei | Beschreibung | OBS-Setup |
