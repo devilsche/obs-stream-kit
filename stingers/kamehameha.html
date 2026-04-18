@@ -95,9 +95,9 @@
       z-index: 4;
       box-shadow: 0 0 80px 40px rgba(80, 180, 255, 0.7), 0 0 150px 60px rgba(50, 140, 230, 0.4);
       animation:
-        orbGrow 0.5s ease-out 0.3s forwards,
-        orbPulse 0.9s ease-in-out 0.8s 6,
-        orbVanish 0.4s ease-out 5.4s forwards;
+        orbGrow 0.5s ease-out 0.8s forwards,
+        orbPulse 0.9s ease-in-out 1.3s 4,
+        orbVanish 0.4s ease-out 4.4s forwards;
     }
 
     /* Chant words — appear one after the other */
@@ -124,13 +124,13 @@
 
     .chant-word.w1 {
       animation:
-        wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 0.6s forwards,
-        wordOut 0.4s ease-in 2.3s forwards;
+        wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 1.3s forwards,
+        wordOut 0.4s ease-in 2.1s forwards;
     }
     .chant-word.w2 {
       animation:
-        wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 2.8s forwards,
-        wordOut 0.4s ease-in 4.9s forwards;
+        wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 2.4s forwards,
+        wordOut 0.4s ease-in 4.0s forwards;
     }
 
     /* Final "HA!" — bigger, explosive */
@@ -153,7 +153,7 @@
         0 0 100px rgba(80, 180, 255, 0.8),
         0 0 180px rgba(50, 140, 230, 0.5),
         8px 8px 0 #0a0a1a;
-      animation: finalWord 0.6s cubic-bezier(0.22, 1.6, 0.36, 1) 5.3s forwards;
+      animation: finalWord 0.6s cubic-bezier(0.22, 1.6, 0.36, 1) 4.3s forwards;
     }
 
     /* Horizontal beam blasting across */
@@ -177,7 +177,7 @@
       opacity: 0;
       filter: blur(2px);
       box-shadow: 0 0 80px rgba(100, 200, 255, 0.9);
-      animation: beamLaunch 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 5.5s forwards;
+      animation: beamLaunch 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 4.5s forwards;
     }
 
     .stage {
