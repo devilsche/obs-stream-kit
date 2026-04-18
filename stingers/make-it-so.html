@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
+  <script src="../js/stinger-ready.js"></script>
   <title>Make It So Stinger</title>
   <style>
     @font-face {
@@ -257,13 +258,7 @@
     <div class="shine"></div>
   </div>
 
-  <audio id="picardAudio" src="../assets/stingers/picard_make_it_so.mp3"></audio>
-  <script>
-    setTimeout(function () {
-      var a = document.getElementById('picardAudio');
-      if (a && a.play) a.play().catch(function () {});
-    }, 1600);
-  </script>
+  <audio data-stinger-autoplay data-delay="1600" preload="auto" src="../assets/stingers/picard_make_it_so.mp3"></audio>
 
 </body>
 </html>
