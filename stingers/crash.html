@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Crash Stinger</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: block;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    @keyframes blackFlash {
+      0%   { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes impactScale {
+      0%   { transform: translate(-50%, -50%) scale(0)    rotate(-6deg); opacity: 0; }
+      25%  { transform: translate(-50%, -50%) scale(1.25) rotate(-3deg); opacity: 1; }
+      45%  { transform: translate(-50%, -50%) scale(0.92) rotate(-4deg); }
+      100% { transform: translate(-50%, -50%) scale(1)    rotate(-4deg); opacity: 1; }
+    }
+
+    @keyframes glitchShift {
+      0%, 100% { transform: translate(-50%, -50%) rotate(-4deg); }
+      20%      { transform: translate(calc(-50% - 4px), -50%) rotate(-4deg); }
+      40%      { transform: translate(calc(-50% + 5px), calc(-50% - 2px)) rotate(-4deg); }
+      60%      { transform: translate(-50%, calc(-50% + 3px)) rotate(-4deg); }
+      80%      { transform: translate(calc(-50% - 3px), -50%) rotate(-4deg); }
+    }
+
+    @keyframes shakeHard {
+      0%, 100% { transform: translate(0, 0); }
+      10% { transform: translate(-14px, 10px); }
+      20% { transform: translate(12px, -8px); }
+      30% { transform: translate(-10px, -12px); }
+      40% { transform: translate(14px, 8px); }
+      50% { transform: translate(-8px, 10px); }
+      60% { transform: translate(10px, -8px); }
+      70% { transform: translate(-12px, 8px); }
+      80% { transform: translate(8px, -10px); }
+      90% { transform: translate(-6px, 6px); }
+    }
+
+    @keyframes barFlicker {
+      0%, 100% { opacity: 0; }
+      20%      { opacity: 0.8; transform: translateX(-20px); }
+      40%      { opacity: 0.3; transform: translateX(30px); }
+      60%      { opacity: 0.9; transform: translateX(-10px); }
+      80%      { opacity: 0.2; transform: translateX(15px); }
+    }
+
+    @keyframes fadeOutAll {
+      from { opacity: 1; }
+      to   { opacity: 0; }
+    }
+
+    .flash {
+      position: absolute; inset: 0;
+      background: #000;
+      z-index: 20;
+      animation: blackFlash 0.08s ease-out forwards;
+    }
+
+    .shaker {
+      position: absolute; inset: 0;
+      animation: shakeHard 0.12s linear 0.05s 14;
+    }
+
+    .crash-text-base,
+    .crash-text-r,
+    .crash-text-b {
+      position: absolute;
+      top: 50%; left: 50%;
+      font-size: 320px;
+      font-weight: 900;
+      letter-spacing: -8px;
+      white-space: nowrap;
+      text-transform: uppercase;
+      font-family: 'DM Sans', sans-serif;
+      -webkit-text-stroke: 6px #000;
+      transform: translate(-50%, -50%) rotate(-4deg);
+    }
+
+    .crash-text-base {
+      color: #fff;
+      z-index: 4;
+      opacity: 0;
+      animation:
+        impactScale 0.45s cubic-bezier(0.22, 1.6, 0.36, 1) 0.05s forwards,
+        glitchShift 0.14s steps(1) 0.5s 10;
+    }
+
+    /* RGB Split layers */
+    .crash-text-r {
+      color: rgba(255, 40, 40, 0.9);
+      z-index: 3;
+      opacity: 0;
+      mix-blend-mode: screen;
+      animation:
+        impactScale 0.45s cubic-bezier(0.22, 1.6, 0.36, 1) 0.05s forwards,
+        barFlicker 0.16s steps(1) 0.5s 10;
+    }
+
+    .crash-text-b {
+      color: rgba(30, 180, 255, 0.9);
+      z-index: 2;
+      opacity: 0;
+      mix-blend-mode: screen;
+      animation:
+        impactScale 0.45s cubic-bezier(0.22, 1.6, 0.36, 1) 0.05s forwards,
+        barFlicker 0.12s steps(1) 0.55s 12;
+    }
+
+    /* Distortion bars — horizontal glitch lines */
+    .glitch-bar {
+      position: absolute;
+      left: 0; right: 0;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.85);
+      z-index: 5;
+      mix-blend-mode: difference;
+      opacity: 0;
+      animation: barFlicker 0.15s steps(1) 0.4s 8;
+    }
+
+    .glitch-bar.b1 { top: 22%; animation-delay: 0.4s; }
+    .glitch-bar.b2 { top: 48%; height: 14px; animation-delay: 0.45s; }
+    .glitch-bar.b3 { top: 63%; animation-delay: 0.5s; }
+    .glitch-bar.b4 { top: 82%; height: 6px; animation-delay: 0.55s; }
+
+    .cracks {
+      position: absolute; inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      opacity: 0;
+      animation: blackFlash 1.5s ease-out 0.1s reverse;
+    }
+
+    .cracks svg { width: 100%; height: 100%; }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.4s ease-in 1.6s forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="flash"></div>
+
+    <div class="cracks">
+      <svg viewBox="0 0 1920 1080" preserveAspectRatio="none">
+        <g stroke="rgba(255,255,255,0.4)" stroke-width="3" fill="none">
+          <polyline points="300,100 500,380 380,480 620,660 480,820 720,1000"/>
+          <polyline points="1700,120 1480,330 1620,500 1380,690 1550,880"/>
+          <polyline points="960,40 900,240 1040,360 880,540 1060,720 940,960"/>
+          <polyline points="200,600 400,720 260,880"/>
+          <polyline points="1720,600 1520,760 1680,920"/>
+        </g>
+      </svg>
+    </div>
+
+    <div class="shaker">
+      <div class="glitch-bar b1"></div>
+      <div class="glitch-bar b2"></div>
+      <div class="glitch-bar b3"></div>
+      <div class="glitch-bar b4"></div>
+
+      <div class="crash-text-b">Crash!</div>
+      <div class="crash-text-r">Crash!</div>
+      <div class="crash-text-base">Crash!</div>
+    </div>
+  </div>
+
+</body>
+</html>

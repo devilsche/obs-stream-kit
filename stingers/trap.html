@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Trap Stinger</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: block;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    @keyframes flashWhite {
+      0%   { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes redAlert {
+      0%, 100% { opacity: 0.55; }
+      50%      { opacity: 0.9; }
+    }
+
+    @keyframes redFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    @keyframes stripeInTop {
+      from { transform: translateY(-100%); }
+      to   { transform: translateY(0); }
+    }
+
+    @keyframes stripeInBottom {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+
+    @keyframes textSlam {
+      0%   { transform: translate(-50%, -50%) scale(0);   opacity: 0; }
+      40%  { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+      60%  { transform: translate(-50%, -50%) scale(0.95); }
+      100% { transform: translate(-50%, -50%) scale(1);   opacity: 1; }
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translate(0, 0); }
+      10%      { transform: translate(-8px, 6px); }
+      20%      { transform: translate(7px, -5px); }
+      30%      { transform: translate(-6px, -7px); }
+      40%      { transform: translate(8px, 4px); }
+      50%      { transform: translate(-5px, 6px); }
+      60%      { transform: translate(6px, -5px); }
+      70%      { transform: translate(-7px, 5px); }
+      80%      { transform: translate(5px, -6px); }
+      90%      { transform: translate(-4px, 4px); }
+    }
+
+    @keyframes fadeOutAll {
+      from { opacity: 1; }
+      to   { opacity: 0; }
+    }
+
+    .flash {
+      position: absolute; inset: 0;
+      background: #ffffff;
+      z-index: 20;
+      animation: flashWhite 0.12s ease-out forwards;
+    }
+
+    .red-bg {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at center,
+        rgba(200, 20, 20, 0.75) 0%,
+        rgba(90, 5, 5, 0.95) 70%
+      );
+      z-index: 1;
+      opacity: 0;
+      animation:
+        redFadeIn 0.15s ease-out 0.1s forwards,
+        redAlert 0.6s ease-in-out 0.25s infinite;
+    }
+
+    .stripes {
+      position: absolute;
+      left: 0; right: 0;
+      height: 72px;
+      background: repeating-linear-gradient(
+        45deg,
+        #f2b705 0 40px,
+        #0d0d0d 40px 80px
+      );
+      z-index: 2;
+      box-shadow: 0 0 30px rgba(0,0,0,0.6);
+    }
+
+    .stripes-top {
+      top: 0;
+      animation: stripeInTop 0.35s cubic-bezier(0.4, 1.6, 0.5, 1) 0.15s backwards;
+    }
+
+    .stripes-bottom {
+      bottom: 0;
+      animation: stripeInBottom 0.35s cubic-bezier(0.4, 1.6, 0.5, 1) 0.15s backwards;
+    }
+
+    .shaker {
+      position: absolute; inset: 0;
+      z-index: 3;
+      animation: shake 0.18s linear 0.3s infinite;
+    }
+
+    .trap-text {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      font-size: 240px;
+      font-weight: 900;
+      color: #f2b705;
+      letter-spacing: -4px;
+      white-space: nowrap;
+      text-transform: uppercase;
+      text-shadow:
+        -6px -6px 0 #0d0d0d,
+         6px -6px 0 #0d0d0d,
+        -6px  6px 0 #0d0d0d,
+         6px  6px 0 #0d0d0d,
+         0 0 40px rgba(242, 183, 5, 0.9),
+         0 0 80px rgba(200, 20, 20, 0.8);
+      opacity: 0;
+      animation: textSlam 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards;
+    }
+
+    .sub-text {
+      position: absolute;
+      top: calc(50% + 160px);
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 36px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      text-shadow: 0 0 18px rgba(200, 20, 20, 0.9), 2px 2px 0 #000;
+      opacity: 0;
+      animation: redFadeIn 0.3s ease-out 0.7s forwards;
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.5s ease-in 2.6s forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="flash"></div>
+    <div class="red-bg"></div>
+
+    <div class="shaker">
+      <div class="stripes stripes-top"></div>
+      <div class="stripes stripes-bottom"></div>
+      <div class="trap-text">It's a Trap!</div>
+      <div class="sub-text">Admiral Ackbar says no</div>
+    </div>
+  </div>
+
+</body>
+</html>
