@@ -28,10 +28,10 @@
     }
 
     @keyframes lukeIn {
-      0%   { transform: translate(-50%, -50%) scale(0.2) rotate(-8deg); opacity: 0; filter: blur(20px); }
-      60%  { transform: translate(-50%, -50%) scale(1.08) rotate(2deg); opacity: 1; filter: blur(0); }
-      80%  { transform: translate(-50%, -50%) scale(0.96) rotate(-1deg); }
-      100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+      0%   { transform: translate(-50%, -50%) scale(0.2) rotate(-8deg); opacity: 0; filter: blur(20px) saturate(1.1) contrast(1.05); }
+      60%  { transform: translate(-50%, -50%) scale(1.08) rotate(2deg); opacity: 1; filter: blur(0) saturate(1.1) contrast(1.05); }
+      80%  { transform: translate(-50%, -50%) scale(0.96) rotate(-1deg); filter: blur(0) saturate(1.1) contrast(1.05); }
+      100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; filter: blur(0) saturate(1.1) contrast(1.05); }
     }
 
     @keyframes ringSpin {
@@ -142,7 +142,7 @@
       background: url('../assets/stingers/luke.jpg') center/cover no-repeat;
       z-index: 5;
       opacity: 0;
-      filter: blur(20px) saturate(1.1) contrast(1.05);
+      filter: saturate(1.1) contrast(1.05);
       box-shadow:
         0 0 40px rgba(255, 160, 60, 0.5),
         0 0 90px rgba(200, 100, 30, 0.35),
