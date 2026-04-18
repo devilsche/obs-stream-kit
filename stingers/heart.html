@@ -107,7 +107,7 @@
       z-index: 3;
       animation:
         heartGroupAppear 0.7s cubic-bezier(0.22, 1.5, 0.36, 1) 0.3s forwards,
-        heartbeat 2.6s ease-in-out 1.2s 2;
+        heartbeat 2.2s ease-in-out 1.2s infinite;
     }
 
     .sparkle {
@@ -172,7 +172,7 @@
 
     .stage {
       position: absolute; inset: 0;
-      animation: fadeOutAll 0.8s ease-in 4.6s forwards;
+      animation: fadeOutAll 1.0s ease-in 15.0s forwards;
     }
   </style>
 </head>
@@ -187,7 +187,7 @@
     <div class="username" id="username">Liebling</div>
   </div>
 
-  <audio data-stinger-autoplay preload="auto" src="../assets/stingers/heartbeat.mp3"></audio>
+  <audio data-stinger-autoplay preload="auto" src="../assets/stingers/heart-beat.mp3"></audio>
 
   <script>
     (function () {
