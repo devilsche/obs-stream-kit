@@ -274,6 +274,8 @@ Fullscreen-Overlays zum manuellen Auslösen (z.B. per Streamer.bot Hotkey oder C
 | `stingers/gg.html` | End-of-Match / Sieg | ~3.3s | 1920×1080 |
 | `stingers/noice.html` | Gelungener Play | ~2s | 1920×1080 |
 | `stingers/luke.html` | Hund im Bild / Shoutout | ~3.5s | 1920×1080 |
+| `stingers/smort.html` | B99-Deadpan-Approval (Holt-Style) | ~2s | 1920×1080 |
+| `stingers/cool.html` | B99 nervöse Zustimmung (Jake-Style) | ~3s | 1920×1080 |
 
 ### Setup in Streamer.bot
 

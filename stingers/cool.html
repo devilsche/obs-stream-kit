@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Cool Cool Cool Stinger</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: block;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    @keyframes bgFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    @keyframes wordPop {
+      0%   { transform: translate(-50%, calc(-50% + 24px)) scale(0.4) rotate(var(--tilt)); opacity: 0; }
+      60%  { transform: translate(-50%, calc(-50% - 6px)) scale(1.08) rotate(var(--tilt)); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1) rotate(var(--tilt)); opacity: 1; }
+    }
+
+    @keyframes subWordIn {
+      0%   { transform: translate(-50%, 14px); opacity: 0; }
+      100% { transform: translate(-50%, 0);    opacity: 1; }
+    }
+
+    @keyframes nervousJitter {
+      0%, 100% { transform: translate(-50%, -50%) rotate(var(--tilt)); }
+      25%      { transform: translate(calc(-50% + 2px), calc(-50% - 1px)) rotate(calc(var(--tilt) + 0.8deg)); }
+      50%      { transform: translate(calc(-50% - 2px), calc(-50% + 1px)) rotate(calc(var(--tilt) - 0.6deg)); }
+      75%      { transform: translate(calc(-50% + 1px), calc(-50% + 2px)) rotate(calc(var(--tilt) + 0.4deg)); }
+    }
+
+    @keyframes subJitter {
+      0%, 100% { transform: translate(-50%, 0); }
+      33%      { transform: translate(calc(-50% + 1px), -1px); }
+      66%      { transform: translate(calc(-50% - 1px), 1px); }
+    }
+
+    @keyframes sweatDrop {
+      0%   { transform: translate(-50%, 0) scale(0.4); opacity: 0; }
+      30%  { transform: translate(-50%, 20px) scale(1.1); opacity: 1; }
+      100% { transform: translate(-50%, 120px) scale(0.6); opacity: 0; }
+    }
+
+    @keyframes fadeOutAll {
+      from { opacity: 1; }
+      to   { opacity: 0; }
+    }
+
+    .bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at center,
+          rgba(30, 50, 75, 0.55) 0%,
+          rgba(15, 15, 30, 0.85) 55%,
+          rgba(8, 8, 16, 0.95) 100%
+        );
+      z-index: 1;
+      opacity: 0;
+      animation: bgFadeIn 0.3s ease-out forwards;
+    }
+
+    /* Thin warning accent at top + bottom */
+    .accent {
+      position: absolute;
+      left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255, 80, 80, 0.6) 30%,
+        rgba(255, 80, 80, 0.6) 70%,
+        transparent 100%
+      );
+      z-index: 2;
+      opacity: 0;
+      animation: bgFadeIn 0.4s ease-out 0.1s forwards;
+    }
+    .accent.top    { top: 80px; }
+    .accent.bottom { bottom: 80px; }
+
+    /* Main line: 4x "cool" staggered */
+    .cool-line {
+      position: absolute;
+      top: 42%;
+      left: 0; right: 0;
+      height: 200px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 36px;
+      z-index: 5;
+    }
+
+    .cool-word {
+      font-size: 170px;
+      font-weight: 900;
+      color: #e0f0ff;
+      letter-spacing: -4px;
+      line-height: 1;
+      text-transform: lowercase;
+      -webkit-text-stroke: 4px #0d0d0d;
+      text-shadow:
+        6px 6px 0 #0d0d0d,
+        0 0 22px rgba(100, 180, 255, 0.7),
+        0 0 50px rgba(60, 120, 220, 0.4);
+      position: relative;
+      transform: translateY(24px) scale(0.4) rotate(var(--tilt));
+      opacity: 0;
+    }
+
+    /* Trick: use the absolute-positioned container's flex + per-word animation */
+    .cool-word {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, calc(-50% + 24px)) scale(0.4) rotate(var(--tilt));
+    }
+
+    .cool-word.w1 { --tilt: -3deg;  --offset: -600px; animation: wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 0.2s forwards, nervousJitter 0.35s ease-in-out 0.8s infinite; }
+    .cool-word.w2 { --tilt:  2deg;  --offset: -200px; animation: wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 0.38s forwards, nervousJitter 0.38s ease-in-out 1.0s infinite; }
+    .cool-word.w3 { --tilt: -1deg;  --offset:  200px; animation: wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 0.56s forwards, nervousJitter 0.33s ease-in-out 1.2s infinite; }
+    .cool-word.w4 { --tilt:  3deg;  --offset:  600px; animation: wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 0.74s forwards, nervousJitter 0.4s ease-in-out 1.4s infinite; }
+
+    /* Shift each word horizontally after the pop */
+    .cool-word.w1 { left: calc(50% - 600px); }
+    .cool-word.w2 { left: calc(50% - 200px); }
+    .cool-word.w3 { left: calc(50% + 200px); }
+    .cool-word.w4 { left: calc(50% + 600px); }
+
+    /* No doubt row below */
+    .nd-line {
+      position: absolute;
+      top: calc(50% + 200px);
+      left: 0; right: 0;
+      height: 100px;
+      z-index: 5;
+    }
+
+    .nd-word {
+      position: absolute;
+      top: 50%;
+      font-size: 72px;
+      font-weight: 700;
+      color: #c0d8ff;
+      letter-spacing: 4px;
+      line-height: 1;
+      text-transform: lowercase;
+      font-style: italic;
+      opacity: 0;
+      transform: translate(-50%, 14px);
+      text-shadow:
+        3px 3px 0 #0d0d0d,
+        0 0 14px rgba(100, 180, 255, 0.5);
+      white-space: nowrap;
+    }
+
+    .nd-word.n1 { left: calc(50% - 420px); animation: subWordIn 0.3s ease-out 1.05s forwards, subJitter 0.3s ease-in-out 1.4s infinite; }
+    .nd-word.n2 { left: 50%;                animation: subWordIn 0.3s ease-out 1.25s forwards, subJitter 0.33s ease-in-out 1.6s infinite; }
+    .nd-word.n3 { left: calc(50% + 420px);  animation: subWordIn 0.3s ease-out 1.45s forwards, subJitter 0.28s ease-in-out 1.8s infinite; }
+
+    .sweat {
+      position: absolute;
+      top: calc(50% - 80px);
+      left: calc(50% + 720px);
+      font-size: 90px;
+      transform: translate(-50%, 0) scale(0.4);
+      opacity: 0;
+      z-index: 6;
+      animation: sweatDrop 1s ease-out 1.2s forwards;
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.4s ease-in 2.8s forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="bg"></div>
+    <div class="accent top"></div>
+    <div class="accent bottom"></div>
+
+    <div class="cool-line">
+      <div class="cool-word w1">cool</div>
+      <div class="cool-word w2">cool</div>
+      <div class="cool-word w3">cool</div>
+      <div class="cool-word w4">cool</div>
+    </div>
+
+    <div class="nd-line">
+      <div class="nd-word n1">no doubt</div>
+      <div class="nd-word n2">no doubt</div>
+      <div class="nd-word n3">no doubt</div>
+    </div>
+
+    <div class="sweat">&#128166;</div>
+  </div>
+
+</body>
+</html>
