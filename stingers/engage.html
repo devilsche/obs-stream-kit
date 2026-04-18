@@ -62,26 +62,27 @@
       animation: bgFadeIn 0.25s ease-out forwards;
     }
 
-    /* Central vanishing point tunnel — ein einziger Kreis mit Gradient statt Kern + box-shadow */
+    /* Central vanishing point tunnel — Kern + Glow (Original-Design) */
     .tunnel {
       position: absolute;
       top: 50%; left: 50%;
-      width: 600px; height: 600px;
+      width: 200px; height: 200px;
       border-radius: 50%;
       transform: translate(-50%, -50%);
       background: radial-gradient(circle,
-        rgba(230, 245, 255, 0.95) 0%,
-        rgba(150, 210, 255, 0.8) 10%,
-        rgba(80, 170, 240, 0.55) 25%,
-        rgba(40, 110, 210, 0.3) 45%,
-        rgba(20, 60, 160, 0.15) 65%,
-        transparent 90%
+        rgba(200, 240, 255, 0.9) 0%,
+        rgba(100, 180, 255, 0.6) 35%,
+        rgba(40, 100, 200, 0.3) 70%,
+        transparent 100%
       );
       z-index: 2;
       opacity: 0;
+      box-shadow:
+        0 0 80px rgba(100, 200, 255, 0.7),
+        0 0 200px rgba(50, 150, 230, 0.4);
       animation:
         bgFadeIn 0.5s ease-out 0.1s forwards,
-        blastForward 0.7s cubic-bezier(0.4, 0, 0.2, 1) 1.5s forwards;
+        blastForward 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.8s forwards;
     }
 
     /* Warp streaks radiating outward from center */
