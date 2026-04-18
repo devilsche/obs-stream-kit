@@ -32,11 +32,22 @@
       inset: 0;
       z-index: 2;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
+      pointer-events: none;
+    }
+
+    .widget-box {
+      position: relative;
+      background: rgba(13, 13, 26, 0.78);
+      border: 1px solid rgba(155, 85, 192, 0.45);
+      border-radius: 12px;
+      padding: 16px 40px 18px;
       text-align: center;
-      padding: 18px 20px;
+      max-width: 540px;
+      box-shadow:
+        0 0 22px rgba(94, 42, 121, 0.45),
+        inset 0 0 18px rgba(94, 42, 121, 0.18);
     }
 
     .kicker {
@@ -48,7 +59,7 @@
       text-shadow:
         0 0 10px rgba(242, 183, 5, 0.8),
         0 0 20px rgba(242, 183, 5, 0.4);
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .name {
@@ -69,25 +80,26 @@
     .divider {
       width: 120px;
       height: 2px;
-      margin-top: 10px;
+      margin: 8px auto 0;
       background: linear-gradient(90deg, transparent, #f2b705, transparent);
     }
 
     .badge {
       position: absolute;
-      top: 12px;
-      right: 14px;
+      top: -10px;
+      right: -10px;
       z-index: 3;
       font-size: 11px;
       font-weight: 700;
       letter-spacing: 1px;
-      color: #c9a0dc;
+      color: #ffffff;
       padding: 4px 10px;
-      border: 1px solid #5e2a79;
+      border: 1px solid #c9a0dc;
       border-radius: 4px;
-      background: rgba(94, 42, 121, 0.15);
+      background: #5e2a79;
       transform: rotate(-8deg);
-      text-shadow: 0 0 6px rgba(155, 85, 192, 0.6);
+      text-shadow: 0 0 6px rgba(155, 85, 192, 0.8);
+      box-shadow: 0 0 12px rgba(94, 42, 121, 0.6);
       text-transform: uppercase;
     }
 
@@ -109,16 +121,17 @@
 </head>
 <body>
 
-  <div class="badge">First Time</div>
-
   <div id="sparkle-container" style="position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;"></div>
 
   <div id="burst-container" style="position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none;"></div>
 
   <div class="content">
-    <div class="kicker">&#10022; Willkommen &#10022;</div>
-    <div class="name" id="name">NewViewer42</div>
-    <div class="divider"></div>
+    <div class="widget-box">
+      <div class="badge">First Time</div>
+      <div class="kicker">&#10022; Willkommen &#10022;</div>
+      <div class="name" id="name">NewViewer42</div>
+      <div class="divider"></div>
+    </div>
   </div>
 
   <script>
