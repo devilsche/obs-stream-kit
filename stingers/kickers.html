@@ -6,13 +6,6 @@
   <script src="../js/stinger-ready.js"></script>
   <title>Kickers Stinger</title>
   <style>
-    @font-face {
-      font-family: 'DM Sans';
-      src: url('../assets/DM-Sans.woff2') format('woff2');
-      font-weight: 100 900;
-      font-display: block;
-    }
-
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     html, body {
@@ -20,7 +13,6 @@
       height: 1080px;
       overflow: hidden;
       background: transparent;
-      font-family: 'DM Sans', sans-serif;
     }
 
     @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
@@ -30,18 +22,8 @@
       to   { opacity: 1; }
     }
 
-    @keyframes gregorIn {
-      0%   { transform: translateY(-50%) translateX(130%) scale(0.8); opacity: 0; }
-      70%  { transform: translateY(-50%) translateX(-6%) scale(1.04); opacity: 1; }
-      100% { transform: translateY(-50%) translateX(0) scale(1); opacity: 1; }
-    }
-
-    @keyframes gregorOut {
-      from { transform: translateY(-50%) translateX(0) scale(1); opacity: 1; }
-      to   { transform: translateY(-50%) translateX(130%) scale(0.85); opacity: 0; }
-    }
-
-    /* Fullscreen Video-Hintergrund */
+    /* Fullscreen Video — Schwarz wird per screen-Blend transparent,
+       nur die hellen Bälle bleiben sichtbar */
     .bg-video {
       position: absolute;
       inset: 0;
@@ -50,27 +32,8 @@
       object-fit: cover;
       z-index: 1;
       opacity: 0;
+      mix-blend-mode: screen;
       animation: videoFadeIn 0.3s ease-out 0.1s forwards;
-    }
-
-    /* Gregor Portrait rechts (falls assets/gregor.jpeg vorhanden) */
-    .gregor {
-      position: absolute;
-      top: 50%;
-      right: 60px;
-      transform: translateY(-50%) translateX(130%) scale(0.8);
-      width: 520px;
-      max-height: 820px;
-      object-fit: contain;
-      z-index: 5;
-      opacity: 0;
-      border-radius: 16px;
-      filter:
-        drop-shadow(0 0 25px rgba(242, 183, 5, 0.8))
-        drop-shadow(0 0 55px rgba(220, 40, 60, 0.5));
-      animation:
-        gregorIn 0.7s cubic-bezier(0.22, 1.4, 0.36, 1) 0.6s forwards,
-        gregorOut 0.6s ease-in 8.0s forwards;
     }
 
     .stage {
@@ -83,8 +46,6 @@
 
   <div class="stage">
     <video class="bg-video" data-stinger-autoplay preload="auto" playsinline src="../assets/stingers/kickers-intro.mp4"></video>
-
-    <img class="gregor" id="gregor" src="../assets/gregor.jpeg" alt="" onerror="this.style.display='none'">
   </div>
 
 </body>
