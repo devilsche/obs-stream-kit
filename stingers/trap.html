@@ -80,39 +80,32 @@
       animation: flashWhite 0.12s ease-out forwards;
     }
 
-    /* Trooper-Video als Hintergrund (optional — wird versteckt falls MP4 fehlt) */
-    .bg-video {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      z-index: 0;
-      opacity: 0;
-      animation: redFadeIn 0.2s ease-out 0.1s forwards;
-    }
-
-    /* Default: kräftige rote Vollfläche (Fallback ohne Video) */
+    /* Rote Vollfläche als Hintergrund (liegt UNTER dem Video) */
     .red-bg {
       position: absolute; inset: 0;
       background: radial-gradient(ellipse at center,
         rgba(200, 20, 20, 0.75) 0%,
         rgba(90, 5, 5, 0.95) 70%
       );
-      z-index: 1;
+      z-index: 0;
       opacity: 0;
       animation:
         redFadeIn 0.15s ease-out 0.1s forwards,
         redAlert 0.6s ease-in-out 0.25s infinite;
     }
 
-    /* Sobald Video geladen ist: rot nur als Tint, damit Trooper durchschimmert */
-    .stage.has-video .red-bg {
-      background: radial-gradient(ellipse at center,
-        rgba(200, 20, 20, 0.35) 0%,
-        rgba(90, 5, 5, 0.55) 70%
-      );
-      mix-blend-mode: multiply;
+    /* Trooper-Video — grüner Chroma-Key wird per SVG-Filter transparent,
+       darunter scheint das rote BG durch */
+    .bg-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 1;
+      opacity: 0;
+      filter: url(#greenKey);
+      animation: redFadeIn 0.2s ease-out 0.1s forwards;
     }
 
     .stripes {
@@ -188,20 +181,30 @@
 </head>
 <body>
 
+  <!-- SVG Chroma-Key-Filter: Grün wird transparent -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <filter id="greenKey" color-interpolation-filters="sRGB">
+        <feColorMatrix type="matrix" values="
+          1 0 0 0 0
+          0 1 0 0 0
+          0 0 1 0 0
+          -2 3 -2 0 -0.25
+        " result="chroma"/>
+        <feComponentTransfer in="chroma" result="mask">
+          <feFuncA type="discrete" tableValues="1 0"/>
+        </feComponentTransfer>
+        <feComposite in="SourceGraphic" in2="mask" operator="in"/>
+      </filter>
+    </defs>
+  </svg>
+
   <div class="stage" id="stage">
+    <div class="red-bg"></div>
     <video class="bg-video" id="bgVideo" data-stinger-autoplay preload="auto" playsinline
            src="../assets/stingers/trap.mp4"
            onerror="this.remove(); this.onerror=null;"></video>
-    <script>
-      (function () {
-        var v = document.getElementById('bgVideo');
-        var s = document.getElementById('stage');
-        if (!v) return;
-        v.addEventListener('loadeddata', function () { s.classList.add('has-video'); });
-      })();
-    </script>
     <div class="flash"></div>
-    <div class="red-bg"></div>
 
     <div class="shaker">
       <div class="stripes stripes-top"></div>
