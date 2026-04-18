@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>GG Stinger</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: block;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    @keyframes bgFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    @keyframes ggPop {
+      0%   { transform: translate(-50%, -50%) scale(0)    rotate(-10deg); opacity: 0; }
+      55%  { transform: translate(-50%, -50%) scale(1.2)  rotate(3deg);  opacity: 1; }
+      75%  { transform: translate(-50%, -50%) scale(0.95) rotate(-1deg); }
+      100% { transform: translate(-50%, -50%) scale(1)    rotate(0deg);  opacity: 1; }
+    }
+
+    @keyframes ggGlow {
+      0%, 100% {
+        text-shadow:
+          0 0 30px rgba(242, 183, 5, 0.8),
+          0 0 60px rgba(242, 183, 5, 0.5),
+          0 0 100px rgba(242, 183, 5, 0.3);
+      }
+      50% {
+        text-shadow:
+          0 0 50px rgba(255, 220, 80, 1),
+          0 0 90px rgba(242, 183, 5, 0.8),
+          0 0 140px rgba(242, 183, 5, 0.5);
+      }
+    }
+
+    @keyframes confettiFall {
+      0%   { transform: translate(-50%, -50%) translate(0, 0) rotate(0deg); opacity: 1; }
+      100% { transform: translate(-50%, -50%) translate(var(--tx), var(--ty)) rotate(var(--rot)); opacity: 0; }
+    }
+
+    @keyframes rayRotate {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to   { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes raysFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 0.55; }
+    }
+
+    @keyframes fadeOutAll {
+      from { opacity: 1; }
+      to   { opacity: 0; }
+    }
+
+    .bg {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at center,
+        rgba(242, 183, 5, 0.25) 0%,
+        rgba(94, 42, 121, 0.35) 45%,
+        rgba(13, 13, 26, 0.9) 90%
+      );
+      z-index: 1;
+      opacity: 0;
+      animation: bgFadeIn 0.3s ease-out forwards;
+    }
+
+    .rays {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 2800px; height: 2800px;
+      transform: translate(-50%, -50%) rotate(0deg);
+      z-index: 2;
+      opacity: 0;
+      background: conic-gradient(
+        from 0deg,
+        rgba(242, 183, 5, 0.5) 0deg,
+        transparent 15deg,
+        rgba(242, 183, 5, 0.5) 30deg,
+        transparent 45deg,
+        rgba(242, 183, 5, 0.5) 60deg,
+        transparent 75deg,
+        rgba(242, 183, 5, 0.5) 90deg,
+        transparent 105deg,
+        rgba(242, 183, 5, 0.5) 120deg,
+        transparent 135deg,
+        rgba(242, 183, 5, 0.5) 150deg,
+        transparent 165deg,
+        rgba(242, 183, 5, 0.5) 180deg,
+        transparent 195deg,
+        rgba(242, 183, 5, 0.5) 210deg,
+        transparent 225deg,
+        rgba(242, 183, 5, 0.5) 240deg,
+        transparent 255deg,
+        rgba(242, 183, 5, 0.5) 270deg,
+        transparent 285deg,
+        rgba(242, 183, 5, 0.5) 300deg,
+        transparent 315deg,
+        rgba(242, 183, 5, 0.5) 330deg,
+        transparent 345deg,
+        rgba(242, 183, 5, 0.5) 360deg
+      );
+      mask-image: radial-gradient(ellipse at center, transparent 200px, black 800px, transparent 1300px);
+      -webkit-mask-image: radial-gradient(ellipse at center, transparent 200px, black 800px, transparent 1300px);
+      mix-blend-mode: screen;
+      animation:
+        raysFadeIn 0.5s ease-out 0.1s forwards,
+        rayRotate 18s linear infinite;
+    }
+
+    .gg-text {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      font-size: 400px;
+      font-weight: 900;
+      color: #f2b705;
+      letter-spacing: 20px;
+      white-space: nowrap;
+      text-transform: uppercase;
+      line-height: 1;
+      z-index: 5;
+      opacity: 0;
+      -webkit-text-stroke: 4px #000;
+      animation:
+        ggPop 0.6s cubic-bezier(0.22, 1.6, 0.36, 1) 0.2s forwards,
+        ggGlow 1.2s ease-in-out 0.8s infinite;
+    }
+
+    .gg-sub {
+      position: absolute;
+      top: calc(50% + 240px);
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 42px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: 16px;
+      text-transform: uppercase;
+      z-index: 5;
+      opacity: 0;
+      text-shadow: 0 0 20px rgba(242, 183, 5, 0.8), 3px 3px 0 #000;
+      animation: bgFadeIn 0.4s ease-out 0.75s forwards;
+    }
+
+    .confetti {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 16px; height: 24px;
+      z-index: 4;
+      animation: confettiFall var(--dur) ease-out var(--delay) forwards;
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.5s ease-in 2.8s forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="bg"></div>
+    <div class="rays"></div>
+
+    <div id="confetti-layer"></div>
+
+    <div class="gg-text">GG!</div>
+    <div class="gg-sub">Good Game</div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+      var layer = document.getElementById('confetti-layer');
+      var COLORS = ['#f2b705', '#ffd84d', '#5e2a79', '#c9a0dc', '#ffffff', '#9b55c0'];
+      var COUNT = 60;
+
+      for (var i = 0; i < COUNT; i++) {
+        var angle = Math.random() * Math.PI * 2;
+        var dist = 450 + Math.random() * 550;
+        var tx = Math.cos(angle) * dist;
+        var ty = Math.sin(angle) * dist + 300; // bias downward
+        var rot = (Math.random() * 720 - 360) + 'deg';
+        var dur = (1.5 + Math.random() * 1.2) + 's';
+        var delay = (0.25 + Math.random() * 0.4) + 's';
+        var color = COLORS[Math.floor(Math.random() * COLORS.length)];
+        var w = 10 + Math.random() * 10;
+        var h = 18 + Math.random() * 16;
+
+        var el = document.createElement('div');
+        el.className = 'confetti';
+        el.style.cssText =
+          'background:' + color + ';' +
+          'width:' + w + 'px;' +
+          'height:' + h + 'px;' +
+          'border-radius:2px;' +
+          'box-shadow:0 0 6px ' + color + ';' +
+          '--tx:' + tx.toFixed(0) + 'px;' +
+          '--ty:' + ty.toFixed(0) + 'px;' +
+          '--rot:' + rot + ';' +
+          '--dur:' + dur + ';' +
+          '--delay:' + delay + ';';
+        layer.appendChild(el);
+      }
+    })();
+  </script>
+
+</body>
+</html>
