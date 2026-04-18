@@ -7,6 +7,11 @@ Keine URL-Parameter nötig.
 Usage:
   python serve.py          # Port 8080
   python serve.py 9000     # eigener Port
+
+Robust gegen:
+  - Broken Pipes wenn Browser Video/Audio-Streams abbricht
+  - Parallele Requests (ThreadingHTTPServer statt single-threaded)
+  - "Address already in use" nach Restart (allow_reuse_address)
 """
 import http.server
 import os
@@ -42,25 +47,65 @@ os.chdir(ROOT)
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
+    # ── Robustheit ──────────────────────────────────────────────────
+    def handle_one_request(self):
+        try:
+            super().handle_one_request()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError,
+                TimeoutError):
+            # Browser hat Verbindung mitten im Download abgebrochen.
+            # Typisch bei Video-Streams / Reloads. Leise ignorieren.
+            pass
+        except OSError:
+            pass
+
+    def copyfile(self, source, outputfile):
+        try:
+            super().copyfile(source, outputfile)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError,
+                OSError):
+            pass
+
+    def send_error(self, code, message=None, explain=None):
+        try:
+            super().send_error(code, message, explain)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError,
+                OSError):
+            pass
+
+    # ── HTML-Injection für Credentials ──────────────────────────────
     def do_GET(self):
-        # Nur HTML-Dateien modifizieren
-        path = self.translate_path(self.path.split("?")[0])
-        if path.endswith(".html") and inject_script and os.path.isfile(path):
-            with open(path, "r", encoding="utf-8") as f:
-                content = f.read()
-            # Script direkt nach <head> injizieren
-            content = content.replace("<head>", "<head>" + inject_script, 1)
-            data = content.encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
-        else:
-            super().do_GET()
+        try:
+            # Nur HTML-Dateien modifizieren
+            path = self.translate_path(self.path.split("?")[0])
+            if path.endswith(".html") and inject_script and os.path.isfile(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                # Script direkt nach <head> injizieren
+                content = content.replace("<head>", "<head>" + inject_script, 1)
+                data = content.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+            else:
+                super().do_GET()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError,
+                OSError):
+            pass
 
     def log_message(self, format, *args):
-        sys.stderr.write(f"  {args[0]}\n")
+        try:
+            sys.stderr.write(f"  {args[0]}\n")
+        except Exception:
+            pass
+
+
+# ── Threading-Server mit Address-Reuse ──────────────────────────────
+class StreamServer(http.server.ThreadingHTTPServer):
+    allow_reuse_address = True
+    daemon_threads = True
 
 
 print()
@@ -88,12 +133,15 @@ print("  Widgets:")
 print(f"  Logo:          http://localhost:{PORT}/widgets/logo.html")
 print(f"  Webcam-Frame:  http://localhost:{PORT}/widgets/webcam-frame.html")
 print()
+print("  Stinger-Preview:")
+print(f"  http://localhost:{PORT}/docs/preview-stingers.html")
+print()
 print(f"  Server: http://localhost:{PORT}")
 print(f"  Beenden mit Ctrl+C")
 print("=" * 60)
 print()
 
-httpd = http.server.HTTPServer((HOST, PORT), Handler)
+httpd = StreamServer((HOST, PORT), Handler)
 try:
     httpd.serve_forever()
 except KeyboardInterrupt:
