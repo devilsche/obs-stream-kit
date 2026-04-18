@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Chevron 7 Locked Stinger</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: block;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    @keyframes bgFadeIn   { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
+
+    @keyframes ringSpin {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to   { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes ringSpinReverse {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to   { transform: translate(-50%, -50%) rotate(-360deg); }
+    }
+
+    @keyframes chevronLight {
+      0%, 100% { opacity: 0.15; filter: drop-shadow(0 0 5px rgba(255, 160, 40, 0.4)); }
+      50%      { opacity: 1;    filter: drop-shadow(0 0 20px rgba(255, 180, 60, 1)); }
+    }
+
+    @keyframes kawoosh {
+      0%   { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+      30%  { transform: translate(-50%, -50%) scale(1.8); opacity: 1; }
+      60%  { transform: translate(-50%, -50%) scale(1); opacity: 0.95; }
+      100% { transform: translate(-50%, -50%) scale(1); opacity: 0.9; }
+    }
+
+    @keyframes horizonRipple {
+      0%   { transform: translate(-50%, -50%) scale(1); }
+      100% { transform: translate(-50%, -50%) scale(1.04); }
+    }
+
+    @keyframes textIn {
+      0%   { transform: translateX(-50%) translateY(30px); opacity: 0; }
+      100% { transform: translateX(-50%) translateY(0);    opacity: 1; }
+    }
+
+    .bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at center,
+          rgba(30, 50, 100, 0.55) 0%,
+          rgba(10, 15, 35, 0.92) 65%,
+          rgba(5, 5, 12, 0.98) 100%
+        );
+      z-index: 1;
+      opacity: 0;
+      animation: bgFadeIn 0.3s ease-out forwards;
+    }
+
+    /* Outer gate ring — spins */
+    .outer-ring {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 780px; height: 780px;
+      border-radius: 50%;
+      border: 16px solid #4a3518;
+      background:
+        radial-gradient(circle at 30% 30%, rgba(255, 220, 140, 0.12), transparent 55%),
+        conic-gradient(from 0deg,
+          #1a130a 0deg, #3d2c14 20deg, #6b4e1f 40deg, #3d2c14 60deg, #1a130a 90deg,
+          #3d2c14 120deg, #6b4e1f 140deg, #3d2c14 160deg, #1a130a 180deg,
+          #3d2c14 200deg, #6b4e1f 220deg, #3d2c14 240deg, #1a130a 270deg,
+          #3d2c14 290deg, #6b4e1f 310deg, #3d2c14 330deg, #1a130a 360deg
+        );
+      transform: translate(-50%, -50%) rotate(0deg);
+      z-index: 2;
+      opacity: 0;
+      box-shadow:
+        0 0 60px rgba(180, 120, 40, 0.3),
+        inset 0 0 40px rgba(0, 0, 0, 0.7);
+      animation:
+        bgFadeIn 0.4s ease-out 0.1s forwards,
+        ringSpin 12s linear infinite;
+    }
+
+    /* Inner horizon circle */
+    .horizon {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 600px; height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle,
+        #0a0a1a 0%,
+        #0e162e 45%,
+        #05050f 100%
+      );
+      transform: translate(-50%, -50%) scale(1);
+      z-index: 3;
+      opacity: 0;
+      box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.95);
+      animation: bgFadeIn 0.3s ease-out 0.1s forwards;
+    }
+
+    /* Event horizon splash (kawoosh) */
+    .kawoosh {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 600px; height: 600px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      background: radial-gradient(circle,
+        rgba(180, 230, 255, 1) 0%,
+        rgba(80, 180, 255, 0.95) 35%,
+        rgba(30, 100, 200, 0.85) 60%,
+        rgba(10, 40, 120, 0.7) 85%,
+        transparent 100%
+      );
+      box-shadow:
+        0 0 80px rgba(100, 200, 255, 0.9),
+        0 0 200px rgba(50, 140, 230, 0.6);
+      z-index: 4;
+      opacity: 0;
+      mix-blend-mode: screen;
+      animation:
+        kawoosh 0.9s cubic-bezier(0.2, 0.9, 0.3, 1) 2s forwards,
+        horizonRipple 1s ease-in-out 2.9s infinite alternate;
+    }
+
+    /* Chevrons around the outer ring */
+    .chevrons {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 820px; height: 820px;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .chevron {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 60px; height: 60px;
+      transform-origin: center -340px;
+      opacity: 0.15;
+      transform: translate(-50%, -50%) rotate(var(--angle)) translateY(-340px);
+    }
+
+    .chevron svg { width: 100%; height: 100%; display: block; }
+
+    .chevron.c1 { --angle:   0deg; animation: chevronLight 0.5s ease-in-out 0.4s forwards; }
+    .chevron.c2 { --angle:  51deg; animation: chevronLight 0.5s ease-in-out 0.6s forwards; }
+    .chevron.c3 { --angle: 103deg; animation: chevronLight 0.5s ease-in-out 0.8s forwards; }
+    .chevron.c4 { --angle: 154deg; animation: chevronLight 0.5s ease-in-out 1.0s forwards; }
+    .chevron.c5 { --angle: 206deg; animation: chevronLight 0.5s ease-in-out 1.2s forwards; }
+    .chevron.c6 { --angle: 257deg; animation: chevronLight 0.5s ease-in-out 1.4s forwards; }
+    .chevron.c7 { --angle: 309deg; animation: chevronLight 0.6s ease-in-out 1.7s infinite alternate; }
+
+    .title {
+      position: absolute;
+      top: calc(50% + 460px);
+      left: 50%;
+      transform: translateX(-50%) translateY(30px);
+      font-size: 72px;
+      font-weight: 900;
+      color: #ffbe3c;
+      letter-spacing: 14px;
+      line-height: 1;
+      white-space: nowrap;
+      text-transform: uppercase;
+      z-index: 6;
+      opacity: 0;
+      text-shadow:
+        0 0 24px rgba(255, 190, 60, 0.9),
+        0 0 50px rgba(220, 140, 30, 0.5),
+        3px 3px 0 #2a1a0a;
+      animation: textIn 0.5s ease-out 2.2s forwards;
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.6s ease-in 3.8s forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="bg"></div>
+    <div class="outer-ring"></div>
+    <div class="horizon"></div>
+
+    <div class="chevrons">
+      <div class="chevron c1"><svg viewBox="0 0 60 60"><polygon points="30,8 52,42 42,52 30,36 18,52 8,42" fill="#ff9624"/></svg></div>
+      <div class="chevron c2"><svg viewBox="0 0 60 60"><polygon points="30,8 52,42 42,52 30,36 18,52 8,42" fill="#ff9624"/></svg></div>
+      <div class="chevron c3"><svg viewBox="0 0 60 60"><polygon points="30,8 52,42 42,52 30,36 18,52 8,42" fill="#ff9624"/></svg></div>
+      <div class="chevron c4"><svg viewBox="0 0 60 60"><polygon points="30,8 52,42 42,52 30,36 18,52 8,42" fill="#ff9624"/></svg></div>
+      <div class="chevron c5"><svg viewBox="0 0 60 60"><polygon points="30,8 52,42 42,52 30,36 18,52 8,42" fill="#ff9624"/></svg></div>
+      <div class="chevron c6"><svg viewBox="0 0 60 60"><polygon points="30,8 52,42 42,52 30,36 18,52 8,42" fill="#ff9624"/></svg></div>
+      <div class="chevron c7"><svg viewBox="0 0 60 60"><polygon points="30,8 52,42 42,52 30,36 18,52 8,42" fill="#ff9624"/></svg></div>
+    </div>
+
+    <div class="kawoosh"></div>
+
+    <div class="title">Chevron 7 — Locked</div>
+  </div>
+
+</body>
+</html>

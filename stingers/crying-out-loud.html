@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>For Crying Out Loud Stinger</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: block;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    @keyframes bgFadeIn   { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
+
+    @keyframes stripeSweep {
+      0%   { transform: translate(-120%, -50%) rotate(-4deg); }
+      100% { transform: translate(-50%, -50%)  rotate(-4deg); }
+    }
+
+    @keyframes textSlam {
+      0%   { transform: translate(-50%, -50%) scale(0.4)  rotate(-3deg); opacity: 0; }
+      50%  { transform: translate(-50%, -50%) scale(1.15) rotate(1deg);  opacity: 1; }
+      70%  { transform: translate(-50%, -50%) scale(0.95) rotate(-1deg); }
+      100% { transform: translate(-50%, -50%) scale(1)    rotate(0deg);  opacity: 1; }
+    }
+
+    @keyframes subIn {
+      from { transform: translateX(-50%) translateY(16px); opacity: 0; }
+      to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+    }
+
+    @keyframes faceShake {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      25%      { transform: translate(-5px, 3px) rotate(-2deg); }
+      50%      { transform: translate(4px, -4px) rotate(1deg); }
+      75%      { transform: translate(-3px, -3px) rotate(-1deg); }
+    }
+
+    .bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at center,
+          rgba(70, 50, 15, 0.7) 0%,
+          rgba(30, 20, 5, 0.92) 65%,
+          rgba(10, 5, 0, 0.98) 100%
+        );
+      z-index: 1;
+      opacity: 0;
+      animation: bgFadeIn 0.25s ease-out forwards;
+    }
+
+    /* Diagonal red frustration stripe behind text */
+    .stripe {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 2800px;
+      height: 360px;
+      transform: translate(-120%, -50%) rotate(-4deg);
+      background:
+        repeating-linear-gradient(
+          90deg,
+          rgba(200, 40, 40, 0.85) 0 60px,
+          rgba(140, 20, 20, 0.85) 60px 120px
+        );
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+      z-index: 2;
+      animation: stripeSweep 0.45s cubic-bezier(0.2, 1.2, 0.4, 1) forwards;
+    }
+
+    .stripe::before,
+    .stripe::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      height: 6px;
+      background: #0d0d0d;
+    }
+    .stripe::before { top: 0; }
+    .stripe::after  { bottom: 0; }
+
+    .shaker {
+      position: absolute; inset: 0;
+      z-index: 3;
+      animation: faceShake 0.16s ease-in-out 0.5s infinite;
+    }
+
+    .title {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0.4) rotate(-3deg);
+      font-size: 200px;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: -4px;
+      line-height: 0.95;
+      white-space: nowrap;
+      text-transform: uppercase;
+      text-align: center;
+      z-index: 6;
+      opacity: 0;
+      -webkit-text-stroke: 5px #0d0d0d;
+      text-shadow:
+        8px 8px 0 #0d0d0d,
+        0 0 24px rgba(255, 80, 80, 0.6);
+      animation: textSlam 0.55s cubic-bezier(0.22, 1.6, 0.36, 1) 0.4s forwards;
+    }
+
+    .sub {
+      position: absolute;
+      top: calc(50% + 220px);
+      left: 50%;
+      transform: translateX(-50%) translateY(16px);
+      font-size: 36px;
+      font-weight: 700;
+      color: #ffbe3c;
+      letter-spacing: 14px;
+      text-transform: uppercase;
+      z-index: 6;
+      opacity: 0;
+      text-shadow:
+        0 0 16px rgba(255, 190, 60, 0.7),
+        3px 3px 0 #0d0d0d;
+      animation: subIn 0.4s ease-out 1.05s forwards;
+    }
+
+    .emoji {
+      position: absolute;
+      top: calc(50% + 330px);
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 110px;
+      z-index: 6;
+      opacity: 0;
+      animation: subIn 0.4s ease-out 1.25s forwards;
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.5s ease-in 2.6s forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="bg"></div>
+    <div class="stripe"></div>
+
+    <div class="shaker">
+      <div class="title">For crying<br>out loud!</div>
+    </div>
+
+    <div class="sub">&#151; Col. Jack O&#8217;Neill</div>
+    <div class="emoji">&#129318;</div>
+  </div>
+
+</body>
+</html>

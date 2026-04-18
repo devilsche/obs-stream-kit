@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Indeed Stinger</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: block;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    @keyframes bgFadeIn   { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
+
+    @keyframes glyphFadeIn {
+      from { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+      to   { opacity: 0.85; transform: translate(-50%, -50%) scale(1); }
+    }
+
+    @keyframes glyphPulse {
+      0%, 100% { filter: drop-shadow(0 0 25px rgba(255, 190, 60, 0.55)); }
+      50%      { filter: drop-shadow(0 0 45px rgba(255, 200, 80, 0.85)); }
+    }
+
+    @keyframes indeedIn {
+      0%   { transform: translateX(-50%) translateY(40px); opacity: 0; letter-spacing: 20px; }
+      100% { transform: translateX(-50%) translateY(0);    opacity: 1; letter-spacing: 6px; }
+    }
+
+    @keyframes subIn {
+      from { transform: translateX(-50%) translateY(12px); opacity: 0; }
+      to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+    }
+
+    .bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at center,
+          rgba(40, 30, 15, 0.78) 0%,
+          rgba(18, 12, 5, 0.96) 70%
+        );
+      z-index: 1;
+      opacity: 0;
+      animation: bgFadeIn 0.4s ease-out forwards;
+    }
+
+    /* Stylized Jaffa forehead glyph — abstract curved symbol */
+    .glyph {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 320px; height: 320px;
+      transform: translate(-50%, -50%) scale(0.6);
+      z-index: 2;
+      opacity: 0;
+      animation:
+        glyphFadeIn 0.6s ease-out 0.2s forwards,
+        glyphPulse 3.5s ease-in-out 0.8s infinite;
+    }
+
+    .glyph svg { width: 100%; height: 100%; }
+
+    .indeed-text {
+      position: absolute;
+      top: calc(50% + 240px);
+      left: 50%;
+      transform: translateX(-50%) translateY(40px);
+      font-size: 160px;
+      font-weight: 900;
+      color: #f2c96b;
+      letter-spacing: 20px;
+      line-height: 1;
+      white-space: nowrap;
+      z-index: 3;
+      opacity: 0;
+      font-style: italic;
+      text-shadow:
+        0 0 24px rgba(255, 200, 80, 0.6),
+        0 0 50px rgba(200, 140, 40, 0.4),
+        3px 3px 0 #2a1a0a;
+      animation: indeedIn 0.8s cubic-bezier(0.2, 0.6, 0.2, 1) 0.5s forwards;
+    }
+
+    .indeed-dot {
+      display: inline-block;
+      color: #f2b705;
+      margin-left: 4px;
+    }
+
+    .sub {
+      position: absolute;
+      top: calc(50% - 240px);
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      font-size: 30px;
+      font-weight: 400;
+      color: rgba(220, 190, 140, 0.85);
+      letter-spacing: 16px;
+      text-transform: uppercase;
+      z-index: 3;
+      opacity: 0;
+      font-style: italic;
+      animation: subIn 0.5s ease-out 1.2s forwards;
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.6s ease-in 2.7s forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="bg"></div>
+
+    <div class="glyph">
+      <svg viewBox="0 0 100 100">
+        <defs>
+          <linearGradient id="goldGlyph" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%"  stop-color="#ffd86b"/>
+            <stop offset="55%" stop-color="#c88a1c"/>
+            <stop offset="100%" stop-color="#7a4a0e"/>
+          </linearGradient>
+        </defs>
+        <g fill="none" stroke="url(#goldGlyph)" stroke-width="3" stroke-linecap="round">
+          <!-- Outer circle -->
+          <circle cx="50" cy="50" r="42" stroke-width="2"/>
+          <!-- Inner sun disc -->
+          <circle cx="50" cy="50" r="10" fill="url(#goldGlyph)" stroke="none"/>
+          <!-- Wings/curves (Ra-style) -->
+          <path d="M 8 50 Q 30 20 50 25 Q 70 20 92 50"/>
+          <path d="M 8 50 Q 30 80 50 75 Q 70 80 92 50"/>
+          <!-- Central crown -->
+          <path d="M 40 38 L 50 22 L 60 38" stroke-width="2.5"/>
+          <path d="M 40 62 L 50 78 L 60 62" stroke-width="2.5"/>
+          <!-- Side marks -->
+          <line x1="14" y1="50" x2="22" y2="50" stroke-width="2.5"/>
+          <line x1="78" y1="50" x2="86" y2="50" stroke-width="2.5"/>
+        </g>
+      </svg>
+    </div>
+
+    <div class="sub">Teal&#8217;c of Chulak</div>
+    <div class="indeed-text">Indeed<span class="indeed-dot">.</span></div>
+  </div>
+
+</body>
+</html>
