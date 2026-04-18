@@ -276,6 +276,18 @@ Fullscreen-Overlays zum manuellen Auslösen (z.B. per Streamer.bot Hotkey oder C
 | `stingers/luke.html` | Hund im Bild / Shoutout | ~3.5s | 1920×1080 |
 | `stingers/smort.html` | B99-Deadpan-Approval (Holt-Style) | ~2s | 1920×1080 |
 | `stingers/cool.html` | B99 nervöse Zustimmung (Jake-Style) | ~3s | 1920×1080 |
+| `stingers/over-9000.html` | DBZ-Reaktion (Vegeta-Scouter, mit MP3) | ~3.5s | 1920×1080 |
+| `stingers/kamehameha.html` | DBZ-Energy-Blast (Kame-Hame-HA) | ~4s | 1920×1080 |
+| `stingers/super-saiyan.html` | DBZ-Transformation (Goku-Aura-Schrei) | ~3.5s | 1920×1080 |
+| `stingers/indeed.html` | Stargate-Deadpan (Teal'c-Twin zu Noice/Smort) | ~3.3s | 1920×1080 |
+| `stingers/chevron-locked.html` | Stargate-Aktivierung (Gate-Ring + Kawoosh) | ~4.4s | 1920×1080 |
+| `stingers/crying-out-loud.html` | Stargate-Frustration (O'Neill-Catchphrase) | ~3.1s | 1920×1080 |
+| `stingers/khan.html` | Star-Trek-Drama (Kirk-Scream, mit MP3) | ~4.1s | 1920×1080 |
+| `stingers/make-it-so.html` | Star-Trek-Befehl (Picard + LCARS) | ~3.2s | 1920×1080 |
+| `stingers/engage.html` | Star-Trek-Warp-Hype (Picard) | ~3.1s | 1920×1080 |
+| `stingers/resistance-futile.html` | Star-Trek-Borg (CRT-Terminal-Look) | ~3.8s | 1920×1080 |
+
+> **Audio:** Stinger mit eigener MP3 binden die Datei via `<audio autoplay>` ein — OBS Browser-Sources spielen das automatisch ab (stelle sicher dass **Audio über OBS steuern** aktiviert ist). Weitere Sounds: Datei in `assets/stingers/` ablegen und im Stinger-HTML per `<audio autoplay src="...">` referenzieren.
 
 ### Setup in Streamer.bot
 
