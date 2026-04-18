@@ -90,6 +90,21 @@
       text-shadow: 0 0 6px rgba(155, 85, 192, 0.6);
       text-transform: uppercase;
     }
+
+    @keyframes burstParticle {
+      0%   { transform: translate(-50%, -50%) translate(0, 0) scale(0); opacity: 0; }
+      15%  { transform: translate(-50%, -50%) translate(calc(var(--tx) * 0.15), calc(var(--ty) * 0.15)) scale(1); opacity: 1; }
+      50%  { transform: translate(-50%, -50%) translate(calc(var(--tx) * 0.5), calc(var(--ty) * 0.5)) scale(1); opacity: 0.8; }
+      100% { transform: translate(-50%, -50%) translate(var(--tx), var(--ty)) scale(1); opacity: 0; }
+    }
+
+    .burst-particle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      border-radius: 50%;
+      animation: burstParticle 1.2s ease-out forwards;
+    }
   </style>
 </head>
 <body>
@@ -97,6 +112,8 @@
   <div class="badge">First Time</div>
 
   <div id="sparkle-container" style="position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;"></div>
+
+  <div id="burst-container" style="position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none;"></div>
 
   <div class="content">
     <div class="kicker">&#10022; Willkommen &#10022;</div>
@@ -124,6 +141,49 @@
         colors: { gold: 0.4, purple: 0.4, white: 0.2 },
         sizeWeights: { big: 0.15, normal: 0.35, small: 0.35, tiny: 0.15 }
       }).start();
+
+      /* ── Pop-Burst (einmalig beim Laden) ─────────────────── */
+      var BURST_COUNT = 12;
+      var CANVAS_W = 600;
+      var CANVAS_H = 140;
+      var EDGE_MARGIN = 40;
+      var BURST_COLORS = ['#f2b705', '#f2b705', '#f2b705',
+                          '#5e2a79', '#c9a0dc', '#9b55c0',
+                          '#ffffff', '#ffffff'];
+
+      var burstContainer = document.getElementById('burst-container');
+      var centerX = CANVAS_W / 2;
+      var centerY = CANVAS_H / 2;
+      var maxDistX = centerX - EDGE_MARGIN;
+      var maxDistY = centerY - EDGE_MARGIN;
+
+      for (var i = 0; i < BURST_COUNT; i++) {
+        var angle = Math.random() * Math.PI * 2;
+        var desired = 150 + Math.random() * 150;
+        var cosA = Math.abs(Math.cos(angle));
+        var sinA = Math.abs(Math.sin(angle));
+        var capX = cosA > 0.001 ? maxDistX / cosA : Infinity;
+        var capY = sinA > 0.001 ? maxDistY / sinA : Infinity;
+        var dist = Math.min(desired, capX, capY);
+        var tx = Math.cos(angle) * dist;
+        var ty = Math.sin(angle) * dist;
+
+        var size = 8 + Math.random() * 6;
+        var color = BURST_COLORS[Math.floor(Math.random() * BURST_COLORS.length)];
+        var delay = Math.random() * 0.15;
+
+        var el = document.createElement('div');
+        el.className = 'burst-particle';
+        el.style.cssText =
+          'width:' + size + 'px;' +
+          'height:' + size + 'px;' +
+          'background:' + color + ';' +
+          'box-shadow:0 0 ' + size + 'px ' + color + ';' +
+          '--tx:' + tx.toFixed(1) + 'px;' +
+          '--ty:' + ty.toFixed(1) + 'px;' +
+          'animation-delay:' + delay.toFixed(2) + 's;';
+        burstContainer.appendChild(el);
+      }
     })();
   </script>
 
