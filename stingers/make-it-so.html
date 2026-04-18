@@ -193,26 +193,32 @@
       animation: textFadeIn 0.5s ease-out 2.7s forwards;
     }
 
-    /* Shine sweep over title — positioniert wie der Title (top: 50%, Höhe passend zur Font) */
+    /* Shine sweep over title — Höhe an den Title, weich gefadete Top-/Bottom-Kanten */
     .shine {
       position: absolute;
-      top: 50%;
+      top: calc(50% - 30px);
       left: 50%;
       transform: translateX(-50%);
       width: 1100px;
-      height: 280px;
+      height: 260px;
       overflow: hidden;
       pointer-events: none;
       z-index: 6;
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 78%, transparent 100%);
+              mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 78%, transparent 100%);
     }
 
     .shine::after {
       content: '';
       position: absolute;
       top: 0; left: 0;
-      width: 300px;
+      width: 340px;
       height: 100%;
-      background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+      background: radial-gradient(ellipse 180px 130px at center,
+        rgba(255, 255, 255, 0.45) 0%,
+        rgba(255, 240, 200, 0.25) 40%,
+        transparent 80%
+      );
       transform: translateX(-120%);
       animation: sweepShine 1.4s ease-in-out 2.2s forwards;
     }
