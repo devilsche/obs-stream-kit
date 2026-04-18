@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <script src="../js/stinger-ready.js"></script>
+  <title>Kickers Stinger</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: block;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    @keyframes bgFadeIn   { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
+
+    @keyframes sunburstSpin {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to   { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes sunburstIn {
+      from { opacity: 0; transform: translate(-50%, -50%) scale(0.5) rotate(0deg); }
+      to   { opacity: 0.75; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+    }
+
+    @keyframes ballBounceIn {
+      0%   { transform: translate(-120vw, 60vh) rotate(-720deg); opacity: 0; }
+      30%  { opacity: 1; }
+      100% { transform: translate(-50%, -50%) rotate(0deg); opacity: 1; }
+    }
+
+    @keyframes ballSpin {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to   { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes hurraaaSlam {
+      0%   { transform: translate(-50%, -50%) scale(0) rotate(-6deg); opacity: 0; letter-spacing: 60px; }
+      45%  { transform: translate(-50%, -50%) scale(1.25) rotate(3deg); opacity: 1; letter-spacing: -4px; }
+      65%  { transform: translate(-50%, -50%) scale(0.95) rotate(-1deg); }
+      100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; letter-spacing: 2px; }
+    }
+
+    @keyframes titleDrop {
+      0%   { transform: translateX(-50%) translateY(-40px); opacity: 0; }
+      100% { transform: translateX(-50%) translateY(0);    opacity: 1; }
+    }
+
+    @keyframes gregorIn {
+      0%   { transform: translateX(120%) scale(0.8); opacity: 0; }
+      70%  { transform: translateX(-8%) scale(1.05); opacity: 1; }
+      100% { transform: translateX(0) scale(1); opacity: 1; }
+    }
+
+    @keyframes kickerShake {
+      0%, 100% { transform: translate(0, 0); }
+      15%      { transform: translate(-8px, 6px); }
+      30%      { transform: translate(7px, -5px); }
+      45%      { transform: translate(-6px, -7px); }
+      60%      { transform: translate(8px, 4px); }
+      75%      { transform: translate(-5px, 6px); }
+    }
+
+    @keyframes confettiFall {
+      0%   { transform: translate(0, -120vh) rotate(var(--startRot)); opacity: 0; }
+      10%  { opacity: 1; }
+      100% { transform: translate(var(--dx), 120vh) rotate(var(--endRot)); opacity: 0; }
+    }
+
+    @keyframes speedLine {
+      0%   { transform: translateX(-100vw); opacity: 0; }
+      20%  { opacity: 1; }
+      100% { transform: translateX(100vw); opacity: 0; }
+    }
+
+    /* Background: red field */
+    .bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at center,
+          rgba(220, 40, 60, 0.55) 0%,
+          rgba(140, 20, 40, 0.85) 55%,
+          rgba(40, 5, 15, 0.95) 100%
+        );
+      z-index: 1;
+      opacity: 0;
+      animation: bgFadeIn 0.3s ease-out forwards;
+    }
+
+    /* Rotating sunburst rays */
+    .sunburst {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 3200px; height: 3200px;
+      transform: translate(-50%, -50%) scale(0.5);
+      opacity: 0;
+      z-index: 2;
+      background: conic-gradient(
+        from 0deg,
+        rgba(255, 230, 120, 0.5) 0deg,
+        transparent 12deg,
+        rgba(255, 230, 120, 0.5) 24deg,
+        transparent 36deg,
+        rgba(255, 230, 120, 0.5) 48deg,
+        transparent 60deg,
+        rgba(255, 230, 120, 0.5) 72deg,
+        transparent 84deg,
+        rgba(255, 230, 120, 0.5) 96deg,
+        transparent 108deg,
+        rgba(255, 230, 120, 0.5) 120deg,
+        transparent 132deg,
+        rgba(255, 230, 120, 0.5) 144deg,
+        transparent 156deg,
+        rgba(255, 230, 120, 0.5) 168deg,
+        transparent 180deg,
+        rgba(255, 230, 120, 0.5) 192deg,
+        transparent 204deg,
+        rgba(255, 230, 120, 0.5) 216deg,
+        transparent 228deg,
+        rgba(255, 230, 120, 0.5) 240deg,
+        transparent 252deg,
+        rgba(255, 230, 120, 0.5) 264deg,
+        transparent 276deg,
+        rgba(255, 230, 120, 0.5) 288deg,
+        transparent 300deg,
+        rgba(255, 230, 120, 0.5) 312deg,
+        transparent 324deg,
+        rgba(255, 230, 120, 0.5) 336deg,
+        transparent 348deg
+      );
+      mask-image: radial-gradient(circle, black 10%, black 70%, transparent 95%);
+      -webkit-mask-image: radial-gradient(circle, black 10%, black 70%, transparent 95%);
+      mix-blend-mode: screen;
+      animation:
+        sunburstIn 0.5s ease-out 0.15s forwards,
+        sunburstSpin 14s linear 0.2s infinite;
+    }
+
+    /* Horizontal speed lines */
+    .speed-layer {
+      position: absolute; inset: 0;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .speed-line {
+      position: absolute;
+      left: 0;
+      width: 60vw;
+      height: 4px;
+      background: linear-gradient(90deg, transparent, #ffffff, transparent);
+      transform: translateX(-100vw);
+      animation: speedLine var(--dur) linear var(--delay) infinite;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+    }
+
+    /* Gregor portrait (falls assets/stingers/gregor.png vorhanden) */
+    .gregor {
+      position: absolute;
+      top: 50%;
+      right: 80px;
+      transform: translateY(-50%) translateX(120%) scale(0.8);
+      width: 540px;
+      max-height: 820px;
+      object-fit: contain;
+      z-index: 5;
+      opacity: 0;
+      filter:
+        drop-shadow(0 0 25px rgba(242, 183, 5, 0.8))
+        drop-shadow(0 0 55px rgba(220, 40, 60, 0.6));
+      animation: gregorIn 0.7s cubic-bezier(0.22, 1.4, 0.36, 1) 0.5s forwards;
+    }
+
+    /* Soccer ball in center (⚽) */
+    .ball {
+      position: absolute;
+      top: 38%;
+      left: 50%;
+      transform: translate(-120vw, 60vh) rotate(-720deg);
+      font-size: 220px;
+      line-height: 1;
+      z-index: 6;
+      opacity: 0;
+      filter:
+        drop-shadow(0 0 24px rgba(255, 230, 120, 0.9))
+        drop-shadow(0 0 48px rgba(242, 183, 5, 0.6));
+      animation:
+        ballBounceIn 0.7s cubic-bezier(0.22, 1.3, 0.36, 1) 0.3s forwards,
+        ballSpin 5s linear 1s infinite;
+    }
+
+    /* HURRAAAAA text (main scream) */
+    .hurraa {
+      position: absolute;
+      top: 65%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0) rotate(-6deg);
+      font-size: 220px;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: 60px;
+      line-height: 1;
+      white-space: nowrap;
+      text-transform: uppercase;
+      z-index: 7;
+      opacity: 0;
+      -webkit-text-stroke: 5px #3a0a14;
+      text-shadow:
+        0 10px 0 #8c1430,
+        0 16px 30px rgba(0, 0, 0, 0.55),
+        0 0 40px rgba(255, 230, 120, 0.9),
+        0 0 80px rgba(242, 183, 5, 0.6);
+      animation: hurraaaSlam 0.55s cubic-bezier(0.22, 1.6, 0.36, 1) 1.0s forwards;
+    }
+
+    /* DIE KICKERS title */
+    .title {
+      position: absolute;
+      top: 12%;
+      left: 50%;
+      transform: translateX(-50%) translateY(-40px);
+      font-size: 96px;
+      font-weight: 900;
+      color: #ffe074;
+      letter-spacing: 16px;
+      line-height: 1;
+      white-space: nowrap;
+      text-transform: uppercase;
+      z-index: 7;
+      opacity: 0;
+      font-style: italic;
+      -webkit-text-stroke: 3px #3a0a14;
+      text-shadow:
+        0 8px 0 #8c1430,
+        0 0 24px rgba(255, 230, 120, 0.7),
+        4px 4px 0 #000;
+      animation: titleDrop 0.45s cubic-bezier(0.22, 1.4, 0.36, 1) 0.7s forwards;
+    }
+
+    .shaker {
+      position: absolute; inset: 0;
+      z-index: 6;
+      animation: kickerShake 0.16s linear 1.0s 12;
+    }
+
+    /* Confetti / small balls */
+    .confetti-layer {
+      position: absolute; inset: 0;
+      z-index: 4;
+      pointer-events: none;
+    }
+
+    .confetti {
+      position: absolute;
+      top: 0;
+      font-size: 28px;
+      line-height: 1;
+      transform: translate(0, -120vh) rotate(0deg);
+      opacity: 0;
+      animation: confettiFall var(--dur) linear var(--delay) infinite;
+      filter: drop-shadow(0 0 6px rgba(255, 200, 80, 0.5));
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.6s ease-in 4.2s forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="bg"></div>
+    <div class="sunburst"></div>
+
+    <div class="speed-layer" id="speedLayer"></div>
+    <div class="confetti-layer" id="confettiLayer"></div>
+
+    <img class="gregor" id="gregor" src="../assets/stingers/gregor.png" alt="" onerror="this.style.display='none'">
+
+    <div class="title">Die Kickers</div>
+
+    <div class="shaker">
+      <div class="ball">&#9917;</div>
+      <div class="hurraa">Hurraaa!</div>
+    </div>
+  </div>
+
+  <audio data-stinger-autoplay preload="auto" src="../assets/stingers/kickers.mp3"></audio>
+
+  <script>
+    (function () {
+      'use strict';
+
+      /* Speed lines */
+      var sp = document.getElementById('speedLayer');
+      var LINE_COUNT = 14;
+      for (var i = 0; i < LINE_COUNT; i++) {
+        var el = document.createElement('div');
+        el.className = 'speed-line';
+        var topPct = (5 + Math.random() * 90) + '%';
+        var dur = (0.6 + Math.random() * 0.6).toFixed(2) + 's';
+        var delay = (0.2 + Math.random() * 2.5).toFixed(2) + 's';
+        el.style.cssText =
+          'top:' + topPct + ';' +
+          'height:' + (2 + Math.random() * 4).toFixed(0) + 'px;' +
+          '--dur:' + dur + ';' +
+          '--delay:' + delay + ';';
+        sp.appendChild(el);
+      }
+
+      /* Confetti: mix of ⚽ and stars */
+      var cf = document.getElementById('confettiLayer');
+      var SYMBOLS = ['\u26BD', '\u2726', '\u2728', '\u26BD'];
+      var COUNT = 34;
+      for (var i = 0; i < COUNT; i++) {
+        var el = document.createElement('div');
+        el.className = 'confetti';
+        var leftPct = (Math.random() * 100) + '%';
+        var dx = (Math.random() * 400 - 200).toFixed(0) + 'px';
+        var startRot = (Math.random() * 360) + 'deg';
+        var endRot   = (Math.random() * 1440 - 720) + 'deg';
+        var dur = (3.0 + Math.random() * 2.5).toFixed(2) + 's';
+        var delay = (0.3 + Math.random() * 3.0).toFixed(2) + 's';
+        var size = (22 + Math.random() * 24).toFixed(0) + 'px';
+        el.textContent = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+        el.style.cssText =
+          'left:' + leftPct + ';' +
+          'font-size:' + size + ';' +
+          '--dx:' + dx + ';' +
+          '--startRot:' + startRot + ';' +
+          '--endRot:' + endRot + ';' +
+          '--dur:' + dur + ';' +
+          '--delay:' + delay + ';';
+        cf.appendChild(el);
+      }
+    })();
+  </script>
+
+</body>
+</html>
