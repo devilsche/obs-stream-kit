@@ -106,12 +106,12 @@ Widgets sind kleinere Elemente, die unabhängig positioniert werden können. Die
 - `widgets/logo.html?glow=purple` → nur lila Glow
 - `widgets/logo.html?glow=#00ccff&lines=sponsor_lines.png&text=sponsor_text.png` → anderes Logo mit eigenem Glow
 
-### Webcam-Rahmen (geplant)
+### Webcam-Rahmen
 
 | | |
 |-|-|
 | **Datei** | `widgets/webcam-frame.html` |
-| **Beschreibung** | Standalone Cam-Rahmen mit Blitz-Arcs und Sparkles auf grünem Chroma-Key |
+| **Beschreibung** | Standalone Cam-Rahmen mit Blitz-Arcs und Sparkles auf transparentem Hintergrund |
 | **Standard-Cam** | 400×225 |
 
 **OBS Browser-Source Größe berechnen:**
@@ -132,11 +132,35 @@ Die Browser-Source muss ca. **100px breiter** und **100px höher** als die Cam-G
 | `height` | `225` | Höhe des Cam-Bereichs in px |
 
 **OBS-Setup:**
-1. Browser-Source hinzufügen mit berechneter Größe
-2. **Chroma Key Filter** auf die Source legen → Grün (`#00b140`) wird entfernt
-3. Source frei positionieren — unabhängig von jeder Szene ein-/ausschaltbar
+1. Webcam-Source in OBS anlegen (z.B. 400×225) und positionieren
+2. Browser-Source mit `webcam-frame.html` **darüber** legen (Größe = Cam + 100×100)
+3. Rahmen-Source so ausrichten, dass das Cam-Cutout (50px Innenabstand) exakt über der Cam liegt
 
 **Beispiel:** `widgets/webcam-frame.html?width=500&height=280` → Browser-Source auf **600×380** setzen
+
+### Welcome-Widget
+
+| | |
+|-|-|
+| **Datei** | `widgets/welcome.html` |
+| **Beschreibung** | Toast-Widget für Erstbesucher im Chat — Name + Gold-Kicker + `FIRST TIME`-Badge, Pop-Burst beim Einblenden |
+| **Interner Canvas** | 600×140 |
+| **OBS Browser-Source** | 600×140 (OBS skaliert proportional) |
+
+**URL-Parameter:**
+
+| Parameter | Default | Beschreibung |
+|-----------|---------|--------------|
+| `name` | `NewViewer42` | Angezeigter Username |
+
+**OBS-Setup:**
+1. Browser-Source hinzufügen → Größe **600×140**
+2. Source auf **unsichtbar** stellen (Auge-Icon aus)
+3. **Show Transition** einstellen: Rechtsklick → Show Transition → *Slide* oder *Fade*
+4. Per Streamer.bot bei First-Chat-Event die URL setzen (`?name=%user%`) und die Source einblenden
+5. Nach X Sekunden Source wieder ausblenden (OBS übernimmt die Animation)
+
+**Beispiel:** `widgets/welcome.html?name=NeuerChatter`
 
 ### Info-Widgets
 
@@ -253,6 +277,7 @@ alerts/raid.html?username=BigStreamer&viewers=150
 | Szenen | **1920×1080** | Fullscreen |
 | Alerts | **1920×1080** | Fullscreen |
 | Info-Widgets | **500×100** (Subgoal: 500×120) | Kompakt, frei positionierbar, OBS-Transition |
+| Welcome-Widget | **600×140** | Kompakt, Pop-Burst beim Einblenden |
 | Logo | **400×152** (oder kleiner, z.B. 158×60) | OBS skaliert proportional |
 | Webcam-Rahmen | **Cam + 100×100** | Platz für Blitz-Arcs und Sparkles |
 
