@@ -47,7 +47,14 @@
         <feComponentTransfer in="chroma" result="mask">
           <feFuncA type="discrete" tableValues="1 0"/>
         </feComponentTransfer>
-        <feComposite in="SourceGraphic" in2="mask" operator="in"/>
+        <feComposite in="SourceGraphic" in2="mask" operator="in" result="keyed"/>
+        <!-- Despill: reduce green tint in remaining pixels -->
+        <feColorMatrix in="keyed" type="matrix" values="
+          1    0    0    0 0
+          0.35 0.3  0.35 0 0
+          0    0    1    0 0
+          0    0    0    1 0
+        "/>
       </filter>
     </defs>
   </svg>
