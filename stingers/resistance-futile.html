@@ -25,12 +25,12 @@
 
     /* Default-Timings als CSS-Vars (via JS ueberschreibbar im ?tune=1 Modus) */
     :root {
-      --l1-in:  1.2s;  --l1-out: 2.7s;
-      --l2-in:  3.1s;  --l2-out: 6.0s;
-      --l3-in:  6.4s;  --l3-out: 11.1s;
-      --l4-in: 11.5s;  --l4-out: 13.9s;
-      --l5-in: 14.2s;
-      --stage-out: 16.0s;
+      --l1-in:  1.2s;  --l1-out: 2.2s;
+      --l2-in:  2.4s;  --l2-out: 4.4s;
+      --l3-in:  4.8s;  --l3-out: 9.2s;
+      --l4-in:  9.9s;  --l4-out: 12.0s;
+      --l5-in: 13.0s;
+      --stage-out: 15.0s;
       --time-offset: 0s;
     }
 
@@ -198,9 +198,9 @@
     /* ── Tune-Panel (nur bei ?tune=1) ── */
     .tune-panel {
       position: fixed;
-      top: 16px;
+      top: 80px;
       right: 16px;
-      width: 380px;
+      width: 420px;
       background: rgba(0, 10, 0, 0.92);
       border: 2px solid #7cff9d;
       padding: 16px;
@@ -247,6 +247,10 @@
       border-radius: 3px;
     }
     .tune-panel input:focus { outline: 1px solid #7cff9d; }
+
+    .tune-panel tr.clickable { cursor: pointer; transition: background 0.1s; }
+    .tune-panel tr.clickable:hover { background: rgba(120, 255, 160, 0.12); }
+    .tune-panel tr.clickable:hover .tune-label { color: #fff; }
 
     .tune-panel .tune-label {
       font-size: 11px;
@@ -315,7 +319,7 @@
 
     <div class="line big l1">We are the Borg.</div>
     <div class="line mid l2">Lower your shields&#10;and surrender your ships.</div>
-    <div class="line small l3">Your biological and technological&#10;distinctiveness will be added to our own.</div>
+    <div class="line small l3">We will add your biological and technological&#10;distinctiveness to our own.</div>
     <div class="line mid l4">Your culture will adapt&#10;to service us.</div>
     <div class="line big l5">Resistance is futile.<span class="cursor"></span></div>
   </div>
@@ -359,19 +363,19 @@
     (function () {
       'use strict';
       var DEFAULTS = {
-        'l1-in':  1.2,  'l1-out': 2.7,
-        'l2-in':  3.1,  'l2-out': 6.0,
-        'l3-in':  6.4,  'l3-out': 11.1,
-        'l4-in': 11.5,  'l4-out': 13.9,
-        'l5-in': 14.2,
-        'stage-out': 16.0
+        'l1-in':  1.2,  'l1-out':  2.2,
+        'l2-in':  2.4,  'l2-out':  4.4,
+        'l3-in':  4.8,  'l3-out':  9.2,
+        'l4-in':  9.9,  'l4-out': 12.0,
+        'l5-in': 13.0,
+        'stage-out': 15.0
       };
       var LABELS = {
         'l1-in':  'L1 "We are the Borg" IN',
         'l1-out': 'L1 OUT',
         'l2-in':  'L2 "Lower your shields" IN',
         'l2-out': 'L2 OUT',
-        'l3-in':  'L3 "Your biological..." IN',
+        'l3-in':  'L3 "We will add..." IN',
         'l3-out': 'L3 OUT',
         'l4-in':  'L4 "Your culture..." IN',
         'l4-out': 'L4 OUT',
@@ -406,30 +410,105 @@
 
       if (!tuneMode) return;
 
-      // Tune-Panel aufbauen
+      // Tune-Panel aufbauen: jede Zeile hat Start (IN) + End (OUT)
       var table = document.getElementById('tuneTable');
       var header = document.createElement('tr');
-      header.innerHTML = '<th>Param</th><th>Sek</th>';
+      header.innerHTML = '<th>Line</th><th>Start</th><th>End</th>';
       table.appendChild(header);
 
-      KEYS.forEach(function (k) {
+      function addRow(lineId, shortLabel, hasOut) {
         var tr = document.createElement('tr');
+        tr.className = 'clickable';
+        tr.dataset.lineId = lineId;
+        tr.dataset.hasOut = hasOut ? '1' : '0';
+
         var tdLabel = document.createElement('td');
         tdLabel.className = 'tune-label';
-        tdLabel.textContent = LABELS[k];
-        var tdInput = document.createElement('td');
-        var input = document.createElement('input');
-        input.type = 'number';
-        input.step = '0.1';
-        input.min = '0';
-        input.max = '30';
-        input.value = getValue(k);
-        input.dataset.key = k;
-        tdInput.appendChild(input);
+        tdLabel.textContent = shortLabel;
+        tdLabel.title = 'Click: Von/Bis unten befuellen';
         tr.appendChild(tdLabel);
-        tr.appendChild(tdInput);
+
+        // IN input
+        var tdIn = document.createElement('td');
+        var inpIn = document.createElement('input');
+        inpIn.type = 'number'; inpIn.step = '0.1'; inpIn.min = '0'; inpIn.max = '30';
+        inpIn.value = getValue(lineId + '-in');
+        inpIn.dataset.key = lineId + '-in';
+        tdIn.appendChild(inpIn);
+        tr.appendChild(tdIn);
+
+        // OUT input (oder leer falls keine out-Animation)
+        var tdOut = document.createElement('td');
+        if (hasOut) {
+          var inpOut = document.createElement('input');
+          inpOut.type = 'number'; inpOut.step = '0.1'; inpOut.min = '0'; inpOut.max = '30';
+          inpOut.value = getValue(lineId + '-out');
+          inpOut.dataset.key = lineId + '-out';
+          tdOut.appendChild(inpOut);
+        } else {
+          tdOut.textContent = '—';
+          tdOut.style.textAlign = 'center';
+          tdOut.style.color = 'rgba(120,255,160,0.3)';
+        }
+        tr.appendChild(tdOut);
+
+        // Klick auf Zeile (aber nicht auf Input) → Von/Bis befuellen
+        tr.addEventListener('click', function (e) {
+          if (e.target.tagName === 'INPUT') return;
+          fillSegmentFromRow(lineId, hasOut);
+        });
+
         table.appendChild(tr);
+      }
+
+      function currentVals() {
+        var vals = {};
+        document.querySelectorAll('.tune-panel input').forEach(function (inp) {
+          if (inp.dataset.key) vals[inp.dataset.key] = parseFloat(inp.value) || 0;
+        });
+        return vals;
+      }
+
+      function fillSegmentFromRow(lineId, hasOut) {
+        var v = currentVals();
+        var from = v[lineId + '-in'];
+        var to;
+        if (hasOut) {
+          to = v[lineId + '-out'];
+        } else if (lineId === 'l5') {
+          to = v['stage-out'];
+        } else {
+          to = from + 3;
+        }
+        document.getElementById('fromInput').value = from.toFixed(2);
+        document.getElementById('toInput').value = to.toFixed(2);
+      }
+
+      addRow('l1', 'L1 We are the Borg', true);
+      addRow('l2', 'L2 Lower shields',   true);
+      addRow('l3', 'L3 We will add',    true);
+      addRow('l4', 'L4 Your culture',    true);
+      addRow('l5', 'L5 Resistance',      false);
+
+      // Stage-Fade als eigene Zeile (nur End, keine Start)
+      var stageRow = document.createElement('tr');
+      var tdS = document.createElement('td'); tdS.className = 'tune-label'; tdS.textContent = 'Stage Fade-Out';
+      var tdSE = document.createElement('td'); tdSE.textContent = '—'; tdSE.style.textAlign='center'; tdSE.style.color='rgba(120,255,160,0.3)';
+      var tdSO = document.createElement('td');
+      var inpSO = document.createElement('input');
+      inpSO.type = 'number'; inpSO.step = '0.1'; inpSO.min = '0'; inpSO.max = '30';
+      inpSO.value = getValue('stage-out');
+      inpSO.dataset.key = 'stage-out';
+      tdSO.appendChild(inpSO);
+      stageRow.appendChild(tdS); stageRow.appendChild(tdSE); stageRow.appendChild(tdSO);
+      // Klick auf Stage-Zeile → ganze Dauer als Segment
+      stageRow.className = 'clickable';
+      stageRow.addEventListener('click', function (e) {
+        if (e.target.tagName === 'INPUT') return;
+        document.getElementById('fromInput').value = '0';
+        document.getElementById('toInput').value = currentVals()['stage-out'].toFixed(2);
       });
+      table.appendChild(stageRow);
 
       document.getElementById('tunePanel').classList.add('visible');
       document.getElementById('timeInd').classList.add('visible');
@@ -467,7 +546,7 @@
           'Borg Tune Values:',
           'L1 (We are the Borg)    : IN ' + v['l1-in'].toFixed(2) + 's  OUT ' + v['l1-out'].toFixed(2) + 's',
           'L2 (Lower shields)      : IN ' + v['l2-in'].toFixed(2) + 's  OUT ' + v['l2-out'].toFixed(2) + 's',
-          'L3 (Your biological)    : IN ' + v['l3-in'].toFixed(2) + 's  OUT ' + v['l3-out'].toFixed(2) + 's',
+          'L3 (We will add)        : IN ' + v['l3-in'].toFixed(2) + 's  OUT ' + v['l3-out'].toFixed(2) + 's',
           'L4 (Your culture)       : IN ' + v['l4-in'].toFixed(2) + 's  OUT ' + v['l4-out'].toFixed(2) + 's',
           'L5 (Resistance)         : IN ' + v['l5-in'].toFixed(2) + 's',
           'Stage Fade-Out          : ' + v['stage-out'].toFixed(2) + 's'

@@ -23,6 +23,21 @@
       font-family: 'DM Sans', sans-serif;
     }
 
+    /* Default-Timings als CSS-Vars (via JS ueberschreibbar im ?tune=1 Modus) */
+    :root {
+      --w1-in:   1.0s;  --w1-out:  2.0s;
+      --w2-in:   2.1s;  --w2-out:  3.5s;
+      --orb-in:  0.8s;  --orb-pulse: 1.0s;  --orb-out: 3.9s;
+      --ha-in:   3.9s;
+      --beam-in: 3.9s;
+      --stage-out: 6.8s;
+      --time-offset: 0s;
+    }
+
+    html.paused *, html.paused *::before, html.paused *::after {
+      animation-play-state: paused !important;
+    }
+
     @keyframes bgFadeIn   { from { opacity: 0; } to { opacity: 1; } }
     @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
 
@@ -96,9 +111,9 @@
       z-index: 4;
       box-shadow: 0 0 80px 40px rgba(80, 180, 255, 0.7), 0 0 150px 60px rgba(50, 140, 230, 0.4);
       animation:
-        orbGrow 0.5s ease-out 0.8s forwards,
-        orbPulse 0.9s ease-in-out 1.3s 4,
-        orbVanish 0.4s ease-out 4.15s forwards;
+        orbGrow   0.5s ease-out     calc(var(--orb-in)    - var(--time-offset)) forwards,
+        orbPulse  0.9s ease-in-out  calc(var(--orb-pulse) - var(--time-offset)) 4,
+        orbVanish 0.4s ease-out     calc(var(--orb-out)   - var(--time-offset)) forwards;
     }
 
     /* Chant words — appear one after the other */
@@ -125,13 +140,13 @@
 
     .chant-word.w1 {
       animation:
-        wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 1.3s forwards,
-        wordOut 0.4s ease-in 2.1s forwards;
+        wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) calc(var(--w1-in)  - var(--time-offset)) forwards,
+        wordOut 0.4s ease-in                            calc(var(--w1-out) - var(--time-offset)) forwards;
     }
     .chant-word.w2 {
       animation:
-        wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) 2.4s forwards,
-        wordOut 0.4s ease-in 4.0s forwards;
+        wordPop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1) calc(var(--w2-in)  - var(--time-offset)) forwards,
+        wordOut 0.4s ease-in                            calc(var(--w2-out) - var(--time-offset)) forwards;
     }
 
     /* Final "HA!" — bigger, explosive */
@@ -154,7 +169,7 @@
         0 0 100px rgba(80, 180, 255, 0.8),
         0 0 180px rgba(50, 140, 230, 0.5),
         8px 8px 0 #0a0a1a;
-      animation: finalWord 0.6s cubic-bezier(0.22, 1.6, 0.36, 1) 4.05s forwards;
+      animation: finalWord 0.6s cubic-bezier(0.22, 1.6, 0.36, 1) calc(var(--ha-in) - var(--time-offset)) forwards;
     }
 
     /* Horizontal beam blasting across */
@@ -178,13 +193,123 @@
       opacity: 0;
       filter: blur(2px);
       box-shadow: 0 0 80px rgba(100, 200, 255, 0.9);
-      animation: beamLaunch 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 4.25s forwards;
+      animation: beamLaunch 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) calc(var(--beam-in) - var(--time-offset)) forwards;
     }
 
     .stage {
       position: absolute; inset: 0;
-      animation: fadeOutAll 0.5s ease-in 6.8s forwards;
+      animation: fadeOutAll 0.5s ease-in calc(var(--stage-out) - var(--time-offset)) forwards;
     }
+
+    /* ── Tune-Panel (nur bei ?tune=1) ── */
+    .tune-panel {
+      position: fixed;
+      top: 80px;
+      right: 16px;
+      width: 420px;
+      background: rgba(10, 15, 35, 0.92);
+      border: 2px solid #a8e4ff;
+      padding: 16px;
+      border-radius: 10px;
+      color: #a8e4ff;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      z-index: 1000;
+      display: none;
+      box-shadow: 0 0 30px rgba(100, 180, 255, 0.4);
+    }
+
+    .tune-panel.visible { display: block; }
+
+    .tune-panel h2 {
+      font-size: 16px;
+      margin-bottom: 12px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .tune-panel table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .tune-panel th, .tune-panel td {
+      padding: 4px 6px;
+      text-align: left;
+      border-bottom: 1px solid rgba(168, 228, 255, 0.2);
+    }
+
+    .tune-panel th { font-size: 11px; text-transform: uppercase; }
+
+    .tune-panel input {
+      width: 70px;
+      background: rgba(168, 228, 255, 0.1);
+      border: 1px solid rgba(168, 228, 255, 0.4);
+      color: #a8e4ff;
+      padding: 3px 6px;
+      font-family: inherit;
+      font-size: 12px;
+      text-align: right;
+      border-radius: 3px;
+    }
+    .tune-panel input:focus { outline: 1px solid #a8e4ff; }
+
+    .tune-panel tr.clickable { cursor: pointer; transition: background 0.1s; }
+    .tune-panel tr.clickable:hover { background: rgba(100, 180, 255, 0.15); }
+    .tune-panel tr.clickable:hover .tune-label { color: #fff; }
+
+    .tune-panel .tune-label {
+      font-size: 11px;
+      color: rgba(200, 230, 255, 0.75);
+      max-width: 180px;
+    }
+
+    .tune-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .tune-btn {
+      flex: 1;
+      background: rgba(100, 180, 255, 0.15);
+      border: 1px solid #a8e4ff;
+      color: #a8e4ff;
+      padding: 8px 10px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .tune-btn:hover { background: rgba(100, 180, 255, 0.3); }
+    .tune-btn.reset { border-color: #ff8888; color: #ff8888; }
+    .tune-btn.reset:hover { background: rgba(255, 136, 136, 0.2); }
+
+    .tune-hint {
+      margin-top: 10px;
+      font-size: 10px;
+      color: rgba(200, 230, 255, 0.6);
+      line-height: 1.4;
+    }
+
+    .time-indicator {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      background: rgba(10, 15, 35, 0.85);
+      border: 1px solid #a8e4ff;
+      color: #a8e4ff;
+      padding: 6px 14px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      z-index: 1000;
+      display: none;
+      border-radius: 4px;
+    }
+    .time-indicator.visible { display: block; }
   </style>
 </head>
 <body>
@@ -200,7 +325,303 @@
     <div class="ha">HA!!!</div>
   </div>
 
-  <audio data-stinger-autoplay preload="auto" src="../assets/stingers/kamehameha.mp3"></audio>
+  <audio id="audio" data-stinger-autoplay preload="auto" src="../assets/stingers/kamehameha.mp3"></audio>
+
+  <div class="tune-panel" id="tunePanel">
+    <h2>Kamehameha Tune Mode</h2>
+    <table id="tuneTable"></table>
+    <div class="tune-actions">
+      <button class="tune-btn" id="applyBtn">&gt; Apply</button>
+      <button class="tune-btn" id="copyBtn">&#128203; Copy</button>
+      <button class="tune-btn reset" id="resetBtn">Reset</button>
+    </div>
+
+    <div style="margin-top: 14px; border-top: 1px solid rgba(168,228,255,0.3); padding-top: 12px;">
+      <div style="font-size: 11px; text-transform: uppercase; margin-bottom: 6px;">Playback</div>
+      <div class="tune-actions" style="margin-top: 6px;">
+        <button class="tune-btn" id="pauseBtn">&#9208; Pause</button>
+        <button class="tune-btn" id="replayBtn">&#8634; Replay 0s</button>
+      </div>
+      <div style="margin-top: 10px; display: flex; align-items: center; gap: 6px; font-size: 11px;">
+        <span>Von:</span>
+        <input type="number" id="fromInput" value="0" step="0.1" min="0" max="20" style="width: 60px;">
+        <span>Bis:</span>
+        <input type="number" id="toInput" value="7" step="0.1" min="0" max="20" style="width: 60px;">
+        <button class="tune-btn" id="segmentBtn" style="flex: 0 0 auto; padding: 6px 12px;">&#9658; Play</button>
+      </div>
+    </div>
+
+    <div class="tune-hint">
+      <b>Apply</b>: speichert + Reload. <b>Pause</b>/<b>Replay</b>/<b>Play Segment</b>: ohne Reload.<br>
+      Shortcuts: <b>Space</b> = Pause, <b>R</b> = Replay, <b>S</b> = Apply, <b>C</b> = Copy.
+    </div>
+  </div>
+
+  <div class="time-indicator" id="timeInd">t = 0.00s</div>
+
+  <script>
+    (function () {
+      'use strict';
+      var DEFAULTS = {
+        'w1-in':    1.0,  'w1-out':  2.0,
+        'w2-in':    2.1,  'w2-out':  3.5,
+        'orb-in':   0.8,  'orb-pulse': 1.0,  'orb-out': 3.9,
+        'ha-in':    3.9,
+        'beam-in':  3.9,
+        'stage-out': 6.8
+      };
+      var LABELS = {
+        'w1-in':     'W1 "Kame..." IN',
+        'w1-out':    'W1 OUT',
+        'w2-in':     'W2 "Hame..." IN',
+        'w2-out':    'W2 OUT',
+        'orb-in':    'Orb Grow',
+        'orb-pulse': 'Orb Pulse Start',
+        'orb-out':   'Orb Vanish',
+        'ha-in':     'HA!!! IN',
+        'beam-in':   'Beam Launch',
+        'stage-out': 'Stage Fade-Out'
+      };
+      var KEYS = ['w1-in','w1-out','w2-in','w2-out','orb-in','orb-pulse','orb-out','ha-in','beam-in','stage-out'];
+      var STORAGE_KEY = 'kamehameha-tune-values';
+
+      var params = new URLSearchParams(window.location.search);
+      var tuneMode = params.get('tune') === '1';
+
+      var saved = {};
+      try {
+        var raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) saved = JSON.parse(raw);
+      } catch (e) {}
+
+      function getValue(key) {
+        return (saved[key] !== undefined) ? saved[key] : DEFAULTS[key];
+      }
+
+      function applyToRoot() {
+        var root = document.documentElement;
+        KEYS.forEach(function (k) {
+          root.style.setProperty('--' + k, getValue(k) + 's');
+        });
+      }
+      applyToRoot();
+
+      if (!tuneMode) return;
+
+      // Tune-Panel aufbauen
+      var table = document.getElementById('tuneTable');
+      var header = document.createElement('tr');
+      header.innerHTML = '<th>Line</th><th>Start</th><th>End</th>';
+      table.appendChild(header);
+
+      function addPairRow(label, startKey, endKey) {
+        var tr = document.createElement('tr');
+        tr.className = 'clickable';
+
+        var tdLabel = document.createElement('td');
+        tdLabel.className = 'tune-label';
+        tdLabel.textContent = label;
+        tdLabel.title = 'Click: Von/Bis befuellen';
+        tr.appendChild(tdLabel);
+
+        function makeInput(key) {
+          var td = document.createElement('td');
+          if (!key) {
+            td.textContent = '—';
+            td.style.textAlign = 'center';
+            td.style.color = 'rgba(168,228,255,0.3)';
+          } else {
+            var inp = document.createElement('input');
+            inp.type = 'number'; inp.step = '0.1'; inp.min = '0'; inp.max = '20';
+            inp.value = getValue(key);
+            inp.dataset.key = key;
+            td.appendChild(inp);
+          }
+          return td;
+        }
+
+        tr.appendChild(makeInput(startKey));
+        tr.appendChild(makeInput(endKey));
+
+        tr.addEventListener('click', function (e) {
+          if (e.target.tagName === 'INPUT') return;
+          var v = currentVals();
+          var from = startKey ? v[startKey] : 0;
+          var to;
+          if (endKey) to = v[endKey];
+          else if (startKey) to = from + 1.5;  // Default-Dauer fuer Events ohne explicit End
+          else to = v['stage-out'];
+          document.getElementById('fromInput').value = from.toFixed(2);
+          document.getElementById('toInput').value   = to.toFixed(2);
+        });
+
+        table.appendChild(tr);
+      }
+
+      addPairRow('W1 Kame...',      'w1-in',    'w1-out');
+      addPairRow('W2 Hame...',      'w2-in',    'w2-out');
+      addPairRow('Orb Grow/Vanish', 'orb-in',   'orb-out');
+      addPairRow('Orb Pulse Start', 'orb-pulse', null);
+      addPairRow('HA!!!',           'ha-in',    null);
+      addPairRow('Beam Launch',     'beam-in',  null);
+      addPairRow('Stage Fade-Out',  null,       'stage-out');
+
+      document.getElementById('tunePanel').classList.add('visible');
+      document.getElementById('timeInd').classList.add('visible');
+
+      function currentVals() {
+        var vals = {};
+        document.querySelectorAll('.tune-panel input').forEach(function (inp) {
+          if (inp.dataset.key) vals[inp.dataset.key] = parseFloat(inp.value) || 0;
+        });
+        return vals;
+      }
+
+      function apply() {
+        var vals = currentVals();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(vals));
+        try {
+          var audio = document.getElementById('audio');
+          if (audio) { audio.pause(); audio.currentTime = 0; }
+        } catch (e) {}
+        location.reload();
+      }
+
+      function reset() {
+        localStorage.removeItem(STORAGE_KEY);
+        location.reload();
+      }
+
+      document.getElementById('applyBtn').addEventListener('click', apply);
+      document.getElementById('resetBtn').addEventListener('click', reset);
+
+      function copyValues() {
+        var v = currentVals();
+        var lines = [
+          'Kamehameha Tune Values:',
+          'W1 (Kame...)     : IN ' + v['w1-in'].toFixed(2) + 's  OUT ' + v['w1-out'].toFixed(2) + 's',
+          'W2 (Hame...)     : IN ' + v['w2-in'].toFixed(2) + 's  OUT ' + v['w2-out'].toFixed(2) + 's',
+          'Orb Grow         : ' + v['orb-in'].toFixed(2) + 's',
+          'Orb Pulse Start  : ' + v['orb-pulse'].toFixed(2) + 's',
+          'Orb Vanish       : ' + v['orb-out'].toFixed(2) + 's',
+          'HA!!! IN         : ' + v['ha-in'].toFixed(2) + 's',
+          'Beam Launch      : ' + v['beam-in'].toFixed(2) + 's',
+          'Stage Fade-Out   : ' + v['stage-out'].toFixed(2) + 's'
+        ];
+        var text = lines.join('\n');
+        var btn = document.getElementById('copyBtn');
+        var original = btn.innerHTML;
+        var restore = function () { btn.innerHTML = original; };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () {
+            btn.innerHTML = '&#10003; Copied!';
+            setTimeout(restore, 1200);
+          }).catch(function () {
+            fallbackCopy(text, btn, restore);
+          });
+        } else {
+          fallbackCopy(text, btn, restore);
+        }
+      }
+
+      function fallbackCopy(text, btn, restore) {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.top = '-9999px';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); btn.innerHTML = '&#10003; Copied!'; }
+        catch (e) { btn.innerHTML = 'Error'; }
+        document.body.removeChild(ta);
+        setTimeout(restore, 1200);
+      }
+
+      document.getElementById('copyBtn').addEventListener('click', copyValues);
+
+      // Playback-Controls
+      var html = document.documentElement;
+      var audio = document.getElementById('audio');
+      var pauseBtn = document.getElementById('pauseBtn');
+      var replayBtn = document.getElementById('replayBtn');
+      var segmentBtn = document.getElementById('segmentBtn');
+      var fromInp = document.getElementById('fromInput');
+      var toInp = document.getElementById('toInput');
+      var segmentTimer = null;
+
+      function setPaused(paused) {
+        if (paused) {
+          html.classList.add('paused');
+          audio.pause();
+          pauseBtn.innerHTML = '&#9654; Resume';
+        } else {
+          html.classList.remove('paused');
+          audio.play().catch(function () {});
+          pauseBtn.innerHTML = '&#9208; Pause';
+        }
+      }
+
+      function togglePause() { setPaused(!html.classList.contains('paused')); }
+
+      function resetAnimations(offsetSec) {
+        clearTimeout(segmentTimer);
+        html.style.setProperty('--time-offset', (offsetSec || 0) + 's');
+        var stage = document.querySelector('.stage');
+        var clone = stage.cloneNode(true);
+        stage.parentNode.replaceChild(clone, stage);
+        html.classList.remove('paused');
+        pauseBtn.innerHTML = '&#9208; Pause';
+      }
+
+      function replayFrom0() {
+        resetAnimations(0);
+        try { audio.currentTime = 0; audio.play().catch(function () {}); } catch (e) {}
+      }
+
+      function playSegment() {
+        var from = parseFloat(fromInp.value) || 0;
+        var to   = parseFloat(toInp.value) || getValue('stage-out');
+        if (to <= from) return;
+        resetAnimations(from);
+        try { audio.currentTime = from; audio.play().catch(function () {}); } catch (e) {}
+        segmentTimer = setTimeout(function () { setPaused(true); }, (to - from) * 1000);
+      }
+
+      pauseBtn.addEventListener('click', togglePause);
+      replayBtn.addEventListener('click', replayFrom0);
+      segmentBtn.addEventListener('click', playSegment);
+
+      document.addEventListener('keydown', function (e) {
+        if (e.target.tagName === 'INPUT') return;
+        if (e.key === 'r' || e.key === 'R') replayFrom0();
+        else if (e.key === 's' || e.key === 'S') apply();
+        else if (e.key === 'c' || e.key === 'C') copyValues();
+        else if (e.key === ' ') { e.preventDefault(); togglePause(); }
+      });
+
+      // Live-Zeit-Indikator
+      var events = [];
+      KEYS.forEach(function (k) { events.push({ t: getValue(k), label: LABELS[k] }); });
+      events.sort(function (a, b) { return a.t - b.t; });
+
+      var timeInd = document.getElementById('timeInd');
+      function tick() {
+        if (html.classList.contains('stinger-loading')) {
+          requestAnimationFrame(tick);
+          return;
+        }
+        var t = audio.currentTime;
+        var currentEvent = null;
+        for (var i = 0; i < events.length; i++) {
+          if (events[i].t <= t) currentEvent = events[i];
+          else break;
+        }
+        var txt = 't = ' + t.toFixed(2) + 's';
+        if (html.classList.contains('paused')) txt += ' [PAUSED]';
+        if (currentEvent) txt += '  |  ' + currentEvent.label + ' @ ' + currentEvent.t.toFixed(2) + 's';
+        timeInd.textContent = txt;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    })();
+  </script>
 
 </body>
 </html>
