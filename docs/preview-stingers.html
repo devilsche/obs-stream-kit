@@ -79,9 +79,9 @@
       background: #000;
     }
 
-    .close {
+    .ctrl-btn {
       position: fixed;
-      top: 16px; right: 16px;
+      top: 16px;
       z-index: 101;
       background: rgba(0,0,0,0.75);
       color: #fff;
@@ -94,7 +94,10 @@
       font-family: inherit;
     }
 
-    .close:hover { background: rgba(242,183,5,0.3); }
+    .ctrl-btn:hover { background: rgba(242,183,5,0.3); }
+    .close  { right: 16px; }
+    .repeat { right: 168px; border-color: #c9a0dc; }
+    .repeat:hover { background: rgba(201,160,220,0.3); }
   </style>
 </head>
 <body>
@@ -105,7 +108,8 @@
   <div class="grid" id="grid"></div>
 
   <div class="stage" id="stage">
-    <button class="close" id="close">× schließen (Esc)</button>
+    <button class="ctrl-btn repeat" id="repeat">↻ Repeat (R)</button>
+    <button class="ctrl-btn close"  id="close">× schließen (Esc)</button>
     <iframe id="frame"></iframe>
   </div>
 
@@ -135,7 +139,13 @@
       { file: 'questionmarks.html',     name: 'Fragezeichen (Video)', sound: false, group: 'Effects' },
       { file: 'explosion.html',         name: 'Explosion (Video)', sound: false, group: 'Effects' },
       { file: 'particle-swirl.html',    name: 'Particle Swirl (Overlay)', sound: false, group: 'Effects' },
-      { file: 'lens-flare.html',        name: 'Lens Flare (Overlay)', sound: false, group: 'Effects' },
+      { file: 'lens-flare.html?n=1',    name: 'Lens Flare 1',       sound: false, group: 'Effects' },
+      { file: 'lens-flare.html?n=2',    name: 'Lens Flare 2',       sound: false, group: 'Effects' },
+      { file: 'lens-flare.html?n=3',    name: 'Lens Flare 3',       sound: false, group: 'Effects' },
+      { file: 'lens-flare.html?n=4',    name: 'Lens Flare 4',       sound: false, group: 'Effects' },
+      { file: 'lens-flare.html?n=5',    name: 'Lens Flare 5',       sound: false, group: 'Effects' },
+      { file: 'lens-flare.html?n=6',    name: 'Lens Flare 6',       sound: false, group: 'Effects' },
+      { file: 'lens-flare.html?n=7',    name: 'Lens Flare 7',       sound: false, group: 'Effects' },
     ];
 
     const grid = document.getElementById('grid');
@@ -152,20 +162,34 @@
     const stage = document.getElementById('stage');
     const frame = document.getElementById('frame');
     const close = document.getElementById('close');
+    const repeat = document.getElementById('repeat');
+    let currentFile = null;
 
     function launch(file) {
+      currentFile = file;
       frame.src = '../stingers/' + file;
       stage.classList.add('active');
+    }
+
+    function replay() {
+      if (!currentFile) return;
+      // Erzwingt Reload auch bei gleicher URL
+      frame.src = 'about:blank';
+      setTimeout(() => { frame.src = '../stingers/' + currentFile; }, 20);
     }
 
     function hide() {
       stage.classList.remove('active');
       frame.src = 'about:blank';
+      currentFile = null;
     }
 
     close.addEventListener('click', hide);
+    repeat.addEventListener('click', replay);
     document.addEventListener('keydown', e => {
+      if (!stage.classList.contains('active')) return;
       if (e.key === 'Escape') hide();
+      else if (e.key === 'r' || e.key === 'R') replay();
     });
   </script>
 
