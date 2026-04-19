@@ -2496,7 +2496,7 @@
         },
         {
             "prev_ver": 536936449,
-            "name": "Browser - Effects - Resistance Futile (4s)",
+            "name": "Browser - Effects - Resistance Futile (17s)",
             "uuid": "12eb363c-78ab-49d4-86a3-678a738c6b8e",
             "id": "browser_source",
             "versioned_id": "browser_source",
@@ -2540,16 +2540,16 @@
                         "action": 3,
                         "canvas": "Main",
                         "scene": "[L] Effects",
-                        "sceneitem": "Browser - Effects - Resistance Futile (4s)",
+                        "sceneitem": "Browser - Effects - Resistance Futile (17s)",
                         "duration_type": 0,
                         "next_move": "",
-                        "duration": 4500,
+                        "duration": 17000,
                         "start_trigger": 3,
                         "stop_trigger": 0,
                         "end_action": 3,
                         "end_canvas": "Main",
                         "end_scene": "[L] Effects",
-                        "end_sceneitem": "Browser - Effects - Resistance Futile (4s)",
+                        "end_sceneitem": "Browser - Effects - Resistance Futile (17s)",
                         "end_enable": 1
                     },
                     "mixers": 0,
@@ -4957,7 +4957,7 @@
                         "private_settings": {}
                     },
                     {
-                        "name": "Browser - Effects - Resistance Futile (4s)",
+                        "name": "Browser - Effects - Resistance Futile (17s)",
                         "source_uuid": "12eb363c-78ab-49d4-86a3-678a738c6b8e",
                         "visible": false,
                         "locked": true,

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
   <script src="../js/stinger-ready.js"></script>
-  <title>Resistance is Futile Stinger</title>
+  <title>We Are The Borg Stinger</title>
   <style>
     @font-face {
       font-family: 'DM Sans';
@@ -20,7 +20,7 @@
       height: 1080px;
       overflow: hidden;
       background: transparent;
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'DM Sans', 'Courier New', monospace;
     }
 
     @keyframes bgFadeIn   { from { opacity: 0; } to { opacity: 1; } }
@@ -36,19 +36,19 @@
       50%      { opacity: 0.55; }
     }
 
-    @keyframes textTypein {
-      0%   { width: 0; }
-      100% { width: 100%; }
-    }
-
     @keyframes cursorBlink {
       0%, 50% { opacity: 1; }
       51%, 100% { opacity: 0; }
     }
 
-    @keyframes subFadeIn {
-      from { transform: translateX(-50%) translateY(20px); opacity: 0; }
-      to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+    @keyframes lineIn {
+      0%   { transform: translate(-50%, -50%) translateY(16px); opacity: 0; letter-spacing: 18px; }
+      100% { transform: translate(-50%, -50%) translateY(0);    opacity: 1; letter-spacing: 4px; }
+    }
+
+    @keyframes lineOut {
+      from { opacity: 1; }
+      to   { opacity: 0; }
     }
 
     .bg {
@@ -64,7 +64,6 @@
       animation: bgFadeIn 0.3s ease-out forwards;
     }
 
-    /* Hex mesh pattern (Borg tech) */
     .hex-bg {
       position: absolute; inset: 0;
       z-index: 2;
@@ -76,7 +75,6 @@
       animation: hexPulse 2.4s ease-in-out 0.3s infinite;
     }
 
-    /* Scanline sweep */
     .scanline {
       position: absolute;
       top: 0; left: 0; right: 0;
@@ -94,7 +92,6 @@
       animation: scanlineSweep 2.2s linear infinite;
     }
 
-    /* Horizontal scanlines overlay (CRT effect) */
     .crt {
       position: absolute; inset: 0;
       z-index: 4;
@@ -109,66 +106,11 @@
       animation: bgFadeIn 0.4s ease-out 0.2s forwards;
     }
 
-    .title-wrap {
-      position: absolute;
-      top: 40%; left: 50%;
-      transform: translate(-50%, -50%);
-      white-space: nowrap;
-      overflow: hidden;
-      z-index: 5;
-    }
-
-    .title {
-      font-size: 140px;
-      font-weight: 900;
-      color: #7cff9d;
-      letter-spacing: 4px;
-      line-height: 1;
-      text-transform: uppercase;
-      font-family: 'Courier New', 'DM Sans', monospace;
-      text-shadow:
-        0 0 20px rgba(120, 255, 160, 0.9),
-        0 0 50px rgba(80, 200, 110, 0.7),
-        0 0 100px rgba(50, 160, 80, 0.5);
-      overflow: hidden;
-      display: inline-block;
-      width: 0;
-      animation: textTypein 1.6s steps(36) 0.5s forwards;
-    }
-
-    .cursor {
-      display: inline-block;
-      width: 20px;
-      height: 1.1em;
-      background: #7cff9d;
-      vertical-align: middle;
-      margin-left: 6px;
-      animation: cursorBlink 0.8s steps(2) infinite;
-      box-shadow: 0 0 20px rgba(120, 255, 160, 1);
-    }
-
-    .sub {
-      position: absolute;
-      top: calc(50% + 120px);
-      left: 50%;
-      transform: translateX(-50%) translateY(20px);
-      font-size: 36px;
-      font-weight: 400;
-      color: rgba(160, 255, 190, 0.85);
-      letter-spacing: 20px;
-      text-transform: uppercase;
-      font-family: 'Courier New', 'DM Sans', monospace;
-      z-index: 5;
-      opacity: 0;
-      text-shadow: 0 0 14px rgba(120, 255, 160, 0.6);
-      animation: subFadeIn 0.5s ease-out 2.3s forwards;
-    }
-
     .kicker {
       position: absolute;
-      top: calc(50% - 180px);
+      top: 12%;
       left: 50%;
-      transform: translateX(-50%) translateY(20px);
+      transform: translateX(-50%) translateY(16px);
       font-size: 28px;
       font-weight: 700;
       color: rgba(120, 255, 160, 0.7);
@@ -177,12 +119,64 @@
       font-family: 'Courier New', 'DM Sans', monospace;
       z-index: 5;
       opacity: 0;
-      animation: subFadeIn 0.4s ease-out 0.15s forwards;
+      animation: bgFadeIn 0.5s ease-out 0.3s forwards;
+    }
+
+    .line {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) translateY(16px);
+      font-weight: 900;
+      color: #7cff9d;
+      line-height: 1.15;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      font-family: 'Courier New', 'DM Sans', monospace;
+      white-space: pre-line;
+      max-width: 1700px;
+      z-index: 6;
+      opacity: 0;
+      text-shadow:
+        0 0 18px rgba(120, 255, 160, 0.9),
+        0 0 40px rgba(80, 200, 110, 0.7),
+        0 0 80px rgba(50, 160, 80, 0.4);
+    }
+
+    .line.big   { font-size: 160px; }
+    .line.mid   { font-size: 90px;  }
+    .line.small { font-size: 62px;  }
+
+    /* Sequenz — Timings zur 16.3s Audio */
+    .line.l1 { animation:
+      lineIn  0.5s ease-out 0.5s forwards,
+      lineOut 0.4s ease-in  3.2s forwards; }
+    .line.l2 { animation:
+      lineIn  0.5s ease-out 3.6s forwards,
+      lineOut 0.4s ease-in  6.5s forwards; }
+    .line.l3 { animation:
+      lineIn  0.6s ease-out 6.9s forwards,
+      lineOut 0.4s ease-in  11.6s forwards; }
+    .line.l4 { animation:
+      lineIn  0.5s ease-out 12.0s forwards,
+      lineOut 0.4s ease-in  14.4s forwards; }
+    .line.l5 { animation:
+      lineIn  0.6s ease-out 14.7s forwards; }
+
+    .cursor {
+      display: inline-block;
+      width: 20px;
+      height: 1em;
+      background: #7cff9d;
+      vertical-align: -0.1em;
+      margin-left: 8px;
+      animation: cursorBlink 0.8s steps(2) infinite;
+      box-shadow: 0 0 20px rgba(120, 255, 160, 1);
     }
 
     .stage {
       position: absolute; inset: 0;
-      animation: fadeOutAll 0.6s ease-in 3.2s forwards;
+      animation: fadeOutAll 0.8s ease-in 16.0s forwards;
     }
   </style>
 </head>
@@ -194,15 +188,16 @@
     <div class="scanline"></div>
     <div class="crt"></div>
 
-    <div class="kicker">&#62;&#62; Collective Signal Detected</div>
+    <div class="kicker">&gt;&gt; Collective Signal Detected</div>
 
-    <div class="title-wrap">
-      <span class="title">Resistance is futile</span>
-      <span class="cursor"></span>
-    </div>
-
-    <div class="sub">We are the Borg</div>
+    <div class="line big l1">We are the Borg.</div>
+    <div class="line mid l2">Lower your shields&#10;and surrender your ships.</div>
+    <div class="line small l3">Your biological and technological&#10;distinctiveness will be added to our own.</div>
+    <div class="line mid l4">Your culture will adapt&#10;to service us.</div>
+    <div class="line big l5">Resistance is futile.<span class="cursor"></span></div>
   </div>
+
+  <audio data-stinger-autoplay preload="auto" src="../assets/stingers/borg.mp3"></audio>
 
 </body>
 </html>
