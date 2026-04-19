@@ -294,7 +294,7 @@
             "filters": [
                 {
                     "prev_ver": 536936449,
-                    "name": "Verst\u00e4rkung",
+                    "name": "Verstärkung",
                     "uuid": "1829ab88-983d-424c-b95e-24ee3f3549cf",
                     "id": "gain_filter",
                     "versioned_id": "gain_filter",
@@ -372,67 +372,67 @@
             "settings": {
                 "playlist": [
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Culture Code - Not Giving In \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb Bubbly.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Culture Code - Not Giving In 🎧 (No Copyright Music)📻 Bubbly.mp3",
                         "uuid": "cc6f11ab-d271-42ba-96d3-52d2939836c8",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Diamond Eyes - Everything \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Diamond Eyes - Everything 🎧 (No Copyright Music)📻.mp3",
                         "uuid": "70de1283-16d3-4424-85b6-e1d456b39d5d",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/DREKS & Jean Rodz - The Money \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/DREKS & Jean Rodz - The Money 🎧 (No Copyright Music)📻.mp3",
                         "uuid": "bdb84645-5ee8-42d2-8331-9261a8d7e347",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Almost Evil \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Almost Evil 🎧 (No Copyright Music)📻.mp3",
                         "uuid": "f4bdbf3f-ad68-418d-9a87-15e88448c858",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Behind - Cyberpunk \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Behind - Cyberpunk 🎧 (No Copyright Music)📻.mp3",
                         "uuid": "53ed9658-5b6b-4cdf-a7c1-5664afbab9ff",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Just Evil \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb Cyberpunk Music.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Just Evil 🎧 (No Copyright Music)📻 Cyberpunk Music.mp3",
                         "uuid": "4c431ab6-108e-4d34-b30c-957991e710e2",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction- My Eyes \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction- My Eyes 🎧 (No Copyright Music)📻.mp3",
                         "uuid": "60a3b44a-a7c0-4cf3-bfa7-2ed0577616d3",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction- Phonk Soul -Phonk \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction- Phonk Soul -Phonk 🎧 (No Copyright Music)📻.mp3",
                         "uuid": "6f7783aa-6690-4e86-b26a-e6713114ee62",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction, Aim To Head - Falling \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction, Aim To Head - Falling 🎧 (No Copyright Music)📻.mp3",
                         "uuid": "aec1390e-ef88-4b05-b5f8-b924b979988d",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/NEFFEX - Rush \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/NEFFEX - Rush 🎧 (No Copyright Music)📻.mp3",
                         "uuid": "7b34f11c-b52c-4056-96ca-dc881e095f9d",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Netrum & Halvorsen - Phoenix \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Netrum & Halvorsen - Phoenix 🎧 (No Copyright Music)📻.mp3",
                         "uuid": "4f7020da-f503-4a0b-966d-023acfa797e4",
                         "selected": false,
                         "hidden": false
@@ -477,7 +477,7 @@
             "settings": {
                 "is_local_file": false,
                 "local_file": "F:/git/obs-stream-kit/scenes/starting-soon.html",
-                "url": "http://localhost:9000/scenes/starting-soon.html",
+                "url": "http://localhost:9000/scenes/starting-soon.html?pause=5",
                 "width": 1920,
                 "height": 1080,
                 "fps": 60,
@@ -1955,12 +1955,56 @@
                 "libobs.unmute": [],
                 "libobs.push-to-mute": [],
                 "libobs.push-to-talk": [],
-                "ObsBrowser.Refresh": []
+                "ObsBrowser.Refresh": [],
+                "Move Action": [],
+                "Move Action Hold": []
             },
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "5969b4a3-c759-4175-a923-ec33c34dcd26",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - GG (6s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 6000,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - GG (6s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -2239,7 +2283,7 @@
                     {
                         "name": "Browser - Alert - Tip",
                         "source_uuid": "92a5b601-3cec-4052-a20c-01a6fd72e83c",
-                        "visible": true,
+                        "visible": false,
                         "locked": false,
                         "rot": 0.0,
                         "scale_ref": {
@@ -2294,7 +2338,7 @@
                     {
                         "name": "Browser - Alert - Sub",
                         "source_uuid": "29a926bd-7402-4e72-9d49-7f76c102c4c3",
-                        "visible": true,
+                        "visible": false,
                         "locked": false,
                         "rot": 0.0,
                         "scale_ref": {
@@ -2349,7 +2393,7 @@
                     {
                         "name": "Browser - Alert - Follow",
                         "source_uuid": "faedcf27-9a4b-4c76-8958-c484d9444d99",
-                        "visible": true,
+                        "visible": false,
                         "locked": false,
                         "rot": 0.0,
                         "scale_ref": {
@@ -2404,7 +2448,7 @@
                     {
                         "name": "Browser - Alert - Raid",
                         "source_uuid": "c3bfe55c-e148-4f50-a709-8cb73314a189",
-                        "visible": true,
+                        "visible": false,
                         "locked": false,
                         "rot": 0.0,
                         "scale_ref": {
@@ -2510,7 +2554,7 @@
                             "duration": 300
                         },
                         "private_settings": {
-                            "collapsed": true
+                            "collapsed": false
                         }
                     },
                     {
@@ -4782,8 +4826,6 @@
             "push-to-talk-delay": 0,
             "hotkeys": {
                 "OBSBasic.SelectScene": [],
-                "Entry Ads - start": [],
-                "Entry Ads - start Hold": [],
                 "libobs.show_scene_item.3": [],
                 "libobs.hide_scene_item.3": [],
                 "libobs.show_scene_item.11": [],
@@ -4792,6 +4834,8 @@
                 "libobs.hide_scene_item.6": [],
                 "libobs.show_scene_item.7": [],
                 "libobs.hide_scene_item.7": [],
+                "Entry Ads - start": [],
+                "Entry Ads - start Hold": [],
                 "Entry Ads - end": [],
                 "Entry Ads - end Hold": []
             },
@@ -5146,14 +5190,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Bild - Cam Background Zeige-\u00dcbergang",
+                            "name": "Bild - Cam Background Zeige-Übergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Bild - Cam Background Verstecke-\u00dcbergang",
+                            "name": "Bild - Cam Background Verstecke-Übergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -5209,14 +5253,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Logitech BRIO Zeige-\u00dcbergang",
+                            "name": "Logitech BRIO Zeige-Übergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Logitech BRIO Verstecke-\u00dcbergang",
+                            "name": "Logitech BRIO Verstecke-Übergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -5272,14 +5316,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Browser -  Cam Overlay Zeige-\u00dcbergang",
+                            "name": "Browser -  Cam Overlay Zeige-Übergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Browser -  Cam Overlay Verstecke-\u00dcbergang",
+                            "name": "Browser -  Cam Overlay Verstecke-Übergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -6877,7 +6921,7 @@
                         "show_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Subgoal Zeige-\u00dcbergang",
+                            "name": "Browser - Subgoal Zeige-Übergang",
                             "transition": {
                                 "direction": "right"
                             },
@@ -6886,7 +6930,7 @@
                         "hide_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Subgoal Verstecke-\u00dcbergang",
+                            "name": "Browser - Subgoal Verstecke-Übergang",
                             "transition": {
                                 "direction": "left"
                             },
@@ -6944,7 +6988,7 @@
                         "show_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Tip Zeige-\u00dcbergang",
+                            "name": "Browser - Tip Zeige-Übergang",
                             "transition": {
                                 "direction": "right"
                             },
@@ -6953,7 +6997,7 @@
                         "hide_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Tip Verstecke-\u00dcbergang",
+                            "name": "Browser - Tip Verstecke-Übergang",
                             "transition": {
                                 "direction": "left"
                             },
@@ -7011,7 +7055,7 @@
                         "show_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Sub Zeige-\u00dcbergang",
+                            "name": "Browser - Sub Zeige-Übergang",
                             "transition": {
                                 "direction": "right"
                             },
@@ -7020,7 +7064,7 @@
                         "hide_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Sub Verstecke-\u00dcbergang",
+                            "name": "Browser - Sub Verstecke-Übergang",
                             "transition": {
                                 "direction": "left"
                             },
@@ -7078,7 +7122,7 @@
                         "show_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Follower Zeige-\u00dcbergang",
+                            "name": "Browser - Follower Zeige-Übergang",
                             "transition": {
                                 "direction": "right"
                             },
@@ -7087,7 +7131,7 @@
                         "hide_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Follower Verstecke-\u00dcbergang",
+                            "name": "Browser - Follower Verstecke-Übergang",
                             "transition": {
                                 "direction": "left"
                             },
@@ -7757,6 +7801,10 @@
             "push-to-talk-delay": 0,
             "hotkeys": {
                 "OBSBasic.SelectScene": [],
+                "Entry Ads - start": [],
+                "Entry Ads - start Hold": [],
+                "Entry Ads - end": [],
+                "Entry Ads - end Hold": [],
                 "libobs.show_scene_item.1": [],
                 "libobs.hide_scene_item.1": [],
                 "libobs.show_scene_item.12": [],
@@ -7764,11 +7812,7 @@
                 "libobs.show_scene_item.4": [],
                 "libobs.hide_scene_item.4": [],
                 "libobs.show_scene_item.5": [],
-                "libobs.hide_scene_item.5": [],
-                "Entry Ads - start": [],
-                "Entry Ads - start Hold": [],
-                "Entry Ads - end": [],
-                "Entry Ads - end Hold": []
+                "libobs.hide_scene_item.5": []
             },
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
@@ -7815,9 +7859,9 @@
                         },
                         "start_trigger": 0,
                         "source": "[G] Cam + Chat - Content",
-                        "transform_text": "pos: x 0.0 y 0.0 rot: 0.0 scale: x 0.833 y 0.833 crop: l 0 t 0 r 0 b 0",
                         "enabled_match_moving": true,
-                        "duration": 700
+                        "duration": 700,
+                        "transform_text": "pos: x 0.0 y 0.0 rot: 0.0 scale: x 0.833 y 0.833 bounds: x 1600.000 y 900.000 crop: l 0 t 0 r 0 b 0"
                     },
                     "mixers": 0,
                     "sync": 0,
@@ -7874,8 +7918,8 @@
                             "bottom_sign": " "
                         },
                         "source": "[G] Cam + Chat - Content",
-                        "transform_text": "pos: x -385.0 y -2.0 rot: 0.0 scale: x 1.000 y 1.000 crop: l 0 t 0 r 0 b 0",
-                        "duration": 600
+                        "duration": 600,
+                        "transform_text": "pos: x -385.0 y -2.0 rot: 0.0 scale: x 1.000 y 1.000 bounds: x 0.000 y 0.000 crop: l 0 t 0 r 0 b 0"
                     },
                     "mixers": 0,
                     "sync": 0,
@@ -8070,14 +8114,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Bild - Cam Background Zeige-\u00dcbergang",
+                            "name": "Bild - Cam Background Zeige-Übergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Bild - Cam Background Verstecke-\u00dcbergang",
+                            "name": "Bild - Cam Background Verstecke-Übergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -8133,14 +8177,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Logitech BRIO Zeige-\u00dcbergang",
+                            "name": "Logitech BRIO Zeige-Übergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Logitech BRIO Verstecke-\u00dcbergang",
+                            "name": "Logitech BRIO Verstecke-Übergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -8196,14 +8240,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Browser -  Cam Overlay Zeige-\u00dcbergang",
+                            "name": "Browser -  Cam Overlay Zeige-Übergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Browser -  Cam Overlay Verstecke-\u00dcbergang",
+                            "name": "Browser -  Cam Overlay Verstecke-Übergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -8369,7 +8413,7 @@
                     {
                         "name": "Browser - Alert - Tip",
                         "source_uuid": "92a5b601-3cec-4052-a20c-01a6fd72e83c",
-                        "visible": true,
+                        "visible": false,
                         "locked": false,
                         "rot": 0.0,
                         "scale_ref": {
@@ -8424,7 +8468,7 @@
                     {
                         "name": "Browser - Alert - Sub",
                         "source_uuid": "29a926bd-7402-4e72-9d49-7f76c102c4c3",
-                        "visible": true,
+                        "visible": false,
                         "locked": false,
                         "rot": 0.0,
                         "scale_ref": {
@@ -8479,7 +8523,7 @@
                     {
                         "name": "Browser - Alert - Follow",
                         "source_uuid": "faedcf27-9a4b-4c76-8958-c484d9444d99",
-                        "visible": true,
+                        "visible": false,
                         "locked": false,
                         "rot": 0.0,
                         "scale_ref": {
@@ -8534,7 +8578,7 @@
                     {
                         "name": "Browser - Alert - Raid",
                         "source_uuid": "c3bfe55c-e148-4f50-a709-8cb73314a189",
-                        "visible": true,
+                        "visible": false,
                         "locked": false,
                         "rot": 0.0,
                         "scale_ref": {
@@ -9055,7 +9099,7 @@
                         "group_item_backup": false,
                         "pos": {
                             "x": 97.2388916015625,
-                            "y": 6.103515625e-05
+                            "y": 6.103515625e-5
                         },
                         "pos_rel": {
                             "x": -1.5977057218551636,
@@ -9329,7 +9373,7 @@
                         "id": 14,
                         "group_item_backup": false,
                         "pos": {
-                            "x": 6.103515625e-05,
+                            "x": 6.103515625e-5,
                             "y": 0.0
                         },
                         "pos_rel": {
@@ -9604,8 +9648,8 @@
             "name": "[L] Audio"
         }
     ],
-    "current_scene": "[S] Main",
-    "current_program_scene": "[S] Main",
+    "current_scene": "[L] Effects",
+    "current_program_scene": "[L] Effects",
     "canvases": [],
     "current_transition": "Schnitt",
     "transition_duration": 300,
@@ -9636,14 +9680,14 @@
             "fade_to_black": false
         },
         {
-            "name": "\u00dcberblende",
+            "name": "Überblende",
             "duration": 300,
             "hotkeys": [],
             "id": 8,
             "fade_to_black": false
         },
         {
-            "name": "\u00dcberblende",
+            "name": "Überblende",
             "duration": 300,
             "hotkeys": [],
             "id": 9,
@@ -9653,7 +9697,7 @@
     "saved_projectors": [],
     "preview_locked": false,
     "scaling_enabled": false,
-    "scaling_level": -15,
+    "scaling_level": -5,
     "scaling_off_x": 0.0,
     "scaling_off_y": 0.0,
     "virtual-camera": {
