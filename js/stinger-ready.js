@@ -79,7 +79,12 @@
   }
 
   function waitForMedia() {
-    var medias = document.querySelectorAll('audio, video');
+    var all = document.querySelectorAll('audio, video');
+    // Nur Media mit Quelle beachten — leere <audio>-/video-Elemente wuerden
+    // sonst nie canplay feuern und den Fallback-Timeout triggern
+    var medias = Array.prototype.filter.call(all, function (m) {
+      return !!(m.src || m.currentSrc || m.querySelector('source[src]'));
+    });
     if (medias.length === 0) {
       ready.media = true;
       maybeGo();
@@ -89,7 +94,7 @@
     var total = medias.length;
     var loaded = 0;
 
-    Array.prototype.forEach.call(medias, function (m) {
+    medias.forEach(function (m) {
       var done = false;
       function check() {
         if (done) return;
@@ -107,7 +112,7 @@
       m.addEventListener('error',      check);
 
       // Fallback wenn gar kein Event feuert
-      setTimeout(check, 1200);
+      setTimeout(check, 600);
 
       if (m.preload !== 'auto') m.preload = 'auto';
       try { m.load(); } catch (e) {}
