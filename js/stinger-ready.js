@@ -100,11 +100,14 @@
           maybeGo();
         }
       }
-      m.addEventListener('canplaythrough', check);
-      m.addEventListener('error', check);
+      // canplay (enough buffered to START) + loadeddata (first frame/audio available)
+      // deutlich schneller als canplaythrough (das auf komplette Pufferung wartet)
+      m.addEventListener('canplay',    check);
+      m.addEventListener('loadeddata', check);
+      m.addEventListener('error',      check);
 
-      // Fallback falls canplaythrough nicht feuert (manche Browser/Codecs)
-      setTimeout(check, 2500);
+      // Fallback wenn gar kein Event feuert
+      setTimeout(check, 1200);
 
       if (m.preload !== 'auto') m.preload = 'auto';
       try { m.load(); } catch (e) {}
@@ -114,8 +117,8 @@
   function init() {
     waitForFonts();
     waitForMedia();
-    // Absolute Safety: max 4s Wartezeit
-    setTimeout(startAnimations, 4000);
+    // Absolute Safety: max 2s Wartezeit
+    setTimeout(startAnimations, 2000);
   }
 
   if (document.readyState === 'loading') {
