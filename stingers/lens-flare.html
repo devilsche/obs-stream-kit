@@ -15,6 +15,8 @@
       background: transparent;
     }
 
+    @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
+
     .bg-video {
       position: absolute;
       inset: 0;
@@ -24,6 +26,11 @@
       /* Luma-Key: Alpha wird aus der Helligkeit berechnet,
          Schwarz wird transparent, helle Flares bleiben sichtbar */
       filter: url(#lumaKey);
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.6s ease-in 26.1s forwards;
     }
   </style>
 </head>
@@ -42,8 +49,10 @@
     </defs>
   </svg>
 
-  <video class="bg-video" data-stinger-autoplay preload="auto" playsinline loop muted
-         src="../assets/stingers/lens-flare.mp4"></video>
+  <div class="stage">
+    <video class="bg-video" data-stinger-autoplay preload="auto" playsinline muted
+           src="../assets/stingers/lens-flare.mp4"></video>
+  </div>
 
 </body>
 </html>

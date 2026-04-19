@@ -3072,7 +3072,7 @@
         },
         {
             "prev_ver": 536936449,
-            "name": "Browser - Effects - Lens Flare (Loop)",
+            "name": "Browser - Effects - Lens Flare (27s)",
             "uuid": "31eb9f20-ba34-4fba-b103-cb3d97298715",
             "id": "browser_source",
             "versioned_id": "browser_source",
@@ -3103,7 +3103,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "7008c8e5-7696-49ad-8e9a-5db969e3be20",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Lens Flare (27s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 27200,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Lens Flare (27s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -4893,7 +4935,7 @@
                         "private_settings": {}
                     },
                     {
-                        "name": "Browser - Effects - Lens Flare (Loop)",
+                        "name": "Browser - Effects - Lens Flare (27s)",
                         "source_uuid": "31eb9f20-ba34-4fba-b103-cb3d97298715",
                         "visible": false,
                         "locked": true,
