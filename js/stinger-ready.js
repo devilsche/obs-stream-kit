@@ -126,8 +126,12 @@
       // Fallback wenn gar kein Event feuert
       setTimeout(check, 600);
 
-      if (m.preload !== 'auto') m.preload = 'auto';
-      try { m.load(); } catch (e) {}
+      // Nur neu laden wenn preload nicht schon auto ist — sonst brechen wir
+      // den bereits laufenden Fetch ab (Chrome zeigt das als "canceled cross-origin")
+      if (m.preload !== 'auto') {
+        m.preload = 'auto';
+        try { m.load(); } catch (e) {}
+      }
     });
   }
 
