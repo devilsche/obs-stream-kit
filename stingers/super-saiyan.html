@@ -52,12 +52,6 @@
       100% { transform: translate(-50%, -50vh) scaleY(1.2); opacity: 0; transform-origin: bottom center; }
     }
 
-    @keyframes titleIn {
-      0%   { transform: translate(-50%, calc(-50% + 40px)) scale(0.7); opacity: 0; }
-      55%  { transform: translate(-50%, calc(-50% - 10px)) scale(1.1); opacity: 1; }
-      100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-    }
-
     .bg {
       position: absolute; inset: 0;
       background:
@@ -145,29 +139,9 @@
       animation: screamGrow 0.6s cubic-bezier(0.22, 1.6, 0.36, 1) 0.45s forwards;
     }
 
-    .title {
-      position: absolute;
-      top: 68%; left: 50%;
-      transform: translate(-50%, calc(-50% + 40px)) scale(0.7);
-      font-size: 84px;
-      font-weight: 900;
-      color: #ffe74c;
-      letter-spacing: 14px;
-      line-height: 1;
-      white-space: nowrap;
-      text-transform: uppercase;
-      z-index: 6;
-      opacity: 0;
-      -webkit-text-stroke: 3px #3a1500;
-      text-shadow:
-        0 0 24px rgba(255, 200, 60, 0.9),
-        4px 4px 0 #2a0a00;
-      animation: titleIn 0.6s cubic-bezier(0.22, 1.5, 0.36, 1) 6.0s forwards;
-    }
-
     .stage {
       position: absolute; inset: 0;
-      animation: fadeOutAll 0.5s ease-in 10.3s forwards;
+      animation: fadeOutAll 1.5s ease-in 9.3s forwards;
     }
   </style>
 </head>
@@ -181,7 +155,6 @@
 
     <div class="shaker">
       <div class="scream">AAAAAAAH!</div>
-      <div class="title">Super Saiyan</div>
     </div>
   </div>
 
