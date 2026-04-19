@@ -37,7 +37,8 @@
     }
 
     @keyframes flashWhite {
-      0%   { opacity: 1; }
+      0%   { opacity: 0; }
+      10%  { opacity: 1; }
       100% { opacity: 0; }
     }
 
@@ -94,8 +95,9 @@
     .flash {
       position: absolute; inset: 0;
       background: #ffffff;
+      opacity: 0;
       z-index: 20;
-      animation: flashWhite 0.12s ease-out forwards;
+      animation: flashWhite 0.18s ease-out forwards;
     }
 
     .red-bg {
