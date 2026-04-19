@@ -47,6 +47,19 @@ os.chdir(ROOT)
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
+    # ── CORS-Header fuer Media (Video/Audio) ───────────────────────
+    # Damit crossorigin=anonymous in OBS CEF funktioniert und Videos
+    # nicht als "tainted" gerendert werden.
+    def end_headers(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "*")
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.end_headers()
+
     # ── Robustheit ──────────────────────────────────────────────────
     def handle_one_request(self):
         try:
