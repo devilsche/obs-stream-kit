@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <script src="../js/stinger-ready.js"></script>
+  <title>Particle Swirl Overlay</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
+
+    .bg-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      /* Schwarzer Hintergrund wird per screen-Blend transparent,
+         Particle-Swirl bleibt sichtbar */
+      mix-blend-mode: screen;
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.5s ease-in 5.6s forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <video class="bg-video" data-stinger-autoplay preload="auto" playsinline
+           src="../assets/stingers/particle-swirl.mp4"></video>
+  </div>
+
+</body>
+</html>

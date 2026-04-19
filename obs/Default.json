@@ -294,7 +294,7 @@
             "filters": [
                 {
                     "prev_ver": 536936449,
-                    "name": "Verstärkung",
+                    "name": "Verst\u00e4rkung",
                     "uuid": "1829ab88-983d-424c-b95e-24ee3f3549cf",
                     "id": "gain_filter",
                     "versioned_id": "gain_filter",
@@ -372,67 +372,67 @@
             "settings": {
                 "playlist": [
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Culture Code - Not Giving In 🎧 (No Copyright Music)📻 Bubbly.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Culture Code - Not Giving In \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb Bubbly.mp3",
                         "uuid": "cc6f11ab-d271-42ba-96d3-52d2939836c8",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Diamond Eyes - Everything 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Diamond Eyes - Everything \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "70de1283-16d3-4424-85b6-e1d456b39d5d",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/DREKS & Jean Rodz - The Money 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/DREKS & Jean Rodz - The Money \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "bdb84645-5ee8-42d2-8331-9261a8d7e347",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Almost Evil 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Almost Evil \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "f4bdbf3f-ad68-418d-9a87-15e88448c858",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Behind - Cyberpunk 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Behind - Cyberpunk \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "53ed9658-5b6b-4cdf-a7c1-5664afbab9ff",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Just Evil 🎧 (No Copyright Music)📻 Cyberpunk Music.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Just Evil \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb Cyberpunk Music.mp3",
                         "uuid": "4c431ab6-108e-4d34-b30c-957991e710e2",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction- My Eyes 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction- My Eyes \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "60a3b44a-a7c0-4cf3-bfa7-2ed0577616d3",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction- Phonk Soul -Phonk 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction- Phonk Soul -Phonk \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "6f7783aa-6690-4e86-b26a-e6713114ee62",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction, Aim To Head - Falling 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction, Aim To Head - Falling \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "aec1390e-ef88-4b05-b5f8-b924b979988d",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/NEFFEX - Rush 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/NEFFEX - Rush \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "7b34f11c-b52c-4056-96ca-dc881e095f9d",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Netrum & Halvorsen - Phoenix 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Netrum & Halvorsen - Phoenix \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "4f7020da-f503-4a0b-966d-023acfa797e4",
                         "selected": false,
                         "hidden": false
@@ -1369,6 +1369,776 @@
         },
         {
             "prev_ver": 536936449,
+            "name": "Browser - Effects - Crash",
+            "uuid": "822520a4-f8de-4324-a223-433207994316",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/crash.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Noice",
+            "uuid": "becfa802-52a1-46b3-b872-273553e9cb35",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/noice.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Smort",
+            "uuid": "bb26d1aa-efa3-4968-935f-556ed4005420",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/smort.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Cool",
+            "uuid": "2f4d0555-ac2f-4f41-8646-bb3cdd4f2e4e",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/cool.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Over 9000",
+            "uuid": "b577f6fd-0984-4b86-b69a-c47a5d095e5e",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/over-9000.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Kamehameha",
+            "uuid": "b47260de-e6fa-4b53-a163-52a4cc36651d",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/kamehameha.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Super Saiyan",
+            "uuid": "02446186-4524-41af-b768-ad8fd6abe90f",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/super-saiyan.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Indeed",
+            "uuid": "6ceb0816-e1c2-425d-a23a-a6e896c1e903",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/indeed.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Chevron Locked",
+            "uuid": "eb3486a5-f4b4-4796-9935-b3719508afc6",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/chevron-locked.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Crying Out Loud",
+            "uuid": "b2b3018a-8512-4e77-82b1-c27e951ddb72",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/crying-out-loud.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Khan",
+            "uuid": "7d00a759-0958-4ea8-9b04-d789f3c56851",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/khan.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Make It So",
+            "uuid": "0bc1cf26-5b27-4495-a6f0-caa0df99bcdf",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/make-it-so.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Engage",
+            "uuid": "df27ea0c-e7c1-4e70-9af7-376e1fa19448",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/engage.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Resistance Futile",
+            "uuid": "12eb363c-78ab-49d4-86a3-678a738c6b8e",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/resistance-futile.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Kickers",
+            "uuid": "765161b3-0e2c-4ebb-b0e3-3ed1839f1426",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/kickers.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Heart",
+            "uuid": "581f3ed8-cf37-4804-9877-fb13330a3f26",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/heart.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - GG",
+            "uuid": "a6587bfe-9cb2-4f6e-aaa7-57733db85016",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/gg.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Snow",
+            "uuid": "c4f7b23b-bba3-4f7f-858a-a564576d334d",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/snow.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Question Marks",
+            "uuid": "dcb99c9c-d2d2-4534-97e9-259eb17248a0",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/questionmarks.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Explosion",
+            "uuid": "ea444261-c531-442b-98e9-ccfc98544098",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/explosion.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Particle Swirl",
+            "uuid": "10bbf654-11ab-4b2f-90a4-2c96534615f9",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/particle-swirl.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
+            "name": "Browser - Effects - Lens Flare",
+            "uuid": "31eb9f20-ba34-4fba-b103-cb3d97298715",
+            "id": "browser_source",
+            "versioned_id": "browser_source",
+            "settings": {
+                "url": "http://localhost:9000/stingers/lens-flare.html",
+                "width": 1920,
+                "height": 1080,
+                "shutdown": true
+            },
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": [],
+                "ObsBrowser.Refresh": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {}
+        },
+        {
+            "prev_ver": 536936449,
             "name": "[L] UI",
             "uuid": "e5fb45c9-578f-4b04-b179-895dcfe7a83b",
             "id": "scene",
@@ -1831,7 +2601,7 @@
             "id": "scene",
             "versioned_id": "scene",
             "settings": {
-                "id_counter": 3,
+                "id_counter": 25,
                 "custom_size": false,
                 "items": [
                     {
@@ -1998,6 +2768,1216 @@
                             "duration": 300
                         },
                         "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Crash",
+                        "source_uuid": "822520a4-f8de-4324-a223-433207994316",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 4,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Noice",
+                        "source_uuid": "becfa802-52a1-46b3-b872-273553e9cb35",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 5,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Smort",
+                        "source_uuid": "bb26d1aa-efa3-4968-935f-556ed4005420",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 6,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Cool",
+                        "source_uuid": "2f4d0555-ac2f-4f41-8646-bb3cdd4f2e4e",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 7,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Over 9000",
+                        "source_uuid": "b577f6fd-0984-4b86-b69a-c47a5d095e5e",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 8,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Kamehameha",
+                        "source_uuid": "b47260de-e6fa-4b53-a163-52a4cc36651d",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 9,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Super Saiyan",
+                        "source_uuid": "02446186-4524-41af-b768-ad8fd6abe90f",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 10,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Indeed",
+                        "source_uuid": "6ceb0816-e1c2-425d-a23a-a6e896c1e903",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 11,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Chevron Locked",
+                        "source_uuid": "eb3486a5-f4b4-4796-9935-b3719508afc6",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 12,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Crying Out Loud",
+                        "source_uuid": "b2b3018a-8512-4e77-82b1-c27e951ddb72",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 13,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Khan",
+                        "source_uuid": "7d00a759-0958-4ea8-9b04-d789f3c56851",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 14,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Make It So",
+                        "source_uuid": "0bc1cf26-5b27-4495-a6f0-caa0df99bcdf",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 15,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Engage",
+                        "source_uuid": "df27ea0c-e7c1-4e70-9af7-376e1fa19448",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 16,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Resistance Futile",
+                        "source_uuid": "12eb363c-78ab-49d4-86a3-678a738c6b8e",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 17,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Kickers",
+                        "source_uuid": "765161b3-0e2c-4ebb-b0e3-3ed1839f1426",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 18,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Heart",
+                        "source_uuid": "581f3ed8-cf37-4804-9877-fb13330a3f26",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 19,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - GG",
+                        "source_uuid": "a6587bfe-9cb2-4f6e-aaa7-57733db85016",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 20,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Snow",
+                        "source_uuid": "c4f7b23b-bba3-4f7f-858a-a564576d334d",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 21,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Question Marks",
+                        "source_uuid": "dcb99c9c-d2d2-4534-97e9-259eb17248a0",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 22,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Explosion",
+                        "source_uuid": "ea444261-c531-442b-98e9-ccfc98544098",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 23,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Particle Swirl",
+                        "source_uuid": "10bbf654-11ab-4b2f-90a4-2c96534615f9",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 24,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Browser - Effects - Lens Flare",
+                        "source_uuid": "31eb9f20-ba34-4fba-b103-cb3d97298715",
+                        "visible": false,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 5,
+                        "bounds_type": 0,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 25,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "pos_rel": {
+                            "x": -1.7777777910232544,
+                            "y": -1.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "bounds_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 300
+                        },
+                        "hide_transition": {
+                            "duration": 300
+                        },
+                        "private_settings": {}
                     }
                 ]
             },
@@ -2019,7 +3999,51 @@
                 "libobs.show_scene_item.2": [],
                 "libobs.hide_scene_item.2": [],
                 "libobs.show_scene_item.3": [],
-                "libobs.hide_scene_item.3": []
+                "libobs.hide_scene_item.3": [],
+                "libobs.show_scene_item.4": [],
+                "libobs.hide_scene_item.4": [],
+                "libobs.show_scene_item.5": [],
+                "libobs.hide_scene_item.5": [],
+                "libobs.show_scene_item.6": [],
+                "libobs.hide_scene_item.6": [],
+                "libobs.show_scene_item.7": [],
+                "libobs.hide_scene_item.7": [],
+                "libobs.show_scene_item.8": [],
+                "libobs.hide_scene_item.8": [],
+                "libobs.show_scene_item.9": [],
+                "libobs.hide_scene_item.9": [],
+                "libobs.show_scene_item.10": [],
+                "libobs.hide_scene_item.10": [],
+                "libobs.show_scene_item.11": [],
+                "libobs.hide_scene_item.11": [],
+                "libobs.show_scene_item.12": [],
+                "libobs.hide_scene_item.12": [],
+                "libobs.show_scene_item.13": [],
+                "libobs.hide_scene_item.13": [],
+                "libobs.show_scene_item.14": [],
+                "libobs.hide_scene_item.14": [],
+                "libobs.show_scene_item.15": [],
+                "libobs.hide_scene_item.15": [],
+                "libobs.show_scene_item.16": [],
+                "libobs.hide_scene_item.16": [],
+                "libobs.show_scene_item.17": [],
+                "libobs.hide_scene_item.17": [],
+                "libobs.show_scene_item.18": [],
+                "libobs.hide_scene_item.18": [],
+                "libobs.show_scene_item.19": [],
+                "libobs.hide_scene_item.19": [],
+                "libobs.show_scene_item.20": [],
+                "libobs.hide_scene_item.20": [],
+                "libobs.show_scene_item.21": [],
+                "libobs.hide_scene_item.21": [],
+                "libobs.show_scene_item.22": [],
+                "libobs.hide_scene_item.22": [],
+                "libobs.show_scene_item.23": [],
+                "libobs.hide_scene_item.23": [],
+                "libobs.show_scene_item.24": [],
+                "libobs.hide_scene_item.24": [],
+                "libobs.show_scene_item.25": [],
+                "libobs.hide_scene_item.25": []
             },
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
@@ -3122,14 +5146,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Bild - Cam Background Zeige-Übergang",
+                            "name": "Bild - Cam Background Zeige-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Bild - Cam Background Verstecke-Übergang",
+                            "name": "Bild - Cam Background Verstecke-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -3185,14 +5209,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Logitech BRIO Zeige-Übergang",
+                            "name": "Logitech BRIO Zeige-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Logitech BRIO Verstecke-Übergang",
+                            "name": "Logitech BRIO Verstecke-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -3248,14 +5272,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Browser -  Cam Overlay Zeige-Übergang",
+                            "name": "Browser -  Cam Overlay Zeige-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Browser -  Cam Overlay Verstecke-Übergang",
+                            "name": "Browser -  Cam Overlay Verstecke-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -4853,7 +6877,7 @@
                         "show_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Subgoal Zeige-Übergang",
+                            "name": "Browser - Subgoal Zeige-\u00dcbergang",
                             "transition": {
                                 "direction": "right"
                             },
@@ -4862,7 +6886,7 @@
                         "hide_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Subgoal Verstecke-Übergang",
+                            "name": "Browser - Subgoal Verstecke-\u00dcbergang",
                             "transition": {
                                 "direction": "left"
                             },
@@ -4920,7 +6944,7 @@
                         "show_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Tip Zeige-Übergang",
+                            "name": "Browser - Tip Zeige-\u00dcbergang",
                             "transition": {
                                 "direction": "right"
                             },
@@ -4929,7 +6953,7 @@
                         "hide_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Tip Verstecke-Übergang",
+                            "name": "Browser - Tip Verstecke-\u00dcbergang",
                             "transition": {
                                 "direction": "left"
                             },
@@ -4987,7 +7011,7 @@
                         "show_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Sub Zeige-Übergang",
+                            "name": "Browser - Sub Zeige-\u00dcbergang",
                             "transition": {
                                 "direction": "right"
                             },
@@ -4996,7 +7020,7 @@
                         "hide_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Sub Verstecke-Übergang",
+                            "name": "Browser - Sub Verstecke-\u00dcbergang",
                             "transition": {
                                 "direction": "left"
                             },
@@ -5054,7 +7078,7 @@
                         "show_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Follower Zeige-Übergang",
+                            "name": "Browser - Follower Zeige-\u00dcbergang",
                             "transition": {
                                 "direction": "right"
                             },
@@ -5063,7 +7087,7 @@
                         "hide_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Follower Verstecke-Übergang",
+                            "name": "Browser - Follower Verstecke-\u00dcbergang",
                             "transition": {
                                 "direction": "left"
                             },
@@ -6046,14 +8070,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Bild - Cam Background Zeige-Übergang",
+                            "name": "Bild - Cam Background Zeige-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Bild - Cam Background Verstecke-Übergang",
+                            "name": "Bild - Cam Background Verstecke-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -6109,14 +8133,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Logitech BRIO Zeige-Übergang",
+                            "name": "Logitech BRIO Zeige-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Logitech BRIO Verstecke-Übergang",
+                            "name": "Logitech BRIO Verstecke-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -6172,14 +8196,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Browser -  Cam Overlay Zeige-Übergang",
+                            "name": "Browser -  Cam Overlay Zeige-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Browser -  Cam Overlay Verstecke-Übergang",
+                            "name": "Browser -  Cam Overlay Verstecke-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -7031,7 +9055,7 @@
                         "group_item_backup": false,
                         "pos": {
                             "x": 97.2388916015625,
-                            "y": 6.103515625e-5
+                            "y": 6.103515625e-05
                         },
                         "pos_rel": {
                             "x": -1.5977057218551636,
@@ -7305,7 +9329,7 @@
                         "id": 14,
                         "group_item_backup": false,
                         "pos": {
-                            "x": 6.103515625e-5,
+                            "x": 6.103515625e-05,
                             "y": 0.0
                         },
                         "pos_rel": {
@@ -7612,14 +9636,14 @@
             "fade_to_black": false
         },
         {
-            "name": "Überblende",
+            "name": "\u00dcberblende",
             "duration": 300,
             "hotkeys": [],
             "id": 8,
             "fade_to_black": false
         },
         {
-            "name": "Überblende",
+            "name": "\u00dcberblende",
             "duration": 300,
             "hotkeys": [],
             "id": 9,

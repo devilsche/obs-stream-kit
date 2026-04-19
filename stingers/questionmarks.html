@@ -13,103 +13,49 @@
       height: 1080px;
       overflow: hidden;
       background: transparent;
-      font-family: sans-serif;
     }
 
     @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
 
-    @keyframes qmFloat {
-      0%   {
-        transform: translate(0, 40px) rotate(var(--startRot)) scale(0.2);
-        opacity: 0;
-      }
-      25%  {
-        transform: translate(calc(var(--dx) * 0.3), calc(-30px + var(--dy) * 0.3)) rotate(var(--midRot)) scale(1.1);
-        opacity: var(--maxOp);
-      }
-      60%  {
-        transform: translate(calc(var(--dx) * 0.7), calc(-80px + var(--dy) * 0.7)) rotate(var(--midRot)) scale(1);
-        opacity: var(--maxOp);
-      }
-      100% {
-        transform: translate(var(--dx), calc(-160px + var(--dy))) rotate(var(--endRot)) scale(0.9);
-        opacity: 0;
-      }
-    }
-
-    .qm {
+    .bg-video {
       position: absolute;
-      color: #ffffff;
-      font-size: 120px;
-      font-weight: 900;
-      line-height: 1;
-      font-family: 'Arial Black', 'Helvetica', sans-serif;
-      user-select: none;
-      will-change: transform, opacity;
-      text-shadow:
-        0 0 16px rgba(255, 255, 255, 0.85),
-        0 0 36px rgba(200, 220, 255, 0.5),
-        4px 4px 0 rgba(0, 0, 0, 0.55);
-      -webkit-text-stroke: 3px rgba(0, 0, 0, 0.5);
-      transform: translate(0, 40px) rotate(0deg) scale(0.2);
-      opacity: 0;
-      animation: qmFloat var(--dur) cubic-bezier(0.25, 0.6, 0.3, 1) var(--delay) forwards;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      /* Greuener Chroma-Key entfernen, dann schwarze Fragezeichen auf weiss invertieren */
+      filter: url(#greenKey) invert(1);
     }
 
     .stage {
       position: absolute; inset: 0;
-      animation: fadeOutAll 0.6s ease-in 3.6s forwards;
+      animation: fadeOutAll 0.6s ease-in 9.0s forwards;
     }
   </style>
 </head>
 <body>
 
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <filter id="greenKey" color-interpolation-filters="sRGB">
+        <feColorMatrix type="matrix" values="
+          1 0 0 0 0
+          0 1 0 0 0
+          0 0 1 0 0
+          -2 3 -2 0 -0.25
+        " result="chroma"/>
+        <feComponentTransfer in="chroma" result="mask">
+          <feFuncA type="discrete" tableValues="1 0"/>
+        </feComponentTransfer>
+        <feComposite in="SourceGraphic" in2="mask" operator="in"/>
+      </filter>
+    </defs>
+  </svg>
+
   <div class="stage">
-    <div id="qmLayer"></div>
+    <video class="bg-video" data-stinger-autoplay preload="auto" playsinline
+           src="../assets/stingers/questionmarks.mp4"></video>
   </div>
-
-  <script>
-    (function () {
-      'use strict';
-      var params = new URLSearchParams(window.location.search);
-      var count = parseInt(params.get('count'), 10) || 18;
-
-      var layer = document.getElementById('qmLayer');
-
-      for (var i = 0; i < count; i++) {
-        var el = document.createElement('div');
-        el.className = 'qm';
-
-        // Grobe Verteilung über den Canvas (aber etwas Mitten-lastig)
-        var leftPct = (8 + Math.random() * 84) + '%';
-        var topPct  = (18 + Math.random() * 60) + '%';
-        var size = (70 + Math.random() * 110).toFixed(0) + 'px';
-        var dx = (Math.random() * 200 - 100).toFixed(0) + 'px';
-        var dy = (Math.random() * 80 - 40).toFixed(0) + 'px';
-        var startRot = (Math.random() * 50 - 25) + 'deg';
-        var midRot   = (Math.random() * 30 - 15) + 'deg';
-        var endRot   = (Math.random() * 80 - 40) + 'deg';
-        var dur = (2.2 + Math.random() * 1.4).toFixed(2) + 's';
-        var delay = (Math.random() * 0.9).toFixed(2) + 's';
-        var maxOp = (0.85 + Math.random() * 0.15).toFixed(2);
-
-        el.textContent = '?';
-        el.style.cssText =
-          'left:' + leftPct + ';' +
-          'top:' + topPct + ';' +
-          'font-size:' + size + ';' +
-          '--dx:' + dx + ';' +
-          '--dy:' + dy + ';' +
-          '--startRot:' + startRot + ';' +
-          '--midRot:' + midRot + ';' +
-          '--endRot:' + endRot + ';' +
-          '--dur:' + dur + ';' +
-          '--delay:' + delay + ';' +
-          '--maxOp:' + maxOp + ';';
-        layer.appendChild(el);
-      }
-    })();
-  </script>
 
 </body>
 </html>

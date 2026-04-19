@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <script src="../js/stinger-ready.js"></script>
+  <title>Explosion Stinger</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
+
+    .bg-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      /* Gruener Chroma-Key transparent, Explosion bleibt sichtbar */
+      filter: url(#greenKey);
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.5s ease-in 14.2s forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <filter id="greenKey" color-interpolation-filters="sRGB">
+        <feColorMatrix type="matrix" values="
+          1 0 0 0 0
+          0 1 0 0 0
+          0 0 1 0 0
+          -2 3 -2 0 -0.25
+        " result="chroma"/>
+        <feComponentTransfer in="chroma" result="mask">
+          <feFuncA type="discrete" tableValues="1 0"/>
+        </feComponentTransfer>
+        <feComposite in="SourceGraphic" in2="mask" operator="in"/>
+      </filter>
+    </defs>
+  </svg>
+
+  <div class="stage">
+    <video class="bg-video" data-stinger-autoplay preload="auto" playsinline
+           src="../assets/stingers/explosion.mp4"></video>
+  </div>
+
+</body>
+</html>
