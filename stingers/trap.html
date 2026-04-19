@@ -122,8 +122,8 @@
       object-fit: contain;
       object-position: center bottom;
       z-index: 1;
-      opacity: 0;
-      animation: redFadeIn 0.2s ease-out 0.1s forwards;
+      /* Kein opacity-fade mehr — manche OBS/CEF-Versionen lassen Animations-Opacity
+         auf 0 haengen, wenn die Animation vor dem ready-Release pausiert wird */
     }
 
     .stripes {
