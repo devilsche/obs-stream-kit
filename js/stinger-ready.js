@@ -50,13 +50,25 @@
     var medias = document.querySelectorAll('audio[data-stinger-autoplay], video[data-stinger-autoplay]');
     Array.prototype.forEach.call(medias, function (m) {
       var delay = parseInt(m.getAttribute('data-delay'), 10) || 0;
-      if (delay > 0) {
-        setTimeout(function () {
-          try { m.play().catch(function () {}); } catch (e) {}
-        }, delay);
-      } else {
+      var run = function () { tryPlay(m); };
+      if (delay > 0) setTimeout(run, delay); else run();
+    });
+  }
+
+  function tryPlay(m) {
+    var p;
+    try { p = m.play(); } catch (e) { console.warn('[stinger-ready] play() threw:', e); return; }
+    if (!p || typeof p.catch !== 'function') return;
+    p.catch(function (err) {
+      console.warn('[stinger-ready] autoplay blocked for', m.currentSrc || m.src, '— retrying on next click', err);
+      // Retry bei naechstem User-Klick (umgeht Chrome Autoplay-Block)
+      var retry = function () {
+        document.removeEventListener('click', retry);
+        document.removeEventListener('keydown', retry);
         try { m.play().catch(function () {}); } catch (e) {}
-      }
+      };
+      document.addEventListener('click', retry, { once: true });
+      document.addEventListener('keydown', retry, { once: true });
     });
   }
 
