@@ -294,7 +294,7 @@
             "filters": [
                 {
                     "prev_ver": 536936449,
-                    "name": "Verstärkung",
+                    "name": "Verst\u00e4rkung",
                     "uuid": "1829ab88-983d-424c-b95e-24ee3f3549cf",
                     "id": "gain_filter",
                     "versioned_id": "gain_filter",
@@ -372,67 +372,67 @@
             "settings": {
                 "playlist": [
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Culture Code - Not Giving In 🎧 (No Copyright Music)📻 Bubbly.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Culture Code - Not Giving In \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb Bubbly.mp3",
                         "uuid": "cc6f11ab-d271-42ba-96d3-52d2939836c8",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Diamond Eyes - Everything 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Diamond Eyes - Everything \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "70de1283-16d3-4424-85b6-e1d456b39d5d",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/DREKS & Jean Rodz - The Money 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/DREKS & Jean Rodz - The Money \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "bdb84645-5ee8-42d2-8331-9261a8d7e347",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Almost Evil 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Almost Evil \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "f4bdbf3f-ad68-418d-9a87-15e88448c858",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Behind - Cyberpunk 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Behind - Cyberpunk \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "53ed9658-5b6b-4cdf-a7c1-5664afbab9ff",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Just Evil 🎧 (No Copyright Music)📻 Cyberpunk Music.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction - Just Evil \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb Cyberpunk Music.mp3",
                         "uuid": "4c431ab6-108e-4d34-b30c-957991e710e2",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction- My Eyes 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction- My Eyes \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "60a3b44a-a7c0-4cf3-bfa7-2ed0577616d3",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction- Phonk Soul -Phonk 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction- Phonk Soul -Phonk \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "6f7783aa-6690-4e86-b26a-e6713114ee62",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction, Aim To Head - Falling 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Infraction, Aim To Head - Falling \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "aec1390e-ef88-4b05-b5f8-b924b979988d",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/NEFFEX - Rush 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/NEFFEX - Rush \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "7b34f11c-b52c-4056-96ca-dc881e095f9d",
                         "selected": false,
                         "hidden": false
                     },
                     {
-                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Netrum & Halvorsen - Phoenix 🎧 (No Copyright Music)📻.mp3",
+                        "value": "E:/#FRAPS/Streaming/Sounds/Music/Netrum & Halvorsen - Phoenix \ud83c\udfa7 (No Copyright Music)\ud83d\udcfb.mp3",
                         "uuid": "4f7020da-f503-4a0b-966d-023acfa797e4",
                         "selected": false,
                         "hidden": false
@@ -1295,7 +1295,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 2,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "5e8b8f10-6ab3-4a22-acf3-c098723cb0a2",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Nani (4s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 4500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Nani (4s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1330,7 +1372,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "4b08b57b-a1f6-44cf-a8a1-0b1c18452262",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Luke (4s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 4500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Luke (4s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1365,7 +1449,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "214915e5-8082-4a33-8a95-57336d752d9b",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Trap (5s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 5500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Trap (5s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1400,7 +1526,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "ef92f364-fe5f-46a0-85e0-ed47ba744f96",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Crash (2s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 2500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Crash (2s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1435,7 +1603,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "0cbda34c-b336-43f1-8f72-29522b05aa7a",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Noice (3s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 3500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Noice (3s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1470,7 +1680,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "066e81ad-5152-421d-8378-8d15a6b36927",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Smort (3s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 3500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Smort (3s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1505,7 +1757,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "c359df00-075e-42a3-b70f-e7293fd9503a",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Cool (6s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 6500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Cool (6s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1540,7 +1834,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "2e140efc-4474-4ac9-aa30-48cc93fcbbaa",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Over 9000 (4s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 4500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Over 9000 (4s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1575,7 +1911,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "c3f5c666-1a17-4536-b2e4-6f92230beb0c",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Kamehameha (8s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 8500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Kamehameha (8s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1610,7 +1988,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "bfa6b642-5d26-4dd0-a7b1-b4ced4776c01",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Super Saiyan (11s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 11500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Super Saiyan (11s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1645,7 +2065,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "4f8c94e6-2c09-41c2-8ec2-53dfe282c3ac",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Indeed (4s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 4500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Indeed (4s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1680,7 +2142,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "338ddb58-469a-4458-ae69-624d6875d1f0",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Chevron Locked (5s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 5500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Chevron Locked (5s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1715,7 +2219,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "e4e1e638-a1b6-4302-988d-4f5c45c2b025",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Crying Out Loud (4s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 4500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Crying Out Loud (4s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1750,7 +2296,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "0d60cfcc-2e1d-483c-90d0-6e11668976ab",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Khan (7s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 7500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Khan (7s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1785,7 +2373,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "b9c6746a-8197-44b8-9a05-ef45da677db4",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Make It So (5s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 5500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Make It So (5s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1820,7 +2450,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "cadfe7b5-acea-45b2-aa69-e45ab738d222",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Engage (4s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 4500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Engage (4s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1855,7 +2527,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "6625cc09-8da6-4df2-b602-4c21f0371d9b",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Resistance Futile (4s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 4500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Resistance Futile (4s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1890,7 +2604,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "02680c57-8166-4f56-9ab4-c8f5e2add277",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Kickers (9s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 9500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Kickers (9s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -1925,7 +2681,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "c3398690-3d76-480a-a7bc-9f0154c4d71b",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Heart (15s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 15500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Heart (15s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -2074,7 +2872,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "049887ab-7c7d-4732-be98-589d21264cff",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Question Marks (10s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 10500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Question Marks (10s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -2109,7 +2949,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "6c3e8c60-96ae-4f80-9699-9ab5a12a23a3",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Explosion (15s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 15500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Explosion (15s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -2144,7 +3026,49 @@
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
-            "private_settings": {}
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536936449,
+                    "name": "Move Action",
+                    "uuid": "136ab468-9bd9-4a5e-a3b2-4e21f8a64ab3",
+                    "id": "move_action_filter",
+                    "versioned_id": "move_action_filter",
+                    "settings": {
+                        "custom_duration": true,
+                        "action": 3,
+                        "canvas": "Main",
+                        "scene": "[L] Effects",
+                        "sceneitem": "Browser - Effects - Particle Swirl (6s)",
+                        "duration_type": 0,
+                        "next_move": "",
+                        "duration": 6500,
+                        "start_trigger": 3,
+                        "stop_trigger": 0,
+                        "end_action": 3,
+                        "end_canvas": "Main",
+                        "end_scene": "[L] Effects",
+                        "end_sceneitem": "Browser - Effects - Particle Swirl (6s)",
+                        "end_enable": 1
+                    },
+                    "mixers": 0,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": false,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536936449,
@@ -5190,14 +6114,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Bild - Cam Background Zeige-Übergang",
+                            "name": "Bild - Cam Background Zeige-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Bild - Cam Background Verstecke-Übergang",
+                            "name": "Bild - Cam Background Verstecke-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -5253,14 +6177,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Logitech BRIO Zeige-Übergang",
+                            "name": "Logitech BRIO Zeige-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Logitech BRIO Verstecke-Übergang",
+                            "name": "Logitech BRIO Verstecke-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -5316,14 +6240,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Browser -  Cam Overlay Zeige-Übergang",
+                            "name": "Browser -  Cam Overlay Zeige-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Browser -  Cam Overlay Verstecke-Übergang",
+                            "name": "Browser -  Cam Overlay Verstecke-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -6921,7 +7845,7 @@
                         "show_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Subgoal Zeige-Übergang",
+                            "name": "Browser - Subgoal Zeige-\u00dcbergang",
                             "transition": {
                                 "direction": "right"
                             },
@@ -6930,7 +7854,7 @@
                         "hide_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Subgoal Verstecke-Übergang",
+                            "name": "Browser - Subgoal Verstecke-\u00dcbergang",
                             "transition": {
                                 "direction": "left"
                             },
@@ -6988,7 +7912,7 @@
                         "show_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Tip Zeige-Übergang",
+                            "name": "Browser - Tip Zeige-\u00dcbergang",
                             "transition": {
                                 "direction": "right"
                             },
@@ -6997,7 +7921,7 @@
                         "hide_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Tip Verstecke-Übergang",
+                            "name": "Browser - Tip Verstecke-\u00dcbergang",
                             "transition": {
                                 "direction": "left"
                             },
@@ -7055,7 +7979,7 @@
                         "show_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Sub Zeige-Übergang",
+                            "name": "Browser - Sub Zeige-\u00dcbergang",
                             "transition": {
                                 "direction": "right"
                             },
@@ -7064,7 +7988,7 @@
                         "hide_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Sub Verstecke-Übergang",
+                            "name": "Browser - Sub Verstecke-\u00dcbergang",
                             "transition": {
                                 "direction": "left"
                             },
@@ -7122,7 +8046,7 @@
                         "show_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Follower Zeige-Übergang",
+                            "name": "Browser - Follower Zeige-\u00dcbergang",
                             "transition": {
                                 "direction": "right"
                             },
@@ -7131,7 +8055,7 @@
                         "hide_transition": {
                             "id": "slide_transition",
                             "versioned_id": "slide_transition",
-                            "name": "Browser - Follower Verstecke-Übergang",
+                            "name": "Browser - Follower Verstecke-\u00dcbergang",
                             "transition": {
                                 "direction": "left"
                             },
@@ -8114,14 +9038,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Bild - Cam Background Zeige-Übergang",
+                            "name": "Bild - Cam Background Zeige-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Bild - Cam Background Verstecke-Übergang",
+                            "name": "Bild - Cam Background Verstecke-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -8177,14 +9101,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Logitech BRIO Zeige-Übergang",
+                            "name": "Logitech BRIO Zeige-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Logitech BRIO Verstecke-Übergang",
+                            "name": "Logitech BRIO Verstecke-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -8240,14 +9164,14 @@
                         "show_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Browser -  Cam Overlay Zeige-Übergang",
+                            "name": "Browser -  Cam Overlay Zeige-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
                         "hide_transition": {
                             "id": "fade_transition",
                             "versioned_id": "fade_transition",
-                            "name": "Browser -  Cam Overlay Verstecke-Übergang",
+                            "name": "Browser -  Cam Overlay Verstecke-\u00dcbergang",
                             "transition": {},
                             "duration": 300
                         },
@@ -9099,7 +10023,7 @@
                         "group_item_backup": false,
                         "pos": {
                             "x": 97.2388916015625,
-                            "y": 6.103515625e-5
+                            "y": 6.103515625e-05
                         },
                         "pos_rel": {
                             "x": -1.5977057218551636,
@@ -9373,7 +10297,7 @@
                         "id": 14,
                         "group_item_backup": false,
                         "pos": {
-                            "x": 6.103515625e-5,
+                            "x": 6.103515625e-05,
                             "y": 0.0
                         },
                         "pos_rel": {
@@ -9680,14 +10604,14 @@
             "fade_to_black": false
         },
         {
-            "name": "Überblende",
+            "name": "\u00dcberblende",
             "duration": 300,
             "hotkeys": [],
             "id": 8,
             "fade_to_black": false
         },
         {
-            "name": "Überblende",
+            "name": "\u00dcberblende",
             "duration": 300,
             "hotkeys": [],
             "id": 9,
