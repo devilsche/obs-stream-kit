@@ -122,8 +122,7 @@
       object-fit: contain;
       object-position: center bottom;
       z-index: 1;
-      /* Kein opacity-fade mehr — manche OBS/CEF-Versionen lassen Animations-Opacity
-         auf 0 haengen, wenn die Animation vor dem ready-Release pausiert wird */
+      filter: url(#greenKey);
     }
 
     .stripes {
@@ -278,6 +277,7 @@
   <div class="stage" id="stage">
     <div class="red-bg"></div>
     <video class="bg-video" id="bgVideo" data-stinger-autoplay preload="auto" playsinline
+           crossorigin="anonymous"
            src="../assets/stingers/trap.mp4"></video>
     <div class="flash"></div>
 
