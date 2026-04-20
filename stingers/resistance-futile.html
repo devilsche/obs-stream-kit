@@ -164,13 +164,7 @@
     .line.mid   { font-size: 90px;  }
     .line.small { font-size: 62px;  }
 
-    /* L5 hat den blinkenden Cursor — darf nicht umbrechen, Font etwas kleiner
-       damit "Resistance is futile." + Cursor auf FullHD in eine Zeile passt */
-    .line.l5 {
-      white-space: nowrap;
-      font-size: 130px;
-      max-width: 90%;
-    }
+    /* L5 darf umbrechen — Break kommt manuell VOR "futile" via &#10; */
 
     .line.l1 { animation:
       lineIn  0.5s ease-out calc(var(--l1-in)  - var(--time-offset)) forwards,
@@ -329,7 +323,7 @@
     <div class="line mid l2">Lower your shields&#10;and surrender your ships.</div>
     <div class="line small l3">We will add your biological and technological&#10;distinctiveness to our own.</div>
     <div class="line mid l4">Your culture will adapt&#10;to service us.</div>
-    <div class="line big l5">Resistance is futile.<span class="cursor"></span></div>
+    <div class="line big l5">Resistance is&#10;futile.<span class="cursor"></span></div>
   </div>
 
   <audio id="audio" data-stinger-autoplay preload="auto" src="../assets/stingers/borg.mp3"></audio>
