@@ -76,6 +76,8 @@
       white-space: nowrap;
       flex-shrink: 0;
     }
+    .widget-count .current { color: #f2b705; }
+    .widget-count .sep     { color: rgba(255, 255, 255, 0.5); margin: 0 3px; }
 
     .progress-track {
       height: 6px;
@@ -99,7 +101,9 @@
   <div class="widget-box">
     <div class="widget-header">
       <div class="widget-label" id="title">Tip Goal</div>
-      <div class="widget-count" id="count"></div>
+      <div class="widget-count">
+        <span class="current" id="current">0</span><span class="sep">/</span><span class="goal" id="goal">100</span>&nbsp;<span id="currency">€</span>
+      </div>
     </div>
     <div class="progress-track">
       <div class="progress-fill" id="fill"></div>
@@ -123,7 +127,9 @@
 
       var percentage = Math.min(100, Math.round((current / goal) * 100));
       document.getElementById('title').textContent = title;
-      document.getElementById('count').textContent = fmt(current) + ' / ' + fmt(goal) + ' ' + currency;
+      document.getElementById('current').textContent = fmt(current);
+      document.getElementById('goal').textContent    = fmt(goal);
+      document.getElementById('currency').textContent = currency;
       document.getElementById('fill').style.width = percentage + '%';
     })();
   </script>
