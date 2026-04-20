@@ -70,6 +70,21 @@
       color: #ffffff;
       white-space: nowrap;
     }
+
+    .widget-amount {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      margin-left: 10px;
+      vertical-align: middle;
+      background: linear-gradient(135deg, rgba(242, 183, 5, 0.35), rgba(255, 160, 20, 0.25));
+      border: 1px solid #f2b705;
+      color: #f2b705;
+      text-shadow: 0 0 8px rgba(242, 183, 5, 0.5);
+    }
   </style>
 </head>
 <body>
@@ -77,16 +92,22 @@
   <div class="widget-box">
     <div class="widget-content">
       <div class="widget-label">Latest Tip</div>
-      <div class="widget-name"></div>
+      <div class="widget-name"><span id="tipName"></span><span class="widget-amount" id="amountBadge"></span></div>
     </div>
   </div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
     const name = params.get('name') || 'ChillVibes';
-    const amount = params.get('amount');
+    const amount = params.get('amount') || '5,00 €';
 
-    document.querySelector('.widget-name').textContent = amount ? `${name} — ${amount}` : name;
+    document.getElementById('tipName').textContent = name;
+    var badge = document.getElementById('amountBadge');
+    if (amount && amount.trim()) {
+      badge.textContent = amount;
+    } else {
+      badge.style.display = 'none';
+    }
   </script>
 
   <div id="sparkle-wrap" style="position:absolute;top:0;left:0;width:500px;height:100px;overflow:visible;pointer-events:none;"></div>
