@@ -44,15 +44,34 @@
   function startAnimations() {
     if (started) return;
     started = true;
-    html.classList.remove('stinger-loading');
 
-    // Autoplay-Audios und -Videos abspielen (mit optionalem Delay)
+    // Autoplay-Audios und -Videos anspielen. Animationen starten erst wenn
+    // play() wirklich Playback begonnen hat (Promise resolved), damit Audio
+    // und Animation synchron starten — auch auf Rechnern mit 100-200ms
+    // Audio-Start-Latenz.
     var medias = document.querySelectorAll('audio[data-stinger-autoplay], video[data-stinger-autoplay]');
+    var immediatePromises = [];
     Array.prototype.forEach.call(medias, function (m) {
       var delay = parseInt(m.getAttribute('data-delay'), 10) || 0;
-      var run = function () { tryPlay(m); };
-      if (delay > 0) setTimeout(run, delay); else run();
+      if (delay > 0) {
+        // Delayed → nicht auf Start warten
+        setTimeout(function () { tryPlay(m); }, delay);
+      } else {
+        try {
+          var p = m.play();
+          if (p && typeof p.then === 'function') immediatePromises.push(p.catch(function () {}));
+        } catch (e) {}
+      }
     });
+
+    var release = function () { html.classList.remove('stinger-loading'); };
+    if (immediatePromises.length === 0) {
+      release();
+    } else {
+      Promise.all(immediatePromises).then(release);
+      // Safety: nach 300ms trotzdem starten falls play() nie resolved
+      setTimeout(release, 300);
+    }
   }
 
   function tryPlay(m) {
