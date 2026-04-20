@@ -224,6 +224,46 @@
         2px 2px 0 rgba(0, 0, 0, 0.5);
       letter-spacing: 2px;
     }
+
+    /* ── Size-Varianten je nach Gift-Sub-Menge ── */
+    /* Medium (5-14 Gifts): Event-Type + Username groesser */
+    body[data-size="medium"] .event-type {
+      font-size: 24px;
+      letter-spacing: 10px;
+    }
+    body[data-size="medium"] .username { font-size: 68px; }
+    body[data-size="medium"] .amount   { font-size: 30px; }
+
+    /* Large / Sub-Bomb (15+ Gifts): alles groesser + goldener Touch */
+    body[data-size="large"] .event-type {
+      font-size: 32px;
+      letter-spacing: 14px;
+      color: var(--color-gold);
+      text-shadow:
+        0 0 16px rgba(255, 200, 60, 1),
+        0 0 36px rgba(242, 183, 5, 0.9),
+        3px 3px 0 rgba(0, 0, 0, 0.7);
+    }
+    body[data-size="large"] .username {
+      font-size: 84px;
+      text-shadow:
+        0 0 24px rgba(255, 255, 255, 0.8),
+        0 0 60px rgba(242, 183, 5, 0.7),
+        0 0 100px rgba(155, 85, 192, 0.7);
+    }
+    body[data-size="large"] .amount {
+      font-size: 38px;
+      font-weight: 900;
+      color: var(--color-gold);
+      text-shadow:
+        0 0 14px rgba(255, 200, 60, 1),
+        0 0 32px rgba(242, 183, 5, 0.85),
+        3px 3px 0 rgba(0, 0, 0, 0.7);
+    }
+    body[data-size="large"] .divider {
+      background: linear-gradient(90deg, transparent, var(--color-gold), transparent);
+      width: 220px;
+    }
   </style>
 </head>
 <body>
@@ -258,8 +298,31 @@
     const amount   = params.get('amount')   || '1';
     const tier     = params.get('tier')     || '1';
 
+    const amountNum = Math.max(1, parseInt(amount, 10) || 1);
+
+    // Size-Klassifizierung: small (1-4), medium (5-14), large (15+ = Sub-Bomb)
+    var size = 'small';
+    if (amountNum >= 15) size = 'large';
+    else if (amountNum >= 5) size = 'medium';
+    document.body.dataset.size = size;
+
+    // Event-Type-Text je nach Groesse
+    var eventTypeEl = document.querySelector('.event-type');
+    if (size === 'large') {
+      eventTypeEl.textContent = amountNum + 'x SUB BOMB!';
+    } else if (size === 'medium') {
+      eventTypeEl.textContent = amountNum + 'x Gift Subs';
+    } else {
+      eventTypeEl.textContent = amountNum === 1 ? 'Gift Sub' : 'Gift Subs';
+    }
+
+    // Amount-Text
+    var amountText = amountNum === 1
+      ? 'ein Gift Sub'
+      : amountNum + ' Gift Subs!';
+    if (size === 'large') amountText = amountNum + ' Subs verschenkt! 🎉';
     document.getElementById('username').textContent = username;
-    document.getElementById('amount').textContent   = amount + ' Gift Subs!';
+    document.getElementById('amount').textContent   = amountText;
 
     // Tier normalisieren: "1000"→"1", " 3"→"3", "Tier 2"→"2", "Prime"→"prime"
     var rawTier = tier.trim().toLowerCase().replace('tier', '').trim();
@@ -275,7 +338,8 @@
 
     /* ─── Particles ──────────────────────────────────────────────── */
     const container = document.getElementById('particles');
-    const COUNT = 25;
+    // Partikel-Menge skaliert mit Gift-Sub-Menge
+    const COUNT = size === 'large' ? 70 : size === 'medium' ? 45 : 25;
 
     // ~70% purple, ~30% gold for giftsub (purple theme — inverted ratio)
     const colors = [
