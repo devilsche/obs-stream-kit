@@ -57,10 +57,8 @@
         // Delayed → nicht auf Start warten
         setTimeout(function () { tryPlay(m); }, delay);
       } else {
-        try {
-          var p = m.play();
-          if (p && typeof p.then === 'function') immediatePromises.push(p.catch(function () {}));
-        } catch (e) {}
+        var p = tryPlay(m);
+        if (p && typeof p.then === 'function') immediatePromises.push(p.catch(function () {}));
       }
     });
 
@@ -76,11 +74,10 @@
 
   function tryPlay(m) {
     var p;
-    try { p = m.play(); } catch (e) { console.warn('[stinger-ready] play() threw:', e); return; }
-    if (!p || typeof p.catch !== 'function') return;
+    try { p = m.play(); } catch (e) { console.warn('[stinger-ready] play() threw:', e); return null; }
+    if (!p || typeof p.catch !== 'function') return p || null;
     p.catch(function (err) {
       console.warn('[stinger-ready] autoplay blocked for', m.currentSrc || m.src, '— retrying on next click', err);
-      // Retry bei naechstem User-Klick (umgeht Chrome Autoplay-Block)
       var retry = function () {
         document.removeEventListener('click', retry);
         document.removeEventListener('keydown', retry);
@@ -89,6 +86,7 @@
       document.addEventListener('click', retry, { once: true });
       document.addEventListener('keydown', retry, { once: true });
     });
+    return p;
   }
 
   var ready = { fonts: false, media: false };
