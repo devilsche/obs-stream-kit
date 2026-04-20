@@ -413,6 +413,25 @@
       }
       applyToRoot();
 
+      // Audio-Fade am Ende — ab title-out linear runterfadet ueber 0.8s
+      var audioEl = document.getElementById('audio');
+      var FADE_DUR = 0.8;
+      function audioFadeTick() {
+        if (audioEl) {
+          var t = audioEl.currentTime;
+          var fadeStart = getValue('title-out');
+          if (t < fadeStart) {
+            if (audioEl.volume !== 1) audioEl.volume = 1;
+          } else {
+            var p = Math.min(1, (t - fadeStart) / FADE_DUR);
+            audioEl.volume = Math.max(0, 1 - p);
+            if (p >= 1 && !audioEl.paused) audioEl.pause();
+          }
+        }
+        requestAnimationFrame(audioFadeTick);
+      }
+      requestAnimationFrame(audioFadeTick);
+
       var swarm = document.getElementById('swarm');
       var COUNT = 50;
       var DIRS = 12;
@@ -526,7 +545,7 @@
       document.getElementById('copyBtn').addEventListener('click', copyValues);
 
       var html = document.documentElement;
-      var audio = document.getElementById('audio');
+      var audio = audioEl;
       var pauseBtn = document.getElementById('pauseBtn');
       var replayBtn = document.getElementById('replayBtn');
       var segmentBtn = document.getElementById('segmentBtn');
