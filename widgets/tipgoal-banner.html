@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=1200, height=220" />
+  <meta name="viewport" content="width=520, height=120" />
   <title>Tip Goal Banner</title>
   <style>
     @font-face {
@@ -16,16 +16,16 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     html, body {
-      width: 1200px;
-      height: 220px;
+      width: 520px;
+      height: 120px;
       overflow: hidden;
       background: transparent;
       font-family: 'DM Sans', sans-serif;
     }
 
     @keyframes bannerGlow {
-      0%, 100% { box-shadow: 0 0 20px rgba(242,183,5,0.35), 0 0 50px rgba(242,183,5,0.2), 0 0 0 1px rgba(242,183,5,0.3) inset; }
-      50%      { box-shadow: 0 0 35px rgba(242,183,5,0.7),  0 0 90px rgba(242,183,5,0.4), 0 0 0 1px rgba(242,183,5,0.5) inset; }
+      0%, 100% { box-shadow: 0 0 14px rgba(242,183,5,0.35), 0 0 32px rgba(242,183,5,0.2), 0 0 0 1px rgba(242,183,5,0.3) inset; }
+      50%      { box-shadow: 0 0 22px rgba(242,183,5,0.7),  0 0 55px rgba(242,183,5,0.4), 0 0 0 1px rgba(242,183,5,0.5) inset; }
     }
 
     @keyframes fillGradient {
@@ -42,15 +42,16 @@
       position: absolute;
       top: 50%;
       left: 20px;
-      right: 20px;
+      width: 480px;
+      height: 80px;
       transform: translateY(-50%);
       background: linear-gradient(135deg, rgba(26, 13, 46, 0.95) 0%, rgba(13, 13, 26, 0.97) 100%);
-      border: 2px solid rgba(242, 183, 5, 0.5);
-      border-radius: 14px;
-      padding: 24px 36px;
+      border: 1.5px solid rgba(242, 183, 5, 0.5);
+      border-radius: 10px;
+      padding: 10px 16px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 6px;
       animation: bannerGlow 3.5s ease-in-out infinite;
       overflow: hidden;
     }
@@ -59,46 +60,45 @@
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      gap: 24px;
+      gap: 12px;
     }
 
     .title {
-      font-size: 32px;
+      font-size: 14px;
       font-weight: 900;
       color: #f2b705;
-      letter-spacing: 4px;
+      letter-spacing: 2px;
       text-transform: uppercase;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
       flex: 1;
       text-shadow:
-        0 0 14px rgba(242, 183, 5, 0.7),
-        0 0 32px rgba(242, 183, 5, 0.4),
-        3px 3px 0 rgba(0, 0, 0, 0.6);
+        0 0 10px rgba(242, 183, 5, 0.7),
+        2px 2px 0 rgba(0, 0, 0, 0.6);
     }
 
     .count {
-      font-size: 38px;
+      font-size: 16px;
       font-weight: 900;
       color: #ffffff;
       white-space: nowrap;
       flex-shrink: 0;
       text-shadow:
-        0 0 16px rgba(255, 220, 100, 0.8),
-        2px 2px 0 rgba(0, 0, 0, 0.6);
+        0 0 10px rgba(255, 220, 100, 0.8),
+        1px 1px 0 rgba(0, 0, 0, 0.6);
     }
 
     .count .current { color: #f2b705; }
-    .count .sep     { color: rgba(255, 255, 255, 0.5); margin: 0 6px; font-size: 30px; }
+    .count .sep     { color: rgba(255, 255, 255, 0.5); margin: 0 4px; font-size: 14px; }
     .count .goal    { color: #ffffff; }
 
     .progress-track {
       position: relative;
-      height: 24px;
-      background: rgba(94, 42, 121, 0.3);
+      height: 14px;
+      background: rgba(94, 42, 121, 0.35);
       border: 1px solid rgba(242, 183, 5, 0.25);
-      border-radius: 12px;
+      border-radius: 7px;
       overflow: hidden;
     }
 
@@ -107,10 +107,10 @@
       width: 0%;
       background: linear-gradient(90deg, #5e2a79 0%, #9b55c0 30%, #f2b705 70%, #ffe074 100%);
       background-size: 200% 100%;
-      border-radius: 12px;
+      border-radius: 7px;
       box-shadow:
-        0 0 14px rgba(242, 183, 5, 0.7),
-        inset 0 0 8px rgba(255, 255, 255, 0.2);
+        0 0 10px rgba(242, 183, 5, 0.7),
+        inset 0 0 6px rgba(255, 255, 255, 0.2);
       transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1) 400ms;
       animation: fillGradient 4s linear infinite;
       position: relative;
@@ -133,10 +133,10 @@
       position: absolute;
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      font-size: 14px;
+      font-size: 10px;
       font-weight: 900;
       color: #ffffff;
-      letter-spacing: 2px;
+      letter-spacing: 1px;
       text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
       z-index: 2;
     }
@@ -146,7 +146,7 @@
 
   <div class="banner">
     <div class="banner-header">
-      <div class="title" id="title">Neue Gaming-Maus</div>
+      <div class="title" id="title">Tip Goal</div>
       <div class="count">
         <span class="current" id="current">0</span>
         <span class="sep">/</span>
@@ -160,7 +160,7 @@
     </div>
   </div>
 
-  <div id="sparkle-wrap" style="position:absolute;top:0;left:0;width:1200px;height:220px;overflow:visible;pointer-events:none;"></div>
+  <div id="sparkle-wrap" style="position:absolute;top:0;left:0;width:520px;height:120px;overflow:visible;pointer-events:none;"></div>
   <script src="../js/sparkles.js"></script>
   <script>
     (function () {
@@ -186,11 +186,11 @@
       document.getElementById('percent').textContent = percentage + '%';
 
       new SparkleEngine(document.getElementById('sparkle-wrap'), {
-        count: 8,
-        speed: 0.25,
-        maxOpacity: 0.8,
-        colors: { gold: 0.6, purple: 0.3, white: 0.1 },
-        sizeWeights: { big: 0.1, normal: 0.3, small: 0.4, tiny: 0.2 }
+        count: 4,
+        speed: 0.2,
+        maxOpacity: 0.75,
+        colors: { gold: 0.7, purple: 0.2, white: 0.1 },
+        sizeWeights: { big: 0, normal: 0.2, small: 0.5, tiny: 0.3 }
       }).start();
     })();
   </script>

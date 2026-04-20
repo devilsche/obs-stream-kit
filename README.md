@@ -195,7 +195,7 @@ Kompakte Browser-Sources, die frei in OBS positioniert werden können. Die Widge
 | tipgoal | `current` | `0` | Aktueller Betrag (Komma oder Punkt als Dezimaltrenner) |
 | tipgoal | `goal` | `100` | Ziel-Betrag |
 | tipgoal | `currency` | `€` | Währungssymbol |
-| tipgoal-banner | `title` / `current` / `goal` / `currency` | wie oben | Wie tipgoal, nur als 1200×220 Banner |
+| tipgoal-banner | `title` / `current` / `goal` / `currency` | wie oben | Wie tipgoal, aber 520×120 mit Shine-Animation |
 
 ---
 
