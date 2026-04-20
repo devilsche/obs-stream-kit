@@ -204,13 +204,15 @@ Alerts sind **1920×1080 Fullscreen-Overlays** mit einmaliger Animation.
 | `alerts/sub.html` | Center-Stage (Purple) | 1920×1080 | `?username=X&message=Y` |
 | `alerts/resub.html` | Center-Stage (Purple) | 1920×1080 | `?username=X&months=N&message=Y` |
 | `alerts/bits.html` | Center-Stage (Gold) | 1920×1080 | `?username=X&amount=N&message=Y` |
-| `alerts/giftsub.html` | Fullscreen-Flash (Purple, skaliert nach Menge) | 1920×1080 | `?username=X&amount=N&tier=1\|2\|3\|prime` |
+| `alerts/giftsub.html` | Fullscreen-Flash (Purple, skaliert nach Menge) | 1920×1080 | `?username=X&amount=N&tier=1\|2\|3\|prime&total=N` |
 | `alerts/raid.html` | Fullscreen-Flash (Gold) | 1920×1080 | `?username=X&viewers=N` |
 
 > **GiftSub-Skalierung:** je nach `amount` wird der Alert unterschiedlich gross:
 > - **1–4 Gifts** → Standard-Alert (weisser Text, 25 Partikel)
-> - **5–14 Gifts** → groesserer Text ("5× Gift Subs"), 45 Partikel
+> - **5–14 Gifts** → groesserer Text ("Multi Gift!"), 45 Partikel
 > - **15+ Gifts** → **SUB BOMB!** — XL-Text, Gold-Akzent, 70 Partikel, breiter Divider
+>
+> **`total`**: optionaler Parameter für kumulative Gesamt-Gifts des Users. Wenn gesetzt (> 0), wird unten „Insgesamt X Subs verschenkt" angezeigt. In Streamer.bot ggf. als `%totalSubsGifted%` oder ähnliche Variable verfügbar.
 
 ### Alerts mit Streamer.bot einrichten
 
@@ -259,7 +261,7 @@ alerts/follow.html?username=CoolViewer42
 alerts/sub.html?username=SubHero99&message=Hype!
 alerts/resub.html?username=OldFan&months=12&message=Ein%20Jahr!
 alerts/bits.html?username=CheerKing&amount=500&message=Take%20my%20bits
-alerts/giftsub.html?username=GiftGod&amount=5&tier=2
+alerts/giftsub.html?username=GiftGod&amount=5&tier=2&total=42
 alerts/raid.html?username=BigStreamer&viewers=150
 ```
 
