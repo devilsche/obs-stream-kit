@@ -191,11 +191,11 @@ Kompakte Browser-Sources, die frei in OBS positioniert werden können. Die Widge
 | latest-tip | `amount` | `5,00 €` | Betrag |
 | subgoal | `current` | `23` | Aktuelle Subs |
 | subgoal | `goal` | `50` | Ziel-Subs |
-| donationgoal | `title` | `Donation Goal` | Angezeigter Titel (z.B. „Neuer Gaming-Stuhl") |
-| donationgoal | `current` | `0` | Aktueller Betrag (Komma oder Punkt als Dezimaltrenner) |
-| donationgoal | `goal` | `100` | Ziel-Betrag |
-| donationgoal | `currency` | `€` | Währungssymbol |
-| donationgoal-banner | `title` / `current` / `goal` / `currency` | wie oben | Wie donationgoal, nur als 1200×220 Banner |
+| tipgoal | `title` | `Tip Goal` | Angezeigter Titel (z.B. „Neuer Gaming-Stuhl") |
+| tipgoal | `current` | `0` | Aktueller Betrag (Komma oder Punkt als Dezimaltrenner) |
+| tipgoal | `goal` | `100` | Ziel-Betrag |
+| tipgoal | `currency` | `€` | Währungssymbol |
+| tipgoal-banner | `title` / `current` / `goal` / `currency` | wie oben | Wie tipgoal, nur als 1200×220 Banner |
 
 ---
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1200, height=220" />
-  <title>Donation Goal Banner</title>
+  <title>Tip Goal Banner</title>
   <style>
     @font-face {
       font-family: 'DM Sans';
@@ -165,7 +165,7 @@
   <script>
     (function () {
       var params = new URLSearchParams(window.location.search);
-      var title = params.get('title') || 'Donation Goal';
+      var title = params.get('title') || 'Tip Goal';
       var current = parseFloat((params.get('current') || '0').replace(',', '.')) || 0;
       var goal    = parseFloat((params.get('goal')    || '100').replace(',', '.')) || 100;
       var currency = params.get('currency') || '€';

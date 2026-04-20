@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=500, height=120" />
-  <title>Donation Goal</title>
+  <title>Tip Goal</title>
   <style>
     @font-face {
       font-family: 'DM Sans';
@@ -98,7 +98,7 @@
 
   <div class="widget-box">
     <div class="widget-header">
-      <div class="widget-label" id="title">Donation Goal</div>
+      <div class="widget-label" id="title">Tip Goal</div>
       <div class="widget-count" id="count"></div>
     </div>
     <div class="progress-track">
@@ -109,7 +109,7 @@
   <script>
     (function () {
       var params = new URLSearchParams(window.location.search);
-      var title = params.get('title') || 'Donation Goal';
+      var title = params.get('title') || 'Tip Goal';
       var current = parseFloat((params.get('current') || '0').replace(',', '.')) || 0;
       var goal    = parseFloat((params.get('goal')    || '100').replace(',', '.')) || 100;
       var currency = params.get('currency') || '€';
