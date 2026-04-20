@@ -28,6 +28,7 @@
       --ohno-in:   1.0s;
       --ohno-out:  1.6s;
       --trap-in:   1.8s;
+      --trap-out:  3.6s;
       --stage-out: 4.1s;
       --time-offset: 0s;
     }
@@ -195,7 +196,9 @@
          0 0 40px rgba(242, 183, 5, 0.9),
          0 0 80px rgba(200, 20, 20, 0.8);
       opacity: 0;
-      animation: textSlam 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) calc(var(--trap-in) - var(--time-offset)) forwards;
+      animation:
+        textSlam    0.5s cubic-bezier(0.34, 1.56, 0.64, 1) calc(var(--trap-in)  - var(--time-offset)) forwards,
+        textFadeOut 0.35s ease-in                          calc(var(--trap-out) - var(--time-offset)) forwards;
     }
 
     .stage {
@@ -332,15 +335,17 @@
         'ohno-in':   1.0,
         'ohno-out':  1.6,
         'trap-in':   1.8,
+        'trap-out':  3.6,
         'stage-out': 4.1
       };
       var LABELS = {
         'ohno-in':   '"Oh no!" IN',
         'ohno-out':  '"Oh no!" OUT',
         'trap-in':   '"It\'s a Trap!" IN',
+        'trap-out':  '"It\'s a Trap!" OUT',
         'stage-out': 'Stage Fade-Out'
       };
-      var KEYS = ['ohno-in','ohno-out','trap-in','stage-out'];
+      var KEYS = ['ohno-in','ohno-out','trap-in','trap-out','stage-out'];
       var STORAGE_KEY = 'trap-tune-values';
 
       var params = new URLSearchParams(window.location.search);
@@ -404,7 +409,7 @@
       }
 
       addPairRow('Oh no!',          'ohno-in',  'ohno-out');
-      addPairRow('It\'s a Trap!',   'trap-in',  null);
+      addPairRow('It\'s a Trap!',   'trap-in',  'trap-out');
       addPairRow('Stage Fade-Out',  null,       'stage-out');
 
       document.getElementById('tunePanel').classList.add('visible');
@@ -434,7 +439,7 @@
         var lines = [
           'Trap Tune Values:',
           'Oh no!          : IN ' + v['ohno-in'].toFixed(2)  + 's  OUT ' + v['ohno-out'].toFixed(2) + 's',
-          "It's a Trap!    : IN " + v['trap-in'].toFixed(2)  + 's',
+          "It's a Trap!    : IN " + v['trap-in'].toFixed(2)  + 's  OUT ' + v['trap-out'].toFixed(2) + 's',
           'Stage Fade-Out  : ' + v['stage-out'].toFixed(2)  + 's'
         ];
         var text = lines.join('\n');
