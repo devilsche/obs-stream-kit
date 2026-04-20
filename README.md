@@ -189,6 +189,7 @@ Kompakte Browser-Sources, die frei in OBS positioniert werden können. Die Widge
 | latest-sub | `name` | `SubHero99` | Angezeigter Name |
 | latest-tip | `name` | `GenPlayer` | Angezeigter Name |
 | latest-tip | `amount` | `5,00 €` | Betrag |
+| subgoal | `title` | `Sub Goal` | Angezeigter Titel (z.B. „Next Stream-Goal") |
 | subgoal | `current` | `23` | Aktuelle Subs |
 | subgoal | `goal` | `50` | Ziel-Subs |
 | tipgoal | `title` | `Tip Goal` | Angezeigter Titel (z.B. „Neuer Gaming-Stuhl") |

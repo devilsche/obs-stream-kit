@@ -63,6 +63,9 @@
       letter-spacing: 2px;
       text-transform: uppercase;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
     }
 
     .widget-count {
@@ -70,7 +73,10 @@
       font-weight: 700;
       color: #ffffff;
       white-space: nowrap;
+      flex-shrink: 0;
     }
+    .widget-count .current { color: #c9a0dc; }
+    .widget-count .sep     { color: rgba(255, 255, 255, 0.5); margin: 0 3px; }
 
     .progress-track {
       height: 6px;
@@ -93,22 +99,27 @@
 
   <div class="widget-box">
     <div class="widget-header">
-      <div class="widget-label">Sub Goal</div>
-      <div class="widget-count"></div>
+      <div class="widget-label" id="title">Sub Goal</div>
+      <div class="widget-count">
+        <span class="current" id="current">0</span><span class="sep">/</span><span class="goal" id="goal">50</span>
+      </div>
     </div>
     <div class="progress-track">
-      <div class="progress-fill"></div>
+      <div class="progress-fill" id="fill"></div>
     </div>
   </div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
+    const title = params.get('title') || 'Sub Goal';
     const current = parseInt(params.get('current') || '23', 10);
     const goal = parseInt(params.get('goal') || '50', 10);
     const percentage = Math.min(100, Math.round((current / goal) * 100));
 
-    document.querySelector('.widget-count').textContent = `${current} / ${goal}`;
-    document.querySelector('.progress-fill').style.width = `${percentage}%`;
+    document.getElementById('title').textContent = title;
+    document.getElementById('current').textContent = current;
+    document.getElementById('goal').textContent = goal;
+    document.getElementById('fill').style.width = percentage + '%';
   </script>
 
   <div id="sparkle-wrap" style="position:absolute;top:0;left:0;width:500px;height:120px;overflow:visible;pointer-events:none;"></div>
