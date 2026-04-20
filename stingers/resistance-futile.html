@@ -164,8 +164,13 @@
     .line.mid   { font-size: 90px;  }
     .line.small { font-size: 62px;  }
 
-    /* L5 hat den blinkenden Cursor — darf nicht umbrechen */
-    .line.l5 { white-space: nowrap; max-width: none; }
+    /* L5 hat den blinkenden Cursor — darf nicht umbrechen, Font etwas kleiner
+       damit "Resistance is futile." + Cursor auf FullHD in eine Zeile passt */
+    .line.l5 {
+      white-space: nowrap;
+      font-size: 130px;
+      max-width: 90%;
+    }
 
     .line.l1 { animation:
       lineIn  0.5s ease-out calc(var(--l1-in)  - var(--time-offset)) forwards,
