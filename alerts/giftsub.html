@@ -306,21 +306,25 @@
     else if (amountNum >= 5) size = 'medium';
     document.body.dataset.size = size;
 
-    // Event-Type-Text je nach Groesse
+    // Event-Type-Text (nur Label, keine Zahl doppelt)
     var eventTypeEl = document.querySelector('.event-type');
     if (size === 'large') {
-      eventTypeEl.textContent = amountNum + 'x SUB BOMB!';
+      eventTypeEl.textContent = 'SUB BOMB!';
     } else if (size === 'medium') {
-      eventTypeEl.textContent = amountNum + 'x Gift Subs';
+      eventTypeEl.textContent = 'Multi Gift!';
     } else {
       eventTypeEl.textContent = amountNum === 1 ? 'Gift Sub' : 'Gift Subs';
     }
 
-    // Amount-Text
-    var amountText = amountNum === 1
-      ? 'ein Gift Sub'
-      : amountNum + ' Gift Subs!';
-    if (size === 'large') amountText = amountNum + ' Subs verschenkt! 🎉';
+    // Amount-Text (hier steht die Zahl)
+    var amountText;
+    if (amountNum === 1) {
+      amountText = 'verschenkt einen Sub!';
+    } else if (size === 'large') {
+      amountText = amountNum + ' Subs verschenkt! 🎉';
+    } else {
+      amountText = amountNum + ' Subs verschenkt!';
+    }
     document.getElementById('username').textContent = username;
     document.getElementById('amount').textContent   = amountText;
 
