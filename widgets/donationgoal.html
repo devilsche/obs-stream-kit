@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=500, height=120" />
+  <title>Donation Goal</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: block;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 500px;
+      height: 120px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    @keyframes widgetGlow {
+      0%, 100% { box-shadow: 0 0 8px rgba(242,183,5,0.2), 0 0 20px rgba(242,183,5,0.1); }
+      50%      { box-shadow: 0 0 15px rgba(242,183,5,0.5), 0 0 35px rgba(242,183,5,0.2); }
+    }
+
+    .widget-box {
+      position: absolute;
+      top: 50%;
+      left: 10px;
+      right: 10px;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: rgba(13, 13, 26, 0.95);
+      border: 1px solid rgba(242, 183, 5, 0.3);
+      border-left: 3px solid #f2b705;
+      border-radius: 0 8px 8px 0;
+      padding: 12px 24px;
+      box-shadow: 0 0 20px rgba(242, 183, 5, 0.15);
+      animation: widgetGlow 3s ease-in-out infinite;
+    }
+
+    .widget-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .widget-label {
+      font-size: 10px;
+      color: #f2b705;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    .widget-count {
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffffff;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .progress-track {
+      height: 6px;
+      background: rgba(242, 183, 5, 0.2);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #5e2a79, #f2b705);
+      border-radius: 3px;
+      box-shadow: 0 0 8px rgba(242, 183, 5, 0.5);
+      transition: width 1s ease 400ms;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="widget-box">
+    <div class="widget-header">
+      <div class="widget-label" id="title">Donation Goal</div>
+      <div class="widget-count" id="count"></div>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="fill"></div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var title = params.get('title') || 'Donation Goal';
+      var current = parseFloat((params.get('current') || '0').replace(',', '.')) || 0;
+      var goal    = parseFloat((params.get('goal')    || '100').replace(',', '.')) || 100;
+      var currency = params.get('currency') || '€';
+
+      function fmt(n) {
+        return n.toLocaleString('de-DE', {
+          minimumFractionDigits: (n % 1 === 0) ? 0 : 2,
+          maximumFractionDigits: 2
+        });
+      }
+
+      var percentage = Math.min(100, Math.round((current / goal) * 100));
+      document.getElementById('title').textContent = title;
+      document.getElementById('count').textContent = fmt(current) + ' / ' + fmt(goal) + ' ' + currency;
+      document.getElementById('fill').style.width = percentage + '%';
+    })();
+  </script>
+
+  <div id="sparkle-wrap" style="position:absolute;top:0;left:0;width:500px;height:120px;overflow:visible;pointer-events:none;"></div>
+  <script src="../js/sparkles.js"></script>
+  <script>
+    new SparkleEngine(document.getElementById('sparkle-wrap'), {
+      count: 3,
+      speed: 0.15,
+      maxOpacity: 0.75,
+      sizeWeights: { big: 0, normal: 0.1, small: 0.5, tiny: 0.4 },
+      fixedColor: 'gold'
+    }).start();
+  </script>
+
+</body>
+</html>
