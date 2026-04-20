@@ -289,7 +289,7 @@ Fullscreen-Overlays zum manuellen Auslösen (z.B. per Streamer.bot Hotkey oder C
 | `stingers/luke.html` | Hund im Bild / Shoutout | ~3.5s | 1920×1080 |
 | `stingers/smort.html` | B99-Deadpan-Approval (Holt-Style) | ~2s | 1920×1080 |
 | `stingers/cool.html` | B99 nervöse Zustimmung (Jake-Style) | ~3s | 1920×1080 |
-| `stingers/over-9000.html` | DBZ-Reaktion (Vegeta-Scouter, mit MP3) | ~3.5s | 1920×1080 |
+| `stingers/over-9000.html` | DBZ-Reaktion (Vegeta-Scouter, mit MP3) — `?level=X` setzt POWER LVL | ~3.5s | 1920×1080 |
 | `stingers/kamehameha.html` | DBZ-Energy-Blast (Kame-Hame-HA) | ~4s | 1920×1080 |
 | `stingers/super-saiyan.html` | DBZ-Transformation (Goku-Aura-Schrei) | ~3.5s | 1920×1080 |
 | `stingers/indeed.html` | Stargate-Deadpan (Teal'c-Twin zu Noice/Smort) | ~3.3s | 1920×1080 |
