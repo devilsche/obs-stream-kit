@@ -36,16 +36,18 @@
       position: absolute;
       top: 50%;
       left: 10px;
-      right: 10px;
       transform: translateY(-50%);
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 16px;
       background: rgba(13, 13, 26, 0.95);
       border: 1px solid rgba(94, 42, 121, 0.3);
       border-left: 3px solid #5e2a79;
       border-radius: 0 8px 8px 0;
       padding: 12px 24px;
+      min-width: 250px;
+      max-width: 400px;
       box-shadow: 0 0 20px rgba(94, 42, 121, 0.15);
       animation: widgetGlow 3s ease-in-out infinite;
     }
@@ -73,13 +75,12 @@
 
     .widget-tier {
       display: inline-block;
-      font-size: 10px;
-      font-weight: 700;
+      font-size: 12px;
+      font-weight: 800;
       letter-spacing: 1px;
-      padding: 2px 8px;
-      border-radius: 10px;
-      margin-left: 8px;
-      vertical-align: middle;
+      padding: 4px 12px;
+      border-radius: 12px;
+      flex-shrink: 0;
     }
 
     .widget-tier--1 {
@@ -104,8 +105,9 @@
   <div class="widget-box">
     <div class="widget-content">
       <div class="widget-label">Latest Sub</div>
-      <div class="widget-name"><span id="subName"></span><span class="widget-tier" id="tierBadge"></span></div>
+      <div class="widget-name" id="subName"></div>
     </div>
+    <span class="widget-tier" id="tierBadge"></span>
   </div>
 
   <script>
