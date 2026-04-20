@@ -104,26 +104,24 @@
     @keyframes flyDir11 { 0%{transform:translate(-1100px, 1600px) scale(2.5) rotate(0);opacity:0;} 4%{opacity:1;} 92%{opacity:1;} 100%{transform:translate(30px,-20px) scale(0.08) rotate(420deg);opacity:0;} }
     @keyframes flyDir12 { 0%{transform:translate( 1100px, 1600px) scale(2.5) rotate(0);opacity:0;} 4%{opacity:1;} 92%{opacity:1;} 100%{transform:translate(-10px,20px) scale(0.08) rotate(-420deg);opacity:0;} }
 
-    /* Hintergrund: Fussballfeld — als Overlay transparent, Gameplay bleibt sichtbar */
-    @keyframes bgIn { from { opacity: 0; } to { opacity: 0.55; } }
+    /* Hintergrund: Fussballfeld — Mitte deutlich sichtbar, nach aussen kreisfoermig ausblendend */
+    @keyframes bgIn { from { opacity: 0; } to { opacity: 0.75; } }
     .bg {
       position: absolute; inset: 0;
       background:
-        /* Leichte Vignette */
-        radial-gradient(ellipse at 50% 70%,
-          transparent 0%,
-          rgba(0, 0, 0, 0.15) 75%,
-          rgba(0, 0, 0, 0.35) 100%),
-        /* Rasen-Streifen (transluzent) */
+        /* Rasen-Streifen (volle Farbdichte, Verblendung passiert via Mask) */
         repeating-linear-gradient(90deg,
-          rgba(48, 120, 42, 0.35) 0 160px,
-          rgba(30,  92, 30, 0.35) 160px 320px);
+          rgba(48, 120, 42, 1) 0 160px,
+          rgba(30,  92, 30, 1) 160px 320px);
       opacity: 0;
       z-index: 1;
       animation: bgIn 0.3s ease-out 0.05s forwards;
+      /* Kreisfoermige Maske: Mitte opak, Rand transparent */
+      -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0%, #000 30%, transparent 75%);
+              mask-image: radial-gradient(circle at 50% 50%, #000 0%, #000 30%, transparent 75%);
     }
 
-    @keyframes fieldIn { from { opacity: 0; } to { opacity: 0.55; } }
+    @keyframes fieldIn { from { opacity: 0; } to { opacity: 0.70; } }
     .field-lines {
       position: absolute; inset: 0;
       width: 100%; height: 100%;
@@ -131,6 +129,8 @@
       opacity: 0;
       animation: fieldIn 0.4s ease-out 0.1s forwards;
       pointer-events: none;
+      -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0%, #000 35%, transparent 80%);
+              mask-image: radial-gradient(circle at 50% 50%, #000 0%, #000 35%, transparent 80%);
     }
 
     .swarm { position: absolute; inset: 0; z-index: 3; }
