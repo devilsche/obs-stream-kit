@@ -164,6 +164,9 @@
     .line.mid   { font-size: 90px;  }
     .line.small { font-size: 62px;  }
 
+    /* L5 hat den blinkenden Cursor — darf nicht umbrechen */
+    .line.l5 { white-space: nowrap; max-width: none; }
+
     .line.l1 { animation:
       lineIn  0.5s ease-out calc(var(--l1-in)  - var(--time-offset)) forwards,
       lineOut 0.4s ease-in  calc(var(--l1-out) - var(--time-offset)) forwards; }
