@@ -12,6 +12,12 @@
       font-weight: 100 900;
       font-display: block;
     }
+    @font-face {
+      font-family: 'Borg';
+      src: url('../assets/fonts/BORG9.TTF') format('truetype');
+      font-weight: normal;
+      font-display: block;
+    }
 
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -129,11 +135,11 @@
       left: 50%;
       transform: translateX(-50%) translateY(16px);
       font-size: 28px;
-      font-weight: 700;
+      font-weight: normal;
       color: rgba(120, 255, 160, 0.7);
       letter-spacing: 18px;
       text-transform: uppercase;
-      font-family: 'Courier New', 'DM Sans', monospace;
+      font-family: 'Borg', 'Courier New', monospace;
       z-index: 5;
       opacity: 0;
       animation: bgFadeIn 0.5s ease-out 0.3s forwards;
@@ -143,13 +149,13 @@
       position: absolute;
       top: 50%; left: 50%;
       transform: translate(-50%, -50%) translateY(12px);
-      font-weight: 900;
+      font-weight: normal;
       color: #7cff9d;
       line-height: 1.15;
       text-align: center;
       text-transform: uppercase;
-      letter-spacing: 4px;
-      font-family: 'Courier New', 'DM Sans', monospace;
+      letter-spacing: 6px;
+      font-family: 'Borg', 'Courier New', monospace;
       white-space: pre-line;
       max-width: 1700px;
       z-index: 6;

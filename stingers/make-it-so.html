@@ -12,6 +12,12 @@
       font-weight: 100 900;
       font-display: block;
     }
+    @font-face {
+      font-family: 'Trek';
+      src: url('../assets/fonts/TKCLSCR2.TTF') format('truetype');
+      font-weight: normal;
+      font-display: block;
+    }
 
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -144,8 +150,9 @@
       top: calc(50% - 180px);
       left: 50%;
       transform: translateX(-50%) translateY(30px);
+      font-family: 'Trek', 'DM Sans', sans-serif;
       font-size: 34px;
-      font-weight: 700;
+      font-weight: normal;
       color: #ffbe3c;
       letter-spacing: 18px;
       text-transform: uppercase;
@@ -160,10 +167,11 @@
       top: 50%;
       left: 50%;
       transform: translateX(-50%) translateY(30px);
+      font-family: 'Trek', 'DM Sans', sans-serif;
       font-size: 240px;
-      font-weight: 900;
+      font-weight: normal;
       color: #ffffff;
-      letter-spacing: -4px;
+      letter-spacing: 6px;
       line-height: 1;
       white-space: nowrap;
       text-transform: none;
@@ -179,15 +187,16 @@
 
     .sub {
       position: absolute;
-      top: calc(50% + 220px);
+      top: calc(86% - 56px);
       left: 50%;
       transform: translateX(-50%) translateY(30px);
-      font-size: 32px;
-      font-weight: 400;
-      color: rgba(255, 200, 130, 0.9);
-      letter-spacing: 14px;
+      font-family: 'Trek', 'DM Sans', sans-serif;
+      font-size: 28px;
+      font-weight: normal;
+      font-style: normal;
+      color: #1a0040;
+      letter-spacing: 10px;
       text-transform: uppercase;
-      font-style: italic;
       z-index: 5;
       opacity: 0;
       animation: textFadeIn 0.5s ease-out 2.7s forwards;
