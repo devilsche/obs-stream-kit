@@ -31,7 +31,6 @@
 
     /* Default-Timings als CSS-Vars (via JS ueberschreibbar im ?tune=1 Modus) */
     :root {
-      --goku-in: 0.2s;
       --w1-in:   1.0s;  --w1-out:  2.0s;
       --w2-in:   2.1s;  --w2-out:  3.5s;
       --orb-in:  0.8s;  --orb-pulse: 1.0s;  --orb-out: 3.9s;
@@ -48,73 +47,6 @@
     @keyframes bgFadeIn   { from { opacity: 0; } to { opacity: 1; } }
     @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
 
-    /* ── Goku ── */
-    @keyframes gokuIn {
-      0%   { opacity: 0; transform: translateY(-52%) translateX(-80px); }
-      100% { opacity: 1; transform: translateY(-52%) translateX(0); }
-    }
-    @keyframes gokuThrust {
-      0%   { transform: translateY(-52%) translateX(0); }
-      35%  { transform: translateY(-52%) translateX(55px) scale(1.04); }
-      100% { transform: translateY(-52%) translateX(35px); }
-    }
-
-    .goku {
-      position: absolute;
-      left: 20px;
-      top: 50%;
-      height: 960px;
-      width: auto;
-      z-index: 3;
-      opacity: 0;
-      transform: translateY(-52%) translateX(-80px);
-      filter:
-        drop-shadow(0 0 18px rgba(80, 180, 255, 0.9))
-        drop-shadow(0 0 55px rgba(50, 140, 230, 0.6))
-        drop-shadow(0 0 100px rgba(30, 100, 200, 0.4));
-      animation:
-        gokuIn     0.7s ease-out calc(var(--goku-in) - var(--time-offset)) forwards,
-        gokuThrust 0.5s ease-out calc(var(--beam-in) - var(--time-offset)) forwards;
-      will-change: transform, opacity;
-    }
-
-    /* Ki-Aura hinter Goku */
-    @keyframes auraIn {
-      0%   { opacity: 0; transform: translate(-50%, -52%) scale(0.6); }
-      100% { opacity: 1; transform: translate(-50%, -52%) scale(1); }
-    }
-    @keyframes auraPulse {
-      0%, 100% { transform: translate(-50%, -52%) scale(1);    opacity: 0.75; }
-      50%       { transform: translate(-50%, -52%) scale(1.30); opacity: 1; }
-    }
-    @keyframes auraBlast {
-      0%   { transform: translate(-50%, -52%) scale(1);   opacity: 1; }
-      50%  { transform: translate(-50%, -52%) scale(2.8); opacity: 0.85; }
-      100% { transform: translate(-50%, -52%) scale(2);   opacity: 0; }
-    }
-
-    .goku-aura {
-      position: absolute;
-      left: 380px;
-      top: 50%;
-      width: 650px;
-      height: 900px;
-      transform: translate(-50%, -52%) scale(0.6);
-      opacity: 0;
-      border-radius: 50%;
-      background: radial-gradient(ellipse at center,
-        rgba(160, 230, 255, 0.55) 0%,
-        rgba(80, 180, 255, 0.28) 45%,
-        transparent 70%
-      );
-      filter: blur(22px);
-      z-index: 2;
-      pointer-events: none;
-      animation:
-        auraIn     0.6s ease-out   calc(var(--goku-in) + 0.2s - var(--time-offset)) forwards,
-        auraPulse  0.9s ease-in-out calc(var(--orb-pulse) - var(--time-offset)) 4,
-        auraBlast  0.7s ease-out   calc(var(--beam-in)  - var(--time-offset)) forwards;
-    }
 
     @keyframes orbGrow {
       0%   { transform: translate(-50%, -50%) scale(0); opacity: 0; }
@@ -393,9 +325,6 @@
 
   <div class="stage">
     <div class="bg"></div>
-
-    <div class="goku-aura"></div>
-    <img class="goku" src="../assets/stingers/goku-kamehameha.png" alt="" draggable="false">
 
     <div class="chant-word w1">Kame...</div>
     <div class="chant-word w2">Hame...</div>
