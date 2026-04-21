@@ -1,0 +1,749 @@
+02:33:58.625: CPU Name: AMD Ryzen 7 7800X3D 8-Core Processor           
+02:33:58.626: CPU Speed: 4200MHz
+02:33:58.626: Physical Cores: 8, Logical Cores: 16
+02:33:58.626: Physical Memory: 61118MB Total, 41304MB Free
+02:33:58.626: Windows Version: 10.0 Build 26200 (release: 25H2; revision: 8246; 64-bit)
+02:33:58.626: Running as administrator: true
+02:33:58.626: Windows 10/11 Gaming Features:
+02:33:58.626: 	Game Bar: On
+02:33:58.626: 	Game DVR: On
+02:33:58.626: 	Game DVR Background Recording: Off
+02:33:58.626: 	Game Mode: Probably On (no reg key set)
+02:33:58.626: Sec. Software Status:
+02:33:58.627: 	Microsoft Defender Antivirus: enabled (AV)
+02:33:58.627: 	Windows-Firewall: enabled (FW)
+02:33:58.628: Current Date/Time: 2026-04-21, 02:33:58
+02:33:58.628: Browser Hardware Acceleration: true
+02:33:58.628: Hide OBS windows from screen capture: false
+02:33:58.628: Qt Version: 6.8.3 (runtime), 6.8.3 (compiled)
+02:33:58.628: Portable mode: false
+02:33:58.731: OBS 32.1.1 (64-bit, windows)
+02:33:58.731: ---------------------------------
+02:33:58.842: ---------------------------------
+02:33:58.842: audio settings reset:
+02:33:58.842: 	samples per sec: 44100
+02:33:58.842: 	speakers:        2
+02:33:58.842: 	max buffering:   1044 milliseconds
+02:33:58.842: 	buffering type:  dynamically increasing
+02:33:58.844: ---------------------------------
+02:33:58.844: Initializing D3D11...
+02:33:58.844: Available Video Adapters: 
+02:33:58.860: 	Adapter 0: NVIDIA GeForce RTX 4080 SUPER
+02:33:58.860: 	  Dedicated VRAM: 16826499072 (15.7 GiB)
+02:33:58.860: 	  Shared VRAM:    32043712512 (29.8 GiB)
+02:33:58.860: 	  PCI ID:         10de:2702
+02:33:58.860: 	  HAGS Status:    Enabled (Default: No, Driver status: Supported)
+02:33:58.861: 	  Driver Version: 32.0.15.9174
+02:33:58.861: 	  output 0:
+02:33:58.861: 	    name=32GK850G
+02:33:58.861: 	    pos={0, 0}
+02:33:58.861: 	    size={2560, 1440}
+02:33:58.861: 	    attached=true
+02:33:58.861: 	    refresh=165
+02:33:58.861: 	    bits_per_color=8
+02:33:58.861: 	    space=RGB_FULL_G22_NONE_P709
+02:33:58.861: 	    primaries=[r=(0.639648, 0.330078), g=(0.299805, 0.599609), b=(0.150391, 0.059570), wp=(0.312500, 0.329102)]
+02:33:58.861: 	    relative_gamut_area=[709=0.998664, P3=0.736186, 2020=0.528164]
+02:33:58.861: 	    sdr_white_nits=80
+02:33:58.861: 	    nit_range=[min=0.500000, max=270.000000, max_full_frame=270.000000]
+02:33:58.861: 	    dpi=96 (100%)
+02:33:58.861: 	    id=\\?\DISPLAY#GSM7709#5&34baa38d&0&UID4353#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}
+02:33:58.861: 	    alt_id=\\.\DISPLAY1
+02:33:58.861: 	  output 1:
+02:33:58.861: 	    name=SAMSUNG
+02:33:58.861: 	    pos={2560, 1}
+02:33:58.861: 	    size={2560, 1440}
+02:33:58.861: 	    attached=true
+02:33:58.861: 	    refresh=60
+02:33:58.861: 	    bits_per_color=8
+02:33:58.861: 	    space=RGB_FULL_G22_NONE_P709
+02:33:58.861: 	    primaries=[r=(0.640625, 0.330078), g=(0.300781, 0.600586), b=(0.150391, 0.060547), wp=(0.280273, 0.290039)]
+02:33:58.861: 	    relative_gamut_area=[709=1.000494, P3=0.737535, 2020=0.529132]
+02:33:58.861: 	    sdr_white_nits=80
+02:33:58.861: 	    nit_range=[min=0.010000, max=1499.000000, max_full_frame=799.000000]
+02:33:58.861: 	    dpi=96 (100%)
+02:33:58.861: 	    id=\\?\DISPLAY#SAM7360#5&34baa38d&0&UID4352#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}
+02:33:58.861: 	    alt_id=\\.\DISPLAY2
+02:33:58.861: 	Adapter 1: AMD Radeon(TM) Graphics
+02:33:58.861: 	  Dedicated VRAM: 4267479040 (4.0 GiB)
+02:33:58.861: 	  Shared VRAM:    32043712512 (29.8 GiB)
+02:33:58.861: 	  PCI ID:         1002:164e
+02:33:58.861: 	  HAGS Status:    Disabled (Default: No, Driver status: Unsupported)
+02:33:58.861: 	  Driver Version: 32.0.21036.18
+02:33:58.862: 	  output 0:
+02:33:58.862: 	    name=DELL P2417H
+02:33:58.862: 	    pos={627, -1080}
+02:33:58.862: 	    size={1920, 1080}
+02:33:58.862: 	    attached=true
+02:33:58.862: 	    refresh=60
+02:33:58.862: 	    bits_per_color=8
+02:33:58.862: 	    space=RGB_FULL_G22_NONE_P709
+02:33:58.862: 	    primaries=[r=(0.652344, 0.335938), g=(0.321289, 0.610352), b=(0.153320, 0.060547), wp=(0.313477, 0.329102)]
+02:33:58.862: 	    relative_gamut_area=[709=1.017887, P3=0.750357, 2020=0.538331]
+02:33:58.862: 	    sdr_white_nits=80
+02:33:58.862: 	    nit_range=[min=0.500000, max=270.000000, max_full_frame=270.000000]
+02:33:58.862: 	    dpi=96 (100%)
+02:33:58.862: 	    id=\\?\DISPLAY#DELA0DB#5&9aefadb&0&UID256#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}
+02:33:58.862: 	    alt_id=\\.\DISPLAY5
+02:33:58.863: Loading up D3D11 on adapter NVIDIA GeForce RTX 4080 SUPER (0)
+02:33:58.956: D3D11 loaded successfully, feature level used: b000
+02:33:58.956: DXGI increase maximum frame latency success
+02:33:58.956: Hardware-Accelerated GPU Scheduling enabled on adapter!
+02:33:58.956: D3D11 GPU priority setup success
+02:33:59.017: ---------------------------------
+02:33:59.017: video settings reset:
+02:33:59.017: 	base resolution:   1920x1080
+02:33:59.017: 	output resolution: 1920x1080
+02:33:59.017: 	downscale filter:  Bicubic
+02:33:59.017: 	fps:               60/1
+02:33:59.017: 	format:            NV12
+02:33:59.017: 	YUV mode:          sRGB/Full
+02:33:59.017: NV12 texture support enabled
+02:33:59.017: P010 texture support not available
+02:33:59.018: Audio monitoring device:
+02:33:59.018: 	name: Lautsprecher (Sound Blaster Z)
+02:33:59.018: 	id: {0.0.0.00000000}.{143237b5-627f-4857-9d68-f296bb14be97}
+02:33:59.048: ---------------------------------
+02:33:59.050: No AJA devices found, skipping loading AJA UI plugin
+02:33:59.050: Failed to initialize module 'aja-output-ui.dll'
+02:33:59.051: No AJA devices found, skipping loading AJA plugin
+02:33:59.051: Failed to initialize module 'aja.dll'
+02:33:59.051: Failed to load 'de-DE' text for module: 'browser-transition.dll'
+02:33:59.051: [Browser Transition] loaded version 0.1.3
+02:33:59.051: Skipping module '../../obs-plugins/64bit/chrome_elf.dll', not an OBS plugin
+02:33:59.053: [CoreAudio encoder]: CoreAudio AAC encoder not installed on the system or couldn't be loaded
+02:33:59.053: Failed to load 'en-US' text for module: 'decklink-captions.dll'
+02:33:59.054: Failed to load 'en-US' text for module: 'decklink-output-ui.dll'
+02:33:59.055: A DeckLink iterator could not be created.  The DeckLink drivers may not be installed
+02:33:59.055: Failed to initialize module 'decklink.dll'
+02:33:59.055: Skipping module '../../obs-plugins/64bit/DirectML.dll', not an OBS plugin
+02:33:59.217: [AMF] Version 2.7.0 loaded (Compiled: 1.4.14.0, Runtime: 1.4.37.0, Library: 1.4.37.0;1.2;CL).
+02:33:59.266: [AMF] <Id: 1> Unable to set converter transfer characteristic, error AMF_NOT_FOUND (code 11)
+02:33:59.309: [AMF] <Id: 2> Unable to set converter transfer characteristic, error AMF_NOT_FOUND (code 11)
+02:33:59.311: [AMF] [Capability Manager] Testing Direct3D 11 Adapter 'AMD Radeon(TM) Graphics (VEN_1002/DEV_164e/SUB_7d751462/REV_00cb)':
+02:33:59.311:   H264/AVC: Supported
+02:33:59.311:   H265/HEVC: Supported
+02:33:59.311: 
+02:33:59.316: Skipping module '../../obs-plugins/64bit/libcef.dll', not an OBS plugin
+02:33:59.316: Skipping module '../../obs-plugins/64bit/libEGL.dll', not an OBS plugin
+02:33:59.316: Skipping module '../../obs-plugins/64bit/libGLESv2.dll', not an OBS plugin
+02:33:59.319: [Move Transition] loaded version 3.2.1
+02:33:59.320: [Move Transition]: NVIDIA AR version: 0.8.2.0
+02:33:59.350: [NVIDIA Audio Effects:] NVIDIA denoiser disabled, redistributable not found or could not be loaded.
+02:33:59.351: [NVIDIA VIDEO FX]: NVIDIA VIDEO FX version: 0.7.6.0
+02:33:59.385: [NVIDIA VIDEO FX]: enabled, redistributable found
+02:33:59.387: Failed to load 'de-DE' text for module: 'obs-backgroundremoval.dll'
+02:33:59.387: [obs-backgroundremoval] Plugin loaded successfully (version 1.1.12)
+02:33:59.387: [obs-backgroundremoval] Failed to open config file C:\Users\nic\AppData\Roaming\obs-studio/plugin_config/obs-backgroundremoval/config.ini
+02:33:59.387: [obs-backgroundremoval] Failed to open config file C:\Users\nic\AppData\Roaming\obs-studio/plugin_config/obs-backgroundremoval/config.ini
+02:33:59.972: [obs-backgroundremoval] Latest release is 1.3.7
+02:33:59.997: [obs-browser]: Version 2.26.8
+02:33:59.997: [obs-browser]: CEF Version 127.0.6533.120 (runtime), 127.145.7+g2b7d20b+chromium-127.0.6533.120 (compiled)
+02:34:00.221: [obs-nvenc] NVENC version: 12.2 (compiled) / 13.0 (driver), CUDA driver version: 13.10, AV1 supported: true
+02:34:00.265: [obs-websocket] [obs_module_load] you can haz websockets (Version: 5.7.3 | RPC Version: 1)
+02:34:00.265: [obs-websocket] [obs_module_load] Qt version (compile-time): 6.8.3 | Qt version (run-time): 6.8.3
+02:34:00.265: [obs-websocket] [obs_module_load] Linked ASIO Version: 103200
+02:34:00.270: [obs-websocket] [obs_module_load] Module loaded.
+02:34:00.273: [Scene As Transition] loaded version 1.1.1
+02:34:00.275: [vlc-video]: VLC 3.0.23 Vetinari found, VLC video source enabled
+02:34:00.284: ---------------------------------
+02:34:00.284:   Loaded Modules:
+02:34:00.284:     win-wasapi.dll
+02:34:00.284:     win-dshow.dll
+02:34:00.284:     win-capture.dll
+02:34:00.284:     vlc-video.dll
+02:34:00.284:     text-freetype2.dll
+02:34:00.284:     scene-as-transition.dll
+02:34:00.284:     rtmp-services.dll
+02:34:00.284:     obs-x264.dll
+02:34:00.284:     obs-websocket.dll
+02:34:00.284:     obs-webrtc.dll
+02:34:00.284:     obs-vst.dll
+02:34:00.284:     obs-transitions.dll
+02:34:00.284:     obs-text.dll
+02:34:00.284:     obs-qsv11.dll
+02:34:00.284:     obs-outputs.dll
+02:34:00.284:     obs-nvenc.dll
+02:34:00.284:     obs-filters.dll
+02:34:00.284:     obs-ffmpeg.dll
+02:34:00.284:     obs-browser.dll
+02:34:00.284:     obs-backgroundremoval.dll
+02:34:00.284:     nv-filters.dll
+02:34:00.284:     move-transition.dll
+02:34:00.284:     logi_obs_plugin_x64.dll
+02:34:00.284:     image-source.dll
+02:34:00.284:     frontend-tools.dll
+02:34:00.284:     enc-amf.dll
+02:34:00.284:     decklink-output-ui.dll
+02:34:00.284:     decklink-captions.dll
+02:34:00.284:     coreaudio-encoder.dll
+02:34:00.284:     browser-transition.dll
+02:34:00.284: ---------------------------------
+02:34:00.284: [obs-websocket] [obs_module_post_load] WebSocket server is enabled, starting...
+02:34:00.284: [obs-websocket] [WebSocketServer::Start] Not locked to IPv4 bindings
+02:34:00.284: [obs-websocket] [WebSocketServer::ServerRunner] IO thread started.
+02:34:00.288: [obs-websocket] [WebSocketServer::Start] Server started successfully on port 4455. Possible connect address: 2a02:8109:a81c:9c00:cd60:50f6:82b6:21c6
+02:34:00.295: ---------------------------------
+02:34:00.295: Available Encoders:
+02:34:00.295:   Video Encoders:
+02:34:00.295: 	- ffmpeg_svt_av1 (SVT-AV1)
+02:34:00.295: 	- ffmpeg_aom_av1 (AOM AV1)
+02:34:00.295: 	- h264_texture_amf (AMD HW H.264 (AVC))
+02:34:00.295: 	- h265_texture_amf (AMD HW H.265 (HEVC))
+02:34:00.295: 	- obs_nvenc_h264_tex (NVIDIA NVENC H.264)
+02:34:00.295: 	- obs_nvenc_hevc_tex (NVIDIA NVENC HEVC)
+02:34:00.295: 	- obs_nvenc_av1_tex (NVIDIA NVENC AV1)
+02:34:00.295: 	- obs_x264 (x264)
+02:34:00.295:   Audio Encoders:
+02:34:00.295: 	- ffmpeg_aac (FFmpeg AAC)
+02:34:00.295: 	- ffmpeg_opus (FFmpeg Opus)
+02:34:00.295: 	- ffmpeg_pcm_s16le (FFmpeg PCM (16 Bit))
+02:34:00.295: 	- ffmpeg_pcm_s24le (FFmpeg PCM (24 Bit))
+02:34:00.295: 	- ffmpeg_pcm_f32le (FFmpeg PCM (32 Bit Float))
+02:34:00.295: 	- ffmpeg_alac (FFmpeg ALAC (24 Bit))
+02:34:00.295: 	- ffmpeg_flac (FFmpeg FLAC (16 Bit))
+02:34:00.295: ==== Startup complete ===============================================
+02:34:00.353: All scene data cleared
+02:34:00.353: ------------------------------------------------
+02:34:00.488: [obs-websocket] [WebSocketServer::onOpen] New WebSocket client has connected from [::ffff:127.0.0.1]:53046
+02:34:00.494: [Media Source 'Medien']: settings:
+02:34:00.494: 	input:                   E:/#FRAPS/Streaming/yt1s.com - No Copyright Video Copyright Free  Motion Graphics Background Animation Green Screen YouTube_1080p.mp4
+02:34:00.494: 	input_format:            (null)
+02:34:00.494: 	speed:                   100
+02:34:00.494: 	is_looping:              yes
+02:34:00.494: 	is_linear_alpha:         no
+02:34:00.494: 	is_hw_decoding:          no
+02:34:00.494: 	is_clear_on_media_end:   no
+02:34:00.494: 	restart_on_activate:     yes
+02:34:00.494: 	close_when_inactive:     no
+02:34:00.494: 	full_decode:             no
+02:34:00.494: 	ffmpeg_options:          
+02:34:00.494: [win-wasapi: 'Microfon'] update settings:
+02:34:00.494: 	device id: {0.0.1.00000000}.{a36f3a89-8ab0-4d20-ba76-c795802a3fcc}
+02:34:00.494: 	use device timing: 0
+02:34:00.495: [win-wasapi: 'Discord'] update settings:
+02:34:00.495: 	executable: Discord.exe
+02:34:00.495: 	title: Freunde - Discord
+02:34:00.495: 	class: Chrome_WidgetWin_1
+02:34:00.495: 	priority: 0
+02:34:00.495: [win-wasapi: 'TeamSpeak 3'] update settings:
+02:34:00.495: 	executable: ts3client_win64.exe
+02:34:00.495: 	title: TeamSpeak 3
+02:34:00.495: 	class: Qt5152QWindowIcon
+02:34:00.495: 	priority: 0
+02:34:00.495: [win-wasapi: 'Spotify'] update settings:
+02:34:00.495: 	executable: Spotify.exe
+02:34:00.495: 	title: Tim Peters - Barcelona
+02:34:00.495: 	class: Chrome_WidgetWin_1
+02:34:00.495: 	priority: 2
+02:34:00.500: ---------------------------------
+02:34:00.500: [DShow Device: 'Logitech BRIO'] settings updated: 
+02:34:00.500: 	video device: Logitech BRIO
+02:34:00.500: 	video path: \\?\usb#vid_046d&pid_085e&mi_00#9&1f5edb00&0&0000#{65e8773d-8f56-11d0-a3b9-00a0c9223196}\global
+02:34:00.500: 	resolution: 4096x2160
+02:34:00.500: 	flip: 0
+02:34:00.500: 	fps: 30.00 (interval: 333333)
+02:34:00.500: 	format: MJPEG
+02:34:00.500: 	buffering: disabled
+02:34:00.500: 	hardware decode: enabled
+02:34:00.513: [WASAPISource::TryInitialize]:[[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]] Failed to find window
+02:34:00.513: WASAPI: Device '' failed to start (source: Discord)
+02:34:00.513: [WASAPISource::TryInitialize]:[[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]] Failed to find window
+02:34:00.513: WASAPI: Device '' failed to start (source: TeamSpeak 3)
+02:34:00.518: WASAPI: Device '[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]' [44100 Hz] initialized (source: Spotify)
+02:34:00.525: WASAPI: Device 'Mikrofon (NVIDIA Broadcast)' [48000 Hz] initialized (source: Microfon)
+02:34:00.564: adding 23 milliseconds of audio buffering, total audio buffering is now 23 milliseconds (source: Microfon)
+02:34:00.564: 
+02:34:00.772: warning: deprecated pixel format used, make sure you did set range correctly
+02:34:01.041: warning: deprecated pixel format used, make sure you did set range correctly
+02:34:01.217: [win-wasapi: 'Streamer.bot'] update settings:
+02:34:01.217: 	executable: Streamer.bot.exe
+02:34:01.217: 	title: Streamer.bot - LkR.bot (v1.0.1)
+02:34:01.217: 	class: HwndWrapper[Streamer.bot.exe;UI;1786931c-fd51-4556-93fa-9a70f09fc64c]
+02:34:01.217: 	priority: 2
+02:34:01.218: WASAPI: Device '[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]' [44100 Hz] initialized (source: Streamer.bot)
+02:34:01.298: [Media Source 'Medien - Effects - Luftballon']: settings:
+02:34:01.298: 	input:                   E:/#FRAPS/Streaming/Lustballons.mp4
+02:34:01.298: 	input_format:            (null)
+02:34:01.298: 	speed:                   100
+02:34:01.298: 	is_looping:              no
+02:34:01.298: 	is_linear_alpha:         no
+02:34:01.298: 	is_hw_decoding:          no
+02:34:01.298: 	is_clear_on_media_end:   yes
+02:34:01.298: 	restart_on_activate:     yes
+02:34:01.298: 	close_when_inactive:     no
+02:34:01.298: 	full_decode:             no
+02:34:01.298: 	ffmpeg_options:          
+02:34:01.298: [Media Source 'Medien - Effects - Strahler 1']: settings:
+02:34:01.298: 	input:                   E:/#FRAPS/Streaming/videoplayback.mp4
+02:34:01.298: 	input_format:            (null)
+02:34:01.298: 	speed:                   100
+02:34:01.298: 	is_looping:              yes
+02:34:01.298: 	is_linear_alpha:         no
+02:34:01.298: 	is_hw_decoding:          no
+02:34:01.298: 	is_clear_on_media_end:   yes
+02:34:01.298: 	restart_on_activate:     no
+02:34:01.298: 	close_when_inactive:     no
+02:34:01.298: 	full_decode:             no
+02:34:01.298: 	ffmpeg_options:          
+02:34:01.299: [win-wasapi: 'Fensteraufnahme (Audio)'] update settings:
+02:34:01.299: 	executable: TslGame.exe
+02:34:01.299: 	title: PUBG: BATTLEGROUNDS 
+02:34:01.299: 	class: UnrealWindow
+02:34:01.299: 	priority: 0
+02:34:01.299: [window-capture: 'Fensteraufnahme'] update settings:
+02:34:01.299: 	executable: TslGame.exe
+02:34:01.299: 	method selected: WGC
+02:34:01.299: 	method chosen: WGC
+02:34:01.299: 	force SDR: true
+02:34:01.300: [Media Source 'Medien - Effects - Pinguine']: settings:
+02:34:01.300: 	input:                   E:/#FRAPS/Streaming/Grafiken/streamer.bot/Oh Yes Green Screen.mp4
+02:34:01.300: 	input_format:            (null)
+02:34:01.300: 	speed:                   100
+02:34:01.300: 	is_looping:              no
+02:34:01.300: 	is_linear_alpha:         no
+02:34:01.300: 	is_hw_decoding:          no
+02:34:01.300: 	is_clear_on_media_end:   yes
+02:34:01.300: 	restart_on_activate:     yes
+02:34:01.300: 	close_when_inactive:     no
+02:34:01.300: 	full_decode:             no
+02:34:01.300: 	ffmpeg_options:          
+02:34:01.300: [WASAPISource::TryInitialize]:[[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]] Failed to find window
+02:34:01.301: WASAPI: Device '' failed to start (source: Fensteraufnahme (Audio))
+02:34:01.307: [Media Source 'Medien - Effects - Konfetti']: settings:
+02:34:01.307: 	input:                   E:/#FRAPS/Streaming/Grafiken/streamer.bot/falling-confetti-three-dimensional-shiny.mov
+02:34:01.307: 	input_format:            (null)
+02:34:01.307: 	speed:                   100
+02:34:01.307: 	is_looping:              no
+02:34:01.307: 	is_linear_alpha:         no
+02:34:01.307: 	is_hw_decoding:          no
+02:34:01.307: 	is_clear_on_media_end:   yes
+02:34:01.307: 	restart_on_activate:     yes
+02:34:01.307: 	close_when_inactive:     no
+02:34:01.307: 	full_decode:             no
+02:34:01.307: 	ffmpeg_options:          
+02:34:01.308: [Media Source 'Medien - Effects - Magic Beat']: settings:
+02:34:01.308: 	input:                   E:/#FRAPS/Streaming/Sounds/magic-beat-151786.mp3
+02:34:01.308: 	input_format:            (null)
+02:34:01.308: 	speed:                   100
+02:34:01.308: 	is_looping:              yes
+02:34:01.308: 	is_linear_alpha:         no
+02:34:01.308: 	is_hw_decoding:          no
+02:34:01.308: 	is_clear_on_media_end:   yes
+02:34:01.308: 	restart_on_activate:     yes
+02:34:01.308: 	close_when_inactive:     no
+02:34:01.308: 	full_decode:             no
+02:34:01.308: 	ffmpeg_options:          
+02:34:01.315: [Media Source 'Command - Medien - WTF']: settings:
+02:34:01.315: 	input:                   E:/#FRAPS/Streaming/Sounds/xfiles.mp3
+02:34:01.315: 	input_format:            (null)
+02:34:01.315: 	speed:                   100
+02:34:01.315: 	is_looping:              no
+02:34:01.315: 	is_linear_alpha:         no
+02:34:01.315: 	is_hw_decoding:          no
+02:34:01.315: 	is_clear_on_media_end:   yes
+02:34:01.315: 	restart_on_activate:     yes
+02:34:01.315: 	close_when_inactive:     no
+02:34:01.315: 	full_decode:             no
+02:34:01.315: 	ffmpeg_options:          
+02:34:01.330: warning: Estimating duration from bitrate, this may be inaccurate
+02:34:01.340: warning: Could not update timestamps for skipped samples.
+02:34:01.354: Switched to scene '[S] End'
+02:34:01.354: ------------------------------------------------
+02:34:01.354: Loaded scenes:
+02:34:01.354: - scene '[S] Start':
+02:34:01.354:     - source: '[L] Audio' (scene)
+02:34:01.354:     - source: 'Musik - no copyright' (vlc_source)
+02:34:01.354:     - source: '[G] Start - Content' (group)
+02:34:01.354:         - source: 'Browser - Start' (browser_source)
+02:34:01.354:             - monitoring: monitor and output
+02:34:01.354:         - source: '[L] Latest' (scene)
+02:34:01.354:         - source: '[L] Effects' (scene)
+02:34:01.354:     - source: '[L] UI' (scene)
+02:34:01.354:     - source: '[L] Overlay' (scene)
+02:34:01.354:     - filter: 'Entry Ads - start' (move_source_filter)
+02:34:01.354:     - filter: 'Entry Ads - end' (move_source_filter)
+02:34:01.354: - scene '[S] Main':
+02:34:01.354:     - source: '[L] Audio' (scene)
+02:34:01.354:     - source: '[G] Main - Content ' (group)
+02:34:01.354:         - source: 'Medien' (ffmpeg_source)
+02:34:01.354:         - source: 'Fensteraufnahme' (window_capture)
+02:34:01.354:         - source: 'Bild - Cam Background' (image_source)
+02:34:01.354:             - filter: 'Zuschneiden/Pad' (crop_filter)
+02:34:01.354:             - show: 'Bild - Cam Background Zeige-Übergang' (fade_transition)
+02:34:01.354:             - hide: 'Bild - Cam Background Verstecke-Übergang' (fade_transition)
+02:34:01.354:         - source: 'Logitech BRIO' (dshow_input)
+02:34:01.354:             - filter: 'NVIDIA-Hintergrundentfernung' (nv_greenscreen_filter)
+02:34:01.354:             - filter: 'Zuschneiden/Pad' (crop_filter)
+02:34:01.354:             - show: 'Logitech BRIO Zeige-Übergang' (fade_transition)
+02:34:01.355:             - hide: 'Logitech BRIO Verstecke-Übergang' (fade_transition)
+02:34:01.355:         - source: 'Browser -  Cam Overlay' (browser_source)
+02:34:01.355:             - filter: 'Chroma Key' (chroma_key_filter_v2)
+02:34:01.355:             - show: 'Browser -  Cam Overlay Zeige-Übergang' (fade_transition)
+02:34:01.355:             - hide: 'Browser -  Cam Overlay Verstecke-Übergang' (fade_transition)
+02:34:01.355:         - source: 'Browser - Gameplay' (browser_source)
+02:34:01.355:         - source: '[L] Latest' (scene)
+02:34:01.355:         - source: '[L] Effects' (scene)
+02:34:01.355:     - source: '[L] UI' (scene)
+02:34:01.355:     - source: '[L] Overlay' (scene)
+02:34:01.355:     - filter: 'Entry Ads - start' (move_source_filter)
+02:34:01.355:     - filter: 'Entry Ads - end' (move_source_filter)
+02:34:01.355: - scene '[S] BRB':
+02:34:01.355:     - source: 'Musik - no copyright' (vlc_source)
+02:34:01.355:     - source: '[L] UI' (scene)
+02:34:01.355:     - source: '[L] Audio' (scene)
+02:34:01.355:     - source: '[G] BRB - Content' (group)
+02:34:01.355:         - source: 'Browser - BRB' (browser_source)
+02:34:01.355:         - source: '[L] Latest' (scene)
+02:34:01.355:         - source: '[L] Effects' (scene)
+02:34:01.355:     - source: '[L] Overlay' (scene)
+02:34:01.355:     - filter: 'Entry Ads - start' (move_source_filter)
+02:34:01.355:     - filter: 'Entry Ads - end' (move_source_filter)
+02:34:01.355: - scene '[S] Cam':
+02:34:01.355:     - source: '[L] Audio' (scene)
+02:34:01.355:     - source: '[G] Cam + Chat - Content' (group)
+02:34:01.355:         - filter: 'Chroma Key' (chroma_key_filter_v2)
+02:34:01.355:         - source: 'Bild - Cam Background 2' (image_source)
+02:34:01.355:             - filter: 'Zuschneiden/Pad' (crop_filter)
+02:34:01.355:         - source: '[L] Cam' (scene)
+02:34:01.355:         - source: 'Browser - Just chatting' (browser_source)
+02:34:01.355:         - source: '[L] Latest' (scene)
+02:34:01.355:         - source: '[L] Effects' (scene)
+02:34:01.355:         - source: 'Twitch Chat' (browser_source)
+02:34:01.355:             - filter: 'Farbkorrektur' (color_filter_v2)
+02:34:01.355:     - source: '[L] UI' (scene)
+02:34:01.355:     - source: '[L] Overlay' (scene)
+02:34:01.355:     - filter: 'Entry Ads - start' (move_source_filter)
+02:34:01.355:     - filter: 'Entry Ads - end' (move_source_filter)
+02:34:01.355: - scene '[S] End':
+02:34:01.355:     - source: '[L] Audio' (scene)
+02:34:01.355:     - source: 'Musik - no copyright' (vlc_source)
+02:34:01.355:     - source: '[G] End - Content' (group)
+02:34:01.355:         - source: 'Browser - End' (browser_source)
+02:34:01.355:             - monitoring: monitor and output
+02:34:01.355:         - source: '[L] Latest' (scene)
+02:34:01.355:         - source: '[L] Effects' (scene)
+02:34:01.355:     - source: '[L] UI' (scene)
+02:34:01.355:     - source: '[L] Overlay' (scene)
+02:34:01.355:     - filter: 'Entry Ads - start' (move_source_filter)
+02:34:01.355:     - filter: 'Entry Ads - end' (move_source_filter)
+02:34:01.355: - scene '[L] Cam':
+02:34:01.355:     - source: 'Logitech BRIO' (dshow_input)
+02:34:01.355:         - filter: 'NVIDIA-Hintergrundentfernung' (nv_greenscreen_filter)
+02:34:01.355:         - filter: 'Zuschneiden/Pad' (crop_filter)
+02:34:01.355: - scene '[L] Overlay':
+02:34:01.355:     - source: '[G] Widgets' (group)
+02:34:01.355:         - source: 'Browser - Widget - Welcome' (browser_source)
+02:34:01.355:             - show: 'Browser - Widget - Welcome Zeige-Übergang' (fade_transition)
+02:34:01.355:             - hide: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+02:34:01.355:         - source: 'Browser - Banner - Tip Goal' (browser_source)
+02:34:01.355:             - show: 'Browser - Banner - Tip Goal Zeige-Übergang' (fade_transition)
+02:34:01.355:             - hide: 'Browser - Banner - Tip Goal Verstecke-Übergang' (slide_transition)
+02:34:01.355:     - source: '[G] Flares' (group)
+02:34:01.355:         - source: 'Browser - Effects - Lens Flare 1 (4s)' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Lens Flare 2 (4s)' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Lens Flare 3 (4s)' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Lens Flare 4 (4s)' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Lens Flare 5 (4s)' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Lens Flare 6 (4s)' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Lens Flare 7 (5s)' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:     - source: '[G] Alerts' (group)
+02:34:01.355:         - source: 'Browser - Alert - Tip' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:             - show: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+02:34:01.355:             - hide: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+02:34:01.355:         - source: 'Browser - Alert - Sub' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:             - show: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+02:34:01.355:             - hide: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+02:34:01.355:         - source: 'Browser - Alert - Follow' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:             - show: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+02:34:01.355:             - hide: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+02:34:01.355:         - source: 'Browser - Alert - Raid' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:             - show: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+02:34:01.355:             - hide: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+02:34:01.355:         - source: 'Browser - Alert - Subgift' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:     - source: 'Browser - Logo' (browser_source)
+02:34:01.355: - scene '[L] UI':
+02:34:01.355:     - source: 'Entry Ads' (browser_source)
+02:34:01.355: - scene '[L] Effects':
+02:34:01.355:     - source: '[G] Effects - Stinger' (group)
+02:34:01.355:         - source: 'Browser - Effects - Nani (4s)' (browser_source)
+02:34:01.355:             - monitoring: monitor and output
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Luke (4s)' (browser_source)
+02:34:01.355:             - monitoring: monitor and output
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Trap (5s)' (browser_source)
+02:34:01.355:             - monitoring: monitor and output
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Crash (2s)' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Noice (3s)' (browser_source)
+02:34:01.355:             - monitoring: monitor and output
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Smort (3s)' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Cool (6s)' (browser_source)
+02:34:01.355:             - monitoring: monitor and output
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Over 9000 (4s)' (browser_source)
+02:34:01.355:             - monitoring: monitor and output
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Kamehameha (8s)' (browser_source)
+02:34:01.355:             - monitoring: monitor and output
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Super Saiyan (11s)' (browser_source)
+02:34:01.355:             - monitoring: monitor and output
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Indeed (4s)' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Chevron Locked (5s)' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Crying Out Loud (4s)' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Khan (7s)' (browser_source)
+02:34:01.355:             - monitoring: monitor and output
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Make It So (5s)' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Engage (4s)' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Resistance Futile (17s)' (browser_source)
+02:34:01.355:             - monitoring: monitor and output
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Kickers (9s)' (browser_source)
+02:34:01.355:             - monitoring: monitor and output
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:             - filter: 'Luma Key' (luma_key_filter_v2)
+02:34:01.355:         - source: 'Browser - Effects - Heart (15s)' (browser_source)
+02:34:01.355:             - monitoring: monitor and output
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - GG (6s)' (browser_source)
+02:34:01.355:             - monitoring: monitor and output
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Snow (Loop)' (browser_source)
+02:34:01.355:             - filter: 'Farbkorrektur' (color_filter_v2)
+02:34:01.355:             - filter: 'Scrollen' (scroll_filter)
+02:34:01.355:             - filter: 'Skalierung/Seitenverhältnis' (scale_filter)
+02:34:01.355:             - show: 'Browser - Effects - Snow (Loop) Zeige-Übergang' (fade_transition)
+02:34:01.355:             - hide: 'Browser - Effects - Snow (Loop) Verstecke-Übergang' (fade_transition)
+02:34:01.355:         - source: 'Browser - Effects - Explosion (15s)' (browser_source)
+02:34:01.355:             - monitoring: monitor and output
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:         - source: 'Browser - Effects - Particle Swirl (6s)' (browser_source)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:     - source: '[G] streamer.bot' (group)
+02:34:01.355:         - source: 'Medien - Effects - Luftballon' (ffmpeg_source)
+02:34:01.355:             - filter: 'Chroma Key' (chroma_key_filter_v2)
+02:34:01.355:             - filter: 'Move Action' (move_action_filter)
+02:34:01.355:             - hide: 'Medien - Effects - Luftballon Verstecke-Übergang' (fade_transition)
+02:34:01.355:         - source: 'Medien - Effects - Strahler 1' (ffmpeg_source)
+02:34:01.355:             - filter: 'Chroma Key' (chroma_key_filter_v2)
+02:34:01.355:             - show: 'Medien - Effects - Strahler 1 Zeige-Übergang' (fade_transition)
+02:34:01.355:             - hide: 'Medien - Effects - Strahler 1 Verstecke-Übergang' (fade_transition)
+02:34:01.355:         - source: 'Medien - Effects - Pinguine' (ffmpeg_source)
+02:34:01.355:             - monitoring: monitor and output
+02:34:01.356:             - filter: 'Chroma Key' (chroma_key_filter_v2)
+02:34:01.356:             - filter: 'Move Action' (move_action_filter)
+02:34:01.356:             - filter: 'Move Value' (move_value_filter)
+02:34:01.356:             - hide: 'Medien - Effects - Pinguine Verstecke-Übergang' (fade_transition)
+02:34:01.356:     - source: '[G] Welcome' (group)
+02:34:01.356:         - source: 'Medien - Effects - Konfetti' (ffmpeg_source)
+02:34:01.356:             - filter: 'Move Action' (move_action_filter)
+02:34:01.356:             - filter: 'Chroma Key' (chroma_key_filter_v2)
+02:34:01.356:             - show: 'Medien 2 Zeige-Übergang' (fade_transition)
+02:34:01.356:             - hide: 'Medien 2 Verstecke-Übergang' (fade_transition)
+02:34:01.356:         - source: 'Bild - Effects - Discokugel' (image_source)
+02:34:01.356:             - show: 'Bild - Effects - Discokugel Zeige-Übergang' (slide_transition)
+02:34:01.356:             - hide: 'Bild - Effects - Discokugel Verstecke-Übergang' (slide_transition)
+02:34:01.356:         - source: 'Medien - Effects - Magic Beat' (ffmpeg_source)
+02:34:01.356:             - monitoring: monitor and output
+02:34:01.356:             - filter: 'Move Value' (move_value_filter)
+02:34:01.356:             - filter: 'Move Action' (move_action_filter)
+02:34:01.356:             - filter: 'Move Value 2' (move_value_filter)
+02:34:01.356:             - show: 'Medien - Effects - Magic Beat Zeige-Übergang' (fade_transition)
+02:34:01.356:     - source: '[G] Command - wtf' (group)
+02:34:01.356:         - source: 'Command - Medien - WTF' (ffmpeg_source)
+02:34:01.356:             - monitoring: monitor and output
+02:34:01.356:             - filter: 'Move Value' (move_value_filter)
+02:34:01.356:             - filter: 'Move Action' (move_action_filter)
+02:34:01.356:         - source: 'Browser - Effects - Question Marks (10s)' (browser_source)
+02:34:01.356:             - filter: 'Move Action' (move_action_filter)
+02:34:01.356:             - filter: 'Chroma Key' (chroma_key_filter_v2)
+02:34:01.356:             - filter: 'Farbkorrektur' (color_filter_v2)
+02:34:01.356:             - show: 'Browser - Effects - Question Marks (10s) Zeige-Übergang' (fade_transition)
+02:34:01.356:             - hide: 'Browser - Effects - Question Marks (10s) Verstecke-Übergang' (fade_transition)
+02:34:01.356: - scene '[L] Latest':
+02:34:01.356:     - source: 'Browser - Donationgoal' (browser_source)
+02:34:01.356:         - show: 'Browser - Donationgoal Zeige-Übergang' (slide_transition)
+02:34:01.356:         - hide: 'Browser - Donationgoal Verstecke-Übergang' (slide_transition)
+02:34:01.356:     - source: 'Browser - Subgoal' (browser_source)
+02:34:01.356:         - show: 'Browser - Subgoal Zeige-Übergang' (slide_transition)
+02:34:01.356:         - hide: 'Browser - Subgoal Verstecke-Übergang' (slide_transition)
+02:34:01.356:     - source: 'Browser - Tip' (browser_source)
+02:34:01.356:         - show: 'Browser - Tip Zeige-Übergang' (slide_transition)
+02:34:01.356:         - hide: 'Browser - Tip Verstecke-Übergang' (slide_transition)
+02:34:01.356:     - source: 'Browser - Sub' (browser_source)
+02:34:01.356:         - show: 'Browser - Sub Zeige-Übergang' (slide_transition)
+02:34:01.356:         - hide: 'Browser - Sub Verstecke-Übergang' (slide_transition)
+02:34:01.356:     - source: 'Browser - Follower' (browser_source)
+02:34:01.356:         - show: 'Browser - Follower Zeige-Übergang' (slide_transition)
+02:34:01.356:         - hide: 'Browser - Follower Verstecke-Übergang' (slide_transition)
+02:34:01.356: - scene '[L] Audio':
+02:34:01.356:     - source: 'Microfon' (wasapi_input_capture)
+02:34:01.356:         - filter: 'Rausch-Gate' (noise_gate_filter)
+02:34:01.356:     - source: 'Discord' (wasapi_process_output_capture)
+02:34:01.356:     - source: 'TeamSpeak 3' (wasapi_process_output_capture)
+02:34:01.356:     - source: 'Spotify' (wasapi_process_output_capture)
+02:34:01.356:         - filter: 'Verstärkung' (gain_filter)
+02:34:01.356:     - source: 'Streamer.bot' (wasapi_process_output_capture)
+02:34:01.356:     - source: 'Mic Muted Sound' (vlc_source)
+02:34:01.356:         - monitoring: monitor only
+02:34:01.356:         - filter: 'Verstärkung' (gain_filter)
+02:34:01.356: ------------------------------------------------
+02:34:01.589: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+02:34:10.683: User switched to scene '[S] Main'
+02:34:29.545: [obs-websocket] [WebSocketServer::onOpen] New WebSocket client has connected from [::ffff:127.0.0.1]:54642
+02:35:01.583: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+02:38:44.750: warning: EOI missing, emulating
+02:39:44.597: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+02:40:33.668: User switched to scene '[L] Effects'
+02:40:34.593: User switched to scene '[L] Latest'
+02:40:44.598: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+02:41:50.316: User switched to scene '[S] Main'
+02:42:45.587: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+02:43:12.338: warning: EOI missing, emulating
+02:43:45.594: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+02:45:46.594: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+02:46:46.585: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+02:49:40.814: warning: EOI missing, emulating
+02:51:32.585: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+02:52:32.589: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+02:54:33.590: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+02:55:33.585: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+02:57:34.585: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+02:58:34.585: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+03:00:35.591: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+03:01:35.599: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+03:03:36.586: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+03:04:36.598: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+03:06:37.587: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+03:07:37.585: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+03:09:38.584: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+03:10:38.586: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+03:12:40.584: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+03:13:40.588: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+03:14:26.331: warning: EOI missing, emulating
+03:15:41.583: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+03:16:41.598: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+03:18:22.914: warning: EOI missing, emulating
+03:18:42.582: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+03:19:42.591: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+03:21:44.587: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+03:22:44.598: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+03:23:19.930: ==== Shutting down ==================================================
+03:23:20.095: WASAPI: Device 'Mikrofon (NVIDIA Broadcast)' Terminated
+03:23:20.098: WASAPI: Device '[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]' Terminated
+03:23:20.099: WASAPI: Device '[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]' Terminated
+03:23:20.100: WASAPI: Device '[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]' Terminated
+03:23:20.102: WASAPI: Device '[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]' Terminated
+03:23:20.110: WASAPI: Device '[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]' Terminated
+03:23:20.111: [obs-websocket] [WebSocketServer::onClose] WebSocket client `[::ffff:127.0.0.1]:53046` has disconnected with code `1006` and reason: End of File
+03:23:20.576: All scene data cleared
+03:23:20.576: ------------------------------------------------
+03:23:21.392: Tried to call obs_frontend_remove_event_callback with no callbacks!
+03:23:21.497: [obs-websocket] [obs_module_unload] Shutting down...
+03:23:21.497: [obs-websocket] [WebSocketServer::onClose] WebSocket client `[::ffff:127.0.0.1]:54642` has disconnected with code `1001` and reason: Server stopping.
+03:23:21.497: [obs-websocket] [WebSocketServer::ServerRunner] IO thread exited.
+03:23:21.498: [obs-websocket] [WebSocketServer::Stop] Server stopped successfully
+03:23:21.499: Tried to call obs_frontend_remove_event_callback with no callbacks!
+03:23:21.499: [obs-websocket] [obs_module_unload] Finished shutting down.
+03:23:21.606: [obs-backgroundremoval] plugin unloaded
+03:23:21.606: [NVIDIA Video Effect: '(null)']
+03:23:21.655: Tried to call obs_frontend_remove_event_callback with no callbacks!
+03:23:21.655: Tried to call obs_frontend_remove_event_callback with no callbacks!
+03:23:21.655: Tried to call obs_frontend_remove_save_callback with no callbacks!
+03:23:21.655: [Scripting] Total detached callbacks: 0
+03:23:21.656: Freeing OBS context data
+03:23:21.697: == Profiler Results =============================
+03:23:21.697: run_program_init: 3749.93 ms
+03:23:21.697:  ┣OBSApp::AppInit: 23.421 ms
+03:23:21.697:  ┃ ┗OBSApp::InitLocale: 1.586 ms
+03:23:21.697:  ┗OBSApp::OBSInit: 3688.86 ms
+03:23:21.697:    ┣obs_startup: 2.598 ms
+03:23:21.697:    ┗OBSBasic::OBSInit: 3484.3 ms
+03:23:21.697:      ┣OBSBasic::InitBasicConfig: 12.597 ms
+03:23:21.697:      ┣OBSBasic::ResetAudio: 0.123 ms
+03:23:21.697:      ┣OBSBasic::ResetVideo: 175.838 ms
+03:23:21.697:      ┃ ┗obs_init_graphics: 174.818 ms
+03:23:21.697:      ┃   ┗shader compilation: 57.046 ms
+03:23:21.697:      ┣OBSBasic::InitOBSCallbacks: 0.004 ms
+03:23:21.697:      ┣OBSBasic::InitHotkeys: 0.022 ms
+03:23:21.697:      ┣obs_load_all_modules2: 1235.39 ms
+03:23:21.697:      ┃ ┣obs_init_module(aja-output-ui.dll): 0.094 ms
+03:23:21.697:      ┃ ┣obs_init_module(aja.dll): 0.075 ms
+03:23:21.697:      ┃ ┣obs_init_module(browser-transition.dll): 0.005 ms
+03:23:21.697:      ┃ ┣obs_init_module(coreaudio-encoder.dll): 0.707 ms
+03:23:21.697:      ┃ ┣obs_init_module(decklink-captions.dll): 0 ms
+03:23:21.697:      ┃ ┣obs_init_module(decklink-output-ui.dll): 0 ms
+03:23:21.697:      ┃ ┣obs_init_module(decklink.dll): 0.878 ms
+03:23:21.697:      ┃ ┣obs_init_module(enc-amf.dll): 254.86 ms
+03:23:21.697:      ┃ ┣obs_init_module(frontend-tools.dll): 3.041 ms
+03:23:21.697:      ┃ ┣obs_init_module(image-source.dll): 0.012 ms
+03:23:21.697:      ┃ ┣obs_init_module(logi_obs_plugin_x64.dll): 1.268 ms
+03:23:21.697:      ┃ ┣obs_init_module(move-transition.dll): 29.724 ms
+03:23:21.697:      ┃ ┣obs_init_module(nv-filters.dll): 35.055 ms
+03:23:21.697:      ┃ ┣obs_init_module(obs-backgroundremoval.dll): 585.328 ms
+03:23:21.697:      ┃ ┣obs_init_module(obs-browser.dll): 0.51 ms
+03:23:21.697:      ┃ ┣obs_init_module(obs-ffmpeg.dll): 84.633 ms
+03:23:21.697:      ┃ ┣obs_init_module(obs-filters.dll): 0.034 ms
+03:23:21.697:      ┃ ┣obs_init_module(obs-nvenc.dll): 136.33 ms
+03:23:21.697:      ┃ ┃ ┗nvenc_check: 136.322 ms
+03:23:21.697:      ┃ ┣obs_init_module(obs-outputs.dll): 0.008 ms
+03:23:21.697:      ┃ ┣obs_init_module(obs-qsv11.dll): 37.783 ms
+03:23:21.697:      ┃ ┣obs_init_module(obs-text.dll): 0.189 ms
+03:23:21.697:      ┃ ┣obs_init_module(obs-transitions.dll): 0.017 ms
+03:23:21.697:      ┃ ┣obs_init_module(obs-vst.dll): 0.003 ms
+03:23:21.697:      ┃ ┣obs_init_module(obs-webrtc.dll): 0.006 ms
+03:23:21.697:      ┃ ┣obs_init_module(obs-websocket.dll): 4.722 ms
+03:23:21.697:      ┃ ┣obs_init_module(obs-x264.dll): 0.001 ms
+03:23:21.697:      ┃ ┣obs_init_module(rtmp-services.dll): 0.659 ms
+03:23:21.697:      ┃ ┣obs_init_module(scene-as-transition.dll): 0.018 ms
+03:23:21.697:      ┃ ┣obs_init_module(text-freetype2.dll): 0.068 ms
+03:23:21.697:      ┃ ┣obs_init_module(vlc-video.dll): 0.983 ms
+03:23:21.697:      ┃ ┣obs_init_module(win-capture.dll): 2.045 ms
+03:23:21.697:      ┃ ┣obs_init_module(win-dshow.dll): 0.869 ms
+03:23:21.697:      ┃ ┣obs_init_module(win-wasapi.dll): 3.158 ms
+03:23:21.697:      ┃ ┗reset_win32_symbol_paths: 0.126 ms
+03:23:21.697:      ┣OBSBasic::InitService: 1.359 ms
+03:23:21.697:      ┣OBSBasic::ResetOutputs: 0.563 ms
+03:23:21.697:      ┣OBSBasic::CreateHotkeys: 0.051 ms
+03:23:21.697:      ┣OBSBasic::InitPrimitives: 0.219 ms
+03:23:21.697:      ┗OBSBasic::Load: 1091.17 ms
+03:23:21.697: obs_hotkey_thread(25 ms): min=0.002 ms, median=0.011 ms, max=21.005 ms, 99th percentile=0.086 ms, 100% below 25 ms
+03:23:21.697: audio_thread(Audio): min=0.004 ms, median=0.074 ms, max=4.916 ms, 99th percentile=0.196 ms
+03:23:21.697: obs_graphics_thread(16.6667 ms): min=0.046 ms, median=0.32 ms, max=159.92 ms, 99th percentile=0.674 ms, 99.9983% below 16.667 ms
+03:23:21.697:  ┣tick_sources: min=0 ms, median=0.031 ms, max=159.704 ms, 99th percentile=0.344 ms
+03:23:21.697:  ┣output_frame: min=0.043 ms, median=0.236 ms, max=7.551 ms, 99th percentile=0.443 ms
+03:23:21.697:  ┃ ┗gs_context(video->graphics): min=0.043 ms, median=0.236 ms, max=7.547 ms, 99th percentile=0.442 ms
+03:23:21.697:  ┃   ┣render_video: min=0.002 ms, median=0.06 ms, max=5.255 ms, 99th percentile=0.29 ms
+03:23:21.697:  ┃   ┃ ┗render_main_texture: min=0.001 ms, median=0.059 ms, max=5.252 ms, 99th percentile=0.289 ms
+03:23:21.697:  ┃   ┗gs_flush: min=0.033 ms, median=0.1 ms, max=7.37 ms, 99th percentile=0.22 ms
+03:23:21.697:  ┗render_displays: min=0 ms, median=0.046 ms, max=1.373 ms, 99th percentile=0.154 ms
+03:23:21.697: =================================================
+03:23:21.697: == Profiler Time Between Calls ==================
+03:23:21.697: obs_hotkey_thread(25 ms): min=23.688 ms, median=25.526 ms, max=45.193 ms, 48.5865% within ±2% of 25 ms (0.00943777% lower, 51.4041% higher)
+03:23:21.697: obs_graphics_thread(16.6667 ms): min=6.737 ms, median=16.667 ms, max=159.925 ms, 99.8205% within ±2% of 16.667 ms (0.0905848% lower, 0.0888969% higher)
+03:23:21.697: =================================================
+03:23:21.706: Number of memory leaks: 2

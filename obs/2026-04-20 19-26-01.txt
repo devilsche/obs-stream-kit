@@ -1,0 +1,1340 @@
+19:26:01.352: CPU Name: AMD Ryzen 7 7800X3D 8-Core Processor           
+19:26:01.352: CPU Speed: 4200MHz
+19:26:01.352: Physical Cores: 8, Logical Cores: 16
+19:26:01.352: Physical Memory: 61118MB Total, 40169MB Free
+19:26:01.352: Windows Version: 10.0 Build 26200 (release: 25H2; revision: 8246; 64-bit)
+19:26:01.352: Running as administrator: true
+19:26:01.352: Windows 10/11 Gaming Features:
+19:26:01.352: 	Game Bar: On
+19:26:01.352: 	Game DVR: On
+19:26:01.352: 	Game DVR Background Recording: Off
+19:26:01.352: 	Game Mode: Probably On (no reg key set)
+19:26:01.353: Sec. Software Status:
+19:26:01.353: 	Microsoft Defender Antivirus: enabled (AV)
+19:26:01.354: 	Windows-Firewall: enabled (FW)
+19:26:01.354: Current Date/Time: 2026-04-20, 19:26:01
+19:26:01.354: Browser Hardware Acceleration: true
+19:26:01.354: Hide OBS windows from screen capture: false
+19:26:01.354: Qt Version: 6.8.3 (runtime), 6.8.3 (compiled)
+19:26:01.354: Portable mode: false
+19:26:01.409: OBS 32.1.1 (64-bit, windows)
+19:26:01.409: ---------------------------------
+19:26:01.508: ---------------------------------
+19:26:01.508: audio settings reset:
+19:26:01.508: 	samples per sec: 44100
+19:26:01.508: 	speakers:        2
+19:26:01.508: 	max buffering:   1044 milliseconds
+19:26:01.508: 	buffering type:  dynamically increasing
+19:26:01.509: ---------------------------------
+19:26:01.509: Initializing D3D11...
+19:26:01.509: Available Video Adapters: 
+19:26:01.524: 	Adapter 0: NVIDIA GeForce RTX 4080 SUPER
+19:26:01.524: 	  Dedicated VRAM: 16826499072 (15.7 GiB)
+19:26:01.524: 	  Shared VRAM:    32043712512 (29.8 GiB)
+19:26:01.524: 	  PCI ID:         10de:2702
+19:26:01.524: 	  HAGS Status:    Enabled (Default: No, Driver status: Supported)
+19:26:01.524: 	  Driver Version: 32.0.15.9174
+19:26:01.525: 	  output 0:
+19:26:01.525: 	    name=32GK850G
+19:26:01.525: 	    pos={0, 0}
+19:26:01.525: 	    size={2560, 1440}
+19:26:01.525: 	    attached=true
+19:26:01.525: 	    refresh=165
+19:26:01.525: 	    bits_per_color=8
+19:26:01.525: 	    space=RGB_FULL_G22_NONE_P709
+19:26:01.525: 	    primaries=[r=(0.639648, 0.330078), g=(0.299805, 0.599609), b=(0.150391, 0.059570), wp=(0.312500, 0.329102)]
+19:26:01.525: 	    relative_gamut_area=[709=0.998664, P3=0.736186, 2020=0.528164]
+19:26:01.525: 	    sdr_white_nits=80
+19:26:01.525: 	    nit_range=[min=0.500000, max=270.000000, max_full_frame=270.000000]
+19:26:01.525: 	    dpi=96 (100%)
+19:26:01.525: 	    id=\\?\DISPLAY#GSM7709#5&34baa38d&0&UID4353#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}
+19:26:01.525: 	    alt_id=\\.\DISPLAY1
+19:26:01.525: 	  output 1:
+19:26:01.525: 	    name=SAMSUNG
+19:26:01.525: 	    pos={2560, 1}
+19:26:01.525: 	    size={2560, 1440}
+19:26:01.525: 	    attached=true
+19:26:01.525: 	    refresh=60
+19:26:01.525: 	    bits_per_color=8
+19:26:01.525: 	    space=RGB_FULL_G22_NONE_P709
+19:26:01.525: 	    primaries=[r=(0.640625, 0.330078), g=(0.300781, 0.600586), b=(0.150391, 0.060547), wp=(0.280273, 0.290039)]
+19:26:01.525: 	    relative_gamut_area=[709=1.000494, P3=0.737535, 2020=0.529132]
+19:26:01.525: 	    sdr_white_nits=80
+19:26:01.525: 	    nit_range=[min=0.010000, max=1499.000000, max_full_frame=799.000000]
+19:26:01.525: 	    dpi=96 (100%)
+19:26:01.525: 	    id=\\?\DISPLAY#SAM7360#5&34baa38d&0&UID4352#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}
+19:26:01.525: 	    alt_id=\\.\DISPLAY2
+19:26:01.526: 	Adapter 1: AMD Radeon(TM) Graphics
+19:26:01.526: 	  Dedicated VRAM: 4267479040 (4.0 GiB)
+19:26:01.526: 	  Shared VRAM:    32043712512 (29.8 GiB)
+19:26:01.526: 	  PCI ID:         1002:164e
+19:26:01.526: 	  HAGS Status:    Disabled (Default: No, Driver status: Unsupported)
+19:26:01.526: 	  Driver Version: 32.0.21036.18
+19:26:01.526: 	  output 0:
+19:26:01.526: 	    name=DELL P2417H
+19:26:01.526: 	    pos={627, -1080}
+19:26:01.526: 	    size={1920, 1080}
+19:26:01.526: 	    attached=true
+19:26:01.526: 	    refresh=60
+19:26:01.526: 	    bits_per_color=8
+19:26:01.526: 	    space=RGB_FULL_G22_NONE_P709
+19:26:01.526: 	    primaries=[r=(0.652344, 0.335938), g=(0.321289, 0.610352), b=(0.153320, 0.060547), wp=(0.313477, 0.329102)]
+19:26:01.526: 	    relative_gamut_area=[709=1.017887, P3=0.750357, 2020=0.538331]
+19:26:01.526: 	    sdr_white_nits=80
+19:26:01.526: 	    nit_range=[min=0.500000, max=270.000000, max_full_frame=270.000000]
+19:26:01.526: 	    dpi=96 (100%)
+19:26:01.526: 	    id=\\?\DISPLAY#DELA0DB#5&9aefadb&0&UID256#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}
+19:26:01.526: 	    alt_id=\\.\DISPLAY5
+19:26:01.526: Loading up D3D11 on adapter NVIDIA GeForce RTX 4080 SUPER (0)
+19:26:01.620: D3D11 loaded successfully, feature level used: b000
+19:26:01.620: DXGI increase maximum frame latency success
+19:26:01.620: Hardware-Accelerated GPU Scheduling enabled on adapter!
+19:26:01.627: D3D11 GPU priority setup success
+19:26:01.685: ---------------------------------
+19:26:01.685: video settings reset:
+19:26:01.685: 	base resolution:   1920x1080
+19:26:01.685: 	output resolution: 1920x1080
+19:26:01.685: 	downscale filter:  Bicubic
+19:26:01.685: 	fps:               60/1
+19:26:01.685: 	format:            NV12
+19:26:01.685: 	YUV mode:          sRGB/Full
+19:26:01.685: NV12 texture support enabled
+19:26:01.685: P010 texture support not available
+19:26:01.686: Audio monitoring device:
+19:26:01.686: 	name: Lautsprecher (Sound Blaster Z)
+19:26:01.686: 	id: {0.0.0.00000000}.{143237b5-627f-4857-9d68-f296bb14be97}
+19:26:01.715: ---------------------------------
+19:26:01.717: No AJA devices found, skipping loading AJA UI plugin
+19:26:01.717: Failed to initialize module 'aja-output-ui.dll'
+19:26:01.717: No AJA devices found, skipping loading AJA plugin
+19:26:01.717: Failed to initialize module 'aja.dll'
+19:26:01.718: Failed to load 'de-DE' text for module: 'browser-transition.dll'
+19:26:01.718: [Browser Transition] loaded version 0.1.3
+19:26:01.718: Skipping module '../../obs-plugins/64bit/chrome_elf.dll', not an OBS plugin
+19:26:01.719: [CoreAudio encoder]: CoreAudio AAC encoder not installed on the system or couldn't be loaded
+19:26:01.719: Failed to load 'en-US' text for module: 'decklink-captions.dll'
+19:26:01.720: Failed to load 'en-US' text for module: 'decklink-output-ui.dll'
+19:26:01.721: A DeckLink iterator could not be created.  The DeckLink drivers may not be installed
+19:26:01.721: Failed to initialize module 'decklink.dll'
+19:26:01.721: Skipping module '../../obs-plugins/64bit/DirectML.dll', not an OBS plugin
+19:26:01.872: [AMF] Version 2.7.0 loaded (Compiled: 1.4.14.0, Runtime: 1.4.37.0, Library: 1.4.37.0;1.2;CL).
+19:26:01.921: [AMF] <Id: 1> Unable to set converter transfer characteristic, error AMF_NOT_FOUND (code 11)
+19:26:01.963: [AMF] <Id: 2> Unable to set converter transfer characteristic, error AMF_NOT_FOUND (code 11)
+19:26:01.966: [AMF] [Capability Manager] Testing Direct3D 11 Adapter 'AMD Radeon(TM) Graphics (VEN_1002/DEV_164e/SUB_7d751462/REV_00cb)':
+19:26:01.966:   H264/AVC: Supported
+19:26:01.966:   H265/HEVC: Supported
+19:26:01.966: 
+19:26:01.970: Skipping module '../../obs-plugins/64bit/libcef.dll', not an OBS plugin
+19:26:01.970: Skipping module '../../obs-plugins/64bit/libEGL.dll', not an OBS plugin
+19:26:01.970: Skipping module '../../obs-plugins/64bit/libGLESv2.dll', not an OBS plugin
+19:26:01.973: [Move Transition] loaded version 3.2.1
+19:26:01.973: [Move Transition]: NVIDIA AR version: 0.8.2.0
+19:26:01.999: [NVIDIA Audio Effects:] NVIDIA denoiser disabled, redistributable not found or could not be loaded.
+19:26:01.999: [NVIDIA VIDEO FX]: NVIDIA VIDEO FX version: 0.7.6.0
+19:26:02.028: [NVIDIA VIDEO FX]: enabled, redistributable found
+19:26:02.030: Failed to load 'de-DE' text for module: 'obs-backgroundremoval.dll'
+19:26:02.030: [obs-backgroundremoval] Plugin loaded successfully (version 1.1.12)
+19:26:02.030: [obs-backgroundremoval] Failed to open config file C:\Users\nic\AppData\Roaming\obs-studio/plugin_config/obs-backgroundremoval/config.ini
+19:26:02.030: [obs-backgroundremoval] Failed to open config file C:\Users\nic\AppData\Roaming\obs-studio/plugin_config/obs-backgroundremoval/config.ini
+19:26:02.821: [obs-backgroundremoval] Latest release is 1.3.7
+19:26:02.843: [obs-browser]: Version 2.26.8
+19:26:02.843: [obs-browser]: CEF Version 127.0.6533.120 (runtime), 127.145.7+g2b7d20b+chromium-127.0.6533.120 (compiled)
+19:26:03.057: [obs-nvenc] NVENC version: 12.2 (compiled) / 13.0 (driver), CUDA driver version: 13.10, AV1 supported: true
+19:26:03.098: [obs-websocket] [obs_module_load] you can haz websockets (Version: 5.7.3 | RPC Version: 1)
+19:26:03.098: [obs-websocket] [obs_module_load] Qt version (compile-time): 6.8.3 | Qt version (run-time): 6.8.3
+19:26:03.098: [obs-websocket] [obs_module_load] Linked ASIO Version: 103200
+19:26:03.102: [obs-websocket] [obs_module_load] Module loaded.
+19:26:03.104: [Scene As Transition] loaded version 1.1.1
+19:26:03.106: [vlc-video]: VLC 3.0.23 Vetinari found, VLC video source enabled
+19:26:03.114: ---------------------------------
+19:26:03.114:   Loaded Modules:
+19:26:03.114:     win-wasapi.dll
+19:26:03.114:     win-dshow.dll
+19:26:03.114:     win-capture.dll
+19:26:03.114:     vlc-video.dll
+19:26:03.114:     text-freetype2.dll
+19:26:03.114:     scene-as-transition.dll
+19:26:03.114:     rtmp-services.dll
+19:26:03.114:     obs-x264.dll
+19:26:03.114:     obs-websocket.dll
+19:26:03.114:     obs-webrtc.dll
+19:26:03.114:     obs-vst.dll
+19:26:03.114:     obs-transitions.dll
+19:26:03.114:     obs-text.dll
+19:26:03.114:     obs-qsv11.dll
+19:26:03.114:     obs-outputs.dll
+19:26:03.114:     obs-nvenc.dll
+19:26:03.114:     obs-filters.dll
+19:26:03.114:     obs-ffmpeg.dll
+19:26:03.114:     obs-browser.dll
+19:26:03.114:     obs-backgroundremoval.dll
+19:26:03.114:     nv-filters.dll
+19:26:03.114:     move-transition.dll
+19:26:03.114:     logi_obs_plugin_x64.dll
+19:26:03.114:     image-source.dll
+19:26:03.114:     frontend-tools.dll
+19:26:03.114:     enc-amf.dll
+19:26:03.114:     decklink-output-ui.dll
+19:26:03.114:     decklink-captions.dll
+19:26:03.114:     coreaudio-encoder.dll
+19:26:03.114:     browser-transition.dll
+19:26:03.114: ---------------------------------
+19:26:03.114: [obs-websocket] [obs_module_post_load] WebSocket server is enabled, starting...
+19:26:03.114: [obs-websocket] [WebSocketServer::Start] Not locked to IPv4 bindings
+19:26:03.114: [obs-websocket] [WebSocketServer::ServerRunner] IO thread started.
+19:26:03.118: [obs-websocket] [WebSocketServer::Start] Server started successfully on port 4455. Possible connect address: 2a02:8109:a81c:9c00:cd60:50f6:82b6:21c6
+19:26:03.124: ---------------------------------
+19:26:03.124: Available Encoders:
+19:26:03.124:   Video Encoders:
+19:26:03.124: 	- ffmpeg_svt_av1 (SVT-AV1)
+19:26:03.124: 	- ffmpeg_aom_av1 (AOM AV1)
+19:26:03.124: 	- h264_texture_amf (AMD HW H.264 (AVC))
+19:26:03.124: 	- h265_texture_amf (AMD HW H.265 (HEVC))
+19:26:03.124: 	- obs_nvenc_h264_tex (NVIDIA NVENC H.264)
+19:26:03.124: 	- obs_nvenc_hevc_tex (NVIDIA NVENC HEVC)
+19:26:03.124: 	- obs_nvenc_av1_tex (NVIDIA NVENC AV1)
+19:26:03.124: 	- obs_x264 (x264)
+19:26:03.124:   Audio Encoders:
+19:26:03.124: 	- ffmpeg_aac (FFmpeg AAC)
+19:26:03.124: 	- ffmpeg_opus (FFmpeg Opus)
+19:26:03.124: 	- ffmpeg_pcm_s16le (FFmpeg PCM (16 Bit))
+19:26:03.124: 	- ffmpeg_pcm_s24le (FFmpeg PCM (24 Bit))
+19:26:03.124: 	- ffmpeg_pcm_f32le (FFmpeg PCM (32 Bit Float))
+19:26:03.124: 	- ffmpeg_alac (FFmpeg ALAC (24 Bit))
+19:26:03.124: 	- ffmpeg_flac (FFmpeg FLAC (16 Bit))
+19:26:03.124: ==== Startup complete ===============================================
+19:26:03.158: All scene data cleared
+19:26:03.158: ------------------------------------------------
+19:26:03.285: ---------------------------------
+19:26:03.285: [DShow Device: 'Logitech BRIO'] settings updated: 
+19:26:03.285: 	video device: Logitech BRIO
+19:26:03.285: 	video path: \\?\usb#vid_046d&pid_085e&mi_00#9&1f5edb00&0&0000#{65e8773d-8f56-11d0-a3b9-00a0c9223196}\global
+19:26:03.285: 	resolution: 4096x2160
+19:26:03.285: 	flip: 0
+19:26:03.285: 	fps: 30.00 (interval: 333333)
+19:26:03.285: 	format: MJPEG
+19:26:03.285: 	buffering: disabled
+19:26:03.285: 	hardware decode: enabled
+19:26:03.285: [Media Source 'Medien']: settings:
+19:26:03.285: 	input:                   E:/#FRAPS/Streaming/yt1s.com - No Copyright Video Copyright Free  Motion Graphics Background Animation Green Screen YouTube_1080p.mp4
+19:26:03.285: 	input_format:            (null)
+19:26:03.285: 	speed:                   100
+19:26:03.285: 	is_looping:              yes
+19:26:03.285: 	is_linear_alpha:         no
+19:26:03.285: 	is_hw_decoding:          no
+19:26:03.285: 	is_clear_on_media_end:   no
+19:26:03.285: 	restart_on_activate:     yes
+19:26:03.285: 	close_when_inactive:     no
+19:26:03.285: 	full_decode:             no
+19:26:03.285: 	ffmpeg_options:          
+19:26:03.285: [win-wasapi: 'Microfon'] update settings:
+19:26:03.285: 	device id: {0.0.1.00000000}.{a36f3a89-8ab0-4d20-ba76-c795802a3fcc}
+19:26:03.285: 	use device timing: 0
+19:26:03.285: [win-wasapi: 'Discord'] update settings:
+19:26:03.285: 	executable: Discord.exe
+19:26:03.285: 	title: Freunde - Discord
+19:26:03.285: 	class: Chrome_WidgetWin_1
+19:26:03.285: 	priority: 0
+19:26:03.286: [win-wasapi: 'TeamSpeak 3'] update settings:
+19:26:03.286: 	executable: ts3client_win64.exe
+19:26:03.286: 	title: TeamSpeak 3
+19:26:03.286: 	class: Qt5152QWindowIcon
+19:26:03.286: 	priority: 0
+19:26:03.286: [win-wasapi: 'Spotify'] update settings:
+19:26:03.286: 	executable: Spotify.exe
+19:26:03.286: 	title: Tim Peters - Barcelona
+19:26:03.286: 	class: Chrome_WidgetWin_1
+19:26:03.286: 	priority: 0
+19:26:03.287: [WASAPISource::TryInitialize]:[[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]] Failed to find window
+19:26:03.287: [WASAPISource::TryInitialize]:[[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]] Failed to find window
+19:26:03.287: [WASAPISource::TryInitialize]:[[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]] Failed to find window
+19:26:03.287: WASAPI: Device '' failed to start (source: Spotify)
+19:26:03.287: WASAPI: Device '' failed to start (source: TeamSpeak 3)
+19:26:03.287: WASAPI: Device '' failed to start (source: Discord)
+19:26:03.306: WASAPI: Device 'Mikrofon (NVIDIA Broadcast)' [48000 Hz] initialized (source: Microfon)
+19:26:03.486: [obs-websocket] [WebSocketServer::onOpen] New WebSocket client has connected from [::ffff:127.0.0.1]:59808
+19:26:03.559: warning: deprecated pixel format used, make sure you did set range correctly
+19:26:03.815: warning: deprecated pixel format used, make sure you did set range correctly
+19:26:03.990: [win-wasapi: 'Streamer.bot'] update settings:
+19:26:03.990: 	executable: Streamer.bot.exe
+19:26:03.990: 	title: Streamer.bot - LkR.bot (v1.0.1)
+19:26:03.990: 	class: HwndWrapper[Streamer.bot.exe;UI;1786931c-fd51-4556-93fa-9a70f09fc64c]
+19:26:03.990: 	priority: 0
+19:26:03.991: [WASAPISource::TryInitialize]:[[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]] Failed to find window
+19:26:03.991: WASAPI: Device '' failed to start (source: Streamer.bot)
+19:26:04.055: [Media Source 'Medien - Effects - Luftballon']: settings:
+19:26:04.055: 	input:                   E:/#FRAPS/Streaming/Lustballons.mp4
+19:26:04.055: 	input_format:            (null)
+19:26:04.055: 	speed:                   100
+19:26:04.055: 	is_looping:              no
+19:26:04.055: 	is_linear_alpha:         no
+19:26:04.055: 	is_hw_decoding:          no
+19:26:04.055: 	is_clear_on_media_end:   yes
+19:26:04.055: 	restart_on_activate:     yes
+19:26:04.055: 	close_when_inactive:     no
+19:26:04.055: 	full_decode:             no
+19:26:04.055: 	ffmpeg_options:          
+19:26:04.056: [Media Source 'Medien - Effects - Strahler 1']: settings:
+19:26:04.056: 	input:                   E:/#FRAPS/Streaming/videoplayback.mp4
+19:26:04.056: 	input_format:            (null)
+19:26:04.056: 	speed:                   100
+19:26:04.056: 	is_looping:              yes
+19:26:04.056: 	is_linear_alpha:         no
+19:26:04.056: 	is_hw_decoding:          no
+19:26:04.056: 	is_clear_on_media_end:   yes
+19:26:04.056: 	restart_on_activate:     no
+19:26:04.056: 	close_when_inactive:     no
+19:26:04.056: 	full_decode:             no
+19:26:04.056: 	ffmpeg_options:          
+19:26:04.057: [win-wasapi: 'Fensteraufnahme (Audio)'] update settings:
+19:26:04.057: 	executable: TslGame.exe
+19:26:04.057: 	title: PUBG: BATTLEGROUNDS 
+19:26:04.057: 	class: UnrealWindow
+19:26:04.057: 	priority: 0
+19:26:04.057: [window-capture: 'Fensteraufnahme'] update settings:
+19:26:04.057: 	executable: TslGame.exe
+19:26:04.057: 	method selected: WGC
+19:26:04.057: 	method chosen: WGC
+19:26:04.057: 	force SDR: true
+19:26:04.058: [WASAPISource::TryInitialize]:[[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]] Failed to find window
+19:26:04.058: WASAPI: Device '' failed to start (source: Fensteraufnahme (Audio))
+19:26:04.061: [Media Source 'Medien - Effects - Pinguine']: settings:
+19:26:04.061: 	input:                   E:/#FRAPS/Streaming/Grafiken/streamer.bot/Oh Yes Green Screen.mp4
+19:26:04.061: 	input_format:            (null)
+19:26:04.061: 	speed:                   100
+19:26:04.061: 	is_looping:              no
+19:26:04.061: 	is_linear_alpha:         no
+19:26:04.061: 	is_hw_decoding:          no
+19:26:04.061: 	is_clear_on_media_end:   yes
+19:26:04.061: 	restart_on_activate:     yes
+19:26:04.061: 	close_when_inactive:     no
+19:26:04.061: 	full_decode:             no
+19:26:04.061: 	ffmpeg_options:          
+19:26:04.065: [Media Source 'Medien - Effects - Konfetti']: settings:
+19:26:04.065: 	input:                   E:/#FRAPS/Streaming/Grafiken/streamer.bot/falling-confetti-three-dimensional-shiny.mov
+19:26:04.065: 	input_format:            (null)
+19:26:04.065: 	speed:                   100
+19:26:04.065: 	is_looping:              no
+19:26:04.065: 	is_linear_alpha:         no
+19:26:04.065: 	is_hw_decoding:          no
+19:26:04.065: 	is_clear_on_media_end:   yes
+19:26:04.065: 	restart_on_activate:     yes
+19:26:04.065: 	close_when_inactive:     no
+19:26:04.065: 	full_decode:             no
+19:26:04.065: 	ffmpeg_options:          
+19:26:04.066: [Media Source 'Medien - Effects - Magic Beat']: settings:
+19:26:04.066: 	input:                   E:/#FRAPS/Streaming/Sounds/magic-beat-151786.mp3
+19:26:04.066: 	input_format:            (null)
+19:26:04.066: 	speed:                   100
+19:26:04.066: 	is_looping:              yes
+19:26:04.066: 	is_linear_alpha:         no
+19:26:04.066: 	is_hw_decoding:          no
+19:26:04.066: 	is_clear_on_media_end:   yes
+19:26:04.066: 	restart_on_activate:     yes
+19:26:04.066: 	close_when_inactive:     no
+19:26:04.066: 	full_decode:             no
+19:26:04.066: 	ffmpeg_options:          
+19:26:04.071: [Media Source 'Command - Medien - WTF']: settings:
+19:26:04.071: 	input:                   E:/#FRAPS/Streaming/Sounds/xfiles.mp3
+19:26:04.071: 	input_format:            (null)
+19:26:04.071: 	speed:                   100
+19:26:04.071: 	is_looping:              no
+19:26:04.071: 	is_linear_alpha:         no
+19:26:04.071: 	is_hw_decoding:          no
+19:26:04.071: 	is_clear_on_media_end:   yes
+19:26:04.071: 	restart_on_activate:     yes
+19:26:04.071: 	close_when_inactive:     no
+19:26:04.071: 	full_decode:             no
+19:26:04.071: 	ffmpeg_options:          
+19:26:04.083: warning: Estimating duration from bitrate, this may be inaccurate
+19:26:04.089: warning: Could not update timestamps for skipped samples.
+19:26:04.101: Switched to scene '[L] Effects'
+19:26:04.101: ------------------------------------------------
+19:26:04.101: Loaded scenes:
+19:26:04.101: - scene '[S] Start':
+19:26:04.101:     - source: 'Musik - no copyright' (vlc_source)
+19:26:04.101:     - source: '[G] Start - Content' (group)
+19:26:04.101:         - source: 'Browser - Start' (browser_source)
+19:26:04.101:         - source: '[L] Latest' (scene)
+19:26:04.101:     - source: '[L] UI' (scene)
+19:26:04.101:     - source: '[L] Overlay' (scene)
+19:26:04.101:     - filter: 'Entry Ads - start' (move_source_filter)
+19:26:04.101:     - filter: 'Entry Ads - end' (move_source_filter)
+19:26:04.101: - scene '[S] Main':
+19:26:04.101:     - source: '[L] Audio' (scene)
+19:26:04.101:     - source: '[L] UI' (scene)
+19:26:04.101:     - source: '[G] Main - Content ' (group)
+19:26:04.101:         - source: 'Medien' (ffmpeg_source)
+19:26:04.101:         - source: 'Fensteraufnahme' (window_capture)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:         - source: 'Bild - Cam Background' (image_source)
+19:26:04.101:             - filter: 'Zuschneiden/Pad' (crop_filter)
+19:26:04.101:             - show: 'Bild - Cam Background Zeige-Übergang' (fade_transition)
+19:26:04.101:             - hide: 'Bild - Cam Background Verstecke-Übergang' (fade_transition)
+19:26:04.101:         - source: 'Logitech BRIO' (dshow_input)
+19:26:04.101:             - filter: 'NVIDIA-Hintergrundentfernung' (nv_greenscreen_filter)
+19:26:04.101:             - filter: 'Zuschneiden/Pad' (crop_filter)
+19:26:04.101:             - show: 'Logitech BRIO Zeige-Übergang' (fade_transition)
+19:26:04.101:             - hide: 'Logitech BRIO Verstecke-Übergang' (fade_transition)
+19:26:04.101:         - source: 'Browser -  Cam Overlay' (browser_source)
+19:26:04.101:             - filter: 'Chroma Key' (chroma_key_filter_v2)
+19:26:04.101:             - show: 'Browser -  Cam Overlay Zeige-Übergang' (fade_transition)
+19:26:04.101:             - hide: 'Browser -  Cam Overlay Verstecke-Übergang' (fade_transition)
+19:26:04.101:         - source: 'Browser - Gameplay' (browser_source)
+19:26:04.101:         - source: '[L] Latest' (scene)
+19:26:04.101:         - source: '[L] Effects' (scene)
+19:26:04.101:     - source: '[L] Overlay' (scene)
+19:26:04.101:     - filter: 'Entry Ads - start' (move_source_filter)
+19:26:04.101:     - filter: 'Entry Ads - end' (move_source_filter)
+19:26:04.101: - scene '[S] BRB':
+19:26:04.101:     - source: 'Musik - no copyright' (vlc_source)
+19:26:04.101:     - source: '[L] UI' (scene)
+19:26:04.101:     - source: '[L] Audio' (scene)
+19:26:04.101:     - source: '[G] BRB - Content' (group)
+19:26:04.101:         - source: 'Browser - BRB' (browser_source)
+19:26:04.101:         - source: '[L] Latest' (scene)
+19:26:04.101:         - source: '[L] Effects' (scene)
+19:26:04.101:     - source: '[L] Overlay' (scene)
+19:26:04.101:     - filter: 'Entry Ads - start' (move_source_filter)
+19:26:04.101:     - filter: 'Entry Ads - end' (move_source_filter)
+19:26:04.101: - scene '[S] Cam':
+19:26:04.101:     - source: '[L] Audio' (scene)
+19:26:04.101:     - source: '[G] Cam + Chat - Content' (group)
+19:26:04.101:         - filter: 'Chroma Key' (chroma_key_filter_v2)
+19:26:04.101:         - source: 'Bild - Cam Background 2' (image_source)
+19:26:04.101:             - filter: 'Zuschneiden/Pad' (crop_filter)
+19:26:04.101:         - source: '[L] Cam' (scene)
+19:26:04.101:         - source: 'Browser - Just chatting' (browser_source)
+19:26:04.101:         - source: '[L] Latest' (scene)
+19:26:04.101:         - source: '[L] Effects' (scene)
+19:26:04.101:         - source: 'Twitch Chat' (browser_source)
+19:26:04.101:             - filter: 'Farbkorrektur' (color_filter_v2)
+19:26:04.101:     - source: '[L] UI' (scene)
+19:26:04.101:     - source: '[L] Overlay' (scene)
+19:26:04.101:     - filter: 'Entry Ads - start' (move_source_filter)
+19:26:04.101:     - filter: 'Entry Ads - end' (move_source_filter)
+19:26:04.101: - scene '[S] End':
+19:26:04.101:     - source: 'Musik - no copyright' (vlc_source)
+19:26:04.101:     - source: '[G] End - Content' (group)
+19:26:04.101:         - source: 'Browser - End' (browser_source)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:         - source: '[L] Latest' (scene)
+19:26:04.101:     - source: '[L] UI' (scene)
+19:26:04.101:     - source: '[L] Overlay' (scene)
+19:26:04.101:     - filter: 'Entry Ads - start' (move_source_filter)
+19:26:04.101:     - filter: 'Entry Ads - end' (move_source_filter)
+19:26:04.101: - scene '[L] Cam':
+19:26:04.101:     - source: 'Logitech BRIO' (dshow_input)
+19:26:04.101:         - filter: 'NVIDIA-Hintergrundentfernung' (nv_greenscreen_filter)
+19:26:04.101:         - filter: 'Zuschneiden/Pad' (crop_filter)
+19:26:04.101: - scene '[L] Overlay':
+19:26:04.101:     - source: '[G] Widgets' (group)
+19:26:04.101:         - source: 'Browser - Widget - Welcome' (browser_source)
+19:26:04.101:             - show: 'Browser - Widget - Welcome Zeige-Übergang' (fade_transition)
+19:26:04.101:             - hide: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+19:26:04.101:         - source: 'Browser - Banner - Tip Goal' (browser_source)
+19:26:04.101:             - show: 'Browser - Banner - Tip Goal Zeige-Übergang' (fade_transition)
+19:26:04.101:             - hide: 'Browser - Banner - Tip Goal Verstecke-Übergang' (slide_transition)
+19:26:04.101:     - source: '[G] Flares' (group)
+19:26:04.101:         - source: 'Browser - Effects - Lens Flare 1 (4s)' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Lens Flare 2 (4s)' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Lens Flare 3 (4s)' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Lens Flare 4 (4s)' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Lens Flare 5 (4s)' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Lens Flare 6 (4s)' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Lens Flare 7 (5s)' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:     - source: '[G] Alerts' (group)
+19:26:04.101:         - source: 'Browser - Alert - Tip' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:             - show: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+19:26:04.101:             - hide: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+19:26:04.101:         - source: 'Browser - Alert - Sub' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:             - show: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+19:26:04.101:             - hide: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+19:26:04.101:         - source: 'Browser - Alert - Follow' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:             - show: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+19:26:04.101:             - hide: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+19:26:04.101:         - source: 'Browser - Alert - Raid' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:             - show: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+19:26:04.101:             - hide: 'Browser - Widget - Welcome Verstecke-Übergang' (fade_transition)
+19:26:04.101:         - source: 'Browser - Alert - Subgift' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:     - source: 'Browser - Logo' (browser_source)
+19:26:04.101: - scene '[L] UI':
+19:26:04.101:     - source: 'Entry Ads' (browser_source)
+19:26:04.101: - scene '[L] Effects':
+19:26:04.101:     - source: '[G] Effects - Stinger' (group)
+19:26:04.101:         - source: 'Browser - Effects - Nani (4s)' (browser_source)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Luke (4s)' (browser_source)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Trap (5s)' (browser_source)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Crash (2s)' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Noice (3s)' (browser_source)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Smort (3s)' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Cool (6s)' (browser_source)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Over 9000 (4s)' (browser_source)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Kamehameha (8s)' (browser_source)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Super Saiyan (11s)' (browser_source)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Indeed (4s)' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Chevron Locked (5s)' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Crying Out Loud (4s)' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Khan (7s)' (browser_source)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Make It So (5s)' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Engage (4s)' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Resistance Futile (17s)' (browser_source)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Kickers (9s)' (browser_source)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:             - filter: 'Luma Key' (luma_key_filter_v2)
+19:26:04.101:         - source: 'Browser - Effects - Heart (15s)' (browser_source)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - GG (6s)' (browser_source)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Snow (Loop)' (browser_source)
+19:26:04.101:             - filter: 'Farbkorrektur' (color_filter_v2)
+19:26:04.101:             - filter: 'Scrollen' (scroll_filter)
+19:26:04.101:             - filter: 'Skalierung/Seitenverhältnis' (scale_filter)
+19:26:04.101:             - show: 'Browser - Effects - Snow (Loop) Zeige-Übergang' (fade_transition)
+19:26:04.101:             - hide: 'Browser - Effects - Snow (Loop) Verstecke-Übergang' (fade_transition)
+19:26:04.101:         - source: 'Browser - Effects - Explosion (15s)' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Particle Swirl (6s)' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:     - source: '[G] streamer.bot' (group)
+19:26:04.101:         - source: 'Medien - Effects - Luftballon' (ffmpeg_source)
+19:26:04.101:             - filter: 'Chroma Key' (chroma_key_filter_v2)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:             - hide: 'Medien - Effects - Luftballon Verstecke-Übergang' (fade_transition)
+19:26:04.101:         - source: 'Medien - Effects - Strahler 1' (ffmpeg_source)
+19:26:04.101:             - filter: 'Chroma Key' (chroma_key_filter_v2)
+19:26:04.101:             - show: 'Medien - Effects - Strahler 1 Zeige-Übergang' (fade_transition)
+19:26:04.101:             - hide: 'Medien - Effects - Strahler 1 Verstecke-Übergang' (fade_transition)
+19:26:04.101:         - source: 'Medien - Effects - Pinguine' (ffmpeg_source)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:             - filter: 'Chroma Key' (chroma_key_filter_v2)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:             - filter: 'Move Value' (move_value_filter)
+19:26:04.101:             - hide: 'Medien - Effects - Pinguine Verstecke-Übergang' (fade_transition)
+19:26:04.101:     - source: '[G] Welcome' (group)
+19:26:04.101:         - source: 'Medien - Effects - Konfetti' (ffmpeg_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:             - filter: 'Chroma Key' (chroma_key_filter_v2)
+19:26:04.101:             - show: 'Medien 2 Zeige-Übergang' (fade_transition)
+19:26:04.101:             - hide: 'Medien 2 Verstecke-Übergang' (fade_transition)
+19:26:04.101:         - source: 'Bild - Effects - Discokugel' (image_source)
+19:26:04.101:             - show: 'Bild - Effects - Discokugel Zeige-Übergang' (slide_transition)
+19:26:04.101:             - hide: 'Bild - Effects - Discokugel Verstecke-Übergang' (slide_transition)
+19:26:04.101:         - source: 'Medien - Effects - Magic Beat' (ffmpeg_source)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:             - filter: 'Move Value' (move_value_filter)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:             - filter: 'Move Value 2' (move_value_filter)
+19:26:04.101:             - show: 'Medien - Effects - Magic Beat Zeige-Übergang' (fade_transition)
+19:26:04.101:     - source: '[G] Command - wtf' (group)
+19:26:04.101:         - source: 'Command - Medien - WTF' (ffmpeg_source)
+19:26:04.101:             - monitoring: monitor and output
+19:26:04.101:             - filter: 'Move Value' (move_value_filter)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:         - source: 'Browser - Effects - Question Marks (10s)' (browser_source)
+19:26:04.101:             - filter: 'Move Action' (move_action_filter)
+19:26:04.101:             - filter: 'Chroma Key' (chroma_key_filter_v2)
+19:26:04.101:             - filter: 'Farbkorrektur' (color_filter_v2)
+19:26:04.101:             - show: 'Browser - Effects - Question Marks (10s) Zeige-Übergang' (fade_transition)
+19:26:04.101:             - hide: 'Browser - Effects - Question Marks (10s) Verstecke-Übergang' (fade_transition)
+19:26:04.101: - scene '[L] Latest':
+19:26:04.101:     - source: 'Browser - Donationgoal' (browser_source)
+19:26:04.101:         - show: 'Browser - Donationgoal Zeige-Übergang' (slide_transition)
+19:26:04.101:         - hide: 'Browser - Donationgoal Verstecke-Übergang' (slide_transition)
+19:26:04.101:     - source: 'Browser - Subgoal' (browser_source)
+19:26:04.101:         - show: 'Browser - Subgoal Zeige-Übergang' (slide_transition)
+19:26:04.101:         - hide: 'Browser - Subgoal Verstecke-Übergang' (slide_transition)
+19:26:04.101:     - source: 'Browser - Tip' (browser_source)
+19:26:04.101:         - show: 'Browser - Tip Zeige-Übergang' (slide_transition)
+19:26:04.101:         - hide: 'Browser - Tip Verstecke-Übergang' (slide_transition)
+19:26:04.101:     - source: 'Browser - Sub' (browser_source)
+19:26:04.101:         - show: 'Browser - Sub Zeige-Übergang' (slide_transition)
+19:26:04.101:         - hide: 'Browser - Sub Verstecke-Übergang' (slide_transition)
+19:26:04.101:     - source: 'Browser - Follower' (browser_source)
+19:26:04.101:         - show: 'Browser - Follower Zeige-Übergang' (slide_transition)
+19:26:04.101:         - hide: 'Browser - Follower Verstecke-Übergang' (slide_transition)
+19:26:04.101: - scene '[L] Audio':
+19:26:04.101:     - source: 'Microfon' (wasapi_input_capture)
+19:26:04.101:     - source: 'Discord' (wasapi_process_output_capture)
+19:26:04.101:     - source: 'TeamSpeak 3' (wasapi_process_output_capture)
+19:26:04.101:     - source: 'Spotify' (wasapi_process_output_capture)
+19:26:04.101:         - filter: 'Verstärkung' (gain_filter)
+19:26:04.101:     - source: 'Streamer.bot' (wasapi_process_output_capture)
+19:26:04.101:     - source: 'Mic Muted Sound' (vlc_source)
+19:26:04.101:         - monitoring: monitor and output
+19:26:04.101: ------------------------------------------------
+19:26:04.587: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:26:12.078: [obs-websocket] [WebSocketServer::onOpen] New WebSocket client has connected from [::ffff:127.0.0.1]:54849
+19:26:15.059: User switched to scene '[S] Main'
+19:27:04.583: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:27:33.102: WASAPI: Device '[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]' [44100 Hz] initialized (source: TeamSpeak 3)
+19:27:33.159: adding 46 milliseconds of audio buffering, total audio buffering is now 46 milliseconds (source: TeamSpeak 3)
+19:27:33.159: 
+19:28:01.614: User switched to scene '[S] Start'
+19:31:47.595: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:32:47.594: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:35:45.080: warning: EOI missing, emulating
+19:37:33.596: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:38:33.599: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:40:34.584: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:41:34.589: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:42:25.828: warning: EOI missing, emulating
+19:43:35.594: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:44:35.586: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:46:36.596: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:47:36.592: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:49:37.590: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:50:37.595: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:52:39.587: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:53:39.590: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:55:40.597: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:56:40.595: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:58:41.582: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+19:59:41.599: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:01:04.947: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:01:42.587: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:02:42.592: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:04:43.588: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:05:43.599: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:05:47.485: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:06:19.368: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:07:45.591: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:07:46.499: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:08:45.587: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:10:46.596: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:10:53.490: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:11:36.623: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:11:46.597: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:12:21.204: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:13:47.588: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:14:47.597: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:17:59.969: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:19:06.804: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:19:33.591: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:20:33.593: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:21:56.143: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:22:35.597: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:23:35.587: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:23:51.369: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:24:33.660: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:25:18.227: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:25:36.590: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:26:36.599: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:28:37.590: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:29:37.595: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:30:25.481: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:31:39.583: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:32:39.597: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:34:41.600: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:35:41.591: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:37:43.584: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:38:43.588: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:40:17.487: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:40:45.586: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:41:45.585: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:42:01.318: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:43:46.592: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:44:46.598: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:47:59.758: warning: EOI missing, emulating
+20:49:32.596: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:50:32.586: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:52:33.591: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:53:33.588: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:55:04.119: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:55:35.592: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:56:35.597: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:58:07.495: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:58:37.586: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:58:52.111: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+20:59:37.586: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+20:59:53.058: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:00:35.976: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:01:38.586: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:02:38.600: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:04:31.463: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:04:40.591: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:05:40.601: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:06:33.592: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:07:18.402: warning: EOI missing, emulating
+21:07:41.588: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:08:41.590: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:10:01.284: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:10:43.588: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:11:08.347: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:11:10.650: warning: EOI missing, emulating
+21:11:43.599: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:13:44.586: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:14:44.593: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:15:07.555: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:16:21.418: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:16:46.596: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:17:46.585: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:17:48.514: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:19:17.777: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:21:13.746: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:21:53.121: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:22:32.591: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:23:32.594: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:23:49.667: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:25:34.590: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:25:41.795: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:26:05.015: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:26:34.596: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:27:55.657: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:28:36.587: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:28:40.038: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:29:36.595: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=36ef59e3f63eb6a4a351:2)
+21:30:50.532: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:31:15.882: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:31:37.594: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+21:32:37.588: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+21:34:39.587: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+21:34:47.838: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:35:28.255: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:35:39.594: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+21:37:10.988: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:37:41.590: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+21:37:53.216: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:38:37.371: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:38:41.592: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+21:39:50.928: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:40:42.587: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+21:41:42.590: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+21:43:27.985: User switched to scene '[S] Main'
+21:43:30.993: WASAPI: Device '[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]' [44100 Hz] initialized (source: Fensteraufnahme (Audio))
+21:43:43.587: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+21:44:43.589: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+21:45:06.381: User is ignoring service bitrate limits.
+21:45:06.381: Service Recommendations:
+21:45:06.381: 	video bitrate: 6000
+21:45:06.381: 	audio bitrate: 320
+21:45:06.385: Go live URL: https://ingest.twitch.tv/api/v3/GetClientConfiguration
+21:45:06.385: Preparing enhanced broadcasting stream for:
+21:45:06.385:     custom config:  No
+21:45:06.385:     config url:     https://ingest.twitch.tv/api/v3/GetClientConfiguration
+21:45:06.385:   settings:
+21:45:06.385:     service:               Twitch
+21:45:06.385:     max aggregate bitrate: Set (8000)
+21:45:06.385:     max video tracks:      Set (0)
+21:45:06.385:     custom rtmp url:       No ('')
+21:45:06.385:     vod track:             No
+21:45:06.385:     canvases:              Main
+21:45:06.386: Go live POST data: {"authentication":"CENSORED","capabilities":{"cpu":{"logical_cores":16,"name":"AMD Ryzen 7 7800X3D 8-Core Processor           ","physical_cores":8,"speed":4200},"gaming_features":{"game_bar_enabled":true,"game_dvr_allowed":null,"game_dvr_bg_recording":false,"game_dvr_enabled":true,"game_mode_enabled":null,"hags_enabled":false},"gpu":[{"dedicated_video_memory":16826499072,"device_id":9986,"driver_version":"32.0.15.9174","model":"NVIDIA GeForce RTX 4080 SUPER","shared_system_memory":32043712512,"vendor_id":4318},{"dedicated_video_memory":4267479040,"device_id":5710,"driver_version":"32.0.21036.18","model":"AMD Radeon(TM) Graphics","shared_system_memory":32043712512,"vendor_id":4098}],"memory":{"free":32705396736,"total":64087425024},"system":{"arm":false,"armEmulation":false,"bits":64,"build":26200,"name":"Windows","release":"25H2","revision":"8246","version":"10.0"}},"client":{"name":"obs-studio","supported_codecs":["av1","h264","h265"],"version":"32.1.1"},"preferences":{"audio_channels":2,"audio_fixed_buffering":false,"audio_max_buffering_ms":1044,"audio_samples_per_sec":44100,"canvases":[{"canvas_height":1080,"canvas_width":1920,"framerate":{"denominator":1,"numerator":60},"height":1080,"width":1920}],"composition_gpu_index":0,"maximum_aggregate_bitrate":8000,"maximum_video_tracks":0,"vod_track_audio":false},"schema_version":"2025-01-25","service":"IVS"}
+21:45:06.786: Go live response data: {
+21:45:06.786:     "audio_configurations": {
+21:45:06.786:         "live": [
+21:45:06.786:             {
+21:45:06.786:                 "channels": 2,
+21:45:06.786:                 "codec": "aac",
+21:45:06.786:                 "settings": {
+21:45:06.786:                     "bitrate": 160
+21:45:06.786:                 },
+21:45:06.786:                 "track_id": 0
+21:45:06.786:             }
+21:45:06.786:         ],
+21:45:06.786:         "vod": []
+21:45:06.786:     },
+21:45:06.786:     "encoder_configurations": [
+21:45:06.786:         {
+21:45:06.786:             "bitrate_interpolation_points": [
+21:45:06.786:                 0,
+21:45:06.786:                 2250,
+21:45:06.786:                 3000,
+21:45:06.786:                 4500
+21:45:06.786:             ],
+21:45:06.786:             "canvas_index": 0,
+21:45:06.786:             "framerate": {
+21:45:06.786:                 "denominator": 1,
+21:45:06.786:                 "numerator": 60
+21:45:06.786:             },
+21:45:06.786:             "gpu_scale_type": "OBS_SCALE_BICUBIC",
+21:45:06.786:             "height": 720,
+21:45:06.786:             "settings": {
+21:45:06.786:                 "adaptive_quantization": true,
+21:45:06.786:                 "bf": 2,
+21:45:06.786:                 "bitrate": 4500,
+21:45:06.786:                 "keyint_sec": 2,
+21:45:06.786:                 "lookahead": true,
+21:45:06.786:                 "multipass": "qres",
+21:45:06.786:                 "opts": "lookaheadDepth=4",
+21:45:06.786:                 "preset": "p6",
+21:45:06.786:                 "profile": "high",
+21:45:06.786:                 "rate_control": "CBR",
+21:45:06.786:                 "tune": "hq"
+21:45:06.786:             },
+21:45:06.786:             "type": "obs_nvenc_h264_tex",
+21:45:06.786:             "width": 1280
+21:45:06.786:         },
+21:45:06.786:         {
+21:45:06.786:             "bitrate_interpolation_points": [
+21:45:06.786:                 0,
+21:45:06.786:                 1000,
+21:45:06.786:                 1000,
+21:45:06.786:                 1000
+21:45:06.786:             ],
+21:45:06.786:             "canvas_index": 0,
+21:45:06.786:             "framerate": {
+21:45:06.786:                 "denominator": 1,
+21:45:06.786:                 "numerator": 30
+21:45:06.786:             },
+21:45:06.786:             "gpu_scale_type": "OBS_SCALE_BILINEAR",
+21:45:06.786:             "height": 480,
+21:45:06.786:             "settings": {
+21:45:06.786:                 "adaptive_quantization": false,
+21:45:06.786:                 "bf": 2,
+21:45:06.786:                 "bitrate": 1000,
+21:45:06.786:                 "keyint_sec": 2,
+21:45:06.786:                 "lookahead": false,
+21:45:06.786:                 "multipass": "qres",
+21:45:06.786:                 "preset": "p5",
+21:45:06.786:                 "profile": "high",
+21:45:06.786:                 "rate_control": "CBR",
+21:45:06.786:                 "tune": "hq"
+21:45:06.786:             },
+21:45:06.786:             "type": "obs_nvenc_h264_tex",
+21:45:06.786:             "width": 852
+21:45:06.786:         },
+21:45:06.786:         {
+21:45:06.786:             "bitrate_interpolation_points": [
+21:45:06.786:                 0,
+21:45:06.786:                 500,
+21:45:06.786:                 500,
+21:45:06.786:                 500
+21:45:06.786:             ],
+21:45:06.786:             "canvas_index": 0,
+21:45:06.786:             "framerate": {
+21:45:06.786:                 "denominator": 1,
+21:45:06.786:                 "numerator": 30
+21:45:06.786:             },
+21:45:06.786:             "gpu_scale_type": "OBS_SCALE_BICUBIC",
+21:45:06.786:             "height": 360,
+21:45:06.786:             "settings": {
+21:45:06.786:                 "adaptive_quantization": false,
+21:45:06.786:                 "bf": 2,
+21:45:06.786:                 "bitrate": 500,
+21:45:06.786:                 "keyint_sec": 2,
+21:45:06.786:                 "lookahead": false,
+21:45:06.786:                 "multipass": "qres",
+21:45:06.786:                 "preset": "p5",
+21:45:06.786:                 "profile": "main",
+21:45:06.786:                 "rate_control": "CBR",
+21:45:06.786:                 "tune": "hq"
+21:45:06.786:             },
+21:45:06.786:             "type": "obs_nvenc_h264_tex",
+21:45:06.786:             "width": 640
+21:45:06.786:         },
+21:45:06.786:         {
+21:45:06.786:             "bitrate_interpolation_points": [
+21:45:06.786:                 0,
+21:45:06.786:                 200,
+21:45:06.786:                 200,
+21:45:06.786:                 200
+21:45:06.786:             ],
+21:45:06.786:             "canvas_index": 0,
+21:45:06.786:             "framerate": {
+21:45:06.786:                 "denominator": 1,
+21:45:06.786:                 "numerator": 30
+21:45:06.786:             },
+21:45:06.786:             "gpu_scale_type": "OBS_SCALE_BILINEAR",
+21:45:06.786:             "height": 160,
+21:45:06.786:             "settings": {
+21:45:06.786:                 "adaptive_quantization": false,
+21:45:06.786:                 "bf": 2,
+21:45:06.786:                 "bitrate": 200,
+21:45:06.786:                 "keyint_sec": 2,
+21:45:06.786:                 "lookahead": false,
+21:45:06.786:                 "multipass": "qres",
+21:45:06.786:                 "preset": "p5",
+21:45:06.786:                 "profile": "main",
+21:45:06.786:                 "rate_control": "CBR",
+21:45:06.786:                 "tune": "hq"
+21:45:06.786:             },
+21:45:06.786:             "type": "obs_nvenc_h264_tex",
+21:45:06.786:             "width": 284
+21:45:06.786:         }
+21:45:06.786:     ],
+21:45:06.786:     "ingest_endpoints": [
+21:45:06.786:         {
+21:45:06.786:             "authentication": "CENSORED",
+21:45:06.786:             "protocol": "RTMP",
+21:45:06.786:             "url_template": "rtmp://ingest.global-contribute.live-video.net/app/{stream_key}"
+21:45:06.786:         },
+21:45:06.786:         {
+21:45:06.786:             "authentication": "CENSORED",
+21:45:06.786:             "protocol": "RTMPS",
+21:45:06.786:             "url_template": "rtmps://ingest.global-contribute.live-video.net/app/{stream_key}"
+21:45:06.786:         }
+21:45:06.786:     ],
+21:45:06.786:     "meta": {
+21:45:06.786:         "config_id": "9d61863a-170e-4b36-b250-1161939f1396",
+21:45:06.786:         "required_encode_resource_estimate_percent": 6,
+21:45:06.786:         "schema_version": "2025-01-25",
+21:45:06.786:         "service": "IVS"
+21:45:06.786:     }
+21:45:06.786: }
+21:45:06.787: Enhanced broadcasting config_id: '9d61863a-170e-4b36-b250-1161939f1396'
+21:45:06.787: Setting frame rate divisor to 2 for encoder 1
+21:45:06.787: Setting frame rate divisor to 2 for encoder 2
+21:45:06.787: Setting frame rate divisor to 2 for encoder 3
+21:45:06.787: Using stream key supplied by autoconfig
+21:45:06.787: Using URL template: 'rtmp://ingest.global-contribute.live-video.net/app/{stream_key}'
+21:45:06.803: NV12 texture support enabled
+21:45:06.803: P010 texture support not available
+21:45:06.805: [obs-nvenc] GPU scaling enabled
+21:45:06.838: [obs-nvenc: 'multitrack video video encoder 0'] settings:
+21:45:06.838: 	codec:        H264
+21:45:06.838: 	rate_control: CBR
+21:45:06.838: 	bitrate:      4500
+21:45:06.838: 	keyint:       120
+21:45:06.838: 	preset:       p6
+21:45:06.838: 	tuning:       hq
+21:45:06.838: 	multipass:    qres
+21:45:06.838: 	profile:      high
+21:45:06.838: 	width:        1280
+21:45:06.838: 	height:       720
+21:45:06.838: 	b-frames:     2
+21:45:06.838: 	b-ref-mode:   0
+21:45:06.838: 	lookahead:    true (4 frames)
+21:45:06.838: 	aq:           true
+21:45:06.838: 	user opts:    lookaheadDepth=4
+21:45:06.838: 
+21:45:06.884: NV12 texture support enabled
+21:45:06.884: P010 texture support not available
+21:45:06.885: [obs-nvenc] GPU scaling enabled
+21:45:06.914: [obs-nvenc: 'multitrack video video encoder 1'] settings:
+21:45:06.914: 	codec:        H264
+21:45:06.914: 	rate_control: CBR
+21:45:06.914: 	bitrate:      1000
+21:45:06.914: 	keyint:       60
+21:45:06.914: 	preset:       p5
+21:45:06.914: 	tuning:       hq
+21:45:06.914: 	multipass:    qres
+21:45:06.914: 	profile:      high
+21:45:06.914: 	width:        852
+21:45:06.914: 	height:       480
+21:45:06.914: 	b-frames:     2
+21:45:06.914: 	b-ref-mode:   0
+21:45:06.914: 	lookahead:    false (0 frames)
+21:45:06.914: 	aq:           false
+21:45:06.914: 
+21:45:06.953: NV12 texture support enabled
+21:45:06.953: P010 texture support not available
+21:45:06.954: [obs-nvenc] GPU scaling enabled
+21:45:06.991: [obs-nvenc: 'multitrack video video encoder 2'] settings:
+21:45:06.991: 	codec:        H264
+21:45:06.991: 	rate_control: CBR
+21:45:06.991: 	bitrate:      500
+21:45:06.991: 	keyint:       60
+21:45:06.991: 	preset:       p5
+21:45:06.991: 	tuning:       hq
+21:45:06.991: 	multipass:    qres
+21:45:06.991: 	profile:      main
+21:45:06.991: 	width:        640
+21:45:06.991: 	height:       360
+21:45:06.991: 	b-frames:     2
+21:45:06.991: 	b-ref-mode:   0
+21:45:06.991: 	lookahead:    false (0 frames)
+21:45:06.991: 	aq:           false
+21:45:06.991: 
+21:45:07.030: NV12 texture support enabled
+21:45:07.031: P010 texture support not available
+21:45:07.032: [obs-nvenc] GPU scaling enabled
+21:45:07.068: [obs-nvenc: 'multitrack video video encoder 3'] settings:
+21:45:07.068: 	codec:        H264
+21:45:07.068: 	rate_control: CBR
+21:45:07.068: 	bitrate:      200
+21:45:07.068: 	keyint:       60
+21:45:07.068: 	preset:       p5
+21:45:07.068: 	tuning:       hq
+21:45:07.068: 	multipass:    qres
+21:45:07.068: 	profile:      main
+21:45:07.068: 	width:        284
+21:45:07.068: 	height:       160
+21:45:07.068: 	b-frames:     2
+21:45:07.068: 	b-ref-mode:   0
+21:45:07.068: 	lookahead:    false (0 frames)
+21:45:07.068: 	aq:           false
+21:45:07.068: 
+21:45:07.112: ---------------------------------
+21:45:07.113: [FFmpeg aac encoder: 'multitrack video live audio 0'] bitrate: 160, channels: 2, channel_layout: stereo, track: 1
+21:45:07.113: 
+21:45:07.118: [rtmp stream: 'rtmp multitrack video'] Connecting to RTMP URL rtmp://ingest.global-contribute.live-video.net/app...
+21:45:07.164: [rtmp stream: 'rtmp multitrack video'] Interface: Realtek Gaming 2.5GbE Family Controller (ethernet, 1000↓/1000↑ mbps)
+21:45:08.464: [rtmp stream: 'rtmp multitrack video'] Connection to rtmp://ingest.global-contribute.live-video.net/app (2600:f0f0:1110:1bbc:378a:4ef9:89fe:4e95) successful
+21:45:08.466: [rtmp stream: 'rtmp multitrack video'] Socket send buffer is 65536 bytes
+21:45:08.493: ==== Streaming Start ===============================================
+21:45:08.509: User switched to scene '[S] Start'
+21:45:59.032: [obs-browser: 'Browser - Start'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+21:46:27.231: User switched to scene '[S] Main'
+21:46:42.808: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+21:46:42.809: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+21:46:42.809: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+21:46:42.809: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+21:46:42.810: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+21:46:42.810: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+21:46:42.811: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+21:46:42.811: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+21:46:42.814: Switched to Preview/Program mode
+21:46:42.814: ------------------------------------------------
+21:46:43.557: User switched to scene '[L] Audio'
+21:46:44.590: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+21:46:51.269: User switched to scene '[S] Main'
+21:46:52.623: Switched to scene '[S] Main'
+21:46:52.628: Switched to regular Preview mode
+21:46:52.628: ------------------------------------------------
+21:47:44.595: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+21:49:46.595: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+21:50:46.599: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+21:55:32.595: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+21:56:32.592: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+21:58:34.589: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+21:59:34.593: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:01:36.589: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:01:43.590: warning: Could not update timestamps for skipped samples.
+22:02:36.595: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:03:22.957: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+22:03:22.957: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+22:03:22.957: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+22:03:22.957: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+22:03:22.958: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+22:03:22.958: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+22:03:22.959: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+22:03:22.959: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+22:03:22.962: Switched to Preview/Program mode
+22:03:22.962: ------------------------------------------------
+22:03:24.196: User switched to scene '[L] Effects'
+22:04:16.136: Switched to scene '[S] Main'
+22:04:16.141: Switched to regular Preview mode
+22:04:16.141: ------------------------------------------------
+22:04:37.591: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:05:34.147: User switched to scene '[S] Start'
+22:05:37.588: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:05:37.829: User switched to scene '[S] Main'
+22:07:38.584: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:08:38.585: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:10:39.584: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:11:39.597: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:12:37.880: warning: EOI missing, emulating
+22:13:41.598: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:14:41.599: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:16:43.584: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:17:43.594: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:19:44.584: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:20:01.207: warning: EOI missing, emulating
+22:20:12.535: warning: EOI missing, emulating
+22:20:32.921: warning: EOI missing, emulating
+22:20:44.594: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:22:46.588: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:23:46.589: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:25:47.584: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:26:47.599: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:29:44.759: warning: EOI missing, emulating
+22:31:32.594: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:32:32.593: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:34:33.595: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:35:33.589: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:37:01.667: warning: EOI missing, emulating
+22:37:35.582: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:38:35.590: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:39:14.553: warning: EOI missing, emulating
+22:40:36.592: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:41:09.516: warning: EOI missing, emulating
+22:41:36.599: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:43:38.596: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:44:38.601: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:46:40.585: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:47:40.594: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:49:42.597: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:50:42.588: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:52:44.596: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:53:44.591: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:55:45.587: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:56:45.594: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:58:47.588: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+22:59:47.590: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:02:38.915: warning: EOI missing, emulating
+23:04:33.593: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:05:33.588: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:05:51.403: warning: EOI missing, emulating
+23:07:34.596: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:08:05.422: warning: EOI missing, emulating
+23:08:34.592: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:10:36.583: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:11:36.598: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:13:38.590: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:14:38.595: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:16:40.584: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:17:40.597: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:19:41.596: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:20:41.595: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:22:43.594: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:23:43.590: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:25:45.593: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:26:45.594: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:28:46.591: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:29:46.591: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:34:33.586: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:35:33.586: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:37:35.595: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:38:35.597: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:40:37.594: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:41:37.594: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:43:39.591: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:44:39.599: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:46:40.593: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:47:40.596: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:49:42.584: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:50:42.591: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:52:16.367: warning: EOI missing, emulating
+23:52:43.583: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:53:43.594: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:55:45.597: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:56:45.595: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:58:47.586: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+23:59:47.594: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+00:04:33.596: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+00:05:33.599: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+00:07:35.585: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+00:08:35.589: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+00:10:37.592: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+00:11:37.591: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+00:13:39.586: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+00:14:39.588: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+00:14:55.976: warning: EOI missing, emulating
+00:16:41.583: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+00:17:41.597: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+00:19:28.111: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+00:19:28.112: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+00:19:28.112: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+00:19:28.113: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+00:19:28.113: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+00:19:28.113: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+00:19:28.114: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+00:19:28.114: Attempted to add Scene without specifying a canvas! Using default canvas instead.
+00:19:28.117: Switched to Preview/Program mode
+00:19:28.117: ------------------------------------------------
+00:19:29.004: User switched to scene '[L] Effects'
+00:19:42.586: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+00:20:42.598: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+00:22:24.351: Stopping stream due to hotkey
+00:22:24.372: User switched to scene '[S] End'
+00:22:24.788: [rtmp stream: 'rtmp multitrack video'] User stopped the stream
+00:22:24.788: [rtmp stream: 'rtmp multitrack video'] Socket send buffer is 1048576 bytes
+00:22:24.788: Output 'rtmp multitrack video': stopping
+00:22:24.788: Output 'rtmp multitrack video': Total frames output: 1415382
+00:22:24.788: Output 'rtmp multitrack video': Total drawn frames: 566247 (566261 attempted)
+00:22:24.788: Output 'rtmp multitrack video': Number of lagged frames due to rendering lag/stalls: 14 (0.0%)
+00:22:24.788: [rtmp stream: 'rtmp multitrack video'] Freeing 2 remaining packets
+00:22:24.790: Video stopped, number of skipped frames due to encoding lag: 14/566178 (0.0%)
+00:22:24.791: ==== Streaming Stop ================================================
+00:22:24.879: Video stopped, number of skipped frames due to encoding lag: 14/566183 (0.0%)
+00:22:24.951: Video stopped, number of skipped frames due to encoding lag: 14/566187 (0.0%)
+00:22:25.025: Video stopped, number of skipped frames due to encoding lag: 14/566191 (0.0%)
+00:22:25.105: warning: 2 frames left in the queue on closing
+00:22:25.107: ==== Streaming Stop ================================================
+00:22:28.600: [obs-browser: 'Browser - End'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+00:22:28.788: User switched to scene '[S] Main'
+00:22:30.715: Switched to scene '[S] Main'
+00:22:30.720: Switched to regular Preview mode
+00:22:30.720: ------------------------------------------------
+00:22:33.501: User switched to scene '[S] End'
+00:22:35.655: [obs-browser: 'Browser - End'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+00:22:42.806: [obs-browser: 'Browser - End'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+00:22:43.590: [obs-browser: 'Twitch Chat'] Error: Uncaught SecurityError: Failed to set the 'cookie' property on 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+00:22:44.037: [obs-browser: 'Browser - End'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+00:22:44.972: [obs-browser: 'Browser - End'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+00:22:47.836: [obs-browser: 'Browser - End'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+00:22:48.288: [obs-browser: 'Browser - End'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+00:22:48.654: [obs-browser: 'Browser - End'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+00:22:49.020: [obs-browser: 'Browser - End'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+00:22:49.407: [obs-browser: 'Browser - End'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+00:23:00.619: [WASAPISource::ProcessCaptureData] window disappeared
+00:23:00.621: Device '[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]' invalidated.  Retrying (source: TeamSpeak 3)
+00:23:09.119: [obs-browser: 'Browser - End'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+00:23:43.588: [obs-browser: 'Twitch Chat'] Error: Uncaught (in promise) Error: No available storage method found. (https://streamlabs.com/mixed/assets/widgets/js/chatbox.custom.js?id=5aceeca3e97a53c80dd6:2)
+00:23:53.669: [obs-browser: 'Browser - End'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+00:24:44.182: [obs-browser: 'Browser - End'] Error: Player stopping playback - error Decode:4 (ErrorInvalidData code 3 - AUDIO_RENDERER_ERROR: audio render error) (https://assets.twitch.tv/assets/amazon-ivs-wasmworker.min-6b06f0e32207f445be99.js:1)
+00:25:09.205: ---------------------------------
+00:25:09.205: video settings reset:
+00:25:09.205: 	base resolution:   1920x1080
+00:25:09.205: 	output resolution: 1920x1080
+00:25:09.205: 	downscale filter:  Bicubic
+00:25:09.205: 	fps:               60/1
+00:25:09.205: 	format:            NV12
+00:25:09.205: 	YUV mode:          sRGB/Full
+00:25:09.205: NV12 texture support enabled
+00:25:09.205: P010 texture support not available
+00:25:09.241: Settings changed (advanced)
+00:25:09.241: ------------------------------------------------
+00:25:11.826: ==== Shutting down ==================================================
+00:25:12.092: WASAPI: Device 'Mikrofon (NVIDIA Broadcast)' Terminated
+00:25:12.097: WASAPI: Device '[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]' Terminated
+00:25:12.097: WASAPI: Device '[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]' Terminated
+00:25:12.097: WASAPI: Device '[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]' Terminated
+00:25:12.098: WASAPI: Device '[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]' Terminated
+00:25:12.105: WASAPI: Device '[VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK]' Terminated
+00:25:12.110: [obs-websocket] [WebSocketServer::onClose] WebSocket client `[::ffff:127.0.0.1]:59808` has disconnected with code `1006` and reason: End of File
+00:25:12.676: All scene data cleared
+00:25:12.676: ------------------------------------------------
+00:25:13.216: Tried to call obs_frontend_remove_event_callback with no callbacks!
+00:25:13.348: [obs-websocket] [obs_module_unload] Shutting down...
+00:25:13.348: [obs-websocket] [WebSocketServer::onClose] WebSocket client `[::ffff:127.0.0.1]:54849` has disconnected with code `1001` and reason: Server stopping.
+00:25:13.348: [obs-websocket] [WebSocketServer::ServerRunner] IO thread exited.
+00:25:13.349: [obs-websocket] [WebSocketServer::Stop] Server stopped successfully
+00:25:13.349: Tried to call obs_frontend_remove_event_callback with no callbacks!
+00:25:13.349: [obs-websocket] [obs_module_unload] Finished shutting down.
+00:25:13.508: [obs-backgroundremoval] plugin unloaded
+00:25:13.508: [NVIDIA Video Effect: '(null)']
+00:25:13.732: Tried to call obs_frontend_remove_event_callback with no callbacks!
+00:25:13.732: Tried to call obs_frontend_remove_event_callback with no callbacks!
+00:25:13.732: Tried to call obs_frontend_remove_save_callback with no callbacks!
+00:25:13.732: [Scripting] Total detached callbacks: 0
+00:25:13.733: Freeing OBS context data
+00:25:13.830: == Profiler Results =============================
+00:25:13.830: run_program_init: 3975.69 ms
+00:25:13.830:  ┣OBSApp::AppInit: 22.083 ms
+00:25:13.830:  ┃ ┗OBSApp::InitLocale: 1.526 ms
+00:25:13.830:  ┗OBSApp::OBSInit: 3921.6 ms
+00:25:13.830:    ┣obs_startup: 2.05 ms
+00:25:13.830:    ┗OBSBasic::OBSInit: 3770.51 ms
+00:25:13.830:      ┣OBSBasic::InitBasicConfig: 4.932 ms
+00:25:13.830:      ┣OBSBasic::ResetAudio: 0.142 ms
+00:25:13.830:      ┣OBSBasic::ResetVideo: 177.576 ms
+00:25:13.830:      ┃ ┗obs_init_graphics: 176.739 ms
+00:25:13.830:      ┃   ┗shader compilation: 53.128 ms
+00:25:13.830:      ┣OBSBasic::InitOBSCallbacks: 0.004 ms
+00:25:13.830:      ┣OBSBasic::InitHotkeys: 0.019 ms
+00:25:13.830:      ┣obs_load_all_modules2: 1398.26 ms
+00:25:13.830:      ┃ ┣obs_init_module(aja-output-ui.dll): 0.116 ms
+00:25:13.830:      ┃ ┣obs_init_module(aja.dll): 0.072 ms
+00:25:13.830:      ┃ ┣obs_init_module(browser-transition.dll): 0.005 ms
+00:25:13.830:      ┃ ┣obs_init_module(coreaudio-encoder.dll): 0.699 ms
+00:25:13.830:      ┃ ┣obs_init_module(decklink-captions.dll): 0 ms
+00:25:13.830:      ┃ ┣obs_init_module(decklink-output-ui.dll): 0 ms
+00:25:13.830:      ┃ ┣obs_init_module(decklink.dll): 0.888 ms
+00:25:13.830:      ┃ ┣obs_init_module(enc-amf.dll): 244.052 ms
+00:25:13.830:      ┃ ┣obs_init_module(frontend-tools.dll): 2.642 ms
+00:25:13.830:      ┃ ┣obs_init_module(image-source.dll): 0.007 ms
+00:25:13.830:      ┃ ┣obs_init_module(logi_obs_plugin_x64.dll): 1.186 ms
+00:25:13.830:      ┃ ┣obs_init_module(move-transition.dll): 25.121 ms
+00:25:13.830:      ┃ ┣obs_init_module(nv-filters.dll): 29.336 ms
+00:25:13.830:      ┃ ┣obs_init_module(obs-backgroundremoval.dll): 791.057 ms
+00:25:13.830:      ┃ ┣obs_init_module(obs-browser.dll): 0.374 ms
+00:25:13.830:      ┃ ┣obs_init_module(obs-ffmpeg.dll): 76.115 ms
+00:25:13.830:      ┃ ┣obs_init_module(obs-filters.dll): 0.037 ms
+00:25:13.830:      ┃ ┣obs_init_module(obs-nvenc.dll): 135.104 ms
+00:25:13.830:      ┃ ┃ ┗nvenc_check: 135.096 ms
+00:25:13.830:      ┃ ┣obs_init_module(obs-outputs.dll): 0.008 ms
+00:25:13.830:      ┃ ┣obs_init_module(obs-qsv11.dll): 35.811 ms
+00:25:13.830:      ┃ ┣obs_init_module(obs-text.dll): 0.15 ms
+00:25:13.830:      ┃ ┣obs_init_module(obs-transitions.dll): 0.016 ms
+00:25:13.830:      ┃ ┣obs_init_module(obs-vst.dll): 0.003 ms
+00:25:13.830:      ┃ ┣obs_init_module(obs-webrtc.dll): 0.007 ms
+00:25:13.830:      ┃ ┣obs_init_module(obs-websocket.dll): 3.845 ms
+00:25:13.830:      ┃ ┣obs_init_module(obs-x264.dll): 0.001 ms
+00:25:13.830:      ┃ ┣obs_init_module(rtmp-services.dll): 0.645 ms
+00:25:13.830:      ┃ ┣obs_init_module(scene-as-transition.dll): 0.018 ms
+00:25:13.830:      ┃ ┣obs_init_module(text-freetype2.dll): 0.074 ms
+00:25:13.830:      ┃ ┣obs_init_module(vlc-video.dll): 0.989 ms
+00:25:13.830:      ┃ ┣obs_init_module(win-capture.dll): 1.822 ms
+00:25:13.830:      ┃ ┣obs_init_module(win-dshow.dll): 0.791 ms
+00:25:13.830:      ┃ ┣obs_init_module(win-wasapi.dll): 2.952 ms
+00:25:13.830:      ┃ ┗reset_win32_symbol_paths: 0.132 ms
+00:25:13.830:      ┣OBSBasic::InitService: 1.185 ms
+00:25:13.830:      ┣OBSBasic::ResetOutputs: 0.379 ms
+00:25:13.830:      ┣OBSBasic::CreateHotkeys: 0.035 ms
+00:25:13.830:      ┣OBSBasic::InitPrimitives: 0.182 ms
+00:25:13.830:      ┗OBSBasic::Load: 1038.49 ms
+00:25:13.830: obs_hotkey_thread(25 ms): min=0.002 ms, median=0.028 ms, max=140.286 ms, 99th percentile=0.131 ms, 99.9999% below 25 ms
+00:25:13.830: audio_thread(Audio): min=0.004 ms, median=0.395 ms, max=47.481 ms, 99th percentile=7.785 ms
+00:25:13.830:  ┗receive_audio: min=0.004 ms, median=0.396 ms, max=8.61 ms, 99th percentile=4.144 ms, 0.525666 calls per parent call
+00:25:13.830:    ┣buffer_audio: min=0 ms, median=0.001 ms, max=0.166 ms, 99th percentile=0.002 ms
+00:25:13.830:    ┗do_encode: min=0.023 ms, median=0.392 ms, max=8.604 ms, 99th percentile=4.141 ms
+00:25:13.830:      ┣encode(multitrack video live audio 0): min=0.021 ms, median=0.381 ms, max=8.592 ms, 99th percentile=4.13 ms
+00:25:13.830:      ┗send_packet: min=0.001 ms, median=0.009 ms, max=0.369 ms, 99th percentile=0.029 ms
+00:25:13.830: obs_graphics_thread(16.6667 ms): min=0.042 ms, median=1.069 ms, max=125.848 ms, 99th percentile=11.782 ms, 99.9844% below 16.667 ms
+00:25:13.831:  ┣tick_sources: min=0 ms, median=0.066 ms, max=125.75 ms, 99th percentile=0.155 ms
+00:25:13.831:  ┣output_frame: min=0.04 ms, median=0.779 ms, max=66.472 ms, 99th percentile=11.31 ms
+00:25:13.831:  ┃ ┗gs_context(video->graphics): min=0.015 ms, median=0.183 ms, max=66.469 ms, 99th percentile=8.72 ms, 3.10349 calls per parent call
+00:25:13.831:  ┃   ┣render_video: min=0.002 ms, median=0.141 ms, max=66.323 ms, 99th percentile=8.609 ms
+00:25:13.831:  ┃   ┃ ┣render_main_texture: min=0.001 ms, median=0.007 ms, max=66.322 ms, 99th percentile=8.607 ms
+00:25:13.831:  ┃   ┃ ┣render_output_texture: min=0.001 ms, median=0.003 ms, max=0.573 ms, 99th percentile=0.01 ms, 0.677664 calls per parent call
+00:25:13.831:  ┃   ┃ ┣render_convert_texture: min=0.003 ms, median=0.01 ms, max=0.978 ms, 99th percentile=0.02 ms, 0.677664 calls per parent call
+00:25:13.831:  ┃   ┃ ┗output_gpu_encoders: min=0 ms, median=0.031 ms, max=0.924 ms, 99th percentile=0.116 ms, 0.677664 calls per parent call
+00:25:13.831:  ┃   ┗gs_flush: min=0.003 ms, median=0.03 ms, max=49.393 ms, 99th percentile=0.223 ms
+00:25:13.831:  ┗render_displays: min=0 ms, median=0.06 ms, max=15.414 ms, 99th percentile=0.253 ms
+00:25:13.831: obs_gpu_encode_thread(16.6667 ms): min=0.003 ms, median=0.858 ms, max=10.966 ms, 99th percentile=1.445 ms, 100% below 16.667 ms
+00:25:13.831:  ┣gpu_encode_frame: min=0.184 ms, median=0.836 ms, max=10.953 ms, 99th percentile=1.423 ms
+00:25:13.831:  ┗send_packet: min=0.001 ms, median=0.012 ms, max=1.601 ms, 99th percentile=0.055 ms
+00:25:13.831: obs_gpu_encode_thread(16.6667 ms): min=0.001 ms, median=0.246 ms, max=3.784 ms, 99th percentile=0.94 ms, 100% below 16.667 ms
+00:25:13.831:  ┣gpu_encode_frame: min=0.205 ms, median=0.557 ms, max=3.761 ms, 99th percentile=0.973 ms, 0.499999 calls per parent call
+00:25:13.831:  ┗send_packet: min=0.002 ms, median=0.016 ms, max=1.767 ms, 99th percentile=0.11 ms, 0.499981 calls per parent call
+00:25:13.831: obs_gpu_encode_thread(16.6667 ms): min=0.001 ms, median=0.186 ms, max=3.618 ms, 99th percentile=0.785 ms, 100% below 16.667 ms
+00:25:13.831:  ┣gpu_encode_frame: min=0.148 ms, median=0.374 ms, max=3.578 ms, 99th percentile=0.845 ms, 0.499999 calls per parent call
+00:25:13.831:  ┗send_packet: min=0.002 ms, median=0.015 ms, max=0.892 ms, 99th percentile=0.116 ms, 0.499981 calls per parent call
+00:25:13.831: obs_gpu_encode_thread(16.6667 ms): min=0.001 ms, median=0.157 ms, max=5.471 ms, 99th percentile=0.686 ms, 100% below 16.667 ms
+00:25:13.831:  ┣gpu_encode_frame: min=0.119 ms, median=0.269 ms, max=5.462 ms, 99th percentile=0.755 ms, 0.500001 calls per parent call
+00:25:13.831:  ┗send_packet: min=0.001 ms, median=0.009 ms, max=1.736 ms, 99th percentile=0.106 ms, 0.499981 calls per parent call
+00:25:13.831: OBSBasicSettings::LoadThemeList: min=0.064 ms, median=0 ms, max=0.097 ms, 99th percentile=0.097 ms
+00:25:13.831: OBSBasic::ResetVideo: 17.944 ms
+00:25:13.831: obs_graphics_thread(16.6667 ms): min=0.073 ms, median=0.386 ms, max=13.775 ms, 99th percentile=1.532 ms, 100% below 16.667 ms
+00:25:13.831:  ┣tick_sources: min=0.001 ms, median=0.081 ms, max=0.413 ms, 99th percentile=0.176 ms
+00:25:13.831:  ┣output_frame: min=0.067 ms, median=0.23 ms, max=1.524 ms, 99th percentile=0.441 ms
+00:25:13.831:  ┃ ┗gs_context(video->graphics): min=0.066 ms, median=0.229 ms, max=1.524 ms, 99th percentile=0.44 ms
+00:25:13.831:  ┃   ┣render_video: min=0.004 ms, median=0.047 ms, max=0.16 ms, 99th percentile=0.152 ms
+00:25:13.831:  ┃   ┃ ┗render_main_texture: min=0.002 ms, median=0.044 ms, max=0.157 ms, 99th percentile=0.15 ms
+00:25:13.831:  ┃   ┗gs_flush: min=0.061 ms, median=0.177 ms, max=1.36 ms, 99th percentile=0.378 ms
+00:25:13.831:  ┗render_displays: min=0 ms, median=0.065 ms, max=0.145 ms, 99th percentile=0.105 ms
+00:25:13.831: =================================================
+00:25:13.831: == Profiler Time Between Calls ==================
+00:25:13.831: obs_hotkey_thread(25 ms): min=23.645 ms, median=25.529 ms, max=164.944 ms, 47.5371% within ±2% of 25 ms (0.0155901% lower, 52.4473% higher)
+00:25:13.831: obs_graphics_thread(16.6667 ms): min=0.527 ms, median=16.667 ms, max=125.854 ms, 99.6154% within ±2% of 16.667 ms (0.191954% lower, 0.192604% higher)
+00:25:13.831: obs_gpu_encode_thread(16.6667 ms): min=0.364 ms, median=16.67 ms, max=111.273 ms, 58.2915% within ±2% of 16.667 ms (20.5653% lower, 21.1432% higher)
+00:25:13.831: obs_gpu_encode_thread(16.6667 ms): min=0.002 ms, median=16.67 ms, max=111.197 ms, 56.5762% within ±2% of 16.667 ms (21.4295% lower, 21.9943% higher)
+00:25:13.831: obs_gpu_encode_thread(16.6667 ms): min=0.001 ms, median=16.67 ms, max=111.152 ms, 54.6365% within ±2% of 16.667 ms (22.4131% lower, 22.9504% higher)
+00:25:13.831: obs_gpu_encode_thread(16.6667 ms): min=0.001 ms, median=16.671 ms, max=111.101 ms, 52.6647% within ±2% of 16.667 ms (23.4133% lower, 23.922% higher)
+00:25:13.831: obs_graphics_thread(16.6667 ms): min=16.461 ms, median=16.667 ms, max=16.872 ms, 100% within ±2% of 16.667 ms (0% lower, 0% higher)
+00:25:13.831: =================================================
+00:25:14.047: Number of memory leaks: 2
