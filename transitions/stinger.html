@@ -3,294 +3,279 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
-  <title>Stinger Transition</title>
-  <!-- <audio id="sfx" src="../assets/stinger-whoosh.mp3" preload="auto"></audio> -->
+  <title>Stinger Transition — Premium</title>
   <style>
-    @font-face {
-      font-family: 'DM Sans';
-      src: url('../assets/DM-Sans.woff2') format('woff2');
-      font-weight: 100 900;
-      font-style: normal;
-      font-display: block;
-    }
-
-    *, *::before, *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    :root {
-      --color-gold:   #f2b705;
-      --color-purple: #5e2a79;
-      --color-dark:   #0d0d1a;
-    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     html, body {
       width: 1920px;
       height: 1080px;
       overflow: hidden;
       background: transparent;
-      font-family: 'DM Sans', sans-serif;
     }
 
-    /* ─── Stinger wrapper ──────────────────────────────────────────── */
-
-    .stinger {
-      position: absolute;
-      inset: 0;
-      overflow: hidden;
-    }
-
-    /* ─── Background ───────────────────────────────────────────────── */
-
-    .stinger-bg {
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(
-        ellipse at center,
-        rgba(242, 183, 5, 0.9),
-        rgba(94, 42, 121, 0.95) 40%,
-        rgba(13, 13, 26, 1) 70%
-      );
-      opacity: 0;
-      transform: scale(0.2);
-      animation: bgExpand 1000ms linear forwards;
-    }
-
-    @keyframes bgExpand {
-      /*  0ms  */ 0%   { opacity: 0;    transform: scale(0.2); }
-      /* 150ms */ 15%  { opacity: 0;    transform: scale(0.5); }
-      /* 350ms */ 35%  { opacity: 1;    transform: scale(1);   }
-      /* 500ms */ 50%  { opacity: 1;    transform: scale(1);   }
-      /* 550ms */ 55%  { opacity: 1;    transform: scale(1);   }
-      /* 800ms */ 80%  { opacity: 0;    transform: scale(1.05);}
-      /* 1000ms*/ 100% { opacity: 0;    transform: scale(1.05);}
-    }
-
-    /* ─── Geometric shapes ─────────────────────────────────────────── */
-
-    .geo {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      border-style: solid;
-      border-color: transparent;
-      transform: translate(-50%, -50%) scale(0) rotate(0deg);
-      opacity: 0;
-    }
-
-    .geo-1 {
-      width: 300px;
-      height: 300px;
-      border-width: 2px;
-      border-color: rgba(242, 183, 5, 0.85);
-      animation: geoSpin1 1000ms linear forwards;
-      animation-delay: 200ms;
-    }
-
-    .geo-2 {
-      width: 220px;
-      height: 220px;
-      border-width: 2px;
-      border-color: rgba(94, 42, 121, 0.9);
-      animation: geoSpin2 1000ms linear forwards;
-      animation-delay: 250ms;
-    }
-
-    .geo-3 {
-      width: 140px;
-      height: 140px;
-      border-width: 2px;
-      border-color: rgba(242, 183, 5, 0.7);
-      animation: geoSpin3 1000ms linear forwards;
-      animation-delay: 300ms;
-    }
-
-    /* geo-1: delay 200ms, so keyframe 0% starts at 200ms real-time */
-    /* Phase 2 cover (200–500ms) → in animation time 0–300ms (0%–37.5% of 800ms remaining)  */
-    /* but total animation is 1000ms, delay=200ms, so keyframes span 0–800ms of animation = 200–1000ms real */
-    @keyframes geoSpin1 {
-      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0)    rotate(0deg);   }
-      /*  300ms real = 100ms in anim */ 12.5% { opacity: 1; transform: translate(-50%, -50%) scale(0.5)  rotate(22deg);  }
-      /*  500ms real = 300ms in anim */ 37.5% { opacity: 1; transform: translate(-50%, -50%) scale(1)    rotate(45deg);  }
-      /*  700ms real = 500ms in anim */ 62.5% { opacity: 0.5; transform: translate(-50%, -50%) scale(1.6)  rotate(80deg);  }
-      /*  800ms real = 600ms in anim */ 75%   { opacity: 0; transform: translate(-50%, -50%) scale(2)    rotate(100deg); }
-      100%  { opacity: 0; transform: translate(-50%, -50%) scale(2)    rotate(120deg); }
-    }
-
-    @keyframes geoSpin2 {
-      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0)    rotate(0deg);   }
-      12.5% { opacity: 1; transform: translate(-50%, -50%) scale(0.5)  rotate(-18deg); }
-      37.5% { opacity: 1; transform: translate(-50%, -50%) scale(1)    rotate(-36deg); }
-      62.5% { opacity: 0.5; transform: translate(-50%, -50%) scale(1.5)  rotate(-60deg); }
-      75%   { opacity: 0; transform: translate(-50%, -50%) scale(1.9)  rotate(-80deg); }
-      100%  { opacity: 0; transform: translate(-50%, -50%) scale(1.9)  rotate(-90deg); }
-    }
-
-    @keyframes geoSpin3 {
-      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0)    rotate(0deg);   }
-      12.5% { opacity: 1; transform: translate(-50%, -50%) scale(0.6)  rotate(30deg);  }
-      37.5% { opacity: 1; transform: translate(-50%, -50%) scale(1)    rotate(60deg);  }
-      62.5% { opacity: 0.4; transform: translate(-50%, -50%) scale(1.7)  rotate(100deg); }
-      75%   { opacity: 0; transform: translate(-50%, -50%) scale(2.1)  rotate(120deg); }
-      100%  { opacity: 0; transform: translate(-50%, -50%) scale(2.1)  rotate(130deg); }
-    }
-
-    /* ─── Explosion lines ──────────────────────────────────────────── */
-
-    .line {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 100%;
-      height: 2px;
-      transform-origin: center center;
-      opacity: 0;
-    }
-
-    .line-1 {
-      background: linear-gradient(90deg,
-        transparent 5%,
-        rgba(242, 183, 5, 0.8) 50%,
-        transparent 95%
-      );
-      transform: translate(-50%, -50%) rotate(15deg);
-      animation: lineFlash 1000ms linear forwards;
-      animation-delay: 220ms;
-    }
-
-    .line-2 {
-      background: linear-gradient(90deg,
-        transparent 5%,
-        rgba(94, 42, 121, 0.9) 50%,
-        transparent 95%
-      );
-      transform: translate(-50%, -50%) rotate(-20deg);
-      animation: lineFlash 1000ms linear forwards;
-      animation-delay: 270ms;
-    }
-
-    .line-3 {
-      background: linear-gradient(90deg,
-        transparent 5%,
-        rgba(242, 183, 5, 0.6) 50%,
-        transparent 95%
-      );
-      transform: translate(-50%, -50%) rotate(60deg);
-      animation: lineFlash 1000ms linear forwards;
-      animation-delay: 320ms;
-    }
-
-    @keyframes lineFlash {
+    /* ── Hintergrund ── */
+    @keyframes bgIn {
       0%   { opacity: 0; }
-      15%  { opacity: 0; }
-      30%  { opacity: 1; }
-      50%  { opacity: 0.8; }
-      65%  { opacity: 0; }
+      20%  { opacity: 1; }
+      65%  { opacity: 1; }
       100% { opacity: 0; }
     }
 
-    /* ─── Particles container ──────────────────────────────────────── */
+    .bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at 50% 50%,
+          rgba(160, 70, 230, 0.95) 0%,
+          rgba(94, 42, 121, 1)     28%,
+          rgba(30, 8, 55, 1)       60%,
+          rgba(10, 5, 20, 1)       100%
+        );
+      animation: bgIn 2000ms ease-in-out forwards;
+    }
 
-    #particles {
+    /* ── Zentraler Gold-Glow ── */
+    @keyframes glowPulse {
+      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.1); }
+      25%  { opacity: 1; transform: translate(-50%, -50%) scale(1);   }
+      60%  { opacity: 0.85; transform: translate(-50%, -50%) scale(1.15); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(1.6); }
+    }
+
+    .glow-center {
       position: absolute;
-      inset: 0;
-      pointer-events: none;
+      top: 50%; left: 50%;
+      width: 1000px; height: 1000px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%) scale(0.1);
+      background: radial-gradient(circle,
+        rgba(255, 245, 180, 0.85) 0%,
+        rgba(242, 183, 5, 0.6)   20%,
+        rgba(180, 80, 240, 0.25) 55%,
+        transparent 80%
+      );
+      mix-blend-mode: screen;
+      animation: glowPulse 2000ms ease-in-out forwards;
+    }
+
+    /* ── Gold-Rand-Frame ── */
+    @keyframes frameIn {
+      0%   { opacity: 0; }
+      20%  { opacity: 1; }
+      70%  { opacity: 0.7; }
+      100% { opacity: 0; }
+    }
+
+    .frame {
+      position: absolute; inset: 0;
+      box-shadow:
+        inset 0 0 80px  40px rgba(242, 183, 5, 0.25),
+        inset 0 0 180px 80px rgba(94, 42, 121, 0.35);
+      animation: frameIn 2000ms ease-in-out forwards;
+    }
+
+    /* ── Ringe ── */
+    @keyframes ringExpand {
+      0%   { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+      12%  { opacity: 1; }
+      65%  { opacity: 0.5; }
+      100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
+    }
+
+    .ring {
+      position: absolute;
+      top: 50%; left: 50%;
+      border-radius: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 0;
+      animation: ringExpand var(--dur) cubic-bezier(0.2, 0.8, 0.4, 1) var(--delay) forwards;
+    }
+
+    .ring-1 {
+      width: 280px; height: 280px;
+      border: 3px solid rgba(242, 183, 5, 0.9);
+      box-shadow: 0 0 24px 4px rgba(242, 183, 5, 0.6), inset 0 0 12px rgba(242, 183, 5, 0.2);
+      --dur: 1300ms; --delay: 80ms;
+    }
+    .ring-2 {
+      width: 520px; height: 520px;
+      border: 2px solid rgba(180, 100, 255, 0.7);
+      box-shadow: 0 0 20px 4px rgba(160, 60, 240, 0.5);
+      --dur: 1400ms; --delay: 180ms;
+    }
+    .ring-3 {
+      width: 800px; height: 800px;
+      border: 3px solid rgba(242, 183, 5, 0.65);
+      box-shadow: 0 0 28px 6px rgba(242, 183, 5, 0.4);
+      --dur: 1500ms; --delay: 280ms;
+    }
+    .ring-4 {
+      width: 1150px; height: 1150px;
+      border: 2px solid rgba(200, 120, 255, 0.45);
+      box-shadow: 0 0 20px 4px rgba(160, 60, 240, 0.3);
+      --dur: 1600ms; --delay: 380ms;
+    }
+    .ring-5 {
+      width: 1600px; height: 1600px;
+      border: 1px solid rgba(242, 183, 5, 0.3);
+      box-shadow: 0 0 20px 4px rgba(242, 183, 5, 0.15);
+      --dur: 1700ms; --delay: 460ms;
+    }
+
+    /* ── Lichtstrahlen ── */
+    @keyframes raysIn {
+      0%   { opacity: 0; }
+      18%  { opacity: 1; }
+      65%  { opacity: 0.6; }
+      100% { opacity: 0; }
+    }
+
+    .rays {
+      position: absolute; inset: 0;
+      animation: raysIn 2000ms ease-in-out forwards;
+    }
+
+    .ray {
+      position: absolute;
+      top: 50%; left: 50%;
+      height: 2px;
+      transform-origin: left center;
+      border-radius: 1px;
+    }
+
+    /* ── Sparkles Container — Rand-Fade via Mask ── */
+    #sparkles {
+      position: absolute; inset: 0;
+      -webkit-mask-image: radial-gradient(ellipse 80% 75% at center, #000 45%, transparent 85%);
+              mask-image: radial-gradient(ellipse 80% 75% at center, #000 45%, transparent 85%);
+    }
+
+    .sparkle {
+      position: absolute;
+      opacity: 0;
+      animation: sparkleAnim var(--dur) ease-in-out var(--delay) forwards;
+      will-change: transform, opacity;
+    }
+
+    @keyframes sparkleAnim {
+      0%   { opacity: 0; transform: scale(0) rotate(0deg); }
+      20%  { opacity: 1; transform: scale(1) rotate(45deg); }
+      55%  { opacity: 0.9; transform: scale(1.15) rotate(90deg); }
+      100% { opacity: 0; transform: scale(0) rotate(180deg); }
+    }
+
+    /* ── Zentraler Flash ── */
+    @keyframes flashBurst {
+      0%   { opacity: 0; }
+      15%  { opacity: 1; }
+      40%  { opacity: 0; }
+      100% { opacity: 0; }
+    }
+
+    .flash {
+      position: absolute; inset: 0;
+      background: radial-gradient(circle at center,
+        rgba(255, 252, 230, 1)  0%,
+        rgba(242, 183, 5, 0.7) 20%,
+        rgba(160, 60, 240, 0.3) 50%,
+        transparent 70%
+      );
+      opacity: 0;
+      animation: flashBurst 500ms ease-out 440ms forwards;
     }
   </style>
 </head>
 <body>
 
-  <div class="stinger">
-    <div class="stinger-bg"></div>
-    <div class="geo geo-1"></div>
-    <div class="geo geo-2"></div>
-    <div class="geo geo-3"></div>
-    <div class="line line-1"></div>
-    <div class="line line-2"></div>
-    <div class="line line-3"></div>
-    <div id="particles"></div>
-  </div>
+  <div class="bg"></div>
+  <div class="glow-center"></div>
+
+  <div class="ring ring-1"></div>
+  <div class="ring ring-2"></div>
+  <div class="ring ring-3"></div>
+  <div class="ring ring-4"></div>
+  <div class="ring ring-5"></div>
+
+  <div class="rays" id="rays"></div>
+  <div id="sparkles"></div>
+  <div class="flash"></div>
+  <div class="frame"></div>
 
   <script>
     (function () {
-      const W = 1920;
-      const H = 1080;
-      const CX = W / 2;
-      const CY = H / 2;
-      const PARTICLE_COUNT = 25;
-      const TOTAL_MS = 1000;
+      'use strict';
+      var W = 1920, H = 1080;
 
-      const container = document.getElementById('particles');
+      /* ── Lichtstrahlen ── */
+      var raysEl = document.getElementById('rays');
+      var RAY_COUNT = 18;
+      for (var r = 0; r < RAY_COUNT; r++) {
+        var ray = document.createElement('div');
+        ray.className = 'ray';
+        var angle = (r / RAY_COUNT) * 360;
+        var len   = 700 + Math.random() * 500;
+        var alpha = (0.25 + Math.random() * 0.55).toFixed(2);
+        var isGold = Math.random() > 0.35;
+        var c = isGold
+          ? 'rgba(242,183,5,' + alpha + ')'
+          : 'rgba(200,140,255,' + alpha + ')';
+        ray.style.cssText =
+          'width:' + len + 'px;' +
+          'background:linear-gradient(90deg,' + c + ' 0%, transparent 100%);' +
+          'transform:rotate(' + angle.toFixed(1) + 'deg);' +
+          'margin-top:-1px;';
+        raysEl.appendChild(ray);
+      }
 
-      for (let i = 0; i < PARTICLE_COUNT; i++) {
-        const size   = 8 + Math.random() * 8;          // 8–16px
-        const isGold = Math.random() > 0.45;
-        const color  = isGold ? '#f2b705' : '#5e2a79';
-        const glow   = isGold
-          ? '0 0 12px 3px rgba(242,183,5,0.9)'
-          : '0 0 12px 3px rgba(94,42,121,0.9)';
+      /* ── Sparkles ── */
+      var sparklesEl = document.getElementById('sparkles');
+      var COUNT = 90;
+      /* Sicherer Bereich: 150px Rand-Puffer — Mask übernimmt den Rest */
+      var PAD = 150;
 
-        /* Random direction angle for gather phase */
-        const gatherAngle = Math.random() * 2 * Math.PI;
-        const gatherDist  = 500 + Math.random() * 600;   // 500–1100px from center
-        const startX = CX + Math.cos(gatherAngle) * gatherDist;
-        const startY = CY + Math.sin(gatherAngle) * gatherDist;
+      for (var i = 0; i < COUNT; i++) {
+        var el = document.createElement('div');
+        el.className = 'sparkle';
 
-        /* Explode in roughly opposite direction (±40°) with different distance */
-        const explodeAngle = gatherAngle + Math.PI + (Math.random() - 0.5) * 1.4;
-        const explodeDist  = 400 + Math.random() * 500;   // 400–900px from center
-        const endX = CX + Math.cos(explodeAngle) * explodeDist;
-        const endY = CY + Math.sin(explodeAngle) * explodeDist;
+        var size  = 7 + Math.random() * 18;
+        var x     = PAD + Math.random() * (W - PAD * 2);
+        var y     = PAD + Math.random() * (H - PAD * 2);
+        var delay = 80 + Math.random() * 1300;
+        var dur   = 450 + Math.random() * 750;
 
-        /* Slight random offset at center so they don't all clump exactly */
-        const centerJitterX = (Math.random() - 0.5) * 40;
-        const centerJitterY = (Math.random() - 0.5) * 40;
+        /* Gold 70 %, helles Lila 20 %, Weiß-Gold 10 % */
+        var rand = Math.random();
+        var color, glow1, glow2;
+        if (rand < 0.70) {
+          color = '#f2b705';
+          glow1 = 'rgba(242,183,5,0.9)';
+          glow2 = 'rgba(242,183,5,0.35)';
+        } else if (rand < 0.90) {
+          color = '#c985ff';
+          glow1 = 'rgba(180,80,255,0.8)';
+          glow2 = 'rgba(160,60,240,0.3)';
+        } else {
+          color = '#fff5c0';
+          glow1 = 'rgba(255,245,180,0.95)';
+          glow2 = 'rgba(242,183,5,0.4)';
+        }
 
-        const el = document.createElement('div');
-        el.style.cssText = [
-          'position:absolute',
-          `width:${size}px`,
-          `height:${size}px`,
-          `background:${color}`,
-          'border-radius:50%',
-          `box-shadow:${glow}`,
-          /* start position (transform-origin default center of element) */
-          `left:${CX - size / 2}px`,
-          `top:${CY - size / 2}px`,
-          'opacity:0',
-          'will-change:transform,opacity',
-        ].join(';');
-        container.appendChild(el);
+        var gs1 = (size * 1.6).toFixed(0);
+        var gs2 = (size * 3.5).toFixed(0);
 
-        /*
-         * Keyframe breakdown (all offsets in 0–1 fraction of TOTAL_MS):
-         *   0%    (0ms)   – at edge, opacity 0
-         *   25%   (250ms) – at center, opacity 1  (gather complete)
-         *   50%   (500ms) – at center, opacity 1  (hold while background fades)
-         *   100%  (1000ms)– exploded outward, opacity 0
-         */
-        const dx_in  = startX - CX + centerJitterX;
-        const dy_in  = startY - CY + centerJitterY;
-        const dx_out = endX   - CX;
-        const dy_out = endY   - CY;
+        el.style.cssText =
+          'left:'   + (x - size / 2).toFixed(0) + 'px;' +
+          'top:'    + (y - size / 2).toFixed(0) + 'px;' +
+          'width:'  + size.toFixed(0) + 'px;' +
+          'height:' + size.toFixed(0) + 'px;' +
+          'background:' + color + ';' +
+          'clip-path:polygon(50% 0%,56% 44%,100% 50%,56% 56%,50% 100%,44% 56%,0% 50%,44% 44%);' +
+          'filter:drop-shadow(0 0 ' + gs1 + 'px ' + glow1 + ')' +
+                 ' drop-shadow(0 0 ' + gs2 + 'px ' + glow2 + ');' +
+          '--delay:' + delay.toFixed(0) + 'ms;' +
+          '--dur:'   + dur.toFixed(0)   + 'ms;';
 
-        el.animate(
-          [
-            { transform: `translate(${dx_in}px,  ${dy_in}px)`,  opacity: 0,   offset: 0    },
-            { transform: `translate(${centerJitterX}px, ${centerJitterY}px)`, opacity: 1,   offset: 0.25 },
-            { transform: `translate(${centerJitterX}px, ${centerJitterY}px)`, opacity: 1,   offset: 0.50 },
-            { transform: `translate(${dx_out}px, ${dy_out}px)`,  opacity: 0,   offset: 1    },
-          ],
-          {
-            duration: TOTAL_MS,
-            delay: 0,
-            fill: 'forwards',
-            easing: 'linear',
-            composite: 'replace',
-          }
-        );
+        sparklesEl.appendChild(el);
       }
     })();
   </script>
