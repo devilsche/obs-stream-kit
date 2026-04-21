@@ -27,6 +27,19 @@
   'use strict';
 
   var html = document.documentElement;
+  var head = document.head || html;
+
+  // Kein Cache — OBS Browser Source soll nie alte Versionen nutzen
+  [
+    ['Cache-Control', 'no-cache, no-store, must-revalidate'],
+    ['Pragma',        'no-cache'],
+    ['Expires',       '0']
+  ].forEach(function (pair) {
+    var m = document.createElement('meta');
+    m.httpEquiv = pair[0];
+    m.content   = pair[1];
+    head.insertBefore(m, head.firstChild);
+  });
 
   // Sofort: Animationen pausieren via class
   html.classList.add('stinger-loading');
