@@ -34,6 +34,7 @@
     @keyframes fadeInGlow {
       0% {
         opacity: 0;
+        letter-spacing: 8px;
         text-shadow:
           0 0  0px rgba(94, 42, 121, 0),
           0 0  0px rgba(201, 160, 220, 0);
@@ -43,6 +44,7 @@
       }
       100% {
         opacity: 1;
+        letter-spacing: 12px;
         text-shadow:
           0 0 20px rgba(94, 42, 121, 0.9),
           0 0 50px rgba(201, 160, 220, 0.5),
@@ -263,9 +265,17 @@
       gap: 0;
       text-align: center;
       flex-shrink: 0;
+      width: 760px;
     }
 
     /* ─── Mini Clip Player ───────────────────────────────────────── */
+
+    @keyframes clipBreathe {
+      0%   { transform: translateZ(0) scale(1)    translateX(0px); box-shadow: 0 0 30px rgba(94, 42, 121, 0.3); }
+      30%  { transform: translateZ(0) scale(1.004) translateX(3px); box-shadow: 0 0 40px rgba(94, 42, 121, 0.45); }
+      60%  { transform: translateZ(0) scale(1.007) translateX(-2px); box-shadow: 0 0 50px rgba(94, 42, 121, 0.55); }
+      100% { transform: translateZ(0) scale(1)    translateX(0px); box-shadow: 0 0 30px rgba(94, 42, 121, 0.3); }
+    }
 
     .clip-player {
       width: 660px;
@@ -273,12 +283,11 @@
       background: #000;
       border: 2px solid var(--color-purple);
       border-radius: 8px;
-      box-shadow: 0 0 30px rgba(94, 42, 121, 0.3);
       overflow: hidden;
       position: relative;
       flex-shrink: 0;
       will-change: transform;
-      transform: translateZ(0);
+      animation: clipBreathe 9s ease-in-out infinite;
     }
 
     .clip-player iframe {
@@ -331,7 +340,7 @@
 
     @keyframes fadeOut {
       0%   { opacity: 1; }
-      100% { opacity: 0; }
+      100% { opacity: 0; letter-spacing: 20px; }
     }
 
     .title {

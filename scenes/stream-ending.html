@@ -48,8 +48,8 @@
     }
 
     @keyframes glowPulse {
-      0%, 100% { text-shadow: 0 0 30px rgba(242, 183, 5, 0.4); }
-      50%       { text-shadow: 0 0 50px rgba(242, 183, 5, 0.6), 0 0 80px rgba(242, 183, 5, 0.3); }
+      0%, 100% { opacity: 1; text-shadow: 0 0 30px rgba(242, 183, 5, 0.4); }
+      50%       { opacity: 1; text-shadow: 0 0 50px rgba(242, 183, 5, 0.6), 0 0 80px rgba(242, 183, 5, 0.3); }
     }
 
     @keyframes floatDown {
@@ -254,9 +254,17 @@
       gap: 0;
       text-align: center;
       flex-shrink: 0;
+      width: 680px;
     }
 
     /* ─── Mini Clip Player ───────────────────────────────────────── */
+
+    @keyframes clipBreathe {
+      0%   { transform: translateZ(0) scale(1)    translateX(0px); box-shadow: 0 0 30px rgba(94, 42, 121, 0.3); }
+      30%  { transform: translateZ(0) scale(1.004) translateX(3px); box-shadow: 0 0 40px rgba(94, 42, 121, 0.45); }
+      60%  { transform: translateZ(0) scale(1.007) translateX(-2px); box-shadow: 0 0 50px rgba(94, 42, 121, 0.55); }
+      100% { transform: translateZ(0) scale(1)    translateX(0px); box-shadow: 0 0 30px rgba(94, 42, 121, 0.3); }
+    }
 
     .clip-player {
       width: 660px;
@@ -264,12 +272,11 @@
       background: #000;
       border: 2px solid var(--color-purple);
       border-radius: 8px;
-      box-shadow: 0 0 30px rgba(94, 42, 121, 0.3);
       overflow: hidden;
       position: relative;
       flex-shrink: 0;
       will-change: transform;
-      transform: translateZ(0);
+      animation: clipBreathe 9s ease-in-out infinite;
     }
 
     .clip-player iframe {
@@ -487,8 +494,8 @@
         subtitle.style.animation = 'fadeInUp 0.8s ease-out forwards';
         await delay(1500);
         // Gold glow pulse starten
-        titleZuschauen.style.animation = 'glowPulse 3s ease-in-out infinite';
         titleZuschauen.style.opacity = '1';
+        titleZuschauen.style.animation = 'glowPulse 3s ease-in-out infinite';
       }
 
       // ── Glitch Phase ─────────────────────────────────────────────
