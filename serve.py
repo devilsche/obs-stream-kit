@@ -130,8 +130,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "*")
         path_lower = (self.path or "").split("?")[0].lower()
         if path_lower.endswith((".html", ".js", ".css", ".json")):
-            # Kein Cache für Code-Dateien
-            self.send_header("Cache-Control", "no-cache, must-revalidate, max-age=0")
+            # Kein Cache für Code-Dateien — no-store verhindert 304/Revalidierung
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
             self.send_header("Pragma", "no-cache")
             self.send_header("Expires", "0")
         elif path_lower.endswith((".mp3", ".ogg", ".wav", ".mp4", ".webm")):
