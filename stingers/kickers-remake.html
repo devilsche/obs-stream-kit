@@ -173,18 +173,25 @@
     }
     .hurra-text {
       display: inline-block;
-      font-size: 320px;
+      font-size: 260px;
       font-weight: 900;
+      font-style: italic;
       color: #ffe74c;
-      letter-spacing: -8px;
+      letter-spacing: -16px;
       line-height: 1;
       text-transform: uppercase;
       white-space: nowrap;
-      -webkit-text-stroke: 8px #5e2a79;
+      -webkit-text-stroke: 10px #000000;
       text-shadow:
-        0 14px 0 #3a1650,
-        0 0 50px rgba(255, 200, 60, 0.95),
-        0 0 100px rgba(242, 140, 20, 0.75);
+        /* Anime 3D-Block-Shadow: gestaffelt rechts-unten */
+        3px  3px 0 #000,
+        6px  6px 0 #000,
+        9px  9px 0 #000,
+        12px 12px 0 rgba(0, 0, 0, 0.6),
+        /* Gold-Glow */
+        0 0 50px rgba(255, 220, 60, 1),
+        0 0 100px rgba(242, 140, 20, 0.85),
+        0 0 160px rgba(255, 100, 0, 0.5);
     }
 
     .hurra.h1 {
@@ -327,8 +334,8 @@
     <div class="hero"></div>
     <div class="swarm" id="swarm"></div>
 
-    <div class="hurra h1"><span class="hurra-text">HURRA!</span></div>
-    <div class="hurra h2"><span class="hurra-text">HURRA!</span></div>
+    <div class="hurra h1"><span class="hurra-text">KICKERS</span></div>
+    <div class="hurra h2"><span class="hurra-text">KICKERS</span></div>
 
     <div class="title-wrap">
       <span class="title-line1">Die tollen</span>
@@ -389,10 +396,10 @@
         'hero-out':    'Hero-Ball OUT',
         'swarm-start': 'Ball-Swarm Start',
         'swarm-end':   'Ball-Swarm End',
-        'hurra1-in':   'HURRA! Nr. 1 IN',
-        'hurra1-out':  'HURRA! Nr. 1 OUT',
-        'hurra2-in':   'HURRA! Nr. 2 IN',
-        'hurra2-out':  'HURRA! Nr. 2 OUT',
+        'hurra1-in':   'KICKERS Nr. 1 IN',
+        'hurra1-out':  'KICKERS Nr. 1 OUT',
+        'hurra2-in':   'KICKERS Nr. 2 IN',
+        'hurra2-out':  'KICKERS Nr. 2 OUT',
         'title-in':    'Titel IN (hochkommend)',
         'title-out':   'Titel OUT (fade)',
         'stage-out':   'Stage Fade-Out'
