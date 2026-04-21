@@ -316,17 +316,27 @@
     /* ─── Mini Clip Player ───────────────────────────────────────── */
 
     @keyframes clipBreathe {
-      0%   { transform: translateZ(0) scale(1)    translateX(0px); box-shadow: 0 0 30px rgba(94, 42, 121, 0.3); }
-      30%  { transform: translateZ(0) scale(1.004) translateX(3px); box-shadow: 0 0 40px rgba(94, 42, 121, 0.45); }
+      0%   { transform: translateZ(0) scale(1)     translateX(0px);  box-shadow: 0 0 30px rgba(94, 42, 121, 0.3); }
+      30%  { transform: translateZ(0) scale(1.004) translateX(3px);  box-shadow: 0 0 40px rgba(94, 42, 121, 0.45); }
       60%  { transform: translateZ(0) scale(1.007) translateX(-2px); box-shadow: 0 0 50px rgba(94, 42, 121, 0.55); }
-      100% { transform: translateZ(0) scale(1)    translateX(0px); box-shadow: 0 0 30px rgba(94, 42, 121, 0.3); }
+      100% { transform: translateZ(0) scale(1)     translateX(0px);  box-shadow: 0 0 30px rgba(94, 42, 121, 0.3); }
+    }
+
+    @keyframes clipSlide {
+      0%, 100% { transform: translateX(0px); }
+      40%       { transform: translateX(14px); }
+      70%       { transform: translateX(-5px); }
+    }
+
+    .clip-wrapper {
+      animation: clipSlide 13s ease-in-out infinite;
     }
 
     .clip-player {
       width: 660px;
       aspect-ratio: 16 / 9;
       background: #000;
-      border: 2px solid var(--color-purple);
+      border: 1px solid var(--color-purple);
       border-radius: 8px;
       overflow: hidden;
       position: relative;
@@ -469,7 +479,7 @@
       <div class="divider"></div>
       <p class="subtitle">Stream beginnt gleich</p>
     </div>
-    <div>
+    <div class="clip-wrapper">
       <div class="clip-player" id="clipContainer">
         <div class="clip-placeholder" id="clipPlaceholder">
           <p class="clip-placeholder__text">Clips laden...</p>
