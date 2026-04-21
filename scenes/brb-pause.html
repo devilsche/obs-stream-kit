@@ -239,6 +239,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      will-change: transform;
+      transform: translateZ(0);
     }
 
     .clip-container iframe,
@@ -482,6 +484,7 @@
 
     .clip-meta {
       width: 100%;
+      min-height: 44px;
       padding: 14px 16px;
       display: flex;
       align-items: baseline;
@@ -719,19 +722,46 @@
         iframe.allowFullscreen = true;
         container.appendChild(iframe);
 
-        // Meta anzeigen
         showMeta(clip);
 
-        // Timer startet erst wenn iframe geladen ist
+        var settled = false;
+
+        function goNext(fade) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(clipTimer);
+          clearTimeout(noLoadTimer);
+          window.removeEventListener('message', onTwitchMsg);
+          hideMeta();
+          if (fade) {
+            iframe.classList.add('fade-out');
+            setTimeout(function () { iframe.remove(); showCountdown(index); }, 800);
+          } else {
+            iframe.remove();
+            showCountdown(index);
+          }
+        }
+
+        function onTwitchMsg(e) {
+          if (!e.data) return;
+          var d;
+          try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch (ex) { return; }
+          if (d && d.eventName === 'ERROR') goNext(false);
+        }
+        window.addEventListener('message', onTwitchMsg);
+
+        var noLoadTimer = setTimeout(function () { goNext(false); }, 12000);
+
         iframe.addEventListener('load', function () {
+          clearTimeout(noLoadTimer);
           var durationMs = Math.ceil(clip.duration) * 1000 + 700;
           clipTimer = setTimeout(function () {
-            // Fade-Out starten, dann Countdown
+            if (settled) return;
+            settled = true;
+            window.removeEventListener('message', onTwitchMsg);
             iframe.classList.add('fade-out');
             hideMeta();
-            setTimeout(function () {
-              showCountdown(index);
-            }, 800);
+            setTimeout(function () { showCountdown(index); }, 800);
           }, durationMs);
         });
       }
