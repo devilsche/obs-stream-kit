@@ -47,12 +47,13 @@
     .stinger-bg {
       position: absolute;
       inset: 0;
-      background: radial-gradient(
+      /* background: radial-gradient(
         ellipse at center,
         rgba(242, 183, 5, 0.9),
         rgba(94, 42, 121, 0.95) 40%,
         rgba(13, 13, 26, 1) 70%
-      );
+      ); */
+      background: radial-gradient(circle,rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 10%, rgba(201, 160, 220, 1) 40%, rgba(201, 160, 220, 1) 50%, rgba(242, 183, 5, 1) 80%, rgba(242, 183, 5, 0.14) 100%);
       opacity: 0;
       transform: scale(0.2);
       animation: bgExpand 1000ms linear forwards;
@@ -60,12 +61,12 @@
 
     @keyframes bgExpand {
       /*  0ms  */ 0%   { opacity: 0;    transform: scale(0.2); }
-      /* 150ms */ 15%  { opacity: 0;    transform: scale(0.5); }
-      /* 350ms */ 35%  { opacity: 1;    transform: scale(1);   }
-      /* 500ms */ 50%  { opacity: 1;    transform: scale(1);   }
-      /* 550ms */ 55%  { opacity: 1;    transform: scale(1);   }
-      /* 800ms */ 80%  { opacity: 0;    transform: scale(1.05);}
-      /* 1000ms*/ 100% { opacity: 0;    transform: scale(1.05);}
+      /* 150ms */ 15%  { opacity: 0;    transform: scale(0.7); }
+      /* 350ms */ 35%  { opacity: 1;    transform: scale(1.2);   }
+      /* 500ms */ 50%  { opacity: 1;    transform: scale(1.2);   }
+      /* 550ms */ 55%  { opacity: 1;    transform: scale(0.5);   }
+      /* 800ms */ 80%  { opacity: 0;    transform: scale(0.8);}
+      /* 1000ms*/ 100% { opacity: 0;    transform: scale(1);}
     }
 
     /* ─── Geometric shapes ─────────────────────────────────────────── */
