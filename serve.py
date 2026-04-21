@@ -271,7 +271,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
             not_found = f"\n  {RED}   → {path_clean}{R}" if code_int == 404 else ''
 
-            client_ip = self.client_address[0] if self.client_address else '?'
+            raw_ip    = self.client_address[0] if self.client_address else '?'
+            client_ip = 'localhost' if raw_ip in ('127.0.0.1', '::1') else raw_ip
 
             sys.stderr.write(
                 f"{DIM}{_now()}{R}  "
