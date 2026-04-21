@@ -14,7 +14,6 @@
       background: transparent;
     }
 
-    /* ── Hintergrund ── */
     @keyframes bgIn {
       0%   { opacity: 0; }
       20%  { opacity: 1; }
@@ -22,24 +21,57 @@
       100% { opacity: 0; }
     }
 
-    .bg {
-      position: absolute; inset: 0;
-      background:
-        radial-gradient(ellipse at 50% 50%,
-          rgba(160, 70, 230, 0.95) 0%,
-          rgba(94, 42, 121, 1)     28%,
-          rgba(30, 8, 55, 1)       60%,
-          rgba(10, 5, 20, 1)       100%
-        );
-      animation: bgIn 2000ms ease-in-out forwards;
-    }
-
-    /* ── Zentraler Gold-Glow ── */
     @keyframes glowPulse {
       0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.1); }
       25%  { opacity: 1; transform: translate(-50%, -50%) scale(1);   }
       60%  { opacity: 0.85; transform: translate(-50%, -50%) scale(1.15); }
-      100% { opacity: 0; transform: translate(-50%, -50%) scale(1.6); }
+      100% { opacity: 0;    transform: translate(-50%, -50%) scale(1.6);  }
+    }
+
+    @keyframes frameIn {
+      0%   { opacity: 0; }
+      20%  { opacity: 1; }
+      70%  { opacity: 0.7; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes ringExpand {
+      0%   { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+      12%  { opacity: 1; }
+      65%  { opacity: 0.5; }
+      100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
+    }
+
+    @keyframes raysIn {
+      0%   { opacity: 0; }
+      18%  { opacity: 1; }
+      65%  { opacity: 0.6; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes flashBurst {
+      0%   { opacity: 0; }
+      15%  { opacity: 1; }
+      40%  { opacity: 0; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes sparkleAnim {
+      0%   { opacity: 0; transform: scale(0)    rotate(0deg);   }
+      20%  { opacity: 1; transform: scale(1)    rotate(45deg);  }
+      55%  { opacity: 0.9; transform: scale(1.15) rotate(90deg);  }
+      100% { opacity: 0; transform: scale(0)    rotate(180deg); }
+    }
+
+    .bg {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 50% 50%,
+        rgba(160, 70, 230, 0.95) 0%,
+        rgba(94, 42, 121, 1)     28%,
+        rgba(30, 8, 55, 1)       60%,
+        rgba(10, 5, 20, 1)       100%
+      );
+      animation: bgIn 2000ms ease-in-out forwards;
     }
 
     .glow-center {
@@ -48,6 +80,7 @@
       width: 1000px; height: 1000px;
       border-radius: 50%;
       transform: translate(-50%, -50%) scale(0.1);
+      opacity: 0;
       background: radial-gradient(circle,
         rgba(255, 245, 180, 0.85) 0%,
         rgba(242, 183, 5, 0.6)   20%,
@@ -58,28 +91,13 @@
       animation: glowPulse 2000ms ease-in-out forwards;
     }
 
-    /* ── Gold-Rand-Frame ── */
-    @keyframes frameIn {
-      0%   { opacity: 0; }
-      20%  { opacity: 1; }
-      70%  { opacity: 0.7; }
-      100% { opacity: 0; }
-    }
-
     .frame {
       position: absolute; inset: 0;
+      opacity: 0;
       box-shadow:
         inset 0 0 80px  40px rgba(242, 183, 5, 0.25),
         inset 0 0 180px 80px rgba(94, 42, 121, 0.35);
       animation: frameIn 2000ms ease-in-out forwards;
-    }
-
-    /* ── Ringe ── */
-    @keyframes ringExpand {
-      0%   { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-      12%  { opacity: 1; }
-      65%  { opacity: 0.5; }
-      100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
     }
 
     .ring {
@@ -88,46 +106,18 @@
       border-radius: 50%;
       transform: translate(-50%, -50%) scale(0);
       opacity: 0;
-      animation: ringExpand var(--dur) cubic-bezier(0.2, 0.8, 0.4, 1) var(--delay) forwards;
     }
 
-    .ring-1 {
-      width: 280px; height: 280px;
-      border: 3px solid rgba(242, 183, 5, 0.9);
-      box-shadow: 0 0 24px 4px rgba(242, 183, 5, 0.6), inset 0 0 12px rgba(242, 183, 5, 0.2);
-      --dur: 1300ms; --delay: 80ms;
-    }
-    .ring-2 {
-      width: 520px; height: 520px;
-      border: 2px solid rgba(180, 100, 255, 0.7);
-      box-shadow: 0 0 20px 4px rgba(160, 60, 240, 0.5);
-      --dur: 1400ms; --delay: 180ms;
-    }
-    .ring-3 {
-      width: 800px; height: 800px;
-      border: 3px solid rgba(242, 183, 5, 0.65);
-      box-shadow: 0 0 28px 6px rgba(242, 183, 5, 0.4);
-      --dur: 1500ms; --delay: 280ms;
-    }
-    .ring-4 {
-      width: 1150px; height: 1150px;
-      border: 2px solid rgba(200, 120, 255, 0.45);
-      box-shadow: 0 0 20px 4px rgba(160, 60, 240, 0.3);
-      --dur: 1600ms; --delay: 380ms;
-    }
-    .ring-5 {
-      width: 1600px; height: 1600px;
-      border: 1px solid rgba(242, 183, 5, 0.3);
-      box-shadow: 0 0 20px 4px rgba(242, 183, 5, 0.15);
-      --dur: 1700ms; --delay: 460ms;
-    }
-
-    /* ── Lichtstrahlen ── */
-    @keyframes raysIn {
-      0%   { opacity: 0; }
-      18%  { opacity: 1; }
-      65%  { opacity: 0.6; }
-      100% { opacity: 0; }
+    .flash {
+      position: absolute; inset: 0;
+      opacity: 0;
+      background: radial-gradient(circle at center,
+        rgba(255, 252, 230, 1)   0%,
+        rgba(242, 183, 5, 0.7)  20%,
+        rgba(160, 60, 240, 0.3) 50%,
+        transparent 70%
+      );
+      animation: flashBurst 500ms ease-out 440ms forwards;
     }
 
     .rays {
@@ -141,11 +131,12 @@
       height: 2px;
       transform-origin: left center;
       border-radius: 1px;
+      margin-top: -1px;
     }
 
-    /* ── Sparkles Container — Rand-Fade via Mask ── */
     #sparkles {
       position: absolute; inset: 0;
+      pointer-events: none;
       -webkit-mask-image: radial-gradient(ellipse 80% 75% at center, #000 45%, transparent 85%);
               mask-image: radial-gradient(ellipse 80% 75% at center, #000 45%, transparent 85%);
     }
@@ -153,35 +144,7 @@
     .sparkle {
       position: absolute;
       opacity: 0;
-      animation: sparkleAnim var(--dur) ease-in-out var(--delay) forwards;
       will-change: transform, opacity;
-    }
-
-    @keyframes sparkleAnim {
-      0%   { opacity: 0; transform: scale(0) rotate(0deg); }
-      20%  { opacity: 1; transform: scale(1) rotate(45deg); }
-      55%  { opacity: 0.9; transform: scale(1.15) rotate(90deg); }
-      100% { opacity: 0; transform: scale(0) rotate(180deg); }
-    }
-
-    /* ── Zentraler Flash ── */
-    @keyframes flashBurst {
-      0%   { opacity: 0; }
-      15%  { opacity: 1; }
-      40%  { opacity: 0; }
-      100% { opacity: 0; }
-    }
-
-    .flash {
-      position: absolute; inset: 0;
-      background: radial-gradient(circle at center,
-        rgba(255, 252, 230, 1)  0%,
-        rgba(242, 183, 5, 0.7) 20%,
-        rgba(160, 60, 240, 0.3) 50%,
-        transparent 70%
-      );
-      opacity: 0;
-      animation: flashBurst 500ms ease-out 440ms forwards;
     }
   </style>
 </head>
@@ -189,14 +152,14 @@
 
   <div class="bg"></div>
   <div class="glow-center"></div>
-
-  <div class="ring ring-1"></div>
-  <div class="ring ring-2"></div>
-  <div class="ring ring-3"></div>
-  <div class="ring ring-4"></div>
-  <div class="ring ring-5"></div>
-
   <div class="rays" id="rays"></div>
+
+  <div class="ring" id="ring1"></div>
+  <div class="ring" id="ring2"></div>
+  <div class="ring" id="ring3"></div>
+  <div class="ring" id="ring4"></div>
+  <div class="ring" id="ring5"></div>
+
   <div id="sparkles"></div>
   <div class="flash"></div>
   <div class="frame"></div>
@@ -204,46 +167,59 @@
   <script>
     (function () {
       'use strict';
-      var W = 1920, H = 1080;
+
+      /* ── Ringe (direkte Animation als Inline-Style) ── */
+      var rings = [
+        { id: 'ring1', w: 280,  border: '3px solid rgba(242,183,5,0.9)',   shadow: '0 0 24px 4px rgba(242,183,5,0.6)',   dur: 1300, delay: 80  },
+        { id: 'ring2', w: 520,  border: '2px solid rgba(180,100,255,0.7)', shadow: '0 0 20px 4px rgba(160,60,240,0.5)',  dur: 1400, delay: 180 },
+        { id: 'ring3', w: 800,  border: '3px solid rgba(242,183,5,0.65)',  shadow: '0 0 28px 6px rgba(242,183,5,0.4)',   dur: 1500, delay: 280 },
+        { id: 'ring4', w: 1150, border: '2px solid rgba(200,120,255,0.45)',shadow: '0 0 20px 4px rgba(160,60,240,0.3)',  dur: 1600, delay: 380 },
+        { id: 'ring5', w: 1600, border: '1px solid rgba(242,183,5,0.3)',   shadow: '0 0 20px 4px rgba(242,183,5,0.15)', dur: 1700, delay: 460 }
+      ];
+
+      rings.forEach(function (r) {
+        var el = document.getElementById(r.id);
+        el.style.width      = r.w + 'px';
+        el.style.height     = r.w + 'px';
+        el.style.border     = r.border;
+        el.style.boxShadow  = r.shadow;
+        el.style.animation  = 'ringExpand ' + r.dur + 'ms cubic-bezier(0.2,0.8,0.4,1) ' + r.delay + 'ms forwards';
+      });
 
       /* ── Lichtstrahlen ── */
       var raysEl = document.getElementById('rays');
       var RAY_COUNT = 18;
       for (var r = 0; r < RAY_COUNT; r++) {
-        var ray = document.createElement('div');
+        var ray   = document.createElement('div');
         ray.className = 'ray';
         var angle = (r / RAY_COUNT) * 360;
         var len   = 700 + Math.random() * 500;
         var alpha = (0.25 + Math.random() * 0.55).toFixed(2);
-        var isGold = Math.random() > 0.35;
-        var c = isGold
+        var gold  = Math.random() > 0.35;
+        var c     = gold
           ? 'rgba(242,183,5,' + alpha + ')'
           : 'rgba(200,140,255,' + alpha + ')';
-        ray.style.cssText =
-          'width:' + len + 'px;' +
-          'background:linear-gradient(90deg,' + c + ' 0%, transparent 100%);' +
-          'transform:rotate(' + angle.toFixed(1) + 'deg);' +
-          'margin-top:-1px;';
+        ray.style.width      = len.toFixed(0) + 'px';
+        ray.style.background = 'linear-gradient(90deg,' + c + ' 0%,transparent 100%)';
+        ray.style.transform  = 'rotate(' + angle.toFixed(1) + 'deg)';
         raysEl.appendChild(ray);
       }
 
       /* ── Sparkles ── */
       var sparklesEl = document.getElementById('sparkles');
+      var W = 1920, H = 1080, PAD = 160;
       var COUNT = 90;
-      /* Sicherer Bereich: 150px Rand-Puffer — Mask übernimmt den Rest */
-      var PAD = 150;
 
       for (var i = 0; i < COUNT; i++) {
-        var el = document.createElement('div');
+        var el    = document.createElement('div');
         el.className = 'sparkle';
 
         var size  = 7 + Math.random() * 18;
         var x     = PAD + Math.random() * (W - PAD * 2);
         var y     = PAD + Math.random() * (H - PAD * 2);
-        var delay = 80 + Math.random() * 1300;
+        var delay = 80  + Math.random() * 1300;
         var dur   = 450 + Math.random() * 750;
 
-        /* Gold 70 %, helles Lila 20 %, Weiß-Gold 10 % */
         var rand = Math.random();
         var color, glow1, glow2;
         if (rand < 0.70) {
@@ -263,17 +239,14 @@
         var gs1 = (size * 1.6).toFixed(0);
         var gs2 = (size * 3.5).toFixed(0);
 
-        el.style.cssText =
-          'left:'   + (x - size / 2).toFixed(0) + 'px;' +
-          'top:'    + (y - size / 2).toFixed(0) + 'px;' +
-          'width:'  + size.toFixed(0) + 'px;' +
-          'height:' + size.toFixed(0) + 'px;' +
-          'background:' + color + ';' +
-          'clip-path:polygon(50% 0%,56% 44%,100% 50%,56% 56%,50% 100%,44% 56%,0% 50%,44% 44%);' +
-          'filter:drop-shadow(0 0 ' + gs1 + 'px ' + glow1 + ')' +
-                 ' drop-shadow(0 0 ' + gs2 + 'px ' + glow2 + ');' +
-          '--delay:' + delay.toFixed(0) + 'ms;' +
-          '--dur:'   + dur.toFixed(0)   + 'ms;';
+        el.style.left      = (x - size / 2).toFixed(0) + 'px';
+        el.style.top       = (y - size / 2).toFixed(0) + 'px';
+        el.style.width     = size.toFixed(0) + 'px';
+        el.style.height    = size.toFixed(0) + 'px';
+        el.style.background = color;
+        el.style.clipPath  = 'polygon(50% 0%,56% 44%,100% 50%,56% 56%,50% 100%,44% 56%,0% 50%,44% 44%)';
+        el.style.filter    = 'drop-shadow(0 0 ' + gs1 + 'px ' + glow1 + ') drop-shadow(0 0 ' + gs2 + 'px ' + glow2 + ')';
+        el.style.animation = 'sparkleAnim ' + dur.toFixed(0) + 'ms ease-in-out ' + delay.toFixed(0) + 'ms forwards';
 
         sparklesEl.appendChild(el);
       }
