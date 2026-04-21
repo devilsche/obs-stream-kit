@@ -37,7 +37,6 @@
         text-shadow:
           0 0  0px rgba(94, 42, 121, 0),
           0 0  0px rgba(201, 160, 220, 0);
-        letter-spacing: 8px;
       }
       60% {
         opacity: 1;
@@ -48,7 +47,6 @@
           0 0 20px rgba(94, 42, 121, 0.9),
           0 0 50px rgba(201, 160, 220, 0.5),
           0 0 90px rgba(94, 42, 121, 0.3);
-        letter-spacing: 12px;
       }
     }
 
@@ -323,7 +321,7 @@
     @keyframes boom2 { 0% { transform: scale(1.6); opacity: 0.4; } 50% { transform: scale(0.93); opacity: 1; } 70% { transform: scale(1.03); } 100% { transform: scale(1); } }
     @keyframes boom1 { 0% { transform: scale(2); opacity: 0.3; } 45% { transform: scale(0.9); opacity: 1; } 65% { transform: scale(1.06); } 100% { transform: scale(1); } }
 
-    .clip-meta { width: 660px; padding: 10px 12px; display: flex; align-items: baseline; gap: 14px; opacity: 0; transition: opacity 0.6s ease; }
+    .clip-meta { width: 660px; min-height: 38px; padding: 10px 12px; display: flex; align-items: baseline; gap: 14px; opacity: 0; transition: opacity 0.6s ease; }
     .clip-meta--visible { opacity: 1; }
     .clip-meta__title { flex: 1; font-size: 13px; font-weight: 700; color: var(--color-gold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .clip-meta__detail { font-size: 11px; color: var(--color-text-muted); white-space: nowrap; display: flex; align-items: center; gap: 5px; }

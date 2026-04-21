@@ -143,7 +143,6 @@ var ClipPlayer = (function () {
       if (countdownOverlay) countdownOverlay.classList.remove('countdown-overlay--visible');
       if (clipTimer) clearTimeout(clipTimer);
 
-      // Altes iframe entfernen
       var oldIframe = container.querySelector('iframe');
       if (oldIframe) oldIframe.remove();
 
@@ -155,16 +154,45 @@ var ClipPlayer = (function () {
 
       showMeta(clip);
 
-      // Timer startet erst wenn iframe geladen ist
+      var settled = false;
+
+      function goNext(fade) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(clipTimer);
+        clearTimeout(noLoadTimer);
+        window.removeEventListener('message', onTwitchMsg);
+        hideMeta();
+        if (fade) {
+          iframe.classList.add('fade-out');
+          setTimeout(function () { iframe.remove(); showCountdown(index); }, 800);
+        } else {
+          iframe.remove();
+          showCountdown(index);
+        }
+      }
+
+      function onTwitchMsg(e) {
+        if (!e.data) return;
+        var d;
+        try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch (ex) { return; }
+        if (d && d.eventName === 'ERROR') goNext(false);
+      }
+      window.addEventListener('message', onTwitchMsg);
+
+      // Fallback: iframe lädt gar nicht (Netzwerk-Fehler etc.)
+      var noLoadTimer = setTimeout(function () { goNext(false); }, 12000);
+
       iframe.addEventListener('load', function () {
+        clearTimeout(noLoadTimer);
         var durationMs = Math.ceil(clip.duration) * 1000 + extraDelay;
         clipTimer = setTimeout(function () {
-          // Fade-Out
+          if (settled) return;
+          settled = true;
+          window.removeEventListener('message', onTwitchMsg);
           iframe.classList.add('fade-out');
           hideMeta();
-          setTimeout(function () {
-            showCountdown(index);
-          }, 800);
+          setTimeout(function () { showCountdown(index); }, 800);
         }, durationMs);
       });
     }
