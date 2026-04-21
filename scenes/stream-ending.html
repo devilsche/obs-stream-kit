@@ -292,10 +292,8 @@
     /* ─── Mini Clip Player ───────────────────────────────────────── */
 
     @keyframes clipBreathe {
-      0%   { transform: translateZ(0) scale(1)    translateX(0px); box-shadow: 0 0 30px rgba(94, 42, 121, 0.3); }
-      30%  { transform: translateZ(0) scale(1.004) translateX(3px); box-shadow: 0 0 40px rgba(94, 42, 121, 0.45); }
-      60%  { transform: translateZ(0) scale(1.007) translateX(-2px); box-shadow: 0 0 50px rgba(94, 42, 121, 0.55); }
-      100% { transform: translateZ(0) scale(1)    translateX(0px); box-shadow: 0 0 30px rgba(94, 42, 121, 0.3); }
+      0%, 100% { transform: translateZ(0) scale(1);      box-shadow: 0 0 30px rgba(94, 42, 121, 0.3); }
+      50%       { transform: translateZ(0) scale(1.006);  box-shadow: 0 0 50px rgba(94, 42, 121, 0.55); }
     }
 
     .clip-player {
@@ -312,11 +310,8 @@
     }
 
     .clip-player iframe {
-      position: absolute;
-      top: -5%;
-      left: -5%;
-      width: 110%;
-      height: 110%;
+      width: 100%;
+      height: 100%;
       border: none;
       display: block;
       opacity: 1;
