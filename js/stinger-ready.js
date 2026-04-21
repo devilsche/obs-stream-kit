@@ -147,14 +147,22 @@
           maybeGo();
         }
       }
+
+      // readyState >= 3 (HAVE_FUTURE_DATA) = canplay-Equivalent — Event könnte bereits
+      // vor diesem Listener gefeuert haben (bei autoplay + preload=auto auf localhost)
+      if (m.readyState >= 3) {
+        check();
+        return;
+      }
+
       // canplay (enough buffered to START) + loadeddata (first frame/audio available)
       // deutlich schneller als canplaythrough (das auf komplette Pufferung wartet)
       m.addEventListener('canplay',    check);
       m.addEventListener('loadeddata', check);
       m.addEventListener('error',      check);
 
-      // Fallback wenn gar kein Event feuert — 8s, damit auch langsame Ladezeiten abgewartet werden
-      setTimeout(check, 8000);
+      // Fallback wenn gar kein Event feuert — 3s Safety für langsame Assets
+      setTimeout(check, 3000);
 
       // Nur neu laden wenn preload nicht schon auto ist — sonst brechen wir
       // den bereits laufenden Fetch ab (Chrome zeigt das als "canceled cross-origin")
@@ -168,8 +176,8 @@
   function init() {
     waitForFonts();
     waitForMedia();
-    // Absolute Safety: max 10s Wartezeit — lieber länger warten als ohne Audio starten
-    setTimeout(startAnimations, 10000);
+    // Absolute Safety: max 5s — auch wenn Assets langsam laden, irgendwann muss der Stinger starten
+    setTimeout(startAnimations, 5000);
   }
 
   if (document.readyState === 'loading') {
