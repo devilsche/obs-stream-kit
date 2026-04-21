@@ -57,6 +57,19 @@
       100% { opacity: 1; transform: translateY(0); }
     }
 
+    @keyframes titleBreathe {
+      0%, 100% {
+        opacity: 1;
+        letter-spacing: 12px;
+        text-shadow: 0 0 20px rgba(94,42,121,0.9), 0 0 50px rgba(201,160,220,0.5), 0 0 90px rgba(94,42,121,0.3);
+      }
+      50% {
+        opacity: 1;
+        letter-spacing: 15px;
+        text-shadow: 0 0 35px rgba(94,42,121,1.0), 0 0 75px rgba(201,160,220,0.7), 0 0 130px rgba(94,42,121,0.5);
+      }
+    }
+
     @keyframes pulse {
       0%   { opacity: 0.7; }
       50%  { opacity: 1; }
@@ -167,14 +180,14 @@
       background: var(--color-purple);
       box-shadow: 0 0 10px 3px rgba(94, 42, 121, 0.7);
       top: 12%; left: 8%;
-      animation: float1 18s ease-in-out infinite;
+      animation: float1 10s ease-in-out infinite;
     }
     .particle--p2 {
       width: 6px; height: 6px;
       background: var(--color-purple);
       box-shadow: 0 0 8px 2px rgba(94, 42, 121, 0.6);
       top: 68%; left: 14%;
-      animation: float3 22s ease-in-out infinite;
+      animation: float3 12s ease-in-out infinite;
       animation-delay: -4s;
     }
     .particle--p3 {
@@ -182,7 +195,7 @@
       background: var(--color-purple);
       box-shadow: 0 0 14px 4px rgba(94, 42, 121, 0.65);
       top: 35%; left: 78%;
-      animation: float2 26s ease-in-out infinite;
+      animation: float2 14s ease-in-out infinite;
       animation-delay: -8s;
     }
     .particle--p4 {
@@ -190,16 +203,32 @@
       background: var(--color-purple);
       box-shadow: 0 0 10px 3px rgba(94, 42, 121, 0.6);
       top: 82%; left: 55%;
-      animation: float4 20s ease-in-out infinite;
-      animation-delay: -12s;
+      animation: float4 11s ease-in-out infinite;
+      animation-delay: -5s;
     }
     .particle--p5 {
       width: 5px; height: 5px;
       background: var(--color-purple);
       box-shadow: 0 0 7px 2px rgba(94, 42, 121, 0.55);
       top: 22%; left: 88%;
-      animation: float5 17s ease-in-out infinite;
+      animation: float5 9s ease-in-out infinite;
       animation-delay: -3s;
+    }
+    .particle--p6 {
+      width: 6px; height: 6px;
+      background: var(--color-purple);
+      box-shadow: 0 0 8px 2px rgba(94, 42, 121, 0.65);
+      top: 45%; left: 32%;
+      animation: float3 8s ease-in-out infinite;
+      animation-delay: -2s;
+    }
+    .particle--p7 {
+      width: 9px; height: 9px;
+      background: var(--color-purple);
+      box-shadow: 0 0 12px 3px rgba(94, 42, 121, 0.7);
+      top: 72%; left: 65%;
+      animation: float1 9s ease-in-out infinite;
+      animation-delay: -6s;
     }
 
     /* Gold particles */
@@ -208,7 +237,7 @@
       background: var(--color-gold);
       box-shadow: 0 0 10px 3px rgba(242, 183, 5, 0.75);
       top: 55%; left: 6%;
-      animation: float2 24s ease-in-out infinite;
+      animation: float2 12s ease-in-out infinite;
       animation-delay: -6s;
     }
     .particle--g2 {
@@ -216,23 +245,23 @@
       background: var(--color-gold);
       box-shadow: 0 0 12px 3px rgba(242, 183, 5, 0.7);
       top: 18%; left: 48%;
-      animation: float4 30s ease-in-out infinite;
-      animation-delay: -15s;
+      animation: float4 15s ease-in-out infinite;
+      animation-delay: -7s;
     }
     .particle--g3 {
       width: 5px; height: 5px;
       background: var(--color-gold);
       box-shadow: 0 0 7px 2px rgba(242, 183, 5, 0.65);
       top: 75%; left: 85%;
-      animation: float1 19s ease-in-out infinite;
-      animation-delay: -9s;
+      animation: float1 10s ease-in-out infinite;
+      animation-delay: -4s;
     }
     .particle--g4 {
       width: 9px; height: 9px;
       background: var(--color-gold);
       box-shadow: 0 0 13px 4px rgba(242, 183, 5, 0.7);
       top: 42%; left: 92%;
-      animation: float3 15s ease-in-out infinite;
+      animation: float3 8s ease-in-out infinite;
       animation-delay: -2s;
     }
     .particle--g5 {
@@ -240,8 +269,24 @@
       background: var(--color-gold);
       box-shadow: 0 0 10px 3px rgba(242, 183, 5, 0.6);
       top: 88%; left: 28%;
-      animation: float5 28s ease-in-out infinite;
-      animation-delay: -20s;
+      animation: float5 14s ease-in-out infinite;
+      animation-delay: -9s;
+    }
+    .particle--g6 {
+      width: 5px; height: 5px;
+      background: var(--color-gold);
+      box-shadow: 0 0 8px 2px rgba(242, 183, 5, 0.7);
+      top: 30%; left: 22%;
+      animation: float4 7s ease-in-out infinite;
+      animation-delay: -3s;
+    }
+    .particle--g7 {
+      width: 7px; height: 7px;
+      background: var(--color-gold);
+      box-shadow: 0 0 11px 3px rgba(242, 183, 5, 0.65);
+      top: 60%; left: 72%;
+      animation: float2 8s ease-in-out infinite;
+      animation-delay: -5s;
     }
 
     /* ─── Main content ───────────────────────────────────────────── */
@@ -291,8 +336,11 @@
     }
 
     .clip-player iframe {
-      width: 100%;
-      height: 100%;
+      position: absolute;
+      top: -5%;
+      left: -5%;
+      width: 110%;
+      height: 110%;
       border: none;
       display: block;
       opacity: 1;
@@ -338,9 +386,14 @@
     .clip-meta__detail { font-size: 11px; color: var(--color-text-muted); white-space: nowrap; display: flex; align-items: center; gap: 5px; }
     .clip-meta__dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(94, 42, 121, 0.6); }
 
-    @keyframes fadeOut {
-      0%   { opacity: 1; }
-      100% { opacity: 0; letter-spacing: 20px; }
+    @keyframes titleFadeOut {
+      0%   { opacity: 1; letter-spacing: 12px; }
+      100% { opacity: 0; letter-spacing: 22px; }
+    }
+
+    @keyframes subtitleFadeOut {
+      0%   { opacity: 1; letter-spacing: 5px; }
+      100% { opacity: 0; letter-spacing: 8px; }
     }
 
     .title {
@@ -400,6 +453,8 @@
   <div class="particle particle--p3"></div>
   <div class="particle particle--p4"></div>
   <div class="particle particle--p5"></div>
+  <div class="particle particle--p6"></div>
+  <div class="particle particle--p7"></div>
 
   <!-- Floating particles – gold -->
   <div class="particle particle--g1"></div>
@@ -407,6 +462,8 @@
   <div class="particle particle--g3"></div>
   <div class="particle particle--g4"></div>
   <div class="particle particle--g5"></div>
+  <div class="particle particle--g6"></div>
+  <div class="particle particle--g7"></div>
 
   <!-- Main content -->
   <div class="main-layout">
@@ -460,14 +517,17 @@
           divider.style.opacity = '1';
           subtitle.style.animation = 'fadeInUp 0.8s ease-out forwards';
           return delay(2000);
+        }).then(function () {
+          title.style.opacity = '1';
+          title.style.animation = 'titleBreathe 7s ease-in-out infinite';
         });
       }
 
       function animateOut() {
-        subtitle.style.animation = 'fadeOut 0.8s ease-in forwards';
+        subtitle.style.animation = 'subtitleFadeOut 0.8s ease-in forwards';
         divider.style.opacity = '0';
         return delay(400).then(function () {
-          title.style.animation = 'fadeOut 1.2s ease-in forwards';
+          title.style.animation = 'titleFadeOut 1.2s ease-in forwards';
           return delay(1200);
         });
       }
