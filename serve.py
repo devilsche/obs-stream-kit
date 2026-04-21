@@ -130,9 +130,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "*")
         path_lower = (self.path or "").split("?")[0].lower()
         if path_lower.endswith((".html", ".js", ".css", ".json")):
+            # Kein Cache für Code-Dateien
             self.send_header("Cache-Control", "no-cache, must-revalidate, max-age=0")
             self.send_header("Pragma", "no-cache")
             self.send_header("Expires", "0")
+        elif path_lower.endswith((".mp3", ".ogg", ".wav", ".mp4", ".webm")):
+            # no-cache (NICHT no-store) für Media — erlaubt Range-Requests,
+            # zwingt aber zur Revalidierung damit OBS nie alte Versionen spielt
+            self.send_header("Cache-Control", "no-cache, max-age=0")
+            self.send_header("Pragma", "no-cache")
         super().end_headers()
 
     def do_OPTIONS(self):
