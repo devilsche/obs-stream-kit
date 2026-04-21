@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
   <script src="../js/stinger-ready.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&display=swap" rel="stylesheet">
   <title>Kickers Intro Remake</title>
   <style>
     @font-face {
@@ -235,21 +238,22 @@
         titleFade 0.5s ease-in                          calc(var(--title-out) - var(--time-offset)) forwards;
     }
 
-    .title-line1 {
+    .title-daddeln {
       display: block;
-      font-size: 56px; font-weight: 700;
-      color: #f2b705; letter-spacing: 12px;
+      font-family: 'Bangers', 'DM Sans', sans-serif;
+      font-size: 200px;
+      font-style: italic;
+      color: #ffe74c;
+      letter-spacing: 8px;
+      line-height: 1;
       text-transform: uppercase;
-      text-shadow: 0 4px 0 #0d0d0d, 0 0 24px rgba(242, 183, 5, 0.8);
-      margin-bottom: 6px;
-    }
-    .title-line2 {
-      display: block;
-      font-size: 180px; font-weight: 900;
-      color: #ffffff; letter-spacing: -4px;
-      text-transform: uppercase; line-height: 1;
-      -webkit-text-stroke: 5px #5e2a79;
-      text-shadow: 0 10px 0 #3a1650, 0 14px 30px rgba(0, 0, 0, 0.6), 0 0 40px rgba(242, 183, 5, 0.8);
+      -webkit-text-stroke: 8px #000000;
+      text-shadow:
+        3px  3px 0 #000,
+        6px  6px 0 #000,
+        9px  9px 0 rgba(0,0,0,0.6),
+        0 0 40px rgba(255, 220, 60, 1),
+        0 0 80px rgba(255, 140, 0, 0.8);
     }
 
     /* Stage Fade-Out */
@@ -338,8 +342,7 @@
     <div class="hurra h2"><span class="hurra-text">KICKERS</span></div>
 
     <div class="title-wrap">
-      <span class="title-line1">Die tollen</span>
-      <span class="title-line2">Superzocker</span>
+      <span class="title-daddeln">DADDELN</span>
     </div>
   </div>
 
