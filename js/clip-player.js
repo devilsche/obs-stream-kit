@@ -34,6 +34,7 @@ var ClipPlayer = (function () {
     return 'https://clips.twitch.tv/embed?clip=' + encodeURIComponent(slug)
       + parentParam
       + '&autoplay=true'
+      + '&controls=false'
       + '&muted=' + (muted ? 'true' : 'false');
   }
 
