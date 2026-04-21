@@ -291,9 +291,40 @@
 
     /* ─── Mini Clip Player ───────────────────────────────────────── */
 
+    @keyframes titleBreathe {
+      0%, 100% {
+        opacity: 1; letter-spacing: 12px;
+        text-shadow: 0 0 20px rgba(94,42,121,0.7), 0 0 50px rgba(201,160,220,0.4);
+      }
+      50% {
+        opacity: 1; letter-spacing: 15px;
+        text-shadow: 0 0 35px rgba(94,42,121,1.0), 0 0 80px rgba(201,160,220,0.65), 0 0 130px rgba(94,42,121,0.45);
+      }
+    }
+
+    @keyframes titleBreathGold {
+      0%, 100% {
+        opacity: 1; letter-spacing: 12px;
+        text-shadow: 0 0 30px rgba(242,183,5,0.4);
+      }
+      50% {
+        opacity: 1; letter-spacing: 15px;
+        text-shadow: 0 0 55px rgba(242,183,5,0.75), 0 0 100px rgba(242,183,5,0.35);
+      }
+    }
+
+    @keyframes clipSlide {
+      0%, 100% { transform: translateX(0px); }
+      50%       { transform: translateX(14px); }
+    }
+
+    .clip-wrapper {
+      animation: clipSlide 9s ease-in-out infinite;
+    }
+
     @keyframes clipBreathe {
-      0%, 100% { transform: translateZ(0) scale(1);     box-shadow: 0 0 20px rgba(94, 42, 121, 0.25); }
-      50%       { transform: translateZ(0) scale(1.018); box-shadow: 0 0 60px rgba(94, 42, 121, 0.65); }
+      0%, 100% { transform: translateZ(0) scale(1);      box-shadow: 0 0 20px rgba(94, 42, 121, 0.25); }
+      50%       { transform: translateZ(0) scale(1.010);  box-shadow: 0 0 55px rgba(94, 42, 121, 0.6); }
     }
 
     .clip-player {
@@ -468,7 +499,7 @@
       <div class="divider" id="divider"></div>
       <p class="subtitle" id="subtitle">Bis zum nächsten Mal</p>
     </div>
-    <div>
+    <div class="clip-wrapper">
       <div class="clip-player" id="clipContainer">
         <div class="clip-placeholder" id="clipPlaceholder">
           <p class="clip-placeholder__text">Clips laden...</p>
@@ -527,9 +558,11 @@
         divider.style.opacity = '1';
         subtitle.style.animation = 'fadeInUp 0.8s ease-out forwards';
         await delay(1500);
-        // Gold glow pulse starten
+        // Breathing starten — sync mit clipSlide (beide 9s)
+        titleDanke.style.opacity = '1';
+        titleDanke.style.animation = 'titleBreathe 9s ease-in-out infinite';
         titleZuschauen.style.opacity = '1';
-        titleZuschauen.style.animation = 'glowPulse 3s ease-in-out infinite';
+        titleZuschauen.style.animation = 'titleBreathGold 9s ease-in-out infinite';
       }
 
       // ── Glitch Phase ─────────────────────────────────────────────
