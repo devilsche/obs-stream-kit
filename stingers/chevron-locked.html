@@ -64,6 +64,16 @@
       100% { transform: translateX(-50%) translateY(0);    opacity: 1; }
     }
 
+    @keyframes apophisIn {
+      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.75); }
+      100% { opacity: 0.82; transform: translate(-50%, -50%) scale(1); }
+    }
+
+    @keyframes apophisPulse {
+      0%, 100% { opacity: 0.65; }
+      50%       { opacity: 0.88; }
+    }
+
     .bg {
       position: absolute; inset: 0;
       background:
@@ -197,6 +207,24 @@
       animation: textIn 0.5s ease-out 2.2s forwards;
     }
 
+    .apophis-symbol {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 400px;
+      height: auto;
+      z-index: 4;
+      opacity: 0;
+      filter:
+        brightness(2)
+        drop-shadow(0 0 18px rgba(100, 210, 255, 1))
+        drop-shadow(0 0 50px rgba(50, 160, 240, 0.85))
+        drop-shadow(0 0 100px rgba(30, 110, 210, 0.5));
+      animation:
+        apophisIn   0.7s ease-out   2.0s forwards,
+        apophisPulse 2.4s ease-in-out 2.7s infinite;
+    }
+
     .stage {
       position: absolute; inset: 0;
       animation: fadeOutAll 0.6s ease-in 3.8s forwards;
@@ -221,6 +249,8 @@
     </div>
 
     <div class="kawoosh"></div>
+
+    <img class="apophis-symbol" src="../assets/apophis_symbol.png" alt="" />
 
     <div class="title">Chevron 7 — Locked</div>
   </div>
