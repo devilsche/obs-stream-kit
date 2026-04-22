@@ -28,12 +28,12 @@
 
     @keyframes glyphFadeIn {
       from { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
-      to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      to   { opacity: 1; transform: translate(-50%, -50%) scale(1);   }
     }
 
     @keyframes glyphPulse {
-      0%, 100% { filter: brightness(6) sepia(1) saturate(4) hue-rotate(5deg) drop-shadow(0 0 25px rgba(255, 190, 60, 0.7)); }
-      50%      { filter: brightness(8) sepia(1) saturate(5) hue-rotate(5deg) drop-shadow(0 0 55px rgba(255, 200, 80, 1)); }
+      0%, 100% { filter: drop-shadow(0 0 20px rgba(255, 190, 60, 0.65)) drop-shadow(0 0 50px rgba(242, 183, 5, 0.4)); }
+      50%      { filter: drop-shadow(0 0 40px rgba(255, 210, 80, 1))    drop-shadow(0 0 90px rgba(242, 183, 5, 0.75)); }
     }
 
     @keyframes indeedIn {
@@ -59,17 +59,22 @@
     }
 
     /* Stylized Jaffa forehead glyph — abstract curved symbol */
-    .glyph {
+    .glyph-wrap {
       position: absolute;
       top: 50%; left: 50%;
-      width: 460px;
-      height: auto;
       transform: translate(-50%, -50%) scale(0.6);
       z-index: 2;
       opacity: 0;
       animation:
         glyphFadeIn 0.6s ease-out 0.2s forwards,
         glyphPulse 3.5s ease-in-out 0.8s infinite;
+    }
+
+    .glyph {
+      width: 460px;
+      height: auto;
+      display: block;
+      filter: invert(1) sepia(1) saturate(5) hue-rotate(8deg) brightness(1.1);
     }
 
     .indeed-text {
@@ -126,7 +131,9 @@
   <div class="stage">
     <div class="bg"></div>
 
-    <img class="glyph" src="../assets/apophis_symbol.png" alt="" />
+    <div class="glyph-wrap">
+      <img class="glyph" src="../assets/apophis_symbol.png" alt="" />
+    </div>
 
     <div class="sub">Teal&#8217;c of Chulak</div>
     <div class="indeed-text">Indeed<span class="indeed-dot">.</span></div>
