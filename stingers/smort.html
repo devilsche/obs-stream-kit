@@ -139,12 +139,16 @@
       transform: translateX(-50%) translateY(16px);
       font-size: 32px;
       font-weight: 700;
-      color: #0d0d0d;
+      color: #ffffff;
       letter-spacing: 10px;
       text-transform: uppercase;
       z-index: 11;
       opacity: 0;
-      text-shadow: 2px 2px 0 rgba(201, 160, 220, 0.8);
+      -webkit-text-stroke: 1px rgba(0, 0, 0, 0.4);
+      text-shadow:
+        2px 2px 0 #0d0d0d,
+        -1px -1px 0 #0d0d0d,
+        0 0 20px rgba(201, 160, 220, 0.8);
       animation: subIn 0.35s ease-out calc(var(--sub-in) - var(--time-offset)) forwards;
     }
 
