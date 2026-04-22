@@ -239,19 +239,19 @@
         }
       });
 
-      /* ── Logo-Boom + Shake bei 1300ms ── */
+      /* ── Logo-Boom + Shake bei 600ms, 1200ms sichtbar ── */
       document.getElementById('logo-text').animate([
-        { opacity: 0,   transform: 'translate(-50%, -50%) scale(1.9)',          offset: 0     },
-        { opacity: 1,   transform: 'translate(-50%, -50%) scale(0.88)',          offset: 0.10 },
-        { opacity: 1,   transform: 'translate(-50%, -50%) scale(1.04)',          offset: 0.16 },
-        { opacity: 1,   transform: 'translate(-50%, -50%) translateX(-18px) scale(1)', offset: 0.23 },
-        { opacity: 1,   transform: 'translate(-50%, -50%) translateX(13px)  scale(1)', offset: 0.30 },
-        { opacity: 1,   transform: 'translate(-50%, -50%) translateX(-9px)  scale(1)', offset: 0.37 },
-        { opacity: 1,   transform: 'translate(-50%, -50%) translateX(5px)   scale(1)', offset: 0.43 },
-        { opacity: 1,   transform: 'translate(-50%, -50%) scale(1)',               offset: 0.50 },
-        { opacity: 1,   transform: 'translate(-50%, -50%) scale(1)',               offset: 0.75 },
-        { opacity: 0,   transform: 'translate(-50%, -50%) scale(1.08)' }
-      ], { duration: 700, delay: 1300, easing: 'ease-out', fill: 'forwards' });
+        { opacity: 0,   transform: 'translate(-50%, -50%) scale(1.9)',                 offset: 0    },
+        { opacity: 1,   transform: 'translate(-50%, -50%) scale(0.88)',                offset: 0.08 },
+        { opacity: 1,   transform: 'translate(-50%, -50%) scale(1.04)',                offset: 0.13 },
+        { opacity: 1,   transform: 'translate(-50%, -50%) translateX(-18px) scale(1)', offset: 0.19 },
+        { opacity: 1,   transform: 'translate(-50%, -50%) translateX(13px)  scale(1)', offset: 0.24 },
+        { opacity: 1,   transform: 'translate(-50%, -50%) translateX(-9px)  scale(1)', offset: 0.29 },
+        { opacity: 1,   transform: 'translate(-50%, -50%) translateX(5px)   scale(1)', offset: 0.34 },
+        { opacity: 1,   transform: 'translate(-50%, -50%) scale(1)',                   offset: 0.40 },
+        { opacity: 1,   transform: 'translate(-50%, -50%) scale(1)',                   offset: 0.78 },
+        { opacity: 0,   transform: 'translate(-50%, -50%) scale(1.06)' }
+      ], { duration: 1200, delay: 600, easing: 'ease-out', fill: 'forwards' });
     })();
   </script>
 
