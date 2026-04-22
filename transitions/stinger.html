@@ -6,123 +6,68 @@
   <title>Stinger Transition — Premium</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    html, body {
-      width: 1920px;
-      height: 1080px;
-      overflow: hidden;
-      background: transparent;
-    }
-
-    @keyframes bgIn {
-      0%   { opacity: 0; }
-      22%  { opacity: 1; }
-      65%  { opacity: 1; }
-      100% { opacity: 0; }
-    }
-    @keyframes glowIn {
-      0%   { opacity: 0; transform: scale(0.05); }
-      28%  { opacity: 1; transform: scale(1);    }
-      65%  { opacity: 0.8; transform: scale(1.1); }
-      100% { opacity: 0; transform: scale(1.8);  }
-    }
-    @keyframes ringOut {
-      0%   { transform: scale(0); opacity: 0; }
-      10%  { opacity: 1; }
-      60%  { opacity: 0.6; }
-      100% { transform: scale(3.5); opacity: 0; }
-    }
-    @keyframes flashIn {
-      0%   { opacity: 0; }
-      20%  { opacity: 1; }
-      60%  { opacity: 0; }
-      100% { opacity: 0; }
-    }
-    @keyframes raysShow {
-      0%   { opacity: 0; }
-      20%  { opacity: 1; }
-      65%  { opacity: 0.7; }
-      100% { opacity: 0; }
-    }
-    @keyframes sparkle {
-      0%   { opacity: 0; transform: scale(0) rotate(0deg);   }
-      25%  { opacity: 1; transform: scale(1) rotate(45deg);  }
-      60%  { opacity: 0.8; transform: scale(1.1) rotate(90deg); }
-      100% { opacity: 0; transform: scale(0) rotate(180deg); }
-    }
+    html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
 
     #bg {
-      position: absolute;
-      inset: 0;
-      background:
-        radial-gradient(ellipse at 50% 50%,
-          rgba(150, 60, 220, 0.95) 0%,
-          rgba(94, 42, 121, 1)     30%,
-          rgba(25, 8, 48, 1)       65%,
-          rgba(8, 4, 16, 1)        100%
-        );
-      animation: bgIn 2000ms ease-in-out forwards;
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 50% 50%,
+        rgba(155, 65, 225, 0.95) 0%,
+        rgba(94, 42, 121, 1)     28%,
+        rgba(25, 8, 48, 1)       62%,
+        rgba(8, 4, 16, 1)        100%
+      );
+      opacity: 0;
     }
-
     #glow {
       position: absolute;
       width: 900px; height: 900px;
       left: 510px; top: 90px;
       border-radius: 50%;
       background: radial-gradient(circle,
-        rgba(255, 240, 140, 0.9) 0%,
-        rgba(242, 183, 5, 0.55)  22%,
-        rgba(140, 60, 200, 0.2)  55%,
+        rgba(255, 242, 140, 0.88) 0%,
+        rgba(242, 183, 5, 0.55)   22%,
+        rgba(140, 55, 200, 0.18)  56%,
         transparent 78%
       );
-      animation: glowIn 2000ms ease-in-out forwards;
+      opacity: 0;
     }
-
-    #rays {
-      position: absolute;
-      inset: 0;
-      animation: raysShow 2000ms ease-in-out forwards;
+    #rays  { position: absolute; inset: 0; opacity: 0; }
+    #rings { position: absolute; inset: 0; }
+    #sparkles { position: absolute; inset: 0; pointer-events: none; }
+    #flash {
+      position: absolute; inset: 0;
+      background: radial-gradient(circle at 50% 50%,
+        rgba(255, 252, 215, 0.95) 0%,
+        rgba(242, 183, 5, 0.65)   18%,
+        rgba(140, 50, 220, 0.22)  46%,
+        transparent 65%
+      );
+      opacity: 0;
     }
-
-    .ray {
-      position: absolute;
-      top: 540px;
-      left: 960px;
-      height: 2px;
-      transform-origin: 0 50%;
-      border-radius: 1px;
+    #frame {
+      position: absolute; inset: 0;
+      box-shadow:
+        inset 0 0 100px 50px rgba(242, 183, 5, 0.22),
+        inset 0 0 200px 80px rgba(94, 42, 121, 0.32);
+      opacity: 0;
     }
-
     .ring {
       position: absolute;
       border-radius: 50%;
+      opacity: 0;
     }
-
-    #flash {
+    .ray {
       position: absolute;
-      inset: 0;
-      background: radial-gradient(circle at 50% 50%,
-        rgba(255, 250, 210, 0.95) 0%,
-        rgba(242, 183, 5, 0.65)   18%,
-        rgba(140, 50, 220, 0.25)  45%,
-        transparent 65%
-      );
-      animation: flashIn 500ms ease-out 430ms forwards;
+      top: 540px; left: 960px;
+      height: 2px;
+      transform-origin: 0 50%;
+      border-radius: 1px;
+      margin-top: -1px;
     }
-
-    #frame {
+    .dot {
       position: absolute;
-      inset: 0;
-      box-shadow:
-        inset 0 0 100px 50px rgba(242, 183, 5, 0.22),
-        inset 0 0 200px 80px rgba(94, 42, 121, 0.3);
-      animation: bgIn 2000ms ease-in-out forwards;
-    }
-
-    .sparkle {
-      position: absolute;
-      border-radius: 0;
-      clip-path: polygon(50% 0%, 56% 44%, 100% 50%, 56% 56%, 50% 100%, 44% 56%, 0% 50%, 44% 44%);
+      border-radius: 50%;
+      opacity: 0;
     }
   </style>
 </head>
@@ -140,30 +85,32 @@
     (function () {
       'use strict';
 
+      var OPT = { fill: 'forwards' };
       var CX = 960, CY = 540;
 
-      /* ── Ringe ── */
-      var ringDefs = [
-        { r: 140,  color: 'rgba(242,183,5,0.95)',   glow: 'rgba(242,183,5,0.7)',   bw: 3, dur: 1300, delay: 60  },
-        { r: 260,  color: 'rgba(180,90,255,0.75)',  glow: 'rgba(160,60,240,0.5)',  bw: 2, dur: 1400, delay: 150 },
-        { r: 400,  color: 'rgba(242,183,5,0.7)',    glow: 'rgba(242,183,5,0.45)',  bw: 3, dur: 1500, delay: 240 },
-        { r: 575,  color: 'rgba(200,110,255,0.5)',  glow: 'rgba(160,60,240,0.3)',  bw: 2, dur: 1600, delay: 320 },
-        { r: 800,  color: 'rgba(242,183,5,0.4)',    glow: 'rgba(242,183,5,0.2)',   bw: 2, dur: 1700, delay: 400 }
-      ];
-      var ringsEl = document.getElementById('rings');
-      ringDefs.forEach(function (d) {
-        var el = document.createElement('div');
-        el.className = 'ring';
-        var size = d.r * 2;
-        el.style.width      = size + 'px';
-        el.style.height     = size + 'px';
-        el.style.left       = (CX - d.r) + 'px';
-        el.style.top        = (CY - d.r) + 'px';
-        el.style.border     = d.bw + 'px solid ' + d.color;
-        el.style.boxShadow  = '0 0 20px 5px ' + d.glow + ', inset 0 0 10px ' + d.glow;
-        el.style.animation  = 'ringOut ' + d.dur + 'ms cubic-bezier(0.15,0.85,0.35,1) ' + d.delay + 'ms forwards';
-        ringsEl.appendChild(el);
-      });
+      /* ── Hintergrund ── */
+      document.getElementById('bg').animate([
+        { opacity: 0 },
+        { opacity: 1, offset: 0.22 },
+        { opacity: 1, offset: 0.65 },
+        { opacity: 0 }
+      ], { duration: 2000, fill: 'forwards' });
+
+      /* ── Zentraler Glow ── */
+      document.getElementById('glow').animate([
+        { opacity: 0, transform: 'scale(0.05)' },
+        { opacity: 1, transform: 'scale(1)',    offset: 0.28 },
+        { opacity: 0.85, transform: 'scale(1.12)', offset: 0.65 },
+        { opacity: 0, transform: 'scale(1.8)' }
+      ], { duration: 2000, easing: 'ease-in-out', fill: 'forwards' });
+
+      /* ── Rand-Glow ── */
+      document.getElementById('frame').animate([
+        { opacity: 0 },
+        { opacity: 1, offset: 0.2 },
+        { opacity: 0.7, offset: 0.68 },
+        { opacity: 0 }
+      ], { duration: 2000, fill: 'forwards' });
 
       /* ── Lichtstrahlen ── */
       var raysEl = document.getElementById('rays');
@@ -171,61 +118,103 @@
         var ray   = document.createElement('div');
         ray.className = 'ray';
         var angle = (r / 20) * 360;
-        var len   = 680 + Math.random() * 550;
-        var alpha = (0.2 + Math.random() * 0.6).toFixed(2);
-        var gold  = Math.random() > 0.38;
-        var c     = gold ? 'rgba(242,183,5,' + alpha + ')' : 'rgba(190,120,255,' + alpha + ')';
+        var len   = 680 + Math.random() * 560;
+        var alpha = (0.22 + Math.random() * 0.58).toFixed(2);
+        var gold  = Math.random() > 0.4;
+        var col   = gold ? 'rgba(242,183,5,' + alpha + ')' : 'rgba(190,120,255,' + alpha + ')';
         ray.style.width      = len.toFixed(0) + 'px';
-        ray.style.background = 'linear-gradient(90deg,' + c + ',transparent)';
+        ray.style.background = 'linear-gradient(90deg,' + col + ',transparent)';
         ray.style.transform  = 'rotate(' + angle.toFixed(1) + 'deg)';
         raysEl.appendChild(ray);
       }
+      document.getElementById('rays').animate([
+        { opacity: 0 },
+        { opacity: 1, offset: 0.18 },
+        { opacity: 0.65, offset: 0.65 },
+        { opacity: 0 }
+      ], { duration: 2000, fill: 'forwards' });
 
-      /* ── Sparkles ── */
+      /* ── Ringe ── */
+      var ringsEl = document.getElementById('rings');
+      var ringDefs = [
+        { r: 140,  color: 'rgba(242,183,5,0.95)',   glow: 'rgba(242,183,5,0.65)',  bw: 3, dur: 1350, delay: 55  },
+        { r: 265,  color: 'rgba(180,90,255,0.78)',  glow: 'rgba(160,55,240,0.5)',  bw: 2, dur: 1450, delay: 145 },
+        { r: 410,  color: 'rgba(242,183,5,0.72)',   glow: 'rgba(242,183,5,0.42)',  bw: 3, dur: 1550, delay: 235 },
+        { r: 590,  color: 'rgba(200,110,255,0.52)', glow: 'rgba(160,55,240,0.28)', bw: 2, dur: 1650, delay: 315 },
+        { r: 820,  color: 'rgba(242,183,5,0.38)',   glow: 'rgba(242,183,5,0.18)',  bw: 2, dur: 1750, delay: 395 }
+      ];
+      ringDefs.forEach(function (d) {
+        var el = document.createElement('div');
+        el.className = 'ring';
+        var size = d.r * 2;
+        el.style.width     = size + 'px';
+        el.style.height    = size + 'px';
+        el.style.left      = (CX - d.r) + 'px';
+        el.style.top       = (CY - d.r) + 'px';
+        el.style.border    = d.bw + 'px solid ' + d.color;
+        el.style.boxShadow = '0 0 22px 5px ' + d.glow + ',inset 0 0 10px ' + d.glow;
+        ringsEl.appendChild(el);
+        el.animate([
+          { opacity: 0, transform: 'scale(0)' },
+          { opacity: 1, transform: 'scale(1)',   offset: 0.12 },
+          { opacity: 0.55, transform: 'scale(2)',  offset: 0.65 },
+          { opacity: 0, transform: 'scale(3.5)' }
+        ], { duration: d.dur, delay: d.delay, easing: 'cubic-bezier(0.15,0.85,0.35,1)', fill: 'forwards' });
+      });
+
+      /* ── Flash ── */
+      document.getElementById('flash').animate([
+        { opacity: 0 },
+        { opacity: 0, offset: 0.21 },
+        { opacity: 1, offset: 0.27 },
+        { opacity: 0, offset: 0.42 },
+        { opacity: 0 }
+      ], { duration: 2000, fill: 'forwards' });
+
+      /* ── Sparkles (glühende Punkte, kein clip-path — sicherer) ── */
       var sparklesEl = document.getElementById('sparkles');
-      /* Rand-Fade per Maske — nur wenn Breite korrekt gesetzt */
-      sparklesEl.style.cssText = 'position:absolute;inset:0;' +
-        '-webkit-mask-image:radial-gradient(ellipse 82% 78% at 50% 50%,#000 40%,transparent 82%);' +
-        'mask-image:radial-gradient(ellipse 82% 78% at 50% 50%,#000 40%,transparent 82%);';
-
-      var COUNT = 88;
-      /* Sparkle-Positionen gleichmäßig verteilt, mit Rand-Puffer */
+      var COUNT = 90;
       for (var i = 0; i < COUNT; i++) {
         var el    = document.createElement('div');
-        el.className = 'sparkle';
+        el.className = 'dot';
 
-        var size  = 8 + Math.random() * 18;
-        /* Gleichmäßige Verteilung über gesamten Screen */
+        var size  = 6 + Math.random() * 16;
+        /* Gleichmäßig über Screen verteilt, mit Rand-Puffer */
         var x     = 120 + Math.random() * (1920 - 240);
-        var y     = 80  + Math.random() * (1080 - 160);
-        var delay = 60  + Math.random() * 1350;
-        var dur   = 420 + Math.random() * 780;
+        var y     = 70  + Math.random() * (1080 - 140);
+        var delay = 60  + Math.random() * 1380;
+        var dur   = 420 + Math.random() * 800;
 
         var rnd = Math.random();
-        var col, ds1, ds2;
+        var col, sh;
         if (rnd < 0.68) {
           col = '#f2b705';
-          ds1 = 'drop-shadow(0 0 ' + (size*1.4).toFixed(0) + 'px rgba(242,183,5,0.95))';
-          ds2 = 'drop-shadow(0 0 ' + (size*3).toFixed(0)   + 'px rgba(242,183,5,0.45))';
+          sh  = '0 0 ' + (size*2).toFixed(0) + 'px 2px rgba(242,183,5,0.95),' +
+                '0 0 ' + (size*4).toFixed(0) + 'px 4px rgba(242,183,5,0.45)';
         } else if (rnd < 0.88) {
           col = '#c985ff';
-          ds1 = 'drop-shadow(0 0 ' + (size*1.4).toFixed(0) + 'px rgba(180,80,255,0.9))';
-          ds2 = 'drop-shadow(0 0 ' + (size*3).toFixed(0)   + 'px rgba(160,60,240,0.38))';
+          sh  = '0 0 ' + (size*2).toFixed(0) + 'px 2px rgba(180,80,255,0.9),' +
+                '0 0 ' + (size*4).toFixed(0) + 'px 4px rgba(160,60,240,0.38)';
         } else {
           col = '#fff8d0';
-          ds1 = 'drop-shadow(0 0 ' + (size*1.4).toFixed(0) + 'px rgba(255,245,180,1))';
-          ds2 = 'drop-shadow(0 0 ' + (size*3).toFixed(0)   + 'px rgba(242,183,5,0.5))';
+          sh  = '0 0 ' + (size*2).toFixed(0) + 'px 2px rgba(255,245,180,1),' +
+                '0 0 ' + (size*4).toFixed(0) + 'px 4px rgba(242,183,5,0.5)';
         }
 
-        el.style.left       = (x - size/2).toFixed(0) + 'px';
-        el.style.top        = (y - size/2).toFixed(0) + 'px';
         el.style.width      = size.toFixed(0) + 'px';
         el.style.height     = size.toFixed(0) + 'px';
+        el.style.left       = (x - size/2).toFixed(0) + 'px';
+        el.style.top        = (y - size/2).toFixed(0) + 'px';
         el.style.background = col;
-        el.style.filter     = ds1 + ' ' + ds2;
-        el.style.animation  = 'sparkle ' + dur.toFixed(0) + 'ms ease-in-out ' + delay.toFixed(0) + 'ms forwards';
-
+        el.style.boxShadow  = sh;
         sparklesEl.appendChild(el);
+
+        el.animate([
+          { opacity: 0, transform: 'scale(0)' },
+          { opacity: 1, transform: 'scale(1)',    offset: 0.25 },
+          { opacity: 0.85, transform: 'scale(1.15)', offset: 0.6  },
+          { opacity: 0, transform: 'scale(0)' }
+        ], { duration: dur, delay: delay, easing: 'ease-in-out', fill: 'forwards' });
       }
     })();
   </script>
