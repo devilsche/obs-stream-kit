@@ -170,50 +170,58 @@
         { opacity: 0 }
       ], { duration: TOTAL, fill: 'forwards' });
 
-      /* ── Sparkles ── */
+      /* ── Sparkles / Sternenstaub ── */
       var sparklesEl = document.getElementById('sparkles');
-      var COUNT = 90;
-      for (var i = 0; i < COUNT; i++) {
-        var el    = document.createElement('div');
-        el.className = 'dot';
 
-        var size  = 6 + Math.random() * 16;
-        var x     = 100 + Math.random() * 1720;
-        var y     = 60  + Math.random() * 960;
-        var delay = 60  + Math.random() * 1380;
-        var dur   = 420 + Math.random() * 800;
+      /* 2 Schichten: große Sterne (wenige) + feiner Staub (viele kleine) */
+      var layers = [
+        { count: 60,  minSize: 5,  maxSize: 16, minDur: 400, maxDur: 900,  minDelay: 50,  maxDelay: 1400 },
+        { count: 160, minSize: 1,  maxSize: 5,  minDur: 250, maxDur: 700,  minDelay: 0,   maxDelay: 1600 }
+      ];
 
-        var rnd = Math.random();
-        var col2, sh;
-        if (rnd < 0.68) {
-          col2 = '#f2b705';
-          sh   = '0 0 ' + (size * 2).toFixed(0) + 'px 2px rgba(242,183,5,0.95),' +
-                 '0 0 ' + (size * 4).toFixed(0) + 'px 4px rgba(242,183,5,0.45)';
-        } else if (rnd < 0.88) {
-          col2 = '#c985ff';
-          sh   = '0 0 ' + (size * 2).toFixed(0) + 'px 2px rgba(180,80,255,0.9),' +
-                 '0 0 ' + (size * 4).toFixed(0) + 'px 4px rgba(160,60,240,0.38)';
-        } else {
-          col2 = '#fff8d0';
-          sh   = '0 0 ' + (size * 2).toFixed(0) + 'px 2px rgba(255,245,180,1),' +
-                 '0 0 ' + (size * 4).toFixed(0) + 'px 4px rgba(242,183,5,0.5)';
+      layers.forEach(function (layer) {
+        for (var i = 0; i < layer.count; i++) {
+          var el   = document.createElement('div');
+          el.className = 'dot';
+
+          var size  = layer.minSize + Math.random() * (layer.maxSize - layer.minSize);
+          var x     = 80 + Math.random() * 1760;
+          var y     = 50 + Math.random() * 980;
+          var delay = layer.minDelay + Math.random() * (layer.maxDelay - layer.minDelay);
+          var dur   = layer.minDur   + Math.random() * (layer.maxDur   - layer.minDur);
+
+          var rnd = Math.random();
+          var col2, sh;
+          if (rnd < 0.60) {
+            col2 = '#f2b705';
+            sh   = '0 0 ' + (size * 2.5).toFixed(0) + 'px 1px rgba(242,183,5,0.95),' +
+                   '0 0 ' + (size * 5).toFixed(0)   + 'px 2px rgba(242,183,5,0.4)';
+          } else if (rnd < 0.82) {
+            col2 = '#c985ff';
+            sh   = '0 0 ' + (size * 2.5).toFixed(0) + 'px 1px rgba(180,80,255,0.9),' +
+                   '0 0 ' + (size * 5).toFixed(0)   + 'px 2px rgba(160,60,240,0.35)';
+          } else {
+            col2 = '#fff8d0';
+            sh   = '0 0 ' + (size * 2.5).toFixed(0) + 'px 1px rgba(255,245,180,1),' +
+                   '0 0 ' + (size * 5).toFixed(0)   + 'px 2px rgba(242,183,5,0.45)';
+          }
+
+          el.style.width      = Math.max(1, size).toFixed(1) + 'px';
+          el.style.height     = Math.max(1, size).toFixed(1) + 'px';
+          el.style.left       = (x - size / 2).toFixed(0) + 'px';
+          el.style.top        = (y - size / 2).toFixed(0) + 'px';
+          el.style.background = col2;
+          el.style.boxShadow  = sh;
+          sparklesEl.appendChild(el);
+
+          el.animate([
+            { opacity: 0, transform: 'scale(0)' },
+            { opacity: 1, transform: 'scale(1)',     offset: 0.3 },
+            { opacity: 0.9, transform: 'scale(1.1)', offset: 0.6 },
+            { opacity: 0, transform: 'scale(0)' }
+          ], { duration: dur, delay: delay, easing: 'ease-in-out', fill: 'forwards' });
         }
-
-        el.style.width      = size.toFixed(0) + 'px';
-        el.style.height     = size.toFixed(0) + 'px';
-        el.style.left       = (x - size / 2).toFixed(0) + 'px';
-        el.style.top        = (y - size / 2).toFixed(0) + 'px';
-        el.style.background = col2;
-        el.style.boxShadow  = sh;
-        sparklesEl.appendChild(el);
-
-        el.animate([
-          { opacity: 0, transform: 'scale(0)' },
-          { opacity: 1, transform: 'scale(1)',     offset: 0.25 },
-          { opacity: 0.85, transform: 'scale(1.15)', offset: 0.6  },
-          { opacity: 0, transform: 'scale(0)' }
-        ], { duration: dur, delay: delay, easing: 'ease-in-out', fill: 'forwards' });
-      }
+      });
     })();
   </script>
 
