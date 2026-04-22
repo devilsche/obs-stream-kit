@@ -6,57 +6,65 @@
   <title>Stinger Transition — Premium</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
 
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    /* Basisstile — kein opacity:0, alles sichtbar bis JS ran ist */
     #bg {
-      position: absolute; inset: 0;
+      position: absolute;
+      top: 0; left: 0;
+      width: 1920px; height: 1080px;
       background: radial-gradient(ellipse at 50% 50%,
-        rgba(155, 65, 225, 0.95) 0%,
-        rgba(94, 42, 121, 1)     28%,
-        rgba(25, 8, 48, 1)       62%,
-        rgba(8, 4, 16, 1)        100%
+        rgba(155, 65, 225, 0.98) 0%,
+        rgba(94,  42, 121, 1)    28%,
+        rgba(25,   8,  48, 1)    62%,
+        rgba(8,    4,  16, 1)    100%
       );
-      opacity: 0;
     }
     #glow {
       position: absolute;
+      top: 90px; left: 510px;
       width: 900px; height: 900px;
-      left: 510px; top: 90px;
       border-radius: 50%;
+      opacity: 0;
       background: radial-gradient(circle,
         rgba(255, 242, 140, 0.88) 0%,
-        rgba(242, 183, 5, 0.55)   22%,
-        rgba(140, 55, 200, 0.18)  56%,
+        rgba(242, 183,   5, 0.55) 22%,
+        rgba(140,  55, 200, 0.18) 56%,
         transparent 78%
       );
-      opacity: 0;
     }
-    #rays  { position: absolute; inset: 0; opacity: 0; }
-    #rings { position: absolute; inset: 0; }
-    #sparkles { position: absolute; inset: 0; pointer-events: none; }
+    #rays     { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; opacity: 0; }
+    #rings    { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; }
+    #sparkles { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; pointer-events: none; }
     #flash {
-      position: absolute; inset: 0;
+      position: absolute;
+      top: 0; left: 0;
+      width: 1920px; height: 1080px;
+      opacity: 0;
       background: radial-gradient(circle at 50% 50%,
         rgba(255, 252, 215, 0.95) 0%,
-        rgba(242, 183, 5, 0.65)   18%,
-        rgba(140, 50, 220, 0.22)  46%,
+        rgba(242, 183,   5, 0.65) 18%,
+        rgba(140,  50, 220, 0.22) 46%,
         transparent 65%
       );
-      opacity: 0;
     }
     #frame {
-      position: absolute; inset: 0;
-      box-shadow:
-        inset 0 0 100px 50px rgba(242, 183, 5, 0.22),
-        inset 0 0 200px 80px rgba(94, 42, 121, 0.32);
-      opacity: 0;
-    }
-    .ring {
       position: absolute;
-      border-radius: 50%;
+      top: 0; left: 0;
+      width: 1920px; height: 1080px;
       opacity: 0;
+      box-shadow:
+        inset 0 0 100px 50px rgba(242, 183, 5, 0.25),
+        inset 0 0 200px 80px rgba(94, 42, 121, 0.35);
     }
-    .ray {
+    .ring { position: absolute; border-radius: 50%; opacity: 0; }
+    .ray  {
       position: absolute;
       top: 540px; left: 960px;
       height: 2px;
@@ -64,11 +72,7 @@
       border-radius: 1px;
       margin-top: -1px;
     }
-    .dot {
-      position: absolute;
-      border-radius: 50%;
-      opacity: 0;
-    }
+    .dot { position: absolute; border-radius: 50%; opacity: 0; }
   </style>
 </head>
 <body>
@@ -85,32 +89,31 @@
     (function () {
       'use strict';
 
-      var OPT = { fill: 'forwards' };
       var CX = 960, CY = 540;
+      var TOTAL = 2000;
 
-      /* ── Hintergrund ── */
+      /* ── Hintergrund: sofort sichtbar, am Ende ausblenden ── */
       document.getElementById('bg').animate([
-        { opacity: 0 },
-        { opacity: 1, offset: 0.22 },
-        { opacity: 1, offset: 0.65 },
+        { opacity: 1 },
+        { opacity: 1, offset: 0.62 },
         { opacity: 0 }
-      ], { duration: 2000, fill: 'forwards' });
-
-      /* ── Zentraler Glow ── */
-      document.getElementById('glow').animate([
-        { opacity: 0, transform: 'scale(0.05)' },
-        { opacity: 1, transform: 'scale(1)',    offset: 0.28 },
-        { opacity: 0.85, transform: 'scale(1.12)', offset: 0.65 },
-        { opacity: 0, transform: 'scale(1.8)' }
-      ], { duration: 2000, easing: 'ease-in-out', fill: 'forwards' });
+      ], { duration: TOTAL, easing: 'ease-in', fill: 'forwards' });
 
       /* ── Rand-Glow ── */
       document.getElementById('frame').animate([
         { opacity: 0 },
-        { opacity: 1, offset: 0.2 },
-        { opacity: 0.7, offset: 0.68 },
+        { opacity: 1, offset: 0.12 },
+        { opacity: 0.8, offset: 0.62 },
         { opacity: 0 }
-      ], { duration: 2000, fill: 'forwards' });
+      ], { duration: TOTAL, fill: 'forwards' });
+
+      /* ── Zentraler Glow ── */
+      document.getElementById('glow').animate([
+        { opacity: 0, transform: 'scale(0.05)' },
+        { opacity: 1, transform: 'scale(1)',     offset: 0.22 },
+        { opacity: 0.85, transform: 'scale(1.12)', offset: 0.62 },
+        { opacity: 0, transform: 'scale(1.8)' }
+      ], { duration: TOTAL, easing: 'ease-in-out', fill: 'forwards' });
 
       /* ── Lichtstrahlen ── */
       var raysEl = document.getElementById('rays');
@@ -121,27 +124,29 @@
         var len   = 680 + Math.random() * 560;
         var alpha = (0.22 + Math.random() * 0.58).toFixed(2);
         var gold  = Math.random() > 0.4;
-        var col   = gold ? 'rgba(242,183,5,' + alpha + ')' : 'rgba(190,120,255,' + alpha + ')';
+        var col   = gold
+          ? 'rgba(242,183,5,' + alpha + ')'
+          : 'rgba(190,120,255,' + alpha + ')';
         ray.style.width      = len.toFixed(0) + 'px';
         ray.style.background = 'linear-gradient(90deg,' + col + ',transparent)';
         ray.style.transform  = 'rotate(' + angle.toFixed(1) + 'deg)';
         raysEl.appendChild(ray);
       }
-      document.getElementById('rays').animate([
+      raysEl.animate([
         { opacity: 0 },
-        { opacity: 1, offset: 0.18 },
-        { opacity: 0.65, offset: 0.65 },
+        { opacity: 1, offset: 0.16 },
+        { opacity: 0.7, offset: 0.62 },
         { opacity: 0 }
-      ], { duration: 2000, fill: 'forwards' });
+      ], { duration: TOTAL, fill: 'forwards' });
 
       /* ── Ringe ── */
-      var ringsEl = document.getElementById('rings');
+      var ringsEl  = document.getElementById('rings');
       var ringDefs = [
-        { r: 140,  color: 'rgba(242,183,5,0.95)',   glow: 'rgba(242,183,5,0.65)',  bw: 3, dur: 1350, delay: 55  },
-        { r: 265,  color: 'rgba(180,90,255,0.78)',  glow: 'rgba(160,55,240,0.5)',  bw: 2, dur: 1450, delay: 145 },
-        { r: 410,  color: 'rgba(242,183,5,0.72)',   glow: 'rgba(242,183,5,0.42)',  bw: 3, dur: 1550, delay: 235 },
-        { r: 590,  color: 'rgba(200,110,255,0.52)', glow: 'rgba(160,55,240,0.28)', bw: 2, dur: 1650, delay: 315 },
-        { r: 820,  color: 'rgba(242,183,5,0.38)',   glow: 'rgba(242,183,5,0.18)',  bw: 2, dur: 1750, delay: 395 }
+        { r: 140,  color: 'rgba(242,183,5,0.95)',    glow: 'rgba(242,183,5,0.65)',   bw: 3, dur: 1350, delay:  55 },
+        { r: 265,  color: 'rgba(180,90,255,0.78)',   glow: 'rgba(160,55,240,0.5)',   bw: 2, dur: 1450, delay: 145 },
+        { r: 410,  color: 'rgba(242,183,5,0.72)',    glow: 'rgba(242,183,5,0.42)',   bw: 3, dur: 1550, delay: 235 },
+        { r: 590,  color: 'rgba(200,110,255,0.52)',  glow: 'rgba(160,55,240,0.28)',  bw: 2, dur: 1650, delay: 315 },
+        { r: 820,  color: 'rgba(242,183,5,0.38)',    glow: 'rgba(242,183,5,0.18)',   bw: 2, dur: 1750, delay: 395 }
       ];
       ringDefs.forEach(function (d) {
         var el = document.createElement('div');
@@ -157,7 +162,7 @@
         el.animate([
           { opacity: 0, transform: 'scale(0)' },
           { opacity: 1, transform: 'scale(1)',   offset: 0.12 },
-          { opacity: 0.55, transform: 'scale(2)',  offset: 0.65 },
+          { opacity: 0.55, transform: 'scale(2)', offset: 0.65 },
           { opacity: 0, transform: 'scale(3.5)' }
         ], { duration: d.dur, delay: d.delay, easing: 'cubic-bezier(0.15,0.85,0.35,1)', fill: 'forwards' });
       });
@@ -165,13 +170,13 @@
       /* ── Flash ── */
       document.getElementById('flash').animate([
         { opacity: 0 },
-        { opacity: 0, offset: 0.21 },
-        { opacity: 1, offset: 0.27 },
-        { opacity: 0, offset: 0.42 },
+        { opacity: 0, offset: 0.20 },
+        { opacity: 1, offset: 0.26 },
+        { opacity: 0, offset: 0.40 },
         { opacity: 0 }
-      ], { duration: 2000, fill: 'forwards' });
+      ], { duration: TOTAL, fill: 'forwards' });
 
-      /* ── Sparkles (glühende Punkte, kein clip-path — sicherer) ── */
+      /* ── Sparkles ── */
       var sparklesEl = document.getElementById('sparkles');
       var COUNT = 90;
       for (var i = 0; i < COUNT; i++) {
@@ -179,39 +184,38 @@
         el.className = 'dot';
 
         var size  = 6 + Math.random() * 16;
-        /* Gleichmäßig über Screen verteilt, mit Rand-Puffer */
-        var x     = 120 + Math.random() * (1920 - 240);
-        var y     = 70  + Math.random() * (1080 - 140);
+        var x     = 100 + Math.random() * 1720;
+        var y     = 60  + Math.random() * 960;
         var delay = 60  + Math.random() * 1380;
         var dur   = 420 + Math.random() * 800;
 
         var rnd = Math.random();
-        var col, sh;
+        var col2, sh;
         if (rnd < 0.68) {
-          col = '#f2b705';
-          sh  = '0 0 ' + (size*2).toFixed(0) + 'px 2px rgba(242,183,5,0.95),' +
-                '0 0 ' + (size*4).toFixed(0) + 'px 4px rgba(242,183,5,0.45)';
+          col2 = '#f2b705';
+          sh   = '0 0 ' + (size * 2).toFixed(0) + 'px 2px rgba(242,183,5,0.95),' +
+                 '0 0 ' + (size * 4).toFixed(0) + 'px 4px rgba(242,183,5,0.45)';
         } else if (rnd < 0.88) {
-          col = '#c985ff';
-          sh  = '0 0 ' + (size*2).toFixed(0) + 'px 2px rgba(180,80,255,0.9),' +
-                '0 0 ' + (size*4).toFixed(0) + 'px 4px rgba(160,60,240,0.38)';
+          col2 = '#c985ff';
+          sh   = '0 0 ' + (size * 2).toFixed(0) + 'px 2px rgba(180,80,255,0.9),' +
+                 '0 0 ' + (size * 4).toFixed(0) + 'px 4px rgba(160,60,240,0.38)';
         } else {
-          col = '#fff8d0';
-          sh  = '0 0 ' + (size*2).toFixed(0) + 'px 2px rgba(255,245,180,1),' +
-                '0 0 ' + (size*4).toFixed(0) + 'px 4px rgba(242,183,5,0.5)';
+          col2 = '#fff8d0';
+          sh   = '0 0 ' + (size * 2).toFixed(0) + 'px 2px rgba(255,245,180,1),' +
+                 '0 0 ' + (size * 4).toFixed(0) + 'px 4px rgba(242,183,5,0.5)';
         }
 
         el.style.width      = size.toFixed(0) + 'px';
         el.style.height     = size.toFixed(0) + 'px';
-        el.style.left       = (x - size/2).toFixed(0) + 'px';
-        el.style.top        = (y - size/2).toFixed(0) + 'px';
-        el.style.background = col;
+        el.style.left       = (x - size / 2).toFixed(0) + 'px';
+        el.style.top        = (y - size / 2).toFixed(0) + 'px';
+        el.style.background = col2;
         el.style.boxShadow  = sh;
         sparklesEl.appendChild(el);
 
         el.animate([
           { opacity: 0, transform: 'scale(0)' },
-          { opacity: 1, transform: 'scale(1)',    offset: 0.25 },
+          { opacity: 1, transform: 'scale(1)',     offset: 0.25 },
           { opacity: 0.85, transform: 'scale(1.15)', offset: 0.6  },
           { opacity: 0, transform: 'scale(0)' }
         ], { duration: dur, delay: delay, easing: 'ease-in-out', fill: 'forwards' });
