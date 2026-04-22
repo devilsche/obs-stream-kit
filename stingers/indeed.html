@@ -28,12 +28,12 @@
 
     @keyframes glyphFadeIn {
       from { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
-      to   { opacity: 0.85; transform: translate(-50%, -50%) scale(1); }
+      to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
     }
 
     @keyframes glyphPulse {
-      0%, 100% { filter: drop-shadow(0 0 25px rgba(255, 190, 60, 0.55)); }
-      50%      { filter: drop-shadow(0 0 45px rgba(255, 200, 80, 0.85)); }
+      0%, 100% { filter: brightness(6) sepia(1) saturate(4) hue-rotate(5deg) drop-shadow(0 0 25px rgba(255, 190, 60, 0.7)); }
+      50%      { filter: brightness(8) sepia(1) saturate(5) hue-rotate(5deg) drop-shadow(0 0 55px rgba(255, 200, 80, 1)); }
     }
 
     @keyframes indeedIn {
@@ -62,7 +62,8 @@
     .glyph {
       position: absolute;
       top: 50%; left: 50%;
-      width: 320px; height: 320px;
+      width: 460px;
+      height: auto;
       transform: translate(-50%, -50%) scale(0.6);
       z-index: 2;
       opacity: 0;
@@ -70,8 +71,6 @@
         glyphFadeIn 0.6s ease-out 0.2s forwards,
         glyphPulse 3.5s ease-in-out 0.8s infinite;
     }
-
-    .glyph svg { width: 100%; height: 100%; }
 
     .indeed-text {
       position: absolute;
@@ -127,32 +126,7 @@
   <div class="stage">
     <div class="bg"></div>
 
-    <div class="glyph">
-      <svg viewBox="0 0 100 100">
-        <defs>
-          <linearGradient id="goldGlyph" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%"  stop-color="#ffd86b"/>
-            <stop offset="55%" stop-color="#c88a1c"/>
-            <stop offset="100%" stop-color="#7a4a0e"/>
-          </linearGradient>
-        </defs>
-        <g fill="none" stroke="url(#goldGlyph)" stroke-width="3" stroke-linecap="round">
-          <!-- Outer circle -->
-          <circle cx="50" cy="50" r="42" stroke-width="2"/>
-          <!-- Inner sun disc -->
-          <circle cx="50" cy="50" r="10" fill="url(#goldGlyph)" stroke="none"/>
-          <!-- Wings/curves (Ra-style) -->
-          <path d="M 8 50 Q 30 20 50 25 Q 70 20 92 50"/>
-          <path d="M 8 50 Q 30 80 50 75 Q 70 80 92 50"/>
-          <!-- Central crown -->
-          <path d="M 40 38 L 50 22 L 60 38" stroke-width="2.5"/>
-          <path d="M 40 62 L 50 78 L 60 62" stroke-width="2.5"/>
-          <!-- Side marks -->
-          <line x1="14" y1="50" x2="22" y2="50" stroke-width="2.5"/>
-          <line x1="78" y1="50" x2="86" y2="50" stroke-width="2.5"/>
-        </g>
-      </svg>
-    </div>
+    <img class="glyph" src="../assets/apophis_symbol.png" alt="" />
 
     <div class="sub">Teal&#8217;c of Chulak</div>
     <div class="indeed-text">Indeed<span class="indeed-dot">.</span></div>
