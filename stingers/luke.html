@@ -23,6 +23,18 @@
       font-family: 'DM Sans', sans-serif;
     }
 
+    :root {
+      --kicker-in:   0.40s;
+      --luke-in:     0.30s;
+      --name-in:     0.55s;
+      --stage-out:   3.20s;
+      --time-offset: 0s;
+    }
+
+    html.paused *, html.paused *::before, html.paused *::after {
+      animation-play-state: paused !important;
+    }
+
     @keyframes bgFadeIn {
       from { opacity: 0; }
       to   { opacity: 1; }
@@ -150,7 +162,7 @@
         inset 0 0 60px rgba(0, 0, 0, 0.35);
       mask-image: radial-gradient(circle at center, black 55%, transparent 95%);
       -webkit-mask-image: radial-gradient(circle at center, black 55%, transparent 95%);
-      animation: lukeIn 0.7s cubic-bezier(0.22, 1.4, 0.36, 1) 0.3s forwards;
+      animation: lukeIn 0.7s cubic-bezier(0.22, 1.4, 0.36, 1) calc(var(--luke-in) - var(--time-offset)) forwards;
     }
 
     /* Paw prints floating around */
@@ -196,7 +208,7 @@
         8px 8px 0 rgba(0, 0, 0, 0.6),
         0 0 30px rgba(242, 183, 5, 0.7),
         0 0 60px rgba(255, 160, 60, 0.5);
-      animation: nameSlideIn 0.55s cubic-bezier(0.22, 1.6, 0.36, 1) 0.55s forwards;
+      animation: nameSlideIn 0.55s cubic-bezier(0.22, 1.6, 0.36, 1) calc(var(--name-in) - var(--time-offset)) forwards;
     }
 
     .kicker {
@@ -214,13 +226,56 @@
       text-shadow:
         0 0 16px rgba(255, 190, 90, 0.9),
         2px 2px 0 rgba(0, 0, 0, 0.6);
-      animation: kickerFadeIn 0.4s ease-out 0.4s forwards;
+      animation: kickerFadeIn 0.4s ease-out calc(var(--kicker-in) - var(--time-offset)) forwards;
     }
 
     .stage {
       position: absolute; inset: 0;
-      animation: fadeOutAll 0.5s ease-in 3.2s forwards;
+      animation: fadeOutAll 0.5s ease-in var(--stage-out) forwards;
     }
+
+    /* ── Tune-Panel ── */
+    .tune-panel {
+      position: fixed; top: 80px; right: 16px; width: 420px;
+      background: rgba(20, 10, 30, 0.92);
+      border: 2px solid #f2b705; padding: 16px; border-radius: 10px;
+      color: #f2b705; font-family: 'Courier New', monospace; font-size: 13px;
+      z-index: 1000; display: none;
+      box-shadow: 0 0 30px rgba(242, 183, 5, 0.4);
+    }
+    .tune-panel.visible { display: block; }
+    .tune-panel h2 { font-size: 16px; margin-bottom: 12px; letter-spacing: 2px; text-transform: uppercase; }
+    .tune-panel table { width: 100%; border-collapse: collapse; }
+    .tune-panel th, .tune-panel td { padding: 4px 6px; text-align: left; border-bottom: 1px solid rgba(242, 183, 5, 0.2); }
+    .tune-panel th { font-size: 11px; text-transform: uppercase; }
+    .tune-panel input {
+      width: 70px; background: rgba(242, 183, 5, 0.1); border: 1px solid rgba(242, 183, 5, 0.4);
+      color: #f2b705; padding: 3px 6px; font-family: inherit; font-size: 12px;
+      text-align: right; border-radius: 3px;
+    }
+    .tune-panel input:focus { outline: 1px solid #f2b705; }
+    .tune-panel tr.clickable { cursor: pointer; }
+    .tune-panel tr.clickable:hover { background: rgba(242, 183, 5, 0.15); }
+    .tune-panel tr.clickable:hover .tune-label { color: #fff; }
+    .tune-panel .tune-label { font-size: 11px; color: rgba(255, 220, 150, 0.75); max-width: 200px; }
+    .tune-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .tune-btn {
+      flex: 1; background: rgba(242, 183, 5, 0.15); border: 1px solid #f2b705;
+      color: #f2b705; padding: 8px 10px; font-family: inherit; font-size: 12px;
+      font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+      border-radius: 4px; cursor: pointer;
+    }
+    .tune-btn:hover { background: rgba(242, 183, 5, 0.3); }
+    .tune-btn.reset { border-color: #ff8888; color: #ff8888; }
+    .tune-btn.reset:hover { background: rgba(255, 136, 136, 0.2); }
+    .tune-hint { margin-top: 10px; font-size: 10px; color: rgba(255, 220, 150, 0.6); line-height: 1.4; }
+    .time-indicator {
+      position: fixed; bottom: 16px; right: 16px;
+      background: rgba(20, 10, 30, 0.85); border: 1px solid #f2b705;
+      color: #f2b705; padding: 6px 14px; font-family: 'Courier New', monospace;
+      font-size: 14px; z-index: 1000; display: none; border-radius: 4px;
+    }
+    .time-indicator.visible { display: block; }
   </style>
 </head>
 <body>
@@ -239,6 +294,219 @@
 
     <div class="name">Luke</div>
   </div>
+
+  <div class="tune-panel" id="tunePanel">
+    <h2>Luke Tune Mode</h2>
+    <table id="tuneTable"></table>
+    <div class="tune-actions">
+      <button class="tune-btn" id="applyBtn">&gt; Apply</button>
+      <button class="tune-btn" id="copyBtn">&#128203; Copy</button>
+      <button class="tune-btn reset" id="resetBtn">Reset</button>
+    </div>
+    <div style="margin-top: 14px; border-top: 1px solid rgba(242,183,5,0.3); padding-top: 12px;">
+      <div style="font-size: 11px; text-transform: uppercase; margin-bottom: 6px;">Playback</div>
+      <div class="tune-actions" style="margin-top: 6px;">
+        <button class="tune-btn" id="pauseBtn">&#9208; Pause</button>
+        <button class="tune-btn" id="replayBtn">&#8634; Replay 0s</button>
+      </div>
+      <div style="margin-top: 10px; display: flex; align-items: center; gap: 6px; font-size: 11px;">
+        <span>Von:</span>
+        <input type="number" id="fromInput" value="0" step="0.05" min="0" max="5" style="width: 60px;">
+        <span>Bis:</span>
+        <input type="number" id="toInput" value="3" step="0.05" min="0" max="5" style="width: 60px;">
+        <button class="tune-btn" id="segmentBtn" style="flex: 0 0 auto; padding: 6px 12px;">&#9658; Play</button>
+      </div>
+    </div>
+    <div class="tune-hint">
+      <b>Apply</b>: speichert + Reload. <b>Pause</b>/<b>Replay</b>/<b>Play Segment</b>: ohne Reload.<br>
+      Shortcuts: <b>Space</b> = Pause, <b>R</b> = Replay, <b>S</b> = Apply, <b>C</b> = Copy.
+    </div>
+  </div>
+
+  <div class="time-indicator" id="timeInd">t = 0.00s</div>
+
+  <script>
+    (function () {
+      'use strict';
+      var DEFAULTS = {
+        'kicker-in':  0.40,
+        'luke-in':    0.30,
+        'name-in':    0.55,
+        'stage-out':  3.20
+      };
+      var LABELS = {
+        'kicker-in':  'Kicker-Text IN',
+        'luke-in':    'Luke-Bild IN',
+        'name-in':    '"Luke" Name IN',
+        'stage-out':  'Stage Fade-Out'
+      };
+      var KEYS = ['kicker-in','luke-in','name-in','stage-out'];
+      var STORAGE_KEY = 'luke-tune-values';
+
+      var params = new URLSearchParams(window.location.search);
+      var tuneMode = params.get('tune') === '1';
+
+      var saved = {};
+      try { var raw = localStorage.getItem(STORAGE_KEY); if (raw) saved = JSON.parse(raw); } catch (e) {}
+      function getValue(key) { return (saved[key] !== undefined) ? saved[key] : DEFAULTS[key]; }
+
+      function applyToRoot() {
+        var root = document.documentElement;
+        KEYS.forEach(function (k) {
+          root.style.setProperty('--' + k, getValue(k) + 's');
+        });
+      }
+      applyToRoot();
+
+      if (!tuneMode) return;
+
+      var table = document.getElementById('tuneTable');
+      var header = document.createElement('tr');
+      header.innerHTML = '<th>Event</th><th>Zeit</th>';
+      table.appendChild(header);
+
+      function addRow(label, key) {
+        var tr = document.createElement('tr');
+        tr.className = 'clickable';
+        var tdLabel = document.createElement('td');
+        tdLabel.className = 'tune-label';
+        tdLabel.textContent = label;
+        tdLabel.title = 'Click: Von/Bis befuellen';
+        tr.appendChild(tdLabel);
+        var td = document.createElement('td');
+        var inp = document.createElement('input');
+        inp.type = 'number'; inp.step = '0.05'; inp.min = '0'; inp.max = '5';
+        inp.value = getValue(key); inp.dataset.key = key;
+        td.appendChild(inp);
+        tr.appendChild(td);
+        tr.addEventListener('click', function (e) {
+          if (e.target.tagName === 'INPUT') return;
+          var v = currentVals();
+          var from = Math.max(0, v[key] - 0.2);
+          var to   = v[key] + 0.6;
+          document.getElementById('fromInput').value = from.toFixed(2);
+          document.getElementById('toInput').value   = to.toFixed(2);
+        });
+        table.appendChild(tr);
+      }
+      KEYS.forEach(function (k) { addRow(LABELS[k], k); });
+
+      document.getElementById('tunePanel').classList.add('visible');
+      document.getElementById('timeInd').classList.add('visible');
+
+      function currentVals() {
+        var vals = {};
+        document.querySelectorAll('.tune-panel input').forEach(function (inp) {
+          if (inp.dataset.key) vals[inp.dataset.key] = parseFloat(inp.value) || 0;
+        });
+        return vals;
+      }
+
+      function apply() {
+        var vals = currentVals();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(vals));
+        location.reload();
+      }
+      function reset() { localStorage.removeItem(STORAGE_KEY); location.reload(); }
+
+      document.getElementById('applyBtn').addEventListener('click', apply);
+      document.getElementById('resetBtn').addEventListener('click', reset);
+
+      function copyValues() {
+        var v = currentVals();
+        var lines = ['Luke Tune Values:'];
+        KEYS.forEach(function (k) {
+          lines.push((LABELS[k] + ':').padEnd(34) + v[k].toFixed(2) + 's');
+        });
+        var text = lines.join('\n');
+        var btn = document.getElementById('copyBtn');
+        var original = btn.innerHTML;
+        var restore = function () { btn.innerHTML = original; };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () {
+            btn.innerHTML = '&#10003; Copied!';
+            setTimeout(restore, 1200);
+          }).catch(function () { fallbackCopy(text, btn, restore); });
+        } else { fallbackCopy(text, btn, restore); }
+      }
+      function fallbackCopy(text, btn, restore) {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.top = '-9999px';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); btn.innerHTML = '&#10003; Copied!'; }
+        catch (e) { btn.innerHTML = 'Error'; }
+        document.body.removeChild(ta);
+        setTimeout(restore, 1200);
+      }
+      document.getElementById('copyBtn').addEventListener('click', copyValues);
+
+      var html = document.documentElement;
+      var pauseBtn = document.getElementById('pauseBtn');
+      var replayBtn = document.getElementById('replayBtn');
+      var segmentBtn = document.getElementById('segmentBtn');
+      var fromInp = document.getElementById('fromInput');
+      var toInp = document.getElementById('toInput');
+      var segmentTimer = null;
+
+      function setPaused(paused) {
+        if (paused) { html.classList.add('paused'); pauseBtn.innerHTML = '&#9654; Resume'; }
+        else        { html.classList.remove('paused'); pauseBtn.innerHTML = '&#9208; Pause'; }
+      }
+      function togglePause() { setPaused(!html.classList.contains('paused')); }
+
+      function resetAnimations(offsetSec) {
+        clearTimeout(segmentTimer);
+        html.style.setProperty('--time-offset', (offsetSec || 0) + 's');
+        var stage = document.querySelector('.stage');
+        var clone = stage.cloneNode(true);
+        stage.parentNode.replaceChild(clone, stage);
+        html.classList.remove('paused');
+        pauseBtn.innerHTML = '&#9208; Pause';
+      }
+      function replayFrom0() { resetAnimations(0); }
+      function playSegment() {
+        var from = parseFloat(fromInp.value) || 0;
+        var to   = parseFloat(toInp.value) || getValue('stage-out');
+        if (to <= from) return;
+        resetAnimations(from);
+        segmentTimer = setTimeout(function () { setPaused(true); }, (to - from) * 1000);
+      }
+      pauseBtn.addEventListener('click', togglePause);
+      replayBtn.addEventListener('click', replayFrom0);
+      segmentBtn.addEventListener('click', playSegment);
+
+      document.addEventListener('keydown', function (e) {
+        if (e.target.tagName === 'INPUT') return;
+        if (e.key === 'r' || e.key === 'R') replayFrom0();
+        else if (e.key === 's' || e.key === 'S') apply();
+        else if (e.key === 'c' || e.key === 'C') copyValues();
+        else if (e.key === ' ') { e.preventDefault(); togglePause(); }
+      });
+
+      var events = [];
+      KEYS.forEach(function (k) { events.push({ t: getValue(k), label: LABELS[k] }); });
+      events.sort(function (a, b) { return a.t - b.t; });
+
+      var timeInd = document.getElementById('timeInd');
+      var startRef = null;
+      function tick() {
+        if (html.classList.contains('stinger-loading')) { requestAnimationFrame(tick); return; }
+        if (startRef === null) startRef = performance.now();
+        var t = (performance.now() - startRef) / 1000;
+        if (html.classList.contains('paused')) t = 0;
+        var currentEvent = null;
+        for (var i = 0; i < events.length; i++) {
+          if (events[i].t <= t) currentEvent = events[i]; else break;
+        }
+        var txt = 't = ' + t.toFixed(2) + 's';
+        if (html.classList.contains('paused')) txt += ' [PAUSED]';
+        if (currentEvent) txt += '  |  ' + currentEvent.label + ' @ ' + currentEvent.t.toFixed(2) + 's';
+        timeInd.textContent = txt;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    })();
+  </script>
 
   <script>
     (function () {

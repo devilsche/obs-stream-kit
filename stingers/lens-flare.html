@@ -15,6 +15,53 @@
       background: transparent;
     }
 
+    :root {
+      --time-offset: 0s;
+    }
+
+    /* ── Tune-Panel ── */
+    .tune-panel {
+      position: fixed; top: 80px; right: 16px; width: 420px;
+      background: rgba(20, 10, 30, 0.92);
+      border: 2px solid #f2b705; padding: 16px; border-radius: 10px;
+      color: #f2b705; font-family: 'Courier New', monospace; font-size: 13px;
+      z-index: 1000; display: none;
+      box-shadow: 0 0 30px rgba(242, 183, 5, 0.4);
+    }
+    .tune-panel.visible { display: block; }
+    .tune-panel h2 { font-size: 16px; margin-bottom: 12px; letter-spacing: 2px; text-transform: uppercase; }
+    .tune-panel table { width: 100%; border-collapse: collapse; }
+    .tune-panel th, .tune-panel td { padding: 4px 6px; text-align: left; border-bottom: 1px solid rgba(242, 183, 5, 0.2); }
+    .tune-panel th { font-size: 11px; text-transform: uppercase; }
+    .tune-panel input {
+      width: 70px; background: rgba(242, 183, 5, 0.1); border: 1px solid rgba(242, 183, 5, 0.4);
+      color: #f2b705; padding: 3px 6px; font-family: inherit; font-size: 12px;
+      text-align: right; border-radius: 3px;
+    }
+    .tune-panel input:focus { outline: 1px solid #f2b705; }
+    .tune-panel tr.clickable { cursor: pointer; }
+    .tune-panel tr.clickable:hover { background: rgba(242, 183, 5, 0.15); }
+    .tune-panel tr.clickable:hover .tune-label { color: #fff; }
+    .tune-panel .tune-label { font-size: 11px; color: rgba(255, 220, 150, 0.75); max-width: 200px; }
+    .tune-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .tune-btn {
+      flex: 1; background: rgba(242, 183, 5, 0.15); border: 1px solid #f2b705;
+      color: #f2b705; padding: 8px 10px; font-family: inherit; font-size: 12px;
+      font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+      border-radius: 4px; cursor: pointer;
+    }
+    .tune-btn:hover { background: rgba(242, 183, 5, 0.3); }
+    .tune-btn.reset { border-color: #ff8888; color: #ff8888; }
+    .tune-btn.reset:hover { background: rgba(255, 136, 136, 0.2); }
+    .tune-hint { margin-top: 10px; font-size: 10px; color: rgba(255, 220, 150, 0.6); line-height: 1.4; }
+    .time-indicator {
+      position: fixed; bottom: 16px; right: 16px;
+      background: rgba(20, 10, 30, 0.85); border: 1px solid #f2b705;
+      color: #f2b705; padding: 6px 14px; font-family: 'Courier New', monospace;
+      font-size: 14px; z-index: 1000; display: none; border-radius: 4px;
+    }
+    .time-indicator.visible { display: block; }
+
     .bg-video {
       position: absolute;
       inset: 0;
@@ -43,12 +90,128 @@
 
   <video class="bg-video" id="bgVideo" data-stinger-autoplay autoplay preload="auto" playsinline muted></video>
 
+  <div class="tune-panel" id="tunePanel">
+    <h2>Lens Flare Tune Mode</h2>
+    <table id="tuneTable"></table>
+    <div class="tune-actions">
+      <button class="tune-btn" id="applyBtn">&gt; Apply</button>
+      <button class="tune-btn" id="copyBtn">&#128203; Copy</button>
+      <button class="tune-btn reset" id="resetBtn">Reset</button>
+    </div>
+    <div class="tune-hint">
+      Video-Variante via URL-Parameter: <b>?tune=1&amp;n=1</b> bis <b>?tune=1&amp;n=7</b><br>
+      Shortcuts: <b>R</b> = Replay, <b>S</b> = Apply, <b>C</b> = Copy.
+    </div>
+  </div>
+
+  <div class="time-indicator" id="timeInd">t = 0.00s</div>
+
   <script>
     (function () {
       var params = new URLSearchParams(window.location.search);
       var n = parseInt(params.get('n'), 10);
       if (!n || n < 1 || n > 7) n = 1;
       document.getElementById('bgVideo').src = '../assets/stingers/lens-flare-' + n + '.mp4';
+
+      var tuneMode = params.get('tune') === '1';
+      var STORAGE_KEY = 'lens-flare-tune-values';
+
+      var DEFAULTS = { 'variant-n': n };
+      var LABELS = { 'variant-n': 'Video-Variante (1-7)' };
+      var KEYS = ['variant-n'];
+
+      var saved = {};
+      try { var raw = localStorage.getItem(STORAGE_KEY); if (raw) saved = JSON.parse(raw); } catch (e) {}
+      function getValue(key) { return (saved[key] !== undefined) ? saved[key] : DEFAULTS[key]; }
+
+      if (!tuneMode) return;
+
+      var table = document.getElementById('tuneTable');
+      var header = document.createElement('tr');
+      header.innerHTML = '<th>Parameter</th><th>Wert</th>';
+      table.appendChild(header);
+
+      function addRow(label, key) {
+        var tr = document.createElement('tr');
+        tr.className = 'clickable';
+        var tdLabel = document.createElement('td');
+        tdLabel.className = 'tune-label';
+        tdLabel.textContent = label;
+        tr.appendChild(tdLabel);
+        var td = document.createElement('td');
+        var inp = document.createElement('input');
+        inp.type = 'number'; inp.step = '1'; inp.min = '1'; inp.max = '7';
+        inp.value = getValue(key); inp.dataset.key = key;
+        td.appendChild(inp);
+        tr.appendChild(td);
+        table.appendChild(tr);
+      }
+      KEYS.forEach(function (k) { addRow(LABELS[k], k); });
+
+      document.getElementById('tunePanel').classList.add('visible');
+      document.getElementById('timeInd').classList.add('visible');
+
+      function currentVals() {
+        var vals = {};
+        document.querySelectorAll('.tune-panel input').forEach(function (inp) {
+          if (inp.dataset.key) vals[inp.dataset.key] = parseFloat(inp.value) || 1;
+        });
+        return vals;
+      }
+
+      function apply() {
+        var vals = currentVals();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(vals));
+        var newN = Math.round(vals['variant-n']);
+        var url = new URL(window.location.href);
+        url.searchParams.set('n', newN);
+        window.location.href = url.toString();
+      }
+      function reset() { localStorage.removeItem(STORAGE_KEY); location.reload(); }
+
+      document.getElementById('applyBtn').addEventListener('click', apply);
+      document.getElementById('resetBtn').addEventListener('click', reset);
+
+      function copyValues() {
+        var v = currentVals();
+        var text = 'Lens Flare Tune Values:\nVariante n = ' + Math.round(v['variant-n']);
+        var btn = document.getElementById('copyBtn');
+        var original = btn.innerHTML;
+        var restore = function () { btn.innerHTML = original; };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () {
+            btn.innerHTML = '&#10003; Copied!';
+            setTimeout(restore, 1200);
+          }).catch(function () { fallbackCopy(text, btn, restore); });
+        } else { fallbackCopy(text, btn, restore); }
+      }
+      function fallbackCopy(text, btn, restore) {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.top = '-9999px';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); btn.innerHTML = '&#10003; Copied!'; }
+        catch (e) { btn.innerHTML = 'Error'; }
+        document.body.removeChild(ta);
+        setTimeout(restore, 1200);
+      }
+      document.getElementById('copyBtn').addEventListener('click', copyValues);
+
+      document.addEventListener('keydown', function (e) {
+        if (e.target.tagName === 'INPUT') return;
+        if (e.key === 'r' || e.key === 'R') { var v = document.getElementById('bgVideo'); if (v) { v.currentTime = 0; v.play().catch(function(){}); } }
+        else if (e.key === 's' || e.key === 'S') apply();
+        else if (e.key === 'c' || e.key === 'C') copyValues();
+      });
+
+      var timeInd = document.getElementById('timeInd');
+      var startRef = null;
+      function tick() {
+        if (startRef === null) startRef = performance.now();
+        var t = (performance.now() - startRef) / 1000;
+        timeInd.textContent = 't = ' + t.toFixed(2) + 's  |  n=' + n;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
     })();
   </script>
 

@@ -15,6 +15,38 @@
       background: transparent;
     }
 
+    :root {
+      --time-offset: 0s;
+    }
+
+    /* ── Tune-Panel ── */
+    .tune-panel {
+      position: fixed; top: 80px; right: 16px; width: 420px;
+      background: rgba(20, 10, 30, 0.92);
+      border: 2px solid #f2b705; padding: 16px; border-radius: 10px;
+      color: #f2b705; font-family: 'Courier New', monospace; font-size: 13px;
+      z-index: 1000; display: none;
+      box-shadow: 0 0 30px rgba(242, 183, 5, 0.4);
+    }
+    .tune-panel.visible { display: block; }
+    .tune-panel h2 { font-size: 16px; margin-bottom: 12px; letter-spacing: 2px; text-transform: uppercase; }
+    .tune-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .tune-btn {
+      flex: 1; background: rgba(242, 183, 5, 0.15); border: 1px solid #f2b705;
+      color: #f2b705; padding: 8px 10px; font-family: inherit; font-size: 12px;
+      font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+      border-radius: 4px; cursor: pointer;
+    }
+    .tune-btn:hover { background: rgba(242, 183, 5, 0.3); }
+    .tune-hint { margin-top: 10px; font-size: 10px; color: rgba(255, 220, 150, 0.6); line-height: 1.4; }
+    .time-indicator {
+      position: fixed; bottom: 16px; right: 16px;
+      background: rgba(20, 10, 30, 0.85); border: 1px solid #f2b705;
+      color: #f2b705; padding: 6px 14px; font-family: 'Courier New', monospace;
+      font-size: 14px; z-index: 1000; display: none; border-radius: 4px;
+    }
+    .time-indicator.visible { display: block; }
+
     .bg-video {
       position: absolute;
       inset: 0;
@@ -55,6 +87,50 @@
 
   <video class="bg-video" data-stinger-autoplay autoplay preload="auto" playsinline loop muted
          src="../assets/stingers/falling_snow.mp4"></video>
+
+  <div class="tune-panel" id="tunePanel">
+    <h2>Snow Tune Mode</h2>
+    <p style="font-size: 11px; color: rgba(255,220,150,0.75); margin-bottom: 10px;">
+      Looping-Video-Overlay — kein Stage-Fade, kein Audio.<br>
+      Zum Testen: Seite neu laden mit <b>?tune=1</b>.
+    </p>
+    <div class="tune-hint">
+      Shortcuts: <b>R</b> = Video-Restart.
+    </div>
+  </div>
+
+  <div class="time-indicator" id="timeInd">t = 0.00s</div>
+
+  <script>
+    (function () {
+      'use strict';
+      var STORAGE_KEY = 'snow-tune-values';
+      var params = new URLSearchParams(window.location.search);
+      var tuneMode = params.get('tune') === '1';
+
+      if (!tuneMode) return;
+
+      document.getElementById('tunePanel').classList.add('visible');
+      document.getElementById('timeInd').classList.add('visible');
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'r' || e.key === 'R') {
+          var v = document.querySelector('.bg-video');
+          if (v) { v.currentTime = 0; }
+        }
+      });
+
+      var timeInd = document.getElementById('timeInd');
+      var startRef = null;
+      function tick() {
+        if (startRef === null) startRef = performance.now();
+        var t = (performance.now() - startRef) / 1000;
+        timeInd.textContent = 't = ' + t.toFixed(2) + 's  |  looping';
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    })();
+  </script>
 
 </body>
 </html>
