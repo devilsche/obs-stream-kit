@@ -92,12 +92,13 @@
       var CX = 960, CY = 540;
       var TOTAL = 2000;
 
-      /* ── Hintergrund: sofort sichtbar, am Ende ausblenden ── */
+      /* ── Hintergrund: kurzes Fade-In, dann halten, am Ende ausblenden ── */
       document.getElementById('bg').animate([
-        { opacity: 1 },
+        { opacity: 0 },
+        { opacity: 1, offset: 0.08 },
         { opacity: 1, offset: 0.62 },
         { opacity: 0 }
-      ], { duration: TOTAL, easing: 'ease-in', fill: 'forwards' });
+      ], { duration: TOTAL, easing: 'linear', fill: 'forwards' });
 
       /* Rand-Glow deaktiviert */
 
