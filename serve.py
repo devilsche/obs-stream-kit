@@ -10,6 +10,7 @@ Usage:
 """
 import http.server
 import os
+import re
 import sys
 import datetime
 import urllib.parse
@@ -313,6 +314,41 @@ class StreamServer(http.server.ThreadingHTTPServer):
     daemon_threads = True
 
 
+def _check_assets():
+    """Scannt alle HTML-Dateien und meldet fehlende lokale Assets."""
+    missing = []
+    seen = set()
+    src_pattern = re.compile(r'(?:src|href)\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
+    ext_pattern  = re.compile(r'\.\w{1,5}$')
+    for dirpath, _, files in os.walk(ROOT):
+        if any(p in dirpath for p in ('__pycache__', '.git', 'node_modules')):
+            continue
+        for fname in files:
+            if not fname.endswith('.html'):
+                continue
+            html_path = os.path.join(dirpath, fname)
+            try:
+                with open(html_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+            except OSError:
+                continue
+            for m in src_pattern.finditer(content):
+                ref = m.group(1).split('?')[0]   # Query-String abschneiden
+                if ref.startswith(('http', '//', 'data:', '#', 'javascript:', 'about:')):
+                    continue
+                if not ext_pattern.search(ref):   # kein Datei-Extension → dynamisch, überspringen
+                    continue
+                abs_ref = os.path.normpath(os.path.join(os.path.dirname(html_path), ref))
+                if not os.path.exists(abs_ref):
+                    rel_html  = os.path.relpath(html_path, ROOT).replace('\\', '/')
+                    rel_asset = os.path.relpath(abs_ref, ROOT).replace('\\', '/')
+                    key = rel_asset
+                    if key not in seen:
+                        seen.add(key)
+                        missing.append((rel_html, rel_asset))
+    return missing
+
+
 print()
 print("=" * 60)
 print("  obs-stream-kit Server")
@@ -344,6 +380,16 @@ print()
 print(f"  Server: http://localhost:{PORT}")
 print(f"  Beenden mit Ctrl+C")
 print("=" * 60)
+
+missing_assets = _check_assets()
+if missing_assets:
+    print()
+    print(f"  \033[91m\033[1m⚠  {len(missing_assets)} fehlende Asset(s) gefunden:\033[0m")
+    for html, asset in missing_assets:
+        print(f"  \033[91m  {asset}\033[0m")
+        print(f"  \033[2m    ← {html}\033[0m")
+    print()
+
 print()
 
 httpd = StreamServer((HOST, PORT), Handler)
