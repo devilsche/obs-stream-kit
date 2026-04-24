@@ -520,10 +520,6 @@
 
   <script src="../js/clip-player.js"></script>
   <script>
-    // Clip-Player sofort starten — unabhängig vom Rest
-    ClipPlayer.init({ containerId: 'clipContainer', muted: false, countdown: 10 });
-  </script>
-  <script>
     (function () {
       var W = 1920;
       var H = 1080;
@@ -677,6 +673,8 @@
 
       runLoop();
     })();
+
+    ClipPlayer.init({ containerId: 'clipContainer', muted: false, countdown: 10 });
   </script>
 </body>
 </html>
