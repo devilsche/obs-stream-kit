@@ -227,8 +227,11 @@ def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
     if not p:
         return {"error": "player not found"}
 
-    # Self-Lookup: das ist der Streamer selbst — Self-Join würde alle eigenen
-    # Matches als "Co-Player-Historie" doppeldeuten. Stattdessen Career zeigen.
+    self_row = conn.execute(
+        "SELECT name FROM players WHERE account_id = ? LIMIT 1", (my_account_id,)
+    ).fetchone()
+    my_name = self_row["name"] if self_row else "Self"
+
     if p["account_id"] == my_account_id:
         lifetime = conn.execute(
             "SELECT * FROM player_lifetime WHERE account_id = ? AND mode = 'all'",
@@ -236,6 +239,7 @@ def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
         ).fetchone()
         return {
             "name": p["name"],
+            "myName": my_name,
             "accountId": p["account_id"],
             "isSelf": True,
             "sharedHistory": None,
@@ -296,6 +300,7 @@ def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
 
     return {
         "name": p["name"],
+        "myName": my_name,
         "accountId": p["account_id"],
         "sharedHistory": history,
         "careerLifetime": dict(lifetime) if lifetime else None,
