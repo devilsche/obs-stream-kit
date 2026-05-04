@@ -69,6 +69,12 @@
   <script>
     const RANGE = PubgUI.qs("range", "all");
 
+    PubgUI.buildFilter([
+      { key: "range", label: "Range", type: "select", default: "all",
+        options: [["all","Alles"],["session","Session"],
+                  ["day","Heute"],["week","Letzte 7 Tage"]]},
+    ]);
+
     function chickens(n) {
       if (!n) return '<span class="zero">—</span>';
       // max 5 visible Hähnchen, Rest als "+N"

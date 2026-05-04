@@ -69,6 +69,22 @@
     const MIN_RAW = PubgUI.qs("minMatches");
     const MIN = MIN_RAW != null ? parseInt(MIN_RAW, 10) : null;
 
+    PubgUI.buildFilter([
+      { key: "sortBy", label: "Sort", type: "select", default: "mostPlayed",
+        options: [
+          ["mostPlayed", "Most Played"],
+          ["synergy", "Synergy"],
+          ["chickensTogether", "Most 🍗"],
+          ["kd", "K/D Meine"],
+          ["mateKd", "K/D Mate"],
+          ["winRate", "Win-Rate"],
+          ["avgPlace", "Avg Place"],
+        ]},
+      { key: "minMatches", label: "Min", type: "range", min: 1, max: 50,
+        default: 10 },
+      { key: "limit", label: "Limit", type: "range", min: 1, max: 20, default: 5 },
+    ]);
+
     const SORT_LABEL = {
       synergy: "Synergy",
       avgPlace: "Avg Place",

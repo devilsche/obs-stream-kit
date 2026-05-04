@@ -75,6 +75,10 @@
   <script>
     const MIN_WINS = parseInt(PubgUI.qs("minWins", 1), 10);
 
+    PubgUI.buildFilter([
+      { key: "minWins", label: "Min 🍗", type: "range", min: 1, max: 10, default: 1 },
+    ]);
+
     function chickens(n) {
       if (!n) return "";
       const visible = Math.min(n, 5);

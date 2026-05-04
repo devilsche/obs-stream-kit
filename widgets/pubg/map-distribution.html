@@ -29,6 +29,12 @@
   <script src="_pubg.js"></script>
   <script>
     const RANGE = PubgUI.qs("range", "session");
+
+    PubgUI.buildFilter([
+      { key: "range", label: "Range", type: "select", default: "session",
+        options: [["session","Session"],["day","Heute"],
+                  ["week","Letzte 7 Tage"],["all","Alles"]]},
+    ]);
     function render(list) {
       const max = Math.max(1, ...list.map(x => x.count));
       const html = list.map(m => `

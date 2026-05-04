@@ -65,6 +65,15 @@
       week:    "Letzte 7 Tage — gespielt mit",
     };
     document.getElementById("header").textContent = HEADERS[RANGE] || HEADERS.session;
+
+    PubgUI.buildFilter([
+      { key: "layout", label: "Layout", type: "select", default: "carousel",
+        options: [["carousel","Carousel"],["stack","Stack"],
+                  ["fold","Fold"],["mosaic","Mosaic"]]},
+      { key: "range", label: "Range", type: "select", default: "session",
+        options: [["session","Session"],["day","Heute"],["week","Letzte 7 Tage"]]},
+      { key: "minMatches", label: "Min", type: "range", min: 1, max: 50, default: 10 },
+    ]);
     document.getElementById("root").className = "pubg-card " + LAYOUT;
 
     function mateBody(m) {

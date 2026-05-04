@@ -28,6 +28,13 @@
     const PLAYERS = (PubgUI.qs("players", "") || "").split(",").filter(Boolean);
     const MATCHES = parseInt(PubgUI.qs("matches", 5), 10);
 
+    PubgUI.buildFilter([
+      { key: "players", label: "Players", type: "text",
+        placeholder: "Komma-Liste: PEX_LuCKoR,MateA" },
+      { key: "matches", label: "Letzte N", type: "range",
+        min: 1, max: 20, default: 5 },
+    ]);
+
     function render(d) {
       const head = ["Map / Datum", ...d.players].map(h => `<th>${h}</th>`).join("");
       document.getElementById("head").innerHTML = head;

@@ -74,6 +74,11 @@
   <script src="_pubg.js"></script>
   <script>
     const RANGE = PubgUI.qs("range", "session");
+
+    PubgUI.buildFilter([
+      { key: "range", label: "Range", type: "select", default: "session",
+        options: [["session","Session"],["day","Heute"],["week","Letzte 7 Tage"]]},
+    ]);
     function render(d) {
       document.getElementById("pct").textContent = (d.rate||0).toFixed(0) + "%";
       document.getElementById("sub").innerHTML =

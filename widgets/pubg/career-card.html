@@ -35,6 +35,15 @@
     const MODE = PubgUI.qs("mode", "all");
     document.getElementById("player").textContent = PLAYER || "Self";
 
+    PubgUI.buildFilter([
+      { key: "mode", label: "Mode", type: "select", default: "all",
+        options: [["all","Alle Modi"],
+                  ["squad-fpp","Squad FPP"],["squad-tpp","Squad TPP"],
+                  ["duo-fpp","Duo FPP"],["duo-tpp","Duo TPP"],
+                  ["solo-fpp","Solo FPP"],["solo-tpp","Solo TPP"]]},
+      { key: "player", label: "Player", type: "text", placeholder: "leer = self" },
+    ]);
+
     function render(d) {
       if (!d || !d.rounds_played) return;
       document.getElementById("matches").textContent = PubgUI.fmtNum(d.rounds_played);

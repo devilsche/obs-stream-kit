@@ -88,5 +88,139 @@
     requestAnimationFrame(tick);
   };
 
+  // ── Filter-Bar ─────────────────────────────────────────────────────────────
+  // Setzt URL-Parameter live + reloaded das Widget. Versteckt sich bei
+  // ?filter=0. Specs: [{key, label, type:"select"|"range"|"text", options?,
+  // min?, max?, default?}]. Nach Reload greifen die neuen URL-Params automatisch.
+
+  PubgUI.setUrlParam = (key, value) => {
+    const u = new URL(location.href);
+    if (value == null || value === "") u.searchParams.delete(key);
+    else u.searchParams.set(key, String(value));
+    history.replaceState(null, "", u.toString());
+  };
+
+  PubgUI._injectFilterCss = () => {
+    if (document.getElementById("pubg-filter-css")) return;
+    const css = document.createElement("style");
+    css.id = "pubg-filter-css";
+    css.textContent = `
+      .pubg-filter-bar {
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        padding: 6px 12px;
+        background: rgba(20, 12, 30, 0.92);
+        border-bottom: 1px solid var(--pubg-border, rgba(94,42,121,0.6));
+        font-size: 0.78em;
+        z-index: 9999;
+        backdrop-filter: blur(6px);
+      }
+      .pubg-filter-bar .grp { display: flex; align-items: center; gap: 6px; }
+      .pubg-filter-bar label {
+        color: var(--pubg-muted, #8a7d99);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 0.85em;
+      }
+      .pubg-filter-bar input[type=range] { width: 100px; }
+      .pubg-filter-bar select, .pubg-filter-bar input[type=text],
+      .pubg-filter-bar input[type=number] {
+        background: rgba(0,0,0,0.4);
+        color: var(--pubg-text, #e8e0f0);
+        border: 1px solid var(--pubg-border, rgba(94,42,121,0.6));
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: inherit;
+        font-size: inherit;
+      }
+      .pubg-filter-bar .val {
+        color: var(--pubg-gold, #f2b705);
+        font-weight: 700;
+        min-width: 24px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .pubg-filter-bar .hint {
+        margin-left: auto;
+        color: var(--pubg-muted, #8a7d99);
+        opacity: 0.6;
+        font-size: 0.85em;
+      }
+      body.pubg-has-filter { padding-top: 36px !important; }
+    `;
+    document.head.appendChild(css);
+  };
+
+  PubgUI.buildFilter = (specs) => {
+    if (PubgUI.qs("filter") === "0") return;
+    PubgUI._injectFilterCss();
+    document.body.classList.add("pubg-has-filter");
+
+    const bar = document.createElement("div");
+    bar.className = "pubg-filter-bar";
+
+    specs.forEach((spec) => {
+      const grp = document.createElement("div");
+      grp.className = "grp";
+
+      const label = document.createElement("label");
+      label.textContent = spec.label;
+      grp.appendChild(label);
+
+      let input;
+      const current = PubgUI.qs(spec.key, spec.default);
+
+      if (spec.type === "select") {
+        input = document.createElement("select");
+        spec.options.forEach(([val, lbl]) => {
+          const opt = document.createElement("option");
+          opt.value = val;
+          opt.textContent = lbl;
+          if (String(val) === String(current)) opt.selected = true;
+          input.appendChild(opt);
+        });
+      } else if (spec.type === "range") {
+        input = document.createElement("input");
+        input.type = "range";
+        input.min = spec.min ?? 1;
+        input.max = spec.max ?? 50;
+        input.value = current ?? spec.default ?? spec.min ?? 1;
+        const valSpan = document.createElement("span");
+        valSpan.className = "val";
+        valSpan.textContent = input.value;
+        input.addEventListener("input", () => valSpan.textContent = input.value);
+        grp.appendChild(input);
+        grp.appendChild(valSpan);
+      } else {
+        input = document.createElement("input");
+        input.type = spec.type || "text";
+        if (current != null) input.value = current;
+        if (spec.placeholder) input.placeholder = spec.placeholder;
+      }
+
+      if (spec.type !== "range") grp.appendChild(input);
+
+      input.addEventListener("change", (e) => {
+        const v = e.target.value;
+        const isDefault = spec.default != null && String(v) === String(spec.default);
+        PubgUI.setUrlParam(spec.key, isDefault ? null : v);
+        location.reload();
+      });
+
+      bar.appendChild(grp);
+    });
+
+    const hint = document.createElement("span");
+    hint.className = "hint";
+    hint.textContent = "?filter=0 versteckt";
+    bar.appendChild(hint);
+
+    document.body.insertBefore(bar, document.body.firstChild);
+  };
+
   global.PubgUI = PubgUI;
 })(window);
