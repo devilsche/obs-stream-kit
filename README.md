@@ -346,3 +346,85 @@ Fullscreen-Overlays zum manuellen Auslösen (z.B. per Streamer.bot Hotkey oder C
 - Animationen: CSS `@keyframes` + Web Animations API + `requestAnimationFrame`
 - Keine externen Abhängigkeiten — alles Vanilla HTML/CSS/JS
 - Meiste Szenen `file://`-kompatibel — BRB-Szene benötigt lokalen Server (Twitch Embed)
+
+---
+
+## PUBG Session Stats
+
+Modulares PUBG-Stats-Set mit lokaler SQLite-Persistenz und Live-Polling der offiziellen
+PUBG-Developer-API. Always-on-Backend (`serve.py` + `pubg/`-Modul) liefert JSON-Endpoints,
+HTML-Widgets als Browser-Sources rendern.
+
+### Setup
+
+1. **API-Key** unter [developer.pubg.com](https://developer.pubg.com) holen (kostenlos, 10 RPM Default).
+2. **`.secrets`** erweitern:
+   ```
+   PUBG-API-Key:  <dein-key>
+   ```
+3. **`config/pubg.json`** anpassen:
+   ```json
+   {
+     "playerName": "PEX_LuCKoR",
+     "platform": "steam",
+     "stammCrew": [],
+     "pollIntervalSec": 60,
+     "minMatchesForLifetime": 5,
+     "minMatchesForTopMates": 10
+   }
+   ```
+4. **DB initialisieren + Cold-Start** (zieht die letzten 30 Matches):
+   ```bash
+   python serve.py --init-pubg-db
+   python serve.py --pubg-cold-start
+   ```
+5. **`serve.py` als Always-on-Service**: siehe `docs/pubg-systemd.service.example`.
+6. **Browser-Sources** in OBS einfügen (Tabelle unten).
+
+### Browser-Source-Komponenten
+
+Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
+
+| Datei | Zweck | URL-Parameter |
+|---|---|---|
+| `live-bar.html` | Slim-Counter Gameplay | `refreshMs` |
+| `flyout-full.html` | Großes Detail-Panel mit Filter-Slider und Reset-Button | — |
+| `mates-today.html` | "Heute gespielt mit X" | `layout=carousel\|stack\|fold\|mosaic`, `range=session\|day\|week` |
+| `top-mates.html` | Top-5-Liste | `sortBy=avgPlace\|kd\|winRate\|mostPlayed`, `limit`, `minMatches` |
+| `post-match-card.html` | 10s-Pop-up nach Match-Ende | `durationMs` |
+| `map-distribution.html` | Map-Häufigkeits-Bars | `range=session\|day\|week\|all` |
+| `first-fight.html` | Survival-% mit Sparkline | `range` |
+| `session-summary.html` | Vollformat Stream-Ending | — |
+| `career-card.html` | Lifetime-Anzeige | `player`, `mode=all\|squad-fpp\|...` |
+| `news-ticker.html` | Marquee-Bar mit rotierenden Snippets | `rotateMs` |
+| `squad-compare.html` | 4er-Vergleichs-Tabelle | `players=A,B,C,D`, `matches` |
+| `chat-stats-popup.html` | Streamer.bot-driven Pop-up | `player`, `duration` (Sek) |
+
+Cross-Player-Web-View: `http://localhost:8080/scenes/stats.html?player=NAME`
+
+### Streamer.bot-Setup für `!mypubgstats`
+
+```
+Trigger: Twitch Chat Command "!mypubgstats"
+Action 1: $pubgName = User-Argument oder gespeichertes Mapping
+Action 2: OBS Browser-Source URL setzen:
+          http://localhost:8080/widgets/pubg/chat-stats-popup.html?player={pubgName}
+Action 3: Source einblenden
+Action 4: 12 Sekunden warten
+Action 5: Source ausblenden
+```
+
+### Status-Monitoring
+
+```
+GET http://localhost:8080/api/pubg/status
+```
+Liefert `{polling, lastPollAt, errors, newMatches, lifetimeRefreshed,
+telemetryProcessed, rateLimitRemaining}`. Brauchbar für ein internes Dashboard
+oder zum Debuggen.
+
+### Rate-Limit
+
+Default 10 RPM reicht für 1-2 Matches/Min steady-state. Bei häufigen
+`!mypubgstats`-Triggern oder vielen Stamm-Mates: Higher-Tier-Key unter
+[developer.pubg.com](https://developer.pubg.com) beantragen (bis 60+ RPM).

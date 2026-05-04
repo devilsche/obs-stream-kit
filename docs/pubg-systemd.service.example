@@ -1,0 +1,24 @@
+# obs-stream-kit Server (PUBG-Stats Always-on)
+#
+# Aktivieren:
+#   cp docs/pubg-systemd.service.example ~/.config/systemd/user/obs-stream-kit.service
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now obs-stream-kit.service
+#   systemctl --user status obs-stream-kit.service
+#
+# Logs:
+#   journalctl --user -u obs-stream-kit.service -f
+
+[Unit]
+Description=obs-stream-kit Server (PUBG-Stats Always-on)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/git/obs-stream-kit
+ExecStart=/usr/bin/python3 %h/git/obs-stream-kit/serve.py 8080
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
