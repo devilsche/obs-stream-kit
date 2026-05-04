@@ -38,57 +38,25 @@
       letter-spacing: 2px;
       color: var(--pubg-gold);
     }
-    .popup .stats-line {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 18px;
-      align-items: baseline;
-      font-size: 1em;
+    .popup .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
     }
-    .popup .stats-line .item b {
-      color: var(--pubg-gold);
-      font-weight: 700;
-      font-size: 1.4em;
-      font-variant-numeric: tabular-nums;
-      margin-right: 4px;
-    }
-    .popup .stats-line .item {
-      color: var(--pubg-muted);
+    .popup .cell { display: flex; flex-direction: column; }
+    .popup .cell .pubg-stat-value { font-size: 1.5em; }
+    .popup .career {
       font-size: 0.85em;
-      letter-spacing: 0.02em;
-    }
-    .popup .kda-row {
-      display: flex; align-items: baseline; justify-content: space-between;
-      gap: 14px; margin-top: 14px;
-      padding: 14px 16px;
-      background: rgba(94, 42, 121, 0.18);
-      border-radius: 6px;
-    }
-    .popup .kda-row .mate-block {
-      display: flex; align-items: baseline; gap: 10px;
-    }
-    .popup .kda-row .mate-kd {
-      font-size: 2.4em;
-      font-weight: 700;
-      color: var(--pubg-gold);
-      line-height: 1;
-      font-variant-numeric: tabular-nums;
-    }
-    .popup .kda-row .mate-label {
       color: var(--pubg-muted);
-      font-size: 0.78em;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
-    .popup .kda-row .my-kd {
-      color: var(--pubg-muted);
-      font-size: 0.85em;
-      font-variant-numeric: tabular-nums;
+    .popup .career.tight {
+      border-top: none;
+      padding-top: 0;
+      margin-top: 6px;
     }
-    .popup .kda-row .my-kd b { color: var(--pubg-text); }
-    .popup .career { font-size: 0.85em; color: var(--pubg-muted);
-                     margin-top: 14px; padding-top: 14px;
-                     border-top: 1px solid rgba(255,255,255,0.08); }
   </style>
 </head>
 <body>
@@ -98,15 +66,14 @@
       <span id="name">—</span>
       <span class="chickens" id="chickens"></span>
     </div>
-    <div class="stats-line" id="statsLine">—</div>
-    <div class="kda-row">
-      <div class="mate-block">
-        <span class="mate-kd" id="kd-mate">—</span>
-        <span class="mate-label">K/D Mate</span>
-      </div>
-      <div class="my-kd"><span id="my-name">—</span> <b id="kd-my">—</b></div>
+    <div class="grid">
+      <div class="cell"><span class="pubg-stat-value" id="m">—</span><span class="pubg-stat-label">Matches</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="wins">—</span><span class="pubg-stat-label">🍗 Together</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="avgplace">—</span><span class="pubg-stat-label">Avg Place</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="kd-mate">—</span><span class="pubg-stat-label">K/D Mate</span></div>
     </div>
-    <div class="career" id="career">—</div>
+    <div class="career" id="my-line">—</div>
+    <div class="career tight" id="career">—</div>
   </div>
 
   <script src="_pubg.js"></script>
@@ -140,38 +107,38 @@
             document.getElementById("name").textContent = "Player nicht gefunden";
             return reveal();
           }
-          const matchWord = (n) => n === 1 ? "Match" : "Matches";
-          const winWord = (n) => n === 1 ? "Chicken" : "Chickens";
 
           if (d.isSelf) {
             document.querySelector(".popup .ribbon").textContent = "Career — du selbst";
             document.getElementById("name").textContent = d.name;
             const cl = d.careerLifetime || {};
-            document.getElementById("statsLine").innerHTML = `
-              <span class="item"><b>${PubgUI.fmtNum(cl.rounds_played)}</b>${matchWord(cl.rounds_played)}</span>
-              <span class="item"><b>${PubgUI.fmtNum(cl.wins)}</b>🍗 Career</span>
-              <span class="item"><b>${PubgUI.fmtPct(cl.win_rate)}</b>Win-Rate</span>`;
+            document.getElementById("m").textContent = PubgUI.fmtNum(cl.rounds_played);
+            document.getElementById("wins").textContent = PubgUI.fmtNum(cl.wins);
+            document.getElementById("avgplace").textContent = PubgUI.fmtPct(cl.win_rate);
             document.getElementById("kd-mate").textContent = PubgUI.fmtKD(cl.kd_ratio);
-            document.querySelector(".kda-row .mate-label").textContent = "Career K/D";
-            document.querySelector(".my-kd").innerHTML =
-              `Headshot: <b>${PubgUI.fmtPct(cl.headshot_rate)}</b>`;
+            document.querySelectorAll(".cell .pubg-stat-label").forEach((el, i) => {
+              const labels = ["Career Matches", "🍗 Career Wins", "Win-Rate", "Career K/D"];
+              if (labels[i]) el.textContent = labels[i];
+            });
             document.getElementById("chickens").innerHTML = "";
-            document.getElementById("career").style.display = "none";
+            document.getElementById("my-line").style.display = "none";
+            document.getElementById("career").textContent =
+              `Headshot: ${PubgUI.fmtPct(cl.headshot_rate)} · Top10: ${PubgUI.fmtPct(cl.top10_rate)}`;
             return reveal();
           }
+
           document.getElementById("name").textContent = d.name || PLAYER;
           const sh = d.sharedHistory || {};
           const wins = sh.wins || 0;
-          const matches = sh.matches || 0;
-          document.getElementById("statsLine").innerHTML = `
-            <span class="item"><b>${matches}</b>${matchWord(matches)}</span>
-            <span class="item"><b>${wins}</b>🍗 ${winWord(wins)}</span>
-            <span class="item">Avg <b>#${(sh.avgPlace || 0).toFixed(1)}</b></span>`;
+          document.getElementById("m").textContent = PubgUI.fmtNum(sh.matches);
+          document.getElementById("wins").textContent = PubgUI.fmtNum(wins);
+          document.getElementById("avgplace").textContent =
+            sh.avgPlace ? "#" + sh.avgPlace.toFixed(1) : "—";
+          document.getElementById("kd-mate").textContent = PubgUI.fmtKD(sh.mateKd);
           document.getElementById("chickens").innerHTML = chickenIcons(wins);
 
-          document.getElementById("my-name").textContent = d.myName || "Meine";
-          document.getElementById("kd-my").textContent = PubgUI.fmtKD(sh.kd);
-          document.getElementById("kd-mate").textContent = PubgUI.fmtKD(sh.mateKd);
+          document.getElementById("my-line").textContent =
+            `${d.myName || "Meine"} K/D: ${PubgUI.fmtKD(sh.kd)}`;
 
           const cl = d.careerLifetime;
           document.getElementById("career").textContent = cl
