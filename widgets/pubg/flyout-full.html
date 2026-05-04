@@ -230,14 +230,13 @@
         `<b>${f.survived||0}</b> / <b>${f.total||0}</b> überlebt`;
     }
 
-    const MIN_HOT_MATCHES = 10;
     const HOT = {
-      synergy:          m => (m.synergyScore || 0) >= 1.5 && m.sharedMatches >= MIN_HOT_MATCHES,
-      winRate:          m => (m.winRate || 0) >= 20.0 && m.sharedMatches >= MIN_HOT_MATCHES,
-      kd:               m => (m.kd || 0) >= 2.5 && m.sharedMatches >= MIN_HOT_MATCHES,
-      mateKd:           m => (m.mateKd || 0) >= 2.5 && m.sharedMatches >= MIN_HOT_MATCHES,
+      synergy:          m => (m.synergyScore || 0) >= 1.5,
+      winRate:          m => (m.winRate || 0) >= 20.0,
+      kd:               m => (m.kd || 0) >= 2.5,
+      mateKd:           m => (m.mateKd || 0) >= 2.5,
       chickensTogether: m => (m.winsTogether || 0) >= 3,
-      avgPlace:         m => (m.avgPlace || 99) <= 5.0 && m.sharedMatches >= MIN_HOT_MATCHES,
+      avgPlace:         m => (m.avgPlace || 99) <= 5.0,
       mostPlayed:       m => m.sharedMatches >= 50,
     };
     const hotWrap = t => `<span class="pubg-fire">🔥</span><span class="pubg-hot">${t}</span>`;

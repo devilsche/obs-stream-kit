@@ -122,17 +122,15 @@
       }).catch(() => setTitle(10));
     }
 
-    // Hot-Schwellen — Werte UND Mindest-Match-Anzahl (sonst Glücks-Stats).
-    // 10 Matches Mindest sorgt dafür dass 2-Match-Glücksspielereien
-    // nicht als "elite" markiert werden.
-    const MIN_HOT_MATCHES = 10;
+    // Hot-Schwellen — pure Wert-Schwellen, Glücks-Stats sind erlaubt.
+    // (Synergy hat eingebaute Stabilitäts-Dämpfung in der Formel.)
     const HOT = {
-      synergy:           m => (m.synergyScore || 0) >= 1.5 && m.sharedMatches >= MIN_HOT_MATCHES,
-      winRate:           m => (m.winRate || 0) >= 20.0 && m.sharedMatches >= MIN_HOT_MATCHES,
-      kd:                m => (m.kd || 0) >= 2.5 && m.sharedMatches >= MIN_HOT_MATCHES,
-      mateKd:            m => (m.mateKd || 0) >= 2.5 && m.sharedMatches >= MIN_HOT_MATCHES,
-      chickensTogether:  m => (m.winsTogether || 0) >= 3,  // absolut, ohne Match-Mindest
-      avgPlace:          m => (m.avgPlace || 99) <= 5.0 && m.sharedMatches >= MIN_HOT_MATCHES,
+      synergy:           m => (m.synergyScore || 0) >= 1.5,
+      winRate:           m => (m.winRate || 0) >= 20.0,
+      kd:                m => (m.kd || 0) >= 2.5,
+      mateKd:            m => (m.mateKd || 0) >= 2.5,
+      chickensTogether:  m => (m.winsTogether || 0) >= 3,
+      avgPlace:          m => (m.avgPlace || 99) <= 5.0,
       mostPlayed:        m => m.sharedMatches >= 50,
     };
 
