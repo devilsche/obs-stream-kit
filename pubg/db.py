@@ -56,6 +56,10 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
     timestamp_ms    INTEGER,
     actor_account   TEXT,
     target_account  TEXT,
+    actor_x         REAL,
+    actor_y         REAL,
+    victim_x        REAL,
+    victim_y        REAL,
     weapon          TEXT,
     distance        REAL,
     damage          REAL,
@@ -130,6 +134,13 @@ def connect(path: str) -> sqlite3.Connection:
 
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    # Migrationen für bestehende DBs: ALTER TABLE ADD COLUMN ist idempotent
+    # via try/except, weil SQLite kein "IF NOT EXISTS" für Columns kennt.
+    for col in ("actor_x", "actor_y", "victim_x", "victim_y"):
+        try:
+            conn.execute(f"ALTER TABLE telemetry_events ADD COLUMN {col} REAL")
+        except sqlite3.OperationalError:
+            pass  # Column existiert bereits
     conn.commit()
 
 
@@ -268,14 +279,17 @@ def get_lifetime(conn, account_id: str, mode: str):
 def insert_telemetry_events(conn, match_id: str, events: list) -> None:
     rows = [(match_id, e["event_type"], e.get("timestamp_ms"),
              e.get("actor_account"), e.get("target_account"),
+             e.get("actor_x"), e.get("actor_y"),
+             e.get("victim_x"), e.get("victim_y"),
              e.get("weapon"), e.get("distance"), e.get("damage"),
              e.get("payload_json", "{}"))
             for e in events]
     conn.executemany("""
         INSERT INTO telemetry_events
         (match_id, event_type, timestamp_ms, actor_account, target_account,
+         actor_x, actor_y, victim_x, victim_y,
          weapon, distance, damage, payload_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, rows)
     conn.commit()
 

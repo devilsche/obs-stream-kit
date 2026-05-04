@@ -13,12 +13,22 @@ def _ts_ms(iso):
     return int(t.timestamp() * 1000) if t else None
 
 
+def _loc(p, key):
+    """Liest p[key]['location']['x'/'y'] sicher raus. PUBG-World-Units (cm).
+    1 km = 100000."""
+    obj = (p or {}).get(key) or {}
+    loc = obj.get("location") or {}
+    return loc.get("x"), loc.get("y")
+
+
 def _normalize(event):
     """Convert one PUBG telemetry event to flat row schema, or None to skip.
     Deckt alle für unsere Stats relevanten Event-Typen ab."""
     et = event.get("_T", "")
     base = {"event_type": None, "timestamp_ms": _ts_ms(event.get("_D")),
             "actor_account": None, "target_account": None,
+            "actor_x": None, "actor_y": None,
+            "victim_x": None, "victim_y": None,
             "weapon": None, "distance": None, "damage": None,
             "payload_json": json.dumps(event, separators=(",", ":"))}
     if et == "LogParachuteLanding":
@@ -31,6 +41,8 @@ def _normalize(event):
         info = event.get("killerDamageInfo") or {}
         base["weapon"] = info.get("damageCauserName") or event.get("damageCauserName")
         base["distance"] = info.get("distance") or event.get("distance")
+        base["actor_x"], base["actor_y"] = _loc(event, "killer")
+        base["victim_x"], base["victim_y"] = _loc(event, "victim")
     elif et == "LogPlayerMakeGroggy":
         # Knock/DBNO — wichtig für First-Fight: oft kommt der Knock vor Kill
         base["event_type"] = "Knock"
@@ -39,6 +51,8 @@ def _normalize(event):
         base["damage"] = event.get("damage")
         base["weapon"] = event.get("damageCauserName")
         base["distance"] = event.get("distance")
+        base["actor_x"], base["actor_y"] = _loc(event, "attacker")
+        base["victim_x"], base["victim_y"] = _loc(event, "victim")
     elif et == "LogPlayerRevive":
         base["event_type"] = "Revive"
         base["actor_account"] = (event.get("reviver") or {}).get("accountId")
@@ -49,6 +63,8 @@ def _normalize(event):
         base["target_account"] = (event.get("victim") or {}).get("accountId")
         base["damage"] = event.get("damage")
         base["weapon"] = event.get("damageCauserName")
+        base["actor_x"], base["actor_y"] = _loc(event, "attacker")
+        base["victim_x"], base["victim_y"] = _loc(event, "victim")
     elif et == "LogPlayerAttack":
         base["event_type"] = "Attack"
         base["actor_account"] = (event.get("attacker") or {}).get("accountId")
@@ -95,12 +111,20 @@ def _normalize(event):
     return base
 
 
+# Events die wir immer behalten (auch ohne Squad-Beteiligung) — wichtig für
+# Fight-Cluster-Detection: enemy-vs-enemy Kills/Knocks zeigen welche anderen
+# Teams im selben Fight involviert sind.
+ALWAYS_KEEP_EVENTS = {"Kill", "Knock"}
+
+
 def filter_squad_events(events, squad_account_ids):
     for e in events:
         norm = _normalize(e)
         if not norm:
             continue
-        if (norm["actor_account"] in squad_account_ids
+        if norm["event_type"] in ALWAYS_KEEP_EVENTS:
+            yield norm
+        elif (norm["actor_account"] in squad_account_ids
                 or norm["target_account"] in squad_account_ids):
             yield norm
 
