@@ -6,8 +6,20 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="_pubg.css">
   <style>
-    body { padding: 16px; }
-    .panel { width: 460px; padding: 16px 18px; }
+    /* Card passt sich dem Browser-Source/Fenster an. OBS-Source-Größe
+       (z.B. 480×420 oder 600×500) bestimmt die finale Card-Breite. */
+    html, body { margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      padding: 8px;
+    }
+    .panel {
+      width: 100%;
+      min-width: 320px;
+      padding: 14px 16px;
+    }
     .panel h3 {
       margin: 0 0 12px;
       font-size: 0.9em;
