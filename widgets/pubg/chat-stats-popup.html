@@ -42,14 +42,34 @@
     .popup .cell { display: flex; flex-direction: column; }
     .popup .cell .pubg-stat-value { font-size: 1.5em; }
     .popup .kda-row {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: 14px; margin-top: 12px;
-      padding: 12px 14px;
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 14px; margin-top: 14px;
+      padding: 14px 16px;
       background: rgba(94, 42, 121, 0.18);
       border-radius: 6px;
     }
-    .popup .kda-row .cell { align-items: flex-start; }
-    .popup .kda-row .pubg-stat-value { font-size: 1.3em; }
+    .popup .kda-row .mate-block {
+      display: flex; align-items: baseline; gap: 10px;
+    }
+    .popup .kda-row .mate-kd {
+      font-size: 2.4em;
+      font-weight: 700;
+      color: var(--pubg-gold);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .popup .kda-row .mate-label {
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .popup .kda-row .my-kd {
+      color: var(--pubg-muted);
+      font-size: 0.85em;
+      font-variant-numeric: tabular-nums;
+    }
+    .popup .kda-row .my-kd b { color: var(--pubg-text); }
     .popup .career { font-size: 0.85em; color: var(--pubg-muted);
                      margin-top: 14px; padding-top: 14px;
                      border-top: 1px solid rgba(255,255,255,0.08); }
@@ -68,14 +88,11 @@
       <div class="cell"><span class="pubg-stat-value" id="avgplace">—</span><span class="pubg-stat-label">Avg Place</span></div>
     </div>
     <div class="kda-row">
-      <div class="cell">
-        <span class="pubg-stat-value" id="kd-my">—</span>
-        <span class="pubg-stat-label">K/D (Meine)</span>
+      <div class="mate-block">
+        <span class="mate-kd" id="kd-mate">—</span>
+        <span class="mate-label">K/D Mate</span>
       </div>
-      <div class="cell">
-        <span class="pubg-stat-value" id="kd-mate">—</span>
-        <span class="pubg-stat-label">K/D (Mate)</span>
-      </div>
+      <div class="my-kd">Meine: <b id="kd-my">—</b></div>
     </div>
     <div class="career" id="career">—</div>
   </div>
