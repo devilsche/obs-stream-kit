@@ -93,17 +93,31 @@ class EndpointRegistry:
 
     def _top_mates(self, qs):
         conn = self.get_conn()
-        # Default sortBy / minMatches kommen aus settings — Slider/Dropdown
-        # im flyout-full setzt dort persistent. URL-Param kann override.
         default_sort = get_setting(conn, "topMatesSortBy", "mostPlayed")
         default_min = int(get_setting(conn, "minMatchesForTopMates", "10"))
         sort_by = qs.get("sortBy", default_sort)
         limit = int(qs.get("limit", 5))
         min_matches = int(qs.get("minMatches", default_min))
-        key = f"top-mates:{sort_by}:{limit}:{min_matches}"
-        return _ok(self.cache.get_or_compute(
-            key, lambda: compute_top_mates(conn, self.my_account_id,
-                                            sort_by, limit, min_matches)))
+
+        # Cache: nur die Roh-Aggregation (alle Mates, alle Stats), ohne Sort/Filter.
+        # Damit liefern alle min_matches/sortBy-Varianten konsistente Zahlen
+        # innerhalb desselben TTL-Fensters.
+        all_mates = self.cache.get_or_compute(
+            "top-mates:raw",
+            lambda: compute_top_mates(conn, self.my_account_id,
+                                       sort_by="mostPlayed",
+                                       limit=10000, min_matches=1))
+        filtered = [m for m in all_mates if m["sharedMatches"] >= min_matches]
+        sort_fns = {
+            "avgPlace":          lambda m: m["avgPlace"] or 99,
+            "kd":                lambda m: -(m["kd"] or 0),
+            "mateKd":            lambda m: -(m["mateKd"] or 0),
+            "winRate":           lambda m: -(m["winRate"] or 0),
+            "mostPlayed":        lambda m: -m["sharedMatches"],
+            "chickensTogether":  lambda m: (-m["winsTogether"], -m["sharedMatches"]),
+        }
+        filtered.sort(key=sort_fns.get(sort_by, sort_fns["mostPlayed"]))
+        return _ok(filtered[:limit])
 
     def _co_player(self, name):
         conn = self.get_conn()
