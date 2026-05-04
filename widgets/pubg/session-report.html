@@ -79,6 +79,18 @@
       border-radius: 3px;
       align-items: center;
     }
+    .matches-list .header-row {
+      display: grid;
+      grid-template-columns: 90px 90px 1fr auto;
+      gap: 10px;
+      padding: 2px 8px 4px;
+      font-size: 0.85em;
+      color: var(--pubg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px dashed rgba(255,255,255,0.1);
+      margin-bottom: 4px;
+    }
     .matches-list .m:hover { background: rgba(255,255,255,0.04); }
     .matches-list .m.win {
       background: rgba(242,183,5,0.15);
@@ -192,6 +204,9 @@
               <span><b>${fmtDuration(s.totalSurvivedSec)}</b>überlebt</span>
             </div>
             <div class="matches-list">
+              <div class="header-row">
+                <span>Start</span><span>Place</span><span>Map</span><span>Stats / Survived</span>
+              </div>
               ${ph.matches.map(fmtMatchRow).join("")}
             </div>
           </div>`;
