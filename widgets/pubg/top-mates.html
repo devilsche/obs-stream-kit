@@ -122,15 +122,18 @@
       }).catch(() => setTitle(10));
     }
 
-    // Hot-Schwellen — Werte, ab denen der Primary-Wert orange/glüht
+    // Hot-Schwellen — Werte UND Mindest-Match-Anzahl (sonst Glücks-Stats).
+    // 10 Matches Mindest sorgt dafür dass 2-Match-Glücksspielereien
+    // nicht als "elite" markiert werden.
+    const MIN_HOT_MATCHES = 10;
     const HOT = {
-      synergy:           v => v >= 3.0,
-      winRate:           v => v >= 20.0,
-      kd:                v => v >= 2.5,
-      mateKd:            v => v >= 2.5,
-      chickensTogether:  v => v >= 3,    // winsTogether
-      avgPlace:          v => v <= 5.0,  // niedriger = besser
-      mostPlayed:        v => v >= 50,   // sharedMatches
+      synergy:           m => (m.synergyScore || 0) >= 1.5 && m.sharedMatches >= MIN_HOT_MATCHES,
+      winRate:           m => (m.winRate || 0) >= 20.0 && m.sharedMatches >= MIN_HOT_MATCHES,
+      kd:                m => (m.kd || 0) >= 2.5 && m.sharedMatches >= MIN_HOT_MATCHES,
+      mateKd:            m => (m.mateKd || 0) >= 2.5 && m.sharedMatches >= MIN_HOT_MATCHES,
+      chickensTogether:  m => (m.winsTogether || 0) >= 3,  // absolut, ohne Match-Mindest
+      avgPlace:          m => (m.avgPlace || 99) <= 5.0 && m.sharedMatches >= MIN_HOT_MATCHES,
+      mostPlayed:        m => m.sharedMatches >= 50,
     };
 
     function hotWrap(text) {
@@ -141,38 +144,38 @@
       if (SORT_BY === "avgPlace") {
         const v = m.avgPlace || 0;
         const text = "Avg #" + v.toFixed(1);
-        return HOT.avgPlace(v) ? hotWrap(text) : text;
+        return HOT.avgPlace(m) ? hotWrap(text) : text;
       }
       if (SORT_BY === "kd") {
         const v = m.kd || 0;
         const text = "K/D " + v.toFixed(2);
-        return HOT.kd(v) ? hotWrap(text) : text;
+        return HOT.kd(m) ? hotWrap(text) : text;
       }
       if (SORT_BY === "mateKd") {
         const v = m.mateKd || 0;
         const text = "K/D " + v.toFixed(2);
-        return HOT.mateKd(v) ? hotWrap(text) : text;
+        return HOT.mateKd(m) ? hotWrap(text) : text;
       }
       if (SORT_BY === "winRate") {
         const v = m.winRate || 0;
         const text = v.toFixed(1) + "%";
-        return HOT.winRate(v) ? hotWrap(text) : text;
+        return HOT.winRate(m) ? hotWrap(text) : text;
       }
       if (SORT_BY === "mostPlayed") {
         const v = m.sharedMatches;
         const text = v + " Matches";
-        return HOT.mostPlayed(v) ? hotWrap(text) : text;
+        return HOT.mostPlayed(m) ? hotWrap(text) : text;
       }
       if (SORT_BY === "chickensTogether") {
         const wins = m.winsTogether || 0;
         const rate = m.winRate || 0;
         const text = wins + " 🍗 · " + rate.toFixed(1) + "%";
-        return HOT.chickensTogether(wins) ? hotWrap(text) : text;
+        return HOT.chickensTogether(m) ? hotWrap(text) : text;
       }
       if (SORT_BY === "synergy") {
         const v = m.synergyScore || 0;
         const text = "Score " + v.toFixed(2);
-        return HOT.synergy(v) ? hotWrap(text) : text;
+        return HOT.synergy(m) ? hotWrap(text) : text;
       }
       return "";
     }

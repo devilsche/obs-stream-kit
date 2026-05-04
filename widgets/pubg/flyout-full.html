@@ -230,52 +230,47 @@
         `<b>${f.survived||0}</b> / <b>${f.total||0}</b> überlebt`;
     }
 
+    const MIN_HOT_MATCHES = 10;
     const HOT = {
-      synergy:          v => v >= 3.0,
-      winRate:          v => v >= 20.0,
-      kd:               v => v >= 2.5,
-      mateKd:           v => v >= 2.5,
-      chickensTogether: v => v >= 3,
-      avgPlace:         v => v <= 5.0,
-      mostPlayed:       v => v >= 50,
+      synergy:          m => (m.synergyScore || 0) >= 1.5 && m.sharedMatches >= MIN_HOT_MATCHES,
+      winRate:          m => (m.winRate || 0) >= 20.0 && m.sharedMatches >= MIN_HOT_MATCHES,
+      kd:               m => (m.kd || 0) >= 2.5 && m.sharedMatches >= MIN_HOT_MATCHES,
+      mateKd:           m => (m.mateKd || 0) >= 2.5 && m.sharedMatches >= MIN_HOT_MATCHES,
+      chickensTogether: m => (m.winsTogether || 0) >= 3,
+      avgPlace:         m => (m.avgPlace || 99) <= 5.0 && m.sharedMatches >= MIN_HOT_MATCHES,
+      mostPlayed:       m => m.sharedMatches >= 50,
     };
     const hotWrap = t => `<span class="pubg-fire">🔥</span><span class="pubg-hot">${t}</span>`;
 
     function topMateValue(m) {
       if (currentSort === "synergy") {
-        const v = m.synergyScore || 0;
-        const t = "Score " + v.toFixed(2);
-        return HOT.synergy(v) ? hotWrap(t) : t;
+        const t = "Score " + (m.synergyScore || 0).toFixed(2);
+        return HOT.synergy(m) ? hotWrap(t) : t;
       }
       if (currentSort === "chickensTogether") {
         const wins = m.winsTogether || 0;
         const rate = m.winRate || 0;
         const t = wins + " 🍗 · " + rate.toFixed(1) + "%";
-        return HOT.chickensTogether(wins) ? hotWrap(t) : t;
+        return HOT.chickensTogether(m) ? hotWrap(t) : t;
       }
       if (currentSort === "kd") {
-        const v = m.kd || 0;
-        const t = "K/D " + v.toFixed(2);
-        return HOT.kd(v) ? hotWrap(t) : t;
+        const t = "K/D " + (m.kd || 0).toFixed(2);
+        return HOT.kd(m) ? hotWrap(t) : t;
       }
       if (currentSort === "mateKd") {
-        const v = m.mateKd || 0;
-        const t = "K/D " + v.toFixed(2);
-        return HOT.mateKd(v) ? hotWrap(t) : t;
+        const t = "K/D " + (m.mateKd || 0).toFixed(2);
+        return HOT.mateKd(m) ? hotWrap(t) : t;
       }
       if (currentSort === "winRate") {
-        const v = m.winRate || 0;
-        const t = v.toFixed(1) + "%";
-        return HOT.winRate(v) ? hotWrap(t) : t;
+        const t = (m.winRate || 0).toFixed(1) + "%";
+        return HOT.winRate(m) ? hotWrap(t) : t;
       }
       if (currentSort === "avgPlace") {
-        const v = m.avgPlace || 0;
-        const t = "Avg #" + v.toFixed(1);
-        return HOT.avgPlace(v) ? hotWrap(t) : t;
+        const t = "Avg #" + (m.avgPlace || 0).toFixed(1);
+        return HOT.avgPlace(m) ? hotWrap(t) : t;
       }
-      const v = m.sharedMatches;
-      const t = v + " Matches";
-      return HOT.mostPlayed(v) ? hotWrap(t) : t;
+      const t = m.sharedMatches + " Matches";
+      return HOT.mostPlayed(m) ? hotWrap(t) : t;
     }
 
     function topMateSub(m) {
