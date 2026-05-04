@@ -113,10 +113,12 @@ def compute_last_match(conn, my_account_id: str):
 
 
 SORT_KEYS = {
-    "avgPlace": "avg_place ASC",
-    "kd": "kd DESC",
-    "winRate": "win_rate DESC",
-    "mostPlayed": "shared DESC",
+    "avgPlace":          "avg_place ASC",
+    "kd":                "kd DESC",                # meine K/D in gemeinsamen Matches
+    "mateKd":            "mate_kd DESC",           # K/D des Mates
+    "winRate":           "win_rate DESC",
+    "mostPlayed":        "shared DESC",
+    "chickensTogether":  "wins DESC, shared DESC", # absolute Anzahl Wins
 }
 
 
@@ -128,7 +130,8 @@ def compute_top_mates(conn, my_account_id: str,
     rows = conn.execute(f"""
         WITH co AS (
             SELECT mate.account_id, mate.name, mate.match_id, mate.place,
-                   me.kills AS my_kills, me.damage_dealt AS my_dmg
+                   me.kills AS my_kills, me.damage_dealt AS my_dmg,
+                   mate.kills AS mate_kills, mate.damage_dealt AS mate_dmg
             FROM participants mate
             JOIN participants me ON me.match_id = mate.match_id AND me.account_id = ?
             WHERE mate.account_id != ?
@@ -136,8 +139,11 @@ def compute_top_mates(conn, my_account_id: str,
         SELECT account_id, name,
                COUNT(*) AS shared,
                AVG(place) AS avg_place,
+               SUM(CASE WHEN place=1 THEN 1 ELSE 0 END) AS wins,
                (CAST(SUM(my_kills) AS REAL) / MAX(COUNT(*) - SUM(CASE WHEN place=1 THEN 1 ELSE 0 END), 1)) AS kd,
+               (CAST(SUM(mate_kills) AS REAL) / MAX(COUNT(*) - SUM(CASE WHEN place=1 THEN 1 ELSE 0 END), 1)) AS mate_kd,
                AVG(my_dmg) AS avg_dmg,
+               AVG(mate_dmg) AS mate_avg_dmg,
                (CAST(SUM(CASE WHEN place=1 THEN 1 ELSE 0 END) AS REAL) / COUNT(*)) * 100 AS win_rate
         FROM co
         GROUP BY account_id, name
@@ -147,13 +153,16 @@ def compute_top_mates(conn, my_account_id: str,
     """, (my_account_id, my_account_id, min_matches, limit)).fetchall()
 
     return [{
-        "accountId": r["account_id"],
-        "name": r["name"],
-        "sharedMatches": r["shared"],
-        "avgPlace": r["avg_place"],
-        "kd": r["kd"],
-        "avgDmg": r["avg_dmg"],
-        "winRate": r["win_rate"],
+        "accountId":       r["account_id"],
+        "name":            r["name"],
+        "sharedMatches":   r["shared"],
+        "winsTogether":    r["wins"],
+        "avgPlace":        r["avg_place"],
+        "kd":              r["kd"],          # meine
+        "mateKd":          r["mate_kd"],     # Mate
+        "avgDmg":          r["avg_dmg"],     # meine
+        "mateAvgDmg":      r["mate_avg_dmg"],
+        "winRate":         r["win_rate"],
     } for r in rows]
 
 
@@ -163,6 +172,21 @@ def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
     """, (name_or_id, name_or_id)).fetchone()
     if not p:
         return {"error": "player not found"}
+
+    # Self-Lookup: das ist der Streamer selbst — Self-Join würde alle eigenen
+    # Matches als "Co-Player-Historie" doppeldeuten. Stattdessen Career zeigen.
+    if p["account_id"] == my_account_id:
+        lifetime = conn.execute(
+            "SELECT * FROM player_lifetime WHERE account_id = ? AND mode = 'all'",
+            (my_account_id,)
+        ).fetchone()
+        return {
+            "name": p["name"],
+            "accountId": p["account_id"],
+            "isSelf": True,
+            "sharedHistory": None,
+            "careerLifetime": dict(lifetime) if lifetime else None,
+        }
 
     shared = conn.execute("""
         SELECT m.match_id, m.map_name, m.played_at, mate.place,

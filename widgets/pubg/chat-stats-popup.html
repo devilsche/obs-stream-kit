@@ -9,7 +9,7 @@
     body { display: flex; align-items: center; justify-content: center;
            height: 100vh; padding: 0; }
     .popup {
-      width: 460px;
+      width: 480px;
       padding: 24px 28px;
       transform: translateY(40px);
       opacity: 0;
@@ -28,10 +28,28 @@
       border-radius: 3px;
       margin-bottom: 10px;
     }
-    .popup .name { font-size: 1.6em; font-weight: 700; margin-bottom: 14px; }
+    .popup .name {
+      font-size: 1.6em; font-weight: 700;
+      margin-bottom: 14px;
+      display: flex; align-items: baseline; justify-content: space-between;
+    }
+    .popup .chickens {
+      font-size: 0.85em;
+      letter-spacing: 2px;
+      color: var(--pubg-gold);
+    }
     .popup .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
     .popup .cell { display: flex; flex-direction: column; }
     .popup .cell .pubg-stat-value { font-size: 1.5em; }
+    .popup .kda-row {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 14px; margin-top: 12px;
+      padding: 12px 14px;
+      background: rgba(94, 42, 121, 0.18);
+      border-radius: 6px;
+    }
+    .popup .kda-row .cell { align-items: flex-start; }
+    .popup .kda-row .pubg-stat-value { font-size: 1.3em; }
     .popup .career { font-size: 0.85em; color: var(--pubg-muted);
                      margin-top: 14px; padding-top: 14px;
                      border-top: 1px solid rgba(255,255,255,0.08); }
@@ -40,11 +58,24 @@
 <body>
   <div class="pubg-card popup" id="popup">
     <span class="ribbon">Mit mir gespielt</span>
-    <div class="name" id="name">—</div>
+    <div class="name">
+      <span id="name">—</span>
+      <span class="chickens" id="chickens"></span>
+    </div>
     <div class="grid">
       <div class="cell"><span class="pubg-stat-value" id="m">—</span><span class="pubg-stat-label">Matches</span></div>
-      <div class="cell"><span class="pubg-stat-value" id="kd">—</span><span class="pubg-stat-label">K/D</span></div>
-      <div class="cell"><span class="pubg-stat-value" id="dmg">—</span><span class="pubg-stat-label">Avg DMG</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="wins">—</span><span class="pubg-stat-label">🍗 Together</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="avgplace">—</span><span class="pubg-stat-label">Avg Place</span></div>
+    </div>
+    <div class="kda-row">
+      <div class="cell">
+        <span class="pubg-stat-value" id="kd-my">—</span>
+        <span class="pubg-stat-label">K/D (du)</span>
+      </div>
+      <div class="cell">
+        <span class="pubg-stat-value" id="kd-mate">—</span>
+        <span class="pubg-stat-label">K/D (er/sie)</span>
+      </div>
     </div>
     <div class="career" id="career">—</div>
   </div>
@@ -63,6 +94,13 @@
       }
     }
 
+    function chickenIcons(n) {
+      if (!n) return "";
+      const visible = Math.min(n, 5);
+      const rest = n > 5 ? ` +${n-5}` : "";
+      return "🍗".repeat(visible) + rest;
+    }
+
     if (!PLAYER) {
       document.getElementById("name").textContent = "?player= fehlt";
       reveal();
@@ -73,15 +111,58 @@
             document.getElementById("name").textContent = "Player nicht gefunden";
             return reveal();
           }
+          if (d.isSelf) {
+            document.querySelector(".popup .ribbon").textContent = "Career — du selbst";
+            document.getElementById("name").textContent = d.name;
+            const cl = d.careerLifetime || {};
+            document.getElementById("m").textContent = PubgUI.fmtNum(cl.rounds_played);
+            document.getElementById("wins").textContent = PubgUI.fmtNum(cl.wins);
+            document.getElementById("avgplace").textContent = PubgUI.fmtPct(cl.win_rate);
+            document.getElementById("kd-my").textContent = PubgUI.fmtKD(cl.kd_ratio);
+            document.getElementById("kd-mate").textContent = PubgUI.fmtPct(cl.headshot_rate);
+            document.querySelectorAll(".pubg-stat-label").forEach((el, i) => {
+              const labels = ["Career Matches", "🍗 Career Wins", "Win-Rate",
+                              "Career K/D", "Headshot %"];
+              if (labels[i]) el.textContent = labels[i];
+            });
+            document.getElementById("chickens").innerHTML = "";
+            document.getElementById("career").style.display = "none";
+            return reveal();
+          }
           document.getElementById("name").textContent = d.name || PLAYER;
           const sh = d.sharedHistory || {};
           document.getElementById("m").textContent = PubgUI.fmtNum(sh.matches);
-          document.getElementById("kd").textContent = PubgUI.fmtKD(sh.kd);
-          document.getElementById("dmg").textContent = PubgUI.fmtNum(Math.round(sh.avgDmg||0));
+          document.getElementById("wins").textContent = PubgUI.fmtNum(sh.wins || 0);
+          document.getElementById("avgplace").textContent =
+            sh.avgPlace ? "#" + sh.avgPlace.toFixed(1) : "—";
+          document.getElementById("chickens").innerHTML = chickenIcons(sh.wins || 0);
+
+          // Eigene K/D = sh.kd (kommt aus compute_co_player über meine kills/non-wins)
+          document.getElementById("kd-my").textContent = PubgUI.fmtKD(sh.kd);
+          // Mate-K/D wird aus Top-Mates-Endpoint geholt (compute_co_player liefert die nicht)
+          document.getElementById("kd-mate").textContent = "…";
+
           const cl = d.careerLifetime;
           document.getElementById("career").textContent = cl
-            ? `Career: ${PubgUI.fmtNum(cl.rounds_played)} Games · K/D ${PubgUI.fmtKD(cl.kd_ratio)} · ${cl.wins} Wins`
+            ? `Career: ${PubgUI.fmtNum(cl.rounds_played)} Games · K/D ${PubgUI.fmtKD(cl.kd_ratio)} · ${cl.wins} Wins · ${PubgUI.fmtPct(cl.headshot_rate)} HS`
             : (sh.matches ? "Career: noch nicht geladen (<5 gemeinsame Matches?)" : "Noch nie zusammen gespielt");
+
+          // Mate-K/D einzeln nachladen, damit auch der Wert da ist
+          if (sh.matches) {
+            PubgUI.fetchJson(`/api/pubg/top-mates?sortBy=mostPlayed&limit=200&minMatches=1`)
+              .then(list => {
+                const found = list.find(m => m.accountId === d.accountId);
+                if (found && found.mateKd != null) {
+                  document.getElementById("kd-mate").textContent = PubgUI.fmtKD(found.mateKd);
+                } else {
+                  document.getElementById("kd-mate").textContent = "—";
+                }
+              })
+              .catch(() => { document.getElementById("kd-mate").textContent = "—"; });
+          } else {
+            document.getElementById("kd-mate").textContent = "—";
+          }
+
           reveal();
         })
         .catch(e => { document.getElementById("name").textContent = "Fehler"; reveal(); });

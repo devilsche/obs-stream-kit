@@ -41,8 +41,12 @@
     const MIN = parseInt(PubgUI.qs("minMatches", 10), 10);
 
     const SORT_LABEL = {
-      avgPlace: "Avg Place", kd: "K/D",
-      winRate: "Win-Rate", mostPlayed: "Most Played",
+      avgPlace: "Avg Place",
+      kd: "Best K/D (du)",
+      mateKd: "Best K/D (Mate)",
+      winRate: "Win-Rate",
+      mostPlayed: "Most Played",
+      chickensTogether: "Most 🍗",
     };
     document.getElementById("title").textContent =
       "Top Mates · " + (SORT_LABEL[SORT_BY] || SORT_BY);
@@ -50,8 +54,10 @@
     function valueFor(m) {
       if (SORT_BY === "avgPlace") return "Avg #" + (m.avgPlace || 0).toFixed(1);
       if (SORT_BY === "kd") return "K/D " + (m.kd || 0).toFixed(2);
+      if (SORT_BY === "mateKd") return "K/D " + (m.mateKd || 0).toFixed(2);
       if (SORT_BY === "winRate") return (m.winRate || 0).toFixed(1) + "%";
       if (SORT_BY === "mostPlayed") return m.sharedMatches + " Games";
+      if (SORT_BY === "chickensTogether") return (m.winsTogether || 0) + " 🍗 · " + m.sharedMatches + "g";
       return "";
     }
 
