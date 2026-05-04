@@ -1,0 +1,17 @@
+[
+  {"_T": "LogParachuteLanding", "_D": "2026-05-04T18:01:30.000Z",
+   "character": {"accountId": "account.A", "name": "PEX_LuCKoR"}},
+  {"_T": "LogParachuteLanding", "_D": "2026-05-04T18:01:32.000Z",
+   "character": {"accountId": "account.B", "name": "MateA"}},
+  {"_T": "LogPlayerTakeDamage", "_D": "2026-05-04T18:02:00.000Z",
+   "attacker": {"accountId": "account.X", "name": "EnemyX"},
+   "victim": {"accountId": "account.A", "name": "PEX_LuCKoR"},
+   "damage": 35.0, "damageCauserName": "WeapHK416_C"},
+  {"_T": "LogPlayerKillV2", "_D": "2026-05-04T18:02:10.000Z",
+   "killer": {"accountId": "account.A", "name": "PEX_LuCKoR"},
+   "victim": {"accountId": "account.X", "name": "EnemyX"},
+   "killerDamageInfo": {"damageCauserName": "WeapBeryl_C", "distance": 87.0}},
+  {"_T": "LogPlayerAttack", "_D": "2026-05-04T18:02:08.000Z",
+   "attacker": {"accountId": "account.A", "name": "PEX_LuCKoR"},
+   "weapon": {"itemId": "WeapBeryl_C"}}
+]

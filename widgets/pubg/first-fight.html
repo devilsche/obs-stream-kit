@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG First Fight</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    body { padding: 16px; }
+    .card { width: 240px; padding: 18px; text-align: center; }
+    .header { font-size: 0.8em; color: var(--pubg-muted);
+              text-transform: uppercase; letter-spacing: 0.1em; }
+    .pct { font-size: 3.2em; font-weight: 700; color: var(--pubg-gold);
+           margin: 8px 0 4px; }
+    .sub { color: var(--pubg-muted); font-size: 0.85em; }
+    .spark { display: flex; gap: 3px; margin-top: 14px; justify-content: center; }
+    .spark span { width: 10px; height: 18px; border-radius: 2px;
+                  background: rgba(255,255,255,0.1); }
+    .spark span.s { background: var(--pubg-gold); }
+    .spark span.d { background: rgba(229, 123, 123, 0.6); }
+  </style>
+</head>
+<body>
+  <div class="pubg-card card pubg-fade-in">
+    <div class="header">First Fight Survived</div>
+    <div class="pct" id="pct">—</div>
+    <div class="sub" id="sub">—</div>
+    <div class="spark" id="spark"></div>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    const RANGE = PubgUI.qs("range", "session");
+    function render(d) {
+      document.getElementById("pct").textContent = (d.rate||0).toFixed(0) + "%";
+      document.getElementById("sub").textContent = `${d.survived||0} von ${d.total||0} überlebt`;
+      const spark = document.getElementById("spark");
+      spark.innerHTML = (d.sparkline||[]).map(v =>
+        `<span class="${v ? 's' : 'd'}"></span>`).join("");
+    }
+    PubgUI.poll(`/api/pubg/first-fight-rate?range=${RANGE}`, 5*60*1000, render, console.error);
+  </script>
+</body>
+</html>
