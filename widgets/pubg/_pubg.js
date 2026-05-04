@@ -162,7 +162,9 @@
         opacity: 0.6;
         font-size: 0.85em;
       }
-      body.pubg-has-filter { padding-top: 36px !important; }
+      /* padding-top wird via JS exakt auf Filter-Bar-Höhe gesetzt
+         (wrappt manchmal bei vielen Specs auf zwei Zeilen) */
+      body.pubg-has-filter { padding-top: 44px !important; }
     `;
     document.head.appendChild(css);
   };
@@ -232,6 +234,15 @@
     bar.appendChild(hint);
 
     document.body.insertBefore(bar, document.body.firstChild);
+
+    // Body-padding-top exakt auf Filter-Bar-Höhe (+ Puffer) setzen,
+    // damit Content darunter nicht verdeckt ist — auch bei Zeilenumbruch.
+    const adjustPadding = () => {
+      const h = bar.getBoundingClientRect().height;
+      document.body.style.paddingTop = (h + 12) + "px";
+    };
+    requestAnimationFrame(adjustPadding);
+    window.addEventListener("resize", adjustPadding);
   };
 
   global.PubgUI = PubgUI;
