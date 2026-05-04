@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Top Mates Slider</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    html, body { margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      padding: 8px;
+    }
+    .panel {
+      width: 100%;
+      min-width: 320px;
+      padding: 14px 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .head {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 10px;
+    }
+    .head h3 {
+      margin: 0;
+      font-size: 0.9em;
+      letter-spacing: 0.08em;
+      color: var(--pubg-muted);
+      text-transform: uppercase;
+    }
+    .head h3 b {
+      color: var(--pubg-gold);
+      font-weight: 700;
+    }
+    .dots { display: flex; gap: 5px; }
+    .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.18);
+      transition: background 0.3s, transform 0.3s;
+    }
+    .dot.active {
+      background: var(--pubg-gold);
+      transform: scale(1.3);
+    }
+    .stage {
+      position: relative;
+      min-height: 200px;
+    }
+    .slide {
+      position: absolute; left: 0; right: 0; top: 0;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.5s, transform 0.5s;
+      pointer-events: none;
+    }
+    .slide.active {
+      opacity: 1; transform: translateY(0);
+      pointer-events: auto;
+      position: relative;
+    }
+    .row {
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .row:last-child { border-bottom: 0; }
+    .row-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .row .rank {
+      color: var(--pubg-gold);
+      width: 18px;
+      font-weight: 700;
+      flex-shrink: 0;
+      text-align: right;
+    }
+    .row .name { flex: 1; font-weight: 700; padding-left: 4px; }
+    .row .primary {
+      color: var(--pubg-gold);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      font-size: 0.95em;
+    }
+    .row-sub {
+      margin-top: 3px;
+      padding-left: 28px;
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      letter-spacing: 0.02em;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .row-sub b {
+      color: var(--pubg-text);
+      font-variant-numeric: tabular-nums;
+    }
+    .empty { color: var(--pubg-muted); font-style: italic; padding: 14px 0; }
+  </style>
+</head>
+<body>
+  <div class="pubg-card panel pubg-fade-in">
+    <div class="head">
+      <h3>Top Mates · <b id="catLabel">…</b> <span id="meta" style="opacity:0.55;font-weight:400;letter-spacing:0;text-transform:none"></span></h3>
+      <div class="dots" id="dots"></div>
+    </div>
+    <div class="stage" id="stage"></div>
+  </div>
+
+  <script src="_pubg.js"></script>
+  <script>
+    const ALL_CATS = [
+      ["mostPlayed",       "Most Played"],
+      ["synergy",          "Synergy"],
+      ["chickensTogether", "Most 🍗"],
+      ["kd",               "K/D Meine"],
+      ["mateKd",           "K/D Mate"],
+      ["winRate",          "Win-Rate"],
+      ["avgPlace",         "Avg Place"],
+    ];
+
+    PubgUI.buildFilter([
+      { key: "rotateMs", label: "Rotate ms", type: "range",
+        min: 3000, max: 20000, default: 8000 },
+      { key: "limit",    label: "Limit",    type: "range",
+        min: 1, max: 10, default: 5 },
+      { key: "minMatches", label: "Min", type: "range",
+        min: 1, max: 50, default: 10 },
+      { key: "cats", label: "Kategorien", type: "text",
+        placeholder: "leer = alle. z.B. synergy,kd,winRate" },
+    ]);
+
+    const ROTATE_MS = parseInt(PubgUI.qs("rotateMs", 8000), 10);
+    const LIMIT = parseInt(PubgUI.qs("limit", 5), 10);
+    const MIN = parseInt(PubgUI.qs("minMatches", 10), 10);
+    const CATS_RAW = PubgUI.qs("cats", "");
+
+    const cats = CATS_RAW
+      ? CATS_RAW.split(",").map(c => c.trim()).filter(Boolean)
+          .map(c => ALL_CATS.find(([k]) => k === c)).filter(Boolean)
+      : ALL_CATS;
+
+    const HOT = {
+      synergy:           m => (m.synergyScore || 0) >= 3.0,
+      winRate:           m => (m.winRate || 0) >= 20.0,
+      kd:                m => (m.kd || 0) >= 2.5,
+      mateKd:            m => (m.mateKd || 0) >= 2.5,
+      chickensTogether:  m => (m.winsTogether || 0) >= 3,
+      avgPlace:          m => (m.avgPlace || 99) <= 5.0,
+      mostPlayed:        m => m.sharedMatches >= 50,
+    };
+
+    function hotWrap(text) {
+      return `<span class="pubg-fire">🔥</span><span class="pubg-hot">${text}</span>`;
+    }
+
+    function primaryValue(sortBy, m) {
+      if (sortBy === "avgPlace") {
+        const text = "Avg #" + (m.avgPlace||0).toFixed(1);
+        return HOT.avgPlace(m) ? hotWrap(text) : text;
+      }
+      if (sortBy === "kd") {
+        const text = "K/D " + (m.kd||0).toFixed(2);
+        return HOT.kd(m) ? hotWrap(text) : text;
+      }
+      if (sortBy === "mateKd") {
+        const text = "K/D " + (m.mateKd||0).toFixed(2);
+        return HOT.mateKd(m) ? hotWrap(text) : text;
+      }
+      if (sortBy === "winRate") {
+        const text = (m.winRate||0).toFixed(1) + "%";
+        return HOT.winRate(m) ? hotWrap(text) : text;
+      }
+      if (sortBy === "mostPlayed") {
+        const text = m.sharedMatches + " Matches";
+        return HOT.mostPlayed(m) ? hotWrap(text) : text;
+      }
+      if (sortBy === "chickensTogether") {
+        const text = (m.winsTogether||0) + " 🍗 · " + (m.winRate||0).toFixed(1) + "%";
+        return HOT.chickensTogether(m) ? hotWrap(text) : text;
+      }
+      if (sortBy === "synergy") {
+        const text = "Score " + (m.synergyScore||0).toFixed(2);
+        return HOT.synergy(m) ? hotWrap(text) : text;
+      }
+      return "";
+    }
+
+    function detailLine(sortBy, m) {
+      const parts = [];
+      if (sortBy !== "mostPlayed") {
+        parts.push(`<span><b>${m.sharedMatches}</b> Matches</span>`);
+      }
+      if (sortBy === "kd") {
+        parts.push(`<span>Mate K/D <b>${(m.mateKd||0).toFixed(2)}</b></span>`);
+      } else if (sortBy === "mateKd") {
+        parts.push(`<span>Meine K/D <b>${(m.kd||0).toFixed(2)}</b></span>`);
+      } else {
+        parts.push(`<span>K/D Meine <b>${(m.kd||0).toFixed(2)}</b> / Mate <b>${(m.mateKd||0).toFixed(2)}</b></span>`);
+      }
+      if (m.winsTogether && sortBy !== "chickensTogether") {
+        parts.push(`<span><b>${m.winsTogether}</b> 🍗</span>`);
+      }
+      if (sortBy !== "winRate" && sortBy !== "chickensTogether"
+          && (m.winRate || 0) > 0) {
+        parts.push(`<span>Win <b>${(m.winRate||0).toFixed(0)}%</b></span>`);
+      }
+      if (sortBy !== "avgPlace" && (m.avgPlace || 0) > 0) {
+        parts.push(`<span>Avg <b>#${(m.avgPlace||0).toFixed(1)}</b></span>`);
+      }
+      return parts.join("");
+    }
+
+    // ── Daten holen ─────────────────────────────────────────
+    // Pro Kategorie ein eigener API-Call. Ergebnisse werden gecached pro Slide.
+    const slideData = {};   // sortBy → array
+
+    async function loadAll() {
+      await Promise.all(cats.map(async ([key]) => {
+        try {
+          const url = `/api/pubg/top-mates?sortBy=${key}&limit=${LIMIT}&minMatches=${MIN}`;
+          slideData[key] = await PubgUI.fetchJson(url);
+        } catch (e) {
+          slideData[key] = [];
+        }
+      }));
+    }
+
+    // ── Rendering ─────────────────────────────────────────
+    function renderSlide(sortBy, label, list) {
+      if (!list || !list.length) {
+        return `<div class="empty">— keine Mates mit Min ${MIN} Matches —</div>`;
+      }
+      return list.map((m, i) => `
+        <div class="row">
+          <div class="row-top">
+            <span class="rank">${i+1}</span>
+            <span class="name">${m.name}</span>
+            <span class="primary">${primaryValue(sortBy, m)}</span>
+          </div>
+          <div class="row-sub">${detailLine(sortBy, m)}</div>
+        </div>`).join("");
+    }
+
+    function buildStage() {
+      const dots = document.getElementById("dots");
+      dots.innerHTML = cats.map((_, i) =>
+        `<div class="dot${i === 0 ? ' active' : ''}" data-idx="${i}"></div>`).join("");
+      const stage = document.getElementById("stage");
+      stage.innerHTML = cats.map(([key, label], i) =>
+        `<div class="slide${i === 0 ? ' active' : ''}" data-key="${key}" data-label="${label}">
+           ${renderSlide(key, label, slideData[key] || [])}
+         </div>`).join("");
+      updateHeader(0);
+    }
+
+    function updateHeader(i) {
+      const [key, label] = cats[i];
+      document.getElementById("catLabel").textContent = label;
+      document.getElementById("meta").textContent = `· min ${MIN} Matches, DB`;
+    }
+
+    let idx = 0;
+    function tick() {
+      const slides = document.querySelectorAll(".slide");
+      const dots = document.querySelectorAll(".dot");
+      if (!slides.length) return;
+      slides[idx].classList.remove("active");
+      dots[idx].classList.remove("active");
+      idx = (idx + 1) % cats.length;
+      slides[idx].classList.add("active");
+      dots[idx].classList.add("active");
+      updateHeader(idx);
+    }
+
+    async function refresh() {
+      await loadAll();
+      // Stage rebauen, Slide-Index halten
+      const keep = idx;
+      buildStage();
+      idx = Math.min(keep, cats.length - 1);
+      const slides = document.querySelectorAll(".slide");
+      const dots = document.querySelectorAll(".dot");
+      slides.forEach((s, i) => s.classList.toggle("active", i === idx));
+      dots.forEach((d, i) => d.classList.toggle("active", i === idx));
+      updateHeader(idx);
+    }
+
+    refresh().then(() => {
+      if (cats.length > 1) setInterval(tick, ROTATE_MS);
+    });
+    // Daten alle 5 Min refreshen
+    setInterval(refresh, 5 * 60 * 1000);
+  </script>
+</body>
+</html>
