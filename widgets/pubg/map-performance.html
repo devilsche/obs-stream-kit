@@ -53,7 +53,7 @@
   <div class="pubg-card panel pubg-fade-in">
     <h2>Map Performance · <b id="rangeLabel">…</b></h2>
     <div class="sub" id="meta"></div>
-    <div id="content"></div>
+    <div id="content"><div class="empty">— wird geladen —</div></div>
   </div>
   <script src="_pubg.js"></script>
   <script>
@@ -118,7 +118,14 @@
         </table>`;
     }
 
-    PubgUI.poll(`/api/pubg/map-performance?range=${RANGE}`, 60000, render, console.error);
+    function showError(e) {
+      console.error(e);
+      document.getElementById("content").innerHTML =
+        `<div class="empty" style="color:#e57b7b">⚠ API-Fehler: ${e.message || e}<br>` +
+        `<small style="opacity:0.7">Endpoint /api/pubg/map-performance erreichbar? ` +
+        `Server ggf. neu starten falls gerade gepullt.</small></div>`;
+    }
+    PubgUI.poll(`/api/pubg/map-performance?range=${RANGE}`, 60000, render, showError);
   </script>
 </body>
 </html>
