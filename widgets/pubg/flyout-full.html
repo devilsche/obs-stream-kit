@@ -175,11 +175,14 @@
 
     function topMateSub(m) {
       // kompakte 2. Zeile mit den anderen wichtigen Werten
+      // Match-Anzahl nur bei mostPlayed (primary) — sonst weglassen
       const bits = [];
-      if (currentSort !== "mostPlayed") bits.push(`${m.sharedMatches}g`);
       if (m.winsTogether && currentSort !== "chickensTogether") bits.push(`${m.winsTogether}🍗`);
       if (currentSort !== "kd" && currentSort !== "mateKd") {
         bits.push(`du ${(m.kd || 0).toFixed(2)} / Mate ${(m.mateKd || 0).toFixed(2)}`);
+      }
+      if (currentSort !== "winRate" && (m.winRate || 0) > 0) {
+        bits.push(`Win ${(m.winRate||0).toFixed(0)}%`);
       }
       return bits.join(" · ");
     }

@@ -87,10 +87,7 @@
 
     function detailLine(m) {
       const parts = [];
-      // Matches — weglassen wenn schon primary
-      if (SORT_BY !== "mostPlayed") {
-        parts.push(`<span><b>${m.sharedMatches}</b> Matches</span>`);
-      }
+      // Match-Anzahl nur bei mostPlayed (wo's primary ist) — sonst weglassen
       // K/D — primary einzeln markieren
       if (SORT_BY === "kd") {
         parts.push(`<span>Mate K/D <b>${(m.mateKd || 0).toFixed(2)}</b></span>`);
