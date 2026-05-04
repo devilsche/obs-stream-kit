@@ -89,10 +89,14 @@ class EndpointRegistry:
         return _ok({"sessionStartedAt": now})
 
     def _top_mates(self, qs):
-        sort_by = qs.get("sortBy", "avgPlace")
-        limit = int(qs.get("limit", 5))
-        min_matches = int(qs.get("minMatches", 10))
         conn = self.get_conn()
+        # Default sortBy / minMatches kommen aus settings — Slider im flyout-full
+        # setzt dort persistent. URL-Param kann override.
+        default_sort = get_setting(conn, "topMatesSortBy", "avgPlace")
+        default_min = int(get_setting(conn, "minMatchesForTopMates", "10"))
+        sort_by = qs.get("sortBy", default_sort)
+        limit = int(qs.get("limit", 5))
+        min_matches = int(qs.get("minMatches", default_min))
         key = f"top-mates:{sort_by}:{limit}:{min_matches}"
         return _ok(self.cache.get_or_compute(
             key, lambda: compute_top_mates(conn, self.my_account_id,
@@ -123,11 +127,15 @@ class EndpointRegistry:
         return _ok(dict(row) if row else {})
 
     def _mates_today(self, qs):
-        range_key = qs.get("range", "session")
         conn = self.get_conn()
+        range_key = qs.get("range", "session")
+        # Gleicher Default wie top-mates: globaler Slider via flyout-full
+        default_min = int(get_setting(conn, "minMatchesForTopMates", "10"))
+        min_total = int(qs.get("minMatches", default_min))
         return _ok(self.cache.get_or_compute(
-            f"mates-today:{range_key}",
-            lambda: compute_mates_today(conn, self.my_account_id, range_key)))
+            f"mates-today:{range_key}:{min_total}",
+            lambda: compute_mates_today(conn, self.my_account_id,
+                                         range_key, min_total)))
 
     def _map_dist(self, qs):
         range_key = qs.get("range", "session")

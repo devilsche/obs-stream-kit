@@ -54,6 +54,7 @@
   <script>
     const LAYOUT = PubgUI.qs("layout", "carousel");
     const RANGE = PubgUI.qs("range", "session");
+    const MIN = parseInt(PubgUI.qs("minMatches", 1), 10);
     document.getElementById("root").className = "pubg-card " + LAYOUT;
 
     function mateBody(m) {
@@ -106,7 +107,8 @@
       }
     }
 
-    PubgUI.poll(`/api/pubg/mates-today?range=${RANGE}`, 30000, render, console.error);
+    PubgUI.poll(`/api/pubg/mates-today?range=${RANGE}&minMatches=${MIN}`,
+                30000, render, console.error);
   </script>
 </body>
 </html>

@@ -217,21 +217,29 @@ def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
 
 
 def compute_mates_today(conn, my_account_id: str,
-                        range_key: str = "session") -> list:
+                        range_key: str = "session",
+                        min_total_matches: int = 1) -> list:
+    """Mates aktiv im range. Optional Filter: nur Mates mit >= min_total_matches
+    Total-Historie mit dir (Random-Squad-Filler raus)."""
     cutoff = _range_filter(conn, range_key)
     rows = conn.execute("""
         SELECT mate.account_id, mate.name,
                COUNT(*) AS shared,
                AVG(mate.kills) AS kills_avg,
                SUM(mate.kills) AS kills_total,
-               AVG(mate.damage_dealt) AS dmg_avg
+               AVG(mate.damage_dealt) AS dmg_avg,
+               (SELECT COUNT(*) FROM participants p2
+                JOIN participants me2 ON me2.match_id = p2.match_id
+                WHERE p2.account_id = mate.account_id AND me2.account_id = ?) AS total_with_me
         FROM participants mate
         JOIN participants me ON me.match_id = mate.match_id AND me.account_id = ?
         JOIN matches m ON m.match_id = mate.match_id
         WHERE mate.account_id != ? AND m.played_at >= ?
         GROUP BY mate.account_id, mate.name
+        HAVING total_with_me >= ?
         ORDER BY shared DESC
-    """, (my_account_id, my_account_id, cutoff)).fetchall()
+    """, (my_account_id, my_account_id, my_account_id, cutoff,
+          min_total_matches)).fetchall()
 
     out = []
     for r in rows:
@@ -242,6 +250,7 @@ def compute_mates_today(conn, my_account_id: str,
             "accountId": r["account_id"],
             "name": r["name"],
             "sharedMatchesToday": r["shared"],
+            "totalWithMe": r["total_with_me"],
             "kdToday": (r["kills_total"] / max(r["shared"], 1)),
             "dmgToday": r["dmg_avg"],
             "careerLifetime": dict(lt) if lt else None,

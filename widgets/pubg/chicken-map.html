@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Chicken Map</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    body { padding: 16px; }
+    .panel { width: 380px; padding: 18px 20px; }
+    .panel h3 {
+      margin: 0 0 14px;
+      font-size: 0.85em; color: var(--pubg-muted);
+      text-transform: uppercase; letter-spacing: 0.1em;
+    }
+    .map-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .map-row:last-child { border-bottom: 0; }
+    .map-row .name {
+      font-weight: 700; font-size: 1em;
+    }
+    .map-row .games {
+      color: var(--pubg-muted); font-size: 0.85em;
+      font-variant-numeric: tabular-nums;
+    }
+    .map-row .chickens {
+      font-size: 1.2em;
+      letter-spacing: 2px;
+      min-width: 70px;
+      text-align: right;
+    }
+    .map-row .chickens.zero { opacity: 0.25; filter: grayscale(1); }
+    .map-row.win .name {
+      color: var(--pubg-gold);
+      text-shadow: 0 0 12px rgba(242, 183, 5, 0.3);
+    }
+    .summary {
+      margin-top: 16px; padding-top: 14px;
+      border-top: 1px solid var(--pubg-border);
+      display: flex; justify-content: space-between;
+      font-size: 0.9em;
+    }
+    .summary span { color: var(--pubg-muted); }
+    .summary b { color: var(--pubg-gold); font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <div class="pubg-card panel pubg-fade-in">
+    <h3 id="title">🍗 Chicken Map</h3>
+    <div id="rows"></div>
+    <div class="summary" id="summary"></div>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    const RANGE = PubgUI.qs("range", "all");
+
+    function chickens(n) {
+      if (!n) return '<span class="zero">—</span>';
+      // max 5 visible Hähnchen, Rest als "+N"
+      const visible = Math.min(n, 5);
+      const rest = n > 5 ? `+${n-5}` : "";
+      return "🍗".repeat(visible) + (rest ? ` <span style="color:var(--pubg-gold)">${rest}</span>` : "");
+    }
+
+    function render(list) {
+      if (!list.length) {
+        document.getElementById("rows").innerHTML = `<div class="pubg-error">noch keine Matches</div>`;
+        document.getElementById("summary").innerHTML = "";
+        return;
+      }
+      // Sortiere: zuerst Maps mit Wins (am meisten zuerst), dann nach Match-Anzahl
+      list.sort((a, b) => (b.wins || 0) - (a.wins || 0) || b.count - a.count);
+
+      const totalGames = list.reduce((s, m) => s + m.count, 0);
+      const totalWins = list.reduce((s, m) => s + (m.wins || 0), 0);
+
+      document.getElementById("rows").innerHTML = list.map(m => `
+        <div class="map-row ${m.wins ? "win" : ""}">
+          <div class="name">${PubgUI.fmtMap(m.map)}</div>
+          <div class="games">${m.count} ${m.count === 1 ? "Spiel" : "Spiele"} · Avg #${(m.avgPlace||0).toFixed(1)}</div>
+          <div class="chickens">${chickens(m.wins || 0)}</div>
+        </div>`).join("");
+
+      document.getElementById("summary").innerHTML =
+        `<span>Total</span><span><b>${totalWins}</b> Win${totalWins === 1 ? "" : "s"} aus <b>${totalGames}</b> Matches</span>`;
+    }
+
+    PubgUI.poll(`/api/pubg/map-distribution?range=${RANGE}`,
+                5*60*1000, render, console.error);
+
+    // Title je nach Range
+    const titles = { all: "🍗 Chicken Map · All-Time",
+                     session: "🍗 Chicken Map · Session",
+                     week: "🍗 Chicken Map · letzte 7 Tage",
+                     day: "🍗 Chicken Map · heute" };
+    document.getElementById("title").textContent = titles[RANGE] || titles.all;
+  </script>
+</body>
+</html>
