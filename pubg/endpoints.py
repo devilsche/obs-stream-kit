@@ -5,7 +5,8 @@ from pubg.db import set_setting, get_setting
 from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_top_mates, compute_co_player,
                                 compute_mates_today, compute_map_distribution,
-                                compute_first_fight_rate, compute_squad_compare)
+                                compute_first_fight_rate, compute_squad_compare,
+                                compute_chickens_together)
 
 
 def _ok(payload):
@@ -54,6 +55,8 @@ class EndpointRegistry:
             return self._first_fight(qs)
         if route == ("GET", "/api/pubg/squad-compare"):
             return self._squad_compare(qs)
+        if route == ("GET", "/api/pubg/chickens-together"):
+            return self._chickens_together(qs)
         if route == ("GET", "/api/pubg/settings"):
             return self._settings_get()
         if route == ("POST", "/api/pubg/settings"):
@@ -150,6 +153,13 @@ class EndpointRegistry:
         return _ok(self.cache.get_or_compute(
             f"ff:{range_key}",
             lambda: compute_first_fight_rate(conn, self.my_account_id, range_key)))
+
+    def _chickens_together(self, qs):
+        min_wins = int(qs.get("minWins", 1))
+        conn = self.get_conn()
+        return _ok(self.cache.get_or_compute(
+            f"chickens-together:{min_wins}",
+            lambda: compute_chickens_together(conn, self.my_account_id, min_wins)))
 
     def _squad_compare(self, qs):
         names = (qs.get("players") or "").split(",")

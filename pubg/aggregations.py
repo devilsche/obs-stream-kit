@@ -327,6 +327,27 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session"):
     }
 
 
+def compute_chickens_together(conn, my_account_id, min_wins=1):
+    """Pro Co-Player: gemeinsame Wins (place=1) + gemeinsame Match-Anzahl."""
+    rows = conn.execute("""
+        SELECT mate.account_id, mate.name,
+               SUM(CASE WHEN mate.place = 1 THEN 1 ELSE 0 END) AS wins_together,
+               COUNT(*) AS shared_matches
+        FROM participants mate
+        JOIN participants me ON me.match_id = mate.match_id AND me.account_id = ?
+        WHERE mate.account_id != ?
+        GROUP BY mate.account_id, mate.name
+        HAVING wins_together >= ?
+        ORDER BY wins_together DESC, shared_matches DESC
+    """, (my_account_id, my_account_id, min_wins)).fetchall()
+    return [{
+        "accountId": r["account_id"],
+        "name": r["name"],
+        "winsTogether": r["wins_together"],
+        "sharedMatches": r["shared_matches"],
+    } for r in rows]
+
+
 def compute_squad_compare(conn, my_account_id, player_names, last_n=5):
     targets = [n.strip() for n in player_names if n.strip()]
     if not targets:

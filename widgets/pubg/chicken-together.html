@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Chicken Together</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    body { padding: 16px; }
+    .panel { width: 380px; padding: 18px 20px; }
+    .panel h3 {
+      margin: 0 0 14px;
+      font-size: 0.85em; color: var(--pubg-muted);
+      text-transform: uppercase; letter-spacing: 0.1em;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 22px 1fr auto auto;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .row:last-child { border-bottom: 0; }
+    .row .rank {
+      color: var(--pubg-gold);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .row .name {
+      font-weight: 700;
+      color: var(--pubg-gold);
+      text-shadow: 0 0 12px rgba(242, 183, 5, 0.3);
+    }
+    .row .games {
+      color: var(--pubg-muted); font-size: 0.85em;
+      font-variant-numeric: tabular-nums;
+    }
+    .row .chickens {
+      font-size: 1.2em;
+      letter-spacing: 2px;
+      min-width: 70px;
+      text-align: right;
+    }
+    .summary {
+      margin-top: 16px; padding-top: 14px;
+      border-top: 1px solid var(--pubg-border);
+      display: flex; justify-content: space-between;
+      font-size: 0.9em;
+    }
+    .summary span { color: var(--pubg-muted); }
+    .summary b { color: var(--pubg-gold); font-variant-numeric: tabular-nums; }
+    .empty {
+      color: var(--pubg-muted); font-size: 0.9em;
+      text-align: center; padding: 20px 0;
+    }
+    .footnote {
+      margin-top: 8px;
+      font-size: 0.7em;
+      color: var(--pubg-muted);
+      opacity: 0.7;
+      font-style: italic;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="pubg-card panel pubg-fade-in">
+    <h3 id="title">🍗 Chicken Together</h3>
+    <div id="rows"></div>
+    <div class="summary" id="summary"></div>
+    <div class="footnote">PUBG-API liefert nur Match-Details der letzten ~14 Tage / 30 Matches. Diese Wins zählen ab Setup-Zeitpunkt.</div>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    const MIN_WINS = parseInt(PubgUI.qs("minWins", 1), 10);
+
+    function chickens(n) {
+      if (!n) return "";
+      const visible = Math.min(n, 5);
+      const rest = n > 5 ? `+${n-5}` : "";
+      return "🍗".repeat(visible) + (rest ? ` <span style="color:var(--pubg-gold)">${rest}</span>` : "");
+    }
+
+    function render(list) {
+      if (!list.length) {
+        document.getElementById("rows").innerHTML =
+          `<div class="empty">noch keine gemeinsamen Wins<br><span style="font-size:0.8em;opacity:0.7">— oder DB hat noch nicht genug Matches</span></div>`;
+        document.getElementById("summary").innerHTML = "";
+        return;
+      }
+      const totalWins = list.reduce((s, m) => s + m.winsTogether, 0);
+
+      document.getElementById("rows").innerHTML = list.map((m, i) => `
+        <div class="row">
+          <div class="rank">${i+1}</div>
+          <div class="name">${m.name}</div>
+          <div class="games">${m.sharedMatches} Spiele</div>
+          <div class="chickens">${chickens(m.winsTogether)}</div>
+        </div>`).join("");
+
+      document.getElementById("summary").innerHTML =
+        `<span>Wins mit Mates</span><span><b>${totalWins}</b> Chicken Dinner${totalWins === 1 ? "" : "s"} mit ${list.length} ${list.length === 1 ? "Mate" : "Mates"}</span>`;
+    }
+
+    PubgUI.poll(`/api/pubg/chickens-together?minWins=${MIN_WINS}`,
+                5*60*1000, render, console.error);
+  </script>
+</body>
+</html>

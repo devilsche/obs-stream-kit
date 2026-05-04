@@ -48,6 +48,14 @@
     }
     .summary span { color: var(--pubg-muted); }
     .summary b { color: var(--pubg-gold); font-variant-numeric: tabular-nums; }
+    .footnote {
+      margin-top: 8px;
+      font-size: 0.7em;
+      color: var(--pubg-muted);
+      opacity: 0.7;
+      font-style: italic;
+      line-height: 1.4;
+    }
   </style>
 </head>
 <body>
@@ -55,6 +63,7 @@
     <h3 id="title">🍗 Chicken Map</h3>
     <div id="rows"></div>
     <div class="summary" id="summary"></div>
+    <div class="footnote" id="footnote"></div>
   </div>
   <script src="_pubg.js"></script>
   <script>
@@ -94,12 +103,18 @@
     PubgUI.poll(`/api/pubg/map-distribution?range=${RANGE}`,
                 5*60*1000, render, console.error);
 
-    // Title je nach Range
-    const titles = { all: "🍗 Chicken Map · All-Time",
+    // Title je nach Range — "All-Time" ist irreführend, da PUBG-API keine
+    // Map-Granularität für Lifetime liefert. DB-Daten wachsen ab Setup-Tag.
+    const titles = { all: "🍗 Chicken Map · seit Setup",
                      session: "🍗 Chicken Map · Session",
                      week: "🍗 Chicken Map · letzte 7 Tage",
                      day: "🍗 Chicken Map · heute" };
     document.getElementById("title").textContent = titles[RANGE] || titles.all;
+
+    if (RANGE === "all") {
+      document.getElementById("footnote").textContent =
+        "PUBG-API hat keine Map-Granularität für Lifetime — diese Zahlen zählen ab dem Tag, an dem das Backend gestartet wurde.";
+    }
   </script>
 </body>
 </html>
