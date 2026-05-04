@@ -72,3 +72,44 @@ def upload_to_ftp(local_path: str, ftp_cfg: dict) -> tuple[bool, str]:
         return True, f"uploaded {os.path.basename(local_path)}"
     except (ftplib.all_errors, socket.error, OSError) as e:
         return False, f"FTP error: {e}"
+
+
+def _ftp_connect(ftp_cfg: dict):
+    cls = ftplib.FTP_TLS if ftp_cfg["tls"] else ftplib.FTP
+    ftp = cls(timeout=30)
+    ftp.connect(ftp_cfg["host"], ftp_cfg["port"])
+    ftp.login(ftp_cfg["user"], ftp_cfg["password"])
+    if ftp_cfg["tls"]:
+        ftp.prot_p()
+    if ftp_cfg["path"]:
+        for part in ftp_cfg["path"].strip("/").split("/"):
+            if part:
+                ftp.cwd(part)
+    return ftp
+
+
+def list_remote_backups(ftp_cfg: dict) -> list[str]:
+    """Listet alle Backup-Dateien auf dem FTP, sortiert ASC (älteste zuerst).
+    Erkennt Dateinamen im Format pubg.db.YYYYMMDD.bak."""
+    ftp = _ftp_connect(ftp_cfg)
+    try:
+        names = ftp.nlst()
+    finally:
+        ftp.quit()
+    backups = [n for n in names if n.endswith(".bak") and ".db." in n]
+    return sorted(backups)
+
+
+def download_from_ftp(remote_name: str, local_path: str,
+                      ftp_cfg: dict) -> tuple[bool, str]:
+    """Lädt eine Datei vom FTP runter. Returns (success, message)."""
+    try:
+        ftp = _ftp_connect(ftp_cfg)
+        try:
+            with open(local_path, "wb") as f:
+                ftp.retrbinary(f"RETR {remote_name}", f.write)
+        finally:
+            ftp.quit()
+        return True, f"downloaded {remote_name} → {local_path}"
+    except (ftplib.all_errors, socket.error, OSError) as e:
+        return False, f"FTP error: {e}"
