@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Top Mates</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    body { padding: 16px; }
+    .panel { width: 320px; padding: 16px; }
+    .panel h3 {
+      margin: 0 0 12px;
+      font-size: 0.9em;
+      letter-spacing: 0.08em;
+      color: var(--pubg-muted);
+      text-transform: uppercase;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .row:last-child { border-bottom: 0; }
+    .row .rank { color: var(--pubg-gold); width: 22px; font-weight: 700; }
+    .row .name { flex: 1; padding-left: 6px; }
+    .row .stat { color: var(--pubg-muted); font-size: 0.85em; }
+    .row .stat b { color: var(--pubg-text); }
+  </style>
+</head>
+<body>
+  <div class="pubg-card panel pubg-fade-in">
+    <h3 id="title">Top Mates</h3>
+    <div id="rows"></div>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    const SORT_BY = PubgUI.qs("sortBy", "avgPlace");
+    const LIMIT = parseInt(PubgUI.qs("limit", 5), 10);
+    const MIN = parseInt(PubgUI.qs("minMatches", 10), 10);
+
+    const SORT_LABEL = {
+      avgPlace: "Avg Place", kd: "K/D",
+      winRate: "Win-Rate", mostPlayed: "Most Played",
+    };
+    document.getElementById("title").textContent =
+      "Top Mates · " + (SORT_LABEL[SORT_BY] || SORT_BY);
+
+    function valueFor(m) {
+      if (SORT_BY === "avgPlace") return "Avg #" + (m.avgPlace || 0).toFixed(1);
+      if (SORT_BY === "kd") return "K/D " + (m.kd || 0).toFixed(2);
+      if (SORT_BY === "winRate") return (m.winRate || 0).toFixed(1) + "%";
+      if (SORT_BY === "mostPlayed") return m.sharedMatches + " Games";
+      return "";
+    }
+
+    function render(list) {
+      const rows = document.getElementById("rows");
+      rows.innerHTML = list.map((m, i) => `
+        <div class="row">
+          <span class="rank">${i+1}</span>
+          <span class="name">${m.name}</span>
+          <span class="stat"><b>${valueFor(m)}</b></span>
+        </div>`).join("") || `<div class="pubg-error">noch keine Daten</div>`;
+    }
+
+    const url = `/api/pubg/top-mates?sortBy=${SORT_BY}&limit=${LIMIT}&minMatches=${MIN}`;
+    PubgUI.poll(url, 5 * 60 * 1000, render, console.error);
+  </script>
+</body>
+</html>

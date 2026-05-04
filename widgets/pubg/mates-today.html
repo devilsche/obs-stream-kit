@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Mates Today</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    body { padding: 16px; }
+    .header {
+      color: var(--pubg-muted);
+      font-size: 0.8em;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .mate {
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      border-left: 3px solid var(--pubg-purple);
+    }
+    .mate-name { font-weight: 700; font-size: 1.05em; }
+    .mate-line {
+      display: flex; justify-content: space-between;
+      font-size: 0.85em; color: var(--pubg-muted);
+      margin-top: 4px;
+    }
+    .mate-line b { color: var(--pubg-text); font-variant-numeric: tabular-nums; }
+
+    .stack { display: flex; flex-direction: column; }
+
+    .fold .mate { opacity: 0; transform: translateX(-12px); }
+    .fold .mate.shown { opacity: 1; transform: translateX(0); transition: 0.4s; }
+
+    .carousel { position: relative; min-height: 180px; }
+    .carousel .mate { position: absolute; inset: 0; opacity: 0; transition: opacity 0.6s; padding: 24px; }
+    .carousel .mate.active { opacity: 1; }
+    .carousel .dots {
+      position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 6px;
+    }
+    .carousel .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--pubg-muted); opacity: 0.4; }
+    .carousel .dot.active { background: var(--pubg-gold); opacity: 1; }
+
+    .mosaic { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .mosaic .mate { border-left: 0; border-top: 3px solid var(--pubg-purple); }
+  </style>
+</head>
+<body>
+  <div class="header">Heute gespielt mit</div>
+  <div id="root" class="pubg-card stack"></div>
+
+  <script src="_pubg.js"></script>
+  <script>
+    const LAYOUT = PubgUI.qs("layout", "carousel");
+    const RANGE = PubgUI.qs("range", "session");
+    document.getElementById("root").className = "pubg-card " + LAYOUT;
+
+    function mateBody(m) {
+      const career = m.careerLifetime;
+      const careerLine = career
+        ? `Career: <b>${PubgUI.fmtNum(career.rounds_played)}</b> Games · K/D <b>${PubgUI.fmtKD(career.kd_ratio)}</b> · <b>${PubgUI.fmtNum(career.wins)}</b> Wins`
+        : `<span style="color:var(--pubg-gold)">🆕 Neuer Mate</span>`;
+      return `
+          <div class="mate-name">${m.name}</div>
+          <div class="mate-line">
+            <span>Heute: <b>K/D ${PubgUI.fmtKD(m.kdToday)}</b> · DMG <b>${PubgUI.fmtNum(Math.round(m.dmgToday||0))}</b> · <b>${m.sharedMatchesToday}</b> Matches</span>
+          </div>
+          <div class="mate-line">
+            <span>${careerLine}</span>
+          </div>`;
+    }
+
+    function mateHTML(m) {
+      return `<div class="mate">${mateBody(m)}</div>`;
+    }
+
+    let carouselIdx = 0;
+    let carouselTimer = null;
+
+    function render(list) {
+      const root = document.getElementById("root");
+      if (!list || !list.length) {
+        root.innerHTML = `<div class="pubg-error">noch keine Mates heute</div>`;
+        return;
+      }
+      if (LAYOUT === "carousel") {
+        root.innerHTML = list.map((m, i) =>
+          `<div class="mate ${i===0?'active':''}" data-i="${i}">${mateBody(m)}</div>`
+        ).join("") + `<div class="dots">${list.map((_,i)=>`<div class="dot ${i===0?'active':''}"></div>`).join("")}</div>`;
+        if (carouselTimer) clearInterval(carouselTimer);
+        carouselIdx = 0;
+        carouselTimer = setInterval(() => {
+          carouselIdx = (carouselIdx + 1) % list.length;
+          root.querySelectorAll(".mate").forEach((el, i) =>
+            el.classList.toggle("active", i === carouselIdx));
+          root.querySelectorAll(".dot").forEach((el, i) =>
+            el.classList.toggle("active", i === carouselIdx));
+        }, 6000);
+      } else if (LAYOUT === "fold") {
+        root.innerHTML = list.map(mateHTML).join("");
+        root.querySelectorAll(".mate").forEach((el, i) =>
+          setTimeout(() => el.classList.add("shown"), i * 600));
+      } else {
+        root.innerHTML = list.map(mateHTML).join("");
+      }
+    }
+
+    PubgUI.poll(`/api/pubg/mates-today?range=${RANGE}`, 30000, render, console.error);
+  </script>
+</body>
+</html>

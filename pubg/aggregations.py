@@ -64,6 +64,7 @@ def compute_session_stats(conn, my_account_id: str) -> dict:
         "wins": wins,
         "top10s": top10s,
         "kd": kills / max(len(rows) - wins, 1),
+        "kpm": kills / max(len(rows), 1),
         "headshotPct": (headshots / kills * 100) if kills else 0,
         "bestPlace": best_place,
         "longestKill": longest,

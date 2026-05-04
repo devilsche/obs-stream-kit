@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Career</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    body { padding: 20px; display: flex; align-items: center; }
+    .card { width: 360px; padding: 20px 24px; }
+    .header { font-size: 0.85em; letter-spacing: 0.1em;
+              color: var(--pubg-muted); text-transform: uppercase; margin-bottom: 14px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
+    .grid div { display: flex; justify-content: space-between; }
+    .grid .label { color: var(--pubg-muted); font-size: 0.85em; }
+  </style>
+</head>
+<body>
+  <div class="pubg-card card pubg-fade-in">
+    <div class="header">Career · <span id="player">—</span></div>
+    <div class="grid">
+      <div><span class="label">Matches</span><span class="pubg-stat-value" id="matches">—</span></div>
+      <div><span class="label">Wins</span><span class="pubg-stat-value" id="wins">—</span></div>
+      <div><span class="label">K/D</span><span class="pubg-stat-value" id="kd">—</span></div>
+      <div><span class="label">Headshot</span><span class="pubg-stat-value" id="hs">—</span></div>
+      <div><span class="label">Win %</span><span class="pubg-stat-value" id="winpct">—</span></div>
+      <div><span class="label">Top10 %</span><span class="pubg-stat-value" id="top10">—</span></div>
+      <div><span class="label">Longest</span><span class="pubg-stat-value" id="longest">—</span></div>
+      <div><span class="label">Kills</span><span class="pubg-stat-value" id="kills">—</span></div>
+    </div>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    const PLAYER = PubgUI.qs("player", "");
+    const MODE = PubgUI.qs("mode", "all");
+    document.getElementById("player").textContent = PLAYER || "Self";
+
+    function render(d) {
+      if (!d || !d.rounds_played) return;
+      document.getElementById("matches").textContent = PubgUI.fmtNum(d.rounds_played);
+      document.getElementById("wins").textContent = PubgUI.fmtNum(d.wins);
+      document.getElementById("kd").textContent = PubgUI.fmtKD(d.kd_ratio);
+      document.getElementById("hs").textContent = PubgUI.fmtPct(d.headshot_rate);
+      document.getElementById("winpct").textContent = PubgUI.fmtPct(d.win_rate);
+      document.getElementById("top10").textContent = PubgUI.fmtPct(d.top10_rate);
+      document.getElementById("longest").textContent = Math.round(d.longest_kill || 0) + "m";
+      document.getElementById("kills").textContent = PubgUI.fmtNum(d.kills);
+    }
+
+    const params = new URLSearchParams({ mode: MODE });
+    if (PLAYER) params.set("player", PLAYER);
+    PubgUI.poll(`/api/pubg/career-lifetime?${params}`, 24*60*60*1000, render, console.error);
+  </script>
+</body>
+</html>

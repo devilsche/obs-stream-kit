@@ -46,6 +46,7 @@ def test_session_stats_aggregates_after_session_start(tmp_db_path):
     assert s["damage"] == 1000.0
     assert s["wins"] == 1
     assert s["bestPlace"] == 1
+    assert s["kpm"] == 5.0  # 10 kills / 2 matches
 
 
 def test_session_stats_includes_extended_fields(tmp_db_path):
