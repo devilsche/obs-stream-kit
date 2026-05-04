@@ -49,6 +49,27 @@
 
     .controls { display: flex; align-items: center; gap: 12px; padding-top: 10px; }
     .controls input[type=range] { flex: 1; }
+    .ff-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .ff-label { display: flex; flex-direction: column; gap: 4px; }
+    .ff-sub {
+      color: var(--pubg-text);
+      font-size: 1em;
+      font-variant-numeric: tabular-nums;
+    }
+    .ff-sub b { color: var(--pubg-gold); font-weight: 700; }
+    .ff-pct {
+      font-size: 2.4em;
+      font-weight: 700;
+      color: var(--pubg-gold);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
     .controls select {
       background: rgba(0,0,0,0.3); color: var(--pubg-text);
       border: 1px solid var(--pubg-border); padding: 4px 6px; border-radius: 4px;
@@ -90,8 +111,13 @@
     </div>
 
     <div class="section">
-      <h3>First Fight Wins</h3>
-      <div><span class="pubg-stat-value" id="ff">—</span> <span class="pubg-stat-label" id="ffsub">—</span></div>
+      <div class="ff-row">
+        <div class="ff-label">
+          <h3 style="margin:0">First Fight Wins</h3>
+          <div class="ff-sub" id="ffsub">—</div>
+        </div>
+        <div class="ff-pct" id="ff">—</div>
+      </div>
     </div>
 
     <div class="section">
@@ -200,7 +226,8 @@
 
     function renderFF(f) {
       document.getElementById("ff").textContent = (f.rate||0).toFixed(0) + "%";
-      document.getElementById("ffsub").textContent = `${f.survived||0} / ${f.total||0}`;
+      document.getElementById("ffsub").innerHTML =
+        `<b>${f.survived||0}</b> / <b>${f.total||0}</b> überlebt`;
     }
 
     const HOT = {
