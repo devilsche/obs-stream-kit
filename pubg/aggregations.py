@@ -544,6 +544,11 @@ def compute_session_report(conn, my_account_id):
         ms = ph["matches"]
         n = len(ms)
         wins = sum(1 for x in ms if (x["place"] or 99) == 1)
+        # Member-Counts: wie oft war jeder dabei in dieser Phase
+        ph["memberCounts"] = {}
+        for x in ms:
+            for name in x["squadSet"]:
+                ph["memberCounts"][name] = ph["memberCounts"].get(name, 0) + 1
         ph["stats"] = {
             "matches": n,
             "wins": wins,
@@ -617,7 +622,16 @@ def compute_session_report(conn, my_account_id):
         "phases": [{
             "coreSquad": sorted(ph["core"]),
             "allMembers": sorted(ph["allMembers"]),
-            "fillers": sorted(ph["allMembers"] - ph["core"]),
+            # Filler mit Count (wie oft war jeder in der Phase dabei) — sortiert
+            # nach Count absteigend, dann Name.
+            "fillers": [
+                {"name": n, "count": ph["memberCounts"].get(n, 0)}
+                for n in sorted(
+                    ph["allMembers"] - ph["core"],
+                    key=lambda nm: (-ph["memberCounts"].get(nm, 0), nm),
+                )
+            ],
+            "phaseMatchCount": len(ph["matches"]),
             "stats": ph["stats"],
             "matches": [_to_payload(m) for m in ph["matches"]],
         } for ph in phases],

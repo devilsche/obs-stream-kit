@@ -297,7 +297,7 @@
           ? ph.coreSquad.map(n => `<b>${n}</b>`).join(" + ")
           : "<i>Solo</i>";
         const fillersStr = (ph.fillers && ph.fillers.length)
-          ? ` <span style="opacity:0.7">+ wechselnd: ${ph.fillers.join(", ")}</span>`
+          ? ` <span style="opacity:0.7">+ wechselnd: ${ph.fillers.map(f => `${f.name} (${f.count}/${ph.phaseMatchCount})`).join(", ")}</span>`
           : "";
         const startStr = PubgUI.fmtTime(s.startTime);
         const endStr = PubgUI.fmtTime(s.endTime);
