@@ -443,19 +443,39 @@
         || String(s.wins).includes(t);
     }
 
-    function renderPicker() {
+    // Picker hat einen statischen Header (Suche bleibt stabil) und einen
+    // separaten Container für Items + Summary. Nur dieser wird re-rendered.
+    function buildPickerShell() {
       const picker = document.getElementById("picker");
       if (!allSessions.length) { picker.style.display = "none"; return; }
       picker.style.display = "block";
+      picker.innerHTML = `
+        <div class="controls">
+          <input type="text" id="sessionSearch" placeholder="🔎 Suche: 03.05., Erangel, MateName, …" value="${searchTerm}">
+          <span class="summary" id="sessionSummary"></span>
+          <button class="toggle-all" id="toggleAll" style="display:none"></button>
+        </div>
+        <div id="sessionList"></div>
+      `;
+      const search = document.getElementById("sessionSearch");
+      search.addEventListener("input", (e) => {
+        searchTerm = e.target.value;
+        renderItems();   // nur Items, NICHT den Header → focus bleibt
+      });
+      document.getElementById("toggleAll").addEventListener("click", () => {
+        showAll = !showAll;
+        renderItems();
+      });
+    }
 
+    function renderItems() {
       const filtered = allSessions.filter(s => matchSearch(s, searchTerm));
       const visible = showAll ? filtered : filtered.slice(0, DEFAULT_LIMIT);
       const totalCount = allSessions.length;
       const filteredCount = filtered.length;
 
-      // Nach Monat gruppieren
       const byMonth = {};
-      visible.forEach((s, i) => {
+      visible.forEach((s) => {
         const idx = allSessions.indexOf(s);
         const m = monthLabel(s.from);
         if (!byMonth[m]) byMonth[m] = [];
@@ -480,37 +500,26 @@
             </div>`;
           }).join("")}
         </div>
-      `).join("");
+      `).join("") || `<div style="padding:20px;color:var(--pubg-muted);text-align:center;font-style:italic">— keine Treffer —</div>`;
 
-      const summary = searchTerm
-        ? `${filteredCount}/${totalCount} Sessions (gefiltert)`
+      document.getElementById("sessionList").innerHTML = groups;
+      document.getElementById("sessionSummary").textContent = searchTerm
+        ? `${filteredCount}/${totalCount} Sessions`
         : `${totalCount} Sessions in DB`;
-      const moreBtn = (filteredCount > DEFAULT_LIMIT && !showAll)
-        ? `<button class="toggle-all" id="toggleAll">+${filteredCount - DEFAULT_LIMIT} weitere zeigen</button>`
-        : (showAll && filteredCount > DEFAULT_LIMIT
-          ? `<button class="toggle-all" id="toggleAll">Nur ${DEFAULT_LIMIT} zeigen</button>` : "");
-
-      picker.innerHTML = `
-        <div class="controls">
-          <input type="text" id="sessionSearch" placeholder="🔎 Suche: 03.05., Erangel, …" value="${searchTerm}">
-          <span class="summary">${summary}</span>
-          ${moreBtn}
-        </div>
-        ${groups}
-      `;
-
-      // Re-attach handlers
-      const search = document.getElementById("sessionSearch");
-      search.addEventListener("input", (e) => {
-        searchTerm = e.target.value;
-        renderPicker();
-        document.getElementById("sessionSearch").focus();
-      });
       const tog = document.getElementById("toggleAll");
-      if (tog) tog.addEventListener("click", () => {
-        showAll = !showAll;
-        renderPicker();
-      });
+      if (filteredCount > DEFAULT_LIMIT) {
+        tog.style.display = "";
+        tog.textContent = showAll
+          ? `Nur ${DEFAULT_LIMIT} zeigen`
+          : `+${filteredCount - DEFAULT_LIMIT} weitere zeigen`;
+      } else {
+        tog.style.display = "none";
+      }
+    }
+
+    function renderPicker() {
+      buildPickerShell();
+      renderItems();
     }
 
     PubgUI.fetchJson("/api/pubg/sessions").then(sessions => {
