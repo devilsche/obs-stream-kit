@@ -68,6 +68,7 @@ try:
     from pubg.poller import PollerThread
     from pubg.endpoints import EndpointRegistry
     from pubg.db import get_player_by_name, upsert_player
+    from pubg.backup import load_ftp_config
 
     pubg_cfg = load_config(os.path.join(ROOT, "config", "pubg.json"))
     pubg_key = load_api_key(secrets_path)
@@ -96,12 +97,16 @@ try:
 
         if my_account_id:
             pubg_cache = TTLCache(ttl_secs=30)
+            ftp_cfg = load_ftp_config(secrets_path)
+            if ftp_cfg:
+                print(f"  PUBG-Backup: FTP-Upload aktiv → {ftp_cfg['host']}{ftp_cfg.get('path','')}")
             pubg_poller = PollerThread(
                 db_path=pubg_db_path, client=pubg_client,
                 my_player_name=pubg_cfg["playerName"],
                 my_account_id=my_account_id,
                 interval_secs=pubg_cfg["pollIntervalSec"],
                 lifetime_min_matches=pubg_cfg["minMatchesForLifetime"],
+                ftp_backup_cfg=ftp_cfg,
             )
             pubg_poller.start()
             pubg_registry = EndpointRegistry(

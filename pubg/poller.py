@@ -10,28 +10,51 @@ from pubg.match_parser import (parse_match_response, parse_lifetime_response,
                                 aggregate_lifetime_modes)
 
 
-def rotate_backup(db_path: str, max_backups: int = 7):
-    """Erstellt täglichen Snapshot der DB. Behält die letzten N Backups."""
+def rotate_backup(db_path: str, max_backups: int = 7,
+                  ftp_cfg: dict | None = None) -> dict:
+    """Erstellt täglichen Snapshot der DB + lädt optional auf FTP.
+    Behält die letzten N lokalen Backups. Returns status dict."""
+    status = {"local": None, "ftp": None}
     if not os.path.exists(db_path):
-        return
+        return status
     today = datetime.datetime.utcnow().strftime("%Y%m%d")
     backup = f"{db_path}.{today}.bak"
     if os.path.exists(backup):
-        return  # heute schon gemacht
-    try:
-        shutil.copy2(db_path, backup)
-    except Exception:
-        return
-    # Alte Backups aufräumen
-    backups = sorted(
-        f for f in os.listdir(os.path.dirname(db_path) or ".")
-        if f.startswith(os.path.basename(db_path) + ".") and f.endswith(".bak")
-    )
-    for old in backups[:-max_backups]:
+        status["local"] = "already-done"
+    else:
         try:
-            os.remove(os.path.join(os.path.dirname(db_path) or ".", old))
-        except Exception:
-            pass
+            shutil.copy2(db_path, backup)
+            status["local"] = "ok"
+        except Exception as e:
+            status["local"] = f"error: {e}"
+            return status
+        # Alte Backups aufräumen
+        dir_path = os.path.dirname(db_path) or "."
+        backups = sorted(
+            f for f in os.listdir(dir_path)
+            if f.startswith(os.path.basename(db_path) + ".") and f.endswith(".bak")
+        )
+        for old in backups[:-max_backups]:
+            try:
+                os.remove(os.path.join(dir_path, old))
+            except Exception:
+                pass
+
+    # FTP-Upload (nur wenn neu erstellt oder noch nicht hochgeladen)
+    if ftp_cfg and status["local"] in ("ok", "already-done"):
+        from pubg.backup import upload_to_ftp
+        marker = f"{backup}.ftp-uploaded"
+        if not os.path.exists(marker):
+            ok, msg = upload_to_ftp(backup, ftp_cfg)
+            status["ftp"] = msg
+            if ok:
+                try:
+                    open(marker, "w").close()
+                except Exception:
+                    pass
+        else:
+            status["ftp"] = "already-uploaded"
+    return status
 
 
 def _iso_utc_now():
@@ -156,7 +179,8 @@ def process_telemetry_backlog(conn, client, my_account_id, max_per_tick=5):
 class PollerThread(threading.Thread):
     def __init__(self, db_path, client, my_player_name, my_account_id,
                  interval_secs=60, lifetime_min_matches=5,
-                 lifetime_max_per_tick=3, match_max_per_tick=5):
+                 lifetime_max_per_tick=3, match_max_per_tick=5,
+                 ftp_backup_cfg=None):
         super().__init__(daemon=True, name="pubg-poller")
         self.db_path = db_path
         self.client = client
@@ -166,6 +190,7 @@ class PollerThread(threading.Thread):
         self.lifetime_min = lifetime_min_matches
         self.lifetime_max = lifetime_max_per_tick
         self.match_max = match_max_per_tick
+        self.ftp_backup_cfg = ftp_backup_cfg
         self._stop = threading.Event()
         self._last_status = {"polling": "starting", "lastPollAt": None,
                               "errors": [], "newMatches": 0,
@@ -178,7 +203,8 @@ class PollerThread(threading.Thread):
             # Tägliches DB-Backup
             today = datetime.datetime.utcnow().strftime("%Y%m%d")
             if last_backup_day != today:
-                rotate_backup(self.db_path)
+                bk = rotate_backup(self.db_path, ftp_cfg=self.ftp_backup_cfg)
+                self._last_status["backup"] = bk
                 last_backup_day = today
             try:
                 conn = connect(self.db_path)
