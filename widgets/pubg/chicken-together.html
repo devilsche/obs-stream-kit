@@ -6,8 +6,18 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="_pubg.css">
   <style>
-    body { padding: 16px; }
-    .panel { width: 380px; padding: 18px 20px; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      padding: 8px;
+    }
+    .panel {
+      width: 100%;
+      min-width: 360px;
+      padding: 18px 20px;
+    }
     .panel h3 {
       margin: 0 0 14px;
       font-size: 0.85em; color: var(--pubg-muted);
@@ -80,9 +90,12 @@
   <script src="_pubg.js"></script>
   <script>
     const MIN_WINS = parseInt(PubgUI.qs("minWins", 1), 10);
+    const MIN_MATCHES = parseInt(PubgUI.qs("minMatches", 1), 10);
 
     PubgUI.buildFilter([
       { key: "minWins", label: "Min 🍗", type: "range", min: 1, max: 10, default: 1 },
+      { key: "minMatches", label: "Min Matches", type: "range",
+        min: 1, max: 50, default: 1 },
     ]);
 
     function chickens(n) {
@@ -114,7 +127,7 @@
         `<span>Wins mit Mates</span><span><b>${totalWins}</b> Chicken Dinner${totalWins === 1 ? "" : "s"} mit ${list.length} ${list.length === 1 ? "Mate" : "Mates"}</span>`;
     }
 
-    PubgUI.poll(`/api/pubg/chickens-together?minWins=${MIN_WINS}`,
+    PubgUI.poll(`/api/pubg/chickens-together?minWins=${MIN_WINS}&minMatches=${MIN_MATCHES}`,
                 5*60*1000, render, console.error);
   </script>
 </body>

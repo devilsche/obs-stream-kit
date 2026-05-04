@@ -171,10 +171,12 @@ class EndpointRegistry:
 
     def _chickens_together(self, qs):
         min_wins = int(qs.get("minWins", 1))
+        min_matches = int(qs.get("minMatches", 1))
         conn = self.get_conn()
         return _ok(self.cache.get_or_compute(
-            f"chickens-together:{min_wins}",
-            lambda: compute_chickens_together(conn, self.my_account_id, min_wins)))
+            f"chickens-together:{min_wins}:{min_matches}",
+            lambda: compute_chickens_together(conn, self.my_account_id,
+                                               min_wins, min_matches)))
 
     def _squad_compare(self, qs):
         names = (qs.get("players") or "").split(",")
