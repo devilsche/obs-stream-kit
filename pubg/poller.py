@@ -5,7 +5,7 @@ import threading
 from pubg.db import (connect, upsert_player, insert_match, insert_participants,
                      get_known_match_ids, upsert_lifetime,
                      insert_telemetry_events, mark_telemetry_fetched,
-                     get_matches_needing_telemetry)
+                     get_matches_needing_telemetry, mark_telemetry_schema)
 from pubg.match_parser import (parse_match_response, parse_lifetime_response,
                                 aggregate_lifetime_modes)
 
@@ -176,9 +176,16 @@ def process_telemetry_backlog(conn, client, my_account_id, max_per_tick=5):
         if my_account_id not in squad:
             squad.add(my_account_id)
         events = list(filter_squad_events(raw, squad))
+        # Bei Re-Fetch (alte Schema-Version) erst alte events löschen,
+        # sonst Doubletten.
+        conn.execute("DELETE FROM telemetry_events WHERE match_id = ?",
+                      (row["match_id"],))
+        conn.commit()
         if events:
             insert_telemetry_events(conn, row["match_id"], events)
         mark_telemetry_fetched(conn, row["match_id"])
+        # Schema-Marker setzen → kein endloser Re-Fetch
+        mark_telemetry_schema(conn, row["match_id"])
         processed += 1
     return {"processed": processed, "errors": errors}
 

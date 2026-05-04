@@ -120,14 +120,22 @@ def test_insert_telemetry_events(tmp_db_path):
 
 def test_telemetry_backlog_helper(tmp_db_path):
     from pubg.db import (insert_match, get_matches_needing_telemetry,
-                         mark_telemetry_fetched)
+                         mark_telemetry_fetched, mark_telemetry_schema)
     conn = _setup(tmp_db_path)
+    # played_at heute, damit Match in der Re-Fetch-Window-Cutoff (-13d) liegt
+    import datetime as dt
+    today_iso = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     insert_match(conn, "m1", "Erangel_Main", "squad-fpp", False, 1800,
-                 "2026-05-04T18:00:00Z", "https://example/tel.json")
+                 today_iso, "https://example/tel.json")
     insert_match(conn, "m2", "Miramar_Main", "duo-fpp", False, 1500,
-                 "2026-05-04T19:00:00Z", None)
+                 today_iso, None)
     pending = get_matches_needing_telemetry(conn)
     assert len(pending) == 1
     assert pending[0]["match_id"] == "m1"
     mark_telemetry_fetched(conn, "m1")
+    # Solange Schema-Marker fehlt → match wird als re-fetch-bedürftig
+    # gemeldet (alte Schema-Version vor 2 = keine Position-Daten)
+    assert len(get_matches_needing_telemetry(conn)) == 1
+    mark_telemetry_schema(conn, "m1")
+    # Mit aktuellem Schema-Marker → nicht mehr pending
     assert get_matches_needing_telemetry(conn) == []
