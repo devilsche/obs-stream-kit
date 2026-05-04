@@ -37,56 +37,84 @@
   <script src="_pubg.js"></script>
   <script>
     const ROTATE_MS = parseInt(PubgUI.qs("rotateMs", 8000), 10);
+
+    PubgUI.buildFilter([
+      { key: "focus", label: "Focus", type: "select", default: "mix",
+        options: [["mix","Session + Lifetime"],
+                  ["session","Nur Session"],
+                  ["lifetime","Nur Lifetime"]]},
+      { key: "rotateMs", label: "Rotate ms", type: "range",
+        min: 3000, max: 20000, default: 8000 },
+    ]);
     let snippets = [];
     let idx = 0;
 
+    // ?focus=session   → nur Session-Snippets (für In-Game-Stream)
+    // ?focus=lifetime  → nur Lifetime-Snippets (für Stream-Ending/Idle)
+    // ?focus=mix       → alle (Default)
+    const FOCUS = PubgUI.qs("focus", "mix");
+
     async function refresh() {
       const out = [];
-      try {
-        const s = await PubgUI.fetchJson("/api/pubg/session");
-        if (s.matches) {
-          out.push(`<span class="label">SESSION STATS</span> ${s.kills} Kills · ${PubgUI.fmtNum(Math.round(s.damage))} DMG · ${s.wins} Wins · K/M ${PubgUI.fmtKD(s.kpm)}`);
-        }
-      } catch (_) {}
-      try {
-        // Folgt dem globalen Setting (topMatesSortBy / minMatchesForTopMates).
-        // Label spiegelt den aktiven Sort-Modus wider.
-        const settings = await PubgUI.fetchJson("/api/pubg/settings").catch(() => ({}));
-        const sortBy = settings.topMatesSortBy || "mostPlayed";
-        const tm = await PubgUI.fetchJson("/api/pubg/top-mates?limit=1");
-        if (tm[0]) {
-          const m = tm[0];
-          const LABELS = {
-            mostPlayed:       "MOST PLAYED",
-            synergy:          "BEST SYNERGY",
-            chickensTogether: "MOST 🍗 TOGETHER",
-            kd:               "BEST K/D (MEINE)",
-            mateKd:           "BEST K/D (MATE)",
-            winRate:          "BEST WIN-RATE",
-            avgPlace:         "BEST AVG PLACE",
-          };
-          const label = LABELS[sortBy] || "TOP MATE";
-          out.push(`<span class="label">${label}</span> ${m.name} · ${m.sharedMatches} Matches · ${m.winsTogether||0} 🍗 · K/D Meine ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
-        }
-      } catch (_) {}
-      try {
-        const md = await PubgUI.fetchJson("/api/pubg/map-distribution?range=session");
-        if (md[0]) {
-          out.push(`<span class="label">SESSION MOST PLAYED MAP</span> ${PubgUI.fmtMap(md[0].map)} (${md[0].count} Spiele)`);
-        }
-      } catch (_) {}
-      try {
-        const c = await PubgUI.fetchJson("/api/pubg/career-lifetime?mode=all");
-        if (c.rounds_played) {
-          out.push(`<span class="label">CAREER</span> ${PubgUI.fmtNum(c.rounds_played)} Games · K/D ${PubgUI.fmtKD(c.kd_ratio)} · ${c.wins} Wins`);
-        }
-      } catch (_) {}
-      try {
-        const f = await PubgUI.fetchJson("/api/pubg/first-fight-rate?range=session");
-        if (f.total) {
-          out.push(`<span class="label">FIRST FIGHT WINS</span> ${(f.rate||0).toFixed(0)}% (${f.survived}/${f.total})`);
-        }
-      } catch (_) {}
+
+      // ── SESSION ──────────────────────────────────────────
+      if (FOCUS !== "lifetime") {
+        try {
+          const s = await PubgUI.fetchJson("/api/pubg/session");
+          if (s.matches) {
+            out.push(`<span class="label">SESSION STATS</span> ${s.kills} Kills · ${PubgUI.fmtNum(Math.round(s.damage))} DMG · ${s.wins} Wins · K/M ${PubgUI.fmtKD(s.kpm)}`);
+          }
+        } catch (_) {}
+        try {
+          const md = await PubgUI.fetchJson("/api/pubg/map-distribution?range=session");
+          if (md[0]) {
+            out.push(`<span class="label">SESSION MOST PLAYED MAP</span> ${PubgUI.fmtMap(md[0].map)} (${md[0].count} Spiele)`);
+          }
+        } catch (_) {}
+        try {
+          const mt = await PubgUI.fetchJson("/api/pubg/mates-today?range=session");
+          if (mt[0]) {
+            const m = mt[0];
+            out.push(`<span class="label">SESSION TOP MATE</span> ${m.name} · ${m.sharedMatchesToday} Matches · K/D Meine ${(m.kdToday||0).toFixed(2)}`);
+          }
+        } catch (_) {}
+        try {
+          const f = await PubgUI.fetchJson("/api/pubg/first-fight-rate?range=session");
+          if (f.total) {
+            out.push(`<span class="label">SESSION FIRST FIGHT WINS</span> ${(f.rate||0).toFixed(0)}% (${f.survived}/${f.total})`);
+          }
+        } catch (_) {}
+      }
+
+      // ── LIFETIME / DB-LIFETIME ────────────────────────────
+      if (FOCUS !== "session") {
+        try {
+          const settings = await PubgUI.fetchJson("/api/pubg/settings").catch(() => ({}));
+          const sortBy = settings.topMatesSortBy || "mostPlayed";
+          const tm = await PubgUI.fetchJson("/api/pubg/top-mates?limit=1");
+          if (tm[0]) {
+            const m = tm[0];
+            const LABELS = {
+              mostPlayed:       "LIFETIME — MOST PLAYED",
+              synergy:          "LIFETIME — BEST SYNERGY",
+              chickensTogether: "LIFETIME — MOST 🍗",
+              kd:               "LIFETIME — BEST K/D (MEINE)",
+              mateKd:           "LIFETIME — BEST K/D (MATE)",
+              winRate:          "LIFETIME — BEST WIN-RATE",
+              avgPlace:         "LIFETIME — BEST AVG PLACE",
+            };
+            const label = LABELS[sortBy] || "LIFETIME — TOP MATE";
+            out.push(`<span class="label">${label}</span> ${m.name} · ${m.sharedMatches} Matches · ${m.winsTogether||0} 🍗 · K/D Meine ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
+          }
+        } catch (_) {}
+        try {
+          const c = await PubgUI.fetchJson("/api/pubg/career-lifetime?mode=all");
+          if (c.rounds_played) {
+            out.push(`<span class="label">CAREER</span> ${PubgUI.fmtNum(c.rounds_played)} Games · K/D ${PubgUI.fmtKD(c.kd_ratio)} · ${c.wins} Wins`);
+          }
+        } catch (_) {}
+      }
+
       snippets = out;
     }
 
