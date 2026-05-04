@@ -121,7 +121,7 @@
     </div>
 
     <div class="section">
-      <h3>Top Mates <span style="opacity:0.5;font-weight:400;letter-spacing:0;text-transform:none">— alle Matches in DB</span></h3>
+      <h3>Top Mates <span id="topMatesSubtitle" style="opacity:0.5;font-weight:400;letter-spacing:0;text-transform:none">— alle Matches in DB</span></h3>
       <div id="topmates"></div>
     </div>
 
@@ -306,7 +306,13 @@
         </div>`).join("") : '<span class="pubg-error">noch keine Daten</span>';
     }
 
+    function updateTopMatesSubtitle() {
+      document.getElementById("topMatesSubtitle").textContent =
+        `— mind. ${currentMin} Matches, DB`;
+    }
+
     function reload() {
+      updateTopMatesSubtitle();
       PubgUI.fetchJson("/api/pubg/session").then(renderSession).catch(()=>{});
       PubgUI.fetchJson("/api/pubg/first-fight-rate?range=session").then(renderFF).catch(()=>{});
       PubgUI.fetchJson(`/api/pubg/top-mates?sortBy=${currentSort}&limit=5&minMatches=${currentMin}`)
