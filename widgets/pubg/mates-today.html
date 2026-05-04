@@ -54,7 +54,10 @@
   <script>
     const LAYOUT = PubgUI.qs("layout", "carousel");
     const RANGE = PubgUI.qs("range", "session");
-    const MIN = parseInt(PubgUI.qs("minMatches", 1), 10);
+    // minMatches OPTIONAL — wenn nicht gesetzt, greift das globale Setting
+    // (minMatchesForTopMates), das vom flyout-full-Slider gesetzt wird.
+    const MIN_RAW = PubgUI.qs("minMatches");
+    const MIN_PARAM = MIN_RAW != null ? `&minMatches=${MIN_RAW}` : "";
 
     const HEADERS = {
       session: "Aktuelle Session — gespielt mit",
@@ -114,7 +117,7 @@
       }
     }
 
-    PubgUI.poll(`/api/pubg/mates-today?range=${RANGE}&minMatches=${MIN}`,
+    PubgUI.poll(`/api/pubg/mates-today?range=${RANGE}${MIN_PARAM}`,
                 30000, render, console.error);
   </script>
 </body>

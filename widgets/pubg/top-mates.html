@@ -41,6 +41,7 @@
     const MIN = parseInt(PubgUI.qs("minMatches", 10), 10);
 
     const SORT_LABEL = {
+      synergy: "Synergy",
       avgPlace: "Avg Place",
       kd: "Best K/D (du)",
       mateKd: "Best K/D (Mate)",
@@ -58,6 +59,7 @@
       if (SORT_BY === "winRate") return (m.winRate || 0).toFixed(1) + "%";
       if (SORT_BY === "mostPlayed") return m.sharedMatches + " Games";
       if (SORT_BY === "chickensTogether") return (m.winsTogether || 0) + " 🍗 · " + m.sharedMatches + "g";
+      if (SORT_BY === "synergy") return "Score " + (m.synergyScore || 0).toFixed(2) + " · " + m.sharedMatches + "g";
       return "";
     }
 

@@ -157,6 +157,10 @@ SORT_KEYS = {
     "winRate":           "win_rate DESC",
     "mostPlayed":        "shared DESC",
     "chickensTogether":  "wins DESC, shared DESC", # absolute Anzahl Wins
+    # Composite — sortBy "synergy": KDA-Fokus, Win-Rate gewichtet, log(matches)
+    # für Stabilität (1-Match-Glück bekommt nicht die Top-Position).
+    # SQL macht das gleiche wie der Python-key in compute_top_mates Postprocess:
+    "synergy":           "((kd + mate_kd)/2) * (1.0 + win_rate/100.0) DESC, shared DESC",
 }
 
 
@@ -190,18 +194,28 @@ def compute_top_mates(conn, my_account_id: str,
         LIMIT ?
     """, (my_account_id, my_account_id, min_matches, limit)).fetchall()
 
-    return [{
-        "accountId":       r["account_id"],
-        "name":            r["name"],
-        "sharedMatches":   r["shared"],
-        "winsTogether":    r["wins"],
-        "avgPlace":        r["avg_place"],
-        "kd":              r["kd"],          # meine
-        "mateKd":          r["mate_kd"],     # Mate
-        "avgDmg":          r["avg_dmg"],     # meine
-        "mateAvgDmg":      r["mate_avg_dmg"],
-        "winRate":         r["win_rate"],
-    } for r in rows]
+    out = []
+    for r in rows:
+        my_kd = r["kd"] or 0
+        mate_kd = r["mate_kd"] or 0
+        win_rate = r["win_rate"] or 0
+        # Synergy-Score: Team-KDA × Win-Rate-Bonus
+        synergy = ((my_kd + mate_kd) / 2.0) * (1.0 + win_rate / 100.0)
+        out.append({
+            "accountId":       r["account_id"],
+            "name":            r["name"],
+            "sharedMatches":   r["shared"],
+            "winsTogether":    r["wins"],
+            "avgPlace":        r["avg_place"],
+            "kd":              my_kd,
+            "mateKd":          mate_kd,
+            "teamKd":          (my_kd + mate_kd) / 2.0,
+            "avgDmg":          r["avg_dmg"],
+            "mateAvgDmg":      r["mate_avg_dmg"],
+            "winRate":         win_rate,
+            "synergyScore":    synergy,
+        })
+    return out
 
 
 def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:

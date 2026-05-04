@@ -38,22 +38,27 @@
   <script>
     const REFRESH_MS = parseInt(PubgUI.qs("refreshMs", 30000), 10);
 
-    function render(s) {
-      const fmt = (n) => {
-        if (n == null) return "—";
-        if (n >= 1000) return (n / 1000).toFixed(1) + "k";
-        return String(Math.round(n));
-      };
+    const fmt = (n) => {
+      if (n == null) return "—";
+      if (n >= 1000) return (n / 1000).toFixed(1) + "k";
+      return String(Math.round(n));
+    };
+
+    function renderSession(s) {
       PubgUI.animateNumber(document.getElementById("kills"), s.kills || 0, {format: fmt});
       PubgUI.animateNumber(document.getElementById("dmg"), s.damage || 0, {format: fmt});
       PubgUI.animateNumber(document.getElementById("wins"), s.wins || 0, {format: fmt});
       PubgUI.animateNumber(document.getElementById("matches"), s.matches || 0, {format: fmt});
-      const lastMap = s.mapBreakdown && s.mapBreakdown[0];
-      document.getElementById("map").textContent =
-        lastMap ? PubgUI.fmtMap(lastMap.map) : "—";
     }
 
-    PubgUI.poll("/api/pubg/session", REFRESH_MS, render, console.error);
+    function renderMap(lm) {
+      // letzte tatsächlich gespielte Map (aus last-match), nicht häufigste der Session
+      const mapEl = document.getElementById("map");
+      mapEl.textContent = lm && lm.map ? PubgUI.fmtMap(lm.map) : "—";
+    }
+
+    PubgUI.poll("/api/pubg/session", REFRESH_MS, renderSession, console.error);
+    PubgUI.poll("/api/pubg/last-match", REFRESH_MS, renderMap, console.error);
   </script>
 </body>
 </html>
