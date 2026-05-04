@@ -184,23 +184,10 @@
         options: [["0","Normal"],["1","Compact"]]},
     ]);
 
-    let currentMin = parseInt(PubgUI.qs("minMatches", 10), 10);
-    let currentSort = PubgUI.qs("sortBy", "mostPlayed");
-
-    async function loadSettings() {
-      // Settings-Defaults nur falls URL-Param fehlt
-      if (PubgUI.qs("minMatches") == null || PubgUI.qs("sortBy") == null) {
-        try {
-          const s = await PubgUI.fetchJson("/api/pubg/settings");
-          if (PubgUI.qs("minMatches") == null && s.minMatchesForTopMates) {
-            currentMin = parseInt(s.minMatchesForTopMates, 10);
-          }
-          if (PubgUI.qs("sortBy") == null && s.topMatesSortBy) {
-            currentSort = s.topMatesSortBy;
-          }
-        } catch (_) {}
-      }
-    }
+    // Filter-Bar oben ist Single Source of Truth — Werte aus URL-Param,
+    // KEIN DB-Setting-Lesen (das war früher der Bug).
+    const currentMin = parseInt(PubgUI.qs("minMatches", 10), 10);
+    const currentSort = PubgUI.qs("sortBy", "mostPlayed");
 
     function renderSession(s) {
       const num = (n) => String(Math.round(n));
@@ -317,8 +304,7 @@
     function reload() {
       updateTopMatesSubtitle();
       PubgUI.fetchJson(`/api/pubg/session?range=${RANGE}`).then(renderSession).catch(()=>{});
-      const ffRange = RANGE === "all" ? "session" : RANGE;
-      PubgUI.fetchJson(`/api/pubg/first-fight-rate?range=${ffRange}`).then(renderFF).catch(()=>{});
+      PubgUI.fetchJson(`/api/pubg/first-fight-rate?range=${RANGE}`).then(renderFF).catch(()=>{});
       const tmRange = RANGE === "all" ? "" : `range=${RANGE}&`;
       PubgUI.fetchJson(`/api/pubg/top-mates?${tmRange}sortBy=${currentSort}&limit=5&minMatches=${currentMin}`)
         .then(renderTopMates).catch(()=>{});
@@ -329,10 +315,8 @@
       reload();
     });
 
-    loadSettings().then(() => {
-      reload();
-      setInterval(reload, 60000);
-    });
+    reload();
+    setInterval(reload, 60000);
   </script>
 </body>
 </html>
