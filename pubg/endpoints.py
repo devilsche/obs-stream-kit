@@ -147,13 +147,13 @@ class EndpointRegistry:
     def _mates_today(self, qs):
         conn = self.get_conn()
         range_key = qs.get("range", "session")
-        # Gleicher Default wie top-mates: globaler Slider via flyout-full
-        default_min = int(get_setting(conn, "minMatchesForTopMates", "10"))
-        min_total = int(qs.get("minMatches", default_min))
+        min_matches = int(qs.get("minMatches", 1))   # Range-Filter
+        min_total = int(qs.get("minTotal", 1))       # Lifetime-Filter (optional)
+        key = f"mates-today:{range_key}:{min_matches}:{min_total}"
         return _ok(self.cache.get_or_compute(
-            f"mates-today:{range_key}:{min_total}",
+            key,
             lambda: compute_mates_today(conn, self.my_account_id,
-                                         range_key, min_total)))
+                                         range_key, min_matches, min_total)))
 
     def _map_dist(self, qs):
         range_key = qs.get("range", "session")

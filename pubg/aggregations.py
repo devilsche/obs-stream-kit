@@ -317,9 +317,12 @@ def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
 
 def compute_mates_today(conn, my_account_id: str,
                         range_key: str = "session",
-                        min_total_matches: int = 1) -> list:
-    """Mates aktiv im range. Optional Filter: nur Mates mit >= min_total_matches
-    Total-Historie mit dir (Random-Squad-Filler raus)."""
+                        min_matches: int = 1,
+                        min_total: int = 1) -> list:
+    """Mates aktiv im range.
+    - min_matches: Mindest-Anzahl Matches IN DER RANGE (z.B. ≥3 in der Woche)
+    - min_total:   Mindest-Anzahl Matches LIFETIME (Random-Squad rausfiltern)
+    """
     cutoff = _range_filter(conn, range_key)
     rows = conn.execute("""
         SELECT mate.account_id, mate.name,
@@ -335,10 +338,10 @@ def compute_mates_today(conn, my_account_id: str,
         JOIN matches m ON m.match_id = mate.match_id
         WHERE mate.account_id != ? AND m.played_at >= ?
         GROUP BY mate.account_id, mate.name
-        HAVING total_with_me >= ?
+        HAVING shared >= ? AND total_with_me >= ?
         ORDER BY shared DESC
     """, (my_account_id, my_account_id, my_account_id, cutoff,
-          min_total_matches)).fetchall()
+          min_matches, min_total)).fetchall()
 
     out = []
     for r in rows:
