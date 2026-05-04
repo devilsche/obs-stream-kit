@@ -248,12 +248,54 @@
       font-family: inherit;
     }
     .session-picker {
-      display: flex; gap: 6px; flex-wrap: wrap;
       margin-bottom: 18px;
-      padding: 10px 14px;
+      padding: 12px 14px;
       background: rgba(0,0,0,0.3);
       border: 1px solid var(--pubg-border);
       border-radius: 6px;
+    }
+    .session-picker .controls {
+      display: flex; gap: 10px; align-items: center;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .session-picker .controls input {
+      flex: 1; min-width: 200px;
+      background: rgba(0,0,0,0.4);
+      color: var(--pubg-text);
+      border: 1px solid var(--pubg-border);
+      padding: 5px 8px;
+      border-radius: 3px;
+      font-family: inherit;
+    }
+    .session-picker .summary {
+      color: var(--pubg-muted);
+      font-size: 0.8em;
+      letter-spacing: 0.04em;
+    }
+    .session-picker .toggle-all {
+      background: rgba(94,42,121,0.3);
+      border: 1px solid var(--pubg-border);
+      padding: 4px 10px;
+      border-radius: 3px;
+      font-size: 0.78em;
+      color: var(--pubg-text);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .session-picker .month-header {
+      color: var(--pubg-gold);
+      font-size: 0.85em;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin: 12px 0 6px;
+      padding-bottom: 3px;
+      border-bottom: 1px solid var(--pubg-border);
+    }
+    .session-picker .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      gap: 6px;
     }
     .session-picker .item {
       padding: 6px 10px;
@@ -380,42 +422,114 @@
       });
     });
 
-    // Sessions-Picker laden + rendern
-    PubgUI.fetchJson("/api/pubg/sessions").then(sessions => {
-      if (!sessions.length) return;
+    // Sessions-Picker mit Suche, Gruppierung nach Monat, Limit + Toggle
+    const DEFAULT_LIMIT = 12;
+    let allSessions = [];
+    let showAll = false;
+    let searchTerm = "";
+
+    function monthLabel(iso) {
+      const d = new Date(iso);
+      return d.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+    }
+
+    function matchSearch(s, term) {
+      if (!term) return true;
+      const t = term.toLowerCase();
+      const date = PubgUI.fmtDate(s.from).toLowerCase();
+      return date.includes(t)
+        || (s.topMap || "").toLowerCase().includes(t)
+        || PubgUI.fmtMap(s.topMap).toLowerCase().includes(t)
+        || String(s.matches).includes(t)
+        || String(s.wins).includes(t);
+    }
+
+    function renderPicker() {
       const picker = document.getElementById("picker");
-      picker.style.display = "flex";
+      if (!allSessions.length) { picker.style.display = "none"; return; }
+      picker.style.display = "block";
 
-      const isCurrent = (s, idx) => idx === 0 && !FROM;
-      const isActiveSelected = (s) => FROM === s.from;
+      const filtered = allSessions.filter(s => matchSearch(s, searchTerm));
+      const visible = showAll ? filtered : filtered.slice(0, DEFAULT_LIMIT);
+      const totalCount = allSessions.length;
+      const filteredCount = filtered.length;
 
-      const items = sessions.slice(0, 30).map((s, i) => {
-        const startCest = PubgUI.fmtDateTime(s.from);
-        const cls = ["item"];
-        if (isCurrent(s, i)) cls.push("current");
-        if (isActiveSelected(s)) cls.push("active");
-        return `<div class="${cls.join(' ')}" data-from="${s.from}" data-to="${s.to}">
-          <span class="label">${i === 0 ? "▶ Aktuelle" : "Session " + (i+1)}</span>
-          <span class="meta">${startCest} · ${s.matches}M · ${s.wins} 🍗 · ${s.kills}K</span>
-        </div>`;
-      }).join("");
-      picker.innerHTML = items;
-
-      picker.addEventListener("click", (e) => {
-        const it = e.target.closest(".item");
-        if (!it) return;
-        const u = new URL(location.href);
-        if (it.classList.contains("current")) {
-          // Aktuelle Session = keine from/to params
-          u.searchParams.delete("from");
-          u.searchParams.delete("to");
-        } else {
-          u.searchParams.set("from", it.dataset.from);
-          u.searchParams.set("to", it.dataset.to);
-        }
-        location.href = u.toString();
+      // Nach Monat gruppieren
+      const byMonth = {};
+      visible.forEach((s, i) => {
+        const idx = allSessions.indexOf(s);
+        const m = monthLabel(s.from);
+        if (!byMonth[m]) byMonth[m] = [];
+        byMonth[m].push({ ...s, _origIdx: idx });
       });
+
+      const groups = Object.entries(byMonth).map(([month, items]) => `
+        <div class="month-header">${month}</div>
+        <div class="grid">
+          ${items.map(s => {
+            const isCurrent = s._origIdx === 0 && !FROM;
+            const isActive = FROM === s.from;
+            const cls = ["item"];
+            if (isCurrent) cls.push("current");
+            if (isActive) cls.push("active");
+            return `<div class="${cls.join(' ')}" data-from="${s.from}" data-to="${s.to}">
+              <span class="label">${PubgUI.fmtDate(s.from)} ${PubgUI.fmtTime(s.from)}${isCurrent ? " ▶" : ""}</span>
+              <span class="meta">${s.matches}M · ${s.wins} 🍗 · ${s.kills}K · ${PubgUI.fmtMap(s.topMap)}</span>
+            </div>`;
+          }).join("")}
+        </div>
+      `).join("");
+
+      const summary = searchTerm
+        ? `${filteredCount}/${totalCount} Sessions (gefiltert)`
+        : `${totalCount} Sessions in DB`;
+      const moreBtn = (filteredCount > DEFAULT_LIMIT && !showAll)
+        ? `<button class="toggle-all" id="toggleAll">+${filteredCount - DEFAULT_LIMIT} weitere zeigen</button>`
+        : (showAll && filteredCount > DEFAULT_LIMIT
+          ? `<button class="toggle-all" id="toggleAll">Nur ${DEFAULT_LIMIT} zeigen</button>` : "");
+
+      picker.innerHTML = `
+        <div class="controls">
+          <input type="text" id="sessionSearch" placeholder="🔎 Suche: 03.05., Erangel, …" value="${searchTerm}">
+          <span class="summary">${summary}</span>
+          ${moreBtn}
+        </div>
+        ${groups}
+      `;
+
+      // Re-attach handlers
+      const search = document.getElementById("sessionSearch");
+      search.addEventListener("input", (e) => {
+        searchTerm = e.target.value;
+        renderPicker();
+        document.getElementById("sessionSearch").focus();
+      });
+      const tog = document.getElementById("toggleAll");
+      if (tog) tog.addEventListener("click", () => {
+        showAll = !showAll;
+        renderPicker();
+      });
+    }
+
+    PubgUI.fetchJson("/api/pubg/sessions").then(sessions => {
+      allSessions = sessions || [];
+      renderPicker();
     }).catch(() => {});
+
+    // Click-Handler delegiert auf body
+    document.addEventListener("click", (e) => {
+      const it = e.target.closest(".session-picker .item");
+      if (!it) return;
+      const u = new URL(location.href);
+      if (it.classList.contains("current")) {
+        u.searchParams.delete("from");
+        u.searchParams.delete("to");
+      } else {
+        u.searchParams.set("from", it.dataset.from);
+        u.searchParams.set("to", it.dataset.to);
+      }
+      location.href = u.toString();
+    });
 
     function fmtDuration(secs) {
       if (!secs) return "0min";
