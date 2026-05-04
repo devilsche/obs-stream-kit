@@ -30,7 +30,7 @@
     <span class="sep">·</span>
     <span><span class="icon">🍗</span><span class="pubg-stat-value" id="wins">—</span> <span class="label">Wins</span></span>
     <span class="sep">·</span>
-    <span class="label">Match</span> <span class="pubg-stat-value" id="matches">—</span>
+    <span class="pubg-stat-value" id="matches">—</span> <span class="label" id="matches-label">Matches</span>
     <span class="sep">·</span>
     <span class="pubg-stat-value" id="map">—</span>
   </div>
@@ -49,6 +49,8 @@
       PubgUI.animateNumber(document.getElementById("dmg"), s.damage || 0, {format: fmt});
       PubgUI.animateNumber(document.getElementById("wins"), s.wins || 0, {format: fmt});
       PubgUI.animateNumber(document.getElementById("matches"), s.matches || 0, {format: fmt});
+      document.getElementById("matches-label").textContent =
+        (s.matches === 1) ? "Match" : "Matches";
     }
 
     function renderMap(lm) {
