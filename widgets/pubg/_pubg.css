@@ -42,7 +42,7 @@ body {
 .pubg-row {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 6px;
 }
 
 .pubg-fade-in {
