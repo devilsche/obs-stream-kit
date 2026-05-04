@@ -73,7 +73,7 @@
     }
     .matches-list .m {
       display: grid;
-      grid-template-columns: 90px 90px 1fr auto;
+      grid-template-columns: 130px 80px 1fr auto;
       gap: 10px;
       padding: 4px 8px;
       border-radius: 3px;
@@ -81,7 +81,7 @@
     }
     .matches-list .header-row {
       display: grid;
-      grid-template-columns: 90px 90px 1fr auto;
+      grid-template-columns: 130px 80px 1fr auto;
       gap: 10px;
       padding: 2px 8px 4px;
       font-size: 0.85em;
@@ -91,6 +91,8 @@
       border-bottom: 1px dashed rgba(255,255,255,0.1);
       margin-bottom: 4px;
     }
+    .matches-list .time-range { color: var(--pubg-muted); }
+    .matches-list .time-range b { color: var(--pubg-text); font-weight: 400; }
     .matches-list .m:hover { background: rgba(255,255,255,0.04); }
     .matches-list .m.win {
       background: rgba(242,183,5,0.15);
@@ -153,7 +155,7 @@
       const isWin = m.place === 1;
       return `
         <div class="m ${isWin ? 'win' : ''}">
-          <span class="time">${PubgUI.fmtTime(startIso)}</span>
+          <span class="time-range"><b>${PubgUI.fmtTime(startIso)}</b> → ${PubgUI.fmtTime(m.matchEnd)}</span>
           <span class="place">${isWin ? '🍗 #1' : '#' + m.place}</span>
           <span class="map">${PubgUI.fmtMap(m.map)}</span>
           <span class="stats"><b>${m.kills}</b>K · <b>${Math.round(m.damage||0)}</b>DMG · ${survStr}</span>
@@ -208,7 +210,7 @@
             </div>
             <div class="matches-list">
               <div class="header-row">
-                <span>Start</span><span>Place</span><span>Map</span><span>Stats / Survived</span>
+                <span>Start → Ende</span><span>Place</span><span>Map</span><span>Stats / Survived</span>
               </div>
               ${ph.matches.map(fmtMatchRow).join("")}
             </div>
