@@ -549,35 +549,47 @@ def compute_session_report(conn, my_account_id):
         for x in ms:
             for name in x["squadSet"]:
                 ph["memberCounts"][name] = ph["memberCounts"].get(name, 0) + 1
+        total_kills = sum(x["kills"] or 0 for x in ms)
+        total_damage = sum(x["damage_dealt"] or 0 for x in ms)
+        total_surv = sum(x["time_survived"] or 0 for x in ms)
         ph["stats"] = {
             "matches": n,
             "wins": wins,
-            "kills": sum(x["kills"] or 0 for x in ms),
-            "damage": sum(x["damage_dealt"] or 0 for x in ms),
+            "kills": total_kills,
+            "damage": total_damage,
+            "avgKills": total_kills / n if n else 0,
+            "avgDamage": total_damage / n if n else 0,
             "avgPlace": (sum(x["place"] or 0 for x in ms) / n) if n else 0,
-            "kd": sum(x["kills"] or 0 for x in ms) / max(n - wins, 1),
-            "totalSurvivedSec": sum(x["time_survived"] or 0 for x in ms),
-            "startTime": _match_start(ms[0]),    # Match-Start des ersten Matches
-            "endTime": ms[-1]["played_at"],      # Match-End des letzten Matches
+            "avgSurvivedSec": total_surv / n if n else 0,
+            "kd": total_kills / max(n - wins, 1),
+            "totalSurvivedSec": total_surv,
+            "startTime": _match_start(ms[0]),
+            "endTime": ms[-1]["played_at"],
         }
 
     # Total-Aggregate
     n = len(enriched)
     wins = sum(1 for x in enriched if (x["place"] or 99) == 1)
+    total_kills = sum(x["kills"] or 0 for x in enriched)
+    total_damage = sum(x["damage_dealt"] or 0 for x in enriched)
+    total_surv = sum(x["time_survived"] or 0 for x in enriched)
     totals = {
         "matches": n,
         "wins": wins,
-        "kills": sum(x["kills"] or 0 for x in enriched),
-        "damage": sum(x["damage_dealt"] or 0 for x in enriched),
+        "kills": total_kills,
+        "damage": total_damage,
+        "avgKills": total_kills / n if n else 0,
+        "avgDamage": total_damage / n if n else 0,
         "avgPlace": sum(x["place"] or 0 for x in enriched) / n if n else 0,
-        "kd": sum(x["kills"] or 0 for x in enriched) / max(n - wins, 1),
+        "avgSurvivedSec": total_surv / n if n else 0,
+        "kd": total_kills / max(n - wins, 1),
         "headshots": sum(x["headshot_kills"] or 0 for x in enriched),
         "assists": sum(x["assists"] or 0 for x in enriched),
         "dbnos": sum(x["dbnos"] or 0 for x in enriched),
-        "totalSurvivedSec": sum(x["time_survived"] or 0 for x in enriched),
+        "totalSurvivedSec": total_surv,
         "longestKill": max((x["longest_kill"] or 0 for x in enriched), default=0),
-        "startTime": _match_start(enriched[0]),    # Match-Start des ersten Matches
-        "endTime": enriched[-1]["played_at"],      # Match-End des letzten Matches
+        "startTime": _match_start(enriched[0]),
+        "endTime": enriched[-1]["played_at"],
         "uniqueMaps": len({x["map_name"] for x in enriched}),
     }
 

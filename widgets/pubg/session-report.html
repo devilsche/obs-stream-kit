@@ -284,6 +284,9 @@
           <div class="cell"><span class="pubg-stat-value">${t.kills}</span><span class="pubg-stat-label">Kills</span></div>
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtNum(Math.round(t.damage))}</span><span class="pubg-stat-label">Damage</span></div>
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.kd)}</span><span class="pubg-stat-label">K/D</span></div>
+          <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.avgKills)}</span><span class="pubg-stat-label">Ø Kills/Match</span></div>
+          <div class="cell"><span class="pubg-stat-value">${Math.round(t.avgDamage)}</span><span class="pubg-stat-label">Ø DMG/Match</span></div>
+          <div class="cell"><span class="pubg-stat-value">${fmtDuration(Math.round(t.avgSurvivedSec))}</span><span class="pubg-stat-label">Ø Survive</span></div>
           <div class="cell"><span class="pubg-stat-value">#${t.avgPlace.toFixed(1)}</span><span class="pubg-stat-label">Avg Place</span></div>
           <div class="cell"><span class="pubg-stat-value">${t.headshots}</span><span class="pubg-stat-label">Headshots</span></div>
           <div class="cell"><span class="pubg-stat-value">${t.dbnos}</span><span class="pubg-stat-label">Knocks</span></div>
@@ -310,8 +313,9 @@
               <span><b>${PubgUI.fmtNum(Math.round(s.damage))}</b>DMG</span>
               <span><b>${s.wins}</b>🍗</span>
               <span><b>${PubgUI.fmtKD(s.kd)}</b>K/D</span>
-              <span><b>#${s.avgPlace.toFixed(1)}</b>Avg</span>
-              <span><b>${fmtDuration(s.totalSurvivedSec)}</b>überlebt</span>
+              <span><b>${Math.round(s.avgDamage)}</b>Ø DMG</span>
+              <span><b>${fmtDuration(Math.round(s.avgSurvivedSec))}</b>Ø Surv</span>
+              <span><b>#${s.avgPlace.toFixed(1)}</b>Avg #</span>
             </div>
             <div class="matches-list">
               <div class="header-row">
