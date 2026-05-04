@@ -2,9 +2,44 @@ import datetime
 from pubg.db import get_setting
 
 
+def _parse_iso(s):
+    if not s:
+        return None
+    try:
+        return datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
 def _session_filter(conn):
+    """Bestimmt den Session-Cutoff. Priorität:
+    1. Wenn `sessionStartedAt` in settings explizit gesetzt → nimm den.
+    2. Sonst auto-detect: gehe Match-Timestamps rückwärts durch.
+       Erste Lücke > sessionGapHours (default 4h) zwischen zwei Matches
+       → das ist der Session-Start.
+    3. Wenn keine Lücke gefunden → alle Matches in DB sind eine Session."""
     started_at = get_setting(conn, "sessionStartedAt")
-    return started_at or "1970-01-01T00:00:00Z"
+    if started_at and started_at > "1970-01-02":
+        return started_at
+
+    gap_hours = float(get_setting(conn, "sessionGapHours", "4"))
+    rows = conn.execute(
+        "SELECT played_at FROM matches ORDER BY played_at DESC LIMIT 200"
+    ).fetchall()
+    if not rows:
+        return "1970-01-01T00:00:00Z"
+
+    last_ts = None
+    for r in rows:
+        cur = _parse_iso(r["played_at"])
+        if cur is None:
+            continue
+        if last_ts is not None:
+            gap_secs = (last_ts - cur).total_seconds()
+            if gap_secs > gap_hours * 3600:
+                return last_ts.strftime("%Y-%m-%dT%H:%M:%SZ")
+        last_ts = cur
+    return rows[-1]["played_at"]
 
 
 def _range_filter(conn, range_key):
@@ -22,6 +57,8 @@ def _range_filter(conn, range_key):
 
 def compute_session_stats(conn, my_account_id: str) -> dict:
     started = _session_filter(conn)
+    explicit = get_setting(conn, "sessionStartedAt")
+    session_mode = "manual" if (explicit and explicit > "1970-01-02") else "auto"
     rows = conn.execute("""
         SELECT m.match_id, m.map_name, m.played_at,
                pa.kills, pa.damage_dealt, pa.place, pa.headshot_kills,
@@ -79,6 +116,7 @@ def compute_session_stats(conn, my_account_id: str) -> dict:
         "rideKm": ride_m / 1000.0,
         "swimKm": swim_m / 1000.0,
         "sessionStartedAt": started,
+        "sessionMode": session_mode,  # "manual" oder "auto"
         "mapBreakdown": [{"map": m, "count": c}
                          for m, c in sorted(map_breakdown.items(),
                                             key=lambda x: -x[1])],
