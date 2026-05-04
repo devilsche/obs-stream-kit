@@ -211,3 +211,77 @@ def get_squad_for_match(conn, match_id):
 def get_known_match_ids(conn):
     rows = conn.execute("SELECT match_id FROM matches").fetchall()
     return {r["match_id"] for r in rows}
+
+
+def set_setting(conn, key: str, value: str) -> None:
+    conn.execute("""
+        INSERT INTO settings(key, value, updated_at) VALUES (?, ?, ?)
+        ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at
+    """, (key, value, _now_iso()))
+    conn.commit()
+
+
+def get_setting(conn, key: str, default=None):
+    r = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    return r["value"] if r else default
+
+
+LIFETIME_COLS = (
+    "rounds_played", "wins", "top10s", "win_rate", "top10_rate",
+    "kills", "kd_ratio", "headshot_kills", "headshot_rate",
+    "avg_damage", "longest_kill", "time_survived_sec",
+)
+
+
+def upsert_lifetime(conn, account_id: str, mode: str, stats: dict) -> None:
+    cols = ", ".join(LIFETIME_COLS)
+    placeholders = ", ".join(["?"] * len(LIFETIME_COLS))
+    updates = ", ".join(f"{c}=excluded.{c}" for c in LIFETIME_COLS)
+    values = [account_id, mode] + [stats.get(c) for c in LIFETIME_COLS]
+    conn.execute(f"""
+        INSERT INTO player_lifetime(account_id, mode, {cols}, last_refreshed)
+        VALUES (?, ?, {placeholders}, ?)
+        ON CONFLICT(account_id, mode) DO UPDATE SET {updates}, last_refreshed=excluded.last_refreshed
+    """, values + [_now_iso()])
+    conn.commit()
+
+
+def get_lifetime(conn, account_id: str, mode: str):
+    return conn.execute(
+        "SELECT * FROM player_lifetime WHERE account_id=? AND mode=?",
+        (account_id, mode),
+    ).fetchone()
+
+
+def insert_telemetry_events(conn, match_id: str, events: list) -> None:
+    rows = [(match_id, e["event_type"], e.get("timestamp_ms"),
+             e.get("actor_account"), e.get("target_account"),
+             e.get("weapon"), e.get("distance"), e.get("damage"),
+             e.get("payload_json", "{}"))
+            for e in events]
+    conn.executemany("""
+        INSERT INTO telemetry_events
+        (match_id, event_type, timestamp_ms, actor_account, target_account,
+         weapon, distance, damage, payload_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, rows)
+    conn.commit()
+
+
+def get_telemetry_for_match(conn, match_id: str):
+    return conn.execute(
+        "SELECT * FROM telemetry_events WHERE match_id=?", (match_id,)
+    ).fetchall()
+
+
+def mark_telemetry_fetched(conn, match_id: str) -> None:
+    conn.execute("UPDATE matches SET telemetry_fetched=1 WHERE match_id=?", (match_id,))
+    conn.commit()
+
+
+def get_matches_needing_telemetry(conn, limit: int = 5):
+    return conn.execute("""
+        SELECT match_id, telemetry_url FROM matches
+        WHERE telemetry_fetched = 0 AND telemetry_url IS NOT NULL
+        ORDER BY played_at DESC LIMIT ?
+    """, (limit,)).fetchall()
