@@ -94,7 +94,8 @@
                   ["fold","Fold"],["mosaic","Mosaic"]]},
       { key: "range", label: "Range", type: "select", default: "session",
         options: [["session","Session"],["day","Heute"],["week","Letzte 7 Tage"]]},
-      { key: "minMatches", label: "Min", type: "range", min: 1, max: 50, default: 10 },
+      { key: "minMatches", label: "Min Total", type: "range",
+        min: 1, max: 50, default: 10 },
     ]);
     document.getElementById("root").className = "pubg-card " + LAYOUT;
 
@@ -103,10 +104,12 @@
       const careerLine = career
         ? `Career: <b>${PubgUI.fmtNum(career.rounds_played)}</b> Games · K/D <b>${PubgUI.fmtKD(career.kd_ratio)}</b> · <b>${PubgUI.fmtNum(career.wins)}</b> Wins`
         : `<span style="color:var(--pubg-gold)">🆕 Neuer Mate</span>`;
+      const totalSuffix = (m.totalWithMe != null && m.totalWithMe !== m.sharedMatchesToday)
+        ? ` (von <b>${m.totalWithMe}</b> total)` : "";
       return `
           <div class="mate-name">${m.name}</div>
           <div class="mate-line">
-            <span>Heute: <b>K/D ${PubgUI.fmtKD(m.kdToday)}</b> · DMG <b>${PubgUI.fmtNum(Math.round(m.dmgToday||0))}</b> · <b>${m.sharedMatchesToday}</b> Matches</span>
+            <span><b>${m.sharedMatchesToday}</b> Matches in Range${totalSuffix} · K/D <b>${PubgUI.fmtKD(m.kdToday)}</b> · DMG <b>${PubgUI.fmtNum(Math.round(m.dmgToday||0))}</b></span>
           </div>
           <div class="mate-line">
             <span>${careerLine}</span>
