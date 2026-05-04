@@ -465,7 +465,13 @@ def _check_assets():
                     continue
                 if not ext_pattern.search(ref):   # kein Datei-Extension → dynamisch, überspringen
                     continue
-                abs_ref = os.path.normpath(os.path.join(os.path.dirname(html_path), ref))
+                # URL-absolute Pfade (ab Server-Root) relativ zu ROOT auflösen,
+                # nicht relativ zum HTML-Verzeichnis (sonst wird "/widgets/..."
+                # als Filesystem-Pfad ab / interpretiert).
+                if ref.startswith('/'):
+                    abs_ref = os.path.normpath(os.path.join(ROOT, ref.lstrip('/')))
+                else:
+                    abs_ref = os.path.normpath(os.path.join(os.path.dirname(html_path), ref))
                 if not os.path.exists(abs_ref):
                     rel_html  = os.path.relpath(html_path, ROOT).replace('\\', '/')
                     rel_asset = os.path.relpath(abs_ref, ROOT).replace('\\', '/')
