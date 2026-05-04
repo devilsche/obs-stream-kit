@@ -90,7 +90,13 @@
         const rate = m.winRate || 0;
         return (m.winsTogether || 0) + " 🍗 · " + rate.toFixed(1) + "%";
       }
-      if (SORT_BY === "synergy")          return "Score " + (m.synergyScore || 0).toFixed(2);
+      if (SORT_BY === "synergy") {
+        const s = m.synergyScore || 0;
+        if (s >= 3) {
+          return `<span class="pubg-fire">🔥</span><span class="pubg-hot">Score ${s.toFixed(2)}</span>`;
+        }
+        return "Score " + s.toFixed(2);
+      }
       return "";
     }
 

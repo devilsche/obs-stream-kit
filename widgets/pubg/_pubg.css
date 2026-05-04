@@ -55,3 +55,39 @@ body {
 }
 
 .pubg-error { color: #e57b7b; font-size: 0.85em; }
+
+/* HOT — für überdurchschnittliche Werte (Synergy >=3 etc.) */
+.pubg-hot {
+  color: #ff7a1f !important;
+  text-shadow:
+    0 0 8px rgba(255, 122, 31, 0.7),
+    0 0 16px rgba(255, 60, 0, 0.4);
+  animation: pubg-hot-pulse 2s ease-in-out infinite;
+}
+
+@keyframes pubg-hot-pulse {
+  0%, 100% {
+    text-shadow:
+      0 0 8px rgba(255, 122, 31, 0.7),
+      0 0 16px rgba(255, 60, 0, 0.4);
+  }
+  50% {
+    text-shadow:
+      0 0 14px rgba(255, 160, 60, 0.9),
+      0 0 28px rgba(255, 80, 0, 0.6),
+      0 0 40px rgba(255, 30, 0, 0.3);
+  }
+}
+
+.pubg-fire {
+  display: inline-block;
+  margin-right: 4px;
+  filter: drop-shadow(0 0 6px rgba(255, 100, 0, 0.6));
+  animation: pubg-fire-flicker 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes pubg-fire-flicker {
+  0%   { transform: translateY(0)   scale(1.0); opacity: 1.0; }
+  50%  { transform: translateY(-1px) scale(1.05); opacity: 0.92; }
+  100% { transform: translateY(0)   scale(0.96); opacity: 1.0; }
+}
