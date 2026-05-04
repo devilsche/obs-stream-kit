@@ -129,31 +129,27 @@
 
   <script src="_pubg.js"></script>
   <script>
-    // URL-Parameter:
-    //   ?filter=0       — versteckt die Filter-Section (kompakt für BRB/In-Game)
-    //   ?compact=1      — kompakter Modus: kleinere Card, kleinere Schrift
-    //   ?hideMates=1    — versteckt Top-Mates-Section
-    //   ?hideSurvival=1 — versteckt Survival-Section
-    //   ?hideFF=1       — versteckt First-Fight-Section
-    const SHOW_FILTER  = PubgUI.qs("filter", "1") !== "0";
-    const COMPACT      = PubgUI.qs("compact") === "1";
-    const HIDE_MATES   = PubgUI.qs("hideMates") === "1";
-    const HIDE_SURV    = PubgUI.qs("hideSurvival") === "1";
-    const HIDE_FF      = PubgUI.qs("hideFF") === "1";
-
-    if (COMPACT) document.body.classList.add("compact");
-    if (!SHOW_FILTER) document.getElementById("filterSection").style.display = "none";
-    if (HIDE_MATES) {
+    // URL-Parameter (alle in der Filter-Bar oben einstellbar):
+    //   ?filter=0       — Filter-Bar verstecken (clean Stream-Look)
+    //   ?range=         — session/day/week/all
+    //   ?sortBy=        — Mate-Sort-Modus
+    //   ?minMatches=    — Mate-Filter-Schwelle
+    //   ?compact=1      — kompakter Modus
+    //   ?hideMates=1    — Top-Mates-Section weg
+    //   ?hideSurvival=1 — Survival-Section weg
+    //   ?hideFF=1       — First-Fight-Section weg
+    if (PubgUI.qs("compact") === "1") document.body.classList.add("compact");
+    if (PubgUI.qs("hideMates") === "1") {
       document.querySelectorAll(".section").forEach(s => {
         if (s.querySelector("h3")?.textContent.includes("Top Mates")) s.style.display = "none";
       });
     }
-    if (HIDE_SURV) {
+    if (PubgUI.qs("hideSurvival") === "1") {
       document.querySelectorAll(".section").forEach(s => {
         if (s.querySelector("h3")?.textContent === "Survival") s.style.display = "none";
       });
     }
-    if (HIDE_FF) {
+    if (PubgUI.qs("hideFF") === "1") {
       document.querySelectorAll(".section").forEach(s => {
         if (s.querySelector("h3")?.textContent.startsWith("First Fight")) s.style.display = "none";
       });
