@@ -467,7 +467,7 @@ def compute_session_report(conn, my_account_id):
         return {"sessionStartedAt": started, "totalMatches": 0,
                 "phases": [], "totals": None, "highlights": []}
 
-    # Squad-Members pro Match
+    # Squad-Members pro Match (ohne dich selbst, sortiert)
     def _squad(match_id):
         rows = conn.execute("""
             SELECT name, kills, damage_dealt, place
@@ -476,11 +476,21 @@ def compute_session_report(conn, my_account_id):
         """, (match_id, my_account_id)).fetchall()
         return [dict(r) for r in rows]
 
+    # Längste time_survived im Squad (du + Mates) — wann der LETZTE Squadmember
+    # raus war. Bei Win = Match-Dauer.
+    def _squad_last_survived(match_id):
+        row = conn.execute("""
+            SELECT MAX(time_survived) AS max_surv FROM participants
+            WHERE match_id=?
+        """, (match_id,)).fetchone()
+        return row["max_surv"] or 0
+
     enriched = []
     for m in matches:
         d = dict(m)
         d["squad"] = _squad(m["match_id"])
         d["squadSet"] = frozenset(s["name"] for s in d["squad"])
+        d["squadTimeSurvived"] = _squad_last_survived(m["match_id"])
         enriched.append(d)
 
     # Phase = aufeinanderfolgende Matches deren Squad-Sets sich überlappen.
@@ -576,7 +586,8 @@ def compute_session_report(conn, my_account_id):
             "place": m["place"],
             "kills": m["kills"],
             "damage": m["damage_dealt"],
-            "timeSurvived": m["time_survived"],
+            "timeSurvived": m["time_survived"],          # nur du
+            "squadTimeSurvived": m["squadTimeSurvived"], # längster im Squad
             "squad": m["squad"],
         }
 

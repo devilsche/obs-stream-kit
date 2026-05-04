@@ -150,21 +150,18 @@
 
     function fmtMatchRow(m) {
       const startIso = PubgUI.matchStartIso(m.matchEnd, m.durationSec);
-      const surv = m.timeSurvived || 0;
-      const survStr = `${Math.floor(surv/60)}:${String(surv%60).padStart(2,"0")}`;
+      const mySurv = m.timeSurvived || 0;
+      const squadSurv = m.squadTimeSurvived || mySurv;
+      const survStr = `${Math.floor(mySurv/60)}:${String(mySurv%60).padStart(2,"0")}`;
       const isWin = m.place === 1;
-      // Du-Zeitstrahl: Start (in Match rein) → Out (du tot oder Win)
-      // Match-End nur als kleine Klammer dazu (für Kontext)
-      const outIso = new Date(new Date(startIso).getTime() + surv * 1000).toISOString();
-      const matchEndStr = isWin
-        ? ""
-        : ` <span style="opacity:0.5">(M endet ${PubgUI.fmtTime(m.matchEnd)})</span>`;
+      // Squad-Out-Zeit = Match-Start + längste Survived-Zeit aller Squad-Mates
+      const squadOutIso = new Date(new Date(startIso).getTime() + squadSurv * 1000).toISOString();
       return `
         <div class="m ${isWin ? 'win' : ''}">
-          <span class="time-range"><b>${PubgUI.fmtTime(startIso)}</b> → <b>${PubgUI.fmtTime(outIso)}</b>${matchEndStr}</span>
+          <span class="time-range"><b>${PubgUI.fmtTime(startIso)}</b> → <b>${PubgUI.fmtTime(squadOutIso)}</b></span>
           <span class="place">${isWin ? '🍗 #1' : '#' + m.place}</span>
           <span class="map">${PubgUI.fmtMap(m.map)}</span>
-          <span class="stats"><b>${m.kills}</b>K · <b>${Math.round(m.damage||0)}</b>DMG · ${survStr}</span>
+          <span class="stats"><b>${m.kills}</b>K · <b>${Math.round(m.damage||0)}</b>DMG · meine ${survStr}</span>
         </div>`;
     }
 
@@ -216,7 +213,7 @@
             </div>
             <div class="matches-list">
               <div class="header-row">
-                <span>Du im Match</span><span>Place</span><span>Map</span><span>Stats / Survived</span>
+                <span>Squad im Match</span><span>Place</span><span>Map</span><span>Stats / meine Surv</span>
               </div>
               ${ph.matches.map(fmtMatchRow).join("")}
             </div>
