@@ -71,9 +71,12 @@
       font-size: 0.78em;
       font-variant-numeric: tabular-nums;
     }
+    /* Match-Row: Spaltenbreiten so dass alles match-übergreifend bündig ist.
+       Stats ist Sub-Grid mit fixen Spaltenbreiten — Werte untereinander
+       zwischen Zeilen sichtbar. */
     .matches-list .m {
       display: grid;
-      grid-template-columns: 240px 70px 1fr 130px;
+      grid-template-columns: 240px 60px 1fr 70px 90px 90px;
       gap: 10px;
       padding: 6px 8px;
       border-radius: 3px;
@@ -85,7 +88,7 @@
     .matches-list .m.expanded { background: rgba(94, 42, 121, 0.25); }
     .matches-list .header-row {
       display: grid;
-      grid-template-columns: 240px 70px 1fr 130px;
+      grid-template-columns: 240px 60px 1fr 70px 90px 90px;
       gap: 10px;
       padding: 2px 8px 4px;
       font-size: 0.85em;
@@ -108,19 +111,15 @@
       top: 50%;
       transform: translateY(-50%);
     }
-    /* Stats-Spalte: 3 Zeilen untereinander */
-    .matches-list .m .stats {
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
+    /* Stats-Spalten: rechtsbündig, fixe Breite, tabular-nums  */
+    .matches-list .stat {
       text-align: right;
-      font-size: 0.85em;
+      font-size: 0.9em;
       color: var(--pubg-muted);
-      line-height: 1.25;
-    }
-    .matches-list .m .stats b {
-      color: var(--pubg-text);
       font-variant-numeric: tabular-nums;
+    }
+    .matches-list .stat b {
+      color: var(--pubg-text);
     }
     .squad-detail {
       padding: 8px 14px 12px 28px;
@@ -261,11 +260,9 @@
           <span class="time-range"><b>${PubgUI.fmtTime(startIso)}</b> → <b>${PubgUI.fmtTime(squadOutIso)}</b></span>
           <span class="place">#${m.place}</span>
           <span class="map">${PubgUI.fmtMap(m.map)}</span>
-          <span class="stats">
-            <span><b>${m.kills}</b> Kills</span>
-            <span><b>${Math.round(m.damage||0)}</b> DMG</span>
-            <span>meine <b>${fmtSurv(mySurv)}</b></span>
-          </span>
+          <span class="stat"><b>${m.kills}</b> K</span>
+          <span class="stat"><b>${Math.round(m.damage||0)}</b> DMG</span>
+          <span class="stat"><b>${fmtSurv(mySurv)}</b></span>
         </div>
         <div class="squad-detail" data-idx-detail="${idx}">${fmtSquadDetail(m)}</div>`;
     }
@@ -318,7 +315,10 @@
             </div>
             <div class="matches-list">
               <div class="header-row">
-                <span>Squad im Match</span><span>Place</span><span>Map</span><span>Stats / meine Surv</span>
+                <span>Squad im Match</span><span>Place</span><span>Map</span>
+                <span style="text-align:right">Kills</span>
+                <span style="text-align:right">Damage</span>
+                <span style="text-align:right">meine Surv</span>
               </div>
               ${ph.matches.map((m, i) => fmtMatchRow(m, `${ph.coreSquad.join('-')}-${i}`)).join("")}
             </div>
