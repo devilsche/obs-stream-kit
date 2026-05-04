@@ -414,23 +414,27 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session"):
 
 
 def compute_chickens_together(conn, my_account_id, min_wins=1):
-    """Pro Co-Player: gemeinsame Wins (place=1) + gemeinsame Match-Anzahl."""
+    """Pro Co-Player: gemeinsame Wins (place=1), Match-Anzahl, Win-Rate.
+    Sortiert: absolute Wins primär, bei Gleichstand höhere Win-Rate vor."""
     rows = conn.execute("""
         SELECT mate.account_id, mate.name,
                SUM(CASE WHEN mate.place = 1 THEN 1 ELSE 0 END) AS wins_together,
-               COUNT(*) AS shared_matches
+               COUNT(*) AS shared_matches,
+               (CAST(SUM(CASE WHEN mate.place = 1 THEN 1 ELSE 0 END) AS REAL)
+                / COUNT(*)) * 100 AS win_rate
         FROM participants mate
         JOIN participants me ON me.match_id = mate.match_id AND me.account_id = ?
         WHERE mate.account_id != ?
         GROUP BY mate.account_id, mate.name
         HAVING wins_together >= ?
-        ORDER BY wins_together DESC, shared_matches DESC
+        ORDER BY wins_together DESC, win_rate DESC, shared_matches DESC
     """, (my_account_id, my_account_id, min_wins)).fetchall()
     return [{
         "accountId": r["account_id"],
         "name": r["name"],
         "winsTogether": r["wins_together"],
         "sharedMatches": r["shared_matches"],
+        "winRate": r["win_rate"],
     } for r in rows]
 
 

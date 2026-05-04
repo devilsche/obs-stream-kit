@@ -15,11 +15,17 @@
     }
     .row {
       display: grid;
-      grid-template-columns: 22px 1fr auto auto;
+      grid-template-columns: 22px 1fr auto auto auto;
       align-items: center;
       gap: 12px;
       padding: 10px 0;
       border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .row .rate {
+      color: var(--pubg-gold);
+      font-weight: 700;
+      font-size: 0.9em;
+      font-variant-numeric: tabular-nums;
     }
     .row:last-child { border-bottom: 0; }
     .row .rank {
@@ -100,6 +106,7 @@
           <div class="rank">${i+1}</div>
           <div class="name">${m.name}</div>
           <div class="games">${m.sharedMatches} Spiele</div>
+          <div class="rate">${(m.winRate||0).toFixed(1)}%</div>
           <div class="chickens">${chickens(m.winsTogether)}</div>
         </div>`).join("");
 
