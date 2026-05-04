@@ -97,6 +97,11 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at      TEXT NOT NULL
 );
 
+-- Lists ALL non-self co-players with their shared_matches count.
+-- The "qualified" threshold (>=N matches) is applied by callers via WHERE,
+-- not pre-filtered here. ON DELETE policy on FKs is implicit NO ACTION
+-- (default) — deleting a referenced players/matches row will fail unless
+-- dependent rows are removed first.
 CREATE VIEW IF NOT EXISTS qualified_co_players AS
 SELECT
     p.account_id,
