@@ -1,4 +1,6 @@
 import datetime
+import os
+import shutil
 import threading
 from pubg.db import (connect, upsert_player, insert_match, insert_participants,
                      get_known_match_ids, upsert_lifetime,
@@ -6,6 +8,30 @@ from pubg.db import (connect, upsert_player, insert_match, insert_participants,
                      get_matches_needing_telemetry)
 from pubg.match_parser import (parse_match_response, parse_lifetime_response,
                                 aggregate_lifetime_modes)
+
+
+def rotate_backup(db_path: str, max_backups: int = 7):
+    """Erstellt täglichen Snapshot der DB. Behält die letzten N Backups."""
+    if not os.path.exists(db_path):
+        return
+    today = datetime.datetime.utcnow().strftime("%Y%m%d")
+    backup = f"{db_path}.{today}.bak"
+    if os.path.exists(backup):
+        return  # heute schon gemacht
+    try:
+        shutil.copy2(db_path, backup)
+    except Exception:
+        return
+    # Alte Backups aufräumen
+    backups = sorted(
+        f for f in os.listdir(os.path.dirname(db_path) or ".")
+        if f.startswith(os.path.basename(db_path) + ".") and f.endswith(".bak")
+    )
+    for old in backups[:-max_backups]:
+        try:
+            os.remove(os.path.join(os.path.dirname(db_path) or ".", old))
+        except Exception:
+            pass
 
 
 def _iso_utc_now():
@@ -147,7 +173,13 @@ class PollerThread(threading.Thread):
                               "telemetryProcessed": 0}
 
     def run(self):
+        last_backup_day = None
         while not self._stop.is_set():
+            # Tägliches DB-Backup
+            today = datetime.datetime.utcnow().strftime("%Y%m%d")
+            if last_backup_day != today:
+                rotate_backup(self.db_path)
+                last_backup_day = today
             try:
                 conn = connect(self.db_path)
                 m_stats = run_single_tick(conn, self.client,
