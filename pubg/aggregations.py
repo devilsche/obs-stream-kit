@@ -216,16 +216,10 @@ def compute_top_mates(conn, my_account_id: str,
         my_kd = r["kd"] or 0
         mate_kd = r["mate_kd"] or 0
         win_rate = r["win_rate"] or 0
-        shared = r["shared"] or 1
-        # Synergy = Team-KDA × Win-Rate-Bonus × Stability-Faktor.
-        # Stability dämpft Glücks-Werte mit wenig Matches:
-        #   2  Matches → Faktor 0.17 · 5  → 0.33 · 11 → 0.52
-        #   20 Matches → Faktor 0.67 · 50 → 0.83 · 100 → 0.91
-        # Damit ist 9.0 in 2 Spielen niedriger als 2.5 in 11 Spielen.
-        # Glücksstats bleiben sichtbar (über minMatches=1) aber nicht
-        # automatisch in die Top-3.
-        stability = shared / (shared + 10.0)
-        synergy = ((my_kd + mate_kd) / 2.0) * (1.0 + win_rate / 100.0) * stability
+        # Synergy = Team-KDA × Win-Rate-Bonus.
+        # KEIN Stability-Faktor — der minMatches-Filter kümmert sich um
+        # Glücks-Stats. Konsistent mit SQL-Sort und anderen Widgets.
+        synergy = ((my_kd + mate_kd) / 2.0) * (1.0 + win_rate / 100.0)
         out.append({
             "accountId":       r["account_id"],
             "name":            r["name"],
