@@ -3,3 +3,7 @@
 .env
 .worktrees/
 __pycache__/
+data/
+config/pubg.local.json
+.pytest_cache/
+*.pyc
