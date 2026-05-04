@@ -77,11 +77,24 @@
         try {
           // Score-basiert nach aktuellem Setting (Synergy / Most Chicken / etc.)
           const settings2 = await PubgUI.fetchJson("/api/pubg/settings").catch(() => ({}));
-          const sortBy2 = settings2.topMatesSortBy || "mostPlayed";
-          const tmS = await PubgUI.fetchJson(`/api/pubg/top-mates?range=session&limit=1&minMatches=1&sortBy=${sortBy2}`);
+          // Default Synergy statt mostPlayed — wer am meisten Matches hat,
+          // ist nicht zwingend der "Top Mate". Synergy bewertet KD+Win-Rate.
+          const sortBy2 = settings2.topMatesSortBy || "synergy";
+          // minMatches=2 damit ein 1-Match-Glücks-Spike nicht oben steht
+          const tmS = await PubgUI.fetchJson(`/api/pubg/top-mates?range=session&limit=1&minMatches=2&sortBy=${sortBy2}`);
           if (tmS[0]) {
             const m = tmS[0];
-            out.push(`<span class="label">SESSION TOP MATE</span> ${m.name} · ${m.sharedMatches} Matches · ${m.winsTogether||0} 🍗 · K/D Meine ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
+            const SESSION_LABELS = {
+              mostPlayed:       "SESSION — MOST PLAYED",
+              synergy:          "SESSION — BEST SYNERGY",
+              chickensTogether: "SESSION — MOST 🍗",
+              kd:               "SESSION — BEST K/D (MEINE)",
+              mateKd:           "SESSION — BEST K/D (MATE)",
+              winRate:          "SESSION — BEST WIN-RATE",
+              avgPlace:         "SESSION — BEST AVG PLACE",
+            };
+            const sLabel = SESSION_LABELS[sortBy2] || "SESSION TOP MATE";
+            out.push(`<span class="label">${sLabel}</span> ${m.name} · ${m.sharedMatches} Matches · ${m.winsTogether||0} 🍗 · K/D Meine ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
           }
         } catch (_) {}
         try {
@@ -112,8 +125,9 @@
         } catch (_) {}
         try {
           const settings = await PubgUI.fetchJson("/api/pubg/settings").catch(() => ({}));
-          const sortBy = settings.topMatesSortBy || "mostPlayed";
-          const tm = await PubgUI.fetchJson("/api/pubg/top-mates?limit=1");
+          const sortBy = settings.topMatesSortBy || "synergy";
+          // Default Synergy + minMatches=10 — Glücks-Spikes raus
+          const tm = await PubgUI.fetchJson(`/api/pubg/top-mates?limit=1&sortBy=${sortBy}&minMatches=10`);
           if (tm[0]) {
             const m = tm[0];
             const LABELS = {
