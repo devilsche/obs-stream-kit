@@ -49,8 +49,9 @@
       mostPlayed: "Most Played",
       chickensTogether: "Most 🍗",
     };
-    document.getElementById("title").textContent =
-      "Top Mates · " + (SORT_LABEL[SORT_BY] || SORT_BY);
+    document.getElementById("title").innerHTML =
+      "Top Mates · " + (SORT_LABEL[SORT_BY] || SORT_BY) +
+      ' <span style="opacity:0.5;font-weight:400;letter-spacing:0;text-transform:none">(alle Matches in DB)</span>';
 
     function valueFor(m) {
       if (SORT_BY === "avgPlace") return "Avg #" + (m.avgPlace || 0).toFixed(1);
