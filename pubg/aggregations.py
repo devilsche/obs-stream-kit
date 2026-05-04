@@ -419,6 +419,48 @@ def compute_map_distribution(conn, my_account_id, range_key="session"):
              "wins": r["wins"], "avgPlace": r["avg_place"]} for r in rows]
 
 
+def compute_map_performance(conn, my_account_id, range_key="all"):
+    """Pro Map: Matches, Wins, K/D, Ø Kills/DMG/Place/Surv.
+    range_key: 'session' | 'day' | 'week' | 'all'."""
+    cutoff = _range_filter(conn, range_key) if range_key != "all" else "1970-01-01T00:00:00Z"
+    rows = conn.execute("""
+        SELECT m.map_name,
+               COUNT(*) AS matches,
+               SUM(CASE WHEN pa.place=1 THEN 1 ELSE 0 END) AS wins,
+               SUM(pa.kills) AS kills,
+               SUM(pa.damage_dealt) AS damage,
+               AVG(pa.place) AS avg_place,
+               AVG(pa.time_survived) AS avg_surv,
+               MAX(pa.longest_kill) AS longest_kill
+        FROM matches m
+        JOIN participants pa ON pa.match_id = m.match_id
+        WHERE pa.account_id = ? AND m.played_at >= ?
+        GROUP BY m.map_name
+        ORDER BY matches DESC
+    """, (my_account_id, cutoff)).fetchall()
+    out = []
+    for r in rows:
+        n = r["matches"] or 0
+        wins = r["wins"] or 0
+        kills = r["kills"] or 0
+        damage = r["damage"] or 0
+        out.append({
+            "map": r["map_name"],
+            "matches": n,
+            "wins": wins,
+            "kills": kills,
+            "damage": damage,
+            "avgKills": (kills / n) if n else 0,
+            "avgDamage": (damage / n) if n else 0,
+            "avgPlace": r["avg_place"] or 0,
+            "avgSurvivedSec": r["avg_surv"] or 0,
+            "kd": kills / max(n - wins, 1),
+            "winRate": (wins / n * 100) if n else 0,
+            "longestKill": r["longest_kill"] or 0,
+        })
+    return out
+
+
 def compute_first_fight_rate(conn, my_account_id, range_key="session",
                               cluster_secs=30, cluster_radius_m=200):
     """First Fight Win Rate — DEFINITION (echtes Fight-Win, nicht First-Engage):

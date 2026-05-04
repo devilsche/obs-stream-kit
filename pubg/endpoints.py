@@ -7,7 +7,8 @@ from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_mates_today, compute_map_distribution,
                                 compute_first_fight_rate, compute_squad_compare,
                                 compute_chickens_together, compute_session_report,
-                                compute_sessions_index, compute_best_worst_map)
+                                compute_sessions_index, compute_best_worst_map,
+                                compute_map_performance)
 
 
 def _ok(payload):
@@ -64,6 +65,8 @@ class EndpointRegistry:
             return self._sessions_index()
         if route == ("GET", "/api/pubg/best-worst-map"):
             return self._best_worst_map(qs)
+        if route == ("GET", "/api/pubg/map-performance"):
+            return self._map_perf(qs)
         if route == ("GET", "/api/pubg/lookup-mate"):
             return self._lookup_mate(qs)
         if route == ("GET", "/api/pubg/settings"):
@@ -211,6 +214,14 @@ class EndpointRegistry:
             f"best-worst-map:{range_key}:{min_m}",
             lambda: compute_best_worst_map(conn, self.my_account_id,
                                             range_key, min_m)))
+
+    def _map_perf(self, qs):
+        range_key = qs.get("range", "all")
+        conn = self.get_conn()
+        return _ok(self.cache.get_or_compute(
+            f"map-perf:{range_key}",
+            lambda: compute_map_performance(conn, self.my_account_id,
+                                              range_key)))
 
     def _lookup_mate(self, qs):
         """Live-Lookup eines Players via PUBG-API: account_id + Lifetime
