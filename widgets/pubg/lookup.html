@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Player Lookup</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    html, body { margin: 0; padding: 0; }
+    body { padding: 20px; min-height: 100vh; }
+    .card { max-width: 720px; margin: 0 auto; padding: 22px 26px; }
+    .card h1 {
+      margin: 0 0 6px;
+      color: var(--pubg-gold);
+      font-size: 1.4em;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .hint { color: var(--pubg-muted); font-size: 0.85em; margin-bottom: 14px; }
+    .search-row {
+      display: flex; gap: 8px; align-items: center;
+      margin-bottom: 18px;
+    }
+    .search-row input {
+      flex: 1;
+      background: rgba(0,0,0,0.4);
+      color: var(--pubg-text);
+      border: 1px solid var(--pubg-border);
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 1em;
+    }
+    .search-row button {
+      background: var(--pubg-gold);
+      color: #1a0d2a;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 4px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.95em;
+    }
+    .search-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .stats-section {
+      margin-top: 18px;
+      padding: 16px 20px;
+      background: rgba(94, 42, 121, 0.12);
+      border-radius: 6px;
+    }
+    .stats-section h3 {
+      margin: 0 0 12px;
+      color: var(--pubg-muted);
+      font-size: 0.8em;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 14px; }
+    .grid .cell { display: flex; flex-direction: column; }
+    .grid .cell .pubg-stat-value { font-size: 1.4em; }
+    .empty { color: var(--pubg-muted); font-style: italic; padding: 20px 0; text-align: center; }
+    .player-name {
+      color: var(--pubg-gold);
+      font-size: 1.6em;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .player-meta {
+      color: var(--pubg-muted);
+      font-size: 0.85em;
+    }
+    .modes-table {
+      width: 100%; border-collapse: collapse;
+      font-size: 0.85em;
+      font-variant-numeric: tabular-nums;
+    }
+    .modes-table th {
+      text-align: left;
+      padding: 4px 8px;
+      color: var(--pubg-muted);
+      font-weight: 400;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 0.85em;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .modes-table td {
+      padding: 4px 8px;
+      text-align: right;
+    }
+    .modes-table td:first-child { text-align: left; color: var(--pubg-text); }
+    .err { color: #e57b7b; padding: 14px; }
+  </style>
+</head>
+<body>
+  <div class="pubg-card card pubg-fade-in">
+    <h1>Player Lookup</h1>
+    <div class="hint">
+      Live von der PUBG-API · Career-Lifetime + Recent-Match-Count.
+      <br>Steam-Account-Name eingeben (case-sensitive!).
+    </div>
+    <div class="search-row">
+      <input type="text" id="searchInput" placeholder="z.B. la-city12" autofocus>
+      <button id="searchBtn">Suchen</button>
+    </div>
+    <div id="result"></div>
+  </div>
+
+  <script src="_pubg.js"></script>
+  <script>
+    const initialPlayer = PubgUI.qs("player", "");
+    if (initialPlayer) {
+      document.getElementById("searchInput").value = initialPlayer;
+    }
+
+    async function lookup(name) {
+      const result = document.getElementById("result");
+      result.innerHTML = `<div class="empty">— wird geholt (1-2 PUBG-API-Calls) —</div>`;
+
+      try {
+        const d = await PubgUI.fetchJson(
+          `/api/pubg/lookup-mate?player=${encodeURIComponent(name)}`);
+        if (d.error) {
+          result.innerHTML = `<div class="err">❌ ${d.error}</div>`;
+          return;
+        }
+
+        const cl = d.careerLifetime || {};
+        const careerHtml = cl.rounds_played ? `
+          <div class="stats-section">
+            <h3>Career — All Time</h3>
+            <div class="grid">
+              <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtNum(cl.rounds_played)}</span><span class="pubg-stat-label">Matches</span></div>
+              <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtNum(cl.wins)}</span><span class="pubg-stat-label">🍗 Wins</span></div>
+              <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(cl.kd_ratio)}</span><span class="pubg-stat-label">K/D</span></div>
+              <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtPct(cl.win_rate)}</span><span class="pubg-stat-label">Win-Rate</span></div>
+              <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtPct(cl.top10_rate)}</span><span class="pubg-stat-label">Top10</span></div>
+              <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtPct(cl.headshot_rate)}</span><span class="pubg-stat-label">Headshot</span></div>
+              <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtNum(cl.kills)}</span><span class="pubg-stat-label">Kills</span></div>
+              <div class="cell"><span class="pubg-stat-value">${Math.round(cl.longest_kill || 0)}m</span><span class="pubg-stat-label">Longest</span></div>
+              <div class="cell"><span class="pubg-stat-value">${Math.round(cl.avg_damage)}</span><span class="pubg-stat-label">Ø Damage</span></div>
+            </div>
+          </div>` : "";
+
+        // Per-Mode-Aggregation
+        const modes = d.modesLifetime || {};
+        const modeRows = Object.entries(modes)
+          .filter(([_, v]) => v.rounds_played > 0)
+          .sort((a, b) => b[1].rounds_played - a[1].rounds_played)
+          .map(([mode, v]) => `<tr>
+            <td>${mode.toUpperCase()}</td>
+            <td>${PubgUI.fmtNum(v.rounds_played)}</td>
+            <td>${v.wins}</td>
+            <td>${PubgUI.fmtKD(v.kd_ratio)}</td>
+            <td>${PubgUI.fmtPct(v.win_rate)}</td>
+            <td>${Math.round(v.avg_damage)}</td>
+          </tr>`).join("");
+        const modesHtml = modeRows ? `
+          <div class="stats-section">
+            <h3>Per Mode</h3>
+            <table class="modes-table">
+              <thead><tr>
+                <th>Mode</th><th style="text-align:right">Matches</th>
+                <th style="text-align:right">🍗</th><th style="text-align:right">K/D</th>
+                <th style="text-align:right">Win%</th><th style="text-align:right">Ø DMG</th>
+              </tr></thead>
+              <tbody>${modeRows}</tbody>
+            </table>
+          </div>` : "";
+
+        result.innerHTML = `
+          <div class="player-name">${d.name}</div>
+          <div class="player-meta">
+            ${d.shardId} · ${PubgUI.fmtNum(d.recentMatchCount)} Matches in den letzten 14 Tagen
+          </div>
+          ${careerHtml}
+          ${modesHtml}
+        `;
+
+        // URL aktualisieren so dass man den Link teilen kann
+        const u = new URL(location.href);
+        u.searchParams.set("player", name);
+        history.replaceState(null, "", u.toString());
+
+      } catch (e) {
+        result.innerHTML = `<div class="err">Fehler: ${e}</div>`;
+      }
+    }
+
+    document.getElementById("searchBtn").addEventListener("click", () => {
+      const name = document.getElementById("searchInput").value.trim();
+      if (name) lookup(name);
+    });
+    document.getElementById("searchInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        const name = e.target.value.trim();
+        if (name) lookup(name);
+      }
+    });
+
+    // Falls URL-Param da ist: direkt suchen
+    if (initialPlayer) lookup(initialPlayer);
+  </script>
+</body>
+</html>
