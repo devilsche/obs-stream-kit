@@ -5287,3 +5287,381 @@ git commit -m "chore(pubg): Final-Smoke-Test-Korrekturen"
 | systemd-User-Service-Beispiel | Phase 13.2 |
 | Cold-Start-Bulk-Import | Phase 13.1 |
 
+
+## Phase 14: Erweiterte Session-Stats + Animated Count-Up
+
+### Task 14.1: compute_session_stats um Boosts/Heals/Revives/Distance erweitern
+
+**Files:**
+- Modify: `pubg/aggregations.py`
+- Modify: `tests/pubg/test_aggregations.py`
+
+- [ ] **Step 1: Test anhängen**
+
+```python
+def test_session_stats_includes_extended_fields(tmp_db_path):
+    from pubg.db import insert_participants, insert_match, set_setting, upsert_player
+    conn = _setup(tmp_db_path)
+    set_setting(conn, "sessionStartedAt", "2026-05-04T00:00:00Z")
+    insert_match(conn, "ext1", "Erangel_Main", "squad-fpp", False, 1800,
+                 "2026-05-04T18:00:00Z", None)
+    insert_participants(conn, "ext1", [{
+        "account_id": "account.A", "name": "PEX_LuCKoR", "team_id": 1,
+        "place": 3, "kills": 4, "headshot_kills": 1, "assists": 2,
+        "dbnos": 3, "revives": 2, "damage_dealt": 412.0, "longest_kill": 187.5,
+        "time_survived": 1690, "walk_distance": 2300.0, "ride_distance": 1500.0,
+        "swim_distance": 50.0, "weapons_acquired": 8, "heals": 5, "boosts": 7,
+        "team_kills": 0,
+    }])
+    s = compute_session_stats(conn, "account.A")
+    assert s["totalBoosts"] == 7
+    assert s["totalHeals"] == 5
+    assert s["totalRevives"] == 2
+    assert s["totalWeaponsAcquired"] == 8
+    assert abs(s["walkKm"] - 2.3) < 0.001
+    assert abs(s["rideKm"] - 1.5) < 0.001
+    assert abs(s["swimKm"] - 0.05) < 0.001
+```
+
+- [ ] **Step 2: Test fail**
+
+- [ ] **Step 3: `compute_session_stats` in `pubg/aggregations.py` erweitern**
+
+Ersetze die SELECT-Query in `compute_session_stats` um die zusätzlichen Spalten:
+
+```python
+def compute_session_stats(conn, my_account_id: str) -> dict:
+    started = _session_filter(conn)
+    rows = conn.execute("""
+        SELECT m.match_id, m.map_name, m.played_at,
+               pa.kills, pa.damage_dealt, pa.place, pa.headshot_kills,
+               pa.longest_kill, pa.boosts, pa.heals, pa.revives,
+               pa.weapons_acquired, pa.walk_distance, pa.ride_distance,
+               pa.swim_distance, pa.assists, pa.dbnos, pa.time_survived
+        FROM matches m
+        JOIN participants pa ON pa.match_id = m.match_id
+        WHERE pa.account_id = ? AND m.played_at >= ?
+        ORDER BY m.played_at ASC
+    """, (my_account_id, started)).fetchall()
+
+    kills = sum(r["kills"] or 0 for r in rows)
+    headshots = sum(r["headshot_kills"] or 0 for r in rows)
+    damage = sum(r["damage_dealt"] or 0.0 for r in rows)
+    wins = sum(1 for r in rows if (r["place"] or 99) == 1)
+    top10s = sum(1 for r in rows if (r["place"] or 99) <= 10)
+    best_place = min((r["place"] for r in rows if r["place"]), default=None)
+    longest = max((r["longest_kill"] or 0.0 for r in rows), default=0.0)
+    boosts = sum(r["boosts"] or 0 for r in rows)
+    heals = sum(r["heals"] or 0 for r in rows)
+    revives = sum(r["revives"] or 0 for r in rows)
+    weapons = sum(r["weapons_acquired"] or 0 for r in rows)
+    walk_m = sum(r["walk_distance"] or 0.0 for r in rows)
+    ride_m = sum(r["ride_distance"] or 0.0 for r in rows)
+    swim_m = sum(r["swim_distance"] or 0.0 for r in rows)
+    assists = sum(r["assists"] or 0 for r in rows)
+    dbnos = sum(r["dbnos"] or 0 for r in rows)
+    survived_sec = sum(r["time_survived"] or 0 for r in rows)
+
+    map_breakdown = {}
+    for r in rows:
+        m = r["map_name"]
+        map_breakdown[m] = map_breakdown.get(m, 0) + 1
+
+    return {
+        "matches": len(rows),
+        "kills": kills,
+        "damage": damage,
+        "wins": wins,
+        "top10s": top10s,
+        "kd": kills / max(len(rows) - wins, 1),
+        "headshotPct": (headshots / kills * 100) if kills else 0,
+        "bestPlace": best_place,
+        "longestKill": longest,
+        "totalBoosts": boosts,
+        "totalHeals": heals,
+        "totalRevives": revives,
+        "totalWeaponsAcquired": weapons,
+        "totalAssists": assists,
+        "totalDbnos": dbnos,
+        "totalSurvivedSec": survived_sec,
+        "walkKm": walk_m / 1000.0,
+        "rideKm": ride_m / 1000.0,
+        "swimKm": swim_m / 1000.0,
+        "sessionStartedAt": started,
+        "mapBreakdown": [{"map": m, "count": c}
+                         for m, c in sorted(map_breakdown.items(),
+                                            key=lambda x: -x[1])],
+    }
+```
+
+- [ ] **Step 4: Tests grün**
+
+```bash
+pytest tests/pubg/test_aggregations.py -v
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add pubg/aggregations.py tests/pubg/test_aggregations.py
+git commit -m "feat(pubg): Session-Stats um Boosts/Heals/Revives/Distance erweitert"
+```
+
+### Task 14.2: animateNumber Helper in _pubg.js
+
+**Files:**
+- Modify: `widgets/pubg/_pubg.js`
+
+- [ ] **Step 1: Helper anhängen**
+
+In `_pubg.js`, vor dem `global.PubgUI = PubgUI;`-Zeile:
+
+```javascript
+  PubgUI.animateNumber = function (el, targetValue, opts) {
+    const o = opts || {};
+    const duration = o.durationMs || 900;
+    const formatter = o.format || ((n) => String(Math.round(n)));
+    const startText = (el.textContent || "").replace(/[^\d.\-]/g, "");
+    const start = parseFloat(startText) || 0;
+    if (start === targetValue) {
+      el.textContent = formatter(targetValue);
+      return;
+    }
+    const startTs = performance.now();
+    function tick(now) {
+      const t = Math.min(1, (now - startTs) / duration);
+      // easeOutQuart
+      const eased = 1 - Math.pow(1 - t, 4);
+      const value = start + (targetValue - start) * eased;
+      el.textContent = formatter(value);
+      if (t < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  };
+
+  PubgUI.fmtNumAnim = (n) => {
+    if (n == null) return "—";
+    if (n >= 1000) return (n / 1000).toFixed(1) + "k";
+    return String(Math.round(n));
+  };
+
+  PubgUI.fmtKm = (km) => (km == null ? "—" : km.toFixed(2) + "km");
+```
+
+- [ ] **Step 2: Manueller Browser-Test**
+
+In Browser-Console:
+```javascript
+const el = document.createElement("div");
+document.body.appendChild(el);
+el.textContent = "0";
+PubgUI.animateNumber(el, 412, {durationMs: 1500});
+// Sehe Zahl smooth hochzählen
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add widgets/pubg/_pubg.js
+git commit -m "feat(pubg): animateNumber Helper für Count-Up-Animationen"
+```
+
+### Task 14.3: live-bar.html nutzt animateNumber
+
+**Files:**
+- Modify: `widgets/pubg/live-bar.html`
+
+- [ ] **Step 1: render() umschreiben**
+
+Im `<script>`-Block, ersetze die `render`-Function:
+
+```javascript
+    function render(s) {
+      const fmt = (n) => {
+        if (n == null) return "—";
+        if (n >= 1000) return (n / 1000).toFixed(1) + "k";
+        return String(Math.round(n));
+      };
+      PubgUI.animateNumber(document.getElementById("kills"), s.kills || 0, {format: fmt});
+      PubgUI.animateNumber(document.getElementById("dmg"), s.damage || 0, {format: fmt});
+      PubgUI.animateNumber(document.getElementById("wins"), s.wins || 0, {format: fmt});
+      PubgUI.animateNumber(document.getElementById("matches"), s.matches || 0, {format: fmt});
+      const lastMap = s.mapBreakdown && s.mapBreakdown[0];
+      document.getElementById("map").textContent =
+        lastMap ? PubgUI.fmtMap(lastMap.map) : "—";
+    }
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add widgets/pubg/live-bar.html
+git commit -m "feat(pubg): live-bar nutzt animateNumber für Count-Up"
+```
+
+### Task 14.4: post-match-card.html nutzt animateNumber
+
+**Files:**
+- Modify: `widgets/pubg/post-match-card.html`
+
+- [ ] **Step 1: showCard() umschreiben**
+
+Im `<script>`-Block, ersetze die `showCard`-Function so dass die Zahlen animiert reinrollen:
+
+```javascript
+    function showCard(lm) {
+      document.getElementById("matchnum").textContent = "#" + (lm.matchId || "");
+      document.getElementById("header").textContent =
+        PubgUI.fmtMap(lm.map) + " · " + PubgUI.fmtMode(lm.mode);
+      document.getElementById("place").textContent = PubgUI.fmtPlace(lm.place);
+      const ms = lm.myStats || {};
+      const card = document.getElementById("card");
+      card.classList.add("visible");
+
+      // Reset für Re-Animation
+      ["kills", "dmg"].forEach(id => document.getElementById(id).textContent = "0");
+      requestAnimationFrame(() => {
+        PubgUI.animateNumber(document.getElementById("kills"), ms.kills || 0,
+                             {format: (n) => String(Math.round(n))});
+        PubgUI.animateNumber(document.getElementById("dmg"),
+                             Math.round(ms.damage_dealt || 0),
+                             {format: (n) => Math.round(n) >= 1000 ? (n/1000).toFixed(1)+"k" : String(Math.round(n))});
+      });
+      const min = Math.floor((ms.time_survived || 0) / 60);
+      const sec = (ms.time_survived || 0) % 60;
+      document.getElementById("surv").textContent = `${min}:${String(sec).padStart(2, "0")}`;
+
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => card.classList.remove("visible"), HIDE_AFTER_MS);
+    }
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add widgets/pubg/post-match-card.html
+git commit -m "feat(pubg): post-match-card nutzt animateNumber"
+```
+
+### Task 14.5: session-summary.html erweitert um Extended Stats
+
+**Files:**
+- Modify: `widgets/pubg/session-summary.html`
+
+- [ ] **Step 1: Layout um Extended-Stats-Block erweitern**
+
+Im HTML, nach dem ersten `<div class="grid">`-Block, einen zweiten Block einfügen:
+
+```html
+    <div class="grid" style="margin-top: 14px;">
+      <div class="cell"><span class="pubg-stat-value" id="boosts">—</span><span class="pubg-stat-label">Boosts</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="heals">—</span><span class="pubg-stat-label">Heals</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="revives">—</span><span class="pubg-stat-label">Revives</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="weapons">—</span><span class="pubg-stat-label">Weapons</span></div>
+    </div>
+    <div class="grid" style="margin-top: 14px;">
+      <div class="cell"><span class="pubg-stat-value" id="walk">—</span><span class="pubg-stat-label">Walked</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="drive">—</span><span class="pubg-stat-label">Driven</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="swim">—</span><span class="pubg-stat-label">Swam</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="assists">—</span><span class="pubg-stat-label">Assists</span></div>
+    </div>
+```
+
+In `render()`-Function ersetze den Session-Block durch animierte Updates:
+
+```javascript
+    function render() {
+      PubgUI.fetchJson("/api/pubg/session").then(s => {
+        const num = (n) => String(Math.round(n));
+        const knum = (n) => n >= 1000 ? (n/1000).toFixed(1)+"k" : String(Math.round(n));
+        const km = (n) => n.toFixed(2) + "km";
+
+        PubgUI.animateNumber(document.getElementById("matches"), s.matches || 0, {format: num});
+        PubgUI.animateNumber(document.getElementById("kills"), s.kills || 0, {format: num});
+        PubgUI.animateNumber(document.getElementById("dmg"), s.damage || 0, {format: knum});
+        PubgUI.animateNumber(document.getElementById("wins"), s.wins || 0, {format: num});
+
+        PubgUI.animateNumber(document.getElementById("boosts"), s.totalBoosts || 0, {format: num});
+        PubgUI.animateNumber(document.getElementById("heals"), s.totalHeals || 0, {format: num});
+        PubgUI.animateNumber(document.getElementById("revives"), s.totalRevives || 0, {format: num});
+        PubgUI.animateNumber(document.getElementById("weapons"), s.totalWeaponsAcquired || 0, {format: num});
+
+        PubgUI.animateNumber(document.getElementById("walk"), s.walkKm || 0, {format: km});
+        PubgUI.animateNumber(document.getElementById("drive"), s.rideKm || 0, {format: km});
+        PubgUI.animateNumber(document.getElementById("swim"), s.swimKm || 0, {format: km});
+        PubgUI.animateNumber(document.getElementById("assists"), s.totalAssists || 0, {format: num});
+      });
+      PubgUI.fetchJson("/api/pubg/map-distribution?range=session").then(list => {
+        document.getElementById("maps").innerHTML = list.map(m =>
+          `<div class="map-row"><span>${PubgUI.fmtMap(m.map)}</span><span class="pubg-stat-value">${m.count}</span></div>`).join("");
+      });
+      PubgUI.fetchJson("/api/pubg/mates-today?range=session").then(list => {
+        document.getElementById("mates").innerHTML = list.map(m =>
+          `<div class="mate-row"><span>${m.name}</span><span class="pubg-stat-value">${m.sharedMatchesToday}</span></div>`).join("");
+      });
+    }
+```
+
+- [ ] **Step 2: Browser-Test in Stream-Ending**
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add widgets/pubg/session-summary.html
+git commit -m "feat(pubg): session-summary mit erweiterten Stats + Count-Up"
+```
+
+### Task 14.6: flyout-full.html — Extended Stats Sektion
+
+**Files:**
+- Modify: `widgets/pubg/flyout-full.html`
+
+- [ ] **Step 1: Neue Section ergänzen**
+
+Vor der Section "Filter" im HTML einfügen:
+
+```html
+    <div class="section">
+      <h3>Survival</h3>
+      <div class="stat-grid">
+        <div class="cell"><span class="pubg-stat-value" id="boosts">—</span><span class="pubg-stat-label">Boosts</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="heals">—</span><span class="pubg-stat-label">Heals</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="revives">—</span><span class="pubg-stat-label">Revives</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="walk">—</span><span class="pubg-stat-label">Walked</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="drive">—</span><span class="pubg-stat-label">Driven</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="weapons">—</span><span class="pubg-stat-label">Weapons</span></div>
+      </div>
+    </div>
+```
+
+In `renderSession(s)` ersetze den Body durch:
+
+```javascript
+    function renderSession(s) {
+      const num = (n) => String(Math.round(n));
+      const knum = (n) => n >= 1000 ? (n/1000).toFixed(1)+"k" : String(Math.round(n));
+      const km = (n) => n.toFixed(1) + "km";
+
+      PubgUI.animateNumber(document.getElementById("kills"), s.kills || 0, {format: num});
+      PubgUI.animateNumber(document.getElementById("dmg"), s.damage || 0, {format: knum});
+      PubgUI.animateNumber(document.getElementById("wins"), s.wins || 0, {format: num});
+      document.getElementById("kd").textContent = PubgUI.fmtKD(s.kd);
+      document.getElementById("hs").textContent = PubgUI.fmtPct(s.headshotPct);
+      document.getElementById("best").textContent = PubgUI.fmtPlace(s.bestPlace);
+
+      PubgUI.animateNumber(document.getElementById("boosts"), s.totalBoosts || 0, {format: num});
+      PubgUI.animateNumber(document.getElementById("heals"), s.totalHeals || 0, {format: num});
+      PubgUI.animateNumber(document.getElementById("revives"), s.totalRevives || 0, {format: num});
+      PubgUI.animateNumber(document.getElementById("walk"), s.walkKm || 0, {format: km});
+      PubgUI.animateNumber(document.getElementById("drive"), s.rideKm || 0, {format: km});
+      PubgUI.animateNumber(document.getElementById("weapons"), s.totalWeaponsAcquired || 0, {format: num});
+    }
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add widgets/pubg/flyout-full.html
+git commit -m "feat(pubg): flyout-full mit Survival-Section + Count-Up"
+```
+
