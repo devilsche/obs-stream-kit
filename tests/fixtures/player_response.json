@@ -1,0 +1,15 @@
+{
+  "data": [{
+    "id": "account.abc123",
+    "type": "player",
+    "attributes": {"name": "PEX_LuCKoR", "shardId": "steam"},
+    "relationships": {
+      "matches": {
+        "data": [
+          {"type": "match", "id": "match-1"},
+          {"type": "match", "id": "match-2"}
+        ]
+      }
+    }
+  }]
+}

@@ -1,0 +1,21 @@
+{
+  "data": {
+    "type": "lifetime",
+    "attributes": {
+      "gameModeStats": {
+        "squad-fpp": {
+          "roundsPlayed": 16509, "wins": 885, "top10s": 6487,
+          "kills": 23974, "headshotKills": 5762,
+          "damageDealt": 4730000.0, "longestKill": 612.0,
+          "timeSurvived": 320000, "assists": 7000, "dBNOs": 12000
+        },
+        "duo-fpp": {
+          "roundsPlayed": 200, "wins": 12, "top10s": 80,
+          "kills": 350, "headshotKills": 70,
+          "damageDealt": 60000.0, "longestKill": 480.0,
+          "timeSurvived": 5000, "assists": 50, "dBNOs": 80
+        }
+      }
+    }
+  }
+}

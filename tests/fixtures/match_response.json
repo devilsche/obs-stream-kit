@@ -1,0 +1,53 @@
+{
+  "data": {
+    "type": "match",
+    "id": "match-1",
+    "attributes": {
+      "mapName": "Erangel_Main",
+      "gameMode": "squad-fpp",
+      "duration": 1820,
+      "createdAt": "2026-05-04T18:00:00Z",
+      "isCustomMatch": false,
+      "matchType": "official"
+    },
+    "relationships": {
+      "rosters": {"data": [{"type": "roster", "id": "r1"}]},
+      "assets": {"data": [{"type": "asset", "id": "a1"}]}
+    }
+  },
+  "included": [
+    {
+      "type": "roster", "id": "r1",
+      "attributes": {"stats": {"teamId": 5, "rank": 3}},
+      "relationships": {
+        "participants": {"data": [
+          {"type": "participant", "id": "p1"},
+          {"type": "participant", "id": "p2"}
+        ]}
+      }
+    },
+    {
+      "type": "participant", "id": "p1",
+      "attributes": {"stats": {
+        "playerId": "account.abc123", "name": "PEX_LuCKoR",
+        "kills": 4, "headshotKills": 1, "assists": 2, "DBNOs": 3,
+        "revives": 1, "damageDealt": 412.0, "longestKill": 187.5,
+        "timeSurvived": 1690, "walkDistance": 2300, "rideDistance": 1100,
+        "swimDistance": 0, "weaponsAcquired": 8, "heals": 3, "boosts": 4,
+        "teamKills": 0, "winPlace": 3
+      }}
+    },
+    {
+      "type": "participant", "id": "p2",
+      "attributes": {"stats": {
+        "playerId": "account.def456", "name": "MateA",
+        "kills": 2, "headshotKills": 0, "assists": 4, "DBNOs": 1,
+        "revives": 2, "damageDealt": 287.0, "longestKill": 92.0,
+        "timeSurvived": 1690, "walkDistance": 2200, "rideDistance": 1100,
+        "swimDistance": 0, "weaponsAcquired": 6, "heals": 2, "boosts": 3,
+        "teamKills": 0, "winPlace": 3
+      }}
+    },
+    {"type": "asset", "id": "a1", "attributes": {"URL": "https://example/tel.json"}}
+  ]
+}
