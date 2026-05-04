@@ -186,15 +186,18 @@
 
       const phasesHtml = d.phases.map((ph, i) => {
         const s = ph.stats;
-        const squad = ph.squadNames.length
-          ? ph.squadNames.map(n => `<b>${n}</b>`).join(" + ")
+        const core = ph.coreSquad && ph.coreSquad.length
+          ? ph.coreSquad.map(n => `<b>${n}</b>`).join(" + ")
           : "<i>Solo</i>";
+        const fillersStr = (ph.fillers && ph.fillers.length)
+          ? ` <span style="opacity:0.7">+ wechselnd: ${ph.fillers.join(", ")}</span>`
+          : "";
         const startStr = PubgUI.fmtTime(s.startTime);
         const endStr = PubgUI.fmtTime(s.endTime);
         return `
           <div class="phase">
             <h2><span class="num">Phase ${i+1}</span> ${startStr} → ${endStr} · ${s.matches} ${s.matches===1?'Match':'Matches'}</h2>
-            <div class="squad">Squad: ${squad}</div>
+            <div class="squad">Stamm: ${core}${fillersStr}</div>
             <div class="phase-stats">
               <span><b>${s.kills}</b>Kills</span>
               <span><b>${PubgUI.fmtNum(Math.round(s.damage))}</b>DMG</span>

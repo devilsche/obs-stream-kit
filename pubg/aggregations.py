@@ -480,18 +480,40 @@ def compute_session_report(conn, my_account_id):
     for m in matches:
         d = dict(m)
         d["squad"] = _squad(m["match_id"])
-        d["squadKey"] = ",".join(sorted(s["name"] for s in d["squad"])) or "(SOLO)"
+        d["squadSet"] = frozenset(s["name"] for s in d["squad"])
         enriched.append(d)
 
-    # Phase = aufeinanderfolgende Matches mit gleicher Squad-Konstellation
+    # Phase = aufeinanderfolgende Matches deren Squad-Sets sich überlappen.
+    # Der "Stamm" der Phase ist die Schnittmenge aller Squads in der Phase
+    # (die Mates die in JEDEM Match dieser Phase dabei waren).
+    # Random-Filler die nur in einzelnen Matches mitliefen werden separat geführt.
     phases = []
     cur_phase = None
     for m in enriched:
-        if cur_phase is None or cur_phase["squadKey"] != m["squadKey"]:
-            cur_phase = {"squadKey": m["squadKey"],
-                          "squadNames": sorted({s["name"] for s in m["squad"]}),
+        cur_set = m["squadSet"]
+        if cur_phase is None:
+            cur_phase = {"core": set(cur_set),
+                          "allMembers": set(cur_set),
                           "matches": []}
             phases.append(cur_phase)
+        else:
+            new_core = cur_phase["core"] & cur_set
+            if not new_core and cur_set:
+                # Stamm-Crew komplett weg → neue Phase
+                cur_phase = {"core": set(cur_set),
+                              "allMembers": set(cur_set),
+                              "matches": []}
+                phases.append(cur_phase)
+            elif not cur_set:
+                # Solo-Match — bricht Phase nur wenn vorher Squad da war
+                if cur_phase["core"]:
+                    cur_phase = {"core": set(),
+                                  "allMembers": set(),
+                                  "matches": []}
+                    phases.append(cur_phase)
+            else:
+                cur_phase["core"] = new_core
+                cur_phase["allMembers"] |= cur_set
         cur_phase["matches"].append(m)
 
     # Pro Phase Aggregate
@@ -563,7 +585,9 @@ def compute_session_report(conn, my_account_id):
         "totalMatches": n,
         "totals": totals,
         "phases": [{
-            "squadNames": ph["squadNames"],
+            "coreSquad": sorted(ph["core"]),
+            "allMembers": sorted(ph["allMembers"]),
+            "fillers": sorted(ph["allMembers"] - ph["core"]),
             "stats": ph["stats"],
             "matches": [_to_payload(m) for m in ph["matches"]],
         } for ph in phases],
