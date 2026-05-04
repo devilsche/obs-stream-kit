@@ -17,15 +17,15 @@
     .mate {
       padding: 10px 14px;
       margin-bottom: 8px;
-      border-left: 3px solid var(--pubg-purple);
     }
     .mate-name { font-weight: 700; font-size: 1.05em; }
     .mate-line {
       display: flex; justify-content: space-between;
       font-size: 0.85em; color: var(--pubg-muted);
       margin-top: 4px;
+      color: var(--pubg-muted);
     }
-    .mate-line b { color: var(--pubg-text); font-variant-numeric: tabular-nums; }
+    .mate-line b { color: var(--pubg-gold); font-variant-numeric: tabular-nums; }
 
     .stack { display: flex; flex-direction: column; }
 
@@ -54,8 +54,8 @@
       transform: translateX(0);
     }
 
-    .carousel { position: relative; min-height: 180px; }
-    .carousel .mate { position: absolute; inset: 0; opacity: 0; transition: opacity 0.6s; padding: 24px; }
+    .carousel { position: relative; min-height: 100px; }
+    .carousel .mate { position: absolute; inset: 0; opacity: 0; transition: opacity 0.6s; padding: 12px; }
     .carousel .mate.active { opacity: 1; }
     .carousel .dots {
       position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
