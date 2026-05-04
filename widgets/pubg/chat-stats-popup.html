@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Chat Stats</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    body { display: flex; align-items: center; justify-content: center;
+           height: 100vh; padding: 0; }
+    .popup {
+      width: 460px;
+      padding: 24px 28px;
+      transform: translateY(40px);
+      opacity: 0;
+      transition: opacity 0.5s, transform 0.5s;
+    }
+    .popup.show { opacity: 1; transform: translateY(0); }
+    .popup .ribbon {
+      display: inline-block;
+      padding: 3px 10px;
+      background: var(--pubg-gold);
+      color: #1a0d2a;
+      font-weight: 700;
+      font-size: 0.72em;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      border-radius: 3px;
+      margin-bottom: 10px;
+    }
+    .popup .name { font-size: 1.6em; font-weight: 700; margin-bottom: 14px; }
+    .popup .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+    .popup .cell { display: flex; flex-direction: column; }
+    .popup .cell .pubg-stat-value { font-size: 1.5em; }
+    .popup .career { font-size: 0.85em; color: var(--pubg-muted);
+                     margin-top: 14px; padding-top: 14px;
+                     border-top: 1px solid rgba(255,255,255,0.08); }
+  </style>
+</head>
+<body>
+  <div class="pubg-card popup" id="popup">
+    <span class="ribbon">Mit mir gespielt</span>
+    <div class="name" id="name">—</div>
+    <div class="grid">
+      <div class="cell"><span class="pubg-stat-value" id="m">—</span><span class="pubg-stat-label">Matches</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="kd">—</span><span class="pubg-stat-label">K/D</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="dmg">—</span><span class="pubg-stat-label">Avg DMG</span></div>
+    </div>
+    <div class="career" id="career">—</div>
+  </div>
+
+  <script src="_pubg.js"></script>
+  <script>
+    const PLAYER = PubgUI.qs("player", "");
+    const DURATION = parseInt(PubgUI.qs("duration", 12), 10) * 1000;
+
+    function reveal() {
+      document.getElementById("popup").classList.add("show");
+      if (DURATION > 0) {
+        setTimeout(() => {
+          document.getElementById("popup").classList.remove("show");
+        }, DURATION);
+      }
+    }
+
+    if (!PLAYER) {
+      document.getElementById("name").textContent = "?player= fehlt";
+      reveal();
+    } else {
+      PubgUI.fetchJson(`/api/pubg/co-player/${encodeURIComponent(PLAYER)}`)
+        .then(d => {
+          if (d.error) {
+            document.getElementById("name").textContent = "Player nicht gefunden";
+            return reveal();
+          }
+          document.getElementById("name").textContent = d.name || PLAYER;
+          const sh = d.sharedHistory || {};
+          document.getElementById("m").textContent = PubgUI.fmtNum(sh.matches);
+          document.getElementById("kd").textContent = PubgUI.fmtKD(sh.kd);
+          document.getElementById("dmg").textContent = PubgUI.fmtNum(Math.round(sh.avgDmg||0));
+          const cl = d.careerLifetime;
+          document.getElementById("career").textContent = cl
+            ? `Career: ${PubgUI.fmtNum(cl.rounds_played)} Games · K/D ${PubgUI.fmtKD(cl.kd_ratio)} · ${cl.wins} Wins`
+            : (sh.matches ? "Career: noch nicht geladen (<5 gemeinsame Matches?)" : "Noch nie zusammen gespielt");
+          reveal();
+        })
+        .catch(e => { document.getElementById("name").textContent = "Fehler"; reveal(); });
+    }
+  </script>
+</body>
+</html>
