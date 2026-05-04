@@ -1,6 +1,6 @@
 import datetime
 import os
-import shutil
+import sqlite3
 import threading
 from pubg.db import (connect, upsert_player, insert_match, insert_participants,
                      get_known_match_ids, upsert_lifetime,
@@ -22,8 +22,15 @@ def rotate_backup(db_path: str, max_backups: int = 7,
     if os.path.exists(backup):
         status["local"] = "already-done"
     else:
+        # SQLite Online-Backup-API: konsistenter Snapshot auch bei laufenden
+        # Schreibvorgängen (anders als shutil.copy bei WAL-Mode → korrupt).
         try:
-            shutil.copy2(db_path, backup)
+            src = sqlite3.connect(db_path)
+            dst = sqlite3.connect(backup)
+            with dst:
+                src.backup(dst)
+            src.close()
+            dst.close()
             status["local"] = "ok"
         except Exception as e:
             status["local"] = f"error: {e}"
@@ -198,6 +205,20 @@ class PollerThread(threading.Thread):
                               "telemetryProcessed": 0}
 
     def run(self):
+        # Beim Start: Integrität checken — Korruption fällt sofort auf,
+        # nicht erst nach Wochen.
+        try:
+            from pubg.db import integrity_check
+            conn0 = connect(self.db_path)
+            ic = integrity_check(conn0)
+            conn0.close()
+            if ic != "ok":
+                self._last_status["integrity"] = f"FAILED: {ic}"
+            else:
+                self._last_status["integrity"] = "ok"
+        except Exception as e:
+            self._last_status["integrity"] = f"check-error: {e}"
+
         last_backup_day = None
         while not self._stop.is_set():
             # Tägliches DB-Backup
