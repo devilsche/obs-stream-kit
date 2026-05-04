@@ -73,9 +73,9 @@
     }
     .matches-list .m {
       display: grid;
-      grid-template-columns: 240px 70px 1fr auto;
+      grid-template-columns: 240px 70px 1fr 130px;
       gap: 10px;
-      padding: 4px 8px;
+      padding: 6px 8px;
       border-radius: 3px;
       align-items: center;
       cursor: pointer;
@@ -85,7 +85,7 @@
     .matches-list .m.expanded { background: rgba(94, 42, 121, 0.25); }
     .matches-list .header-row {
       display: grid;
-      grid-template-columns: 240px 70px 1fr auto;
+      grid-template-columns: 240px 70px 1fr 130px;
       gap: 10px;
       padding: 2px 8px 4px;
       font-size: 0.85em;
@@ -94,6 +94,33 @@
       letter-spacing: 0.06em;
       border-bottom: 1px dashed rgba(255,255,255,0.1);
       margin-bottom: 4px;
+    }
+    /* Place-Spalte: # untereinander ausrichten — 🍗 als CSS-pseudo bei Win */
+    .matches-list .m .place {
+      font-variant-numeric: tabular-nums;
+      position: relative;
+      padding-left: 22px;
+    }
+    .matches-list .m.win .place::before {
+      content: "🍗";
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    /* Stats-Spalte: 3 Zeilen untereinander */
+    .matches-list .m .stats {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      text-align: right;
+      font-size: 0.85em;
+      color: var(--pubg-muted);
+      line-height: 1.25;
+    }
+    .matches-list .m .stats b {
+      color: var(--pubg-text);
+      font-variant-numeric: tabular-nums;
     }
     .squad-detail {
       padding: 8px 14px 12px 28px;
@@ -232,9 +259,13 @@
       return `
         <div class="m ${isWin ? 'win' : ''}" data-idx="${idx}">
           <span class="time-range"><b>${PubgUI.fmtTime(startIso)}</b> → <b>${PubgUI.fmtTime(squadOutIso)}</b></span>
-          <span class="place">${isWin ? '🍗 #1' : '#' + m.place}</span>
+          <span class="place">#${m.place}</span>
           <span class="map">${PubgUI.fmtMap(m.map)}</span>
-          <span class="stats"><b>${m.kills}</b>K · <b>${Math.round(m.damage||0)}</b>DMG · meine ${fmtSurv(mySurv)}</span>
+          <span class="stats">
+            <span><b>${m.kills}</b> Kills</span>
+            <span><b>${Math.round(m.damage||0)}</b> DMG</span>
+            <span>meine <b>${fmtSurv(mySurv)}</b></span>
+          </span>
         </div>
         <div class="squad-detail" data-idx-detail="${idx}">${fmtSquadDetail(m)}</div>`;
     }
