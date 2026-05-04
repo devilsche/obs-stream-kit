@@ -495,6 +495,13 @@ def compute_session_report(conn, my_account_id):
         cur_phase["matches"].append(m)
 
     # Pro Phase Aggregate
+    import datetime as _dt
+    def _match_start(m):
+        """Match-Start = played_at (Match-End) - duration."""
+        end = _dt.datetime.fromisoformat(m["played_at"].replace("Z", "+00:00"))
+        return (end - _dt.timedelta(seconds=m["duration_secs"] or 0)) \
+            .strftime("%Y-%m-%dT%H:%M:%SZ")
+
     for ph in phases:
         ms = ph["matches"]
         n = len(ms)
@@ -507,8 +514,8 @@ def compute_session_report(conn, my_account_id):
             "avgPlace": (sum(x["place"] or 0 for x in ms) / n) if n else 0,
             "kd": sum(x["kills"] or 0 for x in ms) / max(n - wins, 1),
             "totalSurvivedSec": sum(x["time_survived"] or 0 for x in ms),
-            "startTime": ms[0]["played_at"],
-            "endTime": ms[-1]["played_at"],
+            "startTime": _match_start(ms[0]),    # Match-Start des ersten Matches
+            "endTime": ms[-1]["played_at"],      # Match-End des letzten Matches
         }
 
     # Total-Aggregate
@@ -526,8 +533,8 @@ def compute_session_report(conn, my_account_id):
         "dbnos": sum(x["dbnos"] or 0 for x in enriched),
         "totalSurvivedSec": sum(x["time_survived"] or 0 for x in enriched),
         "longestKill": max((x["longest_kill"] or 0 for x in enriched), default=0),
-        "startTime": enriched[0]["played_at"],
-        "endTime": enriched[-1]["played_at"],
+        "startTime": _match_start(enriched[0]),    # Match-Start des ersten Matches
+        "endTime": enriched[-1]["played_at"],      # Match-End des letzten Matches
         "uniqueMaps": len({x["map_name"] for x in enriched}),
     }
 
