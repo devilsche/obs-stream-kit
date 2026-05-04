@@ -65,7 +65,7 @@
         try {
           const s = await PubgUI.fetchJson("/api/pubg/session");
           if (s.matches) {
-            out.push(`<span class="label">SESSION STATS</span> ${s.kills} Kills · ${PubgUI.fmtNum(Math.round(s.damage))} DMG · ${s.wins} Wins · K/M ${PubgUI.fmtKD(s.kpm)}`);
+            out.push(`<span class="label">SESSION STATS</span> ${s.kills} Kills · ${PubgUI.fmtNum(Math.round(s.damage))} DMG · ${s.wins} Wins · K/D ${PubgUI.fmtKD(s.kd)} · K/M ${PubgUI.fmtKD(s.kpm)}`);
           }
         } catch (_) {}
         try {
