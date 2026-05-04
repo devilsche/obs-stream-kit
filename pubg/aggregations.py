@@ -156,7 +156,9 @@ SORT_KEYS = {
     "mateKd":            "mate_kd DESC",           # K/D des Mates
     "winRate":           "win_rate DESC",
     "mostPlayed":        "shared DESC",
-    "chickensTogether":  "wins DESC, shared DESC", # absolute Anzahl Wins
+    # Most Chicken: absolute Win-Anzahl primär, bei Gleichstand höhere
+    # Win-Rate vor (mehr Effizienz pro Match besser als reine Match-Anzahl)
+    "chickensTogether":  "wins DESC, win_rate DESC, shared DESC",
     # Composite — sortBy "synergy": KDA-Fokus, Win-Rate gewichtet, log(matches)
     # für Stabilität (1-Match-Glück bekommt nicht die Top-Position).
     # SQL macht das gleiche wie der Python-key in compute_top_mates Postprocess:

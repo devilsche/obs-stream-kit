@@ -114,7 +114,7 @@ class EndpointRegistry:
             "mateKd":            lambda m: -(m["mateKd"] or 0),
             "winRate":           lambda m: -(m["winRate"] or 0),
             "mostPlayed":        lambda m: -m["sharedMatches"],
-            "chickensTogether":  lambda m: (-m["winsTogether"], -m["sharedMatches"]),
+            "chickensTogether":  lambda m: (-m["winsTogether"], -(m["winRate"] or 0), -m["sharedMatches"]),
             "synergy":           lambda m: -(m.get("synergyScore") or 0),
         }
         filtered.sort(key=sort_fns.get(sort_by, sort_fns["mostPlayed"]))
