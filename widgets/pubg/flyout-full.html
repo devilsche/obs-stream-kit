@@ -163,12 +163,36 @@
       document.getElementById("ffsub").textContent = `${f.survived||0} / ${f.total||0}`;
     }
 
+    function topMateValue(m) {
+      if (currentSort === "synergy")          return "Score " + (m.synergyScore || 0).toFixed(2);
+      if (currentSort === "chickensTogether") return (m.winsTogether || 0) + " 🍗";
+      if (currentSort === "kd")               return "K/D " + (m.kd || 0).toFixed(2);
+      if (currentSort === "mateKd")           return "K/D " + (m.mateKd || 0).toFixed(2);
+      if (currentSort === "winRate")          return (m.winRate || 0).toFixed(1) + "%";
+      if (currentSort === "avgPlace")         return "Avg #" + (m.avgPlace || 0).toFixed(1);
+      return m.sharedMatches + " games";  // mostPlayed
+    }
+
+    function topMateSub(m) {
+      // kompakte 2. Zeile mit den anderen wichtigen Werten
+      const bits = [];
+      if (currentSort !== "mostPlayed") bits.push(`${m.sharedMatches}g`);
+      if (m.winsTogether && currentSort !== "chickensTogether") bits.push(`${m.winsTogether}🍗`);
+      if (currentSort !== "kd" && currentSort !== "mateKd") {
+        bits.push(`du ${(m.kd || 0).toFixed(2)} / Mate ${(m.mateKd || 0).toFixed(2)}`);
+      }
+      return bits.join(" · ");
+    }
+
     function renderTopMates(list) {
       document.getElementById("topmates").innerHTML = list.length ? list.map((m,i) => `
-        <div class="pubg-row" style="padding:4px 0">
-          <span style="color:var(--pubg-gold);width:18px">${i+1}</span>
-          <span style="flex:1">${m.name}</span>
-          <span class="pubg-stat-label">${m.sharedMatches} games</span>
+        <div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
+          <div class="pubg-row">
+            <span style="color:var(--pubg-gold);width:18px;font-weight:700">${i+1}</span>
+            <span style="flex:1;font-weight:700">${m.name}</span>
+            <span style="color:var(--pubg-gold);font-weight:700;font-variant-numeric:tabular-nums">${topMateValue(m)}</span>
+          </div>
+          <div style="padding-left:24px;color:var(--pubg-muted);font-size:0.78em;margin-top:2px">${topMateSub(m)}</div>
         </div>`).join("") : '<span class="pubg-error">noch keine Daten</span>';
     }
 
