@@ -96,12 +96,12 @@
         <input type="range" id="minMatches" min="1" max="50" value="10">
         <span class="pubg-stat-value" id="minVal">10</span>
         <select id="sortBy">
-          <option value="avgPlace">Avg Place</option>
+          <option value="mostPlayed">Most Played</option>
           <option value="chickensTogether">Most 🍗 Together</option>
           <option value="kd">Best K/D (du)</option>
           <option value="mateKd">Best K/D (Mate)</option>
           <option value="winRate">Win-Rate</option>
-          <option value="mostPlayed">Most Played</option>
+          <option value="avgPlace">Avg Place</option>
         </select>
       </div>
     </div>
@@ -110,7 +110,7 @@
   <script src="_pubg.js"></script>
   <script>
     let currentMin = 10;
-    let currentSort = "avgPlace";
+    let currentSort = "mostPlayed";
 
     async function loadSettings() {
       try {

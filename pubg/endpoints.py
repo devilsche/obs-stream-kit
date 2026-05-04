@@ -93,9 +93,9 @@ class EndpointRegistry:
 
     def _top_mates(self, qs):
         conn = self.get_conn()
-        # Default sortBy / minMatches kommen aus settings — Slider im flyout-full
-        # setzt dort persistent. URL-Param kann override.
-        default_sort = get_setting(conn, "topMatesSortBy", "avgPlace")
+        # Default sortBy / minMatches kommen aus settings — Slider/Dropdown
+        # im flyout-full setzt dort persistent. URL-Param kann override.
+        default_sort = get_setting(conn, "topMatesSortBy", "mostPlayed")
         default_min = int(get_setting(conn, "minMatchesForTopMates", "10"))
         sort_by = qs.get("sortBy", default_sort)
         limit = int(qs.get("limit", 5))
