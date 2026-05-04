@@ -95,22 +95,22 @@
           if (tm[0]) {
             const m = tm[0];
             const LABELS = {
-              mostPlayed:       "LIFETIME — MOST PLAYED",
-              synergy:          "LIFETIME — BEST SYNERGY",
-              chickensTogether: "LIFETIME — MOST 🍗",
-              kd:               "LIFETIME — BEST K/D (MEINE)",
-              mateKd:           "LIFETIME — BEST K/D (MATE)",
-              winRate:          "LIFETIME — BEST WIN-RATE",
-              avgPlace:         "LIFETIME — BEST AVG PLACE",
+              mostPlayed:       "DB — MOST PLAYED",
+              synergy:          "DB — BEST SYNERGY",
+              chickensTogether: "DB — MOST 🍗",
+              kd:               "DB — BEST K/D (MEINE)",
+              mateKd:           "DB — BEST K/D (MATE)",
+              winRate:          "DB — BEST WIN-RATE",
+              avgPlace:         "DB — BEST AVG PLACE",
             };
-            const label = LABELS[sortBy] || "LIFETIME — TOP MATE";
+            const label = LABELS[sortBy] || "DB — TOP MATE";
             out.push(`<span class="label">${label}</span> ${m.name} · ${m.sharedMatches} Matches · ${m.winsTogether||0} 🍗 · K/D Meine ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
           }
         } catch (_) {}
         try {
           const c = await PubgUI.fetchJson("/api/pubg/career-lifetime?mode=all");
           if (c.rounds_played) {
-            out.push(`<span class="label">CAREER</span> ${PubgUI.fmtNum(c.rounds_played)} Games · K/D ${PubgUI.fmtKD(c.kd_ratio)} · ${c.wins} Wins`);
+            out.push(`<span class="label">CAREER — ALL TIME</span> ${PubgUI.fmtNum(c.rounds_played)} Games · K/D ${PubgUI.fmtKD(c.kd_ratio)} · ${c.wins} Wins`);
           }
         } catch (_) {}
       }
