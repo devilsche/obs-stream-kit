@@ -72,9 +72,21 @@ Empfohlen: **1920×40**, ganz unten als Marquee. Rotiert: Session-Stats, Top-Mat
 
 ### `flyout-full.html`
 
-Kein URL-Param. Slider und Sort-Dropdown sind interaktiv (OBS → Rechtsklick → "Interagieren"). Werte werden in der DB persistiert (Setting `minMatchesForTopMates`, `topMatesSortBy`) und gelten **global** für alle Mate-Widgets.
+| Param | Default | Wirkung |
+|---|---|---|
+| `filter` | `1` | `0` = Filter-Slider versteckt (für BRB/In-Game ohne Interaktion) |
+| `compact` | `0` | `1` = kleinere Card (360px statt 480px), kleinere Schrift |
+| `hideMates` | `0` | Top-Mates-Section weglassen |
+| `hideSurvival` | `0` | Boosts/Heals/Distance-Section weglassen |
+| `hideFF` | `0` | First-Fight-Section weglassen |
 
-Empfohlen: **520×850**. Als zweite Browser-Source mit Hotkey-Visibility-Toggle in OBS hinzufügen.
+Slider und Sort-Dropdown sind interaktiv (OBS → Rechtsklick → "Interagieren"). Werte werden in der DB persistiert (`minMatchesForTopMates`, `topMatesSortBy`) und gelten **global** für alle Mate-Widgets.
+
+Empfohlene Größen je Variante:
+- **Full** (Default, mit Filter): **520×850** — als zweite Browser-Source mit Hotkey-Toggle in OBS
+- **In-Game-Mid** (`?compact=1&filter=0&hideMates=1`): **400×580** — passt in eine Ecke
+- **BRB-Compact** (`?compact=1`): **400×750** — kleines Detail-Panel auf BRB
+- **Session-Only** (`?filter=0&hideMates=1`): **520×640** — nur Session-Stats + Survival
 
 ### `mates-today.html`
 

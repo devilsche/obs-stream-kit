@@ -8,6 +8,16 @@
   <style>
     body { padding: 20px; }
     .panel { width: 480px; padding: 20px 24px; }
+
+    /* Compact-Modus für In-Game/BRB: weniger Padding, kompakte Stat-Werte */
+    body.compact { padding: 10px; }
+    body.compact .panel { width: 360px; padding: 12px 14px; }
+    body.compact .head { margin-bottom: 8px; }
+    body.compact .head h2 { font-size: 0.95em; }
+    body.compact .section { padding: 8px 0; }
+    body.compact .stat-grid { gap: 8px; }
+    body.compact .stat-grid .pubg-stat-value { font-size: 1.15em; }
+    body.compact .pubg-stat-label { font-size: 0.65em; }
     .head {
       display: flex; justify-content: space-between; align-items: baseline;
       margin-bottom: 14px;
@@ -89,7 +99,7 @@
       <div id="topmates"></div>
     </div>
 
-    <div class="section">
+    <div class="section" id="filterSection">
       <h3>Filter</h3>
       <div class="controls">
         <span class="pubg-stat-label">Min Matches</span>
@@ -110,6 +120,36 @@
 
   <script src="_pubg.js"></script>
   <script>
+    // URL-Parameter:
+    //   ?filter=0       — versteckt die Filter-Section (kompakt für BRB/In-Game)
+    //   ?compact=1      — kompakter Modus: kleinere Card, kleinere Schrift
+    //   ?hideMates=1    — versteckt Top-Mates-Section
+    //   ?hideSurvival=1 — versteckt Survival-Section
+    //   ?hideFF=1       — versteckt First-Fight-Section
+    const SHOW_FILTER  = PubgUI.qs("filter", "1") !== "0";
+    const COMPACT      = PubgUI.qs("compact") === "1";
+    const HIDE_MATES   = PubgUI.qs("hideMates") === "1";
+    const HIDE_SURV    = PubgUI.qs("hideSurvival") === "1";
+    const HIDE_FF      = PubgUI.qs("hideFF") === "1";
+
+    if (COMPACT) document.body.classList.add("compact");
+    if (!SHOW_FILTER) document.getElementById("filterSection").style.display = "none";
+    if (HIDE_MATES) {
+      document.querySelectorAll(".section").forEach(s => {
+        if (s.querySelector("h3")?.textContent.includes("Top Mates")) s.style.display = "none";
+      });
+    }
+    if (HIDE_SURV) {
+      document.querySelectorAll(".section").forEach(s => {
+        if (s.querySelector("h3")?.textContent === "Survival") s.style.display = "none";
+      });
+    }
+    if (HIDE_FF) {
+      document.querySelectorAll(".section").forEach(s => {
+        if (s.querySelector("h3")?.textContent === "First Fight") s.style.display = "none";
+      });
+    }
+
     let currentMin = 10;
     let currentSort = "mostPlayed";
 
