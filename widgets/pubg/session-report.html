@@ -581,9 +581,18 @@
       const squadSurv = m.squadTimeSurvived || mySurv;
       const isWin = m.place === 1;
       const squadOutIso = new Date(new Date(startIso).getTime() + squadSurv * 1000).toISOString();
+      // Datum nur zeigen wenn Match anderen Tag als Match-End hat (Mitternacht-Übergang)
+      const startD = PubgUI.fmtDate(startIso);
+      const outD = PubgUI.fmtDate(squadOutIso);
+      const startTimeStr = (startD === outD)
+        ? PubgUI.fmtTime(startIso)
+        : `${startD.slice(0,5)} ${PubgUI.fmtTime(startIso)}`;
+      const outTimeStr = (startD === outD)
+        ? PubgUI.fmtTime(squadOutIso)
+        : `${outD.slice(0,5)} ${PubgUI.fmtTime(squadOutIso)}`;
       return `
         <div class="m ${isWin ? 'win' : ''}" data-idx="${idx}">
-          <span class="time-range"><b>${PubgUI.fmtTime(startIso)}</b> → <b>${PubgUI.fmtTime(squadOutIso)}</b></span>
+          <span class="time-range"><b>${startTimeStr}</b> → <b>${outTimeStr}</b></span>
           <span class="place">#${m.place}</span>
           <span class="map">${PubgUI.fmtMap(m.map)}</span>
           <span class="stat"><b>${m.kills}</b> K</span>
@@ -628,8 +637,13 @@
         const fillersStr = (ph.fillers && ph.fillers.length)
           ? ` <span style="opacity:0.7">+ wechselnd: ${ph.fillers.map(f => `${f.name} (${f.count})`).join(", ")}</span>`
           : "";
-        const startStr = PubgUI.fmtTime(s.startTime);
-        const endStr = PubgUI.fmtTime(s.endTime);
+        // Datum + Zeit. Bei Tageswechsel auch das End-Datum zeigen.
+        const startD = PubgUI.fmtDate(s.startTime);
+        const endD = PubgUI.fmtDate(s.endTime);
+        const startStr = `${startD} ${PubgUI.fmtTime(s.startTime)}`;
+        const endStr = (startD === endD)
+          ? PubgUI.fmtTime(s.endTime)
+          : `${endD} ${PubgUI.fmtTime(s.endTime)}`;
         return `
           <div class="phase">
             <h2><span class="num">Phase ${i+1}</span> ${startStr} → ${endStr} · ${s.matches} ${s.matches===1?'Match':'Matches'}</h2>
