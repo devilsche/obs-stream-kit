@@ -87,9 +87,12 @@ def test_refresh_lifetimes_for_qualified_co_players(tmp_db_path):
     client = MagicMock()
     client.get_lifetime.return_value = _load("lifetime_response.json")
     stats = refresh_lifetimes(conn, client, min_matches=5, max_per_tick=3)
-    assert stats["refreshed"] == 1
+    # Self + 1 qualified co-player = 2 refreshes
+    assert stats["refreshed"] == 2
     lt = get_lifetime(conn, "account.B", "all")
     assert lt is not None
+    self_lt = get_lifetime(conn, "account.abc123", "all")
+    assert self_lt is not None
 
 
 def test_poller_thread_starts_and_stops(tmp_db_path):

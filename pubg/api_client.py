@@ -1,3 +1,4 @@
+import gzip
 import json
 import time
 import urllib.error
@@ -80,12 +81,17 @@ class PubgClient:
         return self._get_json(url)
 
     def get_telemetry(self, telemetry_url: str) -> list:
-        # Telemetry-CDN, no API-Key needed, no rate-limit on this endpoint
+        # Telemetry-CDN, no API-Key needed, no rate-limit on this endpoint.
+        # CDN delivers gzip-compressed JSON regardless of Accept-Encoding header.
         req = urllib.request.Request(telemetry_url, headers={
             "Accept": "application/vnd.api+json",
+            "Accept-Encoding": "gzip",
         })
         with urllib.request.urlopen(req, timeout=60) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            data = resp.read()
+        if resp.headers.get("Content-Encoding") == "gzip" or data[:2] == b"\x1f\x8b":
+            data = gzip.decompress(data)
+        return json.loads(data.decode("utf-8"))
 
     @staticmethod
     def extract_match_ids(player_payload: dict) -> list:

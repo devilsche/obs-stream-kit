@@ -61,8 +61,16 @@ def _is_stale(iso_ts, max_age_hours=24):
 
 def refresh_lifetimes(conn, client, min_matches: int = 5,
                       max_per_tick: int = 3) -> dict:
+    # Self + qualified co-players (>= min_matches together) get refreshed
+    # every 24h. Self always counts; co-players only beyond threshold.
     rows = conn.execute("""
-        SELECT q.account_id, q.name, q.shared_matches,
+        SELECT p.account_id, p.name,
+               (SELECT MAX(last_refreshed) FROM player_lifetime
+                WHERE account_id = p.account_id) AS last_refreshed
+        FROM players p
+        WHERE p.is_self = 1
+        UNION
+        SELECT q.account_id, q.name,
                (SELECT MAX(last_refreshed) FROM player_lifetime
                 WHERE account_id = q.account_id) AS last_refreshed
         FROM qualified_co_players q

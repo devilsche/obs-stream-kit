@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Widgets — Demo</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    body {
+      background: linear-gradient(180deg, #1a0d2a 0%, #0a0510 100%);
+      min-height: 100vh; padding: 24px;
+      font-family: "DM Sans", system-ui, sans-serif;
+      color: var(--pubg-text);
+    }
+    h1 { color: var(--pubg-gold); margin: 0 0 6px; }
+    p.intro { color: var(--pubg-muted); margin: 0 0 24px; max-width: 720px; line-height: 1.5; }
+    .grid {
+      display: grid; gap: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      margin-bottom: 18px;
+    }
+    .tile {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--pubg-border);
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .tile h2 {
+      margin: 0; padding: 8px 14px;
+      font-size: 0.8em;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--pubg-muted);
+      background: rgba(94, 42, 121, 0.2);
+      border-bottom: 1px solid var(--pubg-border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .tile h2 .url {
+      color: var(--pubg-gold); font-size: 0.7em; opacity: 0.7;
+      text-decoration: none;
+    }
+    .tile h2 .url:hover { opacity: 1; }
+    .tile iframe {
+      border: 0; width: 100%; background: transparent;
+    }
+    .full { grid-column: 1 / -1; }
+    .urlbox {
+      padding: 14px 18px; background: rgba(0,0,0,0.3);
+      border: 1px solid var(--pubg-border);
+      border-radius: 8px; margin-bottom: 18px;
+      font-size: 0.85em;
+    }
+    .urlbox a { color: var(--pubg-gold); display: block; padding: 3px 0; text-decoration: none; }
+    .urlbox a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1>PUBG Widgets — lokale Demo</h1>
+  <p class="intro">
+    Übersicht aller PUBG-Widgets. Jedes Widget läuft als eigene Browser-Source — hier in iframes
+    kombiniert für schnelles Sichten. Die Session aggregiert alle Matches seit
+    <code>sessionStartedAt</code> (Default: Epoch, also alle DB-Matches). Reset via Button im
+    flyout-full oder <code>POST /api/pubg/session/reset</code>.
+  </p>
+
+  <div class="urlbox">
+    <strong>Standalone-URLs zum direkten Aufrufen:</strong>
+    <a href="/widgets/pubg/live-bar.html" target="_blank">/widgets/pubg/live-bar.html</a>
+    <a href="/widgets/pubg/flyout-full.html" target="_blank">/widgets/pubg/flyout-full.html</a>
+    <a href="/widgets/pubg/mates-today.html?layout=carousel" target="_blank">/widgets/pubg/mates-today.html?layout=carousel</a>
+    <a href="/widgets/pubg/mates-today.html?layout=stack" target="_blank">/widgets/pubg/mates-today.html?layout=stack</a>
+    <a href="/widgets/pubg/mates-today.html?layout=fold" target="_blank">/widgets/pubg/mates-today.html?layout=fold</a>
+    <a href="/widgets/pubg/mates-today.html?layout=mosaic" target="_blank">/widgets/pubg/mates-today.html?layout=mosaic</a>
+    <a href="/widgets/pubg/top-mates.html?minMatches=1" target="_blank">/widgets/pubg/top-mates.html?minMatches=1</a>
+    <a href="/widgets/pubg/post-match-card.html" target="_blank">/widgets/pubg/post-match-card.html</a>
+    <a href="/widgets/pubg/map-distribution.html" target="_blank">/widgets/pubg/map-distribution.html</a>
+    <a href="/widgets/pubg/first-fight.html" target="_blank">/widgets/pubg/first-fight.html</a>
+    <a href="/widgets/pubg/session-summary.html" target="_blank">/widgets/pubg/session-summary.html</a>
+    <a href="/widgets/pubg/career-card.html" target="_blank">/widgets/pubg/career-card.html</a>
+    <a href="/widgets/pubg/news-ticker.html" target="_blank">/widgets/pubg/news-ticker.html</a>
+    <a href="/widgets/pubg/squad-compare.html?players=PEX_LuCKoR&matches=5" target="_blank">/widgets/pubg/squad-compare.html?players=PEX_LuCKoR&amp;matches=5</a>
+    <a href="/widgets/pubg/chat-stats-popup.html?player=PEX_LuCKoR" target="_blank">/widgets/pubg/chat-stats-popup.html?player=PEX_LuCKoR</a>
+    <a href="/scenes/stats.html?player=PEX_LuCKoR" target="_blank">/scenes/stats.html?player=PEX_LuCKoR</a>
+    <a href="/api/pubg/status" target="_blank">/api/pubg/status (Backend-Health)</a>
+  </div>
+
+  <div class="grid">
+
+    <div class="tile full">
+      <h2>news-ticker.html <a class="url" href="/widgets/pubg/news-ticker.html" target="_blank">↗</a></h2>
+      <iframe src="/widgets/pubg/news-ticker.html" height="60"></iframe>
+    </div>
+
+    <div class="tile full">
+      <h2>live-bar.html <a class="url" href="/widgets/pubg/live-bar.html" target="_blank">↗</a></h2>
+      <iframe src="/widgets/pubg/live-bar.html" height="60"></iframe>
+    </div>
+
+    <div class="tile">
+      <h2>flyout-full.html <a class="url" href="/widgets/pubg/flyout-full.html" target="_blank">↗</a></h2>
+      <iframe src="/widgets/pubg/flyout-full.html" height="780"></iframe>
+    </div>
+
+    <div class="tile">
+      <h2>mates-today.html (carousel default) <a class="url" href="/widgets/pubg/mates-today.html" target="_blank">↗</a></h2>
+      <iframe src="/widgets/pubg/mates-today.html" height="280"></iframe>
+    </div>
+
+    <div class="tile">
+      <h2>mates-today.html?layout=stack <a class="url" href="/widgets/pubg/mates-today.html?layout=stack" target="_blank">↗</a></h2>
+      <iframe src="/widgets/pubg/mates-today.html?layout=stack" height="320"></iframe>
+    </div>
+
+    <div class="tile">
+      <h2>mates-today.html?layout=mosaic <a class="url" href="/widgets/pubg/mates-today.html?layout=mosaic" target="_blank">↗</a></h2>
+      <iframe src="/widgets/pubg/mates-today.html?layout=mosaic" height="240"></iframe>
+    </div>
+
+    <div class="tile">
+      <h2>top-mates.html?minMatches=1 <a class="url" href="/widgets/pubg/top-mates.html?minMatches=1" target="_blank">↗</a></h2>
+      <iframe src="/widgets/pubg/top-mates.html?minMatches=1" height="380"></iframe>
+    </div>
+
+    <div class="tile">
+      <h2>map-distribution.html <a class="url" href="/widgets/pubg/map-distribution.html" target="_blank">↗</a></h2>
+      <iframe src="/widgets/pubg/map-distribution.html" height="320"></iframe>
+    </div>
+
+    <div class="tile">
+      <h2>first-fight.html <a class="url" href="/widgets/pubg/first-fight.html" target="_blank">↗</a></h2>
+      <iframe src="/widgets/pubg/first-fight.html" height="220"></iframe>
+    </div>
+
+    <div class="tile">
+      <h2>career-card.html <a class="url" href="/widgets/pubg/career-card.html" target="_blank">↗</a></h2>
+      <iframe src="/widgets/pubg/career-card.html" height="280"></iframe>
+    </div>
+
+    <div class="tile">
+      <h2>post-match-card.html <a class="url" href="/widgets/pubg/post-match-card.html" target="_blank">↗</a></h2>
+      <iframe src="/widgets/pubg/post-match-card.html" height="320"></iframe>
+    </div>
+
+    <div class="tile">
+      <h2>chat-stats-popup.html?player=PEX_LuCKoR <a class="url" href="/widgets/pubg/chat-stats-popup.html?player=PEX_LuCKoR" target="_blank">↗</a></h2>
+      <iframe src="/widgets/pubg/chat-stats-popup.html?player=PEX_LuCKoR&duration=99999" height="280"></iframe>
+    </div>
+
+    <div class="tile full">
+      <h2>session-summary.html <a class="url" href="/widgets/pubg/session-summary.html" target="_blank">↗</a></h2>
+      <iframe src="/widgets/pubg/session-summary.html" height="540"></iframe>
+    </div>
+
+  </div>
+</body>
+</html>
