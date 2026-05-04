@@ -438,8 +438,7 @@
       const t = term.toLowerCase();
       const date = PubgUI.fmtDate(s.from).toLowerCase();
       return date.includes(t)
-        || (s.topMap || "").toLowerCase().includes(t)
-        || PubgUI.fmtMap(s.topMap).toLowerCase().includes(t)
+        || (s.topMate || "").toLowerCase().includes(t)
         || String(s.matches).includes(t)
         || String(s.wins).includes(t);
     }
@@ -472,9 +471,12 @@
             const cls = ["item"];
             if (isCurrent) cls.push("current");
             if (isActive) cls.push("active");
+            const mate = s.topMate
+              ? ` · 👥 ${s.topMate}${s.topMateCount > 1 ? ` (${s.topMateCount})` : ""}`
+              : "";
             return `<div class="${cls.join(' ')}" data-from="${s.from}" data-to="${s.to}">
               <span class="label">${PubgUI.fmtDate(s.from)} ${PubgUI.fmtTime(s.from)}${isCurrent ? " ▶" : ""}</span>
-              <span class="meta">${s.matches}M · ${s.wins} 🍗 · ${s.kills}K · ${PubgUI.fmtMap(s.topMap)}</span>
+              <span class="meta">${s.matches}M · ${s.wins} 🍗 · ${s.kills}K${mate}</span>
             </div>`;
           }).join("")}
         </div>

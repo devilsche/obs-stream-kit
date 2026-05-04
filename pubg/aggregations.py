@@ -479,26 +479,35 @@ def compute_sessions_index(conn, my_account_id, gap_hours=4):
     for ms in sessions:
         n = len(ms)
         wins = sum(1 for x in ms if (x["place"] or 99) == 1)
-        # Match-Start des ersten Matches = played_at - duration
         first_end = _parse_iso(ms[0]["played_at"])
         first_start = first_end - datetime.timedelta(
             seconds=ms[0]["duration_secs"] or 0)
         last_end = ms[-1]["played_at"]
+        from_iso = first_start.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        # Top-Map der Session
-        map_count = {}
-        for x in ms:
-            map_count[x["map_name"]] = map_count.get(x["map_name"], 0) + 1
-        top_map = max(map_count.items(), key=lambda x: x[1])[0] if map_count else None
+        # Top-Mate der Session (häufigster Squad-Member, nicht self)
+        match_ids = [x["match_id"] for x in ms]
+        if match_ids:
+            placeholders = ",".join("?" * len(match_ids))
+            mate_rows = conn.execute(f"""
+                SELECT name, COUNT(*) AS c FROM participants
+                WHERE match_id IN ({placeholders}) AND account_id != ?
+                GROUP BY name ORDER BY c DESC LIMIT 1
+            """, list(match_ids) + [my_account_id]).fetchall()
+            top_mate = mate_rows[0]["name"] if mate_rows else None
+            top_mate_count = mate_rows[0]["c"] if mate_rows else 0
+        else:
+            top_mate, top_mate_count = None, 0
 
         out.append({
-            "from": first_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "from": from_iso,
             "to": last_end,
             "matches": n,
             "wins": wins,
             "kills": sum(x["kills"] or 0 for x in ms),
             "damage": sum(x["damage_dealt"] or 0 for x in ms),
-            "topMap": top_map,
+            "topMate": top_mate,
+            "topMateCount": top_mate_count,
         })
     # Sortiert: jüngste Session zuerst
     return list(reversed(out))
