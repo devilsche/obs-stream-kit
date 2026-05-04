@@ -72,7 +72,7 @@
       try {
         const md = await PubgUI.fetchJson("/api/pubg/map-distribution?range=session");
         if (md[0]) {
-          out.push(`<span class="label">MAP HEUTE</span> ${PubgUI.fmtMap(md[0].map)} (${md[0].count} Spiele)`);
+          out.push(`<span class="label">SESSION TOP MAP</span> ${PubgUI.fmtMap(md[0].map)} (${md[0].count} Spiele)`);
         }
       } catch (_) {}
       try {
