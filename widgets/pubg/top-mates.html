@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="_pubg.css">
   <style>
     body { padding: 16px; }
-    .panel { width: 320px; padding: 16px; }
+    .panel { width: 360px; padding: 16px; }
     .panel h3 {
       margin: 0 0 12px;
       font-size: 0.9em;
@@ -16,17 +16,38 @@
       text-transform: uppercase;
     }
     .row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 0;
+      padding: 9px 0;
       border-bottom: 1px solid rgba(255,255,255,0.05);
     }
     .row:last-child { border-bottom: 0; }
-    .row .rank { color: var(--pubg-gold); width: 22px; font-weight: 700; }
-    .row .name { flex: 1; padding-left: 6px; }
-    .row .stat { color: var(--pubg-muted); font-size: 0.85em; }
-    .row .stat b { color: var(--pubg-text); }
+    .row-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .row .rank { color: var(--pubg-gold); width: 20px; font-weight: 700; flex-shrink: 0; }
+    .row .name { flex: 1; font-weight: 700; }
+    .row .primary {
+      color: var(--pubg-gold);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      font-size: 0.95em;
+    }
+    .row-sub {
+      margin-top: 3px;
+      padding-left: 30px;
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      letter-spacing: 0.02em;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .row-sub b {
+      color: var(--pubg-text);
+      font-variant-numeric: tabular-nums;
+    }
   </style>
 </head>
 <body>
@@ -53,24 +74,39 @@
       "Top Mates · " + (SORT_LABEL[SORT_BY] || SORT_BY) +
       ' <span style="opacity:0.5;font-weight:400;letter-spacing:0;text-transform:none">(alle Matches in DB)</span>';
 
-    function valueFor(m) {
-      if (SORT_BY === "avgPlace") return "Avg #" + (m.avgPlace || 0).toFixed(1);
-      if (SORT_BY === "kd") return "K/D " + (m.kd || 0).toFixed(2);
-      if (SORT_BY === "mateKd") return "K/D " + (m.mateKd || 0).toFixed(2);
-      if (SORT_BY === "winRate") return (m.winRate || 0).toFixed(1) + "%";
-      if (SORT_BY === "mostPlayed") return m.sharedMatches + " Games";
-      if (SORT_BY === "chickensTogether") return (m.winsTogether || 0) + " 🍗 · " + m.sharedMatches + "g";
-      if (SORT_BY === "synergy") return "Score " + (m.synergyScore || 0).toFixed(2) + " · " + m.sharedMatches + "g";
+    function primaryValue(m) {
+      if (SORT_BY === "avgPlace")         return "Avg #" + (m.avgPlace || 0).toFixed(1);
+      if (SORT_BY === "kd")               return "K/D " + (m.kd || 0).toFixed(2);
+      if (SORT_BY === "mateKd")           return "K/D " + (m.mateKd || 0).toFixed(2);
+      if (SORT_BY === "winRate")          return (m.winRate || 0).toFixed(1) + "%";
+      if (SORT_BY === "mostPlayed")       return m.sharedMatches + "g";
+      if (SORT_BY === "chickensTogether") return (m.winsTogether || 0) + " 🍗";
+      if (SORT_BY === "synergy")          return "Score " + (m.synergyScore || 0).toFixed(2);
       return "";
+    }
+
+    function detailLine(m) {
+      const parts = [
+        `<span><b>${m.sharedMatches}</b> Matches</span>`,
+        `<span>K/D du <b>${(m.kd || 0).toFixed(2)}</b> / Mate <b>${(m.mateKd || 0).toFixed(2)}</b></span>`,
+      ];
+      if (m.winsTogether) parts.push(`<span><b>${m.winsTogether}</b> 🍗</span>`);
+      if (SORT_BY !== "winRate" && (m.winRate || 0) > 0) {
+        parts.push(`<span>Win <b>${(m.winRate||0).toFixed(0)}%</b></span>`);
+      }
+      return parts.join("");
     }
 
     function render(list) {
       const rows = document.getElementById("rows");
       rows.innerHTML = list.map((m, i) => `
         <div class="row">
-          <span class="rank">${i+1}</span>
-          <span class="name">${m.name}</span>
-          <span class="stat"><b>${valueFor(m)}</b></span>
+          <div class="row-top">
+            <span class="rank">${i+1}</span>
+            <span class="name">${m.name}</span>
+            <span class="primary">${primaryValue(m)}</span>
+          </div>
+          <div class="row-sub">${detailLine(m)}</div>
         </div>`).join("") || `<div class="pubg-error">noch keine Daten</div>`;
     }
 
