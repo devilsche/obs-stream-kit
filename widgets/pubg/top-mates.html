@@ -86,13 +86,30 @@
     }
 
     function detailLine(m) {
-      const parts = [
-        `<span><b>${m.sharedMatches}</b> Matches</span>`,
-        `<span>K/D du <b>${(m.kd || 0).toFixed(2)}</b> / Mate <b>${(m.mateKd || 0).toFixed(2)}</b></span>`,
-      ];
-      if (m.winsTogether) parts.push(`<span><b>${m.winsTogether}</b> 🍗</span>`);
+      const parts = [];
+      // Matches — weglassen wenn schon primary
+      if (SORT_BY !== "mostPlayed") {
+        parts.push(`<span><b>${m.sharedMatches}</b> Matches</span>`);
+      }
+      // K/D — primary einzeln markieren
+      if (SORT_BY === "kd") {
+        parts.push(`<span>Mate K/D <b>${(m.mateKd || 0).toFixed(2)}</b></span>`);
+      } else if (SORT_BY === "mateKd") {
+        parts.push(`<span>du K/D <b>${(m.kd || 0).toFixed(2)}</b></span>`);
+      } else {
+        parts.push(`<span>K/D du <b>${(m.kd || 0).toFixed(2)}</b> / Mate <b>${(m.mateKd || 0).toFixed(2)}</b></span>`);
+      }
+      // 🍗 — weglassen wenn schon primary
+      if (m.winsTogether && SORT_BY !== "chickensTogether") {
+        parts.push(`<span><b>${m.winsTogether}</b> 🍗</span>`);
+      }
+      // Win-Rate — weglassen wenn schon primary
       if (SORT_BY !== "winRate" && (m.winRate || 0) > 0) {
         parts.push(`<span>Win <b>${(m.winRate||0).toFixed(0)}%</b></span>`);
+      }
+      // Avg Place — weglassen wenn schon primary
+      if (SORT_BY !== "avgPlace" && (m.avgPlace || 0) > 0) {
+        parts.push(`<span>Avg <b>#${(m.avgPlace||0).toFixed(1)}</b></span>`);
       }
       return parts.join("");
     }
