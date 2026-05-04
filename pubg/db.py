@@ -1,3 +1,4 @@
+import datetime as _dt
 import sqlite3
 
 SCHEMA = """
@@ -124,3 +125,41 @@ def connect(path: str) -> sqlite3.Connection:
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
     conn.commit()
+
+
+# ── DAO ─────────────────────────────────────────────────────────────────────
+
+
+def _now_iso() -> str:
+    return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def upsert_player(conn, account_id: str, name: str, platform: str,
+                  is_self: bool = False) -> None:
+    conn.execute("""
+        INSERT INTO players(account_id, name, platform, is_self, first_seen_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(account_id) DO UPDATE SET
+            name = excluded.name,
+            platform = excluded.platform,
+            is_self = excluded.is_self
+    """, (account_id, name, platform, 1 if is_self else 0, _now_iso()))
+    conn.commit()
+
+
+def get_player_by_name(conn, name: str):
+    return conn.execute(
+        "SELECT * FROM players WHERE name = ?", (name,)
+    ).fetchone()
+
+
+def get_player_by_id(conn, account_id: str):
+    return conn.execute(
+        "SELECT * FROM players WHERE account_id = ?", (account_id,)
+    ).fetchone()
+
+
+def get_self_player(conn):
+    return conn.execute(
+        "SELECT * FROM players WHERE is_self = 1 LIMIT 1"
+    ).fetchone()
