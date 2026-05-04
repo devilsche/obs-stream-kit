@@ -50,11 +50,23 @@
       } catch (_) {}
       try {
         // Folgt dem globalen Setting (topMatesSortBy / minMatchesForTopMates).
-        // Default backend = mostPlayed → der häufigste Squad-Buddy.
+        // Label spiegelt den aktiven Sort-Modus wider.
+        const settings = await PubgUI.fetchJson("/api/pubg/settings").catch(() => ({}));
+        const sortBy = settings.topMatesSortBy || "mostPlayed";
         const tm = await PubgUI.fetchJson("/api/pubg/top-mates?limit=1");
         if (tm[0]) {
           const m = tm[0];
-          out.push(`<span class="label">TOP MATE</span> ${m.name} · ${m.sharedMatches} Games · ${m.winsTogether||0} 🍗 · K/D Meine ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
+          const LABELS = {
+            mostPlayed:       "MOST PLAYED",
+            synergy:          "BEST SYNERGY",
+            chickensTogether: "MOST 🍗 TOGETHER",
+            kd:               "BEST K/D (MEINE)",
+            mateKd:           "BEST K/D (MATE)",
+            winRate:          "BEST WIN-RATE",
+            avgPlace:         "BEST AVG PLACE",
+          };
+          const label = LABELS[sortBy] || "TOP MATE";
+          out.push(`<span class="label">${label}</span> ${m.name} · ${m.sharedMatches} Matches · ${m.winsTogether||0} 🍗 · K/D Meine ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
         }
       } catch (_) {}
       try {
