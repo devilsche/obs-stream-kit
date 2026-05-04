@@ -169,8 +169,17 @@ SORT_KEYS = {
 def compute_top_mates(conn, my_account_id: str,
                       sort_by: str = "avgPlace",
                       limit: int = 5,
-                      min_matches: int = 10) -> list:
+                      min_matches: int = 10,
+                      range_key: str = None) -> list:
+    """range_key: None=alle DB-Matches; 'session'/'day'/'week' filtert."""
     order = SORT_KEYS.get(sort_by, SORT_KEYS["avgPlace"])
+    if range_key:
+        cutoff = _range_filter(conn, range_key)
+        params = (my_account_id, cutoff, my_account_id, min_matches, limit)
+        match_filter = "JOIN matches m ON m.match_id = mate.match_id AND m.played_at >= ?"
+    else:
+        params = (my_account_id, my_account_id, min_matches, limit)
+        match_filter = ""
     rows = conn.execute(f"""
         WITH co AS (
             SELECT mate.account_id, mate.name, mate.match_id, mate.place,
@@ -178,6 +187,7 @@ def compute_top_mates(conn, my_account_id: str,
                    mate.kills AS mate_kills, mate.damage_dealt AS mate_dmg
             FROM participants mate
             JOIN participants me ON me.match_id = mate.match_id AND me.account_id = ?
+            {match_filter}
             WHERE mate.account_id != ?
         )
         SELECT account_id, name,
@@ -194,7 +204,7 @@ def compute_top_mates(conn, my_account_id: str,
         HAVING shared >= ?
         ORDER BY {order}
         LIMIT ?
-    """, (my_account_id, my_account_id, min_matches, limit)).fetchall()
+    """, params).fetchall()
 
     out = []
     for r in rows:

@@ -98,15 +98,15 @@ class EndpointRegistry:
         sort_by = qs.get("sortBy", default_sort)
         limit = int(qs.get("limit", 5))
         min_matches = int(qs.get("minMatches", default_min))
+        range_key = qs.get("range")  # None = alle DB
 
-        # Cache: nur die Roh-Aggregation (alle Mates, alle Stats), ohne Sort/Filter.
-        # Damit liefern alle min_matches/sortBy-Varianten konsistente Zahlen
-        # innerhalb desselben TTL-Fensters.
+        cache_key = f"top-mates:raw:{range_key or 'all'}"
         all_mates = self.cache.get_or_compute(
-            "top-mates:raw",
+            cache_key,
             lambda: compute_top_mates(conn, self.my_account_id,
                                        sort_by="mostPlayed",
-                                       limit=10000, min_matches=1))
+                                       limit=10000, min_matches=1,
+                                       range_key=range_key))
         filtered = [m for m in all_mates if m["sharedMatches"] >= min_matches]
         sort_fns = {
             "avgPlace":          lambda m: m["avgPlace"] or 99,
