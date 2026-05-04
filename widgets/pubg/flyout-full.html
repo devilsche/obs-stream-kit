@@ -178,7 +178,7 @@
       const bits = [];
       // Match-Anzahl als Kontext überall, außer bei mostPlayed (da primary)
       if (currentSort !== "mostPlayed") bits.push(`${m.sharedMatches} Matches`);
-      if (m.winsTogether && currentSort !== "chickensTogether") bits.push(`${m.winsTogether}🍗`);
+      if (m.winsTogether && currentSort !== "chickensTogether") bits.push(`${m.winsTogether} 🍗`);
       if (currentSort !== "kd" && currentSort !== "mateKd") {
         bits.push(`du ${(m.kd || 0).toFixed(2)} / Mate ${(m.mateKd || 0).toFixed(2)}`);
       }
