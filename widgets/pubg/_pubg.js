@@ -254,8 +254,13 @@
 
       input.addEventListener("change", (e) => {
         const v = e.target.value;
-        const isDefault = spec.default != null && String(v) === String(spec.default);
-        PubgUI.setUrlParam(spec.key, isDefault ? null : v);
+        // Range: immer expliziten Wert setzen — Default-Löschen würde
+        // Backend-Setting greifen lassen statt Slider-Wert (Bug-Quelle).
+        // Select/Text: bei Default-Wert URL sauber halten.
+        const keepInUrl = spec.type === "range"
+          || spec.default == null
+          || String(v) !== String(spec.default);
+        PubgUI.setUrlParam(spec.key, keepInUrl ? v : null);
         location.reload();
       });
 
