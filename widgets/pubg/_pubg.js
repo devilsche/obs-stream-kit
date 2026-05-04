@@ -235,14 +235,20 @@
 
     document.body.insertBefore(bar, document.body.firstChild);
 
-    // Body-padding-top exakt auf Filter-Bar-Höhe (+ Puffer) setzen,
-    // damit Content darunter nicht verdeckt ist — auch bei Zeilenumbruch.
+    // Body-padding-top exakt auf Filter-Bar-Höhe + Puffer setzen.
+    // !important damit Widget-CSS (`body { padding: 16px }`) nicht überstimmt.
     const adjustPadding = () => {
       const h = bar.getBoundingClientRect().height;
-      document.body.style.paddingTop = (h + 12) + "px";
+      document.body.style.setProperty("padding-top",
+        (h + 18) + "px", "important");
     };
     requestAnimationFrame(adjustPadding);
+    requestAnimationFrame(() => requestAnimationFrame(adjustPadding));
     window.addEventListener("resize", adjustPadding);
+    // Fonts laden async → Re-Adjust nach Font-Load
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(adjustPadding);
+    }
   };
 
   global.PubgUI = PubgUI;
