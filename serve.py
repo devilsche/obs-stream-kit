@@ -16,9 +16,19 @@ import datetime
 import urllib.parse
 import json
 
+ROOT = os.path.dirname(os.path.abspath(__file__))
+
+# ── PUBG-CLI-Modes (vor Server-Start abfangen) ────────────────────────────────
+if len(sys.argv) > 1 and sys.argv[1] == "--init-pubg-db":
+    from pubg.cli import init_db
+    init_db(ROOT)
+    sys.exit(0)
+if len(sys.argv) > 1 and sys.argv[1] == "--pubg-cold-start":
+    from pubg.cli import cold_start
+    sys.exit(cold_start(ROOT))
+
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
 HOST = "0.0.0.0"
-ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # ── ANSI-Farben ────────────────────────────────────────────────────────────────
 R     = '\033[0m'
@@ -45,6 +55,72 @@ if os.path.exists(secrets_path):
                 secrets["client_id"] = line.split(":", 1)[1].strip()
             elif line.startswith("Client-Secret:"):
                 secrets["client_secret"] = line.split(":", 1)[1].strip()
+
+# ── PUBG-Backend-Bootstrap ─────────────────────────────────────────────────────
+PUBG_ENABLED = False
+pubg_registry = None
+pubg_poller = None
+try:
+    from pubg.config import load_config, load_api_key
+    from pubg.db import connect as _pubg_connect, init_schema as _pubg_init_schema
+    from pubg.api_client import PubgClient
+    from pubg.cache import TTLCache
+    from pubg.poller import PollerThread
+    from pubg.endpoints import EndpointRegistry
+    from pubg.db import get_player_by_name, upsert_player
+
+    pubg_cfg = load_config(os.path.join(ROOT, "config", "pubg.json"))
+    pubg_key = load_api_key(secrets_path)
+    if pubg_key:
+        os.makedirs(os.path.join(ROOT, "data"), exist_ok=True)
+        pubg_db_path = os.path.join(ROOT, "data", "pubg-history.db")
+        _conn = _pubg_connect(pubg_db_path)
+        _pubg_init_schema(_conn)
+        _self = get_player_by_name(_conn, pubg_cfg["playerName"])
+        my_account_id = _self["account_id"] if _self else None
+        _conn.close()
+
+        pubg_client = PubgClient(api_key=pubg_key, platform=pubg_cfg["platform"])
+
+        if my_account_id is None:
+            try:
+                resp = pubg_client.get_player(pubg_cfg["playerName"])
+                if resp.get("data"):
+                    my_account_id = resp["data"][0]["id"]
+                    _conn = _pubg_connect(pubg_db_path)
+                    upsert_player(_conn, my_account_id, pubg_cfg["playerName"],
+                                  pubg_cfg["platform"], is_self=True)
+                    _conn.close()
+            except Exception as e:
+                print(f"  PUBG-Setup: konnte Account-ID nicht laden: {e}")
+
+        if my_account_id:
+            pubg_cache = TTLCache(ttl_secs=30)
+            pubg_poller = PollerThread(
+                db_path=pubg_db_path, client=pubg_client,
+                my_player_name=pubg_cfg["playerName"],
+                my_account_id=my_account_id,
+                interval_secs=pubg_cfg["pollIntervalSec"],
+                lifetime_min_matches=pubg_cfg["minMatchesForLifetime"],
+            )
+            pubg_poller.start()
+            pubg_registry = EndpointRegistry(
+                get_conn=lambda: _pubg_connect(pubg_db_path),
+                my_account_id=my_account_id,
+                platform=pubg_cfg["platform"],
+                cache=pubg_cache,
+                client=pubg_client,
+                poller_status=pubg_poller.status,
+            )
+            PUBG_ENABLED = True
+            print("  PUBG-Backend aktiv  ✓")
+        else:
+            print("  PUBG-Backend: Account-ID unbekannt, Polling nicht gestartet")
+    else:
+        print("  PUBG-Backend: kein PUBG-API-Key in .secrets — Backend deaktiviert")
+except Exception as e:
+    print(f"  PUBG-Backend Init-Fehler: {e}")
+
 
 # ── Frontend-Error-Logger (immer injiziert) ────────────────────────────────────
 DEV_LOG_JS = """<script>
@@ -127,7 +203,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     # ── CORS-Header ────────────────────────────────────────────────────
     def end_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS, POST")
+        self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS, POST, DELETE")
         self.send_header("Access-Control-Allow-Headers", "*")
         path_lower = (self.path or "").split("?")[0].lower()
         if path_lower.endswith((".html", ".js", ".css", ".json")):
@@ -174,6 +250,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     # ── HTML-Injection ─────────────────────────────────────────────────
     def do_GET(self):
+        if PUBG_ENABLED and self.path.startswith("/api/pubg/"):
+            try:
+                body, code, ctype = pubg_registry.dispatch(
+                    "GET", self.path, b"", dict(self.headers))
+                self.send_response(code)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            except Exception as e:
+                self.send_error(500, str(e))
+                return
         try:
             path = self.translate_path(self.path.split("?")[0])
             if path.endswith(".html") and os.path.isfile(path):
@@ -194,6 +283,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     # ── Frontend-Error-Endpunkt ────────────────────────────────────────
     def do_POST(self):
+        if PUBG_ENABLED and self.path.startswith("/api/pubg/"):
+            try:
+                length = int(self.headers.get('Content-Length', 0))
+                body_in = self.rfile.read(length) if length else b""
+                body, code, ctype = pubg_registry.dispatch(
+                    "POST", self.path, body_in, dict(self.headers))
+                self.send_response(code)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            except Exception as e:
+                self.send_error(500, str(e))
+                return
         if self.path != '/dev-log':
             self.send_response(404)
             self.end_headers()
@@ -227,6 +331,24 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self.send_response(400)
             self.end_headers()
+
+    def do_DELETE(self):
+        if PUBG_ENABLED and self.path.startswith("/api/pubg/"):
+            try:
+                length = int(self.headers.get('Content-Length', 0))
+                body_in = self.rfile.read(length) if length else b""
+                body, code, ctype = pubg_registry.dispatch(
+                    "DELETE", self.path, body_in, dict(self.headers))
+                self.send_response(code)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            except Exception as e:
+                self.send_error(500, str(e))
+                return
+        self.send_error(405)
 
     # ── Request-Logging ────────────────────────────────────────────────
     def log_message(self, format, *args):
