@@ -47,7 +47,7 @@
   </style>
 </head>
 <body>
-  <div class="header">Heute gespielt mit</div>
+  <div class="header" id="header">Aktuelle Session — gespielt mit</div>
   <div id="root" class="pubg-card stack"></div>
 
   <script src="_pubg.js"></script>
@@ -55,6 +55,13 @@
     const LAYOUT = PubgUI.qs("layout", "carousel");
     const RANGE = PubgUI.qs("range", "session");
     const MIN = parseInt(PubgUI.qs("minMatches", 1), 10);
+
+    const HEADERS = {
+      session: "Aktuelle Session — gespielt mit",
+      day:     "Heute — gespielt mit",
+      week:    "Letzte 7 Tage — gespielt mit",
+    };
+    document.getElementById("header").textContent = HEADERS[RANGE] || HEADERS.session;
     document.getElementById("root").className = "pubg-card " + LAYOUT;
 
     function mateBody(m) {

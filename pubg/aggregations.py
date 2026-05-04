@@ -190,7 +190,8 @@ def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
 
     shared = conn.execute("""
         SELECT m.match_id, m.map_name, m.played_at, mate.place,
-               mate.kills, mate.damage_dealt
+               mate.kills AS mate_kills, mate.damage_dealt AS mate_damage,
+               me.kills   AS my_kills,   me.damage_dealt   AS my_damage
         FROM matches m
         JOIN participants mate ON mate.match_id = m.match_id
         JOIN participants me ON me.match_id = m.match_id AND me.account_id = ?
@@ -203,8 +204,10 @@ def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
     else:
         n = len(shared)
         wins = sum(1 for r in shared if (r["place"] or 99) == 1)
-        kills = sum(r["kills"] or 0 for r in shared)
-        avg_dmg = sum(r["damage_dealt"] or 0.0 for r in shared) / n
+        my_kills = sum(r["my_kills"] or 0 for r in shared)
+        mate_kills = sum(r["mate_kills"] or 0 for r in shared)
+        my_avg_dmg = sum(r["my_damage"] or 0.0 for r in shared) / n
+        mate_avg_dmg = sum(r["mate_damage"] or 0.0 for r in shared) / n
         avg_place = sum(r["place"] for r in shared if r["place"]) / n
         deaths = max(n - wins, 1)
         map_dist = {}
@@ -212,8 +215,10 @@ def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
             map_dist[r["map_name"]] = map_dist.get(r["map_name"], 0) + 1
         history = {
             "matches": n,
-            "kd": kills / deaths,
-            "avgDmg": avg_dmg,
+            "kd": my_kills / deaths,           # MEINE K/D in shared matches
+            "mateKd": mate_kills / deaths,     # MATE-K/D in shared matches
+            "avgDmg": my_avg_dmg,              # MEINER avg dmg
+            "mateAvgDmg": mate_avg_dmg,        # MATE avg dmg
             "avgPlace": avg_place,
             "winRate": (wins / n) * 100,
             "wins": wins,
@@ -223,7 +228,10 @@ def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
             "last5Matches": [{
                 "matchId": r["match_id"], "map": r["map_name"],
                 "playedAt": r["played_at"], "place": r["place"],
-                "kills": r["kills"], "damage": r["damage_dealt"],
+                "kills": r["mate_kills"],     # Mate kills im Match
+                "damage": r["mate_damage"],
+                "myKills": r["my_kills"],
+                "myDamage": r["my_damage"],
             } for r in shared[:5]],
         }
 

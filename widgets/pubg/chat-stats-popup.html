@@ -137,31 +137,13 @@
             sh.avgPlace ? "#" + sh.avgPlace.toFixed(1) : "—";
           document.getElementById("chickens").innerHTML = chickenIcons(sh.wins || 0);
 
-          // Eigene K/D = sh.kd (kommt aus compute_co_player über meine kills/non-wins)
           document.getElementById("kd-my").textContent = PubgUI.fmtKD(sh.kd);
-          // Mate-K/D wird aus Top-Mates-Endpoint geholt (compute_co_player liefert die nicht)
-          document.getElementById("kd-mate").textContent = "…";
+          document.getElementById("kd-mate").textContent = PubgUI.fmtKD(sh.mateKd);
 
           const cl = d.careerLifetime;
           document.getElementById("career").textContent = cl
             ? `Career: ${PubgUI.fmtNum(cl.rounds_played)} Games · K/D ${PubgUI.fmtKD(cl.kd_ratio)} · ${cl.wins} Wins · ${PubgUI.fmtPct(cl.headshot_rate)} HS`
             : (sh.matches ? "Career: noch nicht geladen (<5 gemeinsame Matches?)" : "Noch nie zusammen gespielt");
-
-          // Mate-K/D einzeln nachladen, damit auch der Wert da ist
-          if (sh.matches) {
-            PubgUI.fetchJson(`/api/pubg/top-mates?sortBy=mostPlayed&limit=200&minMatches=1`)
-              .then(list => {
-                const found = list.find(m => m.accountId === d.accountId);
-                if (found && found.mateKd != null) {
-                  document.getElementById("kd-mate").textContent = PubgUI.fmtKD(found.mateKd);
-                } else {
-                  document.getElementById("kd-mate").textContent = "—";
-                }
-              })
-              .catch(() => { document.getElementById("kd-mate").textContent = "—"; });
-          } else {
-            document.getElementById("kd-mate").textContent = "—";
-          }
 
           reveal();
         })
