@@ -67,6 +67,18 @@
     return u.searchParams.get(key) ?? fallback;
   };
 
+  // Globaler Scale-Faktor via ?scale=0.8 — skaliert das ganze Widget.
+  // CSS-zoom funktioniert in OBS Browser-Sources (Chromium-basiert).
+  PubgUI._applyScale = () => {
+    const s = parseFloat(PubgUI.qs("scale", ""));
+    if (!isNaN(s) && s > 0 && s !== 1) {
+      const apply = () => { document.body.style.zoom = String(s); };
+      if (document.body) apply();
+      else document.addEventListener("DOMContentLoaded", apply);
+    }
+  };
+  PubgUI._applyScale();
+
   PubgUI.animateNumber = function (el, targetValue, opts) {
     const o = opts || {};
     const duration = o.durationMs || 900;
