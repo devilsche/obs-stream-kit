@@ -24,10 +24,16 @@
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      gap: 10px;
+      gap: 6px;
     }
-    .row .rank { color: var(--pubg-gold); width: 20px; font-weight: 700; flex-shrink: 0; }
-    .row .name { flex: 1; font-weight: 700; }
+    .row .rank {
+      color: var(--pubg-gold);
+      width: 18px;
+      font-weight: 700;
+      flex-shrink: 0;
+      text-align: right;
+    }
+    .row .name { flex: 1; font-weight: 700; padding-left: 4px; }
     .row .primary {
       color: var(--pubg-gold);
       font-weight: 700;
@@ -36,7 +42,7 @@
     }
     .row-sub {
       margin-top: 3px;
-      padding-left: 30px;
+      padding-left: 28px;
       color: var(--pubg-muted);
       font-size: 0.78em;
       letter-spacing: 0.02em;
@@ -64,7 +70,7 @@
     const SORT_LABEL = {
       synergy: "Synergy",
       avgPlace: "Avg Place",
-      kd: "Best K/D (du)",
+      kd: "Best K/D (Meine)",
       mateKd: "Best K/D (Mate)",
       winRate: "Win-Rate",
       mostPlayed: "Most Played",
@@ -95,9 +101,9 @@
       if (SORT_BY === "kd") {
         parts.push(`<span>Mate K/D <b>${(m.mateKd || 0).toFixed(2)}</b></span>`);
       } else if (SORT_BY === "mateKd") {
-        parts.push(`<span>du K/D <b>${(m.kd || 0).toFixed(2)}</b></span>`);
+        parts.push(`<span>Meine K/D <b>${(m.kd || 0).toFixed(2)}</b></span>`);
       } else {
-        parts.push(`<span>K/D du <b>${(m.kd || 0).toFixed(2)}</b> / Mate <b>${(m.mateKd || 0).toFixed(2)}</b></span>`);
+        parts.push(`<span>K/D Meine <b>${(m.kd || 0).toFixed(2)}</b> / Mate <b>${(m.mateKd || 0).toFixed(2)}</b></span>`);
       }
       // 🍗 — weglassen wenn schon primary
       if (m.winsTogether && SORT_BY !== "chickensTogether") {

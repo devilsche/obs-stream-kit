@@ -54,7 +54,7 @@
         const tm = await PubgUI.fetchJson("/api/pubg/top-mates?limit=1");
         if (tm[0]) {
           const m = tm[0];
-          out.push(`<span class="label">TOP MATE</span> ${m.name} · ${m.sharedMatches} Games · ${m.winsTogether||0} 🍗 · K/D du ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
+          out.push(`<span class="label">TOP MATE</span> ${m.name} · ${m.sharedMatches} Games · ${m.winsTogether||0} 🍗 · K/D Meine ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
         }
       } catch (_) {}
       try {

@@ -99,7 +99,7 @@
           <option value="synergy">Synergy (Composite KDA)</option>
           <option value="mostPlayed">Most Played</option>
           <option value="chickensTogether">Most 🍗 Together</option>
-          <option value="kd">Best K/D (du)</option>
+          <option value="kd">Best K/D (Meine)</option>
           <option value="mateKd">Best K/D (Mate)</option>
           <option value="winRate">Win-Rate</option>
           <option value="avgPlace">Avg Place</option>
@@ -180,7 +180,7 @@
       if (currentSort !== "mostPlayed") bits.push(`${m.sharedMatches} Matches`);
       if (m.winsTogether && currentSort !== "chickensTogether") bits.push(`${m.winsTogether} 🍗`);
       if (currentSort !== "kd" && currentSort !== "mateKd") {
-        bits.push(`du ${(m.kd || 0).toFixed(2)} / Mate ${(m.mateKd || 0).toFixed(2)}`);
+        bits.push(`Meine ${(m.kd || 0).toFixed(2)} / Mate ${(m.mateKd || 0).toFixed(2)}`);
       }
       if (currentSort !== "winRate" && (m.winRate || 0) > 0) {
         bits.push(`Win ${(m.winRate||0).toFixed(0)}%`);
