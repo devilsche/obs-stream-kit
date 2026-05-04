@@ -671,6 +671,35 @@
           </div>`;
       }).join("");
 
+      // Map-Performance
+      const mp = d.totals.mapsPerf || [];
+      const mapsHtml = mp.length ? `
+        <h3 style="margin-top:24px;color:var(--pubg-muted);font-size:0.8em;text-transform:uppercase;letter-spacing:0.1em">Map-Performance</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:0.85em;font-variant-numeric:tabular-nums;margin-top:8px">
+          <thead><tr style="color:var(--pubg-muted);font-size:0.85em">
+            <th style="text-align:left;padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.1)">Map</th>
+            <th style="text-align:right;padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.1)">Matches</th>
+            <th style="text-align:right;padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.1)">Wins</th>
+            <th style="text-align:right;padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.1)">K/D</th>
+            <th style="text-align:right;padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.1)">Ø Kills</th>
+            <th style="text-align:right;padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.1)">Ø DMG</th>
+            <th style="text-align:right;padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.1)">Ø Place</th>
+            <th style="text-align:right;padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.1)">Ø Surv</th>
+          </tr></thead>
+          <tbody>
+            ${mp.map(m => `<tr ${m.wins?'style="color:var(--pubg-gold)"':''}>
+              <td style="padding:4px 8px">${PubgUI.fmtMap(m.map)}</td>
+              <td style="text-align:right;padding:4px 8px">${m.matches}</td>
+              <td style="text-align:right;padding:4px 8px">${m.wins ? '🍗 ' + m.wins : '—'}</td>
+              <td style="text-align:right;padding:4px 8px">${m.kd.toFixed(2)}</td>
+              <td style="text-align:right;padding:4px 8px">${m.avgKills.toFixed(1)}</td>
+              <td style="text-align:right;padding:4px 8px">${Math.round(m.avgDamage)}</td>
+              <td style="text-align:right;padding:4px 8px">#${m.avgPlace.toFixed(1)}</td>
+              <td style="text-align:right;padding:4px 8px">${fmtDuration(Math.round(m.avgSurvivedSec))}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>` : "";
+
       const hl = d.highlights || [];
       const ll = d.lowlights || [];
       const highlightsHtml = (hl.length || ll.length) ? `
@@ -697,6 +726,7 @@
         <div class="subtitle">${subtitle}</div>
         ${totalsHtml}
         ${phasesHtml}
+        ${mapsHtml}
         ${highlightsHtml}
       `;
     }

@@ -670,6 +670,39 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
         "uniqueMaps": len({x["map_name"] for x in enriched}),
     }
 
+    # Map-Performance: pro Map → Matches, Wins, K/D, Avg DMG, Avg Place
+    map_stats = {}
+    for x in enriched:
+        mn = x["map_name"]
+        if mn not in map_stats:
+            map_stats[mn] = {"map": mn, "matches": 0, "wins": 0,
+                              "kills": 0, "damage": 0.0,
+                              "totalPlace": 0, "totalSurv": 0}
+        ms_ = map_stats[mn]
+        ms_["matches"] += 1
+        if (x["place"] or 99) == 1:
+            ms_["wins"] += 1
+        ms_["kills"] += x["kills"] or 0
+        ms_["damage"] += x["damage_dealt"] or 0
+        ms_["totalPlace"] += x["place"] or 0
+        ms_["totalSurv"] += x["time_survived"] or 0
+    maps_perf = []
+    for ms_ in map_stats.values():
+        nm = ms_["matches"]
+        maps_perf.append({
+            "map": ms_["map"],
+            "matches": nm,
+            "wins": ms_["wins"],
+            "kills": ms_["kills"],
+            "damage": ms_["damage"],
+            "avgKills": ms_["kills"] / nm if nm else 0,
+            "avgDamage": ms_["damage"] / nm if nm else 0,
+            "avgPlace": ms_["totalPlace"] / nm if nm else 0,
+            "avgSurvivedSec": ms_["totalSurv"] / nm if nm else 0,
+            "kd": ms_["kills"] / max(nm - ms_["wins"], 1),
+        })
+    maps_perf.sort(key=lambda m: -m["matches"])
+
     # Highlights — beste Matches nach DMG
     highlights = sorted(enriched, key=lambda x: -(x["damage_dealt"] or 0))[:3]
     # Lowlights — frühe Deaths (kurze time_survived)
@@ -727,6 +760,7 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
         } for ph in phases],
         "highlights": [_to_payload(m) for m in highlights],
         "lowlights": [_to_payload(m) for m in lowlights],
+        "mapsPerf": maps_perf,
     }
 
 
