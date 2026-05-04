@@ -66,6 +66,7 @@
       <div class="label">
         <div class="header">First Fight Wins</div>
         <div class="sub" id="sub">—</div>
+        <div class="sub" id="teams" style="font-size:0.85em;color:var(--pubg-muted)"></div>
       </div>
       <div class="pct" id="pct">—</div>
     </div>
@@ -83,6 +84,12 @@
       document.getElementById("pct").textContent = (d.rate||0).toFixed(0) + "%";
       document.getElementById("sub").innerHTML =
         `<b>${d.survived||0}</b> / <b>${d.total||0}</b> überlebt`;
+      const teams = document.getElementById("teams");
+      if (d.avgTeams) {
+        teams.innerHTML = `Ø <b>${d.avgTeams.toFixed(1)}</b> Teams pro Fight · Max <b>${d.maxTeams||0}</b>`;
+      } else {
+        teams.textContent = "";
+      }
       const spark = document.getElementById("spark");
       spark.innerHTML = (d.sparkline||[]).map(v =>
         `<span class="${v ? 's' : 'd'}"></span>`).join("");

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Map Performance</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    html, body { margin: 0; padding: 0; }
+    body { padding: 12px; min-height: 100vh; }
+    .panel { width: 100%; max-width: 760px; margin: 0 auto; padding: 14px 18px; }
+    h2 {
+      margin: 0 0 4px;
+      font-size: 0.95em;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--pubg-muted);
+    }
+    h2 b { color: var(--pubg-gold); }
+    .sub {
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      margin-bottom: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85em;
+      font-variant-numeric: tabular-nums;
+    }
+    th {
+      text-align: right;
+      padding: 5px 8px;
+      color: var(--pubg-muted);
+      font-weight: 400;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 0.85em;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    th:first-child { text-align: left; }
+    td {
+      padding: 6px 8px;
+      text-align: right;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    td:first-child { text-align: left; color: var(--pubg-text); }
+    tr.win td { color: var(--pubg-gold); }
+    .empty { padding: 20px; color: var(--pubg-muted); text-align: center; font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="pubg-card panel pubg-fade-in">
+    <h2>Map Performance · <b id="rangeLabel">…</b></h2>
+    <div class="sub" id="meta"></div>
+    <div id="content"></div>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    PubgUI.buildFilter([
+      { key: "range", label: "Range", type: "select", default: "all",
+        options: [["session","Session"],["day","Heute"],
+                  ["week","Letzte 7 Tage"],["all","DB-Lifetime"]]},
+    ]);
+    const RANGE = PubgUI.qs("range", "all");
+    const RANGE_LABEL = {
+      session: "Session", day: "Heute",
+      week: "Letzte 7 Tage", all: "DB-Lifetime",
+    };
+    document.getElementById("rangeLabel").textContent = RANGE_LABEL[RANGE] || RANGE;
+
+    function fmtSurv(secs) {
+      const m = Math.floor((secs||0)/60);
+      const s = Math.floor((secs||0)%60);
+      return `${m}:${String(s).padStart(2,"0")}`;
+    }
+
+    function render(rows) {
+      const root = document.getElementById("content");
+      if (!rows || !rows.length) {
+        root.innerHTML = `<div class="empty">— keine Matches in diesem Range —</div>`;
+        document.getElementById("meta").textContent = "";
+        return;
+      }
+      const totalMatches = rows.reduce((s, r) => s + r.matches, 0);
+      const totalWins = rows.reduce((s, r) => s + r.wins, 0);
+      document.getElementById("meta").textContent =
+        `${rows.length} Maps · ${totalMatches} Matches · ${totalWins} 🍗 gesamt`;
+
+      root.innerHTML = `
+        <table>
+          <thead><tr>
+            <th>Map</th>
+            <th>Matches</th>
+            <th>🍗</th>
+            <th>K/D</th>
+            <th>Win%</th>
+            <th>Ø Kills</th>
+            <th>Ø DMG</th>
+            <th>Ø Place</th>
+            <th>Ø Surv</th>
+            <th>Longest</th>
+          </tr></thead>
+          <tbody>
+            ${rows.map(r => `<tr class="${r.wins ? 'win' : ''}">
+              <td>${PubgUI.fmtMap(r.map)}</td>
+              <td>${r.matches}</td>
+              <td>${r.wins ? '🍗 ' + r.wins : '—'}</td>
+              <td>${r.kd.toFixed(2)}</td>
+              <td>${r.winRate.toFixed(0)}%</td>
+              <td>${r.avgKills.toFixed(1)}</td>
+              <td>${Math.round(r.avgDamage)}</td>
+              <td>#${r.avgPlace.toFixed(1)}</td>
+              <td>${fmtSurv(r.avgSurvivedSec)}</td>
+              <td>${Math.round(r.longestKill)}m</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>`;
+    }
+
+    PubgUI.poll(`/api/pubg/map-performance?range=${RANGE}`, 60000, render, console.error);
+  </script>
+</body>
+</html>

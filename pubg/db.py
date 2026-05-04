@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS matches (
     duration_secs     INTEGER,
     played_at         TEXT NOT NULL,
     telemetry_url     TEXT,
-    telemetry_fetched INTEGER DEFAULT 0
+    telemetry_fetched INTEGER DEFAULT 0,
+    telemetry_schema  INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS participants (
@@ -56,6 +57,10 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
     timestamp_ms    INTEGER,
     actor_account   TEXT,
     target_account  TEXT,
+    actor_x         REAL,
+    actor_y         REAL,
+    victim_x        REAL,
+    victim_y        REAL,
     weapon          TEXT,
     distance        REAL,
     damage          REAL,
@@ -128,8 +133,25 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
+CURRENT_TELEMETRY_SCHEMA = 2  # 1 = squad-only filter, 2 = + Kill/Knock global + Position
+
+
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    # Migrationen für bestehende DBs: ALTER TABLE ADD COLUMN ist idempotent
+    # via try/except, weil SQLite kein "IF NOT EXISTS" für Columns kennt.
+    migrations = [
+        ("telemetry_events", "actor_x", "REAL"),
+        ("telemetry_events", "actor_y", "REAL"),
+        ("telemetry_events", "victim_x", "REAL"),
+        ("telemetry_events", "victim_y", "REAL"),
+        ("matches", "telemetry_schema", "INTEGER DEFAULT 0"),
+    ]
+    for table, col, typ in migrations:
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
+        except sqlite3.OperationalError:
+            pass  # Column existiert bereits
     conn.commit()
 
 
@@ -268,14 +290,17 @@ def get_lifetime(conn, account_id: str, mode: str):
 def insert_telemetry_events(conn, match_id: str, events: list) -> None:
     rows = [(match_id, e["event_type"], e.get("timestamp_ms"),
              e.get("actor_account"), e.get("target_account"),
+             e.get("actor_x"), e.get("actor_y"),
+             e.get("victim_x"), e.get("victim_y"),
              e.get("weapon"), e.get("distance"), e.get("damage"),
              e.get("payload_json", "{}"))
             for e in events]
     conn.executemany("""
         INSERT INTO telemetry_events
         (match_id, event_type, timestamp_ms, actor_account, target_account,
+         actor_x, actor_y, victim_x, victim_y,
          weapon, distance, damage, payload_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, rows)
     conn.commit()
 
@@ -292,8 +317,30 @@ def mark_telemetry_fetched(conn, match_id: str) -> None:
 
 
 def get_matches_needing_telemetry(conn, limit: int = 5):
-    return conn.execute("""
-        SELECT match_id, telemetry_url FROM matches
-        WHERE telemetry_fetched = 0 AND telemetry_url IS NOT NULL
-        ORDER BY played_at DESC LIMIT ?
-    """, (limit,)).fetchall()
+    """Liefert matches die Telemetry brauchen — entweder noch nie gefetched
+    ODER mit veralteter Schema-Version (für First-Fight-Cluster nötig).
+
+    NOTE: telemetry_url-Tokens laufen nach ~14 Tagen ab. Wir filtern auf
+    'played_at > 14 Tage' damit wir keine 404er produzieren bei alten
+    Re-Fetch-Versuchen. Match bekommt bei 404 marker telemetry_fetched=1."""
+    cutoff = "datetime('now', '-13 days')"
+    return conn.execute(f"""
+        SELECT m.match_id, m.telemetry_url FROM matches m
+        WHERE m.telemetry_url IS NOT NULL
+          AND m.played_at > {cutoff}
+          AND (
+            m.telemetry_fetched = 0
+            OR COALESCE(m.telemetry_schema, 0) < ?
+          )
+        ORDER BY m.played_at DESC LIMIT ?
+    """, (CURRENT_TELEMETRY_SCHEMA, limit)).fetchall()
+
+
+def mark_telemetry_schema(conn, match_id: str, schema_version: int = None) -> None:
+    """Setzt telemetry_schema-Marker nach erfolgreichem (Re-)Fetch.
+    Default = aktuelle Schema-Version. Damit kein endloser Re-Fetch."""
+    if schema_version is None:
+        schema_version = CURRENT_TELEMETRY_SCHEMA
+    conn.execute("UPDATE matches SET telemetry_schema=? WHERE match_id=?",
+                 (schema_version, match_id))
+    conn.commit()

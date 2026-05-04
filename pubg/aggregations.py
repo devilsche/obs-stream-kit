@@ -419,17 +419,76 @@ def compute_map_distribution(conn, my_account_id, range_key="session"):
              "wins": r["wins"], "avgPlace": r["avg_place"]} for r in rows]
 
 
-def compute_first_fight_rate(conn, my_account_id, range_key="session"):
-    """First Fight Win Rate — DEFINITION:
-    Pro Match: das erste Engagement-Event (Kill oder TakeDamage), bei dem
-    ein Squad-Member als Attacker ODER Victim involviert ist.
-    - Squad als Attacker im ersten Engagement → WIN (wir haben zuerst getroffen)
-    - Squad als Victim                       → LOSS (wir wurden zuerst getroffen)
-    - Kein Engagement im Match               → nicht gezählt
+def compute_map_performance(conn, my_account_id, range_key="all"):
+    """Pro Map: Matches, Wins, K/D, Ø Kills/DMG/Place/Surv.
+    range_key: 'session' | 'day' | 'week' | 'all'."""
+    cutoff = _range_filter(conn, range_key) if range_key != "all" else "1970-01-01T00:00:00Z"
+    rows = conn.execute("""
+        SELECT m.map_name,
+               COUNT(*) AS matches,
+               SUM(CASE WHEN pa.place=1 THEN 1 ELSE 0 END) AS wins,
+               SUM(pa.kills) AS kills,
+               SUM(pa.damage_dealt) AS damage,
+               AVG(pa.place) AS avg_place,
+               AVG(pa.time_survived) AS avg_surv,
+               MAX(pa.longest_kill) AS longest_kill
+        FROM matches m
+        JOIN participants pa ON pa.match_id = m.match_id
+        WHERE pa.account_id = ? AND m.played_at >= ?
+        GROUP BY m.map_name
+        ORDER BY matches DESC
+    """, (my_account_id, cutoff)).fetchall()
+    out = []
+    for r in rows:
+        n = r["matches"] or 0
+        wins = r["wins"] or 0
+        kills = r["kills"] or 0
+        damage = r["damage"] or 0
+        out.append({
+            "map": r["map_name"],
+            "matches": n,
+            "wins": wins,
+            "kills": kills,
+            "damage": damage,
+            "avgKills": (kills / n) if n else 0,
+            "avgDamage": (damage / n) if n else 0,
+            "avgPlace": r["avg_place"] or 0,
+            "avgSurvivedSec": r["avg_surv"] or 0,
+            "kd": kills / max(n - wins, 1),
+            "winRate": (wins / n * 100) if n else 0,
+            "longestKill": r["longest_kill"] or 0,
+        })
+    return out
+
+
+def compute_first_fight_rate(conn, my_account_id, range_key="session",
+                              cluster_secs=30, cluster_radius_m=200):
+    """First Fight Win Rate — DEFINITION (echtes Fight-Win, nicht First-Engage):
+    Pro Match: das ERSTE Gefecht zwischen Squads.
+
+    Fight-Cluster:
+    - Start: erstes Kill/Knock-Event mit Squad-Beteiligung (Squad als Attacker
+      oder Victim).
+    - Erweiterung: alle weiteren Kill/Knock-Events innerhalb von `cluster_secs`
+      Sekunden zum letzten Cluster-Event UND `cluster_radius_m` Meter Radius
+      werden hinzugefügt — auch enemy-vs-enemy Events. Damit erfassen wir
+      Multi-Team-Gefechte.
+    - Ende: kein neues Kill/Knock-Event mehr passt → Cluster geschlossen.
+
+    Beteiligte Teams: alle team_ids von attackern und victims im Cluster.
+    Win/Loss:
+    - WIN  = unser Team hat am Fight-Ende noch lebende Member (time_survived
+      > Fight-End-Zeit oder besser).
+    - LOSS = alle unsere Squad-Member wurden im/vor Fight-Ende ausgeschaltet.
+
+    Returns: rate, survived, total, sparkline, avgTeams, maxTeams.
     """
+    # PUBG-Welt: Distanzen in cm. 1 Meter = 100 Einheiten.
+    cluster_radius_cm = cluster_radius_m * 100
+    cluster_ms = cluster_secs * 1000
     cutoff = _range_filter(conn, range_key) if range_key != "all" else "1970-01-01T00:00:00Z"
     matches = conn.execute("""
-        SELECT m.match_id FROM matches m
+        SELECT m.match_id, m.duration_secs FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id
         WHERE pa.account_id = ? AND m.played_at >= ?
         ORDER BY m.played_at ASC
@@ -438,45 +497,156 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session"):
     total = 0
     survived = 0
     sparkline = []
+    teams_per_fight = []
     for m in matches:
-        # Squad-Account-IDs aus participants (du + Mates dieses Matches)
-        squad_rows = conn.execute(
-            "SELECT account_id FROM participants WHERE match_id = ?",
-            (m["match_id"],)).fetchall()
-        squad_ids = {r["account_id"] for r in squad_rows}
-        if my_account_id not in squad_ids:
-            squad_ids.add(my_account_id)
-
-        # Erstes Engagement-Event mit Squad-Beteiligung
-        # (Kill = Final Blow, Knock = MakeGroggy/DBNO, TakeDamage = Trefferdamage)
-        first_engagement = conn.execute("""
-            SELECT event_type, actor_account, target_account, timestamp_ms
-            FROM telemetry_events
-            WHERE match_id = ?
-              AND event_type IN ('Kill', 'Knock', 'TakeDamage')
-              AND (actor_account IN (%s) OR target_account IN (%s))
-            ORDER BY timestamp_ms ASC LIMIT 1
-        """ % (",".join("?" * len(squad_ids)), ",".join("?" * len(squad_ids))),
-            [m["match_id"]] + list(squad_ids) + list(squad_ids)
-        ).fetchone()
-
-        if not first_engagement:
+        result = _detect_first_fight(conn, m["match_id"], my_account_id,
+                                       cluster_ms, cluster_radius_cm)
+        if result is None:
             continue
-        # WIN = Squad als Attacker, kein Squad-Member als Victim
-        squad_attacked = first_engagement["actor_account"] in squad_ids
-        squad_attacked_back = first_engagement["target_account"] not in squad_ids
-        won = squad_attacked and squad_attacked_back
         total += 1
-        sparkline.append(1 if won else 0)
-        if won:
+        teams_per_fight.append(result["teams_count"])
+        if result["won"]:
             survived += 1
+            sparkline.append(1)
+        else:
+            sparkline.append(0)
 
+    avg_teams = (sum(teams_per_fight) / len(teams_per_fight)) if teams_per_fight else 0
+    max_teams = max(teams_per_fight) if teams_per_fight else 0
     return {
         "rate": (survived / total * 100) if total else 0,
         "survived": survived,
         "total": total,
         "sparkline": sparkline[-20:],
+        "avgTeams": round(avg_teams, 2),
+        "maxTeams": max_teams,
     }
+
+
+def _detect_first_fight(conn, match_id, my_account_id,
+                         cluster_ms, cluster_radius_cm):
+    """Findet den ersten Squad-Fight in einem Match und bewertet Win/Loss.
+    Returns dict {won, teams_count, ...} oder None wenn kein Fight.
+    """
+    # Squad und Team-Mapping aus participants
+    parts = conn.execute("""
+        SELECT account_id, team_id, time_survived
+        FROM participants WHERE match_id = ?
+    """, (match_id,)).fetchall()
+    if not parts:
+        return None
+    acc_to_team = {p["account_id"]: p["team_id"] for p in parts}
+    acc_to_survived = {p["account_id"]: p["time_survived"] for p in parts}
+    # Mein Squad = mein team_id im Match
+    my_team_id = acc_to_team.get(my_account_id)
+    if my_team_id is None:
+        return None
+    squad_ids = {a for a, t in acc_to_team.items() if t == my_team_id}
+
+    # Alle Kill/Knock-Events des Matches, sortiert nach Zeit.
+    # Wir brauchen Position für räumliche Nähe.
+    events = conn.execute("""
+        SELECT event_type, actor_account, target_account, timestamp_ms,
+               actor_x, actor_y, victim_x, victim_y
+        FROM telemetry_events
+        WHERE match_id = ? AND event_type IN ('Kill', 'Knock')
+        ORDER BY timestamp_ms ASC
+    """, (match_id,)).fetchall()
+    if not events:
+        return None
+
+    # Erstes Squad-beteiligtes Event = Fight-Start
+    first_idx = None
+    for i, e in enumerate(events):
+        if e["actor_account"] in squad_ids or e["target_account"] in squad_ids:
+            first_idx = i
+            break
+    if first_idx is None:
+        return None
+
+    cluster = [events[first_idx]]
+    cluster_acc_ids = set()
+    for e in cluster:
+        if e["actor_account"]: cluster_acc_ids.add(e["actor_account"])
+        if e["target_account"]: cluster_acc_ids.add(e["target_account"])
+
+    # Cluster erweitern: nachfolgende Events die zeitlich + räumlich nah sind
+    last_event_ts = cluster[-1]["timestamp_ms"]
+    for e in events[first_idx + 1:]:
+        ts = e["timestamp_ms"]
+        if ts is None or ts - last_event_ts > cluster_ms:
+            break  # zu weit weg in Zeit
+        # Räumlich: ist mind. eine der Event-Positions nahe genug an einem
+        # bisherigen Cluster-Event?
+        if not _event_near_cluster(e, cluster, cluster_radius_cm):
+            continue
+        cluster.append(e)
+        last_event_ts = ts
+        if e["actor_account"]: cluster_acc_ids.add(e["actor_account"])
+        if e["target_account"]: cluster_acc_ids.add(e["target_account"])
+
+    # Beteiligte Teams = alle team_ids der involvierten accounts
+    teams = set()
+    for acc in cluster_acc_ids:
+        t = acc_to_team.get(acc)
+        if t is not None:
+            teams.add(t)
+
+    # Win-Bedingung: Hat mein Squad noch lebende Member zum Fight-Ende?
+    # time_survived ist in Sekunden ab Match-Start. Kill-Events haben
+    # timestamp_ms (ms ab Match-Start oder absolut?).
+    # Praktisch: wenn ein Squad-Member noch nach Fight-Ende lebt → WIN.
+    # Match-Start aus erstem Kill/Knock geschätzt = nicht zuverlässig.
+    # Wir nehmen einen pragmatischen Ansatz: Wenn mind. 1 Squad-Member
+    # nicht im Fight-Cluster als victim auftaucht UND insgesamt länger
+    # überlebt als der Fight dauert → WIN.
+    fight_end_ts = last_event_ts
+    fight_start_ts = cluster[0]["timestamp_ms"]
+    fight_duration_s = (fight_end_ts - fight_start_ts) / 1000.0
+
+    # Squad-Members die im Cluster als Victim auftauchen → tot/down
+    squad_down_in_fight = {
+        e["target_account"] for e in cluster
+        if e["target_account"] in squad_ids and e["event_type"] == "Kill"
+    }
+    squad_alive_after = squad_ids - squad_down_in_fight
+
+    # WIN = unser Squad hat am Fight-Ende noch lebende Members
+    won = bool(squad_alive_after)
+
+    return {
+        "won": won,
+        "teams_count": len(teams),
+        "fight_duration_s": fight_duration_s,
+        "events_count": len(cluster),
+        "squad_killed_in_fight": len(squad_down_in_fight),
+    }
+
+
+def _event_near_cluster(event, cluster, radius_cm):
+    """True wenn Event räumlich nahe an mind. einem Cluster-Event ist.
+    Nahe = victim_xy oder actor_xy < radius_cm zu mind. einem
+    Cluster-Event (egal welche Position dort)."""
+    e_pts = []
+    if event["actor_x"] is not None and event["actor_y"] is not None:
+        e_pts.append((event["actor_x"], event["actor_y"]))
+    if event["victim_x"] is not None and event["victim_y"] is not None:
+        e_pts.append((event["victim_x"], event["victim_y"]))
+    if not e_pts:
+        return True   # ohne Position: konservativ inkludieren
+    radius_sq = radius_cm * radius_cm
+    for c in cluster:
+        c_pts = []
+        if c["actor_x"] is not None and c["actor_y"] is not None:
+            c_pts.append((c["actor_x"], c["actor_y"]))
+        if c["victim_x"] is not None and c["victim_y"] is not None:
+            c_pts.append((c["victim_x"], c["victim_y"]))
+        for ex, ey in e_pts:
+            for cx, cy in c_pts:
+                dx, dy = ex - cx, ey - cy
+                if dx * dx + dy * dy <= radius_sq:
+                    return True
+    return False
 
 
 def compute_sessions_index(conn, my_account_id, gap_hours=4):

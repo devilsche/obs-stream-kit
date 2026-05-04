@@ -175,42 +175,118 @@ def test_map_distribution_counts_by_range(tmp_db_path):
 
 
 def test_first_fight_rate_aggregates(tmp_db_path):
+    """First-Fight-Win-Rate: Squad gewinnt wenn am Fight-Ende mind. 1 Member
+    noch lebt (kein Squad-Member als Kill-Victim im Fight-Cluster)."""
     conn = _setup(tmp_db_path)
     set_setting(conn, "sessionStartedAt", "2026-05-04T00:00:00Z")
+    # Solo-Squad: nur account.A, mate_count=0 → squad_ids = {A}
     for i in range(4):
-        _add_match(conn, f"f{i}", f"2026-05-04T1{i}:00:00Z", 2, 200.0, 5)
-    # m0: engaged + survived
+        _add_match(conn, f"f{i}", f"2026-05-04T1{i}:00:00Z", 2, 200.0, 5,
+                    mate_count=0)
+    # m0: A killt Enemy → Squad lebt → WIN
     insert_telemetry_events(conn, "f0", [
-        {"event_type": "Landing", "timestamp_ms": 1, "actor_account": "account.A",
-         "target_account": None, "weapon": None, "distance": None,
-         "damage": None, "payload_json": "{}"},
         {"event_type": "Kill", "timestamp_ms": 2000, "actor_account": "account.A",
-         "target_account": "account.X", "weapon": "Beryl", "distance": 50.0,
-         "damage": None, "payload_json": "{}"},
+         "target_account": "account.X", "actor_x": 1000.0, "actor_y": 1000.0,
+         "victim_x": 1100.0, "victim_y": 1000.0, "weapon": "Beryl",
+         "distance": 50.0, "damage": None, "payload_json": "{}"},
     ])
-    # m1: engaged + died
+    # m1: Enemy killt A → Squad tot → LOSS
     insert_telemetry_events(conn, "f1", [
-        {"event_type": "Landing", "timestamp_ms": 1, "actor_account": "account.A",
-         "target_account": None, "weapon": None, "distance": None,
-         "damage": None, "payload_json": "{}"},
         {"event_type": "Kill", "timestamp_ms": 2000, "actor_account": "account.X",
-         "target_account": "account.A", "weapon": "Beryl", "distance": 50.0,
-         "damage": None, "payload_json": "{}"},
+         "target_account": "account.A", "actor_x": 1000.0, "actor_y": 1000.0,
+         "victim_x": 1100.0, "victim_y": 1000.0, "weapon": "Beryl",
+         "distance": 50.0, "damage": None, "payload_json": "{}"},
     ])
-    # m2: kein engagement
-    # m3: engaged + survived
+    # m2: kein engagement → nicht gezählt
+    # m3: A killt Enemy → WIN
     insert_telemetry_events(conn, "f3", [
-        {"event_type": "Landing", "timestamp_ms": 1, "actor_account": "account.A",
-         "target_account": None, "weapon": None, "distance": None,
-         "damage": None, "payload_json": "{}"},
         {"event_type": "Kill", "timestamp_ms": 1500, "actor_account": "account.A",
-         "target_account": "account.X", "weapon": "Beryl", "distance": 50.0,
-         "damage": None, "payload_json": "{}"},
+         "target_account": "account.X", "actor_x": 500.0, "actor_y": 500.0,
+         "victim_x": 600.0, "victim_y": 500.0, "weapon": "Beryl",
+         "distance": 50.0, "damage": None, "payload_json": "{}"},
     ])
     res = compute_first_fight_rate(conn, "account.A", range_key="session")
     assert res["total"] == 3
     assert res["survived"] == 2
     assert abs(res["rate"] - (2/3)*100) < 0.1
+
+
+def test_first_fight_cluster_multi_team(tmp_db_path):
+    """Multi-Team-Fight: 3 Teams beteiligt, unser Squad überlebt."""
+    conn = _setup(tmp_db_path)
+    set_setting(conn, "sessionStartedAt", "2026-05-04T00:00:00Z")
+    insert_match(conn, "mt1", "Erangel_Main", "squad-fpp", False, 1800,
+                  "2026-05-04T18:00:00Z", None)
+    upsert_player(conn, "account.M0", "Mate0", "steam", False)
+    upsert_player(conn, "account.E1", "Enemy1", "steam", False)
+    upsert_player(conn, "account.E2", "Enemy2", "steam", False)
+    upsert_player(conn, "account.E3", "Enemy3", "steam", False)
+    insert_participants(conn, "mt1", [
+        {"account_id": "account.A", "name": "PEX_LuCKoR", "team_id": 1,
+         "place": 1, "kills": 2, "headshot_kills": 0, "assists": 0,
+         "dbnos": 0, "revives": 0, "damage_dealt": 0.0, "longest_kill": 0.0,
+         "time_survived": 1500, "walk_distance": 0.0, "ride_distance": 0.0,
+         "swim_distance": 0.0, "weapons_acquired": 0, "heals": 0, "boosts": 0,
+         "team_kills": 0},
+        {"account_id": "account.M0", "name": "Mate0", "team_id": 1,
+         "place": 1, "kills": 1, "headshot_kills": 0, "assists": 0,
+         "dbnos": 0, "revives": 0, "damage_dealt": 0.0, "longest_kill": 0.0,
+         "time_survived": 1500, "walk_distance": 0.0, "ride_distance": 0.0,
+         "swim_distance": 0.0, "weapons_acquired": 0, "heals": 0, "boosts": 0,
+         "team_kills": 0},
+        {"account_id": "account.E1", "name": "Enemy1", "team_id": 2,
+         "place": 5, "kills": 0, "headshot_kills": 0, "assists": 0,
+         "dbnos": 0, "revives": 0, "damage_dealt": 0.0, "longest_kill": 0.0,
+         "time_survived": 60, "walk_distance": 0.0, "ride_distance": 0.0,
+         "swim_distance": 0.0, "weapons_acquired": 0, "heals": 0, "boosts": 0,
+         "team_kills": 0},
+        {"account_id": "account.E2", "name": "Enemy2", "team_id": 3,
+         "place": 8, "kills": 0, "headshot_kills": 0, "assists": 0,
+         "dbnos": 0, "revives": 0, "damage_dealt": 0.0, "longest_kill": 0.0,
+         "time_survived": 80, "walk_distance": 0.0, "ride_distance": 0.0,
+         "swim_distance": 0.0, "weapons_acquired": 0, "heals": 0, "boosts": 0,
+         "team_kills": 0},
+        {"account_id": "account.E3", "name": "Enemy3", "team_id": 3,
+         "place": 8, "kills": 0, "headshot_kills": 0, "assists": 0,
+         "dbnos": 0, "revives": 0, "damage_dealt": 0.0, "longest_kill": 0.0,
+         "time_survived": 90, "walk_distance": 0.0, "ride_distance": 0.0,
+         "swim_distance": 0.0, "weapons_acquired": 0, "heals": 0, "boosts": 0,
+         "team_kills": 0},
+    ])
+    # Cluster: alle 3 Kills innerhalb von 30s und im Radius 200m
+    # (= 20000 cm). Positionen alle nahe 1000/1000.
+    insert_telemetry_events(conn, "mt1", [
+        # T1: Squad-Member A killt Enemy1 (Team 2) — Fight-Start
+        {"event_type": "Kill", "timestamp_ms": 60000,
+         "actor_account": "account.A", "target_account": "account.E1",
+         "actor_x": 1000.0, "actor_y": 1000.0,
+         "victim_x": 1100.0, "victim_y": 1000.0,
+         "weapon": "M4", "distance": 100.0, "damage": None,
+         "payload_json": "{}"},
+        # T2: Mate0 killt Enemy2 (Team 3) — selber Cluster
+        {"event_type": "Kill", "timestamp_ms": 75000,
+         "actor_account": "account.M0", "target_account": "account.E2",
+         "actor_x": 1050.0, "actor_y": 1050.0,
+         "victim_x": 1150.0, "victim_y": 1050.0,
+         "weapon": "M4", "distance": 100.0, "damage": None,
+         "payload_json": "{}"},
+        # T3: Enemy3 (Team 3) killt einen seiner eigenen? Nein — Enemy1's mate.
+        # Eigentlich enemy-vs-enemy: Enemy3 schießt auf jemanden im Fight.
+        # Hier: Enemy3 killt einen vom Team 2 (gibt's nicht mehr) — vereinfacht
+        # als: Enemy3 wird auch noch gekillt von uns. Wir können auch sagen
+        # Mate0 killt Enemy3.
+        {"event_type": "Kill", "timestamp_ms": 90000,
+         "actor_account": "account.M0", "target_account": "account.E3",
+         "actor_x": 1080.0, "actor_y": 1080.0,
+         "victim_x": 1180.0, "victim_y": 1080.0,
+         "weapon": "M4", "distance": 100.0, "damage": None,
+         "payload_json": "{}"},
+    ])
+    res = compute_first_fight_rate(conn, "account.A", range_key="session")
+    assert res["total"] == 1
+    assert res["survived"] == 1     # Squad lebt → WIN
+    assert res["avgTeams"] == 3.0   # Team 1 (wir), Team 2, Team 3
+    assert res["maxTeams"] == 3
 
 
 def test_squad_compare_table(tmp_db_path):
