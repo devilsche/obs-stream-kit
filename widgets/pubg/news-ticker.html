@@ -49,9 +49,12 @@
         }
       } catch (_) {}
       try {
-        const tm = await PubgUI.fetchJson("/api/pubg/top-mates?sortBy=avgPlace&limit=1&minMatches=10");
+        // Folgt dem globalen Setting (topMatesSortBy / minMatchesForTopMates).
+        // Default backend = mostPlayed → der häufigste Squad-Buddy.
+        const tm = await PubgUI.fetchJson("/api/pubg/top-mates?limit=1");
         if (tm[0]) {
-          out.push(`<span class="label">BEST MATE</span> ${tm[0].name} · Avg #${(tm[0].avgPlace||0).toFixed(1)} · ${tm[0].sharedMatches} Games`);
+          const m = tm[0];
+          out.push(`<span class="label">TOP MATE</span> ${m.name} · ${m.sharedMatches} Games · ${m.winsTogether||0} 🍗 · K/D du ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
         }
       } catch (_) {}
       try {
