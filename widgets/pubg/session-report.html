@@ -259,14 +259,32 @@
       margin-bottom: 10px;
       flex-wrap: wrap;
     }
-    .session-picker .controls input {
-      flex: 1; min-width: 200px;
+    .session-picker .controls select {
       background: rgba(0,0,0,0.4);
       color: var(--pubg-text);
       border: 1px solid var(--pubg-border);
       padding: 5px 8px;
       border-radius: 3px;
       font-family: inherit;
+      cursor: pointer;
+    }
+    .session-picker .controls .month-tabs {
+      display: flex; gap: 4px; flex-wrap: wrap; flex: 1;
+    }
+    .session-picker .controls .month-tab {
+      padding: 4px 10px;
+      background: rgba(94,42,121,0.18);
+      border: 1px solid transparent;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 0.78em;
+      color: var(--pubg-text);
+      font-family: inherit;
+    }
+    .session-picker .controls .month-tab:hover { background: rgba(94,42,121,0.4); }
+    .session-picker .controls .month-tab.active {
+      background: var(--pubg-purple);
+      border-color: var(--pubg-gold);
     }
     .session-picker .summary {
       color: var(--pubg-muted);
@@ -422,99 +440,95 @@
       });
     });
 
-    // Sessions-Picker mit Suche, Gruppierung nach Monat, Limit + Toggle
-    const DEFAULT_LIMIT = 12;
+    // Sessions-Picker: Monats-Tabs + Sort-Dropdown.
+    // Default: aktueller Monat, sortiert nach neueste-zuerst.
     let allSessions = [];
-    let showAll = false;
-    let searchTerm = "";
+    let activeMonth = null;       // null = aktueller (=neuester) Monat
+    let sortBy = "newest";
 
-    function monthLabel(iso) {
+    function monthKey(iso) {
       const d = new Date(iso);
-      return d.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+    }
+    function monthLabel(key) {
+      const [y, m] = key.split("-").map(Number);
+      return new Date(y, m-1, 1).toLocaleDateString("de-DE", { month: "long", year: "numeric" });
     }
 
-    function matchSearch(s, term) {
-      if (!term) return true;
-      const t = term.toLowerCase();
-      const date = PubgUI.fmtDate(s.from).toLowerCase();
-      return date.includes(t)
-        || (s.topMate || "").toLowerCase().includes(t)
-        || String(s.matches).includes(t)
-        || String(s.wins).includes(t);
-    }
-
-    // Picker hat einen statischen Header (Suche bleibt stabil) und einen
-    // separaten Container für Items + Summary. Nur dieser wird re-rendered.
     function buildPickerShell() {
       const picker = document.getElementById("picker");
       if (!allSessions.length) { picker.style.display = "none"; return; }
       picker.style.display = "block";
+
+      // Alle Monate aus den Sessions, neueste zuerst
+      const months = [...new Set(allSessions.map(s => monthKey(s.from)))]
+        .sort((a, b) => b.localeCompare(a));
+      if (!activeMonth) activeMonth = months[0];
+
+      const monthTabs = months.map(k => {
+        const cnt = allSessions.filter(s => monthKey(s.from) === k).length;
+        const cls = "month-tab" + (k === activeMonth ? " active" : "");
+        return `<button class="${cls}" data-month="${k}">${monthLabel(k)} (${cnt})</button>`;
+      }).join("");
+
       picker.innerHTML = `
         <div class="controls">
-          <input type="text" id="sessionSearch" placeholder="🔎 Suche: 03.05., Erangel, MateName, …" value="${searchTerm}">
+          <div class="month-tabs">${monthTabs}</div>
+          <select id="sortBy">
+            <option value="newest">Neueste zuerst</option>
+            <option value="oldest">Älteste zuerst</option>
+            <option value="wins">Meiste 🍗 Wins</option>
+            <option value="matches">Meiste Matches</option>
+            <option value="kills">Meiste Kills</option>
+          </select>
           <span class="summary" id="sessionSummary"></span>
-          <button class="toggle-all" id="toggleAll" style="display:none"></button>
         </div>
         <div id="sessionList"></div>
       `;
-      const search = document.getElementById("sessionSearch");
-      search.addEventListener("input", (e) => {
-        searchTerm = e.target.value;
-        renderItems();   // nur Items, NICHT den Header → focus bleibt
-      });
-      document.getElementById("toggleAll").addEventListener("click", () => {
-        showAll = !showAll;
+      document.getElementById("sortBy").value = sortBy;
+      document.getElementById("sortBy").addEventListener("change", (e) => {
+        sortBy = e.target.value;
         renderItems();
+      });
+      picker.querySelectorAll(".month-tab").forEach(btn => {
+        btn.addEventListener("click", () => {
+          activeMonth = btn.dataset.month;
+          buildPickerShell();
+          renderItems();
+        });
       });
     }
 
     function renderItems() {
-      const filtered = allSessions.filter(s => matchSearch(s, searchTerm));
-      const visible = showAll ? filtered : filtered.slice(0, DEFAULT_LIMIT);
-      const totalCount = allSessions.length;
-      const filteredCount = filtered.length;
+      const inMonth = allSessions.filter(s => monthKey(s.from) === activeMonth);
+      const sortFns = {
+        newest:  (a, b) => b.from.localeCompare(a.from),
+        oldest:  (a, b) => a.from.localeCompare(b.from),
+        wins:    (a, b) => (b.wins||0) - (a.wins||0) || b.from.localeCompare(a.from),
+        matches: (a, b) => (b.matches||0) - (a.matches||0) || b.from.localeCompare(a.from),
+        kills:   (a, b) => (b.kills||0) - (a.kills||0) || b.from.localeCompare(a.from),
+      };
+      const sorted = [...inMonth].sort(sortFns[sortBy] || sortFns.newest);
 
-      const byMonth = {};
-      visible.forEach((s) => {
-        const idx = allSessions.indexOf(s);
-        const m = monthLabel(s.from);
-        if (!byMonth[m]) byMonth[m] = [];
-        byMonth[m].push({ ...s, _origIdx: idx });
-      });
+      const items = sorted.map(s => {
+        const origIdx = allSessions.indexOf(s);
+        const isCurrent = origIdx === 0 && !FROM;
+        const isActive = FROM === s.from;
+        const cls = ["item"];
+        if (isCurrent) cls.push("current");
+        if (isActive) cls.push("active");
+        const mate = s.topMate
+          ? ` · 👥 ${s.topMate}${s.topMateCount > 1 ? ` (${s.topMateCount})` : ""}`
+          : "";
+        return `<div class="${cls.join(' ')}" data-from="${s.from}" data-to="${s.to}">
+          <span class="label">${PubgUI.fmtDate(s.from)} ${PubgUI.fmtTime(s.from)}${isCurrent ? " ▶" : ""}</span>
+          <span class="meta">${s.matches}M · ${s.wins} 🍗 · ${s.kills}K${mate}</span>
+        </div>`;
+      }).join("") || `<div style="padding:20px;color:var(--pubg-muted);text-align:center;font-style:italic">— keine Sessions in diesem Monat —</div>`;
 
-      const groups = Object.entries(byMonth).map(([month, items]) => `
-        <div class="month-header">${month}</div>
-        <div class="grid">
-          ${items.map(s => {
-            const isCurrent = s._origIdx === 0 && !FROM;
-            const isActive = FROM === s.from;
-            const cls = ["item"];
-            if (isCurrent) cls.push("current");
-            if (isActive) cls.push("active");
-            const mate = s.topMate
-              ? ` · 👥 ${s.topMate}${s.topMateCount > 1 ? ` (${s.topMateCount})` : ""}`
-              : "";
-            return `<div class="${cls.join(' ')}" data-from="${s.from}" data-to="${s.to}">
-              <span class="label">${PubgUI.fmtDate(s.from)} ${PubgUI.fmtTime(s.from)}${isCurrent ? " ▶" : ""}</span>
-              <span class="meta">${s.matches}M · ${s.wins} 🍗 · ${s.kills}K${mate}</span>
-            </div>`;
-          }).join("")}
-        </div>
-      `).join("") || `<div style="padding:20px;color:var(--pubg-muted);text-align:center;font-style:italic">— keine Treffer —</div>`;
-
-      document.getElementById("sessionList").innerHTML = groups;
-      document.getElementById("sessionSummary").textContent = searchTerm
-        ? `${filteredCount}/${totalCount} Sessions`
-        : `${totalCount} Sessions in DB`;
-      const tog = document.getElementById("toggleAll");
-      if (filteredCount > DEFAULT_LIMIT) {
-        tog.style.display = "";
-        tog.textContent = showAll
-          ? `Nur ${DEFAULT_LIMIT} zeigen`
-          : `+${filteredCount - DEFAULT_LIMIT} weitere zeigen`;
-      } else {
-        tog.style.display = "none";
-      }
+      document.getElementById("sessionList").innerHTML = `<div class="grid">${items}</div>`;
+      document.getElementById("sessionSummary").textContent =
+        `${inMonth.length} Sessions · ${allSessions.length} gesamt`;
     }
 
     function renderPicker() {
@@ -524,6 +538,8 @@
 
     PubgUI.fetchJson("/api/pubg/sessions").then(sessions => {
       allSessions = sessions || [];
+      // Wenn URL-Range gesetzt: Monat der aktiven Session vorauswählen
+      if (FROM) activeMonth = monthKey(FROM);
       renderPicker();
     }).catch(() => {});
 
