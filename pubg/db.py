@@ -163,3 +163,51 @@ def get_self_player(conn):
     return conn.execute(
         "SELECT * FROM players WHERE is_self = 1 LIMIT 1"
     ).fetchone()
+
+
+def insert_match(conn, match_id, map_name, game_mode, is_ranked,
+                 duration_secs, played_at, telemetry_url) -> None:
+    conn.execute("""
+        INSERT OR IGNORE INTO matches(match_id, map_name, game_mode, is_ranked,
+            duration_secs, played_at, telemetry_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (match_id, map_name, game_mode, 1 if is_ranked else 0,
+          duration_secs, played_at, telemetry_url))
+    conn.commit()
+
+
+def get_match(conn, match_id):
+    return conn.execute(
+        "SELECT * FROM matches WHERE match_id = ?", (match_id,)
+    ).fetchone()
+
+
+PARTICIPANT_COLS = (
+    "match_id", "account_id", "name", "team_id", "place", "kills",
+    "headshot_kills", "assists", "dbnos", "revives", "damage_dealt",
+    "longest_kill", "time_survived", "walk_distance", "ride_distance",
+    "swim_distance", "weapons_acquired", "heals", "boosts", "team_kills",
+)
+
+
+def insert_participants(conn, match_id, rows):
+    placeholders = ",".join(["?"] * len(PARTICIPANT_COLS))
+    cols = ",".join(PARTICIPANT_COLS)
+    for r in rows:
+        values = [match_id] + [r.get(c) for c in PARTICIPANT_COLS[1:]]
+        conn.execute(
+            f"INSERT OR REPLACE INTO participants({cols}) VALUES ({placeholders})",
+            values,
+        )
+    conn.commit()
+
+
+def get_squad_for_match(conn, match_id):
+    return conn.execute(
+        "SELECT * FROM participants WHERE match_id = ? ORDER BY name", (match_id,)
+    ).fetchall()
+
+
+def get_known_match_ids(conn):
+    rows = conn.execute("SELECT match_id FROM matches").fetchall()
+    return {r["match_id"] for r in rows}
