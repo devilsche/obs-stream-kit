@@ -105,7 +105,7 @@
                 <td>#${m.place || "?"}</td>
                 <td>${m.kills || 0}</td>
                 <td>${PubgUI.fmtNum(Math.round(m.damage||0))}</td>
-                <td>${(m.playedAt||"").slice(0,10)}</td>
+                <td>${PubgUI.fmtDate(m.playedAt)} ${PubgUI.fmtTime(m.playedAt)}</td>
               </tr>`).join("") || `<tr><td colspan="5">—</td></tr>`;
         })
         .catch(e => { document.querySelector(".container").innerHTML += `<div class="pubg-error">${e}</div>`; });

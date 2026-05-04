@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG After-Session Report</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    html, body { margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      padding: 16px;
+      background: linear-gradient(180deg, rgba(20,12,30,0.6), rgba(10,5,16,0.6));
+    }
+    .report { max-width: 900px; margin: 0 auto; padding: 22px 26px; }
+    .report h1 {
+      margin: 0 0 6px;
+      color: var(--pubg-gold);
+      font-size: 1.6em;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .report .subtitle { color: var(--pubg-muted); font-size: 0.9em; margin-bottom: 18px; }
+
+    .totals {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .totals .cell { display: flex; flex-direction: column; }
+    .totals .cell .pubg-stat-value { font-size: 1.4em; }
+
+    .phase {
+      margin-bottom: 18px;
+      padding: 14px 16px;
+      background: rgba(94,42,121,0.12);
+      border-left: 3px solid var(--pubg-purple);
+      border-radius: 6px;
+    }
+    .phase h2 {
+      margin: 0 0 4px;
+      font-size: 1em;
+      letter-spacing: 0.04em;
+    }
+    .phase h2 .num { color: var(--pubg-gold); margin-right: 8px; }
+    .phase .squad {
+      color: var(--pubg-muted);
+      font-size: 0.85em;
+      margin-bottom: 10px;
+    }
+    .phase .squad b { color: var(--pubg-text); }
+    .phase-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+      gap: 8px;
+      font-size: 0.8em;
+      margin-bottom: 10px;
+    }
+    .phase-stats span { color: var(--pubg-muted); }
+    .phase-stats span b {
+      color: var(--pubg-text);
+      font-variant-numeric: tabular-nums;
+      font-size: 1.15em;
+      margin-right: 4px;
+    }
+
+    .matches-list {
+      display: flex; flex-direction: column;
+      gap: 4px;
+      font-size: 0.78em;
+      font-variant-numeric: tabular-nums;
+    }
+    .matches-list .m {
+      display: grid;
+      grid-template-columns: 90px 90px 1fr auto;
+      gap: 10px;
+      padding: 4px 8px;
+      border-radius: 3px;
+      align-items: center;
+    }
+    .matches-list .m:hover { background: rgba(255,255,255,0.04); }
+    .matches-list .m.win {
+      background: rgba(242,183,5,0.15);
+      border-left: 2px solid var(--pubg-gold);
+    }
+    .matches-list .m .time { color: var(--pubg-muted); }
+    .matches-list .m .place { color: var(--pubg-gold); font-weight: 700; }
+    .matches-list .m .map { color: var(--pubg-text); }
+    .matches-list .m .stats { color: var(--pubg-muted); text-align: right; }
+    .matches-list .m .stats b { color: var(--pubg-text); }
+
+    .highlights {
+      margin-top: 22px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+    .highlights .col h3 {
+      margin: 0 0 8px;
+      color: var(--pubg-muted);
+      font-size: 0.8em;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .highlight-item {
+      padding: 6px 10px;
+      margin-bottom: 4px;
+      font-size: 0.85em;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.04);
+    }
+    .empty {
+      text-align: center;
+      color: var(--pubg-muted);
+      padding: 40px;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div class="pubg-card report pubg-fade-in" id="report">
+    <div class="empty">— wird geladen —</div>
+  </div>
+
+  <script src="_pubg.js"></script>
+  <script>
+    PubgUI.buildFilter([]);
+
+    function fmtDuration(secs) {
+      if (!secs) return "0min";
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      return h ? `${h}h ${m}min` : `${m}min`;
+    }
+
+    function fmtMatchRow(m) {
+      const startIso = PubgUI.matchStartIso(m.matchEnd, m.durationSec);
+      const surv = m.timeSurvived || 0;
+      const survStr = `${Math.floor(surv/60)}:${String(surv%60).padStart(2,"0")}`;
+      const isWin = m.place === 1;
+      return `
+        <div class="m ${isWin ? 'win' : ''}">
+          <span class="time">${PubgUI.fmtTime(startIso)}</span>
+          <span class="place">${isWin ? '🍗 #1' : '#' + m.place}</span>
+          <span class="map">${PubgUI.fmtMap(m.map)}</span>
+          <span class="stats"><b>${m.kills}</b>K · <b>${Math.round(m.damage||0)}</b>DMG · ${survStr}</span>
+        </div>`;
+    }
+
+    function render(d) {
+      const root = document.getElementById("report");
+      if (!d.totalMatches) {
+        root.innerHTML = `<div class="empty">— noch keine Matches in der Session —</div>`;
+        return;
+      }
+      const t = d.totals;
+      const startIso = PubgUI.matchStartIso(t.startTime, 0);  // approx
+      const subtitle = `${PubgUI.fmtDate(t.startTime)} · ${PubgUI.fmtTime(d.sessionStartedAt)} – ${PubgUI.fmtTime(t.endTime)} · ${fmtDuration(t.totalSurvivedSec)} aktiv gespielt`;
+
+      const totalsHtml = `
+        <div class="totals">
+          <div class="cell"><span class="pubg-stat-value">${t.matches}</span><span class="pubg-stat-label">Matches</span></div>
+          <div class="cell"><span class="pubg-stat-value">${t.wins}</span><span class="pubg-stat-label">🍗 Wins</span></div>
+          <div class="cell"><span class="pubg-stat-value">${t.kills}</span><span class="pubg-stat-label">Kills</span></div>
+          <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtNum(Math.round(t.damage))}</span><span class="pubg-stat-label">Damage</span></div>
+          <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.kd)}</span><span class="pubg-stat-label">K/D</span></div>
+          <div class="cell"><span class="pubg-stat-value">#${t.avgPlace.toFixed(1)}</span><span class="pubg-stat-label">Avg Place</span></div>
+          <div class="cell"><span class="pubg-stat-value">${t.headshots}</span><span class="pubg-stat-label">Headshots</span></div>
+          <div class="cell"><span class="pubg-stat-value">${t.dbnos}</span><span class="pubg-stat-label">Knocks</span></div>
+          <div class="cell"><span class="pubg-stat-value">${Math.round(t.longestKill)}m</span><span class="pubg-stat-label">Longest</span></div>
+          <div class="cell"><span class="pubg-stat-value">${t.uniqueMaps}</span><span class="pubg-stat-label">Maps</span></div>
+        </div>`;
+
+      const phasesHtml = d.phases.map((ph, i) => {
+        const s = ph.stats;
+        const squad = ph.squadNames.length
+          ? ph.squadNames.map(n => `<b>${n}</b>`).join(" + ")
+          : "<i>Solo</i>";
+        const startStr = PubgUI.fmtTime(s.startTime);
+        const endStr = PubgUI.fmtTime(s.endTime);
+        return `
+          <div class="phase">
+            <h2><span class="num">Phase ${i+1}</span> ${startStr} → ${endStr} · ${s.matches} ${s.matches===1?'Match':'Matches'}</h2>
+            <div class="squad">Squad: ${squad}</div>
+            <div class="phase-stats">
+              <span><b>${s.kills}</b>Kills</span>
+              <span><b>${PubgUI.fmtNum(Math.round(s.damage))}</b>DMG</span>
+              <span><b>${s.wins}</b>🍗</span>
+              <span><b>${PubgUI.fmtKD(s.kd)}</b>K/D</span>
+              <span><b>#${s.avgPlace.toFixed(1)}</b>Avg</span>
+              <span><b>${fmtDuration(s.totalSurvivedSec)}</b>überlebt</span>
+            </div>
+            <div class="matches-list">
+              ${ph.matches.map(fmtMatchRow).join("")}
+            </div>
+          </div>`;
+      }).join("");
+
+      const hl = d.highlights || [];
+      const ll = d.lowlights || [];
+      const highlightsHtml = (hl.length || ll.length) ? `
+        <div class="highlights">
+          <div class="col">
+            <h3>★ Top-DMG-Matches</h3>
+            ${hl.map(m => {
+              const startIso = PubgUI.matchStartIso(m.matchEnd, m.durationSec);
+              return `<div class="highlight-item">${PubgUI.fmtTime(startIso)} · ${PubgUI.fmtMap(m.map)} · <b>#${m.place}</b> · <b>${m.kills}</b>K · <b>${Math.round(m.damage)}</b>DMG</div>`;
+            }).join("")}
+          </div>
+          <div class="col">
+            <h3>✘ Frühe Deaths</h3>
+            ${ll.map(m => {
+              const startIso = PubgUI.matchStartIso(m.matchEnd, m.durationSec);
+              const surv = m.timeSurvived || 0;
+              return `<div class="highlight-item">${PubgUI.fmtTime(startIso)} · ${PubgUI.fmtMap(m.map)} · #${m.place} nach <b>${Math.floor(surv/60)}:${String(surv%60).padStart(2,"0")}</b></div>`;
+            }).join("")}
+          </div>
+        </div>` : "";
+
+      root.innerHTML = `
+        <h1>After-Session Report</h1>
+        <div class="subtitle">${subtitle}</div>
+        ${totalsHtml}
+        ${phasesHtml}
+        ${highlightsHtml}
+      `;
+    }
+
+    PubgUI.poll("/api/pubg/session-report", 60000, render, console.error);
+  </script>
+</body>
+</html>

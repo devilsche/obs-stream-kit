@@ -439,6 +439,125 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session"):
     }
 
 
+def compute_session_report(conn, my_account_id):
+    """Erzeugt einen After-Session-Report mit Phasen-Aufteilung basierend
+    auf Squad-Member-Wechseln. Jede Phase hat eigene Aggregat-Stats und
+    eine Match-Liste."""
+    started = _session_filter(conn)
+    matches = conn.execute("""
+        SELECT m.match_id, m.map_name, m.game_mode, m.played_at,
+               m.duration_secs,
+               pa.kills, pa.headshot_kills, pa.assists, pa.dbnos,
+               pa.damage_dealt, pa.place, pa.time_survived,
+               pa.longest_kill
+        FROM matches m
+        JOIN participants pa ON pa.match_id = m.match_id
+        WHERE pa.account_id = ? AND m.played_at >= ?
+        ORDER BY m.played_at ASC
+    """, (my_account_id, started)).fetchall()
+
+    if not matches:
+        return {"sessionStartedAt": started, "totalMatches": 0,
+                "phases": [], "totals": None, "highlights": []}
+
+    # Squad-Members pro Match
+    def _squad(match_id):
+        rows = conn.execute("""
+            SELECT name, kills, damage_dealt, place
+            FROM participants WHERE match_id=? AND account_id != ?
+            ORDER BY name
+        """, (match_id, my_account_id)).fetchall()
+        return [dict(r) for r in rows]
+
+    enriched = []
+    for m in matches:
+        d = dict(m)
+        d["squad"] = _squad(m["match_id"])
+        d["squadKey"] = ",".join(sorted(s["name"] for s in d["squad"])) or "(SOLO)"
+        enriched.append(d)
+
+    # Phase = aufeinanderfolgende Matches mit gleicher Squad-Konstellation
+    phases = []
+    cur_phase = None
+    for m in enriched:
+        if cur_phase is None or cur_phase["squadKey"] != m["squadKey"]:
+            cur_phase = {"squadKey": m["squadKey"],
+                          "squadNames": sorted({s["name"] for s in m["squad"]}),
+                          "matches": []}
+            phases.append(cur_phase)
+        cur_phase["matches"].append(m)
+
+    # Pro Phase Aggregate
+    for ph in phases:
+        ms = ph["matches"]
+        n = len(ms)
+        wins = sum(1 for x in ms if (x["place"] or 99) == 1)
+        ph["stats"] = {
+            "matches": n,
+            "wins": wins,
+            "kills": sum(x["kills"] or 0 for x in ms),
+            "damage": sum(x["damage_dealt"] or 0 for x in ms),
+            "avgPlace": (sum(x["place"] or 0 for x in ms) / n) if n else 0,
+            "kd": sum(x["kills"] or 0 for x in ms) / max(n - wins, 1),
+            "totalSurvivedSec": sum(x["time_survived"] or 0 for x in ms),
+            "startTime": ms[0]["played_at"],
+            "endTime": ms[-1]["played_at"],
+        }
+
+    # Total-Aggregate
+    n = len(enriched)
+    wins = sum(1 for x in enriched if (x["place"] or 99) == 1)
+    totals = {
+        "matches": n,
+        "wins": wins,
+        "kills": sum(x["kills"] or 0 for x in enriched),
+        "damage": sum(x["damage_dealt"] or 0 for x in enriched),
+        "avgPlace": sum(x["place"] or 0 for x in enriched) / n if n else 0,
+        "kd": sum(x["kills"] or 0 for x in enriched) / max(n - wins, 1),
+        "headshots": sum(x["headshot_kills"] or 0 for x in enriched),
+        "assists": sum(x["assists"] or 0 for x in enriched),
+        "dbnos": sum(x["dbnos"] or 0 for x in enriched),
+        "totalSurvivedSec": sum(x["time_survived"] or 0 for x in enriched),
+        "longestKill": max((x["longest_kill"] or 0 for x in enriched), default=0),
+        "startTime": enriched[0]["played_at"],
+        "endTime": enriched[-1]["played_at"],
+        "uniqueMaps": len({x["map_name"] for x in enriched}),
+    }
+
+    # Highlights — beste Matches nach DMG
+    highlights = sorted(enriched, key=lambda x: -(x["damage_dealt"] or 0))[:3]
+    # Lowlights — frühe Deaths (kurze time_survived)
+    lowlights = sorted([x for x in enriched if (x["place"] or 99) > 20],
+                       key=lambda x: x["time_survived"] or 0)[:3]
+
+    def _to_payload(m):
+        return {
+            "matchId": m["match_id"],
+            "map": m["map_name"],
+            "mode": m["game_mode"],
+            "matchEnd": m["played_at"],
+            "durationSec": m["duration_secs"],
+            "place": m["place"],
+            "kills": m["kills"],
+            "damage": m["damage_dealt"],
+            "timeSurvived": m["time_survived"],
+            "squad": m["squad"],
+        }
+
+    return {
+        "sessionStartedAt": started,
+        "totalMatches": n,
+        "totals": totals,
+        "phases": [{
+            "squadNames": ph["squadNames"],
+            "stats": ph["stats"],
+            "matches": [_to_payload(m) for m in ph["matches"]],
+        } for ph in phases],
+        "highlights": [_to_payload(m) for m in highlights],
+        "lowlights": [_to_payload(m) for m in lowlights],
+    }
+
+
 def compute_chickens_together(conn, my_account_id, min_wins=1, min_matches=1):
     """Pro Co-Player: gemeinsame Wins (place=1), Match-Anzahl, Win-Rate.
     Sortiert: absolute Wins primär, bei Gleichstand höhere Win-Rate vor."""

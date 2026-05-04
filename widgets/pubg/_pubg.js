@@ -41,6 +41,40 @@
 
   PubgUI.fmtKm = (km) => (km == null ? "—" : km.toFixed(2) + "km");
 
+  // ── Zeit-Formatter — Browser-Lokalzeit (CEST/CET je nach Sommerzeit) ───────
+  PubgUI.fmtDate = (iso) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return d.toLocaleDateString("de-DE", {
+      day: "2-digit", month: "2-digit", year: "numeric",
+    });
+  };
+  PubgUI.fmtTime = (iso) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  };
+  PubgUI.fmtDateTime = (iso) => {
+    if (!iso) return "—";
+    return PubgUI.fmtDate(iso) + " " + PubgUI.fmtTime(iso);
+  };
+  // Match-Start = matchEnd - durationSec.  PUBG-API played_at ist Match-Ende.
+  PubgUI.matchStartIso = (matchEndIso, durationSec) => {
+    if (!matchEndIso) return null;
+    const end = new Date(matchEndIso).getTime();
+    return new Date(end - (durationSec || 0) * 1000).toISOString();
+  };
+
+  PubgUI.fmtRelative = (iso) => {
+    if (!iso) return "—";
+    const t = new Date(iso).getTime();
+    const diff = (Date.now() - t) / 1000;
+    if (diff < 60) return "gerade eben";
+    if (diff < 3600) return Math.floor(diff/60) + " Min";
+    if (diff < 86400) return Math.floor(diff/3600) + "h";
+    return Math.floor(diff/86400) + " Tagen";
+  };
+
   PubgUI.fetchJson = async (url) => {
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
