@@ -194,6 +194,59 @@
       padding: 40px;
       font-style: italic;
     }
+    .range-picker {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding: 10px 14px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--pubg-border);
+      border-radius: 6px;
+      flex-wrap: wrap;
+    }
+    .range-picker label {
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .range-picker input[type=date],
+    .range-picker input[type=time] {
+      background: rgba(0,0,0,0.4);
+      color: var(--pubg-text);
+      border: 1px solid var(--pubg-border);
+      padding: 4px 6px;
+      border-radius: 3px;
+      font-family: inherit;
+      font-size: inherit;
+      color-scheme: dark;
+    }
+    .range-picker .presets {
+      display: flex; gap: 4px;
+      margin-left: auto;
+    }
+    .range-picker .preset {
+      padding: 4px 10px;
+      background: rgba(94,42,121,0.18);
+      border: 1px solid transparent;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 0.85em;
+      color: var(--pubg-text);
+      font-family: inherit;
+    }
+    .range-picker .preset:hover { background: rgba(94,42,121,0.4); }
+    .range-picker button.apply {
+      background: var(--pubg-gold);
+      color: #1a0d2a;
+      border: none;
+      padding: 5px 14px;
+      border-radius: 3px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+    }
     .session-picker {
       display: flex; gap: 6px; flex-wrap: wrap;
       margin-bottom: 18px;
@@ -236,6 +289,22 @@
   </style>
 </head>
 <body>
+  <div class="range-picker">
+    <label>Von</label>
+    <input type="date" id="dateFrom">
+    <input type="time" id="timeFrom" value="00:00" step="60">
+    <label>Bis</label>
+    <input type="date" id="dateTo">
+    <input type="time" id="timeTo" value="23:59" step="60">
+    <button class="apply" id="applyRange">Anwenden</button>
+    <div class="presets">
+      <button class="preset" data-preset="current">▶ Aktuelle</button>
+      <button class="preset" data-preset="today">Heute</button>
+      <button class="preset" data-preset="yesterday">Gestern</button>
+      <button class="preset" data-preset="last7">Letzte 7 Tage</button>
+      <button class="preset" data-preset="all">Alle (DB)</button>
+    </div>
+  </div>
   <div id="picker" class="session-picker" style="display:none"></div>
   <div class="pubg-card report pubg-fade-in" id="report">
     <div class="empty">— wird geladen —</div>
@@ -246,11 +315,70 @@
     const FROM = PubgUI.qs("from", "");
     const TO = PubgUI.qs("to", "");
 
-    PubgUI.buildFilter([
-      { key: "from", label: "Von (ISO)", type: "text",
-        placeholder: "leer = aktuelle Session" },
-      { key: "to", label: "Bis (ISO)", type: "text", placeholder: "leer = jetzt" },
-    ]);
+    // Date-Range-Picker initialisieren mit aktuellen URL-Werten
+    function isoLocal(date) {
+      // Local-Date → "YYYY-MM-DD"
+      return date.toISOString().slice(0, 10);
+    }
+    function pad(n) { return String(n).padStart(2, "0"); }
+
+    if (FROM) {
+      const d = new Date(FROM);
+      document.getElementById("dateFrom").value = isoLocal(d);
+      document.getElementById("timeFrom").value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+    if (TO) {
+      const d = new Date(TO);
+      document.getElementById("dateTo").value = isoLocal(d);
+      document.getElementById("timeTo").value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function applyRange(fromIso, toIso) {
+      const u = new URL(location.href);
+      if (fromIso) u.searchParams.set("from", fromIso);
+      else u.searchParams.delete("from");
+      if (toIso) u.searchParams.set("to", toIso);
+      else u.searchParams.delete("to");
+      location.href = u.toString();
+    }
+
+    document.getElementById("applyRange").addEventListener("click", () => {
+      const df = document.getElementById("dateFrom").value;
+      const tf = document.getElementById("timeFrom").value || "00:00";
+      const dt = document.getElementById("dateTo").value;
+      const tt = document.getElementById("timeTo").value || "23:59";
+      const from = df ? new Date(`${df}T${tf}:00`).toISOString() : "";
+      const to = dt ? new Date(`${dt}T${tt}:00`).toISOString() : "";
+      applyRange(from, to);
+    });
+
+    document.querySelectorAll(".preset").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const p = btn.dataset.preset;
+        const now = new Date();
+        const today = new Date(now); today.setHours(0,0,0,0);
+        let from = "", to = "";
+        if (p === "current") {
+          // alles leer = aktuelle Session
+        } else if (p === "today") {
+          from = today.toISOString();
+          const e = new Date(today); e.setHours(23,59,59,0);
+          to = e.toISOString();
+        } else if (p === "yesterday") {
+          const ys = new Date(today); ys.setDate(ys.getDate() - 1);
+          from = ys.toISOString();
+          const ye = new Date(ys); ye.setHours(23,59,59,0);
+          to = ye.toISOString();
+        } else if (p === "last7") {
+          const s = new Date(today); s.setDate(s.getDate() - 7);
+          from = s.toISOString();
+          // to leer = jetzt
+        } else if (p === "all") {
+          from = "1970-01-01T00:00:00Z";
+        }
+        applyRange(from, to);
+      });
+    });
 
     // Sessions-Picker laden + rendern
     PubgUI.fetchJson("/api/pubg/sessions").then(sessions => {
