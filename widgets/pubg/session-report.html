@@ -194,16 +194,100 @@
       padding: 40px;
       font-style: italic;
     }
+    .session-picker {
+      display: flex; gap: 6px; flex-wrap: wrap;
+      margin-bottom: 18px;
+      padding: 10px 14px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--pubg-border);
+      border-radius: 6px;
+    }
+    .session-picker .item {
+      padding: 6px 10px;
+      background: rgba(94,42,121,0.18);
+      border: 1px solid transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.78em;
+      transition: all 0.15s;
+    }
+    .session-picker .item:hover {
+      background: rgba(94,42,121,0.4);
+    }
+    .session-picker .item.active {
+      background: var(--pubg-purple);
+      border-color: var(--pubg-gold);
+      color: var(--pubg-text);
+    }
+    .session-picker .item .label {
+      color: var(--pubg-gold); font-weight: 700;
+      display: block;
+      margin-bottom: 2px;
+      font-size: 1.05em;
+    }
+    .session-picker .item .meta {
+      color: var(--pubg-muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .session-picker .item.current {
+      background: rgba(242,183,5,0.15);
+      border-color: rgba(242,183,5,0.4);
+    }
   </style>
 </head>
 <body>
+  <div id="picker" class="session-picker" style="display:none"></div>
   <div class="pubg-card report pubg-fade-in" id="report">
     <div class="empty">— wird geladen —</div>
   </div>
 
   <script src="_pubg.js"></script>
   <script>
-    PubgUI.buildFilter([]);
+    const FROM = PubgUI.qs("from", "");
+    const TO = PubgUI.qs("to", "");
+
+    PubgUI.buildFilter([
+      { key: "from", label: "Von (ISO)", type: "text",
+        placeholder: "leer = aktuelle Session" },
+      { key: "to", label: "Bis (ISO)", type: "text", placeholder: "leer = jetzt" },
+    ]);
+
+    // Sessions-Picker laden + rendern
+    PubgUI.fetchJson("/api/pubg/sessions").then(sessions => {
+      if (!sessions.length) return;
+      const picker = document.getElementById("picker");
+      picker.style.display = "flex";
+
+      const isCurrent = (s, idx) => idx === 0 && !FROM;
+      const isActiveSelected = (s) => FROM === s.from;
+
+      const items = sessions.slice(0, 30).map((s, i) => {
+        const startCest = PubgUI.fmtDateTime(s.from);
+        const cls = ["item"];
+        if (isCurrent(s, i)) cls.push("current");
+        if (isActiveSelected(s)) cls.push("active");
+        return `<div class="${cls.join(' ')}" data-from="${s.from}" data-to="${s.to}">
+          <span class="label">${i === 0 ? "▶ Aktuelle" : "Session " + (i+1)}</span>
+          <span class="meta">${startCest} · ${s.matches}M · ${s.wins} 🍗 · ${s.kills}K</span>
+        </div>`;
+      }).join("");
+      picker.innerHTML = items;
+
+      picker.addEventListener("click", (e) => {
+        const it = e.target.closest(".item");
+        if (!it) return;
+        const u = new URL(location.href);
+        if (it.classList.contains("current")) {
+          // Aktuelle Session = keine from/to params
+          u.searchParams.delete("from");
+          u.searchParams.delete("to");
+        } else {
+          u.searchParams.set("from", it.dataset.from);
+          u.searchParams.set("to", it.dataset.to);
+        }
+        location.href = u.toString();
+      });
+    }).catch(() => {});
 
     function fmtDuration(secs) {
       if (!secs) return "0min";
@@ -371,7 +455,11 @@
       detail.classList.toggle("show", !wasExpanded);
     });
 
-    PubgUI.poll("/api/pubg/session-report", 60000, render, console.error);
+    const reportUrl = "/api/pubg/session-report" +
+      ((FROM || TO) ? "?" + new URLSearchParams({
+        ...(FROM ? {from: FROM} : {}), ...(TO ? {to: TO} : {})
+      }).toString() : "");
+    PubgUI.poll(reportUrl, 60000, render, console.error);
   </script>
 </body>
 </html>

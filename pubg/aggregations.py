@@ -446,12 +446,79 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session"):
     }
 
 
-def compute_session_report(conn, my_account_id):
-    """Erzeugt einen After-Session-Report mit Phasen-Aufteilung basierend
-    auf Squad-Member-Wechseln. Jede Phase hat eigene Aggregat-Stats und
-    eine Match-Liste."""
-    started = _session_filter(conn)
-    matches = conn.execute("""
+def compute_sessions_index(conn, my_account_id, gap_hours=4):
+    """Liste aller erkennbaren Sessions in der DB, basierend auf 4h-Lücken.
+    Returns Sessions sortiert vom neuesten zum ältesten."""
+    rows = conn.execute("""
+        SELECT m.match_id, m.played_at, m.duration_secs, m.map_name,
+               pa.kills, pa.damage_dealt, pa.place
+        FROM matches m
+        JOIN participants pa ON pa.match_id = m.match_id
+        WHERE pa.account_id = ?
+        ORDER BY m.played_at ASC
+    """, (my_account_id,)).fetchall()
+
+    if not rows:
+        return []
+
+    # Sessions identifizieren via Gap zwischen aufeinanderfolgenden played_at
+    sessions = []
+    cur = []
+    prev_ts = None
+    for r in rows:
+        ts = _parse_iso(r["played_at"])
+        if prev_ts is not None and (ts - prev_ts).total_seconds() / 3600 > gap_hours:
+            sessions.append(cur)
+            cur = []
+        cur.append(r)
+        prev_ts = ts
+    if cur:
+        sessions.append(cur)
+
+    out = []
+    for ms in sessions:
+        n = len(ms)
+        wins = sum(1 for x in ms if (x["place"] or 99) == 1)
+        # Match-Start des ersten Matches = played_at - duration
+        first_end = _parse_iso(ms[0]["played_at"])
+        first_start = first_end - datetime.timedelta(
+            seconds=ms[0]["duration_secs"] or 0)
+        last_end = ms[-1]["played_at"]
+
+        # Top-Map der Session
+        map_count = {}
+        for x in ms:
+            map_count[x["map_name"]] = map_count.get(x["map_name"], 0) + 1
+        top_map = max(map_count.items(), key=lambda x: x[1])[0] if map_count else None
+
+        out.append({
+            "from": first_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "to": last_end,
+            "matches": n,
+            "wins": wins,
+            "kills": sum(x["kills"] or 0 for x in ms),
+            "damage": sum(x["damage_dealt"] or 0 for x in ms),
+            "topMap": top_map,
+        })
+    # Sortiert: jüngste Session zuerst
+    return list(reversed(out))
+
+
+def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
+    """Erzeugt einen After-Session-Report mit Phasen-Aufteilung.
+    - Default: aktuelle Session via _session_filter
+    - Mit range_from/range_to (ISO): genauer Zeitraum"""
+    if range_from:
+        started = range_from
+    else:
+        started = _session_filter(conn)
+
+    end_filter = "AND m.played_at <= ?" if range_to else ""
+    params = [my_account_id, started]
+    if range_to:
+        params.append(range_to)
+
+    matches = conn.execute(f"""
         SELECT m.match_id, m.map_name, m.game_mode, m.played_at,
                m.duration_secs,
                pa.kills, pa.headshot_kills, pa.assists, pa.dbnos,
@@ -459,12 +526,13 @@ def compute_session_report(conn, my_account_id):
                pa.longest_kill
         FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id
-        WHERE pa.account_id = ? AND m.played_at >= ?
+        WHERE pa.account_id = ? AND m.played_at >= ? {end_filter}
         ORDER BY m.played_at ASC
-    """, (my_account_id, started)).fetchall()
+    """, params).fetchall()
 
     if not matches:
-        return {"sessionStartedAt": started, "totalMatches": 0,
+        return {"sessionStartedAt": started, "rangeTo": range_to,
+                "totalMatches": 0,
                 "phases": [], "totals": None, "highlights": []}
 
     # Squad-Members pro Match (ohne dich selbst, sortiert)
@@ -629,6 +697,7 @@ def compute_session_report(conn, my_account_id):
 
     return {
         "sessionStartedAt": started,
+        "rangeTo": range_to,
         "totalMatches": n,
         "totals": totals,
         "phases": [{
