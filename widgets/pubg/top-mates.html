@@ -86,7 +86,10 @@
       if (SORT_BY === "mateKd")           return "K/D " + (m.mateKd || 0).toFixed(2);
       if (SORT_BY === "winRate")          return (m.winRate || 0).toFixed(1) + "%";
       if (SORT_BY === "mostPlayed")       return m.sharedMatches + "g";
-      if (SORT_BY === "chickensTogether") return (m.winsTogether || 0) + " 🍗";
+      if (SORT_BY === "chickensTogether") {
+        const rate = m.winRate || 0;
+        return (m.winsTogether || 0) + " 🍗 · " + rate.toFixed(1) + "%";
+      }
       if (SORT_BY === "synergy")          return "Score " + (m.synergyScore || 0).toFixed(2);
       return "";
     }
@@ -109,8 +112,10 @@
       if (m.winsTogether && SORT_BY !== "chickensTogether") {
         parts.push(`<span><b>${m.winsTogether}</b> 🍗</span>`);
       }
-      // Win-Rate — weglassen wenn schon primary
-      if (SORT_BY !== "winRate" && (m.winRate || 0) > 0) {
+      // Win-Rate / Chicken-Rate — bei winRate ist's primary,
+      // bei chickensTogether ist's bereits im primary "X 🍗 · Y%"
+      if (SORT_BY !== "winRate" && SORT_BY !== "chickensTogether"
+          && (m.winRate || 0) > 0) {
         parts.push(`<span>Win <b>${(m.winRate||0).toFixed(0)}%</b></span>`);
       }
       // Avg Place — weglassen wenn schon primary
