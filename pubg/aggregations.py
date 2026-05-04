@@ -470,11 +470,17 @@ def compute_session_report(conn, my_account_id):
     # Squad-Members pro Match (ohne dich selbst, sortiert)
     def _squad(match_id):
         rows = conn.execute("""
-            SELECT name, kills, damage_dealt, place
+            SELECT name, kills, headshot_kills, assists, dbnos,
+                   damage_dealt, place, time_survived
             FROM participants WHERE match_id=? AND account_id != ?
             ORDER BY name
         """, (match_id, my_account_id)).fetchall()
         return [dict(r) for r in rows]
+
+    self_name_row = conn.execute(
+        "SELECT name FROM players WHERE account_id = ?", (my_account_id,)
+    ).fetchone()
+    my_name = self_name_row["name"] if self_name_row else "Self"
 
     # Längste time_survived im Squad (du + Mates) — wann der LETZTE Squadmember
     # raus war. Bei Win = Match-Dauer.
@@ -577,6 +583,18 @@ def compute_session_report(conn, my_account_id):
                        key=lambda x: x["time_survived"] or 0)[:3]
 
     def _to_payload(m):
+        # Eigener Eintrag zusätzlich zu mates-Liste
+        my_entry = {
+            "name": my_name,
+            "kills": m["kills"],
+            "headshot_kills": m["headshot_kills"],
+            "assists": m["assists"],
+            "dbnos": m["dbnos"],
+            "damage_dealt": m["damage_dealt"],
+            "place": m["place"],
+            "time_survived": m["time_survived"],
+            "isSelf": True,
+        }
         return {
             "matchId": m["match_id"],
             "map": m["map_name"],
@@ -586,8 +604,9 @@ def compute_session_report(conn, my_account_id):
             "place": m["place"],
             "kills": m["kills"],
             "damage": m["damage_dealt"],
-            "timeSurvived": m["time_survived"],          # nur du
-            "squadTimeSurvived": m["squadTimeSurvived"], # längster im Squad
+            "timeSurvived": m["time_survived"],
+            "squadTimeSurvived": m["squadTimeSurvived"],
+            "myStats": my_entry,
             "squad": m["squad"],
         }
 

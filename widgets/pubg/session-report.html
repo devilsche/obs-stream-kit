@@ -78,7 +78,11 @@
       padding: 4px 8px;
       border-radius: 3px;
       align-items: center;
+      cursor: pointer;
+      transition: background 0.15s;
     }
+    .matches-list .m:hover { background: rgba(94, 42, 121, 0.18); }
+    .matches-list .m.expanded { background: rgba(94, 42, 121, 0.25); }
     .matches-list .header-row {
       display: grid;
       grid-template-columns: 240px 70px 1fr auto;
@@ -91,6 +95,40 @@
       border-bottom: 1px dashed rgba(255,255,255,0.1);
       margin-bottom: 4px;
     }
+    .squad-detail {
+      padding: 8px 14px 12px 28px;
+      margin-bottom: 4px;
+      background: rgba(94, 42, 121, 0.10);
+      border-radius: 0 0 4px 4px;
+      font-size: 0.78em;
+      display: none;
+    }
+    .squad-detail.show { display: block; animation: pubg-fade-in 0.25s; }
+    .squad-detail table {
+      width: 100%;
+      border-collapse: collapse;
+      font-variant-numeric: tabular-nums;
+    }
+    .squad-detail th, .squad-detail td {
+      padding: 4px 8px;
+      text-align: right;
+    }
+    .squad-detail th:first-child, .squad-detail td:first-child {
+      text-align: left;
+    }
+    .squad-detail th {
+      color: var(--pubg-muted);
+      font-weight: 400;
+      font-size: 0.85em;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .squad-detail .self {
+      color: var(--pubg-gold);
+      font-weight: 700;
+    }
+    .squad-detail tr.win td { color: var(--pubg-gold); }
     .matches-list .time-range { color: var(--pubg-muted); }
     .matches-list .time-range b { color: var(--pubg-text); font-weight: 400; }
     .matches-list .m:hover { background: rgba(255,255,255,0.04); }
@@ -148,21 +186,57 @@
       return h ? `${h}h ${m}min` : `${m}min`;
     }
 
-    function fmtMatchRow(m) {
+    function fmtSurv(secs) {
+      const m = Math.floor((secs||0)/60);
+      const s = (secs||0) % 60;
+      return `${m}:${String(s).padStart(2,"0")}`;
+    }
+
+    function fmtSquadDetail(m) {
+      // Du oben, dann Mates sortiert nach Damage absteigend
+      const all = [m.myStats, ...(m.squad || [])];
+      all.sort((a, b) => {
+        if (a.isSelf) return -1;
+        if (b.isSelf) return 1;
+        return (b.damage_dealt || 0) - (a.damage_dealt || 0);
+      });
+      const isWin = m.place === 1;
+      const rows = all.map(p => {
+        const cls = (p.isSelf ? "self " : "") + (isWin ? "win" : "");
+        const kd = (p.kills || 0);  // pro Match — nicht aggregierte K/D
+        return `<tr class="${cls.trim()}">
+          <td>${p.name}${p.isSelf ? " (du)" : ""}</td>
+          <td>${p.kills || 0}</td>
+          <td>${p.headshot_kills || 0}</td>
+          <td>${p.assists || 0}</td>
+          <td>${p.dbnos || 0}</td>
+          <td>${Math.round(p.damage_dealt || 0)}</td>
+          <td>${fmtSurv(p.time_survived)}</td>
+        </tr>`;
+      }).join("");
+      return `
+        <table>
+          <thead><tr>
+            <th>Squad</th><th>K</th><th>HS</th><th>Ass</th><th>DBNO</th><th>DMG</th><th>Survived</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+
+    function fmtMatchRow(m, idx) {
       const startIso = PubgUI.matchStartIso(m.matchEnd, m.durationSec);
       const mySurv = m.timeSurvived || 0;
       const squadSurv = m.squadTimeSurvived || mySurv;
-      const survStr = `${Math.floor(mySurv/60)}:${String(mySurv%60).padStart(2,"0")}`;
       const isWin = m.place === 1;
-      // Squad-Out-Zeit = Match-Start + längste Survived-Zeit aller Squad-Mates
       const squadOutIso = new Date(new Date(startIso).getTime() + squadSurv * 1000).toISOString();
       return `
-        <div class="m ${isWin ? 'win' : ''}">
+        <div class="m ${isWin ? 'win' : ''}" data-idx="${idx}">
           <span class="time-range"><b>${PubgUI.fmtTime(startIso)}</b> → <b>${PubgUI.fmtTime(squadOutIso)}</b></span>
           <span class="place">${isWin ? '🍗 #1' : '#' + m.place}</span>
           <span class="map">${PubgUI.fmtMap(m.map)}</span>
-          <span class="stats"><b>${m.kills}</b>K · <b>${Math.round(m.damage||0)}</b>DMG · meine ${survStr}</span>
-        </div>`;
+          <span class="stats"><b>${m.kills}</b>K · <b>${Math.round(m.damage||0)}</b>DMG · meine ${fmtSurv(mySurv)}</span>
+        </div>
+        <div class="squad-detail" data-idx-detail="${idx}">${fmtSquadDetail(m)}</div>`;
     }
 
     function render(d) {
@@ -215,7 +289,7 @@
               <div class="header-row">
                 <span>Squad im Match</span><span>Place</span><span>Map</span><span>Stats / meine Surv</span>
               </div>
-              ${ph.matches.map(fmtMatchRow).join("")}
+              ${ph.matches.map((m, i) => fmtMatchRow(m, `${ph.coreSquad.join('-')}-${i}`)).join("")}
             </div>
           </div>`;
       }).join("");
@@ -249,6 +323,18 @@
         ${highlightsHtml}
       `;
     }
+
+    // Click-Handler: Match-Zeile expandiert Squad-Detail
+    document.addEventListener("click", (e) => {
+      const row = e.target.closest(".m[data-idx]");
+      if (!row) return;
+      const idx = row.getAttribute("data-idx");
+      const detail = document.querySelector(`[data-idx-detail="${idx}"]`);
+      if (!detail) return;
+      const wasExpanded = row.classList.contains("expanded");
+      row.classList.toggle("expanded");
+      detail.classList.toggle("show", !wasExpanded);
+    });
 
     PubgUI.poll("/api/pubg/session-report", 60000, render, console.error);
   </script>
