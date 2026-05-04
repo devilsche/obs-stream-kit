@@ -33,7 +33,7 @@ class EndpointRegistry:
         qs = {k: v[0] for k, v in parse_qs(u.query).items()}
 
         if route == ("GET", "/api/pubg/session"):
-            return self._session()
+            return self._session(qs)
         if route == ("GET", "/api/pubg/last-match"):
             return self._last_match()
         if route == ("GET", "/api/pubg/status"):
@@ -71,11 +71,12 @@ class EndpointRegistry:
             return self._stamm_del(body)
         return _err(404, f"unknown route {path}")
 
-    def _session(self):
+    def _session(self, qs=None):
         conn = self.get_conn()
+        range_key = (qs or {}).get("range", "session")
         return _ok(self.cache.get_or_compute(
-            "session",
-            lambda: compute_session_stats(conn, self.my_account_id),
+            f"session:{range_key}",
+            lambda: compute_session_stats(conn, self.my_account_id, range_key),
         ))
 
     def _last_match(self):

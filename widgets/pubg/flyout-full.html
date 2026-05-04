@@ -79,7 +79,7 @@
 <body>
   <div class="pubg-card panel pubg-fade-in">
     <div class="head">
-      <h2>PUBG SESSION</h2>
+      <h2 id="cardTitle">PUBG SESSION</h2>
       <button class="reset-btn" id="reset">Reset</button>
     </div>
 
@@ -125,23 +125,6 @@
       <div id="topmates"></div>
     </div>
 
-    <div class="section" id="filterSection">
-      <h3>Filter</h3>
-      <div class="controls">
-        <span class="pubg-stat-label">Min Matches</span>
-        <input type="range" id="minMatches" min="1" max="50" value="10">
-        <span class="pubg-stat-value" id="minVal">10</span>
-        <select id="sortBy">
-          <option value="synergy">Synergy (Composite KDA)</option>
-          <option value="mostPlayed">Most Played</option>
-          <option value="chickensTogether">Most 🍗 Together</option>
-          <option value="kd">Best K/D (Meine)</option>
-          <option value="mateKd">Best K/D (Mate)</option>
-          <option value="winRate">Win-Rate</option>
-          <option value="avgPlace">Avg Place</option>
-        </select>
-      </div>
-    </div>
   </div>
 
   <script src="_pubg.js"></script>
@@ -176,29 +159,51 @@
       });
     }
 
-    let currentMin = 10;
-    let currentSort = "mostPlayed";
-
-    async function loadSettings() {
-      try {
-        const s = await PubgUI.fetchJson("/api/pubg/settings");
-        if (s.minMatchesForTopMates) {
-          currentMin = parseInt(s.minMatchesForTopMates, 10);
-          document.getElementById("minMatches").value = currentMin;
-          document.getElementById("minVal").textContent = currentMin;
-        }
-        if (s.topMatesSortBy) {
-          currentSort = s.topMatesSortBy;
-          document.getElementById("sortBy").value = currentSort;
-        }
-      } catch (_) {}
+    // Globaler Range-Filter: session/day/week/all
+    const RANGE = PubgUI.qs("range", "session");
+    const TITLES = {
+      session: "PUBG SESSION",
+      day:     "PUBG — HEUTE",
+      week:    "PUBG — LETZTE 7 TAGE",
+      all:     "PUBG — DB-LIFETIME",
+    };
+    document.getElementById("cardTitle").textContent = TITLES[RANGE] || TITLES.session;
+    if (RANGE !== "session") {
+      // Reset-Button nur sinnvoll bei Session-Modus
+      document.getElementById("reset").style.display = "none";
     }
 
-    async function saveSetting(key, value) {
-      await fetch("/api/pubg/settings", {
-        method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({key, value: String(value)}),
-      });
+    PubgUI.buildFilter([
+      { key: "range", label: "Range", type: "select", default: "session",
+        options: [["session","Session"],["day","Heute"],
+                  ["week","Letzte 7 Tage"],["all","DB-Lifetime"]]},
+      { key: "sortBy", label: "Mate-Sort", type: "select", default: "mostPlayed",
+        options: [["synergy","Synergy"],["mostPlayed","Most Played"],
+                  ["chickensTogether","Most 🍗"],["kd","Best K/D Meine"],
+                  ["mateKd","Best K/D Mate"],["winRate","Win-Rate"],
+                  ["avgPlace","Avg Place"]]},
+      { key: "minMatches", label: "Min Mates", type: "range",
+        min: 1, max: 50, default: 10 },
+      { key: "compact", label: "Compact", type: "select", default: "0",
+        options: [["0","Normal"],["1","Compact"]]},
+    ]);
+
+    let currentMin = parseInt(PubgUI.qs("minMatches", 10), 10);
+    let currentSort = PubgUI.qs("sortBy", "mostPlayed");
+
+    async function loadSettings() {
+      // Settings-Defaults nur falls URL-Param fehlt
+      if (PubgUI.qs("minMatches") == null || PubgUI.qs("sortBy") == null) {
+        try {
+          const s = await PubgUI.fetchJson("/api/pubg/settings");
+          if (PubgUI.qs("minMatches") == null && s.minMatchesForTopMates) {
+            currentMin = parseInt(s.minMatchesForTopMates, 10);
+          }
+          if (PubgUI.qs("sortBy") == null && s.topMatesSortBy) {
+            currentSort = s.topMatesSortBy;
+          }
+        } catch (_) {}
+      }
     }
 
     function renderSession(s) {
@@ -300,32 +305,29 @@
         </div>`).join("") : '<span class="pubg-error">noch keine Daten</span>';
     }
 
+    const RANGE_LABEL = {
+      session: "Session",
+      day:     "heute",
+      week:    "letzte 7 Tage",
+      all:     "DB-Lifetime",
+    };
+
     function updateTopMatesSubtitle() {
+      const m = currentMin === 1 ? "Match" : "Matches";
       document.getElementById("topMatesSubtitle").textContent =
-        `— Session, mind. ${currentMin} ${currentMin === 1 ? "Match" : "Matches"}`;
+        `— ${RANGE_LABEL[RANGE]}, mind. ${currentMin} ${m}`;
     }
 
     function reload() {
       updateTopMatesSubtitle();
-      PubgUI.fetchJson("/api/pubg/session").then(renderSession).catch(()=>{});
-      PubgUI.fetchJson("/api/pubg/first-fight-rate?range=session").then(renderFF).catch(()=>{});
-      PubgUI.fetchJson(`/api/pubg/top-mates?range=session&sortBy=${currentSort}&limit=5&minMatches=${currentMin}`)
+      PubgUI.fetchJson(`/api/pubg/session?range=${RANGE}`).then(renderSession).catch(()=>{});
+      const ffRange = RANGE === "all" ? "session" : RANGE;
+      PubgUI.fetchJson(`/api/pubg/first-fight-rate?range=${ffRange}`).then(renderFF).catch(()=>{});
+      const tmRange = RANGE === "all" ? "" : `range=${RANGE}&`;
+      PubgUI.fetchJson(`/api/pubg/top-mates?${tmRange}sortBy=${currentSort}&limit=5&minMatches=${currentMin}`)
         .then(renderTopMates).catch(()=>{});
     }
 
-    document.getElementById("minMatches").addEventListener("input", (e) => {
-      currentMin = parseInt(e.target.value, 10);
-      document.getElementById("minVal").textContent = currentMin;
-    });
-    document.getElementById("minMatches").addEventListener("change", () => {
-      saveSetting("minMatchesForTopMates", currentMin);
-      reload();
-    });
-    document.getElementById("sortBy").addEventListener("change", (e) => {
-      currentSort = e.target.value;
-      saveSetting("topMatesSortBy", currentSort);
-      reload();
-    });
     document.getElementById("reset").addEventListener("click", async () => {
       await fetch("/api/pubg/session/reset", {method: "POST"});
       reload();

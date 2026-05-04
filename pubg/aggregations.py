@@ -55,10 +55,15 @@ def _range_filter(conn, range_key):
     return "1970-01-01T00:00:00Z"
 
 
-def compute_session_stats(conn, my_account_id: str) -> dict:
-    started = _session_filter(conn)
-    explicit = get_setting(conn, "sessionStartedAt")
-    session_mode = "manual" if (explicit and explicit > "1970-01-02") else "auto"
+def compute_session_stats(conn, my_account_id: str,
+                          range_key: str = "session") -> dict:
+    if range_key == "session":
+        started = _session_filter(conn)
+        explicit = get_setting(conn, "sessionStartedAt")
+        session_mode = "manual" if (explicit and explicit > "1970-01-02") else "auto"
+    else:
+        started = _range_filter(conn, range_key) if range_key != "all" else "1970-01-01T00:00:00Z"
+        session_mode = range_key
     rows = conn.execute("""
         SELECT m.match_id, m.map_name, m.played_at,
                pa.kills, pa.damage_dealt, pa.place, pa.headshot_kills,
