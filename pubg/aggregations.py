@@ -369,6 +369,39 @@ def compute_mates_today(conn, my_account_id: str,
     return out
 
 
+def compute_best_worst_map(conn, my_account_id, range_key="all", min_matches=3):
+    """Liefert Best- und Worst-Map basierend auf K/D mit Mindest-Match-Schwelle."""
+    cutoff = (_range_filter(conn, range_key)
+              if range_key != "all" else "1970-01-01T00:00:00Z")
+    rows = conn.execute("""
+        SELECT m.map_name,
+               COUNT(*) AS n,
+               SUM(CASE WHEN pa.place=1 THEN 1 ELSE 0 END) AS wins,
+               SUM(pa.kills) AS kills,
+               AVG(pa.damage_dealt) AS avg_dmg,
+               AVG(pa.place) AS avg_place
+        FROM matches m
+        JOIN participants pa ON pa.match_id = m.match_id
+        WHERE pa.account_id = ? AND m.played_at >= ?
+        GROUP BY m.map_name
+        HAVING n >= ?
+    """, (my_account_id, cutoff, min_matches)).fetchall()
+    if not rows:
+        return {"best": None, "worst": None}
+
+    def _kd(r):
+        return (r["kills"] or 0) / max((r["n"] or 0) - (r["wins"] or 0), 1)
+
+    enriched = [{
+        "map": r["map_name"], "matches": r["n"], "wins": r["wins"],
+        "kills": r["kills"], "kd": _kd(r),
+        "avgDmg": r["avg_dmg"], "avgPlace": r["avg_place"],
+    } for r in rows]
+    best = max(enriched, key=lambda x: x["kd"])
+    worst = min(enriched, key=lambda x: x["kd"])
+    return {"best": best, "worst": worst}
+
+
 def compute_map_distribution(conn, my_account_id, range_key="session"):
     cutoff = _range_filter(conn, range_key) if range_key != "all" else "1970-01-01T00:00:00Z"
     rows = conn.execute("""

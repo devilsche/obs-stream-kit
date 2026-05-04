@@ -92,8 +92,24 @@
         } catch (_) {}
       }
 
+      // ── BEST/WORST MAP (Session) ───────────────────────────
+      if (FOCUS !== "lifetime") {
+        try {
+          const bw = await PubgUI.fetchJson("/api/pubg/best-worst-map?range=session&minMatches=2");
+          if (bw.best && bw.worst && bw.best.map !== bw.worst.map) {
+            out.push(`<span class="label">SESSION BEST/WORST MAP</span> ${PubgUI.fmtMap(bw.best.map)} K/D <b>${bw.best.kd.toFixed(2)}</b> · ${PubgUI.fmtMap(bw.worst.map)} K/D <b>${bw.worst.kd.toFixed(2)}</b>`);
+          }
+        } catch (_) {}
+      }
+
       // ── LIFETIME / DB-LIFETIME ────────────────────────────
       if (FOCUS !== "session") {
+        try {
+          const bw = await PubgUI.fetchJson("/api/pubg/best-worst-map?range=all&minMatches=5");
+          if (bw.best && bw.worst && bw.best.map !== bw.worst.map) {
+            out.push(`<span class="label">DB — BEST/WORST MAP</span> ${PubgUI.fmtMap(bw.best.map)} K/D <b>${bw.best.kd.toFixed(2)}</b> · ${PubgUI.fmtMap(bw.worst.map)} K/D <b>${bw.worst.kd.toFixed(2)}</b>`);
+          }
+        } catch (_) {}
         try {
           const settings = await PubgUI.fetchJson("/api/pubg/settings").catch(() => ({}));
           const sortBy = settings.topMatesSortBy || "mostPlayed";

@@ -7,7 +7,7 @@ from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_mates_today, compute_map_distribution,
                                 compute_first_fight_rate, compute_squad_compare,
                                 compute_chickens_together, compute_session_report,
-                                compute_sessions_index)
+                                compute_sessions_index, compute_best_worst_map)
 
 
 def _ok(payload):
@@ -62,6 +62,10 @@ class EndpointRegistry:
             return self._session_report(qs)
         if route == ("GET", "/api/pubg/sessions"):
             return self._sessions_index()
+        if route == ("GET", "/api/pubg/best-worst-map"):
+            return self._best_worst_map(qs)
+        if route == ("GET", "/api/pubg/lookup-mate"):
+            return self._lookup_mate(qs)
         if route == ("GET", "/api/pubg/settings"):
             return self._settings_get()
         if route == ("POST", "/api/pubg/settings"):
@@ -198,6 +202,53 @@ class EndpointRegistry:
         return _ok(self.cache.get_or_compute(
             "sessions-index",
             lambda: compute_sessions_index(conn, self.my_account_id)))
+
+    def _best_worst_map(self, qs):
+        range_key = qs.get("range", "all")
+        min_m = int(qs.get("minMatches", 3))
+        conn = self.get_conn()
+        return _ok(self.cache.get_or_compute(
+            f"best-worst-map:{range_key}:{min_m}",
+            lambda: compute_best_worst_map(conn, self.my_account_id,
+                                            range_key, min_m)))
+
+    def _lookup_mate(self, qs):
+        """Live-Lookup eines Players via PUBG-API: account_id + Lifetime
+        + Recent-Match-Count. Cached 5 Min."""
+        name = qs.get("player", "").strip()
+        if not name:
+            return _err(400, "missing ?player=NAME")
+        return _ok(self.cache.get_or_compute(
+            f"lookup-mate:{name}",
+            lambda: self._lookup_mate_live(name)))
+
+    def _lookup_mate_live(self, name):
+        try:
+            player_resp = self.client.get_player(name)
+        except Exception as e:
+            return {"error": f"player not found: {e}", "name": name}
+        data = player_resp.get("data") or []
+        if not data:
+            return {"error": "player not found", "name": name}
+        p = data[0]
+        account_id = p["id"]
+        match_ids = self.client.extract_match_ids(player_resp)
+        try:
+            life_resp = self.client.get_lifetime(account_id)
+            from pubg.match_parser import (parse_lifetime_response,
+                                            aggregate_lifetime_modes)
+            modes = parse_lifetime_response(life_resp)
+            agg = aggregate_lifetime_modes(modes)
+        except Exception as e:
+            agg = None
+        return {
+            "name": p["attributes"].get("name") or name,
+            "accountId": account_id,
+            "shardId": p["attributes"].get("shardId"),
+            "recentMatchCount": len(match_ids),
+            "careerLifetime": agg,
+            "modesLifetime": modes if agg else {},
+        }
 
     def _squad_compare(self, qs):
         names = (qs.get("players") or "").split(",")
