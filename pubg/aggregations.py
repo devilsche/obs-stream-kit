@@ -387,7 +387,14 @@ def compute_map_distribution(conn, my_account_id, range_key="session"):
 
 
 def compute_first_fight_rate(conn, my_account_id, range_key="session"):
-    cutoff = _range_filter(conn, range_key)
+    """First Fight Win Rate — DEFINITION:
+    Pro Match: das erste Engagement-Event (Kill oder TakeDamage), bei dem
+    ein Squad-Member als Attacker ODER Victim involviert ist.
+    - Squad als Attacker im ersten Engagement → WIN (wir haben zuerst getroffen)
+    - Squad als Victim                       → LOSS (wir wurden zuerst getroffen)
+    - Kein Engagement im Match               → nicht gezählt
+    """
+    cutoff = _range_filter(conn, range_key) if range_key != "all" else "1970-01-01T00:00:00Z"
     matches = conn.execute("""
         SELECT m.match_id FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id
@@ -399,37 +406,38 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session"):
     survived = 0
     sparkline = []
     for m in matches:
-        events = conn.execute("""
-            SELECT event_type, timestamp_ms, actor_account, target_account
+        # Squad-Account-IDs aus participants (du + Mates dieses Matches)
+        squad_rows = conn.execute(
+            "SELECT account_id FROM participants WHERE match_id = ?",
+            (m["match_id"],)).fetchall()
+        squad_ids = {r["account_id"] for r in squad_rows}
+        if my_account_id not in squad_ids:
+            squad_ids.add(my_account_id)
+
+        # Erstes Engagement-Event mit Squad-Beteiligung
+        # (Kill = Final Blow, Knock = MakeGroggy/DBNO, TakeDamage = Trefferdamage)
+        first_engagement = conn.execute("""
+            SELECT event_type, actor_account, target_account, timestamp_ms
             FROM telemetry_events
-            WHERE match_id = ? ORDER BY timestamp_ms ASC
-        """, (m["match_id"],)).fetchall()
-        if not events:
+            WHERE match_id = ?
+              AND event_type IN ('Kill', 'Knock', 'TakeDamage')
+              AND (actor_account IN (%s) OR target_account IN (%s))
+            ORDER BY timestamp_ms ASC LIMIT 1
+        """ % (",".join("?" * len(squad_ids)), ",".join("?" * len(squad_ids))),
+            [m["match_id"]] + list(squad_ids) + list(squad_ids)
+        ).fetchone()
+
+        if not first_engagement:
             continue
-        landing = next((e for e in events if e["event_type"] == "Landing"
-                        and e["actor_account"] == my_account_id), None)
-        if not landing:
-            continue
-        window_end = (landing["timestamp_ms"] or 0) + 120 * 1000
-        engagements = [e for e in events
-                       if e["event_type"] in ("Kill", "TakeDamage")
-                       and (e["timestamp_ms"] or 0) >= (landing["timestamp_ms"] or 0)
-                       and (e["timestamp_ms"] or 0) <= window_end
-                       and (e["actor_account"] == my_account_id
-                            or e["target_account"] == my_account_id)]
-        if not engagements:
-            continue
-        first = engagements[0]
-        died = any(e["event_type"] == "Kill"
-                   and e["target_account"] == my_account_id
-                   and (e["timestamp_ms"] or 0) <= (first["timestamp_ms"] or 0) + 60000
-                   for e in events)
+        # WIN = Squad als Attacker, kein Squad-Member als Victim
+        squad_attacked = first_engagement["actor_account"] in squad_ids
+        squad_attacked_back = first_engagement["target_account"] not in squad_ids
+        won = squad_attacked and squad_attacked_back
         total += 1
-        if not died:
+        sparkline.append(1 if won else 0)
+        if won:
             survived += 1
-            sparkline.append(1)
-        else:
-            sparkline.append(0)
+
     return {
         "rate": (survived / total * 100) if total else 0,
         "survived": survived,
