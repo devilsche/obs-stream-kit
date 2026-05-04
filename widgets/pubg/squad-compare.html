@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Squad Compare</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    body { padding: 16px; }
+    .panel { padding: 16px; min-width: 480px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+    th, td { padding: 6px 8px; text-align: left;
+             border-bottom: 1px solid rgba(255,255,255,0.06); }
+    th { font-size: 0.75em; color: var(--pubg-muted);
+         text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
+    td.win { color: var(--pubg-gold); }
+  </style>
+</head>
+<body>
+  <div class="pubg-card panel pubg-fade-in">
+    <table>
+      <thead><tr id="head"></tr></thead>
+      <tbody id="body"></tbody>
+    </table>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    const PLAYERS = (PubgUI.qs("players", "") || "").split(",").filter(Boolean);
+    const MATCHES = parseInt(PubgUI.qs("matches", 5), 10);
+
+    function render(d) {
+      const head = ["Map / Datum", ...d.players].map(h => `<th>${h}</th>`).join("");
+      document.getElementById("head").innerHTML = head;
+      const body = d.matchTable.map(row => {
+        const cells = d.players.map(p => {
+          const c = row.cells[p];
+          if (!c) return `<td>—</td>`;
+          const cls = c.place === 1 ? "win" : "";
+          return `<td class="${cls}">#${c.place} · ${c.kills}K · ${PubgUI.fmtNum(Math.round(c.damage_dealt||0))}</td>`;
+        }).join("");
+        const date = (row.playedAt || "").slice(0, 10);
+        return `<tr><td>${PubgUI.fmtMap(row.map)} · ${date}</td>${cells}</tr>`;
+      }).join("");
+      document.getElementById("body").innerHTML = body || `<tr><td>—</td></tr>`;
+    }
+
+    if (PLAYERS.length) {
+      PubgUI.poll(`/api/pubg/squad-compare?players=${encodeURIComponent(PLAYERS.join(","))}&matches=${MATCHES}`,
+                  60000, render, console.error);
+    } else {
+      document.getElementById("body").innerHTML =
+        `<tr><td class="pubg-error">URL-Parameter ?players=A,B,C nötig</td></tr>`;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Session Summary</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    body { padding: 32px; }
+    .summary { width: 720px; padding: 28px 32px; }
+    .summary h1 { margin: 0 0 18px; font-size: 1.4em; letter-spacing: 0.1em;
+                  color: var(--pubg-gold); text-transform: uppercase; }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+    .grid .cell { display: flex; flex-direction: column; }
+    .grid .cell .pubg-stat-value { font-size: 1.8em; }
+    .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 22px; }
+    .col h3 { margin: 0 0 10px; font-size: 0.8em; color: var(--pubg-muted);
+              text-transform: uppercase; letter-spacing: 0.1em; }
+    .map-row, .mate-row {
+      display: flex; justify-content: space-between; padding: 4px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+  </style>
+</head>
+<body>
+  <div class="pubg-card summary pubg-fade-in">
+    <h1>Session-Übersicht</h1>
+    <div class="grid">
+      <div class="cell"><span class="pubg-stat-value" id="matches">—</span><span class="pubg-stat-label">Matches</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="kills">—</span><span class="pubg-stat-label">Kills</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="dmg">—</span><span class="pubg-stat-label">Damage</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="wins">—</span><span class="pubg-stat-label">Wins</span></div>
+    </div>
+    <div class="grid" style="margin-top: 14px;">
+      <div class="cell"><span class="pubg-stat-value" id="boosts">—</span><span class="pubg-stat-label">Boosts</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="heals">—</span><span class="pubg-stat-label">Heals</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="revives">—</span><span class="pubg-stat-label">Revives</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="weapons">—</span><span class="pubg-stat-label">Weapons</span></div>
+    </div>
+    <div class="grid" style="margin-top: 14px;">
+      <div class="cell"><span class="pubg-stat-value" id="walk">—</span><span class="pubg-stat-label">Walked</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="drive">—</span><span class="pubg-stat-label">Driven</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="swim">—</span><span class="pubg-stat-label">Swam</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="assists">—</span><span class="pubg-stat-label">Assists</span></div>
+    </div>
+    <div class="twocol">
+      <div class="col"><h3>Maps</h3><div id="maps"></div></div>
+      <div class="col"><h3>Mates</h3><div id="mates"></div></div>
+    </div>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    function render() {
+      const num = (n) => String(Math.round(n));
+      const knum = (n) => n >= 1000 ? (n/1000).toFixed(1)+"k" : String(Math.round(n));
+      const km = (n) => n.toFixed(2) + "km";
+
+      PubgUI.fetchJson("/api/pubg/session").then(s => {
+        PubgUI.animateNumber(document.getElementById("matches"), s.matches || 0, {format: num});
+        PubgUI.animateNumber(document.getElementById("kills"), s.kills || 0, {format: num});
+        PubgUI.animateNumber(document.getElementById("dmg"), s.damage || 0, {format: knum});
+        PubgUI.animateNumber(document.getElementById("wins"), s.wins || 0, {format: num});
+
+        PubgUI.animateNumber(document.getElementById("boosts"), s.totalBoosts || 0, {format: num});
+        PubgUI.animateNumber(document.getElementById("heals"), s.totalHeals || 0, {format: num});
+        PubgUI.animateNumber(document.getElementById("revives"), s.totalRevives || 0, {format: num});
+        PubgUI.animateNumber(document.getElementById("weapons"), s.totalWeaponsAcquired || 0, {format: num});
+
+        PubgUI.animateNumber(document.getElementById("walk"), s.walkKm || 0, {format: km});
+        PubgUI.animateNumber(document.getElementById("drive"), s.rideKm || 0, {format: km});
+        PubgUI.animateNumber(document.getElementById("swim"), s.swimKm || 0, {format: km});
+        PubgUI.animateNumber(document.getElementById("assists"), s.totalAssists || 0, {format: num});
+      });
+      PubgUI.fetchJson("/api/pubg/map-distribution?range=session").then(list => {
+        document.getElementById("maps").innerHTML = list.map(m =>
+          `<div class="map-row"><span>${PubgUI.fmtMap(m.map)}</span><span class="pubg-stat-value">${m.count}</span></div>`).join("");
+      });
+      PubgUI.fetchJson("/api/pubg/mates-today?range=session").then(list => {
+        document.getElementById("mates").innerHTML = list.map(m =>
+          `<div class="mate-row"><span>${m.name}</span><span class="pubg-stat-value">${m.sharedMatchesToday}</span></div>`).join("");
+      });
+    }
+    render();
+    setInterval(render, 60000);
+  </script>
+</body>
+</html>

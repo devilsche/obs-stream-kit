@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG News Ticker</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    body { display: flex; align-items: center; height: 36px; padding: 0; }
+    .ticker {
+      width: 100%; height: 36px;
+      display: flex; align-items: center;
+      padding: 0 18px;
+      font-size: 0.95em;
+      overflow: hidden;
+      position: relative;
+    }
+    .ticker .slot {
+      position: absolute; left: 18px; right: 18px;
+      transition: opacity 0.5s, transform 0.5s;
+    }
+    .ticker .slot.out { opacity: 0; transform: translateY(-12px); }
+    .ticker .slot.in  { opacity: 0; transform: translateY(12px); }
+    .ticker .slot.active { opacity: 1; transform: translateY(0); }
+    .ticker .label {
+      color: var(--pubg-gold);
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      margin-right: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="pubg-card ticker">
+    <div class="slot active" id="slot"></div>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    const ROTATE_MS = parseInt(PubgUI.qs("rotateMs", 8000), 10);
+    let snippets = [];
+    let idx = 0;
+
+    async function refresh() {
+      const out = [];
+      try {
+        const s = await PubgUI.fetchJson("/api/pubg/session");
+        if (s.matches) {
+          out.push(`<span class="label">SESSION</span> ${s.kills} Kills · ${PubgUI.fmtNum(Math.round(s.damage))} DMG · ${s.wins} Wins · K/M ${PubgUI.fmtKD(s.kpm)}`);
+        }
+      } catch (_) {}
+      try {
+        const tm = await PubgUI.fetchJson("/api/pubg/top-mates?sortBy=avgPlace&limit=1&minMatches=10");
+        if (tm[0]) {
+          out.push(`<span class="label">BEST MATE</span> ${tm[0].name} · Avg #${(tm[0].avgPlace||0).toFixed(1)} · ${tm[0].sharedMatches} Games`);
+        }
+      } catch (_) {}
+      try {
+        const md = await PubgUI.fetchJson("/api/pubg/map-distribution?range=session");
+        if (md[0]) {
+          out.push(`<span class="label">MAP HEUTE</span> ${PubgUI.fmtMap(md[0].map)} (${md[0].count} Spiele)`);
+        }
+      } catch (_) {}
+      try {
+        const c = await PubgUI.fetchJson("/api/pubg/career-lifetime?mode=all");
+        if (c.rounds_played) {
+          out.push(`<span class="label">CAREER</span> ${PubgUI.fmtNum(c.rounds_played)} Games · K/D ${PubgUI.fmtKD(c.kd_ratio)} · ${c.wins} Wins`);
+        }
+      } catch (_) {}
+      try {
+        const f = await PubgUI.fetchJson("/api/pubg/first-fight-rate?range=session");
+        if (f.total) {
+          out.push(`<span class="label">FIRST FIGHT</span> ${(f.rate||0).toFixed(0)}% überlebt (${f.survived}/${f.total})`);
+        }
+      } catch (_) {}
+      snippets = out;
+    }
+
+    function show(html) {
+      const slot = document.getElementById("slot");
+      slot.classList.remove("active");
+      slot.classList.add("out");
+      setTimeout(() => {
+        slot.innerHTML = html;
+        slot.classList.remove("out");
+        slot.classList.add("in");
+        requestAnimationFrame(() => {
+          slot.classList.remove("in");
+          slot.classList.add("active");
+        });
+      }, 500);
+    }
+
+    function tick() {
+      if (snippets.length === 0) return;
+      idx = (idx + 1) % snippets.length;
+      show(snippets[idx]);
+    }
+
+    refresh().then(() => {
+      if (snippets.length) {
+        document.getElementById("slot").innerHTML = snippets[0];
+        setInterval(tick, ROTATE_MS);
+      }
+    });
+    setInterval(refresh, 60000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Maps</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    body { padding: 16px; }
+    .panel { width: 280px; padding: 16px; }
+    .panel h3 { margin: 0 0 12px; font-size: 0.85em;
+                color: var(--pubg-muted); text-transform: uppercase;
+                letter-spacing: 0.08em; }
+    .row { margin-bottom: 8px; }
+    .row .name { display: flex; justify-content: space-between;
+                 font-size: 0.9em; margin-bottom: 3px; }
+    .bar {
+      height: 6px; background: rgba(255,255,255,0.08);
+      border-radius: 3px; overflow: hidden;
+    }
+    .bar-fill { height: 100%; background: var(--pubg-gold); transition: width 0.6s; }
+  </style>
+</head>
+<body>
+  <div class="pubg-card panel pubg-fade-in">
+    <h3 id="title">Map-Verteilung</h3>
+    <div id="rows"></div>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    const RANGE = PubgUI.qs("range", "session");
+    function render(list) {
+      const max = Math.max(1, ...list.map(x => x.count));
+      const html = list.map(m => `
+        <div class="row">
+          <div class="name"><span>${PubgUI.fmtMap(m.map)}</span>
+            <span class="pubg-stat-value">${m.count}${m.wins?` · 🍗${m.wins}`:""}</span></div>
+          <div class="bar"><div class="bar-fill" style="width:${m.count/max*100}%"></div></div>
+        </div>`).join("");
+      document.getElementById("rows").innerHTML =
+        html || `<div class="pubg-error">noch keine Matches</div>`;
+    }
+    PubgUI.poll(`/api/pubg/map-distribution?range=${RANGE}`,
+                5*60*1000, render, console.error);
+  </script>
+</body>
+</html>

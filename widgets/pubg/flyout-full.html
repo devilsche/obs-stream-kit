@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Flyout</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    body { padding: 20px; }
+    .panel { width: 480px; padding: 20px 24px; }
+    .head {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 14px;
+    }
+    .head h2 { margin: 0; font-size: 1.05em; letter-spacing: 0.06em; }
+    .head .reset-btn {
+      background: rgba(94, 42, 121, 0.25); border: 1px solid var(--pubg-border);
+      color: var(--pubg-text); border-radius: 4px;
+      padding: 4px 10px; cursor: pointer; font-family: inherit;
+      font-size: 0.8em;
+    }
+    .head .reset-btn:hover { background: rgba(94, 42, 121, 0.5); }
+
+    .section {
+      border-top: 1px solid rgba(255,255,255,0.07);
+      padding: 12px 0;
+    }
+    .section h3 {
+      margin: 0 0 8px;
+      font-size: 0.75em;
+      color: var(--pubg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .stat-grid .cell { display: flex; flex-direction: column; }
+    .stat-grid .cell .pubg-stat-value { font-size: 1.4em; }
+
+    .controls { display: flex; align-items: center; gap: 12px; padding-top: 10px; }
+    .controls input[type=range] { flex: 1; }
+    .controls select {
+      background: rgba(0,0,0,0.3); color: var(--pubg-text);
+      border: 1px solid var(--pubg-border); padding: 4px 6px; border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="pubg-card panel pubg-fade-in">
+    <div class="head">
+      <h2>PUBG SESSION</h2>
+      <button class="reset-btn" id="reset">Reset</button>
+    </div>
+
+    <div class="section">
+      <h3>Session</h3>
+      <div class="stat-grid">
+        <div class="cell"><span class="pubg-stat-value" id="kills">—</span><span class="pubg-stat-label">Kills</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="dmg">—</span><span class="pubg-stat-label">Damage</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="wins">—</span><span class="pubg-stat-label">Wins</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="kd">—</span><span class="pubg-stat-label">K/D</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="kpm">—</span><span class="pubg-stat-label">K/M</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="hs">—</span><span class="pubg-stat-label">Headshot</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="best">—</span><span class="pubg-stat-label">Best Place</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="long">—</span><span class="pubg-stat-label">Longest</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="matches">—</span><span class="pubg-stat-label">Matches</span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Survival</h3>
+      <div class="stat-grid">
+        <div class="cell"><span class="pubg-stat-value" id="boosts">—</span><span class="pubg-stat-label">Boosts</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="heals">—</span><span class="pubg-stat-label">Heals</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="revives">—</span><span class="pubg-stat-label">Revives</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="walk">—</span><span class="pubg-stat-label">Walked</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="drive">—</span><span class="pubg-stat-label">Driven</span></div>
+        <div class="cell"><span class="pubg-stat-value" id="weapons">—</span><span class="pubg-stat-label">Weapons</span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>First Fight</h3>
+      <div><span class="pubg-stat-value" id="ff">—</span> <span class="pubg-stat-label" id="ffsub">—</span></div>
+    </div>
+
+    <div class="section">
+      <h3>Top Mates</h3>
+      <div id="topmates"></div>
+    </div>
+
+    <div class="section">
+      <h3>Filter</h3>
+      <div class="controls">
+        <span class="pubg-stat-label">Min Matches</span>
+        <input type="range" id="minMatches" min="1" max="50" value="10">
+        <span class="pubg-stat-value" id="minVal">10</span>
+        <select id="sortBy">
+          <option value="avgPlace">Avg Place</option>
+          <option value="kd">K/D</option>
+          <option value="winRate">Win-Rate</option>
+          <option value="mostPlayed">Most Played</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <script src="_pubg.js"></script>
+  <script>
+    let currentMin = 10;
+    let currentSort = "avgPlace";
+
+    async function loadSettings() {
+      try {
+        const s = await PubgUI.fetchJson("/api/pubg/settings");
+        if (s.minMatchesForTopMates) {
+          currentMin = parseInt(s.minMatchesForTopMates, 10);
+          document.getElementById("minMatches").value = currentMin;
+          document.getElementById("minVal").textContent = currentMin;
+        }
+        if (s.topMatesSortBy) {
+          currentSort = s.topMatesSortBy;
+          document.getElementById("sortBy").value = currentSort;
+        }
+      } catch (_) {}
+    }
+
+    async function saveSetting(key, value) {
+      await fetch("/api/pubg/settings", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({key, value: String(value)}),
+      });
+    }
+
+    function renderSession(s) {
+      const num = (n) => String(Math.round(n));
+      const knum = (n) => n >= 1000 ? (n/1000).toFixed(1)+"k" : String(Math.round(n));
+      const km = (n) => n.toFixed(1) + "km";
+
+      PubgUI.animateNumber(document.getElementById("kills"), s.kills || 0, {format: num});
+      PubgUI.animateNumber(document.getElementById("dmg"), s.damage || 0, {format: knum});
+      PubgUI.animateNumber(document.getElementById("wins"), s.wins || 0, {format: num});
+      document.getElementById("kd").textContent = PubgUI.fmtKD(s.kd);
+      document.getElementById("kpm").textContent = PubgUI.fmtKD(s.kpm);
+      document.getElementById("hs").textContent = PubgUI.fmtPct(s.headshotPct);
+      document.getElementById("best").textContent = PubgUI.fmtPlace(s.bestPlace);
+      document.getElementById("long").textContent = Math.round(s.longestKill || 0) + "m";
+      PubgUI.animateNumber(document.getElementById("matches"), s.matches || 0, {format: num});
+
+      PubgUI.animateNumber(document.getElementById("boosts"), s.totalBoosts || 0, {format: num});
+      PubgUI.animateNumber(document.getElementById("heals"), s.totalHeals || 0, {format: num});
+      PubgUI.animateNumber(document.getElementById("revives"), s.totalRevives || 0, {format: num});
+      PubgUI.animateNumber(document.getElementById("walk"), s.walkKm || 0, {format: km});
+      PubgUI.animateNumber(document.getElementById("drive"), s.rideKm || 0, {format: km});
+      PubgUI.animateNumber(document.getElementById("weapons"), s.totalWeaponsAcquired || 0, {format: num});
+    }
+
+    function renderFF(f) {
+      document.getElementById("ff").textContent = (f.rate||0).toFixed(0) + "%";
+      document.getElementById("ffsub").textContent = `${f.survived||0} / ${f.total||0}`;
+    }
+
+    function renderTopMates(list) {
+      document.getElementById("topmates").innerHTML = list.length ? list.map((m,i) => `
+        <div class="pubg-row" style="padding:4px 0">
+          <span style="color:var(--pubg-gold);width:18px">${i+1}</span>
+          <span style="flex:1">${m.name}</span>
+          <span class="pubg-stat-label">${m.sharedMatches} games</span>
+        </div>`).join("") : '<span class="pubg-error">noch keine Daten</span>';
+    }
+
+    function reload() {
+      PubgUI.fetchJson("/api/pubg/session").then(renderSession).catch(()=>{});
+      PubgUI.fetchJson("/api/pubg/first-fight-rate?range=session").then(renderFF).catch(()=>{});
+      PubgUI.fetchJson(`/api/pubg/top-mates?sortBy=${currentSort}&limit=5&minMatches=${currentMin}`)
+        .then(renderTopMates).catch(()=>{});
+    }
+
+    document.getElementById("minMatches").addEventListener("input", (e) => {
+      currentMin = parseInt(e.target.value, 10);
+      document.getElementById("minVal").textContent = currentMin;
+    });
+    document.getElementById("minMatches").addEventListener("change", () => {
+      saveSetting("minMatchesForTopMates", currentMin);
+      reload();
+    });
+    document.getElementById("sortBy").addEventListener("change", (e) => {
+      currentSort = e.target.value;
+      saveSetting("topMatesSortBy", currentSort);
+      reload();
+    });
+    document.getElementById("reset").addEventListener("click", async () => {
+      await fetch("/api/pubg/session/reset", {method: "POST"});
+      reload();
+    });
+
+    loadSettings().then(() => {
+      reload();
+      setInterval(reload, 60000);
+    });
+  </script>
+</body>
+</html>
