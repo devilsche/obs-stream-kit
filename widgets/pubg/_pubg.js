@@ -13,9 +13,25 @@
 
   PubgUI.fmtPlace = (n) => (n == null ? "—" : "#" + n);
 
+  // Offizielle PUBG-Map-Namen — die API liefert interne Codenamen.
+  const MAP_NAMES = {
+    "Baltic_Main":      "Erangel",
+    "Erangel_Main":     "Erangel",
+    "Desert_Main":      "Miramar",
+    "Savage_Main":      "Sanhok",
+    "DihorOtok_Main":   "Vikendi",
+    "Range_Main":       "Camp Jackal",
+    "Chimera_Main":     "Paramo",
+    "Summerland_Main":  "Karakin",
+    "Heaven_Main":      "Haven",
+    "Tiger_Main":       "Taego",
+    "Kiki_Main":        "Deston",
+    "Neon_Main":        "Rondo",
+  };
+
   PubgUI.fmtMap = (raw) => {
     if (!raw) return "—";
-    return raw.replace(/_Main$/, "").replace(/_/g, " ");
+    return MAP_NAMES[raw] || raw.replace(/_Main$/, "").replace(/_/g, " ");
   };
 
   PubgUI.fmtMode = (raw) => {
