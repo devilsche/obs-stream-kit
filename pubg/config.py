@@ -20,11 +20,17 @@ def load_config(path: str) -> dict:
 
 
 def load_api_key(secrets_path: str) -> str | None:
+    """Read the PUBG API key. Accepts both 'PUBG-API-Key:' and 'PUBG API Key:'
+    spellings (dashes or spaces, case-insensitive)."""
     if not os.path.exists(secrets_path):
         return None
     with open(secrets_path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
-            if line.startswith("PUBG-API-Key:"):
-                return line.split(":", 1)[1].strip()
+            if ":" not in line:
+                continue
+            key, _, value = line.partition(":")
+            normalized = key.strip().lower().replace("-", " ")
+            if normalized == "pubg api key":
+                return value.strip()
     return None

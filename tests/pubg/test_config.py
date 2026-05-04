@@ -24,6 +24,12 @@ def test_load_api_key_from_secrets(tmp_path):
     assert load_api_key(str(secrets)) == "my-key-123"
 
 
+def test_load_api_key_accepts_spaces_in_key_name(tmp_path):
+    secrets = tmp_path / ".secrets"
+    secrets.write_text("Client-ID: x\nPUBG API Key: my-key-456\n")
+    assert load_api_key(str(secrets)) == "my-key-456"
+
+
 def test_load_api_key_missing_returns_none(tmp_path):
     secrets = tmp_path / ".secrets"
     secrets.write_text("Client-ID: x\n")
