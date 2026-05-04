@@ -7,24 +7,68 @@
   <link rel="stylesheet" href="_pubg.css">
   <style>
     body { padding: 16px; }
-    .card { width: 240px; padding: 18px; text-align: center; }
-    .header { font-size: 0.8em; color: var(--pubg-muted);
-              text-transform: uppercase; letter-spacing: 0.1em; }
-    .pct { font-size: 3.2em; font-weight: 700; color: var(--pubg-gold);
-           margin: 8px 0 4px; }
-    .sub { color: var(--pubg-muted); font-size: 0.85em; }
-    .spark { display: flex; gap: 3px; margin-top: 14px; justify-content: center; }
-    .spark span { width: 10px; height: 18px; border-radius: 2px;
-                  background: rgba(255,255,255,0.1); }
+    .card {
+      width: 360px;
+      padding: 16px 20px;
+    }
+    .top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .top .label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .top .header {
+      font-size: 0.78em;
+      color: var(--pubg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+    .top .sub {
+      color: var(--pubg-text);
+      font-size: 1.05em;
+      font-variant-numeric: tabular-nums;
+    }
+    .top .sub b {
+      color: var(--pubg-gold);
+      font-weight: 700;
+    }
+    .top .pct {
+      font-size: 2.8em;
+      font-weight: 700;
+      color: var(--pubg-gold);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .spark {
+      display: flex;
+      gap: 3px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+    .spark span {
+      width: 12px; height: 18px; border-radius: 2px;
+      background: rgba(255,255,255,0.1);
+    }
     .spark span.s { background: var(--pubg-gold); }
     .spark span.d { background: rgba(229, 123, 123, 0.6); }
   </style>
 </head>
 <body>
   <div class="pubg-card card pubg-fade-in">
-    <div class="header">First Fight Wins</div>
-    <div class="pct" id="pct">—</div>
-    <div class="sub" id="sub">—</div>
+    <div class="top">
+      <div class="label">
+        <div class="header">First Fight Wins</div>
+        <div class="sub" id="sub">—</div>
+      </div>
+      <div class="pct" id="pct">—</div>
+    </div>
     <div class="spark" id="spark"></div>
   </div>
   <script src="_pubg.js"></script>
@@ -32,7 +76,8 @@
     const RANGE = PubgUI.qs("range", "session");
     function render(d) {
       document.getElementById("pct").textContent = (d.rate||0).toFixed(0) + "%";
-      document.getElementById("sub").textContent = `${d.survived||0} von ${d.total||0} überlebt`;
+      document.getElementById("sub").innerHTML =
+        `<b>${d.survived||0}</b> / <b>${d.total||0}</b> überlebt`;
       const spark = document.getElementById("spark");
       spark.innerHTML = (d.sparkline||[]).map(v =>
         `<span class="${v ? 's' : 'd'}"></span>`).join("");
