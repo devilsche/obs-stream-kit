@@ -1,3 +1,5 @@
 .superpowers/
 .secrets
 .env
+.worktrees/
+__pycache__/
