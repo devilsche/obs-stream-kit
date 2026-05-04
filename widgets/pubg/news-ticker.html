@@ -72,7 +72,7 @@
       try {
         const f = await PubgUI.fetchJson("/api/pubg/first-fight-rate?range=session");
         if (f.total) {
-          out.push(`<span class="label">FIRST FIGHT</span> ${(f.rate||0).toFixed(0)}% überlebt (${f.survived}/${f.total})`);
+          out.push(`<span class="label">FIRST FIGHT WINS</span> ${(f.rate||0).toFixed(0)}% (${f.survived}/${f.total})`);
         }
       } catch (_) {}
       snippets = out;

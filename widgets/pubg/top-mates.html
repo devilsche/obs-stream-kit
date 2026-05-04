@@ -65,7 +65,9 @@
   <script>
     const SORT_BY = PubgUI.qs("sortBy", "mostPlayed");
     const LIMIT = parseInt(PubgUI.qs("limit", 5), 10);
-    const MIN = parseInt(PubgUI.qs("minMatches", 10), 10);
+    // MIN aus URL — wenn nicht gesetzt: undefined → Backend nimmt das Setting
+    const MIN_RAW = PubgUI.qs("minMatches");
+    const MIN = MIN_RAW != null ? parseInt(MIN_RAW, 10) : null;
 
     const SORT_LABEL = {
       synergy: "Synergy",
@@ -76,9 +78,21 @@
       mostPlayed: "Most Played",
       chickensTogether: "Most 🍗",
     };
-    document.getElementById("title").innerHTML =
-      "Top Mates · " + (SORT_LABEL[SORT_BY] || SORT_BY) +
-      ' <span style="opacity:0.5;font-weight:400;letter-spacing:0;text-transform:none">(alle Matches in DB)</span>';
+    function setTitle(minVal) {
+      const min = (minVal != null && minVal > 0) ? `mind. ${minVal} Matches` : "alle Matches";
+      document.getElementById("title").innerHTML =
+        "Top Mates · " + (SORT_LABEL[SORT_BY] || SORT_BY) +
+        ` <span style="opacity:0.5;font-weight:400;letter-spacing:0;text-transform:none">(${min}, DB)</span>`;
+    }
+    setTitle(MIN);  // initial mit URL-Param-Wert (oder undefined)
+
+    // Wenn kein URL-Param gesetzt: aktuellen Setting-Wert vom Backend ziehen
+    if (MIN == null || isNaN(MIN)) {
+      PubgUI.fetchJson("/api/pubg/settings").then(s => {
+        const eff = parseInt(s.minMatchesForTopMates || "10", 10);
+        setTitle(eff);
+      }).catch(() => setTitle(10));
+    }
 
     function primaryValue(m) {
       if (SORT_BY === "avgPlace")         return "Avg #" + (m.avgPlace || 0).toFixed(1);
@@ -144,7 +158,8 @@
         </div>`).join("") || `<div class="pubg-error">noch keine Daten</div>`;
     }
 
-    const url = `/api/pubg/top-mates?sortBy=${SORT_BY}&limit=${LIMIT}&minMatches=${MIN}`;
+    const minPart = (MIN != null && !isNaN(MIN)) ? `&minMatches=${MIN}` : "";
+    const url = `/api/pubg/top-mates?sortBy=${SORT_BY}&limit=${LIMIT}${minPart}`;
     PubgUI.poll(url, 5 * 60 * 1000, render, console.error);
   </script>
 </body>

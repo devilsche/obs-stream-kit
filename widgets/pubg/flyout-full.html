@@ -90,7 +90,7 @@
     </div>
 
     <div class="section">
-      <h3>First Fight</h3>
+      <h3>First Fight Wins</h3>
       <div><span class="pubg-stat-value" id="ff">—</span> <span class="pubg-stat-label" id="ffsub">—</span></div>
     </div>
 
@@ -146,7 +146,7 @@
     }
     if (HIDE_FF) {
       document.querySelectorAll(".section").forEach(s => {
-        if (s.querySelector("h3")?.textContent === "First Fight") s.style.display = "none";
+        if (s.querySelector("h3")?.textContent.startsWith("First Fight")) s.style.display = "none";
       });
     }
 
