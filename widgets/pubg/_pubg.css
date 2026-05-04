@@ -1,0 +1,57 @@
+:root {
+  --pubg-purple: #5e2a79;
+  --pubg-purple-bg: rgba(20, 12, 30, 0.85);
+  --pubg-gold: #f2b705;
+  --pubg-text: #e8e0f0;
+  --pubg-muted: #8a7d99;
+  --pubg-border: rgba(94, 42, 121, 0.6);
+  --pubg-radius: 8px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "DM Sans", system-ui, sans-serif;
+  background: transparent;
+  color: var(--pubg-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+.pubg-card {
+  background: var(--pubg-purple-bg);
+  border: 1px solid var(--pubg-border);
+  border-radius: var(--pubg-radius);
+  padding: 10px 14px;
+  backdrop-filter: blur(6px);
+}
+
+.pubg-stat-value {
+  font-weight: 700;
+  color: var(--pubg-gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.pubg-stat-label {
+  color: var(--pubg-muted);
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pubg-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.pubg-fade-in {
+  animation: pubg-fade-in 0.4s ease-out;
+}
+
+@keyframes pubg-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.pubg-error { color: #e57b7b; font-size: 0.85em; }

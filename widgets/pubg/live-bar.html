@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Live Bar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    body { display: flex; align-items: center; height: 40px; }
+    .live-bar {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 6px 16px;
+      width: 100%;
+      height: 40px;
+      font-size: 16px;
+    }
+    .live-bar .sep { color: var(--pubg-muted); }
+    .live-bar .label { color: var(--pubg-muted); margin-right: 4px; font-size: 0.85em; }
+    .live-bar .icon { margin-right: 4px; }
+  </style>
+</head>
+<body>
+  <div class="pubg-card live-bar pubg-fade-in" id="bar">
+    <span><span class="icon">🎯</span><span class="pubg-stat-value" id="kills">—</span> <span class="label">Kills</span></span>
+    <span class="sep">·</span>
+    <span><span class="icon">🩸</span><span class="pubg-stat-value" id="dmg">—</span> <span class="label">DMG</span></span>
+    <span class="sep">·</span>
+    <span><span class="icon">🍗</span><span class="pubg-stat-value" id="wins">—</span> <span class="label">Wins</span></span>
+    <span class="sep">·</span>
+    <span class="label">Match</span> <span class="pubg-stat-value" id="matches">—</span>
+    <span class="sep">·</span>
+    <span class="pubg-stat-value" id="map">—</span>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    const REFRESH_MS = parseInt(PubgUI.qs("refreshMs", 30000), 10);
+
+    function render(s) {
+      const fmt = (n) => {
+        if (n == null) return "—";
+        if (n >= 1000) return (n / 1000).toFixed(1) + "k";
+        return String(Math.round(n));
+      };
+      PubgUI.animateNumber(document.getElementById("kills"), s.kills || 0, {format: fmt});
+      PubgUI.animateNumber(document.getElementById("dmg"), s.damage || 0, {format: fmt});
+      PubgUI.animateNumber(document.getElementById("wins"), s.wins || 0, {format: fmt});
+      PubgUI.animateNumber(document.getElementById("matches"), s.matches || 0, {format: fmt});
+      const lastMap = s.mapBreakdown && s.mapBreakdown[0];
+      document.getElementById("map").textContent =
+        lastMap ? PubgUI.fmtMap(lastMap.map) : "—";
+    }
+
+    PubgUI.poll("/api/pubg/session", REFRESH_MS, render, console.error);
+  </script>
+</body>
+</html>
