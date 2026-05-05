@@ -96,6 +96,46 @@
 
     }
 
+    function renderCareerOnly(name, careerLifetime, headlineText) {
+      // Career-Only-Layout (wie isSelf): Career-Werte ins Stats-Grid,
+      // gemeinsame-Matches-Section verschwindet.
+      document.querySelector(".popup .ribbon").textContent = headlineText;
+      document.getElementById("name").textContent = name;
+      const cl = careerLifetime || {};
+      document.getElementById("m").textContent = PubgUI.fmtNum(cl.rounds_played || 0);
+      document.getElementById("wins").textContent = PubgUI.fmtNum(cl.wins || 0);
+      document.getElementById("avgplace").textContent = PubgUI.fmtPct(cl.win_rate);
+      document.getElementById("kd-mate").textContent = PubgUI.fmtKD(cl.kd_ratio);
+      document.querySelectorAll(".cell .pubg-stat-label").forEach((el, i) => {
+        const labels = ["Career Matches", "Career Wins", "Win-Rate", "Career K/D"];
+        if (labels[i]) el.textContent = labels[i];
+      });
+      document.getElementById("chickens").innerHTML = "";
+      document.getElementById("my-line").style.display = "none";
+      document.getElementById("career").textContent =
+        `Headshot: ${PubgUI.fmtPct(cl.headshot_rate)} · Top10: ${PubgUI.fmtPct(cl.top10_rate)}`;
+    }
+
+    function liveLookupAndShow(playerName, ribbonLabel) {
+      // Fallback wenn nicht in DB: PUBG-API-Live-Lookup für Career.
+      return PubgUI.fetchJson(
+        `/api/pubg/lookup-mate?player=${encodeURIComponent(playerName)}`)
+        .then(d => {
+          if (d.error || !d.careerLifetime) {
+            document.getElementById("name").textContent =
+              `${playerName} — nicht auf PUBG gefunden`;
+            return reveal();
+          }
+          renderCareerOnly(d.name || playerName, d.careerLifetime, ribbonLabel);
+          reveal();
+        })
+        .catch(() => {
+          document.getElementById("name").textContent =
+            `${playerName} — Live-Lookup fehlgeschlagen`;
+          reveal();
+        });
+    }
+
     if (!PLAYER) {
       document.getElementById("name").textContent = "?player= fehlt";
       reveal();
@@ -103,32 +143,13 @@
       PubgUI.fetchJson(`/api/pubg/co-player/${encodeURIComponent(PLAYER)}`)
         .then(d => {
           if (d.error) {
-            document.getElementById("name").textContent = `Player (${PLAYER}) nicht gefunden seit der Stats-Aufzeichnung`;
-
-            const cl = d.careerLifetime;
-            document.getElementById("career").textContent = cl
-              ? `Career: ${PubgUI.fmtNum(cl.rounds_played)} Games · K/D ${PubgUI.fmtKD(cl.kd_ratio)} · ${cl.wins} Wins · ${PubgUI.fmtPct(cl.headshot_rate)} HS`
-              : (sh.matches ? "Career: noch nicht geladen (<5 gemeinsame Matches?)" : "Noch nie zusammen gespielt");
-
-            return reveal();
+            // Nicht in DB → Live-Lookup über PUBG-API mit Hinweis
+            return liveLookupAndShow(PLAYER,
+              "Noch kein Match zusammen — Career");
           }
 
           if (d.isSelf) {
-            document.querySelector(".popup .ribbon").textContent = "Career — du selbst";
-            document.getElementById("name").textContent = d.name;
-            const cl = d.careerLifetime || {};
-            document.getElementById("m").textContent = PubgUI.fmtNum(cl.rounds_played);
-            document.getElementById("wins").textContent = PubgUI.fmtNum(cl.wins);
-            document.getElementById("avgplace").textContent = PubgUI.fmtPct(cl.win_rate);
-            document.getElementById("kd-mate").textContent = PubgUI.fmtKD(cl.kd_ratio);
-            document.querySelectorAll(".cell .pubg-stat-label").forEach((el, i) => {
-              const labels = ["Career Matches", "Career Wins", "Win-Rate", "Career K/D"];
-              if (labels[i]) el.textContent = labels[i];
-            });
-            document.getElementById("chickens").innerHTML = "";
-            document.getElementById("my-line").style.display = "none";
-            document.getElementById("career").textContent =
-              `Headshot: ${PubgUI.fmtPct(cl.headshot_rate)} · Top10: ${PubgUI.fmtPct(cl.top10_rate)}`;
+            renderCareerOnly(d.name, d.careerLifetime, "Career — du selbst");
             return reveal();
           }
 
