@@ -52,7 +52,8 @@
       document.getElementById("hs").textContent = PubgUI.fmtPct(d.headshot_rate);
       document.getElementById("winpct").textContent = PubgUI.fmtPct(d.win_rate);
       document.getElementById("top10").textContent = PubgUI.fmtPct(d.top10_rate);
-      document.getElementById("longest").textContent = Math.round(d.longest_kill || 0) + "m";
+      document.getElementById("longest").innerHTML =
+        PubgUI.hotIf(d.longest_kill, 300, Math.round(d.longest_kill || 0) + "m");
       document.getElementById("kills").textContent = PubgUI.fmtNum(d.kills);
     }
 

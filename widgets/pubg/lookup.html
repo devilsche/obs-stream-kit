@@ -138,7 +138,7 @@
               <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtPct(cl.top10_rate)}</span><span class="pubg-stat-label">Top10</span></div>
               <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtPct(cl.headshot_rate)}</span><span class="pubg-stat-label">Headshot</span></div>
               <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtNum(cl.kills)}</span><span class="pubg-stat-label">Kills</span></div>
-              <div class="cell"><span class="pubg-stat-value">${Math.round(cl.longest_kill || 0)}m</span><span class="pubg-stat-label">Longest</span></div>
+              <div class="cell"><span class="pubg-stat-value">${PubgUI.hotIf(cl.longest_kill, 300, Math.round(cl.longest_kill || 0) + "m")}</span><span class="pubg-stat-label">Longest</span></div>
               <div class="cell"><span class="pubg-stat-value">${Math.round(cl.avg_damage)}</span><span class="pubg-stat-label">Ø Damage</span></div>
             </div>
           </div>` : "";

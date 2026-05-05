@@ -93,9 +93,6 @@
       document.getElementById("meta").textContent =
         `${rows.length} Maps · ${totalMatches} Matches · ${totalWins} Wins`;
 
-      const hot = (val, thresh) => val > thresh
-        ? `<span class="pubg-fire">🔥</span><span class="pubg-hot">${val}</span>`
-        : val;
       root.innerHTML = `
         <table>
           <thead><tr>
@@ -116,14 +113,14 @@
               <td>${PubgUI.fmtMap(r.map)}</td>
               <td>${r.matches}</td>
               <td>${r.wins || '—'}</td>
-              <td>${hot(r.kills, 300)}</td>
+              <td>${PubgUI.hotIf(r.kills, 300, r.kills)}</td>
               <td>${r.kd.toFixed(2)}</td>
               <td>${r.winRate.toFixed(0)}%</td>
               <td>${r.avgKills.toFixed(1)}</td>
               <td>${Math.round(r.avgDamage)}</td>
               <td>#${r.avgPlace.toFixed(1)}</td>
               <td>${fmtSurv(r.avgSurvivedSec)}</td>
-              <td>${Math.round(r.longestKill)}m</td>
+              <td>${PubgUI.hotIf(r.longestKill, 300, Math.round(r.longestKill) + "m")}</td>
             </tr>`).join("")}
           </tbody>
         </table>`;

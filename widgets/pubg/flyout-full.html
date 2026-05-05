@@ -207,7 +207,8 @@
       document.getElementById("kpm").textContent = PubgUI.fmtKD(s.kpm);
       document.getElementById("hs").textContent = PubgUI.fmtPct(s.headshotPct);
       document.getElementById("best").textContent = PubgUI.fmtPlace(s.bestPlace);
-      document.getElementById("long").textContent = Math.round(s.longestKill || 0) + "m";
+      document.getElementById("long").innerHTML =
+        PubgUI.hotIf(s.longestKill, 300, Math.round(s.longestKill || 0) + "m");
       PubgUI.animateNumber(document.getElementById("matches"), s.matches || 0, {format: num});
 
       PubgUI.animateNumber(document.getElementById("boosts"), s.totalBoosts || 0, {format: num});

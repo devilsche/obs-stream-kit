@@ -654,7 +654,7 @@
           <div class="cell"><span class="pubg-stat-value">#${t.avgPlace.toFixed(1)}</span><span class="pubg-stat-label">Avg Place</span></div>
           <div class="cell"><span class="pubg-stat-value">${t.headshots}</span><span class="pubg-stat-label">Headshots</span></div>
           <div class="cell"><span class="pubg-stat-value">${t.dbnos}</span><span class="pubg-stat-label">Knocks</span></div>
-          <div class="cell"><span class="pubg-stat-value">${Math.round(t.longestKill)}m</span><span class="pubg-stat-label">Longest</span></div>
+          <div class="cell"><span class="pubg-stat-value">${PubgUI.hotIf(t.longestKill, 300, Math.round(t.longestKill) + "m")}</span><span class="pubg-stat-label">Longest</span></div>
           <div class="cell"><span class="pubg-stat-value">${t.uniqueMaps}</span><span class="pubg-stat-label">Maps</span></div>
         </div>`;
 
