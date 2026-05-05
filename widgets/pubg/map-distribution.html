@@ -40,7 +40,7 @@
       const html = list.map(m => `
         <div class="row">
           <div class="name"><span>${PubgUI.fmtMap(m.map)}</span>
-            <span class="pubg-stat-value">${m.count}${m.wins?` · CHICKEN${m.wins}`:""}</span></div>
+            <span class="pubg-stat-value">${m.count}${m.wins?` · ${m.wins} Wins`:""}</span></div>
           <div class="bar"><div class="bar-fill" style="width:${m.count/max*100}%"></div></div>
         </div>`).join("");
       document.getElementById("rows").innerHTML =

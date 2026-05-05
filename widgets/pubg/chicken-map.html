@@ -60,7 +60,7 @@
 </head>
 <body>
   <div class="pubg-card panel pubg-fade-in">
-    <h3 id="title">CHICKEN Chicken Map</h3>
+    <h3 id="title">Chicken Map</h3>
     <div id="rows"></div>
     <div class="summary" id="summary"></div>
     <div class="footnote" id="footnote"></div>
@@ -77,10 +77,9 @@
 
     function chickens(n) {
       if (!n) return '<span class="zero">—</span>';
-      // max 5 visible Hähnchen, Rest als "+N"
-      const visible = Math.min(n, 5);
-      const rest = n > 5 ? `+${n-5}` : "";
-      return "CHICKEN".repeat(visible) + (rest ? ` <span style="color:var(--pubg-gold)">${rest}</span>` : "");
+      // Statt repeat: kompakte Zahl + Wortmarke. Max 99 angezeigt.
+      const display = n > 99 ? "99+" : String(n);
+      return `<span style="color:var(--pubg-gold);font-weight:700">${display}</span> <span style="color:var(--pubg-muted);font-size:0.85em">${n === 1 ? "Win" : "Wins"}</span>`;
     }
 
     function render(list) {
@@ -111,10 +110,10 @@
 
     // Title je nach Range — "All-Time" ist irreführend, da PUBG-API keine
     // Map-Granularität für Lifetime liefert. DB-Daten wachsen ab Setup-Tag.
-    const titles = { all: "CHICKEN Chicken Map · seit Setup",
-                     session: "CHICKEN Chicken Map · Session",
-                     week: "CHICKEN Chicken Map · letzte 7 Tage",
-                     day: "CHICKEN Chicken Map · heute" };
+    const titles = { all: "Chicken Map · seit Setup",
+                     session: "Chicken Map · Session",
+                     week: "Chicken Map · letzte 7 Tage",
+                     day: "Chicken Map · heute" };
     document.getElementById("title").textContent = titles[RANGE] || titles.all;
 
     if (RANGE === "all") {

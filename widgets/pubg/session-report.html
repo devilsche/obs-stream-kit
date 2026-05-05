@@ -98,14 +98,16 @@
       border-bottom: 1px dashed rgba(255,255,255,0.1);
       margin-bottom: 4px;
     }
-    /* Place-Spalte: # untereinander ausrichten — CHICKEN als CSS-pseudo bei Win */
+    /* Place-Spalte: # untereinander ausrichten — gold-Marker bei Win */
     .matches-list .m .place {
       font-variant-numeric: tabular-nums;
       position: relative;
       padding-left: 22px;
     }
     .matches-list .m.win .place::before {
-      content: "CHICKEN";
+      content: "★";
+      color: var(--pubg-gold);
+      font-weight: 700;
       position: absolute;
       left: 0;
       top: 50%;
@@ -676,13 +678,13 @@
             <h2><span class="num">Phase ${i+1}</span> ${startStr} → ${endStr} · ${s.matches} ${s.matches===1?'Match':'Matches'}</h2>
             <div class="squad">Stamm: ${core}${fillersStr}</div>
             <div class="phase-stats">
-              <span><b>${s.kills}</b>Kills</span>
-              <span><b>${PubgUI.fmtNum(Math.round(s.damage))}</b>DMG</span>
-              <span><b>${s.wins}</b>CHICKEN</span>
-              <span><b>${PubgUI.fmtKD(s.kd)}</b>K/D</span>
-              <span><b>${Math.round(s.avgDamage)}</b>Ø DMG</span>
-              <span><b>${fmtDuration(Math.round(s.avgSurvivedSec))}</b>Ø Surv</span>
-              <span><b>#${s.avgPlace.toFixed(1)}</b>Avg #</span>
+              <span><b>${s.kills}</b> Kills</span>
+              <span><b>${PubgUI.fmtNum(Math.round(s.damage))}</b> DMG</span>
+              <span><b>${s.wins}</b> Wins</span>
+              <span><b>${PubgUI.fmtKD(s.kd)}</b> K/D</span>
+              <span><b>${Math.round(s.avgDamage)}</b> Ø DMG</span>
+              <span><b>${fmtDuration(Math.round(s.avgSurvivedSec))}</b> Ø Surv</span>
+              <span><b>#${s.avgPlace.toFixed(1)}</b> Avg #</span>
             </div>
             <div class="matches-list">
               <div class="header-row">
@@ -715,7 +717,7 @@
             ${mp.map(m => `<tr ${m.wins?'style="color:var(--pubg-gold)"':''}>
               <td style="padding:4px 8px">${PubgUI.fmtMap(m.map)}</td>
               <td style="text-align:right;padding:4px 8px">${m.matches}</td>
-              <td style="text-align:right;padding:4px 8px">${m.wins ? 'CHICKEN ' + m.wins : '—'}</td>
+              <td style="text-align:right;padding:4px 8px">${m.wins || '—'}</td>
               <td style="text-align:right;padding:4px 8px">${m.kd.toFixed(2)}</td>
               <td style="text-align:right;padding:4px 8px">${m.avgKills.toFixed(1)}</td>
               <td style="text-align:right;padding:4px 8px">${Math.round(m.avgDamage)}</td>

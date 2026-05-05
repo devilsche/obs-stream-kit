@@ -82,7 +82,7 @@
 </head>
 <body>
   <div class="pubg-card panel pubg-fade-in">
-    <h3 id="title">CHICKEN Chicken Together</h3>
+    <h3 id="title">Chicken Together</h3>
     <div id="rows"></div>
     <div class="summary" id="summary"></div>
     <div class="footnote">PUBG-API liefert nur Match-Details der letzten ~14 Tage / 30 Matches. Diese Wins zählen ab Setup-Zeitpunkt.</div>
@@ -93,16 +93,15 @@
     const MIN_MATCHES = parseInt(PubgUI.qs("minMatches", 1), 10);
 
     PubgUI.buildFilter([
-      { key: "minWins", label: "Min CHICKEN", type: "range", min: 1, max: 10, default: 1 },
+      { key: "minWins", label: "Min Wins", type: "range", min: 1, max: 10, default: 1 },
       { key: "minMatches", label: "Min Matches", type: "range",
         min: 1, max: 50, default: 1 },
     ]);
 
     function chickens(n) {
       if (!n) return "";
-      const visible = Math.min(n, 5);
-      const rest = n > 5 ? `+${n-5}` : "";
-      return "CHICKEN".repeat(visible) + (rest ? ` <span style="color:var(--pubg-gold)">${rest}</span>` : "");
+      const display = n > 99 ? "99+" : String(n);
+      return `<span style="color:var(--pubg-gold);font-weight:700">${display}</span> <span style="color:var(--pubg-muted);font-size:0.85em">${n === 1 ? "Win" : "Wins"}</span>`;
     }
 
     function render(list) {
