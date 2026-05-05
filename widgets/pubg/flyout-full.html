@@ -175,7 +175,7 @@
                   ["week","Letzte 7 Tage"],["all","DB-Lifetime"]]},
       { key: "sortBy", label: "Mate-Sort", type: "select", default: "mostPlayed",
         options: [["synergy","Synergy"],["mostPlayed","Most Played"],
-                  ["chickensTogether","Most 🍗"],["kd","Best K/D Meine"],
+                  ["chickensTogether","Most CHICKEN"],["kd","Best K/D Meine"],
                   ["mateKd","Best K/D Mate"],["winRate","Win-Rate"],
                   ["avgPlace","Avg Place"]]},
       { key: "minMatches", label: "Min Mates", type: "range",
@@ -237,7 +237,7 @@
       if (currentSort === "chickensTogether") {
         const wins = m.winsTogether || 0;
         const rate = m.winRate || 0;
-        const t = wins + " 🍗 · " + rate.toFixed(1) + "%";
+        const t = wins + " CHICKEN · " + rate.toFixed(1) + "%";
         return HOT.chickensTogether(m) ? hotWrap(t) : t;
       }
       if (currentSort === "kd") {
@@ -265,7 +265,7 @@
       const bits = [];
       // Match-Anzahl als Kontext überall, außer bei mostPlayed (da primary)
       if (currentSort !== "mostPlayed") bits.push(`${m.sharedMatches} Matches`);
-      if (m.winsTogether && currentSort !== "chickensTogether") bits.push(`${m.winsTogether} 🍗`);
+      if (m.winsTogether && currentSort !== "chickensTogether") bits.push(`${m.winsTogether} CHICKEN`);
       if (currentSort !== "kd" && currentSort !== "mateKd") {
         bits.push(`Meine ${(m.kd || 0).toFixed(2)} / Mate ${(m.mateKd || 0).toFixed(2)}`);
       }

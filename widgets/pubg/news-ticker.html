@@ -71,7 +71,7 @@
         try {
           const md = await PubgUI.fetchJson("/api/pubg/map-distribution?range=session");
           if (md[0]) {
-            out.push(`<span class="label">SESSION MOST PLAYED MAP</span> ${PubgUI.fmtMap(md[0].map)} (${md[0].count} Spiele)`);
+            out.push(`<span class="label">SESSION MOST PLAYED MAP</span> ${PubgUI.fmtMap(md[0].map)} (${md[0].count} Matches)`);
           }
         } catch (_) {}
         try {
@@ -87,14 +87,14 @@
             const SESSION_LABELS = {
               mostPlayed:       "SESSION — MOST PLAYED",
               synergy:          "SESSION — BEST SYNERGY",
-              chickensTogether: "SESSION — MOST 🍗",
+              chickensTogether: "SESSION — MOST CHICKEN",
               kd:               "SESSION — BEST K/D (MEINE)",
               mateKd:           "SESSION — BEST K/D (MATE)",
               winRate:          "SESSION — BEST WIN-RATE",
               avgPlace:         "SESSION — BEST AVG PLACE",
             };
             const sLabel = SESSION_LABELS[sortBy2] || "SESSION TOP MATE";
-            out.push(`<span class="label">${sLabel}</span> ${m.name} · ${m.sharedMatches} Matches · ${m.winsTogether||0} 🍗 · K/D Meine ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
+            out.push(`<span class="label">${sLabel}</span> ${m.name} · ${m.sharedMatches} Matches · ${m.winsTogether||0} CHICKEN · K/D Meine ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
           }
         } catch (_) {}
         try {
@@ -133,14 +133,14 @@
             const LABELS = {
               mostPlayed:       "DB — MOST PLAYED",
               synergy:          "DB — BEST SYNERGY",
-              chickensTogether: "DB — MOST 🍗",
+              chickensTogether: "DB — MOST CHICKEN",
               kd:               "DB — BEST K/D (MEINE)",
               mateKd:           "DB — BEST K/D (MATE)",
               winRate:          "DB — BEST WIN-RATE",
               avgPlace:         "DB — BEST AVG PLACE",
             };
             const label = LABELS[sortBy] || "DB — TOP MATE";
-            out.push(`<span class="label">${label}</span> ${m.name} · ${m.sharedMatches} Matches · ${m.winsTogether||0} 🍗 · K/D Meine ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
+            out.push(`<span class="label">${label}</span> ${m.name} · ${m.sharedMatches} Matches · ${m.winsTogether||0} CHICKEN · K/D Meine ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
           }
         } catch (_) {}
         try {

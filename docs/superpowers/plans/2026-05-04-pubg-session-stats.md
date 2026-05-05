@@ -2491,7 +2491,7 @@ git commit -m "feat(pubg): Shared JS-Helper-Library"
     <span class="sep">·</span>
     <span><span class="icon">🩸</span><span class="pubg-stat-value" id="dmg">—</span> <span class="label">DMG</span></span>
     <span class="sep">·</span>
-    <span><span class="icon">🍗</span><span class="pubg-stat-value" id="wins">—</span> <span class="label">Wins</span></span>
+    <span><span class="icon">CHICKEN</span><span class="pubg-stat-value" id="wins">—</span> <span class="label">Wins</span></span>
     <span class="sep">·</span>
     <span class="label">Match</span> <span class="pubg-stat-value" id="matches">—</span>
     <span class="sep">·</span>
@@ -3983,7 +3983,7 @@ git commit -m "feat(pubg): map-distribution Aggregation + Endpoint"
       const html = list.map(m => `
         <div class="row">
           <div class="name"><span>${PubgUI.fmtMap(m.map)}</span>
-            <span class="pubg-stat-value">${m.count}${m.wins?` · 🍗${m.wins}`:""}</span></div>
+            <span class="pubg-stat-value">${m.count}${m.wins?` · CHICKEN${m.wins}`:""}</span></div>
           <div class="bar"><div class="bar-fill" style="width:${m.count/max*100}%"></div></div>
         </div>`).join("");
       document.getElementById("rows").innerHTML =

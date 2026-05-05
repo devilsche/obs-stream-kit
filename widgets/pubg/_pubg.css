@@ -1,6 +1,6 @@
 :root {
   --pubg-purple: #5e2a79;
-  --pubg-purple-bg: rgba(20, 12, 30, 0.85);
+  --pubg-purple-bg: rgba(20, 12, 30, 0.95);
   --pubg-gold: #f2b705;
   --pubg-text: #e8e0f0;
   --pubg-muted: #8a7d99;
@@ -23,7 +23,7 @@ body {
   border: 1px solid var(--pubg-border);
   border-radius: var(--pubg-radius);
   padding: 10px 14px;
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(2px);
 }
 
 .pubg-stat-value {

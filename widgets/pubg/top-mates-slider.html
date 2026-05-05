@@ -118,7 +118,7 @@
     const ALL_CATS = [
       ["mostPlayed",       "Most Played"],
       ["synergy",          "Synergy"],
-      ["chickensTogether", "Most 🍗"],
+      ["chickensTogether", "Most CHICKEN"],
       ["kd",               "K/D Meine"],
       ["mateKd",           "K/D Mate"],
       ["winRate",          "Win-Rate"],
@@ -182,7 +182,7 @@
         return HOT.mostPlayed(m) ? hotWrap(text) : text;
       }
       if (sortBy === "chickensTogether") {
-        const text = (m.winsTogether||0) + " 🍗 · " + (m.winRate||0).toFixed(1) + "%";
+        const text = (m.winsTogether||0) + " CHICKEN · " + (m.winRate||0).toFixed(1) + "%";
         return HOT.chickensTogether(m) ? hotWrap(text) : text;
       }
       if (sortBy === "synergy") {
@@ -205,7 +205,7 @@
         parts.push(`<span>K/D Meine <b>${(m.kd||0).toFixed(2)}</b> / Mate <b>${(m.mateKd||0).toFixed(2)}</b></span>`);
       }
       if (m.winsTogether && sortBy !== "chickensTogether") {
-        parts.push(`<span><b>${m.winsTogether}</b> 🍗</span>`);
+        parts.push(`<span><b>${m.winsTogether}</b> CHICKEN</span>`);
       }
       if (sortBy !== "winRate" && sortBy !== "chickensTogether"
           && (m.winRate || 0) > 0) {

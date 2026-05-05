@@ -40,8 +40,8 @@ Alle Widget-URLs sind unter `http://localhost:<port>/widgets/pubg/<datei>.html`.
 | `mates-today.html` | siehe unten | "Heute gespielt mit X" |
 | `top-mates.html` | **400×420** | Top-5-Liste mit Detail-Zeilen (Lifetime) |
 | `career-card.html` | **400×300** | Lifetime-Stats für Starting-Soon |
-| `chicken-map.html` | **430×560** | 🍗 Wins pro Map |
-| `chicken-together.html` | **430×500** | 🍗 mit welchen Mates |
+| `chicken-map.html` | **430×560** | CHICKEN Wins pro Map |
+| `chicken-together.html` | **430×500** | CHICKEN mit welchen Mates |
 | `map-distribution.html` | **310×420** | Map-Häufigkeits-Bars |
 | `first-fight.html` | **300×260** | Survival-% mit Sparkline |
 | `session-summary.html` | **800×620** | Vollformat Stream-Ending |
@@ -218,7 +218,7 @@ Im Browser öffnen, **nicht** als Browser-Source. Layout responsiv.
 ┌─────────────────────────────────────────────────────────────────┐
 │  ┌─ chicken-map ──┐  ┌─ chicken-together ─┐  ┌─ top-mates ────┐ │
 │  │  430×560       │  │   430×500          │  │   400×420       │ │
-│  │  🍗 pro Map    │  │   🍗 mit Mates     │  │  Top-5 Synergy  │ │
+│  │  CHICKEN pro Map    │  │   CHICKEN mit Mates     │  │  Top-5 Synergy  │ │
 │  └────────────────┘  └────────────────────┘  └─────────────────┘ │
 │                                                                  │
 │  ┌─ mates-today.html?layout=mosaic ─ (640×280) ─────────────┐    │

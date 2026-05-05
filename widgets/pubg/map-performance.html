@@ -91,14 +91,14 @@
       const totalMatches = rows.reduce((s, r) => s + r.matches, 0);
       const totalWins = rows.reduce((s, r) => s + r.wins, 0);
       document.getElementById("meta").textContent =
-        `${rows.length} Maps · ${totalMatches} Matches · ${totalWins} 🍗 gesamt`;
+        `${rows.length} Maps · ${totalMatches} Matches · ${totalWins} Wins`;
 
       root.innerHTML = `
         <table>
           <thead><tr>
             <th>Map</th>
             <th>Matches</th>
-            <th>🍗</th>
+            <th>WINS</th>
             <th>K/D</th>
             <th>Win%</th>
             <th>Ø Kills</th>
@@ -111,7 +111,7 @@
             ${rows.map(r => `<tr class="${r.wins ? 'win' : ''}">
               <td>${PubgUI.fmtMap(r.map)}</td>
               <td>${r.matches}</td>
-              <td>${r.wins ? '🍗 ' + r.wins : '—'}</td>
+              <td>${r.wins ? r.wins : '—'}</td>
               <td>${r.kd.toFixed(2)}</td>
               <td>${r.winRate.toFixed(0)}%</td>
               <td>${r.avgKills.toFixed(1)}</td>

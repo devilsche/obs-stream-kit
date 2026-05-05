@@ -68,7 +68,7 @@
     </div>
     <div class="grid">
       <div class="cell"><span class="pubg-stat-value" id="m">—</span><span class="pubg-stat-label">Matches</span></div>
-      <div class="cell"><span class="pubg-stat-value" id="wins">—</span><span class="pubg-stat-label">🍗 Together</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="wins">—</span><span class="pubg-stat-label">Wins Together</span></div>
       <div class="cell"><span class="pubg-stat-value" id="avgplace">—</span><span class="pubg-stat-label">Avg Place</span></div>
       <div class="cell"><span class="pubg-stat-value" id="kd-mate">—</span><span class="pubg-stat-label">K/D</span></div>
     </div>
@@ -92,9 +92,8 @@
 
     function chickenIcons(n) {
       if (!n) return "";
-      const visible = Math.min(n, 5);
-      const rest = n > 5 ? ` +${n-5}` : "";
-      return "🍗".repeat(visible) + rest;
+      return n > 1 ? `${n} Wins` : `${n} Win`;
+
     }
 
     if (!PLAYER) {
@@ -104,7 +103,13 @@
       PubgUI.fetchJson(`/api/pubg/co-player/${encodeURIComponent(PLAYER)}`)
         .then(d => {
           if (d.error) {
-            document.getElementById("name").textContent = "Player nicht gefunden";
+            document.getElementById("name").textContent = `Player (${PLAYER}) nicht gefunden seit der Stats-Aufzeichnung`;
+
+            const cl = d.careerLifetime;
+            document.getElementById("career").textContent = cl
+              ? `Career: ${PubgUI.fmtNum(cl.rounds_played)} Games · K/D ${PubgUI.fmtKD(cl.kd_ratio)} · ${cl.wins} Wins · ${PubgUI.fmtPct(cl.headshot_rate)} HS`
+              : (sh.matches ? "Career: noch nicht geladen (<5 gemeinsame Matches?)" : "Noch nie zusammen gespielt");
+
             return reveal();
           }
 
@@ -117,7 +122,7 @@
             document.getElementById("avgplace").textContent = PubgUI.fmtPct(cl.win_rate);
             document.getElementById("kd-mate").textContent = PubgUI.fmtKD(cl.kd_ratio);
             document.querySelectorAll(".cell .pubg-stat-label").forEach((el, i) => {
-              const labels = ["Career Matches", "🍗 Career Wins", "Win-Rate", "Career K/D"];
+              const labels = ["Career Matches", "Career Wins", "Win-Rate", "Career K/D"];
               if (labels[i]) el.textContent = labels[i];
             });
             document.getElementById("chickens").innerHTML = "";

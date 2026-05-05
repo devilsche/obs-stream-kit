@@ -98,14 +98,14 @@
       border-bottom: 1px dashed rgba(255,255,255,0.1);
       margin-bottom: 4px;
     }
-    /* Place-Spalte: # untereinander ausrichten — 🍗 als CSS-pseudo bei Win */
+    /* Place-Spalte: # untereinander ausrichten — CHICKEN als CSS-pseudo bei Win */
     .matches-list .m .place {
       font-variant-numeric: tabular-nums;
       position: relative;
       padding-left: 22px;
     }
     .matches-list .m.win .place::before {
-      content: "🍗";
+      content: "CHICKEN";
       position: absolute;
       left: 0;
       top: 50%;
@@ -477,7 +477,7 @@
           <select id="sortBy">
             <option value="newest">Neueste zuerst</option>
             <option value="oldest">Älteste zuerst</option>
-            <option value="wins">Meiste 🍗 Wins</option>
+            <option value="wins">Meiste CHICKEN Wins</option>
             <option value="matches">Meiste Matches</option>
             <option value="kills">Meiste Kills</option>
           </select>
@@ -522,7 +522,7 @@
           : "";
         return `<div class="${cls.join(' ')}" data-from="${s.from}" data-to="${s.to}">
           <span class="label">${PubgUI.fmtDate(s.from)} ${PubgUI.fmtTime(s.from)}${isCurrent ? " ▶" : ""}</span>
-          <span class="meta">${s.matches}M · ${s.wins} 🍗 · ${s.kills}K${mate}</span>
+          <span class="meta">${s.matches}M · ${s.wins} CHICKEN · ${s.kills}K${mate}</span>
         </div>`;
       }).join("") || `<div style="padding:20px;color:var(--pubg-muted);text-align:center;font-style:italic">— keine Sessions in diesem Monat —</div>`;
 
@@ -642,7 +642,7 @@
       const totalsHtml = `
         <div class="totals">
           <div class="cell"><span class="pubg-stat-value">${t.matches}</span><span class="pubg-stat-label">Matches</span></div>
-          <div class="cell"><span class="pubg-stat-value">${t.wins}</span><span class="pubg-stat-label">🍗 Wins</span></div>
+          <div class="cell"><span class="pubg-stat-value">${t.wins}</span><span class="pubg-stat-label">CHICKEN Wins</span></div>
           <div class="cell"><span class="pubg-stat-value">${t.kills}</span><span class="pubg-stat-label">Kills</span></div>
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtNum(Math.round(t.damage))}</span><span class="pubg-stat-label">Damage</span></div>
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.kd)}</span><span class="pubg-stat-label">K/D</span></div>
@@ -678,7 +678,7 @@
             <div class="phase-stats">
               <span><b>${s.kills}</b>Kills</span>
               <span><b>${PubgUI.fmtNum(Math.round(s.damage))}</b>DMG</span>
-              <span><b>${s.wins}</b>🍗</span>
+              <span><b>${s.wins}</b>CHICKEN</span>
               <span><b>${PubgUI.fmtKD(s.kd)}</b>K/D</span>
               <span><b>${Math.round(s.avgDamage)}</b>Ø DMG</span>
               <span><b>${fmtDuration(Math.round(s.avgSurvivedSec))}</b>Ø Surv</span>
@@ -715,7 +715,7 @@
             ${mp.map(m => `<tr ${m.wins?'style="color:var(--pubg-gold)"':''}>
               <td style="padding:4px 8px">${PubgUI.fmtMap(m.map)}</td>
               <td style="text-align:right;padding:4px 8px">${m.matches}</td>
-              <td style="text-align:right;padding:4px 8px">${m.wins ? '🍗 ' + m.wins : '—'}</td>
+              <td style="text-align:right;padding:4px 8px">${m.wins ? 'CHICKEN ' + m.wins : '—'}</td>
               <td style="text-align:right;padding:4px 8px">${m.kd.toFixed(2)}</td>
               <td style="text-align:right;padding:4px 8px">${m.avgKills.toFixed(1)}</td>
               <td style="text-align:right;padding:4px 8px">${Math.round(m.avgDamage)}</td>
