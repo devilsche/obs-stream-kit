@@ -89,6 +89,23 @@
     return res.json();
   };
 
+  // Body ausblenden wenn letzter Match älter als maxAgeMs (Default 1h).
+  // Für Live-Widgets (live-bar, news-ticker) — sollen nur on-screen sein
+  // wenn aktuell gespielt wird. Bei Fehler oder leerer DB: ausblenden.
+  PubgUI.hideIfStale = async (maxAgeMs) => {
+    const limit = maxAgeMs == null ? 3600 * 1000 : maxAgeMs;
+    let stale = true;
+    try {
+      const lm = await PubgUI.fetchJson("/api/pubg/last-match");
+      const ts = lm && lm.playedAt ? new Date(lm.playedAt).getTime() : 0;
+      stale = !ts || (Date.now() - ts > limit);
+    } catch (_) {
+      stale = true;
+    }
+    if (document.body) document.body.style.display = stale ? "none" : "";
+    return stale;
+  };
+
   PubgUI.poll = (url, interval, onData, onError) => {
     let stopped = false;
     const tick = async () => {

@@ -62,12 +62,17 @@
 
       // ── SESSION ──────────────────────────────────────────
       if (FOCUS !== "lifetime") {
-        try {
-          const s = await PubgUI.fetchJson("/api/pubg/session");
-          if (s.matches) {
-            out.push(`<span class="label">SESSION STATS</span> ${s.kills} Kills · ${PubgUI.fmtNum(Math.round(s.damage))} DMG · ${s.wins} Wins · K/D ${PubgUI.fmtKD(s.kd)} · K/M ${PubgUI.fmtKD(s.kpm)}`);
-          }
-        } catch (_) {}
+        let session = null;
+        try { session = await PubgUI.fetchJson("/api/pubg/session"); } catch (_) {}
+        // Keine aktuelle Session → Ticker komplett ausblenden.
+        // ?focus=lifetime ist davon ausgenommen (zeigt nur DB-Stats).
+        if (!session || !session.matches) {
+          document.body.style.display = "none";
+          snippets = [];
+          return;
+        }
+        document.body.style.display = "";
+        out.push(`<span class="label">SESSION STATS</span> ${session.kills} Kills · ${PubgUI.fmtNum(Math.round(session.damage))} DMG · ${session.wins} Wins · K/D ${PubgUI.fmtKD(session.kd)} · K/M ${PubgUI.fmtKD(session.kpm)}`);
         try {
           const md = await PubgUI.fetchJson("/api/pubg/map-distribution?range=session");
           if (md[0]) {
@@ -175,13 +180,17 @@
       show(snippets[idx]);
     }
 
+    PubgUI.hideIfStale();
     refresh().then(() => {
       if (snippets.length) {
         document.getElementById("slot").innerHTML = snippets[0];
         setInterval(tick, ROTATE_MS);
       }
     });
-    setInterval(refresh, 60000);
+    setInterval(() => {
+      PubgUI.hideIfStale();
+      refresh();
+    }, 60000);
   </script>
 </body>
 </html>

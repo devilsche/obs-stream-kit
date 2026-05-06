@@ -54,7 +54,11 @@
         (s.matches === 1) ? "Match" : "Matches";
     }
 
-    PubgUI.poll("/api/pubg/session", REFRESH_MS, renderSession, console.error);
+    PubgUI.hideIfStale();
+    PubgUI.poll("/api/pubg/session", REFRESH_MS, (s) => {
+      PubgUI.hideIfStale();
+      renderSession(s);
+    }, console.error);
   </script>
 </body>
 </html>
