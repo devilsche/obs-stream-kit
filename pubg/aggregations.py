@@ -829,19 +829,22 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
 
 
 def compute_hot_drop(conn, my_account_id, range_key="session",
-                     window_secs=180):
+                     window_secs=60):
     """Hot-Drop-Stats über die Range.
 
-    Definition Hot-Drop = im Match gab es ein Kill/Knock-Event in den
-    ersten window_secs (Default 180s = 3 min) zwischen verschiedenen Teams,
-    wo mein Squad als Attacker oder Victim beteiligt war.
+    Definition Hot-Drop = im Match gab es ein Kill/Knock-Event innerhalb
+    der ersten window_secs (Default 60s) NACH der Landung des Squads,
+    zwischen verschiedenen Teams, wo das Squad als Attacker oder Victim
+    beteiligt war. Landung = echte LogParachuteLanding-Events aus
+    Telemetry, NICHT geschätzt.
 
     Pro Match Markierung:
-      - hotDrop: ja/nein (Fight in ersten 180s mit Squad-Beteiligung)
-      - soloSurvived: ja, wenn ich bei t = window_secs noch lebe
-        (proxy: time_survived >= window_secs)
-      - teamSurvived: ja, wenn mindestens ein Squad-Member bei t = 180s
-        noch lebt (max(squad time_survived) >= window_secs)
+      - hotDrop: ja/nein (Fight in window_secs nach Landung mit Squad-
+        Beteiligung)
+      - soloSurvived: ja, wenn ich window_secs nach der Squad-Landung
+        noch lebe (time_survived >= squad_landing_offset + window_secs)
+      - teamSurvived: ja, wenn mindestens ein Squad-Member window_secs
+        nach Landung noch lebt
 
     Aggregat:
       - rate: % der Matches mit Hot-Drop
@@ -909,10 +912,10 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
 def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     """Pro Match: Hot-Drop ja/nein + Survival-Marker.
 
-    Match-Start = matches.played_at (das ist PUBGs `createdAt`,
-    der Match-START — NICHT das Match-Ende, wie ich vorher fälschlich
-    angenommen hatte. Match-Ende = played_at + duration_secs).
-    Window = erste window_ms ab Match-Start.
+    Bezugspunkt = ECHTE Squad-Landung aus LogParachuteLanding-Events
+    (NICHT geschätzt, NICHT Match-Start). Window = erste window_ms ab
+    Squad-Landung. Wenn keine Landing-Events vorhanden (Telemetry
+    fehlt/abgelaufen) → kein Hot-Drop ermittelbar.
     """
     parts = conn.execute("""
         SELECT account_id, team_id, time_survived
@@ -927,28 +930,32 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
 
     squad_ids = {a for a, t in acc_to_team.items() if t == my_team_id}
 
-    # Match-Start aus matches.played_at (PUBG `createdAt` = Match-START)
-    m_row = conn.execute(
-        "SELECT played_at FROM matches WHERE match_id = ?",
-        (match_id,)
-    ).fetchone()
-    if not m_row or not m_row["played_at"]:
+    # Echte Squad-Landung aus Telemetry: erstes Landing-Event eines
+    # Squad-Members. Falls fehlt → kein Hot-Drop ermittelbar.
+    placeholders = ",".join("?" * len(squad_ids))
+    landing_row = conn.execute(f"""
+        SELECT MIN(timestamp_ms) AS first_landing
+        FROM telemetry_events
+        WHERE match_id = ?
+          AND event_type = 'Landing'
+          AND actor_account IN ({placeholders})
+    """, [match_id] + list(squad_ids)).fetchone()
+    if not landing_row or not landing_row["first_landing"]:
         return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
-    start_dt = _parse_iso(m_row["played_at"])
-    if start_dt is None:
-        return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
-    match_start_ms = int(start_dt.timestamp() * 1000)
-    early_cutoff_ms = match_start_ms + window_ms
 
-    # Kill/Knock-Events innerhalb des frühen Fensters
+    landing_ms = landing_row["first_landing"]
+    fight_cutoff_ms = landing_ms + window_ms
+
+    # Kill/Knock-Events ab Squad-Landung bis +window_ms
     events = conn.execute("""
         SELECT actor_account, target_account, timestamp_ms
         FROM telemetry_events
         WHERE match_id = ?
           AND event_type IN ('Kill', 'Knock')
+          AND timestamp_ms >= ?
           AND timestamp_ms <= ?
         ORDER BY timestamp_ms ASC
-    """, (match_id, early_cutoff_ms)).fetchall()
+    """, (match_id, landing_ms, fight_cutoff_ms)).fetchall()
 
     hot_drop = False
     for e in events:
@@ -958,21 +965,33 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
         if a_team is None or v_team is None:
             continue
         if a_team == v_team:
-            # Friendly fire — kein Squad-Fight
-            continue
+            continue  # Friendly fire — kein echter Squad-Fight
         if a in squad_ids or v in squad_ids:
             hot_drop = True
             break
 
-    # Survival-Marker via time_survived (Sekunden ab Match-Start)
+    # Survival: time_survived ist Sekunden ab MATCH-START (nicht Landung).
+    # Squad-Landung als Offset reinrechnen, dann window_secs draufpacken.
+    m_row = conn.execute(
+        "SELECT played_at FROM matches WHERE match_id = ?",
+        (match_id,)
+    ).fetchone()
+    survival_threshold_s = window_secs  # Fallback
+    if m_row and m_row["played_at"]:
+        start_dt = _parse_iso(m_row["played_at"])
+        if start_dt:
+            match_start_ms = int(start_dt.timestamp() * 1000)
+            landing_offset_s = max(0, (landing_ms - match_start_ms) / 1000.0)
+            survival_threshold_s = landing_offset_s + window_secs
+
     my_part = next((p for p in parts if p["account_id"] == my_account_id), None)
     my_surv = (my_part and my_part["time_survived"]) or 0
     squad_surv = max((p["time_survived"] or 0)
                      for p in parts if p["account_id"] in squad_ids)
     return {
         "hotDrop":      hot_drop,
-        "soloSurvived": my_surv >= window_secs,
-        "teamSurvived": squad_surv >= window_secs,
+        "soloSurvived": my_surv >= survival_threshold_s,
+        "teamSurvived": squad_surv >= survival_threshold_s,
     }
 
 

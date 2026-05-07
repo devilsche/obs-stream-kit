@@ -238,6 +238,13 @@ Ordered roughly by impact:
       (post-match aggregated over session matches)
 - [ ] `hot-drop.html` — Hot-Drop rate, solo/team survival, streak — session
       aggregated
+- [ ] `jump-timing.html` — analyse `LogParachuteLanding` events to determine
+      drop-timing personality. Per match: time when first squad member lands,
+      ranked against all other teams ("you landed X out of Y teams; Z teams
+      landed AFTER you"). Aggregates: avg-rank-of-jump-time, early-jumper
+      vs late-jumper bias. Requires telemetry to keep ALL teams' Landing
+      events globally (not just squad-filtered) — backend filter change
+      needed first.
 - [ ] Trend-Indicator — could be standalone widget or news-ticker-snippet:
       `Session vs. last session: K/D ↑0.3 · Wins ↑1 · DMG-Avg ↓120`
 - [ ] `streak-counter.html` — current streak with flame icon, configurable type:
