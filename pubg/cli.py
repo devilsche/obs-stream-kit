@@ -22,7 +22,7 @@ def init_db(root: str) -> str:
     return db_path
 
 
-def cold_start(root: str, max_matches: int = 50):
+def cold_start(root: str, max_matches: int = 500):
     cfg = load_config(os.path.join(root, "config", "pubg.json"))
     api_key = load_api_key(os.path.join(root, ".secrets"))
     if not api_key:
@@ -50,21 +50,34 @@ def cold_start(root: str, max_matches: int = 50):
         my_acc_id = self_p["account_id"]
         print(f"Player bereits in DB: {my_acc_id}")
 
-    print(f"Cold-Start: ziehe bis zu {max_matches} Matches…")
+    # Loopt bis keine neuen Matches mehr in der API-Liste sind. Safety-Cap
+    # max_matches verhindert Endlos-Schleifen bei unerwartetem API-Verhalten.
+    print(f"Cold-Start: ingestiere alle verfügbaren Matches "
+          f"(Safety-Cap {max_matches})…")
     total_imported = 0
-    for _ in range(max_matches // 5 + 1):
+    iterations = 0
+    max_iterations = max_matches // 5 + 1
+    while iterations < max_iterations:
+        iterations += 1
         stats = run_single_tick(conn, client, cfg["playerName"],
                                  my_acc_id, max_matches_per_tick=5)
         total_imported += stats["new_matches"]
         if stats["errors"]:
             print(f"  Errors: {stats['errors']}")
+        # Break wenn nichts neues mehr und auch nichts übersprungen
         if stats["new_matches"] == 0 and stats["skipped"] == 0:
             break
         print(f"  Importiert: +{stats['new_matches']}, "
-              f"insgesamt: {total_imported}, skipped: {stats['skipped']}")
+              f"insgesamt: {total_imported}, "
+              f"verbleibend in API-Liste: {stats['skipped']}")
         time.sleep(12)
     conn.close()
-    print(f"Cold-Start fertig — {total_imported} Matches in DB.")
+    if iterations >= max_iterations:
+        print(f"Cold-Start: Safety-Cap erreicht nach {total_imported} Matches "
+              f"({max_iterations} Iterations × 5 max). Restart triggert "
+              f"Auto-Catch-Up der noch fehlt — oder max_matches erhöhen.")
+    else:
+        print(f"Cold-Start fertig — {total_imported} Matches in DB.")
     return 0
 
 
