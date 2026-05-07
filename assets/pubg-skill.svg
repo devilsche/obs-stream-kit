@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800"
+     font-family="'DM Sans', 'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <!-- Hintergrund-Gradient: tiefes Purple → fast schwarz -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#1a0a22"/>
+      <stop offset="55%"  stop-color="#2a1238"/>
+      <stop offset="100%" stop-color="#0d0414"/>
+    </linearGradient>
+
+    <!-- Gold-Akzent-Gradient -->
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#fde08a"/>
+      <stop offset="50%"  stop-color="#f2b705"/>
+      <stop offset="100%" stop-color="#a87a02"/>
+    </linearGradient>
+
+    <!-- Purple-Akzent-Gradient -->
+    <linearGradient id="purple" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#8b3fb0"/>
+      <stop offset="100%" stop-color="#5e2a79"/>
+    </linearGradient>
+
+    <!-- Glow für K/D-Zahl -->
+    <filter id="goldGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Hex-Grid Pattern (dezent im Hintergrund) -->
+    <pattern id="hex" x="0" y="0" width="56" height="48.5"
+             patternUnits="userSpaceOnUse">
+      <polygon points="14,0 42,0 56,24.25 42,48.5 14,48.5 0,24.25"
+               fill="none" stroke="#5e2a79" stroke-opacity="0.18"
+               stroke-width="0.6"/>
+    </pattern>
+
+    <!-- Crosshair-Symbol (Reticle) -->
+    <symbol id="reticle" viewBox="-50 -50 100 100">
+      <circle cx="0" cy="0" r="42" fill="none"
+              stroke="url(#gold)" stroke-width="1.2" stroke-opacity="0.55"/>
+      <circle cx="0" cy="0" r="28" fill="none"
+              stroke="url(#gold)" stroke-width="0.8" stroke-opacity="0.4"/>
+      <circle cx="0" cy="0" r="2" fill="#f2b705"/>
+      <line x1="-46" y1="0" x2="-12" y2="0"
+            stroke="url(#gold)" stroke-width="1.2" stroke-opacity="0.7"/>
+      <line x1="12"  y1="0" x2="46"  y2="0"
+            stroke="url(#gold)" stroke-width="1.2" stroke-opacity="0.7"/>
+      <line x1="0" y1="-46" x2="0" y2="-12"
+            stroke="url(#gold)" stroke-width="1.2" stroke-opacity="0.7"/>
+      <line x1="0" y1="12"  x2="0" y2="46"
+            stroke="url(#gold)" stroke-width="1.2" stroke-opacity="0.7"/>
+    </symbol>
+  </defs>
+
+  <!-- ░░ Hintergrund ░░ -->
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <rect width="1200" height="800" fill="url(#hex)"/>
+
+  <!-- Diagonale dekorative Linien -->
+  <g stroke="url(#gold)" stroke-opacity="0.12" stroke-width="1">
+    <line x1="0"    y1="120"  x2="1200" y2="60"/>
+    <line x1="0"    y1="730"  x2="1200" y2="780"/>
+  </g>
+
+  <!-- ░░ Reticle hinter K/D ░░ -->
+  <use href="#reticle" x="200" y="280" width="380" height="380"/>
+
+  <!-- ░░ Header-Bar ░░ -->
+  <g transform="translate(60, 60)">
+    <rect x="0" y="0" width="6" height="56" fill="url(#gold)"/>
+    <text x="22" y="22" fill="#f2b705" font-size="13"
+          letter-spacing="6" font-weight="700">PUBG · CAREER SKILL CARD</text>
+    <text x="22" y="48" fill="#ffffff" font-size="34"
+          font-weight="700" letter-spacing="1">PEX_LuCKoR</text>
+
+    <!-- Veteran-Badge -->
+    <g transform="translate(560, 8)">
+      <rect x="0" y="0" width="180" height="42" rx="3"
+            fill="none" stroke="url(#gold)" stroke-width="1.2"/>
+      <rect x="0" y="0" width="6" height="42" fill="url(#gold)"/>
+      <text x="20" y="18" fill="#f2b705" font-size="9"
+            letter-spacing="3" font-weight="700">RANK</text>
+      <text x="20" y="35" fill="#ffffff" font-size="14"
+            letter-spacing="2" font-weight="700">VETERAN · 16.5k</text>
+    </g>
+
+    <!-- Steam-Plattform-Tag -->
+    <g transform="translate(770, 8)">
+      <rect x="0" y="0" width="120" height="42" rx="3"
+            fill="rgba(94,42,121,0.4)" stroke="#5e2a79" stroke-width="1"/>
+      <text x="14" y="18" fill="#caa6dd" font-size="9"
+            letter-spacing="3" font-weight="700">PLATFORM</text>
+      <text x="14" y="35" fill="#ffffff" font-size="14"
+            letter-spacing="2" font-weight="700">STEAM · PC</text>
+    </g>
+  </g>
+
+  <!-- ░░ Hero: K/D Ratio (Mitte Links) ░░ -->
+  <g transform="translate(390, 360)" text-anchor="middle">
+    <text fill="#f2b705" font-size="14"
+          letter-spacing="6" font-weight="700">K / D  RATIO</text>
+    <text y="170" fill="url(#gold)" font-size="200"
+          font-weight="700" filter="url(#goldGlow)">1.53</text>
+    <text y="225" fill="#caa6dd" font-size="14" letter-spacing="4" font-weight="700">
+      24,005 KILLS · LIFETIME
+    </text>
+  </g>
+
+  <!-- ░░ Win-Rate Donut (Rechte Seite) ░░ -->
+  <g transform="translate(900, 410)">
+    <!-- Background Circle -->
+    <circle cx="0" cy="0" r="120" fill="none"
+            stroke="#3a1a4f" stroke-width="14"/>
+    <!-- Progress Arc (Top10 Rate ≈ 39.3%) -->
+    <!-- Umfang ≈ 754 ; 39.3% ≈ 296.3 -->
+    <circle cx="0" cy="0" r="120" fill="none"
+            stroke="url(#gold)" stroke-width="14"
+            stroke-linecap="round"
+            stroke-dasharray="296.3 754"
+            transform="rotate(-90)"/>
+    <text y="-6" text-anchor="middle" fill="#ffffff"
+          font-size="56" font-weight="700">39.3<tspan font-size="28">%</tspan></text>
+    <text y="22" text-anchor="middle" fill="#caa6dd"
+          font-size="11" letter-spacing="4">TOP-10 RATE</text>
+    <text y="60" text-anchor="middle" fill="#f2b705"
+          font-size="12" letter-spacing="3" font-weight="700">
+      6,500 / 16,540
+    </text>
+  </g>
+
+  <!-- ░░ Stat-Grid Bottom ░░ -->
+  <g transform="translate(60, 640)">
+    <!-- Trennlinie oben -->
+    <line x1="0" y1="-20" x2="1080" y2="-20"
+          stroke="url(#gold)" stroke-opacity="0.35" stroke-width="1"/>
+
+    <!-- Cell 1: Matches -->
+    <g transform="translate(0,0)">
+      <text fill="#caa6dd" font-size="11"
+            letter-spacing="3" font-weight="700">MATCHES</text>
+      <text y="42" fill="#ffffff" font-size="38" font-weight="700">16,540</text>
+      <text y="62" fill="#7d5a8e" font-size="10">all modes</text>
+    </g>
+    <line x1="240" y1="0" x2="240" y2="68"
+          stroke="url(#gold)" stroke-opacity="0.25"/>
+
+    <!-- Cell 2: Wins -->
+    <g transform="translate(280,0)">
+      <text fill="#caa6dd" font-size="11"
+            letter-spacing="3" font-weight="700">CHICKEN DINNERS</text>
+      <text y="42" fill="#ffffff" font-size="38" font-weight="700">
+        885 <tspan fill="#f2b705" font-size="22">· 5.35%</tspan>
+      </text>
+      <text y="62" fill="#7d5a8e" font-size="10">winner winner</text>
+    </g>
+    <line x1="540" y1="0" x2="540" y2="68"
+          stroke="url(#gold)" stroke-opacity="0.25"/>
+
+    <!-- Cell 3: Headshot Rate -->
+    <g transform="translate(580,0)">
+      <text fill="#caa6dd" font-size="11"
+            letter-spacing="3" font-weight="700">HEADSHOT RATE</text>
+      <text y="42" fill="#ffffff" font-size="38" font-weight="700">
+        24.0<tspan font-size="22">%</tspan>
+      </text>
+      <text y="62" fill="#7d5a8e" font-size="10">5,771 hs kills</text>
+    </g>
+    <line x1="800" y1="0" x2="800" y2="68"
+          stroke="url(#gold)" stroke-opacity="0.25"/>
+
+    <!-- Cell 4: Longest Kill -->
+    <g transform="translate(840,0)">
+      <text fill="#caa6dd" font-size="11"
+            letter-spacing="3" font-weight="700">LONGEST KILL</text>
+      <text y="42" fill="#ffffff" font-size="38" font-weight="700">
+        753<tspan font-size="22">m</tspan>
+      </text>
+      <text y="62" fill="#7d5a8e" font-size="10">avg dmg 228</text>
+    </g>
+  </g>
+
+  <!-- ░░ Footer ░░ -->
+  <g transform="translate(60, 760)">
+    <text fill="#5e2a79" font-size="10" letter-spacing="2" font-weight="700">
+      OBS-STREAM-KIT · PUBG-MODULE
+    </text>
+    <text x="1080" y="0" text-anchor="end"
+          fill="#5e2a79" font-size="10" letter-spacing="2">
+      LAST REFRESHED · 2026-05-07
+    </text>
+  </g>
+
+  <!-- Eck-Akzente Gold -->
+  <g stroke="url(#gold)" stroke-width="2" fill="none" stroke-opacity="0.7">
+    <polyline points="20,20 20,60 60,20"/>
+    <polyline points="1180,20 1180,60 1140,20"/>
+    <polyline points="20,780 20,740 60,780"/>
+    <polyline points="1180,780 1180,740 1140,780"/>
+  </g>
+</svg>

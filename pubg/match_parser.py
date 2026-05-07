@@ -105,52 +105,95 @@ def _safe_div(a, b):
     return (a / b) if b else 0.0
 
 
+def _parse_modestats(s: dict) -> dict:
+    """Einheitliches Mapping PUBG-API-gameModeStats → unsere DB-Spalten.
+    Wird identisch von Lifetime- und Season-Payload genutzt (gleiche Shape).
+    Speichert sowohl avg_damage (per round) als auch damage_dealt (total),
+    damit Aggregationen exakt stimmen statt aus avg*rounds rückgerechnet
+    werden zu müssen.
+
+    K/D verwendet das `losses`-Feld der PUBG-API (Matches-mit-Tod) statt
+    `rounds-wins` — sonst zählen Matches doppelt in denen das Team gewann
+    aber der Spieler vorher gestorben war. Match mit pubglookup verifiziert."""
+    rounds = s.get("roundsPlayed", 0) or 0
+    wins = s.get("wins", 0) or 0
+    kills = s.get("kills", 0) or 0
+    hs = s.get("headshotKills", 0) or 0
+    dmg_total = s.get("damageDealt", 0.0) or 0.0
+    losses = s.get("losses", 0) or 0
+    # losses ist die exakte Death-Zählung, fällt aber bei sehr alten
+    # Payloads weg → rounds-wins als Fallback (über-counts in Edge-Cases
+    # wo Team gewinnt nachdem Spieler tot war, deckt aber 99% ab).
+    deaths_for_kd = losses if losses > 0 else max(rounds - wins, 0)
+    return {
+        "rounds_played": rounds,
+        "wins": wins,
+        "top10s": s.get("top10s", 0) or 0,
+        "win_rate": _safe_div(wins, rounds) * 100,
+        "top10_rate": _safe_div(s.get("top10s", 0) or 0, rounds) * 100,
+        "kills": kills,
+        "kd_ratio": _safe_div(kills, deaths_for_kd),
+        "headshot_kills": hs,
+        "headshot_rate": _safe_div(hs, kills) * 100,
+        "avg_damage": _safe_div(dmg_total, rounds),
+        "longest_kill": s.get("longestKill", 0.0) or 0.0,
+        "time_survived_sec": s.get("timeSurvived", 0) or 0,
+        "assists": s.get("assists", 0) or 0,
+        "damage_dealt": dmg_total,
+        # PUBG-API: Field heißt "dBNOs" (lowercase d, capital BNO).
+        "dbnos": s.get("dBNOs", 0) or 0,
+        "revives": s.get("revives", 0) or 0,
+        "team_kills": s.get("teamKills", 0) or 0,
+        "losses": losses,
+    }
+
+
 def parse_lifetime_response(payload):
-    out = {}
     modes = payload["data"]["attributes"].get("gameModeStats", {})
-    for mode, s in modes.items():
-        rounds = s.get("roundsPlayed", 0) or 0
-        wins = s.get("wins", 0) or 0
-        kills = s.get("kills", 0) or 0
-        hs = s.get("headshotKills", 0) or 0
-        deaths = max(rounds - wins, 0)
-        out[mode] = {
-            "rounds_played": rounds,
-            "wins": wins,
-            "top10s": s.get("top10s", 0) or 0,
-            "win_rate": _safe_div(wins, rounds) * 100,
-            "top10_rate": _safe_div(s.get("top10s", 0) or 0, rounds) * 100,
-            "kills": kills,
-            "kd_ratio": _safe_div(kills, deaths),
-            "headshot_kills": hs,
-            "headshot_rate": _safe_div(hs, kills) * 100,
-            "avg_damage": _safe_div(s.get("damageDealt", 0) or 0, rounds),
-            "longest_kill": s.get("longestKill", 0.0) or 0.0,
-            "time_survived_sec": s.get("timeSurvived", 0) or 0,
-        }
-    return out
+    return {mode: _parse_modestats(s) for mode, s in modes.items()}
 
 
-def aggregate_lifetime_modes(modes_dict):
+def parse_season_response(payload):
+    """Identische Shape wie Lifetime — die PUBG-API liefert
+    /players/{id}/seasons/{seasonId} mit demselben gameModeStats-Dict."""
+    return parse_lifetime_response(payload)
+
+
+def _aggregate_modes(modes_dict):
+    """Aggregiert mehrere Modes (squad-fpp, duo-fpp, ...) zu einem 'all'.
+    Sums werden direkt aufaddiert, Rates aus den Sums neu berechnet —
+    nicht gewichtet aus den Mode-Rates, das wäre ungenau."""
     sums = {k: 0 for k in (
         "rounds_played", "wins", "top10s", "kills",
         "headshot_kills", "time_survived_sec",
+        "assists", "dbnos", "revives", "team_kills", "losses",
     )}
     dmg_total = 0.0
     longest = 0.0
     for s in modes_dict.values():
         for k in sums:
             sums[k] += s.get(k, 0) or 0
-        dmg_total += (s.get("avg_damage", 0) or 0) * (s.get("rounds_played", 0) or 0)
+        # damage_dealt ist jetzt Total, nicht Avg — direkt summieren.
+        dmg_total += s.get("damage_dealt", 0.0) or 0.0
         longest = max(longest, s.get("longest_kill", 0.0) or 0.0)
     rounds = sums["rounds_played"]
-    deaths = max(rounds - sums["wins"], 0)
+    deaths_for_kd = (sums["losses"] if sums["losses"] > 0
+                     else max(rounds - sums["wins"], 0))
     return {
         **sums,
         "win_rate": _safe_div(sums["wins"], rounds) * 100,
         "top10_rate": _safe_div(sums["top10s"], rounds) * 100,
-        "kd_ratio": _safe_div(sums["kills"], deaths),
+        "kd_ratio": _safe_div(sums["kills"], deaths_for_kd),
         "headshot_rate": _safe_div(sums["headshot_kills"], sums["kills"]) * 100,
         "avg_damage": _safe_div(dmg_total, rounds),
+        "damage_dealt": dmg_total,
         "longest_kill": longest,
     }
+
+
+def aggregate_lifetime_modes(modes_dict):
+    return _aggregate_modes(modes_dict)
+
+
+def aggregate_season_modes(modes_dict):
+    return _aggregate_modes(modes_dict)

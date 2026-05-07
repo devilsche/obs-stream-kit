@@ -15,6 +15,11 @@ echo "PUBG API Key: <dein-key>" >> .secrets
 python serve.py --init-pubg-db
 python serve.py --pubg-cold-start
 
+# 2b. (optional) Alle historischen Season-Aggregate für self ziehen — gibt
+#     dir K/D / Damage / Win-Rate über ALLE PUBG-Seasons (auch >14d alt).
+#     Rate-limited via PUBG-API (10 RPM), läuft ~5-10 min für ~99 Seasons.
+python -m pubg.cli seasons-backfill
+
 # 3. Server starten — läuft als Daemon
 python serve.py 8080
 # (oder als systemd-User-Service: docs/pubg-systemd.service.example)
@@ -41,6 +46,7 @@ Alle Widget-URLs sind unter `http://localhost:<port>/widgets/pubg/<datei>.html`.
 | `mates-today.html` | siehe unten | "Heute gespielt mit X" |
 | `top-mates.html` | **400×420** | Top-5-Liste mit Detail-Zeilen (Lifetime) |
 | `career-card.html` | **400×300** | Lifetime-Stats für Starting-Soon |
+| `season-history.html` | **800×500** | K/D-Verlauf-Chart über alle Seasons |
 | `chicken-map.html` | **430×560** | CHICKEN Wins pro Map |
 | `chicken-together.html` | **430×500** | CHICKEN mit welchen Mates |
 | `map-distribution.html` | **310×420** | Map-Häufigkeits-Bars |
@@ -368,6 +374,8 @@ POST /api/pubg/session/reset
 GET  /api/pubg/top-mates?sortBy=&limit=&minMatches=
 GET  /api/pubg/co-player/{nameOrAccountId}
 GET  /api/pubg/career-lifetime?player=&mode=all|squad-fpp|...
+GET  /api/pubg/season-stats?player=&season=&mode=all|...    # current season default
+GET  /api/pubg/season-history?player=&mode=all|...         # alle gespeicherten Seasons
 GET  /api/pubg/mates-today?range=&minMatches=
 GET  /api/pubg/map-distribution?range=
 GET  /api/pubg/first-fight-rate?range=

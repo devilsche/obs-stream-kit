@@ -3,14 +3,16 @@ import os
 import sqlite3
 import threading
 from pubg.db import (connect, upsert_player, insert_match, insert_participants,
-                     get_known_match_ids, upsert_lifetime,
+                     get_known_match_ids, upsert_lifetime, upsert_season,
                      insert_telemetry_events, mark_telemetry_fetched,
                      get_matches_needing_telemetry, mark_telemetry_schema,
                      insert_team_mapping, mark_match_schema,
                      get_matches_needing_match_schema_update,
+                     get_setting, set_setting,
                      CURRENT_MATCH_SCHEMA)
 from pubg.match_parser import (parse_match_response, parse_lifetime_response,
-                                aggregate_lifetime_modes)
+                                aggregate_lifetime_modes,
+                                parse_season_response, aggregate_season_modes)
 
 
 def rotate_backup(db_path: str, max_backups: int = 7,
@@ -171,6 +173,74 @@ def _is_stale(iso_ts, max_age_hours=24):
         return True
     age = datetime.datetime.now(datetime.timezone.utc) - ts
     return age.total_seconds() > max_age_hours * 3600
+
+
+_CURRENT_SEASON_TTL_DAYS = 7
+
+
+def get_current_season_id(conn, client) -> str | None:
+    """Cached current-season-id. PUBG-Seasons wechseln nur alle paar
+    Monate, daher 7-Tage-Cache in settings — vermeidet unnötige Rate-
+    Limit-Requests gegen /seasons. Bei Cache-Miss/-Stale wird neu gezogen."""
+    cached_id = get_setting(conn, "pubg.current_season_id")
+    cached_at = get_setting(conn, "pubg.current_season_id_fetched_at")
+    if cached_id and not _is_stale(cached_at,
+                                    max_age_hours=_CURRENT_SEASON_TTL_DAYS * 24):
+        return cached_id
+    payload = client.get_seasons()
+    sid = client.extract_current_season_id(payload)
+    if sid:
+        set_setting(conn, "pubg.current_season_id", sid)
+        set_setting(conn, "pubg.current_season_id_fetched_at", _iso_utc_now())
+    return sid
+
+
+def refresh_seasons(conn, client, min_matches: int = 5,
+                    max_per_tick: int = 3,
+                    max_age_hours: int = 6) -> dict:
+    """Holt aktuelle Season-Stats (non-ranked) für self + qualified
+    co-players. Cadence ist enger als Lifetime (6h statt 24h), weil
+    Season-Stats sich öfter ändern (jedes neue Match)."""
+    try:
+        season_id = get_current_season_id(conn, client)
+    except Exception as e:
+        return {"refreshed": 0, "errors": [f"current-season-id: {e}"]}
+    if not season_id:
+        return {"refreshed": 0, "errors": ["no-current-season-id"]}
+
+    rows = conn.execute("""
+        SELECT p.account_id, p.name,
+               (SELECT MAX(last_refreshed) FROM player_season
+                WHERE account_id = p.account_id AND season_id = ?) AS last_refreshed
+        FROM players p
+        WHERE p.is_self = 1
+        UNION
+        SELECT q.account_id, q.name,
+               (SELECT MAX(last_refreshed) FROM player_season
+                WHERE account_id = q.account_id AND season_id = ?) AS last_refreshed
+        FROM qualified_co_players q
+        WHERE q.shared_matches >= ?
+    """, (season_id, season_id, min_matches)).fetchall()
+
+    refreshed = 0
+    errors = []
+    for r in rows:
+        if not _is_stale(r["last_refreshed"], max_age_hours=max_age_hours):
+            continue
+        if refreshed >= max_per_tick:
+            break
+        try:
+            payload = client.get_season(r["account_id"], season_id)
+            modes = parse_season_response(payload)
+            for mode, stats in modes.items():
+                upsert_season(conn, r["account_id"], season_id, mode, stats)
+            agg = aggregate_season_modes(modes)
+            upsert_season(conn, r["account_id"], season_id, "all", agg)
+            refreshed += 1
+        except Exception as e:
+            errors.append(f"{r['name']}: {e}")
+    return {"refreshed": refreshed, "errors": errors,
+            "seasonId": season_id}
 
 
 def refresh_lifetimes(conn, client, min_matches: int = 5,
@@ -357,17 +427,26 @@ class PollerThread(threading.Thread):
                 l_stats = refresh_lifetimes(conn, self.client,
                                             self.lifetime_min, self.lifetime_max)
                 try:
+                    s_stats = refresh_seasons(conn, self.client,
+                                               self.lifetime_min, self.lifetime_max)
+                except Exception as e:
+                    s_stats = {"refreshed": 0, "errors": [f"season-batch: {e}"],
+                               "seasonId": None}
+                try:
                     t_stats = process_telemetry_backlog(conn, self.client,
                                                          self.my_account_id, 3)
                 except Exception as e:
                     t_stats = {"processed": 0, "errors": [f"telemetry-batch: {e}"]}
-                all_errors = m_stats["errors"] + l_stats["errors"] + t_stats["errors"]
+                all_errors = (m_stats["errors"] + l_stats["errors"]
+                              + s_stats["errors"] + t_stats["errors"])
                 self._last_status = {
                     "polling": "ok" if not all_errors else "degraded",
                     "lastPollAt": _iso_utc_now(),
                     "errors": all_errors,
                     "newMatches": m_stats["new_matches"],
                     "lifetimeRefreshed": l_stats["refreshed"],
+                    "seasonRefreshed": s_stats["refreshed"],
+                    "currentSeasonId": s_stats.get("seasonId"),
                     "telemetryProcessed": t_stats["processed"],
                     "rateLimitRemaining": self.client.limiter.remaining()
                                           if hasattr(self.client, "limiter") else None,

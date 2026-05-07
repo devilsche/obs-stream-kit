@@ -71,6 +71,10 @@ class EndpointRegistry:
             return self._co_player(name)
         if route == ("GET", "/api/pubg/career-lifetime"):
             return self._career_lifetime(qs)
+        if route == ("GET", "/api/pubg/season-stats"):
+            return self._season_stats(qs)
+        if route == ("GET", "/api/pubg/season-history"):
+            return self._season_history(qs)
         if route == ("GET", "/api/pubg/mates"):
             return self._mates(qs)
         if route == ("GET", "/api/pubg/map-distribution"):
@@ -274,6 +278,61 @@ class EndpointRegistry:
                 WHERE (p.name = ? OR p.account_id = ?) AND pl.mode = ?
             """, (player, player, mode)).fetchone()
         return _ok(dict(row) if row else {})
+
+    def _season_stats(self, qs):
+        """Aktuelle Season-Stats. ?season=<id> wählt eine konkrete Season,
+        sonst die aktuelle (laut settings.pubg.current_season_id).
+        ?mode=all|squad-fpp|... default 'all'."""
+        player = qs.get("player")
+        mode = qs.get("mode", "all")
+        season = qs.get("season")
+        conn = self.get_conn()
+        if not season:
+            r = conn.execute(
+                "SELECT value FROM settings WHERE key='pubg.current_season_id'"
+            ).fetchone()
+            season = r["value"] if r else None
+        if not season:
+            return _ok({})
+        if not player:
+            row = conn.execute(
+                "SELECT * FROM player_season "
+                "WHERE account_id=? AND season_id=? AND mode=?",
+                (self.my_account_id, season, mode)).fetchone()
+        else:
+            row = conn.execute("""
+                SELECT ps.* FROM player_season ps
+                JOIN players p ON p.account_id = ps.account_id
+                WHERE (p.name = ? OR p.account_id = ?)
+                  AND ps.season_id = ? AND ps.mode = ?
+            """, (player, player, season, mode)).fetchone()
+        result = dict(row) if row else {}
+        if result:
+            result["seasonId"] = season
+        return _ok(result)
+
+    def _season_history(self, qs):
+        """Liste aller gespeicherten Seasons für einen Spieler — chronologisch
+        älteste zuerst. Fürs Verlaufs-Chart (K/D, Win-Rate, DMG über alle
+        Seasons). ?mode default 'all'."""
+        player = qs.get("player")
+        mode = qs.get("mode", "all")
+        conn = self.get_conn()
+        if not player:
+            account_id = self.my_account_id
+        else:
+            r = conn.execute(
+                "SELECT account_id FROM players WHERE name=? OR account_id=?",
+                (player, player)).fetchone()
+            if not r:
+                return _ok({"seasons": []})
+            account_id = r["account_id"]
+        rows = conn.execute("""
+            SELECT * FROM player_season
+            WHERE account_id=? AND mode=?
+            ORDER BY season_id ASC
+        """, (account_id, mode)).fetchall()
+        return _ok({"seasons": [dict(r) for r in rows]})
 
     def _mates(self, qs):
         conn = self.get_conn()

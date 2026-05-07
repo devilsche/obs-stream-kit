@@ -84,6 +84,33 @@ class PubgClient:
                f"/seasons/lifetime")
         return self._get_json(url, rate_limited=True)
 
+    def get_seasons(self) -> dict:
+        # Liste aller Seasons der Plattform — eine hat
+        # attributes.isCurrentSeason=true. Rate-limited (selten gerufen,
+        # aktuelle Season-ID wechselt nur alle paar Monate).
+        url = f"{PUBG_BASE}/shards/{self.platform}/seasons"
+        return self._get_json(url, rate_limited=True)
+
+    def get_season(self, account_id: str, season_id: str) -> dict:
+        # /players/{id}/seasons/{seasonId} liefert non-ranked Aggregat
+        # für DIESE Season inkl. assists/damageDealt/dBNOs/revives.
+        # Rate-limited.
+        url = (f"{PUBG_BASE}/shards/{self.platform}/players/{account_id}"
+               f"/seasons/{season_id}")
+        return self._get_json(url, rate_limited=True)
+
+    @staticmethod
+    def extract_current_season_id(seasons_payload: dict) -> str | None:
+        """Findet die Season mit isCurrentSeason=true im /seasons-Payload."""
+        try:
+            for s in seasons_payload.get("data", []):
+                attrs = s.get("attributes", {}) or {}
+                if attrs.get("isCurrentSeason"):
+                    return s.get("id")
+        except (AttributeError, TypeError):
+            pass
+        return None
+
     def get_telemetry(self, telemetry_url: str) -> list:
         # Telemetry-CDN, no API-Key needed, no rate-limit on this endpoint.
         # CDN delivers gzip-compressed JSON regardless of Accept-Encoding header.

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<!--
+  PUBG Season-History
+  ────────────────────────────────────────────────────────────────────
+  Linien-Chart über alle gespielten Seasons: K/D, Win-Rate, Avg-DMG.
+  Datenquelle: /api/pubg/season-history?mode=<mode>&player=<name>.
+  Empty Seasons (rounds_played=0) werden automatisch rausgefiltert.
+
+  URL-Params:
+    player       — leer = self
+    mode         — all (default), squad-fpp, duo-fpp, ...
+    metric       — kd (default), winrate, dmg, kills, matches
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Season History</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    body { padding: 20px; }
+    .card { width: 760px; padding: 18px 22px; }
+    .chart-wrap { position: relative; }
+    .chart-svg { width: 100%; height: 280px; display: block; }
+    .axis-label { fill: var(--pubg-muted); font-size: 10px; letter-spacing: 0.08em; }
+    .grid-line  { stroke: var(--pubg-border); stroke-dasharray: 2 4; opacity: 0.4; }
+    .data-line  { fill: none; stroke: var(--pubg-gold); stroke-width: 2;
+                  stroke-linejoin: round; stroke-linecap: round;
+                  filter: drop-shadow(0 0 4px rgba(242,183,5,0.4)); }
+    .data-area  { fill: url(#area-grad); opacity: 0.35; }
+    .dot        { fill: var(--pubg-gold); stroke: #2a1238; stroke-width: 1.5; }
+    .dot:hover  { fill: #fff; }
+    .seasons-row { display: grid; grid-template-columns: repeat(7, 1fr);
+                   gap: 4px; margin-top: 12px; font-size: 0.72em;
+                   color: var(--pubg-muted); }
+    .seasons-row span { text-align: center; }
+    .legend { display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap;
+              font-size: 0.78em; }
+    .legend button { background: transparent; border: 1px solid var(--pubg-border);
+                     color: var(--pubg-muted); padding: 4px 10px; border-radius: 3px;
+                     cursor: pointer; font-family: inherit; letter-spacing: 0.06em;
+                     text-transform: uppercase; font-size: 11px; font-weight: 700; }
+    .legend button.active { background: rgba(242,183,5,0.15);
+                            border-color: var(--pubg-gold);
+                            color: var(--pubg-gold); }
+    .summary { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr;
+               gap: 10px; padding-top: 12px; border-top: 1px solid var(--pubg-border); }
+    .summary div { display: flex; flex-direction: column; gap: 2px; }
+    .summary .label { color: var(--pubg-muted); font-size: 0.72em;
+                      letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; }
+    .summary .value { color: var(--pubg-gold); font-weight: 700; font-size: 1.1em;
+                      font-variant-numeric: tabular-nums; }
+    .tooltip { position: absolute; pointer-events: none; padding: 6px 10px;
+               background: rgba(20, 12, 30, 0.95); border: 1px solid var(--pubg-gold);
+               border-radius: 4px; font-size: 0.78em; white-space: nowrap;
+               opacity: 0; transition: opacity 0.12s; z-index: 10;
+               transform: translate(-50%, -110%); }
+    .tooltip.show { opacity: 1; }
+    .tooltip b { color: var(--pubg-gold); }
+    .tooltip span { color: var(--pubg-muted); }
+  </style>
+</head>
+<body>
+  <div class="pubg-card card pubg-fade-in">
+    <div class="pubg-header">SEASON HISTORY · <b id="player">—</b></div>
+    <div class="chart-wrap">
+      <svg class="chart-svg" id="chart" viewBox="0 0 720 280" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="area-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#f2b705" stop-opacity="0.5"/>
+            <stop offset="100%" stop-color="#f2b705" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <g id="grid"></g>
+        <g id="y-labels"></g>
+        <g id="x-labels"></g>
+        <path id="area" class="data-area" d=""/>
+        <polyline id="line" class="data-line" points=""/>
+        <g id="dots"></g>
+      </svg>
+      <div class="tooltip" id="tooltip"></div>
+    </div>
+    <div class="legend" id="legend">
+      <button data-metric="kd" class="active">K / D</button>
+      <button data-metric="winrate">WIN %</button>
+      <button data-metric="dmg">Ø DMG</button>
+      <button data-metric="kills">KILLS</button>
+      <button data-metric="matches">MATCHES</button>
+    </div>
+    <div class="summary" id="summary"></div>
+  </div>
+
+  <script src="_pubg.js"></script>
+  <script>
+    const PLAYER = PubgUI.qs("player", "");
+    const MODE   = PubgUI.qs("mode", "all");
+    let METRIC   = PubgUI.qs("metric", "kd");
+    document.getElementById("player").textContent =
+      (PLAYER || "Self") + " · " + MODE.toUpperCase();
+
+    PubgUI.buildFilter([
+      { key: "mode", label: "Mode", type: "select", default: "all",
+        options: [["all","Alle Modi"],
+                  ["squad-fpp","Squad FPP"],["squad-tpp","Squad TPP"],
+                  ["duo-fpp","Duo FPP"],["duo-tpp","Duo TPP"],
+                  ["solo-fpp","Solo FPP"],["solo-tpp","Solo TPP"]]},
+      { key: "metric", label: "Metric", type: "select", default: "kd",
+        options: [["kd","K/D"],["winrate","Win-Rate"],["dmg","Ø DMG"],
+                  ["kills","Kills"],["matches","Matches"]]},
+      { key: "player", label: "Player", type: "text", placeholder: "leer = self" },
+    ]);
+
+    // METRIC-Definition: getter, format, label, axis-suffix.
+    const METRICS = {
+      kd:      { get: r => r.kd_ratio,     fmt: v => v.toFixed(2),
+                 label: "K/D",   suffix: "" },
+      winrate: { get: r => r.win_rate,     fmt: v => v.toFixed(1) + "%",
+                 label: "Win %", suffix: "%" },
+      dmg:     { get: r => r.avg_damage,   fmt: v => Math.round(v),
+                 label: "Ø DMG", suffix: "" },
+      kills:   { get: r => r.kills,        fmt: v => v.toLocaleString("de-DE"),
+                 label: "Kills", suffix: "" },
+      matches: { get: r => r.rounds_played,fmt: v => v.toLocaleString("de-DE"),
+                 label: "Matches", suffix: "" },
+    };
+
+    function shortSeason(sid) {
+      // "division.bro.official.pc-2018-32" → "S32"
+      const m = sid.match(/(\d+)$/);
+      return m ? "S" + m[1] : sid.slice(-6);
+    }
+
+    function render(data) {
+      const all = (data && data.seasons) || [];
+      // Empty Seasons rausfiltern (rounds_played=0 → nicht gespielt).
+      const seasons = all.filter(s => (s.rounds_played || 0) > 0);
+      if (seasons.length === 0) {
+        document.getElementById("chart").style.display = "none";
+        document.getElementById("summary").innerHTML =
+          "<div><span class='label'>Status</span><span class='value' style='font-size:0.9em'>" +
+          "Keine Season-Daten — backfill erst laufen lassen</span></div>";
+        return;
+      }
+      document.getElementById("chart").style.display = "";
+
+      const def = METRICS[METRIC] || METRICS.kd;
+      const values = seasons.map(s => def.get(s) || 0);
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const range = (max - min) || 1;
+      // Sympathischeres Y-Range: 10% Padding oben/unten.
+      const yMin = Math.max(0, min - range * 0.1);
+      const yMax = max + range * 0.1;
+
+      const w = 720, h = 280;
+      const padL = 42, padR = 18, padT = 16, padB = 32;
+      const innerW = w - padL - padR;
+      const innerH = h - padT - padB;
+      const stepX = seasons.length > 1 ? innerW / (seasons.length - 1) : 0;
+
+      const xOf = i => padL + i * stepX;
+      const yOf = v => padT + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
+
+      // Grid + Y-Labels (5 ticks).
+      const grid = document.getElementById("grid");
+      const yLabels = document.getElementById("y-labels");
+      grid.innerHTML = "";
+      yLabels.innerHTML = "";
+      for (let t = 0; t <= 4; t++) {
+        const v = yMin + (yMax - yMin) * (t / 4);
+        const y = yOf(v);
+        grid.innerHTML += `<line class="grid-line" x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}"/>`;
+        yLabels.innerHTML += `<text class="axis-label" x="${padL-6}" y="${y+3}" text-anchor="end">${def.fmt(v).replace(/,/g," ")}</text>`;
+      }
+
+      // X-Labels — bei vielen Seasons jeden N-ten.
+      const xLabels = document.getElementById("x-labels");
+      xLabels.innerHTML = "";
+      const skipEvery = Math.max(1, Math.ceil(seasons.length / 12));
+      seasons.forEach((s, i) => {
+        if (i % skipEvery === 0 || i === seasons.length - 1) {
+          xLabels.innerHTML += `<text class="axis-label" x="${xOf(i)}" y="${h-padB+18}" text-anchor="middle">${shortSeason(s.season_id)}</text>`;
+        }
+      });
+
+      // Polyline + Area.
+      const points = seasons.map((s, i) => `${xOf(i)},${yOf(def.get(s) || 0)}`);
+      document.getElementById("line").setAttribute("points", points.join(" "));
+      const areaPath = `M ${xOf(0)},${yOf(yMin)} L ${points.join(" L ")} L ${xOf(seasons.length-1)},${yOf(yMin)} Z`;
+      document.getElementById("area").setAttribute("d", areaPath);
+
+      // Dots + Tooltip.
+      const dots = document.getElementById("dots");
+      dots.innerHTML = "";
+      const tt = document.getElementById("tooltip");
+      seasons.forEach((s, i) => {
+        const cx = xOf(i), cy = yOf(def.get(s) || 0);
+        const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        c.setAttribute("cx", cx);
+        c.setAttribute("cy", cy);
+        c.setAttribute("r", 4);
+        c.setAttribute("class", "dot");
+        c.addEventListener("mouseenter", e => {
+          tt.innerHTML =
+            `<b>${shortSeason(s.season_id)}</b><br>` +
+            `<span>${def.label}:</span> ${def.fmt(def.get(s) || 0)}<br>` +
+            `<span>Matches:</span> ${s.rounds_played} · <span>Kills:</span> ${s.kills}`;
+          // Tooltip relativ zum chart-wrap (parent .chart-wrap).
+          const wrap = c.closest(".chart-wrap").getBoundingClientRect();
+          const dotR = c.getBoundingClientRect();
+          tt.style.left = (dotR.left + dotR.width/2 - wrap.left) + "px";
+          tt.style.top  = (dotR.top - wrap.top) + "px";
+          tt.classList.add("show");
+        });
+        c.addEventListener("mouseleave", () => tt.classList.remove("show"));
+        dots.appendChild(c);
+      });
+
+      // Summary: total matches, total kills, best/worst K/D-Season.
+      const totalMatches = seasons.reduce((a, s) => a + (s.rounds_played || 0), 0);
+      const totalKills   = seasons.reduce((a, s) => a + (s.kills || 0), 0);
+      const sortedKd = [...seasons].sort((a, b) => (b.kd_ratio || 0) - (a.kd_ratio || 0));
+      const bestKd  = sortedKd[0];
+      const worstKd = sortedKd[sortedKd.length - 1];
+      document.getElementById("summary").innerHTML = `
+        <div><span class="label">Seasons</span>
+             <span class="value">${seasons.length}</span></div>
+        <div><span class="label">Matches Σ</span>
+             <span class="value">${totalMatches.toLocaleString("de-DE")}</span></div>
+        <div><span class="label">Kills Σ</span>
+             <span class="value">${totalKills.toLocaleString("de-DE")}</span></div>
+        <div><span class="label">Best K/D</span>
+             <span class="value">${(bestKd.kd_ratio || 0).toFixed(2)} <small style="color:var(--pubg-muted);font-size:0.7em">${shortSeason(bestKd.season_id)}</small></span></div>
+      `;
+    }
+
+    // Metric-Toggle.
+    document.getElementById("legend").addEventListener("click", e => {
+      const btn = e.target.closest("button[data-metric]");
+      if (!btn) return;
+      METRIC = btn.dataset.metric;
+      [...document.querySelectorAll("#legend button")]
+        .forEach(b => b.classList.toggle("active", b === btn));
+      if (window.__lastData) render(window.__lastData);
+    });
+
+    // Stelle initial active button auf METRIC.
+    [...document.querySelectorAll("#legend button")]
+      .forEach(b => b.classList.toggle("active", b.dataset.metric === METRIC));
+
+    const params = new URLSearchParams({ mode: MODE });
+    if (PLAYER) params.set("player", PLAYER);
+    PubgUI.poll(`/api/pubg/season-history?${params}`, 5*60*1000,
+                d => { window.__lastData = d; render(d); },
+                console.error);
+  </script>
+</body>
+</html>

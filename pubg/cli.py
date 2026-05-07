@@ -6,9 +6,12 @@ import time
 from pubg.config import load_config, load_api_key
 from pubg.db import (connect, init_schema, upsert_player, get_player_by_name,
                       integrity_check)
-from pubg.api_client import PubgClient
+from pubg.api_client import PubgClient, RateLimitError
 from pubg.poller import (run_bulk_catchup, run_bulk_telemetry_catchup,
-                          run_bulk_match_schema_upgrade)
+                          run_bulk_match_schema_upgrade,
+                          get_current_season_id)
+from pubg.db import upsert_season, set_setting
+from pubg.match_parser import parse_season_response, aggregate_season_modes
 from pubg.backup import (load_ftp_config, list_remote_backups,
                           download_from_ftp)
 
@@ -182,6 +185,114 @@ def pull_from_ftp(root: str) -> int:
     return 0
 
 
+def seasons_backfill(root: str, only_self: bool = True) -> int:
+    """Iteriert ALLE PUBG-Seasons (~99 historisch + aktuelle) und holt
+    die non-ranked Aggregate für self (oder alle DB-Spieler). Rate-limited
+    via /seasons-Endpoint (10 RPM), pacing automatisch durch RateLimiter.
+    Idempotent — schon gespeicherte Seasons werden upsertet."""
+    cfg = load_config(os.path.join(root, "config", "pubg.json"))
+    api_key = load_api_key(os.path.join(root, ".secrets"))
+    if not api_key:
+        print("No PUBG-API-Key in .secrets!")
+        return 1
+    db_path = os.path.join(root, "data", "pubg-history.db")
+    conn = connect(db_path)
+    init_schema(conn)
+
+    self_p = get_player_by_name(conn, cfg["playerName"])
+    if not self_p:
+        print(f"Player {cfg['playerName']} nicht in DB — erst cold-start laufen lassen.")
+        return 1
+
+    client = PubgClient(api_key=api_key, platform=cfg["platform"])
+
+    print("Lade Season-Liste …")
+    try:
+        seasons_payload = client.get_seasons()
+    except Exception as e:
+        print(f"API-Fehler: {e}")
+        return 1
+    seasons = seasons_payload.get("data", [])
+    current_id = client.extract_current_season_id(seasons_payload)
+    if current_id:
+        set_setting(conn, "pubg.current_season_id", current_id)
+        set_setting(conn, "pubg.current_season_id_fetched_at", _iso())
+    print(f"  {len(seasons)} Seasons gefunden, aktuelle: {current_id}")
+
+    accounts = [(self_p["account_id"], self_p["name"])]
+    if not only_self:
+        rows = conn.execute(
+            "SELECT account_id, name FROM players").fetchall()
+        accounts = [(r["account_id"], r["name"]) for r in rows]
+
+    refreshed = 0
+    skipped = 0
+    errors = []
+    for acc_id, name in accounts:
+        print(f"\n→ {name} ({acc_id})")
+        for i, s in enumerate(seasons, 1):
+            sid = s.get("id")
+            if not sid:
+                continue
+            # Skip wenn schon vorhanden + nicht stale.
+            existing = conn.execute(
+                "SELECT 1 FROM player_season "
+                "WHERE account_id=? AND season_id=? AND mode='all'",
+                (acc_id, sid)).fetchone()
+            if existing:
+                skipped += 1
+                continue
+            # Bei Rate-Limit: warten bis Slot frei ist (max 70s, eine
+            # Window-Periode + Buffer), dann nochmal versuchen.
+            payload = None
+            for attempt in range(2):
+                try:
+                    payload = client.get_season(acc_id, sid)
+                    break
+                except RateLimitError:
+                    print(f"  [{i}/{len(seasons)}] {sid} → rate-limited, "
+                          f"warte 7s …")
+                    time.sleep(7)
+                except Exception as e:
+                    errors.append(f"{name}/{sid}: {e}")
+                    print(f"  [{i}/{len(seasons)}] {sid} → ERROR: {e}")
+                    payload = None
+                    break
+            if payload is None:
+                continue
+            try:
+                modes = parse_season_response(payload)
+                for mode, stats in modes.items():
+                    upsert_season(conn, acc_id, sid, mode, stats)
+                agg = aggregate_season_modes(modes)
+                upsert_season(conn, acc_id, sid, "all", agg)
+                refreshed += 1
+                played = agg["rounds_played"]
+                marker = f"  [{i}/{len(seasons)}] {sid} → {played} matches"
+                if played > 0:
+                    marker += (f" / K {agg['kills']} / "
+                               f"K/D {agg['kd_ratio']:.2f}")
+                print(marker)
+            except Exception as e:
+                errors.append(f"{name}/{sid}: parse/persist: {e}")
+                print(f"  [{i}/{len(seasons)}] {sid} → PARSE ERROR: {e}")
+            # Höflichkeits-Pacing zwischen Calls. Rate-Limit ist 10 RPM
+            # → 6s zwischen Calls reicht, mit 200ms Buffer für Bursts.
+            time.sleep(0.2)
+
+    print(f"\nDone: {refreshed} neu gespeichert, {skipped} schon vorhanden, "
+          f"{len(errors)} Fehler.")
+    if errors:
+        print("Erste Fehler:", errors[:3])
+    conn.close()
+    return 0
+
+
+def _iso():
+    return datetime.datetime.now(datetime.timezone.utc).strftime(
+        "%Y-%m-%dT%H:%M:%SZ")
+
+
 if __name__ == "__main__":
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if len(sys.argv) > 1 and sys.argv[1] == "init":
@@ -190,5 +301,8 @@ if __name__ == "__main__":
         sys.exit(cold_start(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "pull-ftp":
         sys.exit(pull_from_ftp(root))
+    elif len(sys.argv) > 1 and sys.argv[1] == "seasons-backfill":
+        sys.exit(seasons_backfill(root))
     else:
-        print("Usage: python -m pubg.cli init | cold-start | pull-ftp")
+        print("Usage: python -m pubg.cli init | cold-start | pull-ftp | "
+              "seasons-backfill")

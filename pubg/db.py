@@ -86,8 +86,41 @@ CREATE TABLE IF NOT EXISTS player_lifetime (
     avg_damage        REAL,
     longest_kill      REAL,
     time_survived_sec INTEGER,
+    assists           INTEGER,
+    damage_dealt      REAL,
+    dbnos             INTEGER,
+    revives           INTEGER,
+    team_kills        INTEGER,
+    losses            INTEGER,
     last_refreshed    TEXT,
     PRIMARY KEY (account_id, mode),
+    FOREIGN KEY (account_id) REFERENCES players(account_id)
+);
+
+CREATE TABLE IF NOT EXISTS player_season (
+    account_id        TEXT NOT NULL,
+    season_id         TEXT NOT NULL,
+    mode              TEXT NOT NULL,
+    rounds_played     INTEGER,
+    wins              INTEGER,
+    top10s            INTEGER,
+    win_rate          REAL,
+    top10_rate        REAL,
+    kills             INTEGER,
+    kd_ratio          REAL,
+    headshot_kills    INTEGER,
+    headshot_rate     REAL,
+    avg_damage        REAL,
+    longest_kill      REAL,
+    time_survived_sec INTEGER,
+    assists           INTEGER,
+    damage_dealt      REAL,
+    dbnos             INTEGER,
+    revives           INTEGER,
+    team_kills        INTEGER,
+    losses            INTEGER,
+    last_refreshed    TEXT,
+    PRIMARY KEY (account_id, season_id, mode),
     FOREIGN KEY (account_id) REFERENCES players(account_id)
 );
 
@@ -155,6 +188,15 @@ def init_schema(conn: sqlite3.Connection) -> None:
         ("telemetry_events", "victim_y", "REAL"),
         ("matches", "telemetry_schema", "INTEGER DEFAULT 0"),
         ("matches", "match_schema", "INTEGER DEFAULT 0"),
+        # KSA-Felder für player_lifetime nachrüsten (assists/damage/dbnos
+        # waren ursprünglich nicht aus dem Lifetime-Payload extrahiert).
+        ("player_lifetime", "assists", "INTEGER"),
+        ("player_lifetime", "damage_dealt", "REAL"),
+        ("player_lifetime", "dbnos", "INTEGER"),
+        ("player_lifetime", "revives", "INTEGER"),
+        ("player_lifetime", "team_kills", "INTEGER"),
+        ("player_lifetime", "losses", "INTEGER"),
+        ("player_season", "losses", "INTEGER"),
     ]
     for table, col, typ in migrations:
         try:
@@ -353,6 +395,8 @@ LIFETIME_COLS = (
     "rounds_played", "wins", "top10s", "win_rate", "top10_rate",
     "kills", "kd_ratio", "headshot_kills", "headshot_rate",
     "avg_damage", "longest_kill", "time_survived_sec",
+    "assists", "damage_dealt", "dbnos", "revives", "team_kills",
+    "losses",
 )
 
 
@@ -374,6 +418,47 @@ def get_lifetime(conn, account_id: str, mode: str):
         "SELECT * FROM player_lifetime WHERE account_id=? AND mode=?",
         (account_id, mode),
     ).fetchone()
+
+
+# Season-Stats: gleiche Shape wie player_lifetime, nur scoped auf eine
+# konkrete season_id (vom PUBG-API-Endpoint /shards/{platform}/seasons).
+SEASON_COLS = LIFETIME_COLS
+
+
+def upsert_season(conn, account_id: str, season_id: str, mode: str,
+                  stats: dict) -> None:
+    cols = ", ".join(SEASON_COLS)
+    placeholders = ", ".join(["?"] * len(SEASON_COLS))
+    updates = ", ".join(f"{c}=excluded.{c}" for c in SEASON_COLS)
+    values = [account_id, season_id, mode] + [stats.get(c) for c in SEASON_COLS]
+    conn.execute(f"""
+        INSERT INTO player_season(account_id, season_id, mode, {cols},
+                                   last_refreshed)
+        VALUES (?, ?, ?, {placeholders}, ?)
+        ON CONFLICT(account_id, season_id, mode) DO UPDATE SET
+            {updates}, last_refreshed=excluded.last_refreshed
+    """, values + [_now_iso()])
+    conn.commit()
+
+
+def get_season(conn, account_id: str, season_id: str, mode: str):
+    return conn.execute(
+        "SELECT * FROM player_season "
+        "WHERE account_id=? AND season_id=? AND mode=?",
+        (account_id, season_id, mode),
+    ).fetchone()
+
+
+def get_seasons_for_player(conn, account_id: str):
+    """Liefert alle gespeicherten (season_id, last_refreshed) für einen
+    Spieler — nützlich für UI-Auswahl ältere Seasons (sobald wir mehrere
+    speichern)."""
+    return conn.execute(
+        "SELECT DISTINCT season_id, MAX(last_refreshed) AS last_refreshed "
+        "FROM player_season WHERE account_id=? "
+        "GROUP BY season_id ORDER BY last_refreshed DESC",
+        (account_id,),
+    ).fetchall()
 
 
 def insert_telemetry_events(conn, match_id: str, events: list) -> None:
