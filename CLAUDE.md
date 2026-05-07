@@ -29,8 +29,18 @@ Repo: github.com/devilsche/obs-stream-kit
 - Konsistenter Look über alle Szenen
 
 ## Twitch
-- Twitch Username: LuCKoR_HD
+- Twitch-Channel kommt aus `.secrets` (`Twitch-Channel:` Eintrag) und
+  wird vom Server in HTML-Seiten injiziert (`window.__TWITCH_CHANNEL__`).
+  Kein hardcodierter Nickname im Source — das Repo ist generisch
+  nutzbar von jedem Streamer der seine `.secrets` + `config/pubg.json`
+  ausfüllt.
 - Clips über Twitch API / Embed laden
+
+## PUBG-Backend
+- PUBG-Nickname + Plattform aus `config/pubg.json`
+  (Template: `config/pubg.example.json`)
+- PUBG-API-Key aus `.secrets` (`PUBG API Key:` Eintrag)
+- Beide Files sind gitignored — jeder Nutzer trägt seine eigenen Daten ein
 
 ## Git
 - Commit messages: Deutsch, Conventional Commits, KEIN Co-Authored-By

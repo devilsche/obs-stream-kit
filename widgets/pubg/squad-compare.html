@@ -30,9 +30,11 @@
 
     PubgUI.buildFilter([
       { key: "players", label: "Players", type: "text",
-        placeholder: "Komma-Liste: PEX_LuCKoR,MateA" },
-      { key: "matches", label: "Letzte N", type: "range",
-        min: 1, max: 20, default: 5 },
+        placeholder: "Comma-list: Player1,Player2",
+        tooltip: "Comma-separated PUBG nicknames to compare." },
+      { key: "matches", label: "Last N matches", type: "range",
+        min: 1, max: 20, default: 5,
+        tooltip: "How many of the most recent shared matches to compare." },
     ]);
 
     function render(d) {

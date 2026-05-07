@@ -55,6 +55,8 @@ if os.path.exists(secrets_path):
                 secrets["client_id"] = line.split(":", 1)[1].strip()
             elif line.startswith("Client-Secret:"):
                 secrets["client_secret"] = line.split(":", 1)[1].strip()
+            elif line.startswith("Twitch-Channel:"):
+                secrets["twitch_channel"] = line.split(":", 1)[1].strip()
 
 # ── PUBG-Backend-Bootstrap ─────────────────────────────────────────────────────
 PUBG_ENABLED = False
@@ -148,15 +150,16 @@ DEV_LOG_JS = """<script>
 })();
 </script>"""
 
-# ── Twitch-Credentials (nur wenn .secrets vorhanden) ──────────────────────────
+# ── Twitch-Credentials + Channel (nur wenn .secrets vorhanden) ────────────────
 creds_js = ""
+parts = []
 if secrets.get("client_id") and secrets.get("client_secret"):
-    creds_js = (
-        '<script>'
-        'window.__TWITCH_CLIENT_ID__="' + secrets["client_id"] + '";'
-        'window.__TWITCH_CLIENT_SECRET__="' + secrets["client_secret"] + '";'
-        '</script>'
-    )
+    parts.append('window.__TWITCH_CLIENT_ID__="' + secrets["client_id"] + '";')
+    parts.append('window.__TWITCH_CLIENT_SECRET__="' + secrets["client_secret"] + '";')
+if secrets.get("twitch_channel"):
+    parts.append('window.__TWITCH_CHANNEL__="' + secrets["twitch_channel"] + '";')
+if parts:
+    creds_js = '<script>' + ''.join(parts) + '</script>'
 
 inject_head = DEV_LOG_JS + creds_js
 

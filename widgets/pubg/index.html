@@ -70,7 +70,7 @@
     <a href="/widgets/pubg/live-bar.html" target="_blank">live-bar.html — top, permanent strip</a>
     <a href="/widgets/pubg/news-ticker.html" target="_blank">news-ticker.html — bottom, snippet rotator</a>
     <a href="/widgets/pubg/flyout-full.html" target="_blank">flyout-full.html — side panel, multi-section</a>
-    <a href="/widgets/pubg/chat-stats-popup.html?player=PEX_LuCKoR" target="_blank">chat-stats-popup.html — top-right, !stats trigger</a>
+    <a href="/widgets/pubg/chat-stats-popup.html?player=__PLAYER__" target="_blank">chat-stats-popup.html — top-right, !stats trigger</a>
 
     <strong style="color:var(--pubg-gold);font-size:1em;margin-top:8px;display:block">▶ Bot-Left rotation slots · 560×360 · session-only</strong>
     <a href="/widgets/pubg/mates.html?layout=carousel" target="_blank">mates.html?layout=carousel</a>
@@ -111,8 +111,8 @@
 
     <strong style="color:var(--pubg-gold);font-size:1em;margin-top:8px;display:block">▶ Just-Chatting / Tools</strong>
     <a href="/widgets/pubg/lookup.html" target="_blank">lookup.html — interactive player search (PUBG-API)</a>
-    <a href="/widgets/pubg/squad-compare.html?players=PEX_LuCKoR&matches=5" target="_blank">squad-compare.html?players=PEX_LuCKoR&amp;matches=5</a>
-    <a href="/scenes/stats.html?player=PEX_LuCKoR" target="_blank">/scenes/stats.html?player=PEX_LuCKoR</a>
+    <a href="/widgets/pubg/squad-compare.html?players=__PLAYER__&matches=5" target="_blank">squad-compare.html?players=__PLAYER__&amp;matches=5</a>
+    <a href="/scenes/stats.html?player=__PLAYER__" target="_blank">/scenes/stats.html?player=__PLAYER__</a>
 
     <strong style="color:var(--pubg-gold);font-size:1em;margin-top:8px;display:block">▶ Backend</strong>
     <a href="/api/pubg/status" target="_blank">/api/pubg/status — poller health</a>
@@ -227,8 +227,8 @@
     </div>
 
     <div class="tile">
-      <h2>chat-stats-popup.html?player=PEX_LuCKoR <a class="url" href="/widgets/pubg/chat-stats-popup.html?player=PEX_LuCKoR" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/chat-stats-popup.html?player=PEX_LuCKoR&duration=99999&ignoreStale=1" height="280"></iframe>
+      <h2>chat-stats-popup.html?player=__PLAYER__ <a class="url" href="/widgets/pubg/chat-stats-popup.html?player=__PLAYER__" target="_blank">↗</a></h2>
+      <iframe src="/widgets/pubg/chat-stats-popup.html?player=__PLAYER__&duration=99999&ignoreStale=1" height="280"></iframe>
     </div>
 
     <div class="tile full">
@@ -237,13 +237,13 @@
     </div>
 
     <div class="tile">
-      <h2>squad-compare.html <a class="url" href="/widgets/pubg/squad-compare.html?players=PEX_LuCKoR&matches=5" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/squad-compare.html?players=PEX_LuCKoR&matches=5&ignoreStale=1" height="420"></iframe>
+      <h2>squad-compare.html <a class="url" href="/widgets/pubg/squad-compare.html?players=__PLAYER__&matches=5" target="_blank">↗</a></h2>
+      <iframe src="/widgets/pubg/squad-compare.html?players=__PLAYER__&matches=5&ignoreStale=1" height="420"></iframe>
     </div>
 
     <div class="tile">
-      <h2>lookup.html — Live PUBG-API <a class="url" href="/widgets/pubg/lookup.html?player=PEX_LuCKoR" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/lookup.html?player=PEX_LuCKoR&ignoreStale=1" height="600"></iframe>
+      <h2>lookup.html — Live PUBG-API <a class="url" href="/widgets/pubg/lookup.html?player=__PLAYER__" target="_blank">↗</a></h2>
+      <iframe src="/widgets/pubg/lookup.html?player=__PLAYER__&ignoreStale=1" height="600"></iframe>
     </div>
 
     <div class="tile full">
@@ -252,5 +252,32 @@
     </div>
 
   </div>
+<script>
+    // Demo-Page lädt den konfigurierten PUBG-Nick einmal beim Start und
+    // ersetzt die __PLAYER__-Placeholder in allen Links und iframe-srcs.
+    // Damit hat der Demo keine hardcodierten Nicknames im Source.
+    (async () => {
+      try {
+        const res = await fetch("/api/pubg/db-info", { cache: "no-store" });
+        const info = await res.json();
+        const name = (info && info.myName) || "Player";
+        const re = /__PLAYER__/g;
+        document.querySelectorAll("a[href*='__PLAYER__']").forEach(a => {
+          a.href = a.href.replace(re, encodeURIComponent(name));
+          a.textContent = a.textContent.replace(re, name);
+        });
+        document.querySelectorAll("iframe[src*='__PLAYER__']").forEach(f => {
+          f.src = f.src.replace(re, encodeURIComponent(name));
+        });
+        document.querySelectorAll("h2").forEach(h => {
+          if (h.textContent.includes("__PLAYER__")) {
+            h.textContent = h.textContent.replace(re, name);
+          }
+        });
+      } catch (_) {
+        // Backend nicht erreichbar — Placeholder bleiben sichtbar
+      }
+    })();
+  </script>
 </body>
 </html>

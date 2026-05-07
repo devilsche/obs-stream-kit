@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
-  <title>BRB – LuCKoR_HD</title>
+  <title>BRB</title>
   <style>
     @font-face {
       font-family: 'DM Sans';
@@ -633,7 +633,7 @@
       document.body.style.height = H + 'px';
 
       var params        = new URLSearchParams(window.location.search);
-      var channel       = params.get('channel') || 'LuCKoR_HD';
+      var channel       = params.get('channel') || window.__TWITCH_CHANNEL__ || '';
       var clientId      = params.get('client_id') || window.__TWITCH_CLIENT_ID__ || '';
       var clientSecret  = params.get('client_secret') || window.__TWITCH_CLIENT_SECRET__ || '';
       var manualClips   = params.get('clips');

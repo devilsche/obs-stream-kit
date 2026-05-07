@@ -7,3 +7,4 @@ data/
 config/pubg.local.json
 .pytest_cache/
 *.pyc
+config/pubg.json

@@ -2,7 +2,7 @@ import json
 import os
 
 DEFAULTS = {
-    "playerName": "PEX_LuCKoR",
+    "playerName": "",
     "platform": "steam",
     "stammCrew": [],
     "pollIntervalSec": 60,
@@ -12,6 +12,11 @@ DEFAULTS = {
 
 
 def load_config(path: str) -> dict:
+    """Loads config/pubg.json. Falls back to DEFAULTS, but the
+    PUBG-Backend won't start without playerName set.
+
+    Provide config/pubg.example.json as template — copy to
+    config/pubg.json and fill in your PUBG nickname + platform."""
     cfg = dict(DEFAULTS)
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:

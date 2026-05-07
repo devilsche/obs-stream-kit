@@ -2,17 +2,30 @@
 
 Komplettes OBS Stream-Overlay-Set als statische HTML/CSS/JS Browser-Sources.
 
-Purple/Gold Entry-Style — für den Twitch-Kanal [LuCKoR_HD](https://twitch.tv/LuCKoR_HD).
+Purple/Gold Entry-Style — generisch nutzbar für jeden Twitch-Streamer mit
+PUBG-Stats-Backend. Trage deine Daten in `.secrets` und `config/pubg.json`
+ein, und das Repo läuft sofort für deinen Account.
 
 ---
 
 ## Schnellstart
 
 1. Repo klonen
-2. `assets/logo.png` mit deinem Logo ersetzen
-3. In OBS: **Browser-Source** hinzufügen → **Lokale Datei** auswählen
-4. Browser-Source-Größe wie unten angegeben einstellen
-5. Alerts/Widgets: Streamer.bot konfigurieren für URL-Parameter + Source-Sichtbarkeit
+2. **Twitch + PUBG konfigurieren:**
+   - `.secrets.example` → `.secrets` kopieren, ausfüllen
+     (Twitch Client-ID/Secret, Twitch-Channel, PUBG-API-Key)
+   - `config/pubg.example.json` → `config/pubg.json` kopieren, eigenen
+     PUBG-Nickname + Plattform eintragen
+3. PUBG-DB initialisieren + Cold-Start:
+   ```bash
+   python serve.py --init-pubg-db
+   python serve.py --pubg-cold-start
+   ```
+4. Server starten: `python serve.py`
+5. `assets/logo.png` mit deinem Logo ersetzen
+6. In OBS: **Browser-Source** hinzufügen → URL `http://localhost:8080/widgets/...`
+7. Browser-Source-Größe wie unten angegeben einstellen
+8. Alerts/Widgets: Streamer.bot konfigurieren für URL-Parameter + Source-Sichtbarkeit
 
 ---
 
@@ -44,7 +57,7 @@ Automatischer Twitch Clip-Player mit Countdown-Overlay und BRB-Animation.
 
 | Parameter | Pflicht | Default | Beschreibung |
 |-----------|---------|---------|--------------|
-| `channel` | nein | `LuCKoR_HD` | Twitch-Kanalname |
+| `channel` | nein | aus `.secrets` (`Twitch-Channel:`) | Twitch-Kanalname; URL-Param überschreibt `.secrets` |
 | `client_id` | ja* | — | Twitch App Client-ID |
 | `client_secret` | ja* | — | Twitch App Client-Secret |
 | `clips` | ja* | — | Manuelle Clip-Slugs (kommagetrennt) |
@@ -362,17 +375,12 @@ HTML-Widgets als Browser-Sources rendern.
    ```
    PUBG-API-Key:  <dein-key>
    ```
-3. **`config/pubg.json`** anpassen:
-   ```json
-   {
-     "playerName": "PEX_LuCKoR",
-     "platform": "steam",
-     "stammCrew": [],
-     "pollIntervalSec": 60,
-     "minMatchesForLifetime": 5,
-     "minMatchesForTopMates": 10
-   }
+3. **`config/pubg.json`** aus dem Template anlegen:
+   ```bash
+   cp config/pubg.example.json config/pubg.json
    ```
+   Dann `playerName` (dein PUBG-Nickname) + `platform` (steam / kakao /
+   xbox / psn) eintragen. Das File ist gitignored — bleibt lokal.
 4. **DB initialisieren + Cold-Start** (zieht die letzten 30 Matches):
    ```bash
    python serve.py --init-pubg-db
@@ -389,7 +397,7 @@ Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
 |---|---|---|
 | `live-bar.html` | Slim-Counter Gameplay | `refreshMs` |
 | `flyout-full.html` | Großes Detail-Panel mit Filter-Slider und Reset-Button | — |
-| `mates-today.html` | "Heute gespielt mit X" | `layout=carousel\|stack\|fold\|mosaic`, `range=session\|day\|week` |
+| `mates.html` | Squad-Mates der Range | `layout=carousel\|stack\|fold\|mosaic`, `range=session\|week` |
 | `top-mates.html` | Top-5-Liste | `sortBy=avgPlace\|kd\|winRate\|mostPlayed`, `limit`, `minMatches` |
 | `post-match-card.html` | 10s-Pop-up nach Match-Ende | `durationMs` |
 | `map-distribution.html` | Map-Häufigkeits-Bars | `range=session\|day\|week\|all` |
