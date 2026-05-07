@@ -77,6 +77,10 @@
       <span class="label">Ø Teams in fight</span>
       <b id="teams">—</b>
     </div>
+    <div class="row">
+      <span class="label">Ø Teams landed within 300m</span>
+      <b id="teamsRadius">—</b>
+    </div>
     <div class="markers" id="markers"></div>
     <div class="meta" id="meta">—</div>
   </div>
@@ -123,6 +127,12 @@
         teamsEl.textContent = `${d.avgTeamsInFight.toFixed(1)} (max ${d.maxTeamsInFight||0})`;
       } else {
         teamsEl.textContent = "—";
+      }
+      const teamsRadiusEl = document.getElementById("teamsRadius");
+      if (d.avgTeamsInRadius) {
+        teamsRadiusEl.textContent = `${d.avgTeamsInRadius.toFixed(1)} (max ${d.maxTeamsInRadius||0})`;
+      } else {
+        teamsRadiusEl.textContent = "—";
       }
 
       // Markers von rechts (neueste) → links (ältere)

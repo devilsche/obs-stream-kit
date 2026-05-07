@@ -34,6 +34,9 @@ def _normalize(event):
     if et == "LogParachuteLanding":
         base["event_type"] = "Landing"
         base["actor_account"] = (event.get("character") or {}).get("accountId")
+        # Position der Landung — wichtig für Radius-Detection
+        # ("Teams im 300m Umkreis").
+        base["actor_x"], base["actor_y"] = _loc(event, "character")
     elif et in ("LogPlayerKillV2", "LogPlayerKill"):
         base["event_type"] = "Kill"
         base["actor_account"] = (event.get("killer") or {}).get("accountId")
@@ -114,7 +117,7 @@ def _normalize(event):
 # Events die wir immer behalten (auch ohne Squad-Beteiligung) — wichtig für
 # Fight-Cluster-Detection: enemy-vs-enemy Kills/Knocks zeigen welche anderen
 # Teams im selben Fight involviert sind.
-ALWAYS_KEEP_EVENTS = {"Kill", "Knock"}
+ALWAYS_KEEP_EVENTS = {"Kill", "Knock", "Landing"}
 
 
 def filter_squad_events(events, squad_account_ids):

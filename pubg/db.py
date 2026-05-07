@@ -133,8 +133,11 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
-CURRENT_TELEMETRY_SCHEMA = 2  # 1 = squad-only filter, 2 = + Kill/Knock global + Position
-# match_schema: 1 = nur Squad-Participants, 2 = alle Lobby-Members + is_squad
+CURRENT_TELEMETRY_SCHEMA = 3
+# 1 = squad-only filter
+# 2 = + Kill/Knock global + Position
+# 3 = + Landing global + Position (für 'Teams in 300m Umkreis')
+# match_schema: 1 = nur Squad-Participants, 2 = + match_team_mapping
 CURRENT_MATCH_SCHEMA = 2
 
 

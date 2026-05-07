@@ -869,20 +869,23 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
     solo_surv = 0
     team_surv = 0
     teams_per_hot = []
+    teams_in_radius_per_hot = []
     for m in matches:
         result = _detect_hot_drop(conn, m["match_id"], my_account_id,
                                   window_ms, window_secs)
         per_match.append({
-            "matchId":      m["match_id"],
-            "playedAt":     m["played_at"],
-            "hotDrop":      result["hotDrop"],
-            "soloSurvived": result["soloSurvived"],
-            "teamSurvived": result["teamSurvived"],
-            "teamsInFight": result.get("teamsInFight", 0),
+            "matchId":        m["match_id"],
+            "playedAt":       m["played_at"],
+            "hotDrop":        result["hotDrop"],
+            "soloSurvived":   result["soloSurvived"],
+            "teamSurvived":   result["teamSurvived"],
+            "teamsInFight":   result.get("teamsInFight", 0),
+            "teamsInRadius":  result.get("teamsInRadius", 0),
         })
         if result["hotDrop"]:
             hot += 1
             teams_per_hot.append(result.get("teamsInFight", 0))
+            teams_in_radius_per_hot.append(result.get("teamsInRadius", 0))
             if result["soloSurvived"]:
                 solo_surv += 1
             if result["teamSurvived"]:
@@ -901,18 +904,24 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
     n = len(matches)
     avg_teams = (sum(teams_per_hot) / len(teams_per_hot)) if teams_per_hot else 0
     max_teams = max(teams_per_hot) if teams_per_hot else 0
+    avg_radius_teams = (sum(teams_in_radius_per_hot) / len(teams_in_radius_per_hot)
+                         if teams_in_radius_per_hot else 0)
+    max_radius_teams = max(teams_in_radius_per_hot) if teams_in_radius_per_hot else 0
     return {
-        "matches":          n,
-        "hotDrops":         hot,
-        "rate":             (hot / n * 100) if n else 0,
-        "soloSurvived":     solo_surv,
-        "teamSurvived":     team_surv,
-        "soloSurvivalRate": (solo_surv / hot * 100) if hot else 0,
-        "teamSurvivalRate": (team_surv / hot * 100) if hot else 0,
-        "streak":           streak,
-        "avgTeamsInFight":  round(avg_teams, 2),
-        "maxTeamsInFight":  max_teams,
-        "perMatch":         per_match[:20],
+        "matches":            n,
+        "hotDrops":           hot,
+        "rate":               (hot / n * 100) if n else 0,
+        "soloSurvived":       solo_surv,
+        "teamSurvived":       team_surv,
+        "soloSurvivalRate":   (solo_surv / hot * 100) if hot else 0,
+        "teamSurvivalRate":   (team_surv / hot * 100) if hot else 0,
+        "streak":             streak,
+        "avgTeamsInFight":    round(avg_teams, 2),
+        "maxTeamsInFight":    max_teams,
+        "avgTeamsInRadius":   round(avg_radius_teams, 2),
+        "maxTeamsInRadius":   max_radius_teams,
+        "radiusMeters":       300,
+        "perMatch":           per_match[:20],
     }
 
 
@@ -938,19 +947,22 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     squad_ids = {a for a, t in acc_to_team.items() if t == my_team_id}
 
     # Echte Squad-Landung aus Telemetry: erstes Landing-Event eines
-    # Squad-Members. Falls fehlt → kein Hot-Drop ermittelbar.
+    # Squad-Members. Plus dessen Position für Radius-Detection.
     placeholders = ",".join("?" * len(squad_ids))
     landing_row = conn.execute(f"""
-        SELECT MIN(timestamp_ms) AS first_landing
+        SELECT timestamp_ms, actor_x, actor_y
         FROM telemetry_events
         WHERE match_id = ?
           AND event_type = 'Landing'
           AND actor_account IN ({placeholders})
+        ORDER BY timestamp_ms ASC LIMIT 1
     """, [match_id] + list(squad_ids)).fetchone()
-    if not landing_row or not landing_row["first_landing"]:
+    if not landing_row or not landing_row["timestamp_ms"]:
         return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
 
-    landing_ms = landing_row["first_landing"]
+    landing_ms = landing_row["timestamp_ms"]
+    landing_x = landing_row["actor_x"]
+    landing_y = landing_row["actor_y"]
     fight_cutoff_ms = landing_ms + window_ms
 
     # Kill/Knock-Events ab Squad-Landung bis +window_ms
@@ -1009,11 +1021,33 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     my_surv = (my_part and my_part["time_survived"]) or 0
     squad_surv = max((p["time_survived"] or 0)
                      for p in parts if p["account_id"] in squad_ids)
+    # Teams die im Radius (Default 300m) zur Squad-Landung gelandet sind.
+    # Braucht alle Lobby-Landings (telemetry_schema >= 3) + Position.
+    teams_in_radius = set()
+    if landing_x is not None and landing_y is not None:
+        radius_cm = 300 * 100  # 1 Meter = 100 PUBG-Welt-Units
+        radius_sq = radius_cm * radius_cm
+        all_landings = conn.execute("""
+            SELECT actor_account, actor_x, actor_y
+            FROM telemetry_events
+            WHERE match_id = ?
+              AND event_type = 'Landing'
+              AND actor_x IS NOT NULL AND actor_y IS NOT NULL
+        """, (match_id,)).fetchall()
+        for ld in all_landings:
+            dx = ld["actor_x"] - landing_x
+            dy = ld["actor_y"] - landing_y
+            if dx * dx + dy * dy <= radius_sq:
+                t = full_team_map.get(ld["actor_account"])
+                if t is not None:
+                    teams_in_radius.add(t)
+
     return {
-        "hotDrop":      hot_drop,
-        "soloSurvived": my_surv >= survival_threshold_s,
-        "teamSurvived": squad_surv >= survival_threshold_s,
-        "teamsInFight": len(teams_in_fight),
+        "hotDrop":         hot_drop,
+        "soloSurvived":    my_surv >= survival_threshold_s,
+        "teamSurvived":    squad_surv >= survival_threshold_s,
+        "teamsInFight":    len(teams_in_fight),
+        "teamsInRadius":   len(teams_in_radius),
     }
 
 
