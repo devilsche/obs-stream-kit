@@ -118,14 +118,39 @@ Every widget with a range-relevant data set shows a header:
 
 ## URL Parameter Conventions
 
-| Pattern | Meaning |
-|---|---|
-| `?<name>=0` | hide / disable. Default is on. Examples: `?header=0`, `?filter=0` |
-| `?range=session\|week\|all\|career` | range selection |
-| `?focus=session\|lifetime\|mix` | news-ticker only — snippet category focus |
-| `?sortBy=<key>` | per-widget sort (existing) |
-| `?layout=<value>` | per-widget layout selector (e.g., mates-today carousel/stack/fold/mosaic) |
-| `?scale=0.8` | global zoom — existing in `_pubg.js` |
+Naming rules — **must be applied consistently across all widgets**:
+
+| Pattern | Meaning | Examples |
+|---|---|---|
+| `?<name>=0` | hide / disable a top-level UI piece. Default is on | `?header=0`, `?filter=0`, `?ignoreStale=1` |
+| `?range=session\|week\|all\|career` | range selection (data scope) | every widget with range-relevant data |
+| `?focus=session\|lifetime\|mix` | news-ticker only — snippet category focus | news-ticker |
+| `?layout=<value>` | per-widget layout selector | `mates.html?layout=carousel\|stack\|fold\|mosaic` |
+| `?sortBy=<key>` | sort metric for list widgets | `top-mates.html?sortBy=synergy` |
+| `?limit=<n>` | how many items to show | top-mates, session-achievements |
+| `?minMatches=<n>` | minimum match count for list inclusion | mates, top-mates, chicken-together |
+| `?minTotal=<n>` | minimum lifetime match count for list inclusion | mates only |
+| `?minWins=<n>` | minimum wins for list inclusion | chicken-together |
+| `?player=<nick>` | **single player reference** (singular) | chat-stats-popup, lookup, career-card, chicken-together (filter) |
+| `?players=A,B,C` | multiple players, comma-separated list | squad-compare |
+| `?from=<iso>` / `?to=<iso>` | explicit time range | session-report |
+| `?refreshMs=<n>` / `?rotateMs=<n>` / `?durationMs=<n>` | timing values **always in milliseconds**, suffix `Ms` | live-bar, news-ticker, chat-stats-popup |
+| `?goal=<metric>:<target>` | session-goal composite spec | session-goal |
+| `?type=<key>` | streak-counter only — which streak metric | streak-counter |
+| `?cats=A,B,C` | top-mates-slider — sort categories to rotate | top-mates-slider |
+| `?compact=1` | compact-mode toggle | flyout-full (content-section toggle exception) |
+| `?hide<Section>=1` | hide content sections within a multi-section widget | flyout-full (`?hideMates=1`, `?hideSurvival=1`, `?hideFF=1`) |
+| `?scale=0.8` | global zoom — existing in `_pubg.js` | any widget |
+
+**camelCase** for all multi-word keys. **No snake_case, no kebab-case** in URL params.
+
+**Player references must use `?player=`** (singular) for one nickname,
+**`?players=`** (plural, comma-separated) for a list. No alternative
+spellings (`?name=`, `?username=`, `?nick=` are not used).
+
+**Time values must be in milliseconds** with `Ms` suffix. Old `?duration=`
+(seconds) on `chat-stats-popup` is supported as a backward-compatible
+fallback for Streamer.bot integrations but should not be used in new code.
 
 ## Visibility Rules
 

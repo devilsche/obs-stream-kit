@@ -79,7 +79,13 @@
   <script src="_pubg.js"></script>
   <script>
     const PLAYER = PubgUI.qs("player", "");
-    const DURATION = parseInt(PubgUI.qs("duration", 12), 10) * 1000;
+    // Spec-Konvention: ms-Werte mit '...Ms'-Suffix. Alter ?duration=
+    // (in Sekunden) bleibt als Fallback unterstützt für Streamer.bot.
+    const _durationMsRaw = PubgUI.qs("durationMs");
+    const _durationSecRaw = PubgUI.qs("duration");
+    const DURATION = _durationMsRaw != null
+      ? parseInt(_durationMsRaw, 10)
+      : (_durationSecRaw != null ? parseInt(_durationSecRaw, 10) * 1000 : 12000);
 
     function reveal() {
       document.getElementById("popup").classList.add("show");
