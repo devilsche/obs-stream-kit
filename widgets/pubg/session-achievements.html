@@ -94,11 +94,9 @@
       `).join("");
     }
 
-    PubgUI.hideIfStale();
-    PubgUI.poll("/api/pubg/session-achievements", 30000, (d) => {
-      PubgUI.hideIfStale();
-      render(d);
-    }, console.error);
+    // KEIN hideIfStale — Achievements einer Session sind auch in BRB
+    // / Stream-Ending sinnvoll zu zeigen.
+    PubgUI.poll("/api/pubg/session-achievements", 30000, render, console.error);
   </script>
 </body>
 </html>

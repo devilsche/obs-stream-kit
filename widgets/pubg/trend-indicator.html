@@ -81,6 +81,9 @@
   </div>
   <script src="_pubg.js"></script>
   <script>
+    // Trend-Widget hat KEINE hide-on-stale-Logik — der Vergleich
+    // (current session vs. previous session) ist auch in BRB / nach
+    // einer Session relevant. Filter-Bar daher ohne Show-always-Toggle.
     PubgUI.buildFilter([]);
     PubgUI.renderHeader(document.getElementById("pubgHeader"), "Trend", "session");
 
@@ -135,11 +138,8 @@
       document.getElementById("meta").textContent = "vs. last session";
     }
 
-    PubgUI.hideIfStale();
-    PubgUI.poll("/api/pubg/trend-deltas", 30000, (d) => {
-      PubgUI.hideIfStale();
-      render(d);
-    }, console.error);
+    // KEIN hideIfStale — Trend ist auch ohne aktive Session sinnvoll.
+    PubgUI.poll("/api/pubg/trend-deltas", 30000, render, console.error);
   </script>
 </body>
 </html>

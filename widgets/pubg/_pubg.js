@@ -344,29 +344,29 @@
     document.head.appendChild(css);
   };
 
+  // Wiederverwendbarer Filter-Eintrag für Widgets mit hideIfStale-Logik.
+  // Widgets nehmen ihn explizit in ihre buildFilter-spec auf — kein
+  // globales Auto-Append. URL-Param ?ignoreStale=1.
+  PubgUI.SHOW_ALWAYS_FILTER = {
+    key: "ignoreStale",
+    label: "Show always",
+    type: "select",
+    default: "0",
+    options: [["0", "No"], ["1", "Yes"]],
+    tooltip: "Bypass the 'hide when no recent session' check. Use for " +
+             "demo or testing — widgets stay visible even without a " +
+             "current session.",
+  };
+
   PubgUI.buildFilter = (specs) => {
     if (PubgUI.qs("filter") === "0") return;
     PubgUI._injectFilterCss();
     document.body.classList.add("pubg-has-filter");
 
-    // Globaler Toggle 'Show always' wird an jede Filter-Bar angehängt.
-    // Dadurch kann jedes Widget die hide-on-no-session-Logik bypassen
-    // (für Demo/Test). URL-Param ?ignoreStale=1.
-    const allSpecs = [...specs, {
-      key: "ignoreStale",
-      label: "Show always",
-      type: "select",
-      default: "0",
-      options: [["0", "No"], ["1", "Yes"]],
-      tooltip: "Bypass the 'hide when no recent session' check. Use for " +
-               "demo or testing — widgets stay visible even without a " +
-               "current session.",
-    }];
-
     const bar = document.createElement("div");
     bar.className = "pubg-filter-bar";
 
-    allSpecs.forEach((spec) => {
+    specs.forEach((spec) => {
       const grp = document.createElement("div");
       grp.className = "grp";
 
