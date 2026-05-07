@@ -946,23 +946,26 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
 
     squad_ids = {a for a, t in acc_to_team.items() if t == my_team_id}
 
-    # Echte Squad-Landung aus Telemetry: erstes Landing-Event eines
-    # Squad-Members. Plus dessen Position für Radius-Detection.
+    # ALLE Squad-Landungen mit Position holen — für Radius-Detection
+    # vergleichen wir jedes Lobby-Landing gegen jede Squad-Landung,
+    # nicht nur gegen den ersten Lander. Dadurch gelten Teams als
+    # "in der Drop-Area" wenn sie nahe IRGENDEINEM Squad-Member gelandet
+    # sind (z.B. bei split-Drops über zwei Compounds).
     placeholders = ",".join("?" * len(squad_ids))
-    landing_row = conn.execute(f"""
-        SELECT timestamp_ms, actor_x, actor_y
+    squad_landings = conn.execute(f"""
+        SELECT actor_account, actor_x, actor_y, timestamp_ms
         FROM telemetry_events
         WHERE match_id = ?
           AND event_type = 'Landing'
           AND actor_account IN ({placeholders})
-        ORDER BY timestamp_ms ASC LIMIT 1
-    """, [match_id] + list(squad_ids)).fetchone()
-    if not landing_row or not landing_row["timestamp_ms"]:
+        ORDER BY timestamp_ms ASC
+    """, [match_id] + list(squad_ids)).fetchall()
+    if not squad_landings:
         return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
 
-    landing_ms = landing_row["timestamp_ms"]
-    landing_x = landing_row["actor_x"]
-    landing_y = landing_row["actor_y"]
+    # Erste Squad-Landung = Anker für Fight-Window (= "Boots on ground")
+    first_landing = squad_landings[0]
+    landing_ms = first_landing["timestamp_ms"]
     fight_cutoff_ms = landing_ms + window_ms
 
     # Kill/Knock-Events ab Squad-Landung bis +window_ms
@@ -985,6 +988,10 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     # (squad-only) — Team-Count wird dann underestimiert.
     full_team_map = lobby_team_map if lobby_team_map else acc_to_team
 
+    # teams_in_fight = nur Teams die UNS angegriffen oder von uns
+    # angegriffen wurden (= fought with squad). Teams die untereinander
+    # kämpfen aber uns nicht touchen → nicht gezählt. Sonst würde die
+    # Zahl bei chaotischen Lobbies absurd hoch werden.
     hot_drop = False
     teams_in_fight = set()
     for e in events:
@@ -993,15 +1000,14 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
         v_in_squad = v in squad_ids
         if a_in_squad and v_in_squad:
             continue  # Friendly fire innerhalb Squad — nicht zählen
-        # Teams aus Mapping (für teams_in_fight-count)
-        for acc in (a, v):
-            t = full_team_map.get(acc)
-            if t is not None:
-                teams_in_fight.add(t)
-        if a_in_squad or v_in_squad:
-            hot_drop = True
-            # break entfernt — wir sammeln weiter Team-Beteiligung im Window
-            # solange zur Team-Count-Berechnung. break wäre zu früh.
+        if not (a_in_squad or v_in_squad):
+            continue  # Fight zwischen anderen Teams — uns egal
+        # Squad ist beteiligt → Hot-Drop, Gegner-Team mitzählen
+        hot_drop = True
+        opponent = v if a_in_squad else a
+        opp_team = full_team_map.get(opponent)
+        if opp_team is not None and opp_team != my_team_id:
+            teams_in_fight.add(opp_team)
 
     # Survival: time_survived ist Sekunden ab MATCH-START (nicht Landung).
     # Squad-Landung als Offset reinrechnen, dann window_secs draufpacken.
@@ -1021,12 +1027,15 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     my_surv = (my_part and my_part["time_survived"]) or 0
     squad_surv = max((p["time_survived"] or 0)
                      for p in parts if p["account_id"] in squad_ids)
-    # Teams die im Radius (Default 300m) zur Squad-Landung gelandet sind.
-    # Braucht alle Lobby-Landings (telemetry_schema >= 3) + Position.
+    # Teams die im Radius (Default 300m) zu IRGENDEINEM Squad-Member
+    # gelandet sind. Braucht alle Lobby-Landings (telemetry_schema >= 3)
+    # + Position. Eigene Squad-Members werden ausgeschlossen.
     teams_in_radius = set()
-    if landing_x is not None and landing_y is not None:
-        radius_cm = 300 * 100  # 1 Meter = 100 PUBG-Welt-Units
-        radius_sq = radius_cm * radius_cm
+    radius_cm = 300 * 100  # 1 Meter = 100 PUBG-Welt-Units
+    radius_sq = radius_cm * radius_cm
+    squad_pos = [(s["actor_x"], s["actor_y"]) for s in squad_landings
+                  if s["actor_x"] is not None and s["actor_y"] is not None]
+    if squad_pos:
         all_landings = conn.execute("""
             SELECT actor_account, actor_x, actor_y
             FROM telemetry_events
@@ -1035,12 +1044,16 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
               AND actor_x IS NOT NULL AND actor_y IS NOT NULL
         """, (match_id,)).fetchall()
         for ld in all_landings:
-            dx = ld["actor_x"] - landing_x
-            dy = ld["actor_y"] - landing_y
-            if dx * dx + dy * dy <= radius_sq:
-                t = full_team_map.get(ld["actor_account"])
-                if t is not None:
-                    teams_in_radius.add(t)
+            if ld["actor_account"] in squad_ids:
+                continue  # eigenes Squad-Member, nicht zählen
+            for sx, sy in squad_pos:
+                dx = ld["actor_x"] - sx
+                dy = ld["actor_y"] - sy
+                if dx * dx + dy * dy <= radius_sq:
+                    t = full_team_map.get(ld["actor_account"])
+                    if t is not None and t != my_team_id:
+                        teams_in_radius.add(t)
+                    break  # in Radius, weitere Squad-Pos nicht prüfen
 
     return {
         "hotDrop":         hot_drop,
