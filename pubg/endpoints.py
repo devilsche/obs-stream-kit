@@ -4,7 +4,7 @@ from urllib.parse import urlparse, parse_qs
 from pubg.db import set_setting, get_setting
 from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_top_mates, compute_co_player,
-                                compute_mates_today, compute_map_distribution,
+                                compute_mates, compute_map_distribution,
                                 compute_first_fight_rate, compute_squad_compare,
                                 compute_chickens_together, compute_session_report,
                                 compute_sessions_index, compute_best_worst_map,
@@ -63,8 +63,8 @@ class EndpointRegistry:
             return self._co_player(name)
         if route == ("GET", "/api/pubg/career-lifetime"):
             return self._career_lifetime(qs)
-        if route == ("GET", "/api/pubg/mates-today"):
-            return self._mates_today(qs)
+        if route == ("GET", "/api/pubg/mates"):
+            return self._mates(qs)
         if route == ("GET", "/api/pubg/map-distribution"):
             return self._map_dist(qs)
         if route == ("GET", "/api/pubg/first-fight-rate"):
@@ -217,15 +217,15 @@ class EndpointRegistry:
             """, (player, player, mode)).fetchone()
         return _ok(dict(row) if row else {})
 
-    def _mates_today(self, qs):
+    def _mates(self, qs):
         conn = self.get_conn()
         range_key = qs.get("range", "session")
         min_matches = int(qs.get("minMatches", 1))   # Range-Filter
         min_total = int(qs.get("minTotal", 1))       # Lifetime-Filter (optional)
-        key = f"mates-today:{range_key}:{min_matches}:{min_total}"
+        key = f"mates:{range_key}:{min_matches}:{min_total}"
         return _ok(self.cache.get_or_compute(
             key,
-            lambda: compute_mates_today(conn, self.my_account_id,
+            lambda: compute_mates(conn, self.my_account_id,
                                          range_key, min_matches, min_total)))
 
     def _map_dist(self, qs):

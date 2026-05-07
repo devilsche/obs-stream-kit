@@ -71,6 +71,7 @@
 <body>
   <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card panel pubg-fade-in">
+    <div id="subtitle" style="color:var(--pubg-muted);font-size:0.78em;letter-spacing:0.06em;margin-bottom:8px"></div>
     <div id="rows"></div>
   </div>
   <script src="_pubg.js"></script>
@@ -99,29 +100,29 @@
       { key: "limit", label: "Limit", type: "range", min: 1, max: 20, default: 5 },
     ]);
 
+    // Sort/Min Info als Subtitle unter dem Header anzeigen.
     const SORT_LABEL = {
       synergy: "Synergy",
       avgPlace: "Avg Place",
-      kd: "Best K/D (Meine)",
+      kd: "Best K/D (Mine)",
       mateKd: "Best K/D (Mate)",
       winRate: "Win-Rate",
       mostPlayed: "Most Played",
       chickensTogether: "Most CHICKEN",
     };
-    function setTitle(minVal) {
-      const min = (minVal != null && minVal > 0) ? `mind. ${minVal} Matches` : "alle Matches";
-      document.getElementById("title").innerHTML =
-        "Top Mates · " + (SORT_LABEL[SORT_BY] || SORT_BY) +
-        ` <span style="opacity:0.5;font-weight:400;letter-spacing:0;text-transform:none">(${min}, DB)</span>`;
+    function setSubtitle(minVal) {
+      const min = (minVal != null && minVal > 0) ? `min. ${minVal} matches` : "all matches";
+      const sub = document.getElementById("subtitle");
+      if (sub) sub.textContent = `${SORT_LABEL[SORT_BY] || SORT_BY} · ${min}`;
     }
-    setTitle(MIN);  // initial mit URL-Param-Wert (oder undefined)
+    setSubtitle(MIN);
 
     // Wenn kein URL-Param gesetzt: aktuellen Setting-Wert vom Backend ziehen
     if (MIN == null || isNaN(MIN)) {
       PubgUI.fetchJson("/api/pubg/settings").then(s => {
         const eff = parseInt(s.minMatchesForTopMates || "10", 10);
-        setTitle(eff);
-      }).catch(() => setTitle(10));
+        setSubtitle(eff);
+      }).catch(() => setSubtitle(10));
     }
 
     // Hot-Schwellen — pure Wert-Schwellen, Glücks-Stats sind erlaubt.

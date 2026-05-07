@@ -324,7 +324,7 @@ def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
     }
 
 
-def compute_mates_today(conn, my_account_id: str,
+def compute_mates(conn, my_account_id: str,
                         range_key: str = "session",
                         min_matches: int = 1,
                         min_total: int = 1) -> list:

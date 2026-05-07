@@ -75,7 +75,7 @@
         document.getElementById("maps").innerHTML = list.map(m =>
           `<div class="map-row"><span>${PubgUI.fmtMap(m.map)}</span><span class="pubg-stat-value">${m.count}</span></div>`).join("");
       });
-      PubgUI.fetchJson("/api/pubg/mates-today?range=session").then(list => {
+      PubgUI.fetchJson("/api/pubg/mates?range=session").then(list => {
         document.getElementById("mates").innerHTML = list.map(m =>
           `<div class="mate-row"><span>${m.name}</span><span class="pubg-stat-value">${m.sharedMatchesToday}</span></div>`).join("");
       });

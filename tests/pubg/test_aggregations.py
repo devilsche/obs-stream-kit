@@ -3,7 +3,7 @@ from pubg.db import (connect, init_schema, upsert_player, insert_match,
                      insert_telemetry_events)
 from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_top_mates, compute_co_player,
-                                compute_mates_today, compute_map_distribution,
+                                compute_mates, compute_map_distribution,
                                 compute_first_fight_rate, compute_squad_compare)
 
 
@@ -145,7 +145,7 @@ def test_mates_today_aggregates_per_mate(tmp_db_path):
             "swim_distance": 0.0, "weapons_acquired": 0, "heals": 0, "boosts": 0,
             "team_kills": 0,
         }])
-    result = compute_mates_today(conn, "account.A", range_key="session")
+    result = compute_mates(conn, "account.A", range_key="session")
     assert len(result) == 1
     assert result[0]["name"] == "MateA"
     assert result[0]["sharedMatchesToday"] == 3

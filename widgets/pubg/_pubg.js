@@ -134,6 +134,53 @@
     el.style.display = "";
   };
 
+  // Vertikaler Auto-Scroll für Slot-Widgets, deren Inhalt die Slot-Höhe
+  // überschreitet. Cycle: bottom → top → bottom mit Pause an den Enden.
+  // root muss overflow:hidden haben und max-height begrenzt sein.
+  // Liefert eine stop()-Function zurück.
+  // opts: { speed: px/sec (default 25), pause: ms an den Enden (default 2500) }
+  PubgUI.autoscroll = (root, opts) => {
+    if (!root) return () => {};
+    const speed = (opts && opts.speed) || 25;
+    const pauseMs = (opts && opts.pause) || 2500;
+    let direction = -1; // -1 = nach oben (zeigt ältere), 1 = nach unten
+    let pauseRemaining = pauseMs;
+    let lastTs = 0;
+    let stopped = false;
+    let rafId = null;
+
+    function step(ts) {
+      if (stopped) return;
+      if (!lastTs) lastTs = ts;
+      const dt = ts - lastTs;
+      lastTs = ts;
+      const overflow = root.scrollHeight - root.clientHeight;
+      if (overflow <= 1) {
+        root.scrollTop = 0;
+        rafId = requestAnimationFrame(step);
+        return;
+      }
+      if (pauseRemaining > 0) {
+        pauseRemaining -= dt;
+        rafId = requestAnimationFrame(step);
+        return;
+      }
+      let pos = root.scrollTop + direction * (speed * dt) / 1000;
+      if (pos <= 0) { pos = 0; direction = 1; pauseRemaining = pauseMs; }
+      if (pos >= overflow) { pos = overflow; direction = -1; pauseRemaining = pauseMs; }
+      root.scrollTop = pos;
+      rafId = requestAnimationFrame(step);
+    }
+
+    // Start am Boden (neueste Inhalte) — passt zum bottom-Anker der Slot-Widgets
+    requestAnimationFrame(() => {
+      root.scrollTop = root.scrollHeight - root.clientHeight;
+      rafId = requestAnimationFrame(step);
+    });
+
+    return () => { stopped = true; if (rafId) cancelAnimationFrame(rafId); };
+  };
+
   // Body ausblenden wenn letzter Match älter als maxAgeMs (Default 1h).
   // Für Live-Widgets (live-bar, news-ticker) — sollen nur on-screen sein
   // wenn aktuell gespielt wird. Bei Fehler oder leerer DB: ausblenden.
