@@ -320,16 +320,13 @@ def get_matches_needing_telemetry(conn, limit: int = 5):
     """Liefert matches die Telemetry brauchen — entweder noch nie gefetched
     ODER mit veralteter Schema-Version (für First-Fight-Cluster nötig).
 
-    NOTE: Die PUBG-Doku dokumentiert KEINEN expliziten Telemetry-CDN-TTL,
-    aber empirisch laufen URLs ungefähr im Match-Retention-Window (14 Tage)
-    ab und liefern dann 404. Wir filtern konservativ auf
-    'played_at > 14 Tage' damit wir keine 404er produzieren bei alten
-    Re-Fetch-Versuchen. Match bekommt bei 404 marker telemetry_fetched=1."""
-    cutoff = "datetime('now', '-13 days')"
-    return conn.execute(f"""
+    NOTE: PUBG-Doku dokumentiert KEINEN expliziten Telemetry-CDN-TTL.
+    /telemetry-cdn ist nicht rate-limited, also versuchen wir jeden Match
+    mit URL — bei 404 (URL abgelaufen) wird sauber telemetry_fetched=1
+    gesetzt, kein endloser Re-Fetch."""
+    return conn.execute("""
         SELECT m.match_id, m.telemetry_url FROM matches m
         WHERE m.telemetry_url IS NOT NULL
-          AND m.played_at > {cutoff}
           AND (
             m.telemetry_fetched = 0
             OR COALESCE(m.telemetry_schema, 0) < ?
