@@ -66,12 +66,11 @@
     if (!iso) return "—";
     return PubgUI.fmtDate(iso) + " " + PubgUI.fmtTime(iso);
   };
-  // Match-Start = matchEnd - durationSec.  PUBG-API played_at ist Match-Ende.
-  PubgUI.matchStartIso = (matchEndIso, durationSec) => {
-    if (!matchEndIso) return null;
-    const end = new Date(matchEndIso).getTime();
-    return new Date(end - (durationSec || 0) * 1000).toISOString();
-  };
+  // PUBG-API `createdAt` IS the match start (not end). Backend speichert
+  // das als matches.played_at — Wert ist also bereits Match-Start.
+  // Helper bleibt für Backwards-Compat (manche Aufrufer übergeben falsch),
+  // aber wenn matchStart bereits der Start ist, einfach durchreichen.
+  PubgUI.matchStartIso = (matchStartIso, _durationSec) => matchStartIso || null;
 
   PubgUI.fmtRelative = (iso) => {
     if (!iso) return "—";

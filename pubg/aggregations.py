@@ -909,10 +909,10 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
 def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     """Pro Match: Hot-Drop ja/nein + Survival-Marker.
 
-    Match-Start = played_at − duration_secs (played_at ist Match-Ende).
-    Window = erste window_ms ab Match-Start. Vorher hatte ich
-    fälschlicherweise events[0].timestamp_ms als Match-Start
-    angenommen — das war der erste Kill, nicht der Match-Anfang.
+    Match-Start = matches.played_at (das ist PUBGs `createdAt`,
+    der Match-START — NICHT das Match-Ende, wie ich vorher fälschlich
+    angenommen hatte. Match-Ende = played_at + duration_secs).
+    Window = erste window_ms ab Match-Start.
     """
     parts = conn.execute("""
         SELECT account_id, team_id, time_survived
@@ -927,18 +927,17 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
 
     squad_ids = {a for a, t in acc_to_team.items() if t == my_team_id}
 
-    # Echter Match-Start aus matches-Tabelle (played_at − duration_secs)
+    # Match-Start aus matches.played_at (PUBG `createdAt` = Match-START)
     m_row = conn.execute(
-        "SELECT played_at, duration_secs FROM matches WHERE match_id = ?",
+        "SELECT played_at FROM matches WHERE match_id = ?",
         (match_id,)
     ).fetchone()
     if not m_row or not m_row["played_at"]:
         return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
-    end_dt = _parse_iso(m_row["played_at"])
-    if end_dt is None:
+    start_dt = _parse_iso(m_row["played_at"])
+    if start_dt is None:
         return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
-    duration_secs = m_row["duration_secs"] or 0
-    match_start_ms = int((end_dt.timestamp() - duration_secs) * 1000)
+    match_start_ms = int(start_dt.timestamp() * 1000)
     early_cutoff_ms = match_start_ms + window_ms
 
     # Kill/Knock-Events innerhalb des frühen Fensters
