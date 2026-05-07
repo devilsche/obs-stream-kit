@@ -16,60 +16,64 @@
       box-sizing: border-box;
     }
     .panel { padding: 16px 18px; }
-    .top {
-      display: flex;
-      align-items: baseline;
-      gap: 14px;
-      margin-bottom: 10px;
+    .kd-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 12px;
     }
-    .big {
-      font-size: 2.4em;
+    .kd-cell {
+      text-align: center;
+      padding: 10px 6px 8px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.03);
+    }
+    .kd-cell .v {
+      font-size: 1.85em;
       font-weight: 700;
-      color: var(--pubg-gold);
+      color: var(--pubg-text);
       font-variant-numeric: tabular-nums;
+      line-height: 1.05;
+    }
+    .kd-cell.me .v {
+      color: var(--pubg-gold);
       text-shadow: 0 0 14px rgba(242, 183, 5, 0.35);
     }
-    .label { color: var(--pubg-muted); font-size: 0.85em; }
-    .row { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.95em; }
+    .kd-cell .l {
+      color: var(--pubg-muted);
+      font-size: 0.7em;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-top: 4px;
+      line-height: 1.2;
+    }
+    .row { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.9em; }
     .row b { color: var(--pubg-text); font-variant-numeric: tabular-nums; }
+    .row .label { color: var(--pubg-muted); }
     .diff-pos { color: #7be57b; }
     .diff-neg { color: #e57b7b; }
-    .spark {
-      display: flex;
-      align-items: flex-end;
-      gap: 2px;
-      height: 36px;
-      margin-top: 12px;
-    }
-    .spark .bar {
-      flex: 1 1 0;
-      min-height: 2px;
-      background: var(--pubg-gold);
-      opacity: 0.55;
-      border-radius: 1px;
-      transition: height 0.4s;
-    }
-    .spark .bar.last { opacity: 1; }
     .meta { color: var(--pubg-muted); font-size: 0.78em; margin-top: 8px; }
+    .hint { color: var(--pubg-muted); font-size: 0.72em; margin-top: 6px; line-height: 1.3; }
   </style>
 </head>
 <body>
   <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card panel pubg-fade-in">
-    <div class="top">
-      <span class="big" id="avg">—</span>
-      <span class="label">Ø Lobby K/D</span>
+    <div class="kd-grid">
+      <div class="kd-cell me"><div class="v" id="myKd">—</div><div class="l">Your K/D</div></div>
+      <div class="kd-cell"><div class="v" id="squadKd">—</div><div class="l">Squad K/D</div></div>
+      <div class="kd-cell"><div class="v" id="top3Kd">—</div><div class="l">Top-3 Lobby K/D</div></div>
     </div>
     <div class="row">
-      <span class="label">Your K/D</span>
-      <b id="myKd">—</b>
+      <span class="label">You vs Squad</span>
+      <b id="diffSquad">—</b>
     </div>
     <div class="row">
-      <span class="label">Diff</span>
-      <b id="diff">—</b>
+      <span class="label">You vs Top-3 Lobby</span>
+      <b id="diffTop3">—</b>
     </div>
-    <div class="spark" id="spark"></div>
     <div class="meta" id="meta">— Matches</div>
+    <div class="hint">Top-3 Lobby K/D = Ø K/D der drei Top-Fragger pro Match (Lobby-Schwierigkeits-Indikator).</div>
   </div>
   <script src="_pubg.js"></script>
   <script>
@@ -83,43 +87,47 @@
                  "whole database." },
     ]);
 
-    function render(d) {
-      if (!d || d.matches === 0) {
-        document.getElementById("avg").textContent = "—";
-        document.getElementById("myKd").textContent = "—";
-        document.getElementById("diff").textContent = "—";
-        document.getElementById("spark").innerHTML = "";
+    function fmtDiff(el, v) {
+      if (v == null || isNaN(v)) { el.textContent = "—"; el.className = ""; return; }
+      const sign = v >= 0 ? "+" : "";
+      el.textContent = sign + v.toFixed(2);
+      el.className = v >= 0 ? "diff-pos" : "diff-neg";
+    }
+
+    function render(squad, top3) {
+      const matches = (squad && squad.matches) || 0;
+      if (!squad || matches === 0) {
+        ["myKd","squadKd","top3Kd","diffSquad","diffTop3"].forEach(id =>
+          document.getElementById(id).textContent = "—");
         document.getElementById("meta").textContent = "no matches in range";
         return;
       }
-      document.getElementById("avg").textContent = (d.avg || 0).toFixed(2);
-      document.getElementById("myKd").textContent = (d.myKd || 0).toFixed(2);
-      const diff = d.diff || 0;
-      const diffEl = document.getElementById("diff");
-      const sign = diff >= 0 ? "+" : "";
-      diffEl.textContent = sign + diff.toFixed(2);
-      diffEl.className = "";
-      diffEl.classList.add(diff >= 0 ? "diff-pos" : "diff-neg");
-
-      // Sparkline aus perMatch (letzte 16)
-      const last = (d.perMatch || []).slice(-16);
-      const max = Math.max(0.5, ...last.map(m => m.lobbyKd || 0));
-      const html = last.map((m, i) => {
-        const h = Math.max(2, Math.round(((m.lobbyKd || 0) / max) * 36));
-        return `<div class="bar ${i === last.length - 1 ? "last" : ""}" style="height:${h}px"></div>`;
-      }).join("");
-      document.getElementById("spark").innerHTML = html;
-
-      const n = d.matches || 0;
+      const myKd = squad.myKd || 0;
+      const squadKd = squad.squadKd || 0;
+      const top3Kd = (top3 && top3.top3Kd) || 0;
+      const top3N = (top3 && top3.matches) || 0;
+      document.getElementById("myKd").textContent = myKd.toFixed(2);
+      document.getElementById("squadKd").textContent = squadKd.toFixed(2);
+      document.getElementById("top3Kd").textContent = top3N > 0 ? top3Kd.toFixed(2) : "—";
+      fmtDiff(document.getElementById("diffSquad"), myKd - squadKd);
+      fmtDiff(document.getElementById("diffTop3"),
+              top3N > 0 ? (myKd - top3Kd) : null);
       document.getElementById("meta").textContent =
-        `${n} ${n === 1 ? "Match" : "Matches"} in range`;
+        `${matches} ${matches === 1 ? "Match" : "Matches"} in range · Top-3 aus ${top3N}`;
     }
 
+    function tick() {
+      Promise.all([
+        PubgUI.fetchJson(`/api/pubg/squad-kd?range=${RANGE}`),
+        PubgUI.fetchJson(`/api/pubg/lobby-top3-kd?range=${RANGE}`),
+      ]).then(([sq, t3]) => {
+        if (RANGE === "session") PubgUI.hideIfStale();
+        render(sq, t3);
+      }).catch(console.error);
+    }
     if (RANGE === "session") PubgUI.hideIfStale();
-    PubgUI.poll(`/api/pubg/lobby-avg-kd?range=${RANGE}`, 30000, (d) => {
-      if (RANGE === "session") PubgUI.hideIfStale();
-      render(d);
-    }, console.error);
+    tick();
+    setInterval(tick, 30000);
   </script>
 </body>
 </html>

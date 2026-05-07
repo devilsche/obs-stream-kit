@@ -9,6 +9,8 @@ from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_chickens_together, compute_session_report,
                                 compute_sessions_index, compute_best_worst_map,
                                 compute_map_performance, compute_lobby_avg_kd,
+                                compute_squad_kd, compute_lobby_top3_kd,
+                                compute_streaks,
                                 compute_trend_deltas, compute_session_matches,
                                 compute_hot_drop, compute_session_achievements)
 
@@ -46,6 +48,12 @@ class EndpointRegistry:
             return self._db_info()
         if route == ("GET", "/api/pubg/lobby-avg-kd"):
             return self._lobby_avg_kd(qs)
+        if route == ("GET", "/api/pubg/squad-kd"):
+            return self._squad_kd(qs)
+        if route == ("GET", "/api/pubg/lobby-top3-kd"):
+            return self._lobby_top3_kd(qs)
+        if route == ("GET", "/api/pubg/streaks"):
+            return self._streaks(qs)
         if route == ("GET", "/api/pubg/trend-deltas"):
             return self._trend_deltas(qs)
         if route == ("GET", "/api/pubg/session-matches"):
@@ -133,6 +141,30 @@ class EndpointRegistry:
         return _ok(self.cache.get_or_compute(
             f"lobby-avg-kd:{range_key}",
             lambda: compute_lobby_avg_kd(conn, self.my_account_id, range_key),
+        ))
+
+    def _squad_kd(self, qs):
+        conn = self.get_conn()
+        range_key = qs.get("range", "session")
+        return _ok(self.cache.get_or_compute(
+            f"squad-kd:{range_key}",
+            lambda: compute_squad_kd(conn, self.my_account_id, range_key),
+        ))
+
+    def _lobby_top3_kd(self, qs):
+        conn = self.get_conn()
+        range_key = qs.get("range", "session")
+        return _ok(self.cache.get_or_compute(
+            f"lobby-top3-kd:{range_key}",
+            lambda: compute_lobby_top3_kd(conn, self.my_account_id, range_key),
+        ))
+
+    def _streaks(self, qs):
+        conn = self.get_conn()
+        range_key = qs.get("range", "session")
+        return _ok(self.cache.get_or_compute(
+            f"streaks:{range_key}",
+            lambda: compute_streaks(conn, self.my_account_id, range_key),
         ))
 
     def _trend_deltas(self, qs):

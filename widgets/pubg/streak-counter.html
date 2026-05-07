@@ -32,6 +32,7 @@
       color: var(--pubg-gold);
       font-variant-numeric: tabular-nums;
       text-shadow: 0 0 14px rgba(242, 183, 5, 0.4);
+      line-height: 1;
     }
     .label {
       color: var(--pubg-muted);
@@ -41,6 +42,23 @@
       margin-top: 4px;
     }
     .desc { color: var(--pubg-muted); font-size: 0.85em; margin-top: 4px; }
+    .best-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      font-size: 0.95em;
+    }
+    .best-row .l { color: var(--pubg-muted); font-size: 0.78em; letter-spacing: 0.06em; text-transform: uppercase; }
+    .best-row .v {
+      color: var(--pubg-text);
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      font-size: 1.4em;
+    }
+    .best-when { color: var(--pubg-muted); font-size: 0.78em; margin-top: 2px; }
     .cold { opacity: 0.5; }
   </style>
 </head>
@@ -55,46 +73,58 @@
       </div>
     </div>
     <div class="desc" id="desc">—</div>
+    <div class="best-row">
+      <div>
+        <div class="l">Best in range</div>
+        <div class="best-when" id="bestWhen">—</div>
+      </div>
+      <span class="v" id="bestNum">0</span>
+    </div>
   </div>
   <script src="_pubg.js"></script>
   <script>
-    // ?type=chicken|top10|kd1   (default chicken)
+    // ?type=chicken|top10|kd1   ?range=session|week|all
     const TYPE = PubgUI.qs("type", "chicken");
+    const RANGE = PubgUI.qs("range", "session");
     const TYPES = {
-      chicken: { title: "Chicken Streak",  desc: "consecutive #1 finishes",
-                 test: m => (m.place || 99) === 1 },
-      top10:   { title: "Top-10 Streak",   desc: "consecutive top-10 finishes",
-                 test: m => (m.place || 99) <= 10 },
-      kd1:     { title: "K/D > 1 Streak",  desc: "consecutive matches with kills > 1",
-                 test: m => (m.kills || 0) >= 1 },
+      chicken: { title: "Chicken Streak",  desc: "consecutive #1 finishes" },
+      top10:   { title: "Top-10 Streak",   desc: "consecutive top-10 finishes" },
+      kd1:     { title: "K/D ≥ 1 Streak",  desc: "consecutive matches with kills ≥ 1" },
+      kd2:     { title: "K/D ≥ 2 Streak",  desc: "consecutive matches with kills ≥ 2" },
     };
     const cfg = TYPES[TYPE] || TYPES.chicken;
-    PubgUI.renderHeader(document.getElementById("pubgHeader"), cfg.title, "session");
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), cfg.title, RANGE);
     document.getElementById("desc").textContent = cfg.desc;
 
     PubgUI.buildFilter([
       { key: "type", label: "Type", type: "select", default: "chicken",
-        options: [["chicken","Chicken"],["top10","Top-10"],["kd1","K/D > 1"]]},
+        options: [["chicken","Chicken"],["top10","Top-10"],
+                  ["kd1","K/D ≥ 1"],["kd2","K/D ≥ 2"]]},
+      { key: "range", label: "Range", type: "select", default: "session",
+        options: [["session","Session"],["week","7 days"],["all","Database"]],
+        tooltip: "Welche Matches einbeziehen — aktuelle Session, letzte 7 Tage, " +
+                 "oder die ganze Datenbank." },
     ]);
 
     async function refresh() {
       try {
-        // /api/pubg/session-matches liefert Matches absteigend (neueste zuerst)
-        const matches = await PubgUI.fetchJson("/api/pubg/session-matches?range=session");
-        let streak = 0;
-        for (const m of matches) {
-          if (cfg.test(m)) streak++;
-          else break;
-        }
-        document.getElementById("num").textContent = streak;
+        const data = await PubgUI.fetchJson(`/api/pubg/streaks?range=${RANGE}`);
+        const s = data[TYPE] || {current: 0, best: 0, bestEndedAt: null};
+        const cur = s.current || 0;
+        const best = s.best || 0;
+        document.getElementById("num").textContent = cur;
+        document.getElementById("bestNum").textContent = best;
+        const bw = document.getElementById("bestWhen");
+        bw.textContent = s.bestEndedAt
+          ? `ended ${PubgUI.fmtDate(s.bestEndedAt)} ${PubgUI.fmtTime(s.bestEndedAt)}`
+          : "—";
         const card = document.getElementById("card");
         const flame = document.getElementById("flame");
-        if (streak === 0) {
+        if (cur === 0) {
           card.classList.add("cold");
           flame.textContent = "";
         } else {
           card.classList.remove("cold");
-          // 🔥 nur wenn Streak > 0 (= geiler Scheiss)
           flame.textContent = "🔥";
         }
       } catch (e) {
@@ -102,12 +132,11 @@
       }
     }
 
-    PubgUI.hideIfStale();
+    // Kein hideIfStale — "cold"-Greyed-Out (current=0) zeigt bereits dass
+    // gerade nichts läuft. Best-in-Range bleibt auch außerhalb einer
+    // aktiven Session sichtbar.
     refresh();
-    setInterval(() => {
-      PubgUI.hideIfStale();
-      refresh();
-    }, 30000);
+    setInterval(refresh, 30000);
   </script>
 </body>
 </html>

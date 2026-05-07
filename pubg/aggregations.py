@@ -559,6 +559,231 @@ def compute_lobby_avg_kd(conn, my_account_id, range_key="session"):
     }
 
 
+def compute_squad_kd(conn, my_account_id, range_key="session"):
+    """Squad-K/D über einen Zeitraum (session/week/all).
+    Squad = pro Match alle match_team_mapping-Einträge mit my_team_id.
+    K/D = SUM(squad_kills) / max(matches - squad_wins, 1).
+
+    Liefert: {squadKd, myKd, diff, matches, kills, wins, kpm, perMatch}
+    """
+    cutoff = (_range_filter(conn, range_key)
+              if range_key != "all" else "1970-01-01T00:00:00Z")
+
+    rows = conn.execute("""
+        WITH my_teams AS (
+          SELECT mtm.match_id, mtm.team_id
+          FROM match_team_mapping mtm
+          JOIN matches m ON m.match_id = mtm.match_id
+          WHERE mtm.account_id = ? AND m.played_at >= ?
+        )
+        SELECT m.match_id, m.played_at, m.duration_secs,
+               SUM(COALESCE(mtm.kills, 0)) AS sq_kills,
+               COUNT(*)                     AS team_size,
+               SUM(CASE WHEN mtm.time_survived IS NOT NULL
+                          AND mtm.time_survived < m.duration_secs - 5
+                        THEN 1 ELSE 0 END)  AS sq_deaths_real,
+               SUM(CASE WHEN mtm.time_survived IS NULL THEN 1 ELSE 0 END)
+                                            AS sq_no_surv,
+               MAX(CASE WHEN mtm.place=1 THEN 1 ELSE 0 END) AS sq_won
+        FROM matches m
+        JOIN my_teams mt ON mt.match_id = m.match_id
+        JOIN match_team_mapping mtm ON mtm.match_id = m.match_id
+                                    AND mtm.team_id = mt.team_id
+        WHERE mtm.kills IS NOT NULL
+        GROUP BY m.match_id
+        ORDER BY m.played_at ASC
+    """, (my_account_id, cutoff)).fetchall()
+
+    per_match = []
+    total_kills = 0
+    total_wins = 0
+    total_deaths = 0
+    for r in rows:
+        kills = r["sq_kills"] or 0
+        team_size = r["team_size"] or 0
+        won = r["sq_won"] or 0
+        # Death pro Mate via time_survived. Fallback (Schema 3): alle
+        # team_size tot wenn Match verloren.
+        if r["sq_no_surv"]:
+            deaths = 0 if won else team_size
+        else:
+            deaths = r["sq_deaths_real"] or 0
+        per_match.append({
+            "matchId": r["match_id"],
+            "playedAt": r["played_at"],
+            "squadKills": kills,
+            "teamSize": team_size,
+            "deaths": deaths,
+            "won": bool(won),
+        })
+        total_kills += kills
+        total_wins += won
+        total_deaths += deaths
+
+    n = len(per_match)
+    squad_kd = (total_kills / max(total_deaths, 1)) if n else 0
+    kpm = (total_kills / n) if n else 0
+
+    # Eigene K/D aus participants über denselben Zeitraum als Vergleich
+    my = conn.execute("""
+        SELECT SUM(p.kills) AS k, COUNT(*) AS n,
+               SUM(CASE WHEN p.place=1 THEN 1 ELSE 0 END) AS w
+        FROM participants p JOIN matches m ON m.match_id = p.match_id
+        WHERE p.account_id = ? AND m.played_at >= ?
+    """, (my_account_id, cutoff)).fetchone()
+    my_k = (my and my["k"]) or 0
+    my_n = (my and my["n"]) or 0
+    my_w = (my and my["w"]) or 0
+    my_kd = my_k / max(my_n - my_w, 1) if my_n else 0
+
+    return {
+        "squadKd": squad_kd,
+        "myKd": my_kd,
+        "diff": squad_kd - my_kd,
+        "matches": n,
+        "kills": total_kills,
+        "wins": total_wins,
+        "kpm": kpm,
+        "perMatch": per_match,
+    }
+
+
+def compute_streaks(conn, my_account_id, range_key="session"):
+    """Streaks pro Typ (chicken/top10/kd1) über einen Range.
+    Liefert pro Typ: current (am Ende laufender Streak), best (höchster
+    Streak im Range), bestEndedAt (wann der best-Streak endete).
+
+    Liefert: {chicken: {...}, top10: {...}, kd1: {...}, range, matches}
+    """
+    cutoff = (_range_filter(conn, range_key)
+              if range_key != "all" else "1970-01-01T00:00:00Z")
+
+    # Matches chronologisch (ASC) damit wir die best-Streaks korrekt finden,
+    # current = letzter laufender Streak am Ende
+    rows = conn.execute("""
+        SELECT m.match_id, m.played_at, p.place, p.kills
+        FROM matches m
+        JOIN participants p ON p.match_id = m.match_id
+        WHERE p.account_id = ? AND m.played_at >= ?
+        ORDER BY m.played_at ASC
+    """, (my_account_id, cutoff)).fetchall()
+
+    tests = {
+        "chicken": lambda r: (r["place"] or 99) == 1,
+        "top10":   lambda r: (r["place"] or 99) <= 10,
+        "kd1":     lambda r: (r["kills"] or 0) >= 1,
+        "kd2":     lambda r: (r["kills"] or 0) >= 2,
+    }
+
+    out = {}
+    for key, test in tests.items():
+        run = 0
+        best = 0
+        best_ended_at = None
+        last_ended_at = None
+        for r in rows:
+            if test(r):
+                run += 1
+                last_ended_at = r["played_at"]
+                if run > best:
+                    best = run
+                    best_ended_at = r["played_at"]
+            else:
+                run = 0
+                last_ended_at = None
+        out[key] = {
+            "current": run,
+            "best": best,
+            "bestEndedAt": best_ended_at,
+        }
+
+    return {
+        "range": range_key,
+        "matches": len(rows),
+        **out,
+    }
+
+
+def compute_lobby_top3_kd(conn, my_account_id, range_key="session",
+                            match_ids=None):
+    """Lobby-Skill-Indikator via Top-3-Fragger pro Match.
+    Pro Match: Top-3 nach Kills in der Lobby, ihre Round-K/D nehmen
+    (kills/max(deaths,1)) und mitteln. Über alle Matches der Range
+    nochmal mitteln. Plus Top-3-Avg-Kills als Vergleichswert.
+
+    Hohe Zahl = harte Lobby (Top-Fragger schreddern). Braucht nur
+    match_team_mapping (kein Career-Fetch).
+
+    `match_ids` optional: wenn gesetzt, range_key wird ignoriert.
+
+    Liefert: {top3Kd, top3Kills, matches, perMatch}
+    """
+    if match_ids is None:
+        cutoff = (_range_filter(conn, range_key)
+                  if range_key != "all" else "1970-01-01T00:00:00Z")
+        matches = conn.execute("""
+            SELECT m.match_id, m.played_at, m.duration_secs
+            FROM matches m
+            WHERE m.match_id IN (
+                SELECT match_id FROM participants WHERE account_id = ?
+            ) AND m.played_at >= ?
+            ORDER BY m.played_at ASC
+        """, (my_account_id, cutoff)).fetchall()
+    else:
+        if not match_ids:
+            return {"top3Kd": 0, "top3Kills": 0, "matches": 0, "perMatch": []}
+        ph = ",".join("?" * len(match_ids))
+        matches = conn.execute(
+            f"SELECT match_id, played_at, duration_secs FROM matches "
+            f"WHERE match_id IN ({ph}) ORDER BY played_at ASC",
+            match_ids,
+        ).fetchall()
+
+    per_match = []
+    sum_kd = 0.0
+    sum_kills = 0.0
+    n = 0
+    for m in matches:
+        top3 = conn.execute("""
+            SELECT kills, place, time_survived
+            FROM match_team_mapping
+            WHERE match_id = ? AND kills IS NOT NULL
+            ORDER BY kills DESC
+            LIMIT 3
+        """, (m["match_id"],)).fetchall()
+        if len(top3) < 3:
+            continue
+        dur = m["duration_secs"] or 0
+        kds = []
+        for r in top3:
+            k = r["kills"] or 0
+            if r["time_survived"] is not None and dur:
+                died = r["time_survived"] < dur - 5
+            else:
+                died = (r["place"] or 99) != 1
+            # K/D = kills/deaths. Tot=1 Death, lebt=keine Deaths → K/D = k
+            # (in beiden Fällen mathematisch k, aber als K/D-Semantik klar)
+            kds.append(k / max(1 if died else 0, 1) if died else k)
+        match_kd = sum(kds) / 3
+        match_kills = sum(r["kills"] or 0 for r in top3) / 3
+        per_match.append({
+            "matchId": m["match_id"],
+            "playedAt": m["played_at"],
+            "top3Kd": match_kd,
+            "top3Kills": match_kills,
+        })
+        sum_kd += match_kd
+        sum_kills += match_kills
+        n += 1
+
+    return {
+        "top3Kd": (sum_kd / n) if n else 0,
+        "top3Kills": (sum_kills / n) if n else 0,
+        "matches": n,
+        "perMatch": per_match,
+    }
+
+
 def compute_trend_deltas(conn, my_account_id, from_iso=None, to_iso=None,
                           gap_hours=4):
     """Vergleich gewählte Session vs. die direkt davor liegende Session.
@@ -1529,6 +1754,81 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
         return (end - _dt.timedelta(seconds=m["duration_secs"] or 0)) \
             .strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    def _squad_lobby_for(match_ids):
+        """Squad-K/D + Lobby-K/D für eine Match-ID-Liste.
+        Squad = my_team_id pro Match. Squad-K/D = SUM(team_kills) /
+        SUM(team_deaths). Death pro Mate = time_survived < duration-5
+        (Toleranz für Rundungs-Unschärfe). Wenn time_survived fehlt
+        (Schema 3): Fallback team_size_if_lost.
+        Beispiel Duo, beide tot, 9 kills: 9/2 = 4.5. Win mit 1 toten
+        Mate: kills/1 statt kills/0."""
+        out = {"squadKills": 0, "squadKd": 0, "squadKillsPerMatch": 0,
+               "squadMatchesWithMapping": 0,
+               "lobbyKd": 0, "lobbyMatchesWithMapping": 0,
+               "lobbyTop3Kd": 0, "lobbyTop3Kills": 0,
+               "lobbyTop3Matches": 0}
+        if not match_ids:
+            return out
+        # Top-3-Lobby-Indikator (separat vom Squad-Aggregat)
+        top3 = compute_lobby_top3_kd(conn, my_account_id, match_ids=match_ids)
+        out["lobbyTop3Kd"] = top3["top3Kd"]
+        out["lobbyTop3Kills"] = top3["top3Kills"]
+        out["lobbyTop3Matches"] = top3["matches"]
+        ph_id = ",".join("?" * len(match_ids))
+        # Squad-Aggregate (mit time_survived basiertem Death-Count)
+        sq_rows = conn.execute(f"""
+            WITH my_teams AS (
+              SELECT match_id, team_id FROM match_team_mapping
+              WHERE account_id = ? AND match_id IN ({ph_id})
+            )
+            SELECT mtm.match_id, m.duration_secs,
+                   SUM(COALESCE(mtm.kills, 0)) AS sq_kills,
+                   COUNT(*)                     AS team_size,
+                   SUM(CASE WHEN mtm.time_survived IS NOT NULL
+                              AND mtm.time_survived < m.duration_secs - 5
+                            THEN 1 ELSE 0 END)  AS sq_deaths_real,
+                   SUM(CASE WHEN mtm.time_survived IS NULL THEN 1 ELSE 0 END)
+                                                AS sq_no_surv,
+                   MAX(CASE WHEN mtm.place=1 THEN 1 ELSE 0 END) AS sq_won
+            FROM match_team_mapping mtm
+            JOIN my_teams mt ON mt.match_id = mtm.match_id
+                              AND mt.team_id = mtm.team_id
+            JOIN matches m   ON m.match_id  = mtm.match_id
+            WHERE mtm.kills IS NOT NULL
+            GROUP BY mtm.match_id
+        """, [my_account_id] + match_ids).fetchall()
+        sq_kills = 0
+        sq_deaths = 0
+        for r in sq_rows:
+            sq_kills += r["sq_kills"] or 0
+            if r["sq_no_surv"]:
+                # Fallback (Schema 3): alle tot wenn nicht gewonnen
+                sq_deaths += 0 if r["sq_won"] else (r["team_size"] or 0)
+            else:
+                sq_deaths += r["sq_deaths_real"] or 0
+        sq_n = len(sq_rows)
+        out["squadKills"] = sq_kills
+        out["squadMatchesWithMapping"] = sq_n
+        out["squadKd"] = (sq_kills / max(sq_deaths, 1)) if sq_n else 0
+        out["squadKillsPerMatch"] = (sq_kills / sq_n) if sq_n else 0
+        # Lobby-Aggregate (wie compute_lobby_avg_kd: Ø lobbyKd pro Match)
+        lo_rows = conn.execute(f"""
+            SELECT match_id,
+                   SUM(COALESCE(kills, 0)) AS l_kills,
+                   COUNT(*)                AS l_n,
+                   SUM(CASE WHEN place=1 THEN 1 ELSE 0 END) AS l_wins
+            FROM match_team_mapping
+            WHERE match_id IN ({ph_id}) AND kills IS NOT NULL
+            GROUP BY match_id
+            HAVING l_n > 4
+        """, match_ids).fetchall()
+        if lo_rows:
+            kds = [(r["l_kills"] or 0) / max((r["l_n"] or 0) - (r["l_wins"] or 0), 1)
+                   for r in lo_rows]
+            out["lobbyKd"] = sum(kds) / len(kds)
+            out["lobbyMatchesWithMapping"] = len(kds)
+        return out
+
     for ph in phases:
         ms = ph["matches"]
         n = len(ms)
@@ -1541,6 +1841,7 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
         total_kills = sum(x["kills"] or 0 for x in ms)
         total_damage = sum(x["damage_dealt"] or 0 for x in ms)
         total_surv = sum(x["time_survived"] or 0 for x in ms)
+        squad_lobby = _squad_lobby_for([x["match_id"] for x in ms])
         ph["stats"] = {
             "matches": n,
             "wins": wins,
@@ -1554,6 +1855,7 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             "totalSurvivedSec": total_surv,
             "startTime": _match_start(ms[0]),
             "endTime": ms[-1]["played_at"],
+            **squad_lobby,
         }
 
     # Total-Aggregate
@@ -1562,41 +1864,8 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
     total_kills = sum(x["kills"] or 0 for x in enriched)
     total_damage = sum(x["damage_dealt"] or 0 for x in enriched)
     total_surv = sum(x["time_survived"] or 0 for x in enriched)
-    # Squad-Aggregate aus match_team_mapping. Nur Matches mit team-id
-    # match einbeziehen (= Schema 2+). Squad = my_team_id pro Match
-    # (nicht ein fixes Squad sondern wer immer mit dabei war).
-    match_ids = [x["match_id"] for x in enriched]
-    squad_total_kills = 0
-    squad_match_count = 0
-    squad_wins = 0
-    if match_ids:
-        placeholders = ",".join("?" * len(match_ids))
-        sq_rows = conn.execute(f"""
-            WITH my_teams AS (
-              SELECT match_id, team_id FROM match_team_mapping
-              WHERE account_id = ? AND match_id IN ({placeholders})
-            )
-            SELECT mtm.match_id,
-                   SUM(COALESCE(mtm.kills, 0)) AS sq_kills,
-                   COUNT(*) AS sq_n,
-                   MAX(CASE WHEN mtm.place=1 THEN 1 ELSE 0 END) AS sq_won
-            FROM match_team_mapping mtm
-            JOIN my_teams mt ON mt.match_id = mtm.match_id
-                              AND mt.team_id = mtm.team_id
-            WHERE mtm.kills IS NOT NULL
-            GROUP BY mtm.match_id
-        """, [my_account_id] + match_ids).fetchall()
-        for r in sq_rows:
-            squad_total_kills += r["sq_kills"] or 0
-            squad_wins += r["sq_won"] or 0
-            squad_match_count += 1
-
-    # Squad-K/D = SUM(squad-kills) / max(squad-deaths-proxy, 1)
-    # deaths_proxy = squad_match_count - squad_wins (jeder verlorene
-    # Match = Squad ist gestorben, jeder Win = Squad lebt)
-    squad_deaths_proxy = max(squad_match_count - squad_wins, 1)
-    squad_kd = (squad_total_kills / squad_deaths_proxy) if squad_match_count else 0
-    squad_kills_per_match = (squad_total_kills / squad_match_count) if squad_match_count else 0
+    # Squad+Lobby-Aggregate über alle Matches der Range
+    totals_squad_lobby = _squad_lobby_for([x["match_id"] for x in enriched])
 
     totals = {
         "matches": n,
@@ -1616,11 +1885,8 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
         "startTime": _match_start(enriched[0]),
         "endTime": enriched[-1]["played_at"],
         "uniqueMaps": len({x["map_name"] for x in enriched}),
-        # Squad-Aggregate (basiert auf match_team_mapping)
-        "squadKills": squad_total_kills,
-        "squadKd": squad_kd,
-        "squadKillsPerMatch": squad_kills_per_match,
-        "squadMatchesWithMapping": squad_match_count,
+        # Squad+Lobby-Aggregate (basiert auf match_team_mapping)
+        **totals_squad_lobby,
     }
 
     # Map-Performance: pro Map → Matches, Wins, K/D, Avg DMG, Avg Place

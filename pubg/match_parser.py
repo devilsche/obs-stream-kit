@@ -73,6 +73,7 @@ def parse_match_response(match_payload, my_account_id):
                     "team_id": team_id,
                     "kills": stats.get("kills"),
                     "place": stats.get("winPlace"),
+                    "time_survived": stats.get("timeSurvived"),
                 })
             if team_id == my_team_id:
                 row = _participant_to_row(p)

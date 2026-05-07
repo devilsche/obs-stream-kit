@@ -52,17 +52,27 @@
     .phase .squad b { color: var(--pubg-text); }
     .phase-stats {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-      gap: 8px;
-      font-size: 0.8em;
-      margin-bottom: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 10px 14px;
+      margin-bottom: 12px;
     }
-    .phase-stats span { color: var(--pubg-muted); }
+    .phase-stats span {
+      display: flex;
+      flex-direction: column;
+      color: var(--pubg-muted);
+      font-size: 0.7em;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      line-height: 1.2;
+    }
     .phase-stats span b {
       color: var(--pubg-text);
       font-variant-numeric: tabular-nums;
-      font-size: 1.15em;
-      margin-right: 4px;
+      font-size: 1.7em;
+      letter-spacing: 0;
+      text-transform: none;
+      margin-bottom: 2px;
+      line-height: 1.05;
     }
 
     .matches-list {
@@ -218,7 +228,7 @@
     .delta-zero { color: var(--pubg-muted); }
     .streaks-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 10px;
       margin-bottom: 10px;
     }
@@ -742,6 +752,7 @@
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtNum(Math.round(t.damage))}</span><span class="pubg-stat-label">Damage</span></div>
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.kd)}</span><span class="pubg-stat-label">K/D</span></div>
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.squadKd || 0)}</span><span class="pubg-stat-label">Squad K/D</span></div>
+          <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.lobbyTop3Kd || 0)}</span><span class="pubg-stat-label">Top-3 Lobby K/D</span></div>
           <div class="cell"><span class="pubg-stat-value">${(t.squadKillsPerMatch || 0).toFixed(1)}</span><span class="pubg-stat-label">Ø Squad Kills/Match</span></div>
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.avgKills)}</span><span class="pubg-stat-label">Ø My Kills/Match</span></div>
           <div class="cell"><span class="pubg-stat-value">${Math.round(t.avgDamage)}</span><span class="pubg-stat-label">Ø DMG/Match</span></div>
@@ -777,6 +788,8 @@
               <span><b>${PubgUI.fmtNum(Math.round(s.damage))}</b> DMG</span>
               <span><b>${s.wins}</b> Wins</span>
               <span><b>${PubgUI.fmtKD(s.kd)}</b> K/D</span>
+              ${(s.squadMatchesWithMapping||0) > 0 ? `<span><b>${PubgUI.fmtKD(s.squadKd||0)}</b> Squad K/D</span>` : ""}
+              ${(s.lobbyTop3Matches||0) > 0 ? `<span><b>${PubgUI.fmtKD(s.lobbyTop3Kd||0)}</b> Top-3 Lobby K/D</span>` : ""}
               <span><b>${Math.round(s.avgDamage)}</b> Ø DMG</span>
               <span><b>${fmtDuration(Math.round(s.avgSurvivedSec))}</b> Ø Surv</span>
               <span><b>#${s.avgPlace.toFixed(1)}</b> Avg #</span>
@@ -915,28 +928,47 @@
           </div>`;
       }
 
-      // Streaks aus session-matches berechnen — vom neuesten Match rückwärts
-      const computeStreak = (test) => {
+      // Streaks aus session-matches berechnen — current = vom neuesten
+      // Match rückwärts; best = längster Run im Range (chronologisch)
+      const computeCurrent = (test) => {
         let n = 0;
         for (const m of (matches || [])) {
           if (test(m)) n++; else break;
         }
         return n;
       };
-      const chickenStreak = computeStreak(m => (m.place || 99) === 1);
-      const top10Streak   = computeStreak(m => (m.place || 99) <= 10);
-      const kdStreak      = computeStreak(m => (m.kills || 0) >= 1);
-      const streakItem = (label, n) =>
-        `<div class="streak-cell ${n > 0 ? '' : 'cold'}">
-           <span class="streak-num">${n}</span>
-           <span class="streak-label">${label}</span>
+      const computeBest = (test) => {
+        // matches kommt newest-first. Für best brauchen wir chrono ASC.
+        const arr = (matches || []).slice().reverse();
+        let run = 0, best = 0;
+        for (const m of arr) {
+          if (test(m)) { run++; if (run > best) best = run; }
+          else run = 0;
+        }
+        return best;
+      };
+      const tests = {
+        chicken: m => (m.place || 99) === 1,
+        top10:   m => (m.place || 99) <= 10,
+        kd1:     m => (m.kills || 0) >= 1,
+        kd2:     m => (m.kills || 0) >= 2,
+      };
+      const chickenCur = computeCurrent(tests.chicken), chickenBest = computeBest(tests.chicken);
+      const top10Cur   = computeCurrent(tests.top10),   top10Best   = computeBest(tests.top10);
+      const kd1Cur     = computeCurrent(tests.kd1),     kd1Best     = computeBest(tests.kd1);
+      const kd2Cur     = computeCurrent(tests.kd2),     kd2Best     = computeBest(tests.kd2);
+      const streakItem = (label, cur, best) =>
+        `<div class="streak-cell ${cur > 0 ? '' : 'cold'}">
+           <span class="streak-num">${cur}</span>
+           <span class="streak-label">${label}<br><span style="font-size:0.85em;opacity:0.7">best ${best}</span></span>
          </div>`;
       const streaksHtml = `
-        <h3 class="extras-h">Current streaks</h3>
+        <h3 class="extras-h">Streaks (current · best)</h3>
         <div class="streaks-grid">
-          ${streakItem("Chicken (place #1)", chickenStreak)}
-          ${streakItem("Top-10", top10Streak)}
-          ${streakItem("Kills ≥ 1", kdStreak)}
+          ${streakItem("Chicken (#1)", chickenCur, chickenBest)}
+          ${streakItem("Top-10", top10Cur, top10Best)}
+          ${streakItem("Kills ≥ 1", kd1Cur, kd1Best)}
+          ${streakItem("Kills ≥ 2", kd2Cur, kd2Best)}
         </div>`;
 
       let achievementsHtml = "";
