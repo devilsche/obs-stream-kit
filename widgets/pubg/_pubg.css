@@ -56,6 +56,17 @@ body {
 
 .pubg-error { color: #e57b7b; font-size: 0.85em; }
 
+/* Einheitliches Header-Format laut Overlay-Rules: <Title> · <Range> */
+.pubg-header {
+  color: var(--pubg-muted);
+  font-size: 0.78em;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.pubg-header b { color: var(--pubg-text); }
+
 /* HOT — für überdurchschnittliche Werte (Synergy >=3 etc.) */
 .pubg-hot {
   color: #ff7a1f !important;

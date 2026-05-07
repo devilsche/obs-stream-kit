@@ -79,12 +79,14 @@
   </style>
 </head>
 <body>
+  <div class="pubg-header" id="pubgHeader"></div>
   <div id="root" class="pubg-card stack"></div>
 
   <script src="_pubg.js"></script>
   <script>
     const LAYOUT = PubgUI.qs("layout", "carousel");
     const RANGE = PubgUI.qs("range", "session");
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), "Mates", RANGE);
     // minMatches OPTIONAL — wenn nicht gesetzt, greift das globale Setting
     // (minMatchesForTopMates), das vom flyout-full-Slider gesetzt wird.
     const MIN_RAW = PubgUI.qs("minMatches");
@@ -95,7 +97,7 @@
         options: [["carousel","Carousel"],["stack","Stack"],
                   ["fold","Fold"],["mosaic","Mosaic"]]},
       { key: "range", label: "Range", type: "select", default: "session",
-        options: [["session","Session"],["day","Heute"],["week","Letzte 7 Tage"]]},
+        options: [["session","Session"],["week","7 days"]]},
       { key: "minMatches", label: "Min Matches", type: "range",
         min: 1, max: 30, default: 1 },
       { key: "minTotal", label: "Min Total", type: "range",

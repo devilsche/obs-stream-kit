@@ -59,8 +59,8 @@
   </style>
 </head>
 <body>
+  <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card panel pubg-fade-in">
-    <h3 id="title">Chicken Map</h3>
     <div id="rows"></div>
     <div class="summary" id="summary"></div>
     <div class="footnote" id="footnote"></div>
@@ -68,11 +68,11 @@
   <script src="_pubg.js"></script>
   <script>
     const RANGE = PubgUI.qs("range", "all");
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), "Chicken Map", RANGE);
 
     PubgUI.buildFilter([
       { key: "range", label: "Range", type: "select", default: "all",
-        options: [["all","Alles"],["session","Session"],
-                  ["day","Heute"],["week","Letzte 7 Tage"]]},
+        options: [["all","Database"],["session","Session"],["week","7 days"]]},
     ]);
 
     function chickens(n) {

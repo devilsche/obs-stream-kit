@@ -105,6 +105,7 @@
   </style>
 </head>
 <body>
+  <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card panel pubg-fade-in">
     <div class="head">
       <h3>Top Mates · <b id="catLabel">…</b> <span id="meta" style="opacity:0.55;font-weight:400;letter-spacing:0;text-transform:none"></span></h3>
@@ -140,6 +141,8 @@
     const LIMIT = parseInt(PubgUI.qs("limit", 5), 10);
     const MIN = parseInt(PubgUI.qs("minMatches", 10), 10);
     const CATS_RAW = PubgUI.qs("cats", "");
+    const RANGE = PubgUI.qs("range", "all");
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), "Top Mates", RANGE);
 
     const cats = CATS_RAW
       ? CATS_RAW.split(",").map(c => c.trim()).filter(Boolean)

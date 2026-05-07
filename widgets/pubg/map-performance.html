@@ -56,8 +56,8 @@
   </style>
 </head>
 <body>
+  <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card panel pubg-fade-in">
-    <h2>Map Performance · <b id="rangeLabel">…</b></h2>
     <div class="sub" id="meta"></div>
     <div id="content"><div class="empty">— wird geladen —</div></div>
   </div>
@@ -65,15 +65,10 @@
   <script>
     PubgUI.buildFilter([
       { key: "range", label: "Range", type: "select", default: "all",
-        options: [["session","Session"],["day","Heute"],
-                  ["week","Letzte 7 Tage"],["all","DB-Lifetime"]]},
+        options: [["session","Session"],["week","7 days"],["all","Database"]]},
     ]);
     const RANGE = PubgUI.qs("range", "all");
-    const RANGE_LABEL = {
-      session: "Session", day: "Heute",
-      week: "Letzte 7 Tage", all: "DB-Lifetime",
-    };
-    document.getElementById("rangeLabel").textContent = RANGE_LABEL[RANGE] || RANGE;
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), "Map Performance", RANGE);
 
     function fmtSurv(secs) {
       const m = Math.floor((secs||0)/60);

@@ -22,18 +22,18 @@
   </style>
 </head>
 <body>
+  <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card panel pubg-fade-in">
-    <h3 id="title">Map-Verteilung</h3>
     <div id="rows"></div>
   </div>
   <script src="_pubg.js"></script>
   <script>
     const RANGE = PubgUI.qs("range", "session");
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), "Map Distribution", RANGE);
 
     PubgUI.buildFilter([
       { key: "range", label: "Range", type: "select", default: "session",
-        options: [["session","Session"],["day","Heute"],
-                  ["week","Letzte 7 Tage"],["all","Alles"]]},
+        options: [["session","Session"],["week","7 days"],["all","Database"]]},
     ]);
     function render(list) {
       const max = Math.max(1, ...list.map(x => x.count));

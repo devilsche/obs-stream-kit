@@ -81,14 +81,15 @@
   </style>
 </head>
 <body>
+  <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card panel pubg-fade-in">
-    <h3 id="title">Chicken Together</h3>
     <div id="rows"></div>
     <div class="summary" id="summary"></div>
     <div class="footnote">PUBG-API liefert nur Match-Details der letzten ~14 Tage / 30 Matches. Diese Wins zählen ab Setup-Zeitpunkt.</div>
   </div>
   <script src="_pubg.js"></script>
   <script>
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), "Chicken Together", "all");
     const MIN_WINS = parseInt(PubgUI.qs("minWins", 1), 10);
     const MIN_MATCHES = parseInt(PubgUI.qs("minMatches", 1), 10);
 

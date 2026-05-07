@@ -40,6 +40,8 @@ class EndpointRegistry:
             return self._last_match()
         if route == ("GET", "/api/pubg/status"):
             return _ok(self.poller_status())
+        if route == ("GET", "/api/pubg/db-info"):
+            return self._db_info()
         if route == ("POST", "/api/pubg/session/reset"):
             return self._session_reset()
         if route == ("GET", "/api/pubg/top-mates"):
@@ -96,6 +98,14 @@ class EndpointRegistry:
             lambda: compute_last_match(conn, self.my_account_id),
         )
         return _ok(result or {})
+
+    def _db_info(self):
+        conn = self.get_conn()
+        return _ok(self.cache.get_or_compute("db-info", lambda: {
+            "firstMatchAt": (conn.execute(
+                "SELECT MIN(played_at) AS first FROM matches"
+            ).fetchone() or {})["first"],
+        }))
 
     def _session_reset(self):
         conn = self.get_conn()

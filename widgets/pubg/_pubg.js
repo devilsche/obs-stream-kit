@@ -89,6 +89,51 @@
     return res.json();
   };
 
+  // Range-Label-Map (englisch durchgängig, laut Overlay-Rules-Spec).
+  // "all" wird dynamisch zu "Database (since DD.MM.)" ergänzt — siehe
+  // PubgUI.fmtRangeLabel.
+  PubgUI._RANGE_LABELS = {
+    session: "Session",
+    week:    "7 days",
+    all:     "Database",
+    career:  "Career",
+  };
+
+  let _dbInfoPromise = null;
+  PubgUI.getDbInfo = () => {
+    if (!_dbInfoPromise) {
+      _dbInfoPromise = PubgUI.fetchJson("/api/pubg/db-info").catch(() => ({}));
+    }
+    return _dbInfoPromise;
+  };
+
+  // Liefert ein Promise<string>. Für range="all" wird "(since DD.MM.)"
+  // angehängt, basierend auf firstMatchAt aus /api/pubg/db-info.
+  PubgUI.fmtRangeLabel = async (range) => {
+    const base = PubgUI._RANGE_LABELS[range] || range;
+    if (range !== "all") return base;
+    const info = await PubgUI.getDbInfo();
+    if (!info || !info.firstMatchAt) return base;
+    const d = new Date(info.firstMatchAt);
+    const since = String(d.getDate()).padStart(2, "0") + "."
+                + String(d.getMonth() + 1).padStart(2, "0") + ".";
+    return `${base} (since ${since})`;
+  };
+
+  // Header-Element rendern: <Title> · <Range>. Deaktivierbar via ?header=0.
+  // Erwartet ein Element mit data-pubg-header="<Title>" oder explizit übergeben.
+  // Range wird async aufgelöst (für Database-since).
+  PubgUI.renderHeader = async (el, title, range) => {
+    if (PubgUI.qs("header") === "0") {
+      if (el) el.style.display = "none";
+      return;
+    }
+    if (!el) return;
+    const rangeLabel = await PubgUI.fmtRangeLabel(range);
+    el.textContent = `${title} · ${rangeLabel}`;
+    el.style.display = "";
+  };
+
   // Body ausblenden wenn letzter Match älter als maxAgeMs (Default 1h).
   // Für Live-Widgets (live-bar, news-ticker) — sollen nur on-screen sein
   // wenn aktuell gespielt wird. Bei Fehler oder leerer DB: ausblenden.

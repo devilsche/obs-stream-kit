@@ -69,13 +69,15 @@
   </style>
 </head>
 <body>
+  <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card panel pubg-fade-in">
-    <h3 id="title">Top Mates</h3>
     <div id="rows"></div>
   </div>
   <script src="_pubg.js"></script>
   <script>
     const SORT_BY = PubgUI.qs("sortBy", "mostPlayed");
+    const RANGE = PubgUI.qs("range", "all");
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), "Top Mates", RANGE);
     const LIMIT = parseInt(PubgUI.qs("limit", 5), 10);
     // MIN aus URL — wenn nicht gesetzt: undefined → Backend nimmt das Setting
     const MIN_RAW = PubgUI.qs("minMatches");

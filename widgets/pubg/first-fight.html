@@ -61,10 +61,10 @@
   </style>
 </head>
 <body>
+  <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card card pubg-fade-in">
     <div class="top">
       <div class="label">
-        <div class="header">First Fight Wins</div>
         <div class="sub" id="sub">—</div>
         <div class="sub" id="teams" style="font-size:0.85em;color:var(--pubg-muted)"></div>
       </div>
@@ -75,15 +75,16 @@
   <script src="_pubg.js"></script>
   <script>
     const RANGE = PubgUI.qs("range", "session");
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), "First Fight Wins", RANGE);
 
     PubgUI.buildFilter([
       { key: "range", label: "Range", type: "select", default: "session",
-        options: [["session","Session"],["day","Heute"],["week","Letzte 7 Tage"]]},
+        options: [["session","Session"],["week","7 days"]]},
     ]);
     function render(d) {
       document.getElementById("pct").textContent = (d.rate||0).toFixed(0) + "%";
       document.getElementById("sub").innerHTML =
-        `<b>${d.survived||0}</b> / <b>${d.total||0}</b> überlebt`;
+        `<b>${d.survived||0}</b> / <b>${d.total||0}</b> survived`;
       const teams = document.getElementById("teams");
       if (d.avgTeams) {
         teams.innerHTML = `Ø <b>${d.avgTeams.toFixed(1)}</b> Teams pro Fight · Max <b>${d.maxTeams||0}</b>`;

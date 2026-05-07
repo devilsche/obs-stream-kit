@@ -161,13 +161,12 @@
       });
     }
 
-    // Globaler Range-Filter: session/day/week/all
+    // Globaler Range-Filter: session/week/all
     const RANGE = PubgUI.qs("range", "session");
     const TITLES = {
-      session: "PUBG SESSION",
-      day:     "PUBG — HEUTE",
-      week:    "PUBG — LETZTE 7 TAGE",
-      all:     "PUBG — DB-LIFETIME",
+      session: "PUBG · Session",
+      week:    "PUBG · 7 days",
+      all:     "PUBG · Database",
     };
     document.getElementById("cardTitle").textContent = TITLES[RANGE] || TITLES.session;
     if (RANGE !== "session") {
@@ -177,8 +176,7 @@
 
     PubgUI.buildFilter([
       { key: "range", label: "Range", type: "select", default: "session",
-        options: [["session","Session"],["day","Heute"],
-                  ["week","Letzte 7 Tage"],["all","DB-Lifetime"]]},
+        options: [["session","Session"],["week","7 days"],["all","Database"]]},
       { key: "sortBy", label: "Mate-Sort", type: "select", default: "mostPlayed",
         options: [["synergy","Synergy"],["mostPlayed","Most Played"],
                   ["chickensTogether","Most CHICKEN"],["kd","Best K/D Meine"],
@@ -297,15 +295,14 @@
 
     const RANGE_LABEL = {
       session: "Session",
-      day:     "heute",
-      week:    "letzte 7 Tage",
-      all:     "DB-Lifetime",
+      week:    "7 days",
+      all:     "Database",
     };
 
     function updateTopMatesSubtitle() {
       const m = currentMin === 1 ? "Match" : "Matches";
       document.getElementById("topMatesSubtitle").textContent =
-        `— ${RANGE_LABEL[RANGE]}, mind. ${currentMin} ${m}`;
+        `— ${RANGE_LABEL[RANGE]}, min. ${currentMin} ${m}`;
     }
 
     function reload() {
