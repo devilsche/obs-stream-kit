@@ -829,13 +829,13 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
 
 
 def compute_hot_drop(conn, my_account_id, range_key="session",
-                     window_secs=60):
+                     window_secs=120):
     """Hot-Drop-Stats über die Range.
 
     Definition Hot-Drop = im Match gab es ein Kill/Knock-Event innerhalb
-    der ersten window_secs (Default 60s) NACH der Landung des Squads,
-    zwischen verschiedenen Teams, wo das Squad als Attacker oder Victim
-    beteiligt war. Landung = echte LogParachuteLanding-Events aus
+    der ersten window_secs (Default 120s = 2 Min) NACH der Landung des
+    Squads, zwischen verschiedenen Teams, wo das Squad als Attacker oder
+    Victim beteiligt war. Landung = echte LogParachuteLanding-Events aus
     Telemetry, NICHT geschätzt.
 
     Pro Match Markierung:
