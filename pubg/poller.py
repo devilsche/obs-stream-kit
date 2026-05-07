@@ -114,15 +114,14 @@ def run_single_tick(conn, client, my_player_name: str,
 
 
 def run_bulk_catchup(conn, client, my_player_name: str,
-                     my_account_id: str, max_matches: int = 500,
+                     my_account_id: str, max_matches: int | None = None,
                      pacing_ms: int = 100, progress_cb=None) -> dict:
     """Ein einziger get_player()-Call (rate-limited), dann sequentielles
     ingest_match() für ALLE neuen IDs. /matches/{id} ist nicht rate-
     limited, daher braucht's keinen 12s-Sleep zwischen Iterationen.
     pacing_ms = höflicher 100ms-Sleep zwischen Match-Calls.
-
-    Liefert Stats wie run_single_tick, aber mit total_processed über alle
-    Matches statt nur 5/Tick."""
+    max_matches=None (Default) → kein Cap, ALLE neuen IDs werden
+    verarbeitet."""
     import time
     stats = {"new_matches": 0, "errors": [], "skipped": 0}
 
@@ -136,8 +135,9 @@ def run_bulk_catchup(conn, client, my_player_name: str,
     known = get_known_match_ids(conn)
     new_ids = [mid for mid in match_ids if mid not in known]
 
-    to_process = new_ids[:max_matches]
-    stats["skipped"] = max(0, len(new_ids) - max_matches)
+    to_process = new_ids if max_matches is None else new_ids[:max_matches]
+    stats["skipped"] = (0 if max_matches is None
+                        else max(0, len(new_ids) - max_matches))
 
     for i, mid in enumerate(to_process, 1):
         try:

@@ -22,7 +22,7 @@ def init_db(root: str) -> str:
     return db_path
 
 
-def cold_start(root: str, max_matches: int = 500):
+def cold_start(root: str, max_matches: int | None = None):
     cfg = load_config(os.path.join(root, "config", "pubg.json"))
     api_key = load_api_key(os.path.join(root, ".secrets"))
     if not api_key:
@@ -51,12 +51,12 @@ def cold_start(root: str, max_matches: int = 500):
         print(f"Player bereits in DB: {my_acc_id}")
 
     # Single get_player()-Call (rate-limited) liefert alle verfügbaren
-    # Match-IDs. Danach sequentielles ingest_match() für jede neue ID —
-    # /matches/{id} ist laut PUBG-Doku NICHT rate-limited, daher kein
-    # 12s-Sleep zwischen Iterationen nötig (nur 100ms Höflichkeits-Pace).
-    # Konsequenz: 170 Matches in ~30s statt früher ~8 Min.
-    print(f"Cold-Start: hole Match-Liste + ingestiere bis zu {max_matches} "
-          f"Matches…")
+    # Match-IDs. Danach sequentielles ingest_match() für JEDE neue ID
+    # ohne Cap — /matches/{id} ist laut PUBG-Doku NICHT rate-limited.
+    # 100ms Höflichkeits-Pace zwischen Calls.
+    cap_msg = "ohne Cap" if max_matches is None else f"max {max_matches}"
+    print(f"Cold-Start: hole Match-Liste + ingestiere alle neuen Matches "
+          f"({cap_msg})…")
 
     def _progress(i, total, imported):
         if i % 10 == 0 or i == total:
@@ -71,12 +71,7 @@ def cold_start(root: str, max_matches: int = 500):
               f"{'...' if len(stats['errors']) > 5 else ''} "
               f"({len(stats['errors'])} total)")
     conn.close()
-    if stats["skipped"] > 0:
-        print(f"Cold-Start: {stats['new_matches']} Matches in DB. "
-              f"{stats['skipped']} weitere Matches in der API-Liste über "
-              f"Safety-Cap — max_matches erhöhen wenn benötigt.")
-    else:
-        print(f"Cold-Start fertig — {stats['new_matches']} Matches in DB.")
+    print(f"Cold-Start fertig — {stats['new_matches']} Matches in DB.")
     return 0
 
 
