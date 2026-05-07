@@ -118,6 +118,52 @@
             out.push(`<span class="label">SESSION BEST/WORST MAP</span> ${PubgUI.fmtMap(bw.best.map)} K/D <b>${bw.best.kd.toFixed(2)}</b> · ${PubgUI.fmtMap(bw.worst.map)} K/D <b>${bw.worst.kd.toFixed(2)}</b>`);
           }
         } catch (_) {}
+
+        // ── Lobby-Difficulty (Session) ────────────────────
+        try {
+          const lk = await PubgUI.fetchJson("/api/pubg/lobby-avg-kd?range=session");
+          if (lk.matches) {
+            const sign = (lk.diff || 0) >= 0 ? "+" : "";
+            out.push(`<span class="label">SESSION LOBBIES</span> Ø Lobby K/D <b>${(lk.avg||0).toFixed(2)}</b> · You <b>${(lk.myKd||0).toFixed(2)}</b> (${sign}${(lk.diff||0).toFixed(2)})`);
+          }
+        } catch (_) {}
+
+        // ── Hot-Drop (Session) ────────────────────────────
+        try {
+          const hd = await PubgUI.fetchJson("/api/pubg/hot-drop?range=session");
+          if (hd.matches) {
+            const streak = hd.streak ? ` · Streak 🔥${hd.streak}` : "";
+            out.push(`<span class="label">SESSION HOT DROPS</span> ${(hd.rate||0).toFixed(0)}% Rate · Solo-Surv <b>${(hd.soloSurvivalRate||0).toFixed(0)}%</b> · Team-Surv <b>${(hd.teamSurvivalRate||0).toFixed(0)}%</b>${streak}`);
+          }
+        } catch (_) {}
+
+        // ── Trend vs. last Session ────────────────────────
+        try {
+          const t = await PubgUI.fetchJson("/api/pubg/trend-deltas");
+          if (t && t.deltas && t.current) {
+            const arr = (v) => v > 0.001 ? "↑" : (v < -0.001 ? "↓" : "·");
+            const d = t.deltas;
+            out.push(`<span class="label">TREND VS. LAST</span> K/D ${arr(d.kd)}${Math.abs(d.kd).toFixed(2)} · Wins ${arr(d.wins)}${Math.abs(d.wins)} · Avg-DMG ${arr(d.avgDmg)}${Math.round(Math.abs(d.avgDmg))}`);
+          }
+        } catch (_) {}
+
+        // ── Top-3 Maps der Session ────────────────────────
+        try {
+          const md = await PubgUI.fetchJson("/api/pubg/map-distribution?range=session");
+          if (md.length >= 2) {
+            const top3 = md.slice(0, 3).map(x => `${PubgUI.fmtMap(x.map)} ×${x.count}`).join(" · ");
+            out.push(`<span class="label">SESSION TOP MAPS</span> ${top3}`);
+          }
+        } catch (_) {}
+
+        // ── Achievements der Session ──────────────────────
+        try {
+          const ach = await PubgUI.fetchJson("/api/pubg/session-achievements");
+          if (ach && ach.length) {
+            const recent = ach.slice(-3).map(a => `${a.icon||"✨"} ${a.label}`).join(" · ");
+            out.push(`<span class="label">SESSION ACHIEVEMENTS</span> ${recent}`);
+          }
+        } catch (_) {}
       }
 
       // ── LIFETIME / DB-LIFETIME ────────────────────────────
