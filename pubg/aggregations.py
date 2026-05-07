@@ -957,16 +957,18 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
         ORDER BY timestamp_ms ASC
     """, (match_id, landing_ms, fight_cutoff_ms)).fetchall()
 
+    # Hinweis: participants-Tabelle enthält NUR Squad-Members (kein Lobby-
+    # Roster). acc_to_team kennt also nur Squad-Spieler — für andere Teams
+    # ist team_id None. Daher prüfen wir Squad-Beteiligung über squad_ids
+    # direkt, nicht über acc_to_team.
     hot_drop = False
     for e in events:
         a, v = e["actor_account"], e["target_account"]
-        a_team = acc_to_team.get(a)
-        v_team = acc_to_team.get(v)
-        if a_team is None or v_team is None:
-            continue
-        if a_team == v_team:
-            continue  # Friendly fire — kein echter Squad-Fight
-        if a in squad_ids or v in squad_ids:
+        a_in_squad = a in squad_ids
+        v_in_squad = v in squad_ids
+        if a_in_squad and v_in_squad:
+            continue  # Friendly fire innerhalb Squad — nicht zählen
+        if a_in_squad or v_in_squad:
             hot_drop = True
             break
 
