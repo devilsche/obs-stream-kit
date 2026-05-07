@@ -261,26 +261,46 @@ Ordered roughly by impact:
   "match running"-indicator faster than API can.
 - **Stream-OCR realtime track** — separate spec if/when invested in true
   realtime HUD (kill/dmg/place from rendered game frames)
-- **Multi-tenant SaaS deployment** — running this for many streamers from
-  a single hosted instance. Two paths considered:
-  - *Self-host per user* (Docker Compose): 1–2 days packaging effort,
-    each streamer hosts own instance. Recommended first step.
-  - *Real SaaS* (shared server, per-user tokens + DBs): 2–3 weeks,
-    requires Postgres, schema-wide `user_id`, per-user PUBG-API-keys.
-    Critical bottleneck is **NOT the DB** but the PUBG-API rate limit
-    (10 req/min per key). Multi-tenant only feasible if each user
-    brings their own API key — shared platform key tops out at ~5
-    active streamers.
-  - DB scaling estimate: 1.000 active users feasible on a single
-    Postgres VPS *if* telemetry events are aggregated at ingest (no
-    raw event-row archive). 20.000 users → cluster + sharding +
-    cold-storage, separate engineering effort.
-- **Server-side cron deployment** — splitting `pubg/poller.py` from
-  in-process thread to separate CLI tick (`--tick-matches`,
-  `--tick-telemetry`), driven by cron / systemd timer on a server.
-  Decouples data ingestion from streaming-PC uptime. ~1–2 days work.
-  Pre-requisite for the SaaS path; also useful standalone for personal
-  always-on collection.
+- **Multi-tenant SaaS deployment** — agreed direction: *Bring-Your-Own-API-Key*
+  model. Each user registers, must provide their own PUBG developer API
+  key during onboarding (free at developer.pubg.com), and gets isolated
+  data + token-protected widget URLs.
+
+  Why BYO-key:
+  - PUBG-API rate limit is 10 req/min **per key** — sharing one
+    platform key would max out at ~5 active streamers
+  - With per-user keys, the API ceiling scales linearly with users
+  - Removes legal liability around shared key usage
+
+  Phased build (separate spec needed when prioritized):
+  1. **Server-cron extraction** — poller from in-process thread to
+     CLI ticks (`--tick-matches`, `--tick-telemetry`), driven by
+     cron/systemd. ~1–2 days. Useful even for personal always-on use.
+  2. **Postgres migration + `user_id` schema** — every relevant table
+     gets `user_id`, all aggregations filter by it. ~3–4 days.
+  3. **User accounts + tokens** — registration, password/OAuth,
+     widget-tokens (read-only) vs admin-tokens (settings/reset).
+     ~2–3 days.
+  4. **Per-user PUBG-key handling + per-user poller queue** — encrypt
+     keys at rest, queue per-user fetches respecting their own
+     rate-limit, error handling for invalid/expired keys. ~2–3 days.
+  5. **Token-aware widget URLs** — `?token=...`, frontend stores it,
+     all `/api/pubg/...` calls include it. ~1 day.
+  6. **Onboarding UI** — sign up, paste API-key, link PUBG account
+     (auto-detect via key), generate tokens, copy widget URLs. ~2–3 days.
+
+  Total: ~2–3 weeks focused work. Self-Host (Docker Compose package)
+  remains a valid parallel deliverable for tech-savvy users who'd
+  rather host themselves.
+
+  DB scaling estimate (with BYO-key model): 1.000 users feasible on
+  single Postgres VPS *if* telemetry events are aggregated at ingest
+  (only summarized stats stored, raw event JSON discarded). 20.000
+  users → cluster + sharding + cold-storage, separate eng. effort.
+- **Server-side cron deployment** — see Phase 1 of the SaaS plan above.
+  Also valuable as a standalone step (independent of multi-tenancy):
+  decouples data ingestion from streaming-PC uptime so matches are
+  ingested even when OBS isn't running.
 - **Permanent news-ticker mode** — pending snippet-pool expansion
 - **Fullscreen slot widgets for Pause-scene reuse** — `?fullscreen=1` param
   semantics tbd
