@@ -738,6 +738,7 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
       - longest_kill_400   : Longest Kill >= 400m in einem Match
       - five_kill_match    : Match mit >= 5 Kills
       - beast_chicken      : place == 1 UND kills >= 5 (mehrfach möglich)
+      - first_hot_drop          : ERSTES Hot-Drop in der Range (egal ob überlebt)
       - first_hot_drop_survived : ERSTES überlebtes Hot-Drop in der Range
       - top10_streak       : längste Top-10-Streak in Session (>= 3)
       - chicken_streak     : längste Chicken-Streak in Session (>= 2)
@@ -857,23 +858,35 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             "playedAt": longest_chicken_streak_match["playedAt"],
         })
 
-    # Hot-Drop-Survivor: ERSTES überlebtes Hot-Drop in der Range
-    # (perMatch ist DESC sortiert → reversed für ASC = ältestes zuerst).
-    # Vorher: das letzte in DESC-Reihenfolge → bei mehreren Hot-Drops
-    # zeigte die Uhrzeit den jüngsten, nicht den ersten.
+    # Hot-Drop-Achievements: ERSTES Hot-Drop überhaupt + ERSTES
+    # überlebtes Hot-Drop in der Range. perMatch ist DESC sortiert →
+    # reversed für ASC = ältestes zuerst. Beide Achievements können
+    # zusammen auftreten (wenn das erste Hot-Drop direkt überlebt wurde).
     try:
         hd = compute_hot_drop(conn, my_account_id, "session",
                                from_iso=from_iso, to_iso=to_iso)
+        first_hot_seen = False
+        first_hot_survived_seen = False
         for pm in reversed(hd.get("perMatch") or []):
-            if (pm.get("hotDrop") and pm.get("soloSurvived")
-                    and "hot_drop_survivor" not in seen):
+            if not pm.get("hotDrop"):
+                continue
+            if not first_hot_seen:
+                out.append({
+                    "id": "first_hot_drop",
+                    "label": "First Hot Drop",
+                    "icon": "🔥",
+                    "matchId": pm["matchId"], "playedAt": pm["playedAt"],
+                })
+                first_hot_seen = True
+            if not first_hot_survived_seen and pm.get("soloSurvived"):
                 out.append({
                     "id": "first_hot_drop_survived",
                     "label": "First Hot Drop Survived",
                     "icon": "🔥",
                     "matchId": pm["matchId"], "playedAt": pm["playedAt"],
                 })
-                seen.add("first_hot_drop_survived")
+                first_hot_survived_seen = True
+            if first_hot_seen and first_hot_survived_seen:
                 break
     except Exception:
         pass
