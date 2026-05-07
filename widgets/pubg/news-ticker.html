@@ -180,7 +180,8 @@
       show(snippets[idx]);
     }
 
-    PubgUI.hideIfStale();
+    // Lifetime-Mode bleibt sichtbar (Starting/BRB-Szenen) — kein Stale-Check.
+    if (FOCUS !== "lifetime") PubgUI.hideIfStale();
     refresh().then(() => {
       if (snippets.length) {
         document.getElementById("slot").innerHTML = snippets[0];
@@ -188,7 +189,7 @@
       }
     });
     setInterval(() => {
-      PubgUI.hideIfStale();
+      if (FOCUS !== "lifetime") PubgUI.hideIfStale();
       refresh();
     }, 60000);
   </script>

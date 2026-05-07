@@ -8,17 +8,22 @@
   <link rel="stylesheet" href="_pubg.css">
   <style>
     html, body { margin: 0; padding: 0; }
-    body { display: flex; align-items: center; min-height: 40px; }
+    /* Anker: top-center. Bar ist nur so breit wie Inhalt — Source kann ruhig
+       1920 sein, sichtbare Pixel = nur Content-Breite, zentriert. */
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+    }
     body:not(.pubg-has-filter) { height: 40px; }
     .live-bar {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 10px;
       padding: 6px 16px;
-      width: 100%;
       height: 40px;
       font-size: 16px;
-      justify-content: center;
     }
     .live-bar .sep { color: var(--pubg-muted); }
     .live-bar .label { color: var(--pubg-muted); margin-right: 4px; font-size: 0.85em; }

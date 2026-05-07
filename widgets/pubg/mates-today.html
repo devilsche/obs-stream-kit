@@ -6,14 +6,17 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="_pubg.css">
   <style>
-    body { padding: 16px; }
-    .header {
-      color: var(--pubg-muted);
-      font-size: 0.8em;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      margin-bottom: 10px;
+    /* Anker: bottom-left. Stack wächst von unten nach oben — neue Mates
+       erscheinen unten und drücken vorhandene nach oben. */
+    html, body { height: 100%; }
+    body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      box-sizing: border-box;
     }
+    #root { width: 100%; }
     .mate {
       padding: 10px 14px;
       margin-bottom: 8px;
@@ -27,17 +30,24 @@
     }
     .mate-line b { color: var(--pubg-gold); font-variant-numeric: tabular-nums; }
 
-    .stack { display: flex; flex-direction: column; }
+    /* Stack: column-reverse → DOM-Reihenfolge bleibt, visuell wächst von unten */
+    .stack { display: flex; flex-direction: column-reverse; }
+    .stack .mate { margin-bottom: 0; margin-top: 8px; }
 
-    /* Fold: Card wächst — Mates initial collapsed, expandieren beim Reveal */
+    /* Fold: Mates erscheinen einzeln nach unten, Stack wächst nach oben.
+       column-reverse + Animation aus translateY(12px). */
+    .fold {
+      display: flex;
+      flex-direction: column-reverse;
+    }
     .fold .mate {
       opacity: 0;
       max-height: 0;
       padding-top: 0;
       padding-bottom: 0;
-      margin-bottom: 0;
+      margin-top: 0;
       overflow: hidden;
-      transform: translateX(-12px);
+      transform: translateY(12px);
       transition:
         max-height 0.5s ease-out,
         padding 0.5s ease-out,
@@ -50,8 +60,8 @@
       max-height: 220px;
       padding-top: 10px;
       padding-bottom: 10px;
-      margin-bottom: 8px;
-      transform: translateX(0);
+      margin-top: 8px;
+      transform: translateY(0);
     }
 
     .carousel { position: relative; min-height: 100px; }
@@ -69,7 +79,6 @@
   </style>
 </head>
 <body>
-  <div class="header" id="header">Aktuelle Session — gespielt mit</div>
   <div id="root" class="pubg-card stack"></div>
 
   <script src="_pubg.js"></script>
@@ -80,13 +89,6 @@
     // (minMatchesForTopMates), das vom flyout-full-Slider gesetzt wird.
     const MIN_RAW = PubgUI.qs("minMatches");
     const MIN_PARAM = MIN_RAW != null ? `&minMatches=${MIN_RAW}` : "";
-
-    const HEADERS = {
-      session: "Aktuelle Session — gespielt mit",
-      day:     "Heute — gespielt mit",
-      week:    "Letzte 7 Tage — gespielt mit",
-    };
-    document.getElementById("header").textContent = HEADERS[RANGE] || HEADERS.session;
 
     PubgUI.buildFilter([
       { key: "layout", label: "Layout", type: "select", default: "carousel",
