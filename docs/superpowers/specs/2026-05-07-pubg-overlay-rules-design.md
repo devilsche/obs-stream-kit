@@ -261,6 +261,26 @@ Ordered roughly by impact:
   "match running"-indicator faster than API can.
 - **Stream-OCR realtime track** — separate spec if/when invested in true
   realtime HUD (kill/dmg/place from rendered game frames)
+- **Multi-tenant SaaS deployment** — running this for many streamers from
+  a single hosted instance. Two paths considered:
+  - *Self-host per user* (Docker Compose): 1–2 days packaging effort,
+    each streamer hosts own instance. Recommended first step.
+  - *Real SaaS* (shared server, per-user tokens + DBs): 2–3 weeks,
+    requires Postgres, schema-wide `user_id`, per-user PUBG-API-keys.
+    Critical bottleneck is **NOT the DB** but the PUBG-API rate limit
+    (10 req/min per key). Multi-tenant only feasible if each user
+    brings their own API key — shared platform key tops out at ~5
+    active streamers.
+  - DB scaling estimate: 1.000 active users feasible on a single
+    Postgres VPS *if* telemetry events are aggregated at ingest (no
+    raw event-row archive). 20.000 users → cluster + sharding +
+    cold-storage, separate engineering effort.
+- **Server-side cron deployment** — splitting `pubg/poller.py` from
+  in-process thread to separate CLI tick (`--tick-matches`,
+  `--tick-telemetry`), driven by cron / systemd timer on a server.
+  Decouples data ingestion from streaming-PC uptime. ~1–2 days work.
+  Pre-requisite for the SaaS path; also useful standalone for personal
+  always-on collection.
 - **Permanent news-ticker mode** — pending snippet-pool expansion
 - **Fullscreen slot widgets for Pause-scene reuse** — `?fullscreen=1` param
   semantics tbd
