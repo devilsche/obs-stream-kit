@@ -1215,19 +1215,28 @@ def _detect_first_fight(conn, match_id, my_account_id,
         if e["actor_account"]: cluster_acc_ids.add(e["actor_account"])
         if e["target_account"]: cluster_acc_ids.add(e["target_account"])
 
-    # Beteiligte Teams = alle team_ids der involvierten accounts.
-    # match_team_mapping (Lobby-weit) bevorzugt; Fallback: acc_to_team
-    # (squad-only) für Matches ohne Schema-Upgrade.
+    # Beteiligte Teams: nur Teams die DIREKT mit dem Squad gekämpft
+    # haben (= Squad ist Attacker oder Victim im Event). Vorher zählten
+    # auch 3rd-party-Teams die zufällig im Cluster-Radius kämpften ohne
+    # uns zu touchen — das hat avgTeams künstlich aufgebläht (Max 15).
     lobby_team_map = dict(conn.execute("""
         SELECT account_id, team_id FROM match_team_mapping
         WHERE match_id = ?
     """, (match_id,)).fetchall())
     full_team_map = lobby_team_map if lobby_team_map else acc_to_team
     teams = set()
-    for acc in cluster_acc_ids:
-        t = full_team_map.get(acc)
-        if t is not None:
-            teams.add(t)
+    for e in cluster:
+        a, v = e["actor_account"], e["target_account"]
+        a_in_squad = a in squad_ids
+        v_in_squad = v in squad_ids
+        if a_in_squad and v_in_squad:
+            continue  # Friendly fire intern — kein Gegner-Team
+        if not (a_in_squad or v_in_squad):
+            continue  # 3rd-party-Fight ohne uns
+        opponent = v if a_in_squad else a
+        opp_team = full_team_map.get(opponent)
+        if opp_team is not None and opp_team != my_team_id:
+            teams.add(opp_team)
 
     # Win-Bedingung: Hat mein Squad noch lebende Member zum Fight-Ende?
     # time_survived ist in Sekunden ab Match-Start. Kill-Events haben
