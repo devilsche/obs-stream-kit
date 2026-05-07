@@ -42,6 +42,8 @@
   </div>
   <script src="_pubg.js"></script>
   <script>
+    // Filter-Bar nur mit dem globalen 'Show always'-Toggle.
+    PubgUI.buildFilter([]);
     const REFRESH_MS = parseInt(PubgUI.qs("refreshMs", 30000), 10);
 
     const fmt = (n) => {

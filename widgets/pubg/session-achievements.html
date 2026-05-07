@@ -58,6 +58,11 @@
   </div>
   <script src="_pubg.js"></script>
   <script>
+    PubgUI.buildFilter([
+      { key: "limit", label: "Show items", type: "range",
+        min: 1, max: 20, default: 5,
+        tooltip: "Maximum number of achievements to display." },
+    ]);
     PubgUI.renderHeader(document.getElementById("pubgHeader"), "Achievements", "session");
 
     const LIMIT = parseInt(PubgUI.qs("limit", 5), 10);
