@@ -998,7 +998,9 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
 
 
 def compute_first_fight_rate(conn, my_account_id, range_key="session",
-                              cluster_secs=30, cluster_radius_m=200):
+                              cluster_secs=30, cluster_radius_m=200,
+                              exclude_hot_drop=False,
+                              hot_drop_window_secs=120):
     """First Fight Win Rate — DEFINITION (echtes Fight-Win, nicht First-Engage):
     Pro Match: das ERSTE Gefecht zwischen Squads.
 
@@ -1032,9 +1034,18 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session",
 
     total = 0
     survived = 0
+    excluded_hot = 0
     sparkline = []
     teams_per_fight = []
+    hot_drop_window_ms = hot_drop_window_secs * 1000
     for m in matches:
+        # Hot-Drop-Matches überspringen wenn excluded
+        if exclude_hot_drop:
+            hd = _detect_hot_drop(conn, m["match_id"], my_account_id,
+                                   hot_drop_window_ms, hot_drop_window_secs)
+            if hd["hotDrop"]:
+                excluded_hot += 1
+                continue
         result = _detect_first_fight(conn, m["match_id"], my_account_id,
                                        cluster_ms, cluster_radius_cm)
         if result is None:
@@ -1056,6 +1067,7 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session",
         "sparkline": sparkline[-20:],
         "avgTeams": round(avg_teams, 2),
         "maxTeams": max_teams,
+        "excludedHotDrop": excluded_hot,
     }
 
 

@@ -83,20 +83,31 @@
   <script src="_pubg.js"></script>
   <script>
     const RANGE = PubgUI.qs("range", "session");
-    PubgUI.renderHeader(document.getElementById("pubgHeader"), "First Fight Wins", RANGE);
+    const EXCLUDE_HOT = PubgUI.qs("excludeHotDrop", "0") === "1";
+    const TITLE = EXCLUDE_HOT ? "Silent Drop Fights" : "First Fight Wins";
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), TITLE, RANGE);
 
     PubgUI.buildFilter([
       { key: "range", label: "Range", type: "select", default: "session",
         options: [["session","Session"],["week","7 days"],["all","Database"]],
-        tooltip: "Which matches to include — current session or last 7 days." },
+        tooltip: "Which matches to include." },
+      { key: "excludeHotDrop", label: "Exclude hot drops", type: "select",
+        default: "0",
+        options: [["0","No (all matches)"],["1","Yes (silent drops only)"]],
+        tooltip: "When 'Yes', skips matches that qualified as hot-drop. " +
+                 "Shows first-fight performance for non-hot-drop matches " +
+                 "= 'silent drop, loot, then fight' scenarios." },
     ]);
     function render(d) {
       document.getElementById("pct").textContent = (d.rate||0).toFixed(0) + "%";
-      document.getElementById("sub").innerHTML =
-        `<b>${d.survived||0}</b> / <b>${d.total||0}</b> survived`;
+      const subParts = [`<b>${d.survived||0}</b> / <b>${d.total||0}</b> survived`];
+      if (d.excludedHotDrop) {
+        subParts.push(`<span style="opacity:0.6">(${d.excludedHotDrop} hot drops excluded)</span>`);
+      }
+      document.getElementById("sub").innerHTML = subParts.join(" ");
       const teams = document.getElementById("teams");
       if (d.avgTeams) {
-        teams.innerHTML = `Ø <b>${d.avgTeams.toFixed(1)}</b> Teams pro Fight · Max <b>${d.maxTeams||0}</b>`;
+        teams.innerHTML = `Ø <b>${d.avgTeams.toFixed(1)}</b> teams per fight · max <b>${d.maxTeams||0}</b>`;
       } else {
         teams.textContent = "";
       }
@@ -104,7 +115,9 @@
       spark.innerHTML = (d.sparkline||[]).map(v =>
         `<span class="${v ? 's' : 'd'}"></span>`).join("");
     }
-    PubgUI.poll(`/api/pubg/first-fight-rate?range=${RANGE}`, 5*60*1000, render, console.error);
+    const ehParam = EXCLUDE_HOT ? "&excludeHotDrop=1" : "";
+    PubgUI.poll(`/api/pubg/first-fight-rate?range=${RANGE}${ehParam}`,
+                5*60*1000, render, console.error);
   </script>
 </body>
 </html>

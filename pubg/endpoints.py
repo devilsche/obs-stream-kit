@@ -259,10 +259,15 @@ class EndpointRegistry:
 
     def _first_fight(self, qs):
         range_key = qs.get("range", "session")
+        # ?excludeHotDrop=1 → 'silent drop & loot then fight' Variante:
+        # nur Matches OHNE Hot-Drop, dann First-Fight-Rate berechnen.
+        exclude_hot = qs.get("excludeHotDrop") == "1"
         conn = self.get_conn()
         return _ok(self.cache.get_or_compute(
-            f"ff:{range_key}",
-            lambda: compute_first_fight_rate(conn, self.my_account_id, range_key)))
+            f"ff:{range_key}:eh{int(exclude_hot)}",
+            lambda: compute_first_fight_rate(
+                conn, self.my_account_id, range_key,
+                exclude_hot_drop=exclude_hot)))
 
     def _chickens_together(self, qs):
         min_wins = int(qs.get("minWins", 1))
