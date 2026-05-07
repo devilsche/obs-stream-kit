@@ -162,9 +162,13 @@ class EndpointRegistry:
     def _hot_drop(self, qs):
         conn = self.get_conn()
         range_key = qs.get("range", "session")
+        from_iso = qs.get("from")
+        to_iso = qs.get("to")
+        cache_key = f"hot-drop:{range_key}:{from_iso or ''}:{to_iso or ''}"
         return _ok(self.cache.get_or_compute(
-            f"hot-drop:{range_key}",
-            lambda: compute_hot_drop(conn, self.my_account_id, range_key),
+            cache_key,
+            lambda: compute_hot_drop(conn, self.my_account_id, range_key,
+                                      from_iso=from_iso, to_iso=to_iso),
         ))
 
     def _session_achievements(self, qs):

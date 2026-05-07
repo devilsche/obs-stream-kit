@@ -741,7 +741,9 @@
           <div class="cell"><span class="pubg-stat-value">${t.kills}</span><span class="pubg-stat-label">Kills</span></div>
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtNum(Math.round(t.damage))}</span><span class="pubg-stat-label">Damage</span></div>
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.kd)}</span><span class="pubg-stat-label">K/D</span></div>
-          <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.avgKills)}</span><span class="pubg-stat-label">Ø Kills/Match</span></div>
+          <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.squadKd || 0)}</span><span class="pubg-stat-label">Squad K/D</span></div>
+          <div class="cell"><span class="pubg-stat-value">${(t.squadKillsPerMatch || 0).toFixed(1)}</span><span class="pubg-stat-label">Ø Squad Kills/Match</span></div>
+          <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.avgKills)}</span><span class="pubg-stat-label">Ø My Kills/Match</span></div>
           <div class="cell"><span class="pubg-stat-value">${Math.round(t.avgDamage)}</span><span class="pubg-stat-label">Ø DMG/Match</span></div>
           <div class="cell"><span class="pubg-stat-value">${fmtDuration(Math.round(t.avgSurvivedSec))}</span><span class="pubg-stat-label">Ø Survive</span></div>
           <div class="cell"><span class="pubg-stat-value">#${t.avgPlace.toFixed(1)}</span><span class="pubg-stat-label">Avg Place</span></div>

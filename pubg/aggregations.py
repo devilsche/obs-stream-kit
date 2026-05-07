@@ -733,13 +733,14 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
 
     Achievements (in dieser Reihenfolge angewendet, max. 1 pro Typ
     außer 'Beast Chicken' und 'Top-DMG' die mehrfach kommen können):
-      - first_chicken     : erste #1 in der Session
-      - first_top10       : erstes Match mit place <= 10
-      - longest_kill_400  : Longest Kill >= 400m in einem Match
-      - five_kill_match   : Match mit >= 5 Kills
-      - beast_chicken     : place == 1 UND kills >= 5
-      - hot_drop_survivor : Hot-Drop überlebt (per compute_hot_drop)
-      - top10_streak_3    : 3 Matches in Folge place <= 10
+      - first_chicken      : erste #1 in der Session
+      - first_top10        : erstes Match mit place <= 10
+      - longest_kill_400   : Longest Kill >= 400m in einem Match
+      - five_kill_match    : Match mit >= 5 Kills
+      - beast_chicken      : place == 1 UND kills >= 5 (mehrfach möglich)
+      - hot_drop_survivor  : Hot-Drop überlebt (per compute_hot_drop)
+      - top10_streak       : längste Top-10-Streak in Session (>= 3)
+      - chicken_streak     : längste Chicken-Streak in Session (>= 2)
 
     Returns Liste { id, label, icon, matchId, playedAt } sortiert
     nach playedAt ASC (Reihenfolge des Erreichens).
@@ -753,7 +754,13 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
     seen = set()
     win_seen = False
     top10_seen = False
+    # Streaks: tatsächliche Längen tracken, nicht nur Threshold-Trigger
     top10_streak = 0
+    longest_top10_streak = 0
+    longest_top10_streak_match = None
+    chicken_streak = 0
+    longest_chicken_streak = 0
+    longest_chicken_streak_match = None
     for m in matches:
         place = m["place"] or 99
         kills = m["kills"] or 0
@@ -814,22 +821,49 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
                 "matchId": m["matchId"], "playedAt": played,
             })
 
+        # Top-10-Streak (≥3 in Folge wird Achievement)
         if place <= 10:
             top10_streak += 1
-            if top10_streak == 3 and "top10_streak_3" not in seen:
-                out.append({
-                    "id": "top10_streak_3",
-                    "label": "Top-10 Streak ×3",
-                    "icon": "🔥",
-                    "matchId": m["matchId"], "playedAt": played,
-                })
-                seen.add("top10_streak_3")
+            if top10_streak > longest_top10_streak:
+                longest_top10_streak = top10_streak
+                longest_top10_streak_match = m
         else:
             top10_streak = 0
 
-    # Hot-Drop-Survivor: aus compute_hot_drop perMatch in Session
+        # Chicken-Streak (≥2 in Folge wird Achievement)
+        if place == 1:
+            chicken_streak += 1
+            if chicken_streak > longest_chicken_streak:
+                longest_chicken_streak = chicken_streak
+                longest_chicken_streak_match = m
+        else:
+            chicken_streak = 0
+
+    # Streak-Achievements (post-loop, mit echter Längen-Anzeige)
+    if longest_top10_streak >= 3 and longest_top10_streak_match:
+        out.append({
+            "id": "top10_streak",
+            "label": f"Top-10 Streak ×{longest_top10_streak}",
+            "icon": "🔥",
+            "matchId": longest_top10_streak_match["matchId"],
+            "playedAt": longest_top10_streak_match["playedAt"],
+        })
+    if longest_chicken_streak >= 2 and longest_chicken_streak_match:
+        out.append({
+            "id": "chicken_streak",
+            "label": f"Chicken Streak ×{longest_chicken_streak}",
+            "icon": "🔥",
+            "matchId": longest_chicken_streak_match["matchId"],
+            "playedAt": longest_chicken_streak_match["playedAt"],
+        })
+
+    # Hot-Drop-Survivor: passend zur gleichen Range (from/to wenn gesetzt,
+    # sonst aktuelle Session) — vorher hat's immer aktuelle Session
+    # angezogen, was zu falschen Zeitstempeln im historischen Report
+    # geführt hat.
     try:
-        hd = compute_hot_drop(conn, my_account_id, "session")
+        hd = compute_hot_drop(conn, my_account_id, "session",
+                               from_iso=from_iso, to_iso=to_iso)
         for pm in (hd.get("perMatch") or []):
             if (pm.get("hotDrop") and pm.get("soloSurvived")
                     and "hot_drop_survivor" not in seen):
@@ -849,7 +883,7 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
 
 
 def compute_hot_drop(conn, my_account_id, range_key="session",
-                     window_secs=120):
+                     window_secs=120, from_iso=None, to_iso=None):
     """Hot-Drop-Stats über die Range.
 
     Definition Hot-Drop = im Match gab es ein Kill/Knock-Event innerhalb
@@ -874,15 +908,26 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
         rückwärts; Solo-Survival als Kriterium)
       - perMatch: Liste mit Match-Markern für Sparklines
     """
-    cutoff = (_range_filter(conn, range_key)
-              if range_key != "all" else "1970-01-01T00:00:00Z")
+    # from_iso/to_iso überschreiben range_key (für historische Sessions
+    # via session-report). Sonst range_key auflösen.
+    if from_iso:
+        cutoff = from_iso
+        end_filter = " AND m.played_at <= ?" if to_iso else ""
+        params = [my_account_id, cutoff]
+        if to_iso:
+            params.append(to_iso)
+    else:
+        cutoff = (_range_filter(conn, range_key)
+                  if range_key != "all" else "1970-01-01T00:00:00Z")
+        end_filter = ""
+        params = [my_account_id, cutoff]
     window_ms = window_secs * 1000
-    matches = conn.execute("""
+    matches = conn.execute(f"""
         SELECT m.match_id, m.played_at FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id
-        WHERE pa.account_id = ? AND m.played_at >= ?
+        WHERE pa.account_id = ? AND m.played_at >= ?{end_filter}
         ORDER BY m.played_at DESC
-    """, (my_account_id, cutoff)).fetchall()
+    """, params).fetchall()
 
     per_match = []
     hot = 0
