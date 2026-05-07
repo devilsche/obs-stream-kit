@@ -63,5 +63,8 @@ def test_process_telemetry_backlog_persists_squad_events(tmp_db_path):
     process_telemetry_backlog(conn, client, "account.abc123", max_per_tick=5)
 
     rows = get_telemetry_for_match(conn, "m1")
-    assert len(rows) == 2
+    # Schema 3: Landing-Events werden für ALLE Lobby-Members behalten
+    # (für 'Teams im Radius'-Detection), Kill/Knock auch global. Hier:
+    # 2 Landing-Events (squad + UNKNOWN) + 1 Kill = 3.
+    assert len(rows) == 3
     assert get_matches_needing_telemetry(conn) == []
