@@ -7,7 +7,7 @@ from pubg.config import load_config, load_api_key
 from pubg.db import (connect, init_schema, upsert_player, get_player_by_name,
                       integrity_check)
 from pubg.api_client import PubgClient
-from pubg.poller import run_single_tick
+from pubg.poller import run_bulk_catchup
 from pubg.backup import (load_ftp_config, list_remote_backups,
                           download_from_ftp)
 
@@ -50,34 +50,33 @@ def cold_start(root: str, max_matches: int = 500):
         my_acc_id = self_p["account_id"]
         print(f"Player bereits in DB: {my_acc_id}")
 
-    # Loopt bis keine neuen Matches mehr in der API-Liste sind. Safety-Cap
-    # max_matches verhindert Endlos-Schleifen bei unerwartetem API-Verhalten.
-    print(f"Cold-Start: ingestiere alle verfügbaren Matches "
-          f"(Safety-Cap {max_matches})…")
-    total_imported = 0
-    iterations = 0
-    max_iterations = max_matches // 5 + 1
-    while iterations < max_iterations:
-        iterations += 1
-        stats = run_single_tick(conn, client, cfg["playerName"],
-                                 my_acc_id, max_matches_per_tick=5)
-        total_imported += stats["new_matches"]
-        if stats["errors"]:
-            print(f"  Errors: {stats['errors']}")
-        # Break wenn nichts neues mehr und auch nichts übersprungen
-        if stats["new_matches"] == 0 and stats["skipped"] == 0:
-            break
-        print(f"  Importiert: +{stats['new_matches']}, "
-              f"insgesamt: {total_imported}, "
-              f"verbleibend in API-Liste: {stats['skipped']}")
-        time.sleep(12)
+    # Single get_player()-Call (rate-limited) liefert alle verfügbaren
+    # Match-IDs. Danach sequentielles ingest_match() für jede neue ID —
+    # /matches/{id} ist laut PUBG-Doku NICHT rate-limited, daher kein
+    # 12s-Sleep zwischen Iterationen nötig (nur 100ms Höflichkeits-Pace).
+    # Konsequenz: 170 Matches in ~30s statt früher ~8 Min.
+    print(f"Cold-Start: hole Match-Liste + ingestiere bis zu {max_matches} "
+          f"Matches…")
+
+    def _progress(i, total, imported):
+        if i % 10 == 0 or i == total:
+            print(f"  ...{i}/{total} Matches verarbeitet "
+                  f"(neu in DB: {imported})")
+
+    stats = run_bulk_catchup(conn, client, cfg["playerName"], my_acc_id,
+                              max_matches=max_matches, pacing_ms=100,
+                              progress_cb=_progress)
+    if stats["errors"]:
+        print(f"  Errors: {stats['errors'][:5]}"
+              f"{'...' if len(stats['errors']) > 5 else ''} "
+              f"({len(stats['errors'])} total)")
     conn.close()
-    if iterations >= max_iterations:
-        print(f"Cold-Start: Safety-Cap erreicht nach {total_imported} Matches "
-              f"({max_iterations} Iterations × 5 max). Restart triggert "
-              f"Auto-Catch-Up der noch fehlt — oder max_matches erhöhen.")
+    if stats["skipped"] > 0:
+        print(f"Cold-Start: {stats['new_matches']} Matches in DB. "
+              f"{stats['skipped']} weitere Matches in der API-Liste über "
+              f"Safety-Cap — max_matches erhöhen wenn benötigt.")
     else:
-        print(f"Cold-Start fertig — {total_imported} Matches in DB.")
+        print(f"Cold-Start fertig — {stats['new_matches']} Matches in DB.")
     return 0
 
 

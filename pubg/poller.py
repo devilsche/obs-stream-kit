@@ -68,9 +68,28 @@ def _iso_utc_now():
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def ingest_match(conn, client, my_account_id: str, match_id: str) -> None:
+    """Lädt + persistiert ein einzelnes Match. Raises bei Fehler.
+    `/matches/{id}` ist laut PUBG-Doku NICHT rate-limited — kann
+    aggressiv sequentiell aufgerufen werden."""
+    m_payload = client.get_match(match_id)
+    parsed = parse_match_response(m_payload, my_account_id)
+    insert_match(conn, parsed["match_id"], parsed["map_name"],
+                 parsed["game_mode"], parsed.get("is_ranked", False),
+                 parsed["duration_secs"], parsed["played_at"],
+                 parsed.get("telemetry_url"))
+    for p in parsed["squad_participants"]:
+        upsert_player(conn, p["account_id"], p["name"],
+                      client.platform,
+                      is_self=(p["account_id"] == my_account_id))
+    insert_participants(conn, parsed["match_id"], parsed["squad_participants"])
+
+
 def run_single_tick(conn, client, my_player_name: str,
                     my_account_id: str, max_matches_per_tick: int = 5) -> dict:
-    """One polling iteration. Returns stats dict for status reporting."""
+    """One polling iteration. Returns stats dict for status reporting.
+    Hier ist ein get_player()-Call (rate-limited) sinnvoll, weil wir in
+    Echtzeit nach NEUEN Matches schauen wollen."""
     stats = {"new_matches": 0, "errors": [], "skipped": 0}
 
     try:
@@ -85,22 +104,52 @@ def run_single_tick(conn, client, my_player_name: str,
 
     for mid in new_ids[:max_matches_per_tick]:
         try:
-            m_payload = client.get_match(mid)
-            parsed = parse_match_response(m_payload, my_account_id)
-            insert_match(conn, parsed["match_id"], parsed["map_name"],
-                         parsed["game_mode"], parsed.get("is_ranked", False),
-                         parsed["duration_secs"], parsed["played_at"],
-                         parsed.get("telemetry_url"))
-            for p in parsed["squad_participants"]:
-                upsert_player(conn, p["account_id"], p["name"],
-                              client.platform,
-                              is_self=(p["account_id"] == my_account_id))
-            insert_participants(conn, parsed["match_id"], parsed["squad_participants"])
+            ingest_match(conn, client, my_account_id, mid)
             stats["new_matches"] += 1
         except Exception as e:
             stats["errors"].append(f"match {mid}: {e}")
 
     stats["skipped"] = max(0, len(new_ids) - max_matches_per_tick)
+    return stats
+
+
+def run_bulk_catchup(conn, client, my_player_name: str,
+                     my_account_id: str, max_matches: int = 500,
+                     pacing_ms: int = 100, progress_cb=None) -> dict:
+    """Ein einziger get_player()-Call (rate-limited), dann sequentielles
+    ingest_match() für ALLE neuen IDs. /matches/{id} ist nicht rate-
+    limited, daher braucht's keinen 12s-Sleep zwischen Iterationen.
+    pacing_ms = höflicher 100ms-Sleep zwischen Match-Calls.
+
+    Liefert Stats wie run_single_tick, aber mit total_processed über alle
+    Matches statt nur 5/Tick."""
+    import time
+    stats = {"new_matches": 0, "errors": [], "skipped": 0}
+
+    try:
+        player_payload = client.get_player(my_player_name)
+    except Exception as e:
+        stats["errors"].append(f"player: {e}")
+        return stats
+
+    match_ids = client.extract_match_ids(player_payload)
+    known = get_known_match_ids(conn)
+    new_ids = [mid for mid in match_ids if mid not in known]
+
+    to_process = new_ids[:max_matches]
+    stats["skipped"] = max(0, len(new_ids) - max_matches)
+
+    for i, mid in enumerate(to_process, 1):
+        try:
+            ingest_match(conn, client, my_account_id, mid)
+            stats["new_matches"] += 1
+        except Exception as e:
+            stats["errors"].append(f"match {mid}: {e}")
+        if progress_cb:
+            progress_cb(i, len(to_process), stats["new_matches"])
+        if pacing_ms > 0 and i < len(to_process):
+            time.sleep(pacing_ms / 1000)
+
     return stats
 
 
