@@ -73,8 +73,8 @@ def cold_start(root: str, max_matches: int | None = None):
 
     total_matches_in_db = conn.execute(
         "SELECT COUNT(*) FROM matches").fetchone()[0]
-    print(f"Cold-Start (matches): +{stats['new_matches']} neu, "
-          f"{total_matches_in_db} insgesamt in DB.")
+    print(f"Cold-Start (matches): {stats['new_matches']} neue geholt "
+          f"→ nun insgesamt {total_matches_in_db} Matches in der DB.")
 
     # Phase 2: Telemetry-Bulk-Catchup. /telemetry-cdn ist nicht rate-
     # limited, also alle pending durchziehen. Telemetry-Files sind groß
@@ -95,8 +95,9 @@ def cold_start(root: str, max_matches: int | None = None):
               f"({len(t_stats['errors'])} total — typisch >14d-Matches)")
     total_telemetry_events = conn.execute(
         "SELECT COUNT(DISTINCT match_id) FROM telemetry_events").fetchone()[0]
-    print(f"Cold-Start (telemetry): +{t_stats['processed']} neu verarbeitet, "
-          f"{total_telemetry_events} Matches mit Telemetry insgesamt.")
+    print(f"Cold-Start (telemetry): {t_stats['processed']} neue verarbeitet "
+          f"→ nun insgesamt {total_telemetry_events} Matches mit Telemetry "
+          f"in der DB.")
 
     conn.close()
     print("Cold-Start fertig.")
