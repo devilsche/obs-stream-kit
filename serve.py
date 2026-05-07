@@ -102,6 +102,28 @@ try:
             ftp_cfg = load_ftp_config(secrets_path)
             if ftp_cfg:
                 print(f"  PUBG-Backup: FTP-Upload aktiv → {ftp_cfg['host']}{ftp_cfg.get('path','')}")
+
+            # Auto-Cold-Start: wenn DB leer ist, holen wir die letzten ~14
+            # Tage Match-History (~30-50 Matches, was die PUBG-API hergibt)
+            # im Hintergrund. Server startet sofort, DB füllt sich progressiv.
+            _conn = _pubg_connect(pubg_db_path)
+            _match_count = _conn.execute(
+                "SELECT COUNT(*) FROM matches").fetchone()[0]
+            _conn.close()
+            if _match_count == 0:
+                print("  PUBG-DB leer — Auto-Cold-Start läuft im Hintergrund "
+                      "(zieht die verfügbare Match-History aus der API, "
+                      "kann ~1-2 Min dauern wegen Rate-Limit)...")
+                import threading as _t
+                from pubg.cli import cold_start as _cold_start
+                def _run_cold_start():
+                    try:
+                        _cold_start(ROOT)
+                        print("  PUBG: Auto-Cold-Start fertig.")
+                    except Exception as e:
+                        print(f"  PUBG: Auto-Cold-Start Fehler: {e}")
+                _t.Thread(target=_run_cold_start, daemon=True).start()
+
             pubg_poller = PollerThread(
                 db_path=pubg_db_path, client=pubg_client,
                 my_player_name=pubg_cfg["playerName"],

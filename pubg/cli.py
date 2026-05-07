@@ -22,7 +22,7 @@ def init_db(root: str) -> str:
     return db_path
 
 
-def cold_start(root: str, max_matches: int = 30):
+def cold_start(root: str, max_matches: int = 50):
     cfg = load_config(os.path.join(root, "config", "pubg.json"))
     api_key = load_api_key(os.path.join(root, ".secrets"))
     if not api_key:
