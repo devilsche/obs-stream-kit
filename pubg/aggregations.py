@@ -857,14 +857,14 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             "playedAt": longest_chicken_streak_match["playedAt"],
         })
 
-    # Hot-Drop-Survivor: passend zur gleichen Range (from/to wenn gesetzt,
-    # sonst aktuelle Session) — vorher hat's immer aktuelle Session
-    # angezogen, was zu falschen Zeitstempeln im historischen Report
-    # geführt hat.
+    # Hot-Drop-Survivor: ERSTES überlebtes Hot-Drop in der Range
+    # (perMatch ist DESC sortiert → reversed für ASC = ältestes zuerst).
+    # Vorher: das letzte in DESC-Reihenfolge → bei mehreren Hot-Drops
+    # zeigte die Uhrzeit den jüngsten, nicht den ersten.
     try:
         hd = compute_hot_drop(conn, my_account_id, "session",
                                from_iso=from_iso, to_iso=to_iso)
-        for pm in (hd.get("perMatch") or []):
+        for pm in reversed(hd.get("perMatch") or []):
             if (pm.get("hotDrop") and pm.get("soloSurvived")
                     and "hot_drop_survivor" not in seen):
                 out.append({
