@@ -5,7 +5,10 @@ import threading
 from pubg.db import (connect, upsert_player, insert_match, insert_participants,
                      get_known_match_ids, upsert_lifetime,
                      insert_telemetry_events, mark_telemetry_fetched,
-                     get_matches_needing_telemetry, mark_telemetry_schema)
+                     get_matches_needing_telemetry, mark_telemetry_schema,
+                     insert_team_mapping, mark_match_schema,
+                     get_matches_needing_match_schema_update,
+                     CURRENT_MATCH_SCHEMA)
 from pubg.match_parser import (parse_match_response, parse_lifetime_response,
                                 aggregate_lifetime_modes)
 
@@ -71,7 +74,10 @@ def _iso_utc_now():
 def ingest_match(conn, client, my_account_id: str, match_id: str) -> None:
     """Lädt + persistiert ein einzelnes Match. Raises bei Fehler.
     `/matches/{id}` ist laut PUBG-Doku NICHT rate-limited — kann
-    aggressiv sequentiell aufgerufen werden."""
+    aggressiv sequentiell aufgerufen werden.
+
+    Persistiert: match-Header, Squad-Participants (full stats),
+    team_mapping für gesamte Lobby (lightweight), match_schema marker."""
     m_payload = client.get_match(match_id)
     parsed = parse_match_response(m_payload, my_account_id)
     insert_match(conn, parsed["match_id"], parsed["map_name"],
@@ -83,6 +89,9 @@ def ingest_match(conn, client, my_account_id: str, match_id: str) -> None:
                       client.platform,
                       is_self=(p["account_id"] == my_account_id))
     insert_participants(conn, parsed["match_id"], parsed["squad_participants"])
+    if parsed.get("team_mapping"):
+        insert_team_mapping(conn, parsed["match_id"], parsed["team_mapping"])
+    mark_match_schema(conn, parsed["match_id"], CURRENT_MATCH_SCHEMA)
 
 
 def run_single_tick(conn, client, my_player_name: str,
@@ -244,6 +253,29 @@ def process_telemetry_backlog(conn, client, my_account_id, max_per_tick=5):
         except Exception as e:
             errors.append(str(e))
     return {"processed": processed, "errors": errors}
+
+
+def run_bulk_match_schema_upgrade(conn, client, my_account_id,
+                                    pacing_ms: int = 100,
+                                    progress_cb=None) -> dict:
+    """Re-fetcht Matches deren match_schema unter CURRENT liegt
+    (z.B. um team_mapping nachzuziehen). /matches/{id} ist nicht
+    rate-limited."""
+    import time
+    stats = {"upgraded": 0, "errors": []}
+    rows = get_matches_needing_match_schema_update(conn, CURRENT_MATCH_SCHEMA)
+    total = len(rows)
+    for i, row in enumerate(rows, 1):
+        try:
+            ingest_match(conn, client, my_account_id, row["match_id"])
+            stats["upgraded"] += 1
+        except Exception as e:
+            stats["errors"].append(f"match {row['match_id']}: {e}")
+        if progress_cb:
+            progress_cb(i, total, stats["upgraded"])
+        if pacing_ms > 0 and i < total:
+            time.sleep(pacing_ms / 1000)
+    return stats
 
 
 def run_bulk_telemetry_catchup(conn, client, my_account_id,

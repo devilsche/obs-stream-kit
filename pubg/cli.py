@@ -7,7 +7,8 @@ from pubg.config import load_config, load_api_key
 from pubg.db import (connect, init_schema, upsert_player, get_player_by_name,
                       integrity_check)
 from pubg.api_client import PubgClient
-from pubg.poller import run_bulk_catchup, run_bulk_telemetry_catchup
+from pubg.poller import (run_bulk_catchup, run_bulk_telemetry_catchup,
+                          run_bulk_match_schema_upgrade)
 from pubg.backup import (load_ftp_config, list_remote_backups,
                           download_from_ftp)
 
@@ -75,6 +76,25 @@ def cold_start(root: str, max_matches: int | None = None):
         "SELECT COUNT(*) FROM matches").fetchone()[0]
     print(f"Cold-Start (matches): fetched {stats['new_matches']} new "
           f"→ {total_matches_in_db} matches total in DB.")
+
+    # Phase 1b: Schema-Upgrade für alte Matches (z.B. team_mapping
+    # nachträglich ziehen). /matches/{id} ist nicht rate-limited, also
+    # einfach durchgehen. Idempotent.
+    print("Cold-Start (schema): re-ingesting matches that need schema "
+          "upgrade (e.g. for new lobby team mapping)…")
+
+    def _s_progress(i, total, done):
+        if i % 10 == 0 or i == total:
+            print(f"  ...{i}/{total} matches upgraded (ok: {done})")
+
+    s_stats = run_bulk_match_schema_upgrade(conn, client, my_acc_id,
+                                              pacing_ms=100,
+                                              progress_cb=_s_progress)
+    if s_stats["errors"]:
+        print(f"  Schema-upgrade errors: {s_stats['errors'][:3]}"
+              f"{'...' if len(s_stats['errors']) > 3 else ''} "
+              f"({len(s_stats['errors'])} total)")
+    print(f"Cold-Start (schema): upgraded {s_stats['upgraded']} matches.")
 
     # Phase 2: Telemetry bulk-catchup. /telemetry-cdn is not rate-
     # limited, so process all pending in a row. Telemetry files are

@@ -868,6 +868,7 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
     hot = 0
     solo_surv = 0
     team_surv = 0
+    teams_per_hot = []
     for m in matches:
         result = _detect_hot_drop(conn, m["match_id"], my_account_id,
                                   window_ms, window_secs)
@@ -877,9 +878,11 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
             "hotDrop":      result["hotDrop"],
             "soloSurvived": result["soloSurvived"],
             "teamSurvived": result["teamSurvived"],
+            "teamsInFight": result.get("teamsInFight", 0),
         })
         if result["hotDrop"]:
             hot += 1
+            teams_per_hot.append(result.get("teamsInFight", 0))
             if result["soloSurvived"]:
                 solo_surv += 1
             if result["teamSurvived"]:
@@ -896,6 +899,8 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
             break
 
     n = len(matches)
+    avg_teams = (sum(teams_per_hot) / len(teams_per_hot)) if teams_per_hot else 0
+    max_teams = max(teams_per_hot) if teams_per_hot else 0
     return {
         "matches":          n,
         "hotDrops":         hot,
@@ -905,6 +910,8 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
         "soloSurvivalRate": (solo_surv / hot * 100) if hot else 0,
         "teamSurvivalRate": (team_surv / hot * 100) if hot else 0,
         "streak":           streak,
+        "avgTeamsInFight":  round(avg_teams, 2),
+        "maxTeamsInFight":  max_teams,
         "perMatch":         per_match[:20],
     }
 
@@ -957,20 +964,32 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
         ORDER BY timestamp_ms ASC
     """, (match_id, landing_ms, fight_cutoff_ms)).fetchall()
 
-    # Hinweis: participants-Tabelle enthält NUR Squad-Members (kein Lobby-
-    # Roster). acc_to_team kennt also nur Squad-Spieler — für andere Teams
-    # ist team_id None. Daher prüfen wir Squad-Beteiligung über squad_ids
-    # direkt, nicht über acc_to_team.
+    # Lobby-weites team_id-Mapping (falls match_schema >= 2)
+    lobby_team_map = dict(conn.execute("""
+        SELECT account_id, team_id FROM match_team_mapping
+        WHERE match_id = ?
+    """, (match_id,)).fetchall())
+    # Falls leer (alte Matches ohne re-ingest): fallback auf acc_to_team
+    # (squad-only) — Team-Count wird dann underestimiert.
+    full_team_map = lobby_team_map if lobby_team_map else acc_to_team
+
     hot_drop = False
+    teams_in_fight = set()
     for e in events:
         a, v = e["actor_account"], e["target_account"]
         a_in_squad = a in squad_ids
         v_in_squad = v in squad_ids
         if a_in_squad and v_in_squad:
             continue  # Friendly fire innerhalb Squad — nicht zählen
+        # Teams aus Mapping (für teams_in_fight-count)
+        for acc in (a, v):
+            t = full_team_map.get(acc)
+            if t is not None:
+                teams_in_fight.add(t)
         if a_in_squad or v_in_squad:
             hot_drop = True
-            break
+            # break entfernt — wir sammeln weiter Team-Beteiligung im Window
+            # solange zur Team-Count-Berechnung. break wäre zu früh.
 
     # Survival: time_survived ist Sekunden ab MATCH-START (nicht Landung).
     # Squad-Landung als Offset reinrechnen, dann window_secs draufpacken.
@@ -994,6 +1013,7 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
         "hotDrop":      hot_drop,
         "soloSurvived": my_surv >= survival_threshold_s,
         "teamSurvived": squad_surv >= survival_threshold_s,
+        "teamsInFight": len(teams_in_fight),
     }
 
 

@@ -45,6 +45,10 @@ def _participant_to_row(p):
 
 
 def parse_match_response(match_payload, my_account_id):
+    """Squad-Members mit vollen Stats nach `squad_participants`,
+    plus Lightweight (account_id, team_id)-Mapping für ALLE Lobby-
+    Members nach `team_mapping` — reicht für Team-Zählung in
+    hot-drop/first-fight ohne Stat-Overhead."""
     data = match_payload["data"]
     attrs = data["attributes"]
     idx = _index_included(match_payload)
@@ -54,16 +58,20 @@ def parse_match_response(match_payload, my_account_id):
     parts = idx.get("participant", {})
 
     squad = []
+    team_mapping = []  # [(account_id, team_id), ...] für gesamte Lobby
     for r in rosters.values():
-        if r["attributes"]["stats"].get("teamId") != my_team_id:
-            continue
+        team_id = r["attributes"]["stats"].get("teamId")
         for pref in r["relationships"]["participants"]["data"]:
             p = parts.get(pref["id"])
             if not p:
                 continue
-            row = _participant_to_row(p)
-            row["team_id"] = my_team_id
-            squad.append(row)
+            acc_id = p["attributes"]["stats"].get("playerId")
+            if acc_id:
+                team_mapping.append({"account_id": acc_id, "team_id": team_id})
+            if team_id == my_team_id:
+                row = _participant_to_row(p)
+                row["team_id"] = my_team_id
+                squad.append(row)
 
     telemetry_url = None
     for asset in idx.get("asset", {}).values():
@@ -82,6 +90,7 @@ def parse_match_response(match_payload, my_account_id):
         "telemetry_url": telemetry_url,
         "my_team_id": my_team_id,
         "squad_participants": squad,
+        "team_mapping": team_mapping,
     }
 
 
