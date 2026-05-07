@@ -9,7 +9,8 @@ from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_chickens_together, compute_session_report,
                                 compute_sessions_index, compute_best_worst_map,
                                 compute_map_performance, compute_lobby_avg_kd,
-                                compute_trend_deltas, compute_session_matches)
+                                compute_trend_deltas, compute_session_matches,
+                                compute_hot_drop, compute_session_achievements)
 
 
 def _ok(payload):
@@ -49,6 +50,10 @@ class EndpointRegistry:
             return self._trend_deltas()
         if route == ("GET", "/api/pubg/session-matches"):
             return self._session_matches(qs)
+        if route == ("GET", "/api/pubg/hot-drop"):
+            return self._hot_drop(qs)
+        if route == ("GET", "/api/pubg/session-achievements"):
+            return self._session_achievements()
         if route == ("POST", "/api/pubg/session/reset"):
             return self._session_reset()
         if route == ("GET", "/api/pubg/top-mates"):
@@ -135,6 +140,21 @@ class EndpointRegistry:
         return _ok(self.cache.get_or_compute(
             f"session-matches:{range_key}",
             lambda: compute_session_matches(conn, self.my_account_id, range_key),
+        ))
+
+    def _hot_drop(self, qs):
+        conn = self.get_conn()
+        range_key = qs.get("range", "session")
+        return _ok(self.cache.get_or_compute(
+            f"hot-drop:{range_key}",
+            lambda: compute_hot_drop(conn, self.my_account_id, range_key),
+        ))
+
+    def _session_achievements(self):
+        conn = self.get_conn()
+        return _ok(self.cache.get_or_compute(
+            "session-achievements",
+            lambda: compute_session_achievements(conn, self.my_account_id),
         ))
 
     def _session_reset(self):

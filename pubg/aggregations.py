@@ -620,6 +620,255 @@ def compute_map_performance(conn, my_account_id, range_key="all"):
     return out
 
 
+def compute_session_achievements(conn, my_account_id):
+    """Detected Achievements der aktuellen Session.
+
+    Achievements (in dieser Reihenfolge angewendet, max. 1 pro Typ
+    außer 'Beast Chicken' und 'Top-DMG' die mehrfach kommen können):
+      - first_chicken     : erste #1 in der Session
+      - first_top10       : erstes Match mit place <= 10
+      - longest_kill_400  : Longest Kill >= 400m in einem Match
+      - five_kill_match   : Match mit >= 5 Kills
+      - beast_chicken     : place == 1 UND kills >= 5
+      - hot_drop_survivor : Hot-Drop überlebt (per compute_hot_drop)
+      - top10_streak_3    : 3 Matches in Folge place <= 10
+
+    Returns Liste { id, label, icon, matchId, playedAt } sortiert
+    nach playedAt ASC (Reihenfolge des Erreichens).
+    """
+    matches_desc = compute_session_matches(conn, my_account_id, "session")
+    matches = list(reversed(matches_desc))  # ASC für Achievement-Reihenfolge
+
+    out = []
+    seen = set()
+    win_seen = False
+    top10_seen = False
+    top10_streak = 0
+    for m in matches:
+        place = m["place"] or 99
+        kills = m["kills"] or 0
+        longest = m["longestKill"] or 0
+        played = m["playedAt"]
+
+        # 100 Einheiten = 1 Meter (Telemetry/PUBG-Welt)
+        longest_m = longest if longest < 50 else longest / 100  # Fallback
+
+        if not win_seen and place == 1:
+            out.append({
+                "id": "first_chicken",
+                "label": "First Chicken!",
+                "icon": "🐔",
+                "matchId": m["matchId"], "playedAt": played,
+            })
+            win_seen = True
+            seen.add("first_chicken")
+
+        if not top10_seen and place <= 10:
+            out.append({
+                "id": "first_top10",
+                "label": "First Top-10",
+                "icon": "🎯",
+                "matchId": m["matchId"], "playedAt": played,
+            })
+            top10_seen = True
+            seen.add("first_top10")
+
+        if longest_m >= 400 and "longest_kill_400" not in seen:
+            out.append({
+                "id": "longest_kill_400",
+                "label": f"Longest Kill {int(longest_m)}m",
+                "icon": "🎯",
+                "matchId": m["matchId"], "playedAt": played,
+            })
+            seen.add("longest_kill_400")
+
+        if kills >= 5 and "five_kill_match" not in seen:
+            out.append({
+                "id": "five_kill_match",
+                "label": f"{kills}-Kill Match",
+                "icon": "💥",
+                "matchId": m["matchId"], "playedAt": played,
+            })
+            seen.add("five_kill_match")
+
+        if place == 1 and kills >= 5:
+            out.append({
+                "id": "beast_chicken_" + (m["matchId"] or ""),
+                "label": f"Beast Chicken · {kills} Kills",
+                "icon": "🔥",
+                "matchId": m["matchId"], "playedAt": played,
+            })
+
+        if place <= 10:
+            top10_streak += 1
+            if top10_streak == 3 and "top10_streak_3" not in seen:
+                out.append({
+                    "id": "top10_streak_3",
+                    "label": "Top-10 Streak ×3",
+                    "icon": "🔥",
+                    "matchId": m["matchId"], "playedAt": played,
+                })
+                seen.add("top10_streak_3")
+        else:
+            top10_streak = 0
+
+    # Hot-Drop-Survivor: aus compute_hot_drop perMatch in Session
+    try:
+        hd = compute_hot_drop(conn, my_account_id, "session")
+        for pm in (hd.get("perMatch") or []):
+            if (pm.get("hotDrop") and pm.get("soloSurvived")
+                    and "hot_drop_survivor" not in seen):
+                out.append({
+                    "id": "hot_drop_survivor",
+                    "label": "Hot-Drop Survivor",
+                    "icon": "🪂",
+                    "matchId": pm["matchId"], "playedAt": pm["playedAt"],
+                })
+                seen.add("hot_drop_survivor")
+                break
+    except Exception:
+        pass
+
+    out.sort(key=lambda a: a.get("playedAt") or "")
+    return out
+
+
+def compute_hot_drop(conn, my_account_id, range_key="session",
+                     window_secs=180):
+    """Hot-Drop-Stats über die Range.
+
+    Definition Hot-Drop = im Match gab es ein Kill/Knock-Event in den
+    ersten window_secs (Default 180s = 3 min) zwischen verschiedenen Teams,
+    wo mein Squad als Attacker oder Victim beteiligt war.
+
+    Pro Match Markierung:
+      - hotDrop: ja/nein (Fight in ersten 180s mit Squad-Beteiligung)
+      - soloSurvived: ja, wenn ich bei t = window_secs noch lebe
+        (proxy: time_survived >= window_secs)
+      - teamSurvived: ja, wenn mindestens ein Squad-Member bei t = 180s
+        noch lebt (max(squad time_survived) >= window_secs)
+
+    Aggregat:
+      - rate: % der Matches mit Hot-Drop
+      - soloSurvivalRate: von Hot-Drops, % wo ich überlebt habe
+      - teamSurvivalRate: von Hot-Drops, % wo Team überlebt hat
+      - streak: aktuelle Streak überlebter Hot-Drops (von neuestem Match
+        rückwärts; Solo-Survival als Kriterium)
+      - perMatch: Liste mit Match-Markern für Sparklines
+    """
+    cutoff = (_range_filter(conn, range_key)
+              if range_key != "all" else "1970-01-01T00:00:00Z")
+    window_ms = window_secs * 1000
+    matches = conn.execute("""
+        SELECT m.match_id, m.played_at FROM matches m
+        JOIN participants pa ON pa.match_id = m.match_id
+        WHERE pa.account_id = ? AND m.played_at >= ?
+        ORDER BY m.played_at DESC
+    """, (my_account_id, cutoff)).fetchall()
+
+    per_match = []
+    hot = 0
+    solo_surv = 0
+    team_surv = 0
+    for m in matches:
+        result = _detect_hot_drop(conn, m["match_id"], my_account_id,
+                                  window_ms, window_secs)
+        per_match.append({
+            "matchId":      m["match_id"],
+            "playedAt":     m["played_at"],
+            "hotDrop":      result["hotDrop"],
+            "soloSurvived": result["soloSurvived"],
+            "teamSurvived": result["teamSurvived"],
+        })
+        if result["hotDrop"]:
+            hot += 1
+            if result["soloSurvived"]:
+                solo_surv += 1
+            if result["teamSurvived"]:
+                team_surv += 1
+
+    # Streak: vom neuesten Match rückwärts, nur Hot-Drop-Matches zählen
+    streak = 0
+    for pm in per_match:
+        if not pm["hotDrop"]:
+            continue
+        if pm["soloSurvived"]:
+            streak += 1
+        else:
+            break
+
+    n = len(matches)
+    return {
+        "matches":          n,
+        "hotDrops":         hot,
+        "rate":             (hot / n * 100) if n else 0,
+        "soloSurvived":     solo_surv,
+        "teamSurvived":     team_surv,
+        "soloSurvivalRate": (solo_surv / hot * 100) if hot else 0,
+        "teamSurvivalRate": (team_surv / hot * 100) if hot else 0,
+        "streak":           streak,
+        "perMatch":         per_match[:20],
+    }
+
+
+def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
+    """Pro Match: Hot-Drop ja/nein + Survival-Marker."""
+    parts = conn.execute("""
+        SELECT account_id, team_id, time_survived
+        FROM participants WHERE match_id = ?
+    """, (match_id,)).fetchall()
+    if not parts:
+        return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
+    acc_to_team = {p["account_id"]: p["team_id"] for p in parts}
+    my_team_id = acc_to_team.get(my_account_id)
+    if my_team_id is None:
+        return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
+
+    squad_ids = {a for a, t in acc_to_team.items() if t == my_team_id}
+
+    # Kill/Knock-Events des Matches, sortiert nach Zeit
+    events = conn.execute("""
+        SELECT actor_account, target_account, timestamp_ms
+        FROM telemetry_events
+        WHERE match_id = ? AND event_type IN ('Kill', 'Knock')
+        ORDER BY timestamp_ms ASC
+    """, (match_id,)).fetchall()
+    if not events:
+        # Keine Telemetry → können nichts sagen
+        return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
+
+    match_start = events[0]["timestamp_ms"] or 0
+    early_cutoff = match_start + window_ms
+
+    hot_drop = False
+    for e in events:
+        ts = e["timestamp_ms"] or 0
+        if ts > early_cutoff:
+            break
+        a, v = e["actor_account"], e["target_account"]
+        a_team = acc_to_team.get(a)
+        v_team = acc_to_team.get(v)
+        if a_team is None or v_team is None:
+            continue
+        if a_team == v_team:
+            # Friendly fire — kein Squad-Fight
+            continue
+        if a in squad_ids or v in squad_ids:
+            hot_drop = True
+            break
+
+    # Survival-Marker via time_survived
+    my_part = next((p for p in parts if p["account_id"] == my_account_id), None)
+    my_surv = (my_part and my_part["time_survived"]) or 0
+    squad_surv = max((p["time_survived"] or 0)
+                     for p in parts if p["account_id"] in squad_ids)
+    return {
+        "hotDrop":      hot_drop,
+        "soloSurvived": my_surv >= window_secs,
+        "teamSurvived": squad_surv >= window_secs,
+    }
+
+
 def compute_first_fight_rate(conn, my_account_id, range_key="session",
                               cluster_secs=30, cluster_radius_m=200):
     """First Fight Win Rate — DEFINITION (echtes Fight-Win, nicht First-Engage):

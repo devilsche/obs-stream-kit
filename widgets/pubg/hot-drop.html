@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Hot Drops</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    /* Anker: bottom-left. */
+    html, body { height: 100%; margin: 0; }
+    body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      box-sizing: border-box;
+    }
+    .panel { padding: 18px; }
+    .top {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .big {
+      font-size: 2.6em;
+      font-weight: 700;
+      color: var(--pubg-gold);
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 14px rgba(242, 183, 5, 0.4);
+    }
+    .label { color: var(--pubg-muted); font-size: 0.85em; }
+    .row {
+      display: flex; justify-content: space-between;
+      margin-top: 6px; font-size: 0.95em;
+    }
+    .row b { color: var(--pubg-text); font-variant-numeric: tabular-nums; }
+    .streak {
+      display: inline-flex; gap: 4px; align-items: center;
+      color: var(--pubg-gold);
+      font-weight: 700;
+    }
+    .streak.cold { opacity: 0.5; color: var(--pubg-muted); }
+    .markers {
+      display: flex; gap: 3px; margin-top: 12px;
+    }
+    .markers .m {
+      width: 10px; height: 10px; border-radius: 2px;
+      background: var(--pubg-muted);
+      opacity: 0.45;
+    }
+    .markers .m.hot   { background: #ff7a1f; opacity: 1; }
+    .markers .m.died  { background: #e57b7b; opacity: 0.7; }
+    .meta { color: var(--pubg-muted); font-size: 0.78em; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="pubg-header" id="pubgHeader"></div>
+  <div class="pubg-card panel pubg-fade-in">
+    <div class="top">
+      <span class="big" id="rate">—</span>
+      <span class="label">Hot-Drop Rate</span>
+    </div>
+    <div class="row">
+      <span class="label">Solo Survival</span>
+      <b id="soloSurv">—</b>
+    </div>
+    <div class="row">
+      <span class="label">Team Survival</span>
+      <b id="teamSurv">—</b>
+    </div>
+    <div class="row">
+      <span class="label">Streak</span>
+      <span class="streak" id="streak">—</span>
+    </div>
+    <div class="markers" id="markers"></div>
+    <div class="meta" id="meta">—</div>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    const RANGE = PubgUI.qs("range", "session");
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), "Hot Drops", RANGE);
+
+    PubgUI.buildFilter([
+      { key: "range", label: "Range", type: "select", default: "session",
+        options: [["session","Session"],["week","7 days"],["all","Database"]]},
+    ]);
+
+    function render(d) {
+      if (!d || d.matches === 0) {
+        document.getElementById("rate").textContent = "—";
+        document.getElementById("soloSurv").textContent = "—";
+        document.getElementById("teamSurv").textContent = "—";
+        document.getElementById("streak").textContent = "—";
+        document.getElementById("markers").innerHTML = "";
+        document.getElementById("meta").textContent = "no matches in range";
+        return;
+      }
+      document.getElementById("rate").textContent = (d.rate || 0).toFixed(0) + "%";
+      const fmt = (rate, num, denom) =>
+        `${(rate||0).toFixed(0)}% (${num||0}/${denom||0})`;
+      document.getElementById("soloSurv").textContent = fmt(d.soloSurvivalRate, d.soloSurvived, d.hotDrops);
+      document.getElementById("teamSurv").textContent = fmt(d.teamSurvivalRate, d.teamSurvived, d.hotDrops);
+
+      const streakEl = document.getElementById("streak");
+      const s = d.streak || 0;
+      if (s > 0) {
+        streakEl.classList.remove("cold");
+        streakEl.innerHTML = `🔥 ${s}`;
+      } else {
+        streakEl.classList.add("cold");
+        streakEl.innerHTML = "—";
+      }
+
+      // Markers von rechts (neueste) → links (ältere)
+      const matches = (d.perMatch || []).slice().reverse();
+      const html = matches.map(m => {
+        if (!m.hotDrop) return `<div class="m" title="cold drop"></div>`;
+        if (m.soloSurvived) return `<div class="m hot" title="hot drop, survived"></div>`;
+        return `<div class="m died" title="hot drop, died"></div>`;
+      }).join("");
+      document.getElementById("markers").innerHTML = html;
+
+      document.getElementById("meta").textContent =
+        `${d.hotDrops||0} hot drops in ${d.matches||0} matches`;
+    }
+
+    if (RANGE === "session") PubgUI.hideIfStale();
+    PubgUI.poll(`/api/pubg/hot-drop?range=${RANGE}`, 30000, (d) => {
+      if (RANGE === "session") PubgUI.hideIfStale();
+      render(d);
+    }, console.error);
+  </script>
+</body>
+</html>
