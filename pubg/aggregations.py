@@ -654,6 +654,59 @@ def compute_map_performance(conn, my_account_id, range_key="all"):
     return out
 
 
+def _ms_to_iso(ms):
+    """Epoch-ms (von Telemetry) → ISO-Z-String."""
+    if not ms:
+        return None
+    return datetime.datetime.fromtimestamp(
+        ms / 1000, datetime.timezone.utc
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _compute_top10_reached_at(conn, match_id, my_account_id):
+    """Liefert ISO-Timestamp (UTC), wann das Match Top-10 erreicht hat
+    (= 10. Squad eliminiert wurde, also nur noch 10 Squads im Spiel).
+    Falls Telemetry fehlt oder Match < 11 Squads: None.
+    """
+    parts = conn.execute("""
+        SELECT account_id, team_id FROM participants WHERE match_id = ?
+    """, (match_id,)).fetchall()
+    if not parts:
+        return None
+    acc_to_team = {p["account_id"]: p["team_id"] for p in parts}
+    teams_alive = {}
+    for p in parts:
+        teams_alive.setdefault(p["team_id"], set()).add(p["account_id"])
+    n_teams = len(teams_alive)
+    if n_teams <= 10:
+        return None
+    threshold = n_teams - 10  # so viele Squads müssen tot sein
+
+    events = conn.execute("""
+        SELECT timestamp_ms, target_account FROM telemetry_events
+        WHERE match_id = ? AND event_type = 'Kill'
+        ORDER BY timestamp_ms ASC
+    """, (match_id,)).fetchall()
+    if not events:
+        return None
+
+    eliminated_teams = 0
+    for e in events:
+        victim = e["target_account"]
+        team_id = acc_to_team.get(victim)
+        if team_id is None:
+            continue
+        members = teams_alive.get(team_id)
+        if not members:
+            continue
+        members.discard(victim)
+        if not members:
+            eliminated_teams += 1
+            if eliminated_teams >= threshold:
+                return _ms_to_iso(e["timestamp_ms"])
+    return None
+
+
 def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None):
     """Detected Achievements der aktuellen oder einer historischen Session.
     from_iso/to_iso optional — sonst aktuelle Session.
@@ -702,11 +755,15 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             seen.add("first_chicken")
 
         if not top10_seen and place <= 10:
+            # playedAt = Zeitpunkt wo das Team Top-10 erreicht hat (10.
+            # Squad eliminiert), nicht Match-Ende. Fallback auf Match-
+            # Ende wenn Telemetry fehlt.
+            top10_ts = _compute_top10_reached_at(conn, m["matchId"], my_account_id)
             out.append({
                 "id": "first_top10",
                 "label": "First Top-10",
                 "icon": "",
-                "matchId": m["matchId"], "playedAt": played,
+                "matchId": m["matchId"], "playedAt": top10_ts or played,
             })
             top10_seen = True
             seen.add("first_top10")
