@@ -10,7 +10,8 @@ Alle Widgets, deren URL-Parameter und empfohlene OBS-Browser-Source-Größen fü
 # 1. PUBG-API-Key in .secrets eintragen
 echo "PUBG API Key: <dein-key>" >> .secrets
 
-# 2. DB initialisieren + Cold-Start (zieht ~30 Matches)
+# 2. DB initialisieren + Cold-Start (zieht alle verfügbaren Matches der letzten 14 Tage,
+#    typisch 30-200 je nach Aktivität)
 python serve.py --init-pubg-db
 python serve.py --pubg-cold-start
 
@@ -385,9 +386,19 @@ In-Memory-Cache: 30s TTL für Heavy-Endpoints, Top-Mates über alle Sort/Filter-
 
 ## Performance-Hinweise
 
-- **Polling**: 60s Tick, max 5 Match-Details pro Tick (Rate-Limit-Schutz)
-- **Cold-Start**: ~30 Matches in ~6 Min eingelesen (5/min Cap)
-- **DB-Größe**: ~10-30 KB pro Match (Header + Squad + gefilterte Telemetry) → ~70 MB/Jahr
-- **Browser-Sources**: poll alle 30-60s, Cache reduziert DB-Last
+- **Polling**: 60s Tick, max 5 Match-Details pro Tick. Eigentliches Rate-
+  Limit ist auf den Player-Endpoint (10 RPM) — `/matches/{id}` selbst ist
+  laut PUBG-Doku frei (zählt nicht gegen Limit).
+- **Cold-Start**: holt ALLE verfügbaren Matches (kein numerischer API-Cap;
+  typisch 30-200 je Spieleraktivität). Aktuell ~12s Sleep zwischen
+  Iterationen — könnte mit 1×get_player + N×get_match-Optimierung auf
+  ~30s/170 Matches gedrückt werden (TODO).
+- **DB-Größe**: ~10-30 KB pro Match (Header + Squad + gefilterte Telemetry)
+  → ~70-200 MB/Jahr je nach Aktivität
+- **Browser-Sources**: poll alle 30-60s lokales Backend, Cache reduziert
+  DB-Last. Keine direkten PUBG-API-Calls aus den Widgets.
+- **14-Tage-Retention**: alles was die API hergibt ist max 14 Tage alt.
+  Server muss laufen wenn Match endet — sonst kommt's nicht in die DB.
+  Nach 14 Tagen ist's API-seitig weg.
 
 Bei langsamen API-Antworten (`rateLimitRemaining` regelmäßig nahe 0): Higher-Tier-Key unter [developer.pubg.com](https://developer.pubg.com) beantragen (bis 60+ RPM).

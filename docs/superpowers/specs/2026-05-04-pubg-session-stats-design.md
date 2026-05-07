@@ -37,20 +37,23 @@ Modulare PUBG-Stats-Komponenten als OBS-Browser-Sources, die in beliebigen Szene
 ## Datenquelle: PUBG Developer API
 
 **Endpoints:**
-- `/players?filter[playerNames]=PEX_LuCKoR&filter[platforms]=steam` → Account-ID + bis zu 30 jüngste Match-IDs
+- `/players?filter[playerNames]=A,B,...&filter[platforms]=steam` → Account-ID + Match-IDs der letzten 14 Tage (kein numerischer Cap dokumentiert; bis zu 10 playerNames pro Request)
 - `/matches/{matchId}` → Roster (alle Teilnehmer), Stats pro Teilnehmer, Telemetry-URL
-- `/matches/{matchId}/telemetry` (URL aus Match-Detail) → JSON-Stream aller In-Game-Events
+- Telemetry-URL aus Match-Detail (`included[type=asset]`) → JSON-Stream aller In-Game-Events (CDN, gzip)
 - `/players/{accountId}/seasons/lifetime` → Career-Aggregate pro Mode
+- `/players/{accountId}/seasons/{seasonId}` → bis zu **32 Match-IDs** pro Player (das ist der einzige dokumentierte Cap, gilt für Season — NICHT für die Player-Resource)
 
-**Limits:**
-- Player-Resource liefert max **30 Match-IDs**, Match-Detail bleibt **~14 Tage** abrufbar
-- Rate-Limit: **10 Requests/Minute** (Default-Tier, kostenlos)
+**Limits (offiziell dokumentiert, verifiziert 2026-05-07):**
+- Rate-Limit: **10 Requests/Minute** Default-Tier (Higher-Tier auf Antrag)
+- **`/matches/{id}` und `/telemetry-cdn` zählen NICHT gegen das Rate-Limit** (rate-limits → "Expected Rate Limit Usage")
+- **Globale Data-Retention: 14 Tage** für Match-Daten über alle Endpoints
+- Telemetry-CDN-URL TTL: nicht dokumentiert (wahrscheinlich an Match-Retention gekoppelt)
 - API-Key kostenlos via `developer.pubg.com`
 - Lifetime-Aggregate: alle Zeiten verfügbar, **keine** Match-Granularität
 - Match-Daten erscheinen **5-10 Min verzögert** nach Match-Ende
 - Filter `playerNames` ist **case-sensitive**
 
-**Konsequenz:** Ohne lokale Persistenz sind Match-Details nach 14 Tagen unwiederbringlich weg. Daher Always-on-Polling und SQLite-Speicherung Pflicht.
+**Konsequenz:** Ohne lokale Persistenz sind Match-Details nach 14 Tagen unwiederbringlich weg. Daher Always-on-Polling und SQLite-Speicherung Pflicht. Bei aktiven Spielern (>50 Matches in 14 Tagen) wirft die API den vollen verfügbaren Bereich zurück, nicht nur 30 — Cold-Start muss ALLE neuen Matches verarbeiten.
 
 ## Architektur
 
@@ -245,8 +248,10 @@ Background-Thread in `serve.py`, Tick alle 60s (konfigurierbar):
 ### Cold-Start-Bulk-Import
 
 Beim ersten Start (oder via `python serve.py --init-pubg-db`):
-- Hole Player-Resource → bis zu 30 Match-IDs
-- Verarbeite alle (gestaffelt, Rate-Limit-aware) → ~3-6 Min für 30 Matches
+- Hole Player-Resource → ALLE verfügbaren Match-IDs (kein Cap, bis 14 Tage)
+- Verarbeite alle (Player-Call rate-limited; /matches/{id}-Calls SIND FREI)
+  → ~30s für 170 Matches wenn 1× get_player + sequential get_match
+  (statt N× get_player das war suboptimal)
 - Telemetry für alle nachladen (im Hintergrund, kann 30+ Min dauern)
 
 ### Datenmenge
@@ -422,7 +427,7 @@ Konsistent mit existierendem Stack (CLAUDE.md: Purple `#5e2a79` / Gold `#f2b705`
 - **Integration-Test** für Polling-Loop (mit Mock-API)
 - **DB-Migration-Test** beim Schema-Update
 - **Browser-Source-Test** manuell in OBS pro Komponente
-- **Rate-Limit-Stresstest:** 30 Match-Backfill darf nicht über 10 req/min ausreißen
+- **Rate-Limit-Stresstest:** Match-Backfill darf nicht über 10 req/min ausreißen für Player-Endpoint-Calls (Match-Endpoint und Telemetry-CDN sind frei)
 
 ## Open Questions / Future Work
 
@@ -436,7 +441,7 @@ Konsistent mit existierendem Stack (CLAUDE.md: Purple `#5e2a79` / Gold `#f2b705`
 
 - ✅ `serve.py` läuft als Always-on-Service, polled PUBG-API, persistiert in SQLite
 - ✅ Alle 13 HTML-Komponenten laden ohne JS-Errors, zeigen korrekte Daten
-- ✅ Cold-Start-Bulk-Import von 30 Matches funktioniert in einem Lauf
+- ✅ Cold-Start-Bulk-Import aller verfügbaren Matches (typisch 30-200 je Player-Aktivität) funktioniert in einem Lauf
 - ✅ Co-Player-Lifetime wird automatisch geholt sobald `shared_matches >= 5`
 - ✅ Top-Mates-Filter im Flyout per Slider verstellbar, persistent in SQLite
 - ✅ `mates-today.html?layout=carousel|stack|fold|mosaic` rendert alle 4 Layouts korrekt
