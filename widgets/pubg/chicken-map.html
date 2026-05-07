@@ -110,17 +110,12 @@
     PubgUI.poll(`/api/pubg/map-distribution?range=${RANGE}`,
                 5*60*1000, render, console.error);
 
-    // Title je nach Range — "All-Time" ist irreführend, da PUBG-API keine
-    // Map-Granularität für Lifetime liefert. DB-Daten wachsen ab Setup-Tag.
-    const titles = { all: "Chicken Map · seit Setup",
-                     session: "Chicken Map · Session",
-                     week: "Chicken Map · letzte 7 Tage",
-                     day: "Chicken Map · heute" };
-    document.getElementById("title").textContent = titles[RANGE] || titles.all;
-
+    // Header wird via PubgUI.renderHeader oben gesetzt — Range steht im Suffix.
+    // PUBG-API hat keine Map-Granularität für Lifetime, daher zählen
+    // Database-Werte ab Backend-Setup-Tag (siehe footnote).
     if (RANGE === "all") {
       document.getElementById("footnote").textContent =
-        "PUBG-API hat keine Map-Granularität für Lifetime — diese Zahlen zählen ab dem Tag, an dem das Backend gestartet wurde.";
+        "PUBG API has no map granularity for lifetime stats — these numbers count from the day the backend was set up.";
     }
   </script>
 </body>

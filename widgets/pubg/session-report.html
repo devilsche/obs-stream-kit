@@ -170,6 +170,99 @@
     .matches-list .m .stats { color: var(--pubg-muted); text-align: right; }
     .matches-list .m .stats b { color: var(--pubg-text); }
 
+    /* Trend / Streaks / Achievements im Report */
+    .extras-h {
+      margin: 24px 0 8px;
+      color: var(--pubg-muted);
+      font-size: 0.8em;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .trend-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .trend-cell {
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: rgba(94, 42, 121, 0.18);
+      border: 1px solid var(--pubg-border);
+    }
+    .trend-label {
+      color: var(--pubg-muted);
+      font-size: 0.75em;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .trend-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .trend-val {
+      font-size: 1.4em;
+      font-weight: 700;
+      color: var(--pubg-text);
+      font-variant-numeric: tabular-nums;
+    }
+    .trend-delta {
+      font-weight: 700;
+      font-size: 0.95em;
+      font-variant-numeric: tabular-nums;
+    }
+    .delta-pos { color: #7be57b; }
+    .delta-neg { color: #e57b7b; }
+    .delta-zero { color: var(--pubg-muted); }
+    .streaks-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .streak-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: rgba(94, 42, 121, 0.18);
+      border: 1px solid var(--pubg-border);
+    }
+    .streak-cell.cold { opacity: 0.55; }
+    .streak-icon { font-size: 1.5em; }
+    .streak-num {
+      font-size: 1.6em;
+      font-weight: 700;
+      color: var(--pubg-gold);
+      font-variant-numeric: tabular-nums;
+    }
+    .streak-label {
+      color: var(--pubg-muted);
+      font-size: 0.85em;
+      margin-left: auto;
+      text-align: right;
+    }
+    .ach-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .ach-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 10px;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.04);
+      font-size: 0.9em;
+    }
+    .ach-icon { font-size: 1.2em; }
+    .ach-label { flex: 1; color: var(--pubg-text); font-weight: 700; }
+    .ach-when { color: var(--pubg-muted); font-size: 0.85em; }
+
     .highlights {
       margin-top: 22px;
       display: grid;
@@ -732,30 +825,123 @@
       const highlightsHtml = (hl.length || ll.length) ? `
         <div class="highlights">
           <div class="col">
-            <h3>★ Top-DMG-Matches</h3>
+            <h3>★ Top-DMG matches</h3>
             ${hl.map(m => {
               const startIso = PubgUI.matchStartIso(m.matchEnd, m.durationSec);
               return `<div class="highlight-item">${PubgUI.fmtTime(startIso)} · ${PubgUI.fmtMap(m.map)} · <b>#${m.place}</b> · <b>${m.kills}</b>K · <b>${Math.round(m.damage)}</b>DMG</div>`;
             }).join("")}
           </div>
           <div class="col">
-            <h3>✘ Frühe Deaths</h3>
+            <h3>✘ Early deaths</h3>
             ${ll.map(m => {
               const startIso = PubgUI.matchStartIso(m.matchEnd, m.durationSec);
               const surv = m.timeSurvived || 0;
-              return `<div class="highlight-item">${PubgUI.fmtTime(startIso)} · ${PubgUI.fmtMap(m.map)} · #${m.place} nach <b>${Math.floor(surv/60)}:${String(surv%60).padStart(2,"0")}</b></div>`;
+              return `<div class="highlight-item">${PubgUI.fmtTime(startIso)} · ${PubgUI.fmtMap(m.map)} · #${m.place} after <b>${Math.floor(surv/60)}:${String(surv%60).padStart(2,"0")}</b></div>`;
             }).join("")}
           </div>
         </div>` : "";
+
+      // Trend / Achievements / Streaks — extra Sektion mit eigenem Fetch
+      const extrasPlaceholder = `<div class="extras-placeholder"></div>`;
 
       root.innerHTML = `
         <h1>After-Session Report</h1>
         <div class="subtitle">${subtitle}</div>
         ${totalsHtml}
+        ${extrasPlaceholder}
         ${phasesHtml}
         ${mapsHtml}
         ${highlightsHtml}
       `;
+
+      renderExtras();
+    }
+
+    // Trend, Achievements und Streaks fetchen + in den Report einhängen.
+    // Streaks werden client-seitig aus session-matches berechnet (matches
+    // sind absteigend sortiert: neueste zuerst).
+    async function renderExtras() {
+      const [trend, achievements, matches] = await Promise.all([
+        PubgUI.fetchJson("/api/pubg/trend-deltas").catch(() => null),
+        PubgUI.fetchJson("/api/pubg/session-achievements").catch(() => []),
+        PubgUI.fetchJson("/api/pubg/session-matches?range=session").catch(() => []),
+      ]);
+
+      const placeholder = document.querySelector(".extras-placeholder");
+      if (!placeholder) return;
+
+      const arrow = (v) => v > 0.001 ? "↑" : (v < -0.001 ? "↓" : "·");
+      const cls = (v) => v > 0.001 ? "delta-pos" : (v < -0.001 ? "delta-neg" : "delta-zero");
+
+      let trendHtml = "";
+      if (trend && trend.deltas && trend.current) {
+        const d = trend.deltas;
+        trendHtml = `
+          <h3 class="extras-h">Trend vs. last session</h3>
+          <div class="trend-grid">
+            <div class="trend-cell">
+              <div class="trend-label">K/D</div>
+              <div class="trend-row"><span class="trend-val">${(trend.current.kd||0).toFixed(2)}</span>
+                <span class="trend-delta ${cls(d.kd)}">${arrow(d.kd)}${Math.abs(d.kd).toFixed(2)}</span></div>
+            </div>
+            <div class="trend-cell">
+              <div class="trend-label">Wins</div>
+              <div class="trend-row"><span class="trend-val">${trend.current.wins||0}</span>
+                <span class="trend-delta ${cls(d.wins)}">${arrow(d.wins)}${Math.abs(d.wins)}</span></div>
+            </div>
+            <div class="trend-cell">
+              <div class="trend-label">Avg DMG</div>
+              <div class="trend-row"><span class="trend-val">${Math.round(trend.current.avgDmg||0)}</span>
+                <span class="trend-delta ${cls(d.avgDmg)}">${arrow(d.avgDmg)}${Math.round(Math.abs(d.avgDmg))}</span></div>
+            </div>
+            <div class="trend-cell">
+              <div class="trend-label">Matches</div>
+              <div class="trend-row"><span class="trend-val">${trend.current.matches||0}</span>
+                <span class="trend-delta ${cls(d.matches)}">${arrow(d.matches)}${Math.abs(d.matches)}</span></div>
+            </div>
+          </div>`;
+      }
+
+      // Streaks aus session-matches berechnen — vom neuesten Match rückwärts
+      const computeStreak = (test) => {
+        let n = 0;
+        for (const m of (matches || [])) {
+          if (test(m)) n++; else break;
+        }
+        return n;
+      };
+      const chickenStreak = computeStreak(m => (m.place || 99) === 1);
+      const top10Streak   = computeStreak(m => (m.place || 99) <= 10);
+      const kdStreak      = computeStreak(m => (m.kills || 0) >= 1);
+      const streakItem = (label, n) =>
+        `<div class="streak-cell ${n > 0 ? '' : 'cold'}">
+           <span class="streak-icon">${n > 0 ? '🔥' : '❄️'}</span>
+           <span class="streak-num">${n}</span>
+           <span class="streak-label">${label}</span>
+         </div>`;
+      const streaksHtml = `
+        <h3 class="extras-h">Current streaks</h3>
+        <div class="streaks-grid">
+          ${streakItem("Chicken (place #1)", chickenStreak)}
+          ${streakItem("Top-10", top10Streak)}
+          ${streakItem("Kills ≥ 1", kdStreak)}
+        </div>`;
+
+      let achievementsHtml = "";
+      if (achievements && achievements.length) {
+        achievementsHtml = `
+          <h3 class="extras-h">Achievements</h3>
+          <div class="ach-list">
+            ${achievements.map(a => `
+              <div class="ach-item">
+                <span class="ach-icon">${a.icon || "✨"}</span>
+                <span class="ach-label">${a.label || a.id}</span>
+                <span class="ach-when">${PubgUI.fmtTime(a.playedAt)}</span>
+              </div>`).join("")}
+          </div>`;
+      }
+
+      placeholder.innerHTML = trendHtml + streaksHtml + achievementsHtml;
     }
 
     // Click-Handler: Match-Zeile expandiert Squad-Detail
