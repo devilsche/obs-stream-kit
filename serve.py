@@ -95,31 +95,30 @@ try:
                                   pubg_cfg["platform"], is_self=True)
                     _conn.close()
             except Exception as e:
-                print(f"  PUBG-Setup: konnte Account-ID nicht laden: {e}")
+                print(f"  PUBG setup: failed to load account-id: {e}")
 
         if my_account_id:
             pubg_cache = TTLCache(ttl_secs=30)
             ftp_cfg = load_ftp_config(secrets_path)
             if ftp_cfg:
-                print(f"  PUBG-Backup: FTP-Upload aktiv → {ftp_cfg['host']}{ftp_cfg.get('path','')}")
+                print(f"  PUBG backup: FTP upload active → {ftp_cfg['host']}{ftp_cfg.get('path','')}")
 
-            # Auto-Catch-Up: bei jedem Server-Start prüfen ob die PUBG-API
-            # neuere Matches hat als die DB und diese ingestieren. Der
-            # Cold-Start ist idempotent (INSERT OR IGNORE + filter known),
-            # daher kostet er bei voll-syncter DB nur 1 Tick (~1s API),
-            # bei leerer DB geht er bis 50 Matches durch (~80s).
-            # → 1 Tag Pause = ~5-10 Matches; 1 Woche Pause = ~30-50 Matches;
-            #   immer alles was die API noch hat.
-            print("  PUBG: Auto-Catch-Up läuft im Hintergrund "
-                  "(holt fehlende Matches aus der API)...")
+            # Auto-Catch-Up: every server start, fetch any matches the
+            # PUBG-API still exposes that aren't yet in the DB.
+            # Cold-Start is idempotent (INSERT OR IGNORE + filters known
+            # IDs), so a fully synced DB just costs 1 player call (~1s).
+            # Empty DB gets the full backlog. Runs in a background
+            # thread, server stays responsive.
+            print("  PUBG: auto-catchup running in background "
+                  "(fetching missing matches from API)…")
             import threading as _t
             from pubg.cli import cold_start as _cold_start
             def _run_cold_start():
                 try:
                     _cold_start(ROOT)
-                    print("  PUBG: Auto-Catch-Up fertig.")
+                    print("  PUBG: auto-catchup done.")
                 except Exception as e:
-                    print(f"  PUBG: Auto-Catch-Up Fehler: {e}")
+                    print(f"  PUBG: auto-catchup error: {e}")
             _t.Thread(target=_run_cold_start, daemon=True).start()
 
             pubg_poller = PollerThread(
@@ -140,13 +139,13 @@ try:
                 poller_status=pubg_poller.status,
             )
             PUBG_ENABLED = True
-            print("  PUBG-Backend aktiv  ✓")
+            print("  PUBG backend active  ✓")
         else:
-            print("  PUBG-Backend: Account-ID unbekannt, Polling nicht gestartet")
+            print("  PUBG backend: account-id unknown, polling not started")
     else:
-        print("  PUBG-Backend: kein PUBG-API-Key in .secrets — Backend deaktiviert")
+        print("  PUBG backend: no PUBG-API key in .secrets — backend disabled")
 except Exception as e:
-    print(f"  PUBG-Backend Init-Fehler: {e}")
+    print(f"  PUBG-Backend init error: {e}")
 
 
 # ── Frontend-Error-Logger (immer injiziert) ────────────────────────────────────

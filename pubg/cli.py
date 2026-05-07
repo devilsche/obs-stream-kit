@@ -18,7 +18,7 @@ def init_db(root: str) -> str:
     conn = connect(db_path)
     init_schema(conn)
     conn.close()
-    print(f"Schema initialisiert: {db_path}")
+    print(f"Schema initialized: {db_path}")
     return db_path
 
 
@@ -26,7 +26,7 @@ def cold_start(root: str, max_matches: int | None = None):
     cfg = load_config(os.path.join(root, "config", "pubg.json"))
     api_key = load_api_key(os.path.join(root, ".secrets"))
     if not api_key:
-        print("Kein PUBG-API-Key in .secrets!")
+        print("No PUBG-API-Key in .secrets!")
         return 1
     db_path = init_db(root)
     client = PubgClient(api_key=api_key, platform=cfg["platform"])
@@ -34,34 +34,34 @@ def cold_start(root: str, max_matches: int | None = None):
 
     self_p = get_player_by_name(conn, cfg["playerName"])
     if not self_p:
-        print(f"Pulle Account-ID für {cfg['playerName']}…")
+        print(f"Resolving account-id for {cfg['playerName']}…")
         try:
             resp = client.get_player(cfg["playerName"])
         except Exception as e:
-            print(f"API-Fehler: {e}")
+            print(f"API error: {e}")
             return 1
         if not resp.get("data"):
-            print("Player nicht gefunden!")
+            print("Player not found!")
             return 1
         my_acc_id = resp["data"][0]["id"]
         upsert_player(conn, my_acc_id, cfg["playerName"],
                       cfg["platform"], is_self=True)
     else:
         my_acc_id = self_p["account_id"]
-        print(f"Player bereits in DB: {my_acc_id}")
+        print(f"Player already in DB: {my_acc_id}")
 
-    # Single get_player()-Call (rate-limited) liefert alle verfügbaren
-    # Match-IDs. Danach sequentielles ingest_match() für JEDE neue ID
-    # ohne Cap — /matches/{id} ist laut PUBG-Doku NICHT rate-limited.
-    # 100ms Höflichkeits-Pace zwischen Calls.
-    cap_msg = "ohne Cap" if max_matches is None else f"max {max_matches}"
-    print(f"Cold-Start: hole Match-Liste + ingestiere alle neuen Matches "
+    # Single get_player() call (rate-limited) returns all available
+    # match-IDs. Then sequential ingest_match() for each new ID — no
+    # cap; /matches/{id} is NOT rate-limited per PUBG docs. 100ms
+    # politeness-pace between calls.
+    cap_msg = "no cap" if max_matches is None else f"max {max_matches}"
+    print(f"Cold-Start: fetching match list + ingesting all new matches "
           f"({cap_msg})…")
 
     def _progress(i, total, imported):
         if i % 10 == 0 or i == total:
-            print(f"  ...{i}/{total} Matches verarbeitet "
-                  f"(neu in DB: {imported})")
+            print(f"  ...{i}/{total} matches processed "
+                  f"(new in DB: {imported})")
 
     stats = run_bulk_catchup(conn, client, cfg["playerName"], my_acc_id,
                               max_matches=max_matches, pacing_ms=100,
@@ -73,34 +73,33 @@ def cold_start(root: str, max_matches: int | None = None):
 
     total_matches_in_db = conn.execute(
         "SELECT COUNT(*) FROM matches").fetchone()[0]
-    print(f"Cold-Start (matches): {stats['new_matches']} neue geholt "
-          f"→ nun insgesamt {total_matches_in_db} Matches in der DB.")
+    print(f"Cold-Start (matches): fetched {stats['new_matches']} new "
+          f"→ {total_matches_in_db} matches total in DB.")
 
-    # Phase 2: Telemetry-Bulk-Catchup. /telemetry-cdn ist nicht rate-
-    # limited, also alle pending durchziehen. Telemetry-Files sind groß
-    # (5-50MB), realistisch ~1-3s pro Match plus Parsing.
-    print("Cold-Start (telemetry): hole Telemetry-Events für alle Matches "
-          "die noch keine haben…")
+    # Phase 2: Telemetry bulk-catchup. /telemetry-cdn is not rate-
+    # limited, so process all pending in a row. Telemetry files are
+    # large (5-50MB), realistic ~1-3s per match plus parsing.
+    print("Cold-Start (telemetry): fetching telemetry events for all "
+          "matches that don't have them yet…")
 
     def _t_progress(i, total, done):
         if i % 5 == 0 or i == total:
-            print(f"  ...{i}/{total} Telemetries verarbeitet (ok: {done})")
+            print(f"  ...{i}/{total} telemetries processed (ok: {done})")
 
     t_stats = run_bulk_telemetry_catchup(conn, client, my_acc_id,
                                           pacing_ms=100,
                                           progress_cb=_t_progress)
     if t_stats["errors"]:
-        print(f"  Telemetry-Errors: {t_stats['errors'][:3]}"
+        print(f"  Telemetry errors: {t_stats['errors'][:3]}"
               f"{'...' if len(t_stats['errors']) > 3 else ''} "
-              f"({len(t_stats['errors'])} total — typisch >14d-Matches)")
+              f"({len(t_stats['errors'])} total — typically >14d matches)")
     total_telemetry_events = conn.execute(
         "SELECT COUNT(DISTINCT match_id) FROM telemetry_events").fetchone()[0]
-    print(f"Cold-Start (telemetry): {t_stats['processed']} neue verarbeitet "
-          f"→ nun insgesamt {total_telemetry_events} Matches mit Telemetry "
-          f"in der DB.")
+    print(f"Cold-Start (telemetry): fetched {t_stats['processed']} new "
+          f"→ {total_telemetry_events} matches with telemetry total in DB.")
 
     conn.close()
-    print("Cold-Start fertig.")
+    print("Cold-Start done.")
     return 0
 
 
@@ -116,48 +115,48 @@ def pull_from_ftp(root: str) -> int:
     db_path = os.path.join(root, "data", "pubg-history.db")
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
-    print(f"Liste FTP-Backups auf {cfg['host']}{cfg['path'] or '/'} …")
+    print(f"Listing FTP backups at {cfg['host']}{cfg['path'] or '/'} …")
     try:
         remote = list_remote_backups(cfg)
     except Exception as e:
-        print(f"FTP-Listing fehlgeschlagen: {e}")
+        print(f"FTP listing failed: {e}")
         return 1
     if not remote:
-        print("Keine Backups gefunden.")
+        print("No backups found.")
         return 1
 
     latest = remote[-1]
-    print(f"Neuestes Backup: {latest}")
-    print(f"Verfügbar gesamt: {len(remote)} ({remote[0]} → {remote[-1]})")
+    print(f"Latest backup: {latest}")
+    print(f"Available total: {len(remote)} ({remote[0]} → {remote[-1]})")
 
-    # Lokale DB wegsichern
+    # Move local DB out of the way as safety copy
     if os.path.exists(db_path):
         ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         safety = f"{db_path}.before-pull-{ts}"
         shutil.copy2(db_path, safety)
-        print(f"Lokale DB gesichert: {safety}")
-        # WAL/SHM-Files (falls noch da) entfernen — passen nicht zur neuen DB
+        print(f"Local DB backed up to: {safety}")
+        # Drop WAL/SHM files (if any) — they wouldn't match the new DB
         for ext in ("-wal", "-shm"):
             p = db_path + ext
             if os.path.exists(p):
                 os.remove(p)
 
-    print(f"Lade {latest} → {db_path}")
+    print(f"Downloading {latest} → {db_path}")
     ok, msg = download_from_ftp(latest, db_path, cfg)
     print(msg)
     if not ok:
         return 1
 
-    # Integrität prüfen
+    # Integrity check
     conn = connect(db_path)
     try:
         ic = integrity_check(conn)
-        print(f"Integrität: {ic}")
+        print(f"Integrity: {ic}")
         if ic != "ok":
-            print("WARNUNG: DB-Integrität nicht ok. Lokale Sicherung wiederherstellen?")
+            print("WARNING: DB integrity not ok. Restore the local safety copy?")
             return 1
         cnt = conn.execute("SELECT COUNT(*) FROM matches").fetchone()[0]
-        print(f"Matches in der DB: {cnt}")
+        print(f"Matches in DB: {cnt}")
     finally:
         conn.close()
     return 0
