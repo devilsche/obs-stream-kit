@@ -220,6 +220,17 @@ Ordered roughly by impact:
 - [ ] `session-goal.html` — progress bar toward configurable session goal:
       `?goal=kills:20 | chickens:3 | matches:10 | kd:2.0` — fills as session
       advances, hides when goal reached
+- [ ] `session-achievements.html` — milestone log for current session. Triggers
+      and persists entries like:
+      - "First Chicken!" (first win)
+      - "First Top-10!"
+      - "Longest Kill 400m+"
+      - "5+ Kills in a Match"
+      - "Beast Chicken" (win with 5+ kills)
+      - "Hot-Drop Survivor" (3-min fight, survived)
+      - "Top-10 Streak ×3"
+      Two display modes: persistent log card (slot-suitable) and pop-up alert
+      when triggered (similar to alert animations)
 
 ### News-ticker enhancements
 
@@ -238,11 +249,6 @@ Ordered roughly by impact:
 
 ## Open Questions
 
-- **Playtime-Counter** (live-bar or news-ticker-snippet) — useful or noise?
-- **Per-Mode-Stats** (Squad / Duo / Solo separated) — currently mixed in most
-  aggregations. Important?
-- **Session-Achievements-Card** ("Erste Chicken!", "Longest Kill 400m+") —
-  nice-to-have or gimmick?
 - **Stream-OCR realtime track** — separate spec if/when invested in true
   realtime HUD
 - **Permanent news-ticker mode** — pending snippet-pool expansion
