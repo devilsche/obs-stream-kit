@@ -249,8 +249,18 @@ Ordered roughly by impact:
 
 ## Open Questions
 
+- **Local-process visibility triggers** — supplement the 1h-stale check with
+  faster local signals about whether a PUBG match is currently running. Scope
+  limited to **safe** approaches:
+  - Process-watch on `tslgame.exe` (running / not) — trivial via local agent
+  - Log-file tailing on `%LOCALAPPDATA%\TslGame\Saved\Logs\TslGame.log` —
+    read-only, scan for match-start / match-end markers
+  Explicitly excluded: process-memory reading, network packet manipulation, or
+  anything BattlEye would flag. Use case: hide widgets *immediately* after
+  match-end instead of waiting for the 1h stale-check; show a
+  "match running"-indicator faster than API can.
 - **Stream-OCR realtime track** — separate spec if/when invested in true
-  realtime HUD
+  realtime HUD (kill/dmg/place from rendered game frames)
 - **Permanent news-ticker mode** — pending snippet-pool expansion
 - **Fullscreen slot widgets for Pause-scene reuse** — `?fullscreen=1` param
   semantics tbd
