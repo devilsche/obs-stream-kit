@@ -738,7 +738,7 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
       - longest_kill_400   : Longest Kill >= 400m in einem Match
       - five_kill_match    : Match mit >= 5 Kills
       - beast_chicken      : place == 1 UND kills >= 5 (mehrfach möglich)
-      - hot_drop_survivor  : Hot-Drop überlebt (per compute_hot_drop)
+      - first_hot_drop_survived : ERSTES überlebtes Hot-Drop in der Range
       - top10_streak       : längste Top-10-Streak in Session (>= 3)
       - chicken_streak     : längste Chicken-Streak in Session (>= 2)
 
@@ -868,12 +868,12 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             if (pm.get("hotDrop") and pm.get("soloSurvived")
                     and "hot_drop_survivor" not in seen):
                 out.append({
-                    "id": "hot_drop_survivor",
-                    "label": "Hot-Drop Survivor",
+                    "id": "first_hot_drop_survived",
+                    "label": "First Hot Drop Survived",
                     "icon": "🔥",
                     "matchId": pm["matchId"], "playedAt": pm["playedAt"],
                 })
-                seen.add("hot_drop_survivor")
+                seen.add("first_hot_drop_survived")
                 break
     except Exception:
         pass
