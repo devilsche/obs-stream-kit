@@ -107,6 +107,14 @@
     return _dbInfoPromise;
   };
 
+  // Liefert den PUBG-Nickname des Streamers (wie er in der DB steht).
+  // Aus Stream-Zuschauer-Sicht der bessere Bezugspunkt als "Yours".
+  // Fallback: "Streamer" wenn DB nicht antwortet.
+  PubgUI.getMyName = async () => {
+    const info = await PubgUI.getDbInfo();
+    return (info && info.myName) || "Streamer";
+  };
+
   // Liefert ein Promise<string>. Für range="all" wird "(since DD.MM.)"
   // angehängt, basierend auf firstMatchAt aus /api/pubg/db-info.
   PubgUI.fmtRangeLabel = async (range) => {
@@ -289,6 +297,15 @@
         letter-spacing: 0.06em;
         font-size: 0.85em;
       }
+      .pubg-filter-bar label.has-tip {
+        cursor: help;
+        border-bottom: 1px dotted rgba(138, 125, 153, 0.5);
+      }
+      .pubg-filter-bar label.has-tip::after {
+        content: " ⓘ";
+        font-size: 0.85em;
+        opacity: 0.7;
+      }
       .pubg-filter-bar input[type=range] { width: 100px; }
       .pubg-filter-bar select, .pubg-filter-bar input[type=text],
       .pubg-filter-bar input[type=number] {
@@ -334,6 +351,10 @@
 
       const label = document.createElement("label");
       label.textContent = spec.label;
+      if (spec.tooltip) {
+        label.title = spec.tooltip;
+        label.classList.add("has-tip");
+      }
       grp.appendChild(label);
 
       let input;

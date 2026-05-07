@@ -164,12 +164,12 @@
           document.getElementById("chickens").innerHTML = chickenIcons(wins);
 
           document.getElementById("my-line").textContent =
-            `${d.myName || "Meine"} K/D: ${PubgUI.fmtKD(sh.kd)}`;
+            `${d.myName || "Yours"} K/D: ${PubgUI.fmtKD(sh.kd)}`;
 
           const cl = d.careerLifetime;
           document.getElementById("career").textContent = cl
-            ? `Career: ${PubgUI.fmtNum(cl.rounds_played)} Games · K/D ${PubgUI.fmtKD(cl.kd_ratio)} · ${cl.wins} Wins · ${PubgUI.fmtPct(cl.headshot_rate)} HS`
-            : (sh.matches ? "Career: noch nicht geladen (<5 gemeinsame Matches?)" : "Noch nie zusammen gespielt");
+            ? `Career: ${PubgUI.fmtNum(cl.rounds_played)} games · K/D ${PubgUI.fmtKD(cl.kd_ratio)} · ${cl.wins} wins · ${PubgUI.fmtPct(cl.headshot_rate)} HS`
+            : (sh.matches ? "Career: not loaded yet (<5 shared matches?)" : "Never played together");
 
           reveal();
         })

@@ -83,7 +83,9 @@
 
     PubgUI.buildFilter([
       { key: "range", label: "Range", type: "select", default: "session",
-        options: [["session","Session"],["week","7 days"],["all","Database"]]},
+        options: [["session","Session"],["week","7 days"],["all","Database"]],
+        tooltip: "Which matches to include — Session, last 7 days, or the " +
+                 "whole database." },
     ]);
 
     function render(d) {

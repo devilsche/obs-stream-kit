@@ -176,22 +176,32 @@
 
     PubgUI.buildFilter([
       { key: "range", label: "Range", type: "select", default: "session",
-        options: [["session","Session"],["week","7 days"],["all","Database"]]},
-      { key: "sortBy", label: "Mate-Sort", type: "select", default: "mostPlayed",
+        options: [["session","Session"],["week","7 days"],["all","Database"]],
+        tooltip: "Which matches to include — Session, last 7 days, or the " +
+                 "whole database." },
+      { key: "sortBy", label: "Mate sort", type: "select", default: "mostPlayed",
         options: [["synergy","Synergy"],["mostPlayed","Most Played"],
-                  ["chickensTogether","Most CHICKEN"],["kd","Best K/D Meine"],
+                  ["chickensTogether","Most CHICKEN"],["kd","Best K/D Yours"],
                   ["mateKd","Best K/D Mate"],["winRate","Win-Rate"],
-                  ["avgPlace","Avg Place"]]},
-      { key: "minMatches", label: "Min Mates", type: "range",
-        min: 1, max: 50, default: 10 },
+                  ["avgPlace","Avg Place"]],
+        tooltip: "How the Top Mates list is sorted. Synergy = composite " +
+                 "KDA × win-rate (recommended)." },
+      { key: "minMatches", label: "Min shared matches", type: "range",
+        min: 1, max: 50, default: 10,
+        tooltip: "Minimum number of shared matches with a mate to appear " +
+                 "in the Top Mates list." },
       { key: "compact", label: "Compact", type: "select", default: "0",
-        options: [["0","Normal"],["1","Compact"]]},
+        options: [["0","Normal"],["1","Compact"]],
+        tooltip: "Compact mode: tighter stat display with less whitespace." },
     ]);
 
     // Filter-Bar oben ist Single Source of Truth — Werte aus URL-Param,
     // KEIN DB-Setting-Lesen (das war früher der Bug).
     const currentMin = parseInt(PubgUI.qs("minMatches", 10), 10);
     const currentSort = PubgUI.qs("sortBy", "mostPlayed");
+
+    let MY_NAME = "Streamer";
+    PubgUI.getMyName().then(n => { MY_NAME = n; });
 
     function renderSession(s) {
       const num = (n) => String(Math.round(n));
@@ -272,7 +282,7 @@
       if (currentSort !== "mostPlayed") bits.push(`${m.sharedMatches} Matches`);
       if (m.winsTogether && currentSort !== "chickensTogether") bits.push(`${m.winsTogether} CHICKEN`);
       if (currentSort !== "kd" && currentSort !== "mateKd") {
-        bits.push(`Meine ${(m.kd || 0).toFixed(2)} / Mate ${(m.mateKd || 0).toFixed(2)}`);
+        bits.push(`${MY_NAME} ${(m.kd || 0).toFixed(2)} / Mate ${(m.mateKd || 0).toFixed(2)}`);
       }
       if (currentSort !== "winRate" && currentSort !== "chickensTogether"
           && (m.winRate || 0) > 0) {
@@ -290,7 +300,7 @@
             <span style="color:var(--pubg-gold);font-weight:700;font-variant-numeric:tabular-nums">${topMateValue(m)}</span>
           </div>
           <div style="padding-left:24px;color:var(--pubg-muted);font-size:0.78em;margin-top:2px">${topMateSub(m)}</div>
-        </div>`).join("") : '<span class="pubg-error">noch keine Daten</span>';
+        </div>`).join("") : '<span class="pubg-error">no data yet</span>';
     }
 
     const RANGE_LABEL = {

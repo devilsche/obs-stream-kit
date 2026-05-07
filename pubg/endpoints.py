@@ -113,11 +113,19 @@ class EndpointRegistry:
 
     def _db_info(self):
         conn = self.get_conn()
-        return _ok(self.cache.get_or_compute("db-info", lambda: {
-            "firstMatchAt": (conn.execute(
+        def _compute():
+            first = (conn.execute(
                 "SELECT MIN(played_at) AS first FROM matches"
-            ).fetchone() or {})["first"],
-        }))
+            ).fetchone() or {})["first"]
+            name_row = conn.execute(
+                "SELECT name FROM players WHERE account_id = ?",
+                (self.my_account_id,)
+            ).fetchone()
+            return {
+                "firstMatchAt": first,
+                "myName": (name_row and name_row["name"]) or None,
+            }
+        return _ok(self.cache.get_or_compute("db-info", _compute))
 
     def _lobby_avg_kd(self, qs):
         conn = self.get_conn()

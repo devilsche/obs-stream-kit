@@ -72,7 +72,9 @@
 
     PubgUI.buildFilter([
       { key: "range", label: "Range", type: "select", default: "all",
-        options: [["all","Database"],["session","Session"],["week","7 days"]]},
+        options: [["all","Database"],["session","Session"],["week","7 days"]],
+        tooltip: "Which matches to include — Database lifetime, Session, " +
+                 "or last 7 days." },
     ]);
 
     function chickens(n) {
@@ -84,7 +86,7 @@
 
     function render(list) {
       if (!list.length) {
-        document.getElementById("rows").innerHTML = `<div class="pubg-error">noch keine Matches</div>`;
+        document.getElementById("rows").innerHTML = `<div class="pubg-error">no matches yet</div>`;
         document.getElementById("summary").innerHTML = "";
         return;
       }

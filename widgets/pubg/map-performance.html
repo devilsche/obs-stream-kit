@@ -14,7 +14,7 @@
       flex-direction: column;
       justify-content: flex-end;
     }
-    .panel { width: 100%; max-width: 760px; margin: 0 auto; padding: 14px 18px; }
+    .panel { width: 100%; padding: 14px 18px; }
     h2 {
       margin: 0 0 4px;
       font-size: 0.95em;
@@ -65,7 +65,9 @@
   <script>
     PubgUI.buildFilter([
       { key: "range", label: "Range", type: "select", default: "all",
-        options: [["session","Session"],["week","7 days"],["all","Database"]]},
+        options: [["session","Session"],["week","7 days"],["all","Database"]],
+        tooltip: "Which matches to include — Session, last 7 days, or the " +
+                 "whole database." },
     ]);
     const RANGE = PubgUI.qs("range", "all");
     PubgUI.renderHeader(document.getElementById("pubgHeader"), "Map Performance", RANGE);

@@ -44,13 +44,19 @@
     PubgUI.buildFilter([
       { key: "focus", label: "Focus", type: "select", default: "mix",
         options: [["mix","Session + Lifetime"],
-                  ["session","Nur Session"],
-                  ["lifetime","Nur Lifetime"]]},
+                  ["session","Session only"],
+                  ["lifetime","Lifetime only"]],
+        tooltip: "Which snippets to show. Session-only suits gameplay " +
+                 "scenes; Lifetime-only is for Starting Soon / BRB. Mix " +
+                 "rotates both." },
       { key: "rotateMs", label: "Rotate ms", type: "range",
-        min: 3000, max: 20000, default: 8000 },
+        min: 3000, max: 20000, default: 8000,
+        tooltip: "How fast each snippet rotates (milliseconds)." },
     ]);
     let snippets = [];
     let idx = 0;
+    let MY_NAME = "Streamer";
+    PubgUI.getMyName().then(n => { MY_NAME = n; });
 
     // ?focus=session   → nur Session-Snippets (für In-Game-Stream)
     // ?focus=lifetime  → nur Lifetime-Snippets (für Stream-Ending/Idle)
@@ -93,13 +99,13 @@
               mostPlayed:       "SESSION — MOST PLAYED",
               synergy:          "SESSION — BEST SYNERGY",
               chickensTogether: "SESSION — MOST CHICKEN",
-              kd:               "SESSION — BEST K/D (MEINE)",
+              kd:               "SESSION — BEST K/D (YOURS)",
               mateKd:           "SESSION — BEST K/D (MATE)",
               winRate:          "SESSION — BEST WIN-RATE",
               avgPlace:         "SESSION — BEST AVG PLACE",
             };
             const sLabel = SESSION_LABELS[sortBy2] || "SESSION TOP MATE";
-            out.push(`<span class="label">${sLabel}</span> ${m.name} · ${m.sharedMatches} Matches · ${m.winsTogether||0} CHICKEN · K/D Meine ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
+            out.push(`<span class="label">${sLabel}</span> ${m.name} · ${m.sharedMatches} matches · ${m.winsTogether||0} CHICKEN · ${MY_NAME} ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
           }
         } catch (_) {}
         try {
@@ -185,13 +191,13 @@
               mostPlayed:       "DB — MOST PLAYED",
               synergy:          "DB — BEST SYNERGY",
               chickensTogether: "DB — MOST CHICKEN",
-              kd:               "DB — BEST K/D (MEINE)",
+              kd:               "DB — BEST K/D (YOURS)",
               mateKd:           "DB — BEST K/D (MATE)",
               winRate:          "DB — BEST WIN-RATE",
               avgPlace:         "DB — BEST AVG PLACE",
             };
             const label = LABELS[sortBy] || "DB — TOP MATE";
-            out.push(`<span class="label">${label}</span> ${m.name} · ${m.sharedMatches} Matches · ${m.winsTogether||0} CHICKEN · K/D Meine ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
+            out.push(`<span class="label">${label}</span> ${m.name} · ${m.sharedMatches} matches · ${m.winsTogether||0} CHICKEN · ${MY_NAME} ${(m.kd||0).toFixed(2)} / Mate ${(m.mateKd||0).toFixed(2)}`);
           }
         } catch (_) {}
         try {

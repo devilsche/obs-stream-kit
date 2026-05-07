@@ -99,13 +99,21 @@
     PubgUI.buildFilter([
       { key: "layout", label: "Layout", type: "select", default: "carousel",
         options: [["carousel","Carousel"],["stack","Stack"],
-                  ["fold","Fold"],["mosaic","Mosaic"]]},
+                  ["fold","Fold"],["mosaic","Mosaic"]],
+        tooltip: "How mates are arranged: Carousel rotates one at a " +
+                 "time, Stack/Fold list them, Mosaic uses a 3-column grid." },
       { key: "range", label: "Range", type: "select", default: "session",
-        options: [["session","Session"],["week","7 days"]]},
-      { key: "minMatches", label: "Min Matches", type: "range",
-        min: 1, max: 30, default: 1 },
-      { key: "minTotal", label: "Min Total", type: "range",
-        min: 1, max: 50, default: 1 },
+        options: [["session","Session"],["week","7 days"]],
+        tooltip: "Which matches to include — current session or last 7 days." },
+      { key: "minMatches", label: "Min matches in range", type: "range",
+        min: 1, max: 30, default: 1,
+        tooltip: "Minimum number of shared matches WITHIN THE SELECTED " +
+                 "RANGE for a mate to be displayed." },
+      { key: "minTotal", label: "Min lifetime matches", type: "range",
+        min: 1, max: 50, default: 1,
+        tooltip: "Minimum number of shared matches LIFETIME (across the " +
+                 "whole DB). Filters out random squad-fills who were only " +
+                 "around for a single match." },
     ]);
     document.getElementById("root").className = "pubg-card " + LAYOUT;
 

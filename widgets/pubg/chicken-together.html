@@ -6,12 +6,14 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="_pubg.css">
   <style>
-    html, body { margin: 0; padding: 0; }
+    /* Anker: bottom-left. Header über Card. */
+    html, body { height: 100%; margin: 0; padding: 0; }
     body {
-      min-height: 100vh;
-      display: flex;
-      align-items: flex-start;
       padding: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      box-sizing: border-box;
     }
     .panel {
       width: 100%;
@@ -94,9 +96,14 @@
     const MIN_MATCHES = parseInt(PubgUI.qs("minMatches", 1), 10);
 
     PubgUI.buildFilter([
-      { key: "minWins", label: "Min Wins", type: "range", min: 1, max: 10, default: 1 },
-      { key: "minMatches", label: "Min Matches", type: "range",
-        min: 1, max: 50, default: 1 },
+      { key: "minWins", label: "Min wins together", type: "range",
+        min: 1, max: 10, default: 1,
+        tooltip: "Minimum number of shared CHICKEN (place #1) with the " +
+                 "mate to qualify for the list." },
+      { key: "minMatches", label: "Min shared matches", type: "range",
+        min: 1, max: 50, default: 1,
+        tooltip: "Minimum number of shared matches overall for the mate " +
+                 "to be counted." },
     ]);
 
     function chickens(n) {
@@ -108,7 +115,7 @@
     function render(list) {
       if (!list.length) {
         document.getElementById("rows").innerHTML =
-          `<div class="empty">noch keine gemeinsamen Wins<br><span style="font-size:0.8em;opacity:0.7">— oder DB hat noch nicht genug Matches</span></div>`;
+          `<div class="empty">no shared wins yet<br><span style="font-size:0.8em;opacity:0.7">— or DB doesn't have enough matches yet</span></div>`;
         document.getElementById("summary").innerHTML = "";
         return;
       }

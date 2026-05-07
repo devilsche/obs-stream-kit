@@ -360,11 +360,11 @@
     <input type="time" id="timeTo" value="23:59" step="60">
     <button class="apply" id="applyRange">Anwenden</button>
     <div class="presets">
-      <button class="preset" data-preset="current">▶ Aktuelle</button>
-      <button class="preset" data-preset="today">Heute</button>
-      <button class="preset" data-preset="yesterday">Gestern</button>
-      <button class="preset" data-preset="last7">Letzte 7 Tage</button>
-      <button class="preset" data-preset="all">Alle (DB)</button>
+      <button class="preset" data-preset="current">▶ Current</button>
+      <button class="preset" data-preset="today">Today</button>
+      <button class="preset" data-preset="yesterday">Yesterday</button>
+      <button class="preset" data-preset="last7">Last 7 days</button>
+      <button class="preset" data-preset="all">All (DB)</button>
     </div>
   </div>
   <div id="picker" class="session-picker" style="display:none"></div>
@@ -634,7 +634,7 @@
     function render(d) {
       const root = document.getElementById("report");
       if (!d.totalMatches) {
-        root.innerHTML = `<div class="empty">— noch keine Matches in der Session —</div>`;
+        root.innerHTML = `<div class="empty">— no matches in session yet —</div>`;
         return;
       }
       const t = d.totals;

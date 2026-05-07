@@ -8,12 +8,14 @@
   <style>
     /* Card passt sich dem Browser-Source/Fenster an. OBS-Source-Größe
        (z.B. 480×420 oder 600×500) bestimmt die finale Card-Breite. */
-    html, body { margin: 0; padding: 0; }
+    /* Anker: bottom-left. Header über Card, beide am unteren Rand. */
+    html, body { height: 100%; margin: 0; padding: 0; }
     body {
-      min-height: 100vh;
-      display: flex;
-      align-items: flex-start;
       padding: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      box-sizing: border-box;
     }
     .panel {
       width: 100%;
@@ -85,19 +87,25 @@
     const MIN = MIN_RAW != null ? parseInt(MIN_RAW, 10) : null;
 
     PubgUI.buildFilter([
-      { key: "sortBy", label: "Sort", type: "select", default: "mostPlayed",
+      { key: "sortBy", label: "Sort by", type: "select", default: "mostPlayed",
         options: [
           ["mostPlayed", "Most Played"],
           ["synergy", "Synergy"],
           ["chickensTogether", "Most CHICKEN"],
-          ["kd", "K/D Meine"],
+          ["kd", "K/D Yours"],
           ["mateKd", "K/D Mate"],
           ["winRate", "Win-Rate"],
           ["avgPlace", "Avg Place"],
-        ]},
-      { key: "minMatches", label: "Min", type: "range", min: 1, max: 50,
-        default: 10 },
-      { key: "limit", label: "Limit", type: "range", min: 1, max: 20, default: 5 },
+        ],
+        tooltip: "Which metric to sort the top mates by. Synergy = " +
+                 "composite KDA × win-rate (recommended)." },
+      { key: "minMatches", label: "Min shared matches", type: "range",
+        min: 1, max: 50, default: 10,
+        tooltip: "Minimum number of shared matches in the DB for a player " +
+                 "to qualify. Filters out lucky-spike 1-match mates." },
+      { key: "limit", label: "Show players", type: "range",
+        min: 1, max: 20, default: 5,
+        tooltip: "Maximum number of players to display." },
     ]);
 
     // Sort/Min Info als Subtitle unter dem Header anzeigen.
@@ -181,19 +189,30 @@
       return "";
     }
 
+    let MY_NAME = "Streamer";
+    PubgUI.getMyName().then(n => { MY_NAME = n; });
+
+    // Lange Nicknames kürzen, damit Detail-Line nicht wrappt
+    function nameLabel(n) {
+      if (!n) return "Streamer";
+      return n.length > 12 ? n.slice(0, 11) + "…" : n;
+    }
+
     function detailLine(m) {
       const parts = [];
       // Match-Anzahl als Kontext überall, außer bei mostPlayed (da primary)
       if (SORT_BY !== "mostPlayed") {
-        parts.push(`<span><b>${m.sharedMatches}</b> Matches</span>`);
+        parts.push(`<span><b>${m.sharedMatches}</b> matches</span>`);
       }
-      // K/D — primary einzeln markieren
+      // K/D — Mate-Name steht bereits in der Row-Headline,
+      // hier nur Streamer-Name + "Mate"-Label zur Disambiguierung.
+      const me = nameLabel(MY_NAME);
       if (SORT_BY === "kd") {
         parts.push(`<span>Mate K/D <b>${(m.mateKd || 0).toFixed(2)}</b></span>`);
       } else if (SORT_BY === "mateKd") {
-        parts.push(`<span>Meine K/D <b>${(m.kd || 0).toFixed(2)}</b></span>`);
+        parts.push(`<span>${me} K/D <b>${(m.kd || 0).toFixed(2)}</b></span>`);
       } else {
-        parts.push(`<span>K/D Meine <b>${(m.kd || 0).toFixed(2)}</b> / Mate <b>${(m.mateKd || 0).toFixed(2)}</b></span>`);
+        parts.push(`<span>${me} <b>${(m.kd || 0).toFixed(2)}</b> · Mate <b>${(m.mateKd || 0).toFixed(2)}</b></span>`);
       }
       // CHICKEN — weglassen wenn schon primary
       if (m.winsTogether && SORT_BY !== "chickensTogether") {
@@ -222,7 +241,7 @@
             <span class="primary">${primaryValue(m)}</span>
           </div>
           <div class="row-sub">${detailLine(m)}</div>
-        </div>`).join("") || `<div class="pubg-error">noch keine Daten</div>`;
+        </div>`).join("") || `<div class="pubg-error">no data yet</div>`;
     }
 
     const minPart = (MIN != null && !isNaN(MIN)) ? `&minMatches=${MIN}` : "";

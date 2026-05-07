@@ -33,7 +33,9 @@
 
     PubgUI.buildFilter([
       { key: "range", label: "Range", type: "select", default: "session",
-        options: [["session","Session"],["week","7 days"],["all","Database"]]},
+        options: [["session","Session"],["week","7 days"],["all","Database"]],
+        tooltip: "Which matches to include — Session, last 7 days, or the " +
+                 "whole database." },
     ]);
     function render(list) {
       const max = Math.max(1, ...list.map(x => x.count));
@@ -44,7 +46,7 @@
           <div class="bar"><div class="bar-fill" style="width:${m.count/max*100}%"></div></div>
         </div>`).join("");
       document.getElementById("rows").innerHTML =
-        html || `<div class="pubg-error">noch keine Matches</div>`;
+        html || `<div class="pubg-error">no matches yet</div>`;
     }
     PubgUI.poll(`/api/pubg/map-distribution?range=${RANGE}`,
                 5*60*1000, render, console.error);

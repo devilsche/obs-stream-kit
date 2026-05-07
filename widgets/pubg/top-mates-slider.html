@@ -6,12 +6,14 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="_pubg.css">
   <style>
-    html, body { margin: 0; padding: 0; }
+    /* Anker: bottom-left. Header über Card. */
+    html, body { height: 100%; margin: 0; padding: 0; }
     body {
-      min-height: 100vh;
-      display: flex;
-      align-items: flex-start;
       padding: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      box-sizing: border-box;
     }
     .panel {
       width: 100%;
@@ -120,7 +122,7 @@
       ["mostPlayed",       "Most Played"],
       ["synergy",          "Synergy"],
       ["chickensTogether", "Most CHICKEN"],
-      ["kd",               "K/D Meine"],
+      ["kd",               "K/D Your"],
       ["mateKd",           "K/D Mate"],
       ["winRate",          "Win-Rate"],
       ["avgPlace",         "Avg Place"],
@@ -128,13 +130,20 @@
 
     PubgUI.buildFilter([
       { key: "rotateMs", label: "Rotate ms", type: "range",
-        min: 3000, max: 20000, default: 8000 },
-      { key: "limit",    label: "Limit",    type: "range",
-        min: 1, max: 10, default: 5 },
-      { key: "minMatches", label: "Min", type: "range",
-        min: 1, max: 50, default: 10 },
-      { key: "cats", label: "Kategorien", type: "text",
-        placeholder: "leer = alle. z.B. synergy,kd,winRate" },
+        min: 3000, max: 20000, default: 8000,
+        tooltip: "How fast the sort category rotates (milliseconds)." },
+      { key: "limit", label: "Show players", type: "range",
+        min: 1, max: 10, default: 5,
+        tooltip: "How many players to show per sort category." },
+      { key: "minMatches", label: "Min shared matches", type: "range",
+        min: 1, max: 50, default: 10,
+        tooltip: "Minimum number of matches played together with a mate, " +
+                 "to qualify for the list. Filters out random squad-fills." },
+      { key: "cats", label: "Categories", type: "text",
+        placeholder: "empty = all. e.g. synergy,kd,winRate",
+        tooltip: "Comma-separated list of sort categories to rotate " +
+                 "through. Empty = all (mostPlayed, synergy, " +
+                 "chickensTogether, kd, mateKd, winRate, avgPlace)." },
     ]);
 
     const ROTATE_MS = parseInt(PubgUI.qs("rotateMs", 8000), 10);
@@ -143,6 +152,13 @@
     const CATS_RAW = PubgUI.qs("cats", "");
     const RANGE = PubgUI.qs("range", "all");
     PubgUI.renderHeader(document.getElementById("pubgHeader"), "Top Mates", RANGE);
+
+    let MY_NAME = "Streamer";
+    PubgUI.getMyName().then(n => { MY_NAME = n; });
+    function nameLabel(n) {
+      if (!n) return "Streamer";
+      return n.length > 12 ? n.slice(0, 11) + "…" : n;
+    }
 
     const cats = CATS_RAW
       ? CATS_RAW.split(",").map(c => c.trim()).filter(Boolean)
@@ -198,14 +214,15 @@
     function detailLine(sortBy, m) {
       const parts = [];
       if (sortBy !== "mostPlayed") {
-        parts.push(`<span><b>${m.sharedMatches}</b> Matches</span>`);
+        parts.push(`<span><b>${m.sharedMatches}</b> matches</span>`);
       }
+      const me = nameLabel(MY_NAME);
       if (sortBy === "kd") {
         parts.push(`<span>Mate K/D <b>${(m.mateKd||0).toFixed(2)}</b></span>`);
       } else if (sortBy === "mateKd") {
-        parts.push(`<span>Meine K/D <b>${(m.kd||0).toFixed(2)}</b></span>`);
+        parts.push(`<span>${me} K/D <b>${(m.kd||0).toFixed(2)}</b></span>`);
       } else {
-        parts.push(`<span>K/D Meine <b>${(m.kd||0).toFixed(2)}</b> / Mate <b>${(m.mateKd||0).toFixed(2)}</b></span>`);
+        parts.push(`<span>${me} <b>${(m.kd||0).toFixed(2)}</b> · Mate <b>${(m.mateKd||0).toFixed(2)}</b></span>`);
       }
       if (m.winsTogether && sortBy !== "chickensTogether") {
         parts.push(`<span><b>${m.winsTogether}</b> CHICKEN</span>`);
