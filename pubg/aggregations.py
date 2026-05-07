@@ -315,12 +315,27 @@ def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
         (p["account_id"],)
     ).fetchone()
 
+    # Same-Lobby-Different-Team-Stat: Matches in denen wir BEIDE in der
+    # Lobby waren (laut match_team_mapping), aber NICHT im selben Squad.
+    # Setzt voraus dass match_team_mapping befüllt ist (match_schema=2).
+    same_lobby = conn.execute("""
+        SELECT COUNT(DISTINCT mtm_them.match_id) AS lobby_matches
+        FROM match_team_mapping mtm_me
+        JOIN match_team_mapping mtm_them
+          ON mtm_them.match_id = mtm_me.match_id
+        WHERE mtm_me.account_id = ?
+          AND mtm_them.account_id = ?
+          AND mtm_me.team_id != mtm_them.team_id
+    """, (my_account_id, p["account_id"])).fetchone()
+    lobby_only = (same_lobby["lobby_matches"] or 0) if same_lobby else 0
+
     return {
         "name": p["name"],
         "myName": my_name,
         "accountId": p["account_id"],
         "sharedHistory": history,
         "careerLifetime": dict(lifetime) if lifetime else None,
+        "lobbyOnlyMatches": lobby_only,  # gleiche Lobby, anderes Team
     }
 
 
@@ -1200,10 +1215,17 @@ def _detect_first_fight(conn, match_id, my_account_id,
         if e["actor_account"]: cluster_acc_ids.add(e["actor_account"])
         if e["target_account"]: cluster_acc_ids.add(e["target_account"])
 
-    # Beteiligte Teams = alle team_ids der involvierten accounts
+    # Beteiligte Teams = alle team_ids der involvierten accounts.
+    # match_team_mapping (Lobby-weit) bevorzugt; Fallback: acc_to_team
+    # (squad-only) für Matches ohne Schema-Upgrade.
+    lobby_team_map = dict(conn.execute("""
+        SELECT account_id, team_id FROM match_team_mapping
+        WHERE match_id = ?
+    """, (match_id,)).fetchall())
+    full_team_map = lobby_team_map if lobby_team_map else acc_to_team
     teams = set()
     for acc in cluster_acc_ids:
-        t = acc_to_team.get(acc)
+        t = full_team_map.get(acc)
         if t is not None:
             teams.add(t)
 
