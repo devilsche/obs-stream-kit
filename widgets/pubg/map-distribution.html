@@ -6,7 +6,15 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="_pubg.css">
   <style>
-    body { padding: 16px; }
+    /* Anker: bottom-left. Header über Card. */
+    html, body { height: 100%; margin: 0; }
+    body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      box-sizing: border-box;
+    }
     .panel { width: 280px; padding: 16px; }
     .panel h3 { margin: 0 0 12px; font-size: 0.85em;
                 color: var(--pubg-muted); text-transform: uppercase;
