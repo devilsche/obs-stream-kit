@@ -944,7 +944,7 @@
           <div class="ach-list">
             ${achievements.map(a => `
               <div class="ach-item">
-                <span class="ach-icon">${a.icon || "✨"}</span>
+                <span class="ach-icon">${a.icon || ""}</span>
                 <span class="ach-label">${a.label || a.id}</span>
                 <span class="ach-when">${PubgUI.fmtTime(a.playedAt)}</span>
               </div>`).join("")}

@@ -80,7 +80,7 @@
       const items = list.slice(-LIMIT);
       root.innerHTML = items.map(a => `
         <div class="item">
-          <span class="icon">${a.icon || "✨"}</span>
+          <span class="icon">${a.icon || ""}</span>
           <div class="text">
             <div class="label">${a.label || a.id}</div>
             <div class="when">${fmtTime(a.playedAt)}</div>

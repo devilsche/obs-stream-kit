@@ -116,7 +116,7 @@
           ? (TARGET - value).toFixed(2)
           : Math.max(0, Math.round(TARGET - value));
         document.getElementById("meta").textContent =
-          (value >= TARGET) ? "🎉 Goal reached" : `${remaining} ${cfg.label} to go`;
+          (value >= TARGET) ? "🔥 Goal reached" : `${remaining} ${cfg.label} to go`;
 
         if (value >= TARGET && !KEEP) {
           // Auto-hide nach 60s wenn Ziel erreicht

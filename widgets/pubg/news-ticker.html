@@ -168,7 +168,7 @@
         try {
           const ach = await PubgUI.fetchJson("/api/pubg/session-achievements");
           if (ach && ach.length) {
-            const recent = ach.slice(-3).map(a => `${a.icon||"✨"} ${a.label}`).join(" · ");
+            const recent = ach.slice(-3).map(a => `${a.icon ? a.icon + " " : ""}${a.label}`).join(" · ");
             out.push(`<span class="label">SESSION ACHIEVEMENTS</span> ${recent}`);
           }
         } catch (_) {}

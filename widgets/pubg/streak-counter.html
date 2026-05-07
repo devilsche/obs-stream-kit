@@ -48,7 +48,7 @@
   <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card panel pubg-fade-in" id="card">
     <div class="row">
-      <span class="flame" id="flame">🔥</span>
+      <span class="flame" id="flame"></span>
       <div>
         <div class="num" id="num">0</div>
         <div class="label" id="lbl">streak</div>
@@ -91,9 +91,10 @@
         const flame = document.getElementById("flame");
         if (streak === 0) {
           card.classList.add("cold");
-          flame.textContent = "❄️";
+          flame.textContent = "";
         } else {
           card.classList.remove("cold");
+          // 🔥 nur wenn Streak > 0 (= geiler Scheiss)
           flame.textContent = "🔥";
         }
       } catch (e) {

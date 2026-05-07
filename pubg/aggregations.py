@@ -690,11 +690,12 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
         # 100 Einheiten = 1 Meter (Telemetry/PUBG-Welt)
         longest_m = longest if longest < 50 else longest / 100  # Fallback
 
+        # Icon-Regel: nur 🔥 für 'geile' Achievements, sonst kein Icon.
         if not win_seen and place == 1:
             out.append({
                 "id": "first_chicken",
                 "label": "First Chicken!",
-                "icon": "🐔",
+                "icon": "🔥",
                 "matchId": m["matchId"], "playedAt": played,
             })
             win_seen = True
@@ -704,7 +705,7 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             out.append({
                 "id": "first_top10",
                 "label": "First Top-10",
-                "icon": "🎯",
+                "icon": "",
                 "matchId": m["matchId"], "playedAt": played,
             })
             top10_seen = True
@@ -714,7 +715,7 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             out.append({
                 "id": "longest_kill_400",
                 "label": f"Longest Kill {int(longest_m)}m",
-                "icon": "🎯",
+                "icon": "🔥",
                 "matchId": m["matchId"], "playedAt": played,
             })
             seen.add("longest_kill_400")
@@ -723,7 +724,7 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             out.append({
                 "id": "five_kill_match",
                 "label": f"{kills}-Kill Match",
-                "icon": "💥",
+                "icon": "🔥",
                 "matchId": m["matchId"], "playedAt": played,
             })
             seen.add("five_kill_match")
@@ -758,7 +759,7 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
                 out.append({
                     "id": "hot_drop_survivor",
                     "label": "Hot-Drop Survivor",
-                    "icon": "🪂",
+                    "icon": "🔥",
                     "matchId": pm["matchId"], "playedAt": pm["playedAt"],
                 })
                 seen.add("hot_drop_survivor")
