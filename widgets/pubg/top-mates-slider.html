@@ -211,30 +211,17 @@
       return "";
     }
 
+    // Detail-Line zeigt IMMER dieselben Felder in derselben Reihenfolge.
+    // sortBy beeinflusst nur die Reihenfolge der Liste + den primary-Wert.
     function detailLine(sortBy, m) {
-      const parts = [];
-      if (sortBy !== "mostPlayed") {
-        parts.push(`<span><b>${m.sharedMatches}</b> matches</span>`);
-      }
       const me = nameLabel(MY_NAME);
-      if (sortBy === "kd") {
-        parts.push(`<span>Mate K/D <b>${(m.mateKd||0).toFixed(2)}</b></span>`);
-      } else if (sortBy === "mateKd") {
-        parts.push(`<span>${me} K/D <b>${(m.kd||0).toFixed(2)}</b></span>`);
-      } else {
-        parts.push(`<span>${me} <b>${(m.kd||0).toFixed(2)}</b> · Mate <b>${(m.mateKd||0).toFixed(2)}</b></span>`);
-      }
-      if (m.winsTogether && sortBy !== "chickensTogether") {
-        parts.push(`<span><b>${m.winsTogether}</b> CHICKEN</span>`);
-      }
-      if (sortBy !== "winRate" && sortBy !== "chickensTogether"
-          && (m.winRate || 0) > 0) {
-        parts.push(`<span>Win <b>${(m.winRate||0).toFixed(0)}%</b></span>`);
-      }
-      if (sortBy !== "avgPlace" && (m.avgPlace || 0) > 0) {
-        parts.push(`<span>Avg <b>#${(m.avgPlace||0).toFixed(1)}</b></span>`);
-      }
-      return parts.join("");
+      return [
+        `<span><b>${m.sharedMatches || 0}</b> matches</span>`,
+        `<span>K/D ${me} <b>${(m.kd||0).toFixed(2)}</b> / Mate <b>${(m.mateKd||0).toFixed(2)}</b></span>`,
+        `<span><b>${m.winsTogether || 0}</b> CHICKEN</span>`,
+        `<span>Win <b>${(m.winRate||0).toFixed(0)}%</b></span>`,
+        `<span>Avg <b>#${(m.avgPlace||0).toFixed(1)}</b></span>`,
+      ].join("");
     }
 
     // ── Daten holen ─────────────────────────────────────────
@@ -255,7 +242,7 @@
     // ── Rendering ─────────────────────────────────────────
     function renderSlide(sortBy, label, list) {
       if (!list || !list.length) {
-        return `<div class="empty">— keine Mates mit Min ${MIN} Matches —</div>`;
+        return `<div class="empty">— no mates with min ${MIN} matches —</div>`;
       }
       return list.map((m, i) => `
         <div class="row">

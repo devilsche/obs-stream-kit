@@ -198,39 +198,23 @@
       return n.length > 12 ? n.slice(0, 11) + "…" : n;
     }
 
+    // Detail-Line zeigt IMMER dieselben Felder in derselben Reihenfolge,
+    // unabhängig von SORT_BY. Sort beeinflusst nur welche Mates oben sind
+    // (und welcher Wert im 'primary'-Slot rechts groß angezeigt wird).
     function detailLine(m) {
-      const parts = [];
-      // Match-Anzahl als Kontext überall, außer bei mostPlayed (da primary)
-      if (SORT_BY !== "mostPlayed") {
-        parts.push(`<span><b>${m.sharedMatches}</b> matches</span>`);
-      }
-      // K/D — Mate-Name steht bereits in der Row-Headline,
-      // hier nur Streamer-Name + "Mate"-Label zur Disambiguierung.
       const me = nameLabel(MY_NAME);
-      if (SORT_BY === "kd") {
-        parts.push(`<span>Mate K/D <b>${(m.mateKd || 0).toFixed(2)}</b></span>`);
-      } else if (SORT_BY === "mateKd") {
-        parts.push(`<span>${me} K/D <b>${(m.kd || 0).toFixed(2)}</b></span>`);
-      } else {
-        parts.push(`<span>${me} <b>${(m.kd || 0).toFixed(2)}</b> · Mate <b>${(m.mateKd || 0).toFixed(2)}</b></span>`);
-      }
-      // CHICKEN — weglassen wenn schon primary
-      if (m.winsTogether && SORT_BY !== "chickensTogether") {
-        parts.push(`<span><b>${m.winsTogether}</b> CHICKEN</span>`);
-      }
-      // Win-Rate / Chicken-Rate — bei winRate ist's primary,
-      // bei chickensTogether ist's bereits im primary "X CHICKEN · Y%"
-      if (SORT_BY !== "winRate" && SORT_BY !== "chickensTogether"
-          && (m.winRate || 0) > 0) {
-        parts.push(`<span>Win <b>${(m.winRate||0).toFixed(0)}%</b></span>`);
-      }
-      // Avg Place — weglassen wenn schon primary
-      if (SORT_BY !== "avgPlace" && (m.avgPlace || 0) > 0) {
-        parts.push(`<span>Avg <b>#${(m.avgPlace||0).toFixed(1)}</b></span>`);
-      }
-      return parts.join("");
+      return [
+        `<span><b>${m.sharedMatches || 0}</b> matches</span>`,
+        `<span>K/D ${me} <b>${(m.kd || 0).toFixed(2)}</b> / Mate <b>${(m.mateKd || 0).toFixed(2)}</b></span>`,
+        `<span><b>${m.winsTogether || 0}</b> CHICKEN</span>`,
+        `<span>Win <b>${(m.winRate || 0).toFixed(0)}%</b></span>`,
+        `<span>Avg <b>#${(m.avgPlace || 0).toFixed(1)}</b></span>`,
+      ].join("");
     }
 
+    // Sort-Reihenfolge der Liste signalisiert den Sort-Kontext —
+    // keine separate primary-Spalte mehr, alle Stats in derselben
+    // Detail-Line in derselben Reihenfolge, unabhängig von SORT_BY.
     function render(list) {
       const rows = document.getElementById("rows");
       rows.innerHTML = list.map((m, i) => `
@@ -238,7 +222,6 @@
           <div class="row-top">
             <span class="rank">${i+1}</span>
             <span class="name">${m.name}</span>
-            <span class="primary">${primaryValue(m)}</span>
           </div>
           <div class="row-sub">${detailLine(m)}</div>
         </div>`).join("") || `<div class="pubg-error">no data yet</div>`;
