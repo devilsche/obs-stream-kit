@@ -419,6 +419,133 @@ def compute_map_distribution(conn, my_account_id, range_key="session"):
              "wins": r["wins"], "avgPlace": r["avg_place"]} for r in rows]
 
 
+def compute_lobby_avg_kd(conn, my_account_id, range_key="session"):
+    """Pro Match: Ø K/D aller ~60-100 Spieler in der Lobby.
+    Plus Aggregat über Range. Idee: Lobby-Schwierigkeit messen.
+
+    Lobby-K/D pro Match = SUM(kills) / max(SUM(deaths_proxy), 1)
+    deaths_proxy: alle Teilnehmer minus Wins (#1) sind irgendwann gestorben,
+    eine grobe Annäherung. Im Squad-Modus ist das nicht exakt, aber für
+    Trend-Vergleiche zwischen Lobbys ausreichend.
+
+    Liefert: {avg, my_kd, diff, perMatch: [{matchId, playedAt, lobbyKd, myKd}]}
+    """
+    cutoff = (_range_filter(conn, range_key)
+              if range_key != "all" else "1970-01-01T00:00:00Z")
+
+    rows = conn.execute("""
+        SELECT m.match_id, m.played_at,
+               SUM(p.kills)  AS lobby_kills,
+               COUNT(*)      AS lobby_n,
+               SUM(CASE WHEN p.place=1 THEN 1 ELSE 0 END) AS lobby_wins
+        FROM matches m
+        JOIN participants p ON p.match_id = m.match_id
+        WHERE m.match_id IN (
+          SELECT match_id FROM participants WHERE account_id = ?
+        ) AND m.played_at >= ?
+        GROUP BY m.match_id
+        ORDER BY m.played_at ASC
+    """, (my_account_id, cutoff)).fetchall()
+
+    per_match = []
+    sum_lobby_kd = 0.0
+    n = 0
+    for r in rows:
+        kills = r["lobby_kills"] or 0
+        ln = r["lobby_n"] or 0
+        wins = r["lobby_wins"] or 0
+        deaths_proxy = max(ln - wins, 1)
+        lobby_kd = kills / deaths_proxy
+        my = conn.execute(
+            "SELECT kills, place FROM participants "
+            "WHERE match_id = ? AND account_id = ?",
+            (r["match_id"], my_account_id),
+        ).fetchone()
+        my_kills = my["kills"] if my else 0
+        my_kd = my_kills if (my and my["place"] == 1) else my_kills
+        # my_kd vereinfacht: kills im Match. Echte K/D pro Match ist undefiniert
+        # (1 Death max), darum führen wir hier "my kills in match" als Proxy.
+        per_match.append({
+            "matchId": r["match_id"],
+            "playedAt": r["played_at"],
+            "lobbyKd": lobby_kd,
+            "myKills": my_kills,
+        })
+        sum_lobby_kd += lobby_kd
+        n += 1
+
+    avg_lobby_kd = (sum_lobby_kd / n) if n else 0
+    # Eigene Session-K/D aus existierender Aggregation berechnen
+    my_session = conn.execute("""
+        SELECT SUM(p.kills) AS k, COUNT(*) AS n,
+               SUM(CASE WHEN p.place=1 THEN 1 ELSE 0 END) AS w
+        FROM participants p JOIN matches m ON m.match_id = p.match_id
+        WHERE p.account_id = ? AND m.played_at >= ?
+    """, (my_account_id, cutoff)).fetchone()
+    my_k = (my_session and my_session["k"]) or 0
+    my_n = (my_session and my_session["n"]) or 0
+    my_w = (my_session and my_session["w"]) or 0
+    my_kd_session = my_k / max(my_n - my_w, 1)
+
+    return {
+        "avg": avg_lobby_kd,
+        "myKd": my_kd_session,
+        "diff": my_kd_session - avg_lobby_kd,
+        "matches": n,
+        "perMatch": per_match,
+    }
+
+
+def compute_trend_deltas(conn, my_account_id, gap_hours=4):
+    """Vergleich aktuelle Session vs. letzte abgeschlossene Session.
+    Liefert Deltas für K/D, Wins, Avg-DMG, Matches.
+    """
+    sessions = compute_sessions_index(conn, my_account_id, gap_hours=gap_hours)
+    if len(sessions) < 1:
+        return {"current": None, "previous": None, "deltas": None}
+
+    def _agg(start, end):
+        # start = sessionStart-ISO; end = sessionEnd-ISO oder None für aktuelle
+        sql = """
+            SELECT SUM(p.kills) AS k, COUNT(*) AS n,
+                   SUM(CASE WHEN p.place=1 THEN 1 ELSE 0 END) AS w,
+                   AVG(p.damage_dealt) AS avg_dmg
+            FROM participants p JOIN matches m ON m.match_id = p.match_id
+            WHERE p.account_id = ? AND m.played_at >= ?
+        """
+        params = [my_account_id, start]
+        if end:
+            sql += " AND m.played_at <= ?"
+            params.append(end)
+        r = conn.execute(sql, params).fetchone()
+        n = (r and r["n"]) or 0
+        w = (r and r["w"]) or 0
+        k = (r and r["k"]) or 0
+        return {
+            "matches": n,
+            "wins": w,
+            "kd": k / max(n - w, 1),
+            "avgDmg": (r and r["avg_dmg"]) or 0,
+        }
+
+    cur_session = sessions[0]
+    cur = _agg(cur_session["from"], None)
+    prev = None
+    if len(sessions) >= 2:
+        prev_session = sessions[1]
+        prev = _agg(prev_session["from"], prev_session["to"])
+
+    deltas = None
+    if prev:
+        deltas = {
+            "kd":      cur["kd"] - prev["kd"],
+            "wins":    cur["wins"] - prev["wins"],
+            "avgDmg":  cur["avgDmg"] - prev["avgDmg"],
+            "matches": cur["matches"] - prev["matches"],
+        }
+    return {"current": cur, "previous": prev, "deltas": deltas}
+
+
 def compute_map_performance(conn, my_account_id, range_key="all"):
     """Pro Map: Matches, Wins, K/D, Ø Kills/DMG/Place/Surv.
     range_key: 'session' | 'day' | 'week' | 'all'."""

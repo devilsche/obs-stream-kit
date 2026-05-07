@@ -6,39 +6,43 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="_pubg.css">
   <style>
-    body { display: flex; align-items: center; justify-content: center; height: 100vh; }
+    /* Anker: bottom-left (Slot-Widget). Card sitzt unten, Inhalt linksbündig. */
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 16px;
+      box-sizing: border-box;
+    }
     .card {
       width: 360px;
-      padding: 24px;
-      text-align: center;
-      transition: opacity 0.6s, transform 0.6s;
-      opacity: 0;
-      transform: translateX(80px);
+      padding: 16px 20px;
     }
-    .card.visible { opacity: 1; transform: translateX(0); }
     .card .label { font-size: 0.85em; color: var(--pubg-muted); }
     .card h2 {
-      margin: 6px 0 18px;
-      font-size: 1.2em;
+      margin: 6px 0 14px;
+      font-size: 1.1em;
       letter-spacing: 0.04em;
       color: var(--pubg-text);
     }
     .card .place {
-      font-size: 3em;
+      font-size: 2.4em;
       font-weight: 700;
       color: var(--pubg-gold);
-      margin: 12px 0;
+      margin: 8px 0;
       text-shadow: 0 0 20px rgba(242, 183, 5, 0.4);
     }
     .card .stats {
-      display: flex; justify-content: space-around;
-      margin-top: 14px; gap: 12px;
+      display: flex; justify-content: space-between;
+      margin-top: 10px; gap: 12px;
     }
     .card .stats > div { display: flex; flex-direction: column; }
   </style>
 </head>
 <body>
-  <div class="pubg-card card" id="card">
+  <div class="pubg-header" id="pubgHeader"></div>
+  <div class="pubg-card card pubg-fade-in" id="card">
     <div class="label">MATCH <span id="matchnum">—</span></div>
     <h2 id="header">— · —</h2>
     <div class="place" id="place">—</div>
@@ -50,41 +54,31 @@
   </div>
   <script src="_pubg.js"></script>
   <script>
-    const HIDE_AFTER_MS = parseInt(PubgUI.qs("durationMs", 10000), 10);
-    let lastMatchId = null;
-    let hideTimer = null;
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), "Last Match", "session");
 
-    function showCard(lm) {
-      document.getElementById("matchnum").textContent = "#" + (lm.matchId || "");
+    function render(lm) {
+      if (!lm || !lm.matchId) return;
+      document.getElementById("matchnum").textContent = "#" + lm.matchId.slice(0, 8);
       document.getElementById("header").textContent =
         PubgUI.fmtMap(lm.map) + " · " + PubgUI.fmtMode(lm.mode);
       document.getElementById("place").textContent = PubgUI.fmtPlace(lm.place);
       const ms = lm.myStats || {};
-      const card = document.getElementById("card");
-      card.classList.add("visible");
-
-      ["kills", "dmg"].forEach(id => document.getElementById(id).textContent = "0");
-      requestAnimationFrame(() => {
-        PubgUI.animateNumber(document.getElementById("kills"), ms.kills || 0,
-                             {format: (n) => String(Math.round(n))});
-        PubgUI.animateNumber(document.getElementById("dmg"),
-                             Math.round(ms.damage_dealt || 0),
-                             {format: (n) => Math.round(n) >= 1000 ? (n/1000).toFixed(1)+"k" : String(Math.round(n))});
-      });
+      PubgUI.animateNumber(document.getElementById("kills"), ms.kills || 0,
+                           {format: (n) => String(Math.round(n))});
+      PubgUI.animateNumber(document.getElementById("dmg"),
+                           Math.round(ms.damage_dealt || 0),
+                           {format: (n) => Math.round(n) >= 1000 ? (n/1000).toFixed(1)+"k" : String(Math.round(n))});
       const min = Math.floor((ms.time_survived || 0) / 60);
       const sec = (ms.time_survived || 0) % 60;
       document.getElementById("surv").textContent = `${min}:${String(sec).padStart(2, "0")}`;
-
-      if (hideTimer) clearTimeout(hideTimer);
-      hideTimer = setTimeout(() => card.classList.remove("visible"), HIDE_AFTER_MS);
     }
 
+    // Slot-Modus: kein Auto-Show/Hide mehr — Card ist immer sichtbar wenn
+    // Last-Match-Daten existieren. Sichtbarkeit steuert OBS via Source-Toggle.
+    PubgUI.hideIfStale();
     PubgUI.poll("/api/pubg/last-match", 30000, (lm) => {
-      if (!lm || !lm.matchId) return;
-      if (lm.matchId !== lastMatchId) {
-        lastMatchId = lm.matchId;
-        showCard(lm);
-      }
+      PubgUI.hideIfStale();
+      render(lm);
     }, console.error);
   </script>
 </body>
