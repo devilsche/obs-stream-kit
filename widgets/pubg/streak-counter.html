@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Streak Counter</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    /* Anker: bottom-left. */
+    html, body { height: 100%; margin: 0; }
+    body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      box-sizing: border-box;
+    }
+    .panel { padding: 18px 22px; }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .flame {
+      font-size: 3em;
+      filter: drop-shadow(0 0 12px rgba(255, 100, 0, 0.6));
+      animation: pubg-fire-flicker 0.6s ease-in-out infinite alternate;
+    }
+    .num {
+      font-size: 3em;
+      font-weight: 700;
+      color: var(--pubg-gold);
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 14px rgba(242, 183, 5, 0.4);
+    }
+    .label {
+      color: var(--pubg-muted);
+      font-size: 0.85em;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+    .desc { color: var(--pubg-muted); font-size: 0.85em; margin-top: 4px; }
+    .cold { opacity: 0.5; }
+  </style>
+</head>
+<body>
+  <div class="pubg-header" id="pubgHeader"></div>
+  <div class="pubg-card panel pubg-fade-in" id="card">
+    <div class="row">
+      <span class="flame" id="flame">🔥</span>
+      <div>
+        <div class="num" id="num">0</div>
+        <div class="label" id="lbl">streak</div>
+      </div>
+    </div>
+    <div class="desc" id="desc">—</div>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    // ?type=chicken|top10|kd1   (default chicken)
+    const TYPE = PubgUI.qs("type", "chicken");
+    const TYPES = {
+      chicken: { title: "Chicken Streak",  desc: "consecutive #1 finishes",
+                 test: m => (m.place || 99) === 1 },
+      top10:   { title: "Top-10 Streak",   desc: "consecutive top-10 finishes",
+                 test: m => (m.place || 99) <= 10 },
+      kd1:     { title: "K/D > 1 Streak",  desc: "consecutive matches with kills > 1",
+                 test: m => (m.kills || 0) >= 1 },
+    };
+    const cfg = TYPES[TYPE] || TYPES.chicken;
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), cfg.title, "session");
+    document.getElementById("desc").textContent = cfg.desc;
+
+    PubgUI.buildFilter([
+      { key: "type", label: "Type", type: "select", default: "chicken",
+        options: [["chicken","Chicken"],["top10","Top-10"],["kd1","K/D > 1"]]},
+    ]);
+
+    async function refresh() {
+      try {
+        // /api/pubg/session-matches liefert Matches absteigend (neueste zuerst)
+        const matches = await PubgUI.fetchJson("/api/pubg/session-matches?range=session");
+        let streak = 0;
+        for (const m of matches) {
+          if (cfg.test(m)) streak++;
+          else break;
+        }
+        document.getElementById("num").textContent = streak;
+        const card = document.getElementById("card");
+        const flame = document.getElementById("flame");
+        if (streak === 0) {
+          card.classList.add("cold");
+          flame.textContent = "❄️";
+        } else {
+          card.classList.remove("cold");
+          flame.textContent = "🔥";
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    PubgUI.hideIfStale();
+    refresh();
+    setInterval(() => {
+      PubgUI.hideIfStale();
+      refresh();
+    }, 30000);
+  </script>
+</body>
+</html>

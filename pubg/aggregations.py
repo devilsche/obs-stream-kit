@@ -419,6 +419,38 @@ def compute_map_distribution(conn, my_account_id, range_key="session"):
              "wins": r["wins"], "avgPlace": r["avg_place"]} for r in rows]
 
 
+def compute_session_matches(conn, my_account_id, range_key="session"):
+    """Flache Liste der Matches in der Range — leichtgewichtig.
+    Genutzt von Streak-Counter, Session-Goal, Achievements etc."""
+    cutoff = (_range_filter(conn, range_key)
+              if range_key != "all" else "1970-01-01T00:00:00Z")
+    rows = conn.execute("""
+        SELECT m.match_id, m.map_name, m.game_mode, m.played_at,
+               m.duration_secs,
+               pa.kills, pa.damage_dealt, pa.place, pa.time_survived,
+               pa.longest_kill, pa.headshot_kills, pa.assists, pa.dbnos
+        FROM matches m
+        JOIN participants pa ON pa.match_id = m.match_id
+        WHERE pa.account_id = ? AND m.played_at >= ?
+        ORDER BY m.played_at DESC
+    """, (my_account_id, cutoff)).fetchall()
+    return [{
+        "matchId":     r["match_id"],
+        "map":         r["map_name"],
+        "mode":        r["game_mode"],
+        "playedAt":    r["played_at"],
+        "durationSec": r["duration_secs"],
+        "kills":       r["kills"] or 0,
+        "damage":      r["damage_dealt"] or 0,
+        "place":       r["place"],
+        "survivedSec": r["time_survived"] or 0,
+        "longestKill": r["longest_kill"] or 0,
+        "headshots":   r["headshot_kills"] or 0,
+        "assists":     r["assists"] or 0,
+        "dbnos":       r["dbnos"] or 0,
+    } for r in rows]
+
+
 def compute_lobby_avg_kd(conn, my_account_id, range_key="session"):
     """Pro Match: Ø K/D aller ~60-100 Spieler in der Lobby.
     Plus Aggregat über Range. Idee: Lobby-Schwierigkeit messen.

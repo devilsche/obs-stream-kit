@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Session Lobbies</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    /* Anker: bottom-left (Slot-Widget). */
+    html, body { height: 100%; margin: 0; }
+    body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      box-sizing: border-box;
+    }
+    .panel { padding: 16px 18px; }
+    .top {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      margin-bottom: 10px;
+    }
+    .big {
+      font-size: 2.4em;
+      font-weight: 700;
+      color: var(--pubg-gold);
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 14px rgba(242, 183, 5, 0.35);
+    }
+    .label { color: var(--pubg-muted); font-size: 0.85em; }
+    .row { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.95em; }
+    .row b { color: var(--pubg-text); font-variant-numeric: tabular-nums; }
+    .diff-pos { color: #7be57b; }
+    .diff-neg { color: #e57b7b; }
+    .spark {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 36px;
+      margin-top: 12px;
+    }
+    .spark .bar {
+      flex: 1 1 0;
+      min-height: 2px;
+      background: var(--pubg-gold);
+      opacity: 0.55;
+      border-radius: 1px;
+      transition: height 0.4s;
+    }
+    .spark .bar.last { opacity: 1; }
+    .meta { color: var(--pubg-muted); font-size: 0.78em; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="pubg-header" id="pubgHeader"></div>
+  <div class="pubg-card panel pubg-fade-in">
+    <div class="top">
+      <span class="big" id="avg">—</span>
+      <span class="label">Ø Lobby K/D</span>
+    </div>
+    <div class="row">
+      <span class="label">Your K/D</span>
+      <b id="myKd">—</b>
+    </div>
+    <div class="row">
+      <span class="label">Diff</span>
+      <b id="diff">—</b>
+    </div>
+    <div class="spark" id="spark"></div>
+    <div class="meta" id="meta">— Matches</div>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    const RANGE = PubgUI.qs("range", "session");
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), "Session Lobbies", RANGE);
+
+    PubgUI.buildFilter([
+      { key: "range", label: "Range", type: "select", default: "session",
+        options: [["session","Session"],["week","7 days"],["all","Database"]]},
+    ]);
+
+    function render(d) {
+      if (!d || d.matches === 0) {
+        document.getElementById("avg").textContent = "—";
+        document.getElementById("myKd").textContent = "—";
+        document.getElementById("diff").textContent = "—";
+        document.getElementById("spark").innerHTML = "";
+        document.getElementById("meta").textContent = "no matches in range";
+        return;
+      }
+      document.getElementById("avg").textContent = (d.avg || 0).toFixed(2);
+      document.getElementById("myKd").textContent = (d.myKd || 0).toFixed(2);
+      const diff = d.diff || 0;
+      const diffEl = document.getElementById("diff");
+      const sign = diff >= 0 ? "+" : "";
+      diffEl.textContent = sign + diff.toFixed(2);
+      diffEl.className = "";
+      diffEl.classList.add(diff >= 0 ? "diff-pos" : "diff-neg");
+
+      // Sparkline aus perMatch (letzte 16)
+      const last = (d.perMatch || []).slice(-16);
+      const max = Math.max(0.5, ...last.map(m => m.lobbyKd || 0));
+      const html = last.map((m, i) => {
+        const h = Math.max(2, Math.round(((m.lobbyKd || 0) / max) * 36));
+        return `<div class="bar ${i === last.length - 1 ? "last" : ""}" style="height:${h}px"></div>`;
+      }).join("");
+      document.getElementById("spark").innerHTML = html;
+
+      const n = d.matches || 0;
+      document.getElementById("meta").textContent =
+        `${n} ${n === 1 ? "Match" : "Matches"} in range`;
+    }
+
+    if (RANGE === "session") PubgUI.hideIfStale();
+    PubgUI.poll(`/api/pubg/lobby-avg-kd?range=${RANGE}`, 30000, (d) => {
+      if (RANGE === "session") PubgUI.hideIfStale();
+      render(d);
+    }, console.error);
+  </script>
+</body>
+</html>

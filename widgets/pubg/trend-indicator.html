@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Trend Indicator</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    /* Anker: bottom-left. */
+    html, body { height: 100%; margin: 0; }
+    body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      box-sizing: border-box;
+    }
+    .panel { padding: 18px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+    .cell {
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: rgba(94, 42, 121, 0.18);
+      border: 1px solid var(--pubg-border);
+    }
+    .cell .label {
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .cell .row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .cell .val {
+      font-size: 1.4em;
+      font-weight: 700;
+      color: var(--pubg-text);
+      font-variant-numeric: tabular-nums;
+    }
+    .delta {
+      font-weight: 700;
+      font-size: 0.95em;
+      font-variant-numeric: tabular-nums;
+    }
+    .delta-pos { color: #7be57b; }
+    .delta-neg { color: #e57b7b; }
+    .delta-zero { color: var(--pubg-muted); }
+    .meta { color: var(--pubg-muted); font-size: 0.78em; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="pubg-header" id="pubgHeader"></div>
+  <div class="pubg-card panel pubg-fade-in">
+    <div class="grid">
+      <div class="cell">
+        <div class="label">K/D</div>
+        <div class="row"><span class="val" id="kd">—</span><span class="delta" id="kdDelta">—</span></div>
+      </div>
+      <div class="cell">
+        <div class="label">Wins</div>
+        <div class="row"><span class="val" id="wins">—</span><span class="delta" id="winsDelta">—</span></div>
+      </div>
+      <div class="cell">
+        <div class="label">Avg DMG</div>
+        <div class="row"><span class="val" id="dmg">—</span><span class="delta" id="dmgDelta">—</span></div>
+      </div>
+      <div class="cell">
+        <div class="label">Matches</div>
+        <div class="row"><span class="val" id="matches">—</span><span class="delta" id="matchesDelta">—</span></div>
+      </div>
+    </div>
+    <div class="meta" id="meta">—</div>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), "Trend", "session");
+
+    function fmtDelta(v, fmt) {
+      if (v == null) return "—";
+      const sign = v > 0 ? "↑" : (v < 0 ? "↓" : "·");
+      const abs = fmt(Math.abs(v));
+      const cls = v > 0.001 ? "delta-pos" : (v < -0.001 ? "delta-neg" : "delta-zero");
+      return `<span class="${cls}">${sign}${abs}</span>`;
+    }
+
+    function setDelta(elId, v, fmt) {
+      const el = document.getElementById(elId);
+      if (v == null) {
+        el.outerHTML = `<span class="delta delta-zero" id="${elId}">—</span>`;
+        return;
+      }
+      const sign = v > 0 ? "↑" : (v < 0 ? "↓" : "·");
+      const abs = fmt(Math.abs(v));
+      const cls = v > 0.001 ? "delta-pos" : (v < -0.001 ? "delta-neg" : "delta-zero");
+      el.className = "delta " + cls;
+      el.textContent = `${sign}${abs}`;
+    }
+
+    function render(d) {
+      if (!d || !d.current) {
+        document.getElementById("meta").textContent = "no current session";
+        return;
+      }
+      const c = d.current;
+      const dl = d.deltas;
+
+      document.getElementById("kd").textContent = (c.kd || 0).toFixed(2);
+      document.getElementById("wins").textContent = c.wins || 0;
+      document.getElementById("dmg").textContent = Math.round(c.avgDmg || 0);
+      document.getElementById("matches").textContent = c.matches || 0;
+
+      if (!dl) {
+        document.getElementById("meta").textContent = "no previous session for comparison";
+        ["kdDelta","winsDelta","dmgDelta","matchesDelta"].forEach(id => {
+          document.getElementById(id).textContent = "—";
+          document.getElementById(id).className = "delta delta-zero";
+        });
+        return;
+      }
+
+      setDelta("kdDelta",      dl.kd,      v => v.toFixed(2));
+      setDelta("winsDelta",    dl.wins,    v => String(v));
+      setDelta("dmgDelta",     dl.avgDmg,  v => Math.round(v).toString());
+      setDelta("matchesDelta", dl.matches, v => String(v));
+
+      document.getElementById("meta").textContent = "vs. last session";
+    }
+
+    PubgUI.hideIfStale();
+    PubgUI.poll("/api/pubg/trend-deltas", 30000, (d) => {
+      PubgUI.hideIfStale();
+      render(d);
+    }, console.error);
+  </script>
+</body>
+</html>

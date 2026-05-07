@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Session Goal</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    /* Anker: bottom-left. */
+    html, body { height: 100%; margin: 0; }
+    body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      box-sizing: border-box;
+    }
+    .panel { padding: 16px 18px; }
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 12px;
+    }
+    .title {
+      color: var(--pubg-text);
+      font-size: 1.05em;
+      font-weight: 700;
+    }
+    .progress {
+      color: var(--pubg-gold);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      font-size: 1.4em;
+    }
+    .progress .target { color: var(--pubg-muted); font-size: 0.7em; }
+    .bar {
+      width: 100%;
+      height: 14px;
+      border-radius: 7px;
+      background: rgba(94, 42, 121, 0.3);
+      border: 1px solid var(--pubg-border);
+      overflow: hidden;
+    }
+    .bar .fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--pubg-gold), #ffce4d);
+      box-shadow: 0 0 12px rgba(242, 183, 5, 0.6);
+      transition: width 0.6s;
+      border-radius: 6px;
+    }
+    .bar.done .fill { background: linear-gradient(90deg, #7be57b, #b9f59b); }
+    .meta { color: var(--pubg-muted); font-size: 0.78em; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="pubg-header" id="pubgHeader"></div>
+  <div class="pubg-card panel pubg-fade-in">
+    <div class="head">
+      <div class="title" id="title">Goal</div>
+      <div class="progress">
+        <span id="current">0</span><span class="target"> / <span id="target">—</span></span>
+      </div>
+    </div>
+    <div class="bar" id="bar"><div class="fill" id="fill" style="width:0%"></div></div>
+    <div class="meta" id="meta">—</div>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    // ?goal=<metric>:<target>
+    // metric: kills | chickens | matches | kd | dmg
+    // Beispiel: ?goal=kills:20  →  "20 Kills" Ziel
+    const GOAL_RAW = PubgUI.qs("goal", "kills:20");
+    const KEEP = PubgUI.qs("keepAfterDone") === "1";
+    const [METRIC, TARGET_RAW] = GOAL_RAW.split(":");
+    const TARGET = parseFloat(TARGET_RAW);
+
+    const METRICS = {
+      kills:    { label: "Kills",    title: "Kills Goal",    aggregate: ms => ms.reduce((a, m) => a + (m.kills || 0), 0) },
+      chickens: { label: "Chickens", title: "Chicken Goal",  aggregate: ms => ms.filter(m => m.place === 1).length },
+      matches:  { label: "Matches",  title: "Matches Goal",  aggregate: ms => ms.length },
+      dmg:      { label: "DMG",      title: "Damage Goal",   aggregate: ms => Math.round(ms.reduce((a, m) => a + (m.damage || 0), 0)) },
+      kd:       { label: "K/D",      title: "K/D Goal",
+                  aggregate: ms => {
+                    const k = ms.reduce((a, m) => a + (m.kills || 0), 0);
+                    const w = ms.filter(m => m.place === 1).length;
+                    return ms.length ? k / Math.max(ms.length - w, 1) : 0;
+                  }},
+    };
+    const cfg = METRICS[METRIC] || METRICS.kills;
+
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), cfg.title, "session");
+    document.getElementById("title").textContent = cfg.label;
+    document.getElementById("target").textContent =
+      METRIC === "kd" ? TARGET.toFixed(1) : Math.round(TARGET);
+
+    PubgUI.buildFilter([
+      { key: "goal", label: "Goal (metric:target)", type: "text",
+        placeholder: "kills:20" },
+    ]);
+
+    async function refresh() {
+      try {
+        const matches = await PubgUI.fetchJson("/api/pubg/session-matches?range=session");
+        const value = cfg.aggregate(matches);
+        const pct = Math.min(100, (value / TARGET) * 100);
+        document.getElementById("current").textContent =
+          METRIC === "kd" ? (value || 0).toFixed(2) : Math.round(value);
+        document.getElementById("fill").style.width = pct + "%";
+        const bar = document.getElementById("bar");
+        bar.classList.toggle("done", value >= TARGET);
+        const remaining = METRIC === "kd"
+          ? (TARGET - value).toFixed(2)
+          : Math.max(0, Math.round(TARGET - value));
+        document.getElementById("meta").textContent =
+          (value >= TARGET) ? "🎉 Goal reached" : `${remaining} ${cfg.label} to go`;
+
+        if (value >= TARGET && !KEEP) {
+          // Auto-hide nach 60s wenn Ziel erreicht
+          setTimeout(() => {
+            if (document.body) document.body.style.display = "none";
+          }, 60000);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    PubgUI.hideIfStale();
+    refresh();
+    setInterval(() => {
+      PubgUI.hideIfStale();
+      refresh();
+    }, 30000);
+  </script>
+</body>
+</html>
