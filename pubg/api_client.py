@@ -60,25 +60,29 @@ class PubgClient:
         except urllib.error.URLError as e:
             raise ApiError(f"URL error: {e.reason}") from e
 
-    def _get_json(self, url: str) -> dict:
-        if not self.limiter.try_acquire():
+    def _get_json(self, url: str, rate_limited: bool = True) -> dict:
+        if rate_limited and not self.limiter.try_acquire():
             raise RateLimitError("Rate-Limit erreicht — bitte warten")
         body = self._raw_get(url)
         return json.loads(body.decode("utf-8"))
 
     def get_player(self, name: str) -> dict:
+        # /players is rate-limited (10 RPM default)
         url = (f"{PUBG_BASE}/shards/{self.platform}/players"
                f"?filter[playerNames]={name}")
-        return self._get_json(url)
+        return self._get_json(url, rate_limited=True)
 
     def get_match(self, match_id: str) -> dict:
+        # /matches/{id} is NOT rate-limited per PUBG docs
+        # (rate-limits.rst → "Expected Rate Limit Usage")
         url = f"{PUBG_BASE}/shards/{self.platform}/matches/{match_id}"
-        return self._get_json(url)
+        return self._get_json(url, rate_limited=False)
 
     def get_lifetime(self, account_id: str) -> dict:
+        # /players/{id}/seasons/lifetime is rate-limited
         url = (f"{PUBG_BASE}/shards/{self.platform}/players/{account_id}"
                f"/seasons/lifetime")
-        return self._get_json(url)
+        return self._get_json(url, rate_limited=True)
 
     def get_telemetry(self, telemetry_url: str) -> list:
         # Telemetry-CDN, no API-Key needed, no rate-limit on this endpoint.
