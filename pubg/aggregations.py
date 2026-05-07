@@ -907,7 +907,13 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
 
 
 def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
-    """Pro Match: Hot-Drop ja/nein + Survival-Marker."""
+    """Pro Match: Hot-Drop ja/nein + Survival-Marker.
+
+    Match-Start = played_at − duration_secs (played_at ist Match-Ende).
+    Window = erste window_ms ab Match-Start. Vorher hatte ich
+    fälschlicherweise events[0].timestamp_ms als Match-Start
+    angenommen — das war der erste Kill, nicht der Match-Anfang.
+    """
     parts = conn.execute("""
         SELECT account_id, team_id, time_survived
         FROM participants WHERE match_id = ?
@@ -921,25 +927,32 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
 
     squad_ids = {a for a, t in acc_to_team.items() if t == my_team_id}
 
-    # Kill/Knock-Events des Matches, sortiert nach Zeit
+    # Echter Match-Start aus matches-Tabelle (played_at − duration_secs)
+    m_row = conn.execute(
+        "SELECT played_at, duration_secs FROM matches WHERE match_id = ?",
+        (match_id,)
+    ).fetchone()
+    if not m_row or not m_row["played_at"]:
+        return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
+    end_dt = _parse_iso(m_row["played_at"])
+    if end_dt is None:
+        return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
+    duration_secs = m_row["duration_secs"] or 0
+    match_start_ms = int((end_dt.timestamp() - duration_secs) * 1000)
+    early_cutoff_ms = match_start_ms + window_ms
+
+    # Kill/Knock-Events innerhalb des frühen Fensters
     events = conn.execute("""
         SELECT actor_account, target_account, timestamp_ms
         FROM telemetry_events
-        WHERE match_id = ? AND event_type IN ('Kill', 'Knock')
+        WHERE match_id = ?
+          AND event_type IN ('Kill', 'Knock')
+          AND timestamp_ms <= ?
         ORDER BY timestamp_ms ASC
-    """, (match_id,)).fetchall()
-    if not events:
-        # Keine Telemetry → können nichts sagen
-        return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
-
-    match_start = events[0]["timestamp_ms"] or 0
-    early_cutoff = match_start + window_ms
+    """, (match_id, early_cutoff_ms)).fetchall()
 
     hot_drop = False
     for e in events:
-        ts = e["timestamp_ms"] or 0
-        if ts > early_cutoff:
-            break
         a, v = e["actor_account"], e["target_account"]
         a_team = acc_to_team.get(a)
         v_team = acc_to_team.get(v)
@@ -952,7 +965,7 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
             hot_drop = True
             break
 
-    # Survival-Marker via time_survived
+    # Survival-Marker via time_survived (Sekunden ab Match-Start)
     my_part = next((p for p in parts if p["account_id"] == my_account_id), None)
     my_surv = (my_part and my_part["time_survived"]) or 0
     squad_surv = max((p["time_survived"] or 0)

@@ -209,34 +209,68 @@ def _squad_account_ids_for_match(conn, match_id):
     return {r["account_id"] for r in rows}
 
 
+def _process_one_telemetry(conn, client, my_account_id, row):
+    """Lädt + persistiert Telemetry-Events für ein Match. Idempotent."""
+    from pubg.telemetry import filter_squad_events
+    try:
+        raw = client.get_telemetry(row["telemetry_url"])
+    except Exception as e:
+        mark_telemetry_fetched(conn, row["match_id"])
+        raise RuntimeError(f"telemetry {row['match_id']}: {e}")
+    squad = _squad_account_ids_for_match(conn, row["match_id"])
+    if my_account_id not in squad:
+        squad.add(my_account_id)
+    events = list(filter_squad_events(raw, squad))
+    # Bei Re-Fetch (alte Schema-Version) erst alte events löschen,
+    # sonst Doubletten.
+    conn.execute("DELETE FROM telemetry_events WHERE match_id = ?",
+                  (row["match_id"],))
+    conn.commit()
+    if events:
+        insert_telemetry_events(conn, row["match_id"], events)
+    mark_telemetry_fetched(conn, row["match_id"])
+    mark_telemetry_schema(conn, row["match_id"])
+
+
 def process_telemetry_backlog(conn, client, my_account_id, max_per_tick=5):
-    from pubg.telemetry import filter_squad_events  # imported lazily, module created in Phase 9
+    """Verarbeitet bis zu max_per_tick Telemetries (für Poller-Tick)."""
     pending = get_matches_needing_telemetry(conn, limit=max_per_tick)
     processed = 0
     errors = []
     for row in pending:
         try:
-            raw = client.get_telemetry(row["telemetry_url"])
+            _process_one_telemetry(conn, client, my_account_id, row)
+            processed += 1
         except Exception as e:
-            errors.append(f"telemetry {row['match_id']}: {e}")
-            mark_telemetry_fetched(conn, row["match_id"])
-            continue
-        squad = _squad_account_ids_for_match(conn, row["match_id"])
-        if my_account_id not in squad:
-            squad.add(my_account_id)
-        events = list(filter_squad_events(raw, squad))
-        # Bei Re-Fetch (alte Schema-Version) erst alte events löschen,
-        # sonst Doubletten.
-        conn.execute("DELETE FROM telemetry_events WHERE match_id = ?",
-                      (row["match_id"],))
-        conn.commit()
-        if events:
-            insert_telemetry_events(conn, row["match_id"], events)
-        mark_telemetry_fetched(conn, row["match_id"])
-        # Schema-Marker setzen → kein endloser Re-Fetch
-        mark_telemetry_schema(conn, row["match_id"])
-        processed += 1
+            errors.append(str(e))
     return {"processed": processed, "errors": errors}
+
+
+def run_bulk_telemetry_catchup(conn, client, my_account_id,
+                                max_matches: int | None = None,
+                                pacing_ms: int = 100, progress_cb=None) -> dict:
+    """Verarbeitet ALLE pending Telemetries ohne 60s-Tick-Drossel.
+    /telemetry-cdn ist laut PUBG-Doku NICHT rate-limited — wir können
+    sequentiell durchziehen, nur 100ms Höflichkeits-Pace zwischen Calls.
+
+    max_matches=None → kein Cap, alle pending werden verarbeitet.
+    """
+    import time
+    stats = {"processed": 0, "errors": [], "skipped": 0}
+    pending = get_matches_needing_telemetry(
+        conn, limit=max_matches if max_matches is not None else 100000)
+    total = len(pending)
+    for i, row in enumerate(pending, 1):
+        try:
+            _process_one_telemetry(conn, client, my_account_id, row)
+            stats["processed"] += 1
+        except Exception as e:
+            stats["errors"].append(str(e))
+        if progress_cb:
+            progress_cb(i, total, stats["processed"])
+        if pacing_ms > 0 and i < total:
+            time.sleep(pacing_ms / 1000)
+    return stats
 
 
 class PollerThread(threading.Thread):

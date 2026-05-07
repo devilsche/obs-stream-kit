@@ -7,7 +7,7 @@ from pubg.config import load_config, load_api_key
 from pubg.db import (connect, init_schema, upsert_player, get_player_by_name,
                       integrity_check)
 from pubg.api_client import PubgClient
-from pubg.poller import run_bulk_catchup
+from pubg.poller import run_bulk_catchup, run_bulk_telemetry_catchup
 from pubg.backup import (load_ftp_config, list_remote_backups,
                           download_from_ftp)
 
@@ -70,8 +70,30 @@ def cold_start(root: str, max_matches: int | None = None):
         print(f"  Errors: {stats['errors'][:5]}"
               f"{'...' if len(stats['errors']) > 5 else ''} "
               f"({len(stats['errors'])} total)")
+    print(f"Cold-Start (matches): {stats['new_matches']} Matches in DB.")
+
+    # Phase 2: Telemetry-Bulk-Catchup. /telemetry-cdn ist nicht rate-
+    # limited, also alle pending durchziehen. Telemetry-Files sind groß
+    # (5-50MB), realistisch ~1-3s pro Match plus Parsing.
+    print("Cold-Start (telemetry): hole Telemetry-Events für alle Matches "
+          "die noch keine haben…")
+
+    def _t_progress(i, total, done):
+        if i % 5 == 0 or i == total:
+            print(f"  ...{i}/{total} Telemetries verarbeitet (ok: {done})")
+
+    t_stats = run_bulk_telemetry_catchup(conn, client, my_acc_id,
+                                          pacing_ms=100,
+                                          progress_cb=_t_progress)
+    if t_stats["errors"]:
+        print(f"  Telemetry-Errors: {t_stats['errors'][:3]}"
+              f"{'...' if len(t_stats['errors']) > 3 else ''} "
+              f"({len(t_stats['errors'])} total — typisch >14d-Matches)")
+    print(f"Cold-Start (telemetry): {t_stats['processed']} Telemetries "
+          f"persistiert.")
+
     conn.close()
-    print(f"Cold-Start fertig — {stats['new_matches']} Matches in DB.")
+    print("Cold-Start fertig.")
     return 0
 
 
