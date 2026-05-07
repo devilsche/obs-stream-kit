@@ -285,8 +285,10 @@ def test_first_fight_cluster_multi_team(tmp_db_path):
     res = compute_first_fight_rate(conn, "account.A", range_key="session")
     assert res["total"] == 1
     assert res["survived"] == 1     # Squad lebt → WIN
-    assert res["avgTeams"] == 3.0   # Team 1 (wir), Team 2, Team 3
-    assert res["maxTeams"] == 3
+    # Neue Semantik: nur OPPONENT-Teams die uns direkt angegriffen haben.
+    # Squad-Team (Team 1) selbst zählt nicht. Hier: Team 2 + Team 3 = 2.
+    assert res["avgTeams"] == 2.0
+    assert res["maxTeams"] == 2
 
 
 def test_squad_compare_table(tmp_db_path):
