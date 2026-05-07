@@ -189,10 +189,15 @@
     return () => { stopped = true; if (rafId) cancelAnimationFrame(rafId); };
   };
 
-  // Body ausblenden wenn letzter Match älter als maxAgeMs (Default 1h).
-  // Für Live-Widgets (live-bar, news-ticker) — sollen nur on-screen sein
-  // wenn aktuell gespielt wird. Bei Fehler oder leerer DB: ausblenden.
+  // Body als 'pubg-stale-hidden' markieren wenn letzter Match älter als
+  // maxAgeMs (Default 1h). CSS blendet alles im Body aus außer die
+  // Filter-Bar — dort kann der Nutzer 'Show always' togglen.
+  // ?ignoreStale=1 (oder Filter-Toggle 'Show always') überspringt den Check.
   PubgUI.hideIfStale = async (maxAgeMs) => {
+    if (PubgUI.qs("ignoreStale") === "1") {
+      if (document.body) document.body.classList.remove("pubg-stale-hidden");
+      return false;
+    }
     const limit = maxAgeMs == null ? 3600 * 1000 : maxAgeMs;
     let stale = true;
     try {
@@ -202,9 +207,11 @@
     } catch (_) {
       stale = true;
     }
-    if (document.body) document.body.style.display = stale ? "none" : "";
+    if (document.body) document.body.classList.toggle("pubg-stale-hidden", stale);
     return stale;
   };
+
+  PubgUI.ignoreStale = () => PubgUI.qs("ignoreStale") === "1";
 
   PubgUI.poll = (url, interval, onData, onError) => {
     let stopped = false;
@@ -342,10 +349,24 @@
     PubgUI._injectFilterCss();
     document.body.classList.add("pubg-has-filter");
 
+    // Globaler Toggle 'Show always' wird an jede Filter-Bar angehängt.
+    // Dadurch kann jedes Widget die hide-on-no-session-Logik bypassen
+    // (für Demo/Test). URL-Param ?ignoreStale=1.
+    const allSpecs = [...specs, {
+      key: "ignoreStale",
+      label: "Show always",
+      type: "select",
+      default: "0",
+      options: [["0", "No"], ["1", "Yes"]],
+      tooltip: "Bypass the 'hide when no recent session' check. Use for " +
+               "demo or testing — widgets stay visible even without a " +
+               "current session.",
+    }];
+
     const bar = document.createElement("div");
     bar.className = "pubg-filter-bar";
 
-    specs.forEach((spec) => {
+    allSpecs.forEach((spec) => {
       const grp = document.createElement("div");
       grp.className = "grp";
 

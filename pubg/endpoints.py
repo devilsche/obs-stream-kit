@@ -47,13 +47,13 @@ class EndpointRegistry:
         if route == ("GET", "/api/pubg/lobby-avg-kd"):
             return self._lobby_avg_kd(qs)
         if route == ("GET", "/api/pubg/trend-deltas"):
-            return self._trend_deltas()
+            return self._trend_deltas(qs)
         if route == ("GET", "/api/pubg/session-matches"):
             return self._session_matches(qs)
         if route == ("GET", "/api/pubg/hot-drop"):
             return self._hot_drop(qs)
         if route == ("GET", "/api/pubg/session-achievements"):
-            return self._session_achievements()
+            return self._session_achievements(qs)
         if route == ("POST", "/api/pubg/session/reset"):
             return self._session_reset()
         if route == ("GET", "/api/pubg/top-mates"):
@@ -135,19 +135,28 @@ class EndpointRegistry:
             lambda: compute_lobby_avg_kd(conn, self.my_account_id, range_key),
         ))
 
-    def _trend_deltas(self):
+    def _trend_deltas(self, qs):
         conn = self.get_conn()
+        from_iso = qs.get("from")
+        to_iso = qs.get("to")
+        cache_key = f"trend-deltas:{from_iso or ''}:{to_iso or ''}"
         return _ok(self.cache.get_or_compute(
-            "trend-deltas",
-            lambda: compute_trend_deltas(conn, self.my_account_id),
+            cache_key,
+            lambda: compute_trend_deltas(conn, self.my_account_id,
+                                          from_iso=from_iso, to_iso=to_iso),
         ))
 
     def _session_matches(self, qs):
         conn = self.get_conn()
         range_key = qs.get("range", "session")
+        from_iso = qs.get("from")
+        to_iso = qs.get("to")
+        cache_key = f"session-matches:{range_key}:{from_iso or ''}:{to_iso or ''}"
         return _ok(self.cache.get_or_compute(
-            f"session-matches:{range_key}",
-            lambda: compute_session_matches(conn, self.my_account_id, range_key),
+            cache_key,
+            lambda: compute_session_matches(
+                conn, self.my_account_id, range_key,
+                from_iso=from_iso, to_iso=to_iso),
         ))
 
     def _hot_drop(self, qs):
@@ -158,11 +167,16 @@ class EndpointRegistry:
             lambda: compute_hot_drop(conn, self.my_account_id, range_key),
         ))
 
-    def _session_achievements(self):
+    def _session_achievements(self, qs):
         conn = self.get_conn()
+        from_iso = qs.get("from")
+        to_iso = qs.get("to")
+        cache_key = f"session-achievements:{from_iso or ''}:{to_iso or ''}"
         return _ok(self.cache.get_or_compute(
-            "session-achievements",
-            lambda: compute_session_achievements(conn, self.my_account_id),
+            cache_key,
+            lambda: compute_session_achievements(
+                conn, self.my_account_id,
+                from_iso=from_iso, to_iso=to_iso),
         ))
 
     def _session_reset(self):

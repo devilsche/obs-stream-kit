@@ -71,14 +71,16 @@
         let session = null;
         try { session = await PubgUI.fetchJson("/api/pubg/session"); } catch (_) {}
         // Keine aktuelle Session → Ticker komplett ausblenden.
-        // ?focus=lifetime ist davon ausgenommen (zeigt nur DB-Stats).
-        if (!session || !session.matches) {
-          document.body.style.display = "none";
+        // ?focus=lifetime und ?ignoreStale=1 sind davon ausgenommen.
+        if ((!session || !session.matches) && !PubgUI.ignoreStale()) {
+          document.body.classList.add("pubg-stale-hidden");
           snippets = [];
           return;
         }
-        document.body.style.display = "";
-        out.push(`<span class="label">SESSION STATS</span> ${session.kills} Kills · ${PubgUI.fmtNum(Math.round(session.damage))} DMG · ${session.wins} Wins · K/D ${PubgUI.fmtKD(session.kd)} · K/M ${PubgUI.fmtKD(session.kpm)}`);
+        document.body.classList.remove("pubg-stale-hidden");
+        if (session && session.matches) {
+          out.push(`<span class="label">SESSION STATS</span> ${session.kills} Kills · ${PubgUI.fmtNum(Math.round(session.damage))} DMG · ${session.wins} Wins · K/D ${PubgUI.fmtKD(session.kd)} · K/M ${PubgUI.fmtKD(session.kpm)}`);
+        }
         try {
           const md = await PubgUI.fetchJson("/api/pubg/map-distribution?range=session");
           if (md[0]) {

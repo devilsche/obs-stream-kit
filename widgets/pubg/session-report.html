@@ -861,10 +861,21 @@
     // Streaks werden client-seitig aus session-matches berechnet (matches
     // sind absteigend sortiert: neueste zuerst).
     async function renderExtras() {
+      // Range an alle Extras durchreichen — sonst zeigen Trend/Achievements/
+      // Streaks immer die aktuelle Session unabhängig von gewählter Phase.
+      const fromTo = (FROM || TO)
+        ? "?" + new URLSearchParams({
+            ...(FROM ? {from: FROM} : {}),
+            ...(TO   ? {to:   TO}   : {}),
+          }).toString()
+        : "";
+      const matchesUrl = (FROM || TO)
+        ? `/api/pubg/session-matches${fromTo}`
+        : `/api/pubg/session-matches?range=session`;
       const [trend, achievements, matches] = await Promise.all([
-        PubgUI.fetchJson("/api/pubg/trend-deltas").catch(() => null),
-        PubgUI.fetchJson("/api/pubg/session-achievements").catch(() => []),
-        PubgUI.fetchJson("/api/pubg/session-matches?range=session").catch(() => []),
+        PubgUI.fetchJson(`/api/pubg/trend-deltas${fromTo}`).catch(() => null),
+        PubgUI.fetchJson(`/api/pubg/session-achievements${fromTo}`).catch(() => []),
+        PubgUI.fetchJson(matchesUrl).catch(() => []),
       ]);
 
       const placeholder = document.querySelector(".extras-placeholder");
@@ -915,7 +926,6 @@
       const kdStreak      = computeStreak(m => (m.kills || 0) >= 1);
       const streakItem = (label, n) =>
         `<div class="streak-cell ${n > 0 ? '' : 'cold'}">
-           <span class="streak-icon">${n > 0 ? '🔥' : '❄️'}</span>
            <span class="streak-num">${n}</span>
            <span class="streak-label">${label}</span>
          </div>`;

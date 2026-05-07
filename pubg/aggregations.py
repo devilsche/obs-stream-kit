@@ -419,21 +419,32 @@ def compute_map_distribution(conn, my_account_id, range_key="session"):
              "wins": r["wins"], "avgPlace": r["avg_place"]} for r in rows]
 
 
-def compute_session_matches(conn, my_account_id, range_key="session"):
+def compute_session_matches(conn, my_account_id, range_key="session",
+                             from_iso=None, to_iso=None):
     """Flache Liste der Matches in der Range — leichtgewichtig.
-    Genutzt von Streak-Counter, Session-Goal, Achievements etc."""
-    cutoff = (_range_filter(conn, range_key)
-              if range_key != "all" else "1970-01-01T00:00:00Z")
-    rows = conn.execute("""
+    Genutzt von Streak-Counter, Session-Goal, Achievements etc.
+    from_iso/to_iso überschreiben range_key (für historische Sessions)."""
+    if from_iso:
+        cutoff = from_iso
+        end_filter = " AND m.played_at <= ?" if to_iso else ""
+        params = [my_account_id, cutoff]
+        if to_iso:
+            params.append(to_iso)
+    else:
+        cutoff = (_range_filter(conn, range_key)
+                  if range_key != "all" else "1970-01-01T00:00:00Z")
+        end_filter = ""
+        params = [my_account_id, cutoff]
+    rows = conn.execute(f"""
         SELECT m.match_id, m.map_name, m.game_mode, m.played_at,
                m.duration_secs,
                pa.kills, pa.damage_dealt, pa.place, pa.time_survived,
                pa.longest_kill, pa.headshot_kills, pa.assists, pa.dbnos
         FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id
-        WHERE pa.account_id = ? AND m.played_at >= ?
+        WHERE pa.account_id = ? AND m.played_at >= ?{end_filter}
         ORDER BY m.played_at DESC
-    """, (my_account_id, cutoff)).fetchall()
+    """, params).fetchall()
     return [{
         "matchId":     r["match_id"],
         "map":         r["map_name"],
@@ -528,16 +539,19 @@ def compute_lobby_avg_kd(conn, my_account_id, range_key="session"):
     }
 
 
-def compute_trend_deltas(conn, my_account_id, gap_hours=4):
-    """Vergleich aktuelle Session vs. letzte abgeschlossene Session.
+def compute_trend_deltas(conn, my_account_id, from_iso=None, to_iso=None,
+                          gap_hours=4):
+    """Vergleich gewählte Session vs. die direkt davor liegende Session.
+    Wenn from_iso/to_iso None: aktuelle (= jüngste) Session.
+    Sonst: Session deren [from,to]-Range from_iso enthält.
+
     Liefert Deltas für K/D, Wins, Avg-DMG, Matches.
     """
     sessions = compute_sessions_index(conn, my_account_id, gap_hours=gap_hours)
-    if len(sessions) < 1:
+    if not sessions:
         return {"current": None, "previous": None, "deltas": None}
 
     def _agg(start, end):
-        # start = sessionStart-ISO; end = sessionEnd-ISO oder None für aktuelle
         sql = """
             SELECT SUM(p.kills) AS k, COUNT(*) AS n,
                    SUM(CASE WHEN p.place=1 THEN 1 ELSE 0 END) AS w,
@@ -560,11 +574,31 @@ def compute_trend_deltas(conn, my_account_id, gap_hours=4):
             "avgDmg": (r and r["avg_dmg"]) or 0,
         }
 
-    cur_session = sessions[0]
-    cur = _agg(cur_session["from"], None)
+    # Index der aktuellen Session in der Liste (sortiert: jüngste zuerst)
+    cur_idx = 0
+    if from_iso:
+        # finde Session deren Range from_iso enthält
+        for i, s in enumerate(sessions):
+            if s["from"] <= from_iso <= s["to"]:
+                cur_idx = i
+                break
+            if s["from"] == from_iso:
+                cur_idx = i
+                break
+        else:
+            # exakte Übereinstimmung von from_iso mit s["from"]
+            for i, s in enumerate(sessions):
+                if s["from"].startswith(from_iso[:19]):
+                    cur_idx = i
+                    break
+
+    cur_session = sessions[cur_idx]
+    cur_to = cur_session["to"] if cur_idx > 0 else None
+    cur = _agg(cur_session["from"], cur_to)
+
     prev = None
-    if len(sessions) >= 2:
-        prev_session = sessions[1]
+    if cur_idx + 1 < len(sessions):
+        prev_session = sessions[cur_idx + 1]
         prev = _agg(prev_session["from"], prev_session["to"])
 
     deltas = None
@@ -620,8 +654,9 @@ def compute_map_performance(conn, my_account_id, range_key="all"):
     return out
 
 
-def compute_session_achievements(conn, my_account_id):
-    """Detected Achievements der aktuellen Session.
+def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None):
+    """Detected Achievements der aktuellen oder einer historischen Session.
+    from_iso/to_iso optional — sonst aktuelle Session.
 
     Achievements (in dieser Reihenfolge angewendet, max. 1 pro Typ
     außer 'Beast Chicken' und 'Top-DMG' die mehrfach kommen können):
@@ -636,7 +671,9 @@ def compute_session_achievements(conn, my_account_id):
     Returns Liste { id, label, icon, matchId, playedAt } sortiert
     nach playedAt ASC (Reihenfolge des Erreichens).
     """
-    matches_desc = compute_session_matches(conn, my_account_id, "session")
+    matches_desc = compute_session_matches(
+        conn, my_account_id, "session",
+        from_iso=from_iso, to_iso=to_iso)
     matches = list(reversed(matches_desc))  # ASC für Achievement-Reihenfolge
 
     out = []

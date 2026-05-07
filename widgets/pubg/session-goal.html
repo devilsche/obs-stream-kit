@@ -121,7 +121,7 @@
         if (value >= TARGET && !KEEP) {
           // Auto-hide nach 60s wenn Ziel erreicht
           setTimeout(() => {
-            if (document.body) document.body.style.display = "none";
+            if (document.body) document.body.classList.add("pubg-stale-hidden");
           }, 60000);
         }
       } catch (e) {

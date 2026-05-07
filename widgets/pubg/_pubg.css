@@ -56,6 +56,11 @@ body {
 
 .pubg-error { color: #e57b7b; font-size: 0.85em; }
 
+/* Stale-Hide: Body wird per Klasse versteckt; die Filter-Bar (falls
+   eingeblendet) bleibt sichtbar — der Nutzer kann ignoreStale togglen
+   um trotzdem zu testen. */
+body.pubg-stale-hidden > *:not(.pubg-filter-bar) { display: none !important; }
+
 /* Einheitliches Header-Format laut Overlay-Rules: <Title> · <Range> */
 .pubg-header {
   color: var(--pubg-muted);
