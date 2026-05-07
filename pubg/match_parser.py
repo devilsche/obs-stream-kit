@@ -58,16 +58,22 @@ def parse_match_response(match_payload, my_account_id):
     parts = idx.get("participant", {})
 
     squad = []
-    team_mapping = []  # [(account_id, team_id), ...] für gesamte Lobby
+    team_mapping = []  # gesamte Lobby: account_id, team_id, kills, place
     for r in rosters.values():
         team_id = r["attributes"]["stats"].get("teamId")
         for pref in r["relationships"]["participants"]["data"]:
             p = parts.get(pref["id"])
             if not p:
                 continue
-            acc_id = p["attributes"]["stats"].get("playerId")
+            stats = p["attributes"]["stats"]
+            acc_id = stats.get("playerId")
             if acc_id:
-                team_mapping.append({"account_id": acc_id, "team_id": team_id})
+                team_mapping.append({
+                    "account_id": acc_id,
+                    "team_id": team_id,
+                    "kills": stats.get("kills"),
+                    "place": stats.get("winPlace"),
+                })
             if team_id == my_team_id:
                 row = _participant_to_row(p)
                 row["team_id"] = my_team_id

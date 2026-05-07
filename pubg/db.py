@@ -137,8 +137,10 @@ CURRENT_TELEMETRY_SCHEMA = 3
 # 1 = squad-only filter
 # 2 = + Kill/Knock global + Position
 # 3 = + Landing global + Position (für 'Teams in 300m Umkreis')
-# match_schema: 1 = nur Squad-Participants, 2 = + match_team_mapping
-CURRENT_MATCH_SCHEMA = 2
+# match_schema: 1 = nur Squad-Participants
+# 2 = + match_team_mapping (account_id, team_id)
+# 3 = + match_team_mapping mit kills + place (für echtes Lobby-K/D + Squad-Aggregat)
+CURRENT_MATCH_SCHEMA = 3
 
 
 def init_schema(conn: sqlite3.Connection) -> None:
@@ -158,19 +160,27 @@ def init_schema(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
         except sqlite3.OperationalError:
             pass  # Column existiert bereits
-    # Lightweight Lookup: account_id → team_id pro Match. Reicht für
-    # Lobby-weite Team-Zählung (z.B. Teams in Hot-Drop). Kein Stat-Overhead.
+    # Lightweight Lookup: account_id → team_id pro Match.
+    # +kills, +place für echtes Lobby-K/D und Squad-Aggregate.
     conn.execute("""
         CREATE TABLE IF NOT EXISTS match_team_mapping (
             match_id TEXT NOT NULL,
             account_id TEXT NOT NULL,
             team_id INTEGER,
+            kills INTEGER,
+            place INTEGER,
             PRIMARY KEY (match_id, account_id)
         )
     """)
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_mtm_match ON match_team_mapping(match_id)
     """)
+    # Migrationen für bestehende DBs (kills + place hinzufügen)
+    for col, typ in [("kills", "INTEGER"), ("place", "INTEGER")]:
+        try:
+            conn.execute(f"ALTER TABLE match_team_mapping ADD COLUMN {col} {typ}")
+        except sqlite3.OperationalError:
+            pass
     conn.commit()
 
 
@@ -256,15 +266,17 @@ def insert_participants(conn, match_id, rows):
 
 
 def insert_team_mapping(conn, match_id: str, mapping_rows) -> None:
-    """Schreibt account_id → team_id Lookup für die gesamte Lobby.
-    Idempotent via INSERT OR REPLACE auf (match_id, account_id)."""
+    """Schreibt account_id → team_id+kills+place Lookup für die gesamte
+    Lobby. Idempotent via INSERT OR REPLACE auf (match_id, account_id)."""
     for r in mapping_rows:
         if not r.get("account_id"):
             continue
         conn.execute(
-            "INSERT OR REPLACE INTO match_team_mapping(match_id, account_id, team_id) "
-            "VALUES (?, ?, ?)",
-            (match_id, r["account_id"], r.get("team_id")),
+            "INSERT OR REPLACE INTO match_team_mapping"
+            "(match_id, account_id, team_id, kills, place) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (match_id, r["account_id"], r.get("team_id"),
+             r.get("kills"), r.get("place")),
         )
     conn.commit()
 
@@ -288,13 +300,20 @@ def mark_match_schema(conn, match_id: str, schema_version: int) -> None:
 
 def get_matches_needing_match_schema_update(conn, target_schema: int,
                                               limit: int = 1000):
-    """Matches deren match_schema < target_schema → re-fetch nötig
-    (z.B. um team_mapping nachzuziehen für vor-Schema-2 Matches)."""
+    """Matches deren match_schema < target_schema OR die noch keine
+    kills-Daten in match_team_mapping haben (Schema 3+ erwartet kills).
+    Letzteres fängt Matches die irrtümlich als 'schema=N' markiert
+    waren ohne dass die Daten wirklich da sind."""
     return conn.execute("""
-        SELECT match_id FROM matches
-        WHERE COALESCE(match_schema, 0) < ?
-        ORDER BY played_at DESC LIMIT ?
-    """, (target_schema, limit)).fetchall()
+        SELECT m.match_id FROM matches m
+        WHERE COALESCE(m.match_schema, 0) < ?
+           OR (? >= 3 AND NOT EXISTS (
+               SELECT 1 FROM match_team_mapping mtm
+               WHERE mtm.match_id = m.match_id
+                 AND mtm.kills IS NOT NULL
+           ))
+        ORDER BY m.played_at DESC LIMIT ?
+    """, (target_schema, target_schema, limit)).fetchall()
 
 
 def get_squad_for_match(conn, match_id):
