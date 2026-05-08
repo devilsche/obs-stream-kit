@@ -23,19 +23,6 @@
       margin-bottom: 14px;
     }
     .head h2 { margin: 0; font-size: 1.05em; letter-spacing: 0.06em; }
-    .head .reset-btn {
-      background: rgba(94, 42, 121, 0.7);
-      border: 1px solid var(--pubg-gold);
-      color: var(--pubg-gold);
-      border-radius: 4px;
-      padding: 5px 14px; cursor: pointer; font-family: inherit;
-      font-size: 0.8em; font-weight: 700;
-      letter-spacing: 0.05em;
-    }
-    .head .reset-btn:hover {
-      background: var(--pubg-gold);
-      color: #1a0d2a;
-    }
 
     .section {
       border-top: 1px solid rgba(255,255,255,0.07);
@@ -86,11 +73,9 @@
   <div class="pubg-card panel pubg-fade-in">
     <div class="head">
       <h2 id="cardTitle">PUBG SESSION</h2>
-      <button class="reset-btn" id="reset">Reset</button>
     </div>
 
     <div class="section">
-      <h3>Stats <span id="statsRangeLabel" style="opacity:0.5;font-weight:400;letter-spacing:0;text-transform:none">— Session</span></h3>
       <div class="stat-grid">
         <div class="cell"><span class="pubg-stat-value" id="kills">—</span><span class="pubg-stat-label">Kills</span></div>
         <div class="cell"><span class="pubg-stat-value" id="dmg">—</span><span class="pubg-stat-label">Damage</span></div>
@@ -169,10 +154,6 @@
       all:     "PUBG · Database",
     };
     document.getElementById("cardTitle").textContent = TITLES[RANGE] || TITLES.session;
-    if (RANGE !== "session") {
-      // Reset-Button nur sinnvoll bei Session-Modus
-      document.getElementById("reset").style.display = "none";
-    }
 
     PubgUI.buildFilter([
       { key: "range", label: "Range", type: "select", default: "session",
@@ -315,13 +296,7 @@
         `— ${RANGE_LABEL[RANGE]}, min. ${currentMin} ${m}`;
     }
 
-    function updateStatsRangeLabel() {
-      document.getElementById("statsRangeLabel").textContent =
-        `— ${RANGE_LABEL[RANGE]}`;
-    }
-
     function reload() {
-      updateStatsRangeLabel();
       updateTopMatesSubtitle();
       PubgUI.fetchJson(`/api/pubg/session?range=${RANGE}`).then(renderSession).catch(()=>{});
       PubgUI.fetchJson(`/api/pubg/first-fight-rate?range=${RANGE}`).then(renderFF).catch(()=>{});
@@ -329,11 +304,6 @@
       PubgUI.fetchJson(`/api/pubg/top-mates?${tmRange}sortBy=${currentSort}&limit=5&minMatches=${currentMin}`)
         .then(renderTopMates).catch(()=>{});
     }
-
-    document.getElementById("reset").addEventListener("click", async () => {
-      await fetch("/api/pubg/session/reset", {method: "POST"});
-      reload();
-    });
 
     reload();
     setInterval(reload, 60000);
