@@ -90,7 +90,7 @@
     </div>
 
     <div class="section">
-      <h3>Session</h3>
+      <h3>Stats <span id="statsRangeLabel" style="opacity:0.5;font-weight:400;letter-spacing:0;text-transform:none">— Session</span></h3>
       <div class="stat-grid">
         <div class="cell"><span class="pubg-stat-value" id="kills">—</span><span class="pubg-stat-label">Kills</span></div>
         <div class="cell"><span class="pubg-stat-value" id="dmg">—</span><span class="pubg-stat-label">Damage</span></div>
@@ -315,7 +315,13 @@
         `— ${RANGE_LABEL[RANGE]}, min. ${currentMin} ${m}`;
     }
 
+    function updateStatsRangeLabel() {
+      document.getElementById("statsRangeLabel").textContent =
+        `— ${RANGE_LABEL[RANGE]}`;
+    }
+
     function reload() {
+      updateStatsRangeLabel();
       updateTopMatesSubtitle();
       PubgUI.fetchJson(`/api/pubg/session?range=${RANGE}`).then(renderSession).catch(()=>{});
       PubgUI.fetchJson(`/api/pubg/first-fight-rate?range=${RANGE}`).then(renderFF).catch(()=>{});
