@@ -70,7 +70,7 @@ body.pubg-stale-hidden > *:not(.pubg-filter-bar) { display: none !important; }
   font-weight: 700;
   margin-bottom: 8px;
 }
-.pubg-header b { color: var(--pubg-text); }
+.pubg-header b { color: var(--pubg-gold); }
 
 /* HOT — für überdurchschnittliche Werte (Synergy >=3 etc.) */
 .pubg-hot {

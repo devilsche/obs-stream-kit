@@ -98,11 +98,12 @@ Activated and rotated via OBS source toggling. Each session-only:
 
 ## Header Rules
 
-Every widget with a range-relevant data set shows a header:
+Every widget with a range-relevant data set can show a header:
 
-- **Format:** `<Title> · <Range>` (English throughout)
+- **Format:** `<Title> · <Range>` — Title is bold + gold, Range stays muted
 - **Position:** at the widget's anchor edge
-- **Deactivation:** `?header=0` URL parameter
+- **Default:** OFF (muted-grey contrast on dark BG is too poor for in-stream legibility)
+- **Activation:** `?header=1` URL parameter
 - No "Aktuelle Session"-style prefixes — range is the dot-separated suffix
 
 ## Range System
@@ -122,7 +123,7 @@ Naming rules — **must be applied consistently across all widgets**:
 
 | Pattern | Meaning | Examples |
 |---|---|---|
-| `?<name>=0` | hide / disable a top-level UI piece. Default is on | `?header=0`, `?filter=0`, `?ignoreStale=1` |
+| `?<name>=0` | hide / disable a top-level UI piece. Default is on | `?filter=0`, `?ignoreStale=1` (header is an exception: default OFF, activate via `?header=1`) |
 | `?range=session\|week\|all\|career` | range selection (data scope) | every widget with range-relevant data |
 | `?focus=session\|lifetime\|mix` | news-ticker only — snippet category focus | news-ticker |
 | `?layout=<value>` | per-widget layout selector | `mates.html?layout=carousel\|stack\|fold\|mosaic` |
@@ -215,7 +216,7 @@ Ordered roughly by impact:
 ### Spec adoption (medium)
 
 - [ ] All widgets — header format `<Title> · <Range>` consistent
-- [ ] All widgets — `?header=0` deactivation parameter implemented
+- [ ] All widgets — `?header=1` activation parameter implemented (default OFF)
 - [ ] All widgets — remove `?range=day` option from filter bars and HTML
 - [ ] Range labels — switch all to English (`Session`, `7 days`, `Career`,
       `Database (since DD.MM.)`)

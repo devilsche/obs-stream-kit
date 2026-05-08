@@ -127,17 +127,19 @@
     return `${base} (since ${since})`;
   };
 
-  // Header-Element rendern: <Title> · <Range>. Deaktivierbar via ?header=0.
+  // Header-Element rendern: <Title> · <Range>. Default: AUS (zu schlecht
+  // lesbar für In-Stream). Aktivierbar via ?header=1 — dann wird der Titel
+  // fett+hell gesetzt, der Range bleibt muted.
   // Erwartet ein Element mit data-pubg-header="<Title>" oder explizit übergeben.
   // Range wird async aufgelöst (für Database-since).
   PubgUI.renderHeader = async (el, title, range) => {
-    if (PubgUI.qs("header") === "0") {
+    if (PubgUI.qs("header") !== "1") {
       if (el) el.style.display = "none";
       return;
     }
     if (!el) return;
     const rangeLabel = await PubgUI.fmtRangeLabel(range);
-    el.textContent = `${title} · ${rangeLabel}`;
+    el.innerHTML = `<b>${title}</b> · ${rangeLabel}`;
     el.style.display = "";
   };
 
