@@ -13,7 +13,7 @@
     body.compact { padding: 10px; }
     body.compact .panel { width: 360px; padding: 12px 14px; }
     body.compact .head { margin-bottom: 8px; }
-    body.compact .head h2 { font-size: 0.95em; }
+    body.compact .head h2 { font-size: 1em; }
     body.compact .section { padding: 8px 0; }
     body.compact .stat-grid { gap: 8px; }
     body.compact .stat-grid .pubg-stat-value { font-size: 1.15em; }
@@ -22,7 +22,14 @@
       display: flex; justify-content: space-between; align-items: baseline;
       margin-bottom: 14px;
     }
-    .head h2 { margin: 0; font-size: 1.05em; letter-spacing: 0.06em; }
+    .head h2 {
+      margin: 0;
+      color: var(--pubg-gold);
+      font-size: 1.2em;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
 
     .section {
       border-top: 1px solid rgba(255,255,255,0.07);
