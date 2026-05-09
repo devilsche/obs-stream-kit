@@ -43,14 +43,27 @@
       <div class="cell"><span class="pubg-stat-value" id="swim">—</span><span class="pubg-stat-label">Swam</span></div>
       <div class="cell"><span class="pubg-stat-value" id="assists">—</span><span class="pubg-stat-label">Assists</span></div>
     </div>
-    <div class="twocol">
-      <div class="col"><h3>Maps</h3><div id="maps"></div></div>
-      <div class="col"><h3>Mates</h3><div id="mates"></div></div>
+    <div class="twocol" id="twocol">
+      <div class="col" id="mapsCol"><h3>Maps</h3><div id="maps"></div></div>
+      <div class="col" id="matesCol"><h3>Mates</h3><div id="mates"></div></div>
     </div>
   </div>
   <script src="_pubg.js"></script>
   <script>
     PubgUI.buildFilter([]);
+
+    // ?hideMaps=1 / ?hideMates=1 — Sektion(en) ausblenden.
+    // Beide aus → ganzes twocol-Grid weg. Nur einer aus → verbleibende
+    // Spalte nimmt volle Breite ein.
+    const HIDE_MAPS = PubgUI.qs("hideMaps") === "1";
+    const HIDE_MATES = PubgUI.qs("hideMates") === "1";
+    if (HIDE_MAPS) document.getElementById("mapsCol").style.display = "none";
+    if (HIDE_MATES) document.getElementById("matesCol").style.display = "none";
+    if (HIDE_MAPS && HIDE_MATES) {
+      document.getElementById("twocol").style.display = "none";
+    } else if (HIDE_MAPS || HIDE_MATES) {
+      document.getElementById("twocol").style.gridTemplateColumns = "1fr";
+    }
 
     function render() {
       const num = (n) => String(Math.round(n));
@@ -73,14 +86,18 @@
         PubgUI.animateNumber(document.getElementById("swim"), s.swimKm || 0, {format: km});
         PubgUI.animateNumber(document.getElementById("assists"), s.totalAssists || 0, {format: num});
       });
-      PubgUI.fetchJson("/api/pubg/map-distribution?range=session").then(list => {
-        document.getElementById("maps").innerHTML = list.map(m =>
-          `<div class="map-row"><span>${PubgUI.fmtMap(m.map)}</span><span class="pubg-stat-value">${m.count}</span></div>`).join("");
-      });
-      PubgUI.fetchJson("/api/pubg/mates?range=session").then(list => {
-        document.getElementById("mates").innerHTML = list.map(m =>
-          `<div class="mate-row"><span>${m.name}</span><span class="pubg-stat-value">${m.sharedMatchesToday}</span></div>`).join("");
-      });
+      if (!HIDE_MAPS) {
+        PubgUI.fetchJson("/api/pubg/map-distribution?range=session").then(list => {
+          document.getElementById("maps").innerHTML = list.map(m =>
+            `<div class="map-row"><span>${PubgUI.fmtMap(m.map)}</span><span class="pubg-stat-value">${m.count}</span></div>`).join("");
+        });
+      }
+      if (!HIDE_MATES) {
+        PubgUI.fetchJson("/api/pubg/mates?range=session").then(list => {
+          document.getElementById("mates").innerHTML = list.map(m =>
+            `<div class="mate-row"><span>${m.name}</span><span class="pubg-stat-value">${m.sharedMatchesToday}</span></div>`).join("");
+        });
+      }
     }
     render();
     setInterval(render, 60000);

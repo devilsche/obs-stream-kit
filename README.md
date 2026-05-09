@@ -402,7 +402,7 @@ Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
 | `post-match-card.html` | 10s-Pop-up nach Match-Ende | `durationMs` |
 | `map-distribution.html` | Map-Häufigkeits-Bars | `range=session\|day\|week\|all` |
 | `first-fight.html` | Survival-% mit Sparkline | `range` |
-| `session-summary.html` | Vollformat Stream-Ending | — |
+| `session-summary.html` | Vollformat Stream-Ending | `hideMaps=1`, `hideMates=1` |
 | `career-card.html` | Lifetime-Anzeige | `player`, `mode=all\|squad-fpp\|...` |
 | `news-ticker.html` | Marquee-Bar mit rotierenden Snippets | `rotateMs` |
 | `squad-compare.html` | 4er-Vergleichs-Tabelle | `players=A,B,C,D`, `matches` |
