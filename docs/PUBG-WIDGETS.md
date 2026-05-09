@@ -55,7 +55,7 @@ Alle Widget-URLs sind unter `http://localhost:<port>/widgets/pubg/<datei>.html`.
 | `squad-compare.html` | **640×400** (variabel) | 4er-Vergleichstabelle |
 | `chat-stats-popup.html` | **540×320** | Streamer.bot-driven Pop-up |
 
-**Web-View** (kein OBS): `http://localhost:8080/scenes/stats.html?player=NAME`
+**Web-View** (kein OBS): `http://localhost:8080/widgets/pubg/coplayer.html?player=NAME`
 
 ---
 
@@ -189,13 +189,15 @@ Empfohlen: **640×400**. Höhe wächst mit Match-Anzahl.
 
 Empfohlen: **540×320**. Streamer.bot triggert: setzt URL → Source einblenden → 12s warten → ausblenden.
 
-### `scenes/stats.html` (Web-View, kein OBS)
+### `widgets/pubg/coplayer.html` (Web-View, kein OBS)
 
 | Param | Default | Wirkung |
 |---|---|---|
 | `player` | (required) | Cross-Player-Detail-Page |
 
 Im Browser öffnen, **nicht** als Browser-Source. Layout responsiv.
+
+> Alte URL `scenes/stats.html?player=NAME` leitet automatisch hierher weiter.
 
 ---
 

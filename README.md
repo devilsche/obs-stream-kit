@@ -408,7 +408,8 @@ Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
 | `squad-compare.html` | 4er-Vergleichs-Tabelle | `players=A,B,C,D`, `matches` |
 | `chat-stats-popup.html` | Streamer.bot-driven Pop-up | `player`, `duration` (Sek) |
 
-Cross-Player-Web-View: `http://localhost:8080/scenes/stats.html?player=NAME`
+Cross-Player-Web-View: `http://localhost:8080/widgets/pubg/coplayer.html?player=NAME`
+(alte URL `scenes/stats.html?player=NAME` leitet weiter)
 
 ### Streamer.bot-Setup für `!mypubgstats`
 
