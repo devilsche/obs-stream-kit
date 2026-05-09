@@ -6,44 +6,45 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="_pubg.css">
   <style>
-    /* Layout-Pattern angeglichen an session-report: gradient body,
-       max-width container, Stat-Werte 1.4em statt 1.8em. Sections
-       innerhalb der Card mit konsistenten h3-Titles. */
+    /* Layout-Pattern angeglichen an map-performance: kompakte Card,
+       width 100%, Stat-Werte 1.2em (vorher waren 1.8 / 1.4 zu gross
+       gegenueber den anderen Stats-Pages). Transparenter BG, weil das
+       Widget in OBS als Browser-Source auf einer Stream-Ending-Szene
+       rendert. */
     html, body { margin: 0; padding: 0; }
     body {
+      padding: 12px;
       min-height: 100vh;
-      padding: 16px;
-      background: linear-gradient(180deg, rgba(20,12,30,0.6), rgba(10,5,16,0.6));
     }
-    .summary { max-width: 900px; margin: 0 auto; padding: 22px 26px; }
+    .summary { width: 100%; padding: 14px 18px; }
 
-    /* Alle Stats in EINEM responsiven Grid - 4er-Block-Optik wenn breit
-       genug Platz, fluider Reflow auf engerem Viewport. */
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-      gap: 14px 18px;
+      grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
+      gap: 10px 14px;
     }
     .grid .cell { display: flex; flex-direction: column; }
-    .grid .cell .pubg-stat-value { font-size: 1.4em; }
+    .grid .cell .pubg-stat-value { font-size: 1.2em; }
 
     .twocol {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 28px;
-      margin-top: 22px;
-      padding-top: 18px;
+      gap: 18px;
+      margin-top: 14px;
+      padding-top: 12px;
       border-top: 1px solid rgba(255,255,255,0.08);
     }
     .twocol .col h3 {
-      margin: 0 0 10px;
+      margin: 0 0 8px;
       color: var(--pubg-muted);
-      font-size: 0.8em;
+      font-size: 0.78em;
       text-transform: uppercase;
       letter-spacing: 0.1em;
     }
     .map-row, .mate-row {
-      display: flex; justify-content: space-between; padding: 4px 0;
+      display: flex; justify-content: space-between;
+      padding: 3px 0;
+      font-size: 0.9em;
       border-bottom: 1px solid rgba(255,255,255,0.05);
     }
   </style>
