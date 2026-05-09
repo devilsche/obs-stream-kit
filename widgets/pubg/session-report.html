@@ -455,13 +455,13 @@
 </head>
 <body>
   <div class="range-picker">
-    <label>Von</label>
+    <label>From</label>
     <input type="date" id="dateFrom">
     <input type="time" id="timeFrom" value="00:00" step="60">
-    <label>Bis</label>
+    <label>To</label>
     <input type="date" id="dateTo">
     <input type="time" id="timeTo" value="23:59" step="60">
-    <button class="apply" id="applyRange">Anwenden</button>
+    <button class="apply" id="applyRange">Apply</button>
     <div class="presets">
       <button class="preset" data-preset="current">▶ Current</button>
       <button class="preset" data-preset="today">Today</button>
@@ -580,8 +580,8 @@
         <div class="controls">
           <div class="month-tabs">${monthTabs}</div>
           <select id="sortBy">
-            <option value="newest">Neueste zuerst</option>
-            <option value="oldest">Älteste zuerst</option>
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
             <option value="wins">Meiste CHICKEN Wins</option>
             <option value="matches">Meiste Matches</option>
             <option value="kills">Meiste Kills</option>
@@ -742,7 +742,7 @@
       }
       const t = d.totals;
       const startIso = PubgUI.matchStartIso(t.startTime, 0);  // approx
-      const subtitle = `${PubgUI.fmtDate(t.startTime)} · ${PubgUI.fmtTime(d.sessionStartedAt)} – ${PubgUI.fmtTime(t.endTime)} · ${fmtDuration(t.totalSurvivedSec)} aktiv gespielt`;
+      const subtitle = `${PubgUI.fmtDate(t.startTime)} · ${PubgUI.fmtTime(d.sessionStartedAt)} – ${PubgUI.fmtTime(t.endTime)} · ${fmtDuration(t.totalSurvivedSec)} active playtime`;
 
       const totalsHtml = `
         <div class="totals">
@@ -796,7 +796,7 @@
             </div>
             <div class="matches-list">
               <div class="header-row">
-                <span>Squad im Match</span><span>Place</span><span>Map</span>
+                <span>Squad in Match</span><span>Place</span><span>Map</span>
                 <span style="text-align:right">Kills</span>
                 <span style="text-align:right">Damage</span>
                 <span style="text-align:right">meine Surv</span>
