@@ -12,7 +12,16 @@
       display: flex; justify-content: center;
     }
     .container { max-width: 720px; width: 100%; }
-    h1 { font-size: 2em; margin: 0 0 24px; color: var(--pubg-gold); }
+    .player-name {
+      color: var(--pubg-gold);
+      font-size: 1.6em;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .player-meta {
+      color: var(--pubg-muted);
+      font-size: 0.85em;
+    }
     .section { margin-bottom: 28px; padding: 20px 24px; }
     .section h2 {
       margin: 0 0 14px; font-size: 0.85em; color: var(--pubg-muted);
@@ -31,7 +40,10 @@
 </head>
 <body>
   <div class="container">
-    <h1 id="title">—</h1>
+    <div class="pubg-card section">
+      <div class="player-name" id="playerName">—</div>
+      <div class="player-meta" id="playerMeta"></div>
+    </div>
 
     <div class="pubg-card section">
       <h2>Played With You</h2>
@@ -72,13 +84,18 @@
 
     if (!PLAYER) {
       document.querySelector(".container").innerHTML =
-        '<h1 style="color:#e57b7b">Missing parameter ?player=NAME</h1>';
+        '<div class="pubg-error" style="padding:20px">Missing parameter ?player=NAME</div>';
     } else {
-      document.getElementById("title").textContent = PLAYER;
+      document.getElementById("playerName").textContent = PLAYER;
       PubgUI.fetchJson(`/api/pubg/co-player/${encodeURIComponent(PLAYER)}`)
         .then(d => {
-          document.getElementById("title").textContent = d.name || PLAYER;
+          document.getElementById("playerName").textContent = d.name || PLAYER;
           const sh = d.sharedHistory || {};
+          const sharedCount = sh.matches || 0;
+          document.getElementById("playerMeta").textContent =
+            sharedCount === 1
+              ? "1 match together"
+              : `${PubgUI.fmtNum(sharedCount)} matches together`;
           document.getElementById("sm").textContent = PubgUI.fmtNum(sh.matches);
           document.getElementById("skd").textContent = PubgUI.fmtKD(sh.kd);
           document.getElementById("sdmg").textContent = PubgUI.fmtNum(Math.round(sh.avgDmg||0));
