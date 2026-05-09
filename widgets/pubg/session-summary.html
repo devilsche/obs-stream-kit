@@ -8,8 +8,14 @@
   <style>
     body { padding: 5px; }
     .summary { width: 720px; padding: 28px 32px; }
-    .summary h1 { margin: 0 0 18px; font-size: 1.4em; letter-spacing: 0.1em;
-                  color: var(--pubg-gold); text-transform: uppercase; }
+    .summary h1 {
+      margin: 0 0 6px;
+      color: var(--pubg-gold);
+      font-size: 1.6em;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .summary .subtitle { color: var(--pubg-muted); font-size: 0.9em; margin-bottom: 18px; }
     .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
     .grid .cell { display: flex; flex-direction: column; }
     .grid .cell .pubg-stat-value { font-size: 1.8em; }
@@ -24,7 +30,7 @@
 </head>
 <body>
   <div class="pubg-card summary pubg-fade-in">
-    <h1>Session-Übersicht</h1>
+    <h1>Session Summary</h1>
     <div class="grid">
       <div class="cell"><span class="pubg-stat-value" id="matches">—</span><span class="pubg-stat-label">Matches</span></div>
       <div class="cell"><span class="pubg-stat-value" id="kills">—</span><span class="pubg-stat-label">Kills</span></div>
