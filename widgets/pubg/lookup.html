@@ -16,7 +16,12 @@
   <style>
     html, body { margin: 0; padding: 0; }
     body { padding: 20px; min-height: 100vh; }
-    .card { max-width: 720px; margin: 0 auto; padding: 22px 26px; }
+    .card {
+      max-width: 720px;
+      margin: 0 auto 18px;
+      padding: 22px 26px;
+    }
+    .card:last-child { margin-bottom: 0; }
     .card h1 {
       margin: 0 0 6px;
       color: var(--pubg-gold);
@@ -24,10 +29,16 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
     }
+    .card h3 {
+      margin: 0 0 12px;
+      color: var(--pubg-muted);
+      font-size: 0.8em;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
     .hint { color: var(--pubg-muted); font-size: 0.85em; margin-bottom: 14px; }
     .search-row {
       display: flex; gap: 8px; align-items: center;
-      margin-bottom: 18px;
     }
     .search-row input {
       flex: 1;
@@ -51,19 +62,6 @@
       font-size: 0.95em;
     }
     .search-row button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .stats-section {
-      margin-top: 18px;
-      padding: 16px 20px;
-      background: rgba(94, 42, 121, 0.12);
-      border-radius: 6px;
-    }
-    .stats-section h3 {
-      margin: 0 0 12px;
-      color: var(--pubg-muted);
-      font-size: 0.8em;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-    }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 14px; }
     .grid .cell { display: flex; flex-direction: column; }
     .grid .cell .pubg-stat-value { font-size: 1.4em; }
@@ -100,15 +98,13 @@
     .modes-table td:first-child { text-align: left; color: var(--pubg-text); }
     .err { color: #e57b7b; padding: 14px; }
 
-    /* ?embed=1 → versteckt Title, Hint und Search-Row.
-       Damit bleibt nur das Result-Panel (clean Embed-View). */
-    body.embed .card h1,
-    body.embed .hint,
-    body.embed .search-row { display: none; }
+    /* ?embed=1 → versteckt die komplette Search-Card (Title, Hint,
+       Input, Button). Damit bleiben nur die Result-Cards. */
+    body.embed .search-card { display: none; }
   </style>
 </head>
 <body>
-  <div class="pubg-card card pubg-fade-in">
+  <div class="pubg-card card search-card pubg-fade-in">
     <h1>Player Lookup</h1>
     <div class="hint">
       Live from the PUBG API · Career-Lifetime + Recent-Match-Count.
@@ -118,8 +114,8 @@
       <input type="text" id="searchInput" placeholder="e.g. la-city12" autofocus>
       <button id="searchBtn">Search</button>
     </div>
-    <div id="result"></div>
   </div>
+  <div id="result"></div>
 
   <script src="_pubg.js"></script>
   <script>
@@ -145,7 +141,7 @@
 
         const cl = d.careerLifetime || {};
         const careerHtml = cl.rounds_played ? `
-          <div class="stats-section">
+          <div class="pubg-card card pubg-fade-in">
             <h3>Career — All Time</h3>
             <div class="grid">
               <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtNum(cl.rounds_played)}</span><span class="pubg-stat-label">Matches</span></div>
@@ -174,7 +170,7 @@
             <td>${Math.round(v.avg_damage)}</td>
           </tr>`).join("");
         const modesHtml = modeRows ? `
-          <div class="stats-section">
+          <div class="pubg-card card pubg-fade-in">
             <h3>Per Mode</h3>
             <table class="modes-table">
               <thead><tr>
@@ -187,9 +183,11 @@
           </div>` : "";
 
         result.innerHTML = `
-          <div class="player-name">${d.name}</div>
-          <div class="player-meta">
-            ${d.shardId} · ${PubgUI.fmtNum(d.recentMatchCount)} matches in the last 14 days
+          <div class="pubg-card card pubg-fade-in">
+            <div class="player-name">${d.name}</div>
+            <div class="player-meta">
+              ${d.shardId} · ${PubgUI.fmtNum(d.recentMatchCount)} matches in the last 14 days
+            </div>
           </div>
           ${careerHtml}
           ${modesHtml}
