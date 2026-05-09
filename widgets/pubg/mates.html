@@ -117,7 +117,11 @@
                  "whole DB). Filters out random squad-fills who were only " +
                  "around for a single match." },
     ]);
-    document.getElementById("root").className = "pubg-card " + LAYOUT;
+    // Bei layout=fold ist jeder Mate eine eigene pubg-card (per-item-cards).
+    // Bei carousel/stack/mosaic bleibt der Container die pubg-card.
+    const ITEMS_AS_CARDS = (LAYOUT === "fold");
+    document.getElementById("root").className =
+      (ITEMS_AS_CARDS ? "" : "pubg-card ") + LAYOUT;
 
     function mateBody(m) {
       return `
@@ -128,7 +132,8 @@
     }
 
     function mateHTML(m) {
-      return `<div class="mate">${mateBody(m)}</div>`;
+      const cls = ITEMS_AS_CARDS ? "mate pubg-card" : "mate";
+      return `<div class="${cls}">${mateBody(m)}</div>`;
     }
 
     let carouselIdx = 0;
