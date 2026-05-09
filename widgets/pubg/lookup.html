@@ -3,10 +3,9 @@
   PUBG Player Lookup
   ────────────────────────────────────────────────────────────────────
   Use case: live lookup of any PUBG player's career / per-mode stats.
-  Suchfeld interaktiv. Nicht primär als Stream-Overlay gedacht — der
-  echte Mehrwert kommt mit einem zukünftigen Twitch-Extension/Overlay-
-  Plugin, in dem Viewer beliebige Player-Lookups triggern können.
-  Bis dahin: ein internes Tool / BRB-Variante.
+  Interactive search by default. Pass ?embed=1 to hide title, hint and
+  search row — useful when embedding via URL with ?player=NAME (no
+  user input needed, just the stats).
 -->
 <html>
 <head>
@@ -100,18 +99,24 @@
     }
     .modes-table td:first-child { text-align: left; color: var(--pubg-text); }
     .err { color: #e57b7b; padding: 14px; }
+
+    /* ?embed=1 → versteckt Title, Hint und Search-Row.
+       Damit bleibt nur das Result-Panel (clean Embed-View). */
+    body.embed .card h1,
+    body.embed .hint,
+    body.embed .search-row { display: none; }
   </style>
 </head>
 <body>
   <div class="pubg-card card pubg-fade-in">
     <h1>Player Lookup</h1>
     <div class="hint">
-      Live von der PUBG-API · Career-Lifetime + Recent-Match-Count.
-      <br>Steam-Account-Name eingeben (case-sensitive!).
+      Live from the PUBG API · Career-Lifetime + Recent-Match-Count.
+      <br>Enter the Steam account name (case-sensitive!).
     </div>
     <div class="search-row">
-      <input type="text" id="searchInput" placeholder="z.B. la-city12" autofocus>
-      <button id="searchBtn">Suchen</button>
+      <input type="text" id="searchInput" placeholder="e.g. la-city12" autofocus>
+      <button id="searchBtn">Search</button>
     </div>
     <div id="result"></div>
   </div>
@@ -123,9 +128,12 @@
       document.getElementById("searchInput").value = initialPlayer;
     }
 
+    // ?embed=1 → header-block (h1, hint, search-row) ausblenden
+    if (PubgUI.qs("embed") === "1") document.body.classList.add("embed");
+
     async function lookup(name) {
       const result = document.getElementById("result");
-      result.innerHTML = `<div class="empty">— wird geholt (1-2 PUBG-API-Calls) —</div>`;
+      result.innerHTML = `<div class="empty">— fetching (1-2 PUBG-API calls) —</div>`;
 
       try {
         const d = await PubgUI.fetchJson(
@@ -181,7 +189,7 @@
         result.innerHTML = `
           <div class="player-name">${d.name}</div>
           <div class="player-meta">
-            ${d.shardId} · ${PubgUI.fmtNum(d.recentMatchCount)} Matches in den letzten 14 Tagen
+            ${d.shardId} · ${PubgUI.fmtNum(d.recentMatchCount)} matches in the last 14 days
           </div>
           ${careerHtml}
           ${modesHtml}
@@ -193,7 +201,7 @@
         history.replaceState(null, "", u.toString());
 
       } catch (e) {
-        result.innerHTML = `<div class="err">Fehler: ${e}</div>`;
+        result.innerHTML = `<div class="err">Error: ${e}</div>`;
       }
     }
 
