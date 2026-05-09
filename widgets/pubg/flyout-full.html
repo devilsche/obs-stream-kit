@@ -12,29 +12,16 @@
     /* Compact-Modus für In-Game/BRB: weniger Padding, kompakte Stat-Werte */
     body.compact { padding: 10px; }
     body.compact .panel { width: 360px; padding: 12px 14px; }
-    body.compact .head { margin-bottom: 8px; }
-    body.compact .head h2 { font-size: 1em; }
     body.compact .section { padding: 8px 0; }
     body.compact .stat-grid { gap: 8px; }
     body.compact .stat-grid .pubg-stat-value { font-size: 1.15em; }
     body.compact .pubg-stat-label { font-size: 0.65em; }
-    .head {
-      display: flex; justify-content: space-between; align-items: baseline;
-      margin-bottom: 14px;
-    }
-    .head h2 {
-      margin: 0;
-      color: var(--pubg-gold);
-      font-size: 1.2em;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
 
     .section {
       border-top: 1px solid rgba(255,255,255,0.07);
       padding: 12px 0;
     }
+    .section:first-child { border-top: none; padding-top: 0; }
     .section h3 {
       margin: 0 0 8px;
       font-size: 0.75em;
@@ -77,11 +64,8 @@
   </style>
 </head>
 <body>
+  <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card panel pubg-fade-in">
-    <div class="head">
-      <h2 id="cardTitle">PUBG SESSION</h2>
-    </div>
-
     <div class="section">
       <div class="stat-grid">
         <div class="cell"><span class="pubg-stat-value" id="kills">—</span><span class="pubg-stat-label">Kills</span></div>
@@ -155,12 +139,7 @@
 
     // Globaler Range-Filter: session/week/all
     const RANGE = PubgUI.qs("range", "session");
-    const TITLES = {
-      session: "PUBG · Session",
-      week:    "PUBG · 7 days",
-      all:     "PUBG · Database",
-    };
-    document.getElementById("cardTitle").textContent = TITLES[RANGE] || TITLES.session;
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), "PUBG", RANGE);
 
     PubgUI.buildFilter([
       { key: "range", label: "Range", type: "select", default: "session",

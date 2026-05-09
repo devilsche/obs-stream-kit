@@ -8,14 +8,6 @@
   <style>
     body { padding: 5px; }
     .summary { width: 720px; padding: 28px 32px; }
-    .summary h1 {
-      margin: 0 0 6px;
-      color: var(--pubg-gold);
-      font-size: 1.6em;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-    .summary .subtitle { color: var(--pubg-muted); font-size: 0.9em; margin-bottom: 18px; }
     .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
     .grid .cell { display: flex; flex-direction: column; }
     .grid .cell .pubg-stat-value { font-size: 1.8em; }
@@ -29,8 +21,8 @@
   </style>
 </head>
 <body>
+  <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card summary pubg-fade-in">
-    <h1>Overview · Session</h1>
     <div class="grid">
       <div class="cell"><span class="pubg-stat-value" id="matches">—</span><span class="pubg-stat-label">Matches</span></div>
       <div class="cell"><span class="pubg-stat-value" id="kills">—</span><span class="pubg-stat-label">Kills</span></div>
@@ -57,6 +49,7 @@
   <script src="_pubg.js"></script>
   <script>
     PubgUI.buildFilter([]);
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), "Overview", "session");
 
     // ?hideMaps=1 / ?hideMates=1 — Sektion(en) ausblenden.
     // Beide aus → ganzes twocol-Grid weg. Nur einer aus → verbleibende
