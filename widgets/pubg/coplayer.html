@@ -6,9 +6,14 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="_pubg.css">
   <style>
+    /* Layout-Pattern B (Web-View Stats-Page), gleiche Werte wie lookup
+       und session-report: body 20px (war 40 20), card 22 26 (war 20 24),
+       h3 0.8em statt h2 0.85em, stat-value 1.4em (war default), grid
+       responsive auto-fit (war fix 3 Spalten). */
     body {
       background: linear-gradient(180deg, #1a0d2a 0%, #0a0510 100%);
-      min-height: 100vh; padding: 40px 20px;
+      min-height: 100vh;
+      padding: 20px;
       display: flex; justify-content: center;
     }
     .container { max-width: 720px; width: 100%; }
@@ -22,13 +27,22 @@
       color: var(--pubg-muted);
       font-size: 0.85em;
     }
-    .section { margin-bottom: 28px; padding: 20px 24px; }
-    .section h2 {
-      margin: 0 0 14px; font-size: 0.85em; color: var(--pubg-muted);
-      text-transform: uppercase; letter-spacing: 0.1em;
+    .section { margin-bottom: 18px; padding: 22px 26px; }
+    .section:last-child { margin-bottom: 0; }
+    .section h3 {
+      margin: 0 0 12px;
+      color: var(--pubg-muted);
+      font-size: 0.8em;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
     }
-    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 14px;
+    }
     .grid .cell { display: flex; flex-direction: column; }
+    .grid .cell .pubg-stat-value { font-size: 1.4em; }
     .matches { width: 100%; border-collapse: collapse; font-size: 0.9em; }
     .matches th, .matches td {
       padding: 6px 8px; text-align: left;
@@ -46,7 +60,7 @@
     </div>
 
     <div class="pubg-card section">
-      <h2>Played With You</h2>
+      <h3>Played With You</h3>
       <div class="grid">
         <div class="cell"><span class="pubg-stat-value" id="sm">—</span><span class="pubg-stat-label">Matches</span></div>
         <div class="cell"><span class="pubg-stat-value" id="skd">—</span><span class="pubg-stat-label">K/D</span></div>
@@ -58,7 +72,7 @@
     </div>
 
     <div class="pubg-card section" id="careerSection">
-      <h2>Career Lifetime (PUBG-API)</h2>
+      <h3>Career Lifetime (PUBG-API)</h3>
       <div class="grid">
         <div class="cell"><span class="pubg-stat-value" id="cm">—</span><span class="pubg-stat-label">Matches</span></div>
         <div class="cell"><span class="pubg-stat-value" id="ckd">—</span><span class="pubg-stat-label">K/D</span></div>
@@ -70,7 +84,7 @@
     </div>
 
     <div class="pubg-card section">
-      <h2>Last 5 Matches Together</h2>
+      <h3>Last 5 Matches Together</h3>
       <table class="matches">
         <thead><tr><th>Map</th><th>Place</th><th>Kills</th><th>DMG</th><th>Date</th></tr></thead>
         <tbody id="last5"></tbody>
