@@ -51,9 +51,10 @@
     }
     .markers .m.hot   { background: #ff7a1f; opacity: 1; }
     .markers .m.died  { background: #e57b7b; opacity: 0.7; }
-    /* Solo tot, Team ueberlebt: Diagonal-Split rot/orange */
+    /* Solo tot, Team ueberlebt: eigener Farbton (lila, brand-purple),
+       weil rot/orange-Mix bei 10x10px nicht unterscheidbar ist. */
     .markers .m.died.team-saved {
-      background: linear-gradient(135deg, #e57b7b 50%, #ff7a1f 50%);
+      background: #a974d4;
       opacity: 1;
     }
     .meta { color: var(--pubg-muted); font-size: 0.78em; margin-top: 8px; }
@@ -74,7 +75,7 @@
     .legend .swatch.hot  { background: #ff7a1f; opacity: 1; }
     .legend .swatch.died { background: #e57b7b; opacity: 0.7; }
     .legend .swatch.team-saved {
-      background: linear-gradient(135deg, #e57b7b 50%, #ff7a1f 50%);
+      background: #a974d4;
       opacity: 1;
     }
     .legend .hint { opacity: 0.7; font-style: italic; }
