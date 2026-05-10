@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG First-Fight Debug</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    body { padding: 20px; min-height: 100vh; }
+    .card { max-width: 1200px; margin: 0 auto; padding: 22px 26px; }
+    h1 {
+      margin: 0 0 6px;
+      color: var(--pubg-gold);
+      font-size: 1.4em;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .hint { color: var(--pubg-muted); font-size: 0.85em; margin-bottom: 14px; }
+    .controls {
+      display: flex; gap: 10px; align-items: center;
+      margin-bottom: 16px;
+    }
+    .controls select, .controls button {
+      background: rgba(0,0,0,0.4);
+      color: var(--pubg-text);
+      border: 1px solid var(--pubg-border);
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.9em;
+    }
+    .controls button {
+      background: var(--pubg-gold);
+      color: #1a0d2a;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+    }
+    table {
+      width: 100%; border-collapse: collapse;
+      font-size: 0.82em; font-variant-numeric: tabular-nums;
+    }
+    th, td {
+      text-align: left; padding: 6px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    th {
+      color: var(--pubg-muted); font-weight: 400;
+      font-size: 0.85em; text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+    }
+    td { color: var(--pubg-text); }
+    .num { color: var(--pubg-gold); font-weight: 700; }
+    .yes { color: #7be57b; }
+    .no  { color: #e57b7b; }
+    .muted { color: var(--pubg-muted); }
+    .verdict { font-weight: 700; }
+    .v-real { color: #7be57b; }
+    .v-fled { color: #f2b705; }
+    .v-died { color: #e57b7b; }
+    .v-savedbyteam { color: #a974d4; }
+    .v-nofight { color: var(--pubg-muted); }
+    .legend {
+      margin-top: 14px;
+      font-size: 0.78em;
+      color: var(--pubg-muted);
+      line-height: 1.6;
+    }
+    .legend b { color: var(--pubg-text); }
+  </style>
+</head>
+<body>
+  <div class="pubg-card card pubg-fade-in">
+    <h1>First-Fight · Debug View</h1>
+    <div class="hint">
+      Liest <code>/api/pubg/first-fight-debug</code> live. Zeigt pro Match,
+      ob die Detection einen "echten" Fight findet, ob's nur ein
+      isoliertes Event war (Disengage), oder ob das Match keine
+      Squad-Combat-Events hat.
+    </div>
+    <div class="controls">
+      <label>Range</label>
+      <select id="range">
+        <option value="session" selected>Session</option>
+        <option value="week">7 days</option>
+        <option value="all">Database</option>
+      </select>
+      <button id="reload">Reload</button>
+      <span class="muted" id="meta"></span>
+    </div>
+    <div id="tbl"><div class="muted">— wird geholt —</div></div>
+    <div class="legend">
+      <b>Verdict-Spalte:</b><br>
+      <span class="v-real">REAL FIGHT</span> = ≥2 Squad-beteiligte Events im Cluster (echter Schlagabtausch)<br>
+      <span class="v-fled">FLED</span> = nur 1 Event, dann Stille — Squad-Berührung mit Disengage<br>
+      <span class="v-savedbyteam">TEAM SAVED</span> = du tot, mind. 1 Squad-Member überlebt<br>
+      <span class="v-died">BOTH DIED</span> = alle aus deinem Squad im Fight gefallen<br>
+      <span class="v-nofight">NO FIGHT</span> = Match hat kein Squad-Kill/Knock-Event (Storm/Vehicle/Disco)
+    </div>
+  </div>
+
+  <script src="_pubg.js"></script>
+  <script>
+    function classify(m) {
+      const r = m.detectionResult;
+      if (!r || r.error) return { kind: "nofight", label: "NO FIGHT" };
+      if (r.events_count <= 1) return { kind: "fled", label: "FLED" };
+      if (r.soloSurvived) return { kind: "real", label: "REAL FIGHT (won)" };
+      if (r.teamSurvived) return { kind: "savedbyteam", label: "TEAM SAVED" };
+      return { kind: "died", label: "BOTH DIED" };
+    }
+
+    function fmtEvent(ev) {
+      if (!ev) return "—";
+      const who = ev.actorIsMe ? "you" : (ev.actorIsSquad ? "mate" : "enemy");
+      const tgt = ev.targetIsMe ? "you" : (ev.targetIsSquad ? "mate" : "enemy");
+      return `${ev.type}: ${who} → ${tgt}`;
+    }
+
+    function render(data) {
+      const matches = data.matches || [];
+      if (!matches.length) {
+        document.getElementById("tbl").innerHTML =
+          '<div class="muted">Keine Matches in dieser Range.</div>';
+        document.getElementById("meta").textContent = "";
+        return;
+      }
+      const tbl = `
+        <table>
+          <thead>
+            <tr>
+              <th>#</th><th>Time</th><th>Place</th>
+              <th>Solo</th><th>Team</th>
+              <th>Events</th><th>Duration</th>
+              <th>1-Event Detail</th>
+              <th>Verdict</th>
+              <th class="muted">match_id</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${matches.map((m, i) => {
+              const r = m.detectionResult || {};
+              const v = classify(m);
+              const time = PubgUI.fmtTime(m.playedAt) + " · " + PubgUI.fmtDate(m.playedAt);
+              const idx = matches.length - i; // chronologisch (oldest=1)
+              const dur = (r.fight_duration_s != null) ? r.fight_duration_s.toFixed(1) + "s" : "—";
+              const ev = (r.events_count === 1) ? fmtEvent(m.firstSquadEvent) : "—";
+              return `<tr>
+                <td>${idx}</td>
+                <td>${time}</td>
+                <td>#${m.place}</td>
+                <td class="${r.soloSurvived ? 'yes' : 'no'}">${r.soloSurvived ? '✓' : '✗'}</td>
+                <td class="${r.teamSurvived ? 'yes' : 'no'}">${r.teamSurvived ? '✓' : '✗'}</td>
+                <td class="num">${r.events_count ?? '—'}</td>
+                <td>${dur}</td>
+                <td class="muted">${ev}</td>
+                <td class="verdict v-${v.kind}">${v.label}</td>
+                <td class="muted" style="font-size:0.85em">${m.matchId}</td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>`;
+      document.getElementById("tbl").innerHTML = tbl;
+      const counts = matches.reduce((acc, m) => {
+        const k = classify(m).kind;
+        acc[k] = (acc[k] || 0) + 1;
+        return acc;
+      }, {});
+      document.getElementById("meta").innerHTML =
+        `${matches.length} matches · ` +
+        `<span class="v-real">real:${counts.real||0}</span> · ` +
+        `<span class="v-fled">fled:${counts.fled||0}</span> · ` +
+        `<span class="v-savedbyteam">teamSaved:${counts.savedbyteam||0}</span> · ` +
+        `<span class="v-died">died:${counts.died||0}</span> · ` +
+        `<span class="v-nofight">nofight:${counts.nofight||0}</span>`;
+    }
+
+    async function load() {
+      const range = document.getElementById("range").value;
+      document.getElementById("tbl").innerHTML = '<div class="muted">— wird geholt —</div>';
+      try {
+        const data = await PubgUI.fetchJson(`/api/pubg/first-fight-debug?range=${range}`);
+        render(data);
+      } catch (e) {
+        document.getElementById("tbl").innerHTML =
+          `<div class="pubg-error">Fehler: ${e}</div>`;
+      }
+    }
+
+    document.getElementById("range").addEventListener("change", load);
+    document.getElementById("reload").addEventListener("click", load);
+    load();
+  </script>
+</body>
+</html>
