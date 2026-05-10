@@ -59,6 +59,8 @@ class SteamEndpointRegistry:
             return self._status()
         if route == "/api/steam/test-unlock":
             return self._test_unlock(qs)
+        if route == "/api/steam/test-reset":
+            return self._test_reset(qs)
         return None
 
     # ── Now-Playing mit Playtime + Achievement-Progress ────────────────────
@@ -168,6 +170,28 @@ class SteamEndpointRegistry:
         if not self.poller:
             return _ok({"poller": "disabled"})
         return _ok({"poller": "active", **self.poller.status()})
+
+    def _test_reset(self, qs):
+        """Markiert Test-Unlocks (app_id=-1) als displayed -> Queue
+        leer, Widget zeigt wieder Now-Playing.
+
+        Query-Params:
+          ?all=1   markiert ALLE undisplayed Unlocks (auch echte)
+        """
+        conn = self.db_connect()
+        try:
+            if qs.get("all") == "1":
+                n = mark_all_displayed(conn, self.client.steam_id)
+            else:
+                cur = conn.execute("""
+                    UPDATE steam_achievements_seen
+                    SET displayed_at = strftime('%s','now')
+                    WHERE steam_id=? AND app_id=-1 AND displayed_at IS NULL
+                """, (self.client.steam_id,))
+                n = cur.rowcount
+            return _ok({"marked": n})
+        finally:
+            conn.close()
 
     # ── Test-Unlock (Diagnose / Widget-Test) ───────────────────────────────
     def _test_unlock(self, qs):
