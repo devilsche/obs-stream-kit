@@ -417,6 +417,30 @@ class EndpointRegistry:
                                               30 * 1000, 200 * 100)
             except Exception as e:
                 result = {"error": str(e)}
+            # Bei verdaechtigen 1-Event-Clustern (events_count == 1)
+            # das erste Squad-beteiligte Event direkt mitgeben - dann
+            # sieht man, ob's ein Knock oder Kill war und wer Actor/Target
+            # war. Damit laesst sich 'wir sind abgehauen'-Faelle
+            # identifizieren.
+            first_event = None
+            if result and isinstance(result, dict) and result.get("events_count") == 1 and squad_ids:
+                placeholders = ",".join("?" * len(squad_ids))
+                row = conn.execute(
+                    f"""SELECT event_type, actor_account, target_account, timestamp_ms
+                        FROM telemetry_events
+                        WHERE match_id = ? AND event_type IN ('Kill','Knock')
+                          AND (actor_account IN ({placeholders})
+                               OR target_account IN ({placeholders}))
+                        ORDER BY timestamp_ms ASC LIMIT 1""",
+                    (mid, *squad_ids, *squad_ids)).fetchone()
+                if row:
+                    first_event = {
+                        "type": row["event_type"],
+                        "actorIsSquad": row["actor_account"] in squad_ids,
+                        "targetIsSquad": row["target_account"] in squad_ids,
+                        "actorIsMe": row["actor_account"] == self.my_account_id,
+                        "targetIsMe": row["target_account"] == self.my_account_id,
+                    }
             out.append({
                 "matchId": mid,
                 "playedAt": m["played_at"],
@@ -430,6 +454,7 @@ class EndpointRegistry:
                 "knockEvents": knock_n,
                 "squadInvolvedEvents": squad_involved,
                 "detectionResult": result,
+                "firstSquadEvent": first_event,
             })
         return _ok({"matches": out})
 
