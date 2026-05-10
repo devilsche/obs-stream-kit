@@ -13,6 +13,7 @@ from steam.api_client import SteamApiError
 from steam.db import (
     get_owned_game, get_app_schema, get_progress,
     get_undisplayed_unlocks, mark_displayed, mark_all_displayed,
+    insert_unlock_if_new, upsert_app_schema,
 )
 
 
@@ -56,6 +57,8 @@ class SteamEndpointRegistry:
             return self._recent_unlocks(qs)
         if route == "/api/steam/status":
             return self._status()
+        if route == "/api/steam/test-unlock":
+            return self._test_unlock(qs)
         return None
 
     # ── Now-Playing mit Playtime + Achievement-Progress ────────────────────
@@ -165,3 +168,40 @@ class SteamEndpointRegistry:
         if not self.poller:
             return _ok({"poller": "disabled"})
         return _ok({"poller": "active", **self.poller.status()})
+
+    # ── Test-Unlock (Diagnose / Widget-Test) ───────────────────────────────
+    def _test_unlock(self, qs):
+        """Triggert einen Fake-Achievement-Unlock — fuer Widget-Tests.
+        Wird via app_id=-1 markiert (kollidiert nicht mit echten Apps).
+
+        Query-Params (alle optional):
+          ?title=...    Display-Name        (Default: 'Test Achievement')
+          ?desc=...     Beschreibung        (Default: 'Triggered via test endpoint')
+          ?game=...     Game-Name fuer Anzeige (Default: 'Test Game')
+          ?icon=...     Icon-URL             (Default: Steam-Logo)
+        """
+        title = qs.get("title", "Test Achievement")
+        desc  = qs.get("desc",  "Triggered via test endpoint")
+        game  = qs.get("game",  "Test Game")
+        icon  = qs.get(
+            "icon",
+            "https://store.cloudflare.steamstatic.com/public/shared/images/responsive/header_logo.png")
+
+        conn = self.db_connect()
+        try:
+            # Fake Schema-Eintrag fuer app_id=-1 (oder updaten)
+            upsert_app_schema(conn, app_id=-1, game_name=game,
+                              achievement_count=0, schema_json="{}")
+            api_name = f"test_{int(time.time() * 1000)}"
+            inserted = insert_unlock_if_new(
+                conn, self.client.steam_id, -1, api_name,
+                int(time.time()),
+                display_name=title, description=desc, icon_url=icon)
+            return _ok({
+                "ok": True,
+                "inserted": inserted,
+                "apiName": api_name,
+                "title": title,
+            })
+        finally:
+            conn.close()
