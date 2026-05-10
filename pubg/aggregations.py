@@ -1331,7 +1331,10 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     # Wenn ein Hot-Drop-Team disengaged und 5 min spaeter zurueck-
     # kommt, ist das ein NEUES Cluster (nicht mehr Hot-Drop).
     cluster_window_ms = 180 * 1000  # 3 min Stille = Cluster zu
-    cluster_radius_cm = 300 * 100
+    # 500m statt 300m — typische PUBG-Stadt (Pochinki, Mylta etc.)
+    # ist 400-500m breit. Ein Gegner am anderen Stadt-Ende ist immer
+    # noch derselbe Hot-Drop, nicht ein 'fremdes' Team.
+    cluster_radius_cm = 500 * 100
     squad_pos_for_kills = [(s["actor_x"], s["actor_y"]) for s in squad_landings
                             if s["actor_x"] is not None and s["actor_y"] is not None]
 
@@ -1407,7 +1410,8 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     # gelandet sind. Braucht alle Lobby-Landings (telemetry_schema >= 3)
     # + Position. Eigene Squad-Members werden ausgeschlossen.
     teams_in_radius = set()
-    radius_cm = 300 * 100  # 1 Meter = 100 PUBG-Welt-Units
+    radius_cm = 500 * 100  # 1 Meter = 100 PUBG-Welt-Units; 500m =
+                            # typische PUBG-Stadt-Breite (Pochinki etc.)
     radius_sq = radius_cm * radius_cm
     squad_pos = [(s["actor_x"], s["actor_y"]) for s in squad_landings
                   if s["actor_x"] is not None and s["actor_y"] is not None]
