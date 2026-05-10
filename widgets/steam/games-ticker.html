@@ -113,6 +113,27 @@
     const HEADING    = PubgUI.qs("header",   "");
 
     PubgUI.renderHeader(document.getElementById("pubgHeader"), "Library", "live");
+    PubgUI.buildFilter([
+      { key: "filter", label: "Filter", type: "select", default: "all",
+        options: [["all","All"], ["coop","Co-op"], ["multiplayer","Multiplayer"]],
+        tooltip: "Limit to a category. 'coop' uses Steam categories " +
+                 "9/36/38, 'multiplayer' adds 1/27." },
+      { key: "sort", label: "Sort", type: "select", default: "playtime",
+        options: [["playtime","Total playtime"],
+                  ["recent","Recently played (14d)"],
+                  ["name","Name A→Z"]],
+        tooltip: "'recent' filters to games with playtime in the last " +
+                 "14 days." },
+      { key: "rotateMs", label: "Rotate ms", type: "range",
+        min: 3000, max: 20000, default: 8000,
+        tooltip: "How fast each game cycles." },
+      { key: "minPlaytime", label: "Min playtime (min)", type: "range",
+        min: 0, max: 1000, default: 0,
+        tooltip: "Show only games with at least N minutes total." },
+      { key: "limit", label: "Pool size", type: "range",
+        min: 1, max: 200, default: 30,
+        tooltip: "How many games go into the ticker pool." },
+    ]);
     document.getElementById("headingText").innerHTML = HEADING
       ? HEADING.replace(/</g, "&lt;")
       : `<b>${FILTER === "coop" ? "Co-op games" : FILTER === "multiplayer" ? "Multiplayer games" : "My library"}</b>`;

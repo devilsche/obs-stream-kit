@@ -95,8 +95,15 @@
   </div>
   <script src="/widgets/pubg/_pubg.js"></script>
   <script>
+    const POLL_MS = parseInt(PubgUI.qs("pollMs", "10000"), 10);
+
     PubgUI.renderHeader(
       document.getElementById("pubgHeader"), "Now Playing", "live");
+    PubgUI.buildFilter([
+      { key: "pollMs", label: "Poll (ms)", type: "range",
+        min: 3000, max: 60000, default: 10000,
+        tooltip: "How often to refresh the now-playing card." },
+    ]);
 
     function fmtHours(min) {
       if (!min || min < 0) return null;
@@ -149,7 +156,7 @@
       }
     }
 
-    PubgUI.poll("/api/steam/now-playing", 10000, render, console.error);
+    PubgUI.poll("/api/steam/now-playing", POLL_MS, render, console.error);
   </script>
 </body>
 </html>

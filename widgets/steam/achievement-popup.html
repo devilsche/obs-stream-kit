@@ -86,6 +86,18 @@
     const GAP_S      = parseFloat(PubgUI.qs("gap", "1.5"));
     const POLL_MS    = parseInt(PubgUI.qs("pollMs", "5000"), 10);
 
+    PubgUI.buildFilter([
+      { key: "duration", label: "Show duration (s)", type: "range",
+        min: 3, max: 15, default: 8,
+        tooltip: "How long each achievement popup stays on screen." },
+      { key: "gap", label: "Gap (s)", type: "range",
+        min: 0, max: 5, default: 1.5,
+        tooltip: "Pause between consecutive achievement popups." },
+      { key: "pollMs", label: "Poll (ms)", type: "range",
+        min: 2000, max: 30000, default: 5000,
+        tooltip: "How often to poll for new unlocks." },
+    ]);
+
     const popup = document.getElementById("popup");
     const queue = [];
     let busy = false;

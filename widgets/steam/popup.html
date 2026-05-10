@@ -118,6 +118,22 @@
     const SHOW_DURATION_MS         = parseInt(PubgUI.qs("durationMs", "8000"),  10);
     const GAP_MS                   = parseInt(PubgUI.qs("gapMs",      "1500"),  10);
 
+    PubgUI.buildFilter([
+      { key: "nowPollMs", label: "Now-playing poll (ms)", type: "range",
+        min: 30000, max: 1800000, default: 600000,
+        tooltip: "How often to poll the now-playing endpoint. Default " +
+                 "10 min — Steam summary rarely changes faster." },
+      { key: "achPollMs", label: "Achievement poll (ms)", type: "range",
+        min: 2000, max: 30000, default: 5000,
+        tooltip: "How often to poll for new achievement unlocks." },
+      { key: "durationMs", label: "Show duration (ms)", type: "range",
+        min: 3000, max: 15000, default: 8000,
+        tooltip: "How long each popup stays visible." },
+      { key: "gapMs", label: "Gap (ms)", type: "range",
+        min: 0, max: 5000, default: 1500,
+        tooltip: "Pause between consecutive popups." },
+    ]);
+
     const popup  = document.getElementById("popup");
     const ribbon = document.getElementById("ribbon");
     const titleEl= document.getElementById("title");
