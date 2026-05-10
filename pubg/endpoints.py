@@ -510,12 +510,15 @@ class EndpointRegistry:
                         dx = r["victim_x"] - slp[0]
                         dy = r["victim_y"] - slp[1]
                         death_dist_m = round(((dx*dx + dy*dy) ** 0.5) / 100, 1)
+                    # PUBG-Telemetry liefert 'distance' in cm (Welt-Units).
+                    # 100 cm = 1 m -> /100 fuer Meter.
+                    shot_m = (r["distance"] / 100.0) if r["distance"] else None
                     squad_deaths.append({
                         "victim": victim_name_map.get(r["victim"]) or r["victim"],
                         "killer": r["killer_name"] or r["killer"],
                         "killerIsSelf": r["killer"] in squad_ids,  # friendly fire?
                         "weapon": r["weapon"],
-                        "shotDistanceM": r["distance"],  # Schuss-Distanz beim Kill
+                        "shotDistanceM": round(shot_m, 1) if shot_m is not None else None,
                         "killerLandingDistM": landing_dist_m,
                         "deathToSquadLandingM": death_dist_m,
                         "tsMs": r["timestamp_ms"],
