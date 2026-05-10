@@ -18,6 +18,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ?dock=1 → fuer OBS Custom Docks (Browser nativ, ohne OBS-Hintergrund).
+   Body bekommt den Brand-Background. Aktiviert via _pubg.js (URL-Param
+   setzt body.dock-Klasse). Mit !important damit Widget-spezifisches
+   body { background: ... } sich nicht in den Weg legt. */
+body.dock {
+  background: linear-gradient(180deg, #1a0d2a 0%, #0a0510 100%) !important;
+  min-height: 100vh;
+}
+
 .pubg-card {
   background: var(--pubg-purple-bg);
   border: 1px solid var(--pubg-border);

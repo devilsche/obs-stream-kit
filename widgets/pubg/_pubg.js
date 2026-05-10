@@ -246,6 +246,17 @@
   };
   PubgUI._applyScale();
 
+  // ?dock=1 — fuer OBS Custom Docks (Browser nativ ohne OBS-Hintergrund).
+  // Body bekommt den Brand-Background, sonst weiss. CSS: body.dock-Regel
+  // in _pubg.css.
+  PubgUI._applyDock = () => {
+    if (PubgUI.qs("dock") !== "1") return;
+    const apply = () => { document.body.classList.add("dock"); };
+    if (document.body) apply();
+    else document.addEventListener("DOMContentLoaded", apply);
+  };
+  PubgUI._applyDock();
+
   PubgUI.animateNumber = function (el, targetValue, opts) {
     const o = opts || {};
     const duration = o.durationMs || 900;
