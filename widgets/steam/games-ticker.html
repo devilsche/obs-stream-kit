@@ -115,7 +115,7 @@
     PubgUI.renderHeader(document.getElementById("pubgHeader"), "Library", "live");
     document.getElementById("headingText").innerHTML = HEADING
       ? HEADING.replace(/</g, "&lt;")
-      : `<b>${FILTER === "coop" ? "Co-op Games" : FILTER === "multiplayer" ? "Multiplayer Games" : "My Library"}</b>`;
+      : `<b>${FILTER === "coop" ? "Co-op games" : FILTER === "multiplayer" ? "Multiplayer games" : "My library"}</b>`;
 
     function fmtHours(min) {
       if (!min || min <= 0) return null;

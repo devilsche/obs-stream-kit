@@ -244,12 +244,10 @@
       } catch (e) { /* silent */ }
     }
 
-    // Defensive Doppel-Anzeige-Schutz: jeder bereits gezeigte
-    // Achievement-apiName wird im LocalStorage gemerkt. Falls die
-    // Server-Markierung mal fehlschlaegt (z.B. Widget war im Hinter-
-    // grund-Tab gethrottled, oder Server-Restart mit Daten-Reset),
-    // skipt das Widget jeden Unlock den es lokal schon hatte.
-    const SHOWN_KEY = "steam_shown_achievements";
+    // Defensive Doppel-Anzeige-Schutz pro Widget-Instanz: jedes
+    // Widget hat eigenen LocalStorage-Key — damit blockt 'popup' nicht
+    // 'achievement-popup' wenn beide parallel offen sind.
+    const SHOWN_KEY = "steam_shown_combined_popup";
     function getShown() {
       try { return new Set(JSON.parse(localStorage.getItem(SHOWN_KEY) || "[]")); }
       catch { return new Set(); }

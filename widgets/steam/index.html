@@ -86,15 +86,16 @@
   </style>
 </head>
 <body>
-  <h1>Steam Widgets — lokale Demo</h1>
+  <h1>Steam Widgets — local demo</h1>
   <p class="intro">
-    Übersicht aller Steam-Widgets + Trigger-Buttons für Test-Endpoints.
-    Klick auf eine Widget-Kachel öffnet die Live-URL in eigenem Tab.
-    Test-Buttons fetchen die Endpoints ohne Navigation.
+    Overview of all Steam widgets plus trigger buttons for the test
+    endpoints. Click a tile header link (↗) to open the widget URL in a
+    new tab. Trigger buttons fetch their endpoint in the background
+    without navigation.
   </p>
 
   <!-- ── Trigger-Bar ────────────────────────────────────────────────── -->
-  <h2 class="section">Test-Trigger</h2>
+  <h2 class="section">Test triggers</h2>
   <div class="triggers">
     <button data-fetch="/api/steam/test-unlock">▶ Test Achievement</button>
     <button data-fetch="/api/steam/test-unlock?title=Rare%20Drop&desc=Less%20than%201%25%20of%20players&game=Test%20Title">▶ Custom Test</button>
@@ -104,7 +105,7 @@
   </div>
 
   <!-- ── API-Endpoints ─────────────────────────────────────────────── -->
-  <h2 class="section">API-Endpoints (öffnen)</h2>
+  <h2 class="section">API endpoints (open)</h2>
   <div class="urlbox">
     <a href="/api/steam/now-playing" target="_blank">/api/steam/now-playing<span class="pill">live + cache</span></a>
     <a href="/api/steam/recent-unlocks" target="_blank">/api/steam/recent-unlocks<span class="pill">read-only</span></a>
@@ -116,7 +117,7 @@
     <a href="/api/steam/status" target="_blank">/api/steam/status<span class="pill">poller</span></a>
   </div>
 
-  <!-- ── Popups (slide-in / Animation) ─────────────────────────────── -->
+  <!-- ── Popups (slide-in / animation) ─────────────────────────────── -->
   <h2 class="section">Popups</h2>
   <div class="grid">
     <div class="tile">
@@ -136,7 +137,7 @@
   </div>
 
   <!-- ── Now-Playing (bottom-left) ─────────────────────────────────── -->
-  <h2 class="section">Now-Playing</h2>
+  <h2 class="section">Now playing</h2>
   <div class="grid">
     <div class="tile">
       <h3>
@@ -148,7 +149,7 @@
   </div>
 
   <!-- ── Games-Ticker (Library / Coop / MP) ────────────────────────── -->
-  <h2 class="section">Games-Ticker</h2>
+  <h2 class="section">Games ticker</h2>
   <div class="grid">
     <div class="tile">
       <h3>

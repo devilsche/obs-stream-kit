@@ -20,6 +20,7 @@ from steam.db import (
     insert_unlock_if_new, upsert_owned_games, upsert_app_schema,
     get_app_schema, upsert_progress,
     find_app_needing_details_sync, upsert_app_details,
+    mark_played_now,
     COOP_CATEGORY_IDS, MULTIPLAYER_CATEGORY_IDS,
 )
 
@@ -99,6 +100,19 @@ class SteamPoller(threading.Thread):
             self._state["currentGameName"] = summary.get("gameextrainfo")
             self._state["lastLayer1At"] = int(time.time())
             self._state["lastError"] = None
+
+        # last_played_at fuer das aktive Spiel auf 'jetzt' setzen —
+        # damit sort=recent zuverlaessig auch dann funktioniert wenn
+        # Steam selbst keine playtime_2weeks-Daten liefert.
+        if app_id:
+            try:
+                conn = self.db_connect()
+                try:
+                    mark_played_now(conn, self.client.steam_id, app_id)
+                finally:
+                    conn.close()
+            except Exception:
+                pass
 
         # Owned-Games-Sync: 1× / Stunde — auch wenn kein Spiel läuft
         ts = int(time.time())

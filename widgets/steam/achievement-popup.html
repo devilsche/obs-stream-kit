@@ -118,9 +118,9 @@
       if (u) showOne(u);
     }
 
-    // Defensive Doppel-Anzeige-Schutz via LocalStorage, falls Server-
-    // Markierung mal fehlschlaegt.
-    const SHOWN_KEY = "steam_shown_achievements";
+    // Defensive Doppel-Anzeige-Schutz pro Widget-Instanz (eigener
+    // LocalStorage-Key — kein Konflikt mit combined popup.html).
+    const SHOWN_KEY = "steam_shown_achievement_popup";
     function getShown() {
       try { return new Set(JSON.parse(localStorage.getItem(SHOWN_KEY) || "[]")); }
       catch { return new Set(); }

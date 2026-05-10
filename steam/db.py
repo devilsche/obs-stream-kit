@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS steam_owned_games (
   img_logo_url TEXT,                    -- 184x69 banner (volle URL)
   playtime_forever_min INTEGER NOT NULL DEFAULT 0,
   playtime_2weeks_min INTEGER NOT NULL DEFAULT 0,
+  last_played_at INTEGER,               -- Unix epoch; aus Steam-API oder Poller-detected
   last_synced INTEGER NOT NULL,
   PRIMARY KEY (steam_id, app_id)
 );
@@ -78,10 +79,14 @@ def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA_SQL)
     # In-place Migrations (idempotent): ADD COLUMN schlaegt fehl wenn
     # Spalte schon da ist -> abfangen.
-    try:
-        conn.execute("ALTER TABLE steam_owned_games ADD COLUMN img_logo_url TEXT")
-    except sqlite3.OperationalError:
-        pass
+    for stmt in (
+        "ALTER TABLE steam_owned_games ADD COLUMN img_logo_url TEXT",
+        "ALTER TABLE steam_owned_games ADD COLUMN last_played_at INTEGER",
+    ):
+        try:
+            conn.execute(stmt)
+        except sqlite3.OperationalError:
+            pass
 
 
 def _steam_image_url(app_id: int, image_hash: str) -> str:
@@ -99,22 +104,43 @@ def upsert_owned_games(conn, steam_id: str, games: list) -> None:
         appid = g.get("appid")
         icon_url = _steam_image_url(appid, g.get("img_icon_url"))
         logo_url = _steam_image_url(appid, g.get("img_logo_url"))
+        # Steam liefert 'rtime_last_played' (Unix epoch) wenn man
+        # include_played_free_games=1 anfragt — meist aber 0 oder
+        # fehlend. Wir nehmen es wenn da, sonst NULL.
+        last_played = g.get("rtime_last_played") or None
+        # COALESCE im UPDATE: bestehenden last_played_at nicht
+        # ueberschreiben wenn Steam diesmal NULL liefert.
         conn.execute("""
             INSERT INTO steam_owned_games
               (steam_id, app_id, name, img_icon_url, img_logo_url,
-               playtime_forever_min, playtime_2weeks_min, last_synced)
-            VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))
+               playtime_forever_min, playtime_2weeks_min,
+               last_played_at, last_synced)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))
             ON CONFLICT(steam_id, app_id) DO UPDATE SET
               name=excluded.name,
               img_icon_url=excluded.img_icon_url,
               img_logo_url=excluded.img_logo_url,
               playtime_forever_min=excluded.playtime_forever_min,
               playtime_2weeks_min=excluded.playtime_2weeks_min,
+              last_played_at=COALESCE(excluded.last_played_at, last_played_at),
               last_synced=excluded.last_synced
         """, (
             steam_id, appid, g.get("name"), icon_url, logo_url,
             g.get("playtime_forever", 0), g.get("playtime_2weeks", 0),
+            last_played,
         ))
+
+
+def mark_played_now(conn, steam_id: str, app_id: int) -> None:
+    """Setzt last_played_at = now für den gerade gespielten Eintrag.
+    Wird vom Poller (Layer-1) bei aktivem currentAppId getriggert —
+    so haben wir IMMER aktuelle Recency-Daten, auch wenn Steam selbst
+    rtime_last_played nicht liefert."""
+    conn.execute("""
+        UPDATE steam_owned_games
+        SET last_played_at = strftime('%s','now')
+        WHERE steam_id = ? AND app_id = ?
+    """, (steam_id, app_id))
 
 
 def get_owned_game(conn, steam_id: str, app_id: int):
@@ -145,10 +171,19 @@ def get_owned_games_filtered(conn, steam_id: str,
     if min_playtime_min > 0:
         where.append("og.playtime_forever_min >= ?")
         params.append(min_playtime_min)
+    # 'recent' = letzte 14 Tage: entweder last_played_at innerhalb 14d
+    # ODER Spielzeit in letzten 2 Wochen >0. Vorher gab's nur playtime_
+    # 2weeks-Filter, der nicht greift wenn Steam diese Stat 0 liefert
+    # obwohl gespielt — Poller setzt last_played_at via Layer-1 Detection.
+    if sort_by == "recent":
+        where.append(
+            "(og.last_played_at >= strftime('%s','now') - 14*86400 "
+            " OR og.playtime_2weeks_min > 0)")
 
     order = {
         "playtime": "og.playtime_forever_min DESC",
-        "recent":   "og.playtime_2weeks_min DESC, og.playtime_forever_min DESC",
+        "recent":   "COALESCE(og.last_played_at, 0) DESC, "
+                    "og.playtime_2weeks_min DESC",
         "name":     "og.name COLLATE NOCASE ASC",
     }.get(sort_by, "og.playtime_forever_min DESC")
 
@@ -175,18 +210,21 @@ def upsert_app_details(conn, app_id: int,
                        is_multiplayer: bool = False,
                        category_ids: str = None,
                        genre_names: str = None) -> None:
+    # COALESCE-Preserve: wenn Storefront ein Game spaeter nicht mehr
+    # ausliefert (z.B. UT2004 — delisted), keine bestehenden Daten mit
+    # NULL ueberschreiben. Neue Werte gewinnen wenn vorhanden.
     conn.execute("""
         INSERT INTO steam_app_details
           (app_id, header_image, short_description,
            is_coop, is_multiplayer, category_ids, genre_names, cached_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))
         ON CONFLICT(app_id) DO UPDATE SET
-          header_image=excluded.header_image,
-          short_description=excluded.short_description,
+          header_image=COALESCE(excluded.header_image, header_image),
+          short_description=COALESCE(excluded.short_description, short_description),
           is_coop=excluded.is_coop,
           is_multiplayer=excluded.is_multiplayer,
-          category_ids=excluded.category_ids,
-          genre_names=excluded.genre_names,
+          category_ids=COALESCE(excluded.category_ids, category_ids),
+          genre_names=COALESCE(excluded.genre_names, genre_names),
           cached_at=excluded.cached_at
     """, (app_id, header_image, short_description,
           int(bool(is_coop)), int(bool(is_multiplayer)),
