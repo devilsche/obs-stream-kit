@@ -244,14 +244,37 @@
       } catch (e) { /* silent */ }
     }
 
+    // Defensive Doppel-Anzeige-Schutz: jeder bereits gezeigte
+    // Achievement-apiName wird im LocalStorage gemerkt. Falls die
+    // Server-Markierung mal fehlschlaegt (z.B. Widget war im Hinter-
+    // grund-Tab gethrottled, oder Server-Restart mit Daten-Reset),
+    // skipt das Widget jeden Unlock den es lokal schon hatte.
+    const SHOWN_KEY = "steam_shown_achievements";
+    function getShown() {
+      try { return new Set(JSON.parse(localStorage.getItem(SHOWN_KEY) || "[]")); }
+      catch { return new Set(); }
+    }
+    function persistShown(s) {
+      const tail = [...s].slice(-500);  // rolling window, max 500
+      try { localStorage.setItem(SHOWN_KEY, JSON.stringify(tail)); }
+      catch { /* quota o.ä. */ }
+    }
+
     async function pollAchievements() {
       try {
         const r = await PubgUI.fetchJson(
           "/api/steam/recent-unlocks?markDisplayed=1");
         const unlocks = (r && r.unlocks) || [];
+        if (!unlocks.length) return;
+        const shown = getShown();
+        let added = 0;
         for (const u of unlocks) {
+          if (shown.has(u.apiName)) continue;
           enqueue({ type: "achievement", data: u, priority: 1 });
+          shown.add(u.apiName);
+          added++;
         }
+        if (added) persistShown(shown);
       } catch (e) { /* silent */ }
     }
 

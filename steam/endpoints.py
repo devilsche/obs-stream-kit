@@ -157,11 +157,19 @@ class SteamEndpointRegistry:
                     "iconUrl":      r["icon_url"],
                     "unlockedAt":   r["unlocked_at"],
                 })
+            marked_n = 0
             if mark and unlocks:
                 for u in unlocks:
                     mark_displayed(conn, self.client.steam_id,
                                    u["appId"], u["apiName"])
-            return _ok({"unlocks": unlocks, "marked": bool(mark and unlocks)})
+                    marked_n += 1
+                # Server-Log fuer Diagnose: in der Konsole siehst du,
+                # ob Markierungen wirklich passieren.
+                names = ", ".join(u["apiName"] for u in unlocks[:5])
+                print(f"  steam: marked {marked_n} unlocks displayed "
+                      f"[{names}{'...' if len(unlocks) > 5 else ''}]",
+                      flush=True)
+            return _ok({"unlocks": unlocks, "marked": marked_n})
         finally:
             conn.close()
 

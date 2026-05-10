@@ -118,16 +118,37 @@
       if (u) showOne(u);
     }
 
+    // Defensive Doppel-Anzeige-Schutz via LocalStorage, falls Server-
+    // Markierung mal fehlschlaegt.
+    const SHOWN_KEY = "steam_shown_achievements";
+    function getShown() {
+      try { return new Set(JSON.parse(localStorage.getItem(SHOWN_KEY) || "[]")); }
+      catch { return new Set(); }
+    }
+    function persistShown(s) {
+      const tail = [...s].slice(-500);
+      try { localStorage.setItem(SHOWN_KEY, JSON.stringify(tail)); }
+      catch { /* quota */ }
+    }
+
     async function pollUnlocks() {
       try {
-        // markDisplayed=1 → Unlocks werden serverseitig als 'gezeigt'
-        // markiert, also kommt jeder Unlock genau einmal durch. Wir
-        // queuen + animieren clientseitig.
         const data = await PubgUI.fetchJson(
           "/api/steam/recent-unlocks?markDisplayed=1");
         const unlocks = (data && data.unlocks) || [];
-        for (const u of unlocks) queue.push(u);
-        processQueue();
+        if (!unlocks.length) return;
+        const shown = getShown();
+        let added = 0;
+        for (const u of unlocks) {
+          if (shown.has(u.apiName)) continue;
+          queue.push(u);
+          shown.add(u.apiName);
+          added++;
+        }
+        if (added) {
+          persistShown(shown);
+          processQueue();
+        }
       } catch (e) {
         // Stille — backend evtl. disabled
       }
