@@ -809,7 +809,7 @@
       // Map-Performance
       const mp = d.mapsPerf || [];
       const mapsHtml = mp.length ? `
-        <h3 style="margin-top:24px;color:var(--pubg-muted);font-size:0.8em;text-transform:uppercase;letter-spacing:0.1em">Map-Performance</h3>
+        <h3 class="extras-h">Map-Performance</h3>
         <table style="width:100%;border-collapse:collapse;font-size:0.85em;font-variant-numeric:tabular-nums;margin-top:8px">
           <thead><tr style="color:var(--pubg-muted);font-size:0.85em">
             <th style="text-align:left;padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.1)">Map</th>
@@ -864,6 +864,7 @@
         <div class="subtitle">${subtitle}</div>
         ${totalsHtml}
         ${extrasPlaceholder}
+        ${d.phases && d.phases.length ? '<h3 class="extras-h">Phases</h3>' : ''}
         ${phasesHtml}
         ${mapsHtml}
         ${highlightsHtml}
