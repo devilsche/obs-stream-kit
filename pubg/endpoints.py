@@ -382,7 +382,7 @@ class EndpointRegistry:
                   if range_key != "all" else "1970-01-01T00:00:00Z")
         matches = conn.execute("""
             SELECT m.match_id, m.played_at, m.duration_secs, m.telemetry_fetched,
-                   pa.place
+                   m.map_name, pa.place
             FROM matches m
             JOIN participants pa ON pa.match_id = m.match_id
             WHERE pa.account_id = ? AND m.played_at >= ?
@@ -441,6 +441,47 @@ class EndpointRegistry:
                         "actorIsMe": row["actor_account"] == self.my_account_id,
                         "targetIsMe": row["target_account"] == self.my_account_id,
                     }
+            # Squad-Landing-Position (= meine eigene Landung) und Match-
+            # Start fuer relative Zeitstempel.
+            my_landing_row = conn.execute("""
+                SELECT actor_x, actor_y, timestamp_ms
+                FROM telemetry_events
+                WHERE match_id = ? AND event_type = 'Landing'
+                  AND actor_account = ?
+                ORDER BY timestamp_ms ASC LIMIT 1
+            """, (mid, self.my_account_id)).fetchone()
+            my_landing = None
+            match_start_ms = None
+            if my_landing_row and my_landing_row["actor_x"] is not None:
+                my_landing = {
+                    "x": round(my_landing_row["actor_x"], 1),
+                    "y": round(my_landing_row["actor_y"], 1),
+                }
+                # Match-Start = Landung-Zeitstempel minus
+                # time_survived ist relativ Match-Start; Landings
+                # liegen nach Match-Start. Wir nehmen Landing-Zeit
+                # als Anker fuer "tSinceLanding".
+                match_start_ms = my_landing_row["timestamp_ms"]
+
+            # Erstes Squad-Event aus _detect_first_fight (events_count==1
+            # haben wir schon, sonst zusaetzlich abrufen). Plus First-Fight
+            # cluster-Start (erstes Squad-Combat-Event egal Typ).
+            first_fight_start_secs = None
+            if squad_ids and result and isinstance(result, dict) and not result.get("error"):
+                placeholders = ",".join("?" * len(squad_ids))
+                ff_row = conn.execute(f"""
+                    SELECT timestamp_ms FROM telemetry_events
+                    WHERE match_id = ?
+                      AND event_type IN ('Kill','Knock','TakeDamage')
+                      AND actor_account IS NOT NULL
+                      AND (actor_account IN ({placeholders})
+                           OR target_account IN ({placeholders}))
+                    ORDER BY timestamp_ms ASC LIMIT 1
+                """, (mid, *squad_ids, *squad_ids)).fetchone()
+                if ff_row and match_start_ms:
+                    first_fight_start_secs = round(
+                        (ff_row["timestamp_ms"] - match_start_ms) / 1000.0, 1)
+
             # Squad-Member-Deaths: pro Death wer war Killer, wo war
             # seine Landung relativ zur Squad-Landung, wo war Death.
             squad_deaths = []
@@ -513,6 +554,10 @@ class EndpointRegistry:
                     # PUBG-Telemetry liefert 'distance' in cm (Welt-Units).
                     # 100 cm = 1 m -> /100 fuer Meter.
                     shot_m = (r["distance"] / 100.0) if r["distance"] else None
+                    t_since_landing = None
+                    if match_start_ms:
+                        t_since_landing = round(
+                            (r["timestamp_ms"] - match_start_ms) / 1000.0, 1)
                     squad_deaths.append({
                         "victim": victim_name_map.get(r["victim"]) or r["victim"],
                         "killer": r["killer_name"] or r["killer"],
@@ -521,17 +566,20 @@ class EndpointRegistry:
                         "shotDistanceM": round(shot_m, 1) if shot_m is not None else None,
                         "killerLandingDistM": landing_dist_m,
                         "deathToSquadLandingM": death_dist_m,
-                        "tsMs": r["timestamp_ms"],
+                        "tSinceLandingSecs": t_since_landing,
                     })
             out.append({
                 "matchId": mid,
                 "playedAt": m["played_at"],
+                "map": m["map_name"],
                 "place": m["place"],
                 "durationSecs": m["duration_secs"],
                 "telemetryFetched": bool(m["telemetry_fetched"]),
                 "participantsCount": len(parts),
                 "myTeamId": my_team,
                 "squadSize": len(squad_ids),
+                "myLandingPos": my_landing,
+                "firstFightStartSecs": first_fight_start_secs,
                 "killEvents": kill_n,
                 "knockEvents": knock_n,
                 "squadInvolvedEvents": squad_involved,
