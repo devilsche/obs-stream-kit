@@ -441,6 +441,85 @@ class EndpointRegistry:
                         "actorIsMe": row["actor_account"] == self.my_account_id,
                         "targetIsMe": row["target_account"] == self.my_account_id,
                     }
+            # Squad-Member-Deaths: pro Death wer war Killer, wo war
+            # seine Landung relativ zur Squad-Landung, wo war Death.
+            squad_deaths = []
+            if squad_ids:
+                placeholders = ",".join("?" * len(squad_ids))
+                # Squad-Landung-Position (eine pro Squad-Member)
+                squad_landings = conn.execute(f"""
+                    SELECT actor_account, actor_x, actor_y
+                    FROM telemetry_events
+                    WHERE match_id = ?
+                      AND event_type = 'Landing'
+                      AND actor_account IN ({placeholders})
+                """, (mid, *squad_ids)).fetchall()
+                squad_landing_map = {r["actor_account"]: (r["actor_x"], r["actor_y"])
+                                       for r in squad_landings
+                                       if r["actor_x"] is not None}
+                # Squad-Member-Kills (mit Killer-Name)
+                kill_rows = conn.execute(f"""
+                    SELECT k.actor_account AS killer, k.target_account AS victim,
+                           k.timestamp_ms, k.victim_x, k.victim_y, k.distance,
+                           k.weapon, p.name AS killer_name
+                    FROM telemetry_events k
+                    LEFT JOIN participants p ON p.match_id = k.match_id
+                                              AND p.account_id = k.actor_account
+                    WHERE k.match_id = ?
+                      AND k.event_type = 'Kill'
+                      AND k.target_account IN ({placeholders})
+                    ORDER BY k.timestamp_ms ASC
+                """, (mid, *squad_ids)).fetchall()
+                # Killer-Landung-Position holen (alle distinct killer)
+                killer_ids = list({r["killer"] for r in kill_rows if r["killer"]})
+                killer_landing_map = {}
+                if killer_ids:
+                    kphs = ",".join("?" * len(killer_ids))
+                    kls = conn.execute(f"""
+                        SELECT actor_account, actor_x, actor_y
+                        FROM telemetry_events
+                        WHERE match_id = ?
+                          AND event_type = 'Landing'
+                          AND actor_account IN ({kphs})
+                    """, (mid, *killer_ids)).fetchall()
+                    killer_landing_map = {r["actor_account"]: (r["actor_x"], r["actor_y"])
+                                            for r in kls
+                                            if r["actor_x"] is not None}
+                # Victim-Name-Map
+                victim_names = {p["account_id"]: None for p in parts}
+                victim_name_rows = conn.execute(f"""
+                    SELECT account_id, name FROM participants
+                    WHERE match_id = ? AND account_id IN ({placeholders})
+                """, (mid, *squad_ids)).fetchall()
+                victim_name_map = {r["account_id"]: r["name"] for r in victim_name_rows}
+                # Distanzen berechnen
+                for r in kill_rows:
+                    landing_dist_m = None
+                    klp = killer_landing_map.get(r["killer"])
+                    # Squad-Landing nehmen: erstes Squad-Landing (oder
+                    # spezifisch das des Victims)
+                    slp = squad_landing_map.get(r["victim"])
+                    if slp is None and squad_landing_map:
+                        slp = next(iter(squad_landing_map.values()))
+                    if klp and slp:
+                        dx = klp[0] - slp[0]
+                        dy = klp[1] - slp[1]
+                        landing_dist_m = round(((dx*dx + dy*dy) ** 0.5) / 100, 1)
+                    death_dist_m = None
+                    if slp and r["victim_x"] is not None:
+                        dx = r["victim_x"] - slp[0]
+                        dy = r["victim_y"] - slp[1]
+                        death_dist_m = round(((dx*dx + dy*dy) ** 0.5) / 100, 1)
+                    squad_deaths.append({
+                        "victim": victim_name_map.get(r["victim"]) or r["victim"],
+                        "killer": r["killer_name"] or r["killer"],
+                        "killerIsSelf": r["killer"] in squad_ids,  # friendly fire?
+                        "weapon": r["weapon"],
+                        "shotDistanceM": r["distance"],  # Schuss-Distanz beim Kill
+                        "killerLandingDistM": landing_dist_m,
+                        "deathToSquadLandingM": death_dist_m,
+                        "tsMs": r["timestamp_ms"],
+                    })
             out.append({
                 "matchId": mid,
                 "playedAt": m["played_at"],
@@ -455,6 +534,7 @@ class EndpointRegistry:
                 "squadInvolvedEvents": squad_involved,
                 "detectionResult": result,
                 "firstSquadEvent": first_event,
+                "squadDeaths": squad_deaths,
             })
         return _ok({"matches": out})
 

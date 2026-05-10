@@ -113,7 +113,7 @@
     <div class="legend">
       <span class="item"><span class="swatch hot"></span>You alive</span>
       <span class="item"><span class="swatch died team-saved"></span>You died · team alive</span>
-      <span class="item"><span class="swatch died"></span>Team wiped</span>
+      <span class="item"><span class="swatch died"></span>Died</span>
       <span class="item"><span class="swatch"></span>Cold</span>
     </div>
   </div>
@@ -183,7 +183,7 @@
         if (!m.hotDrop) { /* cls leer, desc cold */ }
         else if (m.soloSurvived) { cls = "hot"; desc = "hot drop, you survived"; }
         else if (m.teamSurvived) { cls = "died team-saved"; desc = "hot drop, you died — team survived"; }
-        else { cls = "died"; desc = "hot drop, team wiped"; }
+        else { cls = "died"; desc = "hot drop, died"; }
         return `<div class="m ${cls}" title="Match #${num} · ${desc}"></div>`;
       }).join("");
       document.getElementById("markers").innerHTML = html;

@@ -104,7 +104,7 @@
     <div class="legend">
       <span class="item"><span class="swatch s"></span>You alive</span>
       <span class="item"><span class="swatch team-saved"></span>You died · team alive</span>
-      <span class="item"><span class="swatch d"></span>Team wiped</span>
+      <span class="item"><span class="swatch d"></span>Died</span>
       <span class="item"><span class="swatch fled"></span>Disengage</span>
     </div>
   </div>
@@ -160,7 +160,7 @@
             /* fled */
           } else if (m.soloSurvived) { cls = "s"; desc = "you survived"; }
           else if (m.teamSurvived) { cls = "team-saved"; desc = "you died — team survived"; }
-          else { cls = "d"; desc = "team wiped"; }
+          else { cls = "d"; desc = "died"; }
           return `<span class="${cls}" title="Match #${num} · ${desc}"></span>`;
         }).join("");
       } else {
