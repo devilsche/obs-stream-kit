@@ -174,6 +174,12 @@
       background: rgba(242,183,5,0.15);
       border-left: 2px solid var(--pubg-gold);
     }
+    .matches-list .m .num {
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      opacity: 0.55;
+      font-variant-numeric: tabular-nums;
+    }
     .matches-list .m .time { color: var(--pubg-muted); }
     .matches-list .m .place { color: var(--pubg-gold); font-weight: 700; }
     .matches-list .m .map { color: var(--pubg-text); }
@@ -707,7 +713,7 @@
         </table>`;
     }
 
-    function fmtMatchRow(m, idx) {
+    function fmtMatchRow(m, idx, matchNum) {
       const startIso = PubgUI.matchStartIso(m.matchEnd, m.durationSec);
       const mySurv = m.timeSurvived || 0;
       const squadSurv = m.squadTimeSurvived || mySurv;
@@ -722,9 +728,10 @@
       const outTimeStr = (startD === outD)
         ? PubgUI.fmtTime(squadOutIso)
         : `${outD.slice(0,5)} ${PubgUI.fmtTime(squadOutIso)}`;
+      const numStr = matchNum != null ? `<span class="num">#${matchNum}</span> ` : "";
       return `
         <div class="m ${isWin ? 'win' : ''}" data-idx="${idx}">
-          <span class="time-range"><b>${startTimeStr}</b> → <b>${outTimeStr}</b></span>
+          <span class="time-range">${numStr}<b>${startTimeStr}</b> → <b>${outTimeStr}</b></span>
           <span class="place">#${m.place}</span>
           <span class="map">${PubgUI.fmtMap(m.map)}</span>
           <span class="stat"><b>${m.kills}</b> K</span>
@@ -764,6 +771,14 @@
           <div class="cell"><span class="pubg-stat-value">${t.uniqueMaps}</span><span class="pubg-stat-label">Maps</span></div>
         </div>`;
 
+      // Chronologische Match-Nummer ueber alle Phases (key = matchEnd
+       // Iso-String). Robust gegen interne Sortierung der phases.
+      const _allMatches = d.phases.flatMap(ph => ph.matches || []);
+      const _sorted = [..._allMatches].sort((a, b) =>
+        new Date(a.matchEnd || 0) - new Date(b.matchEnd || 0));
+      const matchNumMap = new Map();
+      _sorted.forEach((m, idx) => matchNumMap.set(m.matchEnd, idx + 1));
+
       const phasesHtml = d.phases.map((ph, i) => {
         const s = ph.stats;
         const core = ph.coreSquad && ph.coreSquad.length
@@ -801,7 +816,7 @@
                 <span style="text-align:right">Damage</span>
                 <span style="text-align:right">Survived</span>
               </div>
-              ${ph.matches.map((m, i) => fmtMatchRow(m, `${ph.coreSquad.join('-')}-${i}`)).join("")}
+              ${ph.matches.map((m, i) => fmtMatchRow(m, `${ph.coreSquad.join('-')}-${i}`, matchNumMap.get(m.matchEnd))).join("")}
             </div>
           </div>`;
       }).join("");

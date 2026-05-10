@@ -95,7 +95,7 @@
       <span class="v-real">REAL FIGHT</span> = mind. 1 Kill im Cluster, definitiver Outcome.<br>
       <span class="v-fled">FLED</span> = Cluster ohne Kill (egal wie viele Damage/Knocks). Reines Stalemate/Disengage.<br>
       <span class="v-savedbyteam">TEAM SAVED</span> = du gekillt, mind. 1 Squad-Member überlebt.<br>
-      <span class="v-died">BOTH DIED</span> = alle aus deinem Squad im Fight gefallen.
+      <span class="v-died">TEAM WIPED</span> = alle aus deinem Squad im Fight gefallen.
     </div>
   </div>
 
@@ -115,7 +115,7 @@
       }
       if (r.soloSurvived) return { kind: "real", label: "REAL FIGHT (won)" };
       if (r.teamSurvived) return { kind: "savedbyteam", label: "TEAM SAVED" };
-      return { kind: "died", label: "BOTH DIED" };
+      return { kind: "died", label: "TEAM WIPED" };
     }
 
     function fmtEvent(ev) {

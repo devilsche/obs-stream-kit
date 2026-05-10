@@ -113,7 +113,7 @@
     <div class="legend">
       <span class="item"><span class="swatch hot"></span>You alive</span>
       <span class="item"><span class="swatch died team-saved"></span>You died · team alive</span>
-      <span class="item"><span class="swatch died"></span>Both died</span>
+      <span class="item"><span class="swatch died"></span>Team wiped</span>
       <span class="item"><span class="swatch"></span>Cold</span>
     </div>
   </div>
@@ -173,12 +173,18 @@
       //   hot (orange)           : du ueberlebt (egal ob team)
       //   died+team-saved (split): du tot, team lebt -> diagonal rot/orange
       //   died (rot)             : du + team beide tot
+      // perMatch ist ASC (oldest first). Nach reverse: rechts = neuestes
+      // → Match-Nummer im title chronologisch (# 1 = aeltestes).
       const matches = (d.perMatch || []).slice().reverse();
-      const html = matches.map(m => {
-        if (!m.hotDrop) return `<div class="m" title="cold drop"></div>`;
-        if (m.soloSurvived) return `<div class="m hot" title="hot drop, you survived"></div>`;
-        if (m.teamSurvived) return `<div class="m died team-saved" title="hot drop, you died — team survived"></div>`;
-        return `<div class="m died" title="hot drop, both died"></div>`;
+      const total = matches.length;
+      const html = matches.map((m, i) => {
+        const num = total - i;
+        let cls = "", desc = "cold drop";
+        if (!m.hotDrop) { /* cls leer, desc cold */ }
+        else if (m.soloSurvived) { cls = "hot"; desc = "hot drop, you survived"; }
+        else if (m.teamSurvived) { cls = "died team-saved"; desc = "hot drop, you died — team survived"; }
+        else { cls = "died"; desc = "hot drop, team wiped"; }
+        return `<div class="m ${cls}" title="Match #${num} · ${desc}"></div>`;
       }).join("");
       document.getElementById("markers").innerHTML = html;
 

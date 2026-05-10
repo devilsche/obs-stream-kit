@@ -104,7 +104,7 @@
     <div class="legend">
       <span class="item"><span class="swatch s"></span>You alive</span>
       <span class="item"><span class="swatch team-saved"></span>You died · team alive</span>
-      <span class="item"><span class="swatch d"></span>Both died</span>
+      <span class="item"><span class="swatch d"></span>Team wiped</span>
       <span class="item"><span class="swatch fled"></span>Disengage</span>
     </div>
   </div>
@@ -149,18 +149,23 @@
       // Markers: 4 States — fled (gelb), you alive (orange),
       // you died/team saved (lila), both died (rot). 'No fight' gibt
       // es als eigenen State nicht mehr — Disengage zaehlt als 'fled'.
+      // perMatch ist ASC (oldest first). Match-Nummer = i + 1 fuer
+      // chronologische Anzeige im title.
       const spark = document.getElementById("spark");
       if (d.perMatch && d.perMatch.length) {
-        spark.innerHTML = d.perMatch.map(m => {
-          if (!m.hadFight || m.engaged === false)
-            return `<span class="fled" title="no real first fight — disengage"></span>`;
-          if (m.soloSurvived) return `<span class="s" title="you survived"></span>`;
-          if (m.teamSurvived) return `<span class="team-saved" title="you died — team survived"></span>`;
-          return `<span class="d" title="both died"></span>`;
+        spark.innerHTML = d.perMatch.map((m, i) => {
+          const num = i + 1;
+          let cls = "fled", desc = "no real first fight — disengage";
+          if (!m.hadFight || m.engaged === false) {
+            /* fled */
+          } else if (m.soloSurvived) { cls = "s"; desc = "you survived"; }
+          else if (m.teamSurvived) { cls = "team-saved"; desc = "you died — team survived"; }
+          else { cls = "d"; desc = "team wiped"; }
+          return `<span class="${cls}" title="Match #${num} · ${desc}"></span>`;
         }).join("");
       } else {
-        spark.innerHTML = (d.sparkline||[]).map(v =>
-          `<span class="${v ? 's' : 'd'}"></span>`).join("");
+        spark.innerHTML = (d.sparkline||[]).map((v, i) =>
+          `<span class="${v ? 's' : 'd'}" title="Match #${i+1}"></span>`).join("");
       }
     }
     const ehParam = EXCLUDE_HOT ? "&excludeHotDrop=1" : "";
