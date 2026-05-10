@@ -102,8 +102,7 @@
     </div>
     <div class="spark" id="spark"></div>
     <div class="legend">
-      <span class="item"><span class="swatch s"></span>You alive</span>
-      <span class="item"><span class="swatch team-saved"></span>You died · team alive</span>
+      <span class="item"><span class="swatch s"></span>Survived</span>
       <span class="item"><span class="swatch d"></span>Died</span>
       <span class="item"><span class="swatch fled"></span>Disengage</span>
     </div>
@@ -146,21 +145,23 @@
       } else {
         teams.textContent = "";
       }
-      // Markers: 4 States — fled (gelb), you alive (orange),
-      // you died/team saved (lila), both died (rot). 'No fight' gibt
-      // es als eigenen State nicht mehr — Disengage zaehlt als 'fled'.
-      // perMatch ist ASC (oldest first). Match-Nummer = i + 1 fuer
-      // chronologische Anzeige im title.
+      // Markers: 3 States Team-basiert (Solo-Sicht ist egal):
+      //   fled (gelb)     - Cluster ohne Kill, Disengage
+      //   survived (orange) - Squad ueberlebt (egal ob ich)
+      //   died (rot)      - Squad ausgeloescht
+      // perMatch ist ASC (oldest first). Match-Nummer = i + 1.
       const spark = document.getElementById("spark");
       if (d.perMatch && d.perMatch.length) {
         spark.innerHTML = d.perMatch.map((m, i) => {
           const num = i + 1;
-          let cls = "fled", desc = "no real first fight — disengage";
+          let cls, desc;
           if (!m.hadFight || m.engaged === false) {
-            /* fled */
-          } else if (m.soloSurvived) { cls = "s"; desc = "you survived"; }
-          else if (m.teamSurvived) { cls = "team-saved"; desc = "you died — team survived"; }
-          else { cls = "d"; desc = "died"; }
+            cls = "fled"; desc = "disengage";
+          } else if (m.teamSurvived) {
+            cls = "s"; desc = "survived";
+          } else {
+            cls = "d"; desc = "died";
+          }
           return `<span class="${cls}" title="Match #${num} · ${desc}"></span>`;
         }).join("");
       } else {
