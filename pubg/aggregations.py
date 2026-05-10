@@ -1409,8 +1409,10 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session",
     """, (my_account_id, cutoff)).fetchall()
 
     total = 0
-    solo_survived_n = 0
-    team_survived_n = 0
+    engaged_total = 0      # Matches mit events_count >= 2 (echter Fight)
+    fled_total = 0         # Matches mit events_count == 1 (Disengage)
+    solo_survived_n = 0    # ueber ALLE detected matches (inkl. fled)
+    team_survived_n = 0    # ueber ALLE detected matches (inkl. fled)
     excluded_hot = 0
     sparkline = []
     per_match = []
@@ -1427,42 +1429,61 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session",
         result = _detect_first_fight(conn, m["match_id"], my_account_id,
                                        cluster_ms, cluster_radius_cm)
         if result is None:
+            # Backend findet keine Squad-Combat-Events. Praktisch nie —
+            # falls doch, als 'fled' (nicht detektierbar) behandeln.
+            total += 1
+            fled_total += 1
+            sparkline.append(0)
             per_match.append({
                 "matchId": m["match_id"],
                 "hadFight": False,
+                "engaged": False,
                 "soloSurvived": False,
                 "teamSurvived": False,
             })
             continue
         total += 1
-        teams_per_fight.append(result["teams_count"])
+        # 'engaged' = echter Fight (mind. 2 Squad-Events im Cluster).
+        # Single-Event-Cluster sind Disengage/Flucht.
+        engaged = result["events_count"] >= 2
+        if engaged:
+            engaged_total += 1
+            teams_per_fight.append(result["teams_count"])
+        else:
+            fled_total += 1
+        # Solo/Team counts ueber ALLE detected matches — wenn Squad
+        # nach Disengage uebellebt, zaehlt das als Win (User-Sicht).
         if result["soloSurvived"]:
             solo_survived_n += 1
         if result["teamSurvived"]:
             team_survived_n += 1
-        # Sparkline: 1 = Solo-Survival (wie hot-drop's Logik), 0 = sonst.
-        # perMatch enthaelt beide Werte separat fuer 4-State-Marker.
-        sparkline.append(1 if result["soloSurvived"] else 0)
+        sparkline.append(1 if result["teamSurvived"] else 0)
         per_match.append({
             "matchId": m["match_id"],
             "hadFight": True,
+            "engaged": engaged,
             "soloSurvived": result["soloSurvived"],
             "teamSurvived": result["teamSurvived"],
         })
 
     avg_teams = (sum(teams_per_fight) / len(teams_per_fight)) if teams_per_fight else 0
     max_teams = max(teams_per_fight) if teams_per_fight else 0
+    # Headline-Rate ist Team-Sicht (User wollte 'Won X of Y' team).
+    team_rate = (team_survived_n / total * 100) if total else 0
+    solo_rate = (solo_survived_n / total * 100) if total else 0
     return {
-        # Legacy-Felder (bleibt 'survived' = Solo, fuer alte Konsumenten)
-        "rate": (solo_survived_n / total * 100) if total else 0,
-        "survived": solo_survived_n,
+        # Legacy-Felder — 'rate'/'survived' jetzt Team-basiert.
+        "rate": team_rate,
+        "survived": team_survived_n,
         "total": total,
         "sparkline": sparkline[-20:],
-        # Neue Felder: getrennte Solo/Team-Sicht
+        # Getrennte Solo/Team-Sicht
         "soloSurvived": solo_survived_n,
         "teamSurvived": team_survived_n,
-        "soloSurvivalRate": (solo_survived_n / total * 100) if total else 0,
-        "teamSurvivalRate": (team_survived_n / total * 100) if total else 0,
+        "soloSurvivalRate": solo_rate,
+        "teamSurvivalRate": team_rate,
+        "engagedTotal": engaged_total,
+        "fledTotal": fled_total,
         "perMatch": per_match[-20:],
         "avgTeams": round(avg_teams, 2),
         "maxTeams": max_teams,

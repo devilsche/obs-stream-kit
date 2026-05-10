@@ -93,10 +93,9 @@
     <div class="legend">
       <b>Verdict-Spalte:</b><br>
       <span class="v-real">REAL FIGHT</span> = ≥2 Squad-beteiligte Events im Cluster (echter Schlagabtausch)<br>
-      <span class="v-fled">FLED</span> = nur 1 Event, dann Stille — Squad-Berührung mit Disengage<br>
+      <span class="v-fled">FLED</span> = nur 1 Event, dann Stille — Squad-Berührung mit Disengage. Zählt im Live-Widget als Win, weil Squad ja überlebte.<br>
       <span class="v-savedbyteam">TEAM SAVED</span> = du tot, mind. 1 Squad-Member überlebt<br>
-      <span class="v-died">BOTH DIED</span> = alle aus deinem Squad im Fight gefallen<br>
-      <span class="v-nofight">NO FIGHT</span> = Match hat kein Squad-Kill/Knock-Event (Storm/Vehicle/Disco)
+      <span class="v-died">BOTH DIED</span> = alle aus deinem Squad im Fight gefallen
     </div>
   </div>
 
@@ -104,7 +103,9 @@
   <script>
     function classify(m) {
       const r = m.detectionResult;
-      if (!r || r.error) return { kind: "nofight", label: "NO FIGHT" };
+      // 'no fight at all' gibt es nicht — falls Backend None liefert
+      // (selten), als FLED behandeln.
+      if (!r || r.error) return { kind: "fled", label: "FLED (undet.)" };
       if (r.events_count <= 1) return { kind: "fled", label: "FLED" };
       if (r.soloSurvived) return { kind: "real", label: "REAL FIGHT (won)" };
       if (r.teamSurvived) return { kind: "savedbyteam", label: "TEAM SAVED" };

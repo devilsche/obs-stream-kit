@@ -69,6 +69,7 @@
     .spark span.s          { background: #ff7a1f; opacity: 1; }
     .spark span.team-saved { background: #a974d4; opacity: 1; }
     .spark span.d          { background: #e57b7b; opacity: 0.7; }
+    .spark span.fled       { background: #f2b705; opacity: 0.55; }
     .legend {
       display: flex;
       flex-wrap: wrap;
@@ -86,6 +87,7 @@
     .legend .swatch.s          { background: #ff7a1f; opacity: 1; }
     .legend .swatch.team-saved { background: #a974d4; opacity: 1; }
     .legend .swatch.d          { background: #e57b7b; opacity: 0.7; }
+    .legend .swatch.fled       { background: #f2b705; opacity: 0.55; }
   </style>
 </head>
 <body>
@@ -103,7 +105,7 @@
       <span class="item"><span class="swatch s"></span>You alive</span>
       <span class="item"><span class="swatch team-saved"></span>You died · team alive</span>
       <span class="item"><span class="swatch d"></span>Both died</span>
-      <span class="item"><span class="swatch"></span>No fight</span>
+      <span class="item"><span class="swatch fled"></span>Disengage</span>
     </div>
   </div>
   <script src="_pubg.js"></script>
@@ -125,12 +127,15 @@
                  "= 'silent drop, loot, then fight' scenarios." },
     ]);
     function render(d) {
-      // Hauptzahl = Solo-Survival-Rate (du selbst). Team-Rate steht
-      // klein dahinter in der sub-Zeile.
-      document.getElementById("pct").textContent = (d.soloSurvivalRate ?? d.rate ?? 0).toFixed(0) + "%";
-      const solo = `<b>${d.soloSurvived ?? d.survived ?? 0}</b>/<b>${d.total||0}</b> solo`;
-      const team = `<b>${d.teamSurvived ?? 0}</b>/<b>${d.total||0}</b> team`;
-      const subParts = [`${solo} · ${team}`];
+      // Hauptzahl = Team-Survival-Rate (Squad ueberlebt). Sub-Line:
+      // 'Won X of Y' simpel — User-Wunsch.
+      const teamW = d.teamSurvived ?? d.survived ?? 0;
+      const total = d.total || 0;
+      document.getElementById("pct").textContent = (d.teamSurvivalRate ?? d.rate ?? 0).toFixed(0) + "%";
+      const subParts = [`Won <b>${teamW}</b> of <b>${total}</b>`];
+      if (d.fledTotal) {
+        subParts.push(`<span style="opacity:0.6">(${d.fledTotal} disengage)</span>`);
+      }
       if (d.excludedHotDrop) {
         subParts.push(`<span style="opacity:0.6">(${d.excludedHotDrop} hot drops excluded)</span>`);
       }
@@ -141,12 +146,14 @@
       } else {
         teams.textContent = "";
       }
-      // Markers: perMatch (4-State) bevorzugen, Fallback auf alte
-      // sparkline (boolean) wenn Backend noch nicht aktualisiert ist.
+      // Markers: 4 States — fled (gelb), you alive (orange),
+      // you died/team saved (lila), both died (rot). 'No fight' gibt
+      // es als eigenen State nicht mehr — Disengage zaehlt als 'fled'.
       const spark = document.getElementById("spark");
       if (d.perMatch && d.perMatch.length) {
         spark.innerHTML = d.perMatch.map(m => {
-          if (!m.hadFight) return `<span title="no fight"></span>`;
+          if (!m.hadFight || m.engaged === false)
+            return `<span class="fled" title="no real first fight — disengage"></span>`;
           if (m.soloSurvived) return `<span class="s" title="you survived"></span>`;
           if (m.teamSurvived) return `<span class="team-saved" title="you died — team survived"></span>`;
           return `<span class="d" title="both died"></span>`;
