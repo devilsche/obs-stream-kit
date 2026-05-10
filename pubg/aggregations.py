@@ -1322,13 +1322,15 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     # haengende initiale Combat:
     #   - Trigger: erstes Squad-Combat-Event (Kill/Knock/Damage) in
     #     den ersten window_ms nach Squad-Landung
-    #   - Expansion: 60s Stille beendet Cluster (analog first-fight,
-    #     aber laenger weil Hot-Drop typisch 1-3 min dauert),
-    #     300m-Radius
+    #   - Expansion: 3 min Stille beendet Cluster. 60s war zu kurz
+    #     fuer Lauer-Phasen ('5 min Kampf, 2 min im Haus warten,
+    #     dann weiter'). 3 min faengt typische Hot-Drop-Pausen ein,
+    #     ohne zu lang fuer zufaellige Late-Re-Engages zu sein.
+    #   - 300m-Radius zur initialen Position
     #   - Nur Squad-beteiligte Events zaehlen fuer Cluster-Erweiterung
     # Wenn ein Hot-Drop-Team disengaged und 5 min spaeter zurueck-
     # kommt, ist das ein NEUES Cluster (nicht mehr Hot-Drop).
-    cluster_window_ms = 60 * 1000
+    cluster_window_ms = 180 * 1000  # 3 min Stille = Cluster zu
     cluster_radius_cm = 300 * 100
     squad_pos_for_kills = [(s["actor_x"], s["actor_y"]) for s in squad_landings
                             if s["actor_x"] is not None and s["actor_y"] is not None]
