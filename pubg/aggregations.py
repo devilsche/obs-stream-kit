@@ -171,13 +171,34 @@ SORT_KEYS = {
 }
 
 
+def _invert_order(order: str) -> str:
+    """Invertiert ASC/DESC in einer ORDER BY-Klausel (Komma-getrennt).
+    Wird fuer 'anti-mates' verwendet — dieselbe Sort-Logik, aber
+    schlechteste zuerst."""
+    out = []
+    for term in order.split(","):
+        t = term.strip()
+        if t.upper().endswith(" DESC"):
+            out.append(t[:-5] + " ASC")
+        elif t.upper().endswith(" ASC"):
+            out.append(t[:-4] + " DESC")
+        else:
+            out.append(t + " DESC")
+    return ", ".join(out)
+
+
 def compute_top_mates(conn, my_account_id: str,
                       sort_by: str = "avgPlace",
                       limit: int = 5,
                       min_matches: int = 10,
-                      range_key: str = None) -> list:
-    """range_key: None=alle DB-Matches; 'session'/'day'/'week' filtert."""
+                      range_key: str = None,
+                      worst: bool = False) -> list:
+    """range_key: None=alle DB-Matches; 'session'/'day'/'week' filtert.
+    worst=True kehrt die Sort-Reihenfolge um (= Anti-Mates: schlechteste
+    zuerst)."""
     order = SORT_KEYS.get(sort_by, SORT_KEYS["avgPlace"])
+    if worst:
+        order = _invert_order(order)
     if range_key:
         cutoff = _range_filter(conn, range_key)
         params = (my_account_id, cutoff, my_account_id, min_matches, limit)

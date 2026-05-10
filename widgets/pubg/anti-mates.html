@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Anti-Mates</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    /* Card passt sich dem Browser-Source/Fenster an. Layout 1:1 wie
+       top-mates.html — nur Sort-Direction invertiert (worst=1). */
+    /* Anker: bottom-left. Header über Card, beide am unteren Rand. */
+    html, body { height: 100%; margin: 0; padding: 0; }
+    body {
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      box-sizing: border-box;
+    }
+    .panel {
+      width: 100%;
+      min-width: 320px;
+      padding: 14px 16px;
+    }
+    .panel h3 {
+      margin: 0 0 12px;
+      font-size: 0.9em;
+      letter-spacing: 0.08em;
+      color: var(--pubg-muted);
+      text-transform: uppercase;
+    }
+    .row {
+      padding: 9px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .row:last-child { border-bottom: 0; }
+    .row-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .row .rank {
+      color: #e57b7b;        /* rot statt gold — sind ja die "schlechten" */
+      width: 18px;
+      font-weight: 700;
+      flex-shrink: 0;
+      text-align: right;
+    }
+    .row .name { flex: 1; font-weight: 700; padding-left: 4px; }
+    .row .primary {
+      color: #e57b7b;        /* rot — die schlechte Metrik hervorgehoben */
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      font-size: 0.95em;
+    }
+    .row-sub {
+      margin-top: 3px;
+      padding-left: 28px;
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      letter-spacing: 0.02em;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .row-sub b {
+      color: var(--pubg-text);
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+</head>
+<body>
+  <div class="pubg-header" id="pubgHeader"></div>
+  <div class="pubg-card panel pubg-fade-in">
+    <div id="subtitle" style="color:var(--pubg-muted);font-size:0.78em;letter-spacing:0.06em;margin-bottom:8px"></div>
+    <div id="rows"></div>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    const SORT_BY = PubgUI.qs("sortBy", "kd");
+    const RANGE = PubgUI.qs("range", "all");
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), "Anti-Mates", RANGE);
+    const LIMIT = parseInt(PubgUI.qs("limit", 5), 10);
+    // Default minMatches=2 — niedrigere Schwelle als top-mates, sonst
+    // findet man bei kleinen Sessions niemanden. Override per URL.
+    const MIN_RAW = PubgUI.qs("minMatches");
+    const MIN = MIN_RAW != null ? parseInt(MIN_RAW, 10) : 2;
+
+    PubgUI.buildFilter([
+      { key: "sortBy", label: "Sort by", type: "select", default: "kd",
+        options: [
+          ["kd", "Worst K/D Yours"],
+          ["mateKd", "Worst K/D Mate"],
+          ["winRate", "Worst Win-Rate"],
+          ["avgPlace", "Worst Ø Place"],
+          ["synergy", "Worst Synergy"],
+          ["mostPlayed", "Least Played"],
+          ["chickensTogether", "Fewest CHICKEN"],
+        ],
+        tooltip: "Welche Metrik fuer den 'Anti-Mates'-Rang. Bei 'Worst K/D Yours' " +
+                 "stehen die Mates oben, mit denen DU die schlechteste K/D hast." },
+      { key: "minMatches", label: "Min shared matches", type: "range",
+        min: 1, max: 50, default: 2,
+        tooltip: "Mindest-Anzahl gemeinsamer Matches fuer Auflistung. " +
+                 "Default 2 — weniger Glueckstreffer rausfiltern." },
+      { key: "limit", label: "Show players", type: "range",
+        min: 1, max: 20, default: 5,
+        tooltip: "Maximale Anzahl Spieler in der Liste." },
+    ]);
+
+    const SORT_LABEL = {
+      synergy:           "Worst Synergy",
+      avgPlace:          "Worst Ø Place",
+      kd:                "Worst K/D (Mine)",
+      mateKd:            "Worst K/D (Mate)",
+      winRate:           "Worst Win-Rate",
+      mostPlayed:        "Least Played",
+      chickensTogether:  "Fewest CHICKEN",
+    };
+    function setSubtitle(minVal) {
+      const min = (minVal != null && minVal > 0) ? `min. ${minVal} matches` : "all matches";
+      const sub = document.getElementById("subtitle");
+      if (sub) sub.textContent = `${SORT_LABEL[SORT_BY] || SORT_BY} · ${min}`;
+    }
+    setSubtitle(MIN);
+
+    function primaryValue(m) {
+      if (SORT_BY === "avgPlace") return "Avg #" + (m.avgPlace || 0).toFixed(1);
+      if (SORT_BY === "kd")       return "K/D " + (m.kd || 0).toFixed(2);
+      if (SORT_BY === "mateKd")   return "K/D " + (m.mateKd || 0).toFixed(2);
+      if (SORT_BY === "winRate")  return (m.winRate || 0).toFixed(1) + "%";
+      if (SORT_BY === "mostPlayed") return (m.sharedMatches || 0) + " Matches";
+      if (SORT_BY === "chickensTogether") {
+        return (m.winsTogether || 0) + " CHICKEN · " +
+               (m.winRate || 0).toFixed(1) + "%";
+      }
+      if (SORT_BY === "synergy")  return "Score " + (m.synergyScore || 0).toFixed(2);
+      return "";
+    }
+
+    let MY_NAME = "Streamer";
+    PubgUI.getMyName().then(n => { MY_NAME = n; });
+
+    function nameLabel(n) {
+      if (!n) return "Streamer";
+      return n.length > 12 ? n.slice(0, 11) + "…" : n;
+    }
+
+    function detailLine(m) {
+      const me = nameLabel(MY_NAME);
+      const parts = [];
+      if (SORT_BY !== "mostPlayed") {
+        parts.push(`<span><b>${m.sharedMatches || 0}</b> matches</span>`);
+      }
+      if (SORT_BY === "kd") {
+        parts.push(`<span>Mate K/D <b>${(m.mateKd || 0).toFixed(2)}</b></span>`);
+      } else if (SORT_BY === "mateKd") {
+        parts.push(`<span>${me} K/D <b>${(m.kd || 0).toFixed(2)}</b></span>`);
+      } else {
+        parts.push(`<span>K/D ${me} <b>${(m.kd || 0).toFixed(2)}</b> / Mate <b>${(m.mateKd || 0).toFixed(2)}</b></span>`);
+      }
+      if (SORT_BY !== "chickensTogether") {
+        parts.push(`<span><b>${m.winsTogether || 0}</b> CHICKEN</span>`);
+      }
+      if (SORT_BY !== "winRate" && SORT_BY !== "chickensTogether") {
+        parts.push(`<span>Win <b>${(m.winRate || 0).toFixed(0)}%</b></span>`);
+      }
+      if (SORT_BY !== "avgPlace") {
+        parts.push(`<span>Avg <b>#${(m.avgPlace || 0).toFixed(1)}</b></span>`);
+      }
+      return parts.join("");
+    }
+
+    function render(list) {
+      const rows = document.getElementById("rows");
+      rows.innerHTML = list.map((m, i) => `
+        <div class="row">
+          <div class="row-top">
+            <span class="rank">${i+1}</span>
+            <span class="name">${m.name}</span>
+            <span class="primary">${primaryValue(m)}</span>
+          </div>
+          <div class="row-sub">${detailLine(m)}</div>
+        </div>`).join("") || `<div class="pubg-error">no data yet</div>`;
+    }
+
+    const minPart = (MIN != null && !isNaN(MIN)) ? `&minMatches=${MIN}` : "";
+    const rangePart = (RANGE && RANGE !== "all") ? `&range=${RANGE}` : "";
+    // worst=1 dreht die Sort-Direction um → schlechteste zuerst.
+    const url = `/api/pubg/top-mates?worst=1&sortBy=${SORT_BY}&limit=${LIMIT}${minPart}${rangePart}`;
+    PubgUI.poll(url, 5 * 60 * 1000, render, console.error);
+  </script>
+</body>
+</html>

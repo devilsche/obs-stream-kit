@@ -236,6 +236,7 @@ class EndpointRegistry:
         limit = int(qs.get("limit", 5))
         min_matches = int(qs.get("minMatches", default_min))
         range_key = qs.get("range")  # None = alle DB
+        worst = qs.get("worst") == "1"
 
         cache_key = f"top-mates:raw:{range_key or 'all'}"
         all_mates = self.cache.get_or_compute(
@@ -255,6 +256,8 @@ class EndpointRegistry:
             "synergy":           lambda m: -(m.get("synergyScore") or 0),
         }
         filtered.sort(key=sort_fns.get(sort_by, sort_fns["mostPlayed"]))
+        if worst:
+            filtered.reverse()
         return _ok(filtered[:limit])
 
     def _co_player(self, name):
