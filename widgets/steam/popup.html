@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Steam Combined Popup</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/widgets/pubg/_pubg.css">
+  <style>
+    /* Kombiniertes Steam-Popup. Zeigt abwechselnd:
+         - Now-Playing       (poll alle 10 min, slide-in 8s)
+         - Achievement       (poll alle 5s, slide-in 8s, hat Priority)
+       Beide nicht gleichzeitig — Queue + Interrupt:
+         Wenn Achievement reinkommt während Now-Playing animiert
+         ist, wird Now-Playing weggeschoben und Achievement gezeigt.
+    */
+    html, body { height: 100%; margin: 0; padding: 0; }
+    body {
+      display: flex; align-items: center; justify-content: center;
+      box-sizing: border-box;
+      padding: 20px;
+    }
+    .popup {
+      width: 480px;
+      padding: 16px 20px;
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      transform: translateY(40px);
+      opacity: 0;
+      transition: opacity 0.45s, transform 0.45s;
+    }
+    .popup.show { opacity: 1; transform: translateY(0); }
+
+    .icon {
+      width: 64px; height: 64px;
+      border-radius: 8px;
+      background: rgba(0,0,0,0.3);
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .info { flex: 1; min-width: 0; }
+    .ribbon {
+      display: inline-block;
+      padding: 2px 8px;
+      background: var(--pubg-gold);
+      color: #1a0d2a;
+      font-weight: 700;
+      font-size: 0.7em;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      border-radius: 3px;
+      margin-bottom: 4px;
+    }
+    .title {
+      color: var(--pubg-gold);
+      font-size: 1.15em;
+      font-weight: 700;
+      line-height: 1.2;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .desc {
+      color: var(--pubg-text);
+      font-size: 0.85em;
+      line-height: 1.3;
+      margin-top: 2px;
+    }
+    .meta {
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      margin-top: 4px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 12px;
+    }
+    .meta b { color: var(--pubg-text); font-variant-numeric: tabular-nums; }
+    .ach-bar {
+      margin-top: 6px;
+      width: 100%; height: 4px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .ach-bar .fill {
+      height: 100%;
+      background: var(--pubg-gold);
+      transition: width 0.4s;
+    }
+    /* Achievement-Variante: Icon glüht gold */
+    .popup[data-type="achievement"] .icon {
+      border: 1px solid var(--pubg-gold);
+      box-shadow: 0 0 12px rgba(242, 183, 5, 0.35);
+    }
+    /* Now-Playing-Variante: Icon ohne Glow, aber mit Border */
+    .popup[data-type="now-playing"] .icon {
+      border: 1px solid var(--pubg-border);
+    }
+  </style>
+</head>
+<body>
+  <div class="pubg-card popup" id="popup" data-type="">
+    <img class="icon" id="icon" alt="">
+    <div class="info">
+      <span class="ribbon" id="ribbon">—</span>
+      <div class="title" id="title">—</div>
+      <div class="desc" id="desc"></div>
+      <div class="meta" id="meta"></div>
+      <div class="ach-bar" id="achBar" style="display:none">
+        <div class="fill" id="achFill" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/widgets/pubg/_pubg.js"></script>
+  <script>
+    // ── URL-Params (Override-Optionen) ────────────────────────────────
+    const NOW_PLAYING_INTERVAL_MS  = parseInt(PubgUI.qs("nowPollMs",  String(10 * 60 * 1000)), 10);   // 10 min
+    const ACHIEVEMENT_INTERVAL_MS  = parseInt(PubgUI.qs("achPollMs",  "5000"),  10);                 // 5 s
+    const SHOW_DURATION_MS         = parseInt(PubgUI.qs("durationMs", "8000"),  10);
+    const GAP_MS                   = parseInt(PubgUI.qs("gapMs",      "1500"),  10);
+
+    const popup  = document.getElementById("popup");
+    const ribbon = document.getElementById("ribbon");
+    const titleEl= document.getElementById("title");
+    const descEl = document.getElementById("desc");
+    const metaEl = document.getElementById("meta");
+    const iconEl = document.getElementById("icon");
+    const barEl  = document.getElementById("achBar");
+    const fillEl = document.getElementById("achFill");
+
+    /** Queue-Item:
+     *    { type: 'now-playing' | 'achievement', data: object,
+     *      priority: number (höher = wichtiger) }
+     */
+    const queue = [];
+    let current = null;
+    let hideTimer = null;
+    let gapTimer = null;
+
+    function fmtHours(min) {
+      if (!min || min < 0) return null;
+      if (min < 60) return min + " min";
+      const h = Math.floor(min / 60);
+      if (h < 100) return h + "h " + (min % 60) + "m";
+      return h + " h";
+    }
+
+    // Render-Logik je Type ──────────────────────────────────────────────
+    function renderNowPlaying(d) {
+      popup.dataset.type = "now-playing";
+      ribbon.textContent = "Now Playing";
+      iconEl.src = d.avatar || "";
+      iconEl.style.display = d.avatar ? "" : "none";
+      titleEl.textContent = d.personaName || "—";
+      descEl.textContent = d.gameName ? `is now playing ${d.gameName}` : "is online";
+      const parts = [];
+      const total = fmtHours(d.playtimeTotalMin);
+      if (total) parts.push(`<span><b>${total}</b> total</span>`);
+      const recent = fmtHours(d.playtime2WeeksMin);
+      if (recent) parts.push(`<span><b>${recent}</b> last 2w</span>`);
+      if (d.achievementsTotal && d.achievementsTotal > 0) {
+        const got = d.achievementsUnlocked || 0;
+        parts.push(`<span><b>${got}</b>/<b>${d.achievementsTotal}</b> achievements</span>`);
+      }
+      metaEl.innerHTML = parts.join("");
+      // Progress-Bar
+      if (d.achievementsTotal && d.achievementsTotal > 0) {
+        barEl.style.display = "";
+        fillEl.style.width = ((d.achievementsUnlocked || 0) / d.achievementsTotal * 100).toFixed(1) + "%";
+      } else {
+        barEl.style.display = "none";
+      }
+    }
+
+    function renderAchievement(u) {
+      popup.dataset.type = "achievement";
+      ribbon.textContent = "Achievement Unlocked";
+      iconEl.src = u.iconUrl || "";
+      iconEl.style.display = u.iconUrl ? "" : "none";
+      titleEl.textContent = u.displayName || u.apiName || "Achievement";
+      descEl.textContent = u.description || "";
+      metaEl.innerHTML = u.gameName
+        ? `<span style="text-transform:uppercase;letter-spacing:0.06em">${u.gameName}</span>`
+        : "";
+      barEl.style.display = "none";
+    }
+
+    // Show / Hide / Queue-Processing ────────────────────────────────────
+    function clearTimers() {
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      if (gapTimer)  { clearTimeout(gapTimer);  gapTimer  = null; }
+    }
+
+    function show(item) {
+      clearTimers();
+      current = item;
+      if (item.type === "now-playing") renderNowPlaying(item.data);
+      else                              renderAchievement(item.data);
+      // Doppelter requestAnimationFrame, damit transition triggert
+      requestAnimationFrame(() => requestAnimationFrame(() =>
+        popup.classList.add("show")));
+      hideTimer = setTimeout(hide, SHOW_DURATION_MS);
+    }
+
+    function hide(thenProcess = true) {
+      clearTimers();
+      popup.classList.remove("show");
+      gapTimer = setTimeout(() => {
+        current = null;
+        if (thenProcess) processQueue();
+      }, GAP_MS);
+    }
+
+    function processQueue() {
+      if (current) return;
+      // Sort by priority desc — Achievement (1) vor Now-Playing (0)
+      queue.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+      const next = queue.shift();
+      if (next) show(next);
+    }
+
+    function enqueue(item) {
+      // Dedup Now-Playing: nur 1 in Queue
+      if (item.type === "now-playing") {
+        const existing = queue.findIndex(q => q.type === "now-playing");
+        if (existing !== -1) queue.splice(existing, 1);
+      }
+      queue.push(item);
+      // Interrupt: Achievement während Now-Playing animiert
+      if (current && current.type === "now-playing"
+          && item.type === "achievement") {
+        hide(/*thenProcess*/ true);
+        return;
+      }
+      processQueue();
+    }
+
+    // Pollers ───────────────────────────────────────────────────────────
+    async function pollNowPlaying() {
+      try {
+        const d = await PubgUI.fetchJson("/api/steam/now-playing");
+        if (d && d.active) {
+          enqueue({ type: "now-playing", data: d, priority: 0 });
+        }
+      } catch (e) { /* silent */ }
+    }
+
+    async function pollAchievements() {
+      try {
+        const r = await PubgUI.fetchJson(
+          "/api/steam/recent-unlocks?markDisplayed=1");
+        const unlocks = (r && r.unlocks) || [];
+        for (const u of unlocks) {
+          enqueue({ type: "achievement", data: u, priority: 1 });
+        }
+      } catch (e) { /* silent */ }
+    }
+
+    // Initial + intervalle
+    pollNowPlaying();
+    pollAchievements();
+    setInterval(pollNowPlaying,    NOW_PLAYING_INTERVAL_MS);
+    setInterval(pollAchievements,  ACHIEVEMENT_INTERVAL_MS);
+  </script>
+</body>
+</html>
