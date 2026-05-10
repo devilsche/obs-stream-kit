@@ -1318,24 +1318,57 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
         if opp_team is not None and opp_team != my_team_id:
             teams_in_fight.add(opp_team)
 
-    # Survival: time_survived ist Sekunden ab MATCH-START (nicht Landung).
-    # Squad-Landung als Offset reinrechnen, dann window_secs draufpacken.
-    m_row = conn.execute(
-        "SELECT played_at FROM matches WHERE match_id = ?",
-        (match_id,)
-    ).fetchone()
-    survival_threshold_s = window_secs  # Fallback
-    if m_row and m_row["played_at"]:
-        start_dt = _parse_iso(m_row["played_at"])
-        if start_dt:
-            match_start_ms = int(start_dt.timestamp() * 1000)
-            landing_offset_s = max(0, (landing_ms - match_start_ms) / 1000.0)
-            survival_threshold_s = landing_offset_s + window_secs
+    # Survival: outcome-basiert. Squad-Member, die ihren Tod IM
+    # Drop-Area (300m-Radius zu IRGENDEINEM Squad-Landing) hatten,
+    # gelten als 'im Hot-Drop gestorben'. Egal ob nach 30s oder
+    # nach 6 Min. Wer ausserhalb stirbt (Storm, spaetere Rotation
+    # in andere Map-Region), hat den Hot-Drop ueberlebt.
+    droparea_radius_cm = 300 * 100
+    droparea_radius_sq = droparea_radius_cm * droparea_radius_cm
+    squad_pos_for_kills = [(s["actor_x"], s["actor_y"]) for s in squad_landings
+                            if s["actor_x"] is not None and s["actor_y"] is not None]
 
-    my_part = next((p for p in parts if p["account_id"] == my_account_id), None)
-    my_surv = (my_part and my_part["time_survived"]) or 0
-    squad_surv = max((p["time_survived"] or 0)
-                     for p in parts if p["account_id"] in squad_ids)
+    killed_in_droparea = set()
+    if squad_pos_for_kills:
+        squad_kill_events = conn.execute(f"""
+            SELECT target_account, victim_x, victim_y
+            FROM telemetry_events
+            WHERE match_id = ?
+              AND event_type = 'Kill'
+              AND target_account IN ({placeholders})
+              AND victim_x IS NOT NULL AND victim_y IS NOT NULL
+        """, [match_id] + list(squad_ids)).fetchall()
+        for ev in squad_kill_events:
+            for sx, sy in squad_pos_for_kills:
+                dx = ev["victim_x"] - sx
+                dy = ev["victim_y"] - sy
+                if dx * dx + dy * dy <= droparea_radius_sq:
+                    killed_in_droparea.add(ev["target_account"])
+                    break
+
+    # Fallback (falls Position-Daten fehlen, z.B. alte Telemetry):
+    # zeitliches window_secs-Window als 'Drop-Phase'.
+    if not squad_pos_for_kills:
+        m_row = conn.execute(
+            "SELECT played_at FROM matches WHERE match_id = ?",
+            (match_id,)
+        ).fetchone()
+        survival_threshold_s = window_secs
+        if m_row and m_row["played_at"]:
+            start_dt = _parse_iso(m_row["played_at"])
+            if start_dt:
+                match_start_ms = int(start_dt.timestamp() * 1000)
+                landing_offset_s = max(0, (landing_ms - match_start_ms) / 1000.0)
+                survival_threshold_s = landing_offset_s + window_secs
+        my_part = next((p for p in parts if p["account_id"] == my_account_id), None)
+        my_surv = (my_part and my_part["time_survived"]) or 0
+        squad_surv = max((p["time_survived"] or 0)
+                         for p in parts if p["account_id"] in squad_ids)
+        solo_alive = my_surv >= survival_threshold_s
+        team_alive = squad_surv >= survival_threshold_s
+    else:
+        solo_alive = my_account_id not in killed_in_droparea
+        team_alive = bool(squad_ids - killed_in_droparea)
     # Teams die im Radius (Default 300m) zu IRGENDEINEM Squad-Member
     # gelandet sind. Braucht alle Lobby-Landings (telemetry_schema >= 3)
     # + Position. Eigene Squad-Members werden ausgeschlossen.
@@ -1371,8 +1404,8 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     is_hot_drop = bool(teams_in_radius) or hot_drop
     return {
         "hotDrop":         is_hot_drop,
-        "soloSurvived":    my_surv >= survival_threshold_s,
-        "teamSurvived":    squad_surv >= survival_threshold_s,
+        "soloSurvived":    solo_alive,
+        "teamSurvived":    team_alive,
         "teamsInFight":    len(teams_in_fight),
         "teamsInRadius":   len(teams_in_radius),
     }
