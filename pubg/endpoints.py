@@ -43,7 +43,7 @@ class EndpointRegistry:
         if route == ("GET", "/api/pubg/last-match"):
             return self._last_match()
         if route == ("GET", "/api/pubg/status"):
-            return _ok(self.poller_status())
+            return self._status(qs)
         if route == ("GET", "/api/pubg/db-info"):
             return self._db_info()
         if route == ("GET", "/api/pubg/lobby-avg-kd"):
@@ -353,6 +353,38 @@ class EndpointRegistry:
         return _ok(self.cache.get_or_compute(
             f"map:{range_key}",
             lambda: compute_map_distribution(conn, self.my_account_id, range_key)))
+
+    def _status(self, qs):
+        """Status-Endpoint mit pubgActive-Boolean fuer Streamer.bot.
+        Logik: pubgActive=true wenn letzter Match weniger als
+        activeThresholdMin (Default 30) Minuten zurueckliegt.
+        Override per ?activeMin=N (Sekunden via ?activeSec=N)."""
+        active_min = float(qs.get("activeMin", 30))
+        if "activeSec" in qs:
+            active_min = float(qs["activeSec"]) / 60.0
+        base = dict(self.poller_status() or {})
+        conn = self.get_conn()
+        row = conn.execute(
+            "SELECT MAX(played_at) AS last FROM matches"
+        ).fetchone()
+        last_iso = row["last"] if row else None
+        last_match_age_min = None
+        pubg_active = False
+        if last_iso:
+            try:
+                last_dt = datetime.datetime.fromisoformat(
+                    last_iso.replace("Z", "+00:00"))
+                now = datetime.datetime.now(datetime.timezone.utc)
+                last_match_age_min = round(
+                    (now - last_dt).total_seconds() / 60.0, 1)
+                pubg_active = last_match_age_min < active_min
+            except Exception:
+                pass
+        base["pubgActive"] = pubg_active
+        base["lastMatchAt"] = last_iso
+        base["lastMatchAgeMin"] = last_match_age_min
+        base["activeThresholdMin"] = active_min
+        return _ok(base)
 
     def _first_fight(self, qs):
         range_key = qs.get("range", "session")
