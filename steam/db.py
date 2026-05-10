@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS steam_owned_games (
   steam_id TEXT NOT NULL,
   app_id INTEGER NOT NULL,
   name TEXT,
-  img_icon_url TEXT,                    -- 184x69 banner from Steam
+  img_icon_url TEXT,                    -- 32x32 mini icon (volle URL)
+  img_logo_url TEXT,                    -- 184x69 banner (volle URL)
   playtime_forever_min INTEGER NOT NULL DEFAULT 0,
   playtime_2weeks_min INTEGER NOT NULL DEFAULT 0,
   last_synced INTEGER NOT NULL,
@@ -75,24 +76,43 @@ def connect(path: str) -> sqlite3.Connection:
 
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA_SQL)
+    # In-place Migrations (idempotent): ADD COLUMN schlaegt fehl wenn
+    # Spalte schon da ist -> abfangen.
+    try:
+        conn.execute("ALTER TABLE steam_owned_games ADD COLUMN img_logo_url TEXT")
+    except sqlite3.OperationalError:
+        pass
+
+
+def _steam_image_url(app_id: int, image_hash: str) -> str:
+    """Steam GetOwnedGames liefert image-Hashes ohne CDN-URL. Volle URL
+    bauen — funktioniert fuer img_icon_url + img_logo_url gleichermassen."""
+    if not image_hash or not app_id:
+        return None
+    return (f"https://media.steampowered.com/steamcommunity/public/"
+            f"images/apps/{app_id}/{image_hash}.jpg")
 
 
 # ── Owned Games ────────────────────────────────────────────────────────────
 def upsert_owned_games(conn, steam_id: str, games: list) -> None:
     for g in games:
+        appid = g.get("appid")
+        icon_url = _steam_image_url(appid, g.get("img_icon_url"))
+        logo_url = _steam_image_url(appid, g.get("img_logo_url"))
         conn.execute("""
             INSERT INTO steam_owned_games
-              (steam_id, app_id, name, img_icon_url,
+              (steam_id, app_id, name, img_icon_url, img_logo_url,
                playtime_forever_min, playtime_2weeks_min, last_synced)
-            VALUES (?, ?, ?, ?, ?, ?, strftime('%s','now'))
+            VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))
             ON CONFLICT(steam_id, app_id) DO UPDATE SET
               name=excluded.name,
               img_icon_url=excluded.img_icon_url,
+              img_logo_url=excluded.img_logo_url,
               playtime_forever_min=excluded.playtime_forever_min,
               playtime_2weeks_min=excluded.playtime_2weeks_min,
               last_synced=excluded.last_synced
         """, (
-            steam_id, g.get("appid"), g.get("name"), g.get("img_icon_url"),
+            steam_id, appid, g.get("name"), icon_url, logo_url,
             g.get("playtime_forever", 0), g.get("playtime_2weeks", 0),
         ))
 
@@ -133,7 +153,7 @@ def get_owned_games_filtered(conn, steam_id: str,
     }.get(sort_by, "og.playtime_forever_min DESC")
 
     sql = f"""
-        SELECT og.app_id, og.name, og.img_icon_url,
+        SELECT og.app_id, og.name, og.img_icon_url, og.img_logo_url,
                og.playtime_forever_min, og.playtime_2weeks_min,
                ad.header_image, ad.short_description,
                ad.is_coop, ad.is_multiplayer, ad.category_ids

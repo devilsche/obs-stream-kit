@@ -135,8 +135,12 @@
       // Cross-fade: 0.45s out, dann replace content, dann in
       setTimeout(() => {
         const cover = document.getElementById("cover");
-        if (g.headerImage) {
-          cover.src = g.headerImage;
+        // Fallback-Chain: Storefront header_image (hi-res, kommt von
+        // Layer-3-Poller) > img_logo_url (184x69, immer da nach
+        // Owned-Games-Sync) > img_icon_url (32x32, klein) > hide
+        const src = g.headerImage || g.imgLogoUrl || g.imgIconUrl;
+        if (src) {
+          cover.src = src;
           cover.style.display = "";
         } else {
           cover.style.display = "none";

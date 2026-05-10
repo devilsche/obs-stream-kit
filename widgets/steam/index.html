@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Steam Widgets — Demo</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/widgets/pubg/_pubg.css">
+  <style>
+    body {
+      background: var(--pubg-page-bg);
+      min-height: 100vh; padding: 24px;
+      font-family: "DM Sans", system-ui, sans-serif;
+      color: var(--pubg-text);
+    }
+    h1 { color: var(--pubg-gold); margin: 0 0 6px; }
+    p.intro { color: var(--pubg-muted); margin: 0 0 24px; max-width: 720px; line-height: 1.5; }
+    h2.section {
+      color: var(--pubg-muted); font-size: 0.85em; letter-spacing: 0.1em;
+      text-transform: uppercase; margin: 32px 0 10px;
+    }
+    .grid {
+      display: grid; gap: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      margin-bottom: 18px;
+    }
+    .tile {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--pubg-border);
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .tile h3 {
+      margin: 0; padding: 8px 14px;
+      font-size: 0.78em; letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--pubg-muted);
+      background: rgba(94, 42, 121, 0.2);
+      border-bottom: 1px solid var(--pubg-border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .tile h3 .url {
+      color: var(--pubg-gold); font-size: 0.7em; opacity: 0.7;
+      text-decoration: none;
+    }
+    .tile h3 .url:hover { opacity: 1; }
+    .tile iframe {
+      border: 0; width: 100%; background: transparent;
+    }
+    .full { grid-column: 1 / -1; }
+    .urlbox {
+      padding: 14px 18px; background: rgba(0,0,0,0.3);
+      border: 1px solid var(--pubg-border);
+      border-radius: 8px; margin-bottom: 18px;
+      font-size: 0.85em;
+    }
+    .urlbox a {
+      color: var(--pubg-gold); display: block; padding: 3px 0;
+      text-decoration: none;
+    }
+    .urlbox a:hover { text-decoration: underline; }
+    .triggers {
+      display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px;
+    }
+    .triggers button {
+      background: var(--pubg-gold); color: #1a0d2a;
+      border: none; padding: 8px 14px; border-radius: 5px;
+      font-weight: 700; cursor: pointer; font-family: inherit;
+      font-size: 0.85em; letter-spacing: 0.05em;
+    }
+    .triggers button.secondary {
+      background: rgba(94, 42, 121, 0.4); color: var(--pubg-text);
+      border: 1px solid var(--pubg-border);
+    }
+    .triggers button:hover { opacity: 0.85; }
+    .triggers .out {
+      color: var(--pubg-muted); font-size: 0.78em;
+      align-self: center; font-style: italic;
+    }
+    .pill {
+      display: inline-block; background: rgba(94, 42, 121, 0.3);
+      border: 1px solid var(--pubg-border);
+      border-radius: 999px; padding: 1px 8px; font-size: 0.7em;
+      color: var(--pubg-text); margin-left: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Steam Widgets — lokale Demo</h1>
+  <p class="intro">
+    Übersicht aller Steam-Widgets + Trigger-Buttons für Test-Endpoints.
+    Klick auf eine Widget-Kachel öffnet die Live-URL in eigenem Tab.
+    Test-Buttons fetchen die Endpoints ohne Navigation.
+  </p>
+
+  <!-- ── Trigger-Bar ────────────────────────────────────────────────── -->
+  <h2 class="section">Test-Trigger</h2>
+  <div class="triggers">
+    <button data-fetch="/api/steam/test-unlock">▶ Test Achievement</button>
+    <button data-fetch="/api/steam/test-unlock?title=Rare%20Drop&desc=Less%20than%201%25%20of%20players&game=Test%20Title">▶ Custom Test</button>
+    <button class="secondary" data-fetch="/api/steam/test-reset">Reset Test-Queue</button>
+    <button class="secondary" data-fetch="/api/steam/test-reset?all=1">Reset ALL undisplayed</button>
+    <span class="out" id="triggerOut">—</span>
+  </div>
+
+  <!-- ── API-Endpoints ─────────────────────────────────────────────── -->
+  <h2 class="section">API-Endpoints (öffnen)</h2>
+  <div class="urlbox">
+    <a href="/api/steam/now-playing" target="_blank">/api/steam/now-playing<span class="pill">live + cache</span></a>
+    <a href="/api/steam/recent-unlocks" target="_blank">/api/steam/recent-unlocks<span class="pill">read-only</span></a>
+    <a href="/api/steam/recent-unlocks?markDisplayed=1" target="_blank">/api/steam/recent-unlocks?markDisplayed=1<span class="pill">marks shown</span></a>
+    <a href="/api/steam/recently-played" target="_blank">/api/steam/recently-played</a>
+    <a href="/api/steam/owned-games?limit=10" target="_blank">/api/steam/owned-games?limit=10</a>
+    <a href="/api/steam/owned-games?filter=coop&limit=10" target="_blank">/api/steam/owned-games?filter=coop&limit=10</a>
+    <a href="/api/steam/owned-games?filter=multiplayer&sort=recent&limit=10" target="_blank">/api/steam/owned-games?filter=multiplayer&sort=recent&limit=10</a>
+    <a href="/api/steam/status" target="_blank">/api/steam/status<span class="pill">poller</span></a>
+  </div>
+
+  <!-- ── Popups (slide-in / Animation) ─────────────────────────────── -->
+  <h2 class="section">Popups</h2>
+  <div class="grid">
+    <div class="tile">
+      <h3>
+        <span>popup.html <span class="pill">combined</span></span>
+        <a class="url" href="/widgets/steam/popup.html" target="_blank">↗</a>
+      </h3>
+      <iframe src="/widgets/steam/popup.html?nowPollMs=30000" height="220"></iframe>
+    </div>
+    <div class="tile">
+      <h3>
+        <span>achievement-popup.html</span>
+        <a class="url" href="/widgets/steam/achievement-popup.html" target="_blank">↗</a>
+      </h3>
+      <iframe src="/widgets/steam/achievement-popup.html" height="220"></iframe>
+    </div>
+  </div>
+
+  <!-- ── Now-Playing (bottom-left) ─────────────────────────────────── -->
+  <h2 class="section">Now-Playing</h2>
+  <div class="grid">
+    <div class="tile">
+      <h3>
+        <span>now-playing.html</span>
+        <a class="url" href="/widgets/steam/now-playing.html" target="_blank">↗</a>
+      </h3>
+      <iframe src="/widgets/steam/now-playing.html" height="160"></iframe>
+    </div>
+  </div>
+
+  <!-- ── Games-Ticker (Library / Coop / MP) ────────────────────────── -->
+  <h2 class="section">Games-Ticker</h2>
+  <div class="grid">
+    <div class="tile">
+      <h3>
+        <span>games-ticker.html <span class="pill">library</span></span>
+        <a class="url" href="/widgets/steam/games-ticker.html" target="_blank">↗</a>
+      </h3>
+      <iframe src="/widgets/steam/games-ticker.html?rotateMs=5000" height="160"></iframe>
+    </div>
+    <div class="tile">
+      <h3>
+        <span>games-ticker.html?filter=coop <span class="pill">co-op</span></span>
+        <a class="url" href="/widgets/steam/games-ticker.html?filter=coop&header=Willst%20du%20mit%20mir%20spielen%3F" target="_blank">↗</a>
+      </h3>
+      <iframe src="/widgets/steam/games-ticker.html?filter=coop&rotateMs=5000&header=Willst%20du%20mit%20mir%20spielen%3F" height="160"></iframe>
+    </div>
+    <div class="tile">
+      <h3>
+        <span>games-ticker.html?filter=multiplayer <span class="pill">mp</span></span>
+        <a class="url" href="/widgets/steam/games-ticker.html?filter=multiplayer" target="_blank">↗</a>
+      </h3>
+      <iframe src="/widgets/steam/games-ticker.html?filter=multiplayer&rotateMs=5000" height="160"></iframe>
+    </div>
+    <div class="tile">
+      <h3>
+        <span>games-ticker.html?sort=recent <span class="pill">last 2 weeks</span></span>
+        <a class="url" href="/widgets/steam/games-ticker.html?sort=recent&minPlaytime=1" target="_blank">↗</a>
+      </h3>
+      <iframe src="/widgets/steam/games-ticker.html?sort=recent&minPlaytime=1&rotateMs=5000" height="160"></iframe>
+    </div>
+  </div>
+
+  <script>
+    // Trigger-Buttons: fetch ohne Navigation, Output kurz anzeigen.
+    document.querySelectorAll("button[data-fetch]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const url = btn.dataset.fetch;
+        const out = document.getElementById("triggerOut");
+        out.textContent = "→ " + url;
+        try {
+          const r = await fetch(url, { cache: "no-store" });
+          const j = await r.json();
+          out.textContent = "✓ " + JSON.stringify(j);
+        } catch (e) {
+          out.textContent = "✗ " + e;
+        }
+      });
+    });
+  </script>
+</body>
+</html>

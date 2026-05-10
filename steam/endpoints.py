@@ -159,6 +159,7 @@ class SteamEndpointRegistry:
                     "appId":             r["app_id"],
                     "name":              r["name"],
                     "imgIconUrl":        r["img_icon_url"],
+                    "imgLogoUrl":        r["img_logo_url"],
                     "headerImage":       r["header_image"],
                     "shortDescription":  r["short_description"],
                     "playtimeTotalMin":  r["playtime_forever_min"],
