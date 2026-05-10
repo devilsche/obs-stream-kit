@@ -51,6 +51,11 @@
     }
     .markers .m.hot   { background: #ff7a1f; opacity: 1; }
     .markers .m.died  { background: #e57b7b; opacity: 0.7; }
+    /* Solo tot, Team ueberlebt: Diagonal-Split rot/orange */
+    .markers .m.died.team-saved {
+      background: linear-gradient(135deg, #e57b7b 50%, #ff7a1f 50%);
+      opacity: 1;
+    }
     .meta { color: var(--pubg-muted); font-size: 0.78em; margin-top: 8px; }
     .legend {
       display: flex;
@@ -68,6 +73,10 @@
     }
     .legend .swatch.hot  { background: #ff7a1f; opacity: 1; }
     .legend .swatch.died { background: #e57b7b; opacity: 0.7; }
+    .legend .swatch.team-saved {
+      background: linear-gradient(135deg, #e57b7b 50%, #ff7a1f 50%);
+      opacity: 1;
+    }
     .legend .hint { opacity: 0.7; font-style: italic; }
   </style>
 </head>
@@ -101,10 +110,10 @@
     <div class="markers" id="markers"></div>
     <div class="meta" id="meta">—</div>
     <div class="legend">
-      <span class="item"><span class="swatch hot"></span>Hot · survived</span>
-      <span class="item"><span class="swatch died"></span>Hot · died</span>
+      <span class="item"><span class="swatch hot"></span>You alive</span>
+      <span class="item"><span class="swatch died team-saved"></span>You died · team alive</span>
+      <span class="item"><span class="swatch died"></span>Both died</span>
       <span class="item"><span class="swatch"></span>Cold</span>
-      <span class="hint">— solo survival</span>
     </div>
   </div>
   <script src="_pubg.js"></script>
@@ -158,12 +167,17 @@
         teamsRadiusEl.textContent = "—";
       }
 
-      // Markers von rechts (neueste) → links (ältere)
+      // Markers von rechts (neueste) → links (ältere). Vier Faelle:
+      //   cold (grau)            : kein Hot-Drop
+      //   hot (orange)           : du ueberlebt (egal ob team)
+      //   died+team-saved (split): du tot, team lebt -> diagonal rot/orange
+      //   died (rot)             : du + team beide tot
       const matches = (d.perMatch || []).slice().reverse();
       const html = matches.map(m => {
         if (!m.hotDrop) return `<div class="m" title="cold drop"></div>`;
-        if (m.soloSurvived) return `<div class="m hot" title="hot drop, survived"></div>`;
-        return `<div class="m died" title="hot drop, died"></div>`;
+        if (m.soloSurvived) return `<div class="m hot" title="hot drop, you survived"></div>`;
+        if (m.teamSurvived) return `<div class="m died team-saved" title="hot drop, you died — team survived"></div>`;
+        return `<div class="m died" title="hot drop, both died"></div>`;
       }).join("");
       document.getElementById("markers").innerHTML = html;
 
