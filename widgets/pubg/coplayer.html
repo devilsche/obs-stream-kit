@@ -111,8 +111,11 @@
               ? "1 match together"
               : `${PubgUI.fmtNum(sharedCount)} matches together`;
           document.getElementById("sm").textContent = PubgUI.fmtNum(sh.matches);
-          document.getElementById("skd").textContent = PubgUI.fmtKD(sh.kd);
-          document.getElementById("sdmg").textContent = PubgUI.fmtNum(Math.round(sh.avgDmg||0));
+          // Anzeigen wir die MATE-Werte (analog chat-stats-popup):
+          // sh.kd / sh.avgDmg sind MEINE Werte in shared matches; im
+          // Kontext 'Played With You' will man die des Mates sehen.
+          document.getElementById("skd").textContent = PubgUI.fmtKD(sh.mateKd);
+          document.getElementById("sdmg").textContent = PubgUI.fmtNum(Math.round(sh.mateAvgDmg||0));
           document.getElementById("splace").textContent = sh.avgPlace ? "#" + sh.avgPlace.toFixed(1) : "—";
           document.getElementById("swin").textContent = PubgUI.fmtPct(sh.winRate);
           document.getElementById("swins").textContent = PubgUI.fmtNum(sh.wins);

@@ -353,6 +353,7 @@ def compute_mates(conn, my_account_id: str,
                COUNT(*) AS shared,
                AVG(mate.kills) AS kills_avg,
                SUM(mate.kills) AS kills_total,
+               SUM(CASE WHEN mate.place = 1 THEN 1 ELSE 0 END) AS wins_total,
                AVG(mate.damage_dealt) AS dmg_avg,
                (SELECT COUNT(*) FROM participants p2
                 JOIN participants me2 ON me2.match_id = p2.match_id
@@ -372,12 +373,17 @@ def compute_mates(conn, my_account_id: str,
         lt = conn.execute(
             "SELECT * FROM player_lifetime WHERE account_id = ? AND mode = 'all'",
             (r["account_id"],)).fetchone()
+        # K/D = kills / deaths, mit deaths = matches - wins (in BR stirbt
+        # man immer ausser bei place=1). Frueher war hier kills/matches,
+        # was K/M ist - daher die Abweichung zum chat-stats-popup, das
+        # in compute_co_player mit deaths-basierter K/D rechnet.
+        deaths = max((r["shared"] or 0) - (r["wins_total"] or 0), 1)
         out.append({
             "accountId": r["account_id"],
             "name": r["name"],
             "sharedMatchesToday": r["shared"],
             "totalWithMe": r["total_with_me"],
-            "kdToday": (r["kills_total"] / max(r["shared"], 1)),
+            "kdToday": (r["kills_total"] or 0) / deaths,
             "dmgToday": r["dmg_avg"],
             "careerLifetime": dict(lt) if lt else None,
         })
