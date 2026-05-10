@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Steam Games Ticker</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/widgets/pubg/_pubg.css">
+  <style>
+    /* Rotierender Ticker durch Library/Coop/Multiplayer-Games.
+       Klassischer cross-fade pro Game. Source-Breite bestimmt
+       die Card-Breite. */
+    html, body { height: 100%; margin: 0; }
+    body {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      box-sizing: border-box;
+    }
+    .panel {
+      width: 100%;
+      padding: 14px 18px;
+      min-height: 92px;
+      position: relative;
+    }
+    .heading {
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .heading b { color: var(--pubg-gold); }
+    .slot {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.45s ease-out, transform 0.45s ease-out;
+    }
+    .slot.show { opacity: 1; transform: translateY(0); }
+    .cover {
+      width: 110px; height: 52px;
+      border-radius: 4px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--pubg-border);
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .meta { flex: 1; min-width: 0; }
+    .name {
+      color: var(--pubg-text);
+      font-weight: 700;
+      font-size: 1em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sub {
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      margin-top: 2px;
+      letter-spacing: 0.04em;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .sub b { color: var(--pubg-gold); font-variant-numeric: tabular-nums; }
+    .badge {
+      display: inline-block;
+      font-size: 0.7em;
+      letter-spacing: 0.06em;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: rgba(94, 42, 121, 0.4);
+      color: var(--pubg-text);
+      border: 1px solid var(--pubg-border);
+      text-transform: uppercase;
+    }
+    .badge.coop { background: var(--pubg-gold); color: #1a0d2a; border-color: var(--pubg-gold); }
+    .empty {
+      color: var(--pubg-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="pubg-header" id="pubgHeader"></div>
+  <div class="pubg-card panel pubg-fade-in">
+    <div class="heading" id="headingText"></div>
+    <div class="slot" id="slot">
+      <img class="cover" id="cover" alt="">
+      <div class="meta">
+        <div class="name" id="name">—</div>
+        <div class="sub" id="sub"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/widgets/pubg/_pubg.js"></script>
+  <script>
+    // URL-Params
+    const FILTER     = PubgUI.qs("filter",   "all");      // all|coop|multiplayer
+    const SORT       = PubgUI.qs("sort",     "playtime"); // playtime|recent|name
+    const LIMIT      = parseInt(PubgUI.qs("limit",    "30"),   10);
+    const MIN_PT     = parseInt(PubgUI.qs("minPlaytime", "0"), 10);
+    const ROTATE_MS  = parseInt(PubgUI.qs("rotateMs", "8000"), 10);
+    const REFRESH_MS = parseInt(PubgUI.qs("refreshMs", String(10 * 60 * 1000)), 10); // 10min
+    const HEADING    = PubgUI.qs("header",   "");
+
+    PubgUI.renderHeader(document.getElementById("pubgHeader"), "Library", "live");
+    document.getElementById("headingText").innerHTML = HEADING
+      ? HEADING.replace(/</g, "&lt;")
+      : `<b>${FILTER === "coop" ? "Co-op Games" : FILTER === "multiplayer" ? "Multiplayer Games" : "My Library"}</b>`;
+
+    function fmtHours(min) {
+      if (!min || min <= 0) return null;
+      if (min < 60) return min + " min";
+      const h = Math.floor(min / 60);
+      if (h < 100) return h + "h";
+      return Math.floor(h / 10) * 10 + "+ h";
+    }
+
+    let games = [];
+    let idx = 0;
+    let timer = null;
+
+    function renderOne(g) {
+      const slot = document.getElementById("slot");
+      slot.classList.remove("show");
+      // Cross-fade: 0.45s out, dann replace content, dann in
+      setTimeout(() => {
+        const cover = document.getElementById("cover");
+        if (g.headerImage) {
+          cover.src = g.headerImage;
+          cover.style.display = "";
+        } else {
+          cover.style.display = "none";
+        }
+        document.getElementById("name").textContent = g.name || ("App #" + g.appId);
+        const parts = [];
+        const total = fmtHours(g.playtimeTotalMin);
+        if (total) parts.push(`<span><b>${total}</b> total</span>`);
+        const recent = fmtHours(g.playtime2WeeksMin);
+        if (recent) parts.push(`<span><b>${recent}</b> last 2w</span>`);
+        if (g.isCoop) parts.push(`<span class="badge coop">Co-op</span>`);
+        else if (g.isMultiplayer) parts.push(`<span class="badge">Multiplayer</span>`);
+        document.getElementById("sub").innerHTML = parts.join("");
+        requestAnimationFrame(() => requestAnimationFrame(() =>
+          slot.classList.add("show")));
+      }, 450);
+    }
+
+    function step() {
+      if (!games.length) {
+        document.getElementById("name").textContent = "";
+        document.getElementById("sub").innerHTML =
+          `<span class="empty">no ${FILTER === "all" ? "" : FILTER + " "}games cached yet — Poller fetches Storefront data ~5/min</span>`;
+        return;
+      }
+      const g = games[idx % games.length];
+      idx++;
+      renderOne(g);
+    }
+
+    async function refresh() {
+      try {
+        const u = `/api/steam/owned-games?filter=${encodeURIComponent(FILTER)}` +
+                  `&sort=${encodeURIComponent(SORT)}` +
+                  `&minPlaytime=${MIN_PT}&limit=${LIMIT}`;
+        const data = await PubgUI.fetchJson(u);
+        games = (data && data.games) || [];
+      } catch (e) {
+        games = [];
+      }
+    }
+
+    async function bootstrap() {
+      await refresh();
+      step();
+      timer = setInterval(step, ROTATE_MS);
+      setInterval(refresh, REFRESH_MS);
+    }
+    bootstrap();
+  </script>
+</body>
+</html>
