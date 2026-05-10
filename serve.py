@@ -57,6 +57,10 @@ if os.path.exists(secrets_path):
                 secrets["client_secret"] = line.split(":", 1)[1].strip()
             elif line.startswith("Twitch-Channel:"):
                 secrets["twitch_channel"] = line.split(":", 1)[1].strip()
+            elif line.startswith("Steam API Key:"):
+                secrets["steam_api_key"] = line.split(":", 1)[1].strip()
+            elif line.startswith("Steam ID:"):
+                secrets["steam_id"] = line.split(":", 1)[1].strip()
 
 # ── PUBG-Backend-Bootstrap ─────────────────────────────────────────────────────
 PUBG_ENABLED = False
@@ -146,6 +150,26 @@ try:
         print("  PUBG backend: no PUBG-API key in .secrets — backend disabled")
 except Exception as e:
     print(f"  PUBG-Backend init error: {e}")
+
+
+# ── Steam-Backend-Bootstrap ────────────────────────────────────────────────────
+STEAM_ENABLED = False
+steam_registry = None
+try:
+    from steam.api_client import SteamClient
+    from steam.endpoints import SteamEndpointRegistry
+
+    if secrets.get("steam_api_key") and secrets.get("steam_id"):
+        steam_client = SteamClient(
+            api_key=secrets["steam_api_key"],
+            steam_id=secrets["steam_id"])
+        steam_registry = SteamEndpointRegistry(steam_client)
+        STEAM_ENABLED = True
+        print("  Steam backend active  ✓")
+    else:
+        print("  Steam backend: no Steam API Key / Steam ID in .secrets — backend disabled")
+except Exception as e:
+    print(f"  Steam-Backend init error: {e}")
 
 
 # ── Frontend-Error-Logger (immer injiziert) ────────────────────────────────────
@@ -287,6 +311,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(body)
                 return
+            except Exception as e:
+                self.send_error(500, str(e))
+                return
+        if STEAM_ENABLED and self.path.startswith("/api/steam/"):
+            try:
+                result = steam_registry.dispatch(
+                    "GET", self.path.split("?")[0], b"", dict(self.headers))
+                if result is not None:
+                    body, code, ctype = result
+                    self.send_response(code)
+                    self.send_header("Content-Type", ctype)
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
             except Exception as e:
                 self.send_error(500, str(e))
                 return
