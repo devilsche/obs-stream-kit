@@ -81,6 +81,8 @@ class EndpointRegistry:
             return self._map_dist(qs)
         if route == ("GET", "/api/pubg/first-fight-rate"):
             return self._first_fight(qs)
+        if route == ("GET", "/api/pubg/first-fight-debug"):
+            return self._first_fight_debug(qs)
         if route == ("GET", "/api/pubg/squad-compare"):
             return self._squad_compare(qs)
         if route == ("GET", "/api/pubg/chickens-together"):
@@ -363,6 +365,73 @@ class EndpointRegistry:
             lambda: compute_first_fight_rate(
                 conn, self.my_account_id, range_key,
                 exclude_hot_drop=exclude_hot)))
+
+    def _first_fight_debug(self, qs):
+        """Diagnose: pro Match in Range zeigen, warum die Detection
+        ggf. None liefert. Output:
+          - match_id, played_at, place, telemetry_fetched
+          - participants_count, my_team_id, squad_size
+          - kill_events, knock_events
+          - squad_involved (Anzahl Events mit Squad als Attacker/Target)
+          - detection_result (das was _detect_first_fight liefert)
+        """
+        from pubg.aggregations import _detect_first_fight, _range_filter
+        range_key = qs.get("range", "session")
+        conn = self.get_conn()
+        cutoff = (_range_filter(conn, range_key)
+                  if range_key != "all" else "1970-01-01T00:00:00Z")
+        matches = conn.execute("""
+            SELECT m.match_id, m.played_at, m.duration_secs, m.telemetry_fetched,
+                   pa.place
+            FROM matches m
+            JOIN participants pa ON pa.match_id = m.match_id
+            WHERE pa.account_id = ? AND m.played_at >= ?
+            ORDER BY m.played_at DESC
+        """, (self.my_account_id, cutoff)).fetchall()
+        out = []
+        for m in matches:
+            mid = m["match_id"]
+            parts = conn.execute(
+                "SELECT account_id, team_id FROM participants WHERE match_id = ?",
+                (mid,)).fetchall()
+            acc_to_team = {p["account_id"]: p["team_id"] for p in parts}
+            my_team = acc_to_team.get(self.my_account_id)
+            squad_ids = [a for a, t in acc_to_team.items() if t == my_team] if my_team else []
+            kill_n = conn.execute(
+                "SELECT COUNT(*) FROM telemetry_events WHERE match_id = ? AND event_type = 'Kill'",
+                (mid,)).fetchone()[0]
+            knock_n = conn.execute(
+                "SELECT COUNT(*) FROM telemetry_events WHERE match_id = ? AND event_type = 'Knock'",
+                (mid,)).fetchone()[0]
+            squad_involved = 0
+            if squad_ids:
+                placeholders = ",".join("?" * len(squad_ids))
+                squad_involved = conn.execute(
+                    f"""SELECT COUNT(*) FROM telemetry_events
+                        WHERE match_id = ? AND event_type IN ('Kill','Knock')
+                          AND (actor_account IN ({placeholders})
+                               OR target_account IN ({placeholders}))""",
+                    (mid, *squad_ids, *squad_ids)).fetchone()[0]
+            try:
+                result = _detect_first_fight(conn, mid, self.my_account_id,
+                                              30 * 1000, 200 * 100)
+            except Exception as e:
+                result = {"error": str(e)}
+            out.append({
+                "matchId": mid,
+                "playedAt": m["played_at"],
+                "place": m["place"],
+                "durationSecs": m["duration_secs"],
+                "telemetryFetched": bool(m["telemetry_fetched"]),
+                "participantsCount": len(parts),
+                "myTeamId": my_team,
+                "squadSize": len(squad_ids),
+                "killEvents": kill_n,
+                "knockEvents": knock_n,
+                "squadInvolvedEvents": squad_involved,
+                "detectionResult": result,
+            })
+        return _ok({"matches": out})
 
     def _chickens_together(self, qs):
         min_wins = int(qs.get("minWins", 1))
