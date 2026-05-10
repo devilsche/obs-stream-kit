@@ -92,10 +92,10 @@
     <div id="tbl"><div class="muted">— wird geholt —</div></div>
     <div class="legend">
       <b>Verdict-Spalte:</b><br>
-      <span class="v-real">REAL FIGHT</span> = ≥2 Squad-Events im Cluster, oder 1-Event-Kill mit definitivem Outcome (Long-Range-Sniper-Win).<br>
-      <span class="v-fled">FLED</span> = 1 Knock-Event ohne Folge — Squad-Berührung mit Disengage. Im Live-Widget gelb, zählt aber als Team-Win wenn Squad überlebte.<br>
-      <span class="v-savedbyteam">TEAM SAVED</span> = du tot, mind. 1 Squad-Member überlebt<br>
-      <span class="v-died">BOTH DIED</span> = alle aus deinem Squad im Fight gefallen (auch 1-Shot-Sniper auf Squad-Member möglich)
+      <span class="v-real">REAL FIGHT</span> = mind. 1 Kill im Cluster, definitiver Outcome.<br>
+      <span class="v-fled">FLED</span> = Cluster ohne Kill (egal wie viele Damage/Knocks). Reines Stalemate/Disengage.<br>
+      <span class="v-savedbyteam">TEAM SAVED</span> = du gekillt, mind. 1 Squad-Member überlebt.<br>
+      <span class="v-died">BOTH DIED</span> = alle aus deinem Squad im Fight gefallen.
     </div>
   </div>
 
@@ -103,21 +103,19 @@
   <script>
     function classify(m) {
       const r = m.detectionResult;
-      // 'no fight at all' gibt es nicht — falls Backend None liefert
-      // (selten), als FLED behandeln.
+      // 'no fight at all' gibt es nicht — falls Backend None liefert,
+      // als FLED behandeln.
       if (!r || r.error) return { kind: "fled", label: "FLED (undet.)" };
-      // 1-Event-Knock = fled. 1-Event-Kill = definitiver Outcome.
-      if (r.events_count <= 1 && r.first_event_type !== "Kill")
-        return { kind: "fled", label: "FLED (knock only)" };
-      if (r.soloSurvived) return {
-        kind: "real",
-        label: r.events_count <= 1 ? "REAL (1-shot win)" : "REAL FIGHT (won)"
-      };
+      // Engaged = es gab mind. 1 Kill im Cluster. Sonst Stalemate.
+      if (!r.has_kill) {
+        const tag = r.events_count === 1
+          ? "FLED (single " + (r.first_event_type || "?").toLowerCase() + ")"
+          : "FLED (no kill)";
+        return { kind: "fled", label: tag };
+      }
+      if (r.soloSurvived) return { kind: "real", label: "REAL FIGHT (won)" };
       if (r.teamSurvived) return { kind: "savedbyteam", label: "TEAM SAVED" };
-      return {
-        kind: "died",
-        label: r.events_count <= 1 ? "BOTH DIED (1-shot)" : "BOTH DIED"
-      };
+      return { kind: "died", label: "BOTH DIED" };
     }
 
     function fmtEvent(ev) {

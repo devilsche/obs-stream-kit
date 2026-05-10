@@ -1448,18 +1448,13 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session",
             })
             continue
         total += 1
-        # 'engaged' = echter Fight mit definitivem Outcome:
-        #   - mind. 2 Squad-Events im Cluster (Schlagabtausch), ODER
-        #   - genau 1 Event UND es war ein Kill (Long-Range-Sniper-Kill
-        #     hatte ein eindeutiges Ergebnis: Win wenn Squad-Actor,
-        #     Loss wenn Squad-Target).
-        # Knock-Single-Events ohne Folge sind 'fled' - kein definitiver
-        # Outcome, jemand hat sich entzogen.
-        engaged = (
-            result["events_count"] >= 2
-            or (result["events_count"] == 1
-                and result.get("first_event_type") == "Kill")
-        )
+        # 'engaged' = im Cluster ist mindestens 1 Kill passiert
+        # (egal welche Seite). Damit gilt:
+        #   - Squad hat enemy gekillt -> Win
+        #   - Enemy hat Squad-Member gekillt -> Loss / team-saved
+        #   - Schiesserei mit Damage/Knocks aber niemand stirbt -> fled
+        #     (Stalemate / Disengage, kein definitiver Outcome)
+        engaged = bool(result.get("has_kill"))
         if engaged:
             engaged_total += 1
             teams_per_fight.append(result["teams_count"])
@@ -1618,6 +1613,9 @@ def _detect_first_fight(conn, match_id, my_account_id,
     # Solo: bin ICH (my_account_id) im Cluster als Kill-Victim?
     solo_survived = my_account_id not in squad_down_in_fight
     first_event = cluster[0]
+    # 'has_kill' = irgendein Kill im Cluster (egal welche Seite). Ohne
+    # Kill ist der Fight nicht entschieden -> Disengage/Stalemate.
+    has_kill = any(e["event_type"] == "Kill" for e in cluster)
     return {
         "won": won,
         "soloSurvived": solo_survived,
@@ -1625,8 +1623,9 @@ def _detect_first_fight(conn, match_id, my_account_id,
         "teams_count": len(teams),
         "fight_duration_s": fight_duration_s,
         "events_count": len(cluster),
+        "has_kill": has_kill,
         "squad_killed_in_fight": len(squad_down_in_fight),
-        "first_event_type": first_event["event_type"],     # 'Kill' oder 'Knock'
+        "first_event_type": first_event["event_type"],
         "first_actor_is_squad": first_event["actor_account"] in squad_ids,
         "first_target_is_squad": first_event["target_account"] in squad_ids,
     }
