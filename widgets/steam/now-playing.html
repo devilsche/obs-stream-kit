@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Steam Now Playing</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/widgets/pubg/_pubg.css">
+  <style>
+    /* Anker: bottom-left. Card mit Avatar + Name + Spiel + Playtime + Achievement-Progress.
+       Versteckt sich automatisch wenn kein Spiel laeuft. */
+    html, body { height: 100%; margin: 0; }
+    body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      box-sizing: border-box;
+    }
+    .panel {
+      width: 480px;
+      padding: 14px 18px;
+      display: flex;
+      gap: 14px;
+      align-items: center;
+    }
+    body.empty .panel { display: none; }
+    .avatar {
+      width: 64px; height: 64px; flex-shrink: 0;
+      border-radius: 6px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--pubg-border);
+      object-fit: cover;
+    }
+    .info { flex: 1; min-width: 0; }
+    .name {
+      color: var(--pubg-gold);
+      font-weight: 700;
+      font-size: 1.1em;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .verb {
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin: 1px 0 4px;
+    }
+    .game {
+      color: var(--pubg-text);
+      font-weight: 700;
+      font-size: 1em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .meta {
+      margin-top: 4px;
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 12px;
+    }
+    .meta b { color: var(--pubg-text); font-variant-numeric: tabular-nums; }
+    .ach-bar {
+      margin-top: 6px;
+      width: 100%; height: 4px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .ach-bar .fill {
+      height: 100%;
+      background: var(--pubg-gold);
+      transition: width 0.4s;
+    }
+  </style>
+</head>
+<body class="empty">
+  <div class="pubg-header" id="pubgHeader"></div>
+  <div class="pubg-card panel pubg-fade-in">
+    <img class="avatar" id="avatar" alt="">
+    <div class="info">
+      <div class="name" id="name">—</div>
+      <div class="verb">is now playing</div>
+      <div class="game" id="game">—</div>
+      <div class="meta" id="meta"></div>
+      <div class="ach-bar" id="achBar" style="display:none">
+        <div class="fill" id="achFill" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+  <script src="/widgets/pubg/_pubg.js"></script>
+  <script>
+    PubgUI.renderHeader(
+      document.getElementById("pubgHeader"), "Now Playing", "live");
+
+    function fmtHours(min) {
+      if (!min || min < 0) return null;
+      if (min < 60) return min + " min";
+      const h = Math.floor(min / 60);
+      if (h < 100) return h + "h " + (min % 60) + "m";
+      return h + " h";
+    }
+
+    function render(d) {
+      if (!d || !d.active) {
+        document.body.classList.add("empty");
+        return;
+      }
+      document.body.classList.remove("empty");
+      // Avatar
+      const av = document.getElementById("avatar");
+      if (d.avatar) {
+        av.src = d.avatar;
+        av.style.display = "";
+      } else {
+        av.style.display = "none";
+      }
+      document.getElementById("name").textContent = d.personaName || "—";
+      document.getElementById("game").textContent = d.gameName || ("App #" + d.appId);
+
+      // Meta-Zeile: Total-Playtime, 2-Wochen-Playtime
+      const parts = [];
+      const total = fmtHours(d.playtimeTotalMin);
+      if (total) parts.push(`<span><b>${total}</b> total</span>`);
+      const recent = fmtHours(d.playtime2WeeksMin);
+      if (recent) parts.push(`<span><b>${recent}</b> last 2w</span>`);
+      // Achievement-Count im Text (falls vorhanden)
+      if (d.achievementsTotal && d.achievementsTotal > 0) {
+        const got = d.achievementsUnlocked || 0;
+        parts.push(
+          `<span><b>${got}</b>/<b>${d.achievementsTotal}</b> achievements</span>`);
+      }
+      document.getElementById("meta").innerHTML = parts.join("");
+
+      // Achievement-Progress-Bar
+      const bar = document.getElementById("achBar");
+      const fill = document.getElementById("achFill");
+      if (d.achievementsTotal && d.achievementsTotal > 0) {
+        bar.style.display = "";
+        const pct = ((d.achievementsUnlocked || 0) / d.achievementsTotal) * 100;
+        fill.style.width = pct.toFixed(1) + "%";
+      } else {
+        bar.style.display = "none";
+      }
+    }
+
+    PubgUI.poll("/api/steam/now-playing", 10000, render, console.error);
+  </script>
+</body>
+</html>
