@@ -48,7 +48,22 @@ CREATE TABLE IF NOT EXISTS steam_owned_games (
   last_synced INTEGER NOT NULL,
   PRIMARY KEY (steam_id, app_id)
 );
+
+CREATE TABLE IF NOT EXISTS steam_app_details (
+  app_id INTEGER PRIMARY KEY,
+  header_image TEXT,
+  short_description TEXT,
+  is_coop INTEGER NOT NULL DEFAULT 0,        -- categories 9/36/38
+  is_multiplayer INTEGER NOT NULL DEFAULT 0, -- categories 1/27/36/38
+  category_ids TEXT,                          -- comma-list
+  genre_names TEXT,                           -- comma-list
+  cached_at INTEGER NOT NULL
+);
 """
+
+# Steam-Storefront-Category-IDs (siehe SteamDB)
+COOP_CATEGORY_IDS        = {9, 36, 38}        # Co-op / Online Co-op / Split-Screen
+MULTIPLAYER_CATEGORY_IDS = {1, 27, 36, 38}    # Multi-player / Cross-Platform-MP / ...
 
 
 def connect(path: str) -> sqlite3.Connection:
@@ -87,6 +102,98 @@ def get_owned_game(conn, steam_id: str, app_id: int):
         "SELECT * FROM steam_owned_games WHERE steam_id=? AND app_id=?",
         (steam_id, app_id),
     ).fetchone()
+
+
+def get_owned_games_filtered(conn, steam_id: str,
+                              filter_kind: str = "all",
+                              sort_by: str = "playtime",
+                              min_playtime_min: int = 0,
+                              limit: int = 100) -> list:
+    """Joins steam_owned_games + steam_app_details, filtert nach
+    Coop / Multiplayer / Alle, sortiert + limitiert.
+
+    filter_kind:  'all' | 'coop' | 'multiplayer'
+    sort_by:      'playtime' (forever DESC) | 'recent' (2weeks DESC) |
+                  'name' (alphabetisch)
+    """
+    where = ["og.steam_id = ?"]
+    params = [steam_id]
+    if filter_kind == "coop":
+        where.append("ad.is_coop = 1")
+    elif filter_kind == "multiplayer":
+        where.append("ad.is_multiplayer = 1")
+    if min_playtime_min > 0:
+        where.append("og.playtime_forever_min >= ?")
+        params.append(min_playtime_min)
+
+    order = {
+        "playtime": "og.playtime_forever_min DESC",
+        "recent":   "og.playtime_2weeks_min DESC, og.playtime_forever_min DESC",
+        "name":     "og.name COLLATE NOCASE ASC",
+    }.get(sort_by, "og.playtime_forever_min DESC")
+
+    sql = f"""
+        SELECT og.app_id, og.name, og.img_icon_url,
+               og.playtime_forever_min, og.playtime_2weeks_min,
+               ad.header_image, ad.short_description,
+               ad.is_coop, ad.is_multiplayer, ad.category_ids
+        FROM steam_owned_games og
+        LEFT JOIN steam_app_details ad ON ad.app_id = og.app_id
+        WHERE {' AND '.join(where)}
+        ORDER BY {order}
+        LIMIT ?
+    """
+    params.append(limit)
+    return conn.execute(sql, params).fetchall()
+
+
+# ── App Details (Storefront-Cache) ────────────────────────────────────────
+def upsert_app_details(conn, app_id: int,
+                       header_image: str = None,
+                       short_description: str = None,
+                       is_coop: bool = False,
+                       is_multiplayer: bool = False,
+                       category_ids: str = None,
+                       genre_names: str = None) -> None:
+    conn.execute("""
+        INSERT INTO steam_app_details
+          (app_id, header_image, short_description,
+           is_coop, is_multiplayer, category_ids, genre_names, cached_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))
+        ON CONFLICT(app_id) DO UPDATE SET
+          header_image=excluded.header_image,
+          short_description=excluded.short_description,
+          is_coop=excluded.is_coop,
+          is_multiplayer=excluded.is_multiplayer,
+          category_ids=excluded.category_ids,
+          genre_names=excluded.genre_names,
+          cached_at=excluded.cached_at
+    """, (app_id, header_image, short_description,
+          int(bool(is_coop)), int(bool(is_multiplayer)),
+          category_ids, genre_names))
+
+
+def get_app_details_row(conn, app_id: int):
+    return conn.execute(
+        "SELECT * FROM steam_app_details WHERE app_id=?", (app_id,)
+    ).fetchone()
+
+
+def find_app_needing_details_sync(conn, steam_id: str,
+                                    max_age_s: int) -> int:
+    """Liefert genau eine app_id die einen Storefront-Refresh braucht
+    (nie gefetched ODER aelter als max_age_s).
+    Sortiert nach playtime_forever DESC — meist gespielte zuerst."""
+    row = conn.execute("""
+        SELECT og.app_id
+        FROM steam_owned_games og
+        LEFT JOIN steam_app_details ad ON ad.app_id = og.app_id
+        WHERE og.steam_id = ?
+          AND (ad.cached_at IS NULL OR ad.cached_at < strftime('%s','now') - ?)
+        ORDER BY og.playtime_forever_min DESC, og.app_id ASC
+        LIMIT 1
+    """, (steam_id, max_age_s)).fetchone()
+    return row["app_id"] if row else None
 
 
 # ── App Schema ─────────────────────────────────────────────────────────────

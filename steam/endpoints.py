@@ -14,6 +14,7 @@ from steam.db import (
     get_owned_game, get_app_schema, get_progress,
     get_undisplayed_unlocks, mark_displayed, mark_all_displayed,
     insert_unlock_if_new, upsert_app_schema,
+    get_owned_games_filtered,
 )
 
 
@@ -53,6 +54,8 @@ class SteamEndpointRegistry:
             return self._now_playing(qs)
         if route == "/api/steam/recently-played":
             return self._recently_played()
+        if route == "/api/steam/owned-games":
+            return self._owned_games(qs)
         if route == "/api/steam/recent-unlocks":
             return self._recent_unlocks(qs)
         if route == "/api/steam/status":
@@ -124,6 +127,54 @@ class SteamEndpointRegistry:
         except SteamApiError as e:
             return _err(502, str(e))
         return _ok({"games": games})
+
+    def _owned_games(self, qs):
+        """Library aus DB-Cache (Poller-getrieben), gefiltert + sortiert.
+        Query-Params:
+          ?filter=all|coop|multiplayer   (Default: all)
+          ?sort=playtime|recent|name     (Default: playtime)
+          ?minPlaytime=N                 Mindestspielzeit in Min
+          ?limit=N                       Max Anzahl (Default 100)
+        """
+        filter_kind = qs.get("filter", "all")
+        sort_by     = qs.get("sort", "playtime")
+        try:
+            min_playtime = int(qs.get("minPlaytime", "0"))
+        except ValueError:
+            min_playtime = 0
+        try:
+            limit = int(qs.get("limit", "100"))
+        except ValueError:
+            limit = 100
+
+        conn = self.db_connect()
+        try:
+            rows = get_owned_games_filtered(
+                conn, self.client.steam_id,
+                filter_kind=filter_kind, sort_by=sort_by,
+                min_playtime_min=min_playtime, limit=limit)
+            games = []
+            for r in rows:
+                games.append({
+                    "appId":             r["app_id"],
+                    "name":              r["name"],
+                    "imgIconUrl":        r["img_icon_url"],
+                    "headerImage":       r["header_image"],
+                    "shortDescription":  r["short_description"],
+                    "playtimeTotalMin":  r["playtime_forever_min"],
+                    "playtime2WeeksMin": r["playtime_2weeks_min"],
+                    "isCoop":            bool(r["is_coop"]) if r["is_coop"] is not None else None,
+                    "isMultiplayer":     bool(r["is_multiplayer"]) if r["is_multiplayer"] is not None else None,
+                    "detailsCached":     r["header_image"] is not None,
+                })
+            return _ok({
+                "games": games,
+                "filter": filter_kind,
+                "sort": sort_by,
+                "count": len(games),
+            })
+        finally:
+            conn.close()
 
     # ── Recent Unlocks ──────────────────────────────────────────────────────
     def _recent_unlocks(self, qs):

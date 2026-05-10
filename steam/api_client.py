@@ -14,6 +14,7 @@ API Docs: https://steamcommunity.com/dev
 API Key holen: https://steamcommunity.com/dev/apikey
 """
 import json
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -88,3 +89,21 @@ class SteamClient:
             "/IPlayerService/GetOwnedGames/v0001/",
             steamid=self.steam_id, include_appinfo=1)
         return (data.get("response") or {}).get("games") or []
+
+    def get_app_details(self, app_id: int) -> dict:
+        """Storefront-API (NICHT Web-API): liefert Categories, Genres,
+        Header-Image fuer ein Spiel. Kein API-Key noetig.
+        Vorsicht: Rate-Limit ~200/IP/5min."""
+        url = (f"https://store.steampowered.com/api/appdetails"
+               f"?appids={app_id}&filters=categories,genres,basic")
+        req = urllib.request.Request(
+            url, headers={"User-Agent": "obs-stream-kit/1.0"})
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                data = json.loads(r.read().decode("utf-8"))
+        except Exception as e:
+            raise SteamApiError(f"Storefront appdetails {app_id}: {e}") from e
+        block = data.get(str(app_id)) or {}
+        if not block.get("success"):
+            return {}
+        return block.get("data") or {}

@@ -19,13 +19,17 @@ from steam.api_client import SteamApiError
 from steam.db import (
     insert_unlock_if_new, upsert_owned_games, upsert_app_schema,
     get_app_schema, upsert_progress,
+    find_app_needing_details_sync, upsert_app_details,
+    COOP_CATEGORY_IDS, MULTIPLAYER_CATEGORY_IDS,
 )
 
 
 LAYER1_INTERVAL_S = 10
 LAYER2_INTERVAL_S = 5
+LAYER3_INTERVAL_S = 12              # Storefront-Sync (1 app pro Tick)
 OWNED_GAMES_REFRESH_S = 3600        # 1× / Stunde
 SCHEMA_REFRESH_S = 7 * 86400        # 1× / Woche pro App
+APP_DETAILS_REFRESH_S = 30 * 86400  # 1× / 30 Tage pro App
 
 
 class SteamPoller(threading.Thread):
@@ -58,6 +62,7 @@ class SteamPoller(threading.Thread):
     def run(self):
         last_layer1 = 0.0
         last_layer2 = 0.0
+        last_layer3 = 0.0
         while not self._stop.is_set():
             now = time.monotonic()
             try:
@@ -68,6 +73,9 @@ class SteamPoller(threading.Thread):
                         and now - last_layer2 >= LAYER2_INTERVAL_S):
                     self._tick_layer2()
                     last_layer2 = now
+                if now - last_layer3 >= LAYER3_INTERVAL_S:
+                    self._tick_app_details_sync()
+                    last_layer3 = now
             except Exception as e:
                 with self._lock:
                     self._state["lastError"] = f"{type(e).__name__}: {e}"
@@ -152,6 +160,48 @@ class SteamPoller(threading.Thread):
             with self._lock:
                 self._state["lastLayer2At"] = int(time.time())
                 self._state["newUnlocksTotal"] += new_unlocks
+        finally:
+            conn.close()
+
+    # ── Layer 3: App-Details Storefront-Sync (rate-limited) ────────────────
+    def _tick_app_details_sync(self):
+        """Holt fuer ein einzelnes Game der Library die Storefront-Details
+        (Categories, Header-Image). Pro Tick max 1 Spiel — Rate-Limit-
+        sicher (~5 Calls/Min bei LAYER3_INTERVAL_S=12)."""
+        conn = self.db_connect()
+        try:
+            app_id = find_app_needing_details_sync(
+                conn, self.client.steam_id, APP_DETAILS_REFRESH_S)
+            if not app_id:
+                return  # Library komplett gecached
+        finally:
+            conn.close()
+
+        try:
+            data = self.client.get_app_details(app_id)
+        except SteamApiError as e:
+            with self._lock:
+                self._state["lastError"] = f"app-details {app_id}: {e}"
+            # Trotzdem markieren um keine Endlos-Retry-Schleife zu haben
+            data = {}
+
+        categories = data.get("categories") or []
+        category_ids = [c.get("id") for c in categories if c.get("id") is not None]
+        cat_set = set(category_ids)
+        genres = data.get("genres") or []
+        genre_names = [g.get("description") for g in genres if g.get("description")]
+
+        conn = self.db_connect()
+        try:
+            upsert_app_details(
+                conn, app_id,
+                header_image=data.get("header_image"),
+                short_description=data.get("short_description"),
+                is_coop=bool(cat_set & COOP_CATEGORY_IDS),
+                is_multiplayer=bool(cat_set & MULTIPLAYER_CATEGORY_IDS),
+                category_ids=",".join(str(c) for c in category_ids),
+                genre_names=",".join(genre_names),
+            )
         finally:
             conn.close()
 
