@@ -20,7 +20,8 @@
                 "fight_duration_s": 63.299,
                 "events_count": 8,
                 "squad_killed_in_fight": 0
-            }
+            },
+            "firstSquadEvent": null
         },
         {
             "matchId": "38968a6a-a6ad-4170-a3cd-de7cae52158d",
@@ -42,7 +43,8 @@
                 "fight_duration_s": 4.304,
                 "events_count": 2,
                 "squad_killed_in_fight": 0
-            }
+            },
+            "firstSquadEvent": null
         },
         {
             "matchId": "f34933c9-801b-43ff-bfb5-1776fec1767a",
@@ -64,7 +66,8 @@
                 "fight_duration_s": 53.412,
                 "events_count": 8,
                 "squad_killed_in_fight": 1
-            }
+            },
+            "firstSquadEvent": null
         },
         {
             "matchId": "5450727e-5b18-4e2b-a255-77ca7498be64",
@@ -86,7 +89,8 @@
                 "fight_duration_s": 81.53,
                 "events_count": 12,
                 "squad_killed_in_fight": 2
-            }
+            },
+            "firstSquadEvent": null
         },
         {
             "matchId": "0be05616-a5e1-436c-94d5-5f5d1dccecb3",
@@ -108,7 +112,8 @@
                 "fight_duration_s": 8.713,
                 "events_count": 2,
                 "squad_killed_in_fight": 0
-            }
+            },
+            "firstSquadEvent": null
         },
         {
             "matchId": "29b8cd74-2a6d-4717-8b56-4cc3c686030c",
@@ -130,7 +135,8 @@
                 "fight_duration_s": 28.474,
                 "events_count": 2,
                 "squad_killed_in_fight": 0
-            }
+            },
+            "firstSquadEvent": null
         },
         {
             "matchId": "924037df-451a-4001-acc6-379d4199a5ba",
@@ -152,7 +158,8 @@
                 "fight_duration_s": 48.392,
                 "events_count": 7,
                 "squad_killed_in_fight": 0
-            }
+            },
+            "firstSquadEvent": null
         },
         {
             "matchId": "d032c884-ef68-4bac-a79c-ecb9a0b9c886",
@@ -174,6 +181,13 @@
                 "fight_duration_s": 0.0,
                 "events_count": 1,
                 "squad_killed_in_fight": 0
+            },
+            "firstSquadEvent": {
+                "type": "Knock",
+                "actorIsSquad": true,
+                "targetIsSquad": false,
+                "actorIsMe": false,
+                "targetIsMe": false
             }
         },
         {
@@ -196,7 +210,8 @@
                 "fight_duration_s": 31.045,
                 "events_count": 5,
                 "squad_killed_in_fight": 0
-            }
+            },
+            "firstSquadEvent": null
         },
         {
             "matchId": "834bfafa-d933-48c7-9126-66b6bf414f14",
@@ -218,6 +233,13 @@
                 "fight_duration_s": 0.0,
                 "events_count": 1,
                 "squad_killed_in_fight": 0
+            },
+            "firstSquadEvent": {
+                "type": "Knock",
+                "actorIsSquad": false,
+                "targetIsSquad": true,
+                "actorIsMe": false,
+                "targetIsMe": true
             }
         },
         {
@@ -240,7 +262,8 @@
                 "fight_duration_s": 7.382,
                 "events_count": 3,
                 "squad_killed_in_fight": 2
-            }
+            },
+            "firstSquadEvent": null
         },
         {
             "matchId": "da5ec5fe-ec2f-47a9-84ab-25b7ea56f693",
@@ -262,7 +285,8 @@
                 "fight_duration_s": 78.011,
                 "events_count": 7,
                 "squad_killed_in_fight": 2
-            }
+            },
+            "firstSquadEvent": null
         },
         {
             "matchId": "d422da62-6ed9-4088-8c91-409566e343a4",
@@ -284,7 +308,8 @@
                 "fight_duration_s": 18.361,
                 "events_count": 3,
                 "squad_killed_in_fight": 2
-            }
+            },
+            "firstSquadEvent": null
         },
         {
             "matchId": "937d44df-1063-4d3c-99e0-1563c1a8b22a",
@@ -306,6 +331,13 @@
                 "fight_duration_s": 0.0,
                 "events_count": 1,
                 "squad_killed_in_fight": 0
+            },
+            "firstSquadEvent": {
+                "type": "Knock",
+                "actorIsSquad": true,
+                "targetIsSquad": false,
+                "actorIsMe": false,
+                "targetIsMe": false
             }
         },
         {
@@ -328,6 +360,13 @@
                 "fight_duration_s": 0.0,
                 "events_count": 1,
                 "squad_killed_in_fight": 0
+            },
+            "firstSquadEvent": {
+                "type": "Knock",
+                "actorIsSquad": true,
+                "targetIsSquad": false,
+                "actorIsMe": false,
+                "targetIsMe": false
             }
         },
         {
@@ -350,7 +389,8 @@
                 "fight_duration_s": 2.822,
                 "events_count": 2,
                 "squad_killed_in_fight": 0
-            }
+            },
+            "firstSquadEvent": null
         },
         {
             "matchId": "5add9e4e-681e-4047-9c92-38977881e87e",
@@ -372,7 +412,8 @@
                 "fight_duration_s": 32.166,
                 "events_count": 5,
                 "squad_killed_in_fight": 1
-            }
+            },
+            "firstSquadEvent": null
         },
         {
             "matchId": "383f73bc-c393-4dce-812b-a928ef703c93",
@@ -394,7 +435,8 @@
                 "fight_duration_s": 175.381,
                 "events_count": 42,
                 "squad_killed_in_fight": 4
-            }
+            },
+            "firstSquadEvent": null
         }
     ]
 }
