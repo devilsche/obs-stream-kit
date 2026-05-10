@@ -1364,8 +1364,13 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
                         teams_in_radius.add(t)
                     break  # in Radius, weitere Squad-Pos nicht prüfen
 
+    # Hot-Drop = raeumlich (Teams im Radius beim Landing) ODER zeitlich
+    # (Schusswechsel mit Squad in window_secs). Vorher nur zeitlich -
+    # dadurch wurden 'Stadt-Drops mit Lauer-Phase >2min' faelschlich
+    # als 'cold' gewertet.
+    is_hot_drop = bool(teams_in_radius) or hot_drop
     return {
-        "hotDrop":         hot_drop,
+        "hotDrop":         is_hot_drop,
         "soloSurvived":    my_surv >= survival_threshold_s,
         "teamSurvived":    squad_surv >= survival_threshold_s,
         "teamsInFight":    len(teams_in_fight),
