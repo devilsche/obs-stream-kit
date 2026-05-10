@@ -155,15 +155,36 @@ except Exception as e:
 # ── Steam-Backend-Bootstrap ────────────────────────────────────────────────────
 STEAM_ENABLED = False
 steam_registry = None
+steam_poller = None
 try:
     from steam.api_client import SteamClient
+    from steam.db import connect as _steam_connect, init_schema as _steam_init_schema
     from steam.endpoints import SteamEndpointRegistry
+    from steam.poller import SteamPoller
 
     if secrets.get("steam_api_key") and secrets.get("steam_id"):
         steam_client = SteamClient(
             api_key=secrets["steam_api_key"],
             steam_id=secrets["steam_id"])
-        steam_registry = SteamEndpointRegistry(steam_client)
+        os.makedirs(os.path.join(ROOT, "data"), exist_ok=True)
+        steam_db_path = os.path.join(ROOT, "data", "steam-history.db")
+
+        def _steam_db_connect():
+            c = _steam_connect(steam_db_path)
+            return c
+
+        # Schema einmalig initialisieren
+        _conn = _steam_db_connect()
+        _steam_init_schema(_conn)
+        _conn.close()
+
+        steam_poller = SteamPoller(steam_client, _steam_db_connect)
+        steam_poller.start()
+
+        steam_registry = SteamEndpointRegistry(
+            client=steam_client,
+            db_connect_fn=_steam_db_connect,
+            poller=steam_poller)
         STEAM_ENABLED = True
         print("  Steam backend active  ✓")
     else:
