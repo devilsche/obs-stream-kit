@@ -68,7 +68,7 @@
     </div>
     <div class="grid">
       <div class="cell"><span class="pubg-stat-value" id="m">—</span><span class="pubg-stat-label">Matches</span></div>
-      <div class="cell"><span class="pubg-stat-value" id="wins">—</span><span class="pubg-stat-label">Wins Together</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="dmg">—</span><span class="pubg-stat-label">Avg DMG</span></div>
       <div class="cell"><span class="pubg-stat-value" id="avgplace">—</span><span class="pubg-stat-label">Avg Place</span></div>
       <div class="cell"><span class="pubg-stat-value" id="kd-mate">—</span><span class="pubg-stat-label">K/D</span></div>
     </div>
@@ -109,11 +109,11 @@
       document.getElementById("name").textContent = name;
       const cl = careerLifetime || {};
       document.getElementById("m").textContent = PubgUI.fmtNum(cl.rounds_played || 0);
-      document.getElementById("wins").textContent = PubgUI.fmtNum(cl.wins || 0);
+      document.getElementById("dmg").textContent = PubgUI.fmtNum(Math.round(cl.avg_damage || 0));
       document.getElementById("avgplace").textContent = PubgUI.fmtPct(cl.win_rate);
       document.getElementById("kd-mate").textContent = PubgUI.fmtKD(cl.kd_ratio);
       document.querySelectorAll(".cell .pubg-stat-label").forEach((el, i) => {
-        const labels = ["Career Matches", "Career Wins", "Win-Rate", "Career K/D"];
+        const labels = ["Career Matches", "Avg DMG", "Win-Rate", "Career K/D"];
         if (labels[i]) el.textContent = labels[i];
       });
       document.getElementById("chickens").innerHTML = "";
@@ -163,7 +163,8 @@
           const sh = d.sharedHistory || {};
           const wins = sh.wins || 0;
           document.getElementById("m").textContent = PubgUI.fmtNum(sh.matches);
-          document.getElementById("wins").textContent = PubgUI.fmtNum(wins);
+          document.getElementById("dmg").textContent =
+            PubgUI.fmtNum(Math.round(sh.mateAvgDmg || 0));
           document.getElementById("avgplace").textContent =
             sh.avgPlace ? "#" + sh.avgPlace.toFixed(1) : "—";
           document.getElementById("kd-mate").textContent = PubgUI.fmtKD(sh.mateKd);
