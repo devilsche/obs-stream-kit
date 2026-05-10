@@ -1,7 +1,45 @@
 import datetime
 import json
+import subprocess
+import sys
+import time
 from urllib.parse import urlparse, parse_qs
 from pubg.db import set_setting, get_setting
+
+# ── Process-List-Check fuer PUBG (cross-platform) ─────────────────────────────
+# PUBG-Prozessname: 'TslGame.exe' (Windows) bzw. 'TslGame' (Linux/Mac via
+# Proton/Wine). Wird gecacht, damit ein hochfrequenter Endpoint-Aufruf
+# nicht jedes Mal subprocess startet.
+_PUBG_PROCESS_NAME = "TslGame"
+_proc_cache = {"running": False, "ts": 0.0}
+_PROC_CACHE_TTL_S = 5.0
+
+
+def _is_pubg_running():
+    """True wenn TslGame-Prozess laeuft. 5s-Cache (subprocess-call ~50-100ms,
+    Cache vermeidet Last bei sekuendlichem Polling von Streamer.bot)."""
+    now = time.monotonic()
+    if now - _proc_cache["ts"] < _PROC_CACHE_TTL_S:
+        return _proc_cache["running"]
+    running = False
+    try:
+        if sys.platform.startswith("win"):
+            out = subprocess.check_output(
+                ["tasklist", "/FI", f"IMAGENAME eq {_PUBG_PROCESS_NAME}.exe"],
+                text=True, errors="ignore", timeout=3,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            running = _PUBG_PROCESS_NAME.lower() in out.lower()
+        else:
+            r = subprocess.run(
+                ["pgrep", "-f", _PUBG_PROCESS_NAME],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                timeout=3)
+            running = (r.returncode == 0)
+    except Exception:
+        running = False
+    _proc_cache["running"] = running
+    _proc_cache["ts"] = now
+    return running
 from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_top_mates, compute_co_player,
                                 compute_mates, compute_map_distribution,
@@ -114,23 +152,32 @@ class EndpointRegistry:
     def _active(self, qs):
         """Liefert {active: bool, ...} fuer Streamer.bot/IFTTT-style
         If-Then-Else.
-        active=true wenn letzter Match juenger als thresholdMin
-        (Default 30) zurueckliegt - heisst: PUBG wird grad gespielt.
+
+        Detection (jede Bedingung allein reicht fuer active=true):
+          - processRunning: TslGame.exe laeuft GRAD (instant, lokal)
+          - matchRecent:    letzter Match juenger als thresholdMin
+                            (Default 30) - faengt 'grad nach Match-Ende
+                            mit OBS-Stats-Anzeige' ab
 
         Override per Query:
           ?thresholdMin=15  -> 15 Minuten Schwelle
           ?thresholdSec=300 -> 5 Minuten Schwelle (in Sekunden)
+          ?noProcess=1      -> Process-Check ueberspringen (nur Match-Age)
         """
         threshold_min = float(qs.get("thresholdMin", 30))
         if "thresholdSec" in qs:
             threshold_min = float(qs["thresholdSec"]) / 60.0
+        skip_process = qs.get("noProcess") == "1"
+
+        process_running = False if skip_process else _is_pubg_running()
+
         conn = self.get_conn()
         row = conn.execute(
             "SELECT MAX(played_at) AS last FROM matches"
         ).fetchone()
         last_iso = row["last"] if row else None
         age_min = None
-        active = False
+        match_recent = False
         if last_iso:
             try:
                 last_dt = datetime.datetime.fromisoformat(
@@ -138,11 +185,14 @@ class EndpointRegistry:
                 now = datetime.datetime.now(datetime.timezone.utc)
                 age_min = round(
                     (now - last_dt).total_seconds() / 60.0, 1)
-                active = age_min < threshold_min
+                match_recent = age_min < threshold_min
             except Exception:
                 pass
+        active = process_running or match_recent
         return _ok({
             "active": active,
+            "processRunning": process_running,
+            "matchRecent": match_recent,
             "lastMatchAt": last_iso,
             "lastMatchAgeMin": age_min,
             "thresholdMin": threshold_min,
