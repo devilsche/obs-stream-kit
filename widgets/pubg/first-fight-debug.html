@@ -92,10 +92,10 @@
     <div id="tbl"><div class="muted">— wird geholt —</div></div>
     <div class="legend">
       <b>Verdict-Spalte:</b><br>
-      <span class="v-real">REAL FIGHT</span> = ≥2 Squad-beteiligte Events im Cluster (echter Schlagabtausch)<br>
-      <span class="v-fled">FLED</span> = nur 1 Event, dann Stille — Squad-Berührung mit Disengage. Zählt im Live-Widget als Win, weil Squad ja überlebte.<br>
+      <span class="v-real">REAL FIGHT</span> = ≥2 Squad-Events im Cluster, oder 1-Event-Kill mit definitivem Outcome (Long-Range-Sniper-Win).<br>
+      <span class="v-fled">FLED</span> = 1 Knock-Event ohne Folge — Squad-Berührung mit Disengage. Im Live-Widget gelb, zählt aber als Team-Win wenn Squad überlebte.<br>
       <span class="v-savedbyteam">TEAM SAVED</span> = du tot, mind. 1 Squad-Member überlebt<br>
-      <span class="v-died">BOTH DIED</span> = alle aus deinem Squad im Fight gefallen
+      <span class="v-died">BOTH DIED</span> = alle aus deinem Squad im Fight gefallen (auch 1-Shot-Sniper auf Squad-Member möglich)
     </div>
   </div>
 
@@ -106,10 +106,18 @@
       // 'no fight at all' gibt es nicht — falls Backend None liefert
       // (selten), als FLED behandeln.
       if (!r || r.error) return { kind: "fled", label: "FLED (undet.)" };
-      if (r.events_count <= 1) return { kind: "fled", label: "FLED" };
-      if (r.soloSurvived) return { kind: "real", label: "REAL FIGHT (won)" };
+      // 1-Event-Knock = fled. 1-Event-Kill = definitiver Outcome.
+      if (r.events_count <= 1 && r.first_event_type !== "Kill")
+        return { kind: "fled", label: "FLED (knock only)" };
+      if (r.soloSurvived) return {
+        kind: "real",
+        label: r.events_count <= 1 ? "REAL (1-shot win)" : "REAL FIGHT (won)"
+      };
       if (r.teamSurvived) return { kind: "savedbyteam", label: "TEAM SAVED" };
-      return { kind: "died", label: "BOTH DIED" };
+      return {
+        kind: "died",
+        label: r.events_count <= 1 ? "BOTH DIED (1-shot)" : "BOTH DIED"
+      };
     }
 
     function fmtEvent(ev) {

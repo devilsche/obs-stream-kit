@@ -1448,9 +1448,18 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session",
             })
             continue
         total += 1
-        # 'engaged' = echter Fight (mind. 2 Squad-Events im Cluster).
-        # Single-Event-Cluster sind Disengage/Flucht.
-        engaged = result["events_count"] >= 2
+        # 'engaged' = echter Fight mit definitivem Outcome:
+        #   - mind. 2 Squad-Events im Cluster (Schlagabtausch), ODER
+        #   - genau 1 Event UND es war ein Kill (Long-Range-Sniper-Kill
+        #     hatte ein eindeutiges Ergebnis: Win wenn Squad-Actor,
+        #     Loss wenn Squad-Target).
+        # Knock-Single-Events ohne Folge sind 'fled' - kein definitiver
+        # Outcome, jemand hat sich entzogen.
+        engaged = (
+            result["events_count"] >= 2
+            or (result["events_count"] == 1
+                and result.get("first_event_type") == "Kill")
+        )
         if engaged:
             engaged_total += 1
             teams_per_fight.append(result["teams_count"])
@@ -1604,7 +1613,7 @@ def _detect_first_fight(conn, match_id, my_account_id,
     won = bool(squad_alive_after)
     # Solo: bin ICH (my_account_id) im Cluster als Kill-Victim?
     solo_survived = my_account_id not in squad_down_in_fight
-
+    first_event = cluster[0]
     return {
         "won": won,
         "soloSurvived": solo_survived,
@@ -1613,6 +1622,9 @@ def _detect_first_fight(conn, match_id, my_account_id,
         "fight_duration_s": fight_duration_s,
         "events_count": len(cluster),
         "squad_killed_in_fight": len(squad_down_in_fight),
+        "first_event_type": first_event["event_type"],     # 'Kill' oder 'Knock'
+        "first_actor_is_squad": first_event["actor_account"] in squad_ids,
+        "first_target_is_squad": first_event["target_account"] in squad_ids,
     }
 
 
