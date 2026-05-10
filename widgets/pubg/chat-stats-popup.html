@@ -68,8 +68,8 @@
     </div>
     <div class="grid">
       <div class="cell"><span class="pubg-stat-value" id="m">—</span><span class="pubg-stat-label">Matches</span></div>
-      <div class="cell"><span class="pubg-stat-value" id="dmg">—</span><span class="pubg-stat-label">Avg Damage</span></div>
-      <div class="cell"><span class="pubg-stat-value" id="avgplace">—</span><span class="pubg-stat-label">Avg Place</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="dmg">—</span><span class="pubg-stat-label">Ø Damage</span></div>
+      <div class="cell"><span class="pubg-stat-value" id="avgplace">—</span><span class="pubg-stat-label">Ø Place</span></div>
       <div class="cell"><span class="pubg-stat-value" id="kd-mate">—</span><span class="pubg-stat-label">K/D</span></div>
     </div>
     <div class="career" id="my-line">—</div>
@@ -113,7 +113,7 @@
       document.getElementById("avgplace").textContent = PubgUI.fmtPct(cl.win_rate);
       document.getElementById("kd-mate").textContent = PubgUI.fmtKD(cl.kd_ratio);
       document.querySelectorAll(".cell .pubg-stat-label").forEach((el, i) => {
-        const labels = ["Career Matches", "Avg Damage", "Win-Rate", "Career K/D"];
+        const labels = ["Career Matches", "Ø Damage", "Win-Rate", "Career K/D"];
         if (labels[i]) el.textContent = labels[i];
       });
       document.getElementById("chickens").innerHTML = "";

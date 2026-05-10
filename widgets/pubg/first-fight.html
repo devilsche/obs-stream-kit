@@ -62,10 +62,30 @@
     }
     .spark span {
       width: 12px; height: 18px; border-radius: 2px;
-      background: rgba(255,255,255,0.1);
+      background: var(--pubg-muted); opacity: 0.45;
     }
-    .spark span.s { background: var(--pubg-gold); }
-    .spark span.d { background: rgba(229, 123, 123, 0.6); }
+    /* Vier Faelle (gleich wie hot-drop): grau cold, orange Solo alive,
+       lila Solo tot/Team alive, rot beide tot. */
+    .spark span.s          { background: #ff7a1f; opacity: 1; }
+    .spark span.team-saved { background: #a974d4; opacity: 1; }
+    .spark span.d          { background: #e57b7b; opacity: 0.7; }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 10px;
+      margin-top: 6px;
+      font-size: 0.7em;
+      color: var(--pubg-muted);
+      letter-spacing: 0.04em;
+    }
+    .legend .item { display: inline-flex; align-items: center; gap: 4px; }
+    .legend .swatch {
+      width: 8px; height: 8px; border-radius: 2px;
+      background: var(--pubg-muted); opacity: 0.45;
+    }
+    .legend .swatch.s          { background: #ff7a1f; opacity: 1; }
+    .legend .swatch.team-saved { background: #a974d4; opacity: 1; }
+    .legend .swatch.d          { background: #e57b7b; opacity: 0.7; }
   </style>
 </head>
 <body>
@@ -79,6 +99,12 @@
       <div class="pct" id="pct">—</div>
     </div>
     <div class="spark" id="spark"></div>
+    <div class="legend">
+      <span class="item"><span class="swatch s"></span>You alive</span>
+      <span class="item"><span class="swatch team-saved"></span>You died · team alive</span>
+      <span class="item"><span class="swatch d"></span>Both died</span>
+      <span class="item"><span class="swatch"></span>No fight</span>
+    </div>
   </div>
   <script src="_pubg.js"></script>
   <script>
@@ -99,8 +125,12 @@
                  "= 'silent drop, loot, then fight' scenarios." },
     ]);
     function render(d) {
-      document.getElementById("pct").textContent = (d.rate||0).toFixed(0) + "%";
-      const subParts = [`<b>${d.survived||0}</b> / <b>${d.total||0}</b> survived`];
+      // Hauptzahl = Solo-Survival-Rate (du selbst). Team-Rate steht
+      // klein dahinter in der sub-Zeile.
+      document.getElementById("pct").textContent = (d.soloSurvivalRate ?? d.rate ?? 0).toFixed(0) + "%";
+      const solo = `<b>${d.soloSurvived ?? d.survived ?? 0}</b>/<b>${d.total||0}</b> solo`;
+      const team = `<b>${d.teamSurvived ?? 0}</b>/<b>${d.total||0}</b> team`;
+      const subParts = [`${solo} · ${team}`];
       if (d.excludedHotDrop) {
         subParts.push(`<span style="opacity:0.6">(${d.excludedHotDrop} hot drops excluded)</span>`);
       }
@@ -111,9 +141,20 @@
       } else {
         teams.textContent = "";
       }
+      // Markers: perMatch (4-State) bevorzugen, Fallback auf alte
+      // sparkline (boolean) wenn Backend noch nicht aktualisiert ist.
       const spark = document.getElementById("spark");
-      spark.innerHTML = (d.sparkline||[]).map(v =>
-        `<span class="${v ? 's' : 'd'}"></span>`).join("");
+      if (d.perMatch && d.perMatch.length) {
+        spark.innerHTML = d.perMatch.map(m => {
+          if (!m.hadFight) return `<span title="no fight"></span>`;
+          if (m.soloSurvived) return `<span class="s" title="you survived"></span>`;
+          if (m.teamSurvived) return `<span class="team-saved" title="you died — team survived"></span>`;
+          return `<span class="d" title="both died"></span>`;
+        }).join("");
+      } else {
+        spark.innerHTML = (d.sparkline||[]).map(v =>
+          `<span class="${v ? 's' : 'd'}"></span>`).join("");
+      }
     }
     const ehParam = EXCLUDE_HOT ? "&excludeHotDrop=1" : "";
     PubgUI.poll(`/api/pubg/first-fight-rate?range=${RANGE}${ehParam}`,
