@@ -52,6 +52,23 @@
     .markers .m.hot   { background: #ff7a1f; opacity: 1; }
     .markers .m.died  { background: #e57b7b; opacity: 0.7; }
     .meta { color: var(--pubg-muted); font-size: 0.78em; margin-top: 8px; }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 10px;
+      margin-top: 6px;
+      font-size: 0.7em;
+      color: var(--pubg-muted);
+      letter-spacing: 0.04em;
+    }
+    .legend .item { display: inline-flex; align-items: center; gap: 4px; }
+    .legend .swatch {
+      width: 8px; height: 8px; border-radius: 2px;
+      background: var(--pubg-muted); opacity: 0.45;
+    }
+    .legend .swatch.hot  { background: #ff7a1f; opacity: 1; }
+    .legend .swatch.died { background: #e57b7b; opacity: 0.7; }
+    .legend .hint { opacity: 0.7; font-style: italic; }
   </style>
 </head>
 <body>
@@ -83,6 +100,12 @@
     </div>
     <div class="markers" id="markers"></div>
     <div class="meta" id="meta">—</div>
+    <div class="legend">
+      <span class="item"><span class="swatch hot"></span>Hot · survived</span>
+      <span class="item"><span class="swatch died"></span>Hot · died</span>
+      <span class="item"><span class="swatch"></span>Cold</span>
+      <span class="hint">— solo survival</span>
+    </div>
   </div>
   <script src="_pubg.js"></script>
   <script>
