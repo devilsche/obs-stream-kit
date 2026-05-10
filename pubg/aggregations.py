@@ -1525,13 +1525,17 @@ def _detect_first_fight(conn, match_id, my_account_id,
         return None
     squad_ids = {a for a, t in acc_to_team.items() if t == my_team_id}
 
-    # Alle Kill/Knock-Events des Matches, sortiert nach Zeit.
-    # Wir brauchen Position für räumliche Nähe.
+    # Alle Combat-Events des Matches, sortiert nach Zeit. Damage zaehlt
+    # auch als Engagement (Long-Range-Schiesserei ohne Knock ist genau
+    # so 'erster Squad-Combat' wie ein Knock). actor_account muss != NULL
+    # sein - filtert Storm/Vehicle/Fall-Damage raus, die haben keinen
+    # Attacker.
     events = conn.execute("""
         SELECT event_type, actor_account, target_account, timestamp_ms,
                actor_x, actor_y, victim_x, victim_y
         FROM telemetry_events
-        WHERE match_id = ? AND event_type IN ('Kill', 'Knock')
+        WHERE match_id = ? AND event_type IN ('Kill', 'Knock', 'TakeDamage')
+          AND actor_account IS NOT NULL
         ORDER BY timestamp_ms ASC
     """, (match_id,)).fetchall()
     if not events:
