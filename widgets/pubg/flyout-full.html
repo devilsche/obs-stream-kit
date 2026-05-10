@@ -195,9 +195,15 @@
     }
 
     function renderFF(f) {
+      // Team-Sicht (Refactor 2026-05-10): rate/survived/total = Squad-
+      // ueberlebt-Werte. 'fledTotal' = Disengage-Cluster (zaehlen als
+      // Win, weil Squad ueberlebte) — Hinweis im Sub-Text.
       document.getElementById("ff").textContent = (f.rate||0).toFixed(0) + "%";
+      const fledPart = (f.fledTotal||0)
+        ? ` <span style="opacity:0.6">(${f.fledTotal} fled)</span>`
+        : "";
       document.getElementById("ffsub").innerHTML =
-        `<b>${f.survived||0}</b> / <b>${f.total||0}</b> survived`;
+        `Won <b>${f.survived||0}</b> of <b>${f.total||0}</b>${fledPart}`;
     }
 
     const HOT = {
