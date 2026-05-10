@@ -3,12 +3,18 @@
         {
             "matchId": "b59b8de9-505c-4718-854a-4e9001deba1f",
             "playedAt": "2026-05-09T23:37:17Z",
+            "map": "Tiger_Main",
             "place": 3,
             "durationSecs": 1540,
             "telemetryFetched": true,
             "participantsCount": 4,
             "myTeamId": 6,
             "squadSize": 4,
+            "myLandingPos": {
+                "x": 297777.1,
+                "y": 439511.6
+            },
+            "firstFightStartSecs": 197.8,
             "killEvents": 98,
             "knockEvents": 103,
             "squadInvolvedEvents": 40,
@@ -32,72 +38,78 @@
                     "killer": "account.1b9936da2f9e42af95b70604173f6c98",
                     "killerIsSelf": false,
                     "weapon": "WeapM24_C",
-                    "shotDistanceM": 38751.28125,
+                    "shotDistanceM": 387.5,
                     "killerLandingDistM": 615.4,
                     "deathToSquadLandingM": 7.6,
-                    "tsMs": 1778370569680
+                    "tSinceLandingSecs": 664.8
                 },
                 {
                     "victim": "hacker_luke",
                     "killer": "account.4bcd80b8b33d481690686a977bd0ebfc",
                     "killerIsSelf": false,
                     "weapon": "WeapBerylM762_C",
-                    "shotDistanceM": 3104.50341796875,
+                    "shotDistanceM": 31.0,
                     "killerLandingDistM": 3049.5,
                     "deathToSquadLandingM": 704.6,
-                    "tsMs": 1778370692765
+                    "tSinceLandingSecs": 787.9
                 },
                 {
                     "victim": "PEX_LuCKoR",
                     "killer": "account.fefbd0404e26456a87a3603937f9cff3",
                     "killerIsSelf": false,
                     "weapon": "WeapM24_C",
-                    "shotDistanceM": 30673.70703125,
+                    "shotDistanceM": 306.7,
                     "killerLandingDistM": 568.2,
                     "deathToSquadLandingM": 2948.9,
-                    "tsMs": 1778371078608
+                    "tSinceLandingSecs": 1173.7
                 },
                 {
                     "victim": "ramiswdg123",
                     "killer": "account.1f2a327d1480478593c0d30293f3e284",
                     "killerIsSelf": false,
                     "weapon": "WeapP90_C",
-                    "shotDistanceM": 1221.8564453125,
+                    "shotDistanceM": 12.2,
                     "killerLandingDistM": 3656.9,
                     "deathToSquadLandingM": 754.0,
-                    "tsMs": 1778371091270
+                    "tSinceLandingSecs": 1186.4
                 },
                 {
                     "victim": "Nipplz",
                     "killer": "account.108729ae4a0c48f1ae9418f3f601c4dc",
                     "killerIsSelf": false,
                     "weapon": "WeapBerylM762_C",
-                    "shotDistanceM": 1245.3765869140625,
+                    "shotDistanceM": 12.5,
                     "killerLandingDistM": 703.0,
                     "deathToSquadLandingM": 2910.8,
-                    "tsMs": 1778371291800
+                    "tSinceLandingSecs": 1386.9
                 },
                 {
                     "victim": "hacker_luke",
                     "killer": "account.108729ae4a0c48f1ae9418f3f601c4dc",
                     "killerIsSelf": false,
                     "weapon": "WeapBerylM762_C",
-                    "shotDistanceM": 3144.193115234375,
+                    "shotDistanceM": 31.4,
                     "killerLandingDistM": 3222.7,
                     "deathToSquadLandingM": 181.0,
-                    "tsMs": 1778371291803
+                    "tSinceLandingSecs": 1386.9
                 }
             ]
         },
         {
             "matchId": "38968a6a-a6ad-4170-a3cd-de7cae52158d",
             "playedAt": "2026-05-09T23:27:59Z",
+            "map": "DihorOtok_Main",
             "place": 16,
             "durationSecs": 1510,
             "telemetryFetched": true,
             "participantsCount": 4,
             "myTeamId": 5,
             "squadSize": 4,
+            "myLandingPos": {
+                "x": 346297.2,
+                "y": 293939.1
+            },
+            "firstFightStartSecs": 100.5,
             "killEvents": 92,
             "knockEvents": 92,
             "squadInvolvedEvents": 11,
@@ -121,52 +133,58 @@
                     "killer": "account.f025d2f270dd41c9a0a15ebc52d03e43",
                     "killerIsSelf": false,
                     "weapon": "WeapAUG_C",
-                    "shotDistanceM": 2291.689453125,
+                    "shotDistanceM": 22.9,
                     "killerLandingDistM": 231.4,
                     "deathToSquadLandingM": 74.2,
-                    "tsMs": 1778369601096
+                    "tSinceLandingSecs": 241.6
                 },
                 {
                     "victim": "hacker_luke",
                     "killer": "account.f025d2f270dd41c9a0a15ebc52d03e43",
                     "killerIsSelf": false,
                     "weapon": "WeapSaiga12_C",
-                    "shotDistanceM": 368.81231689453125,
+                    "shotDistanceM": 3.7,
                     "killerLandingDistM": 226.6,
                     "deathToSquadLandingM": 47.2,
-                    "tsMs": 1778369646389
+                    "tSinceLandingSecs": 286.9
                 },
                 {
                     "victim": "Nipplz",
                     "killer": "account.f025d2f270dd41c9a0a15ebc52d03e43",
                     "killerIsSelf": false,
                     "weapon": "WeapAUG_C",
-                    "shotDistanceM": 2019.3475341796875,
+                    "shotDistanceM": 20.2,
                     "killerLandingDistM": 309.1,
                     "deathToSquadLandingM": 98.8,
-                    "tsMs": 1778369654201
+                    "tSinceLandingSecs": 294.7
                 },
                 {
                     "victim": "PEX_LuCKoR",
                     "killer": "account.f025d2f270dd41c9a0a15ebc52d03e43",
                     "killerIsSelf": false,
                     "weapon": "WeapAUG_C",
-                    "shotDistanceM": 2023.4971923828125,
+                    "shotDistanceM": 20.2,
                     "killerLandingDistM": 250.8,
                     "deathToSquadLandingM": 51.0,
-                    "tsMs": 1778369654205
+                    "tSinceLandingSecs": 294.7
                 }
             ]
         },
         {
             "matchId": "f34933c9-801b-43ff-bfb5-1776fec1767a",
             "playedAt": "2026-05-09T23:14:28Z",
+            "map": "Baltic_Main",
             "place": 13,
             "durationSecs": 1587,
             "telemetryFetched": true,
             "participantsCount": 4,
             "myTeamId": 27,
             "squadSize": 4,
+            "myLandingPos": {
+                "x": 360771.8,
+                "y": 395804.2
+            },
+            "firstFightStartSecs": 72.3,
             "killEvents": 94,
             "knockEvents": 101,
             "squadInvolvedEvents": 24,
@@ -190,52 +208,58 @@
                     "killer": "account.2bc9bc8d0cee4dc6a145e40e1203b284",
                     "killerIsSelf": false,
                     "weapon": "WeapAK47_C",
-                    "shotDistanceM": 601.6858520507812,
+                    "shotDistanceM": 6.0,
                     "killerLandingDistM": 36.5,
                     "deathToSquadLandingM": 29.6,
-                    "tsMs": 1778368655188
+                    "tSinceLandingSecs": 113.8
                 },
                 {
                     "victim": "ramiswdg123",
                     "killer": "account.2bc9bc8d0cee4dc6a145e40e1203b284",
                     "killerIsSelf": false,
                     "weapon": "WeapAK47_C",
-                    "shotDistanceM": 2176.2451171875,
+                    "shotDistanceM": 21.8,
                     "killerLandingDistM": 109.0,
                     "deathToSquadLandingM": 86.5,
-                    "tsMs": 1778368790870
+                    "tSinceLandingSecs": 249.5
                 },
                 {
                     "victim": "PEX_LuCKoR",
                     "killer": "account.8ab7a1ab6fe241cc9ade45d1b775a1da",
                     "killerIsSelf": false,
                     "weapon": "WeapAUG_C",
-                    "shotDistanceM": 5327.9296875,
+                    "shotDistanceM": 53.3,
                     "killerLandingDistM": 89.3,
                     "deathToSquadLandingM": 106.8,
-                    "tsMs": 1778368975479
+                    "tSinceLandingSecs": 434.1
                 },
                 {
                     "victim": "Nipplz",
                     "killer": "account.8ab7a1ab6fe241cc9ade45d1b775a1da",
                     "killerIsSelf": false,
                     "weapon": "WeapAUG_C",
-                    "shotDistanceM": 513.134765625,
+                    "shotDistanceM": 5.1,
                     "killerLandingDistM": 115.5,
                     "deathToSquadLandingM": 147.4,
-                    "tsMs": 1778369123189
+                    "tSinceLandingSecs": 581.8
                 }
             ]
         },
         {
             "matchId": "5450727e-5b18-4e2b-a255-77ca7498be64",
             "playedAt": "2026-05-09T22:49:07Z",
+            "map": "Neon_Main",
             "place": 1,
             "durationSecs": 1404,
             "telemetryFetched": true,
             "participantsCount": 4,
             "myTeamId": 5,
             "squadSize": 4,
+            "myLandingPos": {
+                "x": 589943.5,
+                "y": 151327.2
+            },
+            "firstFightStartSecs": 107.7,
             "killEvents": 101,
             "knockEvents": 98,
             "squadInvolvedEvents": 32,
@@ -259,32 +283,38 @@
                     "killer": "account.25bf5170e7cb48bd8fde622dd05e003f",
                     "killerIsSelf": false,
                     "weapon": "WeapACE32_C",
-                    "shotDistanceM": 2674.487548828125,
+                    "shotDistanceM": 26.7,
                     "killerLandingDistM": 2942.7,
                     "deathToSquadLandingM": 3029.3,
-                    "tsMs": 1778367176082
+                    "tSinceLandingSecs": 131.7
                 },
                 {
                     "victim": "Nipplz",
                     "killer": "account.382fe68825fa4b70b12d4472a7aa33be",
                     "killerIsSelf": false,
                     "weapon": "WeapUMP_C",
-                    "shotDistanceM": 552.3983154296875,
+                    "shotDistanceM": 5.5,
                     "killerLandingDistM": 3108.0,
                     "deathToSquadLandingM": 3062.2,
-                    "tsMs": 1778367232222
+                    "tSinceLandingSecs": 187.8
                 }
             ]
         },
         {
             "matchId": "0be05616-a5e1-436c-94d5-5f5d1dccecb3",
             "playedAt": "2026-05-09T22:07:48Z",
+            "map": "Baltic_Main",
             "place": 8,
             "durationSecs": 1457,
             "telemetryFetched": true,
             "participantsCount": 3,
             "myTeamId": 19,
             "squadSize": 3,
+            "myLandingPos": {
+                "x": 274729.3,
+                "y": 567102.6
+            },
+            "firstFightStartSecs": 1.4,
             "killEvents": 89,
             "knockEvents": 98,
             "squadInvolvedEvents": 10,
@@ -314,42 +344,48 @@
                     "killer": "account.c96cf99b8eeb4ba094c4dcce8c1a7c1b",
                     "killerIsSelf": false,
                     "weapon": "WeapHK416_C",
-                    "shotDistanceM": 4629.11328125,
+                    "shotDistanceM": 46.3,
                     "killerLandingDistM": 3398.6,
                     "deathToSquadLandingM": 3584.6,
-                    "tsMs": 1778365559324
+                    "tSinceLandingSecs": 1019.4
                 },
                 {
                     "victim": "PEX_LuCKoR",
                     "killer": "account.c96cf99b8eeb4ba094c4dcce8c1a7c1b",
                     "killerIsSelf": false,
                     "weapon": "WeapHK416_C",
-                    "shotDistanceM": 5626.8203125,
+                    "shotDistanceM": 56.3,
                     "killerLandingDistM": 3417.6,
                     "deathToSquadLandingM": 3580.3,
-                    "tsMs": 1778365559328
+                    "tSinceLandingSecs": 1019.4
                 },
                 {
                     "victim": "ramiswdg123",
                     "killer": "account.c96cf99b8eeb4ba094c4dcce8c1a7c1b",
                     "killerIsSelf": false,
                     "weapon": "WeapHK416_C",
-                    "shotDistanceM": 6259.20458984375,
+                    "shotDistanceM": 62.6,
                     "killerLandingDistM": 3378.7,
                     "deathToSquadLandingM": 3498.2,
-                    "tsMs": 1778365559331
+                    "tSinceLandingSecs": 1019.4
                 }
             ]
         },
         {
             "matchId": "29b8cd74-2a6d-4717-8b56-4cc3c686030c",
             "playedAt": "2026-05-09T21:50:59Z",
+            "map": "Baltic_Main",
             "place": 13,
             "durationSecs": 1558,
             "telemetryFetched": true,
             "participantsCount": 3,
             "myTeamId": 10,
             "squadSize": 3,
+            "myLandingPos": {
+                "x": 589839.2,
+                "y": 141037.8
+            },
+            "firstFightStartSecs": 226.3,
             "killEvents": 98,
             "knockEvents": 109,
             "squadInvolvedEvents": 10,
@@ -379,42 +415,48 @@
                     "killer": "account.f69ca37a974a4ef3814c5c33cbb82135",
                     "killerIsSelf": false,
                     "weapon": "WeapM24_C",
-                    "shotDistanceM": 16471.7578125,
+                    "shotDistanceM": 164.7,
                     "killerLandingDistM": 3275.8,
                     "deathToSquadLandingM": 588.4,
-                    "tsMs": 1778364335546
+                    "tSinceLandingSecs": 744.6
                 },
                 {
                     "victim": "PEX_LuCKoR",
                     "killer": "account.f69ca37a974a4ef3814c5c33cbb82135",
                     "killerIsSelf": false,
                     "weapon": "WeapM24_C",
-                    "shotDistanceM": 15635.7490234375,
+                    "shotDistanceM": 156.4,
                     "killerLandingDistM": 3188.1,
                     "deathToSquadLandingM": 459.4,
-                    "tsMs": 1778364335549
+                    "tSinceLandingSecs": 744.6
                 },
                 {
                     "victim": "ramiswdg123",
                     "killer": "account.123cb6fae68d4f479ad02dad6a3a9c1f",
                     "killerIsSelf": false,
                     "weapon": "WeapAUG_C",
-                    "shotDistanceM": 4293.30859375,
+                    "shotDistanceM": 42.9,
                     "killerLandingDistM": 2264.1,
                     "deathToSquadLandingM": 453.1,
-                    "tsMs": 1778364335552
+                    "tSinceLandingSecs": 744.6
                 }
             ]
         },
         {
             "matchId": "924037df-451a-4001-acc6-379d4199a5ba",
             "playedAt": "2026-05-09T21:36:33Z",
+            "map": "Summerland_Main",
             "place": 5,
             "durationSecs": 1009,
             "telemetryFetched": true,
             "participantsCount": 3,
             "myTeamId": 10,
             "squadSize": 3,
+            "myLandingPos": {
+                "x": 103528.9,
+                "y": 126555.4
+            },
+            "firstFightStartSecs": 11.3,
             "killEvents": 45,
             "knockEvents": 41,
             "squadInvolvedEvents": 17,
@@ -444,42 +486,48 @@
                     "killer": "account.e9d588e765a24415b95e5031ad5ec511",
                     "killerIsSelf": false,
                     "weapon": "WeapAUG_C",
-                    "shotDistanceM": 1493.29736328125,
+                    "shotDistanceM": 14.9,
                     "killerLandingDistM": 662.1,
                     "deathToSquadLandingM": 477.4,
-                    "tsMs": 1778363297954
+                    "tSinceLandingSecs": 650.7
                 },
                 {
                     "victim": "ramiswdg123",
                     "killer": "account.e9d588e765a24415b95e5031ad5ec511",
                     "killerIsSelf": false,
                     "weapon": "WeapAUG_C",
-                    "shotDistanceM": 4004.8310546875,
+                    "shotDistanceM": 40.0,
                     "killerLandingDistM": 674.6,
                     "deathToSquadLandingM": 460.3,
-                    "tsMs": 1778363321470
+                    "tSinceLandingSecs": 674.2
                 },
                 {
                     "victim": "Th3Hi6hGr0und",
                     "killer": "account.e9d588e765a24415b95e5031ad5ec511",
                     "killerIsSelf": false,
                     "weapon": "WeapAUG_C",
-                    "shotDistanceM": 2191.571533203125,
+                    "shotDistanceM": 21.9,
                     "killerLandingDistM": 674.5,
                     "deathToSquadLandingM": 453.0,
-                    "tsMs": 1778363321473
+                    "tSinceLandingSecs": 674.2
                 }
             ]
         },
         {
             "matchId": "d032c884-ef68-4bac-a79c-ecb9a0b9c886",
             "playedAt": "2026-05-09T21:31:20Z",
+            "map": "Tiger_Main",
             "place": 23,
             "durationSecs": 1555,
             "telemetryFetched": true,
             "participantsCount": 3,
             "myTeamId": 15,
             "squadSize": 3,
+            "myLandingPos": {
+                "x": 448705.9,
+                "y": 241248.3
+            },
+            "firstFightStartSecs": 54.3,
             "killEvents": 103,
             "knockEvents": 110,
             "squadInvolvedEvents": 11,
@@ -503,42 +551,48 @@
                     "killer": "account.024470b2f1c64fd19f7cf5673e75cf5f",
                     "killerIsSelf": false,
                     "weapon": "WeapAK47_C",
-                    "shotDistanceM": 727.5341186523438,
+                    "shotDistanceM": 7.3,
                     "killerLandingDistM": 79.5,
                     "deathToSquadLandingM": 6.6,
-                    "tsMs": 1778362461727
+                    "tSinceLandingSecs": 115.9
                 },
                 {
                     "victim": "ramiswdg123",
                     "killer": "account.0eaea66d56844ab1bb473ec90973e5c9",
                     "killerIsSelf": false,
                     "weapon": "WeapMini14_C",
-                    "shotDistanceM": 8409.0263671875,
+                    "shotDistanceM": 84.1,
                     "killerLandingDistM": 4052.0,
                     "deathToSquadLandingM": 27.8,
-                    "tsMs": 1778362482357
+                    "tSinceLandingSecs": 136.5
                 },
                 {
                     "victim": "Th3Hi6hGr0und",
                     "killer": "account.5078dc8a27bc485a8f26c6307f59e22c",
                     "killerIsSelf": false,
                     "weapon": "WeapAK47_C",
-                    "shotDistanceM": 4813.82080078125,
+                    "shotDistanceM": 48.1,
                     "killerLandingDistM": 3927.0,
                     "deathToSquadLandingM": 80.0,
-                    "tsMs": 1778362488617
+                    "tSinceLandingSecs": 142.7
                 }
             ]
         },
         {
             "matchId": "551141ff-f123-496a-8aab-bfc2d1b0f1a4",
             "playedAt": "2026-05-09T21:07:10Z",
+            "map": "DihorOtok_Main",
             "place": 4,
             "durationSecs": 1507,
             "telemetryFetched": true,
             "participantsCount": 2,
             "myTeamId": 36,
             "squadSize": 2,
+            "myLandingPos": {
+                "x": 699334.7,
+                "y": 458385.2
+            },
+            "firstFightStartSecs": 54.7,
             "killEvents": 92,
             "knockEvents": 64,
             "squadInvolvedEvents": 18,
@@ -562,42 +616,48 @@
                     "killer": "account.b39cc522703144aa92fe76b6a892c3d9",
                     "killerIsSelf": false,
                     "weapon": "WeapACE32_C",
-                    "shotDistanceM": 3469.30078125,
+                    "shotDistanceM": 34.7,
                     "killerLandingDistM": 6142.7,
                     "deathToSquadLandingM": 6019.2,
-                    "tsMs": 1778361248067
+                    "tSinceLandingSecs": 349.1
                 },
                 {
                     "victim": "original_Hat3",
                     "killer": "account.f894d3feb3ce4664ac7c2a63fbce1bab",
                     "killerIsSelf": false,
                     "weapon": "WeapAUG_C",
-                    "shotDistanceM": 2184.5185546875,
+                    "shotDistanceM": 21.8,
                     "killerLandingDistM": 1006.8,
                     "deathToSquadLandingM": 1224.6,
-                    "tsMs": 1778361762708
+                    "tSinceLandingSecs": 863.8
                 },
                 {
                     "victim": "PEX_LuCKoR",
                     "killer": "account.3e88b063f5be4b919d1a41f43bbffacf",
                     "killerIsSelf": false,
                     "weapon": "WeapACE32_C",
-                    "shotDistanceM": 575.0949096679688,
+                    "shotDistanceM": 5.8,
                     "killerLandingDistM": 1552.4,
                     "deathToSquadLandingM": 1218.3,
-                    "tsMs": 1778362171055
+                    "tSinceLandingSecs": 1272.1
                 }
             ]
         },
         {
             "matchId": "834bfafa-d933-48c7-9126-66b6bf414f14",
             "playedAt": "2026-05-09T20:55:53Z",
+            "map": "DihorOtok_Main",
             "place": 18,
             "durationSecs": 1463,
             "telemetryFetched": true,
             "participantsCount": 2,
             "myTeamId": 27,
             "squadSize": 2,
+            "myLandingPos": {
+                "x": 600375.1,
+                "y": 653817.1
+            },
+            "firstFightStartSecs": 179.1,
             "killEvents": 99,
             "knockEvents": 73,
             "squadInvolvedEvents": 6,
@@ -627,32 +687,38 @@
                     "killer": "account.c5ec8ace14ae41e69ff8e57054ed815c",
                     "killerIsSelf": false,
                     "weapon": "WeapM24_C",
-                    "shotDistanceM": 10948.255859375,
+                    "shotDistanceM": 109.5,
                     "killerLandingDistM": 151.0,
                     "deathToSquadLandingM": 145.0,
-                    "tsMs": 1778360682957
+                    "tSinceLandingSecs": 465.9
                 },
                 {
                     "victim": "original_Hat3",
                     "killer": "account.694d430962c0432bb7ef042610625df0",
                     "killerIsSelf": false,
                     "weapon": "WeapAUG_C",
-                    "shotDistanceM": 1487.95458984375,
+                    "shotDistanceM": 14.9,
                     "killerLandingDistM": 271.5,
                     "deathToSquadLandingM": 209.0,
-                    "tsMs": 1778360682961
+                    "tSinceLandingSecs": 465.9
                 }
             ]
         },
         {
             "matchId": "4acc9325-1d0f-4e9c-a5f4-0d42d15e2b8c",
             "playedAt": "2026-05-09T20:41:58Z",
+            "map": "Neon_Main",
             "place": 21,
             "durationSecs": 1634,
             "telemetryFetched": true,
             "participantsCount": 2,
             "myTeamId": 29,
             "squadSize": 2,
+            "myLandingPos": {
+                "x": 204205.8,
+                "y": 504036.3
+            },
+            "firstFightStartSecs": 235.1,
             "killEvents": 95,
             "knockEvents": 62,
             "squadInvolvedEvents": 3,
@@ -676,32 +742,38 @@
                     "killer": "account.9026c3ae5ab44110923e69353f5880f7",
                     "killerIsSelf": false,
                     "weapon": "WeapHK416_C",
-                    "shotDistanceM": 6690.4970703125,
+                    "shotDistanceM": 66.9,
                     "killerLandingDistM": 4556.8,
                     "deathToSquadLandingM": 4525.4,
-                    "tsMs": 1778360027399
+                    "tSinceLandingSecs": 640.9
                 },
                 {
                     "victim": "PEX_LuCKoR",
                     "killer": "account.9026c3ae5ab44110923e69353f5880f7",
                     "killerIsSelf": false,
                     "weapon": "ProjGrenade_C",
-                    "shotDistanceM": 5608.36669921875,
+                    "shotDistanceM": 56.1,
                     "killerLandingDistM": 4657.8,
                     "deathToSquadLandingM": 4627.1,
-                    "tsMs": 1778360027402
+                    "tSinceLandingSecs": 640.9
                 }
             ]
         },
         {
             "matchId": "da5ec5fe-ec2f-47a9-84ab-25b7ea56f693",
             "playedAt": "2026-05-09T20:35:33Z",
+            "map": "Baltic_Main",
             "place": 37,
             "durationSecs": 1517,
             "telemetryFetched": true,
             "participantsCount": 2,
             "myTeamId": 32,
             "squadSize": 2,
+            "myLandingPos": {
+                "x": 356087.9,
+                "y": 514148.8
+            },
+            "firstFightStartSecs": 46.7,
             "killEvents": 102,
             "knockEvents": 81,
             "squadInvolvedEvents": 5,
@@ -731,32 +803,38 @@
                     "killer": "account.621e5953b21544819687ede074867d32",
                     "killerIsSelf": false,
                     "weapon": "WeapAK47_C",
-                    "shotDistanceM": 2942.41845703125,
+                    "shotDistanceM": 29.4,
                     "killerLandingDistM": 95.5,
                     "deathToSquadLandingM": 61.0,
-                    "tsMs": 1778359186740
+                    "tSinceLandingSecs": 168.5
                 },
                 {
                     "victim": "PEX_LuCKoR",
                     "killer": "account.621e5953b21544819687ede074867d32",
                     "killerIsSelf": false,
                     "weapon": "WeapAK47_C",
-                    "shotDistanceM": 285.43463134765625,
+                    "shotDistanceM": 2.9,
                     "killerLandingDistM": 116.5,
                     "deathToSquadLandingM": 72.9,
-                    "tsMs": 1778359186743
+                    "tSinceLandingSecs": 168.5
                 }
             ]
         },
         {
             "matchId": "d422da62-6ed9-4088-8c91-409566e343a4",
             "playedAt": "2026-05-09T20:31:38Z",
+            "map": "DihorOtok_Main",
             "place": 38,
             "durationSecs": 1466,
             "telemetryFetched": true,
             "participantsCount": 2,
             "myTeamId": 32,
             "squadSize": 2,
+            "myLandingPos": {
+                "x": 322914.4,
+                "y": 194990.5
+            },
+            "firstFightStartSecs": 21.7,
             "killEvents": 81,
             "knockEvents": 52,
             "squadInvolvedEvents": 3,
@@ -780,32 +858,38 @@
                     "killer": "account.8ff6e48ced8f4ca784a6702a854083ee",
                     "killerIsSelf": false,
                     "weapon": "WeapSCAR-L_C",
-                    "shotDistanceM": 4117.97119140625,
+                    "shotDistanceM": 41.2,
                     "killerLandingDistM": 58.2,
                     "deathToSquadLandingM": 76.0,
-                    "tsMs": 1778358816287
+                    "tSinceLandingSecs": 48.0
                 },
                 {
                     "victim": "PEX_LuCKoR",
                     "killer": "account.8ff6e48ced8f4ca784a6702a854083ee",
                     "killerIsSelf": false,
                     "weapon": "WeapSCAR-L_C",
-                    "shotDistanceM": 942.4878540039062,
+                    "shotDistanceM": 9.4,
                     "killerLandingDistM": 37.2,
                     "deathToSquadLandingM": 21.7,
-                    "tsMs": 1778358816289
+                    "tSinceLandingSecs": 48.0
                 }
             ]
         },
         {
             "matchId": "937d44df-1063-4d3c-99e0-1563c1a8b22a",
             "playedAt": "2026-05-09T20:07:45Z",
+            "map": "Baltic_Main",
             "place": 8,
             "durationSecs": 1654,
             "telemetryFetched": true,
             "participantsCount": 2,
             "myTeamId": 6,
             "squadSize": 2,
+            "myLandingPos": {
+                "x": 199020.8,
+                "y": 286640.2
+            },
+            "firstFightStartSecs": 125.0,
             "killEvents": 101,
             "knockEvents": 75,
             "squadInvolvedEvents": 15,
@@ -829,42 +913,48 @@
                     "killer": "account.eb305586628944b98ca9772997b9778e",
                     "killerIsSelf": false,
                     "weapon": "WeapM24_C",
-                    "shotDistanceM": 21397.04296875,
+                    "shotDistanceM": 214.0,
                     "killerLandingDistM": 2183.4,
                     "deathToSquadLandingM": 443.1,
-                    "tsMs": 1778358189064
+                    "tSinceLandingSecs": 865.0
                 },
                 {
                     "victim": "PEX_LuCKoR",
                     "killer": "account.deb62299cd1a42eb8f0633ba8df2322e",
                     "killerIsSelf": false,
                     "weapon": "WeapHK416_C",
-                    "shotDistanceM": 745.5758056640625,
+                    "shotDistanceM": 7.5,
                     "killerLandingDistM": 4379.1,
                     "deathToSquadLandingM": 1662.7,
-                    "tsMs": 1778358437791
+                    "tSinceLandingSecs": 1113.7
                 },
                 {
                     "victim": "original_Hat3",
                     "killer": "account.7f2fe20063a541c0bc23f08fd9401d27",
                     "killerIsSelf": false,
                     "weapon": "WeapMP5K_C",
-                    "shotDistanceM": 297.1908874511719,
+                    "shotDistanceM": 3.0,
                     "killerLandingDistM": 2644.4,
                     "deathToSquadLandingM": 343.0,
-                    "tsMs": 1778358586449
+                    "tSinceLandingSecs": 1262.4
                 }
             ]
         },
         {
             "matchId": "7f011114-9856-4e26-aafb-0e7e8975d708",
             "playedAt": "2026-05-09T19:42:49Z",
+            "map": "Baltic_Main",
             "place": 7,
             "durationSecs": 1554,
             "telemetryFetched": true,
             "participantsCount": 2,
             "myTeamId": 49,
             "squadSize": 2,
+            "myLandingPos": {
+                "x": 164000.4,
+                "y": 514834.2
+            },
+            "firstFightStartSecs": 171.1,
             "killEvents": 98,
             "knockEvents": 69,
             "squadInvolvedEvents": 16,
@@ -888,32 +978,38 @@
                     "killer": "account.395944ce76d94ef8bb855c35cd3a23f9",
                     "killerIsSelf": false,
                     "weapon": "WeapBerylM762_C",
-                    "shotDistanceM": 779.458251953125,
+                    "shotDistanceM": 7.8,
                     "killerLandingDistM": 908.0,
                     "deathToSquadLandingM": 1097.9,
-                    "tsMs": 1778357106219
+                    "tSinceLandingSecs": 1273.8
                 },
                 {
                     "victim": "PEX_LuCKoR",
                     "killer": "account.0c2dec9754924b1ca74ad9712ddf7265",
                     "killerIsSelf": false,
                     "weapon": "WeapHK416_C",
-                    "shotDistanceM": 972.0274658203125,
+                    "shotDistanceM": 9.7,
                     "killerLandingDistM": 835.6,
                     "deathToSquadLandingM": 1106.1,
-                    "tsMs": 1778357106222
+                    "tSinceLandingSecs": 1273.8
                 }
             ]
         },
         {
             "matchId": "3c407409-d95f-4701-968c-468e061ea4e8",
             "playedAt": "2026-05-09T19:25:12Z",
+            "map": "Baltic_Main",
             "place": 13,
             "durationSecs": 1480,
             "telemetryFetched": true,
             "participantsCount": 2,
             "myTeamId": 22,
             "squadSize": 2,
+            "myLandingPos": {
+                "x": 624553.4,
+                "y": 301941.0
+            },
+            "firstFightStartSecs": 7.6,
             "killEvents": 101,
             "knockEvents": 73,
             "squadInvolvedEvents": 10,
@@ -937,42 +1033,48 @@
                     "killer": "account.69c5bf87445544299fe83c4ab4b638ad",
                     "killerIsSelf": false,
                     "weapon": "WeapKar98k_C",
-                    "shotDistanceM": 4005.27880859375,
+                    "shotDistanceM": 40.1,
                     "killerLandingDistM": 18.7,
                     "deathToSquadLandingM": 25.6,
-                    "tsMs": 1778355229983
+                    "tSinceLandingSecs": 452.9
                 },
                 {
                     "victim": "PEX_LuCKoR",
                     "killer": "account.53e3656d4c464c0b8f2402ed460086c3",
                     "killerIsSelf": false,
                     "weapon": "WeapAK47_C",
-                    "shotDistanceM": 3744.08544921875,
+                    "shotDistanceM": 37.4,
                     "killerLandingDistM": 2772.4,
                     "deathToSquadLandingM": 87.3,
-                    "tsMs": 1778355677051
+                    "tSinceLandingSecs": 899.9
                 },
                 {
                     "victim": "original_Hat3",
                     "killer": "account.53e3656d4c464c0b8f2402ed460086c3",
                     "killerIsSelf": false,
                     "weapon": "WeapAK47_C",
-                    "shotDistanceM": 1621.4781494140625,
+                    "shotDistanceM": 16.2,
                     "killerLandingDistM": 2762.8,
                     "deathToSquadLandingM": 57.3,
-                    "tsMs": 1778355677054
+                    "tSinceLandingSecs": 899.9
                 }
             ]
         },
         {
             "matchId": "5add9e4e-681e-4047-9c92-38977881e87e",
             "playedAt": "2026-05-09T19:11:57Z",
+            "map": "Neon_Main",
             "place": 14,
             "durationSecs": 1631,
             "telemetryFetched": true,
             "participantsCount": 4,
             "myTeamId": 12,
             "squadSize": 4,
+            "myLandingPos": {
+                "x": 671429.4,
+                "y": 478923.3
+            },
+            "firstFightStartSecs": 462.4,
             "killEvents": 105,
             "knockEvents": 121,
             "squadInvolvedEvents": 11,
@@ -996,52 +1098,58 @@
                     "killer": "account.59812e275f334fb1b82b28f492dcc251",
                     "killerIsSelf": false,
                     "weapon": "WeapHK416_C",
-                    "shotDistanceM": 2400.050048828125,
+                    "shotDistanceM": 24.0,
                     "killerLandingDistM": 3350.5,
                     "deathToSquadLandingM": 3409.2,
-                    "tsMs": 1778354472734
+                    "tSinceLandingSecs": 488.9
                 },
                 {
                     "victim": "errorista",
                     "killer": "account.59812e275f334fb1b82b28f492dcc251",
                     "killerIsSelf": false,
                     "weapon": "WeapHK416_C",
-                    "shotDistanceM": 2818.703857421875,
+                    "shotDistanceM": 28.2,
                     "killerLandingDistM": 3442.3,
                     "deathToSquadLandingM": 3532.7,
-                    "tsMs": 1778354531063
+                    "tSinceLandingSecs": 547.3
                 },
                 {
                     "victim": "EnvagyokCSACSII",
                     "killer": "account.59812e275f334fb1b82b28f492dcc251",
                     "killerIsSelf": false,
                     "weapon": "WeapHK416_C",
-                    "shotDistanceM": 2553.98974609375,
+                    "shotDistanceM": 25.5,
                     "killerLandingDistM": 3324.0,
                     "deathToSquadLandingM": 3415.9,
-                    "tsMs": 1778354568823
+                    "tSinceLandingSecs": 585.0
                 },
                 {
                     "victim": "PEX_LuCKoR",
                     "killer": "account.59812e275f334fb1b82b28f492dcc251",
                     "killerIsSelf": false,
                     "weapon": "WeapHK416_C",
-                    "shotDistanceM": 2198.31884765625,
+                    "shotDistanceM": 22.0,
                     "killerLandingDistM": 3362.4,
                     "deathToSquadLandingM": 3454.0,
-                    "tsMs": 1778354568826
+                    "tSinceLandingSecs": 585.0
                 }
             ]
         },
         {
             "matchId": "383f73bc-c393-4dce-812b-a928ef703c93",
             "playedAt": "2026-05-09T19:06:08Z",
+            "map": "Tiger_Main",
             "place": 27,
             "durationSecs": 1540,
             "telemetryFetched": true,
             "participantsCount": 4,
             "myTeamId": 4,
             "squadSize": 4,
+            "myLandingPos": {
+                "x": 337386.4,
+                "y": 504274.7
+            },
+            "firstFightStartSecs": 6.1,
             "killEvents": 105,
             "knockEvents": 125,
             "squadInvolvedEvents": 14,
@@ -1065,40 +1173,40 @@
                     "killer": "account.524cbaaa90d647488d8efbb38631c52b",
                     "killerIsSelf": false,
                     "weapon": "WeapVector_C",
-                    "shotDistanceM": 410.1304626464844,
+                    "shotDistanceM": 4.1,
                     "killerLandingDistM": 13.1,
                     "deathToSquadLandingM": 10.9,
-                    "tsMs": 1778353686440
+                    "tSinceLandingSecs": 51.6
                 },
                 {
                     "victim": "ZeteS86",
                     "killer": "account.98970039df974c4ca933068ec2242e19",
                     "killerIsSelf": false,
                     "weapon": "WeapMk12_C",
-                    "shotDistanceM": 1421.6314697265625,
+                    "shotDistanceM": 14.2,
                     "killerLandingDistM": 48.5,
                     "deathToSquadLandingM": 10.4,
-                    "tsMs": 1778353721360
+                    "tSinceLandingSecs": 86.5
                 },
                 {
                     "victim": "PEX_LuCKoR",
                     "killer": "account.7fdf172f50484d3096a1723d1da082b9",
                     "killerIsSelf": false,
                     "weapon": "WeapBerreta686_C",
-                    "shotDistanceM": 924.0230712890625,
+                    "shotDistanceM": 9.2,
                     "killerLandingDistM": 26.5,
                     "deathToSquadLandingM": 24.8,
-                    "tsMs": 1778353721363
+                    "tSinceLandingSecs": 86.5
                 },
                 {
                     "victim": "IIIBloodWorkIII",
                     "killer": "account.4ed7f4cc01b04a30a1efd5fa4ed8ad9a",
                     "killerIsSelf": false,
                     "weapon": "PanzerFaust100M_Projectile_C",
-                    "shotDistanceM": 1268.7376708984375,
+                    "shotDistanceM": 12.7,
                     "killerLandingDistM": 43.1,
                     "deathToSquadLandingM": 25.0,
-                    "tsMs": 1778353721366
+                    "tSinceLandingSecs": 86.5
                 }
             ]
         }
