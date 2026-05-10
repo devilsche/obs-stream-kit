@@ -178,7 +178,8 @@ try:
         _steam_init_schema(_conn)
         _conn.close()
 
-        steam_poller = SteamPoller(steam_client, _steam_db_connect)
+        steam_poller = SteamPoller(steam_client, _steam_db_connect,
+                                     root_dir=ROOT)
         steam_poller.start()
 
         steam_registry = SteamEndpointRegistry(
@@ -347,6 +348,33 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     self.end_headers()
                     self.wfile.write(body)
                     return
+            except Exception as e:
+                self.send_error(500, str(e))
+                return
+        # Steam Image Cache: /steam/img/<app_id>/<kind>.jpg
+        # → falls lokal gecached liefer direkt aus, sonst 404 (Browser
+        # nimmt dann die remote-URL via Fallback-Chain im Widget).
+        if STEAM_ENABLED and self.path.startswith("/steam/img/"):
+            try:
+                parts = self.path.split("?")[0].split("/")
+                # parts = ['', 'steam', 'img', '<app_id>', '<kind>.jpg']
+                if len(parts) >= 5 and parts[4].endswith(".jpg"):
+                    app_id = parts[3]
+                    kind = parts[4][:-4]
+                    from steam.image_cache import cached_path
+                    p = cached_path(ROOT, app_id, kind)
+                    if os.path.isfile(p) and os.path.getsize(p) > 0:
+                        with open(p, "rb") as f:
+                            data = f.read()
+                        self.send_response(200)
+                        self.send_header("Content-Type", "image/jpeg")
+                        self.send_header("Content-Length", str(len(data)))
+                        self.send_header("Cache-Control", "public, max-age=86400")
+                        self.end_headers()
+                        self.wfile.write(data)
+                        return
+                self.send_error(404, "image not cached")
+                return
             except Exception as e:
                 self.send_error(500, str(e))
                 return

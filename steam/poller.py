@@ -23,6 +23,7 @@ from steam.db import (
     mark_played_now,
     COOP_CATEGORY_IDS, MULTIPLAYER_CATEGORY_IDS,
 )
+from steam.image_cache import ensure_app_images
 
 
 LAYER1_INTERVAL_S = 10
@@ -36,10 +37,11 @@ APP_DETAILS_REFRESH_S = 30 * 86400  # 1× / 30 Tage pro App
 class SteamPoller(threading.Thread):
     daemon = True
 
-    def __init__(self, client, db_connect_fn):
+    def __init__(self, client, db_connect_fn, root_dir: str = None):
         super().__init__(name="SteamPoller")
         self.client = client
         self.db_connect = db_connect_fn  # returns fresh sqlite3.Connection
+        self.root_dir = root_dir  # für lokalen Image-Cache
         self._stop = threading.Event()
         self._lock = threading.Lock()
         self._state = {
@@ -125,11 +127,37 @@ class SteamPoller(threading.Thread):
                         upsert_owned_games(conn, self.client.steam_id, games)
                     finally:
                         conn.close()
+                    # Pro Owned-Games-Sync: max ~10 Bilder cachen, damit
+                    # die ersten Library-Pages sofort lokal verfuegbar
+                    # sind. Restliche Bilder werden vom Layer-3-Sync
+                    # nach und nach gezogen.
+                    if self.root_dir:
+                        self._cache_top_logos(games[:20])
                 with self._lock:
                     self._state["lastOwnedSyncAt"] = ts
             except SteamApiError as e:
                 with self._lock:
                     self._state["lastError"] = f"owned-games sync: {e}"
+
+    def _cache_top_logos(self, games: list) -> None:
+        """Lädt logo + icon der ersten N Games auf Platte. Best-effort,
+        Fehler werden ignoriert (nicht-kritisch)."""
+        for g in games:
+            appid = g.get("appid")
+            if not appid:
+                continue
+            icon_hash = g.get("img_icon_url")
+            logo_hash = g.get("img_logo_url")
+            base = "https://media.steampowered.com/steamcommunity/public/images/apps"
+            try:
+                ensure_app_images(
+                    self.root_dir, appid,
+                    logo_url=(f"{base}/{appid}/{logo_hash}.jpg"
+                              if logo_hash else None),
+                    icon_url=(f"{base}/{appid}/{icon_hash}.jpg"
+                              if icon_hash else None))
+            except Exception:
+                pass
 
     # ── Layer 2: Achievements für aktuelles Spiel ───────────────────────────
     def _tick_layer2(self):
@@ -218,6 +246,14 @@ class SteamPoller(threading.Thread):
             )
         finally:
             conn.close()
+
+        # Header-Image lokal cachen sobald Storefront-URL bekannt
+        if self.root_dir and data.get("header_image"):
+            try:
+                ensure_app_images(self.root_dir, app_id,
+                                   header_url=data["header_image"])
+            except Exception:
+                pass
 
     def _ensure_schema(self, conn, app_id, game_name_hint=None) -> dict:
         """Liefert {api_name: {displayName, description, icon}} fuer das App.

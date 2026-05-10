@@ -155,12 +155,18 @@ class SteamEndpointRegistry:
                 min_playtime_min=min_playtime, limit=limit)
             games = []
             for r in rows:
+                app_id = r["app_id"]
+                # Cached local URLs (Server liefert 200 wenn auf Platte
+                # vorhanden, sonst 404 -> Widget faellt auf remote zurueck)
                 games.append({
-                    "appId":             r["app_id"],
+                    "appId":             app_id,
                     "name":              r["name"],
                     "imgIconUrl":        r["img_icon_url"],
                     "imgLogoUrl":        r["img_logo_url"],
                     "headerImage":       r["header_image"],
+                    "headerImageCached": f"/steam/img/{app_id}/header.jpg",
+                    "imgLogoCached":     f"/steam/img/{app_id}/logo.jpg",
+                    "imgIconCached":     f"/steam/img/{app_id}/icon.jpg",
                     "shortDescription":  r["short_description"],
                     "playtimeTotalMin":  r["playtime_forever_min"],
                     "playtime2WeeksMin": r["playtime_2weeks_min"],
