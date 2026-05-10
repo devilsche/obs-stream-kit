@@ -10,9 +10,9 @@ liefern, ohne dass der User manuell curl/jq/git triggern muss.
 Aufruf:
   python3 tools/debug-dump.py                    # default: first-fight, session
   python3 tools/debug-dump.py first-fight week
-  PORT=9000 python3 tools/debug-dump.py first-fight session
+  PORT=8080 python3 tools/debug-dump.py first-fight session
 
-Voraussetzung: Server läuft lokal auf 8080 (oder PORT env-var).
+Voraussetzung: Server läuft lokal auf 9000 (oder PORT env-var).
 """
 import json
 import os
@@ -27,7 +27,7 @@ DUMPS = {
     "first-fight": ("/api/pubg/first-fight-debug", "firstfight.log"),
 }
 
-PORT = int(os.environ.get("PORT", "8080"))
+PORT = int(os.environ.get("PORT", "9000"))
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
