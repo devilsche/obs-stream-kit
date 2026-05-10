@@ -755,7 +755,7 @@
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.lobbyTop3Kd || 0)}</span><span class="pubg-stat-label">Top-3 Lobby K/D</span></div>
           <div class="cell"><span class="pubg-stat-value">${(t.squadKillsPerMatch || 0).toFixed(1)}</span><span class="pubg-stat-label">Ø Squad Kills/Match</span></div>
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.avgKills)}</span><span class="pubg-stat-label">Ø My Kills/Match</span></div>
-          <div class="cell"><span class="pubg-stat-value">${Math.round(t.avgDamage)}</span><span class="pubg-stat-label">Ø DMG/Match</span></div>
+          <div class="cell"><span class="pubg-stat-value">${Math.round(t.avgDamage)}</span><span class="pubg-stat-label">Ø Damage/Match</span></div>
           <div class="cell"><span class="pubg-stat-value">${fmtDuration(Math.round(t.avgSurvivedSec))}</span><span class="pubg-stat-label">Ø Survive</span></div>
           <div class="cell"><span class="pubg-stat-value">#${t.avgPlace.toFixed(1)}</span><span class="pubg-stat-label">Avg Place</span></div>
           <div class="cell"><span class="pubg-stat-value">${t.headshots}</span><span class="pubg-stat-label">Headshots</span></div>
@@ -917,7 +917,7 @@
                 <span class="trend-delta ${cls(d.wins)}">${arrow(d.wins)}${Math.abs(d.wins)}</span></div>
             </div>
             <div class="trend-cell">
-              <div class="trend-label">Avg DMG</div>
+              <div class="trend-label">Avg Damage</div>
               <div class="trend-row"><span class="trend-val">${Math.round(trend.current.avgDmg||0)}</span>
                 <span class="trend-delta ${cls(d.avgDmg)}">${arrow(d.avgDmg)}${Math.round(Math.abs(d.avgDmg))}</span></div>
             </div>
