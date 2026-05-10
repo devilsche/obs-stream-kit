@@ -6,6 +6,10 @@
   --pubg-muted: #8a7d99;
   --pubg-border: rgba(94, 42, 121, 0.6);
   --pubg-radius: 8px;
+  /* Page-Background-Gradient fuer Web-Views / Custom Docks (von oben
+     dunkel-purple zu fast-schwarz). Nicht zu verwechseln mit
+     --pubg-purple-bg (das ist die semitransparente Card-Farbe). */
+  --pubg-page-bg: linear-gradient(180deg, #1a0d2a 0%, #0a0510 100%);
 }
 
 * { box-sizing: border-box; }
@@ -23,7 +27,7 @@ body {
    setzt body.dock-Klasse). Mit !important damit Widget-spezifisches
    body { background: ... } sich nicht in den Weg legt. */
 body.dock {
-  background: linear-gradient(180deg, #1a0d2a 0%, #0a0510 100%) !important;
+  background: var(--pubg-page-bg) !important;
   min-height: 100vh;
 }
 
