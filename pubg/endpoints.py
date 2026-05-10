@@ -44,6 +44,8 @@ class EndpointRegistry:
             return self._last_match()
         if route == ("GET", "/api/pubg/status"):
             return _ok(self.poller_status())
+        if route == ("GET", "/api/pubg/active"):
+            return self._active(qs)
         if route == ("GET", "/api/pubg/db-info"):
             return self._db_info()
         if route == ("GET", "/api/pubg/lobby-avg-kd"):
@@ -108,6 +110,43 @@ class EndpointRegistry:
         if route == ("DELETE", "/api/pubg/stamm-crew"):
             return self._stamm_del(body)
         return _err(404, f"unknown route {path}")
+
+    def _active(self, qs):
+        """Liefert {active: bool, ...} fuer Streamer.bot/IFTTT-style
+        If-Then-Else.
+        active=true wenn letzter Match juenger als thresholdMin
+        (Default 30) zurueckliegt - heisst: PUBG wird grad gespielt.
+
+        Override per Query:
+          ?thresholdMin=15  -> 15 Minuten Schwelle
+          ?thresholdSec=300 -> 5 Minuten Schwelle (in Sekunden)
+        """
+        threshold_min = float(qs.get("thresholdMin", 30))
+        if "thresholdSec" in qs:
+            threshold_min = float(qs["thresholdSec"]) / 60.0
+        conn = self.get_conn()
+        row = conn.execute(
+            "SELECT MAX(played_at) AS last FROM matches"
+        ).fetchone()
+        last_iso = row["last"] if row else None
+        age_min = None
+        active = False
+        if last_iso:
+            try:
+                last_dt = datetime.datetime.fromisoformat(
+                    last_iso.replace("Z", "+00:00"))
+                now = datetime.datetime.now(datetime.timezone.utc)
+                age_min = round(
+                    (now - last_dt).total_seconds() / 60.0, 1)
+                active = age_min < threshold_min
+            except Exception:
+                pass
+        return _ok({
+            "active": active,
+            "lastMatchAt": last_iso,
+            "lastMatchAgeMin": age_min,
+            "thresholdMin": threshold_min,
+        })
 
     def _session(self, qs=None):
         conn = self.get_conn()
