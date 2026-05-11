@@ -142,21 +142,26 @@ class SteamPoller(threading.Thread):
                     self._state["lastError"] = f"owned-games sync: {e}"
 
     def _cache_top_logos(self, games: list) -> None:
-        """Lädt logo + icon der ersten N Games auf Platte. Best-effort,
-        Fehler werden ignoriert (nicht-kritisch)."""
+        """Lädt header + logo + icon der ersten N Games auf Platte.
+        header.jpg kommt vom Steam-Store-CDN (gleiches Bild wie in der
+        Library) und ist OHNE Storefront-API-Sync verfügbar. Best-
+        effort, Fehler werden geschluckt."""
+        community = ("https://media.steampowered.com/steamcommunity"
+                     "/public/images/apps")
+        store_cdn = "https://cdn.cloudflare.steamstatic.com/steam/apps"
         for g in games:
             appid = g.get("appid")
             if not appid:
                 continue
             icon_hash = g.get("img_icon_url")
             logo_hash = g.get("img_logo_url")
-            base = "https://media.steampowered.com/steamcommunity/public/images/apps"
             try:
                 ensure_app_images(
                     self.root_dir, appid,
-                    logo_url=(f"{base}/{appid}/{logo_hash}.jpg"
+                    header_url=f"{store_cdn}/{appid}/header.jpg",
+                    logo_url=(f"{community}/{appid}/{logo_hash}.jpg"
                               if logo_hash else None),
-                    icon_url=(f"{base}/{appid}/{icon_hash}.jpg"
+                    icon_url=(f"{community}/{appid}/{icon_hash}.jpg"
                               if icon_hash else None))
             except Exception:
                 pass

@@ -162,11 +162,22 @@
       // Cross-fade: 0.45s out, dann replace content, dann in
       setTimeout(() => {
         const cover = document.getElementById("cover");
-        // Fallback-Chain: lokaler Cache > Storefront header > logo > icon
-        // → onerror chained durch die Liste (404 = nicht gecached)
+        // Fallback-Chain durchprobiert (onerror → next):
+        //  1. lokaler Cache (header.jpg falls Layer-3 schon synced hat)
+        //  2. Steam-CDN header.jpg — funktioniert fuer JEDES Game ohne
+        //     Storefront-Sync. Das ist das gleiche Bild das in der
+        //     Library als Header angezeigt wird.
+        //  3. Library-spezifischere CDN-Varianten (library_hero etc.)
+        //  4. lokales logo/icon
+        //  5. remote logo/icon
+        const cdn = `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appId}`;
         const sources = [
-          g.headerImageCached, g.imgLogoCached,
-          g.headerImage,       g.imgLogoUrl, g.imgIconCached, g.imgIconUrl
+          g.headerImageCached,
+          `${cdn}/header.jpg`,
+          `${cdn}/library_600x900.jpg`,
+          g.headerImage,
+          g.imgLogoCached, g.imgLogoUrl,
+          g.imgIconCached, g.imgIconUrl,
         ].filter(Boolean);
         cover.dataset.tryIdx = "0";
         cover.dataset.sources = JSON.stringify(sources);
