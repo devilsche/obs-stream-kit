@@ -103,11 +103,14 @@
 
   <script src="/widgets/pubg/_pubg.js"></script>
   <script>
-    // URL-Params
-    const FILTER     = PubgUI.qs("filter",   "all");      // all|coop|multiplayer
-    const SORT       = PubgUI.qs("sort",     "playtime"); // playtime|recent|name
+    // URL-Params — 'kind' ersetzt 'filter' (vermeidet Collision mit
+    // PubgUI's '?filter=0' zum Verstecken der Bar). Alt-Param 'filter'
+    // wird als Fallback noch akzeptiert.
+    const KIND       = PubgUI.qs("kind") || PubgUI.qs("filter", "all");
+    const SORT       = PubgUI.qs("sort",     "playtime"); // playtime|recent|name|random
     const LIMIT      = parseInt(PubgUI.qs("limit",    "30"),   10);
     const MIN_PT     = parseInt(PubgUI.qs("minPlaytime", "0"), 10);
+    const PLAYED_SINCE_DAYS = parseInt(PubgUI.qs("playedSinceDays", "0"), 10);
     const ROTATE_MS  = parseInt(PubgUI.qs("rotateMs", "8000"), 10);
     const CYCLE_PAUSE_MS = parseInt(PubgUI.qs("cyclePauseMs", "0"), 10);
     const REFRESH_MS = parseInt(PubgUI.qs("refreshMs", String(10 * 60 * 1000)), 10); // 10min
@@ -116,29 +119,37 @@
 
     if (HEADER_OFF) document.body.classList.add("no-header");
 
-    // Header-Text spiegelt FILTER + SORT — so sieht man am Stream was
-    // gerade rotiert (statisches 'My library' war irreführend).
-    const FILTER_LABEL = FILTER === "coop"        ? "Co-op games"
-                       : FILTER === "multiplayer" ? "Multiplayer games"
-                                                  : "Library";
-    const SORT_LABEL   = SORT === "recent" ? "Recently played"
-                       : SORT === "name"   ? "A → Z"
-                                           : "Total playtime";
+    // Header-Text spiegelt KIND + SORT — am Stream sieht man was
+    // gerade rotiert. Override via ?headerTitle=…
+    const KIND_LABEL = KIND === "coop"        ? "Co-op games"
+                     : KIND === "multiplayer" ? "Multiplayer games"
+                                              : "Library";
+    const SORT_LABEL = SORT === "recent" ? "Recently played"
+                     : SORT === "name"   ? "A → Z"
+                     : SORT === "random" ? "Wanna play?"
+                                         : "Total playtime";
     document.getElementById("pubgHeader").innerHTML = HEADING_OVERRIDE
       ? HEADING_OVERRIDE.replace(/</g, "&lt;")
-      : `<b>${FILTER_LABEL}</b> · ${SORT_LABEL}`;
+      : `<b>${KIND_LABEL}</b> · ${SORT_LABEL}`;
 
     PubgUI.buildFilter([
-      { key: "filter", label: "Filter", type: "select", default: "all",
+      { key: "kind", label: "Category", type: "select", default: "all",
         options: [["all","All"], ["coop","Co-op"], ["multiplayer","Multiplayer"]],
         tooltip: "Limit to a category. 'coop' uses Steam categories " +
                  "9/36/38, 'multiplayer' adds 1/27." },
       { key: "sort", label: "Sort", type: "select", default: "playtime",
         options: [["playtime","Total playtime"],
                   ["recent","Recently played (14d)"],
+                  ["random","Random (wanna-play)"],
                   ["name","Name A→Z"]],
-        tooltip: "'recent' filters to games with playtime in the last " +
-                 "14 days." },
+        tooltip: "'recent' filters to games played in the last 14 days. " +
+                 "'random' shuffles the pool — combine with " +
+                 "playedSinceDays for a 'wanna play?' pick." },
+      { key: "playedSinceDays", label: "Played since (days)", type: "range",
+        min: 0, max: 1825, default: 0,
+        tooltip: "Only include games touched in the last N days. " +
+                 "0 = no time filter. Uses Steam's rtime_last_played " +
+                 "(includes library-browse triggers, so generous)." },
       { key: "rotateMs", label: "Rotate ms", type: "range",
         min: 3000, max: 20000, default: 8000,
         tooltip: "How fast each game cycles." },
@@ -235,7 +246,7 @@
         document.body.classList.remove("loading");
         document.getElementById("name").textContent = "";
         document.getElementById("sub").innerHTML =
-          `<span class="empty">no ${FILTER === "all" ? "" : FILTER + " "}games cached yet — Poller fetches Storefront data ~5/min</span>`;
+          `<span class="empty">no ${KIND === "all" ? "" : KIND + " "}games cached yet — Poller fetches Storefront data ~5/min</span>`;
         return;
       }
       const g = games[idx % games.length];
@@ -266,9 +277,11 @@
 
     async function refresh() {
       try {
-        const u = `/api/steam/owned-games?filter=${encodeURIComponent(FILTER)}` +
+        const u = `/api/steam/owned-games?kind=${encodeURIComponent(KIND)}` +
                   `&sort=${encodeURIComponent(SORT)}` +
-                  `&minPlaytime=${MIN_PT}&limit=${LIMIT}`;
+                  `&minPlaytime=${MIN_PT}` +
+                  `&playedSinceDays=${PLAYED_SINCE_DAYS}` +
+                  `&limit=${LIMIT}`;
         const data = await PubgUI.fetchJson(u);
         games = (data && data.games) || [];
         prewarmImages(games);

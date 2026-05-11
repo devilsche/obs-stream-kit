@@ -84,10 +84,15 @@ class SteamClient:
         return (data.get("response") or {}).get("games") or []
 
     def get_owned_games(self) -> list:
-        """Library mit Spielzeit. Privacy 'Game Details' muss public sein."""
+        """Library mit Spielzeit. Privacy 'Game Details' muss public sein.
+        include_played_free_games=1: F2P-MP-Titel (Warframe, Dota etc.)
+        kommen mit rein, sonst fehlten sie im wanna-play-Pool.
+        rtime_last_played wird wenn vorhanden direkt mitgeliefert."""
         data = self._get(
             "/IPlayerService/GetOwnedGames/v0001/",
-            steamid=self.steam_id, include_appinfo=1)
+            steamid=self.steam_id,
+            include_appinfo=1,
+            include_played_free_games=1)
         return (data.get("response") or {}).get("games") or []
 
     def get_number_of_current_players(self, app_id: int) -> int:

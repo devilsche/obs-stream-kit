@@ -136,9 +136,11 @@ class SteamEndpointRegistry:
     def _owned_games(self, qs):
         """Library aus DB-Cache (Poller-getrieben), gefiltert + sortiert.
         Query-Params:
-          ?filter=all|coop|multiplayer   (Default: all)
-          ?sort=playtime|recent|name     (Default: playtime)
+          ?kind=all|coop|multiplayer     (Default: all; alt: ?filter=)
+          ?sort=playtime|recent|name|random (Default: playtime)
           ?minPlaytime=N                 Mindestspielzeit in Min
+          ?playedSinceDays=N             nur Spiele in letzten N Tagen
+                                         angefasst (wanna-play-Pool)
           ?limit=N                       Max Anzahl (Default 100)
 
         Sort=recent nutzt Steam's GetRecentlyPlayedGames als Quelle —
@@ -146,12 +148,19 @@ class SteamEndpointRegistry:
         z.B. nicht enthalten obwohl 2 Tage gespielt). Die Recently-
         Played-Liste ist Steam's autoritative Ground Truth.
         """
-        filter_kind = qs.get("filter", "all")
+        # 'kind' = neuer name, 'filter' bleibt als Fallback fuer
+        # alte Bookmarks. Collision mit PubgUI's '?filter=0' (Bar
+        # verstecken) damit aufgeloest.
+        filter_kind = qs.get("kind") or qs.get("filter", "all")
         sort_by     = qs.get("sort", "playtime")
         try:
             min_playtime = int(qs.get("minPlaytime", "0"))
         except ValueError:
             min_playtime = 0
+        try:
+            played_since_days = int(qs.get("playedSinceDays", "0"))
+        except ValueError:
+            played_since_days = 0
         try:
             limit = int(qs.get("limit", "100"))
         except ValueError:
@@ -165,12 +174,14 @@ class SteamEndpointRegistry:
             rows = get_owned_games_filtered(
                 conn, self.client.steam_id,
                 filter_kind=filter_kind, sort_by=sort_by,
-                min_playtime_min=min_playtime, limit=limit)
+                min_playtime_min=min_playtime,
+                played_since_days=played_since_days, limit=limit)
             games = [self._enrich_row(r) for r in rows]
             return _ok({
                 "games": games,
-                "filter": filter_kind,
+                "kind": filter_kind,
                 "sort": sort_by,
+                "playedSinceDays": played_since_days,
                 "count": len(games),
             })
         finally:
@@ -192,6 +203,7 @@ class SteamEndpointRegistry:
             "playtimeTotalMin":  r["playtime_forever_min"],
             "playtime2WeeksMin": r["playtime_2weeks_min"],
             "lastPlayedAt":      r["last_played_at"],
+            "steamLastPlayed":   r["steam_last_played"],
             "isCoop":            (bool(r["is_coop"])
                                   if r["is_coop"] is not None else None),
             "isMultiplayer":     (bool(r["is_multiplayer"])
@@ -228,7 +240,7 @@ class SteamEndpointRegistry:
                 row = conn.execute("""
                     SELECT og.app_id, og.name, og.img_icon_url, og.img_logo_url,
                            og.playtime_forever_min, og.playtime_2weeks_min,
-                           og.last_played_at,
+                           og.last_played_at, og.steam_last_played,
                            ad.header_image, ad.short_description,
                            ad.is_coop, ad.is_multiplayer, ad.category_ids
                     FROM steam_owned_games og
@@ -261,6 +273,7 @@ class SteamEndpointRegistry:
                         "playtimeTotalMin":  rp.get("playtime_forever") or 0,
                         "playtime2WeeksMin": rp.get("playtime_2weeks") or 0,
                         "lastPlayedAt":      None,
+                        "steamLastPlayed":   None,
                         "isCoop":            None,
                         "isMultiplayer":     None,
                         "detailsCached":     False,

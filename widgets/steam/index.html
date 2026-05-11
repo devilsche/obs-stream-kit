@@ -229,17 +229,55 @@
       </div>
       <div class="tile-desc">
         Library rotator: filterable by All / Co-op / Multiplayer with
-        configurable sort and pool size. Reads from the local cache —
-        survives Steam delistings (e.g. UT2004).
+        configurable sort, pool size, recency window. Reads from the
+        local cache — survives Steam delistings (e.g. UT2004).
       </div>
       <span class="tile-size"><b>520×120</b> · anywhere</span>
       <ul class="tile-params">
-        <li><code>filter</code><span>all / coop / multiplayer (default all)</span></li>
-        <li><code>sort</code><span>playtime / recent / name (default playtime)</span></li>
+        <li><code>kind</code><span>all / coop / multiplayer (default all)</span></li>
+        <li><code>sort</code><span>playtime / recent / random / name</span></li>
+        <li><code>playedSinceDays</code><span>only games touched in last N days (0=off)</span></li>
         <li><code>rotateMs</code><span>per-entry rotation (default 8000)</span></li>
+        <li><code>cyclePauseMs</code><span>pause after last item (default 0)</span></li>
         <li><code>minPlaytime</code><span>minimum total minutes (default 0)</span></li>
         <li><code>limit</code><span>pool size (default 30)</span></li>
-        <li><code>header</code><span>override heading text</span></li>
+        <li><code>headerTitle</code><span>override heading text</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/steam/games-ticker.html?kind=multiplayer&sort=random&playedSinceDays=730&limit=20&rotateMs=6000&cyclePauseMs=10000&headerTitle=Wanna%20play%3F" target="_blank">
+      <div class="tile-title">
+        <h3>games-ticker.html · Wanna play?</h3>
+        <span class="ext">open</span>
+      </div>
+      <div class="tile-desc">
+        Preset for chat engagement: random pick from multiplayer games
+        that you've touched in the last 2 years. Header says
+        <em>Wanna play?</em> — chat sees something they could join.
+      </div>
+      <span class="tile-size"><b>520×120</b> · anywhere</span>
+      <ul class="tile-params">
+        <li><code>kind</code><span>multiplayer</span></li>
+        <li><code>sort</code><span>random</span></li>
+        <li><code>playedSinceDays</code><span>730 (≈ 2 years)</span></li>
+        <li><code>cyclePauseMs</code><span>10000 (pause between cycles)</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/steam/games-ticker.html?kind=coop&sort=random&playedSinceDays=730&limit=20&rotateMs=6000&cyclePauseMs=10000&headerTitle=Wanna%20play%20together%3F" target="_blank">
+      <div class="tile-title">
+        <h3>games-ticker.html · Co-op picker</h3>
+        <span class="ext">open</span>
+      </div>
+      <div class="tile-desc">
+        Same idea but restricted to <em>Co-op</em> games only — pick
+        something for a viewer raid or duo session.
+      </div>
+      <span class="tile-size"><b>520×120</b> · anywhere</span>
+      <ul class="tile-params">
+        <li><code>kind</code><span>coop</span></li>
+        <li><code>sort</code><span>random</span></li>
+        <li><code>playedSinceDays</code><span>730</span></li>
       </ul>
     </a>
 
@@ -265,8 +303,9 @@
     <a href="/api/steam/achievement-feed?limit=20" target="_blank">/api/steam/achievement-feed?limit=20<span class="pill">all unlocks</span></a>
     <a href="/api/steam/recently-played" target="_blank">/api/steam/recently-played</a>
     <a href="/api/steam/owned-games?limit=10" target="_blank">/api/steam/owned-games?limit=10</a>
-    <a href="/api/steam/owned-games?filter=coop&limit=10" target="_blank">/api/steam/owned-games?filter=coop&limit=10</a>
-    <a href="/api/steam/owned-games?filter=multiplayer&sort=recent&limit=10" target="_blank">/api/steam/owned-games?filter=multiplayer&sort=recent&limit=10</a>
+    <a href="/api/steam/owned-games?kind=coop&limit=10" target="_blank">/api/steam/owned-games?kind=coop&limit=10</a>
+    <a href="/api/steam/owned-games?kind=multiplayer&sort=recent&limit=10" target="_blank">/api/steam/owned-games?kind=multiplayer&sort=recent&limit=10</a>
+    <a href="/api/steam/owned-games?kind=multiplayer&sort=random&playedSinceDays=730&limit=10" target="_blank">/api/steam/owned-games?kind=multiplayer&sort=random&playedSinceDays=730<span class="pill">wanna-play</span></a>
     <a href="/api/steam/status" target="_blank">/api/steam/status<span class="pill">poller</span></a>
   </div>
 

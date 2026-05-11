@@ -48,7 +48,8 @@ CREATE TABLE IF NOT EXISTS steam_owned_games (
   img_logo_url TEXT,                    -- 184x69 banner (volle URL)
   playtime_forever_min INTEGER NOT NULL DEFAULT 0,
   playtime_2weeks_min INTEGER NOT NULL DEFAULT 0,
-  last_played_at INTEGER,               -- Unix epoch; aus Steam-API oder Poller-detected
+  last_played_at INTEGER,               -- Unix epoch; nur Poller (mark_played_now) — trusted
+  steam_last_played INTEGER,            -- Unix epoch; Steam's rtime_last_played — unreliable aber breit
   last_synced INTEGER NOT NULL,
   PRIMARY KEY (steam_id, app_id)
 );
@@ -84,6 +85,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
     for stmt in (
         "ALTER TABLE steam_owned_games ADD COLUMN img_logo_url TEXT",
         "ALTER TABLE steam_owned_games ADD COLUMN last_played_at INTEGER",
+        "ALTER TABLE steam_owned_games ADD COLUMN steam_last_played INTEGER",
         "ALTER TABLE steam_app_schema ADD COLUMN global_pct_json TEXT",
         "ALTER TABLE steam_app_schema "
             "ADD COLUMN global_pct_cached_at INTEGER",
@@ -118,34 +120,38 @@ def _steam_image_url(app_id: int, image_hash: str) -> str:
 
 # ── Owned Games ────────────────────────────────────────────────────────────
 def upsert_owned_games(conn, steam_id: str, games: list) -> None:
-    """Schreibt Library-Daten. Bewusst KEIN `last_played_at` aus Steam —
-    Steam's `rtime_last_played` ist unzuverlaessig (zaehlt z.T. auch
-    Library-Browse-Trigger und liefert frische ts fuer jahrealte
-    Spiele). Recency kommt ausschliesslich aus:
-      1. Steam's `playtime_2weeks` (saubere 14-Tage-Playtime)
-      2. `mark_played_now` (Poller setzt's wenn `gameid` aktiv)
-    Das ist die einzige Kombi die fuer 'recent' echte Werte gibt.
+    """Schreibt Library-Daten. Zwei Recency-Spuren bewusst getrennt:
+      1. `last_played_at` — NUR vom Poller (mark_played_now), trusted
+         minute-genau wenn `gameid` aktiv ist.
+      2. `steam_last_played` — Steam's `rtime_last_played`, breiter
+         aber unzuverlaessig (zaehlt auch Library-Browse-Trigger).
+         Brauchbar fuer GROBE Filter wie 'in den letzten 2 Jahren
+         angefasst' (wanna-play-Pool).
     """
     for g in games:
         appid = g.get("appid")
         icon_url = _steam_image_url(appid, g.get("img_icon_url"))
         logo_url = _steam_image_url(appid, g.get("img_logo_url"))
+        steam_last = g.get("rtime_last_played") or None
         conn.execute("""
             INSERT INTO steam_owned_games
               (steam_id, app_id, name, img_icon_url, img_logo_url,
                playtime_forever_min, playtime_2weeks_min,
-               last_played_at, last_synced)
-            VALUES (?, ?, ?, ?, ?, ?, ?, NULL, strftime('%s','now'))
+               last_played_at, steam_last_played, last_synced)
+            VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, strftime('%s','now'))
             ON CONFLICT(steam_id, app_id) DO UPDATE SET
               name=excluded.name,
               img_icon_url=excluded.img_icon_url,
               img_logo_url=excluded.img_logo_url,
               playtime_forever_min=excluded.playtime_forever_min,
               playtime_2weeks_min=excluded.playtime_2weeks_min,
+              steam_last_played=COALESCE(excluded.steam_last_played,
+                                          steam_last_played),
               last_synced=excluded.last_synced
         """, (
             steam_id, appid, g.get("name"), icon_url, logo_url,
             g.get("playtime_forever", 0), g.get("playtime_2weeks", 0),
+            steam_last,
         ))
 
 
@@ -172,13 +178,17 @@ def get_owned_games_filtered(conn, steam_id: str,
                               filter_kind: str = "all",
                               sort_by: str = "playtime",
                               min_playtime_min: int = 0,
+                              played_since_days: int = 0,
                               limit: int = 100) -> list:
     """Joins steam_owned_games + steam_app_details, filtert nach
     Coop / Multiplayer / Alle, sortiert + limitiert.
 
-    filter_kind:  'all' | 'coop' | 'multiplayer'
-    sort_by:      'playtime' (forever DESC) | 'recent' (2weeks DESC) |
-                  'name' (alphabetisch)
+    filter_kind:        'all' | 'coop' | 'multiplayer'
+    sort_by:            'playtime' (forever DESC) | 'recent' (2weeks DESC) |
+                        'name' (alphabetisch) | 'random'
+    min_playtime_min:   playtime_forever >= N min
+    played_since_days:  rtime_last_played >= now - N*86400 — fuer
+                        wanna-play (Steam's grobes 'angefasst').
     """
     where = ["og.steam_id = ?"]
     params = [steam_id]
@@ -189,6 +199,14 @@ def get_owned_games_filtered(conn, steam_id: str,
     if min_playtime_min > 0:
         where.append("og.playtime_forever_min >= ?")
         params.append(min_playtime_min)
+    if played_since_days > 0:
+        # Entweder Steam's grober Wert (kann Library-Browse zaehlen)
+        # ODER Poller's trusted Wert. Fuer 'wanna play' liberal.
+        where.append(
+            "(og.steam_last_played >= strftime('%s','now') - ? "
+            " OR og.last_played_at  >= strftime('%s','now') - ?)")
+        params.append(played_since_days * 86400)
+        params.append(played_since_days * 86400)
     # 'recent' = nur Spiele die Steam selbst als 'played in last 2 weeks'
     # ausweist (playtime_2weeks_min > 0). Das ist die einzig
     # zuverlaessige Quelle — Steam's `rtime_last_played` zaehlt auch
@@ -203,12 +221,13 @@ def get_owned_games_filtered(conn, steam_id: str,
         "playtime": "og.playtime_forever_min DESC",
         "recent":   "og.playtime_2weeks_min DESC",
         "name":     "og.name COLLATE NOCASE ASC",
+        "random":   "RANDOM()",
     }.get(sort_by, "og.playtime_forever_min DESC")
 
     sql = f"""
         SELECT og.app_id, og.name, og.img_icon_url, og.img_logo_url,
                og.playtime_forever_min, og.playtime_2weeks_min,
-               og.last_played_at,
+               og.last_played_at, og.steam_last_played,
                ad.header_image, ad.short_description,
                ad.is_coop, ad.is_multiplayer, ad.category_ids
         FROM steam_owned_games og
