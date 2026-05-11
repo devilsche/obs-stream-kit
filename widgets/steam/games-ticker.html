@@ -28,6 +28,11 @@
        Standard sichtbar; per ?header=0 abschaltbar. */
     .pubg-header { display: block !important; }
     body.no-header .pubg-header { display: none !important; }
+    /* Loading-State: Card + Header unsichtbar bis das erste Game-Bild
+       vollstaendig geladen ist — verhindert das 'leere Karte erst,
+       dann ploetzlich Inhalt'-Flackern. */
+    body.loading .pubg-header,
+    body.loading .pubg-card { visibility: hidden; }
     .slot {
       display: flex;
       gap: 14px;
@@ -84,7 +89,7 @@
     }
   </style>
 </head>
-<body>
+<body class="loading">
   <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card panel pubg-fade-in">
     <div class="slot" id="slot">
@@ -161,64 +166,73 @@
     let idx = 0;
     let timer = null;
 
-    function renderOne(g) {
+    // Preload-Helper: probiert URLs der Reihe nach (Image-onload) und
+    // resolved mit der ersten die geladen werden konnte, oder null.
+    function preloadImage(sources) {
+      return new Promise((resolve) => {
+        if (!sources.length) { resolve(null); return; }
+        let i = 0;
+        const tryNext = () => {
+          if (i >= sources.length) { resolve(null); return; }
+          const img = new Image();
+          img.onload  = () => resolve(sources[i]);
+          img.onerror = () => { i++; tryNext(); };
+          img.src = sources[i];
+        };
+        tryNext();
+      });
+    }
+
+    async function renderOne(g) {
       const slot = document.getElementById("slot");
       slot.classList.remove("show");
-      // Cross-fade: 0.45s out, dann replace content, dann in
-      setTimeout(() => {
-        const cover = document.getElementById("cover");
-        // Fallback-Chain durchprobiert (onerror → next):
-        //  1. lokaler Cache (header.jpg falls Layer-3 schon synced hat)
-        //  2. Steam-CDN header.jpg — funktioniert fuer JEDES Game ohne
-        //     Storefront-Sync. Das ist das gleiche Bild das in der
-        //     Library als Header angezeigt wird.
-        //  3. Library-spezifischere CDN-Varianten (library_hero etc.)
-        //  4. lokales logo/icon
-        //  5. remote logo/icon
-        const cdn = `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appId}`;
-        const sources = [
-          g.headerImageCached,
-          `${cdn}/header.jpg`,
-          `${cdn}/library_600x900.jpg`,
-          g.headerImage,
-          g.imgLogoCached, g.imgLogoUrl,
-          g.imgIconCached, g.imgIconUrl,
-        ].filter(Boolean);
-        cover.dataset.tryIdx = "0";
-        cover.dataset.sources = JSON.stringify(sources);
-        cover.onerror = () => {
-          const idx = parseInt(cover.dataset.tryIdx || "0", 10) + 1;
-          const list = JSON.parse(cover.dataset.sources || "[]");
-          if (idx < list.length) {
-            cover.dataset.tryIdx = String(idx);
-            cover.src = list[idx];
-          } else {
-            cover.style.display = "none";
-            cover.onerror = null;
-          }
-        };
-        if (sources.length) {
-          cover.src = sources[0];
-          cover.style.display = "";
-        } else {
-          cover.style.display = "none";
-        }
-        document.getElementById("name").textContent = g.name || ("App #" + g.appId);
-        const parts = [];
-        const total = fmtHours(g.playtimeTotalMin);
-        if (total) parts.push(`<span><b>${total}</b> total</span>`);
-        const recent = fmtHours(g.playtime2WeeksMin);
-        if (recent) parts.push(`<span><b>${recent}</b> last 2w</span>`);
-        if (g.isCoop) parts.push(`<span class="badge coop">Co-op</span>`);
-        else if (g.isMultiplayer) parts.push(`<span class="badge">Multiplayer</span>`);
-        document.getElementById("sub").innerHTML = parts.join("");
-        requestAnimationFrame(() => requestAnimationFrame(() =>
-          slot.classList.add("show")));
-      }, 450);
+      // Fallback-Chain durchprobiert (preload waehlt die erste die laedt):
+      //  1. lokaler Cache (header.jpg falls Layer-3 schon synced hat)
+      //  2. Steam-CDN header.jpg — funktioniert fuer JEDES Game
+      //  3. Library-Vertikal-Variante
+      //  4. Storefront / logo / icon
+      const cdn = `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appId}`;
+      const sources = [
+        g.headerImageCached,
+        `${cdn}/header.jpg`,
+        `${cdn}/library_600x900.jpg`,
+        g.headerImage,
+        g.imgLogoCached, g.imgLogoUrl,
+        g.imgIconCached, g.imgIconUrl,
+      ].filter(Boolean);
+
+      // Bild im Hintergrund laden waehrend der Out-Fade laeuft —
+      // wir warten auf beides, dann ist das Bild garantiert da bevor
+      // der Slot wieder reinfadet (kein Flicker mehr).
+      const [winner] = await Promise.all([
+        preloadImage(sources),
+        new Promise(r => setTimeout(r, 450)),
+      ]);
+
+      const cover = document.getElementById("cover");
+      if (winner) {
+        cover.src = winner;
+        cover.style.display = "";
+      } else {
+        cover.style.display = "none";
+      }
+      document.getElementById("name").textContent = g.name || ("App #" + g.appId);
+      const parts = [];
+      const total = fmtHours(g.playtimeTotalMin);
+      if (total) parts.push(`<span><b>${total}</b> total</span>`);
+      const recent = fmtHours(g.playtime2WeeksMin);
+      if (recent) parts.push(`<span><b>${recent}</b> last 2w</span>`);
+      if (g.isCoop) parts.push(`<span class="badge coop">Co-op</span>`);
+      else if (g.isMultiplayer) parts.push(`<span class="badge">Multiplayer</span>`);
+      document.getElementById("sub").innerHTML = parts.join("");
+      document.body.classList.remove("loading");
+      requestAnimationFrame(() => requestAnimationFrame(() =>
+        slot.classList.add("show")));
     }
 
     function step() {
       if (!games.length) {
+        document.body.classList.remove("loading");
         document.getElementById("name").textContent = "";
         document.getElementById("sub").innerHTML =
           `<span class="empty">no ${FILTER === "all" ? "" : FILTER + " "}games cached yet — Poller fetches Storefront data ~5/min</span>`;
@@ -240,6 +254,16 @@
       timer = setTimeout(() => { step(); scheduleNext(); }, delay);
     }
 
+    function prewarmImages(list) {
+      // Fire-and-forget: alle Game-Header parallel im Hintergrund
+      // laden. Der Browser bringt sie in den HTTP-Cache; spaeter
+      // braucht preloadImage() nur noch resolve() ohne Netzwerk.
+      list.forEach((g) => {
+        const url = `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appId}/header.jpg`;
+        new Image().src = url;
+      });
+    }
+
     async function refresh() {
       try {
         const u = `/api/steam/owned-games?filter=${encodeURIComponent(FILTER)}` +
@@ -247,6 +271,7 @@
                   `&minPlaytime=${MIN_PT}&limit=${LIMIT}`;
         const data = await PubgUI.fetchJson(u);
         games = (data && data.games) || [];
+        prewarmImages(games);
       } catch (e) {
         games = [];
       }

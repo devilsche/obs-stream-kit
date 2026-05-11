@@ -161,37 +161,52 @@
     let unlocks = [];
     let idx = 0;
 
-    function renderOne(u) {
+    // Preload-Helper: laedt ein Bild im Hintergrund vor.
+    function preloadImage(url) {
+      return new Promise((resolve) => {
+        if (!url) { resolve(false); return; }
+        const img = new Image();
+        img.onload  = () => resolve(true);
+        img.onerror = () => resolve(false);
+        img.src = url;
+      });
+    }
+
+    async function renderOne(u) {
       const slot = document.getElementById("slot");
       slot.classList.remove("show");
-      setTimeout(() => {
-        const pct = Number(u.globalPct);
-        const hasPct = Number.isFinite(pct);
-        const isRare = hasPct && pct <= RARE_PCT;
-        slot.classList.toggle("rare", isRare);
-        const iconEl = document.getElementById("icon");
-        if (u.iconUrl) {
-          iconEl.src = u.iconUrl;
-          iconEl.style.display = "";
-        } else {
-          iconEl.style.display = "none";
-        }
-        document.getElementById("title").textContent =
-          u.displayName || u.apiName || "Achievement";
-        const parts = [];
-        if (u.gameName) {
-          parts.push(`<span class="game">${u.gameName}</span>`);
-        }
-        parts.push(`<span>${fmtAgo(u.unlockedAt)}</span>`);
-        if (hasPct) {
-          parts.push(
-            `<span class="pct"><b>${pct.toFixed(1)}%</b> have it</span>`);
-        }
-        if (isRare) parts.push(`<span class="rare-badge">Rare</span>`);
-        document.getElementById("sub").innerHTML = parts.join("");
-        requestAnimationFrame(() => requestAnimationFrame(() =>
-          slot.classList.add("show")));
-      }, 450);
+      // Bild im Hintergrund laden parallel zum Out-Fade — Slot kommt
+      // erst wieder rein wenn Bild fertig ist.
+      const [iconReady] = await Promise.all([
+        preloadImage(u.iconUrl),
+        new Promise(r => setTimeout(r, 450)),
+      ]);
+      const pct = Number(u.globalPct);
+      const hasPct = Number.isFinite(pct);
+      const isRare = hasPct && pct <= RARE_PCT;
+      slot.classList.toggle("rare", isRare);
+      const iconEl = document.getElementById("icon");
+      if (iconReady) {
+        iconEl.src = u.iconUrl;
+        iconEl.style.display = "";
+      } else {
+        iconEl.style.display = "none";
+      }
+      document.getElementById("title").textContent =
+        u.displayName || u.apiName || "Achievement";
+      const parts = [];
+      if (u.gameName) {
+        parts.push(`<span class="game">${u.gameName}</span>`);
+      }
+      parts.push(`<span>${fmtAgo(u.unlockedAt)}</span>`);
+      if (hasPct) {
+        parts.push(
+          `<span class="pct"><b>${pct.toFixed(1)}%</b> have it</span>`);
+      }
+      if (isRare) parts.push(`<span class="rare-badge">Rare</span>`);
+      document.getElementById("sub").innerHTML = parts.join("");
+      requestAnimationFrame(() => requestAnimationFrame(() =>
+        slot.classList.add("show")));
     }
 
     function step() {
