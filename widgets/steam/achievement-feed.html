@@ -118,6 +118,7 @@
     // URL-Params
     const LIMIT      = parseInt(PubgUI.qs("limit",     "20"),  10);
     const ROTATE_MS  = parseInt(PubgUI.qs("rotateMs",  "8000"), 10);
+    const CYCLE_PAUSE_MS = parseInt(PubgUI.qs("cyclePauseMs", "0"), 10);
     const REFRESH_MS = parseInt(PubgUI.qs("refreshMs", "60000"), 10);
     const RARE_PCT   = parseFloat(PubgUI.qs("rarePct", "5"));
     const HEADER_OFF = PubgUI.qs("header", "1") === "0";
@@ -135,6 +136,10 @@
       { key: "rotateMs", label: "Rotate ms", type: "range",
         min: 3000, max: 20000, default: 8000,
         tooltip: "How fast each entry cycles." },
+      { key: "cyclePauseMs", label: "Cycle pause ms", type: "range",
+        min: 0, max: 60000, default: 0,
+        tooltip: "Extra pause AFTER the last entry before the feed " +
+                 "starts over from the top. 0 = no pause." },
       { key: "refreshMs", label: "Refresh ms", type: "range",
         min: 15000, max: 300000, default: 60000,
         tooltip: "How often to re-fetch the unlock list." },
@@ -200,6 +205,15 @@
       renderOne(u);
     }
 
+    function scheduleNext() {
+      // Pause-am-Ende-Loop wie im games-ticker.
+      const justFinishedCycle = unlocks.length > 0
+                              && idx > 0
+                              && idx % unlocks.length === 0;
+      const delay = ROTATE_MS + (justFinishedCycle ? CYCLE_PAUSE_MS : 0);
+      setTimeout(() => { step(); scheduleNext(); }, delay);
+    }
+
     async function refresh() {
       try {
         const data = await PubgUI.fetchJson(
@@ -213,7 +227,7 @@
     async function bootstrap() {
       await refresh();
       step();
-      setInterval(step, ROTATE_MS);
+      scheduleNext();
       setInterval(refresh, REFRESH_MS);
     }
     bootstrap();

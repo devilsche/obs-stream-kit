@@ -104,6 +104,7 @@
     const LIMIT      = parseInt(PubgUI.qs("limit",    "30"),   10);
     const MIN_PT     = parseInt(PubgUI.qs("minPlaytime", "0"), 10);
     const ROTATE_MS  = parseInt(PubgUI.qs("rotateMs", "8000"), 10);
+    const CYCLE_PAUSE_MS = parseInt(PubgUI.qs("cyclePauseMs", "0"), 10);
     const REFRESH_MS = parseInt(PubgUI.qs("refreshMs", String(10 * 60 * 1000)), 10); // 10min
     const HEADER_OFF = PubgUI.qs("header", "1") === "0";
     const HEADING_OVERRIDE = PubgUI.qs("headerTitle", "");
@@ -136,6 +137,10 @@
       { key: "rotateMs", label: "Rotate ms", type: "range",
         min: 3000, max: 20000, default: 8000,
         tooltip: "How fast each game cycles." },
+      { key: "cyclePauseMs", label: "Cycle pause ms", type: "range",
+        min: 0, max: 60000, default: 0,
+        tooltip: "Extra pause AFTER the last game before the list " +
+                 "starts over from the top. 0 = no pause." },
       { key: "minPlaytime", label: "Min playtime (min)", type: "range",
         min: 0, max: 1000, default: 0,
         tooltip: "Show only games with at least N minutes total." },
@@ -224,6 +229,17 @@
       renderOne(g);
     }
 
+    function scheduleNext() {
+      // Wenn wir gerade durch eine komplette Liste durch sind (idx
+      // landet auf einem N-Vielfachen), zusaetzliche Pause vor dem
+      // naechsten Durchlauf — sonst regulaerer Rotate-Takt.
+      const justFinishedCycle = games.length > 0
+                              && idx > 0
+                              && idx % games.length === 0;
+      const delay = ROTATE_MS + (justFinishedCycle ? CYCLE_PAUSE_MS : 0);
+      timer = setTimeout(() => { step(); scheduleNext(); }, delay);
+    }
+
     async function refresh() {
       try {
         const u = `/api/steam/owned-games?filter=${encodeURIComponent(FILTER)}` +
@@ -239,7 +255,7 @@
     async function bootstrap() {
       await refresh();
       step();
-      timer = setInterval(step, ROTATE_MS);
+      scheduleNext();
       setInterval(refresh, REFRESH_MS);
     }
     bootstrap();
