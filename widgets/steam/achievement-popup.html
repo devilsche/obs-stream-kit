@@ -144,12 +144,14 @@
       // Global-Unlock-%
       const pctEl = document.getElementById("pct");
       const ribbonEl = document.getElementById("ribbon");
-      const isRare = u.globalPct != null && u.globalPct <= RARE_PCT;
+      const pct = Number(u.globalPct);
+      const hasPct = Number.isFinite(pct);
+      const isRare = hasPct && pct <= RARE_PCT;
       popup.classList.toggle("rare", isRare);
-      if (u.globalPct != null) {
+      if (hasPct) {
         pctEl.innerHTML = isRare
-          ? `<b>${u.globalPct.toFixed(1)}%</b> have this — RARE`
-          : `<b>${u.globalPct.toFixed(1)}%</b> of players have this`;
+          ? `<b>${pct.toFixed(1)}%</b> have this — RARE`
+          : `<b>${pct.toFixed(1)}%</b> of players have this`;
         pctEl.style.display = "";
       } else {
         pctEl.style.display = "none";

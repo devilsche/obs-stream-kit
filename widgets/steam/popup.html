@@ -205,7 +205,9 @@
 
     function renderAchievement(u) {
       popup.dataset.type = "achievement";
-      const isRare = u.globalPct != null && u.globalPct <= RARE_PCT;
+      const pct = Number(u.globalPct);
+      const hasPct = Number.isFinite(pct);
+      const isRare = hasPct && pct <= RARE_PCT;
       popup.classList.toggle("rare", isRare);
       ribbon.textContent = isRare
         ? "Rare Achievement Unlocked"
@@ -219,10 +221,10 @@
         parts.push(
           `<span style="text-transform:uppercase;letter-spacing:0.06em">${u.gameName}</span>`);
       }
-      if (u.globalPct != null) {
+      if (hasPct) {
         const label = isRare
-          ? `<b>${u.globalPct.toFixed(1)}%</b> have this — RARE`
-          : `<b>${u.globalPct.toFixed(1)}%</b> of players have this`;
+          ? `<b>${pct.toFixed(1)}%</b> have this — RARE`
+          : `<b>${pct.toFixed(1)}%</b> of players have this`;
         parts.push(`<span class="rare-tag">${label}</span>`);
       }
       metaEl.innerHTML = parts.join("");

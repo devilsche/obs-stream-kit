@@ -217,8 +217,10 @@ class SteamEndpointRegistry:
                 if schema and schema["global_pct_json"]:
                     try:
                         pct_map = json.loads(schema["global_pct_json"])
-                        global_pct = pct_map.get(r["achievement_api_name"])
-                    except Exception:
+                        raw = pct_map.get(r["achievement_api_name"])
+                        global_pct = (float(raw)
+                                      if raw is not None else None)
+                    except (TypeError, ValueError, json.JSONDecodeError):
                         pass
                 unlocks.append({
                     "appId":        r["app_id"],
@@ -298,8 +300,10 @@ class SteamEndpointRegistry:
                 if schema and schema["global_pct_json"]:
                     try:
                         pct_map = json.loads(schema["global_pct_json"])
-                        global_pct = pct_map.get(r["achievement_api_name"])
-                    except Exception:
+                        raw = pct_map.get(r["achievement_api_name"])
+                        global_pct = (float(raw)
+                                      if raw is not None else None)
+                    except (TypeError, ValueError, json.JSONDecodeError):
                         pass
                 unlocks.append({
                     "appId":       r["app_id"],

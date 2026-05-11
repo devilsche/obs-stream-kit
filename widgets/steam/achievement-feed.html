@@ -18,6 +18,11 @@
       justify-content: flex-end;
       box-sizing: border-box;
     }
+    /* Wenn keine Unlocks da sind, komplett unsichtbar bleiben — kein
+       'leerer Container' im Stream. Filter-Bar darf trotzdem sichtbar
+       sein (im Setup-Mode mit ?filter=1). */
+    body.empty .pubg-header,
+    body.empty .pubg-card { display: none; }
     .panel {
       width: 100%;
       padding: 14px 18px;
@@ -101,7 +106,7 @@
     }
   </style>
 </head>
-<body>
+<body class="empty">
   <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card panel pubg-fade-in">
     <div class="heading" id="headingText"></div>
@@ -161,7 +166,9 @@
       const slot = document.getElementById("slot");
       slot.classList.remove("show");
       setTimeout(() => {
-        const isRare = u.globalPct != null && u.globalPct <= RARE_PCT;
+        const pct = Number(u.globalPct);
+        const hasPct = Number.isFinite(pct);
+        const isRare = hasPct && pct <= RARE_PCT;
         slot.classList.toggle("rare", isRare);
         const iconEl = document.getElementById("icon");
         if (u.iconUrl) {
@@ -177,9 +184,9 @@
           parts.push(`<span class="game">${u.gameName}</span>`);
         }
         parts.push(`<span>${fmtAgo(u.unlockedAt)}</span>`);
-        if (u.globalPct != null) {
+        if (hasPct) {
           parts.push(
-            `<span class="pct"><b>${u.globalPct.toFixed(1)}%</b> have it</span>`);
+            `<span class="pct"><b>${pct.toFixed(1)}%</b> have it</span>`);
         }
         if (isRare) parts.push(`<span class="rare-badge">Rare</span>`);
         document.getElementById("sub").innerHTML = parts.join("");
@@ -190,11 +197,10 @@
 
     function step() {
       if (!unlocks.length) {
-        document.getElementById("title").textContent = "";
-        document.getElementById("sub").innerHTML =
-          `<span class="empty">no unlocks yet</span>`;
+        document.body.classList.add("empty");
         return;
       }
+      document.body.classList.remove("empty");
       const u = unlocks[idx % unlocks.length];
       idx++;
       renderOne(u);

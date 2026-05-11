@@ -105,14 +105,25 @@ class SteamClient:
     def get_global_achievement_percentages_for_app(self, app_id: int) -> dict:
         """Liefert {achievement_api_name: percent_float} — wie viele
         Prozent ALLER Spieler dieses Achievement haben. Useful fuer
-        'rare unlock' Highlights im Popup. Kein API-Key noetig."""
+        'rare unlock' Highlights im Popup. Kein API-Key noetig.
+
+        Steam liefert 'percent' je nach Spiel mal als Number, mal als
+        String (z.B. '12.3456'). Wir casten konsequent zu float."""
         data = self._get(
             "/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/",
             gameid=app_id)
         achs = ((data.get("achievementpercentages") or {})
                 .get("achievements") or [])
-        return {a.get("name"): a.get("percent")
-                for a in achs if a.get("name")}
+        out = {}
+        for a in achs:
+            name = a.get("name")
+            if not name:
+                continue
+            try:
+                out[name] = float(a.get("percent"))
+            except (TypeError, ValueError):
+                continue
+        return out
 
     def get_app_details(self, app_id: int) -> dict:
         """Storefront-API (NICHT Web-API): liefert Categories, Genres,
