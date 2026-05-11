@@ -140,6 +140,11 @@ class SteamEndpointRegistry:
           ?sort=playtime|recent|name     (Default: playtime)
           ?minPlaytime=N                 Mindestspielzeit in Min
           ?limit=N                       Max Anzahl (Default 100)
+
+        Sort=recent nutzt Steam's GetRecentlyPlayedGames als Quelle —
+        GetOwnedGames liefert playtime_2weeks inkonsistent (Pragmata
+        z.B. nicht enthalten obwohl 2 Tage gespielt). Die Recently-
+        Played-Liste ist Steam's autoritative Ground Truth.
         """
         filter_kind = qs.get("filter", "all")
         sort_by     = qs.get("sort", "playtime")
@@ -152,39 +157,132 @@ class SteamEndpointRegistry:
         except ValueError:
             limit = 100
 
+        if sort_by == "recent":
+            return self._owned_games_recent(filter_kind, limit)
+
         conn = self.db_connect()
         try:
             rows = get_owned_games_filtered(
                 conn, self.client.steam_id,
                 filter_kind=filter_kind, sort_by=sort_by,
                 min_playtime_min=min_playtime, limit=limit)
-            games = []
-            for r in rows:
-                app_id = r["app_id"]
-                # Cached local URLs (Server liefert 200 wenn auf Platte
-                # vorhanden, sonst 404 -> Widget faellt auf remote zurueck)
-                games.append({
-                    "appId":             app_id,
-                    "name":              r["name"],
-                    "imgIconUrl":        r["img_icon_url"],
-                    "imgLogoUrl":        r["img_logo_url"],
-                    "headerImage":       r["header_image"],
-                    "headerImageCached": f"/steam/img/{app_id}/header.jpg",
-                    "imgLogoCached":     f"/steam/img/{app_id}/logo.jpg",
-                    "imgIconCached":     f"/steam/img/{app_id}/icon.jpg",
-                    "shortDescription":  r["short_description"],
-                    "playtimeTotalMin":  r["playtime_forever_min"],
-                    "playtime2WeeksMin": r["playtime_2weeks_min"],
-                    "lastPlayedAt":      r["last_played_at"],
-                    "isCoop":            bool(r["is_coop"]) if r["is_coop"] is not None else None,
-                    "isMultiplayer":     bool(r["is_multiplayer"]) if r["is_multiplayer"] is not None else None,
-                    "detailsCached":     r["header_image"] is not None,
-                })
+            games = [self._enrich_row(r) for r in rows]
             return _ok({
                 "games": games,
                 "filter": filter_kind,
                 "sort": sort_by,
                 "count": len(games),
+            })
+        finally:
+            conn.close()
+
+    def _enrich_row(self, r):
+        """Standard-Game-Dict aus einer steam_owned_games-Row."""
+        app_id = r["app_id"]
+        return {
+            "appId":             app_id,
+            "name":              r["name"],
+            "imgIconUrl":        r["img_icon_url"],
+            "imgLogoUrl":        r["img_logo_url"],
+            "headerImage":       r["header_image"],
+            "headerImageCached": f"/steam/img/{app_id}/header.jpg",
+            "imgLogoCached":     f"/steam/img/{app_id}/logo.jpg",
+            "imgIconCached":     f"/steam/img/{app_id}/icon.jpg",
+            "shortDescription":  r["short_description"],
+            "playtimeTotalMin":  r["playtime_forever_min"],
+            "playtime2WeeksMin": r["playtime_2weeks_min"],
+            "lastPlayedAt":      r["last_played_at"],
+            "isCoop":            (bool(r["is_coop"])
+                                  if r["is_coop"] is not None else None),
+            "isMultiplayer":     (bool(r["is_multiplayer"])
+                                  if r["is_multiplayer"] is not None else None),
+            "detailsCached":     r["header_image"] is not None,
+        }
+
+    def _owned_games_recent(self, filter_kind: str, limit: int):
+        """sort=recent: hole frische Recently-Played-Liste von Steam,
+        ueberlagere die Cache-Daten + Categories."""
+        try:
+            recent = self._cached(
+                "recent", self.client.get_recently_played_games)
+        except SteamApiError as e:
+            return _err(502, str(e))
+        if not recent:
+            return _ok({"games": [], "filter": filter_kind,
+                        "sort": "recent", "count": 0,
+                        "source": "GetRecentlyPlayedGames"})
+
+        # Reihenfolge wie Steam liefert (= sortiert nach playtime_2weeks
+        # bzw. Last-Played). Bei filter=coop/multiplayer brauchen wir
+        # die Categories aus dem Cache zum filtern.
+        conn = self.db_connect()
+        try:
+            games = []
+            for rp in recent:
+                app_id = rp.get("appid")
+                if not app_id:
+                    continue
+                # Vollen Cache-Row holen (Categories, header_image,
+                # short_description etc.). Wenn nicht da, fallback auf
+                # Steam-Recently-Played-Felder.
+                row = conn.execute("""
+                    SELECT og.app_id, og.name, og.img_icon_url, og.img_logo_url,
+                           og.playtime_forever_min, og.playtime_2weeks_min,
+                           og.last_played_at,
+                           ad.header_image, ad.short_description,
+                           ad.is_coop, ad.is_multiplayer, ad.category_ids
+                    FROM steam_owned_games og
+                    LEFT JOIN steam_app_details ad ON ad.app_id = og.app_id
+                    WHERE og.steam_id = ? AND og.app_id = ?
+                """, (self.client.steam_id, app_id)).fetchone()
+
+                if row:
+                    game = self._enrich_row(row)
+                    # Recently-Played-Werte gewinnen — Steam serviert
+                    # hier frische Daten ohne 1h-Sync-Lag.
+                    if rp.get("playtime_2weeks"):
+                        game["playtime2WeeksMin"] = rp["playtime_2weeks"]
+                    if rp.get("playtime_forever"):
+                        game["playtimeTotalMin"] = rp["playtime_forever"]
+                else:
+                    # Spiel nicht in unserer owned-games Tabelle (z.B.
+                    # frisch gekauftes, Layer-1-Sync noch nicht durch).
+                    # Minimal-Eintrag aus Recently-Played selbst bauen.
+                    game = {
+                        "appId":             app_id,
+                        "name":              rp.get("name"),
+                        "imgIconUrl":        None,
+                        "imgLogoUrl":        None,
+                        "headerImage":       None,
+                        "headerImageCached": f"/steam/img/{app_id}/header.jpg",
+                        "imgLogoCached":     f"/steam/img/{app_id}/logo.jpg",
+                        "imgIconCached":     f"/steam/img/{app_id}/icon.jpg",
+                        "shortDescription":  None,
+                        "playtimeTotalMin":  rp.get("playtime_forever") or 0,
+                        "playtime2WeeksMin": rp.get("playtime_2weeks") or 0,
+                        "lastPlayedAt":      None,
+                        "isCoop":            None,
+                        "isMultiplayer":     None,
+                        "detailsCached":     False,
+                    }
+
+                # Filter nach Category greift erst NACH dem Lookup —
+                # filter=coop/multiplayer braucht ad.is_coop. Bei
+                # unbekannten (frisch gekauft) ohne Categories: raus.
+                if filter_kind == "coop" and not game["isCoop"]:
+                    continue
+                if filter_kind == "multiplayer" and not game["isMultiplayer"]:
+                    continue
+                games.append(game)
+                if len(games) >= limit:
+                    break
+
+            return _ok({
+                "games": games,
+                "filter": filter_kind,
+                "sort": "recent",
+                "count": len(games),
+                "source": "GetRecentlyPlayedGames",
             })
         finally:
             conn.close()
