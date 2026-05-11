@@ -90,6 +90,30 @@ class SteamClient:
             steamid=self.steam_id, include_appinfo=1)
         return (data.get("response") or {}).get("games") or []
 
+    def get_number_of_current_players(self, app_id: int) -> int:
+        """Live-Spielerzahl fuer ein App. Kein API-Key noetig — aber wir
+        nutzen den `_get`-Wrapper trotzdem, damit das User-Agent-Setup
+        konsistent ist. Returns None wenn nicht verfuegbar."""
+        data = self._get(
+            "/ISteamUserStats/GetNumberOfCurrentPlayers/v1/",
+            appid=app_id)
+        resp = data.get("response") or {}
+        if resp.get("result") != 1:
+            return None
+        return resp.get("player_count")
+
+    def get_global_achievement_percentages_for_app(self, app_id: int) -> dict:
+        """Liefert {achievement_api_name: percent_float} — wie viele
+        Prozent ALLER Spieler dieses Achievement haben. Useful fuer
+        'rare unlock' Highlights im Popup. Kein API-Key noetig."""
+        data = self._get(
+            "/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/",
+            gameid=app_id)
+        achs = ((data.get("achievementpercentages") or {})
+                .get("achievements") or [])
+        return {a.get("name"): a.get("percent")
+                for a in achs if a.get("name")}
+
     def get_app_details(self, app_id: int) -> dict:
         """Storefront-API (NICHT Web-API): liefert Categories, Genres,
         Header-Image fuer ein Spiel. Kein API-Key noetig.

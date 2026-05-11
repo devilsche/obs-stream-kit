@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Steam Achievement Feed</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/widgets/pubg/_pubg.css">
+  <style>
+    /* Rotierender Feed der letzten Achievement-Unlocks ueber alle Games.
+       Im Gegensatz zu popup/achievement-popup ist das kein Trigger-
+       Widget — es zeigt IMMER die letzten N Unlocks an, auch wenn sie
+       schon als 'displayed' markiert wurden. */
+    html, body { height: 100%; margin: 0; }
+    body {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      box-sizing: border-box;
+    }
+    .panel {
+      width: 100%;
+      padding: 14px 18px;
+      min-height: 92px;
+      position: relative;
+    }
+    .heading {
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .heading b { color: var(--pubg-gold); }
+    .slot {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.45s ease-out, transform 0.45s ease-out;
+    }
+    .slot.show { opacity: 1; transform: translateY(0); }
+    .icon {
+      width: 56px; height: 56px;
+      border-radius: 6px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--pubg-border);
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+    .meta { flex: 1; min-width: 0; }
+    .title {
+      color: var(--pubg-gold);
+      font-weight: 700;
+      font-size: 1em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sub {
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      margin-top: 2px;
+      letter-spacing: 0.04em;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .sub b { color: var(--pubg-text); font-variant-numeric: tabular-nums; }
+    .game {
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .pct { color: var(--pubg-muted); }
+    .pct b { color: var(--pubg-text); }
+    .rare-badge {
+      display: inline-block;
+      font-size: 0.7em;
+      letter-spacing: 0.08em;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: var(--pubg-gold);
+      color: #1a0d2a;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    /* Rare-Variante: Icon glueht gold */
+    .slot.rare .icon {
+      border-color: #fff8d0;
+      box-shadow: 0 0 14px rgba(242, 183, 5, 0.5),
+                  0 0 28px rgba(242, 183, 5, 0.25);
+    }
+    .slot.rare .pct b { color: var(--pubg-gold); }
+    .empty {
+      color: var(--pubg-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="pubg-header" id="pubgHeader"></div>
+  <div class="pubg-card panel pubg-fade-in">
+    <div class="heading" id="headingText"></div>
+    <div class="slot" id="slot">
+      <img class="icon" id="icon" alt="">
+      <div class="meta">
+        <div class="title" id="title">—</div>
+        <div class="sub" id="sub"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/widgets/pubg/_pubg.js"></script>
+  <script>
+    // URL-Params
+    const LIMIT      = parseInt(PubgUI.qs("limit",     "20"),  10);
+    const ROTATE_MS  = parseInt(PubgUI.qs("rotateMs",  "8000"), 10);
+    const REFRESH_MS = parseInt(PubgUI.qs("refreshMs", "60000"), 10);
+    const RARE_PCT   = parseFloat(PubgUI.qs("rarePct", "5"));
+    const HEADING    = PubgUI.qs("header", "");
+
+    PubgUI.renderHeader(
+      document.getElementById("pubgHeader"), "Achievements", "live");
+    PubgUI.buildFilter([
+      { key: "limit", label: "Pool size", type: "range",
+        min: 5, max: 100, default: 20,
+        tooltip: "How many of the latest unlocks rotate in the feed." },
+      { key: "rotateMs", label: "Rotate ms", type: "range",
+        min: 3000, max: 20000, default: 8000,
+        tooltip: "How fast each entry cycles." },
+      { key: "refreshMs", label: "Refresh ms", type: "range",
+        min: 15000, max: 300000, default: 60000,
+        tooltip: "How often to re-fetch the unlock list." },
+      { key: "rarePct", label: "Rare ≤ (%)", type: "range",
+        min: 1, max: 25, default: 5,
+        tooltip: "Threshold for the 'rare' highlight. Achievements " +
+                 "that fewer than N% of players have get the badge." },
+    ]);
+    document.getElementById("headingText").innerHTML = HEADING
+      ? HEADING.replace(/</g, "&lt;")
+      : `<b>Recent unlocks</b>`;
+
+    function fmtAgo(unixSec) {
+      if (!unixSec) return "";
+      const diff = Date.now() / 1000 - unixSec;
+      if (diff < 60)    return "just now";
+      if (diff < 3600)  return Math.floor(diff / 60) + "m ago";
+      if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+      if (diff < 604800) return Math.floor(diff / 86400) + "d ago";
+      return Math.floor(diff / 604800) + "w ago";
+    }
+
+    let unlocks = [];
+    let idx = 0;
+
+    function renderOne(u) {
+      const slot = document.getElementById("slot");
+      slot.classList.remove("show");
+      setTimeout(() => {
+        const isRare = u.globalPct != null && u.globalPct <= RARE_PCT;
+        slot.classList.toggle("rare", isRare);
+        const iconEl = document.getElementById("icon");
+        if (u.iconUrl) {
+          iconEl.src = u.iconUrl;
+          iconEl.style.display = "";
+        } else {
+          iconEl.style.display = "none";
+        }
+        document.getElementById("title").textContent =
+          u.displayName || u.apiName || "Achievement";
+        const parts = [];
+        if (u.gameName) {
+          parts.push(`<span class="game">${u.gameName}</span>`);
+        }
+        parts.push(`<span>${fmtAgo(u.unlockedAt)}</span>`);
+        if (u.globalPct != null) {
+          parts.push(
+            `<span class="pct"><b>${u.globalPct.toFixed(1)}%</b> have it</span>`);
+        }
+        if (isRare) parts.push(`<span class="rare-badge">Rare</span>`);
+        document.getElementById("sub").innerHTML = parts.join("");
+        requestAnimationFrame(() => requestAnimationFrame(() =>
+          slot.classList.add("show")));
+      }, 450);
+    }
+
+    function step() {
+      if (!unlocks.length) {
+        document.getElementById("title").textContent = "";
+        document.getElementById("sub").innerHTML =
+          `<span class="empty">no unlocks yet</span>`;
+        return;
+      }
+      const u = unlocks[idx % unlocks.length];
+      idx++;
+      renderOne(u);
+    }
+
+    async function refresh() {
+      try {
+        const data = await PubgUI.fetchJson(
+          `/api/steam/achievement-feed?limit=${LIMIT}`);
+        unlocks = (data && data.unlocks) || [];
+      } catch (e) {
+        unlocks = [];
+      }
+    }
+
+    async function bootstrap() {
+      await refresh();
+      step();
+      setInterval(step, ROTATE_MS);
+      setInterval(refresh, REFRESH_MS);
+    }
+    bootstrap();
+  </script>
+</body>
+</html>

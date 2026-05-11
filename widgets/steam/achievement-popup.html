@@ -67,15 +67,35 @@
       letter-spacing: 0.04em;
       text-transform: uppercase;
     }
+    .pct {
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      margin-top: 3px;
+      letter-spacing: 0.04em;
+    }
+    .pct b { color: var(--pubg-text); font-variant-numeric: tabular-nums; }
+    /* Rare-Unlock: <5% aller Spieler — Glow + Ribbon-Text aendert sich */
+    .popup.rare .icon {
+      box-shadow: 0 0 24px rgba(242, 183, 5, 0.85),
+                  0 0 48px rgba(242, 183, 5, 0.45);
+      border-color: #fff8d0;
+      animation: rareGlow 1.8s ease-in-out infinite;
+    }
+    .popup.rare .pct b { color: var(--pubg-gold); }
+    @keyframes rareGlow {
+      0%, 100% { box-shadow: 0 0 18px rgba(242,183,5,0.65), 0 0 36px rgba(242,183,5,0.35); }
+      50%      { box-shadow: 0 0 32px rgba(242,183,5,0.95), 0 0 60px rgba(242,183,5,0.55); }
+    }
   </style>
 </head>
 <body>
   <div class="pubg-card popup" id="popup">
     <img class="icon" id="icon" alt="">
     <div class="info">
-      <span class="ribbon">Achievement Unlocked</span>
+      <span class="ribbon" id="ribbon">Achievement Unlocked</span>
       <div class="title" id="title">—</div>
       <div class="desc" id="desc"></div>
+      <div class="pct" id="pct"></div>
       <div class="game" id="game"></div>
     </div>
   </div>
@@ -85,6 +105,8 @@
     const DURATION_S = parseFloat(PubgUI.qs("duration", "8"));
     const GAP_S      = parseFloat(PubgUI.qs("gap", "1.5"));
     const POLL_MS    = parseInt(PubgUI.qs("pollMs", "5000"), 10);
+
+    const RARE_PCT = parseFloat(PubgUI.qs("rarePct", "5"));
 
     PubgUI.buildFilter([
       { key: "duration", label: "Show duration (s)", type: "range",
@@ -96,6 +118,11 @@
       { key: "pollMs", label: "Poll (ms)", type: "range",
         min: 2000, max: 30000, default: 5000,
         tooltip: "How often to poll for new unlocks." },
+      { key: "rarePct", label: "Rare ≤ (%)", type: "range",
+        min: 1, max: 25, default: 5,
+        tooltip: "Threshold for the 'rare unlock' glow effect. " +
+                 "Achievements that fewer than N% of players have " +
+                 "get the highlight animation." },
     ]);
 
     const popup = document.getElementById("popup");
@@ -114,6 +141,22 @@
       } else {
         iconEl.style.display = "none";
       }
+      // Global-Unlock-%
+      const pctEl = document.getElementById("pct");
+      const ribbonEl = document.getElementById("ribbon");
+      const isRare = u.globalPct != null && u.globalPct <= RARE_PCT;
+      popup.classList.toggle("rare", isRare);
+      if (u.globalPct != null) {
+        pctEl.innerHTML = isRare
+          ? `<b>${u.globalPct.toFixed(1)}%</b> have this — RARE`
+          : `<b>${u.globalPct.toFixed(1)}%</b> of players have this`;
+        pctEl.style.display = "";
+      } else {
+        pctEl.style.display = "none";
+      }
+      ribbonEl.textContent = isRare
+        ? "Rare Achievement Unlocked"
+        : "Achievement Unlocked";
       popup.classList.add("show");
       setTimeout(() => {
         popup.classList.remove("show");

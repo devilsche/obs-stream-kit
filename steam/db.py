@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS steam_app_schema (
   game_name TEXT,
   achievement_count INTEGER NOT NULL DEFAULT 0,  -- total Achievements im Game
   schema_json TEXT,                              -- volles Schema als JSON
+  global_pct_json TEXT,                          -- {api_name: percent_float}
+  global_pct_cached_at INTEGER,                  -- Unix epoch
   cached_at INTEGER NOT NULL
 );
 
@@ -82,6 +84,9 @@ def init_schema(conn: sqlite3.Connection) -> None:
     for stmt in (
         "ALTER TABLE steam_owned_games ADD COLUMN img_logo_url TEXT",
         "ALTER TABLE steam_owned_games ADD COLUMN last_played_at INTEGER",
+        "ALTER TABLE steam_app_schema ADD COLUMN global_pct_json TEXT",
+        "ALTER TABLE steam_app_schema "
+            "ADD COLUMN global_pct_cached_at INTEGER",
     ):
         try:
             conn.execute(stmt)
@@ -273,6 +278,49 @@ def get_app_schema(conn, app_id: int):
     return conn.execute(
         "SELECT * FROM steam_app_schema WHERE app_id=?", (app_id,)
     ).fetchone()
+
+
+def upsert_global_achievement_pct(conn, app_id: int,
+                                    pct_json: str) -> None:
+    """Schreibt die {api_name: percent}-Map ins schema-Row. Falls Row
+    noch nicht existiert, anlegen mit minimalen Defaults — wird vom
+    naechsten _ensure_schema-Call mit Game-Name/Count gefuellt."""
+    conn.execute("""
+        INSERT INTO steam_app_schema
+          (app_id, game_name, achievement_count, schema_json,
+           global_pct_json, global_pct_cached_at, cached_at)
+        VALUES (?, NULL, 0, NULL, ?,
+                strftime('%s','now'), strftime('%s','now'))
+        ON CONFLICT(app_id) DO UPDATE SET
+          global_pct_json=excluded.global_pct_json,
+          global_pct_cached_at=excluded.global_pct_cached_at
+    """, (app_id, pct_json))
+
+
+def get_global_achievement_pct(conn, app_id: int):
+    """Returns (pct_json_str, cached_at) oder (None, None)."""
+    row = conn.execute("""
+        SELECT global_pct_json, global_pct_cached_at
+        FROM steam_app_schema WHERE app_id=?
+    """, (app_id,)).fetchone()
+    if not row:
+        return (None, None)
+    return (row["global_pct_json"], row["global_pct_cached_at"])
+
+
+# ── Achievement Feed (latest unlocks across all games) ─────────────────────
+def get_achievement_feed(conn, steam_id: str, limit: int = 20) -> list:
+    """Letzte N Unlocks ueber alle Games — sortiert nach unlocked_at DESC.
+    Liefert IMMER aktuelle Daten, unabhaengig vom displayed_at-Flag.
+    Fuer den Feed-Ticker (kein Popup-Verhalten)."""
+    return conn.execute("""
+        SELECT app_id, achievement_api_name, unlocked_at,
+               display_name, description, icon_url
+        FROM steam_achievements_seen
+        WHERE steam_id=? AND app_id >= 0
+        ORDER BY unlocked_at DESC
+        LIMIT ?
+    """, (steam_id, limit)).fetchall()
 
 
 # ── Achievement Unlocks ────────────────────────────────────────────────────

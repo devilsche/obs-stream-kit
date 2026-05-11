@@ -94,6 +94,16 @@
     .popup[data-type="now-playing"] .icon {
       border: 1px solid var(--pubg-border);
     }
+    /* Rare-Unlock: <RARE_PCT% aller Spieler — staerkere Animation */
+    .popup.rare[data-type="achievement"] .icon {
+      border-color: #fff8d0;
+      animation: rareGlow 1.8s ease-in-out infinite;
+    }
+    @keyframes rareGlow {
+      0%, 100% { box-shadow: 0 0 18px rgba(242,183,5,0.65), 0 0 36px rgba(242,183,5,0.35); }
+      50%      { box-shadow: 0 0 32px rgba(242,183,5,0.95), 0 0 60px rgba(242,183,5,0.55); }
+    }
+    .popup.rare .meta .rare-tag b { color: var(--pubg-gold); }
   </style>
 </head>
 <body>
@@ -117,6 +127,7 @@
     const ACHIEVEMENT_INTERVAL_MS  = parseInt(PubgUI.qs("achPollMs",  "5000"),  10);                 // 5 s
     const SHOW_DURATION_MS         = parseInt(PubgUI.qs("durationMs", "8000"),  10);
     const GAP_MS                   = parseInt(PubgUI.qs("gapMs",      "1500"),  10);
+    const RARE_PCT                 = parseFloat(PubgUI.qs("rarePct",   "5"));
 
     PubgUI.buildFilter([
       { key: "nowPollMs", label: "Now-playing poll (ms)", type: "range",
@@ -132,6 +143,10 @@
       { key: "gapMs", label: "Gap (ms)", type: "range",
         min: 0, max: 5000, default: 1500,
         tooltip: "Pause between consecutive popups." },
+      { key: "rarePct", label: "Rare ≤ (%)", type: "range",
+        min: 1, max: 25, default: 5,
+        tooltip: "Threshold for 'rare unlock' glow. Achievements that " +
+                 "fewer than N% of players have get the highlight." },
     ]);
 
     const popup  = document.getElementById("popup");
@@ -163,6 +178,7 @@
     // Render-Logik je Type ──────────────────────────────────────────────
     function renderNowPlaying(d) {
       popup.dataset.type = "now-playing";
+      popup.classList.remove("rare");
       ribbon.textContent = "Now Playing";
       iconEl.src = d.avatar || "";
       iconEl.style.display = d.avatar ? "" : "none";
@@ -189,14 +205,27 @@
 
     function renderAchievement(u) {
       popup.dataset.type = "achievement";
-      ribbon.textContent = "Achievement Unlocked";
+      const isRare = u.globalPct != null && u.globalPct <= RARE_PCT;
+      popup.classList.toggle("rare", isRare);
+      ribbon.textContent = isRare
+        ? "Rare Achievement Unlocked"
+        : "Achievement Unlocked";
       iconEl.src = u.iconUrl || "";
       iconEl.style.display = u.iconUrl ? "" : "none";
       titleEl.textContent = u.displayName || u.apiName || "Achievement";
       descEl.textContent = u.description || "";
-      metaEl.innerHTML = u.gameName
-        ? `<span style="text-transform:uppercase;letter-spacing:0.06em">${u.gameName}</span>`
-        : "";
+      const parts = [];
+      if (u.gameName) {
+        parts.push(
+          `<span style="text-transform:uppercase;letter-spacing:0.06em">${u.gameName}</span>`);
+      }
+      if (u.globalPct != null) {
+        const label = isRare
+          ? `<b>${u.globalPct.toFixed(1)}%</b> have this — RARE`
+          : `<b>${u.globalPct.toFixed(1)}%</b> of players have this`;
+        parts.push(`<span class="rare-tag">${label}</span>`);
+      }
+      metaEl.innerHTML = parts.join("");
       barEl.style.display = "none";
     }
 

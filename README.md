@@ -437,3 +437,66 @@ oder zum Debuggen.
 Default 10 RPM reicht für 1-2 Matches/Min steady-state. Bei häufigen
 `!mypubgstats`-Triggern oder vielen Stamm-Mates: Higher-Tier-Key unter
 [developer.pubg.com](https://developer.pubg.com) beantragen (bis 60+ RPM).
+
+## Steam-Integration
+
+Live-Now-Playing-Card, Achievement-Popup mit Rare-Highlight, Library-
+Ticker (alle / Co-op / Multiplayer) und Achievement-Feed. Optional —
+nur aktiv wenn `Steam API Key:` + `Steam-ID:` in `.secrets` stehen.
+
+### Setup
+
+1. Steam-Key holen: <https://steamcommunity.com/dev/apikey>.
+2. SteamID64 ermitteln: <https://steamid.io/>.
+3. Beides in `.secrets`:
+   ```
+   Steam API Key: ABCDEF...
+   Steam-ID:      76561198XXXXXXXXX
+   ```
+4. Server neu starten — Poller läuft im Hintergrund.
+
+### Polling-Layer
+
+| Layer | Intervall | Zweck |
+|---|---|---|
+| 1 | 10 s | `GetPlayerSummaries` — was läuft grad |
+| 1 | 1×/h | `GetOwnedGames` — Library + Playtime |
+| 2 | 5 s | `GetPlayerAchievements` (nur wenn Spiel läuft) — neue Unlocks erkennen |
+| 2 | 1×/d | `GetGlobalAchievementPercentagesForApp` — Rare-Threshold |
+| 3 | 12 s | Storefront `appdetails` (1 App/Tick) — Co-op/Multiplayer-Flag + Header-Image |
+
+Bilder werden lokal in `data/steam-cache/images/` gecached — bleibt
+auch nach Storefront-Delisting verfügbar (z.B. UT2004).
+
+### Browser-Sources
+
+Alle URLs unter `http://localhost:9000/widgets/steam/<datei>.html`.
+
+| Datei | Zweck | URL-Parameter |
+|---|---|---|
+| `now-playing.html` | Bottom-Left-Card mit Avatar + Spiel + Live-Counter | `pollMs`, `livePlayers=0\|1`, `playersPollMs` |
+| `popup.html` | Combined slide-in (Now-Playing + Achievement) mit Rare-Glow | `nowPollMs`, `achPollMs`, `durationMs`, `gapMs`, `rarePct` |
+| `achievement-popup.html` | Pop-up nur für Achievements, separat von Now-Playing | `duration`, `gap`, `pollMs`, `rarePct` |
+| `achievement-feed.html` | Rotierender Feed der letzten N Unlocks | `limit`, `rotateMs`, `refreshMs`, `rarePct`, `header` |
+| `games-ticker.html` | Library/Co-op/Multiplayer-Rotator | `filter=all\|coop\|multiplayer`, `sort=playtime\|recent\|name`, `rotateMs`, `minPlaytime`, `limit` |
+
+Demo + Größenempfehlungen: `http://localhost:9000/widgets/steam/index.html`
+
+### API-Endpoints
+
+| Route | Liefert |
+|---|---|
+| `/api/steam/now-playing` | Aktive Session inkl. Achievement-Progress |
+| `/api/steam/current-players` | Live-Spielerzahl für aktuelle App |
+| `/api/steam/recent-unlocks` | Noch nicht angezeigte Unlocks (`?markDisplayed=1` markiert) |
+| `/api/steam/achievement-feed` | Letzte N Unlocks (auch alte, für Feed-Ticker) |
+| `/api/steam/owned-games` | Library, gefiltert + sortiert |
+| `/api/steam/recently-played` | Letzte ~10 Spiele |
+| `/api/steam/status` | Poller-Health |
+
+### Rare-Unlock-Effekt
+
+Pro Achievement wird der globale Unlock-Prozentsatz (1×/Tag) gepullt.
+Unlocks ≤ `rarePct%` (Default 5 %) bekommen im Popup einen pulsenden
+Gold-Glow + geänderten Ribbon-Text ("Rare Achievement Unlocked"). Im
+Feed wird ein **Rare**-Badge angezeigt.

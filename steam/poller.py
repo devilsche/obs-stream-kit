@@ -21,6 +21,7 @@ from steam.db import (
     get_app_schema, upsert_progress,
     find_app_needing_details_sync, upsert_app_details,
     mark_played_now,
+    upsert_global_achievement_pct, get_global_achievement_pct,
     COOP_CATEGORY_IDS, MULTIPLAYER_CATEGORY_IDS,
 )
 from steam.image_cache import ensure_app_images
@@ -31,6 +32,7 @@ LAYER2_INTERVAL_S = 5
 LAYER3_INTERVAL_S = 12              # Storefront-Sync (1 app pro Tick)
 OWNED_GAMES_REFRESH_S = 3600        # 1× / Stunde
 SCHEMA_REFRESH_S = 7 * 86400        # 1× / Woche pro App
+GLOBAL_PCT_REFRESH_S = 86400        # 1× / Tag pro App
 APP_DETAILS_REFRESH_S = 30 * 86400  # 1× / 30 Tage pro App
 
 
@@ -178,6 +180,8 @@ class SteamPoller(threading.Thread):
         try:
             # Schema für display_name/icon nachladen, falls nicht da
             schema_lookup = self._ensure_schema(conn, app_id, stats.get("gameName"))
+            # Global-Achievement-Pct fuer Rare-Highlight im Popup (1×/Tag)
+            self._ensure_global_pct(conn, app_id)
 
             unlocked_count = 0
             new_unlocks = 0
@@ -254,6 +258,22 @@ class SteamPoller(threading.Thread):
                                    header_url=data["header_image"])
             except Exception:
                 pass
+
+    def _ensure_global_pct(self, conn, app_id: int) -> None:
+        """Holt einmal pro Tag die globalen Unlock-Prozent. Best-effort —
+        Fehler werden geschluckt (kein API-Key noetig, Endpoint ist
+        oeffentlich aber kann auch leer sein)."""
+        _, cached_at = get_global_achievement_pct(conn, app_id)
+        ts = int(time.time())
+        if cached_at and ts - cached_at < GLOBAL_PCT_REFRESH_S:
+            return
+        try:
+            pct_map = self.client.get_global_achievement_percentages_for_app(app_id)
+        except SteamApiError:
+            return
+        if not pct_map:
+            return
+        upsert_global_achievement_pct(conn, app_id, json.dumps(pct_map))
 
     def _ensure_schema(self, conn, app_id, game_name_hint=None) -> dict:
         """Liefert {api_name: {displayName, description, icon}} fuer das App.

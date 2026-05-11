@@ -65,6 +65,24 @@
       gap: 4px 12px;
     }
     .meta b { color: var(--pubg-text); font-variant-numeric: tabular-nums; }
+    .live {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--pubg-muted);
+    }
+    .live::before {
+      content: "";
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #2ecc71;
+      box-shadow: 0 0 6px rgba(46, 204, 113, 0.6);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.5; transform: scale(0.85); }
+    }
     .ach-bar {
       margin-top: 6px;
       width: 100%; height: 4px;
@@ -96,6 +114,10 @@
   <script src="/widgets/pubg/_pubg.js"></script>
   <script>
     const POLL_MS = parseInt(PubgUI.qs("pollMs", "10000"), 10);
+    // Live-Counter optional via ?livePlayers=1 (kostet 1 extra API-Call
+    // alle PLAYERS_POLL_MS); Default an.
+    const SHOW_LIVE_PLAYERS = PubgUI.qs("livePlayers", "1") !== "0";
+    const PLAYERS_POLL_MS = parseInt(PubgUI.qs("playersPollMs", "60000"), 10);
 
     PubgUI.renderHeader(
       document.getElementById("pubgHeader"), "Now Playing", "live");
@@ -103,6 +125,13 @@
       { key: "pollMs", label: "Poll (ms)", type: "range",
         min: 3000, max: 60000, default: 10000,
         tooltip: "How often to refresh the now-playing card." },
+      { key: "livePlayers", label: "Live players", type: "select",
+        default: "1",
+        options: [["1","Show"], ["0","Hide"]],
+        tooltip: "Show live player count for the current game." },
+      { key: "playersPollMs", label: "Players poll (ms)", type: "range",
+        min: 30000, max: 300000, default: 60000,
+        tooltip: "How often to refresh the live player count." },
     ]);
 
     function fmtHours(min) {
@@ -111,6 +140,15 @@
       const h = Math.floor(min / 60);
       if (h < 100) return h + "h " + (min % 60) + "m";
       return h + " h";
+    }
+
+    let livePlayersText = "";  // gemerged in render-Lauf
+
+    function fmtPlayers(n) {
+      if (n == null) return null;
+      if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+      if (n >= 1000)     return (n / 1000).toFixed(1) + "k";
+      return String(n);
     }
 
     function render(d) {
@@ -142,6 +180,7 @@
         parts.push(
           `<span><b>${got}</b>/<b>${d.achievementsTotal}</b> achievements</span>`);
       }
+      if (livePlayersText) parts.push(livePlayersText);
       document.getElementById("meta").innerHTML = parts.join("");
 
       // Achievement-Progress-Bar
@@ -156,7 +195,28 @@
       }
     }
 
-    PubgUI.poll("/api/steam/now-playing", POLL_MS, render, console.error);
+    let lastNowPlaying = null;
+    PubgUI.poll("/api/steam/now-playing", POLL_MS, (d) => {
+      lastNowPlaying = d;
+      render(d);
+    }, console.error);
+
+    if (SHOW_LIVE_PLAYERS) {
+      async function pollPlayers() {
+        try {
+          const r = await PubgUI.fetchJson("/api/steam/current-players");
+          if (r && r.active && r.count != null) {
+            livePlayersText =
+              `<span class="live"><b>${fmtPlayers(r.count)}</b> playing now</span>`;
+          } else {
+            livePlayersText = "";
+          }
+          if (lastNowPlaying) render(lastNowPlaying);
+        } catch (e) { /* silent */ }
+      }
+      pollPlayers();
+      setInterval(pollPlayers, PLAYERS_POLL_MS);
+    }
   </script>
 </body>
 </html>

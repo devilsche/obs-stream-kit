@@ -15,6 +15,7 @@ from steam.db import (
     get_undisplayed_unlocks, mark_displayed, mark_all_displayed,
     insert_unlock_if_new, upsert_app_schema,
     get_owned_games_filtered,
+    get_global_achievement_pct, get_achievement_feed,
 )
 
 
@@ -58,6 +59,10 @@ class SteamEndpointRegistry:
             return self._owned_games(qs)
         if route == "/api/steam/recent-unlocks":
             return self._recent_unlocks(qs)
+        if route == "/api/steam/current-players":
+            return self._current_players(qs)
+        if route == "/api/steam/achievement-feed":
+            return self._achievement_feed(qs)
         if route == "/api/steam/status":
             return self._status()
         if route == "/api/steam/test-unlock":
@@ -206,6 +211,15 @@ class SteamEndpointRegistry:
                 # Game-Name aus Schema-Cache
                 schema = get_app_schema(conn, r["app_id"])
                 gname = schema["game_name"] if schema else None
+                # Global-Pct: wie viele Prozent aller Spieler haben dieses
+                # Achievement? <5% = 'rare unlock' → Glow im Popup.
+                global_pct = None
+                if schema and schema["global_pct_json"]:
+                    try:
+                        pct_map = json.loads(schema["global_pct_json"])
+                        global_pct = pct_map.get(r["achievement_api_name"])
+                    except Exception:
+                        pass
                 unlocks.append({
                     "appId":        r["app_id"],
                     "gameName":     gname,
@@ -214,6 +228,7 @@ class SteamEndpointRegistry:
                     "description":  r["description"],
                     "iconUrl":      r["icon_url"],
                     "unlockedAt":   r["unlocked_at"],
+                    "globalPct":    global_pct,
                 })
             marked_n = 0
             if mark and unlocks:
@@ -228,6 +243,75 @@ class SteamEndpointRegistry:
                       f"[{names}{'...' if len(unlocks) > 5 else ''}]",
                       flush=True)
             return _ok({"unlocks": unlocks, "marked": marked_n})
+        finally:
+            conn.close()
+
+    # ── Current Players (Live-Counter) ─────────────────────────────────────
+    def _current_players(self, qs):
+        """Live-Spielerzahl fuer ein Game.
+        Query: ?appId=<id>  — wenn fehlend: nimmt currentAppId vom Poller.
+        Antwort: { active: bool, appId: int, count: int }
+        Cache: 60s (Steam-Endpoint vertraegt aber Last; konservativ)."""
+        app_id = qs.get("appId")
+        if not app_id and self.poller:
+            app_id = self.poller.status().get("currentAppId")
+        try:
+            app_id = int(app_id) if app_id else None
+        except (TypeError, ValueError):
+            app_id = None
+        if not app_id:
+            return _ok({"active": False, "appId": None, "count": None})
+
+        cache_key = f"current_players:{app_id}"
+        now = time.monotonic()
+        hit = self._cache.get(cache_key)
+        if hit and now - hit[0] < 60.0:
+            count = hit[1]
+        else:
+            try:
+                count = self.client.get_number_of_current_players(app_id)
+            except SteamApiError as e:
+                return _err(502, str(e))
+            self._cache[cache_key] = (now, count)
+        return _ok({"active": True, "appId": app_id, "count": count})
+
+    # ── Achievement Feed (letzte N Unlocks) ────────────────────────────────
+    def _achievement_feed(self, qs):
+        """Letzte N freigeschalteten Achievements aus der DB — fuer den
+        Feed-Ticker. Liefert IMMER Daten (auch alte), unabhaengig vom
+        displayed_at-Flag.
+        Query: ?limit=N  (Default 20, max 100)
+        """
+        try:
+            limit = max(1, min(100, int(qs.get("limit", "20"))))
+        except ValueError:
+            limit = 20
+        conn = self.db_connect()
+        try:
+            rows = get_achievement_feed(conn, self.client.steam_id, limit)
+            unlocks = []
+            for r in rows:
+                schema = get_app_schema(conn, r["app_id"])
+                gname = schema["game_name"] if schema else None
+                # Global-Pct nachladen wenn Schema vorhanden
+                global_pct = None
+                if schema and schema["global_pct_json"]:
+                    try:
+                        pct_map = json.loads(schema["global_pct_json"])
+                        global_pct = pct_map.get(r["achievement_api_name"])
+                    except Exception:
+                        pass
+                unlocks.append({
+                    "appId":       r["app_id"],
+                    "gameName":    gname,
+                    "apiName":     r["achievement_api_name"],
+                    "displayName": r["display_name"],
+                    "description": r["description"],
+                    "iconUrl":     r["icon_url"],
+                    "unlockedAt":  r["unlocked_at"],
+                    "globalPct":   global_pct,
+                })
+            return _ok({"unlocks": unlocks, "count": len(unlocks)})
         finally:
             conn.close()
 
