@@ -338,8 +338,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return
         if STEAM_ENABLED and self.path.startswith("/api/steam/"):
             try:
+                # WICHTIG: self.path inkl. Query an dispatch geben —
+                # SteamEndpointRegistry.dispatch parst die Query selbst
+                # via urlparse(). Vorher wurde split("?")[0] uebergeben,
+                # was alle Query-Params verschluckt hat (Bug:
+                # sort=recent&limit=20 wurde ignoriert).
                 result = steam_registry.dispatch(
-                    "GET", self.path.split("?")[0], b"", dict(self.headers))
+                    "GET", self.path, b"", dict(self.headers))
                 if result is not None:
                     body, code, ctype = result
                     self.send_response(code)
