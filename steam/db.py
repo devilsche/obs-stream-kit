@@ -208,6 +208,7 @@ def get_owned_games_filtered(conn, steam_id: str,
     sql = f"""
         SELECT og.app_id, og.name, og.img_icon_url, og.img_logo_url,
                og.playtime_forever_min, og.playtime_2weeks_min,
+               og.last_played_at,
                ad.header_image, ad.short_description,
                ad.is_coop, ad.is_multiplayer, ad.category_ids
         FROM steam_owned_games og
