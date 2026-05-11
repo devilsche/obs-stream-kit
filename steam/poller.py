@@ -18,7 +18,7 @@ import time
 from steam.api_client import SteamApiError
 from steam.db import (
     insert_unlock_if_new, upsert_owned_games, upsert_app_schema,
-    get_app_schema, upsert_progress,
+    get_app_schema, upsert_progress, get_progress,
     find_app_needing_details_sync, upsert_app_details,
     mark_played_now,
     upsert_global_achievement_pct, get_global_achievement_pct,
@@ -188,29 +188,50 @@ class SteamPoller(threading.Thread):
             # Global-Achievement-Pct fuer Rare-Highlight im Popup (1×/Tag)
             self._ensure_global_pct(conn, app_id)
 
+            # First-Poll-Erkennung: wenn wir noch keinen Progress-Row
+            # haben, ist das der erste Layer-2-Tick fuer dieses Spiel.
+            # Dann ALLE schon unlocked Achievements als displayed
+            # markieren (Backfill ohne Popup-Spam). Spaetere Polls
+            # popupen dann nur echte neue Unlocks.
+            existing_progress = get_progress(conn, self.client.steam_id, app_id)
+            is_first_poll = existing_progress is None
+            now_ts = int(time.time())
+
             unlocked_count = 0
             new_unlocks = 0
             for ach in achievements:
-                if ach.get("achieved"):
-                    unlocked_count += 1
-                    api = ach.get("apiname")
-                    unlock_ts = ach.get("unlocktime") or 0
-                    if not api or unlock_ts <= 0:
-                        continue
-                    meta = schema_lookup.get(api, {})
-                    inserted = insert_unlock_if_new(
-                        conn, self.client.steam_id, app_id,
-                        api, unlock_ts,
-                        display_name=meta.get("displayName") or api,
-                        description=meta.get("description"),
-                        icon_url=meta.get("icon"))
-                    if inserted:
-                        new_unlocks += 1
+                if not ach.get("achieved"):
+                    continue
+                unlocked_count += 1
+                api = ach.get("apiname")
+                if not api:
+                    continue
+                # Spiele wie PUBG liefern unlocktime=0 obwohl achieved
+                # =True. Wir nutzen NOW als Fallback damit die Eintraege
+                # ueberhaupt in der DB landen (sonst skipped). Sortier-
+                # technisch landen sie 'jetzt', was beim Feed-Ticker
+                # OK ist (kommt halt zuerst).
+                unlock_ts = ach.get("unlocktime") or 0
+                if unlock_ts <= 0:
+                    unlock_ts = now_ts
+                meta = schema_lookup.get(api, {})
+                inserted = insert_unlock_if_new(
+                    conn, self.client.steam_id, app_id,
+                    api, unlock_ts,
+                    display_name=meta.get("displayName") or api,
+                    description=meta.get("description"),
+                    icon_url=meta.get("icon"),
+                    suppress_popup=is_first_poll)
+                if inserted:
+                    new_unlocks += 1
 
             upsert_progress(conn, self.client.steam_id, app_id, unlocked_count)
             with self._lock:
                 self._state["lastLayer2At"] = int(time.time())
-                self._state["newUnlocksTotal"] += new_unlocks
+                # Bei first-poll-Backfill nicht in 'new_unlocks_total'
+                # zaehlen — das soll echte neue Trigger reflektieren.
+                if not is_first_poll:
+                    self._state["newUnlocksTotal"] += new_unlocks
         finally:
             conn.close()
 

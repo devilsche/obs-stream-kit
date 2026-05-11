@@ -361,16 +361,25 @@ def insert_unlock_if_new(conn, steam_id: str, app_id: int,
                           api_name: str, unlocked_at: int,
                           display_name: str = None,
                           description: str = None,
-                          icon_url: str = None) -> bool:
-    """Returns True wenn der Unlock neu war (= im Stream als 'fresh' anzeigen)."""
+                          icon_url: str = None,
+                          suppress_popup: bool = False) -> bool:
+    """Returns True wenn der Unlock neu war (= im Stream als 'fresh' anzeigen).
+    suppress_popup=True markiert den Eintrag direkt als displayed —
+    speichert ihn fuer den Feed, aber laesst das Popup unausgeloest.
+    Genutzt beim ersten Poll eines Games damit nicht alle alten
+    Unlocks auf einmal hochpoppen."""
+    displayed_at = None
+    if suppress_popup:
+        import time as _t
+        displayed_at = int(_t.time())
     cur = conn.execute("""
         INSERT INTO steam_achievements_seen
           (steam_id, app_id, achievement_api_name, unlocked_at,
-           display_name, description, icon_url)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+           display_name, description, icon_url, displayed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(steam_id, app_id, achievement_api_name) DO NOTHING
     """, (steam_id, app_id, api_name, unlocked_at,
-          display_name, description, icon_url))
+          display_name, description, icon_url, displayed_at))
     return cur.rowcount > 0
 
 
