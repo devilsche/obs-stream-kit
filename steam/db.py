@@ -92,6 +92,19 @@ def init_schema(conn: sqlite3.Connection) -> None:
             conn.execute(stmt)
         except sqlite3.OperationalError:
             pass
+    # One-shot cleanup beim Server-Start: alle 'last_played_at'-Werte
+    # nullen fuer Spiele die Steam laut playtime_2weeks=0 nicht in den
+    # letzten 14 Tagen gespielt hat. Steam's 'rtime_last_played' war
+    # frueher die Quelle fuer last_played_at, aber unzuverlaessig
+    # (zaehlt Library-Browse-Trigger, liefert frische ts fuer alte
+    # Spiele - siehe Bug 2026-05-11 mit Arma 3). Jetzt: nur Poller's
+    # mark_played_now darf last_played_at setzen.
+    conn.execute("""
+        UPDATE steam_owned_games
+        SET last_played_at = NULL
+        WHERE last_played_at IS NOT NULL
+          AND playtime_2weeks_min = 0
+    """)
 
 
 def _steam_image_url(app_id: int, image_hash: str) -> str:
@@ -105,34 +118,34 @@ def _steam_image_url(app_id: int, image_hash: str) -> str:
 
 # ── Owned Games ────────────────────────────────────────────────────────────
 def upsert_owned_games(conn, steam_id: str, games: list) -> None:
+    """Schreibt Library-Daten. Bewusst KEIN `last_played_at` aus Steam —
+    Steam's `rtime_last_played` ist unzuverlaessig (zaehlt z.T. auch
+    Library-Browse-Trigger und liefert frische ts fuer jahrealte
+    Spiele). Recency kommt ausschliesslich aus:
+      1. Steam's `playtime_2weeks` (saubere 14-Tage-Playtime)
+      2. `mark_played_now` (Poller setzt's wenn `gameid` aktiv)
+    Das ist die einzige Kombi die fuer 'recent' echte Werte gibt.
+    """
     for g in games:
         appid = g.get("appid")
         icon_url = _steam_image_url(appid, g.get("img_icon_url"))
         logo_url = _steam_image_url(appid, g.get("img_logo_url"))
-        # Steam liefert 'rtime_last_played' (Unix epoch) wenn man
-        # include_played_free_games=1 anfragt — meist aber 0 oder
-        # fehlend. Wir nehmen es wenn da, sonst NULL.
-        last_played = g.get("rtime_last_played") or None
-        # COALESCE im UPDATE: bestehenden last_played_at nicht
-        # ueberschreiben wenn Steam diesmal NULL liefert.
         conn.execute("""
             INSERT INTO steam_owned_games
               (steam_id, app_id, name, img_icon_url, img_logo_url,
                playtime_forever_min, playtime_2weeks_min,
                last_played_at, last_synced)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))
+            VALUES (?, ?, ?, ?, ?, ?, ?, NULL, strftime('%s','now'))
             ON CONFLICT(steam_id, app_id) DO UPDATE SET
               name=excluded.name,
               img_icon_url=excluded.img_icon_url,
               img_logo_url=excluded.img_logo_url,
               playtime_forever_min=excluded.playtime_forever_min,
               playtime_2weeks_min=excluded.playtime_2weeks_min,
-              last_played_at=COALESCE(excluded.last_played_at, last_played_at),
               last_synced=excluded.last_synced
         """, (
             steam_id, appid, g.get("name"), icon_url, logo_url,
             g.get("playtime_forever", 0), g.get("playtime_2weeks", 0),
-            last_played,
         ))
 
 
