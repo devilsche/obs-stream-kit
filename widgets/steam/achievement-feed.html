@@ -29,15 +29,10 @@
       min-height: 92px;
       position: relative;
     }
-    .heading {
-      color: var(--pubg-muted);
-      font-size: 0.78em;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
-    .heading b { color: var(--pubg-gold); }
+    /* Header steht ueber der Card — gleiches Pattern wie PUBG-
+       Widgets. Standard sichtbar; per ?header=0 abschaltbar. */
+    .pubg-header { display: block !important; }
+    body.no-header .pubg-header { display: none !important; }
     .slot {
       display: flex;
       gap: 14px;
@@ -109,7 +104,6 @@
 <body class="empty">
   <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card panel pubg-fade-in">
-    <div class="heading" id="headingText"></div>
     <div class="slot" id="slot">
       <img class="icon" id="icon" alt="">
       <div class="meta">
@@ -126,10 +120,14 @@
     const ROTATE_MS  = parseInt(PubgUI.qs("rotateMs",  "8000"), 10);
     const REFRESH_MS = parseInt(PubgUI.qs("refreshMs", "60000"), 10);
     const RARE_PCT   = parseFloat(PubgUI.qs("rarePct", "5"));
-    const HEADING    = PubgUI.qs("header", "");
+    const HEADER_OFF = PubgUI.qs("header", "1") === "0";
+    const HEADING_OVERRIDE = PubgUI.qs("headerTitle", "");
 
-    PubgUI.renderHeader(
-      document.getElementById("pubgHeader"), "Achievements", "live");
+    if (HEADER_OFF) document.body.classList.add("no-header");
+    document.getElementById("pubgHeader").innerHTML = HEADING_OVERRIDE
+      ? HEADING_OVERRIDE.replace(/</g, "&lt;")
+      : `<b>Achievements</b> · Recent unlocks`;
+
     PubgUI.buildFilter([
       { key: "limit", label: "Pool size", type: "range",
         min: 5, max: 100, default: 20,
@@ -145,10 +143,6 @@
         tooltip: "Threshold for the 'rare' highlight. Achievements " +
                  "that fewer than N% of players have get the badge." },
     ]);
-    document.getElementById("headingText").innerHTML = HEADING
-      ? HEADING.replace(/</g, "&lt;")
-      : `<b>Recent unlocks</b>`;
-
     function fmtAgo(unixSec) {
       if (!unixSec) return "";
       const diff = Date.now() / 1000 - unixSec;

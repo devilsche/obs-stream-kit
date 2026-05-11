@@ -23,15 +23,11 @@
       min-height: 92px;
       position: relative;
     }
-    .heading {
-      color: var(--pubg-muted);
-      font-size: 0.78em;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
-    .heading b { color: var(--pubg-gold); }
+    /* Header steht ueber der Card — gleiches Pattern wie PUBG-
+       Widgets (map-performance.html, session-summary.html, etc.).
+       Standard sichtbar; per ?header=0 abschaltbar. */
+    .pubg-header { display: block !important; }
+    body.no-header .pubg-header { display: none !important; }
     .slot {
       display: flex;
       gap: 14px;
@@ -91,7 +87,6 @@
 <body>
   <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card panel pubg-fade-in">
-    <div class="heading" id="headingText"></div>
     <div class="slot" id="slot">
       <img class="cover" id="cover" alt="">
       <div class="meta">
@@ -110,9 +105,23 @@
     const MIN_PT     = parseInt(PubgUI.qs("minPlaytime", "0"), 10);
     const ROTATE_MS  = parseInt(PubgUI.qs("rotateMs", "8000"), 10);
     const REFRESH_MS = parseInt(PubgUI.qs("refreshMs", String(10 * 60 * 1000)), 10); // 10min
-    const HEADING    = PubgUI.qs("header",   "");
+    const HEADER_OFF = PubgUI.qs("header", "1") === "0";
+    const HEADING_OVERRIDE = PubgUI.qs("headerTitle", "");
 
-    PubgUI.renderHeader(document.getElementById("pubgHeader"), "Library", "live");
+    if (HEADER_OFF) document.body.classList.add("no-header");
+
+    // Header-Text spiegelt FILTER + SORT — so sieht man am Stream was
+    // gerade rotiert (statisches 'My library' war irreführend).
+    const FILTER_LABEL = FILTER === "coop"        ? "Co-op games"
+                       : FILTER === "multiplayer" ? "Multiplayer games"
+                                                  : "Library";
+    const SORT_LABEL   = SORT === "recent" ? "Recently played"
+                       : SORT === "name"   ? "A → Z"
+                                           : "Total playtime";
+    document.getElementById("pubgHeader").innerHTML = HEADING_OVERRIDE
+      ? HEADING_OVERRIDE.replace(/</g, "&lt;")
+      : `<b>${FILTER_LABEL}</b> · ${SORT_LABEL}`;
+
     PubgUI.buildFilter([
       { key: "filter", label: "Filter", type: "select", default: "all",
         options: [["all","All"], ["coop","Co-op"], ["multiplayer","Multiplayer"]],
@@ -134,9 +143,6 @@
         min: 1, max: 200, default: 30,
         tooltip: "How many games go into the ticker pool." },
     ]);
-    document.getElementById("headingText").innerHTML = HEADING
-      ? HEADING.replace(/</g, "&lt;")
-      : `<b>${FILTER === "coop" ? "Co-op games" : FILTER === "multiplayer" ? "Multiplayer games" : "My library"}</b>`;
 
     function fmtHours(min) {
       if (!min || min <= 0) return null;
