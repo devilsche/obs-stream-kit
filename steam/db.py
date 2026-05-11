@@ -189,19 +189,19 @@ def get_owned_games_filtered(conn, steam_id: str,
     if min_playtime_min > 0:
         where.append("og.playtime_forever_min >= ?")
         params.append(min_playtime_min)
-    # 'recent' = letzte 14 Tage: entweder last_played_at innerhalb 14d
-    # ODER Spielzeit in letzten 2 Wochen >0. Vorher gab's nur playtime_
-    # 2weeks-Filter, der nicht greift wenn Steam diese Stat 0 liefert
-    # obwohl gespielt — Poller setzt last_played_at via Layer-1 Detection.
+    # 'recent' = nur Spiele die Steam selbst als 'played in last 2 weeks'
+    # ausweist (playtime_2weeks_min > 0). Das ist die einzig
+    # zuverlaessige Quelle — Steam's `rtime_last_played` zaehlt auch
+    # Library-Browse-Trigger und ist daher fuer jahrealte Spiele
+    # (Arma 3 etc.) faelschlich aktuell. Layer-1 `mark_played_now`
+    # bleibt fuer das aktuell laufende Spiel, das aber via now-playing
+    # widget ohnehin separat angezeigt wird.
     if sort_by == "recent":
-        where.append(
-            "(og.last_played_at >= strftime('%s','now') - 14*86400 "
-            " OR og.playtime_2weeks_min > 0)")
+        where.append("og.playtime_2weeks_min > 0")
 
     order = {
         "playtime": "og.playtime_forever_min DESC",
-        "recent":   "COALESCE(og.last_played_at, 0) DESC, "
-                    "og.playtime_2weeks_min DESC",
+        "recent":   "og.playtime_2weeks_min DESC",
         "name":     "og.name COLLATE NOCASE ASC",
     }.get(sort_by, "og.playtime_forever_min DESC")
 

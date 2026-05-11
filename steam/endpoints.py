@@ -175,6 +175,7 @@ class SteamEndpointRegistry:
                     "shortDescription":  r["short_description"],
                     "playtimeTotalMin":  r["playtime_forever_min"],
                     "playtime2WeeksMin": r["playtime_2weeks_min"],
+                    "lastPlayedAt":      r["last_played_at"],
                     "isCoop":            bool(r["is_coop"]) if r["is_coop"] is not None else None,
                     "isMultiplayer":     bool(r["is_multiplayer"]) if r["is_multiplayer"] is not None else None,
                     "detailsCached":     r["header_image"] is not None,
