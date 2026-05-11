@@ -65,6 +65,8 @@ class SteamEndpointRegistry:
             return self._achievement_feed(qs)
         if route == "/api/steam/status":
             return self._status()
+        if route == "/api/steam/debug/achievements":
+            return self._debug_achievements(qs)
         if route == "/api/steam/test-unlock":
             return self._test_unlock(qs)
         if route == "/api/steam/test-reset":
@@ -430,6 +432,75 @@ class SteamEndpointRegistry:
             return _ok({"unlocks": unlocks, "count": len(unlocks)})
         finally:
             conn.close()
+
+    # ── Debug: Achievement-Roh-Antwort fuer ein Game ───────────────────────
+    def _debug_achievements(self, qs):
+        """Zeigt die rohe Steam-Antwort fuer GetPlayerAchievements +
+        GetSchemaForGame fuer eine appId. Diagnostik wenn ein Game
+        (z.B. PUBG) keine Unlocks zeigt — sieht man:
+          - liefert Steam ueberhaupt eine Liste?
+          - sind 'achieved' und 'unlocktime' gesetzt?
+          - existiert ein Schema (display_name + icon)?
+        Query: ?appId=<id>  (oder Default: aktuell laufendes Spiel)
+        """
+        app_id = qs.get("appId")
+        if not app_id and self.poller:
+            app_id = self.poller.status().get("currentAppId")
+        try:
+            app_id = int(app_id) if app_id else None
+        except (TypeError, ValueError):
+            app_id = None
+        if not app_id:
+            return _err(400, "appId required (or game must be running)")
+
+        result = {"appId": app_id}
+        try:
+            stats = self.client.get_player_achievements(app_id)
+            achs = stats.get("achievements") or []
+            result["achievementsCall"] = {
+                "success": stats.get("success", True),
+                "gameName": stats.get("gameName"),
+                "error":    stats.get("error"),
+                "totalAchievements":   len(achs),
+                "unlockedCount":       sum(1 for a in achs if a.get("achieved")),
+                "withUnlocktime":      sum(1 for a in achs
+                                            if a.get("achieved")
+                                            and (a.get("unlocktime") or 0) > 0),
+                "sampleUnlocked":      [a for a in achs
+                                        if a.get("achieved")][:3],
+                "sampleLocked":        [a for a in achs
+                                        if not a.get("achieved")][:2],
+            }
+        except SteamApiError as e:
+            result["achievementsCall"] = {"error": str(e)}
+
+        try:
+            schema = self.client.get_schema_for_game(app_id)
+            schema_achs = schema.get("achievements") or []
+            result["schemaCall"] = {
+                "achievementCount": len(schema_achs),
+                "sample": schema_achs[:3],
+            }
+        except SteamApiError as e:
+            result["schemaCall"] = {"error": str(e)}
+
+        # DB-Stand fuer Vergleich
+        conn = self.db_connect()
+        try:
+            row = conn.execute("""
+                SELECT COUNT(*) AS n FROM steam_achievements_seen
+                WHERE steam_id=? AND app_id=?
+            """, (self.client.steam_id, app_id)).fetchone()
+            result["dbStoredCount"] = row["n"]
+            prog = conn.execute("""
+                SELECT unlocked_count, last_checked FROM steam_app_progress
+                WHERE steam_id=? AND app_id=?
+            """, (self.client.steam_id, app_id)).fetchone()
+            result["dbProgress"] = (dict(prog) if prog else None)
+        finally:
+            conn.close()
+
+        return _ok(result)
 
     # ── Status (Poller-Health) ─────────────────────────────────────────────
     def _status(self):
