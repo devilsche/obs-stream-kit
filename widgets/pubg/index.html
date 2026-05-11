@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>PUBG Widgets — Demo</title>
+  <title>PUBG Widgets — Overview</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="_pubg.css">
   <style>
@@ -13,250 +13,404 @@
       color: var(--pubg-text);
     }
     h1 { color: var(--pubg-gold); margin: 0 0 6px; }
-    p.intro { color: var(--pubg-muted); margin: 0 0 24px; max-width: 720px; line-height: 1.5; }
-    .grid {
-      display: grid; gap: 18px;
-      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-      margin-bottom: 18px;
+    p.intro {
+      color: var(--pubg-muted); margin: 0 0 24px;
+      max-width: 760px; line-height: 1.5;
     }
-    .tile {
-      background: rgba(0,0,0,0.4);
+    h2.section {
+      color: var(--pubg-gold); font-size: 0.9em; letter-spacing: 0.1em;
+      text-transform: uppercase; margin: 28px 0 12px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--pubg-border);
+    }
+    h2.section .ctx {
+      color: var(--pubg-muted); font-weight: 400;
+      letter-spacing: 0.04em; font-size: 0.85em; margin-left: 8px;
+    }
+
+    .grid {
+      display: grid; gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    }
+    a.tile {
+      display: block;
+      background: rgba(0, 0, 0, 0.4);
       border: 1px solid var(--pubg-border);
       border-radius: 8px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-    .tile h2 {
-      margin: 0; padding: 8px 14px;
-      font-size: 0.8em;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--pubg-muted);
-      background: rgba(94, 42, 121, 0.2);
-      border-bottom: 1px solid var(--pubg-border);
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    .tile h2 .url {
-      color: var(--pubg-gold); font-size: 0.7em; opacity: 0.7;
+      padding: 14px 18px 16px;
       text-decoration: none;
+      color: inherit;
+      transition: border-color 0.15s, transform 0.15s, background 0.15s;
     }
-    .tile h2 .url:hover { opacity: 1; }
-    .tile iframe {
-      border: 0; width: 100%; background: transparent;
+    a.tile:hover {
+      border-color: var(--pubg-gold);
+      background: rgba(94, 42, 121, 0.18);
+      transform: translateY(-1px);
     }
-    .full { grid-column: 1 / -1; }
+    .tile-title {
+      display: flex; align-items: baseline; gap: 10px;
+      margin-bottom: 4px;
+    }
+    .tile-title h3 {
+      margin: 0; font-size: 1.0em; color: var(--pubg-gold);
+      font-weight: 700;
+    }
+    .tile-title .ext {
+      font-size: 0.78em; color: var(--pubg-muted);
+      letter-spacing: 0.04em;
+    }
+    .tile-title .ext::before { content: "↗ "; opacity: 0.7; }
+    .tile-desc {
+      color: var(--pubg-text);
+      font-size: 0.88em; line-height: 1.4;
+      margin-bottom: 10px;
+    }
+    .tile-size {
+      display: inline-block;
+      font-size: 0.75em;
+      color: var(--pubg-text);
+      background: rgba(94, 42, 121, 0.35);
+      border: 1px solid var(--pubg-border);
+      border-radius: 4px;
+      padding: 2px 8px;
+      margin-bottom: 10px;
+      letter-spacing: 0.04em;
+    }
+    .tile-size b { color: var(--pubg-gold); font-variant-numeric: tabular-nums; }
+    .tile-params {
+      margin: 0; padding: 0; list-style: none;
+      border-top: 1px solid rgba(94, 42, 121, 0.3);
+      padding-top: 8px;
+    }
+    .tile-params li {
+      display: flex; gap: 8px; padding: 2px 0;
+      font-size: 0.78em;
+    }
+    .tile-params li code {
+      color: var(--pubg-gold);
+      font-family: "DM Sans", monospace;
+      font-weight: 700;
+      min-width: 90px;
+      flex-shrink: 0;
+    }
+    .tile-params li span {
+      color: var(--pubg-muted);
+    }
+
     .urlbox {
       padding: 14px 18px; background: rgba(0,0,0,0.3);
       border: 1px solid var(--pubg-border);
-      border-radius: 8px; margin-bottom: 18px;
+      border-radius: 8px; margin-bottom: 12px;
       font-size: 0.85em;
     }
-    .urlbox a { color: var(--pubg-gold); display: block; padding: 3px 0; text-decoration: none; }
+    .urlbox a {
+      color: var(--pubg-gold); display: block; padding: 3px 0;
+      text-decoration: none;
+    }
     .urlbox a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
-  <h1>PUBG Widgets — lokale Demo</h1>
+  <h1>PUBG Widgets — overview</h1>
   <p class="intro">
-    Übersicht aller PUBG-Widgets. Jedes Widget läuft als eigene Browser-Source — hier in iframes
-    kombiniert für schnelles Sichten. Die Session aggregiert alle Matches seit
-    <code>sessionStartedAt</code> (Default: Epoch, also alle DB-Matches). Reset via Button im
-    flyout-full oder <code>POST /api/pubg/session/reset</code>.
+    All PUBG widgets grouped by stream scene. Click a tile to open the
+    widget URL in a new tab. Each tile shows the recommended OBS
+    browser-source size and the key URL parameters — every widget has
+    its built-in filter panel that writes the same parameters back to
+    the URL. Most widgets hide themselves when no recent match is
+    cached (override via <code>?ignoreStale=1</code>).
   </p>
 
-  <div class="urlbox">
-    <strong style="color:var(--pubg-gold);font-size:1em">▶ Gameplay scene · live, hide-on-no-session</strong>
-    <a href="/widgets/pubg/live-bar.html" target="_blank">live-bar.html — top, permanent strip</a>
-    <a href="/widgets/pubg/news-ticker.html" target="_blank">news-ticker.html — bottom, snippet rotator</a>
-    <a href="/widgets/pubg/flyout-full.html" target="_blank">flyout-full.html — side panel, multi-section</a>
-    <a href="/widgets/pubg/chat-stats-popup.html?player=__PLAYER__" target="_blank">chat-stats-popup.html — top-right, !stats trigger</a>
-
-    <strong style="color:var(--pubg-gold);font-size:1em;margin-top:8px;display:block">▶ Bot-Left rotation slots · 560×360 · session-only</strong>
-    <a href="/widgets/pubg/mates.html?layout=carousel" target="_blank">mates.html?layout=carousel</a>
-    <a href="/widgets/pubg/mates.html?layout=stack" target="_blank">mates.html?layout=stack</a>
-    <a href="/widgets/pubg/mates.html?layout=fold" target="_blank">mates.html?layout=fold</a>
-    <a href="/widgets/pubg/mates.html?layout=mosaic" target="_blank">mates.html?layout=mosaic</a>
-    <a href="/widgets/pubg/post-match-card.html" target="_blank">post-match-card.html — last match summary</a>
-    <a href="/widgets/pubg/map-performance.html?range=session" target="_blank">map-performance.html?range=session</a>
-    <a href="/widgets/pubg/top-mates-slider.html?range=session" target="_blank">top-mates-slider.html?range=session — rotates sort categories</a>
-    <a href="/widgets/pubg/first-fight.html" target="_blank">first-fight.html — first-fight survival rate (all matches)</a>
-    <a href="/widgets/pubg/first-fight.html?excludeHotDrop=1" target="_blank">first-fight.html?excludeHotDrop=1 — silent-drop fights only (no hot drops)</a>
-    <a href="/widgets/pubg/chicken-map.html?range=session" target="_blank">chicken-map.html?range=session</a>
-    <a href="/widgets/pubg/chicken-together.html" target="_blank">chicken-together.html — wins with which mates</a>
-    <a href="/widgets/pubg/session-lobbies.html" target="_blank">session-lobbies.html — Lobby Avg K/D + sparkline</a>
-    <a href="/widgets/pubg/hot-drop.html" target="_blank">hot-drop.html — hot-drop rate, survival, streak</a>
-    <a href="/widgets/pubg/streak-counter.html?type=chicken" target="_blank">streak-counter.html?type=chicken</a>
-    <a href="/widgets/pubg/streak-counter.html?type=top10" target="_blank">streak-counter.html?type=top10</a>
-    <a href="/widgets/pubg/session-goal.html?goal=kills:20" target="_blank">session-goal.html?goal=kills:20 — progress bar</a>
-    <a href="/widgets/pubg/session-goal.html?goal=chickens:3" target="_blank">session-goal.html?goal=chickens:3</a>
-    <a href="/widgets/pubg/trend-indicator.html" target="_blank">trend-indicator.html — current vs. last session</a>
-    <a href="/widgets/pubg/session-achievements.html" target="_blank">session-achievements.html — milestone log</a>
-
-    <strong style="color:var(--pubg-gold);font-size:1em;margin-top:8px;display:block">▶ Starting Soon / BRB · lifetime, always-on</strong>
-    <a href="/widgets/pubg/news-ticker.html?focus=lifetime" target="_blank">news-ticker.html?focus=lifetime</a>
-    <a href="/widgets/pubg/career-card.html" target="_blank">career-card.html — PUBG-API lifetime career</a>
-    <a href="/widgets/pubg/top-mates.html?sortBy=synergy&minMatches=10" target="_blank">top-mates.html?sortBy=synergy (Composite KDA — recommended)</a>
-    <a href="/widgets/pubg/top-mates.html?sortBy=mostPlayed&minMatches=2" target="_blank">top-mates.html?sortBy=mostPlayed</a>
-    <a href="/widgets/pubg/top-mates.html?sortBy=chickensTogether&minMatches=1" target="_blank">top-mates.html?sortBy=chickensTogether</a>
-    <a href="/widgets/pubg/top-mates.html?sortBy=mateKd&minMatches=2" target="_blank">top-mates.html?sortBy=mateKd</a>
-    <a href="/widgets/pubg/top-mates.html?sortBy=kd&minMatches=2" target="_blank">top-mates.html?sortBy=kd (Best K/D)</a>
-    <a href="/widgets/pubg/top-mates.html?sortBy=winRate&minMatches=2" target="_blank">top-mates.html?sortBy=winRate</a>
-    <a href="/widgets/pubg/map-performance.html?range=all" target="_blank">map-performance.html?range=all</a>
-    <a href="/widgets/pubg/chicken-map.html?range=all" target="_blank">chicken-map.html?range=all</a>
-    <a href="/widgets/pubg/session-summary.html" target="_blank">session-summary.html</a>
-    <a href="/widgets/pubg/map-distribution.html" target="_blank">map-distribution.html (candidate for removal)</a>
-
-    <strong style="color:var(--pubg-gold);font-size:1em;margin-top:8px;display:block">▶ Stream-Ending / fullscreen</strong>
-    <a href="/widgets/pubg/session-report.html" target="_blank">session-report.html — full after-session report (phases, maps, trend, streaks, achievements)</a>
-
-    <strong style="color:var(--pubg-gold);font-size:1em;margin-top:8px;display:block">▶ Just-Chatting / Tools</strong>
-    <a href="/widgets/pubg/lookup.html" target="_blank">lookup.html — interactive player search (PUBG-API)</a>
-    <a href="/widgets/pubg/squad-compare.html?players=__PLAYER__&matches=5" target="_blank">squad-compare.html?players=__PLAYER__&amp;matches=5</a>
-    <a href="/widgets/pubg/coplayer.html?player=__PLAYER__" target="_blank">/widgets/pubg/coplayer.html?player=__PLAYER__</a>
-
-    <strong style="color:var(--pubg-gold);font-size:1em;margin-top:8px;display:block">▶ Backend</strong>
-    <a href="/api/pubg/status" target="_blank">/api/pubg/status — poller health</a>
-    <a href="/api/pubg/db-info" target="_blank">/api/pubg/db-info — first match + streamer name</a>
-  </div>
-
+  <!-- ── Gameplay scene · live, hide-on-no-session ─────────────────── -->
+  <h2 class="section">Gameplay scene <span class="ctx">live · hide-on-no-session</span></h2>
   <div class="grid">
 
-    <div class="tile full">
-      <h2>news-ticker.html <a class="url" href="/widgets/pubg/news-ticker.html" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/news-ticker.html?ignoreStale=1" height="60"></iframe>
-    </div>
+    <a class="tile" href="/widgets/pubg/live-bar.html" target="_blank">
+      <div class="tile-title"><h3>live-bar.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Top strip — current session K/D, kills, damage, last placement.</div>
+      <span class="tile-size"><b>1920×60</b> · top anchor</span>
+      <ul class="tile-params">
+        <li><code>refreshMs</code><span>poll interval (default 5000)</span></li>
+        <li><code>ignoreStale</code><span>1 = always render, even without session</span></li>
+      </ul>
+    </a>
 
-    <div class="tile full">
-      <h2>live-bar.html <a class="url" href="/widgets/pubg/live-bar.html" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/live-bar.html?ignoreStale=1" height="60"></iframe>
-    </div>
+    <a class="tile" href="/widgets/pubg/news-ticker.html" target="_blank">
+      <div class="tile-title"><h3>news-ticker.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Marquee bar with rotating snippets — session stats, milestones, last match.</div>
+      <span class="tile-size"><b>1920×60</b> · bottom anchor</span>
+      <ul class="tile-params">
+        <li><code>rotateMs</code><span>snippet rotation (default 8000)</span></li>
+        <li><code>focus</code><span>session / lifetime</span></li>
+      </ul>
+    </a>
 
-    <div class="tile">
-      <h2>flyout-full.html <a class="url" href="/widgets/pubg/flyout-full.html" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/flyout-full.html?ignoreStale=1" height="780"></iframe>
-    </div>
+    <a class="tile" href="/widgets/pubg/flyout-full.html" target="_blank">
+      <div class="tile-title"><h3>flyout-full.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Multi-section side panel — full session readout with filters and reset button.</div>
+      <span class="tile-size"><b>600×900</b> · side anchor</span>
+      <ul class="tile-params">
+        <li><code>range</code><span>session / week / all (default session)</span></li>
+      </ul>
+    </a>
 
-    <div class="tile">
-      <h2>mates.html (carousel default) <a class="url" href="/widgets/pubg/mates.html" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/mates.html?ignoreStale=1" height="280"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>mates.html?layout=stack <a class="url" href="/widgets/pubg/mates.html?layout=stack" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/mates.html?layout=stack&ignoreStale=1" height="320"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>mates.html?layout=mosaic <a class="url" href="/widgets/pubg/mates.html?layout=mosaic" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/mates.html?layout=mosaic&ignoreStale=1" height="240"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>top-mates.html?minMatches=2 <a class="url" href="/widgets/pubg/top-mates.html?minMatches=2" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/top-mates.html?minMatches=2&ignoreStale=1" height="380"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>top-mates-slider.html · rotiert durch alle Sorts <a class="url" href="/widgets/pubg/top-mates-slider.html" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/top-mates-slider.html?minMatches=2&rotateMs=5000&ignoreStale=1" height="380"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>map-distribution.html <a class="url" href="/widgets/pubg/map-distribution.html" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/map-distribution.html?ignoreStale=1" height="320"></iframe>
-    </div>
-
-    <div class="tile full">
-      <h2>map-performance.html — Per-Map K/D / Wins / Ø Stats <a class="url" href="/widgets/pubg/map-performance.html?range=all" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/map-performance.html?range=all&ignoreStale=1" height="420"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>chicken-map.html · CHICKEN Wins pro Map <a class="url" href="/widgets/pubg/chicken-map.html" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/chicken-map.html?ignoreStale=1" height="500"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>chicken-together.html · CHICKEN mit welchen Mates <a class="url" href="/widgets/pubg/chicken-together.html" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/chicken-together.html?ignoreStale=1" height="500"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>first-fight.html <a class="url" href="/widgets/pubg/first-fight.html" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/first-fight.html?ignoreStale=1" height="360"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>session-lobbies.html · Lobby K/D + sparkline <a class="url" href="/widgets/pubg/session-lobbies.html" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/session-lobbies.html?ignoreStale=1" height="360"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>hot-drop.html · rate, survival, streak <a class="url" href="/widgets/pubg/hot-drop.html" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/hot-drop.html?ignoreStale=1" height="360"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>streak-counter.html?type=chicken <a class="url" href="/widgets/pubg/streak-counter.html?type=chicken" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/streak-counter.html?type=chicken&ignoreStale=1" height="360"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>session-goal.html?goal=kills:20 <a class="url" href="/widgets/pubg/session-goal.html?goal=kills:20" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/session-goal.html?goal=kills:20&ignoreStale=1" height="360"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>trend-indicator.html · vs. last session <a class="url" href="/widgets/pubg/trend-indicator.html" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/trend-indicator.html?ignoreStale=1" height="360"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>session-achievements.html · milestone log <a class="url" href="/widgets/pubg/session-achievements.html" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/session-achievements.html?ignoreStale=1" height="360"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>career-card.html <a class="url" href="/widgets/pubg/career-card.html" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/career-card.html?ignoreStale=1" height="280"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>post-match-card.html <a class="url" href="/widgets/pubg/post-match-card.html" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/post-match-card.html?ignoreStale=1" height="320"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>chat-stats-popup.html?player=__PLAYER__ <a class="url" href="/widgets/pubg/chat-stats-popup.html?player=__PLAYER__" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/chat-stats-popup.html?player=__PLAYER__&duration=99999&ignoreStale=1" height="280"></iframe>
-    </div>
-
-    <div class="tile full">
-      <h2>session-summary.html <a class="url" href="/widgets/pubg/session-summary.html" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/session-summary.html?ignoreStale=1" height="540"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>squad-compare.html <a class="url" href="/widgets/pubg/squad-compare.html?players=__PLAYER__&matches=5" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/squad-compare.html?players=__PLAYER__&matches=5&ignoreStale=1" height="420"></iframe>
-    </div>
-
-    <div class="tile">
-      <h2>lookup.html — Live PUBG-API <a class="url" href="/widgets/pubg/lookup.html?player=__PLAYER__" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/lookup.html?player=__PLAYER__&ignoreStale=1" height="600"></iframe>
-    </div>
-
-    <div class="tile full">
-      <h2>session-report.html <a class="url" href="/widgets/pubg/session-report.html" target="_blank">↗</a></h2>
-      <iframe src="/widgets/pubg/session-report.html?ignoreStale=1" height="900"></iframe>
-    </div>
+    <a class="tile" href="/widgets/pubg/chat-stats-popup.html?player=__PLAYER__" target="_blank">
+      <div class="tile-title"><h3>chat-stats-popup.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Triggered popup for <code>!stats &lt;name&gt;</code>. Streamer.bot sets the URL, OBS toggles visibility.</div>
+      <span class="tile-size"><b>540×280</b> · top-right anchor</span>
+      <ul class="tile-params">
+        <li><code>player</code><span>PUBG nickname (required)</span></li>
+        <li><code>duration</code><span>auto-hide seconds (default 12)</span></li>
+      </ul>
+    </a>
 
   </div>
+
+  <!-- ── Bot-Left rotation slots · session-only ────────────────────── -->
+  <h2 class="section">Bottom-left rotation slots <span class="ctx">session · 560×360</span></h2>
+  <div class="grid">
+
+    <a class="tile" href="/widgets/pubg/mates.html" target="_blank">
+      <div class="tile-title"><h3>mates.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Squad mates of the session — four layouts (carousel default, stack, fold, mosaic).</div>
+      <span class="tile-size"><b>560×360</b></span>
+      <ul class="tile-params">
+        <li><code>layout</code><span>carousel / stack / fold / mosaic</span></li>
+        <li><code>range</code><span>session / week</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/post-match-card.html" target="_blank">
+      <div class="tile-title"><h3>post-match-card.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">10-second pop-up after each match — placement, kills, damage, map.</div>
+      <span class="tile-size"><b>560×320</b></span>
+      <ul class="tile-params">
+        <li><code>durationMs</code><span>show duration (default 10000)</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/map-performance.html?range=session" target="_blank">
+      <div class="tile-title"><h3>map-performance.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Per-map K/D, wins, avg stats — bar chart with map icons.</div>
+      <span class="tile-size"><b>960×420</b> · or fullwidth</span>
+      <ul class="tile-params">
+        <li><code>range</code><span>session / day / week / all</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/top-mates-slider.html?range=session" target="_blank">
+      <div class="tile-title"><h3>top-mates-slider.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Auto-rotates through every sort category (synergy / K/D / wins / most-played).</div>
+      <span class="tile-size"><b>560×380</b></span>
+      <ul class="tile-params">
+        <li><code>rotateMs</code><span>sort rotation (default 5000)</span></li>
+        <li><code>minMatches</code><span>minimum shared matches (default 2)</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/first-fight.html" target="_blank">
+      <div class="tile-title"><h3>first-fight.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">First-fight survival rate with sparkline. Detects engage / disengage / loss per match.</div>
+      <span class="tile-size"><b>520×360</b></span>
+      <ul class="tile-params">
+        <li><code>range</code><span>session / week / all</span></li>
+        <li><code>excludeHotDrop</code><span>1 = silent-drop fights only</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/hot-drop.html" target="_blank">
+      <div class="tile-title"><h3>hot-drop.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Hot-drop rate, survival rate within 500m / 3min, current streak.</div>
+      <span class="tile-size"><b>520×360</b></span>
+      <ul class="tile-params">
+        <li><code>range</code><span>session / week / all</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/chicken-map.html?range=session" target="_blank">
+      <div class="tile-title"><h3>chicken-map.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">CHICKEN wins per map — visual breakdown by location.</div>
+      <span class="tile-size"><b>520×500</b></span>
+      <ul class="tile-params">
+        <li><code>range</code><span>session / all</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/chicken-together.html" target="_blank">
+      <div class="tile-title"><h3>chicken-together.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">CHICKEN wins grouped by squad partner — who do you win with?</div>
+      <span class="tile-size"><b>520×500</b></span>
+      <ul class="tile-params">
+        <li><code>minMatches</code><span>minimum shared matches</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/session-lobbies.html" target="_blank">
+      <div class="tile-title"><h3>session-lobbies.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Per-match average lobby K/D with sparkline — how strong were today's lobbies?</div>
+      <span class="tile-size"><b>520×360</b></span>
+      <ul class="tile-params"><li><code>—</code><span>no params</span></li></ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/streak-counter.html?type=chicken" target="_blank">
+      <div class="tile-title"><h3>streak-counter.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Big counter for the current streak — chicken streak, top-10 streak, kill-each-game streak.</div>
+      <span class="tile-size"><b>520×360</b></span>
+      <ul class="tile-params">
+        <li><code>type</code><span>chicken / top10 / killEachGame</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/session-goal.html?goal=kills:20" target="_blank">
+      <div class="tile-title"><h3>session-goal.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Progress bar towards a stream goal — kills, chickens, damage, K/D, top-10s.</div>
+      <span class="tile-size"><b>520×360</b></span>
+      <ul class="tile-params">
+        <li><code>goal</code><span>e.g. kills:20, chickens:3, kd:2.0</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/trend-indicator.html" target="_blank">
+      <div class="tile-title"><h3>trend-indicator.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Current session vs. previous session — are you up or down today?</div>
+      <span class="tile-size"><b>520×360</b></span>
+      <ul class="tile-params"><li><code>—</code><span>no params</span></li></ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/session-achievements.html" target="_blank">
+      <div class="tile-title"><h3>session-achievements.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Milestone log — list of session firsts (first-kill, hot-drop survival, 10-kill match, ...).</div>
+      <span class="tile-size"><b>520×360</b></span>
+      <ul class="tile-params"><li><code>—</code><span>no params</span></li></ul>
+    </a>
+
+  </div>
+
+  <!-- ── Starting Soon / BRB · lifetime, always-on ─────────────────── -->
+  <h2 class="section">Starting Soon / BRB <span class="ctx">lifetime · always-on</span></h2>
+  <div class="grid">
+
+    <a class="tile" href="/widgets/pubg/career-card.html" target="_blank">
+      <div class="tile-title"><h3>career-card.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">PUBG-API lifetime career stats. Independent from the local match cache.</div>
+      <span class="tile-size"><b>540×280</b></span>
+      <ul class="tile-params">
+        <li><code>player</code><span>PUBG nickname (defaults to streamer)</span></li>
+        <li><code>mode</code><span>all / squad-fpp / squad-tpp / duo / solo</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/top-mates.html?sortBy=synergy&minMatches=10" target="_blank">
+      <div class="tile-title"><h3>top-mates.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Top-5 ranked squad partners. Synergy = composite KDA score (recommended).</div>
+      <span class="tile-size"><b>560×380</b></span>
+      <ul class="tile-params">
+        <li><code>sortBy</code><span>synergy / mostPlayed / chickensTogether / mateKd / kd / winRate</span></li>
+        <li><code>minMatches</code><span>minimum shared matches</span></li>
+        <li><code>limit</code><span>list length (default 5)</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/news-ticker.html?focus=lifetime" target="_blank">
+      <div class="tile-title"><h3>news-ticker.html?focus=lifetime</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Same ticker as the gameplay variant, but locked to lifetime stats.</div>
+      <span class="tile-size"><b>1920×60</b></span>
+      <ul class="tile-params">
+        <li><code>focus</code><span>lifetime</span></li>
+        <li><code>rotateMs</code><span>snippet rotation</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/map-performance.html?range=all" target="_blank">
+      <div class="tile-title"><h3>map-performance.html?range=all</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Per-map K/D / wins / avg stats over the whole database.</div>
+      <span class="tile-size"><b>960×420</b></span>
+      <ul class="tile-params">
+        <li><code>range</code><span>all (or session / week / day)</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/chicken-map.html?range=all" target="_blank">
+      <div class="tile-title"><h3>chicken-map.html?range=all</h3><span class="ext">open</span></div>
+      <div class="tile-desc">CHICKEN wins per map across the database.</div>
+      <span class="tile-size"><b>520×500</b></span>
+      <ul class="tile-params">
+        <li><code>range</code><span>all / session</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/session-summary.html" target="_blank">
+      <div class="tile-title"><h3>session-summary.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Mid-format session readout — phases, mates, maps. Use during BRB.</div>
+      <span class="tile-size"><b>1080×540</b></span>
+      <ul class="tile-params">
+        <li><code>hideMaps</code><span>1 = skip the map row</span></li>
+        <li><code>hideMates</code><span>1 = skip the mates row</span></li>
+      </ul>
+    </a>
+
+  </div>
+
+  <!-- ── Stream-Ending / fullscreen ────────────────────────────────── -->
+  <h2 class="section">Stream-Ending <span class="ctx">fullscreen</span></h2>
+  <div class="grid">
+
+    <a class="tile" href="/widgets/pubg/session-report.html" target="_blank">
+      <div class="tile-title"><h3>session-report.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Full after-session report — phases, maps, trend, streaks, achievements. Fullscreen layout for the stream-ending scene.</div>
+      <span class="tile-size"><b>1920×1080</b> · fullscreen</span>
+      <ul class="tile-params"><li><code>—</code><span>no params</span></li></ul>
+    </a>
+
+  </div>
+
+  <!-- ── Just-Chatting / Tools ─────────────────────────────────────── -->
+  <h2 class="section">Just-Chatting / Tools <span class="ctx">interactive · dock-friendly</span></h2>
+  <div class="grid">
+
+    <a class="tile" href="/widgets/pubg/lookup.html" target="_blank">
+      <div class="tile-title"><h3>lookup.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Interactive player search using the PUBG-API live (no DB needed). Type a name and inspect career.</div>
+      <span class="tile-size"><b>520×600</b></span>
+      <ul class="tile-params">
+        <li><code>player</code><span>preset name (optional)</span></li>
+        <li><code>dock</code><span>1 = OBS dock styling</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/squad-compare.html?players=__PLAYER__&matches=5" target="_blank">
+      <div class="tile-title"><h3>squad-compare.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">4-player side-by-side table for the last N matches of a squad.</div>
+      <span class="tile-size"><b>560×420</b></span>
+      <ul class="tile-params">
+        <li><code>players</code><span>A,B,C,D</span></li>
+        <li><code>matches</code><span>match count (default 5)</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/coplayer.html?player=__PLAYER__" target="_blank">
+      <div class="tile-title"><h3>coplayer.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Cross-player web view — open in any browser to check a teammate's stats.</div>
+      <span class="tile-size"><b>variable</b></span>
+      <ul class="tile-params">
+        <li><code>player</code><span>PUBG nickname (required)</span></li>
+      </ul>
+    </a>
+
+  </div>
+
+  <!-- ── Backend endpoints ─────────────────────────────────────────── -->
+  <h2 class="section">Backend endpoints</h2>
+  <div class="urlbox">
+    <a href="/api/pubg/status" target="_blank">/api/pubg/status — poller health, rate-limit, last error</a>
+    <a href="/api/pubg/db-info" target="_blank">/api/pubg/db-info — first cached match, streamer name</a>
+    <a href="/api/pubg/last-match" target="_blank">/api/pubg/last-match — most recent match payload</a>
+  </div>
+
 <script>
     // Demo-Page lädt den konfigurierten PUBG-Nick einmal beim Start und
-    // ersetzt die __PLAYER__-Placeholder in allen Links und iframe-srcs.
-    // Damit hat der Demo keine hardcodierten Nicknames im Source.
+    // ersetzt die __PLAYER__-Placeholder in allen Links. Damit hat der
+    // Demo keine hardcodierten Nicknames im Source.
     (async () => {
       try {
         const res = await fetch("/api/pubg/db-info", { cache: "no-store" });
@@ -267,10 +421,7 @@
           a.href = a.href.replace(re, encodeURIComponent(name));
           a.textContent = a.textContent.replace(re, name);
         });
-        document.querySelectorAll("iframe[src*='__PLAYER__']").forEach(f => {
-          f.src = f.src.replace(re, encodeURIComponent(name));
-        });
-        document.querySelectorAll("h2").forEach(h => {
+        document.querySelectorAll("h3").forEach(h => {
           if (h.textContent.includes("__PLAYER__")) {
             h.textContent = h.textContent.replace(re, name);
           }
