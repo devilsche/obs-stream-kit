@@ -67,6 +67,8 @@ class SteamEndpointRegistry:
             return self._status()
         if route == "/api/steam/debug/achievements":
             return self._debug_achievements(qs)
+        if route == "/api/steam/debug/library-features":
+            return self._debug_library_features(qs)
         if route == "/api/steam/test-unlock":
             return self._test_unlock(qs)
         if route == "/api/steam/test-reset":
@@ -501,6 +503,103 @@ class SteamEndpointRegistry:
             conn.close()
 
         return _ok(result)
+
+    # ── Debug: Library-Features ────────────────────────────────────────────
+    def _debug_library_features(self, qs):
+        """Checkt fuer die Top-Played-Games was an Stream-Daten via Steam
+        verfuegbar waere — UserStats (Kills/Deaths/etc), Review-Score,
+        News. Hilft zu entscheiden welche Steam-API-Features sich fuer
+        DIESEN Streamer lohnen zu integrieren.
+        Query: ?limit=N (Default 12, max 30) — Anzahl Top-Games
+        """
+        try:
+            limit = max(1, min(30, int(qs.get("limit", "12"))))
+        except ValueError:
+            limit = 12
+
+        conn = self.db_connect()
+        try:
+            rows = conn.execute("""
+                SELECT app_id, name, playtime_forever_min
+                FROM steam_owned_games
+                WHERE steam_id=? AND playtime_forever_min > 30
+                ORDER BY playtime_forever_min DESC
+                LIMIT ?
+            """, (self.client.steam_id, limit)).fetchall()
+        finally:
+            conn.close()
+
+        import urllib.error
+        import urllib.request
+
+        def _hours(min_): return round((min_ or 0) / 60, 1)
+
+        results = []
+        for r in rows:
+            app_id = r["app_id"]
+            info = {
+                "appId":         app_id,
+                "name":          r["name"],
+                "playtimeHours": _hours(r["playtime_forever_min"]),
+                "userStats":     None,
+                "reviews":       None,
+                "news":          None,
+            }
+            # GetUserStatsForGame — was an in-game-Stats publiziert wird
+            try:
+                d = self.client._get(
+                    "/ISteamUserStats/GetUserStatsForGame/v0002/",
+                    steamid=self.client.steam_id, appid=app_id)
+                ps = d.get("playerstats") or {}
+                stats = ps.get("stats") or []
+                info["userStats"] = {
+                    "count":  len(stats),
+                    "sample": [s.get("name") for s in stats[:10]],
+                }
+            except SteamApiError as e:
+                info["userStats"] = {"error": str(e).split(" on ")[0]}
+
+            # Storefront appreviews — public score+count
+            try:
+                url = (f"https://store.steampowered.com/appreviews/{app_id}"
+                       f"?json=1&purchase_type=all&num_per_page=0&language=all")
+                req = urllib.request.Request(
+                    url, headers={"User-Agent": "obs-stream-kit/1.0"})
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    rev = json.loads(resp.read().decode("utf-8"))
+                qsum = rev.get("query_summary") or {}
+                tot = qsum.get("total_reviews") or 0
+                pos = qsum.get("total_positive") or 0
+                pct = round(pos / tot * 100, 1) if tot > 0 else None
+                info["reviews"] = {
+                    "totalReviews":  tot,
+                    "positivePct":   pct,
+                    "scoreDesc":     qsum.get("review_score_desc"),
+                }
+            except (urllib.error.URLError, urllib.error.HTTPError,
+                    json.JSONDecodeError, OSError) as e:
+                info["reviews"] = {"error": str(e)[:80]}
+
+            # GetNewsForApp — was an offiziellem Game-News kommt
+            try:
+                d = self.client._get(
+                    "/ISteamNews/GetNewsForApp/v0002/",
+                    appid=app_id, count=3, maxlength=200)
+                items = (d.get("appnews") or {}).get("newsitems") or []
+                info["news"] = {
+                    "count":   len(items),
+                    "latest":  (items[0].get("title")
+                                if items else None),
+                    "latestAgeDays": (
+                        int((time.time() - items[0].get("date", 0)) / 86400)
+                        if items else None),
+                }
+            except SteamApiError as e:
+                info["news"] = {"error": str(e).split(" on ")[0]}
+
+            results.append(info)
+
+        return _ok({"games": results, "count": len(results)})
 
     # ── Status (Poller-Health) ─────────────────────────────────────────────
     def _status(self):
