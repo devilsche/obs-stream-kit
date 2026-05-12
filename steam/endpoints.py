@@ -6,6 +6,7 @@ Steam-Endpoints.
   /api/steam/status            — Poller-State (Debugging)
 """
 import json
+import os
 import time
 from urllib.parse import urlparse, parse_qs
 
@@ -32,12 +33,18 @@ def _err(code, msg):
 
 class SteamEndpointRegistry:
     def __init__(self, client, db_connect_fn,
-                 poller=None, cache_ttl_s: float = 10.0):
+                 poller=None, cache_ttl_s: float = 10.0,
+                 root_dir: str = None):
         self.client = client
         self.db_connect = db_connect_fn
         self.poller = poller
         self.cache_ttl_s = cache_ttl_s
+        self.root_dir = root_dir or os.getcwd()
         self._cache = {}
+        # Persistente Steam-Prefs aus data/steam-prefs.json — Sprache
+        # darin ueberschreibt was im SteamClient kam (= .secrets-Wert).
+        # So kann der User die Sprache ueber's API andern und es bleibt.
+        self._load_prefs()
         # AppID -> {name, headerImage, capsuleImage} (Persistenz waehrend
         # Server-Run). Genutzt wenn ein Game nicht in der DB ist (Non-
         # Steam-via-Proton, fakeAppId-Tests, fresh-bought games).
@@ -136,6 +143,39 @@ class SteamEndpointRegistry:
                 "/steamcommunity/public/images/")
         return base + raw.lstrip("/")
 
+    def _prefs_path(self):
+        return os.path.join(self.root_dir, "data", "steam-prefs.json")
+
+    def _load_prefs(self):
+        path = self._prefs_path()
+        if not os.path.exists(path):
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                prefs = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return
+        lang = (prefs.get("language") or "").strip().lower()
+        if lang:
+            self.client.language = lang
+
+    def _save_prefs(self, **updates):
+        path = self._prefs_path()
+        prefs = {}
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    prefs = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                prefs = {}
+        prefs.update(updates)
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(prefs, f, indent=2)
+        except OSError:
+            pass
+
     def _cached(self, key, fn):
         now = time.monotonic()
         hit = self._cache.get(key)
@@ -183,6 +223,8 @@ class SteamEndpointRegistry:
             return self._replay_achievements(qs)
         if route == "/api/steam/achievements-list":
             return self._achievements_list(qs)
+        if route == "/api/steam/language":
+            return self._language_setting(qs)
         if route == "/api/steam/sync-all-achievements":
             return self._sync_all_achievements(qs)
         return None
@@ -1052,6 +1094,25 @@ class SteamEndpointRegistry:
         finally:
             conn.close()
 
+    # ── Language Setting (persistent) ──────────────────────────────────────
+    def _language_setting(self, qs):
+        """GET ohne Param: returnt aktuell gesetzte Sprache.
+        GET mit ?lang=X: setzt + persistiert die neue Sprache, gilt fuer
+        ALLE Steam-API-Calls ab jetzt (auch fuer's now-playing-Polling
+        und Layer-2-Achievement-Sync). Display-Names neuer Unlocks
+        kommen ab sofort in dieser Sprache.
+        Bestehende Achievements im DB-Cache bleiben in alter Sprache
+        bis ein force-Sync laeuft (siehe sync-all-achievements?force=1).
+        """
+        new_lang = (qs.get("lang") or "").strip().lower()
+        if new_lang:
+            self.client.language = new_lang
+            self._save_prefs(language=new_lang)
+        return _ok({
+            "language": self.client.language,
+            "saved": bool(new_lang),
+        })
+
     # ── Bulk-Sync: Achievements fuer ALLE owned games ──────────────────────
     def _sync_all_achievements(self, qs):
         """Hintergrund-Job: walkt durch alle Games in steam_owned_games und
@@ -1228,10 +1289,13 @@ class SteamEndpointRegistry:
             app_id = int(qs.get("appId")) if qs.get("appId") else None
         except ValueError:
             app_id = None
-        lang = (qs.get("lang") or "").lower()
-        # Wenn lang nicht gesetzt oder gleich der Server-Sprache:
-        # einfach durchreichen ohne Schema-Refetch.
-        translate = bool(lang) and lang != self.client.language.lower()
+        # Sprache: per-Request-Override oder aktuell gesetzte Server-Lang.
+        # Wir uebersetzen IMMER ueber steam_app_schema_lang (lazy-fetch),
+        # damit die Anzeige zur aktuellen Sprache passt — unabhaengig
+        # davon was in steam_achievements_seen.display_name gespeichert
+        # ist (stale-data-Schutz nach Sprach-Wechsel).
+        lang = (qs.get("lang") or self.client.language or "").lower()
+        translate = bool(lang)
 
         conn = self.db_connect()
         try:

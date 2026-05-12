@@ -203,9 +203,8 @@
       <input id="rarePctInput" type="number" min="1" max="50" value="10" style="width: 60px;">
     </div>
     <div class="grp">
-      <label>Sprache:</label>
+      <label title="Persistente Server-Setting — gilt fuer ALLE neuen Steam-Calls inkl. der Achievement-Popups. Wechseln triggert sofortige Neu-Uebersetzung der Liste.">Sprache:</label>
       <select id="langSelect">
-        <option value="">(Server-Default)</option>
         <option value="english">English</option>
         <option value="german">Deutsch</option>
         <option value="french">Français</option>
@@ -359,19 +358,35 @@
       applyFilters();
     });
     rareIn.addEventListener("change", () => applyFilters());
-    langSel.addEventListener("change", (e) => {
-      currentLang = e.target.value;
-      statsEl.textContent = currentLang
-        ? `Lade in '${currentLang}' (kann beim ersten Mal pro Game dauern)…`
-        : "— Achievements werden geladen —";
-      load();
+    langSel.addEventListener("change", async (e) => {
+      const lang = e.target.value;
+      statsEl.textContent =
+        `Setze Sprache '${lang}' + lade Achievements neu (beim ersten Wechsel ` +
+        `pro Sprache wird das Schema pro Game von Steam gepullt — kann was dauern)…`;
+      try {
+        await PubgUI.fetchJson("/api/steam/language?lang=" + encodeURIComponent(lang));
+      } catch (err) {
+        statsEl.textContent = "Sprach-Setting fehlgeschlagen: " + err;
+        return;
+      }
+      currentLang = lang;
+      await load();
     });
+
+    async function syncLangFromServer() {
+      try {
+        const r = await PubgUI.fetchJson("/api/steam/language");
+        if (r && r.language) {
+          currentLang = r.language;
+          langSel.value = r.language;
+        }
+      } catch (e) { /* fallback bleibt english */ }
+    }
 
     async function load() {
       try {
-        const url = "/api/steam/achievements-list?limit=2000"
-          + (currentLang ? "&lang=" + encodeURIComponent(currentLang) : "");
-        const data = await PubgUI.fetchJson(url);
+        const data = await PubgUI.fetchJson(
+          "/api/steam/achievements-list?limit=2000");
         all = (data && data.achievements) || [];
         games = (data && data.games) || [];
         gameSel.innerHTML = `<option value="">— Alle Games (${all.length}) —</option>`
@@ -383,7 +398,11 @@
         statsEl.textContent = "Fehler beim Laden: " + e;
       }
     }
-    load();
+
+    (async () => {
+      await syncLangFromServer();
+      await load();
+    })();
   </script>
 </body>
 </html>

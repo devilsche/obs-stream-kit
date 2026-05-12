@@ -188,7 +188,8 @@ try:
         steam_registry = SteamEndpointRegistry(
             client=steam_client,
             db_connect_fn=_steam_db_connect,
-            poller=steam_poller)
+            poller=steam_poller,
+            root_dir=ROOT)
         STEAM_ENABLED = True
         print("  Steam backend active  ✓")
     else:
