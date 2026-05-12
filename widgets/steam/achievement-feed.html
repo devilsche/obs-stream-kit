@@ -117,6 +117,7 @@
   <script>
     // URL-Params
     const LIMIT      = parseInt(PubgUI.qs("limit",     "20"),  10);
+    const SINCE_DAYS = parseInt(PubgUI.qs("sinceDays", "0"),   10);
     const ROTATE_MS  = parseInt(PubgUI.qs("rotateMs",  "8000"), 10);
     const CYCLE_PAUSE_MS = parseInt(PubgUI.qs("cyclePauseMs", "0"), 10);
     const REFRESH_MS = parseInt(PubgUI.qs("refreshMs", "60000"), 10);
@@ -133,6 +134,10 @@
       { key: "limit", label: "Pool size", type: "range",
         min: 5, max: 100, default: 20,
         tooltip: "How many of the latest unlocks rotate in the feed." },
+      { key: "sinceDays", label: "Since (days)", type: "range",
+        min: 0, max: 365, default: 0,
+        tooltip: "Nur Unlocks juenger als N Tage. 0 = kein Zeit-Limit, " +
+                 "zeigt einfach die Top-Pool-Size neuesten." },
       { key: "rotateMs", label: "Rotate ms", type: "range",
         min: 3000, max: 20000, default: 8000,
         tooltip: "How fast each entry cycles." },
@@ -231,8 +236,10 @@
 
     async function refresh() {
       try {
+        const params = `limit=${LIMIT}` +
+          (SINCE_DAYS > 0 ? `&sinceDays=${SINCE_DAYS}` : "");
         const data = await PubgUI.fetchJson(
-          `/api/steam/achievement-feed?limit=${LIMIT}`);
+          `/api/steam/achievement-feed?${params}`);
         unlocks = (data && data.unlocks) || [];
       } catch (e) {
         unlocks = [];

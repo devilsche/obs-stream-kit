@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Achievement Browser — Click to Replay</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/widgets/pubg/_pubg.css">
+  <style>
+    html, body { margin: 0; }
+    body {
+      background: var(--pubg-page-bg);
+      color: var(--pubg-text);
+      font-family: "DM Sans", sans-serif;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    h1 { color: var(--pubg-gold); margin: 0 0 4px; }
+    .intro {
+      color: var(--pubg-muted);
+      margin: 0 0 18px;
+      max-width: 800px;
+      line-height: 1.5;
+      font-size: 0.92em;
+    }
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--pubg-border);
+      border-radius: 6px;
+    }
+    .toolbar label {
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .toolbar select, .toolbar input {
+      background: rgba(0, 0, 0, 0.4);
+      color: var(--pubg-text);
+      border: 1px solid var(--pubg-border);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.9em;
+    }
+    .toolbar .stats {
+      margin-left: auto;
+      color: var(--pubg-muted);
+      font-size: 0.85em;
+    }
+    .toolbar .stats b { color: var(--pubg-gold); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 10px;
+    }
+    .tile {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--pubg-border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.15s, background 0.15s;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      position: relative;
+      overflow: hidden;
+    }
+    .tile:hover {
+      border-color: var(--pubg-gold);
+      background: rgba(94, 42, 121, 0.2);
+      transform: translateY(-1px);
+    }
+    .tile.rare {
+      border-color: rgba(242, 183, 5, 0.5);
+      box-shadow: 0 0 8px rgba(242, 183, 5, 0.15);
+    }
+    .tile.rare:hover {
+      box-shadow: 0 0 14px rgba(242, 183, 5, 0.4);
+    }
+    .tile.fresh-triggered {
+      animation: triggerFlash 1.2s ease-out;
+    }
+    @keyframes triggerFlash {
+      0%   { background: rgba(242, 183, 5, 0.6); }
+      100% { background: rgba(0, 0, 0, 0.4); }
+    }
+    .tile-icon {
+      width: 48px; height: 48px;
+      flex-shrink: 0;
+      border-radius: 4px;
+      border: 1px solid var(--pubg-border);
+      background: rgba(0, 0, 0, 0.5);
+      object-fit: cover;
+    }
+    .tile-body { flex: 1; min-width: 0; }
+    .tile-game {
+      color: var(--pubg-muted);
+      font-size: 0.7em;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tile-name {
+      color: var(--pubg-gold);
+      font-weight: 700;
+      font-size: 0.95em;
+      margin: 2px 0 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tile-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 0.72em;
+      color: var(--pubg-muted);
+    }
+    .tile-meta .pct b { color: var(--pubg-text); }
+    .tile-meta .pct.rare-pct b { color: var(--pubg-gold); }
+    .tile-meta .date { font-variant-numeric: tabular-nums; }
+    .tile-meta .rare-badge {
+      display: inline-block;
+      background: var(--pubg-gold);
+      color: #1a0d2a;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 0 6px;
+      border-radius: 2px;
+      text-transform: uppercase;
+      font-size: 0.85em;
+    }
+    .toast {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      background: rgba(26, 13, 42, 0.95);
+      color: var(--pubg-text);
+      padding: 10px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--pubg-gold);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.3s, transform 0.3s;
+      pointer-events: none;
+      z-index: 1000;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast b { color: var(--pubg-gold); }
+    .empty {
+      color: var(--pubg-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 32px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Achievement Browser</h1>
+  <p class="intro">
+    Alle in der DB gespeicherten Achievements. Pro Game filterbar.
+    <b>Klick auf eine Kachel</b> markiert das Achievement als
+    "ungesehen" — das <a href="/widgets/steam/achievement-popup.html"
+    target="_blank" style="color:var(--pubg-gold)">achievement-popup-Widget</a>
+    bzw. die <a href="/widgets/steam/popup.html"
+    target="_blank" style="color:var(--pubg-gold)">combined-popup</a>
+    feuern es dann beim nächsten Poll mit Sound + Animation. Praktisch
+    zum Testen oder für Stream-Recaps einzelner Highlights.
+  </p>
+
+  <div class="toolbar">
+    <div class="grp">
+      <label>Game:</label>
+      <select id="gameFilter">
+        <option value="">— Alle Games —</option>
+      </select>
+    </div>
+    <div class="grp">
+      <label>Suche:</label>
+      <input id="searchInput" type="text" placeholder="Name / Beschreibung" style="width: 220px;">
+    </div>
+    <div class="grp">
+      <label>Sortierung:</label>
+      <select id="sortSelect">
+        <option value="recent">Neueste zuerst</option>
+        <option value="oldest">Älteste zuerst</option>
+        <option value="rare">Rarität (rarest first)</option>
+        <option value="name">Name A→Z</option>
+      </select>
+    </div>
+    <div class="grp">
+      <label>Rare ≤ (%):</label>
+      <input id="rarePctInput" type="number" min="1" max="50" value="5" style="width: 60px;">
+    </div>
+    <div class="stats" id="stats">— Achievements werden geladen —</div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+  <div class="toast" id="toast"></div>
+
+  <script src="/widgets/pubg/_pubg.js"></script>
+  <script>
+    let RARE_PCT = 5;
+    let all = [];          // alle Achievements aus der API
+    let games = [];        // unique games {appId, name, count}
+    let filterGame = "";   // appId or ""
+    let searchText = "";
+    let sortMode = "recent";
+
+    const gridEl   = document.getElementById("grid");
+    const toastEl  = document.getElementById("toast");
+    const statsEl  = document.getElementById("stats");
+    const gameSel  = document.getElementById("gameFilter");
+    const searchIn = document.getElementById("searchInput");
+    const sortSel  = document.getElementById("sortSelect");
+    const rareIn   = document.getElementById("rarePctInput");
+
+    function fmtDate(unixSec) {
+      if (!unixSec) return "—";
+      const d = new Date(unixSec * 1000);
+      return d.toLocaleDateString("de-DE", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+      });
+    }
+
+    function showToast(html) {
+      toastEl.innerHTML = html;
+      toastEl.classList.add("show");
+      setTimeout(() => toastEl.classList.remove("show"), 2200);
+    }
+
+    function tileHtml(a) {
+      const isRare = a.globalPct != null && a.globalPct <= RARE_PCT;
+      const icon = a.iconUrl || "";
+      const name = (a.displayName || a.apiName || "Achievement").replace(/</g, "&lt;");
+      const game = (a.gameName || ("App #" + a.appId)).replace(/</g, "&lt;");
+      const date = fmtDate(a.unlockedAt);
+      const pctTxt = (a.globalPct != null)
+        ? `<span class="pct${isRare ? " rare-pct" : ""}"><b>${a.globalPct.toFixed(1)}%</b> have it</span>`
+        : "";
+      const rareBadge = isRare ? `<span class="rare-badge">Rare</span>` : "";
+      return `
+        <div class="tile${isRare ? " rare" : ""}"
+             data-appid="${a.appId}" data-api="${a.apiName.replace(/"/g, "&quot;")}">
+          ${icon ? `<img class="tile-icon" src="${icon}" alt="" onerror="this.style.display='none'">`
+                 : `<div class="tile-icon"></div>`}
+          <div class="tile-body">
+            <div class="tile-game">${game}</div>
+            <div class="tile-name">${name}</div>
+            <div class="tile-meta">
+              <span class="date">Erstmals: ${date}</span>
+              ${pctTxt}
+              ${rareBadge}
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function applyFilters() {
+      RARE_PCT = parseFloat(rareIn.value) || 5;
+      let view = all.slice();
+      if (filterGame) {
+        view = view.filter(a => String(a.appId) === filterGame);
+      }
+      if (searchText) {
+        const q = searchText.toLowerCase();
+        view = view.filter(a =>
+          (a.displayName || a.apiName || "").toLowerCase().includes(q)
+          || (a.description || "").toLowerCase().includes(q)
+          || (a.gameName || "").toLowerCase().includes(q));
+      }
+      // Sort
+      if (sortMode === "recent") view.sort((x, y) => (y.unlockedAt || 0) - (x.unlockedAt || 0));
+      else if (sortMode === "oldest") view.sort((x, y) => (x.unlockedAt || 0) - (y.unlockedAt || 0));
+      else if (sortMode === "rare") view.sort((x, y) => {
+        const xp = x.globalPct != null ? x.globalPct : 999;
+        const yp = y.globalPct != null ? y.globalPct : 999;
+        return xp - yp;
+      });
+      else if (sortMode === "name") view.sort((x, y) =>
+        (x.displayName || x.apiName || "").localeCompare(y.displayName || y.apiName || ""));
+
+      gridEl.innerHTML = view.length
+        ? view.map(tileHtml).join("")
+        : `<div class="empty" style="grid-column: 1 / -1;">Keine Achievements für diese Filter.</div>`;
+      statsEl.innerHTML = `<b>${view.length}</b> / ${all.length} Achievements`;
+    }
+
+    async function triggerReplay(appId, apiName, tileEl) {
+      try {
+        const url = `/api/steam/replay-achievements?appId=${encodeURIComponent(appId)}&apiName=${encodeURIComponent(apiName)}&limit=1`;
+        const r = await fetch(url, { cache: "no-store" });
+        const j = await r.json();
+        if (j.reset > 0) {
+          tileEl.classList.add("fresh-triggered");
+          setTimeout(() => tileEl.classList.remove("fresh-triggered"), 1300);
+          showToast(`<b>✓ Triggered</b> — Popup-Widget feuert es jetzt`);
+        } else {
+          showToast(`<b>○ Schon ungesehen</b> — kommt eh beim nächsten Poll`);
+        }
+      } catch (e) {
+        showToast(`<b>✗ Fehler:</b> ${e.message || e}`);
+      }
+    }
+
+    gridEl.addEventListener("click", (e) => {
+      const tile = e.target.closest(".tile");
+      if (!tile) return;
+      const appId = tile.dataset.appid;
+      const api = tile.dataset.api;
+      if (appId && api) triggerReplay(appId, api, tile);
+    });
+    gameSel.addEventListener("change", (e) => {
+      filterGame = e.target.value;
+      applyFilters();
+    });
+    searchIn.addEventListener("input", (e) => {
+      searchText = e.target.value;
+      applyFilters();
+    });
+    sortSel.addEventListener("change", (e) => {
+      sortMode = e.target.value;
+      applyFilters();
+    });
+    rareIn.addEventListener("change", () => applyFilters());
+
+    async function load() {
+      try {
+        const data = await PubgUI.fetchJson("/api/steam/achievements-list?limit=2000");
+        all = (data && data.achievements) || [];
+        games = (data && data.games) || [];
+        gameSel.innerHTML = `<option value="">— Alle Games (${all.length}) —</option>`
+          + games.map(g =>
+              `<option value="${g.appId}">${(g.name || "App #" + g.appId).replace(/</g, "&lt;")} (${g.count})</option>`
+            ).join("");
+        applyFilters();
+      } catch (e) {
+        statsEl.textContent = "Fehler beim Laden: " + e;
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

@@ -175,6 +175,8 @@ class SteamEndpointRegistry:
             return self._test_reset(qs)
         if route == "/api/steam/replay-achievements":
             return self._replay_achievements(qs)
+        if route == "/api/steam/achievements-list":
+            return self._achievements_list(qs)
         return None
 
     # ── Now-Playing mit Playtime + Achievement-Progress ────────────────────
@@ -782,15 +784,23 @@ class SteamEndpointRegistry:
         """Letzte N freigeschalteten Achievements aus der DB — fuer den
         Feed-Ticker. Liefert IMMER Daten (auch alte), unabhaengig vom
         displayed_at-Flag.
-        Query: ?limit=N  (Default 20, max 100)
+        Query:
+          ?limit=N        Top-N neueste (Default 20, max 100)
+          ?sinceDays=N    nur Unlocks juenger als N Tage (Default 0 = aus)
         """
         try:
             limit = max(1, min(100, int(qs.get("limit", "20"))))
         except ValueError:
             limit = 20
+        try:
+            since_days = max(0, int(qs.get("sinceDays", "0")))
+        except ValueError:
+            since_days = 0
         conn = self.db_connect()
         try:
-            rows = get_achievement_feed(conn, self.client.steam_id, limit)
+            since_ts = (int(time.time()) - since_days * 86400) if since_days else None
+            rows = get_achievement_feed(
+                conn, self.client.steam_id, limit, since_ts=since_ts)
             unlocks = []
             for r in rows:
                 schema = get_app_schema(conn, r["app_id"])
@@ -1034,6 +1044,85 @@ class SteamEndpointRegistry:
         finally:
             conn.close()
 
+    # ── Achievements-List (fuer Browser-Widget) ────────────────────────────
+    def _achievements_list(self, qs):
+        """Liste aller in DB gespeicherten Achievements mit Metadaten —
+        Game-Name, Display-Name, Icon, Global-Pct, Unlock-Zeit. Fuer's
+        Browser-Widget wo man pro Game filtern und einzelne anklicken
+        kann zum Re-Triggern.
+
+        Query:
+          ?appId=N   nur dieses Spiel
+          ?limit=N   max Eintraege (default 500)
+        """
+        try:
+            limit = max(1, int(qs.get("limit", "500")))
+        except ValueError:
+            limit = 500
+        try:
+            app_id = int(qs.get("appId")) if qs.get("appId") else None
+        except ValueError:
+            app_id = None
+
+        conn = self.db_connect()
+        try:
+            sql = """
+                SELECT s.app_id, s.achievement_api_name, s.unlocked_at,
+                       s.display_name, s.description, s.icon_url,
+                       s.displayed_at,
+                       sch.game_name, sch.global_pct_json
+                FROM steam_achievements_seen s
+                LEFT JOIN steam_app_schema sch ON sch.app_id = s.app_id
+                WHERE s.steam_id = ? AND s.app_id >= 0
+            """
+            params = [self.client.steam_id]
+            if app_id is not None:
+                sql += " AND s.app_id = ?"
+                params.append(app_id)
+            sql += " ORDER BY sch.game_name COLLATE NOCASE ASC, s.unlocked_at DESC LIMIT ?"
+            params.append(limit)
+            rows = conn.execute(sql, params).fetchall()
+
+            # Game-Namen + Counts fuer den Filter-Dropdown
+            games = {}
+            items = []
+            for r in rows:
+                ap = r["app_id"]
+                gname = r["game_name"] or ("App #" + str(ap))
+                games.setdefault(ap, {"appId": ap, "name": gname, "count": 0})
+                games[ap]["count"] += 1
+
+                pct = None
+                if r["global_pct_json"]:
+                    try:
+                        pct_map = json.loads(r["global_pct_json"])
+                        raw = pct_map.get(r["achievement_api_name"])
+                        pct = float(raw) if raw is not None else None
+                    except (TypeError, ValueError, json.JSONDecodeError):
+                        pass
+
+                items.append({
+                    "appId":       ap,
+                    "gameName":    gname,
+                    "apiName":     r["achievement_api_name"],
+                    "displayName": r["display_name"],
+                    "description": r["description"],
+                    "iconUrl":     r["icon_url"],
+                    "unlockedAt":  r["unlocked_at"],
+                    "globalPct":   pct,
+                    "displayed":   r["displayed_at"] is not None,
+                })
+
+            return _ok({
+                "achievements": items,
+                "games": sorted(games.values(),
+                                 key=lambda g: g["name"].lower()),
+                "count": len(items),
+                "filter": {"appId": app_id, "limit": limit},
+            })
+        finally:
+            conn.close()
+
     # ── Replay-Achievements (für Sound/Visual-Test) ────────────────────────
     def _replay_achievements(self, qs):
         """Macht bereits-angezeigte Achievements wieder undisplayed —
@@ -1042,6 +1131,7 @@ class SteamEndpointRegistry:
 
         Query-Params:
           ?appId=N       nur fuer dieses Spiel (sonst alle Spiele)
+          ?apiName=NAME  nur dieser eine Eintrag (Click-To-Trigger im Browser)
           ?limit=N       max Anzahl Eintraege (default 20)
           ?onlyRare=1    nur Achievements mit globalPct <= rarePct (default 5)
         """
@@ -1053,6 +1143,7 @@ class SteamEndpointRegistry:
             app_id = int(qs.get("appId")) if qs.get("appId") else None
         except ValueError:
             app_id = None
+        api_name_filter = qs.get("apiName") or None
         only_rare = qs.get("onlyRare") == "1"
         try:
             rare_pct = float(qs.get("rarePct", "5"))
@@ -1066,13 +1157,15 @@ class SteamEndpointRegistry:
                 SELECT s.app_id, s.achievement_api_name
                 FROM steam_achievements_seen s
                 WHERE s.steam_id = ?
-                  AND s.displayed_at IS NOT NULL
                   AND s.app_id >= 0
             """
             params = [self.client.steam_id]
             if app_id is not None:
                 sql += " AND s.app_id = ?"
                 params.append(app_id)
+            if api_name_filter:
+                sql += " AND s.achievement_api_name = ?"
+                params.append(api_name_filter)
             sql += " ORDER BY s.unlocked_at DESC LIMIT ?"
             params.append(limit * 3 if only_rare else limit)
             rows = conn.execute(sql, params).fetchall()

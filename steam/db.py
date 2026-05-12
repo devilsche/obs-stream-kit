@@ -342,18 +342,25 @@ def get_global_achievement_pct(conn, app_id: int):
 
 
 # ── Achievement Feed (latest unlocks across all games) ─────────────────────
-def get_achievement_feed(conn, steam_id: str, limit: int = 20) -> list:
+def get_achievement_feed(conn, steam_id: str, limit: int = 20,
+                          since_ts: int = None) -> list:
     """Letzte N Unlocks ueber alle Games — sortiert nach unlocked_at DESC.
     Liefert IMMER aktuelle Daten, unabhaengig vom displayed_at-Flag.
+    since_ts: nur Unlocks mit unlocked_at >= since_ts (Default None = alle).
     Fuer den Feed-Ticker (kein Popup-Verhalten)."""
-    return conn.execute("""
+    sql = """
         SELECT app_id, achievement_api_name, unlocked_at,
                display_name, description, icon_url
         FROM steam_achievements_seen
         WHERE steam_id=? AND app_id >= 0
-        ORDER BY unlocked_at DESC
-        LIMIT ?
-    """, (steam_id, limit)).fetchall()
+    """
+    params = [steam_id]
+    if since_ts is not None:
+        sql += " AND unlocked_at >= ?"
+        params.append(since_ts)
+    sql += " ORDER BY unlocked_at DESC LIMIT ?"
+    params.append(limit)
+    return conn.execute(sql, params).fetchall()
 
 
 # ── Achievement Unlocks ────────────────────────────────────────────────────
