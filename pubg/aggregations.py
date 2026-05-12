@@ -1147,6 +1147,42 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
     return out
 
 
+# Welche Achievement-IDs als 'rare' im Popup zaehlen (gold-glow + biglvlup.wav).
+# Konservativ — die Kandidaten die wirklich krass sind:
+PUBG_RARE_ACHIEVEMENTS = {
+    "beast_chicken",                 # Chicken + ≥5 Kills
+    "first_hot_drop_survived",       # erstes ueberlebtes Hot-Drop
+    "longest_kill_400",              # ≥400m
+    "chicken_streak",                # ≥2 Chickens in Folge
+}
+
+
+def detect_and_store_session_achievements(conn, my_account_id):
+    """Nach jedem neuen Match aufrufen. Berechnet die aktuellen Session-
+    Achievements und schreibt neue (achievement_id, match_id)-Kombis in
+    pubg_achievements_seen mit displayed_at=NULL. Returns Anzahl neu
+    eingefuegter."""
+    achievements = compute_session_achievements(conn, my_account_id)
+    new_count = 0
+    for a in achievements:
+        aid = a.get("id")
+        mid = a.get("matchId")
+        if not aid or not mid:
+            continue
+        cur = conn.execute("""
+            INSERT INTO pubg_achievements_seen
+              (achievement_id, match_id, label, icon, played_at,
+               detected_at, is_rare)
+            VALUES (?, ?, ?, ?, ?, strftime('%s','now'), ?)
+            ON CONFLICT(achievement_id, match_id) DO NOTHING
+        """, (aid, mid, a.get("label"), a.get("icon"),
+              a.get("playedAt"),
+              1 if aid in PUBG_RARE_ACHIEVEMENTS else 0))
+        if cur.rowcount > 0:
+            new_count += 1
+    return new_count
+
+
 def compute_hot_drop(conn, my_account_id, range_key="session",
                      window_secs=120, from_iso=None, to_iso=None):
     """Hot-Drop-Stats über die Range.

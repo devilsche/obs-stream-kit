@@ -539,6 +539,37 @@ class SteamEndpointRegistry:
         try:
             rows = get_undisplayed_unlocks(conn, self.client.steam_id, since_ts)
             unlocks = []
+            # Aktive Server-Sprache fuer Display-Translation
+            lang = (self.client.language or "").lower()
+            lang_lookups = {}  # app_id -> {api_name: {displayName, description}}
+            unique_apps = set(r["app_id"] for r in rows)
+            for ap in unique_apps:
+                if not lang:
+                    break
+                cached = get_app_schema_lang(conn, ap, lang)
+                if cached and cached["schema_json"]:
+                    try:
+                        lang_lookups[ap] = json.loads(cached["schema_json"])
+                        continue
+                    except json.JSONDecodeError:
+                        pass
+                # Frisch fuer diese Sprache holen
+                try:
+                    schema = self.client.get_schema_for_game(ap, language=lang)
+                    schema_achs = schema.get("achievements") or []
+                    lookup = {
+                        a.get("name"): {
+                            "displayName": a.get("displayName"),
+                            "description": a.get("description"),
+                        }
+                        for a in schema_achs if a.get("name")
+                    }
+                    upsert_app_schema_lang(
+                        conn, ap, lang, json.dumps(lookup))
+                    lang_lookups[ap] = lookup
+                except SteamApiError:
+                    upsert_app_schema_lang(conn, ap, lang, "{}")
+                    lang_lookups[ap] = {}
             for r in rows:
                 # Game-Name aus Schema-Cache
                 schema = get_app_schema(conn, r["app_id"])
@@ -554,12 +585,20 @@ class SteamEndpointRegistry:
                                       if raw is not None else None)
                     except (TypeError, ValueError, json.JSONDecodeError):
                         pass
+                # Display-Translation in aktive Sprache (falls Cache da)
+                disp = r["display_name"]
+                desc = r["description"]
+                meta = (lang_lookups.get(r["app_id"]) or {}).get(
+                    r["achievement_api_name"])
+                if meta:
+                    disp = meta.get("displayName") or disp
+                    desc = meta.get("description") or desc
                 unlocks.append({
                     "appId":        r["app_id"],
                     "gameName":     gname,
                     "apiName":      r["achievement_api_name"],
-                    "displayName":  r["display_name"],
-                    "description":  r["description"],
+                    "displayName":  disp,
+                    "description":  desc,
                     "iconUrl":      r["icon_url"],
                     "unlockedAt":   r["unlocked_at"],
                     "globalPct":    global_pct,

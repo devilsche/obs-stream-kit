@@ -136,6 +136,24 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at      TEXT NOT NULL
 );
 
+-- Session-Milestones / PUBG-Achievements: was im Match passierte und ein
+-- "Achievement Unlocked"-Popup verdient. Pro (achievement_id, match_id)
+-- nur einmal. Detected_at = wann der Poller's es erstmals erkannt hat,
+-- displayed_at = wann's an einen Popup-Client geliefert wurde.
+CREATE TABLE IF NOT EXISTS pubg_achievements_seen (
+    achievement_id  TEXT NOT NULL,
+    match_id        TEXT NOT NULL,
+    label           TEXT,
+    icon            TEXT,
+    played_at       TEXT,
+    detected_at     INTEGER NOT NULL,
+    displayed_at    INTEGER,
+    is_rare         INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (achievement_id, match_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pubg_ach_undisplayed
+  ON pubg_achievements_seen (displayed_at);
+
 -- Lists ALL non-self co-players with their shared_matches count.
 -- The "qualified" threshold (>=N matches) is applied by callers via WHERE,
 -- not pre-filtered here. ON DELETE policy on FKs is implicit NO ACTION

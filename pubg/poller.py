@@ -437,6 +437,20 @@ class PollerThread(threading.Thread):
                                                          self.my_account_id, 3)
                 except Exception as e:
                     t_stats = {"processed": 0, "errors": [f"telemetry-batch: {e}"]}
+                # Session-Achievement-Detection nach neuen Matches.
+                # Detect erfasst alle Session-Milestones, INSERT IGNORE
+                # filtert Duplikate (PK achievement_id+match_id).
+                new_achievements = 0
+                if m_stats["new_matches"] > 0 or t_stats["processed"] > 0:
+                    try:
+                        from pubg.aggregations import (
+                            detect_and_store_session_achievements)
+                        new_achievements = (
+                            detect_and_store_session_achievements(
+                                conn, self.my_account_id))
+                    except Exception as e:
+                        all_errors = (all_errors if 'all_errors' in dir() else [])
+                        all_errors.append(f"achievement-detect: {e}")
                 all_errors = (m_stats["errors"] + l_stats["errors"]
                               + s_stats["errors"] + t_stats["errors"])
                 self._last_status = {
@@ -448,6 +462,7 @@ class PollerThread(threading.Thread):
                     "seasonRefreshed": s_stats["refreshed"],
                     "currentSeasonId": s_stats.get("seasonId"),
                     "telemetryProcessed": t_stats["processed"],
+                    "newAchievements": new_achievements,
                     "rateLimitRemaining": self.client.limiter.remaining()
                                           if hasattr(self.client, "limiter") else None,
                 }

@@ -102,6 +102,10 @@ class EndpointRegistry:
             return self._hot_drop(qs)
         if route == ("GET", "/api/pubg/session-achievements"):
             return self._session_achievements(qs)
+        if route == ("GET", "/api/pubg/recent-achievements"):
+            return self._recent_achievements(qs)
+        if route == ("GET", "/api/pubg/achievements-list"):
+            return self._achievements_list(qs)
         if route == ("POST", "/api/pubg/session/reset"):
             return self._session_reset()
         if route == ("GET", "/api/pubg/top-mates"):
@@ -309,6 +313,111 @@ class EndpointRegistry:
                 conn, self.my_account_id,
                 from_iso=from_iso, to_iso=to_iso),
         ))
+
+    def _recent_achievements(self, qs):
+        """Liefert noch nicht angezeigte Session-Milestones aus
+        pubg_achievements_seen. ?markDisplayed=1 markiert sie nach
+        Lieferung als shown — gleicher Mechanismus wie Steam.
+        Antwort-Schema mappt auf das was achievement-popup.html
+        erwartet (apiName/displayName/iconUrl/etc)."""
+        mark = qs.get("markDisplayed") == "1"
+        conn = self.get_conn()
+        rows = conn.execute("""
+            SELECT achievement_id, match_id, label, icon,
+                   played_at, detected_at, is_rare
+            FROM pubg_achievements_seen
+            WHERE displayed_at IS NULL
+            ORDER BY played_at ASC
+        """).fetchall()
+        items = []
+        for r in rows:
+            # Unix-Epoch fuer played_at (achievement-popup erwartet das)
+            unlocked_ts = 0
+            played = r["played_at"]
+            if played:
+                try:
+                    import datetime as _dt
+                    unlocked_ts = int(_dt.datetime.fromisoformat(
+                        played.replace("Z", "+00:00")).timestamp())
+                except (TypeError, ValueError):
+                    unlocked_ts = 0
+            items.append({
+                "appId":       -2,  # PUBG-Marker (Steam-Side nutzt -1 fuer Test)
+                "gameName":    "PUBG: Session Milestones",
+                "apiName":     f"{r['achievement_id']}:{r['match_id']}",
+                "displayName": r["label"],
+                "description": None,
+                "iconUrl":     r["icon"],
+                "unlockedAt":  unlocked_ts,
+                "globalPct":   1.0 if r["is_rare"] else 50.0,
+                "source":      "pubg",
+            })
+        marked_n = 0
+        if mark and items:
+            conn.execute("""
+                UPDATE pubg_achievements_seen
+                SET displayed_at = strftime('%s','now')
+                WHERE displayed_at IS NULL
+            """)
+            marked_n = len(items)
+        return _ok({"unlocks": items, "marked": marked_n})
+
+    def _achievements_list(self, qs):
+        """Liste aller gespeicherten PUBG-Session-Milestones, mit
+        Range-Filter (session/week/all).
+        Query:
+          ?range=session|week|all  (Default: all)
+        """
+        range_kind = (qs.get("range") or "all").lower()
+        conn = self.get_conn()
+        sql = """
+            SELECT achievement_id, match_id, label, icon,
+                   played_at, detected_at, is_rare, displayed_at
+            FROM pubg_achievements_seen
+        """
+        params = []
+        if range_kind == "week":
+            sql += " WHERE played_at >= datetime('now', '-7 days')"
+        elif range_kind == "session":
+            # Session-Boundary aus den settings: sessionStartedAt
+            try:
+                session_start = get_setting(conn, "sessionStartedAt", "")
+            except Exception:
+                session_start = ""
+            if session_start:
+                sql += " WHERE played_at >= ?"
+                params.append(session_start)
+        sql += " ORDER BY played_at DESC"
+        rows = conn.execute(sql, params).fetchall()
+        items = []
+        for r in rows:
+            unlocked_ts = 0
+            if r["played_at"]:
+                try:
+                    import datetime as _dt
+                    unlocked_ts = int(_dt.datetime.fromisoformat(
+                        r["played_at"].replace("Z", "+00:00")).timestamp())
+                except (TypeError, ValueError):
+                    unlocked_ts = 0
+            items.append({
+                "appId":       -2,
+                "gameName":    "PUBG: Session Milestones",
+                "apiName":     f"{r['achievement_id']}:{r['match_id']}",
+                "displayName": r["label"],
+                "iconUrl":     r["icon"],
+                "unlockedAt":  unlocked_ts,
+                "globalPct":   1.0 if r["is_rare"] else 50.0,
+                "displayed":   r["displayed_at"] is not None,
+                "source":      "pubg",
+                "isRare":      bool(r["is_rare"]),
+                "matchId":     r["match_id"],
+                "achievementId": r["achievement_id"],
+            })
+        return _ok({
+            "achievements": items,
+            "count": len(items),
+            "range": range_kind,
+        })
 
     def _session_reset(self):
         conn = self.get_conn()
