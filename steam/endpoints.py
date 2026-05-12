@@ -35,12 +35,12 @@ class SteamEndpointRegistry:
         self.poller = poller
         self.cache_ttl_s = cache_ttl_s
         self._cache = {}
-        # AppID -> Game-Name (Persistenz waehrend Server-Run). Genutzt
-        # wenn ein Game nicht in der DB ist (Non-Steam-via-Proton,
-        # fakeAppId-Tests, fresh-bought games). Storefront-API hat
-        # ~200/IP/5min Rate-Limit; ohne diesen Cache wuerden wiederholte
-        # Polls dafuer den Limit pruegeln.
-        self._app_names = {}
+        # AppID -> {name, headerImage, capsuleImage} (Persistenz waehrend
+        # Server-Run). Genutzt wenn ein Game nicht in der DB ist (Non-
+        # Steam-via-Proton, fakeAppId-Tests, fresh-bought games).
+        # Storefront-API hat ~200/IP/5min Rate-Limit; ohne diesen Cache
+        # wuerden wiederholte Polls den Limit pruegeln.
+        self._app_meta = {}
 
     def _cached(self, key, fn):
         now = time.monotonic()
@@ -111,6 +111,8 @@ class SteamEndpointRegistry:
         achievements_total = None
         game_name = qs.get("fakeGame") or summary.get("gameextrainfo")
         img_icon_url = None
+        store_header = None
+        store_capsule = None
 
         if game_id:
             conn = self.db_connect()
@@ -133,20 +135,27 @@ class SteamEndpointRegistry:
             finally:
                 conn.close()
 
-            # Letzter Fallback: Storefront-API kennt JEDEN Game-Namen,
-            # auch wenn nicht in der Library. Wichtig fuer fakeAppId-
-            # Tests mit fremden Spielen + fuer Non-Steam-Games via
-            # Proton, die nicht im Owned-Games-Cache landen.
+            # Storefront-Meta IMMER pullen — liefert die einzigen
+            # zuverlaessigen Image-URLs (akamai-content-hashed) und
+            # ueberlebt sowohl die alten /steam/apps/-Pattern als auch
+            # die Library-Hash-Variante. Cached pro AppID fuer Server-
+            # Laufzeit, also nur 1 Storefront-Call pro Game.
+            meta = self._app_meta.get(game_id)
+            if meta is None:
+                try:
+                    details = self.client.get_app_details(game_id)
+                    meta = {
+                        "name":         details.get("name"),
+                        "headerImage":  details.get("header_image"),
+                        "capsuleImage": details.get("capsule_image"),
+                    }
+                except SteamApiError:
+                    meta = {}
+                self._app_meta[game_id] = meta
             if not game_name:
-                if game_id in self._app_names:
-                    game_name = self._app_names[game_id]
-                else:
-                    try:
-                        details = self.client.get_app_details(game_id)
-                        game_name = details.get("name")
-                        self._app_names[game_id] = game_name
-                    except SteamApiError:
-                        pass
+                game_name = meta.get("name")
+            store_header  = meta.get("headerImage")
+            store_capsule = meta.get("capsuleImage")
 
         return _ok({
             "active": bool(game_id),
@@ -162,6 +171,8 @@ class SteamEndpointRegistry:
             "achievementsUnlocked": achievements_unlocked,
             "achievementsTotal": achievements_total,
             "imgIconUrl": img_icon_url,
+            "headerImageUrl": store_header,
+            "capsuleImageUrl": store_capsule,
         })
 
     def _recently_played(self):

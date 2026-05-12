@@ -252,21 +252,17 @@
       } else {
         yearsEl.hidden = true;
       }
-      // Game-Icon vor dem Titel. Fallback-Chain:
-      //  1. lokaler Cache (Hash-basiert, nur owned games)
-      //  2. remote Hash-URL aus owned-games API-Response
-      //  3. Store-CDN capsule (wide rect, mit object-fit:cover gecroppt)
-      //  4. Store-CDN header.jpg (geht fuer JEDES Game)
-      // Bei unowned Games (z.B. fakeAppId=LEGO-Party) reichen 1+2 nicht,
-      // dafuer existiert capsule/header fuer alle Apps auf der CDN.
+      // Game-Icon vor dem Titel. Storefront appdetails-URLs sind die
+      // primaere Quelle — funktionieren fuer JEDES Steam-Game egal ob
+      // owned, neu oder via Family Sharing. Hash-basierte Icons sind
+      // nur Notnagel falls die Storefront-Antwort mal leer war.
       const titleIcon = document.getElementById("gameTitleIcon");
       if (d.appId) {
-        const cdn = `https://cdn.cloudflare.steamstatic.com/steam/apps/${d.appId}`;
         const sources = [
+          d.capsuleImageUrl,     // 231×87, mit object-fit:cover als Square gecroppt
+          d.headerImageUrl,      // 460×215, gleiche Behandlung
           `/steam/img/${d.appId}/icon.jpg`,
           d.imgIconUrl,
-          `${cdn}/capsule_231x87.jpg`,
-          `${cdn}/header.jpg`,
         ].filter(Boolean);
         let srcIdx = 0;
         titleIcon.onerror = () => {
