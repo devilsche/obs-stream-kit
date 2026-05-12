@@ -391,6 +391,22 @@ class EndpointRegistry:
         },
     }
 
+    # Kanonische Labels fuer aggregierte Darstellung. Die in der DB
+    # gespeicherten labels sind kontext-spezifisch (z.B. '7-Kill Match',
+    # 'Longest Kill 423m') — fuer den Gruppen-Tile brauchen wir eine
+    # generische Bezeichnung.
+    PUBG_CANONICAL_LABELS = {
+        "first_chicken":           "First Chicken",
+        "first_top10":             "First Top-10",
+        "longest_kill_400":        "Longest Kill ≥ 400m",
+        "five_kill_match":         "5+ Kill Match",
+        "beast_chicken":           "Beast Chicken",
+        "first_hot_drop":          "First Hot Drop",
+        "first_hot_drop_survived": "First Hot Drop Survived",
+        "top10_streak":            "Top-10 Streak",
+        "chicken_streak":          "Chicken Streak",
+    }
+
     # PUBG-Achievement-Icon-URLs (gemacht von ChatGPT, geschnitten aus
     # 1024x1024 Grid). Werden zur API-Zeit eingesetzt — ueberschreiben
     # die Emoji-Strings die in pubg_achievements_seen.icon stehen.
@@ -492,80 +508,90 @@ class EndpointRegistry:
         return _ok({"unlocks": items, "marked": marked_n})
 
     def _achievements_list(self, qs):
-        """Liste aller gespeicherten PUBG-Session-Milestones, mit
-        Range-Filter (session/week/all).
-        Query:
-          ?range=session|week|all  (Default: all)
+        """Aggregierte Uebersicht der PUBG-Session-Milestones:
+        pro achievement_id EINE Zeile mit erstem Vorkommen + Haeufigkeit.
+        Click-to-Replay nutzt die match_id des ersten Vorkommens.
+
+        Antwort sortiert nach first_at DESC (juengster First-Unlock zuerst).
         """
-        range_kind = (qs.get("range") or "all").lower()
         conn = self.get_conn()
-        sql = """
+        # Alle Rohzeilen lesen (chronologisch ASC fuer first-occurrence-Logik)
+        rows = conn.execute("""
             SELECT achievement_id, match_id, label, icon,
                    played_at, detected_at, is_rare, displayed_at
             FROM pubg_achievements_seen
-        """
-        params = []
-        if range_kind in ("session", "week", "day"):
-            # _range_filter liefert ISO-Cutoff. Bei 'session' mit
-            # auto-fallback (Gap-Detection wenn sessionStartedAt nicht
-            # explizit gesetzt) — wie es alle anderen PUBG-Endpoints
-            # auch machen.
-            from pubg.aggregations import _range_filter
-            cutoff = _range_filter(conn, range_kind)
-            sql += " WHERE played_at >= ?"
-            params.append(cutoff)
-        sql += " ORDER BY played_at DESC"
-        rows = conn.execute(sql, params).fetchall()
+            ORDER BY played_at ASC
+        """).fetchall()
 
-        # Session-Frequenz pro achievement_id: 'wie oft in % deiner
-        # bisherigen Stream-Sessions'. Approximation: 1 Session =
-        # 1 distinct Datum aus matches. Per achievement_id zaehlen
-        # wir distinct Daten in pubg_achievements_seen.
         total_sessions = (conn.execute(
             "SELECT COUNT(DISTINCT date(played_at)) FROM matches"
         ).fetchone()[0]) or 1
-        ach_session_count = {}
-        for r2 in conn.execute("""
-            SELECT achievement_id, COUNT(DISTINCT date(played_at)) AS n
-            FROM pubg_achievements_seen
-            GROUP BY achievement_id
-        """).fetchall():
-            ach_session_count[r2["achievement_id"]] = r2["n"]
+
+        # Per achievement_id aggregieren
+        import datetime as _dt
+        groups = {}
+        for r in rows:
+            aid = r["achievement_id"]
+            g = groups.get(aid)
+            if g is None:
+                g = {
+                    "aid":           aid,
+                    "first_at":      r["played_at"],
+                    "first_match":   r["match_id"],
+                    "first_label":   r["label"],
+                    "is_rare":       bool(r["is_rare"]),
+                    "session_dates": set(),
+                    "count":         0,
+                    "any_undisplayed": False,
+                }
+                groups[aid] = g
+            if r["played_at"]:
+                g["session_dates"].add(r["played_at"][:10])  # YYYY-MM-DD
+            g["count"] += 1
+            if r["displayed_at"] is None:
+                g["any_undisplayed"] = True
+
+        def _iso_to_ts(iso):
+            if not iso:
+                return 0
+            try:
+                return int(_dt.datetime.fromisoformat(
+                    iso.replace("Z", "+00:00")).timestamp())
+            except (TypeError, ValueError):
+                return 0
 
         lang = self._current_lang()
         items = []
-        for r in rows:
-            unlocked_ts = 0
-            if r["played_at"]:
-                try:
-                    import datetime as _dt
-                    unlocked_ts = int(_dt.datetime.fromisoformat(
-                        r["played_at"].replace("Z", "+00:00")).timestamp())
-                except (TypeError, ValueError):
-                    unlocked_ts = 0
-            aid = r["achievement_id"]
+        for g in groups.values():
+            aid = g["aid"]
             sess_pct = round(
-                (ach_session_count.get(aid, 0) / total_sessions) * 100, 1)
+                (len(g["session_dates"]) / total_sessions) * 100, 1)
             items.append({
-                "appId":       -2,
-                "gameName":    "PUBG: Session Milestones",
-                "apiName":     f"{aid}:{r['match_id']}",
-                "displayName": r["label"],
-                "description": self._ach_description(aid, lang),
-                "iconUrl":     self.PUBG_ICON_URLS.get(aid) or r["icon"],
-                "unlockedAt":  unlocked_ts,
-                "sessionPct":  sess_pct,
-                "displayed":   r["displayed_at"] is not None,
-                "source":      "pubg",
-                "isRare":      bool(r["is_rare"]),
-                "matchId":     r["match_id"],
-                "achievementId": aid,
+                "appId":          -2,
+                "gameName":       "PUBG: Session Milestones",
+                # apiName = first-match-key (fuer Replay-Click)
+                "apiName":        f"{aid}:{g['first_match']}",
+                "displayName":    (self.PUBG_CANONICAL_LABELS.get(aid)
+                                   or g["first_label"]),
+                "description":    self._ach_description(aid, lang),
+                "iconUrl":        (self.PUBG_ICON_URLS.get(aid)
+                                   or g["first_label"]),
+                "unlockedAt":     _iso_to_ts(g["first_at"]),
+                "occurrenceCount": g["count"],
+                "sessionPct":     sess_pct,
+                "displayed":      not g["any_undisplayed"],
+                "source":         "pubg",
+                "isRare":         g["is_rare"],
+                "matchId":        g["first_match"],
+                "achievementId":  aid,
             })
+        # Sortiert nach erstem Vorkommen, neuestes zuerst
+        items.sort(key=lambda x: x["unlockedAt"], reverse=True)
         return _ok({
-            "achievements": items,
-            "count": len(items),
-            "range": range_kind,
-            "totalSessions": total_sessions,
+            "achievements":    items,
+            "count":           len(items),
+            "totalSessions":   total_sessions,
+            "aggregated":      True,
         })
 
     def _detect_achievements(self, qs):

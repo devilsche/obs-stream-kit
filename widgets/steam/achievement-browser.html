@@ -271,15 +271,9 @@
       <input id="rarePctInput" type="number" min="1" max="50" value="10" style="width: 60px;">
     </div>
     <div class="grp">
-      <label>PUBG-Range:</label>
-      <select id="rangeSelect">
-        <option value="all">Alle</option>
-        <option value="session">Session</option>
-        <option value="week">7 Tage</option>
-      </select>
       <button id="backfillBtn" type="button"
               style="background:rgba(94,42,121,0.5);color:var(--pubg-gold);border:1px solid var(--pubg-border);padding:4px 8px;border-radius:4px;font-family:inherit;font-size:0.85em;cursor:pointer">
-        Backfill History
+        Backfill PUBG History
       </button>
     </div>
     <div class="grp">
@@ -326,7 +320,6 @@
     let freshKeys = new Set();
     const REFRESH_MS = 30000;
 
-    let pubgRange = "all";
     let pubgDetectTriggered = false;
     const gridEl   = document.getElementById("grid");
     const toastEl  = document.getElementById("toast");
@@ -336,7 +329,6 @@
     const sortSel  = document.getElementById("sortSelect");
     const rareIn   = document.getElementById("rarePctInput");
     const langSel  = document.getElementById("langSelect");
-    const rangeSel = document.getElementById("rangeSelect");
     const backfillBtn = document.getElementById("backfillBtn");
 
     function fmtDate(unixSec) {
@@ -503,10 +495,6 @@
       applyFilters();
     });
     rareIn.addEventListener("change", () => applyFilters());
-    rangeSel.addEventListener("change", (e) => {
-      pubgRange = e.target.value;
-      load();
-    });
     backfillBtn.addEventListener("click", async () => {
       backfillBtn.disabled = true;
       backfillBtn.textContent = "Läuft…";
@@ -573,7 +561,7 @@
         PubgUI.fetchJson("/api/steam/achievements-list?limit=2000")
           .catch(() => ({})),
         PubgUI.fetchJson(
-          `/api/pubg/achievements-list?range=${encodeURIComponent(pubgRange)}`)
+          "/api/pubg/achievements-list")
           .catch(() => ({})),
       ]);
       const steamAch = (steamData && steamData.achievements) || [];
