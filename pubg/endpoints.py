@@ -108,6 +108,8 @@ class EndpointRegistry:
             return self._achievements_list(qs)
         if route == ("GET", "/api/pubg/replay-achievement"):
             return self._replay_achievement(qs)
+        if route == ("GET", "/api/pubg/detect-achievements"):
+            return self._detect_achievements(qs)
         if route == ("POST", "/api/pubg/session/reset"):
             return self._session_reset()
         if route == ("GET", "/api/pubg/top-mates"):
@@ -420,6 +422,29 @@ class EndpointRegistry:
             "count": len(items),
             "range": range_kind,
         })
+
+    def _detect_achievements(self, qs):
+        """Triggert die Session-Milestone-Detection manuell. Schreibt
+        alles was compute_session_achievements jetzt zurueckliefert in
+        pubg_achievements_seen — Duplikate (PK achievement_id+match_id)
+        werden via INSERT OR IGNORE geskippt.
+
+        Praktisch:
+        - Nach erstem Server-Update wenn die Tabelle leer ist
+        - Browser ruft's auto beim Initial-Load auf
+        - Demo-Page Button 'Detect now'
+        """
+        from pubg.aggregations import detect_and_store_session_achievements
+        conn = self.get_conn()
+        try:
+            new_count = detect_and_store_session_achievements(
+                conn, self.my_account_id)
+        except Exception as e:
+            return _err(500, f"detect failed: {e}")
+        # Cache invalidieren damit ein evtl. cached session-achievements
+        # nicht stale ist
+        self.cache.invalidate()
+        return _ok({"newAchievements": new_count})
 
     def _replay_achievement(self, qs):
         """Markiert ein einzelnes PUBG-Session-Milestone als undisplayed

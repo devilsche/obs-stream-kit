@@ -311,6 +311,7 @@
     const REFRESH_MS = 30000;
 
     let pubgRange = "all";
+    let pubgDetectTriggered = false;
     const gridEl   = document.getElementById("grid");
     const toastEl  = document.getElementById("toast");
     const statsEl  = document.getElementById("stats");
@@ -482,6 +483,14 @@
     }
 
     async function fetchAll() {
+      // Beim Initial-Load: einmal PUBG-Detection triggern damit die
+      // pubg_achievements_seen-Tabelle aufgefuellt wird, falls leer.
+      // Idempotent — INSERT OR IGNORE, also kein Schaden bei Wiederholung.
+      if (!pubgDetectTriggered) {
+        try { await PubgUI.fetchJson("/api/pubg/detect-achievements"); }
+        catch (e) { /* silent */ }
+        pubgDetectTriggered = true;
+      }
       // Steam + PUBG parallel pullen, mergen.
       const [steamData, pubgData] = await Promise.all([
         PubgUI.fetchJson("/api/steam/achievements-list?limit=2000")
