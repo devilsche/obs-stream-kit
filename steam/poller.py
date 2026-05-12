@@ -22,6 +22,7 @@ from steam.db import (
     find_app_needing_details_sync, upsert_app_details,
     mark_played_now,
     upsert_global_achievement_pct, get_global_achievement_pct,
+    upsert_app_schema_lang,
     COOP_CATEGORY_IDS, MULTIPLAYER_CATEGORY_IDS,
 )
 from steam.image_cache import ensure_app_images
@@ -315,8 +316,19 @@ class SteamPoller(threading.Thread):
                 "description": a.get("description"),
                 "icon":        a.get("icon"),
             }
+        schema_json_str = json.dumps(lookup)
         upsert_app_schema(conn, app_id,
                           game_name=game_name_hint,
                           achievement_count=len(achs),
-                          schema_json=json.dumps(lookup))
+                          schema_json=schema_json_str)
+        # Dual-write in lang-spezifischen Cache. Damit erspart sich
+        # _achievements_list den erneuten Fetch wenn der User zur
+        # aktuellen Server-Sprache zurueck-switcht.
+        lang = (self.client.language or "english").lower()
+        lang_lookup = {
+            api: {"displayName": v.get("displayName"),
+                  "description": v.get("description")}
+            for api, v in lookup.items()
+        }
+        upsert_app_schema_lang(conn, app_id, lang, json.dumps(lang_lookup))
         return lookup

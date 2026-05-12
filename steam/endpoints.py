@@ -45,6 +45,10 @@ class SteamEndpointRegistry:
         # darin ueberschreibt was im SteamClient kam (= .secrets-Wert).
         # So kann der User die Sprache ueber's API andern und es bleibt.
         self._load_prefs()
+        # Backfill: alle bisher in steam_app_schema gespeicherten
+        # Schemas einmalig auch in steam_app_schema_lang(current_lang)
+        # ablegen, damit Switch zur Current-Lang nicht alles neu pullt.
+        self._backfill_lang_cache()
         # AppID -> {name, headerImage, capsuleImage} (Persistenz waehrend
         # Server-Run). Genutzt wenn ein Game nicht in der DB ist (Non-
         # Steam-via-Proton, fakeAppId-Tests, fresh-bought games).
@@ -142,6 +146,42 @@ class SteamEndpointRegistry:
         base = ("https://cdn.cloudflare.steamstatic.com"
                 "/steamcommunity/public/images/")
         return base + raw.lstrip("/")
+
+    def _backfill_lang_cache(self):
+        """One-shot beim Server-Start: schreibt jeden steam_app_schema-
+        Eintrag der noch keinen Lang-Cache fuer die current_lang hat
+        dorthin um. Damit erspart sich der erste Sprach-Switch zur
+        Server-Default-Sprache ein erneutes Pullen pro Game."""
+        lang = (self.client.language or "english").lower()
+        if not lang:
+            return
+        conn = self.db_connect()
+        try:
+            rows = conn.execute("""
+                SELECT s.app_id, s.schema_json
+                FROM steam_app_schema s
+                LEFT JOIN steam_app_schema_lang l
+                  ON l.app_id = s.app_id AND l.lang = ?
+                WHERE s.schema_json IS NOT NULL
+                  AND s.schema_json != '{}'
+                  AND l.app_id IS NULL
+            """, (lang,)).fetchall()
+            for r in rows:
+                try:
+                    full = json.loads(r["schema_json"])
+                except (TypeError, json.JSONDecodeError):
+                    continue
+                lang_lookup = {
+                    api: {"displayName": v.get("displayName"),
+                          "description": v.get("description")}
+                    for api, v in full.items()
+                }
+                upsert_app_schema_lang(
+                    conn, r["app_id"], lang, json.dumps(lang_lookup))
+        except Exception:
+            pass
+        finally:
+            conn.close()
 
     def _prefs_path(self):
         return os.path.join(self.root_dir, "data", "steam-prefs.json")
@@ -1251,11 +1291,21 @@ class SteamEndpointRegistry:
                         }
                         for a in schema_achs if a.get("name")
                     }
+                    schema_json_str = json.dumps(schema_lookup)
                     upsert_app_schema(
                         conn, app_id,
                         game_name=stats.get("gameName") or game_name,
                         achievement_count=len(schema_achs),
-                        schema_json=json.dumps(schema_lookup))
+                        schema_json=schema_json_str)
+                    # Dual-write in lang-Cache (Server-aktuelle Sprache)
+                    cur_lang = (self.client.language or "english").lower()
+                    lang_lookup = {
+                        api: {"displayName": v.get("displayName"),
+                              "description": v.get("description")}
+                        for api, v in schema_lookup.items()
+                    }
+                    upsert_app_schema_lang(
+                        conn, app_id, cur_lang, json.dumps(lang_lookup))
                 except SteamApiError:
                     pass
             elif existing and existing["schema_json"]:
