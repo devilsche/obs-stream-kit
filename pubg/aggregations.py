@@ -1163,7 +1163,17 @@ def detect_and_store_session_achievements(conn, my_account_id):
     pubg_achievements_seen mit displayed_at=NULL. Returns Anzahl neu
     eingefuegter."""
     achievements = compute_session_achievements(conn, my_account_id)
+    return _insert_achievements(conn, achievements, suppress_popup=False)
+
+
+def _insert_achievements(conn, achievements, suppress_popup=False):
+    """Helper: inserted Liste von compute_session_achievements-Resultaten
+    in pubg_achievements_seen. INSERT OR IGNORE filtert Duplikate.
+    suppress_popup=True markiert direkt als displayed_at=NOW damit's
+    nicht popupt (fuer Backfill)."""
+    import time as _t
     new_count = 0
+    displayed_at = int(_t.time()) if suppress_popup else None
     for a in achievements:
         aid = a.get("id")
         mid = a.get("matchId")
@@ -1172,15 +1182,77 @@ def detect_and_store_session_achievements(conn, my_account_id):
         cur = conn.execute("""
             INSERT INTO pubg_achievements_seen
               (achievement_id, match_id, label, icon, played_at,
-               detected_at, is_rare)
-            VALUES (?, ?, ?, ?, ?, strftime('%s','now'), ?)
+               detected_at, is_rare, displayed_at)
+            VALUES (?, ?, ?, ?, ?, strftime('%s','now'), ?, ?)
             ON CONFLICT(achievement_id, match_id) DO NOTHING
         """, (aid, mid, a.get("label"), a.get("icon"),
               a.get("playedAt"),
-              1 if aid in PUBG_RARE_ACHIEVEMENTS else 0))
+              1 if aid in PUBG_RARE_ACHIEVEMENTS else 0,
+              displayed_at))
         if cur.rowcount > 0:
             new_count += 1
     return new_count
+
+
+def backfill_session_achievements(conn, my_account_id,
+                                    gap_hours=6, suppress_popup=True):
+    """Historischer Backfill: walkt durch ALLE Matches in der DB
+    chronologisch, splittet in Sessions per Time-Gap, laeuft
+    compute_session_achievements pro Session, inserted Milestones
+    in pubg_achievements_seen.
+
+    gap_hours: Lueckenzeit zwischen Matches die als 'neue Session'
+               zaehlt (Default 6h — Stream-Pause).
+    suppress_popup: True (Default) markiert direkt als displayed_at=NOW
+                    damit der Backfill nicht 100+ Popups feuert.
+
+    Returns dict { sessions, inserted, errors }.
+    """
+    import datetime as _dt
+    # Alle Matches chronologisch (ASC)
+    matches = compute_session_matches(conn, my_account_id, "all")
+    matches = list(reversed(matches))  # ASC
+    if not matches:
+        return {"sessions": 0, "inserted": 0, "errors": []}
+
+    def _parse(iso):
+        try:
+            return _dt.datetime.fromisoformat(iso.replace("Z", "+00:00"))
+        except (TypeError, ValueError, AttributeError):
+            return None
+
+    # Sessions per Gap detecten
+    gap_secs = gap_hours * 3600
+    sessions = []
+    cur_start = matches[0]["playedAt"]
+    cur_last  = matches[0]["playedAt"]
+    last_t    = _parse(matches[0]["playedAt"])
+    for m in matches[1:]:
+        t = _parse(m["playedAt"])
+        if t and last_t and (t - last_t).total_seconds() > gap_secs:
+            sessions.append((cur_start, cur_last))
+            cur_start = m["playedAt"]
+        cur_last = m["playedAt"]
+        if t:
+            last_t = t
+    sessions.append((cur_start, cur_last))
+
+    # Detection pro Session
+    total_new = 0
+    errors = []
+    for from_iso, to_iso in sessions:
+        try:
+            achievements = compute_session_achievements(
+                conn, my_account_id, from_iso=from_iso, to_iso=to_iso)
+            total_new += _insert_achievements(
+                conn, achievements, suppress_popup=suppress_popup)
+        except Exception as e:
+            errors.append(f"{from_iso}: {type(e).__name__}: {e}")
+    return {
+        "sessions": len(sessions),
+        "inserted": total_new,
+        "errors": errors,
+    }
 
 
 def compute_hot_drop(conn, my_account_id, range_key="session",

@@ -110,6 +110,8 @@ class EndpointRegistry:
             return self._replay_achievement(qs)
         if route == ("GET", "/api/pubg/detect-achievements"):
             return self._detect_achievements(qs)
+        if route == ("GET", "/api/pubg/backfill-achievements"):
+            return self._backfill_achievements(qs)
         if route == ("POST", "/api/pubg/session/reset"):
             return self._session_reset()
         if route == ("GET", "/api/pubg/top-mates"):
@@ -445,6 +447,32 @@ class EndpointRegistry:
         # nicht stale ist
         self.cache.invalidate()
         return _ok({"newAchievements": new_count})
+
+    def _backfill_achievements(self, qs):
+        """Historischer Backfill — walkt durch ALLE Matches, splittet
+        in Sessions per Time-Gap, detected pro Session, inserted in
+        pubg_achievements_seen.
+
+        Query:
+          ?gapHours=N    Pause-Schwelle fuer Session-Boundary (Default 6)
+          ?popup=1       neue Eintraege als undisplayed markieren (Popups
+                         feuern; default 0 = silent Backfill)
+        """
+        try:
+            gap_hours = max(1, int(qs.get("gapHours", "6")))
+        except ValueError:
+            gap_hours = 6
+        suppress = qs.get("popup") != "1"
+        from pubg.aggregations import backfill_session_achievements
+        conn = self.get_conn()
+        try:
+            result = backfill_session_achievements(
+                conn, self.my_account_id,
+                gap_hours=gap_hours, suppress_popup=suppress)
+        except Exception as e:
+            return _err(500, f"backfill failed: {e}")
+        self.cache.invalidate()
+        return _ok(result)
 
     def _replay_achievement(self, qs):
         """Markiert ein einzelnes PUBG-Session-Milestone als undisplayed
