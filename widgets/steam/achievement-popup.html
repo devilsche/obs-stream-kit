@@ -35,6 +35,20 @@
       flex-shrink: 0;
       box-shadow: 0 0 12px rgba(242, 183, 5, 0.35);
     }
+    /* Emoji-Variante fuer PUBG-Milestones (Icon ist ein Emoji-Char,
+       kein URL). Selbe Box, Emoji zentriert. */
+    .icon-emoji {
+      width: 64px; height: 64px;
+      border-radius: 8px;
+      background: rgba(94, 42, 121, 0.4);
+      border: 1px solid var(--pubg-gold);
+      flex-shrink: 0;
+      box-shadow: 0 0 12px rgba(242, 183, 5, 0.35);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 38px;
+      line-height: 1;
+    }
+    .icon-emoji[hidden] { display: none; }
     .info { flex: 1; min-width: 0; }
     .ribbon {
       display: inline-block;
@@ -91,6 +105,7 @@
 <body>
   <div class="pubg-card popup" id="popup">
     <img class="icon" id="icon" alt="">
+    <div class="icon-emoji" id="iconEmoji" hidden></div>
     <div class="info">
       <span class="ribbon" id="ribbon">Achievement Unlocked</span>
       <div class="title" id="title">—</div>
@@ -159,11 +174,23 @@
       document.getElementById("desc").textContent = u.description || "";
       document.getElementById("game").textContent = u.gameName || ("App #" + u.appId);
       const iconEl = document.getElementById("icon");
-      if (u.iconUrl) {
+      const emojiEl = document.getElementById("iconEmoji");
+      const isUrl = u.iconUrl && (
+        u.iconUrl.startsWith("http://") ||
+        u.iconUrl.startsWith("https://") ||
+        u.iconUrl.startsWith("/"));
+      if (u.iconUrl && isUrl) {
         iconEl.src = u.iconUrl;
         iconEl.style.display = "";
+        emojiEl.hidden = true;
+      } else if (u.iconUrl) {
+        // Emoji oder Text-Icon
+        emojiEl.textContent = u.iconUrl;
+        emojiEl.hidden = false;
+        iconEl.style.display = "none";
       } else {
         iconEl.style.display = "none";
+        emojiEl.hidden = true;
       }
       // Global-Unlock-%
       const pctEl = document.getElementById("pct");

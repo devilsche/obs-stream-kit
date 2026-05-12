@@ -320,13 +320,118 @@ class EndpointRegistry:
                 from_iso=from_iso, to_iso=to_iso),
         ))
 
+    # Per-Lang Beschreibungs-Texte fuer PUBG-Session-Milestones.
+    # Fallback-Sprache: english. Wird in den Responses mit-geliefert.
+    PUBG_ACH_DESCRIPTIONS = {
+        "english": {
+            "first_chicken":           "First Chicken of the session",
+            "first_top10":             "First Top-10 finish of the session",
+            "longest_kill_400":        "Longest Kill of 400m or more",
+            "five_kill_match":         "Match with 5+ kills",
+            "beast_chicken":           "Chicken with 5+ kills — Beast Mode",
+            "first_hot_drop":          "First hot drop in the session",
+            "first_hot_drop_survived": "First survived hot drop",
+            "top10_streak":            "Top-10 streak of 3+ matches",
+            "chicken_streak":          "Chicken streak of 2+ matches",
+        },
+        "german": {
+            "first_chicken":           "Erstes Chicken-Dinner der Session",
+            "first_top10":             "Erster Top-10-Finish der Session",
+            "longest_kill_400":        "Longest Kill ≥ 400m",
+            "five_kill_match":         "Match mit 5+ Kills",
+            "beast_chicken":           "Chicken mit 5+ Kills — Beast Mode",
+            "first_hot_drop":          "Erstes Hot-Drop der Session",
+            "first_hot_drop_survived": "Erstes überlebtes Hot-Drop",
+            "top10_streak":            "Top-10-Streak von 3+ Matches",
+            "chicken_streak":          "Chicken-Streak von 2+ Matches",
+        },
+        "french": {
+            "first_chicken":           "Premier Chicken Dinner de la session",
+            "first_top10":             "Premier top 10 de la session",
+            "longest_kill_400":        "Longest Kill ≥ 400m",
+            "five_kill_match":         "Match avec 5 kills ou plus",
+            "beast_chicken":           "Chicken avec 5+ kills — Beast Mode",
+            "first_hot_drop":          "Premier hot drop de la session",
+            "first_hot_drop_survived": "Premier hot drop survécu",
+            "top10_streak":            "Série top 10 de 3 matches ou plus",
+            "chicken_streak":          "Série de Chicken (2+)",
+        },
+        "spanish": {
+            "first_chicken":           "Primer Chicken Dinner de la sesión",
+            "first_top10":             "Primer Top 10 de la sesión",
+            "longest_kill_400":        "Longest Kill ≥ 400m",
+            "five_kill_match":         "Partida con 5+ kills",
+            "beast_chicken":           "Chicken con 5+ kills — Modo Bestia",
+            "first_hot_drop":          "Primer hot drop de la sesión",
+            "first_hot_drop_survived": "Primer hot drop sobrevivido",
+            "top10_streak":            "Racha de Top 10 (3+)",
+            "chicken_streak":          "Racha de Chickens (2+)",
+        },
+        "dutch": {
+            "first_chicken":           "Eerste Chicken Dinner van de sessie",
+            "first_top10":             "Eerste Top-10 van de sessie",
+            "longest_kill_400":        "Longest Kill ≥ 400m",
+            "five_kill_match":         "Match met 5+ kills",
+            "beast_chicken":           "Chicken met 5+ kills — Beast Mode",
+            "first_hot_drop":          "Eerste hot drop van de sessie",
+            "first_hot_drop_survived": "Eerste overleefde hot drop",
+            "top10_streak":            "Top-10 streak (3+)",
+            "chicken_streak":          "Chicken streak (2+)",
+        },
+        "italian": {
+            "first_chicken":           "Primo Chicken Dinner della sessione",
+            "first_top10":             "Primo Top-10 della sessione",
+            "longest_kill_400":        "Longest Kill ≥ 400m",
+            "five_kill_match":         "Match con 5+ kill",
+            "beast_chicken":           "Chicken con 5+ kill — Modalità Bestia",
+            "first_hot_drop":          "Primo hot drop della sessione",
+            "first_hot_drop_survived": "Primo hot drop sopravvissuto",
+            "top10_streak":            "Streak Top-10 (3+)",
+            "chicken_streak":          "Streak Chicken (2+)",
+        },
+    }
+
+    def _current_lang(self):
+        """Holt die aktive Sprache aus den Steam-Prefs (data/steam-prefs.json)
+        — der Steam-Endpoint persistiert die dort. Fallback english."""
+        import os, json
+        try:
+            # Pfad ist relativ zur cwd des Servers
+            path = os.path.join("data", "steam-prefs.json")
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    prefs = json.load(f)
+                lang = (prefs.get("language") or "").strip().lower()
+                if lang:
+                    return lang
+        except (OSError, json.JSONDecodeError):
+            pass
+        return "english"
+
+    def _ach_description(self, achievement_id, lang):
+        """Liefert die Beschreibung fuer ein PUBG-Achievement in der
+        gewuenschten Sprache. Fallback: english. Returns None wenn
+        achievement_id unbekannt ist."""
+        lang = (lang or "english").lower()
+        d = (self.PUBG_ACH_DESCRIPTIONS.get(lang)
+             or self.PUBG_ACH_DESCRIPTIONS.get("english")
+             or {})
+        if achievement_id in d:
+            return d[achievement_id]
+        # Fallback auf english wenn die gewuenschte Sprache zwar
+        # gemapped ist aber den Key nicht hat
+        return self.PUBG_ACH_DESCRIPTIONS.get("english", {}).get(achievement_id)
+
     def _recent_achievements(self, qs):
         """Liefert noch nicht angezeigte Session-Milestones aus
         pubg_achievements_seen. ?markDisplayed=1 markiert sie nach
         Lieferung als shown — gleicher Mechanismus wie Steam.
         Antwort-Schema mappt auf das was achievement-popup.html
-        erwartet (apiName/displayName/iconUrl/etc)."""
+        erwartet (apiName/displayName/iconUrl/etc).
+        Description kommt aus PUBG_ACH_DESCRIPTIONS in der Sprache
+        die der Steam-Endpoint aktuell als Default fuehrt."""
         mark = qs.get("markDisplayed") == "1"
+        lang = self._current_lang()
         conn = self.get_conn()
         rows = conn.execute("""
             SELECT achievement_id, match_id, label, icon,
@@ -352,10 +457,11 @@ class EndpointRegistry:
                 "gameName":    "PUBG: Session Milestones",
                 "apiName":     f"{r['achievement_id']}:{r['match_id']}",
                 "displayName": r["label"],
-                "description": None,
+                "description": self._ach_description(r["achievement_id"], lang),
                 "iconUrl":     r["icon"],
                 "unlockedAt":  unlocked_ts,
                 "globalPct":   1.0 if r["is_rare"] else 50.0,
+                "isRare":      bool(r["is_rare"]),
                 "source":      "pubg",
             })
         marked_n = 0
@@ -383,19 +489,34 @@ class EndpointRegistry:
             FROM pubg_achievements_seen
         """
         params = []
-        if range_kind == "week":
-            sql += " WHERE played_at >= datetime('now', '-7 days')"
-        elif range_kind == "session":
-            # Session-Boundary aus den settings: sessionStartedAt
-            try:
-                session_start = get_setting(conn, "sessionStartedAt", "")
-            except Exception:
-                session_start = ""
-            if session_start:
-                sql += " WHERE played_at >= ?"
-                params.append(session_start)
+        if range_kind in ("session", "week", "day"):
+            # _range_filter liefert ISO-Cutoff. Bei 'session' mit
+            # auto-fallback (Gap-Detection wenn sessionStartedAt nicht
+            # explizit gesetzt) — wie es alle anderen PUBG-Endpoints
+            # auch machen.
+            from pubg.aggregations import _range_filter
+            cutoff = _range_filter(conn, range_kind)
+            sql += " WHERE played_at >= ?"
+            params.append(cutoff)
         sql += " ORDER BY played_at DESC"
         rows = conn.execute(sql, params).fetchall()
+
+        # Session-Frequenz pro achievement_id: 'wie oft in % deiner
+        # bisherigen Stream-Sessions'. Approximation: 1 Session =
+        # 1 distinct Datum aus matches. Per achievement_id zaehlen
+        # wir distinct Daten in pubg_achievements_seen.
+        total_sessions = (conn.execute(
+            "SELECT COUNT(DISTINCT date(played_at)) FROM matches"
+        ).fetchone()[0]) or 1
+        ach_session_count = {}
+        for r2 in conn.execute("""
+            SELECT achievement_id, COUNT(DISTINCT date(played_at)) AS n
+            FROM pubg_achievements_seen
+            GROUP BY achievement_id
+        """).fetchall():
+            ach_session_count[r2["achievement_id"]] = r2["n"]
+
+        lang = self._current_lang()
         items = []
         for r in rows:
             unlocked_ts = 0
@@ -406,24 +527,29 @@ class EndpointRegistry:
                         r["played_at"].replace("Z", "+00:00")).timestamp())
                 except (TypeError, ValueError):
                     unlocked_ts = 0
+            aid = r["achievement_id"]
+            sess_pct = round(
+                (ach_session_count.get(aid, 0) / total_sessions) * 100, 1)
             items.append({
                 "appId":       -2,
                 "gameName":    "PUBG: Session Milestones",
-                "apiName":     f"{r['achievement_id']}:{r['match_id']}",
+                "apiName":     f"{aid}:{r['match_id']}",
                 "displayName": r["label"],
+                "description": self._ach_description(aid, lang),
                 "iconUrl":     r["icon"],
                 "unlockedAt":  unlocked_ts,
-                "globalPct":   1.0 if r["is_rare"] else 50.0,
+                "sessionPct":  sess_pct,
                 "displayed":   r["displayed_at"] is not None,
                 "source":      "pubg",
                 "isRare":      bool(r["is_rare"]),
                 "matchId":     r["match_id"],
-                "achievementId": r["achievement_id"],
+                "achievementId": aid,
             })
         return _ok({
             "achievements": items,
             "count": len(items),
             "range": range_kind,
+            "totalSessions": total_sessions,
         })
 
     def _detect_achievements(self, qs):

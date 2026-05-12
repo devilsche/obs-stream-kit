@@ -109,6 +109,18 @@
       background: rgba(0, 0, 0, 0.5);
       object-fit: cover;
     }
+    /* Wenn das 'icon' ein Emoji ist (PUBG-Session-Milestones), rendern
+       als Text-Div statt <img>. Gleiches Quadrat, Emoji zentriert. */
+    .tile-icon-emoji {
+      width: 48px; height: 48px;
+      flex-shrink: 0;
+      border-radius: 4px;
+      border: 1px solid var(--pubg-border);
+      background: rgba(94, 42, 121, 0.35);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+      line-height: 1;
+    }
     .tile-body { flex: 1; min-width: 0; }
     .tile-game {
       color: var(--pubg-muted);
@@ -335,6 +347,24 @@
       });
     }
 
+    function fmtDateTime(unixSec) {
+      if (!unixSec) return "—";
+      const d = new Date(unixSec * 1000);
+      return d.toLocaleDateString("de-DE", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+      }) + " " + d.toLocaleTimeString("de-DE", {
+        hour: "2-digit", minute: "2-digit",
+      });
+    }
+
+    function isIconUrl(icon) {
+      return !!icon && (
+        icon.startsWith("http://") ||
+        icon.startsWith("https://") ||
+        icon.startsWith("/")
+      );
+    }
+
     function showToast(html) {
       toastEl.innerHTML = html;
       toastEl.classList.add("show");
@@ -342,34 +372,55 @@
     }
 
     function tileHtml(a) {
-      const isRare = a.globalPct != null && a.globalPct <= RARE_PCT;
+      const source = a.source || "";
+      const isPubg = source === "pubg" || a.appId === -2;
+      // PUBG-Synthetic-Pct ist nicht aussagekraeftig — nur is_rare-Flag
+      // entscheidet. Bei Steam zeigen wir die echte Quote.
+      const isRare = isPubg
+        ? !!a.isRare
+        : (a.globalPct != null && a.globalPct <= RARE_PCT);
       const icon = a.iconUrl || "";
       const name = (a.displayName || a.apiName || "Achievement").replace(/</g, "&lt;");
       const game = (a.gameName || ("App #" + a.appId)).replace(/</g, "&lt;");
-      const date = fmtDate(a.unlockedAt);
-      const pctTxt = (a.globalPct != null)
-        ? `<span class="pct${isRare ? " rare-pct" : ""}"><b>${a.globalPct.toFixed(1)}%</b> have it</span>`
-        : "";
-      const rareBadge = isRare ? `<span class="rare-badge">Rare</span>` : "";
       const desc = (a.description || "").replace(/</g, "&lt;");
       const key = a.appId + ":" + a.apiName;
       const isFresh = freshKeys.has(key);
-      const source = a.source || "";
+
+      // Icon: URL = <img>, Emoji = Text-Div
+      let iconHtml;
+      if (!icon) {
+        iconHtml = `<div class="tile-icon"></div>`;
+      } else if (isIconUrl(icon)) {
+        iconHtml = `<img class="tile-icon" src="${icon}" alt="" onerror="this.style.display='none'">`;
+      } else {
+        iconHtml = `<div class="tile-icon-emoji">${icon}</div>`;
+      }
+
+      // Meta-Zeile: PUBG zeigt Datum+Uhrzeit + Session-Frequenz
+      // (z.B. '20% deiner Sessions'). Steam zeigt nur Datum.
+      let metaInner;
+      if (isPubg) {
+        const sessFreq = (a.sessionPct != null)
+          ? `<span class="pct"><b>${a.sessionPct.toFixed(0)}%</b> deiner Sessions</span>`
+          : "";
+        metaInner = `<span class="date"><b>${fmtDateTime(a.unlockedAt)}</b></span>`
+          + sessFreq
+          + (isRare ? `<span class="rare-badge">Rare</span>` : "");
+      } else {
+        metaInner = `<span class="date">${fmtDate(a.unlockedAt)}</span>`
+          + (isRare ? `<span class="rare-badge">Rare</span>` : "");
+      }
+
       return `
         <div class="tile${isRare ? " rare" : ""}${isFresh ? " brand-new" : ""}"
              data-appid="${a.appId}" data-api="${a.apiName.replace(/"/g, "&quot;")}"
              data-source="${source}">
-          ${icon ? `<img class="tile-icon" src="${icon}" alt="" onerror="this.style.display='none'">`
-                 : `<div class="tile-icon"></div>`}
+          ${iconHtml}
           <div class="tile-body">
             <div class="tile-game">${game}</div>
             <div class="tile-name">${name}</div>
             ${desc ? `<div class="tile-desc">${desc}</div>` : ""}
-            <div class="tile-meta">
-              <span class="date">Erstmals: ${date}</span>
-              ${pctTxt}
-              ${rareBadge}
-            </div>
+            <div class="tile-meta">${metaInner}</div>
           </div>
         </div>`;
     }
