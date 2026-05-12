@@ -45,6 +45,10 @@ class SteamEndpointRegistry:
         # sich selten). Refresh 1×/h reicht.
         self._profile_items = None
         self._profile_items_fetched_at = 0
+        # Friend-Liste (steamid64 strings). Refresh 1×/h — Freunde
+        # aendern sich nicht minuetlich.
+        self._friend_ids = None
+        self._friend_ids_fetched_at = 0
 
     def _get_profile_items(self):
         """Cached fetch von Frame + Animated-Avatar (1× pro Stunde).
@@ -151,6 +155,8 @@ class SteamEndpointRegistry:
             return self._recent_unlocks(qs)
         if route == "/api/steam/current-players":
             return self._current_players(qs)
+        if route == "/api/steam/friends-in-lobby":
+            return self._friends_in_lobby(qs)
         if route == "/api/steam/achievement-feed":
             return self._achievement_feed(qs)
         if route == "/api/steam/status":
@@ -517,6 +523,100 @@ class SteamEndpointRegistry:
             return _ok({"unlocks": unlocks, "marked": marked_n})
         finally:
             conn.close()
+
+    # ── Friends-In-Lobby ───────────────────────────────────────────────────
+    def _get_friend_ids(self):
+        """Cached Friend-IDs (1× pro Stunde). Returns list of SteamID64
+        strings. Leer wenn Friend-Liste privat oder API down."""
+        now = time.monotonic()
+        if (self._friend_ids is not None
+                and now - self._friend_ids_fetched_at < 3600):
+            return self._friend_ids
+        try:
+            friends = self.client.get_friend_list()
+            self._friend_ids = [f.get("steamid") for f in friends
+                                 if f.get("steamid")]
+        except SteamApiError:
+            self._friend_ids = []
+        self._friend_ids_fetched_at = now
+        return self._friend_ids
+
+    def _friends_in_lobby(self, qs):
+        """Welche Freunde sind grad in derselben Lobby + Game wie der
+        Streamer? Matcht auf gameid + lobbysteamid in den Player-
+        Summaries. Voraussetzung: Friend-Liste public und Friends
+        haben 'Game Details' auf Public.
+
+        Antwort: { active, gameId, gameName, lobbySteamId, friends:[…] }
+        """
+        try:
+            me = self._cached("summary", self.client.get_player_summaries)
+        except SteamApiError as e:
+            return _err(502, str(e))
+        my_game = me.get("gameid")
+        my_lobby = me.get("lobbysteamid")
+        my_game = str(my_game) if my_game else None
+        my_lobby = str(my_lobby) if my_lobby else None
+
+        # Test-Override aus query: erlaubt Diagnose-Calls.
+        fake_lobby = qs.get("fakeLobbyId")
+        fake_game  = qs.get("fakeAppId")
+        if fake_lobby: my_lobby = fake_lobby
+        if fake_game:  my_game  = fake_game
+
+        if not my_game and not my_lobby:
+            return _ok({"active": False, "friends": [], "count": 0})
+
+        friend_ids = self._get_friend_ids()
+        if not friend_ids:
+            return _ok({"active": True, "gameId": my_game,
+                        "lobbySteamId": my_lobby, "friends": [],
+                        "count": 0,
+                        "note": "friend list private or empty"})
+
+        # GetPlayerSummaries akzeptiert bis 100 SteamIDs pro Call.
+        # Batch wenn noetig.
+        matches = []
+        for i in range(0, len(friend_ids), 100):
+            batch = friend_ids[i:i+100]
+            try:
+                players = self.client.get_player_summaries_batch(batch)
+            except SteamApiError:
+                continue
+            for p in players:
+                f_lobby = p.get("lobbysteamid")
+                f_game  = p.get("gameid")
+                f_lobby = str(f_lobby) if f_lobby else None
+                f_game  = str(f_game)  if f_game  else None
+                # Match: gleiche Lobby ODER gleiches Game.
+                # Lobby-Match ist starker Indikator (sicher zusammen),
+                # Game-Match nur Indikator (selbes Spiel, evtl. anderes Match).
+                same_lobby = bool(my_lobby and f_lobby == my_lobby)
+                same_game  = bool(my_game  and f_game  == my_game)
+                if not (same_lobby or same_game):
+                    continue
+                matches.append({
+                    "steamId":     p.get("steamid"),
+                    "personaName": p.get("personaname"),
+                    "avatar":      p.get("avatarfull"),
+                    "profileUrl":  p.get("profileurl"),
+                    "gameId":      f_game,
+                    "gameName":    p.get("gameextrainfo"),
+                    "lobbySteamId": f_lobby,
+                    "sameLobby":   same_lobby,
+                    "sameGame":    same_game,
+                })
+        # Lobby-Matches zuerst, dann gleiche-Game-Matches
+        matches.sort(key=lambda m: (not m["sameLobby"], m["personaName"] or ""))
+
+        return _ok({
+            "active":       bool(my_game),
+            "gameId":       my_game,
+            "gameName":     me.get("gameextrainfo"),
+            "lobbySteamId": my_lobby,
+            "friends":      matches,
+            "count":        len(matches),
+        })
 
     # ── Current Players (Live-Counter) ─────────────────────────────────────
     def _current_players(self, qs):

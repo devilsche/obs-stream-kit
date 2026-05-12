@@ -78,6 +78,29 @@ class SteamClient:
         players = (data.get("response") or {}).get("players") or []
         return players[0] if players else {}
 
+    def get_player_summaries_batch(self, steam_ids) -> list:
+        """Batch-Variante: bis zu 100 SteamID64s in einem Call.
+        Returns liste aller player-summaries. SteamIDs kann iterable
+        oder comma-string sein."""
+        if isinstance(steam_ids, (list, tuple, set)):
+            steam_ids = ",".join(str(s) for s in steam_ids)
+        if not steam_ids:
+            return []
+        data = self._get(
+            "/ISteamUser/GetPlayerSummaries/v0002/",
+            steamids=steam_ids)
+        return (data.get("response") or {}).get("players") or []
+
+    def get_friend_list(self) -> list:
+        """Liefert die Friend-Liste als Liste von dicts mit Feldern
+        steamid, relationship, friend_since. Funktioniert nur wenn
+        die Friend-Liste oeffentlich ist — sonst leer."""
+        data = self._get(
+            "/ISteamUser/GetFriendList/v0001/",
+            steamid=self.steam_id, relationship="friend")
+        return ((data.get("friendslist") or {})
+                .get("friends") or [])
+
     def get_player_achievements(self, app_id: int) -> dict:
         """Achievements for one game. Each item has 'apiname', 'achieved'
         (0/1), and 'unlocktime' (Unix epoch, 0 if locked).
