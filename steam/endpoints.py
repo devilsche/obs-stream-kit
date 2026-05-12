@@ -48,19 +48,72 @@ class SteamEndpointRegistry:
 
     def _get_avatar_frame_url(self):
         """Cached fetch des Avatar-Frames (1× pro Stunde). Returns
-        None wenn der Streamer keinen Frame equipped hat."""
+        None wenn der Streamer keinen Frame equipped hat.
+
+        Steam liefert image_large/image_small als RELATIVE Pfade
+        (z.B. 'items/<appid>/<hash>.png'). Hier prepend wir den
+        community-Image-Prefix. Falls Steam dochmal absolute URLs
+        liefert, werden die unveraendert durchgereicht."""
         now = time.monotonic()
         if (self._avatar_frame is not None
                 and now - self._avatar_frame_fetched_at < 3600):
             return self._avatar_frame or None
+        url = None
         try:
             frame = self.client.get_avatar_frame()
-            url = frame.get("image_large") or frame.get("image_small")
-            self._avatar_frame = url or ""
+            raw = frame.get("image_large") or frame.get("image_small")
+            url = self._build_community_image_url(raw)
         except SteamApiError:
-            self._avatar_frame = ""
+            url = None
+        # GetAvatarFrame liefert manchmal nix obwohl ein Frame da
+        # ist — Fallback zu GetProfileItemsEquipped der die gleiche
+        # Info im Bundle hat.
+        if not url:
+            try:
+                items = self.client.get_profile_items_equipped()
+                frame = items.get("avatar_frame") or {}
+                raw = frame.get("image_large") or frame.get("image_small")
+                url = self._build_community_image_url(raw)
+            except SteamApiError:
+                pass
+        self._avatar_frame = url or ""
         self._avatar_frame_fetched_at = now
         return self._avatar_frame or None
+
+    @staticmethod
+    def _derive_library_url(header_url, app_id, filename):
+        """Library-Variante (library_600x900.jpg etc.) zum Header
+        ableiten. Header sieht so aus:
+          .../store_item_assets/steam/apps/<id>/<hash>/header.jpg?t=...
+        Library liegt am SELBEN Hash-Verzeichnis. Falls Header auf
+        altem CDN (cdn.cloudflare.steamstatic.com/steam/apps/<id>/),
+        ist Library dort auch.
+
+        Falls Header None ist, geben wir die alte CDN-URL als
+        Spekulation zurueck — fuer aeltere Games klappt sie."""
+        if header_url:
+            base = header_url.split("?", 1)[0]  # ?t=… abschneiden
+            if "/header.jpg" in base:
+                return base.replace("/header.jpg", "/" + filename)
+        if app_id:
+            return (f"https://cdn.cloudflare.steamstatic.com"
+                    f"/steam/apps/{app_id}/{filename}")
+        return None
+
+    @staticmethod
+    def _build_community_image_url(raw):
+        """Baut absolute URL fuer ein Steam-Community-Item-Bild.
+        - absolute URL: durchreichen
+        - relative (z.B. 'items/<appid>/<hash>.png'): CDN-Prefix dran
+        - leer/None: None
+        """
+        if not raw:
+            return None
+        if raw.startswith("http://") or raw.startswith("https://"):
+            return raw
+        base = ("https://cdn.cloudflare.steamstatic.com"
+                "/steamcommunity/public/images/")
+        return base + raw.lstrip("/")
 
     def _cached(self, key, fn):
         now = time.monotonic()
@@ -95,6 +148,8 @@ class SteamEndpointRegistry:
             return self._debug_achievements(qs)
         if route == "/api/steam/debug/library-features":
             return self._debug_library_features(qs)
+        if route == "/api/steam/debug/profile-items":
+            return self._debug_profile_items(qs)
         if route == "/api/steam/test-unlock":
             return self._test_unlock(qs)
         if route == "/api/steam/test-reset":
@@ -133,6 +188,8 @@ class SteamEndpointRegistry:
         img_icon_url = None
         store_header = None
         store_capsule = None
+        store_lib_bg = None
+        store_lib_logo = None
 
         if game_id:
             conn = self.db_connect()
@@ -171,11 +228,22 @@ class SteamEndpointRegistry:
                     }
                 except SteamApiError:
                     meta = {}
+                # library_600x900 + library_logo gibt's nicht direkt in
+                # appdetails; abgeleitet aus dem Hash-Pfad des Headers
+                # (gleiches store_item_assets-Verzeichnis). Falls Header
+                # auf altem CDN liegt, ist die Library-Variante dort
+                # auch (cdn.cloudflare.steamstatic.com/steam/apps/<id>/).
+                meta["library600x900"] = self._derive_library_url(
+                    meta.get("headerImage"), game_id, "library_600x900.jpg")
+                meta["libraryLogo"] = self._derive_library_url(
+                    meta.get("headerImage"), game_id, "library_logo.png")
                 self._app_meta[game_id] = meta
             if not game_name:
                 game_name = meta.get("name")
             store_header  = meta.get("headerImage")
             store_capsule = meta.get("capsuleImage")
+            store_lib_bg  = meta.get("library600x900")
+            store_lib_logo= meta.get("libraryLogo")
 
         return _ok({
             "active": bool(game_id),
@@ -194,6 +262,8 @@ class SteamEndpointRegistry:
             "imgIconUrl": img_icon_url,
             "headerImageUrl": store_header,
             "capsuleImageUrl": store_capsule,
+            "libraryBgUrl":   store_lib_bg,
+            "libraryLogoUrl": store_lib_logo,
         })
 
     def _recently_played(self):
@@ -666,6 +736,28 @@ class SteamEndpointRegistry:
             results.append(info)
 
         return _ok({"games": results, "count": len(results)})
+
+    # ── Debug: Avatar-Frame / Profile-Items ────────────────────────────────
+    def _debug_profile_items(self, qs):
+        """Roh-Ausgabe beider Frame-API-Calls + die finale URL die
+        _get_avatar_frame_url() zurueckgibt. Hilft beim Debuggen
+        warum kein Frame angezeigt wird (Steam liefert manchmal
+        leere Antwort obwohl Frame equipped, manchmal relative URLs)."""
+        result = {}
+        try:
+            result["getAvatarFrame"] = self.client.get_avatar_frame()
+        except SteamApiError as e:
+            result["getAvatarFrame"] = {"error": str(e)}
+        try:
+            result["getProfileItemsEquipped"] = (
+                self.client.get_profile_items_equipped())
+        except SteamApiError as e:
+            result["getProfileItemsEquipped"] = {"error": str(e)}
+        # Cache leeren damit nochmal frisch gefetched wird
+        self._avatar_frame = None
+        self._avatar_frame_fetched_at = 0
+        result["resolvedFrameUrl"] = self._get_avatar_frame_url()
+        return _ok(result)
 
     # ── Status (Poller-Health) ─────────────────────────────────────────────
     def _status(self):

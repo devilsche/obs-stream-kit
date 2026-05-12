@@ -59,6 +59,16 @@ class SteamClient:
         return ((data.get("response") or {})
                 .get("avatar_frame") or {})
 
+    def get_profile_items_equipped(self) -> dict:
+        """Alle equipped Community-Items (frame, animated avatar,
+        profile_background, mini_profile_background) in einem Call.
+        Reichere Daten als GetAvatarFrame, gleicher Endpoint-Namespace.
+        Returns die gesamte 'response'-Hash, leerer dict wenn nix."""
+        data = self._get(
+            "/IPlayerService/GetProfileItemsEquipped/v1/",
+            steamid=self.steam_id)
+        return data.get("response") or {}
+
     def get_player_summaries(self) -> dict:
         """Returns first player summary (avatar, online state, gameid if
         currently in-game). Empty dict if API returned nothing."""
