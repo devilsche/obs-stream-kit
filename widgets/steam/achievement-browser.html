@@ -92,6 +92,15 @@
       0%   { background: rgba(242, 183, 5, 0.6); }
       100% { background: rgba(0, 0, 0, 0.4); }
     }
+    /* Neuankoemmlinge via Auto-Refresh — 4s sanftes Gold-Glow */
+    .tile.brand-new {
+      animation: brandNewFlash 4s ease-out;
+      border-color: var(--pubg-gold);
+    }
+    @keyframes brandNewFlash {
+      0%   { box-shadow: 0 0 24px rgba(242, 183, 5, 0.9); }
+      100% { box-shadow: 0 0 0 rgba(242, 183, 5, 0); }
+    }
     .tile-icon {
       width: 48px; height: 48px;
       flex-shrink: 0;
@@ -288,6 +297,10 @@
     let searchText = "";
     let sortMode = "recent";
     let currentLang = "";  // "" = Server-Default
+    // Keys (appId:apiName) der Achievements die NEU dazukommen (via
+    // Auto-Refresh) bekommen einen 4s-Flash. Set wird konsumiert.
+    let freshKeys = new Set();
+    const REFRESH_MS = 30000;
 
     const gridEl   = document.getElementById("grid");
     const toastEl  = document.getElementById("toast");
@@ -323,8 +336,10 @@
         : "";
       const rareBadge = isRare ? `<span class="rare-badge">Rare</span>` : "";
       const desc = (a.description || "").replace(/</g, "&lt;");
+      const key = a.appId + ":" + a.apiName;
+      const isFresh = freshKeys.has(key);
       return `
-        <div class="tile${isRare ? " rare" : ""}"
+        <div class="tile${isRare ? " rare" : ""}${isFresh ? " brand-new" : ""}"
              data-appid="${a.appId}" data-api="${a.apiName.replace(/"/g, "&quot;")}">
           ${icon ? `<img class="tile-icon" src="${icon}" alt="" onerror="this.style.display='none'">`
                  : `<div class="tile-icon"></div>`}
@@ -433,17 +448,23 @@
       } catch (e) { /* fallback bleibt english */ }
     }
 
-    async function load() {
-      document.body.classList.add("loading");
+    function rebuildGameDropdown() {
+      const prev = gameSel.value;
+      gameSel.innerHTML = `<option value="">— Alle Games (${all.length}) —</option>`
+        + games.map(g =>
+            `<option value="${g.appId}">${(g.name || "App #" + g.appId).replace(/</g, "&lt;")} (${g.count})</option>`
+          ).join("");
+      if (prev) gameSel.value = prev;
+    }
+
+    async function load(showSpinner = true) {
+      if (showSpinner) document.body.classList.add("loading");
       try {
         const data = await PubgUI.fetchJson(
           "/api/steam/achievements-list?limit=2000");
         all = (data && data.achievements) || [];
         games = (data && data.games) || [];
-        gameSel.innerHTML = `<option value="">— Alle Games (${all.length}) —</option>`
-          + games.map(g =>
-              `<option value="${g.appId}">${(g.name || "App #" + g.appId).replace(/</g, "&lt;")} (${g.count})</option>`
-            ).join("");
+        rebuildGameDropdown();
         applyFilters();
       } catch (e) {
         statsEl.textContent = "Fehler beim Laden: " + e;
@@ -452,9 +473,42 @@
       }
     }
 
+    // Auto-Refresh: alle REFRESH_MS sek silent neu pullen + neue
+    // Achievements als 'brand-new' markieren. Kein Spinner, kein
+    // Disable — laueft im Hintergrund.
+    async function autoRefresh() {
+      let newData;
+      try {
+        newData = await PubgUI.fetchJson(
+          "/api/steam/achievements-list?limit=2000");
+      } catch (e) {
+        return;
+      }
+      const newAll = (newData && newData.achievements) || [];
+      const oldKeys = new Set(all.map(a => a.appId + ":" + a.apiName));
+      const truly_new = newAll.filter(a =>
+        !oldKeys.has(a.appId + ":" + a.apiName));
+      if (!truly_new.length) return;
+      // Mark fresh + nach 4.5s wieder entfernen
+      truly_new.forEach(a => freshKeys.add(a.appId + ":" + a.apiName));
+      setTimeout(() => {
+        truly_new.forEach(a => freshKeys.delete(a.appId + ":" + a.apiName));
+      }, 4500);
+      all = newAll;
+      games = (newData && newData.games) || [];
+      rebuildGameDropdown();
+      applyFilters();
+      const firstName = truly_new[0].displayName || truly_new[0].apiName;
+      const msg = truly_new.length === 1
+        ? `<b>✨ Neu:</b> ${firstName.replace(/</g, "&lt;")}`
+        : `<b>✨ ${truly_new.length} neue Achievements</b>`;
+      showToast(msg);
+    }
+
     (async () => {
       await syncLangFromServer();
       await load();
+      setInterval(autoRefresh, REFRESH_MS);
     })();
   </script>
 </body>
