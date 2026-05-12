@@ -123,6 +123,7 @@ class SteamEndpointRegistry:
             "personaState": summary.get("personastate"),
             "avatar": summary.get("avatarfull"),
             "profileUrl": summary.get("profileurl"),
+            "timeCreated": summary.get("timecreated"),
             "playtimeTotalMin": playtime_total_min,
             "playtime2WeeksMin": playtime_2weeks_min,
             "achievementsUnlocked": achievements_unlocked,

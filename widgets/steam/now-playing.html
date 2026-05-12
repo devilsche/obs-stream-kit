@@ -25,13 +25,51 @@
     }
     body.empty .panel,
     body.empty .pubg-header { display: none; }
+    /* Avatar-Wrapper haelt die zwei Mini-Overlays in den unteren Ecken.
+       Years-Badge unten-links, Game-Icon unten-rechts. Beide skalieren
+       relativ zur Avatar-Groesse (~28% inkl. Border). */
+    .avatar-wrap {
+      position: relative;
+      width: 64px; height: 64px;
+      flex-shrink: 0;
+    }
     .avatar {
-      width: 64px; height: 64px; flex-shrink: 0;
+      width: 100%; height: 100%;
       border-radius: 6px;
       background: rgba(0,0,0,0.3);
       border: 1px solid var(--pubg-border);
       object-fit: cover;
+      display: block;
     }
+    .years-badge {
+      position: absolute;
+      left: -3px; bottom: -3px;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg,
+                  var(--pubg-gold), #b58200);
+      color: #1a0d2a;
+      font-size: 0.6em;
+      font-weight: 700;
+      letter-spacing: 0;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid var(--pubg-page-bg, #1a0d2a);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    .game-icon {
+      position: absolute;
+      right: -3px; bottom: -3px;
+      width: 18px; height: 18px;
+      border-radius: 4px;
+      border: 2px solid var(--pubg-page-bg, #1a0d2a);
+      background: rgba(0,0,0,0.6);
+      object-fit: cover;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+    .game-icon[hidden],
+    .years-badge[hidden] { display: none; }
     .info { flex: 1; min-width: 0; }
     .name {
       color: var(--pubg-gold);
@@ -101,7 +139,11 @@
 <body class="empty">
   <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card panel pubg-fade-in">
-    <img class="avatar" id="avatar" alt="">
+    <div class="avatar-wrap">
+      <img class="avatar" id="avatar" alt="">
+      <span class="years-badge" id="yearsBadge" hidden>—</span>
+      <img class="game-icon" id="gameIcon" hidden alt="">
+    </div>
     <div class="info">
       <div class="name" id="name">—</div>
       <div class="verb">is now playing</div>
@@ -165,6 +207,39 @@
         av.style.display = "";
       } else {
         av.style.display = "none";
+      }
+      // Dienstjahre-Badge (unten-links). timeCreated = Unix-epoch des
+      // Account-Anlagedatums. Bei <1 Jahr verstecken (sieht doof aus).
+      const yearsEl = document.getElementById("yearsBadge");
+      if (d.timeCreated) {
+        const years = Math.floor(
+          (Date.now() / 1000 - d.timeCreated) / (365.25 * 86400));
+        if (years >= 1) {
+          yearsEl.textContent = years + "y";
+          yearsEl.hidden = false;
+          yearsEl.title = `Steam member for ${years} years`;
+        } else {
+          yearsEl.hidden = true;
+        }
+      } else {
+        yearsEl.hidden = true;
+      }
+      // Game-Icon (unten-rechts). Local cache zuerst (CDN-Fallback via onerror).
+      const gi = document.getElementById("gameIcon");
+      if (d.appId) {
+        gi.dataset.fallback = d.imgIconUrl || "";
+        gi.onerror = () => {
+          if (gi.dataset.fallback && gi.src !== gi.dataset.fallback) {
+            gi.src = gi.dataset.fallback;
+          } else {
+            gi.hidden = true;
+            gi.onerror = null;
+          }
+        };
+        gi.src = `/steam/img/${d.appId}/icon.jpg`;
+        gi.hidden = false;
+      } else {
+        gi.hidden = true;
       }
       document.getElementById("name").textContent = d.personaName || "—";
       document.getElementById("game").textContent = d.gameName || ("App #" + d.appId);
