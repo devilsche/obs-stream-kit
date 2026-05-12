@@ -41,44 +41,42 @@ class SteamEndpointRegistry:
         # Storefront-API hat ~200/IP/5min Rate-Limit; ohne diesen Cache
         # wuerden wiederholte Polls den Limit pruegeln.
         self._app_meta = {}
-        # Avatar-Frame URL (Community-Item, aendert sich selten).
-        # Refresh 1×/h reicht.
-        self._avatar_frame = None
-        self._avatar_frame_fetched_at = 0
+        # Avatar-Frame + Animated-Avatar URLs (Community-Items, aendern
+        # sich selten). Refresh 1×/h reicht.
+        self._profile_items = None
+        self._profile_items_fetched_at = 0
 
-    def _get_avatar_frame_url(self):
-        """Cached fetch des Avatar-Frames (1× pro Stunde). Returns
-        None wenn der Streamer keinen Frame equipped hat.
-
-        Steam liefert image_large/image_small als RELATIVE Pfade
-        (z.B. 'items/<appid>/<hash>.png'). Hier prepend wir den
-        community-Image-Prefix. Falls Steam dochmal absolute URLs
-        liefert, werden die unveraendert durchgereicht."""
+    def _get_profile_items(self):
+        """Cached fetch von Frame + Animated-Avatar (1× pro Stunde).
+        Returns dict {avatarFrame, animatedAvatar} mit absoluten URLs
+        oder None. Beides sind getrennte Steam-Community-Items."""
         now = time.monotonic()
-        if (self._avatar_frame is not None
-                and now - self._avatar_frame_fetched_at < 3600):
-            return self._avatar_frame or None
-        url = None
+        if (self._profile_items is not None
+                and now - self._profile_items_fetched_at < 3600):
+            return self._profile_items
+        out = {"avatarFrame": None, "animatedAvatar": None}
         try:
-            frame = self.client.get_avatar_frame()
-            raw = frame.get("image_large") or frame.get("image_small")
-            url = self._build_community_image_url(raw)
+            items = self.client.get_profile_items_equipped()
+            af = items.get("avatar_frame") or {}
+            out["avatarFrame"] = self._build_community_image_url(
+                af.get("image_large") or af.get("image_small"))
+            aa = items.get("animated_avatar") or {}
+            out["animatedAvatar"] = self._build_community_image_url(
+                aa.get("image_large") or aa.get("image_small"))
         except SteamApiError:
-            url = None
-        # GetAvatarFrame liefert manchmal nix obwohl ein Frame da
-        # ist — Fallback zu GetProfileItemsEquipped der die gleiche
-        # Info im Bundle hat.
-        if not url:
+            pass
+        # GetAvatarFrame als Fallback falls GetProfileItemsEquipped
+        # leer war (Steam ist da inkonsistent).
+        if not out["avatarFrame"]:
             try:
-                items = self.client.get_profile_items_equipped()
-                frame = items.get("avatar_frame") or {}
-                raw = frame.get("image_large") or frame.get("image_small")
-                url = self._build_community_image_url(raw)
+                frame = self.client.get_avatar_frame()
+                out["avatarFrame"] = self._build_community_image_url(
+                    frame.get("image_large") or frame.get("image_small"))
             except SteamApiError:
                 pass
-        self._avatar_frame = url or ""
-        self._avatar_frame_fetched_at = now
-        return self._avatar_frame or None
+        self._profile_items = out
+        self._profile_items_fetched_at = now
+        return out
 
     @staticmethod
     def _derive_library_url(header_url, app_id, filename):
@@ -251,8 +249,11 @@ class SteamEndpointRegistry:
             "gameName": game_name,
             "personaName": summary.get("personaname"),
             "personaState": summary.get("personastate"),
-            "avatar": summary.get("avatarfull"),
-            "avatarFrame": self._get_avatar_frame_url(),
+            "avatar": (self._get_profile_items().get("animatedAvatar")
+                       or summary.get("avatarfull")),
+            "avatarStatic": summary.get("avatarfull"),
+            "avatarFrame": self._get_profile_items().get("avatarFrame"),
+            "animatedAvatar": self._get_profile_items().get("animatedAvatar"),
             "profileUrl": summary.get("profileurl"),
             "timeCreated": summary.get("timecreated"),
             "playtimeTotalMin": playtime_total_min,
@@ -739,10 +740,9 @@ class SteamEndpointRegistry:
 
     # ── Debug: Avatar-Frame / Profile-Items ────────────────────────────────
     def _debug_profile_items(self, qs):
-        """Roh-Ausgabe beider Frame-API-Calls + die finale URL die
-        _get_avatar_frame_url() zurueckgibt. Hilft beim Debuggen
-        warum kein Frame angezeigt wird (Steam liefert manchmal
-        leere Antwort obwohl Frame equipped, manchmal relative URLs)."""
+        """Roh-Ausgabe beider Frame-API-Calls + die finalen URLs die
+        _get_profile_items() zurueckgibt. Hilft beim Debuggen
+        warum kein Frame/Animation angezeigt wird."""
         result = {}
         try:
             result["getAvatarFrame"] = self.client.get_avatar_frame()
@@ -754,9 +754,9 @@ class SteamEndpointRegistry:
         except SteamApiError as e:
             result["getProfileItemsEquipped"] = {"error": str(e)}
         # Cache leeren damit nochmal frisch gefetched wird
-        self._avatar_frame = None
-        self._avatar_frame_fetched_at = 0
-        result["resolvedFrameUrl"] = self._get_avatar_frame_url()
+        self._profile_items = None
+        self._profile_items_fetched_at = 0
+        result["resolved"] = self._get_profile_items()
         return _ok(result)
 
     # ── Status (Poller-Health) ─────────────────────────────────────────────
