@@ -173,6 +173,8 @@ class SteamEndpointRegistry:
             return self._test_unlock(qs)
         if route == "/api/steam/test-reset":
             return self._test_reset(qs)
+        if route == "/api/steam/replay-achievements":
+            return self._replay_achievements(qs)
         return None
 
     # ── Now-Playing mit Playtime + Achievement-Progress ────────────────────
@@ -1029,6 +1031,84 @@ class SteamEndpointRegistry:
                 """, (self.client.steam_id,))
                 n = cur.rowcount
             return _ok({"marked": n})
+        finally:
+            conn.close()
+
+    # ── Replay-Achievements (für Sound/Visual-Test) ────────────────────────
+    def _replay_achievements(self, qs):
+        """Macht bereits-angezeigte Achievements wieder undisplayed —
+        damit das Popup-Widget sie nochmal feuert. Nuetzlich zum
+        Sound-Test oder fuer Stream-Recap.
+
+        Query-Params:
+          ?appId=N       nur fuer dieses Spiel (sonst alle Spiele)
+          ?limit=N       max Anzahl Eintraege (default 20)
+          ?onlyRare=1    nur Achievements mit globalPct <= rarePct (default 5)
+        """
+        try:
+            limit = max(1, int(qs.get("limit", "20")))
+        except ValueError:
+            limit = 20
+        try:
+            app_id = int(qs.get("appId")) if qs.get("appId") else None
+        except ValueError:
+            app_id = None
+        only_rare = qs.get("onlyRare") == "1"
+        try:
+            rare_pct = float(qs.get("rarePct", "5"))
+        except ValueError:
+            rare_pct = 5.0
+
+        conn = self.db_connect()
+        try:
+            # Achievements der letzten Unlocks holen (neueste zuerst).
+            sql = """
+                SELECT s.app_id, s.achievement_api_name
+                FROM steam_achievements_seen s
+                WHERE s.steam_id = ?
+                  AND s.displayed_at IS NOT NULL
+                  AND s.app_id >= 0
+            """
+            params = [self.client.steam_id]
+            if app_id is not None:
+                sql += " AND s.app_id = ?"
+                params.append(app_id)
+            sql += " ORDER BY s.unlocked_at DESC LIMIT ?"
+            params.append(limit * 3 if only_rare else limit)
+            rows = conn.execute(sql, params).fetchall()
+
+            keys = []
+            for r in rows:
+                if only_rare:
+                    schema = get_app_schema(conn, r["app_id"])
+                    if not schema or not schema["global_pct_json"]:
+                        continue
+                    try:
+                        pct_map = json.loads(schema["global_pct_json"])
+                        raw = pct_map.get(r["achievement_api_name"])
+                        pct = float(raw) if raw is not None else None
+                    except (TypeError, ValueError, json.JSONDecodeError):
+                        pct = None
+                    if pct is None or pct > rare_pct:
+                        continue
+                keys.append((r["app_id"], r["achievement_api_name"]))
+                if len(keys) >= limit:
+                    break
+
+            n = 0
+            for ap, api in keys:
+                cur = conn.execute("""
+                    UPDATE steam_achievements_seen
+                    SET displayed_at = NULL
+                    WHERE steam_id=? AND app_id=? AND achievement_api_name=?
+                """, (self.client.steam_id, ap, api))
+                n += cur.rowcount
+            return _ok({
+                "reset": n,
+                "appId": app_id,
+                "limit": limit,
+                "onlyRare": only_rare,
+            })
         finally:
             conn.close()
 
