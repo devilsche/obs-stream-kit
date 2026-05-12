@@ -48,6 +48,17 @@ class SteamClient:
             raise SteamApiError(f"Steam API call failed on {path}: {e}") from e
 
     # ── High-Level ───────────────────────────────────────────────────────────
+    def get_avatar_frame(self) -> dict:
+        """Liefert den equipped Avatar-Frame (Community-Item) des Players.
+        Returns {} wenn keiner equipped oder API still. Frame-URLs sind
+        PNG mit Transparenz, geeignet als CSS-Overlay auf dem Avatar.
+        Response-Struktur: {communityitemid, image_small, image_large}."""
+        data = self._get(
+            "/IPlayerService/GetAvatarFrame/v1/",
+            steamid=self.steam_id)
+        return ((data.get("response") or {})
+                .get("avatar_frame") or {})
+
     def get_player_summaries(self) -> dict:
         """Returns first player summary (avatar, online state, gameid if
         currently in-game). Empty dict if API returned nothing."""

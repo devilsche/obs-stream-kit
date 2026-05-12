@@ -6,8 +6,10 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/widgets/pubg/_pubg.css">
   <style>
-    /* Anker: bottom-left. Card mit Avatar + Name + Spiel + Playtime + Achievement-Progress.
-       Versteckt sich automatisch wenn kein Spiel laeuft. */
+    /* Variante C aus design-preview:
+         Game-Header-Image als gedimmter Card-BG, Game-Cover klein
+         links, Persona-Info Mitte, Avatar als gold-gerahmter Kreis
+         rechts + optional Frame-Overlay + Dienstjahre-Badge. */
     html, body { height: 100%; margin: 0; }
     body {
       padding: 16px;
@@ -22,28 +24,63 @@
       display: flex;
       gap: 14px;
       align-items: center;
+      position: relative;
+      overflow: hidden;
+      /* Game-Hero als Background, durch Dimmung lesbar gemacht. */
+      background-color: rgba(26, 13, 42, 0.6);
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
     }
     body.empty .panel,
     body.empty .pubg-header { display: none; }
-    /* Avatar-Wrapper haelt die zwei Mini-Overlays in den unteren Ecken.
-       Years-Badge unten-links, Game-Icon unten-rechts. Beide skalieren
-       relativ zur Avatar-Groesse (~28% inkl. Border). */
-    .avatar-wrap {
-      position: relative;
+
+    /* Game-Cover links (kleine Inset). */
+    .game-cover-wrap {
       width: 64px; height: 64px;
       flex-shrink: 0;
-    }
-    .avatar {
-      width: 100%; height: 100%;
       border-radius: 6px;
-      background: rgba(0,0,0,0.3);
       border: 1px solid var(--pubg-border);
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.4);
+      position: relative;
+      z-index: 2;
+    }
+    .game-cover {
+      width: 100%; height: 100%;
       object-fit: cover;
       display: block;
     }
+
+    /* Avatar rechts: Circle mit Gold-Border, optional Frame drueber. */
+    .avatar-area {
+      position: relative;
+      width: 72px; height: 72px;
+      flex-shrink: 0;
+      z-index: 2;
+    }
+    .avatar {
+      width: 100%; height: 100%;
+      border-radius: 50%;
+      border: 2px solid var(--pubg-gold);
+      background: rgba(0, 0, 0, 0.3);
+      object-fit: cover;
+      box-shadow: 0 0 12px rgba(242, 183, 5, 0.45);
+      display: block;
+    }
+    .avatar-frame {
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: 110px; height: 110px;
+      object-fit: contain;
+      pointer-events: none;
+      z-index: 3;
+    }
+    .avatar-frame[hidden] { display: none; }
     .years-badge {
       position: absolute;
-      right: -4px; bottom: -4px;
+      right: -6px; bottom: -6px;
       min-width: 24px; height: 24px;
       padding: 0 4px;
       box-sizing: border-box;
@@ -53,15 +90,20 @@
       color: #1a0d2a;
       font-size: 0.72em;
       font-weight: 700;
-      letter-spacing: 0;
       display: flex; align-items: center; justify-content: center;
       border: 2px solid var(--pubg-page-bg, #1a0d2a);
-      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
       font-variant-numeric: tabular-nums;
       line-height: 1;
+      z-index: 4;
     }
     .years-badge[hidden] { display: none; }
-    .info { flex: 1; min-width: 0; }
+
+    .info {
+      flex: 1; min-width: 0;
+      position: relative;
+      z-index: 2;
+    }
     .name {
       color: var(--pubg-gold);
       font-weight: 700;
@@ -70,6 +112,7 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
     }
     .verb {
       color: var(--pubg-muted);
@@ -77,30 +120,16 @@
       letter-spacing: 0.06em;
       text-transform: uppercase;
       margin: 1px 0 4px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
     }
     .game {
       color: var(--pubg-text);
       font-weight: 700;
       font-size: 1em;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      min-width: 0;
-    }
-    .game-title-icon {
-      width: 1.05em;
-      height: 1.05em;
-      flex-shrink: 0;
-      border-radius: 3px;
-      border: 1px solid var(--pubg-border);
-      background: rgba(0, 0, 0, 0.5);
-      object-fit: cover;
-    }
-    .game-title-text {
-      min-width: 0;
+      white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
     }
     .meta {
       margin-top: 4px;
@@ -109,6 +138,7 @@
       display: flex;
       flex-wrap: wrap;
       gap: 4px 12px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
     }
     .meta b { color: var(--pubg-text); font-variant-numeric: tabular-nums; }
     .live {
@@ -132,7 +162,7 @@
     .ach-bar {
       margin-top: 6px;
       width: 100%; height: 4px;
-      background: rgba(255,255,255,0.06);
+      background: rgba(255, 255, 255, 0.15);
       border-radius: 2px;
       overflow: hidden;
     }
@@ -145,33 +175,34 @@
 </head>
 <body class="empty">
   <div class="pubg-header" id="pubgHeader"></div>
-  <div class="pubg-card panel pubg-fade-in">
-    <div class="avatar-wrap">
-      <img class="avatar" id="avatar" alt="">
-      <span class="years-badge" id="yearsBadge" hidden>—</span>
+  <div class="pubg-card panel pubg-fade-in" id="panel">
+    <div class="game-cover-wrap">
+      <img class="game-cover" id="gameCover" alt="">
     </div>
     <div class="info">
       <div class="name" id="name">—</div>
       <div class="verb">is now playing</div>
-      <div class="game">
-        <img class="game-title-icon" id="gameTitleIcon" hidden alt="">
-        <span class="game-title-text" id="gameTitleText">—</span>
-      </div>
+      <div class="game" id="game">—</div>
       <div class="meta" id="meta"></div>
       <div class="ach-bar" id="achBar" style="display:none">
         <div class="fill" id="achFill" style="width:0%"></div>
       </div>
     </div>
+    <div class="avatar-area">
+      <img class="avatar" id="avatar" alt="">
+      <img class="avatar-frame" id="avatarFrame" hidden alt="">
+      <span class="years-badge" id="yearsBadge" hidden>—</span>
+    </div>
   </div>
   <script src="/widgets/pubg/_pubg.js"></script>
   <script>
     const POLL_MS = parseInt(PubgUI.qs("pollMs", "10000"), 10);
-    // Live-Counter optional via ?livePlayers=1 (kostet 1 extra API-Call
-    // alle PLAYERS_POLL_MS); Default an.
     const SHOW_LIVE_PLAYERS = PubgUI.qs("livePlayers", "1") !== "0";
     const PLAYERS_POLL_MS = parseInt(PubgUI.qs("playersPollMs", "60000"), 10);
+    // ?heroDim=0..100 → wie stark das Game-Hero-BG abgedunkelt wird (default 70%).
+    const HERO_DIM = Math.max(0, Math.min(100,
+                       parseInt(PubgUI.qs("heroDim", "70"), 10))) / 100;
     // Mock-Modus: ?mock=1 → kein API-Call, fertige Beispieldaten anzeigen.
-    // Fuer lokales Testen ohne .secrets / Steam-API.
     const MOCK = PubgUI.qs("mock") === "1";
     const MOCK_DATA = {
       active: true,
@@ -180,13 +211,16 @@
       personaName: "LuCKoR",
       personaState: 1,
       avatar: "https://placehold.co/184x184/5e2a79/f2b705/png?text=L",
+      avatarFrame: null,
       profileUrl: "https://steamcommunity.com/id/lkrbln/",
       timeCreated: Math.floor(Date.now() / 1000) - 16 * 365 * 86400,
-      playtimeTotalMin: 399300,   // 6655h
-      playtime2WeeksMin: 720,     // 12h
+      playtimeTotalMin: 399300,
+      playtime2WeeksMin: 720,
       achievementsUnlocked: 37,
       achievementsTotal: 37,
       imgIconUrl: "https://placehold.co/32x32/1a0d2a/f2b705/png?text=G",
+      headerImageUrl: "https://cdn.cloudflare.steamstatic.com/steam/apps/578080/header.jpg",
+      capsuleImageUrl: "https://cdn.cloudflare.steamstatic.com/steam/apps/578080/capsule_231x87.jpg",
     };
     const MOCK_PLAYERS = 423000;
 
@@ -196,6 +230,10 @@
       { key: "pollMs", label: "Poll (ms)", type: "range",
         min: 3000, max: 60000, default: 10000,
         tooltip: "How often to refresh the now-playing card." },
+      { key: "heroDim", label: "Hero dim (%)", type: "range",
+        min: 0, max: 95, default: 70,
+        tooltip: "Wie stark das Game-Hero-Bild als Card-Background " +
+                 "abgedunkelt wird. 0 = original, 95 = fast schwarz." },
       { key: "livePlayers", label: "Live players", type: "select",
         default: "1",
         options: [["1","Show"], ["0","Hide"]],
@@ -213,7 +251,7 @@
       return h + " h";
     }
 
-    let livePlayersText = "";  // gemerged in render-Lauf
+    let livePlayersText = "";
 
     function fmtPlayers(n) {
       if (n == null) return null;
@@ -222,13 +260,24 @@
       return String(n);
     }
 
+    function setPanelHero(url) {
+      const panel = document.getElementById("panel");
+      if (url) {
+        panel.style.backgroundImage =
+          `linear-gradient(rgba(26,13,42,${HERO_DIM}), rgba(26,13,42,${HERO_DIM})), url("${url}")`;
+      } else {
+        panel.style.backgroundImage = "";
+      }
+    }
+
     function render(d) {
       if (!d || !d.active) {
         document.body.classList.add("empty");
         return;
       }
       document.body.classList.remove("empty");
-      // Avatar
+
+      // Avatar (Circle mit Gold-Border).
       const av = document.getElementById("avatar");
       if (d.avatar) {
         av.src = d.avatar;
@@ -236,8 +285,18 @@
       } else {
         av.style.display = "none";
       }
-      // Dienstjahre-Badge (unten-links). timeCreated = Unix-epoch des
-      // Account-Anlagedatums. Bei <1 Jahr verstecken (sieht doof aus).
+
+      // Avatar-Frame Overlay (Community-Item, optional).
+      const frameEl = document.getElementById("avatarFrame");
+      if (d.avatarFrame) {
+        frameEl.src = d.avatarFrame;
+        frameEl.hidden = false;
+        frameEl.onerror = () => { frameEl.hidden = true; };
+      } else {
+        frameEl.hidden = true;
+      }
+
+      // Dienstjahre-Badge.
       const yearsEl = document.getElementById("yearsBadge");
       if (d.timeCreated) {
         const years = Math.floor(
@@ -252,45 +311,44 @@
       } else {
         yearsEl.hidden = true;
       }
-      // Game-Icon vor dem Titel. Storefront appdetails-URLs sind die
-      // primaere Quelle — funktionieren fuer JEDES Steam-Game egal ob
-      // owned, neu oder via Family Sharing. Hash-basierte Icons sind
-      // nur Notnagel falls die Storefront-Antwort mal leer war.
-      const titleIcon = document.getElementById("gameTitleIcon");
+
+      // Game-Cover links (kleine Inset).
+      const cover = document.getElementById("gameCover");
       if (d.appId) {
         const sources = [
-          d.capsuleImageUrl,     // 231×87, mit object-fit:cover als Square gecroppt
-          d.headerImageUrl,      // 460×215, gleiche Behandlung
+          d.capsuleImageUrl,
+          d.headerImageUrl,
           `/steam/img/${d.appId}/icon.jpg`,
           d.imgIconUrl,
         ].filter(Boolean);
         let srcIdx = 0;
-        titleIcon.onerror = () => {
+        cover.onerror = () => {
           srcIdx++;
           if (srcIdx < sources.length) {
-            titleIcon.src = sources[srcIdx];
+            cover.src = sources[srcIdx];
           } else {
-            titleIcon.hidden = true;
-            titleIcon.onerror = null;
+            cover.style.display = "none";
+            cover.onerror = null;
           }
         };
-        titleIcon.src = sources[0];
-        titleIcon.hidden = false;
+        cover.src = sources[0];
+        cover.style.display = "";
       } else {
-        titleIcon.hidden = true;
+        cover.style.display = "none";
       }
 
+      // Game-Hero als Card-Background.
+      setPanelHero(d.headerImageUrl);
+
       document.getElementById("name").textContent = d.personaName || "—";
-      document.getElementById("gameTitleText").textContent =
+      document.getElementById("game").textContent =
         d.gameName || ("App #" + d.appId);
 
-      // Meta-Zeile: Total-Playtime, 2-Wochen-Playtime
       const parts = [];
       const total = fmtHours(d.playtimeTotalMin);
       if (total) parts.push(`<span><b>${total}</b> total</span>`);
       const recent = fmtHours(d.playtime2WeeksMin);
       if (recent) parts.push(`<span><b>${recent}</b> last 2w</span>`);
-      // Achievement-Count im Text (falls vorhanden)
       if (d.achievementsTotal && d.achievementsTotal > 0) {
         const got = d.achievementsUnlocked || 0;
         parts.push(
@@ -299,7 +357,6 @@
       if (livePlayersText) parts.push(livePlayersText);
       document.getElementById("meta").innerHTML = parts.join("");
 
-      // Achievement-Progress-Bar
       const bar = document.getElementById("achBar");
       const fill = document.getElementById("achFill");
       if (d.achievementsTotal && d.achievementsTotal > 0) {
@@ -311,8 +368,6 @@
       }
     }
 
-    // ?fakeAppId / ?fakeGame werden 1:1 an die API durchgereicht — der
-    // Endpoint simuliert dann 'das Spiel laeuft', Profildaten bleiben real.
     const fakeAppId = PubgUI.qs("fakeAppId", "");
     const fakeGame  = PubgUI.qs("fakeGame", "");
     const extra = [];
@@ -339,8 +394,6 @@
     if (SHOW_LIVE_PLAYERS && !MOCK) {
       async function pollPlayers() {
         try {
-          // Auch hier fakeAppId durchreichen, sonst hat der Counter
-          // keinen Bezug zum simulierten Spiel.
           const u = "/api/steam/current-players" +
                     (fakeAppId ? "?appId=" + encodeURIComponent(fakeAppId) : "");
           const r = await PubgUI.fetchJson(u);

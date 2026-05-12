@@ -41,6 +41,26 @@ class SteamEndpointRegistry:
         # Storefront-API hat ~200/IP/5min Rate-Limit; ohne diesen Cache
         # wuerden wiederholte Polls den Limit pruegeln.
         self._app_meta = {}
+        # Avatar-Frame URL (Community-Item, aendert sich selten).
+        # Refresh 1×/h reicht.
+        self._avatar_frame = None
+        self._avatar_frame_fetched_at = 0
+
+    def _get_avatar_frame_url(self):
+        """Cached fetch des Avatar-Frames (1× pro Stunde). Returns
+        None wenn der Streamer keinen Frame equipped hat."""
+        now = time.monotonic()
+        if (self._avatar_frame is not None
+                and now - self._avatar_frame_fetched_at < 3600):
+            return self._avatar_frame or None
+        try:
+            frame = self.client.get_avatar_frame()
+            url = frame.get("image_large") or frame.get("image_small")
+            self._avatar_frame = url or ""
+        except SteamApiError:
+            self._avatar_frame = ""
+        self._avatar_frame_fetched_at = now
+        return self._avatar_frame or None
 
     def _cached(self, key, fn):
         now = time.monotonic()
@@ -164,6 +184,7 @@ class SteamEndpointRegistry:
             "personaName": summary.get("personaname"),
             "personaState": summary.get("personastate"),
             "avatar": summary.get("avatarfull"),
+            "avatarFrame": self._get_avatar_frame_url(),
             "profileUrl": summary.get("profileurl"),
             "timeCreated": summary.get("timecreated"),
             "playtimeTotalMin": playtime_total_min,
