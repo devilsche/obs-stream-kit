@@ -389,8 +389,8 @@
       }
 
       // Meta-Zeile: gleiches Pattern fuer Steam + PUBG.
-      // PUBG: 'X% of your sessions got this'
-      // Steam: 'X.X% of players got this' (wenn Daten vorhanden)
+      // Reihenfolge: Datum → %-Stat → Rare-Badge. PUBG nutzt
+      // sessionPct, Steam globalPct — sonst identisches Wording.
       let statText = null;
       if (isPubg && a.sessionPct != null) {
         statText = `<b>${a.sessionPct.toFixed(0)}%</b> of your sessions got this`;
@@ -398,10 +398,7 @@
         statText = `<b>${a.globalPct.toFixed(1)}%</b> of players got this`;
       }
       const statSpan = statText ? `<span class="pct">${statText}</span>` : "";
-      // Datum: PUBG mit Uhrzeit (Stream-Kontext), Steam ohne
-      const dateHtml = isPubg
-        ? `<span class="date"><b>${fmtDateTime(a.unlockedAt)}</b></span>`
-        : `<span class="date">${fmtDate(a.unlockedAt)}</span>`;
+      const dateHtml = `<span class="date">${fmtDate(a.unlockedAt)}</span>`;
       const metaInner = dateHtml
         + statSpan
         + (isRare ? `<span class="rare-badge">Rare</span>` : "");
