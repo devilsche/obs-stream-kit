@@ -157,6 +157,8 @@ class SteamEndpointRegistry:
             return self._current_players(qs)
         if route == "/api/steam/friends-in-lobby":
             return self._friends_in_lobby(qs)
+        if route == "/api/steam/friends-status":
+            return self._friends_status(qs)
         if route == "/api/steam/achievement-feed":
             return self._achievement_feed(qs)
         if route == "/api/steam/status":
@@ -617,6 +619,111 @@ class SteamEndpointRegistry:
             "friends":      matches,
             "count":        len(matches),
         })
+
+    # ── Friends-Status (alle Freunde + Online/Game/Lobby) ─────────────────
+    def _friends_status(self, qs):
+        """Liefert die komplette Friend-Liste mit Online-State, was sie
+        gerade spielen und Lobby-IDs. Funktioniert unabhaengig davon
+        ob der Streamer selber online ist.
+
+        Query:
+          ?filter=all|online|ingame    Default: all
+          ?sort=name|state|game        Default: state (in-game zuerst)
+          ?limit=N                     Default: keine Begrenzung
+
+        personaState-Codes (von Steam):
+          0 = Offline, 1 = Online, 2 = Busy, 3 = Away, 4 = Snooze,
+          5 = Looking to trade, 6 = Looking to play
+        """
+        filt = qs.get("filter", "all").lower()
+        sort_by = qs.get("sort", "state").lower()
+        try:
+            limit = int(qs.get("limit", "0")) or None
+        except ValueError:
+            limit = None
+
+        friend_ids = self._get_friend_ids()
+        if not friend_ids:
+            return _ok({"friends": [], "count": 0,
+                        "note": "friend list private or empty"})
+
+        # Auch meine eigene Lobby-ID mitziehen, damit wir je Friend
+        # entscheiden koennen ob er in MEINER Lobby ist.
+        try:
+            me = self._cached("summary", self.client.get_player_summaries)
+        except SteamApiError:
+            me = {}
+        my_lobby = str(me.get("lobbysteamid")) if me.get("lobbysteamid") else None
+        my_game  = str(me.get("gameid")) if me.get("gameid") else None
+
+        friends = []
+        for i in range(0, len(friend_ids), 100):
+            batch = friend_ids[i:i+100]
+            try:
+                players = self.client.get_player_summaries_batch(batch)
+            except SteamApiError:
+                continue
+            for p in players:
+                f_lobby = str(p.get("lobbysteamid")) if p.get("lobbysteamid") else None
+                f_game  = str(p.get("gameid")) if p.get("gameid") else None
+                state   = p.get("personastate", 0)
+                friends.append({
+                    "steamId":      p.get("steamid"),
+                    "personaName":  p.get("personaname"),
+                    "avatar":       p.get("avatarfull"),
+                    "profileUrl":   p.get("profileurl"),
+                    "personaState": state,
+                    "stateName":    self._persona_state_name(state),
+                    "gameId":       f_game,
+                    "gameName":     p.get("gameextrainfo"),
+                    "lobbySteamId": f_lobby,
+                    "inMyLobby":    bool(my_lobby and f_lobby == my_lobby),
+                    "inMyGame":     bool(my_game  and f_game  == my_game),
+                    "lastLogoff":   p.get("lastlogoff"),
+                })
+
+        # Filter anwenden
+        if filt == "online":
+            friends = [f for f in friends if f["personaState"] != 0]
+        elif filt == "ingame":
+            friends = [f for f in friends if f["gameId"]]
+
+        # Sort
+        if sort_by == "name":
+            friends.sort(key=lambda f: (f["personaName"] or "").lower())
+        elif sort_by == "game":
+            friends.sort(key=lambda f: (
+                not f["gameId"], (f["gameName"] or "").lower(),
+                (f["personaName"] or "").lower()))
+        else:  # state: in-game > online > away/busy > offline
+            def _state_rank(f):
+                if f["gameId"]:        return 0
+                if f["personaState"] == 1: return 1   # Online
+                if f["personaState"] in (3, 4, 5, 6): return 2  # Away/etc
+                if f["personaState"] == 2: return 3   # Busy
+                return 9  # Offline
+            friends.sort(key=lambda f: (
+                _state_rank(f), (f["personaName"] or "").lower()))
+
+        if limit:
+            friends = friends[:limit]
+
+        return _ok({
+            "friends":  friends,
+            "count":    len(friends),
+            "totalFriends": len(friend_ids),
+            "myLobbySteamId": my_lobby,
+            "myGameId": my_game,
+            "filter":   filt,
+            "sort":     sort_by,
+        })
+
+    @staticmethod
+    def _persona_state_name(state):
+        return {
+            0: "offline", 1: "online", 2: "busy", 3: "away",
+            4: "snooze", 5: "lookingToTrade", 6: "lookingToPlay",
+        }.get(state, "unknown")
 
     # ── Current Players (Live-Counter) ─────────────────────────────────────
     def _current_players(self, qs):
