@@ -180,9 +180,17 @@
       } else {
         pctEl.style.display = "none";
       }
-      ribbonEl.textContent = isRare
-        ? "Rare Achievement Unlocked"
-        : "Achievement Unlocked";
+      // Ribbon-Text: PUBG-Session-Milestones bekommen eigenes Label,
+      // damit klar ist dass das nicht ein 'echtes' Steam-Achievement ist.
+      if (u.source === "pubg") {
+        ribbonEl.textContent = isRare
+          ? "Rare Session Milestone"
+          : "Session Milestone Unlocked";
+      } else {
+        ribbonEl.textContent = isRare
+          ? "Rare Achievement Unlocked"
+          : "Achievement Unlocked";
+      }
       playSound(isRare);
       popup.classList.add("show");
       setTimeout(() => {

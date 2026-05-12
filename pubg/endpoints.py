@@ -106,6 +106,8 @@ class EndpointRegistry:
             return self._recent_achievements(qs)
         if route == ("GET", "/api/pubg/achievements-list"):
             return self._achievements_list(qs)
+        if route == ("GET", "/api/pubg/replay-achievement"):
+            return self._replay_achievement(qs)
         if route == ("POST", "/api/pubg/session/reset"):
             return self._session_reset()
         if route == ("GET", "/api/pubg/top-mates"):
@@ -417,6 +419,28 @@ class EndpointRegistry:
             "achievements": items,
             "count": len(items),
             "range": range_kind,
+        })
+
+    def _replay_achievement(self, qs):
+        """Markiert ein einzelnes PUBG-Session-Milestone als undisplayed
+        damit das achievement-popup-Widget es beim naechsten Poll
+        nochmal feuert. Identisch zum Steam-Replay-Klick.
+        Query: ?achievementId=X&matchId=Y (beide required)
+        """
+        aid = qs.get("achievementId")
+        mid = qs.get("matchId")
+        if not aid or not mid:
+            return _err(400, "achievementId und matchId benoetigt")
+        conn = self.get_conn()
+        cur = conn.execute("""
+            UPDATE pubg_achievements_seen
+            SET displayed_at = NULL
+            WHERE achievement_id = ? AND match_id = ?
+        """, (aid, mid))
+        return _ok({
+            "reset": cur.rowcount,
+            "achievementId": aid,
+            "matchId": mid,
         })
 
     def _session_reset(self):

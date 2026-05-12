@@ -259,6 +259,14 @@
       <input id="rarePctInput" type="number" min="1" max="50" value="10" style="width: 60px;">
     </div>
     <div class="grp">
+      <label>PUBG-Range:</label>
+      <select id="rangeSelect">
+        <option value="all">Alle</option>
+        <option value="session">Session</option>
+        <option value="week">7 Tage</option>
+      </select>
+    </div>
+    <div class="grp">
       <label title="Persistente Server-Setting — gilt fuer ALLE neuen Steam-Calls inkl. der Achievement-Popups. Wechseln triggert sofortige Neu-Uebersetzung der Liste.">Sprache:</label>
       <select id="langSelect">
         <option value="english">English</option>
@@ -302,6 +310,7 @@
     let freshKeys = new Set();
     const REFRESH_MS = 30000;
 
+    let pubgRange = "all";
     const gridEl   = document.getElementById("grid");
     const toastEl  = document.getElementById("toast");
     const statsEl  = document.getElementById("stats");
@@ -310,6 +319,7 @@
     const sortSel  = document.getElementById("sortSelect");
     const rareIn   = document.getElementById("rarePctInput");
     const langSel  = document.getElementById("langSelect");
+    const rangeSel = document.getElementById("rangeSelect");
 
     function fmtDate(unixSec) {
       if (!unixSec) return "—";
@@ -338,9 +348,11 @@
       const desc = (a.description || "").replace(/</g, "&lt;");
       const key = a.appId + ":" + a.apiName;
       const isFresh = freshKeys.has(key);
+      const source = a.source || "";
       return `
         <div class="tile${isRare ? " rare" : ""}${isFresh ? " brand-new" : ""}"
-             data-appid="${a.appId}" data-api="${a.apiName.replace(/"/g, "&quot;")}">
+             data-appid="${a.appId}" data-api="${a.apiName.replace(/"/g, "&quot;")}"
+             data-source="${source}">
           ${icon ? `<img class="tile-icon" src="${icon}" alt="" onerror="this.style.display='none'">`
                  : `<div class="tile-icon"></div>`}
           <div class="tile-body">
@@ -386,9 +398,16 @@
       statsEl.innerHTML = `<b>${view.length}</b> / ${all.length} Achievements`;
     }
 
-    async function triggerReplay(appId, apiName, tileEl) {
+    async function triggerReplay(appId, apiName, tileEl, source) {
       try {
-        const url = `/api/steam/replay-achievements?appId=${encodeURIComponent(appId)}&apiName=${encodeURIComponent(apiName)}&limit=1`;
+        let url;
+        if (source === "pubg") {
+          // PUBG: apiName ist "achievement_id:match_id" (siehe Server)
+          const [aid, mid] = (apiName || "").split(":");
+          url = `/api/pubg/replay-achievement?achievementId=${encodeURIComponent(aid)}&matchId=${encodeURIComponent(mid)}`;
+        } else {
+          url = `/api/steam/replay-achievements?appId=${encodeURIComponent(appId)}&apiName=${encodeURIComponent(apiName)}&limit=1`;
+        }
         const r = await fetch(url, { cache: "no-store" });
         const j = await r.json();
         if (j.reset > 0) {
@@ -408,7 +427,8 @@
       if (!tile) return;
       const appId = tile.dataset.appid;
       const api = tile.dataset.api;
-      if (appId && api) triggerReplay(appId, api, tile);
+      const source = tile.dataset.source || "";
+      if (appId && api) triggerReplay(appId, api, tile, source);
     });
     gameSel.addEventListener("change", (e) => {
       filterGame = e.target.value;
@@ -423,6 +443,10 @@
       applyFilters();
     });
     rareIn.addEventListener("change", () => applyFilters());
+    rangeSel.addEventListener("change", (e) => {
+      pubgRange = e.target.value;
+      load();
+    });
     langSel.addEventListener("change", async (e) => {
       const lang = e.target.value;
       statsEl.textContent =
@@ -457,13 +481,41 @@
       if (prev) gameSel.value = prev;
     }
 
+    async function fetchAll() {
+      // Steam + PUBG parallel pullen, mergen.
+      const [steamData, pubgData] = await Promise.all([
+        PubgUI.fetchJson("/api/steam/achievements-list?limit=2000")
+          .catch(() => ({})),
+        PubgUI.fetchJson(
+          `/api/pubg/achievements-list?range=${encodeURIComponent(pubgRange)}`)
+          .catch(() => ({})),
+      ]);
+      const steamAch = (steamData && steamData.achievements) || [];
+      const pubgAch  = (pubgData  && pubgData.achievements)  || [];
+      const merged = [...steamAch, ...pubgAch];
+      // Games-Dropdown: Steam-Games + PUBG-Session-Marker
+      const gameMap = new Map();
+      for (const g of (steamData && steamData.games) || []) {
+        gameMap.set(g.appId, g);
+      }
+      if (pubgAch.length) {
+        gameMap.set(-2, {
+          appId: -2,
+          name: "PUBG: Session Milestones",
+          count: pubgAch.length,
+        });
+      }
+      const gameList = [...gameMap.values()].sort(
+        (a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+      return { achievements: merged, games: gameList };
+    }
+
     async function load(showSpinner = true) {
       if (showSpinner) document.body.classList.add("loading");
       try {
-        const data = await PubgUI.fetchJson(
-          "/api/steam/achievements-list?limit=2000");
-        all = (data && data.achievements) || [];
-        games = (data && data.games) || [];
+        const data = await fetchAll();
+        all = data.achievements;
+        games = data.games;
         rebuildGameDropdown();
         applyFilters();
       } catch (e) {
@@ -477,25 +529,30 @@
     // Achievements als 'brand-new' markieren. Kein Spinner, kein
     // Disable — laueft im Hintergrund.
     async function autoRefresh() {
-      let newData;
+      let data;
       try {
-        newData = await PubgUI.fetchJson(
-          "/api/steam/achievements-list?limit=2000");
+        data = await fetchAll();
       } catch (e) {
         return;
       }
-      const newAll = (newData && newData.achievements) || [];
+      const newAll = data.achievements;
       const oldKeys = new Set(all.map(a => a.appId + ":" + a.apiName));
       const truly_new = newAll.filter(a =>
         !oldKeys.has(a.appId + ":" + a.apiName));
-      if (!truly_new.length) return;
-      // Mark fresh + nach 4.5s wieder entfernen
+      if (!truly_new.length) {
+        // Trotzdem aktualisieren wenn z.B. range-filter etwas wegnimmt
+        all = newAll;
+        games = data.games;
+        rebuildGameDropdown();
+        applyFilters();
+        return;
+      }
       truly_new.forEach(a => freshKeys.add(a.appId + ":" + a.apiName));
       setTimeout(() => {
         truly_new.forEach(a => freshKeys.delete(a.appId + ":" + a.apiName));
       }, 4500);
       all = newAll;
-      games = (newData && newData.games) || [];
+      games = data.games;
       rebuildGameDropdown();
       applyFilters();
       const firstName = truly_new[0].displayName || truly_new[0].apiName;

@@ -233,9 +233,15 @@
       const hasPct = Number.isFinite(pct);
       const isRare = hasPct && pct <= RARE_PCT;
       popup.classList.toggle("rare", isRare);
-      ribbon.textContent = isRare
-        ? "Rare Achievement Unlocked"
-        : "Achievement Unlocked";
+      if (u.source === "pubg") {
+        ribbon.textContent = isRare
+          ? "Rare Session Milestone"
+          : "Session Milestone Unlocked";
+      } else {
+        ribbon.textContent = isRare
+          ? "Rare Achievement Unlocked"
+          : "Achievement Unlocked";
+      }
       playSound(isRare);
       iconEl.src = u.iconUrl || "";
       iconEl.style.display = u.iconUrl ? "" : "none";
@@ -320,13 +326,20 @@
     // Wahrheit. Kein LocalStorage-Cache mehr (hat Replay blockiert).
     // Innerhalb einer Server-Antwort wird trotzdem dedupiert.
     async function pollAchievements() {
+      const justQueued = new Set();
       try {
         const r = await PubgUI.fetchJson(
           "/api/steam/recent-unlocks?markDisplayed=1");
-        const unlocks = (r && r.unlocks) || [];
-        if (!unlocks.length) return;
-        const justQueued = new Set();
-        for (const u of unlocks) {
+        for (const u of (r && r.unlocks) || []) {
+          if (justQueued.has(u.apiName)) continue;
+          enqueue({ type: "achievement", data: u, priority: 1 });
+          justQueued.add(u.apiName);
+        }
+      } catch (e) { /* silent */ }
+      try {
+        const r = await PubgUI.fetchJson(
+          "/api/pubg/recent-achievements?markDisplayed=1");
+        for (const u of (r && r.unlocks) || []) {
           if (justQueued.has(u.apiName)) continue;
           enqueue({ type: "achievement", data: u, priority: 1 });
           justQueued.add(u.apiName);
