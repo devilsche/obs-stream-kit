@@ -78,16 +78,16 @@
       display: block;
     }
     .avatar-area.has-frame .avatar {
-      /* border-radius bleibt 4px (quadratisch). Frame uebernimmt
-         die Deko, deshalb Border + Shadow weg. */
+      /* Komplett scharfe Ecken — Frame uebernimmt die Deko. */
       border: none;
       box-shadow: none;
+      border-radius: 0;
     }
     .avatar-frame {
       position: absolute;
       left: 50%; top: 50%;
       transform: translate(-50%, -50%);
-      width: 92px; height: 92px;
+      width: 88px; height: 88px;
       object-fit: contain;
       pointer-events: none;
       z-index: 3;
