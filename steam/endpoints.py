@@ -16,7 +16,9 @@ from steam.db import (
     insert_unlock_if_new, upsert_app_schema,
     get_owned_games_filtered,
     get_global_achievement_pct, get_achievement_feed,
+    upsert_global_achievement_pct, upsert_progress,
 )
+import threading
 
 
 def _ok(payload):
@@ -49,6 +51,9 @@ class SteamEndpointRegistry:
         # aendern sich nicht minuetlich.
         self._friend_ids = None
         self._friend_ids_fetched_at = 0
+        # Bulk-Achievement-Sync (Backfill ALLER owned games)
+        self._sync_thread = None
+        self._sync_progress = {}
 
     def _get_profile_items(self):
         """Cached fetch von Frame + Animated-Avatar (1× pro Stunde).
@@ -177,6 +182,8 @@ class SteamEndpointRegistry:
             return self._replay_achievements(qs)
         if route == "/api/steam/achievements-list":
             return self._achievements_list(qs)
+        if route == "/api/steam/sync-all-achievements":
+            return self._sync_all_achievements(qs)
         return None
 
     # ── Now-Playing mit Playtime + Achievement-Progress ────────────────────
@@ -1041,6 +1048,158 @@ class SteamEndpointRegistry:
                 """, (self.client.steam_id,))
                 n = cur.rowcount
             return _ok({"marked": n})
+        finally:
+            conn.close()
+
+    # ── Bulk-Sync: Achievements fuer ALLE owned games ──────────────────────
+    def _sync_all_achievements(self, qs):
+        """Hintergrund-Job: walkt durch alle Games in steam_owned_games und
+        zieht pro Game GetPlayerAchievements + GetSchemaForGame +
+        GetGlobalAchievementPercentages. Inserted neue Unlocks in
+        steam_achievements_seen. Markiert sie als suppress_popup=1 by
+        Default (silent Backfill) damit nicht 1000 Popups gleichzeitig
+        kommen.
+
+        Query:
+          ?popup=1      neue Unlocks NICHT als displayed markieren —
+                        Popup-Widget feuert sie alle nacheinander
+                        (Vorsicht: bei riesigen Libraries Stundenlang)
+          ?force=1      Schema/Global-Pct neu pullen auch wenn cached
+
+        Antwort: { started, running, progress }
+        Progress-Felder: total, done, skipped (no public stats),
+                          errors, newUnlocks
+        """
+        if self._sync_thread and self._sync_thread.is_alive():
+            return _ok({"running": True, "started": False,
+                        "progress": self._sync_progress})
+
+        suppress = qs.get("popup") != "1"
+        force = qs.get("force") == "1"
+        self._sync_progress = {
+            "total": 0, "done": 0, "skipped": 0, "errors": 0,
+            "newUnlocks": 0, "running": True,
+            "startedAt": int(time.time()),
+            "suppress": suppress,
+        }
+
+        def worker():
+            try:
+                # Owned-Games-Liste, sortiert nach Playtime (interessante
+                # zuerst — wenn der User abbricht hat er die Wichtigen).
+                conn = self.db_connect()
+                try:
+                    rows = conn.execute("""
+                        SELECT app_id, name FROM steam_owned_games
+                        WHERE steam_id=? AND app_id >= 0
+                        ORDER BY playtime_forever_min DESC
+                    """, (self.client.steam_id,)).fetchall()
+                finally:
+                    conn.close()
+                self._sync_progress["total"] = len(rows)
+
+                for r in rows:
+                    app_id = r["app_id"]
+                    self._sync_one_app(app_id, r["name"], suppress, force)
+                    self._sync_progress["done"] += 1
+                    # Steam-API-Politeness: ~10 calls/s (3 calls pro Game)
+                    time.sleep(0.1)
+            except Exception as e:
+                self._sync_progress["lastError"] = (
+                    f"{type(e).__name__}: {e}")
+            finally:
+                self._sync_progress["running"] = False
+                self._sync_progress["finishedAt"] = int(time.time())
+
+        self._sync_thread = threading.Thread(
+            target=worker, name="SteamBulkSync", daemon=True)
+        self._sync_thread.start()
+        return _ok({"started": True, "running": True,
+                    "progress": self._sync_progress})
+
+    def _sync_one_app(self, app_id, game_name, suppress_popup, force):
+        """Eine Game-App syncen: achievements + schema + global_pct."""
+        try:
+            stats = self.client.get_player_achievements(app_id)
+        except SteamApiError:
+            self._sync_progress["errors"] += 1
+            return
+        if not stats.get("success", True):
+            self._sync_progress["skipped"] += 1
+            return
+        achievements = stats.get("achievements") or []
+        if not achievements:
+            self._sync_progress["skipped"] += 1
+            return
+
+        conn = self.db_connect()
+        try:
+            # Schema (display_name + icon)
+            schema_lookup = {}
+            existing = get_app_schema(conn, app_id)
+            need_schema = force or not existing or not existing["schema_json"]
+            if need_schema:
+                try:
+                    schema = self.client.get_schema_for_game(app_id)
+                    schema_achs = schema.get("achievements") or []
+                    schema_lookup = {
+                        a.get("name"): {
+                            "displayName": a.get("displayName"),
+                            "description": a.get("description"),
+                            "icon":        a.get("icon"),
+                        }
+                        for a in schema_achs if a.get("name")
+                    }
+                    upsert_app_schema(
+                        conn, app_id,
+                        game_name=stats.get("gameName") or game_name,
+                        achievement_count=len(schema_achs),
+                        schema_json=json.dumps(schema_lookup))
+                except SteamApiError:
+                    pass
+            elif existing and existing["schema_json"]:
+                try:
+                    schema_lookup = json.loads(existing["schema_json"])
+                except Exception:
+                    pass
+
+            # Global Pct
+            _, gpct_cached_at = get_global_achievement_pct(conn, app_id)
+            if force or not gpct_cached_at:
+                try:
+                    pct_map = self.client.get_global_achievement_percentages_for_app(app_id)
+                    if pct_map:
+                        upsert_global_achievement_pct(
+                            conn, app_id, json.dumps(pct_map))
+                except SteamApiError:
+                    pass
+
+            # Unlocks inserten
+            now_ts = int(time.time())
+            unlocked_count = 0
+            new_unlocks = 0
+            for ach in achievements:
+                if not ach.get("achieved"):
+                    continue
+                unlocked_count += 1
+                api = ach.get("apiname")
+                if not api:
+                    continue
+                unlock_ts = ach.get("unlocktime") or 0
+                if unlock_ts <= 0:
+                    unlock_ts = now_ts
+                meta = schema_lookup.get(api, {})
+                inserted = insert_unlock_if_new(
+                    conn, self.client.steam_id, app_id,
+                    api, unlock_ts,
+                    display_name=meta.get("displayName") or api,
+                    description=meta.get("description"),
+                    icon_url=meta.get("icon"),
+                    suppress_popup=suppress_popup)
+                if inserted:
+                    new_unlocks += 1
+            upsert_progress(conn, self.client.steam_id, app_id, unlocked_count)
+            self._sync_progress["newUnlocks"] += new_unlocks
         finally:
             conn.close()
 
