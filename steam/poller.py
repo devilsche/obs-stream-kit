@@ -18,7 +18,7 @@ import time
 from steam.api_client import SteamApiError
 from steam.db import (
     insert_unlock_if_new, upsert_owned_games, upsert_app_schema,
-    get_app_schema, upsert_progress, get_progress,
+    get_app_schema, upsert_progress,
     find_app_needing_details_sync, upsert_app_details,
     mark_played_now,
     upsert_global_achievement_pct, get_global_achievement_pct,
@@ -188,13 +188,6 @@ class SteamPoller(threading.Thread):
             # Global-Achievement-Pct fuer Rare-Highlight im Popup (1×/Tag)
             self._ensure_global_pct(conn, app_id)
 
-            # First-Poll-Erkennung: wenn wir noch keinen Progress-Row
-            # haben, ist das der erste Layer-2-Tick fuer dieses Spiel.
-            # Dann ALLE schon unlocked Achievements als displayed
-            # markieren (Backfill ohne Popup-Spam). Spaetere Polls
-            # popupen dann nur echte neue Unlocks.
-            existing_progress = get_progress(conn, self.client.steam_id, app_id)
-            is_first_poll = existing_progress is None
             now_ts = int(time.time())
 
             unlocked_count = 0
@@ -220,18 +213,14 @@ class SteamPoller(threading.Thread):
                     api, unlock_ts,
                     display_name=meta.get("displayName") or api,
                     description=meta.get("description"),
-                    icon_url=meta.get("icon"),
-                    suppress_popup=is_first_poll)
+                    icon_url=meta.get("icon"))
                 if inserted:
                     new_unlocks += 1
 
             upsert_progress(conn, self.client.steam_id, app_id, unlocked_count)
             with self._lock:
                 self._state["lastLayer2At"] = int(time.time())
-                # Bei first-poll-Backfill nicht in 'new_unlocks_total'
-                # zaehlen — das soll echte neue Trigger reflektieren.
-                if not is_first_poll:
-                    self._state["newUnlocksTotal"] += new_unlocks
+                self._state["newUnlocksTotal"] += new_unlocks
         finally:
             conn.close()
 
