@@ -99,6 +99,8 @@
       <div class="game" id="game"></div>
     </div>
   </div>
+  <audio id="soundCommon" src="/widgets/steam/sounds/lvlup.wav" preload="auto"></audio>
+  <audio id="soundRare"   src="/widgets/steam/sounds/biglvlup.wav" preload="auto"></audio>
   <script src="/widgets/pubg/_pubg.js"></script>
   <script>
     // ?duration=8 (Sekunden Anzeige pro Unlock), ?gap=1.5 (Sek Pause zwischen)
@@ -107,6 +109,10 @@
     const POLL_MS    = parseInt(PubgUI.qs("pollMs", "5000"), 10);
 
     const RARE_PCT = parseFloat(PubgUI.qs("rarePct", "5"));
+    const SOUND_ON = PubgUI.qs("sound", "1") !== "0";
+    // Slider liefert 0..100, intern brauchen wir 0..1.
+    const VOLUME   = Math.max(0, Math.min(1,
+                       (parseFloat(PubgUI.qs("volume", "50")) || 0) / 100));
 
     PubgUI.buildFilter([
       { key: "duration", label: "Show duration (s)", type: "range",
@@ -123,7 +129,25 @@
         tooltip: "Threshold for the 'rare unlock' glow effect. " +
                  "Achievements that fewer than N% of players have " +
                  "get the highlight animation." },
+      { key: "sound", label: "Sound", type: "select",
+        default: "1",
+        options: [["1","On"], ["0","Off"]],
+        tooltip: "Play lvlup.wav on unlock (biglvlup.wav on rare)." },
+      { key: "volume", label: "Volume", type: "range",
+        min: 0, max: 100, default: 50,
+        tooltip: "Achievement-Sound-Lautstaerke (0-100%)." },
     ]);
+
+    function playSound(isRare) {
+      if (!SOUND_ON) return;
+      const el = document.getElementById(isRare ? "soundRare" : "soundCommon");
+      if (!el) return;
+      try {
+        el.volume = VOLUME;
+        el.currentTime = 0;
+        el.play().catch(() => {});  // autoplay-block silent
+      } catch (e) { /* silent */ }
+    }
 
     const popup = document.getElementById("popup");
     const queue = [];
@@ -159,6 +183,7 @@
       ribbonEl.textContent = isRare
         ? "Rare Achievement Unlocked"
         : "Achievement Unlocked";
+      playSound(isRare);
       popup.classList.add("show");
       setTimeout(() => {
         popup.classList.remove("show");
