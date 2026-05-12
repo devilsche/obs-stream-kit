@@ -58,16 +58,18 @@ class SteamEndpointRegistry:
         try:
             items = self.client.get_profile_items_equipped()
             af = items.get("avatar_frame") or {}
-            # Frame: image_large bevorzugt (bessere Aufloesung fuer das
-            # 110x110-Overlay).
-            out["avatarFrame"] = self._build_community_image_url(
-                af.get("image_large") or af.get("image_small"))
+            # Frame: image_small ist die ANIMIERTE APNG-Variante
+            # (z.B. Aghanim Frame), image_large das statische
+            # Standbild. User-bestaetigt 2026-05-12.
+            out["avatarFrameAnim"] = self._build_community_image_url(
+                af.get("image_small"))
+            out["avatarFrameStatic"] = self._build_community_image_url(
+                af.get("image_large"))
+            out["avatarFrame"] = (out["avatarFrameAnim"]
+                                  or out["avatarFrameStatic"])
             aa = items.get("animated_avatar") or {}
-            # Animated Avatar: bei Steam ist die Konvention UMGEKEHRT
-            # zu Frames — image_large ist hier oft das animierte APNG,
-            # image_small das statische Standbild. Beide URLs als
-            # separate Felder durchreichen, der Widget kann je nach
-            # Item flippen (?avatarVariant=small).
+            # Animated Avatar (separates Item, nicht-deterministisch
+            # ob small oder large das animierte ist — beide exposen).
             out["animatedAvatarLarge"] = self._build_community_image_url(
                 aa.get("image_large"))
             out["animatedAvatarSmall"] = self._build_community_image_url(
@@ -264,6 +266,8 @@ class SteamEndpointRegistry:
                        or summary.get("avatarfull")),
             "avatarStatic": summary.get("avatarfull"),
             "avatarFrame": self._get_profile_items().get("avatarFrame"),
+            "avatarFrameAnim": self._get_profile_items().get("avatarFrameAnim"),
+            "avatarFrameStatic": self._get_profile_items().get("avatarFrameStatic"),
             "animatedAvatar": self._get_profile_items().get("animatedAvatar"),
             "animatedAvatarLarge": self._get_profile_items().get("animatedAvatarLarge"),
             "animatedAvatarSmall": self._get_profile_items().get("animatedAvatarSmall"),
