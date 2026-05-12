@@ -35,6 +35,12 @@ class SteamEndpointRegistry:
         self.poller = poller
         self.cache_ttl_s = cache_ttl_s
         self._cache = {}
+        # AppID -> Game-Name (Persistenz waehrend Server-Run). Genutzt
+        # wenn ein Game nicht in der DB ist (Non-Steam-via-Proton,
+        # fakeAppId-Tests, fresh-bought games). Storefront-API hat
+        # ~200/IP/5min Rate-Limit; ohne diesen Cache wuerden wiederholte
+        # Polls dafuer den Limit pruegeln.
+        self._app_names = {}
 
     def _cached(self, key, fn):
         now = time.monotonic()
@@ -126,6 +132,21 @@ class SteamEndpointRegistry:
                     achievements_unlocked = progress["unlocked_count"]
             finally:
                 conn.close()
+
+            # Letzter Fallback: Storefront-API kennt JEDEN Game-Namen,
+            # auch wenn nicht in der Library. Wichtig fuer fakeAppId-
+            # Tests mit fremden Spielen + fuer Non-Steam-Games via
+            # Proton, die nicht im Owned-Games-Cache landen.
+            if not game_name:
+                if game_id in self._app_names:
+                    game_name = self._app_names[game_id]
+                else:
+                    try:
+                        details = self.client.get_app_details(game_id)
+                        game_name = details.get("name")
+                        self._app_names[game_id] = game_name
+                    except SteamApiError:
+                        pass
 
         return _ok({
             "active": bool(game_id),
