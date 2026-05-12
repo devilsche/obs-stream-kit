@@ -81,17 +81,29 @@ class SteamEndpointRegistry:
             summary = self._cached("summary", self.client.get_player_summaries)
         except SteamApiError as e:
             return _err(502, str(e))
-        game_id_raw = summary.get("gameid")
-        try:
-            game_id = int(game_id_raw) if game_id_raw else None
-        except ValueError:
-            game_id = None
+
+        # Test-Override: ?fakeAppId=578080[&fakeGame=NAME] simuliert das
+        # Spiel als 'gerade aktiv', alle anderen Felder bleiben real
+        # (Avatar, Persona, timeCreated). Praktisch ohne Steam-Client
+        # offen / ohne Game am Laufen.
+        fake_app_raw = qs.get("fakeAppId")
+        if fake_app_raw:
+            try:
+                game_id = int(fake_app_raw)
+            except ValueError:
+                game_id = None
+        else:
+            game_id_raw = summary.get("gameid")
+            try:
+                game_id = int(game_id_raw) if game_id_raw else None
+            except ValueError:
+                game_id = None
 
         playtime_total_min = None
         playtime_2weeks_min = None
         achievements_unlocked = None
         achievements_total = None
-        game_name = summary.get("gameextrainfo")
+        game_name = qs.get("fakeGame") or summary.get("gameextrainfo")
         img_icon_url = None
 
         if game_id:

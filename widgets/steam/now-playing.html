@@ -290,6 +290,16 @@
       }
     }
 
+    // ?fakeAppId / ?fakeGame werden 1:1 an die API durchgereicht — der
+    // Endpoint simuliert dann 'das Spiel laeuft', Profildaten bleiben real.
+    const fakeAppId = PubgUI.qs("fakeAppId", "");
+    const fakeGame  = PubgUI.qs("fakeGame", "");
+    const extra = [];
+    if (fakeAppId) extra.push("fakeAppId=" + encodeURIComponent(fakeAppId));
+    if (fakeGame)  extra.push("fakeGame="  + encodeURIComponent(fakeGame));
+    const npUrl = "/api/steam/now-playing" +
+                  (extra.length ? "?" + extra.join("&") : "");
+
     let lastNowPlaying = null;
     if (MOCK) {
       lastNowPlaying = MOCK_DATA;
@@ -299,7 +309,7 @@
       }
       render(MOCK_DATA);
     } else {
-      PubgUI.poll("/api/steam/now-playing", POLL_MS, (d) => {
+      PubgUI.poll(npUrl, POLL_MS, (d) => {
         lastNowPlaying = d;
         render(d);
       }, console.error);
@@ -308,7 +318,11 @@
     if (SHOW_LIVE_PLAYERS && !MOCK) {
       async function pollPlayers() {
         try {
-          const r = await PubgUI.fetchJson("/api/steam/current-players");
+          // Auch hier fakeAppId durchreichen, sonst hat der Counter
+          // keinen Bezug zum simulierten Spiel.
+          const u = "/api/steam/current-players" +
+                    (fakeAppId ? "?appId=" + encodeURIComponent(fakeAppId) : "");
+          const r = await PubgUI.fetchJson(u);
           if (r && r.active && r.count != null) {
             livePlayersText =
               `<span class="live"><b>${fmtPlayers(r.count)}</b> playing now</span>`;
