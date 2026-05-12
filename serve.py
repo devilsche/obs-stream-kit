@@ -515,6 +515,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             # erwartetem Rauschen fluten.
             if code_int == 404 and path_clean.startswith('/steam/img/'):
                 return
+            # Chrome-DevTools probet diese Datei beim Oeffnen jeder Seite,
+            # gibt's nicht und das ist normal.
+            if (code_int == 404 and path_clean ==
+                    '/.well-known/appspecific/com.chrome.devtools.json'):
+                return
 
             if code_int >= 500:
                 code_col = f"{REDBG}{B} {code} {R}"
@@ -569,6 +574,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def log_error(self, format, *args):
         try:
+            # Pfad-abhaengige Mute-Liste: gleiche Filter wie log_message.
+            # send_error() ruft log_error() PARALLEL zu log_request(),
+            # daher muss hier auch gefiltert werden.
+            path = getattr(self, "path", "") or ""
+            path_clean = path.split("?")[0]
+            if path_clean.startswith("/steam/img/"):
+                return
+            if path_clean == "/.well-known/appspecific/com.chrome.devtools.json":
+                return
             msg = format % args
             sys.stderr.write(f"{DIM}{_now()}{R}  {RED}{B}SERVER ERROR:{R} {msg}\n")
         except Exception:
