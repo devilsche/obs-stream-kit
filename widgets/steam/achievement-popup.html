@@ -200,37 +200,24 @@
       if (u) showOne(u);
     }
 
-    // Defensive Doppel-Anzeige-Schutz pro Widget-Instanz (eigener
-    // LocalStorage-Key — kein Konflikt mit combined popup.html).
-    const SHOWN_KEY = "steam_shown_achievement_popup";
-    function getShown() {
-      try { return new Set(JSON.parse(localStorage.getItem(SHOWN_KEY) || "[]")); }
-      catch { return new Set(); }
-    }
-    function persistShown(s) {
-      const tail = [...s].slice(-500);
-      try { localStorage.setItem(SHOWN_KEY, JSON.stringify(tail)); }
-      catch { /* quota */ }
-    }
-
     async function pollUnlocks() {
       try {
         const data = await PubgUI.fetchJson(
           "/api/steam/recent-unlocks?markDisplayed=1");
         const unlocks = (data && data.unlocks) || [];
         if (!unlocks.length) return;
-        const shown = getShown();
+        // Server-side displayed_at ist die Wahrheit. Nur innerhalb
+        // DIESER Antwort dedupen (Duplikate koennen vorkommen).
+        // Kein LocalStorage-Cache — der hat Replay-Trigger blockiert.
+        const justQueued = new Set();
         let added = 0;
         for (const u of unlocks) {
-          if (shown.has(u.apiName)) continue;
+          if (justQueued.has(u.apiName)) continue;
           queue.push(u);
-          shown.add(u.apiName);
+          justQueued.add(u.apiName);
           added++;
         }
-        if (added) {
-          persistShown(shown);
-          processQueue();
-        }
+        if (added) processQueue();
       } catch (e) {
         // Stille — backend evtl. disabled
       }

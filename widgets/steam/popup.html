@@ -316,35 +316,21 @@
       } catch (e) { /* silent */ }
     }
 
-    // Defensive Doppel-Anzeige-Schutz pro Widget-Instanz: jedes
-    // Widget hat eigenen LocalStorage-Key — damit blockt 'popup' nicht
-    // 'achievement-popup' wenn beide parallel offen sind.
-    const SHOWN_KEY = "steam_shown_combined_popup";
-    function getShown() {
-      try { return new Set(JSON.parse(localStorage.getItem(SHOWN_KEY) || "[]")); }
-      catch { return new Set(); }
-    }
-    function persistShown(s) {
-      const tail = [...s].slice(-500);  // rolling window, max 500
-      try { localStorage.setItem(SHOWN_KEY, JSON.stringify(tail)); }
-      catch { /* quota o.ä. */ }
-    }
-
+    // Server-side displayed_at-Flag in steam_achievements_seen ist die
+    // Wahrheit. Kein LocalStorage-Cache mehr (hat Replay blockiert).
+    // Innerhalb einer Server-Antwort wird trotzdem dedupiert.
     async function pollAchievements() {
       try {
         const r = await PubgUI.fetchJson(
           "/api/steam/recent-unlocks?markDisplayed=1");
         const unlocks = (r && r.unlocks) || [];
         if (!unlocks.length) return;
-        const shown = getShown();
-        let added = 0;
+        const justQueued = new Set();
         for (const u of unlocks) {
-          if (shown.has(u.apiName)) continue;
+          if (justQueued.has(u.apiName)) continue;
           enqueue({ type: "achievement", data: u, priority: 1 });
-          shown.add(u.apiName);
-          added++;
+          justQueued.add(u.apiName);
         }
-        if (added) persistShown(shown);
       } catch (e) { /* silent */ }
     }
 
