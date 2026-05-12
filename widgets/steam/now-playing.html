@@ -315,9 +315,19 @@
       }
       document.body.classList.remove("empty");
 
-      // Avatar (Circle mit Gold-Border).
+      // Avatar: bevorzugt animated_avatar (d.avatar = APNG image_small),
+      // bei 404 Fallback auf statischen Avatar (d.avatarStatic).
       const av = document.getElementById("avatar");
       if (d.avatar) {
+        const staticFallback = d.avatarStatic || "";
+        av.onerror = () => {
+          if (staticFallback && av.src !== staticFallback) {
+            av.src = staticFallback;
+          } else {
+            av.style.display = "none";
+            av.onerror = null;
+          }
+        };
         av.src = d.avatar;
         av.style.display = "";
       } else {
