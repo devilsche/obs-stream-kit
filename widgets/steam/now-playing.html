@@ -93,9 +93,25 @@
       color: var(--pubg-text);
       font-weight: 700;
       font-size: 1em;
-      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .game-title-icon {
+      width: 1.05em;
+      height: 1.05em;
+      flex-shrink: 0;
+      border-radius: 3px;
+      border: 1px solid var(--pubg-border);
+      background: rgba(0, 0, 0, 0.5);
+      object-fit: cover;
+    }
+    .game-title-text {
+      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .meta {
       margin-top: 4px;
@@ -149,7 +165,10 @@
     <div class="info">
       <div class="name" id="name">—</div>
       <div class="verb">is now playing</div>
-      <div class="game" id="game">—</div>
+      <div class="game">
+        <img class="game-title-icon" id="gameTitleIcon" hidden alt="">
+        <span class="game-title-text" id="gameTitleText">—</span>
+      </div>
       <div class="meta" id="meta"></div>
       <div class="ach-bar" id="achBar" style="display:none">
         <div class="fill" id="achFill" style="width:0%"></div>
@@ -245,25 +264,28 @@
       } else {
         yearsEl.hidden = true;
       }
-      // Game-Icon (unten-rechts). Local cache zuerst (CDN-Fallback via onerror).
-      const gi = document.getElementById("gameIcon");
-      if (d.appId) {
-        gi.dataset.fallback = d.imgIconUrl || "";
-        gi.onerror = () => {
-          if (gi.dataset.fallback && gi.src !== gi.dataset.fallback) {
-            gi.src = gi.dataset.fallback;
+      // Game-Icons: einer unten-rechts am Avatar, einer vor dem Titel.
+      // Beide nutzen denselben Fallback (lokal -> remote -> hide).
+      function setGameIcon(el, appId, remoteUrl) {
+        if (!appId) { el.hidden = true; return; }
+        el.dataset.fallback = remoteUrl || "";
+        el.onerror = () => {
+          if (el.dataset.fallback && el.src !== el.dataset.fallback) {
+            el.src = el.dataset.fallback;
           } else {
-            gi.hidden = true;
-            gi.onerror = null;
+            el.hidden = true;
+            el.onerror = null;
           }
         };
-        gi.src = `/steam/img/${d.appId}/icon.jpg`;
-        gi.hidden = false;
-      } else {
-        gi.hidden = true;
+        el.src = `/steam/img/${appId}/icon.jpg`;
+        el.hidden = false;
       }
+      setGameIcon(document.getElementById("gameIcon"),       d.appId, d.imgIconUrl);
+      setGameIcon(document.getElementById("gameTitleIcon"),  d.appId, d.imgIconUrl);
+
       document.getElementById("name").textContent = d.personaName || "—";
-      document.getElementById("game").textContent = d.gameName || ("App #" + d.appId);
+      document.getElementById("gameTitleText").textContent =
+        d.gameName || ("App #" + d.appId);
 
       // Meta-Zeile: Total-Playtime, 2-Wochen-Playtime
       const parts = [];
