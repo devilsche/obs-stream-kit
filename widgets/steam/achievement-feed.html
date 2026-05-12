@@ -121,7 +121,7 @@
     const ROTATE_MS  = parseInt(PubgUI.qs("rotateMs",  "8000"), 10);
     const CYCLE_PAUSE_MS = parseInt(PubgUI.qs("cyclePauseMs", "0"), 10);
     const REFRESH_MS = parseInt(PubgUI.qs("refreshMs", "60000"), 10);
-    const RARE_PCT   = parseFloat(PubgUI.qs("rarePct", "5"));
+    const RARE_PCT   = parseFloat(PubgUI.qs("rarePct", "10"));
     const HEADER_OFF = PubgUI.qs("header", "1") === "0";
     const HEADING_OVERRIDE = PubgUI.qs("headerTitle", "");
 
@@ -149,7 +149,7 @@
         min: 15000, max: 300000, default: 60000,
         tooltip: "How often to re-fetch the unlock list." },
       { key: "rarePct", label: "Rare ≤ (%)", type: "range",
-        min: 1, max: 25, default: 5,
+        min: 1, max: 25, default: 10,
         tooltip: "Threshold for the 'rare' highlight. Achievements " +
                  "that fewer than N% of players have get the badge." },
     ]);

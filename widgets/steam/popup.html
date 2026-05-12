@@ -129,7 +129,7 @@
     const ACHIEVEMENT_INTERVAL_MS  = parseInt(PubgUI.qs("achPollMs",  "5000"),  10);                 // 5 s
     const SHOW_DURATION_MS         = parseInt(PubgUI.qs("durationMs", "8000"),  10);
     const GAP_MS                   = parseInt(PubgUI.qs("gapMs",      "1500"),  10);
-    const RARE_PCT                 = parseFloat(PubgUI.qs("rarePct",   "5"));
+    const RARE_PCT                 = parseFloat(PubgUI.qs("rarePct",   "10"));
     const SOUND_ON                 = PubgUI.qs("sound", "1") !== "0";
     const VOLUME                   = Math.max(0, Math.min(1,
                                        (parseFloat(PubgUI.qs("volume", "50")) || 0) / 100));
@@ -160,7 +160,7 @@
         min: 0, max: 5000, default: 1500,
         tooltip: "Pause between consecutive popups." },
       { key: "rarePct", label: "Rare ≤ (%)", type: "range",
-        min: 1, max: 25, default: 5,
+        min: 1, max: 25, default: 10,
         tooltip: "Threshold for 'rare unlock' glow. Achievements that " +
                  "fewer than N% of players have get the highlight." },
       { key: "sound", label: "Sound", type: "select",

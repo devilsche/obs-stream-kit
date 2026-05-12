@@ -54,6 +54,17 @@ CREATE TABLE IF NOT EXISTS steam_owned_games (
   PRIMARY KEY (steam_id, app_id)
 );
 
+-- Per-Sprache Schema-Cache (display_name + description in jeweiliger Lang).
+-- Wird lazy gefuellt wenn der achievement-browser eine andere Sprache
+-- als die in steam_app_schema gespeicherte abfragt.
+CREATE TABLE IF NOT EXISTS steam_app_schema_lang (
+  app_id INTEGER NOT NULL,
+  lang TEXT NOT NULL,
+  schema_json TEXT,                    -- {api_name: {displayName, description}}
+  cached_at INTEGER NOT NULL,
+  PRIMARY KEY (app_id, lang)
+);
+
 CREATE TABLE IF NOT EXISTS steam_app_details (
   app_id INTEGER PRIMARY KEY,
   header_image TEXT,
@@ -311,6 +322,28 @@ def get_app_schema(conn, app_id: int):
     return conn.execute(
         "SELECT * FROM steam_app_schema WHERE app_id=?", (app_id,)
     ).fetchone()
+
+
+def get_app_schema_lang(conn, app_id: int, lang: str):
+    """Sprach-spezifisches Schema-Lookup. Returns None wenn nie gefetched."""
+    return conn.execute("""
+        SELECT * FROM steam_app_schema_lang
+        WHERE app_id=? AND lang=?
+    """, (app_id, lang)).fetchone()
+
+
+def upsert_app_schema_lang(conn, app_id: int, lang: str,
+                            schema_json: str) -> None:
+    """Cached pro Sprache. Wird vom achievements-list-Endpoint lazy
+    befuellt wenn der User die Browser-Sprache umschaltet."""
+    conn.execute("""
+        INSERT INTO steam_app_schema_lang
+          (app_id, lang, schema_json, cached_at)
+        VALUES (?, ?, ?, strftime('%s','now'))
+        ON CONFLICT(app_id, lang) DO UPDATE SET
+          schema_json=excluded.schema_json,
+          cached_at=excluded.cached_at
+    """, (app_id, lang, schema_json))
 
 
 def upsert_global_achievement_pct(conn, app_id: int,

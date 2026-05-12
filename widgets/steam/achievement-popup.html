@@ -108,7 +108,7 @@
     const GAP_S      = parseFloat(PubgUI.qs("gap", "1.5"));
     const POLL_MS    = parseInt(PubgUI.qs("pollMs", "5000"), 10);
 
-    const RARE_PCT = parseFloat(PubgUI.qs("rarePct", "5"));
+    const RARE_PCT = parseFloat(PubgUI.qs("rarePct", "10"));
     const SOUND_ON = PubgUI.qs("sound", "1") !== "0";
     // Slider liefert 0..100, intern brauchen wir 0..1.
     const VOLUME   = Math.max(0, Math.min(1,
@@ -125,7 +125,7 @@
         min: 2000, max: 30000, default: 5000,
         tooltip: "How often to poll for new unlocks." },
       { key: "rarePct", label: "Rare ≤ (%)", type: "range",
-        min: 1, max: 25, default: 5,
+        min: 1, max: 25, default: 10,
         tooltip: "Threshold for the 'rare unlock' glow effect. " +
                  "Achievements that fewer than N% of players have " +
                  "get the highlight animation." },

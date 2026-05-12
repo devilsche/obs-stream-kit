@@ -200,7 +200,31 @@
     </div>
     <div class="grp">
       <label>Rare ≤ (%):</label>
-      <input id="rarePctInput" type="number" min="1" max="50" value="5" style="width: 60px;">
+      <input id="rarePctInput" type="number" min="1" max="50" value="10" style="width: 60px;">
+    </div>
+    <div class="grp">
+      <label>Sprache:</label>
+      <select id="langSelect">
+        <option value="">(Server-Default)</option>
+        <option value="english">English</option>
+        <option value="german">Deutsch</option>
+        <option value="french">Français</option>
+        <option value="spanish">Español</option>
+        <option value="italian">Italiano</option>
+        <option value="russian">Русский</option>
+        <option value="polish">Polski</option>
+        <option value="portuguese">Português</option>
+        <option value="brazilian">Português (BR)</option>
+        <option value="japanese">日本語</option>
+        <option value="koreana">한국어</option>
+        <option value="schinese">简体中文</option>
+        <option value="tchinese">繁體中文</option>
+        <option value="czech">Čeština</option>
+        <option value="dutch">Nederlands</option>
+        <option value="hungarian">Magyar</option>
+        <option value="swedish">Svenska</option>
+        <option value="turkish">Türkçe</option>
+      </select>
     </div>
     <div class="stats" id="stats">— Achievements werden geladen —</div>
   </div>
@@ -210,12 +234,13 @@
 
   <script src="/widgets/pubg/_pubg.js"></script>
   <script>
-    let RARE_PCT = 5;
+    let RARE_PCT = 10;
     let all = [];          // alle Achievements aus der API
     let games = [];        // unique games {appId, name, count}
     let filterGame = "";   // appId or ""
     let searchText = "";
     let sortMode = "recent";
+    let currentLang = "";  // "" = Server-Default
 
     const gridEl   = document.getElementById("grid");
     const toastEl  = document.getElementById("toast");
@@ -224,6 +249,7 @@
     const searchIn = document.getElementById("searchInput");
     const sortSel  = document.getElementById("sortSelect");
     const rareIn   = document.getElementById("rarePctInput");
+    const langSel  = document.getElementById("langSelect");
 
     function fmtDate(unixSec) {
       if (!unixSec) return "—";
@@ -267,7 +293,7 @@
     }
 
     function applyFilters() {
-      RARE_PCT = parseFloat(rareIn.value) || 5;
+      RARE_PCT = parseFloat(rareIn.value) || 10;
       let view = all.slice();
       if (filterGame) {
         view = view.filter(a => String(a.appId) === filterGame);
@@ -333,10 +359,19 @@
       applyFilters();
     });
     rareIn.addEventListener("change", () => applyFilters());
+    langSel.addEventListener("change", (e) => {
+      currentLang = e.target.value;
+      statsEl.textContent = currentLang
+        ? `Lade in '${currentLang}' (kann beim ersten Mal pro Game dauern)…`
+        : "— Achievements werden geladen —";
+      load();
+    });
 
     async function load() {
       try {
-        const data = await PubgUI.fetchJson("/api/steam/achievements-list?limit=2000");
+        const url = "/api/steam/achievements-list?limit=2000"
+          + (currentLang ? "&lang=" + encodeURIComponent(currentLang) : "");
+        const data = await PubgUI.fetchJson(url);
         all = (data && data.achievements) || [];
         games = (data && data.games) || [];
         gameSel.innerHTML = `<option value="">— Alle Games (${all.length}) —</option>`

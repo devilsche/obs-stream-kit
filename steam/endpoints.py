@@ -17,6 +17,7 @@ from steam.db import (
     get_owned_games_filtered,
     get_global_achievement_pct, get_achievement_feed,
     upsert_global_achievement_pct, upsert_progress,
+    get_app_schema_lang, upsert_app_schema_lang,
 )
 import threading
 
@@ -1213,6 +1214,11 @@ class SteamEndpointRegistry:
         Query:
           ?appId=N   nur dieses Spiel
           ?limit=N   max Eintraege (default 500)
+          ?lang=X    Sprache fuer displayName/description. Falls eine
+                     andere als die ursprueglich gespeicherte: pro
+                     unique app_id wird einmalig GetSchemaForGame in
+                     dieser Sprache gefetched + gecached (kann beim
+                     ersten Sprach-Wechsel ein paar Sekunden dauern).
         """
         try:
             limit = max(1, int(qs.get("limit", "500")))
@@ -1222,6 +1228,10 @@ class SteamEndpointRegistry:
             app_id = int(qs.get("appId")) if qs.get("appId") else None
         except ValueError:
             app_id = None
+        lang = (qs.get("lang") or "").lower()
+        # Wenn lang nicht gesetzt oder gleich der Server-Sprache:
+        # einfach durchreichen ohne Schema-Refetch.
+        translate = bool(lang) and lang != self.client.language.lower()
 
         conn = self.db_connect()
         try:
@@ -1242,6 +1252,40 @@ class SteamEndpointRegistry:
             params.append(limit)
             rows = conn.execute(sql, params).fetchall()
 
+            # Wenn andere Sprache angefordert: fuer alle unique app_ids
+            # das Schema in dieser Sprache fetchen wenn nicht cached.
+            lang_lookups = {}  # app_id -> {api_name: {displayName, description}}
+            if translate:
+                unique_apps = set(r["app_id"] for r in rows)
+                for ap in unique_apps:
+                    cached = get_app_schema_lang(conn, ap, lang)
+                    if cached and cached["schema_json"]:
+                        try:
+                            lang_lookups[ap] = json.loads(cached["schema_json"])
+                            continue
+                        except json.JSONDecodeError:
+                            pass
+                    # Frisch holen
+                    try:
+                        schema = self.client.get_schema_for_game(
+                            ap, language=lang)
+                        schema_achs = schema.get("achievements") or []
+                        lookup = {
+                            a.get("name"): {
+                                "displayName": a.get("displayName"),
+                                "description": a.get("description"),
+                            }
+                            for a in schema_achs if a.get("name")
+                        }
+                        upsert_app_schema_lang(
+                            conn, ap, lang, json.dumps(lookup))
+                        lang_lookups[ap] = lookup
+                    except SteamApiError:
+                        # Cache leere Antwort, damit kein Retry-Spam
+                        upsert_app_schema_lang(conn, ap, lang, "{}")
+                        lang_lookups[ap] = {}
+                    time.sleep(0.05)  # Politness
+
             # Game-Namen + Counts fuer den Filter-Dropdown
             games = {}
             items = []
@@ -1260,12 +1304,21 @@ class SteamEndpointRegistry:
                     except (TypeError, ValueError, json.JSONDecodeError):
                         pass
 
+                disp = r["display_name"]
+                desc = r["description"]
+                if translate:
+                    meta = (lang_lookups.get(ap) or {}).get(
+                        r["achievement_api_name"])
+                    if meta:
+                        disp = meta.get("displayName") or disp
+                        desc = meta.get("description") or desc
+
                 items.append({
                     "appId":       ap,
                     "gameName":    gname,
                     "apiName":     r["achievement_api_name"],
-                    "displayName": r["display_name"],
-                    "description": r["description"],
+                    "displayName": disp,
+                    "description": desc,
                     "iconUrl":     r["icon_url"],
                     "unlockedAt":  r["unlocked_at"],
                     "globalPct":   pct,
@@ -1277,7 +1330,8 @@ class SteamEndpointRegistry:
                 "games": sorted(games.values(),
                                  key=lambda g: g["name"].lower()),
                 "count": len(items),
-                "filter": {"appId": app_id, "limit": limit},
+                "filter": {"appId": app_id, "limit": limit, "lang": lang or None},
+                "translated": translate,
             })
         finally:
             conn.close()
@@ -1305,7 +1359,7 @@ class SteamEndpointRegistry:
         api_name_filter = qs.get("apiName") or None
         only_rare = qs.get("onlyRare") == "1"
         try:
-            rare_pct = float(qs.get("rarePct", "5"))
+            rare_pct = float(qs.get("rarePct", "10"))
         except ValueError:
             rare_pct = 5.0
 
