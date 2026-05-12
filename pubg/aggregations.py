@@ -992,8 +992,10 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
       - beast_chicken      : place == 1 UND kills >= 5 (mehrfach möglich)
       - first_hot_drop          : ERSTES Hot-Drop in der Range (egal ob überlebt)
       - first_hot_drop_survived : ERSTES überlebtes Hot-Drop in der Range
-      - top10_streak       : längste Top-10-Streak in Session (>= 3)
-      - chicken_streak     : längste Chicken-Streak in Session (>= 2)
+      - top10_streak       : pro Match-Peak einer Top-10-Streak (>=2),
+                             mehrfach pro Session moeglich
+      - chicken_streak     : pro Match-Peak einer Chicken-Streak (>=2),
+                             mehrfach pro Session moeglich
 
     Returns Liste { id, label, icon, matchId, playedAt } sortiert
     nach playedAt ASC (Reihenfolge des Erreichens).
@@ -1007,13 +1009,12 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
     seen = set()
     win_seen = False
     top10_seen = False
-    # Streaks: tatsächliche Längen tracken, nicht nur Threshold-Trigger
+    # Streaks: laufende Laenge tracken, bei jedem neuen Peak (≥2)
+    # ein Achievement emitten. Bei Break (Match ausserhalb Bedingung)
+    # auf 0 zuruecksetzen. Pro Streak-Run koennen mehrere Peaks emitten
+    # (x2, x3, x4, ...) — Browser-Aggregat klappt sie zusammen.
     top10_streak = 0
-    longest_top10_streak = 0
-    longest_top10_streak_match = None
     chicken_streak = 0
-    longest_chicken_streak = 0
-    longest_chicken_streak_match = None
     for m in matches:
         place = m["place"] or 99
         kills = m["kills"] or 0
@@ -1074,41 +1075,37 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
                 "matchId": m["matchId"], "playedAt": played,
             })
 
-        # Top-10-Streak (≥3 in Folge wird Achievement)
+        # Top-10-Streak: pro Match-Peak ab x2 ein eigenes Achievement.
+        # Match-ID kommt aus dem PEAK-Match (also dem der die Streak
+        # auf die jeweilige Laenge gebracht hat). PK (achievement_id,
+        # match_id) verhindert Duplikate; bei jedem neuen Peak wird
+        # eine neue Zeile angelegt.
         if place <= 10:
             top10_streak += 1
-            if top10_streak > longest_top10_streak:
-                longest_top10_streak = top10_streak
-                longest_top10_streak_match = m
+            if top10_streak >= 2:
+                out.append({
+                    "id": "top10_streak",
+                    "label": f"Top-10 Streak ×{top10_streak}",
+                    "icon": "🔥",
+                    "matchId": m["matchId"],
+                    "playedAt": played,
+                })
         else:
             top10_streak = 0
 
-        # Chicken-Streak (≥2 in Folge wird Achievement)
+        # Chicken-Streak: gleiche Logik, Schwelle ab x2.
         if place == 1:
             chicken_streak += 1
-            if chicken_streak > longest_chicken_streak:
-                longest_chicken_streak = chicken_streak
-                longest_chicken_streak_match = m
+            if chicken_streak >= 2:
+                out.append({
+                    "id": "chicken_streak",
+                    "label": f"Chicken Streak ×{chicken_streak}",
+                    "icon": "🔥",
+                    "matchId": m["matchId"],
+                    "playedAt": played,
+                })
         else:
             chicken_streak = 0
-
-    # Streak-Achievements (post-loop, mit echter Längen-Anzeige)
-    if longest_top10_streak >= 3 and longest_top10_streak_match:
-        out.append({
-            "id": "top10_streak",
-            "label": f"Top-10 Streak ×{longest_top10_streak}",
-            "icon": "🔥",
-            "matchId": longest_top10_streak_match["matchId"],
-            "playedAt": longest_top10_streak_match["playedAt"],
-        })
-    if longest_chicken_streak >= 2 and longest_chicken_streak_match:
-        out.append({
-            "id": "chicken_streak",
-            "label": f"Chicken Streak ×{longest_chicken_streak}",
-            "icon": "🔥",
-            "matchId": longest_chicken_streak_match["matchId"],
-            "playedAt": longest_chicken_streak_match["playedAt"],
-        })
 
     # Hot-Drop-Achievements: ERSTES Hot-Drop überhaupt + ERSTES
     # überlebtes Hot-Drop in der Range. perMatch ist DESC sortiert →

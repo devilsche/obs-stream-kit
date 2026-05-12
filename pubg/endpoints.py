@@ -424,11 +424,13 @@ class EndpointRegistry:
 
     def _current_lang(self):
         """Holt die aktive Sprache aus den Steam-Prefs (data/steam-prefs.json)
-        — der Steam-Endpoint persistiert die dort. Fallback english."""
+        — der Steam-Endpoint persistiert die dort. Fallback english.
+        Path absolut zum Repo-Root: pubg/endpoints.py -> ../data/."""
         import os, json
         try:
-            # Pfad ist relativ zur cwd des Servers
-            path = os.path.join("data", "steam-prefs.json")
+            here = os.path.dirname(os.path.abspath(__file__))
+            root = os.path.dirname(here)
+            path = os.path.join(root, "data", "steam-prefs.json")
             if os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as f:
                     prefs = json.load(f)
@@ -539,6 +541,7 @@ class EndpointRegistry:
                     "first_at":      r["played_at"],
                     "first_match":   r["match_id"],
                     "first_label":   r["label"],
+                    "first_icon":    r["icon"],
                     "is_rare":       bool(r["is_rare"]),
                     "session_dates": set(),
                     "count":         0,
@@ -575,7 +578,7 @@ class EndpointRegistry:
                                    or g["first_label"]),
                 "description":    self._ach_description(aid, lang),
                 "iconUrl":        (self.PUBG_ICON_URLS.get(aid)
-                                   or g["first_label"]),
+                                   or g["first_icon"]),
                 "unlockedAt":     _iso_to_ts(g["first_at"]),
                 "occurrenceCount": g["count"],
                 "sessionPct":     sess_pct,
