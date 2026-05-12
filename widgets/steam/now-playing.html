@@ -78,7 +78,8 @@
       display: block;
     }
     .avatar-area.has-frame .avatar {
-      border-radius: 50%;
+      /* border-radius bleibt 4px (quadratisch). Frame uebernimmt
+         die Deko, deshalb Border + Shadow weg. */
       border: none;
       box-shadow: none;
     }
