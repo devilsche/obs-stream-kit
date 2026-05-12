@@ -244,6 +244,31 @@ def init_schema(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE match_team_mapping ADD COLUMN {col} {typ}")
         except sqlite3.OperationalError:
             pass
+
+    # Migration: alte beast_chicken_<matchid>-IDs auf 'beast_chicken'
+    # normalisieren. Davor hatte jeder Beast-Chicken eine kontext-
+    # spezifische ID die Lookups in PUBG_ICON_URLS / _DESCRIPTIONS
+    # umgangen hat. Beim Update gleicher PK kann's zu Conflicts kommen
+    # — INSERT OR REPLACE waere overkill; einfacher: erst die normalen
+    # Eintraege erkennen (zur Vermeidung von Konflikten beim Update),
+    # dann die alten umbenennen und Duplikate ignorieren.
+    try:
+        conn.execute("""
+            DELETE FROM pubg_achievements_seen
+            WHERE achievement_id LIKE 'beast_chicken_%'
+              AND EXISTS (
+                SELECT 1 FROM pubg_achievements_seen p2
+                WHERE p2.achievement_id = 'beast_chicken'
+                  AND p2.match_id = pubg_achievements_seen.match_id
+              )
+        """)
+        conn.execute("""
+            UPDATE pubg_achievements_seen
+            SET achievement_id = 'beast_chicken'
+            WHERE achievement_id LIKE 'beast_chicken_%'
+        """)
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
 
 

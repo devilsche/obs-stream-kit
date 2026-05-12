@@ -1068,8 +1068,13 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             seen.add("five_kill_match")
 
         if place == 1 and kills >= 5:
+            # Mehrfach pro Session moeglich — PK (achievement_id,
+            # match_id) garantiert Eindeutigkeit ohne Suffix-Hack.
+            # Wichtig: 'beast_chicken' bleibt als ID damit Lookups in
+            # PUBG_ICON_URLS / _CANONICAL_LABELS / _ACH_DESCRIPTIONS /
+            # _RARE_ACHIEVEMENTS greifen.
             out.append({
-                "id": "beast_chicken_" + (m["matchId"] or ""),
+                "id": "beast_chicken",
                 "label": f"Beast Chicken · {kills} Kills",
                 "icon": "🔥",
                 "matchId": m["matchId"], "playedAt": played,
