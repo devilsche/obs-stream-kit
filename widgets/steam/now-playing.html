@@ -70,7 +70,7 @@
        runden Innen-Cutout). */
     .avatar {
       width: 100%; height: 100%;
-      border-radius: 8px;
+      border-radius: 4px;
       border: 2px solid var(--pubg-gold);
       background: rgba(0, 0, 0, 0.3);
       object-fit: cover;
@@ -253,6 +253,13 @@
         min: 0, max: 95, default: 70,
         tooltip: "Wie stark das Game-Hero-Bild als Card-Background " +
                  "abgedunkelt wird. 0 = original, 95 = fast schwarz." },
+      { key: "avatarVariant", label: "Avatar variant", type: "select",
+        default: "large",
+        options: [["large","image_large"], ["small","image_small"]],
+        tooltip: "Steam liefert animated_avatar als zwei URLs. Bei " +
+                 "den meisten Items ist image_large das animierte APNG, " +
+                 "bei manchen image_small. Falls dein Avatar statisch " +
+                 "wirkt, hier flippen." },
       { key: "livePlayers", label: "Live players", type: "select",
         default: "1",
         options: [["1","Show"], ["0","Hide"]],
@@ -315,20 +322,30 @@
       }
       document.body.classList.remove("empty");
 
-      // Avatar: bevorzugt animated_avatar (d.avatar = APNG image_small),
-      // bei 404 Fallback auf statischen Avatar (d.avatarStatic).
+      // Avatar: animated_avatar bevorzugt (image_large = APNG), bei 404
+      // Fallback auf image_small (manche Items haben's umgekehrt), dann
+      // auf statischen Avatar. ?avatarVariant=small flippt die Priorisierung.
+      const variant = PubgUI.qs("avatarVariant", "large");
+      const animChain = variant === "small"
+        ? [d.animatedAvatarSmall, d.animatedAvatarLarge]
+        : [d.animatedAvatarLarge, d.animatedAvatarSmall];
+      const avatarChain = [
+        ...animChain.filter(Boolean),
+        d.avatarStatic,
+      ].filter(Boolean);
       const av = document.getElementById("avatar");
-      if (d.avatar) {
-        const staticFallback = d.avatarStatic || "";
+      if (avatarChain.length) {
+        let avIdx = 0;
         av.onerror = () => {
-          if (staticFallback && av.src !== staticFallback) {
-            av.src = staticFallback;
+          avIdx++;
+          if (avIdx < avatarChain.length) {
+            av.src = avatarChain[avIdx];
           } else {
             av.style.display = "none";
             av.onerror = null;
           }
         };
-        av.src = d.avatar;
+        av.src = avatarChain[0];
         av.style.display = "";
       } else {
         av.style.display = "none";

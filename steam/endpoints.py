@@ -63,11 +63,17 @@ class SteamEndpointRegistry:
             out["avatarFrame"] = self._build_community_image_url(
                 af.get("image_large") or af.get("image_small"))
             aa = items.get("animated_avatar") or {}
-            # Animated Avatar: image_small ist die animierte APNG-
-            # Variante; image_large oft nur statisches Standbild.
-            # Steam-Quirk — image_small priorisieren.
-            out["animatedAvatar"] = self._build_community_image_url(
-                aa.get("image_small") or aa.get("image_large"))
+            # Animated Avatar: bei Steam ist die Konvention UMGEKEHRT
+            # zu Frames — image_large ist hier oft das animierte APNG,
+            # image_small das statische Standbild. Beide URLs als
+            # separate Felder durchreichen, der Widget kann je nach
+            # Item flippen (?avatarVariant=small).
+            out["animatedAvatarLarge"] = self._build_community_image_url(
+                aa.get("image_large"))
+            out["animatedAvatarSmall"] = self._build_community_image_url(
+                aa.get("image_small"))
+            out["animatedAvatar"] = (out["animatedAvatarLarge"]
+                                      or out["animatedAvatarSmall"])
         except SteamApiError:
             pass
         # GetAvatarFrame als Fallback falls GetProfileItemsEquipped
@@ -259,6 +265,8 @@ class SteamEndpointRegistry:
             "avatarStatic": summary.get("avatarfull"),
             "avatarFrame": self._get_profile_items().get("avatarFrame"),
             "animatedAvatar": self._get_profile_items().get("animatedAvatar"),
+            "animatedAvatarLarge": self._get_profile_items().get("animatedAvatarLarge"),
+            "animatedAvatarSmall": self._get_profile_items().get("animatedAvatarSmall"),
             "profileUrl": summary.get("profileurl"),
             "timeCreated": summary.get("timecreated"),
             "playtimeTotalMin": playtime_total_min,
