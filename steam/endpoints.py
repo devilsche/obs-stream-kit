@@ -566,14 +566,25 @@ class SteamEndpointRegistry:
         if fake_lobby: my_lobby = fake_lobby
         if fake_game:  my_game  = fake_game
 
+        # Optional: erwartete Squad-Groesse (PUBG: 4 fuer Squad, 2 fuer
+        # Duo, 1 fuer Solo). Wenn gesetzt, berechnen wir wie viele
+        # 'andere' (= nicht auf Steam-Friend-Liste) im Team sind.
+        try:
+            expected_size = int(qs.get("expectedSize", "0"))
+        except ValueError:
+            expected_size = 0
+
         if not my_game and not my_lobby:
-            return _ok({"active": False, "friends": [], "count": 0})
+            return _ok({"active": False, "friends": [], "count": 0,
+                        "othersCount": 0})
 
         friend_ids = self._get_friend_ids()
         if not friend_ids:
+            others = max(0, expected_size - 1) if expected_size else 0
             return _ok({"active": True, "gameId": my_game,
                         "lobbySteamId": my_lobby, "friends": [],
-                        "count": 0,
+                        "count": 0, "othersCount": others,
+                        "expectedSize": expected_size or None,
                         "note": "friend list private or empty"})
 
         # GetPlayerSummaries akzeptiert bis 100 SteamIDs pro Call.
@@ -611,6 +622,14 @@ class SteamEndpointRegistry:
         # Lobby-Matches zuerst, dann gleiche-Game-Matches
         matches.sort(key=lambda m: (not m["sameLobby"], m["personaName"] or ""))
 
+        # Andere im Team die nicht in der Steam-Friend-Liste sind:
+        # Squad-Size minus (Streamer + erkannte Steam-Friends-in-Lobby).
+        # Nur sameLobby-Matches zaehlen — Game-only sind woanders.
+        in_my_lobby_count = sum(1 for m in matches if m["sameLobby"])
+        others = 0
+        if expected_size:
+            others = max(0, expected_size - 1 - in_my_lobby_count)
+
         return _ok({
             "active":       bool(my_game),
             "gameId":       my_game,
@@ -618,6 +637,8 @@ class SteamEndpointRegistry:
             "lobbySteamId": my_lobby,
             "friends":      matches,
             "count":        len(matches),
+            "othersCount":  others,
+            "expectedSize": expected_size or None,
         })
 
     # ── Friends-Status (alle Freunde + Online/Game/Lobby) ─────────────────
