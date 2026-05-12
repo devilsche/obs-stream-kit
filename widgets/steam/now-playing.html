@@ -59,14 +59,22 @@
       flex-shrink: 0;
       z-index: 2;
     }
+    /* Default ohne Frame: quadratischer Avatar mit Gold-Border + Glow.
+       Mit Frame: Border weg, Form auf Circle (Steam-Frames haben einen
+       runden Innen-Cutout). */
     .avatar {
       width: 100%; height: 100%;
-      border-radius: 50%;
+      border-radius: 8px;
       border: 2px solid var(--pubg-gold);
       background: rgba(0, 0, 0, 0.3);
       object-fit: cover;
       box-shadow: 0 0 12px rgba(242, 183, 5, 0.45);
       display: block;
+    }
+    .avatar-area.has-frame .avatar {
+      border-radius: 50%;
+      border: none;
+      box-shadow: none;
     }
     .avatar-frame {
       position: absolute;
@@ -286,14 +294,23 @@
         av.style.display = "none";
       }
 
-      // Avatar-Frame Overlay (Community-Item, optional).
+      // Avatar-Frame Overlay (Community-Item, optional). Wenn der
+      // Frame greift, klappt die .has-frame-Klasse die Default-Gold-
+      // Border weg und macht den Avatar rund — sonst wuerde der Frame-
+      // Rand mit der Gold-Border doppelt-deko-haben.
       const frameEl = document.getElementById("avatarFrame");
+      const avatarArea = document.querySelector(".avatar-area");
       if (d.avatarFrame) {
         frameEl.src = d.avatarFrame;
         frameEl.hidden = false;
-        frameEl.onerror = () => { frameEl.hidden = true; };
+        avatarArea.classList.add("has-frame");
+        frameEl.onerror = () => {
+          frameEl.hidden = true;
+          avatarArea.classList.remove("has-frame");
+        };
       } else {
         frameEl.hidden = true;
+        avatarArea.classList.remove("has-frame");
       }
 
       // Dienstjahre-Badge.
