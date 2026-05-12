@@ -357,8 +357,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self.send_error(500, str(e))
                 return
         # Steam Image Cache: /steam/img/<app_id>/<kind>.jpg
-        # → falls lokal gecached liefer direkt aus, sonst 404 (Browser
-        # nimmt dann die remote-URL via Fallback-Chain im Widget).
+        # → falls lokal gecached liefer direkt aus, sonst 404 (Widget
+        # faellt via Fallback-Chain auf CDN zurueck).
+        # On-Miss-Warming: bei 404 wird im Hintergrund vom Store-CDN
+        # nachgezogen, sodass der NAECHSTE Request einen Cache-Hit hat.
         if STEAM_ENABLED and self.path.startswith("/steam/img/"):
             try:
                 parts = self.path.split("?")[0].split("/")
@@ -378,6 +380,22 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         self.end_headers()
                         self.wfile.write(data)
                         return
+                    # Cache-Miss: 404 zuruecksenden + Hintergrund-DL anstossen.
+                    # Funktioniert nur fuer header (CDN-Pfad ist
+                    # vorhersagbar pro appid). Icon/Logo sind hash-
+                    # basiert, da kann der Widget direkt das remote URL
+                    # aus der API-Antwort nutzen.
+                    if kind == "header" and app_id.isdigit():
+                        cdn_url = (f"https://cdn.cloudflare.steamstatic.com"
+                                   f"/steam/apps/{app_id}/header.jpg")
+                        def _bg_dl():
+                            try:
+                                from steam.image_cache import download_image
+                                download_image(cdn_url, p)
+                            except Exception:
+                                pass
+                        import threading
+                        threading.Thread(target=_bg_dl, daemon=True).start()
                 self.send_error(404, "image not cached")
                 return
             except Exception as e:
@@ -490,6 +508,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return
 
             code_int = int(code) if code.isdigit() else 0
+
+            # /steam/img/* 404s sind by-design Teil der Fallback-Chain
+            # (Widget probiert lokalen Cache, faellt sonst auf CDN
+            # zurueck). Nicht loggen — wuerde sonst das Log mit
+            # erwartetem Rauschen fluten.
+            if code_int == 404 and path_clean.startswith('/steam/img/'):
+                return
 
             if code_int >= 500:
                 code_col = f"{REDBG}{B} {code} {R}"
