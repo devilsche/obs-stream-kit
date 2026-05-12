@@ -61,6 +61,8 @@ if os.path.exists(secrets_path):
                 secrets["steam_api_key"] = line.split(":", 1)[1].strip()
             elif line.startswith("Steam ID:"):
                 secrets["steam_id"] = line.split(":", 1)[1].strip()
+            elif line.startswith("Steam-Language:"):
+                secrets["steam_language"] = line.split(":", 1)[1].strip()
 
 # ── PUBG-Backend-Bootstrap ─────────────────────────────────────────────────────
 PUBG_ENABLED = False
@@ -165,7 +167,8 @@ try:
     if secrets.get("steam_api_key") and secrets.get("steam_id"):
         steam_client = SteamClient(
             api_key=secrets["steam_api_key"],
-            steam_id=secrets["steam_id"])
+            steam_id=secrets["steam_id"],
+            language=secrets.get("steam_language", "english"))
         os.makedirs(os.path.join(ROOT, "data"), exist_ok=True)
         steam_db_path = os.path.join(ROOT, "data", "steam-history.db")
 

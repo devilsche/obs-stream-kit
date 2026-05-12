@@ -27,10 +27,19 @@ class SteamApiError(Exception):
 
 
 class SteamClient:
-    def __init__(self, api_key: str, steam_id: str, timeout: float = 10.0):
+    def __init__(self, api_key: str, steam_id: str, timeout: float = 10.0,
+                 language: str = "english"):
         self.api_key = api_key
         self.steam_id = str(steam_id)
         self.timeout = timeout
+        # Steam-Language fuer Schema + Achievement-Display-Names.
+        # Steam-Codes: english, german, french, spanish, italian,
+        # russian, polish, portuguese, brazilian, japanese, koreana,
+        # schinese, tchinese, thai, turkish, czech, danish, dutch,
+        # finnish, greek, hungarian, norwegian, romanian, swedish, ...
+        # Wenn Steam fuer dieses Spiel keine Uebersetzung hat,
+        # fallback auf english (Steam-seitig).
+        self.language = (language or "english").lower()
 
     # ── Low-Level ────────────────────────────────────────────────────────────
     def _get(self, path: str, **params) -> dict:
@@ -101,22 +110,26 @@ class SteamClient:
         return ((data.get("friendslist") or {})
                 .get("friends") or [])
 
-    def get_player_achievements(self, app_id: int) -> dict:
+    def get_player_achievements(self, app_id: int, language: str = None) -> dict:
         """Achievements for one game. Each item has 'apiname', 'achieved'
         (0/1), and 'unlocktime' (Unix epoch, 0 if locked).
         Returns: {gameName, achievements: [...], success: bool}.
+        language: 'l='-Parameter fuer Display-Namen (default = self.language).
         """
         data = self._get(
             "/ISteamUserStats/GetPlayerAchievements/v0001/",
-            steamid=self.steam_id, appid=app_id)
+            steamid=self.steam_id, appid=app_id,
+            l=language or self.language)
         return data.get("playerstats") or {}
 
-    def get_schema_for_game(self, app_id: int) -> dict:
+    def get_schema_for_game(self, app_id: int, language: str = None) -> dict:
         """Achievement-Schema (display name, description, icon URLs).
-        Useful to map 'apiname' → 'displayName' für Stream-Overlay."""
+        Useful to map 'apiname' → 'displayName' für Stream-Overlay.
+        language: 'l='-Parameter fuer Display-Namen (default = self.language).
+        """
         data = self._get(
             "/ISteamUserStats/GetSchemaForGame/v2/",
-            appid=app_id)
+            appid=app_id, l=language or self.language)
         return (data.get("game") or {}).get("availableGameStats") or {}
 
     def get_recently_played_games(self) -> list:
