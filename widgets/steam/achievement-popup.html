@@ -192,18 +192,37 @@
         iconEl.style.display = "none";
         emojiEl.hidden = true;
       }
-      // Global-Unlock-%
+      // Pct-Display source-aware:
+      //   Steam: globalPct = '% aller Steam-Spieler die das haben'
+      //   PUBG : sessionPct = '% deiner Sessions in denen das passierte'
       const pctEl = document.getElementById("pct");
       const ribbonEl = document.getElementById("ribbon");
-      const pct = Number(u.globalPct);
-      const hasPct = Number.isFinite(pct);
-      const isRare = hasPct && pct <= RARE_PCT;
+      const isPubg = u.source === "pubg";
+      // isRare-Quelle: PUBG hat is_rare-Flag (hardcoded set), Steam
+      // berechnet aus globalPct <= rarePct.
+      let isRare;
+      if (isPubg) {
+        isRare = !!u.isRare;
+      } else {
+        const gp = Number(u.globalPct);
+        isRare = Number.isFinite(gp) && gp <= RARE_PCT;
+      }
       popup.classList.toggle("rare", isRare);
-      if (hasPct) {
-        pctEl.innerHTML = isRare
-          ? `<b>${pct.toFixed(1)}%</b> have this — RARE`
-          : `<b>${pct.toFixed(1)}%</b> of players have this`;
+      if (isPubg && Number.isFinite(Number(u.sessionPct))) {
+        const sp = Number(u.sessionPct);
+        pctEl.innerHTML = `<b>${sp.toFixed(0)}%</b> deiner Sessions`
+          + (isRare ? " — RARE" : "");
         pctEl.style.display = "";
+      } else if (!isPubg) {
+        const gp = Number(u.globalPct);
+        if (Number.isFinite(gp)) {
+          pctEl.innerHTML = isRare
+            ? `<b>${gp.toFixed(1)}%</b> have this — RARE`
+            : `<b>${gp.toFixed(1)}%</b> of players have this`;
+          pctEl.style.display = "";
+        } else {
+          pctEl.style.display = "none";
+        }
       } else {
         pctEl.style.display = "none";
       }

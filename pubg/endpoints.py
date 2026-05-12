@@ -391,6 +391,21 @@ class EndpointRegistry:
         },
     }
 
+    # PUBG-Achievement-Icon-URLs (gemacht von ChatGPT, geschnitten aus
+    # 1024x1024 Grid). Werden zur API-Zeit eingesetzt — ueberschreiben
+    # die Emoji-Strings die in pubg_achievements_seen.icon stehen.
+    PUBG_ICON_URLS = {
+        "first_chicken":           "/widgets/pubg/icons/first_chicken.png",
+        "first_top10":             "/widgets/pubg/icons/first_top10.png",
+        "five_kill_match":         "/widgets/pubg/icons/five_kill_match.png",
+        "longest_kill_400":        "/widgets/pubg/icons/longest_kill_400.png",
+        "beast_chicken":           "/widgets/pubg/icons/beast_chicken.png",
+        "first_hot_drop":          "/widgets/pubg/icons/first_hot_drop.png",
+        "first_hot_drop_survived": "/widgets/pubg/icons/first_hot_drop_survived.png",
+        "top10_streak":            "/widgets/pubg/icons/top10_streak.png",
+        "chicken_streak":          "/widgets/pubg/icons/chicken_streak.png",
+    }
+
     def _current_lang(self):
         """Holt die aktive Sprache aus den Steam-Prefs (data/steam-prefs.json)
         — der Steam-Endpoint persistiert die dort. Fallback english."""
@@ -458,7 +473,8 @@ class EndpointRegistry:
                 "apiName":     f"{r['achievement_id']}:{r['match_id']}",
                 "displayName": r["label"],
                 "description": self._ach_description(r["achievement_id"], lang),
-                "iconUrl":     r["icon"],
+                "iconUrl":     (self.PUBG_ICON_URLS.get(r["achievement_id"])
+                                or r["icon"]),
                 "unlockedAt":  unlocked_ts,
                 "globalPct":   1.0 if r["is_rare"] else 50.0,
                 "isRare":      bool(r["is_rare"]),
@@ -536,7 +552,7 @@ class EndpointRegistry:
                 "apiName":     f"{aid}:{r['match_id']}",
                 "displayName": r["label"],
                 "description": self._ach_description(aid, lang),
-                "iconUrl":     r["icon"],
+                "iconUrl":     self.PUBG_ICON_URLS.get(aid) or r["icon"],
                 "unlockedAt":  unlocked_ts,
                 "sessionPct":  sess_pct,
                 "displayed":   r["displayed_at"] is not None,

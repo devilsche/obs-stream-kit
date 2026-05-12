@@ -1042,7 +1042,7 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             out.append({
                 "id": "first_top10",
                 "label": "First Top-10",
-                "icon": "",
+                "icon": "🏆",
                 "matchId": m["matchId"], "playedAt": top10_ts or played,
             })
             top10_seen = True
