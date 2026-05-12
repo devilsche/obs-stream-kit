@@ -514,14 +514,30 @@ class EndpointRegistry:
         return _ok({"unlocks": items, "marked": marked_n})
 
     def _achievements_list(self, qs):
-        """Aggregierte Uebersicht der PUBG-Session-Milestones:
-        pro achievement_id EINE Zeile mit erstem Vorkommen + Haeufigkeit.
-        Click-to-Replay nutzt die match_id des ersten Vorkommens.
+        """Liste aller einzelnen PUBG-Session-Milestone-Vorkommen.
+        Jeder Eintrag bekommt einen SNAPSHOT-IN-TIME-Pct:
+          (distinct session-Tage mit diesem achievement_id bis hier)
+          / (distinct session-Tage gesamt bis hier) * 100
+        Das heisst der erste Chicken zeigt '100% deiner Sessions' (1/1
+        zum Zeitpunkt), spaeter werden andere %s anders.
 
-        Antwort sortiert nach first_at DESC (juengster First-Unlock zuerst).
+        Antwort sortiert nach played_at DESC (neueste zuerst).
+        Label kommt instanzspezifisch aus pubg_achievements_seen.label
+        (z.B. 'Beast Chicken · 7 Kills'), damit Detailinfo erhalten bleibt.
         """
+        import datetime as _dt
+        from bisect import bisect_right
         conn = self.get_conn()
-        # Alle Rohzeilen lesen (chronologisch ASC fuer first-occurrence-Logik)
+
+        # Alle Match-Tage als sortierte distinct-Liste (ISO YYYY-MM-DD).
+        match_dates = sorted({
+            r[0] for r in conn.execute(
+                "SELECT DISTINCT date(played_at) FROM matches "
+                "WHERE played_at IS NOT NULL"
+            ).fetchall() if r[0]
+        })
+
+        # Alle Achievement-Rows chronologisch ASC fuer den Snapshot-Walk.
         rows = conn.execute("""
             SELECT achievement_id, match_id, label, icon,
                    played_at, detected_at, is_rare, displayed_at
@@ -529,34 +545,15 @@ class EndpointRegistry:
             ORDER BY played_at ASC
         """).fetchall()
 
-        total_sessions = (conn.execute(
-            "SELECT COUNT(DISTINCT date(played_at)) FROM matches"
-        ).fetchone()[0]) or 1
-
-        # Per achievement_id aggregieren
-        import datetime as _dt
-        groups = {}
+        # Pro achievement_id: sorted-distinct-Liste der Match-Tage.
+        ach_dates = {}
         for r in rows:
-            aid = r["achievement_id"]
-            g = groups.get(aid)
-            if g is None:
-                g = {
-                    "aid":           aid,
-                    "first_at":      r["played_at"],
-                    "first_match":   r["match_id"],
-                    "first_label":   r["label"],
-                    "first_icon":    r["icon"],
-                    "is_rare":       bool(r["is_rare"]),
-                    "session_dates": set(),
-                    "count":         0,
-                    "any_undisplayed": False,
-                }
-                groups[aid] = g
-            if r["played_at"]:
-                g["session_dates"].add(r["played_at"][:10])  # YYYY-MM-DD
-            g["count"] += 1
-            if r["displayed_at"] is None:
-                g["any_undisplayed"] = True
+            if not r["played_at"]:
+                continue
+            d = r["played_at"][:10]
+            ach_dates.setdefault(r["achievement_id"], set()).add(d)
+        ach_dates_sorted = {aid: sorted(dates)
+                             for aid, dates in ach_dates.items()}
 
         def _iso_to_ts(iso):
             if not iso:
@@ -569,36 +566,37 @@ class EndpointRegistry:
 
         lang = self._current_lang()
         items = []
-        for g in groups.values():
-            aid = g["aid"]
-            sess_pct = round(
-                (len(g["session_dates"]) / total_sessions) * 100, 1)
+        for r in rows:
+            aid = r["achievement_id"]
+            d = (r["played_at"] or "")[:10]
+            if d and match_dates:
+                total = bisect_right(match_dates, d)
+                ach_n = bisect_right(ach_dates_sorted.get(aid, []), d)
+                snap_pct = round((ach_n / max(total, 1)) * 100, 1)
+            else:
+                snap_pct = None
             items.append({
-                "appId":          -2,
-                "gameName":       "PUBG: Session Milestones",
-                # apiName = first-match-key (fuer Replay-Click)
-                "apiName":        f"{aid}:{g['first_match']}",
-                "displayName":    (self.PUBG_CANONICAL_LABELS.get(aid)
-                                   or g["first_label"]),
-                "description":    self._ach_description(aid, lang),
-                "iconUrl":        (self.PUBG_ICON_URLS.get(aid)
-                                   or g["first_icon"]),
-                "unlockedAt":     _iso_to_ts(g["first_at"]),
-                "occurrenceCount": g["count"],
-                "sessionPct":     sess_pct,
-                "displayed":      not g["any_undisplayed"],
-                "source":         "pubg",
-                "isRare":         g["is_rare"],
-                "matchId":        g["first_match"],
-                "achievementId":  aid,
+                "appId":         -2,
+                "gameName":      "PUBG: Session Milestones",
+                "apiName":       f"{aid}:{r['match_id']}",
+                # Instanz-Label mit Details (z.B. 'Beast Chicken · 6 Kills')
+                "displayName":   r["label"],
+                "description":   self._ach_description(aid, lang),
+                "iconUrl":       (self.PUBG_ICON_URLS.get(aid) or r["icon"]),
+                "unlockedAt":    _iso_to_ts(r["played_at"]),
+                "sessionPct":    snap_pct,
+                "displayed":     r["displayed_at"] is not None,
+                "source":        "pubg",
+                "isRare":        bool(r["is_rare"]),
+                "matchId":       r["match_id"],
+                "achievementId": aid,
             })
-        # Sortiert nach erstem Vorkommen, neuestes zuerst
+        # Juengste zuerst
         items.sort(key=lambda x: x["unlockedAt"], reverse=True)
         return _ok({
-            "achievements":    items,
-            "count":           len(items),
-            "totalSessions":   total_sessions,
-            "aggregated":      True,
+            "achievements":  items,
+            "count":         len(items),
+            "totalSessions": len(match_dates),
         })
 
     def _detect_achievements(self, qs):
