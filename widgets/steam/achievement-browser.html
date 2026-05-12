@@ -265,6 +265,10 @@
         <option value="session">Session</option>
         <option value="week">7 Tage</option>
       </select>
+      <button id="backfillBtn" type="button"
+              style="background:rgba(94,42,121,0.5);color:var(--pubg-gold);border:1px solid var(--pubg-border);padding:4px 8px;border-radius:4px;font-family:inherit;font-size:0.85em;cursor:pointer">
+        Backfill History
+      </button>
     </div>
     <div class="grp">
       <label title="Persistente Server-Setting — gilt fuer ALLE neuen Steam-Calls inkl. der Achievement-Popups. Wechseln triggert sofortige Neu-Uebersetzung der Liste.">Sprache:</label>
@@ -321,6 +325,7 @@
     const rareIn   = document.getElementById("rarePctInput");
     const langSel  = document.getElementById("langSelect");
     const rangeSel = document.getElementById("rangeSelect");
+    const backfillBtn = document.getElementById("backfillBtn");
 
     function fmtDate(unixSec) {
       if (!unixSec) return "—";
@@ -447,6 +452,24 @@
     rangeSel.addEventListener("change", (e) => {
       pubgRange = e.target.value;
       load();
+    });
+    backfillBtn.addEventListener("click", async () => {
+      backfillBtn.disabled = true;
+      backfillBtn.textContent = "Läuft…";
+      showToast("<b>Backfill läuft…</b> kann ein paar Sekunden dauern");
+      try {
+        const r = await PubgUI.fetchJson(
+          "/api/pubg/backfill-achievements?gapHours=6");
+        showToast(
+          `<b>✓ Backfill fertig:</b> ${r.inserted || 0} neue Milestones aus `
+          + `${r.sessions || 0} Sessions`);
+        await load();
+      } catch (e) {
+        showToast(`<b>✗ Fehler:</b> ${e}`);
+      } finally {
+        backfillBtn.disabled = false;
+        backfillBtn.textContent = "Backfill History";
+      }
     });
     langSel.addEventListener("change", async (e) => {
       const lang = e.target.value;
