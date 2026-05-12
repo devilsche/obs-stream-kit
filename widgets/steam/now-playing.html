@@ -161,6 +161,25 @@
     // alle PLAYERS_POLL_MS); Default an.
     const SHOW_LIVE_PLAYERS = PubgUI.qs("livePlayers", "1") !== "0";
     const PLAYERS_POLL_MS = parseInt(PubgUI.qs("playersPollMs", "60000"), 10);
+    // Mock-Modus: ?mock=1 → kein API-Call, fertige Beispieldaten anzeigen.
+    // Fuer lokales Testen ohne .secrets / Steam-API.
+    const MOCK = PubgUI.qs("mock") === "1";
+    const MOCK_DATA = {
+      active: true,
+      appId: 578080,
+      gameName: "PUBG: BATTLEGROUNDS",
+      personaName: "LuCKoR",
+      personaState: 1,
+      avatar: "https://placehold.co/184x184/5e2a79/f2b705/png?text=L",
+      profileUrl: "https://steamcommunity.com/id/lkrbln/",
+      timeCreated: Math.floor(Date.now() / 1000) - 16 * 365 * 86400,
+      playtimeTotalMin: 399300,   // 6655h
+      playtime2WeeksMin: 720,     // 12h
+      achievementsUnlocked: 37,
+      achievementsTotal: 37,
+      imgIconUrl: "https://placehold.co/32x32/1a0d2a/f2b705/png?text=G",
+    };
+    const MOCK_PLAYERS = 423000;
 
     PubgUI.renderHeader(
       document.getElementById("pubgHeader"), "Now Playing", "live");
@@ -272,12 +291,21 @@
     }
 
     let lastNowPlaying = null;
-    PubgUI.poll("/api/steam/now-playing", POLL_MS, (d) => {
-      lastNowPlaying = d;
-      render(d);
-    }, console.error);
+    if (MOCK) {
+      lastNowPlaying = MOCK_DATA;
+      if (SHOW_LIVE_PLAYERS) {
+        livePlayersText =
+          `<span class="live"><b>${fmtPlayers(MOCK_PLAYERS)}</b> playing now</span>`;
+      }
+      render(MOCK_DATA);
+    } else {
+      PubgUI.poll("/api/steam/now-playing", POLL_MS, (d) => {
+        lastNowPlaying = d;
+        render(d);
+      }, console.error);
+    }
 
-    if (SHOW_LIVE_PLAYERS) {
+    if (SHOW_LIVE_PLAYERS && !MOCK) {
       async function pollPlayers() {
         try {
           const r = await PubgUI.fetchJson("/api/steam/current-players");
