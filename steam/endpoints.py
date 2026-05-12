@@ -58,11 +58,16 @@ class SteamEndpointRegistry:
         try:
             items = self.client.get_profile_items_equipped()
             af = items.get("avatar_frame") or {}
+            # Frame: image_large bevorzugt (bessere Aufloesung fuer das
+            # 110x110-Overlay).
             out["avatarFrame"] = self._build_community_image_url(
                 af.get("image_large") or af.get("image_small"))
             aa = items.get("animated_avatar") or {}
+            # Animated Avatar: image_small ist die animierte APNG-
+            # Variante; image_large oft nur statisches Standbild.
+            # Steam-Quirk — image_small priorisieren.
             out["animatedAvatar"] = self._build_community_image_url(
-                aa.get("image_large") or aa.get("image_small"))
+                aa.get("image_small") or aa.get("image_large"))
         except SteamApiError:
             pass
         # GetAvatarFrame als Fallback falls GetProfileItemsEquipped
