@@ -229,11 +229,17 @@
 
     function renderAchievement(u) {
       popup.dataset.type = "achievement";
-      const pct = Number(u.globalPct);
-      const hasPct = Number.isFinite(pct);
-      const isRare = hasPct && pct <= RARE_PCT;
+      const isPubg = u.source === "pubg";
+      // isRare: PUBG hat hardcoded flag, Steam berechnet aus globalPct
+      let isRare;
+      if (isPubg) {
+        isRare = !!u.isRare;
+      } else {
+        const gp = Number(u.globalPct);
+        isRare = Number.isFinite(gp) && gp <= RARE_PCT;
+      }
       popup.classList.toggle("rare", isRare);
-      if (u.source === "pubg") {
+      if (isPubg) {
         ribbon.textContent = isRare
           ? "Rare Session Milestone"
           : "Session Milestone Unlocked";
@@ -243,8 +249,24 @@
           : "Achievement Unlocked";
       }
       playSound(isRare);
-      iconEl.src = u.iconUrl || "";
-      iconEl.style.display = u.iconUrl ? "" : "none";
+      // Icon: URL oder Emoji (Source-Agnostic, gleicher Pfad wie
+      // achievement-popup.html)
+      const isUrl = u.iconUrl && (
+        u.iconUrl.startsWith("http://") ||
+        u.iconUrl.startsWith("https://") ||
+        u.iconUrl.startsWith("/"));
+      if (u.iconUrl && isUrl) {
+        iconEl.src = u.iconUrl;
+        iconEl.style.display = "";
+      } else if (u.iconUrl) {
+        // Emoji-Fallback: zeige als Text statt Bild
+        iconEl.style.display = "none";
+        // Hier koennte man ein zweites Element zeigen — fuer popup.html
+        // ist das Layout aber tighter, daher fuer Emoji einfach
+        // gar nichts darstellen.
+      } else {
+        iconEl.style.display = "none";
+      }
       titleEl.textContent = u.displayName || u.apiName || "Achievement";
       descEl.textContent = u.description || "";
       const parts = [];
@@ -252,11 +274,21 @@
         parts.push(
           `<span style="text-transform:uppercase;letter-spacing:0.06em">${u.gameName}</span>`);
       }
-      if (hasPct) {
-        const label = isRare
-          ? `<b>${pct.toFixed(1)}%</b> have this — RARE`
-          : `<b>${pct.toFixed(1)}%</b> of players have this`;
-        parts.push(`<span class="rare-tag">${label}</span>`);
+      // Stat-Line unified: 'X% of [players|your sessions] got this'
+      let statLine = null;
+      if (isPubg) {
+        const sp = Number(u.sessionPct);
+        if (Number.isFinite(sp)) {
+          statLine = `<b>${sp.toFixed(0)}%</b> of your sessions got this`;
+        }
+      } else {
+        const gp = Number(u.globalPct);
+        if (Number.isFinite(gp)) {
+          statLine = `<b>${gp.toFixed(1)}%</b> of players got this`;
+        }
+      }
+      if (statLine) {
+        parts.push(`<span class="rare-tag">${statLine}</span>`);
       }
       metaEl.innerHTML = parts.join("");
       barEl.style.display = "none";

@@ -192,14 +192,14 @@
         iconEl.style.display = "none";
         emojiEl.hidden = true;
       }
-      // Pct-Display source-aware:
-      //   Steam: globalPct = '% aller Steam-Spieler die das haben'
-      //   PUBG : sessionPct = '% deiner Sessions in denen das passierte'
+      // Stat-Line — gleiches Pattern fuer Steam + PUBG:
+      //   Steam: "12.3% of players got this"
+      //   PUBG : "20% of your sessions got this"
+      // Rare-Indicator als separater Badge (siehe ribbon + .rare-Klasse),
+      // nicht doppelt im Text.
       const pctEl = document.getElementById("pct");
       const ribbonEl = document.getElementById("ribbon");
       const isPubg = u.source === "pubg";
-      // isRare-Quelle: PUBG hat is_rare-Flag (hardcoded set), Steam
-      // berechnet aus globalPct <= rarePct.
       let isRare;
       if (isPubg) {
         isRare = !!u.isRare;
@@ -208,21 +208,21 @@
         isRare = Number.isFinite(gp) && gp <= RARE_PCT;
       }
       popup.classList.toggle("rare", isRare);
-      if (isPubg && Number.isFinite(Number(u.sessionPct))) {
+      let statLine = null;
+      if (isPubg) {
         const sp = Number(u.sessionPct);
-        pctEl.innerHTML = `<b>${sp.toFixed(0)}%</b> deiner Sessions`
-          + (isRare ? " — RARE" : "");
-        pctEl.style.display = "";
-      } else if (!isPubg) {
+        if (Number.isFinite(sp)) {
+          statLine = `<b>${sp.toFixed(0)}%</b> of your sessions got this`;
+        }
+      } else {
         const gp = Number(u.globalPct);
         if (Number.isFinite(gp)) {
-          pctEl.innerHTML = isRare
-            ? `<b>${gp.toFixed(1)}%</b> have this — RARE`
-            : `<b>${gp.toFixed(1)}%</b> of players have this`;
-          pctEl.style.display = "";
-        } else {
-          pctEl.style.display = "none";
+          statLine = `<b>${gp.toFixed(1)}%</b> of players got this`;
         }
+      }
+      if (statLine) {
+        pctEl.innerHTML = statLine;
+        pctEl.style.display = "";
       } else {
         pctEl.style.display = "none";
       }

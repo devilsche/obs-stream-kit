@@ -396,20 +396,23 @@
         iconHtml = `<div class="tile-icon-emoji">${icon}</div>`;
       }
 
-      // Meta-Zeile: PUBG zeigt Datum+Uhrzeit + Session-Frequenz
-      // (z.B. '20% deiner Sessions'). Steam zeigt nur Datum.
-      let metaInner;
-      if (isPubg) {
-        const sessFreq = (a.sessionPct != null)
-          ? `<span class="pct"><b>${a.sessionPct.toFixed(0)}%</b> deiner Sessions</span>`
-          : "";
-        metaInner = `<span class="date"><b>${fmtDateTime(a.unlockedAt)}</b></span>`
-          + sessFreq
-          + (isRare ? `<span class="rare-badge">Rare</span>` : "");
-      } else {
-        metaInner = `<span class="date">${fmtDate(a.unlockedAt)}</span>`
-          + (isRare ? `<span class="rare-badge">Rare</span>` : "");
+      // Meta-Zeile: gleiches Pattern fuer Steam + PUBG.
+      // PUBG: 'X% of your sessions got this'
+      // Steam: 'X.X% of players got this' (wenn Daten vorhanden)
+      let statText = null;
+      if (isPubg && a.sessionPct != null) {
+        statText = `<b>${a.sessionPct.toFixed(0)}%</b> of your sessions got this`;
+      } else if (!isPubg && a.globalPct != null) {
+        statText = `<b>${a.globalPct.toFixed(1)}%</b> of players got this`;
       }
+      const statSpan = statText ? `<span class="pct">${statText}</span>` : "";
+      // Datum: PUBG mit Uhrzeit (Stream-Kontext), Steam ohne
+      const dateHtml = isPubg
+        ? `<span class="date"><b>${fmtDateTime(a.unlockedAt)}</b></span>`
+        : `<span class="date">${fmtDate(a.unlockedAt)}</span>`;
+      const metaInner = dateHtml
+        + statSpan
+        + (isRare ? `<span class="rare-badge">Rare</span>` : "");
 
       return `
         <div class="tile${isRare ? " rare" : ""}${isFresh ? " brand-new" : ""}"
