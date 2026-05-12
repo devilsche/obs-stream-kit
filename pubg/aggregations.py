@@ -1163,7 +1163,9 @@ def detect_and_store_session_achievements(conn, my_account_id):
     pubg_achievements_seen mit displayed_at=NULL. Returns Anzahl neu
     eingefuegter."""
     achievements = compute_session_achievements(conn, my_account_id)
-    return _insert_achievements(conn, achievements, suppress_popup=False)
+    n = _insert_achievements(conn, achievements, suppress_popup=False)
+    conn.commit()
+    return n
 
 
 def _insert_achievements(conn, achievements, suppress_popup=False):
@@ -1248,6 +1250,9 @@ def backfill_session_achievements(conn, my_account_id,
                 conn, achievements, suppress_popup=suppress_popup)
         except Exception as e:
             errors.append(f"{from_iso}: {type(e).__name__}: {e}")
+    # SQLite ist nicht autocommit hier — ohne explizites commit gehen
+    # die INSERTs verloren wenn der Connection geschlossen wird.
+    conn.commit()
     return {
         "sessions": len(sessions),
         "inserted": total_new,

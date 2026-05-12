@@ -365,6 +365,7 @@ class EndpointRegistry:
                 SET displayed_at = strftime('%s','now')
                 WHERE displayed_at IS NULL
             """)
+            conn.commit()
             marked_n = len(items)
         return _ok({"unlocks": items, "marked": marked_n})
 
@@ -490,6 +491,7 @@ class EndpointRegistry:
             SET displayed_at = NULL
             WHERE achievement_id = ? AND match_id = ?
         """, (aid, mid))
+        conn.commit()
         return _ok({
             "reset": cur.rowcount,
             "achievementId": aid,
