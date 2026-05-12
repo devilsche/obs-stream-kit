@@ -43,7 +43,7 @@
     }
     .years-badge {
       position: absolute;
-      left: -4px; bottom: -4px;
+      right: -4px; bottom: -4px;
       min-width: 24px; height: 24px;
       padding: 0 4px;
       box-sizing: border-box;
@@ -60,17 +60,6 @@
       font-variant-numeric: tabular-nums;
       line-height: 1;
     }
-    .game-icon {
-      position: absolute;
-      right: -4px; bottom: -4px;
-      width: 24px; height: 24px;
-      border-radius: 5px;
-      border: 2px solid var(--pubg-page-bg, #1a0d2a);
-      background: rgba(0,0,0,0.6);
-      object-fit: cover;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-    }
-    .game-icon[hidden],
     .years-badge[hidden] { display: none; }
     .info { flex: 1; min-width: 0; }
     .name {
@@ -160,7 +149,6 @@
     <div class="avatar-wrap">
       <img class="avatar" id="avatar" alt="">
       <span class="years-badge" id="yearsBadge" hidden>—</span>
-      <img class="game-icon" id="gameIcon" hidden alt="">
     </div>
     <div class="info">
       <div class="name" id="name">—</div>
@@ -264,24 +252,24 @@
       } else {
         yearsEl.hidden = true;
       }
-      // Game-Icons: einer unten-rechts am Avatar, einer vor dem Titel.
-      // Beide nutzen denselben Fallback (lokal -> remote -> hide).
-      function setGameIcon(el, appId, remoteUrl) {
-        if (!appId) { el.hidden = true; return; }
-        el.dataset.fallback = remoteUrl || "";
-        el.onerror = () => {
-          if (el.dataset.fallback && el.src !== el.dataset.fallback) {
-            el.src = el.dataset.fallback;
+      // Game-Icon vor dem Titel (lokal -> remote -> hide).
+      const titleIcon = document.getElementById("gameTitleIcon");
+      if (d.appId) {
+        titleIcon.dataset.fallback = d.imgIconUrl || "";
+        titleIcon.onerror = () => {
+          if (titleIcon.dataset.fallback
+              && titleIcon.src !== titleIcon.dataset.fallback) {
+            titleIcon.src = titleIcon.dataset.fallback;
           } else {
-            el.hidden = true;
-            el.onerror = null;
+            titleIcon.hidden = true;
+            titleIcon.onerror = null;
           }
         };
-        el.src = `/steam/img/${appId}/icon.jpg`;
-        el.hidden = false;
+        titleIcon.src = `/steam/img/${d.appId}/icon.jpg`;
+        titleIcon.hidden = false;
+      } else {
+        titleIcon.hidden = true;
       }
-      setGameIcon(document.getElementById("gameIcon"),       d.appId, d.imgIconUrl);
-      setGameIcon(document.getElementById("gameTitleIcon"),  d.appId, d.imgIconUrl);
 
       document.getElementById("name").textContent = d.personaName || "—";
       document.getElementById("gameTitleText").textContent =
