@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Now-Playing — Design-Vergleich</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/widgets/pubg/_pubg.css">
+  <style>
+    :root {
+      /* PUBG = AppId 578080 — old CDN pattern funktioniert fuer Vor-
+         2025-Games noch (header.jpg ohne hash). Falls 404: placeholder. */
+      --demo-avatar:  url("https://placehold.co/184x184/5e2a79/f2b705/png?text=L");
+      --demo-cover:   url("https://placehold.co/184x69/1a0d2a/f2b705/png?text=PUBG");
+      --demo-header:  url("https://cdn.cloudflare.steamstatic.com/steam/apps/578080/header.jpg");
+    }
+    html, body { margin: 0; }
+    body {
+      background: var(--pubg-page-bg);
+      color: var(--pubg-text);
+      font-family: "DM Sans", sans-serif;
+      padding: 24px;
+      min-height: 100vh;
+    }
+    h1 { color: var(--pubg-gold); margin: 0 0 6px; }
+    .intro {
+      color: var(--pubg-muted); max-width: 720px;
+      margin: 0 0 32px; line-height: 1.5;
+    }
+    .variant {
+      margin-bottom: 36px;
+    }
+    .variant-label {
+      color: var(--pubg-gold);
+      font-size: 0.85em; letter-spacing: 0.1em;
+      text-transform: uppercase; font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .variant-desc {
+      color: var(--pubg-muted);
+      font-size: 0.82em; margin: 0 0 10px;
+      max-width: 720px; line-height: 1.4;
+    }
+    .variant-desc code {
+      color: var(--pubg-gold);
+      font-family: "DM Sans", monospace;
+      background: rgba(0,0,0,0.4); padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    /* ── Gemeinsame Card-Bausteine ─────────────────────────────── */
+    .card {
+      width: 520px;
+      padding: 14px 18px;
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+      min-height: 92px;
+    }
+    .game-cover {
+      width: 110px; height: 52px;
+      flex-shrink: 0;
+      border-radius: 5px;
+      border: 1px solid var(--pubg-border);
+      background: var(--demo-cover) center/cover;
+      background-color: rgba(0,0,0,0.5);
+      z-index: 2;
+    }
+    .info {
+      flex: 1; min-width: 0;
+      z-index: 2;
+      position: relative;
+    }
+    .info .name {
+      color: var(--pubg-gold);
+      font-weight: 700; font-size: 1.1em;
+      letter-spacing: 0.04em;
+    }
+    .info .verb {
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin: 1px 0 4px;
+    }
+    .info .game-name {
+      color: var(--pubg-text);
+      font-weight: 700; font-size: 1em;
+    }
+    .info .meta {
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      margin-top: 4px;
+      display: flex; flex-wrap: wrap; gap: 4px 12px;
+    }
+    .info .meta b { color: var(--pubg-text); }
+
+    /* ── VARIANT A: Horizontal-Fade Avatar ─────────────────────── */
+    .card-a .avatar-fade {
+      position: absolute;
+      right: 0; top: 0; bottom: 0;
+      width: 280px;
+      background: var(--demo-avatar) center/cover;
+      mask-image: linear-gradient(to right,
+                  transparent 0%, black 70%);
+      -webkit-mask-image: linear-gradient(to right,
+                  transparent 0%, black 70%);
+      opacity: 0.75;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── VARIANT B: Radial-Glow Avatar als Circle ──────────────── */
+    .card-b .avatar-spot {
+      position: absolute;
+      right: 14px; top: 50%; transform: translateY(-50%);
+      width: 90px; height: 90px;
+      border-radius: 50%;
+      background: var(--demo-avatar) center/cover;
+      mask-image: radial-gradient(circle at center,
+                  black 38%, transparent 75%);
+      -webkit-mask-image: radial-gradient(circle at center,
+                  black 38%, transparent 75%);
+      opacity: 0.9;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── VARIANT C: Game-Hero als BG + Avatar Inset ────────────── */
+    .card-c {
+      background-image:
+        linear-gradient(rgba(26,13,42,0.78), rgba(26,13,42,0.78)),
+        var(--demo-header);
+      background-size: cover;
+      background-position: center;
+    }
+    .card-c .avatar-inset {
+      width: 64px; height: 64px;
+      flex-shrink: 0;
+      border-radius: 50%;
+      border: 2px solid var(--pubg-gold);
+      background: var(--demo-avatar) center/cover;
+      box-shadow: 0 0 12px rgba(242,183,5,0.4);
+      z-index: 2;
+    }
+
+    /* ── VARIANT D: Avatar voll rechts, Opacity 35% ────────────── */
+    .card-d .avatar-dim {
+      width: 80px; height: 80px;
+      flex-shrink: 0;
+      border-radius: 8px;
+      border: 1px solid var(--pubg-gold);
+      background: var(--demo-avatar) center/cover;
+      opacity: 0.4;
+      z-index: 2;
+    }
+
+    /* ── VARIANT E: Vertical-Stripe Avatar + Cover overlap ─────── */
+    .card-e .avatar-stripe {
+      position: absolute;
+      right: 0; top: 0; bottom: 0;
+      width: 140px;
+      background: var(--demo-avatar) center/cover;
+      mask-image: linear-gradient(to left,
+                  black 40%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to left,
+                  black 40%, transparent 100%);
+      opacity: 0.85;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .card-e::after {
+      content: "";
+      position: absolute;
+      right: 0; top: 0; bottom: 0;
+      width: 80px;
+      background: linear-gradient(to right,
+                  transparent, var(--pubg-card-bg, rgba(46,28,69,0.95)));
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* ── VARIANT F: Hero-BG + Faded Avatar rechts (Combo) ──────── */
+    .card-f {
+      background-image:
+        linear-gradient(rgba(26,13,42,0.82), rgba(26,13,42,0.82)),
+        var(--demo-header);
+      background-size: cover;
+      background-position: center;
+    }
+    .card-f .avatar-fade {
+      position: absolute;
+      right: 0; top: 0; bottom: 0;
+      width: 220px;
+      background: var(--demo-avatar) center/cover;
+      mask-image: linear-gradient(to right,
+                  transparent 0%, black 80%);
+      -webkit-mask-image: linear-gradient(to right,
+                  transparent 0%, black 80%);
+      opacity: 0.65;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .pubg-header {
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .pubg-header b { color: var(--pubg-gold); }
+  </style>
+</head>
+<body>
+  <h1>Now-Playing — Design-Vergleich</h1>
+  <p class="intro">
+    Sechs Layout-Varianten mit denselben Mock-Daten zum Direkt-Vergleichen.
+    Game-Cover bleibt überall links, Avatar wird unterschiedlich behandelt.
+    Du kannst die HTML/CSS direkt einsehen — alle Effekte sind reine CSS-Masks
+    bzw. Background-Image-Layering, kein JavaScript nötig.
+  </p>
+
+  <!-- ── VARIANT A ─────────────────────────────────────────── -->
+  <div class="variant">
+    <div class="variant-label">A · Horizontal-Fade Avatar</div>
+    <p class="variant-desc">
+      Avatar als Vollhöhe-Streifen rechts, fadet via
+      <code>mask-image: linear-gradient(to right, transparent, black 70%)</code>
+      in den Card-Hintergrund. Opacity 75%. Klassischer, dezenter Look.
+    </p>
+    <div class="pubg-header"><b>Now Playing</b> · Live</div>
+    <div class="pubg-card card card-a">
+      <div class="avatar-fade"></div>
+      <div class="game-cover"></div>
+      <div class="info">
+        <div class="name">LuCKoR</div>
+        <div class="verb">is now playing</div>
+        <div class="game-name">PUBG: BATTLEGROUNDS</div>
+        <div class="meta">
+          <span><b>6655h</b> total</span>
+          <span><b>12h</b> last 2w</span>
+          <span><b>37</b>/<b>37</b> achievements</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── VARIANT B ─────────────────────────────────────────── -->
+  <div class="variant">
+    <div class="variant-label">B · Radial-Glow Avatar (Spot rechts)</div>
+    <p class="variant-desc">
+      Avatar als runder Spot rechts, mit radialer Mask in den Card-BG —
+      wie eine schwebende Portrait-Vignette. Mehr Bildlichkeit als A.
+    </p>
+    <div class="pubg-header"><b>Now Playing</b> · Live</div>
+    <div class="pubg-card card card-b">
+      <div class="avatar-spot"></div>
+      <div class="game-cover"></div>
+      <div class="info">
+        <div class="name">LuCKoR</div>
+        <div class="verb">is now playing</div>
+        <div class="game-name">PUBG: BATTLEGROUNDS</div>
+        <div class="meta">
+          <span><b>6655h</b> total</span>
+          <span><b>12h</b> last 2w</span>
+          <span><b>37</b>/<b>37</b> achievements</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── VARIANT C ─────────────────────────────────────────── -->
+  <div class="variant">
+    <div class="variant-label">C · Game-Hero als BG, Avatar als runde Inset rechts</div>
+    <p class="variant-desc">
+      Game-Header-Image als gedimmtes Card-Background (78% Overlay).
+      Avatar als gold-gerahmter Kreis rechts. Üppigster Look — viel Branding.
+    </p>
+    <div class="pubg-header"><b>Now Playing</b> · Live</div>
+    <div class="pubg-card card card-c">
+      <div class="game-cover"></div>
+      <div class="info">
+        <div class="name">LuCKoR</div>
+        <div class="verb">is now playing</div>
+        <div class="game-name">PUBG: BATTLEGROUNDS</div>
+        <div class="meta">
+          <span><b>6655h</b> total</span>
+          <span><b>12h</b> last 2w</span>
+          <span><b>37</b>/<b>37</b> achievements</span>
+        </div>
+      </div>
+      <div class="avatar-inset"></div>
+    </div>
+  </div>
+
+  <!-- ── VARIANT D ─────────────────────────────────────────── -->
+  <div class="variant">
+    <div class="variant-label">D · Avatar voll rechts, Opacity 40%</div>
+    <p class="variant-desc">
+      Avatar bleibt sichtbar (mit Gold-Border), nur Opacity reduziert.
+      Kein Mask, kein Gradient. Minimalistischste Variante.
+    </p>
+    <div class="pubg-header"><b>Now Playing</b> · Live</div>
+    <div class="pubg-card card card-d">
+      <div class="game-cover"></div>
+      <div class="info">
+        <div class="name">LuCKoR</div>
+        <div class="verb">is now playing</div>
+        <div class="game-name">PUBG: BATTLEGROUNDS</div>
+        <div class="meta">
+          <span><b>6655h</b> total</span>
+          <span><b>12h</b> last 2w</span>
+          <span><b>37</b>/<b>37</b> achievements</span>
+        </div>
+      </div>
+      <div class="avatar-dim"></div>
+    </div>
+  </div>
+
+  <!-- ── VARIANT E ─────────────────────────────────────────── -->
+  <div class="variant">
+    <div class="variant-label">E · Avatar-Stripe + Card-BG-Fade (sanftester Look)</div>
+    <p class="variant-desc">
+      Avatar als Streifen rechts, ZUSÄTZLICH ein Linear-Gradient in
+      Card-BG-Farbe drüber von rechts kommend. Doppelter Fade-Effekt —
+      Avatar schmilzt geschmeidiger in die Card.
+    </p>
+    <div class="pubg-header"><b>Now Playing</b> · Live</div>
+    <div class="pubg-card card card-e">
+      <div class="avatar-stripe"></div>
+      <div class="game-cover"></div>
+      <div class="info">
+        <div class="name">LuCKoR</div>
+        <div class="verb">is now playing</div>
+        <div class="game-name">PUBG: BATTLEGROUNDS</div>
+        <div class="meta">
+          <span><b>6655h</b> total</span>
+          <span><b>12h</b> last 2w</span>
+          <span><b>37</b>/<b>37</b> achievements</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── VARIANT F ─────────────────────────────────────────── -->
+  <div class="variant">
+    <div class="variant-label">F · Combo: Game-Hero BG + Avatar-Fade rechts</div>
+    <p class="variant-desc">
+      Hero-Image als gedimmter Card-BG (wie C), PLUS Avatar als Fade-
+      Streifen rechts (wie A). Volle Game-Atmosphäre + Streamer-Präsenz.
+    </p>
+    <div class="pubg-header"><b>Now Playing</b> · Live</div>
+    <div class="pubg-card card card-f">
+      <div class="avatar-fade"></div>
+      <div class="game-cover"></div>
+      <div class="info">
+        <div class="name">LuCKoR</div>
+        <div class="verb">is now playing</div>
+        <div class="game-name">PUBG: BATTLEGROUNDS</div>
+        <div class="meta">
+          <span><b>6655h</b> total</span>
+          <span><b>12h</b> last 2w</span>
+          <span><b>37</b>/<b>37</b> achievements</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
