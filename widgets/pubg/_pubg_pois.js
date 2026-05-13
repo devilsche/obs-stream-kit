@@ -87,7 +87,7 @@
     // Hilfe — die persistierten Region-Points sind bereits in Welt-cm,
     // daher hier KEINE extra Transformation noetig.
     const regions = blob.regions || [];
-    // Phase 1: smallest containing polygon
+    // Phase 1: kleinste umschliessende Region gewinnt (Nesting-faehig)
     let best = null;
     let bestArea = Infinity;
     for (const r of regions) {
@@ -98,18 +98,41 @@
       }
     }
     if (best) return best.name;
-    // Phase 2: 'near X' wenn Pin innerhalb 30000 cm = 300m zu einer
-    // Polygon-Kante ist. Naechste gewinnt.
-    const NEAR_CM = 30000;
-    let nearBest = null;
-    let nearDist = Infinity;
+
+    // Phase 2: Multi-Tier-Fallback nach Distanz zur Polygon-Kante
+    //   <= 200m  -> "Very close to X"
+    //   <= 500m  -> "Near X"
+    //   sonst    -> null
+    // Wenn naechste Region im Tier <=200m liegt, werden alle anderen
+    // <=200m mitgenommen ("A and B"). Sonst analog fuer 500m.
+    // Wenn naechste >200m aber <=500m, wird kein "very close" gemischt
+    // mit "near" — nur ein Tier zaehlt (das des naechsten).
+    const TIER_VERY_CM = 20000;  // 200m
+    const TIER_NEAR_CM = 50000;  // 500m
+    const candidates = [];
     for (const r of regions) {
       if (!r.name) continue;
       const d = distToPoly(xCm, yCm, r.points);
-      if (d < NEAR_CM && d < nearDist) {
-        nearDist = d; nearBest = r;
-      }
+      if (d <= TIER_NEAR_CM) candidates.push({ name: r.name, d: d });
     }
-    return nearBest ? "near " + nearBest.name : null;
+    if (!candidates.length) return null;
+    candidates.sort((a, b) => a.d - b.d);
+    const closest = candidates[0].d;
+    const tierCutoff = closest <= TIER_VERY_CM ? TIER_VERY_CM : TIER_NEAR_CM;
+    const prefix = closest <= TIER_VERY_CM ? "Very close to " : "Near ";
+    // Alle Kandidaten innerhalb des selben Tiers (= <=tierCutoff)
+    // einsammeln. Duplikat-Namen filtern (z.B. nested 'Pochinki'-Boxen).
+    const seen = new Set();
+    const names = [];
+    for (const c of candidates) {
+      if (c.d > tierCutoff) break;
+      if (seen.has(c.name)) continue;
+      seen.add(c.name);
+      names.push(c.name);
+    }
+    if (names.length === 1) return prefix + names[0];
+    if (names.length === 2) return prefix + names[0] + " and " + names[1];
+    // 3+: Oxford-Comma-Style
+    return prefix + names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
   };
 })();
