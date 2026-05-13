@@ -610,19 +610,19 @@ class EndpointRegistry:
     # PUBG-Achievement-Icon-URLs (gemacht von ChatGPT, geschnitten aus
     # 1024x1024 Grid). Werden zur API-Zeit eingesetzt — ueberschreiben
     # die Emoji-Strings die in pubg_achievements_seen.icon stehen.
-    # Neue Tier-IDs sharen erstmal die Basis-Icons; wenn dir eine
-    # Pro-Tier-Variante (z.B. eigene Massacre/GODLIKE-Icons) wichtig
-    # ist, sag Bescheid und wir generieren die separat.
+    # DMG-Tiers nutzen noch die five_kill_match-Basis als Fallback bis
+    # eigene Icons generiert werden. longest_kill_1000 nutzt 800er als
+    # Fallback (1000m-Tile war im aktuellen Sprite nicht enthalten).
     PUBG_ICON_URLS = {
         "first_chicken":           "/widgets/pubg/icons/first_chicken.png",
-        "phoenix_chicken":         "/widgets/pubg/icons/first_chicken.png",
+        "phoenix_chicken":         "/widgets/pubg/icons/phoenix_chicken.png",
         "first_top10":             "/widgets/pubg/icons/first_top10.png",
         "five_kill_match":         "/widgets/pubg/icons/five_kill_match.png",
-        "kills_5":                 "/widgets/pubg/icons/five_kill_match.png",
-        "kills_7":                 "/widgets/pubg/icons/five_kill_match.png",
-        "kills_10":                "/widgets/pubg/icons/five_kill_match.png",
-        "kills_15":                "/widgets/pubg/icons/five_kill_match.png",
-        "kills_20":                "/widgets/pubg/icons/five_kill_match.png",
+        "kills_5":                 "/widgets/pubg/icons/kills_5.png",
+        "kills_7":                 "/widgets/pubg/icons/kills_7.png",
+        "kills_10":                "/widgets/pubg/icons/kills_10.png",
+        "kills_15":                "/widgets/pubg/icons/kills_15.png",
+        "kills_20":                "/widgets/pubg/icons/kills_20.png",
         "damage_500":              "/widgets/pubg/icons/five_kill_match.png",
         "damage_1000":             "/widgets/pubg/icons/five_kill_match.png",
         "damage_1500":             "/widgets/pubg/icons/five_kill_match.png",
@@ -630,15 +630,15 @@ class EndpointRegistry:
         "damage_2500":             "/widgets/pubg/icons/five_kill_match.png",
         "damage_3000":             "/widgets/pubg/icons/five_kill_match.png",
         "longest_kill_400":        "/widgets/pubg/icons/longest_kill_400.png",
-        "longest_kill_600":        "/widgets/pubg/icons/longest_kill_400.png",
-        "longest_kill_800":        "/widgets/pubg/icons/longest_kill_400.png",
-        "longest_kill_1000":       "/widgets/pubg/icons/longest_kill_400.png",
+        "longest_kill_600":        "/widgets/pubg/icons/longest_kill_600.png",
+        "longest_kill_800":        "/widgets/pubg/icons/longest_kill_800.png",
+        "longest_kill_1000":       "/widgets/pubg/icons/longest_kill_800.png",
         "beast_chicken":           "/widgets/pubg/icons/beast_chicken.png",
         "hot_drop_match":          "/widgets/pubg/icons/first_hot_drop.png",
         "first_hot_drop":          "/widgets/pubg/icons/first_hot_drop.png",
         "hot_drop_match_survived": "/widgets/pubg/icons/first_hot_drop_survived.png",
         "first_hot_drop_survived": "/widgets/pubg/icons/first_hot_drop_survived.png",
-        "top3_streak":             "/widgets/pubg/icons/top10_streak.png",
+        "top3_streak":             "/widgets/pubg/icons/top3_streak.png",
         "top10_streak":            "/widgets/pubg/icons/top10_streak.png",
         "chicken_streak":          "/widgets/pubg/icons/chicken_streak.png",
     }
