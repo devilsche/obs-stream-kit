@@ -153,6 +153,10 @@
   <button id="rotBtn" class="secondary" title="90° drehen">⟳ 0°</button>
   <button id="calResetBtn" class="secondary" title="Calibration zuruecksetzen">↹ Pins 0/0</button>
   <label style="display:inline-flex;gap:4px;align-items:center;font-size:0.78em;color:#8a7d99">
+    Offset X<input id="offsetXIn" type="number" step="1" value="0" style="width:74px" title="Offset in Metern">
+    Y<input id="offsetYIn" type="number" step="1" value="0" style="width:74px" title="Offset in Metern">
+  </label>
+  <label style="display:inline-flex;gap:4px;align-items:center;font-size:0.78em;color:#8a7d99">
     Scale X<input id="scaleXIn" type="number" step="0.0001" value="1.0000" style="width:88px">
     Y<input id="scaleYIn" type="number" step="0.0001" value="1.0000" style="width:88px">
   </label>
@@ -1014,7 +1018,9 @@ document.getElementById("zoomResetBtn").addEventListener("click", () => {
 function updateCalLabel() {
   const xm = (pinCal.offsetX / 100).toFixed(0);
   const ym = (pinCal.offsetY / 100).toFixed(0);
-  document.getElementById("calResetBtn").textContent = `↹ Pins ${xm}/${ym} m`;
+  document.getElementById("calResetBtn").textContent = `↹ Reset Cal`;
+  document.getElementById("offsetXIn").value = xm;
+  document.getElementById("offsetYIn").value = ym;
   document.getElementById("scaleXIn").value = pinCal.scaleX.toFixed(4);
   document.getElementById("scaleYIn").value = pinCal.scaleY.toFixed(4);
   document.getElementById("flipXBtn").classList.toggle("active", pinCal.flipX);
@@ -1034,6 +1040,14 @@ document.getElementById("scaleXIn").addEventListener("input", (ev) => {
 });
 document.getElementById("scaleYIn").addEventListener("input", (ev) => {
   pinCal.scaleY = parseFloat(ev.target.value) || 1.0;
+  render();
+});
+document.getElementById("offsetXIn").addEventListener("input", (ev) => {
+  pinCal.offsetX = (parseFloat(ev.target.value) || 0) * 100;  // m → cm
+  render();
+});
+document.getElementById("offsetYIn").addEventListener("input", (ev) => {
+  pinCal.offsetY = (parseFloat(ev.target.value) || 0) * 100;
   render();
 });
 document.getElementById("gridBtn").addEventListener("click", () => {
