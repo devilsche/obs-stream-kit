@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PUBG POI-Editor</title>
+<link rel="stylesheet" href="_pubg.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    background: #1a0d2a;
+    color: #e8e0f0;
+    font-family: "DM Sans", system-ui, sans-serif;
+    margin: 0;
+    padding: 14px;
+  }
+  h1 { color: #f2b705; margin: 0 0 6px; font-size: 1.3em; }
+  .topbar {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    align-items: center; margin-bottom: 10px;
+  }
+  .topbar label { color: #8a7d99; font-size: 0.85em; }
+  select, input, button {
+    background: rgba(94,42,121,0.55);
+    color: #f2b705;
+    border: 1px solid #5e2a79;
+    border-radius: 4px;
+    padding: 5px 9px;
+    font: inherit;
+    font-size: 0.85em;
+  }
+  button:hover { background: rgba(94,42,121,0.85); cursor: pointer; }
+  button.secondary { color: #c0b0d0; }
+  button.danger { color: #ff8a8a; border-color: #663030; }
+  button.active { background: #f2b705; color: #1a0d2a; }
+  button.save { background: #2a6b2a; color: #fff; border-color: #1a4a1a; }
+  button.save:hover { background: #3a8b3a; }
+  input { color: #e8e0f0; }
+  .wrap {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 14px;
+  }
+  .canvas-host {
+    position: relative;
+    background-color: #0d061a;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    border: 1px solid #5e2a79;
+    border-radius: 6px;
+    overflow: hidden;
+    aspect-ratio: 1 / 1;
+  }
+  canvas { display: block; width: 100%; height: 100%; cursor: crosshair; background: transparent; }
+  .panel {
+    background: rgba(0,0,0,0.35);
+    border: 1px solid #5e2a79;
+    border-radius: 6px;
+    padding: 10px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .panel h3 {
+    margin: 0 0 6px; color: #f2b705;
+    font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .hint {
+    color: #8a7d99; font-size: 0.7em;
+    line-height: 1.4;
+    margin: 4px 0 8px;
+    padding: 6px 8px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 3px;
+  }
+  .region-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 6px;
+    border-radius: 4px;
+    margin-bottom: 2px;
+    font-size: 0.82em;
+  }
+  .region-row.selected { background: rgba(242,183,5,0.18); }
+  .region-row:hover { background: rgba(94,42,121,0.35); cursor: pointer; }
+  .region-row .name { color: #e8e0f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .region-row .badge {
+    color: #8a7d99; font-size: 0.75em;
+    font-variant-numeric: tabular-nums;
+  }
+  .edit-block {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid #5e2a79;
+  }
+  .edit-block label {
+    display: block;
+    color: #8a7d99; font-size: 0.75em;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 6px;
+  }
+  .edit-block input { width: 100%; }
+  .stat-line { color: #8a7d99; font-size: 0.75em; margin-top: 4px; }
+</style>
+</head>
+<body>
+<h1>PUBG POI-Editor</h1>
+<div class="topbar">
+  <label>Map:
+    <select id="mapSel"></select>
+  </label>
+  <label>Map-Size (km):
+    <input id="mapSize" type="number" min="1" max="16" step="0.1" value="8" style="width:70px">
+  </label>
+  <button id="rectBtn">▭ Rechteck</button>
+  <button id="polyBtn">⬠ Polygon</button>
+  <button id="pinsBtn" class="secondary">📍 Pins laden</button>
+  <button id="saveBtn" class="save">💾 Speichern</button>
+  <span id="status" style="color:#8a7d99; font-size:0.8em"></span>
+</div>
+<div class="wrap">
+  <div class="canvas-host">
+    <canvas id="cv"></canvas>
+  </div>
+  <div class="panel">
+    <h3>Regionen</h3>
+    <div class="hint">
+      <b>▭ Rechteck:</b> click+drag<br>
+      <b>⬠ Polygon:</b> klicken um Punkte zu setzen, doppel-klick zum Schließen<br>
+      <b>Drag</b> Vertex-Handle zum Verschieben &nbsp;·&nbsp; <b>Shift+Click</b> auf Kante = neuer Vertex &nbsp;·&nbsp; <b>Alt+Click</b> auf Vertex = löschen
+    </div>
+    <div id="regionList"></div>
+    <div class="edit-block" id="editBlock" style="display:none">
+      <h3 style="margin-top:0">Region bearbeiten</h3>
+      <label>Name (leer = ohne Label)</label>
+      <input id="ed_name" type="text">
+      <div class="stat-line" id="kmStat"></div>
+      <div style="margin-top:8px; display:flex; gap:6px">
+        <button id="dupBtn" class="secondary">Duplizieren</button>
+        <button id="delBtn" class="danger">Löschen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Map-Definitionen
+const MAPS = [
+  ["Baltic_Main",     "Erangel", 8],
+  ["Desert_Main",     "Miramar", 8],
+  ["Savage_Main",     "Sanhok",  4],
+  ["DihorOtok_Main",  "Vikendi", 8],
+  ["Tiger_Main",      "Taego",   8],
+  ["Kiki_Main",       "Deston",  8],
+  ["Neon_Main",       "Rondo",   8],
+  ["Summerland_Main", "Karakin", 2],
+  ["Chimera_Main",    "Paramo",  3],
+];
+
+let currentMap = null;
+let mapKm = 8;
+let regions = [];     // [{name, points: [[x,y], ...]}]  coords in cm
+let pins = [];        // [{name, x, y}]
+let selectedIdx = -1;
+let mode = "view";    // 'view' | 'drawing-rect' | 'drawing-poly' | 'moving-vertex' | 'moving-region'
+let drawStart = null; // for rect-drag
+let drawCurrent = null;
+let polyPoints = []; // active polygon-in-progress
+let dragRef = null;  // {type, vertexIdx?, startPoints, startMouseWorld}
+
+const mapSel    = document.getElementById("mapSel");
+const mapSizeIn = document.getElementById("mapSize");
+const canvas    = document.getElementById("cv");
+const ctx       = canvas.getContext("2d");
+const listEl    = document.getElementById("regionList");
+const editBlock = document.getElementById("editBlock");
+const nameIn    = document.getElementById("ed_name");
+const kmStat    = document.getElementById("kmStat");
+const statusEl  = document.getElementById("status");
+const rectBtn   = document.getElementById("rectBtn");
+const polyBtn   = document.getElementById("polyBtn");
+
+for (const [id, name, km] of MAPS) {
+  const opt = document.createElement("option");
+  opt.value = id; opt.textContent = `${name} (${km}×${km}km)`;
+  mapSel.appendChild(opt);
+}
+
+// ─── Load + render ─────────────────────────────────────────────────────────
+async function loadMap(mapId) {
+  currentMap = mapId;
+  const meta = MAPS.find(m => m[0] === mapId);
+  mapKm = meta ? meta[2] : 8;
+  mapSizeIn.value = mapKm;
+  pins = [];
+  selectedIdx = -1;
+  polyPoints = [];
+
+  canvas.parentElement.style.backgroundImage = `url('/widgets/pubg/maps/${mapId}.webp')`;
+
+  // Fetch saved regions from server
+  try {
+    const r = await fetch(`/api/pubg/pois?map=${encodeURIComponent(mapId)}`);
+    const j = await r.json();
+    const blob = j.data || j;
+    regions = (blob.regions || []).map(r => ({
+      name: r.name || "",
+      points: r.points || [],
+    }));
+    if (blob.mapKm) { mapKm = blob.mapKm; mapSizeIn.value = mapKm; }
+    statusEl.textContent = `${regions.length} Regionen geladen`;
+  } catch (e) {
+    statusEl.textContent = `⚠ Lade-Fehler: ${e}`;
+    regions = [];
+  }
+  renderAll();
+}
+mapSel.addEventListener("change", () => loadMap(mapSel.value));
+mapSizeIn.addEventListener("change", () => {
+  mapKm = parseFloat(mapSizeIn.value) || 8;
+  render();
+});
+loadMap(MAPS[0][0]);
+
+// ─── Coord conversion ──────────────────────────────────────────────────────
+function fitCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+}
+window.addEventListener("resize", () => { fitCanvas(); render(); });
+
+function worldToCanvas(xCm, yCm) {
+  const scale = canvas.width / (mapKm * 100000);
+  return [xCm * scale, yCm * scale];
+}
+function canvasToWorld(px, py) {
+  const scale = canvas.width / (mapKm * 100000);
+  return [Math.round(px / scale), Math.round(py / scale)];
+}
+function canvasXY(ev) {
+  const r = canvas.getBoundingClientRect();
+  return [ev.clientX - r.left, ev.clientY - r.top];
+}
+
+// Polygon-Area via Shoelace (in cm²)
+function polyArea(points) {
+  if (points.length < 3) return 0;
+  let a = 0;
+  for (let i = 0; i < points.length; i++) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[(i + 1) % points.length];
+    a += x1 * y2 - x2 * y1;
+  }
+  return Math.abs(a) / 2;
+}
+
+// Point-in-polygon (ray casting)
+function pointInPoly(px, py, points) {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const xi = points[i][0], yi = points[i][1];
+    const xj = points[j][0], yj = points[j][1];
+    const intersect = ((yi > py) !== (yj > py))
+      && (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+// ─── Render ────────────────────────────────────────────────────────────────
+function render() {
+  fitCanvas();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  regions.forEach((r, i) => {
+    const pts = r.points.map(p => worldToCanvas(p[0], p[1]));
+    if (pts.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+    ctx.closePath();
+    ctx.fillStyle = i === selectedIdx
+      ? "rgba(242,183,5,0.30)"
+      : (r.name ? "rgba(94,42,121,0.30)" : "rgba(160,160,160,0.18)");
+    ctx.fill();
+    ctx.strokeStyle = i === selectedIdx ? "#f2b705" : (r.name ? "#5e2a79" : "#666");
+    ctx.lineWidth = i === selectedIdx ? 2 : 1;
+    ctx.stroke();
+    if (r.name) {
+      const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+      const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+      ctx.fillStyle = "#f2b705";
+      ctx.font = "11px DM Sans, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(r.name, cx, cy);
+      ctx.textAlign = "start";
+    }
+    // Vertex-Handles wenn selected
+    if (i === selectedIdx) {
+      ctx.fillStyle = "#f2b705";
+      ctx.strokeStyle = "#1a0d2a";
+      ctx.lineWidth = 1.5;
+      for (const [x, y] of pts) {
+        ctx.fillRect(x - 4, y - 4, 8, 8);
+        ctx.strokeRect(x - 4, y - 4, 8, 8);
+      }
+    }
+  });
+
+  // In-progress polygon
+  if (mode === "drawing-poly" && polyPoints.length > 0) {
+    const pts = polyPoints.map(p => worldToCanvas(p[0], p[1]));
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+    ctx.strokeStyle = "#f2b705";
+    ctx.setLineDash([4, 3]);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Vertex dots
+    ctx.fillStyle = "#f2b705";
+    for (const [x, y] of pts) {
+      ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // Rect-drawing preview
+  if (mode === "drawing-rect" && drawStart && drawCurrent) {
+    const x = Math.min(drawStart[0], drawCurrent[0]);
+    const y = Math.min(drawStart[1], drawCurrent[1]);
+    const w = Math.abs(drawCurrent[0] - drawStart[0]);
+    const h = Math.abs(drawCurrent[1] - drawStart[1]);
+    ctx.strokeStyle = "#f2b705";
+    ctx.setLineDash([4, 3]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
+  }
+
+  // Pins
+  pins.forEach(p => {
+    const [px, py] = worldToCanvas(p.x, p.y);
+    ctx.beginPath();
+    ctx.arc(px, py, 4, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,80,80,0.85)";
+    ctx.fill();
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+}
+
+// ─── Region list ───────────────────────────────────────────────────────────
+function renderList() {
+  listEl.innerHTML = "";
+  // Sort: largest first (parent regions on top)
+  const indexed = regions.map((r, i) => ({ r, i, area: polyArea(r.points) }));
+  indexed.sort((a, b) => b.area - a.area);
+  indexed.forEach(({r, i, area}) => {
+    const row = document.createElement("div");
+    row.className = "region-row" + (i === selectedIdx ? " selected" : "");
+    const name = r.name || "<i style='color:#666'>kein Name</i>";
+    const km2 = (area / 1e10).toFixed(2);  // cm² -> km²
+    row.innerHTML = `
+      <span class="name">${name}</span>
+      <span class="badge">${km2}km²</span>
+    `;
+    row.addEventListener("click", () => { selectedIdx = i; renderAll(); });
+    listEl.appendChild(row);
+  });
+  if (selectedIdx >= 0 && regions[selectedIdx]) {
+    const r = regions[selectedIdx];
+    editBlock.style.display = "";
+    nameIn.value = r.name || "";
+    kmStat.textContent = `${r.points.length} Punkte · ${(polyArea(r.points)/1e10).toFixed(3)} km²`;
+  } else {
+    editBlock.style.display = "none";
+  }
+}
+function renderAll() { render(); renderList(); }
+
+nameIn.addEventListener("input", () => {
+  if (selectedIdx < 0) return;
+  regions[selectedIdx].name = nameIn.value.trim();
+  renderAll();
+});
+document.getElementById("delBtn").addEventListener("click", () => {
+  if (selectedIdx < 0) return;
+  regions.splice(selectedIdx, 1);
+  selectedIdx = -1;
+  renderAll();
+});
+document.getElementById("dupBtn").addEventListener("click", () => {
+  if (selectedIdx < 0) return;
+  const r = regions[selectedIdx];
+  regions.push({
+    name: r.name + " (copy)",
+    points: r.points.map(p => [p[0] + 20000, p[1] + 20000]),
+  });
+  selectedIdx = regions.length - 1;
+  renderAll();
+});
+
+// ─── Tool buttons ──────────────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  rectBtn.classList.toggle("active", m === "drawing-rect");
+  polyBtn.classList.toggle("active", m === "drawing-poly");
+  if (m === "view") { drawStart = drawCurrent = null; polyPoints = []; }
+  canvas.style.cursor = (m === "drawing-rect" || m === "drawing-poly") ? "crosshair" : "default";
+}
+rectBtn.addEventListener("click", () => setMode(mode === "drawing-rect" ? "view" : "drawing-rect"));
+polyBtn.addEventListener("click", () => { polyPoints = []; setMode(mode === "drawing-poly" ? "view" : "drawing-poly"); });
+
+// ─── Canvas interactions ───────────────────────────────────────────────────
+function hitTestVertex(cx, cy) {
+  if (selectedIdx < 0) return -1;
+  const pts = regions[selectedIdx].points;
+  for (let k = 0; k < pts.length; k++) {
+    const [vx, vy] = worldToCanvas(pts[k][0], pts[k][1]);
+    if (Math.abs(cx - vx) < 7 && Math.abs(cy - vy) < 7) return k;
+  }
+  return -1;
+}
+function hitTestEdge(cx, cy) {
+  // Returns {regionIdx, edgeIdx} if within 6px of an edge of selected region
+  if (selectedIdx < 0) return null;
+  const pts = regions[selectedIdx].points.map(p => worldToCanvas(p[0], p[1]));
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const len2 = dx * dx + dy * dy;
+    if (len2 < 1) continue;
+    const t = Math.max(0, Math.min(1, ((cx - a[0]) * dx + (cy - a[1]) * dy) / len2));
+    const px = a[0] + t * dx, py = a[1] + t * dy;
+    const d = Math.hypot(cx - px, cy - py);
+    if (d < 6) return { edgeIdx: i, t };
+  }
+  return null;
+}
+function hitTestRegion(cx, cy) {
+  const [wx, wy] = canvasToWorld(cx, cy);
+  let best = -1, bestArea = Infinity;
+  for (let i = 0; i < regions.length; i++) {
+    if (pointInPoly(wx, wy, regions[i].points)) {
+      const a = polyArea(regions[i].points);
+      if (a < bestArea) { bestArea = a; best = i; }
+    }
+  }
+  return best;
+}
+
+canvas.addEventListener("mousedown", (ev) => {
+  const [cx, cy] = canvasXY(ev);
+
+  // Drawing-Rect
+  if (mode === "drawing-rect") {
+    drawStart = [cx, cy];
+    drawCurrent = drawStart;
+    return;
+  }
+  // Drawing-Poly
+  if (mode === "drawing-poly") {
+    const [wx, wy] = canvasToWorld(cx, cy);
+    polyPoints.push([wx, wy]);
+    render();
+    return;
+  }
+
+  // Selected: Alt+click on vertex = remove vertex
+  if (ev.altKey && selectedIdx >= 0) {
+    const v = hitTestVertex(cx, cy);
+    if (v >= 0) {
+      if (regions[selectedIdx].points.length > 3) {
+        regions[selectedIdx].points.splice(v, 1);
+        renderAll();
+      }
+      return;
+    }
+  }
+
+  // Selected: Shift+click on edge = insert vertex
+  if (ev.shiftKey && selectedIdx >= 0) {
+    const edge = hitTestEdge(cx, cy);
+    if (edge) {
+      const [wx, wy] = canvasToWorld(cx, cy);
+      regions[selectedIdx].points.splice(edge.edgeIdx + 1, 0, [wx, wy]);
+      renderAll();
+      return;
+    }
+  }
+
+  // Vertex-Handle?
+  if (selectedIdx >= 0) {
+    const v = hitTestVertex(cx, cy);
+    if (v >= 0) {
+      dragRef = {
+        type: "vertex",
+        vertexIdx: v,
+        startMouse: canvasToWorld(cx, cy),
+        startVertex: [...regions[selectedIdx].points[v]],
+      };
+      mode = "moving-vertex";
+      return;
+    }
+  }
+
+  // Click on region → select + start move
+  const hit = hitTestRegion(cx, cy);
+  if (hit >= 0) {
+    selectedIdx = hit;
+    const [wx, wy] = canvasToWorld(cx, cy);
+    dragRef = {
+      type: "region",
+      startMouse: [wx, wy],
+      startPoints: regions[hit].points.map(p => [...p]),
+    };
+    mode = "moving-region";
+    renderAll();
+  } else {
+    selectedIdx = -1;
+    renderAll();
+  }
+});
+
+canvas.addEventListener("dblclick", (ev) => {
+  // Polygon abschliessen
+  if (mode === "drawing-poly" && polyPoints.length >= 3) {
+    regions.push({ name: "", points: polyPoints });
+    selectedIdx = regions.length - 1;
+    polyPoints = [];
+    setMode("view");
+    renderAll();
+  }
+});
+
+canvas.addEventListener("mousemove", (ev) => {
+  const [cx, cy] = canvasXY(ev);
+
+  // Cursor in view-mode
+  if (mode === "view") {
+    if (selectedIdx >= 0 && hitTestVertex(cx, cy) >= 0) canvas.style.cursor = "move";
+    else if (selectedIdx >= 0 && ev.shiftKey && hitTestEdge(cx, cy)) canvas.style.cursor = "copy";
+    else if (hitTestRegion(cx, cy) >= 0) canvas.style.cursor = "pointer";
+    else canvas.style.cursor = "default";
+  }
+
+  if (mode === "drawing-rect" && drawStart) {
+    drawCurrent = [cx, cy];
+    render();
+    return;
+  }
+
+  if (mode === "moving-vertex" && dragRef) {
+    const [wx, wy] = canvasToWorld(cx, cy);
+    const dx = wx - dragRef.startMouse[0];
+    const dy = wy - dragRef.startMouse[1];
+    regions[selectedIdx].points[dragRef.vertexIdx] = [
+      dragRef.startVertex[0] + dx,
+      dragRef.startVertex[1] + dy,
+    ];
+    renderAll();
+    return;
+  }
+
+  if (mode === "moving-region" && dragRef) {
+    const [wx, wy] = canvasToWorld(cx, cy);
+    const dx = wx - dragRef.startMouse[0];
+    const dy = wy - dragRef.startMouse[1];
+    regions[selectedIdx].points = dragRef.startPoints.map(p => [p[0] + dx, p[1] + dy]);
+    renderAll();
+    return;
+  }
+});
+
+canvas.addEventListener("mouseup", (ev) => {
+  if (mode === "drawing-rect" && drawStart) {
+    const [cx, cy] = canvasXY(ev);
+    const x1 = Math.min(drawStart[0], cx), y1 = Math.min(drawStart[1], cy);
+    const x2 = Math.max(drawStart[0], cx), y2 = Math.max(drawStart[1], cy);
+    if (x2 - x1 > 5 && y2 - y1 > 5) {
+      const [wx1, wy1] = canvasToWorld(x1, y1);
+      const [wx2, wy2] = canvasToWorld(x2, y2);
+      regions.push({
+        name: "",
+        points: [[wx1, wy1], [wx2, wy1], [wx2, wy2], [wx1, wy2]],
+      });
+      selectedIdx = regions.length - 1;
+    }
+    setMode("view");
+    renderAll();
+    return;
+  }
+  if (mode === "moving-vertex" || mode === "moving-region") {
+    mode = "view";
+    dragRef = null;
+    renderAll();
+  }
+});
+
+// ─── Pins ──────────────────────────────────────────────────────────────────
+document.getElementById("pinsBtn").addEventListener("click", async () => {
+  statusEl.textContent = "Lade Landings…";
+  try {
+    const r = await fetch(`/api/pubg/landings?map=${encodeURIComponent(currentMap)}`);
+    const j = await r.json();
+    pins = (j.data && j.data.landings) || j.landings || [];
+    statusEl.textContent = `${pins.length} Landings`;
+    render();
+  } catch (e) {
+    statusEl.textContent = `⚠ Fehler: ${e}`;
+  }
+});
+
+// ─── Save ──────────────────────────────────────────────────────────────────
+document.getElementById("saveBtn").addEventListener("click", async () => {
+  statusEl.textContent = "Speichere…";
+  try {
+    const r = await fetch("/api/pubg/pois", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        map: currentMap,
+        mapKm: mapKm,
+        regions: regions,
+      }),
+    });
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    statusEl.textContent = `✓ Gespeichert (${regions.length} Regionen)`;
+  } catch (e) {
+    statusEl.textContent = `⚠ Speicher-Fehler: ${e}`;
+  }
+});
+</script>
+</body>
+</html>

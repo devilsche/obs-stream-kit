@@ -4,6 +4,7 @@
 .worktrees/
 __pycache__/
 data/
+!data/pubg-pois.json
 config/pubg.local.json
 .pytest_cache/
 *.pyc

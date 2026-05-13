@@ -984,6 +984,11 @@
         PubgUI.fetchJson(hotDropUrl).catch(() => null),
       ]);
 
+      // POI-Lookup-Tabelle muss da sein bevor wir Tooltips bauen.
+      if (PubgUI.POI && PubgUI.POI.ready) {
+        try { await PubgUI.POI.ready; } catch (e) {}
+      }
+
       // Flammen-Badge in jeder Match-Zeile rendern: Hot-Drop -> 🔥
       // (greyscale wenn nicht ueberlebt). Tooltip = POI-Name (Map ist
       // schon in der Zeile selbst sichtbar).

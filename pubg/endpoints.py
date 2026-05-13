@@ -102,6 +102,10 @@ class EndpointRegistry:
             return self._hot_drop(qs)
         if route == ("GET", "/api/pubg/landings"):
             return self._landings(qs)
+        if route == ("GET", "/api/pubg/pois"):
+            return self._pois_get(qs)
+        if route == ("POST", "/api/pubg/pois"):
+            return self._pois_post(body)
         if route == ("GET", "/api/pubg/session-achievements"):
             return self._session_achievements(qs)
         if route == ("GET", "/api/pubg/recent-achievements"):
@@ -338,6 +342,78 @@ class EndpointRegistry:
             "y":          r["actor_y"],
         } for r in rows]
         return _ok({"landings": landings, "count": len(landings)})
+
+    POIS_FILE = "data/pubg-pois.json"
+
+    def _load_pois(self):
+        import os, json
+        here = os.path.dirname(os.path.abspath(__file__))
+        root = os.path.dirname(here)
+        path = os.path.join(root, self.POIS_FILE)
+        if not os.path.exists(path):
+            return {}
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return {}
+
+    def _save_pois(self, data):
+        import os, json
+        here = os.path.dirname(os.path.abspath(__file__))
+        root = os.path.dirname(here)
+        path = os.path.join(root, self.POIS_FILE)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def _pois_get(self, qs):
+        """Liefert POI-Regionen. Ohne ?map: ALLE Maps in einem Dict.
+        Mit ?map=Baltic_Main: nur die Daten dieser Map."""
+        data = self._load_pois()
+        map_filter = (qs.get("map") or "").strip()
+        if map_filter:
+            return _ok(data.get(map_filter, {"mapKm": 8, "regions": []}))
+        return _ok(data)
+
+    def _pois_post(self, body):
+        """Speichert/Updated POI-Regionen fuer EINE Map. Body:
+        { "map": "Baltic_Main", "mapKm": 8, "regions":
+          [ { "name": "Pochinki", "points": [[x,y],[x,y],...] }, ... ] }
+        Komplettes Replace der Map-Daten (kein Merge).
+        Andere Maps in der File bleiben unangetastet.
+        Punkt-Coords sind in cm Welt-Units."""
+        import json
+        try:
+            payload = json.loads(body or b"{}")
+        except json.JSONDecodeError as e:
+            return _err(400, f"Invalid JSON: {e}")
+        map_id = (payload.get("map") or "").strip()
+        if not map_id:
+            return _err(400, "missing 'map'")
+        regions = payload.get("regions") or []
+        if not isinstance(regions, list):
+            return _err(400, "'regions' must be a list")
+        clean = []
+        for r in regions:
+            pts = r.get("points") or []
+            if not isinstance(pts, list) or len(pts) < 3:
+                return _err(400, f"region needs >=3 points: {r}")
+            try:
+                clean_pts = [[int(p[0]), int(p[1])] for p in pts]
+            except (KeyError, ValueError, TypeError, IndexError):
+                return _err(400, f"invalid points in region: {r}")
+            clean.append({
+                "name": str(r.get("name") or ""),
+                "points": clean_pts,
+            })
+        data = self._load_pois()
+        data[map_id] = {
+            "mapKm": float(payload.get("mapKm") or 8),
+            "regions": clean,
+        }
+        self._save_pois(data)
+        return _ok({"saved": True, "map": map_id, "count": len(clean)})
 
     def _hot_drop(self, qs):
         conn = self.get_conn()
