@@ -118,6 +118,7 @@
   <button id="rectBtn">▭ Rechteck</button>
   <button id="polyBtn">⬠ Polygon</button>
   <button id="pinsBtn" class="secondary">📍 Pins laden</button>
+  <button id="calResetBtn" class="secondary">↹ Pins 0/0</button>
   <button id="zoomResetBtn" class="secondary">🔍 100%</button>
   <button id="saveBtn" class="save">💾 Speichern</button>
   <span id="status" style="color:#8a7d99; font-size:0.8em"></span>
@@ -135,7 +136,8 @@
       <b>▭ Rechteck:</b> click+drag<br>
       <b>⬠ Polygon:</b> klicken um Punkte zu setzen, doppel-klick zum Schließen<br>
       <b>Drag</b> Vertex-Handle zum Verschieben &nbsp;·&nbsp; <b>Shift+Click</b> auf Kante = neuer Vertex &nbsp;·&nbsp; <b>Alt+Click</b> auf Vertex = löschen<br>
-      <b>Mausrad</b> = Zoom (zentriert) &nbsp;·&nbsp; <b>Rechtsklick-Drag</b> = Pan (auch Space+Drag oder Middle-Mouse)
+      <b>Mausrad</b> = Zoom (zentriert) &nbsp;·&nbsp; <b>Rechtsklick-Drag</b> = Pan (auch Space+Drag oder Middle-Mouse)<br>
+      <b>Strg+Drag</b> = Pin-Calibration (verschiebt alle Pins gemeinsam relativ zur Map; Regionen bleiben fest)
     </div>
     <div id="regionList"></div>
     <div class="edit-block" id="editBlock" style="display:none">
@@ -183,6 +185,13 @@ let isPanning = false;
 let panRef = null;   // [clientX, clientY, startPanX, startPanY]
 let spaceDown = false;
 
+// Pin-Calibration: PUBG-Welt-Coords sind nicht 1:1 zur Map-Image-Pixel-Lage.
+// Offsets werden zum Landing-x/y addiert bevor sie als Pin gezeichnet
+// werden — und auch im Runtime-POI-Lookup. Persistiert pro Map.
+let pinCal = { offsetX: 0, offsetY: 0 };
+let calibratingPins = false;
+let calRef = null;   // [startMouseX, startMouseY, startOffsetX, startOffsetY]
+
 const mapSel    = document.getElementById("mapSel");
 const mapSizeIn = document.getElementById("mapSize");
 const canvas    = document.getElementById("cv");
@@ -208,6 +217,7 @@ async function loadMap(mapId) {
   mapKm = meta ? meta[2] : 8;
   mapSizeIn.value = mapKm;
   pins = [];
+  pinCal = { offsetX: 0, offsetY: 0 };
   selectedIdx = -1;
   polyPoints = [];
 
@@ -235,7 +245,14 @@ async function loadMap(mapId) {
       points: r.points || [],
     }));
     if (blob.mapKm) { mapKm = blob.mapKm; mapSizeIn.value = mapKm; }
+    if (blob.pinCalibration) {
+      pinCal = {
+        offsetX: blob.pinCalibration.offsetX || 0,
+        offsetY: blob.pinCalibration.offsetY || 0,
+      };
+    }
     statusEl.textContent = `${regions.length} Regionen geladen`;
+    updateCalLabel();
   } catch (e) {
     statusEl.textContent = `⚠ Lade-Fehler: ${e}`;
     regions = [];
@@ -392,9 +409,9 @@ function render() {
     ctx.setLineDash([]);
   }
 
-  // Pins
+  // Pins (mit Calibration-Offset)
   pins.forEach(p => {
-    const [px, py] = worldToCanvas(p.x, p.y);
+    const [px, py] = worldToCanvas(p.x + pinCal.offsetX, p.y + pinCal.offsetY);
     ctx.beginPath();
     ctx.arc(px, py, 4 / view.zoom, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(255,80,80,0.85)";
@@ -521,6 +538,15 @@ function hitTestRegion(wx, wy) {
 }
 
 canvas.addEventListener("mousedown", (ev) => {
+  // Strg+LMB = Pin-Calibration verschieben
+  if (ev.ctrlKey && ev.button === 0) {
+    calibratingPins = true;
+    const [wx, wy] = eventToWorld(ev);
+    calRef = [wx, wy, pinCal.offsetX, pinCal.offsetY];
+    canvas.style.cursor = "grabbing";
+    ev.preventDefault();
+    return;
+  }
   // Rechtsklick (2), Middle-Mouse (1) oder Space+LMB = Pan-Modus
   if (ev.button === 2 || ev.button === 1 || (spaceDown && ev.button === 0)) {
     isPanning = true;
@@ -613,6 +639,15 @@ canvas.addEventListener("dblclick", (ev) => {
 });
 
 canvas.addEventListener("mousemove", (ev) => {
+  // Pin-Calibration-Drag
+  if (calibratingPins && calRef) {
+    const [wx, wy] = eventToWorld(ev);
+    pinCal.offsetX = calRef[2] + (wx - calRef[0]);
+    pinCal.offsetY = calRef[3] + (wy - calRef[1]);
+    updateCalLabel();
+    render();
+    return;
+  }
   // Pan-Modus
   if (isPanning && panRef) {
     view.panX = panRef[2] + (ev.clientX - panRef[0]);
@@ -660,6 +695,12 @@ canvas.addEventListener("mousemove", (ev) => {
 });
 
 canvas.addEventListener("mouseup", (ev) => {
+  if (calibratingPins) {
+    calibratingPins = false;
+    calRef = null;
+    canvas.style.cursor = "default";
+    return;
+  }
   if (isPanning) {
     isPanning = false;
     panRef = null;
@@ -732,6 +773,16 @@ document.getElementById("zoomResetBtn").addEventListener("click", () => {
   updateZoomBtn();
   render();
 });
+function updateCalLabel() {
+  const xm = (pinCal.offsetX / 100).toFixed(0);
+  const ym = (pinCal.offsetY / 100).toFixed(0);
+  document.getElementById("calResetBtn").textContent = `↹ Pins ${xm}/${ym} m`;
+}
+document.getElementById("calResetBtn").addEventListener("click", () => {
+  pinCal = { offsetX: 0, offsetY: 0 };
+  updateCalLabel();
+  render();
+});
 
 // ─── Pins ──────────────────────────────────────────────────────────────────
 document.getElementById("pinsBtn").addEventListener("click", async () => {
@@ -757,6 +808,7 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
       body: JSON.stringify({
         map: currentMap,
         mapKm: mapKm,
+        pinCalibration: pinCal,
         regions: regions,
       }),
     });

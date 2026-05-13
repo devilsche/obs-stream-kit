@@ -303,23 +303,40 @@ class EndpointRegistry:
         ))
 
     def _landings(self, qs):
-        """Liefert alle Squad-Landings auf einer Map (oder allen Maps).
+        """Liefert Squad-Landings auf einer Map (oder allen Maps).
         Optional ?map=Baltic_Main fuer Filter, sonst alle Maps gemixt.
+        Default: nur das ERSTE Landing pro Squad-Member pro Match
+        (= initialer Fallschirm-Drop). ?all=1 inkludiert auch Emergency-
+        Pickup-Re-Drops und sonstige Re-Landings.
         Pro Landing: { matchId, playedAt, mapName, accountId, name, x, y }.
-        Wird vom POI-Editor genutzt um die historischen Drop-Points
-        als Pin-Overlay zu zeigen."""
+        """
         conn = self.get_conn()
         map_filter = (qs.get("map") or "").strip()
+        all_landings = qs.get("all") == "1"
         params = [self.my_account_id]
         where = ""
         if map_filter:
             where = "AND m.map_name = ?"
             params.append(map_filter)
+        # Per (match, actor) das frueheste Landing — outer join gegen
+        # Aggregate damit wir nur den ersten Event pro Squad-Member pro
+        # Match bekommen. Mit ?all=1 wird der Filter uebersprungen.
+        first_join = "" if all_landings else """
+            JOIN (
+                SELECT match_id, actor_account, MIN(timestamp_ms) AS first_ts
+                FROM telemetry_events
+                WHERE event_type = 'Landing'
+                GROUP BY match_id, actor_account
+            ) f ON f.match_id = te.match_id
+                AND f.actor_account = te.actor_account
+                AND f.first_ts = te.timestamp_ms
+        """
         rows = conn.execute(f"""
             SELECT te.match_id, m.played_at, m.map_name,
                    te.actor_account, te.actor_x, te.actor_y,
                    p.name AS player_name
             FROM telemetry_events te
+            {first_join}
             JOIN matches m ON m.match_id = te.match_id
             JOIN participants me ON me.match_id = te.match_id
                 AND me.account_id = ?
@@ -341,7 +358,8 @@ class EndpointRegistry:
             "x":          r["actor_x"],
             "y":          r["actor_y"],
         } for r in rows]
-        return _ok({"landings": landings, "count": len(landings)})
+        return _ok({"landings": landings, "count": len(landings),
+                    "firstOnly": not all_landings})
 
     POIS_FILE = "data/pubg-pois.json"
 
@@ -408,8 +426,13 @@ class EndpointRegistry:
                 "points": clean_pts,
             })
         data = self._load_pois()
+        cal = payload.get("pinCalibration") or {}
         data[map_id] = {
             "mapKm": float(payload.get("mapKm") or 8),
+            "pinCalibration": {
+                "offsetX": int(cal.get("offsetX") or 0),
+                "offsetY": int(cal.get("offsetY") or 0),
+            },
             "regions": clean,
         }
         self._save_pois(data)

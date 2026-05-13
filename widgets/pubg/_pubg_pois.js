@@ -62,13 +62,17 @@
     const alias = (mapName === "Erangel_Main") ? "Baltic_Main" : mapName;
     const blob = DATA[alias] || DATA[mapName];
     if (!blob) return null;
+    // Pin-Calibration anwenden: gleiche Offset-Korrektur wie im
+    // Editor, damit Runtime-Lookup und visuelles Pin-Alignment matchen.
+    const cal = blob.pinCalibration || {offsetX: 0, offsetY: 0};
+    const ax = xCm + (cal.offsetX || 0);
+    const ay = yCm + (cal.offsetY || 0);
     const regions = blob.regions || [];
-    // Sammle alle Polygone die den Punkt enthalten, gewinne kleinste.
     let best = null;
     let bestArea = Infinity;
     for (const r of regions) {
-      if (!r.name) continue;  // unnamed -> Lookup ueberspringt
-      if (pointInPoly(xCm, yCm, r.points)) {
+      if (!r.name) continue;
+      if (pointInPoly(ax, ay, r.points)) {
         const a = polyArea(r.points);
         if (a < bestArea) { bestArea = a; best = r; }
       }
