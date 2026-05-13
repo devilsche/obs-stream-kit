@@ -55,6 +55,26 @@
     }
     return inside;
   }
+  // Min-Distanz von Punkt zum Polygon (= zur naechsten Edge).
+  // Punkt im cm-Welt-System; Rueckgabe ebenfalls in cm.
+  function distToPoly(px, py, points) {
+    if (!points || points.length < 2) return Infinity;
+    let best = Infinity;
+    for (let i = 0; i < points.length; i++) {
+      const [ax, ay] = points[i];
+      const [bx, by] = points[(i + 1) % points.length];
+      const dx = bx - ax, dy = by - ay;
+      const len2 = dx * dx + dy * dy;
+      let t = 0;
+      if (len2 > 0) {
+        t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
+      }
+      const qx = ax + t * dx, qy = ay + t * dy;
+      const d = Math.hypot(px - qx, py - qy);
+      if (d < best) best = d;
+    }
+    return best;
+  }
 
   POI.fromCoords = function (mapName, xCm, yCm) {
     if (!mapName || xCm == null || yCm == null) return null;
@@ -67,6 +87,7 @@
     // Hilfe — die persistierten Region-Points sind bereits in Welt-cm,
     // daher hier KEINE extra Transformation noetig.
     const regions = blob.regions || [];
+    // Phase 1: smallest containing polygon
     let best = null;
     let bestArea = Infinity;
     for (const r of regions) {
@@ -76,6 +97,19 @@
         if (a < bestArea) { bestArea = a; best = r; }
       }
     }
-    return best ? best.name : null;
+    if (best) return best.name;
+    // Phase 2: 'near X' wenn Pin innerhalb 30000 cm = 300m zu einer
+    // Polygon-Kante ist. Naechste gewinnt.
+    const NEAR_CM = 30000;
+    let nearBest = null;
+    let nearDist = Infinity;
+    for (const r of regions) {
+      if (!r.name) continue;
+      const d = distToPoly(xCm, yCm, r.points);
+      if (d < NEAR_CM && d < nearDist) {
+        nearDist = d; nearBest = r;
+      }
+    }
+    return nearBest ? "near " + nearBest.name : null;
   };
 })();
