@@ -172,6 +172,18 @@
       text-transform: uppercase;
       font-size: 0.85em;
     }
+    .tile-meta .rare-badge.mythic    { background: linear-gradient(90deg, #a85cd9, #d8b4ff); color: #1a0d2a; }
+    .tile-meta .rare-badge.legendary {
+      background: linear-gradient(90deg, #ff5028, #ffc828, #ff5028);
+      background-size: 200% 100%;
+      animation: legendaryShimmer 2.5s linear infinite;
+      color: #1a0d2a;
+    }
+    @keyframes legendaryShimmer {
+      0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; }
+    }
+    .tile.mythic { border-color: #a85cd9; box-shadow: 0 0 16px rgba(168,92,217,0.45); }
+    .tile.legendary { border-color: #ffc828; box-shadow: 0 0 18px rgba(255,160,40,0.55); }
     .toast {
       position: fixed;
       bottom: 24px; right: 24px;
@@ -359,10 +371,18 @@
     function tileHtml(a) {
       const source = a.source || "";
       const isPubg = source === "pubg" || a.appId === -2;
-      // Rare-Logik konsistent zwischen Steam und PUBG: aus der jeweiligen
-      // % ableiten (Steam globalPct, PUBG sessionPct). Schwelle RARE_PCT.
+      // Rarity-Tiers (Steam globalPct, PUBG sessionPct):
+      //   <=1%   -> legendary
+      //   <=5%   -> mythic
+      //   <=RARE_PCT (Default 10%) -> rare
       const ratePct = isPubg ? a.sessionPct : a.globalPct;
-      const isRare = ratePct != null && ratePct <= RARE_PCT;
+      let tier = "common";
+      if (ratePct != null) {
+        if (ratePct <= 1) tier = "legendary";
+        else if (ratePct <= 5) tier = "mythic";
+        else if (ratePct <= RARE_PCT) tier = "rare";
+      }
+      const isRare = tier !== "common";
       const icon = a.iconUrl || "";
       const name = (a.displayName || a.apiName || "Achievement").replace(/</g, "&lt;");
       const game = (a.gameName || ("App #" + a.appId)).replace(/</g, "&lt;");
@@ -391,12 +411,13 @@
       }
       const statSpan = statText ? `<span class="pct">${statText}</span>` : "";
       const dateHtml = `<span class="date">${fmtDate(a.unlockedAt)}</span>`;
+      const badgeLabel = {legendary:"Legendary", mythic:"Mythic", rare:"Rare"}[tier];
       const metaInner = dateHtml
         + statSpan
-        + (isRare ? `<span class="rare-badge">Rare</span>` : "");
+        + (badgeLabel ? `<span class="rare-badge ${tier}">${badgeLabel}</span>` : "");
 
       return `
-        <div class="tile${isRare ? " rare" : ""}${isFresh ? " brand-new" : ""}"
+        <div class="tile${isRare ? " " + tier : ""}${isFresh ? " brand-new" : ""}"
              data-appid="${a.appId}" data-api="${a.apiName.replace(/"/g, "&quot;")}"
              data-source="${source}">
           ${iconHtml}

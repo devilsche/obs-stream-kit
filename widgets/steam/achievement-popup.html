@@ -94,17 +94,59 @@
       margin-top: 2px;
       font-variant-numeric: tabular-nums;
     }
-    /* Rare-Unlock: <5% aller Spieler — Glow + Ribbon-Text aendert sich */
+    /* Rarity-Tiers — visuell differenziert
+     *   rare      (<=10%) gold-glow
+     *   mythic    (<= 5%) violet/silver-glow
+     *   legendary (<= 1%) rainbow/fire-glow */
     .popup.rare .icon {
-      box-shadow: 0 0 24px rgba(242, 183, 5, 0.85),
-                  0 0 48px rgba(242, 183, 5, 0.45);
+      box-shadow: 0 0 24px rgba(242,183,5,0.85), 0 0 48px rgba(242,183,5,0.45);
       border-color: #fff8d0;
       animation: rareGlow 1.8s ease-in-out infinite;
     }
     .popup.rare .pct b { color: var(--pubg-gold); }
+
+    .popup.mythic .icon {
+      box-shadow: 0 0 28px rgba(180,120,255,0.95), 0 0 64px rgba(160,220,255,0.55);
+      border-color: #e0c8ff;
+      animation: mythicGlow 1.6s ease-in-out infinite;
+    }
+    .popup.mythic .pct b { color: #d8b4ff; }
+    .popup.mythic .ribbon { background: linear-gradient(90deg, #6b3eb0, #a85cd9); }
+
+    .popup.legendary .icon {
+      box-shadow: 0 0 36px rgba(255,80,40,0.95),
+                  0 0 72px rgba(255,200,40,0.65),
+                  inset 0 0 20px rgba(255,140,0,0.4);
+      border-color: #ffdf80;
+      animation: legendaryGlow 1.2s ease-in-out infinite;
+    }
+    .popup.legendary .pct b {
+      background: linear-gradient(90deg, #ff5028, #ffc828, #ff5028);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .popup.legendary .ribbon {
+      background: linear-gradient(90deg, #ff5028, #ffc828, #ff5028);
+      background-size: 200% 100%;
+      animation: legendaryRibbon 2.5s linear infinite;
+    }
+
     @keyframes rareGlow {
       0%, 100% { box-shadow: 0 0 18px rgba(242,183,5,0.65), 0 0 36px rgba(242,183,5,0.35); }
       50%      { box-shadow: 0 0 32px rgba(242,183,5,0.95), 0 0 60px rgba(242,183,5,0.55); }
+    }
+    @keyframes mythicGlow {
+      0%, 100% { box-shadow: 0 0 20px rgba(160,100,235,0.7), 0 0 48px rgba(160,220,255,0.4); }
+      50%      { box-shadow: 0 0 38px rgba(200,150,255,0.95), 0 0 72px rgba(160,220,255,0.6); }
+    }
+    @keyframes legendaryGlow {
+      0%, 100% { box-shadow: 0 0 28px rgba(255,80,40,0.85), 0 0 60px rgba(255,200,40,0.55), inset 0 0 18px rgba(255,140,0,0.4); }
+      50%      { box-shadow: 0 0 44px rgba(255,120,60,1.00), 0 0 90px rgba(255,220,80,0.75), inset 0 0 24px rgba(255,170,40,0.55); }
+    }
+    @keyframes legendaryRibbon {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 200% 50%; }
     }
   </style>
 </head>
@@ -121,8 +163,10 @@
       <div class="game" id="game"></div>
     </div>
   </div>
-  <audio id="soundCommon" src="/widgets/steam/sounds/lvlup.wav" preload="auto"></audio>
-  <audio id="soundRare"   src="/widgets/steam/sounds/biglvlup.wav" preload="auto"></audio>
+  <audio id="soundCommon"    src="/widgets/steam/sounds/lvlup.wav" preload="auto"></audio>
+  <audio id="soundRare"      src="/widgets/steam/sounds/biglvlup.wav" preload="auto"></audio>
+  <audio id="soundMythic"    src="/widgets/steam/sounds/mystique.mp3" preload="auto"></audio>
+  <audio id="soundLegendary" src="/widgets/steam/sounds/legendary.mp3" preload="auto"></audio>
   <script src="/widgets/pubg/_pubg.js"></script>
   <script>
     // ?duration=8 (Sekunden Anzeige pro Unlock), ?gap=1.5 (Sek Pause zwischen)
@@ -160,15 +204,49 @@
         tooltip: "Achievement-Sound-Lautstaerke (0-100%)." },
     ]);
 
-    function playSound(isRare) {
+    // Rarity-Tiers (% basiert):
+    //   <=  1% -> legendary
+    //   <=  5% -> mythic
+    //   <= 10% -> rare
+    //   sonst   -> common
+    function getRarityTier(pct) {
+      if (!Number.isFinite(pct)) return "common";
+      if (pct <=  1) return "legendary";
+      if (pct <=  5) return "mythic";
+      if (pct <= 10) return "rare";
+      return "common";
+    }
+    function playSound(tier) {
       if (!SOUND_ON) return;
-      const el = document.getElementById(isRare ? "soundRare" : "soundCommon");
-      if (!el) return;
-      try {
-        el.volume = VOLUME;
-        el.currentTime = 0;
-        el.play().catch(() => {});  // autoplay-block silent
-      } catch (e) { /* silent */ }
+      const idMap = {
+        legendary: "soundLegendary",
+        mythic:    "soundMythic",
+        rare:      "soundRare",
+        common:    "soundCommon",
+      };
+      let el = document.getElementById(idMap[tier] || "soundCommon");
+      // Falls die tier-spezifische Datei fehlt (404 == el.error nach load):
+      // fallback eine Stufe runter
+      const fallback = { legendary: "soundMythic", mythic: "soundRare",
+                          rare: "soundCommon" };
+      const tryPlay = (audio, fbId) => {
+        if (!audio) return;
+        try {
+          audio.volume = VOLUME;
+          audio.currentTime = 0;
+          const p = audio.play();
+          if (p && p.catch) {
+            p.catch(() => {
+              if (fbId) tryPlay(document.getElementById(fbId), null);
+            });
+          }
+        } catch (e) { /* silent */ }
+      };
+      // Wenn das Audio-Element 'error' Status hat, gleich Fallback
+      if (el && el.error) {
+        el = document.getElementById(fallback[tier]) || el;
+      }
+      tryPlay(el, fallback[tier] ? idMap[fallback[tier]] : null);
     }
 
     const popup = document.getElementById("popup");
@@ -226,18 +304,14 @@
       const pctEl = document.getElementById("pct");
       const ribbonEl = document.getElementById("ribbon");
       const isPubg = u.source === "pubg";
-      // Rare-Logik konsistent: in BEIDEN Faellen aus der % abgeleitet
-      // (Steam: globalPct, PUBG: sessionPct). Schwelle = RARE_PCT (10).
-      // Gleiche % -> gleicher Sound, egal ob Steam oder PUBG.
-      let isRare;
-      if (isPubg) {
-        const sp = Number(u.sessionPct);
-        isRare = Number.isFinite(sp) && sp <= RARE_PCT;
-      } else {
-        const gp = Number(u.globalPct);
-        isRare = Number.isFinite(gp) && gp <= RARE_PCT;
-      }
-      popup.classList.toggle("rare", isRare);
+      // Rarity-Tiers konsistent: PCT aus dem jeweils relevanten Feld
+      // (Steam: globalPct, PUBG: sessionPct). getRarityTier() macht den
+      // Drei-Stufen-Cut (rare=10/mythic=5/legendary=1).
+      const tierPct = isPubg ? Number(u.sessionPct) : Number(u.globalPct);
+      const tier = getRarityTier(tierPct);  // common|rare|mythic|legendary
+      const isRare = tier !== "common";
+      popup.classList.remove("rare", "mythic", "legendary");
+      if (tier !== "common") popup.classList.add(tier);
       let statLine = null;
       if (isPubg) {
         const sp = Number(u.sessionPct);
@@ -264,18 +338,18 @@
       } else {
         agoEl.style.display = "none";
       }
-      // Ribbon-Text: PUBG-Session-Milestones bekommen eigenes Label,
-      // damit klar ist dass das nicht ein 'echtes' Steam-Achievement ist.
-      if (u.source === "pubg") {
-        ribbonEl.textContent = isRare
-          ? "Rare Session Milestone"
-          : "Session Milestone Unlocked";
-      } else {
-        ribbonEl.textContent = isRare
-          ? "Rare Achievement Unlocked"
-          : "Achievement Unlocked";
-      }
-      playSound(isRare);
+      // Ribbon-Text: Tier-spezifisch + Source-spezifisch.
+      const tierLabel = {
+        legendary: "Legendary",
+        mythic:    "Mythic",
+        rare:      "Rare",
+        common:    "",
+      }[tier];
+      const suffix = u.source === "pubg"
+        ? (tier === "common" ? "Session Milestone Unlocked" : "Session Milestone")
+        : (tier === "common" ? "Achievement Unlocked" : "Achievement Unlocked");
+      ribbonEl.textContent = tierLabel ? `${tierLabel} ${suffix}` : suffix;
+      playSound(tier);
       popup.classList.add("show");
       setTimeout(() => {
         popup.classList.remove("show");
