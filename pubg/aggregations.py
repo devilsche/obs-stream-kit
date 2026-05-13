@@ -979,26 +979,74 @@ def _compute_top10_reached_at(conn, match_id, my_account_id):
     return None
 
 
+# Kill-Match-Tiers: jeder Tier den ein Match erreicht wird emittiert
+# (kumulativ), aber im Popup feuert nur der hoechste. Das gibt dem
+# Browser saubere 'Sessions die mind. ≥N Kills hatten'-Pcts, ohne
+# Popup-Spam.
+KILL_TIERS = [
+    (20, "kills_20", "20-Bomb"),
+    (15, "kills_15", "Annihilation"),
+    (10, "kills_10", "Massacre"),
+    (7,  "kills_7",  "Slaughterhouse"),
+    (5,  "kills_5",  "Killing Survivor"),
+]
+DAMAGE_TIERS = [
+    (3000, "damage_3000", "GODLIKE"),
+    (2500, "damage_2500", "Damage Lord"),
+    (2000, "damage_2000", "Damage Demon"),
+    (1500, "damage_1500", "Big Damage"),
+    (1000, "damage_1000", "Damage Dealer"),
+    (500,  "damage_500",  "Heavy Hitter"),
+]
+LONGEST_KILL_TIERS = [
+    (1000, "longest_kill_1000", "Kilometer Kill"),
+    (800,  "longest_kill_800",  "Cross-Map Connection"),
+    (600,  "longest_kill_600",  "Sniper Elite"),
+    (400,  "longest_kill_400",  "Long-Range Ranger"),
+]
+
+
+def _emit_tier_cascade(out, seen, tiers, value, value_label_fn,
+                       match_id, played):
+    """Emittiert alle erreichten Tiers fuer einen Wert (Kills, DMG,
+    Longest-Kill). tiers ist DESC sortiert. Nur der hoechste poppt,
+    die anderen werden mit suppressPopup=True markiert.
+    seen filtert Duplikate auf Session-Ebene damit nicht jeder Match
+    nochmal alle Tiers reinwirft."""
+    qualifying = [(t, aid, name) for t, aid, name in tiers if value >= t]
+    if not qualifying:
+        return
+    new_emits = [(t, aid, name) for t, aid, name in qualifying
+                 if aid not in seen]
+    if not new_emits:
+        return
+    for i, (threshold, aid, name) in enumerate(new_emits):
+        out.append({
+            "id": aid,
+            "label": f"{name} · {value_label_fn(value)}",
+            "icon": "🔥",
+            "matchId": match_id,
+            "playedAt": played,
+            "suppressPopup": i > 0,  # nur der erste (hoechste) poppt
+        })
+        seen.add(aid)
+
+
 def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None):
     """Detected Achievements der aktuellen oder einer historischen Session.
     from_iso/to_iso optional — sonst aktuelle Session.
 
-    Achievements (in dieser Reihenfolge angewendet, max. 1 pro Typ
-    außer 'Beast Chicken' und 'Top-DMG' die mehrfach kommen können):
-      - first_chicken      : erste #1 in der Session
-      - first_top10        : erstes Match mit place <= 10
-      - longest_kill_400   : Longest Kill >= 400m in einem Match
-      - five_kill_match    : Match mit >= 5 Kills
-      - beast_chicken      : place == 1 UND kills >= 5 (mehrfach möglich)
-      - hot_drop_match          : pro Hot-Drop-Match, x-N-Counter pro Session
-      - hot_drop_match_survived : pro UEBERLEBTES Hot-Drop, eigener x-N-Counter
-      - top10_streak       : pro Match-Peak einer Top-10-Streak (>=2),
-                             mehrfach pro Session moeglich
-      - chicken_streak     : pro Match-Peak einer Chicken-Streak (>=2),
-                             mehrfach pro Session moeglich
-      - session_opener_chicken : erster Match der Session war ein Chicken
-      - session_opener_top10   : erster Match der Session war Top-10
-                                 (nicht zusaetzlich wenn opener_chicken)
+    Achievements (max. 1 pro Typ pro Session ausser Tier-Cascades und
+    Streaks/Counters):
+      - first_chicken / first_top10 / session_opener_*: jeweils einmal
+      - beast_chicken: place==1 + kills>=5, mehrfach
+      - phoenix_chicken: erster Hot-Drop-Chicken-Win der Session
+      - Kill-Tiers   : kills_5/_7/_10/_15/_20 (kumulativ; nur hoechster
+                       NEUER Tier poppt, Rest mit suppressPopup in DB)
+      - DMG-Tiers    : damage_500/.../damage_3000 (gleiche Logik)
+      - Longest-Kill : longest_kill_400/_600/_800/_1000 (gleiche Logik)
+      - hot_drop_match / hot_drop_match_survived: x-N-Counter
+      - top3_streak / top10_streak / chicken_streak: ab x2, mehrfach
 
     Returns Liste { id, label, icon, matchId, playedAt } sortiert
     nach playedAt ASC (Reihenfolge des Erreichens).
@@ -1039,11 +1087,13 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
     # ein Achievement emitten. Bei Break (Match ausserhalb Bedingung)
     # auf 0 zuruecksetzen. Pro Streak-Run koennen mehrere Peaks emitten
     # (x2, x3, x4, ...) — Browser-Aggregat klappt sie zusammen.
+    top3_streak = 0
     top10_streak = 0
     chicken_streak = 0
     for m in matches:
         place = m["place"] or 99
         kills = m["kills"] or 0
+        damage = m["damage"] or 0
         longest = m["longestKill"] or 0
         played = m["playedAt"]
 
@@ -1075,23 +1125,23 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             top10_seen = True
             seen.add("first_top10")
 
-        if longest_m >= 400 and "longest_kill_400" not in seen:
-            out.append({
-                "id": "longest_kill_400",
-                "label": f"Long-Range Ranger · {int(longest_m)}m",
-                "icon": "🔥",
-                "matchId": m["matchId"], "playedAt": played,
-            })
-            seen.add("longest_kill_400")
+        # Longest-Kill-Tier-Cascade: jeder erreichte Tier (400/600/800/
+        # 1000m) wird einmal pro Session emittiert. Nur der hoechste
+        # NEUE Tier poppt; die anderen landen mit suppressPopup in DB
+        # damit '% mit ≥400m'-Stat korrekt bleibt.
+        _emit_tier_cascade(
+            out, seen, LONGEST_KILL_TIERS, int(longest_m),
+            lambda v: f"{v}m", m["matchId"], played)
 
-        if kills >= 5 and "five_kill_match" not in seen:
-            out.append({
-                "id": "five_kill_match",
-                "label": f"Killing Survivor · {kills} Kills",
-                "icon": "🔥",
-                "matchId": m["matchId"], "playedAt": played,
-            })
-            seen.add("five_kill_match")
+        # Kill-Tier-Cascade: 5/7/10/15/20+
+        _emit_tier_cascade(
+            out, seen, KILL_TIERS, int(kills),
+            lambda v: f"{v} Kills", m["matchId"], played)
+
+        # Damage-Tier-Cascade: 500..3000+
+        _emit_tier_cascade(
+            out, seen, DAMAGE_TIERS, int(damage),
+            lambda v: f"{v} DMG", m["matchId"], played)
 
         if place == 1 and kills >= 5:
             # Mehrfach pro Session moeglich — PK (achievement_id,
@@ -1124,6 +1174,20 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
         else:
             top10_streak = 0
 
+        # Top-3-Streak: gleiche Logik, Schwelle ab x2.
+        if place <= 3:
+            top3_streak += 1
+            if top3_streak >= 2:
+                out.append({
+                    "id": "top3_streak",
+                    "label": f"Podium Streak ×{top3_streak}",
+                    "icon": "🔥",
+                    "matchId": m["matchId"],
+                    "playedAt": played,
+                })
+        else:
+            top3_streak = 0
+
         # Chicken-Streak: gleiche Logik, Schwelle ab x2.
         if place == 1:
             chicken_streak += 1
@@ -1141,12 +1205,14 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
     # Hot-Drop-Achievements: pro Hot-Drop-Match ein Milestone mit
     # x-N-Counter (resettet pro Session). Survived counter laeuft separat
     # und zaehlt nur die ueberlebten Hot-Drops.
+    # Phoenix Chicken: Chicken-Win aus einem Hot-Drop heraus — super rar.
     # perMatch ist DESC sortiert → reversed für ASC = ältestes zuerst.
     try:
         hd = compute_hot_drop(conn, my_account_id, "session",
                                from_iso=from_iso, to_iso=to_iso)
         hot_drop_count = 0
         hot_drop_survived_count = 0
+        phoenix_seen = False
         for pm in reversed(hd.get("perMatch") or []):
             if not pm.get("hotDrop"):
                 continue
@@ -1165,6 +1231,14 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
                     "icon": "🔥",
                     "matchId": pm["matchId"], "playedAt": pm["playedAt"],
                 })
+            if not phoenix_seen and pm.get("place") == 1:
+                out.append({
+                    "id": "phoenix_chicken",
+                    "label": "Phoenix Chicken",
+                    "icon": "🔥",
+                    "matchId": pm["matchId"], "playedAt": pm["playedAt"],
+                })
+                phoenix_seen = True
     except Exception:
         pass
 
@@ -1177,6 +1251,13 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
 PUBG_RARE_ACHIEVEMENTS = {
     "beast_chicken",                 # Chicken + ≥5 Kills
     "session_opener_chicken",        # Session startet direkt mit Chicken
+    "phoenix_chicken",               # Chicken-Win nach Hot-Drop
+    "kills_15",                      # 15+ Kills
+    "kills_20",                      # 20+ Kills (20-Bomb)
+    "damage_2500",                   # 2500+ DMG
+    "damage_3000",                   # GODLIKE-DMG
+    "longest_kill_800",              # 800m+ Snipe
+    "longest_kill_1000",             # Kilometer-Kill
     "hot_drop_match_survived",       # ueberlebtes Hot-Drop (jedes)
     "first_hot_drop_survived",       # legacy alias (Pre-Counter-Migration)
     "longest_kill_400",              # ≥400m
@@ -1199,15 +1280,21 @@ def _insert_achievements(conn, achievements, suppress_popup=False):
     """Helper: inserted Liste von compute_session_achievements-Resultaten
     in pubg_achievements_seen. INSERT OR IGNORE filtert Duplikate.
     suppress_popup=True markiert direkt als displayed_at=NOW damit's
-    nicht popupt (fuer Backfill)."""
+    nicht popupt (fuer Backfill).
+    Per-row flag 'suppressPopup' (camelCase) ueberschreibt das fuer
+    einzelne Eintraege — z.B. wenn eine 900m-Kill alle drei Tiers
+    (400/600/800) in die DB schreibt, aber nur das hoechste poppen
+    soll."""
     import time as _t
     new_count = 0
-    displayed_at = int(_t.time()) if suppress_popup else None
+    now_ts = int(_t.time())
     for a in achievements:
         aid = a.get("id")
         mid = a.get("matchId")
         if not aid or not mid:
             continue
+        row_suppress = suppress_popup or bool(a.get("suppressPopup"))
+        displayed_at = now_ts if row_suppress else None
         cur = conn.execute("""
             INSERT INTO pubg_achievements_seen
               (achievement_id, match_id, label, icon, played_at,
@@ -1328,7 +1415,8 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
         params = [my_account_id, cutoff]
     window_ms = window_secs * 1000
     matches = conn.execute(f"""
-        SELECT m.match_id, m.played_at, m.map_name FROM matches m
+        SELECT m.match_id, m.played_at, m.map_name, pa.place
+        FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id
         WHERE pa.account_id = ? AND m.played_at >= ?{end_filter}
         ORDER BY m.played_at DESC
@@ -1347,6 +1435,7 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
             "matchId":        m["match_id"],
             "playedAt":       m["played_at"],
             "mapName":        m["map_name"],
+            "place":          m["place"],
             "hotDrop":        result["hotDrop"],
             "soloSurvived":   result["soloSurvived"],
             "teamSurvived":   result["teamSurvived"],
