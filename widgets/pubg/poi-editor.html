@@ -153,8 +153,8 @@
   <button id="rotBtn" class="secondary" title="90° drehen">⟳ 0°</button>
   <button id="calResetBtn" class="secondary" title="Calibration zuruecksetzen">↹ Pins 0/0</button>
   <label style="display:inline-flex;gap:4px;align-items:center;font-size:0.78em;color:#8a7d99">
-    Scale X<input id="scaleXIn" type="number" step="0.005" value="1.000" style="width:78px">
-    Y<input id="scaleYIn" type="number" step="0.005" value="1.000" style="width:78px">
+    Scale X<input id="scaleXIn" type="number" step="0.0001" value="1.0000" style="width:88px">
+    Y<input id="scaleYIn" type="number" step="0.0001" value="1.0000" style="width:88px">
   </label>
   <button id="zoomResetBtn" class="secondary">🔍 100%</button>
   <button id="saveBtn" class="save">💾 Speichern</button>
@@ -175,7 +175,7 @@
       <b>⬠ Polygon:</b> klicken um Punkte zu setzen, doppel-klick zum Schließen<br>
       <b>Drag</b> Vertex-Handle zum Verschieben &nbsp;·&nbsp; <b>Shift+Click</b> auf Kante = neuer Vertex &nbsp;·&nbsp; <b>Alt+Click</b> auf Vertex = löschen<br>
       <b>Mausrad</b> = Zoom (zentriert) &nbsp;·&nbsp; <b>Rechtsklick-Drag</b> = Pan (auch Space+Drag oder Middle-Mouse)<br>
-      <b>Strg+Drag</b> = Welt-Koordsystem (Grid+Pins+Regionen) gemeinsam ueber die Map verschieben. <b>Scale X/Y</b> dehnt symmetrisch um Map-Mitte.
+      <b>Strg+Drag</b> oder <b>Pfeiltasten</b> = Welt-Koordsystem (Grid+Pins+Regionen) verschieben (Shift = 10m, Strg = 100m). <b>Scale X/Y</b> dehnt symmetrisch um Map-Mitte.
     </div>
     <div id="regionList"></div>
     <div class="edit-block" id="editBlock" style="display:none">
@@ -971,13 +971,30 @@ canvas.addEventListener("wheel", (ev) => {
 // Rechtsklick-Kontextmenu unterdruecken — wir benutzen RMB-Drag fuer Pan
 canvas.addEventListener("contextmenu", (ev) => ev.preventDefault());
 
-// Space-Taste fuer Pan-Modus (wie Photoshop/Figma)
+// Space-Taste fuer Pan-Modus (wie Photoshop/Figma) + Arrow-Keys fuer
+// Grid-Offset (Strg+Drag-Aequivalent mit Tastatur-Praezision).
 window.addEventListener("keydown", (ev) => {
-  if (ev.code === "Space" && !ev.repeat && document.activeElement.tagName !== "INPUT") {
+  if (document.activeElement.tagName === "INPUT") return;
+  if (ev.code === "Space" && !ev.repeat) {
     spaceDown = true;
     canvas.style.cursor = "grab";
     ev.preventDefault();
+    return;
   }
+  // Arrow-Keys nudgen pinCal-Offset (verschiebt Grid+Pins+Regionen).
+  // Default = 1m, Shift = 10m, Strg = 100m.
+  const arrows = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+  if (!arrows.includes(ev.key)) return;
+  ev.preventDefault();
+  let step = 100;             // 1m (100 cm)
+  if (ev.shiftKey) step = 1000;   // 10m
+  if (ev.ctrlKey)  step = 10000;  // 100m
+  if (ev.key === "ArrowLeft")  pinCal.offsetX -= step;
+  if (ev.key === "ArrowRight") pinCal.offsetX += step;
+  if (ev.key === "ArrowUp")    pinCal.offsetY -= step;
+  if (ev.key === "ArrowDown")  pinCal.offsetY += step;
+  updateCalLabel();
+  render();
 });
 window.addEventListener("keyup", (ev) => {
   if (ev.code === "Space") {
@@ -998,8 +1015,8 @@ function updateCalLabel() {
   const xm = (pinCal.offsetX / 100).toFixed(0);
   const ym = (pinCal.offsetY / 100).toFixed(0);
   document.getElementById("calResetBtn").textContent = `↹ Pins ${xm}/${ym} m`;
-  document.getElementById("scaleXIn").value = pinCal.scaleX.toFixed(3);
-  document.getElementById("scaleYIn").value = pinCal.scaleY.toFixed(3);
+  document.getElementById("scaleXIn").value = pinCal.scaleX.toFixed(4);
+  document.getElementById("scaleYIn").value = pinCal.scaleY.toFixed(4);
   document.getElementById("flipXBtn").classList.toggle("active", pinCal.flipX);
   document.getElementById("flipYBtn").classList.toggle("active", pinCal.flipY);
   document.getElementById("rotBtn").textContent = `⟳ ${pinCal.rotate}°`;
