@@ -127,7 +127,10 @@
     <canvas id="cv"></canvas>
   </div>
   <div class="panel">
-    <h3>Regionen</h3>
+    <h3>Regionen <select id="sortSel" style="float:right;font-size:0.78em;padding:2px 6px">
+      <option value="area">Fläche ↓</option>
+      <option value="name">Name A–Z</option>
+    </select></h3>
     <div class="hint">
       <b>▭ Rechteck:</b> click+drag<br>
       <b>⬠ Polygon:</b> klicken um Punkte zu setzen, doppel-klick zum Schließen<br>
@@ -407,9 +410,17 @@ function render() {
 // ─── Region list ───────────────────────────────────────────────────────────
 function renderList() {
   listEl.innerHTML = "";
-  // Sort: largest first (parent regions on top)
+  const sortMode = (document.getElementById("sortSel") || {}).value || "area";
   const indexed = regions.map((r, i) => ({ r, i, area: polyArea(r.points) }));
-  indexed.sort((a, b) => b.area - a.area);
+  if (sortMode === "name") {
+    indexed.sort((a, b) => {
+      const an = (a.r.name || "~").toLowerCase();
+      const bn = (b.r.name || "~").toLowerCase();
+      return an.localeCompare(bn);
+    });
+  } else {
+    indexed.sort((a, b) => b.area - a.area);  // largest first
+  }
   indexed.forEach(({r, i, area}) => {
     const row = document.createElement("div");
     row.className = "region-row" + (i === selectedIdx ? " selected" : "");
@@ -438,6 +449,7 @@ nameIn.addEventListener("input", () => {
   regions[selectedIdx].name = nameIn.value.trim();
   renderAll();
 });
+document.getElementById("sortSel").addEventListener("change", () => renderList());
 document.getElementById("delBtn").addEventListener("click", () => {
   if (selectedIdx < 0) return;
   regions.splice(selectedIdx, 1);
