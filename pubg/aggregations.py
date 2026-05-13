@@ -1225,16 +1225,19 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             if not pm.get("hotDrop"):
                 continue
             hot_drop_count += 1
+            # Burning Hell uebersteuert Inferno Begins als Hot-Drop-
+            # Hauptmeldung — wenn 5+ Teams im Radius, popt nur Burning
+            # Hell. Inferno bleibt in DB als suppressed Eintrag.
+            teams_in_radius = pm.get("teamsInRadius") or 0
+            is_burning = teams_in_radius >= 5
             out.append({
                 "id": "hot_drop_match",
                 "label": f"Inferno Begins ×{hot_drop_count}",
                 "icon": "🔥",
                 "matchId": pm["matchId"], "playedAt": pm["playedAt"],
+                "suppressPopup": is_burning,
             })
-            # Burning Hell: Hot-Drop mit 5+ feindlichen Teams im 300m-
-            # Radius der eigenen Squad-Landung. Mehrfach moeglich.
-            teams_in_radius = pm.get("teamsInRadius") or 0
-            if teams_in_radius >= 5:
+            if is_burning:
                 out.append({
                     "id": "burning_hell",
                     "label": f"Burning Hell · {teams_in_radius} Teams",
