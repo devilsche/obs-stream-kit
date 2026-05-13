@@ -129,6 +129,7 @@
   <button id="rectBtn">▭ Rechteck</button>
   <button id="polyBtn">⬠ Polygon</button>
   <button id="pinsBtn" class="secondary">📍 Pins laden</button>
+  <button id="gridBtn" class="secondary active" title="1km-Raster ein/aus">▦ Raster</button>
   <button id="calResetBtn" class="secondary" title="Calibration zuruecksetzen (0/0 m, scale 1.0/1.0)">↹ Pins 0/0</button>
   <label style="display:inline-flex;gap:4px;align-items:center;font-size:0.78em;color:#8a7d99">
     Scale X<input id="scaleXIn" type="number" step="0.005" value="1.000" style="width:78px">
@@ -209,6 +210,7 @@ let spaceDown = false;
 let pinCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0 };
 let calibratingPins = false;
 let calRef = null;   // [startMouseX, startMouseY, startOffsetX, startOffsetY]
+let showGrid = true;
 
 const mapSel    = document.getElementById("mapSel");
 const mapSizeIn = document.getElementById("mapSize");
@@ -360,6 +362,58 @@ function render() {
   // Map als Background
   if (mapImage && mapImage.complete && mapImage.naturalWidth) {
     ctx.drawImage(mapImage, 0, 0, canvas.width, canvas.height);
+  }
+
+  // 1km-Raster mit Achsen-Beschriftung relativ zur Map-Mitte.
+  // Mitte = (0, 0). Links/oben negativ, rechts/unten positiv.
+  // So sieht man sofort wo das System einen km-Strich vermutet,
+  // und kann's mit den Map-eigenen Gitter-Markierungen abgleichen.
+  if (showGrid) {
+    const fullPx = canvas.width;
+    const stepPx = fullPx / mapKm;
+    const centerKm = mapKm / 2;
+    const lw = 1 / view.zoom;
+    const fontPx = 12 / view.zoom;
+    ctx.font = `${fontPx}px DM Sans, sans-serif`;
+    ctx.textBaseline = "top";
+    for (let km = 0; km <= mapKm; km++) {
+      const x = km * stepPx;
+      const rel = km - centerKm;  // -mapKm/2 .. +mapKm/2
+      const isAxis = (rel === 0);
+      ctx.strokeStyle = isAxis ? "rgba(242,183,5,0.95)" : "rgba(242,183,5,0.45)";
+      ctx.lineWidth = isAxis ? lw * 2 : lw;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, fullPx);
+      ctx.stroke();
+      // Label: "+2", "-3" etc. an X-Achse (Top-Edge)
+      ctx.fillStyle = isAxis ? "#fff" : "rgba(242,183,5,0.95)";
+      const label = rel > 0 ? `+${rel}` : `${rel}`;
+      ctx.fillText(label, x + 3/view.zoom, 3/view.zoom);
+    }
+    for (let km = 0; km <= mapKm; km++) {
+      const y = km * stepPx;
+      const rel = km - centerKm;
+      const isAxis = (rel === 0);
+      ctx.strokeStyle = isAxis ? "rgba(242,183,5,0.95)" : "rgba(242,183,5,0.45)";
+      ctx.lineWidth = isAxis ? lw * 2 : lw;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(fullPx, y);
+      ctx.stroke();
+      ctx.fillStyle = isAxis ? "#fff" : "rgba(242,183,5,0.95)";
+      const label = rel > 0 ? `+${rel}` : `${rel}`;
+      // Skip 0-label fuer Y (sonst doppelt mit X-Achsen-0)
+      if (!(isAxis)) ctx.fillText(label, 3/view.zoom, y + 3/view.zoom);
+    }
+    // Center-Marker
+    const cx = centerKm * stepPx, cy = centerKm * stepPx;
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4/view.zoom, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillText("0/0", cx + 5/view.zoom, cy + 5/view.zoom);
+    ctx.textBaseline = "alphabetic";
   }
 
   regions.forEach((r, i) => {
@@ -814,6 +868,11 @@ document.getElementById("scaleXIn").addEventListener("input", (ev) => {
 });
 document.getElementById("scaleYIn").addEventListener("input", (ev) => {
   pinCal.scaleY = parseFloat(ev.target.value) || 1.0;
+  render();
+});
+document.getElementById("gridBtn").addEventListener("click", () => {
+  showGrid = !showGrid;
+  document.getElementById("gridBtn").classList.toggle("active", showGrid);
   render();
 });
 
