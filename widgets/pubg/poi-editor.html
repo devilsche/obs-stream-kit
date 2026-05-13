@@ -205,7 +205,7 @@
 // Region-Daten teilen.
 const MAPS = [
   ["Baltic_Main",       "Erangel",            8],
-  ["Baltic_Main_ortho", "Erangel (in-game)",  8, "Baltic_Main"],
+  ["screenshot",        "Erangel (in-game)",  8, "Baltic_Main"],
   ["Desert_Main",       "Miramar",            8],
   ["Savage_Main",       "Sanhok",             4],
   ["DihorOtok_Main",    "Vikendi",            8],
@@ -281,14 +281,17 @@ async function loadMap(mapId) {
   selectedIdx = -1;
   polyPoints = [];
 
-  // Map als Image-Object laden (in Canvas gezeichnet, damit Zoom/Pan
-  // mit dem Canvas-Transform mitgeht)
+  // Map als Image-Object laden — versucht .webp dann .png als Fallback.
   mapImage = new Image();
   mapImage.crossOrigin = "anonymous";
   mapImage.onload = () => render();
   mapImage.onerror = () => {
-    statusEl.textContent = `⚠ Map ${mapId}.webp nicht gefunden`;
-    render();
+    // .webp failed → versuche .png
+    mapImage.onerror = () => {
+      statusEl.textContent = `⚠ Map ${mapId}.{webp|png} nicht gefunden`;
+      render();
+    };
+    mapImage.src = `/widgets/pubg/maps/${mapId}.png`;
   };
   mapImage.src = `/widgets/pubg/maps/${mapId}.webp`;
   // Zoom/Pan auf Default zurueck wenn die Map wechselt
