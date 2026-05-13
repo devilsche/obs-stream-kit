@@ -359,11 +359,10 @@
     function tileHtml(a) {
       const source = a.source || "";
       const isPubg = source === "pubg" || a.appId === -2;
-      // PUBG-Synthetic-Pct ist nicht aussagekraeftig — nur is_rare-Flag
-      // entscheidet. Bei Steam zeigen wir die echte Quote.
-      const isRare = isPubg
-        ? !!a.isRare
-        : (a.globalPct != null && a.globalPct <= RARE_PCT);
+      // Rare-Logik konsistent zwischen Steam und PUBG: aus der jeweiligen
+      // % ableiten (Steam globalPct, PUBG sessionPct). Schwelle RARE_PCT.
+      const ratePct = isPubg ? a.sessionPct : a.globalPct;
+      const isRare = ratePct != null && ratePct <= RARE_PCT;
       const icon = a.iconUrl || "";
       const name = (a.displayName || a.apiName || "Achievement").replace(/</g, "&lt;");
       const game = (a.gameName || ("App #" + a.appId)).replace(/</g, "&lt;");
