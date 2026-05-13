@@ -197,19 +197,27 @@
 
 <script>
 // Map-Definitionen
+// Format: [imageId, displayName, mapKm, optional dataKey].
+// imageId entscheidet welche Datei aus widgets/pubg/maps/ geladen wird.
+// dataKey entscheidet unter welchem Schluessel in data/pubg-pois.json
+// gespeichert wird — Default == imageId. Mit dataKey kann man also
+// mehrere Bild-Varianten derselben Map auflisten, die alle dieselben
+// Region-Daten teilen.
 const MAPS = [
-  ["Baltic_Main",     "Erangel", 8],
-  ["Desert_Main",     "Miramar", 8],
-  ["Savage_Main",     "Sanhok",  4],
-  ["DihorOtok_Main",  "Vikendi", 8],
-  ["Tiger_Main",      "Taego",   8],
-  ["Kiki_Main",       "Deston",  8],
-  ["Neon_Main",       "Rondo",   8],
-  ["Summerland_Main", "Karakin", 2],
-  ["Chimera_Main",    "Paramo",  3],
+  ["Baltic_Main",       "Erangel",            8],
+  ["Baltic_Main_ortho", "Erangel (in-game)",  8, "Baltic_Main"],
+  ["Desert_Main",       "Miramar",            8],
+  ["Savage_Main",       "Sanhok",             4],
+  ["DihorOtok_Main",    "Vikendi",            8],
+  ["Tiger_Main",        "Taego",              8],
+  ["Kiki_Main",         "Deston",             8],
+  ["Neon_Main",         "Rondo",              8],
+  ["Summerland_Main",   "Karakin",            2],
+  ["Chimera_Main",      "Paramo",             3],
 ];
 
-let currentMap = null;
+let currentMap = null;       // imageId — entscheidet welche .webp geladen wird
+let currentDataKey = null;   // dataKey — entscheidet welche pois-Daten genutzt werden
 let mapKm = 8;
 let regions = [];     // [{name, points: [[x,y], ...]}]  coords in cm
 let pins = [];        // [{name, x, y}]
@@ -261,6 +269,10 @@ for (const [id, name, km] of MAPS) {
 async function loadMap(mapId) {
   currentMap = mapId;
   const meta = MAPS.find(m => m[0] === mapId);
+  // dataKey: vierter Wert im MAPS-Eintrag, fallback auf imageId selbst.
+  // So koennen mehrere Bild-Varianten dieselbe POI-Daten-Datei teilen
+  // (z.B. Baltic_Main und Baltic_Main_ortho teilen 'Baltic_Main').
+  currentDataKey = (meta && meta[3]) || mapId;
   mapKm = meta ? meta[2] : 8;
   mapSizeIn.value = mapKm;
   pins = [];
@@ -283,9 +295,9 @@ async function loadMap(mapId) {
   view = { zoom: 1, panX: 0, panY: 0 };
   updateZoomBtn();
 
-  // Fetch saved regions from server
+  // Fetch saved regions from server (per dataKey, nicht per imageId)
   try {
-    const r = await fetch(`/api/pubg/pois?map=${encodeURIComponent(mapId)}`);
+    const r = await fetch(`/api/pubg/pois?map=${encodeURIComponent(currentDataKey)}`);
     const j = await r.json();
     const blob = j.data || j;
     regions = (blob.regions || []).map(r => ({
@@ -1098,7 +1110,10 @@ document.getElementById("rotBtn").addEventListener("click", () => {
 document.getElementById("pinsBtn").addEventListener("click", async () => {
   statusEl.textContent = "Lade Landings…";
   try {
-    const r = await fetch(`/api/pubg/landings?map=${encodeURIComponent(currentMap)}`);
+    // Landings vom Server holen — Map-Filter ueber dataKey
+    // (Telemetry-Map-Namen entsprechen den 'echten' Map-IDs, nicht den
+    // Bild-Varianten)
+    const r = await fetch(`/api/pubg/landings?map=${encodeURIComponent(currentDataKey)}`);
     const j = await r.json();
     pins = (j.data && j.data.landings) || j.landings || [];
     statusEl.textContent = `${pins.length} Landings`;
@@ -1116,7 +1131,9 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        map: currentMap,
+        // Auf dataKey speichern damit verschiedene Bild-Varianten
+        // derselben Map gemeinsame Region-Daten haben
+        map: currentDataKey,
         mapKm: mapKm,
         pinCalibration: pinCal,
         regions: regions,
