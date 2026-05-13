@@ -187,11 +187,12 @@
     .matches-list .m .stats b { color: var(--pubg-text); }
     .hot-drop-badge {
       display: inline-block;
-      width: 16px;
-      text-align: center;
-      font-size: 0.95em;
+      margin-left: 6px;
+      font-size: 0.9em;
       line-height: 1;
+      vertical-align: middle;
     }
+    .hot-drop-badge:empty { display: none; }
     .hot-drop-badge.hot {
       filter: none;
     }
@@ -551,6 +552,7 @@
   </div>
 
   <script src="_pubg.js"></script>
+  <script src="_pubg_pois.js"></script>
   <script>
     const FROM = PubgUI.qs("from", "");
     const TO = PubgUI.qs("to", "");
@@ -802,8 +804,7 @@
         <div class="m ${isWin ? 'win' : ''}" data-idx="${idx}" data-match-id="${m.matchId || ''}">
           <span class="time-range">${numStr}<b>${startTimeStr}</b> → <b>${outTimeStr}</b></span>
           <span class="place">#${m.place}</span>
-          <span class="map">${PubgUI.fmtMap(m.map)}</span>
-          <span class="hot-drop-badge" data-hd-slot></span>
+          <span class="map">${PubgUI.fmtMap(m.map)}<span class="hot-drop-badge" data-hd-slot></span></span>
           <span class="stat"><b>${m.kills}</b> K</span>
           <span class="stat"><b>${Math.round(m.damage||0)}</b> DMG</span>
           <span class="stat"><b>${fmtSurv(mySurv)}</b></span>
@@ -984,10 +985,9 @@
       ]);
 
       // Flammen-Badge in jeder Match-Zeile rendern: Hot-Drop -> 🔥
-      // (greyscale wenn nicht ueberlebt). Tooltip enthaelt Map + Landing-
-      // Coords umgerechnet in km (PUBG-Welt: 1m = 100 cm = 100 Units).
+      // (greyscale wenn nicht ueberlebt). Tooltip = POI-Name (Map ist
+      // schon in der Zeile selbst sichtbar).
       if (hotDrop && Array.isArray(hotDrop.perMatch)) {
-        const fmtMapName = (raw) => PubgUI.fmtMap(raw);
         const hdMap = new Map();
         for (const pm of hotDrop.perMatch) {
           if (pm.matchId) hdMap.set(pm.matchId, pm);
@@ -1000,12 +1000,11 @@
           if (!pm || !pm.hotDrop) return;
           const survived = !!pm.soloSurvived;
           const teamSaved = !survived && !!pm.teamSurvived;
-          let tooltip = `Hot Drop · ${fmtMapName(pm.mapName)}`;
-          if (pm.landingX != null && pm.landingY != null) {
-            const xKm = (pm.landingX / 100000).toFixed(1);
-            const yKm = (pm.landingY / 100000).toFixed(1);
-            tooltip += ` · landed @ ${xKm}/${yKm} km`;
-          }
+          const poi = (PubgUI.POI && PubgUI.POI.fromCoords)
+            ? PubgUI.POI.fromCoords(pm.mapName, pm.landingX, pm.landingY)
+            : null;
+          let tooltip = "Hot Drop";
+          if (poi) tooltip += " · " + poi;
           if (survived) tooltip += " · survived";
           else if (teamSaved) tooltip += " · died, team survived";
           else tooltip += " · died";
