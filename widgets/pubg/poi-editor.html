@@ -148,6 +148,7 @@
   <button id="polyBtn">⬠ Polygon</button>
   <button id="pinsBtn" class="secondary">📍 Pins laden</button>
   <button id="gridBtn" class="secondary active" title="1km-Raster ein/aus">▦ Raster</button>
+  <button id="modeBtn" class="secondary" title="Welche Cal die Inputs steuern: Pin- oder Grid-Calibration">Cal-Mode: PIN</button>
   <button id="flipXBtn" class="secondary" title="X-Achse spiegeln (Ost/West)">↔ FlipX</button>
   <button id="flipYBtn" class="secondary" title="Y-Achse spiegeln (Nord/Sued)">↕ FlipY</button>
   <button id="rotBtn" class="secondary" title="90° drehen">⟳ 0°</button>
@@ -204,24 +205,16 @@
 // mehrere Bild-Varianten derselben Map auflisten, die alle dieselben
 // Region-Daten teilen.
 const MAPS = [
-  ["Baltic_Main",            "Erangel",            8],
-  ["screenshot",             "Erangel (in-game)",  8, "Baltic_Main"],
-  ["Desert_Main",            "Miramar",            8],
-  ["Desert_Main_ortho",      "Miramar (in-game)",  8, "Desert_Main"],
-  ["Savage_Main",            "Sanhok",             4],
-  ["Savage_Main_ortho",      "Sanhok (in-game)",   4, "Savage_Main"],
-  ["DihorOtok_Main",         "Vikendi",            8],
-  ["DihorOtok_Main_ortho",   "Vikendi (in-game)",  8, "DihorOtok_Main"],
-  ["Tiger_Main",             "Taego",              8],
-  ["Tiger_Main_ortho",       "Taego (in-game)",    8, "Tiger_Main"],
-  ["Kiki_Main",              "Deston",             8],
-  ["Kiki_Main_ortho",        "Deston (in-game)",   8, "Kiki_Main"],
-  ["Neon_Main",              "Rondo",              8],
-  ["Neon_Main_ortho",        "Rondo (in-game)",    8, "Neon_Main"],
-  ["Summerland_Main",        "Karakin",            2],
-  ["Summerland_Main_ortho",  "Karakin (in-game)",  2, "Summerland_Main"],
-  ["Chimera_Main",           "Paramo",             3],
-  ["Chimera_Main_ortho",     "Paramo (in-game)",   3, "Chimera_Main"],
+  ["Baltic_Main",       "Erangel",            8],
+  ["screenshot",        "Erangel (in-game)",  8, "Baltic_Main"],
+  ["Desert_Main",       "Miramar",            8],
+  ["Savage_Main",       "Sanhok",             4],
+  ["DihorOtok_Main",    "Vikendi",            8],
+  ["Tiger_Main",        "Taego",              8],
+  ["Kiki_Main",         "Deston",             8],
+  ["Neon_Main",         "Rondo",              8],
+  ["Summerland_Main",   "Karakin",            2],
+  ["Chimera_Main",      "Paramo",             3],
 ];
 
 let currentMap = null;       // imageId — entscheidet welche .webp geladen wird
@@ -251,6 +244,12 @@ let spaceDown = false;
 // Persistiert pro Map; gleiche Formel im Runtime-POI-Lookup.
 let pinCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0,
                 flipX: false, flipY: false, rotate: 0 };
+// Grid hat ein eigenes affines Mapping. So kannst du das Raster z.B.
+// an die perspektivisch verzogenen pubg.com-km-Marker anpassen ohne die
+// Pin-Position zu verlieren (Pins haben ihren eigenen Cal-Stream).
+let gridCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0 };
+// Toolbar: welches Cal wird gerade von den Inputs gesteuert?
+let calMode = "pin";  // 'pin' | 'grid'
 let calibratingPins = false;
 let calRef = null;   // [startMouseX, startMouseY, startOffsetX, startOffsetY]
 let showGrid = true;
@@ -286,6 +285,7 @@ async function loadMap(mapId) {
   pins = [];
   pinCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0,
               flipX: false, flipY: false, rotate: 0 };
+  gridCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0 };
   selectedIdx = -1;
   polyPoints = [];
 
@@ -325,6 +325,14 @@ async function loadMap(mapId) {
         flipX:   !!blob.pinCalibration.flipX,
         flipY:   !!blob.pinCalibration.flipY,
         rotate:  blob.pinCalibration.rotate || 0,
+      };
+    }
+    if (blob.gridCalibration) {
+      gridCal = {
+        offsetX: blob.gridCalibration.offsetX || 0,
+        offsetY: blob.gridCalibration.offsetY || 0,
+        scaleX:  blob.gridCalibration.scaleX  || 1.0,
+        scaleY:  blob.gridCalibration.scaleY  || 1.0,
       };
     }
     statusEl.textContent = `${regions.length} Regionen geladen`;
@@ -397,13 +405,15 @@ function worldToCanvas(xCm, yCm) {
   const [ex, ey] = _xform(xCm, yCm);
   return [ex * base, ey * base];
 }
-// worldToCanvasRaw: OHNE Calibration. Wird vom Grid genutzt damit die
-// km-Linien stabil am rohen Welt-Koord-System haengen (= passen zur
-// Map sobald die nicht-pin-Calibration einmal stimmt). Pins/Regionen
-// nutzen weiter worldToCanvas mit Cal-Korrektur.
+// worldToCanvasRaw: Grid-Cal anwenden (NICHT pinCal). Damit kann das
+// Grid pro Map an die Map-Anzeige angepasst werden, unabhaengig davon
+// wie die Pins relativ zur Map sitzen muessen.
 function worldToCanvasRaw(xCm, yCm) {
   const base = canvas.width / (mapKm * 100000);
-  return [xCm * base, yCm * base];
+  const mc = mapKm * 100000 / 2;
+  const ex = (xCm - mc) * gridCal.scaleX + mc + gridCal.offsetX;
+  const ey = (yCm - mc) * gridCal.scaleY + mc + gridCal.offsetY;
+  return [ex * base, ey * base];
 }
 function canvasToWorld(px, py) {
   const base = canvas.width / (mapKm * 100000);
@@ -817,11 +827,13 @@ function hitTestRegion(wx, wy) {
 }
 
 canvas.addEventListener("mousedown", (ev) => {
-  // Strg+LMB = Pin-Calibration verschieben
+  // Strg+LMB = aktive Calibration verschieben (Pin- oder Grid-Cal,
+  // je nach Toolbar-Mode)
   if (ev.ctrlKey && ev.button === 0) {
     calibratingPins = true;
     const [wx, wy] = eventToWorld(ev);
-    calRef = [wx, wy, pinCal.offsetX, pinCal.offsetY];
+    const c = activeCal();
+    calRef = [wx, wy, c.offsetX, c.offsetY];
     canvas.style.cursor = "grabbing";
     ev.preventDefault();
     return;
@@ -918,11 +930,12 @@ canvas.addEventListener("dblclick", (ev) => {
 });
 
 canvas.addEventListener("mousemove", (ev) => {
-  // Pin-Calibration-Drag
+  // Calibration-Drag (Pin oder Grid, je nach Mode)
   if (calibratingPins && calRef) {
     const [wx, wy] = eventToWorld(ev);
-    pinCal.offsetX = calRef[2] + (wx - calRef[0]);
-    pinCal.offsetY = calRef[3] + (wy - calRef[1]);
+    const c = activeCal();
+    c.offsetX = calRef[2] + (wx - calRef[0]);
+    c.offsetY = calRef[3] + (wy - calRef[1]);
     updateCalLabel();
     render();
     return;
@@ -1058,10 +1071,11 @@ window.addEventListener("keydown", (ev) => {
   let step = 100;             // 1m (100 cm)
   if (ev.shiftKey) step = 1000;   // 10m
   if (ev.ctrlKey)  step = 10000;  // 100m
-  if (ev.key === "ArrowLeft")  pinCal.offsetX -= step;
-  if (ev.key === "ArrowRight") pinCal.offsetX += step;
-  if (ev.key === "ArrowUp")    pinCal.offsetY -= step;
-  if (ev.key === "ArrowDown")  pinCal.offsetY += step;
+  const c = activeCal();
+  if (ev.key === "ArrowLeft")  c.offsetX -= step;
+  if (ev.key === "ArrowRight") c.offsetX += step;
+  if (ev.key === "ArrowUp")    c.offsetY -= step;
+  if (ev.key === "ArrowDown")  c.offsetY += step;
   updateCalLabel();
   render();
 });
@@ -1080,39 +1094,60 @@ document.getElementById("zoomResetBtn").addEventListener("click", () => {
   updateZoomBtn();
   render();
 });
+function activeCal() { return calMode === "grid" ? gridCal : pinCal; }
 function updateCalLabel() {
-  const xm = (pinCal.offsetX / 100).toFixed(0);
-  const ym = (pinCal.offsetY / 100).toFixed(0);
+  const c = activeCal();
+  const xm = (c.offsetX / 100).toFixed(0);
+  const ym = (c.offsetY / 100).toFixed(0);
   document.getElementById("calResetBtn").textContent = `↹ Reset Cal`;
   document.getElementById("offsetXIn").value = xm;
   document.getElementById("offsetYIn").value = ym;
-  document.getElementById("scaleXIn").value = pinCal.scaleX.toFixed(4);
-  document.getElementById("scaleYIn").value = pinCal.scaleY.toFixed(4);
-  document.getElementById("flipXBtn").classList.toggle("active", pinCal.flipX);
-  document.getElementById("flipYBtn").classList.toggle("active", pinCal.flipY);
-  document.getElementById("rotBtn").textContent = `⟳ ${pinCal.rotate}°`;
-  document.getElementById("rotBtn").classList.toggle("active", pinCal.rotate !== 0);
+  document.getElementById("scaleXIn").value = c.scaleX.toFixed(4);
+  document.getElementById("scaleYIn").value = c.scaleY.toFixed(4);
+  // Flip/Rotate gibt's nur bei pinCal
+  const fx = document.getElementById("flipXBtn");
+  const fy = document.getElementById("flipYBtn");
+  const rt = document.getElementById("rotBtn");
+  if (calMode === "grid") {
+    fx.style.display = fy.style.display = rt.style.display = "none";
+  } else {
+    fx.style.display = fy.style.display = rt.style.display = "";
+    fx.classList.toggle("active", pinCal.flipX);
+    fy.classList.toggle("active", pinCal.flipY);
+    rt.textContent = `⟳ ${pinCal.rotate}°`;
+    rt.classList.toggle("active", pinCal.rotate !== 0);
+  }
+  document.getElementById("modeBtn").textContent = `Cal-Mode: ${calMode.toUpperCase()}`;
+  document.getElementById("modeBtn").classList.toggle("active", calMode === "grid");
 }
 document.getElementById("calResetBtn").addEventListener("click", () => {
-  pinCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0,
-              flipX: false, flipY: false, rotate: 0 };
+  if (calMode === "grid") {
+    gridCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0 };
+  } else {
+    pinCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0,
+                flipX: false, flipY: false, rotate: 0 };
+  }
   updateCalLabel();
   render();
 });
+document.getElementById("modeBtn").addEventListener("click", () => {
+  calMode = calMode === "pin" ? "grid" : "pin";
+  updateCalLabel();
+});
 document.getElementById("scaleXIn").addEventListener("input", (ev) => {
-  pinCal.scaleX = parseFloat(ev.target.value) || 1.0;
+  activeCal().scaleX = parseFloat(ev.target.value) || 1.0;
   render();
 });
 document.getElementById("scaleYIn").addEventListener("input", (ev) => {
-  pinCal.scaleY = parseFloat(ev.target.value) || 1.0;
+  activeCal().scaleY = parseFloat(ev.target.value) || 1.0;
   render();
 });
 document.getElementById("offsetXIn").addEventListener("input", (ev) => {
-  pinCal.offsetX = (parseFloat(ev.target.value) || 0) * 100;  // m → cm
+  activeCal().offsetX = (parseFloat(ev.target.value) || 0) * 100;
   render();
 });
 document.getElementById("offsetYIn").addEventListener("input", (ev) => {
-  pinCal.offsetY = (parseFloat(ev.target.value) || 0) * 100;
+  activeCal().offsetY = (parseFloat(ev.target.value) || 0) * 100;
   render();
 });
 document.getElementById("gridBtn").addEventListener("click", () => {
@@ -1167,6 +1202,7 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
         map: currentDataKey,
         mapKm: mapKm,
         pinCalibration: pinCal,
+        gridCalibration: gridCal,
         regions: regions,
       }),
     });

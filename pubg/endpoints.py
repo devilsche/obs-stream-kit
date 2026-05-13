@@ -483,6 +483,7 @@ class EndpointRegistry:
             })
         data = self._load_pois()
         cal = payload.get("pinCalibration") or {}
+        grid = payload.get("gridCalibration") or {}
         data[map_id] = {
             "mapKm": float(payload.get("mapKm") or 8),
             "pinCalibration": {
@@ -493,6 +494,12 @@ class EndpointRegistry:
                 "flipX":   bool(cal.get("flipX")),
                 "flipY":   bool(cal.get("flipY")),
                 "rotate":  int(cal.get("rotate")  or 0),
+            },
+            "gridCalibration": {
+                "offsetX": int(grid.get("offsetX") or 0),
+                "offsetY": int(grid.get("offsetY") or 0),
+                "scaleX":  float(grid.get("scaleX")  or 1.0),
+                "scaleY":  float(grid.get("scaleY")  or 1.0),
             },
             "regions": clean,
         }
