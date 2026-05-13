@@ -389,6 +389,14 @@ function worldToCanvas(xCm, yCm) {
   const [ex, ey] = _xform(xCm, yCm);
   return [ex * base, ey * base];
 }
+// worldToCanvasRaw: OHNE Calibration. Wird vom Grid genutzt damit die
+// km-Linien stabil am rohen Welt-Koord-System haengen (= passen zur
+// Map sobald die nicht-pin-Calibration einmal stimmt). Pins/Regionen
+// nutzen weiter worldToCanvas mit Cal-Korrektur.
+function worldToCanvasRaw(xCm, yCm) {
+  const base = canvas.width / (mapKm * 100000);
+  return [xCm * base, yCm * base];
+}
 function canvasToWorld(px, py) {
   const base = canvas.width / (mapKm * 100000);
   const [wx, wy] = _ixform(px / base, py / base);
@@ -471,12 +479,14 @@ function render() {
     ctx.font = `${fontPx}px DM Sans, sans-serif`;
     ctx.textBaseline = "top";
     // Endpunkte fuer jede vertikale Linie auf y=0..mapKm*100000
+    // Grid nutzt worldToCanvasRaw (keine Cal) damit es stabil zur Map
+    // bleibt, unabhaengig vom Pin-Offset/Scale.
     const yTop = 0, yBot = mapKm * 100000;
     for (let km = 0; km <= mapKm; km++) {
       const rel = km - centerKm;
       const isAxis = (rel === 0);
-      const [x1, y1] = worldToCanvas(km * 100000, yTop);
-      const [x2, y2] = worldToCanvas(km * 100000, yBot);
+      const [x1, y1] = worldToCanvasRaw(km * 100000, yTop);
+      const [x2, y2] = worldToCanvasRaw(km * 100000, yBot);
       ctx.strokeStyle = isAxis ? "rgba(242,183,5,0.95)" : "rgba(242,183,5,0.45)";
       ctx.lineWidth = isAxis ? lw * 2 : lw;
       ctx.beginPath();
@@ -491,8 +501,8 @@ function render() {
     for (let km = 0; km <= mapKm; km++) {
       const rel = km - centerKm;
       const isAxis = (rel === 0);
-      const [x1, y1] = worldToCanvas(xLeft,  km * 100000);
-      const [x2, y2] = worldToCanvas(xRight, km * 100000);
+      const [x1, y1] = worldToCanvasRaw(xLeft,  km * 100000);
+      const [x2, y2] = worldToCanvasRaw(xRight, km * 100000);
       ctx.strokeStyle = isAxis ? "rgba(242,183,5,0.95)" : "rgba(242,183,5,0.45)";
       ctx.lineWidth = isAxis ? lw * 2 : lw;
       ctx.beginPath();
@@ -505,13 +515,12 @@ function render() {
     }
     // Reference-Pins + Intersection-Labels an jeder km/km-Kreuzung.
     // Zeigt 'wo das System glaubt, dass Welt-Coord (1km, 1km) liegt' usw.
-    // Vergleichswert fuer landing-pins: wenn ein landing-pin nahe einer
-    // Ref-Dot ist, sollte sein Welt-Coord auch nahe der Dot-Coord sein.
+    // Auch raw (ohne Cal) damit sie zur Grid-Linie konsistent sind.
     const dotFont = `${9 / view.zoom}px DM Sans, sans-serif`;
     ctx.font = dotFont;
     for (let kx = 0; kx <= mapKm; kx++) {
       for (let ky = 0; ky <= mapKm; ky++) {
-        const [px, py] = worldToCanvas(kx * 100000, ky * 100000);
+        const [px, py] = worldToCanvasRaw(kx * 100000, ky * 100000);
         // Blue reference dot
         ctx.fillStyle = "rgba(70, 180, 240, 0.95)";
         ctx.beginPath();
@@ -527,7 +536,7 @@ function render() {
       }
     }
     // Welt-Mitte zusaetzlich als groesserer weisser Punkt fuer Orientierung
-    const [cx, cy] = worldToCanvas(centerKm * 100000, centerKm * 100000);
+    const [cx, cy] = worldToCanvasRaw(centerKm * 100000, centerKm * 100000);
     ctx.fillStyle = "#fff";
     ctx.beginPath();
     ctx.arc(cx, cy, 5 / view.zoom, 0, Math.PI * 2);
