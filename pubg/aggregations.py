@@ -1310,6 +1310,49 @@ def _insert_achievements(conn, achievements, suppress_popup=False):
     return new_count
 
 
+def _migrate_legacy_achievement_ids(conn):
+    """Rename alte Achievement-IDs auf die neuen Tier-IDs. Idempotent.
+    Migration:
+      - five_kill_match -> kills_5
+      - first_hot_drop -> hot_drop_match (label wird auf 'Inferno Begins ×1' geupdated)
+      - first_hot_drop_survived -> hot_drop_match_survived (label 'Inferno Survivor ×1')
+    Bei Konflikt (neue ID existiert bereits fuer diesen Match) wird der
+    alte Eintrag geloescht."""
+    # 1) five_kill_match -> kills_5
+    conn.execute("""
+        UPDATE OR IGNORE pubg_achievements_seen
+        SET achievement_id = 'kills_5'
+        WHERE achievement_id = 'five_kill_match'
+    """)
+    conn.execute("""
+        DELETE FROM pubg_achievements_seen
+        WHERE achievement_id = 'five_kill_match'
+    """)
+    # 2) first_hot_drop -> hot_drop_match (×1 weil es das erste war)
+    conn.execute("""
+        UPDATE OR IGNORE pubg_achievements_seen
+        SET achievement_id = 'hot_drop_match',
+            label = 'Inferno Begins ×1'
+        WHERE achievement_id = 'first_hot_drop'
+    """)
+    conn.execute("""
+        DELETE FROM pubg_achievements_seen
+        WHERE achievement_id = 'first_hot_drop'
+    """)
+    # 3) first_hot_drop_survived -> hot_drop_match_survived (×1)
+    conn.execute("""
+        UPDATE OR IGNORE pubg_achievements_seen
+        SET achievement_id = 'hot_drop_match_survived',
+            label = 'Inferno Survivor ×1'
+        WHERE achievement_id = 'first_hot_drop_survived'
+    """)
+    conn.execute("""
+        DELETE FROM pubg_achievements_seen
+        WHERE achievement_id = 'first_hot_drop_survived'
+    """)
+    conn.commit()
+
+
 def backfill_session_achievements(conn, my_account_id,
                                     gap_hours=6, suppress_popup=True):
     """Historischer Backfill: walkt durch ALLE Matches in der DB
@@ -1325,6 +1368,8 @@ def backfill_session_achievements(conn, my_account_id,
     Returns dict { sessions, inserted, errors }.
     """
     import datetime as _dt
+    # Erst Legacy-IDs migrieren (idempotent), dann normal weiter
+    _migrate_legacy_achievement_ids(conn)
     # Alle Matches chronologisch (ASC)
     matches = compute_session_matches(conn, my_account_id, "all")
     matches = list(reversed(matches))  # ASC

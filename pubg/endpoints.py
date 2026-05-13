@@ -691,7 +691,7 @@ class EndpointRegistry:
     PUBG_LABEL_TRANSLATIONS = {
         "german": {
             "first_chicken":           "Dinner serviert",
-            "first_top10":             "Endgame-Initiation",
+            "first_top10":             "Heiße Phase eingeleitet",
             "kills_10":                "Massaker",
             "kills_15":                "Vernichtung",
             "damage_1500":             "Großer Schaden",
@@ -703,7 +703,7 @@ class EndpointRegistry:
             "top3_streak":             "Podium-Serie",
             "top10_streak":            "Endgame-Serie",
             "chicken_streak":          "Dinner-Serie",
-            "session_opener_top10":    "Guter Start",
+            "session_opener_top10":    "Starker Beginn",
         },
         "french": {
             "first_chicken":           "Dîner servi",
