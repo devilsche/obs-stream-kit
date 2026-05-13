@@ -88,6 +88,12 @@
       letter-spacing: 0.04em;
     }
     .pct b { color: var(--pubg-text); font-variant-numeric: tabular-nums; }
+    .ago {
+      color: var(--pubg-muted);
+      font-size: 0.78em;
+      margin-top: 2px;
+      font-variant-numeric: tabular-nums;
+    }
     /* Rare-Unlock: <5% aller Spieler — Glow + Ribbon-Text aendert sich */
     .popup.rare .icon {
       box-shadow: 0 0 24px rgba(242, 183, 5, 0.85),
@@ -111,6 +117,7 @@
       <div class="title" id="title">—</div>
       <div class="desc" id="desc"></div>
       <div class="pct" id="pct"></div>
+      <div class="ago" id="ago"></div>
       <div class="game" id="game"></div>
     </div>
   </div>
@@ -167,6 +174,21 @@
     const popup = document.getElementById("popup");
     const queue = [];
     let busy = false;
+
+    // Relative Zeitangabe — "vor 30s", "vor 8 Min.", "vor 3 Std.",
+    // dann Datum. Wird im Popup unter der pct gerendert damit klar
+    // ist wenn ein Milestone verzoegert popt (PUBG-API laggt 5-10min).
+    function fmtAgo(unlockedAt) {
+      if (!unlockedAt) return "";
+      const nowS = Date.now() / 1000;
+      const delta = Math.max(0, nowS - unlockedAt);
+      if (delta < 60)    return `vor ${Math.round(delta)}s`;
+      if (delta < 3600)  return `vor ${Math.round(delta / 60)} Min.`;
+      if (delta < 86400) return `vor ${Math.round(delta / 3600)} Std.`;
+      const d = new Date(unlockedAt * 1000);
+      return d.toLocaleDateString("de-DE",
+        { day: "2-digit", month: "2-digit" });
+    }
 
     function showOne(u) {
       busy = true;
@@ -229,6 +251,14 @@
         pctEl.style.display = "";
       } else {
         pctEl.style.display = "none";
+      }
+      const agoEl = document.getElementById("ago");
+      const agoText = fmtAgo(u.unlockedAt);
+      if (agoText) {
+        agoEl.textContent = agoText;
+        agoEl.style.display = "";
+      } else {
+        agoEl.style.display = "none";
       }
       // Ribbon-Text: PUBG-Session-Milestones bekommen eigenes Label,
       // damit klar ist dass das nicht ein 'echtes' Steam-Achievement ist.

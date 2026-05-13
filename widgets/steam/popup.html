@@ -293,8 +293,25 @@
       if (statLine) {
         parts.push(`<span class="rare-tag">${statLine}</span>`);
       }
+      const agoText = fmtAgo(u.unlockedAt);
+      if (agoText) {
+        parts.push(`<span class="ago-tag">${agoText}</span>`);
+      }
       metaEl.innerHTML = parts.join("");
       barEl.style.display = "none";
+    }
+
+    // Relative Zeit — "vor 30s" / "vor 8 Min." / "vor 3 Std." / Datum.
+    function fmtAgo(unlockedAt) {
+      if (!unlockedAt) return "";
+      const nowS = Date.now() / 1000;
+      const delta = Math.max(0, nowS - unlockedAt);
+      if (delta < 60)    return `vor ${Math.round(delta)}s`;
+      if (delta < 3600)  return `vor ${Math.round(delta / 60)} Min.`;
+      if (delta < 86400) return `vor ${Math.round(delta / 3600)} Std.`;
+      const d = new Date(unlockedAt * 1000);
+      return d.toLocaleDateString("de-DE",
+        { day: "2-digit", month: "2-digit" });
     }
 
     // Show / Hide / Queue-Processing ────────────────────────────────────
