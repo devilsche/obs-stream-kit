@@ -319,15 +319,17 @@ class EndpointRegistry:
                 conn, self.my_account_id,
                 from_iso=from_iso, to_iso=to_iso),
         )
-        # Enrich: PNG-Icon-URL und Canonical-Label fuer den Report.
+        # Enrich: PNG-Icon-URL, lokalisierter Canonical + Label fuer den Report.
         # Original-icon (Emoji) bleibt als Fallback drin.
+        lang = self._current_lang()
         enriched = []
         for a in items:
             aid = a.get("id")
             enriched.append({
                 **a,
-                "iconUrl": self.PUBG_ICON_URLS.get(aid),
-                "canonical": self.PUBG_CANONICAL_LABELS.get(aid),
+                "label":     self._localize_label(a.get("label"), aid, lang),
+                "iconUrl":   self.PUBG_ICON_URLS.get(aid),
+                "canonical": self._localized_prefix(aid, lang),
             })
         return _ok(enriched)
 
@@ -681,6 +683,121 @@ class EndpointRegistry:
     # 'Sessions die >= N erreicht haben' — dadurch wird ×5 seltener
     # als ×2. Achievements ohne ×N (z.B. first_chicken, beast_chicken)
     # bleiben aggregiert auf achievement_id-Ebene.
+    # Lokalisierte Praefixe pro achievement_id. Wird zur Response-Zeit
+    # eingesetzt — die Labels in der DB bleiben Englisch (sprach-agnostisch).
+    # Was hier NICHT drinsteht, fallback auf English aus PUBG_CANONICAL_LABELS.
+    # Convention: typische Gamer-Begriffe (GODLIKE, 20-Bomb, Phoenix Chicken,
+    # Beast Chicken, Sniper Elite usw.) bleiben universell Englisch.
+    PUBG_LABEL_TRANSLATIONS = {
+        "german": {
+            "first_chicken":           "Dinner serviert",
+            "first_top10":             "Endgame-Initiation",
+            "kills_10":                "Massaker",
+            "kills_15":                "Vernichtung",
+            "damage_1500":             "Großer Schaden",
+            "damage_2000":             "Schadens-Dämon",
+            "hot_drop_match":          "Inferno beginnt",
+            "hot_drop_match_survived": "Inferno-Überlebender",
+            "first_hot_drop":          "Ins Inferno",
+            "first_hot_drop_survived": "Inferno-Überlebender",
+            "top3_streak":             "Podium-Serie",
+            "top10_streak":            "Endgame-Serie",
+            "chicken_streak":          "Dinner-Serie",
+            "session_opener_top10":    "Guter Start",
+        },
+        "french": {
+            "first_chicken":           "Dîner servi",
+            "first_top10":             "Initiation Endgame",
+            "kills_10":                "Massacre",
+            "kills_15":                "Annihilation",
+            "damage_1500":             "Gros dégâts",
+            "damage_2000":             "Démon des dégâts",
+            "hot_drop_match":          "Inferno commence",
+            "hot_drop_match_survived": "Survivant de l'Inferno",
+            "first_hot_drop":          "Dans l'Inferno",
+            "first_hot_drop_survived": "Survivant de l'Inferno",
+            "top3_streak":             "Série Podium",
+            "top10_streak":            "Série Endgame",
+            "chicken_streak":          "Série Dinner",
+            "session_opener_top10":    "Bon départ",
+        },
+        "spanish": {
+            "first_chicken":           "Dinner servido",
+            "first_top10":             "Iniciación Endgame",
+            "kills_10":                "Masacre",
+            "kills_15":                "Aniquilación",
+            "damage_1500":             "Daño grande",
+            "damage_2000":             "Demonio del daño",
+            "hot_drop_match":          "Inferno comienza",
+            "hot_drop_match_survived": "Superviviente del Inferno",
+            "first_hot_drop":          "Al Inferno",
+            "first_hot_drop_survived": "Superviviente del Inferno",
+            "top3_streak":             "Racha Podio",
+            "top10_streak":            "Racha Endgame",
+            "chicken_streak":          "Racha Dinner",
+            "session_opener_top10":    "Buen comienzo",
+        },
+        "dutch": {
+            "first_chicken":           "Dinner geserveerd",
+            "first_top10":             "Endgame-initiatie",
+            "kills_10":                "Bloedbad",
+            "kills_15":                "Vernietiging",
+            "damage_1500":             "Grote schade",
+            "damage_2000":             "Schade-demon",
+            "hot_drop_match":          "Inferno begint",
+            "hot_drop_match_survived": "Inferno-overlever",
+            "first_hot_drop":          "In het Inferno",
+            "first_hot_drop_survived": "Inferno-overlever",
+            "top3_streak":             "Podium-reeks",
+            "top10_streak":            "Endgame-reeks",
+            "chicken_streak":          "Dinner-reeks",
+            "session_opener_top10":    "Goede start",
+        },
+        "italian": {
+            "first_chicken":           "Dinner servito",
+            "first_top10":             "Iniziazione Endgame",
+            "kills_10":                "Massacro",
+            "kills_15":                "Annichilimento",
+            "damage_1500":             "Grandi danni",
+            "damage_2000":             "Demone dei danni",
+            "hot_drop_match":          "Inferno inizia",
+            "hot_drop_match_survived": "Sopravvissuto all'Inferno",
+            "first_hot_drop":          "Nell'Inferno",
+            "first_hot_drop_survived": "Sopravvissuto all'Inferno",
+            "top3_streak":             "Serie Podio",
+            "top10_streak":            "Serie Endgame",
+            "chicken_streak":          "Serie Dinner",
+            "session_opener_top10":    "Buon inizio",
+        },
+    }
+
+    def _localized_prefix(self, achievement_id, lang):
+        """Liefert den lokalisierten Praefix (ohne Suffix) fuer ein
+        achievement_id. Fallback: English aus PUBG_CANONICAL_LABELS."""
+        if not achievement_id:
+            return None
+        lang_map = self.PUBG_LABEL_TRANSLATIONS.get(lang or "english", {})
+        if achievement_id in lang_map:
+            return lang_map[achievement_id]
+        return self.PUBG_CANONICAL_LABELS.get(achievement_id)
+
+    def _localize_label(self, label, achievement_id, lang):
+        """Tauscht den Praefix eines DB-Labels (Englisch) gegen die
+        lokalisierte Version. Suffix (· N Kills / ×3 / · 423m) bleibt.
+        Beispiel: 'Massacre · 12 Kills' + lang=german
+              -> 'Massaker · 12 Kills'"""
+        if not label or not achievement_id:
+            return label
+        new_prefix = self._localized_prefix(achievement_id, lang)
+        if not new_prefix:
+            return label
+        import re as _re
+        # Suffix beginnt beim ersten ' · ', ' ×' oder ' #'
+        m = _re.search(r"\s+[·×#]", label)
+        if m:
+            return new_prefix + label[m.start():]
+        return new_prefix
+
     PUBG_TIERED_ACHIEVEMENTS = {
         "top3_streak",
         "top10_streak",
@@ -799,7 +916,8 @@ class EndpointRegistry:
                 "appId":       -2,  # PUBG-Marker (Steam-Side nutzt -1 fuer Test)
                 "gameName":    "PUBG: Session Milestones",
                 "apiName":     f"{r['achievement_id']}:{r['match_id']}",
-                "displayName": r["label"],
+                "displayName": self._localize_label(
+                    r["label"], r["achievement_id"], lang),
                 "description": self._ach_description(r["achievement_id"], lang),
                 "iconUrl":     (self.PUBG_ICON_URLS.get(r["achievement_id"])
                                 or r["icon"]),
@@ -892,8 +1010,9 @@ class EndpointRegistry:
                 "appId":         -2,
                 "gameName":      "PUBG: Session Milestones",
                 "apiName":       f"{aid}:{r['match_id']}",
-                # Instanz-Label mit Details (z.B. 'Beast Chicken · 6 Kills')
-                "displayName":   r["label"],
+                # Instanz-Label mit Details, lokalisiert
+                # (z.B. 'Beast Chicken · 6 Kills' bzw. 'Massaker · 12 Kills')
+                "displayName":   self._localize_label(r["label"], aid, lang),
                 "description":   self._ach_description(aid, lang),
                 "iconUrl":       (self.PUBG_ICON_URLS.get(aid) or r["icon"]),
                 "unlockedAt":    _iso_to_ts(r["played_at"]),
