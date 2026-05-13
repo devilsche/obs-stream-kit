@@ -100,6 +100,8 @@ class EndpointRegistry:
             return self._session_matches(qs)
         if route == ("GET", "/api/pubg/hot-drop"):
             return self._hot_drop(qs)
+        if route == ("GET", "/api/pubg/landings"):
+            return self._landings(qs)
         if route == ("GET", "/api/pubg/session-achievements"):
             return self._session_achievements(qs)
         if route == ("GET", "/api/pubg/recent-achievements"):
@@ -295,6 +297,47 @@ class EndpointRegistry:
                 conn, self.my_account_id, range_key,
                 from_iso=from_iso, to_iso=to_iso),
         ))
+
+    def _landings(self, qs):
+        """Liefert alle Squad-Landings auf einer Map (oder allen Maps).
+        Optional ?map=Baltic_Main fuer Filter, sonst alle Maps gemixt.
+        Pro Landing: { matchId, playedAt, mapName, accountId, name, x, y }.
+        Wird vom POI-Editor genutzt um die historischen Drop-Points
+        als Pin-Overlay zu zeigen."""
+        conn = self.get_conn()
+        map_filter = (qs.get("map") or "").strip()
+        params = [self.my_account_id]
+        where = ""
+        if map_filter:
+            where = "AND m.map_name = ?"
+            params.append(map_filter)
+        rows = conn.execute(f"""
+            SELECT te.match_id, m.played_at, m.map_name,
+                   te.actor_account, te.actor_x, te.actor_y,
+                   p.name AS player_name
+            FROM telemetry_events te
+            JOIN matches m ON m.match_id = te.match_id
+            JOIN participants me ON me.match_id = te.match_id
+                AND me.account_id = ?
+            JOIN participants pa ON pa.match_id = te.match_id
+                AND pa.team_id = me.team_id
+                AND pa.account_id = te.actor_account
+            LEFT JOIN players p ON p.account_id = te.actor_account
+            WHERE te.event_type = 'Landing'
+              AND te.actor_x IS NOT NULL
+              AND te.actor_y IS NOT NULL
+              {where}
+        """, params).fetchall()
+        landings = [{
+            "matchId":    r["match_id"],
+            "playedAt":   r["played_at"],
+            "mapName":    r["map_name"],
+            "accountId":  r["actor_account"],
+            "name":       r["player_name"] or r["actor_account"][:8],
+            "x":          r["actor_x"],
+            "y":          r["actor_y"],
+        } for r in rows]
+        return _ok({"landings": landings, "count": len(landings)})
 
     def _hot_drop(self, qs):
         conn = self.get_conn()
