@@ -434,6 +434,9 @@ class EndpointRegistry:
                 "offsetY": int(cal.get("offsetY") or 0),
                 "scaleX":  float(cal.get("scaleX")  or 1.0),
                 "scaleY":  float(cal.get("scaleY")  or 1.0),
+                "flipX":   bool(cal.get("flipX")),
+                "flipY":   bool(cal.get("flipY")),
+                "rotate":  int(cal.get("rotate")  or 0),
             },
             "regions": clean,
         }

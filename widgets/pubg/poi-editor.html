@@ -148,7 +148,10 @@
   <button id="polyBtn">⬠ Polygon</button>
   <button id="pinsBtn" class="secondary">📍 Pins laden</button>
   <button id="gridBtn" class="secondary active" title="1km-Raster ein/aus">▦ Raster</button>
-  <button id="calResetBtn" class="secondary" title="Calibration zuruecksetzen (0/0 m, scale 1.0/1.0)">↹ Pins 0/0</button>
+  <button id="flipXBtn" class="secondary" title="X-Achse spiegeln (Ost/West)">↔ FlipX</button>
+  <button id="flipYBtn" class="secondary" title="Y-Achse spiegeln (Nord/Sued)">↕ FlipY</button>
+  <button id="rotBtn" class="secondary" title="90° drehen">⟳ 0°</button>
+  <button id="calResetBtn" class="secondary" title="Calibration zuruecksetzen">↹ Pins 0/0</button>
   <label style="display:inline-flex;gap:4px;align-items:center;font-size:0.78em;color:#8a7d99">
     Scale X<input id="scaleXIn" type="number" step="0.005" value="1.000" style="width:78px">
     Y<input id="scaleYIn" type="number" step="0.005" value="1.000" style="width:78px">
@@ -226,7 +229,8 @@ let spaceDown = false;
 // Formel: effective = (raw - center) * scale + center + offset
 // ScaleX/Y koennen unabhaengig sein wenn die Map asymmetrisch verzerrt.
 // Persistiert pro Map; gleiche Formel im Runtime-POI-Lookup.
-let pinCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0 };
+let pinCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0,
+                flipX: false, flipY: false, rotate: 0 };
 let calibratingPins = false;
 let calRef = null;   // [startMouseX, startMouseY, startOffsetX, startOffsetY]
 let showGrid = true;
@@ -256,7 +260,8 @@ async function loadMap(mapId) {
   mapKm = meta ? meta[2] : 8;
   mapSizeIn.value = mapKm;
   pins = [];
-  pinCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0 };
+  pinCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0,
+              flipX: false, flipY: false, rotate: 0 };
   selectedIdx = -1;
   polyPoints = [];
 
@@ -290,6 +295,9 @@ async function loadMap(mapId) {
         offsetY: blob.pinCalibration.offsetY || 0,
         scaleX:  blob.pinCalibration.scaleX  || 1.0,
         scaleY:  blob.pinCalibration.scaleY  || 1.0,
+        flipX:   !!blob.pinCalibration.flipX,
+        flipY:   !!blob.pinCalibration.flipY,
+        rotate:  blob.pinCalibration.rotate || 0,
       };
     }
     statusEl.textContent = `${regions.length} Regionen geladen`;
@@ -321,20 +329,50 @@ window.addEventListener("resize", () => { fitCanvas(); render(); });
 // Dadurch zieht jede Cal-Aenderung das KOMPLETTE Welt-Koord-System
 // (Grid + Pins + Regions) gemeinsam ueber die Map. Die Map-Image bleibt
 // fix bei (0,0)..(canvas.width). canvasToWorld inversiert.
+// Reihenfolge der Transformationen (Welt → Canvas):
+//   1) flipX/Y um Map-Mitte
+//   2) Rotate (0/90/180/270°) um Map-Mitte
+//   3) Scale + Offset (center-anchored, wie zuvor)
+//   4) base-Skalierung Welt-cm → Canvas-px
+function _xform(xCm, yCm) {
+  const mc = mapKm * 100000 / 2;
+  let x = xCm, y = yCm;
+  if (pinCal.flipX) x = 2 * mc - x;
+  if (pinCal.flipY) y = 2 * mc - y;
+  const rot = ((pinCal.rotate % 360) + 360) % 360;
+  if (rot !== 0) {
+    const dx = x - mc, dy = y - mc;
+    if (rot === 90)  { x = mc - dy; y = mc + dx; }
+    if (rot === 180) { x = mc - dx; y = mc - dy; }
+    if (rot === 270) { x = mc + dy; y = mc - dx; }
+  }
+  const ex = (x - mc) * pinCal.scaleX + mc + pinCal.offsetX;
+  const ey = (y - mc) * pinCal.scaleY + mc + pinCal.offsetY;
+  return [ex, ey];
+}
+function _ixform(ex, ey) {
+  const mc = mapKm * 100000 / 2;
+  let x = (ex - pinCal.offsetX - mc) / pinCal.scaleX + mc;
+  let y = (ey - pinCal.offsetY - mc) / pinCal.scaleY + mc;
+  const rot = ((pinCal.rotate % 360) + 360) % 360;
+  if (rot !== 0) {
+    const dx = x - mc, dy = y - mc;
+    if (rot === 90)  { x = mc + dy; y = mc - dx; }
+    if (rot === 180) { x = mc - dx; y = mc - dy; }
+    if (rot === 270) { x = mc - dy; y = mc + dx; }
+  }
+  if (pinCal.flipX) x = 2 * mc - x;
+  if (pinCal.flipY) y = 2 * mc - y;
+  return [x, y];
+}
 function worldToCanvas(xCm, yCm) {
   const base = canvas.width / (mapKm * 100000);
-  const mc = mapKm * 100000 / 2;
-  const ex = (xCm - mc) * pinCal.scaleX + mc + pinCal.offsetX;
-  const ey = (yCm - mc) * pinCal.scaleY + mc + pinCal.offsetY;
+  const [ex, ey] = _xform(xCm, yCm);
   return [ex * base, ey * base];
 }
 function canvasToWorld(px, py) {
   const base = canvas.width / (mapKm * 100000);
-  const mc = mapKm * 100000 / 2;
-  const ex = px / base;
-  const ey = py / base;
-  const wx = (ex - pinCal.offsetX - mc) / pinCal.scaleX + mc;
-  const wy = (ey - pinCal.offsetY - mc) / pinCal.scaleY + mc;
+  const [wx, wy] = _ixform(px / base, py / base);
   return [Math.round(wx), Math.round(wy)];
 }
 function canvasXY(ev) {
@@ -962,9 +1000,14 @@ function updateCalLabel() {
   document.getElementById("calResetBtn").textContent = `↹ Pins ${xm}/${ym} m`;
   document.getElementById("scaleXIn").value = pinCal.scaleX.toFixed(3);
   document.getElementById("scaleYIn").value = pinCal.scaleY.toFixed(3);
+  document.getElementById("flipXBtn").classList.toggle("active", pinCal.flipX);
+  document.getElementById("flipYBtn").classList.toggle("active", pinCal.flipY);
+  document.getElementById("rotBtn").textContent = `⟳ ${pinCal.rotate}°`;
+  document.getElementById("rotBtn").classList.toggle("active", pinCal.rotate !== 0);
 }
 document.getElementById("calResetBtn").addEventListener("click", () => {
-  pinCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0 };
+  pinCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0,
+              flipX: false, flipY: false, rotate: 0 };
   updateCalLabel();
   render();
 });
@@ -979,6 +1022,22 @@ document.getElementById("scaleYIn").addEventListener("input", (ev) => {
 document.getElementById("gridBtn").addEventListener("click", () => {
   showGrid = !showGrid;
   document.getElementById("gridBtn").classList.toggle("active", showGrid);
+  render();
+});
+document.getElementById("flipXBtn").addEventListener("click", () => {
+  pinCal.flipX = !pinCal.flipX;
+  document.getElementById("flipXBtn").classList.toggle("active", pinCal.flipX);
+  render();
+});
+document.getElementById("flipYBtn").addEventListener("click", () => {
+  pinCal.flipY = !pinCal.flipY;
+  document.getElementById("flipYBtn").classList.toggle("active", pinCal.flipY);
+  render();
+});
+document.getElementById("rotBtn").addEventListener("click", () => {
+  pinCal.rotate = (pinCal.rotate + 90) % 360;
+  document.getElementById("rotBtn").textContent = `⟳ ${pinCal.rotate}°`;
+  document.getElementById("rotBtn").classList.toggle("active", pinCal.rotate !== 0);
   render();
 });
 
