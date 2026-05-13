@@ -172,7 +172,7 @@
       <b>⬠ Polygon:</b> klicken um Punkte zu setzen, doppel-klick zum Schließen<br>
       <b>Drag</b> Vertex-Handle zum Verschieben &nbsp;·&nbsp; <b>Shift+Click</b> auf Kante = neuer Vertex &nbsp;·&nbsp; <b>Alt+Click</b> auf Vertex = löschen<br>
       <b>Mausrad</b> = Zoom (zentriert) &nbsp;·&nbsp; <b>Rechtsklick-Drag</b> = Pan (auch Space+Drag oder Middle-Mouse)<br>
-      <b>Strg+Drag</b> = Pin-Calibration (verschiebt alle Pins gemeinsam relativ zur Map; Regionen bleiben fest)
+      <b>Strg+Drag</b> = Welt-Koordsystem (Grid+Pins+Regionen) gemeinsam ueber die Map verschieben. <b>Scale X/Y</b> dehnt symmetrisch um Map-Mitte.
     </div>
     <div id="regionList"></div>
     <div class="edit-block" id="editBlock" style="display:none">
@@ -316,16 +316,26 @@ function fitCanvas() {
 window.addEventListener("resize", () => { fitCanvas(); render(); });
 
 // worldToCanvas / canvasToWorld arbeiten in 'logischen Canvas-Pixeln'
-// (also vor dem Zoom-Transform). Render-Funktion appliziert das Transform
-// via ctx.translate+ctx.scale. eventToWorld bringt Maus-Position auf
-// World-cm Coords mit Zoom/Pan-Inversion.
+// (vor dem Zoom-Transform) und applizieren die Map-Calibration:
+//   effective = (raw - mapCenter) * scale + mapCenter + offset
+// Dadurch zieht jede Cal-Aenderung das KOMPLETTE Welt-Koord-System
+// (Grid + Pins + Regions) gemeinsam ueber die Map. Die Map-Image bleibt
+// fix bei (0,0)..(canvas.width). canvasToWorld inversiert.
 function worldToCanvas(xCm, yCm) {
-  const scale = canvas.width / (mapKm * 100000);
-  return [xCm * scale, yCm * scale];
+  const base = canvas.width / (mapKm * 100000);
+  const mc = mapKm * 100000 / 2;
+  const ex = (xCm - mc) * pinCal.scaleX + mc + pinCal.offsetX;
+  const ey = (yCm - mc) * pinCal.scaleY + mc + pinCal.offsetY;
+  return [ex * base, ey * base];
 }
 function canvasToWorld(px, py) {
-  const scale = canvas.width / (mapKm * 100000);
-  return [Math.round(px / scale), Math.round(py / scale)];
+  const base = canvas.width / (mapKm * 100000);
+  const mc = mapKm * 100000 / 2;
+  const ex = px / base;
+  const ey = py / base;
+  const wx = (ex - pinCal.offsetX - mc) / pinCal.scaleX + mc;
+  const wy = (ey - pinCal.offsetY - mc) / pinCal.scaleY + mc;
+  return [Math.round(wx), Math.round(wy)];
 }
 function canvasXY(ev) {
   const r = canvas.getBoundingClientRect();
@@ -383,50 +393,50 @@ function render() {
     ctx.drawImage(mapImage, 0, 0, canvas.width, canvas.height);
   }
 
-  // 1km-Raster mit Achsen-Beschriftung relativ zur Map-Mitte.
-  // Mitte = (0, 0). Links/oben negativ, rechts/unten positiv.
-  // So sieht man sofort wo das System einen km-Strich vermutet,
-  // und kann's mit den Map-eigenen Gitter-Markierungen abgleichen.
+  // 1km-Raster — Linien an WORLD-km-Positionen, durch worldToCanvas
+  // gezogen damit sie der Calibration folgen. (0,0) ist Map-Mitte;
+  // Labels zeigen den relativen km-Wert.
   if (showGrid) {
-    const fullPx = canvas.width;
-    const stepPx = fullPx / mapKm;
     const centerKm = mapKm / 2;
     const lw = 1 / view.zoom;
     const fontPx = 12 / view.zoom;
     ctx.font = `${fontPx}px DM Sans, sans-serif`;
     ctx.textBaseline = "top";
+    // Endpunkte fuer jede vertikale Linie auf y=0..mapKm*100000
+    const yTop = 0, yBot = mapKm * 100000;
     for (let km = 0; km <= mapKm; km++) {
-      const x = km * stepPx;
-      const rel = km - centerKm;  // -mapKm/2 .. +mapKm/2
-      const isAxis = (rel === 0);
-      ctx.strokeStyle = isAxis ? "rgba(242,183,5,0.95)" : "rgba(242,183,5,0.45)";
-      ctx.lineWidth = isAxis ? lw * 2 : lw;
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, fullPx);
-      ctx.stroke();
-      // Label: "+2", "-3" etc. an X-Achse (Top-Edge)
-      ctx.fillStyle = isAxis ? "#fff" : "rgba(242,183,5,0.95)";
-      const label = rel > 0 ? `+${rel}` : `${rel}`;
-      ctx.fillText(label, x + 3/view.zoom, 3/view.zoom);
-    }
-    for (let km = 0; km <= mapKm; km++) {
-      const y = km * stepPx;
       const rel = km - centerKm;
       const isAxis = (rel === 0);
+      const [x1, y1] = worldToCanvas(km * 100000, yTop);
+      const [x2, y2] = worldToCanvas(km * 100000, yBot);
       ctx.strokeStyle = isAxis ? "rgba(242,183,5,0.95)" : "rgba(242,183,5,0.45)";
       ctx.lineWidth = isAxis ? lw * 2 : lw;
       ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(fullPx, y);
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
       ctx.stroke();
       ctx.fillStyle = isAxis ? "#fff" : "rgba(242,183,5,0.95)";
       const label = rel > 0 ? `+${rel}` : `${rel}`;
-      // Skip 0-label fuer Y (sonst doppelt mit X-Achsen-0)
-      if (!(isAxis)) ctx.fillText(label, 3/view.zoom, y + 3/view.zoom);
+      ctx.fillText(label, x1 + 3/view.zoom, y1 + 3/view.zoom);
     }
-    // Center-Marker
-    const cx = centerKm * stepPx, cy = centerKm * stepPx;
+    const xLeft = 0, xRight = mapKm * 100000;
+    for (let km = 0; km <= mapKm; km++) {
+      const rel = km - centerKm;
+      const isAxis = (rel === 0);
+      const [x1, y1] = worldToCanvas(xLeft,  km * 100000);
+      const [x2, y2] = worldToCanvas(xRight, km * 100000);
+      ctx.strokeStyle = isAxis ? "rgba(242,183,5,0.95)" : "rgba(242,183,5,0.45)";
+      ctx.lineWidth = isAxis ? lw * 2 : lw;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.fillStyle = isAxis ? "#fff" : "rgba(242,183,5,0.95)";
+      const label = rel > 0 ? `+${rel}` : `${rel}`;
+      if (!isAxis) ctx.fillText(label, x1 + 3/view.zoom, y1 + 3/view.zoom);
+    }
+    // Center-Marker (Welt-Mitte)
+    const [cx, cy] = worldToCanvas(centerKm * 100000, centerKm * 100000);
     ctx.fillStyle = "#fff";
     ctx.beginPath();
     ctx.arc(cx, cy, 4/view.zoom, 0, Math.PI * 2);
@@ -502,12 +512,9 @@ function render() {
     ctx.setLineDash([]);
   }
 
-  // Pins (Center-anchored: effective = (raw - mc) * scale + mc + offset)
-  const mc = mapKm * 100000 / 2;
+  // Pins — worldToCanvas appliziert die Cal automatisch
   pins.forEach(p => {
-    const ex = (p.x - mc) * pinCal.scaleX + mc + pinCal.offsetX;
-    const ey = (p.y - mc) * pinCal.scaleY + mc + pinCal.offsetY;
-    const [px, py] = worldToCanvas(ex, ey);
+    const [px, py] = worldToCanvas(p.x, p.y);
     ctx.beginPath();
     ctx.arc(px, py, 4 / view.zoom, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(255,80,80,0.85)";
@@ -622,16 +629,13 @@ function hitTestEdge(lx, ly) {
   }
   return null;
 }
-// Pin-Hit-Test in 'logischen' Canvas-Pixeln (gleiches Coord-System wie
-// die anderen hit-tests, vor dem Zoom-Transform).
+// Pin-Hit-Test in 'logischen' Canvas-Pixeln (worldToCanvas appliziert
+// die Cal automatisch).
 function hitTestPin(lx, ly) {
-  const mc = mapKm * 100000 / 2;
   const HITR = 6 / view.zoom;
   for (let i = pins.length - 1; i >= 0; i--) {
     const p = pins[i];
-    const ex = (p.x - mc) * pinCal.scaleX + mc + pinCal.offsetX;
-    const ey = (p.y - mc) * pinCal.scaleY + mc + pinCal.offsetY;
-    const [px, py] = worldToCanvas(ex, ey);
+    const [px, py] = worldToCanvas(p.x, p.y);
     if (Math.hypot(lx - px, ly - py) < HITR) return p;
   }
   return null;
@@ -655,15 +659,12 @@ function poiAt(wx, wy) {
 function showPinTooltip(p, clientX, clientY) {
   const tip = document.getElementById("pinTooltip");
   const mc = mapKm * 100000 / 2;
-  // Welt-Koords roh + nach Calibration angewendet
-  const ex = (p.x - mc) * pinCal.scaleX + mc + pinCal.offsetX;
-  const ey = (p.y - mc) * pinCal.scaleY + mc + pinCal.offsetY;
-  // Relative zur Map-Mitte in km
+  // Relative zur Map-Mitte in km (RAW Telemetry-Coords)
   const relRawX = (p.x - mc) / 100000;
   const relRawY = (p.y - mc) / 100000;
-  const relEffX = (ex - mc) / 100000;
-  const relEffY = (ey - mc) / 100000;
-  const poi = poiAt(ex, ey);
+  // POI-Lookup auf RAW Coords (Regions sind in Welt-cm gespeichert,
+  // genau wie die Pin-Coords aus Telemetry — kein extra Cal noetig).
+  const poi = poiAt(p.x, p.y);
   // Datum
   let dateStr = "";
   if (p.playedAt) {
@@ -674,15 +675,12 @@ function showPinTooltip(p, clientX, clientY) {
           hour: "2-digit", minute: "2-digit" });
     } catch (e) {}
   }
-  const calApplied = (pinCal.offsetX || pinCal.offsetY ||
-                       pinCal.scaleX !== 1 || pinCal.scaleY !== 1);
   tip.innerHTML = `
     <div class="row"><span class="lbl">Player</span><b>${p.name || "?"}</b></div>
     ${dateStr ? `<div class="row"><span class="lbl">Match</span><span>${dateStr}</span></div>` : ""}
     <div class="row"><span class="lbl">Match-ID</span><span>${(p.matchId || "").slice(0, 12)}…</span></div>
     <div class="row"><span class="lbl">Welt-cm</span><span>(${p.x|0}, ${p.y|0})</span></div>
     <div class="row"><span class="lbl">rel. zur Mitte</span><b>${relRawX.toFixed(2)} / ${relRawY.toFixed(2)} km</b></div>
-    ${calApplied ? `<div class="row"><span class="lbl">nach Cal.</span><b>${relEffX.toFixed(2)} / ${relEffY.toFixed(2)} km</b></div>` : ""}
     <div class="row"><span class="lbl">POI</span><b>${poi || "<i style='color:#666'>keine Region</i>"}</b></div>
   `;
   tip.style.display = "block";

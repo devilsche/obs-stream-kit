@@ -62,22 +62,16 @@
     const alias = (mapName === "Erangel_Main") ? "Baltic_Main" : mapName;
     const blob = DATA[alias] || DATA[mapName];
     if (!blob) return null;
-    // Pin-Calibration anwenden: gleiche affine Korrektur wie im Editor,
-    // damit Runtime-Lookup und visuelles Pin-Alignment matchen.
-    // Formel: effective = (raw - mapCenter) * scale + mapCenter + offset
-    // -> Center-anchored, scale dehnt symmetrisch aus dem Bildmittelpunkt.
-    const cal = blob.pinCalibration || {};
-    const sx = cal.scaleX != null ? cal.scaleX : 1;
-    const sy = cal.scaleY != null ? cal.scaleY : 1;
-    const mc = (blob.mapKm || 8) * 100000 / 2;
-    const ax = (xCm - mc) * sx + mc + (cal.offsetX || 0);
-    const ay = (yCm - mc) * sy + mc + (cal.offsetY || 0);
+    // Regionen sind in Welt-cm gespeichert (gleiche Coords-Domain wie
+    // die Pin-Telemetry-Coords). Cal im Editor ist nur Visualisierungs-
+    // Hilfe — die persistierten Region-Points sind bereits in Welt-cm,
+    // daher hier KEINE extra Transformation noetig.
     const regions = blob.regions || [];
     let best = null;
     let bestArea = Infinity;
     for (const r of regions) {
       if (!r.name) continue;
-      if (pointInPoly(ax, ay, r.points)) {
+      if (pointInPoly(xCm, yCm, r.points)) {
         const a = polyArea(r.points);
         if (a < bestArea) { bestArea = a; best = r; }
       }
