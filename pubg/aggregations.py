@@ -1144,17 +1144,25 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             lambda v: f"{v} DMG", m["matchId"], played)
 
         if place == 1 and kills >= 5:
-            # Mehrfach pro Session moeglich — PK (achievement_id,
-            # match_id) garantiert Eindeutigkeit ohne Suffix-Hack.
-            # Wichtig: 'beast_chicken' bleibt als ID damit Lookups in
-            # PUBG_ICON_URLS / _CANONICAL_LABELS / _ACH_DESCRIPTIONS /
-            # _RARE_ACHIEVEMENTS greifen.
-            out.append({
-                "id": "beast_chicken",
-                "label": f"Beast Chicken · {kills} Kills",
-                "icon": "🔥",
-                "matchId": m["matchId"], "playedAt": played,
-            })
+            # Chicken-Tier-Cascade: alle erreichten Tiers in DB, nur
+            # hoechster poppt. Tiers: beast (5+), ultra (10+), god (15+).
+            # Mehrfach pro Session moeglich — PK (achievement_id, match_id)
+            # garantiert Eindeutigkeit.
+            tiers = []
+            if kills >= 15:
+                tiers.append(("god_mode_chicken", "God Mode Chicken"))
+            if kills >= 10:
+                tiers.append(("ultra_chicken", "Ultra Chicken"))
+            tiers.append(("beast_chicken", "Beast Chicken"))
+            # Sortierung: hoechster zuerst (poppt), Rest mit suppressPopup
+            for i, (aid, name) in enumerate(tiers):
+                out.append({
+                    "id": aid,
+                    "label": f"{name} · {kills} Kills",
+                    "icon": "🔥",
+                    "matchId": m["matchId"], "playedAt": played,
+                    "suppressPopup": i > 0,
+                })
 
         # Top-10-Streak: pro Match-Peak ab x2 ein eigenes Achievement.
         # Match-ID kommt aus dem PEAK-Match (also dem der die Streak
@@ -1223,6 +1231,16 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
                 "icon": "🔥",
                 "matchId": pm["matchId"], "playedAt": pm["playedAt"],
             })
+            # Burning Hell: Hot-Drop mit 5+ feindlichen Teams im 300m-
+            # Radius der eigenen Squad-Landung. Mehrfach moeglich.
+            teams_in_radius = pm.get("teamsInRadius") or 0
+            if teams_in_radius >= 5:
+                out.append({
+                    "id": "burning_hell",
+                    "label": f"Burning Hell · {teams_in_radius} Teams",
+                    "icon": "🔥",
+                    "matchId": pm["matchId"], "playedAt": pm["playedAt"],
+                })
             if pm.get("soloSurvived"):
                 hot_drop_survived_count += 1
                 out.append({
@@ -1250,6 +1268,9 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
 # Konservativ — die Kandidaten die wirklich krass sind:
 PUBG_RARE_ACHIEVEMENTS = {
     "beast_chicken",                 # Chicken + ≥5 Kills
+    "ultra_chicken",                 # Chicken + ≥10 Kills
+    "god_mode_chicken",              # Chicken + ≥15 Kills
+    "burning_hell",                  # Hot-Drop mit 5+ Teams im Radius
     "session_opener_chicken",        # Session startet direkt mit Chicken
     "phoenix_chicken",               # Chicken-Win nach Hot-Drop
     "kills_15",                      # 15+ Kills
