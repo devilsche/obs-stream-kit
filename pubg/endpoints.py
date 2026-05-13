@@ -304,11 +304,17 @@ class EndpointRegistry:
 
     def _landings(self, qs):
         """Liefert Squad-Landings auf einer Map (oder allen Maps).
-        Optional ?map=Baltic_Main fuer Filter, sonst alle Maps gemixt.
-        Default: nur das ERSTE Landing pro Squad-Member pro Match
-        (= initialer Fallschirm-Drop). ?all=1 inkludiert auch Emergency-
-        Pickup-Re-Drops und sonstige Re-Landings.
-        Pro Landing: { matchId, playedAt, mapName, accountId, name, x, y }.
+
+        Heuristik fuer Touchdown-Detection (PUBG-LogParachuteLanding ist
+        unzuverlaessig — firet teils mid-air bei z>1000 oder doppelt bei
+        Death):
+          1. Pro (match, actor): suche das FRUEHESTE Landing-Event mit
+             z<800 AND health>0 — das ist der ECHTE Bodenkontakt
+          2. Falls keins exists, fallback auf das fruehste Position-Event
+             mit z<800 (= Schema 4+ Daten, Squad-Continuous-Tracking)
+          3. Falls auch das fehlt: nimm das fruehste Landing-Event
+             ueberhaupt (auch wenn mid-air)
+        Mit ?all=1 wird der Filter komplett uebersprungen (alle Landings).
         """
         conn = self.get_conn()
         map_filter = (qs.get("map") or "").strip()
@@ -318,37 +324,84 @@ class EndpointRegistry:
         if map_filter:
             where = "AND m.map_name = ?"
             params.append(map_filter)
-        # Per (match, actor) das frueheste Landing — outer join gegen
-        # Aggregate damit wir nur den ersten Event pro Squad-Member pro
-        # Match bekommen. Mit ?all=1 wird der Filter uebersprungen.
-        first_join = "" if all_landings else """
-            JOIN (
-                SELECT match_id, actor_account, MIN(timestamp_ms) AS first_ts
-                FROM telemetry_events
-                WHERE event_type = 'Landing'
-                GROUP BY match_id, actor_account
-            ) f ON f.match_id = te.match_id
-                AND f.actor_account = te.actor_account
-                AND f.first_ts = te.timestamp_ms
-        """
-        rows = conn.execute(f"""
-            SELECT te.match_id, m.played_at, m.map_name,
-                   te.actor_account, te.actor_x, te.actor_y,
-                   p.name AS player_name
-            FROM telemetry_events te
-            {first_join}
-            JOIN matches m ON m.match_id = te.match_id
-            JOIN participants me ON me.match_id = te.match_id
-                AND me.account_id = ?
-            JOIN participants pa ON pa.match_id = te.match_id
-                AND pa.team_id = me.team_id
-                AND pa.account_id = te.actor_account
-            LEFT JOIN players p ON p.account_id = te.actor_account
-            WHERE te.event_type = 'Landing'
-              AND te.actor_x IS NOT NULL
-              AND te.actor_y IS NOT NULL
-              {where}
-        """, params).fetchall()
+        if all_landings:
+            # Alles ohne Filter
+            rows = conn.execute(f"""
+                SELECT te.match_id, m.played_at, m.map_name,
+                       te.actor_account, te.actor_x, te.actor_y,
+                       p.name AS player_name
+                FROM telemetry_events te
+                JOIN matches m ON m.match_id = te.match_id
+                JOIN participants me ON me.match_id = te.match_id AND me.account_id = ?
+                JOIN participants pa ON pa.match_id = te.match_id
+                    AND pa.team_id = me.team_id AND pa.account_id = te.actor_account
+                LEFT JOIN players p ON p.account_id = te.actor_account
+                WHERE te.event_type = 'Landing'
+                  AND te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
+                  {where}
+            """, params).fetchall()
+        else:
+            # Best-touchdown-Heuristik mit Z + Health Filter
+            # Schritt 1: Landing-Events mit z<800 + health>0 = legit Touchdown
+            # Schritt 2: falls keiner, Position-Event mit z<800 als Fallback
+            # Schritt 3: falls auch keiner, MIN(timestamp_ms) Landing (alt)
+            rows = conn.execute(f"""
+                WITH best_landing AS (
+                  SELECT match_id, actor_account, MIN(timestamp_ms) AS ts
+                  FROM telemetry_events
+                  WHERE event_type = 'Landing'
+                    AND actor_x IS NOT NULL AND actor_y IS NOT NULL
+                    AND (actor_z IS NULL OR actor_z < 800)
+                    AND (actor_health IS NULL OR actor_health > 0)
+                  GROUP BY match_id, actor_account
+                ),
+                fallback_position AS (
+                  SELECT te.match_id, te.actor_account, MIN(te.timestamp_ms) AS ts
+                  FROM telemetry_events te
+                  LEFT JOIN best_landing bl
+                    ON bl.match_id = te.match_id
+                   AND bl.actor_account = te.actor_account
+                  WHERE te.event_type = 'Position'
+                    AND te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
+                    AND te.actor_z IS NOT NULL AND te.actor_z < 800
+                    AND bl.ts IS NULL
+                  GROUP BY te.match_id, te.actor_account
+                ),
+                fallback_any_landing AS (
+                  SELECT te.match_id, te.actor_account, MIN(te.timestamp_ms) AS ts
+                  FROM telemetry_events te
+                  LEFT JOIN best_landing bl
+                    ON bl.match_id = te.match_id AND bl.actor_account = te.actor_account
+                  LEFT JOIN fallback_position fp
+                    ON fp.match_id = te.match_id AND fp.actor_account = te.actor_account
+                  WHERE te.event_type = 'Landing'
+                    AND te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
+                    AND bl.ts IS NULL AND fp.ts IS NULL
+                  GROUP BY te.match_id, te.actor_account
+                ),
+                picked AS (
+                  SELECT match_id, actor_account, ts FROM best_landing
+                  UNION ALL
+                  SELECT match_id, actor_account, ts FROM fallback_position
+                  UNION ALL
+                  SELECT match_id, actor_account, ts FROM fallback_any_landing
+                )
+                SELECT te.match_id, m.played_at, m.map_name,
+                       te.actor_account, te.actor_x, te.actor_y,
+                       p.name AS player_name
+                FROM picked pk
+                JOIN telemetry_events te
+                  ON te.match_id = pk.match_id
+                 AND te.actor_account = pk.actor_account
+                 AND te.timestamp_ms = pk.ts
+                JOIN matches m ON m.match_id = te.match_id
+                JOIN participants me ON me.match_id = te.match_id AND me.account_id = ?
+                JOIN participants pa ON pa.match_id = te.match_id
+                    AND pa.team_id = me.team_id AND pa.account_id = te.actor_account
+                LEFT JOIN players p ON p.account_id = te.actor_account
+                WHERE te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
+                  {where}
+            """, params).fetchall()
         landings = [{
             "matchId":    r["match_id"],
             "playedAt":   r["played_at"],

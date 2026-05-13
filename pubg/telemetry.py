@@ -27,16 +27,34 @@ def _normalize(event):
     et = event.get("_T", "")
     base = {"event_type": None, "timestamp_ms": _ts_ms(event.get("_D")),
             "actor_account": None, "target_account": None,
-            "actor_x": None, "actor_y": None,
+            "actor_x": None, "actor_y": None, "actor_z": None,
+            "actor_health": None,
             "victim_x": None, "victim_y": None,
             "weapon": None, "distance": None, "damage": None,
             "payload_json": json.dumps(event, separators=(",", ":"))}
+    # Helper: extracts z + health for character-events (for landing-pin
+    # heuristic; ground-events have z<800 and health>0).
+    def _z_health(ev, key):
+        ch = ev.get(key) or {}
+        z = (ch.get("location") or {}).get("z")
+        return z, ch.get("health")
+
     if et == "LogParachuteLanding":
         base["event_type"] = "Landing"
         base["actor_account"] = (event.get("character") or {}).get("accountId")
         # Position der Landung — wichtig für Radius-Detection
         # ("Teams im 300m Umkreis").
         base["actor_x"], base["actor_y"] = _loc(event, "character")
+        base["actor_z"], base["actor_health"] = _z_health(event, "character")
+    elif et == "LogPlayerPosition":
+        # Continuous position-tracking (~alle 10s). Wir brauchen das fuer
+        # praezise Ground-Landing-Detection — PUBG-LogParachuteLanding
+        # firet manchmal mid-air (z=1000+) statt am Boden. Ein Position-
+        # Event kurz nach Landing mit z<800 = echter Bodenkontakt.
+        base["event_type"] = "Position"
+        base["actor_account"] = (event.get("character") or {}).get("accountId")
+        base["actor_x"], base["actor_y"] = _loc(event, "character")
+        base["actor_z"], base["actor_health"] = _z_health(event, "character")
     elif et in ("LogPlayerKillV2", "LogPlayerKill"):
         base["event_type"] = "Kill"
         base["actor_account"] = (event.get("killer") or {}).get("accountId")
@@ -119,11 +137,30 @@ def _normalize(event):
 # Teams im selben Fight involviert sind.
 ALWAYS_KEEP_EVENTS = {"Kill", "Knock", "Landing"}
 
+# Position-Events fluten die DB (firet alle ~10s pro Spieler). Wir
+# behalten sie NUR fuer Squad-Members in den ersten 3 Minuten — reicht
+# fuer praezise Landing-Pin-Detection (Touchdown ~50-90s nach Drop).
+POSITION_WINDOW_MS = 180_000
+
 
 def filter_squad_events(events, squad_account_ids):
+    match_start_ms = None
     for e in events:
         norm = _normalize(e)
         if not norm:
+            continue
+        ts = norm.get("timestamp_ms")
+        if match_start_ms is None and ts:
+            match_start_ms = ts
+        if norm["event_type"] == "Position":
+            # Position-Events: nur fuer Squad und nur in den ersten 3 min
+            if norm["actor_account"] not in squad_account_ids:
+                continue
+            if not ts or not match_start_ms:
+                continue
+            if ts - match_start_ms > POSITION_WINDOW_MS:
+                continue
+            yield norm
             continue
         if norm["event_type"] in ALWAYS_KEEP_EVENTS:
             yield norm

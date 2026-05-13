@@ -59,6 +59,8 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
     target_account  TEXT,
     actor_x         REAL,
     actor_y         REAL,
+    actor_z         REAL,
+    actor_health    REAL,
     victim_x        REAL,
     victim_y        REAL,
     weapon          TEXT,
@@ -184,10 +186,13 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
-CURRENT_TELEMETRY_SCHEMA = 3
+CURRENT_TELEMETRY_SCHEMA = 4
 # 1 = squad-only filter
 # 2 = + Kill/Knock global + Position
 # 3 = + Landing global + Position (für 'Teams in 300m Umkreis')
+# 4 = + LogPlayerPosition events fuer Squad-Members + z/health auf Landing
+#     (genauere Landing-Pin-Position; PUBG-LogParachuteLanding firet
+#      manchmal mid-air, also brauchen wir Position-Events fuer Bodencheck)
 # match_schema: 1 = nur Squad-Participants
 # 2 = + match_team_mapping (account_id, team_id)
 # 3 = + match_team_mapping mit kills + place (für echtes Lobby-K/D + Squad-Aggregat)
@@ -202,6 +207,8 @@ def init_schema(conn: sqlite3.Connection) -> None:
     migrations = [
         ("telemetry_events", "actor_x", "REAL"),
         ("telemetry_events", "actor_y", "REAL"),
+        ("telemetry_events", "actor_z", "REAL"),
+        ("telemetry_events", "actor_health", "REAL"),
         ("telemetry_events", "victim_x", "REAL"),
         ("telemetry_events", "victim_y", "REAL"),
         ("matches", "telemetry_schema", "INTEGER DEFAULT 0"),
@@ -244,6 +251,39 @@ def init_schema(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE match_team_mapping ADD COLUMN {col} {typ}")
         except sqlite3.OperationalError:
             pass
+
+    # Migration: z + health auf bestehende Landing-Events backfillen
+    # aus payload_json (Schema 4 erwartet diese Spalten; ohne Refetch
+    # bekommen historische Matches sonst NULL-Werte)
+    try:
+        import json as _json
+        need_backfill = conn.execute("""
+            SELECT id, payload_json FROM telemetry_events
+            WHERE event_type='Landing' AND actor_z IS NULL
+            LIMIT 50000
+        """).fetchall()
+        if need_backfill:
+            updates = []
+            for row in need_backfill:
+                try:
+                    d = _json.loads(row[1] or "{}")
+                    ch = d.get("character") or {}
+                    loc = ch.get("location") or {}
+                    z = loc.get("z")
+                    hp = ch.get("health")
+                    if z is not None or hp is not None:
+                        updates.append((z, hp, row[0]))
+                except (ValueError, TypeError):
+                    pass
+            if updates:
+                conn.executemany("""
+                    UPDATE telemetry_events
+                    SET actor_z = ?, actor_health = ?
+                    WHERE id = ?
+                """, updates)
+                conn.commit()
+    except sqlite3.OperationalError:
+        pass
 
     # Migration: alte beast_chicken_<matchid>-IDs auf 'beast_chicken'
     # normalisieren. Davor hatte jeder Beast-Chicken eine kontext-
@@ -507,7 +547,8 @@ def get_seasons_for_player(conn, account_id: str):
 def insert_telemetry_events(conn, match_id: str, events: list) -> None:
     rows = [(match_id, e["event_type"], e.get("timestamp_ms"),
              e.get("actor_account"), e.get("target_account"),
-             e.get("actor_x"), e.get("actor_y"),
+             e.get("actor_x"), e.get("actor_y"), e.get("actor_z"),
+             e.get("actor_health"),
              e.get("victim_x"), e.get("victim_y"),
              e.get("weapon"), e.get("distance"), e.get("damage"),
              e.get("payload_json", "{}"))
@@ -515,9 +556,9 @@ def insert_telemetry_events(conn, match_id: str, events: list) -> None:
     conn.executemany("""
         INSERT INTO telemetry_events
         (match_id, event_type, timestamp_ms, actor_account, target_account,
-         actor_x, actor_y, victim_x, victim_y,
+         actor_x, actor_y, actor_z, actor_health, victim_x, victim_y,
          weapon, distance, damage, payload_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, rows)
     conn.commit()
 

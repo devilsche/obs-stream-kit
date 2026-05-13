@@ -411,6 +411,23 @@ class PollerThread(threading.Thread):
         except Exception as e:
             self._last_status["integrity"] = f"check-error: {e}"
 
+        # Beim Start: Bulk-Telemetry-Catchup im Hintergrund — alle Matches
+        # mit veraltetem Schema werden refetched (soweit PUBG-Telemetry-URL
+        # noch valide ist, ueblicherweise 14d Retention). Laeuft in eigenem
+        # Thread damit der reguläre Poll-Loop nicht blockiert.
+        def _bulk_catchup():
+            try:
+                conn_bc = connect(self.db_path)
+                stats = run_bulk_telemetry_catchup(
+                    conn_bc, self.client, self.my_account_id,
+                    max_matches=None, pacing_ms=200)
+                conn_bc.close()
+                self._last_status["bulkCatchup"] = stats
+            except Exception as e:
+                self._last_status["bulkCatchup"] = {"error": str(e)}
+        threading.Thread(target=_bulk_catchup, daemon=True,
+                          name="pubg-bulk-catchup").start()
+
         last_backup_day = None
         while not self._stop.is_set():
             # Tägliches DB-Backup
