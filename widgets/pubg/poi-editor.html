@@ -39,13 +39,11 @@
     display: grid;
     grid-template-columns: 1fr 360px;
     gap: 14px;
+    align-items: start;
   }
   .canvas-host {
     position: relative;
     background-color: #0d061a;
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
     border: 1px solid #5e2a79;
     border-radius: 6px;
     overflow: hidden;
@@ -57,8 +55,11 @@
     border: 1px solid #5e2a79;
     border-radius: 6px;
     padding: 10px;
-    max-height: 90vh;
+    position: sticky;
+    top: 14px;
+    max-height: calc(100vh - 28px);
     overflow-y: auto;
+    align-self: start;
   }
   .panel h3 {
     margin: 0 0 6px; color: #f2b705;
@@ -117,6 +118,7 @@
   <button id="rectBtn">▭ Rechteck</button>
   <button id="polyBtn">⬠ Polygon</button>
   <button id="pinsBtn" class="secondary">📍 Pins laden</button>
+  <button id="zoomResetBtn" class="secondary">🔍 100%</button>
   <button id="saveBtn" class="save">💾 Speichern</button>
   <span id="status" style="color:#8a7d99; font-size:0.8em"></span>
 </div>
@@ -129,7 +131,8 @@
     <div class="hint">
       <b>▭ Rechteck:</b> click+drag<br>
       <b>⬠ Polygon:</b> klicken um Punkte zu setzen, doppel-klick zum Schließen<br>
-      <b>Drag</b> Vertex-Handle zum Verschieben &nbsp;·&nbsp; <b>Shift+Click</b> auf Kante = neuer Vertex &nbsp;·&nbsp; <b>Alt+Click</b> auf Vertex = löschen
+      <b>Drag</b> Vertex-Handle zum Verschieben &nbsp;·&nbsp; <b>Shift+Click</b> auf Kante = neuer Vertex &nbsp;·&nbsp; <b>Alt+Click</b> auf Vertex = löschen<br>
+      <b>Mausrad</b> = Zoom auf Cursor &nbsp;·&nbsp; <b>Space+Drag</b> oder <b>Middle-Mouse</b> = Pan
     </div>
     <div id="regionList"></div>
     <div class="edit-block" id="editBlock" style="display:none">
@@ -164,11 +167,18 @@ let mapKm = 8;
 let regions = [];     // [{name, points: [[x,y], ...]}]  coords in cm
 let pins = [];        // [{name, x, y}]
 let selectedIdx = -1;
-let mode = "view";    // 'view' | 'drawing-rect' | 'drawing-poly' | 'moving-vertex' | 'moving-region'
+let mode = "view";    // 'view' | 'drawing-rect' | 'drawing-poly' | 'moving-vertex' | 'moving-region' | 'panning'
 let drawStart = null; // for rect-drag
 let drawCurrent = null;
 let polyPoints = []; // active polygon-in-progress
 let dragRef = null;  // {type, vertexIdx?, startPoints, startMouseWorld}
+let mapImage = null;
+
+// Zoom/Pan-View: zoom multipliziert, panX/panY in Canvas-Pixeln verschoben
+let view = { zoom: 1, panX: 0, panY: 0 };
+let isPanning = false;
+let panRef = null;   // [clientX, clientY, startPanX, startPanY]
+let spaceDown = false;
 
 const mapSel    = document.getElementById("mapSel");
 const mapSizeIn = document.getElementById("mapSize");
@@ -198,7 +208,19 @@ async function loadMap(mapId) {
   selectedIdx = -1;
   polyPoints = [];
 
-  canvas.parentElement.style.backgroundImage = `url('/widgets/pubg/maps/${mapId}.webp')`;
+  // Map als Image-Object laden (in Canvas gezeichnet, damit Zoom/Pan
+  // mit dem Canvas-Transform mitgeht)
+  mapImage = new Image();
+  mapImage.crossOrigin = "anonymous";
+  mapImage.onload = () => render();
+  mapImage.onerror = () => {
+    statusEl.textContent = `⚠ Map ${mapId}.webp nicht gefunden`;
+    render();
+  };
+  mapImage.src = `/widgets/pubg/maps/${mapId}.webp`;
+  // Zoom/Pan auf Default zurueck wenn die Map wechselt
+  view = { zoom: 1, panX: 0, panY: 0 };
+  updateZoomBtn();
 
   // Fetch saved regions from server
   try {
@@ -232,6 +254,10 @@ function fitCanvas() {
 }
 window.addEventListener("resize", () => { fitCanvas(); render(); });
 
+// worldToCanvas / canvasToWorld arbeiten in 'logischen Canvas-Pixeln'
+// (also vor dem Zoom-Transform). Render-Funktion appliziert das Transform
+// via ctx.translate+ctx.scale. eventToWorld bringt Maus-Position auf
+// World-cm Coords mit Zoom/Pan-Inversion.
 function worldToCanvas(xCm, yCm) {
   const scale = canvas.width / (mapKm * 100000);
   return [xCm * scale, yCm * scale];
@@ -243,6 +269,16 @@ function canvasToWorld(px, py) {
 function canvasXY(ev) {
   const r = canvas.getBoundingClientRect();
   return [ev.clientX - r.left, ev.clientY - r.top];
+}
+// Mouse-Coords -> 'logische' Canvas-Pixel (vor Zoom)
+function eventToLogical(ev) {
+  const [cx, cy] = canvasXY(ev);
+  return [(cx - view.panX) / view.zoom, (cy - view.panY) / view.zoom];
+}
+// Mouse-Coords -> World-cm
+function eventToWorld(ev) {
+  const [lx, ly] = eventToLogical(ev);
+  return canvasToWorld(lx, ly);
 }
 
 // Polygon-Area via Shoelace (in cm²)
@@ -273,7 +309,18 @@ function pointInPoly(px, py, points) {
 // ─── Render ────────────────────────────────────────────────────────────────
 function render() {
   fitCanvas();
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#0d061a";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // View-Transform: translate then scale. Everything between save/restore
+  // wird gezoomt und gepannt.
+  ctx.save();
+  ctx.translate(view.panX, view.panY);
+  ctx.scale(view.zoom, view.zoom);
+
+  // Map als Background
+  if (mapImage && mapImage.complete && mapImage.naturalWidth) {
+    ctx.drawImage(mapImage, 0, 0, canvas.width, canvas.height);
+  }
 
   regions.forEach((r, i) => {
     const pts = r.points.map(p => worldToCanvas(p[0], p[1]));
@@ -298,14 +345,16 @@ function render() {
       ctx.fillText(r.name, cx, cy);
       ctx.textAlign = "start";
     }
-    // Vertex-Handles wenn selected
+    // Vertex-Handles wenn selected — invers-zoom-skalieren damit sie
+    // bei hoher Zoom-Stufe nicht zu gross werden.
     if (i === selectedIdx) {
+      const hs = 4 / view.zoom;
       ctx.fillStyle = "#f2b705";
       ctx.strokeStyle = "#1a0d2a";
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.5 / view.zoom;
       for (const [x, y] of pts) {
-        ctx.fillRect(x - 4, y - 4, 8, 8);
-        ctx.strokeRect(x - 4, y - 4, 8, 8);
+        ctx.fillRect(x - hs, y - hs, hs * 2, hs * 2);
+        ctx.strokeRect(x - hs, y - hs, hs * 2, hs * 2);
       }
     }
   });
@@ -344,13 +393,15 @@ function render() {
   pins.forEach(p => {
     const [px, py] = worldToCanvas(p.x, p.y);
     ctx.beginPath();
-    ctx.arc(px, py, 4, 0, Math.PI * 2);
+    ctx.arc(px, py, 4 / view.zoom, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(255,80,80,0.85)";
     ctx.fill();
     ctx.strokeStyle = "white";
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1 / view.zoom;
     ctx.stroke();
   });
+
+  ctx.restore();
 }
 
 // ─── Region list ───────────────────────────────────────────────────────────
@@ -416,34 +467,37 @@ rectBtn.addEventListener("click", () => setMode(mode === "drawing-rect" ? "view"
 polyBtn.addEventListener("click", () => { polyPoints = []; setMode(mode === "drawing-poly" ? "view" : "drawing-poly"); });
 
 // ─── Canvas interactions ───────────────────────────────────────────────────
-function hitTestVertex(cx, cy) {
+// Hit-Tests arbeiten in 'logischen' Canvas-Pixeln (vor Zoom-Transform).
+// Threshold wird invers-zoom-skaliert damit die Hit-Area bei hoher
+// Zoom-Stufe nicht zu klein wird.
+function hitTestVertex(lx, ly) {
   if (selectedIdx < 0) return -1;
   const pts = regions[selectedIdx].points;
+  const T = 7 / view.zoom;
   for (let k = 0; k < pts.length; k++) {
     const [vx, vy] = worldToCanvas(pts[k][0], pts[k][1]);
-    if (Math.abs(cx - vx) < 7 && Math.abs(cy - vy) < 7) return k;
+    if (Math.abs(lx - vx) < T && Math.abs(ly - vy) < T) return k;
   }
   return -1;
 }
-function hitTestEdge(cx, cy) {
-  // Returns {regionIdx, edgeIdx} if within 6px of an edge of selected region
+function hitTestEdge(lx, ly) {
   if (selectedIdx < 0) return null;
   const pts = regions[selectedIdx].points.map(p => worldToCanvas(p[0], p[1]));
+  const T = 6 / view.zoom;
   for (let i = 0; i < pts.length; i++) {
     const a = pts[i];
     const b = pts[(i + 1) % pts.length];
     const dx = b[0] - a[0], dy = b[1] - a[1];
     const len2 = dx * dx + dy * dy;
     if (len2 < 1) continue;
-    const t = Math.max(0, Math.min(1, ((cx - a[0]) * dx + (cy - a[1]) * dy) / len2));
+    const t = Math.max(0, Math.min(1, ((lx - a[0]) * dx + (ly - a[1]) * dy) / len2));
     const px = a[0] + t * dx, py = a[1] + t * dy;
-    const d = Math.hypot(cx - px, cy - py);
-    if (d < 6) return { edgeIdx: i, t };
+    const d = Math.hypot(lx - px, ly - py);
+    if (d < T) return { edgeIdx: i, t };
   }
   return null;
 }
-function hitTestRegion(cx, cy) {
-  const [wx, wy] = canvasToWorld(cx, cy);
+function hitTestRegion(wx, wy) {
   let best = -1, bestArea = Infinity;
   for (let i = 0; i < regions.length; i++) {
     if (pointInPoly(wx, wy, regions[i].points)) {
@@ -455,17 +509,27 @@ function hitTestRegion(cx, cy) {
 }
 
 canvas.addEventListener("mousedown", (ev) => {
-  const [cx, cy] = canvasXY(ev);
+  // Middle-Mouse oder Space+LMB = Pan-Modus
+  if (ev.button === 1 || (spaceDown && ev.button === 0)) {
+    isPanning = true;
+    panRef = [ev.clientX, ev.clientY, view.panX, view.panY];
+    canvas.style.cursor = "grabbing";
+    ev.preventDefault();
+    return;
+  }
+  if (ev.button !== 0) return;
+
+  const [lx, ly] = eventToLogical(ev);
+  const [wx, wy] = eventToWorld(ev);
 
   // Drawing-Rect
   if (mode === "drawing-rect") {
-    drawStart = [cx, cy];
+    drawStart = [lx, ly];
     drawCurrent = drawStart;
     return;
   }
   // Drawing-Poly
   if (mode === "drawing-poly") {
-    const [wx, wy] = canvasToWorld(cx, cy);
     polyPoints.push([wx, wy]);
     render();
     return;
@@ -473,7 +537,7 @@ canvas.addEventListener("mousedown", (ev) => {
 
   // Selected: Alt+click on vertex = remove vertex
   if (ev.altKey && selectedIdx >= 0) {
-    const v = hitTestVertex(cx, cy);
+    const v = hitTestVertex(lx, ly);
     if (v >= 0) {
       if (regions[selectedIdx].points.length > 3) {
         regions[selectedIdx].points.splice(v, 1);
@@ -485,9 +549,8 @@ canvas.addEventListener("mousedown", (ev) => {
 
   // Selected: Shift+click on edge = insert vertex
   if (ev.shiftKey && selectedIdx >= 0) {
-    const edge = hitTestEdge(cx, cy);
+    const edge = hitTestEdge(lx, ly);
     if (edge) {
-      const [wx, wy] = canvasToWorld(cx, cy);
       regions[selectedIdx].points.splice(edge.edgeIdx + 1, 0, [wx, wy]);
       renderAll();
       return;
@@ -496,12 +559,12 @@ canvas.addEventListener("mousedown", (ev) => {
 
   // Vertex-Handle?
   if (selectedIdx >= 0) {
-    const v = hitTestVertex(cx, cy);
+    const v = hitTestVertex(lx, ly);
     if (v >= 0) {
       dragRef = {
         type: "vertex",
         vertexIdx: v,
-        startMouse: canvasToWorld(cx, cy),
+        startMouse: [wx, wy],
         startVertex: [...regions[selectedIdx].points[v]],
       };
       mode = "moving-vertex";
@@ -510,10 +573,9 @@ canvas.addEventListener("mousedown", (ev) => {
   }
 
   // Click on region → select + start move
-  const hit = hitTestRegion(cx, cy);
+  const hit = hitTestRegion(wx, wy);
   if (hit >= 0) {
     selectedIdx = hit;
-    const [wx, wy] = canvasToWorld(cx, cy);
     dragRef = {
       type: "region",
       startMouse: [wx, wy],
@@ -539,24 +601,33 @@ canvas.addEventListener("dblclick", (ev) => {
 });
 
 canvas.addEventListener("mousemove", (ev) => {
-  const [cx, cy] = canvasXY(ev);
+  // Pan-Modus
+  if (isPanning && panRef) {
+    view.panX = panRef[2] + (ev.clientX - panRef[0]);
+    view.panY = panRef[3] + (ev.clientY - panRef[1]);
+    render();
+    return;
+  }
+
+  const [lx, ly] = eventToLogical(ev);
+  const [wx, wy] = eventToWorld(ev);
 
   // Cursor in view-mode
   if (mode === "view") {
-    if (selectedIdx >= 0 && hitTestVertex(cx, cy) >= 0) canvas.style.cursor = "move";
-    else if (selectedIdx >= 0 && ev.shiftKey && hitTestEdge(cx, cy)) canvas.style.cursor = "copy";
-    else if (hitTestRegion(cx, cy) >= 0) canvas.style.cursor = "pointer";
+    if (spaceDown) canvas.style.cursor = "grab";
+    else if (selectedIdx >= 0 && hitTestVertex(lx, ly) >= 0) canvas.style.cursor = "move";
+    else if (selectedIdx >= 0 && ev.shiftKey && hitTestEdge(lx, ly)) canvas.style.cursor = "copy";
+    else if (hitTestRegion(wx, wy) >= 0) canvas.style.cursor = "pointer";
     else canvas.style.cursor = "default";
   }
 
   if (mode === "drawing-rect" && drawStart) {
-    drawCurrent = [cx, cy];
+    drawCurrent = [lx, ly];
     render();
     return;
   }
 
   if (mode === "moving-vertex" && dragRef) {
-    const [wx, wy] = canvasToWorld(cx, cy);
     const dx = wx - dragRef.startMouse[0];
     const dy = wy - dragRef.startMouse[1];
     regions[selectedIdx].points[dragRef.vertexIdx] = [
@@ -568,7 +639,6 @@ canvas.addEventListener("mousemove", (ev) => {
   }
 
   if (mode === "moving-region" && dragRef) {
-    const [wx, wy] = canvasToWorld(cx, cy);
     const dx = wx - dragRef.startMouse[0];
     const dy = wy - dragRef.startMouse[1];
     regions[selectedIdx].points = dragRef.startPoints.map(p => [p[0] + dx, p[1] + dy]);
@@ -578,11 +648,17 @@ canvas.addEventListener("mousemove", (ev) => {
 });
 
 canvas.addEventListener("mouseup", (ev) => {
+  if (isPanning) {
+    isPanning = false;
+    panRef = null;
+    canvas.style.cursor = spaceDown ? "grab" : "default";
+    return;
+  }
   if (mode === "drawing-rect" && drawStart) {
-    const [cx, cy] = canvasXY(ev);
-    const x1 = Math.min(drawStart[0], cx), y1 = Math.min(drawStart[1], cy);
-    const x2 = Math.max(drawStart[0], cx), y2 = Math.max(drawStart[1], cy);
-    if (x2 - x1 > 5 && y2 - y1 > 5) {
+    const [lx, ly] = eventToLogical(ev);
+    const x1 = Math.min(drawStart[0], lx), y1 = Math.min(drawStart[1], ly);
+    const x2 = Math.max(drawStart[0], lx), y2 = Math.max(drawStart[1], ly);
+    if ((x2 - x1) * view.zoom > 5 && (y2 - y1) * view.zoom > 5) {
       const [wx1, wy1] = canvasToWorld(x1, y1);
       const [wx2, wy2] = canvasToWorld(x2, y2);
       regions.push({
@@ -600,6 +676,46 @@ canvas.addEventListener("mouseup", (ev) => {
     dragRef = null;
     renderAll();
   }
+});
+
+// Wheel-Zoom: zoom-zur-Maus damit der Welt-Punkt unter dem Cursor stehen bleibt
+canvas.addEventListener("wheel", (ev) => {
+  ev.preventDefault();
+  const [cx, cy] = canvasXY(ev);
+  const oldZoom = view.zoom;
+  const factor = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
+  const newZoom = Math.max(0.5, Math.min(12, oldZoom * factor));
+  // Damit der Punkt unter dem Cursor stehen bleibt:
+  // newPan = cursor - (cursor - oldPan) * (newZoom/oldZoom)
+  view.panX = cx - (cx - view.panX) * (newZoom / oldZoom);
+  view.panY = cy - (cy - view.panY) * (newZoom / oldZoom);
+  view.zoom = newZoom;
+  updateZoomBtn();
+  render();
+}, { passive: false });
+
+// Space-Taste fuer Pan-Modus (wie Photoshop/Figma)
+window.addEventListener("keydown", (ev) => {
+  if (ev.code === "Space" && !ev.repeat && document.activeElement.tagName !== "INPUT") {
+    spaceDown = true;
+    canvas.style.cursor = "grab";
+    ev.preventDefault();
+  }
+});
+window.addEventListener("keyup", (ev) => {
+  if (ev.code === "Space") {
+    spaceDown = false;
+    if (!isPanning) canvas.style.cursor = "default";
+  }
+});
+
+function updateZoomBtn() {
+  document.getElementById("zoomResetBtn").textContent = `🔍 ${Math.round(view.zoom * 100)}%`;
+}
+document.getElementById("zoomResetBtn").addEventListener("click", () => {
+  view = { zoom: 1, panX: 0, panY: 0 };
+  updateZoomBtn();
+  render();
 });
 
 // ─── Pins ──────────────────────────────────────────────────────────────────
