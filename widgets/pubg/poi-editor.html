@@ -445,9 +445,20 @@ function render() {
   ctx.translate(view.panX, view.panY);
   ctx.scale(view.zoom, view.zoom);
 
-  // Map als Background
+  // Map als Background — wenn das Bild nicht quadratisch ist (z.B.
+  // ein 2K-Screenshot 2560x1440 mit zentrierter quadratischer Map),
+  // nehmen wir das Center-Square (Seite = min(width, height)) und
+  // skalieren das aufs Canvas. So bleiben Grid/Pins korrekt auf dem
+  // sichtbaren Map-Quadrat.
   if (mapImage && mapImage.complete && mapImage.naturalWidth) {
-    ctx.drawImage(mapImage, 0, 0, canvas.width, canvas.height);
+    const iw = mapImage.naturalWidth;
+    const ih = mapImage.naturalHeight;
+    const side = Math.min(iw, ih);
+    const sx = (iw - side) / 2;
+    const sy = (ih - side) / 2;
+    ctx.drawImage(mapImage,
+      sx, sy, side, side,                       // source crop
+      0, 0, canvas.width, canvas.height);       // dest fill canvas
   }
 
   // 1km-Raster — Linien an WORLD-km-Positionen, durch worldToCanvas
