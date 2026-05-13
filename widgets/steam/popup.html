@@ -230,10 +230,13 @@
     function renderAchievement(u) {
       popup.dataset.type = "achievement";
       const isPubg = u.source === "pubg";
-      // isRare: PUBG hat hardcoded flag, Steam berechnet aus globalPct
+      // Rare-Logik konsistent: in BEIDEN Faellen aus der % abgeleitet
+      // (Steam: globalPct, PUBG: sessionPct). Schwelle = RARE_PCT (10).
+      // Gleiche % -> gleicher Sound, egal ob Steam oder PUBG.
       let isRare;
       if (isPubg) {
-        isRare = !!u.isRare;
+        const sp = Number(u.sessionPct);
+        isRare = Number.isFinite(sp) && sp <= RARE_PCT;
       } else {
         const gp = Number(u.globalPct);
         isRare = Number.isFinite(gp) && gp <= RARE_PCT;
