@@ -313,12 +313,23 @@ class EndpointRegistry:
         from_iso = qs.get("from")
         to_iso = qs.get("to")
         cache_key = f"session-achievements:{from_iso or ''}:{to_iso or ''}"
-        return _ok(self.cache.get_or_compute(
+        items = self.cache.get_or_compute(
             cache_key,
             lambda: compute_session_achievements(
                 conn, self.my_account_id,
                 from_iso=from_iso, to_iso=to_iso),
-        ))
+        )
+        # Enrich: PNG-Icon-URL und Canonical-Label fuer den Report.
+        # Original-icon (Emoji) bleibt als Fallback drin.
+        enriched = []
+        for a in items:
+            aid = a.get("id")
+            enriched.append({
+                **a,
+                "iconUrl": self.PUBG_ICON_URLS.get(aid),
+                "canonical": self.PUBG_CANONICAL_LABELS.get(aid),
+            })
+        return _ok(enriched)
 
     # Per-Lang Beschreibungs-Texte fuer PUBG-Session-Milestones.
     # Fallback-Sprache: english. Wird in den Responses mit-geliefert.
@@ -334,9 +345,13 @@ class EndpointRegistry:
             "five_kill_match":         "Match with at least 5 kills",
             "beast_chicken":           "Chicken with 5+ kills — Beast Mode",
             "first_hot_drop":          "First hot drop in the session",
+            "hot_drop_match":          "Match was a hot drop",
+            "hot_drop_match_survived": "Survived a hot drop",
             "first_hot_drop_survived": "First survived hot drop in the session",
             "top10_streak":            "Multiple Top-10 finishes in a row",
             "chicken_streak":          "Multiple Chicken Dinners in a row",
+            "session_opener_chicken":  "First match of the session was a Chicken Dinner",
+            "session_opener_top10":    "First match of the session was a Top-10 finish",
         },
         "german": {
             "first_chicken":           "Erstes Chicken-Dinner der Session",
@@ -345,9 +360,13 @@ class EndpointRegistry:
             "five_kill_match":         "Match mit mindestens 5 Kills",
             "beast_chicken":           "Chicken mit 5+ Kills — Beast Mode",
             "first_hot_drop":          "Erstes Hot-Drop der Session",
+            "hot_drop_match":          "Match war ein Hot-Drop",
+            "hot_drop_match_survived": "Hot-Drop überlebt",
             "first_hot_drop_survived": "Erstes überlebtes Hot-Drop der Session",
             "top10_streak":            "Mehrere Top-10-Finishes in Folge",
             "chicken_streak":          "Mehrere Chicken-Dinners in Folge",
+            "session_opener_chicken":  "Erster Match der Session war ein Chicken-Dinner",
+            "session_opener_top10":    "Erster Match der Session war ein Top-10-Finish",
         },
         "french": {
             "first_chicken":           "Premier Chicken Dinner de la session",
@@ -356,9 +375,13 @@ class EndpointRegistry:
             "five_kill_match":         "Match avec 5 kills ou plus",
             "beast_chicken":           "Chicken avec 5+ kills — Beast Mode",
             "first_hot_drop":          "Premier hot drop de la session",
+            "hot_drop_match":          "Match avec hot drop",
+            "hot_drop_match_survived": "Hot drop survécu",
             "first_hot_drop_survived": "Premier hot drop survécu",
             "top10_streak":            "Plusieurs top 10 d'affilée",
             "chicken_streak":          "Plusieurs Chicken d'affilée",
+            "session_opener_chicken":  "Premier match de la session = Chicken Dinner",
+            "session_opener_top10":    "Premier match de la session = top 10",
         },
         "spanish": {
             "first_chicken":           "Primer Chicken Dinner de la sesión",
@@ -367,9 +390,13 @@ class EndpointRegistry:
             "five_kill_match":         "Partida con 5+ kills",
             "beast_chicken":           "Chicken con 5+ kills — Modo Bestia",
             "first_hot_drop":          "Primer hot drop de la sesión",
+            "hot_drop_match":          "Partida con hot drop",
+            "hot_drop_match_survived": "Hot drop sobrevivido",
             "first_hot_drop_survived": "Primer hot drop sobrevivido",
             "top10_streak":            "Varios Top 10 seguidos",
             "chicken_streak":          "Varios Chickens seguidos",
+            "session_opener_chicken":  "Primer partida de la sesión = Chicken Dinner",
+            "session_opener_top10":    "Primer partida de la sesión = Top 10",
         },
         "dutch": {
             "first_chicken":           "Eerste Chicken Dinner van de sessie",
@@ -378,9 +405,13 @@ class EndpointRegistry:
             "five_kill_match":         "Match met 5+ kills",
             "beast_chicken":           "Chicken met 5+ kills — Beast Mode",
             "first_hot_drop":          "Eerste hot drop van de sessie",
+            "hot_drop_match":          "Match was een hot drop",
+            "hot_drop_match_survived": "Hot drop overleefd",
             "first_hot_drop_survived": "Eerste overleefde hot drop",
             "top10_streak":            "Meerdere Top-10 op rij",
             "chicken_streak":          "Meerdere Chickens op rij",
+            "session_opener_chicken":  "Eerste match van de sessie = Chicken Dinner",
+            "session_opener_top10":    "Eerste match van de sessie = Top-10",
         },
         "italian": {
             "first_chicken":           "Primo Chicken Dinner della sessione",
@@ -389,10 +420,35 @@ class EndpointRegistry:
             "five_kill_match":         "Match con 5+ kill",
             "beast_chicken":           "Chicken con 5+ kill — Modalità Bestia",
             "first_hot_drop":          "Primo hot drop della sessione",
+            "hot_drop_match":          "Match con hot drop",
+            "hot_drop_match_survived": "Hot drop sopravvissuto",
             "first_hot_drop_survived": "Primo hot drop sopravvissuto",
             "top10_streak":            "Più Top-10 di fila",
             "chicken_streak":          "Più Chicken di fila",
+            "session_opener_chicken":  "Primo match della sessione = Chicken Dinner",
+            "session_opener_top10":    "Primo match della sessione = Top-10",
         },
+    }
+
+    # Popup-Reihenfolge bei mehreren Milestones aus demselben Match.
+    # Idee: erst die Story-Hauptaussage (Chicken Win), dann Details
+    # die das Ergebnis ausschmuecken — Spoiler-frei. '7-Kill Match'
+    # darf nicht vor 'Beast Chicken' kommen sonst weiss der Viewer
+    # 'oh gleich kommt der Beast Mode' bevor er den Win sieht.
+    PUBG_POPUP_PRIORITY = {
+        "first_chicken":           1,
+        "session_opener_chicken":  2,
+        "chicken_streak":          3,
+        "beast_chicken":           4,
+        "five_kill_match":         5,
+        "longest_kill_400":        6,
+        "first_top10":             7,
+        "session_opener_top10":    8,
+        "top10_streak":            9,
+        "hot_drop_match":          10,
+        "first_hot_drop":          10,  # legacy (DB-Rows von vor hot_drop_match)
+        "hot_drop_match_survived": 11,
+        "first_hot_drop_survived": 11,  # legacy
     }
 
     # Kanonische Labels fuer aggregierte Darstellung. Die in der DB
@@ -400,15 +456,19 @@ class EndpointRegistry:
     # 'Longest Kill 423m') — fuer den Gruppen-Tile brauchen wir eine
     # generische Bezeichnung.
     PUBG_CANONICAL_LABELS = {
-        "first_chicken":           "First Chicken",
-        "first_top10":             "First Top-10",
-        "longest_kill_400":        "Longest Kill ≥ 400m",
-        "five_kill_match":         "5+ Kill Match",
+        "first_chicken":           "Dinner Served",
+        "first_top10":             "Endgame Initiate",
+        "longest_kill_400":        "Long-Range Ranger",
+        "five_kill_match":         "Killing Survivor",
         "beast_chicken":           "Beast Chicken",
-        "first_hot_drop":          "First Hot Drop",
-        "first_hot_drop_survived": "First Hot Drop Survived",
-        "top10_streak":            "Top-10 Streak",
-        "chicken_streak":          "Chicken Streak",
+        "hot_drop_match":          "Inferno Begins",
+        "hot_drop_match_survived": "Inferno Survivor",
+        "first_hot_drop":          "Into the Inferno",
+        "first_hot_drop_survived": "Inferno Survivor",
+        "top10_streak":            "Endgame Streak",
+        "chicken_streak":          "Dinner Streak",
+        "session_opener_chicken":  "Cold Start Chicken",
+        "session_opener_top10":    "Pretty Good Start",
     }
 
     # PUBG-Achievement-Icon-URLs (gemacht von ChatGPT, geschnitten aus
@@ -420,7 +480,9 @@ class EndpointRegistry:
         "five_kill_match":         "/widgets/pubg/icons/five_kill_match.png",
         "longest_kill_400":        "/widgets/pubg/icons/longest_kill_400.png",
         "beast_chicken":           "/widgets/pubg/icons/beast_chicken.png",
+        "hot_drop_match":          "/widgets/pubg/icons/first_hot_drop.png",
         "first_hot_drop":          "/widgets/pubg/icons/first_hot_drop.png",
+        "hot_drop_match_survived": "/widgets/pubg/icons/first_hot_drop_survived.png",
         "first_hot_drop_survived": "/widgets/pubg/icons/first_hot_drop_survived.png",
         "top10_streak":            "/widgets/pubg/icons/top10_streak.png",
         "chicken_streak":          "/widgets/pubg/icons/chicken_streak.png",
@@ -467,6 +529,7 @@ class EndpointRegistry:
         erwartet (apiName/displayName/iconUrl/etc).
         Description kommt aus PUBG_ACH_DESCRIPTIONS in der Sprache
         die der Steam-Endpoint aktuell als Default fuehrt."""
+        from bisect import bisect_right
         mark = qs.get("markDisplayed") == "1"
         lang = self._current_lang()
         conn = self.get_conn()
@@ -477,6 +540,28 @@ class EndpointRegistry:
             WHERE displayed_at IS NULL
             ORDER BY played_at ASC
         """).fetchall()
+
+        # Snapshot-in-time-Pct: pro Item berechnen wie haeufig dieses
+        # Milestone bis zum Zeitpunkt 'played_at' in deinen Sessions
+        # vorkam — gleiche Logik wie im Achievement-Browser, damit
+        # Popup und Browser konsistent sind.
+        match_dates = sorted({
+            r[0] for r in conn.execute(
+                "SELECT DISTINCT date(played_at) FROM matches "
+                "WHERE played_at IS NOT NULL"
+            ).fetchall() if r[0]
+        })
+        ach_rows_all = conn.execute(
+            "SELECT achievement_id, played_at FROM pubg_achievements_seen "
+            "WHERE played_at IS NOT NULL ORDER BY played_at ASC"
+        ).fetchall()
+        ach_dates = {}
+        for ar in ach_rows_all:
+            d = ar["played_at"][:10]
+            ach_dates.setdefault(ar["achievement_id"], set()).add(d)
+        ach_dates_sorted = {aid: sorted(dates)
+                             for aid, dates in ach_dates.items()}
+
         items = []
         for r in rows:
             # Unix-Epoch fuer played_at (achievement-popup erwartet das)
@@ -489,6 +574,16 @@ class EndpointRegistry:
                         played.replace("Z", "+00:00")).timestamp())
                 except (TypeError, ValueError):
                     unlocked_ts = 0
+            # Snapshot-pct: 'X% of your sessions got this' bis zum
+            # Zeitpunkt dieses Vorkommens. Bei fehlendem Datum None.
+            d = (played or "")[:10]
+            if d and match_dates:
+                total = bisect_right(match_dates, d)
+                ach_n = bisect_right(
+                    ach_dates_sorted.get(r["achievement_id"], []), d)
+                snap_pct = round((ach_n / max(total, 1)) * 100, 1)
+            else:
+                snap_pct = None
             items.append({
                 "appId":       -2,  # PUBG-Marker (Steam-Side nutzt -1 fuer Test)
                 "gameName":    "PUBG: Session Milestones",
@@ -498,10 +593,20 @@ class EndpointRegistry:
                 "iconUrl":     (self.PUBG_ICON_URLS.get(r["achievement_id"])
                                 or r["icon"]),
                 "unlockedAt":  unlocked_ts,
-                "globalPct":   1.0 if r["is_rare"] else 50.0,
+                "sessionPct":  snap_pct,
                 "isRare":      bool(r["is_rare"]),
                 "source":      "pubg",
+                "_aid":        r["achievement_id"],
             })
+        # Innerhalb gleicher played_at-Zeit per Priority sortieren, damit im
+        # Popup-Stream nichts vorweggenommen wird (z.B. '7 Kills' vor
+        # 'First Chicken' wuerde Beast Chicken spoilern).
+        items.sort(key=lambda u: (
+            u["unlockedAt"],
+            self.PUBG_POPUP_PRIORITY.get(u["_aid"], 99),
+        ))
+        for it in items:
+            it.pop("_aid", None)
         marked_n = 0
         if mark and items:
             conn.execute("""

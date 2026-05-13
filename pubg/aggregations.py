@@ -990,12 +990,15 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
       - longest_kill_400   : Longest Kill >= 400m in einem Match
       - five_kill_match    : Match mit >= 5 Kills
       - beast_chicken      : place == 1 UND kills >= 5 (mehrfach möglich)
-      - first_hot_drop          : ERSTES Hot-Drop in der Range (egal ob überlebt)
-      - first_hot_drop_survived : ERSTES überlebtes Hot-Drop in der Range
+      - hot_drop_match          : pro Hot-Drop-Match, x-N-Counter pro Session
+      - hot_drop_match_survived : pro UEBERLEBTES Hot-Drop, eigener x-N-Counter
       - top10_streak       : pro Match-Peak einer Top-10-Streak (>=2),
                              mehrfach pro Session moeglich
       - chicken_streak     : pro Match-Peak einer Chicken-Streak (>=2),
                              mehrfach pro Session moeglich
+      - session_opener_chicken : erster Match der Session war ein Chicken
+      - session_opener_top10   : erster Match der Session war Top-10
+                                 (nicht zusaetzlich wenn opener_chicken)
 
     Returns Liste { id, label, icon, matchId, playedAt } sortiert
     nach playedAt ASC (Reihenfolge des Erreichens).
@@ -1009,6 +1012,29 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
     seen = set()
     win_seen = False
     top10_seen = False
+
+    # Session-Opener: erster Match der Session war direkt ein Top-10
+    # oder sogar ein Chicken. Mutual exclusive — Chicken trumps Top-10,
+    # damit kein redundantes Popup kommt (Chicken ist inherently Top-10).
+    if matches:
+        first_m = matches[0]
+        first_place = first_m["place"] or 99
+        if first_place == 1:
+            out.append({
+                "id": "session_opener_chicken",
+                "label": "Cold Start Chicken",
+                "icon": "🔥",
+                "matchId": first_m["matchId"],
+                "playedAt": first_m["playedAt"],
+            })
+        elif first_place <= 10:
+            out.append({
+                "id": "session_opener_top10",
+                "label": f"Pretty Good Start · #{first_place}",
+                "icon": "🏆",
+                "matchId": first_m["matchId"],
+                "playedAt": first_m["playedAt"],
+            })
     # Streaks: laufende Laenge tracken, bei jedem neuen Peak (≥2)
     # ein Achievement emitten. Bei Break (Match ausserhalb Bedingung)
     # auf 0 zuruecksetzen. Pro Streak-Run koennen mehrere Peaks emitten
@@ -1028,7 +1054,7 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
         if not win_seen and place == 1:
             out.append({
                 "id": "first_chicken",
-                "label": "First Chicken!",
+                "label": "Dinner Served",
                 "icon": "🔥",
                 "matchId": m["matchId"], "playedAt": played,
             })
@@ -1042,7 +1068,7 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             top10_ts = _compute_top10_reached_at(conn, m["matchId"], my_account_id)
             out.append({
                 "id": "first_top10",
-                "label": "First Top-10",
+                "label": "Endgame Initiate",
                 "icon": "🏆",
                 "matchId": m["matchId"], "playedAt": top10_ts or played,
             })
@@ -1052,7 +1078,7 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
         if longest_m >= 400 and "longest_kill_400" not in seen:
             out.append({
                 "id": "longest_kill_400",
-                "label": f"Longest Kill {int(longest_m)}m",
+                "label": f"Long-Range Ranger · {int(longest_m)}m",
                 "icon": "🔥",
                 "matchId": m["matchId"], "playedAt": played,
             })
@@ -1061,7 +1087,7 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
         if kills >= 5 and "five_kill_match" not in seen:
             out.append({
                 "id": "five_kill_match",
-                "label": f"{kills}-Kill Match",
+                "label": f"Killing Survivor · {kills} Kills",
                 "icon": "🔥",
                 "matchId": m["matchId"], "playedAt": played,
             })
@@ -1090,7 +1116,7 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             if top10_streak >= 2:
                 out.append({
                     "id": "top10_streak",
-                    "label": f"Top-10 Streak ×{top10_streak}",
+                    "label": f"Endgame Streak ×{top10_streak}",
                     "icon": "🔥",
                     "matchId": m["matchId"],
                     "playedAt": played,
@@ -1104,7 +1130,7 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             if chicken_streak >= 2:
                 out.append({
                     "id": "chicken_streak",
-                    "label": f"Chicken Streak ×{chicken_streak}",
+                    "label": f"Dinner Streak ×{chicken_streak}",
                     "icon": "🔥",
                     "matchId": m["matchId"],
                     "playedAt": played,
@@ -1112,36 +1138,33 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
         else:
             chicken_streak = 0
 
-    # Hot-Drop-Achievements: ERSTES Hot-Drop überhaupt + ERSTES
-    # überlebtes Hot-Drop in der Range. perMatch ist DESC sortiert →
-    # reversed für ASC = ältestes zuerst. Beide Achievements können
-    # zusammen auftreten (wenn das erste Hot-Drop direkt überlebt wurde).
+    # Hot-Drop-Achievements: pro Hot-Drop-Match ein Milestone mit
+    # x-N-Counter (resettet pro Session). Survived counter laeuft separat
+    # und zaehlt nur die ueberlebten Hot-Drops.
+    # perMatch ist DESC sortiert → reversed für ASC = ältestes zuerst.
     try:
         hd = compute_hot_drop(conn, my_account_id, "session",
                                from_iso=from_iso, to_iso=to_iso)
-        first_hot_seen = False
-        first_hot_survived_seen = False
+        hot_drop_count = 0
+        hot_drop_survived_count = 0
         for pm in reversed(hd.get("perMatch") or []):
             if not pm.get("hotDrop"):
                 continue
-            if not first_hot_seen:
+            hot_drop_count += 1
+            out.append({
+                "id": "hot_drop_match",
+                "label": f"Inferno Begins ×{hot_drop_count}",
+                "icon": "🔥",
+                "matchId": pm["matchId"], "playedAt": pm["playedAt"],
+            })
+            if pm.get("soloSurvived"):
+                hot_drop_survived_count += 1
                 out.append({
-                    "id": "first_hot_drop",
-                    "label": "First Hot Drop",
+                    "id": "hot_drop_match_survived",
+                    "label": f"Inferno Survivor ×{hot_drop_survived_count}",
                     "icon": "🔥",
                     "matchId": pm["matchId"], "playedAt": pm["playedAt"],
                 })
-                first_hot_seen = True
-            if not first_hot_survived_seen and pm.get("soloSurvived"):
-                out.append({
-                    "id": "first_hot_drop_survived",
-                    "label": "First Hot Drop Survived",
-                    "icon": "🔥",
-                    "matchId": pm["matchId"], "playedAt": pm["playedAt"],
-                })
-                first_hot_survived_seen = True
-            if first_hot_seen and first_hot_survived_seen:
-                break
     except Exception:
         pass
 
@@ -1153,7 +1176,9 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
 # Konservativ — die Kandidaten die wirklich krass sind:
 PUBG_RARE_ACHIEVEMENTS = {
     "beast_chicken",                 # Chicken + ≥5 Kills
-    "first_hot_drop_survived",       # erstes ueberlebtes Hot-Drop
+    "session_opener_chicken",        # Session startet direkt mit Chicken
+    "hot_drop_match_survived",       # ueberlebtes Hot-Drop (jedes)
+    "first_hot_drop_survived",       # legacy alias (Pre-Counter-Migration)
     "longest_kill_400",              # ≥400m
     "chicken_streak",                # ≥2 Chickens in Folge
 }
@@ -1303,7 +1328,7 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
         params = [my_account_id, cutoff]
     window_ms = window_secs * 1000
     matches = conn.execute(f"""
-        SELECT m.match_id, m.played_at FROM matches m
+        SELECT m.match_id, m.played_at, m.map_name FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id
         WHERE pa.account_id = ? AND m.played_at >= ?{end_filter}
         ORDER BY m.played_at DESC
@@ -1321,11 +1346,14 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
         per_match.append({
             "matchId":        m["match_id"],
             "playedAt":       m["played_at"],
+            "mapName":        m["map_name"],
             "hotDrop":        result["hotDrop"],
             "soloSurvived":   result["soloSurvived"],
             "teamSurvived":   result["teamSurvived"],
             "teamsInFight":   result.get("teamsInFight", 0),
             "teamsInRadius":  result.get("teamsInRadius", 0),
+            "landingX":       result.get("landingX"),
+            "landingY":       result.get("landingY"),
         })
         if result["hotDrop"]:
             hot += 1
@@ -1366,7 +1394,7 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
         "avgTeamsInRadius":   round(avg_radius_teams, 2),
         "maxTeamsInRadius":   max_radius_teams,
         "radiusMeters":       300,
-        "perMatch":           per_match[:20],
+        "perMatch":           per_match,
     }
 
 
@@ -1576,12 +1604,18 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     # dadurch wurden 'Stadt-Drops mit Lauer-Phase >2min' faelschlich
     # als 'cold' gewertet.
     is_hot_drop = bool(teams_in_radius) or hot_drop
+    # Anker-Landing = erste Squad-Landung (used als Fight-Window-Start).
+    # Coords als Tooltip-Info zurueckliefern.
+    anchor_x = first_landing["actor_x"] if first_landing else None
+    anchor_y = first_landing["actor_y"] if first_landing else None
     return {
         "hotDrop":         is_hot_drop,
         "soloSurvived":    solo_alive,
         "teamSurvived":    team_alive,
         "teamsInFight":    len(teams_in_fight),
         "teamsInRadius":   len(teams_in_radius),
+        "landingX":        anchor_x,
+        "landingY":        anchor_y,
     }
 
 

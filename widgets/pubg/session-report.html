@@ -185,6 +185,24 @@
     .matches-list .m .map { color: var(--pubg-text); }
     .matches-list .m .stats { color: var(--pubg-muted); text-align: right; }
     .matches-list .m .stats b { color: var(--pubg-text); }
+    .hot-drop-badge {
+      display: inline-block;
+      width: 16px;
+      text-align: center;
+      font-size: 0.95em;
+      line-height: 1;
+    }
+    .hot-drop-badge.hot {
+      filter: none;
+    }
+    .hot-drop-badge.died {
+      filter: grayscale(1);
+      opacity: 0.55;
+    }
+    .hot-drop-badge.hot[title],
+    .hot-drop-badge.died[title] {
+      cursor: help;
+    }
 
     /* Trend / Streaks / Achievements im Report */
     .extras-h {
@@ -261,10 +279,35 @@
       margin-left: auto;
       text-align: right;
     }
+    .ach-details {
+      margin-top: 8px;
+    }
+    .ach-summary {
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+    .ach-summary::-webkit-details-marker { display: none; }
+    .ach-summary::before {
+      content: "▸ ";
+      display: inline-block;
+      transition: transform 120ms ease;
+    }
+    .ach-details[open] > .ach-summary::before {
+      transform: rotate(90deg);
+    }
+    .ach-count {
+      color: var(--pubg-muted);
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      margin-left: 6px;
+    }
     .ach-list {
       display: flex;
       flex-direction: column;
       gap: 4px;
+      margin-top: 8px;
     }
     .ach-item {
       display: flex;
@@ -275,8 +318,34 @@
       background: rgba(255,255,255,0.04);
       font-size: 0.9em;
     }
-    .ach-icon { font-size: 1.2em; }
-    .ach-label { flex: 1; color: var(--pubg-text); font-weight: 700; }
+    .ach-icon {
+      font-size: 1.2em;
+      width: 32px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+    }
+    .ach-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 4px;
+    }
+    .ach-text {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.2;
+    }
+    .ach-canonical {
+      color: var(--pubg-gold, #f2b705);
+      font-size: 0.7em;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .ach-label { color: var(--pubg-text); font-weight: 700; }
     .ach-when { color: var(--pubg-muted); font-size: 0.85em; }
 
     .highlights {
@@ -730,10 +799,11 @@
         : `${outD.slice(0,5)} ${PubgUI.fmtTime(squadOutIso)}`;
       const numStr = matchNum != null ? `<span class="num">#${matchNum}</span> ` : "";
       return `
-        <div class="m ${isWin ? 'win' : ''}" data-idx="${idx}">
+        <div class="m ${isWin ? 'win' : ''}" data-idx="${idx}" data-match-id="${m.matchId || ''}">
           <span class="time-range">${numStr}<b>${startTimeStr}</b> → <b>${outTimeStr}</b></span>
           <span class="place">#${m.place}</span>
           <span class="map">${PubgUI.fmtMap(m.map)}</span>
+          <span class="hot-drop-badge" data-hd-slot></span>
           <span class="stat"><b>${m.kills}</b> K</span>
           <span class="stat"><b>${Math.round(m.damage||0)}</b> DMG</span>
           <span class="stat"><b>${fmtSurv(mySurv)}</b></span>
@@ -903,11 +973,47 @@
       const matchesUrl = (FROM || TO)
         ? `/api/pubg/session-matches${fromTo}`
         : `/api/pubg/session-matches?range=session`;
-      const [trend, achievements, matches] = await Promise.all([
+      const hotDropUrl = (FROM || TO)
+        ? `/api/pubg/hot-drop${fromTo}`
+        : `/api/pubg/hot-drop?range=session`;
+      const [trend, achievements, matches, hotDrop] = await Promise.all([
         PubgUI.fetchJson(`/api/pubg/trend-deltas${fromTo}`).catch(() => null),
         PubgUI.fetchJson(`/api/pubg/session-achievements${fromTo}`).catch(() => []),
         PubgUI.fetchJson(matchesUrl).catch(() => []),
+        PubgUI.fetchJson(hotDropUrl).catch(() => null),
       ]);
+
+      // Flammen-Badge in jeder Match-Zeile rendern: Hot-Drop -> 🔥
+      // (greyscale wenn nicht ueberlebt). Tooltip enthaelt Map + Landing-
+      // Coords umgerechnet in km (PUBG-Welt: 1m = 100 cm = 100 Units).
+      if (hotDrop && Array.isArray(hotDrop.perMatch)) {
+        const fmtMapName = (raw) => PubgUI.fmtMap(raw);
+        const hdMap = new Map();
+        for (const pm of hotDrop.perMatch) {
+          if (pm.matchId) hdMap.set(pm.matchId, pm);
+        }
+        document.querySelectorAll(".m[data-match-id]").forEach((row) => {
+          const id = row.getAttribute("data-match-id");
+          const slot = row.querySelector("[data-hd-slot]");
+          if (!id || !slot) return;
+          const pm = hdMap.get(id);
+          if (!pm || !pm.hotDrop) return;
+          const survived = !!pm.soloSurvived;
+          const teamSaved = !survived && !!pm.teamSurvived;
+          let tooltip = `Hot Drop · ${fmtMapName(pm.mapName)}`;
+          if (pm.landingX != null && pm.landingY != null) {
+            const xKm = (pm.landingX / 100000).toFixed(1);
+            const yKm = (pm.landingY / 100000).toFixed(1);
+            tooltip += ` · landed @ ${xKm}/${yKm} km`;
+          }
+          if (survived) tooltip += " · survived";
+          else if (teamSaved) tooltip += " · died, team survived";
+          else tooltip += " · died";
+          slot.className = "hot-drop-badge " + (survived ? "hot" : "died");
+          slot.textContent = "🔥";
+          slot.setAttribute("title", tooltip);
+        });
+      }
 
       const placeholder = document.querySelector(".extras-placeholder");
       if (!placeholder) return;
@@ -989,16 +1095,27 @@
 
       let achievementsHtml = "";
       if (achievements && achievements.length) {
+        const isEmoji = (s) => s && !s.startsWith("/") && !s.startsWith("http");
+        const iconHtml = (a) => a.iconUrl
+          ? `<img src="${a.iconUrl}" alt="">`
+          : (isEmoji(a.icon) ? a.icon : "");
         achievementsHtml = `
-          <h3 class="extras-h">Achievements</h3>
-          <div class="ach-list">
-            ${achievements.map(a => `
-              <div class="ach-item">
-                <span class="ach-icon">${a.icon || ""}</span>
-                <span class="ach-label">${a.label || a.id}</span>
-                <span class="ach-when">${PubgUI.fmtTime(a.playedAt)}</span>
-              </div>`).join("")}
-          </div>`;
+          <details class="ach-details">
+            <summary class="extras-h ach-summary">
+              Achievements <span class="ach-count">(${achievements.length})</span>
+            </summary>
+            <div class="ach-list">
+              ${achievements.map(a => `
+                <div class="ach-item">
+                  <span class="ach-icon">${iconHtml(a)}</span>
+                  <span class="ach-text">
+                    ${a.canonical ? `<span class="ach-canonical">${a.canonical}</span>` : ""}
+                    <span class="ach-label">${a.label || a.id}</span>
+                  </span>
+                  <span class="ach-when">${PubgUI.fmtTime(a.playedAt)}</span>
+                </div>`).join("")}
+            </div>
+          </details>`;
       }
 
       placeholder.innerHTML = trendHtml + streaksHtml + achievementsHtml;
