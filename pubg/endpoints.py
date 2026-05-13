@@ -118,6 +118,8 @@ class EndpointRegistry:
             return self._detect_achievements(qs)
         if route == ("GET", "/api/pubg/backfill-achievements"):
             return self._backfill_achievements(qs)
+        if route == ("GET", "/api/pubg/refetch-telemetry"):
+            return self._refetch_telemetry(qs)
         if route == ("POST", "/api/pubg/session/reset"):
             return self._session_reset()
         if route == ("GET", "/api/pubg/top-mates"):
@@ -1280,6 +1282,49 @@ class EndpointRegistry:
             return _err(500, f"backfill failed: {e}")
         self.cache.invalidate()
         return _ok(result)
+
+    def _refetch_telemetry(self, qs):
+        """Trigger Bulk-Telemetry-Catchup im Background. Holt alle Matches
+        mit veraltetem telemetry_schema vom PUBG-CDN (14d Retention).
+        ?onlyMatch=ID  optionale Einschraenkung auf einen einzigen Match.
+        Returns sofort mit 'started' — Fortschritt via /api/pubg/status.
+        """
+        from pubg.poller import run_bulk_telemetry_catchup
+        only_match = (qs.get("onlyMatch") or "").strip()
+        import threading
+        from pubg.db import connect
+        # We have self.get_conn() but the bulk-catchup runs in background
+        # thread → eigener Connection-Handle. db_path muessen wir uns aus
+        # der bestehenden Connection erraten.
+        try:
+            cur = self.get_conn().execute("PRAGMA database_list").fetchall()
+            db_path = next((r[2] for r in cur if r[1] == "main"), None)
+        except Exception:
+            db_path = None
+        if not db_path:
+            return _err(500, "could not determine db_path")
+        if only_match:
+            # Single-Match-Reset: schema zurueck, damit der Catchup ihn
+            # nochmal anpackt
+            self.get_conn().execute(
+                "UPDATE matches SET telemetry_schema = 0 WHERE match_id = ?",
+                (only_match,))
+            self.get_conn().commit()
+
+        def _run():
+            try:
+                conn_bg = connect(db_path)
+                run_bulk_telemetry_catchup(
+                    conn_bg, self.client, self.my_account_id,
+                    max_matches=None, pacing_ms=150)
+                conn_bg.close()
+            except Exception as e:
+                print(f"[refetch-telemetry] failed: {e}")
+        threading.Thread(target=_run, daemon=True,
+                          name="pubg-refetch-trigger").start()
+        return _ok({"started": True, "onlyMatch": only_match or None,
+                    "info": "running in background — watch DB for "
+                            "telemetry_schema/telemetry_fetched updates"})
 
     def _replay_achievement(self, qs):
         """Markiert ein einzelnes PUBG-Session-Milestone als undisplayed
