@@ -142,6 +142,34 @@
       display: none;
     }
     .squad-detail.show { display: block; animation: pubg-fade-in 0.25s; }
+    .squad-detail .detail-row {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .squad-detail .detail-row > .squad-table-wrap { flex: 1; min-width: 0; }
+    .match-map {
+      width: 220px;
+      height: 220px;
+      flex: none;
+      background: #0d061a;
+      border: 1px solid var(--pubg-border);
+      border-radius: 6px;
+      position: relative;
+      overflow: hidden;
+    }
+    .match-map canvas { width: 100%; height: 100%; display: block; }
+    .match-map .legend {
+      position: absolute;
+      bottom: 4px; left: 4px; right: 4px;
+      font-size: 0.7em;
+      color: var(--pubg-muted);
+      background: rgba(13,6,26,0.7);
+      padding: 2px 6px;
+      border-radius: 3px;
+      line-height: 1.3;
+    }
+    .match-map .legend b { color: var(--pubg-gold); }
     .squad-detail table {
       width: 100%;
       border-collapse: collapse;
@@ -764,7 +792,6 @@
       const isWin = m.place === 1;
       const rows = all.map(p => {
         const cls = (p.isSelf ? "self " : "") + (isWin ? "win" : "");
-        const kd = (p.kills || 0);  // pro Match — nicht aggregierte K/D
         return `<tr class="${cls.trim()}">
           <td>${p.name}${p.isSelf ? " (du)" : ""}</td>
           <td>${p.kills || 0}</td>
@@ -775,13 +802,25 @@
           <td>${fmtSurv(p.time_survived)}</td>
         </tr>`;
       }).join("");
+      // Mini-Map mit Landing-Pins der Squad. Wird lazy beim ersten
+      // Expand der Match-Zeile gerendert (data-rendered Flag).
+      const matchId = m.matchId || "";
+      const mapName = m.map || "";
       return `
-        <table>
-          <thead><tr>
-            <th>Squad</th><th>K</th><th>HS</th><th>Ass</th><th>DBNO</th><th>DMG</th><th>Survived</th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>`;
+        <div class="detail-row">
+          <div class="squad-table-wrap">
+            <table>
+              <thead><tr>
+                <th>Squad</th><th>K</th><th>HS</th><th>Ass</th><th>DBNO</th><th>DMG</th><th>Survived</th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+          <div class="match-map" data-match-id="${matchId}" data-map="${mapName}">
+            <canvas></canvas>
+            <div class="legend">Squad-Landings · ${PubgUI.fmtMap(mapName)}</div>
+          </div>
+        </div>`;
     }
 
     function fmtMatchRow(m, idx, matchNum) {
@@ -989,6 +1028,28 @@
         try { await PubgUI.POI.ready; } catch (e) {}
       }
 
+      // Landings + POI-Cal pre-fetchen fuer Mini-Map. Lazy-rendert wenn
+      // User Match expandiert.
+      try {
+        const [lj, pj] = await Promise.all([
+          PubgUI.fetchJson("/api/pubg/landings"),
+          PubgUI.fetchJson("/api/pubg/pois"),
+        ]);
+        window._landingsByMatch = new Map();
+        const lans = (lj && lj.landings) || lj || [];
+        for (const ld of lans) {
+          if (!ld.matchId) continue;
+          if (!window._landingsByMatch.has(ld.matchId)) {
+            window._landingsByMatch.set(ld.matchId, []);
+          }
+          window._landingsByMatch.get(ld.matchId).push(ld);
+        }
+        window._poiData = pj || {};
+      } catch (e) {
+        window._landingsByMatch = new Map();
+        window._poiData = {};
+      }
+
       // Flammen-Badge in jeder Match-Zeile rendern: Hot-Drop -> 🔥
       // (greyscale wenn nicht ueberlebt). Tooltip = POI-Name (Map ist
       // schon in der Zeile selbst sichtbar).
@@ -1125,7 +1186,110 @@
       placeholder.innerHTML = trendHtml + streaksHtml + achievementsHtml;
     }
 
-    // Click-Handler: Match-Zeile expandiert Squad-Detail
+    // Per-Map: welches Bild im Repo nutzen wir? Wenn der User einen
+    // In-Game-Screenshot abgelegt hat (z.B. screenshot.png fuer Erangel),
+    // dann nutzen wir das — die Pin-Calibration in pubg-pois.json gilt
+    // dafuer. Sonst pubg.com-Default.
+    const MAP_IMAGE = {
+      "Baltic_Main": "/widgets/pubg/maps/screenshot.png",
+    };
+    function mapImageUrl(mapName) {
+      return MAP_IMAGE[mapName] || `/widgets/pubg/maps/${mapName}.webp`;
+    }
+
+    // Center-Anchored Affin (gleiche Formel wie poi-editor.html)
+    function applyPinCal(xCm, yCm, mapKm, cal) {
+      if (!cal) return [xCm, yCm];
+      const mc = mapKm * 100000 / 2;
+      let x = xCm, y = yCm;
+      if (cal.flipX) x = 2 * mc - x;
+      if (cal.flipY) y = 2 * mc - y;
+      const rot = ((cal.rotate || 0) % 360 + 360) % 360;
+      if (rot !== 0) {
+        const dx = x - mc, dy = y - mc;
+        if (rot === 90)  { x = mc - dy; y = mc + dx; }
+        if (rot === 180) { x = mc - dx; y = mc - dy; }
+        if (rot === 270) { x = mc + dy; y = mc - dx; }
+      }
+      const ex = (x - mc) * (cal.scaleX || 1) + mc + (cal.offsetX || 0);
+      const ey = (y - mc) * (cal.scaleY || 1) + mc + (cal.offsetY || 0);
+      return [ex, ey];
+    }
+
+    // Cache fuer geladene Map-Images
+    const _mapImageCache = new Map();
+    function loadMapImage(url) {
+      if (_mapImageCache.has(url)) return _mapImageCache.get(url);
+      const p = new Promise((res) => {
+        const img = new Image();
+        img.onload = () => res(img);
+        img.onerror = () => res(null);
+        img.src = url;
+      });
+      _mapImageCache.set(url, p);
+      return p;
+    }
+
+    async function renderMatchMap(host) {
+      const matchId = host.getAttribute("data-match-id");
+      const mapName = host.getAttribute("data-map");
+      if (!matchId || !mapName) return;
+      const canvas = host.querySelector("canvas");
+      if (!canvas || host.dataset.rendered === "1") return;
+      host.dataset.rendered = "1";
+
+      const blob = (window._poiData || {})[mapName] || {};
+      const mapKm = blob.mapKm || 8;
+      const cal   = blob.pinCalibration || {};
+      const landings = (window._landingsByMatch || new Map()).get(matchId) || [];
+
+      const img = await loadMapImage(mapImageUrl(mapName));
+      const rect = host.getBoundingClientRect();
+      canvas.width  = Math.max(80, Math.round(rect.width));
+      canvas.height = Math.max(80, Math.round(rect.height));
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#0d061a";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // Center-Crop fuer nicht-quadratische Bilder (analog Editor)
+      if (img && img.naturalWidth) {
+        const side = Math.min(img.naturalWidth, img.naturalHeight);
+        const sx = (img.naturalWidth - side) / 2;
+        const sy = (img.naturalHeight - side) / 2;
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, canvas.width, canvas.height);
+      }
+      // Pins mit Calibration
+      const base = canvas.width / (mapKm * 100000);
+      // Farben pro Spieler (deterministisch via accountId-Hash)
+      const playerColor = (acc) => {
+        let h = 0;
+        for (let i = 0; i < (acc || "").length; i++) h = (h * 31 + acc.charCodeAt(i)) | 0;
+        const hue = Math.abs(h) % 360;
+        return `hsl(${hue}, 80%, 60%)`;
+      };
+      // Eigene Squad-Mate-IDs sammeln fuer Hervorhebung
+      landings.forEach((ld) => {
+        const [ex, ey] = applyPinCal(ld.x, ld.y, mapKm, cal);
+        const px = ex * base, py = ey * base;
+        const color = playerColor(ld.accountId);
+        // Pin
+        ctx.beginPath();
+        ctx.arc(px, py, 6, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        // Initial-Buchstabe (1. Char vom Namen)
+        const initial = (ld.name || "?")[0].toUpperCase();
+        ctx.fillStyle = "white";
+        ctx.font = "bold 9px DM Sans, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(initial, px, py);
+      });
+    }
+
+    // Click-Handler: Match-Zeile expandiert Squad-Detail + rendert Mini-Map
     document.addEventListener("click", (e) => {
       const row = e.target.closest(".m[data-idx]");
       if (!row) return;
@@ -1135,6 +1299,10 @@
       const wasExpanded = row.classList.contains("expanded");
       row.classList.toggle("expanded");
       detail.classList.toggle("show", !wasExpanded);
+      if (!wasExpanded) {
+        const host = detail.querySelector(".match-map");
+        if (host) renderMatchMap(host);
+      }
     });
 
     const reportUrl = "/api/pubg/session-report" +
