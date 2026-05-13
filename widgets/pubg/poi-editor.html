@@ -115,6 +115,24 @@
   }
   .edit-block input { width: 100%; }
   .stat-line { color: #8a7d99; font-size: 0.75em; margin-top: 4px; }
+  #pinTooltip {
+    position: fixed;
+    pointer-events: none;
+    background: rgba(13, 6, 26, 0.95);
+    border: 1px solid #f2b705;
+    border-radius: 4px;
+    padding: 6px 9px;
+    font-size: 0.75em;
+    color: #e8e0f0;
+    line-height: 1.4;
+    z-index: 1000;
+    display: none;
+    max-width: 280px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.7);
+  }
+  #pinTooltip b { color: #f2b705; font-variant-numeric: tabular-nums; }
+  #pinTooltip .row { display: flex; gap: 6px; }
+  #pinTooltip .row .lbl { color: #8a7d99; min-width: 56px; }
 </style>
 </head>
 <body>
@@ -142,6 +160,7 @@
 <div class="wrap">
   <div class="canvas-host">
     <canvas id="cv"></canvas>
+    <div id="pinTooltip"></div>
   </div>
   <div class="panel">
     <h3>Regionen <select id="sortSel" style="float:right;font-size:0.78em;padding:2px 6px">
@@ -603,6 +622,84 @@ function hitTestEdge(lx, ly) {
   }
   return null;
 }
+// Pin-Hit-Test in 'logischen' Canvas-Pixeln (gleiches Coord-System wie
+// die anderen hit-tests, vor dem Zoom-Transform).
+function hitTestPin(lx, ly) {
+  const mc = mapKm * 100000 / 2;
+  const HITR = 6 / view.zoom;
+  for (let i = pins.length - 1; i >= 0; i--) {
+    const p = pins[i];
+    const ex = (p.x - mc) * pinCal.scaleX + mc + pinCal.offsetX;
+    const ey = (p.y - mc) * pinCal.scaleY + mc + pinCal.offsetY;
+    const [px, py] = worldToCanvas(ex, ey);
+    if (Math.hypot(lx - px, ly - py) < HITR) return p;
+  }
+  return null;
+}
+
+// Welche POI-Region enthaelt diesen Welt-Punkt (smallest-area-wins,
+// gleiche Logik wie der Runtime-Lookup in _pubg_pois.js)?
+function poiAt(wx, wy) {
+  let best = null;
+  let bestArea = Infinity;
+  for (const r of regions) {
+    if (!r.name) continue;
+    if (pointInPoly(wx, wy, r.points)) {
+      const a = polyArea(r.points);
+      if (a < bestArea) { bestArea = a; best = r; }
+    }
+  }
+  return best ? best.name : null;
+}
+
+function showPinTooltip(p, clientX, clientY) {
+  const tip = document.getElementById("pinTooltip");
+  const mc = mapKm * 100000 / 2;
+  // Welt-Koords roh + nach Calibration angewendet
+  const ex = (p.x - mc) * pinCal.scaleX + mc + pinCal.offsetX;
+  const ey = (p.y - mc) * pinCal.scaleY + mc + pinCal.offsetY;
+  // Relative zur Map-Mitte in km
+  const relRawX = (p.x - mc) / 100000;
+  const relRawY = (p.y - mc) / 100000;
+  const relEffX = (ex - mc) / 100000;
+  const relEffY = (ey - mc) / 100000;
+  const poi = poiAt(ex, ey);
+  // Datum
+  let dateStr = "";
+  if (p.playedAt) {
+    try {
+      const d = new Date(p.playedAt);
+      dateStr = d.toLocaleString("de-DE",
+        { day: "2-digit", month: "2-digit", year: "2-digit",
+          hour: "2-digit", minute: "2-digit" });
+    } catch (e) {}
+  }
+  const calApplied = (pinCal.offsetX || pinCal.offsetY ||
+                       pinCal.scaleX !== 1 || pinCal.scaleY !== 1);
+  tip.innerHTML = `
+    <div class="row"><span class="lbl">Player</span><b>${p.name || "?"}</b></div>
+    ${dateStr ? `<div class="row"><span class="lbl">Match</span><span>${dateStr}</span></div>` : ""}
+    <div class="row"><span class="lbl">Match-ID</span><span>${(p.matchId || "").slice(0, 12)}…</span></div>
+    <div class="row"><span class="lbl">Welt-cm</span><span>(${p.x|0}, ${p.y|0})</span></div>
+    <div class="row"><span class="lbl">rel. zur Mitte</span><b>${relRawX.toFixed(2)} / ${relRawY.toFixed(2)} km</b></div>
+    ${calApplied ? `<div class="row"><span class="lbl">nach Cal.</span><b>${relEffX.toFixed(2)} / ${relEffY.toFixed(2)} km</b></div>` : ""}
+    <div class="row"><span class="lbl">POI</span><b>${poi || "<i style='color:#666'>keine Region</i>"}</b></div>
+  `;
+  tip.style.display = "block";
+  // Position: rechts neben dem Cursor, fallback links wenn am rechten Rand
+  const W = tip.offsetWidth;
+  const H = tip.offsetHeight;
+  let x = clientX + 14;
+  let y = clientY + 12;
+  if (x + W > window.innerWidth - 8) x = clientX - W - 14;
+  if (y + H > window.innerHeight - 8) y = clientY - H - 12;
+  tip.style.left = x + "px";
+  tip.style.top  = y + "px";
+}
+function hidePinTooltip() {
+  document.getElementById("pinTooltip").style.display = "none";
+}
+
 function hitTestRegion(wx, wy) {
   let best = -1, bestArea = Infinity;
   for (let i = 0; i < regions.length; i++) {
@@ -736,11 +833,21 @@ canvas.addEventListener("mousemove", (ev) => {
   const [lx, ly] = eventToLogical(ev);
   const [wx, wy] = eventToWorld(ev);
 
+  // Pin-Hover-Tooltip (View-Mode + nichts wird gerade gezogen)
+  if (mode === "view" && !isPanning && !calibratingPins) {
+    const pin = hitTestPin(lx, ly);
+    if (pin) showPinTooltip(pin, ev.clientX, ev.clientY);
+    else hidePinTooltip();
+  } else {
+    hidePinTooltip();
+  }
+
   // Cursor in view-mode
   if (mode === "view") {
     if (spaceDown) canvas.style.cursor = "grab";
     else if (selectedIdx >= 0 && hitTestVertex(lx, ly) >= 0) canvas.style.cursor = "move";
     else if (selectedIdx >= 0 && ev.shiftKey && hitTestEdge(lx, ly)) canvas.style.cursor = "copy";
+    else if (hitTestPin(lx, ly)) canvas.style.cursor = "help";
     else if (hitTestRegion(wx, wy) >= 0) canvas.style.cursor = "pointer";
     else canvas.style.cursor = "default";
   }
@@ -810,6 +917,7 @@ canvas.addEventListener("mouseup", (ev) => {
 
 // Wheel-Zoom: zoomt um den Canvas-Mittelpunkt damit die Map zentriert
 // bleibt. Verschieben via Rechtsklick-Drag (siehe unten).
+canvas.addEventListener("mouseleave", () => hidePinTooltip());
 canvas.addEventListener("wheel", (ev) => {
   ev.preventDefault();
   const oldZoom = view.zoom;
