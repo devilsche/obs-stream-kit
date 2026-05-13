@@ -477,13 +477,35 @@ function render() {
       const label = rel > 0 ? `+${rel}` : `${rel}`;
       if (!isAxis) ctx.fillText(label, x1 + 3/view.zoom, y1 + 3/view.zoom);
     }
-    // Center-Marker (Welt-Mitte)
+    // Reference-Pins + Intersection-Labels an jeder km/km-Kreuzung.
+    // Zeigt 'wo das System glaubt, dass Welt-Coord (1km, 1km) liegt' usw.
+    // Vergleichswert fuer landing-pins: wenn ein landing-pin nahe einer
+    // Ref-Dot ist, sollte sein Welt-Coord auch nahe der Dot-Coord sein.
+    const dotFont = `${9 / view.zoom}px DM Sans, sans-serif`;
+    ctx.font = dotFont;
+    for (let kx = 0; kx <= mapKm; kx++) {
+      for (let ky = 0; ky <= mapKm; ky++) {
+        const [px, py] = worldToCanvas(kx * 100000, ky * 100000);
+        // Blue reference dot
+        ctx.fillStyle = "rgba(70, 180, 240, 0.95)";
+        ctx.beginPath();
+        ctx.arc(px, py, 3 / view.zoom, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.85)";
+        ctx.lineWidth = 0.8 / view.zoom;
+        ctx.stroke();
+        // Label "kx/ky" — absolute km Coords (0..mapKm)
+        ctx.fillStyle = "rgba(180, 220, 255, 0.95)";
+        ctx.fillText(`${kx}/${ky}`,
+          px + 5 / view.zoom, py - 4 / view.zoom);
+      }
+    }
+    // Welt-Mitte zusaetzlich als groesserer weisser Punkt fuer Orientierung
     const [cx, cy] = worldToCanvas(centerKm * 100000, centerKm * 100000);
     ctx.fillStyle = "#fff";
     ctx.beginPath();
-    ctx.arc(cx, cy, 4/view.zoom, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 5 / view.zoom, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillText("0/0", cx + 5/view.zoom, cy + 5/view.zoom);
     ctx.textBaseline = "alphabetic";
   }
 
