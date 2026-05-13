@@ -28,6 +28,17 @@
     font: inherit;
     font-size: 0.85em;
   }
+  /* Open-state der Dropdown-Liste (Browser-Default war unleserlich
+     mit dem gold text-color-Inherit). */
+  select option {
+    background: #1a0d2a;
+    color: #e8e0f0;
+  }
+  select option:checked,
+  select option:hover {
+    background: #5e2a79;
+    color: #f2b705;
+  }
   button:hover { background: rgba(94,42,121,0.85); cursor: pointer; }
   button.secondary { color: #c0b0d0; }
   button.danger { color: #ff8a8a; border-color: #663030; }
