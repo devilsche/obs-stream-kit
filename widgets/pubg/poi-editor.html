@@ -135,7 +135,7 @@
       <b>▭ Rechteck:</b> click+drag<br>
       <b>⬠ Polygon:</b> klicken um Punkte zu setzen, doppel-klick zum Schließen<br>
       <b>Drag</b> Vertex-Handle zum Verschieben &nbsp;·&nbsp; <b>Shift+Click</b> auf Kante = neuer Vertex &nbsp;·&nbsp; <b>Alt+Click</b> auf Vertex = löschen<br>
-      <b>Mausrad</b> = Zoom auf Cursor &nbsp;·&nbsp; <b>Space+Drag</b> oder <b>Middle-Mouse</b> = Pan
+      <b>Mausrad</b> = Zoom (zentriert) &nbsp;·&nbsp; <b>Rechtsklick-Drag</b> = Pan (auch Space+Drag oder Middle-Mouse)
     </div>
     <div id="regionList"></div>
     <div class="edit-block" id="editBlock" style="display:none">
@@ -521,8 +521,8 @@ function hitTestRegion(wx, wy) {
 }
 
 canvas.addEventListener("mousedown", (ev) => {
-  // Middle-Mouse oder Space+LMB = Pan-Modus
-  if (ev.button === 1 || (spaceDown && ev.button === 0)) {
+  // Rechtsklick (2), Middle-Mouse (1) oder Space+LMB = Pan-Modus
+  if (ev.button === 2 || ev.button === 1 || (spaceDown && ev.button === 0)) {
     isPanning = true;
     panRef = [ev.clientX, ev.clientY, view.panX, view.panY];
     canvas.style.cursor = "grabbing";
@@ -690,21 +690,24 @@ canvas.addEventListener("mouseup", (ev) => {
   }
 });
 
-// Wheel-Zoom: zoom-zur-Maus damit der Welt-Punkt unter dem Cursor stehen bleibt
+// Wheel-Zoom: zoomt um den Canvas-Mittelpunkt damit die Map zentriert
+// bleibt. Verschieben via Rechtsklick-Drag (siehe unten).
 canvas.addEventListener("wheel", (ev) => {
   ev.preventDefault();
-  const [cx, cy] = canvasXY(ev);
   const oldZoom = view.zoom;
   const factor = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
   const newZoom = Math.max(0.5, Math.min(12, oldZoom * factor));
-  // Damit der Punkt unter dem Cursor stehen bleibt:
-  // newPan = cursor - (cursor - oldPan) * (newZoom/oldZoom)
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
   view.panX = cx - (cx - view.panX) * (newZoom / oldZoom);
   view.panY = cy - (cy - view.panY) * (newZoom / oldZoom);
   view.zoom = newZoom;
   updateZoomBtn();
   render();
 }, { passive: false });
+
+// Rechtsklick-Kontextmenu unterdruecken — wir benutzen RMB-Drag fuer Pan
+canvas.addEventListener("contextmenu", (ev) => ev.preventDefault());
 
 // Space-Taste fuer Pan-Modus (wie Photoshop/Figma)
 window.addEventListener("keydown", (ev) => {
