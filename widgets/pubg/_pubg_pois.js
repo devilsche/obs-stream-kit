@@ -62,11 +62,14 @@
     const alias = (mapName === "Erangel_Main") ? "Baltic_Main" : mapName;
     const blob = DATA[alias] || DATA[mapName];
     if (!blob) return null;
-    // Pin-Calibration anwenden: gleiche Offset-Korrektur wie im
-    // Editor, damit Runtime-Lookup und visuelles Pin-Alignment matchen.
-    const cal = blob.pinCalibration || {offsetX: 0, offsetY: 0};
-    const ax = xCm + (cal.offsetX || 0);
-    const ay = yCm + (cal.offsetY || 0);
+    // Pin-Calibration anwenden: gleiche affine Korrektur wie im Editor,
+    // damit Runtime-Lookup und visuelles Pin-Alignment matchen.
+    // Formel: effective = raw * scale + offset (Top-Left als Anker)
+    const cal = blob.pinCalibration || {};
+    const sx = cal.scaleX != null ? cal.scaleX : 1;
+    const sy = cal.scaleY != null ? cal.scaleY : 1;
+    const ax = xCm * sx + (cal.offsetX || 0);
+    const ay = yCm * sy + (cal.offsetY || 0);
     const regions = blob.regions || [];
     let best = null;
     let bestArea = Infinity;

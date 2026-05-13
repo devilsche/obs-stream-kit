@@ -118,7 +118,11 @@
   <button id="rectBtn">▭ Rechteck</button>
   <button id="polyBtn">⬠ Polygon</button>
   <button id="pinsBtn" class="secondary">📍 Pins laden</button>
-  <button id="calResetBtn" class="secondary">↹ Pins 0/0</button>
+  <button id="calResetBtn" class="secondary" title="Calibration zuruecksetzen (0/0 m, scale 1.0/1.0)">↹ Pins 0/0</button>
+  <label style="display:inline-flex;gap:4px;align-items:center;font-size:0.78em;color:#8a7d99">
+    Scale X<input id="scaleXIn" type="number" step="0.005" value="1.000" style="width:78px">
+    Y<input id="scaleYIn" type="number" step="0.005" value="1.000" style="width:78px">
+  </label>
   <button id="zoomResetBtn" class="secondary">🔍 100%</button>
   <button id="saveBtn" class="save">💾 Speichern</button>
   <span id="status" style="color:#8a7d99; font-size:0.8em"></span>
@@ -186,9 +190,11 @@ let panRef = null;   // [clientX, clientY, startPanX, startPanY]
 let spaceDown = false;
 
 // Pin-Calibration: PUBG-Welt-Coords sind nicht 1:1 zur Map-Image-Pixel-Lage.
-// Offsets werden zum Landing-x/y addiert bevor sie als Pin gezeichnet
-// werden — und auch im Runtime-POI-Lookup. Persistiert pro Map.
-let pinCal = { offsetX: 0, offsetY: 0 };
+// Affine 2D: effective = raw * scale + offset. Top-Left ist der Anker
+// (= dort wo die Map am genauesten ist). ScaleX/Y koennen unabhaengig
+// sein wenn die Map-Skalierung nicht uniform ist.
+// Persistiert pro Map und wird im Runtime-POI-Lookup ebenso angewendet.
+let pinCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0 };
 let calibratingPins = false;
 let calRef = null;   // [startMouseX, startMouseY, startOffsetX, startOffsetY]
 
@@ -217,7 +223,7 @@ async function loadMap(mapId) {
   mapKm = meta ? meta[2] : 8;
   mapSizeIn.value = mapKm;
   pins = [];
-  pinCal = { offsetX: 0, offsetY: 0 };
+  pinCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0 };
   selectedIdx = -1;
   polyPoints = [];
 
@@ -249,6 +255,8 @@ async function loadMap(mapId) {
       pinCal = {
         offsetX: blob.pinCalibration.offsetX || 0,
         offsetY: blob.pinCalibration.offsetY || 0,
+        scaleX:  blob.pinCalibration.scaleX  || 1.0,
+        scaleY:  blob.pinCalibration.scaleY  || 1.0,
       };
     }
     statusEl.textContent = `${regions.length} Regionen geladen`;
@@ -409,9 +417,11 @@ function render() {
     ctx.setLineDash([]);
   }
 
-  // Pins (mit Calibration-Offset)
+  // Pins (mit Calibration: effective = raw * scale + offset)
   pins.forEach(p => {
-    const [px, py] = worldToCanvas(p.x + pinCal.offsetX, p.y + pinCal.offsetY);
+    const ex = p.x * pinCal.scaleX + pinCal.offsetX;
+    const ey = p.y * pinCal.scaleY + pinCal.offsetY;
+    const [px, py] = worldToCanvas(ex, ey);
     ctx.beginPath();
     ctx.arc(px, py, 4 / view.zoom, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(255,80,80,0.85)";
@@ -777,10 +787,20 @@ function updateCalLabel() {
   const xm = (pinCal.offsetX / 100).toFixed(0);
   const ym = (pinCal.offsetY / 100).toFixed(0);
   document.getElementById("calResetBtn").textContent = `↹ Pins ${xm}/${ym} m`;
+  document.getElementById("scaleXIn").value = pinCal.scaleX.toFixed(3);
+  document.getElementById("scaleYIn").value = pinCal.scaleY.toFixed(3);
 }
 document.getElementById("calResetBtn").addEventListener("click", () => {
-  pinCal = { offsetX: 0, offsetY: 0 };
+  pinCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0 };
   updateCalLabel();
+  render();
+});
+document.getElementById("scaleXIn").addEventListener("input", (ev) => {
+  pinCal.scaleX = parseFloat(ev.target.value) || 1.0;
+  render();
+});
+document.getElementById("scaleYIn").addEventListener("input", (ev) => {
+  pinCal.scaleY = parseFloat(ev.target.value) || 1.0;
   render();
 });
 

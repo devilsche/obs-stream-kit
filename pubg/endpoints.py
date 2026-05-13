@@ -432,6 +432,8 @@ class EndpointRegistry:
             "pinCalibration": {
                 "offsetX": int(cal.get("offsetX") or 0),
                 "offsetY": int(cal.get("offsetY") or 0),
+                "scaleX":  float(cal.get("scaleX")  or 1.0),
+                "scaleY":  float(cal.get("scaleY")  or 1.0),
             },
             "regions": clean,
         }
