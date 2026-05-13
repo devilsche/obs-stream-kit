@@ -427,8 +427,13 @@
       if (sortMode === "recent") view.sort((x, y) => (y.unlockedAt || 0) - (x.unlockedAt || 0));
       else if (sortMode === "oldest") view.sort((x, y) => (x.unlockedAt || 0) - (y.unlockedAt || 0));
       else if (sortMode === "rare") view.sort((x, y) => {
-        const xp = x.globalPct != null ? x.globalPct : 999;
-        const yp = y.globalPct != null ? y.globalPct : 999;
+        // Steam-Eintraege haben globalPct, PUBG-Eintraege sessionPct.
+        // Beide drücken 'wie selten' aus — kleiner = rarer, also nach
+        // ASC sortieren mit Fallback auf 999 wenn ganz fehlt.
+        const xp = (x.globalPct != null) ? x.globalPct
+                 : (x.sessionPct != null ? x.sessionPct : 999);
+        const yp = (y.globalPct != null) ? y.globalPct
+                 : (y.sessionPct != null ? y.sessionPct : 999);
         return xp - yp;
       });
       else if (sortMode === "name") view.sort((x, y) =>
