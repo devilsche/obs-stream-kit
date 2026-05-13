@@ -305,16 +305,17 @@ class EndpointRegistry:
     def _landings(self, qs):
         """Liefert Squad-Landings auf einer Map (oder allen Maps).
 
-        Heuristik fuer Touchdown-Detection (PUBG-LogParachuteLanding ist
-        unzuverlaessig — firet teils mid-air bei z>1000 oder doppelt bei
-        Death):
-          1. Pro (match, actor): suche das FRUEHESTE Landing-Event mit
-             z<800 AND health>0 — das ist der ECHTE Bodenkontakt
-          2. Falls keins exists, fallback auf das fruehste Position-Event
-             mit z<800 (= Schema 4+ Daten, Squad-Continuous-Tracking)
-          3. Falls auch das fehlt: nimm das fruehste Landing-Event
-             ueberhaupt (auch wenn mid-air)
-        Mit ?all=1 wird der Filter komplett uebersprungen (alle Landings).
+        Heuristik fuer Touchdown-Detection (PUBG kann LogParachuteLanding
+        beim Tod re-firen — Death-Re-Fire-Event mit hp=0):
+          1. Pro (match, actor): fruehestes Landing mit health>0 UND
+             z<80000cm (= z<800m) — schließt mid-plane-Events aus
+             (Plane fliegt bei z~150000cm = 1500m)
+          2. Falls keins: fruehestes Position-Event mit z<80000cm
+             (Schema 4+ Continuous-Tracking)
+          3. Falls auch das fehlt: irgendein Landing (auch mid-air)
+        Z ist in cm wie x/y. Dach-Landings z~1000-2000cm (10-20m) sind
+        normale Boden-Position auf einem Gebaeude — nicht mid-air.
+        Mit ?all=1 wird der Filter komplett uebersprungen.
         """
         conn = self.get_conn()
         map_filter = (qs.get("map") or "").strip()
@@ -351,7 +352,7 @@ class EndpointRegistry:
                   FROM telemetry_events
                   WHERE event_type = 'Landing'
                     AND actor_x IS NOT NULL AND actor_y IS NOT NULL
-                    AND (actor_z IS NULL OR actor_z < 800)
+                    AND (actor_z IS NULL OR actor_z < 80000)
                     AND (actor_health IS NULL OR actor_health > 0)
                   GROUP BY match_id, actor_account
                 ),
@@ -363,7 +364,7 @@ class EndpointRegistry:
                    AND bl.actor_account = te.actor_account
                   WHERE te.event_type = 'Position'
                     AND te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
-                    AND te.actor_z IS NOT NULL AND te.actor_z < 800
+                    AND te.actor_z IS NOT NULL AND te.actor_z < 80000
                     AND bl.ts IS NULL
                   GROUP BY te.match_id, te.actor_account
                 ),
