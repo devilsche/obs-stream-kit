@@ -201,10 +201,11 @@ let panRef = null;   // [clientX, clientY, startPanX, startPanY]
 let spaceDown = false;
 
 // Pin-Calibration: PUBG-Welt-Coords sind nicht 1:1 zur Map-Image-Pixel-Lage.
-// Affine 2D: effective = raw * scale + offset. Top-Left ist der Anker
-// (= dort wo die Map am genauesten ist). ScaleX/Y koennen unabhaengig
-// sein wenn die Map-Skalierung nicht uniform ist.
-// Persistiert pro Map und wird im Runtime-POI-Lookup ebenso angewendet.
+// Affine 2D mit MAP-CENTER als Anker (= scale dehnt symmetrisch aus
+// dem Bildmittelpunkt heraus, intuitiver als origin-anchored).
+// Formel: effective = (raw - center) * scale + center + offset
+// ScaleX/Y koennen unabhaengig sein wenn die Map asymmetrisch verzerrt.
+// Persistiert pro Map; gleiche Formel im Runtime-POI-Lookup.
 let pinCal = { offsetX: 0, offsetY: 0, scaleX: 1.0, scaleY: 1.0 };
 let calibratingPins = false;
 let calRef = null;   // [startMouseX, startMouseY, startOffsetX, startOffsetY]
@@ -428,10 +429,11 @@ function render() {
     ctx.setLineDash([]);
   }
 
-  // Pins (mit Calibration: effective = raw * scale + offset)
+  // Pins (Center-anchored: effective = (raw - mc) * scale + mc + offset)
+  const mc = mapKm * 100000 / 2;
   pins.forEach(p => {
-    const ex = p.x * pinCal.scaleX + pinCal.offsetX;
-    const ey = p.y * pinCal.scaleY + pinCal.offsetY;
+    const ex = (p.x - mc) * pinCal.scaleX + mc + pinCal.offsetX;
+    const ey = (p.y - mc) * pinCal.scaleY + mc + pinCal.offsetY;
     const [px, py] = worldToCanvas(ex, ey);
     ctx.beginPath();
     ctx.arc(px, py, 4 / view.zoom, 0, Math.PI * 2);
