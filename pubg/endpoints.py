@@ -521,6 +521,66 @@ class EndpointRegistry:
         # gemapped ist aber den Key nicht hat
         return self.PUBG_ACH_DESCRIPTIONS.get("english", {}).get(achievement_id)
 
+    # IDs deren Label einen ×N-Counter traegt (Streak-Peak oder
+    # Session-Counter). Fuer diese rechnen wir die Snapshot-pct gegen
+    # 'Sessions die >= N erreicht haben' — dadurch wird ×5 seltener
+    # als ×2. Achievements ohne ×N (z.B. first_chicken, beast_chicken)
+    # bleiben aggregiert auf achievement_id-Ebene.
+    PUBG_TIERED_ACHIEVEMENTS = {
+        "top10_streak",
+        "chicken_streak",
+        "hot_drop_match",
+        "hot_drop_match_survived",
+    }
+
+    @staticmethod
+    def _parse_tier(label):
+        """Extrahiert N aus einem Label wie 'Endgame Streak ×3' oder
+        'Inferno Begins ×2'. Returns int oder None."""
+        if not label:
+            return None
+        import re as _re
+        m = _re.search(r"×\s*(\d+)", label)
+        return int(m.group(1)) if m else None
+
+    def _build_aid_tier_index(self, conn):
+        """Baut pro achievement_id eine sortierte Liste von
+        (date, max_tier_an_dem_tag) — fuer Snapshot-pct-Berechnung.
+        Bei nicht-tiered Achievements ist max_tier immer 0."""
+        rows = conn.execute(
+            "SELECT achievement_id, label, played_at "
+            "FROM pubg_achievements_seen "
+            "WHERE played_at IS NOT NULL"
+        ).fetchall()
+        # (aid, date) -> max_tier
+        per_pair = {}
+        for r in rows:
+            d = r["played_at"][:10]
+            aid = r["achievement_id"]
+            tier = self._parse_tier(r["label"]) or 0
+            key = (aid, d)
+            if key not in per_pair or per_pair[key] < tier:
+                per_pair[key] = tier
+        # aid -> sorted [(date, max_tier), ...]
+        per_aid = {}
+        for (aid, d), t in per_pair.items():
+            per_aid.setdefault(aid, []).append((d, t))
+        for aid in per_aid:
+            per_aid[aid].sort()
+        return per_aid
+
+    def _count_aid_dates_tier(self, per_aid_index, aid, tier, cutoff_date):
+        """Anzahl Session-Tage <= cutoff_date wo diese aid erreicht
+        wurde. Bei tiered Achievement: nur Sessions wo max-Tier >= tier."""
+        entries = per_aid_index.get(aid, [])
+        if not entries:
+            return 0
+        if tier is None or aid not in self.PUBG_TIERED_ACHIEVEMENTS:
+            # Nicht-tiered: jeder Eintrag <= cutoff zaehlt
+            return sum(1 for d, _t in entries if d <= cutoff_date)
+        return sum(1 for d, t in entries
+                   if d <= cutoff_date and t >= tier)
+
     def _recent_achievements(self, qs):
         """Liefert noch nicht angezeigte Session-Milestones aus
         pubg_achievements_seen. ?markDisplayed=1 markiert sie nach
@@ -551,16 +611,7 @@ class EndpointRegistry:
                 "WHERE played_at IS NOT NULL"
             ).fetchall() if r[0]
         })
-        ach_rows_all = conn.execute(
-            "SELECT achievement_id, played_at FROM pubg_achievements_seen "
-            "WHERE played_at IS NOT NULL ORDER BY played_at ASC"
-        ).fetchall()
-        ach_dates = {}
-        for ar in ach_rows_all:
-            d = ar["played_at"][:10]
-            ach_dates.setdefault(ar["achievement_id"], set()).add(d)
-        ach_dates_sorted = {aid: sorted(dates)
-                             for aid, dates in ach_dates.items()}
+        per_aid_dates_tier = self._build_aid_tier_index(conn)
 
         items = []
         for r in rows:
@@ -575,12 +626,16 @@ class EndpointRegistry:
                 except (TypeError, ValueError):
                     unlocked_ts = 0
             # Snapshot-pct: 'X% of your sessions got this' bis zum
-            # Zeitpunkt dieses Vorkommens. Bei fehlendem Datum None.
+            # Zeitpunkt dieses Vorkommens. Bei tier-Milestones wie
+            # 'Endgame Streak ×3' wird nur gegen Sessions gezaehlt die
+            # mindestens ×3 erreicht haben — dadurch wird ×5 seltener
+            # als ×2 (sub-set Logik). Bei fehlendem Datum None.
             d = (played or "")[:10]
             if d and match_dates:
                 total = bisect_right(match_dates, d)
-                ach_n = bisect_right(
-                    ach_dates_sorted.get(r["achievement_id"], []), d)
+                ach_n = self._count_aid_dates_tier(
+                    per_aid_dates_tier, r["achievement_id"],
+                    self._parse_tier(r["label"]), d)
                 snap_pct = round((ach_n / max(total, 1)) * 100, 1)
             else:
                 snap_pct = None
@@ -650,15 +705,10 @@ class EndpointRegistry:
             ORDER BY played_at ASC
         """).fetchall()
 
-        # Pro achievement_id: sorted-distinct-Liste der Match-Tage.
-        ach_dates = {}
-        for r in rows:
-            if not r["played_at"]:
-                continue
-            d = r["played_at"][:10]
-            ach_dates.setdefault(r["achievement_id"], set()).add(d)
-        ach_dates_sorted = {aid: sorted(dates)
-                             for aid, dates in ach_dates.items()}
+        # Tier-aware Index: bei Streaks/Counters zaehlt nur 'Sessions
+        # die mind. diese ×N erreicht haben'. Bei anderen Milestones
+        # zaehlt jeder Eintrag.
+        per_aid_dates_tier = self._build_aid_tier_index(conn)
 
         def _iso_to_ts(iso):
             if not iso:
@@ -676,7 +726,9 @@ class EndpointRegistry:
             d = (r["played_at"] or "")[:10]
             if d and match_dates:
                 total = bisect_right(match_dates, d)
-                ach_n = bisect_right(ach_dates_sorted.get(aid, []), d)
+                ach_n = self._count_aid_dates_tier(
+                    per_aid_dates_tier, aid,
+                    self._parse_tier(r["label"]), d)
                 snap_pct = round((ach_n / max(total, 1)) * 100, 1)
             else:
                 snap_pct = None
