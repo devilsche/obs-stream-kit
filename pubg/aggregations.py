@@ -1461,9 +1461,11 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
         ( 8000, "heist_dmg_8k",  "Heist Heavy"),
     ]
     HEIST_LOOT_TIERS = [
-        (40, "heist_loot_40", "Mega Heist"),
-        (25, "heist_loot_25", "Big Heist"),
-        (10, "heist_loot_10", "Solid Heist"),
+        # Thresholds rescaled — 10/25/40 wurden in jedem Heist erreicht.
+        # Neue Skala: 25 (solide Mitnahme), 60 (richtig fett), 120 (Beute-Boss).
+        (120, "heist_loot_120", "Mega Heist"),
+        ( 60, "heist_loot_60",  "Big Heist"),
+        ( 25, "heist_loot_25",  "Solid Heist"),
     ]
     try:
         payday = compute_payday_stats(
@@ -1627,7 +1629,7 @@ PUBG_RARE_ACHIEVEMENTS = {
     "gold_brick_grab",               # Squad-Loot: Goldbarren
     "heist_kills_75", "heist_kills_100",  # sehr hohe Heist-Kill-Tiers
     "heist_dmg_20k", "heist_dmg_25k",     # sehr hohes Heist-DMG
-    "heist_loot_25", "heist_loot_40",     # Big/Mega-Heist
+    "heist_loot_60", "heist_loot_120",    # Big/Mega-Heist (Top-Tiers rare)
     "silent_heist", "ghost_operative",    # Stealth
     "window_smasher",                # 30+ Fenster im Heist
     "session_opener_chicken",        # Session startet direkt mit Chicken
