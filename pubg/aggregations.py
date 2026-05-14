@@ -1405,58 +1405,103 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             chicken_streak = 0
 
     # PAYDAY/Event-Achievements ueber alle Event-Matches in der Range.
-    # Wir ziehen die echten Kill/Loot-Daten aus Telemetry (Match-Summary
-    # ist 0/0/Win, deshalb separate Quelle).
+    # Skala deutlich hoeher als BR — typische Heist-Matches gehen
+    # 25-100+ Kills + 5k-20k DMG. Plus Stealth-Milestones.
+    HEIST_KILL_TIERS = [
+        (100, "heist_kills_100", "Heist God"),
+        ( 75, "heist_kills_75",  "Heist Annihilation"),
+        ( 50, "heist_kills_50",  "Heist Massacre"),
+        ( 25, "heist_kills_25",  "Heist Killer"),
+    ]
+    HEIST_DAMAGE_TIERS = [
+        (20000, "heist_dmg_20k", "Heist GODLIKE"),
+        (15000, "heist_dmg_15k", "Heist Damage Lord"),
+        (10000, "heist_dmg_10k", "Heist Damage Demon"),
+        ( 5000, "heist_dmg_5k",  "Heist Heavy"),
+    ]
+    HEIST_LOOT_TIERS = [
+        (40, "heist_loot_40", "Mega Heist"),
+        (25, "heist_loot_25", "Big Heist"),
+        (10, "heist_loot_10", "Solid Heist"),
+    ]
     try:
         payday = compute_payday_stats(
             conn, my_account_id, "session",
             from_iso=from_iso, to_iso=to_iso)
-        big_heist_seen = False
         for pm in reversed(payday.get("matches") or []):
             mid = pm["matchId"]; played = pm["playedAt"]
-            # Per-Match Achievements:
-            # - 5+ Kills im Heist
-            if pm["myKills"] >= 5:
+            kills, dmg, loot_total = pm["myKills"], pm["myDamage"], pm["lootTotal"]
+
+            # Kill-Tier-Cascade: alle erreichten in DB, nur hoechster popt
+            kt = [(t, aid, name) for t, aid, name in HEIST_KILL_TIERS if kills >= t]
+            for i, (_, aid, name) in enumerate(kt):
                 out.append({
-                    "id": "heist_kill_match",
-                    "label": f"Heist Killer · {pm['myKills']} Kills",
+                    "id": aid,
+                    "label": f"{name} · {kills} Kills",
                     "icon": "🔥",
                     "matchId": mid, "playedAt": played,
+                    "suppressPopup": i > 0,
                 })
-            # - 1000+ DMG im Heist
-            if pm["myDamage"] >= 1000:
+
+            # Damage-Tier-Cascade
+            dt = [(t, aid, name) for t, aid, name in HEIST_DAMAGE_TIERS if dmg >= t]
+            for i, (_, aid, name) in enumerate(dt):
                 out.append({
-                    "id": "heist_damage_match",
-                    "label": f"Heist Damage · {int(pm['myDamage'])} DMG",
+                    "id": aid,
+                    "label": f"{name} · {int(dmg)} DMG",
                     "icon": "🔥",
                     "matchId": mid, "playedAt": played,
+                    "suppressPopup": i > 0,
                 })
-            # - Goldbarren-Greifer (Squad hat min. 1 Goldbarren gelootet)
+
+            # Loot-Tier-Cascade
+            lt = [(t, aid, name) for t, aid, name in HEIST_LOOT_TIERS if loot_total >= t]
+            for i, (_, aid, name) in enumerate(lt):
+                out.append({
+                    "id": aid,
+                    "label": f"{name} · {loot_total} Items",
+                    "icon": "💎",
+                    "matchId": mid, "playedAt": played,
+                    "suppressPopup": i > 0,
+                })
+
+            # Spezifische Loot-Items (nur einmal pro Match)
             if pm["loot"].get("Item_GoldBricks_0", 0) >= 1:
+                gold_n = pm["loot"]["Item_GoldBricks_0"]
                 out.append({
                     "id": "gold_brick_grab",
-                    "label": "Gold Brick Grab",
+                    "label": f"Gold Brick Heist · {gold_n}× Gold",
                     "icon": "🟨",
                     "matchId": mid, "playedAt": played,
                 })
-            # - Money-Bag (Squad hat ≥1 MoneyBag gelootet)
             if pm["loot"].get("Item_MoneyBagged", 0) >= 1:
+                bag_n = pm["loot"]["Item_MoneyBagged"]
                 out.append({
                     "id": "money_bag_run",
-                    "label": "Money Bag Run",
+                    "label": f"Money Bag Run · {bag_n}× Bag",
                     "icon": "💰",
                     "matchId": mid, "playedAt": played,
                 })
-            # - Big Heist: ≥10 Loot-Items von Squad
-            if pm["lootTotal"] >= 10:
+
+            # Stealth-Milestones — 0 Kills im Heist (= kein Schuss gemacht).
+            # "No Alarm" proxy: keine Telemetrie zur Alarm-Erkennung in PUBG
+            # API verfuegbar, also nutzen wir 0-kills als Annaeherung.
+            if kills == 0 and loot_total >= 1:
                 out.append({
-                    "id": "big_heist",
-                    "label": f"Big Heist · {pm['lootTotal']} Items",
-                    "icon": "💎",
+                    "id": "silent_heist",
+                    "label": f"Silent Heist · {loot_total} Loot, 0 Kills",
+                    "icon": "🤫",
                     "matchId": mid, "playedAt": played,
                 })
-            # - Window Smasher: ≥20 Fenster zerstoert
-            if pm["windows"] >= 20:
+            if kills == 0 and dmg == 0 and loot_total >= 10:
+                out.append({
+                    "id": "ghost_operative",
+                    "label": f"Ghost Operative · {loot_total} Loot, 0 DMG",
+                    "icon": "👻",
+                    "matchId": mid, "playedAt": played,
+                })
+            # Window Smasher: 30+ Fenster (war 20+)
+            if pm["windows"] >= 30:
                 out.append({
                     "id": "window_smasher",
                     "label": f"Window Smasher · {pm['windows']} Windows",
@@ -1531,8 +1576,11 @@ PUBG_RARE_ACHIEVEMENTS = {
     "god_mode_chicken",              # Chicken + ≥15 Kills
     "burning_hell",                  # Hot-Drop mit 5+ Teams im Radius
     "gold_brick_grab",               # Squad-Loot: Goldbarren
-    "big_heist",                     # Squad-Loot: 10+ Items
-    "window_smasher",                # 20+ Fenster im Heist
+    "heist_kills_75", "heist_kills_100",  # sehr hohe Heist-Kill-Tiers
+    "heist_dmg_15k", "heist_dmg_20k",     # sehr hohes Heist-DMG
+    "heist_loot_25", "heist_loot_40",     # Big/Mega-Heist
+    "silent_heist", "ghost_operative",    # Stealth
+    "window_smasher",                # 30+ Fenster im Heist
     "session_opener_chicken",        # Session startet direkt mit Chicken
     "phoenix_chicken",               # Chicken-Win nach Hot-Drop
     "kills_15",                      # 15+ Kills

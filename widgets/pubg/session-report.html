@@ -1293,15 +1293,19 @@
             <td><b>${m.lootTotal}</b></td>
             <td class="loot-cell">${lootBadges(m.loot)}</td>
           </tr>`).join("");
+        const nM = t.matches || 1;
+        const avgK = (t.myKills / nM);
+        const avgD = (t.myDamage / nM);
+        const avgL = (t.lootTotal / nM);
         paydayHtml = `
           <h3 class="extras-h">🎭 Event/Heist Stats (${t.matches} match${t.matches > 1 ? "es" : ""})</h3>
           <div class="payday-totals">
-            <div class="payday-cell"><span class="pubg-stat-value">${t.myKills}</span><span class="pubg-stat-label">My Kills</span></div>
-            <div class="payday-cell"><span class="pubg-stat-value">${Math.round(t.myDamage)}</span><span class="pubg-stat-label">My DMG</span></div>
-            <div class="payday-cell"><span class="pubg-stat-value">${t.squadKills}</span><span class="pubg-stat-label">Squad Kills</span></div>
-            <div class="payday-cell"><span class="pubg-stat-value">${Math.round(t.squadDamage)}</span><span class="pubg-stat-label">Squad DMG</span></div>
+            <div class="payday-cell"><span class="pubg-stat-value">${avgK.toFixed(1)}</span><span class="pubg-stat-label">Ø My Kills</span></div>
+            <div class="payday-cell"><span class="pubg-stat-value">${Math.round(avgD)}</span><span class="pubg-stat-label">Ø My DMG</span></div>
+            <div class="payday-cell"><span class="pubg-stat-value">${avgL.toFixed(1)}</span><span class="pubg-stat-label">Ø Loot</span></div>
+            <div class="payday-cell"><span class="pubg-stat-value">${t.myKills}</span><span class="pubg-stat-label">Total Kills</span></div>
+            <div class="payday-cell"><span class="pubg-stat-value">${Math.round(t.myDamage)}</span><span class="pubg-stat-label">Total DMG</span></div>
             <div class="payday-cell"><span class="pubg-stat-value">${t.windows}</span><span class="pubg-stat-label">Windows</span></div>
-            <div class="payday-cell"><span class="pubg-stat-value">${t.doors}</span><span class="pubg-stat-label">Doors</span></div>
             <div class="payday-cell"><span class="pubg-stat-value">${t.lootTotal}</span><span class="pubg-stat-label">Total Loot</span></div>
           </div>
           <div class="payday-loot-total">${lootBadges(t.loot)}</div>
