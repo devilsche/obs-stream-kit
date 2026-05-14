@@ -198,6 +198,22 @@
     .matches-list .time-range { color: var(--pubg-muted); }
     .matches-list .time-range b { color: var(--pubg-text); font-weight: 400; }
     .matches-list .m:hover { background: rgba(255,255,255,0.04); }
+    .matches-list .m.is-event {
+      opacity: 0.6;
+      background: rgba(50, 50, 60, 0.18);
+    }
+    .matches-list .m.is-event .stat b,
+    .matches-list .m.is-event .map { color: var(--pubg-muted); }
+    .matches-list .place.event-badge {
+      color: #1a0d2a;
+      background: #d8b4ff;
+      padding: 0 5px;
+      border-radius: 3px;
+      font-weight: 700;
+      font-size: 0.78em;
+      letter-spacing: 0.08em;
+      text-align: center;
+    }
     .matches-list .m.win {
       background: rgba(242,183,5,0.15);
       border-left: 2px solid var(--pubg-gold);
@@ -839,10 +855,16 @@
         ? PubgUI.fmtTime(squadOutIso)
         : `${outD.slice(0,5)} ${PubgUI.fmtTime(squadOutIso)}`;
       const numStr = matchNum != null ? `<span class="num">#${matchNum}</span> ` : "";
+      const isEvent = !!m.isEvent;
+      // Event-Matches: Place + Kills/DMG/Surv ausgrauen, Event-Badge in Map-Spalte
+      const placeCell = isEvent
+        ? `<span class="place event-badge" title="${m.mode || 'event'}">EVENT</span>`
+        : `<span class="place">#${m.place}</span>`;
+      const dimAttr = isEvent ? ' data-event="1"' : '';
       return `
-        <div class="m ${isWin ? 'win' : ''}" data-idx="${idx}" data-match-id="${m.matchId || ''}">
+        <div class="m ${isWin && !isEvent ? 'win' : ''}${isEvent ? ' is-event' : ''}" data-idx="${idx}" data-match-id="${m.matchId || ''}"${dimAttr}>
           <span class="time-range">${numStr}<b>${startTimeStr}</b> → <b>${outTimeStr}</b></span>
-          <span class="place">#${m.place}</span>
+          ${placeCell}
           <span class="map">${PubgUI.fmtMap(m.map)}<span class="hot-drop-badge" data-hd-slot></span></span>
           <span class="stat"><b>${m.kills}</b> K</span>
           <span class="stat"><b>${Math.round(m.damage||0)}</b> DMG</span>

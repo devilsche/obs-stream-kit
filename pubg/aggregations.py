@@ -2,6 +2,34 @@ import datetime
 from pubg.db import get_setting
 
 
+# Battle-Royale-Modes — alles andere (TDM, War-Mode, Event-Modes, Labs,
+# Esports) gilt als 'Event' und wird aus K/D / Win-Rate / Streak /
+# Achievement-Detection ausgenommen. Allow-List: robust gegen neue
+# Event-Modes die PUBG einfuehrt.
+BATTLE_ROYALE_MODES = (
+    "solo", "solo-fpp",
+    "duo",  "duo-fpp",
+    "squad","squad-fpp",
+    "normal-solo", "normal-solo-fpp",
+    "normal-duo",  "normal-duo-fpp",
+    "normal-squad","normal-squad-fpp",
+    "ranked-solo", "ranked-solo-fpp",
+    "ranked-duo",  "ranked-duo-fpp",
+    "ranked-squad","ranked-squad-fpp",
+)
+_BR_PLACEHOLDERS = ",".join("?" * len(BATTLE_ROYALE_MODES))
+
+def _br_filter(alias="m"):
+    """SQL-Fragment + Params um auf BR-Matches zu filtern.
+    Beispiel: where, params = _br_filter('m')
+              cursor.execute(f'... WHERE x AND {where}', [other_params, *params])"""
+    return (f"{alias}.game_mode IN ({_BR_PLACEHOLDERS})",
+            list(BATTLE_ROYALE_MODES))
+
+def is_br_mode(game_mode):
+    return game_mode in BATTLE_ROYALE_MODES
+
+
 def _parse_iso(s):
     if not s:
         return None
@@ -64,7 +92,8 @@ def compute_session_stats(conn, my_account_id: str,
     else:
         started = _range_filter(conn, range_key) if range_key != "all" else "1970-01-01T00:00:00Z"
         session_mode = range_key
-    rows = conn.execute("""
+    br_where, br_params = _br_filter("m")
+    rows = conn.execute(f"""
         SELECT m.match_id, m.map_name, m.played_at,
                pa.kills, pa.damage_dealt, pa.place, pa.headshot_kills,
                pa.longest_kill, pa.boosts, pa.heals, pa.revives,
@@ -73,8 +102,9 @@ def compute_session_stats(conn, my_account_id: str,
         FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id
         WHERE pa.account_id = ? AND m.played_at >= ?
+          AND {br_where}
         ORDER BY m.played_at ASC
-    """, (my_account_id, started)).fetchall()
+    """, (my_account_id, started, *br_params)).fetchall()
 
     kills = sum(r["kills"] or 0 for r in rows)
     headshots = sum(r["headshot_kills"] or 0 for r in rows)
@@ -462,10 +492,16 @@ def compute_map_distribution(conn, my_account_id, range_key="session"):
 
 
 def compute_session_matches(conn, my_account_id, range_key="session",
-                             from_iso=None, to_iso=None):
+                             from_iso=None, to_iso=None,
+                             include_events=True):
     """Flache Liste der Matches in der Range — leichtgewichtig.
     Genutzt von Streak-Counter, Session-Goal, Achievements etc.
-    from_iso/to_iso überschreiben range_key (für historische Sessions)."""
+    from_iso/to_iso überschreiben range_key (für historische Sessions).
+
+    include_events=True (Default): Events bleiben in der Liste, sind
+       aber mit isEvent=True markiert. Konsumer der Stats berechnet
+       (compute_streaks, compute_session_achievements) sollten filtern.
+    include_events=False: harter Filter — Events kommen gar nicht raus."""
     if from_iso:
         cutoff = from_iso
         end_filter = " AND m.played_at <= ?" if to_iso else ""
@@ -477,6 +513,11 @@ def compute_session_matches(conn, my_account_id, range_key="session",
                   if range_key != "all" else "1970-01-01T00:00:00Z")
         end_filter = ""
         params = [my_account_id, cutoff]
+    br_where = ""
+    if not include_events:
+        br_sql, br_params = _br_filter("m")
+        br_where = f" AND {br_sql}"
+        params = list(params) + br_params
     rows = conn.execute(f"""
         SELECT m.match_id, m.map_name, m.game_mode, m.played_at,
                m.duration_secs,
@@ -484,13 +525,14 @@ def compute_session_matches(conn, my_account_id, range_key="session",
                pa.longest_kill, pa.headshot_kills, pa.assists, pa.dbnos
         FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id
-        WHERE pa.account_id = ? AND m.played_at >= ?{end_filter}
+        WHERE pa.account_id = ? AND m.played_at >= ?{end_filter}{br_where}
         ORDER BY m.played_at DESC
     """, params).fetchall()
     return [{
         "matchId":     r["match_id"],
         "map":         r["map_name"],
         "mode":        r["game_mode"],
+        "isEvent":     not is_br_mode(r["game_mode"]),
         "playedAt":    r["played_at"],
         "durationSec": r["duration_secs"],
         "kills":       r["kills"] or 0,
@@ -521,7 +563,8 @@ def compute_lobby_avg_kd(conn, my_account_id, range_key="session"):
     # Lobby-weite Aggregation aus match_team_mapping (alle ~96 Lobby-
     # Members + 4 Squad). Fallback: participants (squad-only) für Matches
     # vor match_schema=3, deren Lobby-Mapping noch keine kills+place hat.
-    rows = conn.execute("""
+    br_where, br_params = _br_filter("m")
+    rows = conn.execute(f"""
         SELECT m.match_id, m.played_at,
                SUM(COALESCE(mtm.kills, 0)) AS lobby_kills,
                COUNT(mtm.account_id)        AS lobby_n,
@@ -532,10 +575,11 @@ def compute_lobby_avg_kd(conn, my_account_id, range_key="session"):
           SELECT match_id FROM participants WHERE account_id = ?
         ) AND m.played_at >= ?
           AND mtm.kills IS NOT NULL
+          AND {br_where}
         GROUP BY m.match_id
         HAVING lobby_n > 4   -- nur Matches mit echtem Lobby-Mapping
         ORDER BY m.played_at ASC
-    """, (my_account_id, cutoff)).fetchall()
+    """, (my_account_id, cutoff, *br_params)).fetchall()
 
     per_match = []
     sum_lobby_kd = 0.0
@@ -596,12 +640,14 @@ def compute_squad_kd(conn, my_account_id, range_key="session"):
     cutoff = (_range_filter(conn, range_key)
               if range_key != "all" else "1970-01-01T00:00:00Z")
 
-    rows = conn.execute("""
+    br_where, br_params = _br_filter("m")
+    rows = conn.execute(f"""
         WITH my_teams AS (
           SELECT mtm.match_id, mtm.team_id
           FROM match_team_mapping mtm
           JOIN matches m ON m.match_id = mtm.match_id
           WHERE mtm.account_id = ? AND m.played_at >= ?
+            AND {br_where}
         )
         SELECT m.match_id, m.played_at, m.duration_secs,
                SUM(COALESCE(mtm.kills, 0)) AS sq_kills,
@@ -619,7 +665,7 @@ def compute_squad_kd(conn, my_account_id, range_key="session"):
         WHERE mtm.kills IS NOT NULL
         GROUP BY m.match_id
         ORDER BY m.played_at ASC
-    """, (my_account_id, cutoff)).fetchall()
+    """, (my_account_id, cutoff, *br_params)).fetchall()
 
     per_match = []
     total_kills = 0
@@ -686,14 +732,18 @@ def compute_streaks(conn, my_account_id, range_key="session"):
               if range_key != "all" else "1970-01-01T00:00:00Z")
 
     # Matches chronologisch (ASC) damit wir die best-Streaks korrekt finden,
-    # current = letzter laufender Streak am Ende
-    rows = conn.execute("""
+    # current = letzter laufender Streak am Ende.
+    # Event-Modes (TDM, PAYDAY etc.) sind ausgenommen — Place=1 in Events
+    # bedeutet nicht Chicken-Win.
+    br_where, br_params = _br_filter("m")
+    rows = conn.execute(f"""
         SELECT m.match_id, m.played_at, p.place, p.kills
         FROM matches m
         JOIN participants p ON p.match_id = m.match_id
         WHERE p.account_id = ? AND m.played_at >= ?
+          AND {br_where}
         ORDER BY m.played_at ASC
-    """, (my_account_id, cutoff)).fetchall()
+    """, (my_account_id, cutoff, *br_params)).fetchall()
 
     tests = {
         "chicken": lambda r: (r["place"] or 99) == 1,
@@ -824,14 +874,16 @@ def compute_trend_deltas(conn, my_account_id, from_iso=None, to_iso=None,
         return {"current": None, "previous": None, "deltas": None}
 
     def _agg(start, end):
-        sql = """
+        br_where, br_params = _br_filter("m")
+        sql = f"""
             SELECT SUM(p.kills) AS k, COUNT(*) AS n,
                    SUM(CASE WHEN p.place=1 THEN 1 ELSE 0 END) AS w,
                    AVG(p.damage_dealt) AS avg_dmg
             FROM participants p JOIN matches m ON m.match_id = p.match_id
             WHERE p.account_id = ? AND m.played_at >= ?
+              AND {br_where}
         """
-        params = [my_account_id, start]
+        params = [my_account_id, start, *br_params]
         if end:
             sql += " AND m.played_at <= ?"
             params.append(end)
@@ -888,7 +940,8 @@ def compute_map_performance(conn, my_account_id, range_key="all"):
     """Pro Map: Matches, Wins, K/D, Ø Kills/DMG/Place/Surv.
     range_key: 'session' | 'day' | 'week' | 'all'."""
     cutoff = _range_filter(conn, range_key) if range_key != "all" else "1970-01-01T00:00:00Z"
-    rows = conn.execute("""
+    br_where, br_params = _br_filter("m")
+    rows = conn.execute(f"""
         SELECT m.map_name,
                COUNT(*) AS matches,
                SUM(CASE WHEN pa.place=1 THEN 1 ELSE 0 END) AS wins,
@@ -900,9 +953,10 @@ def compute_map_performance(conn, my_account_id, range_key="all"):
         FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id
         WHERE pa.account_id = ? AND m.played_at >= ?
+          AND {br_where}
         GROUP BY m.map_name
         ORDER BY matches DESC
-    """, (my_account_id, cutoff)).fetchall()
+    """, (my_account_id, cutoff, *br_params)).fetchall()
     out = []
     for r in rows:
         n = r["matches"] or 0
@@ -1051,9 +1105,12 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
     Returns Liste { id, label, icon, matchId, playedAt } sortiert
     nach playedAt ASC (Reihenfolge des Erreichens).
     """
+    # Event-Modes (TDM, PAYDAY etc.) werden hart gefiltert — keine
+    # Achievements/Milestones aus Event-Matches.
     matches_desc = compute_session_matches(
         conn, my_account_id, "session",
-        from_iso=from_iso, to_iso=to_iso)
+        from_iso=from_iso, to_iso=to_iso,
+        include_events=False)
     matches = list(reversed(matches_desc))  # ASC für Achievement-Reihenfolge
 
     out = []
@@ -1483,13 +1540,16 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
         end_filter = ""
         params = [my_account_id, cutoff]
     window_ms = window_secs * 1000
+    # Event-Modes raus — in TDM/PAYDAY gibt es keinen Parachute-Hot-Drop.
+    br_where, br_params = _br_filter("m")
     matches = conn.execute(f"""
         SELECT m.match_id, m.played_at, m.map_name, pa.place
         FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id
         WHERE pa.account_id = ? AND m.played_at >= ?{end_filter}
+          AND {br_where}
         ORDER BY m.played_at DESC
-    """, params).fetchall()
+    """, params + br_params).fetchall()
 
     per_match = []
     hot = 0
@@ -2061,6 +2121,7 @@ def compute_sessions_index(conn, my_account_id, gap_hours=4):
     Returns Sessions sortiert vom neuesten zum ältesten."""
     rows = conn.execute("""
         SELECT m.match_id, m.played_at, m.duration_secs, m.map_name,
+               m.game_mode,
                pa.kills, pa.damage_dealt, pa.place
         FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id
@@ -2087,8 +2148,11 @@ def compute_sessions_index(conn, my_account_id, gap_hours=4):
 
     out = []
     for ms in sessions:
+        # Sessions-Index zeigt total matches inkl Events, aber Wins nur BR
         n = len(ms)
-        wins = sum(1 for x in ms if (x["place"] or 99) == 1)
+        # game_mode steht hier in den row-Daten als Spalte
+        wins = sum(1 for x in ms
+                   if (x["place"] or 99) == 1 and is_br_mode(x["game_mode"]))
         first_end = _parse_iso(ms[0]["played_at"])
         first_start = first_end - datetime.timedelta(
             seconds=ms[0]["duration_secs"] or 0)
@@ -2137,6 +2201,8 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
     if range_to:
         params.append(range_to)
 
+    # Session-Report listet auch Events (sichtbar im Match-List) aber die
+    # Aggregat-Totals werden nur fuer BR-Matches gerechnet (siehe unten).
     matches = conn.execute(f"""
         SELECT m.match_id, m.map_name, m.game_mode, m.played_at,
                m.duration_secs,
@@ -2304,27 +2370,33 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
 
     for ph in phases:
         ms = ph["matches"]
-        n = len(ms)
-        wins = sum(1 for x in ms if (x["place"] or 99) == 1)
-        # Member-Counts: wie oft war jeder dabei in dieser Phase
+        # Aggregate-Stats nur ueber BR-Matches. Events bleiben in der
+        # Match-Liste (Anzeige), zaehlen aber nicht fuer K/D, Wins etc.
+        br_ms = [x for x in ms if is_br_mode(x.get("game_mode"))]
+        ev_ms = [x for x in ms if not is_br_mode(x.get("game_mode"))]
+        n = len(br_ms)
+        wins = sum(1 for x in br_ms if (x["place"] or 99) == 1)
+        # Member-Counts: wie oft war jeder dabei in dieser Phase (auch
+        # Events zaehlen — du hast ja mit ihm/ihr gespielt)
         ph["memberCounts"] = {}
         for x in ms:
             for name in x["squadSet"]:
                 ph["memberCounts"][name] = ph["memberCounts"].get(name, 0) + 1
-        total_kills = sum(x["kills"] or 0 for x in ms)
-        total_damage = sum(x["damage_dealt"] or 0 for x in ms)
-        total_surv = sum(x["time_survived"] or 0 for x in ms)
-        squad_lobby = _squad_lobby_for([x["match_id"] for x in ms])
+        total_kills = sum(x["kills"] or 0 for x in br_ms)
+        total_damage = sum(x["damage_dealt"] or 0 for x in br_ms)
+        total_surv = sum(x["time_survived"] or 0 for x in br_ms)
+        squad_lobby = _squad_lobby_for([x["match_id"] for x in br_ms])
         ph["stats"] = {
             "matches": n,
+            "eventMatches": len(ev_ms),
             "wins": wins,
             "kills": total_kills,
             "damage": total_damage,
             "avgKills": total_kills / n if n else 0,
             "avgDamage": total_damage / n if n else 0,
-            "avgPlace": (sum(x["place"] or 0 for x in ms) / n) if n else 0,
+            "avgPlace": (sum(x["place"] or 0 for x in br_ms) / n) if n else 0,
             "avgSurvivedSec": total_surv / n if n else 0,
-            "kd": total_kills / max(n - wins, 1),
+            "kd": total_kills / max(n - wins, 1) if n else 0,
             "totalSurvivedSec": total_surv,
             "startTime": _match_start(ms[0]),
             "endTime": ms[-1]["played_at"],
@@ -2418,6 +2490,7 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             "matchId": m["match_id"],
             "map": m["map_name"],
             "mode": m["game_mode"],
+            "isEvent": not is_br_mode(m["game_mode"]),
             "matchEnd": m["played_at"],
             "durationSec": m["duration_secs"],
             "place": m["place"],
