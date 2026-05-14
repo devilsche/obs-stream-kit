@@ -1151,7 +1151,7 @@ class EndpointRegistry:
         "heist_dmg_20k", "heist_dmg_25k",
         "heist_loot_10", "heist_loot_25", "heist_loot_40",
         "silent_heist", "ghost_operative",
-        "gold_brick_grab", "window_smasher",
+        "gold_brick_grab", "money_bag_run", "window_smasher",
     }
 
     @staticmethod
