@@ -1802,7 +1802,7 @@ def backfill_session_achievements(conn, my_account_id,
 
 
 def compute_hot_drop(conn, my_account_id, range_key="session",
-                     window_secs=120, from_iso=None, to_iso=None):
+                     window_secs=300, from_iso=None, to_iso=None):
     """Hot-Drop-Stats über die Range.
 
     Definition Hot-Drop = im Match gab es ein Kill/Knock-Event innerhalb
@@ -1997,11 +1997,29 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     landing_ms = first_landing["timestamp_ms"]
     fight_cutoff_ms = landing_ms + window_ms
 
+    # Map-skalierter Radius (in cm).
+    radius_cm = _hot_drop_radius_cm(map_name)
+    radius_sq = radius_cm * radius_cm
+    # Squad-Landing-Positionen fuer Spatial-Filter
+    squad_pos = [(s["actor_x"], s["actor_y"]) for s in squad_landings
+                  if s["actor_x"] is not None and s["actor_y"] is not None]
+
+    def _in_hd_zone(x, y):
+        if x is None or y is None or not squad_pos:
+            return False
+        for sx, sy in squad_pos:
+            dx, dy = x - sx, y - sy
+            if dx * dx + dy * dy <= radius_sq:
+                return True
+        return False
+
     # Combat-Events ab Squad-Landung bis +window_ms. TakeDamage zaehlt
     # mit, sonst werden Drop-Fights wo NUR Bullets fliegen aber niemand
-    # stirbt/knocked verpasst.
+    # stirbt/knocked verpasst. Positionen werden mitgezogen — nur Events
+    # INNERHALB der Hot-Drop-Zone (Radius zur Squad-Landung) zaehlen.
     events = conn.execute("""
-        SELECT actor_account, target_account, timestamp_ms, event_type
+        SELECT actor_account, target_account, timestamp_ms, event_type,
+               actor_x, actor_y, victim_x, victim_y
         FROM telemetry_events
         WHERE match_id = ?
           AND event_type IN ('Kill', 'Knock', 'TakeDamage')
@@ -2020,9 +2038,9 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     full_team_map = lobby_team_map if lobby_team_map else acc_to_team
 
     # teams_in_fight = nur Teams die UNS angegriffen oder von uns
-    # angegriffen wurden (= fought with squad). Teams die untereinander
-    # kämpfen aber uns nicht touchen → nicht gezählt. Sonst würde die
-    # Zahl bei chaotischen Lobbies absurd hoch werden.
+    # angegriffen wurden + nur Events IM Hot-Drop-Radius (Squad-
+    # Landung als Anker). Schusswechsel die 3km weiter passieren
+    # zaehlen nicht als Hot-Drop-Fight (z.B. Rotation, Vehicle-Fight).
     hot_drop = False
     teams_in_fight = set()
     for e in events:
@@ -2033,7 +2051,11 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
             continue  # Friendly fire innerhalb Squad — nicht zählen
         if not (a_in_squad or v_in_squad):
             continue  # Fight zwischen anderen Teams — uns egal
-        # Squad ist beteiligt → Hot-Drop, Gegner-Team mitzählen
+        # Spatial-Check: Event muss in der HD-Zone passieren
+        if not (_in_hd_zone(e["actor_x"], e["actor_y"])
+                or _in_hd_zone(e["victim_x"], e["victim_y"])):
+            continue
+        # Squad ist beteiligt und im Radius → Hot-Drop-Combat
         hot_drop = True
         opponent = v if a_in_squad else a
         opp_team = full_team_map.get(opponent)
@@ -2060,14 +2082,8 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     solo_alive = my_account_id not in killed_in_window
     team_alive = bool(squad_ids - killed_in_window)
     # Teams die im Radius zu IRGENDEINEM Squad-Member gelandet sind.
-    # Radius skaliert mit Map-Groesse (siehe _hot_drop_radius_cm) —
-    # auf Karakin/Haven war 500m hardcoded zu viel (deckte 20%+ der
-    # Karte ab → false-positive Hot-Drops).
+    # radius_cm/radius_sq/squad_pos sind oben definiert.
     teams_in_radius = set()
-    radius_cm = _hot_drop_radius_cm(map_name)
-    radius_sq = radius_cm * radius_cm
-    squad_pos = [(s["actor_x"], s["actor_y"]) for s in squad_landings
-                  if s["actor_x"] is not None and s["actor_y"] is not None]
     if squad_pos:
         all_landings = conn.execute("""
             SELECT actor_account, actor_x, actor_y
