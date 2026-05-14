@@ -2005,94 +2005,25 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
         if opp_team is not None and opp_team != my_team_id:
             teams_in_fight.add(opp_team)
 
-    # Survival: cluster-basiert. Hot-Drop-Cluster ist der zusammen-
-    # haengende initiale Combat:
-    #   - Trigger: erstes Squad-Combat-Event (Kill/Knock/Damage) in
-    #     den ersten window_ms nach Squad-Landung
-    #   - Expansion: 3 min Stille beendet Cluster. 60s war zu kurz
-    #     fuer Lauer-Phasen ('5 min Kampf, 2 min im Haus warten,
-    #     dann weiter'). 3 min faengt typische Hot-Drop-Pausen ein,
-    #     ohne zu lang fuer zufaellige Late-Re-Engages zu sein.
-    #   - 300m-Radius zur initialen Position
-    #   - Nur Squad-beteiligte Events zaehlen fuer Cluster-Erweiterung
-    # Wenn ein Hot-Drop-Team disengaged und 5 min spaeter zurueck-
-    # kommt, ist das ein NEUES Cluster (nicht mehr Hot-Drop).
-    cluster_window_ms = 180 * 1000  # 3 min Stille = Cluster zu
-    # 500m statt 300m — typische PUBG-Stadt (Pochinki, Mylta etc.)
-    # ist 400-500m breit. Ein Gegner am anderen Stadt-Ende ist immer
-    # noch derselbe Hot-Drop, nicht ein 'fremdes' Team.
-    cluster_radius_cm = 500 * 100
-    squad_pos_for_kills = [(s["actor_x"], s["actor_y"]) for s in squad_landings
-                            if s["actor_x"] is not None and s["actor_y"] is not None]
-
-    killed_in_hot_cluster = set()
-    used_cluster = False
-    if squad_pos_for_kills:
-        all_combat = conn.execute(f"""
-            SELECT event_type, actor_account, target_account, timestamp_ms,
-                   actor_x, actor_y, victim_x, victim_y
-            FROM telemetry_events
-            WHERE match_id = ?
-              AND event_type IN ('Kill', 'Knock', 'TakeDamage')
-              AND actor_account IS NOT NULL
-              AND timestamp_ms >= ?
-            ORDER BY timestamp_ms ASC
-        """, (match_id, landing_ms)).fetchall()
-        # Trigger: erstes Squad-Event in den ersten window_ms
-        initial_cutoff = landing_ms + window_ms
-        trigger_idx = None
-        for i, e in enumerate(all_combat):
-            if e["timestamp_ms"] is None or e["timestamp_ms"] > initial_cutoff:
-                break
-            if e["actor_account"] in squad_ids or e["target_account"] in squad_ids:
-                trigger_idx = i
-                break
-        if trigger_idx is not None:
-            used_cluster = True
-            cluster = [all_combat[trigger_idx]]
-            last_ts = cluster[0]["timestamp_ms"]
-            for e in all_combat[trigger_idx + 1:]:
-                ts = e["timestamp_ms"]
-                if ts is None or ts - last_ts > cluster_window_ms:
-                    break  # 60s Stille -> Cluster zu (Disengage)
-                # nur Squad-beteiligte Events erweitern den Cluster
-                if not (e["actor_account"] in squad_ids
-                        or e["target_account"] in squad_ids):
-                    continue
-                if not _event_near_cluster(e, cluster, cluster_radius_cm):
-                    continue
-                cluster.append(e)
-                last_ts = ts
-            # Squad-Member-Kills IM Cluster = im Hot-Drop gestorben
-            for e in cluster:
-                if (e["event_type"] == "Kill"
-                        and e["target_account"] in squad_ids):
-                    killed_in_hot_cluster.add(e["target_account"])
-
-    if used_cluster:
-        solo_alive = my_account_id not in killed_in_hot_cluster
-        team_alive = bool(squad_ids - killed_in_hot_cluster)
-    else:
-        # Fallback: zeitliches window_secs-Window als 'Drop-Phase'
-        # (alte Telemetry ohne Position, oder kein Squad-Combat in
-        # den ersten 2 min -> stiller Hot-Drop).
-        m_row = conn.execute(
-            "SELECT played_at FROM matches WHERE match_id = ?",
-            (match_id,)
-        ).fetchone()
-        survival_threshold_s = window_secs
-        if m_row and m_row["played_at"]:
-            start_dt = _parse_iso(m_row["played_at"])
-            if start_dt:
-                match_start_ms = int(start_dt.timestamp() * 1000)
-                landing_offset_s = max(0, (landing_ms - match_start_ms) / 1000.0)
-                survival_threshold_s = landing_offset_s + window_secs
-        my_part = next((p for p in parts if p["account_id"] == my_account_id), None)
-        my_surv = (my_part and my_part["time_survived"]) or 0
-        squad_surv = max((p["time_survived"] or 0)
-                         for p in parts if p["account_id"] in squad_ids)
-        solo_alive = my_surv >= survival_threshold_s
-        team_alive = squad_surv >= survival_threshold_s
+    # Survival: direkter Death-Event-Check im Hot-Drop-Fenster.
+    # Definition: Hot-Drop ueberlebt = kein Kill-Event mit target=me
+    # innerhalb der ersten HD_SURVIVAL_WINDOW_MIN Minuten nach Landung.
+    # (Vorher cluster-basiert mit 3-min-Stille-Logik; war zu brueckig —
+    # Fights die 2+ Minuten nach Landing weitergehen wurden faelsch-
+    # licherweise NICHT mehr als 'Hot-Drop-Death' gezaehlt.)
+    HD_SURVIVAL_WINDOW_MIN = 5
+    survival_cutoff_ms = landing_ms + HD_SURVIVAL_WINDOW_MIN * 60 * 1000
+    killed_in_window = {r["target_account"] for r in conn.execute(f"""
+        SELECT target_account FROM telemetry_events
+        WHERE match_id = ?
+          AND event_type = 'Kill'
+          AND target_account IN ({placeholders})
+          AND timestamp_ms >= ?
+          AND timestamp_ms <= ?
+    """, [match_id] + list(squad_ids) + [landing_ms, survival_cutoff_ms])
+                          .fetchall()}
+    solo_alive = my_account_id not in killed_in_window
+    team_alive = bool(squad_ids - killed_in_window)
     # Teams die im Radius (Default 300m) zu IRGENDEINEM Squad-Member
     # gelandet sind. Braucht alle Lobby-Landings (telemetry_schema >= 3)
     # + Position. Eigene Squad-Members werden ausgeschlossen.
