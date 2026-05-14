@@ -1844,7 +1844,9 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
     # Event-Modes raus — in TDM/PAYDAY gibt es keinen Parachute-Hot-Drop.
     br_where, br_params = _br_filter("m")
     matches = conn.execute(f"""
-        SELECT m.match_id, m.played_at, m.map_name, pa.place
+        SELECT m.match_id, m.played_at, m.map_name, m.game_mode,
+               m.duration_secs, pa.place, pa.kills, pa.damage_dealt,
+               pa.time_survived
         FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id
         WHERE pa.account_id = ? AND m.played_at >= ?{end_filter}
@@ -1865,7 +1867,12 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
             "matchId":        m["match_id"],
             "playedAt":       m["played_at"],
             "mapName":        m["map_name"],
+            "gameMode":       m["game_mode"],
+            "durationSec":    m["duration_secs"],
             "place":          m["place"],
+            "kills":          m["kills"],
+            "damage":         m["damage_dealt"],
+            "timeSurvived":   m["time_survived"],
             "hotDrop":        result["hotDrop"],
             "soloSurvived":   result["soloSurvived"],
             "teamSurvived":   result["teamSurvived"],
@@ -1873,6 +1880,8 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
             "teamsInRadius":  result.get("teamsInRadius", 0),
             "landingX":       result.get("landingX"),
             "landingY":       result.get("landingY"),
+            "landingOffsetSec": result.get("landingOffsetSec"),
+            "firstFightAfterLandingSec": result.get("firstFightAfterLandingSec"),
         })
         if result["hotDrop"]:
             hot += 1
@@ -2077,6 +2086,7 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     # 'nearby' set ist unterspezifiziert; der HD-Zone-Check faengt das ab.
     hot_drop = False
     teams_in_fight = set()
+    first_fight_ts = None  # timestamp_ms des ersten HD-Combat-Events
     for e in events:
         a, v = e["actor_account"], e["target_account"]
         a_in_squad = a in squad_ids
@@ -2093,6 +2103,8 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
                 or _in_hd_zone(e["victim_x"], e["victim_y"])):
             continue
         hot_drop = True
+        if first_fight_ts is None:
+            first_fight_ts = e["timestamp_ms"]
         opp_team = full_team_map.get(opponent)
         if opp_team is not None and opp_team != my_team_id:
             teams_in_fight.add(opp_team)
@@ -2126,6 +2138,24 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     # Coords als Tooltip-Info zurueckliefern.
     anchor_x = first_landing["actor_x"] if first_landing else None
     anchor_y = first_landing["actor_y"] if first_landing else None
+    # Match-Start-ms: played_at - duration_secs.
+    match_start_ms = None
+    landing_offset_sec = None
+    first_fight_after_landing_sec = None
+    m_row = conn.execute(
+        "SELECT played_at, duration_secs FROM matches WHERE match_id = ?",
+        (match_id,)).fetchone()
+    if m_row and m_row["played_at"]:
+        start_dt = _parse_iso(m_row["played_at"])
+        if start_dt:
+            match_end_ms = int(start_dt.timestamp() * 1000)
+            dur_ms = (m_row["duration_secs"] or 0) * 1000
+            match_start_ms = match_end_ms - dur_ms
+            landing_offset_sec = int(
+                max(0, (landing_ms - match_start_ms) / 1000))
+    if first_fight_ts:
+        first_fight_after_landing_sec = int(
+            max(0, (first_fight_ts - landing_ms) / 1000))
     return {
         "hotDrop":         is_hot_drop,
         "soloSurvived":    solo_alive,
@@ -2134,6 +2164,8 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
         "teamsInRadius":   len(teams_in_radius),
         "landingX":        anchor_x,
         "landingY":        anchor_y,
+        "landingOffsetSec": landing_offset_sec,
+        "firstFightAfterLandingSec": first_fight_after_landing_sec,
     }
 
 
@@ -2166,7 +2198,10 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session",
     cluster_ms = cluster_secs * 1000
     cutoff = _range_filter(conn, range_key) if range_key != "all" else "1970-01-01T00:00:00Z"
     matches = conn.execute("""
-        SELECT m.match_id, m.duration_secs FROM matches m
+        SELECT m.match_id, m.duration_secs, m.played_at, m.map_name,
+               m.game_mode, pa.place, pa.kills, pa.damage_dealt,
+               pa.time_survived
+        FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id
         WHERE pa.account_id = ? AND m.played_at >= ?
         ORDER BY m.played_at ASC
@@ -2200,6 +2235,14 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session",
             sparkline.append(0)
             per_match.append({
                 "matchId": m["match_id"],
+                "playedAt": m["played_at"],
+                "mapName": m["map_name"],
+                "gameMode": m["game_mode"],
+                "durationSec": m["duration_secs"],
+                "place": m["place"],
+                "kills": m["kills"],
+                "damage": m["damage_dealt"],
+                "timeSurvived": m["time_survived"],
                 "hadFight": False,
                 "engaged": False,
                 "soloSurvived": False,
@@ -2228,10 +2271,21 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session",
         sparkline.append(1 if result["teamSurvived"] else 0)
         per_match.append({
             "matchId": m["match_id"],
+            "playedAt": m["played_at"],
+            "mapName": m["map_name"],
+            "gameMode": m["game_mode"],
+            "durationSec": m["duration_secs"],
+            "place": m["place"],
+            "kills": m["kills"],
+            "damage": m["damage_dealt"],
+            "timeSurvived": m["time_survived"],
             "hadFight": True,
             "engaged": engaged,
             "soloSurvived": result["soloSurvived"],
             "teamSurvived": result["teamSurvived"],
+            "teamsCount": result.get("teams_count", 0),
+            "fightStartAfterMatchStartSec":
+                result.get("fightStartAfterMatchStartSec"),
         })
 
     avg_teams = (sum(teams_per_fight) / len(teams_per_fight)) if teams_per_fight else 0
@@ -2375,6 +2429,18 @@ def _detect_first_fight(conn, match_id, my_account_id,
     # 'has_kill' = irgendein Kill im Cluster (egal welche Seite). Ohne
     # Kill ist der Fight nicht entschieden -> Disengage/Stalemate.
     has_kill = any(e["event_type"] == "Kill" for e in cluster)
+    # Match-Start: played_at - duration_secs * 1000.
+    fight_start_after_match_start_sec = None
+    m_row = conn.execute(
+        "SELECT played_at, duration_secs FROM matches WHERE match_id = ?",
+        (match_id,)).fetchone()
+    if m_row and m_row["played_at"]:
+        m_end = _parse_iso(m_row["played_at"])
+        if m_end:
+            m_end_ms = int(m_end.timestamp() * 1000)
+            m_start_ms = m_end_ms - (m_row["duration_secs"] or 0) * 1000
+            fight_start_after_match_start_sec = int(
+                max(0, (fight_start_ts - m_start_ms) / 1000))
     return {
         "won": won,
         "soloSurvived": solo_survived,
@@ -2387,6 +2453,7 @@ def _detect_first_fight(conn, match_id, my_account_id,
         "first_event_type": first_event["event_type"],
         "first_actor_is_squad": first_event["actor_account"] in squad_ids,
         "first_target_is_squad": first_event["target_account"] in squad_ids,
+        "fightStartAfterMatchStartSec": fight_start_after_match_start_sec,
     }
 
 

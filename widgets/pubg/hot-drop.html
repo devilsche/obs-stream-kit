@@ -194,6 +194,11 @@
       // Sparkline begrenzen wir hier auf die letzten 20 Matches.
       const matches = (d.perMatch || []).slice(0, 20).reverse();
       const total = matches.length;
+      const fmtDur = (s) => {
+        if (s == null) return "?";
+        const m = Math.floor(s / 60), x = Math.floor(s % 60);
+        return `${m}:${String(x).padStart(2,"0")}`;
+      };
       const html = matches.map((m, i) => {
         const num = i + 1;
         let cls = "", desc = "cold drop";
@@ -201,7 +206,33 @@
         else if (m.soloSurvived) { cls = "hot"; desc = "hot drop, you survived"; }
         else if (m.teamSurvived) { cls = "died team-saved"; desc = "hot drop, you died — team survived"; }
         else { cls = "died"; desc = "hot drop, died"; }
-        return `<div class="m ${cls}" title="Match #${num} · ${desc}"></div>`;
+        // Rich-Tooltip: native title-Attribute, mit \n als Zeilenumbruch.
+        const startIso = PubgUI.matchStartIso
+          ? PubgUI.matchStartIso(m.playedAt, m.durationSec)
+          : m.playedAt;
+        const startStr = PubgUI.fmtTime ? PubgUI.fmtTime(startIso) : startIso;
+        const endStr = PubgUI.fmtTime ? PubgUI.fmtTime(m.playedAt) : m.playedAt;
+        const mapStr = PubgUI.fmtMap ? PubgUI.fmtMap(m.mapName) : m.mapName;
+        const modeStr = m.gameMode || "?";
+        const tip = [
+          `Match #${num} · ${desc}`,
+          `${mapStr} · ${modeStr}`,
+          `${startStr} → ${endStr}  (${fmtDur(m.durationSec)})`,
+          `Place: #${m.place ?? "?"} · K=${m.kills ?? 0} · DMG=${Math.round(m.damage || 0)}`,
+          m.landingOffsetSec != null
+            ? `Landed: +${fmtDur(m.landingOffsetSec)} into match`
+            : null,
+          m.firstFightAfterLandingSec != null
+            ? `First fight: +${fmtDur(m.firstFightAfterLandingSec)} after landing`
+            : null,
+          m.hotDrop
+            ? `Teams nearby: ${m.teamsInRadius || 0} · Fought: ${m.teamsInFight || 0}`
+            : null,
+          m.timeSurvived != null
+            ? `Survived: ${fmtDur(m.timeSurvived)}`
+            : null,
+        ].filter(Boolean).join("\n");
+        return `<div class="m ${cls}" title="${tip.replace(/"/g, '&quot;')}"></div>`;
       }).join("");
       document.getElementById("markers").innerHTML = html;
 

@@ -421,10 +421,26 @@
         + statSpan
         + (badgeLabel ? `<span class="rare-badge ${tier}">${badgeLabel}</span>` : "");
 
+      // Rich-Hover-Tooltip: alles was nicht direkt im Tile sichtbar ist.
+      const fullDate = a.unlockedAt
+        ? new Date(a.unlockedAt * 1000).toLocaleString("de-DE",
+            {day:"2-digit", month:"2-digit", year:"numeric",
+             hour:"2-digit", minute:"2-digit", second:"2-digit"})
+        : "?";
+      const tipParts = [
+        `${name}${tier && tier !== "common" ? ` · ${badgeLabel}` : ""}`,
+        desc ? desc : null,
+        `Game: ${game}`,
+        `Unlocked: ${fullDate}`,
+        statText ? statText.replace(/<\/?b>/g, "") : null,
+        isPubg && a.matchId ? `Match: ${a.matchId}` : null,
+        isPubg && a.achievementId ? `ID: ${a.achievementId}` : `ID: ${a.apiName}`,
+      ].filter(Boolean).join("\n");
+      const titleAttr = ` title="${tipParts.replace(/"/g, "&quot;")}"`;
       return `
         <div class="tile${isRare ? " " + tier : ""}${isFresh ? " brand-new" : ""}"
              data-appid="${a.appId}" data-api="${a.apiName.replace(/"/g, "&quot;")}"
-             data-source="${source}">
+             data-source="${source}"${titleAttr}>
           ${iconHtml}
           <div class="tile-body">
             <div class="tile-game">${game}</div>

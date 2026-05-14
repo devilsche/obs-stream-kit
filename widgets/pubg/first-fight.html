@@ -166,6 +166,11 @@
       //   died (rot)      - Squad ausgeloescht
       // perMatch ist ASC (oldest first). Match-Nummer = i + 1.
       const spark = document.getElementById("spark");
+      const fmtDur = (s) => {
+        if (s == null) return "?";
+        const mm = Math.floor(s / 60), x = Math.floor(s % 60);
+        return `${mm}:${String(x).padStart(2,"0")}`;
+      };
       if (d.perMatch && d.perMatch.length) {
         spark.innerHTML = d.perMatch.map((m, i) => {
           const num = i + 1;
@@ -177,7 +182,30 @@
           } else {
             cls = "d"; desc = "died";
           }
-          return `<span class="${cls}" title="Match #${num} · ${desc}"></span>`;
+          const startIso = PubgUI.matchStartIso
+            ? PubgUI.matchStartIso(m.playedAt, m.durationSec) : m.playedAt;
+          const startStr = PubgUI.fmtTime ? PubgUI.fmtTime(startIso) : (startIso || "");
+          const endStr = PubgUI.fmtTime ? PubgUI.fmtTime(m.playedAt) : (m.playedAt || "");
+          const mapStr = PubgUI.fmtMap ? PubgUI.fmtMap(m.mapName || "?") : (m.mapName || "?");
+          const modeStr = m.gameMode || "?";
+          const tip = [
+            `Match #${num} · ${desc}`,
+            `${mapStr} · ${modeStr}`,
+            `${startStr} → ${endStr}  (${fmtDur(m.durationSec)})`,
+            m.place != null
+              ? `Place: #${m.place} · K=${m.kills ?? 0} · DMG=${Math.round(m.damage || 0)}`
+              : null,
+            m.fightStartAfterMatchStartSec != null
+              ? `First fight: +${fmtDur(m.fightStartAfterMatchStartSec)} into match`
+              : null,
+            m.teamsCount
+              ? `Teams in fight: ${m.teamsCount}`
+              : null,
+            m.timeSurvived != null
+              ? `Survived: ${fmtDur(m.timeSurvived)}`
+              : null,
+          ].filter(Boolean).join("\n");
+          return `<span class="${cls}" title="${tip.replace(/"/g,'&quot;')}"></span>`;
         }).join("");
       } else {
         spark.innerHTML = (d.sparkline||[]).map((v, i) =>
