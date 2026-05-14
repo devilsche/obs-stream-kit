@@ -118,6 +118,28 @@ def _normalize(event):
         base["event_type"] = "Heal"
         base["actor_account"] = (event.get("character") or {}).get("accountId")
         base["damage"] = event.get("healAmount")
+    elif et == "LogItemPickup":
+        # Wichtig fuer PAYDAY (Loot-Counter: Geldsack, Schmuck, Goldbarren).
+        # Auch fuer BR interessant (Waffen-Pickup-Statistiken)
+        base["event_type"] = "ItemPickup"
+        base["actor_account"] = (event.get("character") or {}).get("accountId")
+        item = event.get("item") or {}
+        base["weapon"] = item.get("itemId")  # = z.B. "Item_MoneyBagged"
+        base["actor_x"], base["actor_y"] = _loc(event, "character")
+    elif et == "LogObjectInteraction":
+        # PAYDAY: Tueren oeffnen/schliessen, Tresore knacken
+        base["event_type"] = "ObjectInteraction"
+        base["actor_account"] = (event.get("character") or {}).get("accountId")
+        ot = event.get("objectType") or ""
+        st = event.get("objectTypeStatus") or ""
+        base["weapon"] = f"{ot}:{st}" if st else ot  # z.B. "Door:Opening"
+        base["actor_x"], base["actor_y"] = _loc(event, "character")
+    elif et == "LogObjectDestroy":
+        # PAYDAY: Fenster eingeschlagen, Wand gesprengt etc.
+        base["event_type"] = "ObjectDestroy"
+        base["actor_account"] = (event.get("character") or {}).get("accountId")
+        base["weapon"] = event.get("objectType")  # z.B. "Window"
+        base["actor_x"], base["actor_y"] = _loc(event, "character")
     elif et == "LogArmorDestroy":
         base["event_type"] = "ArmorDestroy"
         base["actor_account"] = (event.get("attacker") or {}).get("accountId")
@@ -161,6 +183,12 @@ def filter_squad_events(events, squad_account_ids):
             if ts - match_start_ms > POSITION_WINDOW_MS:
                 continue
             yield norm
+            continue
+        # PAYDAY-relevante Events: nur Squad behalten, alle Phasen
+        if norm["event_type"] in ("ItemPickup", "ObjectInteraction",
+                                    "ObjectDestroy"):
+            if norm["actor_account"] in squad_account_ids:
+                yield norm
             continue
         if norm["event_type"] in ALWAYS_KEEP_EVENTS:
             yield norm

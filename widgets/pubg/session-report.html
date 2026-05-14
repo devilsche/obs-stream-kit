@@ -393,6 +393,67 @@
     .ach-label { color: var(--pubg-text); font-weight: 700; }
     .ach-when { color: var(--pubg-muted); font-size: 0.85em; }
 
+    /* PAYDAY / Event Stats */
+    .payday-totals {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .payday-cell {
+      padding: 8px 10px;
+      background: rgba(216,180,255, 0.12);
+      border: 1px solid rgba(216,180,255, 0.35);
+      border-radius: 5px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .payday-cell .pubg-stat-value { color: #e0c8ff; font-size: 1.4em; font-weight: 700; }
+    .payday-cell .pubg-stat-label {
+      color: var(--pubg-muted); font-size: 0.7em;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .payday-loot-total {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .loot-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      background: rgba(216,180,255, 0.15);
+      border: 1px solid rgba(216,180,255, 0.4);
+      border-radius: 12px;
+      font-size: 0.82em;
+    }
+    .loot-badge b { color: #e0c8ff; }
+    .payday-matches {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85em;
+    }
+    .payday-matches th {
+      text-align: left;
+      color: var(--pubg-muted);
+      font-weight: 400;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-size: 0.78em;
+      padding: 4px 6px;
+      border-bottom: 1px solid var(--pubg-border);
+    }
+    .payday-matches td {
+      padding: 5px 6px;
+      border-bottom: 1px solid rgba(94,42,121,0.18);
+    }
+    .payday-matches .loot-cell {
+      display: flex; flex-wrap: wrap; gap: 4px;
+    }
+
     .highlights {
       margin-top: 22px;
       display: grid;
@@ -1038,11 +1099,15 @@
       const hotDropUrl = (FROM || TO)
         ? `/api/pubg/hot-drop${fromTo}`
         : `/api/pubg/hot-drop?range=session`;
-      const [trend, achievements, matches, hotDrop] = await Promise.all([
+      const paydayUrl = (FROM || TO)
+        ? `/api/pubg/payday-stats${fromTo}`
+        : `/api/pubg/payday-stats?range=session`;
+      const [trend, achievements, matches, hotDrop, payday] = await Promise.all([
         PubgUI.fetchJson(`/api/pubg/trend-deltas${fromTo}`).catch(() => null),
         PubgUI.fetchJson(`/api/pubg/session-achievements${fromTo}`).catch(() => []),
         PubgUI.fetchJson(matchesUrl).catch(() => []),
         PubgUI.fetchJson(hotDropUrl).catch(() => null),
+        PubgUI.fetchJson(paydayUrl).catch(() => null),
       ]);
 
       // POI-Lookup-Tabelle muss da sein bevor wir Tooltips bauen.
@@ -1205,7 +1270,52 @@
           </details>`;
       }
 
-      placeholder.innerHTML = trendHtml + streaksHtml + achievementsHtml;
+      // PAYDAY/Event-Stats-Section
+      let paydayHtml = "";
+      if (payday && payday.matches && payday.matches.length) {
+        const t = payday.totals || {};
+        const labels = payday.labels || {};
+        const lootBadges = (loot) => Object.entries(loot || {})
+          .sort((a,b) => b[1] - a[1])
+          .map(([itemId, n]) => {
+            const lbl = labels[itemId] || [itemId.replace(/^Item_/, ""), ""];
+            return `<span class="loot-badge" title="${itemId}">`
+              + `${lbl[1] || ""} <b>${n}</b> ${lbl[0]}</span>`;
+          }).join("");
+        const matchRows = payday.matches.map(m => `
+          <tr>
+            <td>${PubgUI.fmtTime(m.playedAt)}</td>
+            <td>${m.gameMode}</td>
+            <td><b>${m.myKills}</b> / ${m.squadKills}</td>
+            <td><b>${Math.round(m.myDamage)}</b> / ${Math.round(m.squadDamage)}</td>
+            <td>${m.windows}</td>
+            <td>${m.doors}</td>
+            <td><b>${m.lootTotal}</b></td>
+            <td class="loot-cell">${lootBadges(m.loot)}</td>
+          </tr>`).join("");
+        paydayHtml = `
+          <h3 class="extras-h">🎭 Event/Heist Stats (${t.matches} match${t.matches > 1 ? "es" : ""})</h3>
+          <div class="payday-totals">
+            <div class="payday-cell"><span class="pubg-stat-value">${t.myKills}</span><span class="pubg-stat-label">My Kills</span></div>
+            <div class="payday-cell"><span class="pubg-stat-value">${Math.round(t.myDamage)}</span><span class="pubg-stat-label">My DMG</span></div>
+            <div class="payday-cell"><span class="pubg-stat-value">${t.squadKills}</span><span class="pubg-stat-label">Squad Kills</span></div>
+            <div class="payday-cell"><span class="pubg-stat-value">${Math.round(t.squadDamage)}</span><span class="pubg-stat-label">Squad DMG</span></div>
+            <div class="payday-cell"><span class="pubg-stat-value">${t.windows}</span><span class="pubg-stat-label">Windows</span></div>
+            <div class="payday-cell"><span class="pubg-stat-value">${t.doors}</span><span class="pubg-stat-label">Doors</span></div>
+            <div class="payday-cell"><span class="pubg-stat-value">${t.lootTotal}</span><span class="pubg-stat-label">Total Loot</span></div>
+          </div>
+          <div class="payday-loot-total">${lootBadges(t.loot)}</div>
+          <table class="payday-matches">
+            <thead><tr>
+              <th>Time</th><th>Mode</th>
+              <th>Kills (me/squad)</th><th>DMG (me/squad)</th>
+              <th>🪟</th><th>🚪</th><th>Loot</th><th>Items</th>
+            </tr></thead>
+            <tbody>${matchRows}</tbody>
+          </table>`;
+      }
+
+      placeholder.innerHTML = trendHtml + streaksHtml + achievementsHtml + paydayHtml;
     }
 
     // Per-Map: welches Bild im Repo nutzen wir? Wenn der User einen

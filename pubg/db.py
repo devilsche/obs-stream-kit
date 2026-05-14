@@ -186,13 +186,15 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
-CURRENT_TELEMETRY_SCHEMA = 4
+CURRENT_TELEMETRY_SCHEMA = 5
 # 1 = squad-only filter
 # 2 = + Kill/Knock global + Position
 # 3 = + Landing global + Position (für 'Teams in 300m Umkreis')
 # 4 = + LogPlayerPosition events fuer Squad-Members + z/health auf Landing
 #     (genauere Landing-Pin-Position; PUBG-LogParachuteLanding firet
 #      manchmal mid-air, also brauchen wir Position-Events fuer Bodencheck)
+# 5 = + ItemPickup / ObjectInteraction / ObjectDestroy (fuer PAYDAY-Stats:
+#     Geldsack/Schmuck/Goldbarren-Counter, Fenster-Smash-Counter etc.)
 # match_schema: 1 = nur Squad-Participants
 # 2 = + match_team_mapping (account_id, team_id)
 # 3 = + match_team_mapping mit kills + place (für echtes Lobby-K/D + Squad-Aggregat)

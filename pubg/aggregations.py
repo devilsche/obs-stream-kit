@@ -936,6 +936,143 @@ def compute_trend_deltas(conn, my_account_id, from_iso=None, to_iso=None,
     return {"current": cur, "previous": prev, "deltas": deltas}
 
 
+# PAYDAY/Heist-Item-Klassifizierung. Mapping ItemId -> Display-Kategorie.
+# Items die nicht hier auftauchen werden als 'other' gruppiert.
+PAYDAY_LOOT_LABELS = {
+    "Item_MoneyBagged":             ("Money Bag",     "💰"),
+    "Item_GoldBricks_0":            ("Gold Brick",    "🟨"),
+    "Item_JewelryBox_01":           ("Jewelry Box",   "💎"),
+    "Item_Neon_Coin_HR_C":          ("Neon Coin",     "🪙"),
+    "Item_KeyCard_01_B":            ("Keycard",       "🗝️"),
+    "Item_Breaching_C4_0":          ("Breaching C4",  "💣"),
+    "Item_Breaching_Fuel_Oxygen_0": ("Oxygen Tank",   "🧪"),
+    "Item_Thermal_Lance_Bag_0":     ("Thermal Lance", "🔥"),
+    "Item_Bodybag_HR":              ("Bodybag",       "🧳"),
+    "Item_Weapon_Crowbar_HR_C":     ("Crowbar",       "🔧"),
+}
+
+
+def compute_payday_stats(conn, my_account_id, range_key="all",
+                         from_iso=None, to_iso=None):
+    """Pro PAYDAY/Event-Match: echte Stats aus Telemetry rekonstruieren
+    (PUBG-Match-Summary liefert 0/0/win, ist Schrott).
+
+    Returns dict { matches: [{matchId, playedAt, mapName, gameMode,
+        myKills, myDamage, squadKills, squadDamage,
+        loot: {itemId: count, ...}, lootTotal,
+        windows, doors, ...}], totals: {...} }
+    """
+    cutoff = (_range_filter(conn, range_key)
+              if range_key != "all" else "1970-01-01T00:00:00Z")
+    if from_iso: cutoff = from_iso
+    end_filter = " AND m.played_at <= ?" if to_iso else ""
+    params = [my_account_id, cutoff]
+    if to_iso: params.append(to_iso)
+
+    # Alle Event-Matches (= nicht BR) in der Range
+    br_where, br_params = _br_filter("m")
+    matches = conn.execute(f"""
+        SELECT m.match_id, m.played_at, m.map_name, m.game_mode,
+               pa.team_id
+        FROM matches m
+        JOIN participants pa ON pa.match_id = m.match_id
+        WHERE pa.account_id = ? AND m.played_at >= ?{end_filter}
+          AND NOT {br_where}
+        ORDER BY m.played_at DESC
+    """, params + br_params).fetchall()
+    if not matches:
+        return {"matches": [], "totals": {}}
+
+    out_matches = []
+    for m in matches:
+        mid = m["match_id"]
+        team = m["team_id"]
+        # Squad-Account-IDs in dem Match
+        squad = [r["account_id"] for r in conn.execute(
+            "SELECT account_id FROM participants WHERE match_id=? AND team_id=?",
+            (mid, team)).fetchall()]
+        if not squad:
+            continue
+        ph = ",".join("?" * len(squad))
+
+        # Eigene Kills aus Telemetry
+        my_kills = conn.execute(
+            f"SELECT COUNT(*) FROM telemetry_events "
+            f"WHERE match_id=? AND event_type='Kill' AND actor_account=?",
+            (mid, my_account_id)).fetchone()[0]
+        # Eigener Damage (Sum von TakeDamage als attacker)
+        my_dmg = conn.execute(
+            "SELECT COALESCE(SUM(damage), 0) FROM telemetry_events "
+            "WHERE match_id=? AND event_type='TakeDamage' AND actor_account=?",
+            (mid, my_account_id)).fetchone()[0] or 0
+        # Squad-Aggregat (incl. self)
+        sq_kills = conn.execute(
+            f"SELECT COUNT(*) FROM telemetry_events "
+            f"WHERE match_id=? AND event_type='Kill' "
+            f"AND actor_account IN ({ph})",
+            [mid, *squad]).fetchone()[0]
+        sq_dmg = conn.execute(
+            f"SELECT COALESCE(SUM(damage), 0) FROM telemetry_events "
+            f"WHERE match_id=? AND event_type='TakeDamage' "
+            f"AND actor_account IN ({ph})",
+            [mid, *squad]).fetchone()[0] or 0
+
+        # Loot-Pickups (Squad) — gruppiert nach itemId
+        loot = {}
+        for r in conn.execute(
+            f"SELECT weapon AS item_id, COUNT(*) AS c "
+            f"FROM telemetry_events WHERE match_id=? "
+            f"AND event_type='ItemPickup' AND actor_account IN ({ph}) "
+            f"AND weapon IS NOT NULL GROUP BY weapon",
+            [mid, *squad]).fetchall():
+            loot[r["item_id"]] = r["c"]
+
+        # Objects (Window destroy, Door open) Squad
+        windows = conn.execute(
+            f"SELECT COUNT(*) FROM telemetry_events WHERE match_id=? "
+            f"AND event_type='ObjectDestroy' AND weapon='Window' "
+            f"AND actor_account IN ({ph})",
+            [mid, *squad]).fetchone()[0]
+        doors_opened = conn.execute(
+            f"SELECT COUNT(*) FROM telemetry_events WHERE match_id=? "
+            f"AND event_type='ObjectInteraction' AND weapon='Door:Opening' "
+            f"AND actor_account IN ({ph})",
+            [mid, *squad]).fetchone()[0]
+
+        out_matches.append({
+            "matchId":    mid,
+            "playedAt":   m["played_at"],
+            "mapName":    m["map_name"],
+            "gameMode":   m["game_mode"],
+            "myKills":    my_kills,
+            "myDamage":   float(my_dmg),
+            "squadKills": sq_kills,
+            "squadDamage": float(sq_dmg),
+            "loot":       loot,
+            "lootTotal":  sum(loot.values()),
+            "windows":    windows,
+            "doors":      doors_opened,
+        })
+
+    # Totals ueber alle Event-Matches
+    tot = {
+        "matches":     len(out_matches),
+        "myKills":     sum(m["myKills"] for m in out_matches),
+        "myDamage":    sum(m["myDamage"] for m in out_matches),
+        "squadKills":  sum(m["squadKills"] for m in out_matches),
+        "squadDamage": sum(m["squadDamage"] for m in out_matches),
+        "windows":     sum(m["windows"] for m in out_matches),
+        "doors":       sum(m["doors"] for m in out_matches),
+        "loot":        {},
+    }
+    for m in out_matches:
+        for k, v in m["loot"].items():
+            tot["loot"][k] = tot["loot"].get(k, 0) + v
+    tot["lootTotal"] = sum(tot["loot"].values())
+    return {"matches": out_matches, "totals": tot,
+            "labels": PAYDAY_LOOT_LABELS}
+
+
 def compute_map_performance(conn, my_account_id, range_key="all"):
     """Pro Map: Matches, Wins, K/D, Ø Kills/DMG/Place/Surv.
     range_key: 'session' | 'day' | 'week' | 'all'."""
@@ -1267,6 +1404,68 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
         else:
             chicken_streak = 0
 
+    # PAYDAY/Event-Achievements ueber alle Event-Matches in der Range.
+    # Wir ziehen die echten Kill/Loot-Daten aus Telemetry (Match-Summary
+    # ist 0/0/Win, deshalb separate Quelle).
+    try:
+        payday = compute_payday_stats(
+            conn, my_account_id, "session",
+            from_iso=from_iso, to_iso=to_iso)
+        big_heist_seen = False
+        for pm in reversed(payday.get("matches") or []):
+            mid = pm["matchId"]; played = pm["playedAt"]
+            # Per-Match Achievements:
+            # - 5+ Kills im Heist
+            if pm["myKills"] >= 5:
+                out.append({
+                    "id": "heist_kill_match",
+                    "label": f"Heist Killer · {pm['myKills']} Kills",
+                    "icon": "🔥",
+                    "matchId": mid, "playedAt": played,
+                })
+            # - 1000+ DMG im Heist
+            if pm["myDamage"] >= 1000:
+                out.append({
+                    "id": "heist_damage_match",
+                    "label": f"Heist Damage · {int(pm['myDamage'])} DMG",
+                    "icon": "🔥",
+                    "matchId": mid, "playedAt": played,
+                })
+            # - Goldbarren-Greifer (Squad hat min. 1 Goldbarren gelootet)
+            if pm["loot"].get("Item_GoldBricks_0", 0) >= 1:
+                out.append({
+                    "id": "gold_brick_grab",
+                    "label": "Gold Brick Grab",
+                    "icon": "🟨",
+                    "matchId": mid, "playedAt": played,
+                })
+            # - Money-Bag (Squad hat ≥1 MoneyBag gelootet)
+            if pm["loot"].get("Item_MoneyBagged", 0) >= 1:
+                out.append({
+                    "id": "money_bag_run",
+                    "label": "Money Bag Run",
+                    "icon": "💰",
+                    "matchId": mid, "playedAt": played,
+                })
+            # - Big Heist: ≥10 Loot-Items von Squad
+            if pm["lootTotal"] >= 10:
+                out.append({
+                    "id": "big_heist",
+                    "label": f"Big Heist · {pm['lootTotal']} Items",
+                    "icon": "💎",
+                    "matchId": mid, "playedAt": played,
+                })
+            # - Window Smasher: ≥20 Fenster zerstoert
+            if pm["windows"] >= 20:
+                out.append({
+                    "id": "window_smasher",
+                    "label": f"Window Smasher · {pm['windows']} Windows",
+                    "icon": "🪟",
+                    "matchId": mid, "playedAt": played,
+                })
+    except Exception:
+        pass
+
     # Hot-Drop-Achievements: pro Hot-Drop-Match ein Milestone mit
     # x-N-Counter (resettet pro Session). Survived counter laeuft separat
     # und zaehlt nur die ueberlebten Hot-Drops.
@@ -1331,6 +1530,9 @@ PUBG_RARE_ACHIEVEMENTS = {
     "ultra_chicken",                 # Chicken + ≥10 Kills
     "god_mode_chicken",              # Chicken + ≥15 Kills
     "burning_hell",                  # Hot-Drop mit 5+ Teams im Radius
+    "gold_brick_grab",               # Squad-Loot: Goldbarren
+    "big_heist",                     # Squad-Loot: 10+ Items
+    "window_smasher",                # 20+ Fenster im Heist
     "session_opener_chicken",        # Session startet direkt mit Chicken
     "phoenix_chicken",               # Chicken-Win nach Hot-Drop
     "kills_15",                      # 15+ Kills

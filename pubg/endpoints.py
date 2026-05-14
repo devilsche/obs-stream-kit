@@ -100,6 +100,8 @@ class EndpointRegistry:
             return self._session_matches(qs)
         if route == ("GET", "/api/pubg/hot-drop"):
             return self._hot_drop(qs)
+        if route == ("GET", "/api/pubg/payday-stats"):
+            return self._payday_stats(qs)
         if route == ("GET", "/api/pubg/landings"):
             return self._landings(qs)
         if route == ("GET", "/api/pubg/pois"):
@@ -506,6 +508,24 @@ class EndpointRegistry:
         self._save_pois(data)
         return _ok({"saved": True, "map": map_id, "count": len(clean)})
 
+    def _payday_stats(self, qs):
+        """PAYDAY/Event-Match-Stats aus Telemetry rekonstruiert (PUBG-
+        Match-Summary liefert in Events 0/0/win, deshalb echte Kills/
+        Damage + Loot-Counter aus den raw events).
+        Range default 'session', auch 'day'/'week'/'all'. Auch ?from=ISO."""
+        from pubg.aggregations import compute_payday_stats
+        conn = self.get_conn()
+        range_key = qs.get("range", "session")
+        from_iso = qs.get("from")
+        to_iso = qs.get("to")
+        cache_key = f"payday-stats:{range_key}:{from_iso or ''}:{to_iso or ''}"
+        return _ok(self.cache.get_or_compute(
+            cache_key,
+            lambda: compute_payday_stats(conn, self.my_account_id,
+                                         range_key,
+                                         from_iso=from_iso, to_iso=to_iso),
+        ))
+
     def _hot_drop(self, qs):
         conn = self.get_conn()
         range_key = qs.get("range", "session")
@@ -574,6 +594,12 @@ class EndpointRegistry:
             "god_mode_chicken":        "Chicken with 15+ kills — God Mode",
             "burning_hell":            "Hot drop with 5+ enemy teams within 300m",
             "phoenix_chicken":         "Chicken win straight out of a hot drop",
+            "heist_kill_match":        "Heist match with 5+ kills",
+            "heist_damage_match":      "Heist match with 1000+ damage",
+            "gold_brick_grab":         "Squad grabbed a gold brick in a heist",
+            "money_bag_run":           "Squad grabbed a money bag in a heist",
+            "big_heist":               "Squad looted 10+ items in a heist",
+            "window_smasher":          "Smashed 20+ windows in a heist",
             "first_hot_drop":          "First hot drop in the session",
             "hot_drop_match":          "Match was a hot drop",
             "hot_drop_match_survived": "Survived a hot drop",
@@ -608,6 +634,12 @@ class EndpointRegistry:
             "god_mode_chicken":        "Chicken mit 15+ Kills — God Mode",
             "burning_hell":            "Hot-Drop mit 5+ Gegner-Teams im 300m-Radius",
             "phoenix_chicken":         "Chicken-Win direkt aus dem Hot-Drop",
+            "heist_kill_match":        "Heist-Match mit 5+ Kills",
+            "heist_damage_match":      "Heist-Match mit 1000+ Schaden",
+            "gold_brick_grab":         "Squad hat Goldbarren im Heist erbeutet",
+            "money_bag_run":           "Squad hat Geldsack im Heist erbeutet",
+            "big_heist":               "Squad hat 10+ Items im Heist gelootet",
+            "window_smasher":          "20+ Fenster im Heist eingeschlagen",
             "first_hot_drop":          "Erstes Hot-Drop der Session",
             "hot_drop_match":          "Match war ein Hot-Drop",
             "hot_drop_match_survived": "Hot-Drop überlebt",
@@ -841,6 +873,12 @@ class EndpointRegistry:
         "chicken_streak":          "Dinner Streak",
         "session_opener_chicken":  "Cold Start Chicken",
         "session_opener_top10":    "Pretty Good Start",
+        "heist_kill_match":        "Heist Killer",
+        "heist_damage_match":      "Heist Damage",
+        "gold_brick_grab":         "Gold Brick Grab",
+        "money_bag_run":           "Money Bag Run",
+        "big_heist":               "Big Heist",
+        "window_smasher":          "Window Smasher",
     }
 
     # PUBG-Achievement-Icon-URLs (gemacht von ChatGPT, geschnitten aus
