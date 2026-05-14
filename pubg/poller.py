@@ -289,10 +289,30 @@ def _squad_account_ids_for_match(conn, match_id):
 
 
 def _process_one_telemetry(conn, client, my_account_id, row):
-    """Lädt + persistiert Telemetry-Events für ein Match. Idempotent."""
+    """Lädt + persistiert Telemetry-Events für ein Match. Idempotent.
+
+    Fehlerbehandlung:
+    - HTTPError 404 (CDN-URL abgelaufen, PUBG-Retention ~14d): Match wird
+      als 'abandoned' markiert (telemetry_fetched=1 + schema=CURRENT),
+      damit der Poller ihn nie wieder anpackt.
+    - Andere Fehler (Timeout, 5xx, Netzwerk): nur telemetry_fetched=1,
+      schema bleibt < CURRENT → naechster Tick versucht's nochmal.
+    """
+    import urllib.error
     from pubg.telemetry import filter_squad_events
     try:
         raw = client.get_telemetry(row["telemetry_url"])
+    except urllib.error.HTTPError as e:
+        # 404 = URL expired auf dem PUBG-CDN. Wird nie mehr verfuegbar
+        # sein → abandoned markieren, kein Retry mehr.
+        if e.code == 404:
+            mark_telemetry_fetched(conn, row["match_id"])
+            mark_telemetry_schema(conn, row["match_id"])
+            raise RuntimeError(
+                f"telemetry {row['match_id']}: 404 expired (abandoned)")
+        # Andere HTTP-Codes (5xx) sind transient → kein schema-update.
+        mark_telemetry_fetched(conn, row["match_id"])
+        raise RuntimeError(f"telemetry {row['match_id']}: HTTP {e.code}")
     except Exception as e:
         mark_telemetry_fetched(conn, row["match_id"])
         raise RuntimeError(f"telemetry {row['match_id']}: {e}")

@@ -593,14 +593,24 @@ def mark_telemetry_fetched(conn, match_id: str) -> None:
     conn.commit()
 
 
+TELEMETRY_RETENTION_DAYS = 16   # PUBG-CDN haelt ~14d; 2d Puffer
+
 def get_matches_needing_telemetry(conn, limit: int = 5):
     """Liefert matches die Telemetry brauchen — entweder noch nie gefetched
-    ODER mit veralteter Schema-Version (für First-Fight-Cluster nötig).
+    ODER mit veralteter Schema-Version (fuer First-Fight-Cluster noetig).
 
-    NOTE: PUBG-Doku dokumentiert KEINEN expliziten Telemetry-CDN-TTL.
-    /telemetry-cdn ist nicht rate-limited, also versuchen wir jeden Match
-    mit URL — bei 404 (URL abgelaufen) wird sauber telemetry_fetched=1
-    gesetzt, kein endloser Re-Fetch."""
+    Filter:
+    - telemetry_url muss da sein
+    - telemetry_fetched=0 ODER schema < CURRENT
+    - played_at >= now - TELEMETRY_RETENTION_DAYS — Matches die aelter
+      sind koennen vom PUBG-CDN nicht mehr abgerufen werden (Retention
+      ~14d). Wir versuchen es gar nicht erst — sonst sammelt sich
+      pendings unbegrenzt an und der Poller-Thread laeuft im Kreis.
+      Bei 404 vom CDN markieren wir auch innerhalb des Fensters den
+      Match als abandoned (siehe poller.py::_process_one_telemetry)."""
+    # played_at ist im ISO-Format 'YYYY-MM-DDTHH:MM:SSZ'. strftime mit
+    # '%Y-%m-%dT%H:%M:%SZ' liefert dasselbe Format → String-Vergleich
+    # funktioniert lexikografisch.
     return conn.execute("""
         SELECT m.match_id, m.telemetry_url FROM matches m
         WHERE m.telemetry_url IS NOT NULL
@@ -608,8 +618,11 @@ def get_matches_needing_telemetry(conn, limit: int = 5):
             m.telemetry_fetched = 0
             OR COALESCE(m.telemetry_schema, 0) < ?
           )
+          AND m.played_at >= strftime('%Y-%m-%dT%H:%M:%SZ',
+                                      datetime('now', ?))
         ORDER BY m.played_at DESC LIMIT ?
-    """, (CURRENT_TELEMETRY_SCHEMA, limit)).fetchall()
+    """, (CURRENT_TELEMETRY_SCHEMA,
+          f"-{TELEMETRY_RETENTION_DAYS} days", limit)).fetchall()
 
 
 def mark_telemetry_schema(conn, match_id: str, schema_version: int = None) -> None:
