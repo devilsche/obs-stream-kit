@@ -2504,10 +2504,14 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
 
     # Event-Matches: PUBG-API liefert participants.kills/damage_dealt = 0
     # weil ihr System in Event-Modi keine Player-Stats trackt. Wir holen
-    # echte Kills + Damage aus den Telemetry-Events und ueberschreiben.
-    # (Map-Performance + Match-Liste zeigen sonst 0/0 fuer PAYDAY etc.)
+    # echte Kills + Damage aus telemetry_events und packen sie in
+    # SEPARATE Felder (effective_kills / effective_damage). Map-Performance
+    # und die Match-Liste benutzen die effective_*-Werte; Top-Totals + K/D
+    # bleiben unverpestet (Events zaehlen dort 0).
     event_match_ids = [x["match_id"] for x in enriched
                         if not is_br_mode(x.get("game_mode"))]
+    kills_by_match = {}
+    dmg_by_match = {}
     if event_match_ids:
         ph = ",".join("?" * len(event_match_ids))
         kills_by_match = {r["match_id"]: r["k"] for r in conn.execute(
@@ -2521,10 +2525,13 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             f"WHERE event_type='TakeDamage' AND actor_account=? "
             f"AND match_id IN ({ph}) GROUP BY match_id",
             [my_account_id, *event_match_ids]).fetchall()}
-        for x in enriched:
-            if x["match_id"] in kills_by_match or x["match_id"] in dmg_by_match:
-                x["kills"] = kills_by_match.get(x["match_id"], 0)
-                x["damage_dealt"] = dmg_by_match.get(x["match_id"], 0.0)
+    for x in enriched:
+        if not is_br_mode(x.get("game_mode")):
+            x["effective_kills"]  = kills_by_match.get(x["match_id"], 0)
+            x["effective_damage"] = dmg_by_match.get(x["match_id"], 0.0)
+        else:
+            x["effective_kills"]  = x["kills"] or 0
+            x["effective_damage"] = x["damage_dealt"] or 0
 
     # Phase = aufeinanderfolgende Matches deren Squad-Sets sich überlappen.
     # Der "Stamm" der Phase ist die Schnittmenge aller Squads in der Phase
@@ -2735,8 +2742,8 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
                     ms_["deaths"] += 1
         if (x["place"] or 99) == 1:
             ms_["wins"] += 1
-        ms_["kills"] += x["kills"] or 0
-        ms_["damage"] += x["damage_dealt"] or 0
+        ms_["kills"] += x.get("effective_kills", x["kills"] or 0)
+        ms_["damage"] += x.get("effective_damage", x["damage_dealt"] or 0)
         ms_["totalPlace"] += x["place"] or 0
         ms_["totalSurv"] += x["time_survived"] or 0
     maps_perf = []
@@ -2771,11 +2778,11 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
         # Eigener Eintrag zusätzlich zu mates-Liste
         my_entry = {
             "name": my_name,
-            "kills": m["kills"],
+            "kills": m.get("effective_kills", m["kills"]),
             "headshot_kills": m["headshot_kills"],
             "assists": m["assists"],
             "dbnos": m["dbnos"],
-            "damage_dealt": m["damage_dealt"],
+            "damage_dealt": m.get("effective_damage", m["damage_dealt"]),
             "place": m["place"],
             "time_survived": m["time_survived"],
             "isSelf": True,
@@ -2788,8 +2795,8 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             "matchEnd": m["played_at"],
             "durationSec": m["duration_secs"],
             "place": m["place"],
-            "kills": m["kills"],
-            "damage": m["damage_dealt"],
+            "kills": m.get("effective_kills", m["kills"]),
+            "damage": m.get("effective_damage", m["damage_dealt"]),
             "timeSurvived": m["time_survived"],
             "squadTimeSurvived": m["squadTimeSurvived"],
             "myStats": my_entry,

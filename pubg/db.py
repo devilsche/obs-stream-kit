@@ -287,6 +287,23 @@ def init_schema(conn: sqlite3.Connection) -> None:
     except sqlite3.OperationalError:
         pass
 
+    # One-shot Cleanup: Legacy-LogPlayerKill-Duplikate aus telemetry_events
+    # loeschen. PUBG feuert in manchen (Event-)Server-Versionen sowohl
+    # LogPlayerKill als auch LogPlayerKillV2 fuers gleiche Kill. Wir
+    # behalten ab jetzt nur V2 (siehe telemetry.py::_normalize). Historische
+    # DBs muessen die schon-doppelten Eintraege wegputzen.
+    try:
+        cur = conn.execute("""
+            DELETE FROM telemetry_events
+            WHERE event_type='Kill'
+              AND json_extract(payload_json, '$._T') = 'LogPlayerKill'
+        """)
+        if cur.rowcount > 0:
+            print(f"[migrate] LogPlayerKill-Duplikate entfernt: {cur.rowcount}")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+
     # Migration: alte beast_chicken_<matchid>-IDs auf 'beast_chicken'
     # normalisieren. Davor hatte jeder Beast-Chicken eine kontext-
     # spezifische ID die Lookups in PUBG_ICON_URLS / _DESCRIPTIONS

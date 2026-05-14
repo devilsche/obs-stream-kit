@@ -55,7 +55,12 @@ def _normalize(event):
         base["actor_account"] = (event.get("character") or {}).get("accountId")
         base["actor_x"], base["actor_y"] = _loc(event, "character")
         base["actor_z"], base["actor_health"] = _z_health(event, "character")
-    elif et in ("LogPlayerKillV2", "LogPlayerKill"):
+    elif et == "LogPlayerKillV2":
+        # WICHTIG: nur V2 normalisieren. PUBG feuert in manchen (Event-)
+        # Server-Versionen ZUSAETZLICH das Legacy-LogPlayerKill fuer den
+        # exakt gleichen Kill → wuerden wir beide zu 'Kill' machen,
+        # zaehlten Event-Matches doppelt. V2 ist das aktuelle Format mit
+        # mehr Feldern (assistant, finisherDamageInfo, dBNOId).
         base["event_type"] = "Kill"
         base["actor_account"] = (event.get("killer") or {}).get("accountId")
         base["target_account"] = (event.get("victim") or {}).get("accountId")
@@ -64,6 +69,9 @@ def _normalize(event):
         base["distance"] = info.get("distance") or event.get("distance")
         base["actor_x"], base["actor_y"] = _loc(event, "killer")
         base["victim_x"], base["victim_y"] = _loc(event, "victim")
+    elif et == "LogPlayerKill":
+        # Legacy-Form — wird ignoriert. Siehe Kommentar oben.
+        return None
     elif et == "LogPlayerMakeGroggy":
         # Knock/DBNO — wichtig für First-Fight: oft kommt der Knock vor Kill
         base["event_type"] = "Knock"
