@@ -1408,10 +1408,10 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
     # Skala deutlich hoeher als BR — typische Heist-Matches gehen
     # 25-100+ Kills + 5k-20k DMG. Plus Stealth-Milestones.
     HEIST_KILL_TIERS = [
+        # 25 war zu trivial in PAYDAY — NPC-Mob spawnt staendig nach.
         (100, "heist_kills_100", "Heist God"),
         ( 75, "heist_kills_75",  "Heist Annihilation"),
         ( 50, "heist_kills_50",  "Heist Massacre"),
-        ( 25, "heist_kills_25",  "Heist Killer"),
     ]
     HEIST_DAMAGE_TIERS = [
         # 5k war zu trivial — schon 30 NPCs auf Body-Shots reichen.

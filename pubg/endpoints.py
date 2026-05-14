@@ -594,7 +594,6 @@ class EndpointRegistry:
             "god_mode_chicken":        "Chicken with 15+ kills — God Mode",
             "burning_hell":            "Hot drop with 5+ enemy teams within 300m",
             "phoenix_chicken":         "Chicken win straight out of a hot drop",
-            "heist_kills_25":          "Heist match with 25+ kills",
             "heist_kills_50":          "Heist match with 50+ kills",
             "heist_kills_75":          "Heist match with 75+ kills",
             "heist_kills_100":         "Heist match with 100+ kills",
@@ -644,7 +643,6 @@ class EndpointRegistry:
             "god_mode_chicken":        "Chicken mit 15+ Kills — God Mode",
             "burning_hell":            "Hot-Drop mit 5+ Gegner-Teams im 300m-Radius",
             "phoenix_chicken":         "Chicken-Win direkt aus dem Hot-Drop",
-            "heist_kills_25":          "Heist-Match mit 25+ Kills",
             "heist_kills_50":          "Heist-Match mit 50+ Kills",
             "heist_kills_75":          "Heist-Match mit 75+ Kills",
             "heist_kills_100":         "Heist-Match mit 100+ Kills",
@@ -893,7 +891,6 @@ class EndpointRegistry:
         "chicken_streak":          "Dinner Streak",
         "session_opener_chicken":  "Cold Start Chicken",
         "session_opener_top10":    "Pretty Good Start",
-        "heist_kills_25":          "Heist Killer",
         "heist_kills_50":          "Heist Massacre",
         "heist_kills_75":          "Heist Annihilation",
         "heist_kills_100":         "Heist God",
@@ -1109,7 +1106,7 @@ class EndpointRegistry:
         "chicken_streak",
         "hot_drop_match",
         "hot_drop_match_survived",
-        # Event/Heist Tiers werden ueber ihre IDs (heist_kills_25 etc.)
+        # Event/Heist Tiers werden ueber ihre IDs (heist_kills_50 etc.)
         # geparst, nicht ueber Label-x-N — daher nicht in dieser Liste.
     }
 
@@ -1149,8 +1146,7 @@ class EndpointRegistry:
     # seiner Zeit BR spielt jede Heist-pct (selbst 'jedes Heist-Match
     # ein Massacre' waere nur 5% global).
     PUBG_EVENT_ACHIEVEMENTS = {
-        "heist_kills_25", "heist_kills_50",
-        "heist_kills_75", "heist_kills_100",
+        "heist_kills_50", "heist_kills_75", "heist_kills_100",
         "heist_dmg_8k", "heist_dmg_15k",
         "heist_dmg_20k", "heist_dmg_25k",
         "heist_loot_10", "heist_loot_25", "heist_loot_40",
