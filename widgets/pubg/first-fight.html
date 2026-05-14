@@ -15,6 +15,17 @@
       justify-content: flex-end;
       box-sizing: border-box;
     }
+    /* OBS-Dock-Modus: dunkler Hintergrund + Card oben links statt
+       Anker unten. Aktivierung via ?dock=1. */
+    body.dock {
+      background: #0d061a;
+      justify-content: flex-start;
+      padding: 10px;
+    }
+    body.dock .card {
+      width: 100%;
+      max-width: 460px;
+    }
     .card {
       width: 360px;
       padding: 16px 20px;
@@ -111,6 +122,10 @@
   <script>
     const RANGE = PubgUI.qs("range", "session");
     const EXCLUDE_HOT = PubgUI.qs("excludeHotDrop", "0") === "1";
+    const DOCK = PubgUI.qs("dock", "0") === "1";
+    const POLL_MS = parseInt(PubgUI.qs("pollMs",
+                              DOCK ? "8000" : "300000"), 10);
+    if (DOCK) document.body.classList.add("dock");
     const TITLE = EXCLUDE_HOT ? "Silent Drop Fights" : "First Fight Wins";
     PubgUI.renderHeader(document.getElementById("pubgHeader"), TITLE, RANGE);
 
@@ -171,7 +186,7 @@
     }
     const ehParam = EXCLUDE_HOT ? "&excludeHotDrop=1" : "";
     PubgUI.poll(`/api/pubg/first-fight-rate?range=${RANGE}${ehParam}`,
-                5*60*1000, render, console.error);
+                POLL_MS, render, console.error);
   </script>
 </body>
 </html>

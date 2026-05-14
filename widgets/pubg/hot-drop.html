@@ -15,6 +15,17 @@
       justify-content: flex-end;
       box-sizing: border-box;
     }
+    /* OBS-Dock-Modus: dunkler Hintergrund + Card oben links statt
+       Anker unten. Aktivierung via ?dock=1. */
+    body.dock {
+      background: #0d061a;
+      justify-content: flex-start;
+      padding: 10px;
+    }
+    body.dock .panel {
+      width: 100%;
+      max-width: 460px;
+    }
     .panel { padding: 18px; }
     .top {
       display: flex;
@@ -120,6 +131,10 @@
   <script src="_pubg.js"></script>
   <script>
     const RANGE = PubgUI.qs("range", "session");
+    const DOCK = PubgUI.qs("dock", "0") === "1";
+    const POLL_MS = parseInt(PubgUI.qs("pollMs",
+                              DOCK ? "8000" : "30000"), 10);
+    if (DOCK) document.body.classList.add("dock");
     PubgUI.renderHeader(document.getElementById("pubgHeader"), "Hot Drops", RANGE);
 
     PubgUI.buildFilter([
@@ -195,7 +210,7 @@
     }
 
     if (RANGE === "session") PubgUI.hideIfStale();
-    PubgUI.poll(`/api/pubg/hot-drop?range=${RANGE}`, 30000, (d) => {
+    PubgUI.poll(`/api/pubg/hot-drop?range=${RANGE}`, POLL_MS, (d) => {
       if (RANGE === "session") PubgUI.hideIfStale();
       render(d);
     }, console.error);
