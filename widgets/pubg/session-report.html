@@ -1379,6 +1379,26 @@
               <div class="event-stat"><span class="v">${pm.lootTotal}</span><span class="l">📦 Loot</span></div>
             </div>
             ${badges ? `<div class="event-detail-loot">${badges}</div>` : ""}`;
+          // Squad-Tabelle des gleichen Match-Expand-Panels mit Mate-
+          // Daten aus Telemetry ueberschreiben (PUBG-API liefert fuer
+          // Events 0/0 in participants — alle Mate-Stats wuerden sonst
+          // als 0 angezeigt). HS/Ass/DBNO/Survived gibt's in Event-
+          // Modes nicht → '—'.
+          if (pm.mates && pm.mates.length) {
+            const parent = slot.closest(".squad-detail");
+            const tbody = parent && parent.querySelector(
+              ".squad-table-wrap tbody");
+            if (tbody) {
+              tbody.innerHTML = pm.mates.map(mate => `
+                <tr class="${mate.isSelf ? 'self' : ''}">
+                  <td>${mate.name}${mate.isSelf ? ' (du)' : ''}</td>
+                  <td>${mate.kills}</td>
+                  <td>—</td><td>—</td><td>—</td>
+                  <td>${Math.round(mate.damage)}</td>
+                  <td>—</td>
+                </tr>`).join("");
+            }
+          }
         }
         // Event-Matches ohne payday-Daten: 'keine Daten'-Hint
         document.querySelectorAll(".event-detail .event-detail-empty")

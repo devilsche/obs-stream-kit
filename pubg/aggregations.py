@@ -1017,6 +1017,44 @@ def compute_payday_stats(conn, my_account_id, range_key="all",
             f"AND actor_account IN ({ph})",
             [mid, *squad]).fetchone()[0] or 0
 
+        # Per-Mate-Breakdown: Kills + DMG pro Squad-Member.
+        # PUBG-API liefert in Events keine Player-Stats → wir
+        # rekonstruieren das aus Telemetry. Name kommt aus players-
+        # Tabelle (account_id -> name), Fallback name=account_id.
+        mate_kills = {r["actor_account"]: r["k"] for r in conn.execute(
+            f"SELECT actor_account, COUNT(*) AS k FROM telemetry_events "
+            f"WHERE match_id=? AND event_type='Kill' "
+            f"AND actor_account IN ({ph}) GROUP BY actor_account",
+            [mid, *squad]).fetchall()}
+        mate_dmg = {r["actor_account"]: float(r["d"] or 0) for r in conn.execute(
+            f"SELECT actor_account, COALESCE(SUM(damage),0) AS d "
+            f"FROM telemetry_events "
+            f"WHERE match_id=? AND event_type='TakeDamage' "
+            f"AND actor_account IN ({ph}) GROUP BY actor_account",
+            [mid, *squad]).fetchall()}
+        mate_loot = {}
+        for r in conn.execute(
+            f"SELECT actor_account, COUNT(*) AS c FROM telemetry_events "
+            f"WHERE match_id=? AND event_type='ItemPickup' "
+            f"AND actor_account IN ({ph}) AND weapon IS NOT NULL "
+            f"GROUP BY actor_account", [mid, *squad]).fetchall():
+            mate_loot[r["actor_account"]] = r["c"]
+        # Account-ID -> Name. Fallback Account-ID-Kuerzung.
+        names = {r["account_id"]: r["name"] for r in conn.execute(
+            f"SELECT account_id, name FROM players "
+            f"WHERE account_id IN ({ph})", squad).fetchall()}
+        mates = []
+        for acc in squad:
+            mates.append({
+                "name":   names.get(acc, acc[:12]),
+                "isSelf": acc == my_account_id,
+                "kills":  mate_kills.get(acc, 0),
+                "damage": mate_dmg.get(acc, 0.0),
+                "loot":   mate_loot.get(acc, 0),
+            })
+        # Self oben, Rest nach DMG absteigend.
+        mates.sort(key=lambda x: (not x["isSelf"], -x["damage"]))
+
         # Loot-Pickups (Squad) — gruppiert nach itemId
         loot = {}
         for r in conn.execute(
@@ -1048,6 +1086,7 @@ def compute_payday_stats(conn, my_account_id, range_key="all",
             "myDamage":   float(my_dmg),
             "squadKills": sq_kills,
             "squadDamage": float(sq_dmg),
+            "mates":      mates,
             "loot":       loot,
             "lootTotal":  sum(loot.values()),
             "windows":    windows,
@@ -1842,11 +1881,15 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
             if result["teamSurvived"]:
                 team_surv += 1
 
-    # Streak: vom neuesten Match rückwärts, nur Hot-Drop-Matches zählen
+    # Streak: vom neuesten Match rückwärts. Identische Logik wie das
+    # Inferno-Survivor-Milestone (siehe compute_session_achievements):
+    # Cold-Drop bricht den Streak, Hot-Drop-Tod bricht den Streak.
+    # Nur konsekutive Hot-Drops mit Survival zaehlen.
     streak = 0
     for pm in per_match:
         if not pm["hotDrop"]:
-            continue
+            # Cold-Drop bricht den Survived-Streak
+            break
         if pm["soloSurvived"]:
             streak += 1
         else:
