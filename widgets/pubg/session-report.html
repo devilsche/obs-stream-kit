@@ -1091,8 +1091,11 @@
           <tbody>
             ${mp.map(m => {
               const isEvent = !!m.isEvent;
-              const rowStyle = m.wins ? 'style="color:var(--pubg-gold)"'
-                             : isEvent ? 'style="color:#c8b3e3"' : '';
+              // Event-Rows nicht gold faerben — in Events ist 'place=1'
+              // immer fuer alle gesetzt → 'wins' ist hier kein echter Win.
+              const rowStyle = (m.wins && !isEvent)
+                ? 'style="color:var(--pubg-gold)"'
+                : isEvent ? 'style="color:#c8b3e3"' : '';
               // KD: in Event-Only-Maps wenn keine Deaths → 'Perfekt'.
               // Auch in BR ohne Deaths → 'Perfekt'.
               const kdCell = (m.deaths === 0 && (m.brMatches || 0) > 0)
@@ -1101,8 +1104,11 @@
                   ? '<span title="Event ohne DIED" style="color:var(--pubg-gold)">Perfekt</span>'
                   : m.kd.toFixed(2);
               const placeCell = isEvent ? '—' : `#${m.avgPlace.toFixed(1)}`;
+              // Event-Badge: lila Text auf transparentem Hintergrund. Bei
+              // gold-row-context wuerde die Inline-color zwar gewinnen,
+              // aber wir entfernen sie sowieso (siehe rowStyle).
               const nameCell = isEvent
-                ? `${PubgUI.fmtMap(m.map)} <span style="display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid rgba(216,180,255,0.45);border-radius:9px;font-size:0.7em;color:#e0c8ff;letter-spacing:0.06em;text-transform:uppercase">Event</span>`
+                ? `${PubgUI.fmtMap(m.map)} <span style="display:inline-block;margin-left:6px;padding:1px 6px;background:rgba(216,180,255,0.18);border:1px solid rgba(216,180,255,0.5);border-radius:9px;font-size:0.7em;color:#e0c8ff !important;letter-spacing:0.06em;text-transform:uppercase">Event</span>`
                 : PubgUI.fmtMap(m.map);
               return `<tr ${rowStyle}>
                 <td style="padding:4px 8px">${nameCell}</td>

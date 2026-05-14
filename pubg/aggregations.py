@@ -1511,21 +1511,25 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
     except Exception:
         pass
 
-    # Hot-Drop-Achievements: pro Hot-Drop-Match ein Milestone mit
-    # x-N-Counter (resettet pro Session). Survived counter laeuft separat
-    # und zaehlt nur die ueberlebten Hot-Drops.
+    # Hot-Drop-Achievements: Inferno Begins + Inferno Survivor sind
+    # STREAK-Counter (nicht Session-Total). Cold-Drop bricht beide.
+    # Inferno Survivor bricht zusaetzlich wenn der Spieler den Hot-Drop
+    # nicht ueberlebt.
     # Phoenix Chicken: Chicken-Win aus einem Hot-Drop heraus — super rar.
     # perMatch ist DESC sortiert → reversed für ASC = ältestes zuerst.
     try:
         hd = compute_hot_drop(conn, my_account_id, "session",
                                from_iso=from_iso, to_iso=to_iso)
-        hot_drop_count = 0
-        hot_drop_survived_count = 0
+        hot_drop_streak = 0
+        hot_drop_survived_streak = 0
         phoenix_seen = False
         for pm in reversed(hd.get("perMatch") or []):
             if not pm.get("hotDrop"):
+                # Cold-Drop bricht BEIDE Streaks
+                hot_drop_streak = 0
+                hot_drop_survived_streak = 0
                 continue
-            hot_drop_count += 1
+            hot_drop_streak += 1
             # Burning Hell uebersteuert Inferno Begins als Hot-Drop-
             # Hauptmeldung — wenn 5+ Teams im Radius, popt nur Burning
             # Hell. Inferno bleibt in DB als suppressed Eintrag.
@@ -1533,7 +1537,7 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             is_burning = teams_in_radius >= 5
             out.append({
                 "id": "hot_drop_match",
-                "label": f"Inferno Begins ×{hot_drop_count}",
+                "label": f"Inferno Begins ×{hot_drop_streak}",
                 "icon": "🔥",
                 "matchId": pm["matchId"], "playedAt": pm["playedAt"],
                 "suppressPopup": is_burning,
@@ -1546,13 +1550,17 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
                     "matchId": pm["matchId"], "playedAt": pm["playedAt"],
                 })
             if pm.get("soloSurvived"):
-                hot_drop_survived_count += 1
+                hot_drop_survived_streak += 1
                 out.append({
                     "id": "hot_drop_match_survived",
-                    "label": f"Inferno Survivor ×{hot_drop_survived_count}",
+                    "label": f"Inferno Survivor ×{hot_drop_survived_streak}",
                     "icon": "🔥",
                     "matchId": pm["matchId"], "playedAt": pm["playedAt"],
                 })
+            else:
+                # Hot-Drop nicht ueberlebt → Survived-Streak bricht
+                # (Inferno-Streak laeuft weiter — du WARST ja drin).
+                hot_drop_survived_streak = 0
             if not phoenix_seen and pm.get("place") == 1:
                 out.append({
                     "id": "phoenix_chicken",

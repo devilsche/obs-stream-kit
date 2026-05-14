@@ -293,6 +293,131 @@ def _iso():
         "%Y-%m-%dT%H:%M:%SZ")
 
 
+def wipe_day(root: str, date_str: str = None,
+             suppress_popups: bool = True) -> int:
+    """Wipe milestones + telemetry fuer einen Tag und stosse Refetch an.
+    Default-Tag = heute (lokal). suppress_popups markiert NEUE Milestones
+    die nach Re-Detection auftauchen sofort als 'displayed', damit kein
+    Popup-Replay feuert.
+
+    Nutzung:
+        python -m pubg.cli wipe-day                # heute
+        python -m pubg.cli wipe-day 2026-05-13     # spezifischer Tag
+        python -m pubg.cli wipe-day --keep-popups  # ohne Popup-Suppression
+    """
+    db_path = os.path.join(root, "data", "pubg-history.db")
+    if not os.path.exists(db_path):
+        print(f"DB nicht gefunden: {db_path}")
+        return 1
+    if not date_str:
+        date_str = datetime.date.today().isoformat()
+
+    conn = connect(db_path)
+    print(f"\n=== wipe-day {date_str} ===")
+
+    # 1) Was hat der Tag drin?
+    matches = conn.execute(
+        "SELECT match_id, played_at, map_name, game_mode "
+        "FROM matches WHERE played_at LIKE ? ORDER BY played_at",
+        (f"{date_str}%",)).fetchall()
+    if not matches:
+        print(f"Keine Matches fuer {date_str} in DB.")
+        conn.close()
+        return 0
+    print(f"\n{len(matches)} Match(es) am {date_str}:")
+    for m in matches:
+        print(f"  - {m['played_at']} · {m['map_name']:<14} · "
+              f"{m['game_mode']:<20} · {m['match_id']}")
+    achs = conn.execute(
+        "SELECT achievement_id, match_id, label, played_at "
+        "FROM pubg_achievements_seen WHERE played_at LIKE ? "
+        "ORDER BY played_at",
+        (f"{date_str}%",)).fetchall()
+    print(f"\n{len(achs)} Milestone(s) am {date_str}:")
+    for a in achs:
+        print(f"  - {a['played_at']} · {a['achievement_id']:<24} · "
+              f"{a['label'] or '-'}")
+
+    ans = input(f"\nWeiter? Loescht alle Milestones + Telemetry fuer "
+                f"{date_str} und triggert Refetch [y/N] ").strip().lower()
+    if ans != "y":
+        print("Abgebrochen.")
+        conn.close()
+        return 0
+
+    # 2) Milestones weg
+    cur = conn.execute(
+        "DELETE FROM pubg_achievements_seen WHERE played_at LIKE ?",
+        (f"{date_str}%",))
+    print(f"  -> {cur.rowcount} Milestones geloescht")
+
+    # 3) Telemetry-Events der heutigen Matches weg
+    match_ids = [m["match_id"] for m in matches]
+    ph = ",".join("?" * len(match_ids))
+    cur = conn.execute(
+        f"DELETE FROM telemetry_events WHERE match_id IN ({ph})",
+        match_ids)
+    print(f"  -> {cur.rowcount} Telemetry-Events geloescht")
+
+    # 4) Schema-Marker auf 0 -> Poller picks them up
+    cur = conn.execute(
+        f"UPDATE matches SET telemetry_schema=0, telemetry_fetched=NULL "
+        f"WHERE match_id IN ({ph})", match_ids)
+    print(f"  -> {cur.rowcount} Matches als 'needs refetch' markiert")
+    conn.commit()
+
+    # 5) Refetch synchron im Foreground anstossen.
+    cfg = load_config(os.path.join(root, "config", "pubg.json"))
+    api_key = load_api_key(os.path.join(root, ".secrets"))
+    if not api_key:
+        print("\nKein API-Key in .secrets — Refetch uebersprungen.\n"
+              "Nach Server-Restart wird der Poller die Matches automatisch "
+              "neu holen.")
+        conn.close()
+        return 0
+    self_p = get_player_by_name(conn, cfg["playerName"])
+    if not self_p:
+        print("Self-Player nicht in DB — Refetch uebersprungen.")
+        conn.close()
+        return 0
+    print("\nRefetch Telemetry...")
+    client = PubgClient(api_key=api_key, platform=cfg["platform"])
+
+    def _tp(i, total, done):
+        print(f"  ...{i}/{total} ({done} fetched)")
+
+    stats = run_bulk_telemetry_catchup(
+        conn, client, self_p["account_id"],
+        max_matches=len(match_ids), pacing_ms=150,
+        progress_cb=_tp)
+    print(f"  -> {stats.get('fetched', 0)} Match(es) neu geholt, "
+          f"{len(stats.get('errors', []))} Fehler")
+
+    # 6) Optional: Popups suppressen indem wir alle NEU detectierten
+    #    Milestones direkt als displayed markieren. Das passiert
+    #    aber erst auf dem naechsten Poll-Tick im Server — wir koennen
+    #    das hier nicht praeemptiv tun ohne die Detection aufzurufen.
+    #    Workaround: nach einer Wartezeit markieren wir alle aktuell
+    #    undisplayed-Milestones fuer den Tag als gesehen.
+    if suppress_popups:
+        print("\nPopup-Suppression: warte 8s bis der Server-Poller "
+              "die neu detectierten Milestones eingetragen hat...")
+        time.sleep(8)
+        ts_now = int(time.time() * 1000)
+        cur = conn.execute(
+            "UPDATE pubg_achievements_seen "
+            "SET displayed_at = ? "
+            "WHERE displayed_at IS NULL AND played_at LIKE ?",
+            (ts_now, f"{date_str}%"))
+        conn.commit()
+        print(f"  -> {cur.rowcount} re-detected Milestones als "
+              f"'displayed' markiert (kein Popup-Replay)")
+
+    conn.close()
+    print(f"\n=== wipe-day {date_str} fertig ===")
+    return 0
+
+
 if __name__ == "__main__":
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if len(sys.argv) > 1 and sys.argv[1] == "init":
@@ -303,6 +428,11 @@ if __name__ == "__main__":
         sys.exit(pull_from_ftp(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "seasons-backfill":
         sys.exit(seasons_backfill(root))
+    elif len(sys.argv) > 1 and sys.argv[1] == "wipe-day":
+        args = sys.argv[2:]
+        keep_popups = "--keep-popups" in args
+        date_arg = next((a for a in args if not a.startswith("--")), None)
+        sys.exit(wipe_day(root, date_arg, suppress_popups=not keep_popups))
     else:
         print("Usage: python -m pubg.cli init | cold-start | pull-ftp | "
-              "seasons-backfill")
+              "seasons-backfill | wipe-day [YYYY-MM-DD] [--keep-popups]")
