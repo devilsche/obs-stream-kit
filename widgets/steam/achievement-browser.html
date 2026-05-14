@@ -324,7 +324,12 @@
     // Keys (appId:apiName) der Achievements die NEU dazukommen (via
     // Auto-Refresh) bekommen einen 4s-Flash. Set wird konsumiert.
     let freshKeys = new Set();
-    const REFRESH_MS = 30000;
+    // Default 8s — fast genug damit Milestones nahezu zeitgleich mit
+    // dem 5s-Popup-Stream im Browser auftauchen, ohne dem Server bei
+    // grossen Datenmengen einen Sustained-Hammer zu geben. Override
+    // via ?pollMs=N (z.B. ?pollMs=3000 fuer 3s).
+    const REFRESH_MS = parseInt(
+      new URLSearchParams(location.search).get("pollMs") || "8000", 10);
 
     let pubgDetectTriggered = false;
     const gridEl   = document.getElementById("grid");
