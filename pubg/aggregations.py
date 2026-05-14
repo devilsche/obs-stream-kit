@@ -1921,6 +1921,29 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
     }
 
 
+# Map-Groessen in km — bestimmt den Hot-Drop-Radius. Kleine Maps
+# (Karakin 2km, Haven 1km, Range 2km) haben drastisch andere Skalen
+# als Erangel/Miramar/Vikendi (8km). Ein 500m-Radius auf Karakin
+# deckt ~20% der Karte ab und produziert false-positives.
+MAP_SIZE_KM = {
+    "Baltic_Main":      8, "Erangel_Main":   8,
+    "Desert_Main":      8, "Savage_Main":    4,
+    "DihorOtok_Main":   8, "Tiger_Main":     8,
+    "Kiki_Main":        8, "Neon_Main":      8,
+    "Chimera_Main":     3, "Summerland_Main": 2,
+    "Heaven_Main":      1, "Range_Main":     2,
+}
+# Hot-Drop-Radius proportional zur Map-Kantenlaenge. 8km → 480m,
+# 4km → 240m, 2km → 120m, 1km → 60m. Faktor 60 ist empirisch:
+# auf Erangel umschliessen 480m typische Compounds (Pochinki, Mylta).
+HOT_DROP_RADIUS_PER_KM_M = 60
+
+
+def _hot_drop_radius_cm(map_name):
+    map_km = MAP_SIZE_KM.get(map_name, 8)  # default 8km bei unbekannt
+    return int(map_km * HOT_DROP_RADIUS_PER_KM_M) * 100
+
+
 def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     """Pro Match: Hot-Drop ja/nein + Survival-Marker.
 
@@ -1928,6 +1951,8 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     (NICHT geschätzt, NICHT Match-Start). Window = erste window_ms ab
     Squad-Landung. Wenn keine Landing-Events vorhanden (Telemetry
     fehlt/abgelaufen) → kein Hot-Drop ermittelbar.
+
+    Der Hot-Drop-Radius skaliert mit Map-Groesse (siehe MAP_SIZE_KM).
     """
     parts = conn.execute("""
         SELECT account_id, team_id, time_survived
@@ -1939,6 +1964,12 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     my_team_id = acc_to_team.get(my_account_id)
     if my_team_id is None:
         return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
+
+    # Map fuer Radius-Skalierung
+    map_row = conn.execute(
+        "SELECT map_name FROM matches WHERE match_id = ?",
+        (match_id,)).fetchone()
+    map_name = map_row["map_name"] if map_row else None
 
     squad_ids = {a for a, t in acc_to_team.items() if t == my_team_id}
 
@@ -2024,12 +2055,12 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
                           .fetchall()}
     solo_alive = my_account_id not in killed_in_window
     team_alive = bool(squad_ids - killed_in_window)
-    # Teams die im Radius (Default 300m) zu IRGENDEINEM Squad-Member
-    # gelandet sind. Braucht alle Lobby-Landings (telemetry_schema >= 3)
-    # + Position. Eigene Squad-Members werden ausgeschlossen.
+    # Teams die im Radius zu IRGENDEINEM Squad-Member gelandet sind.
+    # Radius skaliert mit Map-Groesse (siehe _hot_drop_radius_cm) —
+    # auf Karakin/Haven war 500m hardcoded zu viel (deckte 20%+ der
+    # Karte ab → false-positive Hot-Drops).
     teams_in_radius = set()
-    radius_cm = 500 * 100  # 1 Meter = 100 PUBG-Welt-Units; 500m =
-                            # typische PUBG-Stadt-Breite (Pochinki etc.)
+    radius_cm = _hot_drop_radius_cm(map_name)
     radius_sq = radius_cm * radius_cm
     squad_pos = [(s["actor_x"], s["actor_y"]) for s in squad_landings
                   if s["actor_x"] is not None and s["actor_y"] is not None]
