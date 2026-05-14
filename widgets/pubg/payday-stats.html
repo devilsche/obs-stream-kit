@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PUBG PAYDAY Stats</title>
+<link rel="stylesheet" href="_pubg.css">
+<style>
+  body {
+    background: transparent;
+    color: var(--pubg-text);
+    font-family: "DM Sans", system-ui, sans-serif;
+    margin: 0;
+    padding: 14px;
+  }
+  .card {
+    background: rgba(26, 13, 42, 0.92);
+    border: 1px solid rgba(216, 180, 255, 0.45);
+    border-radius: 8px;
+    padding: 14px 16px;
+    box-shadow: 0 0 20px rgba(216, 180, 255, 0.18);
+  }
+  .head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .title {
+    color: #e0c8ff;
+    font-size: 1.15em;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .subtitle {
+    color: var(--pubg-muted);
+    font-size: 0.78em;
+  }
+  .totals {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .cell {
+    padding: 8px 10px;
+    background: rgba(216, 180, 255, 0.10);
+    border: 1px solid rgba(216, 180, 255, 0.28);
+    border-radius: 5px;
+    text-align: center;
+  }
+  .cell .v {
+    color: #e0c8ff;
+    font-size: 1.4em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .cell .l {
+    color: var(--pubg-muted);
+    font-size: 0.7em;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .loot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 8px;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    background: rgba(216, 180, 255, 0.14);
+    border: 1px solid rgba(216, 180, 255, 0.4);
+    border-radius: 12px;
+    font-size: 0.82em;
+  }
+  .badge b { color: #e0c8ff; font-variant-numeric: tabular-nums; }
+  .extras {
+    display: flex;
+    gap: 12px;
+    color: var(--pubg-muted);
+    font-size: 0.82em;
+  }
+  .extras b { color: var(--pubg-text); font-variant-numeric: tabular-nums; }
+  .empty {
+    color: var(--pubg-muted);
+    font-size: 0.9em;
+    text-align: center;
+    padding: 20px;
+  }
+</style>
+</head>
+<body>
+<div id="root" class="card"><div class="empty">— no event matches in range —</div></div>
+
+<script src="/widgets/pubg/_pubg.js"></script>
+<script>
+// Params:
+//   range=session (default) | day | week | all
+//   pollMs=15000 (default Poll-Intervall)
+const RANGE   = PubgUI.qs("range", "session");
+const POLL_MS = parseInt(PubgUI.qs("pollMs", "15000"), 10);
+
+PubgUI.buildFilter([
+  { key: "range", label: "Range", type: "choice",
+    choices: [["session","Session"],["day","Day"],["week","Week"],["all","All"]] },
+  { key: "pollMs", label: "Poll-Intervall (ms)", type: "range",
+    min: 5000, max: 60000, step: 5000 },
+]);
+
+function fmtItem(itemId, count, labelMap) {
+  const lbl = labelMap[itemId];
+  const emoji = lbl ? lbl[1] : "";
+  const name = lbl ? lbl[0] : itemId.replace(/^Item_/, "").replace(/_HR_C$/, "");
+  return `<span class="badge" title="${itemId}">${emoji} <b>${count}</b> ${name}</span>`;
+}
+
+function render(d) {
+  const root = document.getElementById("root");
+  if (!d || !d.matches || !d.matches.length) {
+    root.innerHTML = `<div class="empty">— no event matches in range —</div>`;
+    return;
+  }
+  const t = d.totals || {};
+  const labels = d.labels || {};
+  const lootHtml = Object.entries(t.loot || {})
+    .sort((a,b) => b[1] - a[1])
+    .map(([id, c]) => fmtItem(id, c, labels))
+    .join("");
+
+  root.innerHTML = `
+    <div class="head">
+      <span class="title">🎭 Event / Heist Stats</span>
+      <span class="subtitle">${t.matches} match${t.matches > 1 ? "es" : ""} · ${RANGE}</span>
+    </div>
+    <div class="totals">
+      <div class="cell"><div class="v">${t.myKills || 0}</div><div class="l">My Kills</div></div>
+      <div class="cell"><div class="v">${Math.round(t.myDamage || 0)}</div><div class="l">My DMG</div></div>
+      <div class="cell"><div class="v">${t.squadKills || 0}</div><div class="l">Squad Kills</div></div>
+      <div class="cell"><div class="v">${Math.round(t.squadDamage || 0)}</div><div class="l">Squad DMG</div></div>
+    </div>
+    ${lootHtml ? `<div class="loot">${lootHtml}</div>` : ""}
+    <div class="extras">
+      <span>🪟 <b>${t.windows || 0}</b> windows</span>
+      <span>🚪 <b>${t.doors || 0}</b> doors</span>
+      <span>📦 <b>${t.lootTotal || 0}</b> total loot</span>
+    </div>
+  `;
+}
+
+PubgUI.poll(`/api/pubg/payday-stats?range=${RANGE}`, POLL_MS, render, console.error);
+</script>
+</body>
+</html>
