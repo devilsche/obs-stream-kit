@@ -1802,7 +1802,7 @@ def backfill_session_achievements(conn, my_account_id,
 
 
 def compute_hot_drop(conn, my_account_id, range_key="session",
-                     window_secs=300, from_iso=None, to_iso=None):
+                     window_secs=180, from_iso=None, to_iso=None):
     """Hot-Drop-Stats über die Range.
 
     Definition Hot-Drop = im Match gab es ein Kill/Knock-Event innerhalb
@@ -2037,10 +2037,44 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     # (squad-only) — Team-Count wird dann underestimiert.
     full_team_map = lobby_team_map if lobby_team_map else acc_to_team
 
-    # teams_in_fight = nur Teams die UNS angegriffen oder von uns
-    # angegriffen wurden + nur Events IM Hot-Drop-Radius (Squad-
-    # Landung als Anker). Schusswechsel die 3km weiter passieren
-    # zaehlen nicht als Hot-Drop-Fight (z.B. Rotation, Vehicle-Fight).
+    # ERST nearby-teams ermitteln (Landings im Radius), DANN Combat
+    # nur mit denen zaehlen. Damit "Hot-Drop = Fight mit dem Team, das
+    # in deiner Zone gelandet ist", nicht "Fight irgendwo + Gegner war
+    # zufaellig in der Naehe gelandet".
+    teams_in_radius = set()
+    nearby_enemy_accs = set()
+    if squad_pos:
+        all_landings = conn.execute("""
+            SELECT actor_account, actor_x, actor_y
+            FROM telemetry_events
+            WHERE match_id = ?
+              AND event_type = 'Landing'
+              AND actor_x IS NOT NULL AND actor_y IS NOT NULL
+        """, (match_id,)).fetchall()
+        for ld in all_landings:
+            if ld["actor_account"] in squad_ids:
+                continue
+            for sx, sy in squad_pos:
+                dx = ld["actor_x"] - sx
+                dy = ld["actor_y"] - sy
+                if dx * dx + dy * dy <= radius_sq:
+                    t = full_team_map.get(ld["actor_account"])
+                    if t is not None and t != my_team_id:
+                        teams_in_radius.add(t)
+                        nearby_enemy_accs.add(ld["actor_account"])
+                    break
+
+    # Alle Member der nearby-Teams (auch wenn nur 1 von 4 in Radius
+    # gelandet ist — beim Re-Engage kommen die anderen aus dem Team
+    # nachgerueckt; deren Combat zaehlt als Hot-Drop-Fight)
+    nearby_team_accs = {a for a, t in full_team_map.items()
+                        if t in teams_in_radius}
+
+    # Hot-Drop-Combat: Squad vs nearby-Team innerhalb window_secs.
+    # Schusswechsel mit nicht-nearby Teams (Rotation, drittes Team) zaehlt
+    # NICHT als Hot-Drop-Fight. Spatial-Filter zusaetzlich — manchmal
+    # vermisst PUBG-Telemetry Landing-Events (Bot-Spawn etc.) und das
+    # 'nearby' set ist unterspezifiziert; der HD-Zone-Check faengt das ab.
     hot_drop = False
     teams_in_fight = set()
     for e in events:
@@ -2048,16 +2082,17 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
         a_in_squad = a in squad_ids
         v_in_squad = v in squad_ids
         if a_in_squad and v_in_squad:
-            continue  # Friendly fire innerhalb Squad — nicht zählen
+            continue  # Friendly fire — nicht zaehlen
         if not (a_in_squad or v_in_squad):
-            continue  # Fight zwischen anderen Teams — uns egal
-        # Spatial-Check: Event muss in der HD-Zone passieren
+            continue  # Drittes-Team-Fight — uns egal
+        opponent = v if a_in_squad else a
+        if opponent not in nearby_team_accs:
+            continue  # Combat mit Team das NICHT in deiner HD-Zone landete
+        # Spatial-Check: Event muss raeumlich in der HD-Zone passieren
         if not (_in_hd_zone(e["actor_x"], e["actor_y"])
                 or _in_hd_zone(e["victim_x"], e["victim_y"])):
             continue
-        # Squad ist beteiligt und im Radius → Hot-Drop-Combat
         hot_drop = True
-        opponent = v if a_in_squad else a
         opp_team = full_team_map.get(opponent)
         if opp_team is not None and opp_team != my_team_id:
             teams_in_fight.add(opp_team)
@@ -2081,34 +2116,11 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
                           .fetchall()}
     solo_alive = my_account_id not in killed_in_window
     team_alive = bool(squad_ids - killed_in_window)
-    # Teams die im Radius zu IRGENDEINEM Squad-Member gelandet sind.
-    # radius_cm/radius_sq/squad_pos sind oben definiert.
-    teams_in_radius = set()
-    if squad_pos:
-        all_landings = conn.execute("""
-            SELECT actor_account, actor_x, actor_y
-            FROM telemetry_events
-            WHERE match_id = ?
-              AND event_type = 'Landing'
-              AND actor_x IS NOT NULL AND actor_y IS NOT NULL
-        """, (match_id,)).fetchall()
-        for ld in all_landings:
-            if ld["actor_account"] in squad_ids:
-                continue  # eigenes Squad-Member, nicht zählen
-            for sx, sy in squad_pos:
-                dx = ld["actor_x"] - sx
-                dy = ld["actor_y"] - sy
-                if dx * dx + dy * dy <= radius_sq:
-                    t = full_team_map.get(ld["actor_account"])
-                    if t is not None and t != my_team_id:
-                        teams_in_radius.add(t)
-                    break  # in Radius, weitere Squad-Pos nicht prüfen
-
-    # Hot-Drop = BEIDES: mind. 1 Gegner-Team im Radius beim Landing UND
-    # Schusswechsel mit Squad in den ersten window_secs (Kill/Knock/
-    # TakeDamage). Strenge AND-Regel — nur "Gegner gelandet UND es ist
-    # wirklich was passiert" zaehlt. Vorher OR → false-positives bei
-    # Stadt-Drops mit benachbarten aber friedlich gebliebenen Teams.
+    # Hot-Drop = mind. 1 Gegner-Team im Radius beim Landing UND
+    # Schusswechsel zwischen Squad und genau diesem Team innerhalb
+    # der ersten window_secs. teams_in_radius / nearby_team_accs wurden
+    # oben schon ermittelt; hot_drop flag wurde im Combat-Loop gesetzt
+    # nur wenn die Gegner aus den nearby-Teams kommen.
     is_hot_drop = bool(teams_in_radius) and hot_drop
     # Anker-Landing = erste Squad-Landung (used als Fight-Window-Start).
     # Coords als Tooltip-Info zurueckliefern.
