@@ -418,6 +418,68 @@ def wipe_day(root: str, date_str: str = None,
     return 0
 
 
+def reset_milestones(root: str, ids: list) -> int:
+    """Wipe spezifische Milestone-IDs aus pubg_achievements_seen
+    und re-evaluiere ueber ALLE Sessions (backfill_session_achievements).
+    Sinnvoll wenn die Detection-Logik fuer eine ID geaendert wurde
+    (z.B. hot_drop_match von Counter -> Streak).
+
+    suppress_popup=True bei Re-Insert -> kein Popup-Replay."""
+    from pubg.aggregations import backfill_session_achievements
+    from pubg.config import load_config
+    db_path = os.path.join(root, "data", "pubg-history.db")
+    if not os.path.exists(db_path):
+        print(f"DB nicht gefunden: {db_path}")
+        return 1
+    if not ids:
+        print("Fehlende Milestone-IDs. Beispiel:")
+        print("  python -m pubg.cli reset-milestones "
+              "hot_drop_match hot_drop_match_survived")
+        return 1
+    cfg = load_config(os.path.join(root, "config", "pubg.json"))
+    conn = connect(db_path)
+    self_p = get_player_by_name(conn, cfg["playerName"])
+    if not self_p:
+        print("Self-Player nicht in DB.")
+        conn.close()
+        return 1
+
+    print(f"\n=== reset-milestones {ids} ===")
+    ph = ",".join("?" * len(ids))
+    cnt = conn.execute(
+        f"SELECT COUNT(*) FROM pubg_achievements_seen "
+        f"WHERE achievement_id IN ({ph})", ids).fetchone()[0]
+    print(f"  {cnt} bestehende Eintraege mit diesen IDs.")
+    if cnt == 0:
+        print("  Nichts zu loeschen — Backfill laeuft trotzdem fuer "
+              "evtl. nie-detectierte Eintraege.")
+
+    ans = input(f"\nLoeschen + ueber alle Sessions neu detecten? "
+                f"[y/N] ").strip().lower()
+    if ans != "y":
+        print("Abgebrochen.")
+        conn.close()
+        return 0
+
+    cur = conn.execute(
+        f"DELETE FROM pubg_achievements_seen WHERE achievement_id IN ({ph})",
+        ids)
+    conn.commit()
+    print(f"  -> {cur.rowcount} Eintraege geloescht")
+
+    print("\nRe-Detection ueber alle historischen Sessions "
+          "(suppress_popup=True)...")
+    stats = backfill_session_achievements(
+        conn, self_p["account_id"], gap_hours=6, suppress_popup=True)
+    print(f"  -> {stats.get('sessions', 0)} Sessions verarbeitet, "
+          f"{stats.get('inserted', 0)} Milestones (neu) eingetragen.")
+    if stats.get("errors"):
+        print(f"  Fehler: {stats['errors'][:3]}")
+    conn.close()
+    print("=== reset-milestones fertig ===")
+    return 0
+
+
 if __name__ == "__main__":
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if len(sys.argv) > 1 and sys.argv[1] == "init":
@@ -433,6 +495,9 @@ if __name__ == "__main__":
         keep_popups = "--keep-popups" in args
         date_arg = next((a for a in args if not a.startswith("--")), None)
         sys.exit(wipe_day(root, date_arg, suppress_popups=not keep_popups))
+    elif len(sys.argv) > 1 and sys.argv[1] == "reset-milestones":
+        sys.exit(reset_milestones(root, sys.argv[2:]))
     else:
         print("Usage: python -m pubg.cli init | cold-start | pull-ftp | "
-              "seasons-backfill | wipe-day [YYYY-MM-DD] [--keep-popups]")
+              "seasons-backfill | wipe-day [YYYY-MM-DD] [--keep-popups] | "
+              "reset-milestones <id1> [<id2> ...]")
