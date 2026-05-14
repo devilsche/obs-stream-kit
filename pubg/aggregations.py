@@ -1933,10 +1933,12 @@ MAP_SIZE_KM = {
     "Chimera_Main":     3, "Summerland_Main": 2,
     "Heaven_Main":      1, "Range_Main":     2,
 }
-# Hot-Drop-Radius proportional zur Map-Kantenlaenge. 8km → 480m,
-# 4km → 240m, 2km → 120m, 1km → 60m. Faktor 60 ist empirisch:
-# auf Erangel umschliessen 480m typische Compounds (Pochinki, Mylta).
-HOT_DROP_RADIUS_PER_KM_M = 60
+# Hot-Drop-Radius proportional zur Map-Kantenlaenge. 8km → 300m,
+# 4km → 150m, 3km → ~115m, 2km → 75m, 1km → ~38m.
+# Faktor 37.5 (gerundet 38): auf 8km-Maps (Erangel, Miramar, Vikendi)
+# entspricht das einer typischen Stadt-Innengrenze. Vorher 60 war zu
+# grosszuegig — auf Vikendi z.B. 480m, viel zu loose.
+HOT_DROP_RADIUS_PER_KM_M = 38
 
 
 def _hot_drop_radius_cm(map_name):
@@ -1995,12 +1997,14 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     landing_ms = first_landing["timestamp_ms"]
     fight_cutoff_ms = landing_ms + window_ms
 
-    # Kill/Knock-Events ab Squad-Landung bis +window_ms
+    # Combat-Events ab Squad-Landung bis +window_ms. TakeDamage zaehlt
+    # mit, sonst werden Drop-Fights wo NUR Bullets fliegen aber niemand
+    # stirbt/knocked verpasst.
     events = conn.execute("""
-        SELECT actor_account, target_account, timestamp_ms
+        SELECT actor_account, target_account, timestamp_ms, event_type
         FROM telemetry_events
         WHERE match_id = ?
-          AND event_type IN ('Kill', 'Knock')
+          AND event_type IN ('Kill', 'Knock', 'TakeDamage')
           AND timestamp_ms >= ?
           AND timestamp_ms <= ?
         ORDER BY timestamp_ms ASC
@@ -2084,11 +2088,12 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
                         teams_in_radius.add(t)
                     break  # in Radius, weitere Squad-Pos nicht prüfen
 
-    # Hot-Drop = raeumlich (Teams im Radius beim Landing) ODER zeitlich
-    # (Schusswechsel mit Squad in window_secs). Vorher nur zeitlich -
-    # dadurch wurden 'Stadt-Drops mit Lauer-Phase >2min' faelschlich
-    # als 'cold' gewertet.
-    is_hot_drop = bool(teams_in_radius) or hot_drop
+    # Hot-Drop = BEIDES: mind. 1 Gegner-Team im Radius beim Landing UND
+    # Schusswechsel mit Squad in den ersten window_secs (Kill/Knock/
+    # TakeDamage). Strenge AND-Regel — nur "Gegner gelandet UND es ist
+    # wirklich was passiert" zaehlt. Vorher OR → false-positives bei
+    # Stadt-Drops mit benachbarten aber friedlich gebliebenen Teams.
+    is_hot_drop = bool(teams_in_radius) and hot_drop
     # Anker-Landing = erste Squad-Landung (used als Fight-Window-Start).
     # Coords als Tooltip-Info zurueckliefern.
     anchor_x = first_landing["actor_x"] if first_landing else None
