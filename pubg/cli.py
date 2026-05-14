@@ -418,6 +418,60 @@ def wipe_day(root: str, date_str: str = None,
     return 0
 
 
+def purge_before(root: str, date_str: str) -> int:
+    """Loescht alle Milestones (pubg_achievements_seen) deren played_at
+    < date_str ist. Ohne Refetch, ohne Backfill — die historischen
+    Milestones sind einfach weg.
+
+    Nutzung:
+        python -m pubg.cli purge-before 2026-05-01
+    """
+    db_path = os.path.join(root, "data", "pubg-history.db")
+    if not os.path.exists(db_path):
+        print(f"DB nicht gefunden: {db_path}")
+        return 1
+    if not date_str:
+        print("Fehlende Datums-Angabe. Beispiel: "
+              "python -m pubg.cli purge-before 2026-05-01")
+        return 1
+    # Akzeptiert YYYY-MM-DD oder YYYY-MM-DDT...
+    try:
+        datetime.date.fromisoformat(date_str[:10])
+    except ValueError:
+        print(f"Ungueltiges Datum: {date_str} (erwarte YYYY-MM-DD)")
+        return 1
+
+    conn = connect(db_path)
+    cnt = conn.execute(
+        "SELECT COUNT(*) FROM pubg_achievements_seen WHERE played_at < ?",
+        (date_str,)).fetchone()[0]
+    print(f"\n{cnt} Milestones aelter als {date_str} in DB.")
+    if cnt == 0:
+        conn.close()
+        return 0
+    # Stichprobe
+    sample = conn.execute(
+        "SELECT achievement_id, played_at FROM pubg_achievements_seen "
+        "WHERE played_at < ? ORDER BY played_at DESC LIMIT 5",
+        (date_str,)).fetchall()
+    print("Stichprobe der juengsten zu loeschenden:")
+    for r in sample:
+        print(f"  {r['played_at']}  {r['achievement_id']}")
+    ans = input(f"\nWirklich alle {cnt} Eintraege < {date_str} loeschen? "
+                f"[y/N] ").strip().lower()
+    if ans != "y":
+        print("Abgebrochen.")
+        conn.close()
+        return 0
+    cur = conn.execute(
+        "DELETE FROM pubg_achievements_seen WHERE played_at < ?",
+        (date_str,))
+    conn.commit()
+    print(f"  -> {cur.rowcount} Eintraege geloescht")
+    conn.close()
+    return 0
+
+
 def list_milestones(root: str, pattern: str = None) -> int:
     """Listet Milestones in der DB, gruppiert nach achievement_id mit
     Count + letztem played_at. Mit pattern: LIKE-Filter auf
@@ -536,8 +590,12 @@ if __name__ == "__main__":
     elif len(sys.argv) > 1 and sys.argv[1] == "list-milestones":
         pat = sys.argv[2] if len(sys.argv) > 2 else None
         sys.exit(list_milestones(root, pat))
+    elif len(sys.argv) > 1 and sys.argv[1] == "purge-before":
+        date_arg = sys.argv[2] if len(sys.argv) > 2 else None
+        sys.exit(purge_before(root, date_arg))
     else:
         print("Usage: python -m pubg.cli init | cold-start | pull-ftp | "
               "seasons-backfill | wipe-day [YYYY-MM-DD] [--keep-popups] | "
               "reset-milestones <id1> [<id2> ...] | "
-              "list-milestones [pattern]")
+              "list-milestones [pattern] | "
+              "purge-before YYYY-MM-DD")
