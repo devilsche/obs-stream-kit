@@ -399,7 +399,7 @@ class PollerThread(threading.Thread):
     def __init__(self, db_path, client, my_player_name, my_account_id,
                  interval_secs=60, lifetime_min_matches=5,
                  lifetime_max_per_tick=3, match_max_per_tick=5,
-                 ftp_backup_cfg=None):
+                 ftp_backup_cfg=None, cache=None):
         super().__init__(daemon=True, name="pubg-poller")
         self.db_path = db_path
         self.client = client
@@ -410,6 +410,10 @@ class PollerThread(threading.Thread):
         self.lifetime_max = lifetime_max_per_tick
         self.match_max = match_max_per_tick
         self.ftp_backup_cfg = ftp_backup_cfg
+        # Endpoint-Cache (TTLCache) — wird invalidated wenn neue Matches/
+        # Telemetry/Achievements eingespielt sind, sonst zeigen die Widgets
+        # bis zu TTL (30s) lang stale Daten ('nur 1 Match').
+        self.cache = cache
         self._stop = threading.Event()
         self._last_status = {"polling": "starting", "lastPollAt": None,
                               "errors": [], "newMatches": 0,
@@ -488,6 +492,14 @@ class PollerThread(threading.Thread):
                     except Exception as e:
                         all_errors = (all_errors if 'all_errors' in dir() else [])
                         all_errors.append(f"achievement-detect: {e}")
+                    # Endpoint-Cache leeren — sonst zeigen Widgets bis zu
+                    # 30s lang die alten Stats ('nur 1 Match vorhanden')
+                    # waehrend neue Milestones schon im Popup-Stream sind.
+                    if self.cache is not None:
+                        try:
+                            self.cache.invalidate()
+                        except Exception:
+                            pass
                 all_errors = (m_stats["errors"] + l_stats["errors"]
                               + s_stats["errors"] + t_stats["errors"])
                 self._last_status = {

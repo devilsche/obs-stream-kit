@@ -134,6 +134,7 @@ try:
                 interval_secs=pubg_cfg["pollIntervalSec"],
                 lifetime_min_matches=pubg_cfg["minMatchesForLifetime"],
                 ftp_backup_cfg=ftp_cfg,
+                cache=pubg_cache,
             )
             pubg_poller.start()
             pubg_registry = EndpointRegistry(
