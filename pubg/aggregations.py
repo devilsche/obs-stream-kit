@@ -2502,6 +2502,30 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
         d["squadTimeSurvived"] = _squad_last_survived(m["match_id"])
         enriched.append(d)
 
+    # Event-Matches: PUBG-API liefert participants.kills/damage_dealt = 0
+    # weil ihr System in Event-Modi keine Player-Stats trackt. Wir holen
+    # echte Kills + Damage aus den Telemetry-Events und ueberschreiben.
+    # (Map-Performance + Match-Liste zeigen sonst 0/0 fuer PAYDAY etc.)
+    event_match_ids = [x["match_id"] for x in enriched
+                        if not is_br_mode(x.get("game_mode"))]
+    if event_match_ids:
+        ph = ",".join("?" * len(event_match_ids))
+        kills_by_match = {r["match_id"]: r["k"] for r in conn.execute(
+            f"SELECT match_id, COUNT(*) AS k FROM telemetry_events "
+            f"WHERE event_type='Kill' AND actor_account=? "
+            f"AND match_id IN ({ph}) GROUP BY match_id",
+            [my_account_id, *event_match_ids]).fetchall()}
+        dmg_by_match = {r["match_id"]: float(r["d"] or 0) for r in conn.execute(
+            f"SELECT match_id, COALESCE(SUM(damage), 0) AS d "
+            f"FROM telemetry_events "
+            f"WHERE event_type='TakeDamage' AND actor_account=? "
+            f"AND match_id IN ({ph}) GROUP BY match_id",
+            [my_account_id, *event_match_ids]).fetchall()}
+        for x in enriched:
+            if x["match_id"] in kills_by_match or x["match_id"] in dmg_by_match:
+                x["kills"] = kills_by_match.get(x["match_id"], 0)
+                x["damage_dealt"] = dmg_by_match.get(x["match_id"], 0.0)
+
     # Phase = aufeinanderfolgende Matches deren Squad-Sets sich überlappen.
     # Der "Stamm" der Phase ist die Schnittmenge aller Squads in der Phase
     # (die Mates die in JEDEM Match dieser Phase dabei waren).
