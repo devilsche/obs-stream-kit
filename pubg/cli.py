@@ -418,6 +418,42 @@ def wipe_day(root: str, date_str: str = None,
     return 0
 
 
+def list_milestones(root: str, pattern: str = None) -> int:
+    """Listet Milestones in der DB, gruppiert nach achievement_id mit
+    Count + letztem played_at. Mit pattern: LIKE-Filter auf
+    achievement_id (z.B. 'heist%' fuer alle Heist-Milestones).
+    """
+    db_path = os.path.join(root, "data", "pubg-history.db")
+    if not os.path.exists(db_path):
+        print(f"DB nicht gefunden: {db_path}")
+        return 1
+    conn = connect(db_path)
+    if pattern:
+        rows = conn.execute(
+            "SELECT achievement_id, COUNT(*) AS n, MAX(played_at) AS last "
+            "FROM pubg_achievements_seen "
+            "WHERE achievement_id LIKE ? "
+            "GROUP BY achievement_id ORDER BY achievement_id",
+            (pattern,)).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT achievement_id, COUNT(*) AS n, MAX(played_at) AS last "
+            "FROM pubg_achievements_seen "
+            "GROUP BY achievement_id ORDER BY achievement_id"
+        ).fetchall()
+    if not rows:
+        print(f"Keine Milestones {'mit Pattern ' + pattern if pattern else ''}.")
+        conn.close()
+        return 0
+    print(f"\n{'achievement_id':<30}  {'count':>5}  last_played")
+    print("-" * 70)
+    for r in rows:
+        print(f"{r['achievement_id']:<30}  {r['n']:>5}  {r['last']}")
+    print(f"\n{len(rows)} distinct IDs.")
+    conn.close()
+    return 0
+
+
 def reset_milestones(root: str, ids: list) -> int:
     """Wipe spezifische Milestone-IDs aus pubg_achievements_seen
     und re-evaluiere ueber ALLE Sessions (backfill_session_achievements).
@@ -497,7 +533,11 @@ if __name__ == "__main__":
         sys.exit(wipe_day(root, date_arg, suppress_popups=not keep_popups))
     elif len(sys.argv) > 1 and sys.argv[1] == "reset-milestones":
         sys.exit(reset_milestones(root, sys.argv[2:]))
+    elif len(sys.argv) > 1 and sys.argv[1] == "list-milestones":
+        pat = sys.argv[2] if len(sys.argv) > 2 else None
+        sys.exit(list_milestones(root, pat))
     else:
         print("Usage: python -m pubg.cli init | cold-start | pull-ftp | "
               "seasons-backfill | wipe-day [YYYY-MM-DD] [--keep-popups] | "
-              "reset-milestones <id1> [<id2> ...]")
+              "reset-milestones <id1> [<id2> ...] | "
+              "list-milestones [pattern]")
