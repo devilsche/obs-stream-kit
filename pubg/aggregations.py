@@ -1414,10 +1414,12 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
         ( 25, "heist_kills_25",  "Heist Killer"),
     ]
     HEIST_DAMAGE_TIERS = [
-        (20000, "heist_dmg_20k", "Heist GODLIKE"),
-        (15000, "heist_dmg_15k", "Heist Damage Lord"),
-        (10000, "heist_dmg_10k", "Heist Damage Demon"),
-        ( 5000, "heist_dmg_5k",  "Heist Heavy"),
+        # 5k war zu trivial — schon 30 NPCs auf Body-Shots reichen.
+        # Untergrenze auf 8k angehoben, Tiers entsprechend skaliert.
+        (25000, "heist_dmg_25k", "Heist GODLIKE"),
+        (20000, "heist_dmg_20k", "Heist Damage Lord"),
+        (15000, "heist_dmg_15k", "Heist Damage Demon"),
+        ( 8000, "heist_dmg_8k",  "Heist Heavy"),
     ]
     HEIST_LOOT_TIERS = [
         (40, "heist_loot_40", "Mega Heist"),
@@ -1585,7 +1587,7 @@ PUBG_RARE_ACHIEVEMENTS = {
     "burning_hell",                  # Hot-Drop mit 5+ Teams im Radius
     "gold_brick_grab",               # Squad-Loot: Goldbarren
     "heist_kills_75", "heist_kills_100",  # sehr hohe Heist-Kill-Tiers
-    "heist_dmg_15k", "heist_dmg_20k",     # sehr hohes Heist-DMG
+    "heist_dmg_20k", "heist_dmg_25k",     # sehr hohes Heist-DMG
     "heist_loot_25", "heist_loot_40",     # Big/Mega-Heist
     "silent_heist", "ghost_operative",    # Stealth
     "window_smasher",                # 30+ Fenster im Heist

@@ -598,10 +598,10 @@ class EndpointRegistry:
             "heist_kills_50":          "Heist match with 50+ kills",
             "heist_kills_75":          "Heist match with 75+ kills",
             "heist_kills_100":         "Heist match with 100+ kills",
-            "heist_dmg_5k":            "Heist match with 5000+ damage",
-            "heist_dmg_10k":           "Heist match with 10000+ damage",
+            "heist_dmg_8k":            "Heist match with 8000+ damage",
             "heist_dmg_15k":           "Heist match with 15000+ damage",
             "heist_dmg_20k":           "Heist match with 20000+ damage",
+            "heist_dmg_25k":           "Heist match with 25000+ damage",
             "heist_loot_10":           "Squad looted 10+ items in a heist",
             "heist_loot_25":           "Squad looted 25+ items in a heist",
             "heist_loot_40":           "Squad looted 40+ items in a heist",
@@ -648,10 +648,10 @@ class EndpointRegistry:
             "heist_kills_50":          "Heist-Match mit 50+ Kills",
             "heist_kills_75":          "Heist-Match mit 75+ Kills",
             "heist_kills_100":         "Heist-Match mit 100+ Kills",
-            "heist_dmg_5k":            "Heist-Match mit 5000+ Schaden",
-            "heist_dmg_10k":           "Heist-Match mit 10000+ Schaden",
+            "heist_dmg_8k":            "Heist-Match mit 8000+ Schaden",
             "heist_dmg_15k":           "Heist-Match mit 15000+ Schaden",
             "heist_dmg_20k":           "Heist-Match mit 20000+ Schaden",
+            "heist_dmg_25k":           "Heist-Match mit 25000+ Schaden",
             "heist_loot_10":           "Squad hat 10+ Items im Heist gelootet",
             "heist_loot_25":           "Squad hat 25+ Items im Heist gelootet",
             "heist_loot_40":           "Squad hat 40+ Items im Heist gelootet",
@@ -897,10 +897,10 @@ class EndpointRegistry:
         "heist_kills_50":          "Heist Massacre",
         "heist_kills_75":          "Heist Annihilation",
         "heist_kills_100":         "Heist God",
-        "heist_dmg_5k":            "Heist Heavy",
-        "heist_dmg_10k":           "Heist Damage Demon",
-        "heist_dmg_15k":           "Heist Damage Lord",
-        "heist_dmg_20k":           "Heist GODLIKE",
+        "heist_dmg_8k":            "Heist Heavy",
+        "heist_dmg_15k":           "Heist Damage Demon",
+        "heist_dmg_20k":           "Heist Damage Lord",
+        "heist_dmg_25k":           "Heist GODLIKE",
         "heist_loot_10":           "Solid Heist",
         "heist_loot_25":           "Big Heist",
         "heist_loot_40":           "Mega Heist",
@@ -1109,6 +1109,53 @@ class EndpointRegistry:
         "chicken_streak",
         "hot_drop_match",
         "hot_drop_match_survived",
+        # Event/Heist Tiers werden ueber ihre IDs (heist_kills_25 etc.)
+        # geparst, nicht ueber Label-x-N — daher nicht in dieser Liste.
+    }
+
+    def _session_date_pools(self, conn):
+        """Liefert (br_dates, event_dates) — distinct date-Strings auf
+        denen BR bzw. Event-Modes gespielt wurden. Wird fuer sessionPct
+        gebraucht: Event-Achievements duerfen nicht gegen 'alle Sessions'
+        verrechnet werden (sonst zerquetscht der BR-Anteil die pct)."""
+        from pubg.aggregations import BATTLE_ROYALE_MODES
+        br_ph = ",".join("?" * len(BATTLE_ROYALE_MODES))
+        br_dates = sorted({
+            r[0] for r in conn.execute(
+                f"SELECT DISTINCT date(played_at) FROM matches "
+                f"WHERE played_at IS NOT NULL "
+                f"  AND game_mode IN ({br_ph})",
+                list(BATTLE_ROYALE_MODES)
+            ).fetchall() if r[0]
+        })
+        event_dates = sorted({
+            r[0] for r in conn.execute(
+                f"SELECT DISTINCT date(played_at) FROM matches "
+                f"WHERE played_at IS NOT NULL "
+                f"  AND game_mode NOT IN ({br_ph})",
+                list(BATTLE_ROYALE_MODES)
+            ).fetchall() if r[0]
+        })
+        return br_dates, event_dates
+
+    def _pool_for_aid(self, aid, br_dates, event_dates):
+        if aid in self.PUBG_EVENT_ACHIEVEMENTS:
+            return event_dates
+        return br_dates
+
+    # Achievements die nur in Event/PAYDAY-Sessions ueberhaupt erreichbar
+    # sind. Bei der sessionPct-Berechnung wird der Nenner auf 'Sessions
+    # mit Event-Match' begrenzt — sonst zerquetscht ein User der 95%
+    # seiner Zeit BR spielt jede Heist-pct (selbst 'jedes Heist-Match
+    # ein Massacre' waere nur 5% global).
+    PUBG_EVENT_ACHIEVEMENTS = {
+        "heist_kills_25", "heist_kills_50",
+        "heist_kills_75", "heist_kills_100",
+        "heist_dmg_8k", "heist_dmg_15k",
+        "heist_dmg_20k", "heist_dmg_25k",
+        "heist_loot_10", "heist_loot_25", "heist_loot_40",
+        "silent_heist", "ghost_operative",
+        "gold_brick_grab", "window_smasher",
     }
 
     @staticmethod
@@ -1183,12 +1230,10 @@ class EndpointRegistry:
         # Milestone bis zum Zeitpunkt 'played_at' in deinen Sessions
         # vorkam — gleiche Logik wie im Achievement-Browser, damit
         # Popup und Browser konsistent sind.
-        match_dates = sorted({
-            r[0] for r in conn.execute(
-                "SELECT DISTINCT date(played_at) FROM matches "
-                "WHERE played_at IS NOT NULL"
-            ).fetchall() if r[0]
-        })
+        # Zwei getrennte Date-Pools: BR-Achievements werden gegen
+        # BR-Sessions verrechnet, Event-Achievements (Heist etc.) gegen
+        # Event-Sessions — sonst zerstoert der BR-Anteil jede Event-pct.
+        br_dates, event_dates = self._session_date_pools(conn)
         per_aid_dates_tier = self._build_aid_tier_index(conn)
 
         items = []
@@ -1209,8 +1254,10 @@ class EndpointRegistry:
             # mindestens ×3 erreicht haben — dadurch wird ×5 seltener
             # als ×2 (sub-set Logik). Bei fehlendem Datum None.
             d = (played or "")[:10]
-            if d and match_dates:
-                total = bisect_right(match_dates, d)
+            pool = self._pool_for_aid(
+                r["achievement_id"], br_dates, event_dates)
+            if d and pool:
+                total = bisect_right(pool, d)
                 ach_n = self._count_aid_dates_tier(
                     per_aid_dates_tier, r["achievement_id"],
                     self._parse_tier(r["label"]), d)
@@ -1268,13 +1315,10 @@ class EndpointRegistry:
         from bisect import bisect_right
         conn = self.get_conn()
 
-        # Alle Match-Tage als sortierte distinct-Liste (ISO YYYY-MM-DD).
-        match_dates = sorted({
-            r[0] for r in conn.execute(
-                "SELECT DISTINCT date(played_at) FROM matches "
-                "WHERE played_at IS NOT NULL"
-            ).fetchall() if r[0]
-        })
+        # Zwei Date-Pools: BR-Achievements gegen BR-Sessions,
+        # Event-Achievements (Heist etc.) gegen Event-Sessions.
+        br_dates, event_dates = self._session_date_pools(conn)
+        match_dates = sorted(set(br_dates) | set(event_dates))
 
         # Alle Achievement-Rows chronologisch ASC fuer den Snapshot-Walk.
         rows = conn.execute("""
@@ -1303,8 +1347,9 @@ class EndpointRegistry:
         for r in rows:
             aid = r["achievement_id"]
             d = (r["played_at"] or "")[:10]
-            if d and match_dates:
-                total = bisect_right(match_dates, d)
+            pool = self._pool_for_aid(aid, br_dates, event_dates)
+            if d and pool:
+                total = bisect_right(pool, d)
                 ach_n = self._count_aid_dates_tier(
                     per_aid_dates_tier, aid,
                     self._parse_tier(r["label"]), d)
