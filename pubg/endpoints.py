@@ -908,43 +908,69 @@ class EndpointRegistry:
         "window_smasher":          "Window Smasher",
     }
 
-    # PUBG-Achievement-Icon-URLs (gemacht von ChatGPT, geschnitten aus
-    # 1024x1024 Grid). Werden zur API-Zeit eingesetzt — ueberschreiben
-    # die Emoji-Strings die in pubg_achievements_seen.icon stehen.
-    # DMG-Tiers nutzen noch die five_kill_match-Basis als Fallback bis
-    # eigene Icons generiert werden. longest_kill_1000 nutzt 800er als
-    # Fallback (1000m-Tile war im aktuellen Sprite nicht enthalten).
+    # PUBG-Achievement-Icon-URLs. Komplettes Set fuer alle 44 Milestones
+    # nach Sprite-Editor-Workflow generiert. Legacy-IDs (five_kill_match,
+    # first_hot_drop, first_hot_drop_survived) zeigen auf die neuen
+    # Tier-IDs.
     PUBG_ICON_URLS = {
+        # BR Opener
         "first_chicken":           "/widgets/pubg/icons/first_chicken.png",
         "phoenix_chicken":         "/widgets/pubg/icons/phoenix_chicken.png",
         "first_top10":             "/widgets/pubg/icons/first_top10.png",
-        "five_kill_match":         "/widgets/pubg/icons/five_kill_match.png",
+        "session_opener_chicken":  "/widgets/pubg/icons/session_opener_chicken.png",
+        "session_opener_top10":    "/widgets/pubg/icons/session_opener_top10.png",
+        # Kill tiers
+        "five_kill_match":         "/widgets/pubg/icons/kills_5.png",
         "kills_5":                 "/widgets/pubg/icons/kills_5.png",
         "kills_7":                 "/widgets/pubg/icons/kills_7.png",
         "kills_10":                "/widgets/pubg/icons/kills_10.png",
         "kills_15":                "/widgets/pubg/icons/kills_15.png",
         "kills_20":                "/widgets/pubg/icons/kills_20.png",
-        "damage_500":              "/widgets/pubg/icons/five_kill_match.png",
-        "damage_1000":             "/widgets/pubg/icons/five_kill_match.png",
-        "damage_1500":             "/widgets/pubg/icons/five_kill_match.png",
-        "damage_2000":             "/widgets/pubg/icons/five_kill_match.png",
-        "damage_2500":             "/widgets/pubg/icons/five_kill_match.png",
-        "damage_3000":             "/widgets/pubg/icons/five_kill_match.png",
+        # DMG tiers
+        "damage_500":              "/widgets/pubg/icons/damage_500.png",
+        "damage_1000":             "/widgets/pubg/icons/damage_1000.png",
+        "damage_1500":             "/widgets/pubg/icons/damage_1500.png",
+        "damage_2000":             "/widgets/pubg/icons/damage_2000.png",
+        "damage_2500":             "/widgets/pubg/icons/damage_2500.png",
+        "damage_3000":             "/widgets/pubg/icons/damage_3000.png",
+        # Long-range tiers
         "longest_kill_400":        "/widgets/pubg/icons/longest_kill_400.png",
         "longest_kill_600":        "/widgets/pubg/icons/longest_kill_600.png",
         "longest_kill_800":        "/widgets/pubg/icons/longest_kill_800.png",
-        "longest_kill_1000":       "/widgets/pubg/icons/longest_kill_800.png",
+        "longest_kill_1000":       "/widgets/pubg/icons/longest_kill_1000.png",
+        # Beast chickens
         "beast_chicken":           "/widgets/pubg/icons/beast_chicken.png",
-        "ultra_chicken":           "/widgets/pubg/icons/beast_chicken.png",
-        "god_mode_chicken":        "/widgets/pubg/icons/beast_chicken.png",
-        "burning_hell":            "/widgets/pubg/icons/first_hot_drop.png",
-        "hot_drop_match":          "/widgets/pubg/icons/first_hot_drop.png",
-        "first_hot_drop":          "/widgets/pubg/icons/first_hot_drop.png",
-        "hot_drop_match_survived": "/widgets/pubg/icons/first_hot_drop_survived.png",
-        "first_hot_drop_survived": "/widgets/pubg/icons/first_hot_drop_survived.png",
+        "ultra_chicken":           "/widgets/pubg/icons/ultra_chicken.png",
+        "god_mode_chicken":        "/widgets/pubg/icons/god_mode_chicken.png",
+        # Hot-Drop / Inferno (Legacy-IDs point to new files)
+        "burning_hell":            "/widgets/pubg/icons/burning_hell.png",
+        "hot_drop_match":          "/widgets/pubg/icons/hot_drop_match.png",
+        "first_hot_drop":          "/widgets/pubg/icons/hot_drop_match.png",
+        "hot_drop_match_survived": "/widgets/pubg/icons/hot_drop_match_survived.png",
+        "first_hot_drop_survived": "/widgets/pubg/icons/hot_drop_match_survived.png",
+        # Streaks
         "top3_streak":             "/widgets/pubg/icons/top3_streak.png",
         "top10_streak":            "/widgets/pubg/icons/top10_streak.png",
         "chicken_streak":          "/widgets/pubg/icons/chicken_streak.png",
+        # Heist Kills
+        "heist_kills_50":          "/widgets/pubg/icons/heist_kills_50.png",
+        "heist_kills_75":          "/widgets/pubg/icons/heist_kills_75.png",
+        "heist_kills_100":         "/widgets/pubg/icons/heist_kills_100.png",
+        # Heist DMG
+        "heist_dmg_8k":            "/widgets/pubg/icons/heist_dmg_8k.png",
+        "heist_dmg_15k":           "/widgets/pubg/icons/heist_dmg_15k.png",
+        "heist_dmg_20k":           "/widgets/pubg/icons/heist_dmg_20k.png",
+        "heist_dmg_25k":           "/widgets/pubg/icons/heist_dmg_25k.png",
+        # Heist Loot
+        "heist_loot_25":           "/widgets/pubg/icons/heist_loot_25.png",
+        "heist_loot_60":           "/widgets/pubg/icons/heist_loot_60.png",
+        "heist_loot_120":          "/widgets/pubg/icons/heist_loot_120.png",
+        # Heist Special
+        "gold_brick_grab":         "/widgets/pubg/icons/gold_brick_grab.png",
+        "money_bag_run":           "/widgets/pubg/icons/money_bag_run.png",
+        "silent_heist":            "/widgets/pubg/icons/silent_heist.png",
+        "ghost_operative":         "/widgets/pubg/icons/ghost_operative.png",
+        "window_smasher":          "/widgets/pubg/icons/window_smasher.png",
     }
 
     def _current_lang(self):
