@@ -168,19 +168,19 @@
         teamsRadiusEl.textContent = "—";
       }
 
-      // Markers von rechts (neueste) → links (ältere). Vier Faelle:
+      // Markers chronologisch: links = aeltestes (#1), rechts = neuestes
+      // (#N). Vier Faelle:
       //   cold (grau)            : kein Hot-Drop
       //   hot (orange)           : du ueberlebt (egal ob team)
       //   died+team-saved (split): du tot, team lebt -> diagonal rot/orange
       //   died (rot)             : du + team beide tot
-      // perMatch ist ASC (oldest first). Nach reverse: rechts = neuestes
-      // → Match-Nummer im title chronologisch (# 1 = aeltestes).
+      // perMatch kommt DESC (newest first); .reverse() macht ASC.
       // Backend liefert jetzt alle perMatch (kein 20er-Limit). Fuer
       // Sparkline begrenzen wir hier auf die letzten 20 Matches.
       const matches = (d.perMatch || []).slice(0, 20).reverse();
       const total = matches.length;
       const html = matches.map((m, i) => {
-        const num = total - i;
+        const num = i + 1;
         let cls = "", desc = "cold drop";
         if (!m.hotDrop) { /* cls leer, desc cold */ }
         else if (m.soloSurvived) { cls = "hot"; desc = "hot drop, you survived"; }
