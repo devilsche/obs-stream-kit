@@ -254,16 +254,9 @@
     }
     .matches-list .m.is-event .stat b,
     .matches-list .m.is-event .map { color: var(--pubg-muted); }
-    .matches-list .place.event-badge {
-      color: #1a0d2a;
-      background: #d8b4ff;
-      padding: 0 5px;
-      border-radius: 3px;
-      font-weight: 700;
-      font-size: 0.78em;
-      letter-spacing: 0.08em;
-      text-align: center;
-    }
+    /* Event-Badge MUSS nach .m .place stehen (Specificity-Tie, last
+       wins). Sonst zieht die globale .place { color:gold } und der
+       EVENT-Text ist gold-auf-lila → unlesbar. */
     .matches-list .m.win {
       background: rgba(242,183,5,0.15);
       border-left: 2px solid var(--pubg-gold);
@@ -276,6 +269,19 @@
     }
     .matches-list .m .time { color: var(--pubg-muted); }
     .matches-list .m .place { color: var(--pubg-gold); font-weight: 700; }
+    /* Event-Badge ueberschreibt die gold-Farbe (nach .m .place damit
+       Specificity-Tie hier last-wins gewinnt). */
+    .matches-list .m .place.event-badge {
+      color: #1a0d2a;
+      background: #d8b4ff;
+      padding: 0 5px;
+      border-radius: 3px;
+      font-weight: 700;
+      font-size: 0.78em;
+      letter-spacing: 0.08em;
+      text-align: center;
+      padding-left: 5px;
+    }
     .matches-list .m .map { color: var(--pubg-text); }
     .matches-list .m .stats { color: var(--pubg-muted); text-align: right; }
     .matches-list .m .stats b { color: var(--pubg-text); }
