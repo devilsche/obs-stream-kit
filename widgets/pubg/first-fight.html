@@ -97,6 +97,22 @@
     }
     .legend .swatch.s          { background: #ff7a1f; opacity: 1; }
     .legend .swatch.team-saved { background: #a974d4; opacity: 1; }
+    /* Popover bei Hover */
+    .popover {
+      position: fixed; display: none;
+      background: #0d061a; color: var(--pubg-text);
+      border: 1px solid var(--pubg-gold, #f2b705);
+      border-radius: 5px; padding: 10px 12px;
+      font-size: 0.78em; line-height: 1.5; max-width: 320px;
+      z-index: 9999; pointer-events: none;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+      white-space: pre-line;
+    }
+    .popover .pov-title {
+      color: var(--pubg-gold); font-weight: 700;
+      margin-bottom: 4px; font-size: 1.05em;
+    }
+    .popover.show { display: block; }
     .legend .swatch.d          { background: #e57b7b; opacity: 0.7; }
     .legend .swatch.fled       { background: #f2b705; opacity: 0.55; }
   </style>
@@ -112,6 +128,7 @@
       <div class="pct" id="pct">—</div>
     </div>
     <div class="spark" id="spark"></div>
+  <div id="popover" class="popover"></div>
     <div class="legend">
       <span class="item"><span class="swatch s"></span>Survived</span>
       <span class="item"><span class="swatch d"></span>Died</span>
@@ -172,6 +189,7 @@
         return `${mm}:${String(x).padStart(2,"0")}`;
       };
       if (d.perMatch && d.perMatch.length) {
+        window._ffMatches = d.perMatch;
         spark.innerHTML = d.perMatch.map((m, i) => {
           const num = i + 1;
           let cls, desc;
@@ -182,36 +200,64 @@
           } else {
             cls = "d"; desc = "died";
           }
-          const startIso = PubgUI.matchStartIso
-            ? PubgUI.matchStartIso(m.playedAt, m.durationSec) : m.playedAt;
-          const startStr = PubgUI.fmtTime ? PubgUI.fmtTime(startIso) : (startIso || "");
-          const endStr = PubgUI.fmtTime ? PubgUI.fmtTime(m.playedAt) : (m.playedAt || "");
-          const mapStr = PubgUI.fmtMap ? PubgUI.fmtMap(m.mapName || "?") : (m.mapName || "?");
-          const modeStr = m.gameMode || "?";
-          const tip = [
-            `Match #${num} · ${desc}`,
-            `${mapStr} · ${modeStr}`,
-            `${startStr} → ${endStr}  (${fmtDur(m.durationSec)})`,
-            m.place != null
-              ? `Place: #${m.place} · K=${m.kills ?? 0} · DMG=${Math.round(m.damage || 0)}`
-              : null,
-            m.fightStartAfterMatchStartSec != null
-              ? `First fight: +${fmtDur(m.fightStartAfterMatchStartSec)} into match`
-              : null,
-            m.teamsCount
-              ? `Teams in fight: ${m.teamsCount}`
-              : null,
-            m.timeSurvived != null
-              ? `Survived: ${fmtDur(m.timeSurvived)}`
-              : null,
-          ].filter(Boolean).join("\n");
-          return `<span class="${cls}" title="${tip.replace(/"/g,'&quot;')}"></span>`;
+          return `<span class="${cls}" data-mi="${i}" data-num="${num}" data-desc="${desc}"></span>`;
         }).join("");
       } else {
         spark.innerHTML = (d.sparkline||[]).map((v, i) =>
           `<span class="${v ? 's' : 'd'}" title="Match #${i+1}"></span>`).join("");
       }
     }
+    // Popover-Handler
+    const pov = document.getElementById("popover");
+    function fmtDur2(s) {
+      if (s == null) return "?";
+      const m = Math.floor(s/60), x = Math.floor(s%60);
+      return `${m}:${String(x).padStart(2,"0")}`;
+    }
+    function showPov(el, e) {
+      const idx = parseInt(el.dataset.mi, 10);
+      const num = el.dataset.num;
+      const desc = el.dataset.desc;
+      const m = (window._ffMatches || [])[idx];
+      if (!m) return;
+      const startIso = PubgUI.matchStartIso
+        ? PubgUI.matchStartIso(m.playedAt, m.durationSec) : m.playedAt;
+      const startStr = PubgUI.fmtTime ? PubgUI.fmtTime(startIso) : (startIso||"");
+      const endStr = PubgUI.fmtTime ? PubgUI.fmtTime(m.playedAt) : (m.playedAt||"");
+      const mapStr = PubgUI.fmtMap ? PubgUI.fmtMap(m.mapName||"?") : (m.mapName||"?");
+      const modeStr = m.gameMode || "?";
+      const lines = [
+        `${mapStr} · ${modeStr}`,
+        `${startStr} → ${endStr}  (${fmtDur2(m.durationSec)})`,
+        m.place != null
+          ? `Place: #${m.place} · K=${m.kills ?? 0} · DMG=${Math.round(m.damage||0)}` : null,
+        m.fightStartAfterMatchStartSec != null
+          ? `First fight: +${fmtDur2(m.fightStartAfterMatchStartSec)} into match` : null,
+        m.teamsCount ? `Teams in fight: ${m.teamsCount}` : null,
+        m.timeSurvived != null ? `Survived: ${fmtDur2(m.timeSurvived)}` : null,
+      ].filter(Boolean);
+      pov.innerHTML = `<div class="pov-title">Match #${num} · ${desc}</div>${lines.join("\n")}`;
+      pov.classList.add("show");
+      positionPov(e);
+    }
+    function positionPov(e) {
+      const x = e.clientX + 12, y = e.clientY + 12;
+      const r = pov.getBoundingClientRect();
+      const vw = innerWidth, vh = innerHeight;
+      pov.style.left = (x + r.width > vw ? vw - r.width - 8 : x) + "px";
+      pov.style.top  = (y + r.height > vh ? vh - r.height - 8 : y) + "px";
+    }
+    function hidePov() { pov.classList.remove("show"); }
+    const sparkEl = document.getElementById("spark");
+    sparkEl.addEventListener("mouseover", (e) => {
+      const t = e.target.closest("span[data-mi]");
+      if (t) showPov(t, e);
+    });
+    sparkEl.addEventListener("mousemove", (e) => {
+      if (pov.classList.contains("show")) positionPov(e);
+    });
+    sparkEl.addEventListener("mouseleave", hidePov);
+
     const ehParam = EXCLUDE_HOT ? "&excludeHotDrop=1" : "";
     PubgUI.poll(`/api/pubg/first-fight-rate?range=${RANGE}${ehParam}`,
                 POLL_MS, render, console.error);

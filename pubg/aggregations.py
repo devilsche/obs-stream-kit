@@ -1238,26 +1238,33 @@ LONGEST_KILL_TIERS = [
 
 def _emit_tier_cascade(out, seen, tiers, value, value_label_fn,
                        match_id, played):
-    """Emittiert alle erreichten Tiers fuer einen Wert (Kills, DMG,
-    Longest-Kill). tiers ist DESC sortiert. Nur der hoechste poppt,
-    die anderen werden mit suppressPopup=True markiert.
-    seen filtert Duplikate auf Session-Ebene damit nicht jeder Match
-    nochmal alle Tiers reinwirft."""
+    """Emittiert ALLE erreichten Tiers fuer einen Wert (Kills, DMG,
+    Longest-Kill). tiers ist DESC sortiert.
+
+    Per-Match-Emission: jeder Match der einen Tier erreicht bekommt
+    seine eigenen Rows in pubg_achievements_seen. Popup-Suppression:
+    - innerhalb desselben Matches poppt nur der hoechste Tier
+    - ueber die Session hinweg poppt jeder Tier nur einmal (erste
+      Match-Vorkommen); die seen-Liste merkt sich was schon gepoppt
+      ist und markiert spaetere Vorkommen als suppressPopup=True.
+
+    So sieht der Browser/Report fuer Match #17 mit 600 DMG auch
+    'Heavy Hitter' — auch wenn der Popup-Stream das schon bei Match
+    #5 gepoppt hat."""
     qualifying = [(t, aid, name) for t, aid, name in tiers if value >= t]
     if not qualifying:
         return
-    new_emits = [(t, aid, name) for t, aid, name in qualifying
-                 if aid not in seen]
-    if not new_emits:
-        return
-    for i, (threshold, aid, name) in enumerate(new_emits):
+    for i, (threshold, aid, name) in enumerate(qualifying):
+        # i=0 → hoechster erreichter Tier dieses Matches. Suppressed
+        # wenn er in der Session schon gepoppt wurde.
+        already_popped = aid in seen
         out.append({
             "id": aid,
             "label": f"{name} · {value_label_fn(value)}",
             "icon": "🔥",
             "matchId": match_id,
             "playedAt": played,
-            "suppressPopup": i > 0,  # nur der erste (hoechste) poppt
+            "suppressPopup": i > 0 or already_popped,
         })
         seen.add(aid)
 

@@ -90,6 +90,31 @@
       opacity: 1;
     }
     .legend .hint { opacity: 0.7; font-style: italic; }
+
+    /* Floating Popover bei Hover */
+    .popover {
+      position: fixed;
+      display: none;
+      background: #0d061a;
+      border: 1px solid var(--pubg-gold, #f2b705);
+      border-radius: 5px;
+      padding: 10px 12px;
+      font-size: 0.78em;
+      color: var(--pubg-text);
+      line-height: 1.5;
+      max-width: 320px;
+      z-index: 9999;
+      pointer-events: none;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+      white-space: pre-line;
+    }
+    .popover .pov-title {
+      color: var(--pubg-gold);
+      font-weight: 700;
+      margin-bottom: 4px;
+      font-size: 1.05em;
+    }
+    .popover.show { display: block; }
   </style>
 </head>
 <body>
@@ -120,6 +145,7 @@
       <b id="teamsRadius">—</b>
     </div>
     <div class="markers" id="markers"></div>
+    <div id="popover" class="popover"></div>
     <div class="meta" id="meta">—</div>
     <div class="legend">
       <span class="item"><span class="swatch hot"></span>You alive</span>
@@ -199,6 +225,8 @@
         const m = Math.floor(s / 60), x = Math.floor(s % 60);
         return `${m}:${String(x).padStart(2,"0")}`;
       };
+      // perMatch-Daten an Marker per data-Index hängen, fuer Popover.
+      window._hdMatches = matches;
       const html = matches.map((m, i) => {
         const num = i + 1;
         let cls = "", desc = "cold drop";
@@ -206,39 +234,66 @@
         else if (m.soloSurvived) { cls = "hot"; desc = "hot drop, you survived"; }
         else if (m.teamSurvived) { cls = "died team-saved"; desc = "hot drop, you died — team survived"; }
         else { cls = "died"; desc = "hot drop, died"; }
-        // Rich-Tooltip: native title-Attribute, mit \n als Zeilenumbruch.
-        const startIso = PubgUI.matchStartIso
-          ? PubgUI.matchStartIso(m.playedAt, m.durationSec)
-          : m.playedAt;
-        const startStr = PubgUI.fmtTime ? PubgUI.fmtTime(startIso) : startIso;
-        const endStr = PubgUI.fmtTime ? PubgUI.fmtTime(m.playedAt) : m.playedAt;
-        const mapStr = PubgUI.fmtMap ? PubgUI.fmtMap(m.mapName) : m.mapName;
-        const modeStr = m.gameMode || "?";
-        const tip = [
-          `Match #${num} · ${desc}`,
-          `${mapStr} · ${modeStr}`,
-          `${startStr} → ${endStr}  (${fmtDur(m.durationSec)})`,
-          `Place: #${m.place ?? "?"} · K=${m.kills ?? 0} · DMG=${Math.round(m.damage || 0)}`,
-          m.landingOffsetSec != null
-            ? `Landed: +${fmtDur(m.landingOffsetSec)} into match`
-            : null,
-          m.firstFightAfterLandingSec != null
-            ? `First fight: +${fmtDur(m.firstFightAfterLandingSec)} after landing`
-            : null,
-          m.hotDrop
-            ? `Teams nearby: ${m.teamsInRadius || 0} · Fought: ${m.teamsInFight || 0}`
-            : null,
-          m.timeSurvived != null
-            ? `Survived: ${fmtDur(m.timeSurvived)}`
-            : null,
-        ].filter(Boolean).join("\n");
-        return `<div class="m ${cls}" title="${tip.replace(/"/g, '&quot;')}"></div>`;
+        return `<div class="m ${cls}" data-mi="${i}" data-num="${num}" data-desc="${desc}"></div>`;
       }).join("");
       document.getElementById("markers").innerHTML = html;
 
       document.getElementById("meta").textContent =
         `${d.hotDrops||0} hot drops in ${d.matches||0} matches`;
     }
+
+    // Popover-Handler (event-delegation auf den markers-Container)
+    const pov = document.getElementById("popover");
+    function fmtDur2(s) {
+      if (s == null) return "?";
+      const m = Math.floor(s / 60), x = Math.floor(s % 60);
+      return `${m}:${String(x).padStart(2,"0")}`;
+    }
+    function showPov(marker, e) {
+      const idx = parseInt(marker.dataset.mi, 10);
+      const num = marker.dataset.num;
+      const desc = marker.dataset.desc;
+      const m = (window._hdMatches || [])[idx];
+      if (!m) return;
+      const startIso = PubgUI.matchStartIso
+        ? PubgUI.matchStartIso(m.playedAt, m.durationSec) : m.playedAt;
+      const startStr = PubgUI.fmtTime ? PubgUI.fmtTime(startIso) : (startIso||"");
+      const endStr = PubgUI.fmtTime ? PubgUI.fmtTime(m.playedAt) : (m.playedAt||"");
+      const mapStr = PubgUI.fmtMap ? PubgUI.fmtMap(m.mapName||"?") : (m.mapName||"?");
+      const modeStr = m.gameMode || "?";
+      const lines = [
+        `${mapStr} · ${modeStr}`,
+        `${startStr} → ${endStr}  (${fmtDur2(m.durationSec)})`,
+        `Place: #${m.place ?? "?"} · K=${m.kills ?? 0} · DMG=${Math.round(m.damage||0)}`,
+        m.landingOffsetSec != null
+          ? `Landed: +${fmtDur2(m.landingOffsetSec)} into match` : null,
+        m.firstFightAfterLandingSec != null
+          ? `First fight: +${fmtDur2(m.firstFightAfterLandingSec)} after landing` : null,
+        m.hotDrop
+          ? `Teams nearby: ${m.teamsInRadius||0} · Fought: ${m.teamsInFight||0}` : null,
+        m.timeSurvived != null ? `Survived: ${fmtDur2(m.timeSurvived)}` : null,
+      ].filter(Boolean);
+      pov.innerHTML = `<div class="pov-title">Match #${num} · ${desc}</div>${lines.join("\n")}`;
+      pov.classList.add("show");
+      positionPov(e);
+    }
+    function positionPov(e) {
+      const x = e.clientX + 12;
+      const y = e.clientY + 12;
+      const rect = pov.getBoundingClientRect();
+      const vw = window.innerWidth, vh = window.innerHeight;
+      pov.style.left = (x + rect.width > vw ? vw - rect.width - 8 : x) + "px";
+      pov.style.top  = (y + rect.height > vh ? vh - rect.height - 8 : y) + "px";
+    }
+    function hidePov() { pov.classList.remove("show"); }
+    document.getElementById("markers").addEventListener("mouseover", (e) => {
+      const t = e.target.closest(".m[data-mi]");
+      if (t) showPov(t, e);
+    });
+    document.getElementById("markers").addEventListener("mousemove", (e) => {
+      if (pov.classList.contains("show")) positionPov(e);
+    });
+    document.getElementById("markers").addEventListener("mouseleave", hidePov);
 
     if (RANGE === "session") PubgUI.hideIfStale();
     PubgUI.poll(`/api/pubg/hot-drop?range=${RANGE}`, POLL_MS, (d) => {

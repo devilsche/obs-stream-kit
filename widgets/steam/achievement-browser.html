@@ -243,6 +243,23 @@
       box-shadow: 0 0 24px rgba(0, 0, 0, 0.6);
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    /* Floating Popover bei Hover */
+    .ach-popover {
+      position: fixed; display: none;
+      background: #0d061a; color: var(--pubg-text);
+      border: 1px solid var(--pubg-gold);
+      border-radius: 5px; padding: 10px 12px;
+      font-size: 0.78em; line-height: 1.5; max-width: 360px;
+      z-index: 9999; pointer-events: none;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+      white-space: pre-line;
+    }
+    .ach-popover .pov-title {
+      color: var(--pubg-gold); font-weight: 700;
+      margin-bottom: 4px; font-size: 1.05em;
+    }
+    .ach-popover .pov-meta { color: var(--pubg-muted); font-size: 0.95em; }
+    .ach-popover.show { display: block; }
   </style>
 </head>
 <body>
@@ -309,6 +326,7 @@
   </div>
 
   <div class="grid" id="grid"></div>
+  <div id="achPopover" class="ach-popover"></div>
   <div class="loading-overlay"><div class="spinner"></div></div>
   <div class="toast" id="toast"></div>
 
@@ -421,14 +439,14 @@
         + statSpan
         + (badgeLabel ? `<span class="rare-badge ${tier}">${badgeLabel}</span>` : "");
 
-      // Rich-Hover-Tooltip: alles was nicht direkt im Tile sichtbar ist.
+      // Rich-Hover-Popover Daten als data-Attribute serialisieren.
       const fullDate = a.unlockedAt
         ? new Date(a.unlockedAt * 1000).toLocaleString("de-DE",
             {day:"2-digit", month:"2-digit", year:"numeric",
              hour:"2-digit", minute:"2-digit", second:"2-digit"})
         : "?";
-      const tipParts = [
-        `${name}${tier && tier !== "common" ? ` · ${badgeLabel}` : ""}`,
+      const povTitle = `${name}${tier && tier !== "common" ? ` · ${badgeLabel}` : ""}`;
+      const povLines = [
         desc ? desc : null,
         `Game: ${game}`,
         `Unlocked: ${fullDate}`,
@@ -436,11 +454,12 @@
         isPubg && a.matchId ? `Match: ${a.matchId}` : null,
         isPubg && a.achievementId ? `ID: ${a.achievementId}` : `ID: ${a.apiName}`,
       ].filter(Boolean).join("\n");
-      const titleAttr = ` title="${tipParts.replace(/"/g, "&quot;")}"`;
+      const povAttrs = ` data-pov-title="${povTitle.replace(/"/g,"&quot;")}" `
+                     + `data-pov-body="${povLines.replace(/"/g,"&quot;")}"`;
       return `
         <div class="tile${isRare ? " " + tier : ""}${isFresh ? " brand-new" : ""}"
              data-appid="${a.appId}" data-api="${a.apiName.replace(/"/g, "&quot;")}"
-             data-source="${source}"${titleAttr}>
+             data-source="${source}"${povAttrs}>
           ${iconHtml}
           <div class="tile-body">
             <div class="tile-game">${game}</div>
@@ -518,6 +537,33 @@
       const source = tile.dataset.source || "";
       if (appId && api) triggerReplay(appId, api, tile, source);
     });
+
+    // Hover-Popover
+    const achPov = document.getElementById("achPopover");
+    function achShow(tile, e) {
+      const title = tile.dataset.povTitle || "";
+      const body = tile.dataset.povBody || "";
+      if (!title && !body) return;
+      achPov.innerHTML = `<div class="pov-title">${title}</div>${body}`;
+      achPov.classList.add("show");
+      achPosition(e);
+    }
+    function achPosition(e) {
+      const x = e.clientX + 14, y = e.clientY + 14;
+      const r = achPov.getBoundingClientRect();
+      const vw = innerWidth, vh = innerHeight;
+      achPov.style.left = (x + r.width > vw ? vw - r.width - 8 : x) + "px";
+      achPov.style.top  = (y + r.height > vh ? vh - r.height - 8 : y) + "px";
+    }
+    function achHide() { achPov.classList.remove("show"); }
+    gridEl.addEventListener("mouseover", (e) => {
+      const tile = e.target.closest(".tile");
+      if (tile) achShow(tile, e);
+    });
+    gridEl.addEventListener("mousemove", (e) => {
+      if (achPov.classList.contains("show")) achPosition(e);
+    });
+    gridEl.addEventListener("mouseleave", achHide);
     gameSel.addEventListener("change", (e) => {
       filterGame = e.target.value;
       applyFilters();
