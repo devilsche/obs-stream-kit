@@ -2685,15 +2685,30 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
     }
 
     # Map-Performance: pro Map → Matches, Wins, K/D, Avg DMG, Avg Place
+    # Events werden separat markiert. KD ist nur in BR-Modi sinnvoll;
+    # Event-Modi haben kein DIED-Event und kein Placement → 'Perfekt'.
     map_stats = {}
     for x in enriched:
         mn = x["map_name"]
+        is_event = not is_br_mode(x.get("game_mode"))
         if mn not in map_stats:
             map_stats[mn] = {"map": mn, "matches": 0, "wins": 0,
                               "kills": 0, "damage": 0.0,
-                              "totalPlace": 0, "totalSurv": 0}
+                              "totalPlace": 0, "totalSurv": 0,
+                              "eventMatches": 0, "brMatches": 0,
+                              "deaths": 0}
         ms_ = map_stats[mn]
         ms_["matches"] += 1
+        if is_event:
+            ms_["eventMatches"] += 1
+        else:
+            ms_["brMatches"] += 1
+            # Death = nicht gewonnen UND time_survived < duration_secs (Toleranz 5s)
+            if (x["place"] or 99) != 1:
+                dur = x.get("duration_secs") or 0
+                surv = x.get("time_survived") or 0
+                if dur and surv < dur - 5:
+                    ms_["deaths"] += 1
         if (x["place"] or 99) == 1:
             ms_["wins"] += 1
         ms_["kills"] += x["kills"] or 0
@@ -2703,6 +2718,7 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
     maps_perf = []
     for ms_ in map_stats.values():
         nm = ms_["matches"]
+        is_event_only = ms_["brMatches"] == 0 and ms_["eventMatches"] > 0
         maps_perf.append({
             "map": ms_["map"],
             "matches": nm,
@@ -2714,6 +2730,10 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             "avgPlace": ms_["totalPlace"] / nm if nm else 0,
             "avgSurvivedSec": ms_["totalSurv"] / nm if nm else 0,
             "kd": ms_["kills"] / max(nm - ms_["wins"], 1),
+            "isEvent": is_event_only,
+            "eventMatches": ms_["eventMatches"],
+            "brMatches":    ms_["brMatches"],
+            "deaths":       ms_["deaths"],
         })
     maps_perf.sort(key=lambda m: -m["matches"])
 
