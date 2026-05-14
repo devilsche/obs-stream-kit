@@ -7,6 +7,10 @@
   <link rel="stylesheet" href="/widgets/pubg/_pubg.css">
   <style>
     html, body { margin: 0; }
+    /* Popover ist position:fixed; falls am Rand erst zu weit links/oben
+       gerendert wird, koennten Scrollbars entstehen → horizontal hard
+       cappen, vertikal weiter scrollbar (Browser-Liste). */
+    body { overflow-x: hidden; }
     body {
       background: var(--pubg-page-bg);
       color: var(--pubg-text);
