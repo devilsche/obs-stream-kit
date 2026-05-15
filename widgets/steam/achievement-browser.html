@@ -431,8 +431,13 @@
       // Reihenfolge: Datum → %-Stat → Rare-Badge. PUBG nutzt
       // sessionPct, Steam globalPct — sonst identisches Wording.
       let statText = null;
-      if (isPubg && a.sessionPct != null) {
-        statText = `<b>${a.sessionPct.toFixed(0)}%</b> of your sessions got this`;
+      if (isPubg) {
+        // Kompakt: 'Xs · Ym' (Session-Pct + Match-Pct)
+        const sp = (a.sessionPct != null)
+          ? `<b>${a.sessionPct.toFixed(0)}%</b>S` : null;
+        const mp = (a.matchPct != null)
+          ? `<b>${a.matchPct.toFixed(a.matchPct < 1 ? 2 : 1)}%</b>M` : null;
+        if (sp || mp) statText = [sp, mp].filter(Boolean).join(" · ");
       } else if (!isPubg && a.globalPct != null) {
         statText = `<b>${a.globalPct.toFixed(1)}%</b> of players got this`;
       }
@@ -450,13 +455,32 @@
              hour:"2-digit", minute:"2-digit", second:"2-digit"})
         : "?";
       const povTitle = `${name}${tier && tier !== "common" ? ` · ${badgeLabel}` : ""}`;
+      // Map + Mode wenn PUBG. Map formatieren wenn PubgUI verfuegbar.
+      const mapFmt = (typeof PubgUI !== "undefined" && PubgUI.fmtMap)
+        ? PubgUI.fmtMap(a.mapName || "?") : (a.mapName || null);
+      const mapLine = isPubg && a.mapName
+        ? `Map: ${mapFmt}${a.gameMode ? " · " + a.gameMode : ""}`
+        : null;
+      // sessionPct + matchPct getrennt anzeigen
+      const sessPctLine = (isPubg && a.sessionPct != null)
+        ? `Session-Pct: ${a.sessionPct.toFixed(1)}% deiner Sessions`
+        : null;
+      const matchPctLine = (isPubg && a.matchPct != null)
+        ? `Match-Pct:   ${a.matchPct.toFixed(2)}% deiner Matches`
+        : null;
+      const globalPctLine = (!isPubg && a.globalPct != null)
+        ? `${a.globalPct.toFixed(1)}% of players globally`
+        : null;
       const povLines = [
         desc ? desc : null,
+        mapLine,
         `Game: ${game}`,
         `Unlocked: ${fullDate}`,
-        statText ? statText.replace(/<\/?b>/g, "") : null,
-        isPubg && a.matchId ? `Match: ${a.matchId}` : null,
-        isPubg && a.achievementId ? `ID: ${a.achievementId}` : `ID: ${a.apiName}`,
+        sessPctLine,
+        matchPctLine,
+        globalPctLine,
+        isPubg && a.matchId ? `Match-ID: ${a.matchId}` : null,
+        isPubg && a.achievementId ? `Internal: ${a.achievementId}` : `Internal: ${a.apiName}`,
       ].filter(Boolean).join("\n");
       const povAttrs = ` data-pov-title="${povTitle.replace(/"/g,"&quot;")}" `
                      + `data-pov-body="${povLines.replace(/"/g,"&quot;")}"`;

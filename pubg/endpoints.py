@@ -1182,6 +1182,58 @@ class EndpointRegistry:
             return event_dates
         return br_dates
 
+    def _session_match_pools(self, conn):
+        """Wie _session_date_pools, aber pro Match (ISO-String).
+        Fuer matchPct (= % der Matches die dieses Milestone hatten)."""
+        from pubg.aggregations import BATTLE_ROYALE_MODES
+        br_ph = ",".join("?" * len(BATTLE_ROYALE_MODES))
+        br = sorted(
+            r["p"] for r in conn.execute(
+                f"SELECT played_at AS p FROM matches "
+                f"WHERE played_at IS NOT NULL "
+                f"  AND game_mode IN ({br_ph})",
+                list(BATTLE_ROYALE_MODES)).fetchall() if r["p"])
+        ev = sorted(
+            r["p"] for r in conn.execute(
+                f"SELECT played_at AS p FROM matches "
+                f"WHERE played_at IS NOT NULL "
+                f"  AND game_mode NOT IN ({br_ph})",
+                list(BATTLE_ROYALE_MODES)).fetchall() if r["p"])
+        return br, ev
+
+    def _build_aid_match_tier_index(self, conn):
+        """Pro achievement_id → sortierte Liste (played_at, tier).
+        Anders als _build_aid_tier_index (das auf Tagen aggregiert),
+        zaehlt das jede einzelne Match-Vorkommnis."""
+        rows = conn.execute(
+            "SELECT achievement_id, label, played_at "
+            "FROM pubg_achievements_seen "
+            "WHERE played_at IS NOT NULL"
+        ).fetchall()
+        per_aid = {}
+        for r in rows:
+            tier = self._parse_tier(r["label"]) or 0
+            per_aid.setdefault(r["achievement_id"], []).append(
+                (r["played_at"], tier))
+        for aid in per_aid:
+            per_aid[aid].sort()
+        return per_aid
+
+    def _count_aid_matches_tier(self, per_aid_index, aid, tier,
+                                cutoff_played_at):
+        entries = per_aid_index.get(aid, [])
+        if not entries:
+            return 0
+        if tier is None or aid not in self.PUBG_TIERED_ACHIEVEMENTS:
+            return sum(1 for p, _t in entries if p <= cutoff_played_at)
+        return sum(1 for p, t in entries
+                   if p <= cutoff_played_at and t >= tier)
+
+    def _pool_matches_for_aid(self, aid, br_matches, event_matches):
+        if aid in self.PUBG_EVENT_ACHIEVEMENTS:
+            return event_matches
+        return br_matches
+
     # Achievements die nur in Event/PAYDAY-Sessions ueberhaupt erreichbar
     # sind. Bei der sessionPct-Berechnung wird der Nenner auf 'Sessions
     # mit Event-Match' begrenzt — sonst zerquetscht ein User der 95%
@@ -1353,23 +1405,26 @@ class EndpointRegistry:
         from bisect import bisect_right
         conn = self.get_conn()
 
-        # Zwei Date-Pools: BR-Achievements gegen BR-Sessions,
-        # Event-Achievements (Heist etc.) gegen Event-Sessions.
+        # Zwei Date-Pools (fuer sessionPct) + zwei Match-Pools (fuer
+        # matchPct). BR-Achievements gegen BR-Sessions/Matches,
+        # Event-Achievements gegen Event-Sessions/Matches.
         br_dates, event_dates = self._session_date_pools(conn)
+        br_matches, event_matches = self._session_match_pools(conn)
         match_dates = sorted(set(br_dates) | set(event_dates))
 
-        # Alle Achievement-Rows chronologisch ASC fuer den Snapshot-Walk.
+        # Achievement-Rows + Map-Name (LEFT JOIN matches).
         rows = conn.execute("""
-            SELECT achievement_id, match_id, label, icon,
-                   played_at, detected_at, is_rare, displayed_at
-            FROM pubg_achievements_seen
-            ORDER BY played_at ASC
+            SELECT a.achievement_id, a.match_id, a.label, a.icon,
+                   a.played_at, a.detected_at, a.is_rare, a.displayed_at,
+                   m.map_name, m.game_mode, m.duration_secs
+            FROM pubg_achievements_seen a
+            LEFT JOIN matches m ON m.match_id = a.match_id
+            ORDER BY a.played_at ASC
         """).fetchall()
 
-        # Tier-aware Index: bei Streaks/Counters zaehlt nur 'Sessions
-        # die mind. diese ×N erreicht haben'. Bei anderen Milestones
-        # zaehlt jeder Eintrag.
+        # Tier-aware Indizes: pro Tag (Session-Pct) + pro Match (Match-Pct).
         per_aid_dates_tier = self._build_aid_tier_index(conn)
+        per_aid_matches_tier = self._build_aid_match_tier_index(conn)
 
         def _iso_to_ts(iso):
             if not iso:
@@ -1385,31 +1440,44 @@ class EndpointRegistry:
         for r in rows:
             aid = r["achievement_id"]
             d = (r["played_at"] or "")[:10]
-            pool = self._pool_for_aid(aid, br_dates, event_dates)
-            if d and pool:
-                total = bisect_right(pool, d)
-                ach_n = self._count_aid_dates_tier(
-                    per_aid_dates_tier, aid,
-                    self._parse_tier(r["label"]), d)
-                snap_pct = round((ach_n / max(total, 1)) * 100, 1)
+            tier = self._parse_tier(r["label"])
+            # sessionPct
+            pool_dates = self._pool_for_aid(aid, br_dates, event_dates)
+            if d and pool_dates:
+                total_d = bisect_right(pool_dates, d)
+                ach_d = self._count_aid_dates_tier(
+                    per_aid_dates_tier, aid, tier, d)
+                session_pct = round((ach_d / max(total_d, 1)) * 100, 1)
             else:
-                snap_pct = None
+                session_pct = None
+            # matchPct
+            pool_matches = self._pool_matches_for_aid(
+                aid, br_matches, event_matches)
+            if r["played_at"] and pool_matches:
+                total_m = bisect_right(pool_matches, r["played_at"])
+                ach_m = self._count_aid_matches_tier(
+                    per_aid_matches_tier, aid, tier, r["played_at"])
+                match_pct = round((ach_m / max(total_m, 1)) * 100, 2)
+            else:
+                match_pct = None
             items.append({
                 "appId":         -2,
                 "gameName":      "PUBG: Session Milestones",
                 "apiName":       f"{aid}:{r['match_id']}",
-                # Instanz-Label mit Details, lokalisiert
-                # (z.B. 'Beast Chicken · 6 Kills' bzw. 'Massaker · 12 Kills')
                 "displayName":   self._localize_label(r["label"], aid, lang),
                 "description":   self._ach_description(aid, lang),
                 "iconUrl":       (self.PUBG_ICON_URLS.get(aid) or r["icon"]),
                 "unlockedAt":    _iso_to_ts(r["played_at"]),
-                "sessionPct":    snap_pct,
+                "sessionPct":    session_pct,
+                "matchPct":      match_pct,
                 "displayed":     r["displayed_at"] is not None,
                 "source":        "pubg",
                 "isRare":        bool(r["is_rare"]),
                 "matchId":       r["match_id"],
                 "achievementId": aid,
+                "mapName":       r["map_name"],
+                "gameMode":      r["game_mode"],
+                "durationSec":   r["duration_secs"],
             })
         # Juengste zuerst
         items.sort(key=lambda x: x["unlockedAt"], reverse=True)
