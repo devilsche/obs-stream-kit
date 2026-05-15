@@ -1433,13 +1433,13 @@ class EndpointRegistry:
         if cached is not None:
             return _ok(cached)
 
-        # Zwei Date-Pools (fuer sessionPct) + zwei Match-Pools (fuer
-        # matchPct). Fehler hier duerfen den ganzen Endpoint nicht killen.
+        # Pcts werden NICHT mehr live berechnet — sie sind beim Insert als
+        # Snapshot gespeichert (session_pct / match_pct Spalten in DB).
+        # Nur match_dates noch fuer totalSessions.
         try:
             br_dates, event_dates = self._session_date_pools(conn)
-            br_matches, event_matches = self._session_match_pools(conn)
         except Exception:
-            br_dates = event_dates = br_matches = event_matches = []
+            br_dates = event_dates = []
         match_dates = sorted(set(br_dates) | set(event_dates))
 
         # Achievement-Rows + Map-Name (LEFT JOIN matches).
@@ -1452,13 +1452,9 @@ class EndpointRegistry:
             ORDER BY a.played_at ASC
         """).fetchall()
 
-        # Tier-aware Indizes: pro Tag (Session-Pct) + pro Match (Match-Pct).
-        try:
-            per_aid_dates_tier = self._build_aid_tier_index(conn)
-            per_aid_matches_tier = self._build_aid_match_tier_index(conn)
-        except Exception:
-            per_aid_dates_tier = {}
-            per_aid_matches_tier = {}
+        # Kein Index-Aufbau mehr — Pcts kommen direkt aus DB-Spalten.
+        per_aid_dates_tier  = {}  # nicht mehr genutzt
+        per_aid_matches_tier = {}  # nicht mehr genutzt
 
         def _iso_to_ts(iso):
             if not iso:
@@ -1474,26 +1470,10 @@ class EndpointRegistry:
         for r in rows:
             aid = r["achievement_id"]
             d = (r["played_at"] or "")[:10]
-            tier = self._parse_tier(r["label"])
-            # sessionPct
-            pool_dates = self._pool_for_aid(aid, br_dates, event_dates)
-            if d and pool_dates:
-                total_d = bisect_right(pool_dates, d)
-                ach_d = self._count_aid_dates_tier(
-                    per_aid_dates_tier, aid, tier, d)
-                session_pct = round((ach_d / max(total_d, 1)) * 100, 1)
-            else:
-                session_pct = None
-            # matchPct
-            pool_matches = self._pool_matches_for_aid(
-                aid, br_matches, event_matches)
-            if r["played_at"] and pool_matches:
-                total_m = bisect_right(pool_matches, r["played_at"])
-                ach_m = self._count_aid_matches_tier(
-                    per_aid_matches_tier, aid, tier, r["played_at"])
-                match_pct = round((ach_m / max(total_m, 1)) * 100, 2)
-            else:
-                match_pct = None
+            # Pcts direkt aus DB-Spalten — historischer Snapshot,
+            # unveraendert seit dem Zeitpunkt des Inserts.
+            session_pct = r["session_pct"]
+            match_pct   = r["match_pct"]
             items.append({
                 "appId":         -2,
                 "gameName":      "PUBG: Session Milestones",

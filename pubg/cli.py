@@ -418,6 +418,48 @@ def wipe_day(root: str, date_str: str = None,
     return 0
 
 
+def backfill_pcts(root: str) -> int:
+    """Fuellt session_pct und match_pct fuer alle bestehenden Milestones.
+    Muss EINMALIG laufen nach dem Update der DB-Schema (neue Spalten).
+    Verarbeitet chronologisch (ASC) damit der Snapshot korrekt ist.
+
+    Nutzung:
+        python -m pubg.cli backfill-pcts
+    """
+    from pubg.aggregations import _compute_snapshot_pcts
+    db_path = os.path.join(root, "data", "pubg-history.db")
+    if not os.path.exists(db_path):
+        print(f"DB nicht gefunden: {db_path}"); return 1
+    conn = connect(db_path)
+    rows = conn.execute("""
+        SELECT achievement_id, match_id, label, played_at
+        FROM pubg_achievements_seen
+        WHERE session_pct IS NULL OR match_pct IS NULL
+        ORDER BY played_at ASC   -- chronologisch: wichtig fuer korrekten Snapshot
+    """).fetchall()
+    print(f"{len(rows)} Rows ohne Pct-Werte — berechne Snapshot-Pcts...")
+    updated = 0
+    for i, r in enumerate(rows, 1):
+        try:
+            sp, mp = _compute_snapshot_pcts(
+                conn, r["achievement_id"], r["played_at"], r["label"])
+        except Exception as e:
+            print(f"  [{i}] FEHLER {r['achievement_id']}: {e}")
+            continue
+        conn.execute(
+            "UPDATE pubg_achievements_seen SET session_pct=?, match_pct=? "
+            "WHERE achievement_id=? AND match_id=?",
+            (sp, mp, r["achievement_id"], r["match_id"]))
+        updated += 1
+        if i % 50 == 0:
+            conn.commit()
+            print(f"  {i}/{len(rows)} verarbeitet...")
+    conn.commit()
+    conn.close()
+    print(f"Fertig: {updated} Rows mit Pct-Werten befuellt.")
+    return 0
+
+
 def rebuild_achievements(root: str) -> int:
     """Alle Milestones aus vorhandenen telemetry_events neu detektieren.
     Braucht KEINE HiDrive-Verbindung, keine payload_json.
@@ -784,6 +826,8 @@ if __name__ == "__main__":
         sys.exit(purge_before(root, date_arg))
     elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-backfill":
         sys.exit(hidrive_backfill(root))
+    elif len(sys.argv) > 1 and sys.argv[1] == "backfill-pcts":
+        sys.exit(backfill_pcts(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "rebuild-achievements":
         sys.exit(rebuild_achievements(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-clear-payload":

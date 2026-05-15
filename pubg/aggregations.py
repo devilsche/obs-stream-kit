@@ -1767,6 +1767,98 @@ def detect_and_store_session_achievements(conn, my_account_id):
     return n
 
 
+# Event-Achievements (fuer separaten Pool bei Pct-Berechnung)
+_EVENT_ACHIEVEMENT_IDS = {
+    "heist_kills_50", "heist_kills_75", "heist_kills_100",
+    "heist_dmg_8k", "heist_dmg_15k", "heist_dmg_20k", "heist_dmg_25k",
+    "heist_loot_25", "heist_loot_60", "heist_loot_120",
+    "silent_heist", "ghost_operative", "gold_brick_grab",
+    "money_bag_run", "window_smasher",
+}
+
+# Tiered-IDs (x-N in Label) fuer Snapshot-Pct
+_TIERED_ACHIEVEMENT_IDS = {
+    "top3_streak", "top10_streak", "chicken_streak",
+    "hot_drop_match", "hot_drop_match_survived",
+}
+
+
+def _compute_snapshot_pcts(conn, aid, played_at, label):
+    """Berechnet sessionPct + matchPct zum Zeitpunkt 'played_at'.
+    Einmal beim Insert aufrufen — danach persistent in der DB.
+
+    sessionPct = Anteil der Session-Tage (bis played_at) an denen
+                 dieses Milestone (mit >= aktuellem Tier) aufgetaucht ist.
+    matchPct   = Anteil der Matches (bis played_at) mit diesem Milestone.
+    """
+    import re as _re
+    if not played_at:
+        return None, None
+    date_str = played_at[:10]
+    is_event = aid in _EVENT_ACHIEVEMENT_IDS
+    game_mode_filter = "NOT IN" if not is_event else "IN"
+    br_modes = list(BATTLE_ROYALE_MODES)
+    ph = ",".join("?" * len(br_modes))
+
+    # Tier aus Label extrahieren (×N)
+    tier_match = _re.search(r"×\s*(\d+)", label or "")
+    tier = int(tier_match.group(1)) if tier_match else None
+    is_tiered = aid in _TIERED_ACHIEVEMENT_IDS
+
+    # Gesamt-Sessions-Tage (= distinct Tage mit Matches des passenden Typs)
+    total_days = conn.execute(
+        f"SELECT COUNT(DISTINCT date(played_at)) FROM matches "
+        f"WHERE played_at IS NOT NULL AND played_at <= ? "
+        f"  AND game_mode {game_mode_filter} ({ph})",
+        [played_at] + br_modes).fetchone()[0]
+    # Gesamt-Matches
+    total_matches = conn.execute(
+        f"SELECT COUNT(*) FROM matches "
+        f"WHERE played_at IS NOT NULL AND played_at <= ? "
+        f"  AND game_mode {game_mode_filter} ({ph})",
+        [played_at] + br_modes).fetchone()[0]
+    if not total_days or not total_matches:
+        return None, None
+
+    # Bisherige Vorkommen dieses Milestones (<= played_at, Tier-aware)
+    # Wichtig: nur Eintraege ZAEHLEn die BEREITS in der DB sind (played_at <= ?)
+    # Damit ist der Pct ein historischer Snapshot — "wie selten war das,
+    # als ich es zum ersten Mal hatte?" Voraussetzung: Milestones muessen
+    # CHRONOLOGISCH (ASC nach played_at) eingefuegt werden. backfill_session_
+    # achievements() tut das bereits.
+    if is_tiered and tier is not None:
+        import re as _re2
+        ach_days = conn.execute("""
+            SELECT COUNT(DISTINCT date(played_at))
+            FROM pubg_achievements_seen
+            WHERE achievement_id = ? AND played_at < ?
+              AND CAST(COALESCE(
+                    NULLIF(TRIM(REPLACE(REPLACE(label,'×',''),'x','')),''),
+                  '0') AS INTEGER) >= ?
+        """, (aid, played_at, tier)).fetchone()[0]
+        ach_matches = conn.execute("""
+            SELECT COUNT(*)
+            FROM pubg_achievements_seen
+            WHERE achievement_id = ? AND played_at < ?
+              AND CAST(COALESCE(
+                    NULLIF(TRIM(REPLACE(REPLACE(label,'×',''),'x','')),''),
+                  '0') AS INTEGER) >= ?
+        """, (aid, played_at, tier)).fetchone()[0]
+    else:
+        ach_days = conn.execute(
+            "SELECT COUNT(DISTINCT date(played_at)) FROM pubg_achievements_seen "
+            "WHERE achievement_id = ? AND played_at < ?",
+            (aid, played_at)).fetchone()[0]
+        ach_matches = conn.execute(
+            "SELECT COUNT(*) FROM pubg_achievements_seen "
+            "WHERE achievement_id = ? AND played_at < ?",
+            (aid, played_at)).fetchone()[0]
+
+    sess_pct = round(ach_days / total_days * 100, 1) if total_days else None
+    match_pct = round(ach_matches / total_matches * 100, 2) if total_matches else None
+    return sess_pct, match_pct
+
+
 def _insert_achievements(conn, achievements, suppress_popup=False):
     """Helper: inserted Liste von compute_session_achievements-Resultaten
     in pubg_achievements_seen. INSERT OR IGNORE filtert Duplikate.
@@ -1786,16 +1878,24 @@ def _insert_achievements(conn, achievements, suppress_popup=False):
             continue
         row_suppress = suppress_popup or bool(a.get("suppressPopup"))
         displayed_at = now_ts if row_suppress else None
+        played_at = a.get("playedAt")
+        label = a.get("label")
+        # Snapshot-Pcts zum Zeitpunkt des Inserts berechnen
+        try:
+            sess_pct, match_pct = _compute_snapshot_pcts(
+                conn, aid, played_at, label)
+        except Exception:
+            sess_pct = match_pct = None
         cur = conn.execute("""
             INSERT INTO pubg_achievements_seen
               (achievement_id, match_id, label, icon, played_at,
-               detected_at, is_rare, displayed_at)
-            VALUES (?, ?, ?, ?, ?, strftime('%s','now'), ?, ?)
+               detected_at, is_rare, displayed_at, session_pct, match_pct)
+            VALUES (?, ?, ?, ?, ?, strftime('%s','now'), ?, ?, ?, ?)
             ON CONFLICT(achievement_id, match_id) DO NOTHING
-        """, (aid, mid, a.get("label"), a.get("icon"),
-              a.get("playedAt"),
+        """, (aid, mid, label, a.get("icon"),
+              played_at,
               1 if aid in PUBG_RARE_ACHIEVEMENTS else 0,
-              displayed_at))
+              displayed_at, sess_pct, match_pct))
         if cur.rowcount > 0:
             new_count += 1
     return new_count

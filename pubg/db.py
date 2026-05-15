@@ -224,6 +224,9 @@ def init_schema(conn: sqlite3.Connection) -> None:
         ("player_lifetime", "team_kills", "INTEGER"),
         ("player_lifetime", "losses", "INTEGER"),
         ("player_season", "losses", "INTEGER"),
+        # Snapshot-Pcts: bei Insert berechnet, danach unveraendert.
+        ("pubg_achievements_seen", "session_pct", "REAL"),
+        ("pubg_achievements_seen", "match_pct",   "REAL"),
     ]
     for table, col, typ in migrations:
         try:
