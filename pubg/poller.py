@@ -316,6 +316,13 @@ def _process_one_telemetry(conn, client, my_account_id, row):
     except Exception as e:
         mark_telemetry_fetched(conn, row["match_id"])
         raise RuntimeError(f"telemetry {row['match_id']}: {e}")
+    # Raw-Blob auf HiDrive archivieren (fire-and-forget, kein Abort bei Fehler)
+    try:
+        from pubg.hidrive_telemetry import upload_raw as _hd_upload
+        _hd_upload(row["match_id"], raw)
+    except Exception:
+        pass  # HiDrive-Fehler duerfen den normalen Fetch nicht blockieren
+
     squad = _squad_account_ids_for_match(conn, row["match_id"])
     if my_account_id not in squad:
         squad.add(my_account_id)

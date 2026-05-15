@@ -418,6 +418,32 @@ def wipe_day(root: str, date_str: str = None,
     return 0
 
 
+def hidrive_backfill(root: str) -> int:
+    """Uploadet alle Altmatches aus der lokalen SQLite-DB als rekonstruierte
+    Telemetrie-Blobs auf HiDrive. Matches die schon archiviert sind werden
+    uebersprungen (idempotent).
+
+    Nutzung:
+        python -m pubg.cli hidrive-backfill
+    """
+    db_path = os.path.join(root, "data", "pubg-history.db")
+    if not os.path.exists(db_path):
+        print(f"DB nicht gefunden: {db_path}")
+        return 1
+    from pubg.hidrive_telemetry import backfill_from_db, list_archived
+    conn = connect(db_path)
+    secrets = os.path.join(root, ".secrets")
+    print("Prüfe bereits archivierte Matches auf HiDrive...")
+    already = list_archived(secrets)
+    print(f"  {len(already)} bereits auf HiDrive")
+    print("\nStarte Backfill (Altmatches aus SQLite payload_json → HiDrive)...")
+    stats = backfill_from_db(conn, secrets_path=secrets, pacing_s=0.3)
+    print(f"\nFertig: {stats['uploaded']} hochgeladen, "
+          f"{stats['skipped']} schon da, {stats['errors']} Fehler")
+    conn.close()
+    return 0
+
+
 def purge_before(root: str, date_str: str) -> int:
     """Loescht alle Milestones (pubg_achievements_seen) deren played_at
     < date_str ist. Ohne Refetch, ohne Backfill — die historischen
@@ -593,6 +619,8 @@ if __name__ == "__main__":
     elif len(sys.argv) > 1 and sys.argv[1] == "purge-before":
         date_arg = sys.argv[2] if len(sys.argv) > 2 else None
         sys.exit(purge_before(root, date_arg))
+    elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-backfill":
+        sys.exit(hidrive_backfill(root))
     else:
         print("Usage: python -m pubg.cli init | cold-start | pull-ftp | "
               "seasons-backfill | wipe-day [YYYY-MM-DD] [--keep-popups] | "
