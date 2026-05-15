@@ -2431,18 +2431,27 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session",
     hot_drop_window_ms = hot_drop_window_secs * 1000
 
     def _squad_landing_xy(mid):
-        """Erste Squad-Landungs-Position fuer Map/POI-Lookup."""
-        r = conn.execute("""
-            SELECT te.actor_x, te.actor_y FROM telemetry_events te
-            JOIN participants pa ON pa.match_id = te.match_id
-              AND pa.account_id = te.actor_account
-            WHERE te.match_id = ? AND te.event_type = 'Landing'
-              AND pa.team_id = (SELECT team_id FROM participants
-                                 WHERE match_id = ? AND account_id = ?)
-              AND te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
-            ORDER BY te.timestamp_ms ASC LIMIT 1
-        """, (mid, mid, my_account_id)).fetchone()
-        return (r["actor_x"], r["actor_y"]) if r else (None, None)
+        """Erste Squad-Landungs-Position fuer Map/POI-Lookup. Robust
+        gegen fehlende Daten/Telemetry."""
+        try:
+            r = conn.execute("""
+                SELECT te.actor_x, te.actor_y FROM telemetry_events te
+                JOIN participants pa ON pa.match_id = te.match_id
+                  AND pa.account_id = te.actor_account
+                WHERE te.match_id = ? AND te.event_type = 'Landing'
+                  AND pa.team_id = (SELECT team_id FROM participants
+                                     WHERE match_id = ? AND account_id = ?)
+                  AND te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
+                ORDER BY te.timestamp_ms ASC LIMIT 1
+            """, (mid, mid, my_account_id)).fetchone()
+            if not r:
+                return (None, None)
+            # Robust gegen Tupel- oder Row-Resultate
+            if hasattr(r, "keys"):
+                return (r["actor_x"], r["actor_y"])
+            return (r[0], r[1])
+        except Exception:
+            return (None, None)
 
     for m in matches:
         # Hot-Drop-Matches überspringen wenn excluded
@@ -2676,8 +2685,15 @@ def _detect_first_fight(conn, match_id, my_account_id,
                 max(0, (fight_start_ts - m_start_ms) / 1000))
     # Fight-Position: actor_x/y des ersten Event-Akteurs ist die beste
     # Schaetzung wo der Fight stattfand. Notfalls victim_x/y.
-    fight_x = first_event.get("actor_x") or first_event.get("victim_x")
-    fight_y = first_event.get("actor_y") or first_event.get("victim_y")
+    # sqlite3.Row hat kein .get() — bracket-access mit KeyError-Fallback.
+    def _rget(row, key):
+        try:
+            v = row[key]
+            return v
+        except (IndexError, KeyError):
+            return None
+    fight_x = _rget(first_event, "actor_x") or _rget(first_event, "victim_x")
+    fight_y = _rget(first_event, "actor_y") or _rget(first_event, "victim_y")
     return {
         "won": won,
         "soloSurvived": solo_survived,
