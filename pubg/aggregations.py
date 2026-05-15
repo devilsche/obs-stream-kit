@@ -2429,6 +2429,21 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session",
     per_match = []
     teams_per_fight = []
     hot_drop_window_ms = hot_drop_window_secs * 1000
+
+    def _squad_landing_xy(mid):
+        """Erste Squad-Landungs-Position fuer Map/POI-Lookup."""
+        r = conn.execute("""
+            SELECT te.actor_x, te.actor_y FROM telemetry_events te
+            JOIN participants pa ON pa.match_id = te.match_id
+              AND pa.account_id = te.actor_account
+            WHERE te.match_id = ? AND te.event_type = 'Landing'
+              AND pa.team_id = (SELECT team_id FROM participants
+                                 WHERE match_id = ? AND account_id = ?)
+              AND te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
+            ORDER BY te.timestamp_ms ASC LIMIT 1
+        """, (mid, mid, my_account_id)).fetchone()
+        return (r["actor_x"], r["actor_y"]) if r else (None, None)
+
     for m in matches:
         # Hot-Drop-Matches überspringen wenn excluded
         if exclude_hot_drop:
@@ -2445,6 +2460,7 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session",
             total += 1
             fled_total += 1
             sparkline.append(0)
+            lx, ly = _squad_landing_xy(m["match_id"])
             per_match.append({
                 "matchId": m["match_id"],
                 "playedAt": m["played_at"],
@@ -2459,6 +2475,8 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session",
                 "engaged": False,
                 "soloSurvived": False,
                 "teamSurvived": False,
+                "landingX": lx, "landingY": ly,
+                "fightX": None, "fightY": None,
             })
             continue
         total += 1
@@ -2481,6 +2499,7 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session",
         if result["teamSurvived"]:
             team_survived_n += 1
         sparkline.append(1 if result["teamSurvived"] else 0)
+        lx, ly = _squad_landing_xy(m["match_id"])
         per_match.append({
             "matchId": m["match_id"],
             "playedAt": m["played_at"],
@@ -2498,6 +2517,9 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session",
             "teamsCount": result.get("teams_count", 0),
             "fightStartAfterMatchStartSec":
                 result.get("fightStartAfterMatchStartSec"),
+            "landingX": lx, "landingY": ly,
+            "fightX": result.get("fightX"),
+            "fightY": result.get("fightY"),
         })
 
     avg_teams = (sum(teams_per_fight) / len(teams_per_fight)) if teams_per_fight else 0
@@ -2652,6 +2674,10 @@ def _detect_first_fight(conn, match_id, my_account_id,
             m_start_ms = int(m_start.timestamp() * 1000)
             fight_start_after_match_start_sec = int(
                 max(0, (fight_start_ts - m_start_ms) / 1000))
+    # Fight-Position: actor_x/y des ersten Event-Akteurs ist die beste
+    # Schaetzung wo der Fight stattfand. Notfalls victim_x/y.
+    fight_x = first_event.get("actor_x") or first_event.get("victim_x")
+    fight_y = first_event.get("actor_y") or first_event.get("victim_y")
     return {
         "won": won,
         "soloSurvived": solo_survived,
@@ -2665,6 +2691,8 @@ def _detect_first_fight(conn, match_id, my_account_id,
         "first_actor_is_squad": first_event["actor_account"] in squad_ids,
         "first_target_is_squad": first_event["target_account"] in squad_ids,
         "fightStartAfterMatchStartSec": fight_start_after_match_start_sec,
+        "fightX": fight_x,
+        "fightY": fight_y,
     }
 
 

@@ -136,6 +136,7 @@
     </div>
   </div>
   <script src="_pubg.js"></script>
+  <script src="_pubg_pois.js"></script>
   <script>
     const RANGE = PubgUI.qs("range", "session");
     const EXCLUDE_HOT = PubgUI.qs("excludeHotDrop", "0") === "1";
@@ -231,8 +232,20 @@
       }
       const mapStr = PubgUI.fmtMap ? PubgUI.fmtMap(m.mapName||"?") : (m.mapName||"?");
       const modeStr = m.gameMode || "?";
+      // POI-Lookup fuer Landing + Fight (falls Daten vorhanden)
+      let landingPoi = null, fightPoi = null;
+      if (typeof PubgUI !== "undefined" && PubgUI.POI && PubgUI.POI.fromCoords) {
+        if (m.landingX != null && m.landingY != null)
+          landingPoi = PubgUI.POI.fromCoords(m.mapName, m.landingX, m.landingY);
+        if (m.fightX != null && m.fightY != null)
+          fightPoi = PubgUI.POI.fromCoords(m.mapName, m.fightX, m.fightY);
+      }
+      // Fight nur extra zeigen wenn Landing-POI sich von Fight-POI unterscheidet
+      const showFightPoi = fightPoi && (!landingPoi || fightPoi !== landingPoi);
       const lines = [
         `${mapStr} · ${modeStr}`,
+        landingPoi ? `Landing: ${landingPoi}` : null,
+        showFightPoi ? `Fight at: ${fightPoi}` : null,
         `${startStr} → ${endStr}  (${fmtDur2(m.durationSec)})`,
         m.place != null
           ? `Place: #${m.place} · K=${m.kills ?? 0} · DMG=${Math.round(m.damage||0)}` : null,
