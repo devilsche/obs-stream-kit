@@ -446,11 +446,20 @@ def rebuild_achievements(root: str) -> int:
     print("\nDetektiere Milestones aus allen Sessions...")
     stats = backfill_session_achievements(
         conn, my_acc, gap_hours=4, suppress_popup=True)
+    # Sicherheitsnetz: alle die noch NULL haben sofort als displayed markieren
+    # (verhindert Popup-Burst wenn Widget gerade pollt)
+    ts_now = int(time.time() * 1000)
+    marked = conn.execute(
+        "UPDATE pubg_achievements_seen SET displayed_at=? WHERE displayed_at IS NULL",
+        (ts_now,)).rowcount
+    conn.commit()
     n_after = conn.execute(
         "SELECT COUNT(*) FROM pubg_achievements_seen").fetchone()[0]
     conn.close()
     print(f"\nFertig: {stats.get('sessions',0)} Sessions durchlaufen")
     print(f"  Vorher: {n_before}  →  Nachher: {n_after} Milestones")
+    if marked:
+        print(f"  {marked} zusaetzlich als 'already shown' markiert (Popup-Schutz)")
     if stats.get('errors'):
         print(f"  Fehler: {stats['errors'][:3]}")
     return 0
