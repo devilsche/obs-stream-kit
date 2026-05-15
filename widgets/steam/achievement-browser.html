@@ -624,23 +624,30 @@
         catch (e) { /* silent */ }
         pubgDetectTriggered = true;
       }
-      // Steam + PUBG parallel pullen, mergen.
+      // Steam + PUBG parallel pullen, mergen. Errors als null-Marker
+      // an autoRefresh weitergeben damit Partial-Failures nicht das
+      // 'all'-Array auf einen unvollstaendigen Stand setzen (vorher
+      // togglete die Anzeige zwischen voll und ohne-Steam wenn Steam-
+      // Endpoint mal kurz timeoutet).
+      const FAIL = Symbol("fail");
       const [steamData, pubgData] = await Promise.all([
         PubgUI.fetchJson("/api/steam/achievements-list?limit=2000")
-          .catch(() => ({})),
-        PubgUI.fetchJson(
-          "/api/pubg/achievements-list")
-          .catch(() => ({})),
+          .catch(() => FAIL),
+        PubgUI.fetchJson("/api/pubg/achievements-list")
+          .catch(() => FAIL),
       ]);
-      const steamAch = (steamData && steamData.achievements) || [];
-      const pubgAch  = (pubgData  && pubgData.achievements)  || [];
+      const steamOk = steamData !== FAIL;
+      const pubgOk  = pubgData  !== FAIL;
+      const steamAch = steamOk ? ((steamData && steamData.achievements) || []) : [];
+      const pubgAch  = pubgOk  ? ((pubgData  && pubgData.achievements)  || []) : [];
       const merged = [...steamAch, ...pubgAch];
-      // Games-Dropdown: Steam-Games + PUBG-Session-Marker
       const gameMap = new Map();
-      for (const g of (steamData && steamData.games) || []) {
-        gameMap.set(g.appId, g);
+      if (steamOk) {
+        for (const g of (steamData && steamData.games) || []) {
+          gameMap.set(g.appId, g);
+        }
       }
-      if (pubgAch.length) {
+      if (pubgOk && pubgAch.length) {
         gameMap.set(-2, {
           appId: -2,
           name: "PUBG: Session Milestones",
@@ -649,7 +656,11 @@
       }
       const gameList = [...gameMap.values()].sort(
         (a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
-      return { achievements: merged, games: gameList };
+      return {
+        achievements: merged,
+        games: gameList,
+        partial: !steamOk || !pubgOk,
+      };
     }
 
     async function load(showSpinner = true) {
@@ -671,12 +682,19 @@
     // Achievements als 'brand-new' markieren. Kein Spinner, kein
     // Disable — laueft im Hintergrund.
     async function autoRefresh() {
+      // Pause Refresh waehrend User das Dropdown offen hat — Rebuild
+      // wuerde es zumachen.
+      if (document.activeElement === gameSel) return;
       let data;
       try {
         data = await fetchAll();
       } catch (e) {
         return;
       }
+      // Partial-Failure: einer der Endpoints (Steam oder PUBG) hat
+      // gefailed. Wir wuerden sonst all[] auf einen unvollstaendigen
+      // Stand setzen → Anzeige togglet zwischen voll und reduziert.
+      if (data.partial) return;
       const newAll = data.achievements;
       const oldKeys = new Set(all.map(a => a.appId + ":" + a.apiName));
       const truly_new = newAll.filter(a =>
