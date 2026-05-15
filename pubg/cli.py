@@ -433,6 +433,13 @@ def backfill_pcts(root: str) -> int:
         print(f"DB nicht gefunden: {db_path}"); return 1
     conn = connect(db_path)
     init_schema(conn)  # fuegt session_pct / match_pct Spalten hinzu falls noch nicht da
+    # Force: alle Pcts neu berechnen (z.B. wenn die Logik geaendert wurde)
+    force = "--force" in sys.argv
+    if force:
+        conn.execute("UPDATE pubg_achievements_seen "
+                     "SET session_pct=NULL, match_pct=NULL")
+        conn.commit()
+        print("(--force: alle Pcts geloescht)")
     rows = conn.execute("""
         SELECT achievement_id, match_id, label, played_at
         FROM pubg_achievements_seen

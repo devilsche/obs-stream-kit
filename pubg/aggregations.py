@@ -1796,7 +1796,9 @@ def _compute_snapshot_pcts(conn, aid, played_at, label):
         return None, None
     date_str = played_at[:10]
     is_event = aid in _EVENT_ACHIEVEMENT_IDS
-    game_mode_filter = "NOT IN" if not is_event else "IN"
+    # BR-Achievements gegen BR-Sessions/Matches verrechnen,
+    # Event-Achievements gegen Event-Matches.
+    game_mode_filter = "IN" if not is_event else "NOT IN"
     br_modes = list(BATTLE_ROYALE_MODES)
     ph = ",".join("?" * len(br_modes))
 
@@ -1854,6 +1856,12 @@ def _compute_snapshot_pcts(conn, aid, played_at, label):
             "WHERE achievement_id = ? AND played_at < ?",
             (aid, played_at)).fetchone()[0]
 
+    # +1 weil der aktuelle Insert noch nicht in der DB ist (compute laeuft
+    # VOR dem INSERT). Damit das aktuelle Vorkommen mitgezaehlt wird.
+    # min(..., total) schuetzt falls mehrere Achievements pro Match
+    # (z.B. Tier-Cascade) hintereinander rein gehen.
+    ach_days = min(ach_days + 1, total_days)
+    ach_matches = min(ach_matches + 1, total_matches)
     sess_pct = round(ach_days / total_days * 100, 1) if total_days else None
     match_pct = round(ach_matches / total_matches * 100, 2) if total_matches else None
     return sess_pct, match_pct
