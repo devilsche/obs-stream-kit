@@ -682,7 +682,16 @@ function renderAll() { render(); renderList(); }
 
 nameIn.addEventListener("input", () => {
   if (selectedIdx < 0) return;
-  regions[selectedIdx].name = nameIn.value.trim();
+  // Beim Tippen NICHT trimmen — sonst kann man kein Leerzeichen am
+  // Anfang/Ende einfuegen. Wird beim blur/Speichern getrimmt.
+  regions[selectedIdx].name = nameIn.value;
+  renderAll();
+});
+nameIn.addEventListener("blur", () => {
+  if (selectedIdx < 0) return;
+  const trimmed = nameIn.value.trim();
+  nameIn.value = trimmed;
+  regions[selectedIdx].name = trimmed;
   renderAll();
 });
 document.getElementById("sortSel").addEventListener("change", () => renderList());
