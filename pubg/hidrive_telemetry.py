@@ -31,18 +31,47 @@ def _remote_path(base_path: str, match_id: str) -> str:
 
 # ── SFTP via backup.py ─────────────────────────────────────────────────────
 
-def _get_ftp_cfg(secrets_path: str = ".secrets"):
-    from pubg.backup import load_ftp_config
-    return load_ftp_config(secrets_path)
+def _get_hd_cfg(secrets_path: str = ".secrets") -> dict | None:
+    """Liest HiDrive-Credentials aus .secrets.
+    Erwartet Zeilen:
+        HiDrive Host: sftp.hidrive.strato.com
+        HiDrive Port: 22          (optional, default 22)
+        HiDrive User: username
+        HiDrive Pass: password
+        HiDrive Path: /pubg/telemetry   (optional, default /)
+    """
+    if not os.path.exists(secrets_path):
+        return None
+    keys = {
+        "hidrive host": "host",
+        "hidrive port": "port",
+        "hidrive user": "user",
+        "hidrive pass": "password",
+        "hidrive path": "path",
+    }
+    cfg = {"port": "22", "path": "/"}
+    with open(secrets_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if ":" not in line:
+                continue
+            k, _, v = line.partition(":")
+            mapped = keys.get(k.strip().lower())
+            if mapped:
+                cfg[mapped] = v.strip()
+    if not cfg.get("host") or not cfg.get("user") or not cfg.get("password"):
+        return None
+    cfg["port"] = int(cfg["port"])
+    return cfg
 
 
-def _sftp_connect(ftp_cfg):
+def _sftp_connect(hd_cfg):
     try:
         import paramiko
     except ImportError as e:
         raise ImportError("pip install paramiko") from e
-    transport = paramiko.Transport((ftp_cfg["host"], int(ftp_cfg["port"])))
-    transport.connect(username=ftp_cfg["user"], password=ftp_cfg["password"])
+    transport = paramiko.Transport((hd_cfg["host"], int(hd_cfg["port"])))
+    transport.connect(username=hd_cfg["user"], password=hd_cfg["password"])
     sftp = paramiko.SFTPClient.from_transport(transport)
     return sftp, transport
 
@@ -71,7 +100,7 @@ def upload_raw(match_id: str, raw_events: list,
     """Komprimiert + uploadet rohe Telemetrie-Events auf HiDrive.
     Returns True bei Erfolg.
     """
-    ftp_cfg = _get_ftp_cfg(secrets_path)
+    ftp_cfg = _get_hd_cfg(secrets_path)
     if not ftp_cfg:
         return False
     gz_data = gzip.compress(
@@ -132,7 +161,7 @@ def download_raw(match_id: str, secrets_path: str = ".secrets") -> list | None:
     """Lädt Telemetrie-Blob von HiDrive und gibt list[dict] zurück.
     Returns None wenn nicht vorhanden oder Fehler.
     """
-    ftp_cfg = _get_ftp_cfg(secrets_path)
+    ftp_cfg = _get_hd_cfg(secrets_path)
     if not ftp_cfg:
         return None
     remote = _remote_path(ftp_cfg.get("path", ""), match_id)
@@ -151,7 +180,7 @@ def download_raw(match_id: str, secrets_path: str = ".secrets") -> list | None:
 
 def exists(match_id: str, secrets_path: str = ".secrets") -> bool:
     """Prüft ob ein Match-Blob auf HiDrive existiert."""
-    ftp_cfg = _get_ftp_cfg(secrets_path)
+    ftp_cfg = _get_hd_cfg(secrets_path)
     if not ftp_cfg:
         return False
     remote = _remote_path(ftp_cfg.get("path", ""), match_id)
@@ -167,7 +196,7 @@ def exists(match_id: str, secrets_path: str = ".secrets") -> bool:
 
 def list_archived(secrets_path: str = ".secrets") -> list[str]:
     """Listet alle archivierten Match-IDs (ohne .json.gz-Suffix)."""
-    ftp_cfg = _get_ftp_cfg(secrets_path)
+    ftp_cfg = _get_hd_cfg(secrets_path)
     if not ftp_cfg:
         return []
     base = ftp_cfg.get("path", "").rstrip("/")
