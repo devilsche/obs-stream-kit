@@ -918,13 +918,24 @@ canvas.addEventListener("mousedown", (ev) => {
 });
 
 canvas.addEventListener("dblclick", (ev) => {
-  // Polygon abschliessen
-  if (mode === "drawing-poly" && polyPoints.length >= 3) {
-    regions.push({ name: "", points: polyPoints });
-    selectedIdx = regions.length - 1;
-    polyPoints = [];
-    setMode("view");
-    renderAll();
+  // Polygon abschliessen. Beim Doppelklick wurde durch die zwei mousedowns
+  // schon zweimal derselbe Punkt eingefuegt → letzten duplicate entfernen.
+  if (mode === "drawing-poly") {
+    while (polyPoints.length >= 2) {
+      const a = polyPoints[polyPoints.length - 1];
+      const b = polyPoints[polyPoints.length - 2];
+      // Distanz < 10 Welt-Einheiten (= 0.1m) → quasi gleicher Punkt
+      const dx = a[0] - b[0], dy = a[1] - b[1];
+      if (dx*dx + dy*dy < 100) polyPoints.pop();
+      else break;
+    }
+    if (polyPoints.length >= 3) {
+      regions.push({ name: "", points: polyPoints });
+      selectedIdx = regions.length - 1;
+      polyPoints = [];
+      setMode("view");
+      renderAll();
+    }
   }
 });
 
