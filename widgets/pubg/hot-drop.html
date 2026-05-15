@@ -268,8 +268,16 @@
       }
       const mapStr = PubgUI.fmtMap ? PubgUI.fmtMap(m.mapName||"?") : (m.mapName||"?");
       const modeStr = m.gameMode || "?";
+      // POI-Lookup ueber Landing-Coords falls verfuegbar
+      let poiStr = null;
+      if (m.landingX != null && m.landingY != null
+          && typeof PubgUI !== "undefined"
+          && PubgUI.POI && PubgUI.POI.fromCoords) {
+        poiStr = PubgUI.POI.fromCoords(m.mapName, m.landingX, m.landingY);
+      }
       const lines = [
         `${mapStr} · ${modeStr}`,
+        poiStr ? `Landing: ${poiStr}` : null,
         `${startStr} → ${endStr}  (${fmtDur2(m.durationSec)})`,
         `Place: #${m.place ?? "?"} · K=${m.kills ?? 0} · DMG=${Math.round(m.damage||0)}`,
         m.landingOffsetSec != null
@@ -285,12 +293,19 @@
       positionPov(e);
     }
     function positionPov(e) {
-      const x = e.clientX + 12;
-      const y = e.clientY + 12;
       const rect = pov.getBoundingClientRect();
       const vw = window.innerWidth, vh = window.innerHeight;
-      pov.style.left = (x + rect.width > vw ? vw - rect.width - 8 : x) + "px";
-      pov.style.top  = (y + rect.height > vh ? vh - rect.height - 8 : y) + "px";
+      // Wenn rechts kein Platz → links vom Cursor anzeigen
+      let x = e.clientX + 12;
+      if (x + rect.width + 8 > vw) {
+        x = e.clientX - rect.width - 12;
+        if (x < 8) x = 8;  // notfalls am linken Rand kleben
+      }
+      let y = e.clientY + 12;
+      if (y + rect.height + 8 > vh) y = vh - rect.height - 8;
+      if (y < 8) y = 8;
+      pov.style.left = x + "px";
+      pov.style.top  = y + "px";
     }
     function hidePov() {
       pov.classList.remove("show");

@@ -246,11 +246,18 @@
       positionPov(e);
     }
     function positionPov(e) {
-      const x = e.clientX + 12, y = e.clientY + 12;
       const r = pov.getBoundingClientRect();
       const vw = innerWidth, vh = innerHeight;
-      pov.style.left = (x + r.width > vw ? vw - r.width - 8 : x) + "px";
-      pov.style.top  = (y + r.height > vh ? vh - r.height - 8 : y) + "px";
+      let x = e.clientX + 12;
+      if (x + r.width + 8 > vw) {
+        x = e.clientX - r.width - 12;
+        if (x < 8) x = 8;
+      }
+      let y = e.clientY + 12;
+      if (y + r.height + 8 > vh) y = vh - r.height - 8;
+      if (y < 8) y = 8;
+      pov.style.left = x + "px";
+      pov.style.top  = y + "px";
     }
     function hidePov() {
       pov.classList.remove("show");

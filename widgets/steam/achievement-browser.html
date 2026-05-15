@@ -580,11 +580,18 @@
       achPosition(e);
     }
     function achPosition(e) {
-      const x = e.clientX + 14, y = e.clientY + 14;
       const r = achPov.getBoundingClientRect();
       const vw = innerWidth, vh = innerHeight;
-      achPov.style.left = (x + r.width > vw ? vw - r.width - 8 : x) + "px";
-      achPov.style.top  = (y + r.height > vh ? vh - r.height - 8 : y) + "px";
+      let x = e.clientX + 14;
+      if (x + r.width + 8 > vw) {
+        x = e.clientX - r.width - 14;
+        if (x < 8) x = 8;
+      }
+      let y = e.clientY + 14;
+      if (y + r.height + 8 > vh) y = vh - r.height - 8;
+      if (y < 8) y = 8;
+      achPov.style.left = x + "px";
+      achPov.style.top  = y + "px";
     }
     function achHide() {
       achPov.classList.remove("show");
