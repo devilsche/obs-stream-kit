@@ -78,49 +78,80 @@
       return `${m}:${String(s).padStart(2,"0")}`;
     }
 
+    // Sort-State persistent halten ueber Re-Polls hinweg
+    let _sortKey = "matches";  // Default: nach Match-Anzahl sortiert
+    let _sortDir = "desc";
+
+    // Spalten-Definition: key (Datenfeld), label, format-Funktion
+    const COLS = [
+      ["map",            "Map",     r => PubgUI.fmtMap(r.map)],
+      ["matches",        "Matches", r => r.matches],
+      ["wins",           "Wins",    r => r.wins || "—"],
+      ["kills",          "Kills",   r => PubgUI.hotIf(r.kills, 300, r.kills)],
+      ["kd",             "K/D",     r => r.kd.toFixed(2)],
+      ["winRate",        "Win%",    r => r.winRate.toFixed(0) + "%"],
+      ["avgKills",       "Ø Kills", r => r.avgKills.toFixed(1)],
+      ["avgDamage",      "Ø DMG",   r => Math.round(r.avgDamage)],
+      ["avgPlace",       "Ø Place", r => "#" + r.avgPlace.toFixed(1)],
+      ["avgSurvivedSec", "Ø Surv",  r => fmtSurv(r.avgSurvivedSec)],
+      ["longestKill",    "Longest", r => PubgUI.hotIf(r.longestKill, 300, Math.round(r.longestKill) + "m")],
+    ];
+
+    let _rowsCache = [];
+
+    function sortRows(rows) {
+      const sorted = rows.slice();
+      sorted.sort((a, b) => {
+        const va = a[_sortKey], vb = b[_sortKey];
+        let cmp = (typeof va === "number" && typeof vb === "number")
+          ? va - vb
+          : String(va).localeCompare(String(vb));
+        return _sortDir === "asc" ? cmp : -cmp;
+      });
+      return sorted;
+    }
+
     function render(rows) {
       const root = document.getElementById("content");
-      if (!rows || !rows.length) {
+      if (rows && rows.length) _rowsCache = rows;
+      if (!_rowsCache || !_rowsCache.length) {
         root.innerHTML = `<div class="empty">— keine Matches in diesem Range —</div>`;
         document.getElementById("meta").textContent = "";
         return;
       }
-      const totalMatches = rows.reduce((s, r) => s + r.matches, 0);
-      const totalWins = rows.reduce((s, r) => s + r.wins, 0);
+      const totalMatches = _rowsCache.reduce((s, r) => s + r.matches, 0);
+      const totalWins = _rowsCache.reduce((s, r) => s + r.wins, 0);
       document.getElementById("meta").textContent =
-        `${rows.length} Maps · ${totalMatches} Matches · ${totalWins} Wins`;
+        `${_rowsCache.length} Maps · ${totalMatches} Matches · ${totalWins} Wins`;
 
-      root.innerHTML = `
-        <table>
-          <thead><tr>
-            <th>Map</th>
-            <th>Matches</th>
-            <th>Wins</th>
-            <th>Kills</th>
-            <th>K/D</th>
-            <th>Win%</th>
-            <th>Ø Kills</th>
-            <th>Ø DMG</th>
-            <th>Ø Place</th>
-            <th>Ø Surv</th>
-            <th>Longest</th>
-          </tr></thead>
-          <tbody>
-            ${rows.map(r => `<tr class="${r.wins ? 'win' : ''}">
-              <td>${PubgUI.fmtMap(r.map)}</td>
-              <td>${r.matches}</td>
-              <td>${r.wins || '—'}</td>
-              <td>${PubgUI.hotIf(r.kills, 300, r.kills)}</td>
-              <td>${r.kd.toFixed(2)}</td>
-              <td>${r.winRate.toFixed(0)}%</td>
-              <td>${r.avgKills.toFixed(1)}</td>
-              <td>${Math.round(r.avgDamage)}</td>
-              <td>#${r.avgPlace.toFixed(1)}</td>
-              <td>${fmtSurv(r.avgSurvivedSec)}</td>
-              <td>${PubgUI.hotIf(r.longestKill, 300, Math.round(r.longestKill) + "m")}</td>
-            </tr>`).join("")}
-          </tbody>
-        </table>`;
+      const sorted = sortRows(_rowsCache);
+      const arrow = (k) => k === _sortKey
+        ? (_sortDir === "asc" ? " ▲" : " ▼")
+        : "";
+      const headerHtml = COLS.map(([k, lbl]) =>
+        `<th data-sort="${k}" style="cursor:pointer; user-select:none">${lbl}${arrow(k)}</th>`
+      ).join("");
+      const rowsHtml = sorted.map(r =>
+        `<tr class="${r.wins ? 'win' : ''}">
+          ${COLS.map(([_, __, fn]) => `<td>${fn(r)}</td>`).join("")}
+         </tr>`
+      ).join("");
+
+      root.innerHTML = `<table><thead><tr>${headerHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>`;
+
+      // Header-Click → Sortierung umschalten
+      root.querySelectorAll("th[data-sort]").forEach(th => {
+        th.addEventListener("click", () => {
+          const key = th.dataset.sort;
+          if (key === _sortKey) {
+            _sortDir = _sortDir === "asc" ? "desc" : "asc";
+          } else {
+            _sortKey = key;
+            _sortDir = (key === "map") ? "asc" : "desc";  // text asc, numbers desc
+          }
+          render();  // re-render mit Cache
+        });
+      });
     }
 
     function showError(e) {
