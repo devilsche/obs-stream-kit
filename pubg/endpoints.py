@@ -1446,6 +1446,7 @@ class EndpointRegistry:
         rows = conn.execute("""
             SELECT a.achievement_id, a.match_id, a.label, a.icon,
                    a.played_at, a.detected_at, a.is_rare, a.displayed_at,
+                   a.session_pct, a.match_pct,
                    m.map_name, m.game_mode, m.duration_secs
             FROM pubg_achievements_seen a
             LEFT JOIN matches m ON m.match_id = a.match_id
