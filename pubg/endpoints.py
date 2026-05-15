@@ -1429,10 +1429,12 @@ class EndpointRegistry:
         conn = self.get_conn()
 
         # Zwei Date-Pools (fuer sessionPct) + zwei Match-Pools (fuer
-        # matchPct). BR-Achievements gegen BR-Sessions/Matches,
-        # Event-Achievements gegen Event-Sessions/Matches.
-        br_dates, event_dates = self._session_date_pools(conn)
-        br_matches, event_matches = self._session_match_pools(conn)
+        # matchPct). Fehler hier duerfen den ganzen Endpoint nicht killen.
+        try:
+            br_dates, event_dates = self._session_date_pools(conn)
+            br_matches, event_matches = self._session_match_pools(conn)
+        except Exception:
+            br_dates = event_dates = br_matches = event_matches = []
         match_dates = sorted(set(br_dates) | set(event_dates))
 
         # Achievement-Rows + Map-Name (LEFT JOIN matches).
@@ -1446,8 +1448,12 @@ class EndpointRegistry:
         """).fetchall()
 
         # Tier-aware Indizes: pro Tag (Session-Pct) + pro Match (Match-Pct).
-        per_aid_dates_tier = self._build_aid_tier_index(conn)
-        per_aid_matches_tier = self._build_aid_match_tier_index(conn)
+        try:
+            per_aid_dates_tier = self._build_aid_tier_index(conn)
+            per_aid_matches_tier = self._build_aid_match_tier_index(conn)
+        except Exception:
+            per_aid_dates_tier = {}
+            per_aid_matches_tier = {}
 
         def _iso_to_ts(iso):
             if not iso:
