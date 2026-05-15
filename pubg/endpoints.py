@@ -1423,10 +1423,15 @@ class EndpointRegistry:
         Antwort sortiert nach played_at DESC (neueste zuerst).
         Label kommt instanzspezifisch aus pubg_achievements_seen.label
         (z.B. 'Beast Chicken · 7 Kills'), damit Detailinfo erhalten bleibt.
+        Gecacht — wird bei neuen Matches/Achievements via cache.invalidate()
+        automatisch geleert.
         """
         import datetime as _dt
         from bisect import bisect_right
         conn = self.get_conn()
+        cached = self.cache.get("pubg-achievements-list")
+        if cached is not None:
+            return _ok(cached)
 
         # Zwei Date-Pools (fuer sessionPct) + zwei Match-Pools (fuer
         # matchPct). Fehler hier duerfen den ganzen Endpoint nicht killen.
@@ -1510,11 +1515,13 @@ class EndpointRegistry:
             })
         # Juengste zuerst
         items.sort(key=lambda x: x["unlockedAt"], reverse=True)
-        return _ok({
+        result = {
             "achievements":  items,
             "count":         len(items),
             "totalSessions": len(match_dates),
-        })
+        }
+        self.cache.set("pubg-achievements-list", result)
+        return _ok(result)
 
     def _detect_achievements(self, qs):
         """Triggert die Session-Milestone-Detection manuell. Schreibt

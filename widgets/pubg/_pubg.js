@@ -82,10 +82,16 @@
     return Math.floor(diff/86400) + "d ago";
   };
 
-  PubgUI.fetchJson = async (url) => {
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    return res.json();
+  PubgUI.fetchJson = async (url, timeoutMs = 10000) => {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { cache: "no-store", signal: ctrl.signal });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    } finally {
+      clearTimeout(tid);
+    }
   };
 
   // Range-Label-Map (englisch durchgängig, laut Overlay-Rules-Spec).
