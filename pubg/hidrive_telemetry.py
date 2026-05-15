@@ -24,9 +24,10 @@ import time
 # ── Pfad-Helper ────────────────────────────────────────────────────────────
 
 def _remote_path(base_path: str, match_id: str) -> str:
-    """z.B. /pubg-backups + abc123 → /pubg-backups/telemetry/abc123.json.gz"""
-    base = base_path.rstrip("/") if base_path else ""
-    return f"{base}/telemetry/{match_id}.json.gz"
+    """HiDrive Path IST das Telemetrie-Verzeichnis.
+    z.B. /pubg/telemetry + abc123 → /pubg/telemetry/abc123.json.gz"""
+    base = base_path.rstrip("/") if base_path else "/pubg/telemetry"
+    return f"{base}/{match_id}.json.gz"
 
 
 # ── SFTP via backup.py ─────────────────────────────────────────────────────
@@ -106,11 +107,11 @@ def upload_raw(match_id: str, raw_events: list,
     gz_data = gzip.compress(
         json.dumps(raw_events, separators=(",", ":")).encode("utf-8"),
         compresslevel=9)
-    remote = _remote_path(ftp_cfg.get("path", ""), match_id)
-    remote_dir = os.path.dirname(remote)
+    base = ftp_cfg.get("path", "/pubg/telemetry")
+    remote = _remote_path(base, match_id)
     try:
         sftp, transport = _sftp_connect(ftp_cfg)
-        _ensure_dir(sftp, remote_dir)
+        _ensure_dir(sftp, base)  # nur das Basis-Verzeichnis sicherstellen
         with sftp.open(remote, "wb") as f:
             f.write(gz_data)
         sftp.close()
@@ -199,11 +200,10 @@ def list_archived(secrets_path: str = ".secrets") -> list[str]:
     ftp_cfg = _get_hd_cfg(secrets_path)
     if not ftp_cfg:
         return []
-    base = ftp_cfg.get("path", "").rstrip("/")
-    remote_dir = f"{base}/telemetry"
+    base = ftp_cfg.get("path", "/pubg/telemetry").rstrip("/")
     try:
         sftp, transport = _sftp_connect(ftp_cfg)
-        files = sftp.listdir(remote_dir)
+        files = sftp.listdir(base)
         sftp.close()
         transport.close()
         return [f.replace(".json.gz", "") for f in files if f.endswith(".json.gz")]
