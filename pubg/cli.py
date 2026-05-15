@@ -418,6 +418,44 @@ def wipe_day(root: str, date_str: str = None,
     return 0
 
 
+def rebuild_achievements(root: str) -> int:
+    """Alle Milestones aus vorhandenen telemetry_events neu detektieren.
+    Braucht KEINE HiDrive-Verbindung, keine payload_json.
+    Loescht pubg_achievements_seen und befuellt neu aus Telemetrie-Daten.
+
+    Nutzung:
+        python -m pubg.cli rebuild-achievements
+    """
+    from pubg.aggregations import backfill_session_achievements
+    db_path = os.path.join(root, "data", "pubg-history.db")
+    if not os.path.exists(db_path):
+        print(f"DB nicht gefunden: {db_path}"); return 1
+    conn = connect(db_path)
+    me = conn.execute(
+        "SELECT account_id FROM players WHERE is_self=1").fetchone()
+    if not me:
+        print("Self-Player nicht in DB"); conn.close(); return 1
+    my_acc = me["account_id"]
+    n_before = conn.execute(
+        "SELECT COUNT(*) FROM pubg_achievements_seen").fetchone()[0]
+    matches = conn.execute("SELECT COUNT(*) FROM matches").fetchone()[0]
+    events = conn.execute(
+        "SELECT COUNT(*) FROM telemetry_events").fetchone()[0]
+    print(f"DB: {matches} Matches, {events} Telemetrie-Events")
+    print(f"Aktuelle Achievements: {n_before}")
+    print("\nDetektiere Milestones aus allen Sessions...")
+    stats = backfill_session_achievements(
+        conn, my_acc, gap_hours=4, suppress_popup=True)
+    n_after = conn.execute(
+        "SELECT COUNT(*) FROM pubg_achievements_seen").fetchone()[0]
+    conn.close()
+    print(f"\nFertig: {stats.get('sessions',0)} Sessions durchlaufen")
+    print(f"  Vorher: {n_before}  →  Nachher: {n_after} Milestones")
+    if stats.get('errors'):
+        print(f"  Fehler: {stats['errors'][:3]}")
+    return 0
+
+
 def hidrive_clear_payload(root: str) -> int:
     """Loescht payload_json aus allen telemetry_events in SQLite.
     NUR ausfuehren NACHDEM hidrive-backfill erfolgreich war —
@@ -737,6 +775,8 @@ if __name__ == "__main__":
         sys.exit(purge_before(root, date_arg))
     elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-backfill":
         sys.exit(hidrive_backfill(root))
+    elif len(sys.argv) > 1 and sys.argv[1] == "rebuild-achievements":
+        sys.exit(rebuild_achievements(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-clear-payload":
         sys.exit(hidrive_clear_payload(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-refill":
