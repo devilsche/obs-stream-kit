@@ -258,10 +258,14 @@
       const desc = marker.dataset.desc;
       const m = (window._hdMatches || [])[idx];
       if (!m) return;
-      const startIso = PubgUI.matchStartIso
-        ? PubgUI.matchStartIso(m.playedAt, m.durationSec) : m.playedAt;
-      const startStr = PubgUI.fmtTime ? PubgUI.fmtTime(startIso) : (startIso||"");
-      const endStr = PubgUI.fmtTime ? PubgUI.fmtTime(m.playedAt) : (m.playedAt||"");
+      // played_at IST der Match-Start. Match-End = played_at + duration.
+      const startStr = PubgUI.fmtTime ? PubgUI.fmtTime(m.playedAt) : (m.playedAt||"");
+      let endStr = startStr;
+      if (m.playedAt && m.durationSec) {
+        const endIso = new Date(new Date(m.playedAt).getTime()
+                                  + m.durationSec * 1000).toISOString();
+        endStr = PubgUI.fmtTime ? PubgUI.fmtTime(endIso) : endIso;
+      }
       const mapStr = PubgUI.fmtMap ? PubgUI.fmtMap(m.mapName||"?") : (m.mapName||"?");
       const modeStr = m.gameMode || "?";
       const lines = [

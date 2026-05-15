@@ -2145,19 +2145,18 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     # Coords als Tooltip-Info zurueckliefern.
     anchor_x = first_landing["actor_x"] if first_landing else None
     anchor_y = first_landing["actor_y"] if first_landing else None
-    # Match-Start-ms: played_at - duration_secs.
+    # Match-Start-ms: played_at IST der Match-Start (PUBG-API
+    # createdAt), nicht das Match-Ende. Nicht subtrahieren!
     match_start_ms = None
     landing_offset_sec = None
     first_fight_after_landing_sec = None
     m_row = conn.execute(
-        "SELECT played_at, duration_secs FROM matches WHERE match_id = ?",
+        "SELECT played_at FROM matches WHERE match_id = ?",
         (match_id,)).fetchone()
     if m_row and m_row["played_at"]:
         start_dt = _parse_iso(m_row["played_at"])
         if start_dt:
-            match_end_ms = int(start_dt.timestamp() * 1000)
-            dur_ms = (m_row["duration_secs"] or 0) * 1000
-            match_start_ms = match_end_ms - dur_ms
+            match_start_ms = int(start_dt.timestamp() * 1000)
             landing_offset_sec = int(
                 max(0, (landing_ms - match_start_ms) / 1000))
     if first_fight_ts:
@@ -2436,16 +2435,15 @@ def _detect_first_fight(conn, match_id, my_account_id,
     # 'has_kill' = irgendein Kill im Cluster (egal welche Seite). Ohne
     # Kill ist der Fight nicht entschieden -> Disengage/Stalemate.
     has_kill = any(e["event_type"] == "Kill" for e in cluster)
-    # Match-Start: played_at - duration_secs * 1000.
+    # Match-Start: played_at IST der Match-Start (PUBG-API createdAt).
     fight_start_after_match_start_sec = None
     m_row = conn.execute(
-        "SELECT played_at, duration_secs FROM matches WHERE match_id = ?",
+        "SELECT played_at FROM matches WHERE match_id = ?",
         (match_id,)).fetchone()
     if m_row and m_row["played_at"]:
-        m_end = _parse_iso(m_row["played_at"])
-        if m_end:
-            m_end_ms = int(m_end.timestamp() * 1000)
-            m_start_ms = m_end_ms - (m_row["duration_secs"] or 0) * 1000
+        m_start = _parse_iso(m_row["played_at"])
+        if m_start:
+            m_start_ms = int(m_start.timestamp() * 1000)
             fight_start_after_match_start_sec = int(
                 max(0, (fight_start_ts - m_start_ms) / 1000))
     return {
