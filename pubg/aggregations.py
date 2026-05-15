@@ -1622,6 +1622,108 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
     except Exception:
         pass
 
+    # ── Spezial-Milestones: Red Zone, Fahrzeug-Kill, Fahrzeug-Tod ──
+    # Nur fuer mich (my_account_id). Mates werden separat gezaehlt
+    # (compute_session_report per-match squad-detail).
+    # Telemetrie erforderlich — ohne Landing-Events etc. kein Fund.
+    try:
+        all_ms = matches_desc  # DESC sorted, reversed = ASC
+        for m in reversed(all_ms):
+            mid   = m["matchId"]
+            played = m["playedAt"]
+
+            # --- Killed by Red Zone ---
+            # LogPlayerKillV2 mit weapon LIKE '%RedZone%' oder '%Bomb%'
+            # und actor_account IS NULL (kein echter Killer-Account)
+            rz = conn.execute("""
+                SELECT COUNT(*) FROM telemetry_events
+                WHERE match_id=? AND event_type='Kill'
+                  AND target_account=?
+                  AND (actor_account IS NULL OR actor_account='')
+                  AND (weapon LIKE '%RedZone%'
+                       OR weapon LIKE '%Bomb%'
+                       OR weapon LIKE '%bomb%')
+            """, (mid, my_account_id)).fetchone()[0]
+            if rz > 0:
+                out.append({
+                    "id": "redzone_death",
+                    "label": "Red Zone Victim",
+                    "icon": "💥",
+                    "matchId": mid, "playedAt": played,
+                })
+
+            # --- Killed a player WITH a vehicle (run over) ---
+            # damageCauserName = Fahrzeug-Klasse (BP_Buggy_C etc.)
+            vkill = conn.execute("""
+                SELECT COUNT(*) FROM telemetry_events
+                WHERE match_id=? AND event_type='Kill'
+                  AND actor_account=?
+                  AND weapon LIKE 'BP_%'
+            """, (mid, my_account_id)).fetchone()[0]
+            if vkill > 0:
+                out.append({
+                    "id": "vehicle_kill",
+                    "label": f"Road Rage · {vkill}×",
+                    "icon": "🚗",
+                    "matchId": mid, "playedAt": played,
+                })
+
+            # --- Got killed by a vehicle ---
+            vdeath = conn.execute("""
+                SELECT COUNT(*) FROM telemetry_events
+                WHERE match_id=? AND event_type='Kill'
+                  AND target_account=?
+                  AND weapon LIKE 'BP_%'
+            """, (mid, my_account_id)).fetchone()[0]
+            if vdeath > 0:
+                out.append({
+                    "id": "vehicle_death",
+                    "label": "Speed Bump",
+                    "icon": "🚗",
+                    "matchId": mid, "playedAt": played,
+                })
+
+            # --- Kill while driving (shooting from vehicle) ---
+            # VehicleEnter/Leave Intervalle bauen, dann Kill-Events pruefen
+            ve_events = conn.execute("""
+                SELECT event_type, timestamp_ms FROM telemetry_events
+                WHERE match_id=? AND actor_account=?
+                  AND event_type IN ('VehicleEnter', 'VehicleLeave')
+                ORDER BY timestamp_ms ASC
+            """, (mid, my_account_id)).fetchall()
+            if ve_events:
+                # Baue Intervalle: (enter_ms, leave_ms)
+                intervals = []
+                enter_ms = None
+                for e in ve_events:
+                    if e["event_type"] == "VehicleEnter":
+                        enter_ms = e["timestamp_ms"]
+                    elif e["event_type"] == "VehicleLeave" and enter_ms:
+                        intervals.append((enter_ms, e["timestamp_ms"]))
+                        enter_ms = None
+                if enter_ms:
+                    intervals.append((enter_ms, 10**15))
+                if intervals:
+                    my_kills = conn.execute("""
+                        SELECT timestamp_ms FROM telemetry_events
+                        WHERE match_id=? AND event_type='Kill'
+                          AND actor_account=?
+                    """, (mid, my_account_id)).fetchall()
+                    driveby_n = sum(
+                        1 for k in my_kills
+                        if k["timestamp_ms"] and
+                           any(a <= k["timestamp_ms"] <= b
+                               for a, b in intervals))
+                    if driveby_n > 0:
+                        out.append({
+                            "id": "vehicle_gunkill",
+                            "label": f"Drive-By · {driveby_n}×",
+                            "icon": "🔫",
+                            "matchId": mid, "playedAt": played,
+                        })
+    except Exception:
+        pass
+
     out.sort(key=lambda a: a.get("playedAt") or "")
     return out
 
@@ -2896,8 +2998,98 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
     lowlights = sorted([x for x in enriched if (x["place"] or 99) > 20],
                        key=lambda x: x["time_survived"] or 0)[:3]
 
+    def _special_events(match_id, acc_ids):
+        """Sonder-Events (Redzone-Tod, Fahrzeug-Kill/-Tod, Drive-By)
+        pro Account-ID. Nur wenn Telemetrie vorhanden.
+        Returns dict { account_id: {redzone, vkill, vdeath, driveby} }"""
+        ph = ",".join("?" * len(acc_ids))
+        result = {a: {"redzone": 0, "vkill": 0, "vdeath": 0, "driveby": 0}
+                  for a in acc_ids}
+        try:
+            # Redzone-Tode pro Member
+            for r in conn.execute(f"""
+                SELECT target_account, COUNT(*) AS n FROM telemetry_events
+                WHERE match_id=? AND event_type='Kill'
+                  AND target_account IN ({ph})
+                  AND (actor_account IS NULL OR actor_account='')
+                  AND (weapon LIKE '%RedZone%' OR weapon LIKE '%Bomb%'
+                       OR weapon LIKE '%bomb%')
+                GROUP BY target_account
+            """, [match_id] + list(acc_ids)).fetchall():
+                if r["target_account"] in result:
+                    result[r["target_account"]]["redzone"] = r["n"]
+            # Fahrzeug-Kills (run over somebody)
+            for r in conn.execute(f"""
+                SELECT actor_account, COUNT(*) AS n FROM telemetry_events
+                WHERE match_id=? AND event_type='Kill'
+                  AND actor_account IN ({ph}) AND weapon LIKE 'BP_%'
+                GROUP BY actor_account
+            """, [match_id] + list(acc_ids)).fetchall():
+                if r["actor_account"] in result:
+                    result[r["actor_account"]]["vkill"] = r["n"]
+            # Fahrzeug-Tode (run over)
+            for r in conn.execute(f"""
+                SELECT target_account, COUNT(*) AS n FROM telemetry_events
+                WHERE match_id=? AND event_type='Kill'
+                  AND target_account IN ({ph}) AND weapon LIKE 'BP_%'
+                GROUP BY target_account
+            """, [match_id] + list(acc_ids)).fetchall():
+                if r["target_account"] in result:
+                    result[r["target_account"]]["vdeath"] = r["n"]
+            # Drive-By (Kill waehrend in Fahrzeug)
+            for acc in acc_ids:
+                ve = conn.execute("""
+                    SELECT event_type, timestamp_ms FROM telemetry_events
+                    WHERE match_id=? AND actor_account=?
+                      AND event_type IN ('VehicleEnter','VehicleLeave')
+                    ORDER BY timestamp_ms ASC
+                """, (match_id, acc)).fetchall()
+                if not ve:
+                    continue
+                intervals = []
+                enter_ms = None
+                for e in ve:
+                    if e["event_type"] == "VehicleEnter":
+                        enter_ms = e["timestamp_ms"]
+                    elif e["event_type"] == "VehicleLeave" and enter_ms:
+                        intervals.append((enter_ms, e["timestamp_ms"]))
+                        enter_ms = None
+                if enter_ms:
+                    intervals.append((enter_ms, 10**15))
+                if not intervals:
+                    continue
+                ks = conn.execute("""
+                    SELECT timestamp_ms FROM telemetry_events
+                    WHERE match_id=? AND event_type='Kill'
+                      AND actor_account=?
+                """, (match_id, acc)).fetchall()
+                db = sum(1 for k in ks if k["timestamp_ms"] and
+                         any(a <= k["timestamp_ms"] <= b for a, b in intervals))
+                if db and acc in result:
+                    result[acc]["driveby"] = db
+        except Exception:
+            pass
+        return result
+
     def _to_payload(m):
         # Eigener Eintrag zusätzlich zu mates-Liste
+        # Sonder-Events (Redzone, Fahrzeug) fuer ganzes Squad
+        sq_accs = {my_account_id} | {s.get("account_id") or s.get("name")
+                                       for s in (m["squad"] or [])
+                                       if s.get("account_id")}
+        # squad hat aktuell nur Namen, nicht account_ids. Wir holen
+        # account_ids aus participants.
+        sq_accs_from_db = set(r["account_id"] for r in conn.execute(
+            "SELECT account_id FROM participants WHERE match_id=? AND team_id=("
+            "  SELECT team_id FROM participants WHERE match_id=? AND account_id=?)",
+            (m["match_id"], m["match_id"], my_account_id)).fetchall())
+        spec = _special_events(m["match_id"], sq_accs_from_db)
+        # Name-Lookup fuer account_ids
+        acc_name = {r["account_id"]: r["name"] for r in conn.execute(
+            "SELECT account_id, name FROM players WHERE account_id IN ({})".format(
+                ",".join("?"*len(sq_accs_from_db))),
+            list(sq_accs_from_db)).fetchall()} if sq_accs_from_db else {}
+        my_special = spec.get(my_account_id, {})
         my_entry = {
             "name": my_name,
             "kills": m.get("effective_kills", m["kills"]),
@@ -2908,6 +3100,23 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             "place": m["place"],
             "time_survived": m["time_survived"],
             "isSelf": True,
+            "special": my_special,
+        }
+        # Mates-Liste mit special-Events anreichern
+        squad_enriched = []
+        for s in (m["squad"] or []):
+            s2 = dict(s)
+            # Versuch account_id via Name zu finden
+            acc = next((a for a, n in acc_name.items()
+                        if n == s.get("name") and a != my_account_id), None)
+            s2["special"] = spec.get(acc, {}) if acc else {}
+            squad_enriched.append(s2)
+        # Gesamt-Sonder-Events fuer Match als Zusammenfassung
+        match_special = {
+            "redzoneDeaths": sum(v.get("redzone",0) for v in spec.values()),
+            "vehicleKills":  sum(v.get("vkill",0)  for v in spec.values()),
+            "vehicleDeaths": sum(v.get("vdeath",0) for v in spec.values()),
+            "driveBys":      sum(v.get("driveby",0) for v in spec.values()),
         }
         return {
             "matchId": m["match_id"],
@@ -2922,7 +3131,8 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             "timeSurvived": m["time_survived"],
             "squadTimeSurvived": m["squadTimeSurvived"],
             "myStats": my_entry,
-            "squad": m["squad"],
+            "squad": squad_enriched,
+            "matchSpecial": match_special,
         }
 
     return {

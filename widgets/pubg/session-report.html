@@ -923,10 +923,20 @@
         return (b.damage_dealt || 0) - (a.damage_dealt || 0);
       });
       const isWin = m.place === 1;
+      // Sonder-Events-Icons pro Spieler
+      function specialBadges(sp) {
+        if (!sp) return "";
+        const b = [];
+        if (sp.redzone) b.push(`<span title="Red Zone Tod">💥×${sp.redzone}</span>`);
+        if (sp.vkill)   b.push(`<span title="Überfahren">🚗💀×${sp.vkill}</span>`);
+        if (sp.vdeath)  b.push(`<span title="Überfahren worden">🚗×${sp.vdeath}</span>`);
+        if (sp.driveby) b.push(`<span title="Drive-By Kill">🔫🚗×${sp.driveby}</span>`);
+        return b.length ? ` <span style="font-size:0.8em;opacity:0.85">${b.join(" ")}</span>` : "";
+      }
       const rows = all.map(p => {
         const cls = (p.isSelf ? "self " : "") + (isWin ? "win" : "");
         return `<tr class="${cls.trim()}">
-          <td>${p.name}${p.isSelf ? " (du)" : ""}</td>
+          <td>${p.name}${p.isSelf ? " (du)" : ""}${specialBadges(p.special)}</td>
           <td>${p.kills || 0}</td>
           <td>${p.headshot_kills || 0}</td>
           <td>${p.assists || 0}</td>

@@ -609,6 +609,10 @@ class EndpointRegistry:
             "silent_heist":            "Heist match completed with 0 kills",
             "ghost_operative":         "Heist with 0 kills, 0 damage, 10+ loot",
             "window_smasher":          "Smashed 30+ windows in a heist",
+            "redzone_death":           "Killed by the red zone bomb",
+            "vehicle_kill":            "Ran over and killed an enemy",
+            "vehicle_death":           "Got run over by a vehicle",
+            "vehicle_gunkill":         "Killed an enemy while driving",
             "first_hot_drop":          "First hot drop in the session",
             "hot_drop_match":          "Multiple hot drops in a row — no cold drop in between",
             "hot_drop_match_survived": "Multiple hot drops survived in a row",
@@ -658,6 +662,10 @@ class EndpointRegistry:
             "silent_heist":            "Heist-Match ohne Kills abgeschlossen",
             "ghost_operative":         "Heist mit 0 Kills, 0 DMG, 10+ Loot",
             "window_smasher":          "30+ Fenster im Heist eingeschlagen",
+            "redzone_death":           "Von der Roten Zone bombardiert",
+            "vehicle_kill":            "Gegner überfahren",
+            "vehicle_death":           "Von Fahrzeug überfahren worden",
+            "vehicle_gunkill":         "Gegner beim Fahren erschossen",
             "first_hot_drop":          "Erstes Hot-Drop der Session",
             "hot_drop_match":          "Mehrere Hot-Drops in Folge — kein Cold-Drop dazwischen",
             "hot_drop_match_survived": "Mehrere Hot-Drops in Folge überlebt",
@@ -852,6 +860,11 @@ class EndpointRegistry:
         "first_hot_drop":          50,  # legacy (DB-Rows von vor hot_drop_match)
         "hot_drop_match_survived": 51,
         "first_hot_drop_survived": 51,  # legacy
+        # Sonder-Milestones (locker am Ende)
+        "redzone_death":           60,
+        "vehicle_kill":            61,
+        "vehicle_death":           62,
+        "vehicle_gunkill":         63,
     }
 
     # Kanonische Labels fuer aggregierte Darstellung. Die in der DB
@@ -906,6 +919,11 @@ class EndpointRegistry:
         "silent_heist":            "Silent Heist",
         "ghost_operative":         "Ghost Operative",
         "window_smasher":          "Window Smasher",
+        # Sonder-Milestones
+        "redzone_death":           "Red Zone Victim",
+        "vehicle_kill":            "Road Rage",
+        "vehicle_death":           "Speed Bump",
+        "vehicle_gunkill":         "Drive-By",
     }
 
     # PUBG-Achievement-Icon-URLs. Komplettes Set fuer alle 44 Milestones
@@ -971,6 +989,11 @@ class EndpointRegistry:
         "silent_heist":            "/widgets/pubg/icons/silent_heist.png",
         "ghost_operative":         "/widgets/pubg/icons/ghost_operative.png",
         "window_smasher":          "/widgets/pubg/icons/window_smasher.png",
+        # Sonder-Milestones: Redzone, Fahrzeug
+        "redzone_death":           None,   # kein eigenes Icon → Emoji 💥
+        "vehicle_kill":            None,   # 🚗
+        "vehicle_death":           None,   # 🚗
+        "vehicle_gunkill":         None,   # 🔫
     }
 
     def _current_lang(self):
