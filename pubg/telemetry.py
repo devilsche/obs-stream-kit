@@ -25,13 +25,15 @@ def _normalize(event):
     """Convert one PUBG telemetry event to flat row schema, or None to skip.
     Deckt alle für unsere Stats relevanten Event-Typen ab."""
     et = event.get("_T", "")
+    # payload_json wird nicht mehr in SQLite gespeichert — HiDrive ist
+    # ab jetzt das Raw-Archiv. Die Spalte existiert noch fuer alte Rows.
     base = {"event_type": None, "timestamp_ms": _ts_ms(event.get("_D")),
             "actor_account": None, "target_account": None,
             "actor_x": None, "actor_y": None, "actor_z": None,
             "actor_health": None,
             "victim_x": None, "victim_y": None,
             "weapon": None, "distance": None, "damage": None,
-            "payload_json": json.dumps(event, separators=(",", ":"))}
+            "payload_json": None}
     # Helper: extracts z + health for character-events (for landing-pin
     # heuristic; ground-events have z<800 and health>0).
     def _z_health(ev, key):

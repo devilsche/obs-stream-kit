@@ -418,6 +418,115 @@ def wipe_day(root: str, date_str: str = None,
     return 0
 
 
+def hidrive_clear_payload(root: str) -> int:
+    """Loescht payload_json aus allen telemetry_events in SQLite.
+    NUR ausfuehren NACHDEM hidrive-backfill erfolgreich war —
+    danach ist HiDrive die Raw-Quelle, payload_json wird nicht mehr
+    benoetigt.
+
+    Spart ~50% SQLite-Groesse.
+
+    Nutzung:
+        python -m pubg.cli hidrive-clear-payload
+    """
+    db_path = os.path.join(root, "data", "pubg-history.db")
+    if not os.path.exists(db_path):
+        print(f"DB nicht gefunden: {db_path}"); return 1
+    conn = connect(db_path)
+    n = conn.execute(
+        "SELECT COUNT(*) FROM telemetry_events WHERE payload_json IS NOT NULL"
+    ).fetchone()[0]
+    print(f"{n} Rows mit payload_json.")
+    if n == 0:
+        print("Nichts zu tun."); conn.close(); return 0
+    ans = input(f"payload_json aus allen {n} Rows loeschen? "
+                f"(hidrive-backfill zuerst gelaufen?) [y/N] ").strip().lower()
+    if ans != "y":
+        print("Abgebrochen."); conn.close(); return 0
+    conn.execute("UPDATE telemetry_events SET payload_json = NULL "
+                 "WHERE payload_json IS NOT NULL")
+    conn.execute("VACUUM")
+    conn.commit()
+    print(f"Fertig. SQLite-Datei ist jetzt deutlich kleiner (VACUUM ausgefuehrt).")
+    conn.close()
+    return 0
+
+
+def hidrive_refill(root: str, only_match: str = None) -> int:
+    """SQLite telemetry_events aus HiDrive-Archiv neu befuellen.
+    Nuetzlich wenn filter_squad_events erweitert wurde (neue Event-Typen)
+    und alle historischen Matches neu verarbeitet werden sollen.
+
+    Ablauf pro Match:
+      1. Raw-Blob von HiDrive laden
+      2. filter_squad_events() mit aktueller Logik
+      3. telemetry_events in SQLite loeschen + neu einfuegen
+      4. telemetry_schema auf CURRENT setzen
+
+    Nutzung:
+        python -m pubg.cli hidrive-refill                    # alle Matches
+        python -m pubg.cli hidrive-refill --match MATCH_ID   # ein Match
+    """
+    db_path = os.path.join(root, "data", "pubg-history.db")
+    if not os.path.exists(db_path):
+        print(f"DB nicht gefunden: {db_path}")
+        return 1
+
+    from pubg.hidrive_telemetry import download_raw, list_archived
+    from pubg.db import connect, insert_telemetry_events, mark_telemetry_schema
+    from pubg.telemetry import filter_squad_events
+    from pubg.db import CURRENT_TELEMETRY_SCHEMA
+
+    conn = connect(db_path)
+    secrets = os.path.join(root, ".secrets")
+    cfg = load_config(os.path.join(root, "config", "pubg.json"))
+    self_p = get_player_by_name(conn, cfg["playerName"])
+    if not self_p:
+        print("Self-Player nicht in DB")
+        conn.close()
+        return 1
+    my_acc = self_p["account_id"]
+
+    # Match-IDs bestimmen
+    if only_match:
+        match_ids = [only_match]
+    else:
+        match_ids = list_archived(secrets)
+    print(f"{len(match_ids)} Match(es) zum Refill aus HiDrive.\n")
+
+    ok = 0; skip = 0; err = 0
+    for i, mid in enumerate(match_ids, 1):
+        raw = download_raw(mid, secrets)
+        if raw is None:
+            print(f"  [{i}/{len(match_ids)}] SKIP {mid[:20]} (nicht auf HiDrive)")
+            skip += 1
+            continue
+        # Squad bestimmen
+        squad_rows = conn.execute(
+            "SELECT account_id FROM participants WHERE match_id=? "
+            "AND team_id=(SELECT team_id FROM participants "
+            "WHERE match_id=? AND account_id=?)",
+            (mid, mid, my_acc)).fetchall()
+        squad = {r["account_id"] for r in squad_rows} | {my_acc}
+        # Gefilterte Events aus Raw
+        events = list(filter_squad_events(raw, squad))
+        # SQLite: alte Events loeschen + neu einfuegen
+        conn.execute("DELETE FROM telemetry_events WHERE match_id=?", (mid,))
+        conn.commit()
+        if events:
+            insert_telemetry_events(conn, mid, events)
+        mark_telemetry_schema(conn, mid, CURRENT_TELEMETRY_SCHEMA)
+        print(f"  [{i}/{len(match_ids)}] {mid[:20]}  {len(raw)} raw → {len(events)} filtered")
+        ok += 1
+
+    conn.close()
+    print(f"\nFertig: {ok} neu befuellt, {skip} uebersprungen, {err} Fehler")
+    if ok > 0:
+        print("Tipp: 'python -m pubg.cli reset-milestones <ids>' um "
+              "Milestones mit neuer Logik neu zu detektieren.")
+    return 0
+
+
 def hidrive_backfill(root: str) -> int:
     """Uploadet alle Altmatches aus der lokalen SQLite-DB als rekonstruierte
     Telemetrie-Blobs auf HiDrive. Matches die schon archiviert sind werden
@@ -621,6 +730,12 @@ if __name__ == "__main__":
         sys.exit(purge_before(root, date_arg))
     elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-backfill":
         sys.exit(hidrive_backfill(root))
+    elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-clear-payload":
+        sys.exit(hidrive_clear_payload(root))
+    elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-refill":
+        # Optional: --match MATCH_ID fuer einzelnen Match
+        mid = sys.argv[3] if len(sys.argv) > 3 and sys.argv[2] == "--match" else None
+        sys.exit(hidrive_refill(root, only_match=mid))
     else:
         print("Usage: python -m pubg.cli init | cold-start | pull-ftp | "
               "seasons-backfill | wipe-day [YYYY-MM-DD] [--keep-popups] | "
