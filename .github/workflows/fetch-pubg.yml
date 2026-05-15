@@ -1,0 +1,31 @@
+name: PUBG Fetch Job
+
+on:
+  schedule:
+    # Alle 6 Stunden: 0, 6, 12, 18 Uhr UTC
+    - cron: '0 */6 * * *'
+  # Manueller Trigger fuer Tests
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Dependencies installieren
+        run: pip install psycopg2-binary
+
+      - name: Schema sicherstellen + Fetch
+        run: python -m pubg.fetch_job --init-schema
+        env:
+          PUBG_API_KEY: ${{ secrets.PUBG_API_KEY }}
+          PUBG_PG_DSN:  ${{ secrets.PUBG_PG_DSN }}
