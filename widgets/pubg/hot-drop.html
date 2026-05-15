@@ -302,8 +302,10 @@
         if (x < 8) x = 8;  // notfalls am linken Rand kleben
       }
       let y = e.clientY + 12;
-      if (y + rect.height + 8 > vh) y = vh - rect.height - 8;
-      if (y < 8) y = 8;
+      if (y + rect.height + 8 > vh) {
+        y = e.clientY - rect.height - 12;  // flip nach oben
+        if (y < 8) y = 8;  // notfalls oben kleben
+      }
       pov.style.left = x + "px";
       pov.style.top  = y + "px";
     }

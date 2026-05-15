@@ -588,8 +588,10 @@
         if (x < 8) x = 8;
       }
       let y = e.clientY + 14;
-      if (y + r.height + 8 > vh) y = vh - r.height - 8;
-      if (y < 8) y = 8;
+      if (y + r.height + 8 > vh) {
+        y = e.clientY - r.height - 14;
+        if (y < 8) y = 8;
+      }
       achPov.style.left = x + "px";
       achPov.style.top  = y + "px";
     }

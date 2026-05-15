@@ -254,8 +254,10 @@
         if (x < 8) x = 8;
       }
       let y = e.clientY + 12;
-      if (y + r.height + 8 > vh) y = vh - r.height - 8;
-      if (y < 8) y = 8;
+      if (y + r.height + 8 > vh) {
+        y = e.clientY - r.height - 12;
+        if (y < 8) y = 8;
+      }
       pov.style.left = x + "px";
       pov.style.top  = y + "px";
     }
