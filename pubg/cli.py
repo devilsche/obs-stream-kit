@@ -427,10 +427,12 @@ def backfill_pcts(root: str) -> int:
         python -m pubg.cli backfill-pcts
     """
     from pubg.aggregations import _compute_snapshot_pcts
+    from pubg.db import init_schema
     db_path = os.path.join(root, "data", "pubg-history.db")
     if not os.path.exists(db_path):
         print(f"DB nicht gefunden: {db_path}"); return 1
     conn = connect(db_path)
+    init_schema(conn)  # fuegt session_pct / match_pct Spalten hinzu falls noch nicht da
     rows = conn.execute("""
         SELECT achievement_id, match_id, label, played_at
         FROM pubg_achievements_seen
