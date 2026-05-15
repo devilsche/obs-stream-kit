@@ -1823,29 +1823,25 @@ def _compute_snapshot_pcts(conn, aid, played_at, label):
         return None, None
 
     # Bisherige Vorkommen dieses Milestones (<= played_at, Tier-aware)
-    # Wichtig: nur Eintraege ZAEHLEn die BEREITS in der DB sind (played_at <= ?)
-    # Damit ist der Pct ein historischer Snapshot — "wie selten war das,
-    # als ich es zum ersten Mal hatte?" Voraussetzung: Milestones muessen
-    # CHRONOLOGISCH (ASC nach played_at) eingefuegt werden. backfill_session_
-    # achievements() tut das bereits.
+    # Wichtig: nur Eintraege zaehlen die schon in DB sind (played_at < ?)
+    # Historischer Snapshot — "wie selten war das ZU DEM ZEITPUNKT?"
+    # backfill_session_achievements() liefert chronologisch ASC, daher
+    # sind alle frueheren Eintraege bereits in der DB beim _compute-Call.
     if is_tiered and tier is not None:
-        import re as _re2
-        ach_days = conn.execute("""
-            SELECT COUNT(DISTINCT date(played_at))
-            FROM pubg_achievements_seen
-            WHERE achievement_id = ? AND played_at < ?
-              AND CAST(COALESCE(
-                    NULLIF(TRIM(REPLACE(REPLACE(label,'×',''),'x','')),''),
-                  '0') AS INTEGER) >= ?
-        """, (aid, played_at, tier)).fetchone()[0]
-        ach_matches = conn.execute("""
-            SELECT COUNT(*)
-            FROM pubg_achievements_seen
-            WHERE achievement_id = ? AND played_at < ?
-              AND CAST(COALESCE(
-                    NULLIF(TRIM(REPLACE(REPLACE(label,'×',''),'x','')),''),
-                  '0') AS INTEGER) >= ?
-        """, (aid, played_at, tier)).fetchone()[0]
+        # Tier in Python parsen (SQL CAST 'Inferno Begins 3' → 0 ist nutzlos)
+        prior = conn.execute(
+            "SELECT played_at, label FROM pubg_achievements_seen "
+            "WHERE achievement_id = ? AND played_at < ?",
+            (aid, played_at)).fetchall()
+        matching_dates = set()
+        ach_matches = 0
+        for r in prior:
+            m = _re.search(r"×\s*(\d+)", r["label"] or "")
+            t_prior = int(m.group(1)) if m else 0
+            if t_prior >= tier:
+                ach_matches += 1
+                matching_dates.add((r["played_at"] or "")[:10])
+        ach_days = len(matching_dates)
     else:
         ach_days = conn.execute(
             "SELECT COUNT(DISTINCT date(played_at)) FROM pubg_achievements_seen "
