@@ -445,9 +445,16 @@ def hidrive_clear_payload(root: str) -> int:
         print("Abgebrochen."); conn.close(); return 0
     conn.execute("UPDATE telemetry_events SET payload_json = NULL "
                  "WHERE payload_json IS NOT NULL")
-    conn.execute("VACUUM")
-    conn.commit()
-    print(f"Fertig. SQLite-Datei ist jetzt deutlich kleiner (VACUUM ausgefuehrt).")
+    conn.commit()  # erst committen, dann VACUUM (ausserhalb Transaktion)
+    conn.execute("PRAGMA wal_checkpoint(FULL)")
+    try:
+        conn.execute("VACUUM")
+        print("Fertig + VACUUM. SQLite-Datei ist jetzt deutlich kleiner.")
+    except Exception as e:
+        print(f"UPDATE OK. VACUUM fehlgeschlagen: {e}")
+        print("Tipp: serve.py stoppen und manuell ausfuehren:")
+        print("  python3 -c \"import sqlite3; c=sqlite3.connect('data/pubg-history.db'); c.execute('VACUUM'); c.close()\"")
+    conn.close()
     conn.close()
     return 0
 
