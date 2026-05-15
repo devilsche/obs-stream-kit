@@ -242,8 +242,11 @@
         `${d.hotDrops||0} hot drops in ${d.matches||0} matches`;
     }
 
-    // Popover-Handler (event-delegation auf den markers-Container)
+    // Popover-Handler (event-delegation auf den markers-Container).
+    // Nur bei Marker-Wechsel content neu setzen, sonst flickert
+    // innerHTML-Reflow bei jedem mousemove (mouseover bubbelt).
     const pov = document.getElementById("popover");
+    let povActive = null;
     function fmtDur2(s) {
       if (s == null) return "?";
       const m = Math.floor(s / 60), x = Math.floor(s % 60);
@@ -285,10 +288,16 @@
       pov.style.left = (x + rect.width > vw ? vw - rect.width - 8 : x) + "px";
       pov.style.top  = (y + rect.height > vh ? vh - rect.height - 8 : y) + "px";
     }
-    function hidePov() { pov.classList.remove("show"); }
+    function hidePov() {
+      pov.classList.remove("show");
+      povActive = null;
+    }
     document.getElementById("markers").addEventListener("mouseover", (e) => {
       const t = e.target.closest(".m[data-mi]");
-      if (t) showPov(t, e);
+      if (!t) return;
+      if (t === povActive) return;
+      povActive = t;
+      showPov(t, e);
     });
     document.getElementById("markers").addEventListener("mousemove", (e) => {
       if (pov.classList.contains("show")) positionPov(e);

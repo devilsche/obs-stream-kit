@@ -207,8 +207,9 @@
           `<span class="${v ? 's' : 'd'}" title="Match #${i+1}"></span>`).join("");
       }
     }
-    // Popover-Handler
+    // Popover-Handler: nur bei Marker-Wechsel content neu setzen.
     const pov = document.getElementById("popover");
+    let povActive = null;
     function fmtDur2(s) {
       if (s == null) return "?";
       const m = Math.floor(s/60), x = Math.floor(s%60);
@@ -247,11 +248,17 @@
       pov.style.left = (x + r.width > vw ? vw - r.width - 8 : x) + "px";
       pov.style.top  = (y + r.height > vh ? vh - r.height - 8 : y) + "px";
     }
-    function hidePov() { pov.classList.remove("show"); }
+    function hidePov() {
+      pov.classList.remove("show");
+      povActive = null;
+    }
     const sparkEl = document.getElementById("spark");
     sparkEl.addEventListener("mouseover", (e) => {
       const t = e.target.closest("span[data-mi]");
-      if (t) showPov(t, e);
+      if (!t) return;
+      if (t === povActive) return;
+      povActive = t;
+      showPov(t, e);
     });
     sparkEl.addEventListener("mousemove", (e) => {
       if (pov.classList.contains("show")) positionPov(e);

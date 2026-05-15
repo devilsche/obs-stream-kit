@@ -542,8 +542,11 @@
       if (appId && api) triggerReplay(appId, api, tile, source);
     });
 
-    // Hover-Popover
+    // Hover-Popover: nur bei Tile-Wechsel content neu setzen, sonst
+    // flickert die innerHTML-Reflow bei jedem mousemove (mouseover
+    // bubbelt durch alle Kind-Elemente der Tile).
     const achPov = document.getElementById("achPopover");
+    let achActiveTile = null;
     function achShow(tile, e) {
       const title = tile.dataset.povTitle || "";
       const body = tile.dataset.povBody || "";
@@ -559,15 +562,29 @@
       achPov.style.left = (x + r.width > vw ? vw - r.width - 8 : x) + "px";
       achPov.style.top  = (y + r.height > vh ? vh - r.height - 8 : y) + "px";
     }
-    function achHide() { achPov.classList.remove("show"); }
+    function achHide() {
+      achPov.classList.remove("show");
+      achActiveTile = null;
+    }
     gridEl.addEventListener("mouseover", (e) => {
       const tile = e.target.closest(".tile");
-      if (tile) achShow(tile, e);
+      if (!tile) return;
+      if (tile === achActiveTile) return;  // gleiche Tile, kein Re-Render
+      achActiveTile = tile;
+      achShow(tile, e);
     });
     gridEl.addEventListener("mousemove", (e) => {
       if (achPov.classList.contains("show")) achPosition(e);
     });
-    gridEl.addEventListener("mouseleave", achHide);
+    gridEl.addEventListener("mouseout", (e) => {
+      // Verlassen einer Tile: nur hiden wenn wir die GRID verlassen
+      // ODER zu keiner anderen Tile wechseln.
+      const tile = e.target.closest(".tile");
+      const to = e.relatedTarget;
+      const toTile = to && to.closest && to.closest(".tile");
+      if (tile && toTile === tile) return;  // nur Kind verlassen, egal
+      if (!toTile) achHide();
+    });
     gameSel.addEventListener("change", (e) => {
       filterGame = e.target.value;
       applyFilters();
@@ -685,6 +702,10 @@
       // Pause Refresh waehrend User das Dropdown offen hat — Rebuild
       // wuerde es zumachen.
       if (document.activeElement === gameSel) return;
+      // Pause Refresh waehrend Popover offen — sonst wird die Tile
+      // unter dem Cursor neu erstellt waehrend man auf sie clicken
+      // will → Click verlaeuft im Sand.
+      if (achPov.classList.contains("show")) return;
       let data;
       try {
         data = await fetchAll();
