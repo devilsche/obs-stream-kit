@@ -907,26 +907,32 @@ def compute_session_matches(conn, my_account_id, range_key="session",
 
 
 def compute_match_detail(conn, my_account_id, match_id):
-    """Detail-Infos zu einem Match fuer das Expand-Panel im Session-
-    Report. Liefert pro Squad-Member den Landing-POI + Death-Info
-    (wer hat denjenigen gekillt, mit welcher Waffe, auf welche Distanz).
+    """v2: liefert pro Member ein lives[]-Array. Jedes Leben hat
+    planeRoute, landing, groundPath, death (oder None), kills.
+    Comeback-Detection ueber Telemetry-Split an Kill-target=member.
 
     Returns dict:
       {
-        "matchId": ...,
-        "mapName": ...,
+        "matchId": ..., "mapName": ...,
         "members": [
           {
-            "name": "...", "isSelf": bool,
-            "landingX": cm, "landingY": cm,
-            "died": bool,
-            "killerName": "...", "weapon": "WeapId", "weaponName": "M416",
-            "distanceM": float,  # Meter
+            "accountId", "name", "isSelf",
+            "lives": [
+              {
+                "lifeIndex": 1, "planeRoute": [[x,y,ts], ...],
+                "landing": {"x", "y", "tsMs"},
+                "groundPath": [[x,y,ts], ...],
+                "death": {"x", "y", "tsMs", "killerName", "weaponId",
+                          "weaponName", "distanceM"} | None,
+                "kills": [{"actorX", "actorY", "victimX", "victimY",
+                            "tsMs", "weapon", "victimName"}, ...]
+              },
+              ...
+            ],
+            "revivePts": [[x, y, tsMs], ...]
           }, ...
-        ],
+        ]
       }
-    Mate-Telemetrie haben wir; landings + Kill-Events (target=Squad-
-    Member) reichen. Weapon-ID wird ueber _weapon_label gemappt.
     """
     m_row = conn.execute(
         "SELECT match_id, map_name, played_at FROM matches WHERE match_id = ?",
@@ -934,7 +940,6 @@ def compute_match_detail(conn, my_account_id, match_id):
     if not m_row:
         return None
     map_name = m_row["map_name"]
-    # match_start als ms-timestamp fuer Death-Zeitpunkt-Berechnung
     match_start_ms = None
     if m_row["played_at"]:
         try:
@@ -944,14 +949,15 @@ def compute_match_detail(conn, my_account_id, match_id):
             match_start_ms = int(start_dt.timestamp() * 1000)
         except Exception:
             pass
-    # Squad-Mitglieder aus match_team_mapping
+
+    # Squad-Mitglieder
     team_row = conn.execute(
         "SELECT team_id FROM match_team_mapping "
         "WHERE match_id = ? AND account_id = ?",
         (match_id, my_account_id)).fetchone()
     if not team_row:
         return {"matchId": match_id, "mapName": map_name, "members": []}
-    members = conn.execute("""
+    members_rows = conn.execute("""
         SELECT mtm.account_id, p.name
         FROM match_team_mapping mtm
         LEFT JOIN players p ON p.account_id = mtm.account_id
@@ -959,166 +965,195 @@ def compute_match_detail(conn, my_account_id, match_id):
     """, (match_id, team_row["team_id"])).fetchall()
 
     out_members = []
-    for mem in members:
+    for mem in members_rows:
         acc = mem["account_id"]
         if not acc:
             continue
-        # Landing: best-touchdown analog _landings — fruehestes
-        # Landing-Event mit z<800 und health>0
-        landing = conn.execute("""
-            SELECT actor_x, actor_y FROM telemetry_events
-            WHERE match_id = ? AND actor_account = ?
-              AND event_type = 'Landing'
-              AND actor_x IS NOT NULL AND actor_y IS NOT NULL
-              AND (actor_z IS NULL OR actor_z < 80000)
-              AND (actor_health IS NULL OR actor_health > 0)
-            ORDER BY timestamp_ms ASC LIMIT 1
-        """, (match_id, acc)).fetchone()
-        if not landing:
-            landing = conn.execute("""
-                SELECT actor_x, actor_y FROM telemetry_events
-                WHERE match_id = ? AND actor_account = ?
-                  AND event_type = 'Landing'
-                  AND actor_x IS NOT NULL AND actor_y IS NOT NULL
-                ORDER BY timestamp_ms ASC LIMIT 1
-            """, (match_id, acc)).fetchone()
+        # Alle relevanten Events des Members chronologisch
+        ev_rows = conn.execute("""
+            SELECT event_type, timestamp_ms, actor_x, actor_y, actor_z,
+                   actor_health, target_account, victim_x, victim_y,
+                   weapon, distance, actor_account
+            FROM telemetry_events
+            WHERE match_id = ?
+              AND (actor_account = ? OR target_account = ?)
+              AND timestamp_ms IS NOT NULL
+            ORDER BY timestamp_ms ASC
+        """, (match_id, acc, acc)).fetchall()
 
-        # Death: Kill-Event mit target=mem. Killer-Name via COALESCE
-        # ueber players + participants — die volle Lobby (alle 100
-        # Spieler) liegt in participants pro Match, dort kennen wir
-        # auch die Namen der Gegner.
-        death = conn.execute("""
-            SELECT te.actor_account, te.weapon, te.distance,
-                   te.victim_x, te.victim_y, te.timestamp_ms,
-                   COALESCE(p.name, pa.name) AS killer_name
-            FROM telemetry_events te
-            LEFT JOIN players p ON p.account_id = te.actor_account
-            LEFT JOIN participants pa
-              ON pa.match_id = te.match_id
-             AND pa.account_id = te.actor_account
-            WHERE te.match_id = ? AND te.target_account = ?
-              AND te.event_type = 'Kill'
-            ORDER BY te.timestamp_ms ASC LIMIT 1
-        """, (match_id, acc)).fetchone()
+        # Death-Events isolieren (Kill mit target=acc)
+        death_events = [e for e in ev_rows
+                        if e["event_type"] == "Kill" and e["target_account"] == acc]
+        # Lives-Splitting: jedes Leben endet entweder mit einem death_event
+        # oder dem Match-Ende. Pro Death suchen wir die Cruise-Phase davor
+        # als Start des Lebens.
+        live_segments = []
+        last_death_ts = None
+        for de in death_events:
+            seg_start_ts = last_death_ts if last_death_ts is not None else 0
+            live_segments.append((seg_start_ts, de["timestamp_ms"], de))
+            last_death_ts = de["timestamp_ms"]
+        # Letztes Segment ohne Death (Survival oder Match-Ende)
+        live_segments.append((
+            last_death_ts if last_death_ts is not None else 0,
+            10**15,  # Match-Ende-Sentinel
+            None
+        ))
 
-        weapon_id = death["weapon"] if death else None
-        weapon_name = _weapon_label(weapon_id)[0] if weapon_id else None
-        death_offset_sec = None
-        death_ts_ms = None
-        if death and death["timestamp_ms"] and match_start_ms:
-            death_ts_ms = death["timestamp_ms"]
-            death_offset_sec = max(
-                0, int((death_ts_ms - match_start_ms) / 1000))
+        lives = []
+        for life_idx, (seg_start, seg_end, death_ev) in enumerate(live_segments, 1):
+            # Plane-Cruise-Start fuer dieses Leben: erstes Event ab seg_start
+            # mit z>=150000 (Plane-Cruise)
+            cruise_ts = None
+            for e in ev_rows:
+                ts = e["timestamp_ms"]
+                if ts < seg_start: continue
+                if ts > seg_end: break
+                if e["actor_account"] != acc: continue
+                z = e["actor_z"]
+                if z is not None and z >= 150000:
+                    cruise_ts = ts
+                    break
+            if cruise_ts is None:
+                # Kein Cruise gefunden — Leben hat evtl. nur Death (Edge),
+                # skip dieses Segment damit lives nicht mit "leeren" Eintraegen
+                # gefuellt wird. Ausnahme: lifeIndex==1 + erstes Leben → trotzdem
+                # einen leeren Stub liefern damit Frontend rendern kann.
+                if life_idx == 1 and not lives:
+                    lives.append({
+                        "lifeIndex": 1, "planeRoute": [],
+                        "landing": None, "groundPath": [],
+                        "death": None, "kills": [],
+                    })
+                continue
+            path_start_ms = cruise_ts + 3000
 
-        # Pfad-Start: 3s nachdem das Plane erstmals auf Cruise-Hoehe
-        # (~1500m = 150000cm in PUBG-Welt-Units) angekommen ist. Das
-        # ueberspringt das Plane-Spawn + Aufstiegs-Phase, behaelt aber
-        # die Cruise-Trajektorie (Plane-Fahrt ueber die Map) im Pfad
-        # samt Sprung-Punkt. Fallback wenn Telemetrie luecken hat:
-        # erstes VehicleLeave (= Plane-Exit), dann Match-Start.
-        cruise_row = conn.execute("""
-            SELECT MIN(timestamp_ms) AS ts FROM telemetry_events
-            WHERE match_id = ? AND actor_account = ?
-              AND event_type IN ('Position','VehicleEnter')
-              AND actor_z IS NOT NULL AND actor_z >= 150000
-        """, (match_id, acc)).fetchone()
-        if cruise_row and cruise_row["ts"]:
-            path_start_ms = cruise_row["ts"] + 3000
-        else:
-            jump_row = conn.execute("""
-                SELECT MIN(timestamp_ms) AS ts FROM telemetry_events
-                WHERE match_id = ? AND actor_account = ?
-                  AND event_type = 'VehicleLeave'
-            """, (match_id, acc)).fetchone()
-            path_start_ms = (jump_row["ts"] if jump_row and jump_row["ts"]
-                              else (match_start_ms or 0))
-        path_end_ms = death_ts_ms if death_ts_ms else 10**15
+            # Landing-Event in diesem Leben (erstes Landing nach cruise_ts)
+            landing_ev = next((
+                e for e in ev_rows
+                if e["event_type"] == "Landing"
+                and e["actor_account"] == acc
+                and e["timestamp_ms"] >= cruise_ts
+                and e["timestamp_ms"] <= seg_end
+                and e["actor_x"] is not None
+            ), None)
+            landing = None
+            if landing_ev:
+                landing = {
+                    "x": landing_ev["actor_x"],
+                    "y": landing_ev["actor_y"],
+                    "tsMs": landing_ev["timestamp_ms"],
+                }
+            landing_ts = landing["tsMs"] if landing else cruise_ts
 
-        # Pfad-Punkte: alle Position+Landing-Events ab Plane-Exit bis
-        # zum Tod (oder Match-Ende falls ueberlebt). Polyline im
-        # Frontend.
-        path_rows = conn.execute("""
+            # planeRoute: ab path_start_ms bis landing_ts (inkl.)
+            plane_route = [
+                [e["actor_x"], e["actor_y"], e["timestamp_ms"]]
+                for e in ev_rows
+                if e["actor_account"] == acc
+                and e["event_type"] in ("Position", "Landing",
+                                         "VehicleEnter", "VehicleLeave")
+                and e["actor_x"] is not None
+                and e["timestamp_ms"] >= path_start_ms
+                and e["timestamp_ms"] <= landing_ts
+            ]
+
+            # groundPath: nach landing_ts bis seg_end (oder death_ev.ts)
+            path_end = death_ev["timestamp_ms"] if death_ev else seg_end
+            ground_path = [
+                [e["actor_x"], e["actor_y"], e["timestamp_ms"]]
+                for e in ev_rows
+                if e["actor_account"] == acc
+                and e["event_type"] in ("Position", "Landing",
+                                         "VehicleEnter", "VehicleLeave")
+                and e["actor_x"] is not None
+                and e["timestamp_ms"] > landing_ts
+                and e["timestamp_ms"] <= path_end
+            ]
+
+            # Kills die der Member in diesem Leben gemacht hat
+            life_kills = []
+            for e in ev_rows:
+                if e["event_type"] != "Kill": continue
+                if e["actor_account"] != acc: continue
+                if e["target_account"] == acc: continue  # eigener death
+                if e["timestamp_ms"] < cruise_ts or e["timestamp_ms"] > seg_end:
+                    continue
+                # Victim-Name nachschlagen (players + participants)
+                vrow = conn.execute("""
+                    SELECT COALESCE(p.name, pa.name) AS n
+                    FROM (SELECT NULL) x
+                    LEFT JOIN players p ON p.account_id = ?
+                    LEFT JOIN participants pa ON pa.match_id = ?
+                          AND pa.account_id = ?
+                """, (e["target_account"], match_id, e["target_account"])).fetchone()
+                life_kills.append({
+                    "actorX":  e["actor_x"],
+                    "actorY":  e["actor_y"],
+                    "victimX": e["victim_x"],
+                    "victimY": e["victim_y"],
+                    "tsMs":    e["timestamp_ms"],
+                    "weapon":  e["weapon"],
+                    "victimName": vrow["n"] if vrow else None,
+                })
+
+            # Death-Detail
+            death_info = None
+            if death_ev:
+                wid = death_ev["weapon"]
+                weapon_name = _weapon_label(wid)[0] if wid else None
+                # Killer-Name analog
+                kn = None
+                if death_ev["actor_account"]:
+                    krow = conn.execute("""
+                        SELECT COALESCE(p.name, pa.name) AS n
+                        FROM (SELECT NULL) x
+                        LEFT JOIN players p ON p.account_id = ?
+                        LEFT JOIN participants pa ON pa.match_id = ?
+                              AND pa.account_id = ?
+                    """, (death_ev["actor_account"], match_id,
+                          death_ev["actor_account"])).fetchone()
+                    kn = krow["n"] if krow else None
+                death_info = {
+                    "x":           death_ev["victim_x"],
+                    "y":           death_ev["victim_y"],
+                    "tsMs":        death_ev["timestamp_ms"],
+                    "killerName":  kn,
+                    "weaponId":    wid,
+                    "weaponName":  weapon_name,
+                    "distanceM":   (round((death_ev["distance"] or 0) / 100.0, 1)
+                                    if death_ev["distance"] else None),
+                }
+
+            lives.append({
+                "lifeIndex":  life_idx,
+                "planeRoute": plane_route,
+                "landing":    landing,
+                "groundPath": ground_path,
+                "death":      death_info,
+                "kills":      life_kills,
+            })
+
+        # Revive-Pts (innerhalb von DBNO-Revives, separat von Comeback)
+        revive_rows = conn.execute("""
             SELECT actor_x, actor_y, timestamp_ms
             FROM telemetry_events
-            WHERE match_id = ? AND actor_account = ?
-              AND event_type IN ('Position','Landing','VehicleEnter','VehicleLeave')
-              AND actor_x IS NOT NULL AND actor_y IS NOT NULL
-              AND timestamp_ms IS NOT NULL
-              AND timestamp_ms >= ? AND timestamp_ms <= ?
+            WHERE match_id = ? AND target_account = ?
+              AND event_type = 'Revive'
+              AND actor_x IS NOT NULL
             ORDER BY timestamp_ms ASC
-        """, (match_id, acc, path_start_ms, path_end_ms)).fetchall()
-        path = [[r["actor_x"], r["actor_y"], r["timestamp_ms"]]
-                for r in path_rows]
+        """, (match_id, acc)).fetchall()
+        revive_pts = [[r["actor_x"], r["actor_y"], r["timestamp_ms"]]
+                       for r in revive_rows]
 
-        # Revive-Marker — wo wurde der Member im Match revived?
-        # Frontend kann gruene Pins setzen.
-        revives = conn.execute("""
-            SELECT te.actor_x, te.actor_y, te.timestamp_ms
-            FROM telemetry_events te
-            WHERE te.match_id = ? AND te.target_account = ?
-              AND te.event_type = 'Revive'
-              AND te.timestamp_ms IS NOT NULL
-            ORDER BY te.timestamp_ms ASC
-        """, (match_id, acc)).fetchall()
-        # Revive-Event Coords sind actor (Revival-Spieler) — wir nehmen
-        # die als Naeherung (Revive passiert beim Member).
-        revive_pts = [[r["actor_x"], r["actor_y"]] for r in revives
-                       if r["actor_x"] is not None]
-        # Kills dieses Members (fuer Squad-Kill-Toggle in der Map).
-        # Liefert Schuetzen-Coord (actor) + Opfer-Coord (victim) + Timestamp.
-        kill_rows = conn.execute("""
-            SELECT te.actor_x, te.actor_y, te.victim_x, te.victim_y,
-                   te.timestamp_ms, te.weapon,
-                   COALESCE(p.name, pa.name) AS victim_name
-            FROM telemetry_events te
-            LEFT JOIN players p ON p.account_id = te.target_account
-            LEFT JOIN participants pa
-              ON pa.match_id = te.match_id
-             AND pa.account_id = te.target_account
-            WHERE te.match_id = ? AND te.actor_account = ?
-              AND te.event_type = 'Kill'
-              AND te.actor_x IS NOT NULL AND te.victim_x IS NOT NULL
-            ORDER BY te.timestamp_ms ASC
-        """, (match_id, acc)).fetchall()
-        kills = [{
-            "actorX":  kr["actor_x"],
-            "actorY":  kr["actor_y"],
-            "victimX": kr["victim_x"],
-            "victimY": kr["victim_y"],
-            "tsMs":    kr["timestamp_ms"],
-            "weapon":  kr["weapon"],
-            "victimName": kr["victim_name"],
-        } for kr in kill_rows]
         out_members.append({
-            "accountId":   acc,
-            "name":        mem["name"] or acc[:8],
-            "isSelf":      (acc == my_account_id),
-            "landingX":    landing["actor_x"] if landing else None,
-            "landingY":    landing["actor_y"] if landing else None,
-            "died":        bool(death),
-            "killerName":  (death["killer_name"]
-                            if death and death["killer_name"]
-                            else (death["actor_account"][8:16]
-                                  if death and death["actor_account"]
-                                       and death["actor_account"].startswith("account.")
-                                  else None)),
-            "weaponId":    weapon_id,
-            "weaponName":  weapon_name,
-            "distanceM":   (round((death["distance"] or 0) / 100.0, 1)
-                            if death else None),
-            # Wo / wann gestorben — fuer 'starb in Pochinki nach 18:32'
-            "deathX":      death["victim_x"] if death else None,
-            "deathY":      death["victim_y"] if death else None,
-            "deathOffsetSec": death_offset_sec,
-            # Bewegungspfad — Liste von [x_cm, y_cm] vom Plane-Exit bis
-            # zum Death (oder Match-Ende). Frontend zeichnet Polyline.
-            "path":        path,
-            # Revive-Punkte fuer Wiederbelebungs-Marker
-            "revivePts":   revive_pts,
-            "kills":       kills,
+            "accountId": acc,
+            "name":      mem["name"] or acc[:8],
+            "isSelf":    (acc == my_account_id),
+            "lives":     lives,
+            "revivePts": revive_pts,
         })
 
-    # Self zuerst, Rest beliebig
     out_members.sort(key=lambda x: (0 if x["isSelf"] else 1, x["name"].lower()))
     return {
         "matchId": match_id,
