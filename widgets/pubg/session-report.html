@@ -2583,6 +2583,20 @@
       e.stopPropagation();
     });
 
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest && e.target.closest(".md-allebtn");
+      if (!btn) return;
+      const host = btn.closest(".md-host");
+      if (!host) return;
+      const s = mdGetState(host);
+      s.soloAcc = null;
+      s.zeitraffer.cursorTs = 0;
+      s.zeitraffer.playing = false;
+      s.playToken++;
+      mdResetView(host);
+      e.stopPropagation();
+    });
+
   </script>
 </body>
 </html>
