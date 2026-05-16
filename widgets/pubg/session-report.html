@@ -362,6 +362,15 @@
     .md-card .md-life b { color: var(--pubg-text); }
     .md-card .md-life .md-died { color: #e57b7b; }
     .md-card .md-empty { font-style: italic; opacity: 0.6; }
+    .md-warning {
+      background: rgba(229,123,123,0.12);
+      border: 1px solid rgba(229,123,123,0.4);
+      color: #e57b7b;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 0.82em;
+      line-height: 1.45;
+    }
     .matches-list .time-range { color: var(--pubg-muted); }
     .matches-list .time-range b { color: var(--pubg-text); font-weight: 400; }
     .matches-list .m:hover { background: rgba(255,255,255,0.04); }
@@ -1285,6 +1294,133 @@
       wrap.innerHTML = html;
     }
 
+    function mdRenderState(host) {
+      const s = mdGetState(host);
+      if (!s.detail) return;
+      mdRenderBasemap(host);
+      mdRenderOverlay(host);
+      mdRenderCards(host);
+      mdUpdateScrubBar(host);
+      mdUpdateAlleBar(host);
+    }
+
+    function mdUpdateScrubBar(host) {
+      const s = mdGetState(host);
+      const z = s.zeitraffer;
+      const slider = host.querySelector("input.md-scrub-slider");
+      const timeEl = host.querySelector(".md-scrub .md-time");
+      const playBtn = host.querySelector(".md-scrub .md-play-btn");
+      if (!slider || !timeEl) return;
+      const dur = z.matchEnd - z.matchStart;
+      slider.min = 0; slider.max = dur; slider.step = 1000;
+      slider.value = z.cursorTs;
+      function fmt(ms) {
+        const sec = Math.floor(ms / 1000);
+        return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,"0")}`;
+      }
+      timeEl.textContent = `${fmt(z.cursorTs)} / ${fmt(dur)}`;
+      if (playBtn) playBtn.textContent = z.playing ? "⏸" : "▶";
+    }
+
+    function mdUpdateAlleBar(host) {
+      const s = mdGetState(host);
+      const btn = host.querySelector(".md-allebtn");
+      if (!btn) return;
+      btn.classList.toggle("solo-active", !!s.soloAcc);
+      btn.textContent = s.soloAcc ? "↺ Alle anzeigen" : "● Alle";
+    }
+
+    async function mdMount(host) {
+      if (host.dataset.mounted === "1") return;
+      host.dataset.mounted = "1";
+      const matchId = host.getAttribute("data-match-id");
+      const mapName = host.getAttribute("data-map");
+      host.innerHTML = `
+        <div class="md-grid">
+          <div class="md-mapcol">
+            <div class="md-mapwrap">
+              <canvas class="md-basemap"></canvas>
+              <canvas class="md-overlay"></canvas>
+              <div class="md-zoombtns">
+                <button class="md-zoom-in" title="Reinzoomen">+</button>
+                <button class="md-zoom-out" title="Rauszoomen">−</button>
+                <button class="md-zoom-reset" title="Reset">⊙</button>
+              </div>
+              <div class="md-hover-label"></div>
+            </div>
+            <div class="md-scrub">
+              <button class="md-play-btn">▶</button>
+              <input type="range" class="md-scrub-slider" min="0" max="100" value="0">
+              <span class="md-time">0:00 / 0:00</span>
+            </div>
+          </div>
+          <div class="md-cardcol">
+            <div class="md-allebar">
+              <button class="md-allebtn">● Alle</button>
+            </div>
+            <div class="md-cards"></div>
+          </div>
+        </div>`;
+      const md = await mdLoad(matchId);
+      const s = mdGetState(host);
+      if (!md || !md.detail) {
+        host.querySelector(".md-cards").innerHTML =
+          `<div class="md-empty md-card">— keine Telemetrie verfuegbar —</div>`;
+        return;
+      }
+      s.detail = md.detail;
+      s.colorByAcc = md.colorByAcc;
+      // Match-Zeitraum aus allen Pfaden ableiten
+      let mStart = Infinity, mEnd = -Infinity;
+      for (const m of s.detail.members) {
+        if (!m.lives) continue;
+        for (const life of m.lives) {
+          const fullPath = [...(life.planeRoute||[]), ...(life.groundPath||[])];
+          if (!fullPath.length) continue;
+          const t0 = fullPath[0][2], tN = fullPath[fullPath.length - 1][2];
+          if (t0 < mStart) mStart = t0;
+          if (tN > mEnd) mEnd = tN;
+        }
+      }
+      s.zeitraffer.matchStart = isFinite(mStart) ? mStart : 0;
+      s.zeitraffer.matchEnd = isFinite(mEnd) ? mEnd : 1;
+      s.zeitraffer.cursorTs = 0;
+
+      // Viewport-Default: bbox(alle Landings) + 500m
+      const landingCoords = [];
+      for (const m of s.detail.members) {
+        if (!m.lives) continue;
+        for (const life of m.lives) {
+          if (life.landing) landingCoords.push([life.landing.x, life.landing.y]);
+        }
+      }
+      s.viewport = mdBboxFitViewport(landingCoords, MD_PAD_500M_CM);
+
+      // Telemetrie-Pfad-Check: wenn KEIN Member einen Pfad hat (weder
+      // planeRoute noch groundPath fuer irgendein Leben), zeigen wir
+      // einen Hinweis statt einer halb-leeren Karte.
+      let anyPath = false;
+      for (const m of s.detail.members) {
+        if (!m.lives) continue;
+        for (const life of m.lives) {
+          if ((life.planeRoute && life.planeRoute.length) ||
+              (life.groundPath && life.groundPath.length)) {
+            anyPath = true; break;
+          }
+        }
+        if (anyPath) break;
+      }
+      if (!anyPath) {
+        const banner = document.createElement("div");
+        banner.className = "md-warning";
+        banner.textContent = "Kein Bewegungspfad in der Telemetrie. "
+          + "Eventuell historischer Match — 'python -m pubg.cli hidrive-refill' "
+          + "fuellt fehlende Position-Events nach.";
+        host.querySelector(".md-mapcol").appendChild(banner);
+      }
+      mdRenderState(host);
+    }
+
     // Date-Range-Picker initialisieren mit aktuellen URL-Werten
     function isoLocal(date) {
       // Local-Date → "YYYY-MM-DD"
@@ -1612,7 +1748,8 @@
         row.classList.add("expanded");
         if (detail) {
           detail.classList.add("show");
-          // TODO Task 8: mdMount(host) aufrufen sobald implementiert.
+          const host = detail.querySelector(".md-host");
+          if (host) mdMount(host);
         }
       });
       // Achievements-Akkordeon wieder aufklappen (erst nach renderExtras
@@ -2112,7 +2249,15 @@
       row.classList.toggle("expanded");
       detail.classList.toggle("show", !wasExpanded);
       if (!wasExpanded) {
-        // TODO Task 8: mdMount(host) aufrufen sobald implementiert.
+        const host = detail.querySelector(".md-host");
+        if (host) mdMount(host);
+      } else {
+        const host = detail.querySelector(".md-host");
+        if (host && host.dataset.mounted === "1") {
+          const s = mdGetState(host);
+          s.playToken++;
+          s.zeitraffer.playing = false;
+        }
       }
     });
 
