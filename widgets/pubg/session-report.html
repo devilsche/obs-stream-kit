@@ -1147,6 +1147,102 @@
       mdRenderState(host);
     }
 
+    const MD_ANIM_DURATION_MS = 15000;
+    const MD_REVIVE_FLASH_MS  = 500;
+
+    // Findet path-Index per Bisect der ts-Werte fuer einen gegebenen ts.
+    // Returns {idx, interp01} fuer linear interpolierten Punkt zwischen
+    // path[idx] und path[idx+1].
+    function mdPathPointAt(path, tsMs) {
+      if (!path || path.length === 0) return null;
+      if (tsMs <= path[0][2]) return { idx: 0, interp01: 0 };
+      if (tsMs >= path[path.length - 1][2])
+        return { idx: path.length - 1, interp01: 0 };
+      // linear search reicht — Pfade haben max ~300 Punkte
+      let i = 0;
+      while (i < path.length - 1 && path[i + 1][2] <= tsMs) i++;
+      const t0 = path[i][2], t1 = path[i + 1][2];
+      const f = (tsMs - t0) / Math.max(1, (t1 - t0));
+      return { idx: i, interp01: f };
+    }
+
+    function mdInterp(a, b, f) { return a + (b - a) * f; }
+
+    async function mdPlay(host) {
+      const s = mdGetState(host);
+      if (!s.members) return;
+      const token = ++s.playToken;
+      const mapKm = parseFloat(host.dataset.mapKm) || 8;
+      let cal = {};
+      try { cal = JSON.parse(host.dataset.cal || "{}"); } catch (e) {}
+      const mapCm = mapKm * 100000;
+      function cmToCanvas(xCm, yCm) {
+        const [ex, ey] = mdApplyPinCal(xCm, yCm, mapKm, cal);
+        return [(ex / mapCm) * 480, (ey / mapCm) * 480];
+      }
+      // Match-Zeitraum aus pathmin/pathmax aller Members
+      let matchStart = Infinity, matchEnd = -Infinity;
+      for (const m of s.members) {
+        if (!m.path || !m.path.length) continue;
+        const t0 = m.path[0][2];
+        const tN = m.path[m.path.length - 1][2];
+        if (t0 < matchStart) matchStart = t0;
+        if (tN > matchEnd) matchEnd = tN;
+      }
+      if (!isFinite(matchStart) || matchEnd <= matchStart) return;
+      const matchDur = matchEnd - matchStart;
+      const startWallClock = performance.now();
+
+      function frame(now) {
+        if (token !== s.playToken) return;  // canceled
+        if (host.dataset.mounted !== "1") return;
+        const elapsed = now - startWallClock;
+        const t01 = Math.min(1, elapsed / MD_ANIM_DURATION_MS);
+        const matchTs = matchStart + t01 * matchDur;
+
+        // Erst statische Layer (Pfade + Pins) wie sonst rendern
+        mdRenderOverlay(host, {
+          members: s.members,
+          focusAcc: mdEffectiveFocus(s),
+          showKills: s.showKills,
+          colorByAcc: s.colorByAcc,
+        });
+        // Dann animierte Pins ueber den statischen Layer
+        const canvas = host.querySelector("canvas.md-overlay");
+        const ctx = canvas.getContext("2d");
+        for (const m of s.members) {
+          if (!m.path || m.path.length < 2) continue;
+          // Bei Death stoppt der Pin bei seinem letzten Pfad-Punkt.
+          const pinTs = (m.died && m.deathOffsetSec != null)
+            ? Math.min(matchTs, matchStart + m.deathOffsetSec * 1000 + 1000)
+            : matchTs;
+          const pp = mdPathPointAt(m.path, pinTs);
+          if (!pp) continue;
+          const i0 = pp.idx, i1 = Math.min(pp.idx + 1, m.path.length - 1);
+          const [x0, y0] = m.path[i0]; const [x1, y1] = m.path[i1];
+          const xC = mdInterp(x0, x1, pp.interp01);
+          const yC = mdInterp(y0, y1, pp.interp01);
+          const [cx, cy] = cmToCanvas(xC, yC);
+          const color = s.colorByAcc[m.accountId] || "#999";
+          const alive = !m.died || pinTs < (matchStart + (m.deathOffsetSec || 0) * 1000);
+          ctx.beginPath();
+          ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.globalAlpha = alive ? 1 : 0.4;
+          ctx.fill();
+          ctx.strokeStyle = "white";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+          // Revive-Flash: wenn matchTs nahe einem revivePt-Timestamp ist,
+          // gruener Outline-Pulse. (revivePts sind nur [x,y], kein ts —
+          // skipping flash bis Backend ts liefert; vorerst no-op.)
+        }
+        if (t01 < 1) requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    }
+
     // Date-Range-Picker initialisieren mit aktuellen URL-Werten
     function isoLocal(date) {
       // Local-Date → "YYYY-MM-DD"
@@ -2040,6 +2136,15 @@
           e.stopPropagation();
         }
       }
+    });
+
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest && e.target.closest(".md-play");
+      if (!btn) return;
+      const host = btn.closest(".md-host");
+      if (!host) return;
+      mdPlay(host);
+      e.stopPropagation();
     });
 
     document.addEventListener("keydown", (e) => {
