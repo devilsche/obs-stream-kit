@@ -1047,7 +1047,8 @@ def compute_match_detail(conn, my_account_id, match_id):
               AND timestamp_ms >= ? AND timestamp_ms <= ?
             ORDER BY timestamp_ms ASC
         """, (match_id, acc, path_start_ms, path_end_ms)).fetchall()
-        path = [[r["actor_x"], r["actor_y"]] for r in path_rows]
+        path = [[r["actor_x"], r["actor_y"], r["timestamp_ms"]]
+                for r in path_rows]
 
         # Revive-Marker — wo wurde der Member im Match revived?
         # Frontend kann gruene Pins setzen.
