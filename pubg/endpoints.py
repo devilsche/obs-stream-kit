@@ -51,7 +51,8 @@ from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_streaks,
                                 compute_trend_deltas, compute_session_matches,
                                 compute_hot_drop, compute_session_achievements,
-                                compute_vehicle_stats, compute_weapon_stats)
+                                compute_vehicle_stats, compute_weapon_stats,
+                                compute_match_detail)
 
 
 def _ok(payload):
@@ -103,6 +104,8 @@ class EndpointRegistry:
             return self._vehicle_stats(qs)
         if route == ("GET", "/api/pubg/weapon-stats"):
             return self._weapon_stats(qs)
+        if route == ("GET", "/api/pubg/match-detail"):
+            return self._match_detail(qs)
         if route == ("GET", "/api/pubg/hot-drop"):
             return self._hot_drop(qs)
         if route == ("GET", "/api/pubg/payday-stats"):
@@ -530,6 +533,18 @@ class EndpointRegistry:
                                          range_key,
                                          from_iso=from_iso, to_iso=to_iso),
         ))
+
+    def _match_detail(self, qs):
+        conn = self.get_conn()
+        match_id = (qs.get("matchId") or "").strip()
+        if not match_id:
+            return _err(400, "matchId required")
+        data = self.cache.get_or_compute(
+            f"match-detail:{match_id}",
+            lambda: compute_match_detail(conn, self.my_account_id, match_id))
+        if not data:
+            return _err(404, "match not found")
+        return _ok(data)
 
     def _weapon_stats(self, qs):
         conn = self.get_conn()

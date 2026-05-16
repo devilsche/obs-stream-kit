@@ -148,10 +148,10 @@
       align-items: flex-start;
     }
     .squad-detail .detail-row > .squad-table-wrap { flex: 1; min-width: 0; }
+    .match-map-wrap { flex: none; width: 360px; }
     .match-map {
-      width: 220px;
-      height: 220px;
-      flex: none;
+      width: 360px;
+      height: 360px;
       background: #0d061a;
       border: 1px solid var(--pubg-border);
       border-radius: 6px;
@@ -170,6 +170,20 @@
       line-height: 1.3;
     }
     .match-map .legend b { color: var(--pubg-gold); }
+    /* Text-Block unter der Map: Landings + Death-Info. */
+    .match-info {
+      margin-top: 8px;
+      font-size: 0.82em;
+      line-height: 1.55;
+      color: var(--pubg-muted);
+    }
+    .match-info .mi-row b { color: var(--pubg-text); }
+    .match-info .mi-row .self { color: var(--pubg-gold); }
+    .match-info .mi-row .died {
+      color: #e57b7b;
+    }
+    .match-info .mi-row .killer { color: var(--pubg-text); font-weight: 700; }
+    .match-info .mi-empty { font-style: italic; opacity: 0.6; }
     /* Event-Detail-Panel (PAYDAY/Heist) — ersetzt die Mini-Map in Events */
     .event-detail {
       width: 260px;
@@ -957,9 +971,14 @@
         ? `<div class="event-detail" data-event-detail-match-id="${matchId}">
              <div class="event-detail-empty">— event stats laden —</div>
            </div>`
-        : `<div class="match-map" data-match-id="${matchId}" data-map="${mapName}">
-             <canvas></canvas>
-             <div class="legend">Squad-Landings · ${PubgUI.fmtMap(mapName)}</div>
+        : `<div class="match-map-wrap">
+             <div class="match-map" data-match-id="${matchId}" data-map="${mapName}">
+               <canvas></canvas>
+               <div class="legend">Squad-Landings · ${PubgUI.fmtMap(mapName)}</div>
+             </div>
+             <div class="match-info" data-match-info="${matchId}">
+               <div class="mi-empty">— Detail-Daten laden —</div>
+             </div>
            </div>`;
       return `
         <div class="detail-row">
@@ -1050,6 +1069,8 @@
           detail.classList.add("show");
           const host = detail.querySelector(".match-map");
           if (host) renderMatchMap(host);
+          const infoHost = detail.querySelector(".match-info");
+          if (infoHost && host) renderMatchInfo(host.getAttribute("data-match-id"), infoHost);
         }
       });
       // Achievements-Akkordeon wieder aufklappen (erst nach renderExtras
@@ -1585,43 +1606,132 @@
       const ctx = canvas.getContext("2d");
       ctx.fillStyle = "#0d061a";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      // Center-Crop fuer nicht-quadratische Bilder (analog Editor)
-      if (img && img.naturalWidth) {
-        const side = Math.min(img.naturalWidth, img.naturalHeight);
-        const sx = (img.naturalWidth - side) / 2;
-        const sy = (img.naturalHeight - side) / 2;
-        ctx.drawImage(img, sx, sy, side, side, 0, 0, canvas.width, canvas.height);
+      if (!img || !img.naturalWidth) return;
+
+      // Center-Crop: das fertige 'Quadrat-Bild' der Karte (side²).
+      const side = Math.min(img.naturalWidth, img.naturalHeight);
+      const cropOffX = (img.naturalWidth  - side) / 2;
+      const cropOffY = (img.naturalHeight - side) / 2;
+      const mapCm = mapKm * 100000;
+
+      // Helper: cm-Coord (nach Pin-Calibration) -> Bild-Pixel innerhalb
+      // des center-gecroppten Quadrats.
+      function cmToCropPx(xCm, yCm) {
+        const [ex, ey] = applyPinCal(xCm, yCm, mapKm, cal);
+        const fx = ex / mapCm;  // 0..1 innerhalb des Map-Quadrats
+        const fy = ey / mapCm;
+        return [fx * side, fy * side];
       }
-      // Pins mit Calibration
-      const base = canvas.width / (mapKm * 100000);
-      // Farben pro Spieler (deterministisch via accountId-Hash)
+
+      // Bounding-Box aller Squad-Landings im CROP-PIXEL-Raum.
+      let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+      const pts = [];
+      landings.forEach((ld) => {
+        const [px, py] = cmToCropPx(ld.x, ld.y);
+        pts.push({ ld, px, py });
+        if (px < bx0) bx0 = px;
+        if (py < by0) by0 = py;
+        if (px > bx1) bx1 = px;
+        if (py > by1) by1 = py;
+      });
+
+      // Zoom-Region: Bounding-Box + Padding. Mindestgroesse 1.5km
+      // (entspricht 1.5km/mapKm des side-pixels). Falls keine Landings:
+      // ganze Map zeigen (Fallback).
+      let srcX, srcY, srcSize;
+      if (pts.length) {
+        const minSizePx = (1.5 / mapKm) * side;  // 1.5km Sichtfenster
+        const bw = bx1 - bx0;
+        const bh = by1 - by0;
+        let s = Math.max(bw, bh, minSizePx) * 1.4;  // +40% Padding
+        if (s > side) s = side;
+        const cx = (bx0 + bx1) / 2;
+        const cy = (by0 + by1) / 2;
+        srcX = Math.max(0, Math.min(side - s, cx - s / 2));
+        srcY = Math.max(0, Math.min(side - s, cy - s / 2));
+        srcSize = s;
+      } else {
+        srcX = 0; srcY = 0; srcSize = side;
+      }
+
+      // Region zeichnen (cropOff-Korrektur fuer non-square images).
+      ctx.drawImage(img,
+        cropOffX + srcX, cropOffY + srcY, srcSize, srcSize,
+        0, 0, canvas.width, canvas.height);
+
+      // Pin-Mapping: Crop-Pixel -> Canvas-Pixel
+      const cropToCanvas = (px, py) => [
+        ((px - srcX) / srcSize) * canvas.width,
+        ((py - srcY) / srcSize) * canvas.height,
+      ];
+
       const playerColor = (acc) => {
         let h = 0;
         for (let i = 0; i < (acc || "").length; i++) h = (h * 31 + acc.charCodeAt(i)) | 0;
         const hue = Math.abs(h) % 360;
         return `hsl(${hue}, 80%, 60%)`;
       };
-      // Eigene Squad-Mate-IDs sammeln fuer Hervorhebung
-      landings.forEach((ld) => {
-        const [ex, ey] = applyPinCal(ld.x, ld.y, mapKm, cal);
-        const px = ex * base, py = ey * base;
+
+      pts.forEach(({ ld, px, py }) => {
+        const [cx, cy] = cropToCanvas(px, py);
         const color = playerColor(ld.accountId);
-        // Pin
         ctx.beginPath();
-        ctx.arc(px, py, 6, 0, Math.PI * 2);
+        ctx.arc(cx, cy, 8, 0, Math.PI * 2);
         ctx.fillStyle = color;
         ctx.fill();
         ctx.strokeStyle = "white";
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 2;
         ctx.stroke();
-        // Initial-Buchstabe (1. Char vom Namen)
         const initial = (ld.name || "?")[0].toUpperCase();
         ctx.fillStyle = "white";
-        ctx.font = "bold 9px DM Sans, sans-serif";
+        ctx.font = "bold 11px DM Sans, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(initial, px, py);
+        ctx.fillText(initial, cx, cy);
       });
+    }
+
+    // Match-Detail (Landing-POI + Death-Info) lazy nachladen + rendern.
+    async function renderMatchInfo(matchId, host) {
+      if (!matchId || !host || host.dataset.loaded === "1") return;
+      host.dataset.loaded = "1";
+      let d = null;
+      try {
+        d = await PubgUI.fetchJson(
+          `/api/pubg/match-detail?matchId=${encodeURIComponent(matchId)}`);
+      } catch (e) {}
+      if (!d || !d.members || !d.members.length) {
+        host.innerHTML = `<div class="mi-empty">— keine Detail-Daten —</div>`;
+        return;
+      }
+      const poi = (x, y) => {
+        if (x == null || y == null) return null;
+        if (PubgUI.POI && PubgUI.POI.fromCoords) {
+          return PubgUI.POI.fromCoords(d.mapName, x, y);
+        }
+        return null;
+      };
+      const lines = d.members.map((m) => {
+        const cls = m.isSelf ? "self" : "";
+        const who = m.isSelf ? "Du" : m.name;
+        const landP = poi(m.landingX, m.landingY);
+        const parts = [];
+        parts.push(`<b class="${cls}">${who}</b>`);
+        parts.push(landP
+          ? `landete <b>${landP}</b>`
+          : "Landing unbekannt");
+        if (m.died && m.weaponName) {
+          const distStr = m.distanceM
+            ? ` (${m.distanceM.toFixed(0)} m)` : "";
+          const killer = m.killerName || "[Gegner]";
+          parts.push(
+            `<span class="died">– † <span class="killer">${killer}</span> · ${m.weaponName}${distStr}</span>`);
+        } else if (m.died) {
+          parts.push(`<span class="died">– †</span>`);
+        }
+        return `<div class="mi-row">${parts.join(" ")}</div>`;
+      });
+      host.innerHTML = lines.join("");
     }
 
     // Click-Handler: Match-Zeile expandiert Squad-Detail + rendert Mini-Map
@@ -1637,6 +1747,9 @@
       if (!wasExpanded) {
         const host = detail.querySelector(".match-map");
         if (host) renderMatchMap(host);
+        const infoHost = detail.querySelector(".match-info");
+        const matchId  = host && host.getAttribute("data-match-id");
+        if (infoHost && matchId) renderMatchInfo(matchId, infoHost);
       }
     });
 

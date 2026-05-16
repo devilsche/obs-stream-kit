@@ -906,6 +906,113 @@ def compute_session_matches(conn, my_account_id, range_key="session",
     } for r in rows]
 
 
+def compute_match_detail(conn, my_account_id, match_id):
+    """Detail-Infos zu einem Match fuer das Expand-Panel im Session-
+    Report. Liefert pro Squad-Member den Landing-POI + Death-Info
+    (wer hat denjenigen gekillt, mit welcher Waffe, auf welche Distanz).
+
+    Returns dict:
+      {
+        "matchId": ...,
+        "mapName": ...,
+        "members": [
+          {
+            "name": "...", "isSelf": bool,
+            "landingX": cm, "landingY": cm,
+            "died": bool,
+            "killerName": "...", "weapon": "WeapId", "weaponName": "M416",
+            "distanceM": float,  # Meter
+          }, ...
+        ],
+      }
+    Mate-Telemetrie haben wir; landings + Kill-Events (target=Squad-
+    Member) reichen. Weapon-ID wird ueber _weapon_label gemappt.
+    """
+    m_row = conn.execute(
+        "SELECT match_id, map_name FROM matches WHERE match_id = ?",
+        (match_id,)).fetchone()
+    if not m_row:
+        return None
+    map_name = m_row["map_name"]
+    # Squad-Mitglieder aus match_team_mapping
+    team_row = conn.execute(
+        "SELECT team_id FROM match_team_mapping "
+        "WHERE match_id = ? AND account_id = ?",
+        (match_id, my_account_id)).fetchone()
+    if not team_row:
+        return {"matchId": match_id, "mapName": map_name, "members": []}
+    members = conn.execute("""
+        SELECT mtm.account_id, p.name
+        FROM match_team_mapping mtm
+        LEFT JOIN players p ON p.account_id = mtm.account_id
+        WHERE mtm.match_id = ? AND mtm.team_id = ?
+    """, (match_id, team_row["team_id"])).fetchall()
+
+    out_members = []
+    for mem in members:
+        acc = mem["account_id"]
+        if not acc:
+            continue
+        # Landing: best-touchdown analog _landings — fruehestes
+        # Landing-Event mit z<800 und health>0
+        landing = conn.execute("""
+            SELECT actor_x, actor_y FROM telemetry_events
+            WHERE match_id = ? AND actor_account = ?
+              AND event_type = 'Landing'
+              AND actor_x IS NOT NULL AND actor_y IS NOT NULL
+              AND (actor_z IS NULL OR actor_z < 80000)
+              AND (actor_health IS NULL OR actor_health > 0)
+            ORDER BY timestamp_ms ASC LIMIT 1
+        """, (match_id, acc)).fetchone()
+        if not landing:
+            landing = conn.execute("""
+                SELECT actor_x, actor_y FROM telemetry_events
+                WHERE match_id = ? AND actor_account = ?
+                  AND event_type = 'Landing'
+                  AND actor_x IS NOT NULL AND actor_y IS NOT NULL
+                ORDER BY timestamp_ms ASC LIMIT 1
+            """, (match_id, acc)).fetchone()
+
+        # Death: Kill-Event mit target=mem
+        death = conn.execute("""
+            SELECT te.actor_account, te.weapon, te.distance,
+                   p.name AS killer_name
+            FROM telemetry_events te
+            LEFT JOIN players p ON p.account_id = te.actor_account
+            WHERE te.match_id = ? AND te.target_account = ?
+              AND te.event_type = 'Kill'
+            ORDER BY te.timestamp_ms ASC LIMIT 1
+        """, (match_id, acc)).fetchone()
+
+        weapon_id = death["weapon"] if death else None
+        weapon_name = _weapon_label(weapon_id)[0] if weapon_id else None
+        out_members.append({
+            "accountId":   acc,
+            "name":        mem["name"] or acc[:8],
+            "isSelf":      (acc == my_account_id),
+            "landingX":    landing["actor_x"] if landing else None,
+            "landingY":    landing["actor_y"] if landing else None,
+            "died":        bool(death),
+            "killerName":  (death["killer_name"]
+                            if death and death["killer_name"]
+                            else ("[Gegner]"
+                                  if death and death["actor_account"]
+                                  else None)),
+            "weaponId":    weapon_id,
+            "weaponName":  weapon_name,
+            "distanceM":   (round((death["distance"] or 0) / 100.0, 1)
+                            if death else None),
+        })
+
+    # Self zuerst, Rest beliebig
+    out_members.sort(key=lambda x: (0 if x["isSelf"] else 1, x["name"].lower()))
+    return {
+        "matchId": match_id,
+        "mapName": map_name,
+        "members": out_members,
+    }
+
+
 def compute_vehicle_stats(conn, my_account_id, range_key="session",
                            from_iso=None, to_iso=None):
     """Pro Squad-Member (inkl. self) Vehicle-Action-Counter ueber alle
