@@ -909,6 +909,92 @@
       host.dataset.cal   = JSON.stringify(cal);
     }
 
+    // Zeichnet Pfade, Pins und (in spaeteren Tasks) Squad-Kills + Animation
+    // auf das overlay-Canvas. Wird bei JEDEM State-Change neu aufgerufen.
+    // state = { members, focusAcc, showKills, animProgress?, colorByAcc }
+    async function mdRenderOverlay(host, state) {
+      const canvas = host.querySelector("canvas.md-overlay");
+      if (!canvas) return;
+      canvas.width = 480; canvas.height = 480;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, 480, 480);
+
+      const mapKm = parseFloat(host.dataset.mapKm) || 8;
+      let cal = {};
+      try { cal = JSON.parse(host.dataset.cal || "{}"); } catch (e) {}
+      const mapCm = mapKm * 100000;
+      function cmToCanvas(xCm, yCm) {
+        const [ex, ey] = mdApplyPinCal(xCm, yCm, mapKm, cal);
+        return [(ex / mapCm) * 480, (ey / mapCm) * 480];
+      }
+
+      const { members, focusAcc, colorByAcc } = state;
+      if (!members) return;
+
+      // 1) Pfade als Polyline pro Member. Alpha 0.3 default, 0.9 fokussiert,
+      //    0.15 wenn focusAcc gesetzt und member nicht fokussiert (dimmt).
+      for (const m of members) {
+        const color = colorByAcc[m.accountId] || "#999";
+        let alpha;
+        if (!focusAcc) alpha = 0.3;
+        else if (m.accountId === focusAcc) alpha = 0.9;
+        else alpha = 0.15;
+        if (!m.path || m.path.length < 2) continue;
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = alpha;
+        ctx.lineWidth = m.accountId === focusAcc ? 2.5 : 1.5;
+        ctx.beginPath();
+        m.path.forEach(([xCm, yCm], i) => {
+          const [cx, cy] = cmToCanvas(xCm, yCm);
+          if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+        });
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+
+      // 2) Pins pro Member: Landing (7px) + Death (10px) wenn died.
+      //    Keine Symbole, keine X-Markierung. Reine Kreise + weisser Outline.
+      for (const m of members) {
+        const color = colorByAcc[m.accountId] || "#999";
+        if (m.landingX != null && m.landingY != null) {
+          const [cx, cy] = cmToCanvas(m.landingX, m.landingY);
+          ctx.beginPath();
+          ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+          ctx.strokeStyle = "rgba(255,255,255,0.9)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+        if (m.died && m.deathX != null) {
+          const [cx, cy] = cmToCanvas(m.deathX, m.deathY);
+          ctx.beginPath();
+          ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+          ctx.strokeStyle = "white";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+      }
+
+      // 3) Revive-Pins (gruen, 6px) pro revivePts-Eintrag pro Member.
+      for (const m of members) {
+        if (!m.revivePts || !m.revivePts.length) continue;
+        for (const [xCm, yCm] of m.revivePts) {
+          if (xCm == null) continue;
+          const [cx, cy] = cmToCanvas(xCm, yCm);
+          ctx.beginPath();
+          ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+          ctx.fillStyle = "#2ecc71";
+          ctx.fill();
+          ctx.strokeStyle = "rgba(255,255,255,0.85)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      }
+    }
+
     // Date-Range-Picker initialisieren mit aktuellen URL-Werten
     function isoLocal(date) {
       // Local-Date → "YYYY-MM-DD"
