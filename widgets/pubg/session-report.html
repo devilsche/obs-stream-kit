@@ -1009,8 +1009,73 @@
         <div class="squad-detail" data-idx-detail="${idx}">${fmtSquadDetail(m)}</div>`;
     }
 
+    // Fingerprint des Report-Payloads — wenn unveraendert,
+    // ueberspringen wir komplett (kein Re-Render, kein State-Reset).
+    function reportFingerprint(d) {
+      if (!d) return "0";
+      const t = d.totals || {};
+      const phases = (d.phases || []).map(ph =>
+        `${ph.matches ? ph.matches.length : 0}:${(ph.stats||{}).endTime||""}`
+      ).join("|");
+      const maps = (d.mapsPerf || []).length;
+      return [
+        d.totalMatches || 0,
+        t.endTime || "",
+        t.kills || 0, t.damage || 0, t.wins || 0,
+        phases, maps,
+      ].join("#");
+    }
+    // Snapshot offener UI-States damit wir sie nach einem Re-Render
+    // restoren koennen — Match-Expand + Achievements-Details + Scroll.
+    function snapshotUiState() {
+      const expandedMatches = new Set();
+      document.querySelectorAll(".m.expanded[data-match-id]").forEach(r => {
+        const id = r.getAttribute("data-match-id");
+        if (id) expandedMatches.add(id);
+      });
+      const achOpen = !!document.querySelector("details.ach-details[open]");
+      return { expandedMatches, achOpen, scrollY: window.scrollY };
+    }
+    function restoreUiState(snap) {
+      if (!snap) return;
+      // Match-Rows wieder expanden
+      snap.expandedMatches.forEach(id => {
+        const row = document.querySelector(`.m[data-match-id="${id}"]`);
+        if (!row) return;
+        const idx = row.getAttribute("data-idx");
+        const detail = idx
+          ? document.querySelector(`[data-idx-detail="${idx}"]`) : null;
+        row.classList.add("expanded");
+        if (detail) {
+          detail.classList.add("show");
+          const host = detail.querySelector(".match-map");
+          if (host) renderMatchMap(host);
+        }
+      });
+      // Achievements-Akkordeon wieder aufklappen (erst nach renderExtras
+      // verfuegbar — siehe restore-Aufruf weiter unten).
+      if (snap.achOpen) {
+        const det = document.querySelector("details.ach-details");
+        if (det) det.open = true;
+      }
+      // Scroll-Position grob wiederherstellen
+      if (snap.scrollY) window.scrollTo({ top: snap.scrollY, behavior: "instant" });
+    }
+    // Pending-Restore: das Achievements-Akkordeon wird erst durch
+    // renderExtras() asynchron eingehaengt — daher merken wir uns den
+    // Snapshot und re-applien sobald die extras drin sind.
+    let _pendingRestore = null;
+
+    let _lastReportFp = null;
     function render(d) {
       const root = document.getElementById("report");
+      // Skip wenn sich nichts geaendert hat — verhindert dass offene
+      // Match-Expands / Achievement-Details bei jedem 60s-Poll zuklappen.
+      const fp = reportFingerprint(d);
+      if (fp === _lastReportFp && root.querySelector(".totals")) return;
+      _lastReportFp = fp;
+      const snap = root.querySelector(".totals") ? snapshotUiState() : null;
+      _pendingRestore = snap;
       if (!d.totalMatches) {
         root.innerHTML = `<div class="empty">— no matches in session yet —</div>`;
         return;
@@ -1422,6 +1487,12 @@
       }
 
       placeholder.innerHTML = trendHtml + streaksHtml + achievementsHtml;
+      // UI-State nach komplettem Re-Render wiederherstellen (Match-
+      // Expands + Achievement-Details + Scroll).
+      if (_pendingRestore) {
+        restoreUiState(_pendingRestore);
+        _pendingRestore = null;
+      }
     }
 
     function mapImageUrl(mapName) {

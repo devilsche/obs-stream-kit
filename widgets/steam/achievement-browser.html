@@ -304,6 +304,11 @@
       <input id="rarePctInput" type="number" min="1" max="50" value="10" style="width: 60px;">
     </div>
     <div class="grp">
+      <label title="Nur Achievements zeigen, die seit dem Oeffnen dieser Seite neu dazugekommen sind — praktisch um im Stream zu pruefen ob ein eben getriggertes Achievement bereits in der DB angekommen ist.">
+        <input id="liveOnly" type="checkbox" style="vertical-align:middle;margin-right:4px"> Nur Live
+      </label>
+    </div>
+    <div class="grp">
       <label title="Persistente Server-Setting — gilt fuer ALLE neuen Steam-Calls inkl. der Achievement-Popups. Wechseln triggert sofortige Neu-Uebersetzung der Liste.">Sprache:</label>
       <select id="langSelect">
         <option value="english">English</option>
@@ -346,6 +351,15 @@
     // Keys (appId:apiName) der Achievements die NEU dazukommen (via
     // Auto-Refresh) bekommen einen 4s-Flash. Set wird konsumiert.
     let freshKeys = new Set();
+    // 'Live'-Modus: snapshot beim ersten Load — alles was DANACH dazu
+    // kommt zaehlt als 'live geholt'. Toggle blendet alles andere aus.
+    let initialKeys = null;            // Set<key> nach erstem load()
+    let liveOnly = false;
+    // Landings pro Match — Map<matchId, {x,y,mapName,name}> meiner
+    // eigenen Landing-Position. Wird lazy gefuellt + im Popover als POI
+    // angezeigt. Fingerabdruck: myName aus /api/pubg/db-info.
+    let myLandingByMatch = new Map();
+    let myName = null;
     // Default 8s — fast genug damit Milestones nahezu zeitgleich mit
     // dem 5s-Popup-Stream im Browser auftauchen, ohne dem Server bei
     // grossen Datenmengen einen Sustained-Hammer zu geben. Override
@@ -362,6 +376,7 @@
     const sortSel  = document.getElementById("sortSelect");
     const rareIn   = document.getElementById("rarePctInput");
     const langSel  = document.getElementById("langSelect");
+    const liveChk  = document.getElementById("liveOnly");
 
     function fmtDate(unixSec) {
       if (!unixSec) return "—";
@@ -461,6 +476,17 @@
       const mapLine = isPubg && a.mapName
         ? `Map: ${mapFmt}${a.gameMode ? " · " + a.gameMode : ""}`
         : null;
+      // Landing-POI: wenn wir fuer diesen Match ein eigenes Landing
+      // kennen + POI-Modul ready → 'Landed: <POI>'. Wenn noch nicht da,
+      // wird applyFilters() nach prefetch erneut aufgerufen.
+      let landingLine = null;
+      if (isPubg && a.matchId && myLandingByMatch.has(a.matchId)
+          && typeof PubgUI !== "undefined" && PubgUI.POI
+          && PubgUI.POI.fromCoords) {
+        const ld = myLandingByMatch.get(a.matchId);
+        const poi = PubgUI.POI.fromCoords(ld.mapName || a.mapName, ld.x, ld.y);
+        if (poi) landingLine = `Landed: ${poi}`;
+      }
       // sessionPct + matchPct getrennt anzeigen
       const sessPctLine = (isPubg && a.sessionPct != null)
         ? `Session-Pct: ${a.sessionPct.toFixed(1)}% deiner Sessions`
@@ -474,6 +500,7 @@
       const povLines = [
         desc ? desc : null,
         mapLine,
+        landingLine,
         `Game: ${game}`,
         `Unlocked: ${fullDate}`,
         sessPctLine,
@@ -501,6 +528,11 @@
     function applyFilters() {
       RARE_PCT = parseFloat(rareIn.value) || 10;
       let view = all.slice();
+      // Live-Filter: nur Achievements zeigen, die SEIT Oeffnen dieser
+      // Seite neu dazugekommen sind. Snapshot ist initialKeys.
+      if (liveOnly && initialKeys) {
+        view = view.filter(a => !initialKeys.has(a.appId + ":" + a.apiName));
+      }
       if (filterGame) {
         view = view.filter(a => String(a.appId) === filterGame);
       }
@@ -631,6 +663,10 @@
       applyFilters();
     });
     rareIn.addEventListener("change", () => applyFilters());
+    liveChk.addEventListener("change", (e) => {
+      liveOnly = e.target.checked;
+      applyFilters();
+    });
     langSel.addEventListener("change", async (e) => {
       const lang = e.target.value;
       statsEl.textContent =
@@ -776,9 +812,49 @@
       showToast(msg);
     }
 
+    // POI-Berechnung im Popover: braucht Map-Cal + Landings pro Match.
+    // Beides parallel beim Start pullen — wenn's failt, popover zeigt
+    // einfach keine Landing-Zeile (silent degrade).
+    async function prefetchLandingsAndPois() {
+      try {
+        const dbInfo = await PubgUI.fetchJson("/api/pubg/db-info");
+        myName = (dbInfo && dbInfo.myName) || null;
+      } catch (e) { myName = null; }
+      try {
+        const [lj] = await Promise.all([
+          PubgUI.fetchJson("/api/pubg/landings"),
+          // POI-Cal laedt _pubg_pois.js selbst (PubgUI.POI.ready).
+        ]);
+        const lans = (lj && lj.landings) || lj || [];
+        for (const ld of lans) {
+          if (!ld.matchId) continue;
+          // Nur MEIN Landing — gemappt an myName. Wenn myName fehlt,
+          // nehmen wir das erste pro Match als Fallback.
+          if (myName && ld.name !== myName) continue;
+          if (!myLandingByMatch.has(ld.matchId)) {
+            myLandingByMatch.set(ld.matchId, ld);
+          }
+        }
+      } catch (e) { /* silent */ }
+    }
+
     (async () => {
+      // Landings + POI-Cal parallel zur initialen Achievement-Liste
+      // pullen. Beides braucht zum Rendern (Popover) den POI-Modul-Init.
+      const landingsP = (typeof PubgUI !== "undefined")
+        ? prefetchLandingsAndPois() : Promise.resolve();
+      const poiReadyP = (PubgUI && PubgUI.POI && PubgUI.POI.ready)
+        ? PubgUI.POI.ready.catch(() => null) : Promise.resolve();
       await syncLangFromServer();
       await load();
+      // Snapshot der Keys NACH dem ersten erfolgreichen Load — alles
+      // was danach via autoRefresh dazu kommt, gilt als 'live'.
+      initialKeys = new Set(all.map(a => a.appId + ":" + a.apiName));
+      // Landings koennen ruhig im Hintergrund fertig werden; das Popover
+      // greift auf myLandingByMatch zum Hover-Zeitpunkt zu.
+      await Promise.all([landingsP, poiReadyP]).catch(() => {});
+      // Tiles neu rendern damit die Landing-Zeile in Popovern erscheint.
+      applyFilters();
       setInterval(autoRefresh, REFRESH_MS);
     })();
   </script>
