@@ -311,10 +311,10 @@ WEAPON_NAMES = {
     "WeapMk12_C":        ("Mk12",      "dmr"),
     "WeapMk14_C":        ("Mk14",      "dmr"),
     "WeapSKS_C":         ("SKS",       "dmr"),
-    "WeapDragunov_C":    ("SLR",       "dmr"),
+    "WeapDragunov_C":    ("Dragunov",  "dmr"),  # SVD, Care-Package
     "WeapQBU88_C":       ("QBU",       "dmr"),
     "WeapVSS_C":         ("VSS",       "dmr"),
-    "WeapFNFal_C":       ("FN Fal",    "dmr"),
+    "WeapFNFal_C":       ("SLR",       "dmr"),  # PUBG-Internname FN FAL, In-Game 'SLR'
     # Snipers
     "WeapKar98k_C":      ("Kar98",     "sniper"),
     "WeapM24_C":         ("M24",       "sniper"),
