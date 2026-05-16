@@ -288,6 +288,169 @@ def compute_top_mates(conn, my_account_id: str,
     return out
 
 
+# PUBG Weapon-ID → (Pretty-Name, Category). Kategorie steuert
+# Filterung im Widget. Roadkills/Throwables stehen unter eigenen
+# Kategorien (kein klassischer 'Waffen-Skill').
+WEAPON_NAMES = {
+    # Assault Rifles
+    "WeapHK416_C":       ("M416",        "ar"),
+    "WeapBerylM762_C":   ("Beryl M762",  "ar"),
+    "WeapAK47_C":        ("AKM",         "ar"),
+    "WeapSCAR-L_C":      ("SCAR-L",      "ar"),
+    "WeapAUG_C":         ("AUG A3",      "ar"),
+    "WeapM16A4_C":       ("M16A4",       "ar"),
+    "WeapG36C_C":        ("G36C",        "ar"),
+    "WeapGroza_C":       ("Groza",       "ar"),
+    "WeapMk47Mutant_C":  ("Mk47 Mutant", "ar"),
+    "WeapACE32_C":       ("ACE32",       "ar"),
+    "WeapFamasG2_C":     ("FAMAS",       "ar"),
+    "WeapK2_C":          ("K2",          "ar"),
+    "WeapQBZ95_C":       ("QBZ-95",      "ar"),
+    # DMRs
+    "WeapMini14_C":      ("Mini 14",     "dmr"),
+    "WeapMk12_C":        ("Mk12",        "dmr"),
+    "WeapMk14_C":        ("Mk14 EBR",    "dmr"),
+    "WeapSKS_C":         ("SKS",         "dmr"),
+    "WeapDragunov_C":    ("SLR",         "dmr"),
+    "WeapQBU88_C":       ("QBU",         "dmr"),
+    "WeapVSS_C":         ("VSS",         "dmr"),
+    "WeapFNFal_C":       ("FN Fal",      "dmr"),
+    # Snipers
+    "WeapKar98k_C":      ("Kar98k",      "sniper"),
+    "WeapM24_C":         ("M24",         "sniper"),
+    "WeapAWM_C":         ("AWM",         "sniper"),
+    "WeapMosinNagant_C": ("Mosin Nagant","sniper"),
+    "WeapWin94_C":       ("Win94",       "sniper"),
+    "WeapL6_C":          ("Lynx AMR",    "sniper"),
+    # SMGs
+    "WeapMP5K_C":        ("MP5K",        "smg"),
+    "WeapUMP_C":         ("UMP45",       "smg"),
+    "WeapVector_C":      ("Vector",      "smg"),
+    "WeapUZI_C":         ("Micro Uzi",   "smg"),
+    "WeapThompson_C":    ("Tommy Gun",   "smg"),
+    "WeapP90_C":         ("P90",         "smg"),
+    "WeapJS9_C":         ("JS9",         "smg"),
+    "WeapMP9_C":         ("MP9",         "smg"),
+    "WeapBizonPP19_C":   ("Bizon",       "smg"),
+    "Weapvz61Skorpion_C":("Skorpion",    "smg"),
+    # Shotguns
+    "WeapDP12_C":        ("DP-12",       "shotgun"),
+    "WeapSaiga12_C":     ("Saiga-12",    "shotgun"),
+    "WeapOriginS12_C":   ("O12",         "shotgun"),
+    "WeapBerreta686_C":  ("S686",        "shotgun"),
+    "WeapSawnoff_C":     ("Sawed-Off",   "shotgun"),
+    "WeapWinchester_C":  ("S1897",       "shotgun"),
+    # LMGs
+    "WeapM249_C":        ("M249",        "lmg"),
+    "WeapMG3_C":         ("MG3",         "lmg"),
+    # Pistols
+    "WeapM1911_C":       ("P1911",       "pistol"),
+    "WeapM9_C":          ("P92",         "pistol"),
+    "WeapG18_C":         ("P18C",        "pistol"),
+    "WeapDesertEagle_C": ("Deagle",      "pistol"),
+    "WeapRhino_C":       ("R45",         "pistol"),
+    "WeapNagantM1895_C": ("R1895",       "pistol"),
+    # Throwables
+    "ProjGrenade_C":         ("Frag",          "throwable"),
+    "ProjMolotov_C":         ("Molotov",       "throwable"),
+    "ProjStickyGrenade_C":   ("Sticky",        "throwable"),
+    "ProjC4_C":              ("C4",            "throwable"),
+    "PanzerFaust100M_Projectile_C": ("Panzerfaust", "throwable"),
+    "Mortar_Projectile_C":   ("Mortar",        "throwable"),
+    # Melee
+    "WeapCowbar_C":          ("Crowbar",  "melee"),
+    "WeapMachete_C":         ("Machete",  "melee"),
+    "WeapMacheteProjectile_C":("Machete (Throw)","melee"),
+    "WeapPan_C":             ("Pan",      "melee"),
+    "WeapPanProjectile_C":   ("Pan (Throw)","melee"),
+    "WeapSickle_C":          ("Sickle",   "melee"),
+    "WeapSickleProjectile_C":("Sickle (Throw)","melee"),
+    "WeapPickaxeProjectile_C":("Pickaxe (Throw)","melee"),
+    "WeapCrossbow_1_C":      ("Crossbow", "other"),
+    # Other / Misc
+    "Jerrycan":              ("Jerry Can Boom","throwable"),
+    "JerrycanFire":          ("Jerry Can Fire","throwable"),
+    "Bluezonebomb_EffectActor_C": ("Red Zone",  "envir"),
+    "BP_Baltic_GasPump_C":   ("Gas Pump",      "envir"),
+    "BP_FireEffectController_C":  ("Fire", "envir"),
+    "BP_MolotovFireDebuff_C": ("Molotov Fire", "envir"),
+    "BP_CarePackageDrop_nonDest_C": ("Care Package", "envir"),
+    "BP_Pillar_Car_C":       ("Pillar Car",    "vehicle"),
+}
+
+
+def _weapon_label(weapon_id):
+    if not weapon_id or weapon_id == "None":
+        return ("Unknown", "other")
+    # Generische Fahrzeuge (BP_*Mirado/Dacia/...) -> Vehicle Roadkill
+    if weapon_id.startswith("BP_") or weapon_id.startswith("Dacia_") \
+       or weapon_id.startswith("Uaz_"):
+        return (weapon_id.replace("_C", "").replace("BP_", "")
+                .replace("_", " "), "vehicle")
+    if weapon_id in WEAPON_NAMES:
+        return WEAPON_NAMES[weapon_id]
+    # Fallback fuer noch unbekannte IDs — Raw zeigen + 'other'
+    return (weapon_id.replace("Weap", "").replace("_C", ""), "other")
+
+
+def compute_weapon_stats(conn, my_account_id, range_key="session",
+                          from_iso=None, to_iso=None):
+    """Pro Waffe (eigene Kills): Kill-Count, Ø Distanz (m), Max-Distanz,
+    Anzahl Matches mit mind. einem Kill mit dieser Waffe.
+
+    Distance in der DB ist cm — wir liefern Meter zurueck.
+    Range-aware: session/day/week/all + explizite from/to ISO.
+    """
+    if from_iso:
+        cutoff = from_iso
+        end_filter = " AND m.played_at <= ?" if to_iso else ""
+        params = [my_account_id, cutoff]
+        if to_iso:
+            params.append(to_iso)
+    else:
+        cutoff = (_range_filter(conn, range_key)
+                  if range_key != "all" else "1970-01-01T00:00:00Z")
+        end_filter = ""
+        params = [my_account_id, cutoff]
+    br_sql, br_params = _br_filter("m")
+    params += br_params
+
+    rows = conn.execute(f"""
+        SELECT te.weapon AS weapon,
+               COUNT(*) AS kills,
+               AVG(te.distance) AS avg_dist_cm,
+               MAX(te.distance) AS max_dist_cm,
+               COUNT(DISTINCT te.match_id) AS used_matches
+        FROM telemetry_events te
+        JOIN matches m ON m.match_id = te.match_id
+        WHERE te.event_type = 'Kill'
+          AND te.actor_account = ?
+          AND m.played_at >= ?{end_filter}
+          AND {br_sql}
+        GROUP BY te.weapon
+    """, params).fetchall()
+
+    out = []
+    for r in rows:
+        wid = r["weapon"]
+        name, cat = _weapon_label(wid)
+        avg_m = (r["avg_dist_cm"] or 0) / 100.0
+        max_m = (r["max_dist_cm"] or 0) / 100.0
+        out.append({
+            "weaponId":   wid or "",
+            "name":       name,
+            "category":   cat,
+            "kills":      r["kills"] or 0,
+            "avgDist":    round(avg_m, 1),
+            "maxDist":    round(max_m, 1),
+            "usedInMatches": r["used_matches"] or 0,
+            "killsPerMatch": round(
+                (r["kills"] or 0) / max(r["used_matches"] or 1, 1), 2),
+        })
+    out.sort(key=lambda w: -w["kills"])
+    return out
+
+
 def _compute_player_vehicle_evictions(conn, account_id, match_ids):
     """Wie oft hat dieser Spieler andere 'rausgeschossen' und wie oft
     wurde er selbst rausgeschossen — ueber die gegebenen Matches.

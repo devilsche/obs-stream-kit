@@ -51,7 +51,7 @@ from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_streaks,
                                 compute_trend_deltas, compute_session_matches,
                                 compute_hot_drop, compute_session_achievements,
-                                compute_vehicle_stats)
+                                compute_vehicle_stats, compute_weapon_stats)
 
 
 def _ok(payload):
@@ -101,6 +101,8 @@ class EndpointRegistry:
             return self._session_matches(qs)
         if route == ("GET", "/api/pubg/vehicle-stats"):
             return self._vehicle_stats(qs)
+        if route == ("GET", "/api/pubg/weapon-stats"):
+            return self._weapon_stats(qs)
         if route == ("GET", "/api/pubg/hot-drop"):
             return self._hot_drop(qs)
         if route == ("GET", "/api/pubg/payday-stats"):
@@ -528,6 +530,20 @@ class EndpointRegistry:
                                          range_key,
                                          from_iso=from_iso, to_iso=to_iso),
         ))
+
+    def _weapon_stats(self, qs):
+        conn = self.get_conn()
+        range_key = qs.get("range", "all")
+        from_iso = qs.get("from")
+        to_iso = qs.get("to")
+        cache_key = f"weapon-stats:{range_key}:{from_iso or ''}:{to_iso or ''}"
+        rows = self.cache.get_or_compute(
+            cache_key,
+            lambda: compute_weapon_stats(
+                conn, self.my_account_id, range_key,
+                from_iso=from_iso, to_iso=to_iso),
+        )
+        return _ok({"weapons": rows, "count": len(rows)})
 
     def _vehicle_stats(self, qs):
         conn = self.get_conn()

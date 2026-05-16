@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<!--
+  PUBG Weapon Stats
+  ──────────────────────────────────────────────────────────────────────
+  Pro Waffe: Kills, Ø Distanz, Max-Distanz, Anzahl Matches mit Kills,
+  Kills-pro-Match. Aus telemetry_events.Kill mit actor_account=self.
+  Endpoint: /api/pubg/weapon-stats?range=session|week|all
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Weapon Stats</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    html, body { height: 100%; margin: 0; padding: 0; }
+    body {
+      padding: 8px;
+      display: flex; flex-direction: column;
+      justify-content: flex-end;
+      box-sizing: border-box;
+    }
+    body.dock {
+      background: #0d061a;
+      justify-content: flex-start;
+      padding: 10px;
+    }
+    .panel { width: 100%; min-width: 380px; padding: 14px 16px; }
+    .panel h3 {
+      margin: 0 0 12px;
+      font-size: 0.9em; letter-spacing: 0.08em;
+      color: var(--pubg-muted); text-transform: uppercase;
+    }
+
+    .filter-cats {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      margin-bottom: 10px;
+    }
+    .filter-cats button {
+      background: rgba(0,0,0,0.4);
+      color: var(--pubg-muted);
+      border: 1px solid var(--pubg-border);
+      padding: 3px 9px;
+      border-radius: 3px;
+      font: inherit;
+      font-size: 0.74em;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .filter-cats button.active {
+      color: var(--pubg-gold);
+      border-color: var(--pubg-gold);
+    }
+
+    table.ws {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88em;
+      font-variant-numeric: tabular-nums;
+    }
+    table.ws thead th {
+      color: var(--pubg-muted);
+      font-size: 0.7em; font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 4px 6px;
+      border-bottom: 1px solid var(--pubg-border);
+      text-align: right;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    table.ws thead th.name-h { text-align: left; }
+    table.ws thead th.active { color: var(--pubg-gold); }
+    table.ws tbody td {
+      padding: 7px 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    table.ws tbody tr:last-child td { border-bottom: 0; }
+    table.ws td.name {
+      font-weight: 700;
+      color: var(--pubg-text);
+    }
+    table.ws td.cat {
+      color: var(--pubg-muted);
+      font-size: 0.7em;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding-left: 8px;
+    }
+    table.ws td.num { text-align: right; }
+    table.ws td.num.hot { color: var(--pubg-gold); font-weight: 700; }
+    table.ws tr.top-row td.num.kills { color: var(--pubg-gold); font-weight: 700; }
+    .empty {
+      color: var(--pubg-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 18px;
+      font-size: 0.9em;
+    }
+    .meta {
+      margin-top: 8px;
+      font-size: 0.72em;
+      color: var(--pubg-muted);
+      text-align: right;
+      letter-spacing: 0.04em;
+    }
+  </style>
+</head>
+<body>
+  <div class="pubg-header" id="pubgHeader"></div>
+  <div class="pubg-card panel pubg-fade-in">
+    <div class="filter-cats" id="catFilter"></div>
+    <table class="ws" id="wsTable">
+      <thead>
+        <tr>
+          <th class="name-h" data-sort="name">Waffe</th>
+          <th data-sort="kills" class="active">Kills ↓</th>
+          <th data-sort="avgDist">Ø m</th>
+          <th data-sort="maxDist">Max m</th>
+          <th data-sort="killsPerMatch" title="Kills pro Match in dem die Waffe einen Kill hatte">K/M</th>
+        </tr>
+      </thead>
+      <tbody id="wsBody">
+        <tr><td colspan="5" class="empty">— laedt —</td></tr>
+      </tbody>
+    </table>
+    <div class="meta" id="wsMeta"></div>
+  </div>
+
+  <script src="_pubg.js"></script>
+  <script>
+    const RANGE = PubgUI.qs("range", "all");
+    const DOCK  = PubgUI.qs("dock", "0") === "1";
+    const POLL_MS = parseInt(PubgUI.qs("pollMs",
+                              DOCK ? "30000" : "120000"), 10);
+    const MIN_KILLS = parseInt(PubgUI.qs("minKills", "3"), 10);
+    if (DOCK) document.body.classList.add("dock");
+    PubgUI.renderHeader(document.getElementById("pubgHeader"),
+                        "Weapon Stats", RANGE);
+    PubgUI.buildFilter([
+      { key: "range", label: "Range", type: "select", default: "all",
+        options: [["session","Session"],["week","7 days"],["all","Database"]],
+        tooltip: "Which matches to include." },
+      { key: "minKills", label: "Min Kills", type: "number", default: "3",
+        tooltip: "Min. Kills mit dieser Waffe, sonst rausgefiltert." },
+    ]);
+
+    // Category-Filter — null = alle
+    const CATS = [
+      ["all",       "Alle"],
+      ["ar",        "AR"],
+      ["dmr",       "DMR"],
+      ["sniper",    "Sniper"],
+      ["smg",       "SMG"],
+      ["shotgun",   "Shotgun"],
+      ["lmg",       "LMG"],
+      ["pistol",    "Pistol"],
+      ["throwable", "Throw"],
+      ["vehicle",   "Vehicle"],
+      ["melee",     "Melee"],
+      ["other",     "Other"],
+    ];
+    let activeCat = "all";
+    let sortBy    = "kills";
+    let lastData  = [];
+
+    function buildCatFilter() {
+      const host = document.getElementById("catFilter");
+      host.innerHTML = CATS.map(([k,l]) =>
+        `<button data-cat="${k}" class="${k===activeCat?"active":""}">${l}</button>`
+      ).join("");
+      host.querySelectorAll("button").forEach(b => {
+        b.addEventListener("click", () => {
+          activeCat = b.dataset.cat;
+          buildCatFilter();
+          rerender();
+        });
+      });
+    }
+
+    function sortKey(w) {
+      if (sortBy === "name")  return w.name.toLowerCase();
+      return w[sortBy] || 0;
+    }
+    function applySort(arr) {
+      const dir = sortBy === "name" ? 1 : -1;
+      return arr.slice().sort((a, b) => {
+        const av = sortKey(a), bv = sortKey(b);
+        if (av < bv) return -1 * dir;
+        if (av > bv) return  1 * dir;
+        return 0;
+      });
+    }
+
+    function rerender() {
+      const body = document.getElementById("wsBody");
+      const meta = document.getElementById("wsMeta");
+      let view = lastData.filter(w => w.kills >= MIN_KILLS);
+      if (activeCat !== "all") {
+        view = view.filter(w => w.category === activeCat);
+      }
+      view = applySort(view);
+
+      // Sort-Indikator in Headers
+      document.querySelectorAll("#wsTable thead th").forEach(th => {
+        th.classList.toggle("active", th.dataset.sort === sortBy);
+      });
+
+      if (!view.length) {
+        body.innerHTML =
+          `<tr><td colspan="5" class="empty">— keine Waffen im Filter —</td></tr>`;
+        meta.textContent = "";
+        return;
+      }
+      const topKills = view[0] ? view[0].kills : 0;
+      body.innerHTML = view.map((w, i) => {
+        const top = (sortBy === "kills" && i === 0) ? "top-row" : "";
+        const hot = (n, thr) => n >= thr ? "hot" : "";
+        return `<tr class="${top}">
+          <td class="name">${w.name}<span class="cat">${w.category}</span></td>
+          <td class="num kills ${hot(w.kills,10)}">${w.kills}</td>
+          <td class="num">${w.avgDist.toFixed(0)}</td>
+          <td class="num">${w.maxDist.toFixed(0)}</td>
+          <td class="num">${w.killsPerMatch.toFixed(2)}</td>
+        </tr>`;
+      }).join("");
+      const total = view.reduce((s, w) => s + w.kills, 0);
+      meta.textContent = `${view.length} Waffen · ${total} Kills total`;
+    }
+
+    document.querySelectorAll("#wsTable thead th").forEach(th => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.sort;
+        if (!key) return;
+        sortBy = key;
+        rerender();
+      });
+    });
+
+    buildCatFilter();
+
+    if (RANGE === "session") PubgUI.hideIfStale();
+    PubgUI.poll(`/api/pubg/weapon-stats?range=${RANGE}`, POLL_MS, (d) => {
+      if (RANGE === "session") PubgUI.hideIfStale();
+      lastData = (d && d.weapons) || [];
+      rerender();
+    }, console.error);
+  </script>
+</body>
+</html>
