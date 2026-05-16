@@ -568,6 +568,12 @@ class EndpointRegistry:
         range_key = qs.get("range", "session")
         from_iso = qs.get("from")
         to_iso = qs.get("to")
+        # Debug-Mode: ?debug=1 listet pro Match die rohen Event-Counts
+        # + Squad-Members. Hilft beim Diagnostizieren wenn members leer
+        # ist obwohl man weiss dass was passiert ist.
+        if qs.get("debug") == "1":
+            return _ok(self._vehicle_stats_debug(
+                conn, range_key, from_iso, to_iso))
         cache_key = f"vehicle-stats:{range_key}:{from_iso or ''}:{to_iso or ''}"
         rows = self.cache.get_or_compute(
             cache_key,
@@ -576,6 +582,91 @@ class EndpointRegistry:
                 from_iso=from_iso, to_iso=to_iso),
         )
         return _ok({"members": rows, "count": len(rows)})
+
+    def _vehicle_stats_debug(self, conn, range_key, from_iso, to_iso):
+        """Diagnose-Dump: pro Match im Range zeigen wir Squad-Mitglieder
+        + Anzahl Vehicle/Kill/Knock-Events + ob die ENEMY-VehicleEnter
+        Events nach dem Filter-Fix mitlaufen.
+        """
+        from pubg.aggregations import (
+            BATTLE_ROYALE_MODES, _range_filter, _br_filter,
+            compute_vehicle_stats)
+        if from_iso:
+            cutoff = from_iso
+            end_filter = " AND m.played_at <= ?" if to_iso else ""
+            params = [self.my_account_id, cutoff]
+            if to_iso:
+                params.append(to_iso)
+        else:
+            cutoff = (_range_filter(conn, range_key)
+                      if range_key != "all" else "1970-01-01T00:00:00Z")
+            end_filter = ""
+            params = [self.my_account_id, cutoff]
+        br_sql, br_params = _br_filter("m")
+        params += br_params
+        matches = conn.execute(f"""
+            SELECT m.match_id, m.played_at, m.map_name, mtm.team_id
+            FROM matches m
+            JOIN match_team_mapping mtm ON mtm.match_id = m.match_id
+            WHERE mtm.account_id = ? AND m.played_at >= ?{end_filter}
+              AND {br_sql}
+            ORDER BY m.played_at DESC
+            LIMIT 30
+        """, params).fetchall()
+        out = []
+        for m in matches:
+            mid = m["match_id"]
+            team = m["team_id"]
+            squad = [r["account_id"] for r in conn.execute(
+                "SELECT DISTINCT mtm.account_id, p.name "
+                "FROM match_team_mapping mtm "
+                "LEFT JOIN players p ON p.account_id = mtm.account_id "
+                "WHERE mtm.match_id = ? AND mtm.team_id = ?",
+                (mid, team)).fetchall()]
+            squad_names = [r["name"] for r in conn.execute(
+                "SELECT p.name FROM match_team_mapping mtm "
+                "LEFT JOIN players p ON p.account_id = mtm.account_id "
+                "WHERE mtm.match_id = ? AND mtm.team_id = ?",
+                (mid, team)).fetchall() if r["name"]]
+            qsph = ",".join("?" * len(squad)) if squad else "''"
+            ev_squad = conn.execute(
+                f"SELECT COUNT(*) FROM telemetry_events WHERE match_id=? "
+                f"AND event_type='VehicleEnter' AND actor_account IN ({qsph})",
+                [mid] + squad).fetchone()[0]
+            ev_enemy = conn.execute(
+                f"SELECT COUNT(*) FROM telemetry_events WHERE match_id=? "
+                f"AND event_type='VehicleEnter' AND actor_account NOT IN ({qsph})",
+                [mid] + squad).fetchone()[0]
+            kills = conn.execute(
+                f"SELECT COUNT(*) FROM telemetry_events WHERE match_id=? "
+                f"AND event_type='Kill' AND actor_account IN ({qsph})",
+                [mid] + squad).fetchone()[0]
+            knocks = conn.execute(
+                f"SELECT COUNT(*) FROM telemetry_events WHERE match_id=? "
+                f"AND event_type='Knock' AND actor_account IN ({qsph})",
+                [mid] + squad).fetchone()[0]
+            out.append({
+                "matchId":      mid,
+                "playedAt":     m["played_at"],
+                "map":          m["map_name"],
+                "squad":        squad_names,
+                "vehicleEnterSquad":  ev_squad,
+                "vehicleEnterEnemy":  ev_enemy,
+                "killsBySquad":  kills,
+                "knocksBySquad": knocks,
+            })
+        # Plus: gesamtes compute-Ergebnis fuer den Range
+        stats = compute_vehicle_stats(
+            conn, self.my_account_id, range_key,
+            from_iso=from_iso, to_iso=to_iso)
+        return {
+            "range": range_key, "from": from_iso, "to": to_iso,
+            "matchesInRange": len(matches),
+            "matches": out,
+            "stats": stats,
+            "_note": ("vehicleEnterEnemy=0 fuer historische Matches → "
+                      "hidrive-refill noetig damit Eviction-Dealt funktioniert"),
+        }
 
     def _hot_drop(self, qs):
         conn = self.get_conn()
