@@ -1499,6 +1499,120 @@
       e.preventDefault();
     });
 
+    function mdZoomAt(host, deltaScale, anchorPx, anchorPy) {
+      const s = mdGetState(host);
+      const vp = s.viewport;
+      if (!vp) return;
+      // Welcher cm-Punkt liegt aktuell unter anchor?
+      const [acmX, acmY] = mdCanvasToCm(host, anchorPx, anchorPy);
+      // Neuer zoom
+      let newZoom = vp.zoom * deltaScale;
+      // Limits
+      const maxZoom = MD_MAP_PX / MD_MIN_ZOOM_CM;  // tightest 50m visible
+      const minZoom = MD_MAP_PX / MD_MAX_ZOOM_CM;  // ganze 8km Map
+      newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
+      vp.zoom = newZoom;
+      // Center so dass anchor-cm-Punkt unter anchor-px bleibt
+      vp.centerX = acmX - (anchorPx - MD_MAP_PX / 2) / vp.zoom;
+      vp.centerY = acmY - (anchorPy - MD_MAP_PX / 2) / vp.zoom;
+      vp.autoFollow = false;
+      mdRenderBasemap(host);
+      mdRenderOverlay(host);
+    }
+
+    document.addEventListener("wheel", (e) => {
+      const wrap = e.target.closest && e.target.closest(".md-mapwrap");
+      if (!wrap) return;
+      e.preventDefault();
+      const host = wrap.closest(".md-host");
+      if (!host) return;
+      const rect = wrap.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      const scale = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      mdZoomAt(host, scale, px, py);
+    }, { passive: false });
+
+    document.addEventListener("mousedown", (e) => {
+      const wrap = e.target.closest && e.target.closest(".md-mapwrap");
+      if (!wrap) return;
+      if (e.target.closest(".md-zoombtns")) return;
+      const host = wrap.closest(".md-host");
+      if (!host) return;
+      // Right-click oder mit Shift = pan-start
+      if (e.button !== 0) return;  // nur linke Maus
+      const s = mdGetState(host);
+      s.dragPan = {
+        startX: e.clientX, startY: e.clientY,
+        startCenterX: s.viewport.centerX, startCenterY: s.viewport.centerY,
+      };
+    });
+
+    document.addEventListener("mousemove", (e) => {
+      const host = document.querySelector(".md-host[data-mounted='1']");
+      if (!host) return;
+      const s = mdGetState(host);
+      if (!s.dragPan) return;
+      const dx = e.clientX - s.dragPan.startX;
+      const dy = e.clientY - s.dragPan.startY;
+      // 1 px = 1/zoom cm
+      s.viewport.centerX = s.dragPan.startCenterX - dx / s.viewport.zoom;
+      s.viewport.centerY = s.dragPan.startCenterY - dy / s.viewport.zoom;
+      s.viewport.autoFollow = false;
+      mdRenderBasemap(host);
+      mdRenderOverlay(host);
+    });
+
+    document.addEventListener("mouseup", () => {
+      const host = document.querySelector(".md-host[data-mounted='1']");
+      if (!host) return;
+      const s = mdGetState(host);
+      s.dragPan = null;
+    });
+
+    document.addEventListener("dblclick", (e) => {
+      const wrap = e.target.closest && e.target.closest(".md-mapwrap");
+      if (!wrap) return;
+      const host = wrap.closest(".md-host");
+      if (!host) return;
+      mdResetView(host);
+    });
+
+    function mdResetView(host) {
+      const s = mdGetState(host);
+      if (!s.detail) return;
+      const coords = [];
+      for (const m of s.detail.members) {
+        if (!m.lives) continue;
+        for (const life of m.lives) {
+          if (life.landing) coords.push([life.landing.x, life.landing.y]);
+        }
+      }
+      s.viewport = mdBboxFitViewport(coords, MD_PAD_500M_CM);
+      mdRenderState(host);
+    }
+
+    document.addEventListener("click", (e) => {
+      const zi = e.target.closest && e.target.closest(".md-zoom-in");
+      if (zi) {
+        const host = zi.closest(".md-host");
+        mdZoomAt(host, 1.5, MD_MAP_PX / 2, MD_MAP_PX / 2);
+        e.stopPropagation(); return;
+      }
+      const zo = e.target.closest && e.target.closest(".md-zoom-out");
+      if (zo) {
+        const host = zo.closest(".md-host");
+        mdZoomAt(host, 1 / 1.5, MD_MAP_PX / 2, MD_MAP_PX / 2);
+        e.stopPropagation(); return;
+      }
+      const zr = e.target.closest && e.target.closest(".md-zoom-reset");
+      if (zr) {
+        const host = zr.closest(".md-host");
+        mdResetView(host);
+        e.stopPropagation(); return;
+      }
+    });
+
     // Date-Range-Picker initialisieren mit aktuellen URL-Werten
     function isoLocal(date) {
       // Local-Date → "YYYY-MM-DD"
