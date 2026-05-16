@@ -835,8 +835,149 @@
     const FROM = PubgUI.qs("from", "");
     const TO = PubgUI.qs("to", "");
 
-    // ── Match-Detail v2 — Implementation in Tasks 4-15 ───────────────────
-    // (Helpers, Viewport, Basemap, Overlay, Cards, State, Mount, Play …)
+    // ── Match-Detail v2 Globals ──────────────────────────────────────────
+    const MD_COLORS = [
+      "#f2b705", "#e74c3c", "#3498db", "#2ecc71",
+      "#ff7a1f", "#9b59b6", "#1abc9c", "#ec407a",
+    ];
+    const MD_MAP_PX = 300;
+    const MD_PAD_500M_CM = 50000;   // 500m padding fuer Default-Bbox
+    const MD_MIN_ZOOM_CM = 5000;    // 50m minimal sichtbarer Radius
+    const MD_MAX_ZOOM_CM = 800000;  // 8km — ganze Map default Erangel-Range
+    const MD_ANIM_DURATION_MS = 15000;
+
+    // Cache fuer match-detail responses
+    const _mdCache = new Map();
+    async function mdLoad(matchId) {
+      if (!matchId) return null;
+      if (_mdCache.has(matchId)) return _mdCache.get(matchId);
+      let d = null;
+      try {
+        d = await PubgUI.fetchJson(
+          `/api/pubg/match-detail?matchId=${encodeURIComponent(matchId)}`);
+      } catch (e) { console.warn("mdLoad failed", matchId, e); }
+      const colorByAcc = {};
+      if (d && d.members) {
+        d.members.forEach((m, i) => {
+          colorByAcc[m.accountId] = MD_COLORS[i % MD_COLORS.length];
+        });
+      }
+      const cached = { detail: d, colorByAcc };
+      _mdCache.set(matchId, cached);
+      return cached;
+    }
+
+    // Map-Image-Cache mit .png/.webp Fallback
+    const _mdImgCache = new Map();
+    function mdMapImage(mapName) {
+      if (!mapName) return Promise.resolve(null);
+      if (_mdImgCache.has(mapName)) return _mdImgCache.get(mapName);
+      const p = new Promise((res) => {
+        const img = new Image();
+        img.onload = () => res(img);
+        img.onerror = () => {
+          const img2 = new Image();
+          img2.onload = () => res(img2);
+          img2.onerror = () => res(null);
+          img2.src = `/widgets/pubg/maps/${mapName}.webp`;
+        };
+        img.src = `/widgets/pubg/maps/${mapName}.png`;
+      });
+      _mdImgCache.set(mapName, p);
+      return p;
+    }
+
+    // Pin-Calibration (identisch poi-editor.html)
+    function mdApplyPinCal(xCm, yCm, mapKm, cal) {
+      if (!cal) return [xCm, yCm];
+      const mc = mapKm * 100000 / 2;
+      let x = xCm, y = yCm;
+      if (cal.flipX) x = 2 * mc - x;
+      if (cal.flipY) y = 2 * mc - y;
+      const rot = ((cal.rotate || 0) % 360 + 360) % 360;
+      if (rot !== 0) {
+        const dx = x - mc, dy = y - mc;
+        if (rot === 90)  { x = mc - dy; y = mc + dx; }
+        if (rot === 180) { x = mc - dx; y = mc - dy; }
+        if (rot === 270) { x = mc + dy; y = mc - dx; }
+      }
+      const ex = (x - mc) * (cal.scaleX || 1) + mc + (cal.offsetX || 0);
+      const ey = (y - mc) * (cal.scaleY || 1) + mc + (cal.offsetY || 0);
+      return [ex, ey];
+    }
+
+    // State pro Host (DOM-Element) als WeakMap
+    const _mdState = new WeakMap();
+    function mdGetState(host) {
+      let s = _mdState.get(host);
+      if (!s) {
+        s = {
+          detail: null,           // match-detail-response
+          colorByAcc: {},
+          soloAcc: null,
+          viewport: null,          // {centerX, centerY, zoom, autoFollow}
+          zeitraffer: {            // cursorTs in ms relativ zu matchStart
+            cursorTs: 0, playing: false,
+            playStartWallTs: 0, playStartCursor: 0,
+            matchStart: 0, matchEnd: 0,
+          },
+          hoveredMarker: null,
+          playToken: 0,
+          dragPan: null,            // {startX, startY, startCenterX, startCenterY}
+        };
+        _mdState.set(host, s);
+      }
+      return s;
+    }
+
+    // Cm-zu-Canvas-Pixel umrechnen anhand Viewport + Calibration
+    function mdCmToCanvas(host, xCm, yCm) {
+      const s = mdGetState(host);
+      const vp = s.viewport;
+      if (!vp) return [0, 0];
+      const mapKm = parseFloat(host.dataset.mapKm) || 8;
+      let cal = {};
+      try { cal = JSON.parse(host.dataset.cal || "{}"); } catch (e) {}
+      const [ex, ey] = mdApplyPinCal(xCm, yCm, mapKm, cal);
+      // Viewport.zoom = Pixel pro cm
+      const px = (MD_MAP_PX / 2) + (ex - vp.centerX) * vp.zoom;
+      const py = (MD_MAP_PX / 2) + (ey - vp.centerY) * vp.zoom;
+      return [px, py];
+    }
+
+    // Inverse: Canvas-Pixel → cm (fuer Click-Hit-Testing)
+    function mdCanvasToCm(host, px, py) {
+      const s = mdGetState(host);
+      const vp = s.viewport;
+      if (!vp) return [0, 0];
+      return [
+        vp.centerX + (px - MD_MAP_PX / 2) / vp.zoom,
+        vp.centerY + (py - MD_MAP_PX / 2) / vp.zoom,
+      ];
+    }
+
+    // Bbox aus Liste von [x, y] cm-Coords + Padding
+    function mdBboxFitViewport(coords, paddingCm) {
+      if (!coords.length) {
+        return { centerX: 400000, centerY: 400000, zoom: MD_MAP_PX / 800000,
+                  autoFollow: true };
+      }
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (const [x, y] of coords) {
+        if (x < x0) x0 = x; if (y < y0) y0 = y;
+        if (x > x1) x1 = x; if (y > y1) y1 = y;
+      }
+      const cx = (x0 + x1) / 2;
+      const cy = (y0 + y1) / 2;
+      const w = Math.max(MD_PAD_500M_CM * 2,
+                          (x1 - x0) + 2 * paddingCm,
+                          (y1 - y0) + 2 * paddingCm);
+      return {
+        centerX: cx, centerY: cy,
+        zoom: MD_MAP_PX / w,
+        autoFollow: true,
+      };
+    }
 
     // Date-Range-Picker initialisieren mit aktuellen URL-Werten
     function isoLocal(date) {
