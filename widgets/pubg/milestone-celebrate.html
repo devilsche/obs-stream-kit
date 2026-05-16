@@ -207,12 +207,20 @@
   <script src="_pubg.js"></script>
   <script>
     // ?n=<num> erlaubt manuelles Override. Ohne n: auto-detect aus
-    // lifetime.wins (= letzte erreichte 100er-Marke). ?force=1 zeigt
-    // die Szene auch dann, wenn die letzte Marke schon laenger zurueckliegt.
+    // lifetime.wins (= letzte erreichte 100er-Marke). ?force=1
+    // erzwingt die Sequenz auch wenn nichts NEUES gehittet wurde
+    // (zum Testen). ?reset=1 loescht den localStorage-Marker —
+    // naechster echte Milestone feiert dann wieder.
     const N_OVERRIDE = parseInt(PubgUI.qs("n", "") || "0", 10) || null;
     const WAIT       = parseInt(PubgUI.qs("wait", "15"), 10);
     const MUTE       = PubgUI.qs("mute", "0") === "1";
     const PLAYER     = PubgUI.qs("player", "");
+    const FORCE      = PubgUI.qs("force", "0") === "1";
+    const STORAGE_KEY = "pubg.milestone.lastCelebrated"
+                      + (PLAYER ? ":" + PLAYER : "");
+    if (PubgUI.qs("reset", "0") === "1") {
+      try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    }
 
     // Alle Animationen pausiert lassen bis bootstrap() durch ist.
     document.documentElement.classList.add("preload");
@@ -267,13 +275,39 @@
         d = await PubgUI.fetchJson(`/api/pubg/career-lifetime?${params}`);
       } catch (e) { /* silent */ }
 
-      // N bestimmen: Override > floor(wins/100)*100 > 1000 als Notfall.
+      // N bestimmen: Override > floor(wins/100)*100.
       let N = N_OVERRIDE;
       if (!N && d && d.wins != null) {
         N = Math.floor(d.wins / 100) * 100;
       }
-      if (!N || N < 100) N = 1000;  // Notfall — wir zeigen wenigstens irgendwas
+
+      // Gate: nur feiern wenn die Marke wirklich NEU ist (oder force/
+      // override). Sonst (z.B. OBS-Start, Szene aktiviert, aber nichts
+      // hat sich seit letzter Feier veraendert) bleibt die Szene
+      // komplett still — kein Sound, keine Animation, transparent.
+      let lastCelebrated = 0;
+      try { lastCelebrated = parseInt(localStorage.getItem(STORAGE_KEY) || "0", 10) || 0; }
+      catch (e) {}
+      const isNew = N && N >= 100 && N > lastCelebrated;
+      if (!N_OVERRIDE && !FORCE && !isNew) {
+        // Erstkontakt (lastCelebrated == 0) ohne erkennbaren Hit:
+        // aktuellen Stand still wegspeichern, damit der naechste echte
+        // Milestone feiern darf. Bei N === lastCelebrated nichts tun.
+        if (N && N > lastCelebrated) {
+          try { localStorage.setItem(STORAGE_KEY, String(N)); } catch (e) {}
+        }
+        // Stage bleibt versteckt — preload-Klasse wird nicht entfernt.
+        return;
+      }
+
+      // N feststeht und ist 'feierwuerdig'. Falls ueber Override/Force:
+      // localStorage NICHT bumpen — sonst suppress'd man eine echte
+      // spaetere Feier auf die gleiche Marke.
+      if (!N || N < 100) N = 1000;
       setNumber(N);
+      if (isNew) {
+        try { localStorage.setItem(STORAGE_KEY, String(N)); } catch (e) {}
+      }
 
       // Stats-Grid mit den lifetime-Werten
       if (d && d.rounds_played) {
