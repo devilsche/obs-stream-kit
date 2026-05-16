@@ -1269,6 +1269,27 @@ def _emit_tier_cascade(out, seen, tiers, value, value_label_fn,
         seen.add(aid)
 
 
+def _career_win_number(conn, my_account_id, match_id, played_at):
+    """Wie viele BR-Chicken-Wins (career-weit) hat der Spieler bis
+    inkl. diesem Match? Filtert auf BATTLE_ROYALE_MODES — Event-Matches
+    haben place=1 fuer alle Spieler und zaehlen nicht als 'Win'.
+    Tiebreaker bei gleichem played_at: match_id, damit deterministisch.
+    """
+    ph = ",".join("?" * len(BATTLE_ROYALE_MODES))
+    row = conn.execute(f"""
+        SELECT COUNT(*) AS n
+        FROM participants p
+        JOIN matches m ON m.match_id = p.match_id
+        WHERE p.account_id = ?
+          AND p.place = 1
+          AND m.game_mode IN ({ph})
+          AND (m.played_at < ?
+               OR (m.played_at = ? AND m.match_id <= ?))
+    """, [my_account_id] + list(BATTLE_ROYALE_MODES)
+         + [played_at, played_at, match_id]).fetchone()
+    return (row["n"] if row else 0) or 0
+
+
 def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None):
     """Detected Achievements der aktuellen oder einer historischen Session.
     from_iso/to_iso optional — sonst aktuelle Session.
@@ -1350,6 +1371,35 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             })
             win_seen = True
             seen.add("first_chicken")
+
+        # Career-Wins-Milestone: bei jedem Chicken-Win die kumulative
+        # Career-Win-Number bis zu diesem Match berechnen — wenn glatte
+        # 100er-Marke, emit ein Milestone-Achievement. Tiers:
+        #   N % 1000 == 0 → 'GRAND' (legendary via session_pct snapshot)
+        #   N %  500 == 0 → 'Half-Grand' (mythic-ish)
+        #   N %  100 == 0 → Standard-Milestone (rare)
+        if place == 1:
+            cwn = _career_win_number(conn, my_account_id, m["matchId"], played)
+            if cwn and cwn >= 100 and cwn % 100 == 0:
+                if cwn % 1000 == 0:
+                    label_prefix = "GRAND CHICKEN"
+                    icon = "👑"
+                elif cwn % 500 == 0:
+                    label_prefix = "Half-Grand Chicken"
+                    icon = "🏆"
+                else:
+                    label_prefix = "Career Milestone"
+                    icon = "🏆"
+                out.append({
+                    "id":      f"wins_milestone_{cwn}",
+                    "label":   f"{label_prefix} · {cwn} Career Wins",
+                    "icon":    icon,
+                    "matchId": m["matchId"],
+                    "playedAt": played,
+                    # 500er + 1000er als rare markieren — gibt Gold-Glow
+                    # + biglvlup-Sound im Popup. 100er bleiben standard.
+                    "isRare":  (cwn % 500 == 0),
+                })
 
         if not top10_seen and place <= 10:
             # playedAt = Zeitpunkt wo das Team Top-10 erreicht hat (10.
@@ -1890,6 +1940,10 @@ def _insert_achievements(conn, achievements, suppress_popup=False):
                 conn, aid, played_at, label)
         except Exception:
             sess_pct = match_pct = None
+        # Rare-Flag: statisches Set ODER per-row Override 'isRare'.
+        # Letzteres fuer dynamisch generierte IDs (z.B. wins_milestone_N
+        # wo N variabel ist und nicht ins Set passt).
+        rare = (aid in PUBG_RARE_ACHIEVEMENTS) or bool(a.get("isRare"))
         cur = conn.execute("""
             INSERT INTO pubg_achievements_seen
               (achievement_id, match_id, label, icon, played_at,
@@ -1898,7 +1952,7 @@ def _insert_achievements(conn, achievements, suppress_popup=False):
             ON CONFLICT(achievement_id, match_id) DO NOTHING
         """, (aid, mid, label, a.get("icon"),
               played_at,
-              1 if aid in PUBG_RARE_ACHIEVEMENTS else 0,
+              1 if rare else 0,
               displayed_at, sess_pct, match_pct))
         if cur.rowcount > 0:
             new_count += 1

@@ -305,11 +305,23 @@
 
     <a class="tile" href="/widgets/pubg/career-card.html" target="_blank">
       <div class="tile-title"><h3>career-card.html</h3><span class="ext">open</span></div>
-      <div class="tile-desc">PUBG-API lifetime career stats. Independent from the local match cache.</div>
-      <span class="tile-size"><b>540×280</b></span>
+      <div class="tile-desc">PUBG-API lifetime career stats. Independent from the local match cache. Includes countdown to next 100/500/1000 wins milestone.</div>
+      <span class="tile-size"><b>540×340</b></span>
       <ul class="tile-params">
         <li><code>player</code><span>PUBG nickname (defaults to streamer)</span></li>
         <li><code>mode</code><span>all / squad-fpp / squad-tpp / duo / solo</span></li>
+      </ul>
+    </a>
+
+    <a class="tile" href="/widgets/pubg/milestone-celebrate.html?n=1000" target="_blank">
+      <div class="tile-title"><h3>milestone-celebrate.html</h3><span class="ext">open</span></div>
+      <div class="tile-desc">Vollbild-Celebration fuer einen Wins-Meilenstein (z.B. 1000. Career-Chicken). Konfetti, Fanfare, Career-Snapshot. Manuell oder via OBS-Scene-Switch trigger.</div>
+      <span class="tile-size"><b>1920×1080</b></span>
+      <ul class="tile-params">
+        <li><code>n</code><span>Ziel-Zahl (default 1000)</span></li>
+        <li><code>wait</code><span>Sekunden bis fade-out (default 15)</span></li>
+        <li><code>mute</code><span>1 = ohne Fanfare</span></li>
+        <li><code>player</code><span>anderer Spieler (default = self)</span></li>
       </ul>
     </a>
 

@@ -23,6 +23,50 @@
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
     .grid div { display: flex; justify-content: space-between; }
     .grid .label { color: var(--pubg-muted); font-size: 0.85em; }
+
+    /* Milestone-Countdown: dezent unter der Stats-Grid. Wird bei
+       <=3 Wins bis zum naechsten 100er heller + Gold-Glow + groesser. */
+    .milestone {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--pubg-border);
+      font-size: 0.85em;
+      color: var(--pubg-muted);
+      display: none;
+    }
+    .milestone.show { display: block; }
+    .milestone .ms-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 6px;
+    }
+    .milestone .ms-target { color: var(--pubg-text); }
+    .milestone .ms-target b { color: var(--pubg-gold); font-variant-numeric: tabular-nums; }
+    .milestone .bar {
+      height: 4px; background: rgba(255,255,255,0.08);
+      border-radius: 2px; overflow: hidden;
+    }
+    .milestone .bar > i {
+      display: block; height: 100%;
+      background: var(--pubg-gold); width: 0%;
+      transition: width 0.6s ease;
+    }
+    .milestone.close {
+      font-size: 1.05em;
+      color: var(--pubg-text);
+      animation: msPulse 2.2s ease-in-out infinite;
+    }
+    .milestone.close .ms-target { font-weight: 700; }
+    .milestone.close .ms-target b {
+      text-shadow: 0 0 12px rgba(242, 183, 5, 0.7);
+      font-size: 1.15em;
+    }
+    .milestone.close .bar > i {
+      box-shadow: 0 0 10px rgba(242, 183, 5, 0.7);
+    }
+    @keyframes msPulse {
+      0%,100% { opacity: 1; }
+      50%     { opacity: 0.75; }
+    }
   </style>
 </head>
 <body>
@@ -37,6 +81,13 @@
       <div><span class="label">Top10 %</span><span class="pubg-stat-value" id="top10">—</span></div>
       <div><span class="label">Longest</span><span class="pubg-stat-value" id="longest">—</span></div>
       <div><span class="label">Kills</span><span class="pubg-stat-value" id="kills">—</span></div>
+    </div>
+    <div class="milestone" id="milestone">
+      <div class="ms-row">
+        <span class="label" id="msLabel">Next milestone</span>
+        <span class="ms-target"><b id="msRemain">—</b> to <b id="msTarget">—</b></span>
+      </div>
+      <div class="bar"><i id="msBar"></i></div>
     </div>
   </div>
   <script src="_pubg.js"></script>
@@ -54,6 +105,20 @@
       { key: "player", label: "Player", type: "text", placeholder: "leer = self" },
     ]);
 
+    // Naechster Milestone: alle 100. Tier-Highlight bei 500er/1000er.
+    function nextMilestone(wins) {
+      const next = Math.floor(wins / 100) * 100 + 100;
+      const prev = next - 100;
+      const remain = next - wins;
+      const pct = Math.max(0, Math.min(100, ((wins - prev) / 100) * 100));
+      const isGrand = next % 1000 === 0;
+      const isHalf  = !isGrand && next % 500 === 0;
+      let label = "Next milestone";
+      if (isGrand) label = "👑 GRAND CHICKEN incoming";
+      else if (isHalf) label = "🏆 Half-Grand incoming";
+      return { next, remain, pct, isGrand, isHalf, label };
+    }
+
     function render(d) {
       if (!d || !d.rounds_played) return;
       document.getElementById("matches").textContent = PubgUI.fmtNum(d.rounds_played);
@@ -65,6 +130,21 @@
       document.getElementById("longest").innerHTML =
         PubgUI.hotIf(d.longest_kill, 300, Math.round(d.longest_kill || 0) + "m");
       document.getElementById("kills").textContent = PubgUI.fmtNum(d.kills);
+
+      // Milestone-Countdown. Erst ab 50+ Wins anzeigen (vorher zaehlt
+      // jeder Win mehr als ein Milestone-Hinweis).
+      const ms = document.getElementById("milestone");
+      if (d.wins == null || d.wins < 50) {
+        ms.classList.remove("show", "close");
+        return;
+      }
+      const info = nextMilestone(d.wins);
+      ms.classList.add("show");
+      ms.classList.toggle("close", info.remain <= 3);
+      document.getElementById("msLabel").textContent  = info.label;
+      document.getElementById("msRemain").textContent = info.remain;
+      document.getElementById("msTarget").textContent = "#" + info.next;
+      document.getElementById("msBar").style.width    = info.pct.toFixed(1) + "%";
     }
 
     const params = new URLSearchParams({ mode: MODE });

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<!--
+  PUBG Career-Wins Milestone Celebration
+  ──────────────────────────────────────────────────────────────────────
+  Vollbild-Overlay fuer einen besonderen Wins-Meilenstein (z.B. 1000.
+  Career-Win). Zeigt Titel + Konfetti + Career-Stats-Snapshot.
+
+  Parameter:
+    ?n=1000        Ziel-Zahl im Titel (default 1000)
+    ?wait=15       Sekunden bis fade-out (default 15)
+    ?mute=1        ohne Fanfare
+    ?player=Name   anderer Spieler (default = self)
+
+  Quelle Career-Stats: /api/pubg/career-lifetime (selbe API wie career-card).
+-->
+<head>
+  <meta charset="utf-8">
+  <title>Career Wins Milestone</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    html, body {
+      width: 1920px; height: 1080px;
+      margin: 0; overflow: hidden;
+      background: transparent;
+      font-family: "DM Sans", sans-serif;
+      color: var(--pubg-text, #fff);
+    }
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOut 1.2s ease-in forwards;
+      animation-delay: var(--out-delay, 13.8s);
+    }
+    @keyframes fadeOut { from { opacity: 1 } to { opacity: 0 } }
+
+    .bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at center,
+          rgba(94, 42, 121, 0.85) 0%,
+          rgba(40, 15, 70, 0.92) 45%,
+          rgba(13, 6, 26, 0.98) 90%);
+      animation: bgIn 0.6s ease-out forwards;
+      opacity: 0;
+    }
+    @keyframes bgIn { to { opacity: 1 } }
+
+    /* Goldener Rahmen-Beam oben/unten */
+    .beam {
+      position: absolute; left: 0; right: 0;
+      height: 6px;
+      background: linear-gradient(90deg,
+        transparent, var(--pubg-gold) 30%, var(--pubg-gold) 70%, transparent);
+      box-shadow: 0 0 24px rgba(242,183,5,0.7);
+      opacity: 0;
+      animation: bgIn 0.5s ease-out 0.4s forwards;
+    }
+    .beam.top { top: 60px; }
+    .beam.bot { bottom: 60px; }
+
+    /* Crown */
+    .crown {
+      position: absolute; left: 50%; top: 200px;
+      transform: translate(-50%, 40px) scale(0.4);
+      font-size: 120px;
+      opacity: 0;
+      filter: drop-shadow(0 0 30px rgba(242,183,5,0.8));
+      animation: crownIn 0.7s cubic-bezier(0.22,1.6,0.36,1) 0.8s forwards,
+                 crownBob 3.2s ease-in-out 1.6s infinite;
+    }
+    @keyframes crownIn {
+      to { transform: translate(-50%, 0) scale(1); opacity: 1 }
+    }
+    @keyframes crownBob {
+      0%,100% { transform: translate(-50%, 0) scale(1); }
+      50%     { transform: translate(-50%, -8px) scale(1.04); }
+    }
+
+    /* Big number */
+    .num {
+      position: absolute; left: 50%; top: 350px;
+      transform: translate(-50%, 80px) scale(0.5);
+      font-size: 360px;
+      font-weight: 900;
+      letter-spacing: -8px;
+      line-height: 1;
+      color: var(--pubg-gold);
+      -webkit-text-stroke: 4px #2a0f4a;
+      text-shadow:
+        0 0 40px rgba(242,183,5,0.7),
+        0 0 100px rgba(242,183,5,0.4),
+        8px 8px 0 #1a0d2a;
+      opacity: 0;
+      background: linear-gradient(90deg, #ffb84a, #fff2a8, #ffb84a);
+      background-size: 250% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: numIn 0.6s cubic-bezier(0.22,1.6,0.36,1) 1.4s forwards,
+                 numShimmer 3s linear 2.0s infinite;
+    }
+    @keyframes numIn {
+      to { transform: translate(-50%, 0) scale(1); opacity: 1 }
+    }
+    @keyframes numShimmer {
+      0%   { background-position: 0% 50%; }
+      100% { background-position: 250% 50%; }
+    }
+
+    /* Subtitle */
+    .sub {
+      position: absolute; left: 50%; top: 760px;
+      transform: translate(-50%, 20px);
+      font-size: 60px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #fff;
+      text-shadow: 0 0 14px rgba(255,255,255,0.4);
+      opacity: 0;
+      animation: subIn 0.5s ease-out 2.4s forwards;
+    }
+    @keyframes subIn {
+      to { transform: translate(-50%, 0); opacity: 1 }
+    }
+
+    /* Stat-Grid */
+    .stats {
+      position: absolute; left: 50%; top: 860px;
+      transform: translate(-50%, 20px);
+      display: grid;
+      grid-template-columns: repeat(4, auto);
+      gap: 12px 60px;
+      opacity: 0;
+      animation: subIn 0.6s ease-out 3.0s forwards;
+    }
+    .stats .cell {
+      text-align: center;
+      min-width: 200px;
+    }
+    .stats .v {
+      font-size: 56px; font-weight: 900;
+      color: var(--pubg-gold);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      text-shadow: 0 0 10px rgba(242,183,5,0.5);
+    }
+    .stats .l {
+      display: block;
+      font-size: 18px;
+      color: rgba(255,255,255,0.7);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-top: 8px;
+    }
+
+    /* Konfetti — 80 Stueck pro Side. */
+    .confetti {
+      position: absolute; inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .c {
+      position: absolute; top: -40px;
+      width: 14px; height: 14px;
+      transform-origin: center;
+      animation: cFall linear forwards;
+    }
+    @keyframes cFall {
+      0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+      80%  { opacity: 1; }
+      100% { transform: translateY(1180px) rotate(720deg); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <div class="bg"></div>
+    <div class="beam top"></div>
+    <div class="beam bot"></div>
+
+    <div class="confetti" id="confetti"></div>
+
+    <div class="crown">👑</div>
+    <div class="num" id="num">1000</div>
+    <div class="sub" id="sub">Career Chicken Dinners</div>
+
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <audio id="fanfare" preload="auto" src="/assets/stingers/fanfare.mp3"></audio>
+
+  <script src="_pubg.js"></script>
+  <script>
+    const N      = parseInt(PubgUI.qs("n", "1000"), 10);
+    const WAIT   = parseInt(PubgUI.qs("wait", "15"), 10);
+    const MUTE   = PubgUI.qs("mute", "0") === "1";
+    const PLAYER = PubgUI.qs("player", "");
+
+    document.documentElement.style.setProperty("--out-delay",
+      Math.max(3, WAIT - 1.2) + "s");
+    document.getElementById("num").textContent = PubgUI.fmtNum(N);
+    // Untertitel kontextabhaengig
+    const sub = (N % 1000 === 0)  ? "Grand Career Chickens"
+              : (N % 500  === 0)  ? "Half-Grand Career Chickens"
+              : `Career Chicken Dinner #${N}`;
+    document.getElementById("sub").textContent = sub.toUpperCase();
+
+    // Konfetti generieren — Gold, Purple, Weiss in zufaelligen Bahnen.
+    (function makeConfetti() {
+      const host = document.getElementById("confetti");
+      const colors = ["#f2b705", "#fff2a8", "#a974d4", "#5e2a79", "#ffffff"];
+      const COUNT = 110;
+      for (let i = 0; i < COUNT; i++) {
+        const el = document.createElement("div");
+        el.className = "c";
+        el.style.left = (Math.random() * 100).toFixed(2) + "%";
+        el.style.background = colors[i % colors.length];
+        // Rechteck oder Strip — Variation
+        if (i % 3 === 0) { el.style.width = "6px"; el.style.height = "18px"; }
+        if (i % 5 === 0) { el.style.borderRadius = "50%"; }
+        // Dauer + Start-Delay zufaellig spreizen ueber die ersten 10s.
+        const dur   = (3 + Math.random() * 4).toFixed(2);
+        const delay = (Math.random() * 8).toFixed(2);
+        el.style.animationDuration = dur + "s";
+        el.style.animationDelay    = delay + "s";
+        host.appendChild(el);
+      }
+    })();
+
+    // Career-Stats laden + grid fuellen
+    async function loadStats() {
+      const params = new URLSearchParams({ mode: "all" });
+      if (PLAYER) params.set("player", PLAYER);
+      let d = null;
+      try {
+        d = await PubgUI.fetchJson(`/api/pubg/career-lifetime?${params}`);
+      } catch (e) { /* silent */ }
+      if (!d || !d.rounds_played) return;
+
+      const cells = [
+        { v: PubgUI.fmtNum(d.rounds_played),    l: "Matches"   },
+        { v: PubgUI.fmtKD(d.kd_ratio),          l: "K/D"       },
+        { v: PubgUI.fmtNum(d.kills),            l: "Kills"     },
+        { v: PubgUI.fmtPct(d.win_rate),         l: "Win Rate"  },
+      ];
+      document.getElementById("stats").innerHTML = cells.map(c =>
+        `<div class="cell"><div class="v">${c.v}</div><span class="l">${c.l}</span></div>`
+      ).join("");
+    }
+    loadStats();
+
+    // Fanfare. Browsers koennen autoplay blockieren — kein Crash wenn's
+    // failt (User-Geste in OBS via Show-Hide-Trigger reicht idR).
+    if (!MUTE) {
+      const a = document.getElementById("fanfare");
+      // 0.4s Delay damit Audio mit Crown-In-Pop synct.
+      setTimeout(() => { a.play().catch(() => {}); }, 400);
+    }
+  </script>
+</body>
+</html>
