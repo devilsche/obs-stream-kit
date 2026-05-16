@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<!--
+  PUBG Vehicle Stats
+  ──────────────────────────────────────────────────────────────────────
+  Pro Squad-Member (inkl. self) vier Vehicle-Action-Counter:
+    - 🔪 Knocks aus Auto raus (du knockst andere im Fahren)
+    - 💀 Kills aus Auto raus
+    - 🤕 Im Auto geknockt worden
+    - ⚰  Im Auto getoetet worden
+    - 🏴 (von 🤕) — danach auch wirklich gestorben ohne Revive
+
+  Quelle: VehicleEnter/Leave-Intervalle + Knock/Kill-Events.
+  Endpoint: /api/pubg/vehicle-stats?range=session|week|all
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Vehicle Stats</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <style>
+    html, body { height: 100%; margin: 0; padding: 0; }
+    body {
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      box-sizing: border-box;
+    }
+    body.dock {
+      background: #0d061a;
+      justify-content: flex-start;
+      padding: 10px;
+    }
+    .panel {
+      width: 100%;
+      min-width: 360px;
+      padding: 14px 16px;
+    }
+    .panel h3 {
+      margin: 0 0 12px;
+      font-size: 0.9em;
+      letter-spacing: 0.08em;
+      color: var(--pubg-muted);
+      text-transform: uppercase;
+    }
+
+    table.vs {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9em;
+      font-variant-numeric: tabular-nums;
+    }
+    table.vs thead th {
+      color: var(--pubg-muted);
+      font-size: 0.72em;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 4px 6px;
+      border-bottom: 1px solid var(--pubg-border);
+      text-align: right;
+      white-space: nowrap;
+    }
+    table.vs thead th.name-h { text-align: left; }
+    table.vs tbody td {
+      padding: 8px 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    table.vs tbody tr:last-child td { border-bottom: 0; }
+    table.vs td.name {
+      font-weight: 700;
+      color: var(--pubg-text);
+    }
+    table.vs tr.self td.name {
+      color: var(--pubg-gold);
+    }
+    table.vs td.num {
+      text-align: right;
+      color: var(--pubg-text);
+    }
+    table.vs td.num.zero { color: rgba(255,255,255,0.25); }
+    table.vs td.num.hot  { color: var(--pubg-gold); font-weight: 700; }
+
+    /* Die 'knocked-in-vehicle-then-died' Spalte fokussieren — Sub-Stat zur
+       'knocked in vehicle'-Spalte. Etwas kleiner + gedimmt. */
+    table.vs .sub {
+      font-size: 0.78em;
+      color: rgba(255,255,255,0.55);
+      margin-left: 4px;
+    }
+
+    .empty {
+      color: var(--pubg-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 18px;
+      font-size: 0.9em;
+    }
+
+    .meta {
+      margin-top: 8px;
+      font-size: 0.72em;
+      color: var(--pubg-muted);
+      text-align: right;
+      letter-spacing: 0.04em;
+    }
+  </style>
+</head>
+<body>
+  <div class="pubg-header" id="pubgHeader"></div>
+  <div class="pubg-card panel pubg-fade-in">
+    <table class="vs" id="vsTable">
+      <thead>
+        <tr>
+          <th class="name-h">Spieler</th>
+          <th title="Knocks while driving (du im Auto, Gegner geknockt)">🔪 Knock</th>
+          <th title="Kills while driving (du im Auto, Gegner getoetet)">💀 Kill</th>
+          <th title="Knocked in vehicle (du geknockt waehrend im Auto). Zusatz-Zahl: davon gestorben (kein Revive).">🤕 Knocked</th>
+          <th title="Killed in vehicle (du getoetet waehrend im Auto)">⚰ Killed</th>
+        </tr>
+      </thead>
+      <tbody id="vsBody">
+        <tr><td colspan="5" class="empty">— laedt —</td></tr>
+      </tbody>
+    </table>
+    <div class="meta" id="vsMeta"></div>
+  </div>
+
+  <script src="_pubg.js"></script>
+  <script>
+    const RANGE = PubgUI.qs("range", "session");
+    const DOCK  = PubgUI.qs("dock", "0") === "1";
+    const POLL_MS = parseInt(PubgUI.qs("pollMs",
+                              DOCK ? "8000" : "60000"), 10);
+    if (DOCK) document.body.classList.add("dock");
+    PubgUI.renderHeader(document.getElementById("pubgHeader"),
+                        "Vehicle Action", RANGE);
+    PubgUI.buildFilter([
+      { key: "range", label: "Range", type: "select", default: "session",
+        options: [["session","Session"],["week","7 days"],["all","Database"]],
+        tooltip: "Which matches to include." },
+    ]);
+
+    function cellNum(n, opts) {
+      opts = opts || {};
+      const cls = "num"
+        + (n === 0 ? " zero" : "")
+        + (opts.hot ? " hot" : "");
+      let inner = String(n);
+      if (opts.sub != null && opts.sub > 0) {
+        inner += `<span class="sub">(${opts.sub})</span>`;
+      }
+      return `<td class="${cls}">${inner}</td>`;
+    }
+
+    function render(d) {
+      const body = document.getElementById("vsBody");
+      const meta = document.getElementById("vsMeta");
+      const members = (d && d.members) || [];
+      if (!members.length) {
+        body.innerHTML =
+          `<tr><td colspan="5" class="empty">— noch keine Auto-Action im Range —</td></tr>`;
+        meta.textContent = "";
+        return;
+      }
+      body.innerHTML = members.map((m) => {
+        const selfCls = m.isSelf ? "self" : "";
+        return `<tr class="${selfCls}">
+          <td class="name">${m.name}${m.isSelf ? " (du)" : ""}</td>
+          ${cellNum(m.knocksFromVehicle, { hot: m.knocksFromVehicle >= 5 })}
+          ${cellNum(m.killsFromVehicle,  { hot: m.killsFromVehicle  >= 5 })}
+          ${cellNum(m.knockedInVehicle,  { sub: m.knockedInVehicleThenDied })}
+          ${cellNum(m.killedInVehicle)}
+        </tr>`;
+      }).join("");
+      // Meta: Anzahl Matches im Range (gleicher Wert pro Member —
+      // sie sind ja alle in den Squad-Matches drin).
+      const maxMatches = Math.max(...members.map(m => m.matches || 0));
+      meta.textContent = maxMatches
+        ? `${maxMatches} ${maxMatches === 1 ? "Match" : "Matches"} im Range`
+        : "";
+    }
+
+    if (RANGE === "session") PubgUI.hideIfStale();
+    PubgUI.poll(`/api/pubg/vehicle-stats?range=${RANGE}`, POLL_MS, (d) => {
+      if (RANGE === "session") PubgUI.hideIfStale();
+      render(d);
+    }, console.error);
+  </script>
+</body>
+</html>

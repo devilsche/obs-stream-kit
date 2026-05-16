@@ -546,6 +546,185 @@ def compute_session_matches(conn, my_account_id, range_key="session",
     } for r in rows]
 
 
+def compute_vehicle_stats(conn, my_account_id, range_key="session",
+                           from_iso=None, to_iso=None):
+    """Pro Squad-Member (inkl. self) Vehicle-Action-Counter ueber alle
+    BR-Matches in der Range.
+
+    Pro Eintrag:
+      accountId, name, isSelf, matches,
+      knocksFromVehicle  — du knockst andere aus dem Fahrzeug heraus
+      killsFromVehicle   — du killst andere aus dem Fahrzeug heraus
+      knockedInVehicle   — du wirst geknockt waehrend du im Fahrzeug bist
+      killedInVehicle    — du wirst getoetet waehrend du im Fahrzeug bist
+      knockedInVehicleThenDied — knocked-in-vehicle + danach gestorben
+                                 ohne Revive dazwischen
+
+    'Im Fahrzeug' = Timestamp innerhalb eines VehicleEnter..VehicleLeave-
+    Intervalls fuer diesen Spieler. Letzter VehicleEnter ohne Leave gilt
+    bis Match-Ende.
+    """
+    if from_iso:
+        cutoff = from_iso
+        end_filter = " AND m.played_at <= ?" if to_iso else ""
+        params = [my_account_id, cutoff]
+        if to_iso:
+            params.append(to_iso)
+    else:
+        cutoff = (_range_filter(conn, range_key)
+                  if range_key != "all" else "1970-01-01T00:00:00Z")
+        end_filter = ""
+        params = [my_account_id, cutoff]
+    br_where, br_params = _br_filter("m")
+    params += br_params
+
+    # 1) Range-Matches + mein Team pro Match
+    match_rows = conn.execute(f"""
+        SELECT m.match_id, mtm.team_id AS my_team
+        FROM matches m
+        JOIN match_team_mapping mtm ON mtm.match_id = m.match_id
+        WHERE mtm.account_id = ? AND m.played_at >= ?{end_filter}
+          AND {br_where}
+    """, params).fetchall()
+    if not match_rows:
+        return []
+    match_team = {r["match_id"]: r["my_team"] for r in match_rows}
+    match_ids = list(match_team.keys())
+    ph = ",".join("?" * len(match_ids))
+
+    # 2) Squad-Members pro Match (= alle aus meinem team_id)
+    member_rows = conn.execute(f"""
+        SELECT mtm.match_id, mtm.account_id, mtm.team_id,
+               p.name AS player_name
+        FROM match_team_mapping mtm
+        LEFT JOIN players p ON p.account_id = mtm.account_id
+        WHERE mtm.match_id IN ({ph})
+    """, match_ids).fetchall()
+    # match_id -> set(account_id) (gefiltert auf my_team)
+    squad_per_match = {}
+    name_by_acc = {}
+    for r in member_rows:
+        mid = r["match_id"]
+        if r["team_id"] != match_team.get(mid):
+            continue
+        acc = r["account_id"]
+        if not acc:
+            continue
+        squad_per_match.setdefault(mid, set()).add(acc)
+        if r["player_name"]:
+            name_by_acc[acc] = r["player_name"]
+
+    # 3) Alle relevanten Events fuer diese Matches in einem Schwung
+    ev_rows = conn.execute(f"""
+        SELECT match_id, event_type, timestamp_ms,
+               actor_account, target_account
+        FROM telemetry_events
+        WHERE match_id IN ({ph})
+          AND event_type IN ('VehicleEnter','VehicleLeave',
+                              'Knock','Kill','Revive')
+        ORDER BY match_id, timestamp_ms ASC
+    """, match_ids).fetchall()
+    # match_id -> list of event dicts
+    events_per_match = {}
+    for r in ev_rows:
+        events_per_match.setdefault(r["match_id"], []).append({
+            "type": r["event_type"], "ts": r["timestamp_ms"],
+            "actor": r["actor_account"], "target": r["target_account"],
+        })
+
+    # 4) Pro Match + Squad-Member die Counter aufsummieren
+    INF = 10**15
+    # account_id -> dict mit den 5 Countern + matches
+    stats = {}
+
+    def _ensure(acc):
+        if acc not in stats:
+            stats[acc] = {
+                "accountId": acc,
+                "name": name_by_acc.get(acc) or acc[:8],
+                "isSelf": acc == my_account_id,
+                "matches": 0,
+                "knocksFromVehicle": 0,
+                "killsFromVehicle": 0,
+                "knockedInVehicle":  0,
+                "killedInVehicle":   0,
+                "knockedInVehicleThenDied": 0,
+            }
+        return stats[acc]
+
+    def _in_intervals(ts, intervals):
+        for a, b in intervals:
+            if a <= ts <= b:
+                return True
+        return False
+
+    for mid, squad in squad_per_match.items():
+        events = events_per_match.get(mid, [])
+        # Pro Member: VehicleEnter/Leave-Intervalle bauen
+        intervals_by = {}
+        for acc in squad:
+            cur_enter = None
+            ivals = []
+            for e in events:
+                if e["actor"] != acc:
+                    continue
+                if e["type"] == "VehicleEnter":
+                    cur_enter = e["ts"]
+                elif e["type"] == "VehicleLeave" and cur_enter is not None:
+                    ivals.append((cur_enter, e["ts"]))
+                    cur_enter = None
+            if cur_enter is not None:
+                ivals.append((cur_enter, INF))
+            intervals_by[acc] = ivals
+            _ensure(acc)["matches"] += 1
+
+        # Counter durchrechnen
+        for e in events:
+            t  = e["type"]
+            ts = e["ts"]
+            if ts is None:
+                continue
+            actor  = e["actor"]
+            target = e["target"]
+            # Knock / Kill as actor (from vehicle)
+            if t == "Knock" and actor in squad:
+                if _in_intervals(ts, intervals_by[actor]):
+                    _ensure(actor)["knocksFromVehicle"] += 1
+            elif t == "Kill" and actor in squad:
+                if _in_intervals(ts, intervals_by[actor]):
+                    _ensure(actor)["killsFromVehicle"] += 1
+            # Knock / Kill as target (in vehicle)
+            if t == "Knock" and target in squad:
+                if _in_intervals(ts, intervals_by[target]):
+                    _ensure(target)["knockedInVehicle"] += 1
+                    # knocked-in-vehicle-then-died: check ob danach Kill
+                    # mit target=member ohne Revive dazwischen
+                    revived = False
+                    died    = False
+                    for later in events:
+                        if later["ts"] is None or later["ts"] <= ts:
+                            continue
+                        if later["type"] == "Revive" and later["target"] == target:
+                            revived = True
+                            break
+                        if later["type"] == "Kill" and later["target"] == target:
+                            died = True
+                            break
+                    if died and not revived:
+                        _ensure(target)["knockedInVehicleThenDied"] += 1
+            elif t == "Kill" and target in squad:
+                if _in_intervals(ts, intervals_by[target]):
+                    _ensure(target)["killedInVehicle"] += 1
+
+    # Self zuerst, dann nach total absteigend
+    def _total(s):
+        return (s["knocksFromVehicle"] + s["killsFromVehicle"]
+                + s["knockedInVehicle"] + s["killedInVehicle"])
+    out = list(stats.values())
+    out.sort(key=lambda s: (0 if s["isSelf"] else 1, -_total(s)))
+    return out
+
+
 def compute_lobby_avg_kd(conn, my_account_id, range_key="session"):
     """Pro Match: Ø K/D aller ~60-100 Spieler in der Lobby.
     Plus Aggregat über Range. Idee: Lobby-Schwierigkeit messen.
