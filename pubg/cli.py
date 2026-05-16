@@ -557,6 +557,63 @@ def hidrive_clear_payload(root: str) -> int:
     return 0
 
 
+def refresh_maps(root: str) -> int:
+    """Lade die No-Text-Hi-Res-Maps aus dem offiziellen pubg/api-assets
+    Repo und ersetze die lokalen .webp-Dateien in widgets/pubg/maps/.
+
+    PUBG-API-Assets nutzt Public-Namen (Erangel, Miramar...), unsere
+    DB internal-Namen (Baltic_Main, Desert_Main...). Mapping unten.
+
+    Nutzung:
+        python -m pubg.cli refresh-maps
+    """
+    import io, urllib.request as _ur
+    try:
+        from PIL import Image
+    except ImportError:
+        print("PIL/Pillow fehlt — 'pip install pillow' und neu starten.")
+        return 1
+    NAME_MAP = {
+        "Baltic_Main":     "Erangel",
+        "Desert_Main":     "Miramar",
+        "Savage_Main":     "Sanhok",
+        "DihorOtok_Main":  "Vikendi",
+        "Summerland_Main": "Karakin",
+        "Chimera_Main":    "Paramo",
+        "Tiger_Main":      "Taego",
+        "Kiki_Main":       "Deston",
+        "Neon_Main":       "Rondo",
+        "Heaven_Main":     "Haven",
+    }
+    out_dir = os.path.join(root, "widgets", "pubg", "maps")
+    os.makedirs(out_dir, exist_ok=True)
+    print(f"Schreibe in {out_dir}/")
+    ok, err = 0, 0
+    for internal, public in NAME_MAP.items():
+        url = ("https://raw.githubusercontent.com/pubg/api-assets/"
+               f"master/Assets/Maps/{public}_Main_No_Text_Low_Res.png")
+        out_path = os.path.join(out_dir, f"{internal}.webp")
+        try:
+            with _ur.urlopen(url, timeout=15) as resp:
+                buf = resp.read()
+            img = Image.open(io.BytesIO(buf))
+            # Auf 1024 verkleinern (Mini-Map zeigt max 900px) — spart
+            # Repo-Size signifikant, bleibt fuer Display ueberlegen
+            # zu den alten Bildern (vorher waren die ~1024 mit Text).
+            # 2048x2048 — gut fuers Modal (900px Anzeige) + Mini-Map (220px)
+            # WebP-Compression haelt Files unter ~500KB pro Map.
+            img.thumbnail((2048, 2048), Image.LANCZOS)
+            img.save(out_path, "WEBP", quality=85, method=6)
+            sz = os.path.getsize(out_path)
+            print(f"  ok   {internal:18s} <- {public}  ({sz//1024} KB)")
+            ok += 1
+        except Exception as e:
+            print(f"  FAIL {internal:18s}: {e}")
+            err += 1
+    print(f"\nFertig: {ok} ok, {err} Fehler.")
+    return 0 if err == 0 else 1
+
+
 def hidrive_refill(root: str, only_match: str = None) -> int:
     """SQLite telemetry_events aus HiDrive-Archiv neu befuellen.
     Nuetzlich wenn filter_squad_events erweitert wurde (neue Event-Typen)
@@ -855,6 +912,8 @@ if __name__ == "__main__":
         # Optional: --match MATCH_ID fuer einzelnen Match
         mid = sys.argv[3] if len(sys.argv) > 3 and sys.argv[2] == "--match" else None
         sys.exit(hidrive_refill(root, only_match=mid))
+    elif len(sys.argv) > 1 and sys.argv[1] == "refresh-maps":
+        sys.exit(refresh_maps(root))
     else:
         print("Usage: python -m pubg.cli init | cold-start | pull-ftp | "
               "seasons-backfill | wipe-day [YYYY-MM-DD] [--keep-popups] | "
