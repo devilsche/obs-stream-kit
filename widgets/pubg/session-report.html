@@ -144,10 +144,18 @@
     .squad-detail.show { display: block; animation: pubg-fade-in 0.25s; }
     .squad-detail .detail-row {
       display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: stretch;
+    }
+    .squad-detail .detail-row > .squad-table-wrap { width: 100%; min-width: 0; }
+    /* Event-Matches (event-detail) bleiben rechts neben der Tabelle */
+    .squad-detail .detail-row.has-event {
+      flex-direction: row;
       gap: 16px;
       align-items: flex-start;
     }
-    .squad-detail .detail-row > .squad-table-wrap { flex: 1; min-width: 0; }
+    .squad-detail .detail-row.has-event > .squad-table-wrap { flex: 1; width: auto; }
     /* Event-Detail-Panel (PAYDAY/Heist) — ersetzt die Mini-Map in Events */
     .event-detail {
       width: 260px;
@@ -1879,7 +1887,7 @@
            </div>`
         : `<div class="md-host" data-match-id="${matchId}" data-map="${mapName}"></div>`;
       return `
-        <div class="detail-row">
+        <div class="detail-row${isEvent ? ' has-event' : ''}">
           <div class="squad-table-wrap">
             <table>
               <thead><tr>
