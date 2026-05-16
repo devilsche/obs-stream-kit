@@ -88,6 +88,13 @@
     table.ws td.name {
       font-weight: 700;
       color: var(--pubg-text);
+      display: flex; align-items: center; gap: 8px;
+      min-height: 32px;
+    }
+    table.ws td.name img.wicon {
+      height: 28px; max-width: 60px;
+      object-fit: contain;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
     }
     table.ws td.cat {
       color: var(--pubg-muted);
@@ -228,8 +235,12 @@
       body.innerHTML = view.map((w, i) => {
         const top = (sortBy === "kills" && i === 0) ? "top-row" : "";
         const hot = (n, thr) => n >= thr ? "hot" : "";
+        const iconUrl = PubgUI.weaponIconUrl(w.weaponId);
+        const iconImg = iconUrl
+          ? `<img class="wicon" src="${iconUrl}" alt="" onerror="this.style.display='none'">`
+          : "";
         return `<tr class="${top}">
-          <td class="name">${w.name}</td>
+          <td class="name">${iconImg}<span>${w.name}</span></td>
           <td class="num kills ${hot(w.kills,10)}">${w.kills}</td>
           <td class="num">${w.avgDist.toFixed(0)}</td>
           <td class="num">${w.maxDist.toFixed(0)}</td>

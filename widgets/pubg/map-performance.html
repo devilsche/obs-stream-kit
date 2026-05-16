@@ -52,6 +52,13 @@
     }
     td:first-child { text-align: left; color: var(--pubg-text); }
     tr.win td { color: var(--pubg-gold); }
+    .mapcell { display: inline-flex; align-items: center; gap: 8px; }
+    .mthumb {
+      width: 40px; height: 40px;
+      object-fit: cover; border-radius: 3px;
+      border: 1px solid var(--pubg-border);
+      flex-shrink: 0;
+    }
     .empty { padding: 20px; color: var(--pubg-muted); text-align: center; font-style: italic; }
   </style>
 </head>
@@ -84,7 +91,13 @@
 
     // Spalten-Definition: key (Datenfeld), label, format-Funktion
     const COLS = [
-      ["map",            "Map",     r => PubgUI.fmtMap(r.map)],
+      ["map",            "Map",     r => {
+        const thumb = PubgUI.mapThumbUrl(r.map);
+        const img = thumb
+          ? `<img class="mthumb" src="${thumb}" alt="" onerror="this.style.display='none'">`
+          : "";
+        return `<span class="mapcell">${img}${PubgUI.fmtMap(r.map)}</span>`;
+      }],
       ["matches",        "Matches", r => r.matches],
       ["wins",           "Wins",    r => r.wins || "—"],
       ["kills",          "Kills",   r => PubgUI.hotIf(r.kills, 300, r.kills)],

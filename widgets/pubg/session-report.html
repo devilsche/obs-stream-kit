@@ -194,6 +194,13 @@
       vertical-align: -1px;
       border: 1px solid rgba(255,255,255,0.5);
     }
+    .match-info .mi-row .wicon, .match-info .mi-row .kficon {
+      vertical-align: -4px;
+      margin: 0 3px;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+    }
+    .match-info .mi-row .wicon { height: 18px; max-width: 60px; }
+    .match-info .mi-row .kficon { height: 16px; }
     .match-info .mi-empty { font-style: italic; opacity: 0.6; }
     .match-info .mi-row[data-acc] { cursor: help; }
     .match-info .mi-row[data-acc]:hover { background: rgba(255,255,255,0.04); }
@@ -1953,12 +1960,28 @@
         if (m.died) {
           const killer = m.killerName || "Gegner";
           const distStr = m.distanceM ? ` auf <b>${m.distanceM.toFixed(0)}m</b>` : "";
-          const weaponStr = m.weaponName ? ` mit <b>${m.weaponName}</b>` : "";
+          // Killfeed-Icon je nach Death-Cause: Vehicle / Bluezone / Redzone /
+          // Fall / Drown via Weapon-ID heuristisch
+          const wid = m.weaponId || "";
+          let kf = null;
+          if (wid.startsWith("BP_") || wid.startsWith("Dacia") || wid.startsWith("Uaz")) kf = "Vehicle";
+          else if (wid.includes("Bluezone")) kf = "Bluezone";
+          else if (wid.includes("RedZone") || wid.includes("Bluezonebomb")) kf = "Redzone";
+          else if (wid.includes("Drown")) kf = "Drown";
+          else if (wid.includes("Fall")) kf = "Fall";
+          const kfIcon = kf
+            ? `<img class="kficon" src="${PubgUI.killfeedIconUrl(kf)}" alt="" onerror="this.style.display='none'">`
+            : "";
+          // Weapon-Icon falls Schusswaffe
+          const wIcon = (wid && wid.startsWith("Weap"))
+            ? `<img class="wicon" src="${PubgUI.weaponIconUrl(wid)}" alt="" onerror="this.style.display='none'">`
+            : "";
+          const weaponStr = m.weaponName ? `${wIcon}<b>${m.weaponName}</b>` : "";
           const whereStr  = deathP ? ` in <b>${deathP}</b>` : "";
           const whenStr   = m.deathOffsetSec != null
             ? ` (${fmtMinSec(m.deathOffsetSec)})` : "";
           parts.push(
-            `<span class="died">– †${whereStr}${whenStr} durch <span class="killer">${killer}</span>${weaponStr}${distStr}</span>`);
+            `<span class="died">– †${kfIcon}${whereStr}${whenStr} durch <span class="killer">${killer}</span> mit ${weaponStr}${distStr}</span>`);
         }
         return `<div class="mi-row" data-match-id="${matchId}" data-acc="${m.accountId}">${parts.join(" ")}</div>`;
       });
