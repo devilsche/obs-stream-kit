@@ -151,6 +151,13 @@ CREATE TABLE IF NOT EXISTS pubg_achievements_seen (
     detected_at     INTEGER NOT NULL,
     displayed_at    INTEGER,
     is_rare         INTEGER NOT NULL DEFAULT 0,
+    -- 1 = Eintrag wurde von Anfang an als 'kein Popup' markiert.
+    -- Unterscheidet sich von 'displayed_at IS NOT NULL', das z.B.
+    -- auch beim Backfill auf jetzt gesetzt wird obwohl der Eintrag
+    -- konzeptionell pop-faehig waere. Wird vom Live-Filter im
+    -- Achievement-Browser benutzt um nur die wirklich popaufenden
+    -- Eintraege zu zeigen.
+    suppress_popup  INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (achievement_id, match_id)
 );
 CREATE INDEX IF NOT EXISTS idx_pubg_ach_undisplayed
@@ -227,6 +234,11 @@ def init_schema(conn: sqlite3.Connection) -> None:
         # Snapshot-Pcts: bei Insert berechnet, danach unveraendert.
         ("pubg_achievements_seen", "session_pct", "REAL"),
         ("pubg_achievements_seen", "match_pct",   "REAL"),
+        # 0/1 ob der Eintrag urspruenglich als suppressed (kein Popup)
+        # detected wurde. Nicht rueckwirkend ableitbar fuer alte Rows,
+        # die behalten 0 — fuer den Live-Filter ist das unkritisch weil
+        # Live ohnehin nur frische Eintraege ab Browser-Open zeigt.
+        ("pubg_achievements_seen", "suppress_popup", "INTEGER NOT NULL DEFAULT 0"),
     ]
     for table, col, typ in migrations:
         try:

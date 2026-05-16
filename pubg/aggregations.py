@@ -1684,11 +1684,22 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
                 })
             if pm.get("soloSurvived"):
                 hot_drop_survived_streak += 1
+                # Burning Hell Survivor uebersteuert Inferno Survivor
+                # als Survival-Hauptmeldung — analog zu Burning Hell
+                # vs Inferno Begins. Streak laeuft trotzdem weiter.
+                if is_burning:
+                    out.append({
+                        "id": "burning_hell_survivor",
+                        "label": f"Burning Hell Survivor · {teams_in_radius} Teams",
+                        "icon": "🔥",
+                        "matchId": pm["matchId"], "playedAt": pm["playedAt"],
+                    })
                 out.append({
                     "id": "hot_drop_match_survived",
                     "label": f"Inferno Survivor ×{hot_drop_survived_streak}",
                     "icon": "🔥",
                     "matchId": pm["matchId"], "playedAt": pm["playedAt"],
+                    "suppressPopup": is_burning,
                 })
             else:
                 # Hot-Drop nicht ueberlebt → Survived-Streak bricht
@@ -1818,6 +1829,7 @@ PUBG_RARE_ACHIEVEMENTS = {
     "ultra_chicken",                 # Chicken + ≥10 Kills
     "god_mode_chicken",              # Chicken + ≥15 Kills
     "burning_hell",                  # Hot-Drop mit 5+ Teams im Radius
+    "burning_hell_survivor",         # ueberlebt mit 5+ Teams im Radius
     "gold_brick_grab",               # Squad-Loot: Goldbarren
     "heist_kills_75", "heist_kills_100",  # sehr hohe Heist-Kill-Tiers
     "heist_dmg_20k", "heist_dmg_25k",     # sehr hohes Heist-DMG
@@ -1980,13 +1992,19 @@ def _insert_achievements(conn, achievements, suppress_popup=False):
         cur = conn.execute("""
             INSERT INTO pubg_achievements_seen
               (achievement_id, match_id, label, icon, played_at,
-               detected_at, is_rare, displayed_at, session_pct, match_pct)
-            VALUES (?, ?, ?, ?, ?, strftime('%s','now'), ?, ?, ?, ?)
+               detected_at, is_rare, displayed_at, session_pct, match_pct,
+               suppress_popup)
+            VALUES (?, ?, ?, ?, ?, strftime('%s','now'), ?, ?, ?, ?, ?)
             ON CONFLICT(achievement_id, match_id) DO NOTHING
         """, (aid, mid, label, a.get("icon"),
               played_at,
               1 if rare else 0,
-              displayed_at, sess_pct, match_pct))
+              displayed_at, sess_pct, match_pct,
+              # suppress_popup unterscheidet 'als suppressed detected'
+              # von Backfill (wo wir nachtraeglich alles displayed_at
+              # markieren). Der per-row-Flag aus dem detector ist
+              # dafuer authoritativ, NICHT der suppress_popup-Param.
+              1 if bool(a.get("suppressPopup")) else 0))
         if cur.rowcount > 0:
             new_count += 1
     return new_count

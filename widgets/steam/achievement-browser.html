@@ -529,9 +529,12 @@
       RARE_PCT = parseFloat(rareIn.value) || 10;
       let view = all.slice();
       // Live-Filter: nur Achievements zeigen, die SEIT Oeffnen dieser
-      // Seite neu dazugekommen sind. Snapshot ist initialKeys.
+      // Seite neu dazugekommen sind UND wirklich poppen koennen
+      // (suppressed=true sind Tier-Cascade-Eintraege die nie im Stream
+      // erscheinen — z.B. kills_5 bei einem 9-Kill-Match).
       if (liveOnly && initialKeys) {
         view = view.filter(a => !initialKeys.has(a.appId + ":" + a.apiName));
+        view = view.filter(a => !a.suppressed);
       }
       if (filterGame) {
         view = view.filter(a => String(a.appId) === filterGame);

@@ -1446,7 +1446,7 @@ class EndpointRegistry:
         rows = conn.execute("""
             SELECT a.achievement_id, a.match_id, a.label, a.icon,
                    a.played_at, a.detected_at, a.is_rare, a.displayed_at,
-                   a.session_pct, a.match_pct,
+                   a.session_pct, a.match_pct, a.suppress_popup,
                    m.map_name, m.game_mode, m.duration_secs
             FROM pubg_achievements_seen a
             LEFT JOIN matches m ON m.match_id = a.match_id
@@ -1493,6 +1493,7 @@ class EndpointRegistry:
                 "mapName":       r["map_name"],
                 "gameMode":      r["game_mode"],
                 "durationSec":   r["duration_secs"],
+                "suppressed":    bool(r["suppress_popup"]),
             })
         # Juengste zuerst
         items.sort(key=lambda x: x["unlockedAt"], reverse=True)
