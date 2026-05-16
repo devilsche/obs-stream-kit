@@ -1966,6 +1966,47 @@
       mdRenderState(host);
     }, true);
 
+    // Click auf Card: lockedAcc togglen. Click in Map-Leerflaeche, ESC: unlock.
+    document.addEventListener("click", (e) => {
+      // Card-Click
+      const card = e.target.closest && e.target.closest(".md-card[data-acc]");
+      if (card) {
+        const host = card.closest(".md-host");
+        if (!host) return;
+        const s = mdGetState(host);
+        const acc = card.getAttribute("data-acc");
+        s.lockedAcc = (s.lockedAcc === acc) ? null : acc;
+        mdRenderState(host);
+        e.stopPropagation();
+        return;
+      }
+      // Map-Leerflaechen-Click: unlock
+      const overlay = e.target.closest && e.target.closest(".md-mapwrap");
+      if (overlay && !e.target.closest(".md-tools")) {
+        const host = overlay.closest(".md-host");
+        if (!host) return;
+        const s = mdGetState(host);
+        if (s.lockedAcc) {
+          s.lockedAcc = null;
+          mdRenderState(host);
+          e.stopPropagation();
+        }
+      }
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      // Erste sichtbare md-host mit lock zuruecksetzen.
+      document.querySelectorAll(".md-host[data-mounted]").forEach((host) => {
+        const s = mdGetState(host);
+        if (s.lockedAcc) {
+          s.lockedAcc = null;
+          s.playToken++;  // stoppt evtl. laufende Animation
+          mdRenderState(host);
+        }
+      });
+    });
+
     const reportUrl = "/api/pubg/session-report" +
       ((FROM || TO) ? "?" + new URLSearchParams({
         ...(FROM ? {from: FROM} : {}), ...(TO ? {to: TO} : {})
