@@ -1945,6 +1945,27 @@
       }
     });
 
+    // Hover-Preview: state.hoveredAcc folgt der gehoverten Card.
+    document.addEventListener("mouseenter", (e) => {
+      const card = e.target && e.target.closest && e.target.closest(".md-card[data-acc]");
+      if (!card) return;
+      const host = card.closest(".md-host");
+      if (!host) return;
+      const s = mdGetState(host);
+      s.hoveredAcc = card.getAttribute("data-acc");
+      mdRenderState(host);
+    }, true);  // capture-phase damit mouseenter ueberhaupt bubbelt
+
+    document.addEventListener("mouseleave", (e) => {
+      const card = e.target && e.target.closest && e.target.closest(".md-card[data-acc]");
+      if (!card) return;
+      const host = card.closest(".md-host");
+      if (!host) return;
+      const s = mdGetState(host);
+      s.hoveredAcc = null;
+      mdRenderState(host);
+    }, true);
+
     const reportUrl = "/api/pubg/session-report" +
       ((FROM || TO) ? "?" + new URLSearchParams({
         ...(FROM ? {from: FROM} : {}), ...(TO ? {to: TO} : {})
