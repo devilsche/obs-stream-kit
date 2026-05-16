@@ -1595,24 +1595,48 @@
       return p;
     }
 
-    // Konsistente Spielerfarbe per accountId-Hash — gleiche Berechnung
-    // in Map-Pin und Match-Info Dot, damit man die Zuordnung sieht.
-    // Festes Palette aus eindeutig unterscheidbaren Farben (Gelb / Rot
-    // / Blau / Gruen + ein paar Reserven). Vorher HSL-Hash hat aehnliche
-    // Tones wie Rot+DarkOrange produziert die kaum unterscheidbar waren.
+    // Spielerfarben: pro Match eine acc->color Map aufgebaut aus stabiler
+    // Squad-Reihenfolge (Self zuerst, dann alphabetisch). Garantiert
+    // eindeutige Farben innerhalb eines Matches — wichtiger als
+    // cross-match-Konsistenz die mit 4-er Palette und vielen Mates
+    // ohnehin nicht garantierbar waere.
     const PLAYER_COLORS = [
-      "#f2b705",  // Gelb (Gold)
+      "#f2b705",  // Gelb (Self)
       "#e74c3c",  // Rot
       "#3498db",  // Blau
       "#2ecc71",  // Gruen
+      "#ff7a1f",  // Orange (5er-Squad Reserve)
       "#9b59b6",  // Violett
-      "#ff7a1f",  // Orange
       "#1abc9c",  // Tuerkis
       "#ec407a",  // Pink
     ];
-    function playerColor(acc) {
+    // Cache: matchId -> {detail: {...}, colorByAcc: {...}}
+    const _matchDetailCache = new Map();
+    async function loadMatchDetail(matchId) {
+      if (!matchId) return null;
+      if (_matchDetailCache.has(matchId)) return _matchDetailCache.get(matchId);
+      let d = null;
+      try {
+        d = await PubgUI.fetchJson(
+          `/api/pubg/match-detail?matchId=${encodeURIComponent(matchId)}`);
+      } catch (e) {}
+      const colorByAcc = {};
+      if (d && d.members) {
+        d.members.forEach((m, i) => {
+          colorByAcc[m.accountId] = PLAYER_COLORS[i % PLAYER_COLORS.length];
+        });
+      }
+      const result = { detail: d, colorByAcc };
+      _matchDetailCache.set(matchId, result);
+      return result;
+    }
+    // Fallback wenn match-detail noch nicht geladen ist
+    function playerColor(acc, colorByAcc) {
+      if (colorByAcc && colorByAcc[acc]) return colorByAcc[acc];
+      // Deterministischer Fallback ueber Hash mit Bit-Mix gegen Modulo-Bias.
       let h = 0;
       for (let i = 0; i < (acc || "").length; i++) h = (h * 31 + acc.charCodeAt(i)) | 0;
+      h = h ^ (h >>> 13) ^ (h >>> 19);
       return PLAYER_COLORS[Math.abs(h) % PLAYER_COLORS.length];
     }
 
@@ -1628,6 +1652,9 @@
       const mapKm = blob.mapKm || 8;
       const cal   = blob.pinCalibration || {};
       const landings = (window._landingsByMatch || new Map()).get(matchId) || [];
+      // Match-Detail vorab holen → konsistente Farb-Map fuer Pins + Dots
+      const md = await loadMatchDetail(matchId);
+      const colorByAcc = (md && md.colorByAcc) || {};
 
       const img = await loadMapImage(mapImageUrl(mapName));
       const rect = host.getBoundingClientRect();
@@ -1701,7 +1728,7 @@
       // Punkt vor dem Namen unten in match-info gehoert dazu.
       pts.forEach(({ ld, px, py }) => {
         const [cx, cy] = cropToCanvas(px, py);
-        const color = playerColor(ld.accountId);
+        const color = playerColor(ld.accountId, colorByAcc);
         ctx.beginPath();
         ctx.arc(cx, cy, 4.5, 0, Math.PI * 2);
         ctx.fillStyle = color;
@@ -1716,11 +1743,9 @@
     async function renderMatchInfo(matchId, host) {
       if (!matchId || !host || host.dataset.loaded === "1") return;
       host.dataset.loaded = "1";
-      let d = null;
-      try {
-        d = await PubgUI.fetchJson(
-          `/api/pubg/match-detail?matchId=${encodeURIComponent(matchId)}`);
-      } catch (e) {}
+      const md = await loadMatchDetail(matchId);
+      const d = md && md.detail;
+      const colorByAcc = (md && md.colorByAcc) || {};
       if (!d || !d.members || !d.members.length) {
         host.innerHTML = `<div class="mi-empty">— keine Detail-Daten —</div>`;
         return;
@@ -1743,7 +1768,7 @@
         const who = m.isSelf ? "Du" : m.name;
         const landP = poi(m.landingX, m.landingY);
         const deathP = poi(m.deathX, m.deathY);
-        const color = playerColor(m.accountId);
+        const color = playerColor(m.accountId, colorByAcc);
         const dot = `<span class="dot" style="background:${color}"></span>`;
         const parts = [];
         parts.push(`${dot}<b class="${cls}">${who}</b>`);
