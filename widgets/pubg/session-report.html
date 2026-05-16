@@ -1445,6 +1445,10 @@
         const realElapsed = now - z.playStartWallTs;
         const scaledCursor = z.playStartCursor + realElapsed * (dur / MD_ANIM_DURATION_MS);
         z.cursorTs = Math.min(dur, scaledCursor);
+        if (s.viewport && s.viewport.autoFollow) {
+          mdAutoFollow(host);
+        }
+        mdRenderBasemap(host);
         mdRenderOverlay(host);
         mdUpdateScrubBar(host);
         if (z.cursorTs < dur) {
@@ -1455,6 +1459,27 @@
         }
       }
       requestAnimationFrame(frame);
+    }
+
+    function mdAutoFollow(host) {
+      const s = mdGetState(host);
+      const absTs = s.zeitraffer.matchStart + s.zeitraffer.cursorTs;
+      const coords = [];
+      const visibleMembers = s.soloAcc
+        ? s.detail.members.filter(m => m.accountId === s.soloAcc)
+        : s.detail.members;
+      for (const m of visibleMembers) {
+        const pin = mdInterpolatePin(m, absTs);
+        if (pin) coords.push([pin.x, pin.y]);
+      }
+      if (coords.length === 0) return;
+      const target = mdBboxFitViewport(coords, MD_PAD_500M_CM);
+      // Smooth ease toward target (lerp 0.18 / frame)
+      const t = 0.18;
+      s.viewport.centerX += (target.centerX - s.viewport.centerX) * t;
+      s.viewport.centerY += (target.centerY - s.viewport.centerY) * t;
+      s.viewport.zoom += (target.zoom - s.viewport.zoom) * t;
+      // autoFollow bleibt true
     }
 
     // Slider-Input setzt cursor + pausiert
