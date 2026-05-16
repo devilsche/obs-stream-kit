@@ -75,6 +75,24 @@
     }
     return best;
   }
+  // Schwerpunkt (Vertex-Mittel) — fuer Kompass-Richtung gut genug.
+  function polyCentroid(points) {
+    if (!points || !points.length) return [0, 0];
+    let sx = 0, sy = 0;
+    for (const p of points) { sx += p[0]; sy += p[1]; }
+    return [sx / points.length, sy / points.length];
+  }
+  // PUBG-Welt: X+ = Osten, Y+ = Sueden (Y waechst nach unten auf der Map).
+  // Bearing = Winkel im Uhrzeigersinn von Norden zu Vektor (dx, dy).
+  // dx,dy = Spielerposition relativ zum POI-Mittelpunkt; das Label sagt
+  // "Spieler kommt aus Richtung X" relativ zum POI.
+  function compassDir(dx, dy) {
+    const rad = Math.atan2(dx, -dy);
+    const deg = (rad * 180 / Math.PI + 360) % 360;
+    const dirs = ["north", "north-east", "east", "south-east",
+                  "south", "south-west", "west", "north-west"];
+    return dirs[Math.round(deg / 45) % 8];
+  }
 
   POI.fromCoords = function (mapName, xCm, yCm) {
     if (!mapName || xCm == null || yCm == null) return null;
@@ -113,7 +131,7 @@
     for (const r of regions) {
       if (!r.name) continue;
       const d = distToPoly(xCm, yCm, r.points);
-      if (d <= TIER_NEAR_CM) candidates.push({ name: r.name, d: d });
+      if (d <= TIER_NEAR_CM) candidates.push({ name: r.name, d: d, points: r.points });
     }
     if (!candidates.length) return null;
     candidates.sort((a, b) => a.d - b.d);
@@ -130,9 +148,16 @@
       seen.add(c.name);
       names.push(c.name);
     }
-    if (names.length === 1) return prefix + names[0];
-    if (names.length === 2) return prefix + names[0] + " and " + names[1];
-    // 3+: Oxford-Comma-Style
-    return prefix + names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+    // Richtung + Distanz vom Schwerpunkt des naechsten POI (= Spieler-
+    // Position relativ zum POI). Distanz = Kante in m (Closest-Edge).
+    const [cx, cy] = polyCentroid(candidates[0].points);
+    const dir = compassDir(xCm - cx, yCm - cy);
+    const distM = Math.max(1, Math.round(closest / 100));
+    const suffix = `, ${distM}m from ${dir}`;
+    let label;
+    if (names.length === 1)      label = prefix + names[0];
+    else if (names.length === 2) label = prefix + names[0] + " and " + names[1];
+    else                          label = prefix + names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+    return label + suffix;
   };
 })();
