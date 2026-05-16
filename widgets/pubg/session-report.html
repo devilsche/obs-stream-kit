@@ -1421,6 +1421,84 @@
       mdRenderState(host);
     }
 
+    function mdTogglePlay(host) {
+      const s = mdGetState(host);
+      const z = s.zeitraffer;
+      if (z.playing) {
+        z.playing = false;
+        s.playToken++;
+        mdRenderState(host);
+        return;
+      }
+      z.playing = true;
+      z.playStartWallTs = performance.now();
+      z.playStartCursor = z.cursorTs;
+      if (z.cursorTs >= z.matchEnd - z.matchStart) {
+        z.cursorTs = 0;
+        z.playStartCursor = 0;
+      }
+      const token = ++s.playToken;
+      const dur = z.matchEnd - z.matchStart;
+      function frame(now) {
+        if (token !== s.playToken) return;
+        if (host.dataset.mounted !== "1") return;
+        const realElapsed = now - z.playStartWallTs;
+        const scaledCursor = z.playStartCursor + realElapsed * (dur / MD_ANIM_DURATION_MS);
+        z.cursorTs = Math.min(dur, scaledCursor);
+        mdRenderOverlay(host);
+        mdUpdateScrubBar(host);
+        if (z.cursorTs < dur) {
+          requestAnimationFrame(frame);
+        } else {
+          z.playing = false;
+          mdUpdateScrubBar(host);
+        }
+      }
+      requestAnimationFrame(frame);
+    }
+
+    // Slider-Input setzt cursor + pausiert
+    function mdScrubTo(host, cursorMs) {
+      const s = mdGetState(host);
+      const z = s.zeitraffer;
+      z.cursorTs = Math.max(0, Math.min(z.matchEnd - z.matchStart, cursorMs));
+      z.playing = false;
+      s.playToken++;
+      mdRenderOverlay(host);
+      mdUpdateScrubBar(host);
+    }
+
+    // Globale Event-Delegations
+    document.addEventListener("click", (e) => {
+      const playBtn = e.target.closest && e.target.closest(".md-play-btn");
+      if (playBtn) {
+        const host = playBtn.closest(".md-host");
+        if (host) { mdTogglePlay(host); e.stopPropagation(); }
+        return;
+      }
+    });
+
+    document.addEventListener("input", (e) => {
+      const slider = e.target.closest && e.target.closest(".md-scrub-slider");
+      if (!slider) return;
+      const host = slider.closest(".md-host");
+      if (!host) return;
+      mdScrubTo(host, parseInt(slider.value, 10) || 0);
+    });
+
+    document.addEventListener("keydown", (e) => {
+      // Pfeil-Tasten ±1s wenn ein Match-Detail focused
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      // nicht in Inputs
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      const host = document.querySelector(".md-host[data-mounted='1']");
+      if (!host) return;
+      const s = mdGetState(host);
+      const delta = e.key === "ArrowLeft" ? -1000 : 1000;
+      mdScrubTo(host, s.zeitraffer.cursorTs + delta);
+      e.preventDefault();
+    });
+
     // Date-Range-Picker initialisieren mit aktuellen URL-Werten
     function isoLocal(date) {
       // Local-Date → "YYYY-MM-DD"
