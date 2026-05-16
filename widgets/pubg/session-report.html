@@ -1625,7 +1625,9 @@
     }
 
     function mapImageUrl(mapName) {
-      return `/widgets/pubg/maps/${mapName}.webp`;
+      // .png ist primaer (Symlinks zu api-assets HD No-Text-Versionen),
+      // .webp ist Remote-Fallback wenn kein Lokal-Clone vorhanden.
+      return `/widgets/pubg/maps/${mapName}.png`;
     }
 
     // Center-Anchored Affin (gleiche Formel wie poi-editor.html)
@@ -1647,14 +1649,26 @@
       return [ex, ey];
     }
 
-    // Cache fuer geladene Map-Images
+    // Cache fuer geladene Map-Images. Wenn .png nicht gefunden
+    // wird, fallback auf .webp (Remote-Fallback ohne api-assets-Clone).
     const _mapImageCache = new Map();
     function loadMapImage(url) {
       if (_mapImageCache.has(url)) return _mapImageCache.get(url);
       const p = new Promise((res) => {
         const img = new Image();
         img.onload = () => res(img);
-        img.onerror = () => res(null);
+        img.onerror = () => {
+          // Fallback: .png -> .webp
+          if (url.endsWith(".png")) {
+            const fallback = url.replace(/\.png$/, ".webp");
+            const img2 = new Image();
+            img2.onload = () => res(img2);
+            img2.onerror = () => res(null);
+            img2.src = fallback;
+          } else {
+            res(null);
+          }
+        };
         img.src = url;
       });
       _mapImageCache.set(url, p);

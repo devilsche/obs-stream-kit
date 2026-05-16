@@ -9,3 +9,11 @@ config/pubg.local.json
 .pytest_cache/
 *.pyc
 config/pubg.json
+
+# PUBG-Assets aus ../api-assets/ (Sibling-Clone): Symlinks die per
+# 'python -m pubg.cli refresh-assets' angelegt werden — nicht im Repo.
+widgets/pubg/maps/*.png
+widgets/pubg/assets/weapons/
+widgets/pubg/assets/vehicles/
+widgets/pubg/assets/killfeed/
+widgets/pubg/assets/mapselection/

@@ -557,51 +557,296 @@ def hidrive_clear_payload(root: str) -> int:
     return 0
 
 
-def refresh_maps(root: str) -> int:
-    """Lade die No-Text-Hi-Res-Maps aus dem offiziellen pubg/api-assets
-    Repo und ersetze die lokalen .webp-Dateien in widgets/pubg/maps/.
+def _download(url, timeout=15):
+    import urllib.request as _ur
+    with _ur.urlopen(url, timeout=timeout) as resp:
+        return resp.read()
 
-    PUBG-API-Assets nutzt Public-Namen (Erangel, Miramar...), unsere
-    DB internal-Namen (Baltic_Main, Desert_Main...). Mapping unten.
+
+def _ensure_dir(p):
+    os.makedirs(p, exist_ok=True)
+
+
+def _asset_source(root):
+    """Bevorzugt: ../api-assets/ neben obs-stream-kit. Fallback:
+    GitHub raw URL. Returns ('local', path) oder ('remote', baseurl)."""
+    local = os.path.abspath(os.path.join(root, "..", "api-assets"))
+    if os.path.isdir(os.path.join(local, "Assets", "Maps")):
+        return ("local", local)
+    return ("remote",
+            "https://raw.githubusercontent.com/pubg/api-assets/master")
+
+
+def _fetch_asset(src, rel_path, timeout=15):
+    """rel_path is repo-relative z.B. 'Assets/Item/Weapon/Main/Item_X.png'
+    oder 'dictionaries/telemetry/mapName.json'. Returns bytes."""
+    mode, base = src
+    if mode == "local":
+        p = os.path.join(base, rel_path)
+        with open(p, "rb") as f: return f.read()
+    return _download(f"{base}/{rel_path}", timeout=timeout)
+
+
+def _save_icon_webp(png_bytes, out_path, max_size=256, quality=85):
+    """PNG-Bytes -> verkleinertes WebP. Icons sind oft 4k+ HD, in der
+    UI aber max 48-128px sichtbar — Resize spart Repo-Size massiv."""
+    import io
+    from PIL import Image
+    img = Image.open(io.BytesIO(png_bytes))
+    if img.mode != "RGBA":
+        img = img.convert("RGBA")
+    img.thumbnail((max_size, max_size), Image.LANCZOS)
+    img.save(out_path, "WEBP", quality=quality, method=6)
+
+
+def refresh_assets(root: str) -> int:
+    """Lade Maps + Dictionaries + Weapon/Vehicle/Killfeed-Icons aus
+    pubg/api-assets in widgets/pubg/assets/ und widgets/pubg/maps/.
+
+    Bevorzugt einen lokalen Clone (../api-assets/ neben obs-stream-kit),
+    faellt sonst auf GitHub raw URL zurueck.
+
+    Nutzung:
+        python -m pubg.cli refresh-assets
+    """
+    src = _asset_source(root)
+    print(f"Quelle: {src[0]} ({src[1]})")
+    assets_dir = os.path.join(root, "widgets", "pubg", "assets")
+    _ensure_dir(assets_dir)
+
+    # 1) Dictionaries — kleine JSON-Files mit ID→Name Mappings
+    dict_dir = os.path.join(assets_dir, "dictionaries")
+    _ensure_dir(dict_dir)
+    DICTS = [
+        "telemetry/mapName.json",
+        "telemetry/damageCauserName.json",
+        "telemetry/damageTypeCategory.json",
+        "gameMode.json",
+    ]
+    print("=== Dictionaries ===")
+    for path in DICTS:
+        rel = f"dictionaries/{path}"
+        fname = path.split("/")[-1]
+        out = os.path.join(dict_dir, fname)
+        try:
+            data = _fetch_asset(src, rel)
+            with open(out, "wb") as f: f.write(data)
+            print(f"  ok   {fname:30s} ({len(data)} B)")
+        except Exception as e:
+            print(f"  FAIL {fname:30s} {e}")
+
+    # 2) Maps — schon vorhandene Funktion wiederverwenden
+    print("\n=== Maps ===")
+    refresh_maps(root)
+
+    # 3) Weapon-Icons (alle Weap*.png aus Assets/Item/Weapon/Main/).
+    #    Wir holen sie via dem damageCauserName-Dict — fuer jeden
+    #    WeapXxx_C versuchen wir das passende Item_Weapon_XXX_C.png.
+    print("\n=== Weapon-Icons ===")
+    weap_dir = os.path.join(assets_dir, "weapons")
+    _ensure_dir(weap_dir)
+    import json as _json
+    dcn_path = os.path.join(dict_dir, "damageCauserName.json")
+    try:
+        with open(dcn_path) as f: dcn = _json.load(f)
+    except Exception:
+        dcn = {}
+    weap_ids = [k for k in dcn.keys() if k.startswith("Weap")]
+    # Plus ein paar Special-Cases
+    weap_ids += ["ProjGrenade_C", "ProjMolotov_C", "ProjC4_C",
+                 "ProjStickyGrenade_C", "PanzerFaust100M_Projectile_C"]
+    ok = err = 0
+    for wid in weap_ids:
+        clean = wid.replace("WeapDuncans", "Weap").replace("WeapJulies", "Weap")
+        if clean.startswith("Weap"):
+            stem = "Item_Weapon_" + clean[len("Weap"):]
+        else:
+            stem = "Item_Weapon_" + clean
+        out = os.path.join(weap_dir, f"{wid}.webp")
+        if os.path.exists(out):
+            ok += 1; continue
+        success = False
+        for sub in ("Main", "Handgun", "Melee"):
+            rel = f"Assets/Item/Weapon/{sub}/{stem}.png"
+            try:
+                data = _fetch_asset(src, rel, timeout=8)
+                _save_icon_webp(data, out, max_size=192, quality=85)
+                ok += 1; success = True; break
+            except Exception:
+                continue
+        if not success: err += 1
+    print(f"  Weapon-Icons: {ok} ok, {err} fehlend (Skins/Special)")
+
+    # 4) Vehicle-Icons
+    print("\n=== Vehicle-Icons ===")
+    veh_dir = os.path.join(assets_dir, "vehicles")
+    _ensure_dir(veh_dir)
+    VEHICLE_IDS = [
+        "BP_BRDM_C", "BP_Buggy_C", "BP_CoupeRB_C", "BP_PonyCoupe_C",
+        "BP_Mirado_A_00_C", "BP_Mirado_Open_00_C",
+        "BP_Niva_00_C", "BP_PickupTruck_A_00_C", "BP_PickupTruck_B_00_C",
+        "BP_Van_A_00_C", "BP_Porter_C", "BP_LootTruck_C",
+        "BP_Motorbike_00_C", "BP_Motorbike_00_SideCar_C",
+        "BP_Motorglider_C", "BP_M_Rony_A_00_C",
+        "BP_Snowbike_00_C", "BP_Snowmobile_00_C",
+        "BP_Scooter_00_A_C", "BP_TukTukTuk_A_00_C",
+        "BP_ATV_C", "BP_Airboat_C", "BP_Dirtbike_C",
+        "Boat_PG117_C", "Buggy_A_00_C",
+        "Dacia_A_00_v2_C", "Dacia_A_00_v2_snow_C",
+        "Uaz_A_00_C", "Uaz_B_00_C", "Uaz_C_00_C",
+        "AquaRail_A_00_C", "PG117_A_00_C", "ParachutePlayer_C",
+        "DummyTransportAircraft_C",
+    ]
+    ok = err = 0
+    for vid in VEHICLE_IDS:
+        rel = f"Assets/Vehicle/{vid}.png"
+        out = os.path.join(veh_dir, f"{vid}.webp")
+        try:
+            if os.path.exists(out): ok += 1; continue
+            data = _fetch_asset(src, rel, timeout=8)
+            _save_icon_webp(data, out, max_size=192, quality=85)
+            ok += 1
+        except Exception:
+            err += 1
+    print(f"  Vehicle-Icons: {ok} ok, {err} fehlend")
+
+    # 5) Killfeed-Icons — Death-Cause-Anzeige
+    print("\n=== Killfeed-Icons ===")
+    kf_dir = os.path.join(assets_dir, "killfeed")
+    _ensure_dir(kf_dir)
+    KF_ICONS = [
+        "Headshot", "Bluezone", "Redzone", "Blackzone",
+        "Drown", "Fall", "Punch", "Death", "DBNO", "Groggy",
+        "Vehicle", "Vehicle_Explosion", "Kill_Truck", "Train",
+        "Melee_Throw", "Headshot_DBNO", "Ferry", "Zombie_Punch",
+        "Kill_Truck_Turret",
+    ]
+    ok = err = 0
+    for kf in KF_ICONS:
+        rel = f"Assets/Icons/Killfeed/{kf}.png"
+        out = os.path.join(kf_dir, f"{kf}.webp")
+        try:
+            if os.path.exists(out): ok += 1; continue
+            data = _fetch_asset(src, rel, timeout=8)
+            _save_icon_webp(data, out, max_size=128, quality=85)
+            ok += 1
+        except Exception:
+            err += 1
+    print(f"  Killfeed-Icons: {ok} ok, {err} fehlend")
+
+    # 6) Map-Selection Thumbnails
+    print("\n=== Map-Selection-Thumbnails ===")
+    ms_dir = os.path.join(assets_dir, "mapselection")
+    _ensure_dir(ms_dir)
+    MAP_THUMBS = {
+        "Baltic_Main": "Erangel", "Erangel_Main": "Erangel",
+        "Desert_Main": "Miramar", "Savage_Main": "Sanhok",
+        "DihorOtok_Main": "Vikendi", "Summerland_Main": "Karakin",
+        "Chimera_Main": "Paramo", "Range_Main": "Camp_Jackal",
+    }
+    ok = err = 0
+    for internal, public in MAP_THUMBS.items():
+        out = os.path.join(ms_dir, f"{internal}.webp")
+        if os.path.exists(out): ok += 1; continue
+        success = False
+        for ext in ("png", "jpg"):
+            rel = f"Assets/MapSelection/{public}.{ext}"
+            try:
+                data = _fetch_asset(src, rel, timeout=8)
+                _save_icon_webp(data, out, max_size=384, quality=85)
+                ok += 1; success = True; break
+            except Exception:
+                continue
+        if not success: err += 1
+    print(f"  Map-Thumbnails: {ok} ok, {err} fehlend")
+
+    print("\n=== refresh-assets fertig ===")
+    return 0
+
+
+NAME_MAP = {
+    "Baltic_Main":     "Erangel",
+    "Desert_Main":     "Miramar",
+    "Savage_Main":     "Sanhok",
+    "DihorOtok_Main":  "Vikendi",
+    "Summerland_Main": "Karakin",
+    "Chimera_Main":    "Paramo",
+    "Tiger_Main":      "Taego",
+    "Kiki_Main":       "Deston",
+    "Neon_Main":       "Rondo",
+    "Heaven_Main":     "Haven",
+}
+
+
+def _symlink_or_copy(target_abs, link_path):
+    """Erstellt Symlink link_path -> target_abs (relative).
+    Wenn vorher schon da: ersetzen. Fallback auf Copy wenn Symlink
+    nicht moeglich (z.B. Windows ohne Admin)."""
+    if os.path.islink(link_path) or os.path.exists(link_path):
+        try: os.remove(link_path)
+        except OSError: pass
+    rel_target = os.path.relpath(target_abs, os.path.dirname(link_path))
+    try:
+        os.symlink(rel_target, link_path)
+    except (OSError, NotImplementedError):
+        import shutil
+        shutil.copy2(target_abs, link_path)
+
+
+def refresh_maps(root: str) -> int:
+    """Verlinkt die offiziellen No-Text-High-Res-Maps aus dem lokalen
+    ../api-assets/Assets/Maps/-Clone in widgets/pubg/maps/.
+
+        widgets/pubg/maps/Baltic_Main.png  ->
+            ../../../api-assets/Assets/Maps/Erangel_Main_No_Text_High_Res.png
+
+    Falls Lokal-Clone fehlt: Fallback auf GitHub-Download mit
+    WebP-Komprimierung (Low_Res 2048x2048).
 
     Nutzung:
         python -m pubg.cli refresh-maps
     """
-    import io, urllib.request as _ur
+    out_dir = os.path.join(root, "widgets", "pubg", "maps")
+    os.makedirs(out_dir, exist_ok=True)
+    src = _asset_source(root)
+    print(f"Schreibe in {out_dir}/  (Quelle: {src[0]})")
+
+    if src[0] == "local":
+        ok, err = 0, 0
+        for internal, public in NAME_MAP.items():
+            target = os.path.join(
+                src[1], "Assets", "Maps",
+                f"{public}_Main_No_Text_High_Res.png")
+            link = os.path.join(out_dir, f"{internal}.png")
+            if not os.path.exists(target):
+                print(f"  FAIL {internal:18s} kein Target: {target}")
+                err += 1; continue
+            try:
+                _symlink_or_copy(target, link)
+                sz = os.path.getsize(target)
+                print(f"  ok   {internal:18s} -> {public}  ({sz//1024} KB)")
+                ok += 1
+            except Exception as e:
+                print(f"  FAIL {internal:18s}: {e}")
+                err += 1
+        print(f"\nFertig: {ok} Symlinks, {err} Fehler.")
+        return 0 if err == 0 else 1
+
+    # Remote-Fallback: Low-Res → WebP
+    import io
     try:
         from PIL import Image
     except ImportError:
         print("PIL/Pillow fehlt — 'pip install pillow' und neu starten.")
         return 1
-    NAME_MAP = {
-        "Baltic_Main":     "Erangel",
-        "Desert_Main":     "Miramar",
-        "Savage_Main":     "Sanhok",
-        "DihorOtok_Main":  "Vikendi",
-        "Summerland_Main": "Karakin",
-        "Chimera_Main":    "Paramo",
-        "Tiger_Main":      "Taego",
-        "Kiki_Main":       "Deston",
-        "Neon_Main":       "Rondo",
-        "Heaven_Main":     "Haven",
-    }
-    out_dir = os.path.join(root, "widgets", "pubg", "maps")
-    os.makedirs(out_dir, exist_ok=True)
-    print(f"Schreibe in {out_dir}/")
+    print("Lokal-Clone von api-assets fehlt — Remote-Download mit Verkleinerung.")
     ok, err = 0, 0
     for internal, public in NAME_MAP.items():
-        url = ("https://raw.githubusercontent.com/pubg/api-assets/"
-               f"master/Assets/Maps/{public}_Main_No_Text_Low_Res.png")
+        rel = f"Assets/Maps/{public}_Main_No_Text_Low_Res.png"
         out_path = os.path.join(out_dir, f"{internal}.webp")
         try:
-            with _ur.urlopen(url, timeout=15) as resp:
-                buf = resp.read()
+            buf = _fetch_asset(src, rel, timeout=15)
             img = Image.open(io.BytesIO(buf))
-            # Auf 1024 verkleinern (Mini-Map zeigt max 900px) — spart
-            # Repo-Size signifikant, bleibt fuer Display ueberlegen
-            # zu den alten Bildern (vorher waren die ~1024 mit Text).
-            # 2048x2048 — gut fuers Modal (900px Anzeige) + Mini-Map (220px)
-            # WebP-Compression haelt Files unter ~500KB pro Map.
             img.thumbnail((2048, 2048), Image.LANCZOS)
             img.save(out_path, "WEBP", quality=85, method=6)
             sz = os.path.getsize(out_path)
@@ -914,6 +1159,8 @@ if __name__ == "__main__":
         sys.exit(hidrive_refill(root, only_match=mid))
     elif len(sys.argv) > 1 and sys.argv[1] == "refresh-maps":
         sys.exit(refresh_maps(root))
+    elif len(sys.argv) > 1 and sys.argv[1] == "refresh-assets":
+        sys.exit(refresh_assets(root))
     else:
         print("Usage: python -m pubg.cli init | cold-start | pull-ftp | "
               "seasons-backfill | wipe-day [YYYY-MM-DD] [--keep-popups] | "

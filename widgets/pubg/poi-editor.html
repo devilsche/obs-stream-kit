@@ -288,19 +288,19 @@ async function loadMap(mapId) {
   selectedIdx = -1;
   polyPoints = [];
 
-  // Map als Image-Object laden — versucht .webp dann .png als Fallback.
+  // Map als Image-Object laden — versucht .png (Symlink zu api-assets
+  // HD-No-Text) dann .webp (Remote-Fallback) als Fallback.
   mapImage = new Image();
   mapImage.crossOrigin = "anonymous";
   mapImage.onload = () => render();
   mapImage.onerror = () => {
-    // .webp failed → versuche .png
     mapImage.onerror = () => {
-      statusEl.textContent = `⚠ Map ${mapId}.{webp|png} nicht gefunden`;
+      statusEl.textContent = `⚠ Map ${mapId}.{png|webp} nicht gefunden`;
       render();
     };
-    mapImage.src = `/widgets/pubg/maps/${mapId}.png`;
+    mapImage.src = `/widgets/pubg/maps/${mapId}.webp`;
   };
-  mapImage.src = `/widgets/pubg/maps/${mapId}.webp`;
+  mapImage.src = `/widgets/pubg/maps/${mapId}.png`;
   // Zoom/Pan auf Default zurueck wenn die Map wechselt
   view = { zoom: 1, panX: 0, panY: 0 };
   updateZoomBtn();
