@@ -1064,6 +1064,31 @@ def compute_match_detail(conn, my_account_id, match_id):
         # die als Naeherung (Revive passiert beim Member).
         revive_pts = [[r["actor_x"], r["actor_y"]] for r in revives
                        if r["actor_x"] is not None]
+        # Kills dieses Members (fuer Squad-Kill-Toggle in der Map).
+        # Liefert Schuetzen-Coord (actor) + Opfer-Coord (victim) + Timestamp.
+        kill_rows = conn.execute("""
+            SELECT te.actor_x, te.actor_y, te.victim_x, te.victim_y,
+                   te.timestamp_ms, te.weapon,
+                   COALESCE(p.name, pa.name) AS victim_name
+            FROM telemetry_events te
+            LEFT JOIN players p ON p.account_id = te.target_account
+            LEFT JOIN participants pa
+              ON pa.match_id = te.match_id
+             AND pa.account_id = te.target_account
+            WHERE te.match_id = ? AND te.actor_account = ?
+              AND te.event_type = 'Kill'
+              AND te.actor_x IS NOT NULL AND te.victim_x IS NOT NULL
+            ORDER BY te.timestamp_ms ASC
+        """, (match_id, acc)).fetchall()
+        kills = [{
+            "actorX":  kr["actor_x"],
+            "actorY":  kr["actor_y"],
+            "victimX": kr["victim_x"],
+            "victimY": kr["victim_y"],
+            "tsMs":    kr["timestamp_ms"],
+            "weapon":  kr["weapon"],
+            "victimName": kr["victim_name"],
+        } for kr in kill_rows]
         out_members.append({
             "accountId":   acc,
             "name":        mem["name"] or acc[:8],
@@ -1090,6 +1115,7 @@ def compute_match_detail(conn, my_account_id, match_id):
             "path":        path,
             # Revive-Punkte fuer Wiederbelebungs-Marker
             "revivePts":   revive_pts,
+            "kills":       kills,
         })
 
     # Self zuerst, Rest beliebig
