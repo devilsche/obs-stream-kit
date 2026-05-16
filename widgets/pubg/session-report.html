@@ -138,7 +138,7 @@
       margin-bottom: 4px;
       background: rgba(94, 42, 121, 0.10);
       border-radius: 0 0 4px 4px;
-      font-size: 0.78em;
+      font-size: 0.95em;
       display: none;
     }
     .squad-detail.show { display: block; animation: pubg-fade-in 0.25s; }
@@ -162,22 +162,22 @@
     .match-map .legend {
       position: absolute;
       bottom: 4px; left: 4px; right: 4px;
-      font-size: 0.7em;
-      color: var(--pubg-muted);
-      background: rgba(13,6,26,0.7);
-      padding: 2px 6px;
+      font-size: 0.85em;
+      color: var(--pubg-text);
+      background: rgba(13,6,26,0.85);
+      padding: 4px 8px;
       border-radius: 3px;
       line-height: 1.3;
     }
     .match-map .legend b { color: var(--pubg-gold); }
     /* Text-Block unter der Squad-Tabelle: Landing-POI + Death-Info
-       pro Mate. Eigene Zeile pro Member, kompakt. */
+       pro Mate. Eigene Zeile pro Member. */
     .match-info {
       margin-top: 10px;
       padding-top: 8px;
       border-top: 1px solid rgba(255,255,255,0.05);
-      font-size: 0.82em;
-      line-height: 1.55;
+      font-size: 1.0em;
+      line-height: 1.65;
       color: var(--pubg-muted);
     }
     .match-info .mi-row b { color: var(--pubg-text); }
@@ -188,49 +188,16 @@
     .match-info .mi-row .killer { color: var(--pubg-text); font-weight: 700; }
     .match-info .mi-row .dot {
       display: inline-block;
-      width: 9px; height: 9px;
+      width: 11px; height: 11px;
       border-radius: 50%;
-      margin-right: 6px;
+      margin-right: 7px;
       vertical-align: -1px;
-      border: 1px solid rgba(255,255,255,0.4);
+      border: 1px solid rgba(255,255,255,0.5);
     }
     .match-info .mi-empty { font-style: italic; opacity: 0.6; }
     .match-info .mi-row[data-acc] { cursor: help; }
     .match-info .mi-row[data-acc]:hover { background: rgba(255,255,255,0.04); }
-
-    /* Hover-Popover mit Map (Landing + Death Pin) */
-    .death-pov {
-      position: fixed; display: none;
-      width: 320px;
-      background: #0d061a;
-      border: 1px solid var(--pubg-gold);
-      border-radius: 5px;
-      padding: 8px;
-      z-index: 9999;
-      pointer-events: none;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.6);
-    }
-    .death-pov.show { display: block; }
-    .death-pov canvas {
-      width: 304px; height: 304px;
-      display: block;
-      background: #0d061a;
-      border-radius: 3px;
-    }
-    .death-pov .pov-title {
-      font-size: 0.78em;
-      color: var(--pubg-gold);
-      margin: 0 0 4px;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-    }
-    .death-pov .pov-foot {
-      margin-top: 4px;
-      font-size: 0.72em;
-      color: var(--pubg-muted);
-      line-height: 1.4;
-    }
-    .death-pov .pov-foot b { color: var(--pubg-text); }
+    .match-map.focused { box-shadow: 0 0 12px rgba(242,183,5,0.25); }
     /* Event-Detail-Panel (PAYDAY/Heist) — ersetzt die Mini-Map in Events */
     .event-detail {
       width: 260px;
@@ -1676,13 +1643,16 @@
       return PLAYER_COLORS[Math.abs(h) % PLAYER_COLORS.length];
     }
 
-    async function renderMatchMap(host) {
+    async function renderMatchMap(host, focusAcc) {
       const matchId = host.getAttribute("data-match-id");
       const mapName = host.getAttribute("data-map");
       if (!matchId || !mapName) return;
       const canvas = host.querySelector("canvas");
-      if (!canvas || host.dataset.rendered === "1") return;
-      host.dataset.rendered = "1";
+      if (!canvas) return;
+      // Re-render erlauben wenn focusAcc gesetzt ist (Hover-Swap), sonst
+      // nur einmal pro Match (rendered-Flag).
+      if (!focusAcc && host.dataset.rendered === "1") return;
+      if (!focusAcc) host.dataset.rendered = "1";
 
       const blob = (window._poiData || {})[mapName] || {};
       const mapKm = blob.mapKm || 8;
@@ -1691,6 +1661,11 @@
       // Match-Detail vorab holen → konsistente Farb-Map fuer Pins + Dots
       const md = await loadMatchDetail(matchId);
       const colorByAcc = (md && md.colorByAcc) || {};
+      // Focus-Member raussuchen — falls Hover-Modus
+      let focusMember = null;
+      if (focusAcc && md && md.detail) {
+        focusMember = md.detail.members.find(m => m.accountId === focusAcc);
+      }
 
       const img = await loadMapImage(mapImageUrl(mapName));
       const rect = host.getBoundingClientRect();
@@ -1716,29 +1691,45 @@
         return [fx * side, fy * side];
       }
 
-      // Bounding-Box aller Squad-Landings im CROP-PIXEL-Raum.
+      // Bounding-Box berechnen. Pins-Liste fuer das spaetere Zeichnen.
       let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
       const pts = [];
-      landings.forEach((ld) => {
-        const [px, py] = cmToCropPx(ld.x, ld.y);
-        pts.push({ ld, px, py });
+      function _addBox(px, py) {
         if (px < bx0) bx0 = px;
         if (py < by0) by0 = py;
         if (px > bx1) bx1 = px;
         if (py > by1) by1 = py;
-      });
+      }
+      if (focusMember) {
+        // Death-View: nur Landing + Death dieses Members in der Box.
+        if (focusMember.landingX != null) {
+          const [px, py] = cmToCropPx(focusMember.landingX, focusMember.landingY);
+          pts.push({ kind: "landing", acc: focusMember.accountId, px, py });
+          _addBox(px, py);
+        }
+        if (focusMember.died && focusMember.deathX != null) {
+          const [px, py] = cmToCropPx(focusMember.deathX, focusMember.deathY);
+          pts.push({ kind: "death", acc: focusMember.accountId, px, py });
+          _addBox(px, py);
+        }
+      } else {
+        // Default: Squad-Landings
+        landings.forEach((ld) => {
+          const [px, py] = cmToCropPx(ld.x, ld.y);
+          pts.push({ kind: "landing", acc: ld.accountId, ld, px, py });
+          _addBox(px, py);
+        });
+      }
 
-      // Zoom-Region: Bounding-Box + Padding. Mindestgroesse 1.5km
-      // (entspricht 1.5km/mapKm des side-pixels). Falls keine Landings:
-      // ganze Map zeigen (Fallback).
+      // Zoom-Region: enger fuer Death-View (min 400m), default 800m
       let srcX, srcY, srcSize;
       if (pts.length) {
-        // Enger Zoom: min. 800m Sichtfenster, Padding nur 20% — der
-        // User will den Bereich gross sehen, nicht den Map-Kontext.
-        const minSizePx = (0.8 / mapKm) * side;
+        const minKm = focusMember ? 0.4 : 0.8;
+        const padFactor = focusMember ? 1.5 : 1.2;
+        const minSizePx = (minKm / mapKm) * side;
         const bw = bx1 - bx0;
         const bh = by1 - by0;
-        let s = Math.max(bw, bh, minSizePx) * 1.2;
+        let s = Math.max(bw, bh, minSizePx) * padFactor;
         if (s > side) s = side;
         const cx = (bx0 + bx1) / 2;
         const cy = (by0 + by1) / 2;
@@ -1760,18 +1751,46 @@
         ((py - srcY) / srcSize) * canvas.height,
       ];
 
-      // Pins kompakt — Farbe identifiziert den Spieler, der farbige
-      // Punkt vor dem Namen unten in match-info gehoert dazu.
-      pts.forEach(({ ld, px, py }) => {
-        const [cx, cy] = cropToCanvas(px, py);
-        const color = playerColor(ld.accountId, colorByAcc);
+      // Pins zeichnen. Landing = kleiner Kreis, Death = groesserer
+      // Kreis mit Kreuz darin. Im Focus-Mode auch noch eine
+      // gestrichelte Linie zwischen Landing und Death.
+      if (focusMember && focusMember.landingX != null && focusMember.died) {
+        const [lp, lp2] = pts;  // erste: landing, zweite: death (siehe oben)
+        if (lp && lp2) {
+          const [lx, ly] = cropToCanvas(lp.px, lp.py);
+          const [dx, dy] = cropToCanvas(lp2.px, lp2.py);
+          ctx.strokeStyle = playerColor(focusMember.accountId, colorByAcc);
+          ctx.globalAlpha = 0.35;
+          ctx.setLineDash([4, 4]);
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(lx, ly); ctx.lineTo(dx, dy);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.globalAlpha = 1;
+        }
+      }
+      pts.forEach((p) => {
+        const [cx, cy] = cropToCanvas(p.px, p.py);
+        const color = playerColor(p.acc, colorByAcc);
+        const isDeath = p.kind === "death";
+        const r = isDeath ? 8 : 4.5;
         ctx.beginPath();
-        ctx.arc(cx, cy, 4.5, 0, Math.PI * 2);
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
         ctx.fillStyle = color;
         ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,0.85)";
-        ctx.lineWidth = 1.25;
+        ctx.strokeStyle = isDeath ? "white" : "rgba(255,255,255,0.85)";
+        ctx.lineWidth = isDeath ? 2 : 1.25;
         ctx.stroke();
+        if (isDeath) {
+          // Kreuz drauf
+          ctx.strokeStyle = "white";
+          ctx.lineWidth = 1.75;
+          ctx.beginPath();
+          ctx.moveTo(cx - 3.5, cy - 3.5); ctx.lineTo(cx + 3.5, cy + 3.5);
+          ctx.moveTo(cx + 3.5, cy - 3.5); ctx.lineTo(cx - 3.5, cy + 3.5);
+          ctx.stroke();
+        }
       });
     }
 
@@ -1851,166 +1870,50 @@
       }).toString() : "");
     PubgUI.poll(reportUrl, 60000, render, console.error);
 
-    // ─── Death-Map Hover-Popover ────────────────────────────────────
-    // Beim mouseover auf eine mi-row im Match-Expand: floating Popover
-    // mit Mini-Map zeigen, Landing-Pin (klein, gedimmt) + Death-Pin
-    // (groß, in Spielerfarbe, Kreuz-Marker).
-    // Lazy-Lookups: der Popover-Div steht im HTML NACH diesem Script-
-    // Tag, deshalb gibt's zur Script-Lade-Zeit getElementById noch
-    // null zurueck. Wir holen die Refs erst beim ersten Event.
-    let _dpEl = null, _dpCanvas = null, _dpTitle = null, _dpFoot = null;
-    let _dpActive = null;
-    function _dpInit() {
-      if (_dpEl) return _dpEl;
-      _dpEl     = document.getElementById("deathPov");
-      if (!_dpEl) return null;
-      _dpCanvas = _dpEl.querySelector("canvas");
-      _dpTitle  = _dpEl.querySelector(".pov-title");
-      _dpFoot   = _dpEl.querySelector(".pov-foot");
-      return _dpEl;
+    // ─── Hover-Swap: Match-Map zeigt Death-Region des Members ───────
+    // Beim mouseover auf .mi-row[data-acc] wird die zugehoerige
+    // .match-map des Matches neu gezeichnet — zoomed in auf Landing +
+    // Death des hovered Members. Beim mouseleave: zurueck zur Squad-
+    // Landings-Ansicht.
+    function _hoverFindMap(matchId) {
+      return document.querySelector(
+        `.match-map[data-match-id="${matchId}"]`);
     }
-
-    async function _dpShow(row, ev) {
+    async function _hoverFocus(row) {
       const matchId = row.getAttribute("data-match-id");
       const acc     = row.getAttribute("data-acc");
-      if (!matchId || !acc) return;
-      if (!_dpInit() || !_dpCanvas) return;
-      const md = await loadMatchDetail(matchId);
-      if (!md || !md.detail) return;
-      const member = md.detail.members.find(m => m.accountId === acc);
-      if (!member) return;
-      const mapName = md.detail.mapName;
-      const blob = (window._poiData || {})[mapName] || {};
-      const mapKm = blob.mapKm || 8;
-      const cal   = blob.pinCalibration || {};
-      const mapCm = mapKm * 100000;
-      const img = await loadMapImage(mapImageUrl(mapName));
-
-      const canvas = _dpCanvas;
-      canvas.width = 304; canvas.height = 304;
-      const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#0d061a";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      if (!img || !img.naturalWidth) return;
-      // Komplette Karte zeigen (kein Zoom) — User will Kontext sehen.
-      const side = Math.min(img.naturalWidth, img.naturalHeight);
-      const cropX = (img.naturalWidth - side) / 2;
-      const cropY = (img.naturalHeight - side) / 2;
-      ctx.drawImage(img, cropX, cropY, side, side,
-                    0, 0, canvas.width, canvas.height);
-
-      function cmToCanvas(xCm, yCm) {
-        const [ex, ey] = applyPinCal(xCm, yCm, mapKm, cal);
-        return [(ex / mapCm) * canvas.width,
-                (ey / mapCm) * canvas.height];
-      }
-      const color = (md.colorByAcc && md.colorByAcc[acc])
-                    || playerColor(acc);
-
-      // Landing-Pin (klein, gedimmt)
-      if (member.landingX != null && member.landingY != null) {
-        const [lx, ly] = cmToCanvas(member.landingX, member.landingY);
-        ctx.beginPath();
-        ctx.arc(lx, ly, 5, 0, Math.PI * 2);
-        ctx.fillStyle = color;
-        ctx.globalAlpha = 0.55;
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = "rgba(255,255,255,0.6)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-      // Death-Pin (groß, voll, mit Kreuz)
-      if (member.died && member.deathX != null && member.deathY != null) {
-        const [dx, dy] = cmToCanvas(member.deathX, member.deathY);
-        ctx.beginPath();
-        ctx.arc(dx, dy, 9, 0, Math.PI * 2);
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.strokeStyle = "white";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        // Kreuz drauf damit's klar als 'Tod' lesbar ist
-        ctx.strokeStyle = "white";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(dx - 4, dy - 4); ctx.lineTo(dx + 4, dy + 4);
-        ctx.moveTo(dx + 4, dy - 4); ctx.lineTo(dx - 4, dy + 4);
-        ctx.stroke();
-      }
-      // Linie zwischen Landing und Death — visuelle Verbindung
-      if (member.landingX != null && member.died
-          && member.deathX != null) {
-        const [lx, ly] = cmToCanvas(member.landingX, member.landingY);
-        const [dx, dy] = cmToCanvas(member.deathX, member.deathY);
-        ctx.strokeStyle = color;
-        ctx.globalAlpha = 0.35;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(lx, ly); ctx.lineTo(dx, dy);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.globalAlpha = 1;
-      }
-
-      const who = member.isSelf ? "Du" : member.name;
-      _dpTitle.textContent = `${who} · ${PubgUI.fmtMap(mapName)}`;
-
-      let footHtml = "";
-      if (member.died) {
-        const dt = member.deathOffsetSec != null
-          ? `${Math.floor(member.deathOffsetSec/60)}:${String(member.deathOffsetSec%60).padStart(2,"0")}` : "?";
-        footHtml = `<b>† nach ${dt}</b>${member.weaponName ? " · " + member.weaponName : ""}${member.distanceM ? " · " + member.distanceM.toFixed(0) + "m" : ""}`;
-        if (member.killerName) footHtml += `<br>durch <b>${member.killerName}</b>`;
-      } else {
-        footHtml = "<b>uberlebt</b>";
-      }
-      _dpFoot.innerHTML = footHtml;
-      _dpEl.classList.add("show");
-      _dpPosition(ev);
+      const host    = matchId && _hoverFindMap(matchId);
+      if (!host) return;
+      host.classList.add("focused");
+      // rendered-Flag zwar gesetzt aber focusAcc-Variante umgeht es
+      await renderMatchMap(host, acc);
     }
-    function _dpPosition(ev) {
-      if (!_dpEl) return;
-      const r = _dpEl.getBoundingClientRect();
-      const vw = innerWidth, vh = innerHeight;
-      let x = ev.clientX + 14;
-      if (x + r.width + 8 > vw) x = ev.clientX - r.width - 14;
-      if (x < 8) x = 8;
-      let y = ev.clientY + 14;
-      if (y + r.height + 8 > vh) y = ev.clientY - r.height - 14;
-      if (y < 8) y = 8;
-      _dpEl.style.left = x + "px";
-      _dpEl.style.top  = y + "px";
+    async function _hoverRestore(row) {
+      const matchId = row.getAttribute("data-match-id");
+      const host    = matchId && _hoverFindMap(matchId);
+      if (!host) return;
+      host.classList.remove("focused");
+      await renderMatchMap(host, null);
     }
-    function _dpHide() {
-      if (_dpEl) _dpEl.classList.remove("show");
-      _dpActive = null;
-    }
+    let _hoverActive = null;
     document.addEventListener("mouseover", (e) => {
       const row = e.target.closest(".match-info .mi-row[data-acc]");
       if (!row) return;
-      if (row === _dpActive) return;
-      _dpActive = row;
-      _dpShow(row, e);
-    });
-    document.addEventListener("mousemove", (e) => {
-      if (_dpEl && _dpEl.classList.contains("show")) _dpPosition(e);
+      if (row === _hoverActive) return;
+      _hoverActive = row;
+      _hoverFocus(row);
     });
     document.addEventListener("mouseout", (e) => {
       const row = e.target.closest(".match-info .mi-row[data-acc]");
       const to  = e.relatedTarget;
       const toRow = to && to.closest && to.closest(".match-info .mi-row[data-acc]");
       if (row && toRow === row) return;
-      if (!toRow) _dpHide();
+      if (!toRow && _hoverActive) {
+        _hoverRestore(_hoverActive);
+        _hoverActive = null;
+      }
     });
-  </script>
 
-  <!-- Death-Map Popover (am Body-Ende damit kein backdrop-filter-Ancestor
-       das fixed-positioning bricht — siehe hot-drop.html Lesson). -->
-  <div id="deathPov" class="death-pov">
-    <div class="pov-title">—</div>
-    <canvas width="304" height="304"></canvas>
-    <div class="pov-foot">—</div>
-  </div>
+  </script>
 </body>
 </html>
