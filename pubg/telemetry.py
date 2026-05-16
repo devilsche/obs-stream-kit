@@ -208,27 +208,18 @@ ALWAYS_KEEP_EVENTS = {
 }
 
 # Position-Events fluten die DB (firet alle ~10s pro Spieler). Wir
-# behalten sie NUR fuer Squad-Members in den ersten 3 Minuten — reicht
-# fuer praezise Landing-Pin-Detection (Touchdown ~50-90s nach Drop).
-POSITION_WINDOW_MS = 180_000
-
-
+# behalten sie fuer alle Squad-Members ueber das gesamte Match —
+# brauchen wir fuer den Bewegungs-Pfad im Session-Report-Detail.
+# Pro Match ~180 Events × 4 Squadies = ~720 zusaetzliche Rows,
+# verkraftbar bei einigen hundert Matches.
 def filter_squad_events(events, squad_account_ids):
-    match_start_ms = None
     for e in events:
         norm = _normalize(e)
         if not norm:
             continue
-        ts = norm.get("timestamp_ms")
-        if match_start_ms is None and ts:
-            match_start_ms = ts
         if norm["event_type"] == "Position":
-            # Position-Events: nur fuer Squad und nur in den ersten 3 min
+            # Position-Events: nur fuer Squad, dafuer das ganze Match
             if norm["actor_account"] not in squad_account_ids:
-                continue
-            if not ts or not match_start_ms:
-                continue
-            if ts - match_start_ms > POSITION_WINDOW_MS:
                 continue
             yield norm
             continue

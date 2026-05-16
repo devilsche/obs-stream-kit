@@ -1004,9 +1004,26 @@ def compute_match_detail(conn, my_account_id, match_id):
         weapon_id = death["weapon"] if death else None
         weapon_name = _weapon_label(weapon_id)[0] if weapon_id else None
         death_offset_sec = None
+        death_ts_ms = None
         if death and death["timestamp_ms"] and match_start_ms:
+            death_ts_ms = death["timestamp_ms"]
             death_offset_sec = max(
-                0, int((death["timestamp_ms"] - match_start_ms) / 1000))
+                0, int((death_ts_ms - match_start_ms) / 1000))
+
+        # Pfad-Punkte: alle Position+Landing-Events des Members bis
+        # zum Tod (oder Match-Ende falls ueberlebt). Wird im Frontend
+        # als Polyline gezeichnet zwischen Landing und Death.
+        path_cutoff = death_ts_ms if death_ts_ms else 10**15
+        path_rows = conn.execute("""
+            SELECT actor_x, actor_y, timestamp_ms
+            FROM telemetry_events
+            WHERE match_id = ? AND actor_account = ?
+              AND event_type IN ('Position','Landing','VehicleEnter','VehicleLeave')
+              AND actor_x IS NOT NULL AND actor_y IS NOT NULL
+              AND (timestamp_ms IS NULL OR timestamp_ms <= ?)
+            ORDER BY timestamp_ms ASC
+        """, (match_id, acc, path_cutoff)).fetchall()
+        path = [[r["actor_x"], r["actor_y"]] for r in path_rows]
         out_members.append({
             "accountId":   acc,
             "name":        mem["name"] or acc[:8],
@@ -1028,6 +1045,9 @@ def compute_match_detail(conn, my_account_id, match_id):
             "deathX":      death["victim_x"] if death else None,
             "deathY":      death["victim_y"] if death else None,
             "deathOffsetSec": death_offset_sec,
+            # Bewegungspfad — Liste von [x_cm, y_cm] vom Landing bis
+            # zum Death (oder Match-Ende). Frontend zeichnet Polyline.
+            "path":        path,
         })
 
     # Self zuerst, Rest beliebig

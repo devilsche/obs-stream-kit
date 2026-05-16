@@ -1688,16 +1688,19 @@
       return PLAYER_COLORS[Math.abs(h) % PLAYER_COLORS.length];
     }
 
-    async function renderMatchMap(host, focusAcc) {
+    // focusMode: "landing" | "death" | "both" (default).
+    async function renderMatchMap(host, focusAcc, focusMode) {
       const matchId = host.getAttribute("data-match-id");
       const mapName = host.getAttribute("data-map");
       if (!matchId || !mapName) return;
       const canvas = host.querySelector("canvas");
       if (!canvas) return;
-      // Re-render erlauben wenn focusAcc gesetzt ist (Hover-Swap), sonst
-      // nur einmal pro Match (rendered-Flag).
-      if (!focusAcc && host.dataset.rendered === "1") return;
-      if (!focusAcc) host.dataset.rendered = "1";
+      // State-Track via dataset.viewKey — re-render nur bei Wechsel.
+      // Vorher hat ein 'rendered=1'-Flag das Restore beim Mouse-Leave
+      // verhindert, weil derselbe Mode (=null) als 'schon gerendert' galt.
+      const viewKey = (focusAcc || "default") + ":" + (focusMode || "both");
+      if (host.dataset.viewKey === viewKey) return;
+      host.dataset.viewKey = viewKey;
 
       const blob = (window._poiData || {})[mapName] || {};
       const mapKm = blob.mapKm || 8;
@@ -1746,7 +1749,8 @@
         if (py > by1) by1 = py;
       }
       if (focusMember) {
-        // Death-View: nur Landing + Death dieses Members in der Box.
+        // Death-View: Landing + Death + alle Path-Punkte in der Box,
+        // damit der Zoom den ganzen Bewegungsweg einschliesst.
         if (focusMember.landingX != null) {
           const [px, py] = cmToCropPx(focusMember.landingX, focusMember.landingY);
           pts.push({ kind: "landing", acc: focusMember.accountId, px, py });
@@ -1756,6 +1760,12 @@
           const [px, py] = cmToCropPx(focusMember.deathX, focusMember.deathY);
           pts.push({ kind: "death", acc: focusMember.accountId, px, py });
           _addBox(px, py);
+        }
+        if (focusMember.path) {
+          focusMember.path.forEach(([xCm, yCm]) => {
+            const [px, py] = cmToCropPx(xCm, yCm);
+            _addBox(px, py);
+          });
         }
       } else {
         // Default: Squad-Landings
@@ -1796,11 +1806,25 @@
         ((py - srcY) / srcSize) * canvas.height,
       ];
 
-      // Pins zeichnen. Landing = kleiner Kreis, Death = groesserer
-      // Kreis mit Kreuz darin. Im Focus-Mode auch noch eine
-      // gestrichelte Linie zwischen Landing und Death.
-      if (focusMember && focusMember.landingX != null && focusMember.died) {
-        const [lp, lp2] = pts;  // erste: landing, zweite: death (siehe oben)
+      // Pfad zeichnen — echte Telemetrie-Bewegung Landing → Death.
+      // Falls path-Daten vorhanden, Polyline statt gerader Linie.
+      if (focusMember && focusMember.path && focusMember.path.length >= 2) {
+        ctx.strokeStyle = playerColor(focusMember.accountId, colorByAcc);
+        ctx.globalAlpha = 0.55;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        focusMember.path.forEach(([xCm, yCm], i) => {
+          const [px, py] = cmToCropPx(xCm, yCm);
+          const [cx, cy] = cropToCanvas(px, py);
+          if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+        });
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else if (focusMember && focusMember.landingX != null
+                  && focusMember.died) {
+        // Fallback: gerade gestrichelte Linie wenn kein Pfad da
+        // (z.B. historische Matches ohne erweiterte Position-Events).
+        const [lp, lp2] = pts;
         if (lp && lp2) {
           const [lx, ly] = cropToCanvas(lp.px, lp.py);
           const [dx, dy] = cropToCanvas(lp2.px, lp2.py);
