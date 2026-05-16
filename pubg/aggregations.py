@@ -973,12 +973,18 @@ def compute_match_detail(conn, my_account_id, match_id):
                 ORDER BY timestamp_ms ASC LIMIT 1
             """, (match_id, acc)).fetchone()
 
-        # Death: Kill-Event mit target=mem
+        # Death: Kill-Event mit target=mem. Killer-Name via COALESCE
+        # ueber players + participants — die volle Lobby (alle 100
+        # Spieler) liegt in participants pro Match, dort kennen wir
+        # auch die Namen der Gegner.
         death = conn.execute("""
             SELECT te.actor_account, te.weapon, te.distance,
-                   p.name AS killer_name
+                   COALESCE(p.name, pa.name) AS killer_name
             FROM telemetry_events te
             LEFT JOIN players p ON p.account_id = te.actor_account
+            LEFT JOIN participants pa
+              ON pa.match_id = te.match_id
+             AND pa.account_id = te.actor_account
             WHERE te.match_id = ? AND te.target_account = ?
               AND te.event_type = 'Kill'
             ORDER BY te.timestamp_ms ASC LIMIT 1
@@ -995,8 +1001,9 @@ def compute_match_detail(conn, my_account_id, match_id):
             "died":        bool(death),
             "killerName":  (death["killer_name"]
                             if death and death["killer_name"]
-                            else ("[Gegner]"
+                            else (death["actor_account"][8:16]
                                   if death and death["actor_account"]
+                                       and death["actor_account"].startswith("account.")
                                   else None)),
             "weaponId":    weapon_id,
             "weaponName":  weapon_name,
