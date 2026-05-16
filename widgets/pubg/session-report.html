@@ -1749,23 +1749,22 @@
         if (py > by1) by1 = py;
       }
       if (focusMember) {
-        // Death-View: Landing + Death + alle Path-Punkte in der Box,
-        // damit der Zoom den ganzen Bewegungsweg einschliesst.
-        if (focusMember.landingX != null) {
+        // Death-View: nur Landing + Death in die Zoom-Box. Path-Punkte
+        // werden NICHT in die Bbox aufgenommen — sonst zoomt es bei
+        // langen Bewegungswegen praktisch auf die ganze Map raus.
+        // focusMode steuert was im Fokus steht: 'landing' / 'death' /
+        // 'both' (default).
+        const fm = focusMode || "both";
+        if ((fm === "landing" || fm === "both") && focusMember.landingX != null) {
           const [px, py] = cmToCropPx(focusMember.landingX, focusMember.landingY);
           pts.push({ kind: "landing", acc: focusMember.accountId, px, py });
           _addBox(px, py);
         }
-        if (focusMember.died && focusMember.deathX != null) {
+        if ((fm === "death" || fm === "both")
+            && focusMember.died && focusMember.deathX != null) {
           const [px, py] = cmToCropPx(focusMember.deathX, focusMember.deathY);
           pts.push({ kind: "death", acc: focusMember.accountId, px, py });
           _addBox(px, py);
-        }
-        if (focusMember.path) {
-          focusMember.path.forEach(([xCm, yCm]) => {
-            const [px, py] = cmToCropPx(xCm, yCm);
-            _addBox(px, py);
-          });
         }
       } else {
         // Default: Squad-Landings
@@ -1938,47 +1937,52 @@
       }).toString() : "");
     PubgUI.poll(reportUrl, 60000, render, console.error);
 
-    // ─── Hover-Swap: Match-Map zeigt Death-Region des Members ───────
-    // Beim mouseover auf .mi-row[data-acc] wird die zugehoerige
-    // .match-map des Matches neu gezeichnet — zoomed in auf Landing +
-    // Death des hovered Members. Beim mouseleave: zurueck zur Squad-
-    // Landings-Ansicht.
+    // ─── Click-Focus: Match-Map zeigt Death-Region des Members ──────
+    // Klick auf .mi-row[data-acc] focused den Member in der Map. Klick
+    // auf selbe Zeile (oder andere Zeile) cycelt. Klick auf leeren
+    // Bereich oder die Map raestiert zur Squad-Landings-Ansicht.
     function _hoverFindMap(matchId) {
       return document.querySelector(
         `.match-map[data-match-id="${matchId}"]`);
     }
-    async function _hoverFocus(row) {
+    async function _focusMember(row, mode) {
       const matchId = row.getAttribute("data-match-id");
       const acc     = row.getAttribute("data-acc");
       const host    = matchId && _hoverFindMap(matchId);
       if (!host) return;
       host.classList.add("focused");
-      // rendered-Flag zwar gesetzt aber focusAcc-Variante umgeht es
-      await renderMatchMap(host, acc);
+      // alle anderen Rows in derselben info-Sektion deaktivieren
+      const wrap = row.closest(".match-info");
+      if (wrap) {
+        wrap.querySelectorAll(".mi-row.active").forEach(r => r.classList.remove("active"));
+      }
+      row.classList.add("active");
+      _hoverActive = row;
+      await renderMatchMap(host, acc, mode || "both");
     }
-    async function _hoverRestore(row) {
-      const matchId = row.getAttribute("data-match-id");
-      const host    = matchId && _hoverFindMap(matchId);
+    async function _focusClear(matchId) {
+      const host = matchId && _hoverFindMap(matchId);
       if (!host) return;
       host.classList.remove("focused");
+      const info = host.closest(".detail-row")
+                    && host.closest(".detail-row").querySelector(".match-info");
+      if (info) info.querySelectorAll(".mi-row.active").forEach(r => r.classList.remove("active"));
+      _hoverActive = null;
       await renderMatchMap(host, null);
     }
     let _hoverActive = null;
-    document.addEventListener("mouseover", (e) => {
+    document.addEventListener("click", (e) => {
+      // Klick auf eine Detail-Zeile → focus + Map-Swap
       const row = e.target.closest(".match-info .mi-row[data-acc]");
-      if (!row) return;
-      if (row === _hoverActive) return;
-      _hoverActive = row;
-      _hoverFocus(row);
-    });
-    document.addEventListener("mouseout", (e) => {
-      const row = e.target.closest(".match-info .mi-row[data-acc]");
-      const to  = e.relatedTarget;
-      const toRow = to && to.closest && to.closest(".match-info .mi-row[data-acc]");
-      if (row && toRow === row) return;
-      if (!toRow && _hoverActive) {
-        _hoverRestore(_hoverActive);
-        _hoverActive = null;
+      if (row) {
+        // Bei wiederholtem Klick auf bereits-aktive Row: zurueck zur
+        // Squad-Landings-Ansicht (Toggle-Verhalten).
+        if (row === _hoverActive) {
+          _focusClear(row.getAttribute("data-match-id"));
+        } else {
+          _focusMember(row);
+        }
+        e.stopPropagation();
       }
     });
 

@@ -1010,20 +1010,59 @@ def compute_match_detail(conn, my_account_id, match_id):
             death_offset_sec = max(
                 0, int((death_ts_ms - match_start_ms) / 1000))
 
-        # Pfad-Punkte: alle Position+Landing-Events des Members bis
-        # zum Tod (oder Match-Ende falls ueberlebt). Wird im Frontend
-        # als Polyline gezeichnet zwischen Landing und Death.
-        path_cutoff = death_ts_ms if death_ts_ms else 10**15
+        # Pfad-Start: 3s nachdem das Plane erstmals auf Cruise-Hoehe
+        # (~1500m = 150000cm in PUBG-Welt-Units) angekommen ist. Das
+        # ueberspringt das Plane-Spawn + Aufstiegs-Phase, behaelt aber
+        # die Cruise-Trajektorie (Plane-Fahrt ueber die Map) im Pfad
+        # samt Sprung-Punkt. Fallback wenn Telemetrie luecken hat:
+        # erstes VehicleLeave (= Plane-Exit), dann Match-Start.
+        cruise_row = conn.execute("""
+            SELECT MIN(timestamp_ms) AS ts FROM telemetry_events
+            WHERE match_id = ? AND actor_account = ?
+              AND event_type IN ('Position','VehicleEnter')
+              AND actor_z IS NOT NULL AND actor_z >= 150000
+        """, (match_id, acc)).fetchone()
+        if cruise_row and cruise_row["ts"]:
+            path_start_ms = cruise_row["ts"] + 3000
+        else:
+            jump_row = conn.execute("""
+                SELECT MIN(timestamp_ms) AS ts FROM telemetry_events
+                WHERE match_id = ? AND actor_account = ?
+                  AND event_type = 'VehicleLeave'
+            """, (match_id, acc)).fetchone()
+            path_start_ms = (jump_row["ts"] if jump_row and jump_row["ts"]
+                              else (match_start_ms or 0))
+        path_end_ms = death_ts_ms if death_ts_ms else 10**15
+
+        # Pfad-Punkte: alle Position+Landing-Events ab Plane-Exit bis
+        # zum Tod (oder Match-Ende falls ueberlebt). Polyline im
+        # Frontend.
         path_rows = conn.execute("""
             SELECT actor_x, actor_y, timestamp_ms
             FROM telemetry_events
             WHERE match_id = ? AND actor_account = ?
               AND event_type IN ('Position','Landing','VehicleEnter','VehicleLeave')
               AND actor_x IS NOT NULL AND actor_y IS NOT NULL
-              AND (timestamp_ms IS NULL OR timestamp_ms <= ?)
+              AND timestamp_ms IS NOT NULL
+              AND timestamp_ms >= ? AND timestamp_ms <= ?
             ORDER BY timestamp_ms ASC
-        """, (match_id, acc, path_cutoff)).fetchall()
+        """, (match_id, acc, path_start_ms, path_end_ms)).fetchall()
         path = [[r["actor_x"], r["actor_y"]] for r in path_rows]
+
+        # Revive-Marker — wo wurde der Member im Match revived?
+        # Frontend kann gruene Pins setzen.
+        revives = conn.execute("""
+            SELECT te.actor_x, te.actor_y, te.timestamp_ms
+            FROM telemetry_events te
+            WHERE te.match_id = ? AND te.target_account = ?
+              AND te.event_type = 'Revive'
+              AND te.timestamp_ms IS NOT NULL
+            ORDER BY te.timestamp_ms ASC
+        """, (match_id, acc)).fetchall()
+        # Revive-Event Coords sind actor (Revival-Spieler) — wir nehmen
+        # die als Naeherung (Revive passiert beim Member).
+        revive_pts = [[r["actor_x"], r["actor_y"]] for r in revives
+                       if r["actor_x"] is not None]
         out_members.append({
             "accountId":   acc,
             "name":        mem["name"] or acc[:8],
@@ -1045,9 +1084,11 @@ def compute_match_detail(conn, my_account_id, match_id):
             "deathX":      death["victim_x"] if death else None,
             "deathY":      death["victim_y"] if death else None,
             "deathOffsetSec": death_offset_sec,
-            # Bewegungspfad — Liste von [x_cm, y_cm] vom Landing bis
+            # Bewegungspfad — Liste von [x_cm, y_cm] vom Plane-Exit bis
             # zum Death (oder Match-Ende). Frontend zeichnet Polyline.
             "path":        path,
+            # Revive-Punkte fuer Wiederbelebungs-Marker
+            "revivePts":   revive_pts,
         })
 
     # Self zuerst, Rest beliebig
