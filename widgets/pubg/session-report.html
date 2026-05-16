@@ -880,6 +880,35 @@
       return [ex, ey];
     }
 
+    // Zeichnet die statische Karte (Map-Tile + Crop) auf das basemap-Canvas.
+    // Wird einmal pro Match-Open aufgerufen. cmToCanvas + cropBox werden
+    // im host.dataset gespeichert damit der overlay-Renderer dieselben
+    // Coords nutzt.
+    async function mdRenderBasemap(host, mapName) {
+      const canvas = host.querySelector("canvas.md-basemap");
+      if (!canvas) return;
+      const blob = (window._poiData || {})[mapName] || {};
+      const mapKm = blob.mapKm || 8;
+      const cal   = blob.pinCalibration || {};
+      const img = await mdMapImage(mapName);
+
+      canvas.width = 480; canvas.height = 480;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#0d061a";
+      ctx.fillRect(0, 0, 480, 480);
+      if (!img || !img.naturalWidth) return;
+
+      // Center-Crop (analog poi-editor).
+      const side = Math.min(img.naturalWidth, img.naturalHeight);
+      const cropOffX = (img.naturalWidth  - side) / 2;
+      const cropOffY = (img.naturalHeight - side) / 2;
+      ctx.drawImage(img, cropOffX, cropOffY, side, side, 0, 0, 480, 480);
+
+      // Cm -> Canvas-Pixel Mapping fuer den overlay-Renderer in dataset.
+      host.dataset.mapKm = mapKm;
+      host.dataset.cal   = JSON.stringify(cal);
+    }
+
     // Date-Range-Picker initialisieren mit aktuellen URL-Werten
     function isoLocal(date) {
       // Local-Date → "YYYY-MM-DD"
