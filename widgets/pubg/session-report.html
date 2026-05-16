@@ -995,6 +995,55 @@
       }
     }
 
+    // Stacked Cards rechts/unter der Map — eine pro Squad-Member.
+    function mdRenderCards(host, state) {
+      const wrap = host.querySelector(".md-cards");
+      if (!wrap) return;
+      const { members, focusAcc, colorByAcc } = state;
+      function fmtMinSec(sec) {
+        if (sec == null) return "?";
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return `${m}:${String(s).padStart(2, "0")}`;
+      }
+      function poi(x, y, mapName) {
+        if (x == null || y == null) return null;
+        if (PubgUI.POI && PubgUI.POI.fromCoords) {
+          return PubgUI.POI.fromCoords(mapName, x, y);
+        }
+        return null;
+      }
+      const mapName = host.getAttribute("data-map");
+      const html = members.map((m) => {
+        const color = colorByAcc[m.accountId] || "#999";
+        const active = (m.accountId === focusAcc) ? " active" : "";
+        const selfCls = m.isSelf ? " md-self" : "";
+        const who = m.isSelf ? "Du" : m.name;
+        const landP  = poi(m.landingX, m.landingY, mapName);
+        const deathP = poi(m.deathX, m.deathY, mapName);
+        const badge = m.died
+          ? `<span class="md-badge died">† ${fmtMinSec(m.deathOffsetSec)}</span>`
+          : `<span class="md-badge alive">ueberlebt</span>`;
+        let body = `<div class="md-row">landete <b>${landP || "?"}</b>`;
+        if (m.died && deathP) body += ` &mdash; gestorben in <b>${deathP}</b>`;
+        body += `</div>`;
+        if (m.died && m.weaponName) {
+          const dist = m.distanceM ? ` auf <b>${m.distanceM.toFixed(0)}m</b>` : "";
+          const killer = m.killerName || "Gegner";
+          body += `<div class="md-deathby">durch <b>${killer}</b> mit <b>${m.weaponName}</b>${dist}</div>`;
+        }
+        return `<div class="md-card${active}${selfCls}" data-acc="${m.accountId}">
+          <div class="md-head">
+            <span class="md-dot" style="background:${color}"></span>
+            <span class="md-name">${who}</span>
+            ${badge}
+          </div>
+          ${body}
+        </div>`;
+      }).join("");
+      wrap.innerHTML = html;
+    }
+
     // Date-Range-Picker initialisieren mit aktuellen URL-Werten
     function isoLocal(date) {
       // Local-Date → "YYYY-MM-DD"
