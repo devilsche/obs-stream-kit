@@ -121,10 +121,15 @@
       100% { background-position: 250% 50%; }
     }
 
-    /* Subtitle */
+    /* Subtitle — volle Breite + text-align: center, sonst rutscht
+       bei langen Strings wie 'CAREER CHICKEN DINNER #800' das #800
+       auf eine zweite Zeile (mit left:50% ist nur die rechte
+       Container-Haelfte als Layout-Breite verfuegbar). */
     .sub {
-      position: absolute; left: 50%; top: 760px;
-      transform: translate(-50%, 20px);
+      position: absolute; left: 0; right: 0; top: 760px;
+      transform: translateY(20px);
+      text-align: center;
+      white-space: nowrap;
       font-size: 60px;
       font-weight: 700;
       letter-spacing: 0.2em;
@@ -135,6 +140,9 @@
       animation: subIn 0.5s ease-out 2.4s forwards;
     }
     @keyframes subIn {
+      to { transform: translateY(0); opacity: 1 }
+    }
+    @keyframes statsIn {
       to { transform: translate(-50%, 0); opacity: 1 }
     }
 
@@ -146,7 +154,7 @@
       grid-template-columns: repeat(4, auto);
       gap: 12px 60px;
       opacity: 0;
-      animation: subIn 0.6s ease-out 3.0s forwards;
+      animation: statsIn 0.6s ease-out 3.0s forwards;
     }
     .stats .cell {
       text-align: center;
