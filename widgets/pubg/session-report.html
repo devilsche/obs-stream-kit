@@ -993,6 +993,41 @@
           ctx.stroke();
         }
       }
+
+      // 4) Squad-Kills (Schuetze + Opfer + Verbindung) wenn Toggle aktiv.
+      if (state.showKills) {
+        for (const m of members) {
+          if (!m.kills || !m.kills.length) continue;
+          const color = colorByAcc[m.accountId] || "#999";
+          for (const k of m.kills) {
+            if (k.actorX == null || k.victimX == null) continue;
+            const [ax, ay] = cmToCanvas(k.actorX, k.actorY);
+            const [vx, vy] = cmToCanvas(k.victimX, k.victimY);
+            // Verbindungslinie
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = 0.4;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(ax, ay); ctx.lineTo(vx, vy);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            // Schuetze-Punkt
+            ctx.beginPath();
+            ctx.arc(ax, ay, 4, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            // Opfer-Punkt (hellgrau, etwas kleiner als Squad-Pins damit
+            // unverwechselbar mit Landings).
+            ctx.beginPath();
+            ctx.arc(vx, vy, 4, 0, Math.PI * 2);
+            ctx.fillStyle = "#bbb";
+            ctx.fill();
+            ctx.strokeStyle = "rgba(0,0,0,0.5)";
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+          }
+        }
+      }
     }
 
     // Stacked Cards rechts/unter der Map — eine pro Squad-Member.
@@ -1965,6 +2000,19 @@
       s.hoveredAcc = null;
       mdRenderState(host);
     }, true);
+
+    // Kills-Toggle-Button (.md-toggle[data-toggle=kills]) togglen.
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest && e.target.closest(".md-toggle[data-toggle=kills]");
+      if (!btn) return;
+      const host = btn.closest(".md-host");
+      if (!host) return;
+      const s = mdGetState(host);
+      s.showKills = !s.showKills;
+      btn.classList.toggle("active", s.showKills);
+      mdRenderState(host);
+      e.stopPropagation();
+    });
 
     // Click auf Card: lockedAcc togglen. Click in Map-Leerflaeche, ESC: unlock.
     document.addEventListener("click", (e) => {
