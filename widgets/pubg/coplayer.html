@@ -69,6 +69,7 @@
         <div class="cell"><span class="pubg-stat-value" id="swin">—</span><span class="pubg-stat-label">Win-Rate</span></div>
         <div class="cell"><span class="pubg-stat-value" id="swins">—</span><span class="pubg-stat-label">Wins</span></div>
       </div>
+      <div class="vehicle-evict" id="evictRow" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--pubg-border);font-size:0.92em;color:var(--pubg-muted);line-height:1.7"></div>
     </div>
 
     <div class="pubg-card section" id="careerSection">
@@ -119,6 +120,20 @@
           document.getElementById("splace").textContent = sh.avgPlace ? "#" + sh.avgPlace.toFixed(1) : "—";
           document.getElementById("swin").textContent = PubgUI.fmtPct(sh.winRate);
           document.getElementById("swins").textContent = PubgUI.fmtNum(sh.wins);
+
+          // Vehicle-Eviction Zeilen — nur zeigen wenn relevant.
+          const ed = sh.vehicleEvictionsDealt || 0;
+          const et = sh.vehicleEvictionsTaken || 0;
+          if (ed > 0 || et > 0) {
+            const lines = [];
+            if (ed > 0) lines.push(
+              `🚗 hat <b style="color:var(--pubg-gold)">${ed}</b> ${ed === 1 ? "Person" : "Personen"} aus dem Auto rausgeschossen`);
+            if (et > 0) lines.push(
+              `💀 wurde <b style="color:var(--pubg-gold)">${et}</b> mal aus dem Auto rausgeschossen`);
+            const er = document.getElementById("evictRow");
+            er.innerHTML = lines.join("<br>");
+            er.style.display = "block";
+          }
 
           const cl = d.careerLifetime;
           if (cl) {

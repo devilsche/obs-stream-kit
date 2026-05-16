@@ -288,6 +288,138 @@ def compute_top_mates(conn, my_account_id: str,
     return out
 
 
+def _compute_player_vehicle_evictions(conn, account_id, match_ids):
+    """Wie oft hat dieser Spieler andere 'rausgeschossen' und wie oft
+    wurde er selbst rausgeschossen — ueber die gegebenen Matches.
+
+    'Rausgeschossen' = Gegner im Vehicle eliminiert. Konkret:
+       Kill-Event mit target=Gegner UND Gegner im Vehicle zum
+       Zeitpunkt des Kills. Plus Knock-Event mit target=Gegner im
+       Vehicle, danach Tod ohne Revive (geknockt → rausgeflogen → tot).
+
+    Returns (dealt, taken).
+    """
+    if not match_ids:
+        return (0, 0)
+    ph = ",".join("?" * len(match_ids))
+    rows = conn.execute(f"""
+        SELECT match_id, event_type, timestamp_ms,
+               actor_account, target_account
+        FROM telemetry_events
+        WHERE match_id IN ({ph})
+          AND event_type IN ('VehicleEnter','VehicleLeave',
+                              'Knock','Kill','Revive')
+        ORDER BY match_id, timestamp_ms ASC
+    """, list(match_ids)).fetchall()
+    if not rows:
+        return (0, 0)
+
+    INF = 10**15
+    # Pro Match die Events sammeln + Vehicle-Intervalle pro betroffenem
+    # Account aufbauen — wir wissen nicht im Voraus welche Accounts es
+    # sind, deshalb on-demand.
+    by_match = {}
+    for r in rows:
+        by_match.setdefault(r["match_id"], []).append({
+            "type": r["event_type"], "ts": r["timestamp_ms"],
+            "actor": r["actor_account"], "target": r["target_account"],
+        })
+
+    dealt = taken = 0
+    for mid, events in by_match.items():
+        # Vehicle-Intervalle: nur fuer Accounts die wir brauchen — als
+        # actor (fuer self-im-vehicle als victim) und als target von
+        # diesem player (fuer Gegner-im-vehicle als victim).
+        intervals_self = []
+        intervals_targets = {}  # other_account_id -> list
+        cur = None
+        for e in events:
+            if e["actor"] == account_id:
+                if e["type"] == "VehicleEnter":
+                    cur = e["ts"]
+                elif e["type"] == "VehicleLeave" and cur is not None:
+                    intervals_self.append((cur, e["ts"]))
+                    cur = None
+        if cur is not None:
+            intervals_self.append((cur, INF))
+        # Targets (Gegner): iteriere ueber alle distinct accounts die
+        # mal ein VehicleEnter haben — nur die brauchen wir fuer dealt.
+        for e in events:
+            if e["type"] != "VehicleEnter" or not e["actor"]:
+                continue
+            if e["actor"] == account_id or e["actor"] in intervals_targets:
+                continue
+            cur2 = None
+            ivals = []
+            for ev in events:
+                if ev["actor"] != e["actor"]:
+                    continue
+                if ev["type"] == "VehicleEnter":
+                    cur2 = ev["ts"]
+                elif ev["type"] == "VehicleLeave" and cur2 is not None:
+                    ivals.append((cur2, ev["ts"]))
+                    cur2 = None
+            if cur2 is not None:
+                ivals.append((cur2, INF))
+            intervals_targets[e["actor"]] = ivals
+
+        def _in(ts, ivals):
+            return any(a <= ts <= b for a, b in ivals) if ts is not None else False
+
+        for e in events:
+            t  = e["type"]; ts = e["ts"]
+            a  = e["actor"]; v = e["target"]
+            if t == "Kill" and a == account_id and v:
+                if _in(ts, intervals_targets.get(v, [])):
+                    dealt += 1
+            elif t == "Kill" and v == account_id:
+                if _in(ts, intervals_self):
+                    taken += 1
+            elif t == "Knock":
+                # Knock-then-died-Pfad: zaehlt wenn das Knock im Vehicle
+                # passierte UND spaeter ein Kill ohne Revive folgt.
+                if a == account_id and v and _in(ts, intervals_targets.get(v, [])):
+                    revived = died = False
+                    for later in events:
+                        if later["ts"] is None or later["ts"] <= ts:
+                            continue
+                        if later["type"] == "Revive" and later["target"] == v:
+                            revived = True; break
+                        if later["type"] == "Kill" and later["target"] == v:
+                            died = True; break
+                    if died and not revived:
+                        # War schon ein Kill-Event mit Vehicle-Match —
+                        # zaehlen wir nicht doppelt. Pruefen ob das Kill
+                        # ebenfalls im Vehicle war.
+                        kill_in_veh = False
+                        for later in events:
+                            if (later["type"] == "Kill" and later["target"] == v
+                                    and later["ts"] and later["ts"] > ts):
+                                kill_in_veh = _in(later["ts"], intervals_targets.get(v, []))
+                                break
+                        if not kill_in_veh:
+                            dealt += 1
+                elif v == account_id and _in(ts, intervals_self):
+                    revived = died = False
+                    for later in events:
+                        if later["ts"] is None or later["ts"] <= ts:
+                            continue
+                        if later["type"] == "Revive" and later["target"] == account_id:
+                            revived = True; break
+                        if later["type"] == "Kill" and later["target"] == account_id:
+                            died = True; break
+                    if died and not revived:
+                        kill_in_veh = False
+                        for later in events:
+                            if (later["type"] == "Kill" and later["target"] == account_id
+                                    and later["ts"] and later["ts"] > ts):
+                                kill_in_veh = _in(later["ts"], intervals_self)
+                                break
+                        if not kill_in_veh:
+                            taken += 1
+    return (dealt, taken)
+
+
 def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
     p = conn.execute("""
         SELECT * FROM players WHERE name = ? OR account_id = ? LIMIT 1
@@ -325,6 +457,19 @@ def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
         ORDER BY m.played_at DESC
     """, (my_account_id, p["account_id"])).fetchall()
 
+    # Vehicle-Eviction-Counter ueber die geteilten Matches:
+    #   dealt — Kills die DIESER Spieler an Gegnern im Vehicle verursacht hat
+    #   taken — Kills/Knock-Death die DIESER Spieler im Vehicle erlitten hat
+    # Nur valide wenn Telemetrie da ist (Squad-Member werden gefiltert).
+    shared_match_ids = [r["match_id"] for r in shared] if shared else []
+    evict_dealt = evict_taken = 0
+    if shared_match_ids:
+        try:
+            evict_dealt, evict_taken = _compute_player_vehicle_evictions(
+                conn, p["account_id"], shared_match_ids)
+        except Exception:
+            evict_dealt = evict_taken = 0
+
     if not shared:
         history = {"matches": 0}
     else:
@@ -359,6 +504,8 @@ def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
                 "myKills": r["my_kills"],
                 "myDamage": r["my_damage"],
             } for r in shared[:5]],
+            "vehicleEvictionsDealt": evict_dealt,  # andere im Auto rausgeschossen
+            "vehicleEvictionsTaken": evict_taken,  # selbst im Auto rausgeflogen
         }
 
     lifetime = conn.execute(
@@ -644,11 +791,12 @@ def compute_vehicle_stats(conn, my_account_id, range_key="session",
                 "name": name_by_acc.get(acc) or acc[:8],
                 "isSelf": acc == my_account_id,
                 "matches": 0,
-                "knocksFromVehicle": 0,
-                "killsFromVehicle": 0,
-                "knockedInVehicle":  0,
-                "killedInVehicle":   0,
-                "knockedInVehicleThenDied": 0,
+                # 'rausgeschossen': member hat einen Gegner eliminiert
+                # der zum Zeitpunkt des Kills/Knocks im Auto sass.
+                "evictionsDealt": 0,
+                # 'wurde rausgeschossen': member wurde eliminiert
+                # waehrend er selbst im Auto sass.
+                "evictionsTaken": 0,
             }
         return stats[acc]
 
@@ -658,70 +806,100 @@ def compute_vehicle_stats(conn, my_account_id, range_key="session",
                 return True
         return False
 
+    def _build_intervals(events, acc):
+        cur = None
+        ivals = []
+        for e in events:
+            if e["actor"] != acc:
+                continue
+            if e["type"] == "VehicleEnter":
+                cur = e["ts"]
+            elif e["type"] == "VehicleLeave" and cur is not None:
+                ivals.append((cur, e["ts"]))
+                cur = None
+        if cur is not None:
+            ivals.append((cur, INF))
+        return ivals
+
     for mid, squad in squad_per_match.items():
         events = events_per_match.get(mid, [])
-        # Pro Member: VehicleEnter/Leave-Intervalle bauen
+        # Vehicle-Intervalle pro Squad-Member (fuer 'taken')
         intervals_by = {}
         for acc in squad:
-            cur_enter = None
-            ivals = []
-            for e in events:
-                if e["actor"] != acc:
-                    continue
-                if e["type"] == "VehicleEnter":
-                    cur_enter = e["ts"]
-                elif e["type"] == "VehicleLeave" and cur_enter is not None:
-                    ivals.append((cur_enter, e["ts"]))
-                    cur_enter = None
-            if cur_enter is not None:
-                ivals.append((cur_enter, INF))
-            intervals_by[acc] = ivals
+            intervals_by[acc] = _build_intervals(events, acc)
             _ensure(acc)["matches"] += 1
-
-        # Counter durchrechnen
+        # Vehicle-Intervalle pro Gegner — nur fuer Accounts mit Enter
+        # im Match, on-demand. (Caching ueber das Match-Loop hinweg
+        # waere overkill — Squad-Matches haben ~20 Vehicle-Accounts max.)
+        opp_intervals = {}
         for e in events:
-            t  = e["type"]
-            ts = e["ts"]
-            if ts is None:
-                continue
-            actor  = e["actor"]
-            target = e["target"]
-            # Knock / Kill as actor (from vehicle)
-            if t == "Knock" and actor in squad:
-                if _in_intervals(ts, intervals_by[actor]):
-                    _ensure(actor)["knocksFromVehicle"] += 1
-            elif t == "Kill" and actor in squad:
-                if _in_intervals(ts, intervals_by[actor]):
-                    _ensure(actor)["killsFromVehicle"] += 1
-            # Knock / Kill as target (in vehicle)
-            if t == "Knock" and target in squad:
-                if _in_intervals(ts, intervals_by[target]):
-                    _ensure(target)["knockedInVehicle"] += 1
-                    # knocked-in-vehicle-then-died: check ob danach Kill
-                    # mit target=member ohne Revive dazwischen
-                    revived = False
-                    died    = False
-                    for later in events:
-                        if later["ts"] is None or later["ts"] <= ts:
-                            continue
-                        if later["type"] == "Revive" and later["target"] == target:
-                            revived = True
-                            break
-                        if later["type"] == "Kill" and later["target"] == target:
-                            died = True
-                            break
-                    if died and not revived:
-                        _ensure(target)["knockedInVehicleThenDied"] += 1
-            elif t == "Kill" and target in squad:
-                if _in_intervals(ts, intervals_by[target]):
-                    _ensure(target)["killedInVehicle"] += 1
+            if e["type"] == "VehicleEnter" and e["actor"] and e["actor"] not in squad:
+                opp_intervals.setdefault(e["actor"], None)
+        for acc in list(opp_intervals.keys()):
+            opp_intervals[acc] = _build_intervals(events, acc)
 
-    # Self zuerst, dann nach total absteigend
-    def _total(s):
-        return (s["knocksFromVehicle"] + s["killsFromVehicle"]
-                + s["knockedInVehicle"] + s["killedInVehicle"])
-    out = list(stats.values())
-    out.sort(key=lambda s: (0 if s["isSelf"] else 1, -_total(s)))
+        # Helper: was zwischen ts und einem zukuenftigen Kill-Event,
+        # gabs ein Revive fuer das Target?
+        def _knock_leads_to_death(after_ts, target):
+            for later in events:
+                if later["ts"] is None or later["ts"] <= after_ts:
+                    continue
+                if later["type"] == "Revive" and later["target"] == target:
+                    return False
+                if later["type"] == "Kill" and later["target"] == target:
+                    return True
+            return False
+
+        for e in events:
+            t  = e["type"]; ts = e["ts"]
+            if ts is None: continue
+            actor = e["actor"]; target = e["target"]
+            # === DEALT: actor=squad-member, target im vehicle ===
+            if actor in squad and target:
+                target_ivals = (intervals_by.get(target)
+                                if target in squad
+                                else opp_intervals.get(target, []))
+                if t == "Kill" and _in_intervals(ts, target_ivals):
+                    _ensure(actor)["evictionsDealt"] += 1
+                elif t == "Knock" and _in_intervals(ts, target_ivals):
+                    # Knock im Auto + danach Tod ohne Revive — aber
+                    # nur zaehlen wenn das spaetere Kill NICHT auch
+                    # schon im Vehicle war (sonst doppelt mit Kill-Pfad).
+                    if _knock_leads_to_death(ts, target):
+                        kill_in_veh = False
+                        for later in events:
+                            if (later["type"] == "Kill" and later["target"] == target
+                                    and later["ts"] and later["ts"] > ts):
+                                kill_in_veh = _in_intervals(
+                                    later["ts"], target_ivals)
+                                break
+                        if not kill_in_veh:
+                            _ensure(actor)["evictionsDealt"] += 1
+
+            # === TAKEN: target=squad-member, member im vehicle ===
+            if target in squad:
+                m_ivals = intervals_by[target]
+                if t == "Kill" and _in_intervals(ts, m_ivals):
+                    _ensure(target)["evictionsTaken"] += 1
+                elif t == "Knock" and _in_intervals(ts, m_ivals):
+                    if _knock_leads_to_death(ts, target):
+                        kill_in_veh = False
+                        for later in events:
+                            if (later["type"] == "Kill" and later["target"] == target
+                                    and later["ts"] and later["ts"] > ts):
+                                kill_in_veh = _in_intervals(
+                                    later["ts"], m_ivals)
+                                break
+                        if not kill_in_veh:
+                            _ensure(target)["evictionsTaken"] += 1
+
+    # Nur Mitglieder mit irgendeinem Eintrag liefern — saubere Liste
+    out = [s for s in stats.values()
+           if s["evictionsDealt"] > 0 or s["evictionsTaken"] > 0]
+    out.sort(key=lambda s: (
+        0 if s["isSelf"] else 1,
+        -(s["evictionsDealt"] + s["evictionsTaken"]),
+    ))
     return out
 
 

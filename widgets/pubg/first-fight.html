@@ -296,8 +296,12 @@
     sparkEl.addEventListener("mouseleave", hidePov);
 
     const ehParam = EXCLUDE_HOT ? "&excludeHotDrop=1" : "";
+    if (RANGE === "session") PubgUI.hideIfStale();
     PubgUI.poll(`/api/pubg/first-fight-rate?range=${RANGE}${ehParam}`,
-                POLL_MS, render, console.error);
+                POLL_MS, (d) => {
+                  if (RANGE === "session") PubgUI.hideIfStale();
+                  render(d);
+                }, console.error);
   </script>
 </body>
 </html>
