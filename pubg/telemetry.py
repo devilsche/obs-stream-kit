@@ -167,7 +167,14 @@ def _normalize(event):
 # Events die wir immer behalten (auch ohne Squad-Beteiligung) — wichtig für
 # Fight-Cluster-Detection: enemy-vs-enemy Kills/Knocks zeigen welche anderen
 # Teams im selben Fight involviert sind.
-ALWAYS_KEEP_EVENTS = {"Kill", "Knock", "Landing"}
+ALWAYS_KEEP_EVENTS = {
+    "Kill", "Knock", "Landing",
+    # Vehicle-Enter/Leave fuer ALLE Spieler — sonst koennen wir nicht
+    # detecten, ob ein Gegner zum Kill-Zeitpunkt im Auto sass. Pro
+    # Match relativ wenig Events (~50-300 in 100-Spieler-Lobby), also
+    # verkraftbar.
+    "VehicleEnter", "VehicleLeave",
+}
 
 # Position-Events fluten die DB (firet alle ~10s pro Spieler). Wir
 # behalten sie NUR fuer Squad-Members in den ersten 3 Minuten — reicht
