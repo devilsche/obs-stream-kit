@@ -17,6 +17,9 @@
 <head>
   <meta charset="utf-8">
   <title>Career Wins Milestone</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <link rel="stylesheet" href="_pubg.css">
   <style>
     /* Lokale Schrift — verhindert Layout-Sprung wenn Google-Fonts
@@ -242,14 +245,39 @@
                 : `Career Chicken Dinner #${N}`;
       document.getElementById("sub").textContent = sub.toUpperCase();
     }
+    // Robustes Audio-Play: wartet auf canplay (sonst kann play() vor
+    // Buffer-Ready fehlschlagen), retried auf Click/Keydown wenn
+    // Chromium autoplay blockt. Mimick'd das Pattern von stinger-ready.js.
+    function playFanfare() {
+      const a = document.getElementById("fanfare");
+      const start = () => {
+        const p = a.play();
+        if (p && p.catch) p.catch((err) => {
+          console.warn("[milestone] autoplay blocked — retry on next input", err);
+          const retry = () => {
+            document.removeEventListener("click", retry);
+            document.removeEventListener("keydown", retry);
+            try { a.play().catch(() => {}); } catch (e) {}
+          };
+          document.addEventListener("click", retry, { once: true });
+          document.addEventListener("keydown", retry, { once: true });
+        });
+      };
+      // canplay-Schwelle: readyState >= 3 (HAVE_FUTURE_DATA).
+      if (a.readyState >= 3) {
+        start();
+      } else {
+        const onReady = () => { a.removeEventListener("canplay", onReady); start(); };
+        a.addEventListener("canplay", onReady);
+        // Safety wenn canplay nie feuert
+        setTimeout(start, 1500);
+      }
+    }
+
     function startStage() {
       document.documentElement.classList.remove("preload");
-      // Fanfare hier triggern, damit Sound mit Animation synct.
-      if (!MUTE) {
-        setTimeout(() => {
-          document.getElementById("fanfare").play().catch(() => {});
-        }, 400);
-      }
+      // Fanfare 400ms verzoegert — synct mit Crown-Pop.
+      if (!MUTE) setTimeout(playFanfare, 400);
     }
 
     // Konfetti generieren — Gold, Purple, Weiss in zufaelligen Bahnen.
