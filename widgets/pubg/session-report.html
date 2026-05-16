@@ -1597,11 +1597,23 @@
 
     // Konsistente Spielerfarbe per accountId-Hash — gleiche Berechnung
     // in Map-Pin und Match-Info Dot, damit man die Zuordnung sieht.
+    // Festes Palette aus eindeutig unterscheidbaren Farben (Gelb / Rot
+    // / Blau / Gruen + ein paar Reserven). Vorher HSL-Hash hat aehnliche
+    // Tones wie Rot+DarkOrange produziert die kaum unterscheidbar waren.
+    const PLAYER_COLORS = [
+      "#f2b705",  // Gelb (Gold)
+      "#e74c3c",  // Rot
+      "#3498db",  // Blau
+      "#2ecc71",  // Gruen
+      "#9b59b6",  // Violett
+      "#ff7a1f",  // Orange
+      "#1abc9c",  // Tuerkis
+      "#ec407a",  // Pink
+    ];
     function playerColor(acc) {
       let h = 0;
       for (let i = 0; i < (acc || "").length; i++) h = (h * 31 + acc.charCodeAt(i)) | 0;
-      const hue = Math.abs(h) % 360;
-      return `hsl(${hue}, 80%, 60%)`;
+      return PLAYER_COLORS[Math.abs(h) % PLAYER_COLORS.length];
     }
 
     async function renderMatchMap(host) {
@@ -1720,10 +1732,17 @@
         }
         return null;
       };
+      function fmtMinSec(sec) {
+        if (sec == null) return "";
+        const mm = Math.floor(sec / 60);
+        const ss = sec % 60;
+        return `${mm}:${String(ss).padStart(2, "0")}`;
+      }
       const lines = d.members.map((m) => {
         const cls = m.isSelf ? "self" : "";
         const who = m.isSelf ? "Du" : m.name;
         const landP = poi(m.landingX, m.landingY);
+        const deathP = poi(m.deathX, m.deathY);
         const color = playerColor(m.accountId);
         const dot = `<span class="dot" style="background:${color}"></span>`;
         const parts = [];
@@ -1731,14 +1750,15 @@
         parts.push(landP
           ? `landete <b>${landP}</b>`
           : `<i>kein Landing</i>`);
-        if (m.died && m.weaponName) {
-          const distStr = m.distanceM
-            ? ` (${m.distanceM.toFixed(0)} m)` : "";
+        if (m.died) {
           const killer = m.killerName || "Gegner";
+          const distStr = m.distanceM ? ` auf <b>${m.distanceM.toFixed(0)}m</b>` : "";
+          const weaponStr = m.weaponName ? ` mit <b>${m.weaponName}</b>` : "";
+          const whereStr  = deathP ? ` in <b>${deathP}</b>` : "";
+          const whenStr   = m.deathOffsetSec != null
+            ? ` (${fmtMinSec(m.deathOffsetSec)})` : "";
           parts.push(
-            `<span class="died">– † <span class="killer">${killer}</span> · ${m.weaponName}${distStr}</span>`);
-        } else if (m.died) {
-          parts.push(`<span class="died">– †</span>`);
+            `<span class="died">– †${whereStr}${whenStr} durch <span class="killer">${killer}</span>${weaponStr}${distStr}</span>`);
         }
         return `<div class="mi-row">${parts.join(" ")}</div>`;
       });

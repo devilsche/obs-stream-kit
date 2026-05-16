@@ -929,11 +929,21 @@ def compute_match_detail(conn, my_account_id, match_id):
     Member) reichen. Weapon-ID wird ueber _weapon_label gemappt.
     """
     m_row = conn.execute(
-        "SELECT match_id, map_name FROM matches WHERE match_id = ?",
+        "SELECT match_id, map_name, played_at FROM matches WHERE match_id = ?",
         (match_id,)).fetchone()
     if not m_row:
         return None
     map_name = m_row["map_name"]
+    # match_start als ms-timestamp fuer Death-Zeitpunkt-Berechnung
+    match_start_ms = None
+    if m_row["played_at"]:
+        try:
+            import datetime as _dt
+            start_dt = _dt.datetime.fromisoformat(
+                m_row["played_at"].replace("Z", "+00:00"))
+            match_start_ms = int(start_dt.timestamp() * 1000)
+        except Exception:
+            pass
     # Squad-Mitglieder aus match_team_mapping
     team_row = conn.execute(
         "SELECT team_id FROM match_team_mapping "
@@ -979,6 +989,7 @@ def compute_match_detail(conn, my_account_id, match_id):
         # auch die Namen der Gegner.
         death = conn.execute("""
             SELECT te.actor_account, te.weapon, te.distance,
+                   te.victim_x, te.victim_y, te.timestamp_ms,
                    COALESCE(p.name, pa.name) AS killer_name
             FROM telemetry_events te
             LEFT JOIN players p ON p.account_id = te.actor_account
@@ -992,6 +1003,10 @@ def compute_match_detail(conn, my_account_id, match_id):
 
         weapon_id = death["weapon"] if death else None
         weapon_name = _weapon_label(weapon_id)[0] if weapon_id else None
+        death_offset_sec = None
+        if death and death["timestamp_ms"] and match_start_ms:
+            death_offset_sec = max(
+                0, int((death["timestamp_ms"] - match_start_ms) / 1000))
         out_members.append({
             "accountId":   acc,
             "name":        mem["name"] or acc[:8],
@@ -1009,6 +1024,10 @@ def compute_match_detail(conn, my_account_id, match_id):
             "weaponName":  weapon_name,
             "distanceM":   (round((death["distance"] or 0) / 100.0, 1)
                             if death else None),
+            # Wo / wann gestorben — fuer 'starb in Pochinki nach 18:32'
+            "deathX":      death["victim_x"] if death else None,
+            "deathY":      death["victim_y"] if death else None,
+            "deathOffsetSec": death_offset_sec,
         })
 
     # Self zuerst, Rest beliebig
