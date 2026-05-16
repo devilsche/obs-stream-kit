@@ -195,6 +195,42 @@
       border: 1px solid rgba(255,255,255,0.4);
     }
     .match-info .mi-empty { font-style: italic; opacity: 0.6; }
+    .match-info .mi-row[data-acc] { cursor: help; }
+    .match-info .mi-row[data-acc]:hover { background: rgba(255,255,255,0.04); }
+
+    /* Hover-Popover mit Map (Landing + Death Pin) */
+    .death-pov {
+      position: fixed; display: none;
+      width: 320px;
+      background: #0d061a;
+      border: 1px solid var(--pubg-gold);
+      border-radius: 5px;
+      padding: 8px;
+      z-index: 9999;
+      pointer-events: none;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+    }
+    .death-pov.show { display: block; }
+    .death-pov canvas {
+      width: 304px; height: 304px;
+      display: block;
+      background: #0d061a;
+      border-radius: 3px;
+    }
+    .death-pov .pov-title {
+      font-size: 0.78em;
+      color: var(--pubg-gold);
+      margin: 0 0 4px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .death-pov .pov-foot {
+      margin-top: 4px;
+      font-size: 0.72em;
+      color: var(--pubg-muted);
+      line-height: 1.4;
+    }
+    .death-pov .pov-foot b { color: var(--pubg-text); }
     /* Event-Detail-Panel (PAYDAY/Heist) — ersetzt die Mini-Map in Events */
     .event-detail {
       width: 260px;
@@ -1785,7 +1821,7 @@
           parts.push(
             `<span class="died">– †${whereStr}${whenStr} durch <span class="killer">${killer}</span>${weaponStr}${distStr}</span>`);
         }
-        return `<div class="mi-row">${parts.join(" ")}</div>`;
+        return `<div class="mi-row" data-match-id="${matchId}" data-acc="${m.accountId}">${parts.join(" ")}</div>`;
       });
       host.innerHTML = lines.join("");
     }
@@ -1814,6 +1850,156 @@
         ...(FROM ? {from: FROM} : {}), ...(TO ? {to: TO} : {})
       }).toString() : "");
     PubgUI.poll(reportUrl, 60000, render, console.error);
+
+    // ─── Death-Map Hover-Popover ────────────────────────────────────
+    // Beim mouseover auf eine mi-row im Match-Expand: floating Popover
+    // mit Mini-Map zeigen, Landing-Pin (klein, gedimmt) + Death-Pin
+    // (groß, in Spielerfarbe, Kreuz-Marker).
+    const _dpEl = document.getElementById("deathPov");
+    const _dpCanvas = _dpEl && _dpEl.querySelector("canvas");
+    const _dpTitle  = _dpEl && _dpEl.querySelector(".pov-title");
+    const _dpFoot   = _dpEl && _dpEl.querySelector(".pov-foot");
+    let _dpActive   = null;
+
+    async function _dpShow(row, ev) {
+      const matchId = row.getAttribute("data-match-id");
+      const acc     = row.getAttribute("data-acc");
+      if (!matchId || !acc || !_dpCanvas) return;
+      const md = await loadMatchDetail(matchId);
+      if (!md || !md.detail) return;
+      const member = md.detail.members.find(m => m.accountId === acc);
+      if (!member) return;
+      const mapName = md.detail.mapName;
+      const blob = (window._poiData || {})[mapName] || {};
+      const mapKm = blob.mapKm || 8;
+      const cal   = blob.pinCalibration || {};
+      const mapCm = mapKm * 100000;
+      const img = await loadMapImage(mapImageUrl(mapName));
+
+      const canvas = _dpCanvas;
+      canvas.width = 304; canvas.height = 304;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#0d061a";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (!img || !img.naturalWidth) return;
+      // Komplette Karte zeigen (kein Zoom) — User will Kontext sehen.
+      const side = Math.min(img.naturalWidth, img.naturalHeight);
+      const cropX = (img.naturalWidth - side) / 2;
+      const cropY = (img.naturalHeight - side) / 2;
+      ctx.drawImage(img, cropX, cropY, side, side,
+                    0, 0, canvas.width, canvas.height);
+
+      function cmToCanvas(xCm, yCm) {
+        const [ex, ey] = applyPinCal(xCm, yCm, mapKm, cal);
+        return [(ex / mapCm) * canvas.width,
+                (ey / mapCm) * canvas.height];
+      }
+      const color = (md.colorByAcc && md.colorByAcc[acc])
+                    || playerColor(acc);
+
+      // Landing-Pin (klein, gedimmt)
+      if (member.landingX != null && member.landingY != null) {
+        const [lx, ly] = cmToCanvas(member.landingX, member.landingY);
+        ctx.beginPath();
+        ctx.arc(lx, ly, 5, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.55;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = "rgba(255,255,255,0.6)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      // Death-Pin (groß, voll, mit Kreuz)
+      if (member.died && member.deathX != null && member.deathY != null) {
+        const [dx, dy] = cmToCanvas(member.deathX, member.deathY);
+        ctx.beginPath();
+        ctx.arc(dx, dy, 9, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // Kreuz drauf damit's klar als 'Tod' lesbar ist
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(dx - 4, dy - 4); ctx.lineTo(dx + 4, dy + 4);
+        ctx.moveTo(dx + 4, dy - 4); ctx.lineTo(dx - 4, dy + 4);
+        ctx.stroke();
+      }
+      // Linie zwischen Landing und Death — visuelle Verbindung
+      if (member.landingX != null && member.died
+          && member.deathX != null) {
+        const [lx, ly] = cmToCanvas(member.landingX, member.landingY);
+        const [dx, dy] = cmToCanvas(member.deathX, member.deathY);
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.35;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(lx, ly); ctx.lineTo(dx, dy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+      }
+
+      const who = member.isSelf ? "Du" : member.name;
+      _dpTitle.textContent = `${who} · ${PubgUI.fmtMap(mapName)}`;
+
+      let footHtml = "";
+      if (member.died) {
+        const dt = member.deathOffsetSec != null
+          ? `${Math.floor(member.deathOffsetSec/60)}:${String(member.deathOffsetSec%60).padStart(2,"0")}` : "?";
+        footHtml = `<b>† nach ${dt}</b>${member.weaponName ? " · " + member.weaponName : ""}${member.distanceM ? " · " + member.distanceM.toFixed(0) + "m" : ""}`;
+        if (member.killerName) footHtml += `<br>durch <b>${member.killerName}</b>`;
+      } else {
+        footHtml = "<b>uberlebt</b>";
+      }
+      _dpFoot.innerHTML = footHtml;
+      _dpEl.classList.add("show");
+      _dpPosition(ev);
+    }
+    function _dpPosition(ev) {
+      const r = _dpEl.getBoundingClientRect();
+      const vw = innerWidth, vh = innerHeight;
+      let x = ev.clientX + 14;
+      if (x + r.width + 8 > vw) x = ev.clientX - r.width - 14;
+      if (x < 8) x = 8;
+      let y = ev.clientY + 14;
+      if (y + r.height + 8 > vh) y = ev.clientY - r.height - 14;
+      if (y < 8) y = 8;
+      _dpEl.style.left = x + "px";
+      _dpEl.style.top  = y + "px";
+    }
+    function _dpHide() {
+      _dpEl.classList.remove("show");
+      _dpActive = null;
+    }
+    document.addEventListener("mouseover", (e) => {
+      const row = e.target.closest(".match-info .mi-row[data-acc]");
+      if (!row) return;
+      if (row === _dpActive) return;
+      _dpActive = row;
+      _dpShow(row, e);
+    });
+    document.addEventListener("mousemove", (e) => {
+      if (_dpEl && _dpEl.classList.contains("show")) _dpPosition(e);
+    });
+    document.addEventListener("mouseout", (e) => {
+      const row = e.target.closest(".match-info .mi-row[data-acc]");
+      const to  = e.relatedTarget;
+      const toRow = to && to.closest && to.closest(".match-info .mi-row[data-acc]");
+      if (row && toRow === row) return;
+      if (!toRow) _dpHide();
+    });
   </script>
+
+  <!-- Death-Map Popover (am Body-Ende damit kein backdrop-filter-Ancestor
+       das fixed-positioning bricht — siehe hot-drop.html Lesson). -->
+  <div id="deathPov" class="death-pov">
+    <div class="pov-title">—</div>
+    <canvas width="304" height="304"></canvas>
+    <div class="pov-foot">—</div>
+  </div>
 </body>
 </html>
