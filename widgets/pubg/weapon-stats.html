@@ -222,7 +222,7 @@
         const top = (sortBy === "kills" && i === 0) ? "top-row" : "";
         const hot = (n, thr) => n >= thr ? "hot" : "";
         return `<tr class="${top}">
-          <td class="name">${w.name}<span class="cat">${w.category}</span></td>
+          <td class="name">${w.name}</td>
           <td class="num kills ${hot(w.kills,10)}">${w.kills}</td>
           <td class="num">${w.avgDist.toFixed(0)}</td>
           <td class="num">${w.maxDist.toFixed(0)}</td>
