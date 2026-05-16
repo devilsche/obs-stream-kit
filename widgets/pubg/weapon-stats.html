@@ -13,17 +13,24 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="_pubg.css">
   <style>
-    html, body { height: 100%; margin: 0; padding: 0; }
+    html, body { margin: 0; padding: 0; }
     body {
       padding: 8px;
-      display: flex; flex-direction: column;
-      justify-content: flex-end;
+      min-height: 100vh;
       box-sizing: border-box;
     }
+    /* OBS-Source (?dock=1): fixe Hoehe + Card oben. */
     body.dock {
       background: #0d061a;
-      justify-content: flex-start;
       padding: 10px;
+      height: 100vh;
+      overflow: hidden;
+    }
+    /* Lange Listen scrollen lassen — sonst klebt das Panel mit
+       80 Weapons unsichtbar unter dem viewport. */
+    body:not(.dock) .panel {
+      max-height: calc(100vh - 80px);
+      overflow-y: auto;
     }
     .panel { width: 100%; min-width: 380px; padding: 14px 16px; }
     .panel h3 {
