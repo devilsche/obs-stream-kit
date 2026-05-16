@@ -1044,6 +1044,74 @@
       wrap.innerHTML = html;
     }
 
+    // State pro Match-Host (DOM-Element). Storage als WeakMap damit
+    // expanded-collapse-Cycle das automatisch GC'd wenn das DOM weg ist.
+    const _mdState = new WeakMap();
+
+    function mdGetState(host) {
+      let s = _mdState.get(host);
+      if (!s) {
+        s = {
+          members: null, colorByAcc: {}, hoveredAcc: null, lockedAcc: null,
+          showKills: false, playToken: 0,
+        };
+        _mdState.set(host, s);
+      }
+      return s;
+    }
+
+    function mdEffectiveFocus(s) {
+      return s.lockedAcc || s.hoveredAcc;
+    }
+
+    function mdRenderState(host) {
+      const s = mdGetState(host);
+      if (!s.members) return;
+      mdRenderOverlay(host, {
+        members: s.members,
+        focusAcc: mdEffectiveFocus(s),
+        showKills: s.showKills,
+        colorByAcc: s.colorByAcc,
+      });
+      mdRenderCards(host, {
+        members: s.members,
+        focusAcc: mdEffectiveFocus(s),
+        colorByAcc: s.colorByAcc,
+      });
+    }
+
+    async function mdMount(host) {
+      // 1) Erstmaliges Setup: HTML-Skelett rein, Basemap + Overlay malen.
+      if (host.dataset.mounted === "1") return;
+      host.dataset.mounted = "1";
+      const matchId = host.getAttribute("data-match-id");
+      const mapName = host.getAttribute("data-map");
+      host.innerHTML = `
+        <div class="md-grid">
+          <div class="md-mapwrap">
+            <canvas class="md-basemap"></canvas>
+            <canvas class="md-overlay"></canvas>
+            <div class="md-tools">
+              <button class="md-toggle" data-toggle="kills">Kills</button>
+              <button class="md-play">▶ Zeitraffer</button>
+              <span class="md-legend">${PubgUI.fmtMap(mapName)}</span>
+            </div>
+          </div>
+          <div class="md-cards"></div>
+        </div>`;
+      await mdRenderBasemap(host, mapName);
+      const md = await mdLoad(matchId);
+      const s = mdGetState(host);
+      if (!md || !md.detail) {
+        host.querySelector(".md-cards").innerHTML =
+          `<div class="md-empty md-card">— keine Telemetrie verfuegbar —</div>`;
+        return;
+      }
+      s.members = md.detail.members;
+      s.colorByAcc = md.colorByAcc;
+      mdRenderState(host);
+    }
+
     // Date-Range-Picker initialisieren mit aktuellen URL-Werten
     function isoLocal(date) {
       // Local-Date → "YYYY-MM-DD"
@@ -1371,6 +1439,8 @@
         row.classList.add("expanded");
         if (detail) {
           detail.classList.add("show");
+          const host = detail.querySelector(".md-host");
+          if (host) mdMount(host);
         }
       });
       // Achievements-Akkordeon wieder aufklappen (erst nach renderExtras
@@ -1870,7 +1940,8 @@
       row.classList.toggle("expanded");
       detail.classList.toggle("show", !wasExpanded);
       if (!wasExpanded) {
-        // Task 9: hier mdMount fuer die neue match-detail-Architektur
+        const host = detail.querySelector(".md-host");
+        if (host) mdMount(host);
       }
     });
 
