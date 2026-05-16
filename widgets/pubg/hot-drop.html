@@ -145,7 +145,6 @@
       <b id="teamsRadius">—</b>
     </div>
     <div class="markers" id="markers"></div>
-    <div id="popover" class="popover"></div>
     <div class="meta" id="meta">—</div>
     <div class="legend">
       <span class="item"><span class="swatch hot"></span>You alive</span>
@@ -154,6 +153,11 @@
       <span class="item"><span class="swatch"></span>Cold</span>
     </div>
   </div>
+  <!-- Popover MUSS ausserhalb von .pubg-card stehen: .pubg-card hat
+       backdrop-filter, was in Chromium einen Containing Block fuer
+       position:fixed-Kinder erzeugt — der Popover wuerde sonst am
+       unten geankerten Panel haengen statt am Viewport. -->
+  <div id="popover" class="popover"></div>
   <script src="_pubg.js"></script>
   <script src="_pubg_pois.js"></script>
   <script>

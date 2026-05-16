@@ -128,13 +128,17 @@
       <div class="pct" id="pct">—</div>
     </div>
     <div class="spark" id="spark"></div>
-  <div id="popover" class="popover"></div>
     <div class="legend">
       <span class="item"><span class="swatch s"></span>Survived</span>
       <span class="item"><span class="swatch d"></span>Died</span>
       <span class="item"><span class="swatch fled"></span>Disengage</span>
     </div>
   </div>
+  <!-- Popover MUSS ausserhalb von .pubg-card stehen: .pubg-card hat
+       backdrop-filter, was in Chromium einen Containing Block fuer
+       position:fixed-Kinder erzeugt — der Popover wuerde sonst am
+       (im Browser-Modus unten geankerten) Panel haengen statt am Viewport. -->
+  <div id="popover" class="popover"></div>
   <script src="_pubg.js"></script>
   <script src="_pubg_pois.js"></script>
   <script>
