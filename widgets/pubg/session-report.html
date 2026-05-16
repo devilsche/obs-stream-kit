@@ -1855,16 +1855,26 @@
     // Beim mouseover auf eine mi-row im Match-Expand: floating Popover
     // mit Mini-Map zeigen, Landing-Pin (klein, gedimmt) + Death-Pin
     // (groß, in Spielerfarbe, Kreuz-Marker).
-    const _dpEl = document.getElementById("deathPov");
-    const _dpCanvas = _dpEl && _dpEl.querySelector("canvas");
-    const _dpTitle  = _dpEl && _dpEl.querySelector(".pov-title");
-    const _dpFoot   = _dpEl && _dpEl.querySelector(".pov-foot");
-    let _dpActive   = null;
+    // Lazy-Lookups: der Popover-Div steht im HTML NACH diesem Script-
+    // Tag, deshalb gibt's zur Script-Lade-Zeit getElementById noch
+    // null zurueck. Wir holen die Refs erst beim ersten Event.
+    let _dpEl = null, _dpCanvas = null, _dpTitle = null, _dpFoot = null;
+    let _dpActive = null;
+    function _dpInit() {
+      if (_dpEl) return _dpEl;
+      _dpEl     = document.getElementById("deathPov");
+      if (!_dpEl) return null;
+      _dpCanvas = _dpEl.querySelector("canvas");
+      _dpTitle  = _dpEl.querySelector(".pov-title");
+      _dpFoot   = _dpEl.querySelector(".pov-foot");
+      return _dpEl;
+    }
 
     async function _dpShow(row, ev) {
       const matchId = row.getAttribute("data-match-id");
       const acc     = row.getAttribute("data-acc");
-      if (!matchId || !acc || !_dpCanvas) return;
+      if (!matchId || !acc) return;
+      if (!_dpInit() || !_dpCanvas) return;
       const md = await loadMatchDetail(matchId);
       if (!md || !md.detail) return;
       const member = md.detail.members.find(m => m.accountId === acc);
@@ -1960,6 +1970,7 @@
       _dpPosition(ev);
     }
     function _dpPosition(ev) {
+      if (!_dpEl) return;
       const r = _dpEl.getBoundingClientRect();
       const vw = innerWidth, vh = innerHeight;
       let x = ev.clientX + 14;
@@ -1972,7 +1983,7 @@
       _dpEl.style.top  = y + "px";
     }
     function _dpHide() {
-      _dpEl.classList.remove("show");
+      if (_dpEl) _dpEl.classList.remove("show");
       _dpActive = null;
     }
     document.addEventListener("mouseover", (e) => {
