@@ -139,12 +139,15 @@
     if (DOCK) document.body.classList.add("dock");
     PubgUI.renderHeader(document.getElementById("pubgHeader"),
                         "Weapon Stats", RANGE);
+    const PLAYER_PARAM = PubgUI.qs("player", "");
     PubgUI.buildFilter([
       { key: "range", label: "Range", type: "select", default: "all",
         options: [["session","Session"],["week","7 days"],["all","Database"]],
         tooltip: "Which matches to include." },
       { key: "minKills", label: "Min Kills", type: "number", default: "3",
         tooltip: "Min. Kills mit dieser Waffe, sonst rausgefiltert." },
+      { key: "player", label: "Player", type: "text", placeholder: "leer = self",
+        tooltip: "Squad-Mate-Name eintragen um dessen Weapon-Stats zu sehen." },
     ]);
 
     // Category-Filter — null = alle
@@ -242,7 +245,16 @@
     buildCatFilter();
 
     if (RANGE === "session") PubgUI.hideIfStale();
-    PubgUI.poll(`/api/pubg/weapon-stats?range=${RANGE}`, POLL_MS, (d) => {
+    const playerQS = PLAYER_PARAM
+      ? "&player=" + encodeURIComponent(PLAYER_PARAM) : "";
+    // Header anpassen wenn ein anderer Spieler abgefragt wird.
+    if (PLAYER_PARAM) {
+      const h = document.getElementById("pubgHeader");
+      h.innerHTML = h.innerHTML.replace("Weapon Stats",
+        `Weapon Stats · ${PLAYER_PARAM}`);
+    }
+    PubgUI.poll(`/api/pubg/weapon-stats?range=${RANGE}${playerQS}`,
+                POLL_MS, (d) => {
       if (RANGE === "session") PubgUI.hideIfStale();
       lastData = (d && d.weapons) || [];
       rerender();

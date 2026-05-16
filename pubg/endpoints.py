@@ -536,14 +536,32 @@ class EndpointRegistry:
         range_key = qs.get("range", "all")
         from_iso = qs.get("from")
         to_iso = qs.get("to")
-        cache_key = f"weapon-stats:{range_key}:{from_iso or ''}:{to_iso or ''}"
+        player = (qs.get("player") or "").strip()
+        actor_account = None
+        actor_name    = None
+        if player:
+            row = conn.execute(
+                "SELECT account_id, name FROM players "
+                "WHERE name = ? OR account_id = ? LIMIT 1",
+                (player, player)).fetchone()
+            if row:
+                actor_account = row["account_id"]
+                actor_name    = row["name"]
+            else:
+                return _err(404, f"player not found: {player}")
+        cache_key = (f"weapon-stats:{range_key}:{from_iso or ''}:"
+                     f"{to_iso or ''}:{actor_account or 'self'}")
         rows = self.cache.get_or_compute(
             cache_key,
             lambda: compute_weapon_stats(
                 conn, self.my_account_id, range_key,
-                from_iso=from_iso, to_iso=to_iso),
+                from_iso=from_iso, to_iso=to_iso,
+                actor_account=actor_account),
         )
-        return _ok({"weapons": rows, "count": len(rows)})
+        return _ok({
+            "weapons": rows, "count": len(rows),
+            "playerName": actor_name,
+        })
 
     def _vehicle_stats(self, qs):
         conn = self.get_conn()

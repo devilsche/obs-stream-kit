@@ -379,39 +379,94 @@ WEAPON_NAMES = {
 }
 
 
+# Vehicle-Pattern → Klartext-Name. Mehrere Skins/Varianten desselben
+# Modells werden zusammengefasst (Mirado_A_02 / Mirado_A_03_Esports / ...
+# alle → 'Mirado').
+_VEHICLE_PATTERNS = [
+    ("Mirado",        "Mirado"),
+    ("PickupTruck",   "Pickup Truck"),
+    ("Motorbike",     "Motorbike"),
+    ("Dacia",         "Dacia"),
+    ("Uaz",           "UAZ"),
+    ("Niva",          "Niva"),
+    ("BearV2",        "Bear"),
+    ("Bear",          "Bear"),
+    ("PonyCoupe",     "Pony Coupe"),
+    ("CoupeRB",       "Coupe RB"),
+    ("Blanc",         "Blanc"),
+    ("PicoBus",       "Pico Bus"),
+    ("Van_",          "Van"),
+    ("BRDM",          "BRDM"),
+    ("Pillar_Car",    "Pillar Car"),
+    ("Buggy",         "Buggy"),
+    ("Boat",          "Aquarail"),
+    ("Snowmobile",    "Snowmobile"),
+    ("Tukshai",       "Tukshai"),
+    ("Lava_Mtb",      "Mountain Bike"),
+    ("Scooter",       "Scooter"),
+]
+
+# Environment / Misc — Brand/Bombe/Care-Package-Drop etc.
+_ENVIR_NAMES = {
+    "BP_Baltic_GasPump_C":          "Gas Pump (Boom)",
+    "BP_CarePackageDrop_nonDest_C": "Care Package",
+    "BP_FireEffectController_C":    "Fire",
+    "BP_MolotovFireDebuff_C":       "Molotov Fire",
+    "Bluezonebomb_EffectActor_C":   "Red Zone",
+    "Jerrycan":                     "Jerry Can (Boom)",
+    "JerrycanFire":                 "Jerry Can (Fire)",
+}
+
+
 def _weapon_label(weapon_id):
     if not weapon_id or weapon_id == "None":
         return ("Unknown", "other")
-    # Generische Fahrzeuge (BP_*Mirado/Dacia/...) -> Vehicle Roadkill
-    if weapon_id.startswith("BP_") or weapon_id.startswith("Dacia_") \
-       or weapon_id.startswith("Uaz_"):
-        return (weapon_id.replace("_C", "").replace("BP_", "")
-                .replace("_", " "), "vehicle")
+    # Punch / Melee mit Faust — PUBG kodiert das ueber den Player-Mesh
+    if weapon_id in ("PlayerFemale_A_C", "PlayerMale_A_C"):
+        return ("Faust", "melee")
+    # Explizite Lookups zuerst
     if weapon_id in WEAPON_NAMES:
         return WEAPON_NAMES[weapon_id]
-    # Fallback fuer noch unbekannte IDs — Raw zeigen + 'other'
-    return (weapon_id.replace("Weap", "").replace("_C", ""), "other")
+    if weapon_id in _ENVIR_NAMES:
+        return (_ENVIR_NAMES[weapon_id], "envir")
+    # Vehicle-Pattern matchen — fasst Skin-Varianten zusammen
+    for needle, label in _VEHICLE_PATTERNS:
+        if needle in weapon_id:
+            return (label, "vehicle")
+    # Letzter Fallback — Raw, aber sauber gestripped (nicht naiv mit
+    # global-replace, das zerlegt 'BP_Pillar_Car_C' zu 'BParillarar')
+    raw = weapon_id
+    if raw.endswith("_C"):
+        raw = raw[:-2]
+    if raw.startswith("BP_"):
+        raw = raw[3:]
+    if raw.startswith("Weap"):
+        raw = raw[4:]
+    return (raw.replace("_", " "), "other")
 
 
 def compute_weapon_stats(conn, my_account_id, range_key="session",
-                          from_iso=None, to_iso=None):
-    """Pro Waffe (eigene Kills): Kill-Count, Ø Distanz (m), Max-Distanz,
-    Anzahl Matches mit mind. einem Kill mit dieser Waffe.
+                          from_iso=None, to_iso=None, actor_account=None):
+    """Pro Waffe Kill-Count + Ø/Max-Distanz + Anzahl Matches mit Kills
+    + Kills-pro-Match. Default fuer my_account_id (= self), via
+    actor_account kann ein beliebiger Squad-Mate adressiert werden
+    (Telemetrie-Events fuer Squad-Member sind in der DB).
 
     Distance in der DB ist cm — wir liefern Meter zurueck.
     Range-aware: session/day/week/all + explizite from/to ISO.
     """
+    actor = actor_account or my_account_id
     if from_iso:
         cutoff = from_iso
         end_filter = " AND m.played_at <= ?" if to_iso else ""
-        params = [my_account_id, cutoff]
+        params = [actor, cutoff]
         if to_iso:
             params.append(to_iso)
     else:
         cutoff = (_range_filter(conn, range_key)
                   if range_key != "all" else "1970-01-01T00:00:00Z")
         end_filter = ""
-        params = [my_account_id, cutoff]
+        params = [actor, cutoff]
     br_sql, br_params = _br_filter("m")
     params += br_params
 
