@@ -613,6 +613,16 @@ def hidrive_refill(root: str, only_match: str = None) -> int:
             "WHERE match_id=? AND account_id=?)",
             (mid, mid, my_acc)).fetchall()
         squad = {r["account_id"] for r in squad_rows} | {my_acc}
+        # Spielernamen extrahieren + upserten fuer alle Lobby-Member
+        try:
+            from pubg.telemetry import extract_player_names
+            from pubg.db import upsert_player
+            for acc, nm in extract_player_names(raw).items():
+                if acc and nm and acc != my_acc:
+                    upsert_player(conn, acc, nm, cfg.get("platform", "steam"),
+                                   is_self=False)
+        except Exception:
+            pass
         # Gefilterte Events aus Raw
         events = list(filter_squad_events(raw, squad))
         # SQLite: alte Events loeschen + neu einfuegen

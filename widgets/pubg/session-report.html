@@ -186,6 +186,14 @@
       color: #e57b7b;
     }
     .match-info .mi-row .killer { color: var(--pubg-text); font-weight: 700; }
+    .match-info .mi-row .dot {
+      display: inline-block;
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: -1px;
+      border: 1px solid rgba(255,255,255,0.4);
+    }
     .match-info .mi-empty { font-style: italic; opacity: 0.6; }
     /* Event-Detail-Panel (PAYDAY/Heist) — ersetzt die Mini-Map in Events */
     .event-detail {
@@ -1587,6 +1595,15 @@
       return p;
     }
 
+    // Konsistente Spielerfarbe per accountId-Hash — gleiche Berechnung
+    // in Map-Pin und Match-Info Dot, damit man die Zuordnung sieht.
+    function playerColor(acc) {
+      let h = 0;
+      for (let i = 0; i < (acc || "").length; i++) h = (h * 31 + acc.charCodeAt(i)) | 0;
+      const hue = Math.abs(h) % 360;
+      return `hsl(${hue}, 80%, 60%)`;
+    }
+
     async function renderMatchMap(host) {
       const matchId = host.getAttribute("data-match-id");
       const mapName = host.getAttribute("data-map");
@@ -1668,29 +1685,18 @@
         ((py - srcY) / srcSize) * canvas.height,
       ];
 
-      const playerColor = (acc) => {
-        let h = 0;
-        for (let i = 0; i < (acc || "").length; i++) h = (h * 31 + acc.charCodeAt(i)) | 0;
-        const hue = Math.abs(h) % 360;
-        return `hsl(${hue}, 80%, 60%)`;
-      };
-
+      // Pins kompakt — Farbe identifiziert den Spieler, der farbige
+      // Punkt vor dem Namen unten in match-info gehoert dazu.
       pts.forEach(({ ld, px, py }) => {
         const [cx, cy] = cropToCanvas(px, py);
         const color = playerColor(ld.accountId);
         ctx.beginPath();
-        ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+        ctx.arc(cx, cy, 4.5, 0, Math.PI * 2);
         ctx.fillStyle = color;
         ctx.fill();
-        ctx.strokeStyle = "white";
-        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "rgba(255,255,255,0.85)";
+        ctx.lineWidth = 1.25;
         ctx.stroke();
-        const initial = (ld.name || "?")[0].toUpperCase();
-        ctx.fillStyle = "white";
-        ctx.font = "bold 9px DM Sans, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(initial, cx, cy);
       });
     }
 
@@ -1718,15 +1724,17 @@
         const cls = m.isSelf ? "self" : "";
         const who = m.isSelf ? "Du" : m.name;
         const landP = poi(m.landingX, m.landingY);
+        const color = playerColor(m.accountId);
+        const dot = `<span class="dot" style="background:${color}"></span>`;
         const parts = [];
-        parts.push(`<b class="${cls}">${who}</b>`);
+        parts.push(`${dot}<b class="${cls}">${who}</b>`);
         parts.push(landP
           ? `landete <b>${landP}</b>`
-          : "Landing unbekannt");
+          : `<i>kein Landing</i>`);
         if (m.died && m.weaponName) {
           const distStr = m.distanceM
             ? ` (${m.distanceM.toFixed(0)} m)` : "";
-          const killer = m.killerName || "[Gegner]";
+          const killer = m.killerName || "Gegner";
           parts.push(
             `<span class="died">– † <span class="killer">${killer}</span> · ${m.weaponName}${distStr}</span>`);
         } else if (m.died) {

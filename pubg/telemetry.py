@@ -167,6 +167,37 @@ def _normalize(event):
 # Events die wir immer behalten (auch ohne Squad-Beteiligung) — wichtig für
 # Fight-Cluster-Detection: enemy-vs-enemy Kills/Knocks zeigen welche anderen
 # Teams im selben Fight involviert sind.
+def extract_player_names(events):
+    """Sammelt alle (account_id -> name) Paare aus den Raw-Telemetry-
+    Events. Quelle: jedes Event hat character/killer/victim/attacker-
+    Objekte mit accountId + name. Wird genutzt um Gegner-Namen in die
+    players-Tabelle zu upserten, sodass match-detail im Report 'Killer
+    Joe (M416, 89m)' anzeigt statt 'account.0a1b2c3d'.
+
+    Returns: dict {account_id: name} (name leer/None werden uebersprungen).
+    """
+    out = {}
+    keys = ("character", "killer", "victim", "attacker",
+             "reviver", "instigator")
+    for e in events:
+        for k in keys:
+            obj = e.get(k)
+            if not isinstance(obj, dict):
+                continue
+            acc = obj.get("accountId")
+            nm  = obj.get("name")
+            if acc and nm and acc not in out:
+                out[acc] = nm
+        # LogEmPickupLiftOff hat 'riders' = Liste
+        riders = e.get("riders") or []
+        for r in riders:
+            if not isinstance(r, dict): continue
+            acc = r.get("accountId"); nm = r.get("name")
+            if acc and nm and acc not in out:
+                out[acc] = nm
+    return out
+
+
 ALWAYS_KEEP_EVENTS = {
     "Kill", "Knock", "Landing",
     # Vehicle-Enter/Leave fuer ALLE Spieler — sonst koennen wir nicht

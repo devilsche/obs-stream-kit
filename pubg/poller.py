@@ -326,6 +326,17 @@ def _process_one_telemetry(conn, client, my_account_id, row):
     squad = _squad_account_ids_for_match(conn, row["match_id"])
     if my_account_id not in squad:
         squad.add(my_account_id)
+    # Spielernamen aus den Raw-Events extrahieren + upserten — sonst
+    # haben wir nur account_ids fuer Lobby-Gegner und match-detail
+    # zeigt nur die ID statt 'Killer Joe'.
+    try:
+        from pubg.telemetry import extract_player_names
+        from pubg.db import upsert_player
+        for acc, nm in extract_player_names(raw).items():
+            if acc and nm and acc != my_account_id:
+                upsert_player(conn, acc, nm, client.platform, is_self=False)
+    except Exception:
+        pass
     events = list(filter_squad_events(raw, squad))
     # Bei Re-Fetch (alte Schema-Version) erst alte events löschen,
     # sonst Doubletten.

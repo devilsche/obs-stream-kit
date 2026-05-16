@@ -361,13 +361,16 @@ def _now_iso() -> str:
 
 def upsert_player(conn, account_id: str, name: str, platform: str,
                   is_self: bool = False) -> None:
+    # is_self via MAX(existing, new) — verhindert dass ein Lobby-Upsert
+    # (is_self=False) den Self-Marker eines bestehenden Eintrags
+    # ueberschreibt. Once-self-always-self.
     conn.execute("""
         INSERT INTO players(account_id, name, platform, is_self, first_seen_at)
         VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(account_id) DO UPDATE SET
             name = excluded.name,
             platform = excluded.platform,
-            is_self = excluded.is_self
+            is_self = MAX(players.is_self, excluded.is_self)
     """, (account_id, name, platform, 1 if is_self else 0, _now_iso()))
     conn.commit()
 
