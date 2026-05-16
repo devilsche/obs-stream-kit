@@ -1271,11 +1271,20 @@ def _emit_tier_cascade(out, seen, tiers, value, value_label_fn,
 
 def _career_win_number(conn, my_account_id, match_id, played_at):
     """Wie viele BR-Chicken-Wins (career-weit) hat der Spieler bis
-    inkl. diesem Match? Filtert auf BATTLE_ROYALE_MODES — Event-Matches
-    haben place=1 fuer alle Spieler und zaehlen nicht als 'Win'.
+    inkl. diesem Match? Authoritative Quelle: player_lifetime.wins
+    (PUBG-API, mode='all'). Local-count waere unzuverlaessig wenn die
+    Match-DB historisch luecken hat (PUBG-API liefert nur 14d).
+
+    Berechnung:
+      offset = lifetime.wins - SUM(local_wins_in_DB)
+      result = local_wins_bis_match_X + offset
+
+    offset deckt alte Wins ab, die nicht in der Match-DB sind. Wenn
+    lifetime nicht verfuegbar → Fallback auf rein lokale Zaehlung.
     Tiebreaker bei gleichem played_at: match_id, damit deterministisch.
     """
     ph = ",".join("?" * len(BATTLE_ROYALE_MODES))
+    # 1) Lokale Wins bis inkl. diesem Match
     row = conn.execute(f"""
         SELECT COUNT(*) AS n
         FROM participants p
@@ -1287,7 +1296,31 @@ def _career_win_number(conn, my_account_id, match_id, played_at):
                OR (m.played_at = ? AND m.match_id <= ?))
     """, [my_account_id] + list(BATTLE_ROYALE_MODES)
          + [played_at, played_at, match_id]).fetchone()
-    return (row["n"] if row else 0) or 0
+    local_at = (row["n"] if row else 0) or 0
+
+    # 2) Lifetime-Total + lokale Total → Offset
+    lr = conn.execute(
+        "SELECT wins FROM player_lifetime WHERE account_id = ? AND mode = 'all'",
+        (my_account_id,)).fetchone()
+    if not lr or lr["wins"] is None:
+        return local_at  # Fallback wenn lifetime fehlt
+    lifetime_wins = int(lr["wins"])
+    tr = conn.execute(f"""
+        SELECT COUNT(*) AS n
+        FROM participants p
+        JOIN matches m ON m.match_id = p.match_id
+        WHERE p.account_id = ?
+          AND p.place = 1
+          AND m.game_mode IN ({ph})
+    """, [my_account_id] + list(BATTLE_ROYALE_MODES)).fetchone()
+    local_total = (tr["n"] if tr else 0) or 0
+    offset = lifetime_wins - local_total
+    # Negativer Offset (lokal > lifetime) sollte nicht passieren — kann
+    # nur bei Stale-Lifetime auftreten. In dem Fall ignorieren, sonst
+    # wuerden wir Milestones zurueckdatieren.
+    if offset < 0:
+        offset = 0
+    return local_at + offset
 
 
 def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None):
