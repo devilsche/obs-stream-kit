@@ -44,3 +44,41 @@ Repo: github.com/devilsche/obs-stream-kit
 
 ## Git
 - Commit messages: Deutsch, Conventional Commits, KEIN Co-Authored-By
+- Direkt auf `master` committen, keine Feature-Branches, keine Worktrees
+
+## Architektur-Konventionen
+
+**Verzeichnis-Layout (verbindlich fuer neuen Code):**
+
+- **`widgets/<domain>/*.html`** — NUR Display-Widgets fuer OBS Browser-Sources. Pollen einen JSON-Endpoint und rendern, sonst nichts. Keine Schreib-Operationen, kein Edit-Modus. Tipische Groessen: 1920x1080 (Vollbild-Szene), oder kompakte Ecken-Overlays.
+- **`tools/*.html`** — Config-Editoren + Verwaltungs-Tools. Schreiben in `data/*.json` via POST-Endpoints. Werden im normalen Browser-Tab geoeffnet, NICHT als OBS-Source. Mehrere Domains koennen sich `tools/` teilen, oder mit Praefix (`tools/pubg-pois.html`, `tools/teamspeak-names.html`).
+- **Alt-Bestand** (z.B. `widgets/pubg/poi-editor.html`, `widgets/steam/achievement-browser.html`) bleiben aus historischen Gruenden wo sie sind. Nicht migrieren, aber NEUER Code folgt der sauberen Trennung.
+
+**Konfigurations- und Daten-Files:**
+
+- **`.secrets`** — Credentials/API-Keys. Gitignored. Vom Server beim Start eingelesen. Format: `Key: Wert` zeilenweise.
+- **`config/<domain>.json`** — Setup-Daten die der Nutzer pro Installation einmalig ausfuellt (PUBG-Nickname, Plattform). Gitignored. Mit `config/<domain>.example.json` als Template.
+- **`data/<domain>.json`** oder `data/<domain>-history.db` — Persistenter State, der zur Laufzeit waechst/aendert. Gitignored. Wird von Tools/Backends geschrieben.
+
+**API-Endpoints (`pubg/endpoints.py`-Pattern):**
+
+- Pfad-Schema `/api/<domain>/<resource>` (z.B. `/api/pubg/last-match`, `/api/teamspeak/state`).
+- GET fuer Lesen, POST fuer Schreiben. Body als JSON.
+- Returns: `_ok(payload)` oder `_err(status, msg)` — gemeinsame Helper in `pubg/endpoints.py`.
+- Domain-Module bekommen ihren eigenen Endpoint-Handler. Routing-Dispatch in `serve.py`.
+
+**Backend-Module:**
+
+- **`<domain>/`** Python-Package mit `endpoints.py`, optional `client.py` (externe API), `aggregations.py` (DB-Queries), `db.py` (Schema + DAO). Beispiel: `pubg/` und kuenftiges `teamspeak/`.
+- **`pubg/aggregations.py`** kann sehr gross werden — neue domain-spezifische Logik landet im eigenen Package, nicht im PUBG-Modul.
+
+**Frontend-Helpers:**
+
+- **`widgets/<domain>/_<domain>.js`** und `_<domain>.css` — gemeinsame UI-Bausteine fuer Widgets innerhalb der Domain (z.B. `widgets/pubg/_pubg.js`).
+- Frontend ist **vanilla JS** — kein Build-Tool, kein Bundler, kein npm. Browser laedt direkt.
+
+**Tests:**
+
+- `tests/<domain>/test_<feature>.py` mit pytest. Fixture `tmp_db_path` aus `tests/conftest.py` fuer DB-tests.
+- TDD wenn moeglich: Test schreiben → fail → Implement → pass.
+- Frontend-JS hat keine Test-Infrastruktur. Manuelle Smoke-Tests im Browser oder per `node -e "new Function(...)"`-Syntax-Check.
