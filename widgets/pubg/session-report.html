@@ -1027,6 +1027,194 @@
       ctx.drawImage(img, sx, sy, sw, sh, 0, 0, MD_MAP_PX, MD_MAP_PX);
     }
 
+    function mdRenderOverlay(host) {
+      const canvas = host.querySelector("canvas.md-overlay");
+      if (!canvas) return;
+      canvas.width = MD_MAP_PX; canvas.height = MD_MAP_PX;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, MD_MAP_PX, MD_MAP_PX);
+
+      const s = mdGetState(host);
+      if (!s.detail || !s.detail.members) return;
+      const cursorTs = s.zeitraffer.cursorTs;
+      const matchStart = s.zeitraffer.matchStart;
+      const absTs = matchStart + cursorTs;
+      const soloAcc = s.soloAcc;
+
+      // Members filtern fuer Solo-Mode
+      const visibleMembers = soloAcc
+        ? s.detail.members.filter(m => m.accountId === soloAcc)
+        : s.detail.members;
+
+      for (const m of visibleMembers) {
+        const color = s.colorByAcc[m.accountId] || "#999";
+        if (!m.lives) continue;
+        for (const life of m.lives) {
+          // PlaneRoute: gestrichelt, nur sichtbar wenn relevant fuer aktuellen
+          // Cursor (oder Default-View bei cursor=0)
+          const planeStartTs = life.planeRoute.length
+            ? life.planeRoute[0][2] : null;
+          const landingTs = life.landing ? life.landing.tsMs : null;
+          // Default-View (cursor=0) zeigt planeRoute komplett + Landing-Pin
+          const inDefault = (cursorTs === 0);
+          const showPlaneRoute = inDefault
+            || (landingTs && absTs <= landingTs && planeStartTs && absTs >= planeStartTs);
+          if (showPlaneRoute && life.planeRoute.length >= 2) {
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = 0.6;
+            ctx.setLineDash([4, 4]);
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            life.planeRoute.forEach(([xCm, yCm], i) => {
+              const [cx, cy] = mdCmToCanvas(host, xCm, yCm);
+              if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+            });
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.globalAlpha = 1;
+          }
+
+          // Landing-Pin (sobald cursor >= landing-ts oder im Default)
+          const showLanding = inDefault
+            || (landingTs && absTs >= landingTs);
+          if (showLanding && life.landing) {
+            const [cx, cy] = mdCmToCanvas(host, life.landing.x, life.landing.y);
+            ctx.beginPath();
+            ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = "rgba(255,255,255,0.9)";
+            ctx.lineWidth = 0.75;
+            ctx.stroke();
+          }
+
+          // groundPath als Trail bis cursor (nicht im Default-View)
+          if (!inDefault && landingTs && life.groundPath.length >= 2) {
+            const trailEnd = life.death
+              ? Math.min(absTs, life.death.tsMs)
+              : absTs;
+            if (trailEnd > landingTs) {
+              ctx.strokeStyle = color;
+              ctx.globalAlpha = 0.7;
+              ctx.lineWidth = 1.5;
+              ctx.beginPath();
+              let started = false;
+              for (let i = 0; i < life.groundPath.length; i++) {
+                const [xCm, yCm, ts] = life.groundPath[i];
+                if (ts > trailEnd) break;
+                const [cx, cy] = mdCmToCanvas(host, xCm, yCm);
+                if (!started) { ctx.moveTo(cx, cy); started = true; }
+                else { ctx.lineTo(cx, cy); }
+              }
+              ctx.stroke();
+              ctx.globalAlpha = 1;
+            }
+          }
+
+          // Death-Pin (sobald cursor >= death-ts)
+          if (!inDefault && life.death && absTs >= life.death.tsMs) {
+            const [cx, cy] = mdCmToCanvas(host, life.death.x, life.death.y);
+            ctx.beginPath();
+            ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+
+          // Kill-Marker (sobald cursor >= kill-ts)
+          if (!inDefault) {
+            for (const k of life.kills) {
+              if (absTs < k.tsMs) continue;
+              if (k.actorX == null || k.victimX == null) continue;
+              const [ax, ay] = mdCmToCanvas(host, k.actorX, k.actorY);
+              const [vx, vy] = mdCmToCanvas(host, k.victimX, k.victimY);
+              // Verbindungslinie
+              ctx.strokeStyle = color;
+              ctx.globalAlpha = 0.4;
+              ctx.lineWidth = 0.8;
+              ctx.beginPath();
+              ctx.moveTo(ax, ay); ctx.lineTo(vx, vy);
+              ctx.stroke();
+              ctx.globalAlpha = 1;
+              // Schuetze-Punkt
+              ctx.beginPath();
+              ctx.arc(ax, ay, 2.5, 0, Math.PI * 2);
+              ctx.fillStyle = color;
+              ctx.fill();
+              // Opfer-Punkt (grau)
+              ctx.beginPath();
+              ctx.arc(vx, vy, 2.5, 0, Math.PI * 2);
+              ctx.fillStyle = "#bbb";
+              ctx.fill();
+              ctx.strokeStyle = "rgba(0,0,0,0.5)";
+              ctx.lineWidth = 0.4;
+              ctx.stroke();
+            }
+          }
+        }
+
+        // Revive-Pins (nur bis cursor erreicht)
+        if (m.revivePts) {
+          for (const [xCm, yCm, ts] of m.revivePts) {
+            if (!inDefault && absTs < ts) continue;
+            const [cx, cy] = mdCmToCanvas(host, xCm, yCm);
+            ctx.beginPath();
+            ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+            ctx.fillStyle = "#2ecc71";
+            ctx.fill();
+            ctx.strokeStyle = "rgba(255,255,255,0.85)";
+            ctx.lineWidth = 0.6;
+            ctx.stroke();
+          }
+        }
+
+        // Aktiver Zeitraffer-Pin (interpolated Position)
+        if (!inDefault && s.zeitraffer.playing || (!inDefault && cursorTs > 0)) {
+          const activePin = mdInterpolatePin(m, absTs);
+          if (activePin) {
+            const [cx, cy] = mdCmToCanvas(host, activePin.x, activePin.y);
+            ctx.beginPath();
+            ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    // Liefert {x, y} fuer Member m zum Absolut-Timestamp absTs
+    // durch Interpolation im aktuellen Leben.
+    function mdInterpolatePin(m, absTs) {
+      if (!m.lives) return null;
+      for (const life of m.lives) {
+        if (!life.landing) continue;
+        if (life.death && absTs > life.death.tsMs) continue;
+        const fullPath = [...(life.planeRoute || []), ...(life.groundPath || [])];
+        if (fullPath.length < 2) {
+          if (life.landing) return { x: life.landing.x, y: life.landing.y };
+          continue;
+        }
+        if (absTs < fullPath[0][2]) return null;
+        // Bisect
+        for (let i = 0; i < fullPath.length - 1; i++) {
+          const [x0, y0, t0] = fullPath[i];
+          const [x1, y1, t1] = fullPath[i + 1];
+          if (absTs >= t0 && absTs <= t1) {
+            const f = (absTs - t0) / Math.max(1, (t1 - t0));
+            return { x: x0 + (x1 - x0) * f, y: y0 + (y1 - y0) * f };
+          }
+        }
+        const last = fullPath[fullPath.length - 1];
+        return { x: last[0], y: last[1] };
+      }
+      return null;
+    }
+
     // Date-Range-Picker initialisieren mit aktuellen URL-Werten
     function isoLocal(date) {
       // Local-Date → "YYYY-MM-DD"
