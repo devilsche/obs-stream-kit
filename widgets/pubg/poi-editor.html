@@ -836,12 +836,14 @@ function hitTestRegion(wx, wy) {
 
 canvas.addEventListener("mousedown", (ev) => {
   // Strg+LMB = aktive Calibration verschieben (Pin- oder Grid-Cal,
-  // je nach Toolbar-Mode)
+  // je nach Toolbar-Mode). WICHTIG: Delta in logischen Canvas-Pixeln
+  // tracken, NICHT in Welt-Koords — eventToWorld haengt vom Offset ab
+  // und wuerde Feedback-Loop verursachen (Drag springt weg).
   if (ev.ctrlKey && ev.button === 0) {
     calibratingPins = true;
-    const [wx, wy] = eventToWorld(ev);
+    const [lx, ly] = eventToLogical(ev);
     const c = activeCal();
-    calRef = [wx, wy, c.offsetX, c.offsetY];
+    calRef = [lx, ly, c.offsetX, c.offsetY];
     canvas.style.cursor = "grabbing";
     ev.preventDefault();
     return;
@@ -949,12 +951,14 @@ canvas.addEventListener("dblclick", (ev) => {
 });
 
 canvas.addEventListener("mousemove", (ev) => {
-  // Calibration-Drag (Pin oder Grid, je nach Mode)
+  // Calibration-Drag (Pin oder Grid, je nach Mode). Delta in
+  // logischen Canvas-Pixeln → in cm via base-Faktor umrechnen.
   if (calibratingPins && calRef) {
-    const [wx, wy] = eventToWorld(ev);
+    const [lx, ly] = eventToLogical(ev);
+    const base = canvas.width / (mapKm * 100000);
     const c = activeCal();
-    c.offsetX = calRef[2] + (wx - calRef[0]);
-    c.offsetY = calRef[3] + (wy - calRef[1]);
+    c.offsetX = calRef[2] + (lx - calRef[0]) / base;
+    c.offsetY = calRef[3] + (ly - calRef[1]) / base;
     updateCalLabel();
     render();
     return;
