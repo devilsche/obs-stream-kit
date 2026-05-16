@@ -1215,6 +1215,76 @@
       return null;
     }
 
+    function mdRenderCards(host) {
+      const wrap = host.querySelector(".md-cards");
+      if (!wrap) return;
+      const s = mdGetState(host);
+      if (!s.detail || !s.detail.members) {
+        wrap.innerHTML = "";
+        return;
+      }
+      const soloAcc = s.soloAcc;
+      function fmtMinSec(sec) {
+        if (sec == null) return "?";
+        const m = Math.floor(sec / 60);
+        const ss = sec % 60;
+        return `${m}:${String(ss).padStart(2, "0")}`;
+      }
+      function poi(x, y, mapName) {
+        if (x == null || y == null) return null;
+        if (PubgUI.POI && PubgUI.POI.fromCoords)
+          return PubgUI.POI.fromCoords(mapName, x, y);
+        return null;
+      }
+      const mapName = host.getAttribute("data-map");
+      const visible = soloAcc
+        ? s.detail.members.filter(m => m.accountId === soloAcc)
+        : s.detail.members;
+      const html = visible.map((m) => {
+        const color = s.colorByAcc[m.accountId] || "#999";
+        const active = (m.accountId === soloAcc) ? " active" : "";
+        const selfCls = m.isSelf ? " md-self" : "";
+        const who = m.isSelf ? "Du" : m.name;
+        // Overall-Badge: alive falls letztes Leben ohne Death, sonst der letzte Death
+        let badge = '<span class="md-badge alive">ueberlebt</span>';
+        if (m.lives && m.lives.length) {
+          const last = m.lives[m.lives.length - 1];
+          if (last.death) {
+            const sec = Math.floor(
+              (last.death.tsMs - (s.zeitraffer.matchStart || 0)) / 1000);
+            badge = `<span class="md-badge died">† ${fmtMinSec(sec)}</span>`;
+          }
+        }
+        // Lives-Detail (eine Zeile pro Leben)
+        const livesHtml = (m.lives || []).map((life, idx) => {
+          const prefix = m.lives.length > 1 ? `Leben ${life.lifeIndex}: ` : "";
+          const landP = life.landing
+            ? poi(life.landing.x, life.landing.y, mapName) : null;
+          let row = `${prefix}landete <b>${landP || "?"}</b>`;
+          if (life.death) {
+            const deathP = poi(life.death.x, life.death.y, mapName);
+            const killer = life.death.killerName || "Gegner";
+            const wn = life.death.weaponName || "?";
+            const dist = life.death.distanceM
+              ? ` auf <b>${life.death.distanceM.toFixed(0)}m</b>` : "";
+            row += ` <span class="md-died">— gestorben in <b>${deathP || "?"}</b> durch <b>${killer}</b> mit <b>${wn}</b>${dist}</span>`;
+          } else if (m.lives.length > 1) {
+            row += ` <span style="color:var(--pubg-gold)">— survived</span>`;
+          }
+          return `<div class="md-life">${row}</div>`;
+        }).join("");
+        return `<div class="md-card${active}${selfCls}" data-acc="${m.accountId}">
+          <div class="md-head">
+            <span class="md-dot" style="background:${color}"></span>
+            <span class="md-name">${who}</span>
+            ${badge}
+          </div>
+          ${livesHtml}
+        </div>`;
+      }).join("");
+      wrap.innerHTML = html;
+    }
+
     // Date-Range-Picker initialisieren mit aktuellen URL-Werten
     function isoLocal(date) {
       // Local-Date → "YYYY-MM-DD"
