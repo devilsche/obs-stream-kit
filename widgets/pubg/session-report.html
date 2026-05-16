@@ -2074,6 +2074,15 @@
         const host = detail.querySelector(".md-host");
         if (host) mdMount(host);
       }
+      if (wasExpanded) {
+        const host = detail.querySelector(".md-host");
+        if (host && host.dataset.mounted === "1") {
+          const s = mdGetState(host);
+          s.playToken++;  // stoppt evtl. laufende Animation
+        }
+        // mounted-flag bleibt — Re-Open ist cached. Beim naechsten Open
+        // wird kein erneuter Fetch gemacht.
+      }
     });
 
     // Hover-Preview: state.hoveredAcc folgt der gehoverten Card.
