@@ -806,6 +806,80 @@
     const FROM = PubgUI.qs("from", "");
     const TO = PubgUI.qs("to", "");
 
+    // ── Match-Detail Rework Globals ──────────────────────────────────────
+    const MD_COLORS = [
+      "#f2b705",  // Gelb (Self idx 0)
+      "#e74c3c",  // Rot
+      "#3498db",  // Blau
+      "#2ecc71",  // Gruen
+      "#ff7a1f",  // Orange (5er-Squad)
+      "#9b59b6",  // Violett
+      "#1abc9c",  // Tuerkis
+      "#ec407a",  // Pink
+    ];
+
+    // Cache: matchId -> { detail: <md>, colorByAcc: {acc -> hex} }
+    const _mdCache = new Map();
+
+    async function mdLoad(matchId) {
+      if (!matchId) return null;
+      if (_mdCache.has(matchId)) return _mdCache.get(matchId);
+      let d = null;
+      try {
+        d = await PubgUI.fetchJson(
+          `/api/pubg/match-detail?matchId=${encodeURIComponent(matchId)}`);
+      } catch (e) { console.warn("mdLoad failed", matchId, e); }
+      const colorByAcc = {};
+      if (d && d.members) {
+        d.members.forEach((m, i) => {
+          colorByAcc[m.accountId] = MD_COLORS[i % MD_COLORS.length];
+        });
+      }
+      const cached = { detail: d, colorByAcc };
+      _mdCache.set(matchId, cached);
+      return cached;
+    }
+
+    // Map-Image-Cache + Load (kept from old code, .png with .webp fallback).
+    const _mdImgCache = new Map();
+    function mdMapImage(mapName) {
+      if (!mapName) return Promise.resolve(null);
+      if (_mdImgCache.has(mapName)) return _mdImgCache.get(mapName);
+      const p = new Promise((res) => {
+        const img = new Image();
+        img.onload = () => res(img);
+        img.onerror = () => {
+          // .png fehlte -> versuche .webp
+          const img2 = new Image();
+          img2.onload = () => res(img2);
+          img2.onerror = () => res(null);
+          img2.src = `/widgets/pubg/maps/${mapName}.webp`;
+        };
+        img.src = `/widgets/pubg/maps/${mapName}.png`;
+      });
+      _mdImgCache.set(mapName, p);
+      return p;
+    }
+
+    // Center-Anchored Affin (gleiche Formel wie poi-editor.html).
+    function mdApplyPinCal(xCm, yCm, mapKm, cal) {
+      if (!cal) return [xCm, yCm];
+      const mc = mapKm * 100000 / 2;
+      let x = xCm, y = yCm;
+      if (cal.flipX) x = 2 * mc - x;
+      if (cal.flipY) y = 2 * mc - y;
+      const rot = ((cal.rotate || 0) % 360 + 360) % 360;
+      if (rot !== 0) {
+        const dx = x - mc, dy = y - mc;
+        if (rot === 90)  { x = mc - dy; y = mc + dx; }
+        if (rot === 180) { x = mc - dx; y = mc - dy; }
+        if (rot === 270) { x = mc + dy; y = mc - dx; }
+      }
+      const ex = (x - mc) * (cal.scaleX || 1) + mc + (cal.offsetX || 0);
+      const ey = (y - mc) * (cal.scaleY || 1) + mc + (cal.offsetY || 0);
+      return [ex, ey];
+    }
+
     // Date-Range-Picker initialisieren mit aktuellen URL-Werten
     function isoLocal(date) {
       // Local-Date → "YYYY-MM-DD"
