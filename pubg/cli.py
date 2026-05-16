@@ -656,9 +656,29 @@ def refresh_assets(root: str) -> int:
     weap_ids += ["ProjGrenade_C", "ProjMolotov_C", "ProjC4_C",
                  "ProjStickyGrenade_C", "PanzerFaust100M_Projectile_C"]
     ok = err = 0
+    # Spezial-Mappings fuer IDs die im File-Namen anders heissen.
+    # Projektile/Throwables tragen meistens das Wort 'Projectile' / 'Proj'
+    # im Telemetry-ID, im Assets-Repo aber nicht.
+    SPECIAL_STEMS = {
+        "ProjGrenade_C":              "Item_Weapon_Grenade_C",
+        "ProjMolotov_C":              "Item_Weapon_Molotov_C",
+        "ProjStickyGrenade_C":        "Item_Weapon_StickyGrenade_C",
+        "ProjC4_C":                   "Item_Weapon_C4_C",
+        "ProjSmokeBomb_C":            "Item_Weapon_SmokeBomb_C",
+        "PanzerFaust100M_Projectile_C": "Item_Weapon_PanzerFaust100M_C",
+        "Mortar_Projectile_C":        "Item_Weapon_Mortar_C",
+        "WeapCrossbow_1_C":           "Item_Weapon_Crossbow_C",
+        "WeapMosinNagant_C":          "Item_Weapon_Mosin_C",
+        "WeapMacheteProjectile_C":    "Item_Weapon_Machete_C",
+        "WeapPanProjectile_C":        "Item_Weapon_Pan_C",
+        "WeapSickleProjectile_C":     "Item_Weapon_Sickle_C",
+        "WeapPickaxeProjectile_C":    "Item_Weapon_Pickaxe_C",
+    }
     for wid in weap_ids:
         clean = wid.replace("WeapDuncans", "Weap").replace("WeapJulies", "Weap")
-        if clean.startswith("Weap"):
+        if wid in SPECIAL_STEMS:
+            stem = SPECIAL_STEMS[wid]
+        elif clean.startswith("Weap"):
             stem = "Item_Weapon_" + clean[len("Weap"):]
         else:
             stem = "Item_Weapon_" + clean
@@ -666,7 +686,7 @@ def refresh_assets(root: str) -> int:
         if os.path.exists(out):
             ok += 1; continue
         success = False
-        for sub in ("Main", "Handgun", "Melee"):
+        for sub in ("Main", "Handgun", "Melee", "Throwable"):
             rel = f"Assets/Item/Weapon/{sub}/{stem}.png"
             try:
                 data = _fetch_asset(src, rel, timeout=8)
@@ -674,6 +694,16 @@ def refresh_assets(root: str) -> int:
                 ok += 1; success = True; break
             except Exception:
                 continue
+        # Letzter Versuch: /Assets/Item/Use/ (Throwables liegen dort)
+        if not success:
+            for sub in ("Use",):
+                rel = f"Assets/Item/{sub}/{stem}.png"
+                try:
+                    data = _fetch_asset(src, rel, timeout=8)
+                    _save_icon_webp(data, out, max_size=192, quality=85)
+                    ok += 1; success = True; break
+                except Exception:
+                    continue
         if not success: err += 1
     print(f"  Weapon-Icons: {ok} ok, {err} fehlend (Skins/Special)")
 
@@ -779,18 +809,32 @@ NAME_MAP = {
 
 
 def _symlink_or_copy(target_abs, link_path):
-    """Erstellt Symlink link_path -> target_abs (relative).
-    Wenn vorher schon da: ersetzen. Fallback auf Copy wenn Symlink
-    nicht moeglich (z.B. Windows ohne Admin)."""
+    """Verlinkt link_path auf target_abs. Strategy:
+      1. Hardlink (os.link)   — kein Admin auf NTFS noetig, 0 Disk-Cost
+                                 wenn auf gleichem Filesystem
+      2. Symlink (relative)   — braucht auf Windows Developer-Mode
+      3. Copy                 — Letzter Fallback (Disk-Duplikation!)
+    Existierender Eintrag wird vorher entfernt (idempotent)."""
     if os.path.islink(link_path) or os.path.exists(link_path):
         try: os.remove(link_path)
         except OSError: pass
+    # 1) Hardlink — beste Option (kein Admin, kein Disk-Overhead)
+    try:
+        os.link(target_abs, link_path)
+        return
+    except OSError:
+        pass  # z.B. cross-device link not permitted
+    # 2) Symlink (relative damit Repo-portable)
     rel_target = os.path.relpath(target_abs, os.path.dirname(link_path))
     try:
         os.symlink(rel_target, link_path)
+        return
     except (OSError, NotImplementedError):
-        import shutil
-        shutil.copy2(target_abs, link_path)
+        pass  # z.B. Windows ohne Developer-Mode
+    # 3) Copy als letzter Ausweg — Warnung ausgeben
+    import shutil
+    shutil.copy2(target_abs, link_path)
+    print(f"  WARN  {os.path.basename(link_path)} kopiert (kein hardlink/symlink moeglich)")
 
 
 def refresh_maps(root: str) -> int:

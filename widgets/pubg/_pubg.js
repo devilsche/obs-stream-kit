@@ -50,16 +50,17 @@
   PubgUI.fmtKm = (km) => (km == null ? "—" : km.toFixed(2) + "km");
 
   // Asset-URLs — Pfade die per 'python -m pubg.cli refresh-assets'
-  // angelegt werden. Files koennen fehlen (lokal nicht generiert) —
+  // angelegt werden. Icons sind alle .webp (verkleinert auf 128-256px),
+  // Files koennen fehlen (lokal nicht generiert) —
   // <img onerror="this.style.display='none'"> als Fallback im Markup.
   PubgUI.weaponIconUrl = (weaponId) =>
-    weaponId ? `/widgets/pubg/assets/weapons/${weaponId}.png` : null;
+    weaponId ? `/widgets/pubg/assets/weapons/${weaponId}.webp` : null;
   PubgUI.vehicleIconUrl = (vehicleId) =>
-    vehicleId ? `/widgets/pubg/assets/vehicles/${vehicleId}.png` : null;
+    vehicleId ? `/widgets/pubg/assets/vehicles/${vehicleId}.webp` : null;
   PubgUI.killfeedIconUrl = (name) =>
-    name ? `/widgets/pubg/assets/killfeed/${name}.png` : null;
+    name ? `/widgets/pubg/assets/killfeed/${name}.webp` : null;
   PubgUI.mapThumbUrl = (mapName) =>
-    mapName ? `/widgets/pubg/assets/mapselection/${mapName}.png` : null;
+    mapName ? `/widgets/pubg/assets/mapselection/${mapName}.webp` : null;
 
   // ── Zeit-Formatter — Browser-Lokalzeit (CEST/CET je nach Sommerzeit) ───────
   PubgUI.fmtDate = (iso) => {
