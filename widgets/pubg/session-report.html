@@ -2622,6 +2622,43 @@
       e.stopPropagation();
     });
 
+    document.addEventListener("mousemove", (e) => {
+      const wrap = e.target.closest && e.target.closest(".md-mapwrap");
+      if (!wrap) return;
+      const host = wrap.closest(".md-host");
+      if (!host || host.dataset.mounted !== "1") return;
+      const s = mdGetState(host);
+      if (s.dragPan) return;  // waehrend Pan keine Hover-Label
+      const rect = wrap.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      const hit = mdHitTestMarker(host, px, py);
+      const labelEl = wrap.querySelector(".md-hover-label");
+      if (!labelEl) return;
+      if (!hit) {
+        labelEl.classList.remove("show");
+        return;
+      }
+      let txt = "?";
+      const member = s.detail.members.find(m => m.accountId === hit.acc);
+      const memberName = member && (member.isSelf ? "Du" : member.name);
+      const lifeSuffix = (member && member.lives.length > 1)
+        ? ` ${hit.lifeIdx}` : "";
+      if (hit.kind === "landing") txt = `${memberName} • Landing${lifeSuffix}`;
+      else if (hit.kind === "death") txt = `${memberName} • Death${lifeSuffix}`;
+      else if (hit.kind === "kill") {
+        const life = member.lives.find(l => l.lifeIndex === hit.lifeIdx);
+        const k = life.kills.find(kk => kk.tsMs === hit.tsMs);
+        const wn = k && k.weapon ? k.weapon.replace("Weap_", "").replace("_C", "") : "Kill";
+        const victim = k && k.victimName ? k.victimName : "Gegner";
+        txt = `${memberName} • ${wn} → ${victim}`;
+      }
+      labelEl.textContent = txt;
+      labelEl.style.left = (px + 8) + "px";
+      labelEl.style.top  = (py - 24) + "px";
+      labelEl.classList.add("show");
+    });
+
   </script>
 </body>
 </html>
