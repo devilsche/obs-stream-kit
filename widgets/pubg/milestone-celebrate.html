@@ -17,9 +17,17 @@
 <head>
   <meta charset="utf-8">
   <title>Career Wins Milestone</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="_pubg.css">
   <style>
+    /* Lokale Schrift — verhindert Layout-Sprung wenn Google-Fonts
+       per swap die Fallback-Schrift gegen DM Sans austauscht
+       (Zahl wird breiter → translate(-50%) re-zentriert → springt). */
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('/assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: block;
+    }
     html, body {
       width: 1920px; height: 1080px;
       margin: 0; overflow: hidden;
@@ -27,6 +35,11 @@
       font-family: "DM Sans", sans-serif;
       color: var(--pubg-text, #fff);
     }
+    /* Alle Animationen pausieren bis JS Schrift+Daten geladen hat —
+       sonst startet die Sequenz noch waehrend wir lifetime fetchen
+       und die Riesenzahl springt beim Font-Swap nach. */
+    html.preload * { animation-play-state: paused !important; }
+    html.preload .stage { opacity: 0; }
     .stage {
       position: absolute; inset: 0;
       animation: fadeOut 1.2s ease-in forwards;
@@ -193,19 +206,35 @@
 
   <script src="_pubg.js"></script>
   <script>
-    const N      = parseInt(PubgUI.qs("n", "1000"), 10);
-    const WAIT   = parseInt(PubgUI.qs("wait", "15"), 10);
-    const MUTE   = PubgUI.qs("mute", "0") === "1";
-    const PLAYER = PubgUI.qs("player", "");
+    // ?n=<num> erlaubt manuelles Override. Ohne n: auto-detect aus
+    // lifetime.wins (= letzte erreichte 100er-Marke). ?force=1 zeigt
+    // die Szene auch dann, wenn die letzte Marke schon laenger zurueckliegt.
+    const N_OVERRIDE = parseInt(PubgUI.qs("n", "") || "0", 10) || null;
+    const WAIT       = parseInt(PubgUI.qs("wait", "15"), 10);
+    const MUTE       = PubgUI.qs("mute", "0") === "1";
+    const PLAYER     = PubgUI.qs("player", "");
 
+    // Alle Animationen pausiert lassen bis bootstrap() durch ist.
+    document.documentElement.classList.add("preload");
     document.documentElement.style.setProperty("--out-delay",
       Math.max(3, WAIT - 1.2) + "s");
-    document.getElementById("num").textContent = PubgUI.fmtNum(N);
-    // Untertitel kontextabhaengig
-    const sub = (N % 1000 === 0)  ? "Grand Career Chickens"
-              : (N % 500  === 0)  ? "Half-Grand Career Chickens"
-              : `Career Chicken Dinner #${N}`;
-    document.getElementById("sub").textContent = sub.toUpperCase();
+
+    function setNumber(N) {
+      document.getElementById("num").textContent = PubgUI.fmtNum(N);
+      const sub = (N % 1000 === 0) ? "Grand Career Chickens"
+                : (N % 500  === 0) ? "Half-Grand Career Chickens"
+                : `Career Chicken Dinner #${N}`;
+      document.getElementById("sub").textContent = sub.toUpperCase();
+    }
+    function startStage() {
+      document.documentElement.classList.remove("preload");
+      // Fanfare hier triggern, damit Sound mit Animation synct.
+      if (!MUTE) {
+        setTimeout(() => {
+          document.getElementById("fanfare").play().catch(() => {});
+        }, 400);
+      }
+    }
 
     // Konfetti generieren — Gold, Purple, Weiss in zufaelligen Bahnen.
     (function makeConfetti() {
@@ -229,35 +258,43 @@
       }
     })();
 
-    // Career-Stats laden + grid fuellen
-    async function loadStats() {
+    // Lifetime laden, N + Stats setzen, dann erst animieren.
+    async function bootstrap() {
       const params = new URLSearchParams({ mode: "all" });
       if (PLAYER) params.set("player", PLAYER);
       let d = null;
       try {
         d = await PubgUI.fetchJson(`/api/pubg/career-lifetime?${params}`);
       } catch (e) { /* silent */ }
-      if (!d || !d.rounds_played) return;
 
-      const cells = [
-        { v: PubgUI.fmtNum(d.rounds_played),    l: "Matches"   },
-        { v: PubgUI.fmtKD(d.kd_ratio),          l: "K/D"       },
-        { v: PubgUI.fmtNum(d.kills),            l: "Kills"     },
-        { v: PubgUI.fmtPct(d.win_rate),         l: "Win Rate"  },
-      ];
-      document.getElementById("stats").innerHTML = cells.map(c =>
-        `<div class="cell"><div class="v">${c.v}</div><span class="l">${c.l}</span></div>`
-      ).join("");
-    }
-    loadStats();
+      // N bestimmen: Override > floor(wins/100)*100 > 1000 als Notfall.
+      let N = N_OVERRIDE;
+      if (!N && d && d.wins != null) {
+        N = Math.floor(d.wins / 100) * 100;
+      }
+      if (!N || N < 100) N = 1000;  // Notfall — wir zeigen wenigstens irgendwas
+      setNumber(N);
 
-    // Fanfare. Browsers koennen autoplay blockieren — kein Crash wenn's
-    // failt (User-Geste in OBS via Show-Hide-Trigger reicht idR).
-    if (!MUTE) {
-      const a = document.getElementById("fanfare");
-      // 0.4s Delay damit Audio mit Crown-In-Pop synct.
-      setTimeout(() => { a.play().catch(() => {}); }, 400);
+      // Stats-Grid mit den lifetime-Werten
+      if (d && d.rounds_played) {
+        const cells = [
+          { v: PubgUI.fmtNum(d.rounds_played), l: "Matches"  },
+          { v: PubgUI.fmtKD(d.kd_ratio),       l: "K/D"      },
+          { v: PubgUI.fmtNum(d.kills),         l: "Kills"    },
+          { v: PubgUI.fmtPct(d.win_rate),      l: "Win Rate" },
+        ];
+        document.getElementById("stats").innerHTML = cells.map(c =>
+          `<div class="cell"><div class="v">${c.v}</div><span class="l">${c.l}</span></div>`
+        ).join("");
+      }
+
+      // Auf Font warten, sonst springt die zentrierte Riesenzahl beim
+      // Font-Swap (Fallback breiter als DM Sans 900).
+      try { await document.fonts.ready; } catch (e) {}
+
+      startStage();
     }
+    bootstrap();
   </script>
 </body>
 </html>
