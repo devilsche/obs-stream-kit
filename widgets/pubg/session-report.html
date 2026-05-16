@@ -979,6 +979,54 @@
       };
     }
 
+    async function mdRenderBasemap(host) {
+      const canvas = host.querySelector("canvas.md-basemap");
+      if (!canvas) return;
+      const mapName = host.getAttribute("data-map");
+      const blob = (window._poiData || {})[mapName] || {};
+      const mapKm = blob.mapKm || 8;
+      const cal = blob.pinCalibration || {};
+      host.dataset.mapKm = mapKm;
+      host.dataset.cal = JSON.stringify(cal);
+
+      canvas.width = MD_MAP_PX; canvas.height = MD_MAP_PX;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#0d061a";
+      ctx.fillRect(0, 0, MD_MAP_PX, MD_MAP_PX);
+
+      const img = await mdMapImage(mapName);
+      if (!img || !img.naturalWidth) return;
+
+      const s = mdGetState(host);
+      const vp = s.viewport;
+      if (!vp) return;
+
+      // Quell-Region berechnen: Viewport in Map-cm → in Bild-pixel
+      const side = Math.min(img.naturalWidth, img.naturalHeight);
+      const cropOffX = (img.naturalWidth  - side) / 2;
+      const cropOffY = (img.naturalHeight - side) / 2;
+      const mapCm = mapKm * 100000;
+
+      // Welche cm-Region wollen wir zeichnen? Viewport: centerX +/- (150/zoom) cm
+      const halfVisibleCm = (MD_MAP_PX / 2) / vp.zoom;
+      let cmX0 = vp.centerX - halfVisibleCm;
+      let cmY0 = vp.centerY - halfVisibleCm;
+      let cmX1 = vp.centerX + halfVisibleCm;
+      let cmY1 = vp.centerY + halfVisibleCm;
+
+      // cm → Bild-Pixel: (cm / mapCm) * side + cropOff
+      function cmToImg(cm, axis) {
+        return (cm / mapCm) * side + (axis === "x" ? cropOffX : cropOffY);
+      }
+      const sx = cmToImg(cmX0, "x");
+      const sy = cmToImg(cmY0, "y");
+      const sw = ((cmX1 - cmX0) / mapCm) * side;
+      const sh = ((cmY1 - cmY0) / mapCm) * side;
+
+      // Clamping wenn Viewport ueber Karten-Rand geht — pad mit Hintergrund
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, MD_MAP_PX, MD_MAP_PX);
+    }
+
     // Date-Range-Picker initialisieren mit aktuellen URL-Werten
     function isoLocal(date) {
       // Local-Date → "YYYY-MM-DD"
