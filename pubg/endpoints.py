@@ -2291,16 +2291,39 @@ class EndpointRegistry:
 
     # ── Calibration-Korrekturen — fuer Map-Cal-Fit via User-Death-Drag ──
     def _calibration_events(self, qs):
-        """Alle Death/Kill/Knock-Events fuer eine Map mit Telemetrie-
-        Coords (cm). Frontend rendert sie als zieh-bare Pins, der User
-        verschiebt sie an die tatsaechliche Stelle, daraus rechnen wir
-        den affinen Map-Transform.
-        Optional Filter: ?account=<id> nur Events wo Self/Mate beteiligt."""
+        """Kill/Knock-Events fuer eine Map mit Telemetrie-Coords (cm).
+        Default: nur Events wo der Actor im Squad des Streamers (self)
+        war — die Positionen sind dann verlaesslich, weil PUBG meine
+        eigenen Squad-Position-Snapshots haeufiger schickt als von
+        Gegnern. ?squadOnly=0 schaltet das ab."""
         conn = self.get_conn()
         map_name = (qs.get("map") or "").strip()
         if not map_name:
             return _err(400, "map required")
-        rows = conn.execute("""
+        squad_only = (qs.get("squadOnly", "1") != "0")
+        match_filter = (qs.get("matchId") or "").strip()
+
+        # Squad-IDs pro Match auf der Map ermitteln (= mein Team)
+        squad_per_match = {}
+        if squad_only and self.my_account_id:
+            for r in conn.execute("""
+                WITH my_teams AS (
+                  SELECT mtm.match_id, mtm.team_id
+                  FROM match_team_mapping mtm
+                  JOIN matches m ON m.match_id = mtm.match_id
+                  WHERE mtm.account_id = ? AND m.map_name = ?
+                )
+                SELECT mtm.match_id, mtm.account_id
+                FROM match_team_mapping mtm
+                JOIN my_teams mt ON mt.match_id = mtm.match_id
+                                  AND mt.team_id = mtm.team_id
+            """, (self.my_account_id, map_name)).fetchall():
+                squad_per_match.setdefault(
+                    r["match_id"], set()).add(r["account_id"])
+            if not squad_per_match:
+                return _ok({"map": map_name, "events": []})
+
+        sql = """
             SELECT te.match_id, m.played_at, te.event_type, te.timestamp_ms,
                    te.actor_account, te.target_account,
                    te.victim_x, te.victim_y, te.weapon, te.distance
@@ -2309,9 +2332,16 @@ class EndpointRegistry:
             WHERE m.map_name = ?
               AND te.event_type IN ('Kill','Knock')
               AND te.victim_x IS NOT NULL
-            ORDER BY m.played_at DESC, te.timestamp_ms ASC
-            LIMIT 5000
-        """, (map_name,)).fetchall()
+        """
+        params = [map_name]
+        if match_filter:
+            sql += " AND te.match_id = ?"
+            params.append(match_filter)
+        sql += " ORDER BY m.played_at DESC, te.timestamp_ms ASC LIMIT 5000"
+        rows = conn.execute(sql, params).fetchall()
+        if squad_only:
+            rows = [r for r in rows
+                    if r["actor_account"] in squad_per_match.get(r["match_id"], set())]
         # Name-Lookup
         accs = set()
         for r in rows:

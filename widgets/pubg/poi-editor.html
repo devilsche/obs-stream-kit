@@ -1327,13 +1327,16 @@ async function loadCalEvents() {
   if (!currentDataKey) return;
   statusEl.textContent = "Lade Cal-Events…";
   try {
+    // squadOnly=1 default → nur Kills/Knocks die mein Squad gemacht hat
+    // (Positionen verlaesslicher, weil eigene Telem-Snapshots dichter).
+    // Match-Filter machen wir clientseitig (Dropdown bleibt befuellt).
     const [er, cr] = await Promise.all([
-      fetch(`/api/pubg/calibration-events?map=${encodeURIComponent(currentDataKey)}`).then(r => r.json()),
+      fetch(`/api/pubg/calibration-events?map=${encodeURIComponent(currentDataKey)}&squadOnly=1`).then(r => r.json()),
       fetch(`/api/pubg/calibration-corrections?map=${encodeURIComponent(currentDataKey)}`).then(r => r.json()),
     ]);
     calEvents = er.events || [];
     calCorrections = cr.corrections || [];
-    statusEl.textContent = `${calEvents.length} Events, ${calCorrections.length} Korrekturen`;
+    statusEl.textContent = `${calEvents.length} Squad-Events, ${calCorrections.length} Korrekturen`;
     renderCalList();
     render();
   } catch (e) {
@@ -1353,13 +1356,14 @@ function _calMatchSummary() {
     (b.playedAt || "").localeCompare(a.playedAt || ""));
 }
 
-// Events die aktuell auf der Map gerendert werden (gefiltert nach Match-Auswahl)
+// Events die aktuell auf der Map gerendert werden (gefiltert nach Match)
 function _calVisibleEvents() {
   if (!calSelectedMatch) {
-    // Default: letzte 10 Matches
-    const top = _calMatchSummary().slice(0, 10).map(m => m.matchId);
-    const set = new Set(top);
-    return calEvents.filter(ev => set.has(ev.matchId));
+    // Default: das neueste Match — User sieht sofort Events, kann via
+    // Dropdown auf andere wechseln.
+    const ms = _calMatchSummary();
+    if (!ms.length) return [];
+    return calEvents.filter(ev => ev.matchId === ms[0].matchId);
   }
   return calEvents.filter(ev => ev.matchId === calSelectedMatch);
 }
@@ -1371,8 +1375,7 @@ function renderCalList() {
   const correctedIds = new Set(calCorrections.map(c => c.eventId));
   const matches = _calMatchSummary();
   // Match-Dropdown bauen
-  const opts = [`<option value="">— letzte 10 Matches (${
-    Math.min(10, matches.length)} Runden) —</option>`]
+  const opts = [`<option value="">— neuestes Match —</option>`]
     .concat(matches.map(m => {
       const date = (m.playedAt || "").slice(0, 16).replace("T", " ");
       const sel = (m.matchId === calSelectedMatch) ? "selected" : "";
