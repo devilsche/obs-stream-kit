@@ -1045,9 +1045,16 @@ canvas.addEventListener("mousemove", (ev) => {
 
   // Pin-Hover-Tooltip (View-Mode + nichts wird gerade gezogen)
   if (mode === "view" && !isPanning && !calibratingPins) {
-    const pin = hitTestPin(lx, ly);
-    if (pin) showPinTooltip(pin, ev.clientX, ev.clientY);
-    else hidePinTooltip();
+    if (calCorrMode) {
+      // Cal-Mode: Tooltip ueber Cal-Event-X
+      const ce = hitTestCalEvent(ev.clientX, ev.clientY);
+      if (ce) showCalTooltip(ce, ev.clientX, ev.clientY);
+      else hidePinTooltip();
+    } else {
+      const pin = hitTestPin(lx, ly);
+      if (pin) showPinTooltip(pin, ev.clientX, ev.clientY);
+      else hidePinTooltip();
+    }
   } else {
     hidePinTooltip();
   }
@@ -1344,6 +1351,56 @@ async function loadCalEvents() {
   }
 }
 
+function hitTestCalEvent(clientX, clientY) {
+  if (!calCorrMode) return null;
+  const rect = canvas.getBoundingClientRect();
+  const cx = clientX - rect.left;
+  const cy = clientY - rect.top;
+  const vis = _calVisibleEvents();
+  const correctedIds = new Set(calCorrections.map(c => c.eventId));
+  const HIT_PX = 12;
+  let best = null, bestDist = Infinity;
+  for (const ev of vis) {
+    if (correctedIds.has(_calEventId(ev))) continue;
+    const [ex, ey] = worldToCanvas(ev.x, ev.y);
+    const d = Math.hypot(ex - cx, ey - cy);
+    if (d < HIT_PX && d < bestDist) { best = ev; bestDist = d; }
+  }
+  return best;
+}
+
+function showCalTooltip(ev, clientX, clientY) {
+  const tip = document.getElementById("pinTooltip");
+  const correctedIds = new Set(calCorrections.map(c => c.eventId));
+  const isCorrected = correctedIds.has(_calEventId(ev));
+  const isSel = (calSelectedEvent && _calEventId(calSelectedEvent) === _calEventId(ev));
+  let dateStr = "";
+  if (ev.playedAt) {
+    try {
+      const d = new Date(ev.playedAt);
+      dateStr = d.toLocaleString("de-DE",
+        { day: "2-digit", month: "2-digit", year: "2-digit",
+          hour: "2-digit", minute: "2-digit" });
+    } catch (e) {}
+  }
+  const actLbl = ev.type === "Knock" ? "Knocked by" : "Killed by";
+  tip.innerHTML = `
+    <div class="row"><span class="lbl">Event</span><b style="color:${ev.type==="Kill"?"#e74c3c":"#ffa028"}">${ev.type}</b>${isSel?" <span style='color:#f2b705'>● SELECT</span>":""}${isCorrected?" <span style='color:#48c878'>✓ korrigiert</span>":""}</div>
+    <div class="row"><span class="lbl">${actLbl}</span><b>${ev.actorName || "?"}</b></div>
+    <div class="row"><span class="lbl">Opfer</span><b>${ev.targetName || "?"}</b></div>
+    ${dateStr ? `<div class="row"><span class="lbl">Match</span><span>${dateStr}</span></div>` : ""}
+    <div class="row"><span class="lbl">Match-Zeit</span><span>${_shortTime(ev.tsMs)}</span></div>
+    ${ev.weapon ? `<div class="row"><span class="lbl">Waffe</span><span>${ev.weapon}</span></div>` : ""}
+  `;
+  tip.style.display = "block";
+  const W = tip.offsetWidth, H = tip.offsetHeight;
+  let x = clientX + 14, y = clientY + 12;
+  if (x + W > window.innerWidth - 8) x = clientX - W - 14;
+  if (y + H > window.innerHeight - 8) y = clientY - H - 12;
+  tip.style.left = x + "px";
+  tip.style.top  = y + "px";
+}
+
 function _calMatchSummary() {
   // Returns [{matchId, playedAt, count}] sortiert neueste zuerst.
   const by = new Map();
@@ -1399,8 +1456,14 @@ function renderCalList() {
   });
   const canFit = calCorrections.length >= 3;
   host.innerHTML = `
-    <div style="padding:6px 4px;border-bottom:1px solid #2a1d3f;margin-bottom:6px">
-      <select id="calMatchSel" style="width:100%;padding:4px;font-size:0.85em">
+    <div style="padding:6px 4px;border-bottom:1px solid #2a1d3f;margin-bottom:6px;font-size:0.75em;color:#8a7d99">
+      <div style="display:grid;grid-template-columns:24px 1fr;gap:3px 8px;margin-bottom:6px;font-size:0.9em">
+        <span style="color:#e74c3c;font-weight:700;text-align:center">✕</span><span>Kill</span>
+        <span style="color:#ffa028;font-weight:700;text-align:center">✕</span><span>Knock</span>
+        <span style="color:#f2b705;font-weight:700;text-align:center">✕</span><span>ausgewaehlt — naechster Klick = Korrektur-Ziel</span>
+        <span style="text-align:center"><span style="color:#e74c3c">✕</span><span style="color:#48c878">→●</span></span><span>bereits korrigiert (Telem→Fix)</span>
+      </div>
+      <select id="calMatchSel" style="width:100%;padding:4px;font-size:0.95em">
         ${opts.join("")}
       </select>
       <div style="display:flex;gap:4px;margin-top:6px">
