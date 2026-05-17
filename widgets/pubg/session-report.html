@@ -1648,20 +1648,37 @@
       const s = mdGetState(host);
       const vp = s.viewport;
       if (!vp) return;
-      // Welcher cm-Punkt liegt aktuell unter anchor?
-      const [acmX, acmY] = mdCanvasToCm(host, anchorPx, anchorPy);
-      // Neuer zoom
-      let newZoom = vp.zoom * deltaScale;
-      // Limits
-      const maxZoom = MD_MAP_PX / MD_MIN_ZOOM_CM;  // tightest 50m visible
-      const minZoom = MD_MAP_PX / MD_MAX_ZOOM_CM;  // ganze 8km Map
-      newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
+      // Neuer zoom mit Limits
+      const maxZoom = MD_MAP_PX / MD_MIN_ZOOM_CM;
+      const minZoom = MD_MAP_PX / MD_MAX_ZOOM_CM;
+      let newZoom = Math.max(minZoom, Math.min(maxZoom, vp.zoom * deltaScale));
       vp.zoom = newZoom;
-      // Center so dass anchor-cm-Punkt unter anchor-px bleibt
-      vp.centerX = acmX - (anchorPx - MD_MAP_PX / 2) / vp.zoom;
-      vp.centerY = acmY - (anchorPy - MD_MAP_PX / 2) / vp.zoom;
-      // autoFollow bleibt erhalten — Zoom-Level setzt der User, die
-      // Kamera folgt weiterhin der Action auf der gewaehlten Stufe.
+      if (vp.autoFollow) {
+        // Auto-Follow ist an → Zoom soll Pins zentriert lassen, NICHT
+        // an Maus-Anker. Direkt auf Pin-bbox snappen, naechster Frame
+        // lerpt dann weiter.
+        const absTs = s.zeitraffer.matchStart + s.zeitraffer.cursorTs;
+        const coords = [];
+        for (const m of s.detail.members) {
+          if (s.hiddenAccs.has(m.accountId)) continue;
+          const pin = mdInterpolatePin(m, absTs);
+          if (pin) coords.push([pin.x, pin.y]);
+        }
+        if (coords.length) {
+          let mnX = Infinity, mxX = -Infinity, mnY = Infinity, mxY = -Infinity;
+          for (const [x, y] of coords) {
+            if (x < mnX) mnX = x; if (x > mxX) mxX = x;
+            if (y < mnY) mnY = y; if (y > mxY) mxY = y;
+          }
+          vp.centerX = (mnX + mxX) / 2;
+          vp.centerY = (mnY + mxY) / 2;
+        }
+      } else {
+        // Manueller Modus (nach Drag-Pan) → Zoom an Maus-Anker
+        const [acmX, acmY] = mdCanvasToCm(host, anchorPx, anchorPy);
+        vp.centerX = acmX - (anchorPx - MD_MAP_PX / 2) / vp.zoom;
+        vp.centerY = acmY - (anchorPy - MD_MAP_PX / 2) / vp.zoom;
+      }
       mdClampViewport(host);
       mdRenderBasemap(host);
       mdRenderOverlay(host);
