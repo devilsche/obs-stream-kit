@@ -131,15 +131,16 @@
     <table class="ws" id="wsTable">
       <thead>
         <tr>
-          <th class="name-h" data-sort="name">Waffe</th>
-          <th data-sort="kills" class="active">Kills ↓</th>
-          <th data-sort="avgDist">Ø m</th>
-          <th data-sort="maxDist">Max m</th>
-          <th data-sort="killsPerMatch" title="Kills pro Match in dem die Waffe einen Kill hatte">K/M</th>
+          <th class="name-h" data-sort="name"><span class="hdr">Waffe</span></th>
+          <th data-sort="kills"><span class="hdr">Kills</span></th>
+          <th data-sort="usedInMatches" title="In wie vielen Matches die Waffe min. 1 Kill hatte"><span class="hdr">Matches</span></th>
+          <th data-sort="avgDist"><span class="hdr">Ø m</span></th>
+          <th data-sort="maxDist"><span class="hdr">Max m</span></th>
+          <th data-sort="killsPerMatch" title="Kills pro Match in dem die Waffe einen Kill hatte"><span class="hdr">K/M</span></th>
         </tr>
       </thead>
       <tbody id="wsBody">
-        <tr><td colspan="5" class="empty">— laedt —</td></tr>
+        <tr><td colspan="6" class="empty">— laedt —</td></tr>
       </tbody>
     </table>
     <div class="meta" id="wsMeta"></div>
@@ -225,18 +226,24 @@
       }
       view = applySort(view);
 
-      // Sort-Indikator in Headers
+      // Sort-Indikator in Headers — Pfeil nur an aktiver Spalte
+      const arrow = sortBy === "name" ? "↑" : "↓";
       document.querySelectorAll("#wsTable thead th").forEach(th => {
-        th.classList.toggle("active", th.dataset.sort === sortBy);
+        const isActive = th.dataset.sort === sortBy;
+        th.classList.toggle("active", isActive);
+        const hdr = th.querySelector(".hdr");
+        if (!hdr) return;
+        const base = hdr.dataset.base || hdr.textContent;
+        hdr.dataset.base = base;
+        hdr.textContent = isActive ? `${base} ${arrow}` : base;
       });
 
       if (!view.length) {
         body.innerHTML =
-          `<tr><td colspan="5" class="empty">— keine Waffen im Filter —</td></tr>`;
+          `<tr><td colspan="6" class="empty">— keine Waffen im Filter —</td></tr>`;
         meta.textContent = "";
         return;
       }
-      const topKills = view[0] ? view[0].kills : 0;
       body.innerHTML = view.map((w, i) => {
         const top = (sortBy === "kills" && i === 0) ? "top-row" : "";
         const hot = (n, thr) => n >= thr ? "hot" : "";
@@ -247,6 +254,7 @@
         return `<tr class="${top}">
           <td class="name">${iconImg}<span>${w.name}</span></td>
           <td class="num kills ${hot(w.kills,10)}">${w.kills}</td>
+          <td class="num">${w.usedInMatches || 0}</td>
           <td class="num">${w.avgDist.toFixed(0)}</td>
           <td class="num">${w.maxDist.toFixed(0)}</td>
           <td class="num">${w.killsPerMatch.toFixed(2)}</td>
