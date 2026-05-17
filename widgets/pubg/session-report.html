@@ -1574,11 +1574,11 @@
       }
       if (coords.length === 0) return;
       const target = mdBboxFitViewport(coords, MD_PAD_500M_CM);
-      // Smooth ease toward target (lerp 0.18 / frame)
+      // Smooth ease toward target (lerp 0.18 / frame) — Zoom bleibt
+      // bewusst auf User-Wert, nur Center bewegt sich mit der Action.
       const t = 0.18;
       s.viewport.centerX += (target.centerX - s.viewport.centerX) * t;
       s.viewport.centerY += (target.centerY - s.viewport.centerY) * t;
-      s.viewport.zoom += (target.zoom - s.viewport.zoom) * t;
       mdClampViewport(host);
     }
 
@@ -1660,7 +1660,8 @@
       // Center so dass anchor-cm-Punkt unter anchor-px bleibt
       vp.centerX = acmX - (anchorPx - MD_MAP_PX / 2) / vp.zoom;
       vp.centerY = acmY - (anchorPy - MD_MAP_PX / 2) / vp.zoom;
-      vp.autoFollow = false;
+      // autoFollow bleibt erhalten — Zoom-Level setzt der User, die
+      // Kamera folgt weiterhin der Action auf der gewaehlten Stufe.
       mdClampViewport(host);
       mdRenderBasemap(host);
       mdRenderOverlay(host);
