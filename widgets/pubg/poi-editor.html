@@ -147,6 +147,7 @@
   <button id="rectBtn">▭ Rechteck</button>
   <button id="polyBtn">⬠ Polygon</button>
   <button id="pinsBtn" class="secondary">📍 Pins laden</button>
+  <button id="calBtn" class="secondary" title="Calibration-Mode: Kill/Death-Events verschieben zur Map-Cal-Berechnung">🎯 Cal</button>
   <button id="gridBtn" class="secondary active" title="1km-Raster ein/aus">▦ Raster</button>
   <button id="modeBtn" class="secondary" title="Welche Cal die Inputs steuern: Pin- oder Grid-Calibration">Cal-Mode: PIN</button>
   <button id="flipXBtn" class="secondary" title="X-Achse spiegeln (Ost/West)">↔ FlipX</button>
@@ -639,6 +640,52 @@ function render() {
     ctx.lineWidth = 1 / view.zoom;
     ctx.stroke();
   });
+
+  // Cal-Korrektur-Mode: Korrekturen (orig → fixed) als gruener Pfeil
+  if (calCorrMode) {
+    for (const c of calCorrections) {
+      const [ox, oy] = worldToCanvas(c.origX, c.origY);
+      const [fx, fy] = worldToCanvas(c.fixedX, c.fixedY);
+      // Linie orig → fixed
+      ctx.strokeStyle = "rgba(72,200,120,0.85)";
+      ctx.lineWidth = 1.5 / view.zoom;
+      ctx.beginPath();
+      ctx.moveTo(ox, oy); ctx.lineTo(fx, fy);
+      ctx.stroke();
+      // Orig-Punkt (rotes X)
+      const xs = 5 / view.zoom;
+      ctx.strokeStyle = "#e74c3c";
+      ctx.lineWidth = 1.5 / view.zoom;
+      ctx.beginPath();
+      ctx.moveTo(ox - xs, oy - xs); ctx.lineTo(ox + xs, oy + xs);
+      ctx.moveTo(ox - xs, oy + xs); ctx.lineTo(ox + xs, oy - xs);
+      ctx.stroke();
+      // Fixed-Punkt (gruener Kreis)
+      ctx.beginPath();
+      ctx.arc(fx, fy, 4 / view.zoom, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(72,200,120,0.95)";
+      ctx.fill();
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 0.8 / view.zoom;
+      ctx.stroke();
+    }
+    // Aktuell ausgewaehltes Event (gelbes X — wartet auf Klick fuer Fix)
+    if (calSelectedEvent) {
+      const [ex, ey] = worldToCanvas(calSelectedEvent.x, calSelectedEvent.y);
+      const xs = 7 / view.zoom;
+      ctx.strokeStyle = "#f2b705";
+      ctx.lineWidth = 2.5 / view.zoom;
+      ctx.beginPath();
+      ctx.moveTo(ex - xs, ey - xs); ctx.lineTo(ex + xs, ey + xs);
+      ctx.moveTo(ex - xs, ey + xs); ctx.lineTo(ex + xs, ey - xs);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(ex, ey, xs + 3 / view.zoom, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(242,183,5,0.55)";
+      ctx.lineWidth = 1 / view.zoom;
+      ctx.stroke();
+    }
+  }
 
   ctx.restore();
 }
@@ -1236,6 +1283,147 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
     statusEl.textContent = `⚠ Speicher-Fehler: ${e}`;
   }
 });
+
+// ─── Calibration-Mode ──────────────────────────────────────────────────────
+let calCorrMode = false;
+let calEvents = [];        // [{matchId, type, x, y, actorName, targetName, tsMs, ...}]
+let calCorrections = [];   // [{id, eventId, origX, origY, fixedX, fixedY, ...}]
+let calSelectedEvent = null;
+
+function _calEventId(ev) {
+  // stabiler Identifier fuer Event = match+ts+target
+  return `${ev.matchId}:${ev.tsMs}:${ev.targetAcc||"?"}`;
+}
+function _shortTime(ms) {
+  if (!ms) return "?";
+  const sec = Math.floor(ms / 1000);
+  return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,"0")}`;
+}
+
+async function loadCalEvents() {
+  if (!currentDataKey) return;
+  statusEl.textContent = "Lade Cal-Events…";
+  try {
+    const [er, cr] = await Promise.all([
+      fetch(`/api/pubg/calibration-events?map=${encodeURIComponent(currentDataKey)}`).then(r => r.json()),
+      fetch(`/api/pubg/calibration-corrections?map=${encodeURIComponent(currentDataKey)}`).then(r => r.json()),
+    ]);
+    calEvents = er.events || [];
+    calCorrections = cr.corrections || [];
+    statusEl.textContent = `${calEvents.length} Events, ${calCorrections.length} Korrekturen`;
+    renderCalList();
+    render();
+  } catch (e) {
+    statusEl.textContent = `⚠ Cal-Load: ${e}`;
+  }
+}
+
+function renderCalList() {
+  const host = document.getElementById("regionList");
+  if (!host) return;
+  if (!calCorrMode) { renderList(); return; }
+  // Liste: pro Event eine Zeile (komprimiert). Mit ✓ markiert wenn schon
+  // korrigiert. Klick selektiert + zentriert auf Map.
+  const correctedIds = new Set(calCorrections.map(c => c.eventId));
+  // Sortierung: neueste zuerst (playedAt desc, dann tsMs)
+  const sorted = calEvents.slice().sort((a, b) =>
+    (b.playedAt || "").localeCompare(a.playedAt || "") ||
+    (a.tsMs || 0) - (b.tsMs || 0));
+  const rows = sorted.slice(0, 200).map(ev => {
+    const id = _calEventId(ev);
+    const done = correctedIds.has(id) ? "✓ " : "";
+    const date = (ev.playedAt || "").slice(0, 10);
+    const who = ev.type === "Kill"
+      ? `${ev.actorName||"?"} → ${ev.targetName||"?"}`
+      : `${ev.actorName||"?"} knock ${ev.targetName||"?"}`;
+    return `<div class="region-row" data-eid="${id}" style="cursor:pointer">
+      <span class="name">${done}${date} · ${_shortTime(ev.tsMs)} · ${who}</span>
+      <span class="badge">${ev.type}</span>
+    </div>`;
+  });
+  host.innerHTML = rows.join("");
+  host.querySelectorAll(".region-row").forEach(el => {
+    el.addEventListener("click", () => {
+      const id = el.dataset.eid;
+      calSelectedEvent = sorted.find(ev => _calEventId(ev) === id);
+      if (calSelectedEvent) {
+        statusEl.textContent = `Event ${id} ausgewaehlt — klicke auf der Karte die echte Stelle`;
+        render();
+      }
+    });
+  });
+  // Edit-Block ausblenden in Cal-Mode
+  const eb = document.getElementById("editBlock");
+  if (eb) eb.style.display = "none";
+}
+
+async function saveCorrection(fixedX, fixedY) {
+  if (!calSelectedEvent || !currentDataKey) return;
+  const ev = calSelectedEvent;
+  const corr = {
+    id:       _calEventId(ev),
+    eventId:  _calEventId(ev),
+    matchId:  ev.matchId,
+    tsMs:     ev.tsMs,
+    type:     ev.type,
+    origX:    ev.x,
+    origY:    ev.y,
+    fixedX:   fixedX,
+    fixedY:   fixedY,
+    targetName: ev.targetName,
+    actorName:  ev.actorName,
+    savedAt:  new Date().toISOString(),
+  };
+  try {
+    const r = await fetch("/api/pubg/calibration-corrections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ map: currentDataKey, correction: corr }),
+    });
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    // lokal aktualisieren
+    calCorrections = calCorrections.filter(c => c.id !== corr.id);
+    calCorrections.push(corr);
+    calSelectedEvent = null;
+    statusEl.textContent = `✓ Korrektur gespeichert (${calCorrections.length} total)`;
+    renderCalList();
+    render();
+  } catch (e) {
+    statusEl.textContent = `⚠ Korrektur-Speicher: ${e}`;
+  }
+}
+
+document.getElementById("calBtn").addEventListener("click", () => {
+  calCorrMode = !calCorrMode;
+  document.getElementById("calBtn").classList.toggle("active", calCorrMode);
+  if (calCorrMode) {
+    loadCalEvents();
+  } else {
+    calSelectedEvent = null;
+    renderList();
+    render();
+  }
+});
+
+// Click-Handler fuer Map: wenn Cal-Mode aktiv + Event ausgewaehlt, fix
+// die Welt-Koord wo geklickt wurde als Korrektur. Wir haengen uns an den
+// canvas-click-Cycle an — VOR den existierenden Handler (capture phase).
+canvas.addEventListener("click", (e) => {
+  if (!calCorrMode || !calSelectedEvent) return;
+  // Welt-Koord aus Maus-Position
+  const rect = canvas.getBoundingClientRect();
+  const cx = e.clientX - rect.left;
+  const cy = e.clientY - rect.top;
+  // Inverse von worldToCanvas — Canvas-Px → cm.
+  // canvas-Px = worldToCanvas(cm) durchlaeuft applyPinCal + view-Transform.
+  // canvasToWorld liefert uns cm direkt.
+  if (typeof canvasToWorld === "function") {
+    const [wx, wy] = canvasToWorld(cx, cy);
+    saveCorrection(wx, wy);
+    e.stopPropagation();
+  }
+}, true);  // capture phase, vor den anderen
 </script>
 </body>
 </html>
