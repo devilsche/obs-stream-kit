@@ -1194,9 +1194,10 @@ def compute_vehicle_stats(conn, my_account_id, range_key="session",
     br_where, br_params = _br_filter("m")
     params += br_params
 
-    # 1) Range-Matches + mein Team pro Match
+    # 1) Range-Matches + mein Team + map_name pro Match
     match_rows = conn.execute(f"""
-        SELECT m.match_id, mtm.team_id AS my_team
+        SELECT m.match_id, m.map_name, m.played_at,
+               mtm.team_id AS my_team
         FROM matches m
         JOIN match_team_mapping mtm ON mtm.match_id = m.match_id
         WHERE mtm.account_id = ? AND m.played_at >= ?{end_filter}
@@ -1205,6 +1206,9 @@ def compute_vehicle_stats(conn, my_account_id, range_key="session",
     if not match_rows:
         return []
     match_team = {r["match_id"]: r["my_team"] for r in match_rows}
+    match_meta = {r["match_id"]: {"map": r["map_name"],
+                                     "playedAt": r["played_at"]}
+                  for r in match_rows}
     match_ids = list(match_team.keys())
     ph = ",".join("?" * len(match_ids))
 
@@ -1233,7 +1237,8 @@ def compute_vehicle_stats(conn, my_account_id, range_key="session",
     # 3) Alle relevanten Events fuer diese Matches in einem Schwung
     ev_rows = conn.execute(f"""
         SELECT match_id, event_type, timestamp_ms,
-               actor_account, target_account
+               actor_account, target_account,
+               actor_x, actor_y, victim_x, victim_y, weapon
         FROM telemetry_events
         WHERE match_id IN ({ph})
           AND event_type IN ('VehicleEnter','VehicleLeave',
@@ -1242,11 +1247,31 @@ def compute_vehicle_stats(conn, my_account_id, range_key="session",
     """, match_ids).fetchall()
     # match_id -> list of event dicts
     events_per_match = {}
+    match_start_by = {}  # match_id -> earliest ts seen (fuer relative Zeit)
     for r in ev_rows:
+        ts = r["timestamp_ms"]
+        if ts and (r["match_id"] not in match_start_by
+                   or ts < match_start_by[r["match_id"]]):
+            match_start_by[r["match_id"]] = ts
         events_per_match.setdefault(r["match_id"], []).append({
-            "type": r["event_type"], "ts": r["timestamp_ms"],
+            "type": r["event_type"], "ts": ts,
             "actor": r["actor_account"], "target": r["target_account"],
+            "ax": r["actor_x"],  "ay": r["actor_y"],
+            "vx": r["victim_x"], "vy": r["victim_y"],
+            "weapon": r["weapon"],
         })
+
+    # Opponent-Name-Cache fuer Pretty-Print im Detail
+    opp_name_cache = {}
+    def _opp_name(acc):
+        if not acc: return None
+        if acc in opp_name_cache: return opp_name_cache[acc]
+        r = conn.execute(
+            "SELECT name FROM players WHERE account_id = ?",
+            (acc,)).fetchone()
+        n = r["name"] if r else None
+        opp_name_cache[acc] = n
+        return n
 
     # 4) Pro Match + Squad-Member die Counter aufsummieren
     INF = 10**15
@@ -1260,35 +1285,63 @@ def compute_vehicle_stats(conn, my_account_id, range_key="session",
                 "name": name_by_acc.get(acc) or acc[:8],
                 "isSelf": acc == my_account_id,
                 "matches": 0,
-                # 'rausgeschossen': member hat einen Gegner eliminiert
-                # der zum Zeitpunkt des Kills/Knocks im Auto sass.
                 "evictionsDealt": 0,
-                # 'wurde rausgeschossen': member wurde eliminiert
-                # waehrend er selbst im Auto sass.
                 "evictionsTaken": 0,
+                # Detail-Listen: pro Eviction-Event ein Dict mit
+                # matchId, mapName, tsMs (relativ), x, y, vehicle, name, type
+                "eventsDealt": [],
+                "eventsTaken": [],
             }
         return stats[acc]
 
+    def _add_event(acc, bucket, kind, mid, e, opponent_acc, vehicle_class):
+        """Detail-Event ans bucket (eventsDealt/eventsTaken) anhaengen."""
+        meta = match_meta.get(mid) or {}
+        ts0 = match_start_by.get(mid) or 0
+        stats[acc][bucket].append({
+            "matchId":   mid,
+            "mapName":   meta.get("map"),
+            "playedAt":  meta.get("playedAt"),
+            "tsMs":      (e["ts"] - ts0) if e.get("ts") and ts0 else None,
+            "kind":      kind,          # 'kill' oder 'knock_died'
+            "x":         e.get("vx"),
+            "y":         e.get("vy"),
+            "vehicle":   vehicle_class,
+            "opponent":  _opp_name(opponent_acc),
+        })
+
     def _in_intervals(ts, intervals):
-        for a, b in intervals:
+        for ival in intervals:
+            a, b = ival[0], ival[1]
             if a <= ts <= b:
                 return True
         return False
 
     def _build_intervals(events, acc):
+        """Returns list of (start_ts, end_ts, vehicle_class)."""
         cur = None
+        cur_veh = None
         ivals = []
         for e in events:
             if e["actor"] != acc:
                 continue
             if e["type"] == "VehicleEnter":
                 cur = e["ts"]
+                cur_veh = e.get("weapon")  # vehicleId
             elif e["type"] == "VehicleLeave" and cur is not None:
-                ivals.append((cur, e["ts"]))
+                ivals.append((cur, e["ts"], cur_veh))
                 cur = None
+                cur_veh = None
         if cur is not None:
-            ivals.append((cur, INF))
+            ivals.append((cur, INF, cur_veh))
         return ivals
+
+    def _vehicle_in_intervals(ts, intervals):
+        """Returns vehicle class if ts inside an interval, else None."""
+        for a, b, veh in intervals:
+            if a <= ts <= b:
+                return veh
+        return None
 
     for mid, squad in squad_per_match.items():
         events = events_per_match.get(mid, [])
@@ -1328,12 +1381,12 @@ def compute_vehicle_stats(conn, my_account_id, range_key="session",
                 target_ivals = (intervals_by.get(target)
                                 if target in squad
                                 else opp_intervals.get(target, []))
-                if t == "Kill" and _in_intervals(ts, target_ivals):
+                veh = _vehicle_in_intervals(ts, target_ivals)
+                if t == "Kill" and veh is not None:
                     _ensure(actor)["evictionsDealt"] += 1
-                elif t == "Knock" and _in_intervals(ts, target_ivals):
-                    # Knock im Auto + danach Tod ohne Revive — aber
-                    # nur zaehlen wenn das spaetere Kill NICHT auch
-                    # schon im Vehicle war (sonst doppelt mit Kill-Pfad).
+                    _add_event(actor, "eventsDealt", "kill",
+                                mid, e, target, veh)
+                elif t == "Knock" and veh is not None:
                     if _knock_leads_to_death(ts, target):
                         kill_in_veh = False
                         for later in events:
@@ -1344,13 +1397,18 @@ def compute_vehicle_stats(conn, my_account_id, range_key="session",
                                 break
                         if not kill_in_veh:
                             _ensure(actor)["evictionsDealt"] += 1
+                            _add_event(actor, "eventsDealt", "knock_died",
+                                        mid, e, target, veh)
 
             # === TAKEN: target=squad-member, member im vehicle ===
             if target in squad:
                 m_ivals = intervals_by[target]
-                if t == "Kill" and _in_intervals(ts, m_ivals):
+                veh = _vehicle_in_intervals(ts, m_ivals)
+                if t == "Kill" and veh is not None:
                     _ensure(target)["evictionsTaken"] += 1
-                elif t == "Knock" and _in_intervals(ts, m_ivals):
+                    _add_event(target, "eventsTaken", "kill",
+                                mid, e, actor, veh)
+                elif t == "Knock" and veh is not None:
                     if _knock_leads_to_death(ts, target):
                         kill_in_veh = False
                         for later in events:
@@ -1361,6 +1419,15 @@ def compute_vehicle_stats(conn, my_account_id, range_key="session",
                                 break
                         if not kill_in_veh:
                             _ensure(target)["evictionsTaken"] += 1
+                            _add_event(target, "eventsTaken", "knock_died",
+                                        mid, e, actor, veh)
+
+    # Detail-Listen pro Member chronologisch sortieren
+    for s in stats.values():
+        s["eventsDealt"].sort(key=lambda x: (x.get("playedAt") or "",
+                                              x.get("tsMs") or 0))
+        s["eventsTaken"].sort(key=lambda x: (x.get("playedAt") or "",
+                                              x.get("tsMs") or 0))
 
     # Nur Mitglieder mit irgendeinem Eintrag liefern — saubere Liste
     out = [s for s in stats.values()
