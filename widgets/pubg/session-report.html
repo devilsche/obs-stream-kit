@@ -1532,13 +1532,15 @@
       mdClampViewport(host);
     }
 
-    // Slider-Input setzt cursor + pausiert
+    // Slider-Input setzt cursor — Playback laeuft weiter (Anker rebasen).
     function mdScrubTo(host, cursorMs) {
       const s = mdGetState(host);
       const z = s.zeitraffer;
       z.cursorTs = Math.max(0, Math.min(z.matchEnd - z.matchStart, cursorMs));
-      z.playing = false;
-      s.playToken++;
+      if (z.playing) {
+        z.playStartWallTs = performance.now();
+        z.playStartCursor = z.cursorTs;
+      }
       mdRenderOverlay(host);
       mdUpdateScrubBar(host);
     }
@@ -1686,6 +1688,8 @@
         }
       }
       s.viewport = mdBboxFitViewport(coords, MD_PAD_500M_CM);
+      s.viewport.autoFollow = true;
+      mdClampViewport(host);
       mdRenderState(host);
     }
 
@@ -2672,7 +2676,8 @@
       e.stopPropagation();
     });
 
-    // "Alle anzeigen"-Button: hidden leeren + Zeitraffer reset + Reset-View
+    // "Alle anzeigen"-Button: nur Sichtbarkeit + Viewport zurueck, Zeit + Play
+    // bleiben unangetastet.
     document.addEventListener("click", (e) => {
       const btn = e.target.closest && e.target.closest(".md-allebtn");
       if (!btn) return;
@@ -2680,9 +2685,6 @@
       if (!host) return;
       const s = mdGetState(host);
       s.hiddenAccs.clear();
-      s.zeitraffer.cursorTs = 0;
-      s.zeitraffer.playing = false;
-      s.playToken++;
       mdResetView(host);
       e.stopPropagation();
     });
