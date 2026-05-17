@@ -1260,8 +1260,8 @@
               ctx.strokeStyle = "white";
               ctx.lineWidth = 0.8;
               ctx.stroke();
-              // Opfer als rotes X
-              ctx.strokeStyle = "#e74c3c";
+              // Opfer-X in der Farbe des Killers (= aktueller member-color)
+              ctx.strokeStyle = color;
               ctx.lineWidth = 2;
               const xs = 4.5;
               ctx.beginPath();
