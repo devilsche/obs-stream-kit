@@ -899,6 +899,11 @@ function hitTestRegion(wx, wy) {
 }
 
 canvas.addEventListener("mousedown", (ev) => {
+  // Cal-Mode: alle Region-/Draw-Handler ueberspringen. Pan und Cal-Drag
+  // (Strg+LMB) bleiben moeglich.
+  if (calCorrMode && !ev.ctrlKey && ev.button === 0) {
+    return;  // click-Handler uebernimmt
+  }
   // Strg+LMB = aktive Calibration verschieben (Pin- oder Grid-Cal,
   // je nach Toolbar-Mode). WICHTIG: Delta in logischen Canvas-Pixeln
   // tracken, NICHT in Welt-Koords — eventToWorld haengt vom Offset ab
@@ -1475,6 +1480,9 @@ document.getElementById("calBtn").addEventListener("click", () => {
 // canvas-click-Cycle an — VOR den existierenden Handler (capture phase).
 canvas.addEventListener("click", (e) => {
   if (!calCorrMode) return;
+  // Cal-Mode haengt sich auf jedem Click ein — kein Region-Pick durchlassen
+  e.stopPropagation();
+  e.preventDefault();
   const rect = canvas.getBoundingClientRect();
   const cx = e.clientX - rect.left;
   const cy = e.clientY - rect.top;
@@ -1484,7 +1492,7 @@ canvas.addEventListener("click", (e) => {
     // Hit-Test: ist ein Event-X unter dem Klick?
     const vis = _calVisibleEvents();
     const correctedIds = new Set(calCorrections.map(c => c.eventId));
-    const HIT_PX = 10;
+    const HIT_PX = 12;
     let best = null, bestDist = Infinity;
     for (const ev of vis) {
       if (correctedIds.has(_calEventId(ev))) continue;
@@ -1498,13 +1506,13 @@ canvas.addEventListener("click", (e) => {
         `${best.type} ausgewaehlt (${best.actorName||"?"}→${best.targetName||"?"}) — klicke jetzt die echte Stelle`;
       renderCalList();
       render();
-      e.stopPropagation();
+    } else {
+      statusEl.textContent = "Kein Event in Klick-Naehe — bitte direkt auf ein X klicken";
     }
     return;
   }
   // Event war ausgewaehlt → Klick = Korrektur-Ziel
   saveCorrection(wx, wy);
-  e.stopPropagation();
 }, true);
 </script>
 </body>
