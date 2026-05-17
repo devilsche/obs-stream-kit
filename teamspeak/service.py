@@ -80,17 +80,19 @@ class TeamSpeakService:
 
     # ── Initial Sync ───────────────────────────────────────────────────
     def _initial_sync(self):
-        # whoami → clid + cid
+        # whoami → client_id + client_channel_id + virtualserver_unique_identifier.
+        # ACHTUNG: whoami nutzt Underscore-Variante 'client_id'/'client_channel_id',
+        # 'clientlist' dagegen 'clid'/'cid'. Beide unterstuetzen.
         rows = self.client.send_command("whoami")
-        if not rows: return
+        if not rows:
+            LOG.warning("whoami: empty reply")
+            return
         w = parse_params(rows[0])
-        my_clid = w.get("clid")
-        my_cid  = w.get("cid")
-        # eigene UID + Server-UID
-        sv = self.client.send_command("servervariable virtualserver_unique_identifier")
-        server_uid = None
-        if sv:
-            server_uid = parse_params(sv[0]).get("virtualserver_unique_identifier")
+        my_clid = w.get("client_id") or w.get("clid")
+        my_cid  = w.get("client_channel_id") or w.get("cid")
+        server_uid = w.get("virtualserver_unique_identifier")
+        LOG.info("whoami: clid=%s cid=%s server_uid=%s",
+                 my_clid, my_cid, server_uid)
         self.state.server_uid = server_uid
         if my_clid:
             try:
