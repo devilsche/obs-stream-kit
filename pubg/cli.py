@@ -810,6 +810,47 @@ def refresh_assets(root: str) -> int:
     return 0
 
 
+def refresh_skins(root: str) -> int:
+    """Lade Weapon-/Vehicle-Icons von pubg.com/game-info/ — saubere
+    Base-Renderings ohne Skins, stabile URLs.
+
+    Default: NEUE Icons schreiben, existierende intakt lassen.
+    Mit --force werden alle Icons ueberschrieben."""
+    from pubg.skins import (WEAPON_SLUG_TO_CLASS, VEHICLE_SLUG_TO_CLASS,
+                              download_weapon, download_vehicle)
+    force = "--force" in sys.argv
+    weap_dir = os.path.join(root, "widgets", "pubg", "assets", "weapons")
+    veh_dir  = os.path.join(root, "widgets", "pubg", "assets", "vehicles")
+    _ensure_dir(weap_dir); _ensure_dir(veh_dir)
+
+    def _do(label, mapping, out_dir, downloader, max_size):
+        print(f"\n=== {label} (pubg.com/game-info) ===")
+        ok = err = skipped = 0
+        for slug, cls in sorted(mapping.items()):
+            out = os.path.join(out_dir, f"{cls}.webp")
+            if os.path.exists(out) and not force:
+                skipped += 1; continue
+            try:
+                data = downloader(slug, timeout=12)
+                _save_icon_webp(data, out, max_size=max_size, quality=85)
+                print(f"  {cls:<32} ← {slug}")
+                ok += 1
+            except Exception as e:
+                print(f"  {cls:<32} FEHLER: {e}")
+                err += 1
+        print(f"  → {ok} geladen, {skipped} unveraendert, {err} fehlend")
+
+    _do("Weapons", WEAPON_SLUG_TO_CLASS, weap_dir,
+        download_weapon, max_size=192)
+    _do("Vehicles", VEHICLE_SLUG_TO_CLASS, veh_dir,
+        download_vehicle, max_size=256)
+
+    print("\n=== refresh-skins fertig ===")
+    print("Tipp: --force ueberschreibt bestehende Icons. Neue Waffen/"
+          "Vehicles werden in pubg/skins.py erweitert.")
+    return 0
+
+
 NAME_MAP = {
     "Baltic_Main":     "Erangel",
     "Desert_Main":     "Miramar",
@@ -1221,6 +1262,8 @@ if __name__ == "__main__":
         sys.exit(refresh_maps(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "refresh-assets":
         sys.exit(refresh_assets(root))
+    elif len(sys.argv) > 1 and sys.argv[1] == "refresh-skins":
+        sys.exit(refresh_skins(root))
     else:
         print("Usage: python -m pubg.cli init | cold-start | pull-ftp | "
               "seasons-backfill | wipe-day [YYYY-MM-DD] [--keep-popups] | "
