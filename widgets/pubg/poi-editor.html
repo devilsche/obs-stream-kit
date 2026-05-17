@@ -643,6 +643,23 @@ function render() {
 
   // Cal-Korrektur-Mode: Korrekturen (orig → fixed) als gruener Pfeil
   if (calCorrMode) {
+    // Alle sichtbaren Events (aktueller Match-Filter) als kleine
+    // rote X-Punkte — anklickbar.
+    const vis = _calVisibleEvents();
+    const correctedIds = new Set(calCorrections.map(c => c.eventId));
+    const xs = 4 / view.zoom;
+    ctx.lineWidth = 1.2 / view.zoom;
+    for (const ev of vis) {
+      const id = _calEventId(ev);
+      if (correctedIds.has(id)) continue;  // schon korrigiert → separat
+      const [ex, ey] = worldToCanvas(ev.x, ev.y);
+      ctx.strokeStyle = ev.type === "Kill"
+        ? "rgba(231,76,60,0.85)" : "rgba(255,160,40,0.85)";
+      ctx.beginPath();
+      ctx.moveTo(ex - xs, ey - xs); ctx.lineTo(ex + xs, ey + xs);
+      ctx.moveTo(ex - xs, ey + xs); ctx.lineTo(ex + xs, ey - xs);
+      ctx.stroke();
+    }
     for (const c of calCorrections) {
       const [ox, oy] = worldToCanvas(c.origX, c.origY);
       const [fx, fy] = worldToCanvas(c.fixedX, c.fixedY);
@@ -1289,6 +1306,7 @@ let calCorrMode = false;
 let calEvents = [];        // [{matchId, type, x, y, actorName, targetName, tsMs, ...}]
 let calCorrections = [];   // [{id, eventId, origX, origY, fixedX, fixedY, ...}]
 let calSelectedEvent = null;
+let calSelectedMatch = "";   // matchId-Filter ('' = letzte 10)
 
 function _calEventId(ev) {
   // stabiler Identifier fuer Event = match+ts+target
@@ -1318,41 +1336,87 @@ async function loadCalEvents() {
   }
 }
 
+function _calMatchSummary() {
+  // Returns [{matchId, playedAt, count}] sortiert neueste zuerst.
+  const by = new Map();
+  for (const ev of calEvents) {
+    const k = ev.matchId;
+    if (!by.has(k)) by.set(k, { matchId: k, playedAt: ev.playedAt, count: 0 });
+    by.get(k).count++;
+  }
+  return [...by.values()].sort((a, b) =>
+    (b.playedAt || "").localeCompare(a.playedAt || ""));
+}
+
+// Events die aktuell auf der Map gerendert werden (gefiltert nach Match-Auswahl)
+function _calVisibleEvents() {
+  if (!calSelectedMatch) {
+    // Default: letzte 10 Matches
+    const top = _calMatchSummary().slice(0, 10).map(m => m.matchId);
+    const set = new Set(top);
+    return calEvents.filter(ev => set.has(ev.matchId));
+  }
+  return calEvents.filter(ev => ev.matchId === calSelectedMatch);
+}
+
 function renderCalList() {
   const host = document.getElementById("regionList");
   if (!host) return;
   if (!calCorrMode) { renderList(); return; }
-  // Liste: pro Event eine Zeile (komprimiert). Mit ✓ markiert wenn schon
-  // korrigiert. Klick selektiert + zentriert auf Map.
   const correctedIds = new Set(calCorrections.map(c => c.eventId));
-  // Sortierung: neueste zuerst (playedAt desc, dann tsMs)
-  const sorted = calEvents.slice().sort((a, b) =>
+  const matches = _calMatchSummary();
+  // Match-Dropdown bauen
+  const opts = [`<option value="">— letzte 10 Matches (${
+    Math.min(10, matches.length)} Runden) —</option>`]
+    .concat(matches.map(m => {
+      const date = (m.playedAt || "").slice(0, 16).replace("T", " ");
+      const sel = (m.matchId === calSelectedMatch) ? "selected" : "";
+      return `<option value="${m.matchId}" ${sel}>${date} (${m.count} Events)</option>`;
+    }));
+  const sortedVis = _calVisibleEvents().sort((a, b) =>
     (b.playedAt || "").localeCompare(a.playedAt || "") ||
     (a.tsMs || 0) - (b.tsMs || 0));
-  const rows = sorted.slice(0, 200).map(ev => {
+  const rows = sortedVis.map(ev => {
     const id = _calEventId(ev);
     const done = correctedIds.has(id) ? "✓ " : "";
-    const date = (ev.playedAt || "").slice(0, 10);
+    const date = (ev.playedAt || "").slice(11, 16);
     const who = ev.type === "Kill"
       ? `${ev.actorName||"?"} → ${ev.targetName||"?"}`
       : `${ev.actorName||"?"} knock ${ev.targetName||"?"}`;
-    return `<div class="region-row" data-eid="${id}" style="cursor:pointer">
+    const isSel = (calSelectedEvent && _calEventId(calSelectedEvent) === id);
+    return `<div class="region-row${isSel?" selected":""}" data-eid="${id}" style="cursor:pointer">
       <span class="name">${done}${date} · ${_shortTime(ev.tsMs)} · ${who}</span>
       <span class="badge">${ev.type}</span>
     </div>`;
   });
-  host.innerHTML = rows.join("");
+  host.innerHTML = `
+    <div style="padding:6px 4px;border-bottom:1px solid #2a1d3f;margin-bottom:6px">
+      <select id="calMatchSel" style="width:100%;padding:4px;font-size:0.85em">
+        ${opts.join("")}
+      </select>
+      <div style="font-size:0.75em;color:#8a7d99;margin-top:4px">
+        ${sortedVis.length} sichtbar · ${calCorrections.length} korrigiert
+      </div>
+    </div>
+    ${rows.join("")}`;
+  document.getElementById("calMatchSel").addEventListener("change", (e) => {
+    calSelectedMatch = e.target.value;
+    calSelectedEvent = null;
+    renderCalList();
+    render();
+  });
   host.querySelectorAll(".region-row").forEach(el => {
     el.addEventListener("click", () => {
       const id = el.dataset.eid;
-      calSelectedEvent = sorted.find(ev => _calEventId(ev) === id);
+      calSelectedEvent = sortedVis.find(ev => _calEventId(ev) === id);
       if (calSelectedEvent) {
-        statusEl.textContent = `Event ${id} ausgewaehlt — klicke auf der Karte die echte Stelle`;
+        statusEl.textContent =
+          `Event ${id} ausgewaehlt — klicke auf der Karte die echte Stelle`;
+        renderCalList();
         render();
       }
     });
   });
-  // Edit-Block ausblenden in Cal-Mode
   const eb = document.getElementById("editBlock");
   if (eb) eb.style.display = "none";
 }
@@ -1410,20 +1474,38 @@ document.getElementById("calBtn").addEventListener("click", () => {
 // die Welt-Koord wo geklickt wurde als Korrektur. Wir haengen uns an den
 // canvas-click-Cycle an — VOR den existierenden Handler (capture phase).
 canvas.addEventListener("click", (e) => {
-  if (!calCorrMode || !calSelectedEvent) return;
-  // Welt-Koord aus Maus-Position
+  if (!calCorrMode) return;
   const rect = canvas.getBoundingClientRect();
   const cx = e.clientX - rect.left;
   const cy = e.clientY - rect.top;
-  // Inverse von worldToCanvas — Canvas-Px → cm.
-  // canvas-Px = worldToCanvas(cm) durchlaeuft applyPinCal + view-Transform.
-  // canvasToWorld liefert uns cm direkt.
-  if (typeof canvasToWorld === "function") {
-    const [wx, wy] = canvasToWorld(cx, cy);
-    saveCorrection(wx, wy);
-    e.stopPropagation();
+  if (typeof canvasToWorld !== "function") return;
+  const [wx, wy] = canvasToWorld(cx, cy);
+  if (!calSelectedEvent) {
+    // Hit-Test: ist ein Event-X unter dem Klick?
+    const vis = _calVisibleEvents();
+    const correctedIds = new Set(calCorrections.map(c => c.eventId));
+    const HIT_PX = 10;
+    let best = null, bestDist = Infinity;
+    for (const ev of vis) {
+      if (correctedIds.has(_calEventId(ev))) continue;
+      const [ex, ey] = worldToCanvas(ev.x, ev.y);
+      const d = Math.hypot(ex - cx, ey - cy);
+      if (d < HIT_PX && d < bestDist) { best = ev; bestDist = d; }
+    }
+    if (best) {
+      calSelectedEvent = best;
+      statusEl.textContent =
+        `${best.type} ausgewaehlt (${best.actorName||"?"}→${best.targetName||"?"}) — klicke jetzt die echte Stelle`;
+      renderCalList();
+      render();
+      e.stopPropagation();
+    }
+    return;
   }
-}, true);  // capture phase, vor den anderen
+  // Event war ausgewaehlt → Klick = Korrektur-Ziel
+  saveCorrection(wx, wy);
+  e.stopPropagation();
+}, true);
 </script>
 </body>
 </html>
