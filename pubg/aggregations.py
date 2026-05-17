@@ -2383,9 +2383,12 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             out, seen, KILL_TIERS, int(kills),
             lambda v: f"{v} Kills", m["matchId"], played)
 
-        # Damage-Tier-Cascade: 500..3000+
+        # Damage-Tier-Cascade: 500..3000+.
+        # round() statt int() weil PUBG-API float-Damage liefert: ein
+        # In-Game-510 kann als 509.84 ankommen — int() haette 'Heavy
+        # Hitter' (≥500) verfehlt obwohl 510 angezeigt wird.
         _emit_tier_cascade(
-            out, seen, DAMAGE_TIERS, int(damage),
+            out, seen, DAMAGE_TIERS, round(damage),
             lambda v: f"{v} DMG", m["matchId"], played)
 
         if place == 1 and kills >= 5:
