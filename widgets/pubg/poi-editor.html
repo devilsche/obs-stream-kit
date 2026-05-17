@@ -629,8 +629,17 @@ function render() {
     ctx.setLineDash([]);
   }
 
-  // Pins — worldToCanvas appliziert die Cal automatisch
-  pins.forEach(p => {
+  // Pins — worldToCanvas appliziert die Cal automatisch. In Cal-Mode
+  // werden Pins auf dasselbe Match gefiltert wie die Cal-Events.
+  let visiblePins = pins;
+  if (calCorrMode) {
+    const activeMid = calSelectedMatch || (
+      _calMatchSummary().length ? _calMatchSummary()[0].matchId : null);
+    visiblePins = activeMid
+      ? pins.filter(p => p.matchId === activeMid)
+      : [];
+  }
+  visiblePins.forEach(p => {
     const [px, py] = worldToCanvas(p.x, p.y);
     ctx.beginPath();
     ctx.arc(px, py, 4 / view.zoom, 0, Math.PI * 2);
