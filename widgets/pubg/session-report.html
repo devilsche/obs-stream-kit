@@ -224,6 +224,53 @@
       font-weight: 700;
     }
     .squad-detail tr.win td { color: var(--pubg-gold); }
+    /* Special-Event-Badges (Vehicle-Kill etc.) — aufklappbar */
+    .squad-detail .name-cell { white-space: nowrap; vertical-align: top; }
+    .sd-row-wrap { display: inline-flex; gap: 4px; margin-left: 6px; }
+    details.sd { display: inline-block; vertical-align: middle; }
+    details.sd > summary {
+      list-style: none; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 1px 5px;
+      background: rgba(13,6,26,0.45);
+      border: 1px solid var(--pubg-border);
+      border-radius: 3px;
+      font-size: 0.78em;
+      color: var(--pubg-muted);
+    }
+    details.sd[open] > summary {
+      border-color: var(--pubg-gold);
+      color: var(--pubg-gold);
+    }
+    details.sd > summary::-webkit-details-marker { display: none; }
+    details.sd .sd-icon.veh { height: 16px; max-width: 24px; object-fit: contain; }
+    details.sd .sd-emoji { font-size: 0.95em; line-height: 1; }
+    details.sd .sd-cnt { font-variant-numeric: tabular-nums; }
+    details.sd .sd-body {
+      display: block;
+      margin-top: 4px;
+      padding: 6px 8px;
+      background: rgba(13,6,26,0.7);
+      border: 1px solid var(--pubg-border);
+      border-radius: 4px;
+      font-size: 0.85em;
+      min-width: 220px;
+    }
+    details.sd .sd-row {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding: 3px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    details.sd .sd-row:last-child { border-bottom: 0; }
+    details.sd .sd-w { color: var(--pubg-text); font-weight: 600; }
+    details.sd .sd-opp { color: var(--pubg-muted); }
+    details.sd .sd-opp b { color: var(--pubg-text); }
+    details.sd .sd-poi { color: var(--pubg-gold); }
+    details.sd .sd-dist {
+      color: var(--pubg-muted);
+      font-variant-numeric: tabular-nums;
+      margin-left: auto;
+    }
     /* Match-Detail v2 — Two-Canvas 300x300 + Scrub-Bar + Cards-Col */
     .md-host {
       flex: 1;
@@ -1152,33 +1199,36 @@
             ctx.stroke();
           }
 
-          // Kill-Marker (sobald cursor >= kill-ts)
+          // Kill-Marker (sobald cursor >= kill-ts) — bleiben bestehen
           if (!inDefault) {
             for (const k of life.kills) {
               if (absTs < k.tsMs) continue;
               if (k.actorX == null || k.victimX == null) continue;
               const [ax, ay] = mdCmToCanvas(host, k.actorX, k.actorY);
               const [vx, vy] = mdCmToCanvas(host, k.victimX, k.victimY);
-              // Verbindungslinie
+              // Schusslinie (zart)
               ctx.strokeStyle = color;
-              ctx.globalAlpha = 0.4;
-              ctx.lineWidth = 0.8;
+              ctx.globalAlpha = 0.55;
+              ctx.lineWidth = 1.2;
               ctx.beginPath();
               ctx.moveTo(ax, ay); ctx.lineTo(vx, vy);
               ctx.stroke();
               ctx.globalAlpha = 1;
-              // Schuetze-Punkt
+              // Schuetze (gefuellter Kreis in Member-Farbe)
               ctx.beginPath();
-              ctx.arc(ax, ay, 2.5, 0, Math.PI * 2);
+              ctx.arc(ax, ay, 4, 0, Math.PI * 2);
               ctx.fillStyle = color;
               ctx.fill();
-              // Opfer-Punkt (grau)
+              ctx.strokeStyle = "white";
+              ctx.lineWidth = 0.8;
+              ctx.stroke();
+              // Opfer als rotes X
+              ctx.strokeStyle = "#e74c3c";
+              ctx.lineWidth = 2;
+              const xs = 4.5;
               ctx.beginPath();
-              ctx.arc(vx, vy, 2.5, 0, Math.PI * 2);
-              ctx.fillStyle = "#bbb";
-              ctx.fill();
-              ctx.strokeStyle = "rgba(0,0,0,0.5)";
-              ctx.lineWidth = 0.4;
+              ctx.moveTo(vx - xs, vy - xs); ctx.lineTo(vx + xs, vy + xs);
+              ctx.moveTo(vx - xs, vy + xs); ctx.lineTo(vx + xs, vy - xs);
               ctx.stroke();
             }
           }
@@ -1919,20 +1969,60 @@
         return (b.damage_dealt || 0) - (a.damage_dealt || 0);
       });
       const isWin = m.place === 1;
-      // Sonder-Events-Icons pro Spieler
+      const mapName = m.map || "";
+      function poiOf(x, y) {
+        if (x == null || y == null) return null;
+        if (PubgUI.POI && PubgUI.POI.fromCoords)
+          return PubgUI.POI.fromCoords(mapName, x, y);
+        return null;
+      }
+      function eventLine(ev, role) {
+        // role: 'vkill' (er hat gekillt), 'vdeath' (er starb), 'driveby', 'redzone'
+        const poi = poiOf(ev.x, ev.y);
+        const dist = (ev.distanceM != null)
+          ? `<span class="sd-dist">${Math.round(ev.distanceM)}m</span>` : "";
+        const opp = (role === "vkill" && ev.victimName)
+          ? `<span class="sd-opp">→ <b>${ev.victimName}</b></span>`
+          : (role === "vdeath" && ev.killerName)
+            ? `<span class="sd-opp">durch <b>${ev.killerName}</b></span>`
+            : (role === "driveby" && ev.victimName)
+              ? `<span class="sd-opp">→ <b>${ev.victimName}</b></span>` : "";
+        const where = poi ? `<span class="sd-poi">${poi}</span>` : "";
+        const wn = ev.weaponName ? `<span class="sd-w">${ev.weaponName}</span>` : "";
+        return `<div class="sd-row">${wn}${opp}${where}${dist}</div>`;
+      }
+      // Sonder-Events: Icon + Anzahl als <details>-Badge, aufklappbar zeigt
+      // pro Event: Waffe/Fahrzeug, Gegner, POI, Distanz.
       function specialBadges(sp) {
         if (!sp) return "";
-        const b = [];
-        if (sp.redzone) b.push(`<span title="Red Zone Tod">💥×${sp.redzone}</span>`);
-        if (sp.vkill)   b.push(`<span title="Überfahren">🚗💀×${sp.vkill}</span>`);
-        if (sp.vdeath)  b.push(`<span title="Überfahren worden">🚗×${sp.vdeath}</span>`);
-        if (sp.driveby) b.push(`<span title="Drive-By Kill">🔫🚗×${sp.driveby}</span>`);
-        return b.length ? ` <span style="font-size:0.8em;opacity:0.85">${b.join(" ")}</span>` : "";
+        const out = [];
+        function mk(role, list, titleLbl, iconHtml) {
+          if (!list || !list.length) return;
+          const details = list.map(ev => eventLine(ev, role)).join("");
+          out.push(`<details class="sd ${role}"><summary title="${titleLbl}">${iconHtml}<span class="sd-cnt">×${list.length}</span></summary><div class="sd-body">${details}</div></details>`);
+        }
+        // Vehicle-Icon: nimm den ersten Eintrag mit weapon=Vehicle-ID
+        function vehIcon(list) {
+          const wid = list[0] && list[0].weapon;
+          const url = wid ? `/widgets/pubg/assets/vehicles/${wid}.webp` : "";
+          return url
+            ? `<img class="sd-icon veh" src="${url}" onerror="this.style.display='none'">`
+            : `<span class="sd-emoji">🚗</span>`;
+        }
+        mk("redzone", sp.redzone, "Red Zone Tod",
+           `<span class="sd-emoji">💥</span>`);
+        mk("vkill", sp.vkill, "Vehicle-Kill (jemanden ueberfahren)",
+           vehIcon(sp.vkill || []));
+        mk("vdeath", sp.vdeath, "Mit Vehicle ueberfahren worden",
+           vehIcon(sp.vdeath || []) + `<span class="sd-emoji">💀</span>`);
+        mk("driveby", sp.driveby, "Drive-By Kill (aus Fahrzeug)",
+           `<span class="sd-emoji">🔫🚗</span>`);
+        return out.length ? ` <span class="sd-row-wrap">${out.join("")}</span>` : "";
       }
       const rows = all.map(p => {
         const cls = (p.isSelf ? "self " : "") + (isWin ? "win" : "");
         return `<tr class="${cls.trim()}">
-          <td>${p.name}${p.isSelf ? " (du)" : ""}${specialBadges(p.special)}</td>
+          <td class="name-cell">${p.name}${p.isSelf ? " (du)" : ""}${specialBadges(p.special)}</td>
           <td>${p.kills || 0}</td>
           <td>${p.headshot_kills || 0}</td>
           <td>${p.assists || 0}</td>
@@ -1947,7 +2037,6 @@
       // Windows, Doors) — wird in renderExtras gefuellt sobald payday-stats
       // geladen sind.
       const matchId = m.matchId || "";
-      const mapName = m.map || "";
       const isEvent = !!m.isEvent;
       const tableHtml = `<table>
         <thead><tr>

@@ -4078,43 +4078,85 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
                        key=lambda x: x["time_survived"] or 0)[:3]
 
     def _special_events(match_id, acc_ids):
-        """Sonder-Events (Redzone-Tod, Fahrzeug-Kill/-Tod, Drive-By)
-        pro Account-ID. Nur wenn Telemetrie vorhanden.
-        Returns dict { account_id: {redzone, vkill, vdeath, driveby} }"""
+        """Sonder-Events (Redzone-Tod, Fahrzeug-Kill/-Tod, Drive-By) pro
+        Account-ID. Liefert pro Kategorie eine Liste von Detail-Dicts mit
+        weapon, weaponName, victim/killer (Name + Acc), Position, Distanz,
+        Timestamp — damit das Frontend einzelne Events aufklappen kann.
+
+        Returns dict { account_id: {redzone:[...], vkill:[...],
+                                     vdeath:[...], driveby:[...]} }"""
         ph = ",".join("?" * len(acc_ids))
-        result = {a: {"redzone": 0, "vkill": 0, "vdeath": 0, "driveby": 0}
+        result = {a: {"redzone": [], "vkill": [], "vdeath": [], "driveby": []}
                   for a in acc_ids}
         try:
-            # Redzone-Tode pro Member
+            # Helper — Name-Lookup ueber participants + players, cached.
+            name_cache = {}
+            def _name(acc):
+                if not acc: return None
+                if acc in name_cache: return name_cache[acc]
+                r = conn.execute("""
+                    SELECT COALESCE(p.name, pa.name) AS n
+                    FROM (SELECT NULL) x
+                    LEFT JOIN players p ON p.account_id = ?
+                    LEFT JOIN participants pa ON pa.match_id = ?
+                          AND pa.account_id = ?
+                """, (acc, match_id, acc)).fetchone()
+                n = r["n"] if r else None
+                name_cache[acc] = n
+                return n
+
+            def _vehicle_event(r, is_actor):
+                wid = r["weapon"]
+                wn, cat = _weapon_label(wid) if wid else (None, "other")
+                if cat != "vehicle":
+                    return None
+                return {
+                    "tsMs":       r["timestamp_ms"],
+                    "weapon":     wid,
+                    "weaponName": wn,
+                    "x":          r["victim_x"],
+                    "y":          r["victim_y"],
+                    "distanceM":  (round((r["distance"] or 0) / 100.0, 1)
+                                   if r["distance"] else None),
+                    ("victimName" if is_actor else "killerName"):
+                        _name(r["target_account"] if is_actor
+                              else r["actor_account"]),
+                    ("victimAcc" if is_actor else "killerAcc"):
+                        r["target_account"] if is_actor else r["actor_account"],
+                }
+
+            # Redzone-Tode (Kill ohne actor + Bomb/RedZone-Waffe)
             for r in conn.execute(f"""
-                SELECT target_account, COUNT(*) AS n FROM telemetry_events
+                SELECT * FROM telemetry_events
                 WHERE match_id=? AND event_type='Kill'
                   AND target_account IN ({ph})
                   AND (actor_account IS NULL OR actor_account='')
                   AND (weapon LIKE '%RedZone%' OR weapon LIKE '%Bomb%'
                        OR weapon LIKE '%bomb%')
-                GROUP BY target_account
             """, [match_id] + list(acc_ids)).fetchall():
-                if r["target_account"] in result:
-                    result[r["target_account"]]["redzone"] = r["n"]
-            # Fahrzeug-Kills (run over somebody)
+                target = r["target_account"]
+                if target in result:
+                    result[target]["redzone"].append({
+                        "tsMs":       r["timestamp_ms"],
+                        "weapon":     r["weapon"],
+                        "weaponName": _weapon_label(r["weapon"])[0]
+                                      if r["weapon"] else "Red Zone",
+                        "x":          r["victim_x"],
+                        "y":          r["victim_y"],
+                    })
+            # Vehicle-Kills + Vehicle-Tode — gleiche SQL, separate Buckets
             for r in conn.execute(f"""
-                SELECT actor_account, COUNT(*) AS n FROM telemetry_events
+                SELECT * FROM telemetry_events
                 WHERE match_id=? AND event_type='Kill'
-                  AND actor_account IN ({ph}) AND weapon LIKE 'BP_%'
-                GROUP BY actor_account
-            """, [match_id] + list(acc_ids)).fetchall():
-                if r["actor_account"] in result:
-                    result[r["actor_account"]]["vkill"] = r["n"]
-            # Fahrzeug-Tode (run over)
-            for r in conn.execute(f"""
-                SELECT target_account, COUNT(*) AS n FROM telemetry_events
-                WHERE match_id=? AND event_type='Kill'
-                  AND target_account IN ({ph}) AND weapon LIKE 'BP_%'
-                GROUP BY target_account
-            """, [match_id] + list(acc_ids)).fetchall():
-                if r["target_account"] in result:
-                    result[r["target_account"]]["vdeath"] = r["n"]
+                  AND (actor_account IN ({ph}) OR target_account IN ({ph}))
+            """, [match_id] + list(acc_ids) + list(acc_ids)).fetchall():
+                actor, target = r["actor_account"], r["target_account"]
+                if actor in result:
+                    ev = _vehicle_event(r, is_actor=True)
+                    if ev: result[actor]["vkill"].append(ev)
+                if target in result and target != actor:
+                    ev = _vehicle_event(r, is_actor=False)
+                    if ev: result[target]["vdeath"].append(ev)
             # Drive-By (Kill waehrend in Fahrzeug)
             for acc in acc_ids:
                 ve = conn.execute("""
@@ -4123,8 +4165,7 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
                       AND event_type IN ('VehicleEnter','VehicleLeave')
                     ORDER BY timestamp_ms ASC
                 """, (match_id, acc)).fetchall()
-                if not ve:
-                    continue
+                if not ve: continue
                 intervals = []
                 enter_ms = None
                 for e in ve:
@@ -4135,17 +4176,30 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
                         enter_ms = None
                 if enter_ms:
                     intervals.append((enter_ms, 10**15))
-                if not intervals:
-                    continue
-                ks = conn.execute("""
-                    SELECT timestamp_ms FROM telemetry_events
+                if not intervals: continue
+                for k in conn.execute("""
+                    SELECT * FROM telemetry_events
                     WHERE match_id=? AND event_type='Kill'
                       AND actor_account=?
-                """, (match_id, acc)).fetchall()
-                db = sum(1 for k in ks if k["timestamp_ms"] and
-                         any(a <= k["timestamp_ms"] <= b for a, b in intervals))
-                if db and acc in result:
-                    result[acc]["driveby"] = db
+                """, (match_id, acc)).fetchall():
+                    ts = k["timestamp_ms"]
+                    if not ts: continue
+                    if not any(a <= ts <= b for a, b in intervals): continue
+                    # Drive-By soll Fahrzeug-Kills NICHT doppeln
+                    wn, cat = _weapon_label(k["weapon"]) if k["weapon"] \
+                              else (None, "other")
+                    if cat == "vehicle": continue
+                    result[acc]["driveby"].append({
+                        "tsMs":       ts,
+                        "weapon":     k["weapon"],
+                        "weaponName": wn,
+                        "victimName": _name(k["target_account"]),
+                        "victimAcc":  k["target_account"],
+                        "x":          k["victim_x"],
+                        "y":          k["victim_y"],
+                        "distanceM":  (round((k["distance"] or 0) / 100.0, 1)
+                                       if k["distance"] else None),
+                    })
         except Exception:
             pass
         return result
@@ -4192,10 +4246,10 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             squad_enriched.append(s2)
         # Gesamt-Sonder-Events fuer Match als Zusammenfassung
         match_special = {
-            "redzoneDeaths": sum(v.get("redzone",0) for v in spec.values()),
-            "vehicleKills":  sum(v.get("vkill",0)  for v in spec.values()),
-            "vehicleDeaths": sum(v.get("vdeath",0) for v in spec.values()),
-            "driveBys":      sum(v.get("driveby",0) for v in spec.values()),
+            "redzoneDeaths": sum(len(v.get("redzone",[])) for v in spec.values()),
+            "vehicleKills":  sum(len(v.get("vkill",[]))   for v in spec.values()),
+            "vehicleDeaths": sum(len(v.get("vdeath",[]))  for v in spec.values()),
+            "driveBys":      sum(len(v.get("driveby",[])) for v in spec.values()),
         }
         return {
             "matchId": m["match_id"],
