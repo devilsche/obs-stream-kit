@@ -149,20 +149,40 @@ class ClientQuery:
         s.settimeout(None)
         self._sock = s
         self._buf = b""
-        # ClientQuery schickt sofort 2-3 Banner-Zeilen — ueberlesen
-        for _ in range(3):
-            self._readline(timeout=2.0)
+        # Banner — TS3 ClientQuery schickt typischerweise 3 Zeilen
+        # (TS3 Client / Welcome … / selected schandlerid=N). Wir lesen so
+        # viel wie verfuegbar, brechen ab wenn 500ms nichts mehr kommt.
+        for _ in range(6):
+            try:
+                ln = self._readline(timeout=0.5)
+                if ln is None:
+                    break
+                LOG.debug("banner: %s", ln)
+            except socket.timeout:
+                break
 
     def _auth_and_subscribe(self):
-        # Fuer ClientQuery >=1.0: 'auth apikey=...'. Aeltere Versionen
-        # ohne API-Key akzeptieren das Kommando auch als no-op.
+        # ClientQuery >=1.1 (TS3 Client 3.5+) verlangt 'auth apikey=…'
+        # bevor andere Commands akzeptiert werden. Wenn auth fehlschlaegt,
+        # MUESSEN wir abbrechen — sonst silently hangen alle folgenden
+        # Commands ins Timeout.
+        if not self.apikey:
+            raise ClientQueryError(
+                "no API key configured (TS3-ClientQuery-Key in .secrets)")
         try:
             self.send_command(f"auth apikey={self.apikey}", timeout=3.0)
+            LOG.info("auth ok")
         except ClientQueryError as e:
-            # Some old plugin builds reject 'auth' silently — wir loggen
-            # und versuchen weiter (manche Setups brauchen keinen Auth).
-            LOG.info("auth reply: %s — fortsetzen", e)
-        # Notify-Subscriptions: Talk-Status, Channel-Move, Enter/Leave
+            msg = str(e)
+            # error id=256 = command not found → aeltere Plugin-Version
+            # ohne API-Key-Auth. Da ist alles offen, weiter.
+            if "256" in msg or "command not found" in msg.lower():
+                LOG.info("auth not required (alt plugin) — fortsetzen")
+            else:
+                raise ClientQueryError(
+                    f"auth failed ({msg}). Pruef TS3-ClientQuery-Key "
+                    f"in .secrets, ggf. in TS3 neu generieren.")
+        # Notify-Subscriptions
         for ev in ("notifytalkstatuschange",
                     "notifyclientmoved",
                     "notifycliententerview",

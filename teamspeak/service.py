@@ -48,6 +48,9 @@ class TeamSpeakService:
                 self._initial_sync()
             except Exception as e:
                 LOG.warning("initial sync failed: %s", e)
+                # Fehler im Status sichtbar machen — sonst wundert sich der
+                # User dass connected=true aber channelName=null ist.
+                self.state.set_connected(True, f"sync failed: {e}")
 
     def _on_notify(self, event, params):
         try:
