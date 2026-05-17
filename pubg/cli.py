@@ -777,10 +777,13 @@ def refresh_assets(root: str) -> int:
         "Neon_Main": "Rondo", "Heaven_Main": "Haven",
     }
     ok = err = 0
+    maps_dir = os.path.join(root, "widgets", "pubg", "maps")
     for internal, public in MAP_THUMBS.items():
         out = os.path.join(ms_dir, f"{internal}.webp")
         if os.path.exists(out): ok += 1; continue
         success = False
+        # 1) Upstream MapSelection-Asset (existiert nicht fuer alle Maps —
+        #    Tiger/Kiki/Neon/Heaven fehlen im pubg/api-assets-Repo)
         for ext in ("png", "jpg"):
             rel = f"Assets/MapSelection/{public}.{ext}"
             try:
@@ -789,6 +792,17 @@ def refresh_assets(root: str) -> int:
                 ok += 1; success = True; break
             except Exception:
                 continue
+        if success: continue
+        # 2) Fallback: HD-Map aus widgets/pubg/maps/ downsamplen
+        local_map = os.path.join(maps_dir, f"{internal}.png")
+        if os.path.exists(local_map):
+            try:
+                with open(local_map, "rb") as f:
+                    data = f.read()
+                _save_icon_webp(data, out, max_size=384, quality=85)
+                ok += 1; success = True
+            except Exception as e:
+                print(f"  {internal}: downsample fehlgeschlagen — {e}")
         if not success: err += 1
     print(f"  Map-Thumbnails: {ok} ok, {err} fehlend")
 
