@@ -660,14 +660,26 @@ function render() {
       ctx.moveTo(ex - xs, ey + xs); ctx.lineTo(ex + xs, ey - xs);
       ctx.stroke();
     }
-    for (const c of calCorrections) {
+    for (let i = 0; i < calCorrections.length; i++) {
+      const c = calCorrections[i];
       const [ox, oy] = worldToCanvas(c.origX, c.origY);
       const [fx, fy] = worldToCanvas(c.fixedX, c.fixedY);
-      // Linie orig → fixed
+      // Linie orig → fixed (dicker + gestrichelt, mit Pfeilspitze)
       ctx.strokeStyle = "rgba(72,200,120,0.85)";
-      ctx.lineWidth = 1.5 / view.zoom;
+      ctx.lineWidth = 2 / view.zoom;
+      ctx.setLineDash([4 / view.zoom, 3 / view.zoom]);
       ctx.beginPath();
       ctx.moveTo(ox, oy); ctx.lineTo(fx, fy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Pfeilspitze am Fix-Ende
+      const ang = Math.atan2(fy - oy, fx - ox);
+      const arr = 7 / view.zoom;
+      ctx.beginPath();
+      ctx.moveTo(fx, fy);
+      ctx.lineTo(fx - arr * Math.cos(ang - 0.4), fy - arr * Math.sin(ang - 0.4));
+      ctx.moveTo(fx, fy);
+      ctx.lineTo(fx - arr * Math.cos(ang + 0.4), fy - arr * Math.sin(ang + 0.4));
       ctx.stroke();
       // Orig-Punkt (rotes X)
       const xs = 5 / view.zoom;
@@ -677,14 +689,22 @@ function render() {
       ctx.moveTo(ox - xs, oy - xs); ctx.lineTo(ox + xs, oy + xs);
       ctx.moveTo(ox - xs, oy + xs); ctx.lineTo(ox + xs, oy - xs);
       ctx.stroke();
-      // Fixed-Punkt (gruener Kreis)
+      // Fixed-Punkt (gruener Kreis mit Nummer)
       ctx.beginPath();
-      ctx.arc(fx, fy, 4 / view.zoom, 0, Math.PI * 2);
+      ctx.arc(fx, fy, 6 / view.zoom, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(72,200,120,0.95)";
       ctx.fill();
       ctx.strokeStyle = "white";
-      ctx.lineWidth = 0.8 / view.zoom;
+      ctx.lineWidth = 1 / view.zoom;
       ctx.stroke();
+      // Index-Label im Kreis
+      ctx.fillStyle = "#0d061a";
+      ctx.font = `bold ${8 / view.zoom}px DM Sans, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(i + 1), fx, fy);
+      ctx.textAlign = "start";
+      ctx.textBaseline = "alphabetic";
     }
     // Aktuell ausgewaehltes Event (gelbes X — wartet auf Klick fuer Fix)
     if (calSelectedEvent) {
@@ -1356,10 +1376,25 @@ function hitTestCalEvent(clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
   const cx = clientX - rect.left;
   const cy = clientY - rect.top;
-  const vis = _calVisibleEvents();
-  const correctedIds = new Set(calCorrections.map(c => c.eventId));
   const HIT_PX = 12;
   let best = null, bestDist = Infinity;
+  // 1) Korrektur-Endpunkte (orig X + fixed circle) — bevorzugt
+  for (let i = 0; i < calCorrections.length; i++) {
+    const c = calCorrections[i];
+    const [ox, oy] = worldToCanvas(c.origX, c.origY);
+    const [fx, fy] = worldToCanvas(c.fixedX, c.fixedY);
+    for (const [px, py] of [[ox, oy], [fx, fy]]) {
+      const d = Math.hypot(px - cx, py - cy);
+      if (d < HIT_PX && d < bestDist) {
+        best = { _kind: "correction", correction: c, index: i + 1 };
+        bestDist = d;
+      }
+    }
+  }
+  if (best) return best;
+  // 2) Unkorrigierte Events
+  const vis = _calVisibleEvents();
+  const correctedIds = new Set(calCorrections.map(c => c.eventId));
   for (const ev of vis) {
     if (correctedIds.has(_calEventId(ev))) continue;
     const [ex, ey] = worldToCanvas(ev.x, ev.y);
@@ -1369,8 +1404,27 @@ function hitTestCalEvent(clientX, clientY) {
   return best;
 }
 
-function showCalTooltip(ev, clientX, clientY) {
+function showCalTooltip(hit, clientX, clientY) {
   const tip = document.getElementById("pinTooltip");
+  // Korrektur-Hit (orig X oder fixed Kreis)
+  if (hit && hit._kind === "correction") {
+    const c = hit.correction;
+    const drift = Math.hypot(c.fixedX - c.origX, c.fixedY - c.origY) / 100;
+    const actLbl = c.type === "Knock" ? "Knocked by" : "Killed by";
+    tip.innerHTML = `
+      <div class="row"><span class="lbl">Korrektur</span><b style="color:#48c878">#${hit.index}</b></div>
+      <div class="row"><span class="lbl">Event</span><b style="color:${c.type==="Kill"?"#e74c3c":"#ffa028"}">${c.type || "?"}</b></div>
+      <div class="row"><span class="lbl">${actLbl}</span><b>${c.actorName || "?"}</b></div>
+      <div class="row"><span class="lbl">Opfer</span><b>${c.targetName || "?"}</b></div>
+      <div class="row"><span class="lbl">Drift</span><b>${drift.toFixed(0)} m</b></div>
+      <div class="row"><span class="lbl">Gesetzt</span><span>${(c.savedAt||"").slice(0,16).replace("T"," ")}</span></div>
+    `;
+    tip.style.display = "block";
+    _positionTip(tip, clientX, clientY);
+    return;
+  }
+  // Normales Event
+  const ev = hit;
   const correctedIds = new Set(calCorrections.map(c => c.eventId));
   const isCorrected = correctedIds.has(_calEventId(ev));
   const isSel = (calSelectedEvent && _calEventId(calSelectedEvent) === _calEventId(ev));
@@ -1393,6 +1447,10 @@ function showCalTooltip(ev, clientX, clientY) {
     ${ev.weapon ? `<div class="row"><span class="lbl">Waffe</span><span>${ev.weapon}</span></div>` : ""}
   `;
   tip.style.display = "block";
+  _positionTip(tip, clientX, clientY);
+}
+
+function _positionTip(tip, clientX, clientY) {
   const W = tip.offsetWidth, H = tip.offsetHeight;
   let x = clientX + 14, y = clientY + 12;
   if (x + W > window.innerWidth - 8) x = clientX - W - 14;
@@ -1425,18 +1483,44 @@ function _calVisibleEvents() {
   return calEvents.filter(ev => ev.matchId === calSelectedMatch);
 }
 
+// Pro Match: welche Map-Quadranten (NW, NE, SW, SE) sind durch Events
+// abgedeckt? Wir nutzen Telemetrie-Coords + Map-Center.
+function _quadrantsOfMatch(matchId) {
+  const mc = mapKm * 100000 / 2;
+  const quads = new Set();
+  for (const ev of calEvents) {
+    if (ev.matchId !== matchId) continue;
+    const xLeft = ev.x < mc;
+    const yTop  = ev.y < mc;
+    quads.add(`${yTop ? "N" : "S"}${xLeft ? "W" : "E"}`);
+  }
+  return quads;
+}
+
 function renderCalList() {
   const host = document.getElementById("regionList");
   if (!host) return;
   if (!calCorrMode) { renderList(); return; }
   const correctedIds = new Set(calCorrections.map(c => c.eventId));
   const matches = _calMatchSummary();
-  // Match-Dropdown bauen
+  // Sortier-Helfer: Matches mit allen 4 Quadranten zuerst (am besten
+  // fuer Calibration-Fit), dann Quadranten-Anzahl absteigend, dann
+  // neueste zuerst.
+  const matchSpread = matches.map(m => ({
+    ...m, quads: _quadrantsOfMatch(m.matchId)
+  })).sort((a, b) => {
+    const da = b.quads.size - a.quads.size;
+    if (da !== 0) return da;
+    return (b.playedAt || "").localeCompare(a.playedAt || "");
+  });
+  // Match-Dropdown — Eintraege mit 4-Quadranten-Coverage golden markiert
   const opts = [`<option value="">— neuestes Match —</option>`]
-    .concat(matches.map(m => {
+    .concat(matchSpread.map(m => {
       const date = (m.playedAt || "").slice(0, 16).replace("T", " ");
       const sel = (m.matchId === calSelectedMatch) ? "selected" : "";
-      return `<option value="${m.matchId}" ${sel}>${date} (${m.count} Events)</option>`;
+      const qLbl = [...m.quads].sort().join("/");
+      const star = m.quads.size === 4 ? "⭐ " : (m.quads.size >= 3 ? "✦ " : "");
+      return `<option value="${m.matchId}" ${sel}>${star}${date} · ${qLbl} (${m.count})</option>`;
     }));
   const sortedVis = _calVisibleEvents().sort((a, b) =>
     (b.playedAt || "").localeCompare(a.playedAt || "") ||
@@ -1480,7 +1564,27 @@ function renderCalList() {
         ${sortedVis.length} sichtbar · ${calCorrections.length} korrigiert
       </div>
     </div>
-    ${rows.join("")}`;
+    ${rows.join("")}
+    ${calCorrections.length ? `
+      <div style="margin-top:14px;padding-top:8px;border-top:1px solid #2a1d3f">
+        <div style="font-size:0.75em;color:#8a7d99;letter-spacing:0.05em;margin-bottom:4px">
+          KORREKTUREN (${calCorrections.length})
+        </div>
+        ${calCorrections.slice().sort((a,b)=>(b.savedAt||"").localeCompare(a.savedAt||"")).map(c => {
+          const drift = Math.hypot(c.fixedX - c.origX, c.fixedY - c.origY) / 100;
+          return `<div class="region-row" data-corr-id="${c.id}" style="cursor:pointer">
+            <span class="name" style="font-size:0.85em">
+              <span style="color:#48c878">●</span>
+              ${c.type || "?"} · ${c.actorName||"?"}→${c.targetName||"?"}
+              <span style="color:#8a7d99">· ${drift.toFixed(0)}m</span>
+            </span>
+            <button class="corr-del-btn" data-corr-id="${c.id}"
+                    style="background:transparent;border:0;color:#e57b7b;cursor:pointer;font-size:1.1em;padding:0 4px"
+                    title="Diese Korrektur loeschen">×</button>
+          </div>`;
+        }).join("")}
+      </div>
+    ` : ""}`;
   document.getElementById("calMatchSel").addEventListener("change", (e) => {
     calSelectedMatch = e.target.value;
     calSelectedEvent = null;
@@ -1505,15 +1609,50 @@ function renderCalList() {
       render();
     } catch (e) { statusEl.textContent = `⚠ ${e}`; }
   });
-  host.querySelectorAll(".region-row").forEach(el => {
-    el.addEventListener("click", () => {
-      const id = el.dataset.eid;
-      calSelectedEvent = sortedVis.find(ev => _calEventId(ev) === id);
-      if (calSelectedEvent) {
-        statusEl.textContent =
-          `Event ${id} ausgewaehlt — klicke auf der Karte die echte Stelle`;
+  // Korrektur loeschen (einzeln)
+  host.querySelectorAll(".corr-del-btn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.corrId;
+      try {
+        await fetch("/api/pubg/calibration-corrections", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ map: currentDataKey, id }),
+        });
+        calCorrections = calCorrections.filter(c => c.id !== id);
+        statusEl.textContent = `Korrektur entfernt (${calCorrections.length} verbleibend)`;
         renderCalList();
         render();
+      } catch (err) { statusEl.textContent = `⚠ ${err}`; }
+    });
+  });
+  host.querySelectorAll(".region-row").forEach(el => {
+    el.addEventListener("click", () => {
+      const eid = el.dataset.eid;
+      const cid = el.dataset.corrId;
+      if (cid) {
+        // Korrektur-Zeile: Map-Mitte auf das Paar setzen
+        const c = calCorrections.find(x => x.id === cid);
+        if (c) {
+          const mid = ((c.origX + c.fixedX) / 2);
+          const myd = ((c.origY + c.fixedY) / 2);
+          // Welt-cm → canvas-px via worldToCanvas, dann pan auf Canvas-Mitte
+          const [cx, cy] = worldToCanvas(mid, myd);
+          view.panX += (canvas.width / 2 - cx);
+          view.panY += (canvas.height / 2 - cy);
+          render();
+        }
+        return;
+      }
+      if (eid) {
+        calSelectedEvent = sortedVis.find(ev => _calEventId(ev) === eid);
+        if (calSelectedEvent) {
+          statusEl.textContent =
+            `Event ${eid} ausgewaehlt — klicke auf der Karte die echte Stelle`;
+          renderCalList();
+          render();
+        }
       }
     });
   });
