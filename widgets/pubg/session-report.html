@@ -1220,6 +1220,31 @@
             }
           }
 
+          // Crawl-Path nach Knock (gekrochener Weg zwischen DBNO und Tod) —
+          // gestrichelt in heller Member-Farbe.
+          if (!inDefault && life.death && life.death.knockTsMs
+              && life.death.crawl && life.death.crawl.length >= 2) {
+            const knockTs = life.death.knockTsMs;
+            const trailEnd = Math.min(absTs, life.death.tsMs);
+            if (trailEnd > knockTs) {
+              ctx.strokeStyle = color;
+              ctx.globalAlpha = 0.55;
+              ctx.lineWidth = 1.5;
+              ctx.setLineDash([3, 3]);
+              ctx.beginPath();
+              let started = false;
+              for (const [xCm, yCm, ts] of life.death.crawl) {
+                if (ts > trailEnd) break;
+                const [cx, cy] = mdCmToCanvas(host, xCm, yCm);
+                if (!started) { ctx.moveTo(cx, cy); started = true; }
+                else { ctx.lineTo(cx, cy); }
+              }
+              ctx.stroke();
+              ctx.setLineDash([]);
+              ctx.globalAlpha = 1;
+            }
+          }
+
           // Death-Pin (sobald cursor >= death-ts)
           if (!inDefault && life.death && absTs >= life.death.tsMs) {
             const [cx, cy] = mdCmToCanvas(host, life.death.x, life.death.y);
@@ -1230,6 +1255,16 @@
             ctx.strokeStyle = "white";
             ctx.lineWidth = 1;
             ctx.stroke();
+            // Knock-Pin: kleiner offener Ring am Anfang des Crawls
+            if (life.death.knockTsMs && life.death.crawl && life.death.crawl.length) {
+              const [kx, ky] = life.death.crawl[0];
+              const [kcx, kcy] = mdCmToCanvas(host, kx, ky);
+              ctx.beginPath();
+              ctx.arc(kcx, kcy, 4.5, 0, Math.PI * 2);
+              ctx.strokeStyle = color;
+              ctx.lineWidth = 1.2;
+              ctx.stroke();
+            }
           }
 
           // Kill-Marker (sobald cursor >= kill-ts) — bleiben bestehen

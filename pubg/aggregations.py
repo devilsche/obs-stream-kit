@@ -1114,6 +1114,33 @@ def compute_match_detail(conn, my_account_id, match_id):
                     """, (death_ev["actor_account"], match_id,
                           death_ev["actor_account"])).fetchone()
                     kn = krow["n"] if krow else None
+                # Crawl-Path: war der Spieler vor dem Tod im DBNO-Zustand?
+                # Letztes Knock-Event mit target=acc vor death suchen.
+                knock_ts = None
+                for k in ev_rows:
+                    if k["event_type"] != "Knock": continue
+                    if k["target_account"] != acc: continue
+                    kts = k["timestamp_ms"]
+                    if kts is None or kts >= death_ev["timestamp_ms"]: continue
+                    # Falls Revive zwischen Knock und Death — Knock zaehlt nicht
+                    revived = any(
+                        r["event_type"] == "Revive" and r["target_account"] == acc
+                        and r["timestamp_ms"] and kts < r["timestamp_ms"] < death_ev["timestamp_ms"]
+                        for r in ev_rows)
+                    if revived: continue
+                    if knock_ts is None or kts > knock_ts:
+                        knock_ts = kts
+                crawl = []
+                if knock_ts is not None:
+                    crawl = [
+                        [e["actor_x"], e["actor_y"], e["timestamp_ms"]]
+                        for e in ev_rows
+                        if e["actor_account"] == acc
+                        and e["event_type"] == "Position"
+                        and e["actor_x"] is not None
+                        and e["timestamp_ms"] >= knock_ts
+                        and e["timestamp_ms"] <= death_ev["timestamp_ms"]
+                    ]
                 death_info = {
                     "x":           death_ev["victim_x"],
                     "y":           death_ev["victim_y"],
@@ -1123,6 +1150,8 @@ def compute_match_detail(conn, my_account_id, match_id):
                     "weaponName":  weapon_name,
                     "distanceM":   (round((death_ev["distance"] or 0) / 100.0, 1)
                                     if death_ev["distance"] else None),
+                    "knockTsMs":   knock_ts,
+                    "crawl":       crawl,
                 }
 
             lives.append({
