@@ -1394,11 +1394,22 @@ function renderCalList() {
       <span class="badge">${ev.type}</span>
     </div>`;
   });
+  const canFit = calCorrections.length >= 3;
   host.innerHTML = `
     <div style="padding:6px 4px;border-bottom:1px solid #2a1d3f;margin-bottom:6px">
       <select id="calMatchSel" style="width:100%;padding:4px;font-size:0.85em">
         ${opts.join("")}
       </select>
+      <div style="display:flex;gap:4px;margin-top:6px">
+        <button id="calFitBtn" ${canFit ? "" : "disabled"}
+                style="flex:1;padding:5px;font-size:0.85em;background:${canFit?"#5e2a79":"#2a1d3f"};color:${canFit?"#f2b705":"#666"};border:1px solid ${canFit?"#f2b705":"#444"};border-radius:3px;cursor:${canFit?"pointer":"not-allowed"}">
+          📐 Cal aus ${calCorrections.length} Korrekturen
+        </button>
+        <button id="calClearBtn" title="Alle Korrekturen loeschen"
+                style="padding:5px 8px;font-size:0.85em;background:#3a1818;color:#e57b7b;border:1px solid #5a2828;border-radius:3px;cursor:pointer">
+          🗑
+        </button>
+      </div>
       <div style="font-size:0.75em;color:#8a7d99;margin-top:4px">
         ${sortedVis.length} sichtbar · ${calCorrections.length} korrigiert
       </div>
@@ -1409,6 +1420,24 @@ function renderCalList() {
     calSelectedEvent = null;
     renderCalList();
     render();
+  });
+  const fitBtn = document.getElementById("calFitBtn");
+  if (fitBtn && !fitBtn.disabled) {
+    fitBtn.addEventListener("click", computeAndApplyFit);
+  }
+  document.getElementById("calClearBtn").addEventListener("click", async () => {
+    if (!confirm(`Alle ${calCorrections.length} Korrekturen fuer diese Map loeschen?`)) return;
+    try {
+      await fetch("/api/pubg/calibration-corrections", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ map: currentDataKey, clearAll: true }),
+      });
+      calCorrections = [];
+      statusEl.textContent = "Alle Korrekturen geloescht";
+      renderCalList();
+      render();
+    } catch (e) { statusEl.textContent = `⚠ ${e}`; }
   });
   host.querySelectorAll(".region-row").forEach(el => {
     el.addEventListener("click", () => {
@@ -1424,6 +1453,91 @@ function renderCalList() {
   });
   const eb = document.getElementById("editBlock");
   if (eb) eb.style.display = "none";
+}
+
+// Wendet flip+rotate (aktuelle pinCal-Werte) auf einen Welt-Punkt an,
+// OHNE scale/offset — damit wir die unteren beiden Parameter rein per
+// Linear-Regression aus den Korrekturen bestimmen koennen.
+function _applyFlipRotate(x, y) {
+  const mc = mapKm * 100000 / 2;
+  if (pinCal.flipX) x = 2 * mc - x;
+  if (pinCal.flipY) y = 2 * mc - y;
+  const rot = ((pinCal.rotate % 360) + 360) % 360;
+  if (rot !== 0) {
+    const dx = x - mc, dy = y - mc;
+    if (rot === 90)  { x = mc - dy; y = mc + dx; }
+    if (rot === 180) { x = mc - dx; y = mc - dy; }
+    if (rot === 270) { x = mc + dy; y = mc - dx; }
+  }
+  return [x, y];
+}
+
+// 1D-Linear-Regression: y_i = a*x_i + b. Returns {a, b, r2}.
+function _linfit(xs, ys) {
+  const n = xs.length;
+  if (n < 2) return { a: 1, b: 0, r2: 0 };
+  let sx = 0, sy = 0;
+  for (let i = 0; i < n; i++) { sx += xs[i]; sy += ys[i]; }
+  const mx = sx / n, my = sy / n;
+  let num = 0, den = 0, ssTot = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = xs[i] - mx, dy = ys[i] - my;
+    num += dx * dy;
+    den += dx * dx;
+    ssTot += dy * dy;
+  }
+  if (den === 0) return { a: 1, b: my - mx, r2: 0 };
+  const a = num / den;
+  const b = my - a * mx;
+  // R^2
+  let ssRes = 0;
+  for (let i = 0; i < n; i++) {
+    const e = ys[i] - (a * xs[i] + b);
+    ssRes += e * e;
+  }
+  const r2 = ssTot === 0 ? 1 : 1 - ssRes / ssTot;
+  return { a, b, r2 };
+}
+
+function computeAndApplyFit() {
+  if (calCorrections.length < 3) {
+    statusEl.textContent = "Brauche mindestens 3 Korrekturen";
+    return;
+  }
+  const mc = mapKm * 100000 / 2;
+  // Bereite Regressions-Daten:
+  //   In die Formel ex = (preX - mc)*scaleX + mc + offsetX
+  //   substituieren wir u = preX - mc, v = ex - mc, dann v = scaleX*u + offsetX
+  const uX = [], vX = [], uY = [], vY = [];
+  for (const c of calCorrections) {
+    const [preX, preY] = _applyFlipRotate(c.origX, c.origY);
+    uX.push(preX - mc);
+    vX.push(c.fixedX - mc);
+    uY.push(preY - mc);
+    vY.push(c.fixedY - mc);
+  }
+  const fitX = _linfit(uX, vX);
+  const fitY = _linfit(uY, vY);
+  // Sanity check: scale sollte plausibel sein (0.9-1.1 typisch)
+  const sX = fitX.a, oX = fitX.b, sY = fitY.a, oY = fitY.b;
+  const ok = isFinite(sX) && isFinite(sY) && isFinite(oX) && isFinite(oY);
+  if (!ok) {
+    statusEl.textContent = "⚠ Fit hat NaN/Infinity geliefert — Korrekturen ueberpruefen";
+    return;
+  }
+  const msg = `Fit (n=${calCorrections.length}): ` +
+    `scaleX=${sX.toFixed(4)} (R²=${fitX.r2.toFixed(3)}) · ` +
+    `scaleY=${sY.toFixed(4)} (R²=${fitY.r2.toFixed(3)}) · ` +
+    `offsetX=${(oX/100).toFixed(1)}m · offsetY=${(oY/100).toFixed(1)}m`;
+  if (!confirm(`${msg}\n\nUebernehmen + Speichern?`)) return;
+  pinCal.scaleX = sX;
+  pinCal.scaleY = sY;
+  pinCal.offsetX = oX;
+  pinCal.offsetY = oY;
+  // UI-Inputs aus pinCal sync'en
+  if (typeof updateCalLabel === "function") updateCalLabel();
+  statusEl.textContent = `✓ ${msg}`;
+  render();
 }
 
 async function saveCorrection(fixedX, fixedY) {
