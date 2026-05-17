@@ -144,18 +144,11 @@
     .squad-detail.show { display: block; animation: pubg-fade-in 0.25s; }
     .squad-detail .detail-row {
       display: flex;
-      flex-direction: column;
-      gap: 12px;
-      align-items: stretch;
-    }
-    .squad-detail .detail-row > .squad-table-wrap { width: 100%; min-width: 0; }
-    /* Event-Matches (event-detail) bleiben rechts neben der Tabelle */
-    .squad-detail .detail-row.has-event {
       flex-direction: row;
       gap: 16px;
       align-items: flex-start;
     }
-    .squad-detail .detail-row.has-event > .squad-table-wrap { flex: 1; width: auto; }
+    .squad-detail .detail-row > .squad-table-wrap { flex: 1; min-width: 0; }
     /* Event-Detail-Panel (PAYDAY/Heist) — ersetzt die Mini-Map in Events */
     .event-detail {
       width: 260px;
@@ -233,16 +226,18 @@
     .squad-detail tr.win td { color: var(--pubg-gold); }
     /* Match-Detail v2 — Two-Canvas 300x300 + Scrub-Bar + Cards-Col */
     .md-host {
-      flex: none;
-      width: 100%;
+      flex: 1;
+      min-width: 0;
     }
     .md-grid {
       display: grid;
-      grid-template-columns: 340px 1fr;
+      grid-template-columns: 314px 1fr;
       gap: 14px;
       align-items: start;
     }
     .md-mapcol { display: flex; flex-direction: column; gap: 6px; }
+    .md-rightcol { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+    .md-rightcol .squad-table-wrap { max-height: 220px; overflow-y: auto; }
     .md-mapwrap {
       position: relative;
       width: 300px; height: 300px;
@@ -872,10 +867,14 @@
       let d = null;
       try {
         d = await PubgUI.fetchJson(
-          `/api/pubg/match-detail?matchId=${encodeURIComponent(matchId)}`);
+          `/api/pubg/match-detail?matchId=${encodeURIComponent(matchId)}`,
+          60000);
       } catch (e) { console.warn("mdLoad failed", matchId, e); }
+      // Wenn die Anfrage fehlschlug, NICHT cachen — sonst friert ein
+      // einmaliger Timeout das Match permanent ein.
+      if (!d) return { detail: null, colorByAcc: {} };
       const colorByAcc = {};
-      if (d && d.members) {
+      if (d.members) {
         d.members.forEach((m, i) => {
           colorByAcc[m.accountId] = MD_COLORS[i % MD_COLORS.length];
         });
@@ -1337,6 +1336,7 @@
       host.dataset.mounted = "1";
       const matchId = host.getAttribute("data-match-id");
       const mapName = host.getAttribute("data-map");
+      const tableHtml = decodeURIComponent(host.getAttribute("data-table") || "");
       host.innerHTML = `
         <div class="md-grid">
           <div class="md-mapcol">
@@ -1356,9 +1356,10 @@
               <span class="md-time">0:00 / 0:00</span>
             </div>
           </div>
-          <div class="md-cardcol">
+          <div class="md-rightcol">
+            <div class="squad-table-wrap">${tableHtml}</div>
             <div class="md-allebar">
-              <button class="md-allebtn">● Alle</button>
+              <button class="md-allebtn">● Alle sichtbar</button>
             </div>
             <div class="md-cards"></div>
           </div>
@@ -1397,6 +1398,8 @@
         }
       }
       s.viewport = mdBboxFitViewport(landingCoords, MD_PAD_500M_CM);
+      s.viewport.autoFollow = true;
+      mdClampViewport(host);
 
       // Telemetrie-Pfad-Check: wenn KEIN Member einen Pfad hat (weder
       // planeRoute noch groundPath fuer irgendein Leben), zeigen wir
@@ -1421,6 +1424,28 @@
         host.querySelector(".md-mapcol").appendChild(banner);
       }
       mdRenderState(host);
+      // Auto-Play: Zeitraffer startet sofort, Kamera folgt automatisch
+      if (anyPath) {
+        mdTogglePlay(host);
+      }
+    }
+
+    // Begrenze viewport.center so dass das sichtbare Fenster die Map nicht
+    // verlaesst. Wenn das Fenster groesser als die Map ist, zentrieren wir.
+    function mdClampViewport(host) {
+      const s = mdGetState(host);
+      const vp = s.viewport;
+      if (!vp) return;
+      const mapKm = parseFloat(host.dataset.mapKm) || 8;
+      const mapCm = mapKm * 100000;
+      const halfVis = (MD_MAP_PX / 2) / vp.zoom;
+      if (halfVis * 2 >= mapCm) {
+        vp.centerX = mapCm / 2;
+        vp.centerY = mapCm / 2;
+        return;
+      }
+      vp.centerX = Math.max(halfVis, Math.min(mapCm - halfVis, vp.centerX));
+      vp.centerY = Math.max(halfVis, Math.min(mapCm - halfVis, vp.centerY));
     }
 
     function mdTogglePlay(host) {
@@ -1480,7 +1505,7 @@
       s.viewport.centerX += (target.centerX - s.viewport.centerX) * t;
       s.viewport.centerY += (target.centerY - s.viewport.centerY) * t;
       s.viewport.zoom += (target.zoom - s.viewport.zoom) * t;
-      // autoFollow bleibt true
+      mdClampViewport(host);
     }
 
     // Slider-Input setzt cursor + pausiert
@@ -1542,6 +1567,7 @@
       vp.centerX = acmX - (anchorPx - MD_MAP_PX / 2) / vp.zoom;
       vp.centerY = acmY - (anchorPy - MD_MAP_PX / 2) / vp.zoom;
       vp.autoFollow = false;
+      mdClampViewport(host);
       mdRenderBasemap(host);
       mdRenderOverlay(host);
     }
@@ -1587,6 +1613,7 @@
       s.viewport.centerX = s.dragPan.startCenterX - dx / s.viewport.zoom;
       s.viewport.centerY = s.dragPan.startCenterY - dy / s.viewport.zoom;
       s.viewport.autoFollow = false;
+      mdClampViewport(host);
       mdRenderBasemap(host);
       mdRenderOverlay(host);
     });
@@ -1876,22 +1903,28 @@
       const matchId = m.matchId || "";
       const mapName = m.map || "";
       const isEvent = !!m.isEvent;
-      const sidePanel = isEvent
-        ? `<div class="event-detail" data-event-detail-match-id="${matchId}">
-             <div class="event-detail-empty">— event stats laden —</div>
-           </div>`
-        : `<div class="md-host" data-match-id="${matchId}" data-map="${mapName}"></div>`;
+      const tableHtml = `<table>
+        <thead><tr>
+          <th>Squad</th><th>K</th><th>HS</th><th>Ass</th><th>DBNO</th><th>DMG</th><th>Survived</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+      if (isEvent) {
+        return `
+          <div class="detail-row has-event">
+            <div class="squad-table-wrap">${tableHtml}</div>
+            <div class="event-detail" data-event-detail-match-id="${matchId}">
+              <div class="event-detail-empty">— event stats laden —</div>
+            </div>
+          </div>`;
+      }
+      // Match-Detail: Map links, rechts (Squad-Tabelle + Member-Cards).
+      // Tabelle wandert in md-host und wird von mdMount in die rechte
+      // Spalte gesetzt — via data-table (URI-encoded).
       return `
-        <div class="detail-row${isEvent ? ' has-event' : ''}">
-          <div class="squad-table-wrap">
-            <table>
-              <thead><tr>
-                <th>Squad</th><th>K</th><th>HS</th><th>Ass</th><th>DBNO</th><th>DMG</th><th>Survived</th>
-              </tr></thead>
-              <tbody>${rows}</tbody>
-            </table>
-          </div>
-          ${sidePanel}
+        <div class="detail-row">
+          <div class="md-host" data-match-id="${matchId}" data-map="${mapName}"
+               data-table="${encodeURIComponent(tableHtml)}"></div>
         </div>`;
     }
 
@@ -2562,6 +2595,7 @@
           zoom: MD_MAP_PX / MD_PAD_500M_CM * 0.5,  // 500m wide visible
           autoFollow: false,
         };
+        mdClampViewport(host);
       }
       mdRenderState(host);
     }
