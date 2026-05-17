@@ -285,34 +285,6 @@
       display: none;
     }
     .md-mapwrap .md-hover-label.show { display: block; }
-    /* Scrub-Bar */
-    .md-scrub {
-      display: flex; gap: 6px; align-items: center;
-      padding: 4px 6px;
-      background: rgba(13,6,26,0.55);
-      border: 1px solid var(--pubg-border);
-      border-radius: 4px;
-      font-size: 0.8em;
-      color: var(--pubg-muted);
-    }
-    .md-scrub button {
-      background: rgba(242,183,5,0.12);
-      border: 1px solid rgba(242,183,5,0.4);
-      color: var(--pubg-gold);
-      padding: 2px 8px;
-      border-radius: 3px;
-      font-family: inherit; cursor: pointer; font-size: 0.95em;
-    }
-    .md-scrub button:hover { background: rgba(242,183,5,0.22); }
-    .md-scrub input[type=range] {
-      flex: 1; cursor: pointer;
-      accent-color: var(--pubg-gold);
-    }
-    .md-scrub .md-time {
-      font-variant-numeric: tabular-nums;
-      min-width: 90px; text-align: right;
-      color: var(--pubg-text);
-    }
     /* Cards-Col */
     .md-cardcol { display: flex; flex-direction: column; gap: 8px; }
     .md-allebar {
@@ -342,10 +314,11 @@
       transition: background 0.12s, border-color 0.12s;
     }
     .md-card:hover { background: rgba(255,255,255,0.04); }
-    .md-card.active {
-      background: rgba(242,183,5,0.08);
-      border-color: var(--pubg-gold);
+    .md-card.hidden {
+      opacity: 0.35;
+      filter: grayscale(0.5);
     }
+    .md-card.hidden .md-name { text-decoration: line-through; }
     .md-card .md-head {
       display: flex; align-items: center; gap: 8px;
       margin-bottom: 4px;
@@ -861,7 +834,6 @@
     const MD_PAD_500M_CM = 50000;   // 500m padding fuer Default-Bbox
     const MD_MIN_ZOOM_CM = 5000;    // 50m minimal sichtbarer Radius
     const MD_MAX_ZOOM_CM = 800000;  // 8km — ganze Map default Erangel-Range
-    const MD_ANIM_DURATION_MS = 15000;
 
     // Cache fuer match-detail responses
     const _mdCache = new Map();
@@ -871,8 +843,12 @@
       let d = null;
       try {
         d = await PubgUI.fetchJson(
-          `/api/pubg/match-detail?matchId=${encodeURIComponent(matchId)}`);
+          `/api/pubg/match-detail?matchId=${encodeURIComponent(matchId)}`,
+          60000);
       } catch (e) { console.warn("mdLoad failed", matchId, e); }
+      // Wenn die Anfrage fehlschlug (Timeout o.a.), Eintrag NICHT cachen —
+      // sonst friert der erste fehlgeschlagene Versuch das Match permanent.
+      if (!d) return { detail: null, colorByAcc: {} };
       const colorByAcc = {};
       if (d && d.members) {
         d.members.forEach((m, i) => {
@@ -931,15 +907,9 @@
         s = {
           detail: null,           // match-detail-response
           colorByAcc: {},
-          soloAcc: null,
-          viewport: null,          // {centerX, centerY, zoom, autoFollow}
-          zeitraffer: {            // cursorTs in ms relativ zu matchStart
-            cursorTs: 0, playing: false,
-            playStartWallTs: 0, playStartCursor: 0,
-            matchStart: 0, matchEnd: 0,
-          },
+          hiddenAccs: new Set(),   // Accounts deren Pfad/Pin nicht angezeigt wird
+          viewport: null,          // {centerX, centerY, zoom}
           hoveredMarker: null,
-          playToken: 0,
           dragPan: null,            // {startX, startY, startCenterX, startCenterY}
         };
         _mdState.set(host, s);
@@ -1053,30 +1023,16 @@
 
       const s = mdGetState(host);
       if (!s.detail || !s.detail.members) return;
-      const cursorTs = s.zeitraffer.cursorTs;
-      const matchStart = s.zeitraffer.matchStart;
-      const absTs = matchStart + cursorTs;
-      const soloAcc = s.soloAcc;
 
-      // Members filtern fuer Solo-Mode
-      const visibleMembers = soloAcc
-        ? s.detail.members.filter(m => m.accountId === soloAcc)
-        : s.detail.members;
+      const visibleMembers = s.detail.members.filter(
+        m => !s.hiddenAccs.has(m.accountId));
 
       for (const m of visibleMembers) {
         const color = s.colorByAcc[m.accountId] || "#999";
         if (!m.lives) continue;
         for (const life of m.lives) {
-          // PlaneRoute: gestrichelt, nur sichtbar wenn relevant fuer aktuellen
-          // Cursor (oder Default-View bei cursor=0)
-          const planeStartTs = life.planeRoute.length
-            ? life.planeRoute[0][2] : null;
-          const landingTs = life.landing ? life.landing.tsMs : null;
-          // Default-View (cursor=0) zeigt planeRoute komplett + Landing-Pin
-          const inDefault = (cursorTs === 0);
-          const showPlaneRoute = inDefault
-            || (landingTs && absTs <= landingTs && planeStartTs && absTs >= planeStartTs);
-          if (showPlaneRoute && life.planeRoute.length >= 2) {
+          // PlaneRoute (gestrichelt)
+          if (life.planeRoute && life.planeRoute.length >= 2) {
             ctx.strokeStyle = color;
             ctx.globalAlpha = 0.6;
             ctx.setLineDash([4, 4]);
@@ -1091,10 +1047,8 @@
             ctx.globalAlpha = 1;
           }
 
-          // Landing-Pin (sobald cursor >= landing-ts oder im Default)
-          const showLanding = inDefault
-            || (landingTs && absTs >= landingTs);
-          if (showLanding && life.landing) {
+          // Landing-Pin
+          if (life.landing) {
             const [cx, cy] = mdCmToCanvas(host, life.landing.x, life.landing.y);
             ctx.beginPath();
             ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
@@ -1105,31 +1059,23 @@
             ctx.stroke();
           }
 
-          // groundPath als Trail bis cursor (nicht im Default-View)
-          if (!inDefault && landingTs && life.groundPath.length >= 2) {
-            const trailEnd = life.death
-              ? Math.min(absTs, life.death.tsMs)
-              : absTs;
-            if (trailEnd > landingTs) {
-              ctx.strokeStyle = color;
-              ctx.globalAlpha = 0.7;
-              ctx.lineWidth = 1.5;
-              ctx.beginPath();
-              let started = false;
-              for (let i = 0; i < life.groundPath.length; i++) {
-                const [xCm, yCm, ts] = life.groundPath[i];
-                if (ts > trailEnd) break;
-                const [cx, cy] = mdCmToCanvas(host, xCm, yCm);
-                if (!started) { ctx.moveTo(cx, cy); started = true; }
-                else { ctx.lineTo(cx, cy); }
-              }
-              ctx.stroke();
-              ctx.globalAlpha = 1;
+          // groundPath als durchgehende Linie bis Death
+          if (life.groundPath && life.groundPath.length >= 2) {
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = 0.7;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            for (let i = 0; i < life.groundPath.length; i++) {
+              const [xCm, yCm] = life.groundPath[i];
+              const [cx, cy] = mdCmToCanvas(host, xCm, yCm);
+              if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
             }
+            ctx.stroke();
+            ctx.globalAlpha = 1;
           }
 
-          // Death-Pin (sobald cursor >= death-ts)
-          if (!inDefault && life.death && absTs >= life.death.tsMs) {
+          // Death-Pin
+          if (life.death) {
             const [cx, cy] = mdCmToCanvas(host, life.death.x, life.death.y);
             ctx.beginPath();
             ctx.arc(cx, cy, 5, 0, Math.PI * 2);
@@ -1140,42 +1086,35 @@
             ctx.stroke();
           }
 
-          // Kill-Marker (sobald cursor >= kill-ts)
-          if (!inDefault) {
-            for (const k of life.kills) {
-              if (absTs < k.tsMs) continue;
-              if (k.actorX == null || k.victimX == null) continue;
-              const [ax, ay] = mdCmToCanvas(host, k.actorX, k.actorY);
-              const [vx, vy] = mdCmToCanvas(host, k.victimX, k.victimY);
-              // Verbindungslinie
-              ctx.strokeStyle = color;
-              ctx.globalAlpha = 0.4;
-              ctx.lineWidth = 0.8;
-              ctx.beginPath();
-              ctx.moveTo(ax, ay); ctx.lineTo(vx, vy);
-              ctx.stroke();
-              ctx.globalAlpha = 1;
-              // Schuetze-Punkt
-              ctx.beginPath();
-              ctx.arc(ax, ay, 2.5, 0, Math.PI * 2);
-              ctx.fillStyle = color;
-              ctx.fill();
-              // Opfer-Punkt (grau)
-              ctx.beginPath();
-              ctx.arc(vx, vy, 2.5, 0, Math.PI * 2);
-              ctx.fillStyle = "#bbb";
-              ctx.fill();
-              ctx.strokeStyle = "rgba(0,0,0,0.5)";
-              ctx.lineWidth = 0.4;
-              ctx.stroke();
-            }
+          // Kill-Marker (Schuetze + Opfer + Verbindung)
+          for (const k of (life.kills || [])) {
+            if (k.actorX == null || k.victimX == null) continue;
+            const [ax, ay] = mdCmToCanvas(host, k.actorX, k.actorY);
+            const [vx, vy] = mdCmToCanvas(host, k.victimX, k.victimY);
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = 0.4;
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.moveTo(ax, ay); ctx.lineTo(vx, vy);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            ctx.beginPath();
+            ctx.arc(ax, ay, 2.5, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(vx, vy, 2.5, 0, Math.PI * 2);
+            ctx.fillStyle = "#bbb";
+            ctx.fill();
+            ctx.strokeStyle = "rgba(0,0,0,0.5)";
+            ctx.lineWidth = 0.4;
+            ctx.stroke();
           }
         }
 
-        // Revive-Pins (nur bis cursor erreicht)
+        // Revive-Pins
         if (m.revivePts) {
-          for (const [xCm, yCm, ts] of m.revivePts) {
-            if (!inDefault && absTs < ts) continue;
+          for (const [xCm, yCm] of m.revivePts) {
             const [cx, cy] = mdCmToCanvas(host, xCm, yCm);
             ctx.beginPath();
             ctx.arc(cx, cy, 3, 0, Math.PI * 2);
@@ -1186,50 +1125,7 @@
             ctx.stroke();
           }
         }
-
-        // Aktiver Zeitraffer-Pin (interpolated Position)
-        if (!inDefault && s.zeitraffer.playing || (!inDefault && cursorTs > 0)) {
-          const activePin = mdInterpolatePin(m, absTs);
-          if (activePin) {
-            const [cx, cy] = mdCmToCanvas(host, activePin.x, activePin.y);
-            ctx.beginPath();
-            ctx.arc(cx, cy, 4, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.fill();
-            ctx.strokeStyle = "white";
-            ctx.lineWidth = 1;
-            ctx.stroke();
-          }
-        }
       }
-    }
-
-    // Liefert {x, y} fuer Member m zum Absolut-Timestamp absTs
-    // durch Interpolation im aktuellen Leben.
-    function mdInterpolatePin(m, absTs) {
-      if (!m.lives) return null;
-      for (const life of m.lives) {
-        if (!life.landing) continue;
-        if (life.death && absTs > life.death.tsMs) continue;
-        const fullPath = [...(life.planeRoute || []), ...(life.groundPath || [])];
-        if (fullPath.length < 2) {
-          if (life.landing) return { x: life.landing.x, y: life.landing.y };
-          continue;
-        }
-        if (absTs < fullPath[0][2]) return null;
-        // Bisect
-        for (let i = 0; i < fullPath.length - 1; i++) {
-          const [x0, y0, t0] = fullPath[i];
-          const [x1, y1, t1] = fullPath[i + 1];
-          if (absTs >= t0 && absTs <= t1) {
-            const f = (absTs - t0) / Math.max(1, (t1 - t0));
-            return { x: x0 + (x1 - x0) * f, y: y0 + (y1 - y0) * f };
-          }
-        }
-        const last = fullPath[fullPath.length - 1];
-        return { x: last[0], y: last[1] };
-      }
-      return null;
     }
 
     function mdRenderCards(host) {
@@ -1240,7 +1136,6 @@
         wrap.innerHTML = "";
         return;
       }
-      const soloAcc = s.soloAcc;
       function fmtMinSec(sec) {
         if (sec == null) return "?";
         const m = Math.floor(sec / 60);
@@ -1254,12 +1149,11 @@
         return null;
       }
       const mapName = host.getAttribute("data-map");
-      const visible = soloAcc
-        ? s.detail.members.filter(m => m.accountId === soloAcc)
-        : s.detail.members;
-      const html = visible.map((m) => {
+      const all = s.detail.members;
+      const html = all.map((m) => {
         const color = s.colorByAcc[m.accountId] || "#999";
-        const active = (m.accountId === soloAcc) ? " active" : "";
+        const hidden = s.hiddenAccs.has(m.accountId);
+        const hiddenCls = hidden ? " hidden" : "";
         const selfCls = m.isSelf ? " md-self" : "";
         const who = m.isSelf ? "Du" : m.name;
         // Overall-Badge: alive falls letztes Leben ohne Death, sonst der letzte Death
@@ -1268,7 +1162,7 @@
           const last = m.lives[m.lives.length - 1];
           if (last.death) {
             const sec = Math.floor(
-              (last.death.tsMs - (s.zeitraffer.matchStart || 0)) / 1000);
+              (last.death.tsMs - (s.matchStartMs || 0)) / 1000);
             badge = `<span class="md-badge died">† ${fmtMinSec(sec)}</span>`;
           }
         }
@@ -1290,7 +1184,7 @@
           }
           return `<div class="md-life">${row}</div>`;
         }).join("");
-        return `<div class="md-card${active}${selfCls}" data-acc="${m.accountId}">
+        return `<div class="md-card${hiddenCls}${selfCls}" data-acc="${m.accountId}">
           <div class="md-head">
             <span class="md-dot" style="background:${color}"></span>
             <span class="md-name">${who}</span>
@@ -1308,34 +1202,16 @@
       mdRenderBasemap(host);
       mdRenderOverlay(host);
       mdRenderCards(host);
-      mdUpdateScrubBar(host);
       mdUpdateAlleBar(host);
-    }
-
-    function mdUpdateScrubBar(host) {
-      const s = mdGetState(host);
-      const z = s.zeitraffer;
-      const slider = host.querySelector("input.md-scrub-slider");
-      const timeEl = host.querySelector(".md-scrub .md-time");
-      const playBtn = host.querySelector(".md-scrub .md-play-btn");
-      if (!slider || !timeEl) return;
-      const dur = z.matchEnd - z.matchStart;
-      slider.min = 0; slider.max = dur; slider.step = 1000;
-      slider.value = z.cursorTs;
-      function fmt(ms) {
-        const sec = Math.floor(ms / 1000);
-        return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,"0")}`;
-      }
-      timeEl.textContent = `${fmt(z.cursorTs)} / ${fmt(dur)}`;
-      if (playBtn) playBtn.textContent = z.playing ? "⏸" : "▶";
     }
 
     function mdUpdateAlleBar(host) {
       const s = mdGetState(host);
       const btn = host.querySelector(".md-allebtn");
       if (!btn) return;
-      btn.classList.toggle("solo-active", !!s.soloAcc);
-      btn.textContent = s.soloAcc ? "↺ Alle anzeigen" : "● Alle";
+      const anyHidden = s.hiddenAccs && s.hiddenAccs.size > 0;
+      btn.classList.toggle("solo-active", anyHidden);
+      btn.textContent = anyHidden ? "↺ Alle anzeigen" : "● Alle sichtbar";
     }
 
     async function mdMount(host) {
@@ -1356,15 +1232,10 @@
               </div>
               <div class="md-hover-label"></div>
             </div>
-            <div class="md-scrub">
-              <button class="md-play-btn">▶</button>
-              <input type="range" class="md-scrub-slider" min="0" max="100" value="0">
-              <span class="md-time">0:00 / 0:00</span>
-            </div>
           </div>
           <div class="md-cardcol">
             <div class="md-allebar">
-              <button class="md-allebtn">● Alle</button>
+              <button class="md-allebtn">● Alle anzeigen</button>
             </div>
             <div class="md-cards"></div>
           </div>
@@ -1378,21 +1249,17 @@
       }
       s.detail = md.detail;
       s.colorByAcc = md.colorByAcc;
-      // Match-Zeitraum aus allen Pfaden ableiten
-      let mStart = Infinity, mEnd = -Infinity;
+      s.hiddenAccs = new Set();
+      // matchStartMs: frühester Pfad-Timestamp (fuer Death-Zeit-Badge)
+      let mStart = Infinity;
       for (const m of s.detail.members) {
         if (!m.lives) continue;
         for (const life of m.lives) {
           const fullPath = [...(life.planeRoute||[]), ...(life.groundPath||[])];
-          if (!fullPath.length) continue;
-          const t0 = fullPath[0][2], tN = fullPath[fullPath.length - 1][2];
-          if (t0 < mStart) mStart = t0;
-          if (tN > mEnd) mEnd = tN;
+          if (fullPath.length && fullPath[0][2] < mStart) mStart = fullPath[0][2];
         }
       }
-      s.zeitraffer.matchStart = isFinite(mStart) ? mStart : 0;
-      s.zeitraffer.matchEnd = isFinite(mEnd) ? mEnd : 1;
-      s.zeitraffer.cursorTs = 0;
+      s.matchStartMs = isFinite(mStart) ? mStart : 0;
 
       // Viewport-Default: bbox(alle Landings) + 500m
       const landingCoords = [];
@@ -1429,108 +1296,6 @@
       mdRenderState(host);
     }
 
-    function mdTogglePlay(host) {
-      const s = mdGetState(host);
-      const z = s.zeitraffer;
-      if (z.playing) {
-        z.playing = false;
-        s.playToken++;
-        mdRenderState(host);
-        return;
-      }
-      z.playing = true;
-      z.playStartWallTs = performance.now();
-      z.playStartCursor = z.cursorTs;
-      if (z.cursorTs >= z.matchEnd - z.matchStart) {
-        z.cursorTs = 0;
-        z.playStartCursor = 0;
-      }
-      const token = ++s.playToken;
-      const dur = z.matchEnd - z.matchStart;
-      function frame(now) {
-        if (token !== s.playToken) return;
-        if (host.dataset.mounted !== "1") return;
-        const realElapsed = now - z.playStartWallTs;
-        const scaledCursor = z.playStartCursor + realElapsed * (dur / MD_ANIM_DURATION_MS);
-        z.cursorTs = Math.min(dur, scaledCursor);
-        if (s.viewport && s.viewport.autoFollow) {
-          mdAutoFollow(host);
-        }
-        mdRenderBasemap(host);
-        mdRenderOverlay(host);
-        mdUpdateScrubBar(host);
-        if (z.cursorTs < dur) {
-          requestAnimationFrame(frame);
-        } else {
-          z.playing = false;
-          mdUpdateScrubBar(host);
-        }
-      }
-      requestAnimationFrame(frame);
-    }
-
-    function mdAutoFollow(host) {
-      const s = mdGetState(host);
-      const absTs = s.zeitraffer.matchStart + s.zeitraffer.cursorTs;
-      const coords = [];
-      const visibleMembers = s.soloAcc
-        ? s.detail.members.filter(m => m.accountId === s.soloAcc)
-        : s.detail.members;
-      for (const m of visibleMembers) {
-        const pin = mdInterpolatePin(m, absTs);
-        if (pin) coords.push([pin.x, pin.y]);
-      }
-      if (coords.length === 0) return;
-      const target = mdBboxFitViewport(coords, MD_PAD_500M_CM);
-      // Smooth ease toward target (lerp 0.18 / frame)
-      const t = 0.18;
-      s.viewport.centerX += (target.centerX - s.viewport.centerX) * t;
-      s.viewport.centerY += (target.centerY - s.viewport.centerY) * t;
-      s.viewport.zoom += (target.zoom - s.viewport.zoom) * t;
-      // autoFollow bleibt true
-    }
-
-    // Slider-Input setzt cursor + pausiert
-    function mdScrubTo(host, cursorMs) {
-      const s = mdGetState(host);
-      const z = s.zeitraffer;
-      z.cursorTs = Math.max(0, Math.min(z.matchEnd - z.matchStart, cursorMs));
-      z.playing = false;
-      s.playToken++;
-      mdRenderOverlay(host);
-      mdUpdateScrubBar(host);
-    }
-
-    // Globale Event-Delegations
-    document.addEventListener("click", (e) => {
-      const playBtn = e.target.closest && e.target.closest(".md-play-btn");
-      if (playBtn) {
-        const host = playBtn.closest(".md-host");
-        if (host) { mdTogglePlay(host); e.stopPropagation(); }
-        return;
-      }
-    });
-
-    document.addEventListener("input", (e) => {
-      const slider = e.target.closest && e.target.closest(".md-scrub-slider");
-      if (!slider) return;
-      const host = slider.closest(".md-host");
-      if (!host) return;
-      mdScrubTo(host, parseInt(slider.value, 10) || 0);
-    });
-
-    document.addEventListener("keydown", (e) => {
-      // Pfeil-Tasten ±1s wenn ein Match-Detail focused
-      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-      // nicht in Inputs
-      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-      const host = document.querySelector(".md-host[data-mounted='1']");
-      if (!host) return;
-      const s = mdGetState(host);
-      const delta = e.key === "ArrowLeft" ? -1000 : 1000;
-      mdScrubTo(host, s.zeitraffer.cursorTs + delta);
-      e.preventDefault();
-    });
 
     function mdZoomAt(host, deltaScale, anchorPx, anchorPy) {
       const s = mdGetState(host);
@@ -2476,13 +2241,6 @@
       if (!wasExpanded) {
         const host = detail.querySelector(".md-host");
         if (host) mdMount(host);
-      } else {
-        const host = detail.querySelector(".md-host");
-        if (host && host.dataset.mounted === "1") {
-          const s = mdGetState(host);
-          s.playToken++;
-          s.zeitraffer.playing = false;
-        }
       }
     });
 
@@ -2492,44 +2250,34 @@
       }).toString() : "");
     PubgUI.poll(reportUrl, 60000, render, console.error);
 
-    // Findet Marker unter Maus-Position. Returns {acc, lifeIdx, kind, target}
-    // oder null. kind = 'landing' | 'death' | 'kill' | 'revive'
+    // Findet Marker unter Maus-Position. Returns {acc, lifeIdx, kind, tsMs}
+    // oder null. kind = 'landing' | 'death' | 'kill'
     function mdHitTestMarker(host, canvasPx, canvasPy) {
       const s = mdGetState(host);
       if (!s.detail) return null;
-      const HIT_PX = 8;  // 8px hit-radius
-      const cursorTs = s.zeitraffer.cursorTs;
-      const absTs = s.zeitraffer.matchStart + cursorTs;
-      const inDefault = (cursorTs === 0);
+      const HIT_PX = 8;
       for (const m of s.detail.members) {
-        if (s.soloAcc && m.accountId !== s.soloAcc) continue;
+        if (s.hiddenAccs.has(m.accountId)) continue;
         if (!m.lives) continue;
         for (const life of m.lives) {
-          // Landing
-          if (life.landing && (inDefault || absTs >= life.landing.tsMs)) {
+          if (life.landing) {
             const [cx, cy] = mdCmToCanvas(host, life.landing.x, life.landing.y);
             if (Math.hypot(cx - canvasPx, cy - canvasPy) <= HIT_PX) {
-              return { acc: m.accountId, lifeIdx: life.lifeIndex,
-                       kind: "landing", tsMs: life.landing.tsMs };
+              return { acc: m.accountId, lifeIdx: life.lifeIndex, kind: "landing" };
             }
           }
-          // Death
-          if (!inDefault && life.death && absTs >= life.death.tsMs) {
+          if (life.death) {
             const [cx, cy] = mdCmToCanvas(host, life.death.x, life.death.y);
             if (Math.hypot(cx - canvasPx, cy - canvasPy) <= HIT_PX) {
-              return { acc: m.accountId, lifeIdx: life.lifeIndex,
-                       kind: "death", tsMs: life.death.tsMs };
+              return { acc: m.accountId, lifeIdx: life.lifeIndex, kind: "death" };
             }
           }
-          // Kills
-          if (!inDefault) {
-            for (const k of life.kills) {
-              if (absTs < k.tsMs) continue;
-              const [ax, ay] = mdCmToCanvas(host, k.actorX, k.actorY);
-              if (Math.hypot(ax - canvasPx, ay - canvasPy) <= HIT_PX) {
-                return { acc: m.accountId, lifeIdx: life.lifeIndex,
-                         kind: "kill", tsMs: k.tsMs };
-              }
+          for (const k of (life.kills || [])) {
+            if (k.actorX == null) continue;
+            const [ax, ay] = mdCmToCanvas(host, k.actorX, k.actorY);
+            if (Math.hypot(ax - canvasPx, ay - canvasPy) <= HIT_PX) {
+              return { acc: m.accountId, lifeIdx: life.lifeIndex,
+                       kind: "kill", tsMs: k.tsMs };
             }
           }
         }
@@ -2537,56 +2285,7 @@
       return null;
     }
 
-    // Click auf Marker: Solo + Zoom 500m + Cursor-Seek + Pause
-    async function mdMarkerClick(host, hit) {
-      const s = mdGetState(host);
-      s.soloAcc = hit.acc;
-      s.zeitraffer.cursorTs = Math.max(0, hit.tsMs - s.zeitraffer.matchStart);
-      s.zeitraffer.playing = false;
-      s.playToken++;
-      // 500m-Zoom auf Marker-Position
-      const member = s.detail.members.find(m => m.accountId === hit.acc);
-      let cx = null, cy = null;
-      if (member && member.lives) {
-        const life = member.lives.find(l => l.lifeIndex === hit.lifeIdx);
-        if (life) {
-          if (hit.kind === "landing" && life.landing) {
-            cx = life.landing.x; cy = life.landing.y;
-          } else if (hit.kind === "death" && life.death) {
-            cx = life.death.x; cy = life.death.y;
-          } else if (hit.kind === "kill") {
-            const k = life.kills.find(kk => kk.tsMs === hit.tsMs);
-            if (k) { cx = k.actorX; cy = k.actorY; }
-          }
-        }
-      }
-      if (cx != null) {
-        s.viewport = {
-          centerX: cx, centerY: cy,
-          zoom: MD_MAP_PX / MD_PAD_500M_CM * 0.5,  // 500m wide visible
-          autoFollow: false,
-        };
-      }
-      mdRenderState(host);
-    }
-
-    document.addEventListener("click", (e) => {
-      const wrap = e.target.closest && e.target.closest(".md-mapwrap");
-      if (!wrap) return;
-      if (e.target.closest(".md-zoombtns") || e.target.closest(".md-tools")) return;
-      const host = wrap.closest(".md-host");
-      if (!host) return;
-      const rect = wrap.getBoundingClientRect();
-      const px = e.clientX - rect.left;
-      const py = e.clientY - rect.top;
-      const hit = mdHitTestMarker(host, px, py);
-      if (hit) {
-        mdMarkerClick(host, hit);
-        e.stopPropagation();
-      }
-    });
-
-    // Card-Click setzt nur Solo + Reset-Viewport auf member-bbox
+    // Card-Click toggelt Sichtbarkeit (default: alle sichtbar, klick = ausblenden)
     document.addEventListener("click", (e) => {
       const card = e.target.closest && e.target.closest(".md-card[data-acc]");
       if (!card) return;
@@ -2594,38 +2293,20 @@
       if (!host) return;
       const s = mdGetState(host);
       const acc = card.getAttribute("data-acc");
-      if (s.soloAcc === acc) {
-        // Toggle off
-        s.soloAcc = null;
-      } else {
-        s.soloAcc = acc;
-        // Viewport: bbox(alle Landings + Deaths) des Members
-        const m = s.detail.members.find(x => x.accountId === acc);
-        const coords = [];
-        if (m && m.lives) {
-          for (const life of m.lives) {
-            if (life.landing) coords.push([life.landing.x, life.landing.y]);
-            if (life.death) coords.push([life.death.x, life.death.y]);
-          }
-        }
-        if (coords.length) {
-          s.viewport = mdBboxFitViewport(coords, MD_PAD_500M_CM);
-        }
-      }
+      if (s.hiddenAccs.has(acc)) s.hiddenAccs.delete(acc);
+      else                       s.hiddenAccs.add(acc);
       mdRenderState(host);
       e.stopPropagation();
     });
 
+    // "Alle anzeigen"-Button: clear hidden
     document.addEventListener("click", (e) => {
       const btn = e.target.closest && e.target.closest(".md-allebtn");
       if (!btn) return;
       const host = btn.closest(".md-host");
       if (!host) return;
       const s = mdGetState(host);
-      s.soloAcc = null;
-      s.zeitraffer.cursorTs = 0;
-      s.zeitraffer.playing = false;
-      s.playToken++;
+      s.hiddenAccs.clear();
       mdResetView(host);
       e.stopPropagation();
     });
@@ -2651,15 +2332,27 @@
       const member = s.detail.members.find(m => m.accountId === hit.acc);
       const memberName = member && (member.isSelf ? "Du" : member.name);
       const lifeSuffix = (member && member.lives.length > 1)
-        ? ` ${hit.lifeIdx}` : "";
-      if (hit.kind === "landing") txt = `${memberName} • Landing${lifeSuffix}`;
-      else if (hit.kind === "death") txt = `${memberName} • Death${lifeSuffix}`;
-      else if (hit.kind === "kill") {
+        ? ` (L${hit.lifeIdx})` : "";
+      if (hit.kind === "landing") {
+        txt = `${memberName} • Landing${lifeSuffix}`;
+      } else if (hit.kind === "death") {
+        const life = member.lives.find(l => l.lifeIndex === hit.lifeIdx);
+        const d = life && life.death;
+        const killer = d && d.killerName ? d.killerName : "Gegner";
+        const wn = d && d.weaponName ? d.weaponName : "?";
+        const dist = d && d.distanceM ? ` · ${Math.round(d.distanceM)}m` : "";
+        txt = `${memberName} † ${killer} mit ${wn}${dist}${lifeSuffix}`;
+      } else if (hit.kind === "kill") {
         const life = member.lives.find(l => l.lifeIndex === hit.lifeIdx);
         const k = life.kills.find(kk => kk.tsMs === hit.tsMs);
         const wn = k && k.weapon ? k.weapon.replace("Weap_", "").replace("_C", "") : "Kill";
         const victim = k && k.victimName ? k.victimName : "Gegner";
-        txt = `${memberName} • ${wn} → ${victim}`;
+        let dist = "";
+        if (k && k.actorX != null && k.victimX != null) {
+          const dx = k.actorX - k.victimX, dy = k.actorY - k.victimY;
+          dist = ` · ${Math.round(Math.hypot(dx, dy) / 100)}m`;
+        }
+        txt = `${memberName} → ${victim} mit ${wn}${dist}${lifeSuffix}`;
       }
       labelEl.textContent = txt;
       labelEl.style.left = (px + 8) + "px";
