@@ -849,10 +849,20 @@ function hitTestEdge(lx, ly) {
 }
 // Pin-Hit-Test in 'logischen' Canvas-Pixeln (worldToCanvas appliziert
 // die Cal automatisch).
+function _visiblePins() {
+  // Im Cal-Mode werden Pins auf das aktuell ausgewaehlte Match (oder das
+  // neueste, falls keins gewaehlt) gefiltert. Sonst: alle.
+  if (!calCorrMode) return pins;
+  const activeMid = calSelectedMatch || (
+    typeof _calMatchSummary === "function" && _calMatchSummary().length
+      ? _calMatchSummary()[0].matchId : null);
+  return activeMid ? pins.filter(p => p.matchId === activeMid) : [];
+}
 function hitTestPin(lx, ly) {
   const HITR = 6 / view.zoom;
-  for (let i = pins.length - 1; i >= 0; i--) {
-    const p = pins[i];
+  const vp = _visiblePins();
+  for (let i = vp.length - 1; i >= 0; i--) {
+    const p = vp[i];
     const [px, py] = worldToCanvas(p.x, p.y);
     if (Math.hypot(lx - px, ly - py) < HITR) return p;
   }
@@ -1074,16 +1084,16 @@ canvas.addEventListener("mousemove", (ev) => {
 
   // Pin-Hover-Tooltip (View-Mode + nichts wird gerade gezogen)
   if (mode === "view" && !isPanning && !calibratingPins) {
+    let shown = false;
     if (calCorrMode) {
-      // Cal-Mode: Tooltip ueber Cal-Event-X
       const ce = hitTestCalEvent(ev.clientX, ev.clientY);
-      if (ce) showCalTooltip(ce, ev.clientX, ev.clientY);
-      else hidePinTooltip();
-    } else {
-      const pin = hitTestPin(lx, ly);
-      if (pin) showPinTooltip(pin, ev.clientX, ev.clientY);
-      else hidePinTooltip();
+      if (ce) { showCalTooltip(ce, ev.clientX, ev.clientY); shown = true; }
     }
+    if (!shown) {
+      const pin = hitTestPin(lx, ly);
+      if (pin) { showPinTooltip(pin, ev.clientX, ev.clientY); shown = true; }
+    }
+    if (!shown) hidePinTooltip();
   } else {
     hidePinTooltip();
   }
@@ -1382,10 +1392,12 @@ async function loadCalEvents() {
 
 function hitTestCalEvent(clientX, clientY) {
   if (!calCorrMode) return null;
+  // worldToCanvas liefert LOGICAL canvas pixel (vor view.zoom/pan).
+  // Maus-Coords in dieselbe Domain bringen:
   const rect = canvas.getBoundingClientRect();
-  const cx = clientX - rect.left;
-  const cy = clientY - rect.top;
-  const HIT_PX = 12;
+  const lx = ((clientX - rect.left) - view.panX) / view.zoom;
+  const ly = ((clientY - rect.top)  - view.panY) / view.zoom;
+  const HIT_PX = 10 / view.zoom;  // 10px Bildschirm
   let best = null, bestDist = Infinity;
   // 1) Korrektur-Endpunkte (orig X + fixed circle) — bevorzugt
   for (let i = 0; i < calCorrections.length; i++) {
@@ -1393,7 +1405,7 @@ function hitTestCalEvent(clientX, clientY) {
     const [ox, oy] = worldToCanvas(c.origX, c.origY);
     const [fx, fy] = worldToCanvas(c.fixedX, c.fixedY);
     for (const [px, py] of [[ox, oy], [fx, fy]]) {
-      const d = Math.hypot(px - cx, py - cy);
+      const d = Math.hypot(px - lx, py - ly);
       if (d < HIT_PX && d < bestDist) {
         best = { _kind: "correction", correction: c, index: i + 1 };
         bestDist = d;
@@ -1407,7 +1419,7 @@ function hitTestCalEvent(clientX, clientY) {
   for (const ev of vis) {
     if (correctedIds.has(_calEventId(ev))) continue;
     const [ex, ey] = worldToCanvas(ev.x, ev.y);
-    const d = Math.hypot(ex - cx, ey - cy);
+    const d = Math.hypot(ex - lx, ey - ly);
     if (d < HIT_PX && d < bestDist) { best = ev; bestDist = d; }
   }
   return best;
@@ -1811,21 +1823,21 @@ canvas.addEventListener("click", (e) => {
   // Cal-Mode haengt sich auf jedem Click ein — kein Region-Pick durchlassen
   e.stopPropagation();
   e.preventDefault();
-  const rect = canvas.getBoundingClientRect();
-  const cx = e.clientX - rect.left;
-  const cy = e.clientY - rect.top;
   if (typeof canvasToWorld !== "function") return;
-  const [wx, wy] = canvasToWorld(cx, cy);
+  // In LOGICAL canvas pixels (vor view.zoom/pan) — gleiche Domain wie
+  // worldToCanvas/hitTestPin.
+  const [lx, ly] = eventToLogical(e);
+  const [wx, wy] = canvasToWorld(lx, ly);
   if (!calSelectedEvent) {
     // Hit-Test: ist ein Event-X unter dem Klick?
     const vis = _calVisibleEvents();
     const correctedIds = new Set(calCorrections.map(c => c.eventId));
-    const HIT_PX = 12;
+    const HIT_PX = 12 / view.zoom;
     let best = null, bestDist = Infinity;
     for (const ev of vis) {
       if (correctedIds.has(_calEventId(ev))) continue;
       const [ex, ey] = worldToCanvas(ev.x, ev.y);
-      const d = Math.hypot(ex - cx, ey - cy);
+      const d = Math.hypot(ex - lx, ey - ly);
       if (d < HIT_PX && d < bestDist) { best = ev; bestDist = d; }
     }
     if (best) {
