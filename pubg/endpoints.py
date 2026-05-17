@@ -52,7 +52,7 @@ from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_trend_deltas, compute_session_matches,
                                 compute_hot_drop, compute_session_achievements,
                                 compute_vehicle_stats, compute_weapon_stats,
-                                compute_match_detail)
+                                compute_match_detail, is_br_mode)
 
 
 def _ok(payload):
@@ -175,6 +175,8 @@ class EndpointRegistry:
             return self._stamm_add(body)
         if route == ("DELETE", "/api/pubg/stamm-crew"):
             return self._stamm_del(body)
+        if route == ("GET", "/api/pubg/debug-matches"):
+            return self._debug_matches(qs)
         if route == ("GET", "/api/pubg/calibration-events"):
             return self._calibration_events(qs)
         if route == ("GET", "/api/pubg/calibration-corrections"):
@@ -2288,6 +2290,69 @@ class EndpointRegistry:
             return _ok({"ok": True})
         except Exception as e:
             return _err(400, str(e))
+
+    # ── Debug: letzte N Matches mit Damage + Achievement-Status ─────────
+    def _debug_matches(self, qs):
+        """Liefert die letzten N Matches mit damage_dealt, game_mode +
+        welche Achievements pro Match in der DB landeten (mit
+        suppress_popup-Flag). URL: /api/pubg/debug-matches?n=10"""
+        conn = self.get_conn()
+        n = int(qs.get("n", "10"))
+        rows = conn.execute("""
+            SELECT m.match_id, m.played_at, m.game_mode, m.map_name,
+                   pa.damage_dealt, pa.kills, pa.place, pa.time_survived,
+                   pa.longest_kill, pa.headshot_kills
+            FROM participants pa
+            JOIN matches m ON m.match_id = pa.match_id
+            WHERE pa.account_id = ?
+            ORDER BY m.played_at DESC
+            LIMIT ?
+        """, (self.my_account_id, n)).fetchall()
+        out = []
+        for r in rows:
+            mid = r["match_id"]
+            ach_rows = conn.execute("""
+                SELECT achievement_id, suppress_popup
+                FROM pubg_achievements_seen
+                WHERE match_id = ?
+                ORDER BY achievement_id
+            """, (mid,)).fetchall()
+            achievements = [
+                {"id": a["achievement_id"],
+                 "suppressed": bool(a["suppress_popup"])}
+                for a in ach_rows
+            ]
+            # Heavy-Hitter-Diagnose
+            dmg = r["damage_dealt"] or 0
+            mode = r["game_mode"] or ""
+            is_br = is_br_mode(mode)
+            heavy_eligible = is_br and dmg >= 500
+            heavy_emitted = any(a["id"] == "damage_500" for a in achievements)
+            out.append({
+                "matchId":      mid,
+                "playedAt":     r["played_at"],
+                "gameMode":     mode,
+                "isBR":         is_br,
+                "map":          r["map_name"],
+                "damageDealt":  dmg,
+                "kills":        r["kills"] or 0,
+                "place":        r["place"],
+                "headshots":    r["headshot_kills"] or 0,
+                "longestKill":  r["longest_kill"] or 0,
+                "achievements": achievements,
+                "diag": {
+                    "heavyHitterEligible": heavy_eligible,
+                    "heavyHitterInDB":     heavy_emitted,
+                    "reason": (
+                        "OK — Heavy Hitter wurde emittiert" if heavy_emitted
+                        else "DMG < 500" if dmg < 500
+                        else "Match ist Event-Mode (kein BR)" if not is_br
+                        else "DMG ≥ 500 + BR, aber NICHT emittiert "
+                             "— rebuild-achievements noch nicht gelaufen?"
+                    ),
+                },
+            })
+        return _ok({"matches": out})
 
     # ── Calibration-Korrekturen — fuer Map-Cal-Fit via User-Death-Drag ──
     def _calibration_events(self, qs):
