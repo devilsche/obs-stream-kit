@@ -199,6 +199,35 @@ except Exception as e:
     print(f"  Steam-Backend init error: {e}")
 
 
+# ── TeamSpeak-Backend-Bootstrap ────────────────────────────────────────────────
+TS_ENABLED = False
+ts_registry = None
+ts_service = None
+try:
+    from teamspeak.config import load_config as _ts_load_config, load_api_key as _ts_load_apikey
+    from teamspeak.service import TeamSpeakService
+    from teamspeak.endpoints import TeamSpeakRegistry
+    ts_cfg = _ts_load_config(os.path.join(ROOT, "config", "teamspeak.json"))
+    ts_apikey = _ts_load_apikey(os.path.join(ROOT, ".secrets"))
+    if ts_apikey:
+        ts_service = TeamSpeakService(
+            host=ts_cfg["host"], port=int(ts_cfg["port"]),
+            apikey=ts_apikey,
+            talking_tail_ms=int(ts_cfg.get("talkingTailMs", 400)))
+        ts_service.start()
+        ts_registry = TeamSpeakRegistry(ts_service)
+        TS_ENABLED = True
+        print("  TeamSpeak backend active  ✓")
+    else:
+        # Auch ohne Key registry erstellen — liefert 'connected=false'
+        ts_registry = TeamSpeakRegistry(None)
+        TS_ENABLED = True
+        print("  TeamSpeak backend: no TS3-ClientQuery-Key in .secrets — "
+              "endpoint liefert connected=false")
+except Exception as e:
+    print(f"  TeamSpeak-Backend init error: {e}")
+
+
 # ── Frontend-Error-Logger (immer injiziert) ────────────────────────────────────
 DEV_LOG_JS = """<script>
 (function(){
@@ -350,6 +379,23 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 # sort=recent&limit=20 wurde ignoriert).
                 result = steam_registry.dispatch(
                     "GET", self.path, b"", dict(self.headers))
+                if result is not None:
+                    body, code, ctype = result
+                    self.send_response(code)
+                    self.send_header("Content-Type", ctype)
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
+            except Exception as e:
+                self.send_error(500, str(e))
+                return
+        if TS_ENABLED and self.path.startswith("/api/teamspeak/"):
+            try:
+                from urllib.parse import urlparse, parse_qs
+                u = urlparse(self.path)
+                qs = {k: v[0] for k, v in parse_qs(u.query).items()}
+                result = ts_registry.handle("GET", u.path, qs, b"")
                 if result is not None:
                     body, code, ctype = result
                     self.send_response(code)
