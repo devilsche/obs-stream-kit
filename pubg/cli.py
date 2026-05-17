@@ -773,6 +773,8 @@ def refresh_assets(root: str) -> int:
         "Desert_Main": "Miramar", "Savage_Main": "Sanhok",
         "DihorOtok_Main": "Vikendi", "Summerland_Main": "Karakin",
         "Chimera_Main": "Paramo", "Range_Main": "Camp_Jackal",
+        "Tiger_Main": "Taego", "Kiki_Main": "Deston",
+        "Neon_Main": "Rondo", "Heaven_Main": "Haven",
     }
     ok = err = 0
     for internal, public in MAP_THUMBS.items():
