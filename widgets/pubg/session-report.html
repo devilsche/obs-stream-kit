@@ -308,6 +308,23 @@
       min-width: 90px; text-align: right;
       color: var(--pubg-text);
     }
+    .md-speedbar { display: flex; gap: 4px; }
+    .md-speedbtn {
+      flex: 1;
+      background: rgba(13,6,26,0.5);
+      border: 1px solid var(--pubg-border);
+      color: var(--pubg-muted);
+      padding: 2px 0;
+      border-radius: 3px;
+      font-family: inherit; cursor: pointer; font-size: 0.78em;
+      font-variant-numeric: tabular-nums;
+    }
+    .md-speedbtn:hover { color: var(--pubg-text); border-color: var(--pubg-gold); }
+    .md-speedbtn.active {
+      background: rgba(242,183,5,0.18);
+      border-color: var(--pubg-gold);
+      color: var(--pubg-gold);
+    }
     /* Cards-Col */
     .md-cardcol { display: flex; flex-direction: column; gap: 8px; }
     .md-allebar {
@@ -857,7 +874,8 @@
     const MD_PAD_500M_CM = 50000;   // 500m padding fuer Default-Bbox
     const MD_MIN_ZOOM_CM = 5000;    // 50m minimal sichtbarer Radius
     const MD_MAX_ZOOM_CM = 800000;  // 8km — ganze Map default Erangel-Range
-    const MD_ANIM_DURATION_MS = 15000;
+    const MD_ANIM_DURATION_MS = 60000;  // Baseline: ganzes Match in 60s (speed=1.0)
+    const MD_SPEEDS = [0.25, 0.5, 1, 2, 4];
 
     // Cache fuer match-detail responses
     const _mdCache = new Map();
@@ -933,6 +951,7 @@
           colorByAcc: {},
           hiddenAccs: new Set(),   // accountIds die ausgeblendet sind
           viewport: null,          // {centerX, centerY, zoom, autoFollow}
+          playSpeed: 1,            // Multiplikator (siehe MD_SPEEDS)
           zeitraffer: {            // cursorTs in ms relativ zu matchStart
             cursorTs: 0, playing: false,
             playStartWallTs: 0, playStartCursor: 0,
@@ -1317,6 +1336,10 @@
       }
       timeEl.textContent = `${fmt(z.cursorTs)} / ${fmt(dur)}`;
       if (playBtn) playBtn.textContent = z.playing ? "⏸" : "▶";
+      host.querySelectorAll(".md-speedbtn").forEach(btn => {
+        btn.classList.toggle("active",
+          parseFloat(btn.dataset.speed) === (s.playSpeed || 1));
+      });
     }
 
     function mdUpdateAlleBar(host) {
@@ -1351,6 +1374,9 @@
               <button class="md-play-btn">▶</button>
               <input type="range" class="md-scrub-slider" min="0" max="100" value="0">
               <span class="md-time">0:00 / 0:00</span>
+            </div>
+            <div class="md-speedbar">
+              ${MD_SPEEDS.map(sp => `<button class="md-speedbtn" data-speed="${sp}">${sp}×</button>`).join("")}
             </div>
           </div>
           <div class="md-rightcol">
@@ -1467,7 +1493,8 @@
         if (token !== s.playToken) return;
         if (host.dataset.mounted !== "1") return;
         const realElapsed = now - z.playStartWallTs;
-        const scaledCursor = z.playStartCursor + realElapsed * (dur / MD_ANIM_DURATION_MS);
+        const scaledCursor = z.playStartCursor
+          + realElapsed * (dur / MD_ANIM_DURATION_MS) * (s.playSpeed || 1);
         z.cursorTs = Math.min(dur, scaledCursor);
         if (s.viewport && s.viewport.autoFollow) {
           mdAutoFollow(host);
@@ -1522,6 +1549,24 @@
       if (playBtn) {
         const host = playBtn.closest(".md-host");
         if (host) { mdTogglePlay(host); e.stopPropagation(); }
+        return;
+      }
+      const speedBtn = e.target.closest && e.target.closest(".md-speedbtn");
+      if (speedBtn) {
+        const host = speedBtn.closest(".md-host");
+        if (host) {
+          const s = mdGetState(host);
+          const newSpeed = parseFloat(speedBtn.dataset.speed) || 1;
+          // Wenn gerade Playback laeuft: Zeit-Anker neu setzen damit der
+          // Speed-Wechsel ohne Cursor-Sprung passiert.
+          if (s.zeitraffer.playing) {
+            s.zeitraffer.playStartWallTs = performance.now();
+            s.zeitraffer.playStartCursor = s.zeitraffer.cursorTs;
+          }
+          s.playSpeed = newSpeed;
+          mdUpdateScrubBar(host);
+          e.stopPropagation();
+        }
         return;
       }
     });
