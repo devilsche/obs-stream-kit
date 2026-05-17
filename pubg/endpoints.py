@@ -175,6 +175,14 @@ class EndpointRegistry:
             return self._stamm_add(body)
         if route == ("DELETE", "/api/pubg/stamm-crew"):
             return self._stamm_del(body)
+        if route == ("GET", "/api/pubg/calibration-events"):
+            return self._calibration_events(qs)
+        if route == ("GET", "/api/pubg/calibration-corrections"):
+            return self._calibration_corrections_get(qs)
+        if route == ("POST", "/api/pubg/calibration-corrections"):
+            return self._calibration_corrections_post(body)
+        if route == ("DELETE", "/api/pubg/calibration-corrections"):
+            return self._calibration_corrections_delete(body)
         return _err(404, f"unknown route {path}")
 
     def _active(self, qs):
@@ -2278,5 +2286,140 @@ class EndpointRegistry:
             conn.execute("DELETE FROM stamm_crew WHERE name = ?", (name,))
             conn.commit()
             return _ok({"ok": True})
+        except Exception as e:
+            return _err(400, str(e))
+
+    # ── Calibration-Korrekturen — fuer Map-Cal-Fit via User-Death-Drag ──
+    def _calibration_events(self, qs):
+        """Alle Death/Kill/Knock-Events fuer eine Map mit Telemetrie-
+        Coords (cm). Frontend rendert sie als zieh-bare Pins, der User
+        verschiebt sie an die tatsaechliche Stelle, daraus rechnen wir
+        den affinen Map-Transform.
+        Optional Filter: ?account=<id> nur Events wo Self/Mate beteiligt."""
+        conn = self.get_conn()
+        map_name = (qs.get("map") or "").strip()
+        if not map_name:
+            return _err(400, "map required")
+        rows = conn.execute("""
+            SELECT te.match_id, m.played_at, te.event_type, te.timestamp_ms,
+                   te.actor_account, te.target_account,
+                   te.victim_x, te.victim_y, te.weapon, te.distance
+            FROM telemetry_events te
+            JOIN matches m ON m.match_id = te.match_id
+            WHERE m.map_name = ?
+              AND te.event_type IN ('Kill','Knock')
+              AND te.victim_x IS NOT NULL
+            ORDER BY m.played_at DESC, te.timestamp_ms ASC
+            LIMIT 5000
+        """, (map_name,)).fetchall()
+        # Name-Lookup
+        accs = set()
+        for r in rows:
+            if r["actor_account"]:  accs.add(r["actor_account"])
+            if r["target_account"]: accs.add(r["target_account"])
+        names = {}
+        if accs:
+            ph = ",".join("?" * len(accs))
+            for r in conn.execute(
+                f"SELECT account_id, name FROM players "
+                f"WHERE account_id IN ({ph})",
+                list(accs)).fetchall():
+                names[r["account_id"]] = r["name"]
+        out = []
+        for r in rows:
+            out.append({
+                "matchId":    r["match_id"],
+                "playedAt":   r["played_at"],
+                "type":       r["event_type"],   # Kill | Knock
+                "tsMs":       r["timestamp_ms"],
+                "actorAcc":   r["actor_account"],
+                "actorName":  names.get(r["actor_account"]),
+                "targetAcc":  r["target_account"],
+                "targetName": names.get(r["target_account"]),
+                "x":          r["victim_x"],
+                "y":          r["victim_y"],
+                "weapon":     r["weapon"],
+            })
+        return _ok({"map": map_name, "events": out})
+
+    def _cal_corr_path(self, map_name):
+        import os
+        # Speichert pro Map in data/calibration/<map>.json
+        base = os.path.join(os.path.dirname(self.cache.__class__.__module__)
+                            if False else
+                            os.path.dirname(os.path.abspath(__file__)),
+                            "..", "data", "calibration")
+        os.makedirs(base, exist_ok=True)
+        # safe filename
+        safe = "".join(c for c in map_name if c.isalnum() or c in "._-")
+        return os.path.join(base, f"{safe}.json")
+
+    def _calibration_corrections_get(self, qs):
+        import os
+        map_name = (qs.get("map") or "").strip()
+        if not map_name:
+            return _err(400, "map required")
+        path = self._cal_corr_path(map_name)
+        if not os.path.exists(path):
+            return _ok({"map": map_name, "corrections": []})
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return _ok(data)
+        except Exception as e:
+            return _err(500, f"read error: {e}")
+
+    def _calibration_corrections_post(self, body):
+        """Body: {map, correction: {id, eventId, origX, origY, fixedX,
+        fixedY, ...}}  — appended/updated by id."""
+        try:
+            payload = json.loads(body or b"{}")
+            map_name = (payload.get("map") or "").strip()
+            corr = payload.get("correction") or {}
+            if not map_name or not corr.get("id"):
+                return _err(400, "map + correction.id required")
+            path = self._cal_corr_path(map_name)
+            import os
+            data = {"map": map_name, "corrections": []}
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            # Update-by-id (gleicher id ueberschreibt)
+            lst = data.get("corrections") or []
+            lst = [c for c in lst if c.get("id") != corr["id"]]
+            lst.append(corr)
+            data["corrections"] = lst
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            return _ok({"ok": True, "count": len(lst)})
+        except Exception as e:
+            return _err(400, str(e))
+
+    def _calibration_corrections_delete(self, body):
+        """Body: {map, id} — entfernt eine einzelne Korrektur,
+        oder {map, clearAll: true} — alles loeschen."""
+        try:
+            payload = json.loads(body or b"{}")
+            map_name = (payload.get("map") or "").strip()
+            if not map_name:
+                return _err(400, "map required")
+            path = self._cal_corr_path(map_name)
+            import os
+            if not os.path.exists(path):
+                return _ok({"ok": True, "count": 0})
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            lst = data.get("corrections") or []
+            if payload.get("clearAll"):
+                lst = []
+            else:
+                cid = payload.get("id")
+                if not cid:
+                    return _err(400, "id or clearAll required")
+                lst = [c for c in lst if c.get("id") != cid]
+            data["corrections"] = lst
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            return _ok({"ok": True, "count": len(lst)})
         except Exception as e:
             return _err(400, str(e))
