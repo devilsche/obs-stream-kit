@@ -1056,6 +1056,7 @@
       const cursorTs = s.zeitraffer.cursorTs;
       const matchStart = s.zeitraffer.matchStart;
       const absTs = matchStart + cursorTs;
+      const inDefault = (cursorTs === 0);
       const visibleMembers = s.detail.members.filter(
         m => !s.hiddenAccs.has(m.accountId));
 
@@ -1063,13 +1064,9 @@
         const color = s.colorByAcc[m.accountId] || "#999";
         if (!m.lives) continue;
         for (const life of m.lives) {
-          // PlaneRoute: gestrichelt, nur sichtbar wenn relevant fuer aktuellen
-          // Cursor (oder Default-View bei cursor=0)
           const planeStartTs = life.planeRoute.length
             ? life.planeRoute[0][2] : null;
           const landingTs = life.landing ? life.landing.tsMs : null;
-          // Default-View (cursor=0) zeigt planeRoute komplett + Landing-Pin
-          const inDefault = (cursorTs === 0);
           const showPlaneRoute = inDefault
             || (landingTs && absTs <= landingTs && planeStartTs && absTs >= planeStartTs);
           if (showPlaneRoute && life.planeRoute.length >= 2) {
