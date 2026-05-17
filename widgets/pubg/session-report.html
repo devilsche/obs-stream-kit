@@ -342,10 +342,11 @@
       transition: background 0.12s, border-color 0.12s;
     }
     .md-card:hover { background: rgba(255,255,255,0.04); }
-    .md-card.active {
-      background: rgba(242,183,5,0.08);
-      border-color: var(--pubg-gold);
+    .md-card.hidden {
+      opacity: 0.35;
+      filter: grayscale(0.5);
     }
+    .md-card.hidden .md-name { text-decoration: line-through; }
     .md-card .md-head {
       display: flex; align-items: center; gap: 8px;
       margin-bottom: 4px;
@@ -931,7 +932,7 @@
         s = {
           detail: null,           // match-detail-response
           colorByAcc: {},
-          soloAcc: null,
+          hiddenAccs: new Set(),   // accountIds die ausgeblendet sind
           viewport: null,          // {centerX, centerY, zoom, autoFollow}
           zeitraffer: {            // cursorTs in ms relativ zu matchStart
             cursorTs: 0, playing: false,
@@ -1056,12 +1057,8 @@
       const cursorTs = s.zeitraffer.cursorTs;
       const matchStart = s.zeitraffer.matchStart;
       const absTs = matchStart + cursorTs;
-      const soloAcc = s.soloAcc;
-
-      // Members filtern fuer Solo-Mode
-      const visibleMembers = soloAcc
-        ? s.detail.members.filter(m => m.accountId === soloAcc)
-        : s.detail.members;
+      const visibleMembers = s.detail.members.filter(
+        m => !s.hiddenAccs.has(m.accountId));
 
       for (const m of visibleMembers) {
         const color = s.colorByAcc[m.accountId] || "#999";
@@ -1240,7 +1237,6 @@
         wrap.innerHTML = "";
         return;
       }
-      const soloAcc = s.soloAcc;
       function fmtMinSec(sec) {
         if (sec == null) return "?";
         const m = Math.floor(sec / 60);
@@ -1254,12 +1250,9 @@
         return null;
       }
       const mapName = host.getAttribute("data-map");
-      const visible = soloAcc
-        ? s.detail.members.filter(m => m.accountId === soloAcc)
-        : s.detail.members;
-      const html = visible.map((m) => {
+      const html = s.detail.members.map((m) => {
         const color = s.colorByAcc[m.accountId] || "#999";
-        const active = (m.accountId === soloAcc) ? " active" : "";
+        const active = s.hiddenAccs.has(m.accountId) ? " hidden" : "";
         const selfCls = m.isSelf ? " md-self" : "";
         const who = m.isSelf ? "Du" : m.name;
         // Overall-Badge: alive falls letztes Leben ohne Death, sonst der letzte Death
@@ -1334,8 +1327,9 @@
       const s = mdGetState(host);
       const btn = host.querySelector(".md-allebtn");
       if (!btn) return;
-      btn.classList.toggle("solo-active", !!s.soloAcc);
-      btn.textContent = s.soloAcc ? "↺ Alle anzeigen" : "● Alle";
+      const anyHidden = s.hiddenAccs && s.hiddenAccs.size > 0;
+      btn.classList.toggle("solo-active", anyHidden);
+      btn.textContent = anyHidden ? "↺ Alle anzeigen" : "● Alle sichtbar";
     }
 
     async function mdMount(host) {
@@ -1473,9 +1467,8 @@
       const s = mdGetState(host);
       const absTs = s.zeitraffer.matchStart + s.zeitraffer.cursorTs;
       const coords = [];
-      const visibleMembers = s.soloAcc
-        ? s.detail.members.filter(m => m.accountId === s.soloAcc)
-        : s.detail.members;
+      const visibleMembers = s.detail.members.filter(
+        m => !s.hiddenAccs.has(m.accountId));
       for (const m of visibleMembers) {
         const pin = mdInterpolatePin(m, absTs);
         if (pin) coords.push([pin.x, pin.y]);
@@ -1566,29 +1559,31 @@
       mdZoomAt(host, scale, px, py);
     }, { passive: false });
 
+    // Aktueller Drag-Host (modul-global), damit mousemove/up den richtigen
+    // Host treffen wenn mehrere Match-Details gleichzeitig ausgeklappt sind.
+    let _mdDragHost = null;
     document.addEventListener("mousedown", (e) => {
       const wrap = e.target.closest && e.target.closest(".md-mapwrap");
       if (!wrap) return;
       if (e.target.closest(".md-zoombtns")) return;
       const host = wrap.closest(".md-host");
       if (!host) return;
-      // Right-click oder mit Shift = pan-start
-      if (e.button !== 0) return;  // nur linke Maus
+      if (e.button !== 0) return;
       const s = mdGetState(host);
       s.dragPan = {
         startX: e.clientX, startY: e.clientY,
         startCenterX: s.viewport.centerX, startCenterY: s.viewport.centerY,
       };
+      _mdDragHost = host;
     });
 
     document.addEventListener("mousemove", (e) => {
-      const host = document.querySelector(".md-host[data-mounted='1']");
+      const host = _mdDragHost;
       if (!host) return;
       const s = mdGetState(host);
       if (!s.dragPan) return;
       const dx = e.clientX - s.dragPan.startX;
       const dy = e.clientY - s.dragPan.startY;
-      // 1 px = 1/zoom cm
       s.viewport.centerX = s.dragPan.startCenterX - dx / s.viewport.zoom;
       s.viewport.centerY = s.dragPan.startCenterY - dy / s.viewport.zoom;
       s.viewport.autoFollow = false;
@@ -1597,10 +1592,10 @@
     });
 
     document.addEventListener("mouseup", () => {
-      const host = document.querySelector(".md-host[data-mounted='1']");
-      if (!host) return;
-      const s = mdGetState(host);
+      if (!_mdDragHost) return;
+      const s = mdGetState(_mdDragHost);
       s.dragPan = null;
+      _mdDragHost = null;
     });
 
     document.addEventListener("dblclick", (e) => {
@@ -2502,7 +2497,7 @@
       const absTs = s.zeitraffer.matchStart + cursorTs;
       const inDefault = (cursorTs === 0);
       for (const m of s.detail.members) {
-        if (s.soloAcc && m.accountId !== s.soloAcc) continue;
+        if (s.hiddenAccs.has(m.accountId)) continue;
         if (!m.lives) continue;
         for (const life of m.lives) {
           // Landing
@@ -2537,10 +2532,11 @@
       return null;
     }
 
-    // Click auf Marker: Solo + Zoom 500m + Cursor-Seek + Pause
+    // Click auf Marker: alle anderen ausblenden + Zoom 500m + Cursor-Seek + Pause
     async function mdMarkerClick(host, hit) {
       const s = mdGetState(host);
-      s.soloAcc = hit.acc;
+      s.hiddenAccs = new Set(
+        s.detail.members.map(m => m.accountId).filter(a => a !== hit.acc));
       s.zeitraffer.cursorTs = Math.max(0, hit.tsMs - s.zeitraffer.matchStart);
       s.zeitraffer.playing = false;
       s.playToken++;
@@ -2586,7 +2582,7 @@
       }
     });
 
-    // Card-Click setzt nur Solo + Reset-Viewport auf member-bbox
+    // Card-Click toggelt Sichtbarkeit dieses Members
     document.addEventListener("click", (e) => {
       const card = e.target.closest && e.target.closest(".md-card[data-acc]");
       if (!card) return;
@@ -2594,35 +2590,20 @@
       if (!host) return;
       const s = mdGetState(host);
       const acc = card.getAttribute("data-acc");
-      if (s.soloAcc === acc) {
-        // Toggle off
-        s.soloAcc = null;
-      } else {
-        s.soloAcc = acc;
-        // Viewport: bbox(alle Landings + Deaths) des Members
-        const m = s.detail.members.find(x => x.accountId === acc);
-        const coords = [];
-        if (m && m.lives) {
-          for (const life of m.lives) {
-            if (life.landing) coords.push([life.landing.x, life.landing.y]);
-            if (life.death) coords.push([life.death.x, life.death.y]);
-          }
-        }
-        if (coords.length) {
-          s.viewport = mdBboxFitViewport(coords, MD_PAD_500M_CM);
-        }
-      }
+      if (s.hiddenAccs.has(acc)) s.hiddenAccs.delete(acc);
+      else                       s.hiddenAccs.add(acc);
       mdRenderState(host);
       e.stopPropagation();
     });
 
+    // "Alle anzeigen"-Button: hidden leeren + Zeitraffer reset + Reset-View
     document.addEventListener("click", (e) => {
       const btn = e.target.closest && e.target.closest(".md-allebtn");
       if (!btn) return;
       const host = btn.closest(".md-host");
       if (!host) return;
       const s = mdGetState(host);
-      s.soloAcc = null;
+      s.hiddenAccs.clear();
       s.zeitraffer.cursorTs = 0;
       s.zeitraffer.playing = false;
       s.playToken++;
