@@ -89,9 +89,7 @@ class TeamSpeakService:
                 if not uid: continue
                 # talking-state per state.is_talking_now
                 if s._is_talking_now(clid, now):
-                    # Aber nicht wenn muted (consistent mit snapshot)
                     muted = (c.get("input_muted") == "1"
-                              or c.get("output_muted") == "1"
                               or c.get("input_hardware") == "0")
                     if not muted:
                         mates.append(uid)
