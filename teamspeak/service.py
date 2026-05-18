@@ -232,6 +232,10 @@ class TeamSpeakService:
         LOG.info("whoami: clid=%s cid=%s server_uid=%s",
                  my_clid, my_cid, server_uid)
         self.state.server_uid = server_uid
+        # Channel-ID SOFORT setzen damit snapshot ab jetzt funktioniert,
+        # auch wenn channellist (Name-Lookup) gleich noch hakt.
+        if my_cid:
+            self.state.set_channel(my_cid, self.state.channel_name)
         # Streamer-UID via clientlist -uid (per-Client-clientvariable
         # vermeiden — bareword-Syntax frisst die Library nicht).
         self._refresh_channel_name(my_cid)
