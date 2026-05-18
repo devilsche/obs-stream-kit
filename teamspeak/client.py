@@ -184,17 +184,27 @@ class ClientQuery:
         params)."""
         if not self._conn:
             raise ClientQueryError("not connected")
-        # 'cmd k=v k=v' → ('cmd', {'k': 'v'})
+        # 'cmd k=v k=v option1 option2' →
+        # ('cmd', {'k': 'v'}, ['option1', 'option2'])
+        # Barewords sind in TS3 wichtig (z.B. 'clientvariable clid=X
+        # client_unique_identifier' — Letzte ist das anzufragende Feld).
         parts = cmd.split(" ")
         name = parts[0]
         params = {}
+        options = []
         for p in parts[1:]:
             if "=" in p:
                 k, _, v = p.partition("=")
                 params[k] = v
+            elif p:
+                options.append(p)
         with self._cmd_lock:
             try:
-                resp = self._conn.send(name, params if params else None)
+                resp = self._conn.send(
+                    name,
+                    params if params else None,
+                    None,
+                    options if options else None)
             except Exception as e:
                 raise ClientQueryError(str(e))
         # Liefere parsed dicts direkt — nicht durch raw-Format jagen
