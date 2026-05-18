@@ -1,80 +1,52 @@
-"""TS3 ClientQuery — persistente Telnet-Connection mit Notify-Subscriptions.
+"""TS3 ClientQuery — Wrapper um die `ts3` Library (PyPI: ts3,
+benediktschmitt/py-ts3).
 
-Protokoll: zeilenbasiert. Server sendet 'TS3 Client' Banner + 'selected
-schandlcid=...'. Wir senden 'auth apikey=<key>', dann
-'clientnotifyregister schandlerid=N event=notifytalkstatuschange' usw.
+Installation am Streaming-PC: `pip install ts3`
 
-Notify-Events laufen asynchron rein, Replies auf Commands haben am Ende
-'error id=0 msg=ok'. Wir parsen beides aus demselben Stream und routen
-ueber prefix.
+Unsere Schnittstelle ist gleich geblieben (start/stop, on_notify,
+on_status, send_command), damit teamspeak/service.py unveraendert
+funktioniert. Intern macht jetzt aber die Library den ganzen
+Banner/Auth/Escape/Notify-Parsing-Krempel — die hatte bei mir
+Timeout-Probleme im Handshake.
 
-Encoding: ClientQuery escaped strings nach TS3-Regeln (space=\\s,
-| =\\p, /=\\/, =\\\\, \\n=\\n, ...). Wir de-/escapen nur die noetigsten.
-
-Run in Background-Thread: connect-Loop mit Exponential-Backoff, halten
-den State in `state.py`-Strukturen.
+Notify-Events werden ueber `wait_for_event` aus dem Background-Thread
+gepollt. Library wirft TS3TimeoutError wenn nichts ankam — wir nutzen
+das als Keep-Alive-Timer.
 """
 
-import socket
+import logging
 import threading
 import time
-import logging
 
 LOG = logging.getLogger("teamspeak.client")
-
-ESCAPES = {
-    "\\\\": "\\",  "\\/": "/",  "\\s": " ", "\\p": "|",
-    "\\a": "\x07", "\\b": "\b", "\\f": "\f", "\\n": "\n",
-    "\\r": "\r",   "\\t": "\t", "\\v": "\x0b",
-}
-
-
-def ts_unescape(s):
-    """TS3-string-escape → plain Python string."""
-    if "\\" not in s:
-        return s
-    out = []
-    i = 0
-    while i < len(s):
-        if s[i] == "\\" and i + 1 < len(s):
-            tok = s[i:i + 2]
-            out.append(ESCAPES.get(tok, tok))
-            i += 2
-        else:
-            out.append(s[i])
-            i += 1
-    return "".join(out)
-
-
-def parse_params(line):
-    """ClientQuery-Zeile in dict aufdroeseln. Format: 'cmd k=v k=v ...'
-    Werte koennen TS3-escaped sein."""
-    parts = line.split(" ")
-    out = {}
-    for p in parts:
-        if "=" not in p:
-            continue
-        k, _, v = p.partition("=")
-        out[k] = ts_unescape(v)
-    return out
-
-
-def parse_list(line):
-    """Manche Replies sind Listen, getrennt durch '|'. Returns list of dicts."""
-    chunks = line.split("|")
-    return [parse_params(c) for c in chunks]
 
 
 class ClientQueryError(Exception):
     pass
 
 
-class ClientQuery:
-    """Persistente Verbindung zur TS3 ClientQuery.
-    Verbraucht einen Background-Thread fuer den Read-Loop.
+def parse_params(line):
+    """Hilfs-Parser fuer service.py: 'k=v k=v ...' → dict."""
+    out = {}
+    if not line:
+        return out
+    for p in line.split(" "):
+        if "=" in p:
+            k, _, v = p.partition("=")
+            out[k] = v
+    return out
 
-    on_notify(event_name: str, params: dict) wird fuer jeden Notify-Event
-    aufgerufen. on_status(connected: bool, msg: str) fuer Connect-Status.
+
+def parse_list(line):
+    """Hilfs-Parser fuer service.py: 'a|b|c' wo a/b/c je 'k=v k=v ...'."""
+    return [parse_params(c) for c in line.split("|")]
+
+
+class ClientQuery:
+    """Persistente ClientQuery-Connection auf Basis der `ts3`-Library.
+
+    Background-Thread-Loop: connect → auth → subscribe → wait_for_event.
+    Reconnect mit Exponential-Backoff bei Verbindungsverlust.
     """
 
     def __init__(self, host, port, apikey, on_notify=None, on_status=None,
@@ -85,15 +57,11 @@ class ClientQuery:
         self.on_notify = on_notify or (lambda *a: None)
         self.on_status = on_status or (lambda *a: None)
         self.reconnect_secs = reconnect_secs
-        self._sock = None
-        self._buf = b""
-        self._reply_lines = []
-        self._reply_event = threading.Event()
-        self._cmd_lock = threading.Lock()
+        self._conn = None
         self._running = False
         self._thread = None
         self._connected = False
-        self._read_loop_active = False  # True nur waehrend _read_forever laeuft
+        self._cmd_lock = threading.Lock()
 
     def start(self):
         if self._running:
@@ -106,217 +74,129 @@ class ClientQuery:
     def stop(self):
         self._running = False
         try:
-            if self._sock:
-                self._sock.shutdown(socket.SHUT_RDWR)
-        except Exception:
-            pass
-        try:
-            if self._sock:
-                self._sock.close()
+            if self._conn:
+                self._conn.close()
         except Exception:
             pass
 
     def is_connected(self):
         return self._connected
 
-    # ── Read-Loop ──────────────────────────────────────────────────────
+    # ── Run-Loop ──────────────────────────────────────────────────────
     def _run_loop(self):
+        try:
+            from ts3.query import TS3ClientConnection
+            from ts3.query import TS3TimeoutError, TS3QueryError
+        except ImportError as e:
+            self.on_status(False,
+                f"python-package 'ts3' fehlt — auf dem PC ausfuehren: "
+                f"pip install ts3 ({e})")
+            return
+        self._TS3TimeoutError = TS3TimeoutError
+        self._TS3QueryError = TS3QueryError
         backoff = self.reconnect_secs
         while self._running:
             try:
-                self._connect()
-                self._auth_and_subscribe()
+                conn = TS3ClientConnection(
+                    f"telnet://{self.host}:{self.port}")
+                self._conn = conn
+                self._handshake(conn)
                 self._connected = True
                 self.on_status(True, "connected")
                 backoff = self.reconnect_secs
-                self._read_forever()
+                self._event_loop(conn)
             except Exception as e:
                 LOG.warning("TS3 connection lost: %s", e)
                 self._connected = False
                 self.on_status(False, str(e))
             try:
-                if self._sock:
-                    self._sock.close()
+                if self._conn:
+                    self._conn.close()
             except Exception:
                 pass
-            self._sock = None
+            self._conn = None
             if not self._running:
                 break
             time.sleep(min(60, backoff))
             backoff = min(60, backoff * 1.5)
 
-    def _connect(self):
-        s = socket.create_connection((self.host, self.port), timeout=5)
-        s.settimeout(None)
-        self._sock = s
-        self._buf = b""
-        # Banner — TS3 ClientQuery schickt typischerweise 3 Zeilen
-        # (TS3 Client / Welcome … / selected schandlerid=N). Wir lesen so
-        # viel wie verfuegbar, brechen ab wenn 500ms nichts mehr kommt.
-        for _ in range(6):
+    def _handshake(self, conn):
+        if self.apikey:
+            LOG.info("auth: apikey-Laenge=%d", len(self.apikey))
             try:
-                ln = self._readline(timeout=0.5)
-                if ln is None:
-                    break
-                LOG.debug("banner: %s", ln)
-            except socket.timeout:
-                break
-
-    # Synchroner Send-Read fuer die Handshake-Phase (BEVOR der Read-Loop
-    # laeuft — sonst gibt's keinen Reader fuer Replies).
-    def _sync_command(self, cmd, timeout=3.0):
+                conn.auth(apikey=self.apikey)
+                LOG.info("auth ok")
+            except self._TS3QueryError as e:
+                # Manche Setups haben 'Open Query' — auth wird nicht
+                # benoetigt. Wir probieren weiter, whoami sagt's uns.
+                LOG.info("auth fehlgeschlagen (%s) — probier weiter", e)
+        # Sanity: whoami
         try:
-            self._sock.sendall((cmd + "\n").encode("utf-8"))
-        except OSError as e:
-            raise ClientQueryError(f"send failed: {e}")
-        # Lies Zeilen bis wir 'error id=...' sehen oder Timeout.
-        body = []
-        deadline_each = timeout
-        while True:
-            line = self._readline(timeout=deadline_each)
-            if line is None:
-                raise ClientQueryError(f"connection closed waiting for: {cmd}")
-            if line.startswith("error "):
-                params = parse_params(line[6:])
-                if params.get("id") != "0":
-                    raise ClientQueryError(
-                        f"err {params.get('id')}: {params.get('msg','?')}")
-                return body
-            if line.startswith("notify"):
-                # Async-Notify mitten in Handshake — buffern fuer den
-                # spaeteren Read-Loop ist umstaendlich, also einfach
-                # ignorieren waehrend des Handshakes.
-                continue
-            body.append(line)
-
-    def _auth_and_subscribe(self):
-        # Strategie:
-        # 1. whoami direkt probieren — wenn das klappt, braucht der Plugin
-        #    keinen auth (z.B. 'Open Query for everyone' aktiv) → fertig.
-        # 2. Sonst auth apikey=… senden und whoami nochmal probieren.
-        key_len = len(self.apikey or "")
-        LOG.info("apikey-Laenge=%d, erste 4 Zeichen=%s****",
-                 key_len, (self.apikey or "")[:4])
-        # Phase 1: ohne auth
-        try:
-            self._sync_command("whoami", timeout=2.0)
-            LOG.info("whoami klappt ohne auth — Plugin ist offen")
-            self._subscribe_notifies_sync()
-            return
-        except ClientQueryError as e1:
-            LOG.info("whoami ohne auth: %s — probiere auth", e1)
-        # Phase 2: mit auth
-        if not self.apikey:
-            raise ClientQueryError(
-                "Plugin verlangt auth aber kein TS3-ClientQuery-Key in "
-                ".secrets. Trag ihn ein als 'TS3-ClientQuery-Key: <KEY>'")
-        try:
-            self._sync_command(f"auth apikey={self.apikey}", timeout=3.0)
-            LOG.info("auth ok")
-        except ClientQueryError as e:
-            raise ClientQueryError(
-                f"auth schlug fehl [{e}] (Key-Laenge {key_len}). "
-                f"Im TS3-Client → Extras → Optionen → Erweiterungen → "
-                f"Plug-ins → 'Client Query' → Einstellungen → API-Key copy. "
-                f"In .secrets eintragen als 'TS3-ClientQuery-Key: <KEY>' "
-                f"(keine Anfuehrungszeichen, keine Leerzeichen davor/dahinter).")
-        # Phase 3: whoami nochmal
-        try:
-            self._sync_command("whoami", timeout=2.0)
-            LOG.info("whoami nach auth ok")
-        except ClientQueryError as e:
-            raise ClientQueryError(
-                f"auth ging durch, aber whoami immer noch nicht: {e}")
-        self._subscribe_notifies_sync()
-
-    def _subscribe_notifies_sync(self):
+            conn.send("whoami")
+        except Exception as e:
+            raise ClientQueryError(f"whoami nach handshake fehlgeschlagen: {e}")
+        # Notify-Subscriptions
         for ev in ("notifytalkstatuschange",
                     "notifyclientmoved",
                     "notifycliententerview",
                     "notifyclientleftview"):
             try:
-                self._sync_command(
-                    f"clientnotifyregister schandlerid=0 event={ev}",
-                    timeout=2.0)
-            except ClientQueryError as e:
+                conn.send(
+                    "clientnotifyregister",
+                    {"schandlerid": "0", "event": ev})
+            except Exception as e:
                 LOG.warning("subscribe %s failed: %s", ev, e)
 
-    def _read_forever(self):
-        self._read_loop_active = True
-        try:
-            self._read_forever_inner()
-        finally:
-            self._read_loop_active = False
-
-    def _read_forever_inner(self):
+    def _event_loop(self, conn):
+        # wait_for_event blockiert, gibt Event oder TS3TimeoutError.
+        # Wir nutzen ein 30s-Timeout als Keep-Alive-Tick.
         while self._running:
-            line = self._readline()
-            if line is None:
-                raise ClientQueryError("connection closed")
-            self._handle_line(line)
-
-    def _readline(self, timeout=None):
-        # Vor jedem read explizit timeout setzen — None = blocking
-        self._sock.settimeout(timeout)
-        try:
-            while b"\n" not in self._buf:
-                chunk = self._sock.recv(4096)
-                if not chunk:
-                    return None
-                self._buf += chunk
-            line, _, rest = self._buf.partition(b"\n")
-            self._buf = rest
-            return line.decode("utf-8", "replace").rstrip("\r")
-        finally:
-            self._sock.settimeout(None)
-
-    def _handle_line(self, line):
-        if not line:
-            return
-        if line.startswith("notify"):
-            head, _, rest = line.partition(" ")
-            self.on_notify(head, parse_params(rest))
-            return
-        if line.startswith("error "):
-            params = parse_params(line[6:])
-            self._reply_lines.append(("error", params))
-            self._reply_event.set()
-            return
-        # Sonst: Body einer Reply
-        self._reply_lines.append(("body", line))
-
-    # ── Send-Command ───────────────────────────────────────────────────
-    def send_command(self, cmd, timeout=3.0):
-        """Sendet 'cmd\\n', wartet auf 'error id=0 msg=ok'-Zeile.
-        Returns Body-Lines als Liste. Wirft ClientQueryError bei error_id
-        != 0 oder Timeout.
-
-        Wenn der Read-Loop noch nicht laeuft (Phase: Handshake +
-        initial_sync VOR _read_forever), lesen wir die Reply synchron
-        selbst — sonst wartet send_command auf einen Reader, der nicht
-        existiert, und timed alles aus."""
-        if not self._sock:
-            raise ClientQueryError("not connected")
-        if not self._read_loop_active:
-            with self._cmd_lock:
-                return self._sync_command(cmd, timeout=timeout)
-        with self._cmd_lock:
-            self._reply_lines = []
-            self._reply_event.clear()
             try:
-                self._sock.sendall((cmd + "\n").encode("utf-8"))
-            except OSError as e:
-                raise ClientQueryError(f"send failed: {e}")
-            if not self._reply_event.wait(timeout):
-                raise ClientQueryError(f"timeout waiting for reply to: {cmd}")
-            err = None
-            body = []
-            for kind, payload in self._reply_lines:
-                if kind == "body":
-                    body.append(payload)
-                else:
-                    err = payload
-            if err and err.get("id") != "0":
-                raise ClientQueryError(
-                    f"err {err.get('id')}: {err.get('msg', '?')}")
-            return body
+                ev = conn.wait_for_event(timeout=30)
+            except self._TS3TimeoutError:
+                # Keep-Alive: leerer send als TCP-keepalive Ersatz
+                try:
+                    conn.send_keepalive()
+                except Exception as e:
+                    raise ClientQueryError(f"keepalive failed: {e}")
+                continue
+            if ev is None:
+                continue
+            event_name = "notify" + ev.event  # ev.event = "talkstatuschange" etc
+            params = dict(ev.parsed[0]) if ev.parsed else {}
+            self.on_notify(event_name, params)
+
+    # ── Synchronous send for service.py (initial-sync etc.) ────────────
+    def send_command(self, cmd, timeout=3.0):
+        """Senden waehrend der Event-Loop laeuft. Library serialisiert
+        intern, aber wir nutzen einen Lock damit nicht Event-Loop und
+        Send sich gegenseitig den Socket-Buffer zerlegen.
+
+        cmd kann String mit Parametern sein (z.B. 'channelvariable
+        cid=1 channel_name'). Wir parsen das und nutzen conn.send(name,
+        params)."""
+        if not self._conn:
+            raise ClientQueryError("not connected")
+        # 'cmd k=v k=v' → ('cmd', {'k': 'v'})
+        parts = cmd.split(" ")
+        name = parts[0]
+        params = {}
+        for p in parts[1:]:
+            if "=" in p:
+                k, _, v = p.partition("=")
+                params[k] = v
+        with self._cmd_lock:
+            try:
+                resp = self._conn.send(name, params if params else None)
+            except Exception as e:
+                raise ClientQueryError(str(e))
+        # Resp ist TS3QueryResponse. Body so formatieren wie das
+        # raw TS3-Protokoll (eine Zeile, Items mit '|' getrennt) — dann
+        # funktionieren parse_params / parse_list in service.py
+        # unveraendert.
+        items = []
+        for item in (resp.parsed or []):
+            items.append(" ".join(f"{k}={v}" for k, v in item.items()))
+        if not items:
+            return []
+        return ["|".join(items)]
