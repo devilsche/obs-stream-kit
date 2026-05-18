@@ -203,24 +203,36 @@ except Exception as e:
 TS_ENABLED = False
 ts_registry = None
 ts_service = None
+ts_db = None
 try:
     from teamspeak.config import load_config as _ts_load_config, load_api_key as _ts_load_apikey
     from teamspeak.service import TeamSpeakService
     from teamspeak.endpoints import TeamSpeakRegistry
+    from teamspeak.db import connect as _ts_db_connect, init_schema as _ts_db_init
     ts_cfg = _ts_load_config(os.path.join(ROOT, "config", "teamspeak.json"))
     ts_apikey = _ts_load_apikey(os.path.join(ROOT, ".secrets"))
+    ts_db_path = os.path.join(ROOT, "data", "teamspeak.db")
+    ts_db = _ts_db_connect(ts_db_path)
+    _ts_db_init(ts_db)
+    steam_key_for_ts = secrets.get("steam_api_key")
     if ts_apikey:
         ts_service = TeamSpeakService(
             host=ts_cfg["host"], port=int(ts_cfg["port"]),
             apikey=ts_apikey,
-            talking_tail_ms=int(ts_cfg.get("talkingTailMs", 400)))
+            talking_tail_ms=int(ts_cfg.get("talkingTailMs", 400)),
+            db_conn=ts_db,
+            root_dir=ROOT,
+            steam_api_key=steam_key_for_ts)
         ts_service.start()
-        ts_registry = TeamSpeakRegistry(ts_service)
+        ts_registry = TeamSpeakRegistry(
+            ts_service, db_conn=ts_db, root_dir=ROOT,
+            steam_api_key=steam_key_for_ts)
         TS_ENABLED = True
         print("  TeamSpeak backend active  ✓")
     else:
-        # Auch ohne Key registry erstellen — liefert 'connected=false'
-        ts_registry = TeamSpeakRegistry(None)
+        ts_registry = TeamSpeakRegistry(
+            None, db_conn=ts_db, root_dir=ROOT,
+            steam_api_key=steam_key_for_ts)
         TS_ENABLED = True
         print("  TeamSpeak backend: no TS3-ClientQuery-Key in .secrets — "
               "endpoint liefert connected=false")
@@ -390,6 +402,26 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 self.send_error(500, str(e))
                 return
+        if self.path.startswith("/steam-avatars/"):
+            try:
+                name = self.path[len("/steam-avatars/"):]
+                safe = "".join(c for c in name if c.isalnum() or c in ".-_")
+                full = os.path.join(ROOT, "data", "steam-avatars", safe)
+                if os.path.exists(full):
+                    with open(full, "rb") as f:
+                        data = f.read()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "image/webp")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.send_header("Cache-Control", "public, max-age=3600")
+                    self.end_headers()
+                    self.wfile.write(data)
+                else:
+                    self.send_error(404, "avatar not cached")
+                return
+            except Exception as e:
+                self.send_error(500, str(e))
+                return
         if TS_ENABLED and self.path.startswith("/api/teamspeak/"):
             try:
                 from urllib.parse import urlparse, parse_qs
@@ -487,6 +519,25 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 self.send_error(500, str(e))
                 return
+        if TS_ENABLED and self.path.startswith("/api/teamspeak/"):
+            try:
+                from urllib.parse import urlparse, parse_qs
+                u = urlparse(self.path)
+                qs = {k: v[0] for k, v in parse_qs(u.query).items()}
+                length = int(self.headers.get('Content-Length', 0))
+                body_in = self.rfile.read(length) if length else b""
+                result = ts_registry.handle("POST", u.path, qs, body_in)
+                if result is not None:
+                    body, code, ctype = result
+                    self.send_response(code)
+                    self.send_header("Content-Type", ctype)
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
+            except Exception as e:
+                self.send_error(500, str(e))
+                return
         if self.path != '/dev-log':
             self.send_response(404)
             self.end_headers()
@@ -534,6 +585,25 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(body)
                 return
+            except Exception as e:
+                self.send_error(500, str(e))
+                return
+        if TS_ENABLED and self.path.startswith("/api/teamspeak/"):
+            try:
+                from urllib.parse import urlparse, parse_qs
+                u = urlparse(self.path)
+                qs = {k: v[0] for k, v in parse_qs(u.query).items()}
+                length = int(self.headers.get('Content-Length', 0))
+                body_in = self.rfile.read(length) if length else b""
+                result = ts_registry.handle("DELETE", u.path, qs, body_in)
+                if result is not None:
+                    body, code, ctype = result
+                    self.send_response(code)
+                    self.send_header("Content-Type", ctype)
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
             except Exception as e:
                 self.send_error(500, str(e))
                 return

@@ -1,10 +1,18 @@
 """TeamSpeak-Endpoints — folgt dem pubg/endpoints.py-Pattern.
 
-Aktuelle Routes (Commit 1):
-  GET /api/teamspeak/state
+Routes (Commit 1+2):
+  GET   /api/teamspeak/state                — live channel + members
+  GET   /api/teamspeak/users                — alle bekannten Mappings
+  POST  /api/teamspeak/users                — Mapping setzen
+  GET   /api/teamspeak/discover             — online aber unmappt
+  GET   /api/teamspeak/encounters           — Begegnungszaehler
+  GET   /api/teamspeak/afk-channels         — Liste (opt ?server=)
+  POST  /api/teamspeak/afk-channels         — Channel als AFK markieren
+  DELETE/api/teamspeak/afk-channels         — Channel raus
 """
 
 import json
+import os
 
 
 def _ok(payload):
@@ -16,22 +24,177 @@ def _err(code, msg):
 
 
 class TeamSpeakRegistry:
-    """Routet TS3-Requests. service kann None sein wenn kein API-Key
-    konfiguriert war — dann liefern wir 'connected=false'."""
-    def __init__(self, service):
+    def __init__(self, service, db_conn=None, root_dir=None,
+                  steam_api_key=None):
         self.service = service
+        self.db = db_conn
+        self.root_dir = root_dir
+        self.steam_api_key = steam_api_key
 
     def handle(self, method, path, qs, body):
         route = (method, path)
         if route == ("GET", "/api/teamspeak/state"):
             return self._state()
-        return None  # not handled → server.py macht den 404
+        if route == ("GET", "/api/teamspeak/users"):
+            return self._users_get()
+        if route == ("POST", "/api/teamspeak/users"):
+            return self._users_post(body)
+        if route == ("GET", "/api/teamspeak/discover"):
+            return self._discover()
+        if route == ("GET", "/api/teamspeak/encounters"):
+            return self._encounters()
+        if route == ("GET", "/api/teamspeak/afk-channels"):
+            return self._afk_get(qs)
+        if route == ("POST", "/api/teamspeak/afk-channels"):
+            return self._afk_post(body)
+        if route == ("DELETE", "/api/teamspeak/afk-channels"):
+            return self._afk_delete(body)
+        return None
 
+    # ── State ──────────────────────────────────────────────────────────
     def _state(self):
         if not self.service:
             return _ok({
                 "connected": False,
-                "status":    "no api-key configured (TS3-ClientQuery-Key in .secrets)",
+                "status":    "no api-key configured",
                 "members":   [],
             })
-        return _ok(self.service.state.snapshot())
+        snap = self.service.state.snapshot()
+        # Mappings ergaenzen pro Member
+        if self.db:
+            from teamspeak.db import get_user
+            from teamspeak.avatars import url_for as avatar_url
+            for m in snap["members"]:
+                u = get_user(self.db, m.get("tsUid")) if m.get("tsUid") else None
+                if u:
+                    src = u.get("display_source") or "ts"
+                    custom = u.get("custom_name")
+                    # Steam-Name kennen wir nicht direkt — Override per
+                    # custom_name oder ts-name verfuegbar
+                    if src == "custom" and custom:
+                        m["displayName"] = custom
+                    else:
+                        m["displayName"] = m.get("tsName")
+                    m["steamId"]       = u.get("steam_id")
+                    m["speakingIcon"]  = u.get("speaking_icon")
+                    m["silentIcon"]    = u.get("silent_icon")
+                    m["showInWidget"]  = bool(u.get("show_in_widget", 1))
+                    if self.root_dir and u.get("steam_id"):
+                        m["avatarUrl"] = avatar_url(
+                            self.root_dir, u["steam_id"])
+                else:
+                    m["displayName"]  = m.get("tsName")
+                    m["showInWidget"] = True
+        return _ok(snap)
+
+    # ── User-Mappings ──────────────────────────────────────────────────
+    def _users_get(self):
+        if not self.db:
+            return _ok({"users": []})
+        from teamspeak.db import get_all_users
+        return _ok({"users": get_all_users(self.db)})
+
+    def _users_post(self, body):
+        if not self.db:
+            return _err(503, "db not available")
+        try:
+            payload = json.loads(body or b"{}")
+            ts_uid = (payload.get("tsUid") or "").strip()
+            if not ts_uid:
+                return _err(400, "tsUid required")
+            from teamspeak.db import save_user_mapping
+            from teamspeak.avatars import fetch_and_cache
+            # Whitelist + Mapping camelCase -> snake_case
+            fields = {}
+            for src_key, db_key in [
+                ("steamId",        "steam_id"),
+                ("customName",     "custom_name"),
+                ("displaySource",  "display_source"),
+                ("speakingIcon",   "speaking_icon"),
+                ("silentIcon",     "silent_icon"),
+                ("showInWidget",   "show_in_widget"),
+                ("lastNick",       "last_nick"),
+            ]:
+                if src_key in payload:
+                    v = payload[src_key]
+                    if db_key == "show_in_widget":
+                        v = 1 if v else 0
+                    fields[db_key] = v
+            save_user_mapping(self.db, ts_uid, **fields)
+            # Wenn eine Steam-ID neu gesetzt wurde → Avatar nachziehen
+            if fields.get("steam_id") and self.root_dir and self.steam_api_key:
+                fetch_and_cache(self.root_dir, fields["steam_id"],
+                                 self.steam_api_key)
+            return _ok({"ok": True})
+        except Exception as e:
+            return _err(400, str(e))
+
+    # ── Discover: online aber noch nicht gemappt ───────────────────────
+    def _discover(self):
+        if not self.service:
+            return _ok({"members": []})
+        snap = self.service.state.snapshot()
+        unmapped = []
+        if self.db:
+            from teamspeak.db import get_user
+            for m in snap["members"]:
+                if not m.get("tsUid"): continue
+                u = get_user(self.db, m["tsUid"])
+                # 'unmappt' = noch kein steam_id UND kein custom_name
+                if not u or (not u.get("steam_id") and not u.get("custom_name")):
+                    unmapped.append({
+                        "tsUid": m["tsUid"],
+                        "tsName": m.get("tsName"),
+                        "isSelf": m.get("isSelf"),
+                    })
+        return _ok({"members": unmapped})
+
+    # ── Encounters ─────────────────────────────────────────────────────
+    def _encounters(self):
+        if not self.service or not self.db:
+            return _ok({"encounters": []})
+        sid = self.service.state.streamer_uid
+        if not sid:
+            return _ok({"encounters": []})
+        from teamspeak.db import get_encounters, get_user
+        rows = get_encounters(self.db, sid)
+        # Namen ergaenzen
+        for r in rows:
+            u = get_user(self.db, r["mate_uid"])
+            r["name"] = (u or {}).get("custom_name") \
+                or (u or {}).get("last_nick") \
+                or r["mate_uid"][:12]
+        return _ok({"encounters": rows})
+
+    # ── AFK-Channels ───────────────────────────────────────────────────
+    def _afk_get(self, qs):
+        if not self.db:
+            return _ok({"afkChannels": []})
+        from teamspeak.db import get_afk_channels
+        return _ok({"afkChannels": get_afk_channels(
+            self.db, qs.get("server"))})
+
+    def _afk_post(self, body):
+        if not self.db:
+            return _err(503, "db not available")
+        try:
+            payload = json.loads(body or b"{}")
+            from teamspeak.db import set_afk_channel
+            set_afk_channel(self.db,
+                payload["serverUid"], payload["channelId"],
+                payload.get("channelName"))
+            return _ok({"ok": True})
+        except Exception as e:
+            return _err(400, str(e))
+
+    def _afk_delete(self, body):
+        if not self.db:
+            return _err(503, "db not available")
+        try:
+            payload = json.loads(body or b"{}")
+            from teamspeak.db import remove_afk_channel
+            remove_afk_channel(self.db,
+                payload["serverUid"], payload["channelId"])
+            return _ok({"ok": True})
+        except Exception as e:
+            return _err(400, str(e))

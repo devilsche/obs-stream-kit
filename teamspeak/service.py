@@ -25,13 +25,22 @@ LOG = logging.getLogger("teamspeak.service")
 
 
 class TeamSpeakService:
-    def __init__(self, host, port, apikey, talking_tail_ms=400):
+    def __init__(self, host, port, apikey, talking_tail_ms=400,
+                  db_conn=None, root_dir=None, steam_api_key=None):
         self.state = TsState(talking_tail_ms=talking_tail_ms)
         self.client = ClientQuery(
             host=host, port=port, apikey=apikey,
             on_notify=self._on_notify,
             on_status=self._on_status)
         self._connect_seq = 0
+        self.db = db_conn
+        self.root_dir = root_dir
+        self.steam_api_key = steam_api_key
+        # Encounter-Tracking: vorheriger Streamer-Channel + Member-Set,
+        # damit wir pro Channel-Wechsel die Mates des verlassenen
+        # Channels NICHT mehr zaehlen, sondern die des neuen.
+        self._last_streamer_channel = None
+        self._counted_in_current_channel = set()
 
     def start(self):
         self.client.start()
@@ -66,6 +75,15 @@ class TeamSpeakService:
                     uid=params.get("client_unique_identifier"),
                     nick=params.get("client_nickname"),
                     channelId=params.get("ctid"))
+                if self.db and params.get("client_unique_identifier"):
+                    try:
+                        from teamspeak.db import upsert_user_nick
+                        upsert_user_nick(self.db,
+                            params.get("client_unique_identifier"),
+                            params.get("client_nickname"))
+                    except Exception:
+                        pass
+                self._maybe_count_encounters()
             elif event == "notifyclientleftview":
                 clid = params.get("clid")
                 if not clid: return
@@ -84,6 +102,9 @@ class TeamSpeakService:
                         self._refresh_clientlist()
                     except Exception as e:
                         LOG.warning("post-move clientlist refresh: %s", e)
+                else:
+                    # Mate ist in unseren Channel gewechselt → ggf zaehlen
+                    self._maybe_count_encounters()
         except Exception as e:
             LOG.warning("notify-handler error %s: %s", event, e)
 
@@ -95,19 +116,14 @@ class TeamSpeakService:
 
     # ── Initial Sync ───────────────────────────────────────────────────
     def _initial_sync(self):
-        self._dbg("initial_sync START")
         rows = self.client.send_command("whoami")
-        self._dbg(f" whoami rows-anzahl: {len(rows)}")
-        for i, r in enumerate(rows):
-            self._dbg(f" whoami row[{i}]: {r}")
         if not rows:
             LOG.warning("whoami: empty reply")
             return
-        # Falls multiple rows: alle Felder zusammenkippen
+        # whoami liefert je nach TS3-Version 1+ rows — alle Felder mergen
         w = {}
         for r in rows:
             w.update(r)
-        self._dbg(f" whoami merged keys: {list(w.keys())}")
         my_clid = w.get("client_id") or w.get("clid")
         my_cid  = w.get("client_channel_id") or w.get("cid")
         # ServerUid: kann unter unterschiedlichen Keys auftauchen
@@ -124,7 +140,6 @@ class TeamSpeakService:
         if not server_uid:
             try:
                 sc = self.client.send_command("serverconnectinfo") or []
-                self._dbg(f" serverconnectinfo: {sc}")
                 if sc:
                     r = sc[0]
                     ip = r.get("ip") or r.get("host") or ""
@@ -132,7 +147,7 @@ class TeamSpeakService:
                     if ip and port:
                         server_uid = f"{ip}:{port}"
             except ClientQueryError as e:
-                self._dbg(f" serverconnectinfo failed: {e}")
+                LOG.info("serverconnectinfo: %s", e)
         LOG.info("whoami: clid=%s cid=%s server_uid=%s",
                  my_clid, my_cid, server_uid)
         self.state.server_uid = server_uid
@@ -160,6 +175,49 @@ class TeamSpeakService:
             if streamer_clid and clid == streamer_clid:
                 self.state.set_streamer(
                     clid, it.get("client_unique_identifier"))
+            # last_nick in DB persistieren
+            if self.db and it.get("client_unique_identifier"):
+                try:
+                    from teamspeak.db import upsert_user_nick
+                    upsert_user_nick(self.db,
+                        it.get("client_unique_identifier"),
+                        it.get("client_nickname"))
+                except Exception:
+                    pass
+        self._maybe_count_encounters()
+
+    def _maybe_count_encounters(self):
+        """Pro Channel-Wechsel: fuer jeden Mate im aktuellen Channel
+        (= nicht-AFK) +1 Begegnung — aber nur EINMAL pro Aufenthalt
+        in diesem Channel."""
+        if not self.db: return
+        s = self.state
+        if not s.streamer_uid or not s.channel_id or not s.server_uid:
+            return
+        # AFK-Channel ueberspringen
+        try:
+            from teamspeak.db import is_afk_channel, bump_encounter
+            if is_afk_channel(self.db, s.server_uid, s.channel_id):
+                return
+        except Exception:
+            return
+        # Channel-Wechsel?
+        if self._last_streamer_channel != s.channel_id:
+            self._last_streamer_channel = s.channel_id
+            self._counted_in_current_channel = set()
+        # Alle Mates im selben Channel (nicht self), die noch nicht
+        # gezaehlt wurden
+        for clid, c in list(s.clients.items()):
+            if clid == s.streamer_clid: continue
+            if c.get("channelId") != s.channel_id: continue
+            mate_uid = c.get("uid")
+            if not mate_uid: continue
+            if mate_uid in self._counted_in_current_channel: continue
+            try:
+                bump_encounter(self.db, s.streamer_uid, mate_uid, s.server_uid)
+            except Exception:
+                continue
+            self._counted_in_current_channel.add(mate_uid)
 
     def _refresh_channel_name(self, cid):
         """Channel-Name aus channellist (statt channelvariable mit
