@@ -169,6 +169,9 @@ class ClientQuery:
         if not self.apikey:
             raise ClientQueryError(
                 "no API key configured (TS3-ClientQuery-Key in .secrets)")
+        key_len = len(self.apikey)
+        LOG.info("auth: apikey-Laenge=%d, ersten 4 Zeichen=%s****",
+                 key_len, self.apikey[:4] if key_len > 4 else "?")
         try:
             self.send_command(f"auth apikey={self.apikey}", timeout=3.0)
             LOG.info("auth ok")
@@ -178,10 +181,21 @@ class ClientQuery:
             # ohne API-Key-Auth. Da ist alles offen, weiter.
             if "256" in msg or "command not found" in msg.lower():
                 LOG.info("auth not required (alt plugin) — fortsetzen")
-            else:
-                raise ClientQueryError(
-                    f"auth failed ({msg}). Pruef TS3-ClientQuery-Key "
-                    f"in .secrets, ggf. in TS3 neu generieren.")
+                return
+            # Versuch: gehts auch ohne auth? Manche Setups haben
+            # 'apikey nicht erforderlich' und auth wirft trotzdem.
+            try:
+                self.send_command("whoami", timeout=2.0)
+                LOG.info("auth required, aber whoami klappt ohne — fortsetzen")
+                return
+            except ClientQueryError:
+                pass
+            raise ClientQueryError(
+                f"auth failed [{msg}] mit Key-Laenge {key_len}. "
+                f"In TS3-Client: Extras→Optionen→Erweiterungen→Plug-ins→"
+                f"'Client Query'→Einstellungen→API-Key copy. "
+                f"Dann in .secrets als 'TS3-ClientQuery-Key: <KEY>' (genau "
+                f"so, KEINE Anfuehrungszeichen, KEIN Leerzeichen davor).")
         # Notify-Subscriptions
         for ev in ("notifytalkstatuschange",
                     "notifyclientmoved",
