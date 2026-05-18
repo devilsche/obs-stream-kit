@@ -32,6 +32,8 @@ class TeamSpeakService:
             host=host, port=port, apikey=apikey,
             on_notify=self._on_notify,
             on_status=self._on_status)
+        from teamspeak.sse import SSEHub
+        self.sse_hub = SSEHub()
         self._connect_seq = 0
         self.db = db_conn
         self.root_dir = root_dir
@@ -128,8 +130,17 @@ class TeamSpeakService:
                 continue
 
     # ── Hooks ──────────────────────────────────────────────────────────
+    def _publish(self):
+        """Pusht aktuellen Snapshot an SSE-Subscribers. Wird nach jedem
+        State-Change aufgerufen."""
+        try:
+            self.sse_hub.publish(self.state.snapshot())
+        except Exception:
+            pass
+
     def _on_status(self, connected, msg):
         self.state.set_connected(connected, msg)
+        self._publish()
         if connected:
             self._connect_seq += 1
             try:

@@ -47,7 +47,7 @@
       border: 1px solid var(--border);
       border-radius: 8px;
       box-shadow: 0 2px 16px rgba(0,0,0,0.5);
-      padding: 10px 10px 8px;
+      padding: 12px 14px 10px;
       box-sizing: border-box;
       backdrop-filter: blur(6px);
     }
@@ -86,8 +86,8 @@
       gap: 3px;
     }
     .ts-row {
-      display: flex; align-items: center; gap: 8px;
-      padding: 4px 6px;
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 8px;
       border-radius: 5px;
       background: var(--bg-row);
       opacity: 0.35;
@@ -105,20 +105,38 @@
     .ts-avatar {
       position: relative;
       width: var(--av-size); height: var(--av-size);
+      flex-shrink: 0;
+    }
+    .ts-avatar .avbg {
+      position: absolute; inset: 0;
       border-radius: 50%;
       overflow: hidden;
-      flex-shrink: 0;
       background: #2a1d3f;
     }
-    .ts-avatar img { width: 100%; height: 100%; object-fit: cover;
-                      display: block; }
+    .ts-avatar img.av { width: 100%; height: 100%; object-fit: cover;
+                         display: block; }
     .ts-avatar .initials {
       width: 100%; height: 100%;
       display: flex; align-items: center; justify-content: center;
       font-weight: 700; color: var(--text);
       font-size: 0.95em;
     }
-    .ts-row.talking .ts-avatar {
+    /* Steam-Frame: leicht groesser, ueber dem Avatar gelegt. Frame
+       hat transparenten Innenraum. */
+    .ts-avatar .frame {
+      position: absolute; left: -15%; top: -15%;
+      width: 130%; height: 130%;
+      pointer-events: none;
+      object-fit: contain;
+      opacity: 0;
+      transition: opacity 0.12s ease;
+    }
+    /* Frame-Variante: Avatar ist eckig (Frames sind fuer eckige
+       Container designed), Frame wird beim Sprechen sichtbar.
+       Standard-Gold-Ring NUR wenn kein Frame da ist. */
+    .ts-row.framed .ts-avatar .avbg { border-radius: 8%; }
+    .ts-row.talking.framed .ts-avatar .frame { opacity: 1; }
+    .ts-row.talking:not(.framed) .ts-avatar .avbg {
       box-shadow: 0 0 0 2px var(--accent);
     }
     .ts-name { flex: 1; min-width: 0;
@@ -321,24 +339,37 @@
           row = document.createElement("div");
           row.className = "ts-row";
           row.dataset.uid = uid;
-          row.innerHTML = `<div class="ts-avatar"></div><div class="ts-name"></div>`;
+          row.innerHTML =
+            `<div class="ts-avatar">
+               <div class="avbg"></div>
+               <img class="frame" alt="">
+             </div>
+             <div class="ts-name"></div>`;
         }
         // Klassen toggeln (kein DOM-Rebuild noetig)
         row.classList.toggle("talking", !!m.isTalking);
         row.classList.toggle("self", !!m.isSelf);
+        row.classList.toggle("framed", !!m.avatarFrameUrl);
         // Name nur setzen wenn aendert
         const nameEl = row.querySelector(".ts-name");
         if (nameEl.textContent !== name) nameEl.textContent = name;
-        // Avatar/Icon nur ersetzen wenn src wechselt
-        const avEl = row.querySelector(".ts-avatar");
+        // Avatar-BG (Bild oder Initialen) nur ersetzen wenn src wechselt
+        const avBg = row.querySelector(".ts-avatar .avbg");
         const wantSrc = iconSrc || "";
-        if (avEl.dataset.src !== wantSrc) {
-          avEl.dataset.src = wantSrc;
+        if (avBg.dataset.src !== wantSrc) {
+          avBg.dataset.src = wantSrc;
           if (wantSrc) {
-            avEl.innerHTML = `<img src="${wantSrc}" alt="">`;
+            avBg.innerHTML = `<img class="av" src="${wantSrc}" alt="">`;
           } else {
-            avEl.innerHTML = `<div class="initials">${initials(name)}</div>`;
+            avBg.innerHTML = `<div class="initials">${initials(name)}</div>`;
           }
+        }
+        // Steam-Frame overlay
+        const frameEl = row.querySelector(".ts-avatar .frame");
+        const frameSrc = m.avatarFrameUrl || "";
+        if (frameEl.dataset.src !== frameSrc) {
+          frameEl.dataset.src = frameSrc;
+          frameEl.src = frameSrc;  // leer → kein Frame
         }
         // In DOM einsortieren (nach prev, oder als erstes)
         const wantBefore = prev ? prev.nextSibling : elList.firstChild;

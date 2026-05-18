@@ -221,9 +221,10 @@ class TeamSpeakRegistry:
         import time
         cache_age = time.time() - TeamSpeakRegistry._channels_cache[0]
         # Kurzer Cache (10s) damit der channellist-Call nicht jeden
-        # 3s-Tool-Refresh hits.
-        if cache_age < 10.0 and TeamSpeakRegistry._channels_cache[1]:
-            return _ok({"channels": TeamSpeakRegistry._channels_cache[1]})
+        # 3s-Tool-Refresh hits. Leere Antworten NIE cachen.
+        cached = TeamSpeakRegistry._channels_cache[1]
+        if cache_age < 10.0 and cached:
+            return _ok({"channels": cached})
         try:
             rows = self.service.client.send_command("channellist") or []
         except Exception as e:
@@ -266,7 +267,10 @@ class TeamSpeakRegistry:
                 "totalClients": r.get("total_clients"),
             })
         out.sort(key=lambda c: (c.get("path") or "").lower())
-        TeamSpeakRegistry._channels_cache = (time.time(), out)
+        # Nur cachen wenn nicht-leer — sonst bleiben Tool-Reloads
+        # auf einer leeren Liste haengen.
+        if out:
+            TeamSpeakRegistry._channels_cache = (time.time(), out)
         return _ok({"channels": out})
 
     # ── Mute via ClientQuery (lokaler TS3-Mute) ────────────────────────
