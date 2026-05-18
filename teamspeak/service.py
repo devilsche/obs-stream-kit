@@ -75,19 +75,30 @@ class TeamSpeakService:
                            daemon=True).start()
 
     def _poll_talk_flags(self):
-        """Pollt clientlist -voice und gleicht client_flag_talking mit
-        unserem _talking-State ab. Loest set_talking(True/False) bei
-        Wechseln aus. Damit funktioniert das Widget auch fuer Clients
-        die kein notifytalkstatuschange feuern (Radio-Bots etc.)."""
+        """Pollt clientlist -voice — Talk-Flags UND Client-State (cid,
+        nick, mute) gleichzeitig refreshen. Damit ist das die einzige
+        zuverlaessige Quelle wenn Notifies droppen."""
         if not self.state.connected: return
         try:
             items = self.client.send_command("clientlist -voice") or []
-        except Exception:
+        except Exception as e:
+            self._dbg(f"talk-poll FEHLER: {e}")
             return
         changed = False
+        seen_clids = set()
         for it in items:
             clid = it.get("clid")
             if not clid: continue
+            seen_clids.add(clid)
+            # State-Update — Channel, Nick, Mute aus dem Voice-Listing
+            self.state.upsert_client(
+                clid,
+                nick=it.get("client_nickname"),
+                channelId=it.get("cid"),
+                input_muted=it.get("client_input_muted"),
+                output_muted=it.get("client_output_muted"),
+                input_hardware=it.get("client_input_hardware"))
+            # Talk-Flag-Vergleich
             now_talk = (it.get("client_flag_talking") == "1")
             was_talk = bool(self.state._talking.get(clid))
             if now_talk != was_talk:
@@ -95,6 +106,12 @@ class TeamSpeakService:
                     clid, now_talk,
                     on_transition=self._on_talk_transition)
                 changed = True
+        # Clients die nicht mehr in der Liste sind → entfernen
+        with self.state._lock:
+            stale = [c for c in self.state.clients if c not in seen_clids]
+        for c in stale:
+            self.state.remove_client(c)
+            changed = True
         if changed:
             self._publish()
 
