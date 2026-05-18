@@ -197,14 +197,18 @@ class ClientQuery:
                 k, _, v = p.partition("=")
                 params[k] = v
             elif p:
-                options.append(p)
+                # Library setzt den '-' Prefix selbst, also strip wenn
+                # User '-uid' geschrieben hat.
+                options.append(p[1:] if p.startswith("-") else p)
         with self._cmd_lock:
             try:
-                resp = self._conn.send(
-                    name,
-                    params if params else None,
-                    None,
-                    options if options else None)
+                # Library-API kann je nach Version unterschiedlich sein.
+                # Wir nutzen kwargs, damit None-Slots in der Signatur
+                # nichts kaputt machen.
+                kwargs = {}
+                if params:  kwargs["common_parameters"] = params
+                if options: kwargs["options"] = options
+                resp = self._conn.send(name, **kwargs)
             except Exception as e:
                 raise ClientQueryError(str(e))
         # Liefere parsed dicts direkt — nicht durch raw-Format jagen

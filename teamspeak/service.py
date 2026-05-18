@@ -89,10 +89,7 @@ class TeamSpeakService:
 
     # ── Initial Sync ───────────────────────────────────────────────────
     def _initial_sync(self):
-        # send_command liefert jetzt parsed dicts direkt (statt joined-raw-
-        # Lines durchs eigene parse_params). 'whoami' nutzt 'client_id'/
-        # 'client_channel_id', 'clientlist' nutzt 'clid'/'cid' — beide
-        # unterstuetzen.
+        # whoami: client_id / client_channel_id / virtualserver_unique_identifier
         rows = self.client.send_command("whoami")
         if not rows:
             LOG.warning("whoami: empty reply")
@@ -104,72 +101,41 @@ class TeamSpeakService:
         LOG.info("whoami: clid=%s cid=%s server_uid=%s",
                  my_clid, my_cid, server_uid)
         self.state.server_uid = server_uid
-        if my_clid:
-            try:
-                cv = self.client.send_command(
-                    f"clientvariable clid={my_clid} client_unique_identifier")
-                if cv:
-                    uid = cv[0].get("client_unique_identifier")
-                    self.state.set_streamer(my_clid, uid)
-            except ClientQueryError:
-                pass
+        # Streamer-UID via clientlist -uid (per-Client-clientvariable
+        # vermeiden — bareword-Syntax frisst die Library nicht).
         self._refresh_channel_name(my_cid)
+        self._refresh_clientlist(streamer_clid=my_clid)
+
+    def _refresh_clientlist(self, streamer_clid=None):
+        """Holt clientlist -uid (alle Clients + UIDs in einer Antwort)
+        und merged sie in den State."""
         try:
-            items = self.client.send_command("clientlist") or []
-            for it in items:
-                clid = it.get("clid")
-                if not clid: continue
-                self.state.upsert_client(
-                    clid,
-                    nick=it.get("client_nickname"),
-                    channelId=it.get("cid"))
-            for it in items:
-                if it.get("cid") != my_cid: continue
-                clid = it.get("clid")
-                try:
-                    cv = self.client.send_command(
-                        f"clientvariable clid={clid} client_unique_identifier")
-                    if cv:
-                        uid = cv[0].get("client_unique_identifier")
-                        self.state.upsert_client(clid, uid=uid)
-                except ClientQueryError:
-                    pass
+            items = self.client.send_command("clientlist -uid") or []
         except ClientQueryError as e:
             LOG.warning("clientlist failed: %s", e)
-
-    def _refresh_clientlist(self):
-        """Holt die aktuelle clientlist und merged sie in den State.
-        Wird beim Streamer-Move aufgerufen damit Member im neuen Channel
-        sofort bekannt sind."""
-        items = self.client.send_command("clientlist") or []
+            return
         for it in items:
             clid = it.get("clid")
             if not clid: continue
             self.state.upsert_client(
                 clid,
                 nick=it.get("client_nickname"),
-                channelId=it.get("cid"))
-        # UIDs der Channel-Member nachladen
-        my_cid = self.state.channel_id
-        for it in items:
-            if it.get("cid") != my_cid: continue
-            clid = it.get("clid")
-            try:
-                cv = self.client.send_command(
-                    f"clientvariable clid={clid} client_unique_identifier")
-                if cv:
-                    self.state.upsert_client(
-                        clid, uid=cv[0].get("client_unique_identifier"))
-            except ClientQueryError:
-                pass
+                channelId=it.get("cid"),
+                uid=it.get("client_unique_identifier"))
+            if streamer_clid and clid == streamer_clid:
+                self.state.set_streamer(
+                    clid, it.get("client_unique_identifier"))
 
     def _refresh_channel_name(self, cid):
+        """Channel-Name aus channellist (statt channelvariable mit
+        bareword)."""
         if not cid: return
         try:
-            rows = self.client.send_command(
-                f"channelvariable cid={cid} channel_name")
-            if rows:
-                name = rows[0].get("channel_name")
-                self.state.set_channel(cid, name)
+            rows = self.client.send_command("channellist") or []
         except ClientQueryError as e:
-            LOG.info("channelvariable cid=%s: %s", cid, e)
+            LOG.info("channellist: %s", e)
+            return
+        for r in rows:
+            if r.get("cid") == cid:
+                self.state.set_channel(cid, r.get("channel_name"))
+                return
