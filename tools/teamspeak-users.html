@@ -121,7 +121,6 @@
 <div class="wrap">
   <div class="toolbar">
     <button id="refreshBtn">↻ Reload</button>
-    <button id="discoverBtn" title="Aktuell online im Channel — als neue Mappings vorladen">+ Discover</button>
     <span class="status" id="status"></span>
   </div>
 
@@ -179,15 +178,27 @@
   }
 
   // ── API ───────────────────────────────────────────────────────────
+  async function safeFetch(url, defaultVal) {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 5000);
+      const r = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(t);
+      return await r.json();
+    } catch (e) {
+      console.warn("fetch failed", url, e);
+      return defaultVal;
+    }
+  }
   async function fetchAll() {
     setStatus("lade…");
     try {
       const [usersR, stateR, encR, afkR, chR] = await Promise.all([
-        fetch("/api/teamspeak/users").then(r => r.json()),
-        fetch("/api/teamspeak/state").then(r => r.json()),
-        fetch("/api/teamspeak/encounters").then(r => r.json()),
-        fetch("/api/teamspeak/afk-channels").then(r => r.json()),
-        fetch("/api/teamspeak/channels").then(r => r.json()).catch(() => ({})),
+        safeFetch("/api/teamspeak/users",         { users: [] }),
+        safeFetch("/api/teamspeak/state",         { members: [], connected: false }),
+        safeFetch("/api/teamspeak/encounters",    { encounters: [] }),
+        safeFetch("/api/teamspeak/afk-channels",  { afkChannels: [] }),
+        safeFetch("/api/teamspeak/channels",      { channels: [] }),
       ]);
       users = usersR.users || [];
       currentState = stateR;
@@ -452,7 +463,6 @@
   }
 
   document.getElementById("refreshBtn").addEventListener("click", fetchAll);
-  document.getElementById("discoverBtn").addEventListener("click", fetchAll);
 
   // ── Helpers ───────────────────────────────────────────────────────
   function escapeHtml(s) {

@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS teamspeak_encounters (
     mate_uid     TEXT NOT NULL,
     server_uid   TEXT NOT NULL,
     count        INTEGER NOT NULL DEFAULT 0,
+    talk_seconds INTEGER NOT NULL DEFAULT 0,
     last_seen    TEXT,
     PRIMARY KEY (streamer_uid, mate_uid, server_uid)
 );
@@ -89,6 +90,11 @@ def init_schema(conn):
             conn.execute(f"ALTER TABLE teamspeak_users ADD COLUMN {col} {ddl}")
         except Exception:
             pass
+    try:
+        conn.execute("ALTER TABLE teamspeak_encounters "
+                     "ADD COLUMN talk_seconds INTEGER NOT NULL DEFAULT 0")
+    except Exception:
+        pass
     conn.commit()
 
 
@@ -172,18 +178,39 @@ def bump_encounter(conn, streamer_uid, mate_uid, server_uid):
 
 
 def get_encounters(conn, streamer_uid):
-    """Liefert {mate_uid: total_count, last_seen} aufsummiert ueber alle
-    Server, sortiert nach count desc."""
+    """Liefert {mate_uid, total, talk_seconds, last_seen} aufsummiert
+    ueber alle Server, sortiert nach talk_seconds desc dann count desc."""
     rows = conn.execute("""
         SELECT mate_uid,
                SUM(count) AS total,
+               SUM(talk_seconds) AS talk_seconds,
                MAX(last_seen) AS last_seen
         FROM teamspeak_encounters
         WHERE streamer_uid = ?
         GROUP BY mate_uid
-        ORDER BY total DESC
+        ORDER BY talk_seconds DESC, total DESC
     """, (streamer_uid,)).fetchall()
     return [dict(r) for r in rows]
+
+
+def bump_talk_seconds(conn, streamer_uid, mate_uid, server_uid, seconds):
+    """Erhoeht talk_seconds fuer ein Encounter-Tupel. Wenn das Tupel
+    noch nicht existiert wird ein Eintrag angelegt (count=0 + die
+    seconds)."""
+    if not streamer_uid or not mate_uid or not server_uid: return
+    if streamer_uid == mate_uid: return
+    if seconds <= 0: return
+    import datetime
+    now = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    conn.execute("""
+        INSERT INTO teamspeak_encounters
+            (streamer_uid, mate_uid, server_uid, count, talk_seconds, last_seen)
+        VALUES (?, ?, ?, 0, ?, ?)
+        ON CONFLICT(streamer_uid, mate_uid, server_uid) DO UPDATE SET
+            talk_seconds = teamspeak_encounters.talk_seconds + ?,
+            last_seen = excluded.last_seen
+    """, (streamer_uid, mate_uid, server_uid, seconds, now, seconds))
+    conn.commit()
 
 
 # ── AFK-Channels ──────────────────────────────────────────────────────

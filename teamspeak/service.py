@@ -44,9 +44,61 @@ class TeamSpeakService:
 
     def start(self):
         self.client.start()
+        # Talk-Tick: alle 1s pro talking Mate im aktuellen Channel (nicht
+        # AFK) eine Sekunde talk_seconds buchen.
+        import threading
+        self._talk_tick_thread = threading.Thread(
+            target=self._talk_tick_loop, name="ts-talk-tick", daemon=True)
+        self._talk_tick_thread.start()
 
     def stop(self):
         self.client.stop()
+
+    def _talk_tick_loop(self):
+        import time
+        while True:
+            try:
+                self._tick_once()
+            except Exception:
+                pass
+            time.sleep(1)
+
+    def _tick_once(self):
+        if not self.db: return
+        s = self.state
+        if not s.connected: return
+        if not s.streamer_uid or not s.channel_id or not s.server_uid: return
+        # AFK-Channel ueberspringen
+        try:
+            from teamspeak.db import is_afk_channel, bump_talk_seconds
+            if is_afk_channel(self.db, s.server_uid, s.channel_id):
+                return
+        except Exception:
+            return
+        import time
+        now = time.time()
+        # snapshot der talking mates im current channel
+        with s._lock:
+            mates = []
+            for clid, c in s.clients.items():
+                if clid == s.streamer_clid: continue
+                if c.get("channelId") != s.channel_id: continue
+                uid = c.get("uid")
+                if not uid: continue
+                # talking-state per state.is_talking_now
+                if s._is_talking_now(clid, now):
+                    # Aber nicht wenn muted (consistent mit snapshot)
+                    muted = (c.get("input_muted") == "1"
+                              or c.get("output_muted") == "1"
+                              or c.get("input_hardware") == "0")
+                    if not muted:
+                        mates.append(uid)
+        for uid in mates:
+            try:
+                bump_talk_seconds(self.db, s.streamer_uid, uid,
+                                   s.server_uid, 1)
+            except Exception:
+                continue
 
     # ── Hooks ──────────────────────────────────────────────────────────
     def _on_status(self, connected, msg):
