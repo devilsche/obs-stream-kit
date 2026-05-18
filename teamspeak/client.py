@@ -85,7 +85,7 @@ class ClientQuery:
     # ── Run-Loop ──────────────────────────────────────────────────────
     def _run_loop(self):
         try:
-            from ts3.query import TS3ClientConnection
+            from ts3.query import TS3Connection
             from ts3.query import TS3TimeoutError, TS3QueryError
         except ImportError as e:
             self.on_status(False,
@@ -97,8 +97,9 @@ class ClientQuery:
         backoff = self.reconnect_secs
         while self._running:
             try:
-                conn = TS3ClientConnection(
-                    f"telnet://{self.host}:{self.port}")
+                # ClientQuery laeuft ueber dieselbe Telnet-Protokollklasse
+                # wie ServerQuery — nur anderer Port (25639 statt 10011).
+                conn = TS3Connection(self.host, self.port)
                 self._conn = conn
                 self._handshake(conn)
                 self._connected = True
