@@ -224,6 +224,15 @@ try:
             root_dir=ROOT,
             steam_api_key=steam_key_for_ts)
         ts_service.start()
+        # Avatar-Refresh-Thread: alle 15min ueberfaellige Cache-Files
+        # neu von Steam ziehen.
+        if steam_key_for_ts:
+            try:
+                from teamspeak.avatars import start_refresh_thread as _ts_avatar_refresh
+                _ts_avatar_refresh(ROOT, ts_db, steam_key_for_ts,
+                                     interval_secs=900)
+            except Exception as e:
+                print(f"  TS-Avatar-Refresh init: {e}")
         ts_registry = TeamSpeakRegistry(
             ts_service, db_conn=ts_db, root_dir=ROOT,
             steam_api_key=steam_key_for_ts)
@@ -413,7 +422,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     self.send_response(200)
                     self.send_header("Content-Type", "image/webp")
                     self.send_header("Content-Length", str(len(data)))
-                    self.send_header("Cache-Control", "public, max-age=3600")
+                    # 15min Cache — gleich-takt wie Server-Refresh-Thread
+                    self.send_header("Cache-Control", "public, max-age=900")
                     self.end_headers()
                     self.wfile.write(data)
                 else:

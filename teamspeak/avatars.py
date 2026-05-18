@@ -75,8 +75,10 @@ def fetch_and_cache(root, steam_id, api_key, force=False):
     return True
 
 
-def fetch_all_pending(root, db_conn, api_key):
-    """Iteriert alle User mit gesetzter steam_id, holt fehlende Avatare.
+def fetch_all_pending(root, db_conn, api_key, max_age_secs=None):
+    """Iteriert alle User mit gesetzter steam_id, holt fehlende oder
+    veraltete Avatare. max_age_secs: wenn gesetzt, werden Cache-Files
+    aelter als das Alter neu geholt (Default None = nur fehlende).
     Returns (anzahl_neu, anzahl_fehlgeschlagen)."""
     rows = db_conn.execute(
         "SELECT ts_uid, steam_id FROM teamspeak_users "
@@ -84,12 +86,39 @@ def fetch_all_pending(root, db_conn, api_key):
     ).fetchall()
     new = 0
     err = 0
+    import time
+    now = time.time()
     for r in rows:
         sid = r["steam_id"]
-        if os.path.exists(_cache_path(root, sid)):
-            continue
-        if fetch_and_cache(root, sid, api_key):
+        path = _cache_path(root, sid)
+        if os.path.exists(path):
+            if max_age_secs is None:
+                continue
+            mtime = os.path.getmtime(path)
+            if (now - mtime) < max_age_secs:
+                continue
+        if fetch_and_cache(root, sid, api_key, force=True):
             new += 1
         else:
             err += 1
     return (new, err)
+
+
+def start_refresh_thread(root, db_conn, api_key, interval_secs=900):
+    """Background-Thread der alle interval_secs Sekunden veraltete
+    Avatar-Cache-Files neu zieht. Default 15 Minuten."""
+    import threading
+    import time
+
+    def _loop():
+        while True:
+            try:
+                fetch_all_pending(root, db_conn, api_key,
+                                    max_age_secs=interval_secs)
+            except Exception:
+                pass
+            time.sleep(interval_secs)
+
+    t = threading.Thread(target=_loop, name="ts-avatar-refresh", daemon=True)
+    t.start()
+    return t
