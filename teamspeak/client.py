@@ -192,13 +192,6 @@ class ClientQuery:
                 resp = self._conn.send(name, params if params else None)
             except Exception as e:
                 raise ClientQueryError(str(e))
-        # Resp ist TS3QueryResponse. Body so formatieren wie das
-        # raw TS3-Protokoll (eine Zeile, Items mit '|' getrennt) — dann
-        # funktionieren parse_params / parse_list in service.py
-        # unveraendert.
-        items = []
-        for item in (resp.parsed or []):
-            items.append(" ".join(f"{k}={v}" for k, v in item.items()))
-        if not items:
-            return []
-        return ["|".join(items)]
+        # Liefere parsed dicts direkt — nicht durch raw-Format jagen
+        # weil sonst Nicknames mit '|' (TS3 \p) verstuemmelt werden.
+        return list(resp.parsed or [])

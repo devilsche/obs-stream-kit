@@ -18,7 +18,7 @@ in client.py uebernimmt das.
 """
 
 import logging
-from teamspeak.client import ClientQuery, ClientQueryError, parse_list, parse_params
+from teamspeak.client import ClientQuery, ClientQueryError
 from teamspeak.state import TsState
 
 LOG = logging.getLogger("teamspeak.service")
@@ -83,14 +83,15 @@ class TeamSpeakService:
 
     # ── Initial Sync ───────────────────────────────────────────────────
     def _initial_sync(self):
-        # whoami → client_id + client_channel_id + virtualserver_unique_identifier.
-        # ACHTUNG: whoami nutzt Underscore-Variante 'client_id'/'client_channel_id',
-        # 'clientlist' dagegen 'clid'/'cid'. Beide unterstuetzen.
+        # send_command liefert jetzt parsed dicts direkt (statt joined-raw-
+        # Lines durchs eigene parse_params). 'whoami' nutzt 'client_id'/
+        # 'client_channel_id', 'clientlist' nutzt 'clid'/'cid' — beide
+        # unterstuetzen.
         rows = self.client.send_command("whoami")
         if not rows:
             LOG.warning("whoami: empty reply")
             return
-        w = parse_params(rows[0])
+        w = rows[0]
         my_clid = w.get("client_id") or w.get("clid")
         my_cid  = w.get("client_channel_id") or w.get("cid")
         server_uid = w.get("virtualserver_unique_identifier")
@@ -102,35 +103,31 @@ class TeamSpeakService:
                 cv = self.client.send_command(
                     f"clientvariable clid={my_clid} client_unique_identifier")
                 if cv:
-                    uid = parse_params(cv[0]).get("client_unique_identifier")
+                    uid = cv[0].get("client_unique_identifier")
                     self.state.set_streamer(my_clid, uid)
             except ClientQueryError:
                 pass
         self._refresh_channel_name(my_cid)
-        # clientlist mit Channel-Info
         try:
-            rows = self.client.send_command("clientlist")
-            if rows:
-                items = parse_list(rows[0])
-                for it in items:
-                    clid = it.get("clid")
-                    if not clid: continue
-                    self.state.upsert_client(
-                        clid,
-                        nick=it.get("client_nickname"),
-                        channelId=it.get("cid"))
-                # UIDs der Channel-Member nachladen
-                for it in items:
-                    if it.get("cid") != my_cid: continue
-                    clid = it.get("clid")
-                    try:
-                        cv = self.client.send_command(
-                            f"clientvariable clid={clid} client_unique_identifier")
-                        if cv:
-                            uid = parse_params(cv[0]).get("client_unique_identifier")
-                            self.state.upsert_client(clid, uid=uid)
-                    except ClientQueryError:
-                        pass
+            items = self.client.send_command("clientlist") or []
+            for it in items:
+                clid = it.get("clid")
+                if not clid: continue
+                self.state.upsert_client(
+                    clid,
+                    nick=it.get("client_nickname"),
+                    channelId=it.get("cid"))
+            for it in items:
+                if it.get("cid") != my_cid: continue
+                clid = it.get("clid")
+                try:
+                    cv = self.client.send_command(
+                        f"clientvariable clid={clid} client_unique_identifier")
+                    if cv:
+                        uid = cv[0].get("client_unique_identifier")
+                        self.state.upsert_client(clid, uid=uid)
+                except ClientQueryError:
+                    pass
         except ClientQueryError as e:
             LOG.warning("clientlist failed: %s", e)
 
@@ -140,7 +137,7 @@ class TeamSpeakService:
             rows = self.client.send_command(
                 f"channelvariable cid={cid} channel_name")
             if rows:
-                name = parse_params(rows[0]).get("channel_name")
+                name = rows[0].get("channel_name")
                 self.state.set_channel(cid, name)
         except ClientQueryError as e:
             LOG.info("channelvariable cid=%s: %s", cid, e)
