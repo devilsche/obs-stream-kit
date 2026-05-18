@@ -68,6 +68,7 @@ class TeamSpeakRegistry:
         if self.db:
             from teamspeak.db import get_user
             from teamspeak.avatars import url_for as avatar_url
+            from teamspeak.avatars import frame_url_for as frame_url
             for m in snap["members"]:
                 u = get_user(self.db, m.get("tsUid")) if m.get("tsUid") else None
                 if u:
@@ -89,6 +90,8 @@ class TeamSpeakRegistry:
                         m["showInWidget"] = False
                     if self.root_dir and u.get("steam_id"):
                         m["avatarUrl"] = avatar_url(
+                            self.root_dir, u["steam_id"])
+                        m["avatarFrameUrl"] = frame_url(
                             self.root_dir, u["steam_id"])
                 else:
                     m["displayName"]  = m.get("tsName")

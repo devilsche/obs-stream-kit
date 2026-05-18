@@ -15,15 +15,12 @@ import urllib.request
 CACHE_DIR_REL = ("data", "steam-avatars")
 
 
-def _cache_path(root, steam_id):
+def _cache_path(root, steam_id, suffix=""):
     safe = "".join(c for c in steam_id if c.isalnum())
-    return os.path.join(root, *CACHE_DIR_REL, f"{safe}.webp")
+    return os.path.join(root, *CACHE_DIR_REL, f"{safe}{suffix}.webp")
 
 
 def url_for(root, steam_id):
-    """Fuer Frontend: liefert die URL unter der das Cache-Bild
-    bereitgestellt wird. Falls Datei nicht da → None (Caller fallbackt
-    auf default-Avatar)."""
     if not steam_id:
         return None
     path = _cache_path(root, steam_id)
@@ -32,47 +29,84 @@ def url_for(root, steam_id):
     return None
 
 
-def fetch_and_cache(root, steam_id, api_key, force=False):
-    """Holt das Profil-Image via Steam-API + speichert als webp.
-    Returns True bei Erfolg."""
-    if not steam_id or not api_key:
-        return False
-    out = _cache_path(root, steam_id)
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    if os.path.exists(out) and not force:
-        return True
-    api = (f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/"
-           f"?key={api_key}&steamids={steam_id}")
+def frame_url_for(root, steam_id):
+    """Liefert URL zum Frame-Cache wenn vorhanden, sonst None."""
+    if not steam_id:
+        return None
+    path = _cache_path(root, steam_id, suffix="_frame")
+    if os.path.exists(path):
+        return f"/steam-avatars/{steam_id}_frame.webp"
+    return None
+
+
+def _http_get_json(url):
+    import json
     try:
-        req = urllib.request.Request(api, headers={"User-Agent": "obs-stream-kit/1.0"})
+        req = urllib.request.Request(
+            url, headers={"User-Agent": "obs-stream-kit/1.0"})
         with urllib.request.urlopen(req, timeout=10) as r:
-            import json
-            data = json.loads(r.read().decode("utf-8"))
+            return json.loads(r.read().decode("utf-8"))
     except Exception:
-        return False
-    players = (data.get("response") or {}).get("players") or []
-    if not players:
-        return False
-    # avatarfull = 184x184, avatar = 32x32, avatarmedium = 64x64
-    img_url = players[0].get("avatarfull") or players[0].get("avatarmedium")
-    if not img_url:
-        return False
+        return None
+
+
+def _download_to_webp(url, out_path):
     try:
-        with urllib.request.urlopen(img_url, timeout=10) as r:
-            img_bytes = r.read()
+        with urllib.request.urlopen(url, timeout=10) as r:
+            data = r.read()
     except Exception:
         return False
-    # Konvertiere zu webp via PIL (falls verfuegbar) — sonst raw speichern
     try:
         from PIL import Image
-        im = Image.open(io.BytesIO(img_bytes))
+        im = Image.open(io.BytesIO(data))
         if im.mode != "RGBA":
             im = im.convert("RGBA")
-        im.save(out, "WEBP", quality=85, method=6)
+        im.save(out_path, "WEBP", quality=85, method=6)
     except Exception:
-        with open(out, "wb") as f:
-            f.write(img_bytes)
+        with open(out_path, "wb") as f:
+            f.write(data)
     return True
+
+
+def fetch_and_cache(root, steam_id, api_key, force=False):
+    """Holt Profil-Avatar + ggf. Steam-Avatar-Frame via Steam-API.
+    Returns True wenn mindestens der Avatar gespeichert wurde."""
+    if not steam_id or not api_key:
+        return False
+    avatar_out = _cache_path(root, steam_id)
+    frame_out  = _cache_path(root, steam_id, suffix="_frame")
+    os.makedirs(os.path.dirname(avatar_out), exist_ok=True)
+    need_avatar = force or not os.path.exists(avatar_out)
+    need_frame  = force or not os.path.exists(frame_out)
+    avatar_ok = os.path.exists(avatar_out)
+    # ── Avatar ───────────────────────────────────────────────────────
+    if need_avatar:
+        data = _http_get_json(
+            f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/"
+            f"?key={api_key}&steamids={steam_id}")
+        if data:
+            players = (data.get("response") or {}).get("players") or []
+            if players:
+                img_url = (players[0].get("avatarfull")
+                            or players[0].get("avatarmedium"))
+                if img_url and _download_to_webp(img_url, avatar_out):
+                    avatar_ok = True
+    # ── Frame (Premium-Feature; viele Accounts haben keinen) ─────────
+    if need_frame:
+        data = _http_get_json(
+            f"https://api.steampowered.com/IPlayerService/GetAvatarFrame/v1/"
+            f"?key={api_key}&steamid={steam_id}")
+        if data:
+            frame_info = (data.get("response") or {}).get("avatar_frame") or {}
+            img_url = (frame_info.get("image_large")
+                       or frame_info.get("image_small"))
+            if img_url:
+                _download_to_webp(img_url, frame_out)
+            else:
+                # Kein Frame gesetzt → ggf. alte Datei loeschen
+                try: os.remove(frame_out)
+                except (FileNotFoundError, OSError): pass
+    return avatar_ok
 
 
 def fetch_all_pending(root, db_conn, api_key, max_age_secs=None):
