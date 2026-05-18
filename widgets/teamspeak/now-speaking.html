@@ -14,6 +14,8 @@
     transparent   '1' = kein Card-BG/Border/Schatten + keine Row-BGs
                   (nur Avatar + Name + Ring beim Sprechen) — fuer OBS
                   Browser-Source ueber Gameplay-Overlay.
+    hideOffline   '1' (Default) = bei TS-Disconnect Card komplett
+                  verstecken. '0' = zarte "no connection"-Anzeige zeigen.
 -->
 <html>
 <head>
@@ -191,6 +193,7 @@
     if (qs.get("transparent") === "1") {
       document.body.classList.add("transparent");
     }
+    const HIDE_OFFLINE = qs.get("hideOffline") !== "0";  // Default an
 
     const elList   = document.getElementById("list");
     const elCh     = document.getElementById("chName");
@@ -225,6 +228,15 @@
     }
 
     function render(data) {
+      const card = document.getElementById("card");
+      const isConn = !!data.connected;
+      // Bei Disconnect verstecken (Default) — Widget unsichtbar in OBS.
+      if (HIDE_OFFLINE && !isConn) {
+        card.style.display = "none";
+        lastConnected = isConn;
+        return;
+      }
+      card.style.display = "";
       const today = initialDay();
       if (today !== lastDayStart) {
         // Tag-Wechsel — kurz "wir versuchen wieder Verbindung"
@@ -233,7 +245,6 @@
       }
 
       const wasConnected = lastConnected;
-      const isConn = !!data.connected;
       if (wasConnected === false && isConn) {
         // Reconnect-Event
         setBanner("TS3 wieder verbunden");
