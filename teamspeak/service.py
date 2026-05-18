@@ -274,9 +274,7 @@ class TeamSpeakService:
 
     def _dbg(self, *parts):
         msg = "[teamspeak] " + " ".join(str(p) for p in parts)
-        import sys
         print(msg, flush=True)
-        print(msg, file=sys.stderr, flush=True)
 
     # ── Initial Sync ───────────────────────────────────────────────────
     def _initial_sync(self):
