@@ -518,40 +518,45 @@
   }
 
   fetchAll();
-  // Live-Refresh nur des Online-Status + Mute-Buttons (KEIN Full-Render
-  // — sonst flackern die Avatar-Bilder bei jedem Tick).
-  function refreshOnlineState() {
-    fetch("/api/teamspeak/state").then(r => r.json()).then(s => {
-      currentState = s;
-      online = {};
-      for (const m of (s.members || [])) {
-        if (m.tsUid) online[m.tsUid] = m;
-      }
-      // Pro Zeile Klasse + Aktionen patchen, Avatar/Inputs unangetastet
-      document.querySelectorAll("#userBody tr").forEach(tr => {
-        const uid = tr.dataset.uid;
-        const onlineMem = online[uid];
-        const u = users.find(x => x.ts_uid === uid) || {};
-        tr.classList.toggle("online", !!onlineMem);
-        tr.classList.toggle("offline", !onlineMem);
-        tr.classList.toggle("blocked", !!u.is_blocked);
-        const actionsCell = tr.querySelector("td.actions");
-        if (actionsCell) {
-          // Stabiler Vergleichs-Key statt innerHTML (das normalisiert
-          // browser-seitig und matcht nie 1:1).
-          const stateKey = onlineMem ? `clid:${onlineMem.clid}` : "off";
-          if (actionsCell.dataset.stateKey !== stateKey) {
-            actionsCell.dataset.stateKey = stateKey;
-            actionsCell.innerHTML = onlineMem
-              ? `<button class="subtle" data-clid="${onlineMem.clid}" data-act="mute" title="Mute">🔇</button>
-                 <button class="subtle" data-clid="${onlineMem.clid}" data-act="unmute" title="Unmute">🔊</button>`
-              : "";
-          }
+  // Online-State per SSE (statt 3s-Polling)
+  function applyState(s) {
+    currentState = s;
+    online = {};
+    for (const m of (s.members || [])) {
+      if (m.tsUid) online[m.tsUid] = m;
+    }
+    document.querySelectorAll("#userBody tr").forEach(tr => {
+      const uid = tr.dataset.uid;
+      const onlineMem = online[uid];
+      const u = users.find(x => x.ts_uid === uid) || {};
+      tr.classList.toggle("online", !!onlineMem);
+      tr.classList.toggle("offline", !onlineMem);
+      tr.classList.toggle("blocked", !!u.is_blocked);
+      const actionsCell = tr.querySelector("td.actions");
+      if (actionsCell) {
+        const stateKey = onlineMem ? `clid:${onlineMem.clid}` : "off";
+        if (actionsCell.dataset.stateKey !== stateKey) {
+          actionsCell.dataset.stateKey = stateKey;
+          actionsCell.innerHTML = onlineMem
+            ? `<button class="subtle" data-clid="${onlineMem.clid}" data-act="mute" title="Mute">🔇</button>
+               <button class="subtle" data-clid="${onlineMem.clid}" data-act="unmute" title="Unmute">🔊</button>`
+            : "";
         }
-      });
-    }).catch(() => {});
+      }
+    });
   }
-  setInterval(refreshOnlineState, 3000);
+  let _esTool = null;
+  try {
+    _esTool = new EventSource("/api/teamspeak/stream");
+    _esTool.onmessage = (ev) => {
+      try { applyState(JSON.parse(ev.data)); } catch (e) {}
+    };
+  } catch (e) {
+    // Fallback: alte 3s-Polling
+    setInterval(() => {
+      fetch("/api/teamspeak/state").then(r => r.json()).then(applyState).catch(() => {});
+    }, 3000);
+  }
 </script>
 </body>
 </html>

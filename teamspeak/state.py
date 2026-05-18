@@ -34,7 +34,7 @@ class TsState:
         self.last_channel_change_at = None
 
     # ── Public read-API ───────────────────────────────────────────────
-    def snapshot(self):
+    def snapshot(self, debug=False):
         with self._lock:
             now = time.time()
             members = []
@@ -49,6 +49,13 @@ class TsState:
                     "serverUid":    None,
                     "members":      [],
                 }
+            if debug:
+                payload = {
+                    "channel_id": self.channel_id,
+                    "streamer_clid": self.streamer_clid,
+                    "all_clients": {k: dict(v) for k, v in self.clients.items()},
+                }
+                return payload
             for clid, c in self.clients.items():
                 if c.get("channelId") != self.channel_id:
                     continue

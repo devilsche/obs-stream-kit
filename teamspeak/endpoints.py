@@ -53,6 +53,9 @@ class TeamSpeakRegistry:
             return self._mute(body)
         if route == ("GET", "/api/teamspeak/channels"):
             return self._channels()
+        if route == ("GET", "/api/teamspeak/debug-state"):
+            if not self.service: return _ok({"error": "no service"})
+            return _ok(self.service.state.snapshot(debug=True))
         # /stream wird in serve.py spezial-gehandled (Streaming-Response)
         return None
 
