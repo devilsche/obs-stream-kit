@@ -140,31 +140,47 @@ class ClientQuery:
             conn.send("whoami")
         except Exception as e:
             raise ClientQueryError(f"whoami nach handshake fehlgeschlagen: {e}")
-        # Notify-Subscriptions
-        for ev in ("notifytalkstatuschange",
-                    "notifyclientmoved",
-                    "notifycliententerview",
-                    "notifyclientleftview",
-                    "notifyclientupdated"):
+        self._subscribe_events(conn)
+
+    _SUBSCRIBE_EVENTS = (
+        "notifytalkstatuschange",
+        "notifyclientmoved",
+        "notifycliententerview",
+        "notifyclientleftview",
+        "notifyclientupdated",
+    )
+
+    def _subscribe_events(self, conn):
+        """Notify-Subscriptions setzen/erneuern. TS3 droppt die manchmal
+        stillschweigend — periodisch erneuern als Sicherheitsnetz."""
+        for ev in self._SUBSCRIBE_EVENTS:
             try:
                 conn.send(
                     "clientnotifyregister",
                     {"schandlerid": "0", "event": ev})
+                print(f"[teamspeak] subscribed {ev}", flush=True)
             except Exception as e:
                 LOG.warning("subscribe %s failed: %s", ev, e)
 
     def _event_loop(self, conn):
         # wait_for_event blockiert, gibt Event oder TS3TimeoutError.
-        # Wir nutzen ein 30s-Timeout als Keep-Alive-Tick.
+        # Wir nutzen ein 10s-Timeout: alle 30s re-subscriben damit
+        # TS3-seitige Subscription-Drops nicht zum Stille fuehren.
+        import time
+        last_resub = time.time()
         while self._running:
             try:
-                ev = conn.wait_for_event(timeout=30)
+                ev = conn.wait_for_event(timeout=10)
             except self._TS3TimeoutError:
                 # Keep-Alive: leerer send als TCP-keepalive Ersatz
                 try:
                     conn.send_keepalive()
                 except Exception as e:
                     raise ClientQueryError(f"keepalive failed: {e}")
+                # Re-Subscribe alle 30s
+                if time.time() - last_resub >= 30:
+                    self._subscribe_events(conn)
+                    last_resub = time.time()
                 continue
             if ev is None:
                 continue
@@ -174,7 +190,11 @@ class ClientQuery:
             if not ev_name.startswith("notify"):
                 ev_name = "notify" + ev_name
             params = dict(ev.parsed[0]) if ev.parsed else {}
-            LOG.debug("notify %s: %s", ev_name, params)
+            # Roh-Log JEDES eingehenden Notify-Events — sehen wir ob TS3
+            # die Events ueberhaupt sendet oder nur nicht greifen.
+            print(f"[teamspeak] NOTIFY {ev_name}: "
+                  f"{ {k: params.get(k) for k in ('clid', 'ctid', 'status', 'client_nickname')} }",
+                  flush=True)
             self.on_notify(ev_name, params)
 
     # ── Synchronous send for service.py (initial-sync etc.) ────────────
