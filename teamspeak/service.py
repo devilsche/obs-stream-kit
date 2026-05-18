@@ -43,6 +43,8 @@ class TeamSpeakService:
         # Channels NICHT mehr zaehlen, sondern die des neuen.
         self._last_streamer_channel = None
         self._counted_in_current_channel = set()
+        # cid → channel_name, gefuellt aus channellist-Calls
+        self._channel_names = {}
 
     def start(self):
         self.client.start()
@@ -478,8 +480,18 @@ class TeamSpeakService:
     def _refresh_channel_name(self, cid):
         """Channel-Name aus channellist holen. channelinfo gibt's in
         ClientQuery NICHT (error 256). channellist scannen ist der
-        einzig zuverlaessige Weg."""
+        einzig zuverlaessige Weg.
+
+        Erst Service-internen Namen-Cache pruefen — der wird bei jedem
+        channellist-Call gefuellt und ist instant verfuegbar. Fallback:
+        frischer channellist-Call."""
         if not cid: return
+        nm = self._channel_names.get(cid)
+        if nm:
+            self._dbg(f"channel-name cache HIT cid={cid} → '{nm}'")
+            self.state.set_channel(cid, nm)
+            self._publish()
+            return
         try:
             rows = self.client.send_command("channellist") or []
         except Exception as e:
@@ -487,12 +499,18 @@ class TeamSpeakService:
             self._publish()  # Channel-ID-Update wenigstens raus
             return
         self._dbg(f"channellist: {len(rows)} channels, suche cid={cid}")
+        # Cache komplett befuellen — naechstes Lookup ist instant
+        found_nm = None
         for r in rows:
-            if r.get("cid") == cid:
-                nm = r.get("channel_name")
-                self._dbg(f"  → gefunden: '{nm}'")
-                self.state.set_channel(cid, nm)
-                self._publish()
-                return
-        self._dbg(f"  → cid={cid} NICHT in channellist gefunden")
+            rcid = r.get("cid")
+            rnm = r.get("channel_name")
+            if rcid and rnm:
+                self._channel_names[rcid] = rnm
+                if rcid == cid:
+                    found_nm = rnm
+        if found_nm:
+            self._dbg(f"  → gefunden: '{found_nm}'")
+            self.state.set_channel(cid, found_nm)
+        else:
+            self._dbg(f"  → cid={cid} NICHT in channellist gefunden")
         self._publish()
