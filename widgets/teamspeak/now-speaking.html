@@ -328,7 +328,9 @@
       const seen = new Set();
       let prev = null;
       for (const m of members) {
-        const uid = m.tsUid || m.clid || "";
+        // clid (TS3 client-id, immer gesetzt) ist stabiler Key.
+        // tsUid kann initial leer sein bis clientlist -uid Antwort da ist.
+        const uid = m.clid || m.tsUid || "";
         seen.add(uid);
         const name = m.displayName || m.tsName || "?";
         const iconSrc = m.isTalking
