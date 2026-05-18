@@ -417,7 +417,10 @@
     }
     const filter = (document.getElementById("chFilter").value || "").toLowerCase().trim();
     const filtered = filter
-      ? serverChannels.filter(c => (c.name||"").toLowerCase().includes(filter))
+      ? serverChannels.filter(c => {
+          const txt = ((c.path || c.name || "")).toLowerCase();
+          return txt.includes(filter);
+        })
       : serverChannels;
     if (!filtered.length) {
       host.innerHTML = `<div class="meta">— kein Channel matched "${escapeHtml(filter)}" —</div>`;
@@ -429,9 +432,10 @@
         ? `<button class="danger" data-srv="${escapeAttr(srvUid)}" data-cid="${c.cid}" data-act="off">AFK aus</button>`
         : `<button data-srv="${escapeAttr(srvUid)}" data-cid="${c.cid}" data-cname="${escapeAttr(c.name||"")}" data-act="on">→ AFK</button>`;
       const ind = isAfk ? "😴 " : "";
+      const label = c.path || c.name || "?";
       return `<div class="afk-row">
         <span class="server" style="min-width:60px">cid=${c.cid}</span>
-        <span class="chname">${ind}${escapeHtml(c.name||"?")}</span>
+        <span class="chname">${ind}${escapeHtml(label)}</span>
         ${btn}
       </div>`;
     }).join("");

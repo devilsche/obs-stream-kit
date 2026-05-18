@@ -226,26 +226,44 @@ class TeamSpeakRegistry:
             rows = self.service.client.send_command("channellist") or []
         except Exception as e:
             return _err(500, f"channellist failed: {e}")
+        import re
+        spacer_re = re.compile(r"\[[*clr]spacer\d*\]", re.IGNORECASE)
+        # Vollstaendige cid->name Map (auch Spacer) fuer Parent-Path
+        name_by_cid = {r.get("cid"): (r.get("channel_name") or "")
+                       for r in rows if r.get("cid")}
+        pid_by_cid  = {r.get("cid"): r.get("pid") for r in rows if r.get("cid")}
+
+        def _path(cid):
+            """Eltern-Pfad als 'Top / Sub / Channel' (ohne Spacer)."""
+            parts = []
+            seen = set()
+            cur = cid
+            while cur and cur not in seen:
+                seen.add(cur)
+                nm = name_by_cid.get(cur) or ""
+                if nm and not spacer_re.search(nm):
+                    parts.append(nm)
+                cur = pid_by_cid.get(cur)
+                if cur in (None, "0", ""):
+                    break
+            return " / ".join(reversed(parts))
+
         out = []
         for r in rows:
-            # Spacer-Channels (Trenner-Linien im TS3-Tree) sind keine
-            # echten Channels — Namen enthalten '[*spacer' / '[lspacer'
-            # etc. Wir filtern sie weg, der User kann da eh nicht rein.
             name = r.get("channel_name") or ""
-            if name.startswith("[") and ("spacer" in name or "*" in name):
+            if spacer_re.search(name):
                 continue
-            # Channels mit komplett leerem Namen ignorieren (Library
-            # parser-Issue bei manchen TS3-Builds).
             if not name.strip():
                 continue
             out.append({
                 "cid":         r.get("cid"),
                 "pid":         r.get("pid"),
                 "name":        name,
+                "path":        _path(r.get("cid")),
                 "order":       r.get("channel_order"),
                 "totalClients": r.get("total_clients"),
             })
-        out.sort(key=lambda c: (c.get("name") or "").lower())
+        out.sort(key=lambda c: (c.get("path") or "").lower())
         TeamSpeakRegistry._channels_cache = (time.time(), out)
         return _ok({"channels": out})
 
