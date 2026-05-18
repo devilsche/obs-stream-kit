@@ -75,16 +75,16 @@ class TeamSpeakService:
                            daemon=True).start()
 
     def _poll_talk_flags(self):
-        """Pollt clientlist -voice — Talk-Flags UND Client-State (cid,
-        nick, mute) gleichzeitig refreshen."""
+        """Pollt clientlist -voice — refreshed Client-State (cid, nick,
+        mute). Talking-State wird NICHT mehr aus client_flag_talking
+        uebernommen — das hat sich mit notifytalkstatuschange in die
+        Wolle gekriegt (Flip-Flop). Talking kommt nur noch via Notify."""
         if not self.state.connected: return
         try:
             items = self.client.send_command("clientlist -voice")
         except Exception as e:
             self._dbg(f"talk-poll FEHLER: {e}")
             return
-        # KRITISCH: bei leerer Antwort NICHTS loeschen — sonst wiped der
-        # Poll bei einem einzelnen UTF-8-Fehler den ganzen State.
         if not items:
             return
         changed = False
@@ -100,15 +100,6 @@ class TeamSpeakService:
                 input_muted=it.get("client_input_muted"),
                 output_muted=it.get("client_output_muted"),
                 input_hardware=it.get("client_input_hardware"))
-            now_talk = (it.get("client_flag_talking") == "1")
-            was_talk = bool(self.state._talking.get(clid))
-            if now_talk != was_talk:
-                self.state.set_talking(
-                    clid, now_talk,
-                    on_transition=self._on_talk_transition)
-                changed = True
-        # Stale-Removal nur wenn wir eine plausible Antwort haben
-        # (mindestens 1 Client — uns selbst sollten wir IMMER sehen).
         if seen_clids:
             with self.state._lock:
                 stale = [c for c in self.state.clients if c not in seen_clids]
