@@ -159,12 +159,19 @@ class TsState:
                 self._talking[clid] = True
                 if not was_talking:
                     self._talk_start_ts[clid] = now
+                # Tail nur setzen wenn aktuell wirklich talking — bei
+                # talking=True bleibt der Tail eh durch _talking[clid].
                 self._talking_until[clid] = (
                     now + self.talking_tail_ms / 1000.0)
             else:
                 self._talking.pop(clid, None)
-                self._talking_until[clid] = (
-                    now + self.talking_tail_ms / 1000.0)
+                # Tail NUR verlaengern wenn wir gerade aufhoeren — nicht
+                # bei jedem False-Poll. Sonst klebt isTalking dauerhaft
+                # weil der Tail bei jedem 500ms-Tick neu in die Zukunft
+                # geschoben wird.
+                if was_talking:
+                    self._talking_until[clid] = (
+                        now + self.talking_tail_ms / 1000.0)
         # Callback ausserhalb des Locks aufrufen (kein Deadlock-Risiko)
         if on_transition:
             if talking and not was_talking:
