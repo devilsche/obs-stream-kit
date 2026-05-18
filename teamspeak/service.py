@@ -49,29 +49,54 @@ class TeamSpeakService:
         # Talk-Tracking ist event-basiert (notifytalkstatuschange-Stop
         # buchstabiert die Sekunden in die DB). Kein zyklisches
         # Polling-Tick mehr noetig.
-        # Safety: alle 5s publishen + alle 15s full re-sync mit TS3.
-        # Hintergrund: ts3-Library verschluckt manchmal Notifies durch
-        # UTF-8-Strict-Decode-Errors. Periodisches Resync holt den
-        # echten Zustand und korrigiert silently verlorene Events.
+        # Talk-Poll: alle 1s clientlist -voice fragen + client_flag_talking
+        # auswerten. Notwendig fuer Radio-Bots etc. die KEIN
+        # notifytalkstatuschange feuern aber trotzdem Audio streamen.
+        # Plus alle 15s full re-sync gegen verschluckte Notifies.
         import threading
         def _safety_loop():
             import time as _t
             i = 0
             while True:
-                _t.sleep(5)
+                _t.sleep(1)
                 i += 1
-                try: self._publish()
+                try: self._poll_talk_flags()
                 except Exception: pass
-                if i % 3 == 0 and self.state.connected:
+                if i % 5 == 0:
+                    try: self._publish()
+                    except Exception: pass
+                if i % 15 == 0 and self.state.connected:
                     try:
-                        # Re-sync: whoami + clientlist neu, in Worker-
-                        # Thread damit unser sleep nicht haengt.
                         threading.Thread(
                             target=self._safe_resync,
                             name="ts-safety-resync", daemon=True).start()
                     except Exception: pass
         threading.Thread(target=_safety_loop, name="ts-safety-pub",
                            daemon=True).start()
+
+    def _poll_talk_flags(self):
+        """Pollt clientlist -voice und gleicht client_flag_talking mit
+        unserem _talking-State ab. Loest set_talking(True/False) bei
+        Wechseln aus. Damit funktioniert das Widget auch fuer Clients
+        die kein notifytalkstatuschange feuern (Radio-Bots etc.)."""
+        if not self.state.connected: return
+        try:
+            items = self.client.send_command("clientlist -voice") or []
+        except Exception:
+            return
+        changed = False
+        for it in items:
+            clid = it.get("clid")
+            if not clid: continue
+            now_talk = (it.get("client_flag_talking") == "1")
+            was_talk = bool(self.state._talking.get(clid))
+            if now_talk != was_talk:
+                self.state.set_talking(
+                    clid, now_talk,
+                    on_transition=self._on_talk_transition)
+                changed = True
+        if changed:
+            self._publish()
 
     def _safe_resync(self):
         """Zieht whoami + clientlist + channelName neu, ueberschreibt
