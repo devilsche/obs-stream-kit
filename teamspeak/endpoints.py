@@ -213,21 +213,45 @@ class TeamSpeakRegistry:
 
     # ── Channels (fuer AFK-Auswahl im Tool) ────────────────────────────
     _channels_cache = (0.0, [])  # (timestamp, channels)
+    _channels_refreshing = False  # Flag: laeuft gerade Background-Refresh?
 
     def _channels(self):
         if not self.service:
             return _ok({"channels": [], "error": "no service"})
-        import time
+        import time, threading
         cache_age = time.time() - TeamSpeakRegistry._channels_cache[0]
-        # Kurzer Cache (10s) damit der channellist-Call nicht jeden
-        # 3s-Tool-Refresh hits. Leere Antworten NIE cachen.
         cached = TeamSpeakRegistry._channels_cache[1]
-        if cache_age < 10.0 and cached:
+        # Cache 60s gueltig. Wenn aelter: Cache trotzdem sofort zurueck
+        # geben + Background-Refresh anwerfen. Tool wartet nie auf
+        # channellist (122 Channels + Lock-Kontention mit dem 500ms-Poll
+        # = viele Sekunden im worst case).
+        if cached and cache_age >= 60.0 and not TeamSpeakRegistry._channels_refreshing:
+            TeamSpeakRegistry._channels_refreshing = True
+            threading.Thread(
+                target=self._refresh_channels_cache,
+                name="ts-channels-refresh", daemon=True).start()
+        if cached:
             return _ok({"channels": cached})
+        # Erst-Aufruf ohne Cache → synchron einmal holen
+        try:
+            return _ok({"channels": self._fetch_channels()})
+        except Exception as e:
+            return _err(500, f"channellist failed: {e}")
+
+    def _refresh_channels_cache(self):
+        try:
+            self._fetch_channels()
+        except Exception:
+            pass
+        finally:
+            TeamSpeakRegistry._channels_refreshing = False
+
+    def _fetch_channels(self):
+        import time
         try:
             rows = self.service.client.send_command("channellist") or []
         except Exception as e:
-            return _err(500, f"channellist failed: {e}")
+            raise
         import re
         spacer_re = re.compile(r"\[[*clr]spacer\d*\]", re.IGNORECASE)
         # Vollstaendige cid->name Map (auch Spacer) fuer Parent-Path
@@ -270,7 +294,7 @@ class TeamSpeakRegistry:
         # auf einer leeren Liste haengen.
         if out:
             TeamSpeakRegistry._channels_cache = (time.time(), out)
-        return _ok({"channels": out})
+        return out
 
     # ── Mute via ClientQuery (lokaler TS3-Mute) ────────────────────────
     def _mute(self, body):
