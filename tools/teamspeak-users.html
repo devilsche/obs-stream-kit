@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<!--
+  TS3 User-Mapping & Channel-Tool
+  ──────────────────────────────────────────────────────────────────────
+  Verwaltet alles was das now-speaking-Widget braucht:
+  - TS-UID ↔ Steam-ID ↔ Custom-Name verknuepfen
+  - Anzeige-Quelle pro User (ts/steam/custom)
+  - Icon-Overrides (speaking/silent)
+  - show_in_widget Toggle
+  - is_friend / is_blocked / notes
+  - Mute/Unmute online Member (lokaler TS3-Mute)
+  - AFK-Channels pro Server markieren (werden vom Encounter-Counter
+    ignoriert)
+  - Encounter-Counter sortierbar
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>TS3 User-Mappings</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background: #0d061a;
+      color: #e8e0f0;
+      font-family: 'DM Sans', system-ui, sans-serif;
+      font-size: 14px;
+    }
+    h1 { margin: 12px 16px; font-size: 1.4em; color: #f2b705; }
+    h2 { margin: 18px 16px 6px; font-size: 1.05em; color: #b89af0;
+         border-bottom: 1px solid #2a1d3f; padding-bottom: 4px; }
+    .wrap { padding: 4px 16px 30px; }
+    .toolbar { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap;
+               align-items: center; }
+    button {
+      background: rgba(94,42,121,0.4);
+      color: #e8e0f0;
+      border: 1px solid #5e2a79;
+      border-radius: 4px;
+      padding: 5px 10px;
+      cursor: pointer;
+      font: inherit;
+    }
+    button:hover { background: rgba(94,42,121,0.7); }
+    button.danger { background: rgba(180,40,40,0.3); border-color: #a02828; }
+    button.danger:hover { background: rgba(180,40,40,0.55); }
+    button.subtle { background: transparent; border-color: #444; color: #aaa; }
+    button.subtle:hover { color: #e8e0f0; border-color: #777; }
+    input, select, textarea {
+      background: #1a0d2a;
+      color: #e8e0f0;
+      border: 1px solid #3a1d4f;
+      border-radius: 3px;
+      padding: 3px 6px;
+      font: inherit;
+    }
+    input:focus, select:focus, textarea:focus { outline: 1px solid #f2b705; }
+    input[type=checkbox] { transform: scale(1.1); }
+    .status {
+      color: #8a7d99; font-size: 0.85em; margin-left: 8px;
+    }
+    .status.ok::before { content: "✓ "; color: #48c878; }
+    .status.err::before { content: "✖ "; color: #e57b7b; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+    th {
+      text-align: left; padding: 5px 6px; font-size: 0.78em;
+      color: #b89af0; letter-spacing: 0.04em;
+      text-transform: uppercase; border-bottom: 1px solid #2a1d3f;
+      cursor: pointer; user-select: none;
+      position: sticky; top: 0; background: #0d061a;
+    }
+    th.active { color: #f2b705; }
+    td {
+      padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.04);
+      vertical-align: middle;
+    }
+    tr.online td:first-child::before {
+      content: "● ";
+      color: #48c878;
+    }
+    tr.offline td:first-child::before {
+      content: "○ ";
+      color: #444;
+    }
+    tr.blocked { opacity: 0.5; }
+    .avatar-cell img {
+      width: 28px; height: 28px; border-radius: 50%;
+      object-fit: cover; vertical-align: middle;
+    }
+    .avatar-cell .ph {
+      display: inline-block; width: 28px; height: 28px; border-radius: 50%;
+      background: #2a1d3f; vertical-align: middle;
+      line-height: 28px; text-align: center; font-size: 0.75em;
+      color: #b89af0;
+    }
+    td.tsname { font-weight: 700; min-width: 130px; }
+    input.col-steam, input.col-custom, input.col-notes { width: 100%; min-width: 100px; }
+    select.col-src { width: 80px; }
+    .col-icons input { width: 100px; }
+    td.actions { text-align: right; white-space: nowrap; }
+
+    .afk-list { margin: 4px 16px; }
+    .afk-row { display: flex; gap: 10px; padding: 4px 0;
+               border-bottom: 1px solid rgba(255,255,255,0.04);
+               align-items: center; }
+    .afk-row .server { color: #b89af0; font-family: monospace;
+                       font-size: 0.85em; }
+    .afk-row .chname { flex: 1; color: #e8e0f0; }
+    .afk-add { display: flex; gap: 6px; margin-top: 8px; align-items: center;
+               background: rgba(94,42,121,0.18);
+               padding: 8px; border-radius: 4px; }
+
+    .meta { color: #8a7d99; font-size: 0.85em; margin: 4px 16px; }
+  </style>
+</head>
+<body>
+<h1>TS3 User-Mappings &amp; Channel-Tool</h1>
+
+<div class="wrap">
+  <div class="toolbar">
+    <button id="refreshBtn">↻ Reload</button>
+    <button id="discoverBtn" title="Aktuell online im Channel — als neue Mappings vorladen">+ Discover</button>
+    <span class="status" id="status"></span>
+  </div>
+
+  <h2>User-Mappings</h2>
+  <div class="meta" id="userMeta"></div>
+  <table id="userTable">
+    <thead>
+      <tr>
+        <th data-sort="online">St</th>
+        <th data-sort="tsName">TS-Name</th>
+        <th class="avatar-cell">Avatar</th>
+        <th data-sort="customName">Custom Name</th>
+        <th data-sort="steamId">Steam-ID</th>
+        <th data-sort="displaySource">Anzeige</th>
+        <th data-sort="speakingIcon">Speak-Icon</th>
+        <th data-sort="silentIcon">Silent-Icon</th>
+        <th data-sort="showInWidget">Show</th>
+        <th data-sort="isFriend">Freund</th>
+        <th data-sort="isBlocked">Block</th>
+        <th data-sort="notes">Notes</th>
+        <th data-sort="encounters">Begegnungen</th>
+        <th>Aktionen</th>
+      </tr>
+    </thead>
+    <tbody id="userBody"></tbody>
+  </table>
+
+  <h2>AFK-Channels (pro Server)</h2>
+  <div class="meta">Channels die hier markiert sind, werden vom Encounter-Counter ignoriert.</div>
+  <div class="afk-list" id="afkList"></div>
+  <div class="afk-add">
+    <label>Server: <select id="afkServer" style="min-width:160px"></select></label>
+    <label>Channel-ID: <input id="afkChId" style="width:80px"></label>
+    <label>Channel-Name: <input id="afkChName" style="width:180px"></label>
+    <button id="afkAddBtn">+ AFK-Channel</button>
+  </div>
+</div>
+
+<script>
+  // ── State ─────────────────────────────────────────────────────────
+  let users = [];          // alle bekannten TS-User aus DB
+  let online = {};         // tsUid -> member-Objekt aus state.members
+  let encounters = {};     // mate_uid -> total
+  let afkChannels = [];
+  let currentState = null; // letzter /state response
+
+  let sortKey = "tsName";
+  let sortDir = 1;
+  const statusEl = document.getElementById("status");
+  function setStatus(text, kind) {
+    statusEl.className = "status" + (kind ? " " + kind : "");
+    statusEl.textContent = text || "";
+    if (kind === "ok") setTimeout(() => setStatus(""), 2000);
+  }
+
+  // ── API ───────────────────────────────────────────────────────────
+  async function fetchAll() {
+    setStatus("lade…");
+    try {
+      const [usersR, stateR, encR, afkR] = await Promise.all([
+        fetch("/api/teamspeak/users").then(r => r.json()),
+        fetch("/api/teamspeak/state").then(r => r.json()),
+        fetch("/api/teamspeak/encounters").then(r => r.json()),
+        fetch("/api/teamspeak/afk-channels").then(r => r.json()),
+      ]);
+      users = usersR.users || [];
+      currentState = stateR;
+      online = {};
+      for (const m of (stateR.members || [])) {
+        if (m.tsUid) online[m.tsUid] = m;
+      }
+      encounters = {};
+      for (const e of (encR.encounters || [])) {
+        encounters[e.mate_uid] = e.total;
+      }
+      afkChannels = afkR.afkChannels || [];
+      // online Member als noch-nicht-gemappte User in die Liste mergen
+      // damit man sie direkt editieren kann ohne 'Discover' klicken zu muessen.
+      const known = new Set(users.map(u => u.ts_uid));
+      for (const m of (stateR.members || [])) {
+        if (!m.tsUid || known.has(m.tsUid)) continue;
+        users.push({
+          ts_uid: m.tsUid,
+          last_nick: m.tsName,
+          steam_id: "", custom_name: "",
+          display_source: "ts",
+          speaking_icon: "", silent_icon: "",
+          show_in_widget: 1, is_friend: 0, is_blocked: 0,
+          notes: "",
+        });
+      }
+      renderUsers();
+      renderAfk();
+      setStatus("");
+    } catch (e) {
+      setStatus("Fehler: " + e, "err");
+    }
+  }
+
+  async function saveUser(tsUid, patch) {
+    setStatus("speichere…");
+    try {
+      const r = await fetch("/api/teamspeak/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tsUid, ...patch }),
+      });
+      const j = await r.json();
+      if (j.error) throw new Error(j.error);
+      setStatus("gespeichert", "ok");
+    } catch (e) {
+      setStatus("Speicher-Fehler: " + e, "err");
+    }
+  }
+
+  async function muteClient(clid, mute) {
+    setStatus(mute ? "mute…" : "unmute…");
+    try {
+      const r = await fetch("/api/teamspeak/mute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clid, mute }),
+      });
+      const j = await r.json();
+      if (j.error) throw new Error(j.error);
+      setStatus(mute ? "muted" : "unmuted", "ok");
+    } catch (e) {
+      setStatus("Mute-Fehler: " + e, "err");
+    }
+  }
+
+  // ── User-Tabelle ──────────────────────────────────────────────────
+  function rowVal(u, key) {
+    switch (key) {
+      case "online":       return online[u.ts_uid] ? 1 : 0;
+      case "tsName":       return (u.last_nick || u.ts_uid).toLowerCase();
+      case "customName":   return (u.custom_name || "").toLowerCase();
+      case "steamId":      return u.steam_id || "";
+      case "displaySource":return u.display_source || "ts";
+      case "speakingIcon": return u.speaking_icon || "";
+      case "silentIcon":   return u.silent_icon || "";
+      case "showInWidget": return u.show_in_widget ? 1 : 0;
+      case "isFriend":     return u.is_friend ? 1 : 0;
+      case "isBlocked":    return u.is_blocked ? 1 : 0;
+      case "notes":        return u.notes || "";
+      case "encounters":   return encounters[u.ts_uid] || 0;
+      default:             return "";
+    }
+  }
+
+  function renderUsers() {
+    const sorted = users.slice().sort((a, b) => {
+      const av = rowVal(a, sortKey);
+      const bv = rowVal(b, sortKey);
+      if (av < bv) return -1 * sortDir;
+      if (av > bv) return  1 * sortDir;
+      return 0;
+    });
+    const meta = document.getElementById("userMeta");
+    const onlineCount = users.filter(u => online[u.ts_uid]).length;
+    meta.textContent = `${users.length} bekannt · ${onlineCount} online · `
+      + `Channel: ${currentState && currentState.channelName || "—"}`;
+    const body = document.getElementById("userBody");
+    body.innerHTML = sorted.map(u => {
+      const onlineMem = online[u.ts_uid];
+      const cls = (onlineMem ? "online" : "offline") + (u.is_blocked ? " blocked" : "");
+      const avatar = onlineMem && onlineMem.avatarUrl
+        ? `<img src="${onlineMem.avatarUrl}" alt="">`
+        : `<span class="ph">${(u.last_nick || "?").slice(0,2).toUpperCase()}</span>`;
+      const muteBtn = onlineMem
+        ? `<button class="subtle" data-clid="${onlineMem.clid}" data-act="mute" title="Mute">🔇</button>
+           <button class="subtle" data-clid="${onlineMem.clid}" data-act="unmute" title="Unmute">🔊</button>`
+        : "";
+      return `<tr class="${cls}" data-uid="${u.ts_uid}">
+        <td></td>
+        <td class="tsname">${escapeHtml(u.last_nick || u.ts_uid.slice(0,8))}</td>
+        <td class="avatar-cell">${avatar}</td>
+        <td><input class="col-custom" data-f="customName" value="${escapeAttr(u.custom_name || "")}"></td>
+        <td><input class="col-steam" data-f="steamId" placeholder="76561…" value="${escapeAttr(u.steam_id || "")}"></td>
+        <td><select class="col-src" data-f="displaySource">
+          <option value="ts" ${u.display_source==="ts"?"selected":""}>TS</option>
+          <option value="custom" ${u.display_source==="custom"?"selected":""}>Custom</option>
+          <option value="steam" ${u.display_source==="steam"?"selected":""}>Steam</option>
+        </select></td>
+        <td class="col-icons"><input data-f="speakingIcon" placeholder="URL/Pfad" value="${escapeAttr(u.speaking_icon || "")}"></td>
+        <td class="col-icons"><input data-f="silentIcon" placeholder="URL/Pfad" value="${escapeAttr(u.silent_icon || "")}"></td>
+        <td><input type="checkbox" data-f="showInWidget" ${u.show_in_widget?"checked":""}></td>
+        <td><input type="checkbox" data-f="isFriend" ${u.is_friend?"checked":""}></td>
+        <td><input type="checkbox" data-f="isBlocked" ${u.is_blocked?"checked":""}></td>
+        <td><input class="col-notes" data-f="notes" placeholder="—" value="${escapeAttr(u.notes || "")}"></td>
+        <td style="text-align:right; font-variant-numeric:tabular-nums">${encounters[u.ts_uid] || 0}</td>
+        <td class="actions">${muteBtn}</td>
+      </tr>`;
+    }).join("");
+
+    // Sort-Indikator
+    document.querySelectorAll("#userTable thead th").forEach(th => {
+      th.classList.toggle("active", th.dataset.sort === sortKey);
+      const base = th.dataset.baseTxt || th.textContent.replace(/[↑↓]$/,"").trim();
+      th.dataset.baseTxt = base;
+      th.textContent = base + (th.dataset.sort === sortKey ? (sortDir === 1 ? " ↑" : " ↓") : "");
+    });
+
+    // Per-Zeile-Listeners
+    body.querySelectorAll("input, select").forEach(el => {
+      const handler = () => {
+        const tr = el.closest("tr");
+        const tsUid = tr.dataset.uid;
+        const field = el.dataset.f;
+        const value = (el.type === "checkbox") ? el.checked : el.value;
+        saveUser(tsUid, { [field]: value });
+        // Lokal patchen damit die Tabelle nicht neu rendern muss
+        const u = users.find(x => x.ts_uid === tsUid);
+        if (u) {
+          const dbKey = ({
+            customName: "custom_name", steamId: "steam_id",
+            displaySource: "display_source",
+            speakingIcon: "speaking_icon", silentIcon: "silent_icon",
+            showInWidget: "show_in_widget", isFriend: "is_friend",
+            isBlocked: "is_blocked", notes: "notes",
+          })[field];
+          u[dbKey] = (typeof value === "boolean") ? (value ? 1 : 0) : value;
+        }
+      };
+      el.addEventListener("change", handler);
+      if (el.tagName === "INPUT" && el.type === "text") {
+        el.addEventListener("blur", handler);
+      }
+    });
+
+    // Mute-Buttons
+    body.querySelectorAll("button[data-clid]").forEach(b => {
+      b.addEventListener("click", () => {
+        muteClient(b.dataset.clid, b.dataset.act === "mute");
+      });
+    });
+  }
+
+  // Sort-Header
+  document.querySelectorAll("#userTable thead th").forEach(th => {
+    if (!th.dataset.sort) return;
+    th.addEventListener("click", () => {
+      if (sortKey === th.dataset.sort) sortDir *= -1;
+      else { sortKey = th.dataset.sort; sortDir = 1; }
+      renderUsers();
+    });
+  });
+
+  // ── AFK-Channels ──────────────────────────────────────────────────
+  function renderAfk() {
+    const host = document.getElementById("afkList");
+    host.innerHTML = afkChannels.length
+      ? afkChannels.map(c => `
+          <div class="afk-row">
+            <span class="server" title="${c.server_uid}">${c.server_uid.slice(0,20)}…</span>
+            <span class="chname">cid=${c.channel_id} ${c.channel_name ? "· "+escapeHtml(c.channel_name) : ""}</span>
+            <button class="danger" data-srv="${escapeAttr(c.server_uid)}" data-cid="${c.channel_id}">×</button>
+          </div>`).join("")
+      : `<div class="meta">— keine AFK-Channels konfiguriert —</div>`;
+    host.querySelectorAll("button[data-cid]").forEach(b => {
+      b.addEventListener("click", async () => {
+        if (!confirm("AFK-Channel-Marker entfernen?")) return;
+        await fetch("/api/teamspeak/afk-channels", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            serverUid: b.dataset.srv,
+            channelId: b.dataset.cid,
+          }),
+        });
+        fetchAll();
+      });
+    });
+
+    // Server-Dropdown: aktueller + alle bekannten Server-Uids aus
+    // bestehenden Eintraegen
+    const sel = document.getElementById("afkServer");
+    const servers = new Set();
+    if (currentState && currentState.serverUid) servers.add(currentState.serverUid);
+    afkChannels.forEach(c => servers.add(c.server_uid));
+    sel.innerHTML = [...servers].map(s =>
+      `<option value="${escapeAttr(s)}">${s}</option>`).join("")
+      || `<option value="">(kein Server)</option>`;
+  }
+
+  document.getElementById("afkAddBtn").addEventListener("click", async () => {
+    const srv = document.getElementById("afkServer").value;
+    const cid = document.getElementById("afkChId").value.trim();
+    const nm  = document.getElementById("afkChName").value.trim();
+    if (!srv || !cid) {
+      setStatus("Server + Channel-ID required", "err");
+      return;
+    }
+    try {
+      const r = await fetch("/api/teamspeak/afk-channels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          serverUid: srv, channelId: cid, channelName: nm,
+        }),
+      });
+      const j = await r.json();
+      if (j.error) throw new Error(j.error);
+      document.getElementById("afkChId").value = "";
+      document.getElementById("afkChName").value = "";
+      setStatus("AFK-Channel hinzugefuegt", "ok");
+      fetchAll();
+    } catch (e) {
+      setStatus("Fehler: " + e, "err");
+    }
+  });
+
+  document.getElementById("refreshBtn").addEventListener("click", fetchAll);
+  document.getElementById("discoverBtn").addEventListener("click", fetchAll);
+
+  // ── Helpers ───────────────────────────────────────────────────────
+  function escapeHtml(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function escapeAttr(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  }
+
+  fetchAll();
+  // Live-Refresh des online-Status alle 3s (damit Mute-Buttons aktuell sind)
+  setInterval(() => {
+    fetch("/api/teamspeak/state").then(r => r.json()).then(s => {
+      currentState = s;
+      online = {};
+      for (const m of (s.members || [])) {
+        if (m.tsUid) online[m.tsUid] = m;
+      }
+      renderUsers();
+    }).catch(() => {});
+  }, 3000);
+</script>
+</body>
+</html>

@@ -71,8 +71,6 @@ class TeamSpeakRegistry:
                 if u:
                     src = u.get("display_source") or "ts"
                     custom = u.get("custom_name")
-                    # Steam-Name kennen wir nicht direkt — Override per
-                    # custom_name oder ts-name verfuegbar
                     if src == "custom" and custom:
                         m["displayName"] = custom
                     else:
@@ -81,12 +79,20 @@ class TeamSpeakRegistry:
                     m["speakingIcon"]  = u.get("speaking_icon")
                     m["silentIcon"]    = u.get("silent_icon")
                     m["showInWidget"]  = bool(u.get("show_in_widget", 1))
+                    m["isFriend"]      = bool(u.get("is_friend", 0))
+                    m["isBlocked"]     = bool(u.get("is_blocked", 0))
+                    # Blocked → showInWidget=false damit das Display-
+                    # Widget sie automatisch ausblendet.
+                    if m["isBlocked"]:
+                        m["showInWidget"] = False
                     if self.root_dir and u.get("steam_id"):
                         m["avatarUrl"] = avatar_url(
                             self.root_dir, u["steam_id"])
                 else:
                     m["displayName"]  = m.get("tsName")
                     m["showInWidget"] = True
+                    m["isFriend"]     = False
+                    m["isBlocked"]    = False
         return _ok(snap)
 
     # ── User-Mappings ──────────────────────────────────────────────────
@@ -116,10 +122,13 @@ class TeamSpeakRegistry:
                 ("silentIcon",     "silent_icon"),
                 ("showInWidget",   "show_in_widget"),
                 ("lastNick",       "last_nick"),
+                ("isFriend",       "is_friend"),
+                ("isBlocked",      "is_blocked"),
+                ("notes",          "notes"),
             ]:
                 if src_key in payload:
                     v = payload[src_key]
-                    if db_key == "show_in_widget":
+                    if db_key in ("show_in_widget", "is_friend", "is_blocked"):
                         v = 1 if v else 0
                     fields[db_key] = v
             save_user_mapping(self.db, ts_uid, **fields)

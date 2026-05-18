@@ -42,6 +42,9 @@ CREATE TABLE IF NOT EXISTS teamspeak_users (
     speaking_icon    TEXT,
     silent_icon      TEXT,
     show_in_widget   INTEGER NOT NULL DEFAULT 1,
+    is_friend        INTEGER NOT NULL DEFAULT 0,
+    is_blocked       INTEGER NOT NULL DEFAULT 0,
+    notes            TEXT,
     updated_at       TEXT
 );
 
@@ -75,6 +78,17 @@ def connect(path):
 
 def init_schema(conn):
     conn.executescript(SCHEMA_SQL)
+    # Migrate existing DBs — neue Spalten dazu (IF NOT EXISTS verfuegbar
+    # ab SQLite 3.35, sonst try/except).
+    for col, ddl in [
+        ("is_friend",  "INTEGER NOT NULL DEFAULT 0"),
+        ("is_blocked", "INTEGER NOT NULL DEFAULT 0"),
+        ("notes",      "TEXT"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE teamspeak_users ADD COLUMN {col} {ddl}")
+        except Exception:
+            pass
     conn.commit()
 
 
@@ -113,7 +127,7 @@ def save_user_mapping(conn, ts_uid, **fields):
     neuen Eintrag (last_nick wird auf '' gesetzt wenn noch nicht da)."""
     allowed = {"steam_id", "custom_name", "display_source",
                "speaking_icon", "silent_icon", "show_in_widget",
-               "last_nick"}
+               "last_nick", "is_friend", "is_blocked", "notes"}
     fields = {k: v for k, v in fields.items() if k in allowed}
     if not fields:
         return
