@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<!--
+  TS3 "Wer spricht jetzt"-Widget
+  ──────────────────────────────────────────────────────────────────────
+  Pollt /api/teamspeak/state alle 500ms. Pro Member ein vertikaler
+  Eintrag mit Avatar + Name. Spricht = volle Opacity + Gold-Ring,
+  Schweigen = gedimmt (~35%). Hysterese 400ms macht das Backend.
+
+  URL-Params:
+    pollMs        Default 500
+    width         Default 280px (Container-Breite)
+    avatar        Default 36 (px)
+    accent        Default #f2b705 (Talking-Ring-Farbe)
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>TS3 — Wer spricht jetzt</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --width: 280px;
+      --av-size: 36px;
+      --accent: #f2b705;
+      --bg-card: rgba(13, 6, 26, 0.78);
+      --bg-row: rgba(255, 255, 255, 0.04);
+      --bg-row-talking: rgba(242, 183, 5, 0.10);
+      --text: #e8e0f0;
+      --muted: #8a7d99;
+      --border: rgba(216, 180, 255, 0.25);
+    }
+    html, body {
+      margin: 0; padding: 0;
+      background: transparent;
+      color: var(--text);
+      font-family: 'DM Sans', system-ui, sans-serif;
+      font-size: 14px;
+    }
+    .ts-card {
+      width: var(--width);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.5);
+      padding: 10px 10px 8px;
+      box-sizing: border-box;
+      backdrop-filter: blur(6px);
+    }
+    .ts-header {
+      display: flex; align-items: center; gap: 6px;
+      color: var(--muted);
+      font-size: 0.78em;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      margin-bottom: 6px;
+    }
+    .ts-header .ch-name { color: var(--text); text-transform: none;
+                          letter-spacing: 0; font-size: 1.05em;
+                          font-weight: 700; }
+    .ts-status {
+      margin-left: auto;
+      font-size: 0.9em;
+      color: var(--muted);
+    }
+    .ts-status.ok::before { content: "● "; color: #48c878; }
+    .ts-status.warn::before { content: "● "; color: #e57b7b; }
+
+    .ts-no-conn {
+      font-size: 0.85em;
+      color: #e57b7b;
+      text-align: center;
+      padding: 6px 4px;
+      animation: tsFade 0.5s ease;
+    }
+    @keyframes tsFade { from { opacity: 0; } to { opacity: 1; } }
+
+    .ts-list {
+      display: flex; flex-direction: column;
+      gap: 3px;
+    }
+    .ts-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 4px 6px;
+      border-radius: 5px;
+      background: var(--bg-row);
+      opacity: 0.35;
+      filter: saturate(0.6);
+      transition: opacity 0.12s ease, filter 0.12s ease,
+                  background 0.12s ease, box-shadow 0.12s ease;
+    }
+    .ts-row.talking {
+      opacity: 1;
+      filter: saturate(1) brightness(1);
+      background: var(--bg-row-talking);
+      box-shadow: 0 0 0 1px rgba(242,183,5,0.35) inset,
+                  0 0 8px rgba(242,183,5,0.15);
+    }
+    .ts-avatar {
+      position: relative;
+      width: var(--av-size); height: var(--av-size);
+      border-radius: 50%;
+      overflow: hidden;
+      flex-shrink: 0;
+      background: #2a1d3f;
+    }
+    .ts-avatar img { width: 100%; height: 100%; object-fit: cover;
+                      display: block; }
+    .ts-avatar .initials {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; color: var(--text);
+      font-size: 0.95em;
+    }
+    .ts-row.talking .ts-avatar {
+      box-shadow: 0 0 0 2px var(--accent);
+    }
+    .ts-name { flex: 1; min-width: 0;
+                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                 font-weight: 600; }
+    .ts-row.self .ts-name { color: var(--accent); }
+
+    .ts-empty {
+      font-style: italic; color: var(--muted); font-size: 0.85em;
+      padding: 6px; text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="ts-card" id="card">
+    <div class="ts-header">
+      <span class="ch-name" id="chName">— TeamSpeak —</span>
+      <span class="ts-status" id="status">…</span>
+    </div>
+    <div id="banner"></div>
+    <div class="ts-list" id="list"></div>
+  </div>
+
+  <script>
+    // ── URL-Params ────────────────────────────────────────────────────
+    const qs = new URLSearchParams(location.search);
+    const POLL_MS  = parseInt(qs.get("pollMs") || "500", 10);
+    const WIDTH    = qs.get("width") || "280";
+    const AV_SIZE  = qs.get("avatar") || "36";
+    const ACCENT   = qs.get("accent") || "#f2b705";
+    document.documentElement.style.setProperty("--width", WIDTH + "px");
+    document.documentElement.style.setProperty("--av-size", AV_SIZE + "px");
+    document.documentElement.style.setProperty("--accent", ACCENT);
+
+    const elList   = document.getElementById("list");
+    const elCh     = document.getElementById("chName");
+    const elStat   = document.getElementById("status");
+    const elBan    = document.getElementById("banner");
+
+    // ── Banner-Logik ──────────────────────────────────────────────────
+    // "No connection" zart 30s nach Connect oder Tag-Wechsel-Retry.
+    let lastConnected = null;     // letzter Wert
+    let lastDayStart = null;      // YYYY-MM-DD beim ersten Tick heute
+    let bannerHideAt = 0;         // wann blendet die Meldung wieder aus
+    function initialDay() {
+      return new Date().toISOString().slice(0, 10);
+    }
+    lastDayStart = initialDay();
+
+    function setBanner(text) {
+      if (text) {
+        elBan.innerHTML = `<div class="ts-no-conn">${text}</div>`;
+        bannerHideAt = Date.now() + 30000;
+      } else {
+        elBan.innerHTML = "";
+        bannerHideAt = 0;
+      }
+    }
+
+    function initials(name) {
+      if (!name) return "?";
+      const parts = name.replace(/[^a-zA-Z0-9_ ]/g, " ").trim().split(/\s+/);
+      if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+
+    function render(data) {
+      const today = initialDay();
+      if (today !== lastDayStart) {
+        // Tag-Wechsel — kurz "wir versuchen wieder Verbindung"
+        setBanner("Neuer Tag — verbinde mit TS3…");
+        lastDayStart = today;
+      }
+
+      const wasConnected = lastConnected;
+      const isConn = !!data.connected;
+      if (wasConnected === false && isConn) {
+        // Reconnect-Event
+        setBanner("TS3 wieder verbunden");
+      }
+      if (wasConnected === true && !isConn) {
+        // Disconnect
+        setBanner("TS3 getrennt — versuche neu zu verbinden…");
+      }
+      if (wasConnected === null) {
+        // Erster Tick — nur banner wenn nicht-connected
+        if (!isConn) setBanner("Verbinde mit TS3…");
+      }
+      lastConnected = isConn;
+
+      // Banner-Timeout
+      if (bannerHideAt && Date.now() > bannerHideAt) {
+        setBanner("");
+      }
+
+      // Header
+      elCh.textContent = data.channelName || "— kein Channel —";
+      if (isConn) {
+        elStat.className = "ts-status ok";
+        elStat.textContent = data.members ? `${data.members.filter(m => m.showInWidget !== false).length}` : "0";
+      } else {
+        elStat.className = "ts-status warn";
+        elStat.textContent = "off";
+      }
+
+      // Members — sortiert: self zuerst, dann talking, dann nick
+      const members = (data.members || [])
+        .filter(m => m.showInWidget !== false)
+        .slice()
+        .sort((a, b) => {
+          if (a.isSelf && !b.isSelf) return -1;
+          if (b.isSelf && !a.isSelf) return 1;
+          if (a.isTalking !== b.isTalking) return a.isTalking ? -1 : 1;
+          return (a.displayName || a.tsName || "").localeCompare(
+                 b.displayName || b.tsName || "");
+        });
+      if (!members.length) {
+        elList.innerHTML = `<div class="ts-empty">— allein im Channel —</div>`;
+        return;
+      }
+      const html = members.map(m => {
+        const name = m.displayName || m.tsName || "?";
+        const avatar = m.avatarUrl
+          ? `<img src="${m.avatarUrl}" alt="">`
+          : `<div class="initials">${initials(name)}</div>`;
+        const cls = "ts-row"
+          + (m.isTalking ? " talking" : "")
+          + (m.isSelf ? " self" : "");
+        return `<div class="${cls}" data-uid="${m.tsUid || m.clid || ""}">
+          <div class="ts-avatar">${avatar}</div>
+          <div class="ts-name">${name}</div>
+        </div>`;
+      }).join("");
+      elList.innerHTML = html;
+    }
+
+    async function tick() {
+      try {
+        const r = await fetch("/api/teamspeak/state", { cache: "no-store" });
+        const j = await r.json();
+        render(j);
+      } catch (e) {
+        // Server selber down → State pessimistisch
+        render({ connected: false, members: [] });
+      }
+    }
+    tick();
+    setInterval(tick, POLL_MS);
+  </script>
+</body>
+</html>
