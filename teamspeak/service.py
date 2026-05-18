@@ -49,6 +49,17 @@ class TeamSpeakService:
         # Talk-Tracking ist event-basiert (notifytalkstatuschange-Stop
         # buchstabiert die Sekunden in die DB). Kein zyklisches
         # Polling-Tick mehr noetig.
+        # Safety: alle 5s einmal publishen — falls ein Event-Pfad einen
+        # publish vergisst, bleibt das Widget nie laenger als 5s stale.
+        import threading
+        def _safety_publish():
+            import time as _t
+            while True:
+                _t.sleep(5)
+                try: self._publish()
+                except Exception: pass
+        threading.Thread(target=_safety_publish, name="ts-safety-pub",
+                           daemon=True).start()
 
     def stop(self):
         self.client.stop()
@@ -366,4 +377,5 @@ class TeamSpeakService:
         for r in rows:
             if r.get("cid") == cid:
                 self.state.set_channel(cid, r.get("channel_name"))
+                self._publish()
                 return

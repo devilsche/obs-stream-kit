@@ -92,6 +92,23 @@ class ClientQuery:
                 f"python-package 'ts3' fehlt — auf dem PC ausfuehren: "
                 f"pip install ts3 ({e})")
             return
+        # Monkey-patch: lib decoded strict UTF-8 → crasht bei manchen
+        # TS3-Channels mit ungueltigen Bytes. Wir setzen errors='replace'.
+        try:
+            import ts3.escape as _esc
+            if hasattr(_esc, "unescape") and not getattr(_esc, "_lenient_decode_patched", False):
+                _orig = _esc.unescape
+                def _safe_unescape(b):
+                    if isinstance(b, bytes):
+                        b = b.decode("utf-8", errors="replace")
+                    try:
+                        return _orig(b)
+                    except UnicodeDecodeError:
+                        return b
+                _esc.unescape = _safe_unescape
+                _esc._lenient_decode_patched = True
+        except Exception:
+            pass
         self._TS3TimeoutError = TS3TimeoutError
         self._TS3QueryError = TS3QueryError
         backoff = self.reconnect_secs
