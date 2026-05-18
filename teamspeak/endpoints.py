@@ -51,6 +51,8 @@ class TeamSpeakRegistry:
             return self._afk_delete(body)
         if route == ("POST", "/api/teamspeak/mute"):
             return self._mute(body)
+        if route == ("GET", "/api/teamspeak/channels"):
+            return self._channels()
         return None
 
     # ── State ──────────────────────────────────────────────────────────
@@ -209,6 +211,25 @@ class TeamSpeakRegistry:
             return _ok({"ok": True})
         except Exception as e:
             return _err(400, str(e))
+
+    # ── Channels (fuer AFK-Auswahl im Tool) ────────────────────────────
+    def _channels(self):
+        if not self.service:
+            return _ok({"channels": []})
+        try:
+            rows = self.service.client.send_command("channellist") or []
+        except Exception as e:
+            return _err(500, str(e))
+        out = []
+        for r in rows:
+            out.append({
+                "cid":         r.get("cid"),
+                "pid":         r.get("pid"),
+                "name":        r.get("channel_name"),
+                "order":       r.get("channel_order"),
+                "totalClients": r.get("total_clients"),
+            })
+        return _ok({"channels": out})
 
     # ── Mute via ClientQuery (lokaler TS3-Mute) ────────────────────────
     def _mute(self, body):

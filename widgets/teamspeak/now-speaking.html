@@ -227,15 +227,29 @@
       return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     }
 
+    let firstDisconnectAt = null;  // ts wann disconnect erkannt
     function render(data) {
       const card = document.getElementById("card");
       const isConn = !!data.connected;
-      // Bei Disconnect verstecken (Default) — Widget unsichtbar in OBS.
+      // Bei Disconnect: 30s "no connection"-Banner zeigen, dann
+      // komplett verstecken. Reconnect → sofort sichtbar.
       if (HIDE_OFFLINE && !isConn) {
-        card.style.display = "none";
+        if (firstDisconnectAt === null) firstDisconnectAt = Date.now();
+        const ageMs = Date.now() - firstDisconnectAt;
+        if (ageMs < 30000) {
+          card.style.display = "";
+          elCh.textContent = "— TeamSpeak —";
+          elStat.className = "ts-status warn";
+          elStat.textContent = "off";
+          elList.innerHTML = "";
+          setBanner("TS3 nicht verbunden");
+        } else {
+          card.style.display = "none";
+        }
         lastConnected = isConn;
         return;
       }
+      firstDisconnectAt = null;
       card.style.display = "";
       const today = initialDay();
       if (today !== lastDayStart) {

@@ -149,20 +149,9 @@
     <tbody id="userBody"></tbody>
   </table>
 
-  <h2>AFK-Channels (pro Server)</h2>
-  <div class="meta">Channels die hier markiert sind, werden vom Encounter-Counter ignoriert.</div>
+  <h2>Channels — als AFK markieren</h2>
+  <div class="meta" id="afkHint">Channels die hier als AFK markiert sind, werden vom Encounter-Counter ignoriert.</div>
   <div class="afk-list" id="afkList"></div>
-  <div class="afk-add">
-    <label>Server:
-      <input id="afkServer" list="afkServerList" style="min-width:220px"
-             placeholder="ip:port oder Server-UID">
-      <datalist id="afkServerList"></datalist>
-    </label>
-    <label>Channel-ID: <input id="afkChId" style="width:80px"></label>
-    <label>Channel-Name: <input id="afkChName" style="width:180px"></label>
-    <button id="afkAddBtn">+ AFK-Channel</button>
-  </div>
-  <div class="meta" id="afkHint"></div>
 </div>
 
 <script>
@@ -171,6 +160,7 @@
   let online = {};         // tsUid -> member-Objekt aus state.members
   let encounters = {};     // mate_uid -> total
   let afkChannels = [];
+  let serverChannels = []; // [{cid, name, ...}] aus /channels
   let currentState = null; // letzter /state response
 
   let sortKey = "tsName";
@@ -186,14 +176,16 @@
   async function fetchAll() {
     setStatus("lade…");
     try {
-      const [usersR, stateR, encR, afkR] = await Promise.all([
+      const [usersR, stateR, encR, afkR, chR] = await Promise.all([
         fetch("/api/teamspeak/users").then(r => r.json()),
         fetch("/api/teamspeak/state").then(r => r.json()),
         fetch("/api/teamspeak/encounters").then(r => r.json()),
         fetch("/api/teamspeak/afk-channels").then(r => r.json()),
+        fetch("/api/teamspeak/channels").then(r => r.json()).catch(() => ({})),
       ]);
       users = usersR.users || [];
       currentState = stateR;
+      serverChannels = chR.channels || [];
       online = {};
       for (const m of (stateR.members || [])) {
         if (m.tsUid) online[m.tsUid] = m;
@@ -378,84 +370,63 @@
   // ── AFK-Channels ──────────────────────────────────────────────────
   function renderAfk() {
     const host = document.getElementById("afkList");
-    host.innerHTML = afkChannels.length
-      ? afkChannels.map(c => `
-          <div class="afk-row">
-            <span class="server" title="${c.server_uid}">${c.server_uid.slice(0,20)}…</span>
-            <span class="chname">cid=${c.channel_id} ${c.channel_name ? "· "+escapeHtml(c.channel_name) : ""}</span>
-            <button class="danger" data-srv="${escapeAttr(c.server_uid)}" data-cid="${c.channel_id}">×</button>
-          </div>`).join("")
-      : `<div class="meta">— keine AFK-Channels konfiguriert —</div>`;
+    const hint = document.getElementById("afkHint");
+    const srvUid = currentState && currentState.serverUid;
+    if (!srvUid) {
+      host.innerHTML = `<div class="meta">— TS3 nicht verbunden — Channel-Liste nicht verfuegbar —</div>`;
+      hint.textContent = "Channels die hier als AFK markiert sind, werden vom Encounter-Counter ignoriert.";
+      return;
+    }
+    const afkIds = new Set(
+      afkChannels.filter(c => c.server_uid === srvUid).map(c => c.channel_id));
+    hint.textContent =
+      `Aktueller Server: ${srvUid} · ${serverChannels.length} Channels · `
+      + `${afkIds.size} als AFK markiert`;
+    if (!serverChannels.length) {
+      host.innerHTML = `<div class="meta">— keine Channels (Server liefert leer) —</div>`;
+      return;
+    }
+    host.innerHTML = serverChannels.map(c => {
+      const isAfk = afkIds.has(c.cid);
+      const btn = isAfk
+        ? `<button class="danger" data-srv="${escapeAttr(srvUid)}" data-cid="${c.cid}" data-act="off">AFK aus</button>`
+        : `<button data-srv="${escapeAttr(srvUid)}" data-cid="${c.cid}" data-cname="${escapeAttr(c.name||"")}" data-act="on">→ AFK</button>`;
+      const ind = isAfk ? "😴 " : "";
+      return `<div class="afk-row">
+        <span class="server" style="min-width:60px">cid=${c.cid}</span>
+        <span class="chname">${ind}${escapeHtml(c.name||"?")}</span>
+        ${btn}
+      </div>`;
+    }).join("");
     host.querySelectorAll("button[data-cid]").forEach(b => {
       b.addEventListener("click", async () => {
-        if (!confirm("AFK-Channel-Marker entfernen?")) return;
-        await fetch("/api/teamspeak/afk-channels", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            serverUid: b.dataset.srv,
-            channelId: b.dataset.cid,
-          }),
-        });
-        fetchAll();
+        const srv = b.dataset.srv;
+        const cid = b.dataset.cid;
+        const act = b.dataset.act;
+        try {
+          if (act === "on") {
+            await fetch("/api/teamspeak/afk-channels", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                serverUid: srv, channelId: cid,
+                channelName: b.dataset.cname,
+              }),
+            });
+          } else {
+            await fetch("/api/teamspeak/afk-channels", {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ serverUid: srv, channelId: cid }),
+            });
+          }
+          fetchAll();
+        } catch (e) {
+          setStatus("Fehler: " + e, "err");
+        }
       });
     });
-
-    // Datalist mit allen bekannten Server-Uids fuer Autocomplete.
-    // Plus: aktuellen TS-Server automatisch als Default vorbelegen.
-    const dl = document.getElementById("afkServerList");
-    const inp = document.getElementById("afkServer");
-    const servers = new Set();
-    if (currentState && currentState.serverUid) servers.add(currentState.serverUid);
-    afkChannels.forEach(c => servers.add(c.server_uid));
-    dl.innerHTML = [...servers].map(s =>
-      `<option value="${escapeAttr(s)}">`).join("");
-    if (!inp.value && currentState && currentState.serverUid) {
-      inp.value = currentState.serverUid;
-    }
-    const hint = document.getElementById("afkHint");
-    if (currentState && currentState.serverUid) {
-      hint.textContent =
-        `Aktueller TS-Server: ${currentState.serverUid} · Channel-ID `
-        + `findest du in TS3 via Rechtsklick auf Channel → 'ID kopieren' `
-        + `oder am Channel-Eintrag (im Server-Tree mit aktivierten IDs).`;
-    } else {
-      hint.textContent =
-        "TS-Server-ID wurde nicht erkannt — du kannst manuell ip:port "
-        + "eintragen (genau wie es in der TS3-Server-Verbindung steht).";
-    }
   }
-
-  document.getElementById("afkAddBtn").addEventListener("click", async () => {
-    const srv = document.getElementById("afkServer").value.trim();
-    const cid = document.getElementById("afkChId").value.trim();
-    const nm  = document.getElementById("afkChName").value.trim();
-    if (!srv) {
-      setStatus("Server-Identifier eintragen (ip:port oder UID)", "err");
-      return;
-    }
-    if (!cid) {
-      setStatus("Channel-ID eintragen", "err");
-      return;
-    }
-    try {
-      const r = await fetch("/api/teamspeak/afk-channels", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          serverUid: srv, channelId: cid, channelName: nm,
-        }),
-      });
-      const j = await r.json();
-      if (j.error) throw new Error(j.error);
-      document.getElementById("afkChId").value = "";
-      document.getElementById("afkChName").value = "";
-      setStatus("AFK-Channel hinzugefuegt", "ok");
-      fetchAll();
-    } catch (e) {
-      setStatus("Fehler: " + e, "err");
-    }
-  });
 
   document.getElementById("refreshBtn").addEventListener("click", fetchAll);
   document.getElementById("discoverBtn").addEventListener("click", fetchAll);
