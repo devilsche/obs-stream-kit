@@ -420,16 +420,19 @@ class TeamSpeakService:
             self._counted_in_current_channel.add(mate_uid)
 
     def _refresh_channel_name(self, cid):
-        """Channel-Name aus channellist (statt channelvariable mit
-        bareword)."""
+        """Channel-Name aus channellist."""
         if not cid: return
         try:
             rows = self.client.send_command("channellist") or []
-        except ClientQueryError as e:
-            LOG.info("channellist: %s", e)
+        except Exception as e:
+            self._dbg(f"channellist FEHLER: {e}")
             return
+        self._dbg(f"channellist: {len(rows)} channels, suche cid={cid}")
         for r in rows:
             if r.get("cid") == cid:
-                self.state.set_channel(cid, r.get("channel_name"))
+                nm = r.get("channel_name")
+                self._dbg(f"  → gefunden: '{nm}'")
+                self.state.set_channel(cid, nm)
                 self._publish()
                 return
+        self._dbg(f"  → cid={cid} NICHT in channellist gefunden")
