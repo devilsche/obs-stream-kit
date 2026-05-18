@@ -282,15 +282,24 @@ class TeamSpeakService:
                 clid = params.get("clid")
                 ctid = params.get("ctid")
                 if not clid or not ctid: return
+                self._dbg(f"moved clid={clid} → ctid={ctid} "
+                          f"(streamer_clid={self.state.streamer_clid}, "
+                          f"current_cid={self.state.channel_id})")
                 self.state.upsert_client(clid, channelId=ctid)
                 # Wenn der Streamer selbst gemoved wurde → neuer Channel
                 # + clientlist neu (andere Member waren bereits drin,
                 # haben also kein cliententerview gefeuert).
                 if clid == self.state.streamer_clid:
                     # Channel-ID SOFORT setzen damit snapshot ab jetzt den
-                    # neuen Channel filtert. Name auf None — alter Name
-                    # waere irrefuehrend, neuer kommt asynchron nach.
-                    self.state.set_channel(ctid, None)
+                    # neuen Channel filtert. Name nur dann auf None setzen
+                    # wenn die cid sich tatsaechlich aendert — sonst
+                    # plaetten wir einen schon gesetzten Namen wenn das
+                    # selbe move-Event nochmal feuert.
+                    if ctid != self.state.channel_id:
+                        self.state.set_channel(ctid, None)
+                    else:
+                        # selbe cid, name unangetastet
+                        self.state.set_channel(ctid, self.state.channel_name)
                     # Sofort publishen — Widget sieht den neuen Channel
                     # (auch wenn der Name-Lookup gleich noch laeuft/failt).
                     self._publish()

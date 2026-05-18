@@ -125,10 +125,16 @@ class TsState:
     def set_channel(self, cid, name):
         with self._lock:
             changed = (cid != self.channel_id)
+            old_name = self.channel_name
             self.channel_id = cid
             self.channel_name = name
             if changed:
                 self.last_channel_change_at = time.time()
+        # Log ausserhalb des Locks
+        if changed or old_name != name:
+            print(f"[teamspeak] set_channel: cid={cid} name='{name}' "
+                  f"(changed={changed}, old_name='{old_name}')",
+                  flush=True)
 
     def upsert_client(self, clid, **fields):
         with self._lock:
