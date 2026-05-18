@@ -57,11 +57,15 @@ class TsState:
                 }
                 return payload
             for clid, c in self.clients.items():
-                if c.get("channelId") != self.channel_id:
+                # Streamer-Selbst-Sicherheit: der Streamer ist per
+                # Definition im channel_id (kommt direkt aus dem
+                # move-Event). Falls clientlist race-y noch die alte
+                # channelId fuer ihn hat → trotzdem zeigen.
+                is_self = (clid == self.streamer_clid)
+                if not is_self and c.get("channelId") != self.channel_id:
                     continue
                 # Nur input-mute (Mic aus) blockiert talking — output_muted
                 # bedeutet 'ich hoere nichts' und hindert nicht am Sprechen.
-                is_self = (clid == self.streamer_clid)
                 # KEIN Mute-Filter — wenn TS3 'talking=1' meldet, vertrauen
                 # wir dem. Push-to-talk feuert nur bei gehaltener Taste,
                 # VAD nur bei tatsaechlichem Mikro-Input. Filter
