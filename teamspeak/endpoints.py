@@ -125,13 +125,11 @@ class TeamSpeakRegistry:
                 ("silentIcon",     "silent_icon"),
                 ("showInWidget",   "show_in_widget"),
                 ("lastNick",       "last_nick"),
-                ("isFriend",       "is_friend"),
-                ("isBlocked",      "is_blocked"),
                 ("notes",          "notes"),
             ]:
                 if src_key in payload:
                     v = payload[src_key]
-                    if db_key in ("show_in_widget", "is_friend", "is_blocked"):
+                    if db_key == "show_in_widget":
                         v = 1 if v else 0
                     fields[db_key] = v
             save_user_mapping(self.db, ts_uid, **fields)

@@ -7,7 +7,7 @@
   - Anzeige-Quelle pro User (ts/steam/custom)
   - Icon-Overrides (speaking/silent)
   - show_in_widget Toggle
-  - is_friend / is_blocked / notes
+  - notes
   - Mute/Unmute online Member (lokaler TS3-Mute)
   - AFK-Channels pro Server markieren (werden vom Encounter-Counter
     ignoriert)
@@ -238,8 +238,7 @@
           steam_id: "", custom_name: "",
           display_source: "ts",
           speaking_icon: "", silent_icon: "",
-          show_in_widget: 1, is_friend: 0, is_blocked: 0,
-          notes: "",
+          show_in_widget: 1, notes: "",
         });
       }
       renderUsers();
@@ -322,7 +321,7 @@
     }
     body.innerHTML = sorted.map(u => {
       const onlineMem = online[u.ts_uid];
-      const cls = (onlineMem ? "online" : "offline") + (u.is_blocked ? " blocked" : "");
+      const cls = onlineMem ? "online" : "offline";
       const avatar = onlineMem && onlineMem.avatarUrl
         ? `<img src="${onlineMem.avatarUrl}" alt="">`
         : `<span class="ph">${(u.last_nick || "?").slice(0,2).toUpperCase()}</span>`;
@@ -536,8 +535,7 @@
         steam_id: "", custom_name: "",
         display_source: "ts",
         speaking_icon: "", silent_icon: "",
-        show_in_widget: 1, is_friend: 0, is_blocked: 0,
-        notes: "",
+        show_in_widget: 1, notes: "",
       });
       added = true;
     }
@@ -553,7 +551,6 @@
       const u = users.find(x => x.ts_uid === uid) || {};
       tr.classList.toggle("online", !!onlineMem);
       tr.classList.toggle("offline", !onlineMem);
-      tr.classList.toggle("blocked", !!u.is_blocked);
       const actionsCell = tr.querySelector("td.actions");
       if (actionsCell) {
         const stateKey = onlineMem ? `clid:${onlineMem.clid}` : "off";
