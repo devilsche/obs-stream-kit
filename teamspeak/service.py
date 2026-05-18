@@ -88,14 +88,17 @@ class TeamSpeakService:
         if not items:
             return
         seen_clids = set()
+        streamer_clid = self.state.streamer_clid
+        new_streamer_cid = None
         for it in items:
             clid = it.get("clid")
             if not clid: continue
             seen_clids.add(clid)
+            it_cid = it.get("cid")
             self.state.upsert_client(
                 clid,
                 nick=it.get("client_nickname"),
-                channelId=it.get("cid"),
+                channelId=it_cid,
                 input_muted=it.get("client_input_muted"),
                 output_muted=it.get("client_output_muted"),
                 input_hardware=it.get("client_input_hardware"))
@@ -103,6 +106,25 @@ class TeamSpeakService:
             talking = (it.get("client_flag_talking") == "1")
             self.state.set_talking(clid, talking,
                                    on_transition=self._on_talk_transition)
+            if streamer_clid and clid == streamer_clid:
+                new_streamer_cid = it_cid
+        # Streamer-Channel-Sync: wenn TS3 fuer den Streamer eine andere
+        # cid meldet als state.channel_id, ist der Move-Notify verloren
+        # gegangen. Sofort nachziehen — sonst sieht das Widget die Member
+        # im neuen Channel nie.
+        if (new_streamer_cid and
+                new_streamer_cid != self.state.channel_id):
+            self._dbg(f"poll: streamer-cid drift {self.state.channel_id} "
+                      f"→ {new_streamer_cid}, sync")
+            self.state.set_channel(new_streamer_cid, None)
+            # Channel-Name im Worker holen (send_command darf nicht aus
+            # demselben Thread laufen waehrend wir gerade einen Befehl
+            # verarbeiten — wobei wir hier nach dem clientlist-Return
+            # eigentlich frei sind. Trotzdem im Worker zur Sicherheit.)
+            import threading
+            threading.Thread(
+                target=lambda: self._refresh_channel_name(new_streamer_cid),
+                name="ts-channel-name-sync", daemon=True).start()
         # Stale-Removal
         if seen_clids:
             with self.state._lock:
