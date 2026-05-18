@@ -374,12 +374,15 @@
     });
 
     // Mute-Buttons
-    body.querySelectorAll("button[data-clid]").forEach(b => {
-      b.addEventListener("click", () => {
-        muteClient(b.dataset.clid, b.dataset.act === "mute");
-      });
-    });
   }
+
+  // Event-Delegation fuer Mute-Buttons — funktioniert auch nach
+  // Live-Refreshs die das Aktionen-Cell austauschen.
+  document.getElementById("userBody").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-clid]");
+    if (!b) return;
+    muteClient(b.dataset.clid, b.dataset.act === "mute");
+  });
 
   // Sort-Header
   document.querySelectorAll("#userTable thead th").forEach(th => {
@@ -493,17 +496,15 @@
         tr.classList.toggle("blocked", !!u.is_blocked);
         const actionsCell = tr.querySelector("td.actions");
         if (actionsCell) {
-          const newHtml = onlineMem
-            ? `<button class="subtle" data-clid="${onlineMem.clid}" data-act="mute" title="Mute">🔇</button>
-               <button class="subtle" data-clid="${onlineMem.clid}" data-act="unmute" title="Unmute">🔊</button>`
-            : "";
-          if (actionsCell.innerHTML !== newHtml) {
-            actionsCell.innerHTML = newHtml;
-            actionsCell.querySelectorAll("button[data-clid]").forEach(b => {
-              b.addEventListener("click", () => {
-                muteClient(b.dataset.clid, b.dataset.act === "mute");
-              });
-            });
+          // Stabiler Vergleichs-Key statt innerHTML (das normalisiert
+          // browser-seitig und matcht nie 1:1).
+          const stateKey = onlineMem ? `clid:${onlineMem.clid}` : "off";
+          if (actionsCell.dataset.stateKey !== stateKey) {
+            actionsCell.dataset.stateKey = stateKey;
+            actionsCell.innerHTML = onlineMem
+              ? `<button class="subtle" data-clid="${onlineMem.clid}" data-act="mute" title="Mute">🔇</button>
+                 <button class="subtle" data-clid="${onlineMem.clid}" data-act="unmute" title="Unmute">🔊</button>`
+              : "";
           }
         }
       });

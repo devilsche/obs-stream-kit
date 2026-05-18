@@ -40,8 +40,9 @@ class TsState:
             for clid, c in self.clients.items():
                 if c.get("channelId") != self.channel_id:
                     continue
+                # Nur input-mute (Mic aus) blockiert talking — output_muted
+                # bedeutet 'ich hoere nichts' und hindert nicht am Sprechen.
                 muted = (c.get("input_muted") == "1"
-                          or c.get("output_muted") == "1"
                           or c.get("input_hardware") == "0")
                 talking = self._is_talking_now(clid, now) and not muted
                 members.append({
