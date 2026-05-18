@@ -109,9 +109,18 @@ class TeamSpeakService:
             w.get("virtualserver_unique_identifier")
             or w.get("vsid")
             or w.get("server_unique_identifier"))
-        # Fallback: servervariable nutzt bareword → geht ueber py-ts3
-        # nicht direkt. Aber serverconnectionhandlerlist liefert alle
-        # verbundenen Server-Tabs mit ihren UIDs.
+        # Fallback 1: serverinfo liefert alle Felder zum aktuellen Server
+        if not server_uid:
+            try:
+                si = self.client.send_command("serverinfo") or []
+                print(f"[teamspeak] serverinfo: {si}", flush=True)
+                for r in si:
+                    if r.get("virtualserver_unique_identifier"):
+                        server_uid = r.get("virtualserver_unique_identifier")
+                        break
+            except ClientQueryError as e:
+                LOG.info("serverinfo: %s", e)
+        # Fallback 2: serverconnectionhandlerlist (verbundene Server-Tabs)
         if not server_uid:
             try:
                 hl = self.client.send_command(
