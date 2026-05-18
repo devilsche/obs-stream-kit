@@ -127,11 +127,10 @@
   <h2>User-Mappings</h2>
   <div class="meta" id="userMeta"></div>
   <div class="meta">
-    Hinweis: <b>Kontakt</b> (Freund / Block) ist ein lokaler obs-stream-kit-
-    Marker, NICHT synchronisiert mit der TS3-Kontaktliste. TS3 ClientQuery
-    liefert die Kontakte nicht an externe Tools.
-    💛 Freund = gruener Ring + Badge im Widget. 🚫 Block = im Widget
-    versteckt. Beide sind mutual-exclusive.
+    <b>Channels</b> = wie oft im selben nicht-AFK Channel gewesen.
+    <b>Talk-Zeit</b> = Sekunden die der Mate gesprochen hat waehrend
+    ihr im selben Channel wart.
+    <b>Show</b> = im Widget anzeigen (Trolle aus).
   </div>
   <table id="userTable">
     <thead>
@@ -145,9 +144,9 @@
         <th data-sort="speakingIcon">Speak-Icon</th>
         <th data-sort="silentIcon">Silent-Icon</th>
         <th data-sort="showInWidget">Show</th>
-        <th data-sort="contactStatus" title="Lokaler Marker in obs-stream-kit — NICHT aus TS3 Kontaktliste gelesen">Kontakt</th>
         <th data-sort="notes">Notes</th>
-        <th data-sort="encounters">Begegnungen</th>
+        <th data-sort="encounters" title="Wie oft im selben nicht-AFK Channel gesehen">Channels</th>
+        <th data-sort="talkSecs" title="Sekunden die der Mate gesprochen hat waehrend wir im selben Channel waren">Talk-Zeit</th>
         <th>Aktionen</th>
       </tr>
     </thead>
@@ -163,7 +162,8 @@
   // ── State ─────────────────────────────────────────────────────────
   let users = [];          // alle bekannten TS-User aus DB
   let online = {};         // tsUid -> member-Objekt aus state.members
-  let encounters = {};     // mate_uid -> total
+  let encounters = {};     // mate_uid -> total (count)
+  let talkSecs = {};       // mate_uid -> total seconds talked together
   let afkChannels = [];
   let serverChannels = []; // [{cid, name, ...}] aus /channels
   let currentState = null; // letzter /state response
@@ -208,8 +208,10 @@
         if (m.tsUid) online[m.tsUid] = m;
       }
       encounters = {};
+      talkSecs   = {};
       for (const e of (encR.encounters || [])) {
         encounters[e.mate_uid] = e.total;
+        talkSecs[e.mate_uid]   = e.talk_seconds || 0;
       }
       afkChannels = afkR.afkChannels || [];
       // online Member als noch-nicht-gemappte User in die Liste mergen
@@ -278,12 +280,9 @@
       case "speakingIcon": return u.speaking_icon || "";
       case "silentIcon":   return u.silent_icon || "";
       case "showInWidget": return u.show_in_widget ? 1 : 0;
-      case "contactStatus":
-        if (u.is_friend)  return 2;
-        if (u.is_blocked) return 1;
-        return 0;
       case "notes":        return u.notes || "";
       case "encounters":   return encounters[u.ts_uid] || 0;
+      case "talkSecs":     return talkSecs[u.ts_uid] || 0;
       default:             return "";
     }
   }
@@ -325,13 +324,9 @@
         <td class="col-icons"><input data-f="speakingIcon" placeholder="URL/Pfad" value="${escapeAttr(u.speaking_icon || "")}"></td>
         <td class="col-icons"><input data-f="silentIcon" placeholder="URL/Pfad" value="${escapeAttr(u.silent_icon || "")}"></td>
         <td><input type="checkbox" data-f="showInWidget" ${u.show_in_widget?"checked":""}></td>
-        <td><select data-f="contactStatus">
-          <option value="none"   ${!u.is_friend && !u.is_blocked ? "selected" : ""}>—</option>
-          <option value="friend" ${u.is_friend ? "selected" : ""}>💛 Freund</option>
-          <option value="block"  ${u.is_blocked ? "selected" : ""}>🚫 Block</option>
-        </select></td>
         <td><input class="col-notes" data-f="notes" placeholder="—" value="${escapeAttr(u.notes || "")}"></td>
         <td style="text-align:right; font-variant-numeric:tabular-nums">${encounters[u.ts_uid] || 0}</td>
+        <td style="text-align:right; font-variant-numeric:tabular-nums">${fmtSecs(talkSecs[u.ts_uid] || 0)}</td>
         <td class="actions">${muteBtn}</td>
       </tr>`;
     }).join("");
@@ -351,18 +346,6 @@
         const tsUid = tr.dataset.uid;
         const field = el.dataset.f;
         const value = (el.type === "checkbox") ? el.checked : el.value;
-        // contactStatus → split in isFriend + isBlocked
-        if (field === "contactStatus") {
-          const isFriend  = (value === "friend");
-          const isBlocked = (value === "block");
-          saveUser(tsUid, { isFriend, isBlocked });
-          const u = users.find(x => x.ts_uid === tsUid);
-          if (u) {
-            u.is_friend  = isFriend ? 1 : 0;
-            u.is_blocked = isBlocked ? 1 : 0;
-          }
-          return;
-        }
         saveUser(tsUid, { [field]: value });
         const u = users.find(x => x.ts_uid === tsUid);
         if (u) {
@@ -465,6 +448,15 @@
   document.getElementById("refreshBtn").addEventListener("click", fetchAll);
 
   // ── Helpers ───────────────────────────────────────────────────────
+  function fmtSecs(s) {
+    if (!s) return "—";
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${sec}s`;
+    return `${sec}s`;
+  }
   function escapeHtml(s) {
     return String(s || "")
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

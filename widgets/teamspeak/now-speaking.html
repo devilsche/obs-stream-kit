@@ -125,14 +125,6 @@
                  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
                  font-weight: 600; }
     .ts-row.self .ts-name { color: var(--accent); }
-    .ts-row.friend .ts-avatar { box-shadow: 0 0 0 2px #48c878; }
-    .ts-row.friend.talking .ts-avatar { box-shadow: 0 0 0 2px var(--accent),
-                                                       0 0 0 4px #48c878; }
-    .ts-badge {
-      font-size: 0.85em;
-      flex-shrink: 0;
-      filter: drop-shadow(0 1px 1px rgba(0,0,0,0.6));
-    }
 
     .ts-empty {
       font-style: italic; color: var(--muted); font-size: 0.85em;
@@ -310,13 +302,10 @@
           : `<div class="initials">${initials(name)}</div>`;
         const cls = "ts-row"
           + (m.isTalking ? " talking" : "")
-          + (m.isSelf ? " self" : "")
-          + (m.isFriend ? " friend" : "");
-        const badge = m.isFriend ? `<span class="ts-badge" title="Freund">💛</span>` : "";
+          + (m.isSelf ? " self" : "");
         return `<div class="${cls}" data-uid="${m.tsUid || m.clid || ""}">
           <div class="ts-avatar">${avatar}</div>
           <div class="ts-name">${name}</div>
-          ${badge}
         </div>`;
       }).join("");
       elList.innerHTML = html;
