@@ -388,9 +388,13 @@
             frameEl.removeAttribute("src");
           }
         }
-        // In DOM einsortieren (nach prev, oder als erstes)
+        // In DOM einsortieren (nach prev, oder als erstes).
+        // Wichtig: wenn row noch nicht im DOM (z.B. neu erstellte Row
+        // als erster Member), MUSS insertBefore laufen — sonst bleibt
+        // sie unsichtbar.
+        const inDom = row.parentNode === elList;
         const wantBefore = prev ? prev.nextSibling : elList.firstChild;
-        if (row !== wantBefore && row.previousSibling !== prev) {
+        if (!inDom || (row !== wantBefore && row.previousSibling !== prev)) {
           elList.insertBefore(row, wantBefore);
         }
         prev = row;
