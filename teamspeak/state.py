@@ -38,6 +38,17 @@ class TsState:
         with self._lock:
             now = time.time()
             members = []
+            # Wenn Connection weg ist, melden wir KEINE Member —
+            # State.clients ist evtl. noch stale aus Vor-Disconnect.
+            if not self.connected:
+                return {
+                    "connected":    False,
+                    "status":       self.status_msg,
+                    "channelId":    None,
+                    "channelName":  None,
+                    "serverUid":    None,
+                    "members":      [],
+                }
             for clid, c in self.clients.items():
                 if c.get("channelId") != self.channel_id:
                     continue
@@ -84,9 +95,16 @@ class TsState:
             self.connected = ok
             self.status_msg = msg
             if not ok:
-                # Bei Disconnect alles als nicht-sprechend markieren
+                # Bei Disconnect kompletten State leeren — alles veraltet.
                 self._talking = {}
                 self._talking_until = {}
+                self._talk_start_ts = {}
+                self.clients = {}
+                self.channel_id = None
+                self.channel_name = None
+                self.server_uid = None
+                self.streamer_clid = None
+                self.streamer_uid = None
 
     def set_streamer(self, clid, uid):
         with self._lock:
