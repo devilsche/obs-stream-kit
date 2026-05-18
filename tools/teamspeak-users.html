@@ -127,6 +127,13 @@
 
   <h2>User-Mappings</h2>
   <div class="meta" id="userMeta"></div>
+  <div class="meta">
+    Hinweis: <b>Kontakt</b> (Freund / Block) ist ein lokaler obs-stream-kit-
+    Marker, NICHT synchronisiert mit der TS3-Kontaktliste. TS3 ClientQuery
+    liefert die Kontakte nicht an externe Tools.
+    💛 Freund = gruener Ring + Badge im Widget. 🚫 Block = im Widget
+    versteckt. Beide sind mutual-exclusive.
+  </div>
   <table id="userTable">
     <thead>
       <tr>
@@ -139,8 +146,7 @@
         <th data-sort="speakingIcon">Speak-Icon</th>
         <th data-sort="silentIcon">Silent-Icon</th>
         <th data-sort="showInWidget">Show</th>
-        <th data-sort="isFriend">Freund</th>
-        <th data-sort="isBlocked">Block</th>
+        <th data-sort="contactStatus" title="Lokaler Marker in obs-stream-kit — NICHT aus TS3 Kontaktliste gelesen">Kontakt</th>
         <th data-sort="notes">Notes</th>
         <th data-sort="encounters">Begegnungen</th>
         <th>Aktionen</th>
@@ -261,8 +267,10 @@
       case "speakingIcon": return u.speaking_icon || "";
       case "silentIcon":   return u.silent_icon || "";
       case "showInWidget": return u.show_in_widget ? 1 : 0;
-      case "isFriend":     return u.is_friend ? 1 : 0;
-      case "isBlocked":    return u.is_blocked ? 1 : 0;
+      case "contactStatus":
+        if (u.is_friend)  return 2;
+        if (u.is_blocked) return 1;
+        return 0;
       case "notes":        return u.notes || "";
       case "encounters":   return encounters[u.ts_uid] || 0;
       default:             return "";
@@ -306,8 +314,11 @@
         <td class="col-icons"><input data-f="speakingIcon" placeholder="URL/Pfad" value="${escapeAttr(u.speaking_icon || "")}"></td>
         <td class="col-icons"><input data-f="silentIcon" placeholder="URL/Pfad" value="${escapeAttr(u.silent_icon || "")}"></td>
         <td><input type="checkbox" data-f="showInWidget" ${u.show_in_widget?"checked":""}></td>
-        <td><input type="checkbox" data-f="isFriend" ${u.is_friend?"checked":""}></td>
-        <td><input type="checkbox" data-f="isBlocked" ${u.is_blocked?"checked":""}></td>
+        <td><select data-f="contactStatus">
+          <option value="none"   ${!u.is_friend && !u.is_blocked ? "selected" : ""}>—</option>
+          <option value="friend" ${u.is_friend ? "selected" : ""}>💛 Freund</option>
+          <option value="block"  ${u.is_blocked ? "selected" : ""}>🚫 Block</option>
+        </select></td>
         <td><input class="col-notes" data-f="notes" placeholder="—" value="${escapeAttr(u.notes || "")}"></td>
         <td style="text-align:right; font-variant-numeric:tabular-nums">${encounters[u.ts_uid] || 0}</td>
         <td class="actions">${muteBtn}</td>
@@ -329,18 +340,30 @@
         const tsUid = tr.dataset.uid;
         const field = el.dataset.f;
         const value = (el.type === "checkbox") ? el.checked : el.value;
+        // contactStatus → split in isFriend + isBlocked
+        if (field === "contactStatus") {
+          const isFriend  = (value === "friend");
+          const isBlocked = (value === "block");
+          saveUser(tsUid, { isFriend, isBlocked });
+          const u = users.find(x => x.ts_uid === tsUid);
+          if (u) {
+            u.is_friend  = isFriend ? 1 : 0;
+            u.is_blocked = isBlocked ? 1 : 0;
+          }
+          return;
+        }
         saveUser(tsUid, { [field]: value });
-        // Lokal patchen damit die Tabelle nicht neu rendern muss
         const u = users.find(x => x.ts_uid === tsUid);
         if (u) {
           const dbKey = ({
             customName: "custom_name", steamId: "steam_id",
             displaySource: "display_source",
             speakingIcon: "speaking_icon", silentIcon: "silent_icon",
-            showInWidget: "show_in_widget", isFriend: "is_friend",
-            isBlocked: "is_blocked", notes: "notes",
+            showInWidget: "show_in_widget", notes: "notes",
           })[field];
-          u[dbKey] = (typeof value === "boolean") ? (value ? 1 : 0) : value;
+          if (dbKey) {
+            u[dbKey] = (typeof value === "boolean") ? (value ? 1 : 0) : value;
+          }
         }
       };
       el.addEventListener("change", handler);

@@ -138,6 +138,12 @@ def save_user_mapping(conn, ts_uid, **fields):
             (ts_uid, last_nick, display_source, show_in_widget, updated_at)
         VALUES (?, '', 'ts', 1, ?)
     """, (ts_uid, now))
+    # Mutual-Exclusion: is_friend und is_blocked koennen nicht beide
+    # gleichzeitig aktiv sein.
+    if fields.get("is_friend") == 1:
+        fields["is_blocked"] = 0
+    elif fields.get("is_blocked") == 1:
+        fields["is_friend"] = 0
     set_parts = [f"{k} = ?" for k in fields.keys()]
     set_parts.append("updated_at = ?")
     values = list(fields.values()) + [now, ts_uid]
