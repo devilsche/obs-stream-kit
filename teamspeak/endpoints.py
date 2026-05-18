@@ -53,52 +53,45 @@ class TeamSpeakRegistry:
             return self._mute(body)
         if route == ("GET", "/api/teamspeak/channels"):
             return self._channels()
+        # /stream wird in serve.py spezial-gehandled (Streaming-Response)
         return None
+
+    def enrich_member(self, m):
+        """Pro Member-Eintrag DB-Mappings + Avatar/Frame ergaenzen.
+        Wird sowohl von /state als auch vom SSE-Stream genutzt."""
+        if not self.db: return m
+        from teamspeak.db import get_user
+        from teamspeak.avatars import url_for as avatar_url, frame_url_for as frame_url
+        u = get_user(self.db, m.get("tsUid")) if m.get("tsUid") else None
+        if not u:
+            m.setdefault("displayName", m.get("tsName"))
+            m.setdefault("showInWidget", True)
+            return m
+        src = u.get("display_source") or "ts"
+        custom = u.get("custom_name")
+        m["displayName"]  = custom if (src == "custom" and custom) else m.get("tsName")
+        m["steamId"]      = u.get("steam_id")
+        m["speakingIcon"] = u.get("speaking_icon")
+        m["silentIcon"]   = u.get("silent_icon")
+        m["showInWidget"] = bool(u.get("show_in_widget", 1))
+        if u.get("is_blocked"): m["showInWidget"] = False
+        if self.root_dir and u.get("steam_id"):
+            m["avatarUrl"]      = avatar_url(self.root_dir, u["steam_id"])
+            m["avatarFrameUrl"] = frame_url(self.root_dir, u["steam_id"])
+        return m
+
+    def build_state_payload(self):
+        """Voller enriched Snapshot — von /state und Stream genutzt."""
+        if not self.service:
+            return {"connected": False, "status": "no service", "members": []}
+        snap = self.service.state.snapshot()
+        for m in snap.get("members", []):
+            self.enrich_member(m)
+        return snap
 
     # ── State ──────────────────────────────────────────────────────────
     def _state(self):
-        if not self.service:
-            return _ok({
-                "connected": False,
-                "status":    "no api-key configured",
-                "members":   [],
-            })
-        snap = self.service.state.snapshot()
-        # Mappings ergaenzen pro Member
-        if self.db:
-            from teamspeak.db import get_user
-            from teamspeak.avatars import url_for as avatar_url
-            from teamspeak.avatars import frame_url_for as frame_url
-            for m in snap["members"]:
-                u = get_user(self.db, m.get("tsUid")) if m.get("tsUid") else None
-                if u:
-                    src = u.get("display_source") or "ts"
-                    custom = u.get("custom_name")
-                    if src == "custom" and custom:
-                        m["displayName"] = custom
-                    else:
-                        m["displayName"] = m.get("tsName")
-                    m["steamId"]       = u.get("steam_id")
-                    m["speakingIcon"]  = u.get("speaking_icon")
-                    m["silentIcon"]    = u.get("silent_icon")
-                    m["showInWidget"]  = bool(u.get("show_in_widget", 1))
-                    m["isFriend"]      = bool(u.get("is_friend", 0))
-                    m["isBlocked"]     = bool(u.get("is_blocked", 0))
-                    # Blocked → showInWidget=false damit das Display-
-                    # Widget sie automatisch ausblendet.
-                    if m["isBlocked"]:
-                        m["showInWidget"] = False
-                    if self.root_dir and u.get("steam_id"):
-                        m["avatarUrl"] = avatar_url(
-                            self.root_dir, u["steam_id"])
-                        m["avatarFrameUrl"] = frame_url(
-                            self.root_dir, u["steam_id"])
-                else:
-                    m["displayName"]  = m.get("tsName")
-                    m["showInWidget"] = True
-                    m["isFriend"]     = False
-                    m["isBlocked"]    = False
-        return _ok(snap)
+        return _ok(self.build_state_payload())
 
     # ── User-Mappings ──────────────────────────────────────────────────
     def _users_get(self):

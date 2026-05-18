@@ -61,6 +61,8 @@ class TsState:
                 # blockierte den User wenn TS3 input_hardware=0 meldete
                 # (bei manchen PTT-Setups normaler Default).
                 talking = self._is_talking_now(clid, now)
+                muted = (c.get("input_muted") == "1"
+                          or c.get("input_hardware") == "0")
                 members.append({
                     "clid":      clid,
                     "tsUid":     c.get("uid"),

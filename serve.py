@@ -432,6 +432,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 self.send_error(500, str(e))
                 return
+        if TS_ENABLED and self.path == "/api/teamspeak/stream":
+            self._ts_stream()
+            return
         if TS_ENABLED and self.path.startswith("/api/teamspeak/"):
             try:
                 from urllib.parse import urlparse, parse_qs
@@ -531,6 +534,56 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             pass
 
     # ── Frontend-Error-Endpunkt ────────────────────────────────────────
+    def _ts_stream(self):
+        """SSE-Stream fuer /api/teamspeak/stream — push State an
+        verbundene EventSource-Clients statt 200ms-Polling."""
+        import queue as _q
+        if not ts_service or not ts_registry:
+            self.send_error(503, "teamspeak service offline")
+            return
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache, no-store")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("X-Accel-Buffering", "no")
+            self.end_headers()
+            # Initial-Snapshot direkt schicken
+            payload = ts_registry.build_state_payload()
+            self.wfile.write(
+                f"data: {json.dumps(payload)}\n\n".encode("utf-8"))
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            return
+        sub = ts_service.sse_hub.subscribe()
+        try:
+            while True:
+                try:
+                    msg = sub.get(timeout=20)
+                except _q.Empty:
+                    # Keepalive damit Proxies die Verbindung nicht killen
+                    try:
+                        self.wfile.write(b": keepalive\n\n")
+                        self.wfile.flush()
+                    except (BrokenPipeError, ConnectionResetError, OSError):
+                        break
+                    continue
+                # msg ist der raw State-Snapshot — wir enrichen vor dem
+                # Senden mit DB-Mappings (Steam-Avatar, etc).
+                try:
+                    snap = json.loads(msg)
+                    for m in snap.get("members", []):
+                        ts_registry.enrich_member(m)
+                    out = json.dumps(snap)
+                    self.wfile.write(f"data: {out}\n\n".encode("utf-8"))
+                    self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    break
+                except Exception:
+                    continue
+        finally:
+            ts_service.sse_hub.unsubscribe(sub)
+
     def do_POST(self):
         if PUBG_ENABLED and self.path.startswith("/api/pubg/"):
             try:

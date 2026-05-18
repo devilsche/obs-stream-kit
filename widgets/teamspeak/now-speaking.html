@@ -386,18 +386,35 @@
       });
     }
 
-    async function tick() {
+    // SSE — Server pusht Snapshot bei jedem State-Change. Fallback
+    // auf Polling falls EventSource nicht verfuegbar.
+    let _es = null;
+    function startSSE() {
       try {
-        const r = await fetch("/api/teamspeak/state", { cache: "no-store" });
-        const j = await r.json();
-        render(j);
+        _es = new EventSource("/api/teamspeak/stream");
+        _es.onmessage = (ev) => {
+          try { render(JSON.parse(ev.data)); } catch (e) {}
+        };
+        _es.onerror = () => {
+          // EventSource verbindet sich von selbst wieder. Bei laengerem
+          // Ausfall pessimistisch rendern.
+          render({ connected: false, members: [] });
+        };
       } catch (e) {
-        // Server selber down → State pessimistisch
-        render({ connected: false, members: [] });
+        console.warn("SSE fehlt, fallback polling");
+        async function tick() {
+          try {
+            const r = await fetch("/api/teamspeak/state", { cache: "no-store" });
+            render(await r.json());
+          } catch (_e) {
+            render({ connected: false, members: [] });
+          }
+        }
+        tick();
+        setInterval(tick, POLL_MS);
       }
     }
-    tick();
-    setInterval(tick, POLL_MS);
+    startSSE();
   </script>
 </body>
 </html>

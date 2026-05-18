@@ -153,6 +153,12 @@ class TeamSpeakService:
 
     def _on_notify(self, event, params):
         try:
+            self._handle_notify(event, params)
+        finally:
+            self._publish()
+
+    def _handle_notify(self, event, params):
+        try:
             if event == "notifytalkstatuschange":
                 clid = params.get("clid")
                 if not clid: return
@@ -313,6 +319,7 @@ class TeamSpeakService:
                 except Exception:
                     pass
         self._maybe_count_encounters()
+        self._publish()
 
     def _maybe_count_encounters(self):
         """Pro Channel-Wechsel: fuer jeden Mate im aktuellen Channel
