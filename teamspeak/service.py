@@ -44,17 +44,44 @@ class TeamSpeakService:
 
     def start(self):
         self.client.start()
-        # Talk-Tick: alle 1s pro talking Mate im aktuellen Channel (nicht
-        # AFK) eine Sekunde talk_seconds buchen.
-        import threading
-        self._talk_tick_thread = threading.Thread(
-            target=self._talk_tick_loop, name="ts-talk-tick", daemon=True)
-        self._talk_tick_thread.start()
+        # Talk-Tracking ist event-basiert (notifytalkstatuschange-Stop
+        # buchstabiert die Sekunden in die DB). Kein zyklisches
+        # Polling-Tick mehr noetig.
 
     def stop(self):
         self.client.stop()
 
-    TALK_TICK_SECS = 5
+    TALK_TICK_SECS = 30  # Periodischer Flush fuer langlaufende Talks
+
+    def _on_talk_transition(self, clid, started, started_ts, stopped_ts):
+        """Wird vom State bei JEDEM echten Talk-Start/Stop gerufen.
+        Auf Stop schreiben wir die Differenz in talk_seconds."""
+        if started:
+            return  # Nichts zu tun beim Start — nur Timestamp merken
+        if not self.db: return
+        s = self.state
+        if not s.streamer_uid or not s.server_uid: return
+        # AFK-Channel ueberspringen
+        try:
+            from teamspeak.db import is_afk_channel, bump_talk_seconds
+            if is_afk_channel(self.db, s.server_uid, s.channel_id):
+                return
+        except Exception:
+            return
+        # Welche UID gehoert zu der clid?
+        with s._lock:
+            c = s.clients.get(clid)
+        if not c: return
+        if c.get("channelId") != s.channel_id: return
+        uid = c.get("uid")
+        if not uid or uid == s.streamer_uid: return
+        if started_ts is None or stopped_ts is None: return
+        secs = int(stopped_ts - started_ts)
+        if secs <= 0: return
+        try:
+            bump_talk_seconds(self.db, s.streamer_uid, uid, s.server_uid, secs)
+        except Exception:
+            pass
 
     def _talk_tick_loop(self):
         import time
@@ -118,7 +145,9 @@ class TeamSpeakService:
             if event == "notifytalkstatuschange":
                 clid = params.get("clid")
                 if not clid: return
-                self.state.set_talking(clid, params.get("status") == "1")
+                started = (params.get("status") == "1")
+                self.state.set_talking(clid, started,
+                                         on_transition=self._on_talk_transition)
             elif event == "notifycliententerview":
                 clid = params.get("clid")
                 if not clid: return

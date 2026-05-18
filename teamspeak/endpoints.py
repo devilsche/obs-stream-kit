@@ -220,7 +220,9 @@ class TeamSpeakRegistry:
             return _ok({"channels": [], "error": "no service"})
         import time
         cache_age = time.time() - TeamSpeakRegistry._channels_cache[0]
-        if cache_age < 30.0:
+        # Kurzer Cache (10s) damit der channellist-Call nicht jeden
+        # 3s-Tool-Refresh hits.
+        if cache_age < 10.0 and TeamSpeakRegistry._channels_cache[1]:
             return _ok({"channels": TeamSpeakRegistry._channels_cache[1]})
         try:
             rows = self.service.client.send_command("channellist") or []
