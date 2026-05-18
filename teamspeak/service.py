@@ -45,6 +45,8 @@ class TeamSpeakService:
         self._counted_in_current_channel = set()
         # cid → channel_name, gefuellt aus channellist-Calls
         self._channel_names = {}
+        self._channel_names_at = 0.0  # timestamp letzter channellist
+        self._channel_names_ttl = 60.0
 
     def start(self):
         self.client.start()
@@ -486,12 +488,16 @@ class TeamSpeakService:
         channellist-Call gefuellt und ist instant verfuegbar. Fallback:
         frischer channellist-Call."""
         if not cid: return
-        nm = self._channel_names.get(cid)
-        if nm:
-            self._dbg(f"channel-name cache HIT cid={cid} → '{nm}'")
-            self.state.set_channel(cid, nm)
-            self._publish()
-            return
+        import time as _t
+        cache_age = _t.time() - self._channel_names_at
+        if cache_age < self._channel_names_ttl:
+            nm = self._channel_names.get(cid)
+            if nm:
+                self._dbg(f"channel-name cache HIT cid={cid} → '{nm}' "
+                          f"(age={cache_age:.1f}s)")
+                self.state.set_channel(cid, nm)
+                self._publish()
+                return
         try:
             rows = self.client.send_command("channellist") or []
         except Exception as e:
@@ -499,15 +505,18 @@ class TeamSpeakService:
             self._publish()  # Channel-ID-Update wenigstens raus
             return
         self._dbg(f"channellist: {len(rows)} channels, suche cid={cid}")
-        # Cache komplett befuellen — naechstes Lookup ist instant
+        # Cache komplett ersetzen + timestamp aktualisieren
+        new_cache = {}
         found_nm = None
         for r in rows:
             rcid = r.get("cid")
             rnm = r.get("channel_name")
             if rcid and rnm:
-                self._channel_names[rcid] = rnm
+                new_cache[rcid] = rnm
                 if rcid == cid:
                     found_nm = rnm
+        self._channel_names = new_cache
+        self._channel_names_at = _t.time()
         if found_nm:
             self._dbg(f"  → gefunden: '{found_nm}'")
             self.state.set_channel(cid, found_nm)
