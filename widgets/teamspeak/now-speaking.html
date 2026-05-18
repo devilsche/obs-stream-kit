@@ -316,7 +316,16 @@
         }
         return;
       }
-      elList.dataset.empty = "0";
+      // Wenn wir aus dem Empty-State kommen: alles wegputzen damit
+      // .ts-empty + neue Rows nicht parallel im DOM stehen.
+      if (elList.dataset.empty === "1") {
+        elList.innerHTML = "";
+        elList.dataset.empty = "0";
+      }
+      // Alle non-row Kinder (zur Sicherheit) raus
+      Array.from(elList.children).forEach(c => {
+        if (!c.classList.contains("ts-row")) c.remove();
+      });
 
       // Diff: per UID das existierende DOM-Element wiederverwenden.
       // Nur wenn Member-Set wechselt oder Icon-URL sich aendert wird
