@@ -256,8 +256,8 @@ class ClientQuery:
             self._handle_line(line)
 
     def _readline(self, timeout=None):
-        if timeout is not None:
-            self._sock.settimeout(timeout)
+        # Vor jedem read explizit timeout setzen — None = blocking
+        self._sock.settimeout(timeout)
         try:
             while b"\n" not in self._buf:
                 chunk = self._sock.recv(4096)
@@ -268,8 +268,7 @@ class ClientQuery:
             self._buf = rest
             return line.decode("utf-8", "replace").rstrip("\r")
         finally:
-            if timeout is not None:
-                self._sock.settimeout(None)
+            self._sock.settimeout(None)
 
     def _handle_line(self, line):
         if not line:
