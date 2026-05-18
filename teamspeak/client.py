@@ -141,7 +141,8 @@ class ClientQuery:
         for ev in ("notifytalkstatuschange",
                     "notifyclientmoved",
                     "notifycliententerview",
-                    "notifyclientleftview"):
+                    "notifyclientleftview",
+                    "notifyclientupdated"):
             try:
                 conn.send(
                     "clientnotifyregister",

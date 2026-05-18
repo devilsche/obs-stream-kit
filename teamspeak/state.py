@@ -40,12 +40,17 @@ class TsState:
             for clid, c in self.clients.items():
                 if c.get("channelId") != self.channel_id:
                     continue
+                muted = (c.get("input_muted") == "1"
+                          or c.get("output_muted") == "1"
+                          or c.get("input_hardware") == "0")
+                talking = self._is_talking_now(clid, now) and not muted
                 members.append({
                     "clid":      clid,
                     "tsUid":     c.get("uid"),
                     "tsName":    c.get("nick"),
                     "isSelf":    (clid == self.streamer_clid),
-                    "isTalking": self._is_talking_now(clid, now),
+                    "isTalking": talking,
+                    "isMuted":   muted,
                 })
             return {
                 "connected":    self.connected,

@@ -49,6 +49,8 @@ class TeamSpeakRegistry:
             return self._afk_post(body)
         if route == ("DELETE", "/api/teamspeak/afk-channels"):
             return self._afk_delete(body)
+        if route == ("POST", "/api/teamspeak/mute"):
+            return self._mute(body)
         return None
 
     # ── State ──────────────────────────────────────────────────────────
@@ -196,5 +198,24 @@ class TeamSpeakRegistry:
             remove_afk_channel(self.db,
                 payload["serverUid"], payload["channelId"])
             return _ok({"ok": True})
+        except Exception as e:
+            return _err(400, str(e))
+
+    # ── Mute via ClientQuery (lokaler TS3-Mute) ────────────────────────
+    def _mute(self, body):
+        """Body: {clid, mute: true|false}. Lokaler Mute im TS3-Client
+        des Streamers — du hoerst die Person nicht mehr, andere im
+        Channel schon. Wird via clientmute/clientunmute clid=X gesetzt."""
+        if not self.service:
+            return _err(503, "ts service not running")
+        try:
+            payload = json.loads(body or b"{}")
+            clid = str(payload.get("clid") or "").strip()
+            mute = bool(payload.get("mute"))
+            if not clid:
+                return _err(400, "clid required")
+            cmd = "clientmute" if mute else "clientunmute"
+            self.service.client.send_command(f"{cmd} clid={clid}")
+            return _ok({"ok": True, "clid": clid, "mute": mute})
         except Exception as e:
             return _err(400, str(e))

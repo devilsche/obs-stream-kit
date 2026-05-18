@@ -88,6 +88,21 @@ class TeamSpeakService:
                 clid = params.get("clid")
                 if not clid: return
                 self.state.remove_client(clid)
+            elif event == "notifyclientupdated":
+                # Mute/Hardware-Status-Aenderungen + Nick-Aenderung
+                clid = params.get("clid")
+                if not clid: return
+                fields = {}
+                if "client_input_muted"  in params:
+                    fields["input_muted"]  = params["client_input_muted"]
+                if "client_output_muted" in params:
+                    fields["output_muted"] = params["client_output_muted"]
+                if "client_input_hardware" in params:
+                    fields["input_hardware"] = params["client_input_hardware"]
+                if "client_nickname" in params:
+                    fields["nick"] = params["client_nickname"]
+                if fields:
+                    self.state.upsert_client(clid, **fields)
             elif event == "notifyclientmoved":
                 clid = params.get("clid")
                 ctid = params.get("ctid")
@@ -157,10 +172,10 @@ class TeamSpeakService:
         self._refresh_clientlist(streamer_clid=my_clid)
 
     def _refresh_clientlist(self, streamer_clid=None):
-        """Holt clientlist -uid (alle Clients + UIDs in einer Antwort)
-        und merged sie in den State."""
+        """Holt clientlist mit -uid + -voice (UIDs + Mute/Talking-Flags
+        fuer alle Clients) und merged in den State."""
         try:
-            items = self.client.send_command("clientlist -uid") or []
+            items = self.client.send_command("clientlist -uid -voice") or []
         except ClientQueryError as e:
             LOG.warning("clientlist failed: %s", e)
             return
@@ -171,7 +186,10 @@ class TeamSpeakService:
                 clid,
                 nick=it.get("client_nickname"),
                 channelId=it.get("cid"),
-                uid=it.get("client_unique_identifier"))
+                uid=it.get("client_unique_identifier"),
+                input_muted=it.get("client_input_muted"),
+                output_muted=it.get("client_output_muted"),
+                input_hardware=it.get("client_input_hardware"))
             if streamer_clid and clid == streamer_clid:
                 self.state.set_streamer(
                     clid, it.get("client_unique_identifier"))
