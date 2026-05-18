@@ -76,13 +76,16 @@ class TeamSpeakService:
 
     def _poll_talk_flags(self):
         """Pollt clientlist -voice — Talk-Flags UND Client-State (cid,
-        nick, mute) gleichzeitig refreshen. Damit ist das die einzige
-        zuverlaessige Quelle wenn Notifies droppen."""
+        nick, mute) gleichzeitig refreshen."""
         if not self.state.connected: return
         try:
-            items = self.client.send_command("clientlist -voice") or []
+            items = self.client.send_command("clientlist -voice")
         except Exception as e:
             self._dbg(f"talk-poll FEHLER: {e}")
+            return
+        # KRITISCH: bei leerer Antwort NICHTS loeschen — sonst wiped der
+        # Poll bei einem einzelnen UTF-8-Fehler den ganzen State.
+        if not items:
             return
         changed = False
         seen_clids = set()
@@ -90,7 +93,6 @@ class TeamSpeakService:
             clid = it.get("clid")
             if not clid: continue
             seen_clids.add(clid)
-            # State-Update — Channel, Nick, Mute aus dem Voice-Listing
             self.state.upsert_client(
                 clid,
                 nick=it.get("client_nickname"),
@@ -98,7 +100,6 @@ class TeamSpeakService:
                 input_muted=it.get("client_input_muted"),
                 output_muted=it.get("client_output_muted"),
                 input_hardware=it.get("client_input_hardware"))
-            # Talk-Flag-Vergleich
             now_talk = (it.get("client_flag_talking") == "1")
             was_talk = bool(self.state._talking.get(clid))
             if now_talk != was_talk:
@@ -106,12 +107,14 @@ class TeamSpeakService:
                     clid, now_talk,
                     on_transition=self._on_talk_transition)
                 changed = True
-        # Clients die nicht mehr in der Liste sind → entfernen
-        with self.state._lock:
-            stale = [c for c in self.state.clients if c not in seen_clids]
-        for c in stale:
-            self.state.remove_client(c)
-            changed = True
+        # Stale-Removal nur wenn wir eine plausible Antwort haben
+        # (mindestens 1 Client — uns selbst sollten wir IMMER sehen).
+        if seen_clids:
+            with self.state._lock:
+                stale = [c for c in self.state.clients if c not in seen_clids]
+            for c in stale:
+                self.state.remove_client(c)
+                changed = True
         if changed:
             self._publish()
 
