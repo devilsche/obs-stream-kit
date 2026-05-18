@@ -76,8 +76,14 @@ class TeamSpeakService:
                 if not clid or not ctid: return
                 self.state.upsert_client(clid, channelId=ctid)
                 # Wenn der Streamer selbst gemoved wurde → neuer Channel
+                # + clientlist neu (andere Member waren bereits drin,
+                # haben also kein cliententerview gefeuert).
                 if clid == self.state.streamer_clid:
                     self._refresh_channel_name(ctid)
+                    try:
+                        self._refresh_clientlist()
+                    except Exception as e:
+                        LOG.warning("post-move clientlist refresh: %s", e)
         except Exception as e:
             LOG.warning("notify-handler error %s: %s", event, e)
 
@@ -130,6 +136,32 @@ class TeamSpeakService:
                     pass
         except ClientQueryError as e:
             LOG.warning("clientlist failed: %s", e)
+
+    def _refresh_clientlist(self):
+        """Holt die aktuelle clientlist und merged sie in den State.
+        Wird beim Streamer-Move aufgerufen damit Member im neuen Channel
+        sofort bekannt sind."""
+        items = self.client.send_command("clientlist") or []
+        for it in items:
+            clid = it.get("clid")
+            if not clid: continue
+            self.state.upsert_client(
+                clid,
+                nick=it.get("client_nickname"),
+                channelId=it.get("cid"))
+        # UIDs der Channel-Member nachladen
+        my_cid = self.state.channel_id
+        for it in items:
+            if it.get("cid") != my_cid: continue
+            clid = it.get("clid")
+            try:
+                cv = self.client.send_command(
+                    f"clientvariable clid={clid} client_unique_identifier")
+                if cv:
+                    self.state.upsert_client(
+                        clid, uid=cv[0].get("client_unique_identifier"))
+            except ClientQueryError:
+                pass
 
     def _refresh_channel_name(self, cid):
         if not cid: return

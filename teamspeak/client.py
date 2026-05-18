@@ -164,9 +164,14 @@ class ClientQuery:
                 continue
             if ev is None:
                 continue
-            event_name = "notify" + ev.event  # ev.event = "talkstatuschange" etc
+            # ev.event kann je nach Library-Version 'clientmoved' ODER
+            # 'notifyclientmoved' sein. Normalisieren.
+            ev_name = ev.event or ""
+            if not ev_name.startswith("notify"):
+                ev_name = "notify" + ev_name
             params = dict(ev.parsed[0]) if ev.parsed else {}
-            self.on_notify(event_name, params)
+            LOG.debug("notify %s: %s", ev_name, params)
+            self.on_notify(ev_name, params)
 
     # ── Synchronous send for service.py (initial-sync etc.) ────────────
     def send_command(self, cmd, timeout=3.0):
