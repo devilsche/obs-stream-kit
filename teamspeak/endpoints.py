@@ -213,18 +213,19 @@ class TeamSpeakRegistry:
             return _err(400, str(e))
 
     # ── Channels (fuer AFK-Auswahl im Tool) ────────────────────────────
+    _channels_cache = (0.0, [])  # (timestamp, channels)
+
     def _channels(self):
         if not self.service:
             return _ok({"channels": [], "error": "no service"})
+        import time
+        cache_age = time.time() - TeamSpeakRegistry._channels_cache[0]
+        if cache_age < 30.0:
+            return _ok({"channels": TeamSpeakRegistry._channels_cache[1]})
         try:
             rows = self.service.client.send_command("channellist") or []
         except Exception as e:
-            import traceback
-            print(f"[teamspeak] channellist failed: {e}\n{traceback.format_exc()}",
-                  flush=True)
             return _err(500, f"channellist failed: {e}")
-        print(f"[teamspeak] channellist rows={len(rows)} "
-              f"first={rows[0] if rows else None}", flush=True)
         out = []
         for r in rows:
             out.append({
@@ -234,6 +235,7 @@ class TeamSpeakRegistry:
                 "order":       r.get("channel_order"),
                 "totalClients": r.get("total_clients"),
             })
+        TeamSpeakRegistry._channels_cache = (time.time(), out)
         return _ok({"channels": out})
 
     # ── Mute via ClientQuery (lokaler TS3-Mute) ────────────────────────

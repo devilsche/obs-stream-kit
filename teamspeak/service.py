@@ -54,6 +54,8 @@ class TeamSpeakService:
     def stop(self):
         self.client.stop()
 
+    TALK_TICK_SECS = 5
+
     def _talk_tick_loop(self):
         import time
         while True:
@@ -61,7 +63,7 @@ class TeamSpeakService:
                 self._tick_once()
             except Exception:
                 pass
-            time.sleep(1)
+            time.sleep(self.TALK_TICK_SECS)
 
     def _tick_once(self):
         if not self.db: return
@@ -96,7 +98,7 @@ class TeamSpeakService:
         for uid in mates:
             try:
                 bump_talk_seconds(self.db, s.streamer_uid, uid,
-                                   s.server_uid, 1)
+                                   s.server_uid, self.TALK_TICK_SECS)
             except Exception:
                 continue
 

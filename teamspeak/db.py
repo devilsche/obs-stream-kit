@@ -69,21 +69,14 @@ CREATE TABLE IF NOT EXISTS teamspeak_afk_channels (
 """
 
 
-import threading
-_DB_LOCK = threading.Lock()
-
-
 def connect(path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    # check_same_thread=False + WAL + timeout=5s ist multi-thread-safe.
+    # SQLite serialisiert intern, kein Python-Lock noetig.
     conn = sqlite3.connect(path, check_same_thread=False, timeout=5.0)
     conn.row_factory = sqlite3.Row
-    with _DB_LOCK: conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA journal_mode=WAL")
     return conn
-
-
-def _safe_execute(conn, sql, params=()):
-    with _DB_LOCK:
-        return conn.execute(sql, params)
 
 
 def init_schema(conn):
@@ -96,11 +89,11 @@ def init_schema(conn):
         ("notes",      "TEXT"),
     ]:
         try:
-            with _DB_LOCK: conn.execute(f"ALTER TABLE teamspeak_users ADD COLUMN {col} {ddl}")
+            conn.execute(f"ALTER TABLE teamspeak_users ADD COLUMN {col} {ddl}")
         except Exception:
             pass
     try:
-        with _DB_LOCK: conn.execute("ALTER TABLE teamspeak_encounters "
+        conn.execute("ALTER TABLE teamspeak_encounters "
                      "ADD COLUMN talk_seconds INTEGER NOT NULL DEFAULT 0")
     except Exception:
         pass
@@ -114,7 +107,7 @@ def upsert_user_nick(conn, ts_uid, nick):
     if not ts_uid or not nick:
         return
     now = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-    with _DB_LOCK: conn.execute("""
+    conn.execute("""
         INSERT INTO teamspeak_users (ts_uid, last_nick, updated_at)
         VALUES (?, ?, ?)
         ON CONFLICT(ts_uid) DO UPDATE SET
@@ -130,7 +123,7 @@ def get_all_users(conn):
 
 
 def get_user(conn, ts_uid):
-    with _DB_LOCK: r = conn.execute(
+    r = conn.execute(
         "SELECT * FROM teamspeak_users WHERE ts_uid = ?",
         (ts_uid,)).fetchone()
     return dict(r) if r else None
@@ -148,7 +141,7 @@ def save_user_mapping(conn, ts_uid, **fields):
         return
     now = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     # Erst INSERT mit Defaults sicherstellen
-    with _DB_LOCK: conn.execute("""
+    conn.execute("""
         INSERT OR IGNORE INTO teamspeak_users
             (ts_uid, last_nick, display_source, show_in_widget, updated_at)
         VALUES (?, '', 'ts', 1, ?)
@@ -162,7 +155,7 @@ def save_user_mapping(conn, ts_uid, **fields):
     set_parts = [f"{k} = ?" for k in fields.keys()]
     set_parts.append("updated_at = ?")
     values = list(fields.values()) + [now, ts_uid]
-    with _DB_LOCK: conn.execute(
+    conn.execute(
         f"UPDATE teamspeak_users SET {', '.join(set_parts)} WHERE ts_uid = ?",
         values)
     conn.commit()
@@ -175,7 +168,7 @@ def bump_encounter(conn, streamer_uid, mate_uid, server_uid):
     if streamer_uid == mate_uid:
         return
     now = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-    with _DB_LOCK: conn.execute("""
+    conn.execute("""
         INSERT INTO teamspeak_encounters
             (streamer_uid, mate_uid, server_uid, count, last_seen)
         VALUES (?, ?, ?, 1, ?)
@@ -211,7 +204,7 @@ def bump_talk_seconds(conn, streamer_uid, mate_uid, server_uid, seconds):
     if seconds <= 0: return
     import datetime
     now = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-    with _DB_LOCK: conn.execute("""
+    conn.execute("""
         INSERT INTO teamspeak_encounters
             (streamer_uid, mate_uid, server_uid, count, talk_seconds, last_seen)
         VALUES (?, ?, ?, 0, ?, ?)
@@ -235,7 +228,7 @@ def get_afk_channels(conn, server_uid=None):
 
 
 def set_afk_channel(conn, server_uid, channel_id, channel_name):
-    with _DB_LOCK: conn.execute("""
+    conn.execute("""
         INSERT INTO teamspeak_afk_channels (server_uid, channel_id, channel_name)
         VALUES (?, ?, ?)
         ON CONFLICT(server_uid, channel_id) DO UPDATE SET
@@ -245,7 +238,7 @@ def set_afk_channel(conn, server_uid, channel_id, channel_name):
 
 
 def remove_afk_channel(conn, server_uid, channel_id):
-    with _DB_LOCK: conn.execute(
+    conn.execute(
         "DELETE FROM teamspeak_afk_channels "
         "WHERE server_uid = ? AND channel_id = ?",
         (server_uid, channel_id))
@@ -253,7 +246,7 @@ def remove_afk_channel(conn, server_uid, channel_id):
 
 
 def is_afk_channel(conn, server_uid, channel_id):
-    with _DB_LOCK: r = conn.execute(
+    r = conn.execute(
         "SELECT 1 FROM teamspeak_afk_channels "
         "WHERE server_uid = ? AND channel_id = ?",
         (server_uid, channel_id)).fetchone()
