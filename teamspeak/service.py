@@ -277,8 +277,9 @@ class TeamSpeakService:
                 # haben also kein cliententerview gefeuert).
                 if clid == self.state.streamer_clid:
                     # Channel-ID SOFORT setzen damit snapshot ab jetzt den
-                    # neuen Channel filtert. Name kommt asynchron nach.
-                    self.state.set_channel(ctid, self.state.channel_name)
+                    # neuen Channel filtert. Name auf None — alter Name
+                    # waere irrefuehrend, neuer kommt asynchron nach.
+                    self.state.set_channel(ctid, None)
                     # Worker-Thread — send_command darf nicht aus dem
                     # notify/read-thread laufen (deadlock).
                     import threading
