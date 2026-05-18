@@ -280,39 +280,77 @@
         elStat.textContent = "off";
       }
 
-      // Members — sortiert: self zuerst, dann talking, dann nick
       const members = (data.members || [])
         .filter(m => m.showInWidget !== false)
         .slice()
         .sort((a, b) => {
           if (a.isSelf && !b.isSelf) return -1;
           if (b.isSelf && !a.isSelf) return 1;
-          if (a.isTalking !== b.isTalking) return a.isTalking ? -1 : 1;
+          // KEIN talking-sort — sonst rebuilden wir das DOM nur weil
+          // jemand zu reden anfaengt. Nur alpha + self oben.
           return (a.displayName || a.tsName || "").localeCompare(
                  b.displayName || b.tsName || "");
         });
       if (!members.length) {
-        elList.innerHTML = `<div class="ts-empty">— allein im Channel —</div>`;
+        if (elList.dataset.empty !== "1") {
+          elList.innerHTML = `<div class="ts-empty">— allein im Channel —</div>`;
+          elList.dataset.empty = "1";
+        }
         return;
       }
-      const html = members.map(m => {
+      elList.dataset.empty = "0";
+
+      // Diff: per UID das existierende DOM-Element wiederverwenden.
+      // Nur wenn Member-Set wechselt oder Icon-URL sich aendert wird
+      // wirklich gerendert. Sonst toggeln wir nur die .talking-Klasse.
+      const existing = new Map();
+      elList.querySelectorAll(".ts-row").forEach(el => {
+        existing.set(el.dataset.uid, el);
+      });
+      const seen = new Set();
+      let prev = null;
+      for (const m of members) {
+        const uid = m.tsUid || m.clid || "";
+        seen.add(uid);
         const name = m.displayName || m.tsName || "?";
-        // Priorisierung: custom Icon je nach Talking → Steam-Avatar → Initialen
         const iconSrc = m.isTalking
           ? (m.speakingIcon || m.avatarUrl)
           : (m.silentIcon || m.avatarUrl);
-        const avatar = iconSrc
-          ? `<img src="${iconSrc}" alt="">`
-          : `<div class="initials">${initials(name)}</div>`;
-        const cls = "ts-row"
-          + (m.isTalking ? " talking" : "")
-          + (m.isSelf ? " self" : "");
-        return `<div class="${cls}" data-uid="${m.tsUid || m.clid || ""}">
-          <div class="ts-avatar">${avatar}</div>
-          <div class="ts-name">${name}</div>
-        </div>`;
-      }).join("");
-      elList.innerHTML = html;
+        let row = existing.get(uid);
+        if (!row) {
+          row = document.createElement("div");
+          row.className = "ts-row";
+          row.dataset.uid = uid;
+          row.innerHTML = `<div class="ts-avatar"></div><div class="ts-name"></div>`;
+        }
+        // Klassen toggeln (kein DOM-Rebuild noetig)
+        row.classList.toggle("talking", !!m.isTalking);
+        row.classList.toggle("self", !!m.isSelf);
+        // Name nur setzen wenn aendert
+        const nameEl = row.querySelector(".ts-name");
+        if (nameEl.textContent !== name) nameEl.textContent = name;
+        // Avatar/Icon nur ersetzen wenn src wechselt
+        const avEl = row.querySelector(".ts-avatar");
+        const wantSrc = iconSrc || "";
+        if (avEl.dataset.src !== wantSrc) {
+          avEl.dataset.src = wantSrc;
+          if (wantSrc) {
+            avEl.innerHTML = `<img src="${wantSrc}" alt="">`;
+          } else {
+            avEl.innerHTML = `<div class="initials">${initials(name)}</div>`;
+          }
+        }
+        // In DOM einsortieren (nach prev, oder als erstes)
+        const wantBefore = prev ? prev.nextSibling : elList.firstChild;
+        if (row !== wantBefore && row.previousSibling !== prev) {
+          elList.insertBefore(row, wantBefore);
+        }
+        prev = row;
+      }
+      // Entfernte Members ausblenden
+      existing.forEach((el, uid) => {
+        if (!seen.has(uid)) el.remove();
+      });
     }
 
     async function tick() {
