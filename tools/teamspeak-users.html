@@ -300,6 +300,13 @@
     meta.textContent = `${users.length} bekannt · ${onlineCount} online · `
       + `Channel: ${currentState && currentState.channelName || "—"}`;
     const body = document.getElementById("userBody");
+    if (!sorted.length) {
+      body.innerHTML = `<tr><td colspan="14" style="text-align:center;color:#8a7d99;padding:20px">
+        — keine User in DB UND keiner online im Channel — TS3 verbunden? Check
+        /api/teamspeak/state im Browser.
+      </td></tr>`;
+      return;
+    }
     body.innerHTML = sorted.map(u => {
       const onlineMem = online[u.ts_uid];
       const cls = (onlineMem ? "online" : "offline") + (u.is_blocked ? " blocked" : "");
