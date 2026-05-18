@@ -155,14 +155,18 @@ class TeamSpeakService:
         if not server_uid:
             try:
                 sc = self.client.send_command("serverconnectinfo") or []
+                self._dbg(f" serverconnectinfo parsed: {sc}")
                 if sc:
                     r = sc[0]
                     ip = r.get("ip") or r.get("host") or ""
                     port = r.get("port") or ""
                     if ip and port:
                         server_uid = f"{ip}:{port}"
+                    elif ip:
+                        server_uid = str(ip)
             except ClientQueryError as e:
                 LOG.info("serverconnectinfo: %s", e)
+        self._dbg(f" -> server_uid={server_uid}")
         LOG.info("whoami: clid=%s cid=%s server_uid=%s",
                  my_clid, my_cid, server_uid)
         self.state.server_uid = server_uid

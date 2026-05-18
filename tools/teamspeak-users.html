@@ -153,11 +153,16 @@
   <div class="meta">Channels die hier markiert sind, werden vom Encounter-Counter ignoriert.</div>
   <div class="afk-list" id="afkList"></div>
   <div class="afk-add">
-    <label>Server: <select id="afkServer" style="min-width:160px"></select></label>
+    <label>Server:
+      <input id="afkServer" list="afkServerList" style="min-width:220px"
+             placeholder="ip:port oder Server-UID">
+      <datalist id="afkServerList"></datalist>
+    </label>
     <label>Channel-ID: <input id="afkChId" style="width:80px"></label>
     <label>Channel-Name: <input id="afkChName" style="width:180px"></label>
     <button id="afkAddBtn">+ AFK-Channel</button>
   </div>
+  <div class="meta" id="afkHint"></div>
 </div>
 
 <script>
@@ -396,23 +401,41 @@
       });
     });
 
-    // Server-Dropdown: aktueller + alle bekannten Server-Uids aus
-    // bestehenden Eintraegen
-    const sel = document.getElementById("afkServer");
+    // Datalist mit allen bekannten Server-Uids fuer Autocomplete.
+    // Plus: aktuellen TS-Server automatisch als Default vorbelegen.
+    const dl = document.getElementById("afkServerList");
+    const inp = document.getElementById("afkServer");
     const servers = new Set();
     if (currentState && currentState.serverUid) servers.add(currentState.serverUid);
     afkChannels.forEach(c => servers.add(c.server_uid));
-    sel.innerHTML = [...servers].map(s =>
-      `<option value="${escapeAttr(s)}">${s}</option>`).join("")
-      || `<option value="">(kein Server)</option>`;
+    dl.innerHTML = [...servers].map(s =>
+      `<option value="${escapeAttr(s)}">`).join("");
+    if (!inp.value && currentState && currentState.serverUid) {
+      inp.value = currentState.serverUid;
+    }
+    const hint = document.getElementById("afkHint");
+    if (currentState && currentState.serverUid) {
+      hint.textContent =
+        `Aktueller TS-Server: ${currentState.serverUid} · Channel-ID `
+        + `findest du in TS3 via Rechtsklick auf Channel → 'ID kopieren' `
+        + `oder am Channel-Eintrag (im Server-Tree mit aktivierten IDs).`;
+    } else {
+      hint.textContent =
+        "TS-Server-ID wurde nicht erkannt — du kannst manuell ip:port "
+        + "eintragen (genau wie es in der TS3-Server-Verbindung steht).";
+    }
   }
 
   document.getElementById("afkAddBtn").addEventListener("click", async () => {
-    const srv = document.getElementById("afkServer").value;
+    const srv = document.getElementById("afkServer").value.trim();
     const cid = document.getElementById("afkChId").value.trim();
     const nm  = document.getElementById("afkChName").value.trim();
-    if (!srv || !cid) {
-      setStatus("Server + Channel-ID required", "err");
+    if (!srv) {
+      setStatus("Server-Identifier eintragen (ip:port oder UID)", "err");
+      return;
+    }
+    if (!cid) {
+      setStatus("Channel-ID eintragen", "err");
       return;
     }
     try {
