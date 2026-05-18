@@ -13,7 +13,9 @@ DEFAULTS = {
     # automatisch ermittelt (whoami) und in DB persistiert.
     "streamerTsUid": "",
     # Hysterese — wie lange ein "stopped talking" verzoegert wird.
-    "talkingTailMs": 400,
+    # 150ms reicht damit Mikropausen nicht ans Stoppen koppeln, sub-200ms
+    # 'ja'/'ok' bleiben aber sichtbar.
+    "talkingTailMs": 150,
 }
 
 

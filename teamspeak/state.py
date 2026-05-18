@@ -43,8 +43,14 @@ class TsState:
                     continue
                 # Nur input-mute (Mic aus) blockiert talking — output_muted
                 # bedeutet 'ich hoere nichts' und hindert nicht am Sprechen.
-                muted = (c.get("input_muted") == "1"
-                          or c.get("input_hardware") == "0")
+                is_self = (clid == self.streamer_clid)
+                # Mute-Filter nur fuer SELF — bei mir ist Mute ein
+                # echtes 'Ich rede nicht' Signal. Bei anderen vertrauen
+                # wir notifytalkstatuschange direkt — sonst werden
+                # Radio-Bots etc. faelschlich rausgefiltert.
+                muted = is_self and (
+                    c.get("input_muted") == "1"
+                    or c.get("input_hardware") == "0")
                 talking = self._is_talking_now(clid, now) and not muted
                 members.append({
                     "clid":      clid,

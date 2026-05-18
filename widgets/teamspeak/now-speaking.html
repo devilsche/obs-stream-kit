@@ -175,7 +175,7 @@
   <script>
     // ── URL-Params ────────────────────────────────────────────────────
     const qs = new URLSearchParams(location.search);
-    const POLL_MS  = parseInt(qs.get("pollMs") || "500", 10);
+    const POLL_MS  = parseInt(qs.get("pollMs") || "200", 10);
     const WIDTH    = qs.get("width") || "280";
     const AV_SIZE  = qs.get("avatar") || "36";
     const ACCENT   = qs.get("accent") || "#f2b705";
@@ -297,8 +297,12 @@
       }
       const html = members.map(m => {
         const name = m.displayName || m.tsName || "?";
-        const avatar = m.avatarUrl
-          ? `<img src="${m.avatarUrl}" alt="">`
+        // Priorisierung: custom Icon je nach Talking → Steam-Avatar → Initialen
+        const iconSrc = m.isTalking
+          ? (m.speakingIcon || m.avatarUrl)
+          : (m.silentIcon || m.avatarUrl);
+        const avatar = iconSrc
+          ? `<img src="${iconSrc}" alt="">`
           : `<div class="initials">${initials(name)}</div>`;
         const cls = "ts-row"
           + (m.isTalking ? " talking" : "")
