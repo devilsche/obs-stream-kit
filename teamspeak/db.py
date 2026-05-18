@@ -97,6 +97,13 @@ def init_schema(conn):
                      "ADD COLUMN talk_seconds INTEGER NOT NULL DEFAULT 0")
     except Exception:
         pass
+    # is_blocked-Spalte gibt's noch (Schema), aber wir nutzen sie nicht
+    # mehr. Stelle sicher dass keine alten Flags Member ausblenden.
+    try:
+        conn.execute("UPDATE teamspeak_users SET is_blocked = 0 "
+                     "WHERE is_blocked = 1")
+    except Exception:
+        pass
     conn.commit()
 
 

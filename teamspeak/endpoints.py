@@ -77,7 +77,9 @@ class TeamSpeakRegistry:
         m["speakingIcon"] = u.get("speaking_icon")
         m["silentIcon"]   = u.get("silent_icon")
         m["showInWidget"] = bool(u.get("show_in_widget", 1))
-        if u.get("is_blocked"): m["showInWidget"] = False
+        # is_blocked-Logik bewusst raus — User hat die Spalte aus dem
+        # Tool entfernt, alte Flags duerften nicht stillschweigend
+        # weiterfiltern.
         if self.root_dir and u.get("steam_id"):
             m["avatarUrl"]      = avatar_url(self.root_dir, u["steam_id"])
             m["avatarFrameUrl"] = frame_url(self.root_dir, u["steam_id"])
