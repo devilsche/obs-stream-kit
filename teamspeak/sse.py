@@ -23,16 +23,13 @@ class SSEHub:
         self._last_snapshot = None  # fuer initial send
 
     def subscribe(self):
-        """Returns eine Queue. Caller liest in einer Loop davon."""
+        """Returns eine Queue. Caller liest in einer Loop davon.
+        Initialer Snapshot wird NICHT vorab eingestellt — der Handler
+        ruft selbst einen frischen build_state_payload() und sendet
+        den als erstes."""
         q = queue.Queue(maxsize=50)
         with self._lock:
             self._subs.append(q)
-            # initiales Snapshot in die Queue
-            if self._last_snapshot is not None:
-                try:
-                    q.put_nowait(self._last_snapshot)
-                except queue.Full:
-                    pass
         return q
 
     def unsubscribe(self, q):

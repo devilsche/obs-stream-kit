@@ -49,17 +49,46 @@ class TeamSpeakService:
         # Talk-Tracking ist event-basiert (notifytalkstatuschange-Stop
         # buchstabiert die Sekunden in die DB). Kein zyklisches
         # Polling-Tick mehr noetig.
-        # Safety: alle 5s einmal publishen — falls ein Event-Pfad einen
-        # publish vergisst, bleibt das Widget nie laenger als 5s stale.
+        # Safety: alle 5s publishen + alle 15s full re-sync mit TS3.
+        # Hintergrund: ts3-Library verschluckt manchmal Notifies durch
+        # UTF-8-Strict-Decode-Errors. Periodisches Resync holt den
+        # echten Zustand und korrigiert silently verlorene Events.
         import threading
-        def _safety_publish():
+        def _safety_loop():
             import time as _t
+            i = 0
             while True:
                 _t.sleep(5)
+                i += 1
                 try: self._publish()
                 except Exception: pass
-        threading.Thread(target=_safety_publish, name="ts-safety-pub",
+                if i % 3 == 0 and self.state.connected:
+                    try:
+                        # Re-sync: whoami + clientlist neu, in Worker-
+                        # Thread damit unser sleep nicht haengt.
+                        threading.Thread(
+                            target=self._safe_resync,
+                            name="ts-safety-resync", daemon=True).start()
+                    except Exception: pass
+        threading.Thread(target=_safety_loop, name="ts-safety-pub",
                            daemon=True).start()
+
+    def _safe_resync(self):
+        """Zieht whoami + clientlist + channelName neu, ueberschreibt
+        State mit echten TS3-Daten. Hilft bei Notifies die die Library
+        wegen UTF-8-Decode-Errors verschluckt hat."""
+        try:
+            rows = self.client.send_command("whoami") or []
+            if rows:
+                w = rows[0]
+                my_cid = w.get("client_channel_id") or w.get("cid")
+                if my_cid and my_cid != self.state.channel_id:
+                    # Channel hat sich heimlich geaendert!
+                    self.state.set_channel(my_cid, None)
+                    self._refresh_channel_name(my_cid)
+            self._refresh_clientlist(streamer_clid=self.state.streamer_clid)
+        except Exception as e:
+            LOG.info("safe_resync: %s", e)
 
     def stop(self):
         self.client.stop()
@@ -174,6 +203,7 @@ class TeamSpeakService:
                 clid = params.get("clid")
                 if not clid: return
                 started = (params.get("status") == "1")
+                print(f"[teamspeak] talk {clid} → {started}", flush=True)
                 self.state.set_talking(clid, started,
                                          on_transition=self._on_talk_transition)
             elif event == "notifycliententerview":
