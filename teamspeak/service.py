@@ -91,12 +91,17 @@ class TeamSpeakService:
     def _initial_sync(self):
         # whoami: client_id / client_channel_id / virtualserver_unique_identifier
         rows = self.client.send_command("whoami")
+        print(f"[teamspeak] whoami rows-anzahl: {len(rows)}", flush=True)
+        for i, r in enumerate(rows):
+            print(f"[teamspeak] whoami row[{i}]: {r}", flush=True)
         if not rows:
             LOG.warning("whoami: empty reply")
             return
-        w = rows[0]
-        print(f"[teamspeak] whoami felder: {list(w.keys())}", flush=True)
-        print(f"[teamspeak] whoami werte: {dict(w)}", flush=True)
+        # Falls multiple rows: alle Felder zusammenkippen
+        w = {}
+        for r in rows:
+            w.update(r)
+        print(f"[teamspeak] whoami merged keys: {list(w.keys())}", flush=True)
         my_clid = w.get("client_id") or w.get("clid")
         my_cid  = w.get("client_channel_id") or w.get("cid")
         # ServerUid: kann unter unterschiedlichen Keys auftauchen
