@@ -93,6 +93,7 @@ class ClientQuery:
         self._running = False
         self._thread = None
         self._connected = False
+        self._read_loop_active = False  # True nur waehrend _read_forever laeuft
 
     def start(self):
         if self._running:
@@ -161,20 +162,46 @@ class ClientQuery:
             except socket.timeout:
                 break
 
+    # Synchroner Send-Read fuer die Handshake-Phase (BEVOR der Read-Loop
+    # laeuft — sonst gibt's keinen Reader fuer Replies).
+    def _sync_command(self, cmd, timeout=3.0):
+        try:
+            self._sock.sendall((cmd + "\n").encode("utf-8"))
+        except OSError as e:
+            raise ClientQueryError(f"send failed: {e}")
+        # Lies Zeilen bis wir 'error id=...' sehen oder Timeout.
+        body = []
+        deadline_each = timeout
+        while True:
+            line = self._readline(timeout=deadline_each)
+            if line is None:
+                raise ClientQueryError(f"connection closed waiting for: {cmd}")
+            if line.startswith("error "):
+                params = parse_params(line[6:])
+                if params.get("id") != "0":
+                    raise ClientQueryError(
+                        f"err {params.get('id')}: {params.get('msg','?')}")
+                return body
+            if line.startswith("notify"):
+                # Async-Notify mitten in Handshake — buffern fuer den
+                # spaeteren Read-Loop ist umstaendlich, also einfach
+                # ignorieren waehrend des Handshakes.
+                continue
+            body.append(line)
+
     def _auth_and_subscribe(self):
         # Strategie:
         # 1. whoami direkt probieren — wenn das klappt, braucht der Plugin
         #    keinen auth (z.B. 'Open Query for everyone' aktiv) → fertig.
         # 2. Sonst auth apikey=… senden und whoami nochmal probieren.
-        # 3. Wenn auch das nicht klappt → klarer Fehler.
         key_len = len(self.apikey or "")
         LOG.info("apikey-Laenge=%d, erste 4 Zeichen=%s****",
                  key_len, (self.apikey or "")[:4])
         # Phase 1: ohne auth
         try:
-            self.send_command("whoami", timeout=2.0)
+            self._sync_command("whoami", timeout=2.0)
             LOG.info("whoami klappt ohne auth — Plugin ist offen")
-            self._subscribe_notifies()
+            self._subscribe_notifies_sync()
             return
         except ClientQueryError as e1:
             LOG.info("whoami ohne auth: %s — probiere auth", e1)
@@ -184,7 +211,7 @@ class ClientQuery:
                 "Plugin verlangt auth aber kein TS3-ClientQuery-Key in "
                 ".secrets. Trag ihn ein als 'TS3-ClientQuery-Key: <KEY>'")
         try:
-            self.send_command(f"auth apikey={self.apikey}", timeout=3.0)
+            self._sync_command(f"auth apikey={self.apikey}", timeout=3.0)
             LOG.info("auth ok")
         except ClientQueryError as e:
             raise ClientQueryError(
@@ -195,26 +222,33 @@ class ClientQuery:
                 f"(keine Anfuehrungszeichen, keine Leerzeichen davor/dahinter).")
         # Phase 3: whoami nochmal
         try:
-            self.send_command("whoami", timeout=2.0)
+            self._sync_command("whoami", timeout=2.0)
             LOG.info("whoami nach auth ok")
         except ClientQueryError as e:
             raise ClientQueryError(
                 f"auth ging durch, aber whoami immer noch nicht: {e}")
-        self._subscribe_notifies()
+        self._subscribe_notifies_sync()
 
-    def _subscribe_notifies(self):
+    def _subscribe_notifies_sync(self):
         for ev in ("notifytalkstatuschange",
                     "notifyclientmoved",
                     "notifycliententerview",
                     "notifyclientleftview"):
             try:
-                self.send_command(
+                self._sync_command(
                     f"clientnotifyregister schandlerid=0 event={ev}",
                     timeout=2.0)
             except ClientQueryError as e:
                 LOG.warning("subscribe %s failed: %s", ev, e)
 
     def _read_forever(self):
+        self._read_loop_active = True
+        try:
+            self._read_forever_inner()
+        finally:
+            self._read_loop_active = False
+
+    def _read_forever_inner(self):
         while self._running:
             line = self._readline()
             if line is None:
@@ -252,13 +286,21 @@ class ClientQuery:
         # Sonst: Body einer Reply
         self._reply_lines.append(("body", line))
 
-    # ── Send-Command (synchron, blocking) ─────────────────────────────
+    # ── Send-Command ───────────────────────────────────────────────────
     def send_command(self, cmd, timeout=3.0):
         """Sendet 'cmd\\n', wartet auf 'error id=0 msg=ok'-Zeile.
-        Returns Body-Lines als Liste. Wirft ClientQueryError bei error_id != 0
-        oder Timeout."""
+        Returns Body-Lines als Liste. Wirft ClientQueryError bei error_id
+        != 0 oder Timeout.
+
+        Wenn der Read-Loop noch nicht laeuft (Phase: Handshake +
+        initial_sync VOR _read_forever), lesen wir die Reply synchron
+        selbst — sonst wartet send_command auf einen Reader, der nicht
+        existiert, und timed alles aus."""
         if not self._sock:
             raise ClientQueryError("not connected")
+        if not self._read_loop_active:
+            with self._cmd_lock:
+                return self._sync_command(cmd, timeout=timeout)
         with self._cmd_lock:
             self._reply_lines = []
             self._reply_event.clear()
