@@ -164,11 +164,18 @@ class TeamSpeakService:
                 # + clientlist neu (andere Member waren bereits drin,
                 # haben also kein cliententerview gefeuert).
                 if clid == self.state.streamer_clid:
-                    self._refresh_channel_name(ctid)
-                    try:
-                        self._refresh_clientlist()
-                    except Exception as e:
-                        LOG.warning("post-move clientlist refresh: %s", e)
+                    # Worker-Thread — send_command darf nicht aus dem
+                    # notify/read-thread laufen (deadlock).
+                    import threading
+                    def _post_move():
+                        try:
+                            self._refresh_channel_name(ctid)
+                            self._refresh_clientlist()
+                        except Exception as e:
+                            LOG.warning("post-move refresh: %s", e)
+                    threading.Thread(
+                        target=_post_move, name="ts-post-move",
+                        daemon=True).start()
                 else:
                     # Mate ist in unseren Channel gewechselt → ggf zaehlen
                     self._maybe_count_encounters()
