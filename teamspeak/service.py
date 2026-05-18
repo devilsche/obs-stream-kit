@@ -115,23 +115,24 @@ class TeamSpeakService:
             w.get("virtualserver_unique_identifier")
             or w.get("vsid")
             or w.get("server_unique_identifier"))
-        # Fallback-Kette fuer ServerUid. Wir loggen jedes Resultat
-        # voll, damit klar ist welche Antwort die Library wie parst.
-        for fb_cmd in ("serverinfo", "serverconnectinfo",
-                        "serverconnectionhandlerlist", "currentschandlerid"):
-            if server_uid:
-                break
+        # ClientQuery hat keinen sauberen Weg zur kryptografischen
+        # virtualserver_unique_identifier (servervariable braucht
+        # bareword-Syntax die py-ts3 nicht unterstuetzt). Wir nutzen
+        # 'ip:port' aus serverconnectinfo als Server-Identifier — fuer
+        # unseren Zweck (AFK-Channels pro Server scopen, User-Mapping)
+        # reicht das vollkommen.
+        if not server_uid:
             try:
-                fb = self.client.send_command(fb_cmd) or []
-                self._dbg(f" {fb_cmd}: {fb}")
-                for r in fb:
-                    uid = (r.get("virtualserver_unique_identifier")
-                           or r.get("server_unique_identifier"))
-                    if uid:
-                        server_uid = uid
-                        break
+                sc = self.client.send_command("serverconnectinfo") or []
+                self._dbg(f" serverconnectinfo: {sc}")
+                if sc:
+                    r = sc[0]
+                    ip = r.get("ip") or r.get("host") or ""
+                    port = r.get("port") or ""
+                    if ip and port:
+                        server_uid = f"{ip}:{port}"
             except ClientQueryError as e:
-                self._dbg(f" {fb_cmd} failed: {e}")
+                self._dbg(f" serverconnectinfo failed: {e}")
         LOG.info("whoami: clid=%s cid=%s server_uid=%s",
                  my_clid, my_cid, server_uid)
         self.state.server_uid = server_uid
