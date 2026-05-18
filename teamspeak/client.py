@@ -125,13 +125,14 @@ class ClientQuery:
         if self.apikey:
             LOG.info("auth: apikey-Laenge=%d", len(self.apikey))
             try:
-                conn.auth(apikey=self.apikey)
+                # TS3Connection.send(command, common_parameters_dict).
+                # Library hat keine .auth() / .whoami()-Magic-Methods —
+                # alle commands gehen ueber .send().
+                conn.send("auth", {"apikey": self.apikey})
                 LOG.info("auth ok")
             except self._TS3QueryError as e:
-                # Manche Setups haben 'Open Query' — auth wird nicht
-                # benoetigt. Wir probieren weiter, whoami sagt's uns.
                 LOG.info("auth fehlgeschlagen (%s) — probier weiter", e)
-        # Sanity: whoami
+        # Sanity: whoami (probiert ob commands jetzt durchgehen)
         try:
             conn.send("whoami")
         except Exception as e:
