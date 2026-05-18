@@ -87,13 +87,19 @@ class TeamSpeakService:
         except Exception as e:
             LOG.warning("notify-handler error %s: %s", event, e)
 
+    def _dbg(self, *parts):
+        msg = "[teamspeak] " + " ".join(str(p) for p in parts)
+        import sys
+        print(msg, flush=True)
+        print(msg, file=sys.stderr, flush=True)
+
     # ── Initial Sync ───────────────────────────────────────────────────
     def _initial_sync(self):
-        # whoami: client_id / client_channel_id / virtualserver_unique_identifier
+        self._dbg("initial_sync START")
         rows = self.client.send_command("whoami")
-        print(f"[teamspeak] whoami rows-anzahl: {len(rows)}", flush=True)
+        self._dbg(f" whoami rows-anzahl: {len(rows)}")
         for i, r in enumerate(rows):
-            print(f"[teamspeak] whoami row[{i}]: {r}", flush=True)
+            self._dbg(f" whoami row[{i}]: {r}")
         if not rows:
             LOG.warning("whoami: empty reply")
             return
@@ -101,7 +107,7 @@ class TeamSpeakService:
         w = {}
         for r in rows:
             w.update(r)
-        print(f"[teamspeak] whoami merged keys: {list(w.keys())}", flush=True)
+        self._dbg(f" whoami merged keys: {list(w.keys())}")
         my_clid = w.get("client_id") or w.get("clid")
         my_cid  = w.get("client_channel_id") or w.get("cid")
         # ServerUid: kann unter unterschiedlichen Keys auftauchen
@@ -113,7 +119,7 @@ class TeamSpeakService:
         if not server_uid:
             try:
                 si = self.client.send_command("serverinfo") or []
-                print(f"[teamspeak] serverinfo: {si}", flush=True)
+                self._dbg(f" serverinfo: {si}")
                 for r in si:
                     if r.get("virtualserver_unique_identifier"):
                         server_uid = r.get("virtualserver_unique_identifier")
