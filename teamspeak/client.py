@@ -162,41 +162,47 @@ class ClientQuery:
                 break
 
     def _auth_and_subscribe(self):
-        # ClientQuery >=1.1 (TS3 Client 3.5+) verlangt 'auth apikey=…'
-        # bevor andere Commands akzeptiert werden. Wenn auth fehlschlaegt,
-        # MUESSEN wir abbrechen — sonst silently hangen alle folgenden
-        # Commands ins Timeout.
+        # Strategie:
+        # 1. whoami direkt probieren — wenn das klappt, braucht der Plugin
+        #    keinen auth (z.B. 'Open Query for everyone' aktiv) → fertig.
+        # 2. Sonst auth apikey=… senden und whoami nochmal probieren.
+        # 3. Wenn auch das nicht klappt → klarer Fehler.
+        key_len = len(self.apikey or "")
+        LOG.info("apikey-Laenge=%d, erste 4 Zeichen=%s****",
+                 key_len, (self.apikey or "")[:4])
+        # Phase 1: ohne auth
+        try:
+            self.send_command("whoami", timeout=2.0)
+            LOG.info("whoami klappt ohne auth — Plugin ist offen")
+            self._subscribe_notifies()
+            return
+        except ClientQueryError as e1:
+            LOG.info("whoami ohne auth: %s — probiere auth", e1)
+        # Phase 2: mit auth
         if not self.apikey:
             raise ClientQueryError(
-                "no API key configured (TS3-ClientQuery-Key in .secrets)")
-        key_len = len(self.apikey)
-        LOG.info("auth: apikey-Laenge=%d, ersten 4 Zeichen=%s****",
-                 key_len, self.apikey[:4] if key_len > 4 else "?")
+                "Plugin verlangt auth aber kein TS3-ClientQuery-Key in "
+                ".secrets. Trag ihn ein als 'TS3-ClientQuery-Key: <KEY>'")
         try:
             self.send_command(f"auth apikey={self.apikey}", timeout=3.0)
             LOG.info("auth ok")
         except ClientQueryError as e:
-            msg = str(e)
-            # error id=256 = command not found → aeltere Plugin-Version
-            # ohne API-Key-Auth. Da ist alles offen, weiter.
-            if "256" in msg or "command not found" in msg.lower():
-                LOG.info("auth not required (alt plugin) — fortsetzen")
-                return
-            # Versuch: gehts auch ohne auth? Manche Setups haben
-            # 'apikey nicht erforderlich' und auth wirft trotzdem.
-            try:
-                self.send_command("whoami", timeout=2.0)
-                LOG.info("auth required, aber whoami klappt ohne — fortsetzen")
-                return
-            except ClientQueryError:
-                pass
             raise ClientQueryError(
-                f"auth failed [{msg}] mit Key-Laenge {key_len}. "
-                f"In TS3-Client: Extras→Optionen→Erweiterungen→Plug-ins→"
-                f"'Client Query'→Einstellungen→API-Key copy. "
-                f"Dann in .secrets als 'TS3-ClientQuery-Key: <KEY>' (genau "
-                f"so, KEINE Anfuehrungszeichen, KEIN Leerzeichen davor).")
-        # Notify-Subscriptions
+                f"auth schlug fehl [{e}] (Key-Laenge {key_len}). "
+                f"Im TS3-Client → Extras → Optionen → Erweiterungen → "
+                f"Plug-ins → 'Client Query' → Einstellungen → API-Key copy. "
+                f"In .secrets eintragen als 'TS3-ClientQuery-Key: <KEY>' "
+                f"(keine Anfuehrungszeichen, keine Leerzeichen davor/dahinter).")
+        # Phase 3: whoami nochmal
+        try:
+            self.send_command("whoami", timeout=2.0)
+            LOG.info("whoami nach auth ok")
+        except ClientQueryError as e:
+            raise ClientQueryError(
+                f"auth ging durch, aber whoami immer noch nicht: {e}")
+        self._subscribe_notifies()
+
+    def _subscribe_notifies(self):
         for ev in ("notifytalkstatuschange",
                     "notifyclientmoved",
                     "notifycliententerview",
