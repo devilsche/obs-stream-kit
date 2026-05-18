@@ -12,7 +12,7 @@ import time
 
 
 class TsState:
-    def __init__(self, talking_tail_ms=400):
+    def __init__(self, talking_tail_ms=700):
         self._lock = threading.Lock()
         self.connected = False
         self.status_msg = "starting"

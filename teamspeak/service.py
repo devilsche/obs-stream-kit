@@ -58,14 +58,13 @@ class TeamSpeakService:
             import time as _t
             i = 0
             while True:
-                _t.sleep(1)
+                _t.sleep(0.5)
                 i += 1
                 try: self._poll_talk_flags()
                 except Exception: pass
-                if i % 5 == 0:
-                    try: self._publish()
-                    except Exception: pass
-                if i % 15 == 0 and self.state.connected:
+                # Alle 15s (= 30 ticks à 500ms) full re-sync gegen
+                # verschluckte Notifies (Channel-Wechsel etc.)
+                if i % 30 == 0 and self.state.connected:
                     try:
                         threading.Thread(
                             target=self._safe_resync,
@@ -75,10 +74,11 @@ class TeamSpeakService:
                            daemon=True).start()
 
     def _poll_talk_flags(self):
-        """Pollt clientlist -voice — refreshed Client-State (cid, nick,
-        mute). Talking-State wird NICHT mehr aus client_flag_talking
-        uebernommen — das hat sich mit notifytalkstatuschange in die
-        Wolle gekriegt (Flip-Flop). Talking kommt nur noch via Notify."""
+        """Pollt clientlist -voice alle 500ms. Primaere Quelle fuer
+        Talking-State: client_flag_talking aus der TS3-Antwort.
+        Hysterese-Tail im State (siehe TsState.talking_tail_ms) glaettet
+        Flicker zwischen 500ms-Ticks. Notify-Events kommen ergaenzend —
+        set_talking ist idempotent."""
         if not self.state.connected: return
         try:
             items = self.client.send_command("clientlist -voice")
@@ -87,7 +87,6 @@ class TeamSpeakService:
             return
         if not items:
             return
-        changed = False
         seen_clids = set()
         for it in items:
             clid = it.get("clid")
@@ -100,14 +99,20 @@ class TeamSpeakService:
                 input_muted=it.get("client_input_muted"),
                 output_muted=it.get("client_output_muted"),
                 input_hardware=it.get("client_input_hardware"))
+            # Talking-Flag aus poll uebernehmen — primaere Quelle.
+            talking = (it.get("client_flag_talking") == "1")
+            self.state.set_talking(clid, talking,
+                                   on_transition=self._on_talk_transition)
+        # Stale-Removal
         if seen_clids:
             with self.state._lock:
                 stale = [c for c in self.state.clients if c not in seen_clids]
             for c in stale:
                 self.state.remove_client(c)
-                changed = True
-        if changed:
-            self._publish()
+        # Immer publishen — Widget bekommt frischen Stand mit aktuellen
+        # talking-Flags. SSE dedupliziert nicht, aber das ist OK: das
+        # Widget rendert nur Klassen-Toggles, keine DOM-Rebuilds.
+        self._publish()
 
     def _safe_resync(self):
         """Zieht whoami + clientlist + channelName neu, ueberschreibt
