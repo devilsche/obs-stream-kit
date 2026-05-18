@@ -454,23 +454,10 @@ class TeamSpeakService:
             self._counted_in_current_channel.add(mate_uid)
 
     def _refresh_channel_name(self, cid):
-        """Channel-Name holen. Erst direkt via channelinfo cid=X (billig,
-        kein bareword-Problem). Fallback channellist falls channelinfo
-        keinen Namen liefert."""
+        """Channel-Name aus channellist holen. channelinfo gibt's in
+        ClientQuery NICHT (error 256). channellist scannen ist der
+        einzig zuverlaessige Weg."""
         if not cid: return
-        # Versuch 1: channelinfo cid=X — gibt alle properties des Channels
-        try:
-            rows = self.client.send_command(f"channelinfo cid={cid}") or []
-            for r in rows:
-                nm = r.get("channel_name")
-                if nm:
-                    self._dbg(f"channelinfo cid={cid} → '{nm}'")
-                    self.state.set_channel(cid, nm)
-                    self._publish()
-                    return
-        except Exception as e:
-            self._dbg(f"channelinfo cid={cid} FEHLER: {e}")
-        # Versuch 2: channellist scannen
         try:
             rows = self.client.send_command("channellist") or []
         except Exception as e:
