@@ -95,7 +95,8 @@ class TeamSpeakService:
             LOG.warning("whoami: empty reply")
             return
         w = rows[0]
-        LOG.info("whoami felder: %s", list(w.keys()))
+        print(f"[teamspeak] whoami felder: {list(w.keys())}", flush=True)
+        print(f"[teamspeak] whoami werte: {dict(w)}", flush=True)
         my_clid = w.get("client_id") or w.get("clid")
         my_cid  = w.get("client_channel_id") or w.get("cid")
         # ServerUid: kann unter unterschiedlichen Keys auftauchen
