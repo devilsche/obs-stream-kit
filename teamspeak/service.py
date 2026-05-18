@@ -291,15 +291,24 @@ class TeamSpeakService:
                     # neuen Channel filtert. Name auf None — alter Name
                     # waere irrefuehrend, neuer kommt asynchron nach.
                     self.state.set_channel(ctid, None)
+                    # Sofort publishen — Widget sieht den neuen Channel
+                    # (auch wenn der Name-Lookup gleich noch laeuft/failt).
+                    self._publish()
                     # Worker-Thread — send_command darf nicht aus dem
                     # notify/read-thread laufen (deadlock).
+                    # Erst clientlist (Member-Set), dann channelname —
+                    # so sieht das Widget die Member auch wenn channellist
+                    # fuer den Namen UTF-8-Mist baut.
                     import threading
                     def _post_move():
                         try:
-                            self._refresh_channel_name(ctid)
                             self._refresh_clientlist()
                         except Exception as e:
-                            LOG.warning("post-move refresh: %s", e)
+                            LOG.warning("post-move clientlist: %s", e)
+                        try:
+                            self._refresh_channel_name(ctid)
+                        except Exception as e:
+                            LOG.warning("post-move channelname: %s", e)
                     threading.Thread(
                         target=_post_move, name="ts-post-move",
                         daemon=True).start()
@@ -431,12 +440,28 @@ class TeamSpeakService:
             self._counted_in_current_channel.add(mate_uid)
 
     def _refresh_channel_name(self, cid):
-        """Channel-Name aus channellist."""
+        """Channel-Name holen. Erst direkt via channelinfo cid=X (billig,
+        kein bareword-Problem). Fallback channellist falls channelinfo
+        keinen Namen liefert."""
         if not cid: return
+        # Versuch 1: channelinfo cid=X — gibt alle properties des Channels
+        try:
+            rows = self.client.send_command(f"channelinfo cid={cid}") or []
+            for r in rows:
+                nm = r.get("channel_name")
+                if nm:
+                    self._dbg(f"channelinfo cid={cid} → '{nm}'")
+                    self.state.set_channel(cid, nm)
+                    self._publish()
+                    return
+        except Exception as e:
+            self._dbg(f"channelinfo cid={cid} FEHLER: {e}")
+        # Versuch 2: channellist scannen
         try:
             rows = self.client.send_command("channellist") or []
         except Exception as e:
             self._dbg(f"channellist FEHLER: {e}")
+            self._publish()  # Channel-ID-Update wenigstens raus
             return
         self._dbg(f"channellist: {len(rows)} channels, suche cid={cid}")
         for r in rows:
@@ -447,3 +472,4 @@ class TeamSpeakService:
                 self._publish()
                 return
         self._dbg(f"  → cid={cid} NICHT in channellist gefunden")
+        self._publish()
