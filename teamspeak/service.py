@@ -95,9 +95,27 @@ class TeamSpeakService:
             LOG.warning("whoami: empty reply")
             return
         w = rows[0]
+        LOG.info("whoami felder: %s", list(w.keys()))
         my_clid = w.get("client_id") or w.get("clid")
         my_cid  = w.get("client_channel_id") or w.get("cid")
-        server_uid = w.get("virtualserver_unique_identifier")
+        # ServerUid: kann unter unterschiedlichen Keys auftauchen
+        server_uid = (
+            w.get("virtualserver_unique_identifier")
+            or w.get("vsid")
+            or w.get("server_unique_identifier"))
+        # Fallback: servervariable nutzt bareword → geht ueber py-ts3
+        # nicht direkt. Aber serverconnectionhandlerlist liefert alle
+        # verbundenen Server-Tabs mit ihren UIDs.
+        if not server_uid:
+            try:
+                hl = self.client.send_command(
+                    "serverconnectionhandlerlist") or []
+                for h in hl:
+                    if h.get("virtualserver_unique_identifier"):
+                        server_uid = h.get("virtualserver_unique_identifier")
+                        break
+            except ClientQueryError as e:
+                LOG.info("serverconnectionhandlerlist: %s", e)
         LOG.info("whoami: clid=%s cid=%s server_uid=%s",
                  my_clid, my_cid, server_uid)
         self.state.server_uid = server_uid
