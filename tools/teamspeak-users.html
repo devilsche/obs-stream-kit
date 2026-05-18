@@ -525,6 +525,28 @@
     for (const m of (s.members || [])) {
       if (m.tsUid) online[m.tsUid] = m;
     }
+    // Neue Online-User die wir noch nicht in users[] haben → Stub anlegen
+    const known = new Set(users.map(u => u.ts_uid));
+    let added = false;
+    for (const m of (s.members || [])) {
+      if (!m.tsUid || known.has(m.tsUid)) continue;
+      users.push({
+        ts_uid: m.tsUid,
+        last_nick: m.tsName,
+        steam_id: "", custom_name: "",
+        display_source: "ts",
+        speaking_icon: "", silent_icon: "",
+        show_in_widget: 1, is_friend: 0, is_blocked: 0,
+        notes: "",
+      });
+      added = true;
+    }
+    if (added) {
+      renderUsers();        // Tabelle hat eine neue Zeile
+      renderAfk();          // Server-Liste evtl. auch updated
+      return;               // renderUsers hat schon online/offline class gesetzt
+    }
+    // Sonst: nur Klassen + Aktionen patchen, kein Rebuild
     document.querySelectorAll("#userBody tr").forEach(tr => {
       const uid = tr.dataset.uid;
       const onlineMem = online[uid];
@@ -544,6 +566,9 @@
         }
       }
     });
+    // Channel-Auswahl-Block (AFK) ebenfalls re-rendern damit der
+    // aktuelle Server-Name + Channel-Liste mitwandern.
+    renderAfk();
   }
   let _esTool = null;
   try {
