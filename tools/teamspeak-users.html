@@ -471,17 +471,42 @@
   }
 
   fetchAll();
-  // Live-Refresh des online-Status alle 3s (damit Mute-Buttons aktuell sind)
-  setInterval(() => {
+  // Live-Refresh nur des Online-Status + Mute-Buttons (KEIN Full-Render
+  // — sonst flackern die Avatar-Bilder bei jedem Tick).
+  function refreshOnlineState() {
     fetch("/api/teamspeak/state").then(r => r.json()).then(s => {
       currentState = s;
       online = {};
       for (const m of (s.members || [])) {
         if (m.tsUid) online[m.tsUid] = m;
       }
-      renderUsers();
+      // Pro Zeile Klasse + Aktionen patchen, Avatar/Inputs unangetastet
+      document.querySelectorAll("#userBody tr").forEach(tr => {
+        const uid = tr.dataset.uid;
+        const onlineMem = online[uid];
+        const u = users.find(x => x.ts_uid === uid) || {};
+        tr.classList.toggle("online", !!onlineMem);
+        tr.classList.toggle("offline", !onlineMem);
+        tr.classList.toggle("blocked", !!u.is_blocked);
+        const actionsCell = tr.querySelector("td.actions");
+        if (actionsCell) {
+          const newHtml = onlineMem
+            ? `<button class="subtle" data-clid="${onlineMem.clid}" data-act="mute" title="Mute">🔇</button>
+               <button class="subtle" data-clid="${onlineMem.clid}" data-act="unmute" title="Unmute">🔊</button>`
+            : "";
+          if (actionsCell.innerHTML !== newHtml) {
+            actionsCell.innerHTML = newHtml;
+            actionsCell.querySelectorAll("button[data-clid]").forEach(b => {
+              b.addEventListener("click", () => {
+                muteClient(b.dataset.clid, b.dataset.act === "mute");
+              });
+            });
+          }
+        }
+      });
     }).catch(() => {});
-  }, 3000);
+  }
+  setInterval(refreshOnlineState, 3000);
 </script>
 </body>
 </html>
