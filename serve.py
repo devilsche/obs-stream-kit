@@ -438,16 +438,34 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 u = urlparse(self.path)
                 qs = {k: v[0] for k, v in parse_qs(u.query).items()}
                 result = ts_registry.handle("GET", u.path, qs, b"")
-                if result is not None:
-                    body, code, ctype = result
-                    self.send_response(code)
-                    self.send_header("Content-Type", ctype)
+                if result is None:
+                    # Route nicht gefunden — explizit JSON 404 statt
+                    # SimpleHTTPRequestHandler-Fallthrough zu HTML-Error.
+                    body = json.dumps({"error": f"unknown route {u.path}"}).encode("utf-8")
+                    self.send_response(404)
+                    self.send_header("Content-Type", "application/json")
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
                     self.wfile.write(body)
                     return
+                body, code, ctype = result
+                self.send_response(code)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
             except Exception as e:
-                self.send_error(500, str(e))
+                # JSON-Fehler statt HTML
+                import traceback
+                tb = traceback.format_exc()
+                print(f"[teamspeak] endpoint exception: {tb}", flush=True)
+                err = json.dumps({"error": str(e)}).encode("utf-8")
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(err)))
+                self.end_headers()
+                self.wfile.write(err)
                 return
         # Steam Image Cache: /steam/img/<app_id>/<kind>.jpg
         # → falls lokal gecached liefer direkt aus, sonst 404 (Widget
@@ -537,16 +555,28 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 length = int(self.headers.get('Content-Length', 0))
                 body_in = self.rfile.read(length) if length else b""
                 result = ts_registry.handle("POST", u.path, qs, body_in)
-                if result is not None:
-                    body, code, ctype = result
-                    self.send_response(code)
-                    self.send_header("Content-Type", ctype)
-                    self.send_header("Content-Length", str(len(body)))
+                if result is None:
+                    body_out = json.dumps({"error": f"unknown route {u.path}"}).encode("utf-8")
+                    self.send_response(404)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body_out)))
                     self.end_headers()
-                    self.wfile.write(body)
+                    self.wfile.write(body_out)
                     return
+                body, code, ctype = result
+                self.send_response(code)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
             except Exception as e:
-                self.send_error(500, str(e))
+                err = json.dumps({"error": str(e)}).encode("utf-8")
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(err)))
+                self.end_headers()
+                self.wfile.write(err)
                 return
         if self.path != '/dev-log':
             self.send_response(404)
@@ -606,16 +636,28 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 length = int(self.headers.get('Content-Length', 0))
                 body_in = self.rfile.read(length) if length else b""
                 result = ts_registry.handle("DELETE", u.path, qs, body_in)
-                if result is not None:
-                    body, code, ctype = result
-                    self.send_response(code)
-                    self.send_header("Content-Type", ctype)
-                    self.send_header("Content-Length", str(len(body)))
+                if result is None:
+                    body_out = json.dumps({"error": f"unknown route {u.path}"}).encode("utf-8")
+                    self.send_response(404)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body_out)))
                     self.end_headers()
-                    self.wfile.write(body)
+                    self.wfile.write(body_out)
                     return
+                body, code, ctype = result
+                self.send_response(code)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
             except Exception as e:
-                self.send_error(500, str(e))
+                err = json.dumps({"error": str(e)}).encode("utf-8")
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(err)))
+                self.end_headers()
+                self.wfile.write(err)
                 return
         self.send_error(405)
 
