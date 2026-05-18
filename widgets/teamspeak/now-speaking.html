@@ -380,7 +380,13 @@
         const frameSrc = m.avatarFrameUrl || "";
         if (frameEl.dataset.src !== frameSrc) {
           frameEl.dataset.src = frameSrc;
-          frameEl.src = frameSrc;  // leer → kein Frame
+          if (frameSrc) {
+            frameEl.src = frameSrc;
+          } else {
+            // Kein Frame: leeren statt 'src=""' (das triggert sonst
+            // Browser-Fetch der aktuellen Page als Bild).
+            frameEl.removeAttribute("src");
+          }
         }
         // In DOM einsortieren (nach prev, oder als erstes)
         const wantBefore = prev ? prev.nextSibling : elList.firstChild;
