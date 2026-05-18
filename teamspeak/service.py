@@ -115,28 +115,23 @@ class TeamSpeakService:
             w.get("virtualserver_unique_identifier")
             or w.get("vsid")
             or w.get("server_unique_identifier"))
-        # Fallback 1: serverinfo liefert alle Felder zum aktuellen Server
-        if not server_uid:
+        # Fallback-Kette fuer ServerUid. Wir loggen jedes Resultat
+        # voll, damit klar ist welche Antwort die Library wie parst.
+        for fb_cmd in ("serverinfo", "serverconnectinfo",
+                        "serverconnectionhandlerlist", "currentschandlerid"):
+            if server_uid:
+                break
             try:
-                si = self.client.send_command("serverinfo") or []
-                self._dbg(f" serverinfo: {si}")
-                for r in si:
-                    if r.get("virtualserver_unique_identifier"):
-                        server_uid = r.get("virtualserver_unique_identifier")
+                fb = self.client.send_command(fb_cmd) or []
+                self._dbg(f" {fb_cmd}: {fb}")
+                for r in fb:
+                    uid = (r.get("virtualserver_unique_identifier")
+                           or r.get("server_unique_identifier"))
+                    if uid:
+                        server_uid = uid
                         break
             except ClientQueryError as e:
-                LOG.info("serverinfo: %s", e)
-        # Fallback 2: serverconnectionhandlerlist (verbundene Server-Tabs)
-        if not server_uid:
-            try:
-                hl = self.client.send_command(
-                    "serverconnectionhandlerlist") or []
-                for h in hl:
-                    if h.get("virtualserver_unique_identifier"):
-                        server_uid = h.get("virtualserver_unique_identifier")
-                        break
-            except ClientQueryError as e:
-                LOG.info("serverconnectionhandlerlist: %s", e)
+                self._dbg(f" {fb_cmd} failed: {e}")
         LOG.info("whoami: clid=%s cid=%s server_uid=%s",
                  my_clid, my_cid, server_uid)
         self.state.server_uid = server_uid
