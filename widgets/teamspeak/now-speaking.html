@@ -11,6 +11,9 @@
     width         Default 280px (Container-Breite)
     avatar        Default 36 (px)
     accent        Default #f2b705 (Talking-Ring-Farbe)
+    transparent   '1' = kein Card-BG/Border/Schatten + keine Row-BGs
+                  (nur Avatar + Name + Ring beim Sprechen) — fuer OBS
+                  Browser-Source ueber Gameplay-Overlay.
 -->
 <html>
 <head>
@@ -125,6 +128,36 @@
       font-style: italic; color: var(--muted); font-size: 0.85em;
       padding: 6px; text-align: center;
     }
+
+    /* Transparent-Modus: Card-Chrome komplett weg, Rows ohne BG, nur
+       Avatar/Name + Talking-Ring + Outline-Text-Shadow damit der Name
+       auf hellem Gameplay-BG lesbar bleibt. */
+    body.transparent .ts-card {
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+      backdrop-filter: none;
+      padding: 6px 4px;
+    }
+    body.transparent .ts-header {
+      border-bottom: 0;
+      padding-bottom: 4px;
+      margin-bottom: 4px;
+    }
+    body.transparent .ch-name,
+    body.transparent .ts-name {
+      text-shadow:
+        0 0 3px rgba(0,0,0,0.95),
+        0 0 6px rgba(0,0,0,0.7),
+        0 1px 2px rgba(0,0,0,0.9);
+    }
+    body.transparent .ts-row {
+      background: transparent;
+    }
+    body.transparent .ts-row.talking {
+      background: transparent;
+      box-shadow: none;
+    }
   </style>
 </head>
 <body>
@@ -147,6 +180,9 @@
     document.documentElement.style.setProperty("--width", WIDTH + "px");
     document.documentElement.style.setProperty("--av-size", AV_SIZE + "px");
     document.documentElement.style.setProperty("--accent", ACCENT);
+    if (qs.get("transparent") === "1") {
+      document.body.classList.add("transparent");
+    }
 
     const elList   = document.getElementById("list");
     const elCh     = document.getElementById("chName");
