@@ -228,13 +228,24 @@ class TeamSpeakRegistry:
             return _err(500, f"channellist failed: {e}")
         out = []
         for r in rows:
+            # Spacer-Channels (Trenner-Linien im TS3-Tree) sind keine
+            # echten Channels — Namen enthalten '[*spacer' / '[lspacer'
+            # etc. Wir filtern sie weg, der User kann da eh nicht rein.
+            name = r.get("channel_name") or ""
+            if name.startswith("[") and ("spacer" in name or "*" in name):
+                continue
+            # Channels mit komplett leerem Namen ignorieren (Library
+            # parser-Issue bei manchen TS3-Builds).
+            if not name.strip():
+                continue
             out.append({
                 "cid":         r.get("cid"),
                 "pid":         r.get("pid"),
-                "name":        r.get("channel_name"),
+                "name":        name,
                 "order":       r.get("channel_order"),
                 "totalClients": r.get("total_clients"),
             })
+        out.sort(key=lambda c: (c.get("name") or "").lower())
         TeamSpeakRegistry._channels_cache = (time.time(), out)
         return _ok({"channels": out})
 

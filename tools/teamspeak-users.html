@@ -155,6 +155,8 @@
 
   <h2>Channels — als AFK markieren</h2>
   <div class="meta" id="afkHint">Channels die hier als AFK markiert sind, werden vom Encounter-Counter ignoriert.</div>
+  <input id="chFilter" placeholder="Channel suchen…"
+         style="width:300px;padding:5px;margin:6px 0">
   <div class="afk-list" id="afkList"></div>
 </div>
 
@@ -413,7 +415,15 @@
       host.innerHTML = `<div class="meta">— keine Channels (Server liefert leer) —</div>`;
       return;
     }
-    host.innerHTML = serverChannels.map(c => {
+    const filter = (document.getElementById("chFilter").value || "").toLowerCase().trim();
+    const filtered = filter
+      ? serverChannels.filter(c => (c.name||"").toLowerCase().includes(filter))
+      : serverChannels;
+    if (!filtered.length) {
+      host.innerHTML = `<div class="meta">— kein Channel matched "${escapeHtml(filter)}" —</div>`;
+      return;
+    }
+    host.innerHTML = filtered.map(c => {
       const isAfk = afkIds.has(c.cid);
       const btn = isAfk
         ? `<button class="danger" data-srv="${escapeAttr(srvUid)}" data-cid="${c.cid}" data-act="off">AFK aus</button>`
@@ -456,6 +466,7 @@
   }
 
   document.getElementById("refreshBtn").addEventListener("click", fetchAll);
+  document.getElementById("chFilter").addEventListener("input", renderAfk);
 
   // ── Helpers ───────────────────────────────────────────────────────
   function fmtSecs(s) {
