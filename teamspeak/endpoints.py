@@ -215,11 +215,16 @@ class TeamSpeakRegistry:
     # ── Channels (fuer AFK-Auswahl im Tool) ────────────────────────────
     def _channels(self):
         if not self.service:
-            return _ok({"channels": []})
+            return _ok({"channels": [], "error": "no service"})
         try:
             rows = self.service.client.send_command("channellist") or []
         except Exception as e:
-            return _err(500, str(e))
+            import traceback
+            print(f"[teamspeak] channellist failed: {e}\n{traceback.format_exc()}",
+                  flush=True)
+            return _err(500, f"channellist failed: {e}")
+        print(f"[teamspeak] channellist rows={len(rows)} "
+              f"first={rows[0] if rows else None}", flush=True)
         out = []
         for r in rows:
             out.append({
