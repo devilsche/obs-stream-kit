@@ -109,6 +109,7 @@
     .col-icons .icon-preview.err {
       outline: 1px solid #e57b7b;
     }
+    .col-icons .icon-preview.hidden { display: none; }
     td.actions { text-align: right; white-space: nowrap; }
 
     .afk-list { margin: 4px 16px; }
@@ -342,11 +343,11 @@
         </select></td>
         <td class="col-icons">
           <input data-f="speakingIcon" placeholder="URL/Pfad" value="${escapeAttr(u.speaking_icon || "")}">
-          ${u.speaking_icon ? `<img class="icon-preview" src="${escapeAttr(u.speaking_icon)}" onerror="this.classList.add('err')">` : ""}
+          <img class="icon-preview${u.speaking_icon ? "" : " hidden"}" src="${escapeAttr(u.speaking_icon || "")}" onerror="this.classList.add('err')">
         </td>
         <td class="col-icons">
           <input data-f="silentIcon" placeholder="URL/Pfad" value="${escapeAttr(u.silent_icon || "")}">
-          ${u.silent_icon ? `<img class="icon-preview" src="${escapeAttr(u.silent_icon)}" onerror="this.classList.add('err')">` : ""}
+          <img class="icon-preview${u.silent_icon ? "" : " hidden"}" src="${escapeAttr(u.silent_icon || "")}" onerror="this.classList.add('err')">
         </td>
         <td><input type="checkbox" data-f="showInWidget" ${u.show_in_widget?"checked":""}></td>
         <td><input class="col-notes" data-f="notes" placeholder="—" value="${escapeAttr(u.notes || "")}"></td>
@@ -371,6 +372,15 @@
         const tsUid = tr.dataset.uid;
         const field = el.dataset.f;
         const value = (el.type === "checkbox") ? el.checked : el.value;
+        // Live-Preview neben Icon-Inputs aktualisieren
+        if (field === "speakingIcon" || field === "silentIcon") {
+          const preview = el.parentNode.querySelector(".icon-preview");
+          if (preview) {
+            preview.classList.remove("err");
+            preview.classList.toggle("hidden", !value);
+            preview.src = value || "";
+          }
+        }
         saveUser(tsUid, { [field]: value });
         const u = users.find(x => x.ts_uid === tsUid);
         if (u) {
