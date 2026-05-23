@@ -469,15 +469,18 @@ def backfill_pcts(root: str) -> int:
     return 0
 
 
-def detect_achievements(root: str) -> int:
-    """Ruft detect_and_store_session_achievements fuer alle Matches auf
-    die noch keine Milestones haben. Idempotent — loescht nichts.
-    Sinnvoll wenn Runden ohne laufenden Server gespielt wurden.
+def detect_achievements(root: str, days: int = 14) -> int:
+    """Scannt alle Sessions der letzten N Tage (Default: 14) und legt
+    fehlende Milestones an. Idempotent via INSERT OR IGNORE.
+    Popups: letzte 7 Tage aktiv, aeltere suppress (kein Popup-Burst).
 
     Nutzung:
-        python -m pubg.cli detect-achievements
+        python -m pubg.cli detect-achievements        # letzte 14 Tage
+        python -m pubg.cli detect-achievements 30     # letzte 30 Tage
     """
-    from pubg.aggregations import detect_and_store_session_achievements
+    import datetime as _dt
+    from pubg.aggregations import compute_session_matches, compute_session_achievements
+    from pubg.db import _insert_achievements  # noqa – interner Helper
     db_path = os.path.join(root, "data", "pubg-history.db")
     if not os.path.exists(db_path):
         print(f"DB nicht gefunden: {db_path}"); return 1
@@ -487,13 +490,59 @@ def detect_achievements(root: str) -> int:
     if not me:
         print("Self-Player nicht in DB"); conn.close(); return 1
     my_acc = me["account_id"]
+
+    # Session-Gap: .secrets > DB-Setting > 4h Default
+    from pubg.config import load_session_gap_hours as _load_gap
+    from pubg.db import get_setting as _get_setting
+    secrets_path = os.path.join(root, ".secrets")
+    gap_hours = (_load_gap(secrets_path)
+                 or float(_get_setting(conn, "sessionGapHours", "4")))
+    print(f"  Session-Gap: {gap_hours}h")
+
+    cutoff = (_dt.datetime.utcnow() - _dt.timedelta(days=days)
+              ).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Alle Matches im Zeitraum, chronologisch
+    all_matches = compute_session_matches(
+        conn, my_acc, from_iso=cutoff, include_events=False)
+    all_matches = list(reversed(all_matches))  # ASC
+    if not all_matches:
+        print(f"Keine Matches in den letzten {days} Tagen."); conn.close(); return 0
+
+    # Sessions per konfigurierbarem Gap splitten
+    gap_secs = gap_hours * 3600
+    sessions = []
+    cur_start = all_matches[0]["playedAt"]
+    cur_last  = all_matches[0]["playedAt"]
+    last_t    = _dt.datetime.fromisoformat(all_matches[0]["playedAt"].replace("Z", "+00:00"))
+    for m in all_matches[1:]:
+        t = _dt.datetime.fromisoformat(m["playedAt"].replace("Z", "+00:00"))
+        if (t - last_t).total_seconds() > gap_secs:
+            sessions.append((cur_start, cur_last))
+            cur_start = m["playedAt"]
+        cur_last = m["playedAt"]
+        last_t = t
+    sessions.append((cur_start, cur_last))
+
     n_before = conn.execute(
         "SELECT COUNT(*) FROM pubg_achievements_seen").fetchone()[0]
-    print(f"Milestones vorher: {n_before}")
-    print("Detektiere fehlende Milestones...")
-    n_new = detect_and_store_session_achievements(conn, my_acc)
+    print(f"  {len(all_matches)} Matches in {len(sessions)} Sessions "
+          f"(letzte {days} Tage). Milestones vorher: {n_before}")
+
+    # Popup bleibt immer aktiv — INSERT OR IGNORE schützt bereits
+    # gesehene Einträge, also keine Doppel-Popups für alte Achievements.
+    from pubg.aggregations import _insert_achievements as _ia
+    total_new = 0
+    for from_iso, to_iso in sessions:
+        achievements = compute_session_achievements(
+            conn, my_acc, from_iso=from_iso, to_iso=to_iso)
+        n = _ia(conn, achievements, suppress_popup=False)
+        if n:
+            print(f"  {from_iso[:10]}  +{n} Milestones")
+        total_new += n
+    conn.commit()
     conn.close()
-    print(f"Neu erkannt: {n_new}  (gesamt jetzt: {n_before + n_new})")
+    print(f"Fertig: {total_new} neue Milestones.")
     return 0
 
 
@@ -1275,11 +1324,21 @@ def diagnose(root: str, n: int = 30) -> int:
     print(f"\n{'Datum':<17} {'Map':<14} {'Tel':3} {'Milestones'}")
     print("-" * 75)
 
+    me = conn.execute(
+        "SELECT account_id FROM players WHERE is_self=1").fetchone()
+    my_acc = me["account_id"] if me else None
+
     matches = conn.execute(
-        "SELECT match_id, played_at, map_name, telemetry_fetched "
-        "FROM matches ORDER BY played_at DESC LIMIT ?", (n,)
+        "SELECT m.match_id, m.played_at, m.map_name, m.telemetry_fetched, "
+        "       pa.kills, pa.damage_dealt, pa.place "
+        "FROM matches m "
+        "LEFT JOIN participants pa "
+        "  ON pa.match_id = m.match_id AND pa.account_id = ? "
+        "ORDER BY m.played_at DESC LIMIT ?", (my_acc, n)
     ).fetchall()
 
+    print(f"  {'Datum':<16}  {'Map':<13}  Tel  {'Pl':>3}  {'K':>3}  {'DMG':>6}  Milestones")
+    print("  " + "-" * 80)
     for m in matches:
         achs = conn.execute(
             "SELECT achievement_id FROM pubg_achievements_seen WHERE match_id=?",
@@ -1288,7 +1347,10 @@ def diagnose(root: str, n: int = 30) -> int:
         ach_str = "  ".join(a["achievement_id"] for a in achs) if achs else "-"
         tel = "ok" if m["telemetry_fetched"] else "!!"
         map_short = (m["map_name"] or "?").replace("_Main", "")[:13]
-        print(f"  {m['played_at'][:16]}  {map_short:<13}  {tel}  {ach_str}")
+        pl  = str(m["place"] or "?")
+        k   = str(m["kills"] or "?")
+        dmg = str(round(m["damage_dealt"] or 0)) if m["damage_dealt"] is not None else "?"
+        print(f"  {m['played_at'][:16]}  {map_short:<13}  {tel}  {pl:>3}  {k:>3}  {dmg:>6}  {ach_str}")
 
     conn.close()
     return 0
@@ -1325,7 +1387,8 @@ if __name__ == "__main__":
         n_arg = int(sys.argv[2]) if len(sys.argv) > 2 else 30
         sys.exit(diagnose(root, n_arg))
     elif len(sys.argv) > 1 and sys.argv[1] == "detect-achievements":
-        sys.exit(detect_achievements(root))
+        days_arg = int(sys.argv[2]) if len(sys.argv) > 2 else 14
+        sys.exit(detect_achievements(root, days_arg))
     elif len(sys.argv) > 1 and sys.argv[1] == "rebuild-achievements":
         sys.exit(rebuild_achievements(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-clear-payload":

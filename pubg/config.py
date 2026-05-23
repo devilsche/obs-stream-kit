@@ -24,6 +24,25 @@ def load_config(path: str) -> dict:
     return cfg
 
 
+def load_session_gap_hours(secrets_path: str) -> float | None:
+    """Liest 'Session Gap Hours: N' aus .secrets.
+    Gibt None zurueck wenn nicht gesetzt (Fallback auf DB-Setting oder 4h)."""
+    if not os.path.exists(secrets_path):
+        return None
+    with open(secrets_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if ":" not in line:
+                continue
+            key, _, value = line.partition(":")
+            if key.strip().lower().replace("-", " ") == "session gap hours":
+                try:
+                    return float(value.strip())
+                except ValueError:
+                    return None
+    return None
+
+
 def load_api_key(secrets_path: str) -> str | None:
     """Read the PUBG API key. Accepts both 'PUBG-API-Key:' and 'PUBG API Key:'
     spellings (dashes or spaces, case-insensitive)."""

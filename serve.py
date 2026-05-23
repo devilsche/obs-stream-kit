@@ -87,6 +87,13 @@ try:
         _pubg_init_schema(_conn)
         _self = get_player_by_name(_conn, pubg_cfg["playerName"])
         my_account_id = _self["account_id"] if _self else None
+        # Session-Gap aus .secrets in DB-Settings uebernehmen
+        from pubg.config import load_session_gap_hours as _load_gap
+        from pubg.db import set_setting as _set_setting
+        _gap = _load_gap(secrets_path)
+        if _gap is not None:
+            _set_setting(_conn, "sessionGapHours", str(_gap))
+            _conn.commit()
         _conn.close()
 
         pubg_client = PubgClient(api_key=pubg_key, platform=pubg_cfg["platform"])
