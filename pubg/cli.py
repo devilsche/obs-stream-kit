@@ -469,6 +469,34 @@ def backfill_pcts(root: str) -> int:
     return 0
 
 
+def detect_achievements(root: str) -> int:
+    """Ruft detect_and_store_session_achievements fuer alle Matches auf
+    die noch keine Milestones haben. Idempotent — loescht nichts.
+    Sinnvoll wenn Runden ohne laufenden Server gespielt wurden.
+
+    Nutzung:
+        python -m pubg.cli detect-achievements
+    """
+    from pubg.aggregations import detect_and_store_session_achievements
+    db_path = os.path.join(root, "data", "pubg-history.db")
+    if not os.path.exists(db_path):
+        print(f"DB nicht gefunden: {db_path}"); return 1
+    conn = connect(db_path)
+    me = conn.execute(
+        "SELECT account_id FROM players WHERE is_self=1").fetchone()
+    if not me:
+        print("Self-Player nicht in DB"); conn.close(); return 1
+    my_acc = me["account_id"]
+    n_before = conn.execute(
+        "SELECT COUNT(*) FROM pubg_achievements_seen").fetchone()[0]
+    print(f"Milestones vorher: {n_before}")
+    print("Detektiere fehlende Milestones...")
+    n_new = detect_and_store_session_achievements(conn, my_acc)
+    conn.close()
+    print(f"Neu erkannt: {n_new}  (gesamt jetzt: {n_before + n_new})")
+    return 0
+
+
 def rebuild_achievements(root: str) -> int:
     """Alle Milestones aus vorhandenen telemetry_events neu detektieren.
     Braucht KEINE HiDrive-Verbindung, keine payload_json.
@@ -1250,6 +1278,8 @@ if __name__ == "__main__":
         sys.exit(hidrive_backfill(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "backfill-pcts":
         sys.exit(backfill_pcts(root))
+    elif len(sys.argv) > 1 and sys.argv[1] == "detect-achievements":
+        sys.exit(detect_achievements(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "rebuild-achievements":
         sys.exit(rebuild_achievements(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-clear-payload":
@@ -1267,6 +1297,7 @@ if __name__ == "__main__":
     else:
         print("Usage: python -m pubg.cli init | cold-start | pull-ftp | "
               "seasons-backfill | wipe-day [YYYY-MM-DD] [--keep-popups] | "
+              "detect-achievements | rebuild-achievements | "
               "reset-milestones <id1> [<id2> ...] | "
               "list-milestones [pattern] | "
               "purge-before YYYY-MM-DD")
