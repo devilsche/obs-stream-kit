@@ -1251,11 +1251,12 @@ def reset_milestones(root: str, ids: list) -> int:
     return 0
 
 
-def diagnose(root: str) -> int:
-    """Zeigt DB-Status: letzte Matches, Telemetrie-Stand, letzte Milestones.
+def diagnose(root: str, n: int = 30) -> int:
+    """Zeigt die letzten N Matches mit Telemetrie-Status und Milestones.
 
     Nutzung:
-        python -m pubg.cli diagnose
+        python -m pubg.cli diagnose        # letzte 30
+        python -m pubg.cli diagnose 50     # letzte 50
     """
     db_path = os.path.join(root, "data", "pubg-history.db")
     if not os.path.exists(db_path):
@@ -1267,32 +1268,27 @@ def diagnose(root: str) -> int:
         "SELECT COUNT(*) FROM pubg_achievements_seen").fetchone()[0]
     pending_tel = conn.execute(
         "SELECT COUNT(*) FROM matches "
-        "WHERE telemetry_url IS NOT NULL "
-        "AND (telemetry_fetched IS NULL OR telemetry_schema < "
-        "(SELECT COALESCE(MAX(telemetry_schema),0) FROM matches WHERE telemetry_schema IS NOT NULL))"
+        "WHERE telemetry_url IS NOT NULL AND telemetry_fetched IS NULL"
     ).fetchone()[0]
 
-    print(f"\n=== PUBG DB-Status ===")
-    print(f"Matches gesamt : {total_m}")
-    print(f"Milestones     : {total_a}")
-    print(f"Telemetrie pend: {pending_tel}")
+    print(f"\n=== PUBG DB ({total_m} Matches, {total_a} Milestones, {pending_tel} Telemetrie ausstehend) ===")
+    print(f"\n{'Datum':<17} {'Map':<14} {'Tel':3} {'Milestones'}")
+    print("-" * 75)
 
-    print(f"\n--- Letzte 10 Matches ---")
-    rows = conn.execute(
-        "SELECT played_at, map_name, telemetry_fetched, telemetry_schema "
-        "FROM matches ORDER BY played_at DESC LIMIT 10"
+    matches = conn.execute(
+        "SELECT match_id, played_at, map_name, telemetry_fetched "
+        "FROM matches ORDER BY played_at DESC LIMIT ?", (n,)
     ).fetchall()
-    for r in rows:
-        tf = "ok" if r["telemetry_fetched"] else "MISSING"
-        print(f"  {r['played_at'][:16]}  {(r['map_name'] or '?'):<16}  tel={tf}  schema={r['telemetry_schema']}")
 
-    print(f"\n--- Letzte 5 Milestones ---")
-    rows = conn.execute(
-        "SELECT played_at, achievement_id, label "
-        "FROM pubg_achievements_seen ORDER BY played_at DESC LIMIT 5"
-    ).fetchall()
-    for r in rows:
-        print(f"  {r['played_at'][:16]}  {r['achievement_id']:<30}  {r['label'] or ''}")
+    for m in matches:
+        achs = conn.execute(
+            "SELECT achievement_id FROM pubg_achievements_seen WHERE match_id=?",
+            (m["match_id"],)
+        ).fetchall()
+        ach_str = "  ".join(a["achievement_id"] for a in achs) if achs else "-"
+        tel = "ok" if m["telemetry_fetched"] else "!!"
+        map_short = (m["map_name"] or "?").replace("_Main", "")[:13]
+        print(f"  {m['played_at'][:16]}  {map_short:<13}  {tel}  {ach_str}")
 
     conn.close()
     return 0
@@ -1326,7 +1322,8 @@ if __name__ == "__main__":
     elif len(sys.argv) > 1 and sys.argv[1] == "backfill-pcts":
         sys.exit(backfill_pcts(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "diagnose":
-        sys.exit(diagnose(root))
+        n_arg = int(sys.argv[2]) if len(sys.argv) > 2 else 30
+        sys.exit(diagnose(root, n_arg))
     elif len(sys.argv) > 1 and sys.argv[1] == "detect-achievements":
         sys.exit(detect_achievements(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "rebuild-achievements":
