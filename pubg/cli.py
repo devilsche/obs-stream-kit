@@ -499,7 +499,7 @@ def detect_achievements(root: str, days: int = 14) -> int:
                  or float(_get_setting(conn, "sessionGapHours", "4")))
     print(f"  Session-Gap: {gap_hours}h")
 
-    cutoff = (_dt.datetime.utcnow() - _dt.timedelta(days=days)
+    cutoff = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=days)
               ).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Alle Matches im Zeitraum, chronologisch
