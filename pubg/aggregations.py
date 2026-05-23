@@ -2336,25 +2336,32 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
         if place == 1:
             cwn = _career_win_number(conn, my_account_id, m["matchId"], played)
             if cwn and cwn >= 100 and cwn % 100 == 0:
-                if cwn % 1000 == 0:
-                    label_prefix = "GRAND CHICKEN"
-                    icon = "👑"
-                elif cwn % 500 == 0:
-                    label_prefix = "Half-Grand Chicken"
-                    icon = "🏆"
-                else:
-                    label_prefix = "Career Milestone"
-                    icon = "🏆"
-                out.append({
-                    "id":      f"wins_milestone_{cwn}",
-                    "label":   f"{label_prefix} · {cwn} Career Wins",
-                    "icon":    icon,
-                    "matchId": m["matchId"],
-                    "playedAt": played,
-                    # 500er + 1000er als rare markieren — gibt Gold-Glow
-                    # + biglvlup-Sound im Popup. 100er bleiben standard.
-                    "isRare":  (cwn % 500 == 0),
-                })
+                aid = f"wins_milestone_{cwn}"
+                # Global einmalig: nur anlegen wenn noch kein Eintrag
+                # fuer diesen Milestone existiert (egal welcher Match).
+                # Verhindert dass ein fehlerhafter cwn-Wert bei jeder
+                # Session einen neuen Popup-Eintrag produziert.
+                already = conn.execute(
+                    "SELECT 1 FROM pubg_achievements_seen "
+                    "WHERE achievement_id = ? LIMIT 1", (aid,)).fetchone()
+                if not already:
+                    if cwn % 1000 == 0:
+                        label_prefix = "GRAND CHICKEN"
+                        icon = "👑"
+                    elif cwn % 500 == 0:
+                        label_prefix = "Half-Grand Chicken"
+                        icon = "🏆"
+                    else:
+                        label_prefix = "Career Milestone"
+                        icon = "🏆"
+                    out.append({
+                        "id":      aid,
+                        "label":   f"{label_prefix} · {cwn} Career Wins",
+                        "icon":    icon,
+                        "matchId": m["matchId"],
+                        "playedAt": played,
+                        "isRare":  (cwn % 500 == 0),
+                    })
 
         if not top10_seen and place <= 10:
             # playedAt = Zeitpunkt wo das Team Top-10 erreicht hat (10.
