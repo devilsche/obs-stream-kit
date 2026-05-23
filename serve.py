@@ -211,49 +211,61 @@ TS_ENABLED = False
 ts_registry = None
 ts_service = None
 ts_db = None
-try:
-    from teamspeak.config import load_config as _ts_load_config, load_api_key as _ts_load_apikey
-    from teamspeak.service import TeamSpeakService
-    from teamspeak.endpoints import TeamSpeakRegistry
-    from teamspeak.db import connect as _ts_db_connect, init_schema as _ts_db_init
-    ts_cfg = _ts_load_config(os.path.join(ROOT, "config", "teamspeak.json"))
-    ts_apikey = _ts_load_apikey(os.path.join(ROOT, ".secrets"))
-    ts_db_path = os.path.join(ROOT, "data", "teamspeak.db")
-    ts_db = _ts_db_connect(ts_db_path)
-    _ts_db_init(ts_db)
-    steam_key_for_ts = secrets.get("steam_api_key")
-    if ts_apikey:
-        ts_service = TeamSpeakService(
-            host=ts_cfg["host"], port=int(ts_cfg["port"]),
-            apikey=ts_apikey,
-            talking_tail_ms=int(ts_cfg.get("talkingTailMs", 400)),
-            db_conn=ts_db,
-            root_dir=ROOT,
-            steam_api_key=steam_key_for_ts)
-        ts_service.start()
-        # Avatar-Refresh-Thread: alle 15min ueberfaellige Cache-Files
-        # neu von Steam ziehen.
-        if steam_key_for_ts:
-            try:
-                from teamspeak.avatars import start_refresh_thread as _ts_avatar_refresh
-                _ts_avatar_refresh(ROOT, ts_db, steam_key_for_ts,
-                                     interval_secs=900)
-            except Exception as e:
-                print(f"  TS-Avatar-Refresh init: {e}")
-        ts_registry = TeamSpeakRegistry(
-            ts_service, db_conn=ts_db, root_dir=ROOT,
-            steam_api_key=steam_key_for_ts)
-        TS_ENABLED = True
-        print("  TeamSpeak backend active  ✓")
-    else:
-        ts_registry = TeamSpeakRegistry(
-            None, db_conn=ts_db, root_dir=ROOT,
-            steam_api_key=steam_key_for_ts)
-        TS_ENABLED = True
-        print("  TeamSpeak backend: no TS3-ClientQuery-Key in .secrets — "
-              "endpoint liefert connected=false")
-except Exception as e:
-    print(f"  TeamSpeak-Backend init error: {e}")
+
+def _ts_is_disabled():
+    if not os.path.exists(secrets_path):
+        return False
+    with open(secrets_path) as _f:
+        for _l in _f:
+            if _l.strip().lower() in ("teamspeak: off", "teamspeak: false",
+                                       "teamspeak: disabled"):
+                return True
+    return False
+
+if _ts_is_disabled():
+    print("  TeamSpeak backend: disabled via .secrets (TeamSpeak: off)")
+else:
+    try:
+        from teamspeak.config import load_config as _ts_load_config, load_api_key as _ts_load_apikey
+        from teamspeak.service import TeamSpeakService
+        from teamspeak.endpoints import TeamSpeakRegistry
+        from teamspeak.db import connect as _ts_db_connect, init_schema as _ts_db_init
+        ts_cfg = _ts_load_config(os.path.join(ROOT, "config", "teamspeak.json"))
+        ts_apikey = _ts_load_apikey(os.path.join(ROOT, ".secrets"))
+        ts_db_path = os.path.join(ROOT, "data", "teamspeak.db")
+        ts_db = _ts_db_connect(ts_db_path)
+        _ts_db_init(ts_db)
+        steam_key_for_ts = secrets.get("steam_api_key")
+        if ts_apikey:
+            ts_service = TeamSpeakService(
+                host=ts_cfg["host"], port=int(ts_cfg["port"]),
+                apikey=ts_apikey,
+                talking_tail_ms=int(ts_cfg.get("talkingTailMs", 400)),
+                db_conn=ts_db,
+                root_dir=ROOT,
+                steam_api_key=steam_key_for_ts)
+            ts_service.start()
+            if steam_key_for_ts:
+                try:
+                    from teamspeak.avatars import start_refresh_thread as _ts_avatar_refresh
+                    _ts_avatar_refresh(ROOT, ts_db, steam_key_for_ts,
+                                       interval_secs=900)
+                except Exception as e:
+                    print(f"  TS-Avatar-Refresh init: {e}")
+            ts_registry = TeamSpeakRegistry(
+                ts_service, db_conn=ts_db, root_dir=ROOT,
+                steam_api_key=steam_key_for_ts)
+            TS_ENABLED = True
+            print("  TeamSpeak backend active  ✓")
+        else:
+            ts_registry = TeamSpeakRegistry(
+                None, db_conn=ts_db, root_dir=ROOT,
+                steam_api_key=steam_key_for_ts)
+            TS_ENABLED = True
+            print("  TeamSpeak backend: no TS3-ClientQuery-Key in .secrets — "
+                  "endpoint liefert connected=false")
+    except Exception as e:
+        print(f"  TeamSpeak-Backend init error: {e}")
 
 
 # ── Frontend-Error-Logger (immer injiziert) ────────────────────────────────────
