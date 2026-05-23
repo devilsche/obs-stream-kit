@@ -116,6 +116,7 @@
         tooltip: "Minimum number of shared matches LIFETIME (across the " +
                  "whole DB). Filters out random squad-fills who were only " +
                  "around for a single match." },
+      PubgUI.SHOW_ALWAYS_FILTER,
     ]);
     // Bei layout=fold ist jeder Mate eine eigene pubg-card (per-item-cards).
     // Bei carousel/stack/mosaic bleibt der Container die pubg-card.
@@ -175,8 +176,12 @@
       }
     }
 
+    if (RANGE === "session") PubgUI.hideIfStale();
     PubgUI.poll(`/api/pubg/mates?range=${RANGE}${MIN_PARAM}`,
-                30000, render, console.error);
+                30000, (d) => {
+      if (RANGE === "session") PubgUI.hideIfStale();
+      render(d);
+    }, console.error);
   </script>
 </body>
 </html>

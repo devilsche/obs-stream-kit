@@ -73,7 +73,7 @@
   </div>
   <script src="_pubg.js"></script>
   <script>
-    PubgUI.buildFilter([]);
+    PubgUI.buildFilter([PubgUI.SHOW_ALWAYS_FILTER]);
     PubgUI.renderHeader(document.getElementById("pubgHeader"), "Overview", "session");
 
     // ?hideMaps=1 / ?hideMates=1 — Sektion(en) ausblenden.
@@ -123,8 +123,12 @@
         });
       }
     }
+    PubgUI.hideIfStale();
     render();
-    setInterval(render, 60000);
+    setInterval(() => {
+      PubgUI.hideIfStale();
+      render();
+    }, 60000);
   </script>
 </body>
 </html>
