@@ -480,7 +480,7 @@ def detect_achievements(root: str, days: int = 14) -> int:
     """
     import datetime as _dt
     from pubg.aggregations import compute_session_matches, compute_session_achievements
-    from pubg.db import _insert_achievements  # noqa – interner Helper
+
     db_path = os.path.join(root, "data", "pubg-history.db")
     if not os.path.exists(db_path):
         print(f"DB nicht gefunden: {db_path}"); return 1
