@@ -463,6 +463,20 @@ class PollerThread(threading.Thread):
                 stats = run_bulk_telemetry_catchup(
                     conn_bc, self.client, self.my_account_id,
                     max_matches=None, pacing_ms=200)
+                # Achievement-Detection nach Bulk-Catchup — sonst werden
+                # Runden die ohne laufenden Server gespielt wurden nie
+                # ausgewertet (normaler Tick findet 0 pending Telemetries).
+                if stats.get("processed", 0) > 0:
+                    try:
+                        from pubg.aggregations import (
+                            detect_and_store_session_achievements)
+                        n = detect_and_store_session_achievements(
+                            conn_bc, self.my_account_id)
+                        stats["newAchievements"] = n
+                        if n > 0 and self.cache is not None:
+                            self.cache.invalidate()
+                    except Exception as ae:
+                        stats["achievementError"] = str(ae)
                 conn_bc.close()
                 self._last_status["bulkCatchup"] = stats
             except Exception as e:
