@@ -1251,6 +1251,53 @@ def reset_milestones(root: str, ids: list) -> int:
     return 0
 
 
+def diagnose(root: str) -> int:
+    """Zeigt DB-Status: letzte Matches, Telemetrie-Stand, letzte Milestones.
+
+    Nutzung:
+        python -m pubg.cli diagnose
+    """
+    db_path = os.path.join(root, "data", "pubg-history.db")
+    if not os.path.exists(db_path):
+        print(f"DB nicht gefunden: {db_path}"); return 1
+    conn = connect(db_path)
+
+    total_m = conn.execute("SELECT COUNT(*) FROM matches").fetchone()[0]
+    total_a = conn.execute(
+        "SELECT COUNT(*) FROM pubg_achievements_seen").fetchone()[0]
+    pending_tel = conn.execute(
+        "SELECT COUNT(*) FROM matches "
+        "WHERE telemetry_url IS NOT NULL "
+        "AND (telemetry_fetched IS NULL OR telemetry_schema < "
+        "(SELECT COALESCE(MAX(telemetry_schema),0) FROM matches WHERE telemetry_schema IS NOT NULL))"
+    ).fetchone()[0]
+
+    print(f"\n=== PUBG DB-Status ===")
+    print(f"Matches gesamt : {total_m}")
+    print(f"Milestones     : {total_a}")
+    print(f"Telemetrie pend: {pending_tel}")
+
+    print(f"\n--- Letzte 10 Matches ---")
+    rows = conn.execute(
+        "SELECT played_at, map_name, telemetry_fetched, telemetry_schema "
+        "FROM matches ORDER BY played_at DESC LIMIT 10"
+    ).fetchall()
+    for r in rows:
+        tf = "ok" if r["telemetry_fetched"] else "MISSING"
+        print(f"  {r['played_at'][:16]}  {(r['map_name'] or '?'):<16}  tel={tf}  schema={r['telemetry_schema']}")
+
+    print(f"\n--- Letzte 5 Milestones ---")
+    rows = conn.execute(
+        "SELECT played_at, achievement_id, label "
+        "FROM pubg_achievements_seen ORDER BY played_at DESC LIMIT 5"
+    ).fetchall()
+    for r in rows:
+        print(f"  {r['played_at'][:16]}  {r['achievement_id']:<30}  {r['label'] or ''}")
+
+    conn.close()
+    return 0
+
+
 if __name__ == "__main__":
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if len(sys.argv) > 1 and sys.argv[1] == "init":
@@ -1278,6 +1325,8 @@ if __name__ == "__main__":
         sys.exit(hidrive_backfill(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "backfill-pcts":
         sys.exit(backfill_pcts(root))
+    elif len(sys.argv) > 1 and sys.argv[1] == "diagnose":
+        sys.exit(diagnose(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "detect-achievements":
         sys.exit(detect_achievements(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "rebuild-achievements":
@@ -1297,7 +1346,7 @@ if __name__ == "__main__":
     else:
         print("Usage: python -m pubg.cli init | cold-start | pull-ftp | "
               "seasons-backfill | wipe-day [YYYY-MM-DD] [--keep-popups] | "
-              "detect-achievements | rebuild-achievements | "
+              "diagnose | detect-achievements | rebuild-achievements | "
               "reset-milestones <id1> [<id2> ...] | "
               "list-milestones [pattern] | "
               "purge-before YYYY-MM-DD")
