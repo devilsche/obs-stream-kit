@@ -2316,16 +2316,17 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
         # 100 Einheiten = 1 Meter (Telemetry/PUBG-Welt)
         longest_m = longest if longest < 50 else longest / 100  # Fallback
 
-        # Icon-Regel: nur 🔥 für 'geile' Achievements, sonst kein Icon.
-        if not win_seen and place == 1:
+        # Jedes Chicken bekommt einen eigenen Milestone — jeder Win ist
+        # das Highlight der Runde. PK (achievement_id, match_id) stellt
+        # Eindeutigkeit sicher. win_seen bleibt fuer Streak-Logik aktiv.
+        if place == 1:
             out.append({
-                "id": "first_chicken",
+                "id": "chicken",
                 "label": "Dinner Served",
                 "icon": "🔥",
                 "matchId": m["matchId"], "playedAt": played,
             })
             win_seen = True
-            seen.add("first_chicken")
 
         # Career-Wins-Milestone: bei jedem Chicken-Win die kumulative
         # Career-Win-Number bis zu diesem Match berechnen — wenn glatte
@@ -2981,6 +2982,16 @@ def _migrate_legacy_achievement_ids(conn):
     conn.execute("""
         DELETE FROM pubg_achievements_seen
         WHERE achievement_id = 'first_hot_drop_survived'
+    """)
+    # 4) first_chicken -> chicken (jedes Chicken bekommt Milestone)
+    conn.execute("""
+        UPDATE OR IGNORE pubg_achievements_seen
+        SET achievement_id = 'chicken'
+        WHERE achievement_id = 'first_chicken'
+    """)
+    conn.execute("""
+        DELETE FROM pubg_achievements_seen
+        WHERE achievement_id = 'first_chicken'
     """)
     conn.commit()
 
