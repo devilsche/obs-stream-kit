@@ -1100,6 +1100,7 @@ class EndpointRegistry:
     PUBG_ICON_URLS = {
         # BR Opener
         "first_chicken":           "/widgets/pubg/icons/first_chicken.png",
+        "chicken":                 "/widgets/pubg/icons/session_opener_chicken.png",
         "phoenix_chicken":         "/widgets/pubg/icons/phoenix_chicken.png",
         "first_top10":             "/widgets/pubg/icons/first_top10.png",
         "session_opener_chicken":  "/widgets/pubg/icons/session_opener_chicken.png",
