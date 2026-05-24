@@ -2323,7 +2323,7 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             out.append({
                 "id": "chicken",
                 "label": "Dinner Served",
-                "icon": "🔥",
+                "icon": "",
                 "matchId": m["matchId"], "playedAt": played,
             })
             win_seen = True
