@@ -1130,6 +1130,7 @@ class EndpointRegistry:
         "god_mode_chicken":        "/widgets/pubg/icons/god_mode_chicken.png",
         # Hot-Drop / Inferno (Legacy-IDs point to new files)
         "burning_hell":            "/widgets/pubg/icons/burning_hell.png",
+        "burning_hell_survivor":   "/widgets/pubg/icons/burning_hell_survivor.png",
         "hot_drop_match":          "/widgets/pubg/icons/hot_drop_match.png",
         "first_hot_drop":          "/widgets/pubg/icons/hot_drop_match.png",
         "hot_drop_match_survived": "/widgets/pubg/icons/hot_drop_match_survived.png",
