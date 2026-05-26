@@ -49,3 +49,92 @@ def test_team_colors_stable_order():
     a = team_colors([3, 1, 2])
     b = team_colors([1, 2, 3])
     assert a == b
+
+
+from pubg.replay_builder import extract_events
+
+
+def _raw_fixture():
+    """Minimaler Raw-Blob: 1 Landing, 1 Position, 1 Hit, 1 Knock, 1 Kill."""
+    return [
+        {"_T": "LogParachuteLanding", "_D": "2026-05-01T10:00:10Z",
+         "character": {"accountId": "acc.A", "name": "LuCKoR",
+                       "location": {"x": 400000, "y": 400000, "z": 100}}},
+        {"_T": "LogPlayerPosition", "_D": "2026-05-01T10:00:15Z",
+         "character": {"accountId": "acc.A", "name": "LuCKoR",
+                       "location": {"x": 410000, "y": 405000, "z": 100}}},
+        {"_T": "LogPlayerTakeDamage", "_D": "2026-05-01T10:01:30Z",
+         "attacker": {"accountId": "acc.A", "name": "LuCKoR",
+                      "location": {"x": 420000, "y": 410000, "z": 100}},
+         "victim": {"accountId": "acc.B", "name": "Enemy",
+                    "location": {"x": 425000, "y": 412000, "z": 100}},
+         "damageCauserName": "WeapAK47_C"},
+        {"_T": "LogPlayerMakeGroggy", "_D": "2026-05-01T10:01:31Z",
+         "attacker": {"accountId": "acc.A", "name": "LuCKoR",
+                      "location": {"x": 420000, "y": 410000, "z": 100}},
+         "victim": {"accountId": "acc.B", "name": "Enemy",
+                    "location": {"x": 425000, "y": 412000, "z": 100}},
+         "damageCauserName": "WeapAK47_C", "distance": 5000},
+        {"_T": "LogPlayerKillV2", "_D": "2026-05-01T10:01:35Z",
+         "killer": {"accountId": "acc.A", "name": "LuCKoR",
+                    "location": {"x": 420000, "y": 410000, "z": 100}},
+         "victim": {"accountId": "acc.B", "name": "Enemy",
+                    "location": {"x": 425000, "y": 412000, "z": 100}},
+         "killerDamageInfo": {"damageCauserName": "WeapAK47_C", "distance": 5000}},
+    ]
+
+
+def test_extract_events_types_and_count():
+    events = extract_events(_raw_fixture(), mapKm=8, position_interval_ms=1000)
+    types = [e["type"] for e in events]
+    assert "landing" in types
+    assert "position" in types
+    assert "hit" in types
+    assert "knock" in types
+    assert "kill" in types
+
+
+def test_extract_events_sorted_by_ts():
+    events = extract_events(_raw_fixture(), mapKm=8, position_interval_ms=1000)
+    ts = [e["ts"] for e in events]
+    assert ts == sorted(ts)
+
+
+def test_extract_events_normalizes_coords():
+    events = extract_events(_raw_fixture(), mapKm=8, position_interval_ms=1000)
+    landing = next(e for e in events if e["type"] == "landing")
+    assert abs(landing["x"] - 0.5) < 1e-6  # 400000/800000
+    assert abs(landing["y"] - 0.5) < 1e-6
+
+
+def test_extract_events_hit_has_both_endpoints():
+    events = extract_events(_raw_fixture(), mapKm=8, position_interval_ms=1000)
+    hit = next(e for e in events if e["type"] == "hit")
+    assert "ax" in hit and "ay" in hit and "tx" in hit and "ty" in hit
+    assert hit["actorId"] == "acc.A"
+    assert hit["targetId"] == "acc.B"
+
+
+def test_extract_events_kill_has_weapon_distance():
+    events = extract_events(_raw_fixture(), mapKm=8, position_interval_ms=1000)
+    kill = next(e for e in events if e["type"] == "kill")
+    assert kill["weapon"] == "WeapAK47_C"
+    assert kill["distance"] == 5000
+
+
+def test_extract_events_position_interval_thins():
+    # Zwei Position-Events 200ms auseinander, interval=1000 → nur erstes bleibt
+    raw = [
+        {"_T": "LogPlayerPosition", "_D": "2026-05-01T10:00:00.000Z",
+         "character": {"accountId": "acc.A", "name": "X",
+                       "location": {"x": 1, "y": 1, "z": 100}}},
+        {"_T": "LogPlayerPosition", "_D": "2026-05-01T10:00:00.200Z",
+         "character": {"accountId": "acc.A", "name": "X",
+                       "location": {"x": 2, "y": 2, "z": 100}}},
+        {"_T": "LogPlayerPosition", "_D": "2026-05-01T10:00:01.500Z",
+         "character": {"accountId": "acc.A", "name": "X",
+                       "location": {"x": 3, "y": 3, "z": 100}}},
+    ]
+    events = extract_events(raw, mapKm=8, position_interval_ms=1000)
+    pos = [e for e in events if e["type"] == "position"]
+    assert len(pos) == 2  # 0.0s und 1.5s; 0.2s wird verworfen
