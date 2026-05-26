@@ -72,6 +72,7 @@ class EndpointRegistry:
         self.cache = cache
         self.client = client
         self.poller_status = poller_status
+        self._replay_cache = {}  # match_id → fertiges Replay-Dict (Session-Memory)
 
     def dispatch(self, method: str, path: str, body: bytes, headers: dict):
         u = urlparse(path)
@@ -106,6 +107,10 @@ class EndpointRegistry:
             return self._weapon_stats(qs)
         if route == ("GET", "/api/pubg/match-detail"):
             return self._match_detail(qs)
+        if route == ("GET", "/api/pubg/matches-list"):
+            return self._matches_list(qs)
+        if route == ("GET", "/api/pubg/match-replay"):
+            return self._match_replay(qs)
         if route == ("GET", "/api/pubg/hot-drop"):
             return self._hot_drop(qs)
         if route == ("GET", "/api/pubg/payday-stats"):
@@ -555,6 +560,80 @@ class EndpointRegistry:
         if not data:
             return _err(404, "match not found")
         return _ok(data)
+
+    def _matches_list(self, qs):
+        conn = self.get_conn()
+        try:
+            limit = int(qs.get("limit", "50"))
+        except ValueError:
+            limit = 50
+        limit = max(1, min(200, limit))
+        rows = conn.execute("""
+            SELECT m.match_id, m.played_at, m.map_name,
+                   pa.place, pa.kills
+            FROM matches m
+            LEFT JOIN participants pa
+              ON pa.match_id = m.match_id AND pa.account_id = ?
+            ORDER BY m.played_at DESC
+            LIMIT ?
+        """, (self.my_account_id, limit)).fetchall()
+        return _ok([{
+            "matchId":  r["match_id"],
+            "playedAt": r["played_at"],
+            "mapName":  r["map_name"],
+            "place":    r["place"],
+            "kills":    r["kills"],
+        } for r in rows])
+
+    def _match_replay(self, qs):
+        import os
+        from pubg import hidrive_telemetry
+        from pubg.replay_builder import build_replay
+        from pubg.telemetry import extract_player_names
+        from pubg.db import get_team_mapping_for_match
+
+        match_id = (qs.get("match") or "").strip()
+        if not match_id:
+            return _err(400, "match required")
+        if match_id in self._replay_cache:
+            return _ok(self._replay_cache[match_id])
+
+        conn = self.get_conn()
+        m_row = conn.execute(
+            "SELECT map_name FROM matches WHERE match_id = ?",
+            (match_id,)).fetchone()
+        if not m_row:
+            return _err(404, "match not found")
+        map_name = m_row["map_name"]
+
+        # Map-Groesse aus POIs (Fallback 8km)
+        pois = self._load_pois()
+        alias = "Baltic_Main" if map_name == "Erangel_Main" else map_name
+        blob = pois.get(alias) or pois.get(map_name) or {}
+        mapKm = float(blob.get("mapKm") or 8)
+
+        # Raw-Telemetrie von HiDrive
+        here = os.path.dirname(os.path.abspath(__file__))
+        secrets = os.path.join(os.path.dirname(here), ".secrets")
+        raw = hidrive_telemetry.download_raw(match_id, secrets)
+        if not raw:
+            return _err(404, "no telemetry available for this match")
+
+        # Team-Mapping + Namen
+        team_mapping = get_team_mapping_for_match(conn, match_id)
+        names = {}
+        rows = conn.execute(
+            "SELECT account_id, name FROM players").fetchall()
+        for r in rows:
+            names[r["account_id"]] = r["name"]
+        # Fehlende Namen aus dem Raw-Blob nachziehen
+        for acc, nm in extract_player_names(raw).items():
+            names.setdefault(acc, nm)
+
+        result = build_replay(
+            raw, match_id, map_name, mapKm, team_mapping, names)
+        self._replay_cache[match_id] = result
+        return _ok(result)
 
     def _weapon_stats(self, qs):
         conn = self.get_conn()

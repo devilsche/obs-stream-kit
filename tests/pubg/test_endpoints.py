@@ -119,3 +119,27 @@ def test_stamm_crew_add_and_list(tmp_db_path):
     assert code == 200
     body, code, _ = reg.dispatch("GET", "/api/pubg/stamm-crew", b"", {})
     assert "MateA" in body.decode()
+
+
+# ── Task 5: /api/pubg/matches-list ───────────────────────────────────────────
+
+def test_matches_list_returns_recent(tmp_db_path):
+    conn = _setup(tmp_db_path)
+    conn.execute(
+        "INSERT INTO matches (match_id, played_at, map_name, game_mode) "
+        "VALUES (?,?,?,?)",
+        ("m1", "2026-05-26T10:00:00Z", "Baltic_Main", "squad"))
+    conn.execute(
+        "INSERT INTO participants (match_id, account_id, name, team_id, place, kills) "
+        "VALUES (?,?,?,?,?,?)",
+        ("m1", "account.A", "PEX_LuCKoR", 3, 2, 5))
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/matches-list?limit=10", b"", {})
+    assert code == 200
+    payload = json.loads(body)
+    assert isinstance(payload, list)
+    assert payload[0]["matchId"] == "m1"
+    assert payload[0]["mapName"] == "Baltic_Main"
+    assert payload[0]["place"] == 2
+    assert payload[0]["kills"] == 5
