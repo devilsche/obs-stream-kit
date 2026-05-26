@@ -1,7 +1,8 @@
 /* landing-spots.js — PUBG Landing Spots Tool
    Task 8: Karten-Selektor + State
    Task 9: Spieler-Autocomplete + refresh()
-   Task 10: Heatmap + Scatter rendern */
+   Task 10: Heatmap + Scatter rendern
+   Task 11: POI-Liste mit per-Spieler-Aufschlüsselung + Hover-Verknüpfung */
 
 const LS = {
   data: null,            // landing-heatmap Response
@@ -241,6 +242,48 @@ function buildPlayersBar() {
     });
   });
 }
+
+// ---------------------------------------------------------------------------
+// Task 11: POI-Liste mit per-Spieler-Aufschlüsselung + Hover-Verknüpfung
+// ---------------------------------------------------------------------------
+
+function renderPoiList() {
+  const host = document.getElementById("poiList");
+  if (!LS.data || !LS.data.pois.length) {
+    host.innerHTML = `<p>Keine Landings für diese Auswahl.</p>`;
+    return;
+  }
+  const maxTotal = Math.max(1, ...LS.data.pois.map(p => p.total));
+  host.innerHTML = LS.data.pois.map(poi => {
+    const players = Object.entries(poi.byPlayer)
+      .sort((a, b) => b[1].count - a[1].count)
+      .map(([, v]) =>
+        `<div class="poi-player"><span>${v.name}</span>`
+        + `<span>${v.count}× · ${v.pct}%</span></div>`).join("");
+    const w = Math.round(poi.total / maxTotal * 100);
+    return `
+      <div class="poi" data-poi="${poi.name}">
+        <div class="poi-head">
+          <span>${poi.name}</span><span>${poi.total}×</span>
+        </div>
+        <div class="bar" style="width:${w}%" role="presentation"></div>
+        ${players}
+      </div>`;
+  }).join("");
+}
+
+function highlightPoi(name) {
+  LS._hoverPoi = name;
+  renderHeatmap();
+}
+
+document.getElementById("poiList").addEventListener("mouseover", e => {
+  const el = e.target.closest(".poi");
+  if (el) highlightPoi(el.dataset.poi);
+});
+document.getElementById("poiList").addEventListener("mouseout", e => {
+  if (e.target.closest(".poi")) highlightPoi(null);
+});
 
 // ---------------------------------------------------------------------------
 // Init
