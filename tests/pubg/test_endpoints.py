@@ -206,3 +206,26 @@ def test_match_replay_404_when_no_telemetry(tmp_db_path):
         body, code, _ = reg.dispatch(
             "GET", "/api/pubg/match-replay?match=m2", b"", {})
         assert code == 404
+
+
+def test_player_search_matches_prefix(tmp_db_path):
+    conn = _setup(tmp_db_path)
+    upsert_player(conn, "account.B", "Mate1", "steam", False)
+    upsert_player(conn, "account.C", "LuckyGuy", "steam", False)
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/player-search?q=Luc", b"", {})
+    assert code == 200
+    payload = json.loads(body)
+    names = {p["name"] for p in payload}
+    assert "PEX_LuCKoR" in names      # account.A aus _setup
+    assert "LuckyGuy" in names
+    assert "Mate1" not in names
+
+
+def test_player_search_empty_query_returns_empty(tmp_db_path):
+    conn = _setup(tmp_db_path)
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/player-search?q=", b"", {})
+    assert code == 200
+    assert json.loads(body) == []

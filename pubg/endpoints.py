@@ -117,6 +117,10 @@ class EndpointRegistry:
             return self._payday_stats(qs)
         if route == ("GET", "/api/pubg/landings"):
             return self._landings(qs)
+        if route == ("GET", "/api/pubg/player-search"):
+            return self._player_search(qs)
+        if route == ("GET", "/api/pubg/landing-heatmap"):
+            return self._landing_heatmap(qs)
         if route == ("GET", "/api/pubg/pois"):
             return self._pois_get(qs)
         if route == ("POST", "/api/pubg/pois"):
@@ -441,6 +445,34 @@ class EndpointRegistry:
         } for r in rows]
         return _ok({"landings": landings, "count": len(landings),
                     "firstOnly": not all_landings})
+
+    def _player_search(self, qs):
+        conn = self.get_conn()
+        q = (qs.get("q") or "").strip()
+        if not q:
+            return _ok([])
+        rows = conn.execute(
+            "SELECT account_id, name FROM players "
+            "WHERE name LIKE ? ORDER BY name LIMIT 20",
+            (f"%{q}%",)).fetchall()
+        return _ok([{"accountId": r["account_id"], "name": r["name"]}
+                    for r in rows if r["name"]])
+
+    def _landing_heatmap(self, qs):
+        from pubg.aggregations import compute_landing_spots
+        conn = self.get_conn()
+        map_name = (qs.get("map") or "").strip()
+        if not map_name:
+            return _err(400, "map required")
+        accs = [qs.get(k) for k in ("p0", "p1", "p2", "p3")]
+        accs = [a for a in accs if a]
+        route_filter = qs.get("routeFilter") == "1"
+        pois = self._load_pois()
+        alias = "Baltic_Main" if map_name == "Erangel_Main" else map_name
+        blob = pois.get(alias) or pois.get(map_name) or {"mapKm": 8, "regions": []}
+        result = compute_landing_spots(
+            conn, map_name, accs, pois_blob=blob, route_filter=route_filter)
+        return _ok(result)
 
     POIS_FILE = "data/pubg-pois.json"
 
