@@ -143,3 +143,66 @@ def test_matches_list_returns_recent(tmp_db_path):
     assert payload[0]["mapName"] == "Baltic_Main"
     assert payload[0]["place"] == 2
     assert payload[0]["kills"] == 5
+
+
+# ── Task 6: /api/pubg/match-replay ───────────────────────────────────────────
+from unittest.mock import patch
+
+
+def test_match_replay_requires_match_id(tmp_db_path):
+    conn = _setup(tmp_db_path)
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/match-replay", b"", {})
+    assert code == 400
+
+
+def test_match_replay_builds_and_caches(tmp_db_path):
+    conn = _setup(tmp_db_path)
+    conn.execute(
+        "INSERT INTO matches (match_id, played_at, map_name, game_mode) "
+        "VALUES (?,?,?,?)",
+        ("m1", "2026-05-26T10:00:00Z", "Baltic_Main", "squad"))
+    conn.execute(
+        "INSERT INTO match_team_mapping (match_id, account_id, team_id) "
+        "VALUES (?,?,?)", ("m1", "account.A", 1))
+    conn.execute(
+        "INSERT INTO match_team_mapping (match_id, account_id, team_id) "
+        "VALUES (?,?,?)", ("m1", "account.B", 2))
+    conn.commit()
+
+    raw = [
+        {"_T": "LogParachuteLanding", "_D": "2026-05-26T10:00:10Z",
+         "character": {"accountId": "account.A", "name": "PEX_LuCKoR",
+                       "location": {"x": 400000, "y": 400000, "z": 100}}},
+        {"_T": "LogPlayerKillV2", "_D": "2026-05-26T10:01:00Z",
+         "killer": {"accountId": "account.A", "name": "PEX_LuCKoR",
+                    "location": {"x": 400000, "y": 400000, "z": 100}},
+         "victim": {"accountId": "account.B", "name": "Foe",
+                    "location": {"x": 410000, "y": 410000, "z": 100}},
+         "killerDamageInfo": {"damageCauserName": "WeapAK47_C", "distance": 90}},
+    ]
+    reg = _registry(conn)
+    with patch("pubg.hidrive_telemetry.download_raw", return_value=raw) as dl:
+        body, code, _ = reg.dispatch(
+            "GET", "/api/pubg/match-replay?match=m1", b"", {})
+        assert code == 200
+        payload = json.loads(body)
+        assert payload["matchId"] == "m1"
+        assert len(payload["teams"]) == 2
+        assert any(e["type"] == "kill" for e in payload["events"])
+        # Zweiter Aufruf → Cache, kein zweiter Download
+        reg.dispatch("GET", "/api/pubg/match-replay?match=m1", b"", {})
+        assert dl.call_count == 1
+
+
+def test_match_replay_404_when_no_telemetry(tmp_db_path):
+    conn = _setup(tmp_db_path)
+    conn.execute(
+        "INSERT INTO matches (match_id, played_at, map_name, game_mode) "
+        "VALUES (?,?,?,?)", ("m2", "2026-05-26T10:00:00Z", "Baltic_Main", "squad"))
+    conn.commit()
+    reg = _registry(conn)
+    with patch("pubg.hidrive_telemetry.download_raw", return_value=None):
+        body, code, _ = reg.dispatch(
+            "GET", "/api/pubg/match-replay?match=m2", b"", {})
+        assert code == 404
