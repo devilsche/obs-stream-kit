@@ -351,6 +351,33 @@ def test_landing_spots_single_player_all_matches(tmp_db_path):
     assert res["totalMatches"] == 2
 
 
+def test_landing_spots_route_filter_excludes_far_pois(tmp_db_path):
+    conn = _seed_landings(tmp_db_path)
+    # Flugroute fuer m1: zwei Cruise-Position-Events (z>=150000) entlang
+    # der Linie x=400000 (vertikal). POI bei (400000,400000) liegt drauf
+    # (0km Querdistanz), also bleibt er drin.
+    conn.execute("INSERT INTO telemetry_events "
+                 "(match_id, event_type, timestamp_ms, actor_account, actor_x, actor_y, actor_z) "
+                 "VALUES ('m1','Position',100,'acc.A',400000,0,160000)")
+    conn.execute("INSERT INTO telemetry_events "
+                 "(match_id, event_type, timestamp_ms, actor_account, actor_x, actor_y, actor_z) "
+                 "VALUES ('m1','Position',200,'acc.A',400000,800000,160000)")
+    conn.commit()
+    # Filter A allein, route_filter an. POIs der Map kommen aus pois_blob.
+    pois = {"mapKm": 8, "regions": [
+        {"name": "OnRoute",  "points": [[390000,390000],[410000,390000],
+                                        [410000,410000],[390000,410000]]},
+        {"name": "FarAway",  "points": [[10000,10000],[30000,10000],
+                                        [30000,30000],[10000,30000]]},
+    ]}
+    res = compute_landing_spots(conn, "Baltic_Main", ["acc.A"],
+                                pois_blob=pois, route_filter=True)
+    # m1-Landung (400000,400000) ist auf der Route → bleibt.
+    # m2 hat keine Cruise-Events → routeUnknown → bleibt ebenfalls.
+    poi_names = {p["name"] for p in res["pois"]}
+    assert "OnRoute" in poi_names
+
+
 def test_squad_compare_table(tmp_db_path):
     conn = _setup(tmp_db_path)
     upsert_player(conn, "account.MA", "MateA", "steam", False)
