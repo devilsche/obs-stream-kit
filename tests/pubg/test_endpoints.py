@@ -229,3 +229,29 @@ def test_player_search_empty_query_returns_empty(tmp_db_path):
     body, code, _ = reg.dispatch("GET", "/api/pubg/player-search?q=", b"", {})
     assert code == 200
     assert json.loads(body) == []
+
+
+def test_landing_heatmap_endpoint(tmp_db_path):
+    conn = _setup(tmp_db_path)
+    conn.execute("INSERT INTO matches (match_id, played_at, map_name, game_mode) "
+                 "VALUES ('m1','2026-05-01T10:00:00Z','Baltic_Main','squad')")
+    conn.execute("INSERT INTO match_team_mapping (match_id, account_id, team_id) "
+                 "VALUES ('m1','account.A',1)")
+    conn.execute("INSERT INTO telemetry_events "
+                 "(match_id, event_type, timestamp_ms, actor_account, actor_x, actor_y, actor_z, actor_health) "
+                 "VALUES ('m1','Landing',1000,'account.A',400000,400000,100,90)")
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch(
+        "GET", "/api/pubg/landing-heatmap?map=Baltic_Main&p0=account.A", b"", {})
+    assert code == 200
+    payload = json.loads(body)
+    assert payload["totalMatches"] == 1
+    assert len(payload["scatterPoints"]) == 1
+
+
+def test_landing_heatmap_requires_map(tmp_db_path):
+    conn = _setup(tmp_db_path)
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/landing-heatmap", b"", {})
+    assert code == 400
