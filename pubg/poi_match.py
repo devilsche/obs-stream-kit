@@ -52,6 +52,19 @@ def dist_to_poly(px, py, points):
     return best
 
 
+def perp_distance_to_route(px, py, ax, ay, bx, by):
+    """Kuerzeste Distanz von Punkt P zur UNENDLICHEN Geraden durch A,B.
+    (Flugzeug fliegt ueber die ganze Karte → unendliche Linie, nicht
+    Segment.) Bei A==B: Punkt-zu-Punkt-Distanz."""
+    dx, dy = bx - ax, by - ay
+    denom = math.hypot(dx, dy)
+    if denom == 0:
+        return math.hypot(px - ax, py - ay)
+    # |(B-A) x (A-P)| / |B-A|
+    cross = abs(dx * (ay - py) - dy * (ax - px))
+    return cross / denom
+
+
 def match_poi(x, y, regions):
     """Liefert den POI-Namen fuer eine Koordinate. Kleinste umschliessende
     benannte Region gewinnt (Nesting-faehig). None wenn in keiner Region.

@@ -1,5 +1,6 @@
 from pubg.poi_match import point_in_poly, poly_area, dist_to_poly
 from pubg.poi_match import match_poi
+from pubg.poi_match import perp_distance_to_route
 
 
 SQUARE = [[0, 0], [100, 0], [100, 100], [0, 100]]
@@ -54,3 +55,21 @@ def test_match_poi_none_when_outside():
 def test_match_poi_ignores_unnamed_regions():
     # Punkt im namenlosen Dreieck → None (kein Label)
     assert match_poi(350, 330, _regions()) is None
+
+
+def test_perp_distance_on_line_is_zero():
+    # Route entlang x-Achse (0,0)->(100,0); Punkt (50,0) liegt drauf
+    d = perp_distance_to_route(50, 0, 0, 0, 100, 0)
+    assert abs(d) < 1e-6
+
+
+def test_perp_distance_perpendicular():
+    # Punkt 30 ueber der Linie
+    d = perp_distance_to_route(50, 30, 0, 0, 100, 0)
+    assert abs(d - 30) < 1e-6
+
+
+def test_perp_distance_degenerate_route():
+    # A == B → Distanz = Punkt-zu-Punkt
+    d = perp_distance_to_route(3, 4, 0, 0, 0, 0)
+    assert abs(d - 5) < 1e-6
