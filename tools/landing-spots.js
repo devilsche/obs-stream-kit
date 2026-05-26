@@ -1,6 +1,7 @@
 /* landing-spots.js — PUBG Landing Spots Tool
    Task 8: Karten-Selektor + State
-   Task 9: Spieler-Autocomplete + refresh() */
+   Task 9: Spieler-Autocomplete + refresh()
+   Task 10: Heatmap + Scatter rendern */
 
 const LS = {
   data: null,            // landing-heatmap Response
@@ -124,7 +125,121 @@ async function refresh() {
   await ensureMapImage();
   buildPlayersBar();
   renderPoiList();
-  renderHeatmap();   // Task 10
+  renderHeatmap();
+}
+
+// ---------------------------------------------------------------------------
+// Task 10: Heatmap + Scatter rendern
+// ---------------------------------------------------------------------------
+
+function ensureMapImage() {
+  const name = LS.mapName === "Erangel_Main" ? "Baltic_Main" : LS.mapName;
+  if (LS.mapImg && LS._imgName === name) return Promise.resolve();
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => { LS.mapImg = img; LS._imgName = name; res(); };
+    img.onerror = () => { LS.mapImg = null; res(); };
+    img.src = "/widgets/pubg/maps/" + name + ".webp";
+  });
+}
+
+function fitCanvas() {
+  const cnv = document.getElementById("heat");
+  const r = cnv.parentElement.getBoundingClientRect();
+  cnv.width = Math.floor(r.width);
+  cnv.height = Math.floor(r.height);
+}
+
+// normalisiert (0-1) → Canvas-Pixel (Map quadratisch zentriert)
+function projXY(nx, ny) {
+  const cnv = document.getElementById("heat");
+  const base = Math.min(cnv.width, cnv.height);
+  const offX = (cnv.width - base) / 2;
+  const offY = (cnv.height - base) / 2;
+  return [offX + nx * base, offY + ny * base];
+}
+
+function renderHeatmap() {
+  fitCanvas();
+  const cnv = document.getElementById("heat");
+  const ctx = cnv.getContext("2d");
+  ctx.fillStyle = "#0d061a";
+  ctx.fillRect(0, 0, cnv.width, cnv.height);
+  // Basemap quadratisch
+  if (LS.mapImg) {
+    const [x0, y0] = projXY(0, 0);
+    const [x1, y1] = projXY(1, 1);
+    ctx.drawImage(LS.mapImg, x0, y0, x1 - x0, y1 - y0);
+  }
+  if (!LS.data) return;
+
+  // Heatmap-Blobs pro POI (Radius ~ total, Farbe Gold→Lila nach Intensität)
+  const maxTotal = Math.max(1, ...LS.data.pois.map(p => p.total));
+  for (const poi of LS.data.pois) {
+    if (poi.cx == null) continue;
+    const [px, py] = projXY(poi.cx, poi.cy);
+    const intensity = poi.total / maxTotal;
+    const radius = 20 + intensity * 60;
+    const grad = ctx.createRadialGradient(px, py, 0, px, py, radius);
+    grad.addColorStop(0, `rgba(94,42,121,${0.25 + intensity * 0.45})`);
+    grad.addColorStop(1, "rgba(242,183,5,0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(px, py, radius, 0, Math.PI * 2); ctx.fill();
+    // POI-Label
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 12px DM Sans";
+    ctx.textAlign = "center";
+    ctx.fillText(poi.name + " " + poi.total + "×", px, py - radius - 4);
+  }
+
+  // Scatter-Punkte nur für aktive Spieler
+  for (const sp of LS.data.scatterPoints) {
+    if (!LS.activeScatter.has(sp.accountId)) continue;
+    const idx = LS.players.findIndex(
+      p => p && p.accountId === sp.accountId);
+    const color = SCATTER_COLORS[idx] || "#fff";
+    const [px, py] = projXY(sp.x, sp.y);
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Hover-Highlight (Task 11 — ausgeführt wenn _hoverPoi gesetzt)
+  if (LS._hoverPoi && LS.data) {
+    const poi = LS.data.pois.find(p => p.name === LS._hoverPoi);
+    if (poi && poi.cx != null) {
+      const [px, py] = projXY(poi.cx, poi.cy);
+      ctx.strokeStyle = "#f2b705";
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(px, py, 36, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+}
+window.addEventListener("resize", renderHeatmap);
+
+function buildPlayersBar() {
+  const bar = document.getElementById("playersBar");
+  const active = LS.players.map((p, i) => ({ p, i })).filter(o => o.p);
+  bar.innerHTML = active.map(({ p, i }) => `
+    <div class="pchip" role="button" tabindex="0" data-acc="${p.accountId}"
+         aria-pressed="${LS.activeScatter.has(p.accountId) ? "true" : "false"}"
+         aria-label="Scatter ${p.name} umschalten">
+      <span class="dot" style="background:${SCATTER_COLORS[i]}"></span>
+      <span>${p.name}</span>
+    </div>`).join("");
+  bar.querySelectorAll(".pchip").forEach(chip => {
+    const acc = chip.dataset.acc;
+    const toggle = () => {
+      if (LS.activeScatter.has(acc)) LS.activeScatter.delete(acc);
+      else LS.activeScatter.add(acc);
+      chip.classList.toggle("active", LS.activeScatter.has(acc));
+      chip.setAttribute("aria-pressed", String(LS.activeScatter.has(acc)));
+      renderHeatmap();
+    };
+    chip.addEventListener("click", toggle);
+    chip.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
