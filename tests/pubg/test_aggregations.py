@@ -291,6 +291,66 @@ def test_first_fight_cluster_multi_team(tmp_db_path):
     assert res["maxTeams"] == 2
 
 
+from pubg.aggregations import compute_landing_spots
+
+
+def _seed_landings(tmp_db_path):
+    conn = connect(tmp_db_path)
+    init_schema(conn)
+    upsert_player(conn, "acc.A", "LuCKoR", "steam", True)
+    upsert_player(conn, "acc.B", "Mate1", "steam", False)
+    upsert_player(conn, "acc.C", "Rando", "steam", False)
+    # Match 1: A + B im Team 1
+    conn.execute("INSERT INTO matches (match_id, played_at, map_name, game_mode) "
+                 "VALUES ('m1','2026-05-01T10:00:00Z','Baltic_Main','squad')")
+    for acc, tid in [("acc.A", 1), ("acc.B", 1)]:
+        conn.execute("INSERT INTO match_team_mapping (match_id, account_id, team_id) "
+                     "VALUES (?,?,?)", ("m1", acc, tid))
+        conn.execute("INSERT INTO participants (match_id, account_id, name, team_id) "
+                     "VALUES (?,?,?,?)", ("m1", acc,
+                     "LuCKoR" if acc == "acc.A" else "Mate1", tid))
+    # A landet bei (400000,400000), B bei (410000,410000)
+    conn.execute("INSERT INTO telemetry_events "
+                 "(match_id, event_type, timestamp_ms, actor_account, actor_x, actor_y, actor_z, actor_health) "
+                 "VALUES ('m1','Landing',1000,'acc.A',400000,400000,100,90)")
+    conn.execute("INSERT INTO telemetry_events "
+                 "(match_id, event_type, timestamp_ms, actor_account, actor_x, actor_y, actor_z, actor_health) "
+                 "VALUES ('m1','Landing',1000,'acc.B',410000,410000,100,90)")
+    # Match 2: A + C im Team 1 (andere Konstellation)
+    conn.execute("INSERT INTO matches (match_id, played_at, map_name, game_mode) "
+                 "VALUES ('m2','2026-05-02T10:00:00Z','Baltic_Main','squad')")
+    for acc, tid in [("acc.A", 1), ("acc.C", 1)]:
+        conn.execute("INSERT INTO match_team_mapping (match_id, account_id, team_id) "
+                     "VALUES (?,?,?)", ("m2", acc, tid))
+    conn.execute("INSERT INTO telemetry_events "
+                 "(match_id, event_type, timestamp_ms, actor_account, actor_x, actor_y, actor_z, actor_health) "
+                 "VALUES ('m2','Landing',1000,'acc.A',600000,600000,100,90)")
+    conn.commit()
+    return conn
+
+
+def test_landing_spots_filters_by_constellation(tmp_db_path):
+    conn = _seed_landings(tmp_db_path)
+    # Filter: A + B zusammen → nur Match 1 zaehlt
+    res = compute_landing_spots(conn, "Baltic_Main", ["acc.A", "acc.B"])
+    accs_with_points = {p["accountId"] for p in res["scatterPoints"]}
+    assert "acc.A" in accs_with_points
+    assert "acc.B" in accs_with_points
+    # Match 2 (A+C) ist ausgeschlossen → A hat nur 1 Landung (aus m1)
+    a_points = [p for p in res["scatterPoints"] if p["accountId"] == "acc.A"]
+    assert len(a_points) == 1
+    assert res["totalMatches"] == 1
+
+
+def test_landing_spots_single_player_all_matches(tmp_db_path):
+    conn = _seed_landings(tmp_db_path)
+    # Nur A → beide Matches
+    res = compute_landing_spots(conn, "Baltic_Main", ["acc.A"])
+    a_points = [p for p in res["scatterPoints"] if p["accountId"] == "acc.A"]
+    assert len(a_points) == 2
+    assert res["totalMatches"] == 2
+
+
 def test_squad_compare_table(tmp_db_path):
     conn = _setup(tmp_db_path)
     upsert_player(conn, "account.MA", "MateA", "steam", False)

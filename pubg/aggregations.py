@@ -4474,3 +4474,165 @@ def compute_squad_compare(conn, my_account_id, player_names, last_n=5):
                       "playedAt": mid_row["played_at"],
                       "cells": cells})
     return {"players": targets, "matchTable": table}
+
+
+def compute_landing_spots(conn, map_name, player_accs, pois_blob=None,
+                          route_filter=False):
+    """Aggregiert Landings auf einer Map, gefiltert auf Matches in denen
+    ALLE player_accs im selben Squad waren (Konstellations-Filter).
+    Leere player_accs-Liste → alle Matches der Map.
+
+    pois_blob: {mapKm, regions:[...]} der Map (fuer POI-Zuordnung).
+    route_filter: nur Matches wo der Landing-POI <=1.5km Querdistanz zur
+                  Flugroute hatte (siehe Task 6 — hier noch ignoriert).
+
+    Returns:
+      { "pois": [{name, cx, cy, total, byPlayer:{acc:{name,count,pct}}}],
+        "scatterPoints": [{accountId, x, y, matchId}],
+        "totalMatches": int }
+    """
+    from pubg.poi_match import match_poi, poly_area, perp_distance_to_route
+    player_accs = [a for a in (player_accs or []) if a]
+
+    # 1) Matches der Map bestimmen, die den Konstellations-Filter erfuellen
+    match_rows = conn.execute(
+        "SELECT match_id FROM matches WHERE map_name = ?",
+        (map_name,)).fetchall()
+    match_ids = []
+    for mr in match_rows:
+        mid = mr["match_id"]
+        if not player_accs:
+            match_ids.append(mid)
+            continue
+        # Alle player_accs muessen im selben team_id dieses Matches sein
+        rows = conn.execute(
+            "SELECT account_id, team_id FROM match_team_mapping "
+            "WHERE match_id = ?", (mid,)).fetchall()
+        team_of = {r["account_id"]: r["team_id"] for r in rows}
+        teams = {team_of.get(a) for a in player_accs}
+        if None in teams or len(teams) != 1:
+            continue
+        match_ids.append(mid)
+
+    if not match_ids:
+        return {"pois": [], "scatterPoints": [], "totalMatches": 0}
+
+    # Flugrouten-Filter: nur Matches behalten wo die Landung des
+    # Referenz-Spielers <=1.5km Querdistanz zur Cruise-Route lag.
+    # Referenz = erster angegebener Spieler (oder self bei leerer Liste).
+    if route_filter and player_accs:
+        ref = player_accs[0]
+        ROUTE_MAX_CM = 150000  # 1.5km
+        kept = []
+        for mid in match_ids:
+            cruise = conn.execute("""
+                SELECT actor_x, actor_y FROM telemetry_events
+                WHERE match_id=? AND actor_account=? AND event_type='Position'
+                  AND actor_z >= 150000
+                ORDER BY timestamp_ms ASC
+            """, (mid, ref)).fetchall()
+            land = conn.execute("""
+                SELECT actor_x, actor_y FROM telemetry_events
+                WHERE match_id=? AND actor_account=? AND event_type='Landing'
+                  AND actor_x IS NOT NULL
+                ORDER BY timestamp_ms ASC LIMIT 1
+            """, (mid, ref)).fetchone()
+            if len(cruise) < 2 or not land:
+                kept.append(mid)  # routeUnknown → einbeziehen
+                continue
+            ax, ay = cruise[0]["actor_x"], cruise[0]["actor_y"]
+            bx, by = cruise[-1]["actor_x"], cruise[-1]["actor_y"]
+            d = perp_distance_to_route(land["actor_x"], land["actor_y"],
+                                       ax, ay, bx, by)
+            if d <= ROUTE_MAX_CM:
+                kept.append(mid)
+        match_ids = kept
+
+    if not match_ids:
+        return {"pois": [], "scatterPoints": [], "totalMatches": 0}
+
+    # 2) Landings dieser Matches fuer die gewuenschten Spieler holen.
+    #    Best-Touchdown: fruehestes Landing mit z<80000 + health>0 pro
+    #    (match, actor). Vereinfachte Variante der _landings-Heuristik.
+    ph = ",".join("?" * len(match_ids))
+    acc_clause = ""
+    params = list(match_ids)
+    if player_accs:
+        acc_ph = ",".join("?" * len(player_accs))
+        acc_clause = f"AND te.actor_account IN ({acc_ph})"
+        params += player_accs
+    rows = conn.execute(f"""
+        WITH best AS (
+          SELECT match_id, actor_account, MIN(timestamp_ms) AS ts
+          FROM telemetry_events
+          WHERE event_type='Landing' AND match_id IN ({ph})
+            AND actor_x IS NOT NULL AND actor_y IS NOT NULL
+            AND (actor_z IS NULL OR actor_z < 80000)
+            AND (actor_health IS NULL OR actor_health > 0)
+          GROUP BY match_id, actor_account
+        )
+        SELECT te.match_id, te.actor_account, te.actor_x, te.actor_y,
+               p.name AS player_name
+        FROM best b
+        JOIN telemetry_events te
+          ON te.match_id=b.match_id AND te.actor_account=b.actor_account
+         AND te.timestamp_ms=b.ts AND te.event_type='Landing'
+        LEFT JOIN players p ON p.account_id = te.actor_account
+        WHERE 1=1 {acc_clause}
+    """, params).fetchall()
+
+    regions = (pois_blob or {}).get("regions") or []
+    # POI-Zentren vorberechnen (Vertex-Mittel) + Flaeche fuer Sortier-Stabilitaet
+    poi_centroid = {}
+    for r in regions:
+        nm = r.get("name")
+        if not nm:
+            continue
+        pts = r.get("points") or []
+        if pts:
+            sx = sum(p[0] for p in pts) / len(pts)
+            sy = sum(p[1] for p in pts) / len(pts)
+            poi_centroid[nm] = (sx, sy)
+
+    mapKm = (pois_blob or {}).get("mapKm") or 8
+    span = mapKm * 100000.0
+
+    scatter = []
+    poi_acc = {}  # poi_name → {acc → count}
+    for r in rows:
+        x, y = r["actor_x"], r["actor_y"]
+        acc = r["actor_account"]
+        scatter.append({
+            "accountId": acc,
+            "x": max(0.0, min(1.0, x / span)),
+            "y": max(0.0, min(1.0, y / span)),
+            "matchId": r["match_id"],
+        })
+        name = match_poi(x, y, regions) or "—"
+        poi_acc.setdefault(name, {})
+        poi_acc[name][acc] = poi_acc[name].get(acc, 0) + 1
+
+    # Namens-Lookup
+    name_of = {r["actor_account"]: (r["player_name"] or r["actor_account"][:8])
+               for r in rows}
+
+    pois_out = []
+    for name, accmap in poi_acc.items():
+        total = sum(accmap.values())
+        cx, cy = poi_centroid.get(name, (None, None))
+        by = {}
+        for acc, cnt in accmap.items():
+            by[acc] = {"name": name_of.get(acc, acc[:8]),
+                       "count": cnt,
+                       "pct": round(cnt / total * 100)}
+        pois_out.append({
+            "name": name,
+            "cx": (cx / span) if cx is not None else None,
+            "cy": (cy / span) if cy is not None else None,
+            "total": total,
+            "byPlayer": by,
+        })
+    pois_out.sort(key=lambda p: p["total"], reverse=True)
+
+    return {"pois": pois_out, "scatterPoints": scatter,
+            "totalMatches": len(match_ids)}
