@@ -65,6 +65,33 @@ def perp_distance_to_route(px, py, ax, ay, bx, by):
     return cross / denom
 
 
+def apply_pin_cal(x_cm, y_cm, mapKm, cal):
+    """Wendet die pinCalibration auf eine Welt-cm-Koordinate an, damit die
+    Anzeige zum Karten-Bild passt. Python-Port von _xform aus poi-editor.html.
+    Reihenfolge: flipX/Y → rotate(0/90/180/270) → scale+offset (center-anchored).
+    offsetX/Y sind in cm. cal kann None/leer sein → unveraendert."""
+    if not cal:
+        return x_cm, y_cm
+    mc = mapKm * 100000 / 2.0
+    x, y = x_cm, y_cm
+    if cal.get("flipX"):
+        x = 2 * mc - x
+    if cal.get("flipY"):
+        y = 2 * mc - y
+    rot = ((cal.get("rotate", 0) or 0) % 360 + 360) % 360
+    if rot != 0:
+        dx, dy = x - mc, y - mc
+        if rot == 90:
+            x, y = mc - dy, mc + dx
+        elif rot == 180:
+            x, y = mc - dx, mc - dy
+        elif rot == 270:
+            x, y = mc + dy, mc - dx
+    ex = (x - mc) * (cal.get("scaleX", 1) or 1) + mc + (cal.get("offsetX", 0) or 0)
+    ey = (y - mc) * (cal.get("scaleY", 1) or 1) + mc + (cal.get("offsetY", 0) or 0)
+    return ex, ey
+
+
 def match_poi(x, y, regions):
     """Liefert den POI-Namen fuer eine Koordinate. Kleinste umschliessende
     benannte Region gewinnt (Nesting-faehig). None wenn in keiner Region.

@@ -36,8 +36,9 @@ async function loadReplay(matchId) {
   await PubgUI.POI.ready;
   const mapName = RS.replay.mapName;
   const alias = mapName === "Erangel_Main" ? "Baltic_Main" : mapName;
-  RS._poiBlob = await PubgUI.fetchJson(
+  const poiResp = await PubgUI.fetchJson(
     "/api/pubg/pois?map=" + encodeURIComponent(alias));
+  RS._poiBlob = (poiResp && poiResp.data) || poiResp;
   buildTeamList();
   buildPlayerTracks();
   syncScrubberAndClock();

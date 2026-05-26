@@ -73,3 +73,33 @@ def test_perp_distance_degenerate_route():
     # A == B → Distanz = Punkt-zu-Punkt
     d = perp_distance_to_route(3, 4, 0, 0, 0, 0)
     assert abs(d - 5) < 1e-6
+
+
+from pubg.poi_match import apply_pin_cal
+
+
+def test_apply_pin_cal_identity_when_empty():
+    assert apply_pin_cal(400000, 300000, 8, None) == (400000, 300000)
+    assert apply_pin_cal(400000, 300000, 8, {}) == (400000, 300000)
+
+
+def test_apply_pin_cal_offset_shifts_in_cm():
+    x, y = apply_pin_cal(400000, 400000, 8, {"offsetX": 5000, "offsetY": -3000})
+    assert x == 405000
+    assert y == 397000
+
+
+def test_apply_pin_cal_flipx_mirrors_around_center():
+    # mapKm=8 → center=400000; flipX spiegelt x
+    x, y = apply_pin_cal(300000, 400000, 8, {"flipX": True})
+    assert x == 500000  # 2*400000 - 300000
+    assert y == 400000
+
+
+def test_apply_pin_cal_scale_center_anchored():
+    # Punkt auf dem Zentrum bleibt fix bei scale
+    x, y = apply_pin_cal(400000, 400000, 8, {"scaleX": 2, "scaleY": 2})
+    assert x == 400000 and y == 400000
+    # Punkt abseits skaliert um Zentrum
+    x2, y2 = apply_pin_cal(500000, 400000, 8, {"scaleX": 2})
+    assert x2 == 600000  # (500000-400000)*2 + 400000

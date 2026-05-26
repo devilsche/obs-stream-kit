@@ -4491,7 +4491,8 @@ def compute_landing_spots(conn, map_name, player_accs, pois_blob=None,
         "scatterPoints": [{accountId, x, y, matchId}],
         "totalMatches": int }
     """
-    from pubg.poi_match import match_poi, poly_area, perp_distance_to_route
+    from pubg.poi_match import (match_poi, poly_area, perp_distance_to_route,
+                                apply_pin_cal)
     player_accs = [a for a in (player_accs or []) if a]
 
     # 1) Matches der Map bestimmen, die den Konstellations-Filter erfuellen
@@ -4596,16 +4597,26 @@ def compute_landing_spots(conn, map_name, player_accs, pois_blob=None,
 
     mapKm = (pois_blob or {}).get("mapKm") or 8
     span = mapKm * 100000.0
+    # pinCalibration: zieht das Welt-Koord-System auf das Karten-Bild
+    # (flip/rotate/scale/offset). POI-Matching bleibt in ROHEN cm
+    # (kalibrierungs-unabhaengig); nur Anzeige-Coords werden kalibriert.
+    cal = (pois_blob or {}).get("pinCalibration") or {}
+
+    def _disp(x_cm, y_cm):
+        ex, ey = apply_pin_cal(x_cm, y_cm, mapKm, cal)
+        return (max(0.0, min(1.0, ex / span)),
+                max(0.0, min(1.0, ey / span)))
 
     scatter = []
     poi_acc = {}  # poi_name → {acc → count}
     for r in rows:
         x, y = r["actor_x"], r["actor_y"]
         acc = r["actor_account"]
+        dx, dy = _disp(x, y)
         scatter.append({
             "accountId": acc,
-            "x": max(0.0, min(1.0, x / span)),
-            "y": max(0.0, min(1.0, y / span)),
+            "x": dx,
+            "y": dy,
             "matchId": r["match_id"],
         })
         name = match_poi(x, y, regions) or "—"
@@ -4620,6 +4631,7 @@ def compute_landing_spots(conn, map_name, player_accs, pois_blob=None,
     for name, accmap in poi_acc.items():
         total = sum(accmap.values())
         cx, cy = poi_centroid.get(name, (None, None))
+        dcx, dcy = _disp(cx, cy) if cx is not None else (None, None)
         by = {}
         for acc, cnt in accmap.items():
             by[acc] = {"name": name_of.get(acc, acc[:8]),
@@ -4627,8 +4639,8 @@ def compute_landing_spots(conn, map_name, player_accs, pois_blob=None,
                        "pct": round(cnt / total * 100)}
         pois_out.append({
             "name": name,
-            "cx": (cx / span) if cx is not None else None,
-            "cy": (cy / span) if cy is not None else None,
+            "cx": dcx,
+            "cy": dcy,
             "total": total,
             "byPlayer": by,
         })
