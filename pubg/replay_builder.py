@@ -120,3 +120,40 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
                             "actorId": victim.get("accountId")})
     out.sort(key=lambda e: e["ts"])
     return out
+
+
+def build_replay(raw_events, match_id, map_name, mapKm,
+                 team_mapping, names, position_interval_ms=1000):
+    """Top-Level: Raw-Blob → vollstaendiges Replay-Dict.
+
+    team_mapping: {account_id: team_id}
+    names:        {account_id: display_name}
+    """
+    events = extract_events(raw_events, mapKm, position_interval_ms)
+    # Teams aus team_mapping aufbauen
+    by_team = {}
+    for acc, tid in team_mapping.items():
+        by_team.setdefault(tid, []).append(acc)
+    colors = team_colors(list(by_team.keys()))
+    teams = []
+    for tid in sorted(by_team.keys()):
+        players = [{"accountId": acc, "name": names.get(acc, acc[:8])}
+                   for acc in by_team[tid]]
+        teams.append({"teamId": tid, "color": colors[tid],
+                      "players": players})
+    # Dauer: erstes bis letztes Event, normalisiert auf 0
+    if events:
+        t0 = events[0]["ts"]
+        for e in events:
+            e["ts"] = e["ts"] - t0
+        duration = events[-1]["ts"]
+    else:
+        duration = 0
+    return {
+        "matchId": match_id,
+        "mapName": map_name,
+        "mapKm": mapKm,
+        "durationMs": duration,
+        "teams": teams,
+        "events": events,
+    }

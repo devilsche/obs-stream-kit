@@ -138,3 +138,42 @@ def test_extract_events_position_interval_thins():
     events = extract_events(raw, mapKm=8, position_interval_ms=1000)
     pos = [e for e in events if e["type"] == "position"]
     assert len(pos) == 2  # 0.0s und 1.5s; 0.2s wird verworfen
+
+
+from pubg.replay_builder import build_replay
+
+
+def test_build_replay_structure():
+    raw = _raw_fixture()
+    team_mapping = {"acc.A": 1, "acc.B": 2}
+    names = {"acc.A": "LuCKoR", "acc.B": "Enemy"}
+    result = build_replay(
+        raw, match_id="m1", map_name="Baltic_Main", mapKm=8,
+        team_mapping=team_mapping, names=names)
+    assert result["matchId"] == "m1"
+    assert result["mapName"] == "Baltic_Main"
+    assert result["durationMs"] > 0
+    # Teams: zwei Teams, jeweils mit Farbe + Spielern
+    teams = {t["teamId"]: t for t in result["teams"]}
+    assert set(teams.keys()) == {1, 2}
+    assert teams[1]["color"].startswith("#")
+    assert teams[1]["players"][0]["name"] == "LuCKoR"
+    assert len(result["events"]) > 0
+
+
+def test_build_replay_duration_from_last_event():
+    raw = _raw_fixture()
+    result = build_replay(
+        raw, match_id="m1", map_name="Baltic_Main", mapKm=8,
+        team_mapping={"acc.A": 1, "acc.B": 2},
+        names={"acc.A": "LuCKoR", "acc.B": "Enemy"})
+    # Erstes Event 10:00:10, letztes 10:01:35 → 85000ms
+    assert result["durationMs"] == 85000
+
+
+def test_build_replay_empty_raw_returns_empty_events():
+    result = build_replay(
+        [], match_id="m1", map_name="Baltic_Main", mapKm=8,
+        team_mapping={}, names={})
+    assert result["events"] == []
+    assert result["durationMs"] == 0
