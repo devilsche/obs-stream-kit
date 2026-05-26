@@ -50,3 +50,22 @@ def dist_to_poly(px, py, points):
         if d < best:
             best = d
     return best
+
+
+def match_poi(x, y, regions):
+    """Liefert den POI-Namen fuer eine Koordinate. Kleinste umschliessende
+    benannte Region gewinnt (Nesting-faehig). None wenn in keiner Region.
+    Namenlose Regionen ('') werden ignoriert."""
+    best = None
+    best_area = float("inf")
+    for r in regions or []:
+        name = r.get("name")
+        if not name:
+            continue
+        pts = r.get("points") or []
+        if point_in_poly(x, y, pts):
+            a = poly_area(pts)
+            if a < best_area:
+                best_area = a
+                best = name
+    return best
