@@ -411,6 +411,57 @@ Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
 Cross-Player-Web-View: `http://localhost:8080/widgets/pubg/coplayer.html?player=NAME`
 (alte URL `scenes/stats.html?player=NAME` leitet weiter)
 
+### Browser-Tools
+
+Werden im normalen Browser-Tab geöffnet — **nicht** als OBS-Source. Schreib-/Lese-Zugriff
+auf das Backend; kein Streaming nötig.
+
+| Datei | Zweck | Größe |
+|---|---|---|
+| `tools/match-replay.html` | Animierter Replay eines PUBG-Matches auf der Karte | Browser-Tab |
+| `tools/landing-spots.html` | Heatmap + Scatter der Landeorte pro Karte und Spieler-Konstellation | Browser-Tab / 1920×1080 |
+
+#### tools/match-replay.html
+
+Zeigt einen aufgezeichneten PUBG-Match als animierten Replay aller Teams auf der
+Karte. Lädt Raw-Telemetrie on-demand von HiDrive (gecached im Server-Memory).
+
+**Features:**
+- Spieler-Pins mit Teamnummer + Teamfarbe; Kill/Knock-Marker (×); Bullet-Streaks (200 ms)
+- Sidebar: Match-Dropdown + Teamliste — Klick auf ein Team fokussiert es, die anderen werden grau
+- Toggles: Kills / Knocks / Streaks / Namen ein-/ausblenden
+- Wiedergabe: Play/Pause, Timeline-Scrubber, Speed 0,5×–8×
+- Zoom (Scrollwheel), Pan (Drag), Hover-Tooltips auf Pins und Markern
+
+| Parameter | Beschreibung |
+|-----------|-------------|
+| `match` | PUBG-Match-ID — öffnet direkt das angegebene Match |
+
+**Endpoints:**
+- `GET /api/pubg/last-match` — Match-Liste für das Dropdown
+- Telemetrie-Blob wird on-demand über HiDrive geladen (`.secrets`: `HiDrive-*`)
+
+#### tools/landing-spots.html
+
+Zeigt pro Karte, wo Spieler landen — kombinierte Heatmap (alle Daten) und
+per-Spieler-Scatter-Overlay. Auch als 1920×1080-Vollbild-Tab nutzbar.
+
+**Features:**
+- Karten-Selektor im Header wechselt die angezeigte Map
+- 4 Spieler-Eingabefelder mit Autocomplete — leer = beliebig; alle ausgefüllten
+  Felder müssen im selben Squad gewesen sein (Konstellations-Filter)
+- Optionaler Flugrouten-Filter: nur Matches mit ≤ 1,5 km Querdistanz zur Cruise-Route
+- POI-Liste rechts mit per-Spieler-Aufschlüsselung (z.B. `Pochinki — LuCKoR 8×, Mate1 3×`)
+- Player-Chips schalten Scatter-Punkte pro Spieler ein/aus
+
+| Parameter | Beschreibung |
+|-----------|-------------|
+| *(keine URL-Parameter — alles über UI steuerbar)* | |
+
+**Endpoints:**
+- `GET /api/pubg/landing-heatmap` — Heatmap-Daten gefiltert nach Karte + Spieler-Konstellation
+- `GET /api/pubg/player-search` — Autocomplete für Spielernamen
+
 ### Streamer.bot-Setup für `!mypubgstats`
 
 ```
