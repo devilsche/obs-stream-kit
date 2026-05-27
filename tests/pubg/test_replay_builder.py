@@ -177,3 +177,38 @@ def test_build_replay_empty_raw_returns_empty_events():
         team_mapping={}, names={})
     assert result["events"] == []
     assert result["durationMs"] == 0
+
+
+def test_extract_events_zone_from_gamestate():
+    raw = [
+        {"_T": "LogGameStatePeriodic", "_D": "2026-05-01T10:05:00Z",
+         "gameState": {
+             "safetyZonePosition": {"x": 400000, "y": 400000, "z": 0},
+             "safetyZoneRadius": 200000,
+             "poisonGasWarningPosition": {"x": 300000, "y": 300000, "z": 0},
+             "poisonGasWarningRadius": 100000,
+         }},
+    ]
+    events = extract_events(raw, mapKm=8, position_interval_ms=1000)
+    z = next(e for e in events if e["type"] == "zone")
+    assert abs(z["safeX"] - 0.5) < 1e-6
+    assert abs(z["safeY"] - 0.5) < 1e-6
+    assert abs(z["safeR"] - 0.25) < 1e-6      # 200000/800000
+    assert abs(z["nextX"] - 0.375) < 1e-6     # 300000/800000
+    assert abs(z["nextR"] - 0.125) < 1e-6     # 100000/800000
+
+
+def test_extract_events_zone_radius_zero_is_none():
+    raw = [
+        {"_T": "LogGameStatePeriodic", "_D": "2026-05-01T10:00:00Z",
+         "gameState": {
+             "safetyZonePosition": {"x": 0, "y": 0, "z": 0},
+             "safetyZoneRadius": 0,
+             "poisonGasWarningPosition": {"x": 0, "y": 0, "z": 0},
+             "poisonGasWarningRadius": 0,
+         }},
+    ]
+    events = extract_events(raw, mapKm=8, position_interval_ms=1000)
+    z = next(e for e in events if e["type"] == "zone")
+    assert z["safeR"] is None
+    assert z["nextR"] is None

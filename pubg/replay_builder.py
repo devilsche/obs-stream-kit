@@ -58,6 +58,9 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
       knock    : {type, ts, actorId, targetId, ax, ay, tx, ty, weapon, distance}
       kill     : {type, ts, actorId, targetId, ax, ay, tx, ty, weapon, distance}
       death    : {type, ts, actorId}  (abgeleitet aus kill.victim)
+      zone     : {type, ts, safeX, safeY, safeR, nextX, nextY, nextR}
+                 (Bluezone = safetyZone, naechste weisse Zone = poisonGasWarning;
+                  Coords 0-1 roh-normalisiert, Radien als Anteil der Map-Spanne)
     """
     out = []
     last_pos_ts = {}  # actorId → letzter behaltener Position-ts
@@ -118,6 +121,22 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
             if typ == "kill":
                 out.append({"type": "death", "ts": ts,
                             "actorId": victim.get("accountId")})
+        elif et == "LogGameStatePeriodic":
+            gs = e.get("gameState") or {}
+            span = mapKm * 100000.0
+            safe = gs.get("safetyZonePosition") or {}
+            nxt = gs.get("poisonGasWarningPosition") or {}
+            sr = gs.get("safetyZoneRadius")
+            nr = gs.get("poisonGasWarningRadius")
+            sx, sy = normalize_coords(safe.get("x"), safe.get("y"), mapKm)
+            zx, zy = normalize_coords(nxt.get("x"), nxt.get("y"), mapKm)
+            out.append({
+                "type": "zone", "ts": ts,
+                "safeX": sx, "safeY": sy,
+                "safeR": (sr / span) if sr else None,
+                "nextX": zx, "nextY": zy,
+                "nextR": (nr / span) if nr else None,
+            })
     out.sort(key=lambda e: e["ts"])
     return out
 

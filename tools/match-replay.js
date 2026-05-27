@@ -6,7 +6,7 @@ const RS = {
   cursorMs: 0,
   speed: 1,
   lastFrameWall: 0,
-  toggles: { kills: true, knocks: true, streaks: true, names: true },
+  toggles: { kills: true, knocks: true, streaks: true, zones: true, names: true },
   view: { zoom: 1, panX: 0, panY: 0 },  // zoom: Faktor, pan: Pixel-Offset
 };
 
@@ -262,12 +262,58 @@ function teamColorOf(acc) {
   return RS._teamColor[tid] || "#888";
 }
 
+// Letztes Zone-Event <= Cursor (Bluezone schreitet ueber die Match-Zeit fort).
+function currentZone(ms) {
+  let z = null;
+  for (const e of RS.replay.events) {
+    if (e.type !== "zone") continue;
+    if (e.ts > ms) break;
+    z = e;
+  }
+  return z;
+}
+
+// Canvas-Radius aus normalisiertem Radius: Mitte + Randpunkt projizieren,
+// Pixel-Distanz nehmen (uebernimmt Zoom + Kalibrierungs-Scale automatisch).
+function zoneRadiusPx(cx, cy, rNorm) {
+  const [px, py] = projToCanvas(cx, cy);
+  const [ex, ey] = projToCanvas(cx + rNorm, cy);
+  return Math.hypot(ex - px, ey - py);
+}
+
 function renderFrame() {
   const cnv = document.getElementById("map");
   const ctx = cnv.getContext("2d");
   drawBasemap(ctx);
   if (!RS.replay) return;
   const ms = RS.cursorMs;
+
+  // 0) Bluezone: aktuelle Safe-Zone (durchgezogen) + naechste weisse Zone
+  //    (gestrichelt). Liegt unter Streaks/Markern/Pins.
+  const zone = RS.toggles.zones ? currentZone(ms) : null;
+  if (zone) {
+    if (zone.safeR) {
+      const [sx, sy] = projToCanvas(zone.safeX, zone.safeY);
+      ctx.strokeStyle = "#3aa0ff";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(sx, sy, zoneRadiusPx(zone.safeX, zone.safeY, zone.safeR),
+              0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (zone.nextR) {
+      const [nx, ny] = projToCanvas(zone.nextX, zone.nextY);
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 5]);
+      ctx.beginPath();
+      ctx.arc(nx, ny, zoneRadiusPx(zone.nextX, zone.nextY, zone.nextR),
+              0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
 
   // 1) Bullet-Streaks (unter den Pins)
   for (const e of activeStreaks(ms)) {
@@ -323,7 +369,7 @@ function renderFrame() {
 }
 
 // Toggle-Checkboxen verdrahten
-["Kills", "Knocks", "Streaks", "Names"].forEach(k => {
+["Kills", "Knocks", "Streaks", "Zones", "Names"].forEach(k => {
   const cb = document.getElementById("tgl" + k);
   cb.addEventListener("change", () => {
     RS.toggles[k.toLowerCase()] = cb.checked;
