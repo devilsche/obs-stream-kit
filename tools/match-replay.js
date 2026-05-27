@@ -6,7 +6,8 @@ const RS = {
   cursorMs: 0,
   speed: 1,
   lastFrameWall: 0,
-  toggles: { kills: true, knocks: true, streaks: true, zones: true, names: true },
+  toggles: { kills: true, knocks: true, streaks: true, zones: true, names: true,
+             grid: false },
   view: { zoom: 1, panX: 0, panY: 0 },  // zoom: Faktor, pan: Pixel-Offset
 };
 
@@ -281,6 +282,38 @@ function zoneRadiusPx(cx, cy, rNorm) {
   return Math.hypot(ex - px, ey - py);
 }
 
+// 8×8-Kalibrier-Raster: zwei Gitter uebereinander.
+//   - bildbasiert (projRaw, weiss): teilt das Kartenbild gleichmaessig
+//   - kalibriert (projToCanvas, cyan): Welt-Gitter durch pinCalibration,
+//     gleiche Projektion wie die Pins
+// Decken sie sich → Kalibrierung stimmt; Versatz zeigt den Fehler.
+function drawGrid(ctx) {
+  const N = 8;
+  function gridWith(projFn, color, width) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.setLineDash([]);
+    for (let i = 0; i <= N; i++) {
+      const f = i / N;
+      // vertikale Linie f über volle Höhe (0..1 in y)
+      ctx.beginPath();
+      let [x0, y0] = projFn(f, 0);
+      let [x1, y1] = projFn(f, 1);
+      ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      // horizontale Linie f über volle Breite (0..1 in x)
+      ctx.beginPath();
+      [x0, y0] = projFn(0, f);
+      [x1, y1] = projFn(1, f);
+      ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 0.5;
+  gridWith(projRaw, "rgba(255,255,255,0.9)", 1);          // Bild-Raster
+  gridWith(projToCanvas, "rgba(60,200,255,0.9)", 1);      // kalibriertes Raster
+  ctx.globalAlpha = 1;
+  ctx.setLineDash([]);
+}
+
 function renderFrame() {
   const cnv = document.getElementById("map");
   const ctx = cnv.getContext("2d");
@@ -366,10 +399,13 @@ function renderFrame() {
     }
     ctx.globalAlpha = 1;
   }
+
+  // 4) Kalibrier-Raster (ganz oben, damit beide Gitter sichtbar sind)
+  if (RS.toggles.grid) drawGrid(ctx);
 }
 
 // Toggle-Checkboxen verdrahten
-["Kills", "Knocks", "Streaks", "Zones", "Names"].forEach(k => {
+["Kills", "Knocks", "Streaks", "Zones", "Names", "Grid"].forEach(k => {
   const cb = document.getElementById("tgl" + k);
   cb.addEventListener("change", () => {
     RS.toggles[k.toLowerCase()] = cb.checked;
