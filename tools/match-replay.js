@@ -405,26 +405,6 @@ function drawFlightRoute(ctx, ms) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Marker: erster Absprung (grün) + letzter Spieler verlässt Flieger (rot)
-  // Basis: erster Track-Event pro Spieler = Zeitpunkt des Absprungs (z<150000)
-  const allJumpTs = Object.values(RS._firstTrackTs || {});
-  const firstJumpTs = allJumpTs.length ? Math.min(...allJumpTs) : Infinity;
-  const lastJumpTs  = allJumpTs.length ? Math.max(...allJumpTs) : -Infinity;
-  function drawJumpMarker(flightMs, color, label) {
-    const p = flightPosAt(flightMs);
-    if (!p) return;
-    const [jx, jy] = projToCanvas(p.x, p.y);
-    ctx.fillStyle = color;
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(jx, jy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 9px DM Sans";
-    ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-    ctx.fillText(label, jx, jy - 6);
-  }
-  if (firstJumpTs !== Infinity)  drawJumpMarker(firstJumpTs, "#3cdb5e", "▼");
-  if (lastJumpTs !== -Infinity)  drawJumpMarker(lastJumpTs,  "#ff4444", "▼");
 
   // Flugzeug-Icon als Dreieck am aktuellen Punkt
   const pos = flightPosAt(ms);
