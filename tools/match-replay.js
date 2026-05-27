@@ -238,8 +238,9 @@ function posAt(acc, ms) {
   const firstTrackTs = RS._firstTrackTs[acc] ?? Infinity;
   if (ms < firstTrackTs) {
     const fp = RS.replay.flightPath;
-    if (fp && fp.length && ms >= fp[0][2] && ms <= fp[fp.length - 1][2])
-      return flightPosAt(ms);
+    if (!fp || !fp.length) return null;
+    if (ms < fp[0][2]) return { x: fp[0][0], y: fp[0][1] };  // vor Abflug: Startpunkt
+    if (ms <= fp[fp.length - 1][2]) return flightPosAt(ms);   // Flug: mitbewegen
     return null;
   }
   // Ab erstem Track-Event: Track-Interpolation (deckt Fallschirm-Descent + Boden ab).
