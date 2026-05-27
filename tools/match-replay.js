@@ -199,10 +199,13 @@ function buildPlayerTracks() {
   RS._tracks = tracks;
   RS._deaths = deaths;
   RS._relands = relands;
-  // Frühester bekannter Boden-Timestamp pro Spieler (vor diesem → im Flieger)
-  RS._firstGroundTs = {};
-  for (const acc in tracks) {
-    RS._firstGroundTs[acc] = tracks[acc][0]?.ts ?? Infinity;
+  // Erster LANDING-Timestamp pro Spieler — vor diesem Zeitpunkt zeigt posAt()
+  // die Flugzeugposition (Parachute-Descent-Events werden ignoriert).
+  RS._firstLandingTs = {};
+  for (const e of RS.replay.events) {
+    if (e.type !== "landing") continue;
+    if (!(e.actorId in RS._firstLandingTs))
+      RS._firstLandingTs[e.actorId] = e.ts;
   }
   // accountId → teamId und → color Lookup
   RS._accTeam = {};
@@ -231,8 +234,11 @@ function posAt(acc, ms) {
     }
   }
   if (dead) return null;
-  // Noch im Flieger: an Flugzeugposition anzeigen statt an erster Bodenpos einfrieren
-  if (ms < tr[0].ts) {
+  // Noch im Flieger: bis zur ersten Landung Flugzeugposition zeigen.
+  // Parachute-Descent-Positions (z<150000, im Track enthalten) werden dabei
+  // übersprungen — erst ab Landing ist der Spieler "auf dem Boden".
+  const firstLand = RS._firstLandingTs[acc] ?? Infinity;
+  if (ms < firstLand) {
     const fp = RS.replay.flightPath;
     if (fp && fp.length) return flightPosAt(ms);
     return null;
@@ -287,9 +293,10 @@ function teamColorOf(acc) {
   return RS._teamColor[tid] || "#888";
 }
 
-// Interpolierte Zone zum Cursor-Zeitpunkt.
-// Zwischen zwei aufeinanderfolgenden Zone-Events wird linear interpoliert,
-// damit die Bluezone sich fließend bewegt statt zu springen.
+// Zone zum Cursor-Zeitpunkt.
+// safeZone (blau) interpoliert smooth zwischen Events.
+// nextZone (weiß gestrichelt) wird sofort aus dem letzten Event genommen —
+// keine Animation, da sie als "angekündigt" gilt und sofort erscheinen soll.
 function currentZone(ms) {
   let prev = null, next = null;
   for (const e of RS.replay.events) {
@@ -304,8 +311,8 @@ function currentZone(ms) {
   return {
     safeX: lerp(prev.safeX, next.safeX), safeY: lerp(prev.safeY, next.safeY),
     safeR: lerp(prev.safeR, next.safeR),
-    nextX: lerp(prev.nextX, next.nextX), nextY: lerp(prev.nextY, next.nextY),
-    nextR: lerp(prev.nextR, next.nextR),
+    // nextZone: sofort aus prev (keine Interpolation)
+    nextX: prev.nextX, nextY: prev.nextY, nextR: prev.nextR,
   };
 }
 
@@ -369,10 +376,27 @@ function flightPosAt(ms) {
 function drawFlightRoute(ctx, ms) {
   const fp = RS.replay.flightPath;
   if (!fp || fp.length < 2) return;
-  // Pfad-Linie (gestrichelt, gold)
-  ctx.strokeStyle = "rgba(242,183,5,0.55)";
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([8, 6]);
+
+  // Richtungsvektor aus ersten + letzten bekannten Punkt
+  const first = fp[0], last = fp[fp.length - 1];
+  const dx = last[0] - first[0], dy = last[1] - first[1];
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = dx / len, ny = dy / len;
+
+  // Linie über gesamte Kartenbreite extrapolieren (canvas clippt automatisch)
+  const ext = 3;
+  const [ex0, ey0] = projToCanvas(first[0] - nx * ext, first[1] - ny * ext);
+  const [ex1, ey1] = projToCanvas(last[0]  + nx * ext, last[1]  + ny * ext);
+  ctx.strokeStyle = "rgba(242,183,5,0.45)";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6, 8]);
+  ctx.beginPath(); ctx.moveTo(ex0, ey0); ctx.lineTo(ex1, ey1); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Bekannter Pfad kräftiger darüber
+  ctx.strokeStyle = "rgba(242,183,5,0.7)";
+  ctx.lineWidth = 1.8;
+  ctx.setLineDash([8, 5]);
   ctx.beginPath();
   for (let i = 0; i < fp.length; i++) {
     const [cx, cy] = projToCanvas(fp[i][0], fp[i][1]);
@@ -380,20 +404,44 @@ function drawFlightRoute(ctx, ms) {
   }
   ctx.stroke();
   ctx.setLineDash([]);
+
+  // Marker: erster Absprung (grün) + letzter Force-Eject (rot)
+  let firstLandTs = Infinity, lastLandTs = -Infinity;
+  for (const e of RS.replay.events) {
+    if (e.type !== "landing") continue;
+    if (e.ts < firstLandTs) firstLandTs = e.ts;
+    if (e.ts > lastLandTs) lastLandTs = e.ts;
+  }
+  function drawJumpMarker(flightMs, color, label) {
+    const p = flightPosAt(flightMs);
+    if (!p) return;
+    const [mx, my] = projToCanvas(p.x, p.y);
+    ctx.fillStyle = color;
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(mx, my, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 9px DM Sans";
+    ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.fillText(label, mx, my - 6);
+  }
+  if (firstLandTs !== Infinity)  drawJumpMarker(firstLandTs, "#3cdb5e", "▼");
+  if (lastLandTs !== -Infinity)  drawJumpMarker(lastLandTs,  "#ff4444", "▼");
+
   // Flugzeug-Icon als Dreieck am aktuellen Punkt
   const pos = flightPosAt(ms);
   if (!pos) return;
   const [px, py] = projToCanvas(pos.x, pos.y);
   // Flugrichtung aus dem Pfad ableiten
-  let dx = 0, dy = 0;
+  let vx = 0, vy = 0;
   for (let i = 1; i < fp.length; i++) {
     if (fp[i][2] >= ms) {
-      dx = fp[i][0] - fp[i - 1][0];
-      dy = fp[i][1] - fp[i - 1][1];
+      vx = fp[i][0] - fp[i - 1][0];
+      vy = fp[i][1] - fp[i - 1][1];
       break;
     }
   }
-  const angle = Math.atan2(dy, dx);
+  const angle = Math.atan2(vy, vx);
   const sz = 8;
   ctx.save();
   ctx.translate(px, py);
@@ -642,8 +690,15 @@ const stageEl = () => document.querySelector(".stage");
 
 stageEl().addEventListener("wheel", e => {
   e.preventDefault();
+  const cnv = document.getElementById("map");
+  const r = cnv.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
   const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-  RS.view.zoom = Math.max(0.5, Math.min(20, RS.view.zoom * factor));
+  const newZoom = Math.max(0.5, Math.min(20, RS.view.zoom * factor));
+  // Mausposition beim Zoomen als Ankerpunkt
+  RS.view.panX = mx - (mx - RS.view.panX) * (newZoom / RS.view.zoom);
+  RS.view.panY = my - (my - RS.view.panY) * (newZoom / RS.view.zoom);
+  RS.view.zoom = newZoom;
   renderFrame();
 }, { passive: false });
 

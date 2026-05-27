@@ -462,10 +462,10 @@ function pointInPoly(px, py, points) {
   return inside;
 }
 
-// Label-Bildschirmgroesse: linear 100% (zoom 1.0)=16px → 200% (zoom 2.0)=6px,
-// also screen = 26 - 10*zoom. Geclamped auf 8..16px — NIE kleiner als 8px.
+// Label-Bildschirmgroesse: 16/zoom — schrumpft proportional zum Reinzoomen,
+// identisch zum match-replay-Muster. Geclamped auf [6, 16] px.
 function labelScreenPx() {
-  return Math.max(8, Math.min(16, 26 - 10 * view.zoom));
+  return Math.max(6, Math.min(16, 16 / view.zoom));
 }
 
 // ─── Render ────────────────────────────────────────────────────────────────
@@ -1206,10 +1206,10 @@ canvas.addEventListener("wheel", (ev) => {
   const oldZoom = view.zoom;
   const factor = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
   const newZoom = Math.max(0.5, Math.min(12, oldZoom * factor));
-  const cx = canvas.width / 2;
-  const cy = canvas.height / 2;
-  view.panX = cx - (cx - view.panX) * (newZoom / oldZoom);
-  view.panY = cy - (cy - view.panY) * (newZoom / oldZoom);
+  const r = canvas.getBoundingClientRect();
+  const mx = ev.clientX - r.left, my = ev.clientY - r.top;
+  view.panX = mx - (mx - view.panX) * (newZoom / oldZoom);
+  view.panY = my - (my - view.panY) * (newZoom / oldZoom);
   view.zoom = newZoom;
   updateZoomBtn();
   render();
