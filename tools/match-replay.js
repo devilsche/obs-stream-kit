@@ -682,9 +682,10 @@ stageEl().addEventListener("wheel", e => {
   const mx = e.clientX - r.left, my = e.clientY - r.top;
   const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
   const newZoom = Math.max(0.5, Math.min(20, RS.view.zoom * factor));
-  // Mausposition beim Zoomen als Ankerpunkt
-  RS.view.panX = mx - (mx - RS.view.panX) * (newZoom / RS.view.zoom);
-  RS.view.panY = my - (my - RS.view.panY) * (newZoom / RS.view.zoom);
+  const r2 = newZoom / RS.view.zoom;
+  const hw = cnv.width / 2, hh = cnv.height / 2;
+  RS.view.panX = mx - hw - (mx - hw - RS.view.panX) * r2;
+  RS.view.panY = my - hh - (my - hh - RS.view.panY) * r2;
   RS.view.zoom = newZoom;
   renderFrame();
 }, { passive: false });
