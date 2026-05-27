@@ -68,9 +68,8 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
     """
     out = []
     last_pos_ts = {}  # actorId → letzter behaltener Position-ts
-    # Flugroute: erster Spieler dessen Plane-Positions wir sehen
-    _flight_acc = None
-    _flight_pts = []   # [[nx, ny, ts_ms]] vor ts-Normalisierung
+    # Flugroute: ALLE Spieler zusammengeführt, 1-s-Buckets → lückenlose Route
+    _flight_by_ts = {}  # ts_bucket (ms, 1s-Raster) → [nx, ny]
     for e in raw_events:
         et = e.get("_T", "")
         ts = _ts_ms(e.get("_D"))
@@ -90,14 +89,14 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
             loc = (ch.get("location") or {})
             z = loc.get("z")
             # Flugroute: z >= 150000 cm (Flugzeug-Cruise-Hoehe)
+            # Alle Spieler zusammenführen → lückenlose Route
             if z is not None and z >= 150000:
-                if _flight_acc is None:
-                    _flight_acc = acc
-                if acc == _flight_acc:
-                    x, y = _loc(ch)
-                    nx, ny = normalize_coords(x, y, mapKm)
-                    if nx is not None:
-                        _flight_pts.append([nx, ny, ts])
+                x, y = _loc(ch)
+                nx, ny = normalize_coords(x, y, mapKm)
+                if nx is not None:
+                    bucket = (ts // 1000) * 1000
+                    if bucket not in _flight_by_ts:
+                        _flight_by_ts[bucket] = [nx, ny]
                 continue  # Plane-Events nicht als Boden-Positions mischen
             prev = last_pos_ts.get(acc)
             if prev is not None and ts - prev < position_interval_ms:
@@ -157,7 +156,8 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
                 "nextR": (nr / span) if nr else None,
             })
     out.sort(key=lambda e: e["ts"])
-    return out, _flight_pts
+    flight_pts = [[nx, ny, ts] for ts, (nx, ny) in sorted(_flight_by_ts.items())]
+    return out, flight_pts
 
 
 def build_replay(raw_events, match_id, map_name, mapKm,
@@ -187,15 +187,8 @@ def build_replay(raw_events, match_id, map_name, mapKm,
         duration = events[-1]["ts"]
     else:
         duration = 0
-    # Flugroute: gleiche t0 abziehen; Punkte deduplizieren (5 s-Raster reicht)
-    flight_path = []
-    if flight_pts:
-        last_ft = None
-        for nx, ny, abs_ts in flight_pts:
-            rel_ts = abs_ts - t0_abs
-            if last_ft is None or rel_ts - last_ft >= 5000:
-                flight_path.append([nx, ny, rel_ts])
-                last_ft = rel_ts
+    # Flugroute: t0 abziehen; Buckets sind bereits 1s → direkt übernehmen
+    flight_path = [[nx, ny, abs_ts - t0_abs] for nx, ny, abs_ts in flight_pts]
     return {
         "matchId": match_id,
         "mapName": map_name,

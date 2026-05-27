@@ -199,6 +199,11 @@ function buildPlayerTracks() {
   RS._tracks = tracks;
   RS._deaths = deaths;
   RS._relands = relands;
+  // Frühester bekannter Boden-Timestamp pro Spieler (vor diesem → im Flieger)
+  RS._firstGroundTs = {};
+  for (const acc in tracks) {
+    RS._firstGroundTs[acc] = tracks[acc][0]?.ts ?? Infinity;
+  }
   // accountId → teamId und → color Lookup
   RS._accTeam = {};
   RS._accName = {};
@@ -226,7 +231,12 @@ function posAt(acc, ms) {
     }
   }
   if (dead) return null;
-  if (ms <= tr[0].ts) return { x: tr[0].x, y: tr[0].y };
+  // Noch im Flieger: an Flugzeugposition anzeigen statt an erster Bodenpos einfrieren
+  if (ms < tr[0].ts) {
+    const fp = RS.replay.flightPath;
+    if (fp && fp.length) return flightPosAt(ms);
+    return null;
+  }
   if (ms >= tr[tr.length - 1].ts) {
     const last = tr[tr.length - 1];
     return { x: last.x, y: last.y };
@@ -359,8 +369,8 @@ function flightPosAt(ms) {
 function drawFlightRoute(ctx, ms) {
   const fp = RS.replay.flightPath;
   if (!fp || fp.length < 2) return;
-  // Pfad-Linie (gestrichelt, weiß-transparent)
-  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  // Pfad-Linie (gestrichelt, gold)
+  ctx.strokeStyle = "rgba(242,183,5,0.55)";
   ctx.lineWidth = 1.5;
   ctx.setLineDash([8, 6]);
   ctx.beginPath();
@@ -388,7 +398,9 @@ function drawFlightRoute(ctx, ms) {
   ctx.save();
   ctx.translate(px, py);
   ctx.rotate(angle);
-  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.fillStyle = "rgba(242,183,5,0.95)";
+  ctx.strokeStyle = "rgba(255,255,255,0.7)";
+  ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(sz, 0);
   ctx.lineTo(-sz, -sz * 0.6);
@@ -396,6 +408,7 @@ function drawFlightRoute(ctx, ms) {
   ctx.lineTo(-sz, sz * 0.6);
   ctx.closePath();
   ctx.fill();
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -466,9 +479,10 @@ function renderFrame() {
     const isHeroVictim = heroTeamId !== null && victimTeam === heroTeamId;
     const sz = e.type === "kill" ? 6 : 3;
     // Kreis-Highlight um eigene Tode/Knocks
+    const heroColor = RS._teamColor[heroTeamId] || "#fff";
     if (isHeroVictim) {
       const r = e.type === "kill" ? 14 : 10;
-      ctx.strokeStyle = e.type === "kill" ? "#ff3a3a" : "#ffaa00";
+      ctx.strokeStyle = e.type === "kill" ? "#ff3a3a" : heroColor;
       ctx.lineWidth = e.type === "kill" ? 2.5 : 1.5;
       ctx.globalAlpha = 0.9;
       if (e.type === "knock") ctx.setLineDash([4, 3]);
@@ -479,7 +493,7 @@ function renderFrame() {
       ctx.globalAlpha = 1;
     }
     ctx.strokeStyle = isHeroVictim
-      ? (e.type === "kill" ? "#ff3a3a" : "#ffaa00")
+      ? (e.type === "kill" ? "#ff3a3a" : heroColor)
       : teamColorOf(e.actorId);
     ctx.globalAlpha = e.type === "kill" ? 1 : 0.6;
     ctx.lineWidth = isHeroVictim ? 2.5 : 2;
@@ -543,8 +557,9 @@ function renderFrame() {
       ctx.font = "bold 8px DM Sans";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(String(tid), px, py);
-      if (RS.toggles.names && RS.focusedTeam === tid) {
-        ctx.fillStyle = "#fff";
+      if (RS.toggles.names) {
+        ctx.globalAlpha = focused ? 1 : 0.5;
+        ctx.fillStyle = RS._teamColor[tid] || "#fff";
         ctx.font = `${nameScale}px DM Sans`;
         ctx.textAlign = "left"; ctx.textBaseline = "bottom";
         ctx.fillText(RS._accName[acc] || "", px + 7, py - 5);
