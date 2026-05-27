@@ -149,6 +149,7 @@
   <button id="pinsBtn" class="secondary">📍 Pins laden</button>
   <button id="calBtn" class="secondary" title="Calibration-Mode: Kill/Death-Events verschieben zur Map-Cal-Berechnung">🎯 Cal</button>
   <button id="gridBtn" class="secondary active" title="1km-Raster ein/aus">▦ Raster</button>
+  <button id="imgGridBtn" class="secondary" title="Bildbasiertes 8x8-Raster (fix am Kartenbild) ein/aus — zum Vergleich mit dem Welt-Raster">▦ Bild 8×8</button>
   <button id="modeBtn" class="secondary" title="Welche Cal die Inputs steuern: Pin- oder Grid-Calibration">Cal-Mode: PIN</button>
   <button id="flipXBtn" class="secondary" title="X-Achse spiegeln (Ost/West)">↔ FlipX</button>
   <button id="flipYBtn" class="secondary" title="Y-Achse spiegeln (Nord/Sued)">↕ FlipY</button>
@@ -253,6 +254,7 @@ let calMode = "pin";  // 'pin' | 'grid'
 let calibratingPins = false;
 let calRef = null;   // [startMouseX, startMouseY, startOffsetX, startOffsetY]
 let showGrid = true;
+let showImgGrid = false;
 
 const mapSel    = document.getElementById("mapSel");
 const mapSizeIn = document.getElementById("mapSize");
@@ -485,6 +487,24 @@ function render() {
     ctx.drawImage(mapImage,
       sx, sy, side, side,                       // source crop
       0, 0, canvas.width, canvas.height);       // dest fill canvas
+  }
+
+  // Bildbasiertes 8×8-Raster: fix am Kartenbild (Canvas-Fraktionen 0..1),
+  // unabhaengig von jeder Calibration. Dient als Referenz — deckt sich das
+  // Welt-Raster (gold) damit, passt die Kalibrierung. 7 Linien je Achse +
+  // Rahmen = 8×8 Felder.
+  if (showImgGrid) {
+    const N = 8;
+    const lw = 1 / view.zoom;
+    ctx.strokeStyle = "rgba(255,60,200,0.85)";  // magenta, klar vom goldenen Welt-Raster unterscheidbar
+    ctx.lineWidth = lw;
+    for (let i = 0; i <= N; i++) {
+      const p = (i / N);
+      const cx = p * canvas.width;
+      const cy = p * canvas.height;
+      ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, canvas.height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(canvas.width, cy); ctx.stroke();
+    }
   }
 
   // 1km-Raster — Linien an WORLD-km-Positionen, durch worldToCanvas
@@ -1291,6 +1311,11 @@ document.getElementById("offsetYIn").addEventListener("input", (ev) => {
 document.getElementById("gridBtn").addEventListener("click", () => {
   showGrid = !showGrid;
   document.getElementById("gridBtn").classList.toggle("active", showGrid);
+  render();
+});
+document.getElementById("imgGridBtn").addEventListener("click", () => {
+  showImgGrid = !showImgGrid;
+  document.getElementById("imgGridBtn").classList.toggle("active", showImgGrid);
   render();
 });
 document.getElementById("flipXBtn").addEventListener("click", () => {
