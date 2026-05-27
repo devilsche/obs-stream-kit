@@ -434,13 +434,31 @@ function renderFrame() {
     ctx.globalAlpha = 1;
   }
 
-  // 2) Kill/Knock-Marker (X)
+  // 2) Kill/Knock-Marker (X) — eigene Team-Opfer extra hervorheben
+  const heroTeamId = RS.replay.heroTeamId ?? null;
   for (const e of markersUpTo(ms)) {
     const [mx, my] = projToCanvas(e.tx, e.ty);
+    const victimTeam = RS._accTeam[e.targetId];
+    const isHeroVictim = heroTeamId !== null && victimTeam === heroTeamId;
     const sz = e.type === "kill" ? 6 : 3;
-    ctx.strokeStyle = teamColorOf(e.actorId);
+    // Kreis-Highlight um eigene Tode/Knocks
+    if (isHeroVictim) {
+      const r = e.type === "kill" ? 14 : 10;
+      ctx.strokeStyle = e.type === "kill" ? "#ff3a3a" : "#ffaa00";
+      ctx.lineWidth = e.type === "kill" ? 2.5 : 1.5;
+      ctx.globalAlpha = 0.9;
+      if (e.type === "knock") ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.arc(mx, my, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle = isHeroVictim
+      ? (e.type === "kill" ? "#ff3a3a" : "#ffaa00")
+      : teamColorOf(e.actorId);
     ctx.globalAlpha = e.type === "kill" ? 1 : 0.6;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = isHeroVictim ? 2.5 : 2;
     ctx.beginPath();
     ctx.moveTo(mx - sz, my - sz); ctx.lineTo(mx + sz, my + sz);
     ctx.moveTo(mx + sz, my - sz); ctx.lineTo(mx - sz, my + sz);
@@ -448,28 +466,65 @@ function renderFrame() {
     ctx.globalAlpha = 1;
   }
 
-  // 3) Spieler-Pins
+  // 3) Spieler-Pins — eigener Spieler als Pfeilnadel (◆ + Halo)
+  const heroAcc = RS.replay.heroAccountId ?? null;
   const nameScale = Math.max(8, Math.min(12, 12 / RS.view.zoom));
-  for (const acc in RS._accTeam) {
+  // Nicht-Hero zuerst, dann Hero obendrauf
+  const accList = Object.keys(RS._accTeam);
+  const sorted = [...accList.filter(a => a !== heroAcc),
+                  ...accList.filter(a => a === heroAcc)];
+  for (const acc of sorted) {
     const p = posAt(acc, ms);
     if (!p) continue;
     const [px, py] = projToCanvas(p.x, p.y);
     const tid = RS._accTeam[acc];
     const focused = RS.focusedTeam == null || RS.focusedTeam === tid;
-    ctx.fillStyle = focused ? RS._teamColor[tid] : "#bbb";
-    ctx.globalAlpha = focused ? 1 : 0.7;
-    ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill();
-    // Teamnummer immer
-    ctx.fillStyle = "#000";
-    ctx.font = "bold 8px DM Sans";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(String(tid), px, py);
-    // Namens-Badge (nur fokussiertes Team + Toggle)
-    if (RS.toggles.names && RS.focusedTeam === tid) {
-      ctx.fillStyle = "#fff";
-      ctx.font = `${nameScale}px DM Sans`;
-      ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-      ctx.fillText(RS._accName[acc] || "", px + 7, py - 5);
+    const isHero = acc === heroAcc;
+    if (isHero) {
+      // Äußerer Glow-Ring
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.lineWidth = 3;
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath(); ctx.arc(px, py, 11, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+      // Diamant-Pin (◆)
+      const d = 8;
+      ctx.fillStyle = RS._teamColor[tid] || "#fff";
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(px,     py - d);
+      ctx.lineTo(px + d, py);
+      ctx.lineTo(px,     py + d);
+      ctx.lineTo(px - d, py);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      // Teamnummer
+      ctx.fillStyle = "#000";
+      ctx.font = "bold 8px DM Sans";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(String(tid), px, py);
+      // Name immer sichtbar
+      if (RS.toggles.names) {
+        ctx.fillStyle = "#fff";
+        ctx.font = `bold ${nameScale}px DM Sans`;
+        ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+        ctx.fillText(RS._accName[acc] || "", px + 10, py - 7);
+      }
+    } else {
+      ctx.fillStyle = focused ? RS._teamColor[tid] : "#bbb";
+      ctx.globalAlpha = focused ? 1 : 0.7;
+      ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#000";
+      ctx.font = "bold 8px DM Sans";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(String(tid), px, py);
+      if (RS.toggles.names && RS.focusedTeam === tid) {
+        ctx.fillStyle = "#fff";
+        ctx.font = `${nameScale}px DM Sans`;
+        ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+        ctx.fillText(RS._accName[acc] || "", px + 7, py - 5);
+      }
     }
     ctx.globalAlpha = 1;
   }

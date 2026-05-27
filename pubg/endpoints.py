@@ -664,6 +664,13 @@ class EndpointRegistry:
 
         result = build_replay(
             raw, match_id, map_name, mapKm, team_mapping, names)
+        # Hero-Account + Team (eigener Spieler, is_self=1 in DB)
+        from pubg.db import get_self_player
+        self_row = get_self_player(conn)
+        if self_row:
+            hero_acc = self_row["account_id"]
+            result["heroAccountId"] = hero_acc
+            result["heroTeamId"] = team_mapping.get(hero_acc)
         self._replay_cache[match_id] = result
         return _ok(result)
 
