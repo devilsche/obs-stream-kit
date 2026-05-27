@@ -232,7 +232,30 @@ let dragRef = null;  // {type, vertexIdx?, startPoints, startMouseWorld}
 let mapImage = null;
 
 // Zoom/Pan-View: zoom multipliziert, panX/panY in Canvas-Pixeln verschoben
-let view = { zoom: 1, panX: 0, panY: 0 };
+let view = { zoom: 1, panX: 0, panY: 0, tZoom: 1, tPanX: 0, tPanY: 0 };
+
+// Smooth-Zoom-Animation: lerpt view zum Target (tau ≈ 100ms)
+let _poiAnimId = null, _poiAnimLast = 0;
+function _poiAnimStep(now) {
+  const dt = now - (_poiAnimLast || now);
+  _poiAnimLast = now;
+  const lf = 1 - Math.exp(-dt / 100);
+  const zd = view.tZoom - view.zoom, xd = view.tPanX - view.panX, yd = view.tPanY - view.panY;
+  view.zoom += zd * lf;  view.panX += xd * lf;  view.panY += yd * lf;
+  render();
+  if (Math.abs(zd) > 0.0005 || Math.abs(xd) > 0.2 || Math.abs(yd) > 0.2) {
+    _poiAnimId = requestAnimationFrame(_poiAnimStep);
+  } else {
+    view.zoom = view.tZoom; view.panX = view.tPanX; view.panY = view.tPanY;
+    render();
+    _poiAnimId = null;
+  }
+}
+function _poiAnimStart() {
+  _poiAnimLast = 0;
+  if (!_poiAnimId) _poiAnimId = requestAnimationFrame(_poiAnimStep);
+}
+
 let isPanning = false;
 let panRef = null;   // [clientX, clientY, startPanX, startPanY]
 let spaceDown = false;
@@ -305,7 +328,7 @@ async function loadMap(mapId) {
   };
   mapImage.src = `/widgets/pubg/maps/${mapId}.png`;
   // Zoom/Pan auf Default zurueck wenn die Map wechselt
-  view = { zoom: 1, panX: 0, panY: 0 };
+  view = { zoom: 1, panX: 0, panY: 0, tZoom: 1, tPanX: 0, tPanY: 0 };
   updateZoomBtn();
 
   // Fetch saved regions from server (per dataKey, nicht per imageId)
@@ -986,7 +1009,7 @@ canvas.addEventListener("mousedown", (ev) => {
   // Rechtsklick (2), Middle-Mouse (1) oder Space+LMB = Pan-Modus
   if (ev.button === 2 || ev.button === 1 || (spaceDown && ev.button === 0)) {
     isPanning = true;
-    panRef = [ev.clientX, ev.clientY, view.panX, view.panY];
+    panRef = [ev.clientX, ev.clientY, view.tPanX, view.tPanY];
     canvas.style.cursor = "grabbing";
     ev.preventDefault();
     return;
@@ -1100,8 +1123,8 @@ canvas.addEventListener("mousemove", (ev) => {
   }
   // Pan-Modus
   if (isPanning && panRef) {
-    view.panX = panRef[2] + (ev.clientX - panRef[0]);
-    view.panY = panRef[3] + (ev.clientY - panRef[1]);
+    view.panX = view.tPanX = panRef[2] + (ev.clientX - panRef[0]);
+    view.panY = view.tPanY = panRef[3] + (ev.clientY - panRef[1]);
     render();
     return;
   }
@@ -1203,16 +1226,16 @@ canvas.addEventListener("mouseup", (ev) => {
 canvas.addEventListener("mouseleave", () => hidePinTooltip());
 canvas.addEventListener("wheel", (ev) => {
   ev.preventDefault();
-  const oldZoom = view.zoom;
   const factor = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
-  const newZoom = Math.max(0.5, Math.min(12, oldZoom * factor));
+  const newZoom = Math.max(0.5, Math.min(12, view.tZoom * factor));
   const r = canvas.getBoundingClientRect();
   const mx = ev.clientX - r.left, my = ev.clientY - r.top;
-  view.panX = mx - (mx - view.panX) * (newZoom / oldZoom);
-  view.panY = my - (my - view.panY) * (newZoom / oldZoom);
-  view.zoom = newZoom;
+  const ratio = newZoom / view.tZoom;
+  view.tPanX = mx - (mx - view.tPanX) * ratio;
+  view.tPanY = my - (my - view.tPanY) * ratio;
+  view.tZoom = newZoom;
   updateZoomBtn();
-  render();
+  _poiAnimStart();
 }, { passive: false });
 
 // Rechtsklick-Kontextmenu unterdruecken — wir benutzen RMB-Drag fuer Pan
@@ -1255,7 +1278,7 @@ function updateZoomBtn() {
   document.getElementById("zoomResetBtn").textContent = `🔍 ${Math.round(view.zoom * 100)}%`;
 }
 document.getElementById("zoomResetBtn").addEventListener("click", () => {
-  view = { zoom: 1, panX: 0, panY: 0 };
+  view = { zoom: 1, panX: 0, panY: 0, tZoom: 1, tPanX: 0, tPanY: 0 };
   updateZoomBtn();
   render();
 });

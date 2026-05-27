@@ -8,7 +8,7 @@ const RS = {
   lastFrameWall: 0,
   toggles: { kills: true, knocks: true, streaks: true, zones: true, names: true,
              grid: false },
-  view: { zoom: 1, panX: 0, panY: 0 },  // zoom: Faktor, pan: Pixel-Offset
+  view: { zoom: 1, panX: 0, panY: 0, tZoom: 1, tPanX: 0, tPanY: 0 },
 };
 
 async function loadMatchList() {
@@ -623,8 +623,21 @@ function renderFrame() {
 // --- Task 10: Wiedergabe-Steuerung ---
 
 function tick(wallNow) {
+  const dt = wallNow - (RS.lastFrameWall || wallNow);
+  RS.lastFrameWall = wallNow;
+
+  // Smooth-Zoom: Ansicht per Exponential-Lerp zum Zielwert interpolieren (tau ≈ 100 ms)
+  const lf = 1 - Math.exp(-dt / 100);
+  const v = RS.view;
+  const zDiff = v.tZoom - v.zoom, xDiff = v.tPanX - v.panX, yDiff = v.tPanY - v.panY;
+  const animating = Math.abs(zDiff) > 0.0005 || Math.abs(xDiff) > 0.2 || Math.abs(yDiff) > 0.2;
+  if (animating) {
+    v.zoom += zDiff * lf;
+    v.panX += xDiff * lf;
+    v.panY += yDiff * lf;
+  }
+
   if (RS.playing && RS.replay) {
-    const dt = wallNow - (RS.lastFrameWall || wallNow);
     RS.cursorMs += dt * RS.speed;
     if (RS.cursorMs >= RS.replay.durationMs) {
       RS.cursorMs = RS.replay.durationMs;
@@ -633,8 +646,9 @@ function tick(wallNow) {
     }
     syncScrubberAndClock();
     renderFrame();
+  } else if (animating) {
+    renderFrame();
   }
-  RS.lastFrameWall = wallNow;
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
@@ -685,24 +699,23 @@ stageEl().addEventListener("wheel", e => {
   const r = cnv.getBoundingClientRect();
   const mx = e.clientX - r.left, my = e.clientY - r.top;
   const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-  const newZoom = Math.max(0.5, Math.min(20, RS.view.zoom * factor));
-  const r2 = newZoom / RS.view.zoom;
+  const newZoom = Math.max(0.5, Math.min(20, RS.view.tZoom * factor));
+  const ratio = newZoom / RS.view.tZoom;
   const hw = cnv.width / 2, hh = cnv.height / 2;
-  RS.view.panX = mx - hw - (mx - hw - RS.view.panX) * r2;
-  RS.view.panY = my - hh - (my - hh - RS.view.panY) * r2;
-  RS.view.zoom = newZoom;
-  renderFrame();
+  RS.view.tPanX = mx - hw - (mx - hw - RS.view.tPanX) * ratio;
+  RS.view.tPanY = my - hh - (my - hh - RS.view.tPanY) * ratio;
+  RS.view.tZoom = newZoom;
 }, { passive: false });
 
 let _drag = null;
 stageEl().addEventListener("mousedown", e => {
   _drag = { x: e.clientX, y: e.clientY,
-            px: RS.view.panX, py: RS.view.panY };
+            px: RS.view.tPanX, py: RS.view.tPanY };
 });
 window.addEventListener("mousemove", e => {
   if (!_drag) return;
-  RS.view.panX = _drag.px + (e.clientX - _drag.x);
-  RS.view.panY = _drag.py + (e.clientY - _drag.y);
+  RS.view.panX = RS.view.tPanX = _drag.px + (e.clientX - _drag.x);
+  RS.view.panY = RS.view.tPanY = _drag.py + (e.clientY - _drag.y);
   renderFrame();
 });
 window.addEventListener("mouseup", () => { _drag = null; });
