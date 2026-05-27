@@ -199,13 +199,11 @@ function buildPlayerTracks() {
   RS._tracks = tracks;
   RS._deaths = deaths;
   RS._relands = relands;
-  // Erster LANDING-Timestamp pro Spieler — vor diesem Zeitpunkt zeigt posAt()
-  // die Flugzeugposition (Parachute-Descent-Events werden ignoriert).
-  RS._firstLandingTs = {};
-  for (const e of RS.replay.events) {
-    if (e.type !== "landing") continue;
-    if (!(e.actorId in RS._firstLandingTs))
-      RS._firstLandingTs[e.actorId] = e.ts;
+  // Erster Track-Timestamp pro Spieler = erster Moment mit z < 150000 (Fallschirm/Boden).
+  // Davor zeigt posAt() die Flugzeugposition; danach Track-Interpolation (Fallschirm + Boden).
+  RS._firstTrackTs = {};
+  for (const [acc, tr] of Object.entries(tracks)) {
+    if (tr.length) RS._firstTrackTs[acc] = tr[0].ts;
   }
   // accountId → teamId und → color Lookup
   RS._accTeam = {};
@@ -234,15 +232,17 @@ function posAt(acc, ms) {
     }
   }
   if (dead) return null;
-  // Noch im Flieger: bis zur ersten Landung Flugzeugposition zeigen.
-  // Parachute-Descent-Positions (z<150000, im Track enthalten) werden dabei
-  // übersprungen — erst ab Landing ist der Spieler "auf dem Boden".
-  const firstLand = RS._firstLandingTs[acc] ?? Infinity;
-  if (ms < firstLand) {
+  // Noch im Flieger: vor dem ersten Track-Event (z<150000) → Flugzeugposition.
+  // Strikt auf das bekannte Flight-Path-Fenster begrenzen → kein "null-Loch"
+  // zwischen Flugzeug-Ende und erstem Boden-Event mehr.
+  const firstTrackTs = RS._firstTrackTs[acc] ?? Infinity;
+  if (ms < firstTrackTs) {
     const fp = RS.replay.flightPath;
-    if (fp && fp.length) return flightPosAt(ms);
+    if (fp && fp.length && ms >= fp[0][2] && ms <= fp[fp.length - 1][2])
+      return flightPosAt(ms);
     return null;
   }
+  // Ab erstem Track-Event: Track-Interpolation (deckt Fallschirm-Descent + Boden ab).
   if (ms >= tr[tr.length - 1].ts) {
     const last = tr[tr.length - 1];
     return { x: last.x, y: last.y };
@@ -405,28 +405,26 @@ function drawFlightRoute(ctx, ms) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Marker: erster Absprung (grün) + letzter Force-Eject (rot)
-  let firstLandTs = Infinity, lastLandTs = -Infinity;
-  for (const e of RS.replay.events) {
-    if (e.type !== "landing") continue;
-    if (e.ts < firstLandTs) firstLandTs = e.ts;
-    if (e.ts > lastLandTs) lastLandTs = e.ts;
-  }
+  // Marker: erster Absprung (grün) + letzter Spieler verlässt Flieger (rot)
+  // Basis: erster Track-Event pro Spieler = Zeitpunkt des Absprungs (z<150000)
+  const allJumpTs = Object.values(RS._firstTrackTs || {});
+  const firstJumpTs = allJumpTs.length ? Math.min(...allJumpTs) : Infinity;
+  const lastJumpTs  = allJumpTs.length ? Math.max(...allJumpTs) : -Infinity;
   function drawJumpMarker(flightMs, color, label) {
     const p = flightPosAt(flightMs);
     if (!p) return;
-    const [mx, my] = projToCanvas(p.x, p.y);
+    const [jx, jy] = projToCanvas(p.x, p.y);
     ctx.fillStyle = color;
     ctx.strokeStyle = "#fff";
     ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(mx, my, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(jx, jy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = "#fff";
     ctx.font = "bold 9px DM Sans";
     ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-    ctx.fillText(label, mx, my - 6);
+    ctx.fillText(label, jx, jy - 6);
   }
-  if (firstLandTs !== Infinity)  drawJumpMarker(firstLandTs, "#3cdb5e", "▼");
-  if (lastLandTs !== -Infinity)  drawJumpMarker(lastLandTs,  "#ff4444", "▼");
+  if (firstJumpTs !== Infinity)  drawJumpMarker(firstJumpTs, "#3cdb5e", "▼");
+  if (lastJumpTs !== -Infinity)  drawJumpMarker(lastJumpTs,  "#ff4444", "▼");
 
   // Flugzeug-Icon als Dreieck am aktuellen Punkt
   const pos = flightPosAt(ms);
@@ -519,40 +517,7 @@ function renderFrame() {
     ctx.globalAlpha = 1;
   }
 
-  // 2) Kill/Knock-Marker (X) — eigene Team-Opfer extra hervorheben
-  const heroTeamId = RS.replay.heroTeamId ?? null;
-  for (const e of markersUpTo(ms)) {
-    const [mx, my] = projToCanvas(e.tx, e.ty);
-    const victimTeam = RS._accTeam[e.targetId];
-    const isHeroVictim = heroTeamId !== null && victimTeam === heroTeamId;
-    const sz = e.type === "kill" ? 6 : 3;
-    // Kreis-Highlight um eigene Tode/Knocks
-    const heroColor = RS._teamColor[heroTeamId] || "#fff";
-    if (isHeroVictim) {
-      const r = e.type === "kill" ? 14 : 10;
-      ctx.strokeStyle = e.type === "kill" ? "#ff3a3a" : heroColor;
-      ctx.lineWidth = e.type === "kill" ? 2.5 : 1.5;
-      ctx.globalAlpha = 0.9;
-      if (e.type === "knock") ctx.setLineDash([4, 3]);
-      ctx.beginPath();
-      ctx.arc(mx, my, r, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 1;
-    }
-    ctx.strokeStyle = isHeroVictim
-      ? (e.type === "kill" ? "#ff3a3a" : heroColor)
-      : teamColorOf(e.actorId);
-    ctx.globalAlpha = e.type === "kill" ? 1 : 0.6;
-    ctx.lineWidth = isHeroVictim ? 2.5 : 2;
-    ctx.beginPath();
-    ctx.moveTo(mx - sz, my - sz); ctx.lineTo(mx + sz, my + sz);
-    ctx.moveTo(mx + sz, my - sz); ctx.lineTo(mx - sz, my + sz);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-  }
-
-  // 3) Spieler-Pins — eigener Spieler als Pfeilnadel (◆ + Halo)
+  // 2) Spieler-Pins — eigener Spieler als Pfeilnadel (◆ + Halo)
   const heroAcc = RS.replay.heroAccountId ?? null;
   const nameScale = Math.max(8, Math.min(12, 12 / RS.view.zoom));
   // Nicht-Hero zuerst, dann Hero obendrauf
@@ -613,6 +578,36 @@ function renderFrame() {
         ctx.fillText(RS._accName[acc] || "", px + 7, py - 5);
       }
     }
+    ctx.globalAlpha = 1;
+  }
+
+  // 3) Kill/Knock-Marker (X) — nach den Pins, damit sie nicht verdeckt werden
+  const heroTeamId = RS.replay.heroTeamId ?? null;
+  const heroColor2 = RS._teamColor[heroTeamId] || "#fff";
+  for (const e of markersUpTo(ms)) {
+    const [emx, emy] = projToCanvas(e.tx, e.ty);
+    const victimTeam = RS._accTeam[e.targetId];
+    const isHeroVictim = heroTeamId !== null && victimTeam === heroTeamId;
+    const sz = e.type === "kill" ? 6 : 5;
+    if (isHeroVictim) {
+      const r = e.type === "kill" ? 14 : 10;
+      ctx.strokeStyle = e.type === "kill" ? "#ff3a3a" : heroColor2;
+      ctx.lineWidth = e.type === "kill" ? 2.5 : 1.5;
+      ctx.globalAlpha = 0.9;
+      if (e.type === "knock") ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.arc(emx, emy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle = isHeroVictim
+      ? (e.type === "kill" ? "#ff3a3a" : heroColor2)
+      : teamColorOf(e.actorId);
+    ctx.globalAlpha = e.type === "kill" ? 1 : 0.85;
+    ctx.lineWidth = isHeroVictim ? 2.5 : 2;
+    ctx.beginPath();
+    ctx.moveTo(emx - sz, emy - sz); ctx.lineTo(emx + sz, emy + sz);
+    ctx.moveTo(emx + sz, emy - sz); ctx.lineTo(emx - sz, emy + sz);
+    ctx.stroke();
     ctx.globalAlpha = 1;
   }
 
