@@ -392,6 +392,15 @@ window.addEventListener("mouseup", () => { _drag = null; });
 
 const TOOLTIP = () => document.getElementById("tooltip");
 
+// POI-Name fuer eine normalisierte Position. Die Event-Coords sind ROH-
+// normalisiert (build_replay: cm/span ohne Kalibrierung), Regionen liegen
+// im selben Weltsystem → cm zurueckrechnen und PubgUI.POI.fromCoords nutzen.
+function poiAt(nx, ny) {
+  if (!RS.replay || nx == null) return null;
+  const span = (RS.replay.mapKm || 8) * 100000;
+  return PubgUI.POI.fromCoords(RS.replay.mapName, nx * span, ny * span);
+}
+
 function hitTest(mx, my) {
   const ms = RS.cursorMs;
   // 1) Pins (Radius 7px)
@@ -408,7 +417,9 @@ function hitTest(mx, my) {
         if (e.actorId === acc && e.type === "kill") k++;
         if (e.actorId === acc && e.type === "knock") kn++;
       }
-      return `Team ${tid} · ${RS._accName[acc]} · ${k} Kills · ${kn} Knocks`;
+      const poi = poiAt(p.x, p.y);
+      const loc = poi ? ` · ${poi}` : "";
+      return `Team ${tid} · ${RS._accName[acc]} · ${k} Kills · ${kn} Knocks${loc}`;
     }
   }
   // 2) Kill/Knock-Marker (8px)
@@ -418,8 +429,10 @@ function hitTest(mx, my) {
       const verb = e.type === "kill" ? "killed" : "knocked";
       const dist = e.distance != null ? Math.round(e.distance / 100) + "m" : "?";
       const wp = (e.weapon || "?").replace(/^Weap/, "").replace(/_C$/, "");
+      const poi = poiAt(e.tx, e.ty);
+      const loc = poi ? ` · ${poi}` : "";
       return `${RS._accName[e.targetId] || "?"} ${verb} by `
-           + `${RS._accName[e.actorId] || "?"} · ${wp} · ${dist}`;
+           + `${RS._accName[e.actorId] || "?"} · ${wp} · ${dist}${loc}`;
     }
   }
   return null;
