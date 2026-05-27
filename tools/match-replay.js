@@ -251,11 +251,25 @@ function markersUpTo(ms) {
   return out;
 }
 
+// Bullets die zum Cursor-Zeitpunkt in der Luft sind.
+// Flugzeit aus Distanz errechnet (750 m/s Durchschnitt → 75 cm/ms).
+// Impact-ts - travelMs = fire_ts; Bullet ist sichtbar für fire_ts..impact_ts.
+const _BULLET_CM_PER_MS = 75;
+const _MAX_BULLET_MS    = 2000;  // längster sinnvoller Schuss ~1500 m
+
 function activeStreaks(ms) {
   if (!RS.toggles.streaks) return [];
-  // Hit-Events deren Einschlag < 200ms her ist
-  return RS.replay.events.filter(e =>
-    e.type === "hit" && e.ts <= ms && ms - e.ts <= 200);
+  const out = [];
+  for (const e of RS.replay.events) {
+    if (e.ts > ms + _MAX_BULLET_MS) break;
+    if (e.type !== "hit") continue;
+    const dist     = e.distance ?? 0;
+    const travelMs = Math.max(30, dist / _BULLET_CM_PER_MS);
+    const fireTs   = e.ts - travelMs;
+    if (ms < fireTs || ms > e.ts) continue;
+    out.push({ ...e, t: (ms - fireTs) / travelMs });  // t: 0=abgefeuert, 1=Einschlag
+  }
+  return out;
 }
 
 function teamColorOf(acc) {
@@ -422,15 +436,25 @@ function renderFrame() {
     }
   }
 
-  // 1) Bullet-Streaks (unter den Pins)
-  for (const e of activeStreaks(ms)) {
-    const [ax, ay] = projToCanvas(e.ax, e.ay);
-    const [tx, ty] = projToCanvas(e.tx, e.ty);
-    const age = ms - e.ts;
-    ctx.globalAlpha = 0.7 * (1 - age / 200);
-    ctx.strokeStyle = teamColorOf(e.actorId);
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(tx, ty); ctx.stroke();
+  // 1) Bullet-Streaks — kurzer Screen-Space-Strich an der aktuellen Bullet-Position
+  for (const s of activeStreaks(ms)) {
+    // Bullet-Kopf interpoliert zwischen Schütze und Ziel
+    const bx = s.ax + (s.tx - s.ax) * s.t;
+    const by = s.ay + (s.ty - s.ay) * s.t;
+    const [hpx, hpy] = projToCanvas(bx, by);
+    // Richtungsvektor in Screen-Space (von Quelle → Ziel)
+    const [apx, apy] = projToCanvas(s.ax, s.ay);
+    const [tpx, tpy] = projToCanvas(s.tx, s.ty);
+    const dx = tpx - apx, dy = tpy - apy;
+    const len = Math.hypot(dx, dy) || 1;
+    const streak = 4;  // px
+    ctx.strokeStyle = teamColorOf(s.actorId);
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(hpx - dx / len * streak, hpy - dy / len * streak);
+    ctx.lineTo(hpx, hpy);
+    ctx.stroke();
     ctx.globalAlpha = 1;
   }
 
