@@ -183,13 +183,20 @@ function drawBasemap(ctx) {
 // --- Task 9: Pin-Interpolation + Marker + Streaks ---
 
 function buildPlayerTracks() {
-  const tracks = {};   // accountId → [{ts,x,y}]
-  const deaths = {};   // accountId → [ts,...]
-  const relands = {};  // accountId → [ts,...]  (landings nach erstem)
+  const tracks = {};       // accountId → [{ts,x,y}]  — alle Events (Lobby + Boden)
+  const groundTracks = {}; // accountId → [{ts,x,y}]  — nur Events ab Flugstart
+  const deaths = {};
+  const relands = {};
+  const fp = RS.replay.flightPath;
+  const flightStart = fp && fp.length ? fp[0][2] : 0;
+
   for (const e of RS.replay.events) {
     if (e.type === "position" || e.type === "landing") {
       (tracks[e.actorId] = tracks[e.actorId] || []).push(
         { ts: e.ts, x: e.x, y: e.y });
+      if (e.ts >= flightStart)
+        (groundTracks[e.actorId] = groundTracks[e.actorId] || []).push(
+          { ts: e.ts, x: e.x, y: e.y });
       if (e.type === "landing")
         (relands[e.actorId] = relands[e.actorId] || []).push(e.ts);
     } else if (e.type === "death") {
@@ -197,15 +204,16 @@ function buildPlayerTracks() {
     }
   }
   RS._tracks = tracks;
+  RS._groundTracks = groundTracks;
   RS._deaths = deaths;
   RS._relands = relands;
-  // Erster Track-Timestamp pro Spieler = erster Moment mit z < 150000 (Fallschirm/Boden).
-  // Davor zeigt posAt() die Flugzeugposition; danach Track-Interpolation (Fallschirm + Boden).
-  RS._firstTrackTs = {};
-  for (const [acc, tr] of Object.entries(tracks)) {
-    if (tr.length) RS._firstTrackTs[acc] = tr[0].ts;
+  // Absprung-Zeitpunkt = erster Ground-Track-Event (z<150000) nach Flugstart
+  RS._jumpTs = {};
+  for (const [acc, gt] of Object.entries(groundTracks)) {
+    if (gt.length) RS._jumpTs[acc] = gt[0].ts;
   }
-  // accountId → teamId und → color Lookup
+  RS._flightStart = flightStart;
+
   RS._accTeam = {};
   RS._accName = {};
   RS._teamColor = {};
@@ -218,35 +226,10 @@ function buildPlayerTracks() {
   }
 }
 
-function posAt(acc, ms) {
-  const tr = RS._tracks[acc];
-  if (!tr || !tr.length) return null;
-  // tot? letzter death vor ms ohne nachfolgendes reland
-  const dts = RS._deaths[acc] || [];
-  const rts = RS._relands[acc] || [];
-  let dead = false;
-  for (const d of dts) {
-    if (d <= ms) {
-      const reland = rts.find(r => r > d && r <= ms);
-      dead = !reland;
-    }
-  }
-  if (dead) return null;
-  // Noch im Flieger: vor dem ersten Track-Event (z<150000) → Flugzeugposition.
-  // Strikt auf das bekannte Flight-Path-Fenster begrenzen → kein "null-Loch"
-  // zwischen Flugzeug-Ende und erstem Boden-Event mehr.
-  const firstTrackTs = RS._firstTrackTs[acc] ?? Infinity;
-  if (ms < firstTrackTs) {
-    const fp = RS.replay.flightPath;
-    if (!fp || !fp.length) return null;
-    if (ms < fp[0][2]) return { x: fp[0][0], y: fp[0][1] };  // vor Abflug: Startpunkt
-    if (ms <= fp[fp.length - 1][2]) return flightPosAt(ms);   // Flug: mitbewegen
-    return null;
-  }
-  // Ab erstem Track-Event: Track-Interpolation (deckt Fallschirm-Descent + Boden ab).
+function _interpTrack(tr, ms) {
+  if (!tr || !tr.length || ms < tr[0].ts) return null;
   if (ms >= tr[tr.length - 1].ts) {
-    const last = tr[tr.length - 1];
-    return { x: last.x, y: last.y };
+    const l = tr[tr.length - 1]; return { x: l.x, y: l.y };
   }
   for (let i = 1; i < tr.length; i++) {
     if (tr[i].ts >= ms) {
@@ -256,6 +239,34 @@ function posAt(acc, ms) {
     }
   }
   return null;
+}
+
+function posAt(acc, ms) {
+  // Tod-Check
+  const dts = RS._deaths[acc] || [];
+  const rts = RS._relands[acc] || [];
+  let dead = false;
+  for (const d of dts) {
+    if (d <= ms) dead = !rts.find(r => r > d && r <= ms);
+  }
+  if (dead) return null;
+
+  const fp  = RS.replay.flightPath;
+  const fs  = RS._flightStart;   // Flugstart-Zeitpunkt
+  const fe  = fp && fp.length ? fp[fp.length - 1][2] : -Infinity;
+  const jts = RS._jumpTs[acc] ?? Infinity;  // Absprung (erster Ground-Event nach Flugstart)
+
+  if (ms < fs) {
+    // Lobby: Spieler laufen auf der Karte — normaler Track
+    return _interpTrack(RS._tracks[acc], ms);
+  }
+  if (ms < jts) {
+    // Im Flieger: zum Flugstartpunkt teleportiert, dann mitfliegen
+    if (ms <= fe) return flightPosAt(ms);
+    return null;
+  }
+  // Fallschirm / Boden: Ground-Track
+  return _interpTrack(RS._groundTracks[acc], ms);
 }
 
 function markersUpTo(ms) {
