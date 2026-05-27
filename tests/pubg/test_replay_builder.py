@@ -85,7 +85,7 @@ def _raw_fixture():
 
 
 def test_extract_events_types_and_count():
-    events = extract_events(_raw_fixture(), mapKm=8, position_interval_ms=1000)
+    events, _ = extract_events(_raw_fixture(), mapKm=8, position_interval_ms=1000)
     types = [e["type"] for e in events]
     assert "landing" in types
     assert "position" in types
@@ -95,20 +95,20 @@ def test_extract_events_types_and_count():
 
 
 def test_extract_events_sorted_by_ts():
-    events = extract_events(_raw_fixture(), mapKm=8, position_interval_ms=1000)
+    events, _ = extract_events(_raw_fixture(), mapKm=8, position_interval_ms=1000)
     ts = [e["ts"] for e in events]
     assert ts == sorted(ts)
 
 
 def test_extract_events_normalizes_coords():
-    events = extract_events(_raw_fixture(), mapKm=8, position_interval_ms=1000)
+    events, _ = extract_events(_raw_fixture(), mapKm=8, position_interval_ms=1000)
     landing = next(e for e in events if e["type"] == "landing")
     assert abs(landing["x"] - 0.5) < 1e-6  # 400000/800000
     assert abs(landing["y"] - 0.5) < 1e-6
 
 
 def test_extract_events_hit_has_both_endpoints():
-    events = extract_events(_raw_fixture(), mapKm=8, position_interval_ms=1000)
+    events, _ = extract_events(_raw_fixture(), mapKm=8, position_interval_ms=1000)
     hit = next(e for e in events if e["type"] == "hit")
     assert "ax" in hit and "ay" in hit and "tx" in hit and "ty" in hit
     assert hit["actorId"] == "acc.A"
@@ -116,7 +116,7 @@ def test_extract_events_hit_has_both_endpoints():
 
 
 def test_extract_events_kill_has_weapon_distance():
-    events = extract_events(_raw_fixture(), mapKm=8, position_interval_ms=1000)
+    events, _ = extract_events(_raw_fixture(), mapKm=8, position_interval_ms=1000)
     kill = next(e for e in events if e["type"] == "kill")
     assert kill["weapon"] == "WeapAK47_C"
     assert kill["distance"] == 5000
@@ -135,7 +135,7 @@ def test_extract_events_position_interval_thins():
          "character": {"accountId": "acc.A", "name": "X",
                        "location": {"x": 3, "y": 3, "z": 100}}},
     ]
-    events = extract_events(raw, mapKm=8, position_interval_ms=1000)
+    events, _ = extract_events(raw, mapKm=8, position_interval_ms=1000)
     pos = [e for e in events if e["type"] == "position"]
     assert len(pos) == 2  # 0.0s und 1.5s; 0.2s wird verworfen
 
@@ -189,7 +189,7 @@ def test_extract_events_zone_from_gamestate():
              "poisonGasWarningRadius": 100000,
          }},
     ]
-    events = extract_events(raw, mapKm=8, position_interval_ms=1000)
+    events, _ = extract_events(raw, mapKm=8, position_interval_ms=1000)
     z = next(e for e in events if e["type"] == "zone")
     assert abs(z["safeX"] - 0.5) < 1e-6
     assert abs(z["safeY"] - 0.5) < 1e-6
@@ -208,7 +208,7 @@ def test_extract_events_zone_radius_zero_is_none():
              "poisonGasWarningRadius": 0,
          }},
     ]
-    events = extract_events(raw, mapKm=8, position_interval_ms=1000)
+    events, _ = extract_events(raw, mapKm=8, position_interval_ms=1000)
     z = next(e for e in events if e["type"] == "zone")
     assert z["safeR"] is None
     assert z["nextR"] is None

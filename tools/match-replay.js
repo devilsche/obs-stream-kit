@@ -18,7 +18,7 @@ async function loadMatchList() {
     const d = new Date(m.playedAt);
     const dt = d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit",
               hour: "2-digit", minute: "2-digit" });
-    const mapShort = (m.mapName || "?").replace("_Main", "");
+    const mapShort = PubgUI.fmtMap(m.mapName);
     return `<option value="${m.matchId}">${dt} · ${mapShort} · #${m.place ?? "?"} · ${m.kills ?? "?"}K</option>`;
   }).join("");
   // URL-Parameter ?match=ID überschreibt die Vorauswahl
@@ -263,15 +263,26 @@ function teamColorOf(acc) {
   return RS._teamColor[tid] || "#888";
 }
 
-// Letztes Zone-Event <= Cursor (Bluezone schreitet ueber die Match-Zeit fort).
+// Interpolierte Zone zum Cursor-Zeitpunkt.
+// Zwischen zwei aufeinanderfolgenden Zone-Events wird linear interpoliert,
+// damit die Bluezone sich fließend bewegt statt zu springen.
 function currentZone(ms) {
-  let z = null;
+  let prev = null, next = null;
   for (const e of RS.replay.events) {
     if (e.type !== "zone") continue;
-    if (e.ts > ms) break;
-    z = e;
+    if (e.ts <= ms) prev = e;
+    else if (!next) { next = e; break; }
   }
-  return z;
+  if (!prev) return next || null;
+  if (!next) return prev;
+  const t = (ms - prev.ts) / Math.max(1, next.ts - prev.ts);
+  const lerp = (a, b) => a == null || b == null ? (a ?? b) : a + (b - a) * t;
+  return {
+    safeX: lerp(prev.safeX, next.safeX), safeY: lerp(prev.safeY, next.safeY),
+    safeR: lerp(prev.safeR, next.safeR),
+    nextX: lerp(prev.nextX, next.nextX), nextY: lerp(prev.nextY, next.nextY),
+    nextR: lerp(prev.nextR, next.nextR),
+  };
 }
 
 // Canvas-Radius aus normalisiertem Radius: Mitte + Randpunkt projizieren,
@@ -314,6 +325,66 @@ function drawGrid(ctx) {
   ctx.setLineDash([]);
 }
 
+// Flugzeug-Position zum Cursor-Zeitpunkt interpolieren.
+// Gibt {x,y} (normalisiert) oder null zurück.
+function flightPosAt(ms) {
+  const fp = RS.replay.flightPath;
+  if (!fp || fp.length < 2) return null;
+  if (ms < fp[0][2]) return null;
+  if (ms > fp[fp.length - 1][2]) return null;
+  for (let i = 1; i < fp.length; i++) {
+    if (fp[i][2] >= ms) {
+      const a = fp[i - 1], b = fp[i];
+      const t = (ms - a[2]) / Math.max(1, b[2] - a[2]);
+      return { x: a[0] + (b[0] - a[0]) * t, y: a[1] + (b[1] - a[1]) * t };
+    }
+  }
+  return null;
+}
+
+function drawFlightRoute(ctx, ms) {
+  const fp = RS.replay.flightPath;
+  if (!fp || fp.length < 2) return;
+  // Pfad-Linie (gestrichelt, weiß-transparent)
+  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([8, 6]);
+  ctx.beginPath();
+  for (let i = 0; i < fp.length; i++) {
+    const [cx, cy] = projToCanvas(fp[i][0], fp[i][1]);
+    if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // Flugzeug-Icon als Dreieck am aktuellen Punkt
+  const pos = flightPosAt(ms);
+  if (!pos) return;
+  const [px, py] = projToCanvas(pos.x, pos.y);
+  // Flugrichtung aus dem Pfad ableiten
+  let dx = 0, dy = 0;
+  for (let i = 1; i < fp.length; i++) {
+    if (fp[i][2] >= ms) {
+      dx = fp[i][0] - fp[i - 1][0];
+      dy = fp[i][1] - fp[i - 1][1];
+      break;
+    }
+  }
+  const angle = Math.atan2(dy, dx);
+  const sz = 8;
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.rotate(angle);
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.beginPath();
+  ctx.moveTo(sz, 0);
+  ctx.lineTo(-sz, -sz * 0.6);
+  ctx.lineTo(-sz * 0.4, 0);
+  ctx.lineTo(-sz, sz * 0.6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 function renderFrame() {
   const cnv = document.getElementById("map");
   const ctx = cnv.getContext("2d");
@@ -321,7 +392,10 @@ function renderFrame() {
   if (!RS.replay) return;
   const ms = RS.cursorMs;
 
-  // 0) Bluezone: aktuelle Safe-Zone (durchgezogen) + naechste weisse Zone
+  // 0a) Flugroute (unter allem anderen)
+  drawFlightRoute(ctx, ms);
+
+  // 0b) Bluezone: aktuelle Safe-Zone (durchgezogen) + naechste weisse Zone
   //    (gestrichelt). Liegt unter Streaks/Markern/Pins.
   const zone = RS.toggles.zones ? currentZone(ms) : null;
   if (zone) {
