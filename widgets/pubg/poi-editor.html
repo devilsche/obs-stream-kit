@@ -463,10 +463,9 @@ function pointInPoly(px, py, points) {
 }
 
 // Label-Bildschirmgroesse: linear 100% (zoom 1.0)=16px → 200% (zoom 2.0)=6px,
-// also screen = 26 - 10*zoom. Geclamped auf 3..16px (unter 100% nicht groesser,
-// stark reingezoomt nicht unlesbar klein).
+// also screen = 26 - 10*zoom. Geclamped auf 8..16px — NIE kleiner als 8px.
 function labelScreenPx() {
-  return Math.max(3, Math.min(16, 26 - 10 * view.zoom));
+  return Math.max(8, Math.min(16, 26 - 10 * view.zoom));
 }
 
 // ─── Render ────────────────────────────────────────────────────────────────
@@ -562,7 +561,7 @@ function render() {
     // Reference-Pins + Intersection-Labels an jeder km/km-Kreuzung.
     // Zeigt 'wo das System glaubt, dass Welt-Coord (1km, 1km) liegt' usw.
     // Auch raw (ohne Cal) damit sie zur Grid-Linie konsistent sind.
-    const dotFont = `${labelScreenPx() * 0.75 / view.zoom}px DM Sans, sans-serif`;
+    const dotFont = `${Math.max(8, labelScreenPx() * 0.75) / view.zoom}px DM Sans, sans-serif`;
     ctx.font = dotFont;
     for (let kx = 0; kx <= mapKm; kx++) {
       for (let ky = 0; ky <= mapKm; ky++) {
@@ -608,7 +607,7 @@ function render() {
       const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
       const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
       ctx.fillStyle = "#f2b705";
-      ctx.font = `${labelScreenPx() * 0.92 / view.zoom}px DM Sans, sans-serif`;
+      ctx.font = `${Math.max(8, labelScreenPx() * 0.92) / view.zoom}px DM Sans, sans-serif`;
       ctx.textAlign = "center";
       ctx.fillText(r.name, cx, cy);
       ctx.textAlign = "start";
