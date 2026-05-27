@@ -256,12 +256,16 @@ function posAt(acc, ms) {
   const fe  = fp && fp.length ? fp[fp.length - 1][2] : -Infinity;
   const jts = RS._jumpTs[acc] ?? Infinity;  // Absprung (erster Ground-Event nach Flugstart)
 
-  if (ms < fs) {
+  // 1,5 s vor Flugstart alle zum Startpunkt teleportieren → kein sichtbares Gleiten
+  const SNAP_MS = 1500;
+  if (ms < fs - SNAP_MS) {
     // Lobby: Spieler laufen auf der Karte — normaler Track
     return _interpTrack(RS._tracks[acc], ms);
   }
   if (ms < jts) {
-    // Im Flieger: zum Flugstartpunkt teleportiert, dann mitfliegen
+    // Im Flieger (inkl. Snap-Fenster): Startpunkt oder mitfliegen
+    if (!fp || !fp.length) return null;
+    if (ms < fp[0][2]) return { x: fp[0][0], y: fp[0][1] };
     if (ms <= fe) return flightPosAt(ms);
     return null;
   }
