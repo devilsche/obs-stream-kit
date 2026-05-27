@@ -513,9 +513,9 @@ function render() {
   if (showGrid) {
     const centerKm = mapKm / 2;
     const lw = 1 / view.zoom;
-    // Schrift schrumpft beim Reinzoomen: Bildschirm-Groesse = clamp(4..12,
-    // 12/zoom), dann durch zoom in Welt-Einheiten (ctx ist um zoom skaliert).
-    const labelScreen = Math.max(4, Math.min(12, 12 / view.zoom));
+    // Schrift schrumpft beim Reinzoomen, aber nie kleiner als bei 170% Zoom
+    // (= 12/1.7). Bildschirm-Groesse clampen, dann /zoom in Welt-Einheiten.
+    const labelScreen = Math.max(12 / 1.7, Math.min(12, 12 / view.zoom));
     const fontPx = labelScreen / view.zoom;
     ctx.font = `${fontPx}px DM Sans, sans-serif`;
     ctx.textBaseline = "top";
@@ -557,7 +557,7 @@ function render() {
     // Reference-Pins + Intersection-Labels an jeder km/km-Kreuzung.
     // Zeigt 'wo das System glaubt, dass Welt-Coord (1km, 1km) liegt' usw.
     // Auch raw (ohne Cal) damit sie zur Grid-Linie konsistent sind.
-    const dotScreen = Math.max(3, Math.min(9, 9 / view.zoom));
+    const dotScreen = Math.max(9 / 1.7, Math.min(9, 9 / view.zoom));
     const dotFont = `${dotScreen / view.zoom}px DM Sans, sans-serif`;
     ctx.font = dotFont;
     for (let kx = 0; kx <= mapKm; kx++) {
@@ -604,7 +604,7 @@ function render() {
       const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
       const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
       ctx.fillStyle = "#f2b705";
-      const nameScreen = Math.max(5, Math.min(11, 11 / view.zoom));
+      const nameScreen = Math.max(11 / 1.7, Math.min(11, 11 / view.zoom));
       ctx.font = `${nameScreen / view.zoom}px DM Sans, sans-serif`;
       ctx.textAlign = "center";
       ctx.fillText(r.name, cx, cy);
