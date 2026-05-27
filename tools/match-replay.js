@@ -106,10 +106,8 @@ function getCal() {
   return RS._poiBlob || { mapKm: RS.replay ? RS.replay.mapKm : 8, pinCalibration: {} };
 }
 
-// normalisiertes (0-1) → Canvas-Pixel (mit Zoom + Pan)
-function projToCanvas(nx, ny) {
-  const blob = getCal();
-  const [cx, cy] = applyCal(nx, ny, blob.mapKm || 8, blob.pinCalibration || {});
+// Kern: kalibriertes/rohes 0-1 → Canvas-Pixel (Zoom + Pan + Quadrat-Fit).
+function _normToCanvas(cx, cy) {
   const cnv = document.getElementById("map");
   const base = Math.min(cnv.width, cnv.height);
   const offX = (cnv.width - base) / 2;
@@ -122,13 +120,35 @@ function projToCanvas(nx, ny) {
   ];
 }
 
+// Fuer PINS/Marker/Streaks: pinCalibration anwenden (verschiebt die Pins
+// relativ zur FIXEN Basemap — exakt wie mdApplyPinCal im Session-Report).
+function projToCanvas(nx, ny) {
+  const blob = getCal();
+  const [cx, cy] = applyCal(nx, ny, blob.mapKm || 8, blob.pinCalibration || {});
+  return _normToCanvas(cx, cy);
+}
+
+// Fuer die BASEMAP: KEINE Kalibrierung — das Kartenbild bleibt fix, nur
+// die Pins werden darueber kalibriert. (Vorher lief die Basemap durch
+// projToCanvas und verschob sich mit den Pins → Kalibrierung wirkungslos.)
+function projRaw(nx, ny) {
+  return _normToCanvas(nx, ny);
+}
+
 let _mapImg = null;
 function loadMapImage(mapName) {
+  // High-Res .png zuerst (Symlinks aus api-assets via refresh-maps, wie
+  // im Session-Report), .webp als Fallback.
   return new Promise(res => {
     const img = new Image();
     img.onload = () => res(img);
-    img.onerror = () => res(null);
-    img.src = "/widgets/pubg/maps/" + mapName + ".webp";
+    img.onerror = () => {
+      const img2 = new Image();
+      img2.onload = () => res(img2);
+      img2.onerror = () => res(null);
+      img2.src = "/widgets/pubg/maps/" + mapName + ".webp";
+    };
+    img.src = "/widgets/pubg/maps/" + mapName + ".png";
   });
 }
 
@@ -154,8 +174,8 @@ function drawBasemap(ctx) {
   if (!_mapImg) return;
   // Quadrat-Crop des Map-Bildes auf den Canvas-Quadrat-Bereich,
   // dann Zoom/Pan via projToCanvas-Eckpunkte.
-  const [x0, y0] = projToCanvas(0, 0);
-  const [x1, y1] = projToCanvas(1, 1);
+  const [x0, y0] = projRaw(0, 0);
+  const [x1, y1] = projRaw(1, 1);
   ctx.drawImage(_mapImg, x0, y0, x1 - x0, y1 - y0);
 }
 
