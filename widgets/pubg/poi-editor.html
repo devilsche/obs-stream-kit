@@ -462,10 +462,9 @@ function pointInPoly(px, py, points) {
   return inside;
 }
 
-// Label-Bildschirmgroesse: 16/zoom — schrumpft proportional zum Reinzoomen,
-// identisch zum match-replay-Muster. Geclamped auf [6, 16] px.
+// Label-Bildschirmgroesse: 12/zoom, identisch zu match-replay. Geclamped auf [8, 12] px.
 function labelScreenPx() {
-  return Math.max(6, Math.min(16, 16 / view.zoom));
+  return Math.max(8, Math.min(12, 12 / view.zoom));
 }
 
 // ─── Render ────────────────────────────────────────────────────────────────
@@ -501,7 +500,7 @@ function render() {
   // Rahmen = 8×8 Felder.
   if (showImgGrid) {
     const N = 8;
-    const lw = 1 / view.zoom;
+    const lw = Math.max(0.5, 1 / view.zoom) / view.zoom;
     ctx.strokeStyle = "rgba(255,60,200,0.85)";  // magenta, klar vom goldenen Welt-Raster unterscheidbar
     ctx.lineWidth = lw;
     for (let i = 0; i <= N; i++) {
@@ -518,8 +517,7 @@ function render() {
   // Labels zeigen den relativen km-Wert.
   if (showGrid) {
     const centerKm = mapKm / 2;
-    const lw = 1 / view.zoom;
-    // 100%=16px, 200%=6px (linear). ctx ist um zoom skaliert → /zoom.
+    const lw = Math.max(0.5, 1 / view.zoom) / view.zoom;
     const fontPx = labelScreenPx() / view.zoom;
     ctx.font = `${fontPx}px DM Sans, sans-serif`;
     ctx.textBaseline = "top";
@@ -601,7 +599,9 @@ function render() {
       : (r.name ? "rgba(94,42,121,0.30)" : "rgba(160,160,160,0.18)");
     ctx.fill();
     ctx.strokeStyle = i === selectedIdx ? "#f2b705" : (r.name ? "#5e2a79" : "#666");
-    ctx.lineWidth = i === selectedIdx ? 2 : 1;
+    ctx.lineWidth = i === selectedIdx
+      ? Math.max(0.5, 2 / view.zoom) / view.zoom
+      : Math.max(0.5, 1 / view.zoom) / view.zoom;
     ctx.stroke();
     if (r.name) {
       const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
@@ -618,7 +618,7 @@ function render() {
       const hs = 4 / view.zoom;
       ctx.fillStyle = "#f2b705";
       ctx.strokeStyle = "#1a0d2a";
-      ctx.lineWidth = 1.5 / view.zoom;
+      ctx.lineWidth = Math.max(0.5, 1.5 / view.zoom) / view.zoom;
       for (const [x, y] of pts) {
         ctx.fillRect(x - hs, y - hs, hs * 2, hs * 2);
         ctx.strokeRect(x - hs, y - hs, hs * 2, hs * 2);
@@ -633,8 +633,8 @@ function render() {
     ctx.moveTo(pts[0][0], pts[0][1]);
     for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
     ctx.strokeStyle = "#f2b705";
-    ctx.setLineDash([4, 3]);
-    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4 / view.zoom, 3 / view.zoom]);
+    ctx.lineWidth = Math.max(0.5, 1.5 / view.zoom) / view.zoom;
     ctx.stroke();
     ctx.setLineDash([]);
     // Vertex dots
@@ -673,7 +673,7 @@ function render() {
     ctx.fillStyle = "rgba(255,80,80,0.85)";
     ctx.fill();
     ctx.strokeStyle = "white";
-    ctx.lineWidth = 1 / view.zoom;
+    ctx.lineWidth = Math.max(0.5, 1 / view.zoom) / view.zoom;
     ctx.stroke();
   });
 
