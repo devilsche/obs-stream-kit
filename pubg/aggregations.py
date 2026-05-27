@@ -4339,6 +4339,24 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             "SELECT account_id, name FROM players WHERE account_id IN ({})".format(
                 ",".join("?"*len(sq_accs_from_db))),
             list(sq_accs_from_db)).fetchall()} if sq_accs_from_db else {}
+        # Knock-Empfang + Wiederbelebungen pro Squadmember aus Telemetrie
+        ph = ",".join("?"*len(sq_accs_from_db)) if sq_accs_from_db else "''"
+        sq_list = list(sq_accs_from_db)
+        knocks_received = {}
+        revives_given = {}
+        if sq_list:
+            for r in conn.execute(
+                f"SELECT target_account, COUNT(*) AS c FROM telemetry_events "
+                f"WHERE match_id=? AND event_type='Knock' "
+                f"AND target_account IN ({ph}) GROUP BY target_account",
+                    [m["match_id"]] + sq_list).fetchall():
+                knocks_received[r["target_account"]] = r["c"]
+            for r in conn.execute(
+                f"SELECT actor_account, COUNT(*) AS c FROM telemetry_events "
+                f"WHERE match_id=? AND event_type='Revive' "
+                f"AND actor_account IN ({ph}) GROUP BY actor_account",
+                    [m["match_id"]] + sq_list).fetchall():
+                revives_given[r["actor_account"]] = r["c"]
         my_special = spec.get(my_account_id, {})
         my_entry = {
             "name": my_name,
@@ -4351,6 +4369,8 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             "time_survived": m["time_survived"],
             "isSelf": True,
             "special": my_special,
+            "knocksReceived": knocks_received.get(my_account_id, 0),
+            "revivesGiven": revives_given.get(my_account_id, 0),
         }
         # Mates-Liste mit special-Events anreichern
         squad_enriched = []
@@ -4360,6 +4380,8 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             acc = next((a for a, n in acc_name.items()
                         if n == s.get("name") and a != my_account_id), None)
             s2["special"] = spec.get(acc, {}) if acc else {}
+            s2["knocksReceived"] = knocks_received.get(acc, 0) if acc else 0
+            s2["revivesGiven"] = revives_given.get(acc, 0) if acc else 0
             squad_enriched.append(s2)
         # Gesamt-Sonder-Events fuer Match als Zusammenfassung
         match_special = {
