@@ -462,6 +462,13 @@ function pointInPoly(px, py, points) {
   return inside;
 }
 
+// Label-Bildschirmgroesse: linear 100% (zoom 1.0)=16px → 200% (zoom 2.0)=6px,
+// also screen = 26 - 10*zoom. Geclamped auf 3..16px (unter 100% nicht groesser,
+// stark reingezoomt nicht unlesbar klein).
+function labelScreenPx() {
+  return Math.max(3, Math.min(16, 26 - 10 * view.zoom));
+}
+
 // ─── Render ────────────────────────────────────────────────────────────────
 function render() {
   fitCanvas();
@@ -513,10 +520,8 @@ function render() {
   if (showGrid) {
     const centerKm = mapKm / 2;
     const lw = 1 / view.zoom;
-    // Schrift schrumpft beim Reinzoomen, aber nie kleiner als bei 170% Zoom
-    // (= 12/1.7). Bildschirm-Groesse clampen, dann /zoom in Welt-Einheiten.
-    const labelScreen = Math.max(12 / 1.7, Math.min(12, 12 / view.zoom));
-    const fontPx = labelScreen / view.zoom;
+    // 100%=16px, 200%=6px (linear). ctx ist um zoom skaliert → /zoom.
+    const fontPx = labelScreenPx() / view.zoom;
     ctx.font = `${fontPx}px DM Sans, sans-serif`;
     ctx.textBaseline = "top";
     // Endpunkte fuer jede vertikale Linie auf y=0..mapKm*100000
@@ -557,8 +562,7 @@ function render() {
     // Reference-Pins + Intersection-Labels an jeder km/km-Kreuzung.
     // Zeigt 'wo das System glaubt, dass Welt-Coord (1km, 1km) liegt' usw.
     // Auch raw (ohne Cal) damit sie zur Grid-Linie konsistent sind.
-    const dotScreen = Math.max(9 / 1.7, Math.min(9, 9 / view.zoom));
-    const dotFont = `${dotScreen / view.zoom}px DM Sans, sans-serif`;
+    const dotFont = `${labelScreenPx() * 0.75 / view.zoom}px DM Sans, sans-serif`;
     ctx.font = dotFont;
     for (let kx = 0; kx <= mapKm; kx++) {
       for (let ky = 0; ky <= mapKm; ky++) {
@@ -604,8 +608,7 @@ function render() {
       const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
       const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
       ctx.fillStyle = "#f2b705";
-      const nameScreen = Math.max(11 / 1.7, Math.min(11, 11 / view.zoom));
-      ctx.font = `${nameScreen / view.zoom}px DM Sans, sans-serif`;
+      ctx.font = `${labelScreenPx() * 0.92 / view.zoom}px DM Sans, sans-serif`;
       ctx.textAlign = "center";
       ctx.fillText(r.name, cx, cy);
       ctx.textAlign = "start";
