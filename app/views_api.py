@@ -18,16 +18,20 @@ bp_api = Blueprint("api", __name__)
 
 
 def _build_pubg_registry(tenant_id):
-    """Frische EndpointRegistry pro Request. Per-Request TTLCache (kein
-    Cross-Tenant-Leak, dafuer kein cross-Request-Hit — Spec 3 baut shared
-    tenant-scoped Cache). Client=None: Endpoints lesen aus DB, der Poller-
-    Client wird nur fuer Resolves benutzt — der Endpoint-Pfad braucht ihn nicht."""
+    """Frische EndpointRegistry pro Request. Credentials werden pro-Tenant
+    geladen damit my_account_id/platform fuer das Filtern verfuegbar ist."""
     from pubg.endpoints import EndpointRegistry
     from pubg.cache import TTLCache
+    from core import credentials as core_creds
+    conn = _get_conn()
+    try:
+        creds = core_creds.get(conn, tenant_id)
+    finally:
+        conn.close()
     return EndpointRegistry(
         get_conn=lambda: _get_conn(),
-        my_account_id=None,
-        platform=None,
+        my_account_id=creds.pubg_account_id,
+        platform=creds.pubg_platform or "steam",
         cache=TTLCache(ttl_secs=30),
         client=None,
         poller_status=lambda: {"running": False},
@@ -36,10 +40,23 @@ def _build_pubg_registry(tenant_id):
 
 
 def _build_steam_registry(tenant_id):
-    """Frische SteamEndpointRegistry pro Request."""
+    """Frische SteamEndpointRegistry pro Request. Client wird mit den
+    Tenant-Credentials gebaut damit Spracheinstellungen + steam_id da sind."""
     from steam.endpoints import SteamEndpointRegistry
+    from steam.api_client import SteamClient
+    from core import credentials as core_creds
+    conn = _get_conn()
+    try:
+        creds = core_creds.get(conn, tenant_id)
+    finally:
+        conn.close()
+    client = None
+    if creds.steam_api_key and creds.steam_id:
+        client = SteamClient(api_key=creds.steam_api_key,
+                             steam_id=creds.steam_id,
+                             language="english")
     return SteamEndpointRegistry(
-        client=None,
+        client=client,
         db_connect_fn=lambda: _get_conn(),
         poller=None,
         root_dir=current_app.config.get("_PROJECT_ROOT") or ".",
