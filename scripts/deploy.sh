@@ -28,15 +28,9 @@ rsync -avz --delete \
   --exclude='widgets/pubg/maps' \
   "$LOCAL_DIR/" "$SERVER:$REMOTE_DIR/"
 
-# .secrets + config/pubg.json mitschicken falls vorhanden (nie im Git)
-if [ -f "$LOCAL_DIR/.secrets" ]; then
-  echo "▶ .secrets hochladen"
-  rsync -az -e "ssh -i $SSH_KEY" "$LOCAL_DIR/.secrets" "$SERVER:$REMOTE_DIR/.secrets"
-fi
-if [ -f "$LOCAL_DIR/config/pubg.json" ]; then
-  echo "▶ config/pubg.json hochladen"
-  rsync -az -e "ssh -i $SSH_KEY" "$LOCAL_DIR/config/pubg.json" "$SERVER:$REMOTE_DIR/config/pubg.json"
-fi
+# .secrets + config/pubg.json werden NIE vom Deploy angefasst — sie sind
+# server-seitige Wahrheit (einmalig via server-setup.sh angelegt) und oben
+# bereits vom rsync ausgeschlossen.
 
 echo "▶ Service neu starten"
 ssh -i "$SSH_KEY" "$SERVER" "systemctl restart obs-stream-kit && systemctl status obs-stream-kit --no-pager -l | head -20"
