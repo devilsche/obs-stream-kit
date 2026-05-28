@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}OBS-URLs — OBS Stream Kit{% endblock %}
+{% block title %}OBS URLs — OBS Stream Kit{% endblock %}
 {% block body %}
 <div class="layout">
   {% include "_sidebar.html" %}
@@ -7,13 +7,13 @@
     <div class="topbar"><div class="greeting">OBS Browser-Source URLs</div></div>
 
     <div class="card">
-      <h3>So gehts</h3>
-      <p>Pro Widget: aktiviere die Filter die du willst (default = alle aus = Widget nimmt seine eigenen Defaults). Die URL unter den Switches updated live. Copy-Button kopiert die URL inkl. der aktiven Filter.</p>
-      <p style="color: var(--text-dim); font-size: 13px;">Token: <code>{{ token }}</code> · {{ widgets|length }} Widgets</p>
+      <h3>How it works</h3>
+      <p>Each widget has its default value pre-selected. Click another value to override — the URL below the switches updates live, and the copy button copies the URL with your overrides. Picking the default value keeps the URL clean (the widget uses its own default anyway).</p>
+      <p style="color: var(--text-dim); font-size: 13px;">Token: <code>{{ token }}</code> · {{ widgets|length }} widgets</p>
     </div>
 
     {% if not token %}
-    <div class="card"><p style="color: var(--danger);">Kein Token gefunden — Admin muss dein Tenant noch einrichten.</p></div>
+    <div class="card"><p style="color: var(--danger);">No token found — admin still has to set up your tenant.</p></div>
     {% else %}
 
     {% set grouped = {} %}
@@ -36,11 +36,10 @@
         {% if switches %}
         <div class="widget-switches">
           {% for sw in switches %}
-          <div class="sw-group" data-param="{{ sw.name }}">
+          <div class="sw-group" data-param="{{ sw.name }}" data-default="{{ sw.default }}">
             <span class="sw-label">{{ sw.label }}</span>
-            <button type="button" class="sw-btn sw-off active" data-value="">aus</button>
             {% for value, vlabel in sw.options %}
-            <button type="button" class="sw-btn" data-value="{{ value }}">{{ vlabel }}</button>
+            <button type="button" class="sw-btn{% if value == sw.default %} active{% endif %}" data-value="{{ value }}">{{ vlabel }}</button>
             {% endfor %}
           </div>
           {% endfor %}
@@ -58,7 +57,7 @@
 
     <div class="card">
       <h3>Streamer.bot</h3>
-      <p>Bisherige <code>/api/pubg/...</code>-URLs ersetzen durch <code>{{ base_url }}/s/{{ token }}/api/...</code> (Auth-Header weg).</p>
+      <p>Replace previous <code>/api/pubg/...</code> URLs with <code>{{ base_url }}/s/{{ token }}/api/...</code> (drop the auth header).</p>
     </div>
     {% endif %}
   </main>
@@ -67,23 +66,21 @@
 <style>
   .widget-block {
     margin-bottom: 18px;
-    padding: 14px 16px;
+    padding: 16px 18px;
     background: var(--bg-deeper);
     border: 1px solid var(--border);
     border-radius: 8px;
   }
   .widget-head {
     display: flex; justify-content: space-between; align-items: baseline;
-    margin-bottom: 4px;
+    margin-bottom: 10px;
   }
   .widget-head strong { color: var(--brand-gold); font-size: 15px; }
   .widget-path { color: var(--text-very-dim); font-size: 11px; font-family: ui-monospace, monospace; }
-  .widget-desc { color: var(--text-muted); font-size: 13px; margin: 4px 0 12px; }
+  .widget-desc { color: var(--text-muted); font-size: 13px; margin: 0 0 14px; line-height: 1.45; }
 
-  .widget-switches { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-  .sw-group {
-    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  }
+  .widget-switches { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .sw-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .sw-label {
     color: var(--text-dim); font-size: 11px; text-transform: uppercase;
     letter-spacing: 0.08em; min-width: 110px;
@@ -92,7 +89,7 @@
     background: var(--bg-card);
     color: var(--text-muted);
     border: 1px solid var(--border);
-    padding: 4px 10px;
+    padding: 4px 12px;
     border-radius: 100px;
     font-size: 12px;
     cursor: pointer;
@@ -103,11 +100,6 @@
     color: #fff;
     border-color: var(--brand-purple);
   }
-  .sw-btn.sw-off.active {
-    background: var(--bg-card);
-    color: var(--text-dim);
-    border-color: var(--border);
-  }
 </style>
 
 <script>
@@ -115,8 +107,10 @@
     const base = block.dataset.base;
     const params = [];
     block.querySelectorAll(".sw-group").forEach(g => {
-      const active = g.querySelector(".sw-btn.active:not(.sw-off)");
-      if (active && active.dataset.value) {
+      const active = g.querySelector(".sw-btn.active");
+      const def = g.dataset.default;
+      // Only add to URL if the active value differs from the default.
+      if (active && active.dataset.value && active.dataset.value !== def) {
         params.push(g.dataset.param + "=" + encodeURIComponent(active.dataset.value));
       }
     });
@@ -127,9 +121,7 @@
     const urlEl = block.querySelector(".url-text");
     const copyBtn = block.querySelector(".copy-btn");
 
-    function refresh() {
-      urlEl.textContent = buildUrl(block);
-    }
+    function refresh() { urlEl.textContent = buildUrl(block); }
 
     block.querySelectorAll(".sw-group").forEach(group => {
       group.querySelectorAll(".sw-btn").forEach(btn => {

@@ -5,7 +5,7 @@
   {% include "_sidebar.html" %}
   <main class="main">
     <div class="topbar">
-      <div class="greeting">Hallo {{ user.display_name }} 👋</div>
+      <div class="greeting">Hi {{ user.display_name }} 👋</div>
       <div class="user-chip">
         {% if user.avatar_url %}<img src="{{ user.avatar_url }}">{% else %}<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--brand-purple),var(--brand-gold))"></div>{% endif %}
         <span>{{ user.display_name }}</span>
@@ -14,20 +14,20 @@
 
     {% if cred_status.any_missing %}
     <div class="card" style="border-color: var(--warning);">
-      <h3 style="color: var(--warning);">⚠ Konfiguration unvollständig</h3>
+      <h3 style="color: var(--warning);">⚠ Configuration incomplete</h3>
       <ul>
         {% if not cred_status.pubg_ready %}
-        <li><a href="/app/settings">PUBG-API-Key + Spielername fehlt</a> — Poller laeuft nicht.</li>
+        <li><a href="/app/settings">PUBG API key + in-game name missing</a> — the poller won't run.</li>
         {% endif %}
         {% if not cred_status.steam_ready %}
-        <li><a href="/app/settings">Steam-API-Key + Steam-ID fehlt</a> — keine Achievements.</li>
+        <li><a href="/app/settings">Steam API key + Steam ID missing</a> — no achievements.</li>
         {% endif %}
       </ul>
     </div>
     {% endif %}
 
     <div class="card">
-      <h3>Übersicht</h3>
+      <h3>Overview</h3>
       <p style="margin: 0 0 12px;">
         Status:
         {% if cred_status.pubg_ready %}<span style="color: var(--success);">✓ PUBG</span>{% else %}<span style="color: var(--warning);">⏳ PUBG</span>{% endif %}
@@ -35,11 +35,11 @@
         {% if cred_status.steam_ready %}<span style="color: var(--success);">✓ Steam</span>{% else %}<span style="color: var(--warning);">⏳ Steam</span>{% endif %}
       </p>
       <p>
-        <a href="/app/urls" class="btn">🔗 Meine OBS-URLs</a>
+        <a href="/app/urls" class="btn">🔗 My OBS URLs</a>
         <a href="/app/settings" class="btn" style="background: var(--bg-deeper); border: 1px solid var(--border);">⚙️ Settings</a>
       </p>
       <p style="color: var(--text-dim); font-size: 13px; margin-top: 16px;">
-        Stats-Cards, Match-History und System-Status-Panel kommen in Spec 3.
+        Stat cards, match history and system status panel are coming in Spec 3.
       </p>
     </div>
   </main>
