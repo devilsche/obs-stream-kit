@@ -272,17 +272,26 @@ def refresh_seasons(conn, tenant_id: int, client, min_matches: int = 5,
     return {"refreshed": refreshed, "errors": errors, "seasonId": season_id}
 
 
+SELF_LIFETIME_MAX_AGE_HOURS = 1
+"""SELF lifetime-stats werden viel oefter refreshed als die von Co-Players.
+   Defaults: SELF alle 1h, Co-Players alle 24h."""
+
+
 def refresh_lifetimes(conn, tenant_id: int, client, min_matches: int = 5,
                       max_per_tick: int = 3) -> dict:
-    """Self + qualified co-players → Lifetime-Stats jeden 24h."""
+    """Self (alle 1h) + qualified co-players (alle 24h) -> Lifetime-Stats.
+
+    SELF kommt mit einem is_self-Flag, damit die for-loop weiss ob hier die
+    kuerzere Stale-Schwelle gilt. Self-Rows werden via UNION ALL zuerst
+    geliefert, damit sie auch bei max_per_tick-Limit zuerst rankommen."""
     rows = conn.execute("""
-        SELECT p.account_id, p.name,
+        SELECT p.account_id, p.name, 1 AS is_self,
                (SELECT MAX(last_refreshed) FROM player_lifetime
                 WHERE account_id = p.account_id AND tenant_id = ?) AS last_refreshed
         FROM players p
         WHERE p.is_self = 1 AND p.tenant_id = ?
-        UNION
-        SELECT q.account_id, q.name,
+        UNION ALL
+        SELECT q.account_id, q.name, 0 AS is_self,
                (SELECT MAX(last_refreshed) FROM player_lifetime
                 WHERE account_id = q.account_id AND tenant_id = ?) AS last_refreshed
         FROM qualified_co_players q
@@ -292,7 +301,8 @@ def refresh_lifetimes(conn, tenant_id: int, client, min_matches: int = 5,
     refreshed = 0
     errors = []
     for r in rows:
-        if not _is_stale(r["last_refreshed"]):
+        max_age = SELF_LIFETIME_MAX_AGE_HOURS if r["is_self"] else 24
+        if not _is_stale(r["last_refreshed"], max_age_hours=max_age):
             continue
         if refreshed >= max_per_tick:
             break
