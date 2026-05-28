@@ -50,11 +50,20 @@
                      value="{{ sw.default }}"
                      placeholder="{{ sw.placeholder or '' }}">
             {% else %}
-              {# range/number: numeric input #}
+              {# range/number: numeric input + preset-Buttons #}
               <input type="number" class="sw-input"
                      value="{{ sw.default }}"
                      {% if sw.min is defined %}min="{{ sw.min }}"{% endif %}
                      {% if sw.max is defined %}max="{{ sw.max }}"{% endif %}>
+              {% set lo = sw.min|default(0)|int %}
+              {% set hi = sw.max|default(100)|int %}
+              {% set presets = [] %}
+              {% for cand in [1, 2, 5, 10, 20, 50, 100, 500, 1000, 5000, 10000, 60000] %}
+                {% if cand >= lo and cand <= hi %}{% set _ = presets.append(cand) %}{% endif %}
+              {% endfor %}
+              {% for p in presets %}
+              <button type="button" class="sw-btn sw-preset{% if p|string == sw.default %} active{% endif %}" data-value="{{ p }}">{{ p }}</button>
+              {% endfor %}
             {% endif %}
           </div>
           {% endfor %}
@@ -179,15 +188,27 @@
     function refresh() { urlEl.textContent = buildUrl(block); }
 
     block.querySelectorAll(".sw-group").forEach(group => {
+      const numInput = group.querySelector("input[type=number]");
       group.querySelectorAll(".sw-btn").forEach(btn => {
         btn.addEventListener("click", () => {
           group.querySelectorAll(".sw-btn").forEach(b => b.classList.remove("active"));
           btn.classList.add("active");
+          // Preset für numeric input: setze auch den Input-Wert
+          if (numInput && btn.classList.contains("sw-preset")) {
+            numInput.value = btn.dataset.value;
+          }
           refresh();
         });
       });
       group.querySelectorAll(".sw-input").forEach(inp => {
-        inp.addEventListener("input", refresh);
+        inp.addEventListener("input", () => {
+          // Bei manueller Eingabe: alle Preset-Buttons deaktivieren, dann
+          // den passenden re-aktivieren falls die Eingabe einem Preset matched.
+          group.querySelectorAll(".sw-preset").forEach(b => b.classList.remove("active"));
+          const match = group.querySelector(`.sw-preset[data-value="${inp.value}"]`);
+          if (match) match.classList.add("active");
+          refresh();
+        });
       });
     });
 

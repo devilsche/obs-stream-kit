@@ -160,6 +160,15 @@
       { key: "compact", label: "Compact", type: "select", default: "0",
         options: [["0","Normal"],["1","Compact"]],
         tooltip: "Compact mode: tighter stat display with less whitespace." },
+      { key: "hideMates", label: "Hide Mates panel", type: "select", default: "0",
+        options: [["0","Show"],["1","Hide"]],
+        tooltip: "Hides the Top-Mates panel." },
+      { key: "hideSurvival", label: "Hide Survival panel", type: "select", default: "0",
+        options: [["0","Show"],["1","Hide"]],
+        tooltip: "Hides the Survival/Map panel." },
+      { key: "hideFF", label: "Hide First-Fight panel", type: "select", default: "0",
+        options: [["0","Show"],["1","Hide"]],
+        tooltip: "Hides the First-Fight-Rate panel." },
     ]);
 
     // Filter-Bar oben ist Single Source of Truth — Werte aus URL-Param,
