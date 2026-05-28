@@ -170,7 +170,7 @@ class SteamEndpointRegistry:
                 SELECT s.app_id, s.schema_json
                 FROM steam_app_schema s
                 LEFT JOIN steam_app_schema_lang l
-                  ON l.app_id = s.app_id AND l.lang = %s
+                  ON l.app_id = s.app_id AND l.lang = ?
                 WHERE s.schema_json IS NOT NULL
                   AND s.schema_json != '{}'
                   AND l.app_id IS NULL
@@ -516,8 +516,8 @@ class SteamEndpointRegistry:
                            ad.is_coop, ad.is_multiplayer, ad.category_ids
                     FROM steam_owned_games og
                     LEFT JOIN steam_app_details ad ON ad.app_id = og.app_id
-                    WHERE og.tenant_id = %s AND og.steam_id = %s
-                      AND og.app_id = %s
+                    WHERE og.tenant_id = ? AND og.steam_id = ?
+                      AND og.app_id = ?
                 """, (self.tenant_id, self.client.steam_id,
                       app_id)).fetchone()
 
@@ -1420,12 +1420,12 @@ class SteamEndpointRegistry:
                        sch.game_name, sch.global_pct_json
                 FROM steam_achievements_seen s
                 LEFT JOIN steam_app_schema sch ON sch.app_id = s.app_id
-                WHERE s.tenant_id = %s AND s.steam_id = %s
+                WHERE s.tenant_id = ? AND s.steam_id = ?
                   AND s.app_id >= 0
             """
             params = [self.tenant_id, self.client.steam_id]
             if app_id is not None:
-                sql += " AND s.app_id = %s"
+                sql += " AND s.app_id = ?"
                 params.append(app_id)
             sql += (" ORDER BY LOWER(sch.game_name) ASC, "
                     "s.unlocked_at DESC LIMIT %s")
@@ -1549,16 +1549,16 @@ class SteamEndpointRegistry:
             sql = """
                 SELECT s.app_id, s.achievement_api_name
                 FROM steam_achievements_seen s
-                WHERE s.tenant_id = %s
-                  AND s.steam_id = %s
+                WHERE s.tenant_id = ?
+                  AND s.steam_id = ?
                   AND s.app_id >= 0
             """
             params = [self.tenant_id, self.client.steam_id]
             if app_id is not None:
-                sql += " AND s.app_id = %s"
+                sql += " AND s.app_id = ?"
                 params.append(app_id)
             if api_name_filter:
-                sql += " AND s.achievement_api_name = %s"
+                sql += " AND s.achievement_api_name = ?"
                 params.append(api_name_filter)
             sql += " ORDER BY s.unlocked_at DESC LIMIT %s"
             params.append(limit * 3 if only_rare else limit)
