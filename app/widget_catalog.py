@@ -60,22 +60,14 @@ WIDGET_META = [
 ]
 
 
-_BUILD_FILTER_RE = re.compile(r"buildFilter\(\s*\[(.*?)\]\s*\)\s*;", re.DOTALL)
-_ITEM_RE = re.compile(
-    r"\{\s*"
-    r"key:\s*\"(?P<key>[^\"]+)\"\s*,\s*"
-    r"label:\s*\"(?P<label>[^\"]+)\"\s*,\s*"
-    r"type:\s*\"(?P<type>[^\"]+)\"\s*,\s*"
-    r"default:\s*(?P<default>(?:\"[^\"]*\"|[^,\}\n]+))"
-    r"(?P<rest>(?:[^{}]|\{[^{}]*\})*)\}",
-    re.DOTALL,
-)
-_OPTIONS_RE = re.compile(r"options:\s*\[(?P<body>.+?)\]\s*(?:,|\})", re.DOTALL)
-_OPTION_PAIR_RE = re.compile(r"\[\s*\"([^\"]+)\"\s*,\s*\"([^\"]+)\"\s*\]")
+_BUILD_FILTER_RE = re.compile(r"buildFilter\(\s*\[", re.DOTALL)
+_KEY_RE = re.compile(r"key:\s*\"(?P<v>[^\"]+)\"")
+_LABEL_RE = re.compile(r"label:\s*\"(?P<v>[^\"]+)\"")
+_TYPE_RE = re.compile(r"type:\s*\"(?P<v>[^\"]+)\"")
+_DEFAULT_RE = re.compile(r"default:\s*(?P<v>\"[^\"]*\"|[^,\n}]+)")
+_PLACEHOLDER_RE = re.compile(r"placeholder:\s*\"(?P<v>[^\"]*)\"")
 _NUM_FIELD_RE = re.compile(r"\b(min|max|step):\s*(\d+(?:\.\d+)?)")
-# tooltip kann multi-line + JS-string-concat sein:
-#   tooltip: "Welche Metrik …" +
-#            "Bei 'Worst K/D' …"
+_OPTION_PAIR_RE = re.compile(r"\[\s*\"([^\"]+)\"\s*,\s*\"([^\"]+)\"\s*\]")
 _TOOLTIP_RE = re.compile(
     r"tooltip:\s*((?:\"(?:[^\"\\]|\\.)*\"\s*\+\s*)*\"(?:[^\"\\]|\\.)*\")",
     re.DOTALL,
@@ -83,34 +75,115 @@ _TOOLTIP_RE = re.compile(
 _STRING_PIECE_RE = re.compile(r"\"((?:[^\"\\]|\\.)*)\"")
 
 
+def _split_top_level(body: str, sep: str = ",") -> list:
+    """Split string at `sep` only on top level — ignores commas inside
+    nested {}, []. Used to break `buildFilter`-array into per-item chunks
+    and item-body into key-value chunks."""
+    out, depth, start = [], 0, 0
+    for i, ch in enumerate(body):
+        if ch in "{[":
+            depth += 1
+        elif ch in "}]":
+            depth -= 1
+        elif ch == sep and depth == 0:
+            out.append(body[start:i])
+            start = i + 1
+    tail = body[start:]
+    if tail.strip():
+        out.append(tail)
+    return out
+
+
+def _find_array_body(text: str, start: int) -> tuple:
+    """Find balanced [..] starting at `text[start]==`'['. Returns (body, end_index)."""
+    assert text[start] == "["
+    depth = 0
+    i = start
+    while i < len(text):
+        ch = text[i]
+        if ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth -= 1
+            if depth == 0:
+                return text[start + 1:i], i + 1
+        i += 1
+    raise ValueError("unbalanced [")
+
+
+def _extract_options(rest: str) -> Optional[list]:
+    idx = rest.find("options:")
+    if idx < 0:
+        return None
+    # Find first `[` after "options:"
+    bracket = rest.find("[", idx)
+    if bracket < 0:
+        return None
+    try:
+        body, _ = _find_array_body(rest, bracket)
+    except ValueError:
+        return None
+    return [(p.group(1), p.group(2)) for p in _OPTION_PAIR_RE.finditer(body)]
+
+
+from typing import Tuple
+
+
 def _extract_schema_from_html(content: str) -> list:
     m = _BUILD_FILTER_RE.search(content)
     if not m:
         return []
-    block = m.group(1)
+    # Find balanced [..] for the outer array
+    start = m.end() - 1  # points at the `[`
+    try:
+        block, _ = _find_array_body(content, start)
+    except ValueError:
+        return []
+    # Split into per-{...}-item chunks
     items = []
-    for itm in _ITEM_RE.finditer(block):
+    depth, item_start = 0, None
+    for i, ch in enumerate(block):
+        if ch == "{":
+            if depth == 0:
+                item_start = i + 1
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0 and item_start is not None:
+                items.append(block[item_start:i])
+                item_start = None
+
+    out = []
+    for body in items:
+        key_m = _KEY_RE.search(body)
+        type_m = _TYPE_RE.search(body)
+        label_m = _LABEL_RE.search(body)
+        if not (key_m and type_m and label_m):
+            continue
         entry = {
-            "key": itm.group("key"),
-            "label": itm.group("label"),
-            "type": itm.group("type"),
-            "default": itm.group("default").strip().strip("\""),
+            "key": key_m.group("v"),
+            "label": label_m.group("v"),
+            "type": type_m.group("v"),
         }
-        rest = itm.group("rest") or ""
-        opt_m = _OPTIONS_RE.search(rest)
-        if opt_m:
-            opts = []
-            for p in _OPTION_PAIR_RE.finditer(opt_m.group("body")):
-                opts.append([p.group(1), p.group(2)])
+        def_m = _DEFAULT_RE.search(body)
+        if def_m:
+            entry["default"] = def_m.group("v").strip().strip("\"")
+        else:
+            entry["default"] = ""
+        ph_m = _PLACEHOLDER_RE.search(body)
+        if ph_m:
+            entry["placeholder"] = ph_m.group("v")
+        opts = _extract_options(body)
+        if opts is not None:
             entry["options"] = opts
-        for nm in _NUM_FIELD_RE.finditer(rest):
+        for nm in _NUM_FIELD_RE.finditer(body):
             entry[nm.group(1)] = float(nm.group(2)) if "." in nm.group(2) else int(nm.group(2))
-        tt_m = _TOOLTIP_RE.search(rest)
+        tt_m = _TOOLTIP_RE.search(body)
         if tt_m:
             pieces = [p.group(1) for p in _STRING_PIECE_RE.finditer(tt_m.group(1))]
             entry["tooltip"] = "".join(pieces).strip()
-        items.append(entry)
-    return items
+        out.append(entry)
+    return out
 
 
 _cache: Optional[list] = None

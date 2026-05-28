@@ -45,6 +45,10 @@
               {% for value, vlabel in sw.options %}
               <button type="button" class="sw-btn{% if value == sw.default %} active{% endif %}" data-value="{{ value }}">{{ vlabel }}</button>
               {% endfor %}
+            {% elif sw.type == "text" %}
+              <input type="text" class="sw-input" style="width: 200px;"
+                     value="{{ sw.default }}"
+                     placeholder="{{ sw.placeholder or '' }}">
             {% else %}
               {# range/number: numeric input #}
               <input type="number" class="sw-input"
