@@ -43,6 +43,10 @@ PUBG_TABLES = [
     ("pubg_achievements_seen",
      ["achievement_id","match_id","label","icon","played_at","detected_at",
       "displayed_at","is_rare"]),
+    ("telemetry_events",
+     ["match_id","event_type","timestamp_ms","actor_account","target_account",
+      "actor_x","actor_y","actor_z","actor_health",
+      "victim_x","victim_y","weapon","distance","damage","payload_json"]),
 ]
 
 STEAM_PER_TENANT_TABLES = [
