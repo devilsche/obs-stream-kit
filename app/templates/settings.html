@@ -7,19 +7,19 @@
     <div class="topbar"><div class="greeting">Settings</div></div>
 
     {% if saved %}
-    <div class="card" style="border-color: var(--success); color: var(--success);">✓ Gespeichert</div>
+    <div class="card" style="border-color: var(--success); color: var(--success);">✓ Saved</div>
     {% endif %}
 
     <form method="POST" class="card">
       <h3>PUBG</h3>
       <div class="form-row">
-        <label>Spielername</label>
-        <input name="pubg_name" value="{{ creds.pubg_name or '' }}" placeholder="z.B. LuCKoR">
+        <label>In-game name</label>
+        <input name="pubg_name" value="{{ creds.pubg_name or '' }}" placeholder="e.g. PEX_LuCKoR">
       </div>
       <div class="form-row">
-        <label>Plattform</label>
+        <label>Platform</label>
         <select name="pubg_platform">
-          <option value="">— wähle —</option>
+          <option value="">— pick one —</option>
           <option value="steam" {% if creds.pubg_platform == 'steam' %}selected{% endif %}>Steam</option>
           <option value="kakao" {% if creds.pubg_platform == 'kakao' %}selected{% endif %}>Kakao</option>
           <option value="psn" {% if creds.pubg_platform == 'psn' %}selected{% endif %}>PlayStation</option>
@@ -27,21 +27,21 @@
         </select>
       </div>
       <div class="form-row">
-        <label>API-Key</label>
-        <input name="pubg_api_key" type="password" placeholder="{% if creds.pubg_api_key %}(gespeichert — leer lassen zum behalten){% else %}aus developer.pubg.com{% endif %}">
+        <label>API key</label>
+        <input name="pubg_api_key" type="password" placeholder="{% if creds.pubg_api_key %}(stored — leave blank to keep){% else %}from developer.pubg.com{% endif %}">
       </div>
 
       <h3 style="margin-top: 24px;">Steam</h3>
       <div class="form-row">
-        <label>Steam-ID (Steam64)</label>
+        <label>Steam ID (Steam64)</label>
         <input name="steam_id" value="{{ creds.steam_id or '' }}" placeholder="76561198...">
       </div>
       <div class="form-row">
-        <label>API-Key</label>
-        <input name="steam_api_key" type="password" placeholder="{% if creds.steam_api_key %}(gespeichert — leer lassen zum behalten){% else %}aus steamcommunity.com/dev{% endif %}">
+        <label>API key</label>
+        <input name="steam_api_key" type="password" placeholder="{% if creds.steam_api_key %}(stored — leave blank to keep){% else %}from steamcommunity.com/dev{% endif %}">
       </div>
 
-      <button class="btn" type="submit">Speichern</button>
+      <button class="btn" type="submit">Save</button>
     </form>
   </main>
 </div>

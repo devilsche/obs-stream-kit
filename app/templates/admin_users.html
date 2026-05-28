@@ -1,20 +1,20 @@
 {% extends "base.html" %}
-{% block title %}User-Approval — OBS Stream Kit{% endblock %}
+{% block title %}User approval — OBS Stream Kit{% endblock %}
 {% block body %}
 <div class="layout">
   {% include "_sidebar.html" %}
   <main class="main">
-    <div class="topbar"><div class="greeting">User-Approval</div></div>
+    <div class="topbar"><div class="greeting">User approval</div></div>
     <div class="card">
       <table class="users">
         <thead>
           <tr>
             <th>Avatar</th>
-            <th>Display-Name</th>
-            <th>Twitch-ID</th>
-            <th>Registriert</th>
+            <th>Display name</th>
+            <th>Twitch ID</th>
+            <th>Registered</th>
             <th>Status</th>
-            <th>Aktion</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -26,23 +26,23 @@
             <td style="color: var(--text-dim); font-size: 12px;">{{ u.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
             <td>
               {% if u.is_approved %}
-              <span style="color: var(--success);">✓ Aktiv</span>
+              <span style="color: var(--success);">✓ Active</span>
               {% else %}
-              <span style="color: var(--warning);">⏳ Wartend</span>
+              <span style="color: var(--warning);">⏳ Pending</span>
               {% endif %}
             </td>
             <td>
               {% if not u.is_admin %}
                 {% if not u.is_approved %}
                 <form method="POST" action="/admin/users/{{ u.id }}/approve" style="display:inline">
-                  <button type="submit" class="btn btn-sm btn-gold">✓ Freigeben</button>
+                  <button type="submit" class="btn btn-sm btn-gold">✓ Approve</button>
                 </form>
                 <form method="POST" action="/admin/users/{{ u.id }}/deny" style="display:inline">
-                  <button type="submit" class="btn btn-sm btn-danger">✗ Ablehnen</button>
+                  <button type="submit" class="btn btn-sm btn-danger">✗ Deny</button>
                 </form>
                 {% else %}
                 <form method="POST" action="/admin/users/{{ u.id }}/suspend" style="display:inline">
-                  <button type="submit" class="btn btn-sm btn-danger">🔒 Sperren</button>
+                  <button type="submit" class="btn btn-sm btn-danger">🔒 Suspend</button>
                 </form>
                 {% endif %}
               {% endif %}

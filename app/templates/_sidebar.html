@@ -6,13 +6,13 @@
   <nav>
     <a href="/app/" class="{% if request.path == '/app/' %}active{% endif %}">📊 Dashboard</a>
     <a href="/app/settings" class="{% if request.path.startswith('/app/settings') %}active{% endif %}">⚙️ Settings</a>
-    <a href="/app/urls" class="{% if request.path.startswith('/app/urls') %}active{% endif %}">🔗 OBS-URLs</a>
+    <a href="/app/urls" class="{% if request.path.startswith('/app/urls') %}active{% endif %}">🔗 OBS URLs</a>
     <a href="/app/logout">🚪 Logout</a>
     {% if user.is_admin %}
     <div class="admin-section">
       <div class="admin-label">Admin</div>
-      <a href="/admin/users" class="{% if request.path.startswith('/admin/users') %}active{% endif %}">👥 User-Approval</a>
-      <a href="/admin/" class="{% if request.path == '/admin/' %}active{% endif %}">📈 Admin-Home</a>
+      <a href="/admin/users" class="{% if request.path.startswith('/admin/users') %}active{% endif %}">👥 User approval</a>
+      <a href="/admin/" class="{% if request.path == '/admin/' %}active{% endif %}">📈 Admin home</a>
     </div>
     {% endif %}
   </nav>
