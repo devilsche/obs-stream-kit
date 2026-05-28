@@ -1,6 +1,10 @@
 -- Spec 2 Schema-Migration (additiv)
 -- Idempotent: kann mehrfach laufen.
 
+-- Search-Path setzen damit unqualifizierte Tabellen-Refs (users etc.)
+-- aufgeloest werden — sonst Fehler beim Ausfuehren als postgres-Superuser.
+SET search_path TO obs, public;
+
 -- pgcrypto fuer gen_random_uuid()
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
