@@ -23,12 +23,6 @@ from steam.db_pg import (
 import threading
 
 
-# Spec 1 Tenant-Migration: hardcodiert auf 1 (Owner-Tenant), wird in
-# Spec 2 entfernt sobald Session-basierte Auth den Tenant aus dem
-# Login-Context liefert.
-HARDCODED_TENANT_ID = 1
-
-
 def _json_default(o):
     # psycopg2 liefert NUMERIC/REAL als decimal.Decimal — JSON kennt das nicht
     import decimal
@@ -48,12 +42,13 @@ def _err(code, msg):
 class SteamEndpointRegistry:
     def __init__(self, client, db_connect_fn,
                  poller=None, cache_ttl_s: float = 10.0,
-                 root_dir: str = None):
+                 root_dir: str = None, tenant_id: int = None):
         self.client = client
         self.db_connect = db_connect_fn
         self.poller = poller
         self.cache_ttl_s = cache_ttl_s
         self.root_dir = root_dir or os.getcwd()
+        self.tenant_id = tenant_id
         self._cache = {}
         # Persistente Steam-Prefs aus data/steam-prefs.json — Sprache
         # darin ueberschreibt was im SteamClient kam (= .secrets-Wert).
@@ -322,7 +317,7 @@ class SteamEndpointRegistry:
             conn = self.db_connect()
             try:
                 # Playtime aus DB-Cache (Poller füllt das alle Stunde)
-                owned = get_owned_game(conn, HARDCODED_TENANT_ID,
+                owned = get_owned_game(conn, self.tenant_id,
                                         self.client.steam_id, game_id)
                 if owned:
                     playtime_total_min = owned["playtime_forever_min"]
@@ -334,7 +329,7 @@ class SteamEndpointRegistry:
                 schema = get_app_schema(conn, game_id)
                 if schema:
                     achievements_total = schema["achievement_count"]
-                progress = get_progress(conn, HARDCODED_TENANT_ID,
+                progress = get_progress(conn, self.tenant_id,
                                          self.client.steam_id, game_id)
                 if progress:
                     achievements_unlocked = progress["unlocked_count"]
@@ -448,7 +443,7 @@ class SteamEndpointRegistry:
         conn = self.db_connect()
         try:
             rows = get_owned_games_filtered(
-                conn, HARDCODED_TENANT_ID, self.client.steam_id,
+                conn, self.tenant_id, self.client.steam_id,
                 filter_kind=filter_kind, sort_by=sort_by,
                 min_playtime_min=min_playtime,
                 played_since_days=played_since_days, limit=limit)
@@ -523,7 +518,7 @@ class SteamEndpointRegistry:
                     LEFT JOIN steam_app_details ad ON ad.app_id = og.app_id
                     WHERE og.tenant_id = %s AND og.steam_id = %s
                       AND og.app_id = %s
-                """, (HARDCODED_TENANT_ID, self.client.steam_id,
+                """, (self.tenant_id, self.client.steam_id,
                       app_id)).fetchone()
 
                 if row:
@@ -596,7 +591,7 @@ class SteamEndpointRegistry:
         conn = self.db_connect()
         try:
             rows = get_undisplayed_unlocks(
-                conn, HARDCODED_TENANT_ID, self.client.steam_id, since_ts)
+                conn, self.tenant_id, self.client.steam_id, since_ts)
             unlocks = []
             # Aktive Server-Sprache fuer Display-Translation
             lang = (self.client.language or "").lower()
@@ -665,7 +660,7 @@ class SteamEndpointRegistry:
             marked_n = 0
             if mark and unlocks:
                 for u in unlocks:
-                    mark_displayed(conn, HARDCODED_TENANT_ID,
+                    mark_displayed(conn, self.tenant_id,
                                    self.client.steam_id,
                                    u["appId"], u["apiName"])
                     marked_n += 1
@@ -949,7 +944,7 @@ class SteamEndpointRegistry:
         try:
             since_ts = (int(time.time()) - since_days * 86400) if since_days else None
             rows = get_achievement_feed(
-                conn, HARDCODED_TENANT_ID, self.client.steam_id,
+                conn, self.tenant_id, self.client.steam_id,
                 limit, since_ts=since_ts)
             unlocks = []
             for r in rows:
@@ -1036,13 +1031,13 @@ class SteamEndpointRegistry:
             row = conn.execute("""
                 SELECT COUNT(*) AS n FROM steam_achievements_seen
                 WHERE tenant_id=%s AND steam_id=%s AND app_id=%s
-            """, (HARDCODED_TENANT_ID, self.client.steam_id,
+            """, (self.tenant_id, self.client.steam_id,
                   app_id)).fetchone()
             result["dbStoredCount"] = row["n"]
             prog = conn.execute("""
                 SELECT unlocked_count, last_checked FROM steam_app_progress
                 WHERE tenant_id=%s AND steam_id=%s AND app_id=%s
-            """, (HARDCODED_TENANT_ID, self.client.steam_id,
+            """, (self.tenant_id, self.client.steam_id,
                   app_id)).fetchone()
             result["dbProgress"] = (dict(prog) if prog else None)
         finally:
@@ -1072,7 +1067,7 @@ class SteamEndpointRegistry:
                   AND playtime_forever_min > 30
                 ORDER BY playtime_forever_min DESC
                 LIMIT %s
-            """, (HARDCODED_TENANT_ID, self.client.steam_id,
+            """, (self.tenant_id, self.client.steam_id,
                   limit)).fetchall()
         finally:
             conn.close()
@@ -1186,7 +1181,7 @@ class SteamEndpointRegistry:
         conn = self.db_connect()
         try:
             if qs.get("all") == "1":
-                n = mark_all_displayed(conn, HARDCODED_TENANT_ID,
+                n = mark_all_displayed(conn, self.tenant_id,
                                        self.client.steam_id)
             else:
                 cur = conn.execute("""
@@ -1194,7 +1189,7 @@ class SteamEndpointRegistry:
                     SET displayed_at = EXTRACT(EPOCH FROM now())::BIGINT
                     WHERE tenant_id=%s AND steam_id=%s
                       AND app_id=-1 AND displayed_at IS NULL
-                """, (HARDCODED_TENANT_ID, self.client.steam_id))
+                """, (self.tenant_id, self.client.steam_id))
                 n = cur.rowcount
             return _ok({"marked": n})
         finally:
@@ -1261,7 +1256,7 @@ class SteamEndpointRegistry:
                         SELECT app_id, name FROM steam_owned_games
                         WHERE tenant_id=%s AND steam_id=%s AND app_id >= 0
                         ORDER BY playtime_forever_min DESC
-                    """, (HARDCODED_TENANT_ID,
+                    """, (self.tenant_id,
                           self.client.steam_id)).fetchall()
                 finally:
                     conn.close()
@@ -1369,7 +1364,7 @@ class SteamEndpointRegistry:
                     unlock_ts = now_ts
                 meta = schema_lookup.get(api, {})
                 inserted = insert_unlock_if_new(
-                    conn, HARDCODED_TENANT_ID,
+                    conn, self.tenant_id,
                     self.client.steam_id, app_id,
                     api, unlock_ts,
                     display_name=meta.get("displayName") or api,
@@ -1378,7 +1373,7 @@ class SteamEndpointRegistry:
                     suppress_popup=suppress_popup)
                 if inserted:
                     new_unlocks += 1
-            upsert_progress(conn, HARDCODED_TENANT_ID,
+            upsert_progress(conn, self.tenant_id,
                             self.client.steam_id, app_id, unlocked_count)
             self._sync_progress["newUnlocks"] += new_unlocks
         finally:
@@ -1428,7 +1423,7 @@ class SteamEndpointRegistry:
                 WHERE s.tenant_id = %s AND s.steam_id = %s
                   AND s.app_id >= 0
             """
-            params = [HARDCODED_TENANT_ID, self.client.steam_id]
+            params = [self.tenant_id, self.client.steam_id]
             if app_id is not None:
                 sql += " AND s.app_id = %s"
                 params.append(app_id)
@@ -1558,7 +1553,7 @@ class SteamEndpointRegistry:
                   AND s.steam_id = %s
                   AND s.app_id >= 0
             """
-            params = [HARDCODED_TENANT_ID, self.client.steam_id]
+            params = [self.tenant_id, self.client.steam_id]
             if app_id is not None:
                 sql += " AND s.app_id = %s"
                 params.append(app_id)
@@ -1594,7 +1589,7 @@ class SteamEndpointRegistry:
                     SET displayed_at = NULL
                     WHERE tenant_id=%s AND steam_id=%s
                       AND app_id=%s AND achievement_api_name=%s
-                """, (HARDCODED_TENANT_ID, self.client.steam_id, ap, api))
+                """, (self.tenant_id, self.client.steam_id, ap, api))
                 n += cur.rowcount
             return _ok({
                 "reset": n,
@@ -1630,7 +1625,7 @@ class SteamEndpointRegistry:
                               achievement_count=0, schema_json="{}")
             api_name = f"test_{int(time.time() * 1000)}"
             inserted = insert_unlock_if_new(
-                conn, HARDCODED_TENANT_ID,
+                conn, self.tenant_id,
                 self.client.steam_id, -1, api_name,
                 int(time.time()),
                 display_name=title, description=desc, icon_url=icon)

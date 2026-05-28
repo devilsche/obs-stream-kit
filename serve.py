@@ -274,6 +274,9 @@ try:
                 cache=pubg_cache,
                 client=pubg_client_local,
                 poller_status=pubg_poller.status,
+                # TODO Spec-2 Task 10: tenant_id pro Request aus g.tenant_id
+                # statt hardcodiert hier. Aktuell Single-Tenant-Default = 1.
+                tenant_id=1,
             )
             PUBG_ENABLED = True
             print("  PUBG backend active  ✓")
@@ -325,7 +328,9 @@ try:
             client=steam_client,
             db_connect_fn=_conn_factory,
             poller=steam_poller,
-            root_dir=ROOT)
+            root_dir=ROOT,
+            # TODO Spec-2 Task 10: tenant_id pro Request setzen
+            tenant_id=1)
         STEAM_ENABLED = True
         print("  Steam backend active  ✓")
     else:

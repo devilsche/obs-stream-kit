@@ -21,6 +21,7 @@ def _registry(conn):
         cache=TTLCache(ttl_secs=30),
         client=MagicMock(),
         poller_status=lambda: {"polling": "ok"},
+        tenant_id=1,
     )
 
 

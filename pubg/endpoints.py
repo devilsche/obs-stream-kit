@@ -7,10 +7,6 @@ from urllib.parse import urlparse, parse_qs
 from pubg.db_pg import set_setting, get_setting
 from core.db_compat import SqliteCompatConn
 
-# Tenant-Scope: Spec 1 hardcoded auf 1. Wird in Spec 2 durch Session-Auth
-# ersetzt (Cookie/JWT -> tenant_id).
-HARDCODED_TENANT_ID = 1
-
 # ── Process-List-Check fuer PUBG (cross-platform) ─────────────────────────────
 # PUBG-Prozessname: 'TslGame.exe' (Windows) bzw. 'TslGame' (Linux/Mac via
 # Proton/Wine). Wird gecacht, damit ein hochfrequenter Endpoint-Aufruf
@@ -78,7 +74,7 @@ def _err(code, msg):
 
 class EndpointRegistry:
     def __init__(self, get_conn, my_account_id, platform, cache,
-                 client, poller_status):
+                 client, poller_status, tenant_id: int):
         # SqliteCompat-Wrapper damit der bestehende sqlite-Style-Code
         # (conn.execute(sql).fetchall()) auf psycopg2 weiterhin funktioniert.
         # Echte ?->%s Konvertierung erfolgt im Wrapper.
@@ -89,6 +85,7 @@ class EndpointRegistry:
         self.cache = cache
         self.client = client
         self.poller_status = poller_status
+        self.tenant_id = tenant_id
         self._replay_cache = {}  # match_id → fertiges Replay-Dict (Session-Memory)
 
     def dispatch(self, method: str, path: str, body: bytes, headers: dict):
@@ -238,7 +235,7 @@ class EndpointRegistry:
         conn = self.get_conn()
         row = conn.execute(
             "SELECT MAX(played_at) AS last FROM matches WHERE tenant_id = ?",
-            (HARDCODED_TENANT_ID,)
+            (self.tenant_id,)
         ).fetchone()
         last_iso = row["last"] if row else None
         age_min = None
@@ -268,14 +265,14 @@ class EndpointRegistry:
         range_key = (qs or {}).get("range", "session")
         return _ok(self.cache.get_or_compute(
             f"session:{range_key}",
-            lambda: compute_session_stats(conn, self.my_account_id, range_key),
+            lambda: compute_session_stats(conn, self.tenant_id, self.my_account_id, range_key),
         ))
 
     def _last_match(self):
         conn = self.get_conn()
         result = self.cache.get_or_compute(
             "last-match",
-            lambda: compute_last_match(conn, self.my_account_id),
+            lambda: compute_last_match(conn, self.tenant_id, self.my_account_id),
         )
         return _ok(result or {})
 
@@ -284,11 +281,11 @@ class EndpointRegistry:
         def _compute():
             first = (conn.execute(
                 "SELECT MIN(played_at) AS first FROM matches WHERE tenant_id = ?",
-                (HARDCODED_TENANT_ID,)
+                (self.tenant_id,)
             ).fetchone() or {})["first"]
             name_row = conn.execute(
                 "SELECT name FROM players WHERE tenant_id = ? AND account_id = ?",
-                (HARDCODED_TENANT_ID, self.my_account_id,)
+                (self.tenant_id, self.my_account_id,)
             ).fetchone()
             return {
                 "firstMatchAt": first,
@@ -301,7 +298,7 @@ class EndpointRegistry:
         range_key = qs.get("range", "session")
         return _ok(self.cache.get_or_compute(
             f"lobby-avg-kd:{range_key}",
-            lambda: compute_lobby_avg_kd(conn, self.my_account_id, range_key),
+            lambda: compute_lobby_avg_kd(conn, self.tenant_id, self.my_account_id, range_key),
         ))
 
     def _squad_kd(self, qs):
@@ -309,7 +306,7 @@ class EndpointRegistry:
         range_key = qs.get("range", "session")
         return _ok(self.cache.get_or_compute(
             f"squad-kd:{range_key}",
-            lambda: compute_squad_kd(conn, self.my_account_id, range_key),
+            lambda: compute_squad_kd(conn, self.tenant_id, self.my_account_id, range_key),
         ))
 
     def _lobby_top3_kd(self, qs):
@@ -317,7 +314,7 @@ class EndpointRegistry:
         range_key = qs.get("range", "session")
         return _ok(self.cache.get_or_compute(
             f"lobby-top3-kd:{range_key}",
-            lambda: compute_lobby_top3_kd(conn, self.my_account_id, range_key),
+            lambda: compute_lobby_top3_kd(conn, self.tenant_id, self.my_account_id, range_key),
         ))
 
     def _streaks(self, qs):
@@ -325,7 +322,7 @@ class EndpointRegistry:
         range_key = qs.get("range", "session")
         return _ok(self.cache.get_or_compute(
             f"streaks:{range_key}",
-            lambda: compute_streaks(conn, self.my_account_id, range_key),
+            lambda: compute_streaks(conn, self.tenant_id, self.my_account_id, range_key),
         ))
 
     def _trend_deltas(self, qs):
@@ -335,7 +332,7 @@ class EndpointRegistry:
         cache_key = f"trend-deltas:{from_iso or ''}:{to_iso or ''}"
         return _ok(self.cache.get_or_compute(
             cache_key,
-            lambda: compute_trend_deltas(conn, self.my_account_id,
+            lambda: compute_trend_deltas(conn, self.tenant_id, self.my_account_id,
                                           from_iso=from_iso, to_iso=to_iso),
         ))
 
@@ -348,7 +345,7 @@ class EndpointRegistry:
         return _ok(self.cache.get_or_compute(
             cache_key,
             lambda: compute_session_matches(
-                conn, self.my_account_id, range_key,
+                conn, self.tenant_id, self.my_account_id, range_key,
                 from_iso=from_iso, to_iso=to_iso),
         ))
 
@@ -370,7 +367,7 @@ class EndpointRegistry:
         conn = self.get_conn()
         map_filter = (qs.get("map") or "").strip()
         all_landings = qs.get("all") == "1"
-        params = [self.my_account_id, HARDCODED_TENANT_ID]
+        params = [self.my_account_id, self.tenant_id]
         where = ""
         if map_filter:
             where = "AND m.map_name = ?"
@@ -452,7 +449,7 @@ class EndpointRegistry:
                 LEFT JOIN players p ON p.account_id = te.actor_account AND p.tenant_id = te.tenant_id
                 WHERE te.tenant_id = ? AND te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
                   {where}
-            """, [HARDCODED_TENANT_ID, HARDCODED_TENANT_ID, HARDCODED_TENANT_ID] + params).fetchall()
+            """, [self.tenant_id, self.tenant_id, self.tenant_id] + params).fetchall()
         landings = [{
             "matchId":    r["match_id"],
             "playedAt":   r["played_at"],
@@ -473,7 +470,7 @@ class EndpointRegistry:
         rows = conn.execute(
             "SELECT account_id, name FROM players "
             "WHERE tenant_id = ? AND name LIKE ? ORDER BY name LIMIT 20",
-            (HARDCODED_TENANT_ID, f"%{q}%",)).fetchall()
+            (self.tenant_id, f"%{q}%",)).fetchall()
         return _ok([{"accountId": r["account_id"], "name": r["name"]}
                     for r in rows if r["name"]])
 
@@ -490,7 +487,7 @@ class EndpointRegistry:
         alias = "Baltic_Main" if map_name == "Erangel_Main" else map_name
         blob = pois.get(alias) or pois.get(map_name) or {"mapKm": 8, "regions": []}
         result = compute_landing_spots(
-            conn, map_name, accs, pois_blob=blob, route_filter=route_filter)
+            conn, self.tenant_id, map_name, accs, pois_blob=blob, route_filter=route_filter)
         return _ok(result)
 
     POIS_FILE = "data/pubg-pois.json"
@@ -595,7 +592,7 @@ class EndpointRegistry:
         cache_key = f"payday-stats:{range_key}:{from_iso or ''}:{to_iso or ''}"
         return _ok(self.cache.get_or_compute(
             cache_key,
-            lambda: compute_payday_stats(conn, self.my_account_id,
+            lambda: compute_payday_stats(conn, self.tenant_id, self.my_account_id,
                                          range_key,
                                          from_iso=from_iso, to_iso=to_iso),
         ))
@@ -607,7 +604,7 @@ class EndpointRegistry:
             return _err(400, "matchId required")
         data = self.cache.get_or_compute(
             f"match-detail:{match_id}",
-            lambda: compute_match_detail(conn, self.my_account_id, match_id))
+            lambda: compute_match_detail(conn, self.tenant_id, self.my_account_id, match_id))
         if not data:
             return _err(404, "match not found")
         return _ok(data)
@@ -628,7 +625,7 @@ class EndpointRegistry:
             WHERE m.tenant_id = ?
             ORDER BY m.played_at DESC
             LIMIT ?
-        """, (self.my_account_id, HARDCODED_TENANT_ID, limit)).fetchall()
+        """, (self.my_account_id, self.tenant_id, limit)).fetchall()
         return _ok([{
             "matchId":  r["match_id"],
             "playedAt": r["played_at"],
@@ -653,7 +650,7 @@ class EndpointRegistry:
         conn = self.get_conn()
         m_row = conn.execute(
             "SELECT map_name FROM matches WHERE tenant_id = ? AND match_id = ?",
-            (HARDCODED_TENANT_ID, match_id,)).fetchone()
+            (self.tenant_id, match_id,)).fetchone()
         if not m_row:
             return _err(404, "match not found")
         map_name = m_row["map_name"]
@@ -672,11 +669,11 @@ class EndpointRegistry:
             return _err(404, "no telemetry available for this match")
 
         # Team-Mapping + Namen
-        team_mapping = get_team_mapping_for_match(conn.raw, HARDCODED_TENANT_ID, match_id)
+        team_mapping = get_team_mapping_for_match(conn.raw, self.tenant_id, match_id)
         names = {}
         rows = conn.execute(
             "SELECT account_id, name FROM players WHERE tenant_id = ?",
-            (HARDCODED_TENANT_ID,)).fetchall()
+            (self.tenant_id,)).fetchall()
         for r in rows:
             names[r["account_id"]] = r["name"]
         # Fehlende Namen aus dem Raw-Blob nachziehen
@@ -687,7 +684,7 @@ class EndpointRegistry:
             raw, match_id, map_name, mapKm, team_mapping, names)
         # Hero-Account + Team (eigener Spieler, is_self=1 in DB)
         from pubg.db_pg import get_self_player
-        self_row = get_self_player(conn.raw, HARDCODED_TENANT_ID)
+        self_row = get_self_player(conn.raw, self.tenant_id)
         if self_row:
             hero_acc = self_row["account_id"]
             result["heroAccountId"] = hero_acc
@@ -707,7 +704,7 @@ class EndpointRegistry:
             row = conn.execute(
                 "SELECT account_id, name FROM players "
                 "WHERE tenant_id = ? AND (name = ? OR account_id = ?) LIMIT 1",
-                (HARDCODED_TENANT_ID, player, player)).fetchone()
+                (self.tenant_id, player, player)).fetchone()
             if row:
                 actor_account = row["account_id"]
                 actor_name    = row["name"]
@@ -718,7 +715,7 @@ class EndpointRegistry:
         rows = self.cache.get_or_compute(
             cache_key,
             lambda: compute_weapon_stats(
-                conn, self.my_account_id, range_key,
+                conn, self.tenant_id, self.my_account_id, range_key,
                 from_iso=from_iso, to_iso=to_iso,
                 actor_account=actor_account),
         )
@@ -742,7 +739,7 @@ class EndpointRegistry:
         rows = self.cache.get_or_compute(
             cache_key,
             lambda: compute_vehicle_stats(
-                conn, self.my_account_id, range_key,
+                conn, self.tenant_id, self.my_account_id, range_key,
                 from_iso=from_iso, to_iso=to_iso),
         )
         return _ok({"members": rows, "count": len(rows)})
@@ -758,14 +755,14 @@ class EndpointRegistry:
         if from_iso:
             cutoff = from_iso
             end_filter = " AND m.played_at <= ?" if to_iso else ""
-            params = [HARDCODED_TENANT_ID, self.my_account_id, cutoff]
+            params = [self.tenant_id, self.my_account_id, cutoff]
             if to_iso:
                 params.append(to_iso)
         else:
             cutoff = (_range_filter(conn, range_key)
                       if range_key != "all" else "1970-01-01T00:00:00Z")
             end_filter = ""
-            params = [HARDCODED_TENANT_ID, self.my_account_id, cutoff]
+            params = [self.tenant_id, self.my_account_id, cutoff]
         br_sql, br_params = _br_filter("m")
         params += br_params
         matches = conn.execute(f"""
@@ -786,30 +783,30 @@ class EndpointRegistry:
                 "FROM match_team_mapping mtm "
                 "LEFT JOIN players p ON p.account_id = mtm.account_id AND p.tenant_id = mtm.tenant_id "
                 "WHERE mtm.tenant_id = ? AND mtm.match_id = ? AND mtm.team_id = ?",
-                (HARDCODED_TENANT_ID, mid, team)).fetchall()]
+                (self.tenant_id, mid, team)).fetchall()]
             squad_names = [r["name"] for r in conn.execute(
                 "SELECT p.name FROM match_team_mapping mtm "
                 "LEFT JOIN players p ON p.account_id = mtm.account_id AND p.tenant_id = mtm.tenant_id "
                 "WHERE mtm.tenant_id = ? AND mtm.match_id = ? AND mtm.team_id = ?",
-                (HARDCODED_TENANT_ID, mid, team)).fetchall() if r["name"]]
+                (self.tenant_id, mid, team)).fetchall() if r["name"]]
             qsph = ",".join("?" * len(squad)) if squad else "''"
             # fetchone()[0] -> fetchone()["count"] (RealDictCursor)
             ev_squad = (conn.execute(
                 f"SELECT COUNT(*) AS c FROM telemetry_events WHERE tenant_id=? AND match_id=? "
                 f"AND event_type='VehicleEnter' AND actor_account IN ({qsph})",
-                [HARDCODED_TENANT_ID, mid] + squad).fetchone() or {}).get("c", 0)
+                [self.tenant_id, mid] + squad).fetchone() or {}).get("c", 0)
             ev_enemy = (conn.execute(
                 f"SELECT COUNT(*) AS c FROM telemetry_events WHERE tenant_id=? AND match_id=? "
                 f"AND event_type='VehicleEnter' AND actor_account NOT IN ({qsph})",
-                [HARDCODED_TENANT_ID, mid] + squad).fetchone() or {}).get("c", 0)
+                [self.tenant_id, mid] + squad).fetchone() or {}).get("c", 0)
             kills = (conn.execute(
                 f"SELECT COUNT(*) AS c FROM telemetry_events WHERE tenant_id=? AND match_id=? "
                 f"AND event_type='Kill' AND actor_account IN ({qsph})",
-                [HARDCODED_TENANT_ID, mid] + squad).fetchone() or {}).get("c", 0)
+                [self.tenant_id, mid] + squad).fetchone() or {}).get("c", 0)
             knocks = (conn.execute(
                 f"SELECT COUNT(*) AS c FROM telemetry_events WHERE tenant_id=? AND match_id=? "
                 f"AND event_type='Knock' AND actor_account IN ({qsph})",
-                [HARDCODED_TENANT_ID, mid] + squad).fetchone() or {}).get("c", 0)
+                [self.tenant_id, mid] + squad).fetchone() or {}).get("c", 0)
             out.append({
                 "matchId":      mid,
                 "playedAt":     m["played_at"],
@@ -822,7 +819,7 @@ class EndpointRegistry:
             })
         # Plus: gesamtes compute-Ergebnis fuer den Range
         stats = compute_vehicle_stats(
-            conn, self.my_account_id, range_key,
+            conn, self.tenant_id, self.my_account_id, range_key,
             from_iso=from_iso, to_iso=to_iso)
         return {
             "range": range_key, "from": from_iso, "to": to_iso,
@@ -844,7 +841,7 @@ class EndpointRegistry:
         ttl = 600 if range_key == "all" else None
         return _ok(self.cache.get_or_compute(
             cache_key,
-            lambda: compute_hot_drop(conn, self.my_account_id, range_key,
+            lambda: compute_hot_drop(conn, self.tenant_id, self.my_account_id, range_key,
                                       from_iso=from_iso, to_iso=to_iso),
             ttl=ttl,
         ))
@@ -857,7 +854,7 @@ class EndpointRegistry:
         items = self.cache.get_or_compute(
             cache_key,
             lambda: compute_session_achievements(
-                conn, self.my_account_id,
+                conn, self.tenant_id, self.my_account_id,
                 from_iso=from_iso, to_iso=to_iso),
         )
         # Enrich: PNG-Icon-URL, lokalisierter Canonical + Label fuer den Report.
@@ -1502,7 +1499,7 @@ class EndpointRegistry:
                 f"SELECT DISTINCT substr(played_at, 1, 10) AS d FROM matches "
                 f"WHERE tenant_id = ? AND played_at IS NOT NULL "
                 f"  AND game_mode IN ({br_ph})",
-                [HARDCODED_TENANT_ID] + list(BATTLE_ROYALE_MODES)
+                [self.tenant_id] + list(BATTLE_ROYALE_MODES)
             ).fetchall() if r["d"]
         })
         event_dates = sorted({
@@ -1510,7 +1507,7 @@ class EndpointRegistry:
                 f"SELECT DISTINCT substr(played_at, 1, 10) AS d FROM matches "
                 f"WHERE tenant_id = ? AND played_at IS NOT NULL "
                 f"  AND game_mode NOT IN ({br_ph})",
-                [HARDCODED_TENANT_ID] + list(BATTLE_ROYALE_MODES)
+                [self.tenant_id] + list(BATTLE_ROYALE_MODES)
             ).fetchall() if r["d"]
         })
         return br_dates, event_dates
@@ -1530,13 +1527,13 @@ class EndpointRegistry:
                 f"SELECT played_at AS p FROM matches "
                 f"WHERE tenant_id = ? AND played_at IS NOT NULL "
                 f"  AND game_mode IN ({br_ph})",
-                [HARDCODED_TENANT_ID] + list(BATTLE_ROYALE_MODES)).fetchall() if r["p"])
+                [self.tenant_id] + list(BATTLE_ROYALE_MODES)).fetchall() if r["p"])
         ev = sorted(
             r["p"] for r in conn.execute(
                 f"SELECT played_at AS p FROM matches "
                 f"WHERE tenant_id = ? AND played_at IS NOT NULL "
                 f"  AND game_mode NOT IN ({br_ph})",
-                [HARDCODED_TENANT_ID] + list(BATTLE_ROYALE_MODES)).fetchall() if r["p"])
+                [self.tenant_id] + list(BATTLE_ROYALE_MODES)).fetchall() if r["p"])
         return br, ev
 
     def _build_aid_match_tier_index(self, conn):
@@ -1547,7 +1544,7 @@ class EndpointRegistry:
             "SELECT achievement_id, label, played_at "
             "FROM pubg_achievements_seen "
             "WHERE tenant_id = ? AND played_at IS NOT NULL",
-            (HARDCODED_TENANT_ID,)
+            (self.tenant_id,)
         ).fetchall()
         per_aid = {}
         for r in rows:
@@ -1605,7 +1602,7 @@ class EndpointRegistry:
             "SELECT achievement_id, label, played_at "
             "FROM pubg_achievements_seen "
             "WHERE tenant_id = ? AND played_at IS NOT NULL",
-            (HARDCODED_TENANT_ID,)
+            (self.tenant_id,)
         ).fetchall()
         # (aid, date) -> max_tier
         per_pair = {}
@@ -1654,7 +1651,7 @@ class EndpointRegistry:
             FROM pubg_achievements_seen
             WHERE tenant_id = ? AND displayed_at IS NULL
             ORDER BY played_at ASC
-        """, (HARDCODED_TENANT_ID,)).fetchall()
+        """, (self.tenant_id,)).fetchall()
 
         # Snapshot-in-time-Pct: pro Item berechnen wie haeufig dieses
         # Milestone bis zum Zeitpunkt 'played_at' in deinen Sessions
@@ -1725,7 +1722,7 @@ class EndpointRegistry:
                 UPDATE pubg_achievements_seen
                 SET displayed_at = EXTRACT(EPOCH FROM NOW())::BIGINT
                 WHERE tenant_id = ? AND displayed_at IS NULL
-            """, (HARDCODED_TENANT_ID,))
+            """, (self.tenant_id,))
             conn.commit()
             marked_n = len(items)
         return _ok({"unlocks": items, "marked": marked_n})
@@ -1770,7 +1767,7 @@ class EndpointRegistry:
             LEFT JOIN matches m ON m.match_id = a.match_id AND m.tenant_id = a.tenant_id
             WHERE a.tenant_id = ?
             ORDER BY a.played_at ASC
-        """, (HARDCODED_TENANT_ID,)).fetchall()
+        """, (self.tenant_id,)).fetchall()
 
         # Kein Index-Aufbau mehr — Pcts kommen direkt aus DB-Spalten.
         per_aid_dates_tier  = {}  # nicht mehr genutzt
@@ -1839,7 +1836,7 @@ class EndpointRegistry:
         conn = self.get_conn()
         try:
             new_count = detect_and_store_session_achievements(
-                conn, self.my_account_id)
+                conn, self.tenant_id, self.my_account_id)
         except Exception as e:
             return _err(500, f"detect failed: {e}")
         # Cache invalidieren damit ein evtl. cached session-achievements
@@ -1866,7 +1863,7 @@ class EndpointRegistry:
         conn = self.get_conn()
         try:
             result = backfill_session_achievements(
-                conn, self.my_account_id,
+                conn, self.tenant_id, self.my_account_id,
                 gap_hours=gap_hours, suppress_popup=suppress)
         except Exception as e:
             return _err(500, f"backfill failed: {e}")
@@ -1891,7 +1888,7 @@ class EndpointRegistry:
             c.execute(
                 "UPDATE matches SET telemetry_schema = 0 "
                 "WHERE tenant_id = ? AND match_id = ?",
-                (HARDCODED_TENANT_ID, only_match,))
+                (self.tenant_id, only_match,))
             c.commit()
 
         def _run():
@@ -1926,7 +1923,7 @@ class EndpointRegistry:
             UPDATE pubg_achievements_seen
             SET displayed_at = NULL
             WHERE tenant_id = ? AND achievement_id = ? AND match_id = ?
-        """, (HARDCODED_TENANT_ID, aid, mid))
+        """, (self.tenant_id, aid, mid))
         conn.commit()
         return _ok({
             "reset": cur.rowcount,
@@ -1937,14 +1934,14 @@ class EndpointRegistry:
     def _session_reset(self):
         conn = self.get_conn()
         now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        set_setting(conn.raw, HARDCODED_TENANT_ID, "sessionStartedAt", now)
+        set_setting(conn.raw, self.tenant_id, "sessionStartedAt", now)
         self.cache.invalidate()
         return _ok({"sessionStartedAt": now})
 
     def _top_mates(self, qs):
         conn = self.get_conn()
-        default_sort = get_setting(conn.raw, HARDCODED_TENANT_ID, "topMatesSortBy", "mostPlayed")
-        default_min = int(get_setting(conn.raw, HARDCODED_TENANT_ID, "minMatchesForTopMates", "10"))
+        default_sort = get_setting(conn.raw, self.tenant_id, "topMatesSortBy", "mostPlayed")
+        default_min = int(get_setting(conn.raw, self.tenant_id, "minMatchesForTopMates", "10"))
         sort_by = qs.get("sortBy", default_sort)
         limit = int(qs.get("limit", 5))
         min_matches = int(qs.get("minMatches", default_min))
@@ -1954,7 +1951,7 @@ class EndpointRegistry:
         cache_key = f"top-mates:raw:{range_key or 'all'}"
         all_mates = self.cache.get_or_compute(
             cache_key,
-            lambda: compute_top_mates(conn, self.my_account_id,
+            lambda: compute_top_mates(conn, self.tenant_id, self.my_account_id,
                                        sort_by="mostPlayed",
                                        limit=10000, min_matches=1,
                                        range_key=range_key))
@@ -1977,7 +1974,7 @@ class EndpointRegistry:
         conn = self.get_conn()
         result = self.cache.get_or_compute(
             f"co-player:{name}",
-            lambda: compute_co_player(conn, self.my_account_id, name),
+            lambda: compute_co_player(conn, self.tenant_id, self.my_account_id, name),
         )
         return _ok(result)
 
@@ -1989,13 +1986,13 @@ class EndpointRegistry:
             row = conn.execute(
                 "SELECT * FROM player_lifetime "
                 "WHERE tenant_id = ? AND account_id = ? AND mode = ?",
-                (HARDCODED_TENANT_ID, self.my_account_id, mode)).fetchone()
+                (self.tenant_id, self.my_account_id, mode)).fetchone()
         else:
             row = conn.execute("""
                 SELECT pl.* FROM player_lifetime pl
                 JOIN players p ON p.account_id = pl.account_id AND p.tenant_id = pl.tenant_id
                 WHERE pl.tenant_id = ? AND (p.name = ? OR p.account_id = ?) AND pl.mode = ?
-            """, (HARDCODED_TENANT_ID, player, player, mode)).fetchone()
+            """, (self.tenant_id, player, player, mode)).fetchone()
         return _ok(dict(row) if row else {})
 
     def _season_stats(self, qs):
@@ -2009,7 +2006,7 @@ class EndpointRegistry:
         if not season:
             r = conn.execute(
                 "SELECT value FROM settings WHERE tenant_id = ? AND key='pubg.current_season_id'",
-                (HARDCODED_TENANT_ID,)
+                (self.tenant_id,)
             ).fetchone()
             season = r["value"] if r else None
         if not season:
@@ -2018,14 +2015,14 @@ class EndpointRegistry:
             row = conn.execute(
                 "SELECT * FROM player_season "
                 "WHERE tenant_id = ? AND account_id=? AND season_id=? AND mode=?",
-                (HARDCODED_TENANT_ID, self.my_account_id, season, mode)).fetchone()
+                (self.tenant_id, self.my_account_id, season, mode)).fetchone()
         else:
             row = conn.execute("""
                 SELECT ps.* FROM player_season ps
                 JOIN players p ON p.account_id = ps.account_id AND p.tenant_id = ps.tenant_id
                 WHERE ps.tenant_id = ? AND (p.name = ? OR p.account_id = ?)
                   AND ps.season_id = ? AND ps.mode = ?
-            """, (HARDCODED_TENANT_ID, player, player, season, mode)).fetchone()
+            """, (self.tenant_id, player, player, season, mode)).fetchone()
         result = dict(row) if row else {}
         if result:
             result["seasonId"] = season
@@ -2044,7 +2041,7 @@ class EndpointRegistry:
             r = conn.execute(
                 "SELECT account_id FROM players "
                 "WHERE tenant_id = ? AND (name=? OR account_id=?)",
-                (HARDCODED_TENANT_ID, player, player)).fetchone()
+                (self.tenant_id, player, player)).fetchone()
             if not r:
                 return _ok({"seasons": []})
             account_id = r["account_id"]
@@ -2052,7 +2049,7 @@ class EndpointRegistry:
             SELECT * FROM player_season
             WHERE tenant_id = ? AND account_id=? AND mode=?
             ORDER BY season_id ASC
-        """, (HARDCODED_TENANT_ID, account_id, mode)).fetchall()
+        """, (self.tenant_id, account_id, mode)).fetchall()
         return _ok({"seasons": [dict(r) for r in rows]})
 
     def _mates(self, qs):
@@ -2063,7 +2060,7 @@ class EndpointRegistry:
         key = f"mates:{range_key}:{min_matches}:{min_total}"
         return _ok(self.cache.get_or_compute(
             key,
-            lambda: compute_mates(conn, self.my_account_id,
+            lambda: compute_mates(conn, self.tenant_id, self.my_account_id,
                                          range_key, min_matches, min_total)))
 
     def _map_dist(self, qs):
@@ -2071,7 +2068,7 @@ class EndpointRegistry:
         conn = self.get_conn()
         return _ok(self.cache.get_or_compute(
             f"map:{range_key}",
-            lambda: compute_map_distribution(conn, self.my_account_id, range_key)))
+            lambda: compute_map_distribution(conn, self.tenant_id, self.my_account_id, range_key)))
 
     def _first_fight(self, qs):
         range_key = qs.get("range", "session")
@@ -2082,7 +2079,7 @@ class EndpointRegistry:
         return _ok(self.cache.get_or_compute(
             f"ff:{range_key}:eh{int(exclude_hot)}",
             lambda: compute_first_fight_rate(
-                conn, self.my_account_id, range_key,
+                conn, self.tenant_id, self.my_account_id, range_key,
                 exclude_hot_drop=exclude_hot)))
 
     def _first_fight_debug(self, qs):
@@ -2106,25 +2103,25 @@ class EndpointRegistry:
             JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
             WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?
             ORDER BY m.played_at DESC
-        """, (HARDCODED_TENANT_ID, self.my_account_id, cutoff)).fetchall()
+        """, (self.tenant_id, self.my_account_id, cutoff)).fetchall()
         out = []
         for m in matches:
             mid = m["match_id"]
             parts = conn.execute(
                 "SELECT account_id, team_id FROM participants "
                 "WHERE tenant_id = ? AND match_id = ?",
-                (HARDCODED_TENANT_ID, mid,)).fetchall()
+                (self.tenant_id, mid,)).fetchall()
             acc_to_team = {p["account_id"]: p["team_id"] for p in parts}
             my_team = acc_to_team.get(self.my_account_id)
             squad_ids = [a for a, t in acc_to_team.items() if t == my_team] if my_team else []
             kill_n = (conn.execute(
                 "SELECT COUNT(*) AS c FROM telemetry_events "
                 "WHERE tenant_id = ? AND match_id = ? AND event_type = 'Kill'",
-                (HARDCODED_TENANT_ID, mid,)).fetchone() or {}).get("c", 0)
+                (self.tenant_id, mid,)).fetchone() or {}).get("c", 0)
             knock_n = (conn.execute(
                 "SELECT COUNT(*) AS c FROM telemetry_events "
                 "WHERE tenant_id = ? AND match_id = ? AND event_type = 'Knock'",
-                (HARDCODED_TENANT_ID, mid,)).fetchone() or {}).get("c", 0)
+                (self.tenant_id, mid,)).fetchone() or {}).get("c", 0)
             squad_involved = 0
             if squad_ids:
                 placeholders = ",".join("?" * len(squad_ids))
@@ -2133,7 +2130,7 @@ class EndpointRegistry:
                         WHERE tenant_id = ? AND match_id = ? AND event_type IN ('Kill','Knock')
                           AND (actor_account IN ({placeholders})
                                OR target_account IN ({placeholders}))""",
-                    (HARDCODED_TENANT_ID, mid, *squad_ids, *squad_ids)).fetchone() or {}).get("c", 0)
+                    (self.tenant_id, mid, *squad_ids, *squad_ids)).fetchone() or {}).get("c", 0)
             try:
                 result = _detect_first_fight(conn, mid, self.my_account_id,
                                               30 * 1000, 200 * 100)
@@ -2154,7 +2151,7 @@ class EndpointRegistry:
                           AND (actor_account IN ({placeholders})
                                OR target_account IN ({placeholders}))
                         ORDER BY timestamp_ms ASC LIMIT 1""",
-                    (HARDCODED_TENANT_ID, mid, *squad_ids, *squad_ids)).fetchone()
+                    (self.tenant_id, mid, *squad_ids, *squad_ids)).fetchone()
                 if row:
                     first_event = {
                         "type": row["event_type"],
@@ -2171,7 +2168,7 @@ class EndpointRegistry:
                 WHERE tenant_id = ? AND match_id = ? AND event_type = 'Landing'
                   AND actor_account = ?
                 ORDER BY timestamp_ms ASC LIMIT 1
-            """, (HARDCODED_TENANT_ID, mid, self.my_account_id)).fetchone()
+            """, (self.tenant_id, mid, self.my_account_id)).fetchone()
             my_landing = None
             match_start_ms = None
             if my_landing_row and my_landing_row["actor_x"] is not None:
@@ -2199,7 +2196,7 @@ class EndpointRegistry:
                       AND (actor_account IN ({placeholders})
                            OR target_account IN ({placeholders}))
                     ORDER BY timestamp_ms ASC LIMIT 1
-                """, (HARDCODED_TENANT_ID, mid, *squad_ids, *squad_ids)).fetchone()
+                """, (self.tenant_id, mid, *squad_ids, *squad_ids)).fetchone()
                 if ff_row and match_start_ms:
                     first_fight_start_secs = round(
                         (ff_row["timestamp_ms"] - match_start_ms) / 1000.0, 1)
@@ -2216,7 +2213,7 @@ class EndpointRegistry:
                     WHERE tenant_id = ? AND match_id = ?
                       AND event_type = 'Landing'
                       AND actor_account IN ({placeholders})
-                """, (HARDCODED_TENANT_ID, mid, *squad_ids)).fetchall()
+                """, (self.tenant_id, mid, *squad_ids)).fetchall()
                 squad_landing_map = {r["actor_account"]: (r["actor_x"], r["actor_y"])
                                        for r in squad_landings
                                        if r["actor_x"] is not None}
@@ -2233,7 +2230,7 @@ class EndpointRegistry:
                       AND k.event_type = 'Kill'
                       AND k.target_account IN ({placeholders})
                     ORDER BY k.timestamp_ms ASC
-                """, (HARDCODED_TENANT_ID, mid, *squad_ids)).fetchall()
+                """, (self.tenant_id, mid, *squad_ids)).fetchall()
                 # Killer-Landung-Position holen (alle distinct killer)
                 killer_ids = list({r["killer"] for r in kill_rows if r["killer"]})
                 killer_landing_map = {}
@@ -2245,7 +2242,7 @@ class EndpointRegistry:
                         WHERE tenant_id = ? AND match_id = ?
                           AND event_type = 'Landing'
                           AND actor_account IN ({kphs})
-                    """, (HARDCODED_TENANT_ID, mid, *killer_ids)).fetchall()
+                    """, (self.tenant_id, mid, *killer_ids)).fetchall()
                     killer_landing_map = {r["actor_account"]: (r["actor_x"], r["actor_y"])
                                             for r in kls
                                             if r["actor_x"] is not None}
@@ -2254,7 +2251,7 @@ class EndpointRegistry:
                 victim_name_rows = conn.execute(f"""
                     SELECT account_id, name FROM participants
                     WHERE tenant_id = ? AND match_id = ? AND account_id IN ({placeholders})
-                """, (HARDCODED_TENANT_ID, mid, *squad_ids)).fetchall()
+                """, (self.tenant_id, mid, *squad_ids)).fetchall()
                 victim_name_map = {r["account_id"]: r["name"] for r in victim_name_rows}
                 # Distanzen berechnen
                 for r in kill_rows:
@@ -2318,7 +2315,7 @@ class EndpointRegistry:
         conn = self.get_conn()
         return _ok(self.cache.get_or_compute(
             f"chickens-together:{min_wins}:{min_matches}",
-            lambda: compute_chickens_together(conn, self.my_account_id,
+            lambda: compute_chickens_together(conn, self.tenant_id, self.my_account_id,
                                                min_wins, min_matches)))
 
     def _session_report(self, qs):
@@ -2328,13 +2325,13 @@ class EndpointRegistry:
         key = f"session-report:{rf or 'auto'}:{rt or 'now'}"
         return _ok(self.cache.get_or_compute(
             key,
-            lambda: compute_session_report(conn, self.my_account_id, rf, rt)))
+            lambda: compute_session_report(conn, self.tenant_id, self.my_account_id, rf, rt)))
 
     def _sessions_index(self):
         conn = self.get_conn()
         return _ok(self.cache.get_or_compute(
             "sessions-index",
-            lambda: compute_sessions_index(conn, self.my_account_id)))
+            lambda: compute_sessions_index(conn, self.tenant_id, self.my_account_id)))
 
     def _best_worst_map(self, qs):
         range_key = qs.get("range", "all")
@@ -2342,7 +2339,7 @@ class EndpointRegistry:
         conn = self.get_conn()
         return _ok(self.cache.get_or_compute(
             f"best-worst-map:{range_key}:{min_m}",
-            lambda: compute_best_worst_map(conn, self.my_account_id,
+            lambda: compute_best_worst_map(conn, self.tenant_id, self.my_account_id,
                                             range_key, min_m)))
 
     def _map_perf(self, qs):
@@ -2350,7 +2347,7 @@ class EndpointRegistry:
         conn = self.get_conn()
         return _ok(self.cache.get_or_compute(
             f"map-perf:{range_key}",
-            lambda: compute_map_performance(conn, self.my_account_id,
+            lambda: compute_map_performance(conn, self.tenant_id, self.my_account_id,
                                               range_key)))
 
     def _lookup_mate(self, qs):
@@ -2395,19 +2392,19 @@ class EndpointRegistry:
         names = (qs.get("players") or "").split(",")
         n = int(qs.get("matches", 5))
         conn = self.get_conn()
-        return _ok(compute_squad_compare(conn, self.my_account_id, names, n))
+        return _ok(compute_squad_compare(conn, self.tenant_id, self.my_account_id, names, n))
 
     def _settings_get(self):
         conn = self.get_conn()
         rows = conn.execute(
             "SELECT key, value FROM settings WHERE tenant_id = ?",
-            (HARDCODED_TENANT_ID,)).fetchall()
+            (self.tenant_id,)).fetchall()
         return _ok({r["key"]: r["value"] for r in rows})
 
     def _settings_set(self, body):
         try:
             payload = json.loads(body or b"{}")
-            set_setting(self.get_conn().raw, HARDCODED_TENANT_ID, payload["key"], str(payload["value"]))
+            set_setting(self.get_conn().raw, self.tenant_id, payload["key"], str(payload["value"]))
             self.cache.invalidate()
             return _ok({"ok": True})
         except Exception as e:
@@ -2442,7 +2439,7 @@ class EndpointRegistry:
             WHERE pa.tenant_id = ? AND pa.account_id = ?
             ORDER BY m.played_at DESC
             LIMIT ?
-        """, (HARDCODED_TENANT_ID, self.my_account_id, n)).fetchall()
+        """, (self.tenant_id, self.my_account_id, n)).fetchall()
         out = []
         for r in rows:
             mid = r["match_id"]
@@ -2451,7 +2448,7 @@ class EndpointRegistry:
                 FROM pubg_achievements_seen
                 WHERE tenant_id = ? AND match_id = ?
                 ORDER BY achievement_id
-            """, (HARDCODED_TENANT_ID, mid,)).fetchall()
+            """, (self.tenant_id, mid,)).fetchall()
             achievements = [
                 {"id": a["achievement_id"],
                  "suppressed": bool(a["suppress_popup"])}
@@ -2518,7 +2515,7 @@ class EndpointRegistry:
                 JOIN my_teams mt ON mt.match_id = mtm.match_id
                                   AND mt.team_id = mtm.team_id
                 WHERE mtm.tenant_id = ?
-            """, (HARDCODED_TENANT_ID, self.my_account_id, map_name, HARDCODED_TENANT_ID)).fetchall():
+            """, (self.tenant_id, self.my_account_id, map_name, self.tenant_id)).fetchall():
                 squad_per_match.setdefault(
                     r["match_id"], set()).add(r["account_id"])
             if not squad_per_match:
@@ -2534,7 +2531,7 @@ class EndpointRegistry:
               AND te.event_type IN ('Kill','Knock')
               AND te.victim_x IS NOT NULL
         """
-        params = [HARDCODED_TENANT_ID, map_name]
+        params = [self.tenant_id, map_name]
         if match_filter:
             sql += " AND te.match_id = ?"
             params.append(match_filter)
@@ -2554,7 +2551,7 @@ class EndpointRegistry:
             for r in conn.execute(
                 f"SELECT account_id, name FROM players "
                 f"WHERE tenant_id = ? AND account_id IN ({ph})",
-                [HARDCODED_TENANT_ID] + list(accs)).fetchall():
+                [self.tenant_id] + list(accs)).fetchall():
                 names[r["account_id"]] = r["name"]
         out = []
         for r in rows:
