@@ -272,6 +272,97 @@ def refresh_seasons(conn, tenant_id: int, client, min_matches: int = 5,
     return {"refreshed": refreshed, "errors": errors, "seasonId": season_id}
 
 
+def backfill_missing_seasons(conn, tenant_id: int, client,
+                             max_per_tick: int = 1) -> dict:
+    """Holt eine missing historische Season pro Tick fuer SELF.
+
+    Strategie:
+    - Liste aller Seasons aus client.get_seasons() (cached via settings).
+    - Welche fehlen in player_season fuer SELF?
+    - Welche stehen auf der Skip-Liste (vorher fehlgeschlagen, z.B. 500)?
+    - Picke die neueste verbleibende → fetch → store. Bei Fehler in Skip-Liste.
+
+    Cost: ~1 API-Call/min. Over Zeit catched alle holbaren Seasons.
+    """
+    import json
+    # SELF account_id holen
+    self_row = conn.execute(
+        "SELECT account_id FROM players WHERE tenant_id=? AND is_self=1 LIMIT 1",
+        (tenant_id,)).fetchone()
+    if not self_row:
+        return {"backfilled": 0, "errors": []}
+    acc_id = self_row["account_id"]
+
+    # Skip-Liste laden
+    skip_row = conn.execute(
+        "SELECT value FROM settings WHERE tenant_id=? AND key=?",
+        (tenant_id, "pubg.season_backfill_skip")).fetchone()
+    skip = set(json.loads(skip_row["value"])) if skip_row else set()
+
+    # Existing-Seasons fuer SELF
+    existing = {r["season_id"] for r in conn.execute(
+        "SELECT DISTINCT season_id FROM player_season "
+        "WHERE tenant_id=? AND account_id=? AND mode=?",
+        (tenant_id, acc_id, "all")).fetchall()}
+
+    # All-Seasons aus API (mit lokalem Cache via settings — 7d)
+    cache_row = conn.execute(
+        "SELECT value, updated_at FROM settings WHERE tenant_id=? AND key=?",
+        (tenant_id, "pubg.all_seasons_cache")).fetchone()
+    all_seasons = None
+    if cache_row and not _is_stale(cache_row.get("updated_at"),
+                                    max_age_hours=24 * 7):
+        try:
+            all_seasons = json.loads(cache_row["value"])
+        except Exception:
+            all_seasons = None
+    if all_seasons is None:
+        try:
+            payload = client.get_seasons()
+            all_seasons = [s["id"] for s in payload.get("data", []) if s.get("id")]
+            conn.execute(
+                "INSERT INTO settings (tenant_id, key, value, updated_at) "
+                "VALUES (?,?,?,?) "
+                "ON CONFLICT (tenant_id, key) DO UPDATE SET value=EXCLUDED.value, "
+                "updated_at=EXCLUDED.updated_at",
+                (tenant_id, "pubg.all_seasons_cache",
+                 json.dumps(all_seasons), _iso_utc_now()))
+            conn.commit()
+        except Exception as e:
+            return {"backfilled": 0, "errors": [f"get_seasons: {e}"]}
+
+    # Welche fehlen UND nicht auf Skip-Liste?
+    # Sortiert: aktuelle zuerst (vermutlich rueckwaerts sortiert in API).
+    missing = [s for s in all_seasons if s not in existing and s not in skip]
+    if not missing:
+        return {"backfilled": 0, "errors": []}
+
+    backfilled = 0
+    errors = []
+    for sid in missing[:max_per_tick]:
+        try:
+            payload = client.get_season(acc_id, sid)
+            modes = parse_season_response(payload)
+            for mode, stats in modes.items():
+                upsert_season(conn, tenant_id, acc_id, sid, mode, stats)
+            upsert_season(conn, tenant_id, acc_id, sid, "all",
+                          aggregate_season_modes(modes))
+            backfilled += 1
+        except Exception as e:
+            # Markiere season als skip — sonst hammern wir die ewig
+            skip.add(sid)
+            conn.execute(
+                "INSERT INTO settings (tenant_id, key, value, updated_at) "
+                "VALUES (?,?,?,?) "
+                "ON CONFLICT (tenant_id, key) DO UPDATE SET value=EXCLUDED.value, "
+                "updated_at=EXCLUDED.updated_at",
+                (tenant_id, "pubg.season_backfill_skip",
+                 json.dumps(sorted(skip)), _iso_utc_now()))
+            conn.commit()
+            errors.append(f"{sid}: {e}")
+    return {"backfilled": backfilled, "errors": errors}
+
+
 SELF_LIFETIME_MAX_AGE_MINUTES = 1
 """SELF lifetime-stats werden in JEDEM Poll-Tick refreshed (alle 60s,
    solange last_refreshed > 60s alt). Cost: 1 API-Call/Min — voellig im
@@ -521,13 +612,18 @@ def poll_tenant(conn, tenant_id: int, client_factory,
         s_stats = {"refreshed": 0, "errors": [f"season-batch: {e}"],
                    "seasonId": None}
     try:
+        b_stats = backfill_missing_seasons(conn, tenant_id, client,
+                                            max_per_tick=1)
+    except Exception as e:
+        b_stats = {"backfilled": 0, "errors": [f"season-backfill: {e}"]}
+    try:
         t_stats = process_telemetry_backlog(conn, tenant_id, client,
                                              my_account_id, 3)
     except Exception as e:
         t_stats = {"processed": 0, "errors": [f"telemetry-batch: {e}"]}
 
     all_errors = (m_stats["errors"] + l_stats["errors"] + s_stats["errors"]
-                  + t_stats["errors"])
+                  + b_stats["errors"] + t_stats["errors"])
     return {
         "polling": "ok" if not all_errors else "degraded",
         "tenantId": tenant_id,
@@ -535,6 +631,7 @@ def poll_tenant(conn, tenant_id: int, client_factory,
         "newMatches": m_stats["new_matches"],
         "lifetimeRefreshed": l_stats["refreshed"],
         "seasonRefreshed": s_stats["refreshed"],
+        "seasonBackfilled": b_stats["backfilled"],
         "currentSeasonId": s_stats.get("seasonId"),
         "telemetryProcessed": t_stats["processed"],
     }
