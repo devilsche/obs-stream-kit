@@ -4630,7 +4630,8 @@ def compute_landing_spots(conn, map_name, player_accs, pois_blob=None,
                 max(0.0, min(1.0, ey / span)))
 
     scatter = []
-    poi_acc = {}  # poi_name → {acc → count}
+    poi_acc = {}      # poi_name → {acc → count}
+    poi_matches = {}  # poi_name → set of match_ids (für distinct-Match-Zählung)
     for r in rows:
         x, y = r["actor_x"], r["actor_y"]
         acc = r["actor_account"]
@@ -4644,6 +4645,8 @@ def compute_landing_spots(conn, map_name, player_accs, pois_blob=None,
         name = match_poi(x, y, regions) or "—"
         poi_acc.setdefault(name, {})
         poi_acc[name][acc] = poi_acc[name].get(acc, 0) + 1
+        poi_matches.setdefault(name, set())
+        poi_matches[name].add(r["match_id"])
 
     # Namens-Lookup
     name_of = {r["actor_account"]: (r["player_name"] or r["actor_account"][:8])
@@ -4651,7 +4654,7 @@ def compute_landing_spots(conn, map_name, player_accs, pois_blob=None,
 
     pois_out = []
     for name, accmap in poi_acc.items():
-        total = sum(accmap.values())
+        total = len(poi_matches.get(name, set()))
         cx, cy = poi_centroid.get(name, (None, None))
         dcx, dcy = _disp(cx, cy) if cx is not None else (None, None)
         by = {}
