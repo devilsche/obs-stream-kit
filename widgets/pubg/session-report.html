@@ -124,6 +124,17 @@
       transform: translateY(-50%);
     }
     /* Stats-Spalten: rechtsbündig, fixe Breite, tabular-nums  */
+    .bot-kills {
+      color: var(--pubg-muted);
+      font-size: 0.85em;
+      font-weight: 400;
+    }
+    .matches-list .bot-teams {
+      color: var(--pubg-muted);
+    }
+    .matches-list .bot-teams b {
+      color: var(--pubg-text);
+    }
     .matches-list .stat {
       text-align: right;
       font-size: 0.9em;
@@ -2114,7 +2125,7 @@
         const cls = (p.isSelf ? "self " : "") + (isWin ? "win" : "");
         return `<tr class="${cls.trim()}">
           <td class="name-cell">${p.name}${p.isSelf ? " (du)" : ""}${specialBadges(p.special)}</td>
-          <td>${p.kills || 0}</td>
+          <td>${p.kills || 0}${p.botKills ? ` <span class="bot-kills" title="${p.botKills} davon Bot-Kills">(${p.botKills})</span>` : ""}</td>
           <td>${p.headshot_kills || 0}</td>
           <td>${p.assists || 0}</td>
           <td>${p.dbnos || 0}</td>
@@ -2183,9 +2194,10 @@
           <span class="time-range">${numStr}<b>${startTimeStr}</b> → <b>${outTimeStr}</b></span>
           ${placeCell}
           <span class="map">${PubgUI.fmtMap(m.map)}<span class="hot-drop-badge" data-hd-slot></span></span>
-          <span class="stat"><b>${m.kills}</b> K</span>
+          <span class="stat"><b>${m.kills}</b> K${m.myStats && m.myStats.botKills ? ` <span class="bot-kills">(${m.myStats.botKills})</span>` : ""}</span>
           <span class="stat"><b>${Math.round(m.damage||0)}</b> DMG</span>
           <span class="stat"><b>${fmtSurv(mySurv)}</b></span>
+          <span class="stat bot-teams" title="Bot-Teams in der Lobby"><b>${m.botTeamsInLobby || 0}</b> 🤖</span>
         </div>
         <div class="squad-detail" data-idx-detail="${idx}">${fmtSquadDetail(m)}</div>`;
     }

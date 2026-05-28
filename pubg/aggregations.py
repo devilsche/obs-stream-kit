@@ -4344,6 +4344,7 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
         sq_list = list(sq_accs_from_db)
         knocks_received = {}
         revives_given = {}
+        bot_kills = {}
         if sq_list:
             for r in conn.execute(
                 f"SELECT target_account, COUNT(*) AS c FROM telemetry_events "
@@ -4357,6 +4358,19 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
                 f"AND actor_account IN ({ph}) GROUP BY actor_account",
                     [m["match_id"]] + sq_list).fetchall():
                 revives_given[r["actor_account"]] = r["c"]
+            # Bot-Kills pro Squadmember: Kill-Events mit target_account=ai.*
+            for r in conn.execute(
+                f"SELECT actor_account, COUNT(*) AS c FROM telemetry_events "
+                f"WHERE match_id=? AND event_type='Kill' "
+                f"AND actor_account IN ({ph}) "
+                f"AND target_account LIKE 'ai.%' GROUP BY actor_account",
+                    [m["match_id"]] + sq_list).fetchall():
+                bot_kills[r["actor_account"]] = r["c"]
+        # Anzahl Bot-Teams in dieser Match-Lobby (team_id >= 200)
+        bot_teams_in_lobby = conn.execute(
+            "SELECT COUNT(DISTINCT team_id) FROM match_team_mapping "
+            "WHERE match_id=? AND team_id>=200",
+            (m["match_id"],)).fetchone()[0] or 0
         my_special = spec.get(my_account_id, {})
         my_entry = {
             "name": my_name,
@@ -4371,6 +4385,7 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             "special": my_special,
             "knocksReceived": knocks_received.get(my_account_id, 0),
             "revivesGiven": revives_given.get(my_account_id, 0),
+            "botKills": bot_kills.get(my_account_id, 0),
         }
         # Mates-Liste mit special-Events anreichern
         squad_enriched = []
@@ -4382,6 +4397,7 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             s2["special"] = spec.get(acc, {}) if acc else {}
             s2["knocksReceived"] = knocks_received.get(acc, 0) if acc else 0
             s2["revivesGiven"] = revives_given.get(acc, 0) if acc else 0
+            s2["botKills"] = bot_kills.get(acc, 0) if acc else 0
             squad_enriched.append(s2)
         # Gesamt-Sonder-Events fuer Match als Zusammenfassung
         match_special = {
@@ -4405,6 +4421,7 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             "myStats": my_entry,
             "squad": squad_enriched,
             "matchSpecial": match_special,
+            "botTeamsInLobby": bot_teams_in_lobby,
         }
 
     return {
