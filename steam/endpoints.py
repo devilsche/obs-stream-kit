@@ -29,8 +29,16 @@ import threading
 HARDCODED_TENANT_ID = 1
 
 
+def _json_default(o):
+    # psycopg2 liefert NUMERIC/REAL als decimal.Decimal — JSON kennt das nicht
+    import decimal
+    if isinstance(o, decimal.Decimal):
+        return float(o)
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+
+
 def _ok(payload):
-    return json.dumps(payload).encode("utf-8"), 200, "application/json"
+    return json.dumps(payload, default=_json_default).encode("utf-8"), 200, "application/json"
 
 
 def _err(code, msg):
