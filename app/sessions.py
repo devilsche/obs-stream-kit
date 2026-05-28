@@ -59,4 +59,6 @@ def revoke_all_for_user(conn, user_id: int) -> int:
         cur.execute(
             "DELETE FROM user_sessions WHERE user_id = %s", (user_id,)
         )
-        return cur.rowcount
+        rowcount = cur.rowcount
+    conn.commit()
+    return rowcount

@@ -1,5 +1,5 @@
 import os
-import datetime as dt
+import time
 import pytest
 from core import db as core_db
 from app import sessions
@@ -74,7 +74,6 @@ def test_touch_updates_last_seen(pg_conn):
             "SELECT last_seen_at FROM user_sessions WHERE id = %s::uuid", (sid,)
         )
         ts1 = cur.fetchone()["last_seen_at"]
-    import time
     time.sleep(0.05)
     sessions.touch(conn, sid)
     with conn.cursor() as cur:
