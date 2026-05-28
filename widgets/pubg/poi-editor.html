@@ -333,7 +333,7 @@ async function loadMap(mapId) {
 
   // Fetch saved regions from server (per dataKey, nicht per imageId)
   try {
-    const r = await fetch(`/api/pubg/pois?map=${encodeURIComponent(currentDataKey)}`);
+    const r = await fetch((window.__SERVE_BASE__||"/") + `api/pubg/pois?map=${encodeURIComponent(currentDataKey)}`);
     const j = await r.json();
     const blob = j.data || j;
     regions = (blob.regions || []).map(r => ({
@@ -1372,7 +1372,7 @@ document.getElementById("pinsBtn").addEventListener("click", async () => {
     // Landings vom Server holen — Map-Filter ueber dataKey
     // (Telemetry-Map-Namen entsprechen den 'echten' Map-IDs, nicht den
     // Bild-Varianten)
-    const r = await fetch(`/api/pubg/landings?map=${encodeURIComponent(currentDataKey)}`);
+    const r = await fetch((window.__SERVE_BASE__||"/") + `api/pubg/landings?map=${encodeURIComponent(currentDataKey)}`);
     const j = await r.json();
     pins = (j.data && j.data.landings) || j.landings || [];
     statusEl.textContent = `${pins.length} Landings`;
@@ -1386,7 +1386,7 @@ document.getElementById("pinsBtn").addEventListener("click", async () => {
 document.getElementById("saveBtn").addEventListener("click", async () => {
   statusEl.textContent = "Speichere…";
   try {
-    const r = await fetch("/api/pubg/pois", {
+    const r = await fetch((window.__SERVE_BASE__||"/") + "api/pubg/pois", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1432,8 +1432,8 @@ async function loadCalEvents() {
     // (Positionen verlaesslicher, weil eigene Telem-Snapshots dichter).
     // Match-Filter machen wir clientseitig (Dropdown bleibt befuellt).
     const [er, cr] = await Promise.all([
-      fetch(`/api/pubg/calibration-events?map=${encodeURIComponent(currentDataKey)}&squadOnly=1`).then(r => r.json()),
-      fetch(`/api/pubg/calibration-corrections?map=${encodeURIComponent(currentDataKey)}`).then(r => r.json()),
+      fetch((window.__SERVE_BASE__||"/") + `api/pubg/calibration-events?map=${encodeURIComponent(currentDataKey)}&squadOnly=1`).then(r => r.json()),
+      fetch((window.__SERVE_BASE__||"/") + `api/pubg/calibration-corrections?map=${encodeURIComponent(currentDataKey)}`).then(r => r.json()),
     ]);
     calEvents = er.events || [];
     calCorrections = cr.corrections || [];
@@ -1674,7 +1674,7 @@ function renderCalList() {
   document.getElementById("calClearBtn").addEventListener("click", async () => {
     if (!confirm(`Alle ${calCorrections.length} Korrekturen fuer diese Map loeschen?`)) return;
     try {
-      await fetch("/api/pubg/calibration-corrections", {
+      await fetch((window.__SERVE_BASE__||"/") + "api/pubg/calibration-corrections", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ map: currentDataKey, clearAll: true }),
@@ -1691,7 +1691,7 @@ function renderCalList() {
       e.stopPropagation();
       const id = btn.dataset.corrId;
       try {
-        await fetch("/api/pubg/calibration-corrections", {
+        await fetch((window.__SERVE_BASE__||"/") + "api/pubg/calibration-corrections", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ map: currentDataKey, id }),
@@ -1839,7 +1839,7 @@ async function saveCorrection(fixedX, fixedY) {
     savedAt:  new Date().toISOString(),
   };
   try {
-    const r = await fetch("/api/pubg/calibration-corrections", {
+    const r = await fetch((window.__SERVE_BASE__||"/") + "api/pubg/calibration-corrections", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ map: currentDataKey, correction: corr }),

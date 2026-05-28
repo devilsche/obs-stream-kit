@@ -676,7 +676,7 @@
         `Setze Sprache '${lang}' + lade Achievements neu (beim ersten Wechsel ` +
         `pro Sprache wird das Schema pro Game von Steam gepullt — kann was dauern)…`;
       try {
-        await PubgUI.fetchJson("/api/steam/language?lang=" + encodeURIComponent(lang));
+        await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/steam/language?lang=" + encodeURIComponent(lang));
       } catch (err) {
         statsEl.textContent = "Sprach-Setting fehlgeschlagen: " + err;
         return;
@@ -687,7 +687,7 @@
 
     async function syncLangFromServer() {
       try {
-        const r = await PubgUI.fetchJson("/api/steam/language");
+        const r = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/steam/language");
         if (r && r.language) {
           currentLang = r.language;
           langSel.value = r.language;
@@ -709,7 +709,7 @@
       // pubg_achievements_seen-Tabelle aufgefuellt wird, falls leer.
       // Idempotent — INSERT OR IGNORE, also kein Schaden bei Wiederholung.
       if (!pubgDetectTriggered) {
-        try { await PubgUI.fetchJson("/api/pubg/detect-achievements"); }
+        try { await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/detect-achievements"); }
         catch (e) { /* silent */ }
         pubgDetectTriggered = true;
       }
@@ -720,9 +720,9 @@
       // Endpoint mal kurz timeoutet).
       const FAIL = Symbol("fail");
       const [steamData, pubgData] = await Promise.all([
-        PubgUI.fetchJson("/api/steam/achievements-list?limit=2000")
+        PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/steam/achievements-list?limit=2000")
           .catch(() => FAIL),
-        PubgUI.fetchJson("/api/pubg/achievements-list")
+        PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/achievements-list")
           .catch(() => FAIL),
       ]);
       const steamOk = steamData !== FAIL;
@@ -820,12 +820,12 @@
     // einfach keine Landing-Zeile (silent degrade).
     async function prefetchLandingsAndPois() {
       try {
-        const dbInfo = await PubgUI.fetchJson("/api/pubg/db-info");
+        const dbInfo = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/db-info");
         myName = (dbInfo && dbInfo.myName) || null;
       } catch (e) { myName = null; }
       try {
         const [lj] = await Promise.all([
-          PubgUI.fetchJson("/api/pubg/landings"),
+          PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/landings"),
           // POI-Cal laedt _pubg_pois.js selbst (PubgUI.POI.ready).
         ]);
         const lans = (lj && lj.landings) || lj || [];

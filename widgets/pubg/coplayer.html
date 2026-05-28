@@ -102,7 +102,7 @@
         '<div class="pubg-error" style="padding:20px">Missing parameter ?player=NAME</div>';
     } else {
       document.getElementById("playerName").textContent = PLAYER;
-      PubgUI.fetchJson(`/api/pubg/co-player/${encodeURIComponent(PLAYER)}`)
+      PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/co-player/${encodeURIComponent(PLAYER)}`)
         .then(d => {
           document.getElementById("playerName").textContent = d.name || PLAYER;
           const sh = d.sharedHistory || {};

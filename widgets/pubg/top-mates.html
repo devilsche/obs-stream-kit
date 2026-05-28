@@ -127,7 +127,7 @@
 
     // Wenn kein URL-Param gesetzt: aktuellen Setting-Wert vom Backend ziehen
     if (MIN == null || isNaN(MIN)) {
-      PubgUI.fetchJson("/api/pubg/settings").then(s => {
+      PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/settings").then(s => {
         const eff = parseInt(s.minMatchesForTopMates || "10", 10);
         setSubtitle(eff);
       }).catch(() => setSubtitle(10));

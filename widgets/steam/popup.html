@@ -399,7 +399,7 @@
     // Pollers ───────────────────────────────────────────────────────────
     async function pollNowPlaying() {
       try {
-        const d = await PubgUI.fetchJson("/api/steam/now-playing");
+        const d = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/steam/now-playing");
         if (d && d.active) {
           enqueue({ type: "now-playing", data: d, priority: 0 });
         }

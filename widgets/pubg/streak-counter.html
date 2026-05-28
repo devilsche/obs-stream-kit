@@ -108,7 +108,7 @@
 
     async function refresh() {
       try {
-        const data = await PubgUI.fetchJson(`/api/pubg/streaks?range=${RANGE}`);
+        const data = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/streaks?range=${RANGE}`);
         const s = data[TYPE] || {current: 0, best: 0, bestEndedAt: null};
         const cur = s.current || 0;
         const best = s.best || 0;

@@ -477,7 +477,7 @@
     // Demo keine hardcodierten Nicknames im Source.
     (async () => {
       try {
-        const res = await fetch("/api/pubg/db-info", { cache: "no-store" });
+        const res = await fetch((window.__SERVE_BASE__||"/") + "api/pubg/db-info", { cache: "no-store" });
         const info = await res.json();
         const name = (info && info.myName) || "Player";
         const re = /__PLAYER__/g;

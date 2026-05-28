@@ -290,10 +290,10 @@
 
     function reload() {
       updateTopMatesSubtitle();
-      PubgUI.fetchJson(`/api/pubg/session?range=${RANGE}`).then(renderSession).catch(()=>{});
-      PubgUI.fetchJson(`/api/pubg/first-fight-rate?range=${RANGE}`).then(renderFF).catch(()=>{});
+      PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/session?range=${RANGE}`).then(renderSession).catch(()=>{});
+      PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/first-fight-rate?range=${RANGE}`).then(renderFF).catch(()=>{});
       const tmRange = RANGE === "all" ? "" : `range=${RANGE}&`;
-      PubgUI.fetchJson(`/api/pubg/top-mates?${tmRange}sortBy=${currentSort}&limit=5&minMatches=${currentMin}`)
+      PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/top-mates?${tmRange}sortBy=${currentSort}&limit=5&minMatches=${currentMin}`)
         .then(renderTopMates).catch(()=>{});
     }
 

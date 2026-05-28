@@ -94,7 +94,7 @@
       const knum = (n) => n >= 1000 ? (n/1000).toFixed(1)+"k" : String(Math.round(n));
       const km = (n) => n.toFixed(2) + "km";
 
-      PubgUI.fetchJson("/api/pubg/session").then(s => {
+      PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/session").then(s => {
         PubgUI.animateNumber(document.getElementById("matches"), s.matches || 0, {format: num});
         PubgUI.animateNumber(document.getElementById("kills"), s.kills || 0, {format: num});
         PubgUI.animateNumber(document.getElementById("dmg"), s.damage || 0, {format: knum});
@@ -111,13 +111,13 @@
         PubgUI.animateNumber(document.getElementById("assists"), s.totalAssists || 0, {format: num});
       });
       if (!HIDE_MAPS) {
-        PubgUI.fetchJson("/api/pubg/map-distribution?range=session").then(list => {
+        PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/map-distribution?range=session").then(list => {
           document.getElementById("maps").innerHTML = list.map(m =>
             `<div class="map-row"><span>${PubgUI.fmtMap(m.map)}</span><span class="pubg-stat-value">${m.count}</span></div>`).join("");
         });
       }
       if (!HIDE_MATES) {
-        PubgUI.fetchJson("/api/pubg/mates?range=session").then(list => {
+        PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/mates?range=session").then(list => {
           document.getElementById("mates").innerHTML = list.map(m =>
             `<div class="mate-row"><span>${m.name}</span><span class="pubg-stat-value">${m.sharedMatchesToday}</span></div>`).join("");
         });

@@ -423,7 +423,7 @@
         console.warn("SSE fehlt, fallback polling");
         async function tick() {
           try {
-            const r = await fetch("/api/teamspeak/state", { cache: "no-store" });
+            const r = await fetch((window.__SERVE_BASE__||"/") + "api/teamspeak/state", { cache: "no-store" });
             render(await r.json());
           } catch (_e) {
             render({ connected: false, members: [] });

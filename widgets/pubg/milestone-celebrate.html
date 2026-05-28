@@ -308,7 +308,7 @@
       if (PLAYER) params.set("player", PLAYER);
       let d = null;
       try {
-        d = await PubgUI.fetchJson(`/api/pubg/career-lifetime?${params}`);
+        d = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/career-lifetime?${params}`);
       } catch (e) { /* silent */ }
 
       // N bestimmen: Override > floor(wins/100)*100.

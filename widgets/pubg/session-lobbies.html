@@ -118,8 +118,8 @@
 
     function tick() {
       Promise.all([
-        PubgUI.fetchJson(`/api/pubg/squad-kd?range=${RANGE}`),
-        PubgUI.fetchJson(`/api/pubg/lobby-top3-kd?range=${RANGE}`),
+        PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/squad-kd?range=${RANGE}`),
+        PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/lobby-top3-kd?range=${RANGE}`),
       ]).then(([sq, t3]) => {
         if (RANGE === "session") PubgUI.hideIfStale();
         render(sq, t3);

@@ -187,7 +187,7 @@
       const range = document.getElementById("range").value;
       document.getElementById("tbl").innerHTML = '<div class="muted">— wird geholt —</div>';
       try {
-        const data = await PubgUI.fetchJson(`/api/pubg/first-fight-debug?range=${range}`);
+        const data = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/first-fight-debug?range=${range}`);
         render(data);
       } catch (e) {
         document.getElementById("tbl").innerHTML =

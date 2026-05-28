@@ -69,7 +69,7 @@
       // ── SESSION ──────────────────────────────────────────
       if (FOCUS !== "lifetime") {
         let session = null;
-        try { session = await PubgUI.fetchJson("/api/pubg/session"); } catch (_) {}
+        try { session = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/session"); } catch (_) {}
         // Keine aktuelle Session → Ticker komplett ausblenden.
         // ?focus=lifetime und ?ignoreStale=1 sind davon ausgenommen.
         if ((!session || !session.matches) && !PubgUI.ignoreStale()) {
@@ -82,19 +82,19 @@
           out.push(`<span class="label">SESSION STATS</span> ${session.kills} Kills · ${PubgUI.fmtNum(Math.round(session.damage))} DMG · ${session.wins} Wins · K/D ${PubgUI.fmtKD(session.kd)} · K/M ${PubgUI.fmtKD(session.kpm)}`);
         }
         try {
-          const md = await PubgUI.fetchJson("/api/pubg/map-distribution?range=session");
+          const md = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/map-distribution?range=session");
           if (md[0]) {
             out.push(`<span class="label">SESSION MOST PLAYED MAP</span> ${PubgUI.fmtMap(md[0].map)} (${md[0].count} Matches)`);
           }
         } catch (_) {}
         try {
           // Score-basiert nach aktuellem Setting (Synergy / Most Chicken / etc.)
-          const settings2 = await PubgUI.fetchJson("/api/pubg/settings").catch(() => ({}));
+          const settings2 = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/settings").catch(() => ({}));
           // Default Synergy statt mostPlayed — wer am meisten Matches hat,
           // ist nicht zwingend der "Top Mate". Synergy bewertet KD+Win-Rate.
           const sortBy2 = settings2.topMatesSortBy || "synergy";
           // minMatches=2 damit ein 1-Match-Glücks-Spike nicht oben steht
-          const tmS = await PubgUI.fetchJson(`/api/pubg/top-mates?range=session&limit=1&minMatches=2&sortBy=${sortBy2}`);
+          const tmS = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/top-mates?range=session&limit=1&minMatches=2&sortBy=${sortBy2}`);
           if (tmS[0]) {
             const m = tmS[0];
             const SESSION_LABELS = {
@@ -111,7 +111,7 @@
           }
         } catch (_) {}
         try {
-          const f = await PubgUI.fetchJson("/api/pubg/first-fight-rate?range=session");
+          const f = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/first-fight-rate?range=session");
           if (f.total) {
             const fledStr = (f.fledTotal||0) ? ` · ${f.fledTotal} fled` : "";
           out.push(`<span class="label">SESSION FIRST FIGHT</span> ${(f.rate||0).toFixed(0)}% won (${f.survived}/${f.total})${fledStr}`);
@@ -122,7 +122,7 @@
       // ── BEST/WORST MAP (Session) ───────────────────────────
       if (FOCUS !== "lifetime") {
         try {
-          const bw = await PubgUI.fetchJson("/api/pubg/best-worst-map?range=session&minMatches=2");
+          const bw = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/best-worst-map?range=session&minMatches=2");
           if (bw.best && bw.worst && bw.best.map !== bw.worst.map) {
             out.push(`<span class="label">SESSION BEST/WORST MAP</span> ${PubgUI.fmtMap(bw.best.map)} K/D <b>${bw.best.kd.toFixed(2)}</b> · ${PubgUI.fmtMap(bw.worst.map)} K/D <b>${bw.worst.kd.toFixed(2)}</b>`);
           }
@@ -130,7 +130,7 @@
 
         // ── Lobby-Difficulty (Session) ────────────────────
         try {
-          const lk = await PubgUI.fetchJson("/api/pubg/lobby-avg-kd?range=session");
+          const lk = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/lobby-avg-kd?range=session");
           if (lk.matches) {
             const sign = (lk.diff || 0) >= 0 ? "+" : "";
             out.push(`<span class="label">SESSION LOBBIES</span> Ø Lobby K/D <b>${(lk.avg||0).toFixed(2)}</b> · You <b>${(lk.myKd||0).toFixed(2)}</b> (${sign}${(lk.diff||0).toFixed(2)})`);
@@ -139,7 +139,7 @@
 
         // ── Hot-Drop (Session) ────────────────────────────
         try {
-          const hd = await PubgUI.fetchJson("/api/pubg/hot-drop?range=session");
+          const hd = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/hot-drop?range=session");
           if (hd.matches) {
             const streak = hd.streak ? ` · Streak 🔥${hd.streak}` : "";
             out.push(`<span class="label">SESSION HOT DROPS</span> ${(hd.rate||0).toFixed(0)}% Rate · Solo-Surv <b>${(hd.soloSurvivalRate||0).toFixed(0)}%</b> · Team-Surv <b>${(hd.teamSurvivalRate||0).toFixed(0)}%</b>${streak}`);
@@ -148,7 +148,7 @@
 
         // ── Trend vs. last Session ────────────────────────
         try {
-          const t = await PubgUI.fetchJson("/api/pubg/trend-deltas");
+          const t = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/trend-deltas");
           if (t && t.deltas && t.current) {
             const arr = (v) => v > 0.001 ? "↑" : (v < -0.001 ? "↓" : "·");
             const d = t.deltas;
@@ -158,7 +158,7 @@
 
         // ── Top-3 Maps der Session ────────────────────────
         try {
-          const md = await PubgUI.fetchJson("/api/pubg/map-distribution?range=session");
+          const md = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/map-distribution?range=session");
           if (md.length >= 2) {
             const top3 = md.slice(0, 3).map(x => `${PubgUI.fmtMap(x.map)} ×${x.count}`).join(" · ");
             out.push(`<span class="label">SESSION TOP MAPS</span> ${top3}`);
@@ -167,7 +167,7 @@
 
         // ── Achievements der Session ──────────────────────
         try {
-          const ach = await PubgUI.fetchJson("/api/pubg/session-achievements");
+          const ach = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/session-achievements");
           if (ach && ach.length) {
             const recent = ach.slice(-3).map(a => `${a.icon ? a.icon + " " : ""}${a.label}`).join(" · ");
             out.push(`<span class="label">SESSION ACHIEVEMENTS</span> ${recent}`);
@@ -178,16 +178,16 @@
       // ── LIFETIME / DB-LIFETIME ────────────────────────────
       if (FOCUS !== "session") {
         try {
-          const bw = await PubgUI.fetchJson("/api/pubg/best-worst-map?range=all&minMatches=5");
+          const bw = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/best-worst-map?range=all&minMatches=5");
           if (bw.best && bw.worst && bw.best.map !== bw.worst.map) {
             out.push(`<span class="label">DB — BEST/WORST MAP</span> ${PubgUI.fmtMap(bw.best.map)} K/D <b>${bw.best.kd.toFixed(2)}</b> · ${PubgUI.fmtMap(bw.worst.map)} K/D <b>${bw.worst.kd.toFixed(2)}</b>`);
           }
         } catch (_) {}
         try {
-          const settings = await PubgUI.fetchJson("/api/pubg/settings").catch(() => ({}));
+          const settings = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/settings").catch(() => ({}));
           const sortBy = settings.topMatesSortBy || "synergy";
           // Default Synergy + minMatches=10 — Glücks-Spikes raus
-          const tm = await PubgUI.fetchJson(`/api/pubg/top-mates?limit=1&sortBy=${sortBy}&minMatches=10`);
+          const tm = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/top-mates?limit=1&sortBy=${sortBy}&minMatches=10`);
           if (tm[0]) {
             const m = tm[0];
             const LABELS = {
@@ -204,7 +204,7 @@
           }
         } catch (_) {}
         try {
-          const c = await PubgUI.fetchJson("/api/pubg/career-lifetime?mode=all");
+          const c = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/career-lifetime?mode=all");
           if (c.rounds_played) {
             out.push(`<span class="label">CAREER — ALL TIME</span> ${PubgUI.fmtNum(c.rounds_played)} Games · K/D ${PubgUI.fmtKD(c.kd_ratio)} · ${c.wins} Wins`);
           }

@@ -25,7 +25,7 @@
   // map_id -> { mapKm, regions: [{name, points: [[x,y]...]}] }
   let DATA = {};
 
-  POI.ready = fetch("/api/pubg/pois")
+  POI.ready = fetch((window.__SERVE_BASE__||"/") + "api/pubg/pois")
     .then(r => r.json())
     .then(j => {
       const d = (j && j.data) || j;

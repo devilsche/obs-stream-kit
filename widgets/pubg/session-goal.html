@@ -104,7 +104,7 @@
 
     async function refresh() {
       try {
-        const matches = await PubgUI.fetchJson("/api/pubg/session-matches?range=session");
+        const matches = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/session-matches?range=session");
         const value = cfg.aggregate(matches);
         const pct = Math.min(100, (value / TARGET) * 100);
         document.getElementById("current").textContent =

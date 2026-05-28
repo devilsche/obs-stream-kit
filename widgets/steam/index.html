@@ -348,7 +348,8 @@
     // Trigger-Buttons: fetch ohne Navigation, Output kurz anzeigen.
     document.querySelectorAll("button[data-fetch]").forEach(btn => {
       btn.addEventListener("click", async () => {
-        const url = btn.dataset.fetch;
+        const raw = btn.dataset.fetch;
+        const url = (window.__SERVE_BASE__||"/") + raw.replace(/^\//, "");
         const out = document.getElementById("triggerOut");
         out.textContent = "→ " + url;
         try {

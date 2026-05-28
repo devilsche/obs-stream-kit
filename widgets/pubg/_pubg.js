@@ -120,7 +120,7 @@
   let _dbInfoPromise = null;
   PubgUI.getDbInfo = () => {
     if (!_dbInfoPromise) {
-      _dbInfoPromise = PubgUI.fetchJson("/api/pubg/db-info").catch(() => ({}));
+      _dbInfoPromise = PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/db-info").catch(() => ({}));
     }
     return _dbInfoPromise;
   };
@@ -221,7 +221,7 @@
     const limit = maxAgeMs == null ? 3600 * 1000 : maxAgeMs;
     let stale = true;
     try {
-      const lm = await PubgUI.fetchJson("/api/pubg/last-match");
+      const lm = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/last-match");
       const ts = lm && lm.playedAt ? new Date(lm.playedAt).getTime() : 0;
       stale = !ts || (Date.now() - ts > limit);
     } catch (_) {

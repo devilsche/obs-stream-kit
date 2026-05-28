@@ -2033,7 +2033,7 @@
       renderItems();
     }
 
-    PubgUI.fetchJson("/api/pubg/sessions").then(sessions => {
+    PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/sessions").then(sessions => {
       allSessions = sessions || [];
       // Wenn URL-Range gesetzt: Monat der aktiven Session vorauswählen
       if (FROM) activeMonth = monthKey(FROM);
@@ -2471,8 +2471,8 @@
         ? `/api/pubg/vehicle-stats${fromTo}`
         : `/api/pubg/vehicle-stats?range=session`;
       const [trend, achievements, matches, hotDrop, payday, vehicle] = await Promise.all([
-        PubgUI.fetchJson(`/api/pubg/trend-deltas${fromTo}`).catch(() => null),
-        PubgUI.fetchJson(`/api/pubg/session-achievements${fromTo}`).catch(() => []),
+        PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/trend-deltas${fromTo}`).catch(() => null),
+        PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/session-achievements${fromTo}`).catch(() => []),
         PubgUI.fetchJson(matchesUrl).catch(() => []),
         PubgUI.fetchJson(hotDropUrl).catch(() => null),
         PubgUI.fetchJson(paydayUrl).catch(() => null),
@@ -2488,8 +2488,8 @@
       // User Match expandiert.
       try {
         const [lj, pj] = await Promise.all([
-          PubgUI.fetchJson("/api/pubg/landings"),
-          PubgUI.fetchJson("/api/pubg/pois"),
+          PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/landings"),
+          PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/pois"),
         ]);
         window._landingsByMatch = new Map();
         const lans = (lj && lj.landings) || lj || [];

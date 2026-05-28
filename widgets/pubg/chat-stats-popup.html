@@ -146,7 +146,7 @@
       document.getElementById("name").textContent = "?player= fehlt";
       reveal();
     } else {
-      PubgUI.fetchJson(`/api/pubg/co-player/${encodeURIComponent(PLAYER)}`)
+      PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/co-player/${encodeURIComponent(PLAYER)}`)
         .then(d => {
           if (d.error) {
             // Nicht in DB → Live-Lookup über PUBG-API mit Hinweis
