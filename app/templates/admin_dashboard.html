@@ -1,1 +1,18 @@
-<html><body>admin dashboard stub</body></html>
+{% extends "base.html" %}
+{% block title %}Admin — OBS Stream Kit{% endblock %}
+{% block body %}
+<div class="layout">
+  {% include "_sidebar.html" %}
+  <main class="main">
+    <div class="topbar"><div class="greeting">Admin-Bereich</div></div>
+    <div class="card">
+      <h3>Bereiche</h3>
+      <ul>
+        <li><a href="/admin/users">User-Approval-Queue</a></li>
+        <li><span style="color: var(--text-dim)">POI-Editor — kommt in Spec 4</span></li>
+        <li><span style="color: var(--text-dim)">System-Status — kommt in Spec 4</span></li>
+      </ul>
+    </div>
+  </main>
+</div>
+{% endblock %}
