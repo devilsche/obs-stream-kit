@@ -1,3 +1,14 @@
+"""DEPRECATED — SQLite-Adapter, wird nicht mehr genutzt seit PG-Migration (Spec 1).
+
+Der laufende Code (serve.py, pubg/poller.py, pubg/endpoints.py, pubg/aggregations.py)
+greift jetzt ueber `pubg/db_pg.py` auf PostgreSQL zu. Diese Datei bleibt vorerst
+liegen, weil sie noch:
+  - die Pre-Migration-Backup-Files (`data/pubg-history.db.*.bak`) lesbar haelt,
+  - in `pubg/cli.py` und `pubg/fetch_job.py` referenziert wird
+    (Helper-Skripte, separate Migration noetig).
+
+Wird in einer spaeteren Aufraeumphase entfernt.
+"""
 import datetime as _dt
 import sqlite3
 

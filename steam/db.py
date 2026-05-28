@@ -1,7 +1,12 @@
-"""
-Steam-DB Schema und Helper.
-Separate SQLite-File (data/steam-history.db), unabhängig von pubg-history.db
-— Steam-Modul kann separat aktiviert/deaktiviert werden.
+"""DEPRECATED — SQLite-Adapter, wird nicht mehr genutzt seit PG-Migration (Spec 1).
+
+Der laufende Code (serve.py, steam/poller.py, steam/endpoints.py) greift jetzt
+ueber `steam/db_pg.py` auf PostgreSQL zu. Diese Datei bleibt vorerst liegen,
+weil sie:
+  - die Pre-Migration-Backup-Files lesbar haelt,
+  - evtl. noch in Hilfsskripten referenziert wird.
+
+Wird in einer spaeteren Aufraeumphase entfernt.
 """
 import sqlite3
 
