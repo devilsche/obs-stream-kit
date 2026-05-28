@@ -83,7 +83,7 @@
     <div class="legend" id="legend">
       <button data-metric="kd" class="active">K / D</button>
       <button data-metric="winrate">WIN %</button>
-      <button data-metric="dmg">AVG DMG</button>
+      <button data-metric="dmg">Ø DMG</button>
       <button data-metric="kills">KILLS</button>
       <button data-metric="matches">MATCHES</button>
     </div>
@@ -105,7 +105,7 @@
                   ["duo-fpp","Duo FPP"],["duo-tpp","Duo TPP"],
                   ["solo-fpp","Solo FPP"],["solo-tpp","Solo TPP"]]},
       { key: "metric", label: "Metric", type: "select", default: "kd",
-        options: [["kd","K/D"],["winrate","Win rate"],["dmg","Avg DMG"],
+        options: [["kd","K/D"],["winrate","Win rate"],["dmg","Ø DMG"],
                   ["kills","Kills"],["matches","Matches"]]},
       { key: "player", label: "Player", type: "text", placeholder: "empty = self" },
     ]);
@@ -118,7 +118,7 @@
       winrate: { get: r => r.win_rate,     fmt: v => Number(v || 0).toFixed(1) + "%",
                  label: "Win %", suffix: "%" },
       dmg:     { get: r => r.avg_damage,   fmt: v => String(Math.round(v || 0)),
-                 label: "Avg DMG", suffix: "" },
+                 label: "Ø DMG", suffix: "" },
       kills:   { get: r => r.kills,        fmt: v => Math.round(v || 0).toLocaleString("en-US"),
                  label: "Kills", suffix: "" },
       matches: { get: r => r.rounds_played,fmt: v => Math.round(v || 0).toLocaleString("en-US"),
@@ -129,6 +129,19 @@
       // "division.bro.official.pc-2018-32" → "S32"
       const m = sid.match(/(\d+)$/);
       return m ? "S" + m[1] : sid.slice(-6);
+    }
+
+    // Approximate Date-Range pro Season via Position in sortierter Liste.
+    // PUBG-Seasons sind im Schnitt ~2 Monate lang. Letzte Season = "current".
+    // Liefert "≈ MMM YYYY – MMM YYYY".
+    function approxSeasonRange(idx, totalSeasons) {
+      const now = new Date();
+      const stepsBack = (totalSeasons - 1 - idx);
+      const SEASON_MONTHS = 2;
+      const end = new Date(now.getFullYear(), now.getMonth() - stepsBack * SEASON_MONTHS, 1);
+      const start = new Date(end.getFullYear(), end.getMonth() - SEASON_MONTHS, 1);
+      const fmt = d => d.toLocaleString("en-US", {month: "short", year: "numeric"});
+      return `≈ ${fmt(start)} – ${fmt(end)}`;
     }
 
     function render(data) {
@@ -202,10 +215,21 @@
         c.setAttribute("r", 4);
         c.setAttribute("class", "dot");
         c.addEventListener("mouseenter", e => {
+          const range = approxSeasonRange(i, seasons.length);
+          // Alle Metriken IMMER zeigen — kein Doppel-Label mehr wenn der
+          // gewaehlte Metric mit der Default-Liste kollidiert.
+          const rows = [
+            ["K/D",      METRICS.kd.fmt(s.kd_ratio || 0)],
+            ["Win %",    METRICS.winrate.fmt(s.win_rate || 0)],
+            ["Ø DMG",    METRICS.dmg.fmt(s.avg_damage || 0)],
+            ["Kills",    METRICS.kills.fmt(s.kills || 0)],
+            ["Matches",  METRICS.matches.fmt(s.rounds_played || 0)],
+          ];
           tt.innerHTML =
-            `<b>${shortSeason(s.season_id)}</b><br>` +
-            `<span>${def.label}:</span> ${def.fmt(def.get(s) || 0)}<br>` +
-            `<span>Matches:</span> ${s.rounds_played} · <span>Kills:</span> ${s.kills}`;
+            `<b>${shortSeason(s.season_id)}</b> <span style="color:var(--pubg-muted);font-size:0.85em">${range}</span><br>` +
+            rows.map(([l, v]) =>
+              `<span>${l}:</span> <b style="color:${l === def.label ? "var(--pubg-gold)" : "inherit"}">${v}</b>`
+            ).join(" · ");
           // Tooltip relativ zum chart-wrap (parent .chart-wrap).
           const wrap = c.closest(".chart-wrap").getBoundingClientRect();
           const dotR = c.getBoundingClientRect();
