@@ -1523,6 +1523,10 @@
             <div class="md-cards"></div>
           </div>
         </div>`;
+      // Map-Bild parallel zum Telemetrie-Fetch starten — sonst kettet sich
+      // das (mdLoad ~30s fuer 99-Spieler-Matches, danach 2-3s fuer das Bild
+      // = 40s schwarz). Promise wird gecached, also gleich verfuegbar.
+      mdMapImage(mapName);
       const md = await mdLoad(matchId);
       const s = mdGetState(host);
       if (!md || !md.detail) {
