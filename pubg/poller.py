@@ -272,9 +272,12 @@ def refresh_seasons(conn, tenant_id: int, client, min_matches: int = 5,
     return {"refreshed": refreshed, "errors": errors, "seasonId": season_id}
 
 
-SELF_LIFETIME_MAX_AGE_HOURS = 1
-"""SELF lifetime-stats werden viel oefter refreshed als die von Co-Players.
-   Defaults: SELF alle 1h, Co-Players alle 24h."""
+SELF_LIFETIME_MAX_AGE_MINUTES = 1
+"""SELF lifetime-stats werden in JEDEM Poll-Tick refreshed (alle 60s,
+   solange last_refreshed > 60s alt). Cost: 1 API-Call/Min — voellig im
+   Rate-Limit. Vorteil: Lifetime-Stats sehen jeden neuen Match-Win
+   spaetestens zum naechsten Tick, nicht erst Stunden spaeter.
+   Co-Players bleiben bei 24h Stale-Schwelle (sonst Rate-Limit-Sturm)."""
 
 
 def refresh_lifetimes(conn, tenant_id: int, client, min_matches: int = 5,
@@ -301,10 +304,15 @@ def refresh_lifetimes(conn, tenant_id: int, client, min_matches: int = 5,
     refreshed = 0
     errors = []
     for r in rows:
-        max_age = SELF_LIFETIME_MAX_AGE_HOURS if r["is_self"] else 24
+        if r["is_self"]:
+            # SELF: minuten-granular pruefen (gleichgesetzt: max_age_hours-Float).
+            max_age = SELF_LIFETIME_MAX_AGE_MINUTES / 60.0
+        else:
+            max_age = 24
         if not _is_stale(r["last_refreshed"], max_age_hours=max_age):
             continue
-        if refreshed >= max_per_tick:
+        # SELF zaehlt nicht gegen max_per_tick (1 Self-Call/min ist Pflicht).
+        if not r["is_self"] and refreshed >= max_per_tick:
             break
         try:
             payload = client.get_lifetime(r["account_id"])
