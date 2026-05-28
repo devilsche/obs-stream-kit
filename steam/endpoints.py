@@ -1030,13 +1030,13 @@ class SteamEndpointRegistry:
         try:
             row = conn.execute("""
                 SELECT COUNT(*) AS n FROM steam_achievements_seen
-                WHERE tenant_id=%s AND steam_id=%s AND app_id=%s
+                WHERE tenant_id=? AND steam_id=? AND app_id=?
             """, (self.tenant_id, self.client.steam_id,
                   app_id)).fetchone()
             result["dbStoredCount"] = row["n"]
             prog = conn.execute("""
                 SELECT unlocked_count, last_checked FROM steam_app_progress
-                WHERE tenant_id=%s AND steam_id=%s AND app_id=%s
+                WHERE tenant_id=? AND steam_id=? AND app_id=?
             """, (self.tenant_id, self.client.steam_id,
                   app_id)).fetchone()
             result["dbProgress"] = (dict(prog) if prog else None)
@@ -1063,10 +1063,10 @@ class SteamEndpointRegistry:
             rows = conn.execute("""
                 SELECT app_id, name, playtime_forever_min
                 FROM steam_owned_games
-                WHERE tenant_id=%s AND steam_id=%s
+                WHERE tenant_id=? AND steam_id=?
                   AND playtime_forever_min > 30
                 ORDER BY playtime_forever_min DESC
-                LIMIT %s
+                LIMIT ?
             """, (self.tenant_id, self.client.steam_id,
                   limit)).fetchall()
         finally:
@@ -1187,7 +1187,7 @@ class SteamEndpointRegistry:
                 cur = conn.execute("""
                     UPDATE steam_achievements_seen
                     SET displayed_at = EXTRACT(EPOCH FROM now())::BIGINT
-                    WHERE tenant_id=%s AND steam_id=%s
+                    WHERE tenant_id=? AND steam_id=?
                       AND app_id=-1 AND displayed_at IS NULL
                 """, (self.tenant_id, self.client.steam_id))
                 n = cur.rowcount
@@ -1254,7 +1254,7 @@ class SteamEndpointRegistry:
                 try:
                     rows = conn.execute("""
                         SELECT app_id, name FROM steam_owned_games
-                        WHERE tenant_id=%s AND steam_id=%s AND app_id >= 0
+                        WHERE tenant_id=? AND steam_id=? AND app_id >= 0
                         ORDER BY playtime_forever_min DESC
                     """, (self.tenant_id,
                           self.client.steam_id)).fetchall()
@@ -1428,7 +1428,7 @@ class SteamEndpointRegistry:
                 sql += " AND s.app_id = ?"
                 params.append(app_id)
             sql += (" ORDER BY LOWER(sch.game_name) ASC, "
-                    "s.unlocked_at DESC LIMIT %s")
+                    "s.unlocked_at DESC LIMIT ?")
             params.append(limit)
             rows = conn.execute(sql, params).fetchall()
 
@@ -1560,7 +1560,7 @@ class SteamEndpointRegistry:
             if api_name_filter:
                 sql += " AND s.achievement_api_name = ?"
                 params.append(api_name_filter)
-            sql += " ORDER BY s.unlocked_at DESC LIMIT %s"
+            sql += " ORDER BY s.unlocked_at DESC LIMIT ?"
             params.append(limit * 3 if only_rare else limit)
             rows = conn.execute(sql, params).fetchall()
 
@@ -1587,8 +1587,8 @@ class SteamEndpointRegistry:
                 cur = conn.execute("""
                     UPDATE steam_achievements_seen
                     SET displayed_at = NULL
-                    WHERE tenant_id=%s AND steam_id=%s
-                      AND app_id=%s AND achievement_api_name=%s
+                    WHERE tenant_id=? AND steam_id=?
+                      AND app_id=? AND achievement_api_name=?
                 """, (self.tenant_id, self.client.steam_id, ap, api))
                 n += cur.rowcount
             return _ok({
