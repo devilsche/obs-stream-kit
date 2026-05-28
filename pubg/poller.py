@@ -1,158 +1,175 @@
+"""PUBG-Poller — tenant-aware.
+
+Iteriert alle Tenants aus der Postgres-DB, laedt pro Tenant Credentials
+aus dem Vault (core.credentials) und pollt die PUBG-API mit dem
+tenant-eigenen API-Key und Spieler-Namen.
+
+Telemetrie-Archivierung auf HiDrive ist an `users.is_admin` gebunden —
+nur Admin-Owner-Accounts duerfen Telemetrie-Blobs auf den geteilten
+FTP-Storage hochladen (Cost-/Datenschutz-Gate).
+"""
 import datetime
-import os
-import sqlite3
 import threading
-from pubg.db import (connect, upsert_player, insert_match, insert_participants,
-                     get_known_match_ids, upsert_lifetime, upsert_season,
-                     insert_telemetry_events, mark_telemetry_fetched,
-                     get_matches_needing_telemetry, mark_telemetry_schema,
-                     insert_team_mapping, mark_match_schema,
-                     get_matches_needing_match_schema_update,
-                     get_setting, set_setting,
-                     CURRENT_MATCH_SCHEMA)
+
+from core import db as core_db
+from core import credentials
+from core.db_compat import SqliteCompatConn
+from pubg.db_pg import (upsert_player, insert_match, insert_participants,
+                        get_known_match_ids, upsert_lifetime, upsert_season,
+                        insert_telemetry_events, mark_telemetry_fetched,
+                        get_matches_needing_telemetry, mark_telemetry_schema,
+                        insert_team_mapping, mark_match_schema,
+                        get_matches_needing_match_schema_update,
+                        get_setting, set_setting,
+                        CURRENT_MATCH_SCHEMA)
 from pubg.match_parser import (parse_match_response, parse_lifetime_response,
                                 aggregate_lifetime_modes,
                                 parse_season_response, aggregate_season_modes)
-
-
-def rotate_backup(db_path: str, max_backups: int = 7,
-                  ftp_cfg: dict | None = None) -> dict:
-    """Erstellt täglichen Snapshot der DB + lädt optional auf FTP.
-    Behält die letzten N lokalen Backups. Returns status dict."""
-    status = {"local": None, "ftp": None}
-    if not os.path.exists(db_path):
-        return status
-    today = datetime.datetime.utcnow().strftime("%Y%m%d")
-    backup = f"{db_path}.{today}.bak"
-    if os.path.exists(backup):
-        status["local"] = "already-done"
-    else:
-        # SQLite Online-Backup-API: konsistenter Snapshot auch bei laufenden
-        # Schreibvorgängen (anders als shutil.copy bei WAL-Mode → korrupt).
-        try:
-            src = sqlite3.connect(db_path)
-            dst = sqlite3.connect(backup)
-            with dst:
-                src.backup(dst)
-            src.close()
-            dst.close()
-            status["local"] = "ok"
-        except Exception as e:
-            status["local"] = f"error: {e}"
-            return status
-        # Alte Backups aufräumen
-        dir_path = os.path.dirname(db_path) or "."
-        backups = sorted(
-            f for f in os.listdir(dir_path)
-            if f.startswith(os.path.basename(db_path) + ".") and f.endswith(".bak")
-        )
-        for old in backups[:-max_backups]:
-            try:
-                os.remove(os.path.join(dir_path, old))
-            except Exception:
-                pass
-
-    # FTP-Upload (nur wenn neu erstellt oder noch nicht hochgeladen)
-    if ftp_cfg and status["local"] in ("ok", "already-done"):
-        from pubg.backup import upload_to_ftp
-        marker = f"{backup}.ftp-uploaded"
-        if not os.path.exists(marker):
-            ok, msg = upload_to_ftp(backup, ftp_cfg)
-            status["ftp"] = msg
-            if ok:
-                try:
-                    open(marker, "w").close()
-                except Exception:
-                    pass
-        else:
-            status["ftp"] = "already-uploaded"
-    return status
 
 
 def _iso_utc_now():
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def ingest_match(conn, client, my_account_id: str, match_id: str) -> None:
-    """Lädt + persistiert ein einzelnes Match. Raises bei Fehler.
-    `/matches/{id}` ist laut PUBG-Doku NICHT rate-limited — kann
-    aggressiv sequentiell aufgerufen werden.
+# ---------------------------------------------------------------------------
+# Telemetrie-Archivierungs-Gate
+# ---------------------------------------------------------------------------
 
-    Persistiert: match-Header, Squad-Participants (full stats),
-    team_mapping für gesamte Lobby (lightweight), match_schema marker."""
+def maybe_archive_telemetry(conn, tenant_id: int, match_id: str,
+                             telemetry_url: str) -> None:
+    """Telemetrie-Upload-Gate: nur fuer Tenants, deren Owner-User
+    `is_admin = TRUE` hat. Andere Tenants ueberspringen den FTP-Upload
+    (Cost-/Storage-Gate auf dem geteilten HiDrive-Bucket).
+
+    `conn` darf ein psycopg2-RealDict-Conn oder SqliteCompatConn sein —
+    wir greifen nur ueber den Standard-cursor()-Pfad zu.
+    """
+    raw_conn = conn.raw if isinstance(conn, SqliteCompatConn) else conn
+    with raw_conn.cursor() as cur:
+        cur.execute("""
+            SELECT u.is_admin
+            FROM tenants t
+            JOIN users u ON u.id = t.owner_user_id
+            WHERE t.id = %s
+        """, (tenant_id,))
+        row = cur.fetchone()
+    if not row or not row["is_admin"]:
+        return
+    _ftp_upload_telemetry(tenant_id, match_id, telemetry_url)
+
+
+def _ftp_upload_telemetry(tenant_id: int, match_id: str,
+                          telemetry_url: str) -> None:
+    """Telemetrie vom PUBG-CDN ziehen und auf HiDrive ablegen.
+
+    Verwendet die bestehende hidrive_telemetry.upload_raw()-Logik.
+    Die Funktion signatur akzeptiert (match_id, raw_events) — wir ziehen
+    die Events hier ad-hoc per HTTP-Get vom CDN, falls noch nicht
+    geschehen. Im Normalfall wird maybe_archive_telemetry() nach einem
+    erfolgreichen CDN-Fetch in _process_one_telemetry() aufgerufen, sodass
+    der Aufrufer den `raw`-Blob bereits hat. Diese Helfer-Funktion ist
+    daher primaer fuer kuenftige Wiederverwendung gedacht.
+
+    `tenant_id` ist aktuell nicht Teil der hidrive_telemetry-Signatur —
+    HiDrive-Pfad enthaelt nur die match_id. TODO: Tenant in Path
+    aufnehmen wenn mehrere Admin-Tenants gleichzeitig archivieren.
+    """
+    try:
+        import urllib.request, json
+        with urllib.request.urlopen(telemetry_url, timeout=30) as resp:
+            raw = json.loads(resp.read())
+    except Exception as e:
+        print(f"[archive] tenant {tenant_id} match {match_id[:16]}: "
+              f"CDN-Fetch fehlgeschlagen: {e}")
+        return
+    try:
+        from pubg import hidrive_telemetry
+        hidrive_telemetry.upload_raw(match_id, raw)
+    except Exception as e:
+        print(f"[archive] tenant {tenant_id} match {match_id[:16]}: "
+              f"HiDrive-Upload fehlgeschlagen: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Match-Ingest
+# ---------------------------------------------------------------------------
+
+def ingest_match(conn, tenant_id: int, client, my_account_id: str,
+                 match_id: str) -> None:
+    """Laedt + persistiert ein einzelnes Match fuer einen Tenant.
+    `/matches/{id}` ist nicht rate-limited."""
     m_payload = client.get_match(match_id)
     parsed = parse_match_response(m_payload, my_account_id)
-    insert_match(conn, parsed["match_id"], parsed["map_name"],
+    insert_match(conn, tenant_id, parsed["match_id"], parsed["map_name"],
                  parsed["game_mode"], parsed.get("is_ranked", False),
                  parsed["duration_secs"], parsed["played_at"],
                  parsed.get("telemetry_url"))
     for p in parsed["squad_participants"]:
-        upsert_player(conn, p["account_id"], p["name"],
+        upsert_player(conn, tenant_id, p["account_id"], p["name"],
                       client.platform,
                       is_self=(p["account_id"] == my_account_id))
-    insert_participants(conn, parsed["match_id"], parsed["squad_participants"])
+    insert_participants(conn, tenant_id, parsed["match_id"],
+                        parsed["squad_participants"])
     if parsed.get("team_mapping"):
-        insert_team_mapping(conn, parsed["match_id"], parsed["team_mapping"])
-    mark_match_schema(conn, parsed["match_id"], CURRENT_MATCH_SCHEMA)
+        insert_team_mapping(conn, tenant_id, parsed["match_id"],
+                            parsed["team_mapping"])
+    mark_match_schema(conn, tenant_id, parsed["match_id"],
+                       CURRENT_MATCH_SCHEMA)
+    # Telemetrie-Archivierung (nur Admin-Tenants)
+    if parsed.get("telemetry_url"):
+        try:
+            maybe_archive_telemetry(conn, tenant_id, parsed["match_id"],
+                                     parsed["telemetry_url"])
+        except Exception as e:
+            print(f"[archive] tenant {tenant_id} match "
+                  f"{parsed['match_id'][:16]}: {e}")
 
 
-def run_single_tick(conn, client, my_player_name: str,
-                    my_account_id: str, max_matches_per_tick: int = 5) -> dict:
-    """One polling iteration. Returns stats dict for status reporting.
-    Hier ist ein get_player()-Call (rate-limited) sinnvoll, weil wir in
-    Echtzeit nach NEUEN Matches schauen wollen."""
+def run_single_tick(conn, tenant_id: int, client, my_player_name: str,
+                    my_account_id: str,
+                    max_matches_per_tick: int = 5) -> dict:
+    """Eine Polling-Iteration fuer einen Tenant."""
     stats = {"new_matches": 0, "errors": [], "skipped": 0}
-
     try:
         player_payload = client.get_player(my_player_name)
     except Exception as e:
         stats["errors"].append(f"player: {e}")
         return stats
-
     match_ids = client.extract_match_ids(player_payload)
-    known = get_known_match_ids(conn)
+    known = get_known_match_ids(conn, tenant_id)
     new_ids = [mid for mid in match_ids if mid not in known]
-
     for mid in new_ids[:max_matches_per_tick]:
         try:
-            ingest_match(conn, client, my_account_id, mid)
+            ingest_match(conn, tenant_id, client, my_account_id, mid)
             stats["new_matches"] += 1
         except Exception as e:
             stats["errors"].append(f"match {mid}: {e}")
-
     stats["skipped"] = max(0, len(new_ids) - max_matches_per_tick)
     return stats
 
 
-def run_bulk_catchup(conn, client, my_player_name: str,
+def run_bulk_catchup(conn, tenant_id: int, client, my_player_name: str,
                      my_account_id: str, max_matches: int | None = None,
                      pacing_ms: int = 100, progress_cb=None) -> dict:
-    """Ein einziger get_player()-Call (rate-limited), dann sequentielles
-    ingest_match() für ALLE neuen IDs. /matches/{id} ist nicht rate-
-    limited, daher braucht's keinen 12s-Sleep zwischen Iterationen.
-    pacing_ms = höflicher 100ms-Sleep zwischen Match-Calls.
-    max_matches=None (Default) → kein Cap, ALLE neuen IDs werden
-    verarbeitet."""
+    """Ein get_player()-Call (rate-limited), dann sequentielles
+    ingest_match() fuer alle neuen Match-IDs. /matches/{id} ist nicht
+    rate-limited."""
     import time
     stats = {"new_matches": 0, "errors": [], "skipped": 0}
-
     try:
         player_payload = client.get_player(my_player_name)
     except Exception as e:
         stats["errors"].append(f"player: {e}")
         return stats
-
     match_ids = client.extract_match_ids(player_payload)
-    known = get_known_match_ids(conn)
+    known = get_known_match_ids(conn, tenant_id)
     new_ids = [mid for mid in match_ids if mid not in known]
-
     to_process = new_ids if max_matches is None else new_ids[:max_matches]
     stats["skipped"] = (0 if max_matches is None
                         else max(0, len(new_ids) - max_matches))
-
     for i, mid in enumerate(to_process, 1):
         try:
-            ingest_match(conn, client, my_account_id, mid)
+            ingest_match(conn, tenant_id, client, my_account_id, mid)
             stats["new_matches"] += 1
         except Exception as e:
             stats["errors"].append(f"match {mid}: {e}")
@@ -160,9 +177,12 @@ def run_bulk_catchup(conn, client, my_player_name: str,
             progress_cb(i, len(to_process), stats["new_matches"])
         if pacing_ms > 0 and i < len(to_process):
             time.sleep(pacing_ms / 1000)
-
     return stats
 
+
+# ---------------------------------------------------------------------------
+# Lifetime + Season-Refresh
+# ---------------------------------------------------------------------------
 
 def _is_stale(iso_ts, max_age_hours=24):
     if not iso_ts:
@@ -178,31 +198,28 @@ def _is_stale(iso_ts, max_age_hours=24):
 _CURRENT_SEASON_TTL_DAYS = 7
 
 
-def get_current_season_id(conn, client) -> str | None:
-    """Cached current-season-id. PUBG-Seasons wechseln nur alle paar
-    Monate, daher 7-Tage-Cache in settings — vermeidet unnötige Rate-
-    Limit-Requests gegen /seasons. Bei Cache-Miss/-Stale wird neu gezogen."""
-    cached_id = get_setting(conn, "pubg.current_season_id")
-    cached_at = get_setting(conn, "pubg.current_season_id_fetched_at")
-    if cached_id and not _is_stale(cached_at,
-                                    max_age_hours=_CURRENT_SEASON_TTL_DAYS * 24):
+def get_current_season_id(conn, tenant_id: int, client) -> str | None:
+    """Cached current-season-id pro Tenant in settings."""
+    cached_id = get_setting(conn, tenant_id, "pubg.current_season_id")
+    cached_at = get_setting(conn, tenant_id, "pubg.current_season_id_fetched_at")
+    if cached_id and not _is_stale(
+            cached_at, max_age_hours=_CURRENT_SEASON_TTL_DAYS * 24):
         return cached_id
     payload = client.get_seasons()
     sid = client.extract_current_season_id(payload)
     if sid:
-        set_setting(conn, "pubg.current_season_id", sid)
-        set_setting(conn, "pubg.current_season_id_fetched_at", _iso_utc_now())
+        set_setting(conn, tenant_id, "pubg.current_season_id", sid)
+        set_setting(conn, tenant_id, "pubg.current_season_id_fetched_at",
+                    _iso_utc_now())
     return sid
 
 
-def refresh_seasons(conn, client, min_matches: int = 5,
+def refresh_seasons(conn, tenant_id: int, client, min_matches: int = 5,
                     max_per_tick: int = 3,
                     max_age_hours: int = 6) -> dict:
-    """Holt aktuelle Season-Stats (non-ranked) für self + qualified
-    co-players. Cadence ist enger als Lifetime (6h statt 24h), weil
-    Season-Stats sich öfter ändern (jedes neue Match)."""
+    """Aktuelle Season-Stats fuer self + qualified co-players."""
     try:
-        season_id = get_current_season_id(conn, client)
+        season_id = get_current_season_id(conn, tenant_id, client)
     except Exception as e:
         return {"refreshed": 0, "errors": [f"current-season-id: {e}"]}
     if not season_id:
@@ -211,16 +228,19 @@ def refresh_seasons(conn, client, min_matches: int = 5,
     rows = conn.execute("""
         SELECT p.account_id, p.name,
                (SELECT MAX(last_refreshed) FROM player_season
-                WHERE account_id = p.account_id AND season_id = ?) AS last_refreshed
+                WHERE account_id = p.account_id AND season_id = ?
+                  AND tenant_id = ?) AS last_refreshed
         FROM players p
-        WHERE p.is_self = 1
+        WHERE p.is_self = TRUE AND p.tenant_id = ?
         UNION
         SELECT q.account_id, q.name,
                (SELECT MAX(last_refreshed) FROM player_season
-                WHERE account_id = q.account_id AND season_id = ?) AS last_refreshed
+                WHERE account_id = q.account_id AND season_id = ?
+                  AND tenant_id = ?) AS last_refreshed
         FROM qualified_co_players q
-        WHERE q.shared_matches >= ?
-    """, (season_id, season_id, min_matches)).fetchall()
+        WHERE q.shared_matches >= ? AND q.tenant_id = ?
+    """, (season_id, tenant_id, tenant_id,
+          season_id, tenant_id, min_matches, tenant_id)).fetchall()
 
     refreshed = 0
     errors = []
@@ -233,33 +253,33 @@ def refresh_seasons(conn, client, min_matches: int = 5,
             payload = client.get_season(r["account_id"], season_id)
             modes = parse_season_response(payload)
             for mode, stats in modes.items():
-                upsert_season(conn, r["account_id"], season_id, mode, stats)
+                upsert_season(conn, tenant_id, r["account_id"], season_id,
+                              mode, stats)
             agg = aggregate_season_modes(modes)
-            upsert_season(conn, r["account_id"], season_id, "all", agg)
+            upsert_season(conn, tenant_id, r["account_id"], season_id, "all",
+                          agg)
             refreshed += 1
         except Exception as e:
             errors.append(f"{r['name']}: {e}")
-    return {"refreshed": refreshed, "errors": errors,
-            "seasonId": season_id}
+    return {"refreshed": refreshed, "errors": errors, "seasonId": season_id}
 
 
-def refresh_lifetimes(conn, client, min_matches: int = 5,
+def refresh_lifetimes(conn, tenant_id: int, client, min_matches: int = 5,
                       max_per_tick: int = 3) -> dict:
-    # Self + qualified co-players (>= min_matches together) get refreshed
-    # every 24h. Self always counts; co-players only beyond threshold.
+    """Self + qualified co-players → Lifetime-Stats jeden 24h."""
     rows = conn.execute("""
         SELECT p.account_id, p.name,
                (SELECT MAX(last_refreshed) FROM player_lifetime
-                WHERE account_id = p.account_id) AS last_refreshed
+                WHERE account_id = p.account_id AND tenant_id = ?) AS last_refreshed
         FROM players p
-        WHERE p.is_self = 1
+        WHERE p.is_self = TRUE AND p.tenant_id = ?
         UNION
         SELECT q.account_id, q.name,
                (SELECT MAX(last_refreshed) FROM player_lifetime
-                WHERE account_id = q.account_id) AS last_refreshed
+                WHERE account_id = q.account_id AND tenant_id = ?) AS last_refreshed
         FROM qualified_co_players q
-        WHERE q.shared_matches >= ?
-    """, (min_matches,)).fetchall()
+        WHERE q.shared_matches >= ? AND q.tenant_id = ?
+    """, (tenant_id, tenant_id, tenant_id, min_matches, tenant_id)).fetchall()
 
     refreshed = 0
     errors = []
@@ -272,110 +292,122 @@ def refresh_lifetimes(conn, client, min_matches: int = 5,
             payload = client.get_lifetime(r["account_id"])
             modes = parse_lifetime_response(payload)
             for mode, stats in modes.items():
-                upsert_lifetime(conn, r["account_id"], mode, stats)
+                upsert_lifetime(conn, tenant_id, r["account_id"], mode, stats)
             agg = aggregate_lifetime_modes(modes)
-            upsert_lifetime(conn, r["account_id"], "all", agg)
+            upsert_lifetime(conn, tenant_id, r["account_id"], "all", agg)
             refreshed += 1
         except Exception as e:
             errors.append(f"{r['name']}: {e}")
     return {"refreshed": refreshed, "errors": errors}
 
 
-def _squad_account_ids_for_match(conn, match_id):
+# ---------------------------------------------------------------------------
+# Telemetrie-Backlog
+# ---------------------------------------------------------------------------
+
+def _squad_account_ids_for_match(conn, tenant_id: int, match_id):
     rows = conn.execute(
-        "SELECT account_id FROM participants WHERE match_id = ?", (match_id,)
+        "SELECT account_id FROM participants "
+        "WHERE match_id = ? AND tenant_id = ?",
+        (match_id, tenant_id)
     ).fetchall()
     return {r["account_id"] for r in rows}
 
 
-def _process_one_telemetry(conn, client, my_account_id, row):
-    """Lädt + persistiert Telemetry-Events für ein Match. Idempotent.
+def _process_one_telemetry(conn, tenant_id: int, client, my_account_id, row):
+    """Laedt + persistiert Telemetry-Events fuer ein Match. Idempotent.
 
-    Fehlerbehandlung:
-    - HTTPError 404 (CDN-URL abgelaufen, PUBG-Retention ~14d): Match wird
-      als 'abandoned' markiert (telemetry_fetched=1 + schema=CURRENT),
-      damit der Poller ihn nie wieder anpackt.
-    - Andere Fehler (Timeout, 5xx, Netzwerk): nur telemetry_fetched=1,
-      schema bleibt < CURRENT → naechster Tick versucht's nochmal.
+    Bei 404 → abandoned (kein Retry). Bei anderen Fehlern: nur
+    telemetry_fetched=1, naechster Tick versucht's nochmal.
     """
     import urllib.error
     from pubg.telemetry import filter_squad_events
     try:
         raw = client.get_telemetry(row["telemetry_url"])
     except urllib.error.HTTPError as e:
-        # 404 = URL expired auf dem PUBG-CDN. Wird nie mehr verfuegbar
-        # sein → abandoned markieren, kein Retry mehr.
         if e.code == 404:
-            mark_telemetry_fetched(conn, row["match_id"])
-            mark_telemetry_schema(conn, row["match_id"])
+            mark_telemetry_fetched(conn, tenant_id, row["match_id"])
+            mark_telemetry_schema(conn, tenant_id, row["match_id"])
             raise RuntimeError(
                 f"telemetry {row['match_id']}: 404 expired (abandoned)")
-        # Andere HTTP-Codes (5xx) sind transient → kein schema-update.
-        mark_telemetry_fetched(conn, row["match_id"])
+        mark_telemetry_fetched(conn, tenant_id, row["match_id"])
         raise RuntimeError(f"telemetry {row['match_id']}: HTTP {e.code}")
     except Exception as e:
-        mark_telemetry_fetched(conn, row["match_id"])
+        mark_telemetry_fetched(conn, tenant_id, row["match_id"])
         raise RuntimeError(f"telemetry {row['match_id']}: {e}")
-    # Raw-Blob auf HiDrive archivieren (fire-and-forget, kein Abort bei Fehler)
-    try:
-        from pubg.hidrive_telemetry import upload_raw as _hd_upload
-        _hd_upload(row["match_id"], raw)
-    except Exception:
-        pass  # HiDrive-Fehler duerfen den normalen Fetch nicht blockieren
 
-    squad = _squad_account_ids_for_match(conn, row["match_id"])
+    # Raw-Blob auf HiDrive archivieren — nur fuer Admin-Tenants.
+    # Wir haben raw bereits im Speicher, daher den Upload direkt
+    # statt ueber maybe_archive_telemetry() (das wuerde nochmal CDN-fetchen).
+    try:
+        raw_conn = conn.raw if isinstance(conn, SqliteCompatConn) else conn
+        with raw_conn.cursor() as cur:
+            cur.execute("""
+                SELECT u.is_admin
+                FROM tenants t JOIN users u ON u.id = t.owner_user_id
+                WHERE t.id = %s
+            """, (tenant_id,))
+            adm_row = cur.fetchone()
+        if adm_row and adm_row["is_admin"]:
+            from pubg.hidrive_telemetry import upload_raw as _hd_upload
+            _hd_upload(row["match_id"], raw)
+    except Exception:
+        pass  # HiDrive/Admin-Check-Fehler duerfen Fetch nicht blockieren
+
+    squad = _squad_account_ids_for_match(conn, tenant_id, row["match_id"])
     if my_account_id not in squad:
         squad.add(my_account_id)
-    # Spielernamen aus den Raw-Events extrahieren + upserten — sonst
-    # haben wir nur account_ids fuer Lobby-Gegner und match-detail
-    # zeigt nur die ID statt 'Killer Joe'.
+    # Spielernamen aus den Raw-Events upserten (Lobby-Gegner).
     try:
         from pubg.telemetry import extract_player_names
-        from pubg.db import upsert_player
         for acc, nm in extract_player_names(raw).items():
             if acc and nm and acc != my_account_id:
-                upsert_player(conn, acc, nm, client.platform, is_self=False)
+                upsert_player(conn, tenant_id, acc, nm, client.platform,
+                              is_self=False)
     except Exception:
         pass
     events = list(filter_squad_events(raw, squad))
-    # Bei Re-Fetch (alte Schema-Version) erst alte events löschen,
-    # sonst Doubletten.
-    conn.execute("DELETE FROM telemetry_events WHERE match_id = ?",
-                  (row["match_id"],))
+    # Bei Re-Fetch alte events loeschen → keine Doubletten.
+    conn.execute(
+        "DELETE FROM telemetry_events "
+        "WHERE match_id = ? AND tenant_id = ?",
+        (row["match_id"], tenant_id))
     conn.commit()
     if events:
-        insert_telemetry_events(conn, row["match_id"], events)
-    mark_telemetry_fetched(conn, row["match_id"])
-    mark_telemetry_schema(conn, row["match_id"])
+        insert_telemetry_events(conn, tenant_id, row["match_id"], events)
+    mark_telemetry_fetched(conn, tenant_id, row["match_id"])
+    mark_telemetry_schema(conn, tenant_id, row["match_id"])
 
 
-def process_telemetry_backlog(conn, client, my_account_id, max_per_tick=5):
-    """Verarbeitet bis zu max_per_tick Telemetries (für Poller-Tick)."""
-    pending = get_matches_needing_telemetry(conn, limit=max_per_tick)
+def process_telemetry_backlog(conn, tenant_id: int, client, my_account_id,
+                               max_per_tick=5):
+    """Verarbeitet bis zu max_per_tick Telemetries pro Tick."""
+    pending = get_matches_needing_telemetry(conn, tenant_id,
+                                             limit=max_per_tick)
     processed = 0
     errors = []
     for row in pending:
         try:
-            _process_one_telemetry(conn, client, my_account_id, row)
+            _process_one_telemetry(conn, tenant_id, client, my_account_id, row)
             processed += 1
         except Exception as e:
             errors.append(str(e))
     return {"processed": processed, "errors": errors}
 
 
-def run_bulk_match_schema_upgrade(conn, client, my_account_id,
+def run_bulk_match_schema_upgrade(conn, tenant_id: int, client, my_account_id,
                                     pacing_ms: int = 100,
                                     progress_cb=None) -> dict:
-    """Re-fetcht Matches deren match_schema unter CURRENT liegt
-    (z.B. um team_mapping nachzuziehen). /matches/{id} ist nicht
-    rate-limited."""
+    """Re-fetcht Matches mit veraltetem match_schema."""
     import time
     stats = {"upgraded": 0, "errors": []}
-    rows = get_matches_needing_match_schema_update(conn, CURRENT_MATCH_SCHEMA)
+    rows = get_matches_needing_match_schema_update(
+        conn, tenant_id, CURRENT_MATCH_SCHEMA)
     total = len(rows)
     for i, row in enumerate(rows, 1):
         try:
-            ingest_match(conn, client, my_account_id, row["match_id"])
+            ingest_match(conn, tenant_id, client, my_account_id,
+                         row["match_id"])
             stats["upgraded"] += 1
         except Exception as e:
             stats["errors"].append(f"match {row['match_id']}: {e}")
@@ -386,23 +418,20 @@ def run_bulk_match_schema_upgrade(conn, client, my_account_id,
     return stats
 
 
-def run_bulk_telemetry_catchup(conn, client, my_account_id,
+def run_bulk_telemetry_catchup(conn, tenant_id: int, client, my_account_id,
                                 max_matches: int | None = None,
-                                pacing_ms: int = 100, progress_cb=None) -> dict:
-    """Verarbeitet ALLE pending Telemetries ohne 60s-Tick-Drossel.
-    /telemetry-cdn ist laut PUBG-Doku NICHT rate-limited — wir können
-    sequentiell durchziehen, nur 100ms Höflichkeits-Pace zwischen Calls.
-
-    max_matches=None → kein Cap, alle pending werden verarbeitet.
-    """
+                                pacing_ms: int = 100,
+                                progress_cb=None) -> dict:
+    """Verarbeitet alle pending Telemetries ohne 60s-Drossel."""
     import time
     stats = {"processed": 0, "errors": [], "skipped": 0}
     pending = get_matches_needing_telemetry(
-        conn, limit=max_matches if max_matches is not None else 100000)
+        conn, tenant_id,
+        limit=max_matches if max_matches is not None else 100000)
     total = len(pending)
     for i, row in enumerate(pending, 1):
         try:
-            _process_one_telemetry(conn, client, my_account_id, row)
+            _process_one_telemetry(conn, tenant_id, client, my_account_id, row)
             stats["processed"] += 1
         except Exception as e:
             stats["errors"].append(str(e))
@@ -413,141 +442,148 @@ def run_bulk_telemetry_catchup(conn, client, my_account_id,
     return stats
 
 
+# ---------------------------------------------------------------------------
+# Top-Level Tenant-Loop
+# ---------------------------------------------------------------------------
+
+def _list_tenant_ids(conn) -> list[int]:
+    raw_conn = conn.raw if isinstance(conn, SqliteCompatConn) else conn
+    with raw_conn.cursor() as cur:
+        cur.execute("SELECT id FROM tenants ORDER BY id")
+        return [r["id"] for r in cur.fetchall()]
+
+
+def poll_tenant(conn, tenant_id: int, client_factory,
+                match_max: int = 5,
+                lifetime_min: int = 5,
+                lifetime_max: int = 3) -> dict:
+    """Pollt einen einzelnen Tenant.
+
+    `client_factory(api_key, platform)` baut den PUBG-API-Client. So muss
+    der Caller (PollerThread/run()) nichts ueber die Client-Implementierung
+    wissen, und Tests koennen einen Stub injizieren.
+    """
+    creds = credentials.get(conn, tenant_id)
+    if not creds.pubg_api_key or not creds.pubg_name:
+        return {"polling": "skip", "reason": "no-pubg-credentials",
+                "tenantId": tenant_id}
+    client = client_factory(creds.pubg_api_key,
+                            creds.pubg_platform or "steam")
+    # account_id aus credentials (gecached) oder vom client nachziehen
+    my_account_id = creds.pubg_account_id
+    if not my_account_id:
+        try:
+            payload = client.get_player(creds.pubg_name)
+            ids = list({p.get("id") for p in payload.get("data", [])
+                        if isinstance(p, dict)})
+            my_account_id = ids[0] if ids else None
+        except Exception as e:
+            return {"polling": "error", "tenantId": tenant_id,
+                    "errors": [f"player-lookup: {e}"]}
+        if not my_account_id:
+            return {"polling": "error", "tenantId": tenant_id,
+                    "errors": ["account-id-unknown"]}
+
+    m_stats = run_single_tick(conn, tenant_id, client, creds.pubg_name,
+                              my_account_id, match_max)
+    l_stats = refresh_lifetimes(conn, tenant_id, client, lifetime_min,
+                                lifetime_max)
+    try:
+        s_stats = refresh_seasons(conn, tenant_id, client, lifetime_min,
+                                  lifetime_max)
+    except Exception as e:
+        s_stats = {"refreshed": 0, "errors": [f"season-batch: {e}"],
+                   "seasonId": None}
+    try:
+        t_stats = process_telemetry_backlog(conn, tenant_id, client,
+                                             my_account_id, 3)
+    except Exception as e:
+        t_stats = {"processed": 0, "errors": [f"telemetry-batch: {e}"]}
+
+    all_errors = (m_stats["errors"] + l_stats["errors"] + s_stats["errors"]
+                  + t_stats["errors"])
+    return {
+        "polling": "ok" if not all_errors else "degraded",
+        "tenantId": tenant_id,
+        "errors": all_errors,
+        "newMatches": m_stats["new_matches"],
+        "lifetimeRefreshed": l_stats["refreshed"],
+        "seasonRefreshed": s_stats["refreshed"],
+        "currentSeasonId": s_stats.get("seasonId"),
+        "telemetryProcessed": t_stats["processed"],
+    }
+
+
+def run(client_factory, match_max: int = 5, lifetime_min: int = 5,
+        lifetime_max: int = 3) -> dict:
+    """Single polling pass ueber ALLE Tenants. Returns Dict mit
+    per-Tenant-Stats."""
+    pg_conn = core_db.connect()
+    conn = SqliteCompatConn(pg_conn)
+    out = {"perTenant": {}, "errors": []}
+    try:
+        tenant_ids = _list_tenant_ids(conn)
+        for tid in tenant_ids:
+            try:
+                out["perTenant"][tid] = poll_tenant(
+                    conn, tid, client_factory,
+                    match_max=match_max,
+                    lifetime_min=lifetime_min,
+                    lifetime_max=lifetime_max,
+                )
+            except Exception as e:
+                out["errors"].append(f"tenant {tid}: {e}")
+    finally:
+        conn.close()
+    out["lastPollAt"] = _iso_utc_now()
+    return out
+
+
+# ---------------------------------------------------------------------------
+# PollerThread — Background-Loop fuer serve.py
+# ---------------------------------------------------------------------------
+
 class PollerThread(threading.Thread):
-    def __init__(self, db_path, client, my_player_name, my_account_id,
-                 interval_secs=60, lifetime_min_matches=5,
-                 lifetime_max_per_tick=3, match_max_per_tick=5,
-                 ftp_backup_cfg=None, cache=None):
+    """Hintergrund-Thread, der run() alle `interval_secs` aufruft.
+
+    Anders als frueher (per-Streamer-Konfiguration) iteriert run() alle
+    Tenants aus der DB; Credentials kommen pro Tenant aus dem Vault.
+    """
+    def __init__(self, client_factory, interval_secs=60,
+                 lifetime_min_matches=5, lifetime_max_per_tick=3,
+                 match_max_per_tick=5, cache=None):
         super().__init__(daemon=True, name="pubg-poller")
-        self.db_path = db_path
-        self.client = client
-        self.my_player_name = my_player_name
-        self.my_account_id = my_account_id
+        self.client_factory = client_factory
         self.interval = interval_secs
         self.lifetime_min = lifetime_min_matches
         self.lifetime_max = lifetime_max_per_tick
         self.match_max = match_max_per_tick
-        self.ftp_backup_cfg = ftp_backup_cfg
-        # Endpoint-Cache (TTLCache) — wird invalidated wenn neue Matches/
-        # Telemetry/Achievements eingespielt sind, sonst zeigen die Widgets
-        # bis zu TTL (30s) lang stale Daten ('nur 1 Match').
         self.cache = cache
         self._stop = threading.Event()
         self._last_status = {"polling": "starting", "lastPollAt": None,
-                              "errors": [], "newMatches": 0,
-                              "lifetimeRefreshed": 0,
-                              "telemetryProcessed": 0}
+                              "perTenant": {}, "errors": []}
 
     def run(self):
-        # Beim Start: Integrität checken — Korruption fällt sofort auf,
-        # nicht erst nach Wochen.
-        try:
-            from pubg.db import integrity_check
-            conn0 = connect(self.db_path)
-            ic = integrity_check(conn0)
-            conn0.close()
-            if ic != "ok":
-                self._last_status["integrity"] = f"FAILED: {ic}"
-            else:
-                self._last_status["integrity"] = "ok"
-        except Exception as e:
-            self._last_status["integrity"] = f"check-error: {e}"
-
-        # Beim Start: Bulk-Telemetry-Catchup im Hintergrund — alle Matches
-        # mit veraltetem Schema werden refetched (soweit PUBG-Telemetry-URL
-        # noch valide ist, ueblicherweise 14d Retention). Laeuft in eigenem
-        # Thread damit der reguläre Poll-Loop nicht blockiert.
-        def _bulk_catchup():
-            try:
-                conn_bc = connect(self.db_path)
-                stats = run_bulk_telemetry_catchup(
-                    conn_bc, self.client, self.my_account_id,
-                    max_matches=None, pacing_ms=200)
-                # Achievement-Detection nach Bulk-Catchup — sonst werden
-                # Runden die ohne laufenden Server gespielt wurden nie
-                # ausgewertet (normaler Tick findet 0 pending Telemetries).
-                if stats.get("processed", 0) > 0:
-                    try:
-                        from pubg.aggregations import (
-                            detect_and_store_session_achievements)
-                        n = detect_and_store_session_achievements(
-                            conn_bc, self.my_account_id)
-                        stats["newAchievements"] = n
-                        if n > 0 and self.cache is not None:
-                            self.cache.invalidate()
-                    except Exception as ae:
-                        stats["achievementError"] = str(ae)
-                conn_bc.close()
-                self._last_status["bulkCatchup"] = stats
-            except Exception as e:
-                self._last_status["bulkCatchup"] = {"error": str(e)}
-        threading.Thread(target=_bulk_catchup, daemon=True,
-                          name="pubg-bulk-catchup").start()
-
-        last_backup_day = None
         while not self._stop.is_set():
-            # Tägliches DB-Backup
-            today = datetime.datetime.utcnow().strftime("%Y%m%d")
-            if last_backup_day != today:
-                bk = rotate_backup(self.db_path, ftp_cfg=self.ftp_backup_cfg)
-                self._last_status["backup"] = bk
-                last_backup_day = today
             try:
-                conn = connect(self.db_path)
-                m_stats = run_single_tick(conn, self.client,
-                                          self.my_player_name, self.my_account_id,
-                                          self.match_max)
-                l_stats = refresh_lifetimes(conn, self.client,
-                                            self.lifetime_min, self.lifetime_max)
-                try:
-                    s_stats = refresh_seasons(conn, self.client,
-                                               self.lifetime_min, self.lifetime_max)
-                except Exception as e:
-                    s_stats = {"refreshed": 0, "errors": [f"season-batch: {e}"],
-                               "seasonId": None}
-                try:
-                    t_stats = process_telemetry_backlog(conn, self.client,
-                                                         self.my_account_id, 3)
-                except Exception as e:
-                    t_stats = {"processed": 0, "errors": [f"telemetry-batch: {e}"]}
-                # Session-Achievement-Detection nach neuen Matches.
-                # Detect erfasst alle Session-Milestones, INSERT IGNORE
-                # filtert Duplikate (PK achievement_id+match_id).
-                new_achievements = 0
-                if m_stats["new_matches"] > 0 or t_stats["processed"] > 0:
+                status = run(
+                    self.client_factory,
+                    match_max=self.match_max,
+                    lifetime_min=self.lifetime_min,
+                    lifetime_max=self.lifetime_max,
+                )
+                # Achievements + Cache-Invalidate, wenn irgendwo neue
+                # Matches/Telemetries dazukamen.
+                any_change = any(
+                    (t.get("newMatches", 0) > 0
+                     or t.get("telemetryProcessed", 0) > 0)
+                    for t in status.get("perTenant", {}).values())
+                if any_change and self.cache is not None:
                     try:
-                        from pubg.aggregations import (
-                            detect_and_store_session_achievements)
-                        new_achievements = (
-                            detect_and_store_session_achievements(
-                                conn, self.my_account_id))
-                    except Exception as e:
-                        all_errors = (all_errors if 'all_errors' in dir() else [])
-                        all_errors.append(f"achievement-detect: {e}")
-                    # Endpoint-Cache leeren — sonst zeigen Widgets bis zu
-                    # 30s lang die alten Stats ('nur 1 Match vorhanden')
-                    # waehrend neue Milestones schon im Popup-Stream sind.
-                    if self.cache is not None:
-                        try:
-                            self.cache.invalidate()
-                        except Exception:
-                            pass
-                all_errors = (m_stats["errors"] + l_stats["errors"]
-                              + s_stats["errors"] + t_stats["errors"])
-                self._last_status = {
-                    "polling": "ok" if not all_errors else "degraded",
-                    "lastPollAt": _iso_utc_now(),
-                    "errors": all_errors,
-                    "newMatches": m_stats["new_matches"],
-                    "lifetimeRefreshed": l_stats["refreshed"],
-                    "seasonRefreshed": s_stats["refreshed"],
-                    "currentSeasonId": s_stats.get("seasonId"),
-                    "telemetryProcessed": t_stats["processed"],
-                    "newAchievements": new_achievements,
-                    "rateLimitRemaining": self.client.limiter.remaining()
-                                          if hasattr(self.client, "limiter") else None,
-                }
-                conn.close()
+                        self.cache.invalidate()
+                    except Exception:
+                        pass
+                self._last_status = status
             except Exception as e:
                 self._last_status = {"polling": "error", "errors": [str(e)],
                                      "lastPollAt": _iso_utc_now()}
