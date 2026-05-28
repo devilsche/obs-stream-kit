@@ -1,4 +1,8 @@
 // tools/match-replay.js
+const isBotAcc = (acc) => typeof acc === "string" && acc.startsWith("ai.");
+const isBotTeam = (tid) => Number(tid) >= 200;
+const botSuffix = (acc) => isBotAcc(acc) ? " ·BOT" : "";
+
 const RS = {
   replay: null,         // geladenes Replay-Dict
   focusedTeam: null,    // team_id oder null
@@ -77,17 +81,20 @@ async function loadReplay(matchId) {
 function buildTeamList() {
   const host = document.getElementById("teamList");
   if (!RS.replay) { host.innerHTML = ""; return; }
-  host.innerHTML = RS.replay.teams.map(t => `
-    <div class="team" data-team="${t.teamId}">
+  host.innerHTML = RS.replay.teams.map(t => {
+    const bot = isBotTeam(t.teamId);
+    return `
+    <div class="team${bot ? " bot-team" : ""}" data-team="${t.teamId}">
       <div class="team-head" role="button" tabindex="0"
-           aria-label="Team ${t.teamId} fokussieren">
+           aria-label="Team ${t.teamId}${bot ? " (Bots)" : ""} fokussieren">
         <span class="team-swatch" style="background:${t.color}"></span>
-        <strong>Team ${t.teamId}</strong>
+        <strong>Team ${t.teamId}${bot ? " 🤖" : ""}</strong>
       </div>
       <div class="team-players">
-        ${t.players.map(p => p.name).join("<br>")}
+        ${t.players.map(p => p.name + (isBotAcc(p.accountId) ? " ·BOT" : "")).join("<br>")}
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
   host.querySelectorAll(".team-head").forEach(el => {
     const tid = Number(el.closest(".team").dataset.team);
     const focus = () => setFocus(tid);
@@ -583,7 +590,7 @@ function renderFrame() {
         ctx.fillStyle = "#fff";
         ctx.font = `bold ${nameScale}px DM Sans`;
         ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-        ctx.fillText(RS._accName[acc] || "", px + 10, py - 7);
+        ctx.fillText((RS._accName[acc] || "") + botSuffix(acc), px + 10, py - 7);
       }
     } else {
       ctx.fillStyle = focused ? RS._teamColor[tid] : "#bbb";
@@ -598,7 +605,7 @@ function renderFrame() {
         ctx.fillStyle = RS._teamColor[tid] || "#fff";
         ctx.font = `${nameScale}px DM Sans`;
         ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-        ctx.fillText(RS._accName[acc] || "", px + 7, py - 5);
+        ctx.fillText((RS._accName[acc] || "") + botSuffix(acc), px + 7, py - 5);
       }
     }
     ctx.globalAlpha = 1;

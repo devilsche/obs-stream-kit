@@ -4366,10 +4366,14 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
                 f"AND target_account LIKE 'ai.%' GROUP BY actor_account",
                     [m["match_id"]] + sq_list).fetchall():
                 bot_kills[r["actor_account"]] = r["c"]
-        # Anzahl Bot-Teams in dieser Match-Lobby (team_id >= 200)
+        # Bot-Teams (team_id >= 200) und Gesamt-Teams in dieser Lobby
         bot_teams_in_lobby = conn.execute(
             "SELECT COUNT(DISTINCT team_id) FROM match_team_mapping "
             "WHERE match_id=? AND team_id>=200",
+            (m["match_id"],)).fetchone()[0] or 0
+        total_teams_in_lobby = conn.execute(
+            "SELECT COUNT(DISTINCT team_id) FROM match_team_mapping "
+            "WHERE match_id=?",
             (m["match_id"],)).fetchone()[0] or 0
         my_special = spec.get(my_account_id, {})
         my_entry = {
@@ -4422,6 +4426,7 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             "squad": squad_enriched,
             "matchSpecial": match_special,
             "botTeamsInLobby": bot_teams_in_lobby,
+            "totalTeamsInLobby": total_teams_in_lobby,
         }
 
     return {

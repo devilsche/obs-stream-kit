@@ -15,6 +15,8 @@ const LS = {
   view: { zoom: 1, panX: 0, panY: 0 },
 };
 const SCATTER_COLORS = ["#f2b705", "#3cb44b", "#46f0f0", "#f032e6"];
+const isBotAcc = (acc) => typeof acc === "string" && acc.startsWith("ai.");
+const botMark = (acc) => isBotAcc(acc) ? " <span class=\"bot-mark\">·BOT</span>" : "";
 
 // ---------------------------------------------------------------------------
 // Task 8: Karten-Selektor
@@ -68,7 +70,7 @@ function wireAutocomplete(idx) {
         "/api/pubg/player-search?q=" + encodeURIComponent(q));
       list.innerHTML = res.map(p =>
         `<div role="option" tabindex="0" data-acc="${p.accountId}"
-              aria-selected="false">${p.name}</div>`
+              aria-selected="false">${p.name}${botMark(p.accountId)}</div>`
       ).join("");
       showList(res.length > 0);
       list.querySelectorAll("[role='option']").forEach(d => {
@@ -291,7 +293,7 @@ function buildPlayersBar() {
          aria-pressed="${LS.activeScatter.has(p.accountId) ? "true" : "false"}"
          aria-label="Scatter ${p.name} umschalten">
       <span class="dot" style="background:${SCATTER_COLORS[i]}"></span>
-      <span>${p.name}</span>
+      <span>${p.name}${botMark(p.accountId)}</span>
     </div>`).join("");
   bar.querySelectorAll(".pchip").forEach(chip => {
     const acc = chip.dataset.acc;
@@ -323,8 +325,8 @@ function renderPoiList() {
   host.innerHTML = LS.data.pois.map(poi => {
     const players = Object.entries(poi.byPlayer)
       .sort((a, b) => b[1].count - a[1].count)
-      .map(([, v]) =>
-        `<div class="poi-player"><span>${v.name}</span>`
+      .map(([acc, v]) =>
+        `<div class="poi-player"><span>${v.name}${botMark(acc)}</span>`
         + `<span>${v.count}× · ${v.pct}%</span></div>`).join("");
     const w = Math.round(poi.total / maxTotal * 100);
     return `
