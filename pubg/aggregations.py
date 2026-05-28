@@ -1,5 +1,8 @@
 import datetime
-from pubg.db import get_setting
+from pubg.db_pg import get_setting
+
+# Tenant-Scope (Spec 1: hardcoded). Wird in Spec 2 durch Session-Auth ersetzt.
+HARDCODED_TENANT_ID = 1
 
 
 # Battle-Royale-Modes — alles andere (TDM, War-Mode, Event-Modes, Labs,
@@ -46,13 +49,14 @@ def _session_filter(conn):
        Erste Lücke > sessionGapHours (default 4h) zwischen zwei Matches
        → das ist der Session-Start.
     3. Wenn keine Lücke gefunden → alle Matches in DB sind eine Session."""
-    started_at = get_setting(conn, "sessionStartedAt")
+    started_at = get_setting(conn.raw, HARDCODED_TENANT_ID, "sessionStartedAt")
     if started_at and started_at > "1970-01-02":
         return started_at
 
-    gap_hours = float(get_setting(conn, "sessionGapHours", "4"))
+    gap_hours = float(get_setting(conn.raw, HARDCODED_TENANT_ID, "sessionGapHours", "4"))
     rows = conn.execute(
-        "SELECT played_at FROM matches ORDER BY played_at DESC LIMIT 200"
+        "SELECT played_at FROM matches WHERE tenant_id = ? ORDER BY played_at DESC LIMIT 200",
+        (HARDCODED_TENANT_ID,)
     ).fetchall()
     if not rows:
         return "1970-01-01T00:00:00Z"
@@ -87,7 +91,7 @@ def compute_session_stats(conn, my_account_id: str,
                           range_key: str = "session") -> dict:
     if range_key == "session":
         started = _session_filter(conn)
-        explicit = get_setting(conn, "sessionStartedAt")
+        explicit = get_setting(conn.raw, HARDCODED_TENANT_ID, "sessionStartedAt")
         session_mode = "manual" if (explicit and explicit > "1970-01-02") else "auto"
     else:
         started = _range_filter(conn, range_key) if range_key != "all" else "1970-01-01T00:00:00Z"
@@ -100,11 +104,11 @@ def compute_session_stats(conn, my_account_id: str,
                pa.weapons_acquired, pa.walk_distance, pa.ride_distance,
                pa.swim_distance, pa.assists, pa.dbnos, pa.time_survived
         FROM matches m
-        JOIN participants pa ON pa.match_id = m.match_id
-        WHERE pa.account_id = ? AND m.played_at >= ?
+        JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
+        WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?
           AND {br_where}
         ORDER BY m.played_at ASC
-    """, (my_account_id, started, *br_params)).fetchall()
+    """, (HARDCODED_TENANT_ID, my_account_id, started, *br_params)).fetchall()
 
     kills = sum(r["kills"] or 0 for r in rows)
     headshots = sum(r["headshot_kills"] or 0 for r in rows)
@@ -161,14 +165,15 @@ def compute_session_stats(conn, my_account_id: str,
 def compute_last_match(conn, my_account_id: str):
     row = conn.execute("""
         SELECT m.* FROM matches m
-        JOIN participants pa ON pa.match_id = m.match_id
-        WHERE pa.account_id = ?
+        JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
+        WHERE m.tenant_id = ? AND pa.account_id = ?
         ORDER BY m.played_at DESC LIMIT 1
-    """, (my_account_id,)).fetchone()
+    """, (HARDCODED_TENANT_ID, my_account_id,)).fetchone()
     if not row:
         return None
     parts = conn.execute(
-        "SELECT * FROM participants WHERE match_id = ?", (row["match_id"],)
+        "SELECT * FROM participants WHERE tenant_id = ? AND match_id = ?",
+        (HARDCODED_TENANT_ID, row["match_id"],)
     ).fetchall()
     me = next((p for p in parts if p["account_id"] == my_account_id), None)
     mates = [p for p in parts if p["account_id"] != my_account_id]
@@ -231,10 +236,10 @@ def compute_top_mates(conn, my_account_id: str,
         order = _invert_order(order)
     if range_key:
         cutoff = _range_filter(conn, range_key)
-        params = (my_account_id, cutoff, my_account_id, min_matches, limit)
-        match_filter = "JOIN matches m ON m.match_id = mate.match_id AND m.played_at >= ?"
+        params = (my_account_id, cutoff, HARDCODED_TENANT_ID, my_account_id, min_matches, limit)
+        match_filter = "JOIN matches m ON m.match_id = mate.match_id AND m.tenant_id = mate.tenant_id AND m.played_at >= ?"
     else:
-        params = (my_account_id, my_account_id, min_matches, limit)
+        params = (my_account_id, HARDCODED_TENANT_ID, my_account_id, min_matches, limit)
         match_filter = ""
     rows = conn.execute(f"""
         WITH co AS (
@@ -242,9 +247,9 @@ def compute_top_mates(conn, my_account_id: str,
                    me.kills AS my_kills, me.damage_dealt AS my_dmg,
                    mate.kills AS mate_kills, mate.damage_dealt AS mate_dmg
             FROM participants mate
-            JOIN participants me ON me.match_id = mate.match_id AND me.account_id = ?
+            JOIN participants me ON me.match_id = mate.match_id AND me.tenant_id = mate.tenant_id AND me.account_id = ?
             {match_filter}
-            WHERE mate.account_id != ?
+            WHERE mate.tenant_id = ? AND mate.account_id != ?
         )
         SELECT account_id, name,
                COUNT(*) AS shared,
@@ -454,14 +459,14 @@ def compute_weapon_stats(conn, my_account_id, range_key="session",
     if from_iso:
         cutoff = from_iso
         end_filter = " AND m.played_at <= ?" if to_iso else ""
-        params = [actor, cutoff]
+        params = [HARDCODED_TENANT_ID, actor, cutoff]
         if to_iso:
             params.append(to_iso)
     else:
         cutoff = (_range_filter(conn, range_key)
                   if range_key != "all" else "1970-01-01T00:00:00Z")
         end_filter = ""
-        params = [actor, cutoff]
+        params = [HARDCODED_TENANT_ID, actor, cutoff]
     br_sql, br_params = _br_filter("m")
     params += br_params
 
@@ -472,8 +477,8 @@ def compute_weapon_stats(conn, my_account_id, range_key="session",
                MAX(te.distance) AS max_dist_cm,
                COUNT(DISTINCT te.match_id) AS used_matches
         FROM telemetry_events te
-        JOIN matches m ON m.match_id = te.match_id
-        WHERE te.event_type = 'Kill'
+        JOIN matches m ON m.match_id = te.match_id AND m.tenant_id = te.tenant_id
+        WHERE te.tenant_id = ? AND te.event_type = 'Kill'
           AND te.actor_account = ?
           AND m.played_at >= ?{end_filter}
           AND {br_sql}
@@ -519,11 +524,11 @@ def _compute_player_vehicle_evictions(conn, account_id, match_ids):
         SELECT match_id, event_type, timestamp_ms,
                actor_account, target_account
         FROM telemetry_events
-        WHERE match_id IN ({ph})
+        WHERE tenant_id = ? AND match_id IN ({ph})
           AND event_type IN ('VehicleEnter','VehicleLeave',
                               'Knock','Kill','Revive')
         ORDER BY match_id, timestamp_ms ASC
-    """, list(match_ids)).fetchall()
+    """, [HARDCODED_TENANT_ID] + list(match_ids)).fetchall()
     if not rows:
         return (0, 0)
 
@@ -635,20 +640,22 @@ def _compute_player_vehicle_evictions(conn, account_id, match_ids):
 
 def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
     p = conn.execute("""
-        SELECT * FROM players WHERE name = ? OR account_id = ? LIMIT 1
-    """, (name_or_id, name_or_id)).fetchone()
+        SELECT * FROM players WHERE tenant_id = ? AND (name = ? OR account_id = ?) LIMIT 1
+    """, (HARDCODED_TENANT_ID, name_or_id, name_or_id)).fetchone()
     if not p:
         return {"error": "player not found"}
 
     self_row = conn.execute(
-        "SELECT name FROM players WHERE account_id = ? LIMIT 1", (my_account_id,)
+        "SELECT name FROM players WHERE tenant_id = ? AND account_id = ? LIMIT 1",
+        (HARDCODED_TENANT_ID, my_account_id,)
     ).fetchone()
     my_name = self_row["name"] if self_row else "Self"
 
     if p["account_id"] == my_account_id:
         lifetime = conn.execute(
-            "SELECT * FROM player_lifetime WHERE account_id = ? AND mode = 'all'",
-            (my_account_id,)
+            "SELECT * FROM player_lifetime "
+            "WHERE tenant_id = ? AND account_id = ? AND mode = 'all'",
+            (HARDCODED_TENANT_ID, my_account_id,)
         ).fetchone()
         return {
             "name": p["name"],
@@ -664,11 +671,11 @@ def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
                mate.kills AS mate_kills, mate.damage_dealt AS mate_damage,
                me.kills   AS my_kills,   me.damage_dealt   AS my_damage
         FROM matches m
-        JOIN participants mate ON mate.match_id = m.match_id
-        JOIN participants me ON me.match_id = m.match_id AND me.account_id = ?
-        WHERE mate.account_id = ?
+        JOIN participants mate ON mate.match_id = m.match_id AND mate.tenant_id = m.tenant_id
+        JOIN participants me ON me.match_id = m.match_id AND me.tenant_id = m.tenant_id AND me.account_id = ?
+        WHERE m.tenant_id = ? AND mate.account_id = ?
         ORDER BY m.played_at DESC
-    """, (my_account_id, p["account_id"])).fetchall()
+    """, (my_account_id, HARDCODED_TENANT_ID, p["account_id"])).fetchall()
 
     # Vehicle-Eviction-Counter ueber die geteilten Matches:
     #   dealt — Kills die DIESER Spieler an Gegnern im Vehicle verursacht hat
@@ -722,8 +729,9 @@ def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
         }
 
     lifetime = conn.execute(
-        "SELECT * FROM player_lifetime WHERE account_id = ? AND mode = 'all'",
-        (p["account_id"],)
+        "SELECT * FROM player_lifetime "
+        "WHERE tenant_id = ? AND account_id = ? AND mode = 'all'",
+        (HARDCODED_TENANT_ID, p["account_id"],)
     ).fetchone()
 
     # Same-Lobby-Different-Team-Stat: Matches in denen wir BEIDE in der
@@ -733,11 +741,11 @@ def compute_co_player(conn, my_account_id: str, name_or_id: str) -> dict:
         SELECT COUNT(DISTINCT mtm_them.match_id) AS lobby_matches
         FROM match_team_mapping mtm_me
         JOIN match_team_mapping mtm_them
-          ON mtm_them.match_id = mtm_me.match_id
-        WHERE mtm_me.account_id = ?
+          ON mtm_them.match_id = mtm_me.match_id AND mtm_them.tenant_id = mtm_me.tenant_id
+        WHERE mtm_me.tenant_id = ? AND mtm_me.account_id = ?
           AND mtm_them.account_id = ?
           AND mtm_me.team_id != mtm_them.team_id
-    """, (my_account_id, p["account_id"])).fetchone()
+    """, (HARDCODED_TENANT_ID, my_account_id, p["account_id"])).fetchone()
     lobby_only = (same_lobby["lobby_matches"] or 0) if same_lobby else 0
 
     return {
@@ -767,23 +775,29 @@ def compute_mates(conn, my_account_id: str,
                SUM(CASE WHEN mate.place = 1 THEN 1 ELSE 0 END) AS wins_total,
                AVG(mate.damage_dealt) AS dmg_avg,
                (SELECT COUNT(*) FROM participants p2
-                JOIN participants me2 ON me2.match_id = p2.match_id
-                WHERE p2.account_id = mate.account_id AND me2.account_id = ?) AS total_with_me
+                JOIN participants me2 ON me2.match_id = p2.match_id AND me2.tenant_id = p2.tenant_id
+                WHERE p2.tenant_id = ? AND p2.account_id = mate.account_id AND me2.account_id = ?) AS total_with_me
         FROM participants mate
-        JOIN participants me ON me.match_id = mate.match_id AND me.account_id = ?
-        JOIN matches m ON m.match_id = mate.match_id
-        WHERE mate.account_id != ? AND m.played_at >= ?
+        JOIN participants me ON me.match_id = mate.match_id AND me.tenant_id = mate.tenant_id AND me.account_id = ?
+        JOIN matches m ON m.match_id = mate.match_id AND m.tenant_id = mate.tenant_id
+        WHERE mate.tenant_id = ? AND mate.account_id != ? AND m.played_at >= ?
         GROUP BY mate.account_id, mate.name
-        HAVING shared >= ? AND total_with_me >= ?
+        HAVING COUNT(*) >= ? AND
+               (SELECT COUNT(*) FROM participants p2
+                JOIN participants me2 ON me2.match_id = p2.match_id AND me2.tenant_id = p2.tenant_id
+                WHERE p2.tenant_id = ? AND p2.account_id = mate.account_id AND me2.account_id = ?) >= ?
         ORDER BY shared DESC
-    """, (my_account_id, my_account_id, my_account_id, cutoff,
-          min_matches, min_total)).fetchall()
+    """, (HARDCODED_TENANT_ID, my_account_id, my_account_id,
+          HARDCODED_TENANT_ID, my_account_id, cutoff,
+          min_matches,
+          HARDCODED_TENANT_ID, my_account_id, min_total)).fetchall()
 
     out = []
     for r in rows:
         lt = conn.execute(
-            "SELECT * FROM player_lifetime WHERE account_id = ? AND mode = 'all'",
-            (r["account_id"],)).fetchone()
+            "SELECT * FROM player_lifetime "
+            "WHERE tenant_id = ? AND account_id = ? AND mode = 'all'",
+            (HARDCODED_TENANT_ID, r["account_id"],)).fetchone()
         # K/D = kills / deaths, mit deaths = matches - wins (in BR stirbt
         # man immer ausser bei place=1). Frueher war hier kills/matches,
         # was K/M ist - daher die Abweichung zum chat-stats-popup, das
@@ -813,11 +827,11 @@ def compute_best_worst_map(conn, my_account_id, range_key="all", min_matches=3):
                AVG(pa.damage_dealt) AS avg_dmg,
                AVG(pa.place) AS avg_place
         FROM matches m
-        JOIN participants pa ON pa.match_id = m.match_id
-        WHERE pa.account_id = ? AND m.played_at >= ?
+        JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
+        WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?
         GROUP BY m.map_name
-        HAVING n >= ?
-    """, (my_account_id, cutoff, min_matches)).fetchall()
+        HAVING COUNT(*) >= ?
+    """, (HARDCODED_TENANT_ID, my_account_id, cutoff, min_matches)).fetchall()
     if not rows:
         return {"best": None, "worst": None}
 
@@ -842,11 +856,11 @@ def compute_map_distribution(conn, my_account_id, range_key="session"):
                SUM(CASE WHEN pa.place=1 THEN 1 ELSE 0 END) AS wins,
                AVG(pa.place) AS avg_place
         FROM matches m
-        JOIN participants pa ON pa.match_id = m.match_id
-        WHERE pa.account_id = ? AND m.played_at >= ?
+        JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
+        WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?
         GROUP BY m.map_name
         ORDER BY cnt DESC
-    """, (my_account_id, cutoff)).fetchall()
+    """, (HARDCODED_TENANT_ID, my_account_id, cutoff)).fetchall()
     return [{"map": r["map_name"], "count": r["cnt"],
              "wins": r["wins"], "avgPlace": r["avg_place"]} for r in rows]
 
@@ -865,14 +879,14 @@ def compute_session_matches(conn, my_account_id, range_key="session",
     if from_iso:
         cutoff = from_iso
         end_filter = " AND m.played_at <= ?" if to_iso else ""
-        params = [my_account_id, cutoff]
+        params = [HARDCODED_TENANT_ID, my_account_id, cutoff]
         if to_iso:
             params.append(to_iso)
     else:
         cutoff = (_range_filter(conn, range_key)
                   if range_key != "all" else "1970-01-01T00:00:00Z")
         end_filter = ""
-        params = [my_account_id, cutoff]
+        params = [HARDCODED_TENANT_ID, my_account_id, cutoff]
     br_where = ""
     if not include_events:
         br_sql, br_params = _br_filter("m")
@@ -884,8 +898,8 @@ def compute_session_matches(conn, my_account_id, range_key="session",
                pa.kills, pa.damage_dealt, pa.place, pa.time_survived,
                pa.longest_kill, pa.headshot_kills, pa.assists, pa.dbnos
         FROM matches m
-        JOIN participants pa ON pa.match_id = m.match_id
-        WHERE pa.account_id = ? AND m.played_at >= ?{end_filter}{br_where}
+        JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
+        WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?{end_filter}{br_where}
         ORDER BY m.played_at DESC
     """, params).fetchall()
     return [{
@@ -935,8 +949,9 @@ def compute_match_detail(conn, my_account_id, match_id):
       }
     """
     m_row = conn.execute(
-        "SELECT match_id, map_name, played_at FROM matches WHERE match_id = ?",
-        (match_id,)).fetchone()
+        "SELECT match_id, map_name, played_at FROM matches "
+        "WHERE tenant_id = ? AND match_id = ?",
+        (HARDCODED_TENANT_ID, match_id,)).fetchone()
     if not m_row:
         return None
     map_name = m_row["map_name"]
@@ -953,16 +968,16 @@ def compute_match_detail(conn, my_account_id, match_id):
     # Squad-Mitglieder
     team_row = conn.execute(
         "SELECT team_id FROM match_team_mapping "
-        "WHERE match_id = ? AND account_id = ?",
-        (match_id, my_account_id)).fetchone()
+        "WHERE tenant_id = ? AND match_id = ? AND account_id = ?",
+        (HARDCODED_TENANT_ID, match_id, my_account_id)).fetchone()
     if not team_row:
         return {"matchId": match_id, "mapName": map_name, "members": []}
     members_rows = conn.execute("""
         SELECT mtm.account_id, p.name
         FROM match_team_mapping mtm
-        LEFT JOIN players p ON p.account_id = mtm.account_id
-        WHERE mtm.match_id = ? AND mtm.team_id = ?
-    """, (match_id, team_row["team_id"])).fetchall()
+        LEFT JOIN players p ON p.account_id = mtm.account_id AND p.tenant_id = mtm.tenant_id
+        WHERE mtm.tenant_id = ? AND mtm.match_id = ? AND mtm.team_id = ?
+    """, (HARDCODED_TENANT_ID, match_id, team_row["team_id"])).fetchall()
 
     out_members = []
     for mem in members_rows:
@@ -975,11 +990,11 @@ def compute_match_detail(conn, my_account_id, match_id):
                    actor_health, target_account, victim_x, victim_y,
                    weapon, distance, actor_account
             FROM telemetry_events
-            WHERE match_id = ?
+            WHERE tenant_id = ? AND match_id = ?
               AND (actor_account = ? OR target_account = ?)
               AND timestamp_ms IS NOT NULL
             ORDER BY timestamp_ms ASC
-        """, (match_id, acc, acc)).fetchall()
+        """, (HARDCODED_TENANT_ID, match_id, acc, acc)).fetchall()
 
         # Death-Events isolieren (Kill mit target=acc)
         death_events = [e for e in ev_rows
@@ -1083,11 +1098,12 @@ def compute_match_detail(conn, my_account_id, match_id):
                 # Victim-Name nachschlagen (players + participants)
                 vrow = conn.execute("""
                     SELECT COALESCE(p.name, pa.name) AS n
-                    FROM (SELECT NULL) x
-                    LEFT JOIN players p ON p.account_id = ?
-                    LEFT JOIN participants pa ON pa.match_id = ?
+                    FROM (SELECT NULL AS dummy) x
+                    LEFT JOIN players p ON p.tenant_id = ? AND p.account_id = ?
+                    LEFT JOIN participants pa ON pa.tenant_id = ? AND pa.match_id = ?
                           AND pa.account_id = ?
-                """, (e["target_account"], match_id, e["target_account"])).fetchone()
+                """, (HARDCODED_TENANT_ID, e["target_account"],
+                       HARDCODED_TENANT_ID, match_id, e["target_account"])).fetchone()
                 life_kills.append({
                     "actorX":  e["actor_x"],
                     "actorY":  e["actor_y"],
@@ -1108,11 +1124,12 @@ def compute_match_detail(conn, my_account_id, match_id):
                 if death_ev["actor_account"]:
                     krow = conn.execute("""
                         SELECT COALESCE(p.name, pa.name) AS n
-                        FROM (SELECT NULL) x
-                        LEFT JOIN players p ON p.account_id = ?
-                        LEFT JOIN participants pa ON pa.match_id = ?
+                        FROM (SELECT NULL AS dummy) x
+                        LEFT JOIN players p ON p.tenant_id = ? AND p.account_id = ?
+                        LEFT JOIN participants pa ON pa.tenant_id = ? AND pa.match_id = ?
                               AND pa.account_id = ?
-                    """, (death_ev["actor_account"], match_id,
+                    """, (HARDCODED_TENANT_ID, death_ev["actor_account"],
+                          HARDCODED_TENANT_ID, match_id,
                           death_ev["actor_account"])).fetchone()
                     kn = krow["n"] if krow else None
                 # Crawl-Path: war der Spieler vor dem Tod im DBNO-Zustand?
@@ -1168,11 +1185,11 @@ def compute_match_detail(conn, my_account_id, match_id):
         revive_rows = conn.execute("""
             SELECT actor_x, actor_y, timestamp_ms
             FROM telemetry_events
-            WHERE match_id = ? AND target_account = ?
+            WHERE tenant_id = ? AND match_id = ? AND target_account = ?
               AND event_type = 'Revive'
               AND actor_x IS NOT NULL
             ORDER BY timestamp_ms ASC
-        """, (match_id, acc)).fetchall()
+        """, (HARDCODED_TENANT_ID, match_id, acc)).fetchall()
         revive_pts = [[r["actor_x"], r["actor_y"], r["timestamp_ms"]]
                        for r in revive_rows]
 
@@ -1213,14 +1230,14 @@ def compute_vehicle_stats(conn, my_account_id, range_key="session",
     if from_iso:
         cutoff = from_iso
         end_filter = " AND m.played_at <= ?" if to_iso else ""
-        params = [my_account_id, cutoff]
+        params = [HARDCODED_TENANT_ID, my_account_id, cutoff]
         if to_iso:
             params.append(to_iso)
     else:
         cutoff = (_range_filter(conn, range_key)
                   if range_key != "all" else "1970-01-01T00:00:00Z")
         end_filter = ""
-        params = [my_account_id, cutoff]
+        params = [HARDCODED_TENANT_ID, my_account_id, cutoff]
     br_where, br_params = _br_filter("m")
     params += br_params
 
@@ -1229,8 +1246,8 @@ def compute_vehicle_stats(conn, my_account_id, range_key="session",
         SELECT m.match_id, m.map_name, m.played_at,
                mtm.team_id AS my_team
         FROM matches m
-        JOIN match_team_mapping mtm ON mtm.match_id = m.match_id
-        WHERE mtm.account_id = ? AND m.played_at >= ?{end_filter}
+        JOIN match_team_mapping mtm ON mtm.match_id = m.match_id AND mtm.tenant_id = m.tenant_id
+        WHERE m.tenant_id = ? AND mtm.account_id = ? AND m.played_at >= ?{end_filter}
           AND {br_where}
     """, params).fetchall()
     if not match_rows:
@@ -1247,9 +1264,9 @@ def compute_vehicle_stats(conn, my_account_id, range_key="session",
         SELECT mtm.match_id, mtm.account_id, mtm.team_id,
                p.name AS player_name
         FROM match_team_mapping mtm
-        LEFT JOIN players p ON p.account_id = mtm.account_id
-        WHERE mtm.match_id IN ({ph})
-    """, match_ids).fetchall()
+        LEFT JOIN players p ON p.account_id = mtm.account_id AND p.tenant_id = mtm.tenant_id
+        WHERE mtm.tenant_id = ? AND mtm.match_id IN ({ph})
+    """, [HARDCODED_TENANT_ID] + match_ids).fetchall()
     # match_id -> set(account_id) (gefiltert auf my_team)
     squad_per_match = {}
     name_by_acc = {}
@@ -1270,11 +1287,11 @@ def compute_vehicle_stats(conn, my_account_id, range_key="session",
                actor_account, target_account,
                actor_x, actor_y, victim_x, victim_y, weapon
         FROM telemetry_events
-        WHERE match_id IN ({ph})
+        WHERE tenant_id = ? AND match_id IN ({ph})
           AND event_type IN ('VehicleEnter','VehicleLeave',
                               'Knock','Kill','Revive')
         ORDER BY match_id, timestamp_ms ASC
-    """, match_ids).fetchall()
+    """, [HARDCODED_TENANT_ID] + match_ids).fetchall()
     # match_id -> list of event dicts
     events_per_match = {}
     match_start_by = {}  # match_id -> earliest ts seen (fuer relative Zeit)
@@ -1297,8 +1314,8 @@ def compute_vehicle_stats(conn, my_account_id, range_key="session",
         if not acc: return None
         if acc in opp_name_cache: return opp_name_cache[acc]
         r = conn.execute(
-            "SELECT name FROM players WHERE account_id = ?",
-            (acc,)).fetchone()
+            "SELECT name FROM players WHERE tenant_id = ? AND account_id = ?",
+            (HARDCODED_TENANT_ID, acc,)).fetchone()
         n = r["name"] if r else None
         opp_name_cache[acc] = n
         return n
@@ -1493,16 +1510,16 @@ def compute_lobby_avg_kd(conn, my_account_id, range_key="session"):
                COUNT(mtm.account_id)        AS lobby_n,
                SUM(CASE WHEN mtm.place=1 THEN 1 ELSE 0 END) AS lobby_wins
         FROM matches m
-        JOIN match_team_mapping mtm ON mtm.match_id = m.match_id
-        WHERE m.match_id IN (
-          SELECT match_id FROM participants WHERE account_id = ?
+        JOIN match_team_mapping mtm ON mtm.match_id = m.match_id AND mtm.tenant_id = m.tenant_id
+        WHERE m.tenant_id = ? AND m.match_id IN (
+          SELECT match_id FROM participants WHERE tenant_id = ? AND account_id = ?
         ) AND m.played_at >= ?
           AND mtm.kills IS NOT NULL
           AND {br_where}
         GROUP BY m.match_id
-        HAVING lobby_n > 4   -- nur Matches mit echtem Lobby-Mapping
+        HAVING COUNT(mtm.account_id) > 4   -- nur Matches mit echtem Lobby-Mapping
         ORDER BY m.played_at ASC
-    """, (my_account_id, cutoff, *br_params)).fetchall()
+    """, (HARDCODED_TENANT_ID, HARDCODED_TENANT_ID, my_account_id, cutoff, *br_params)).fetchall()
 
     per_match = []
     sum_lobby_kd = 0.0
@@ -1515,8 +1532,8 @@ def compute_lobby_avg_kd(conn, my_account_id, range_key="session"):
         lobby_kd = kills / deaths_proxy
         my = conn.execute(
             "SELECT kills, place FROM participants "
-            "WHERE match_id = ? AND account_id = ?",
-            (r["match_id"], my_account_id),
+            "WHERE tenant_id = ? AND match_id = ? AND account_id = ?",
+            (HARDCODED_TENANT_ID, r["match_id"], my_account_id),
         ).fetchone()
         my_kills = my["kills"] if my else 0
         my_kd = my_kills if (my and my["place"] == 1) else my_kills
@@ -1536,9 +1553,9 @@ def compute_lobby_avg_kd(conn, my_account_id, range_key="session"):
     my_session = conn.execute("""
         SELECT SUM(p.kills) AS k, COUNT(*) AS n,
                SUM(CASE WHEN p.place=1 THEN 1 ELSE 0 END) AS w
-        FROM participants p JOIN matches m ON m.match_id = p.match_id
-        WHERE p.account_id = ? AND m.played_at >= ?
-    """, (my_account_id, cutoff)).fetchone()
+        FROM participants p JOIN matches m ON m.match_id = p.match_id AND m.tenant_id = p.tenant_id
+        WHERE p.tenant_id = ? AND p.account_id = ? AND m.played_at >= ?
+    """, (HARDCODED_TENANT_ID, my_account_id, cutoff)).fetchone()
     my_k = (my_session and my_session["k"]) or 0
     my_n = (my_session and my_session["n"]) or 0
     my_w = (my_session and my_session["w"]) or 0
@@ -1568,8 +1585,8 @@ def compute_squad_kd(conn, my_account_id, range_key="session"):
         WITH my_teams AS (
           SELECT mtm.match_id, mtm.team_id
           FROM match_team_mapping mtm
-          JOIN matches m ON m.match_id = mtm.match_id
-          WHERE mtm.account_id = ? AND m.played_at >= ?
+          JOIN matches m ON m.match_id = mtm.match_id AND m.tenant_id = mtm.tenant_id
+          WHERE mtm.tenant_id = ? AND mtm.account_id = ? AND m.played_at >= ?
             AND {br_where}
         )
         SELECT m.match_id, m.played_at, m.duration_secs,
@@ -1584,11 +1601,12 @@ def compute_squad_kd(conn, my_account_id, range_key="session"):
         FROM matches m
         JOIN my_teams mt ON mt.match_id = m.match_id
         JOIN match_team_mapping mtm ON mtm.match_id = m.match_id
+                                    AND mtm.tenant_id = m.tenant_id
                                     AND mtm.team_id = mt.team_id
-        WHERE mtm.kills IS NOT NULL
-        GROUP BY m.match_id
+        WHERE m.tenant_id = ? AND mtm.kills IS NOT NULL
+        GROUP BY m.match_id, m.played_at, m.duration_secs
         ORDER BY m.played_at ASC
-    """, (my_account_id, cutoff, *br_params)).fetchall()
+    """, (HARDCODED_TENANT_ID, my_account_id, cutoff, *br_params, HARDCODED_TENANT_ID)).fetchall()
 
     per_match = []
     total_kills = 0
@@ -1624,9 +1642,9 @@ def compute_squad_kd(conn, my_account_id, range_key="session"):
     my = conn.execute("""
         SELECT SUM(p.kills) AS k, COUNT(*) AS n,
                SUM(CASE WHEN p.place=1 THEN 1 ELSE 0 END) AS w
-        FROM participants p JOIN matches m ON m.match_id = p.match_id
-        WHERE p.account_id = ? AND m.played_at >= ?
-    """, (my_account_id, cutoff)).fetchone()
+        FROM participants p JOIN matches m ON m.match_id = p.match_id AND m.tenant_id = p.tenant_id
+        WHERE p.tenant_id = ? AND p.account_id = ? AND m.played_at >= ?
+    """, (HARDCODED_TENANT_ID, my_account_id, cutoff)).fetchone()
     my_k = (my and my["k"]) or 0
     my_n = (my and my["n"]) or 0
     my_w = (my and my["w"]) or 0
@@ -1662,11 +1680,11 @@ def compute_streaks(conn, my_account_id, range_key="session"):
     rows = conn.execute(f"""
         SELECT m.match_id, m.played_at, p.place, p.kills
         FROM matches m
-        JOIN participants p ON p.match_id = m.match_id
-        WHERE p.account_id = ? AND m.played_at >= ?
+        JOIN participants p ON p.match_id = m.match_id AND p.tenant_id = m.tenant_id
+        WHERE m.tenant_id = ? AND p.account_id = ? AND m.played_at >= ?
           AND {br_where}
         ORDER BY m.played_at ASC
-    """, (my_account_id, cutoff, *br_params)).fetchall()
+    """, (HARDCODED_TENANT_ID, my_account_id, cutoff, *br_params)).fetchall()
 
     tests = {
         "chicken": lambda r: (r["place"] or 99) == 1,
@@ -1724,19 +1742,19 @@ def compute_lobby_top3_kd(conn, my_account_id, range_key="session",
         matches = conn.execute("""
             SELECT m.match_id, m.played_at, m.duration_secs
             FROM matches m
-            WHERE m.match_id IN (
-                SELECT match_id FROM participants WHERE account_id = ?
+            WHERE m.tenant_id = ? AND m.match_id IN (
+                SELECT match_id FROM participants WHERE tenant_id = ? AND account_id = ?
             ) AND m.played_at >= ?
             ORDER BY m.played_at ASC
-        """, (my_account_id, cutoff)).fetchall()
+        """, (HARDCODED_TENANT_ID, HARDCODED_TENANT_ID, my_account_id, cutoff)).fetchall()
     else:
         if not match_ids:
             return {"top3Kd": 0, "top3Kills": 0, "matches": 0, "perMatch": []}
         ph = ",".join("?" * len(match_ids))
         matches = conn.execute(
             f"SELECT match_id, played_at, duration_secs FROM matches "
-            f"WHERE match_id IN ({ph}) ORDER BY played_at ASC",
-            match_ids,
+            f"WHERE tenant_id = ? AND match_id IN ({ph}) ORDER BY played_at ASC",
+            [HARDCODED_TENANT_ID] + match_ids,
         ).fetchall()
 
     per_match = []
@@ -1747,10 +1765,10 @@ def compute_lobby_top3_kd(conn, my_account_id, range_key="session",
         top3 = conn.execute("""
             SELECT kills, place, time_survived
             FROM match_team_mapping
-            WHERE match_id = ? AND kills IS NOT NULL
+            WHERE tenant_id = ? AND match_id = ? AND kills IS NOT NULL
             ORDER BY kills DESC
             LIMIT 3
-        """, (m["match_id"],)).fetchall()
+        """, (HARDCODED_TENANT_ID, m["match_id"],)).fetchall()
         if len(top3) < 3:
             continue
         dur = m["duration_secs"] or 0
@@ -1802,11 +1820,11 @@ def compute_trend_deltas(conn, my_account_id, from_iso=None, to_iso=None,
             SELECT SUM(p.kills) AS k, COUNT(*) AS n,
                    SUM(CASE WHEN p.place=1 THEN 1 ELSE 0 END) AS w,
                    AVG(p.damage_dealt) AS avg_dmg
-            FROM participants p JOIN matches m ON m.match_id = p.match_id
-            WHERE p.account_id = ? AND m.played_at >= ?
+            FROM participants p JOIN matches m ON m.match_id = p.match_id AND m.tenant_id = p.tenant_id
+            WHERE p.tenant_id = ? AND p.account_id = ? AND m.played_at >= ?
               AND {br_where}
         """
-        params = [my_account_id, start, *br_params]
+        params = [HARDCODED_TENANT_ID, my_account_id, start, *br_params]
         if end:
             sql += " AND m.played_at <= ?"
             params.append(end)
@@ -1889,7 +1907,7 @@ def compute_payday_stats(conn, my_account_id, range_key="all",
               if range_key != "all" else "1970-01-01T00:00:00Z")
     if from_iso: cutoff = from_iso
     end_filter = " AND m.played_at <= ?" if to_iso else ""
-    params = [my_account_id, cutoff]
+    params = [HARDCODED_TENANT_ID, my_account_id, cutoff]
     if to_iso: params.append(to_iso)
 
     # Alle Event-Matches (= nicht BR) in der Range
@@ -1898,8 +1916,8 @@ def compute_payday_stats(conn, my_account_id, range_key="all",
         SELECT m.match_id, m.played_at, m.map_name, m.game_mode,
                pa.team_id
         FROM matches m
-        JOIN participants pa ON pa.match_id = m.match_id
-        WHERE pa.account_id = ? AND m.played_at >= ?{end_filter}
+        JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
+        WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?{end_filter}
           AND NOT {br_where}
         ORDER BY m.played_at DESC
     """, params + br_params).fetchall()
@@ -1912,33 +1930,33 @@ def compute_payday_stats(conn, my_account_id, range_key="all",
         team = m["team_id"]
         # Squad-Account-IDs in dem Match
         squad = [r["account_id"] for r in conn.execute(
-            "SELECT account_id FROM participants WHERE match_id=? AND team_id=?",
-            (mid, team)).fetchall()]
+            "SELECT account_id FROM participants WHERE tenant_id=? AND match_id=? AND team_id=?",
+            (HARDCODED_TENANT_ID, mid, team)).fetchall()]
         if not squad:
             continue
         ph = ",".join("?" * len(squad))
 
         # Eigene Kills aus Telemetry
-        my_kills = conn.execute(
-            f"SELECT COUNT(*) FROM telemetry_events "
-            f"WHERE match_id=? AND event_type='Kill' AND actor_account=?",
-            (mid, my_account_id)).fetchone()[0]
+        my_kills = (conn.execute(
+            f"SELECT COUNT(*) AS c FROM telemetry_events "
+            f"WHERE tenant_id=? AND match_id=? AND event_type='Kill' AND actor_account=?",
+            (HARDCODED_TENANT_ID, mid, my_account_id)).fetchone() or {}).get("c", 0)
         # Eigener Damage (Sum von TakeDamage als attacker)
-        my_dmg = conn.execute(
-            "SELECT COALESCE(SUM(damage), 0) FROM telemetry_events "
-            "WHERE match_id=? AND event_type='TakeDamage' AND actor_account=?",
-            (mid, my_account_id)).fetchone()[0] or 0
+        my_dmg = (conn.execute(
+            "SELECT COALESCE(SUM(damage), 0) AS s FROM telemetry_events "
+            "WHERE tenant_id=? AND match_id=? AND event_type='TakeDamage' AND actor_account=?",
+            (HARDCODED_TENANT_ID, mid, my_account_id)).fetchone() or {}).get("s", 0) or 0
         # Squad-Aggregat (incl. self)
-        sq_kills = conn.execute(
-            f"SELECT COUNT(*) FROM telemetry_events "
-            f"WHERE match_id=? AND event_type='Kill' "
+        sq_kills = (conn.execute(
+            f"SELECT COUNT(*) AS c FROM telemetry_events "
+            f"WHERE tenant_id=? AND match_id=? AND event_type='Kill' "
             f"AND actor_account IN ({ph})",
-            [mid, *squad]).fetchone()[0]
-        sq_dmg = conn.execute(
-            f"SELECT COALESCE(SUM(damage), 0) FROM telemetry_events "
-            f"WHERE match_id=? AND event_type='TakeDamage' "
+            [HARDCODED_TENANT_ID, mid, *squad]).fetchone() or {}).get("c", 0)
+        sq_dmg = (conn.execute(
+            f"SELECT COALESCE(SUM(damage), 0) AS s FROM telemetry_events "
+            f"WHERE tenant_id=? AND match_id=? AND event_type='TakeDamage' "
             f"AND actor_account IN ({ph})",
-            [mid, *squad]).fetchone()[0] or 0
+            [HARDCODED_TENANT_ID, mid, *squad]).fetchone() or {}).get("s", 0) or 0
 
         # Per-Mate-Breakdown: Kills + DMG pro Squad-Member.
         # PUBG-API liefert in Events keine Player-Stats → wir
@@ -1946,26 +1964,26 @@ def compute_payday_stats(conn, my_account_id, range_key="all",
         # Tabelle (account_id -> name), Fallback name=account_id.
         mate_kills = {r["actor_account"]: r["k"] for r in conn.execute(
             f"SELECT actor_account, COUNT(*) AS k FROM telemetry_events "
-            f"WHERE match_id=? AND event_type='Kill' "
+            f"WHERE tenant_id=? AND match_id=? AND event_type='Kill' "
             f"AND actor_account IN ({ph}) GROUP BY actor_account",
-            [mid, *squad]).fetchall()}
+            [HARDCODED_TENANT_ID, mid, *squad]).fetchall()}
         mate_dmg = {r["actor_account"]: float(r["d"] or 0) for r in conn.execute(
             f"SELECT actor_account, COALESCE(SUM(damage),0) AS d "
             f"FROM telemetry_events "
-            f"WHERE match_id=? AND event_type='TakeDamage' "
+            f"WHERE tenant_id=? AND match_id=? AND event_type='TakeDamage' "
             f"AND actor_account IN ({ph}) GROUP BY actor_account",
-            [mid, *squad]).fetchall()}
+            [HARDCODED_TENANT_ID, mid, *squad]).fetchall()}
         mate_loot = {}
         for r in conn.execute(
             f"SELECT actor_account, COUNT(*) AS c FROM telemetry_events "
-            f"WHERE match_id=? AND event_type='ItemPickup' "
+            f"WHERE tenant_id=? AND match_id=? AND event_type='ItemPickup' "
             f"AND actor_account IN ({ph}) AND weapon IS NOT NULL "
-            f"GROUP BY actor_account", [mid, *squad]).fetchall():
+            f"GROUP BY actor_account", [HARDCODED_TENANT_ID, mid, *squad]).fetchall():
             mate_loot[r["actor_account"]] = r["c"]
         # Account-ID -> Name. Fallback Account-ID-Kuerzung.
         names = {r["account_id"]: r["name"] for r in conn.execute(
             f"SELECT account_id, name FROM players "
-            f"WHERE account_id IN ({ph})", squad).fetchall()}
+            f"WHERE tenant_id=? AND account_id IN ({ph})", [HARDCODED_TENANT_ID] + squad).fetchall()}
         mates = []
         for acc in squad:
             mates.append({
@@ -1982,23 +2000,23 @@ def compute_payday_stats(conn, my_account_id, range_key="all",
         loot = {}
         for r in conn.execute(
             f"SELECT weapon AS item_id, COUNT(*) AS c "
-            f"FROM telemetry_events WHERE match_id=? "
+            f"FROM telemetry_events WHERE tenant_id=? AND match_id=? "
             f"AND event_type='ItemPickup' AND actor_account IN ({ph}) "
             f"AND weapon IS NOT NULL GROUP BY weapon",
-            [mid, *squad]).fetchall():
+            [HARDCODED_TENANT_ID, mid, *squad]).fetchall():
             loot[r["item_id"]] = r["c"]
 
         # Objects (Window destroy, Door open) Squad
-        windows = conn.execute(
-            f"SELECT COUNT(*) FROM telemetry_events WHERE match_id=? "
+        windows = (conn.execute(
+            f"SELECT COUNT(*) AS c FROM telemetry_events WHERE tenant_id=? AND match_id=? "
             f"AND event_type='ObjectDestroy' AND weapon='Window' "
             f"AND actor_account IN ({ph})",
-            [mid, *squad]).fetchone()[0]
-        doors_opened = conn.execute(
-            f"SELECT COUNT(*) FROM telemetry_events WHERE match_id=? "
+            [HARDCODED_TENANT_ID, mid, *squad]).fetchone() or {}).get("c", 0)
+        doors_opened = (conn.execute(
+            f"SELECT COUNT(*) AS c FROM telemetry_events WHERE tenant_id=? AND match_id=? "
             f"AND event_type='ObjectInteraction' AND weapon='Door:Opening' "
             f"AND actor_account IN ({ph})",
-            [mid, *squad]).fetchone()[0]
+            [HARDCODED_TENANT_ID, mid, *squad]).fetchone() or {}).get("c", 0)
 
         out_matches.append({
             "matchId":    mid,
@@ -2050,12 +2068,12 @@ def compute_map_performance(conn, my_account_id, range_key="all"):
                AVG(pa.time_survived) AS avg_surv,
                MAX(pa.longest_kill) AS longest_kill
         FROM matches m
-        JOIN participants pa ON pa.match_id = m.match_id
-        WHERE pa.account_id = ? AND m.played_at >= ?
+        JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
+        WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?
           AND {br_where}
         GROUP BY m.map_name
         ORDER BY matches DESC
-    """, (my_account_id, cutoff, *br_params)).fetchall()
+    """, (HARDCODED_TENANT_ID, my_account_id, cutoff, *br_params)).fetchall()
     out = []
     for r in rows:
         n = r["matches"] or 0
@@ -2094,8 +2112,8 @@ def _compute_top10_reached_at(conn, match_id, my_account_id):
     Falls Telemetry fehlt oder Match < 11 Squads: None.
     """
     parts = conn.execute("""
-        SELECT account_id, team_id FROM participants WHERE match_id = ?
-    """, (match_id,)).fetchall()
+        SELECT account_id, team_id FROM participants WHERE tenant_id = ? AND match_id = ?
+    """, (HARDCODED_TENANT_ID, match_id,)).fetchall()
     if not parts:
         return None
     acc_to_team = {p["account_id"]: p["team_id"] for p in parts}
@@ -2109,9 +2127,9 @@ def _compute_top10_reached_at(conn, match_id, my_account_id):
 
     events = conn.execute("""
         SELECT timestamp_ms, target_account FROM telemetry_events
-        WHERE match_id = ? AND event_type = 'Kill'
+        WHERE tenant_id = ? AND match_id = ? AND event_type = 'Kill'
         ORDER BY timestamp_ms ASC
-    """, (match_id,)).fetchall()
+    """, (HARDCODED_TENANT_ID, match_id,)).fetchall()
     if not events:
         return None
 
@@ -2211,31 +2229,32 @@ def _career_win_number(conn, my_account_id, match_id, played_at):
     row = conn.execute(f"""
         SELECT COUNT(*) AS n
         FROM participants p
-        JOIN matches m ON m.match_id = p.match_id
-        WHERE p.account_id = ?
+        JOIN matches m ON m.match_id = p.match_id AND m.tenant_id = p.tenant_id
+        WHERE p.tenant_id = ? AND p.account_id = ?
           AND p.place = 1
           AND m.game_mode IN ({ph})
           AND (m.played_at < ?
                OR (m.played_at = ? AND m.match_id <= ?))
-    """, [my_account_id] + list(BATTLE_ROYALE_MODES)
+    """, [HARDCODED_TENANT_ID, my_account_id] + list(BATTLE_ROYALE_MODES)
          + [played_at, played_at, match_id]).fetchone()
     local_at = (row["n"] if row else 0) or 0
 
     # 2) Lifetime-Total + lokale Total → Offset
     lr = conn.execute(
-        "SELECT wins FROM player_lifetime WHERE account_id = ? AND mode = 'all'",
-        (my_account_id,)).fetchone()
+        "SELECT wins FROM player_lifetime "
+        "WHERE tenant_id = ? AND account_id = ? AND mode = 'all'",
+        (HARDCODED_TENANT_ID, my_account_id,)).fetchone()
     if not lr or lr["wins"] is None:
         return local_at  # Fallback wenn lifetime fehlt
     lifetime_wins = int(lr["wins"])
     tr = conn.execute(f"""
         SELECT COUNT(*) AS n
         FROM participants p
-        JOIN matches m ON m.match_id = p.match_id
-        WHERE p.account_id = ?
+        JOIN matches m ON m.match_id = p.match_id AND m.tenant_id = p.tenant_id
+        WHERE p.tenant_id = ? AND p.account_id = ?
           AND p.place = 1
           AND m.game_mode IN ({ph})
-    """, [my_account_id] + list(BATTLE_ROYALE_MODES)).fetchone()
+    """, [HARDCODED_TENANT_ID, my_account_id] + list(BATTLE_ROYALE_MODES)).fetchone()
     local_total = (tr["n"] if tr else 0) or 0
     offset = lifetime_wins - local_total
     # Negativer Offset (lokal > lifetime) sollte nicht passieren — kann
@@ -2345,7 +2364,8 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
                 # Session einen neuen Popup-Eintrag produziert.
                 already = conn.execute(
                     "SELECT 1 FROM pubg_achievements_seen "
-                    "WHERE achievement_id = ? LIMIT 1", (aid,)).fetchone()
+                    "WHERE tenant_id = ? AND achievement_id = ? LIMIT 1",
+                    (HARDCODED_TENANT_ID, aid,)).fetchone()
                 if not already:
                     if cwn % 1000 == 0:
                         label_prefix = "GRAND CHICKEN"
@@ -2663,15 +2683,15 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             # --- Killed by Red Zone ---
             # LogPlayerKillV2 mit weapon LIKE '%RedZone%' oder '%Bomb%'
             # und actor_account IS NULL (kein echter Killer-Account)
-            rz = conn.execute("""
-                SELECT COUNT(*) FROM telemetry_events
-                WHERE match_id=? AND event_type='Kill'
+            rz = (conn.execute("""
+                SELECT COUNT(*) AS c FROM telemetry_events
+                WHERE tenant_id=? AND match_id=? AND event_type='Kill'
                   AND target_account=?
                   AND (actor_account IS NULL OR actor_account='')
                   AND (weapon LIKE '%RedZone%'
                        OR weapon LIKE '%Bomb%'
                        OR weapon LIKE '%bomb%')
-            """, (mid, my_account_id)).fetchone()[0]
+            """, (HARDCODED_TENANT_ID, mid, my_account_id)).fetchone() or {}).get("c", 0)
             if rz > 0:
                 out.append({
                     "id": "redzone_death",
@@ -2682,12 +2702,12 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
 
             # --- Killed a player WITH a vehicle (run over) ---
             # damageCauserName = Fahrzeug-Klasse (BP_Buggy_C etc.)
-            vkill = conn.execute("""
-                SELECT COUNT(*) FROM telemetry_events
-                WHERE match_id=? AND event_type='Kill'
+            vkill = (conn.execute("""
+                SELECT COUNT(*) AS c FROM telemetry_events
+                WHERE tenant_id=? AND match_id=? AND event_type='Kill'
                   AND actor_account=?
                   AND weapon LIKE 'BP_%'
-            """, (mid, my_account_id)).fetchone()[0]
+            """, (HARDCODED_TENANT_ID, mid, my_account_id)).fetchone() or {}).get("c", 0)
             if vkill > 0:
                 out.append({
                     "id": "vehicle_kill",
@@ -2697,12 +2717,12 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
                 })
 
             # --- Got killed by a vehicle ---
-            vdeath = conn.execute("""
-                SELECT COUNT(*) FROM telemetry_events
-                WHERE match_id=? AND event_type='Kill'
+            vdeath = (conn.execute("""
+                SELECT COUNT(*) AS c FROM telemetry_events
+                WHERE tenant_id=? AND match_id=? AND event_type='Kill'
                   AND target_account=?
                   AND weapon LIKE 'BP_%'
-            """, (mid, my_account_id)).fetchone()[0]
+            """, (HARDCODED_TENANT_ID, mid, my_account_id)).fetchone() or {}).get("c", 0)
             if vdeath > 0:
                 out.append({
                     "id": "vehicle_death",
@@ -2715,10 +2735,10 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
             # VehicleEnter/Leave Intervalle bauen, dann Kill-Events pruefen
             ve_events = conn.execute("""
                 SELECT event_type, timestamp_ms FROM telemetry_events
-                WHERE match_id=? AND actor_account=?
+                WHERE tenant_id=? AND match_id=? AND actor_account=?
                   AND event_type IN ('VehicleEnter', 'VehicleLeave')
                 ORDER BY timestamp_ms ASC
-            """, (mid, my_account_id)).fetchall()
+            """, (HARDCODED_TENANT_ID, mid, my_account_id)).fetchall()
             if ve_events:
                 # Baue Intervalle: (enter_ms, leave_ms)
                 intervals = []
@@ -2734,9 +2754,9 @@ def compute_session_achievements(conn, my_account_id, from_iso=None, to_iso=None
                 if intervals:
                     my_kills = conn.execute("""
                         SELECT timestamp_ms FROM telemetry_events
-                        WHERE match_id=? AND event_type='Kill'
+                        WHERE tenant_id=? AND match_id=? AND event_type='Kill'
                           AND actor_account=?
-                    """, (mid, my_account_id)).fetchall()
+                    """, (HARDCODED_TENANT_ID, mid, my_account_id)).fetchall()
                     driveby_n = sum(
                         1 for k in my_kills
                         if k["timestamp_ms"] and
@@ -2837,17 +2857,18 @@ def _compute_snapshot_pcts(conn, aid, played_at, label):
     is_tiered = aid in _TIERED_ACHIEVEMENT_IDS
 
     # Gesamt-Sessions-Tage (= distinct Tage mit Matches des passenden Typs)
-    total_days = conn.execute(
-        f"SELECT COUNT(DISTINCT date(played_at)) FROM matches "
-        f"WHERE played_at IS NOT NULL AND played_at <= ? "
+    # PG: date(text) -> substr(played_at, 1, 10) (ISO 'YYYY-MM-DD...')
+    total_days = (conn.execute(
+        f"SELECT COUNT(DISTINCT substr(played_at, 1, 10)) AS c FROM matches "
+        f"WHERE tenant_id = ? AND played_at IS NOT NULL AND played_at <= ? "
         f"  AND game_mode {game_mode_filter} ({ph})",
-        [played_at] + br_modes).fetchone()[0]
+        [HARDCODED_TENANT_ID, played_at] + br_modes).fetchone() or {}).get("c", 0)
     # Gesamt-Matches
-    total_matches = conn.execute(
-        f"SELECT COUNT(*) FROM matches "
-        f"WHERE played_at IS NOT NULL AND played_at <= ? "
+    total_matches = (conn.execute(
+        f"SELECT COUNT(*) AS c FROM matches "
+        f"WHERE tenant_id = ? AND played_at IS NOT NULL AND played_at <= ? "
         f"  AND game_mode {game_mode_filter} ({ph})",
-        [played_at] + br_modes).fetchone()[0]
+        [HARDCODED_TENANT_ID, played_at] + br_modes).fetchone() or {}).get("c", 0)
     if not total_days or not total_matches:
         return None, None
 
@@ -2860,8 +2881,8 @@ def _compute_snapshot_pcts(conn, aid, played_at, label):
         # Tier in Python parsen (SQL CAST 'Inferno Begins 3' → 0 ist nutzlos)
         prior = conn.execute(
             "SELECT played_at, label FROM pubg_achievements_seen "
-            "WHERE achievement_id = ? AND played_at < ?",
-            (aid, played_at)).fetchall()
+            "WHERE tenant_id = ? AND achievement_id = ? AND played_at < ?",
+            (HARDCODED_TENANT_ID, aid, played_at)).fetchall()
         matching_dates = set()
         ach_matches = 0
         for r in prior:
@@ -2872,14 +2893,14 @@ def _compute_snapshot_pcts(conn, aid, played_at, label):
                 matching_dates.add((r["played_at"] or "")[:10])
         ach_days = len(matching_dates)
     else:
-        ach_days = conn.execute(
-            "SELECT COUNT(DISTINCT date(played_at)) FROM pubg_achievements_seen "
-            "WHERE achievement_id = ? AND played_at < ?",
-            (aid, played_at)).fetchone()[0]
-        ach_matches = conn.execute(
-            "SELECT COUNT(*) FROM pubg_achievements_seen "
-            "WHERE achievement_id = ? AND played_at < ?",
-            (aid, played_at)).fetchone()[0]
+        ach_days = (conn.execute(
+            "SELECT COUNT(DISTINCT substr(played_at, 1, 10)) AS c FROM pubg_achievements_seen "
+            "WHERE tenant_id = ? AND achievement_id = ? AND played_at < ?",
+            (HARDCODED_TENANT_ID, aid, played_at)).fetchone() or {}).get("c", 0)
+        ach_matches = (conn.execute(
+            "SELECT COUNT(*) AS c FROM pubg_achievements_seen "
+            "WHERE tenant_id = ? AND achievement_id = ? AND played_at < ?",
+            (HARDCODED_TENANT_ID, aid, played_at)).fetchone() or {}).get("c", 0)
 
     # +1 weil der aktuelle Insert noch nicht in der DB ist (compute laeuft
     # VOR dem INSERT). Damit das aktuelle Vorkommen mitgezaehlt wird.
@@ -2925,12 +2946,12 @@ def _insert_achievements(conn, achievements, suppress_popup=False):
         rare = (aid in PUBG_RARE_ACHIEVEMENTS) or bool(a.get("isRare"))
         cur = conn.execute("""
             INSERT INTO pubg_achievements_seen
-              (achievement_id, match_id, label, icon, played_at,
+              (tenant_id, achievement_id, match_id, label, icon, played_at,
                detected_at, is_rare, displayed_at, session_pct, match_pct,
                suppress_popup)
-            VALUES (?, ?, ?, ?, ?, strftime('%s','now'), ?, ?, ?, ?, ?)
-            ON CONFLICT(achievement_id, match_id) DO NOTHING
-        """, (aid, mid, label, a.get("icon"),
+            VALUES (?, ?, ?, ?, ?, ?, EXTRACT(EPOCH FROM NOW())::BIGINT, ?, ?, ?, ?, ?)
+            ON CONFLICT(tenant_id, achievement_id, match_id) DO NOTHING
+        """, (HARDCODED_TENANT_ID, aid, mid, label, a.get("icon"),
               played_at,
               1 if rare else 0,
               displayed_at, sess_pct, match_pct,
@@ -2952,48 +2973,51 @@ def _migrate_legacy_achievement_ids(conn):
       - first_hot_drop_survived -> hot_drop_match_survived (label 'Inferno Survivor ×1')
     Bei Konflikt (neue ID existiert bereits fuer diesen Match) wird der
     alte Eintrag geloescht."""
+    # PG hat kein UPDATE OR IGNORE — wir loeschen Konflikt-Eintraege
+    # ZUERST (DELETE WHERE EXISTS Zielkollision), dann UPDATE.
+    # Bei Backfill-Migration ist Toleranz ggue. Race-Conditions egal.
+    def _del_conflicts(old_id, new_id):
+        conn.execute("""
+            DELETE FROM pubg_achievements_seen old
+            WHERE old.tenant_id = ? AND old.achievement_id = ?
+              AND EXISTS (
+                SELECT 1 FROM pubg_achievements_seen new
+                WHERE new.tenant_id = old.tenant_id
+                  AND new.match_id = old.match_id
+                  AND new.achievement_id = ?
+              )
+        """, (HARDCODED_TENANT_ID, old_id, new_id))
+
     # 1) five_kill_match -> kills_5
+    _del_conflicts("five_kill_match", "kills_5")
     conn.execute("""
-        UPDATE OR IGNORE pubg_achievements_seen
+        UPDATE pubg_achievements_seen
         SET achievement_id = 'kills_5'
-        WHERE achievement_id = 'five_kill_match'
-    """)
+        WHERE tenant_id = ? AND achievement_id = 'five_kill_match'
+    """, (HARDCODED_TENANT_ID,))
+    # 2) first_hot_drop -> hot_drop_match (×1)
+    _del_conflicts("first_hot_drop", "hot_drop_match")
     conn.execute("""
-        DELETE FROM pubg_achievements_seen
-        WHERE achievement_id = 'five_kill_match'
-    """)
-    # 2) first_hot_drop -> hot_drop_match (×1 weil es das erste war)
-    conn.execute("""
-        UPDATE OR IGNORE pubg_achievements_seen
+        UPDATE pubg_achievements_seen
         SET achievement_id = 'hot_drop_match',
             label = 'Inferno Begins ×1'
-        WHERE achievement_id = 'first_hot_drop'
-    """)
-    conn.execute("""
-        DELETE FROM pubg_achievements_seen
-        WHERE achievement_id = 'first_hot_drop'
-    """)
+        WHERE tenant_id = ? AND achievement_id = 'first_hot_drop'
+    """, (HARDCODED_TENANT_ID,))
     # 3) first_hot_drop_survived -> hot_drop_match_survived (×1)
+    _del_conflicts("first_hot_drop_survived", "hot_drop_match_survived")
     conn.execute("""
-        UPDATE OR IGNORE pubg_achievements_seen
+        UPDATE pubg_achievements_seen
         SET achievement_id = 'hot_drop_match_survived',
             label = 'Inferno Survivor ×1'
-        WHERE achievement_id = 'first_hot_drop_survived'
-    """)
-    conn.execute("""
-        DELETE FROM pubg_achievements_seen
-        WHERE achievement_id = 'first_hot_drop_survived'
-    """)
+        WHERE tenant_id = ? AND achievement_id = 'first_hot_drop_survived'
+    """, (HARDCODED_TENANT_ID,))
     # 4) first_chicken -> chicken (jedes Chicken bekommt Milestone)
+    _del_conflicts("first_chicken", "chicken")
     conn.execute("""
-        UPDATE OR IGNORE pubg_achievements_seen
+        UPDATE pubg_achievements_seen
         SET achievement_id = 'chicken'
-        WHERE achievement_id = 'first_chicken'
-    """)
-    conn.execute("""
-        DELETE FROM pubg_achievements_seen
-        WHERE achievement_id = 'first_chicken'
-    """)
+        WHERE tenant_id = ? AND achievement_id = 'first_chicken'
+    """, (HARDCODED_TENANT_ID,))
     conn.commit()
 
 
@@ -3094,14 +3118,14 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
     if from_iso:
         cutoff = from_iso
         end_filter = " AND m.played_at <= ?" if to_iso else ""
-        params = [my_account_id, cutoff]
+        params = [HARDCODED_TENANT_ID, my_account_id, cutoff]
         if to_iso:
             params.append(to_iso)
     else:
         cutoff = (_range_filter(conn, range_key)
                   if range_key != "all" else "1970-01-01T00:00:00Z")
         end_filter = ""
-        params = [my_account_id, cutoff]
+        params = [HARDCODED_TENANT_ID, my_account_id, cutoff]
     window_ms = window_secs * 1000
     # Event-Modes raus — in TDM/PAYDAY gibt es keinen Parachute-Hot-Drop.
     br_where, br_params = _br_filter("m")
@@ -3110,8 +3134,8 @@ def compute_hot_drop(conn, my_account_id, range_key="session",
                m.duration_secs, pa.place, pa.kills, pa.damage_dealt,
                pa.time_survived
         FROM matches m
-        JOIN participants pa ON pa.match_id = m.match_id
-        WHERE pa.account_id = ? AND m.played_at >= ?{end_filter}
+        JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
+        WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?{end_filter}
           AND {br_where}
         ORDER BY m.played_at DESC
     """, params + br_params).fetchall()
@@ -3229,8 +3253,8 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     """
     parts = conn.execute("""
         SELECT account_id, team_id, time_survived
-        FROM participants WHERE match_id = ?
-    """, (match_id,)).fetchall()
+        FROM participants WHERE tenant_id = ? AND match_id = ?
+    """, (HARDCODED_TENANT_ID, match_id,)).fetchall()
     if not parts:
         return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
     acc_to_team = {p["account_id"]: p["team_id"] for p in parts}
@@ -3240,8 +3264,8 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
 
     # Map fuer Radius-Skalierung
     map_row = conn.execute(
-        "SELECT map_name FROM matches WHERE match_id = ?",
-        (match_id,)).fetchone()
+        "SELECT map_name FROM matches WHERE tenant_id = ? AND match_id = ?",
+        (HARDCODED_TENANT_ID, match_id,)).fetchone()
     map_name = map_row["map_name"] if map_row else None
 
     squad_ids = {a for a, t in acc_to_team.items() if t == my_team_id}
@@ -3255,11 +3279,11 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     squad_landings = conn.execute(f"""
         SELECT actor_account, actor_x, actor_y, timestamp_ms
         FROM telemetry_events
-        WHERE match_id = ?
+        WHERE tenant_id = ? AND match_id = ?
           AND event_type = 'Landing'
           AND actor_account IN ({placeholders})
         ORDER BY timestamp_ms ASC
-    """, [match_id] + list(squad_ids)).fetchall()
+    """, [HARDCODED_TENANT_ID, match_id] + list(squad_ids)).fetchall()
     if not squad_landings:
         return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
 
@@ -3292,18 +3316,19 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
         SELECT actor_account, target_account, timestamp_ms, event_type,
                actor_x, actor_y, victim_x, victim_y
         FROM telemetry_events
-        WHERE match_id = ?
+        WHERE tenant_id = ? AND match_id = ?
           AND event_type IN ('Kill', 'Knock', 'TakeDamage')
           AND timestamp_ms >= ?
           AND timestamp_ms <= ?
         ORDER BY timestamp_ms ASC
-    """, (match_id, landing_ms, fight_cutoff_ms)).fetchall()
+    """, (HARDCODED_TENANT_ID, match_id, landing_ms, fight_cutoff_ms)).fetchall()
 
     # Lobby-weites team_id-Mapping (falls match_schema >= 2)
-    lobby_team_map = dict(conn.execute("""
+    # PG: dict(rows) klappt nicht direkt mit RealDictRow — manuell mappen.
+    lobby_team_map = {r["account_id"]: r["team_id"] for r in conn.execute("""
         SELECT account_id, team_id FROM match_team_mapping
-        WHERE match_id = ?
-    """, (match_id,)).fetchall())
+        WHERE tenant_id = ? AND match_id = ?
+    """, (HARDCODED_TENANT_ID, match_id,)).fetchall()}
     # Falls leer (alte Matches ohne re-ingest): fallback auf acc_to_team
     # (squad-only) — Team-Count wird dann underestimiert.
     full_team_map = lobby_team_map if lobby_team_map else acc_to_team
@@ -3318,10 +3343,10 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
         all_landings = conn.execute("""
             SELECT actor_account, actor_x, actor_y
             FROM telemetry_events
-            WHERE match_id = ?
+            WHERE tenant_id = ? AND match_id = ?
               AND event_type = 'Landing'
               AND actor_x IS NOT NULL AND actor_y IS NOT NULL
-        """, (match_id,)).fetchall()
+        """, (HARDCODED_TENANT_ID, match_id,)).fetchall()
         for ld in all_landings:
             if ld["actor_account"] in squad_ids:
                 continue
@@ -3381,12 +3406,12 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     survival_cutoff_ms = landing_ms + HD_SURVIVAL_WINDOW_MIN * 60 * 1000
     killed_in_window = {r["target_account"] for r in conn.execute(f"""
         SELECT target_account FROM telemetry_events
-        WHERE match_id = ?
+        WHERE tenant_id = ? AND match_id = ?
           AND event_type = 'Kill'
           AND target_account IN ({placeholders})
           AND timestamp_ms >= ?
           AND timestamp_ms <= ?
-    """, [match_id] + list(squad_ids) + [landing_ms, survival_cutoff_ms])
+    """, [HARDCODED_TENANT_ID, match_id] + list(squad_ids) + [landing_ms, survival_cutoff_ms])
                           .fetchall()}
     solo_alive = my_account_id not in killed_in_window
     team_alive = bool(squad_ids - killed_in_window)
@@ -3406,8 +3431,8 @@ def _detect_hot_drop(conn, match_id, my_account_id, window_ms, window_secs):
     landing_offset_sec = None
     first_fight_after_landing_sec = None
     m_row = conn.execute(
-        "SELECT played_at FROM matches WHERE match_id = ?",
-        (match_id,)).fetchone()
+        "SELECT played_at FROM matches WHERE tenant_id = ? AND match_id = ?",
+        (HARDCODED_TENANT_ID, match_id,)).fetchone()
     if m_row and m_row["played_at"]:
         start_dt = _parse_iso(m_row["played_at"])
         if start_dt:
@@ -3463,10 +3488,10 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session",
                m.game_mode, pa.place, pa.kills, pa.damage_dealt,
                pa.time_survived
         FROM matches m
-        JOIN participants pa ON pa.match_id = m.match_id
-        WHERE pa.account_id = ? AND m.played_at >= ?
+        JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
+        WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?
         ORDER BY m.played_at ASC
-    """, (my_account_id, cutoff)).fetchall()
+    """, (HARDCODED_TENANT_ID, my_account_id, cutoff)).fetchall()
 
     total = 0
     engaged_total = 0      # Matches mit events_count >= 2 (echter Fight)
@@ -3486,13 +3511,14 @@ def compute_first_fight_rate(conn, my_account_id, range_key="session",
             r = conn.execute("""
                 SELECT te.actor_x, te.actor_y FROM telemetry_events te
                 JOIN participants pa ON pa.match_id = te.match_id
+                  AND pa.tenant_id = te.tenant_id
                   AND pa.account_id = te.actor_account
-                WHERE te.match_id = ? AND te.event_type = 'Landing'
+                WHERE te.tenant_id = ? AND te.match_id = ? AND te.event_type = 'Landing'
                   AND pa.team_id = (SELECT team_id FROM participants
-                                     WHERE match_id = ? AND account_id = ?)
+                                     WHERE tenant_id = ? AND match_id = ? AND account_id = ?)
                   AND te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
                 ORDER BY te.timestamp_ms ASC LIMIT 1
-            """, (mid, mid, my_account_id)).fetchone()
+            """, (HARDCODED_TENANT_ID, mid, HARDCODED_TENANT_ID, mid, my_account_id)).fetchone()
             if not r:
                 return (None, None)
             # Robust gegen Tupel- oder Row-Resultate
@@ -3613,8 +3639,8 @@ def _detect_first_fight(conn, match_id, my_account_id,
     # Squad und Team-Mapping aus participants
     parts = conn.execute("""
         SELECT account_id, team_id, time_survived
-        FROM participants WHERE match_id = ?
-    """, (match_id,)).fetchall()
+        FROM participants WHERE tenant_id = ? AND match_id = ?
+    """, (HARDCODED_TENANT_ID, match_id,)).fetchall()
     if not parts:
         return None
     acc_to_team = {p["account_id"]: p["team_id"] for p in parts}
@@ -3634,10 +3660,10 @@ def _detect_first_fight(conn, match_id, my_account_id,
         SELECT event_type, actor_account, target_account, timestamp_ms,
                actor_x, actor_y, victim_x, victim_y
         FROM telemetry_events
-        WHERE match_id = ? AND event_type IN ('Kill', 'Knock', 'TakeDamage')
+        WHERE tenant_id = ? AND match_id = ? AND event_type IN ('Kill', 'Knock', 'TakeDamage')
           AND actor_account IS NOT NULL
         ORDER BY timestamp_ms ASC
-    """, (match_id,)).fetchall()
+    """, (HARDCODED_TENANT_ID, match_id,)).fetchall()
     if not events:
         return None
 
@@ -3675,10 +3701,10 @@ def _detect_first_fight(conn, match_id, my_account_id,
     # haben (= Squad ist Attacker oder Victim im Event). Vorher zählten
     # auch 3rd-party-Teams die zufällig im Cluster-Radius kämpften ohne
     # uns zu touchen — das hat avgTeams künstlich aufgebläht (Max 15).
-    lobby_team_map = dict(conn.execute("""
+    lobby_team_map = {r["account_id"]: r["team_id"] for r in conn.execute("""
         SELECT account_id, team_id FROM match_team_mapping
-        WHERE match_id = ?
-    """, (match_id,)).fetchall())
+        WHERE tenant_id = ? AND match_id = ?
+    """, (HARDCODED_TENANT_ID, match_id,)).fetchall()}
     full_team_map = lobby_team_map if lobby_team_map else acc_to_team
     teams = set()
     for e in cluster:
@@ -3724,8 +3750,8 @@ def _detect_first_fight(conn, match_id, my_account_id,
     # Match-Start: played_at IST der Match-Start (PUBG-API createdAt).
     fight_start_after_match_start_sec = None
     m_row = conn.execute(
-        "SELECT played_at FROM matches WHERE match_id = ?",
-        (match_id,)).fetchone()
+        "SELECT played_at FROM matches WHERE tenant_id = ? AND match_id = ?",
+        (HARDCODED_TENANT_ID, match_id,)).fetchone()
     if m_row and m_row["played_at"]:
         m_start = _parse_iso(m_row["played_at"])
         if m_start:
@@ -3795,10 +3821,10 @@ def compute_sessions_index(conn, my_account_id, gap_hours=4):
                m.game_mode,
                pa.kills, pa.damage_dealt, pa.place
         FROM matches m
-        JOIN participants pa ON pa.match_id = m.match_id
-        WHERE pa.account_id = ?
+        JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
+        WHERE m.tenant_id = ? AND pa.account_id = ?
         ORDER BY m.played_at ASC
-    """, (my_account_id,)).fetchall()
+    """, (HARDCODED_TENANT_ID, my_account_id,)).fetchall()
 
     if not rows:
         return []
@@ -3836,9 +3862,9 @@ def compute_sessions_index(conn, my_account_id, gap_hours=4):
             placeholders = ",".join("?" * len(match_ids))
             mate_rows = conn.execute(f"""
                 SELECT name, COUNT(*) AS c FROM participants
-                WHERE match_id IN ({placeholders}) AND account_id != ?
+                WHERE tenant_id = ? AND match_id IN ({placeholders}) AND account_id != ?
                 GROUP BY name ORDER BY c DESC LIMIT 1
-            """, list(match_ids) + [my_account_id]).fetchall()
+            """, [HARDCODED_TENANT_ID] + list(match_ids) + [my_account_id]).fetchall()
             top_mate = mate_rows[0]["name"] if mate_rows else None
             top_mate_count = mate_rows[0]["c"] if mate_rows else 0
         else:
@@ -3881,10 +3907,10 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
                pa.damage_dealt, pa.place, pa.time_survived,
                pa.longest_kill
         FROM matches m
-        JOIN participants pa ON pa.match_id = m.match_id
-        WHERE pa.account_id = ? AND m.played_at >= ? {end_filter}
+        JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
+        WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ? {end_filter}
         ORDER BY m.played_at ASC
-    """, params).fetchall()
+    """, [HARDCODED_TENANT_ID] + params).fetchall()
 
     if not matches:
         return {"sessionStartedAt": started, "rangeTo": range_to,
@@ -3896,13 +3922,14 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
         rows = conn.execute("""
             SELECT name, kills, headshot_kills, assists, dbnos,
                    damage_dealt, place, time_survived
-            FROM participants WHERE match_id=? AND account_id != ?
+            FROM participants WHERE tenant_id=? AND match_id=? AND account_id != ?
             ORDER BY name
-        """, (match_id, my_account_id)).fetchall()
+        """, (HARDCODED_TENANT_ID, match_id, my_account_id)).fetchall()
         return [dict(r) for r in rows]
 
     self_name_row = conn.execute(
-        "SELECT name FROM players WHERE account_id = ?", (my_account_id,)
+        "SELECT name FROM players WHERE tenant_id = ? AND account_id = ?",
+        (HARDCODED_TENANT_ID, my_account_id,)
     ).fetchone()
     my_name = self_name_row["name"] if self_name_row else "Self"
 
@@ -3911,8 +3938,8 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
     def _squad_last_survived(match_id):
         row = conn.execute("""
             SELECT MAX(time_survived) AS max_surv FROM participants
-            WHERE match_id=?
-        """, (match_id,)).fetchone()
+            WHERE tenant_id=? AND match_id=?
+        """, (HARDCODED_TENANT_ID, match_id,)).fetchone()
         return row["max_surv"] or 0
 
     enriched = []
@@ -3937,15 +3964,15 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
         ph = ",".join("?" * len(event_match_ids))
         kills_by_match = {r["match_id"]: r["k"] for r in conn.execute(
             f"SELECT match_id, COUNT(*) AS k FROM telemetry_events "
-            f"WHERE event_type='Kill' AND actor_account=? "
+            f"WHERE tenant_id=? AND event_type='Kill' AND actor_account=? "
             f"AND match_id IN ({ph}) GROUP BY match_id",
-            [my_account_id, *event_match_ids]).fetchall()}
+            [HARDCODED_TENANT_ID, my_account_id, *event_match_ids]).fetchall()}
         dmg_by_match = {r["match_id"]: float(r["d"] or 0) for r in conn.execute(
             f"SELECT match_id, COALESCE(SUM(damage), 0) AS d "
             f"FROM telemetry_events "
-            f"WHERE event_type='TakeDamage' AND actor_account=? "
+            f"WHERE tenant_id=? AND event_type='TakeDamage' AND actor_account=? "
             f"AND match_id IN ({ph}) GROUP BY match_id",
-            [my_account_id, *event_match_ids]).fetchall()}
+            [HARDCODED_TENANT_ID, my_account_id, *event_match_ids]).fetchall()}
     for x in enriched:
         if not is_br_mode(x.get("game_mode")):
             x["effective_kills"]  = kills_by_match.get(x["match_id"], 0)
@@ -4020,7 +4047,7 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
         sq_rows = conn.execute(f"""
             WITH my_teams AS (
               SELECT match_id, team_id FROM match_team_mapping
-              WHERE account_id = ? AND match_id IN ({ph_id})
+              WHERE tenant_id = ? AND account_id = ? AND match_id IN ({ph_id})
             )
             SELECT mtm.match_id, m.duration_secs,
                    SUM(COALESCE(mtm.kills, 0)) AS sq_kills,
@@ -4034,10 +4061,10 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             FROM match_team_mapping mtm
             JOIN my_teams mt ON mt.match_id = mtm.match_id
                               AND mt.team_id = mtm.team_id
-            JOIN matches m   ON m.match_id  = mtm.match_id
-            WHERE mtm.kills IS NOT NULL
-            GROUP BY mtm.match_id
-        """, [my_account_id] + match_ids).fetchall()
+            JOIN matches m   ON m.match_id  = mtm.match_id AND m.tenant_id = mtm.tenant_id
+            WHERE mtm.tenant_id = ? AND mtm.kills IS NOT NULL
+            GROUP BY mtm.match_id, m.duration_secs
+        """, [HARDCODED_TENANT_ID, my_account_id] + match_ids + [HARDCODED_TENANT_ID]).fetchall()
         sq_kills = 0
         sq_deaths = 0
         for r in sq_rows:
@@ -4059,10 +4086,10 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
                    COUNT(*)                AS l_n,
                    SUM(CASE WHEN place=1 THEN 1 ELSE 0 END) AS l_wins
             FROM match_team_mapping
-            WHERE match_id IN ({ph_id}) AND kills IS NOT NULL
+            WHERE tenant_id = ? AND match_id IN ({ph_id}) AND kills IS NOT NULL
             GROUP BY match_id
-            HAVING l_n > 4
-        """, match_ids).fetchall()
+            HAVING COUNT(*) > 4
+        """, [HARDCODED_TENANT_ID] + match_ids).fetchall()
         if lo_rows:
             kds = [(r["l_kills"] or 0) / max((r["l_n"] or 0) - (r["l_wins"] or 0), 1)
                    for r in lo_rows]
@@ -4214,11 +4241,11 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
                 if acc in name_cache: return name_cache[acc]
                 r = conn.execute("""
                     SELECT COALESCE(p.name, pa.name) AS n
-                    FROM (SELECT NULL) x
-                    LEFT JOIN players p ON p.account_id = ?
-                    LEFT JOIN participants pa ON pa.match_id = ?
+                    FROM (SELECT NULL AS dummy) x
+                    LEFT JOIN players p ON p.tenant_id = ? AND p.account_id = ?
+                    LEFT JOIN participants pa ON pa.tenant_id = ? AND pa.match_id = ?
                           AND pa.account_id = ?
-                """, (acc, match_id, acc)).fetchone()
+                """, (HARDCODED_TENANT_ID, acc, HARDCODED_TENANT_ID, match_id, acc)).fetchone()
                 n = r["n"] if r else None
                 name_cache[acc] = n
                 return n
@@ -4246,12 +4273,12 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             # Redzone-Tode (Kill ohne actor + Bomb/RedZone-Waffe)
             for r in conn.execute(f"""
                 SELECT * FROM telemetry_events
-                WHERE match_id=? AND event_type='Kill'
+                WHERE tenant_id=? AND match_id=? AND event_type='Kill'
                   AND target_account IN ({ph})
                   AND (actor_account IS NULL OR actor_account='')
                   AND (weapon LIKE '%RedZone%' OR weapon LIKE '%Bomb%'
                        OR weapon LIKE '%bomb%')
-            """, [match_id] + list(acc_ids)).fetchall():
+            """, [HARDCODED_TENANT_ID, match_id] + list(acc_ids)).fetchall():
                 target = r["target_account"]
                 if target in result:
                     result[target]["redzone"].append({
@@ -4265,9 +4292,9 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             # Vehicle-Kills + Vehicle-Tode — gleiche SQL, separate Buckets
             for r in conn.execute(f"""
                 SELECT * FROM telemetry_events
-                WHERE match_id=? AND event_type='Kill'
+                WHERE tenant_id=? AND match_id=? AND event_type='Kill'
                   AND (actor_account IN ({ph}) OR target_account IN ({ph}))
-            """, [match_id] + list(acc_ids) + list(acc_ids)).fetchall():
+            """, [HARDCODED_TENANT_ID, match_id] + list(acc_ids) + list(acc_ids)).fetchall():
                 actor, target = r["actor_account"], r["target_account"]
                 if actor in result:
                     ev = _vehicle_event(r, is_actor=True)
@@ -4279,10 +4306,10 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
             for acc in acc_ids:
                 ve = conn.execute("""
                     SELECT event_type, timestamp_ms FROM telemetry_events
-                    WHERE match_id=? AND actor_account=?
+                    WHERE tenant_id=? AND match_id=? AND actor_account=?
                       AND event_type IN ('VehicleEnter','VehicleLeave')
                     ORDER BY timestamp_ms ASC
-                """, (match_id, acc)).fetchall()
+                """, (HARDCODED_TENANT_ID, match_id, acc)).fetchall()
                 if not ve: continue
                 intervals = []
                 enter_ms = None
@@ -4297,9 +4324,9 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
                 if not intervals: continue
                 for k in conn.execute("""
                     SELECT * FROM telemetry_events
-                    WHERE match_id=? AND event_type='Kill'
+                    WHERE tenant_id=? AND match_id=? AND event_type='Kill'
                       AND actor_account=?
-                """, (match_id, acc)).fetchall():
+                """, (HARDCODED_TENANT_ID, match_id, acc)).fetchall():
                     ts = k["timestamp_ms"]
                     if not ts: continue
                     if not any(a <= ts <= b for a, b in intervals): continue
@@ -4331,15 +4358,15 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
         # squad hat aktuell nur Namen, nicht account_ids. Wir holen
         # account_ids aus participants.
         sq_accs_from_db = set(r["account_id"] for r in conn.execute(
-            "SELECT account_id FROM participants WHERE match_id=? AND team_id=("
-            "  SELECT team_id FROM participants WHERE match_id=? AND account_id=?)",
-            (m["match_id"], m["match_id"], my_account_id)).fetchall())
+            "SELECT account_id FROM participants WHERE tenant_id=? AND match_id=? AND team_id=("
+            "  SELECT team_id FROM participants WHERE tenant_id=? AND match_id=? AND account_id=?)",
+            (HARDCODED_TENANT_ID, m["match_id"], HARDCODED_TENANT_ID, m["match_id"], my_account_id)).fetchall())
         spec = _special_events(m["match_id"], sq_accs_from_db)
         # Name-Lookup fuer account_ids
         acc_name = {r["account_id"]: r["name"] for r in conn.execute(
-            "SELECT account_id, name FROM players WHERE account_id IN ({})".format(
+            "SELECT account_id, name FROM players WHERE tenant_id=? AND account_id IN ({})".format(
                 ",".join("?"*len(sq_accs_from_db))),
-            list(sq_accs_from_db)).fetchall()} if sq_accs_from_db else {}
+            [HARDCODED_TENANT_ID] + list(sq_accs_from_db)).fetchall()} if sq_accs_from_db else {}
         # Knock-Empfang + Wiederbelebungen pro Squadmember aus Telemetrie
         ph = ",".join("?"*len(sq_accs_from_db)) if sq_accs_from_db else "''"
         sq_list = list(sq_accs_from_db)
@@ -4349,33 +4376,33 @@ def compute_session_report(conn, my_account_id, range_from=None, range_to=None):
         if sq_list:
             for r in conn.execute(
                 f"SELECT target_account, COUNT(*) AS c FROM telemetry_events "
-                f"WHERE match_id=? AND event_type='Knock' "
+                f"WHERE tenant_id=? AND match_id=? AND event_type='Knock' "
                 f"AND target_account IN ({ph}) GROUP BY target_account",
-                    [m["match_id"]] + sq_list).fetchall():
+                    [HARDCODED_TENANT_ID, m["match_id"]] + sq_list).fetchall():
                 knocks_received[r["target_account"]] = r["c"]
             for r in conn.execute(
                 f"SELECT actor_account, COUNT(*) AS c FROM telemetry_events "
-                f"WHERE match_id=? AND event_type='Revive' "
+                f"WHERE tenant_id=? AND match_id=? AND event_type='Revive' "
                 f"AND actor_account IN ({ph}) GROUP BY actor_account",
-                    [m["match_id"]] + sq_list).fetchall():
+                    [HARDCODED_TENANT_ID, m["match_id"]] + sq_list).fetchall():
                 revives_given[r["actor_account"]] = r["c"]
             # Bot-Kills pro Squadmember: Kill-Events mit target_account=ai.*
             for r in conn.execute(
                 f"SELECT actor_account, COUNT(*) AS c FROM telemetry_events "
-                f"WHERE match_id=? AND event_type='Kill' "
+                f"WHERE tenant_id=? AND match_id=? AND event_type='Kill' "
                 f"AND actor_account IN ({ph}) "
                 f"AND target_account LIKE 'ai.%' GROUP BY actor_account",
-                    [m["match_id"]] + sq_list).fetchall():
+                    [HARDCODED_TENANT_ID, m["match_id"]] + sq_list).fetchall():
                 bot_kills[r["actor_account"]] = r["c"]
         # Bot-Teams (team_id >= 200) und Gesamt-Teams in dieser Lobby
-        bot_teams_in_lobby = conn.execute(
-            "SELECT COUNT(DISTINCT team_id) FROM match_team_mapping "
-            "WHERE match_id=? AND team_id>=200",
-            (m["match_id"],)).fetchone()[0] or 0
-        total_teams_in_lobby = conn.execute(
-            "SELECT COUNT(DISTINCT team_id) FROM match_team_mapping "
-            "WHERE match_id=?",
-            (m["match_id"],)).fetchone()[0] or 0
+        bot_teams_in_lobby = (conn.execute(
+            "SELECT COUNT(DISTINCT team_id) AS c FROM match_team_mapping "
+            "WHERE tenant_id=? AND match_id=? AND team_id>=200",
+            (HARDCODED_TENANT_ID, m["match_id"],)).fetchone() or {}).get("c", 0) or 0
+        total_teams_in_lobby = (conn.execute(
+            "SELECT COUNT(DISTINCT team_id) AS c FROM match_team_mapping "
+            "WHERE tenant_id=? AND match_id=?",
+            (HARDCODED_TENANT_ID, m["match_id"],)).fetchone() or {}).get("c", 0) or 0
         my_special = spec.get(my_account_id, {})
         my_entry = {
             "name": my_name,
@@ -4464,15 +4491,15 @@ def compute_chickens_together(conn, my_account_id, min_wins=1, min_matches=1):
         SELECT mate.account_id, mate.name,
                SUM(CASE WHEN mate.place = 1 THEN 1 ELSE 0 END) AS wins_together,
                COUNT(*) AS shared_matches,
-               (CAST(SUM(CASE WHEN mate.place = 1 THEN 1 ELSE 0 END) AS REAL)
+               (CAST(SUM(CASE WHEN mate.place = 1 THEN 1 ELSE 0 END) AS DOUBLE PRECISION)
                 / COUNT(*)) * 100 AS win_rate
         FROM participants mate
-        JOIN participants me ON me.match_id = mate.match_id AND me.account_id = ?
-        WHERE mate.account_id != ?
+        JOIN participants me ON me.match_id = mate.match_id AND me.tenant_id = mate.tenant_id AND me.account_id = ?
+        WHERE mate.tenant_id = ? AND mate.account_id != ?
         GROUP BY mate.account_id, mate.name
-        HAVING wins_together >= ? AND shared_matches >= ?
+        HAVING SUM(CASE WHEN mate.place = 1 THEN 1 ELSE 0 END) >= ? AND COUNT(*) >= ?
         ORDER BY wins_together DESC, win_rate DESC, shared_matches DESC
-    """, (my_account_id, my_account_id, min_wins, min_matches)).fetchall()
+    """, (my_account_id, HARDCODED_TENANT_ID, my_account_id, min_wins, min_matches)).fetchall()
     return [{
         "accountId": r["account_id"],
         "name": r["name"],
@@ -4489,17 +4516,17 @@ def compute_squad_compare(conn, my_account_id, player_names, last_n=5):
 
     rows = conn.execute(f"""
         SELECT p.account_id, p.name FROM players p
-        WHERE p.name IN ({",".join(["?"]*len(targets))})
-    """, targets).fetchall()
+        WHERE p.tenant_id = ? AND p.name IN ({",".join(["?"]*len(targets))})
+    """, [HARDCODED_TENANT_ID] + targets).fetchall()
     name_to_acc = {r["name"]: r["account_id"] for r in rows}
 
     cutoff_q = conn.execute("""
         SELECT m.match_id, m.map_name, m.played_at
         FROM matches m
-        JOIN participants pa ON pa.match_id = m.match_id
-        WHERE pa.account_id = ?
+        JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
+        WHERE m.tenant_id = ? AND pa.account_id = ?
         ORDER BY m.played_at DESC LIMIT ?
-    """, (my_account_id, last_n)).fetchall()
+    """, (HARDCODED_TENANT_ID, my_account_id, last_n)).fetchall()
 
     table = []
     for mid_row in cutoff_q:
@@ -4511,8 +4538,8 @@ def compute_squad_compare(conn, my_account_id, player_names, last_n=5):
                 continue
             p = conn.execute("""
                 SELECT kills, damage_dealt, place
-                FROM participants WHERE match_id = ? AND account_id = ?
-            """, (mid_row["match_id"], acc)).fetchone()
+                FROM participants WHERE tenant_id = ? AND match_id = ? AND account_id = ?
+            """, (HARDCODED_TENANT_ID, mid_row["match_id"], acc)).fetchone()
             cells[name] = dict(p) if p else None
         table.append({"matchId": mid_row["match_id"],
                       "map": mid_row["map_name"],
@@ -4542,8 +4569,8 @@ def compute_landing_spots(conn, map_name, player_accs, pois_blob=None,
 
     # 1) Matches der Map bestimmen, die den Konstellations-Filter erfuellen
     match_rows = conn.execute(
-        "SELECT match_id FROM matches WHERE map_name = ?",
-        (map_name,)).fetchall()
+        "SELECT match_id FROM matches WHERE tenant_id = ? AND map_name = ?",
+        (HARDCODED_TENANT_ID, map_name,)).fetchall()
     match_ids = []
     for mr in match_rows:
         mid = mr["match_id"]
@@ -4553,7 +4580,7 @@ def compute_landing_spots(conn, map_name, player_accs, pois_blob=None,
         # Alle player_accs muessen im selben team_id dieses Matches sein
         rows = conn.execute(
             "SELECT account_id, team_id FROM match_team_mapping "
-            "WHERE match_id = ?", (mid,)).fetchall()
+            "WHERE tenant_id = ? AND match_id = ?", (HARDCODED_TENANT_ID, mid,)).fetchall()
         team_of = {r["account_id"]: r["team_id"] for r in rows}
         teams = {team_of.get(a) for a in player_accs}
         if None in teams or len(teams) != 1:
@@ -4573,16 +4600,16 @@ def compute_landing_spots(conn, map_name, player_accs, pois_blob=None,
         for mid in match_ids:
             cruise = conn.execute("""
                 SELECT actor_x, actor_y FROM telemetry_events
-                WHERE match_id=? AND actor_account=? AND event_type='Position'
+                WHERE tenant_id=? AND match_id=? AND actor_account=? AND event_type='Position'
                   AND actor_z >= 150000
                 ORDER BY timestamp_ms ASC
-            """, (mid, ref)).fetchall()
+            """, (HARDCODED_TENANT_ID, mid, ref)).fetchall()
             land = conn.execute("""
                 SELECT actor_x, actor_y FROM telemetry_events
-                WHERE match_id=? AND actor_account=? AND event_type='Landing'
+                WHERE tenant_id=? AND match_id=? AND actor_account=? AND event_type='Landing'
                   AND actor_x IS NOT NULL
                 ORDER BY timestamp_ms ASC LIMIT 1
-            """, (mid, ref)).fetchone()
+            """, (HARDCODED_TENANT_ID, mid, ref)).fetchone()
             if len(cruise) < 2 or not land:
                 kept.append(mid)  # routeUnknown → einbeziehen
                 continue
@@ -4602,7 +4629,8 @@ def compute_landing_spots(conn, map_name, player_accs, pois_blob=None,
     #    (match, actor). Vereinfachte Variante der _landings-Heuristik.
     ph = ",".join("?" * len(match_ids))
     acc_clause = ""
-    params = list(match_ids)
+    # Params: tenant (CTE), match_ids, tenant (main JOIN), [player_accs]
+    params = [HARDCODED_TENANT_ID] + list(match_ids) + [HARDCODED_TENANT_ID]
     if player_accs:
         acc_ph = ",".join("?" * len(player_accs))
         acc_clause = f"AND te.actor_account IN ({acc_ph})"
@@ -4611,7 +4639,7 @@ def compute_landing_spots(conn, map_name, player_accs, pois_blob=None,
         WITH best AS (
           SELECT match_id, actor_account, MIN(timestamp_ms) AS ts
           FROM telemetry_events
-          WHERE event_type='Landing' AND match_id IN ({ph})
+          WHERE tenant_id = ? AND event_type='Landing' AND match_id IN ({ph})
             AND actor_x IS NOT NULL AND actor_y IS NOT NULL
             AND (actor_z IS NULL OR actor_z < 80000)
             AND (actor_health IS NULL OR actor_health > 0)
@@ -4622,8 +4650,8 @@ def compute_landing_spots(conn, map_name, player_accs, pois_blob=None,
         FROM best b
         JOIN telemetry_events te
           ON te.match_id=b.match_id AND te.actor_account=b.actor_account
-         AND te.timestamp_ms=b.ts AND te.event_type='Landing'
-        LEFT JOIN players p ON p.account_id = te.actor_account
+         AND te.timestamp_ms=b.ts AND te.event_type='Landing' AND te.tenant_id = ?
+        LEFT JOIN players p ON p.account_id = te.actor_account AND p.tenant_id = te.tenant_id
         WHERE 1=1 {acc_clause}
     """, params).fetchall()
 
