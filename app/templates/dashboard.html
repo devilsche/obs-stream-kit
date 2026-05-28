@@ -12,13 +12,32 @@
       </div>
     </div>
 
+    {% if cred_status.any_missing %}
+    <div class="card" style="border-color: var(--warning);">
+      <h3 style="color: var(--warning);">⚠ Konfiguration unvollständig</h3>
+      <ul>
+        {% if not cred_status.pubg_ready %}
+        <li><a href="/app/settings">PUBG-API-Key + Spielername fehlt</a> — Poller laeuft nicht.</li>
+        {% endif %}
+        {% if not cred_status.steam_ready %}
+        <li><a href="/app/settings">Steam-API-Key + Steam-ID fehlt</a> — keine Achievements.</li>
+        {% endif %}
+      </ul>
+    </div>
+    {% endif %}
+
     <div class="card">
-      <h3>Willkommen</h3>
-      <p>Dein Tenant ist bereit. Naechste Schritte:</p>
-      <ol>
-        <li><a href="/app/settings">Trag deine PUBG- und Steam-API-Keys ein</a> — ohne die laeuft kein Poller.</li>
-        <li><a href="/app/urls">Hol dir deine OBS-Widget-URLs</a> und konfiguriere sie als Browser-Source.</li>
-      </ol>
+      <h3>Übersicht</h3>
+      <p style="margin: 0 0 12px;">
+        Status:
+        {% if cred_status.pubg_ready %}<span style="color: var(--success);">✓ PUBG</span>{% else %}<span style="color: var(--warning);">⏳ PUBG</span>{% endif %}
+        ·
+        {% if cred_status.steam_ready %}<span style="color: var(--success);">✓ Steam</span>{% else %}<span style="color: var(--warning);">⏳ Steam</span>{% endif %}
+      </p>
+      <p>
+        <a href="/app/urls" class="btn">🔗 Meine OBS-URLs</a>
+        <a href="/app/settings" class="btn" style="background: var(--bg-deeper); border: 1px solid var(--border);">⚙️ Settings</a>
+      </p>
       <p style="color: var(--text-dim); font-size: 13px; margin-top: 16px;">
         Stats-Cards, Match-History und System-Status-Panel kommen in Spec 3.
       </p>

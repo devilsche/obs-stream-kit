@@ -20,7 +20,19 @@ def landing():
 @bp_app.route("/app/")
 @require_session
 def dashboard():
-    return render_template("dashboard.html", user=g.user)
+    conn = _get_conn()
+    try:
+        creds = core_creds.get(conn, g.tenant_id)
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            conn.close()
+    cred_status = {
+        "pubg_ready": bool(creds.pubg_name and creds.pubg_api_key),
+        "steam_ready": bool(creds.steam_id and creds.steam_api_key),
+        "any_missing": not (creds.pubg_name and creds.pubg_api_key
+                            and creds.steam_id and creds.steam_api_key),
+    }
+    return render_template("dashboard.html", user=g.user, cred_status=cred_status)
 
 
 @bp_app.route("/app/pending")
