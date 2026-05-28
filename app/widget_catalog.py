@@ -16,8 +16,8 @@ WIDGET_META = [
     ("PUBG · Stats", "Career Card",          "Career stats: K/D, wins, top 10 — current season.",                    "pubg/career-card.html"),
 
 
-    ("PUBG · Stats", "Live Bar",             "Live stat bar for the gameplay overlay — kills, damage, place.",       "pubg/live-bar.html"),
-    ("PUBG · Stats", "Streak Counter",       "Live win-streak / top10-streak counter.",                              "pubg/streak-counter.html"),
+    ("PUBG · Stats", "Live Bar",             "Live stat bar for the gameplay overlay — kills, damage, place. Only visible during an active session (auto-hides between matches).", "pubg/live-bar.html"),
+    ("PUBG · Stats", "Streak Counter",       "Live win-streak / top10-streak counter. Tied to the active session.",  "pubg/streak-counter.html"),
     ("PUBG · Stats", "First Fight Rate",     "How often you win the first fight.",                                   "pubg/first-fight.html"),
     ("PUBG · Stats", "Weapon Stats",         "Damage and kill distribution by weapon.",                              "pubg/weapon-stats.html"),
     ("PUBG · Stats", "Season History",       "Career-history across seasons.",                                       "pubg/season-history.html"),
