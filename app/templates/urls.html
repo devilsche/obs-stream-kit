@@ -1,1 +1,41 @@
-<html><body>urls stub</body></html>
+{% extends "base.html" %}
+{% block title %}OBS-URLs — OBS Stream Kit{% endblock %}
+{% block body %}
+<div class="layout">
+  {% include "_sidebar.html" %}
+  <main class="main">
+    <div class="topbar"><div class="greeting">OBS Browser-Source URLs</div></div>
+
+    <div class="card">
+      <h3>Anleitung</h3>
+      <p>Kopiere die URLs unten in OBS als <strong>Browser-Source</strong> (1920x1080 oder je nach Widget). Token ist persistent — wenn du ihn rotierst, musst du alle Browser-Sources neu setzen.</p>
+    </div>
+
+    <div class="card">
+      <h3>Widgets</h3>
+      {% if not token %}
+      <p style="color: var(--danger);">Kein Token gefunden — der Admin hat dein Tenant noch nicht eingerichtet.</p>
+      {% else %}
+      {% for label, path in widgets %}
+      <div class="url-pill">
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">
+          <strong style="color: var(--brand-gold);">{{ label }}</strong> ·
+          {{ base_url }}/s/{{ token }}/widgets/{{ path }}
+        </span>
+        <button class="copy-btn" onclick="navigator.clipboard.writeText('{{ base_url }}/s/{{ token }}/widgets/{{ path }}')">copy</button>
+      </div>
+      {% endfor %}
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h3>Streamer.bot Integration</h3>
+      <p>Wenn du <a href="https://streamer.bot">Streamer.bot</a> verwendest, ersetze deine bisherigen <code>/api/pubg/...</code> URLs durch:</p>
+      <div class="url-pill">
+        <span><code>{{ base_url }}/s/{{ token }}/api/pubg/last-match</code></span>
+        <button class="copy-btn" onclick="navigator.clipboard.writeText('{{ base_url }}/s/{{ token }}/api/pubg/last-match')">copy</button>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}

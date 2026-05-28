@@ -1,1 +1,28 @@
-<html><body>dashboard stub</body></html>
+{% extends "base.html" %}
+{% block title %}Dashboard — OBS Stream Kit{% endblock %}
+{% block body %}
+<div class="layout">
+  {% include "_sidebar.html" %}
+  <main class="main">
+    <div class="topbar">
+      <div class="greeting">Hallo {{ user.display_name }} 👋</div>
+      <div class="user-chip">
+        {% if user.avatar_url %}<img src="{{ user.avatar_url }}">{% else %}<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--brand-purple),var(--brand-gold))"></div>{% endif %}
+        <span>{{ user.display_name }}</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Willkommen</h3>
+      <p>Dein Tenant ist bereit. Naechste Schritte:</p>
+      <ol>
+        <li><a href="/app/settings">Trag deine PUBG- und Steam-API-Keys ein</a> — ohne die laeuft kein Poller.</li>
+        <li><a href="/app/urls">Hol dir deine OBS-Widget-URLs</a> und konfiguriere sie als Browser-Source.</li>
+      </ol>
+      <p style="color: var(--text-dim); font-size: 13px; margin-top: 16px;">
+        Stats-Cards, Match-History und System-Status-Panel kommen in Spec 3.
+      </p>
+    </div>
+  </main>
+</div>
+{% endblock %}
