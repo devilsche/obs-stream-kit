@@ -27,7 +27,17 @@ rsync -avz --delete \
   --exclude='node_modules/' \
   "$LOCAL_DIR/" "$SERVER:$REMOTE_DIR/"
 
+# .secrets + config/pubg.json mitschicken falls vorhanden (nie im Git)
+if [ -f "$LOCAL_DIR/.secrets" ]; then
+  echo "▶ .secrets hochladen"
+  rsync -az -e "ssh -i $SSH_KEY" "$LOCAL_DIR/.secrets" "$SERVER:$REMOTE_DIR/.secrets"
+fi
+if [ -f "$LOCAL_DIR/config/pubg.json" ]; then
+  echo "▶ config/pubg.json hochladen"
+  rsync -az -e "ssh -i $SSH_KEY" "$LOCAL_DIR/config/pubg.json" "$SERVER:$REMOTE_DIR/config/pubg.json"
+fi
+
 echo "▶ Service neu starten"
 ssh -i "$SSH_KEY" "$SERVER" "systemctl restart obs-stream-kit && systemctl status obs-stream-kit --no-pager -l | head -20"
 
-echo "✓ Deploy fertig — https://pubg.myentry.info"
+echo "✓ Deploy fertig — https://king-edition.de"
