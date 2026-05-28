@@ -72,13 +72,14 @@ def _build_pubg_registry(tenant_id):
     mit Tenant-Prefix. Credentials kommen pro Request frisch aus DB."""
     from pubg.endpoints import EndpointRegistry
     from core import credentials as core_creds
+    from core.db_compat import SqliteCompatConn
     conn = _get_conn()
     try:
         creds = core_creds.get(conn, tenant_id)
     finally:
         conn.close()
     return EndpointRegistry(
-        get_conn=lambda: _get_conn(),
+        get_conn=lambda: SqliteCompatConn(_get_conn()),
         my_account_id=creds.pubg_account_id,
         platform=creds.pubg_platform or "steam",
         cache=_TenantPrefixCache(_shared_pubg_cache(), tenant_id),
@@ -93,6 +94,7 @@ def _build_steam_registry(tenant_id):
     from steam.endpoints import SteamEndpointRegistry
     from steam.api_client import SteamClient
     from core import credentials as core_creds
+    from core.db_compat import SqliteCompatConn
     conn = _get_conn()
     try:
         creds = core_creds.get(conn, tenant_id)
@@ -105,7 +107,7 @@ def _build_steam_registry(tenant_id):
                              language="english")
     return SteamEndpointRegistry(
         client=client,
-        db_connect_fn=lambda: _get_conn(),
+        db_connect_fn=lambda: SqliteCompatConn(_get_conn()),
         poller=None,
         root_dir=current_app.config.get("_PROJECT_ROOT") or ".",
         tenant_id=tenant_id,
