@@ -60,7 +60,7 @@
   PubgUI.killfeedIconUrl = (name) =>
     name ? `/widgets/pubg/assets/killfeed/${name}.webp` : null;
   PubgUI.mapThumbUrl = (mapName) =>
-    mapName ? `/widgets/pubg/assets/mapselection/${mapName}.webp` : null;
+    mapName ? `/widgets/pubg/maps/${mapName}.webp` : null;
 
   // ── Zeit-Formatter — Browser-Lokalzeit (CEST/CET je nach Sommerzeit) ───────
   PubgUI.fmtDate = (iso) => {
