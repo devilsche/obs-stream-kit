@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Warte auf Freischaltung — OBS Stream Kit{% endblock %}
+{% block body %}
+<div class="pending">
+  <div class="pending-card">
+    <h1>👋 Hallo {{ user.display_name }}</h1>
+    <p>Dein Account ist registriert und wartet auf Freischaltung durch den Admin.</p>
+    <p style="color: var(--text-dim); font-size: 13px;">Sobald freigegeben, landest du automatisch im Dashboard.</p>
+    <p style="margin-top: 24px;"><a href="/app/logout" class="btn btn-sm">Logout</a></p>
+  </div>
+</div>
+<script>
+  setInterval(async () => {
+    const r = await fetch("/app/pending-check");
+    const j = await r.json();
+    if (j.approved) location.href = "/app/";
+  }, 30000);
+</script>
+{% endblock %}

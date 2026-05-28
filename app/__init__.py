@@ -9,6 +9,7 @@ from app.views_admin import bp_admin
 from app.views_widgets import bp_widgets
 from app.views_static import bp_static
 from app.views_api import bp_api
+from app.views_app import bp_app
 
 
 def create_app(testing: bool = False) -> Flask:
@@ -25,6 +26,7 @@ def create_app(testing: bool = False) -> Flask:
     app.register_blueprint(bp_widgets)
     app.register_blueprint(bp_static)
     app.register_blueprint(bp_api)
+    app.register_blueprint(bp_app)
 
     @app.route("/healthz")
     def healthz():
