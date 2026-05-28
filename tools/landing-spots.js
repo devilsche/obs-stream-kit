@@ -12,6 +12,7 @@ const LS = {
   mapImg: null,
   _imgName: null,
   _hoverPoi: null,
+  view: { zoom: 1, panX: 0, panY: 0 },
 };
 const SCATTER_COLORS = ["#f2b705", "#3cb44b", "#46f0f0", "#f032e6"];
 
@@ -26,7 +27,11 @@ async function loadMaps() {
   const sel = document.getElementById("mapSelect");
   sel.innerHTML = maps.map(m =>
     `<option value="${m}">${PubgUI.fmtMap(m)}</option>`).join("");
-  sel.addEventListener("change", () => { LS.mapName = sel.value; refresh(); });
+  sel.addEventListener("change", () => {
+    LS.mapName = sel.value;
+    LS.view = { zoom: 1, panX: 0, panY: 0 };
+    refresh();
+  });
   LS.mapName = sel.value || maps[0];
   if (LS.mapName) { sel.value = LS.mapName; refresh(); }
 }
@@ -167,13 +172,19 @@ function fitCanvas() {
   cnv.height = Math.floor(r.height);
 }
 
-// normalisiert (0-1) → Canvas-Pixel (Map quadratisch zentriert)
+// normalisiert (0-1) → Canvas-Pixel (Map quadratisch zentriert, + Zoom/Pan)
 function projXY(nx, ny) {
   const cnv = document.getElementById("heat");
   const base = Math.min(cnv.width, cnv.height);
   const offX = (cnv.width - base) / 2;
   const offY = (cnv.height - base) / 2;
-  return [offX + nx * base, offY + ny * base];
+  const px = offX + nx * base;
+  const py = offY + ny * base;
+  const z = LS.view.zoom;
+  return [
+    (px - cnv.width / 2) * z + cnv.width / 2 + LS.view.panX,
+    (py - cnv.height / 2) * z + cnv.height / 2 + LS.view.panY,
+  ];
 }
 
 function renderHeatmap() {
@@ -232,6 +243,45 @@ function renderHeatmap() {
   }
 }
 window.addEventListener("resize", renderHeatmap);
+
+// --- Zoom (Wheel, zur Cursor-Position) + Pan (Drag) + Reset (Doppelklick) ---
+const heatEl = () => document.getElementById("heat");
+
+heatEl().addEventListener("wheel", e => {
+  e.preventDefault();
+  const cnv = heatEl();
+  const r = cnv.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+  const newZoom = Math.max(1, Math.min(20, LS.view.zoom * factor));
+  const ratio = newZoom / LS.view.zoom;
+  const hw = cnv.width / 2, hh = cnv.height / 2;
+  LS.view.panX = mx - hw - (mx - hw - LS.view.panX) * ratio;
+  LS.view.panY = my - hh - (my - hh - LS.view.panY) * ratio;
+  LS.view.zoom = newZoom;
+  renderHeatmap();
+}, { passive: false });
+
+let _lsDrag = null;
+heatEl().addEventListener("mousedown", e => {
+  _lsDrag = { x: e.clientX, y: e.clientY,
+              px: LS.view.panX, py: LS.view.panY };
+  heatEl().style.cursor = "grabbing";
+});
+window.addEventListener("mousemove", e => {
+  if (!_lsDrag) return;
+  LS.view.panX = _lsDrag.px + (e.clientX - _lsDrag.x);
+  LS.view.panY = _lsDrag.py + (e.clientY - _lsDrag.y);
+  renderHeatmap();
+});
+window.addEventListener("mouseup", () => {
+  _lsDrag = null;
+  heatEl().style.cursor = "";
+});
+heatEl().addEventListener("dblclick", () => {
+  LS.view.zoom = 1; LS.view.panX = 0; LS.view.panY = 0;
+  renderHeatmap();
+});
 
 function buildPlayersBar() {
   const bar = document.getElementById("playersBar");
