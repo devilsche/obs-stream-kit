@@ -18,11 +18,10 @@ from app import sessions
 from core import db as core_db
 
 
-PUBLIC_PATHS = (
-    "/", "/healthz",
-    "/app/login", "/app/oauth/callback",
-    "/widgets-static/",
-)
+# Exakte Pfade, fuer die kein Session-Lookup gemacht wird.
+PUBLIC_EXACT = ("/", "/healthz", "/app/login", "/app/oauth/callback")
+# Prefixe (mit trailing-slash) — alle darunter gelten als public.
+PUBLIC_PREFIXES = ("/widgets-static/", "/static/")
 
 _TOKEN_RE = re.compile(r"^/s/([A-Za-z0-9_]+)/")
 
@@ -61,37 +60,47 @@ def register_middleware(app):
                     conn.close()
             return
 
-        # 2. Public?
-        if any(path == p or path.startswith(p) for p in PUBLIC_PATHS):
+        # 2. Public? Exakte Matches und prefix-Matches getrennt — sonst
+        # haetten alle Pfade durch startswith("/") gematched.
+        if path in PUBLIC_EXACT or any(path.startswith(p) for p in PUBLIC_PREFIXES):
+            # Auf Public-Pfaden trotzdem User aus Session lesen (fuer Landing
+            # die User-Status anzeigt). Nur keinen Redirect-Zwang.
+            sid = request.cookies.get(Config.OBSKIT_SID_COOKIE)
+            if sid:
+                _maybe_set_user_from_session(sid)
             return
 
-        # 3. Session-Cookie?
+        # 3. Session-Cookie auf geschützten Pfaden
         sid = request.cookies.get(Config.OBSKIT_SID_COOKIE)
         if not sid:
             return  # Decorators handle the redirect
+        _maybe_set_user_from_session(sid)
 
-        conn = _get_conn()
-        try:
-            row = sessions.lookup(conn, sid)
-            if row is None:
-                return
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT u.id, u.twitch_user_id, u.display_name, u.is_admin,
-                           u.is_approved, u.avatar_url,
-                           t.id AS tenant_id
-                    FROM users u
-                    LEFT JOIN tenants t ON t.owner_user_id = u.id
-                    WHERE u.id = %s
-                """, (row["user_id"],))
-                user = cur.fetchone()
-            if user:
-                g.user = dict(user)
-                g.tenant_id = user["tenant_id"]
-                sessions.touch(conn, sid)
-        finally:
-            if "_PG_CONN_FACTORY" not in current_app.config:
-                conn.close()
+
+def _maybe_set_user_from_session(sid: str) -> None:
+    """Liest session + user aus DB und setzt g.user/g.tenant_id falls valide."""
+    conn = _get_conn()
+    try:
+        row = sessions.lookup(conn, sid)
+        if row is None:
+            return
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT u.id, u.twitch_user_id, u.display_name, u.is_admin,
+                       u.is_approved, u.avatar_url,
+                       t.id AS tenant_id
+                FROM users u
+                LEFT JOIN tenants t ON t.owner_user_id = u.id
+                WHERE u.id = %s
+            """, (row["user_id"],))
+            user = cur.fetchone()
+        if user:
+            g.user = dict(user)
+            g.tenant_id = user["tenant_id"]
+            sessions.touch(conn, sid)
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            conn.close()
 
 
 def require_session(view):
