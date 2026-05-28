@@ -127,9 +127,9 @@
           if (ed > 0 || et > 0) {
             const lines = [];
             if (ed > 0) lines.push(
-              `🚗 hat <b style="color:var(--pubg-gold)">${ed}</b> ${ed === 1 ? "Person" : "Personen"} aus dem Auto rausgeschossen`);
+              `🚗 shot <b style="color:var(--pubg-gold)">${ed}</b> ${ed === 1 ? "player" : "players"} out of a vehicle`);
             if (et > 0) lines.push(
-              `💀 wurde <b style="color:var(--pubg-gold)">${et}</b> mal aus dem Auto rausgeschossen`);
+              `💀 got shot out of a vehicle <b style="color:var(--pubg-gold)">${et}</b> ${et === 1 ? "time" : "times"}`);
             const er = document.getElementById("evictRow");
             er.innerHTML = lines.join("<br>");
             er.style.display = "block";
