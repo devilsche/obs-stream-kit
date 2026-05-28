@@ -13,8 +13,8 @@ _lock = threading.Lock()
 
 
 def _pubg_client_factory(api_key: str, platform: str):
-    from pubg.api_client import PUBGAPIClient
-    return PUBGAPIClient(api_key=api_key, platform=platform)
+    from pubg.api_client import PubgClient
+    return PubgClient(api_key=api_key, platform=platform)
 
 
 def _steam_client_factory(api_key: str, steam_id: str, language: str):
