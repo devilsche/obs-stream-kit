@@ -100,51 +100,60 @@ def urls():
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()
 
-    # Widget-Katalog: (Kategorie, Label, Beschreibung, Pfad, Range-Optionen)
-    # Range-Optionen: None = keine Range, sonst Liste von (label, query) Paaren
-    RANGE_SESSION_WEEK_ALL = [
-        ("Session", "?range=session"),
-        ("Woche",   "?range=week"),
-        ("Alle",    "?range=all"),
-    ]
-    RANGE_SESSION_ALL = [
-        ("Session", "?range=session"),
-        ("Alle",    "?range=all"),
-    ]
+    # Widget-Katalog. Jeder Eintrag:
+    #   (kategorie, label, beschreibung, pfad, switches)
+    # switches = Liste von {name, label, options=[(value, label), ...]}
+    # Default: alle Switches OFF. Wenn ein Switch aktiviert wird, wird er
+    # als ?<name>=<value> in die URL gehaengt.
+    RANGE_SW = {
+        "name": "range",
+        "label": "Range",
+        "options": [("session", "Session"), ("week", "Woche"), ("all", "Alle")],
+    }
+    SORT_KD = {
+        "name": "sortBy",
+        "label": "Sortiert nach",
+        "options": [("kd", "K/D"), ("matches", "Matches"), ("damage", "Damage")],
+    }
+    MIN_MATCHES = {
+        "name": "minMatches",
+        "label": "Min. Matches",
+        "options": [("2", "2"), ("5", "5"), ("10", "10"), ("20", "20")],
+    }
 
     widgets_list = [
-        ("PUBG · Stats", "Career Card", "Karriere-Stats: K/D, Wins, Top10 — aktuelle Season.", "pubg/career-card.html", None),
-        ("PUBG · Stats", "Session Report", "Vollstaendiger Match-Report nach Session-Ende — Kills/Damage/Place pro Match.", "pubg/session-report.html", None),
-        ("PUBG · Stats", "Live Bar", "Live-Stat-Leiste fuers Gameplay-Overlay — Kills, Damage, Place.", "pubg/live-bar.html", None),
-        ("PUBG · Stats", "Streak Counter", "Win-Streak / Top10-Streak Counter, live.", "pubg/streak-counter.html", None),
-        ("PUBG · Stats", "First Fight Rate", "Wie oft du den First-Fight gewinnst.", "pubg/first-fight.html", RANGE_SESSION_WEEK_ALL),
-        ("PUBG · Stats", "Weapon Stats", "Damage- und Kill-Verteilung nach Waffe.", "pubg/weapon-stats.html", RANGE_SESSION_WEEK_ALL),
+        ("PUBG · Stats", "Career Card", "Karriere-Stats: K/D, Wins, Top10 — aktuelle Season.", "pubg/career-card.html", []),
+        ("PUBG · Stats", "Session Report", "Vollstaendiger Match-Report nach Session-Ende — Kills/Damage/Place pro Match.", "pubg/session-report.html", []),
+        ("PUBG · Stats", "Live Bar", "Live-Stat-Leiste fuers Gameplay-Overlay — Kills, Damage, Place.", "pubg/live-bar.html", []),
+        ("PUBG · Stats", "Streak Counter", "Win-Streak / Top10-Streak Counter, live.", "pubg/streak-counter.html", []),
+        ("PUBG · Stats", "First Fight Rate", "Wie oft du den First-Fight gewinnst.", "pubg/first-fight.html", [RANGE_SW]),
+        ("PUBG · Stats", "Weapon Stats", "Damage- und Kill-Verteilung nach Waffe.", "pubg/weapon-stats.html", [RANGE_SW]),
 
-        ("PUBG · Mates", "Coplayer", "Wer mit dir spielt (auch teils-gespielt).", "pubg/coplayer.html", RANGE_SESSION_WEEK_ALL),
-        ("PUBG · Mates", "Top Mates", "Beste Synergie-Partner sortiert nach Team-KD.", "pubg/top-mates.html", RANGE_SESSION_WEEK_ALL),
-        ("PUBG · Mates", "Mates Flyout", "Detail-Flyout mit Mate-Statistiken.", "pubg/flyout-full.html", RANGE_SESSION_WEEK_ALL),
-        ("PUBG · Mates", "Anti-Mates", "Spieler die gegen dich antreten (Kill/Tot Stats).", "pubg/anti-mates.html", RANGE_SESSION_WEEK_ALL),
+        ("PUBG · Mates", "Coplayer", "Wer mit dir spielt (auch teils-gespielt).", "pubg/coplayer.html", [RANGE_SW, MIN_MATCHES]),
+        ("PUBG · Mates", "Top Mates", "Beste Synergie-Partner sortiert nach Team-KD.", "pubg/top-mates.html", [RANGE_SW, SORT_KD, MIN_MATCHES]),
+        ("PUBG · Mates", "Mates Flyout", "Detail-Flyout mit Mate-Statistiken.", "pubg/flyout-full.html", [RANGE_SW, SORT_KD, MIN_MATCHES]),
+        ("PUBG · Mates", "Anti-Mates", "Spieler die gegen dich antreten (Kill/Tot Stats).", "pubg/anti-mates.html", [RANGE_SW]),
 
-        ("PUBG · Maps", "Map Performance", "Performance pro Map: Place, Kills, Damage.", "pubg/map-performance.html", RANGE_SESSION_WEEK_ALL),
-        ("PUBG · Maps", "Map Distribution", "Chicken-Dinner-Pins auf der Map (alle Wins).", "pubg/chicken-map.html", None),
-        ("PUBG · Maps", "Hot Drop", "Hot-Drop-Visualisierung — wo gelandet wird.", "pubg/hot-drop.html", None),
+        ("PUBG · Maps", "Map Performance", "Performance pro Map: Place, Kills, Damage.", "pubg/map-performance.html", [RANGE_SW]),
+        ("PUBG · Maps", "Map Distribution", "Chicken-Dinner-Pins auf der Map (alle Wins).", "pubg/chicken-map.html", []),
+        ("PUBG · Maps", "Hot Drop", "Hot-Drop-Visualisierung — wo gelandet wird.", "pubg/hot-drop.html", []),
 
-        ("PUBG · Match", "Post-Match Card", "Card direkt nach Match-Ende mit Stats + Replay-Link.", "pubg/post-match-card.html", None),
-        ("PUBG · Match", "Session Summary", "Zusammenfassung der laufenden Session.", "pubg/session-summary.html", None),
-        ("PUBG · Match", "Session Goal", "Fortschritt zum gesetzten Session-Ziel.", "pubg/session-goal.html", None),
+        ("PUBG · Match", "Post-Match Card", "Card direkt nach Match-Ende mit Stats + Replay-Link.", "pubg/post-match-card.html", []),
+        ("PUBG · Match", "Session Summary", "Zusammenfassung der laufenden Session.", "pubg/session-summary.html", []),
+        ("PUBG · Match", "Session Goal", "Fortschritt zum gesetzten Session-Ziel.", "pubg/session-goal.html", []),
 
-        ("PUBG · Achievements", "Milestone Celebrate", "Animation/Sound bei erreichten Meilensteinen.", "pubg/milestone-celebrate.html", None),
-        ("PUBG · Achievements", "Achievement Feed", "Ticker mit Achievements.", "pubg/achievement-feed.html", None),
-        ("PUBG · Achievements", "Session Achievements", "Achievements der aktuellen Session.", "pubg/session-achievements.html", None),
+        ("PUBG · Achievements", "Milestone Celebrate", "Animation/Sound bei erreichten Meilensteinen.", "pubg/milestone-celebrate.html", []),
+        ("PUBG · Achievements", "Achievement Feed", "Ticker mit Achievements.", "pubg/achievement-feed.html", []),
+        ("PUBG · Achievements", "Session Achievements", "Achievements der aktuellen Session.", "pubg/session-achievements.html", []),
 
-        ("PUBG · News", "News Ticker", "Bottom-Bar mit Nachrichten + Stats-Highlights.", "pubg/news-ticker.html", None),
-        ("PUBG · News", "Lookup", "Live-Player-Lookup (Chat-Befehl-Driven).", "pubg/lookup.html", None),
+        ("PUBG · News", "News Ticker", "Bottom-Bar mit Nachrichten + Stats-Highlights.", "pubg/news-ticker.html", []),
+        ("PUBG · News", "Lookup", "Live-Player-Lookup (Chat-Befehl-Driven).", "pubg/lookup.html", []),
 
-        ("Steam", "Achievement Feed", "Achievement-Unlock-Ticker.", "steam/recent-unlocks.html", None),
-        ("Steam", "Achievement Popup", "Animation bei frischem Unlock.", "steam/popup.html", None),
-        ("Steam", "Now Playing", "Aktuell gespieltes Steam-Spiel.", "steam/now-playing.html", None),
-        ("Steam", "Games Ticker", "Owned-Games Ticker.", "steam/games-ticker.html", None),
-        ("Steam", "Achievement Browser", "Vollbild-Browser fuer alle Achievements (Just-Chatting).", "steam/achievement-browser.html", None),
+        ("Steam", "Achievement Feed", "Achievement-Unlock-Ticker.", "steam/recent-unlocks.html", []),
+        ("Steam", "Achievement Popup", "Animation bei frischem Unlock.", "steam/popup.html", []),
+        ("Steam", "Now Playing", "Aktuell gespieltes Steam-Spiel.", "steam/now-playing.html", []),
+        ("Steam", "Games Ticker", "Owned-Games Ticker.", "steam/games-ticker.html", []),
+        ("Steam", "Achievement Browser", "Vollbild-Browser fuer alle Achievements (Just-Chatting).", "steam/achievement-browser.html", []),
     ]
     base_url = request.url_root.rstrip("/")
     return render_template("urls.html",
