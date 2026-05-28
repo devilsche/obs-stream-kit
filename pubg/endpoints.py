@@ -817,10 +817,14 @@ class EndpointRegistry:
         from_iso = qs.get("from")
         to_iso = qs.get("to")
         cache_key = f"hot-drop:{range_key}:{from_iso or ''}:{to_iso or ''}"
+        # range=all braucht ~32s zu berechnen (Telemetrie-Scans pro Match).
+        # Aenderungen kommen nur durch neue Matches → 10 Min Cache reicht.
+        ttl = 600 if range_key == "all" else None
         return _ok(self.cache.get_or_compute(
             cache_key,
             lambda: compute_hot_drop(conn, self.my_account_id, range_key,
                                       from_iso=from_iso, to_iso=to_iso),
+            ttl=ttl,
         ))
 
     def _session_achievements(self, qs):
