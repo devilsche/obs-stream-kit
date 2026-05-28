@@ -32,6 +32,9 @@ rsync -avz --delete \
 # server-seitige Wahrheit (einmalig via server-setup.sh angelegt) und oben
 # bereits vom rsync ausgeschlossen.
 
+echo "▶ Ownership → obskit (Service-User)"
+ssh -i "$SSH_KEY" "$SERVER" "chown -R obskit:obskit $REMOTE_DIR"
+
 echo "▶ Service neu starten"
 ssh -i "$SSH_KEY" "$SERVER" "systemctl restart obs-stream-kit && systemctl status obs-stream-kit --no-pager -l | head -20"
 
