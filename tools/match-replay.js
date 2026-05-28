@@ -28,9 +28,30 @@ async function loadMatchList() {
   if (sel.value) loadReplay(sel.value);
 }
 
+function setLoading(state, text) {
+  const el = document.getElementById("loading");
+  if (!el) return;
+  const txt = document.getElementById("loadingText");
+  if (txt && text) txt.textContent = text;
+  el.querySelector(".spinner").style.display =
+    state === "error" ? "none" : "";
+  el.classList.toggle("show", state !== "done");
+}
+
 async function loadReplay(matchId) {
-  RS.replay = await PubgUI.fetchJson(
-    "/api/pubg/match-replay?match=" + encodeURIComponent(matchId), 60000);
+  setLoading("show", "Replay wird geladen…");
+  try {
+    RS.replay = await PubgUI.fetchJson(
+      "/api/pubg/match-replay?match=" + encodeURIComponent(matchId), 60000);
+  } catch (e) {
+    RS.replay = null;
+    const msg = (e && /404/.test(String(e.message || e)))
+      ? "Keine Telemetrie für dieses Match verfügbar."
+      : "Replay konnte nicht geladen werden.";
+    setLoading("error", msg);
+    buildTeamList();
+    return;
+  }
   RS.cursorMs = 0;
   RS.playing = false;
   RS.focusedTeam = null;
@@ -45,6 +66,7 @@ async function loadReplay(matchId) {
   syncScrubberAndClock();
   // resize + initial render
   if (window._rsInitCanvas) window._rsInitCanvas();
+  setLoading("done");
 }
 
 function buildTeamList() {
