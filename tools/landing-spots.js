@@ -25,7 +25,7 @@ async function loadMaps() {
   const maps = [...new Set(list.map(m => m.mapName).filter(Boolean))];
   const sel = document.getElementById("mapSelect");
   sel.innerHTML = maps.map(m =>
-    `<option value="${m}">${m.replace("_Main", "")}</option>`).join("");
+    `<option value="${m}">${PubgUI.fmtMap(m)}</option>`).join("");
   sel.addEventListener("change", () => { LS.mapName = sel.value; refresh(); });
   LS.mapName = sel.value || maps[0];
   if (LS.mapName) { sel.value = LS.mapName; refresh(); }
@@ -93,6 +93,15 @@ function wireAutocomplete(idx) {
       e.preventDefault();
       setActiveOption(opts, Math.max(activeIdx - 1, 0));
       if (opts[activeIdx]) opts[activeIdx].focus();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const d = opts[activeIdx >= 0 ? activeIdx : 0];
+      if (d) {
+        input.value = d.textContent;
+        setPlayer(idx, { accountId: d.dataset.acc, name: d.textContent });
+        showList(false);
+        refresh();
+      }
     } else if (e.key === "Escape") {
       showList(false);
       input.focus();
