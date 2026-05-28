@@ -55,6 +55,7 @@ WIDGET_META = [
     ("Steam",         "Combined Popup",     "Combined now-playing + achievement popup.",                            "steam/popup.html"),
     ("Steam",         "Now Playing",        "Currently played Steam game.",                                         "steam/now-playing.html"),
     ("Steam",         "Games Ticker",       "Owned-games ticker.",                                                  "steam/games-ticker.html"),
+    ("Steam",         "Achievement Browser","Full-screen browser through all achievements (use as Just-Chatting overlay).", "steam/achievement-browser.html"),
 ]
 
 
@@ -266,18 +267,23 @@ def _normalize_switches(switches: list, content: str) -> list:
             s = dict(s)
             s["presets"] = _smart_presets(s)
         out.append(s)
-    # Synthetic header-Switch wenn das Widget renderHeader nutzt und keinen
-    # eigenen 'header'-Switch deklariert hat
+    # Synthetic header-Switch wenn das Widget renderHeader nutzt ODER
+    # einen header-Param direkt liest. Default-Wert wird aus dem
+    # PubgUI.qs("header", "?")-Default extrahiert (sonst "0").
     has_header = any(s["key"] == "header" for s in out)
-    if not has_header and "renderHeader(" in content:
+    uses_header = "renderHeader(" in content
+    m_def = re.search(r'qs\(\s*"header"\s*,\s*"(\d)"', content)
+    if m_def:
+        uses_header = True
+    if not has_header and uses_header:
+        default = m_def.group(1) if m_def else "0"
         out.append({
             "key": "header",
             "label": "Header",
             "type": "select",
-            "default": "0",
+            "default": default,
             "options": [("0", "Hide"), ("1", "Show")],
-            "tooltip": "Title bar above the widget (showing widget name + range). "
-                       "Default off for in-stream use; turn on for the Just Chatting/preview view.",
+            "tooltip": "Title bar above the widget (showing widget name + range).",
         })
     # Synthetic ignoreStale-Switch wenn das Widget hideIfStale verwendet —
     # erlaubt dem Streamer in OBS die letzte Session weiterzuzeigen wenn
