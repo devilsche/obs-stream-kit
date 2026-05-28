@@ -4,32 +4,36 @@ Gleiche Tabellen-Struktur wie db.py (SQLite), aber PostgreSQL-kompatibel.
 Typ-Mapping: AUTOINCREMENT → BIGSERIAL, TEXT bleibt TEXT, REAL → DOUBLE PRECISION,
 INTEGER → INTEGER, json_extract → #>>/->>.
 
-Verbindung via DSN-String (postgresql://user:pass@host:port/db)
-aus .secrets (Zeile: PUBG PG DSN: ...) oder Umgebungsvariable PUBG_PG_DSN.
+Alle Tabellen tragen `tenant_id` als FK auf `tenants(id)` (Multi-Tenant-Setup).
+
+Verbindung: `load_dsn`/`connect` werden aus `core.db` re-exportiert (zentrale
+OBS-Kit-DSN aus `.secrets` / `OBS_KIT_PG_DSN`).
 """
 
-import os
-import re
+from core.db import load_dsn, connect  # noqa: F401  (Re-Export fuer Backward-Compat)
 
 try:
-    import psycopg2
-    import psycopg2.extras
+    import psycopg2  # noqa: F401
+    import psycopg2.extras  # noqa: F401
     HAS_PSYCOPG2 = True
 except ImportError:
     HAS_PSYCOPG2 = False
 
 PG_SCHEMA = """
 CREATE TABLE IF NOT EXISTS players (
-    account_id      TEXT PRIMARY KEY,
+    tenant_id       INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    account_id      TEXT NOT NULL,
     name            TEXT NOT NULL,
     platform        TEXT NOT NULL,
     is_self         INTEGER DEFAULT 0,
     first_seen_at   TEXT NOT NULL,
-    last_polled_at  TEXT
+    last_polled_at  TEXT,
+    PRIMARY KEY (tenant_id, account_id)
 );
 
 CREATE TABLE IF NOT EXISTS matches (
-    match_id          TEXT PRIMARY KEY,
+    tenant_id         INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    match_id          TEXT NOT NULL,
     map_name          TEXT NOT NULL,
     game_mode         TEXT NOT NULL,
     is_ranked         INTEGER DEFAULT 0,
@@ -37,11 +41,14 @@ CREATE TABLE IF NOT EXISTS matches (
     played_at         TEXT NOT NULL,
     telemetry_url     TEXT,
     telemetry_fetched INTEGER DEFAULT 0,
-    telemetry_schema  INTEGER DEFAULT 0
+    telemetry_schema  INTEGER DEFAULT 0,
+    PRIMARY KEY (tenant_id, match_id)
 );
-CREATE INDEX IF NOT EXISTS idx_matches_played_at ON matches(played_at);
+CREATE INDEX IF NOT EXISTS idx_matches_tenant_played
+    ON matches(tenant_id, played_at DESC);
 
 CREATE TABLE IF NOT EXISTS participants (
+    tenant_id        INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     match_id         TEXT NOT NULL,
     account_id       TEXT NOT NULL,
     name             TEXT NOT NULL,
@@ -62,24 +69,29 @@ CREATE TABLE IF NOT EXISTS participants (
     heals            INTEGER,
     boosts           INTEGER,
     team_kills       INTEGER,
-    PRIMARY KEY (match_id, account_id)
+    PRIMARY KEY (tenant_id, match_id, account_id)
 );
-CREATE INDEX IF NOT EXISTS idx_part_player ON participants(account_id);
-CREATE INDEX IF NOT EXISTS idx_part_match  ON participants(match_id);
+CREATE INDEX IF NOT EXISTS idx_part_tenant_player
+    ON participants(tenant_id, account_id);
+CREATE INDEX IF NOT EXISTS idx_part_tenant_match
+    ON participants(tenant_id, match_id);
 
 CREATE TABLE IF NOT EXISTS match_team_mapping (
-    match_id    TEXT NOT NULL,
-    account_id  TEXT NOT NULL,
-    team_id     INTEGER,
-    kills       INTEGER,
-    place       INTEGER,
+    tenant_id    INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    match_id     TEXT NOT NULL,
+    account_id   TEXT NOT NULL,
+    team_id      INTEGER,
+    kills        INTEGER,
+    place        INTEGER,
     time_survived INTEGER,
-    PRIMARY KEY (match_id, account_id)
+    PRIMARY KEY (tenant_id, match_id, account_id)
 );
-CREATE INDEX IF NOT EXISTS idx_mtm_match ON match_team_mapping(match_id);
+CREATE INDEX IF NOT EXISTS idx_mtm_tenant_match
+    ON match_team_mapping(tenant_id, match_id);
 
 CREATE TABLE IF NOT EXISTS telemetry_events (
     id              BIGSERIAL PRIMARY KEY,
+    tenant_id       INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     match_id        TEXT NOT NULL,
     event_type      TEXT NOT NULL,
     timestamp_ms    BIGINT,
@@ -96,11 +108,15 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
     damage          DOUBLE PRECISION,
     payload_json    TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_tel_match  ON telemetry_events(match_id);
-CREATE INDEX IF NOT EXISTS idx_tel_actor  ON telemetry_events(actor_account);
-CREATE INDEX IF NOT EXISTS idx_tel_type   ON telemetry_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_tel_tenant_match
+    ON telemetry_events(tenant_id, match_id);
+CREATE INDEX IF NOT EXISTS idx_tel_tenant_actor
+    ON telemetry_events(tenant_id, actor_account);
+CREATE INDEX IF NOT EXISTS idx_tel_type
+    ON telemetry_events(event_type);
 
 CREATE TABLE IF NOT EXISTS player_lifetime (
+    tenant_id         INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     account_id        TEXT NOT NULL,
     mode              TEXT NOT NULL,
     rounds_played     INTEGER,
@@ -122,10 +138,11 @@ CREATE TABLE IF NOT EXISTS player_lifetime (
     team_kills        INTEGER,
     losses            INTEGER,
     last_refreshed    TEXT,
-    PRIMARY KEY (account_id, mode)
+    PRIMARY KEY (tenant_id, account_id, mode)
 );
 
 CREATE TABLE IF NOT EXISTS player_season (
+    tenant_id         INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     account_id        TEXT NOT NULL,
     season_id         TEXT NOT NULL,
     mode              TEXT NOT NULL,
@@ -148,16 +165,19 @@ CREATE TABLE IF NOT EXISTS player_season (
     team_kills        INTEGER,
     losses            INTEGER,
     last_refreshed    TEXT,
-    PRIMARY KEY (account_id, season_id, mode)
+    PRIMARY KEY (tenant_id, account_id, season_id, mode)
 );
 
 CREATE TABLE IF NOT EXISTS settings (
-    key        TEXT PRIMARY KEY,
+    tenant_id  INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    key        TEXT NOT NULL,
     value      TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (tenant_id, key)
 );
 
 CREATE TABLE IF NOT EXISTS pubg_achievements_seen (
+    tenant_id       INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     achievement_id  TEXT NOT NULL,
     match_id        TEXT NOT NULL,
     label           TEXT,
@@ -166,39 +186,11 @@ CREATE TABLE IF NOT EXISTS pubg_achievements_seen (
     detected_at     BIGINT NOT NULL,
     displayed_at    BIGINT,
     is_rare         INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (achievement_id, match_id)
+    PRIMARY KEY (tenant_id, achievement_id, match_id)
 );
 CREATE INDEX IF NOT EXISTS idx_pubg_ach_undisplayed
-    ON pubg_achievements_seen (displayed_at);
+    ON pubg_achievements_seen (tenant_id, displayed_at);
 """
-
-
-def load_dsn(secrets_path: str = ".secrets") -> str | None:
-    """DSN aus .secrets (Zeile: PUBG PG DSN: postgresql://...) oder
-    Umgebungsvariable PUBG_PG_DSN."""
-    env = os.environ.get("PUBG_PG_DSN")
-    if env:
-        return env
-    if not os.path.exists(secrets_path):
-        return None
-    with open(secrets_path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if ":" not in line:
-                continue
-            key, _, val = line.partition(":")
-            if key.strip().lower().replace("-", " ") == "pubg pg dsn":
-                return val.strip()
-    return None
-
-
-def connect(dsn: str):
-    """Verbindung herstellen + Row-Factory a la sqlite3.Row."""
-    if not HAS_PSYCOPG2:
-        raise ImportError("psycopg2 nicht installiert: pip install psycopg2-binary")
-    conn = psycopg2.connect(dsn, cursor_factory=psycopg2.extras.RealDictCursor)
-    conn.autocommit = False
-    return conn
 
 
 def init_schema(conn) -> None:
