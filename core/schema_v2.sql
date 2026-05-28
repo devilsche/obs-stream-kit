@@ -27,5 +27,7 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_user_sessions_user
     ON user_sessions(user_id);
+-- Full index (PG erlaubt kein now() in partial index predicate — STABLE statt
+-- IMMUTABLE). Geringfuegig groesser, fuer unser Volumen egal.
 CREATE INDEX IF NOT EXISTS idx_user_sessions_expires
-    ON user_sessions(expires_at) WHERE expires_at > now();
+    ON user_sessions(expires_at);
