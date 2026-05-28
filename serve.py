@@ -367,6 +367,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
             self.send_header("Pragma", "no-cache")
             self.send_header("Expires", "0")
+        elif path_lower.startswith("/widgets/pubg/maps/") and \
+                path_lower.endswith((".png", ".webp", ".jpg", ".jpeg")):
+            # Map-Tiles sind 1-121MB gross → 30 Tage hart cachen, sonst lädt
+            # die Mini-Map bei jedem Report-Aufruf neu.
+            self.send_header("Cache-Control", "public, max-age=2592000, immutable")
         super().end_headers()
 
     def do_OPTIONS(self):
