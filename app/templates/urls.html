@@ -37,7 +37,10 @@
         <div class="widget-switches">
           {% for sw in switches %}
           <div class="sw-group" data-param="{{ sw.key }}" data-default="{{ sw.default }}" data-type="{{ sw.type }}">
-            <span class="sw-label">{{ sw.label }}</span>
+            <span class="sw-label">
+              {{ sw.label }}
+              {% if sw.tooltip %}<span class="info-i" title="{{ sw.tooltip }}">ⓘ</span>{% endif %}
+            </span>
             {% if sw.type == "select" and sw.options %}
               {% for value, vlabel in sw.options %}
               <button type="button" class="sw-btn{% if value == sw.default %} active{% endif %}" data-value="{{ value }}">{{ vlabel }}</button>
@@ -56,7 +59,8 @@
 
         <div class="url-pill">
           <span class="url-text" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">{{ base_url }}/s/{{ token }}/widgets/{{ path }}</span>
-          <button class="copy-btn">copy</button>
+          <button class="preview-btn" title="Open widget in new tab">↗ preview</button>
+          <button class="copy-btn" title="Copy URL to clipboard">copy</button>
         </div>
       </div>
       {% endfor %}
@@ -118,6 +122,29 @@
     width: 90px;
     font-variant-numeric: tabular-nums;
   }
+  .info-i {
+    display: inline-block;
+    margin-left: 4px;
+    color: var(--brand-gold);
+    cursor: help;
+    font-size: 12px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .preview-btn {
+    background: var(--bg-card);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    margin-right: 6px;
+  }
+  .preview-btn:hover {
+    color: var(--brand-gold);
+    border-color: var(--brand-gold);
+  }
 </style>
 
 <script>
@@ -166,6 +193,13 @@
       copyBtn.textContent = "✓";
       setTimeout(() => copyBtn.textContent = orig, 1200);
     });
+
+    const previewBtn = block.querySelector(".preview-btn");
+    if (previewBtn) {
+      previewBtn.addEventListener("click", () => {
+        window.open(buildUrl(block), "_blank", "noopener");
+      });
+    }
   });
 </script>
 {% endblock %}

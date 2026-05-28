@@ -72,6 +72,14 @@ _ITEM_RE = re.compile(
 _OPTIONS_RE = re.compile(r"options:\s*\[(?P<body>.+?)\]\s*(?:,|\})", re.DOTALL)
 _OPTION_PAIR_RE = re.compile(r"\[\s*\"([^\"]+)\"\s*,\s*\"([^\"]+)\"\s*\]")
 _NUM_FIELD_RE = re.compile(r"\b(min|max|step):\s*(\d+(?:\.\d+)?)")
+# tooltip kann multi-line + JS-string-concat sein:
+#   tooltip: "Welche Metrik …" +
+#            "Bei 'Worst K/D' …"
+_TOOLTIP_RE = re.compile(
+    r"tooltip:\s*((?:\"(?:[^\"\\]|\\.)*\"\s*\+\s*)*\"(?:[^\"\\]|\\.)*\")",
+    re.DOTALL,
+)
+_STRING_PIECE_RE = re.compile(r"\"((?:[^\"\\]|\\.)*)\"")
 
 
 def _extract_schema_from_html(content: str) -> list:
@@ -96,6 +104,10 @@ def _extract_schema_from_html(content: str) -> list:
             entry["options"] = opts
         for nm in _NUM_FIELD_RE.finditer(rest):
             entry[nm.group(1)] = float(nm.group(2)) if "." in nm.group(2) else int(nm.group(2))
+        tt_m = _TOOLTIP_RE.search(rest)
+        if tt_m:
+            pieces = [p.group(1) for p in _STRING_PIECE_RE.finditer(tt_m.group(1))]
+            entry["tooltip"] = "".join(pieces).strip()
         items.append(entry)
     return items
 
