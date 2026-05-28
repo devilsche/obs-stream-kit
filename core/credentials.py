@@ -64,6 +64,8 @@ def set_pubg(conn, tenant_id: int, *, name=None, platform=None,
                 updated_at = now()
             WHERE tenant_id = %s
         """, (name, platform, account_id, enc, tenant_id))
+        if cur.rowcount == 0:
+            raise LookupError(f"Keine tenant_credentials fuer tenant_id={tenant_id}")
     conn.commit()
 
 
@@ -80,6 +82,8 @@ def set_twitch(conn, tenant_id: int, *, channel=None, client_id=None,
                 updated_at = now()
             WHERE tenant_id = %s
         """, (channel, client_id, enc, tenant_id))
+        if cur.rowcount == 0:
+            raise LookupError(f"Keine tenant_credentials fuer tenant_id={tenant_id}")
     conn.commit()
 
 
@@ -94,6 +98,8 @@ def set_steam(conn, tenant_id: int, *, steam_id=None, api_key=None):
                 updated_at = now()
             WHERE tenant_id = %s
         """, (steam_id, enc, tenant_id))
+        if cur.rowcount == 0:
+            raise LookupError(f"Keine tenant_credentials fuer tenant_id={tenant_id}")
     conn.commit()
 
 
@@ -105,4 +111,6 @@ def set_ftp(conn, tenant_id: int, *, config_json: str):
             UPDATE tenant_credentials SET ftp_config_enc = %s, updated_at = now()
             WHERE tenant_id = %s
         """, (enc, tenant_id))
+        if cur.rowcount == 0:
+            raise LookupError(f"Keine tenant_credentials fuer tenant_id={tenant_id}")
     conn.commit()

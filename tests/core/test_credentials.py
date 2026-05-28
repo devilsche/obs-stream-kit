@@ -9,6 +9,8 @@ def pg_conn(monkeypatch):
     dsn = os.environ.get("OBS_KIT_PG_DSN_TEST")
     if not dsn:
         pytest.skip("OBS_KIT_PG_DSN_TEST nicht gesetzt")
+    if "test" not in dsn.lower():
+        pytest.skip("OBS_KIT_PG_DSN_TEST muss 'test' im DB-Namen enthalten (Schutz vor versehentlichem TRUNCATE)")
     conn = db.connect(dsn)
     with conn.cursor() as cur:
         cur.execute("TRUNCATE tenant_credentials, tenants, users RESTART IDENTITY CASCADE")
