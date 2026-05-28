@@ -86,7 +86,7 @@
        zwischen Zeilen sichtbar. */
     .matches-list .m {
       display: grid;
-      grid-template-columns: 240px 60px 1fr 70px 90px 90px;
+      grid-template-columns: 240px 60px 1fr 70px 70px 90px 90px;
       gap: 10px;
       padding: 6px 8px;
       border-radius: 3px;
@@ -98,7 +98,7 @@
     .matches-list .m.expanded { background: rgba(94, 42, 121, 0.25); }
     .matches-list .header-row {
       display: grid;
-      grid-template-columns: 240px 60px 1fr 70px 90px 90px;
+      grid-template-columns: 240px 60px 1fr 70px 70px 90px 90px;
       gap: 10px;
       padding: 2px 8px 4px;
       font-size: 0.85em;
@@ -2341,6 +2341,7 @@
             <div class="matches-list">
               <div class="header-row">
                 <span>Squad in Match</span><span>Place</span><span>Map</span>
+                <span style="text-align:right" title="Bot-Teams / Teams gesamt">Bots</span>
                 <span style="text-align:right">Kills</span>
                 <span style="text-align:right">Damage</span>
                 <span style="text-align:right">Survived</span>
