@@ -36,11 +36,19 @@
         {% if switches %}
         <div class="widget-switches">
           {% for sw in switches %}
-          <div class="sw-group" data-param="{{ sw.name }}" data-default="{{ sw.default }}">
+          <div class="sw-group" data-param="{{ sw.key }}" data-default="{{ sw.default }}" data-type="{{ sw.type }}">
             <span class="sw-label">{{ sw.label }}</span>
-            {% for value, vlabel in sw.options %}
-            <button type="button" class="sw-btn{% if value == sw.default %} active{% endif %}" data-value="{{ value }}">{{ vlabel }}</button>
-            {% endfor %}
+            {% if sw.type == "select" and sw.options %}
+              {% for value, vlabel in sw.options %}
+              <button type="button" class="sw-btn{% if value == sw.default %} active{% endif %}" data-value="{{ value }}">{{ vlabel }}</button>
+              {% endfor %}
+            {% else %}
+              {# range/number: numeric input #}
+              <input type="number" class="sw-input"
+                     value="{{ sw.default }}"
+                     {% if sw.min is defined %}min="{{ sw.min }}"{% endif %}
+                     {% if sw.max is defined %}max="{{ sw.max }}"{% endif %}>
+            {% endif %}
           </div>
           {% endfor %}
         </div>
@@ -100,6 +108,16 @@
     color: #fff;
     border-color: var(--brand-purple);
   }
+  .sw-input {
+    background: var(--bg-card);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    width: 90px;
+    font-variant-numeric: tabular-nums;
+  }
 </style>
 
 <script>
@@ -107,11 +125,18 @@
     const base = block.dataset.base;
     const params = [];
     block.querySelectorAll(".sw-group").forEach(g => {
-      const active = g.querySelector(".sw-btn.active");
       const def = g.dataset.default;
-      // Only add to URL if the active value differs from the default.
-      if (active && active.dataset.value && active.dataset.value !== def) {
-        params.push(g.dataset.param + "=" + encodeURIComponent(active.dataset.value));
+      let value = null;
+      if (g.dataset.type === "select") {
+        const active = g.querySelector(".sw-btn.active");
+        if (active) value = active.dataset.value;
+      } else {
+        const inp = g.querySelector(".sw-input");
+        if (inp) value = inp.value.trim();
+      }
+      // Only emit param if user picked something different than the default.
+      if (value && value !== def) {
+        params.push(g.dataset.param + "=" + encodeURIComponent(value));
       }
     });
     return params.length ? base + "?" + params.join("&") : base;
@@ -120,7 +145,6 @@
   document.querySelectorAll(".widget-block").forEach(block => {
     const urlEl = block.querySelector(".url-text");
     const copyBtn = block.querySelector(".copy-btn");
-
     function refresh() { urlEl.textContent = buildUrl(block); }
 
     block.querySelectorAll(".sw-group").forEach(group => {
@@ -130,6 +154,9 @@
           btn.classList.add("active");
           refresh();
         });
+      });
+      group.querySelectorAll(".sw-input").forEach(inp => {
+        inp.addEventListener("input", refresh);
       });
     });
 

@@ -80,6 +80,10 @@ def _dispatch(path: str, tenant_id: int, method: str = "GET",
                 200, "application/json")
 
     full_path = "/api/" + "/".join(parts)
+    # Query-String wieder anhaengen — die Endpoint-Klasse erwartet einen
+    # urlparse-baren Pfad und liest qs aus dem Query-Teil.
+    if request.query_string:
+        full_path = full_path + "?" + request.query_string.decode("utf-8")
     if domain == "pubg":
         try:
             reg = _build_pubg_registry(tenant_id)
