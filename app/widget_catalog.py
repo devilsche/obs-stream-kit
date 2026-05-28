@@ -33,7 +33,8 @@ WIDGET_META = [
     ("PUBG · Mates",  "Squad Compare",       "Side-by-side squad stat comparison.",                                  "pubg/squad-compare.html"),
 
     ("PUBG · Maps",   "Map Performance",     "Performance per map: place, kills, damage.",                           "pubg/map-performance.html"),
-    ("PUBG · Maps",   "Map Distribution",    "Chicken-dinner pins on the map (all wins).",                           "pubg/chicken-map.html"),
+    ("PUBG · Maps",   "Chicken Map",         "Chicken-dinner pins on the map (all wins).",                           "pubg/chicken-map.html"),
+    ("PUBG · Maps",   "Map Play Distribution","How often you play each map (bar chart).",                            "pubg/map-distribution.html"),
     ("PUBG · Maps",   "Hot Drop",            "Hot-drop visualisation — where you land.",                             "pubg/hot-drop.html"),
 
     ("PUBG · Match",  "Post-Match Card",     "Card right after a match ends — stats + replay link.",                 "pubg/post-match-card.html"),
@@ -42,21 +43,18 @@ WIDGET_META = [
     ("PUBG · Match",  "Session Lobbies",     "Lobby-strength of recent matches.",                                    "pubg/session-lobbies.html"),
     ("PUBG · Match",  "Payday Stats",        "Damage paid out by enemy faction.",                                    "pubg/payday-stats.html"),
 
-    ("PUBG · Achievements", "Milestone Celebrate",   "Animation/sound on milestone achievements.",                  "pubg/milestone-celebrate.html"),
-    ("PUBG · Achievements", "Achievement Feed",      "Achievement ticker.",                                          "pubg/achievement-feed.html"),
+    ("PUBG · Achievements", "Milestone Celebrate",   "Big celebration overlay — fires only after a fresh chicken-dinner crossing a 100-mark.", "pubg/milestone-celebrate.html"),
     ("PUBG · Achievements", "Session Achievements",  "Achievements unlocked in the current session.",                "pubg/session-achievements.html"),
 
     ("PUBG · News",   "News Ticker",        "Bottom-bar news + stats highlights.",                                  "pubg/news-ticker.html"),
     ("PUBG · News",   "Lookup",             "Live player lookup driven by chat commands.",                          "pubg/lookup.html"),
     ("PUBG · News",   "Chat Stats Popup",   "Stat popup triggered from chat.",                                      "pubg/chat-stats-popup.html"),
 
-    ("Steam",         "Achievement Feed",   "Achievement-unlock ticker.",                                           "steam/achievement-feed.html"),
+    ("Steam",         "Achievement Feed",   "Achievement-unlock ticker (rotating list).",                           "steam/achievement-feed.html"),
     ("Steam",         "Achievement Popup",  "Animation on a fresh unlock.",                                         "steam/achievement-popup.html"),
-    ("Steam",         "Recent Unlocks",     "Recently unlocked achievements.",                                      "steam/recent-unlocks.html"),
-    ("Steam",         "Popup",              "Combined now-playing + achievement popup.",                            "steam/popup.html"),
+    ("Steam",         "Combined Popup",     "Combined now-playing + achievement popup.",                            "steam/popup.html"),
     ("Steam",         "Now Playing",        "Currently played Steam game.",                                         "steam/now-playing.html"),
     ("Steam",         "Games Ticker",       "Owned-games ticker.",                                                  "steam/games-ticker.html"),
-    ("Steam",         "Achievement Browser","Full-screen browser for all achievements (Just Chatting).",            "steam/achievement-browser.html"),
 ]
 
 

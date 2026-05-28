@@ -302,50 +302,42 @@
       }
     })();
 
-    // Lifetime laden, N + Stats setzen, dann erst animieren.
-    async function bootstrap() {
+    // Win-Triggered Celebration: pollt last-match. Bei NEUEM Win (place=1
+    // mit anderem matchId als zuletzt gesehen) wird career-lifetime gefetcht
+    // und geprueft ob ein 100er-Meilenstein gerade ueberschritten wurde.
+    // Erst-Load: ANY current N wird stumm wegspeichert (= "Stand beim ersten
+    // Start", noch kein neuer Win seit dem) → keine Feier. Sonst kaem der
+    // Knaller jedes Mal beim OBS-Szenenwechsel.
+    const LAST_MATCH_KEY = "pubg.milestone.lastSeenMatchId"
+                         + (PLAYER ? ":" + PLAYER : "");
+
+    function readLastCelebrated() {
+      try { return parseInt(localStorage.getItem(STORAGE_KEY) || "0", 10) || 0; }
+      catch (e) { return 0; }
+    }
+    function writeLastCelebrated(N) {
+      try { localStorage.setItem(STORAGE_KEY, String(N)); } catch (e) {}
+    }
+    function readLastSeenMatch() {
+      try { return localStorage.getItem(LAST_MATCH_KEY) || ""; }
+      catch (e) { return ""; }
+    }
+    function writeLastSeenMatch(mid) {
+      try { localStorage.setItem(LAST_MATCH_KEY, mid || ""); } catch (e) {}
+    }
+
+    async function fetchLifetime() {
       const params = new URLSearchParams({ mode: "all" });
       if (PLAYER) params.set("player", PLAYER);
-      let d = null;
       try {
-        d = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/career-lifetime?${params}`);
-      } catch (e) { /* silent */ }
+        return await PubgUI.fetchJson(
+          (window.__SERVE_BASE__||"/") + `api/pubg/career-lifetime?${params}`);
+      } catch (e) { return null; }
+    }
 
-      // N bestimmen: Override > floor(wins/100)*100.
-      let N = N_OVERRIDE;
-      if (!N && d && d.wins != null) {
-        N = Math.floor(d.wins / 100) * 100;
-      }
-
-      // Gate: nur feiern wenn die Marke wirklich NEU ist (oder force/
-      // override). Sonst (z.B. OBS-Start, Szene aktiviert, aber nichts
-      // hat sich seit letzter Feier veraendert) bleibt die Szene
-      // komplett still — kein Sound, keine Animation, transparent.
-      let lastCelebrated = 0;
-      try { lastCelebrated = parseInt(localStorage.getItem(STORAGE_KEY) || "0", 10) || 0; }
-      catch (e) {}
-      const isNew = N && N >= 100 && N > lastCelebrated;
-      if (!N_OVERRIDE && !FORCE && !isNew) {
-        // Erstkontakt (lastCelebrated == 0) ohne erkennbaren Hit:
-        // aktuellen Stand still wegspeichern, damit der naechste echte
-        // Milestone feiern darf. Bei N === lastCelebrated nichts tun.
-        if (N && N > lastCelebrated) {
-          try { localStorage.setItem(STORAGE_KEY, String(N)); } catch (e) {}
-        }
-        // Stage bleibt versteckt — preload-Klasse wird nicht entfernt.
-        return;
-      }
-
-      // N feststeht und ist 'feierwuerdig'. Falls ueber Override/Force:
-      // localStorage NICHT bumpen — sonst suppress'd man eine echte
-      // spaetere Feier auf die gleiche Marke.
-      if (!N || N < 100) N = 1000;
+    async function celebrate(N, d) {
       setNumber(N);
-      if (isNew) {
-        try { localStorage.setItem(STORAGE_KEY, String(N)); } catch (e) {}
-      }
-
-      // Stats-Grid mit den lifetime-Werten
+      writeLastCelebrated(N);
       if (d && d.rounds_played) {
         const cells = [
           { v: PubgUI.fmtNum(d.rounds_played), l: "Matches"  },
@@ -357,12 +349,60 @@
           `<div class="cell"><div class="v">${c.v}</div><span class="l">${c.l}</span></div>`
         ).join("");
       }
-
-      // Auf Font warten, sonst springt die zentrierte Riesenzahl beim
-      // Font-Swap (Fallback breiter als DM Sans 900).
       try { await document.fonts.ready; } catch (e) {}
-
       startStage();
+    }
+
+    async function bootstrap() {
+      // Force/Override: sofort feiern (Testpfad)
+      if (FORCE || N_OVERRIDE) {
+        const d = await fetchLifetime();
+        let N = N_OVERRIDE;
+        if (!N && d && d.wins != null) N = Math.floor(d.wins / 100) * 100;
+        if (!N || N < 100) N = 1000;
+        await celebrate(N, d);
+        return;
+      }
+
+      // Erst-Load: aktuellen Stand stumm wegspeichern, NICHT feiern.
+      // Stage bleibt versteckt.
+      let lastCelebrated = readLastCelebrated();
+      if (lastCelebrated === 0) {
+        const d = await fetchLifetime();
+        if (d && d.wins != null) {
+          const N = Math.floor(d.wins / 100) * 100;
+          if (N >= 100) writeLastCelebrated(N);
+        }
+        // Stage bleibt im preload — niemals zeigen ohne Trigger.
+      }
+
+      // Win-Trigger-Loop: pollt /api/pubg/last-match alle 30s. Wenn neue
+      // matchId UND place=1 → fetch lifetime → bei Milestone-Hit feiern.
+      let lastSeen = readLastSeenMatch();
+      async function checkOnce() {
+        let lm;
+        try {
+          lm = await PubgUI.fetchJson(
+            (window.__SERVE_BASE__||"/") + "api/pubg/last-match");
+        } catch (e) { return; }
+        if (!lm || !lm.matchId) return;
+        const isNewMatch = lm.matchId !== lastSeen;
+        if (!isNewMatch) return;
+        lastSeen = lm.matchId;
+        writeLastSeenMatch(lastSeen);
+        if (lm.place !== 1) return;  // kein Win → nichts zu feiern
+        // Win! Pruefe ob ein neuer Milestone fiel.
+        const d = await fetchLifetime();
+        if (!d || d.wins == null) return;
+        const N = Math.floor(d.wins / 100) * 100;
+        const lastN = readLastCelebrated();
+        if (N >= 100 && N > lastN) {
+          await celebrate(N, d);
+        }
+      }
+      // Sofortiger Check (falls man die Page nach einem Win lädt) + alle 30s
+      checkOnce();
+      setInterval(checkOnce, 30000);
     }
     bootstrap();
   </script>
