@@ -189,6 +189,44 @@ def _extract_schema_from_html(content: str) -> list:
 _cache: Optional[list] = None
 
 
+# Range-Optionen sind ueber alle Widgets in dieser kanonischen Reihenfolge:
+# session vor week vor all (von "klein" zu "gross" Zeitraum).
+_CANONICAL_RANGE = [("session", "Session"), ("week", "Week"), ("all", "All")]
+
+
+def _normalize_switches(switches: list, content: str) -> list:
+    """Vereinheitlicht switches:
+    - select ohne options: rausfiltern (nicht renderbar)
+    - 'range'-Switches: kanonische Reihenfolge session->week->all
+    - Wenn widget renderHeader() verwendet: synthetic 'header'-Switch dranhaengen."""
+    out = []
+    for s in switches:
+        if s["type"] == "select" and not s.get("options"):
+            continue
+        # range-Switch normalisieren: gleiche Werte → kanonische Order + Labels
+        if s["key"] == "range" and s["type"] == "select":
+            values_in_widget = {v for v, _ in s.get("options", [])}
+            if values_in_widget and values_in_widget.issubset({v for v, _ in _CANONICAL_RANGE}):
+                s = dict(s)
+                s["options"] = [(v, lbl) for v, lbl in _CANONICAL_RANGE
+                                 if v in values_in_widget]
+        out.append(s)
+    # Synthetic header-Switch wenn das Widget renderHeader nutzt und keinen
+    # eigenen 'header'-Switch deklariert hat
+    has_header = any(s["key"] == "header" for s in out)
+    if not has_header and "renderHeader(" in content:
+        out.append({
+            "key": "header",
+            "label": "Header",
+            "type": "select",
+            "default": "0",
+            "options": [("0", "Hide"), ("1", "Show")],
+            "tooltip": "Title bar above the widget (showing widget name + range). "
+                       "Default off for in-stream use; turn on for the Just Chatting/preview view.",
+        })
+    return out
+
+
 def build(project_root: str) -> list:
     """Liest pro Widget die buildFilter-Schemas + liefert die fuer urls.html
     aufbereitete Liste:  (kategorie, label, desc, pfad, switches[])"""
@@ -196,15 +234,15 @@ def build(project_root: str) -> list:
     for cat, label, desc, path in WIDGET_META:
         full = os.path.join(project_root, "widgets", path)
         switches = []
+        content = ""
         if os.path.isfile(full):
             try:
                 with open(full, "r", encoding="utf-8") as fp:
-                    switches = _extract_schema_from_html(fp.read())
+                    content = fp.read()
+                switches = _extract_schema_from_html(content)
             except Exception:
                 switches = []
-        # Normalisiere: select ohne options kann nicht als UI-Switch
-        # gerendert werden — wir lassen es weg.
-        switches = [s for s in switches if not (s["type"] == "select" and not s.get("options"))]
+        switches = _normalize_switches(switches, content)
         out.append((cat, label, desc, path, switches))
     return out
 
