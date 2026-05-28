@@ -14,7 +14,8 @@ from typing import Optional
 # (kategorie, label, beschreibung, path)
 WIDGET_META = [
     ("PUBG · Stats", "Career Card",          "Career stats: K/D, wins, top 10 — current season.",                    "pubg/career-card.html"),
-    ("PUBG · Stats", "Session Report",       "Full per-match report after session end — kills, damage, placement.",  "pubg/session-report.html"),
+
+
     ("PUBG · Stats", "Live Bar",             "Live stat bar for the gameplay overlay — kills, damage, place.",       "pubg/live-bar.html"),
     ("PUBG · Stats", "Streak Counter",       "Live win-streak / top10-streak counter.",                              "pubg/streak-counter.html"),
     ("PUBG · Stats", "First Fight Rate",     "How often you win the first fight.",                                   "pubg/first-fight.html"),
