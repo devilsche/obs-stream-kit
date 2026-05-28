@@ -34,9 +34,10 @@ from typing import Iterable, Optional, Sequence
 
 
 def _to_pg_sql(sql: str) -> str:
-    """Ersetzt sqlite-Style `?` mit psycopg-Style `%s`. Naiv, aber bei uns
-    sicher (kein `?` in Literalen)."""
-    return sql.replace("?", "%s")
+    """Ersetzt sqlite-Style `?` mit psycopg-Style `%s`.
+    Achtung: literale `%` (z.B. `LIKE 'ai.%'`) werden zu `%%` escaped,
+    sonst interpretiert psycopg2 sie als param-Marker."""
+    return sql.replace("%", "%%").replace("?", "%s")
 
 
 class _Result:
