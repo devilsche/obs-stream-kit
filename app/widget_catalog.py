@@ -192,6 +192,59 @@ _cache: Optional[list] = None
 _CANONICAL_RANGE = [("session", "Session"), ("week", "Week"), ("all", "All")]
 
 
+def _smart_presets(switch: dict) -> list:
+    """Liefert sinnvolle Preset-Werte fuer einen range/number-Switch.
+
+    Logik:
+    - Percent-Style (key/label nennt 'pct', 'rate', 'rare', 'dim', 'volume',
+      'win'): 10/25/50/75/100 — clamp auf min..max.
+    - Time-in-ms (key endet auf 'Ms' oder label enthaelt '(ms)'):
+      500/1000/3000/8000/30000/60000.
+    - Sec (label enthaelt '(s)'): 3/5/10/30.
+    - Sonst Skala nach max:
+      max<=10  → 1/2/5/10
+      max<=50  → 1/5/10/20/50
+      max<=100 → 10/25/50/75/100
+      max<=1000 → 10/100/500/1000
+      sonst   → 1000/10000/60000/600000
+    Default-Wert wird, falls nicht in Liste, automatisch eingefuegt.
+    """
+    lo = int(switch.get("min", 0))
+    hi = int(switch.get("max", 100))
+    key = (switch.get("key") or "").lower()
+    label = (switch.get("label") or "").lower()
+    blob = key + " " + label
+
+    candidates = None
+    if any(s in blob for s in ("pct", "rate", "rare", "dim", "volume", "win", "headshot")):
+        candidates = [10, 25, 50, 75, 100]
+    elif key.endswith("ms") or "(ms)" in blob:
+        candidates = [500, 1000, 3000, 8000, 30000, 60000, 600000]
+    elif key.endswith("sec") or "(s)" in blob or " seconds" in blob:
+        candidates = [3, 5, 10, 30, 60]
+    elif hi <= 10:
+        candidates = [1, 2, 5, 10]
+    elif hi <= 50:
+        candidates = [1, 5, 10, 20, 50]
+    elif hi <= 100:
+        candidates = [10, 25, 50, 75, 100]
+    elif hi <= 1000:
+        candidates = [10, 100, 500, 1000]
+    else:
+        candidates = [1000, 10000, 60000, 600000]
+
+    presets = [c for c in candidates if lo <= c <= hi]
+    # Default-Wert immer mit anbieten
+    try:
+        d = int(switch.get("default", ""))
+        if lo <= d <= hi and d not in presets:
+            presets.append(d)
+            presets.sort()
+    except (TypeError, ValueError):
+        pass
+    return presets
+
+
 def _normalize_switches(switches: list, content: str) -> list:
     """Vereinheitlicht switches:
     - select ohne options: rausfiltern (nicht renderbar)
@@ -208,6 +261,10 @@ def _normalize_switches(switches: list, content: str) -> list:
                 s = dict(s)
                 s["options"] = [(v, lbl) for v, lbl in _CANONICAL_RANGE
                                  if v in values_in_widget]
+        # Smart presets fuer numerische Switches anhaengen
+        if s["type"] in ("range", "number"):
+            s = dict(s)
+            s["presets"] = _smart_presets(s)
         out.append(s)
     # Synthetic header-Switch wenn das Widget renderHeader nutzt und keinen
     # eigenen 'header'-Switch deklariert hat
