@@ -1,0 +1,128 @@
+"""Flask Middleware: Tenant-Resolution + Auth-Decorators.
+
+before_request laeuft fuer jeden Request und setzt flask.g:
+- g.tenant_id (aus URL-Token oder User-Session)
+- g.user (dict mit id, is_admin, is_approved, ...) wenn eingeloggt
+
+Decorators erzwingen Auth-State auf einzelnen Routes:
+- require_session: redirected zu /app/login wenn nicht eingeloggt
+- require_admin: 403 wenn nicht is_admin
+- require_approved: redirected zu /app/pending wenn is_approved=FALSE
+"""
+import re
+from functools import wraps
+from flask import g, request, redirect, abort, current_app
+
+from app.config import Config
+from app import sessions
+from core import db as core_db
+
+
+PUBLIC_PATHS = (
+    "/", "/healthz",
+    "/app/login", "/app/oauth/callback",
+    "/widgets-static/",
+)
+
+_TOKEN_RE = re.compile(r"^/s/([A-Za-z0-9_]+)/")
+
+
+def _get_conn():
+    factory = current_app.config.get("_PG_CONN_FACTORY")
+    if factory:
+        return factory()
+    return core_db.connect()
+
+
+def register_middleware(app):
+    @app.before_request
+    def resolve_context():
+        g.tenant_id = None
+        g.user = None
+        path = request.path
+
+        # 1. URL-Token-Pfad?
+        m = _TOKEN_RE.match(path)
+        if m:
+            token = m.group(1)
+            conn = _get_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT tenant_id FROM widget_tokens
+                        WHERE token = %s AND revoked_at IS NULL
+                    """, (token,))
+                    row = cur.fetchone()
+                if row is None:
+                    abort(404, description="Unknown widget token")
+                g.tenant_id = row["tenant_id"]
+            finally:
+                if "_PG_CONN_FACTORY" not in current_app.config:
+                    conn.close()
+            return
+
+        # 2. Public?
+        if any(path == p or path.startswith(p) for p in PUBLIC_PATHS):
+            return
+
+        # 3. Session-Cookie?
+        sid = request.cookies.get(Config.OBSKIT_SID_COOKIE)
+        if not sid:
+            return  # Decorators handle the redirect
+
+        conn = _get_conn()
+        try:
+            row = sessions.lookup(conn, sid)
+            if row is None:
+                return
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT u.id, u.twitch_user_id, u.display_name, u.is_admin,
+                           u.is_approved, u.avatar_url,
+                           t.id AS tenant_id
+                    FROM users u
+                    LEFT JOIN tenants t ON t.owner_user_id = u.id
+                    WHERE u.id = %s
+                """, (row["user_id"],))
+                user = cur.fetchone()
+            if user:
+                g.user = dict(user)
+                g.tenant_id = user["tenant_id"]
+                sessions.touch(conn, sid)
+        finally:
+            if "_PG_CONN_FACTORY" not in current_app.config:
+                conn.close()
+
+
+def require_session(view):
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if g.user is None:
+            return redirect("/app/login")
+        if not g.user["is_approved"]:
+            return redirect("/app/pending")
+        return view(*args, **kwargs)
+    return wrapper
+
+
+def require_admin(view):
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if g.user is None:
+            return redirect("/app/login")
+        if not g.user["is_admin"]:
+            abort(403)
+        return view(*args, **kwargs)
+    return wrapper
+
+
+def require_approved(view):
+    """Erlaubt is_approved=FALSE nur auf /app/pending und /app/logout."""
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if g.user is None:
+            return redirect("/app/login")
+        if not g.user["is_approved"]:
+            return redirect("/app/pending")
+        return view(*args, **kwargs)
+    return wrapper
