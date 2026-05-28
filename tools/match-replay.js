@@ -24,7 +24,12 @@ async function loadMatchList() {
   // URL-Parameter ?match=ID überschreibt die Vorauswahl
   const urlMatch = PubgUI.qs("match");
   if (urlMatch) sel.value = urlMatch;
-  sel.addEventListener("change", () => loadReplay(sel.value));
+  sel.addEventListener("change", () => {
+    const url = new URL(window.location);
+    url.searchParams.set("match", sel.value);
+    history.replaceState(null, "", url);
+    loadReplay(sel.value);
+  });
   if (sel.value) loadReplay(sel.value);
 }
 
