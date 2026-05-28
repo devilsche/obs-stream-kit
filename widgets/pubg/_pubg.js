@@ -390,7 +390,10 @@
   };
 
   PubgUI.buildFilter = (specs) => {
-    if (PubgUI.qs("filter") === "0") return;
+    // Default: in-Widget-Filter ist AUS (Dashboard /app/urls ist der
+    // Konfigurator). Nur sichtbar wenn explizit ?filter=1 in der URL —
+    // praktisch fuer Lokal-Tests, OBS-Browser-Sources kriegen den Schalter nie.
+    if (PubgUI.qs("filter") !== "1") return;
     PubgUI._injectFilterCss();
     document.body.classList.add("pubg-has-filter");
 
