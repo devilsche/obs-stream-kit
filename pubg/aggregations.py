@@ -262,7 +262,7 @@ def compute_top_mates(conn, my_account_id: str,
                (CAST(SUM(CASE WHEN place=1 THEN 1 ELSE 0 END) AS REAL) / COUNT(*)) * 100 AS win_rate
         FROM co
         GROUP BY account_id, name
-        HAVING shared >= ?
+        HAVING COUNT(*) >= ?
         ORDER BY {order}
         LIMIT ?
     """, params).fetchall()
