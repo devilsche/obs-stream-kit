@@ -19,8 +19,10 @@ def pg():
     # Schema neu laden
     import core.init_schema as init
     schema_path = os.path.join(os.path.dirname(init.__file__), "schema.sql")
+    with open(schema_path) as f:
+        schema_sql = f.read()
     with conn.cursor() as cur:
-        cur.execute(open(schema_path).read())
+        cur.execute(schema_sql)
         cur.execute(db_pg.PG_SCHEMA)
         cur.execute(
             "INSERT INTO users (display_name, is_admin) VALUES ('A',TRUE) RETURNING id"

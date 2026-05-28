@@ -12,13 +12,6 @@ OBS-Kit-DSN aus `.secrets` / `OBS_KIT_PG_DSN`).
 
 from core.db import load_dsn, connect  # noqa: F401  (Re-Export fuer Backward-Compat)
 
-try:
-    import psycopg2  # noqa: F401
-    import psycopg2.extras  # noqa: F401
-    HAS_PSYCOPG2 = True
-except ImportError:
-    HAS_PSYCOPG2 = False
-
 PG_SCHEMA = """
 CREATE TABLE IF NOT EXISTS players (
     tenant_id       INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
