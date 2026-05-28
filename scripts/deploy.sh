@@ -25,6 +25,7 @@ rsync -avz --delete \
   --exclude='*.db-wal' \
   --exclude='logs/' \
   --exclude='node_modules/' \
+  --exclude='widgets/pubg/maps/' \
   "$LOCAL_DIR/" "$SERVER:$REMOTE_DIR/"
 
 # .secrets + config/pubg.json mitschicken falls vorhanden (nie im Git)
