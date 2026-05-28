@@ -83,7 +83,7 @@
     <div class="legend" id="legend">
       <button data-metric="kd" class="active">K / D</button>
       <button data-metric="winrate">WIN %</button>
-      <button data-metric="dmg">Ø DMG</button>
+      <button data-metric="dmg">AVG DMG</button>
       <button data-metric="kills">KILLS</button>
       <button data-metric="matches">MATCHES</button>
     </div>
@@ -100,27 +100,28 @@
 
     PubgUI.buildFilter([
       { key: "mode", label: "Mode", type: "select", default: "all",
-        options: [["all","Alle Modi"],
+        options: [["all","All modes"],
                   ["squad-fpp","Squad FPP"],["squad-tpp","Squad TPP"],
                   ["duo-fpp","Duo FPP"],["duo-tpp","Duo TPP"],
                   ["solo-fpp","Solo FPP"],["solo-tpp","Solo TPP"]]},
       { key: "metric", label: "Metric", type: "select", default: "kd",
-        options: [["kd","K/D"],["winrate","Win-Rate"],["dmg","Ø DMG"],
+        options: [["kd","K/D"],["winrate","Win rate"],["dmg","Avg DMG"],
                   ["kills","Kills"],["matches","Matches"]]},
-      { key: "player", label: "Player", type: "text", placeholder: "leer = self" },
+      { key: "player", label: "Player", type: "text", placeholder: "empty = self" },
     ]);
 
     // METRIC-Definition: getter, format, label, axis-suffix.
+    // fmt MUSS einen String zurueckliefern — sonst .replace() crash in y-Axis.
     const METRICS = {
-      kd:      { get: r => r.kd_ratio,     fmt: v => v.toFixed(2),
+      kd:      { get: r => r.kd_ratio,     fmt: v => Number(v || 0).toFixed(2),
                  label: "K/D",   suffix: "" },
-      winrate: { get: r => r.win_rate,     fmt: v => v.toFixed(1) + "%",
+      winrate: { get: r => r.win_rate,     fmt: v => Number(v || 0).toFixed(1) + "%",
                  label: "Win %", suffix: "%" },
-      dmg:     { get: r => r.avg_damage,   fmt: v => Math.round(v),
-                 label: "Ø DMG", suffix: "" },
-      kills:   { get: r => r.kills,        fmt: v => v.toLocaleString("de-DE"),
+      dmg:     { get: r => r.avg_damage,   fmt: v => String(Math.round(v || 0)),
+                 label: "Avg DMG", suffix: "" },
+      kills:   { get: r => r.kills,        fmt: v => Math.round(v || 0).toLocaleString("en-US"),
                  label: "Kills", suffix: "" },
-      matches: { get: r => r.rounds_played,fmt: v => v.toLocaleString("de-DE"),
+      matches: { get: r => r.rounds_played,fmt: v => Math.round(v || 0).toLocaleString("en-US"),
                  label: "Matches", suffix: "" },
     };
 
@@ -138,7 +139,7 @@
         document.getElementById("chart").style.display = "none";
         document.getElementById("summary").innerHTML =
           "<div><span class='label'>Status</span><span class='value' style='font-size:0.9em'>" +
-          "Keine Season-Daten — backfill erst laufen lassen</span></div>";
+          "No season data — run backfill first</span></div>";
         return;
       }
       document.getElementById("chart").style.display = "";
@@ -170,7 +171,7 @@
         const v = yMin + (yMax - yMin) * (t / 4);
         const y = yOf(v);
         grid.innerHTML += `<line class="grid-line" x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}"/>`;
-        yLabels.innerHTML += `<text class="axis-label" x="${padL-6}" y="${y+3}" text-anchor="end">${def.fmt(v).replace(/,/g," ")}</text>`;
+        yLabels.innerHTML += `<text class="axis-label" x="${padL-6}" y="${y+3}" text-anchor="end">${def.fmt(v)}</text>`;
       }
 
       // X-Labels — bei vielen Seasons jeden N-ten.
@@ -226,9 +227,9 @@
         <div><span class="label">Seasons</span>
              <span class="value">${seasons.length}</span></div>
         <div><span class="label">Matches Σ</span>
-             <span class="value">${totalMatches.toLocaleString("de-DE")}</span></div>
+             <span class="value">${totalMatches.toLocaleString("en-US")}</span></div>
         <div><span class="label">Kills Σ</span>
-             <span class="value">${totalKills.toLocaleString("de-DE")}</span></div>
+             <span class="value">${totalKills.toLocaleString("en-US")}</span></div>
         <div><span class="label">Best K/D</span>
              <span class="value">${(bestKd.kd_ratio || 0).toFixed(2)} <small style="color:var(--pubg-muted);font-size:0.7em">${shortSeason(bestKd.season_id)}</small></span></div>
       `;
