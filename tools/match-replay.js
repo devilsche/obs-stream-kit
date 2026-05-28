@@ -542,7 +542,7 @@ function renderFrame() {
 
   // 2) Spieler-Pins — eigener Spieler als Pfeilnadel (◆ + Halo)
   const heroAcc = RS.replay.heroAccountId ?? null;
-  const nameScale = Math.max(8, Math.min(12, 12 / RS.view.zoom));
+  const nameScale = Math.max(12, Math.min(18, 18 / RS.view.zoom));
   // Nicht-Hero zuerst, dann Hero obendrauf
   const accList = Object.keys(RS._accTeam);
   const sorted = [...accList.filter(a => a !== heroAcc),
