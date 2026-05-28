@@ -53,14 +53,15 @@
   // angelegt werden. Icons sind alle .webp (verkleinert auf 128-256px),
   // Files koennen fehlen (lokal nicht generiert) —
   // <img onerror="this.style.display='none'"> als Fallback im Markup.
+  const _STATIC = () => window.__STATIC_BASE__ || "/widgets/";
   PubgUI.weaponIconUrl = (weaponId) =>
-    weaponId ? `/widgets/pubg/assets/weapons/${weaponId}.webp` : null;
+    weaponId ? `${_STATIC()}pubg/assets/weapons/${weaponId}.webp` : null;
   PubgUI.vehicleIconUrl = (vehicleId) =>
-    vehicleId ? `/widgets/pubg/assets/vehicles/${vehicleId}.webp` : null;
+    vehicleId ? `${_STATIC()}pubg/assets/vehicles/${vehicleId}.webp` : null;
   PubgUI.killfeedIconUrl = (name) =>
-    name ? `/widgets/pubg/assets/killfeed/${name}.webp` : null;
+    name ? `${_STATIC()}pubg/assets/killfeed/${name}.webp` : null;
   PubgUI.mapThumbUrl = (mapName) =>
-    mapName ? `/widgets/pubg/maps/${mapName}.webp` : null;
+    mapName ? `${_STATIC()}pubg/maps/${mapName}.webp` : null;
 
   // ── Zeit-Formatter — Browser-Lokalzeit (CEST/CET je nach Sommerzeit) ───────
   PubgUI.fmtDate = (iso) => {

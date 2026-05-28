@@ -56,7 +56,7 @@
       document.getElementById("rows").innerHTML =
         html || `<div class="pubg-error">no matches yet</div>`;
     }
-    PubgUI.poll(`/api/pubg/map-distribution?range=${RANGE}`,
+    PubgUI.poll((window.__SERVE_BASE__||"/") + `api/pubg/map-distribution?range=${RANGE}`,
                 5*60*1000, render, console.error);
   </script>
 </body>

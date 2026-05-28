@@ -96,7 +96,7 @@
 
     // KEIN hideIfStale — Achievements einer Session sind auch in BRB
     // / Stream-Ending sinnvoll zu zeigen.
-    PubgUI.poll("/api/pubg/session-achievements", 30000, render, console.error);
+    PubgUI.poll((window.__SERVE_BASE__||"/") + "api/pubg/session-achievements", 30000, render, console.error);
   </script>
 </body>
 </html>

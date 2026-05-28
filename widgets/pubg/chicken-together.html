@@ -143,7 +143,7 @@
         `<span>Wins with mates</span><span><b>${totalWins}</b> chicken dinner${totalWins === 1 ? "" : "s"} with ${list.length} ${list.length === 1 ? "mate" : "mates"}</span>`;
     }
 
-    PubgUI.poll(`/api/pubg/chickens-together?minWins=${MIN_WINS}&minMatches=${MIN_MATCHES}`,
+    PubgUI.poll((window.__SERVE_BASE__||"/") + `api/pubg/chickens-together?minWins=${MIN_WINS}&minMatches=${MIN_MATCHES}`,
                 5*60*1000, render, console.error);
   </script>
 </body>

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>Steam Games Ticker</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/widgets/pubg/_pubg.css">
+  <link rel="stylesheet" href="../pubg/_pubg.css">
   <style>
     /* Rotierender Ticker durch Library/Coop/Multiplayer-Games.
        Klassischer cross-fade pro Game. Source-Breite bestimmt
@@ -101,7 +101,7 @@
     </div>
   </div>
 
-  <script src="/widgets/pubg/_pubg.js"></script>
+  <script src="../pubg/_pubg.js"></script>
   <script>
     // URL-Params — 'kind' ersetzt 'filter' (vermeidet Collision mit
     // PubgUI's '?filter=0' zum Verstecken der Bar). Alt-Param 'filter'
@@ -277,7 +277,7 @@
 
     async function refresh() {
       try {
-        const u = `/api/steam/owned-games?kind=${encodeURIComponent(KIND)}` +
+        const u = (window.__SERVE_BASE__||"/") + `api/steam/owned-games?kind=${encodeURIComponent(KIND)}` +
                   `&sort=${encodeURIComponent(SORT)}` +
                   `&minPlaytime=${MIN_PT}` +
                   `&playedSinceDays=${PLAYED_SINCE_DAYS}` +

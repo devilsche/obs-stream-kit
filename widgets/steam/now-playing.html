@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>Steam Now Playing</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/widgets/pubg/_pubg.css">
+  <link rel="stylesheet" href="../pubg/_pubg.css">
   <style>
     /* Variante C aus design-preview:
          Game-Header-Image als gedimmter Card-BG, Game-Cover klein
@@ -212,7 +212,7 @@
       <span class="years-badge" id="yearsBadge" hidden>—</span>
     </div>
   </div>
-  <script src="/widgets/pubg/_pubg.js"></script>
+  <script src="../pubg/_pubg.js"></script>
   <script>
     const POLL_MS = parseInt(PubgUI.qs("pollMs", "10000"), 10);
     const SHOW_LIVE_PLAYERS = PubgUI.qs("livePlayers", "1") !== "0";
@@ -462,7 +462,7 @@
     const extra = [];
     if (fakeAppId) extra.push("fakeAppId=" + encodeURIComponent(fakeAppId));
     if (fakeGame)  extra.push("fakeGame="  + encodeURIComponent(fakeGame));
-    const npUrl = "/api/steam/now-playing" +
+    const npUrl = (window.__SERVE_BASE__||"/") + "api/steam/now-playing" +
                   (extra.length ? "?" + extra.join("&") : "");
 
     let lastNowPlaying = null;
@@ -483,7 +483,7 @@
     if (SHOW_LIVE_PLAYERS && !MOCK) {
       async function pollPlayers() {
         try {
-          const u = "/api/steam/current-players" +
+          const u = (window.__SERVE_BASE__||"/") + "api/steam/current-players" +
                     (fakeAppId ? "?appId=" + encodeURIComponent(fakeAppId) : "");
           const r = await PubgUI.fetchJson(u);
           if (r && r.active && r.count != null) {

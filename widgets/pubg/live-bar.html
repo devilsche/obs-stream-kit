@@ -62,7 +62,7 @@
     }
 
     PubgUI.hideIfStale();
-    PubgUI.poll("/api/pubg/session", REFRESH_MS, (s) => {
+    PubgUI.poll((window.__SERVE_BASE__||"/") + "api/pubg/session", REFRESH_MS, (s) => {
       PubgUI.hideIfStale();
       renderSession(s);
     }, console.error);

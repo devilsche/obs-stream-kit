@@ -297,7 +297,7 @@
 
     const ehParam = EXCLUDE_HOT ? "&excludeHotDrop=1" : "";
     if (RANGE === "session") PubgUI.hideIfStale();
-    PubgUI.poll(`/api/pubg/first-fight-rate?range=${RANGE}${ehParam}`,
+    PubgUI.poll((window.__SERVE_BASE__||"/") + `api/pubg/first-fight-rate?range=${RANGE}${ehParam}`,
                 POLL_MS, (d) => {
                   if (RANGE === "session") PubgUI.hideIfStale();
                   render(d);

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>Steam Achievement Feed</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/widgets/pubg/_pubg.css">
+  <link rel="stylesheet" href="../pubg/_pubg.css">
   <style>
     /* Rotierender Feed der letzten Achievement-Unlocks ueber alle Games.
        Im Gegensatz zu popup/achievement-popup ist das kein Trigger-
@@ -113,7 +113,7 @@
     </div>
   </div>
 
-  <script src="/widgets/pubg/_pubg.js"></script>
+  <script src="../pubg/_pubg.js"></script>
   <script>
     // URL-Params
     const LIMIT      = parseInt(PubgUI.qs("limit",     "20"),  10);
@@ -239,7 +239,7 @@
         const params = `limit=${LIMIT}` +
           (SINCE_DAYS > 0 ? `&sinceDays=${SINCE_DAYS}` : "");
         const data = await PubgUI.fetchJson(
-          `/api/steam/achievement-feed?${params}`);
+          (window.__SERVE_BASE__||"/") + `api/steam/achievement-feed?${params}`);
         unlocks = (data && data.unlocks) || [];
       } catch (e) {
         unlocks = [];

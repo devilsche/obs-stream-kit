@@ -77,7 +77,7 @@
     // Slot-Modus: kein Auto-Show/Hide mehr — Card ist immer sichtbar wenn
     // Last-Match-Daten existieren. Sichtbarkeit steuert OBS via Source-Toggle.
     PubgUI.hideIfStale();
-    PubgUI.poll("/api/pubg/last-match", 30000, (lm) => {
+    PubgUI.poll((window.__SERVE_BASE__||"/") + "api/pubg/last-match", 30000, (lm) => {
       PubgUI.hideIfStale();
       render(lm);
     }, console.error);

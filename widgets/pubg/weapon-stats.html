@@ -284,7 +284,7 @@
       h.innerHTML = h.innerHTML.replace("Weapon Stats",
         `Weapon Stats · ${PLAYER_PARAM}`);
     }
-    PubgUI.poll(`/api/pubg/weapon-stats?range=${RANGE}${playerQS}`,
+    PubgUI.poll((window.__SERVE_BASE__||"/") + `api/pubg/weapon-stats?range=${RANGE}${playerQS}`,
                 POLL_MS, (d) => {
       if (RANGE === "session") PubgUI.hideIfStale();
       lastData = (d && d.weapons) || [];

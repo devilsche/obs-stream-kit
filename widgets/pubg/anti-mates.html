@@ -188,7 +188,7 @@
     const minPart = (MIN != null && !isNaN(MIN)) ? `&minMatches=${MIN}` : "";
     const rangePart = (RANGE && RANGE !== "all") ? `&range=${RANGE}` : "";
     // worst=1 dreht die Sort-Direction um → schlechteste zuerst.
-    const url = `/api/pubg/top-mates?worst=1&sortBy=${SORT_BY}&limit=${LIMIT}${minPart}${rangePart}`;
+    const url = (window.__SERVE_BASE__||"/") + `api/pubg/top-mates?worst=1&sortBy=${SORT_BY}&limit=${LIMIT}${minPart}${rangePart}`;
     PubgUI.poll(url, 5 * 60 * 1000, render, console.error);
   </script>
 </body>

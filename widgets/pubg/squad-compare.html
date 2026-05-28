@@ -53,7 +53,7 @@
     }
 
     if (PLAYERS.length) {
-      PubgUI.poll(`/api/pubg/squad-compare?players=${encodeURIComponent(PLAYERS.join(","))}&matches=${MATCHES}`,
+      PubgUI.poll((window.__SERVE_BASE__||"/") + `api/pubg/squad-compare?players=${encodeURIComponent(PLAYERS.join(","))}&matches=${MATCHES}`,
                   60000, render, console.error);
     } else {
       document.getElementById("body").innerHTML =

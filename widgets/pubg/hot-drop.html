@@ -331,7 +331,7 @@
     document.getElementById("markers").addEventListener("mouseleave", hidePov);
 
     if (RANGE === "session") PubgUI.hideIfStale();
-    PubgUI.poll(`/api/pubg/hot-drop?range=${RANGE}`, POLL_MS, (d) => {
+    PubgUI.poll((window.__SERVE_BASE__||"/") + `api/pubg/hot-drop?range=${RANGE}`, POLL_MS, (d) => {
       if (RANGE === "session") PubgUI.hideIfStale();
       render(d);
     }, console.error);

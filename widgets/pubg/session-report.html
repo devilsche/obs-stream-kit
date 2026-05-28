@@ -976,7 +976,7 @@
       let d = null;
       try {
         d = await PubgUI.fetchJson(
-          `/api/pubg/match-detail?matchId=${encodeURIComponent(matchId)}`,
+          (window.__SERVE_BASE__||"/") + `api/pubg/match-detail?matchId=${encodeURIComponent(matchId)}`,
           60000);
       } catch (e) { console.warn("mdLoad failed", matchId, e); }
       // Wenn die Anfrage fehlschlug, NICHT cachen — sonst friert ein
@@ -1007,9 +1007,9 @@
           const img2 = new Image();
           img2.onload = () => res(img2);
           img2.onerror = () => res(null);
-          img2.src = `/widgets/pubg/maps/${mapName}.png`;
+          img2.src = `${window.__STATIC_BASE__||"/widgets/"}pubg/maps/${mapName}.png`;
         };
-        img.src = `/widgets/pubg/maps/${mapName}_hd.webp`;
+        img.src = `${window.__STATIC_BASE__||"/widgets/"}pubg/maps/${mapName}_hd.webp`;
       });
       _mdImgCache.set(mapName, p);
       return p;
@@ -2112,7 +2112,7 @@
         // Vehicle-Icon: nimm den ersten Eintrag mit weapon=Vehicle-ID
         function vehIcon(list) {
           const wid = list[0] && list[0].weapon;
-          const url = wid ? `/widgets/pubg/assets/vehicles/${wid}.webp` : "";
+          const url = wid ? `${window.__STATIC_BASE__||"/widgets/"}pubg/assets/vehicles/${wid}.webp` : "";
           return url
             ? `<img class="sd-icon veh" src="${url}" onerror="this.style.display='none'">`
             : `<span class="sd-emoji">🚗</span>`;
@@ -2458,18 +2458,19 @@
             ...(TO   ? {to:   TO}   : {}),
           }).toString()
         : "";
+      const _SB = window.__SERVE_BASE__||"/";
       const matchesUrl = (FROM || TO)
-        ? `/api/pubg/session-matches${fromTo}`
-        : `/api/pubg/session-matches?range=session`;
+        ? _SB + `api/pubg/session-matches${fromTo}`
+        : _SB + `api/pubg/session-matches?range=session`;
       const hotDropUrl = (FROM || TO)
-        ? `/api/pubg/hot-drop${fromTo}`
-        : `/api/pubg/hot-drop?range=session`;
+        ? _SB + `api/pubg/hot-drop${fromTo}`
+        : _SB + `api/pubg/hot-drop?range=session`;
       const paydayUrl = (FROM || TO)
-        ? `/api/pubg/payday-stats${fromTo}`
-        : `/api/pubg/payday-stats?range=session`;
+        ? _SB + `api/pubg/payday-stats${fromTo}`
+        : _SB + `api/pubg/payday-stats?range=session`;
       const vehicleUrl = (FROM || TO)
-        ? `/api/pubg/vehicle-stats${fromTo}`
-        : `/api/pubg/vehicle-stats?range=session`;
+        ? _SB + `api/pubg/vehicle-stats${fromTo}`
+        : _SB + `api/pubg/vehicle-stats?range=session`;
       const [trend, achievements, matches, hotDrop, payday, vehicle] = await Promise.all([
         PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/trend-deltas${fromTo}`).catch(() => null),
         PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/session-achievements${fromTo}`).catch(() => []),
@@ -2767,7 +2768,7 @@
     function mapImageUrl(mapName) {
       // .png ist primaer (Symlinks zu api-assets HD No-Text-Versionen),
       // .webp ist Remote-Fallback wenn kein Lokal-Clone vorhanden.
-      return `/widgets/pubg/maps/${mapName}.png`;
+      return `${window.__STATIC_BASE__||"/widgets/"}pubg/maps/${mapName}.png`;
     }
 
 
@@ -2794,7 +2795,7 @@
       }
     });
 
-    const reportUrl = "/api/pubg/session-report" +
+    const reportUrl = (window.__SERVE_BASE__||"/") + "api/pubg/session-report" +
       ((FROM || TO) ? "?" + new URLSearchParams({
         ...(FROM ? {from: FROM} : {}), ...(TO ? {to: TO} : {})
       }).toString() : "");

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>Steam Combined Popup</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/widgets/pubg/_pubg.css">
+  <link rel="stylesheet" href="../pubg/_pubg.css">
   <style>
     /* Kombiniertes Steam-Popup. Zeigt abwechselnd:
          - Now-Playing       (poll alle 10 min, slide-in 8s)
@@ -137,12 +137,12 @@
       </div>
     </div>
   </div>
-  <audio id="soundCommon"    src="/widgets/steam/sounds/lvlup.wav" preload="auto"></audio>
-  <audio id="soundRare"      src="/widgets/steam/sounds/biglvlup.wav" preload="auto"></audio>
-  <audio id="soundMythic"    src="/widgets/steam/sounds/mystique.mp3" preload="auto"></audio>
-  <audio id="soundLegendary" src="/widgets/steam/sounds/legendary.mp3" preload="auto"></audio>
+  <audio id="soundCommon"    src="sounds/lvlup.wav" preload="auto"></audio>
+  <audio id="soundRare"      src="sounds/biglvlup.wav" preload="auto"></audio>
+  <audio id="soundMythic"    src="sounds/mystique.mp3" preload="auto"></audio>
+  <audio id="soundLegendary" src="sounds/legendary.mp3" preload="auto"></audio>
 
-  <script src="/widgets/pubg/_pubg.js"></script>
+  <script src="../pubg/_pubg.js"></script>
   <script>
     // ── URL-Params (Override-Optionen) ────────────────────────────────
     const NOW_PLAYING_INTERVAL_MS  = parseInt(PubgUI.qs("nowPollMs",  String(10 * 60 * 1000)), 10);   // 10 min
@@ -413,7 +413,7 @@
       const justQueued = new Set();
       try {
         const r = await PubgUI.fetchJson(
-          "/api/steam/recent-unlocks?markDisplayed=1");
+          (window.__SERVE_BASE__||"/") + "api/steam/recent-unlocks?markDisplayed=1");
         for (const u of (r && r.unlocks) || []) {
           if (justQueued.has(u.apiName)) continue;
           enqueue({ type: "achievement", data: u, priority: 1 });
@@ -422,7 +422,7 @@
       } catch (e) { /* silent */ }
       try {
         const r = await PubgUI.fetchJson(
-          "/api/pubg/recent-achievements?markDisplayed=1");
+          (window.__SERVE_BASE__||"/") + "api/pubg/recent-achievements?markDisplayed=1");
         for (const u of (r && r.unlocks) || []) {
           if (justQueued.has(u.apiName)) continue;
           enqueue({ type: "achievement", data: u, priority: 1 });

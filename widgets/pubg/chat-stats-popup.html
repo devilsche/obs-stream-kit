@@ -125,7 +125,7 @@
     function liveLookupAndShow(playerName, ribbonLabel) {
       // Fallback wenn nicht in DB: PUBG-API-Live-Lookup für Career.
       return PubgUI.fetchJson(
-        `/api/pubg/lookup-mate?player=${encodeURIComponent(playerName)}`)
+        (window.__SERVE_BASE__||"/") + `api/pubg/lookup-mate?player=${encodeURIComponent(playerName)}`)
         .then(d => {
           if (d.error || !d.careerLifetime) {
             document.getElementById("name").textContent =

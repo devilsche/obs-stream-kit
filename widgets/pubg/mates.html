@@ -177,7 +177,7 @@
     }
 
     if (RANGE === "session") PubgUI.hideIfStale();
-    PubgUI.poll(`/api/pubg/mates?range=${RANGE}${MIN_PARAM}`,
+    PubgUI.poll((window.__SERVE_BASE__||"/") + `api/pubg/mates?range=${RANGE}${MIN_PARAM}`,
                 30000, (d) => {
       if (RANGE === "session") PubgUI.hideIfStale();
       render(d);

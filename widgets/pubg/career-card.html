@@ -151,7 +151,7 @@
 
     const params = new URLSearchParams({ mode: MODE });
     if (PLAYER) params.set("player", PLAYER);
-    PubgUI.poll(`/api/pubg/career-lifetime?${params}`, 24*60*60*1000, render, console.error);
+    PubgUI.poll((window.__SERVE_BASE__||"/") + `api/pubg/career-lifetime?${params}`, 24*60*60*1000, render, console.error);
   </script>
 </body>
 </html>

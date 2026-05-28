@@ -231,7 +231,7 @@
     async function loadAll() {
       await Promise.all(cats.map(async ([key]) => {
         try {
-          const url = `/api/pubg/top-mates?sortBy=${key}&limit=${LIMIT}&minMatches=${MIN}`;
+          const url = (window.__SERVE_BASE__||"/") + `api/pubg/top-mates?sortBy=${key}&limit=${LIMIT}&minMatches=${MIN}`;
           slideData[key] = await PubgUI.fetchJson(url);
         } catch (e) {
           slideData[key] = [];

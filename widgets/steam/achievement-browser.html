@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>Achievement Browser — Click to Replay</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/widgets/pubg/_pubg.css">
+  <link rel="stylesheet" href="../pubg/_pubg.css">
   <style>
     html, body { margin: 0; }
     /* Popover ist position:fixed; falls am Rand erst zu weit links/oben
@@ -339,7 +339,7 @@
   <div class="loading-overlay"><div class="spinner"></div></div>
   <div class="toast" id="toast"></div>
 
-  <script src="/widgets/pubg/_pubg.js"></script>
+  <script src="../pubg/_pubg.js"></script>
   <script>
     let RARE_PCT = 10;
     let all = [];          // alle Achievements aus der API
@@ -574,9 +574,9 @@
         if (source === "pubg") {
           // PUBG: apiName ist "achievement_id:match_id" (siehe Server)
           const [aid, mid] = (apiName || "").split(":");
-          url = `/api/pubg/replay-achievement?achievementId=${encodeURIComponent(aid)}&matchId=${encodeURIComponent(mid)}`;
+          url = (window.__SERVE_BASE__||"/") + `api/pubg/replay-achievement?achievementId=${encodeURIComponent(aid)}&matchId=${encodeURIComponent(mid)}`;
         } else {
-          url = `/api/steam/replay-achievements?appId=${encodeURIComponent(appId)}&apiName=${encodeURIComponent(apiName)}&limit=1`;
+          url = (window.__SERVE_BASE__||"/") + `api/steam/replay-achievements?appId=${encodeURIComponent(appId)}&apiName=${encodeURIComponent(apiName)}&limit=1`;
         }
         const r = await fetch(url, { cache: "no-store" });
         const j = await r.json();

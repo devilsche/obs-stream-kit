@@ -250,7 +250,7 @@
 
     const params = new URLSearchParams({ mode: MODE });
     if (PLAYER) params.set("player", PLAYER);
-    PubgUI.poll(`/api/pubg/season-history?${params}`, 5*60*1000,
+    PubgUI.poll((window.__SERVE_BASE__||"/") + `api/pubg/season-history?${params}`, 5*60*1000,
                 d => { window.__lastData = d; render(d); },
                 console.error);
   </script>

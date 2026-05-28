@@ -410,7 +410,7 @@
     let _es = null;
     function startSSE() {
       try {
-        _es = new EventSource("/api/teamspeak/stream");
+        _es = new EventSource((window.__SERVE_BASE__||"/") + "api/teamspeak/stream");
         _es.onmessage = (ev) => {
           try { render(JSON.parse(ev.data)); } catch (e) {}
         };
