@@ -993,8 +993,9 @@
       return cached;
     }
 
-    // Map-Image-Cache: Mini-Map nutzt .webp (Low_Res, ~1MB), Fallback .png.
-    // High_Res .png (bis 121MB fuer Rondo) ueberlastet das kleine Detail-Canvas.
+    // Map-Image-Cache: High_Res .png zuerst (zoombarer Mini-Map),
+    // .webp (Low_Res) als Fallback. Promise wird gecached → einmal geladen,
+    // dann sofort verfuegbar.
     const _mdImgCache = new Map();
     function mdMapImage(mapName) {
       if (!mapName) return Promise.resolve(null);
@@ -1006,9 +1007,9 @@
           const img2 = new Image();
           img2.onload = () => res(img2);
           img2.onerror = () => res(null);
-          img2.src = `/widgets/pubg/maps/${mapName}.png`;
+          img2.src = `/widgets/pubg/maps/${mapName}.webp`;
         };
-        img.src = `/widgets/pubg/maps/${mapName}.webp`;
+        img.src = `/widgets/pubg/maps/${mapName}.png`;
       });
       _mdImgCache.set(mapName, p);
       return p;
