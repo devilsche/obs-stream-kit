@@ -279,6 +279,22 @@ def _normalize_switches(switches: list, content: str) -> list:
             "tooltip": "Title bar above the widget (showing widget name + range). "
                        "Default off for in-stream use; turn on for the Just Chatting/preview view.",
         })
+    # Synthetic ignoreStale-Switch wenn das Widget hideIfStale verwendet —
+    # erlaubt dem Streamer in OBS die letzte Session weiterzuzeigen wenn
+    # gerade keine aktive Session laeuft (sonst wird das Widget versteckt).
+    has_stale = any(s["key"] == "ignoreStale" for s in out)
+    if not has_stale and ("hideIfStale" in content or "ignoreStale" in content):
+        out.append({
+            "key": "ignoreStale",
+            "label": "Show stale data",
+            "type": "select",
+            "default": "0",
+            "options": [("0", "Hide when idle"), ("1", "Keep last session")],
+            "tooltip": "If no session is currently running, what should the "
+                       "widget do? Default (Hide) makes it disappear between "
+                       "play sessions. 'Keep last session' keeps showing the "
+                       "last session's stats so the slot stays filled.",
+        })
     return out
 
 
