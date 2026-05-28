@@ -3,11 +3,9 @@
 Beide Routen-Familien rufen dieselben Handler — die Middleware hat
 g.tenant_id schon gesetzt, wir reichen es einfach durch.
 
-Spec-2 Task 10: per-request EndpointRegistry-Konstruktion. Tradeoff:
-- pro: kein Cross-Tenant-Leak im Cache, simples Wiring ohne grossen
-  Refactor der Registry-Klassen (Task 9 hat tenant_id auf self gepackt).
-- contra: Cache wird pro Request neu aufgebaut → effektiv aus. Fuer
-  Spec 2 (1-few tenants) OK; Spec 3 kann Tenant-aware shared Cache.
+Cache: module-level shared TTLCache, aber jeder Tenant kriegt einen
+Prefix-Wrapper. So bleibt das Speed-Win zwischen Requests erhalten
+ohne Cross-Tenant-Lecks (Tenant 1's Keys: 't1:...', Tenant 2's: 't2:...').
 """
 from flask import Blueprint, g, jsonify, abort, request, current_app
 
@@ -17,11 +15,62 @@ from app.middleware import _get_conn
 bp_api = Blueprint("api", __name__)
 
 
+# Process-global TTL-Cache. Wird beim Server-Start einmal erzeugt und
+# zwischen ALLEN Requests geteilt. Tenant-Trennung passiert via Prefix-Wrapper.
+_SHARED_PUBG_CACHE = None
+_SHARED_STEAM_CACHE = None
+
+
+def _shared_pubg_cache():
+    global _SHARED_PUBG_CACHE
+    if _SHARED_PUBG_CACHE is None:
+        from pubg.cache import TTLCache
+        _SHARED_PUBG_CACHE = TTLCache(ttl_secs=30)
+    return _SHARED_PUBG_CACHE
+
+
+def _shared_steam_cache():
+    global _SHARED_STEAM_CACHE
+    if _SHARED_STEAM_CACHE is None:
+        from pubg.cache import TTLCache
+        _SHARED_STEAM_CACHE = TTLCache(ttl_secs=30)
+    return _SHARED_STEAM_CACHE
+
+
+class _TenantPrefixCache:
+    """Cache-Wrapper der allen keys einen tenant-spezifischen Prefix
+    voranstellt. So koennen mehrere Tenants denselben TTLCache nutzen,
+    ohne sich gegenseitig zu sehen."""
+
+    __slots__ = ("_u", "_p")
+
+    def __init__(self, underlying, tenant_id: int):
+        self._u = underlying
+        self._p = f"t{tenant_id}:"
+
+    def get(self, key):
+        return self._u.get(self._p + key)
+
+    def set(self, key, value, ttl=None):
+        return self._u.set(self._p + key, value, ttl=ttl)
+
+    def get_or_compute(self, key, compute_fn, ttl=None):
+        return self._u.get_or_compute(self._p + key, compute_fn, ttl=ttl)
+
+    def invalidate(self, key=None):
+        if key is None:
+            # Nur eigene tenant-Eintraege loeschen — andere Tenants unangetastet
+            doomed = [k for k in list(self._u._store) if k.startswith(self._p)]
+            for k in doomed:
+                self._u._store.pop(k, None)
+        else:
+            self._u.invalidate(self._p + key)
+
+
 def _build_pubg_registry(tenant_id):
-    """Frische EndpointRegistry pro Request. Credentials werden pro-Tenant
-    geladen damit my_account_id/platform fuer das Filtern verfuegbar ist."""
+    """Frische EndpointRegistry pro Request, aber Cache ist process-shared
+    mit Tenant-Prefix. Credentials kommen pro Request frisch aus DB."""
     from pubg.endpoints import EndpointRegistry
-    from pubg.cache import TTLCache
     from core import credentials as core_creds
     conn = _get_conn()
     try:
@@ -32,7 +81,7 @@ def _build_pubg_registry(tenant_id):
         get_conn=lambda: _get_conn(),
         my_account_id=creds.pubg_account_id,
         platform=creds.pubg_platform or "steam",
-        cache=TTLCache(ttl_secs=30),
+        cache=_TenantPrefixCache(_shared_pubg_cache(), tenant_id),
         client=None,
         poller_status=lambda: {"running": False},
         tenant_id=tenant_id,
@@ -40,8 +89,7 @@ def _build_pubg_registry(tenant_id):
 
 
 def _build_steam_registry(tenant_id):
-    """Frische SteamEndpointRegistry pro Request. Client wird mit den
-    Tenant-Credentials gebaut damit Spracheinstellungen + steam_id da sind."""
+    """Frische SteamEndpointRegistry pro Request, shared cache."""
     from steam.endpoints import SteamEndpointRegistry
     from steam.api_client import SteamClient
     from core import credentials as core_creds
