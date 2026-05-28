@@ -8,34 +8,66 @@
 
     <div class="card">
       <h3>Anleitung</h3>
-      <p>Kopiere die URLs unten in OBS als <strong>Browser-Source</strong> (1920x1080 oder je nach Widget). Token ist persistent — wenn du ihn rotierst, musst du alle Browser-Sources neu setzen.</p>
+      <p>Kopiere die URLs in OBS als <strong>Browser-Source</strong>. Bei Widgets mit Range-Buttons gilt: in der URL der gewuenschte Filter (Session / Woche / Alle) gepickt — das wird in Spec 3 durch UI-Settings ersetzt.</p>
+      <p style="color: var(--text-dim); font-size: 13px;">Token: <code>{{ token }}</code> · {{ widgets|length }} Widgets verfuegbar</p>
     </div>
 
+    {% if not token %}
     <div class="card">
-      <h3>Widgets</h3>
-      {% if not token %}
-      <p style="color: var(--danger);">Kein Token gefunden — der Admin hat dein Tenant noch nicht eingerichtet.</p>
-      {% else %}
-      {% for label, path in widgets %}
-      <div class="url-pill">
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">
-          <strong style="color: var(--brand-gold);">{{ label }}</strong> ·
-          {{ base_url }}/s/{{ token }}/widgets/{{ path }}
-        </span>
-        <button class="copy-btn" onclick="navigator.clipboard.writeText('{{ base_url }}/s/{{ token }}/widgets/{{ path }}')">copy</button>
+      <p style="color: var(--danger);">Kein Token gefunden — Admin muss dein Tenant noch einrichten.</p>
+    </div>
+    {% else %}
+
+    {% set grouped = {} %}
+    {% for cat, label, desc, path, ranges in widgets %}
+      {% if cat not in grouped %}{% set _ = grouped.update({cat: []}) %}{% endif %}
+      {% set _ = grouped[cat].append((label, desc, path, ranges)) %}
+    {% endfor %}
+
+    {% for cat, items in grouped.items() %}
+    <div class="card">
+      <h3>{{ cat }}</h3>
+      {% for label, desc, path, ranges in items %}
+      <div style="margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border);">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+          <strong style="color: var(--brand-gold); font-size: 15px;">{{ label }}</strong>
+          <span style="color: var(--text-very-dim); font-size: 11px; font-family: ui-monospace, monospace;">{{ path }}</span>
+        </div>
+        <p style="color: var(--text-muted); font-size: 13px; margin: 4px 0 8px;">{{ desc }}</p>
+
+        {% if ranges %}
+        {% for rlabel, rquery in ranges %}
+        <div class="url-pill">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">
+            <span style="background: var(--bg-deeper); border: 1px solid var(--border); padding: 1px 7px; border-radius: 100px; font-size: 10px; margin-right: 6px; color: var(--brand-gold);">{{ rlabel }}</span>
+            {{ base_url }}/s/{{ token }}/widgets/{{ path }}{{ rquery }}
+          </span>
+          <button class="copy-btn" onclick="navigator.clipboard.writeText('{{ base_url }}/s/{{ token }}/widgets/{{ path }}{{ rquery }}'); this.textContent='✓'; setTimeout(()=>this.textContent='copy',1200)">copy</button>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="url-pill">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">{{ base_url }}/s/{{ token }}/widgets/{{ path }}</span>
+          <button class="copy-btn" onclick="navigator.clipboard.writeText('{{ base_url }}/s/{{ token }}/widgets/{{ path }}'); this.textContent='✓'; setTimeout(()=>this.textContent='copy',1200)">copy</button>
+        </div>
+        {% endif %}
       </div>
       {% endfor %}
-      {% endif %}
     </div>
+    {% endfor %}
 
     <div class="card">
-      <h3>Streamer.bot Integration</h3>
-      <p>Wenn du <a href="https://streamer.bot">Streamer.bot</a> verwendest, ersetze deine bisherigen <code>/api/pubg/...</code> URLs durch:</p>
+      <h3>Streamer.bot</h3>
+      <p>Wenn du <a href="https://streamer.bot">Streamer.bot</a> verwendest, ersetze die bisherigen <code>/api/pubg/...</code> URLs durch:</p>
       <div class="url-pill">
         <span><code>{{ base_url }}/s/{{ token }}/api/pubg/last-match</code></span>
-        <button class="copy-btn" onclick="navigator.clipboard.writeText('{{ base_url }}/s/{{ token }}/api/pubg/last-match')">copy</button>
+        <button class="copy-btn" onclick="navigator.clipboard.writeText('{{ base_url }}/s/{{ token }}/api/pubg/last-match'); this.textContent='✓'; setTimeout(()=>this.textContent='copy',1200)">copy</button>
       </div>
+      <p style="color: var(--text-dim); font-size: 13px; margin-top: 12px;">
+        Generell: jede bisherige <code>https://king-edition.de/api/...</code> URL wird zu <code>https://king-edition.de/s/{{ token }}/api/...</code> — Auth-Header entfernen.
+      </p>
     </div>
+    {% endif %}
   </main>
 </div>
 {% endblock %}
