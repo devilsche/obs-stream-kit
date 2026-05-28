@@ -1003,7 +1003,8 @@ def compute_match_detail(conn, my_account_id, match_id):
         lives = []
         for life_idx, (seg_start, seg_end, death_ev) in enumerate(live_segments, 1):
             # Plane-Cruise-Start fuer dieses Leben: erstes Event ab seg_start
-            # mit z>=150000 (Plane-Cruise)
+            # mit z>=80000 (>=800m). Initial-Drop-Plane ~1500m, Comeback-BR-
+            # Plane nur ~1000m → niedrigere Schwelle damit beides erkannt wird.
             cruise_ts = None
             for e in ev_rows:
                 ts = e["timestamp_ms"]
@@ -1011,7 +1012,7 @@ def compute_match_detail(conn, my_account_id, match_id):
                 if ts > seg_end: break
                 if e["actor_account"] != acc: continue
                 z = e["actor_z"]
-                if z is not None and z >= 150000:
+                if z is not None and z >= 80000:
                     cruise_ts = ts
                     break
             if cruise_ts is None:
