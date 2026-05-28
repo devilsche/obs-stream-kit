@@ -231,7 +231,7 @@ def refresh_seasons(conn, tenant_id: int, client, min_matches: int = 5,
                 WHERE account_id = p.account_id AND season_id = ?
                   AND tenant_id = ?) AS last_refreshed
         FROM players p
-        WHERE p.is_self = TRUE AND p.tenant_id = ?
+        WHERE p.is_self = 1 AND p.tenant_id = ?
         UNION
         SELECT q.account_id, q.name,
                (SELECT MAX(last_refreshed) FROM player_season
@@ -272,7 +272,7 @@ def refresh_lifetimes(conn, tenant_id: int, client, min_matches: int = 5,
                (SELECT MAX(last_refreshed) FROM player_lifetime
                 WHERE account_id = p.account_id AND tenant_id = ?) AS last_refreshed
         FROM players p
-        WHERE p.is_self = TRUE AND p.tenant_id = ?
+        WHERE p.is_self = 1 AND p.tenant_id = ?
         UNION
         SELECT q.account_id, q.name,
                (SELECT MAX(last_refreshed) FROM player_lifetime
