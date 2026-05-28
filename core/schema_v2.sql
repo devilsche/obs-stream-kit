@@ -31,3 +31,19 @@ CREATE INDEX IF NOT EXISTS idx_user_sessions_user
 -- IMMUTABLE). Geringfuegig groesser, fuer unser Volumen egal.
 CREATE INDEX IF NOT EXISTS idx_user_sessions_expires
     ON user_sessions(expires_at);
+
+-- View fuer Lifetime/Season-Refresh-Loop im Poller: qualified-co-players
+-- pro Tenant (mit shared_matches). Aequivalent zur SQLite-Variante
+-- in pubg/db.py, aber tenant-aware.
+CREATE OR REPLACE VIEW qualified_co_players AS
+SELECT
+    p.tenant_id,
+    p.account_id,
+    p.name,
+    COUNT(DISTINCT pa.match_id) AS shared_matches
+FROM participants pa
+JOIN players p
+  ON p.tenant_id = pa.tenant_id AND p.account_id = pa.account_id
+WHERE p.is_self = 0
+GROUP BY p.tenant_id, p.account_id, p.name;
+ALTER VIEW qualified_co_players OWNER TO obs_stream;
