@@ -75,9 +75,17 @@ def _ftp_upload_telemetry(tenant_id: int, match_id: str,
     aufnehmen wenn mehrere Admin-Tenants gleichzeitig archivieren.
     """
     try:
-        import urllib.request, json
-        with urllib.request.urlopen(telemetry_url, timeout=30) as resp:
-            raw = json.loads(resp.read())
+        import urllib.request, json, gzip
+        req = urllib.request.Request(telemetry_url, headers={
+            "Accept-Encoding": "gzip",
+        })
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = resp.read()
+        # PUBG-CDN liefert manchmal gzipped JSON ohne Content-Encoding-Header.
+        # Erkennen via Magic-Bytes (0x1f 0x8b) und entpacken.
+        if body[:2] == b"\x1f\x8b":
+            body = gzip.decompress(body)
+        raw = json.loads(body)
     except Exception as e:
         print(f"[archive] tenant {tenant_id} match {match_id[:16]}: "
               f"CDN-Fetch fehlgeschlagen: {e}")
