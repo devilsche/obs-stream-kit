@@ -44,7 +44,7 @@ BLUE  = '\033[94m'
 MAG   = '\033[95m'
 WHT   = '\033[97m'
 
-# .secrets lesen
+# .secrets lesen (Bootstrap-Fallback; primaere Quelle ist die DB).
 secrets = {}
 secrets_path = os.path.join(ROOT, ".secrets")
 if os.path.exists(secrets_path):
@@ -64,64 +64,190 @@ if os.path.exists(secrets_path):
             elif line.startswith("Steam-Language:"):
                 secrets["steam_language"] = line.split(":", 1)[1].strip()
 
+# ── PG-Conn-Factory + Tenant-Credentials aus DB ────────────────────────────────
+# Spec-1: Credentials liegen verschluesselt in tenant_credentials.
+# OBS_KIT_MASTER_KEY (env) wird zum Entschluesseln gebraucht. Fehlt der
+# Key, bleibt der Server lauffaehig, faellt aber komplett auf die alten
+# .secrets-Werte zurueck.
+if not os.environ.get("OBS_KIT_MASTER_KEY"):
+    print("  WARNUNG: OBS_KIT_MASTER_KEY nicht gesetzt — "
+          "Tenant-Credentials werden NICHT aus DB entschluesselt.")
+    print("           Fallback: .secrets-Werte werden weiter genutzt.")
+
+try:
+    from core import db as core_db
+    from core.db_compat import SqliteCompatConn
+    _PG_AVAILABLE = True
+except Exception as _e:
+    print(f"  WARNUNG: core.db nicht importierbar ({_e}); "
+          f"PG-Backend deaktiviert, .secrets-Only-Modus.")
+    _PG_AVAILABLE = False
+
+
+def _conn_factory():
+    """Liefert frische psycopg2-Conn gewrappt im SQLite-Compat-Wrapper.
+    Endpoints + Aggregations erwarten sqlite-style API
+    (`conn.execute(sql).fetchone()`)."""
+    return SqliteCompatConn(core_db.connect())
+
+
+def _load_tenant_secrets(tenant_id: int = 1) -> dict:
+    """Liest Twitch/Steam/PUBG-Config aus tenant_credentials.
+    Liefert die Felder als Bootstrap-Dict, das ueber `.secrets` gemerged
+    wird (DB gewinnt). Spec 2 ersetzt das durch Per-Request-Tenant-
+    Resolve."""
+    if not _PG_AVAILABLE:
+        return {}
+    from core import credentials as core_creds
+    try:
+        conn = core_db.connect()
+        try:
+            creds = core_creds.get(conn, tenant_id)
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f"  _load_tenant_secrets({tenant_id}) fehlgeschlagen: {e}")
+        return {}
+    out = {}
+    if creds.twitch_channel:
+        out["twitch_channel"] = creds.twitch_channel
+    if creds.twitch_client_id:
+        out["client_id"] = creds.twitch_client_id
+    # Twitch-Client-Secret bleibt server-side — NICHT in HTML injecten.
+    # (Frueher wurde es injiziert; siehe creds_js-Block. Halten wir aus
+    # Backward-Compat-Gruenden in `secrets` fuer interne Nutzung.)
+    if creds.twitch_client_secret:
+        out["client_secret"] = creds.twitch_client_secret
+    if creds.pubg_name:
+        out["pubg_name"] = creds.pubg_name
+    if creds.pubg_platform:
+        out["pubg_platform"] = creds.pubg_platform
+    if creds.pubg_api_key:
+        out["pubg_api_key"] = creds.pubg_api_key
+    if creds.pubg_account_id:
+        out["pubg_account_id"] = creds.pubg_account_id
+    if creds.steam_id:
+        out["steam_id"] = creds.steam_id
+    if creds.steam_api_key:
+        out["steam_api_key"] = creds.steam_api_key
+    return out
+
+
+# DB-Werte gewinnen, fehlende Felder fallen auf .secrets zurueck.
+_db_secrets = _load_tenant_secrets(tenant_id=1)
+if _db_secrets:
+    secrets.update(_db_secrets)
+    print(f"  Tenant-Credentials aus DB geladen "
+          f"({len(_db_secrets)} Felder uebersteuern .secrets).")
+
 # ── PUBG-Backend-Bootstrap ─────────────────────────────────────────────────────
+# Spec-1: Daten liegen in Postgres unter tenant_id=1. Pro-Tenant-Credentials
+# (PUBG-Name, Platform, API-Key) kommen aus tenant_credentials. Der
+# Single-Tenant-Server haelt weiterhin EIN EndpointRegistry + EINEN
+# PollerThread; der Poller iteriert DB-seitig alle Tenants (Spec 2 read-y).
 PUBG_ENABLED = False
 pubg_registry = None
 pubg_poller = None
 try:
-    from pubg.config import load_config, load_api_key
-    from pubg.db import connect as _pubg_connect, init_schema as _pubg_init_schema
     from pubg.api_client import PubgClient
     from pubg.cache import TTLCache
     from pubg.poller import PollerThread
     from pubg.endpoints import EndpointRegistry
-    from pubg.db import get_player_by_name, upsert_player
-    from pubg.backup import load_ftp_config
+    from pubg import db_pg as pubg_db_pg
+    from pubg.config import load_session_gap_hours as _load_gap
 
-    pubg_cfg = load_config(os.path.join(ROOT, "config", "pubg.json"))
-    pubg_key = load_api_key(secrets_path)
-    if pubg_key:
-        os.makedirs(os.path.join(ROOT, "data"), exist_ok=True)
-        pubg_db_path = os.path.join(ROOT, "data", "pubg-history.db")
-        _conn = _pubg_connect(pubg_db_path)
-        _pubg_init_schema(_conn)
-        _self = get_player_by_name(_conn, pubg_cfg["playerName"])
-        my_account_id = _self["account_id"] if _self else None
-        # Session-Gap aus .secrets in DB-Settings uebernehmen
-        from pubg.config import load_session_gap_hours as _load_gap
-        from pubg.db import set_setting as _set_setting
-        _gap = _load_gap(secrets_path)
-        if _gap is not None:
-            _set_setting(_conn, "sessionGapHours", str(_gap))
-            _conn.commit()
-        _conn.close()
+    # Credentials primaer aus DB (Tenant 1), Fallback .secrets/config/pubg.json.
+    pubg_key = secrets.get("pubg_api_key")
+    pubg_name = secrets.get("pubg_name")
+    pubg_platform = secrets.get("pubg_platform")
+    if not (pubg_key and pubg_name and pubg_platform):
+        # Fallback: alte config/pubg.json + .secrets-Key
+        try:
+            from pubg.config import load_config, load_api_key
+            _cfg = load_config(os.path.join(ROOT, "config", "pubg.json"))
+            pubg_name = pubg_name or _cfg.get("playerName")
+            pubg_platform = pubg_platform or _cfg.get("platform")
+            pubg_key = pubg_key or load_api_key(secrets_path)
+        except Exception:
+            pass
 
-        pubg_client = PubgClient(api_key=pubg_key, platform=pubg_cfg["platform"])
+    if pubg_key and pubg_name and pubg_platform and _PG_AVAILABLE:
+        # Session-Gap-Setting aus .secrets in DB-Settings uebernehmen
+        # (idempotent; nur einmal pro Server-Start).
+        try:
+            _gap = _load_gap(secrets_path)
+            if _gap is not None:
+                _c = _conn_factory()
+                pubg_db_pg.set_setting(_c.raw, 1, "sessionGapHours", str(_gap))
+                _c.commit()
+                _c.close()
+        except Exception as e:
+            print(f"  PUBG setup: sessionGap-uebernahme fehlgeschlagen: {e}")
 
-        if my_account_id is None:
+        # account_id aus DB ziehen; falls leer, einmal via API holen und
+        # in players + tenant_credentials.pubg_account_id persistieren.
+        my_account_id = secrets.get("pubg_account_id")
+        if not my_account_id:
             try:
-                resp = pubg_client.get_player(pubg_cfg["playerName"])
+                _c = _conn_factory()
+                _self = pubg_db_pg.get_player_by_name(_c.raw, 1, pubg_name)
+                _c.close()
+                if _self and _self.get("account_id"):
+                    my_account_id = _self["account_id"]
+            except Exception as e:
+                print(f"  PUBG setup: get_player_by_name failed: {e}")
+
+        # Ein "lokaler" Client fuer Bootstrap (player-lookup + Registry).
+        # Der Poller baut seine eigenen Clients pro Tenant via Factory.
+        pubg_client_local = PubgClient(api_key=pubg_key, platform=pubg_platform)
+
+        if not my_account_id:
+            try:
+                resp = pubg_client_local.get_player(pubg_name)
                 if resp.get("data"):
                     my_account_id = resp["data"][0]["id"]
-                    _conn = _pubg_connect(pubg_db_path)
-                    upsert_player(_conn, my_account_id, pubg_cfg["playerName"],
-                                  pubg_cfg["platform"], is_self=True)
-                    _conn.close()
+                    _c = _conn_factory()
+                    pubg_db_pg.upsert_player(_c.raw, 1, my_account_id,
+                                             pubg_name, pubg_platform,
+                                             is_self=True)
+                    _c.commit()
+                    _c.close()
+                    # auch in tenant_credentials zurueckschreiben
+                    try:
+                        from core import credentials as _cc
+                        _c2 = core_db.connect()
+                        _cc.set_pubg(_c2, 1, account_id=my_account_id)
+                        _c2.commit()
+                        _c2.close()
+                    except Exception as e:
+                        print(f"  PUBG setup: account_id-persist failed: {e}")
             except Exception as e:
                 print(f"  PUBG setup: failed to load account-id: {e}")
 
         if my_account_id:
             pubg_cache = TTLCache(ttl_secs=30)
-            ftp_cfg = load_ftp_config(secrets_path)
-            if ftp_cfg:
-                print(f"  PUBG backup: FTP upload active → {ftp_cfg['host']}{ftp_cfg.get('path','')}")
 
-            # Auto-Catch-Up: every server start, fetch any matches the
-            # PUBG-API still exposes that aren't yet in the DB.
-            # Cold-Start is idempotent (INSERT OR IGNORE + filters known
-            # IDs), so a fully synced DB just costs 1 player call (~1s).
-            # Empty DB gets the full backlog. Runs in a background
-            # thread, server stays responsive.
+            # client_factory fuer den PollerThread — der Poller iteriert
+            # alle Tenants in der DB und braucht pro Tenant einen frischen
+            # Client. api_key/platform kommen aus tenant_credentials.
+            def _pubg_client_factory(api_key: str, platform: str):
+                return PubgClient(api_key=api_key, platform=platform)
+
+            # Poll-Intervall + lifetime_min sind globale Server-Einstellungen;
+            # liegen weiterhin in config/pubg.json (alte Datei reicht).
+            _interval = 60
+            _lifetime_min = 5
+            try:
+                from pubg.config import load_config as _lc
+                _cfg2 = _lc(os.path.join(ROOT, "config", "pubg.json"))
+                _interval = _cfg2.get("pollIntervalSec", 60)
+                _lifetime_min = _cfg2.get("minMatchesForLifetime", 5)
+            except Exception:
+                pass
+
+            # Auto-Catch-Up: bei jedem Server-Start die Matches aus der
+            # API holen, die noch nicht in der DB sind. cold_start ist
+            # idempotent.
             print("  PUBG: auto-catchup running in background "
                   "(fetching missing matches from API)…")
             import threading as _t
@@ -135,21 +261,18 @@ try:
             _t.Thread(target=_run_cold_start, daemon=True).start()
 
             pubg_poller = PollerThread(
-                db_path=pubg_db_path, client=pubg_client,
-                my_player_name=pubg_cfg["playerName"],
-                my_account_id=my_account_id,
-                interval_secs=pubg_cfg["pollIntervalSec"],
-                lifetime_min_matches=pubg_cfg["minMatchesForLifetime"],
-                ftp_backup_cfg=ftp_cfg,
+                client_factory=_pubg_client_factory,
+                interval_secs=_interval,
+                lifetime_min_matches=_lifetime_min,
                 cache=pubg_cache,
             )
             pubg_poller.start()
             pubg_registry = EndpointRegistry(
-                get_conn=lambda: _pubg_connect(pubg_db_path),
+                get_conn=lambda: core_db.connect(),
                 my_account_id=my_account_id,
-                platform=pubg_cfg["platform"],
+                platform=pubg_platform,
                 cache=pubg_cache,
-                client=pubg_client,
+                client=pubg_client_local,
                 poller_status=pubg_poller.status,
             )
             PUBG_ENABLED = True
@@ -157,53 +280,63 @@ try:
         else:
             print("  PUBG backend: account-id unknown, polling not started")
     else:
-        print("  PUBG backend: no PUBG-API key in .secrets — backend disabled")
+        if not _PG_AVAILABLE:
+            print("  PUBG backend: PG nicht verfuegbar — disabled")
+        else:
+            print("  PUBG backend: Credentials unvollstaendig "
+                  "(name/platform/api-key) — disabled")
 except Exception as e:
+    import traceback
     print(f"  PUBG-Backend init error: {e}")
+    traceback.print_exc()
 
 
 # ── Steam-Backend-Bootstrap ────────────────────────────────────────────────────
+# Spec-1: Steam-History liegt in Postgres unter tenant_id=1. SteamPoller
+# iteriert alle Tenants und baut sich pro Tenant einen Client via
+# client_factory. SteamEndpointRegistry bleibt single-tenant (haelt EINEN
+# steam_client fuer Direkt-API-Calls).
 STEAM_ENABLED = False
 steam_registry = None
 steam_poller = None
 try:
     from steam.api_client import SteamClient
-    from steam.db import connect as _steam_connect, init_schema as _steam_init_schema
     from steam.endpoints import SteamEndpointRegistry
     from steam.poller import SteamPoller
 
-    if secrets.get("steam_api_key") and secrets.get("steam_id"):
+    if secrets.get("steam_api_key") and secrets.get("steam_id") and _PG_AVAILABLE:
+        _default_lang = secrets.get("steam_language", "english")
         steam_client = SteamClient(
             api_key=secrets["steam_api_key"],
             steam_id=secrets["steam_id"],
-            language=secrets.get("steam_language", "english"))
-        os.makedirs(os.path.join(ROOT, "data"), exist_ok=True)
-        steam_db_path = os.path.join(ROOT, "data", "steam-history.db")
+            language=_default_lang)
 
-        def _steam_db_connect():
-            c = _steam_connect(steam_db_path)
-            return c
+        def _steam_client_factory(api_key: str, steam_id: str, language: str):
+            return SteamClient(api_key=api_key, steam_id=steam_id,
+                               language=language)
 
-        # Schema einmalig initialisieren
-        _conn = _steam_db_connect()
-        _steam_init_schema(_conn)
-        _conn.close()
-
-        steam_poller = SteamPoller(steam_client, _steam_db_connect,
-                                     root_dir=ROOT)
+        steam_poller = SteamPoller(
+            client_factory=_steam_client_factory,
+            root_dir=ROOT,
+            default_language=_default_lang)
         steam_poller.start()
 
         steam_registry = SteamEndpointRegistry(
             client=steam_client,
-            db_connect_fn=_steam_db_connect,
+            db_connect_fn=_conn_factory,
             poller=steam_poller,
             root_dir=ROOT)
         STEAM_ENABLED = True
         print("  Steam backend active  ✓")
     else:
-        print("  Steam backend: no Steam API Key / Steam ID in .secrets — backend disabled")
+        if not _PG_AVAILABLE:
+            print("  Steam backend: PG nicht verfuegbar — disabled")
+        else:
+            print("  Steam backend: no Steam API Key / Steam ID — disabled")
 except Exception as e:
+    import traceback
     print(f"  Steam-Backend init error: {e}")
+    traceback.print_exc()
 
 
 # ── TeamSpeak-Backend-Bootstrap ────────────────────────────────────────────────
