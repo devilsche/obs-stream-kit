@@ -993,9 +993,9 @@
       return cached;
     }
 
-    // Map-Image-Cache: High_Res .png zuerst (zoombarer Mini-Map),
-    // .webp (Low_Res) als Fallback. Promise wird gecached → einmal geladen,
-    // dann sofort verfuegbar.
+    // Map-Image-Cache: _hd.webp zuerst (8192px webp, ~6-13MB) — gleiche
+    // Aufloesung wie das High_Res-PNG aber 10x kleiner. .png als Fallback
+    // wenn _hd.webp fuer eine Map noch nicht erzeugt wurde.
     const _mdImgCache = new Map();
     function mdMapImage(mapName) {
       if (!mapName) return Promise.resolve(null);
@@ -1007,9 +1007,9 @@
           const img2 = new Image();
           img2.onload = () => res(img2);
           img2.onerror = () => res(null);
-          img2.src = `/widgets/pubg/maps/${mapName}.webp`;
+          img2.src = `/widgets/pubg/maps/${mapName}.png`;
         };
-        img.src = `/widgets/pubg/maps/${mapName}.png`;
+        img.src = `/widgets/pubg/maps/${mapName}_hd.webp`;
       });
       _mdImgCache.set(mapName, p);
       return p;
