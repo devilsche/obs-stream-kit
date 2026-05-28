@@ -22,8 +22,11 @@ PORT = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else 9000
 HOST = "0.0.0.0"
 
 from app import create_app
+from app.poller_startup import start_pollers
 
+ROOT = os.path.dirname(os.path.abspath(__file__))
 app = create_app()
+start_pollers(ROOT)
 
 if __name__ == "__main__":
     print(f"obs-stream-kit serving on {HOST}:{PORT}")
