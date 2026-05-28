@@ -25,8 +25,12 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
 
-    TWITCH_CLIENT_ID = _secret("Twitch App Client-ID")
-    TWITCH_CLIENT_SECRET = _secret("Twitch App Client-Secret")
+    # Twitch-App-Credentials kommen aus .secrets — die Keys heissen bewusst
+    # nur "Client-ID" / "Client-Secret" (passt zum bestehenden .secrets-Schema
+    # vor Spec 2). Im obs-stream-kit-Kontext sind sie eindeutig die Twitch-App.
+    TWITCH_CLIENT_ID = _secret("Client-ID")
+    TWITCH_CLIENT_SECRET = _secret("Client-Secret")
+    TWITCH_CHANNEL = _secret("Twitch-Channel")
     TWITCH_REDIRECT_URI = os.environ.get("OBS_KIT_OAUTH_REDIRECT") or "https://king-edition.de/app/oauth/callback"
     TWITCH_AUTH_URL = "https://id.twitch.tv/oauth2/authorize"
     TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token"
