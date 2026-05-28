@@ -74,6 +74,7 @@
     </div>
     <div class="career" id="my-line">—</div>
     <div class="career tight" id="career">—</div>
+    <div class="career tight" id="vehicle" style="display:none"></div>
   </div>
 
   <script src="_pubg.js"></script>
@@ -185,6 +186,20 @@
                 : (lobbyOnly
                     ? `Never in same squad — but ${lobbyOnly} times in same lobby`
                     : "Never played together"));
+
+          // Vehicle-Eviction: nur zeigen wenn relevant.
+          const ed = sh.vehicleEvictionsDealt || 0;
+          const et = sh.vehicleEvictionsTaken || 0;
+          const veh = document.getElementById("vehicle");
+          if (ed > 0 || et > 0) {
+            const parts = [];
+            if (ed > 0) parts.push(`🚗 shot ${ed} ${ed === 1 ? "player" : "players"} out of a vehicle`);
+            if (et > 0) parts.push(`💀 got shot out of a vehicle ${et} ${et === 1 ? "time" : "times"}`);
+            veh.textContent = parts.join(" · ");
+            veh.style.display = "";
+          } else {
+            veh.style.display = "none";
+          }
 
           reveal();
         })
