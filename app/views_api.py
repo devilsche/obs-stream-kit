@@ -18,14 +18,17 @@ bp_api = Blueprint("api", __name__)
 
 
 def _build_pubg_registry(tenant_id):
-    """Frische EndpointRegistry pro Request. Cache=None, Client=None —
-    Endpoints lesen aus der DB und brauchen den Poll-Client nicht."""
+    """Frische EndpointRegistry pro Request. Per-Request TTLCache (kein
+    Cross-Tenant-Leak, dafuer kein cross-Request-Hit — Spec 3 baut shared
+    tenant-scoped Cache). Client=None: Endpoints lesen aus DB, der Poller-
+    Client wird nur fuer Resolves benutzt — der Endpoint-Pfad braucht ihn nicht."""
     from pubg.endpoints import EndpointRegistry
+    from pubg.cache import TTLCache
     return EndpointRegistry(
         get_conn=lambda: _get_conn(),
         my_account_id=None,
         platform=None,
-        cache=None,
+        cache=TTLCache(ttl_secs=30),
         client=None,
         poller_status=lambda: {"running": False},
         tenant_id=tenant_id,
