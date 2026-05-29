@@ -416,20 +416,49 @@ _ENVIR_NAMES = {
 }
 
 
-def _death_cause_label(death_ev, victim_acc, weapon_id, weapon_name):
+def _death_cause_label(death_ev, victim_acc, weapon_id, weapon_name,
+                         ev_rows=None):
     """Liefert eine lesbare Todesursache wenn der Tod NICHT durch einen
     Gegner kam (Vehicle-Eject, Fall, Zone, Ertrinken etc.). Sonst None
     — dann nutzt das Frontend die Standard 'durch <killer> mit <weapon>'.
 
-    Self-Kill (actor_account == victim_account) kombiniert mit Ragdoll/
-    Vehicle weist auf 'aus Fahrzeug gesprungen' hin (klassische PUBG-
-    Death-Mechanik bei Sprung aus fahrendem Auto).
+    Special-Case: Wenn das Kill-Event KEINE weapon und KEINEN attacker hat
+    (PUBG-Telemetrie bei 'sprang aus fahrendem Auto'), schauen wir in
+    ev_rows nach einem VehicleLeave-Event des Opfers innerhalb 5 s vor
+    dem Tod — Indikator fuer Auto-Ausstieg.
     """
+    actor = death_ev.get("actor_account")
+    is_self = (actor == victim_acc)
+    is_no_attacker = (actor is None or actor == "")
+
+    # 1. Weapon-less + actor-less Kill → meist Vehicle-Eject
+    if not weapon_id and is_no_attacker and ev_rows is not None:
+        death_ts = death_ev.get("timestamp_ms") or 0
+        for e in ev_rows:
+            if e["event_type"] != "VehicleLeave": continue
+            if e["actor_account"] != victim_acc: continue
+            ets = e["timestamp_ms"] or 0
+            if 0 < (death_ts - ets) < 5000:  # innerhalb 5 s vor Tod
+                return "aus Fahrzeug gesprungen"
+        return "unbekannter Selbsttod"
+
     if not weapon_id:
         return None
     wid = weapon_id
-    is_self = (death_ev.get("actor_account") == victim_acc)
-    # Vehicle-Eject / Ragdoll-Sprung
+
+    # Mesh-Self-Damage → Ragdoll (z.B. Fall aus Auto, weapon=PlayerFemale_A_C)
+    if is_self and wid in ("PlayerFemale_A_C", "PlayerMale_A_C"):
+        if ev_rows is not None:
+            death_ts = death_ev.get("timestamp_ms") or 0
+            for e in ev_rows:
+                if e["event_type"] != "VehicleLeave": continue
+                if e["actor_account"] != victim_acc: continue
+                ets = e["timestamp_ms"] or 0
+                if 0 < (death_ts - ets) < 5000:
+                    return "aus Fahrzeug gesprungen"
+        return "Sturz"
+
+    # Ragdoll-Sprung (direkt vom Weapon-Field)
     if "RagdollPhysics" in wid or "Damage_HelpMeGroundFall" in wid:
         return "aus Fahrzeug gesprungen" if is_self else "Ragdoll-Impact"
     # Fall-Damage
@@ -1193,7 +1222,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                         and e["timestamp_ms"] >= knock_ts
                         and e["timestamp_ms"] <= death_ev["timestamp_ms"]
                     ]
-                cause_label = _death_cause_label(death_ev, acc, wid, weapon_name)
+                cause_label = _death_cause_label(death_ev, acc, wid,
+                                                  weapon_name, ev_rows=ev_rows)
                 death_info = {
                     "x":           death_ev["victim_x"],
                     "y":           death_ev["victim_y"],
