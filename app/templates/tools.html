@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Tools — OBS Stream Kit{% endblock %}
+{% block body %}
+<div class="layout">
+  {% include "_sidebar.html" %}
+  <main class="main">
+    <div class="topbar"><div class="greeting">Tools</div></div>
+
+    <div class="card">
+      <h3>How it works</h3>
+      <p>Tools run inside the dashboard (no OBS token needed). They use your logged-in session — every API call is scoped to your tenant. Click a tile to open the tool in a new tab.</p>
+    </div>
+
+    <div class="card">
+      <div class="tools-grid">
+        {% for t in tools %}
+        <a class="tool-tile" href="/app/tools/{{ t.key }}" target="_blank" rel="noopener">
+          <div class="tool-title">
+            {{ t.label }}
+            {% if t.admin_only %}<span class="badge-admin">admin</span>{% endif %}
+          </div>
+          <div class="tool-desc">{{ t.desc }}</div>
+          <div class="tool-path">{{ t.path }}</div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </main>
+</div>
+
+<style>
+  .tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+  }
+  .tool-tile {
+    display: block;
+    padding: 16px;
+    background: var(--surface-2, rgba(0,0,0,0.25));
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .tool-tile:hover {
+    border-color: var(--accent, #f2b705);
+    transform: translateY(-1px);
+  }
+  .tool-tile:focus-visible {
+    outline: 2px solid var(--accent, #f2b705);
+    outline-offset: 2px;
+  }
+  .tool-title {
+    font-weight: 700;
+    color: var(--accent, #f2b705);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tool-desc {
+    color: var(--text, #e8e8e8);
+    font-size: 0.92em;
+    line-height: 1.4;
+    margin-bottom: 8px;
+  }
+  .tool-path {
+    color: var(--text-dim, #888);
+    font-family: ui-monospace, "Cascadia Mono", "JetBrains Mono", monospace;
+    font-size: 0.78em;
+  }
+  .badge-admin {
+    font-size: 0.7em;
+    background: var(--accent, #f2b705);
+    color: #1a0d2a;
+    padding: 2px 6px;
+    border-radius: 3px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+</style>
+{% endblock %}
