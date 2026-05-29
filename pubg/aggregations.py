@@ -4484,6 +4484,16 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             "SELECT COUNT(DISTINCT team_id) AS c FROM match_team_mapping "
             "WHERE tenant_id = ? AND match_id = ?",
             (tenant_id, m["match_id"],)).fetchone() or {}).get("c", 0) or 0
+        # Bot-Spieler einzeln (jeder ai.*-account_id zaehlt einmal)
+        # und Gesamt-Spieler in der Lobby.
+        bot_players_in_lobby = (conn.execute(
+            "SELECT COUNT(*) AS c FROM match_team_mapping "
+            "WHERE tenant_id = ? AND match_id = ? AND account_id LIKE 'ai.%'",
+            (tenant_id, m["match_id"],)).fetchone() or {}).get("c", 0) or 0
+        total_players_in_lobby = (conn.execute(
+            "SELECT COUNT(*) AS c FROM match_team_mapping "
+            "WHERE tenant_id = ? AND match_id = ?",
+            (tenant_id, m["match_id"],)).fetchone() or {}).get("c", 0) or 0
         my_special = spec.get(my_account_id, {})
         my_entry = {
             "name": my_name,
@@ -4536,6 +4546,8 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             "matchSpecial": match_special,
             "botTeamsInLobby": bot_teams_in_lobby,
             "totalTeamsInLobby": total_teams_in_lobby,
+            "botPlayersInLobby": bot_players_in_lobby,
+            "totalPlayersInLobby": total_players_in_lobby,
         }
 
     return {

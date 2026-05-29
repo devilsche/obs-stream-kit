@@ -55,7 +55,7 @@ WIDGET_META = [
     ("Steam",         "Combined Popup",     "Combined now-playing + achievement popup.",                            "steam/popup.html"),
     ("Steam",         "Now Playing",        "Currently played Steam game.",                                         "steam/now-playing.html"),
     ("Steam",         "Games Ticker",       "Owned-games ticker.",                                                  "steam/games-ticker.html"),
-    ("Steam",         "Achievement Browser","Full-screen browser through all achievements (use as Just-Chatting overlay).", "steam/achievement-browser.html"),
+    # Achievement Browser ist ein Tool, kein OBS-Widget -> tools/achievement-browser.html, sichtbar unter /app/tools/
 ]
 
 

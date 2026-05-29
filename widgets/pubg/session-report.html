@@ -86,7 +86,7 @@
        zwischen Zeilen sichtbar. */
     .matches-list .m {
       display: grid;
-      grid-template-columns: 240px 60px 1fr 70px 70px 90px 90px;
+      grid-template-columns: 240px 60px 1fr 80px 70px 70px 90px 90px;
       gap: 10px;
       padding: 6px 8px;
       border-radius: 3px;
@@ -98,7 +98,7 @@
     .matches-list .m.expanded { background: rgba(94, 42, 121, 0.25); }
     .matches-list .header-row {
       display: grid;
-      grid-template-columns: 240px 60px 1fr 70px 70px 90px 90px;
+      grid-template-columns: 240px 60px 1fr 80px 70px 70px 90px 90px;
       gap: 10px;
       padding: 2px 8px 4px;
       font-size: 0.85em;
@@ -2272,7 +2272,8 @@
           <span class="time-range">${numStr}<b>${startTimeStr}</b> → <b>${outTimeStr}</b></span>
           ${placeCell}
           <span class="map">${PubgUI.fmtMap(m.map)}<span class="hot-drop-badge" data-hd-slot></span></span>
-          <span class="stat bot-teams" title="Bot-Teams / Teams gesamt in der Lobby"><b>${m.botTeamsInLobby || 0}/${m.totalTeamsInLobby || 0}</b> 🤖</span>
+          <span class="stat bot-teams" title="Bot-Teams / Teams gesamt in der Lobby"><b>${m.botTeamsInLobby || 0}/${m.totalTeamsInLobby || 0}</b> 🤖T</span>
+          <span class="stat bot-teams" title="Bot-Spieler / Spieler gesamt in der Lobby"><b>${m.botPlayersInLobby || 0}/${m.totalPlayersInLobby || 0}</b> 🤖P</span>
           <span class="stat"><b>${m.kills}</b> K${m.myStats && m.myStats.botKills ? ` <span class="bot-kills">(${m.myStats.botKills})</span>` : ""}</span>
           <span class="stat"><b>${Math.round(m.damage||0)}</b> DMG</span>
           <span class="stat"><b>${fmtSurv(mySurv)}</b></span>
@@ -2419,7 +2420,8 @@
             <div class="matches-list">
               <div class="header-row">
                 <span>Squad in Match</span><span>Place</span><span>Map</span>
-                <span style="text-align:right" title="Bot-Teams / Teams gesamt">Bots</span>
+                <span style="text-align:right" title="Bot-Teams / Teams gesamt">Botteams</span>
+                <span style="text-align:right" title="Bot-Spieler / Spieler gesamt">Bots</span>
                 <span style="text-align:right">Kills</span>
                 <span style="text-align:right">Damage</span>
                 <span style="text-align:right">Survived</span>

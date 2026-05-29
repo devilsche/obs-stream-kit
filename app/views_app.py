@@ -26,6 +26,11 @@ TOOLS = [
      "desc": "Heatmap of where you and your mates land across all matches.",
      "path": "tools/landing-spots.html",
      "admin_only": False},
+    {"key": "achievement-browser",
+     "label": "Achievement Browser",
+     "desc": "Full-screen browser through all Steam + PUBG achievements. Click a tile to re-trigger the popup.",
+     "path": "tools/achievement-browser.html",
+     "admin_only": False},
 ]
 
 
