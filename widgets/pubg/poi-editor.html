@@ -59,6 +59,10 @@
     border-radius: 6px;
     overflow: hidden;
     aspect-ratio: 1 / 1;
+    /* Karte nie hoeher als Viewport abzueglich h1 + topbar + body-padding */
+    max-height: calc(100vh - 120px);
+    max-width: calc(100vh - 120px);
+    justify-self: start;
   }
   canvas { display: block; width: 100%; height: 100%; cursor: crosshair; background: transparent; }
   .panel {
