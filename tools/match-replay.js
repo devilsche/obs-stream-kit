@@ -453,12 +453,22 @@ function _interpTrack(tr, ms) {
 }
 
 function posAt(acc, ms) {
-  // Tod-Check
+  // Tod-Check — Spieler ist tot wenn ein death-event vor ms und kein
+  // reland (LogParachuteLanding) danach. Plus Comeback-Heuristik: wenn
+  // nach dem Tod weitere Position-Events fuer diesen Spieler existieren
+  // (z.B. Comeback-Heli auf Taego), ist er nicht mehr tot — der naechste
+  // Track-Eintrag nach dem Death zaehlt als 'wieder da'.
   const dts = RS._deaths[acc] || [];
   const rts = RS._relands[acc] || [];
+  const tr  = RS._tracks[acc] || [];
   let dead = false;
   for (const d of dts) {
-    if (d <= ms) dead = !rts.find(r => r > d && r <= ms);
+    if (d <= ms) {
+      const reland = rts.some(r => r > d && r <= ms);
+      const trackPos = tr.some(p => p.ts > d && p.ts <= ms);
+      if (!reland && !trackPos) dead = true;
+      else dead = false;
+    }
   }
   if (dead) return null;
 

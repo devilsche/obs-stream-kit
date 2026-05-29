@@ -88,16 +88,22 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
             acc = ch.get("accountId")
             loc = (ch.get("location") or {})
             z = loc.get("z")
-            # Flugroute: z >= 150000 cm (Flugzeug-Cruise-Hoehe)
-            # Alle Spieler zusammenführen → lückenlose Route
-            if z is not None and z >= 150000:
+            # Flugroute: z >= 150000 cm (Flugzeug-Cruise-Hoehe).
+            # Bei der INITIALEN Plane (Spieler hat noch nie eine Boden-
+            # Position gehabt) → pool ins flight_by_ts (gemeinsame Linie).
+            # Bei spaeterer Hoehe (Comeback-Heli, Vehicle in der Luft) →
+            # als per-Actor Position emittieren, sonst sieht man den
+            # Comeback-Spieler im Heli nicht.
+            high_alt = (z is not None and z >= 150000)
+            already_grounded = acc in last_pos_ts  # erste Ground-Pos gesehen
+            if high_alt and not already_grounded:
                 x, y = _loc(ch)
                 nx, ny = normalize_coords(x, y, mapKm)
                 if nx is not None:
                     bucket = (ts // 1000) * 1000
                     if bucket not in _flight_by_ts:
                         _flight_by_ts[bucket] = [nx, ny]
-                continue  # Plane-Events nicht als Boden-Positions mischen
+                continue
             prev = last_pos_ts.get(acc)
             if prev is not None and ts - prev < position_interval_ms:
                 continue
