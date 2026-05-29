@@ -212,6 +212,50 @@ function setFocus(teamId) {
   document.querySelectorAll(".team").forEach(el =>
     el.classList.toggle("focused",
       Number(el.dataset.team) === RS.focusedTeam));
+  if (RS.focusedTeam == null) {
+    // Defokussieren → zurueck auf Default-View (smooth via tick-lerp)
+    RS.view.tZoom = 1;
+    RS.view.tPanX = 0;
+    RS.view.tPanY = 0;
+  } else {
+    zoomToTeam(RS.focusedTeam);
+  }
+}
+
+function zoomToTeam(teamId) {
+  const cnv = document.getElementById("map");
+  if (!cnv || !cnv.width) return;
+  const blob = getCal();
+  const cal = blob.pinCalibration || {};
+  const mapKm = blob.mapKm || 8;
+  const base = Math.min(cnv.width, cnv.height);
+  const offX = (cnv.width - base) / 2;
+  const offY = (cnv.height - base) / 2;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, n = 0;
+  for (const acc of Object.keys(RS._accTeam)) {
+    if (RS._accTeam[acc] !== teamId) continue;
+    const p = posAt(acc, RS.cursorMs);
+    if (!p) continue;
+    const [cx, cy] = applyCal(p.x, p.y, mapKm, cal);
+    const px = offX + cx * base;
+    const py = offY + cy * base;
+    if (px < minX) minX = px;
+    if (py < minY) minY = py;
+    if (px > maxX) maxX = px;
+    if (py > maxY) maxY = py;
+    n++;
+  }
+  if (!n) return;
+  const bw = Math.max(60, maxX - minX);
+  const bh = Math.max(60, maxY - minY);
+  const padding = 1.6;
+  const z = Math.max(1, Math.min(8,
+    Math.min(cnv.width / (bw * padding), cnv.height / (bh * padding))));
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  RS.view.tZoom = z;
+  RS.view.tPanX = -(cx - cnv.width / 2) * z;
+  RS.view.tPanY = -(cy - cnv.height / 2) * z;
 }
 
 // --- Task 8: Canvas-Basemap + Koordinaten-Projektion ---
@@ -727,17 +771,24 @@ function renderFrame() {
         ctx.fillText((RS._accName[acc] || "") + botSuffix(acc), px + 10, py - 7);
       }
     } else {
-      ctx.fillStyle = focused ? RS._teamColor[tid] : "#bbb";
-      ctx.globalAlpha = focused ? 1 : 0.7;
+      // Team-Farbe immer voll — kein Ausgrauen mehr. Stattdessen
+      // markiert ein Ring (gold) Mitglieder des fokussierten Teams.
+      const isFocusedTeam = (RS.focusedTeam != null && RS.focusedTeam === tid);
+      if (isFocusedTeam) {
+        ctx.strokeStyle = "#f2b705";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(px, py, 9, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.fillStyle = RS._teamColor[tid];
+      ctx.globalAlpha = 1;
       ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#000";
       ctx.font = "bold 8px DM Sans";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(String(tid), px, py);
       if (RS.toggles.names) {
-        ctx.globalAlpha = focused ? 1 : 0.5;
         ctx.fillStyle = RS._teamColor[tid] || "#fff";
-        ctx.font = `${nameScale}px DM Sans`;
+        ctx.font = `${isFocusedTeam ? "bold " : ""}${nameScale}px DM Sans`;
         ctx.textAlign = "left"; ctx.textBaseline = "bottom";
         ctx.fillText((RS._accName[acc] || "") + botSuffix(acc), px + 7, py - 5);
       }
