@@ -1181,8 +1181,10 @@ canvas.addEventListener("mousemove", (ev) => {
 
   // Cursor in view-mode
   if (mode === "view") {
+    const overVertex = (selectedIdx >= 0 && hitTestVertex(lx, ly) >= 0);
     if (spaceDown) canvas.style.cursor = "grab";
-    else if (selectedIdx >= 0 && hitTestVertex(lx, ly) >= 0) canvas.style.cursor = "move";
+    else if (ev.altKey && overVertex) canvas.style.cursor = "not-allowed";  // = vertex loeschen
+    else if (overVertex) canvas.style.cursor = "move";
     else if (selectedIdx >= 0 && ev.shiftKey && hitTestEdge(lx, ly)) canvas.style.cursor = "copy";
     else if (hitTestPin(lx, ly)) canvas.style.cursor = "help";
     else if (hitTestRegion(wx, wy) >= 0) canvas.style.cursor = "pointer";
