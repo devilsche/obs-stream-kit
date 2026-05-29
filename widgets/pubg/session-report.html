@@ -311,7 +311,7 @@
     .md-matchid:hover { background: rgba(94,42,121,0.25); }
     .md-mapwrap {
       position: relative;
-      width: 600px; height: 600px;
+      width: 360px; height: 360px;
       margin: 0;
       background: #0d061a;
       border: 1px solid var(--pubg-border);
@@ -321,7 +321,7 @@
     }
     .md-mapwrap canvas {
       position: absolute; inset: 0;
-      width: 600px; height: 600px; display: block;
+      width: 360px; height: 360px; display: block;
     }
     .md-mapwrap canvas.md-overlay { pointer-events: none; }
     .md-mapwrap .md-zoombtns {
@@ -977,7 +977,7 @@
     // Canvas-Display-Size (px). devicePixelRatio wird in mdRenderBasemap
     // separat angewendet, damit das Bitmap-Buffer hoeher aufgeloest ist
     // als die CSS-Box — fuer scharfe HD-Maps auch auf Retina-Screens.
-    const MD_MAP_PX = 600;
+    const MD_MAP_PX = 360;
     const MD_PAD_500M_CM = 50000;   // 500m padding fuer Default-Bbox
     const MD_MIN_ZOOM_CM = 5000;    // 50m minimal sichtbarer Radius
     const MD_MAX_ZOOM_CM = 800000;  // 8km — ganze Map default Erangel-Range
@@ -1136,10 +1136,9 @@
       host.dataset.mapKm = mapKm;
       host.dataset.cal = JSON.stringify(cal);
 
-      // Bitmap-Buffer auf devicePixelRatio (gecappt bei 2) skalieren —
-      // auf Retina (DPR=2) ist Buffer 1200x1200, CSS bleibt 600x600 →
-      // 2x scharfere Map-Details.
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      // Bitmap-Buffer immer 2x CSS-Size (mit DPR-Boost auf Retina) →
+      // HD-Webp Source nutzt Aufloesung, statt downscaled darzustellen.
+      const dpr = Math.max(2, Math.min(3, window.devicePixelRatio || 1));
       const BUF = Math.round(MD_MAP_PX * dpr);
       canvas.width = BUF; canvas.height = BUF;
       const ctx = canvas.getContext("2d");
@@ -1186,7 +1185,7 @@
       if (!canvas) return;
       // Buffer auf DPR skalieren + ctx.scale damit unsere Zeichen-
       // koordinaten weiter in CSS-Pixeln (0..MD_MAP_PX) liegen.
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const dpr = Math.max(2, Math.min(3, window.devicePixelRatio || 1));
       const BUF = Math.round(MD_MAP_PX * dpr);
       canvas.width = BUF; canvas.height = BUF;
       const ctx = canvas.getContext("2d");
