@@ -26,11 +26,6 @@ TOOLS = [
      "desc": "Heatmap of where you and your mates land across all matches.",
      "path": "tools/landing-spots.html",
      "admin_only": False},
-    {"key": "poi-editor",
-     "label": "POI Editor",
-     "desc": "Edit map points of interest — drop zones, hot drops, rotations.",
-     "path": "widgets/pubg/poi-editor.html",
-     "admin_only": True},
 ]
 
 

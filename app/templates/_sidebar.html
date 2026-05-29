@@ -13,6 +13,7 @@
     <div class="admin-section">
       <div class="admin-label">Admin</div>
       <a href="/admin/users" class="{% if request.path.startswith('/admin/users') %}active{% endif %}">👥 User approval</a>
+      <a href="/admin/poi-editor" class="{% if request.path.startswith('/admin/poi-editor') %}active{% endif %}" target="_blank">🗺️ POI Editor</a>
       <a href="/admin/" class="{% if request.path == '/admin/' %}active{% endif %}">📈 Admin home</a>
     </div>
     {% endif %}

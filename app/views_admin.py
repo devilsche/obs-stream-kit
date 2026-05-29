@@ -1,8 +1,9 @@
 """Admin-Routes: User-Approval, Tenant-Erstellung beim Freigeben."""
+import os
 import re
 import secrets
 from flask import (
-    Blueprint, redirect, request, render_template, g, current_app
+    Blueprint, redirect, request, render_template, g, current_app, abort
 )
 
 from app.middleware import require_admin, _get_conn
@@ -123,3 +124,38 @@ def admin_suspend(user_id: int):
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()
     return redirect("/admin/users")
+
+
+@bp_admin.route("/admin/poi-editor")
+@require_admin
+def admin_poi_editor():
+    """Serviert den PUBG POI-Editor admin-only. POIs sind global
+    (eine Map-Definition fuer alle Tenants), daher gehoert die
+    Bearbeitung in den Admin-Bereich."""
+    root = current_app.config.get("_PROJECT_ROOT") or os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__)))
+    src = os.path.join(root, "widgets", "pubg", "poi-editor.html")
+    if not os.path.exists(src):
+        abort(404)
+    with open(src, "r", encoding="utf-8") as f:
+        html = f.read()
+    # Relative Asset-Pfade (_pubg.css, _pubg.js, _pubg_pois.js) auf
+    # absolute /widgets-static/pubg/ umschreiben — analog tools_open().
+    for asset in ("_pubg.css", "_pubg.js", "_pubg_pois.js"):
+        html = html.replace(
+            f'href="{asset}"',
+            f'href="/widgets-static/pubg/{asset}"')
+        html = html.replace(
+            f'src="{asset}"',
+            f'src="/widgets-static/pubg/{asset}"')
+    inject = (
+        '<script>\n'
+        'window.__SERVE_BASE__ = "/";\n'
+        'window.__STATIC_BASE__ = "/widgets-static/";\n'
+        '</script>'
+    )
+    if "</head>" in html:
+        html = html.replace("</head>", inject + "\n</head>", 1)
+    else:
+        html = inject + "\n" + html
+    return html, 200, {"Content-Type": "text/html; charset=utf-8"}
