@@ -1384,7 +1384,7 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
           AND event_type IN ('VehicleEnter','VehicleLeave',
                               'Knock','Kill','Revive')
         ORDER BY match_id, timestamp_ms ASC
-    """, [tenant_id] + match_ids).fetchall()
+    """, match_ids).fetchall()
     # match_id -> list of event dicts
     events_per_match = {}
     match_start_by = {}  # match_id -> earliest ts seen (fuer relative Zeit)
@@ -2044,12 +2044,12 @@ def compute_payday_stats(conn, tenant_id: int, my_account_id, range_key="all",
             f"SELECT COUNT(*) AS c FROM telemetry_events "
             f"WHERE match_id = ? AND event_type='Kill' "
             f"AND actor_account IN ({ph})",
-            [tenant_id, mid, *squad]).fetchone() or {}).get("c", 0)
+            [mid, *squad]).fetchone() or {}).get("c", 0)
         sq_dmg = (conn.execute(
             f"SELECT COALESCE(SUM(damage), 0) AS s FROM telemetry_events "
             f"WHERE match_id = ? AND event_type='TakeDamage' "
             f"AND actor_account IN ({ph})",
-            [tenant_id, mid, *squad]).fetchone() or {}).get("s", 0) or 0
+            [mid, *squad]).fetchone() or {}).get("s", 0) or 0
 
         # Per-Mate-Breakdown: Kills + DMG pro Squad-Member.
         # PUBG-API liefert in Events keine Player-Stats → wir
@@ -2059,19 +2059,19 @@ def compute_payday_stats(conn, tenant_id: int, my_account_id, range_key="all",
             f"SELECT actor_account, COUNT(*) AS k FROM telemetry_events "
             f"WHERE match_id = ? AND event_type='Kill' "
             f"AND actor_account IN ({ph}) GROUP BY actor_account",
-            [tenant_id, mid, *squad]).fetchall()}
+            [mid, *squad]).fetchall()}
         mate_dmg = {r["actor_account"]: float(r["d"] or 0) for r in conn.execute(
             f"SELECT actor_account, COALESCE(SUM(damage),0) AS d "
             f"FROM telemetry_events "
             f"WHERE match_id = ? AND event_type='TakeDamage' "
             f"AND actor_account IN ({ph}) GROUP BY actor_account",
-            [tenant_id, mid, *squad]).fetchall()}
+            [mid, *squad]).fetchall()}
         mate_loot = {}
         for r in conn.execute(
             f"SELECT actor_account, COUNT(*) AS c FROM telemetry_events "
             f"WHERE match_id = ? AND event_type='ItemPickup' "
             f"AND actor_account IN ({ph}) AND weapon IS NOT NULL "
-            f"GROUP BY actor_account", [tenant_id, mid, *squad]).fetchall():
+            f"GROUP BY actor_account", [mid, *squad]).fetchall():
             mate_loot[r["actor_account"]] = r["c"]
         # Account-ID -> Name. Fallback Account-ID-Kuerzung.
         names = {r["account_id"]: r["name"] for r in conn.execute(
@@ -2096,7 +2096,7 @@ def compute_payday_stats(conn, tenant_id: int, my_account_id, range_key="all",
             f"FROM telemetry_events WHERE match_id=? "
             f"AND event_type='ItemPickup' AND actor_account IN ({ph}) "
             f"AND weapon IS NOT NULL GROUP BY weapon",
-            [tenant_id, mid, *squad]).fetchall():
+            [mid, *squad]).fetchall():
             loot[r["item_id"]] = r["c"]
 
         # Objects (Window destroy, Door open) Squad
@@ -2104,12 +2104,12 @@ def compute_payday_stats(conn, tenant_id: int, my_account_id, range_key="all",
             f"SELECT COUNT(*) AS c FROM telemetry_events WHERE match_id=? "
             f"AND event_type='ObjectDestroy' AND weapon='Window' "
             f"AND actor_account IN ({ph})",
-            [tenant_id, mid, *squad]).fetchone() or {}).get("c", 0)
+            [mid, *squad]).fetchone() or {}).get("c", 0)
         doors_opened = (conn.execute(
             f"SELECT COUNT(*) AS c FROM telemetry_events WHERE match_id=? "
             f"AND event_type='ObjectInteraction' AND weapon='Door:Opening' "
             f"AND actor_account IN ({ph})",
-            [tenant_id, mid, *squad]).fetchone() or {}).get("c", 0)
+            [mid, *squad]).fetchone() or {}).get("c", 0)
 
         out_matches.append({
             "matchId":    mid,
@@ -3376,7 +3376,7 @@ def _detect_hot_drop(conn, tenant_id: int, match_id, my_account_id, window_ms, w
           AND event_type = 'Landing'
           AND actor_account IN ({placeholders})
         ORDER BY timestamp_ms ASC
-    """, [tenant_id, match_id] + list(squad_ids)).fetchall()
+    """, [match_id] + list(squad_ids)).fetchall()
     if not squad_landings:
         return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
 
