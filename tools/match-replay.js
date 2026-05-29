@@ -13,6 +13,10 @@ const RS = {
   toggles: { kills: true, knocks: true, streaks: true, zones: true, names: true,
              grid: false },
   view: { zoom: 1, panX: 0, panY: 0, tZoom: 1, tPanX: 0, tPanY: 0 },
+  // Empty defaults damit Hover/Render-Helpers vor dem ersten Load nicht crashen
+  _tracks: {}, _groundTracks: {}, _deaths: {}, _relands: {},
+  _jumpTs: {}, _accTeam: {}, _accName: {}, _teamColor: {},
+  _flightStart: 0,
 };
 
 async function loadMatchList() {
@@ -369,6 +373,7 @@ function posAt(acc, ms) {
 }
 
 function markersUpTo(ms) {
+  if (!RS.replay || !RS.replay.events) return [];
   const out = [];
   for (const e of RS.replay.events) {
     if (e.ts > ms) break;
