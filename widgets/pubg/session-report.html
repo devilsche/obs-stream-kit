@@ -2287,8 +2287,8 @@
           <span class="time-range">${numStr}<b>${startTimeStr}</b> → <b>${outTimeStr}</b></span>
           ${placeCell}
           <span class="map">${PubgUI.fmtMap(m.map)}<span class="hot-drop-badge" data-hd-slot></span></span>
-          <span class="stat bot-teams" title="Bot-Teams / Teams gesamt in der Lobby"><b>${m.botTeamsInLobby || 0}/${m.totalTeamsInLobby || 0}</b> 🤖T</span>
-          <span class="stat bot-teams" title="Bot-Spieler / Spieler gesamt in der Lobby"><b>${m.botPlayersInLobby || 0}/${m.totalPlayersInLobby || 0}</b> 🤖P</span>
+          <span class="stat bot-teams" title="Bot-Teams / Teams gesamt in der Lobby"><b>${m.botTeamsInLobby || 0}/${m.totalTeamsInLobby || 0}</b> Teams</span>
+          <span class="stat bot-teams" title="Bot-Spieler / Spieler gesamt in der Lobby"><b>${m.botPlayersInLobby || 0}/${m.totalPlayersInLobby || 0}</b> 🤖</span>
           <span class="stat"><b>${m.kills}</b> K${m.myStats && m.myStats.botKills ? ` <span class="bot-kills">(${m.myStats.botKills})</span>` : ""}</span>
           <span class="stat"><b>${Math.round(m.damage||0)}</b> DMG</span>
           <span class="stat"><b>${fmtSurv(mySurv)}</b></span>
