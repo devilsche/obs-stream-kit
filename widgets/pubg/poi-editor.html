@@ -53,6 +53,7 @@
     text-transform: uppercase; letter-spacing: 0.06em;
   }
   .cal-grid input { width: 100%; box-sizing: border-box; }
+  .cal-grid .cal-row-full { grid-column: 1 / -1; }
   select, input, button {
     background: rgba(94,42,121,0.55);
     color: #f2b705;
@@ -206,6 +207,7 @@
     <button id="tabCalibrate" class="tab" data-mode="calibrate">🎯 Calibrate</button>
   </div>
   <button id="zoomResetBtn" class="secondary">🔍 100%</button>
+  <button id="imgGridBtn" class="secondary active" title="Bildbasiertes 8x8-Raster (Referenz, fix am Kartenbild)">▦ Raster</button>
   <button id="pinsBtn" class="secondary">📍 Pins laden</button>
   <button id="saveBtn" class="save">💾 Speichern</button>
   <span id="status" style="color:#8a7d99; font-size:0.8em"></span>
@@ -223,7 +225,6 @@
       <div class="panel-buttons">
         <button id="rectBtn">▭ Rechteck</button>
         <button id="polyBtn">⬠ Polygon</button>
-        <button id="imgGridBtn" class="secondary active" title="Bildbasiertes 8x8-Raster (Referenz)">▦ Raster</button>
       </div>
       <h3>Regionen <select id="sortSel" style="float:right;font-size:0.78em;padding:2px 6px">
         <option value="area">Fläche ↓</option>
@@ -252,7 +253,6 @@
       <h3>Calibration</h3>
       <div class="panel-buttons">
         <button id="calBtn" class="secondary" title="Calibration-Mode: Kill/Death-Events verschieben zur Map-Cal-Berechnung">🎯 Cal</button>
-        <button id="imgGridBtnCal" class="secondary active" title="Bildbasiertes 8x8-Raster (Referenz)">▦ Raster</button>
         <button id="modeBtn" class="secondary" title="Welche Cal die Inputs steuern: Pin- oder Grid-Calibration">Cal-Mode: PIN</button>
         <button id="flipXBtn" class="secondary" title="X-Achse spiegeln (Ost/West)">↔ FlipX</button>
         <button id="flipYBtn" class="secondary" title="Y-Achse spiegeln (Nord/Sued)">↕ FlipY</button>
@@ -260,7 +260,7 @@
         <button id="calResetBtn" class="secondary" title="Calibration zuruecksetzen">↹ Pins 0/0</button>
       </div>
       <div class="cal-grid">
-        <label>Map-Size (km)
+        <label class="cal-row-full">Map-Size (km)
           <input id="mapSize" type="number" min="1" max="16" step="0.1" value="8">
         </label>
         <label>Offset X (m)
@@ -1368,6 +1368,9 @@ document.getElementById("offsetYIn").addEventListener("input", (ev) => {
 // Editor-Tab: Regions edit vs Calibrate. Persistent in localStorage.
 // Heisst setEditorTab (NICHT setMode), weil setMode oben bereits den
 // Zeichen-Modus 'view'/'drawing-rect'/'drawing-poly' verwaltet.
+// Wichtig: render() referenziert spaeter mit let deklarierte Variablen
+// (calCorrMode etc.) — TDZ! Daher den initialen setEditorTab-Aufruf
+// ans Script-Ende verschieben (siehe ganz unten).
 function setEditorTab(m) {
   document.body.dataset.mode = m;
   document.querySelectorAll(".mode-tabs .tab").forEach(b =>
@@ -1379,21 +1382,12 @@ function setEditorTab(m) {
 }
 document.querySelectorAll(".mode-tabs .tab").forEach(b =>
   b.addEventListener("click", () => setEditorTab(b.dataset.mode)));
-setEditorTab((function(){
-  try { return localStorage.getItem("poi.editor.tab") || "regions"; }
-  catch(_) { return "regions"; }
-})());
 
-function _toggleImgGrid() {
+document.getElementById("imgGridBtn").addEventListener("click", () => {
   showImgGrid = !showImgGrid;
-  for (const id of ["imgGridBtn", "imgGridBtnCal"]) {
-    const el = document.getElementById(id);
-    if (el) el.classList.toggle("active", showImgGrid);
-  }
+  document.getElementById("imgGridBtn").classList.toggle("active", showImgGrid);
   render();
-}
-document.getElementById("imgGridBtn").addEventListener("click", _toggleImgGrid);
-document.getElementById("imgGridBtnCal").addEventListener("click", _toggleImgGrid);
+});
 document.getElementById("flipXBtn").addEventListener("click", () => {
   pinCal.flipX = !pinCal.flipX;
   document.getElementById("flipXBtn").classList.toggle("active", pinCal.flipX);
@@ -1955,6 +1949,13 @@ canvas.addEventListener("click", (e) => {
   // Event war ausgewaehlt → Klick = Korrektur-Ziel
   saveCorrection(wx, wy);
 }, true);
+
+// Initial-Tab-Auswahl muss NACH allen let/const-Deklarationen passieren
+// (render() greift sonst auf calCorrMode etc. zu, bevor diese existieren).
+setEditorTab((function(){
+  try { return localStorage.getItem("poi.editor.tab") || "regions"; }
+  catch(_) { return "regions"; }
+})());
 </script>
 </body>
 </html>
