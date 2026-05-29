@@ -271,12 +271,23 @@
   <p class="intro">
     All achievements stored in the DB. Filterable per game.
     <b>Click a tile</b> to mark the achievement as "unseen" — the
-    <a href="/widgets/steam/achievement-popup.html"
+    <a id="lnkAchPopup" href="#"
     target="_blank" style="color:var(--pubg-gold)">achievement-popup widget</a>
-    or the <a href="/widgets/steam/popup.html"
+    or the <a id="lnkCombinedPopup" href="#"
     target="_blank" style="color:var(--pubg-gold)">combined-popup</a>
     will fire it on the next poll with sound + animation. Handy for testing
     or for stream recaps of individual highlights.
+    <script>
+      // Tokenized base — falls die Seite unter /s/<token>/widgets/steam/...
+      // geladen wird, kommt window.__STATIC_BASE__ vom Server. Sonst Fallback.
+      (function () {
+        const base = (window.__SERVE_BASE__ || "/").replace(/\/$/, "");
+        document.getElementById("lnkAchPopup").href =
+          base + "/widgets/steam/achievement-popup.html";
+        document.getElementById("lnkCombinedPopup").href =
+          base + "/widgets/steam/popup.html";
+      })();
+    </script>
   </p>
 
   <div class="toolbar">
