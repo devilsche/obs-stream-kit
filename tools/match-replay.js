@@ -224,17 +224,42 @@ function buildPlayerTracks() {
   const fp = RS.replay.flightPath;
   const flightStart = fp && fp.length ? fp[0][2] : 0;
 
+  // Hilfs-Push: Track-Sample anhaengen. Sort+Dedup machen wir nachher
+  // pro Account, sonst werden's O(n²)-Inserts.
+  const pushSample = (acc, ts, x, y) => {
+    if (!acc || x == null || y == null) return;
+    (tracks[acc] = tracks[acc] || []).push({ ts, x, y });
+    if (ts >= flightStart)
+      (groundTracks[acc] = groundTracks[acc] || []).push({ ts, x, y });
+  };
+
   for (const e of RS.replay.events) {
     if (e.type === "position" || e.type === "landing") {
-      (tracks[e.actorId] = tracks[e.actorId] || []).push(
-        { ts: e.ts, x: e.x, y: e.y });
-      if (e.ts >= flightStart)
-        (groundTracks[e.actorId] = groundTracks[e.actorId] || []).push(
-          { ts: e.ts, x: e.x, y: e.y });
+      pushSample(e.actorId, e.ts, e.x, e.y);
       if (e.type === "landing")
         (relands[e.actorId] = relands[e.actorId] || []).push(e.ts);
     } else if (e.type === "death") {
       (deaths[e.actorId] = deaths[e.actorId] || []).push(e.ts);
+    } else if (e.type === "knock" || e.type === "kill" || e.type === "hit") {
+      // Schuss-Events haben EXAKTE Koordinaten zum Event-Zeitpunkt —
+      // sowohl fuer den Schuetzen (ax/ay) als auch das Opfer (tx/ty).
+      // Als zusaetzliche Track-Stuetzstellen einspeisen, damit der Pin
+      // nicht 10s lang linear zwischen zwei LogPlayerPosition-Samples
+      // schwebt waehrend der Spieler im Auto fuer den Knock fuhr.
+      pushSample(e.actorId, e.ts, e.ax, e.ay);
+      pushSample(e.targetId, e.ts, e.tx, e.ty);
+    }
+  }
+  // Pro Account: nach Timestamp sortieren + Duplikate (selbe ts) zusammenfassen
+  for (const map of [tracks, groundTracks]) {
+    for (const acc of Object.keys(map)) {
+      map[acc].sort((a, b) => a.ts - b.ts);
+      const dedup = [];
+      for (const s of map[acc]) {
+        if (dedup.length && dedup[dedup.length - 1].ts === s.ts) continue;
+        dedup.push(s);
+      }
+      map[acc] = dedup;
     }
   }
   RS._tracks = tracks;
