@@ -347,14 +347,15 @@ async function loadMap(mapId) {
   mapImage = new Image();
   mapImage.crossOrigin = "anonymous";
   mapImage.onload = () => render();
+  const _staticBase = (window.__STATIC_BASE__ || "/widgets-static/").replace(/\/$/, "/");
   mapImage.onerror = () => {
     mapImage.onerror = () => {
       statusEl.textContent = `⚠ Map ${mapId}.{png|webp} nicht gefunden`;
       render();
     };
-    mapImage.src = `/widgets/pubg/maps/${mapId}.webp`;
+    mapImage.src = `${_staticBase}pubg/maps/${mapId}.webp`;
   };
-  mapImage.src = `/widgets/pubg/maps/${mapId}.png`;
+  mapImage.src = `${_staticBase}pubg/maps/${mapId}.png`;
   // Zoom/Pan auf Default zurueck wenn die Map wechselt
   view = { zoom: 1, panX: 0, panY: 0, tZoom: 1, tPanX: 0, tPanY: 0 };
   updateZoomBtn();
@@ -546,14 +547,17 @@ function render() {
   }
 
   // Bildbasiertes 8×8-Raster: fix am Kartenbild (Canvas-Fraktionen 0..1),
-  // unabhaengig von jeder Calibration. Dient als Referenz — deckt sich das
-  // Welt-Raster (gold) damit, passt die Kalibrierung. 7 Linien je Achse +
-  // Rahmen = 8×8 Felder.
+  // unabhaengig von jeder Calibration. 7 Linien je Achse + Rahmen = 8×8 Felder.
+  // Labels an jeder Kreuzung im Format X/Y (0..8).
   if (showImgGrid) {
     const N = 8;
     const lw = Math.max(0.5, 1 / view.zoom) / view.zoom;
-    ctx.strokeStyle = "rgba(255,60,200,0.85)";  // magenta, klar vom goldenen Welt-Raster unterscheidbar
+    const fontPx = Math.max(8, labelScreenPx() * 0.85) / view.zoom;
+    ctx.strokeStyle = "rgba(242,183,5,0.85)";  // gold
+    ctx.fillStyle = "rgba(242,183,5,0.95)";
     ctx.lineWidth = lw;
+    ctx.font = `${fontPx}px DM Sans, sans-serif`;
+    ctx.textBaseline = "top";
     for (let i = 0; i <= N; i++) {
       const p = (i / N);
       const cx = p * canvas.width;
@@ -561,82 +565,18 @@ function render() {
       ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, canvas.height); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(canvas.width, cy); ctx.stroke();
     }
-  }
-
-  // 1km-Raster — Linien an WORLD-km-Positionen, durch worldToCanvas
-  // gezogen damit sie der Calibration folgen. (0,0) ist Map-Mitte;
-  // Labels zeigen den relativen km-Wert.
-  if (showGrid) {
-    const centerKm = mapKm / 2;
-    const lw = Math.max(0.5, 1 / view.zoom) / view.zoom;
-    const fontPx = labelScreenPx() / view.zoom;
-    ctx.font = `${fontPx}px DM Sans, sans-serif`;
-    ctx.textBaseline = "top";
-    // Endpunkte fuer jede vertikale Linie auf y=0..mapKm*100000
-    // Grid nutzt worldToCanvasRaw (keine Cal) damit es stabil zur Map
-    // bleibt, unabhaengig vom Pin-Offset/Scale.
-    const yTop = 0, yBot = mapKm * 100000;
-    for (let km = 0; km <= mapKm; km++) {
-      const rel = km - centerKm;
-      const isAxis = (rel === 0);
-      const [x1, y1] = worldToCanvasRaw(km * 100000, yTop);
-      const [x2, y2] = worldToCanvasRaw(km * 100000, yBot);
-      ctx.strokeStyle = isAxis ? "rgba(242,183,5,0.95)" : "rgba(242,183,5,0.45)";
-      ctx.lineWidth = isAxis ? lw * 2 : lw;
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-      ctx.fillStyle = isAxis ? "#fff" : "rgba(242,183,5,0.95)";
-      const label = rel > 0 ? `+${rel}` : `${rel}`;
-      ctx.fillText(label, x1 + 3/view.zoom, y1 + 3/view.zoom);
-    }
-    const xLeft = 0, xRight = mapKm * 100000;
-    for (let km = 0; km <= mapKm; km++) {
-      const rel = km - centerKm;
-      const isAxis = (rel === 0);
-      const [x1, y1] = worldToCanvasRaw(xLeft,  km * 100000);
-      const [x2, y2] = worldToCanvasRaw(xRight, km * 100000);
-      ctx.strokeStyle = isAxis ? "rgba(242,183,5,0.95)" : "rgba(242,183,5,0.45)";
-      ctx.lineWidth = isAxis ? lw * 2 : lw;
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-      ctx.fillStyle = isAxis ? "#fff" : "rgba(242,183,5,0.95)";
-      const label = rel > 0 ? `+${rel}` : `${rel}`;
-      if (!isAxis) ctx.fillText(label, x1 + 3/view.zoom, y1 + 3/view.zoom);
-    }
-    // Reference-Pins + Intersection-Labels an jeder km/km-Kreuzung.
-    // Zeigt 'wo das System glaubt, dass Welt-Coord (1km, 1km) liegt' usw.
-    // Auch raw (ohne Cal) damit sie zur Grid-Linie konsistent sind.
-    const dotFont = `${Math.max(8, labelScreenPx() * 0.75) / view.zoom}px DM Sans, sans-serif`;
-    ctx.font = dotFont;
-    for (let kx = 0; kx <= mapKm; kx++) {
-      for (let ky = 0; ky <= mapKm; ky++) {
-        const [px, py] = worldToCanvasRaw(kx * 100000, ky * 100000);
-        // Blue reference dot
-        ctx.fillStyle = "rgba(70, 180, 240, 0.95)";
-        ctx.beginPath();
-        ctx.arc(px, py, 3 / view.zoom, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,0.85)";
-        ctx.lineWidth = 0.8 / view.zoom;
-        ctx.stroke();
-        // Label "kx/ky" — absolute km Coords (0..mapKm)
-        ctx.fillStyle = "rgba(180, 220, 255, 0.95)";
-        ctx.fillText(`${kx}/${ky}`,
-          px + 5 / view.zoom, py - 4 / view.zoom);
+    for (let ix = 0; ix <= N; ix++) {
+      for (let iy = 0; iy <= N; iy++) {
+        const px = (ix / N) * canvas.width;
+        const py = (iy / N) * canvas.height;
+        ctx.fillText(`${ix}/${iy}`,
+          px + 3 / view.zoom, py + 3 / view.zoom);
       }
     }
-    // Welt-Mitte zusaetzlich als groesserer weisser Punkt fuer Orientierung
-    const [cx, cy] = worldToCanvasRaw(centerKm * 100000, centerKm * 100000);
-    ctx.fillStyle = "#fff";
-    ctx.beginPath();
-    ctx.arc(cx, cy, 5 / view.zoom, 0, Math.PI * 2);
-    ctx.fill();
     ctx.textBaseline = "alphabetic";
   }
+
+  // (Welt-Raster entfernt — bildbasiertes 8×8 Raster ist die Referenz.)
 
   regions.forEach((r, i) => {
     const pts = r.points.map(p => worldToCanvas(p[0], p[1]));
