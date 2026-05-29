@@ -69,8 +69,18 @@
     position: sticky;
     top: 14px;
     max-height: calc(100vh - 28px);
-    overflow-y: auto;
     align-self: start;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  /* Header + Hint bleiben oben fix sichtbar, edit-block unten fix —
+     nur die Region-Liste in der Mitte scrollt. */
+  #regionList {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    max-height: 40vh;
   }
   .panel h3 {
     margin: 0 0 6px; color: #f2b705;
