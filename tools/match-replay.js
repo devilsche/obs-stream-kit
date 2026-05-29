@@ -24,7 +24,7 @@ async function loadMatchList() {
   console.log("[match-replay] loadMatchList start, sel=", sel);
   let list;
   try {
-    list = await PubgUI.fetchJson("/api/pubg/matches-list?limit=50");
+    list = await PubgUI.fetchJson("/api/pubg/matches-list?limit=100");
   } catch (e) {
     console.error("[match-replay] matches-list FAIL", e);
     if (sel) sel.innerHTML = `<option>⚠ ${e.message || e}</option>`;
