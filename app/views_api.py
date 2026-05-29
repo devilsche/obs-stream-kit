@@ -71,6 +71,7 @@ def _build_pubg_registry(tenant_id):
     """Frische EndpointRegistry pro Request, aber Cache ist process-shared
     mit Tenant-Prefix. Credentials kommen pro Request frisch aus DB."""
     from pubg.endpoints import EndpointRegistry
+    from pubg.api_client import PubgClient
     from core import credentials as core_creds
     from core.db_compat import SqliteCompatConn
     conn = _get_conn()
@@ -78,12 +79,16 @@ def _build_pubg_registry(tenant_id):
         creds = core_creds.get(conn, tenant_id)
     finally:
         conn.close()
+    client = None
+    if creds.pubg_api_key:
+        client = PubgClient(api_key=creds.pubg_api_key,
+                             platform=creds.pubg_platform or "steam")
     return EndpointRegistry(
         get_conn=lambda: SqliteCompatConn(_get_conn()),
         my_account_id=creds.pubg_account_id,
         platform=creds.pubg_platform or "steam",
         cache=_TenantPrefixCache(_shared_pubg_cache(), tenant_id),
-        client=None,
+        client=client,
         poller_status=lambda: {"running": False},
         tenant_id=tenant_id,
     )
