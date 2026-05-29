@@ -475,8 +475,8 @@ def compute_weapon_stats(conn, tenant_id: int, my_account_id, range_key="session
                MAX(te.distance) AS max_dist_cm,
                COUNT(DISTINCT te.match_id) AS used_matches
         FROM telemetry_events te
-        JOIN matches m ON m.match_id = te.match_id AND m.tenant_id = te.tenant_id
-        WHERE te.tenant_id = ? AND te.event_type = 'Kill'
+        JOIN matches m ON m.match_id = te.match_id AND m.tenant_id = ?
+        WHERE te.event_type = 'Kill'
           AND te.actor_account = ?
           AND m.played_at >= ?{end_filter}
           AND {br_sql}
@@ -522,7 +522,7 @@ def _compute_player_vehicle_evictions(conn, tenant_id: int, account_id, match_id
         SELECT match_id, event_type, timestamp_ms,
                actor_account, target_account
         FROM telemetry_events
-        WHERE tenant_id = ? AND match_id IN ({ph})
+        WHERE match_id IN ({ph})
           AND event_type IN ('VehicleEnter','VehicleLeave',
                               'Knock','Kill','Revive')
         ORDER BY match_id, timestamp_ms ASC
@@ -988,11 +988,11 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                    actor_health, target_account, victim_x, victim_y,
                    weapon, distance, actor_account
             FROM telemetry_events
-            WHERE tenant_id = ? AND match_id = ?
+            WHERE match_id = ?
               AND (actor_account = ? OR target_account = ?)
               AND timestamp_ms IS NOT NULL
             ORDER BY timestamp_ms ASC
-        """, (tenant_id, match_id, acc, acc)).fetchall()
+        """, (match_id, acc, acc)).fetchall()
 
         # Death-Events isolieren (Kill mit target=acc)
         death_events = [e for e in ev_rows
@@ -1183,11 +1183,11 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         revive_rows = conn.execute("""
             SELECT actor_x, actor_y, timestamp_ms
             FROM telemetry_events
-            WHERE tenant_id = ? AND match_id = ? AND target_account = ?
+            WHERE match_id = ? AND target_account = ?
               AND event_type = 'Revive'
               AND actor_x IS NOT NULL
             ORDER BY timestamp_ms ASC
-        """, (tenant_id, match_id, acc)).fetchall()
+        """, (match_id, acc)).fetchall()
         revive_pts = [[r["actor_x"], r["actor_y"], r["timestamp_ms"]]
                        for r in revive_rows]
 
@@ -1285,7 +1285,7 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
                actor_account, target_account,
                actor_x, actor_y, victim_x, victim_y, weapon
         FROM telemetry_events
-        WHERE tenant_id = ? AND match_id IN ({ph})
+        WHERE match_id IN ({ph})
           AND event_type IN ('VehicleEnter','VehicleLeave',
                               'Knock','Kill','Revive')
         ORDER BY match_id, timestamp_ms ASC
@@ -1937,22 +1937,22 @@ def compute_payday_stats(conn, tenant_id: int, my_account_id, range_key="all",
         # Eigene Kills aus Telemetry
         my_kills = (conn.execute(
             f"SELECT COUNT(*) AS c FROM telemetry_events "
-            f"WHERE tenant_id=? AND match_id=? AND event_type='Kill' AND actor_account=?",
-            (tenant_id, mid, my_account_id)).fetchone() or {}).get("c", 0)
+            f"WHERE match_id = ? AND event_type='Kill' AND actor_account=?",
+            (mid, my_account_id)).fetchone() or {}).get("c", 0)
         # Eigener Damage (Sum von TakeDamage als attacker)
         my_dmg = (conn.execute(
             "SELECT COALESCE(SUM(damage), 0) AS s FROM telemetry_events "
-            "WHERE tenant_id=? AND match_id=? AND event_type='TakeDamage' AND actor_account=?",
-            (tenant_id, mid, my_account_id)).fetchone() or {}).get("s", 0) or 0
+            "WHERE match_id = ? AND event_type='TakeDamage' AND actor_account=?",
+            (mid, my_account_id)).fetchone() or {}).get("s", 0) or 0
         # Squad-Aggregat (incl. self)
         sq_kills = (conn.execute(
             f"SELECT COUNT(*) AS c FROM telemetry_events "
-            f"WHERE tenant_id=? AND match_id=? AND event_type='Kill' "
+            f"WHERE match_id = ? AND event_type='Kill' "
             f"AND actor_account IN ({ph})",
             [tenant_id, mid, *squad]).fetchone() or {}).get("c", 0)
         sq_dmg = (conn.execute(
             f"SELECT COALESCE(SUM(damage), 0) AS s FROM telemetry_events "
-            f"WHERE tenant_id=? AND match_id=? AND event_type='TakeDamage' "
+            f"WHERE match_id = ? AND event_type='TakeDamage' "
             f"AND actor_account IN ({ph})",
             [tenant_id, mid, *squad]).fetchone() or {}).get("s", 0) or 0
 
@@ -1962,26 +1962,26 @@ def compute_payday_stats(conn, tenant_id: int, my_account_id, range_key="all",
         # Tabelle (account_id -> name), Fallback name=account_id.
         mate_kills = {r["actor_account"]: r["k"] for r in conn.execute(
             f"SELECT actor_account, COUNT(*) AS k FROM telemetry_events "
-            f"WHERE tenant_id=? AND match_id=? AND event_type='Kill' "
+            f"WHERE match_id = ? AND event_type='Kill' "
             f"AND actor_account IN ({ph}) GROUP BY actor_account",
             [tenant_id, mid, *squad]).fetchall()}
         mate_dmg = {r["actor_account"]: float(r["d"] or 0) for r in conn.execute(
             f"SELECT actor_account, COALESCE(SUM(damage),0) AS d "
             f"FROM telemetry_events "
-            f"WHERE tenant_id=? AND match_id=? AND event_type='TakeDamage' "
+            f"WHERE match_id = ? AND event_type='TakeDamage' "
             f"AND actor_account IN ({ph}) GROUP BY actor_account",
             [tenant_id, mid, *squad]).fetchall()}
         mate_loot = {}
         for r in conn.execute(
             f"SELECT actor_account, COUNT(*) AS c FROM telemetry_events "
-            f"WHERE tenant_id=? AND match_id=? AND event_type='ItemPickup' "
+            f"WHERE match_id = ? AND event_type='ItemPickup' "
             f"AND actor_account IN ({ph}) AND weapon IS NOT NULL "
             f"GROUP BY actor_account", [tenant_id, mid, *squad]).fetchall():
             mate_loot[r["actor_account"]] = r["c"]
         # Account-ID -> Name. Fallback Account-ID-Kuerzung.
         names = {r["account_id"]: r["name"] for r in conn.execute(
             f"SELECT account_id, name FROM players "
-            f"WHERE tenant_id=? AND account_id IN ({ph})", [tenant_id] + squad).fetchall()}
+            f"WHERE account_id IN ({ph})", [tenant_id] + squad).fetchall()}
         mates = []
         for acc in squad:
             mates.append({
@@ -1998,7 +1998,7 @@ def compute_payday_stats(conn, tenant_id: int, my_account_id, range_key="all",
         loot = {}
         for r in conn.execute(
             f"SELECT weapon AS item_id, COUNT(*) AS c "
-            f"FROM telemetry_events WHERE tenant_id=? AND match_id=? "
+            f"FROM telemetry_events WHERE match_id=? "
             f"AND event_type='ItemPickup' AND actor_account IN ({ph}) "
             f"AND weapon IS NOT NULL GROUP BY weapon",
             [tenant_id, mid, *squad]).fetchall():
@@ -2006,12 +2006,12 @@ def compute_payday_stats(conn, tenant_id: int, my_account_id, range_key="all",
 
         # Objects (Window destroy, Door open) Squad
         windows = (conn.execute(
-            f"SELECT COUNT(*) AS c FROM telemetry_events WHERE tenant_id=? AND match_id=? "
+            f"SELECT COUNT(*) AS c FROM telemetry_events WHERE match_id=? "
             f"AND event_type='ObjectDestroy' AND weapon='Window' "
             f"AND actor_account IN ({ph})",
             [tenant_id, mid, *squad]).fetchone() or {}).get("c", 0)
         doors_opened = (conn.execute(
-            f"SELECT COUNT(*) AS c FROM telemetry_events WHERE tenant_id=? AND match_id=? "
+            f"SELECT COUNT(*) AS c FROM telemetry_events WHERE match_id=? "
             f"AND event_type='ObjectInteraction' AND weapon='Door:Opening' "
             f"AND actor_account IN ({ph})",
             [tenant_id, mid, *squad]).fetchone() or {}).get("c", 0)
@@ -2125,9 +2125,9 @@ def _compute_top10_reached_at(conn, tenant_id: int, match_id, my_account_id):
 
     events = conn.execute("""
         SELECT timestamp_ms, target_account FROM telemetry_events
-        WHERE tenant_id = ? AND match_id = ? AND event_type = 'Kill'
+        WHERE match_id = ? AND event_type = 'Kill'
         ORDER BY timestamp_ms ASC
-    """, (tenant_id, match_id,)).fetchall()
+    """, (match_id,)).fetchall()
     if not events:
         return None
 
@@ -2683,13 +2683,13 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
             # und actor_account IS NULL (kein echter Killer-Account)
             rz = (conn.execute("""
                 SELECT COUNT(*) AS c FROM telemetry_events
-                WHERE tenant_id=? AND match_id=? AND event_type='Kill'
+                WHERE match_id=? AND event_type='Kill'
                   AND target_account=?
                   AND (actor_account IS NULL OR actor_account='')
                   AND (weapon LIKE '%RedZone%'
                        OR weapon LIKE '%Bomb%'
                        OR weapon LIKE '%bomb%')
-            """, (tenant_id, mid, my_account_id)).fetchone() or {}).get("c", 0)
+            """, (mid, my_account_id)).fetchone() or {}).get("c", 0)
             if rz > 0:
                 out.append({
                     "id": "redzone_death",
@@ -2702,10 +2702,10 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
             # damageCauserName = Fahrzeug-Klasse (BP_Buggy_C etc.)
             vkill = (conn.execute("""
                 SELECT COUNT(*) AS c FROM telemetry_events
-                WHERE tenant_id=? AND match_id=? AND event_type='Kill'
+                WHERE match_id=? AND event_type='Kill'
                   AND actor_account=?
                   AND weapon LIKE 'BP_%'
-            """, (tenant_id, mid, my_account_id)).fetchone() or {}).get("c", 0)
+            """, (mid, my_account_id)).fetchone() or {}).get("c", 0)
             if vkill > 0:
                 out.append({
                     "id": "vehicle_kill",
@@ -2717,10 +2717,10 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
             # --- Got killed by a vehicle ---
             vdeath = (conn.execute("""
                 SELECT COUNT(*) AS c FROM telemetry_events
-                WHERE tenant_id=? AND match_id=? AND event_type='Kill'
+                WHERE match_id=? AND event_type='Kill'
                   AND target_account=?
                   AND weapon LIKE 'BP_%'
-            """, (tenant_id, mid, my_account_id)).fetchone() or {}).get("c", 0)
+            """, (mid, my_account_id)).fetchone() or {}).get("c", 0)
             if vdeath > 0:
                 out.append({
                     "id": "vehicle_death",
@@ -2733,10 +2733,10 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
             # VehicleEnter/Leave Intervalle bauen, dann Kill-Events pruefen
             ve_events = conn.execute("""
                 SELECT event_type, timestamp_ms FROM telemetry_events
-                WHERE tenant_id=? AND match_id=? AND actor_account=?
+                WHERE match_id=? AND actor_account=?
                   AND event_type IN ('VehicleEnter', 'VehicleLeave')
                 ORDER BY timestamp_ms ASC
-            """, (tenant_id, mid, my_account_id)).fetchall()
+            """, (mid, my_account_id)).fetchall()
             if ve_events:
                 # Baue Intervalle: (enter_ms, leave_ms)
                 intervals = []
@@ -2752,9 +2752,9 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
                 if intervals:
                     my_kills = conn.execute("""
                         SELECT timestamp_ms FROM telemetry_events
-                        WHERE tenant_id=? AND match_id=? AND event_type='Kill'
+                        WHERE match_id=? AND event_type='Kill'
                           AND actor_account=?
-                    """, (tenant_id, mid, my_account_id)).fetchall()
+                    """, (mid, my_account_id)).fetchall()
                     driveby_n = sum(
                         1 for k in my_kills
                         if k["timestamp_ms"] and
@@ -3277,7 +3277,7 @@ def _detect_hot_drop(conn, tenant_id: int, match_id, my_account_id, window_ms, w
     squad_landings = conn.execute(f"""
         SELECT actor_account, actor_x, actor_y, timestamp_ms
         FROM telemetry_events
-        WHERE tenant_id = ? AND match_id = ?
+        WHERE match_id = ?
           AND event_type = 'Landing'
           AND actor_account IN ({placeholders})
         ORDER BY timestamp_ms ASC
@@ -3314,12 +3314,12 @@ def _detect_hot_drop(conn, tenant_id: int, match_id, my_account_id, window_ms, w
         SELECT actor_account, target_account, timestamp_ms, event_type,
                actor_x, actor_y, victim_x, victim_y
         FROM telemetry_events
-        WHERE tenant_id = ? AND match_id = ?
+        WHERE match_id = ?
           AND event_type IN ('Kill', 'Knock', 'TakeDamage')
           AND timestamp_ms >= ?
           AND timestamp_ms <= ?
         ORDER BY timestamp_ms ASC
-    """, (tenant_id, match_id, landing_ms, fight_cutoff_ms)).fetchall()
+    """, (match_id, landing_ms, fight_cutoff_ms)).fetchall()
 
     # Lobby-weites team_id-Mapping (falls match_schema >= 2)
     # PG: dict(rows) klappt nicht direkt mit RealDictRow — manuell mappen.
@@ -3341,10 +3341,10 @@ def _detect_hot_drop(conn, tenant_id: int, match_id, my_account_id, window_ms, w
         all_landings = conn.execute("""
             SELECT actor_account, actor_x, actor_y
             FROM telemetry_events
-            WHERE tenant_id = ? AND match_id = ?
+            WHERE match_id = ?
               AND event_type = 'Landing'
               AND actor_x IS NOT NULL AND actor_y IS NOT NULL
-        """, (tenant_id, match_id,)).fetchall()
+        """, (match_id,)).fetchall()
         for ld in all_landings:
             if ld["actor_account"] in squad_ids:
                 continue
@@ -3404,7 +3404,7 @@ def _detect_hot_drop(conn, tenant_id: int, match_id, my_account_id, window_ms, w
     survival_cutoff_ms = landing_ms + HD_SURVIVAL_WINDOW_MIN * 60 * 1000
     killed_in_window = {r["target_account"] for r in conn.execute(f"""
         SELECT target_account FROM telemetry_events
-        WHERE tenant_id = ? AND match_id = ?
+        WHERE match_id = ?
           AND event_type = 'Kill'
           AND target_account IN ({placeholders})
           AND timestamp_ms >= ?
@@ -3509,9 +3509,9 @@ def compute_first_fight_rate(conn, tenant_id: int, my_account_id, range_key="ses
             r = conn.execute("""
                 SELECT te.actor_x, te.actor_y FROM telemetry_events te
                 JOIN participants pa ON pa.match_id = te.match_id
-                  AND pa.tenant_id = te.tenant_id
+                  AND pa.tenant_id = ?
                   AND pa.account_id = te.actor_account
-                WHERE te.tenant_id = ? AND te.match_id = ? AND te.event_type = 'Landing'
+                WHERE te.match_id = ? AND te.event_type = 'Landing'
                   AND pa.team_id = (SELECT team_id FROM participants
                                      WHERE tenant_id = ? AND match_id = ? AND account_id = ?)
                   AND te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
@@ -3658,10 +3658,10 @@ def _detect_first_fight(conn, tenant_id: int, match_id, my_account_id,
         SELECT event_type, actor_account, target_account, timestamp_ms,
                actor_x, actor_y, victim_x, victim_y
         FROM telemetry_events
-        WHERE tenant_id = ? AND match_id = ? AND event_type IN ('Kill', 'Knock', 'TakeDamage')
+        WHERE match_id = ? AND event_type IN ('Kill', 'Knock', 'TakeDamage')
           AND actor_account IS NOT NULL
         ORDER BY timestamp_ms ASC
-    """, (tenant_id, match_id,)).fetchall()
+    """, (match_id,)).fetchall()
     if not events:
         return None
 
@@ -3962,13 +3962,13 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         ph = ",".join("?" * len(event_match_ids))
         kills_by_match = {r["match_id"]: r["k"] for r in conn.execute(
             f"SELECT match_id, COUNT(*) AS k FROM telemetry_events "
-            f"WHERE tenant_id=? AND event_type='Kill' AND actor_account=? "
+            f"WHERE event_type='Kill' AND actor_account=? "
             f"AND match_id IN ({ph}) GROUP BY match_id",
             [tenant_id, my_account_id, *event_match_ids]).fetchall()}
         dmg_by_match = {r["match_id"]: float(r["d"] or 0) for r in conn.execute(
             f"SELECT match_id, COALESCE(SUM(damage), 0) AS d "
             f"FROM telemetry_events "
-            f"WHERE tenant_id=? AND event_type='TakeDamage' AND actor_account=? "
+            f"WHERE event_type='TakeDamage' AND actor_account=? "
             f"AND match_id IN ({ph}) GROUP BY match_id",
             [tenant_id, my_account_id, *event_match_ids]).fetchall()}
     for x in enriched:
@@ -4271,7 +4271,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             # Redzone-Tode (Kill ohne actor + Bomb/RedZone-Waffe)
             for r in conn.execute(f"""
                 SELECT * FROM telemetry_events
-                WHERE tenant_id=? AND match_id=? AND event_type='Kill'
+                WHERE match_id=? AND event_type='Kill'
                   AND target_account IN ({ph})
                   AND (actor_account IS NULL OR actor_account='')
                   AND (weapon LIKE '%RedZone%' OR weapon LIKE '%Bomb%'
@@ -4290,7 +4290,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             # Vehicle-Kills + Vehicle-Tode — gleiche SQL, separate Buckets
             for r in conn.execute(f"""
                 SELECT * FROM telemetry_events
-                WHERE tenant_id=? AND match_id=? AND event_type='Kill'
+                WHERE match_id=? AND event_type='Kill'
                   AND (actor_account IN ({ph}) OR target_account IN ({ph}))
             """, [tenant_id, match_id] + list(acc_ids) + list(acc_ids)).fetchall():
                 actor, target = r["actor_account"], r["target_account"]
@@ -4304,10 +4304,10 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             for acc in acc_ids:
                 ve = conn.execute("""
                     SELECT event_type, timestamp_ms FROM telemetry_events
-                    WHERE tenant_id=? AND match_id=? AND actor_account=?
+                    WHERE match_id=? AND actor_account=?
                       AND event_type IN ('VehicleEnter','VehicleLeave')
                     ORDER BY timestamp_ms ASC
-                """, (tenant_id, match_id, acc)).fetchall()
+                """, (match_id, acc)).fetchall()
                 if not ve: continue
                 intervals = []
                 enter_ms = None
@@ -4322,9 +4322,9 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                 if not intervals: continue
                 for k in conn.execute("""
                     SELECT * FROM telemetry_events
-                    WHERE tenant_id=? AND match_id=? AND event_type='Kill'
+                    WHERE match_id=? AND event_type='Kill'
                       AND actor_account=?
-                """, (tenant_id, match_id, acc)).fetchall():
+                """, (match_id, acc)).fetchall():
                     ts = k["timestamp_ms"]
                     if not ts: continue
                     if not any(a <= ts <= b for a, b in intervals): continue
@@ -4374,20 +4374,20 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         if sq_list:
             for r in conn.execute(
                 f"SELECT target_account, COUNT(*) AS c FROM telemetry_events "
-                f"WHERE tenant_id=? AND match_id=? AND event_type='Knock' "
+                f"WHERE match_id = ? AND event_type='Knock' "
                 f"AND target_account IN ({ph}) GROUP BY target_account",
                     [tenant_id, m["match_id"]] + sq_list).fetchall():
                 knocks_received[r["target_account"]] = r["c"]
             for r in conn.execute(
                 f"SELECT actor_account, COUNT(*) AS c FROM telemetry_events "
-                f"WHERE tenant_id=? AND match_id=? AND event_type='Revive' "
+                f"WHERE match_id = ? AND event_type='Revive' "
                 f"AND actor_account IN ({ph}) GROUP BY actor_account",
                     [tenant_id, m["match_id"]] + sq_list).fetchall():
                 revives_given[r["actor_account"]] = r["c"]
             # Bot-Kills pro Squadmember: Kill-Events mit target_account=ai.*
             for r in conn.execute(
                 f"SELECT actor_account, COUNT(*) AS c FROM telemetry_events "
-                f"WHERE tenant_id=? AND match_id=? AND event_type='Kill' "
+                f"WHERE match_id = ? AND event_type='Kill' "
                 f"AND actor_account IN ({ph}) "
                 f"AND target_account LIKE 'ai.%' GROUP BY actor_account",
                     [tenant_id, m["match_id"]] + sq_list).fetchall():
@@ -4395,11 +4395,11 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         # Bot-Teams (team_id >= 200) und Gesamt-Teams in dieser Lobby
         bot_teams_in_lobby = (conn.execute(
             "SELECT COUNT(DISTINCT team_id) AS c FROM match_team_mapping "
-            "WHERE tenant_id=? AND match_id=? AND team_id>=200",
+            "WHERE tenant_id = ? AND match_id = ? AND team_id>=200",
             (tenant_id, m["match_id"],)).fetchone() or {}).get("c", 0) or 0
         total_teams_in_lobby = (conn.execute(
             "SELECT COUNT(DISTINCT team_id) AS c FROM match_team_mapping "
-            "WHERE tenant_id=? AND match_id=?",
+            "WHERE tenant_id = ? AND match_id = ?",
             (tenant_id, m["match_id"],)).fetchone() or {}).get("c", 0) or 0
         my_special = spec.get(my_account_id, {})
         my_entry = {
@@ -4598,16 +4598,16 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
         for mid in match_ids:
             cruise = conn.execute("""
                 SELECT actor_x, actor_y FROM telemetry_events
-                WHERE tenant_id=? AND match_id=? AND actor_account=? AND event_type='Position'
+                WHERE match_id=? AND actor_account=? AND event_type='Position'
                   AND actor_z >= 150000
                 ORDER BY timestamp_ms ASC
-            """, (tenant_id, mid, ref)).fetchall()
+            """, (mid, ref)).fetchall()
             land = conn.execute("""
                 SELECT actor_x, actor_y FROM telemetry_events
-                WHERE tenant_id=? AND match_id=? AND actor_account=? AND event_type='Landing'
+                WHERE match_id=? AND actor_account=? AND event_type='Landing'
                   AND actor_x IS NOT NULL
                 ORDER BY timestamp_ms ASC LIMIT 1
-            """, (tenant_id, mid, ref)).fetchone()
+            """, (mid, ref)).fetchone()
             if len(cruise) < 2 or not land:
                 kept.append(mid)  # routeUnknown → einbeziehen
                 continue
@@ -4627,8 +4627,9 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
     #    (match, actor). Vereinfachte Variante der _landings-Heuristik.
     ph = ",".join("?" * len(match_ids))
     acc_clause = ""
-    # Params: tenant (CTE), match_ids, tenant (main JOIN), [player_accs]
-    params = [tenant_id] + list(match_ids) + [tenant_id]
+    # Telemetrie ist global — keine tenant_id-Filter. Players join filtert
+    # auf tenant_id damit der Name aus der eigenen DB kommt.
+    params = list(match_ids) + [tenant_id]
     if player_accs:
         acc_ph = ",".join("?" * len(player_accs))
         acc_clause = f"AND te.actor_account IN ({acc_ph})"
@@ -4637,7 +4638,7 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
         WITH best AS (
           SELECT match_id, actor_account, MIN(timestamp_ms) AS ts
           FROM telemetry_events
-          WHERE tenant_id = ? AND event_type='Landing' AND match_id IN ({ph})
+          WHERE event_type='Landing' AND match_id IN ({ph})
             AND actor_x IS NOT NULL AND actor_y IS NOT NULL
             AND (actor_z IS NULL OR actor_z < 80000)
             AND (actor_health IS NULL OR actor_health > 0)
@@ -4648,8 +4649,8 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
         FROM best b
         JOIN telemetry_events te
           ON te.match_id=b.match_id AND te.actor_account=b.actor_account
-         AND te.timestamp_ms=b.ts AND te.event_type='Landing' AND te.tenant_id = ?
-        LEFT JOIN players p ON p.account_id = te.actor_account AND p.tenant_id = te.tenant_id
+         AND te.timestamp_ms=b.ts AND te.event_type='Landing'
+        LEFT JOIN players p ON p.account_id = te.actor_account AND p.tenant_id = ?
         WHERE 1=1 {acc_clause}
     """, params).fetchall()
 

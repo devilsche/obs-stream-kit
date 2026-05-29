@@ -367,7 +367,8 @@ class EndpointRegistry:
         conn = self.get_conn()
         map_filter = (qs.get("map") or "").strip()
         all_landings = qs.get("all") == "1"
-        params = [self.my_account_id, self.tenant_id]
+        # Bind-Order: m.tenant_id (1) → me.account_id (2) → optional map_filter (3)
+        params = [self.tenant_id, self.my_account_id]
         where = ""
         if map_filter:
             where = "AND m.map_name = ?"
@@ -379,12 +380,12 @@ class EndpointRegistry:
                        te.actor_account, te.actor_x, te.actor_y,
                        p.name AS player_name
                 FROM telemetry_events te
-                JOIN matches m ON m.match_id = te.match_id AND m.tenant_id = te.tenant_id
-                JOIN participants me ON me.match_id = te.match_id AND me.tenant_id = te.tenant_id AND me.account_id = ?
-                JOIN participants pa ON pa.match_id = te.match_id AND pa.tenant_id = te.tenant_id
+                JOIN matches m ON m.match_id = te.match_id AND m.tenant_id = ?
+                JOIN participants me ON me.match_id = te.match_id AND me.tenant_id = m.tenant_id AND me.account_id = ?
+                JOIN participants pa ON pa.match_id = te.match_id AND pa.tenant_id = m.tenant_id
                     AND pa.team_id = me.team_id AND pa.account_id = te.actor_account
-                LEFT JOIN players p ON p.account_id = te.actor_account AND p.tenant_id = te.tenant_id
-                WHERE te.tenant_id = ? AND te.event_type = 'Landing'
+                LEFT JOIN players p ON p.account_id = te.actor_account AND p.tenant_id = m.tenant_id
+                WHERE te.event_type = 'Landing'
                   AND te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
                   {where}
             """, params).fetchall()
@@ -393,11 +394,12 @@ class EndpointRegistry:
             # Schritt 1: Landing-Events mit z<800 + health>0 = legit Touchdown
             # Schritt 2: falls keiner, Position-Event mit z<800 als Fallback
             # Schritt 3: falls auch keiner, MIN(timestamp_ms) Landing (alt)
+            # Bind-Order: m.tenant_id, me.account_id, optional map_filter
             rows = conn.execute(f"""
                 WITH best_landing AS (
                   SELECT match_id, actor_account, MIN(timestamp_ms) AS ts
                   FROM telemetry_events
-                  WHERE tenant_id = ? AND event_type = 'Landing'
+                  WHERE event_type = 'Landing'
                     AND actor_x IS NOT NULL AND actor_y IS NOT NULL
                     AND (actor_z IS NULL OR actor_z < 80000)
                     AND (actor_health IS NULL OR actor_health > 0)
@@ -409,7 +411,7 @@ class EndpointRegistry:
                   LEFT JOIN best_landing bl
                     ON bl.match_id = te.match_id
                    AND bl.actor_account = te.actor_account
-                  WHERE te.tenant_id = ? AND te.event_type = 'Position'
+                  WHERE te.event_type = 'Position'
                     AND te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
                     AND te.actor_z IS NOT NULL AND te.actor_z < 80000
                     AND bl.ts IS NULL
@@ -422,7 +424,7 @@ class EndpointRegistry:
                     ON bl.match_id = te.match_id AND bl.actor_account = te.actor_account
                   LEFT JOIN fallback_position fp
                     ON fp.match_id = te.match_id AND fp.actor_account = te.actor_account
-                  WHERE te.tenant_id = ? AND te.event_type = 'Landing'
+                  WHERE te.event_type = 'Landing'
                     AND te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
                     AND bl.ts IS NULL AND fp.ts IS NULL
                   GROUP BY te.match_id, te.actor_account
@@ -442,14 +444,14 @@ class EndpointRegistry:
                   ON te.match_id = pk.match_id
                  AND te.actor_account = pk.actor_account
                  AND te.timestamp_ms = pk.ts
-                JOIN matches m ON m.match_id = te.match_id AND m.tenant_id = te.tenant_id
-                JOIN participants me ON me.match_id = te.match_id AND me.tenant_id = te.tenant_id AND me.account_id = ?
-                JOIN participants pa ON pa.match_id = te.match_id AND pa.tenant_id = te.tenant_id
+                JOIN matches m ON m.match_id = te.match_id AND m.tenant_id = ?
+                JOIN participants me ON me.match_id = te.match_id AND me.tenant_id = m.tenant_id AND me.account_id = ?
+                JOIN participants pa ON pa.match_id = te.match_id AND pa.tenant_id = m.tenant_id
                     AND pa.team_id = me.team_id AND pa.account_id = te.actor_account
-                LEFT JOIN players p ON p.account_id = te.actor_account AND p.tenant_id = te.tenant_id
-                WHERE te.tenant_id = ? AND te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
+                LEFT JOIN players p ON p.account_id = te.actor_account AND p.tenant_id = m.tenant_id
+                WHERE te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
                   {where}
-            """, [self.tenant_id, self.tenant_id, self.tenant_id] + params).fetchall()
+            """, params).fetchall()
         landings = [{
             "matchId":    r["match_id"],
             "playedAt":   r["played_at"],
@@ -792,21 +794,21 @@ class EndpointRegistry:
             qsph = ",".join("?" * len(squad)) if squad else "''"
             # fetchone()[0] -> fetchone()["count"] (RealDictCursor)
             ev_squad = (conn.execute(
-                f"SELECT COUNT(*) AS c FROM telemetry_events WHERE tenant_id=? AND match_id=? "
+                f"SELECT COUNT(*) AS c FROM telemetry_events WHERE match_id=? "
                 f"AND event_type='VehicleEnter' AND actor_account IN ({qsph})",
-                [self.tenant_id, mid] + squad).fetchone() or {}).get("c", 0)
+                [mid] + squad).fetchone() or {}).get("c", 0)
             ev_enemy = (conn.execute(
-                f"SELECT COUNT(*) AS c FROM telemetry_events WHERE tenant_id=? AND match_id=? "
+                f"SELECT COUNT(*) AS c FROM telemetry_events WHERE match_id=? "
                 f"AND event_type='VehicleEnter' AND actor_account NOT IN ({qsph})",
-                [self.tenant_id, mid] + squad).fetchone() or {}).get("c", 0)
+                [mid] + squad).fetchone() or {}).get("c", 0)
             kills = (conn.execute(
-                f"SELECT COUNT(*) AS c FROM telemetry_events WHERE tenant_id=? AND match_id=? "
+                f"SELECT COUNT(*) AS c FROM telemetry_events WHERE match_id=? "
                 f"AND event_type='Kill' AND actor_account IN ({qsph})",
-                [self.tenant_id, mid] + squad).fetchone() or {}).get("c", 0)
+                [mid] + squad).fetchone() or {}).get("c", 0)
             knocks = (conn.execute(
-                f"SELECT COUNT(*) AS c FROM telemetry_events WHERE tenant_id=? AND match_id=? "
+                f"SELECT COUNT(*) AS c FROM telemetry_events WHERE match_id=? "
                 f"AND event_type='Knock' AND actor_account IN ({qsph})",
-                [self.tenant_id, mid] + squad).fetchone() or {}).get("c", 0)
+                [mid] + squad).fetchone() or {}).get("c", 0)
             out.append({
                 "matchId":      mid,
                 "playedAt":     m["played_at"],
@@ -2116,21 +2118,21 @@ class EndpointRegistry:
             squad_ids = [a for a, t in acc_to_team.items() if t == my_team] if my_team else []
             kill_n = (conn.execute(
                 "SELECT COUNT(*) AS c FROM telemetry_events "
-                "WHERE tenant_id = ? AND match_id = ? AND event_type = 'Kill'",
-                (self.tenant_id, mid,)).fetchone() or {}).get("c", 0)
+                "WHERE match_id = ? AND event_type = 'Kill'",
+                (mid,)).fetchone() or {}).get("c", 0)
             knock_n = (conn.execute(
                 "SELECT COUNT(*) AS c FROM telemetry_events "
-                "WHERE tenant_id = ? AND match_id = ? AND event_type = 'Knock'",
-                (self.tenant_id, mid,)).fetchone() or {}).get("c", 0)
+                "WHERE match_id = ? AND event_type = 'Knock'",
+                (mid,)).fetchone() or {}).get("c", 0)
             squad_involved = 0
             if squad_ids:
                 placeholders = ",".join("?" * len(squad_ids))
                 squad_involved = (conn.execute(
                     f"""SELECT COUNT(*) AS c FROM telemetry_events
-                        WHERE tenant_id = ? AND match_id = ? AND event_type IN ('Kill','Knock')
+                        WHERE match_id = ? AND event_type IN ('Kill','Knock')
                           AND (actor_account IN ({placeholders})
                                OR target_account IN ({placeholders}))""",
-                    (self.tenant_id, mid, *squad_ids, *squad_ids)).fetchone() or {}).get("c", 0)
+                    (mid, *squad_ids, *squad_ids)).fetchone() or {}).get("c", 0)
             try:
                 result = _detect_first_fight(conn, mid, self.my_account_id,
                                               30 * 1000, 200 * 100)
@@ -2147,11 +2149,11 @@ class EndpointRegistry:
                 row = conn.execute(
                     f"""SELECT event_type, actor_account, target_account, timestamp_ms
                         FROM telemetry_events
-                        WHERE tenant_id = ? AND match_id = ? AND event_type IN ('Kill','Knock')
+                        WHERE match_id = ? AND event_type IN ('Kill','Knock')
                           AND (actor_account IN ({placeholders})
                                OR target_account IN ({placeholders}))
                         ORDER BY timestamp_ms ASC LIMIT 1""",
-                    (self.tenant_id, mid, *squad_ids, *squad_ids)).fetchone()
+                    (mid, *squad_ids, *squad_ids)).fetchone()
                 if row:
                     first_event = {
                         "type": row["event_type"],
@@ -2165,10 +2167,10 @@ class EndpointRegistry:
             my_landing_row = conn.execute("""
                 SELECT actor_x, actor_y, timestamp_ms
                 FROM telemetry_events
-                WHERE tenant_id = ? AND match_id = ? AND event_type = 'Landing'
+                WHERE match_id = ? AND event_type = 'Landing'
                   AND actor_account = ?
                 ORDER BY timestamp_ms ASC LIMIT 1
-            """, (self.tenant_id, mid, self.my_account_id)).fetchone()
+            """, (mid, self.my_account_id)).fetchone()
             my_landing = None
             match_start_ms = None
             if my_landing_row and my_landing_row["actor_x"] is not None:
@@ -2190,13 +2192,13 @@ class EndpointRegistry:
                 placeholders = ",".join("?" * len(squad_ids))
                 ff_row = conn.execute(f"""
                     SELECT timestamp_ms FROM telemetry_events
-                    WHERE tenant_id = ? AND match_id = ?
+                    WHERE match_id = ?
                       AND event_type IN ('Kill','Knock','TakeDamage')
                       AND actor_account IS NOT NULL
                       AND (actor_account IN ({placeholders})
                            OR target_account IN ({placeholders}))
                     ORDER BY timestamp_ms ASC LIMIT 1
-                """, (self.tenant_id, mid, *squad_ids, *squad_ids)).fetchone()
+                """, (mid, *squad_ids, *squad_ids)).fetchone()
                 if ff_row and match_start_ms:
                     first_fight_start_secs = round(
                         (ff_row["timestamp_ms"] - match_start_ms) / 1000.0, 1)
@@ -2210,10 +2212,10 @@ class EndpointRegistry:
                 squad_landings = conn.execute(f"""
                     SELECT actor_account, actor_x, actor_y
                     FROM telemetry_events
-                    WHERE tenant_id = ? AND match_id = ?
+                    WHERE match_id = ?
                       AND event_type = 'Landing'
                       AND actor_account IN ({placeholders})
-                """, (self.tenant_id, mid, *squad_ids)).fetchall()
+                """, (mid, *squad_ids)).fetchall()
                 squad_landing_map = {r["actor_account"]: (r["actor_x"], r["actor_y"])
                                        for r in squad_landings
                                        if r["actor_x"] is not None}
@@ -2230,7 +2232,7 @@ class EndpointRegistry:
                       AND k.event_type = 'Kill'
                       AND k.target_account IN ({placeholders})
                     ORDER BY k.timestamp_ms ASC
-                """, (self.tenant_id, mid, *squad_ids)).fetchall()
+                """, (mid, *squad_ids)).fetchall()
                 # Killer-Landung-Position holen (alle distinct killer)
                 killer_ids = list({r["killer"] for r in kill_rows if r["killer"]})
                 killer_landing_map = {}
@@ -2239,10 +2241,10 @@ class EndpointRegistry:
                     kls = conn.execute(f"""
                         SELECT actor_account, actor_x, actor_y
                         FROM telemetry_events
-                        WHERE tenant_id = ? AND match_id = ?
+                        WHERE match_id = ?
                           AND event_type = 'Landing'
                           AND actor_account IN ({kphs})
-                    """, (self.tenant_id, mid, *killer_ids)).fetchall()
+                    """, (mid, *killer_ids)).fetchall()
                     killer_landing_map = {r["actor_account"]: (r["actor_x"], r["actor_y"])
                                             for r in kls
                                             if r["actor_x"] is not None}
@@ -2251,7 +2253,7 @@ class EndpointRegistry:
                 victim_name_rows = conn.execute(f"""
                     SELECT account_id, name FROM participants
                     WHERE tenant_id = ? AND match_id = ? AND account_id IN ({placeholders})
-                """, (self.tenant_id, mid, *squad_ids)).fetchall()
+                """, (mid, *squad_ids)).fetchall()
                 victim_name_map = {r["account_id"]: r["name"] for r in victim_name_rows}
                 # Distanzen berechnen
                 for r in kill_rows:
@@ -2526,8 +2528,8 @@ class EndpointRegistry:
                    te.actor_account, te.target_account,
                    te.victim_x, te.victim_y, te.weapon, te.distance
             FROM telemetry_events te
-            JOIN matches m ON m.match_id = te.match_id AND m.tenant_id = te.tenant_id
-            WHERE te.tenant_id = ? AND m.map_name = ?
+            JOIN matches m ON m.match_id = te.match_id AND m.tenant_id = ?
+            WHERE m.map_name = ?
               AND te.event_type IN ('Kill','Knock')
               AND te.victim_x IS NOT NULL
         """

@@ -439,6 +439,15 @@ def _process_one_telemetry(conn, tenant_id: int, client, my_account_id, row):
     """
     import urllib.error
     from pubg.telemetry import filter_squad_events
+    from pubg.db_pg import has_telemetry_for_match
+    # Telemetrie ist global — wenn ein anderer Tenant das Match schon
+    # gefetched hat, einfach markieren + raus, kein API-Call.
+    if has_telemetry_for_match(
+            conn.raw if isinstance(conn, SqliteCompatConn) else conn,
+            row["match_id"]):
+        mark_telemetry_fetched(conn, tenant_id, row["match_id"])
+        mark_telemetry_schema(conn, tenant_id, row["match_id"])
+        return
     try:
         raw = client.get_telemetry(row["telemetry_url"])
     except urllib.error.HTTPError as e:
@@ -484,14 +493,16 @@ def _process_one_telemetry(conn, tenant_id: int, client, my_account_id, row):
     except Exception:
         pass
     events = list(filter_squad_events(raw, squad))
-    # Bei Re-Fetch alte events loeschen → keine Doubletten.
+    # Bei Re-Fetch alte events loeschen → keine Doubletten. Telemetrie
+    # ist global, kein tenant_id-Filter.
     conn.execute(
-        "DELETE FROM telemetry_events "
-        "WHERE match_id = ? AND tenant_id = ?",
-        (row["match_id"], tenant_id))
+        "DELETE FROM telemetry_events WHERE match_id = ?",
+        (row["match_id"],))
     conn.commit()
     if events:
-        insert_telemetry_events(conn, tenant_id, row["match_id"], events)
+        insert_telemetry_events(
+            conn.raw if isinstance(conn, SqliteCompatConn) else conn,
+            row["match_id"], events)
     mark_telemetry_fetched(conn, tenant_id, row["match_id"])
     mark_telemetry_schema(conn, tenant_id, row["match_id"])
 

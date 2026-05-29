@@ -93,9 +93,11 @@ CREATE TABLE IF NOT EXISTS match_team_mapping (
 CREATE INDEX IF NOT EXISTS idx_mtm_tenant_match
     ON match_team_mapping(tenant_id, match_id);
 
+-- telemetry_events: GLOBAL (no tenant_id). Wenn zwei Tenants im selben
+-- Match sind, wird die Telemetrie einmal gespeichert. Sichtbarkeit
+-- kommt durch den Join mit matches (das hat tenant_id).
 CREATE TABLE IF NOT EXISTS telemetry_events (
     id              BIGSERIAL PRIMARY KEY,
-    tenant_id       INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     match_id        TEXT NOT NULL,
     event_type      TEXT NOT NULL,
     timestamp_ms    BIGINT,
@@ -112,10 +114,12 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
     damage          DOUBLE PRECISION,
     payload_json    TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_tel_tenant_match
-    ON telemetry_events(tenant_id, match_id);
-CREATE INDEX IF NOT EXISTS idx_tel_tenant_actor
-    ON telemetry_events(tenant_id, actor_account);
+CREATE INDEX IF NOT EXISTS idx_tel_match
+    ON telemetry_events(match_id);
+CREATE INDEX IF NOT EXISTS idx_tel_match_type
+    ON telemetry_events(match_id, event_type);
+CREATE INDEX IF NOT EXISTS idx_tel_actor
+    ON telemetry_events(actor_account);
 CREATE INDEX IF NOT EXISTS idx_tel_type
     ON telemetry_events(event_type);
 
@@ -558,12 +562,20 @@ def get_seasons_for_player(conn, tenant_id: int, account_id: str):
 # ── Telemetry ───────────────────────────────────────────────────────────────
 
 
-def insert_telemetry_events(conn, tenant_id: int, match_id: str,
-                            events: list) -> None:
+def insert_telemetry_events(conn, match_id: str, events: list) -> None:
+    """Insert telemetry events for a match. Telemetry is GLOBAL (no
+    tenant_id) — wenn ein anderer Tenant das Match schon gefetched hat,
+    skippen wir komplett und sparen sowohl API-Call als auch Speicher."""
     if not events:
         return
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM telemetry_events WHERE match_id = %s LIMIT 1",
+            (match_id,))
+        if cur.fetchone():
+            return  # schon da — anderer Tenant war schneller
     rows = [(
-        tenant_id, match_id, e["event_type"], e.get("timestamp_ms"),
+        match_id, e["event_type"], e.get("timestamp_ms"),
         e.get("actor_account"), e.get("target_account"),
         e.get("actor_x"), e.get("actor_y"), e.get("actor_z"),
         e.get("actor_health"),
@@ -575,7 +587,7 @@ def insert_telemetry_events(conn, tenant_id: int, match_id: str,
         execute_values(
             cur,
             "INSERT INTO telemetry_events "
-            "(tenant_id, match_id, event_type, timestamp_ms, actor_account, "
+            "(match_id, event_type, timestamp_ms, actor_account, "
             "target_account, actor_x, actor_y, actor_z, actor_health, "
             "victim_x, victim_y, weapon, distance, damage, payload_json) "
             "VALUES %s",
@@ -584,12 +596,21 @@ def insert_telemetry_events(conn, tenant_id: int, match_id: str,
     conn.commit()
 
 
-def get_telemetry_for_match(conn, tenant_id: int, match_id: str):
+def has_telemetry_for_match(conn, match_id: str) -> bool:
+    """Check if telemetry already exists globally for this match.
+    Used by fetch-jobs to short-circuit before hitting the PUBG API."""
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT * FROM telemetry_events "
-            "WHERE tenant_id=%s AND match_id=%s",
-            (tenant_id, match_id),
+            "SELECT 1 FROM telemetry_events WHERE match_id = %s LIMIT 1",
+            (match_id,))
+        return cur.fetchone() is not None
+
+
+def get_telemetry_for_match(conn, match_id: str):
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT * FROM telemetry_events WHERE match_id=%s",
+            (match_id,),
         )
         return cur.fetchall()
 
