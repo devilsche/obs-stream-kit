@@ -77,8 +77,11 @@
   <main class="app">
     <aside class="sidebar" aria-label="Teams und Steuerung">
       <div class="match-picker">
-        <label for="matchSelect">Match auswählen</label>
-        <select id="matchSelect" aria-label="Match auswählen"></select>
+        <label for="matchSelect">Match auswählen <span id="matchCount" style="color:#888"></span></label>
+        <input id="matchFilter" type="search" placeholder="🔍 Filter: Datum, Map, Platz…"
+               aria-label="Match-Liste filtern"
+               style="width:100%;box-sizing:border-box;margin-bottom:4px">
+        <select id="matchSelect" aria-label="Match auswählen" size="1"></select>
       </div>
       <div id="teamList" aria-label="Teamliste"></div>
       <fieldset class="toggles">

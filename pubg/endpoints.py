@@ -617,7 +617,7 @@ class EndpointRegistry:
             limit = int(qs.get("limit", "50"))
         except ValueError:
             limit = 50
-        limit = max(1, min(200, limit))
+        limit = max(1, min(2000, limit))
         rows = conn.execute("""
             SELECT m.match_id, m.played_at, m.map_name,
                    pa.place, pa.kills

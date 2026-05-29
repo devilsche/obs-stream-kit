@@ -24,7 +24,7 @@ async function loadMatchList() {
   console.log("[match-replay] loadMatchList start, sel=", sel);
   let list;
   try {
-    list = await PubgUI.fetchJson("/api/pubg/matches-list?limit=100");
+    list = await PubgUI.fetchJson("/api/pubg/matches-list?limit=2000");
   } catch (e) {
     console.error("[match-replay] matches-list FAIL", e);
     if (sel) sel.innerHTML = `<option>⚠ ${e.message || e}</option>`;
@@ -40,13 +40,35 @@ async function loadMatchList() {
     if (sel) sel.innerHTML = `<option>⚠ keine Matches in der DB</option>`;
     return;
   }
-  sel.innerHTML = list.map(m => {
+  // Optionen-Texte vorberechnen (case-insensitive Filter spaeter)
+  const items = list.map(m => {
     const d = new Date(m.playedAt);
     const dt = d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit",
               hour: "2-digit", minute: "2-digit" });
     const mapShort = PubgUI.fmtMap(m.mapName);
-    return `<option value="${m.matchId}">${dt} · ${mapShort} · #${m.place ?? "?"} · ${m.kills ?? "?"}K</option>`;
-  }).join("");
+    const text = `${dt} · ${mapShort} · #${m.place ?? "?"} · ${m.kills ?? "?"}K`;
+    return { matchId: m.matchId, text, lower: text.toLowerCase() };
+  });
+  RS._matchItems = items;
+  const cntEl = document.getElementById("matchCount");
+  if (cntEl) cntEl.textContent = `(${items.length})`;
+  function renderOptions(filter) {
+    const f = (filter || "").toLowerCase().trim();
+    const filtered = f ? items.filter(it => it.lower.includes(f)) : items;
+    sel.innerHTML = filtered.map(it =>
+      `<option value="${it.matchId}">${it.text}</option>`).join("");
+    if (cntEl) cntEl.textContent = f ? `(${filtered.length}/${items.length})` : `(${items.length})`;
+  }
+  renderOptions("");
+  const filterEl = document.getElementById("matchFilter");
+  if (filterEl) {
+    filterEl.addEventListener("input", () => {
+      const prev = sel.value;
+      renderOptions(filterEl.value);
+      // Auswahl beibehalten wenn noch in der gefilterten Liste
+      if (Array.from(sel.options).some(o => o.value === prev)) sel.value = prev;
+    });
+  }
   // URL-Parameter ?match=ID überschreibt die Vorauswahl. Wenn die ID
   // nicht in der Liste der letzten 50 ist, fuegen wir sie als
   // separate Option oben ein, damit der Replay trotzdem laeuft
