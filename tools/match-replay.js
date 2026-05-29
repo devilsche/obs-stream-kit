@@ -172,19 +172,21 @@ function projRaw(nx, ny) {
 
 let _mapImg = null;
 function loadMapImage(mapName) {
-  // High-Res .png zuerst (Symlinks aus api-assets via refresh-maps, wie
-  // im Session-Report), .webp als Fallback.
-  return new Promise(res => {
-    const img = new Image();
-    img.onload = () => res(img);
-    img.onerror = () => {
-      const img2 = new Image();
-      img2.onload = () => res(img2);
-      img2.onerror = () => res(null);
-      img2.src = "/widgets/pubg/maps/" + mapName + ".webp";
-    };
-    img.src = "/widgets/pubg/maps/" + mapName + ".png";
-  });
+  // _hd.webp zuerst (8192px HD webp, ~6-13MB) — gleiche Aufloesung
+  // wie .png aber ~10x kleiner. Fallback .png (Symlink ins HD-Source),
+  // dann .webp (Mid_Res).
+  const base = "/widgets-static/pubg/maps/" + mapName;
+  function tryLoad(url) {
+    return new Promise(res => {
+      const img = new Image();
+      img.onload = () => res(img);
+      img.onerror = () => res(null);
+      img.src = url;
+    });
+  }
+  return tryLoad(base + "_hd.webp")
+    .then(i => i || tryLoad(base + ".png"))
+    .then(i => i || tryLoad(base + ".webp"));
 }
 
 function resizeCanvas() {
@@ -207,6 +209,10 @@ function drawBasemap(ctx) {
   ctx.fillStyle = "#0d061a";
   ctx.fillRect(0, 0, cnv.width, cnv.height);
   if (!_mapImg) return;
+  // Hochwertiges Resampling: ohne 'high' wird das HD-Webp matschig
+  // gerendert wenn die Canvas-Pixelgroesse kleiner als die Quelle ist.
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   // Quadrat-Crop des Map-Bildes auf den Canvas-Quadrat-Bereich,
   // dann Zoom/Pan via projToCanvas-Eckpunkte.
   const [x0, y0] = projRaw(0, 0);
