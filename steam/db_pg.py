@@ -482,6 +482,50 @@ def upsert_progress(conn, tenant_id: int, steam_id: str, app_id: int,
     raw.commit()
 
 
+def find_app_needing_backfill(conn, tenant_id: int, steam_id: str):
+    """Liefert genau eine app_id aus der Library, fuer die noch kein
+    Achievement-Schema gecached ist. Sortiert nach playtime desc — meist
+    gespielte Spiele zuerst, damit der Streamer schnell relevante Daten
+    sieht."""
+    raw = _raw(conn)
+    with raw.cursor() as cur:
+        cur.execute("""
+            SELECT og.app_id
+            FROM steam_owned_games og
+            LEFT JOIN steam_app_schema s ON s.app_id = og.app_id
+            WHERE og.tenant_id = %s AND og.steam_id = %s
+              AND s.app_id IS NULL
+            ORDER BY og.playtime_forever_min DESC, og.app_id ASC
+            LIMIT 1
+        """, (tenant_id, steam_id))
+        row = cur.fetchone()
+    return row["app_id"] if row else None
+
+
+def find_app_needing_unlock_check(conn, tenant_id: int, steam_id: str):
+    """Liefert eine app_id mit gecachtem Schema (>0 Achievements), fuer
+    die der User noch keinen Progress-Eintrag hat — d.h. die Unlocks
+    wurden noch nie geprueft. Sortiert nach playtime desc."""
+    raw = _raw(conn)
+    with raw.cursor() as cur:
+        cur.execute("""
+            SELECT og.app_id
+            FROM steam_owned_games og
+            JOIN steam_app_schema s ON s.app_id = og.app_id
+            LEFT JOIN steam_app_progress p
+              ON p.tenant_id = og.tenant_id
+             AND p.steam_id = og.steam_id
+             AND p.app_id = og.app_id
+            WHERE og.tenant_id = %s AND og.steam_id = %s
+              AND s.achievement_count > 0
+              AND p.app_id IS NULL
+            ORDER BY og.playtime_forever_min DESC, og.app_id ASC
+            LIMIT 1
+        """, (tenant_id, steam_id))
+        row = cur.fetchone()
+    return row["app_id"] if row else None
+
+
 def get_progress(conn, tenant_id: int, steam_id: str, app_id: int):
     raw = _raw(conn)
     with raw.cursor() as cur:

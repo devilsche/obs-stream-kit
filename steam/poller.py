@@ -26,6 +26,7 @@ from steam.db_pg import (
     insert_unlock_if_new, upsert_owned_games, upsert_app_schema,
     get_app_schema, upsert_progress,
     find_app_needing_details_sync, upsert_app_details,
+    find_app_needing_backfill, find_app_needing_unlock_check,
     mark_played_now,
     upsert_global_achievement_pct, get_global_achievement_pct,
     upsert_app_schema_lang,
@@ -37,6 +38,7 @@ from steam.image_cache import ensure_app_images
 LAYER1_INTERVAL_S = 10
 LAYER2_INTERVAL_S = 5
 LAYER3_INTERVAL_S = 12              # Storefront-Sync (1 app pro Tick)
+LAYER4_INTERVAL_S = 30              # Achievement-Backfill (1 app pro Tick)
 OWNED_GAMES_REFRESH_S = 3600        # 1× / Stunde
 SCHEMA_REFRESH_S = 7 * 86400        # 1× / Woche pro App
 GLOBAL_PCT_REFRESH_S = 86400        # 1× / Tag pro App
@@ -77,6 +79,7 @@ class SteamPoller(threading.Thread):
         self._last_layer1 = {}
         self._last_layer2 = {}
         self._last_layer3 = {}
+        self._last_layer4 = {}
 
     def stop(self):
         self._stop.set()
@@ -152,6 +155,7 @@ class SteamPoller(threading.Thread):
         last1 = self._last_layer1.get(tenant_id, 0.0)
         last2 = self._last_layer2.get(tenant_id, 0.0)
         last3 = self._last_layer3.get(tenant_id, 0.0)
+        last4 = self._last_layer4.get(tenant_id, 0.0)
         state = self._ensure_state(tenant_id)
 
         if now - last1 >= LAYER1_INTERVAL_S:
@@ -164,6 +168,9 @@ class SteamPoller(threading.Thread):
         if now - last3 >= LAYER3_INTERVAL_S:
             self._tick_app_details_sync(pg_conn, tenant_id, client, state)
             self._last_layer3[tenant_id] = now
+        if now - last4 >= LAYER4_INTERVAL_S:
+            self._tick_backfill(pg_conn, tenant_id, client, state)
+            self._last_layer4[tenant_id] = now
 
     # ── Layer 1: Now-Playing + Owned Games refresh ──────────────────────────
     def _tick_layer1(self, conn, tenant_id, client, state):
@@ -314,6 +321,17 @@ class SteamPoller(threading.Thread):
             except Exception:
                 pass
 
+    # ── Layer 4: Achievement-Backfill (Library aufholen) ────────────────────
+    def _tick_backfill(self, conn, tenant_id, client, state):
+        """Holt eine App pro Tick auf — entweder fehlendes Schema oder
+        fehlende Unlock-Pruefung. Sortiert nach Playtime, damit relevante
+        Spiele zuerst auftauchen. Liefert (status, app_id) fuer den CLI-
+        Caller; bei Hintergrund-Use wird Return ignoriert."""
+        return run_backfill_step(conn, tenant_id, client,
+                                 ensure_schema_fn=self._ensure_schema,
+                                 ensure_global_pct_fn=self._ensure_global_pct,
+                                 state=state, lock=self._lock)
+
     def _ensure_global_pct(self, conn, client, app_id: int) -> None:
         _, cached_at = get_global_achievement_pct(conn, app_id)
         ts = int(time.time())
@@ -363,3 +381,92 @@ class SteamPoller(threading.Thread):
         }
         upsert_app_schema_lang(conn, app_id, lang, json.dumps(lang_lookup))
         return lookup
+
+
+def run_backfill_step(conn, tenant_id: int, client,
+                       ensure_schema_fn, ensure_global_pct_fn,
+                       state: dict = None, lock=None):
+    """Eine Backfill-Iteration: schaut ob ein Spiel ohne Schema existiert
+    → Schema + Global-Pct fetchen. Sonst: ein Spiel ohne Unlock-Check
+    → Achievements + Progress fetchen. Liefert ("schema", app_id),
+    ("unlocks", app_id, new_unlocks) oder ("done", None).
+    """
+    app_id = find_app_needing_backfill(conn, tenant_id, client.steam_id)
+    if app_id:
+        try:
+            ensure_schema_fn(conn, client, app_id)
+            ensure_global_pct_fn(conn, client, app_id)
+        except SteamApiError as e:
+            if state is not None and lock is not None:
+                with lock:
+                    state["lastError"] = f"backfill schema {app_id}: {e}"
+            # Trotzdem leeres Schema cachen damit die App nicht endlos
+            # wieder vorne in der Queue auftaucht.
+            try:
+                upsert_app_schema(conn, app_id, game_name=None,
+                                   achievement_count=0, schema_json="{}")
+            except Exception:
+                pass
+            return ("error", app_id)
+        return ("schema", app_id)
+
+    app_id = find_app_needing_unlock_check(conn, tenant_id, client.steam_id)
+    if app_id:
+        try:
+            stats = client.get_player_achievements(app_id)
+        except SteamApiError as e:
+            if state is not None and lock is not None:
+                with lock:
+                    state["lastError"] = f"backfill unlocks {app_id}: {e}"
+            # Leeres Progress-Row damit App nicht wieder gepickt wird —
+            # bei naechster Live-Session wird sie via Layer 2 ohnehin
+            # frisch geprueft.
+            try:
+                upsert_progress(conn, tenant_id, client.steam_id, app_id, 0)
+            except Exception:
+                pass
+            return ("error", app_id)
+
+        if not stats.get("success", True):
+            upsert_progress(conn, tenant_id, client.steam_id, app_id, 0)
+            return ("skip", app_id)
+
+        achievements = stats.get("achievements") or []
+        existing = get_app_schema(conn, app_id)
+        try:
+            schema_lookup = (json.loads(existing["schema_json"] or "{}")
+                              if existing else {})
+        except Exception:
+            schema_lookup = {}
+
+        now_ts = int(time.time())
+        unlocked_count = 0
+        new_unlocks = 0
+        for ach in achievements:
+            if not ach.get("achieved"):
+                continue
+            unlocked_count += 1
+            api = ach.get("apiname")
+            if not api:
+                continue
+            unlock_ts = ach.get("unlocktime") or 0
+            if unlock_ts <= 0:
+                unlock_ts = now_ts
+            meta = schema_lookup.get(api, {})
+            inserted = insert_unlock_if_new(
+                conn, tenant_id, client.steam_id, app_id,
+                api, unlock_ts,
+                display_name=meta.get("displayName") or api,
+                description=meta.get("description"),
+                icon_url=meta.get("icon"))
+            if inserted:
+                new_unlocks += 1
+        upsert_progress(conn, tenant_id, client.steam_id, app_id,
+                        unlocked_count)
+        if state is not None and lock is not None:
+            with lock:
+                state["newUnlocksTotal"] = (
+                    state.get("newUnlocksTotal", 0) + new_unlocks)
+        return ("unlocks", app_id, new_unlocks)
+
+    return ("done", None)
