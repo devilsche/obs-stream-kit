@@ -965,8 +965,10 @@
     const MD_PAD_500M_CM = 50000;   // 500m padding fuer Default-Bbox
     const MD_MIN_ZOOM_CM = 5000;    // 50m minimal sichtbarer Radius
     const MD_MAX_ZOOM_CM = 800000;  // 8km — ganze Map default Erangel-Range
-    const MD_ANIM_DURATION_MS = 60000;  // Baseline: ganzes Match in 60s (speed=1.0)
-    const MD_SPEEDS = [0.25, 0.5, 1, 2, 4];
+    // 1x = 1 Match-Sekunde pro Real-Sekunde. 4x = 4 Match-Sekunden pro Real-Sekunde.
+    // (frueher: ganzes Match in 60s — match-laengen-abhaengig, verwirrend.)
+    const MD_SPEEDS = [0.5, 1, 2, 4, 8];
+    const MD_DEFAULT_SPEED = 4;
 
     // Cache fuer match-detail responses
     const _mdCache = new Map();
@@ -1044,7 +1046,7 @@
           colorByAcc: {},
           hiddenAccs: new Set(),   // accountIds die ausgeblendet sind
           viewport: null,          // {centerX, centerY, zoom, autoFollow}
-          playSpeed: 1,            // Multiplikator (siehe MD_SPEEDS)
+          playSpeed: MD_DEFAULT_SPEED,  // Multiplikator (siehe MD_SPEEDS)
           zeitraffer: {            // cursorTs in ms relativ zu matchStart
             cursorTs: 0, playing: false,
             playStartWallTs: 0, playStartCursor: 0,
@@ -1428,7 +1430,11 @@
             const wn = life.death.weaponName || "?";
             const dist = life.death.distanceM
               ? ` auf <b>${life.death.distanceM.toFixed(0)}m</b>` : "";
-            row += ` <span class="md-died">— gestorben in <b>${deathP || "?"}</b> durch <b>${killer}</b> mit <b>${wn}</b>${dist}</span>`;
+            if (life.death.causeLabel) {
+              row += ` <span class="md-died">— gestorben in <b>${deathP || "?"}</b> — <b>${life.death.causeLabel}</b></span>`;
+            } else {
+              row += ` <span class="md-died">— gestorben in <b>${deathP || "?"}</b> durch <b>${killer}</b> mit <b>${wn}</b>${dist}</span>`;
+            }
           } else if (m.lives.length > 1) {
             row += ` <span style="color:var(--pubg-gold)">— survived</span>`;
           }
@@ -1474,7 +1480,7 @@
       if (playBtn) playBtn.textContent = z.playing ? "⏸" : "▶";
       host.querySelectorAll(".md-speedbtn").forEach(btn => {
         btn.classList.toggle("active",
-          parseFloat(btn.dataset.speed) === (s.playSpeed || 1));
+          parseFloat(btn.dataset.speed) === (s.playSpeed || MD_DEFAULT_SPEED));
       });
     }
 
@@ -1633,8 +1639,9 @@
         if (token !== s.playToken) return;
         if (host.dataset.mounted !== "1") return;
         const realElapsed = now - z.playStartWallTs;
+        // 1x = 1 ms cursor pro 1 ms real-time. Multiplikator skaliert.
         const scaledCursor = z.playStartCursor
-          + realElapsed * (dur / MD_ANIM_DURATION_MS) * (s.playSpeed || 1);
+          + realElapsed * (s.playSpeed || MD_DEFAULT_SPEED);
         z.cursorTs = Math.min(dur, scaledCursor);
         if (s.viewport && s.viewport.autoFollow) {
           mdAutoFollow(host);

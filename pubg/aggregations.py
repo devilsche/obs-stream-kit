@@ -416,6 +416,42 @@ _ENVIR_NAMES = {
 }
 
 
+def _death_cause_label(death_ev, victim_acc, weapon_id, weapon_name):
+    """Liefert eine lesbare Todesursache wenn der Tod NICHT durch einen
+    Gegner kam (Vehicle-Eject, Fall, Zone, Ertrinken etc.). Sonst None
+    — dann nutzt das Frontend die Standard 'durch <killer> mit <weapon>'.
+
+    Self-Kill (actor_account == victim_account) kombiniert mit Ragdoll/
+    Vehicle weist auf 'aus Fahrzeug gesprungen' hin (klassische PUBG-
+    Death-Mechanik bei Sprung aus fahrendem Auto).
+    """
+    if not weapon_id:
+        return None
+    wid = weapon_id
+    is_self = (death_ev.get("actor_account") == victim_acc)
+    # Vehicle-Eject / Ragdoll-Sprung
+    if "RagdollPhysics" in wid or "Damage_HelpMeGroundFall" in wid:
+        return "aus Fahrzeug gesprungen" if is_self else "Ragdoll-Impact"
+    # Fall-Damage
+    if "Damage_Falling" in wid or "Damage_Instant_Fall" in wid:
+        return "Sturz"
+    # Zone
+    if "BattleRoyaleModeController" in wid:
+        return "Blue Zone"
+    if "Bluezonebomb" in wid:
+        return "Red Zone"
+    # Ertrinken
+    if "DecreaseBreathInApnea" in wid or "Drown" in wid:
+        return "ertrunken"
+    # Vehicle-Crash als Selbst-Kill (Spieler hat eigenes Auto geschrottet)
+    if is_self:
+        for needle, label in _VEHICLE_PATTERNS:
+            if needle in wid:
+                return f"Selbst-Crash ({label})"
+        return "Selbsttod"
+    return None
+
+
 def _weapon_label(weapon_id):
     if not weapon_id or weapon_id == "None":
         return ("Unknown", "other")
@@ -1157,6 +1193,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                         and e["timestamp_ms"] >= knock_ts
                         and e["timestamp_ms"] <= death_ev["timestamp_ms"]
                     ]
+                cause_label = _death_cause_label(death_ev, acc, wid, weapon_name)
                 death_info = {
                     "x":           death_ev["victim_x"],
                     "y":           death_ev["victim_y"],
@@ -1164,6 +1201,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                     "killerName":  kn,
                     "weaponId":    wid,
                     "weaponName":  weapon_name,
+                    "causeLabel":  cause_label,
                     "distanceM":   (round((death_ev["distance"] or 0) / 100.0, 1)
                                     if death_ev["distance"] else None),
                     "knockTsMs":   knock_ts,
