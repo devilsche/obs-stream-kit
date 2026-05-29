@@ -672,13 +672,13 @@ class EndpointRegistry:
         raw = hidrive_telemetry.download_raw(match_id, secrets)
         if not raw:
             if not m_row:
-                return _err(404, "Match nicht gefunden — weder in der "
-                                  "Datenbank noch im HiDrive-Telemetrie-"
-                                  "Archiv vorhanden (Match-ID korrekt?).")
-            return _err(404, "Keine Telemetrie fuer dieses Match auf "
-                              "HiDrive vorhanden — moeglicherweise lief "
-                              "der Telemetrie-Download fehl oder das "
-                              "Match ist abgelaufen (>14 Tage).")
+                return _err(404, "Match nicht gefunden — Match-ID korrekt? "
+                                  "Die PUBG-API liefert nur Matches der "
+                                  "letzten 14 Tage; aeltere Matches sind "
+                                  "nicht mehr abrufbar.")
+            return _err(404, "Keine Telemetrie fuer dieses Match verfuegbar "
+                              "— die PUBG-API liefert keine Daten mehr dazu "
+                              "(>14 Tage alt oder Download lief damals fehl).")
 
         # map_name aus Raw extrahieren wenn DB-Row fehlte
         if not map_name:
