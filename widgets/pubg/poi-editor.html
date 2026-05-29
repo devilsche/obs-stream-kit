@@ -19,6 +19,25 @@
     align-items: center; margin-bottom: 10px;
   }
   .topbar label { color: #8a7d99; font-size: 0.85em; }
+  .mode-tabs {
+    display: inline-flex; gap: 0;
+    border: 1px solid #5e2a79; border-radius: 6px; overflow: hidden;
+  }
+  .mode-tabs .tab {
+    background: transparent; color: #c0b0d0;
+    border: none; border-radius: 0;
+    padding: 6px 12px; font-size: 0.85em;
+  }
+  .mode-tabs .tab:hover { background: rgba(94,42,121,0.55); }
+  .mode-tabs .tab.active { background: #f2b705; color: #1a0d2a; font-weight: 700; }
+  .tools-group { display: inline-flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  /* Mode-Sichtbarkeit: nur die aktive Gruppe an Buttons/Inputs zeigen. */
+  body[data-mode="regions"]   .mode-calibrate { display: none; }
+  body[data-mode="calibrate"] .mode-regions   { display: none; }
+  /* Im Calibrate-Modus brauchen wir die Regionen-Liste nicht — Map nutzt
+     die Breite voll aus. (Regionen werden weiter auf der Karte gezeichnet.) */
+  body[data-mode="calibrate"] .wrap { grid-template-columns: 1fr; }
+  body[data-mode="calibrate"] .panel { display: none; }
   select, input, button {
     background: rgba(94,42,121,0.55);
     color: #f2b705;
@@ -170,25 +189,32 @@
   <label>Map-Size (km):
     <input id="mapSize" type="number" min="1" max="16" step="0.1" value="8" style="width:70px">
   </label>
-  <button id="rectBtn">▭ Rechteck</button>
-  <button id="polyBtn">⬠ Polygon</button>
-  <button id="pinsBtn" class="secondary">📍 Pins laden</button>
-  <button id="calBtn" class="secondary" title="Calibration-Mode: Kill/Death-Events verschieben zur Map-Cal-Berechnung">🎯 Cal</button>
-  <button id="gridBtn" class="secondary active" title="1km-Raster ein/aus">▦ Raster</button>
-  <button id="imgGridBtn" class="secondary" title="Bildbasiertes 8x8-Raster (fix am Kartenbild) ein/aus — zum Vergleich mit dem Welt-Raster">▦ Bild 8×8</button>
-  <button id="modeBtn" class="secondary" title="Welche Cal die Inputs steuern: Pin- oder Grid-Calibration">Cal-Mode: PIN</button>
-  <button id="flipXBtn" class="secondary" title="X-Achse spiegeln (Ost/West)">↔ FlipX</button>
-  <button id="flipYBtn" class="secondary" title="Y-Achse spiegeln (Nord/Sued)">↕ FlipY</button>
-  <button id="rotBtn" class="secondary" title="90° drehen">⟳ 0°</button>
-  <button id="calResetBtn" class="secondary" title="Calibration zuruecksetzen">↹ Pins 0/0</button>
-  <label style="display:inline-flex;gap:4px;align-items:center;font-size:0.78em;color:#8a7d99">
-    Offset X<input id="offsetXIn" type="number" step="1" value="0" style="width:74px" title="Offset in Metern">
-    Y<input id="offsetYIn" type="number" step="1" value="0" style="width:74px" title="Offset in Metern">
-  </label>
-  <label style="display:inline-flex;gap:4px;align-items:center;font-size:0.78em;color:#8a7d99">
-    Scale X<input id="scaleXIn" type="number" step="0.0001" value="1.0000" style="width:88px">
-    Y<input id="scaleYIn" type="number" step="0.0001" value="1.0000" style="width:88px">
-  </label>
+  <div class="mode-tabs">
+    <button id="tabRegions" class="tab active" data-mode="regions">📐 Regions edit</button>
+    <button id="tabCalibrate" class="tab" data-mode="calibrate">🎯 Calibrate</button>
+  </div>
+  <span class="mode-regions tools-group">
+    <button id="rectBtn">▭ Rechteck</button>
+    <button id="polyBtn">⬠ Polygon</button>
+    <button id="pinsBtn" class="secondary">📍 Pins laden</button>
+  </span>
+  <span class="mode-calibrate tools-group">
+    <button id="calBtn" class="secondary" title="Calibration-Mode: Kill/Death-Events verschieben zur Map-Cal-Berechnung">🎯 Cal</button>
+    <button id="imgGridBtn" class="secondary active" title="Bildbasiertes 8x8-Raster (Referenz, fix am Kartenbild)">▦ Raster</button>
+    <button id="modeBtn" class="secondary" title="Welche Cal die Inputs steuern: Pin- oder Grid-Calibration">Cal-Mode: PIN</button>
+    <button id="flipXBtn" class="secondary" title="X-Achse spiegeln (Ost/West)">↔ FlipX</button>
+    <button id="flipYBtn" class="secondary" title="Y-Achse spiegeln (Nord/Sued)">↕ FlipY</button>
+    <button id="rotBtn" class="secondary" title="90° drehen">⟳ 0°</button>
+    <button id="calResetBtn" class="secondary" title="Calibration zuruecksetzen">↹ Pins 0/0</button>
+    <label style="display:inline-flex;gap:4px;align-items:center;font-size:0.78em;color:#8a7d99">
+      Offset X<input id="offsetXIn" type="number" step="1" value="0" style="width:74px" title="Offset in Metern">
+      Y<input id="offsetYIn" type="number" step="1" value="0" style="width:74px" title="Offset in Metern">
+    </label>
+    <label style="display:inline-flex;gap:4px;align-items:center;font-size:0.78em;color:#8a7d99">
+      Scale X<input id="scaleXIn" type="number" step="0.0001" value="1.0000" style="width:88px">
+      Y<input id="scaleYIn" type="number" step="0.0001" value="1.0000" style="width:88px">
+    </label>
+  </span>
   <button id="zoomResetBtn" class="secondary">🔍 100%</button>
   <button id="saveBtn" class="save">💾 Speichern</button>
   <span id="status" style="color:#8a7d99; font-size:0.8em"></span>
@@ -551,10 +577,15 @@ function render() {
   // Labels an jeder Kreuzung im Format X/Y (0..8).
   if (showImgGrid) {
     const N = 8;
-    const lw = Math.max(0.5, 1 / view.zoom) / view.zoom;
+    // Beim Rauszoomen duenner + transparenter — Raster soll als Referenz
+    // dienen, nicht ueber dem Map-Bild dominieren.
+    const zfade = Math.min(1, view.zoom);
+    const lw = Math.max(0.25, 0.8 / view.zoom) / view.zoom;
+    const alphaLine = 0.85 * (0.25 + 0.75 * zfade);
+    const alphaText = 0.95 * (0.30 + 0.70 * zfade);
     const fontPx = Math.max(8, labelScreenPx() * 0.85) / view.zoom;
-    ctx.strokeStyle = "rgba(242,183,5,0.85)";  // gold
-    ctx.fillStyle = "rgba(242,183,5,0.95)";
+    ctx.strokeStyle = `rgba(242,183,5,${alphaLine})`;
+    ctx.fillStyle = `rgba(242,183,5,${alphaText})`;
     ctx.lineWidth = lw;
     ctx.font = `${fontPx}px DM Sans, sans-serif`;
     ctx.textBaseline = "top";
@@ -1306,11 +1337,23 @@ document.getElementById("offsetYIn").addEventListener("input", (ev) => {
   activeCal().offsetY = (parseFloat(ev.target.value) || 0) * 100;
   render();
 });
-document.getElementById("gridBtn").addEventListener("click", () => {
-  showGrid = !showGrid;
-  document.getElementById("gridBtn").classList.toggle("active", showGrid);
-  render();
-});
+// Mode-Tabs: Regions edit vs Calibrate. Persistent in localStorage.
+function setMode(m) {
+  document.body.dataset.mode = m;
+  document.querySelectorAll(".mode-tabs .tab").forEach(b =>
+    b.classList.toggle("active", b.dataset.mode === m));
+  try { localStorage.setItem("poi.editor.mode", m); } catch (_) {}
+  // Canvas neu vermessen (Spalten-Layout aenderte sich)
+  if (typeof fitCanvas === "function") fitCanvas();
+  if (typeof render === "function") render();
+}
+document.querySelectorAll(".mode-tabs .tab").forEach(b =>
+  b.addEventListener("click", () => setMode(b.dataset.mode)));
+setMode((function(){
+  try { return localStorage.getItem("poi.editor.mode") || "regions"; }
+  catch(_) { return "regions"; }
+})());
+
 document.getElementById("imgGridBtn").addEventListener("click", () => {
   showImgGrid = !showImgGrid;
   document.getElementById("imgGridBtn").classList.toggle("active", showImgGrid);
