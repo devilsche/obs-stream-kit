@@ -17,7 +17,25 @@ const RS = {
 
 async function loadMatchList() {
   const sel = document.getElementById("matchSelect");
-  const list = await PubgUI.fetchJson("/api/pubg/matches-list?limit=50");
+  console.log("[match-replay] loadMatchList start, sel=", sel);
+  let list;
+  try {
+    list = await PubgUI.fetchJson("/api/pubg/matches-list?limit=50");
+  } catch (e) {
+    console.error("[match-replay] matches-list FAIL", e);
+    if (sel) sel.innerHTML = `<option>⚠ ${e.message || e}</option>`;
+    return;
+  }
+  console.log("[match-replay] got list type=", typeof list, "len=",
+              Array.isArray(list) ? list.length : "(not array)", list);
+  if (!Array.isArray(list)) {
+    if (sel) sel.innerHTML = `<option>⚠ unexpected: ${JSON.stringify(list).slice(0,80)}</option>`;
+    return;
+  }
+  if (list.length === 0) {
+    if (sel) sel.innerHTML = `<option>⚠ keine Matches in der DB</option>`;
+    return;
+  }
   sel.innerHTML = list.map(m => {
     const d = new Date(m.playedAt);
     const dt = d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit",
@@ -25,9 +43,21 @@ async function loadMatchList() {
     const mapShort = PubgUI.fmtMap(m.mapName);
     return `<option value="${m.matchId}">${dt} · ${mapShort} · #${m.place ?? "?"} · ${m.kills ?? "?"}K</option>`;
   }).join("");
-  // URL-Parameter ?match=ID überschreibt die Vorauswahl
+  // URL-Parameter ?match=ID überschreibt die Vorauswahl. Wenn die ID
+  // nicht in der Liste der letzten 50 ist, fuegen wir sie als
+  // separate Option oben ein, damit der Replay trotzdem laeuft
+  // (Backend faellt auf HiDrive zurueck).
   const urlMatch = PubgUI.qs("match");
-  if (urlMatch) sel.value = urlMatch;
+  if (urlMatch) {
+    sel.value = urlMatch;
+    if (sel.value !== urlMatch) {
+      const opt = document.createElement("option");
+      opt.value = urlMatch;
+      opt.textContent = `(URL) ${urlMatch.slice(0, 8)}…`;
+      sel.insertBefore(opt, sel.firstChild);
+      sel.value = urlMatch;
+    }
+  }
   sel.addEventListener("change", () => {
     const url = new URL(window.location);
     url.searchParams.set("match", sel.value);
