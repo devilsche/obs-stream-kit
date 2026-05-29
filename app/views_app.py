@@ -170,6 +170,20 @@ def tools_open(key):
         abort(404)
     with open(full_path, "r", encoding="utf-8") as f:
         html = f.read()
+    # Bei Tools die als widgets/<domain>/*.html liegen (Alt-Bestand:
+    # session-report, poi-editor) zeigen die relativen Asset-Pfade
+    # (_pubg.css, _pubg.js, _pubg_pois.js) auf das gleiche Verzeichnis.
+    # Unter /app/tools/<key> ist das geschluckt, deshalb rewriten auf
+    # absolute /widgets-static/<domain>/...
+    if tool["path"].startswith("widgets/"):
+        domain = tool["path"].split("/")[1]
+        for asset in ("_pubg.css", "_pubg.js", "_pubg_pois.js"):
+            html = html.replace(
+                f'href="{asset}"',
+                f'href="/widgets-static/{domain}/{asset}"')
+            html = html.replace(
+                f'src="{asset}"',
+                f'src="/widgets-static/{domain}/{asset}"')
     # Tools laufen cookie-authenticated, kein Token — alle /api/-Calls
     # gehen direkt an die Cookie-Routes mit g.tenant_id aus der Session.
     inject = (
