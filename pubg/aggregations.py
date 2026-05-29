@@ -3504,7 +3504,7 @@ def _detect_hot_drop(conn, tenant_id: int, match_id, my_account_id, window_ms, w
           AND target_account IN ({placeholders})
           AND timestamp_ms >= ?
           AND timestamp_ms <= ?
-    """, [tenant_id, match_id] + list(squad_ids) + [landing_ms, survival_cutoff_ms])
+    """, [match_id] + list(squad_ids) + [landing_ms, survival_cutoff_ms])
                           .fetchall()}
     solo_alive = my_account_id not in killed_in_window
     team_alive = bool(squad_ids - killed_in_window)
@@ -4371,7 +4371,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                   AND (actor_account IS NULL OR actor_account='')
                   AND (weapon LIKE '%RedZone%' OR weapon LIKE '%Bomb%'
                        OR weapon LIKE '%bomb%')
-            """, [tenant_id, match_id] + list(acc_ids)).fetchall():
+            """, [match_id] + list(acc_ids)).fetchall():
                 target = r["target_account"]
                 if target in result:
                     result[target]["redzone"].append({
@@ -4387,7 +4387,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                 SELECT * FROM telemetry_events
                 WHERE match_id=? AND event_type='Kill'
                   AND (actor_account IN ({ph}) OR target_account IN ({ph}))
-            """, [tenant_id, match_id] + list(acc_ids) + list(acc_ids)).fetchall():
+            """, [match_id] + list(acc_ids) + list(acc_ids)).fetchall():
                 actor, target = r["actor_account"], r["target_account"]
                 if actor in result:
                     ev = _vehicle_event(r, is_actor=True)
