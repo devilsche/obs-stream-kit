@@ -52,7 +52,7 @@ Repo: github.com/devilsche/obs-stream-kit
 
 - **`widgets/<domain>/*.html`** — NUR Display-Widgets fuer OBS Browser-Sources. Pollen einen JSON-Endpoint und rendern, sonst nichts. Keine Schreib-Operationen, kein Edit-Modus. Tipische Groessen: 1920x1080 (Vollbild-Szene), oder kompakte Ecken-Overlays.
 - **`tools/*.html`** — Config-Editoren + Verwaltungs-Tools. Schreiben in `data/*.json` via POST-Endpoints. Werden im normalen Browser-Tab geoeffnet, NICHT als OBS-Source. Mehrere Domains koennen sich `tools/` teilen, oder mit Praefix (`tools/pubg-pois.html`).
-- **Alt-Bestand** (z.B. `widgets/pubg/poi-editor.html`, `widgets/steam/achievement-browser.html`) bleiben aus historischen Gruenden wo sie sind. Nicht migrieren, aber NEUER Code folgt der sauberen Trennung.
+- **Alt-Bestand** (z.B. `widgets/pubg/session-report.html`, `widgets/steam/achievement-browser.html`) bleiben aus historischen Gruenden wo sie sind. Nicht migrieren, aber NEUER Code folgt der sauberen Trennung. (POI-Editor wurde 2026-05-29 nach `tools/poi-editor.html` migriert — Admin-only via `/admin/poi-editor`.)
 
 **Konfigurations- und Daten-Files:**
 

@@ -134,7 +134,7 @@ def admin_poi_editor():
     Bearbeitung in den Admin-Bereich."""
     root = current_app.config.get("_PROJECT_ROOT") or os.path.dirname(
         os.path.dirname(os.path.abspath(__file__)))
-    src = os.path.join(root, "widgets", "pubg", "poi-editor.html")
+    src = os.path.join(root, "tools", "poi-editor.html")
     if not os.path.exists(src):
         abort(404)
     with open(src, "r", encoding="utf-8") as f:
