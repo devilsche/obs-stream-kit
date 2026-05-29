@@ -117,22 +117,14 @@ async function loadReplay(matchId) {
 function buildTeamList() {
   const host = document.getElementById("teamList");
   if (!RS.replay) { host.innerHTML = ""; return; }
-  // Kill-Counter pro Account aus den Replay-Events
-  const killCount = {};
-  for (const e of RS.replay.events) {
-    if (e.type === "kill" && e.actorId) {
-      killCount[e.actorId] = (killCount[e.actorId] || 0) + 1;
-    }
-  }
   host.innerHTML = RS.replay.teams.map(t => {
     const bot = isBotTeam(t.teamId);
     const players = t.players.map(p => {
-      const k = killCount[p.accountId] || 0;
       const botLbl = isBotAcc(p.accountId) ? " ·BOT" : "";
       return `<div class="player" data-acc="${p.accountId}">`
            + `<span class="pname">${p.name}${botLbl}</span>`
-           + `<span class="pkills" title="Kills in diesem Match">`
-           + `${k}<small>K</small></span>`
+           + `<span class="pkills" title="Kills bis Cursor-Zeitpunkt">`
+           + `0<small>K</small></span>`
            + `</div>`;
     }).join("");
     return `
@@ -159,12 +151,23 @@ function buildTeamList() {
 
 function updateTeamListDeadState(cursorMs) {
   // Pro Spieler: wenn ein Death-Event <= cursorMs UND kein Reland nach
-  // diesem Death — markiere als dead. Performance: O(players * deaths).
+  // diesem Death — markiere als dead. Plus: Kill-Counter live mitziehen
+  // (zaehlt nur kill-Events <= cursorMs).
   const tl = document.getElementById("teamList");
-  if (!tl) return;
+  if (!tl || !RS.replay) return;
+  // Kill-Counts bis Cursor — Events sind nach ts sortiert, also einfach
+  // bis zum ersten Event mit ts > cursor zaehlen.
+  const killsByAcc = {};
+  for (const e of RS.replay.events) {
+    if (e.ts > cursorMs) break;
+    if (e.type === "kill" && e.actorId) {
+      killsByAcc[e.actorId] = (killsByAcc[e.actorId] || 0) + 1;
+    }
+  }
   tl.querySelectorAll(".player").forEach(el => {
     const acc = el.dataset.acc;
     if (!acc) return;
+    // dead-state
     const deaths = RS._deaths[acc] || [];
     const relands = RS._relands[acc] || [];
     let dead = false;
@@ -175,6 +178,10 @@ function updateTeamListDeadState(cursorMs) {
       }
     }
     el.classList.toggle("dead", dead);
+    // kill-count
+    const k = killsByAcc[acc] || 0;
+    const kEl = el.querySelector(".pkills");
+    if (kEl) kEl.innerHTML = `${k}<small>K</small>`;
   });
 }
 
