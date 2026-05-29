@@ -289,7 +289,8 @@
     }
     .md-grid {
       display: grid;
-      grid-template-columns: 314px 1fr;
+      /* Linke Spalte = Map-Breite (360px) + ~14px Border/Padding */
+      grid-template-columns: 374px 1fr;
       gap: 14px;
       align-items: start;
     }
@@ -1341,35 +1342,14 @@
             }
           }
 
-          // Kill-Marker (sobald cursor >= kill-ts) — bleiben bestehen
+          // Kill-Marker (sobald cursor >= kill-ts) — nur das Opfer-X.
+          // Kein Schuetze-Pin, keine Schusslinie (Userwunsch: weniger
+          // Cluttering, Distanz steht im Hover-Label).
           if (!inDefault) {
             for (const k of life.kills) {
               if (absTs < k.tsMs) continue;
-              if (k.actorX == null || k.victimX == null) continue;
-              const [ax, ay] = mdCmToCanvas(host, k.actorX, k.actorY);
+              if (k.victimX == null) continue;
               const [vx, vy] = mdCmToCanvas(host, k.victimX, k.victimY);
-              // Schusslinie als Punkt-Linie (deutlich von groundPath
-              // abgegrenzt — der ist durchgezogen)
-              ctx.strokeStyle = color;
-              ctx.globalAlpha = 0.7;
-              ctx.lineWidth = 1.2;
-              ctx.setLineDash([1, 3]);
-              ctx.lineCap = "round";
-              ctx.beginPath();
-              ctx.moveTo(ax, ay); ctx.lineTo(vx, vy);
-              ctx.stroke();
-              ctx.setLineDash([]);
-              ctx.lineCap = "butt";
-              ctx.globalAlpha = 1;
-              // Schuetze (gefuellter Kreis in Member-Farbe)
-              ctx.beginPath();
-              ctx.arc(ax, ay, 4, 0, Math.PI * 2);
-              ctx.fillStyle = color;
-              ctx.fill();
-              ctx.strokeStyle = "white";
-              ctx.lineWidth = 0.8;
-              ctx.stroke();
-              // Opfer-X in der Farbe des Killers (= aktueller member-color)
               ctx.strokeStyle = color;
               ctx.lineWidth = 2;
               const xs = 4.5;
@@ -3039,9 +3019,11 @@
       else if (hit.kind === "kill") {
         const life = member.lives.find(l => l.lifeIndex === hit.lifeIdx);
         const k = life.kills.find(kk => kk.tsMs === hit.tsMs);
-        const wn = k && k.weapon ? k.weapon.replace("Weap_", "").replace("_C", "") : "Kill";
+        const wn = (k && k.weaponName) ? k.weaponName
+                 : (k && k.weapon ? k.weapon.replace("Weap_", "").replace("_C", "") : "Kill");
         const victim = k && k.victimName ? k.victimName : "Gegner";
-        txt = `${memberName} • ${wn} → ${victim}`;
+        const dist = k && k.distanceM != null ? ` · ${Math.round(k.distanceM)}m` : "";
+        txt = `${memberName} • ${wn}${dist} → ${victim}`;
       }
       labelEl.textContent = txt;
       labelEl.style.left = (px + 8) + "px";

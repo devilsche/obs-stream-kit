@@ -1167,6 +1167,16 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                           AND pa.account_id = ?
                 """, (tenant_id, e["target_account"],
                        tenant_id, match_id, e["target_account"])).fetchone()
+                # Distanz: actor → victim in Metern (cm/100). Wenn DB-
+                # weapon-Field eine eigene 'distance' hatte (Kill-Event-
+                # native), bevorzugen, sonst aus Koordinaten rechnen.
+                dist_m = None
+                if (e["actor_x"] is not None and e["actor_y"] is not None
+                        and e["victim_x"] is not None and e["victim_y"] is not None):
+                    dx = (e["actor_x"] - e["victim_x"]) / 100.0
+                    dy = (e["actor_y"] - e["victim_y"]) / 100.0
+                    dist_m = round((dx*dx + dy*dy) ** 0.5, 1)
+                wlabel = _weapon_label(e["weapon"])[0] if e["weapon"] else None
                 life_kills.append({
                     "actorX":  e["actor_x"],
                     "actorY":  e["actor_y"],
@@ -1174,6 +1184,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                     "victimY": e["victim_y"],
                     "tsMs":    e["timestamp_ms"],
                     "weapon":  e["weapon"],
+                    "weaponName": wlabel,
+                    "distanceM":  dist_m,
                     "victimName": vrow["n"] if vrow else None,
                 })
 
