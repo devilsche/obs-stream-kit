@@ -4376,13 +4376,13 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                 f"SELECT target_account, COUNT(*) AS c FROM telemetry_events "
                 f"WHERE match_id = ? AND event_type='Knock' "
                 f"AND target_account IN ({ph}) GROUP BY target_account",
-                    [tenant_id, m["match_id"]] + sq_list).fetchall():
+                    [m["match_id"]] + sq_list).fetchall():
                 knocks_received[r["target_account"]] = r["c"]
             for r in conn.execute(
                 f"SELECT actor_account, COUNT(*) AS c FROM telemetry_events "
                 f"WHERE match_id = ? AND event_type='Revive' "
                 f"AND actor_account IN ({ph}) GROUP BY actor_account",
-                    [tenant_id, m["match_id"]] + sq_list).fetchall():
+                    [m["match_id"]] + sq_list).fetchall():
                 revives_given[r["actor_account"]] = r["c"]
             # Bot-Kills pro Squadmember: Kill-Events mit target_account=ai.*
             for r in conn.execute(
@@ -4390,7 +4390,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                 f"WHERE match_id = ? AND event_type='Kill' "
                 f"AND actor_account IN ({ph}) "
                 f"AND target_account LIKE 'ai.%' GROUP BY actor_account",
-                    [tenant_id, m["match_id"]] + sq_list).fetchall():
+                    [m["match_id"]] + sq_list).fetchall():
                 bot_kills[r["actor_account"]] = r["c"]
         # Bot-Teams (team_id >= 200) und Gesamt-Teams in dieser Lobby
         bot_teams_in_lobby = (conn.execute(
