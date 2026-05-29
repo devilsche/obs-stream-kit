@@ -93,23 +93,13 @@
     border: 1px solid #5e2a79;
     border-radius: 6px;
     overflow: hidden;
-    /* Host fuellt die Grid-Spalte (Rechteck), feste Hoehe = Viewport
-       minus Topbar/Header. Zoom passiert intern via ctx.scale(). */
+    /* Host = Rechteck, fuellt die Grid-Spalte komplett. Canvas DOM-Element
+       hat dieselbe Groesse. Die Map wird im Canvas zentriert quadratisch
+       gerendert (mapSize = min(width, height)), aber beim Reinzoomen kann
+       der Inhalt ueber den Quadrat-Rand hinaus den vollen Rechteck-Bereich
+       ausnutzen. Centering via render-translate (siehe render() im JS). */
     height: calc(100vh - 150px);
     width: 100%;
-    /* Inneres Map-Quadrat wird via .canvas-square zentriert. */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .canvas-square {
-    /* Quadratisch — kleinere Dimension des Hosts.
-       100% = Host-Hoehe und Host-Breite; min() nimmt die kleinere
-       und die andere wird via aspect-ratio gleich gross. */
-    aspect-ratio: 1 / 1;
-    height: 100%;
-    max-width: 100%;
-    position: relative;
   }
   canvas { display: block; width: 100%; height: 100%; cursor: crosshair; background: transparent; }
   .panel {
@@ -207,16 +197,14 @@
     <button id="tabCalibrate" class="tab" data-mode="calibrate">🎯 Calibrate</button>
   </div>
   <button id="zoomResetBtn" class="secondary">🔍 100%</button>
-  <button id="imgGridBtn" class="secondary active" title="Bildbasiertes 8x8-Raster (Referenz, fix am Kartenbild)">▦ Raster</button>
+  <button id="imgGridBtn" class="secondary" title="Bildbasiertes 8x8-Raster (Referenz, fix am Kartenbild)">▦ Raster</button>
   <button id="pinsBtn" class="secondary">📍 Pins laden</button>
   <button id="saveBtn" class="save">💾 Speichern</button>
   <span id="status" style="color:#8a7d99; font-size:0.8em"></span>
 </div>
 <div class="wrap">
   <div class="canvas-host">
-    <div class="canvas-square">
-      <canvas id="cv"></canvas>
-    </div>
+    <canvas id="cv"></canvas>
     <div id="pinTooltip"></div>
   </div>
   <div class="panel">
@@ -508,23 +496,34 @@ function _ixform(ex, ey) {
   if (pinCal.flipY) y = 2 * mc - y;
   return [x, y];
 }
+// Map wird quadratisch in den (rechteckigen) Canvas gerendert.
+// mapDims() liefert die inscribed-square Groesse + Centering-Offsets.
+// Render-Reihenfolge in render(): translate(offX,offY) [centering, NICHT
+// vom zoom skaliert] → translate(panX,panY) → scale(zoom,zoom). Damit
+// nutzt die Map beim Reinzoomen den vollen Rechteck-Bereich, am Start
+// aber sitzt sie zentriert. Projektionen arbeiten im Quadrat-Space.
+function mapDims() {
+  const size = Math.min(canvas.width, canvas.height);
+  return {
+    size,
+    offX: (canvas.width  - size) / 2,
+    offY: (canvas.height - size) / 2,
+  };
+}
 function worldToCanvas(xCm, yCm) {
-  const base = canvas.width / (mapKm * 100000);
+  const base = mapDims().size / (mapKm * 100000);
   const [ex, ey] = _xform(xCm, yCm);
   return [ex * base, ey * base];
 }
-// worldToCanvasRaw: Grid-Cal anwenden (NICHT pinCal). Damit kann das
-// Grid pro Map an die Map-Anzeige angepasst werden, unabhaengig davon
-// wie die Pins relativ zur Map sitzen muessen.
 function worldToCanvasRaw(xCm, yCm) {
-  const base = canvas.width / (mapKm * 100000);
+  const base = mapDims().size / (mapKm * 100000);
   const mc = mapKm * 100000 / 2;
   const ex = (xCm - mc) * gridCal.scaleX + mc + gridCal.offsetX;
   const ey = (yCm - mc) * gridCal.scaleY + mc + gridCal.offsetY;
   return [ex * base, ey * base];
 }
 function canvasToWorld(px, py) {
-  const base = canvas.width / (mapKm * 100000);
+  const base = mapDims().size / (mapKm * 100000);
   const [wx, wy] = _ixform(px / base, py / base);
   return [Math.round(wx), Math.round(wy)];
 }
@@ -535,7 +534,11 @@ function canvasXY(ev) {
 // Mouse-Coords -> 'logische' Canvas-Pixel (vor Zoom)
 function eventToLogical(ev) {
   const [cx, cy] = canvasXY(ev);
-  return [(cx - view.panX) / view.zoom, (cy - view.panY) / view.zoom];
+  const _md = mapDims();
+  return [
+    (cx - _md.offX - view.panX) / view.zoom,
+    (cy - _md.offY - view.panY) / view.zoom,
+  ];
 }
 // Mouse-Coords -> World-cm
 function eventToWorld(ev) {
@@ -578,17 +581,17 @@ function render() {
   fitCanvas();
   ctx.fillStyle = "#0d061a";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  // View-Transform: translate then scale. Everything between save/restore
-  // wird gezoomt und gepannt.
+  // Centering-Translate VOR Zoom/Pan: Map sitzt zentriert quadratisch im
+  // Rechteck. Beim Reinzoomen wachsen Map-Inhalte ueber den Quadrat-Rand
+  // hinaus und fuellen den verfuegbaren Rechteck-Bereich aus.
+  const _md = mapDims();
   ctx.save();
+  ctx.translate(_md.offX, _md.offY);
   ctx.translate(view.panX, view.panY);
   ctx.scale(view.zoom, view.zoom);
 
-  // Map als Background — wenn das Bild nicht quadratisch ist (z.B.
-  // ein 2K-Screenshot 2560x1440 mit zentrierter quadratischer Map),
-  // nehmen wir das Center-Square (Seite = min(width, height)) und
-  // skalieren das aufs Canvas. So bleiben Grid/Pins korrekt auf dem
-  // sichtbaren Map-Quadrat.
+  // Map als Background — Center-Square aus dem Quellbild auf den
+  // inscribed-Square (mapSize×mapSize im zentrierten Space) skalieren.
   if (mapImage && mapImage.complete && mapImage.naturalWidth) {
     const iw = mapImage.naturalWidth;
     const ih = mapImage.naturalHeight;
@@ -596,8 +599,8 @@ function render() {
     const sx = (iw - side) / 2;
     const sy = (ih - side) / 2;
     ctx.drawImage(mapImage,
-      sx, sy, side, side,                       // source crop
-      0, 0, canvas.width, canvas.height);       // dest fill canvas
+      sx, sy, side, side,
+      0, 0, _md.size, _md.size);
   }
 
   // Bildbasiertes 8×8-Raster: fix am Kartenbild (Canvas-Fraktionen 0..1),
@@ -619,15 +622,15 @@ function render() {
     ctx.textBaseline = "top";
     for (let i = 0; i <= N; i++) {
       const p = (i / N);
-      const cx = p * canvas.width;
-      const cy = p * canvas.height;
-      ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, canvas.height); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(canvas.width, cy); ctx.stroke();
+      const cx = p * _md.size;
+      const cy = p * _md.size;
+      ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, _md.size); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(_md.size, cy); ctx.stroke();
     }
     for (let ix = 0; ix <= N; ix++) {
       for (let iy = 0; iy <= N; iy++) {
-        const px = (ix / N) * canvas.width;
-        const py = (iy / N) * canvas.height;
+        const px = (ix / N) * _md.size;
+        const py = (iy / N) * _md.size;
         ctx.fillText(`${ix}/${iy}`,
           px + 3 / view.zoom, py + 3 / view.zoom);
       }
@@ -687,10 +690,11 @@ function render() {
     ctx.lineWidth = Math.max(0.5, 1.5 / view.zoom) / view.zoom;
     ctx.stroke();
     ctx.setLineDash([]);
-    // Vertex dots
+    // Vertex dots — Radius zoom-skaliert wie bei den fertigen Polygonen
     ctx.fillStyle = "#f2b705";
+    const vr = 3 / view.zoom;
     for (const [x, y] of pts) {
-      ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, vr, 0, Math.PI * 2); ctx.fill();
     }
   }
 
@@ -1140,7 +1144,7 @@ canvas.addEventListener("mousemove", (ev) => {
   // logischen Canvas-Pixeln → in cm via base-Faktor umrechnen.
   if (calibratingPins && calRef) {
     const [lx, ly] = eventToLogical(ev);
-    const base = canvas.width / (mapKm * 100000);
+    const base = mapDims().size / (mapKm * 100000);
     const c = activeCal();
     c.offsetX = calRef[2] + (lx - calRef[0]) / base;
     c.offsetY = calRef[3] + (ly - calRef[1]) / base;
@@ -1256,7 +1260,11 @@ canvas.addEventListener("wheel", (ev) => {
   const factor = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
   const newZoom = Math.max(0.5, Math.min(12, view.tZoom * factor));
   const r = canvas.getBoundingClientRect();
-  const mx = ev.clientX - r.left, my = ev.clientY - r.top;
+  // Cursor relativ zum zentrierten Map-Quadrat (offset rausrechnen),
+  // damit Zoom-to-cursor unter dem Maus-Cursor zentriert bleibt.
+  const _md = mapDims();
+  const mx = (ev.clientX - r.left) - _md.offX;
+  const my = (ev.clientY - r.top)  - _md.offY;
   const ratio = newZoom / view.tZoom;
   view.tPanX = mx - (mx - view.tPanX) * ratio;
   view.tPanY = my - (my - view.tPanY) * ratio;
@@ -1755,8 +1763,11 @@ function renderCalList() {
           const myd = ((c.origY + c.fixedY) / 2);
           // Welt-cm → canvas-px via worldToCanvas, dann pan auf Canvas-Mitte
           const [cx, cy] = worldToCanvas(mid, myd);
-          view.panX += (canvas.width / 2 - cx);
-          view.panY += (canvas.height / 2 - cy);
+          // Zentriere auf Map-Quadrat-Mitte, NICHT auf Canvas-Mitte
+          // (Centering-Offset ist VOR pan/zoom angewendet).
+          const _md = mapDims();
+          view.panX += (_md.size / 2 - cx);
+          view.panY += (_md.size / 2 - cy);
           render();
         }
         return;
