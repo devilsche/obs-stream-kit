@@ -2898,12 +2898,14 @@
                        kind: "death", tsMs: life.death.tsMs };
             }
           }
-          // Kills
+          // Kills — Hit-Test auf das Opfer-X (Schuetzen-Pin wurde
+          // entfernt; der Marker auf der Karte ist das X beim Opfer).
           if (!inDefault) {
             for (const k of life.kills) {
               if (absTs < k.tsMs) continue;
-              const [ax, ay] = mdCmToCanvas(host, k.actorX, k.actorY);
-              if (Math.hypot(ax - canvasPx, ay - canvasPy) <= HIT_PX) {
+              if (k.victimX == null) continue;
+              const [vx, vy] = mdCmToCanvas(host, k.victimX, k.victimY);
+              if (Math.hypot(vx - canvasPx, vy - canvasPy) <= HIT_PX) {
                 return { acc: m.accountId, lifeIdx: life.lifeIndex,
                          kind: "kill", tsMs: k.tsMs };
               }
