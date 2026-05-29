@@ -31,13 +31,28 @@
   .mode-tabs .tab:hover { background: rgba(94,42,121,0.55); }
   .mode-tabs .tab.active { background: #f2b705; color: #1a0d2a; font-weight: 700; }
   .tools-group { display: inline-flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-  /* Mode-Sichtbarkeit: nur die aktive Gruppe an Buttons/Inputs zeigen. */
-  body[data-mode="regions"]   .mode-calibrate { display: none; }
-  body[data-mode="calibrate"] .mode-regions   { display: none; }
-  /* Im Calibrate-Modus brauchen wir die Regionen-Liste nicht — Map nutzt
-     die Breite voll aus. (Regionen werden weiter auf der Karte gezeichnet.) */
-  body[data-mode="calibrate"] .wrap { grid-template-columns: 1fr; }
-  body[data-mode="calibrate"] .panel { display: none; }
+  /* Mode-Sichtbarkeit: Topbar hat nur das Wesentliche. Panel rechts
+     zeigt entweder Regions-Tools+Liste oder Calibration-Controls. */
+  body[data-mode="regions"]   .mode-calibrate { display: none !important; }
+  body[data-mode="calibrate"] .mode-regions   { display: none !important; }
+  .panel-section { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+  .panel-buttons {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding-bottom: 10px; margin-bottom: 10px;
+    border-bottom: 1px solid #5e2a79;
+  }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 10px;
+    margin-top: 10px;
+  }
+  .cal-grid label {
+    display: flex; flex-direction: column; gap: 3px;
+    color: #8a7d99; font-size: 0.72em;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .cal-grid input { width: 100%; box-sizing: border-box; }
   select, input, button {
     background: rgba(94,42,121,0.55);
     color: #f2b705;
@@ -186,36 +201,12 @@
   <label>Map:
     <select id="mapSel"></select>
   </label>
-  <label>Map-Size (km):
-    <input id="mapSize" type="number" min="1" max="16" step="0.1" value="8" style="width:70px">
-  </label>
   <div class="mode-tabs">
     <button id="tabRegions" class="tab active" data-mode="regions">📐 Regions edit</button>
     <button id="tabCalibrate" class="tab" data-mode="calibrate">🎯 Calibrate</button>
   </div>
-  <span class="mode-regions tools-group">
-    <button id="rectBtn">▭ Rechteck</button>
-    <button id="polyBtn">⬠ Polygon</button>
-    <button id="pinsBtn" class="secondary">📍 Pins laden</button>
-  </span>
-  <span class="mode-calibrate tools-group">
-    <button id="calBtn" class="secondary" title="Calibration-Mode: Kill/Death-Events verschieben zur Map-Cal-Berechnung">🎯 Cal</button>
-    <button id="imgGridBtn" class="secondary active" title="Bildbasiertes 8x8-Raster (Referenz, fix am Kartenbild)">▦ Raster</button>
-    <button id="modeBtn" class="secondary" title="Welche Cal die Inputs steuern: Pin- oder Grid-Calibration">Cal-Mode: PIN</button>
-    <button id="flipXBtn" class="secondary" title="X-Achse spiegeln (Ost/West)">↔ FlipX</button>
-    <button id="flipYBtn" class="secondary" title="Y-Achse spiegeln (Nord/Sued)">↕ FlipY</button>
-    <button id="rotBtn" class="secondary" title="90° drehen">⟳ 0°</button>
-    <button id="calResetBtn" class="secondary" title="Calibration zuruecksetzen">↹ Pins 0/0</button>
-    <label style="display:inline-flex;gap:4px;align-items:center;font-size:0.78em;color:#8a7d99">
-      Offset X<input id="offsetXIn" type="number" step="1" value="0" style="width:74px" title="Offset in Metern">
-      Y<input id="offsetYIn" type="number" step="1" value="0" style="width:74px" title="Offset in Metern">
-    </label>
-    <label style="display:inline-flex;gap:4px;align-items:center;font-size:0.78em;color:#8a7d99">
-      Scale X<input id="scaleXIn" type="number" step="0.0001" value="1.0000" style="width:88px">
-      Y<input id="scaleYIn" type="number" step="0.0001" value="1.0000" style="width:88px">
-    </label>
-  </span>
   <button id="zoomResetBtn" class="secondary">🔍 100%</button>
+  <button id="pinsBtn" class="secondary">📍 Pins laden</button>
   <button id="saveBtn" class="save">💾 Speichern</button>
   <span id="status" style="color:#8a7d99; font-size:0.8em"></span>
 </div>
@@ -227,26 +218,63 @@
     <div id="pinTooltip"></div>
   </div>
   <div class="panel">
-    <h3>Regionen <select id="sortSel" style="float:right;font-size:0.78em;padding:2px 6px">
-      <option value="area">Fläche ↓</option>
-      <option value="name">Name A–Z</option>
-    </select></h3>
-    <div class="hint">
-      <b>▭ Rechteck:</b> click+drag<br>
-      <b>⬠ Polygon:</b> klicken um Punkte zu setzen, doppel-klick zum Schließen<br>
-      <b>Drag</b> Vertex-Handle zum Verschieben &nbsp;·&nbsp; <b>Shift+Click</b> auf Kante = neuer Vertex &nbsp;·&nbsp; <b>Alt+Click</b> auf Vertex = löschen<br>
-      <b>Mausrad</b> = Zoom (zentriert) &nbsp;·&nbsp; <b>Rechtsklick-Drag</b> = Pan (auch Space+Drag oder Middle-Mouse)<br>
-      <b>Strg+Drag</b> oder <b>Pfeiltasten</b> = Welt-Koordsystem (Grid+Pins+Regionen) verschieben (Shift = 10m, Strg = 100m). <b>Scale X/Y</b> dehnt symmetrisch um Map-Mitte.
+    <!-- ─── Regions-Panel ─────────────────────────────────────────────── -->
+    <div class="panel-section mode-regions">
+      <div class="panel-buttons">
+        <button id="rectBtn">▭ Rechteck</button>
+        <button id="polyBtn">⬠ Polygon</button>
+        <button id="imgGridBtn" class="secondary active" title="Bildbasiertes 8x8-Raster (Referenz)">▦ Raster</button>
+      </div>
+      <h3>Regionen <select id="sortSel" style="float:right;font-size:0.78em;padding:2px 6px">
+        <option value="area">Fläche ↓</option>
+        <option value="name">Name A–Z</option>
+      </select></h3>
+      <div class="hint">
+        <b>▭ Rechteck:</b> click+drag<br>
+        <b>⬠ Polygon:</b> klicken um Punkte zu setzen, doppel-klick zum Schließen<br>
+        <b>Drag</b> Vertex-Handle zum Verschieben &nbsp;·&nbsp; <b>Shift+Click</b> auf Kante = neuer Vertex &nbsp;·&nbsp; <b>Alt+Click</b> auf Vertex = löschen<br>
+        <b>Mausrad</b> = Zoom &nbsp;·&nbsp; <b>Rechtsklick-Drag</b> = Pan
+      </div>
+      <div id="regionList"></div>
+      <div class="edit-block" id="editBlock" style="display:none">
+        <h3 style="margin-top:0">Region bearbeiten</h3>
+        <label>Name (leer = ohne Label)</label>
+        <input id="ed_name" type="text">
+        <div class="stat-line" id="kmStat"></div>
+        <div style="margin-top:8px; display:flex; gap:6px">
+          <button id="dupBtn" class="secondary">Duplizieren</button>
+          <button id="delBtn" class="danger">Löschen</button>
+        </div>
+      </div>
     </div>
-    <div id="regionList"></div>
-    <div class="edit-block" id="editBlock" style="display:none">
-      <h3 style="margin-top:0">Region bearbeiten</h3>
-      <label>Name (leer = ohne Label)</label>
-      <input id="ed_name" type="text">
-      <div class="stat-line" id="kmStat"></div>
-      <div style="margin-top:8px; display:flex; gap:6px">
-        <button id="dupBtn" class="secondary">Duplizieren</button>
-        <button id="delBtn" class="danger">Löschen</button>
+    <!-- ─── Calibrate-Panel ─────────────────────────────────────────────── -->
+    <div class="panel-section mode-calibrate">
+      <h3>Calibration</h3>
+      <div class="panel-buttons">
+        <button id="calBtn" class="secondary" title="Calibration-Mode: Kill/Death-Events verschieben zur Map-Cal-Berechnung">🎯 Cal</button>
+        <button id="imgGridBtnCal" class="secondary active" title="Bildbasiertes 8x8-Raster (Referenz)">▦ Raster</button>
+        <button id="modeBtn" class="secondary" title="Welche Cal die Inputs steuern: Pin- oder Grid-Calibration">Cal-Mode: PIN</button>
+        <button id="flipXBtn" class="secondary" title="X-Achse spiegeln (Ost/West)">↔ FlipX</button>
+        <button id="flipYBtn" class="secondary" title="Y-Achse spiegeln (Nord/Sued)">↕ FlipY</button>
+        <button id="rotBtn" class="secondary" title="90° drehen">⟳ 0°</button>
+        <button id="calResetBtn" class="secondary" title="Calibration zuruecksetzen">↹ Pins 0/0</button>
+      </div>
+      <div class="cal-grid">
+        <label>Map-Size (km)
+          <input id="mapSize" type="number" min="1" max="16" step="0.1" value="8">
+        </label>
+        <label>Offset X (m)
+          <input id="offsetXIn" type="number" step="1" value="0">
+        </label>
+        <label>Offset Y (m)
+          <input id="offsetYIn" type="number" step="1" value="0">
+        </label>
+        <label>Scale X
+          <input id="scaleXIn" type="number" step="0.0001" value="1.0000">
+        </label>
+        <label>Scale Y
+          <input id="scaleYIn" type="number" step="0.0001" value="1.0000">
+        </label>
       </div>
     </div>
   </div>
@@ -1337,28 +1365,35 @@ document.getElementById("offsetYIn").addEventListener("input", (ev) => {
   activeCal().offsetY = (parseFloat(ev.target.value) || 0) * 100;
   render();
 });
-// Mode-Tabs: Regions edit vs Calibrate. Persistent in localStorage.
-function setMode(m) {
+// Editor-Tab: Regions edit vs Calibrate. Persistent in localStorage.
+// Heisst setEditorTab (NICHT setMode), weil setMode oben bereits den
+// Zeichen-Modus 'view'/'drawing-rect'/'drawing-poly' verwaltet.
+function setEditorTab(m) {
   document.body.dataset.mode = m;
   document.querySelectorAll(".mode-tabs .tab").forEach(b =>
     b.classList.toggle("active", b.dataset.mode === m));
-  try { localStorage.setItem("poi.editor.mode", m); } catch (_) {}
-  // Canvas neu vermessen (Spalten-Layout aenderte sich)
+  try { localStorage.setItem("poi.editor.tab", m); } catch (_) {}
   if (typeof fitCanvas === "function") fitCanvas();
   if (typeof render === "function") render();
+  if (typeof renderList === "function") renderList();
 }
 document.querySelectorAll(".mode-tabs .tab").forEach(b =>
-  b.addEventListener("click", () => setMode(b.dataset.mode)));
-setMode((function(){
-  try { return localStorage.getItem("poi.editor.mode") || "regions"; }
+  b.addEventListener("click", () => setEditorTab(b.dataset.mode)));
+setEditorTab((function(){
+  try { return localStorage.getItem("poi.editor.tab") || "regions"; }
   catch(_) { return "regions"; }
 })());
 
-document.getElementById("imgGridBtn").addEventListener("click", () => {
+function _toggleImgGrid() {
   showImgGrid = !showImgGrid;
-  document.getElementById("imgGridBtn").classList.toggle("active", showImgGrid);
+  for (const id of ["imgGridBtn", "imgGridBtnCal"]) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle("active", showImgGrid);
+  }
   render();
-});
+}
+document.getElementById("imgGridBtn").addEventListener("click", _toggleImgGrid);
+document.getElementById("imgGridBtnCal").addEventListener("click", _toggleImgGrid);
 document.getElementById("flipXBtn").addEventListener("click", () => {
   pinCal.flipX = !pinCal.flipX;
   document.getElementById("flipXBtn").classList.toggle("active", pinCal.flipX);
