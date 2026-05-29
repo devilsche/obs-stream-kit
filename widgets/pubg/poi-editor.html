@@ -58,12 +58,13 @@
     border: 1px solid #5e2a79;
     border-radius: 6px;
     overflow: hidden;
-    aspect-ratio: 1 / 1;
-    /* Quadratisch, fuellt die Grid-Spalte, aber nie hoeher als
-       Viewport abzueglich h1+topbar+body-padding. */
-    width: 100%;
-    max-width: calc(100vh - 100px);
-    max-height: calc(100vh - 100px);
+    /* Quadratisch, fest definiert: Hoehe = Viewport minus Header/Topbar/
+       Padding. Breite = Hoehe damit es ein Quadrat ist. Zoom im Canvas
+       veraendert die Container-Groesse NICHT — das passiert nur innerhalb
+       des ctx.scale(). Wenn Grid-Spalte schmaler ist, capped via max-width. */
+    height: calc(100vh - 110px);
+    width: calc(100vh - 110px);
+    max-width: 100%;
   }
   canvas { display: block; width: 100%; height: 100%; cursor: crosshair; background: transparent; }
   .panel {
