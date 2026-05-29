@@ -10,6 +10,7 @@ from app.views_widgets import bp_widgets
 from app.views_static import bp_static
 from app.views_api import bp_api
 from app.views_app import bp_app
+from app.metrics import register_metrics
 
 
 def create_app(testing: bool = False) -> Flask:
@@ -21,6 +22,7 @@ def create_app(testing: bool = False) -> Flask:
     app.config["_PROJECT_ROOT"] = project_root
 
     register_middleware(app)
+    register_metrics(app)
     app.register_blueprint(bp_auth)
     app.register_blueprint(bp_admin)
     app.register_blueprint(bp_widgets)

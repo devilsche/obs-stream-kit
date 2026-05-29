@@ -47,57 +47,65 @@ class PubgClient:
         self.platform = platform
         self.limiter = RateLimiter(rate_limiter_max, rate_limiter_window)
 
-    def _raw_get(self, url: str) -> bytes:
+    def _raw_get(self, url: str, metric_endpoint: str = "unknown") -> bytes:
         req = urllib.request.Request(url, headers={
             "Authorization": f"Bearer {self.api_key}",
             "Accept": "application/vnd.api+json",
         })
+        # Lazy import — Metriken-Modul ist optional fuer Tests/CLI.
+        try:
+            from app.metrics import observe_external
+            _obs_ctx = observe_external("pubg", metric_endpoint)
+        except Exception:
+            _obs_ctx = None
+        if _obs_ctx is not None:
+            _obs_ctx.__enter__()
         try:
             with urllib.request.urlopen(req, timeout=15) as resp:
+                if _obs_ctx is not None:
+                    _obs_ctx.set_status(resp.status)
                 return resp.read()
         except urllib.error.HTTPError as e:
+            if _obs_ctx is not None:
+                _obs_ctx.set_status(e.code)
             raise ApiError(f"HTTP {e.code}: {e.reason}") from e
         except urllib.error.URLError as e:
+            if _obs_ctx is not None:
+                _obs_ctx.set_status("url_error")
             raise ApiError(f"URL error: {e.reason}") from e
+        finally:
+            if _obs_ctx is not None:
+                _obs_ctx.__exit__(None, None, None)
 
-    def _get_json(self, url: str, rate_limited: bool = True) -> dict:
+    def _get_json(self, url: str, rate_limited: bool = True,
+                  metric_endpoint: str = "unknown") -> dict:
         if rate_limited and not self.limiter.try_acquire():
             raise RateLimitError("Rate-Limit erreicht — bitte warten")
-        body = self._raw_get(url)
+        body = self._raw_get(url, metric_endpoint=metric_endpoint)
         return json.loads(body.decode("utf-8"))
 
     def get_player(self, name: str) -> dict:
-        # /players is rate-limited (10 RPM default)
         url = (f"{PUBG_BASE}/shards/{self.platform}/players"
                f"?filter[playerNames]={name}")
-        return self._get_json(url, rate_limited=True)
+        return self._get_json(url, rate_limited=True, metric_endpoint="player")
 
     def get_match(self, match_id: str) -> dict:
-        # /matches/{id} is NOT rate-limited per PUBG docs
-        # (rate-limits.rst → "Expected Rate Limit Usage")
         url = f"{PUBG_BASE}/shards/{self.platform}/matches/{match_id}"
-        return self._get_json(url, rate_limited=False)
+        return self._get_json(url, rate_limited=False, metric_endpoint="match")
 
     def get_lifetime(self, account_id: str) -> dict:
-        # /players/{id}/seasons/lifetime is rate-limited
         url = (f"{PUBG_BASE}/shards/{self.platform}/players/{account_id}"
                f"/seasons/lifetime")
-        return self._get_json(url, rate_limited=True)
+        return self._get_json(url, rate_limited=True, metric_endpoint="lifetime")
 
     def get_seasons(self) -> dict:
-        # Liste aller Seasons der Plattform — eine hat
-        # attributes.isCurrentSeason=true. Rate-limited (selten gerufen,
-        # aktuelle Season-ID wechselt nur alle paar Monate).
         url = f"{PUBG_BASE}/shards/{self.platform}/seasons"
-        return self._get_json(url, rate_limited=True)
+        return self._get_json(url, rate_limited=True, metric_endpoint="seasons")
 
     def get_season(self, account_id: str, season_id: str) -> dict:
-        # /players/{id}/seasons/{seasonId} liefert non-ranked Aggregat
-        # für DIESE Season inkl. assists/damageDealt/dBNOs/revives.
-        # Rate-limited.
         url = (f"{PUBG_BASE}/shards/{self.platform}/players/{account_id}"
                f"/seasons/{season_id}")
-        return self._get_json(url, rate_limited=True)
+        return self._get_json(url, rate_limited=True, metric_endpoint="season")
 
     @staticmethod
     def extract_current_season_id(seasons_payload: dict) -> str | None:
@@ -112,14 +120,29 @@ class PubgClient:
         return None
 
     def get_telemetry(self, telemetry_url: str) -> list:
-        # Telemetry-CDN, no API-Key needed, no rate-limit on this endpoint.
-        # CDN delivers gzip-compressed JSON regardless of Accept-Encoding header.
         req = urllib.request.Request(telemetry_url, headers={
             "Accept": "application/vnd.api+json",
             "Accept-Encoding": "gzip",
         })
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            data = resp.read()
+        try:
+            from app.metrics import observe_external
+            _obs = observe_external("pubg", "telemetry")
+        except Exception:
+            _obs = None
+        if _obs is not None:
+            _obs.__enter__()
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                if _obs is not None:
+                    _obs.set_status(resp.status)
+                data = resp.read()
+        except Exception as e:
+            if _obs is not None:
+                _obs.set_status(getattr(e, "code", "exception"))
+            raise
+        finally:
+            if _obs is not None:
+                _obs.__exit__(None, None, None)
         if resp.headers.get("Content-Encoding") == "gzip" or data[:2] == b"\x1f\x8b":
             data = gzip.decompress(data)
         return json.loads(data.decode("utf-8"))

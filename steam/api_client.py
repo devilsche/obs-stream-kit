@@ -47,14 +47,32 @@ class SteamClient:
         url = f"{STEAM_API_BASE}{path}?{urllib.parse.urlencode(params)}"
         req = urllib.request.Request(
             url, headers={"User-Agent": "obs-stream-kit/1.0"})
+        # Metric-Endpoint = letztes Pfadsegment (z.B. GetPlayerAchievements)
+        try:
+            from app.metrics import observe_external
+            ep = path.rstrip("/").split("/")[-2] or "unknown"
+            _obs = observe_external("steam", ep)
+        except Exception:
+            _obs = None
+        if _obs is not None:
+            _obs.__enter__()
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                if _obs is not None:
+                    _obs.set_status(r.status)
                 return json.loads(r.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
+            if _obs is not None:
+                _obs.set_status(e.code)
             raise SteamApiError(
                 f"Steam API HTTP {e.code} on {path}: {e.reason}") from e
         except Exception as e:
+            if _obs is not None:
+                _obs.set_status("exception")
             raise SteamApiError(f"Steam API call failed on {path}: {e}") from e
+        finally:
+            if _obs is not None:
+                _obs.__exit__(None, None, None)
 
     # ── High-Level ───────────────────────────────────────────────────────────
     def get_avatar_frame(self) -> dict:
