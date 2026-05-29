@@ -269,33 +269,33 @@
 <body>
   <h1>Achievement Browser</h1>
   <p class="intro">
-    Alle in der DB gespeicherten Achievements. Pro Game filterbar.
-    <b>Klick auf eine Kachel</b> markiert das Achievement als
-    "ungesehen" — das <a href="/widgets/steam/achievement-popup.html"
-    target="_blank" style="color:var(--pubg-gold)">achievement-popup-Widget</a>
-    bzw. die <a href="/widgets/steam/popup.html"
+    All achievements stored in the DB. Filterable per game.
+    <b>Click a tile</b> to mark the achievement as "unseen" — the
+    <a href="/widgets/steam/achievement-popup.html"
+    target="_blank" style="color:var(--pubg-gold)">achievement-popup widget</a>
+    or the <a href="/widgets/steam/popup.html"
     target="_blank" style="color:var(--pubg-gold)">combined-popup</a>
-    feuern es dann beim nächsten Poll mit Sound + Animation. Praktisch
-    zum Testen oder für Stream-Recaps einzelner Highlights.
+    will fire it on the next poll with sound + animation. Handy for testing
+    or for stream recaps of individual highlights.
   </p>
 
   <div class="toolbar">
     <div class="grp">
       <label>Game:</label>
       <select id="gameFilter">
-        <option value="">— Alle Games —</option>
+        <option value="">— All games —</option>
       </select>
     </div>
     <div class="grp">
-      <label>Suche:</label>
-      <input id="searchInput" type="text" placeholder="Name / Beschreibung" style="width: 220px;">
+      <label>Search:</label>
+      <input id="searchInput" type="text" placeholder="Name / description" style="width: 220px;">
     </div>
     <div class="grp">
-      <label>Sortierung:</label>
+      <label>Sort:</label>
       <select id="sortSelect">
-        <option value="recent">Neueste zuerst</option>
-        <option value="oldest">Älteste zuerst</option>
-        <option value="rare">Rarität (rarest first)</option>
+        <option value="recent">Newest first</option>
+        <option value="oldest">Oldest first</option>
+        <option value="rare">Rarity (rarest first)</option>
         <option value="name">Name A→Z</option>
       </select>
     </div>
@@ -304,12 +304,12 @@
       <input id="rarePctInput" type="number" min="1" max="50" value="10" style="width: 60px;">
     </div>
     <div class="grp">
-      <label title="Nur Achievements zeigen, die seit dem Oeffnen dieser Seite neu dazugekommen sind — praktisch um im Stream zu pruefen ob ein eben getriggertes Achievement bereits in der DB angekommen ist.">
-        <input id="liveOnly" type="checkbox" style="vertical-align:middle;margin-right:4px"> Nur Live
+      <label title="Only show achievements that were added since this page was opened — handy for checking during a stream whether a just-triggered achievement has arrived in the DB.">
+        <input id="liveOnly" type="checkbox" style="vertical-align:middle;margin-right:4px"> Live only
       </label>
     </div>
     <div class="grp">
-      <label title="Persistente Server-Setting — gilt fuer ALLE neuen Steam-Calls inkl. der Achievement-Popups. Wechseln triggert sofortige Neu-Uebersetzung der Liste.">Sprache:</label>
+      <label title="Persistent server setting — applies to ALL new Steam calls including achievement popups. Switching triggers an immediate re-translation of the list.">Language:</label>
       <select id="langSelect">
         <option value="english">English</option>
         <option value="german">Deutsch</option>
@@ -331,7 +331,7 @@
         <option value="turkish">Türkçe</option>
       </select>
     </div>
-    <div class="stats" id="stats">— Achievements werden geladen —</div>
+    <div class="stats" id="stats">— Loading achievements —</div>
   </div>
 
   <div class="grid" id="grid"></div>
@@ -381,7 +381,7 @@
     function fmtDate(unixSec) {
       if (!unixSec) return "—";
       const d = new Date(unixSec * 1000);
-      return d.toLocaleDateString("de-DE", {
+      return d.toLocaleDateString("en-US", {
         day: "2-digit", month: "2-digit", year: "numeric",
       });
     }
@@ -389,9 +389,9 @@
     function fmtDateTime(unixSec) {
       if (!unixSec) return "—";
       const d = new Date(unixSec * 1000);
-      return d.toLocaleDateString("de-DE", {
+      return d.toLocaleDateString("en-US", {
         day: "2-digit", month: "2-digit", year: "numeric",
-      }) + " " + d.toLocaleTimeString("de-DE", {
+      }) + " " + d.toLocaleTimeString("en-US", {
         hour: "2-digit", minute: "2-digit",
       });
     }
@@ -465,7 +465,7 @@
 
       // Rich-Hover-Popover Daten als data-Attribute serialisieren.
       const fullDate = a.unlockedAt
-        ? new Date(a.unlockedAt * 1000).toLocaleString("de-DE",
+        ? new Date(a.unlockedAt * 1000).toLocaleString("en-US",
             {day:"2-digit", month:"2-digit", year:"numeric",
              hour:"2-digit", minute:"2-digit", second:"2-digit"})
         : "?";
@@ -489,10 +489,10 @@
       }
       // sessionPct + matchPct getrennt anzeigen
       const sessPctLine = (isPubg && a.sessionPct != null)
-        ? `Session-Pct: ${a.sessionPct.toFixed(1)}% deiner Sessions`
+        ? `Session pct: ${a.sessionPct.toFixed(1)}% of your sessions`
         : null;
       const matchPctLine = (isPubg && a.matchPct != null)
-        ? `Match-Pct:   ${a.matchPct.toFixed(2)}% deiner Matches`
+        ? `Match pct:   ${a.matchPct.toFixed(2)}% of your matches`
         : null;
       const globalPctLine = (!isPubg && a.globalPct != null)
         ? `${a.globalPct.toFixed(1)}% of players globally`
@@ -564,7 +564,7 @@
 
       gridEl.innerHTML = view.length
         ? view.map(tileHtml).join("")
-        : `<div class="empty" style="grid-column: 1 / -1;">Keine Achievements für diese Filter.</div>`;
+        : `<div class="empty" style="grid-column: 1 / -1;">No achievements match these filters.</div>`;
       statsEl.innerHTML = `<b>${view.length}</b> / ${all.length} Achievements`;
     }
 
@@ -585,10 +585,10 @@
           setTimeout(() => tileEl.classList.remove("fresh-triggered"), 1300);
           showToast(`<b>✓ Triggered</b> — Popup-Widget feuert es jetzt`);
         } else {
-          showToast(`<b>○ Schon ungesehen</b> — kommt eh beim nächsten Poll`);
+          showToast(`<b>○ Already unseen</b> — will fire on the next poll anyway`);
         }
       } catch (e) {
-        showToast(`<b>✗ Fehler:</b> ${e.message || e}`);
+        showToast(`<b>✗ Error:</b> ${e.message || e}`);
       }
     }
 
@@ -673,12 +673,12 @@
     langSel.addEventListener("change", async (e) => {
       const lang = e.target.value;
       statsEl.textContent =
-        `Setze Sprache '${lang}' + lade Achievements neu (beim ersten Wechsel ` +
-        `pro Sprache wird das Schema pro Game von Steam gepullt — kann was dauern)…`;
+        `Setting language to '${lang}' and reloading achievements (the first ` +
+        `switch per language pulls the schema for each game from Steam — may take a moment)…`;
       try {
         await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/steam/language?lang=" + encodeURIComponent(lang));
       } catch (err) {
-        statsEl.textContent = "Sprach-Setting fehlgeschlagen: " + err;
+        statsEl.textContent = "Language setting failed: " + err;
         return;
       }
       currentLang = lang;
@@ -697,7 +697,7 @@
 
     function rebuildGameDropdown() {
       const prev = gameSel.value;
-      gameSel.innerHTML = `<option value="">— Alle Games (${all.length}) —</option>`
+      gameSel.innerHTML = `<option value="">— All games (${all.length}) —</option>`
         + games.map(g =>
             `<option value="${g.appId}">${(g.name || "App #" + g.appId).replace(/</g, "&lt;")} (${g.count})</option>`
           ).join("");
@@ -761,7 +761,7 @@
         rebuildGameDropdown();
         applyFilters();
       } catch (e) {
-        statsEl.textContent = "Fehler beim Laden: " + e;
+        statsEl.textContent = "Loading failed: " + e;
       } finally {
         document.body.classList.remove("loading");
       }
@@ -810,8 +810,8 @@
       applyFilters();
       const firstName = truly_new[0].displayName || truly_new[0].apiName;
       const msg = truly_new.length === 1
-        ? `<b>✨ Neu:</b> ${firstName.replace(/</g, "&lt;")}`
-        : `<b>✨ ${truly_new.length} neue Achievements</b>`;
+        ? `<b>✨ New:</b> ${firstName.replace(/</g, "&lt;")}`
+        : `<b>✨ ${truly_new.length} new achievements</b>`;
       showToast(msg);
     }
 
