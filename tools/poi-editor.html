@@ -221,7 +221,7 @@
       <div class="hint">
         <b>▭ Rechteck:</b> click+drag<br>
         <b>⬠ Polygon:</b> klicken um Punkte zu setzen, doppel-klick zum Schließen<br>
-        <b>Drag</b> Vertex-Handle zum Verschieben &nbsp;·&nbsp; <b>Shift+Click</b> auf Kante = neuer Vertex &nbsp;·&nbsp; <b>Alt+Click</b> auf Vertex = löschen<br>
+        <b>Drag</b> Vertex-Handle zum Verschieben &nbsp;·&nbsp; <b>Shift+Click</b> auf Kante = neuer Vertex &nbsp;·&nbsp; <b>Alt+Click</b> oder <b>Delete</b> über Vertex = löschen<br>
         <b>Mausrad</b> = Zoom &nbsp;·&nbsp; <b>Rechtsklick-Drag</b> = Pan
       </div>
       <div id="regionList"></div>
@@ -294,6 +294,7 @@ let mapKm = 8;
 let regions = [];     // [{name, points: [[x,y], ...]}]  coords in cm
 let pins = [];        // [{name, x, y}]
 let selectedIdx = -1;
+let _hoverVertexIdx = -1;  // letzter unter dem Cursor schwebender Vertex (fuer Delete-Key-Shortcut)
 let mode = "view";    // 'view' | 'drawing-rect' | 'drawing-poly' | 'moving-vertex' | 'moving-region' | 'panning'
 let drawStart = null; // for rect-drag
 let drawCurrent = null;
@@ -1181,7 +1182,11 @@ canvas.addEventListener("mousemove", (ev) => {
 
   // Cursor in view-mode
   if (mode === "view") {
-    const overVertex = (selectedIdx >= 0 && hitTestVertex(lx, ly) >= 0);
+    const hoveredV = (selectedIdx >= 0) ? hitTestVertex(lx, ly) : -1;
+    const overVertex = hoveredV >= 0;
+    // Track fuer Delete-Key-Shortcut (Alt+Click wird auf Linux/X11
+    // oft vom Window-Manager abgefangen, Mod1+Button1 = window move).
+    _hoverVertexIdx = overVertex ? hoveredV : -1;
     if (spaceDown) canvas.style.cursor = "grab";
     else if (ev.altKey && overVertex) canvas.style.cursor = "not-allowed";  // = vertex loeschen
     else if (overVertex) canvas.style.cursor = "move";
@@ -1285,6 +1290,20 @@ window.addEventListener("keydown", (ev) => {
   if (ev.code === "Space" && !ev.repeat) {
     spaceDown = true;
     canvas.style.cursor = "grab";
+    ev.preventDefault();
+    return;
+  }
+  // Delete/Backspace: loescht den unter dem Cursor schwebenden Vertex
+  // der selektierten Region. Alternative zu Alt+Click — letzteres wird
+  // unter Linux/X11 oft vom Window-Manager geschluckt (Mod1+Button1
+  // = window move). Mindestens 4 Punkte muessen bleiben.
+  if ((ev.key === "Delete" || ev.key === "Backspace") &&
+      selectedIdx >= 0 && _hoverVertexIdx >= 0) {
+    if (regions[selectedIdx].points.length > 3) {
+      regions[selectedIdx].points.splice(_hoverVertexIdx, 1);
+      _hoverVertexIdx = -1;
+      renderAll();
+    }
     ev.preventDefault();
     return;
   }
