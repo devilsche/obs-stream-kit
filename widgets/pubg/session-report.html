@@ -1475,8 +1475,11 @@
             const wn = life.death.weaponName || "?";
             const dist = life.death.distanceM
               ? ` auf <b>${life.death.distanceM.toFixed(0)}m</b>` : "";
-            if (life.death.causeLabel) {
-              row += ` <span class="md-died">— gestorben in <b>${deathP || "?"}</b> — <b>${life.death.causeLabel}</b></span>`;
+            // Cause-Label-Prioritaet: death > knock > Standard
+            const causeLbl = life.death.causeLabel || life.death.knockCauseLabel;
+            if (causeLbl) {
+              const verb = life.death.causeLabel ? "gestorben" : "geknockt+gestorben";
+              row += ` <span class="md-died">— ${verb} in <b>${deathP || "?"}</b> — <b>${causeLbl}</b></span>`;
             } else {
               row += ` <span class="md-died">— gestorben in <b>${deathP || "?"}</b> durch <b>${killer}</b> mit <b>${wn}</b>${dist}</span>`;
             }

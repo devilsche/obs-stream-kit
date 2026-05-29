@@ -1198,6 +1198,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 # Crawl-Path: war der Spieler vor dem Tod im DBNO-Zustand?
                 # Letztes Knock-Event mit target=acc vor death suchen.
                 knock_ts = None
+                knock_ev = None
                 for k in ev_rows:
                     if k["event_type"] != "Knock": continue
                     if k["target_account"] != acc: continue
@@ -1211,6 +1212,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                     if revived: continue
                     if knock_ts is None or kts > knock_ts:
                         knock_ts = kts
+                        knock_ev = k
                 crawl = []
                 if knock_ts is not None:
                     crawl = [
@@ -1224,6 +1226,18 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                     ]
                 cause_label = _death_cause_label(death_ev, acc, wid,
                                                   weapon_name, ev_rows=ev_rows)
+                # Wenn Tod selbst keine Ursache liefert, aber ein Knock
+                # davor — schaue ob DER Knock ein Vehicle-Eject-Knock war.
+                # Frontend kann dann 'knocked aus Fahrzeug gesprungen'
+                # rendern. Vehicle-Eject-Knock-Pattern: actor=NULL ODER
+                # actor==victim mit Mesh-weapon, plus VehicleLeave davor.
+                knock_cause_label = None
+                if knock_ev is not None:
+                    kw = knock_ev["weapon"]
+                    knock_cause_label = _death_cause_label(
+                        knock_ev, acc, kw,
+                        _weapon_label(kw)[0] if kw else None,
+                        ev_rows=ev_rows)
                 death_info = {
                     "x":           death_ev["victim_x"],
                     "y":           death_ev["victim_y"],
@@ -1232,6 +1246,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                     "weaponId":    wid,
                     "weaponName":  weapon_name,
                     "causeLabel":  cause_label,
+                    "knockCauseLabel": knock_cause_label,
                     "distanceM":   (round((death_ev["distance"] or 0) / 100.0, 1)
                                     if death_ev["distance"] else None),
                     "knockTsMs":   knock_ts,
