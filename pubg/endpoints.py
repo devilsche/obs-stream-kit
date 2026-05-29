@@ -653,22 +653,44 @@ class EndpointRegistry:
         m_row = conn.execute(
             "SELECT map_name FROM matches WHERE tenant_id = ? AND match_id = ?",
             (self.tenant_id, match_id,)).fetchone()
-        if not m_row:
-            return _err(404, "match not found")
-        map_name = m_row["map_name"]
+        # Match ist nicht in DB — kann sein dass es > 14 Tage alt ist und
+        # aus der API-Liste gefallen ist, aber HiDrive hat das Blob evtl.
+        # noch. Versuchen wir es trotzdem: map_name dann aus Raw-Events.
+        map_name = m_row["map_name"] if m_row else None
 
         # Map-Groesse aus POIs (Fallback 8km)
         pois = self._load_pois()
-        alias = "Baltic_Main" if map_name == "Erangel_Main" else map_name
-        blob = pois.get(alias) or pois.get(map_name) or {}
-        mapKm = float(blob.get("mapKm") or 8)
+        def _map_meta(mn):
+            alias = "Baltic_Main" if mn == "Erangel_Main" else mn
+            b = pois.get(alias) or pois.get(mn) or {}
+            return float(b.get("mapKm") or 8)
+        mapKm = _map_meta(map_name) if map_name else 8.0
 
-        # Raw-Telemetrie von HiDrive
+        # Raw-Telemetrie von HiDrive — Single Source of Truth
         here = os.path.dirname(os.path.abspath(__file__))
         secrets = os.path.join(os.path.dirname(here), ".secrets")
         raw = hidrive_telemetry.download_raw(match_id, secrets)
         if not raw:
-            return _err(404, "no telemetry available for this match")
+            if not m_row:
+                return _err(404, "Match nicht gefunden — weder in der "
+                                  "Datenbank noch im HiDrive-Telemetrie-"
+                                  "Archiv vorhanden (Match-ID korrekt?).")
+            return _err(404, "Keine Telemetrie fuer dieses Match auf "
+                              "HiDrive vorhanden — moeglicherweise lief "
+                              "der Telemetrie-Download fehl oder das "
+                              "Match ist abgelaufen (>14 Tage).")
+
+        # map_name aus Raw extrahieren wenn DB-Row fehlte
+        if not map_name:
+            try:
+                from pubg.telemetry import extract_map_name
+                map_name = extract_map_name(raw)
+                if map_name:
+                    mapKm = _map_meta(map_name)
+            except Exception:
+                pass
+            if not map_name:
+                map_name = "Baltic_Main"  # ultra-Fallback
 
         # Team-Mapping + Namen
         team_mapping = get_team_mapping_for_match(conn.raw, self.tenant_id, match_id)

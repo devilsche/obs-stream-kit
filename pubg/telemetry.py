@@ -167,6 +167,24 @@ def _normalize(event):
 # Events die wir immer behalten (auch ohne Squad-Beteiligung) — wichtig für
 # Fight-Cluster-Detection: enemy-vs-enemy Kills/Knocks zeigen welche anderen
 # Teams im selben Fight involviert sind.
+def extract_map_name(events) -> str | None:
+    """Sucht in den Raw-Events den Map-Namen.
+
+    PUBG-Telemetrie hat ein LogMatchStart-Event ganz am Anfang mit
+    `mapName`. Wir nehmen das. Fallback: das erste Event mit common-keys.
+    """
+    for e in events:
+        if e.get("_T") == "LogMatchStart":
+            mn = e.get("mapName") or (e.get("matchInfo") or {}).get("mapName")
+            if mn:
+                return mn
+    for e in events[:50]:
+        mn = e.get("mapName")
+        if mn:
+            return mn
+    return None
+
+
 def extract_player_names(events):
     """Sammelt alle (account_id -> name) Paare aus den Raw-Telemetry-
     Events. Quelle: jedes Event hat character/killer/victim/attacker-
