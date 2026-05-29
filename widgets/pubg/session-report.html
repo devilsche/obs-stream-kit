@@ -311,7 +311,7 @@
     .md-matchid:hover { background: rgba(94,42,121,0.25); }
     .md-mapwrap {
       position: relative;
-      width: 300px; height: 300px;
+      width: 600px; height: 600px;
       margin: 0;
       background: #0d061a;
       border: 1px solid var(--pubg-border);
@@ -321,7 +321,7 @@
     }
     .md-mapwrap canvas {
       position: absolute; inset: 0;
-      width: 300px; height: 300px; display: block;
+      width: 600px; height: 600px; display: block;
     }
     .md-mapwrap canvas.md-overlay { pointer-events: none; }
     .md-mapwrap .md-zoombtns {
@@ -974,7 +974,10 @@
       "#f2b705", "#e74c3c", "#3498db", "#2ecc71",
       "#ff7a1f", "#9b59b6", "#1abc9c", "#ec407a",
     ];
-    const MD_MAP_PX = 300;
+    // Canvas-Display-Size (px). devicePixelRatio wird in mdRenderBasemap
+    // separat angewendet, damit das Bitmap-Buffer hoeher aufgeloest ist
+    // als die CSS-Box — fuer scharfe HD-Maps auch auf Retina-Screens.
+    const MD_MAP_PX = 600;
     const MD_PAD_500M_CM = 50000;   // 500m padding fuer Default-Bbox
     const MD_MIN_ZOOM_CM = 5000;    // 50m minimal sichtbarer Radius
     const MD_MAX_ZOOM_CM = 800000;  // 8km — ganze Map default Erangel-Range
@@ -1133,10 +1136,17 @@
       host.dataset.mapKm = mapKm;
       host.dataset.cal = JSON.stringify(cal);
 
-      canvas.width = MD_MAP_PX; canvas.height = MD_MAP_PX;
+      // Bitmap-Buffer auf devicePixelRatio (gecappt bei 2) skalieren —
+      // auf Retina (DPR=2) ist Buffer 1200x1200, CSS bleibt 600x600 →
+      // 2x scharfere Map-Details.
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const BUF = Math.round(MD_MAP_PX * dpr);
+      canvas.width = BUF; canvas.height = BUF;
       const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
       ctx.fillStyle = "#0d061a";
-      ctx.fillRect(0, 0, MD_MAP_PX, MD_MAP_PX);
+      ctx.fillRect(0, 0, BUF, BUF);
 
       const img = await mdMapImage(mapName);
       if (!img || !img.naturalWidth) return;
@@ -1168,14 +1178,19 @@
       const sh = ((cmY1 - cmY0) / mapCm) * side;
 
       // Clamping wenn Viewport ueber Karten-Rand geht — pad mit Hintergrund
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, MD_MAP_PX, MD_MAP_PX);
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, BUF, BUF);
     }
 
     function mdRenderOverlay(host) {
       const canvas = host.querySelector("canvas.md-overlay");
       if (!canvas) return;
-      canvas.width = MD_MAP_PX; canvas.height = MD_MAP_PX;
+      // Buffer auf DPR skalieren + ctx.scale damit unsere Zeichen-
+      // koordinaten weiter in CSS-Pixeln (0..MD_MAP_PX) liegen.
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const BUF = Math.round(MD_MAP_PX * dpr);
+      canvas.width = BUF; canvas.height = BUF;
       const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, MD_MAP_PX, MD_MAP_PX);
 
       const s = mdGetState(host);
