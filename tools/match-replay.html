@@ -31,6 +31,25 @@
     .team-swatch { width: 14px; height: 14px; border-radius: 3px; flex: none; }
     .team.focused { outline: 2px solid #f2b705; }
     .team-players { padding: 0 8px 6px 30px; font-size: 0.85em; color: #ccc; }
+    .team-players .player {
+      display: flex; justify-content: space-between; align-items: baseline;
+      gap: 8px; padding: 1px 0;
+    }
+    .team-players .player .pname { overflow: hidden; text-overflow: ellipsis;
+                                    white-space: nowrap; }
+    .team-players .player .pkills {
+      color: #f2b705; font-variant-numeric: tabular-nums; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .team-players .player .pkills small { color: #8a7d99; font-weight: 400;
+                                            margin-left: 2px; font-size: 0.85em; }
+    .team-players .player.dead .pname,
+    .team-players .player.dead .pkills,
+    .team-players .player.dead .pkills small {
+      color: #555; text-decoration: line-through;
+      text-decoration-color: rgba(255,255,255,0.25);
+    }
+    .team-players .player.dead .pkills { color: #6a5a3a; }
     .team.bot-team { opacity: 0.55; }
     .team.bot-team strong { color: #aaa; font-weight: 400; }
     .toggles { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }

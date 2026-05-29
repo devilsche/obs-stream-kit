@@ -104,8 +104,10 @@ async function loadReplay(matchId) {
   const poiResp = await PubgUI.fetchJson(
     "/api/pubg/pois?map=" + encodeURIComponent(alias));
   RS._poiBlob = (poiResp && poiResp.data) || poiResp;
-  buildTeamList();
+  // buildPlayerTracks fuellt RS._deaths — vor buildTeamList damit das
+  // Team-List initial den dead-state und Kill-Counts kennt.
   buildPlayerTracks();
+  buildTeamList();
   syncScrubberAndClock();
   // resize + initial render
   if (window._rsInitCanvas) window._rsInitCanvas();
@@ -115,8 +117,24 @@ async function loadReplay(matchId) {
 function buildTeamList() {
   const host = document.getElementById("teamList");
   if (!RS.replay) { host.innerHTML = ""; return; }
+  // Kill-Counter pro Account aus den Replay-Events
+  const killCount = {};
+  for (const e of RS.replay.events) {
+    if (e.type === "kill" && e.actorId) {
+      killCount[e.actorId] = (killCount[e.actorId] || 0) + 1;
+    }
+  }
   host.innerHTML = RS.replay.teams.map(t => {
     const bot = isBotTeam(t.teamId);
+    const players = t.players.map(p => {
+      const k = killCount[p.accountId] || 0;
+      const botLbl = isBotAcc(p.accountId) ? " ·BOT" : "";
+      return `<div class="player" data-acc="${p.accountId}">`
+           + `<span class="pname">${p.name}${botLbl}</span>`
+           + `<span class="pkills" title="Kills in diesem Match">`
+           + `${k}<small>K</small></span>`
+           + `</div>`;
+    }).join("");
     return `
     <div class="team${bot ? " bot-team" : ""}" data-team="${t.teamId}">
       <div class="team-head" role="button" tabindex="0"
@@ -124,11 +142,11 @@ function buildTeamList() {
         <span class="team-swatch" style="background:${t.color}"></span>
         <strong>Team ${t.teamId}${bot ? " 🤖" : ""}</strong>
       </div>
-      <div class="team-players">
-        ${t.players.map(p => p.name + (isBotAcc(p.accountId) ? " ·BOT" : "")).join("<br>")}
-      </div>
+      <div class="team-players">${players}</div>
     </div>`;
   }).join("");
+  // Initial dead-state setzen (Cursor=0 -> niemand tot)
+  updateTeamListDeadState(0);
   host.querySelectorAll(".team-head").forEach(el => {
     const tid = Number(el.closest(".team").dataset.team);
     const focus = () => setFocus(tid);
@@ -136,6 +154,27 @@ function buildTeamList() {
     el.addEventListener("keydown", e => {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); focus(); }
     });
+  });
+}
+
+function updateTeamListDeadState(cursorMs) {
+  // Pro Spieler: wenn ein Death-Event <= cursorMs UND kein Reland nach
+  // diesem Death — markiere als dead. Performance: O(players * deaths).
+  const tl = document.getElementById("teamList");
+  if (!tl) return;
+  tl.querySelectorAll(".player").forEach(el => {
+    const acc = el.dataset.acc;
+    if (!acc) return;
+    const deaths = RS._deaths[acc] || [];
+    const relands = RS._relands[acc] || [];
+    let dead = false;
+    for (const d of deaths) {
+      if (d <= cursorMs) {
+        const revived = relands.some(r => r > d && r <= cursorMs);
+        if (!revived) dead = true;
+      }
+    }
+    el.classList.toggle("dead", dead);
   });
 }
 
@@ -745,6 +784,7 @@ function tick(wallNow) {
       document.getElementById("playPause").textContent = "▶";
     }
     syncScrubberAndClock();
+    updateTeamListDeadState(RS.cursorMs);
     renderFrame();
   } else if (animating) {
     renderFrame();
@@ -782,6 +822,7 @@ document.getElementById("scrubber").addEventListener("input", () => {
   RS.playing = false;
   document.getElementById("playPause").textContent = "▶";
   syncScrubberAndClock();
+  updateTeamListDeadState(RS.cursorMs);
   renderFrame();
 });
 
