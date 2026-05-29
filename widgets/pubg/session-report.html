@@ -296,6 +296,19 @@
     .md-mapcol { display: flex; flex-direction: column; gap: 6px; }
     .md-rightcol { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
     .md-rightcol .squad-table-wrap { max-height: 220px; overflow-y: auto; }
+    .md-matchid {
+      font-family: ui-monospace, "Cascadia Mono", monospace;
+      font-size: 0.72em;
+      color: var(--pubg-muted, #8a7d99);
+      background: rgba(94,42,121,0.15);
+      border: 1px solid rgba(94,42,121,0.35);
+      border-radius: 3px;
+      padding: 4px 8px;
+      cursor: pointer;
+      user-select: all;
+      word-break: break-all;
+    }
+    .md-matchid:hover { background: rgba(94,42,121,0.25); }
     .md-mapwrap {
       position: relative;
       width: 300px; height: 300px;
@@ -1212,7 +1225,9 @@
             ctx.stroke();
           }
 
-          // groundPath als Trail bis cursor (nicht im Default-View)
+          // groundPath als Trail bis cursor (nicht im Default-View) —
+          // interpoliert das letzte Segment damit das Wegende GLEICHMAESSIG
+          // mit dem Pin mitwandert (sonst springt der Weg in 10s-Stufen).
           if (!inDefault && landingTs && life.groundPath.length >= 2) {
             const trailEnd = life.death
               ? Math.min(absTs, life.death.tsMs)
@@ -1223,12 +1238,28 @@
               ctx.lineWidth = 1.5;
               ctx.beginPath();
               let started = false;
+              let lastDrawnIdx = -1;
               for (let i = 0; i < life.groundPath.length; i++) {
                 const [xCm, yCm, ts] = life.groundPath[i];
                 if (ts > trailEnd) break;
                 const [cx, cy] = mdCmToCanvas(host, xCm, yCm);
                 if (!started) { ctx.moveTo(cx, cy); started = true; }
                 else { ctx.lineTo(cx, cy); }
+                lastDrawnIdx = i;
+              }
+              // Interpoliertes letztes Segment: zwischen lastDrawn und naechstem Sample
+              if (started && lastDrawnIdx >= 0
+                  && lastDrawnIdx < life.groundPath.length - 1) {
+                const [, , tsA] = life.groundPath[lastDrawnIdx];
+                const [xB, yB, tsB] = life.groundPath[lastDrawnIdx + 1];
+                if (tsB > tsA && trailEnd > tsA) {
+                  const f = Math.min(1, (trailEnd - tsA) / (tsB - tsA));
+                  const [xA, yA] = life.groundPath[lastDrawnIdx];
+                  const ix = xA + (xB - xA) * f;
+                  const iy = yA + (yB - yA) * f;
+                  const [icx, icy] = mdCmToCanvas(host, ix, iy);
+                  ctx.lineTo(icx, icy);
+                }
               }
               ctx.stroke();
               ctx.globalAlpha = 1;
@@ -1236,7 +1267,7 @@
           }
 
           // Crawl-Path nach Knock (gekrochener Weg zwischen DBNO und Tod) —
-          // gestrichelt in heller Member-Farbe.
+          // gestrichelt in heller Member-Farbe. Letztes Segment interpoliert.
           if (!inDefault && life.death && life.death.knockTsMs
               && life.death.crawl && life.death.crawl.length >= 2) {
             const knockTs = life.death.knockTsMs;
@@ -1248,11 +1279,25 @@
               ctx.setLineDash([3, 3]);
               ctx.beginPath();
               let started = false;
-              for (const [xCm, yCm, ts] of life.death.crawl) {
+              let lastIdx = -1;
+              for (let i = 0; i < life.death.crawl.length; i++) {
+                const [xCm, yCm, ts] = life.death.crawl[i];
                 if (ts > trailEnd) break;
                 const [cx, cy] = mdCmToCanvas(host, xCm, yCm);
                 if (!started) { ctx.moveTo(cx, cy); started = true; }
                 else { ctx.lineTo(cx, cy); }
+                lastIdx = i;
+              }
+              if (started && lastIdx >= 0 && lastIdx < life.death.crawl.length - 1) {
+                const [xA, yA, tsA] = life.death.crawl[lastIdx];
+                const [xB, yB, tsB] = life.death.crawl[lastIdx + 1];
+                if (tsB > tsA && trailEnd > tsA) {
+                  const f = Math.min(1, (trailEnd - tsA) / (tsB - tsA));
+                  const ix = xA + (xB - xA) * f;
+                  const iy = yA + (yB - yA) * f;
+                  const [icx, icy] = mdCmToCanvas(host, ix, iy);
+                  ctx.lineTo(icx, icy);
+                }
               }
               ctx.stroke();
               ctx.setLineDash([]);
@@ -1522,6 +1567,7 @@
             </div>
           </div>
           <div class="md-rightcol">
+            <div class="md-matchid" title="Klick = Match-ID kopieren">${matchId}</div>
             <div class="squad-table-wrap">${tableHtml}</div>
             <div class="md-allebar">
               <button class="md-allebtn">● Alle sichtbar</button>
@@ -1694,6 +1740,19 @@
 
     // Globale Event-Delegations
     document.addEventListener("click", (e) => {
+      const mid = e.target.closest && e.target.closest(".md-matchid");
+      if (mid) {
+        const id = mid.textContent.trim();
+        if (id && navigator.clipboard) {
+          navigator.clipboard.writeText(id).then(() => {
+            const orig = mid.textContent;
+            mid.textContent = "✓ kopiert";
+            setTimeout(() => { mid.textContent = orig; }, 1200);
+          });
+        }
+        e.stopPropagation();
+        return;
+      }
       const playBtn = e.target.closest && e.target.closest(".md-play-btn");
       if (playBtn) {
         const host = playBtn.closest(".md-host");
@@ -2164,6 +2223,9 @@
       if (isEvent) {
         return `
           <div class="detail-row has-event">
+            <div style="grid-column:1/-1;width:100%">
+              <div class="md-matchid" title="Klick = Match-ID kopieren">${matchId}</div>
+            </div>
             <div class="squad-table-wrap">${tableHtml}</div>
             <div class="event-detail" data-event-detail-match-id="${matchId}">
               <div class="event-detail-empty">— event stats laden —</div>
