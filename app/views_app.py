@@ -82,6 +82,7 @@ def pending_check():
 @require_session
 def settings():
     conn = _get_conn()
+    from pubg.db_pg import get_setting, set_setting
     try:
         if request.method == "POST":
             pubg_name = request.form.get("pubg_name") or None
@@ -99,13 +100,25 @@ def settings():
                     conn, g.tenant_id,
                     steam_id=steam_id, api_key=steam_api_key
                 )
+            # Defaults (Widget-Range + Sprache) — speichern wenn explizit gesetzt
+            default_range = request.form.get("default_range")
+            if default_range in ("session", "week", "all"):
+                set_setting(conn, g.tenant_id, "ui.default_range", default_range)
+            lang = request.form.get("lang")
+            if lang in ("de", "en"):
+                set_setting(conn, g.tenant_id, "ui.lang", lang)
             return redirect("/app/settings?saved=1")
         creds = core_creds.get(conn, g.tenant_id)
+        prefs = {
+            "default_range": get_setting(conn, g.tenant_id, "ui.default_range",
+                                          default="session"),
+            "lang": get_setting(conn, g.tenant_id, "ui.lang", default="de"),
+        }
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()
     return render_template("settings.html",
-                           user=g.user, creds=creds,
+                           user=g.user, creds=creds, prefs=prefs,
                            saved=request.args.get("saved"))
 
 

@@ -47,6 +47,29 @@
                placeholder="{% if creds.steam_api_key %}(stored — leave blank to keep){% else %}from steamcommunity.com/dev{% endif %}">
       </div>
 
+      <h3>Defaults</h3>
+      <div class="form-row">
+        <label for="default_range">Default-Range fuer Widgets</label>
+        <select id="default_range" name="default_range">
+          <option value="session" {% if prefs.default_range == 'session' %}selected{% endif %}>Session (current/last)</option>
+          <option value="week"    {% if prefs.default_range == 'week'    %}selected{% endif %}>Last 7 days</option>
+          <option value="all"     {% if prefs.default_range == 'all'     %}selected{% endif %}>All-time (full DB)</option>
+        </select>
+        <small style="color: var(--text-dim); display: block; margin-top: 4px;">
+          Greift fuer Widgets die <code>?range=</code> akzeptieren — wenn URL keinen Range explizit setzt.
+        </small>
+      </div>
+      <div class="form-row">
+        <label for="lang">Sprache</label>
+        <select id="lang" name="lang">
+          <option value="de" {% if prefs.lang == 'de' %}selected{% endif %}>Deutsch</option>
+          <option value="en" {% if prefs.lang == 'en' %}selected{% endif %}>English</option>
+        </select>
+        <small style="color: var(--text-dim); display: block; margin-top: 4px;">
+          Aktuell vorbereitet — Widgets/Tools rendern noch ueberwiegend in Englisch.
+        </small>
+      </div>
+
       <div class="form-actions">
         <button class="btn btn-gold" type="submit">Speichern</button>
         <button class="btn" type="reset"
@@ -55,6 +78,45 @@
         </button>
       </div>
     </form>
+
+    <div class="card">
+      <h3>Twitch-Account</h3>
+      <div class="form-row">
+        <label>Display Name</label>
+        <div style="color: var(--text); font-weight: 700;">{{ user.display_name }}</div>
+      </div>
+      <div class="form-row">
+        <label>Twitch User ID</label>
+        <div style="color: var(--text-muted); font-family: ui-monospace, monospace;">
+          {{ user.twitch_user_id }}
+        </div>
+      </div>
+      {% if user.avatar_url %}
+      <div class="form-row">
+        <label>Avatar</label>
+        <img src="{{ user.avatar_url }}" alt="Twitch-Avatar von {{ user.display_name }}"
+             width="64" height="64" style="border-radius: 8px; border: 1px solid var(--border);">
+      </div>
+      {% endif %}
+      <div class="form-row">
+        <label>Status</label>
+        <div>
+          {% if user.is_admin %}<span class="badge-admin">Admin</span>{% endif %}
+          {% if user.is_approved %}
+            <span style="color: var(--success);">✓ approved</span>
+          {% else %}
+            <span style="color: var(--warning);">⏳ pending</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="form-actions">
+        <a class="btn" href="/app/login">Twitch-Token erneuern</a>
+      </div>
+      <p style="color: var(--text-dim); font-size: 0.85em; margin-top: 14px;">
+        Login-Token sind serverseitig sessioniert. "Erneuern" startet einen neuen Twitch-OAuth-Flow
+        (kann hilfreich sein wenn Display-Name oder Avatar gewechselt wurde).
+      </p>
+    </div>
   </main>
 </div>
 {% endblock %}

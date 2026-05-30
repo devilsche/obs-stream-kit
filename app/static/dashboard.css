@@ -216,6 +216,15 @@ label { color: var(--text-muted); font-size: 0.9em; display: block; margin-botto
 .card h3 { margin-top: 24px; }
 .card h3:first-child { margin-top: 0; }
 
+.badge-admin {
+  display: inline-block;
+  background: var(--brand-gold); color: #1a0d2a;
+  padding: 2px 8px; border-radius: 3px;
+  font-size: 0.75em; letter-spacing: 0.05em;
+  text-transform: uppercase; font-weight: 700;
+  margin-right: 6px;
+}
+
 button, .btn {
   display: inline-flex; align-items: center; gap: 8px;
   background: var(--brand-purple);
