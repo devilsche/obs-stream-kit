@@ -1052,6 +1052,86 @@
       border-radius: 50%; margin-right: 6px;
       vertical-align: -1px;
     }
+    /* ─── Match-Detail Timeline ─────────────────────────────────────────── */
+    .md-timeline {
+      margin-top: 18px;
+      border-top: 1px solid var(--pubg-border);
+      padding-top: 12px;
+    }
+    .md-timeline__head {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 8px;
+      margin-bottom: 10px;
+    }
+    .md-timeline__title {
+      color: var(--pubg-gold);
+      font-size: 1em; font-weight: 700;
+      margin: 0;
+      cursor: pointer;
+      list-style: none;
+    }
+    .md-timeline__title::-webkit-details-marker { display: none; }
+    .md-timeline__filters {
+      display: inline-flex; gap: 6px; flex-wrap: wrap;
+    }
+    .md-timeline__chip {
+      background: transparent;
+      color: var(--pubg-muted);
+      border: 1px solid var(--pubg-border);
+      border-radius: 100px;
+      padding: 4px 12px;
+      font: inherit; font-size: 12px;
+      cursor: pointer;
+      min-height: 32px;
+    }
+    .md-timeline__chip:hover { color: var(--pubg-text); }
+    .md-timeline__chip.is-active {
+      background: var(--pubg-purple);
+      color: #fff;
+      border-color: var(--pubg-purple);
+    }
+    .md-timeline__chip:focus-visible {
+      outline: 2px solid var(--pubg-gold); outline-offset: 2px;
+    }
+    .md-timeline__list {
+      display: flex; flex-direction: column;
+      gap: 2px;
+      font-size: 0.92em;
+      font-variant-numeric: tabular-nums;
+    }
+    .md-tl-row {
+      display: grid;
+      grid-template-columns: 78px minmax(90px, 130px) 28px 1fr auto;
+      gap: 8px;
+      padding: 4px 6px;
+      align-items: baseline;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .md-tl-t      { color: var(--pubg-text); }
+    .md-tl-actor  { font-weight: 700; }
+    .md-tl-arrow  { color: var(--pubg-muted); text-align: center; }
+    .md-tl-rest b { color: var(--pubg-text); }
+    .md-tl-rest .md-tl-veh {
+      color: var(--pubg-gold);
+      font-size: 0.92em;
+      margin-left: 6px;
+    }
+    .md-tl-meta {
+      color: var(--pubg-muted);
+      font-size: 0.85em;
+      white-space: nowrap;
+    }
+    .md-tl-empty {
+      color: var(--pubg-muted);
+      font-style: italic;
+      padding: 12px 0;
+    }
+    @media (max-width: 600px) {
+      .md-tl-row {
+        grid-template-columns: 64px minmax(80px, 1fr) 22px 1fr;
+      }
+      .md-tl-meta { grid-column: 1 / -1; padding-left: 86px; }
+    }
   </style>
 </head>
 <body>
@@ -1691,6 +1771,116 @@
       </table>`;
     }
 
+    // ── Match-Detail Timeline (collapsible, gefiltert) ────────────────
+    const _MD_TIMELINE_TYPE_LABEL = {
+      knock_dealt:     ["knocked",       "&rarr;"],
+      knock_taken:     ["geknockt von",  "&larr;"],
+      kill_dealt:      ["killed",        "&rarr;"],
+      kill_taken:      ["gekillt von",   "&larr;"],
+      revive_given:    ["revived",       "&rarr;"],
+      revive_received: ["revived von",   "&larr;"],
+    };
+    const _MD_TIMELINE_FILTERS = [
+      ["all",     "Alle",    null],
+      ["me",      "Du",      null],
+      ["knocks",  "Knocks",  ["knock_dealt", "knock_taken"]],
+      ["kills",   "Kills",   ["kill_dealt", "kill_taken"]],
+      ["revives", "Revives", ["revive_given", "revive_received"]],
+    ];
+
+    function mdTlFmtAbsClock(playedAtIso, msIntoMatch) {
+      if (!playedAtIso) return "?";
+      const start = Date.parse(playedAtIso);
+      if (isNaN(start)) return "?";
+      const d = new Date(start + (msIntoMatch || 0));
+      return `${String(d.getHours()).padStart(2,"0")}:` +
+             `${String(d.getMinutes()).padStart(2,"0")}:` +
+             `${String(d.getSeconds()).padStart(2,"0")}`;
+    }
+
+    function mdTlPickColor(slot, colorByAcc, account) {
+      if (account && colorByAcc && colorByAcc[account]) return colorByAcc[account];
+      if (slot >= 1 && slot <= MD_SLOT_COLORS.length)
+        return MD_SLOT_COLORS[slot - 1];
+      return "var(--pubg-muted)";
+    }
+
+    function mdTlRowHtml(ev, ctx) {
+      const [verbLbl, arrow] = _MD_TIMELINE_TYPE_LABEL[ev.type] || [ev.type, "·"];
+      const tCell = mdTlFmtAbsClock(ctx.playedAt, ev.tsMs);
+      const actorColor = mdTlPickColor(ev.actorSlot, ctx.colorByAcc,
+                                        ev.actorAccount);
+      const actorName  = ev.actorName || "?";
+      const targetName = ev.targetName || "?";
+      // POI clientseitig aus victimX/Y
+      let poi = "";
+      if (ctx.mapName && PubgUI.POI && PubgUI.POI.fromCoords
+          && ev.victimX != null && ev.victimY != null) {
+        const p = PubgUI.POI.fromCoords(ctx.mapName, ev.victimX, ev.victimY);
+        if (p) poi = `<span class="md-tl-poi">· ${p}</span>`;
+      }
+      const vehVictim  = ev.victimVehicleLabel
+        ? ` <span class="md-tl-veh">aus <b>${ev.victimVehicleLabel}</b></span>`
+        : "";
+      const vehShooter = ev.shooterVehicleLabel
+        ? ` <span class="md-tl-veh">aus eigenem <b>${ev.shooterVehicleLabel}</b></span>`
+        : "";
+      const weapon = ev.weaponName ? `<b>${ev.weaponName}</b>` : "";
+      const dist   = ev.distanceM ? ` · ${ev.distanceM.toFixed(0)}m` : "";
+      const meta   = (weapon || dist) ? `${weapon}${dist}` : "";
+      return `<div class="md-tl-row" data-ev-type="${ev.type}"
+                   data-ev-me="${ev.actorAccount === ctx.myAccount
+                                  || ev.targetAccount === ctx.myAccount}">
+        <span class="md-tl-t">${tCell}</span>
+        <span class="md-tl-actor" style="color:${actorColor}">${actorName}</span>
+        <span class="md-tl-arrow">${arrow}</span>
+        <span class="md-tl-rest">${verbLbl} <b>${targetName}</b>${vehVictim}${vehShooter} ${poi}</span>
+        <span class="md-tl-meta">${meta}</span>
+      </div>`;
+    }
+
+    function renderMdTimeline(events, ctx) {
+      const filters = _MD_TIMELINE_FILTERS.map(([key, lbl]) =>
+        `<button type="button" class="md-timeline__chip${key === "all" ? " is-active" : ""}"
+                 data-tl-filter="${key}">${lbl}</button>`).join("");
+      if (!events || !events.length) {
+        return `<details class="md-timeline-details" open>
+          <summary class="md-timeline__title">Timeline</summary>
+          <div class="md-tl-empty">Keine Squad-Events in diesem Match.</div>
+        </details>`;
+      }
+      const rows = events.map(ev => mdTlRowHtml(ev, ctx)).join("");
+      return `<details class="md-timeline-details" open>
+        <summary class="md-timeline__title">Timeline (${events.length} Events)</summary>
+        <div class="md-timeline__head">
+          <div class="md-timeline__filters">${filters}</div>
+        </div>
+        <div class="md-timeline__list">${rows}</div>
+      </details>`;
+    }
+
+    function wireMdTimelineFilters(rootEl, myAccount) {
+      const chips = rootEl.querySelectorAll(".md-timeline__chip");
+      const rows  = rootEl.querySelectorAll(".md-tl-row");
+      chips.forEach(chip => {
+        chip.addEventListener("click", () => {
+          chips.forEach(c => c.classList.remove("is-active"));
+          chip.classList.add("is-active");
+          const key = chip.getAttribute("data-tl-filter");
+          const spec = _MD_TIMELINE_FILTERS.find(f => f[0] === key);
+          const allow = spec ? spec[2] : null;
+          rows.forEach(r => {
+            const t = r.getAttribute("data-ev-type");
+            const me = r.getAttribute("data-ev-me") === "true";
+            let show = true;
+            if (key === "me") show = me;
+            else if (allow) show = allow.indexOf(t) >= 0;
+            r.style.display = show ? "" : "none";
+          });
+        });
+      });
+    }
+
     async function mdMount(host) {
       if (host.dataset.mounted === "1") return;
       host.dataset.mounted = "1";
@@ -1755,6 +1945,32 @@
       if (panelTitle && md && md.detail) {
         const mapLbl = PubgUI.fmtMap(md.detail.mapName);
         panelTitle.textContent = `Match · ${mapLbl}`;
+      }
+      // Timeline-Sektion fuellen (nur sichtbar wenn Slide-In aktiv ist —
+      // dort gibt es <section id="mdTimelineSection">)
+      const tlSect = document.getElementById("mdTimelineSection");
+      if (tlSect && md && md.detail) {
+        tlSect.hidden = false;
+        const myAcc = (md.detail.members.find(x => x.isSelf) || {}).accountId;
+        const ctx = {
+          playedAt:    null,
+          mapName:     md.detail.mapName,
+          colorByAcc:  md.colorByAcc,
+          myAccount:   myAcc,
+        };
+        // playedAt aus Session-Match-Liste suchen
+        const matchIdAttr = host.getAttribute("data-match-id");
+        try {
+          const sessMatch = (window._allMatchIds || []).indexOf(matchIdAttr);
+          if (sessMatch >= 0 && window._allMatchesByIdx
+              && window._allMatchesByIdx[sessMatch]) {
+            ctx.playedAt = PubgUI.matchStartIso(
+              window._allMatchesByIdx[sessMatch].matchEnd,
+              window._allMatchesByIdx[sessMatch].durationSec);
+          }
+        } catch (_) {}
+        tlSect.innerHTML = renderMdTimeline(md.detail.events || [], ctx);
+        wireMdTimelineFilters(tlSect, myAcc);
       }
       // Match-Zeitraum aus allen Pfaden ableiten
       let mStart = Infinity, mEnd = -Infinity;
@@ -2450,6 +2666,7 @@
       // Modal-Navigation braucht die chrono Liste der Match-IDs
       window._allMatchIds = _sorted
         .map(m => m.matchId || "").filter(Boolean);
+      window._allMatchesByIdx = _sorted;
 
       const phasesHtml = d.phases.map((ph, i) => {
         const s = ph.stats;
