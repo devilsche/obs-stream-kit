@@ -3154,6 +3154,19 @@
       if (_mdPanelCurrentId === matchId && !panel.hidden) return;
       _mdPanelLastFocused = document.activeElement;
       _mdPanelCurrentId = matchId;
+      // Vorheriges md-host (falls Panel bereits offen war) stoppen — sonst
+      // läuft die requestAnimationFrame-Schleife des Zeitraffers auf einem
+      // detachten Canvas weiter und verbrennt CPU.
+      const _prevHost = body.querySelector(".md-host");
+      if (_prevHost) {
+        try {
+          const _prevState = mdGetState(_prevHost);
+          if (_prevState) {
+            _prevState.playToken++;
+            if (_prevState.zeitraffer) _prevState.zeitraffer.playing = false;
+          }
+        } catch (_) {}
+      }
       // Body: existierende mdMount-Logik nutzen via md-host
       body.innerHTML = `
         <div class="md-host" data-match-id="${matchId}" data-map=""></div>
@@ -3177,6 +3190,16 @@
     function mdPanelClose() {
       const panel = document.getElementById("mdPanel");
       if (!panel || panel.hidden) return;
+      const _closeHost = panel.querySelector(".md-host");
+      if (_closeHost) {
+        try {
+          const _closeState = mdGetState(_closeHost);
+          if (_closeState) {
+            _closeState.playToken++;
+            if (_closeState.zeitraffer) _closeState.zeitraffer.playing = false;
+          }
+        } catch (_) {}
+      }
       panel.classList.remove("is-open");
       const finish = () => {
         panel.hidden = true;
