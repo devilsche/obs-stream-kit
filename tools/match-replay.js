@@ -154,7 +154,7 @@ function buildTeamList() {
       <div class="team-head" role="button" tabindex="0"
            aria-label="Team ${t.teamId}${bot ? " (Bots)" : ""} fokussieren">
         <span class="team-swatch" style="background:${t.color}"></span>
-        <strong>Team ${t.teamId}${bot ? " 🤖" : ""}</strong>
+        <strong>Team ${t.teamId}${bot ? ' <span class="material-symbols-outlined icon-sm" aria-hidden="true">smart_toy</span>' : ""}</strong>
       </div>
       <div class="team-players">${players}</div>
     </div>`;

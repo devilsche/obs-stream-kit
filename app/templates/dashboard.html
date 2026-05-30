@@ -13,7 +13,7 @@
 
     {% if cred_status.any_missing %}
     <div class="card" style="border-color: var(--warning);">
-      <h3 style="color: var(--warning);">⚠ Configuration incomplete</h3>
+      <h3 style="color: var(--warning);"><span class="material-symbols-outlined icon-warning" aria-hidden="true">warning</span> Configuration incomplete</h3>
       <ul>
         {% if not cred_status.pubg_ready %}
         <li><a href="/app/settings">PUBG API key + in-game name missing</a> — the poller won't run.</li>
@@ -29,13 +29,13 @@
       <h3>Overview</h3>
       <p style="margin: 0 0 12px;">
         Status:
-        {% if cred_status.pubg_ready %}<span style="color: var(--success);">✓ PUBG</span>{% else %}<span style="color: var(--warning);">⏳ PUBG</span>{% endif %}
+        {% if cred_status.pubg_ready %}<span style="color: var(--success);"><span class="material-symbols-outlined icon-sm icon-success" aria-hidden="true">check_circle</span> PUBG</span>{% else %}<span style="color: var(--warning);"><span class="material-symbols-outlined icon-sm icon-warning" aria-hidden="true">hourglass_empty</span> PUBG</span>{% endif %}
         ·
-        {% if cred_status.steam_ready %}<span style="color: var(--success);">✓ Steam</span>{% else %}<span style="color: var(--warning);">⏳ Steam</span>{% endif %}
+        {% if cred_status.steam_ready %}<span style="color: var(--success);"><span class="material-symbols-outlined icon-sm icon-success" aria-hidden="true">check_circle</span> Steam</span>{% else %}<span style="color: var(--warning);"><span class="material-symbols-outlined icon-sm icon-warning" aria-hidden="true">hourglass_empty</span> Steam</span>{% endif %}
       </p>
       <p>
-        <a href="/app/urls" class="btn">🔗 My OBS URLs</a>
-        <a href="/app/settings" class="btn" style="background: var(--bg-deeper); border: 1px solid var(--border);">⚙️ Settings</a>
+        <a href="/app/urls" class="btn"><span class="material-symbols-outlined" aria-hidden="true">link</span> My OBS URLs</a>
+        <a href="/app/settings" class="btn" style="background: var(--bg-deeper); border: 1px solid var(--border);"><span class="material-symbols-outlined" aria-hidden="true">settings</span> Settings</a>
       </p>
       <p style="color: var(--text-dim); font-size: 13px; margin-top: 16px;">
         Stat cards, match history and system status panel are coming in Spec 3.

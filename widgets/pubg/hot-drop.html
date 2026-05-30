@@ -195,7 +195,7 @@
       const s = d.streak || 0;
       if (s > 0) {
         streakEl.classList.remove("cold");
-        streakEl.innerHTML = `🔥 ${s}`;
+        streakEl.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">local_fire_department</span> ${s}`;
       } else {
         streakEl.classList.add("cold");
         streakEl.innerHTML = "—";

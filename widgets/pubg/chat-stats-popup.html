@@ -193,9 +193,9 @@
           const veh = document.getElementById("vehicle");
           if (ed > 0 || et > 0) {
             const parts = [];
-            if (ed > 0) parts.push(`🚗 shot ${ed} ${ed === 1 ? "player" : "players"} out of a vehicle`);
-            if (et > 0) parts.push(`💀 got shot out of a vehicle ${et} ${et === 1 ? "time" : "times"}`);
-            veh.textContent = parts.join(" · ");
+            if (ed > 0) parts.push(`<span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span> shot ${ed} ${ed === 1 ? "player" : "players"} out of a vehicle`);
+            if (et > 0) parts.push(`<span class="material-symbols-outlined icon-sm" aria-hidden="true">skull</span> got shot out of a vehicle ${et} ${et === 1 ? "time" : "times"}`);
+            veh.innerHTML = parts.join(" · ");
             veh.style.display = "";
           } else {
             veh.style.display = "none";

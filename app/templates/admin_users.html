@@ -26,23 +26,23 @@
             <td style="color: var(--text-dim); font-size: 12px;">{{ u.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
             <td>
               {% if u.is_approved %}
-              <span style="color: var(--success);">✓ Active</span>
+              <span style="color: var(--success);"><span class="material-symbols-outlined icon-sm icon-success" aria-hidden="true">check_circle</span> Active</span>
               {% else %}
-              <span style="color: var(--warning);">⏳ Pending</span>
+              <span style="color: var(--warning);"><span class="material-symbols-outlined icon-sm icon-warning" aria-hidden="true">hourglass_empty</span> Pending</span>
               {% endif %}
             </td>
             <td>
               {% if not u.is_admin %}
                 {% if not u.is_approved %}
                 <form method="POST" action="/admin/users/{{ u.id }}/approve" style="display:inline">
-                  <button type="submit" class="btn btn-sm btn-gold">✓ Approve</button>
+                  <button type="submit" class="btn btn-sm btn-gold"><span class="material-symbols-outlined icon-sm" aria-hidden="true">check</span> Approve</button>
                 </form>
                 <form method="POST" action="/admin/users/{{ u.id }}/deny" style="display:inline">
-                  <button type="submit" class="btn btn-sm btn-danger">✗ Deny</button>
+                  <button type="submit" class="btn btn-sm btn-danger"><span class="material-symbols-outlined icon-sm" aria-hidden="true">close</span> Deny</button>
                 </form>
                 {% else %}
                 <form method="POST" action="/admin/users/{{ u.id }}/suspend" style="display:inline">
-                  <button type="submit" class="btn btn-sm btn-danger">🔒 Suspend</button>
+                  <button type="submit" class="btn btn-sm btn-danger"><span class="material-symbols-outlined icon-sm" aria-hidden="true">lock</span> Suspend</button>
                 </form>
                 {% endif %}
               {% endif %}

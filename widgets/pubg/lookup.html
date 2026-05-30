@@ -135,7 +135,7 @@
         const d = await PubgUI.fetchJson(
           (window.__SERVE_BASE__||"/") + `api/pubg/lookup-mate?player=${encodeURIComponent(name)}`);
         if (d.error) {
-          result.innerHTML = `<div class="err">❌ ${d.error}</div>`;
+          result.innerHTML = `<div class="err"><span class="material-symbols-outlined icon-sm" aria-hidden="true">error</span> ${d.error}</div>`;
           return;
         }
 

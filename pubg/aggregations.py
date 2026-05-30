@@ -1059,6 +1059,38 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             ORDER BY timestamp_ms ASC
         """, (match_id, acc, acc)).fetchall()
 
+        # Vehicle-Intervalle des Members (für 'wurde aus Fahrzeug erschossen').
+        # VehicleEnter/Leave-Events haben actor_account = der Spieler im
+        # Fahrzeug, weapon-Feld trägt die vehicleId (z.B. "BP_PicoBus_C").
+        veh_intervals = []
+        _cur_enter = None
+        _cur_veh   = None
+        for _e in ev_rows:
+            if _e["actor_account"] != acc:
+                continue
+            if _e["event_type"] == "VehicleEnter":
+                _cur_enter = _e["timestamp_ms"]
+                _cur_veh   = _e["weapon"]
+            elif _e["event_type"] == "VehicleLeave" and _cur_enter is not None:
+                veh_intervals.append((_cur_enter, _e["timestamp_ms"], _cur_veh))
+                _cur_enter = None
+                _cur_veh   = None
+        if _cur_enter is not None:
+            veh_intervals.append((_cur_enter, float("inf"), _cur_veh))
+
+        def _vehicle_label_at(ts):
+            """Wenn der Member zum Zeitpunkt ts im Fahrzeug war: Klartext
+            zurückgeben (z.B. 'Pico Bus'), sonst None."""
+            if ts is None:
+                return None
+            for a, b, vid in veh_intervals:
+                if a <= ts <= b and vid:
+                    for needle, label in _VEHICLE_PATTERNS:
+                        if needle in vid:
+                            return label
+                    return vid  # Fallback: raw id wenn nicht gemappt
+            return None
+
         # Death-Events isolieren (Kill mit target=acc)
         death_events = [e for e in ev_rows
                         if e["event_type"] == "Kill" and e["target_account"] == acc]
@@ -1250,6 +1282,10 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                         knock_ev, acc, kw,
                         _weapon_label(kw)[0] if kw else None,
                         ev_rows=ev_rows)
+                # Fahrzeug-Kontext: war das Opfer beim Tod / beim Knock im
+                # Fahrzeug? (z.B. 'wurde aus dem Pico Bus rausgeschossen')
+                victim_vehicle_label = _vehicle_label_at(death_ev["timestamp_ms"])
+                knock_victim_vehicle_label = _vehicle_label_at(knock_ts)
                 death_info = {
                     "x":           death_ev["victim_x"],
                     "y":           death_ev["victim_y"],
@@ -1259,6 +1295,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                     "weaponName":  weapon_name,
                     "causeLabel":  cause_label,
                     "knockCauseLabel": knock_cause_label,
+                    "victimVehicleLabel":      victim_vehicle_label,
+                    "knockVictimVehicleLabel": knock_victim_vehicle_label,
                     "distanceM":   (round((death_ev["distance"] or 0) / 100.0, 1)
                                     if death_ev["distance"] else None),
                     "knockTsMs":   knock_ts,

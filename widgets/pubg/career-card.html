@@ -116,8 +116,8 @@
       const isGrand = next % 1000 === 0;
       const isHalf  = !isGrand && next % 500 === 0;
       let label = "Next milestone";
-      if (isGrand) label = "👑 GRAND CHICKEN incoming";
-      else if (isHalf) label = "🏆 Half-Grand incoming";
+      if (isGrand) label = '<span class="material-symbols-outlined icon-gold" aria-hidden="true">workspace_premium</span> GRAND CHICKEN incoming';
+      else if (isHalf) label = '<span class="material-symbols-outlined icon-gold" aria-hidden="true">emoji_events</span> Half-Grand incoming';
       return { next, remain, pct, isGrand, isHalf, label };
     }
 

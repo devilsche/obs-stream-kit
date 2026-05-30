@@ -7,7 +7,7 @@
     <div class="topbar"><div class="greeting">Settings</div></div>
 
     {% if saved %}
-    <div class="card" style="border-color: var(--success); color: var(--success);">✓ Saved</div>
+    <div class="card" style="border-color: var(--success); color: var(--success);"><span class="material-symbols-outlined icon-success" aria-hidden="true">check_circle</span> Saved</div>
     {% endif %}
 
     <form method="POST" class="card">
@@ -103,9 +103,9 @@
         <div>
           {% if user.is_admin %}<span class="badge-admin">Admin</span>{% endif %}
           {% if user.is_approved %}
-            <span style="color: var(--success);">✓ approved</span>
+            <span style="color: var(--success);"><span class="material-symbols-outlined icon-sm icon-success" aria-hidden="true">check_circle</span> approved</span>
           {% else %}
-            <span style="color: var(--warning);">⏳ pending</span>
+            <span style="color: var(--warning);"><span class="material-symbols-outlined icon-sm icon-warning" aria-hidden="true">hourglass_empty</span> pending</span>
           {% endif %}
         </div>
       </div>

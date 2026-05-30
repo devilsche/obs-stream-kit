@@ -123,10 +123,10 @@
         const flame = document.getElementById("flame");
         if (cur === 0) {
           card.classList.add("cold");
-          flame.textContent = "";
+          flame.innerHTML = "";
         } else {
           card.classList.remove("cold");
-          flame.textContent = "🔥";
+          flame.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">local_fire_department</span>';
         }
       } catch (e) {
         console.error(e);

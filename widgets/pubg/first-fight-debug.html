@@ -157,8 +157,8 @@
                 <td>${idx}</td>
                 <td>${time}</td>
                 <td>#${m.place}</td>
-                <td class="${r.soloSurvived ? 'yes' : 'no'}">${r.soloSurvived ? '✓' : '✗'}</td>
-                <td class="${r.teamSurvived ? 'yes' : 'no'}">${r.teamSurvived ? '✓' : '✗'}</td>
+                <td class="${r.soloSurvived ? 'yes' : 'no'}"><span class="material-symbols-outlined icon-sm" aria-hidden="true">${r.soloSurvived ? 'check' : 'close'}</span></td>
+                <td class="${r.teamSurvived ? 'yes' : 'no'}"><span class="material-symbols-outlined icon-sm" aria-hidden="true">${r.teamSurvived ? 'check' : 'close'}</span></td>
                 <td class="num">${r.events_count ?? '—'}</td>
                 <td>${dur}</td>
                 <td class="muted">${ev}</td>

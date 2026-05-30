@@ -29,7 +29,7 @@
            role="navigation" aria-label="Widget list">
         <input type="search" id="urlFilter"
                class="url-master__filter"
-               placeholder="🔍 Filter widget…"
+               placeholder="Filter widget…"
                aria-label="Widget-Liste filtern">
 
         {% for cat, items in grouped.items() %}
@@ -62,7 +62,7 @@
       {# ── DETAIL ──────────────────────────────────────── #}
       <section class="url-detail" id="urlDetail" aria-live="off">
         <button type="button" id="urlBackBtn" class="url-back-btn"
-                aria-label="Zurück zur Widget-Liste">← Zurück zur Liste</button>
+                aria-label="Zurück zur Widget-Liste"><span class="material-symbols-outlined" aria-hidden="true">arrow_back</span> Zurück zur Liste</button>
         <div id="urlDetailContent">
           <div class="url-detail__empty">Wähle links ein Widget aus.</div>
         </div>
@@ -123,7 +123,7 @@
     if (!switches || !switches.length) return "";
     return switches.map(sw => {
       const tooltip = sw.tooltip
-        ? `<span class="info-i" data-tip="${escapeHtml(sw.tooltip)}">ⓘ</span>`
+        ? `<span class="info-i" data-tip="${escapeHtml(sw.tooltip)}" aria-label="Info"><span class="material-symbols-outlined icon-sm" aria-hidden="true">info</span></span>`
         : "";
       let controls = "";
       if (sw.type === "select" && sw.options) {
@@ -192,10 +192,10 @@
         <div class="url-card-primary__url" id="urlText">${escapeHtml(base)}</div>
         <div class="url-card-primary__actions">
           <button type="button" class="btn-copy-primary" id="btnCopy">
-            <span aria-hidden="true">📋</span> URL kopieren
+            <span class="material-symbols-outlined" aria-hidden="true">content_copy</span> URL kopieren
           </button>
           <button type="button" class="btn-preview-secondary" id="btnPreview">
-            <span aria-hidden="true">↗</span> Preview öffnen
+            <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span> Preview öffnen
           </button>
         </div>
         <div class="url-copy-status" id="urlCopyStatus" role="status" aria-live="polite"></div>
@@ -263,9 +263,9 @@
       try {
         await navigator.clipboard.writeText(url);
         status.textContent = "URL kopiert.";
-        copyBtn.textContent = "✓ Kopiert";
+        copyBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">check</span> Kopiert';
         setTimeout(() => {
-          copyBtn.innerHTML = '<span aria-hidden="true">📋</span> URL kopieren';
+          copyBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">content_copy</span> URL kopieren';
           status.textContent = "";
         }, 1500);
       } catch (_) {

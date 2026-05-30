@@ -44,7 +44,7 @@
 <body>
   <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card panel pubg-fade-in">
-    <h3 id="panelTitle">🔫🚗 Top Vehicle Hunters</h3>
+    <h3 id="panelTitle"><span class="material-symbols-outlined icon-gold" aria-hidden="true">directions_car</span> Top Vehicle Hunters</h3>
     <div id="content"><div class="empty">— loading —</div></div>
   </div>
   <script src="_pubg.js"></script>
@@ -55,21 +55,22 @@
     const MIN_EVENTS = parseInt(PubgUI.qs("minEvents", "1"), 10) || 1;
 
     const SORT_TITLES = {
-      dealt:  "🔫🚗 Top Vehicle Hunters",
-      taken:  "💀🚗 Most-Hunted",
-      ratio:  "⚖️ Hunter/Hunted Ratio",
+      dealt:  { icon: "directions_car",  text: "Top Vehicle Hunters" },
+      taken:  { icon: "skull",           text: "Most-Hunted" },
+      ratio:  { icon: "balance",         text: "Hunter/Hunted Ratio" },
     };
-    document.getElementById("panelTitle").textContent =
-      SORT_TITLES[SORT] || SORT_TITLES.dealt;
+    const titleSpec = SORT_TITLES[SORT] || SORT_TITLES.dealt;
+    document.getElementById("panelTitle").innerHTML =
+      `<span class="material-symbols-outlined icon-gold" aria-hidden="true">${titleSpec.icon}</span> ${titleSpec.text}`;
 
     PubgUI.renderHeader(document.getElementById("pubgHeader"),
-      SORT_TITLES[SORT] || "Top Vehicle Hunters", RANGE);
+      titleSpec.text, RANGE);
 
     PubgUI.buildFilter([
       { key: "range", label: "Range", type: "select", default: "session",
         options: [["session", "Session"], ["week", "7 days"], ["all", "Database"]] },
       { key: "sort", label: "Sort by", type: "select", default: "dealt",
-        options: [["dealt", "🔫🚗 dealt"], ["taken", "💀🚗 taken"], ["ratio", "ratio"]],
+        options: [["dealt", "dealt"], ["taken", "taken"], ["ratio", "ratio"]],
         tooltip: "dealt = wer am meisten rausgeschossen hat. taken = wer am " +
                   "oeftesten geholt wurde. ratio = dealt/taken (hoeher = besser)." },
       { key: "limit", label: "Max rows", type: "range", default: 10,
@@ -131,7 +132,7 @@
           </div>`;
       } catch (e) {
         document.getElementById("content").innerHTML =
-          `<div class="empty">⚠ ${e.message || e}</div>`;
+          `<div class="empty"><span class="material-symbols-outlined icon-sm icon-danger" aria-hidden="true">error</span> ${e.message || e}</div>`;
       }
     }
 

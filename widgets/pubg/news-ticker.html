@@ -141,7 +141,7 @@
         try {
           const hd = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/hot-drop?range=session");
           if (hd.matches) {
-            const streak = hd.streak ? ` · Streak 🔥${hd.streak}` : "";
+            const streak = hd.streak ? ` · Streak <span class="material-symbols-outlined icon-sm" aria-hidden="true">local_fire_department</span>${hd.streak}` : "";
             out.push(`<span class="label">SESSION HOT DROPS</span> ${(hd.rate||0).toFixed(0)}% Rate · Solo-Surv <b>${(hd.soloSurvivalRate||0).toFixed(0)}%</b> · Team-Surv <b>${(hd.teamSurvivalRate||0).toFixed(0)}%</b>${streak}`);
           }
         } catch (_) {}

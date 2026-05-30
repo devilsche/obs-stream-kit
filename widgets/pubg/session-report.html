@@ -454,6 +454,16 @@
     .md-card .md-life { padding-left: 4px; font-size: 0.93em; color: var(--pubg-muted); }
     .md-card .md-life b { color: var(--pubg-text); }
     .md-card .md-life .md-died { color: #e57b7b; }
+    .md-card .md-life .md-veh {
+      display: inline-flex; align-items: center; gap: 3px;
+      margin-left: 6px;
+      padding: 1px 7px;
+      border-radius: 100px;
+      background: rgba(242, 183, 5, 0.13);
+      color: var(--pubg-gold);
+      font-size: 0.88em;
+    }
+    .md-card .md-life .md-veh b { color: var(--pubg-gold); font-weight: 700; }
     .md-card .md-empty { font-style: italic; opacity: 0.6; }
     .md-warning {
       background: rgba(229,123,123,0.12);
@@ -1471,11 +1481,17 @@
               ? ` auf <b>${life.death.distanceM.toFixed(0)}m</b>` : "";
             // Cause-Label-Prioritaet: death > knock > Standard
             const causeLbl = life.death.causeLabel || life.death.knockCauseLabel;
+            // Fahrzeug-Kontext: war Opfer beim Tod (oder beim Knock) im Fahrzeug
+            const vehLbl = life.death.victimVehicleLabel
+                        || life.death.knockVictimVehicleLabel;
+            const vehTag = vehLbl
+              ? ` <span class="md-veh"><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_bus</span> aus <b>${vehLbl}</b></span>`
+              : "";
             if (causeLbl) {
               const verb = life.death.causeLabel ? "gestorben" : "geknockt+gestorben";
-              row += ` <span class="md-died">— ${verb} in <b>${deathP || "?"}</b> — <b>${causeLbl}</b></span>`;
+              row += ` <span class="md-died">— ${verb} in <b>${deathP || "?"}</b> — <b>${causeLbl}</b>${vehTag}</span>`;
             } else {
-              row += ` <span class="md-died">— gestorben in <b>${deathP || "?"}</b> durch <b>${killer}</b> mit <b>${wn}</b>${dist}</span>`;
+              row += ` <span class="md-died">— gestorben in <b>${deathP || "?"}</b> durch <b>${killer}</b> mit <b>${wn}</b>${dist}${vehTag}</span>`;
             }
           } else if (m.lives.length > 1) {
             row += ` <span style="color:var(--pubg-gold)">— survived</span>`;
@@ -2078,7 +2094,7 @@
         if (isCurrent) cls.push("current");
         if (isActive) cls.push("active");
         const mate = s.topMate
-          ? ` · 👥 ${s.topMate}${s.topMateCount > 1 ? ` (${s.topMateCount})` : ""}`
+          ? ` · <span class="material-symbols-outlined icon-sm" aria-hidden="true">group</span> ${s.topMate}${s.topMateCount > 1 ? ` (${s.topMateCount})` : ""}`
           : "";
         return `<div class="${cls.join(' ')}" data-from="${s.from}" data-to="${s.to}">
           <span class="label">${PubgUI.fmtDate(s.from)} ${PubgUI.fmtTime(s.from)}${isCurrent ? " ▶" : ""}</span>
@@ -2178,16 +2194,16 @@
           const url = wid ? `${window.__STATIC_BASE__||"/widgets/"}pubg/assets/vehicles/${wid}.webp` : "";
           return url
             ? `<img class="sd-icon veh" src="${url}" onerror="this.style.display='none'">`
-            : `<span class="sd-emoji">🚗</span>`;
+            : `<span class="sd-emoji"><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span></span>`;
         }
         mk("redzone", sp.redzone, "Red Zone Tod",
-           `<span class="sd-emoji">💥</span>`);
-        mk("vkill", sp.vkill, "Vehicle-Kill (jemanden ueberfahren)",
+           `<span class="sd-emoji"><span class="material-symbols-outlined icon-sm" aria-hidden="true">bomb</span></span>`);
+        mk("vkill", sp.vkill, "Vehicle-Kill (jemanden überfahren)",
            vehIcon(sp.vkill || []));
-        mk("vdeath", sp.vdeath, "Mit Vehicle ueberfahren worden",
-           vehIcon(sp.vdeath || []) + `<span class="sd-emoji">💀</span>`);
+        mk("vdeath", sp.vdeath, "Mit Vehicle überfahren worden",
+           vehIcon(sp.vdeath || []) + `<span class="sd-emoji"><span class="material-symbols-outlined icon-sm" aria-hidden="true">skull</span></span>`);
         mk("driveby", sp.driveby, "Drive-By Kill (aus Fahrzeug)",
-           `<span class="sd-emoji">🔫🚗</span>`);
+           `<span class="sd-emoji"><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span></span>`);
         return out.length ? ` <span class="sd-row-wrap">${out.join("")}</span>` : "";
       }
       const rows = all.map(p => {
@@ -2267,7 +2283,7 @@
           ${placeCell}
           <span class="map">${PubgUI.fmtMap(m.map)}<span class="hot-drop-badge" data-hd-slot></span></span>
           <span class="stat bot-teams" title="Bot-Teams / Teams gesamt in der Lobby"><b>${m.botTeamsInLobby || 0}/${m.totalTeamsInLobby || 0}</b> Teams</span>
-          <span class="stat bot-teams" title="Bot-Spieler / Spieler gesamt in der Lobby"><b>${m.botPlayersInLobby || 0}/${m.totalPlayersInLobby || 0}</b> 🤖</span>
+          <span class="stat bot-teams" title="Bot-Spieler / Spieler gesamt in der Lobby"><b>${m.botPlayersInLobby || 0}/${m.totalPlayersInLobby || 0}</b> <span class="material-symbols-outlined icon-sm" aria-hidden="true">smart_toy</span></span>
           <span class="stat"><b>${m.kills}</b> K${m.myStats && m.myStats.botKills ? ` <span class="bot-kills">(${m.myStats.botKills})</span>` : ""}</span>
           <span class="stat"><b>${Math.round(m.damage||0)}</b> DMG</span>
           <span class="stat"><b>${fmtSurv(mySurv)}</b></span>
@@ -2575,7 +2591,7 @@
         window._poiData = {};
       }
 
-      // Flammen-Badge in jeder Match-Zeile rendern: Hot-Drop -> 🔥
+      // Flammen-Badge in jeder Match-Zeile rendern: Hot-Drop → local_fire_department
       // (greyscale wenn nicht ueberlebt). Tooltip = POI-Name (Map ist
       // schon in der Zeile selbst sichtbar).
       if (hotDrop && Array.isArray(hotDrop.perMatch)) {
@@ -2600,7 +2616,7 @@
           else if (teamSaved) tooltip += " · died, team survived";
           else tooltip += " · died";
           slot.className = "hot-drop-badge " + (survived ? "hot" : "died");
-          slot.textContent = "🔥";
+          slot.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">local_fire_department</span>';
           slot.setAttribute("title", tooltip);
         });
       }
@@ -2731,9 +2747,9 @@
               <div class="event-stat"><span class="v">${Math.round(pm.myDamage)}</span><span class="l">My DMG</span></div>
               <div class="event-stat"><span class="v">${pm.squadKills}</span><span class="l">Squad K</span></div>
               <div class="event-stat"><span class="v">${Math.round(pm.squadDamage)}</span><span class="l">Squad DMG</span></div>
-              <div class="event-stat"><span class="v">${pm.windows}</span><span class="l">🪟 Windows</span></div>
-              <div class="event-stat"><span class="v">${pm.doors}</span><span class="l">🚪 Doors</span></div>
-              <div class="event-stat"><span class="v">${pm.lootTotal}</span><span class="l">📦 Loot</span></div>
+              <div class="event-stat"><span class="v">${pm.windows}</span><span class="l"><span class="material-symbols-outlined icon-sm" aria-hidden="true">window</span> Windows</span></div>
+              <div class="event-stat"><span class="v">${pm.doors}</span><span class="l"><span class="material-symbols-outlined icon-sm" aria-hidden="true">door_front</span> Doors</span></div>
+              <div class="event-stat"><span class="v">${pm.lootTotal}</span><span class="l"><span class="material-symbols-outlined icon-sm" aria-hidden="true">inventory_2</span> Loot</span></div>
             </div>
             ${badges ? `<div class="event-detail-loot">${badges}</div>` : ""}`;
           // Squad-Tabelle des gleichen Match-Expand-Panels mit Mate-
@@ -2795,7 +2811,7 @@
             ? `→ ${opp}` : `durch ${opp}`;
           return `<div class="ve-row">
             <span class="ve-t">${t}</span>
-            <span class="ve-veh">🚗 ${veh}</span>
+            <span class="ve-veh"><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span> ${veh}</span>
             <span class="ve-act">${verb}</span>
             ${where}
             <span class="ve-kind">${kindLbl}</span>
@@ -2811,10 +2827,10 @@
           const who = m.isSelf ? "Du" : m.name;
           const blocks = [];
           if (dealt > 0) {
-            blocks.push(`<details class="ve"><summary>🔫🚗 hat <b>${dealt}</b> rausgeschossen</summary>${evRows(m.eventsDealt || [], "dealt")}</details>`);
+            blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span> hat <b>${dealt}</b> rausgeschossen</summary>${evRows(m.eventsDealt || [], "dealt")}</details>`);
           }
           if (taken > 0) {
-            blocks.push(`<details class="ve"><summary>💀🚗 wurde <b>${taken}</b> mal rausgeschossen</summary>${evRows(m.eventsTaken || [], "taken")}</details>`);
+            blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm" aria-hidden="true">skull</span> wurde <b>${taken}</b> mal rausgeschossen</summary>${evRows(m.eventsTaken || [], "taken")}</details>`);
           }
           parts.push(`<div class="ve-member"><div class="ve-name">${who}</div>${blocks.join("")}</div>`);
         }

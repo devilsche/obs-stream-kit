@@ -189,9 +189,9 @@ function render(d) {
         </div>
         ${lootHtml ? `<div class="loot">${lootHtml}</div>` : ""}
         <div class="extras">
-          <span>🪟 <b>${m.windows}</b> windows</span>
-          <span>🚪 <b>${m.doors}</b> doors</span>
-          <span>📦 <b>${m.lootTotal}</b> total loot</span>
+          <span><span class="material-symbols-outlined icon-sm" aria-hidden="true">window</span> <b>${m.windows}</b> windows</span>
+          <span><span class="material-symbols-outlined icon-sm" aria-hidden="true">door_front</span> <b>${m.doors}</b> doors</span>
+          <span><span class="material-symbols-outlined icon-sm" aria-hidden="true">inventory_2</span> <b>${m.lootTotal}</b> total loot</span>
         </div>
       </div>`;
   }).join("");
@@ -203,7 +203,7 @@ function render(d) {
   const avgL = n ? (t.lootTotal / n) : 0;
   root.innerHTML = `
     <div class="head">
-      <span class="title">🎭 Event / Heist Stats</span>
+      <span class="title"><span class="material-symbols-outlined" aria-hidden="true">theater_comedy</span> Event / Heist Stats</span>
       <span class="subtitle">${n} match${n > 1 ? "es" : ""} · ${RANGE}
         &nbsp;·&nbsp; Ø <b style="color:#e0c8ff">${avgK.toFixed(1)}</b> K
         &nbsp;·&nbsp; Ø <b style="color:#e0c8ff">${Math.round(avgD)}</b> DMG
