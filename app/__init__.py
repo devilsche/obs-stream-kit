@@ -1,6 +1,7 @@
 """obs-stream-kit Flask-App-Factory."""
 import os
 from flask import Flask, jsonify
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.config import Config, TestingConfig
 from app.middleware import register_middleware
@@ -20,6 +21,11 @@ def create_app(testing: bool = False) -> Flask:
                 static_folder="static")
     app.config.from_object(TestingConfig if testing else Config)
     app.config["_PROJECT_ROOT"] = project_root
+
+    # Hinter nginx: X-Forwarded-Proto/Host/For respektieren, damit
+    # request.url_root korrekt https://stats-overlay.info/ liefert.
+    # Streng x_*=1, weil genau ein vertrauenswuerdiger Proxy-Hop existiert.
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_for=1)
 
     register_middleware(app)
     register_metrics(app)
