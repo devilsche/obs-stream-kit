@@ -2,11 +2,14 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}OBS Stream Kit{% endblock %}</title>
+  {# initial-scale=1, KEIN maximum-scale/user-scalable=no — Zoom muss erlaubt sein (WCAG 1.4.4) #}
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>{% block title %}stats-overlay.info{% endblock %}</title>
   <link rel="stylesheet" href="/static/dashboard.css">
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
   {% block body %}{% endblock %}
 </body>
 </html>

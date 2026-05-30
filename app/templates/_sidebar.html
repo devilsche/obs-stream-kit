@@ -1,21 +1,51 @@
-<aside class="sidebar">
-  <div class="brand">
-    <div class="brand-dot"></div>
-    OBS Stream Kit
+{# Heisst weiter _sidebar.html aus Kompatibilitaet, ist jetzt aber eine
+   responsive Top-Nav mit Hamburger fuer Mobile. #}
+<header class="topnav" role="banner">
+  <div class="topnav-inner">
+    <a class="brand" href="/app/" aria-label="stats-overlay.info — Dashboard">
+      <span class="brand-dot" aria-hidden="true"></span>
+      <span class="brand-text">stats-overlay.info</span>
+    </a>
+    <button class="nav-toggle" type="button" aria-expanded="false"
+            aria-controls="primaryNav" aria-label="Menü öffnen">
+      <span class="nav-toggle-bar" aria-hidden="true"></span>
+      <span class="nav-toggle-bar" aria-hidden="true"></span>
+      <span class="nav-toggle-bar" aria-hidden="true"></span>
+    </button>
+    <nav id="primaryNav" class="primary-nav" aria-label="Hauptnavigation">
+      <ul>
+        <li><a href="/app/" {% if request.path == '/app/' %}aria-current="page"{% endif %}>Dashboard</a></li>
+        <li><a href="/app/settings" {% if request.path.startswith('/app/settings') %}aria-current="page"{% endif %}>Settings</a></li>
+        <li><a href="/app/urls" {% if request.path.startswith('/app/urls') %}aria-current="page"{% endif %}>OBS URLs</a></li>
+        <li><a href="/app/tools" {% if request.path.startswith('/app/tools') %}aria-current="page"{% endif %}>Tools</a></li>
+        {% if user.is_admin %}
+        <li class="admin-li"><a href="/admin/users" {% if request.path.startswith('/admin/users') %}aria-current="page"{% endif %}>Users</a></li>
+        <li class="admin-li"><a href="/admin/poi-editor" target="_blank" rel="noopener">POI Editor</a></li>
+        <li class="admin-li"><a href="/admin/" {% if request.path == '/admin/' %}aria-current="page"{% endif %}>Admin</a></li>
+        {% endif %}
+        <li class="logout-li"><a href="/app/logout">Logout</a></li>
+      </ul>
+    </nav>
   </div>
-  <nav>
-    <a href="/app/" class="{% if request.path == '/app/' %}active{% endif %}">📊 Dashboard</a>
-    <a href="/app/settings" class="{% if request.path.startswith('/app/settings') %}active{% endif %}">⚙️ Settings</a>
-    <a href="/app/urls" class="{% if request.path.startswith('/app/urls') %}active{% endif %}">🔗 OBS URLs</a>
-    <a href="/app/tools" class="{% if request.path.startswith('/app/tools') %}active{% endif %}">🛠️ Tools</a>
-    <a href="/app/logout">🚪 Logout</a>
-    {% if user.is_admin %}
-    <div class="admin-section">
-      <div class="admin-label">Admin</div>
-      <a href="/admin/users" class="{% if request.path.startswith('/admin/users') %}active{% endif %}">👥 User approval</a>
-      <a href="/admin/poi-editor" class="{% if request.path.startswith('/admin/poi-editor') %}active{% endif %}" target="_blank">🗺️ POI Editor</a>
-      <a href="/admin/" class="{% if request.path == '/admin/' %}active{% endif %}">📈 Admin home</a>
-    </div>
-    {% endif %}
-  </nav>
-</aside>
+</header>
+<script>
+  // Hamburger-Toggle (klein, kein Framework)
+  (function () {
+    var btn = document.querySelector(".nav-toggle");
+    var nav = document.getElementById("primaryNav");
+    if (!btn || !nav) return;
+    btn.addEventListener("click", function () {
+      var open = nav.classList.toggle("is-open");
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      btn.setAttribute("aria-label", open ? "Menü schließen" : "Menü öffnen");
+    });
+    // Esc schließt
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && nav.classList.contains("is-open")) {
+        nav.classList.remove("is-open");
+        btn.setAttribute("aria-expanded", "false");
+        btn.focus();
+      }
+    });
+  })();
+</script>

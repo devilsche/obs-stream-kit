@@ -1,13 +1,175 @@
 {% extends "base.html" %}
-{% block title %}OBS Stream Kit{% endblock %}
+{% block title %}stats-overlay.info — PUBG &amp; Steam Stats für Twitch{% endblock %}
 {% block body %}
-<div class="landing">
-  <div class="landing-logo"></div>
-  <h1>OBS Stream Kit</h1>
-  <p>PUBG and Steam stats for your Twitch stream. Tenant-aware widgets, telemetry replay, achievement feed.</p>
-  <a class="btn-twitch" href="/app/login">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></svg>
-    Sign in with Twitch
-  </a>
-</div>
+<main id="main-content" class="landing" tabindex="-1">
+  <header class="landing-hero">
+    <div class="landing-logo" aria-hidden="true"></div>
+    <h1>stats-overlay.info</h1>
+    <p class="tagline">
+      Live PUBG- und Steam-Statistiken für deinen Twitch-Stream —
+      Browser-Source-Widgets, Match-Replay, Achievement-Feeds, alles
+      automatisch aus deinem PUBG- und Steam-Account.
+    </p>
+    <a class="btn-twitch" href="/app/login">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"
+           aria-hidden="true" focusable="false">
+        <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/>
+      </svg>
+      Sign in with Twitch
+    </a>
+    <p class="hint">
+      Anmeldung via Twitch. Nach Freischaltung durch den Admin trägst du
+      deinen PUBG- und Steam-API-Key ein — der Rest läuft automatisch.
+    </p>
+  </header>
+
+  <section class="landing-section" aria-labelledby="h-widgets">
+    <h2 id="h-widgets">🎯 OBS Browser-Source Widgets</h2>
+    <div class="feature-grid">
+      <article class="feature">
+        <h3>Live während Match</h3>
+        <ul>
+          <li><strong>Live Bar</strong> — Kills, Damage, Platz live</li>
+          <li><strong>Mates Carousel / Flyout</strong> — Squad-Stats nebenbei</li>
+          <li><strong>Streak Counter</strong> — Chicken/Top-10/K-D-Streak</li>
+          <li><strong>Hot Drop Indicator</strong></li>
+        </ul>
+      </article>
+      <article class="feature">
+        <h3>Statistik &amp; Trends</h3>
+        <ul>
+          <li><strong>Career Card</strong> — K/D, Wins, Top10 (Season)</li>
+          <li><strong>Season History</strong> — Verlauf über Seasons</li>
+          <li><strong>Map Performance</strong> — pro Map (Place, K/D, DMG)</li>
+          <li><strong>Trend Indicator</strong> — Form-Pfeil</li>
+          <li><strong>Weapon Stats</strong> — Waffen-Verteilung</li>
+        </ul>
+      </article>
+      <article class="feature">
+        <h3>Squad &amp; Mates</h3>
+        <ul>
+          <li><strong>Top Mates / Slider</strong> — beste Synergie</li>
+          <li><strong>Anti-Mates</strong> — mit wem läuft's schlecht</li>
+          <li><strong>Chicken Together</strong> — geteilte Wins</li>
+          <li><strong>Squad Compare</strong> — Stat-Vergleich</li>
+          <li><strong>Coplayer</strong> — wer war dabei</li>
+        </ul>
+      </article>
+      <article class="feature">
+        <h3>Match &amp; Session</h3>
+        <ul>
+          <li><strong>Post-Match Card</strong> — direkt nach dem Match</li>
+          <li><strong>Session Summary / Goal / Lobbies</strong></li>
+          <li><strong>Payday Stats</strong> — Damage per Fraktion</li>
+          <li><strong>Map Distribution</strong> — wie oft welche Map</li>
+        </ul>
+      </article>
+      <article class="feature">
+        <h3>Achievements &amp; Popups</h3>
+        <ul>
+          <li><strong>Milestone Celebrate</strong> — Big-Win-Animation</li>
+          <li><strong>Session Achievements</strong> — Unlocks der Session</li>
+          <li><strong>Steam Achievement Feed / Popup</strong></li>
+          <li><strong>Combined Popup</strong> — Now-Playing + Achievement</li>
+        </ul>
+      </article>
+      <article class="feature">
+        <h3>Chat &amp; Bot</h3>
+        <ul>
+          <li><strong>Lookup</strong> — Spieler via Chat-Command</li>
+          <li><strong>Chat Stats Popup</strong> — Stats per Trigger</li>
+          <li><strong>News Ticker</strong> — Stat-Highlights als Banner</li>
+          <li>Streamer.bot-kompatible URLs</li>
+        </ul>
+      </article>
+      <article class="feature">
+        <h3>Steam</h3>
+        <ul>
+          <li><strong>Now Playing</strong> — aktuelles Steam-Spiel</li>
+          <li><strong>Games Ticker</strong> — Owned-Games-Strip</li>
+          <li><strong>Achievement Feed</strong> — letzte Unlocks rotieren</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="landing-section" aria-labelledby="h-tools">
+    <h2 id="h-tools">🛠️ Tools (im Dashboard)</h2>
+    <div class="feature-grid">
+      <article class="feature">
+        <h3>Session Report</h3>
+        <p>Detailreport pro Session: Matches mit Squad-Tabelle, Mini-Map
+        mit Bewegungs-Pfaden, Kills/Knocks pro Spieler, Hot-Drop-Detection,
+        Achievements, Botteam-Counts. Pro Match ausklappbar mit Zeitraffer-
+        Replay.</p>
+      </article>
+      <article class="feature">
+        <h3>Match Replay</h3>
+        <p>Vollständiger Match-Replay mit allen 100 Spielern, Teams,
+        Flugroute, Bluezone, Kill-/Knock-Markern, Schusslinien. 1×/2×/4×/
+        8×/16× Speed. Team-Focus mit Zoom. Filter über alle gespeicherten
+        Matches.</p>
+      </article>
+      <article class="feature">
+        <h3>Landing Spots</h3>
+        <p>Heatmap der Landungs-Positionen über alle Matches — eigene
+        und Squad-Mates filterbar pro Map.</p>
+      </article>
+      <article class="feature">
+        <h3>Achievement Browser</h3>
+        <p>Vollbild-Browser durch alle Steam &amp; PUBG-Achievements.
+        Filterbar nach Spiel, Sortierung Datum/Rarität/Name. Click-to-
+        Replay triggert das Popup-Widget für Stream-Recaps.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="landing-section" aria-labelledby="h-tech">
+    <h2 id="h-tech">⚙️ Wie es funktioniert</h2>
+    <ol class="how-list">
+      <li>Login per Twitch (OAuth) — Admin schaltet deinen Account frei.</li>
+      <li>In den Settings deinen <strong>PUBG-API-Key</strong> (kostenlos,
+        <a href="https://developer.pubg.com" target="_blank" rel="noopener">developer.pubg.com</a>)
+        und deinen <strong>Steam-API-Key</strong>
+        (<a href="https://steamcommunity.com/dev" target="_blank" rel="noopener">steamcommunity.com/dev</a>) hinterlegen.</li>
+      <li>Der Server pollt im Hintergrund alle 10 s deine PUBG- und
+        Steam-Daten ab und befüllt deine DB-Tabellen.</li>
+      <li>Auf <code>/app/urls</code> findest du für jedes Widget eine
+        Token-URL die du als OBS Browser-Source einfügst.</li>
+      <li>Tools liegen unter <code>/app/tools</code> (Dashboard, kein
+        OBS-Browser-Source).</li>
+    </ol>
+  </section>
+</main>
+
+{# Inline-Styles entfernt — alle Landing-Styles jetzt in dashboard.css #}
+<style style="display:none">
+  /* obsolete */
+  .landing { max-width: 1100px; margin: 0 auto; padding: 32px 20px 64px; }
+  .landing-hero { text-align: center; padding: 24px 0 40px; }
+  .landing-hero h1 { font-size: 2.4em; color: var(--accent, #f2b705); margin: 12px 0 6px; }
+  .landing-hero .tagline { color: var(--text, #e8e8e8); font-size: 1.05em;
+                          max-width: 720px; margin: 0 auto 24px; line-height: 1.5; }
+  .landing-hero .hint { color: var(--text-dim, #8a7d99); font-size: 0.85em;
+                        margin-top: 14px; max-width: 600px; margin-left: auto;
+                        margin-right: auto; }
+  .landing-section { margin-top: 48px; }
+  .landing-section h2 { color: var(--accent, #f2b705); font-size: 1.4em;
+                        margin: 0 0 18px; border-bottom: 1px solid rgba(255,255,255,0.08);
+                        padding-bottom: 8px; }
+  .feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+                  gap: 14px; }
+  .feature {
+    background: var(--surface-2, rgba(0,0,0,0.25));
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border-radius: 8px; padding: 16px;
+  }
+  .feature h3 { color: var(--accent, #f2b705); margin: 0 0 8px; font-size: 1.05em; }
+  .feature ul, .feature p { margin: 0; color: var(--text, #e8e8e8); font-size: 0.92em;
+                            line-height: 1.5; }
+  .feature ul { padding-left: 18px; }
+  .feature li { margin-bottom: 3px; }
+  .how-list { color: var(--text, #e8e8e8); line-height: 1.6; padding-left: 20px; }
+  .how-list a { color: var(--accent, #f2b705); }
+</style>
 {% endblock %}
