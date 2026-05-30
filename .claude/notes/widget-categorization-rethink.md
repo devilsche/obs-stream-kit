@@ -111,10 +111,21 @@ Vorschlag neue Spalten:
   Telemetry sagt nicht direkt "was hattest du in der Hand beim Tod".
   Heuristik: letzter ItemPickup/Attack-Event vor eigenem Kill-Target-
   Event → angenommene Waffe in der Hand. ~80% Genauigkeit.
-- **"Kills/Playtime"?** Beste Metrik wäre `kills / carry_minutes` (Zeit
-  zwischen Pickup und Drop, summiert). Daten via ItemPickup+ItemDrop
-  vorhanden, aber Drop-Events haben evtl. Lücken (Waffenwechsel beim
-  Looten). Phase-2-Feature. Simpler Proxy: `killsPerCarry` (oben).
+- **"Kills/Playtime" = Kills/Carry-Minuten** (User-Klarstellung:
+  "Playtime" meint hier explizit Carry-Time der Waffe, nicht die
+  Match-Spielzeit). Konkret:
+  - Pro Waffe + Match: Σ (drop_ts − pickup_ts) für jedes Pickup/Drop-Paar
+  - Über alle Matches summieren → `carryMinutes`
+  - Metrik: `killsPerHour = kills / (carryMinutes / 60)` oder
+    `killsPerMin = kills / carryMinutes`
+  - **Diese Metrik ist das eigentliche Ziel** — sie unterscheidet
+    "M16 hatte ich 30 s und 1 Kill" (60 K/min, krass) von "AKM hatte
+    ich 4 Matches lang und 4 Kills" (~0.02 K/min, mittelmäßig).
+  - Implementation: `ItemPickup`/`ItemDrop`-Events für Waffe + actor.
+    Falls Drop fehlt (Match-Ende oder Tod ohne expliziten Drop) →
+    bis death_ts oder match_end_ts rechnen. Edge-Cases dokumentieren.
+  - Phase-2 wegen Implementations-Aufwand; bis dahin ist
+    `killsPerCarry` der ehrliche Proxy.
 
 **Frontend-Parameter** (`/api/pubg/weapon-stats?…`):
 - `range` (session/week/all) — vorhanden
