@@ -966,6 +966,70 @@
       background: rgba(242,183,5,0.15);
       border-color: rgba(242,183,5,0.4);
     }
+
+    /* ─── Slide-In Match-Detail Panel ───────────────────────────────────── */
+    .md-panel {
+      position: fixed; inset: 0; z-index: 1000;
+      display: flex; justify-content: flex-end;
+    }
+    .md-panel[hidden] { display: none; }
+    .md-panel__backdrop {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(2px);
+      opacity: 0;
+      transition: opacity 220ms ease;
+    }
+    .md-panel.is-open .md-panel__backdrop { opacity: 1; }
+    .md-panel__sheet {
+      position: relative;
+      width: 90vw; max-width: 1600px;
+      height: 100vh;
+      background: var(--pubg-purple-bg);
+      border-left: 1px solid var(--pubg-border);
+      transform: translateX(100%);
+      transition: transform 220ms ease;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .md-panel.is-open .md-panel__sheet { transform: translateX(0); }
+    .md-panel__header {
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 18px;
+      background: rgba(20, 12, 30, 0.95);
+      border-bottom: 1px solid var(--pubg-border);
+    }
+    .md-panel__title {
+      margin: 0;
+      color: var(--pubg-gold);
+      font-size: 1.05em; font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .md-panel__close {
+      background: transparent; border: 0;
+      color: var(--pubg-text);
+      cursor: pointer;
+      padding: 6px; border-radius: 6px;
+      min-width: 44px; min-height: 44px;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .md-panel__close:hover { background: rgba(255,255,255,0.08); }
+    .md-panel__close:focus-visible {
+      outline: 2px solid var(--pubg-gold);
+      outline-offset: 2px;
+    }
+    .md-panel__body {
+      flex: 1; min-height: 0;
+      overflow-y: auto;
+      padding: 16px 18px 32px;
+    }
+    @media (max-width: 767px) {
+      .md-panel__sheet { width: 100vw; max-width: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .md-panel__backdrop, .md-panel__sheet { transition: none; }
+    }
   </style>
 </head>
 <body>
@@ -3141,6 +3205,102 @@
       labelEl.classList.add("show");
     });
 
+    // ── Slide-In Match-Detail Panel ───────────────────────────────────
+    let _mdPanelLastFocused = null;
+    let _mdPanelCurrentId = null;
+
+    function mdPanelOpen(matchId) {
+      const panel = document.getElementById("mdPanel");
+      const title = document.getElementById("mdPanelTitle");
+      const body  = document.getElementById("mdPanelBody");
+      if (!panel || !body) return;
+      if (_mdPanelCurrentId === matchId && !panel.hidden) return;
+      _mdPanelLastFocused = document.activeElement;
+      _mdPanelCurrentId = matchId;
+      // Body: existierende mdMount-Logik nutzen via md-host
+      body.innerHTML = `
+        <div class="md-host" data-match-id="${matchId}" data-map=""
+             data-table=""></div>
+        <section class="md-timeline" id="mdTimelineSection" hidden></section>`;
+      title.textContent = "Match-Detail · lädt …";
+      const host = body.querySelector(".md-host");
+      mdMount(host);
+      panel.hidden = false;
+      requestAnimationFrame(() => panel.classList.add("is-open"));
+      document.body.style.overflow = "hidden";
+      // URL-Hash setzen (replace damit der Open kein Doppel-State erzeugt)
+      const newHash = "#match=" + encodeURIComponent(matchId);
+      if (location.hash !== newHash) {
+        history.pushState({ matchId }, "", newHash);
+      }
+      // Focus auf Close-Button
+      const closeBtn = panel.querySelector(".md-panel__close");
+      if (closeBtn) closeBtn.focus();
+    }
+
+    function mdPanelClose() {
+      const panel = document.getElementById("mdPanel");
+      if (!panel || panel.hidden) return;
+      panel.classList.remove("is-open");
+      const finish = () => {
+        panel.hidden = true;
+        document.body.style.overflow = "";
+        _mdPanelCurrentId = null;
+        if (_mdPanelLastFocused && _mdPanelLastFocused.focus) {
+          _mdPanelLastFocused.focus();
+        }
+      };
+      // Wenn reduced-motion: sofort schließen, sonst nach Transition
+      const reduced = window.matchMedia &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduced) finish();
+      else setTimeout(finish, 230);
+      if (location.hash.includes("match=")) {
+        history.pushState({}, "", location.pathname + location.search);
+      }
+    }
+
+    // Backdrop + X + Esc-Handling
+    document.addEventListener("click", (e) => {
+      if (e.target.closest("[data-md-close]")) mdPanelClose();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      const panel = document.getElementById("mdPanel");
+      if (panel && !panel.hidden) mdPanelClose();
+    });
+
+    // Browser-Back → öffnet/schließt Panel je nach Hash
+    window.addEventListener("popstate", () => {
+      const m = (location.hash || "").match(/match=([^&]+)/);
+      if (m) mdPanelOpen(decodeURIComponent(m[1]));
+      else mdPanelClose();
+    });
+
+    // Deep-Link: bei Page-Load nach #match=<id> schauen.
+    // Da die Session-Liste asynchron lädt, warten wir 800ms damit
+    // mdMount eine Match-ID greifen kann (sonst nur Telemetrie-Fetch
+    // — der funktioniert ohnehin matchId-only).
+    document.addEventListener("DOMContentLoaded", () => {
+      const m = (location.hash || "").match(/match=([^&]+)/);
+      if (m) mdPanelOpen(decodeURIComponent(m[1]));
+    });
+
   </script>
+
+  <div id="mdPanel" class="md-panel" hidden role="dialog" aria-modal="true"
+       aria-labelledby="mdPanelTitle">
+    <div class="md-panel__backdrop" data-md-close></div>
+    <div class="md-panel__sheet" role="document">
+      <header class="md-panel__header">
+        <h2 id="mdPanelTitle" class="md-panel__title">Match-Detail</h2>
+        <button class="md-panel__close" data-md-close type="button"
+                aria-label="Match-Detail schließen">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
+      </header>
+      <div class="md-panel__body" id="mdPanelBody"></div>
+    </div>
+  </div>
 </body>
 </html>
