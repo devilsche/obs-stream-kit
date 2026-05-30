@@ -90,11 +90,23 @@ Kills/Match.
   das im Knock-Counter auftauchen mit Indikator "led to kill".
 
 **Semantik-Klärungen (User-Fragen 2026-05-30)**:
-- **"Match" = ?** Aktuell: Matches mit ≥1 Kill mit der Waffe (zu eng).
-  Vorschlag neue Spalten:
+
+Warum "≥1 Kill = used_match" täuscht — drei reale Szenarien die heute
+falsch gewertet werden:
+
+| Szenario | Aktuelle Anzeige | Realität |
+|---|---|---|
+| AKM 30 Matches lang im Loadout, oft ohne Engagement → 5 Kills | "AKM in 5 von 30 Matches" → 0.17 K/Match | Wirklich: getragen 30/30, 5 Kills total = 0.17 K/carry → ähnlich, aber Carry-Sicht ehrlicher |
+| M16 2min im Match, 1 Kill, dann gegen Beryl gewechselt | "M16 in 1 Match, 1 K/Match — wow!" | War effektiv 1 Kill in 2 Minuten — Stat blaehte die Effizienz auf, weil "Match" eigentlich nur kurze Carry-Phase war |
+| AKM 20 Matches getragen, 0 Kills (immer früh gestorben oder kein Kontakt) | NICHT in der Liste — taucht gar nicht auf | Tatsächliche "Konsistenz" bzw. "Failure-Rate" der Waffe komplett unsichtbar |
+
+Vorschlag neue Spalten:
   - `pickups` — `COUNT(*)` aus ItemPickup-Events pro Waffe (cheap)
   - `carryMatches` — distinkte Matches mit ≥1 Pickup der Waffe
   - `killsPerCarry` — kills / carryMatches (sinnvoller als heute kills/match)
+  - **Wichtig:** Waffen ohne Kills aber mit Pickups MÜSSEN auftauchen
+    (UNION-Query: rows = pickup-aggregate LEFT JOIN kill-aggregate).
+    Sonst bleibt der "20 Pickups, 0 Kills"-Fall im Dunkeln.
 - **"Wie oft ohne Kill gestorben mit der Waffe"?** Schwierig:
   Telemetry sagt nicht direkt "was hattest du in der Hand beim Tod".
   Heuristik: letzter ItemPickup/Attack-Event vor eigenem Kill-Target-
