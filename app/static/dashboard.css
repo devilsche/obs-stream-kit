@@ -184,9 +184,12 @@ img { max-width: 100%; height: auto; }
 }
 
 /* ====== Forms ======================================================== */
+/* Auch Inputs ohne type-Attribut (Default = text) treffen */
+input:not([type]),
 input[type="text"], input[type="number"], input[type="search"],
 input[type="email"], input[type="password"], input[type="date"],
-input[type="time"], input[type="url"], textarea, select {
+input[type="time"], input[type="url"], input[type="tel"],
+textarea, select {
   background: var(--bg-deeper);
   color: var(--text);
   border: 1px solid var(--border-strong);
@@ -200,7 +203,18 @@ input[type="time"], input[type="url"], textarea, select {
 input:focus-visible, textarea:focus-visible, select:focus-visible {
   border-color: var(--focus);
 }
-label { color: var(--text-muted); font-size: 0.9em; display: block; margin-bottom: 4px; }
+label { color: var(--text-muted); font-size: 0.9em; display: block; margin-bottom: 6px; }
+
+/* Form-Layout: Felder mit Abstand, Action-Reihe abgesetzt */
+.form-row { margin-bottom: 16px; max-width: 520px; }
+.form-row:last-of-type { margin-bottom: 20px; }
+.form-actions {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.card h3 { margin-top: 24px; }
+.card h3:first-child { margin-top: 0; }
 
 button, .btn {
   display: inline-flex; align-items: center; gap: 8px;
