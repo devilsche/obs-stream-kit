@@ -557,7 +557,7 @@
     details.ve > summary::-webkit-details-marker { display: none; }
     .ve-row {
       display: grid;
-      grid-template-columns: 56px 130px 1fr auto auto;
+      grid-template-columns: 110px 130px 1fr auto auto;
       gap: 8px;
       padding: 3px 6px 3px 22px;
       font-size: 0.92em;
@@ -566,6 +566,23 @@
     }
     .ve-row:last-child { border-bottom: 0; }
     .ve-t { color: var(--pubg-text); font-variant-numeric: tabular-nums; }
+    .ve-tsub {
+      color: var(--pubg-muted); font-size: 0.82em;
+      font-variant-numeric: tabular-nums;
+      margin-left: 3px;
+    }
+    .ve-match-head {
+      margin: 8px 0 4px;
+      padding: 4px 10px 4px 22px;
+      color: var(--pubg-gold);
+      font-size: 0.82em;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-weight: 700;
+      border-left: 2px solid var(--pubg-gold);
+      background: rgba(242, 183, 5, 0.06);
+    }
+    .ve-match-head:first-child { margin-top: 2px; }
     .ve-veh { color: var(--pubg-text); }
     .ve-poi { color: var(--pubg-gold); }
     .ve-act b { color: var(--pubg-text); }
@@ -2792,25 +2809,57 @@
         const sec = Math.floor(ms / 1000);
         return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,"0")}`;
       }
+      function fmtAbsClock(playedAtIso, msIntoMatch) {
+        if (!playedAtIso) return null;
+        const start = Date.parse(playedAtIso);
+        if (isNaN(start)) return null;
+        const d = new Date(start + (msIntoMatch || 0));
+        return `${String(d.getHours()).padStart(2,"0")}:` +
+               `${String(d.getMinutes()).padStart(2,"0")}`;
+      }
       function fmtVeh(wid) {
         if (!wid) return "Fahrzeug";
         // BP_Mirado_A_00_C → "Mirado"
         return wid.replace(/^BP_/, "").replace(/_[A-Z]?_\d+_C$/, "")
                   .replace(/_C$/, "").replace(/_/g, " ");
       }
-      function evRows(events, role, mapNamesByMatch) {
+      function evRows(events, role) {
+        // Match-Nummer pro matchId (in Reihenfolge des Auftretens) bestimmen,
+        // damit zusammenliegende Events vom selben Match einen #N-Header bekommen.
+        const matchNumByMid = new Map();
+        events.forEach(ev => {
+          if (ev.matchId && !matchNumByMid.has(ev.matchId)) {
+            matchNumByMid.set(ev.matchId, matchNumByMid.size + 1);
+          }
+        });
+        let lastMid = null;
         return events.map(ev => {
           const mapName = ev.mapName || "";
           const poi = poiOfV(mapName, ev.x, ev.y);
           const veh = fmtVeh(ev.vehicle);
           const opp = ev.opponent ? `<b>${ev.opponent}</b>` : "Gegner";
-          const t = fmtMatchTime(ev.tsMs);
+          const matchT = fmtMatchTime(ev.tsMs);
+          const absT = fmtAbsClock(ev.playedAt, ev.tsMs);
           const where = poi ? `<span class="ve-poi">${poi}</span>` : "";
           const kindLbl = ev.kind === "knock_died" ? "knocked→tot" : "kill";
           const verb = role === "dealt"
             ? `→ ${opp}` : `durch ${opp}`;
-          return `<div class="ve-row">
-            <span class="ve-t">${t}</span>
+          // Match-Header beim Wechsel der matchId davorhängen
+          const matchN = matchNumByMid.get(ev.matchId);
+          let header = "";
+          if (ev.matchId !== lastMid) {
+            const mapLbl = mapName || "—";
+            const startLbl = ev.playedAt
+              ? fmtAbsClock(ev.playedAt, 0) : "?";
+            header = `<div class="ve-match-head">Match #${matchN || "?"} · ${mapLbl} · Start ${startLbl}</div>`;
+            lastMid = ev.matchId;
+          }
+          // Zeitspalte: absolute Uhrzeit + (mm:ss ins Match)
+          const tCell = absT
+            ? `<span class="ve-t" title="${matchT} ins Match"><b>${absT}</b> <span class="ve-tsub">+${matchT}</span></span>`
+            : `<span class="ve-t">${matchT}</span>`;
+          return header + `<div class="ve-row">
+            ${tCell}
             <span class="ve-veh"><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span> ${veh}</span>
             <span class="ve-act">${verb}</span>
             ${where}
