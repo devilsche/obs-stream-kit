@@ -104,10 +104,14 @@ def _normalize(event):
         base["event_type"] = "VehicleEnter"
         base["actor_account"] = (event.get("character") or {}).get("accountId")
         base["weapon"] = (event.get("vehicle") or {}).get("vehicleId")
+        base["actor_x"], base["actor_y"] = _loc(event, "character")
+        base["actor_z"], base["actor_health"] = _z_health(event, "character")
     elif et == "LogVehicleLeave":
         base["event_type"] = "VehicleLeave"
         base["actor_account"] = (event.get("character") or {}).get("accountId")
         base["distance"] = event.get("rideDistance")
+        base["actor_x"], base["actor_y"] = _loc(event, "character")
+        base["actor_z"], base["actor_health"] = _z_health(event, "character")
     elif et == "LogVehicleDestroy":
         base["event_type"] = "VehicleDestroy"
         base["actor_account"] = (event.get("attacker") or {}).get("accountId")

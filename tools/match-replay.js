@@ -385,6 +385,10 @@ function buildPlayerTracks() {
       (groundTracks[acc] = groundTracks[acc] || []).push({ ts, x, y });
   };
 
+  // Comeback-Linien: pro Spieler Liste von [{deathTs, x0, y0, landTs, x1, y1}]
+  // 'x0/y0' = letzte bekannte Pos vor death, 'x1/y1' = first land-pos nach death.
+  // Wird in Render gezeichnet als gestrichelte Linie (= Comeback-Trip).
+  const comebacks = {};
   for (const e of RS.replay.events) {
     if (e.type === "position" || e.type === "landing") {
       pushSample(e.actorId, e.ts, e.x, e.y);
@@ -393,13 +397,13 @@ function buildPlayerTracks() {
     } else if (e.type === "death") {
       (deaths[e.actorId] = deaths[e.actorId] || []).push(e.ts);
     } else if (e.type === "knock" || e.type === "kill" || e.type === "hit") {
-      // Schuss-Events haben EXAKTE Koordinaten zum Event-Zeitpunkt —
-      // sowohl fuer den Schuetzen (ax/ay) als auch das Opfer (tx/ty).
-      // Als zusaetzliche Track-Stuetzstellen einspeisen, damit der Pin
-      // nicht 10s lang linear zwischen zwei LogPlayerPosition-Samples
-      // schwebt waehrend der Spieler im Auto fuer den Knock fuhr.
+      // Schuss-Events haben EXAKTE Koordinaten zum Event-Zeitpunkt.
       pushSample(e.actorId, e.ts, e.ax, e.ay);
       pushSample(e.targetId, e.ts, e.tx, e.ty);
+    } else if (e.type === "vehicle_enter" || e.type === "vehicle_leave") {
+      // Comeback-Heli capture (DummyTransportAircraft). actor_x/y NUR
+      // in neuen Matches (telemetry.py erweitert) — alte Matches: null.
+      pushSample(e.actorId, e.ts, e.x, e.y);
     }
   }
   // Pro Account: nach Timestamp sortieren + Duplikate (selbe ts) zusammenfassen
@@ -418,6 +422,32 @@ function buildPlayerTracks() {
   RS._groundTracks = groundTracks;
   RS._deaths = deaths;
   RS._relands = relands;
+  // Comeback-Linien: pro Account fuer jeden death-then-reland-Pair eine
+  // [from-pos, to-pos] Linie. Frontend zeichnet sie als gestrichelte
+  // Spur weil PUBG keine Heli-Position-Events emittiert.
+  RS._comebackLines = {};
+  for (const acc of Object.keys(deaths)) {
+    const ds = deaths[acc] || [];
+    const rs = relands[acc] || [];
+    const tr = tracks[acc] || [];
+    const lines = [];
+    for (const d of ds) {
+      // Erste Reland NACH dieser Death
+      const reland = rs.find(r => r > d);
+      if (reland == null) continue;
+      // Letzte Position vor death
+      let from = null;
+      for (const p of tr) {
+        if (p.ts <= d) from = p; else break;
+      }
+      // Erste Position >= reland (Landing-Punkt)
+      const to = tr.find(p => p.ts >= reland);
+      if (!from || !to) continue;
+      lines.push({ deathTs: d, relandTs: reland,
+                    x0: from.x, y0: from.y, x1: to.x, y1: to.y });
+    }
+    if (lines.length) RS._comebackLines[acc] = lines;
+  }
   // Absprung-Zeitpunkt = erster Ground-Track-Event (z<150000) nach Flugstart
   RS._jumpTs = {};
   for (const [acc, gt] of Object.entries(groundTracks)) {
@@ -733,6 +763,34 @@ function renderFrame() {
     ctx.lineTo(hpx, hpy);
     ctx.stroke();
     ctx.globalAlpha = 1;
+  }
+
+  // 1b) Comeback-Linien (gestrichelt, Team-Farbe) zwischen Last-Pos
+  // vor Tod und Landing nach Comeback-Heli — PUBG liefert keine
+  // Heli-Position-Events, daher diese Visual-Bruecke.
+  if (RS._comebackLines) {
+    for (const acc of Object.keys(RS._comebackLines)) {
+      const tid = RS._accTeam[acc];
+      const color = RS._teamColor[tid] || "#888";
+      for (const cb of RS._comebackLines[acc]) {
+        if (ms < cb.deathTs) continue;  // noch nicht gestorben
+        const [x0, y0] = projToCanvas(cb.x0, cb.y0);
+        const [x1, y1] = projToCanvas(cb.x1, cb.y1);
+        // Fade nach Reland in den naechsten 30s auf Alpha 0.3
+        const sinceReland = ms - cb.relandTs;
+        let alpha = 0.75;
+        if (sinceReland > 0) alpha = Math.max(0.25, 0.75 - sinceReland / 30000 * 0.5);
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 5]);
+        ctx.beginPath();
+        ctx.moveTo(x0, y0); ctx.lineTo(x1, y1);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+      }
+    }
   }
 
   // 2) Spieler-Pins — eigener Spieler als Pfeilnadel (◆ + Halo)

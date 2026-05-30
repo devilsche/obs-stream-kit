@@ -145,6 +145,21 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
             if typ == "kill":
                 out.append({"type": "death", "ts": ts,
                             "actorId": victim.get("accountId")})
+        elif et in ("LogVehicleRide", "LogVehicleLeave"):
+            # Comeback-Heli (DummyTransportAircraft) eintragen damit das
+            # Frontend einen Marker bzw. Comeback-Linie zeichnen kann.
+            # actor_x/y kommt aus character.location (siehe pubg/telemetry.py).
+            ch = e.get("character") or {}
+            acc = ch.get("accountId")
+            x, y = _loc(ch)
+            nx, ny = normalize_coords(x, y, mapKm)
+            if acc:
+                vehicle = (e.get("vehicle") or {}).get("vehicleId") or ""
+                out.append({
+                    "type": "vehicle_enter" if et == "LogVehicleRide" else "vehicle_leave",
+                    "ts": ts, "actorId": acc, "x": nx, "y": ny,
+                    "vehicleId": vehicle,
+                })
         elif et == "LogGameStatePeriodic":
             gs = e.get("gameState") or {}
             span = mapKm * 100000.0
