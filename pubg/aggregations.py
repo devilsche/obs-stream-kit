@@ -1034,7 +1034,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         "WHERE tenant_id = ? AND match_id = ? AND account_id = ?",
         (tenant_id, match_id, my_account_id)).fetchone()
     if not team_row:
-        return {"matchId": match_id, "mapName": map_name, "members": []}
+        return {"matchId": match_id, "mapName": map_name, "members": [], "events": []}
     members_rows = conn.execute("""
         SELECT mtm.account_id, mtm.slot, p.name
         FROM match_team_mapping mtm
@@ -1043,6 +1043,11 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         ORDER BY mtm.slot NULLS LAST, p.name
     """, (tenant_id, match_id, team_row["team_id"])).fetchall()
 
+    squad_accs = [r["account_id"] for r in members_rows if r["account_id"]]
+    if not squad_accs:
+        return {"matchId": match_id, "mapName": map_name, "members": [], "events": []}
+
+    veh_intervals_by_acc = {}
     out_members = []
     for mem in members_rows:
         acc = mem["account_id"]
@@ -1078,6 +1083,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 _cur_veh   = None
         if _cur_enter is not None:
             veh_intervals.append((_cur_enter, float("inf"), _cur_veh))
+
+        veh_intervals_by_acc[acc] = list(veh_intervals)
 
         def _vehicle_label_at(ts):
             """Wenn der Member zum Zeitpunkt ts im Fahrzeug war: Klartext
@@ -1342,10 +1349,116 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         x["slot"] if x["slot"] is not None else 999,
         x["name"].lower(),
     ))
+
+    # Squad-weite Event-Liste fuer Match-Detail-Timeline. Holt Knock/Kill/
+    # Revive-Events bei denen actor ODER target ein Squad-Mitglied ist,
+    # chronologisch sortiert. Pro Event werden dealt/taken-Perspektive(n)
+    # in die finale Liste geschrieben.
+    ph_sq = ",".join(["?"] * len(squad_accs))
+    sq_events_rows = conn.execute(f"""
+        SELECT event_type, timestamp_ms, actor_account, target_account,
+               victim_x, victim_y, weapon, distance
+        FROM telemetry_events
+        WHERE match_id = ?
+          AND event_type IN ('Kill', 'Knock', 'Revive')
+          AND (actor_account IN ({ph_sq}) OR target_account IN ({ph_sq}))
+          AND timestamp_ms IS NOT NULL
+        ORDER BY timestamp_ms ASC
+    """, (match_id, *squad_accs, *squad_accs)).fetchall()
+
+    # Name-Lookup fuer Actor/Target — Players + Match-Participants
+    _name_cache = {}
+    def _name_of(acc):
+        if not acc:
+            return None
+        if acc in _name_cache:
+            return _name_cache[acc]
+        nrow = conn.execute("""
+            SELECT COALESCE(p.name, pa.name) AS n
+            FROM (SELECT NULL AS dummy) x
+            LEFT JOIN players p ON p.tenant_id = ? AND p.account_id = ?
+            LEFT JOIN participants pa ON pa.tenant_id = ? AND pa.match_id = ?
+                  AND pa.account_id = ?
+        """, (tenant_id, acc, tenant_id, match_id, acc)).fetchone()
+        n = nrow["n"] if nrow else None
+        _name_cache[acc] = n
+        return n
+
+    # Slot-Lookup nur fuer Squad-Members (out_members hat das schon)
+    slot_by_acc = {mem["accountId"]: mem.get("slot") for mem in out_members}
+
+    def _veh_label_for(acc, ts):
+        """Vehicle-Label fuer einen Squad-Member zum Zeitpunkt ts.
+        Non-Squad-Members liefern immer None (Vehicle-Intervalle nicht
+        gequeried)."""
+        if not acc or acc not in veh_intervals_by_acc:
+            return None
+        for a, b, vid in veh_intervals_by_acc[acc]:
+            if a <= ts <= b and vid:
+                for needle, label in _VEHICLE_PATTERNS:
+                    if needle in vid:
+                        return label
+                return vid
+        return None
+
+    sq_set = set(squad_accs)
+    events_out = []
+    for e in sq_events_rows:
+        et = e["event_type"]
+        actor  = e["actor_account"]
+        target = e["target_account"]
+        ts     = e["timestamp_ms"]
+        weapon = e["weapon"]
+        weapon_name = _weapon_label(weapon)[0] if weapon else None
+        dist_m = (round((e["distance"] or 0) / 100.0, 1)
+                  if e["distance"] else None)
+        victim_veh = _veh_label_for(target, ts)
+        shooter_veh = _veh_label_for(actor, ts)
+        # Pro Event je nach Squad-Perspektive 1 oder 2 Eintraege erzeugen.
+        # Type-Map: ("Kill", actor_in_squad) -> kill_dealt, etc.
+        perspectives = []
+        if et == "Kill":
+            if actor in sq_set:
+                perspectives.append("kill_dealt")
+            if target in sq_set:
+                perspectives.append("kill_taken")
+        elif et == "Knock":
+            if actor in sq_set:
+                perspectives.append("knock_dealt")
+            if target in sq_set:
+                perspectives.append("knock_taken")
+        elif et == "Revive":
+            if actor in sq_set:
+                perspectives.append("revive_given")
+            if target in sq_set:
+                perspectives.append("revive_received")
+        for ptype in perspectives:
+            events_out.append({
+                "tsMs":          ts,
+                "type":          ptype,
+                "actorAccount":  actor,
+                "actorName":     _name_of(actor),
+                "actorSlot":     slot_by_acc.get(actor),
+                "targetAccount": target,
+                "targetName":    _name_of(target),
+                "targetSlot":    slot_by_acc.get(target),
+                "weapon":        weapon,
+                "weaponName":    weapon_name,
+                "distanceM":     dist_m,
+                "victimX":       e["victim_x"],
+                "victimY":       e["victim_y"],
+                "victimVehicleLabel":  victim_veh,
+                "shooterVehicleLabel": shooter_veh,
+            })
+    # Sortiert nach tsMs (sq_events_rows war schon sortiert, aber durch
+    # die 2-Perspektiven-Aufteilung leichte Reihenfolgewechsel moeglich)
+    events_out.sort(key=lambda x: x["tsMs"] or 0)
+
     return {
         "matchId": match_id,
         "mapName": map_name,
         "members": out_members,
+        "events":  events_out,
     }
 
 
