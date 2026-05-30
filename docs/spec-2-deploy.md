@@ -11,8 +11,8 @@ Speichern als Variable, z.B. `ADMIN_TWITCH_ID=123456789`.
 ### 2. Twitch-OAuth-App anlegen
 
 Unter https://dev.twitch.tv/console/apps:
-- Name: "OBS Stream Kit (king-edition.de)"
-- OAuth Redirect URLs: `https://king-edition.de/app/oauth/callback`
+- Name: "OBS Stream Kit (stats-overlay.info)"
+- OAuth Redirect URLs: `https://stats-overlay.info/app/oauth/callback`
 - Category: Application Integration
 
 Speichern → Client-ID + Client-Secret notieren.
@@ -64,24 +64,24 @@ ssh -i ~/.ssh/entry_server root@87.106.4.31 \
 
 ```bash
 # Landing
-curl -s -o /dev/null -w "%{http_code}\n" https://king-edition.de/
+curl -s -o /dev/null -w "%{http_code}\n" https://stats-overlay.info/
 # Expected: 200
 
 # Login Start
 curl -s -o /dev/null -w "%{http_code} → %{redirect_url}\n" \
-  https://king-edition.de/app/login
+  https://stats-overlay.info/app/login
 # Expected: 302 → https://id.twitch.tv/oauth2/authorize?...
 
 # Healthz
-curl -s https://king-edition.de/healthz
+curl -s https://stats-overlay.info/healthz
 # Expected: {"status":"ok"}
 ```
 
 Admin loggt sich danach manuell im Browser ein:
-- https://king-edition.de/ → "Mit Twitch einloggen"
+- https://stats-overlay.info/ → "Mit Twitch einloggen"
 - Nach Login: Dashboard sichtbar
 - /app/urls → Token kopieren
-- OBS Browser-Sources umstellen auf `https://king-edition.de/s/<token>/widgets/...`
+- OBS Browser-Sources umstellen auf `https://stats-overlay.info/s/<token>/widgets/...`
 
 ## Rollback (Notfall)
 
