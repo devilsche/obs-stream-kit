@@ -1030,6 +1030,28 @@
     @media (prefers-reduced-motion: reduce) {
       .md-panel__backdrop, .md-panel__sheet { transition: none; }
     }
+    /* Slide-In: Squad-Tabelle (clientseitig aus md.detail.members gerendert) */
+    .md-squad-table {
+      width: 100%; border-collapse: collapse;
+      margin-bottom: 12px;
+      font-size: 0.92em;
+    }
+    .md-squad-table th {
+      text-align: left; padding: 6px 8px;
+      color: var(--pubg-muted);
+      font-size: 0.78em; text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .md-squad-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .md-squad-table .md-dot {
+      display: inline-block; width: 10px; height: 10px;
+      border-radius: 50%; margin-right: 6px;
+      vertical-align: -1px;
+    }
   </style>
 </head>
 <body>
@@ -1647,12 +1669,33 @@
       btn.textContent = anyHidden ? "↺ Alle anzeigen" : "● Alle sichtbar";
     }
 
+    function renderMdSquadTable(members, colorByAcc) {
+      const rows = members.map(m => {
+        const color = colorByAcc[m.accountId] || "#999";
+        const slotLbl = (m.slot != null) ? `Slot ${m.slot}` : "";
+        const lives = m.lives || [];
+        const totalKills = lives.reduce((n, l) =>
+          n + ((l.kills || []).length), 0);
+        const died = lives.some(l => l.death);
+        return `<tr>
+          <td><span class="md-dot" style="background:${color}"></span>
+              <b>${m.name}${m.isSelf ? " (du)" : ""}</b>
+              <span style="color:var(--pubg-muted);font-size:0.8em;margin-left:6px">${slotLbl}</span></td>
+          <td style="text-align:right">${totalKills}</td>
+          <td style="text-align:right">${died ? "✗" : "✓"}</td>
+        </tr>`;
+      }).join("");
+      return `<table class="md-squad-table">
+        <thead><tr><th>Member</th><th style="text-align:right">Kills</th><th style="text-align:right">Surv.</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    }
+
     async function mdMount(host) {
       if (host.dataset.mounted === "1") return;
       host.dataset.mounted = "1";
       const matchId = host.getAttribute("data-match-id");
       const mapName = host.getAttribute("data-map");
-      const tableHtml = decodeURIComponent(host.getAttribute("data-table") || "");
       host.innerHTML = `
         <div class="md-grid">
           <div class="md-mapcol">
@@ -1677,7 +1720,7 @@
             </div>
           </div>
           <div class="md-rightcol">
-            <div class="squad-table-wrap">${tableHtml}</div>
+            <div class="squad-table-wrap" id="mdSquadTableWrap_${matchId}"></div>
             <div class="md-allebar">
               <button class="md-allebtn">● Alle sichtbar</button>
             </div>
@@ -1697,6 +1740,22 @@
       }
       s.detail = md.detail;
       s.colorByAcc = md.colorByAcc;
+      // Squad-Tabelle aus Match-Detail-Response rendern.
+      // Liefert das gleiche `<table>` wie zuvor fmtSquadDetail im
+      // session-report-Kontext — aber datenbasiert aus md.detail.members
+      // statt aus dem Session-Match-Objekt.
+      const tableWrap = host.querySelector(
+        `#mdSquadTableWrap_${CSS.escape(matchId)}`);
+      if (tableWrap && md && md.detail && md.detail.members) {
+        tableWrap.innerHTML = renderMdSquadTable(md.detail.members,
+                                                  md.colorByAcc);
+      }
+      // Panel-Titel aktualisieren (Map + Match-Nr + Uhrzeit)
+      const panelTitle = document.getElementById("mdPanelTitle");
+      if (panelTitle && md && md.detail) {
+        const mapLbl = PubgUI.fmtMap(md.detail.mapName);
+        panelTitle.textContent = `Match · ${mapLbl}`;
+      }
       // Match-Zeitraum aus allen Pfaden ableiten
       let mStart = Infinity, mEnd = -Infinity;
       for (const m of s.detail.members) {
@@ -2243,114 +2302,6 @@
       return `${m}:${String(s).padStart(2,"0")}`;
     }
 
-    function fmtSquadDetail(m) {
-      // Du oben, dann Mates sortiert nach Damage absteigend
-      const all = [m.myStats, ...(m.squad || [])];
-      all.sort((a, b) => {
-        if (a.isSelf) return -1;
-        if (b.isSelf) return 1;
-        return (b.damage_dealt || 0) - (a.damage_dealt || 0);
-      });
-      const isWin = m.place === 1;
-      const mapName = m.map || "";
-      function poiOf(x, y) {
-        if (x == null || y == null) return null;
-        if (PubgUI.POI && PubgUI.POI.fromCoords)
-          return PubgUI.POI.fromCoords(mapName, x, y);
-        return null;
-      }
-      function eventLine(ev, role) {
-        // role: 'vkill' (er hat gekillt), 'vdeath' (er starb), 'driveby', 'redzone'
-        const poi = poiOf(ev.x, ev.y);
-        const dist = (ev.distanceM != null)
-          ? `<span class="sd-dist">${Math.round(ev.distanceM)}m</span>` : "";
-        const opp = (role === "vkill" && ev.victimName)
-          ? `<span class="sd-opp">→ <b>${ev.victimName}</b></span>`
-          : (role === "vdeath" && ev.killerName)
-            ? `<span class="sd-opp">durch <b>${ev.killerName}</b></span>`
-            : (role === "driveby" && ev.victimName)
-              ? `<span class="sd-opp">→ <b>${ev.victimName}</b></span>` : "";
-        const where = poi ? `<span class="sd-poi">${poi}</span>` : "";
-        const wn = ev.weaponName ? `<span class="sd-w">${ev.weaponName}</span>` : "";
-        return `<div class="sd-row">${wn}${opp}${where}${dist}</div>`;
-      }
-      // Sonder-Events: Icon + Anzahl als <details>-Badge, aufklappbar zeigt
-      // pro Event: Waffe/Fahrzeug, Gegner, POI, Distanz.
-      function specialBadges(sp) {
-        if (!sp) return "";
-        const out = [];
-        function mk(role, list, titleLbl, iconHtml) {
-          if (!list || !list.length) return;
-          const details = list.map(ev => eventLine(ev, role)).join("");
-          out.push(`<details class="sd ${role}"><summary title="${titleLbl}">${iconHtml}<span class="sd-cnt">×${list.length}</span></summary><div class="sd-body">${details}</div></details>`);
-        }
-        // Vehicle-Icon: nimm den ersten Eintrag mit weapon=Vehicle-ID
-        function vehIcon(list) {
-          const wid = list[0] && list[0].weapon;
-          const url = wid ? `${window.__STATIC_BASE__||"/widgets/"}pubg/assets/vehicles/${wid}.webp` : "";
-          return url
-            ? `<img class="sd-icon veh" src="${url}" onerror="this.style.display='none'">`
-            : `<span class="sd-emoji"><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span></span>`;
-        }
-        mk("redzone", sp.redzone, "Red Zone Tod",
-           `<span class="sd-emoji"><span class="material-symbols-outlined icon-sm" aria-hidden="true">bomb</span></span>`);
-        mk("vkill", sp.vkill, "Vehicle-Kill (jemanden überfahren)",
-           vehIcon(sp.vkill || []));
-        mk("vdeath", sp.vdeath, "Mit Vehicle überfahren worden",
-           vehIcon(sp.vdeath || []) + `<span class="sd-emoji"><span class="material-symbols-outlined icon-sm" aria-hidden="true">skull</span></span>`);
-        mk("driveby", sp.driveby, "Drive-By Kill (aus Fahrzeug)",
-           `<span class="sd-emoji"><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span></span>`);
-        return out.length ? ` <span class="sd-row-wrap">${out.join("")}</span>` : "";
-      }
-      const rows = all.map(p => {
-        const cls = (p.isSelf ? "self " : "") + (isWin ? "win" : "");
-        return `<tr class="${cls.trim()}">
-          <td class="name-cell">${p.name}${p.isSelf ? " (du)" : ""}${specialBadges(p.special)}</td>
-          <td>${p.kills || 0}${p.botKills ? ` <span class="bot-kills" title="${p.botKills} davon Bot-Kills">(${p.botKills})</span>` : ""}</td>
-          <td>${p.headshot_kills || 0}</td>
-          <td>${p.assists || 0}</td>
-          <td>${p.dbnos || 0}</td>
-          <td>${p.revivesReceived || 0}</td>
-          <td>${p.revivesGiven || 0}</td>
-          <td>${Math.round(p.damage_dealt || 0)}</td>
-          <td>${fmtSurv(p.time_survived)}</td>
-        </tr>`;
-      }).join("");
-      // Match-Detail-Mount-Point. mdMount() in Task 9 fuellt das Div mit
-      // basemap+overlay-Canvases + Tools-Bar + Cards-Container.
-      // Event-Matches: kein Mini-Map, dafuer Event/PAYDAY-Details (Loot,
-      // Windows, Doors) — wird in renderExtras gefuellt sobald payday-stats
-      // geladen sind.
-      const matchId = m.matchId || "";
-      const isEvent = !!m.isEvent;
-      const tableHtml = `<table>
-        <thead><tr>
-          <th>Squad</th><th>K</th><th>HS</th><th>Ass</th><th>DBNO</th><th title="Wie oft wurde ich von Squadmates wiederbelebt (knocked + revived, ohne Tod dazwischen)">REV&#x2190;</th><th title="Teamkollegen wiederbelebt">REV&#x2192;</th><th>DMG</th><th>Survived</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>`;
-      if (isEvent) {
-        return `
-          <div class="detail-row has-event">
-            <div style="grid-column:1/-1;width:100%">
-              <div class="md-matchid" title="Klick = Match-ID kopieren">${matchId}</div>
-            </div>
-            <div class="squad-table-wrap">${tableHtml}</div>
-            <div class="event-detail" data-event-detail-match-id="${matchId}">
-              <div class="event-detail-empty">— event stats laden —</div>
-            </div>
-          </div>`;
-      }
-      // Match-Detail: Map links, rechts (Squad-Tabelle + Member-Cards).
-      // Tabelle wandert in md-host und wird von mdMount in die rechte
-      // Spalte gesetzt — via data-table (URI-encoded).
-      return `
-        <div class="detail-row">
-          <div class="md-host" data-match-id="${matchId}" data-map="${mapName}"
-               data-table="${encodeURIComponent(tableHtml)}"></div>
-        </div>`;
-    }
-
     function fmtMatchRow(m, idx, matchNum) {
       const startIso = PubgUI.matchStartIso(m.matchEnd, m.durationSec);
       const mySurv = m.timeSurvived || 0;
@@ -2384,7 +2335,7 @@
           <span class="stat"><b>${Math.round(m.damage||0)}</b> DMG</span>
           <span class="stat"><b>${fmtSurv(mySurv)}</b></span>
         </div>
-        <div class="squad-detail" data-idx-detail="${idx}">${fmtSquadDetail(m)}</div>`;
+`;
     }
 
     // Fingerprint des Report-Payloads — wenn unveraendert,
@@ -3012,27 +2963,13 @@
     }
 
 
-    // Click-Handler: Match-Zeile expandiert Squad-Detail
+    // Click-Handler: Match-Zeile öffnet Slide-In Match-Detail-Panel
     document.addEventListener("click", (e) => {
       const row = e.target.closest(".m[data-idx]");
       if (!row) return;
-      const idx = row.getAttribute("data-idx");
-      const detail = document.querySelector(`[data-idx-detail="${idx}"]`);
-      if (!detail) return;
-      const wasExpanded = row.classList.contains("expanded");
-      row.classList.toggle("expanded");
-      detail.classList.toggle("show", !wasExpanded);
-      if (!wasExpanded) {
-        const host = detail.querySelector(".md-host");
-        if (host) mdMount(host);
-      } else {
-        const host = detail.querySelector(".md-host");
-        if (host && host.dataset.mounted === "1") {
-          const s = mdGetState(host);
-          s.playToken++;
-          s.zeitraffer.playing = false;
-        }
-      }
+      const mid = row.getAttribute("data-match-id");
+      if (!mid) return;
+      mdPanelOpen(mid);
     });
 
     const reportUrl = (window.__SERVE_BASE__||"/") + "api/pubg/session-report" +
@@ -3219,8 +3156,7 @@
       _mdPanelCurrentId = matchId;
       // Body: existierende mdMount-Logik nutzen via md-host
       body.innerHTML = `
-        <div class="md-host" data-match-id="${matchId}" data-map=""
-             data-table=""></div>
+        <div class="md-host" data-match-id="${matchId}" data-map=""></div>
         <section class="md-timeline" id="mdTimelineSection" hidden></section>`;
       title.textContent = "Match-Detail · lädt …";
       const host = body.querySelector(".md-host");
