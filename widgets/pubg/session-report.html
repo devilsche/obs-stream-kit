@@ -1132,6 +1132,49 @@
       }
       .md-tl-meta { grid-column: 1 / -1; padding-left: 86px; }
     }
+
+    /* ─── Monats-Gruppen in der Session-Picker-Liste ────────────────────── */
+    .month-group {
+      border: 1px solid var(--pubg-border);
+      border-radius: var(--pubg-radius);
+      margin-bottom: 8px;
+      background: rgba(20, 12, 30, 0.4);
+    }
+    .month-group > summary.month-group__head {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+      min-height: 44px;
+    }
+    .month-group > summary.month-group__head::-webkit-details-marker { display: none; }
+    .month-group__name {
+      flex: 1;
+      color: var(--pubg-gold);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .month-group__count {
+      color: var(--pubg-muted);
+      font-size: 0.85em;
+      font-variant-numeric: tabular-nums;
+    }
+    .month-group__chev {
+      color: var(--pubg-muted);
+      transition: transform 180ms ease;
+    }
+    .month-group[open] > summary .month-group__chev { transform: rotate(180deg); }
+    .month-group__body {
+      padding: 0 10px 10px;
+    }
+    .month-group > summary:focus-visible {
+      outline: 2px solid var(--pubg-gold);
+      outline-offset: -2px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .month-group__chev { transition: none; }
+    }
   </style>
 </head>
 <body>
@@ -2390,37 +2433,19 @@
     // Sessions-Picker: Monats-Tabs + Sort-Dropdown.
     // Default: aktueller Monat, sortiert nach neueste-zuerst.
     let allSessions = [];
-    let activeMonth = null;       // null = aktueller (=neuester) Monat
     let sortBy = "newest";
 
     function monthKey(iso) {
       const d = new Date(iso);
       return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
     }
-    function monthLabel(key) {
-      const [y, m] = key.split("-").map(Number);
-      return new Date(y, m-1, 1).toLocaleDateString("de-DE", { month: "long", year: "numeric" });
-    }
-
     function buildPickerShell() {
       const picker = document.getElementById("picker");
       if (!allSessions.length) { picker.style.display = "none"; return; }
       picker.style.display = "block";
 
-      // Alle Monate aus den Sessions, neueste zuerst
-      const months = [...new Set(allSessions.map(s => monthKey(s.from)))]
-        .sort((a, b) => b.localeCompare(a));
-      if (!activeMonth) activeMonth = months[0];
-
-      const monthTabs = months.map(k => {
-        const cnt = allSessions.filter(s => monthKey(s.from) === k).length;
-        const cls = "month-tab" + (k === activeMonth ? " active" : "");
-        return `<button class="${cls}" data-month="${k}">${monthLabel(k)} (${cnt})</button>`;
-      }).join("");
-
       picker.innerHTML = `
         <div class="controls">
-          <div class="month-tabs">${monthTabs}</div>
           <select id="sortBy">
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
@@ -2430,6 +2455,9 @@
           </select>
           <span class="summary" id="sessionSummary"></span>
         </div>
+        <div class="session-picker__header">
+          <span id="monthCounter" class="session-picker__counter">—</span>
+        </div>
         <div id="sessionList"></div>
       `;
       document.getElementById("sortBy").value = sortBy;
@@ -2437,17 +2465,11 @@
         sortBy = e.target.value;
         renderItems();
       });
-      picker.querySelectorAll(".month-tab").forEach(btn => {
-        btn.addEventListener("click", () => {
-          activeMonth = btn.dataset.month;
-          buildPickerShell();
-          renderItems();
-        });
-      });
     }
 
     function renderItems() {
-      const inMonth = allSessions.filter(s => monthKey(s.from) === activeMonth);
+      const months = [...new Set(allSessions.map(s => monthKey(s.from)))]
+        .sort().reverse();
       const sortFns = {
         newest:  (a, b) => b.from.localeCompare(a.from),
         oldest:  (a, b) => a.from.localeCompare(b.from),
@@ -2455,27 +2477,61 @@
         matches: (a, b) => (b.matches||0) - (a.matches||0) || b.from.localeCompare(a.from),
         kills:   (a, b) => (b.kills||0) - (a.kills||0) || b.from.localeCompare(a.from),
       };
-      const sorted = [...inMonth].sort(sortFns[sortBy] || sortFns.newest);
+      if (!months.length) {
+        document.getElementById("sessionList").innerHTML =
+          `<div class="empty">Keine Sessions im Zeitraum.</div>`;
+        return;
+      }
+      const currentMonth = months[0];  // hoechster Key = neuester Monat
+      const html = months.map(k => {
+        const inMonth = allSessions.filter(s => monthKey(s.from) === k);
+        const sorted = [...inMonth].sort(sortFns[sortBy] || sortFns.newest);
+        const totalMatches = inMonth.reduce((n, s) => n + (s.matches || 0), 0);
+        // LocalStorage: Default = aktueller Monat offen, andere zu
+        const lsKey = "obs.month." + k + ".open";
+        let openLs = localStorage.getItem(lsKey);
+        if (openLs === null) openLs = (k === currentMonth) ? "1" : "0";
+        const isOpen = openLs === "1";
+        const items = sorted.map(s => {
+          const origIdx = allSessions.indexOf(s);
+          const cls = "item" + (s.current ? " current" : "");
+          return `<div class="${cls}" data-from="${s.from}" data-to="${s.to}"
+                       data-idx="${origIdx}">
+            <div class="item-date">${PubgUI.fmtDate(s.from)}</div>
+            <div class="item-meta">${s.matches || 0} Matches · ${s.wins || 0} W</div>
+          </div>`;
+        }).join("");
+        const monthLabelStr = _monthLabel(k);
+        return `<details class="month-group" data-month-key="${k}"${isOpen ? " open" : ""}>
+          <summary class="month-group__head">
+            <span class="month-group__name">${monthLabelStr}</span>
+            <span class="month-group__count">${inMonth.length} Sessions · ${totalMatches} Matches</span>
+            <span class="material-symbols-outlined month-group__chev" aria-hidden="true">expand_more</span>
+          </summary>
+          <div class="month-group__body">${items}</div>
+        </details>`;
+      }).join("");
+      document.getElementById("sessionList").innerHTML = html;
+      document.getElementById("monthCounter").textContent =
+        `${months.length} Monate · ${allSessions.length} Sessions gesamt`;
+      // LocalStorage-Persistenz: bei jedem toggle den State speichern
+      document.querySelectorAll(".month-group").forEach(el => {
+        el.addEventListener("toggle", () => {
+          const k = el.getAttribute("data-month-key");
+          localStorage.setItem("obs.month." + k + ".open",
+                                el.open ? "1" : "0");
+        });
+      });
+    }
 
-      const items = sorted.map(s => {
-        const origIdx = allSessions.indexOf(s);
-        const isCurrent = origIdx === 0 && !FROM;
-        const isActive = FROM === s.from;
-        const cls = ["item"];
-        if (isCurrent) cls.push("current");
-        if (isActive) cls.push("active");
-        const mate = s.topMate
-          ? ` · <span class="material-symbols-outlined icon-sm" aria-hidden="true">group</span> ${s.topMate}${s.topMateCount > 1 ? ` (${s.topMateCount})` : ""}`
-          : "";
-        return `<div class="${cls.join(' ')}" data-from="${s.from}" data-to="${s.to}">
-          <span class="label">${PubgUI.fmtDate(s.from)} ${PubgUI.fmtTime(s.from)}${isCurrent ? " ▶" : ""}</span>
-          <span class="meta">${s.matches}M · ${s.wins} CHICKEN · ${s.kills}K${mate}</span>
-        </div>`;
-      }).join("") || `<div style="padding:20px;color:var(--pubg-muted);text-align:center;font-style:italic">— keine Sessions in diesem Monat —</div>`;
-
-      document.getElementById("sessionList").innerHTML = `<div class="grid">${items}</div>`;
-      document.getElementById("sessionSummary").textContent =
-        `${inMonth.length} Sessions · ${allSessions.length} gesamt`;
+    function _monthLabel(monthKey) {
+      // monthKey: "YYYY-MM" → "Monat-Name YYYY" auf Deutsch
+      const [y, m] = monthKey.split("-");
+      const months = ["Januar", "Februar", "März", "April", "Mai", "Juni",
+                      "Juli", "August", "September", "Oktober",
+                      "November", "Dezember"];
+      const idx = parseInt(m, 10) - 1;
+      return `${months[idx] || m} ${y}`;
     }
 
     function renderPicker() {
@@ -2485,8 +2541,6 @@
 
     PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/sessions").then(sessions => {
       allSessions = sessions || [];
-      // Wenn URL-Range gesetzt: Monat der aktiven Session vorauswählen
-      if (FROM) activeMonth = monthKey(FROM);
       renderPicker();
     }).catch(() => {});
 
