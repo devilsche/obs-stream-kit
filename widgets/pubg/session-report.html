@@ -455,15 +455,14 @@
     .md-card .md-life b { color: var(--pubg-text); }
     .md-card .md-life .md-died { color: #e57b7b; }
     .md-card .md-life .md-veh {
-      display: inline-flex; align-items: center; gap: 3px;
-      margin-left: 6px;
-      padding: 1px 7px;
-      border-radius: 100px;
-      background: rgba(242, 183, 5, 0.13);
-      color: var(--pubg-gold);
-      font-size: 0.88em;
+      color: var(--pubg-muted);
+      font-size: 0.92em;
     }
     .md-card .md-life .md-veh b { color: var(--pubg-gold); font-weight: 700; }
+    .md-card .md-life .md-veh .material-symbols-outlined {
+      color: var(--pubg-gold);
+      vertical-align: -3px;
+    }
     .md-card .md-empty { font-style: italic; opacity: 0.6; }
     .md-warning {
       background: rgba(229,123,123,0.12);
@@ -1502,7 +1501,7 @@
             const vehLbl = life.death.victimVehicleLabel
                         || life.death.knockVictimVehicleLabel;
             const vehTag = vehLbl
-              ? ` <span class="md-veh"><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_bus</span> aus <b>${vehLbl}</b></span>`
+              ? ` <span class="md-veh">aus <b>${vehLbl}</b> <span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_bus</span></span>`
               : "";
             if (causeLbl) {
               const verb = life.death.causeLabel ? "gestorben" : "geknockt+gestorben";
