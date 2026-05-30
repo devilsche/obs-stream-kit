@@ -216,6 +216,33 @@ label { color: var(--text-muted); font-size: 0.9em; display: block; margin-botto
 .card h3 { margin-top: 24px; }
 .card h3:first-child { margin-top: 0; }
 
+.url-tabs {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-bottom: 16px;
+  padding: 6px;
+  background: var(--bg-deeper);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.url-tab {
+  background: transparent; border: 0;
+  color: var(--text-muted);
+  padding: 8px 12px; border-radius: 6px;
+  font: inherit; font-weight: 600;
+  cursor: pointer; min-height: 36px;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.url-tab:hover { background: var(--bg-elev); color: var(--text); }
+.url-tab.active {
+  background: var(--brand-purple); color: #fff;
+}
+.url-tab-count {
+  background: rgba(255,255,255,0.12);
+  padding: 1px 7px; border-radius: 10px;
+  font-size: 0.75em; font-weight: 700;
+}
+.url-tab.active .url-tab-count { background: rgba(255,255,255,0.25); }
+
 .badge-admin {
   display: inline-block;
   background: var(--brand-gold); color: #1a0d2a;

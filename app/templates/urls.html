@@ -22,8 +22,24 @@
       {% set _ = grouped[cat].append((label, desc, path, switches)) %}
     {% endfor %}
 
+    <nav class="url-tabs" role="tablist" aria-label="Widget-Kategorien">
+      <button type="button" role="tab" class="url-tab active"
+              data-tab="__all__" aria-selected="true">
+        Alle <span class="url-tab-count">{{ widgets|length }}</span>
+      </button>
+      {% for cat, items in grouped.items() %}
+      <button type="button" role="tab" class="url-tab"
+              data-tab="{{ loop.index }}" aria-selected="false">
+        {{ cat }} <span class="url-tab-count">{{ items|length }}</span>
+      </button>
+      {% endfor %}
+      <input type="search" id="urlFilter" placeholder="🔍 Filter widget name…"
+             aria-label="Widget-Liste filtern"
+             style="flex:1;min-width:200px;max-width:320px;margin-left:auto">
+    </nav>
+
     {% for cat, items in grouped.items() %}
-    <div class="card">
+    <div class="card url-cat" data-tab="{{ loop.index }}">
       <h3>{{ cat }}</h3>
       {% for label, desc, path, switches in items %}
       <div class="widget-block" data-base="{{ base_url }}/s/{{ token }}/widgets/{{ path }}">
@@ -262,5 +278,42 @@
       });
     }
   });
+
+  // Tabs: 'Alle' zeigt alle Kategorien, eine Kategorie zeigt nur ihre Cards.
+  (function () {
+    const tabs = document.querySelectorAll(".url-tab");
+    const cats = document.querySelectorAll(".url-cat");
+    function activate(tabId) {
+      tabs.forEach(t => {
+        const active = t.dataset.tab === tabId;
+        t.classList.toggle("active", active);
+        t.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      cats.forEach(c => {
+        c.style.display = (tabId === "__all__" || c.dataset.tab === tabId)
+          ? "" : "none";
+      });
+      try { history.replaceState(null, "", "#tab=" + tabId); } catch (_) {}
+    }
+    tabs.forEach(t => t.addEventListener("click", () => activate(t.dataset.tab)));
+    // Deep-Link via Hash
+    const m = (location.hash || "").match(/tab=([^&]+)/);
+    if (m) activate(decodeURIComponent(m[1]));
+
+    // Live-Filter über Widget-Label + Path
+    const filter = document.getElementById("urlFilter");
+    if (filter) {
+      filter.addEventListener("input", () => {
+        const q = filter.value.toLowerCase().trim();
+        document.querySelectorAll(".widget-block").forEach(b => {
+          const txt = b.textContent.toLowerCase();
+          b.style.display = (!q || txt.includes(q)) ? "" : "none";
+        });
+        // Wenn Filter aktiv, ALLE Kategorien zeigen damit nichts versteckt bleibt
+        if (q) cats.forEach(c => c.style.display = "");
+        else activate(document.querySelector(".url-tab.active").dataset.tab);
+      });
+    }
+  })();
 </script>
 {% endblock %}
