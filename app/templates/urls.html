@@ -62,6 +62,10 @@
               {% for value, vlabel in sw.options %}
               <button type="button" class="sw-btn{% if value == sw.default %} active{% endif %}" data-value="{{ value }}">{{ vlabel }}</button>
               {% endfor %}
+            {% elif sw.type == "multiselect" and sw.options %}
+              {% for value, vlabel in sw.options %}
+              <button type="button" class="sw-btn sw-multi" data-value="{{ value }}">{{ vlabel }}</button>
+              {% endfor %}
             {% elif sw.type == "text" %}
               <input type="text" class="sw-input" style="width: 200px;"
                      value="{{ sw.default }}"
@@ -222,6 +226,11 @@
       if (g.dataset.type === "select") {
         const active = g.querySelector(".sw-btn.active");
         if (active) value = active.dataset.value;
+      } else if (g.dataset.type === "multiselect") {
+        // Mehrere active-Buttons → comma-separated. Empty = use default.
+        const picks = Array.from(g.querySelectorAll(".sw-btn.active"))
+          .map(b => b.dataset.value);
+        value = picks.join(",");
       } else {
         const inp = g.querySelector(".sw-input");
         if (inp) value = inp.value.trim();
@@ -241,10 +250,16 @@
 
     block.querySelectorAll(".sw-group").forEach(group => {
       const numInput = group.querySelector("input[type=number]");
+      const isMulti = group.dataset.type === "multiselect";
       group.querySelectorAll(".sw-btn").forEach(btn => {
         btn.addEventListener("click", () => {
-          group.querySelectorAll(".sw-btn").forEach(b => b.classList.remove("active"));
-          btn.classList.add("active");
+          if (isMulti) {
+            // Multi-select: nur diesen Button togglen, andere unberuehrt
+            btn.classList.toggle("active");
+          } else {
+            group.querySelectorAll(".sw-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+          }
           // Preset für numeric input: setze auch den Input-Wert
           if (numInput && btn.classList.contains("sw-preset")) {
             numInput.value = btn.dataset.value;

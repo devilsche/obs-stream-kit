@@ -139,11 +139,18 @@
         min: 1, max: 50, default: 10,
         tooltip: "Minimum number of matches played together with a mate, " +
                  "to qualify for the list. Filters out random squad-fills." },
-      { key: "cats", label: "Categories", type: "text",
-        placeholder: "empty = all. e.g. synergy,kd,winRate",
-        tooltip: "Comma-separated list of sort categories to rotate " +
-                 "through. Empty = all (mostPlayed, synergy, " +
-                 "chickensTogether, kd, mateKd, winRate, avgPlace)." },
+      { key: "cats", label: "Categories", type: "multiselect", default: "",
+        options: [
+          ["mostPlayed",       "Most played"],
+          ["synergy",          "Synergy"],
+          ["chickensTogether", "Chickens together"],
+          ["kd",               "Your K/D"],
+          ["mateKd",           "Mate's K/D"],
+          ["winRate",          "Win rate"],
+          ["avgPlace",         "Ø Place"],
+        ],
+        tooltip: "Welche Kategorien rotieren. Keine ausgewaehlt = alle " +
+                 "(Default). Mehrfach-Auswahl moeglich." },
     ]);
 
     const ROTATE_MS = parseInt(PubgUI.qs("rotateMs", 8000), 10);

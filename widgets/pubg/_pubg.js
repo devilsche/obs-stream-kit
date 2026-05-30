@@ -425,6 +425,26 @@
           if (String(val) === String(current)) opt.selected = true;
           input.appendChild(opt);
         });
+      } else if (spec.type === "multiselect") {
+        // Pillen-Buttons; mehrere koennen aktiv sein. Wert = csv.
+        input = document.createElement("div");
+        input.className = "multi";
+        const picks = new Set((current || "").split(",").map(s => s.trim()).filter(Boolean));
+        spec.options.forEach(([val, lbl]) => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.textContent = lbl;
+          b.dataset.value = val;
+          if (picks.has(val)) b.classList.add("active");
+          b.addEventListener("click", () => {
+            b.classList.toggle("active");
+            const next = Array.from(input.querySelectorAll(".active"))
+              .map(x => x.dataset.value).join(",");
+            PubgUI.setUrlParam(spec.key, next || null);
+            location.reload();
+          });
+          input.appendChild(b);
+        });
       } else if (spec.type === "range") {
         input = document.createElement("input");
         input.type = "range";
@@ -446,17 +466,17 @@
 
       if (spec.type !== "range") grp.appendChild(input);
 
-      input.addEventListener("change", (e) => {
-        const v = e.target.value;
-        // Range: immer expliziten Wert setzen — Default-Löschen würde
-        // Backend-Setting greifen lassen statt Slider-Wert (Bug-Quelle).
-        // Select/Text: bei Default-Wert URL sauber halten.
-        const keepInUrl = spec.type === "range"
-          || spec.default == null
-          || String(v) !== String(spec.default);
-        PubgUI.setUrlParam(spec.key, keepInUrl ? v : null);
-        location.reload();
-      });
+      // Multi-select handled seinen Klick selbst (kein change-Event auf div)
+      if (spec.type !== "multiselect") {
+        input.addEventListener("change", (e) => {
+          const v = e.target.value;
+          const keepInUrl = spec.type === "range"
+            || spec.default == null
+            || String(v) !== String(spec.default);
+          PubgUI.setUrlParam(spec.key, keepInUrl ? v : null);
+          location.reload();
+        });
+      }
 
       bar.appendChild(grp);
     });
