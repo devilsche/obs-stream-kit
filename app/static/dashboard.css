@@ -163,6 +163,25 @@ img { max-width: 100%; height: auto; }
 }
 .greeting { font-size: 1.4em; color: var(--brand-gold); font-weight: 700; }
 
+.user-chip {
+  display: inline-flex; align-items: center; gap: 12px;
+  padding: 6px 14px 6px 6px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+}
+.user-chip img,
+.user-chip__avatar-fallback {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.user-chip__avatar-fallback {
+  background: linear-gradient(135deg, var(--brand-purple), var(--brand-gold));
+}
+.user-chip .greeting { font-size: 1.1em; line-height: 1; }
+
 /* ====== Cards ======================================================== */
 .card {
   background: var(--bg-elev);

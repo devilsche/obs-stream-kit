@@ -5,10 +5,9 @@
   {% include "_sidebar.html" %}
   <main id="main-content" class="main" tabindex="-1">
     <div class="topbar">
-      <div class="greeting">Hi {{ user.display_name }} 👋</div>
       <div class="user-chip">
-        {% if user.avatar_url %}<img src="{{ user.avatar_url }}">{% else %}<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--brand-purple),var(--brand-gold))"></div>{% endif %}
-        <span>{{ user.display_name }}</span>
+        {% if user.avatar_url %}<img src="{{ user.avatar_url }}" alt="">{% else %}<div class="user-chip__avatar-fallback" aria-hidden="true"></div>{% endif %}
+        <div class="greeting">Hi {{ user.display_name }}</div>
       </div>
     </div>
 
