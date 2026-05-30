@@ -2848,7 +2848,7 @@
           const matchN = matchNumByMid.get(ev.matchId);
           let header = "";
           if (ev.matchId !== lastMid) {
-            const mapLbl = mapName || "—";
+            const mapLbl = PubgUI.fmtMap(mapName);
             const startLbl = ev.playedAt
               ? fmtAbsClock(ev.playedAt, 0) : "?";
             header = `<div class="ve-match-head">Match #${matchN || "?"} · ${mapLbl} · Start ${startLbl}</div>`;
