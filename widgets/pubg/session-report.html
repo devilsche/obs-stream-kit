@@ -1175,6 +1175,24 @@
     @media (prefers-reduced-motion: reduce) {
       .month-group__chev { transition: none; }
     }
+    /* Item-Inhalte in den Monats-Gruppen (Date oben, Meta darunter) */
+    .session-picker .item .item-date {
+      color: var(--pubg-gold);
+      font-weight: 700;
+      display: block;
+      margin-bottom: 2px;
+      font-size: 1.05em;
+    }
+    .session-picker .item .item-meta {
+      color: var(--pubg-muted);
+      font-variant-numeric: tabular-nums;
+      font-size: 0.9em;
+    }
+    .session-picker .item .item-live {
+      color: var(--pubg-gold);
+      font-size: 0.85em;
+      margin-left: 4px;
+    }
   </style>
 </head>
 <body>
@@ -2494,11 +2512,15 @@
         const isOpen = openLs === "1";
         const items = sorted.map(s => {
           const origIdx = allSessions.indexOf(s);
-          const cls = "item" + (s.current ? " current" : "");
+          const isCurrent = origIdx === 0 && !FROM;
+          const cls = "item" + (isCurrent ? " current" : "");
+          const timeStr = PubgUI.fmtTime ? PubgUI.fmtTime(s.from) : "";
+          const playMarker = isCurrent ? ' <span class="item-live">&#9654;</span>' : '';
+          const kills = (s.kills != null) ? ` · ${s.kills} K` : "";
           return `<div class="${cls}" data-from="${s.from}" data-to="${s.to}"
                        data-idx="${origIdx}">
-            <div class="item-date">${PubgUI.fmtDate(s.from)}</div>
-            <div class="item-meta">${s.matches || 0} Matches · ${s.wins || 0} W</div>
+            <div class="item-date">${PubgUI.fmtDate(s.from)}${timeStr ? " · " + timeStr : ""}${playMarker}</div>
+            <div class="item-meta">${s.matches || 0} Matches · ${s.wins || 0} W${kills}</div>
           </div>`;
         }).join("");
         const monthLabelStr = _monthLabel(k);
@@ -2514,14 +2536,26 @@
       document.getElementById("sessionList").innerHTML = html;
       document.getElementById("monthCounter").textContent =
         `${months.length} Monate · ${allSessions.length} Sessions gesamt`;
-      // LocalStorage-Persistenz: bei jedem toggle den State speichern
-      document.querySelectorAll(".month-group").forEach(el => {
-        el.addEventListener("toggle", () => {
-          const k = el.getAttribute("data-month-key");
-          localStorage.setItem("obs.month." + k + ".open",
-                                el.open ? "1" : "0");
-        });
-      });
+      // LocalStorage-Persistenz: erfolgt via globalem 'toggle'-Delegate
+      // (siehe _ensureMonthGroupToggleListener), wird einmalig installiert.
+      _ensureMonthGroupToggleListener();
+    }
+
+    let _monthGroupToggleInstalled = false;
+    function _ensureMonthGroupToggleListener() {
+      if (_monthGroupToggleInstalled) return;
+      _monthGroupToggleInstalled = true;
+      // 'toggle' bubbelt nicht. Listener wird per Capture-Phase auf
+      // document gebunden — damit ein einziger Listener alle aktuellen
+      // und zukuenftigen .month-group-Toggles auffaengt.
+      document.addEventListener("toggle", (e) => {
+        const el = e.target;
+        if (!el || !el.classList || !el.classList.contains("month-group")) return;
+        const k = el.getAttribute("data-month-key");
+        if (!k) return;
+        localStorage.setItem("obs.month." + k + ".open",
+                              el.open ? "1" : "0");
+      }, true);
     }
 
     function _monthLabel(monthKey) {
