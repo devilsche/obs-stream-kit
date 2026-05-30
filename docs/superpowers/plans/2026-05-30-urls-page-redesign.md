@@ -36,7 +36,7 @@ Append an `tests/app/test_app_factory.py`:
 
 ```python
 def test_proxyfix_respects_x_forwarded_proto():
-    """Mit X-Forwarded-Proto: https muss request.url_root https:// zurueckgeben."""
+    """Mit X-Forwarded-Proto: https muss request.url_root https:// zurückgeben."""
     app = create_app(testing=True)
 
     @app.route("/__scheme_probe__")
@@ -551,7 +551,7 @@ Expected: `OK` (kein Fehler).
 ```bash
 cd /home/ruschinski/git/obs-stream-kit
 git add app/static/dashboard.css
-git commit -m "style(urls): CSS fuer Master-Detail Layout + WCAG-konforme Touch-Targets"
+git commit -m "style(urls): CSS für Master-Detail Layout + WCAG-konforme Touch-Targets"
 ```
 
 ---
@@ -738,7 +738,7 @@ Ersetze den gesamten Inhalt von `app/templates/urls.html` mit:
       .replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
   }
 
-  // ── Detail-Panel rendern fuer ein Widget
+  // ── Detail-Panel rendern für ein Widget
   function renderDetail(item) {
     let switches;
     try { switches = JSON.parse(item.dataset.widgetSwitches || "[]"); }

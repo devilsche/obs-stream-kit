@@ -16,7 +16,7 @@ def test_app_has_healthz_route():
 
 
 def test_proxyfix_respects_x_forwarded_proto():
-    """Mit X-Forwarded-Proto: https muss request.url_root https:// zurueckgeben."""
+    """Mit X-Forwarded-Proto: https muss request.url_root https:// zurückgeben."""
     app = create_app(testing=True)
 
     @app.route("/__scheme_probe__")

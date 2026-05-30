@@ -39,7 +39,7 @@ ssh -i ~/.ssh/entry_server root@87.106.4.31 \
 ## Deploy
 
 ```bash
-# 1. Schema-Migration ausfuehren (wenn noch nicht geschehen)
+# 1. Schema-Migration ausführen (wenn noch nicht geschehen)
 scp -i ~/.ssh/entry_server core/schema_v2.sql root@87.106.4.31:/tmp/
 ssh -i ~/.ssh/entry_server root@87.106.4.31 \
   "sudo -u postgres psql obs_stream_kit -f /tmp/schema_v2.sql"
@@ -86,19 +86,19 @@ Admin loggt sich danach manuell im Browser ein:
 ## Rollback (Notfall)
 
 ```bash
-# 1. Code zurueck (Vorausgesetzt vorheriger Stand ist in git):
+# 1. Code zurück (Vorausgesetzt vorheriger Stand ist in git):
 ssh -i ~/.ssh/entry_server root@87.106.4.31 \
   "cd /opt/obs-stream-kit && systemctl stop obs-stream-kit"
 # Auf der lokalen Maschine:
 git checkout <prev-commit>
 bash scripts/deploy.sh
-# (anschliessend Branch wieder zurueck auf master)
+# (anschließend Branch wieder zurück auf master)
 
 # 2. nginx Basic-Auth wieder rein
 ssh -i ~/.ssh/entry_server root@87.106.4.31 \
   "cp /etc/nginx/sites-enabled/obs-stream-kit.conf.bak /etc/nginx/sites-enabled/obs-stream-kit.conf && systemctl reload nginx"
 
-# 3. PG-Schema NICHT zurueck rollen (additive only — alte Code-Version ignoriert die neuen Spalten).
+# 3. PG-Schema NICHT zurück rollen (additive only — alte Code-Version ignoriert die neuen Spalten).
 ```
 
 ## Fallbacks
