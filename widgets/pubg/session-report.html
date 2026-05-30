@@ -2231,7 +2231,7 @@
           <td>${p.headshot_kills || 0}</td>
           <td>${p.assists || 0}</td>
           <td>${p.dbnos || 0}</td>
-          <td>${p.knocksReceived || 0}</td>
+          <td>${p.revivesReceived || 0}</td>
           <td>${p.revivesGiven || 0}</td>
           <td>${Math.round(p.damage_dealt || 0)}</td>
           <td>${fmtSurv(p.time_survived)}</td>
@@ -2246,7 +2246,7 @@
       const isEvent = !!m.isEvent;
       const tableHtml = `<table>
         <thead><tr>
-          <th>Squad</th><th>K</th><th>HS</th><th>Ass</th><th>DBNO</th><th title="Mal geknocked (als Opfer)">KO</th><th title="Teamkollegen wiederbelebt">REV</th><th>DMG</th><th>Survived</th>
+          <th>Squad</th><th>K</th><th>HS</th><th>Ass</th><th>DBNO</th><th title="Wie oft wurde ich von Squadmates wiederbelebt (knocked + revived, ohne Tod dazwischen)">REV&#x2190;</th><th title="Teamkollegen wiederbelebt">REV&#x2192;</th><th>DMG</th><th>Survived</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
