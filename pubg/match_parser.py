@@ -58,10 +58,13 @@ def parse_match_response(match_payload, my_account_id):
     parts = idx.get("participant", {})
 
     squad = []
-    team_mapping = []  # gesamte Lobby: account_id, team_id, kills, place
+    team_mapping = []  # gesamte Lobby: account_id, team_id, kills, place, slot
     for r in rosters.values():
         team_id = r["attributes"]["stats"].get("teamId")
-        for pref in r["relationships"]["participants"]["data"]:
+        # Roster-Slot 1..N in API-Reihenfolge = In-Game Slot/Plate-Reihenfolge
+        # (PUBG vergibt Plate-Farben slot-fix). Erstes Element = Slot 1.
+        for slot_idx, pref in enumerate(
+                r["relationships"]["participants"]["data"], start=1):
             p = parts.get(pref["id"])
             if not p:
                 continue
@@ -71,6 +74,7 @@ def parse_match_response(match_payload, my_account_id):
                 team_mapping.append({
                     "account_id": acc_id,
                     "team_id": team_id,
+                    "slot": slot_idx,
                     "kills": stats.get("kills"),
                     "place": stats.get("winPlace"),
                     "time_survived": stats.get("timeSurvived"),
@@ -78,6 +82,7 @@ def parse_match_response(match_payload, my_account_id):
             if team_id == my_team_id:
                 row = _participant_to_row(p)
                 row["team_id"] = my_team_id
+                row["slot"] = slot_idx
                 squad.append(row)
 
     telemetry_url = None

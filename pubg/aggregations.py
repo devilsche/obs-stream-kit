@@ -1036,10 +1036,11 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     if not team_row:
         return {"matchId": match_id, "mapName": map_name, "members": []}
     members_rows = conn.execute("""
-        SELECT mtm.account_id, p.name
+        SELECT mtm.account_id, mtm.slot, p.name
         FROM match_team_mapping mtm
         LEFT JOIN players p ON p.account_id = mtm.account_id AND p.tenant_id = mtm.tenant_id
         WHERE mtm.tenant_id = ? AND mtm.match_id = ? AND mtm.team_id = ?
+        ORDER BY mtm.slot NULLS LAST, p.name
     """, (tenant_id, match_id, team_row["team_id"])).fetchall()
 
     out_members = []
@@ -1327,12 +1328,20 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         out_members.append({
             "accountId": acc,
             "name":      mem["name"] or acc[:8],
+            "slot":      mem["slot"] if "slot" in mem.keys() else None,
             "isSelf":    (acc == my_account_id),
             "lives":     lives,
             "revivePts": revive_pts,
         })
 
-    out_members.sort(key=lambda x: (0 if x["isSelf"] else 1, x["name"].lower()))
+    # Sortierung: Self first, dann nach Slot (1..4), Slot=NULL als Fallback
+    # alphabetisch ans Ende. So entspricht die Reihenfolge im Frontend dem
+    # PUBG-In-Game-Roster.
+    out_members.sort(key=lambda x: (
+        0 if x["isSelf"] else 1,
+        x["slot"] if x["slot"] is not None else 999,
+        x["name"].lower(),
+    ))
     return {
         "matchId": match_id,
         "mapName": map_name,

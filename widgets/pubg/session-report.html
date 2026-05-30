@@ -997,9 +997,20 @@
     const TO = PubgUI.qs("to", "");
 
     // ── Match-Detail v2 Globals ──────────────────────────────────────────
+    // Fallback-Palette wenn kein Slot bekannt ist (alte Matches vor der
+    // Slot-Capture-Migration). Reihenfolge irrelevant fuer Lesbarkeit.
     const MD_COLORS = [
       "#f2b705", "#e74c3c", "#3498db", "#2ecc71",
       "#ff7a1f", "#9b59b6", "#1abc9c", "#ec407a",
+    ];
+    // PUBG-In-Game Squad-Plate-Farben — index = slot-1 (Roster-Slot 1..4).
+    // Reihenfolge gewaehlt nach typischen In-Game-Plates (gruen/orange/
+    // blau/pink). Wenn das nicht zur Wahrnehmung passt, hier umstellen.
+    const MD_SLOT_COLORS = [
+      "#00d97a",  // Slot 1 — gruen
+      "#ff8a3d",  // Slot 2 — orange
+      "#4ec9ff",  // Slot 3 — blau
+      "#ff5fc4",  // Slot 4 — pink
     ];
     // Canvas-Display-Size (px). devicePixelRatio wird in mdRenderBasemap
     // separat angewendet, damit das Bitmap-Buffer hoeher aufgeloest ist
@@ -1030,7 +1041,12 @@
       const colorByAcc = {};
       if (d.members) {
         d.members.forEach((m, i) => {
-          colorByAcc[m.accountId] = MD_COLORS[i % MD_COLORS.length];
+          // Slot-basierte PUBG-Plate-Farbe wenn verfuegbar (neue Matches),
+          // sonst MD_COLORS-Fallback (alte Matches ohne slot).
+          const slot = m.slot;
+          colorByAcc[m.accountId] = (slot >= 1 && slot <= MD_SLOT_COLORS.length)
+            ? MD_SLOT_COLORS[slot - 1]
+            : MD_COLORS[i % MD_COLORS.length];
         });
       }
       const cached = { detail: d, colorByAcc };
@@ -2823,11 +2839,27 @@
         return `${String(d.getHours()).padStart(2,"0")}:` +
                `${String(d.getMinutes()).padStart(2,"0")}`;
       }
+      // Port von pubg/aggregations.py:_VEHICLE_PATTERNS. Fasst Skin/Variant-
+      // Varianten ('BP_Dacia_A_04_v2_C', 'BP_Mirado_A_03_Esports_C', ...)
+      // unter einem Klartext-Namen zusammen.
+      const VEHICLE_PATTERNS = [
+        ["Mirado", "Mirado"], ["PickupTruck", "Pickup Truck"],
+        ["Motorbike", "Motorbike"], ["Dacia", "Dacia"], ["Uaz", "UAZ"],
+        ["Niva", "Niva"], ["BearV2", "Bear"], ["Bear", "Bear"],
+        ["PonyCoupe", "Pony Coupe"], ["CoupeRB", "Coupe RB"],
+        ["Blanc", "Blanc"], ["PicoBus", "Pico Bus"], ["Van_", "Van"],
+        ["BRDM", "BRDM"], ["Pillar_Car", "Pillar Car"], ["Buggy", "Buggy"],
+        ["Boat", "Aquarail"], ["Snowmobile", "Snowmobile"],
+        ["Tukshai", "Tukshai"], ["Lava_Mtb", "Mountain Bike"],
+        ["Scooter", "Scooter"],
+      ];
       function fmtVeh(wid) {
         if (!wid) return "Fahrzeug";
-        // BP_Mirado_A_00_C → "Mirado"
-        return wid.replace(/^BP_/, "").replace(/_[A-Z]?_\d+_C$/, "")
-                  .replace(/_C$/, "").replace(/_/g, " ");
+        for (const [needle, label] of VEHICLE_PATTERNS) {
+          if (wid.indexOf(needle) >= 0) return label;
+        }
+        // Fallback: BP_ und _C strippen, Underscores zu Leerzeichen
+        return wid.replace(/^BP_/, "").replace(/_C$/, "").replace(/_/g, " ");
       }
       function evRows(events, role) {
         // Globale Session-Match-Nummer (in chronologischer Reihenfolge

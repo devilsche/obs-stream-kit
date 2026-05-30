@@ -274,7 +274,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
     """)
     # Migrationen für bestehende DBs
     for col, typ in [("kills", "INTEGER"), ("place", "INTEGER"),
-                     ("time_survived", "INTEGER")]:
+                     ("time_survived", "INTEGER"), ("slot", "INTEGER")]:
         try:
             conn.execute(f"ALTER TABLE match_team_mapping ADD COLUMN {col} {typ}")
         except sqlite3.OperationalError:
