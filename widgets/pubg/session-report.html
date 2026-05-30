@@ -2409,7 +2409,14 @@
       const _sorted = [..._allMatches].sort((a, b) =>
         new Date(a.matchEnd || 0) - new Date(b.matchEnd || 0));
       const matchNumMap = new Map();
-      _sorted.forEach((m, idx) => matchNumMap.set(m.matchEnd, idx + 1));
+      const matchNumByMatchId = new Map();
+      _sorted.forEach((m, idx) => {
+        matchNumMap.set(m.matchEnd, idx + 1);
+        if (m.matchId) matchNumByMatchId.set(m.matchId, idx + 1);
+      });
+      // Globaler Cache fuer evRows (Vehicle-Events) — damit dort die
+      // korrekte Session-Match-Nummer angezeigt wird, nicht die lokale.
+      window._matchNumByMatchId = matchNumByMatchId;
       // Modal-Navigation braucht die chrono Liste der Match-IDs
       window._allMatchIds = _sorted
         .map(m => m.matchId || "").filter(Boolean);
@@ -2824,11 +2831,16 @@
                   .replace(/_C$/, "").replace(/_/g, " ");
       }
       function evRows(events, role) {
-        // Match-Nummer pro matchId (in Reihenfolge des Auftretens) bestimmen,
-        // damit zusammenliegende Events vom selben Match einen #N-Header bekommen.
+        // Globale Session-Match-Nummer (in chronologischer Reihenfolge
+        // aller Matches dieser Session), aus renderSessionSummary gecached.
+        // Fallback auf lokale Numerierung wenn (noch) nicht vorhanden.
+        const globalMap = window._matchNumByMatchId;
         const matchNumByMid = new Map();
         events.forEach(ev => {
-          if (ev.matchId && !matchNumByMid.has(ev.matchId)) {
+          if (!ev.matchId || matchNumByMid.has(ev.matchId)) return;
+          if (globalMap && globalMap.has(ev.matchId)) {
+            matchNumByMid.set(ev.matchId, globalMap.get(ev.matchId));
+          } else {
             matchNumByMid.set(ev.matchId, matchNumByMid.size + 1);
           }
         });
