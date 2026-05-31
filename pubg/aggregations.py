@@ -1800,10 +1800,11 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             # als Waffen-ID-Heuristik. Bei NULL → Fallback auf Waffen-ID.
             dmg_reason = (e["damage_reason"] or "") if "damage_reason" in e.keys() else ""
             wid = weapon or ""
-            # Bleed-Out: zuerst damage_reason pruefen (authoritative),
-            # sonst Heuristik mit TakeDamage-Events.
-            if "BleedOut" in dmg_reason:
-                bled_out = True
+            # Bleed-Out: wenn damage_reason gesetzt ist, ist es authoritative
+            # (PUBG-Payload). Sonst Heuristik mit TakeDamage-Events fuer
+            # alte Daten ohne damage_reason.
+            if dmg_reason:
+                bled_out = ("BleedOut" in dmg_reason)
             else:
                 bled_out = bool(knock_ev) and _is_bleed_out(target, ts)
             # Env-Death-Detection: damage_reason zuerst, dann Waffen-ID.
