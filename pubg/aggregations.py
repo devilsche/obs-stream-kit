@@ -1640,7 +1640,10 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             return None
         return f"Team #{tid}"
 
-    # 4) Name-Lookup (Cache)
+    # 4) Name-Lookup (Cache) — PUBG-Namen sind universell pro Account
+    # (gleicher Account in mehreren Tenants = gleicher Name). Wir suchen
+    # daher OHNE tenant_id-Filter, sodass auch Enemies erkannt werden die
+    # nur ein anderer Tenant ingestet hat.
     _name_cache = {}
     def _name_of(acc):
         if not acc:
@@ -1648,12 +1651,14 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         if acc in _name_cache:
             return _name_cache[acc]
         nrow = conn.execute("""
-            SELECT COALESCE(p.name, pa.name) AS n
-            FROM (SELECT NULL AS dummy) x
-            LEFT JOIN players p ON p.tenant_id = ? AND p.account_id = ?
-            LEFT JOIN participants pa ON pa.tenant_id = ? AND pa.match_id = ?
-                  AND pa.account_id = ?
-        """, (tenant_id, acc, tenant_id, match_id, acc)).fetchone()
+            SELECT COALESCE(
+                (SELECT name FROM players
+                  WHERE account_id = ? AND name IS NOT NULL LIMIT 1),
+                (SELECT name FROM participants
+                  WHERE match_id = ? AND account_id = ?
+                    AND name IS NOT NULL LIMIT 1)
+            ) AS n
+        """, (acc, match_id, acc)).fetchone()
         n = nrow["n"] if nrow else None
         _name_cache[acc] = n
         return n
