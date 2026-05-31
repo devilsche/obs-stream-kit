@@ -1818,7 +1818,15 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             wid = weapon or ""
             # TakeDamage-basierte Bleed-/Finisher-Erkennung:
             # Suche letzten Damage von einem ANDEREN Akteur (nicht
-            # Selbst-Bleed-Ticks) in den letzten 2s vor dem Kill.
+            # Selbst-Bleed-Ticks, nicht Fahrzeug-Touch mit damage=0).
+            def _is_vehicle_weapon(wid):
+                if not wid:
+                    return False
+                for needle, _ in _VEHICLE_PATTERNS:
+                    if needle in wid:
+                        return True
+                return False
+
             recent_other_damage = None
             for d in dmg_by_target.get(target, []):
                 d_ts = d["timestamp_ms"]
@@ -1829,6 +1837,11 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 d_actor = d["actor_account"]
                 if not d_actor or d_actor == target:
                     continue  # PUBG None oder Selbst-Bleed-Tick
+                # Fahrzeug-Touch mit damage=0 ist meist Zufalls-Kollision,
+                # nicht der eigentliche Finisher. Skip.
+                if ((d["damage"] or 0) <= 0
+                        and _is_vehicle_weapon(d["weapon"])):
+                    continue
                 recent_other_damage = d  # latest non-self damage wins
             # Bleed-Out: wenn vorher ein Knock UND in den letzten 2s
             # KEIN non-self damage → ausgeblutet.
