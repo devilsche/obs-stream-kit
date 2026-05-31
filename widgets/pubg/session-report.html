@@ -2211,10 +2211,14 @@
           return ev.targetName
             ? `${A} uploaded ${T}'s BlueChip at the Comeback Tower`
             : `${A} uploaded a squad BlueChip at the Comeback Tower`;
-        case "chip_upload_carepackage":
-          return ev.targetName
-            ? `${A} uploaded ${T}'s BlueChip (Carepackage incoming)`
+        case "chip_upload_carepackage": {
+          const n = ev.chipCount || 1;
+          if (ev.targetName)
+            return `${A} uploaded ${T}'s BlueChip (Carepackage incoming)`;
+          return (n > 1)
+            ? `${A} uploaded ${n} enemy BlueChips at the Tower (Carepackage incoming)`
             : `${A} uploaded an enemy BlueChip (Carepackage incoming)`;
+        }
         case "chip_upload":
           return `${A} uploaded a BlueChip at the Comeback Tower`;
         case "kill_self_eject": {

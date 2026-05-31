@@ -1689,6 +1689,20 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
           AND timestamp_ms IS NOT NULL
         ORDER BY timestamp_ms ASC
     """, (match_id,)).fetchall()
+    # Carepackage-Spawns mit BlueChip-ItemPackage = 2 enemy-chips wurden
+    # an einem Tower hochgeladen. PUBG feuert LogItemUse fuer Bluechip
+    # nicht zuverlaessig — diese Carepackage-Spawns sind der robuste
+    # Trigger. Attribution via naechstem Position-Event eines Squad-
+    # Members in der Naehe (Spieler musste am Tower stehen).
+    carepkg_rows = conn.execute("""
+        SELECT timestamp_ms, actor_x, actor_y
+        FROM telemetry_events
+        WHERE match_id = ?
+          AND event_type = 'CarePackageSpawn'
+          AND weapon LIKE '%Bluechip%'
+          AND timestamp_ms IS NOT NULL
+        ORDER BY timestamp_ms ASC
+    """, (match_id,)).fetchall()
 
     # 1b) TakeDamage-Events fuer Bleed-Out-Heuristik. Brauchen nur die
     # letzten 3-5 Sekunden vor jedem Kill. Pull global einmalig, gruppieren
@@ -2183,6 +2197,50 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         chip_events_mixed.append(
             ("upload", up["timestamp_ms"], up["actor_account"],
              None, up["actor_x"], up["actor_y"]))
+    # Carepackage-Spawn (BlueChip-Variante) = irgendein Spieler hat
+    # 2 enemy-chips an einem Tower hochgeladen. PUBG fired LogItemUse
+    # nicht zuverlaessig — wir attribuieren via Position-Lookup auf
+    # den naechsten Squadmate in den 90s davor.
+    cp_pos_rows = conn.execute("""
+        SELECT actor_account, timestamp_ms, actor_x, actor_y
+        FROM telemetry_events
+        WHERE match_id = ?
+          AND event_type = 'Position'
+          AND actor_account IS NOT NULL
+          AND actor_x IS NOT NULL
+          AND timestamp_ms IS NOT NULL
+        ORDER BY timestamp_ms ASC
+    """, (match_id,)).fetchall()
+    # Group positions by account fuer schnellen Lookup
+    pos_by_acc = {}
+    for r in cp_pos_rows:
+        pos_by_acc.setdefault(r["actor_account"], []).append(
+            (r["timestamp_ms"], r["actor_x"], r["actor_y"]))
+    for cp in carepkg_rows:
+        cp_ts = cp["timestamp_ms"]
+        cp_x, cp_y = cp["actor_x"], cp["actor_y"]
+        # Suche naechsten Squadmate, dessen letzte bekannte Position
+        # in den 90s vor cp_ts liegt. Distanz zum Spawn weniger relevant,
+        # weil Tower und Spawn weit auseinander sein koennen (Tower-Anruf
+        # triggert Spawn an anderem Ort) — wir nehmen einfach den Squad-
+        # member dessen Position-Stempel am dichtesten dran ist.
+        best_acc = None
+        best_dt = None
+        for acc in sq_set:
+            positions = pos_by_acc.get(acc, [])
+            for p_ts, _, _ in positions:
+                if p_ts > cp_ts:
+                    break
+                if cp_ts - p_ts > 90_000:
+                    continue
+                dt = cp_ts - p_ts
+                if best_dt is None or dt < best_dt:
+                    best_dt = dt
+                    best_acc = acc
+        # Emit nur wenn ein Squadmate attribuiert werden konnte
+        if best_acc:
+            chip_events_mixed.append(
+                ("carepkg", cp_ts, best_acc, None, cp_x, cp_y))
     chip_events_mixed.sort(key=lambda x: x[1])
 
     chip_queue = {}  # account → [owner_acc, ...] FIFO
@@ -2218,6 +2276,19 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 continue
             cr = _row_skeleton("BluechipDrop", ts, acc, owner, px, py)
             cr["type"] = "chip_drop"
+            events_out.append(cr)
+        elif kind == "carepkg":
+            # Synthetisches Upload-Event aus Carepackage-Spawn rueckwaerts
+            # attribuiert. Pop 2 Chips aus der Queue (= 2 enemy chips ->
+            # 1 carepackage). Klassifikation: immer enemy → carepackage.
+            q = chip_queue.get(acc) or []
+            for _ in range(2):
+                if q: q.pop(0)
+            if acc not in sq_set:
+                continue
+            cr = _row_skeleton("BluechipUpload", ts, acc, None, px, py)
+            cr["type"] = "chip_upload_carepackage"
+            cr["chipCount"] = 2
             events_out.append(cr)
         elif kind == "upload":
             # Owner-Bestimmung WAHR: Wenn innerhalb der naechsten 5min

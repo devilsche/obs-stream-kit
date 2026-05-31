@@ -205,6 +205,17 @@ def _normalize(event):
         item = event.get("item") or {}
         base["weapon"] = item.get("itemId")
         base["actor_x"], base["actor_y"] = _loc(event, "character")
+    elif et == "LogCarePackageSpawn":
+        # System-Event — Carepackage spawnt. Wichtig fuer den BlueChip-
+        # Tower-Trigger: itemPackageId enthaelt 'Bluechip' wenn die
+        # Lieferung durch einen Chip-Upload ausgeloest wurde. Position =
+        # Tower-Standort = wo der Spieler war beim Upload.
+        base["event_type"] = "CarePackageSpawn"
+        pkg = event.get("itemPackage") or {}
+        base["weapon"] = pkg.get("itemPackageId")
+        loc = pkg.get("location") or {}
+        base["actor_x"], base["actor_y"] = loc.get("x"), loc.get("y")
+        base["actor_z"] = loc.get("z")
     elif et == "LogObjectInteraction":
         # PAYDAY: Tueren oeffnen/schliessen, Tresore knacken
         base["event_type"] = "ObjectInteraction"
@@ -310,6 +321,10 @@ ALWAYS_KEEP_EVENTS = {
     # MatchStart liefert den Plane-Takeoff-Timestamp (= Match-Zeit 0).
     # Login fuer Lobby-Join-Events (negative Match-Zeit).
     "MatchStart", "Login",
+    # CarePackageSpawn ist system-weit (kein actor) — fuer BlueChip-
+    # Tower-Detection. Nur Bluechip-Variante ist fuer uns relevant,
+    # aber wir behalten alle Carepackage-Spawns (paar pro Match, billig).
+    "CarePackageSpawn",
 }
 
 # Position-Events fluten die DB (firet alle ~10s pro Spieler). Wir
