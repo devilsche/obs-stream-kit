@@ -12,6 +12,14 @@
 </head>
 <body>
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
+  {% if g.tenant_impersonating %}
+  <div class="impersonation-banner" role="status">
+    <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+    Viewing as <b>{{ g.tenant_impersonating.display_name }}</b>
+    (Tenant&nbsp;#{{ g.tenant_impersonating.id }})
+    <a href="?">Zurueck zur eigenen Sicht</a>
+  </div>
+  {% endif %}
   {% block body %}{% endblock %}
 </body>
 </html>

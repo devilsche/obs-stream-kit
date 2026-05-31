@@ -97,11 +97,29 @@
     return Math.floor(diff/86400) + "d ago";
   };
 
+  // Admin-Impersonation: wenn die aktuelle Page mit ?asTenant=N geladen
+  // wurde, propagieren wir das in ALLE API-Calls. Sonst geht der Backend
+  // wieder auf das eigene Tenant des Admins.
+  const _AS_TENANT = (() => {
+    try {
+      const m = (window.location.search || "").match(/[?&]asTenant=(\d+)/);
+      return m ? m[1] : null;
+    } catch (_) { return null; }
+  })();
+  PubgUI._AS_TENANT = _AS_TENANT;
+
+  function _withAsTenant(url) {
+    if (!_AS_TENANT) return url;
+    const sep = url.includes("?") ? "&" : "?";
+    return url + sep + "asTenant=" + encodeURIComponent(_AS_TENANT);
+  }
+
   PubgUI.fetchJson = async (url, timeoutMs = 10000) => {
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const res = await fetch(url, { cache: "no-store", signal: ctrl.signal });
+      const res = await fetch(_withAsTenant(url),
+                               { cache: "no-store", signal: ctrl.signal });
       if (!res.ok) throw new Error("HTTP " + res.status);
       return res.json();
     } finally {

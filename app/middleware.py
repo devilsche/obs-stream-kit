@@ -78,7 +78,11 @@ def register_middleware(app):
 
 
 def _maybe_set_user_from_session(sid: str) -> None:
-    """Liest session + user aus DB und setzt g.user/g.tenant_id falls valide."""
+    """Liest session + user aus DB und setzt g.user/g.tenant_id falls valide.
+    Admin-Impersonation: ?asTenant=<id> ueberschreibt g.tenant_id auf den
+    gewuenschten Tenant (nur fuer is_admin User). g.tenant_impersonating
+    enthaelt dann {id, slug, display_name} fuer UI-Banner."""
+    g.tenant_impersonating = None
     conn = _get_conn()
     try:
         row = sessions.lookup(conn, sid)
@@ -98,6 +102,31 @@ def _maybe_set_user_from_session(sid: str) -> None:
             g.user = dict(user)
             g.tenant_id = user["tenant_id"]
             sessions.touch(conn, sid)
+            # Admin-Impersonation via ?asTenant=<id>
+            if user["is_admin"]:
+                as_t = request.args.get("asTenant")
+                if as_t:
+                    try:
+                        as_tid = int(as_t)
+                    except (TypeError, ValueError):
+                        as_tid = None
+                    if as_tid and as_tid != user["tenant_id"]:
+                        with conn.cursor() as cur:
+                            cur.execute("""
+                                SELECT t.id, t.slug, u2.display_name
+                                FROM tenants t
+                                LEFT JOIN users u2 ON u2.id = t.owner_user_id
+                                WHERE t.id = %s
+                            """, (as_tid,))
+                            t_row = cur.fetchone()
+                        if t_row:
+                            g.tenant_id = t_row["id"]
+                            g.tenant_impersonating = {
+                                "id": t_row["id"],
+                                "slug": t_row["slug"],
+                                "display_name": t_row["display_name"]
+                                                  or t_row["slug"],
+                            }
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()
