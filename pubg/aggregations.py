@@ -1489,6 +1489,41 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     # (kill / kill_finish / kill_steal). Revive loescht den Knock aus dem
     # State, da das Opfer dann wieder oben war.
     last_knock_by_target = {}  # target_account → Knock-Event-Row
+
+    def _row_skeleton(et_row, ts_row, actor_row, target_row,
+                       vx, vy, weapon_row=None, dist_cm=None):
+        """Gemeinsame Felder fuer eine Timeline-Row bauen."""
+        wn = _weapon_label(weapon_row)[0] if weapon_row else None
+        dist_m_local = (round((dist_cm or 0) / 100.0, 1)
+                        if dist_cm else None)
+        return {
+            "tsMs":          ts_row,
+            "absTs":         _abs_ts_iso(ts_row),
+            "actorAccount":  actor_row,
+            "actorName":     _name_of(actor_row),
+            "actorSlot":     slot_by_acc.get(actor_row),
+            "actorTeamId":   team_by_acc.get(actor_row),
+            "actorTeamLabel": _team_label_for(actor_row),
+            "actorIsSquad":  actor_row in sq_set,
+            "targetAccount": target_row,
+            "targetName":    _name_of(target_row),
+            "targetSlot":    slot_by_acc.get(target_row),
+            "targetTeamId":  team_by_acc.get(target_row),
+            "targetTeamLabel": _team_label_for(target_row),
+            "targetIsSquad": target_row in sq_set,
+            "weapon":        weapon_row,
+            "weaponName":    wn,
+            "distanceM":     dist_m_local,
+            "victimX":       vx,
+            "victimY":       vy,
+            "victimVehicleLabel":  _veh_label_for(target_row, ts_row),
+            "shooterVehicleLabel": _veh_label_for(actor_row, ts_row),
+        }
+
+    # Position-Cache der Knock-Opfer (fuer Revive-POI-Fallback wenn
+    # LogPlayerRevive keine victim_x/y mitgeschickt hat — alte Daten).
+    knock_pos_by_target = {}
+
     events_out = []
     for e in all_events_rows:
         et     = e["event_type"]
@@ -1497,68 +1532,57 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         ts     = e["timestamp_ms"]
         weapon = e["weapon"]
 
+        # Inferred-Revive: wenn ein chained-Enemy (noch in unserer
+        # "offen"-Menge) aktiv handelt (Knock/Kill jemand anderen),
+        # muss er zwischendurch revived worden sein. PUBG-Telemetrie
+        # liefert nicht IMMER ein Revive-Event — wir synthetisieren eins.
+        if (et in ("Knock", "Kill")
+                and actor and actor in currently_knocked_by_squad):
+            knock_pos_target = knock_pos_by_target.get(actor)
+            infer_vx = knock_pos_target[0] if knock_pos_target else None
+            infer_vy = knock_pos_target[1] if knock_pos_target else None
+            infer_row = _row_skeleton(
+                "Revive", ts, None, actor, infer_vx, infer_vy)
+            infer_row["type"] = "revive_inferred"
+            events_out.append(infer_row)
+            currently_knocked_by_squad.discard(actor)
+            last_knock_by_target.pop(actor, None)
+            knock_pos_by_target.pop(actor, None)
+
         # Scope: Squad-involved ODER chained-enemy (target ist gerade von
-        # uns geknockt und noch nicht revived/gekillt). WICHTIG: vor allen
-        # State-Updates evaluieren — sonst wuerde z.B. ein Knock-durch-Squad
-        # sich selbst in scope schreiben (er wuerde auch ohne dass squad-
-        # involved waere — was inkorrekt ist).
+        # uns geknockt und noch nicht revived/gekillt).
         in_scope = (
             (actor in sq_set) or (target in sq_set)
             or (target in currently_knocked_by_squad)
         )
 
-        # Knock-State pflegen AUCH wenn nicht in scope (Lobby-Knocks koennen
-        # spaeter relevant werden wenn der geknockte Spieler von Squad gekillt
-        # wird → wir wollen 'stole the knock' korrekt erkennen).
+        # Knock-State pflegen AUCH wenn nicht in scope (Lobby-Knocks
+        # koennen spaeter relevant werden bei stole-the-knock).
+        revive_fallback_pos = None
         if et == "Knock":
             last_knock_by_target[target] = e
-            # Knock durch uns auf einen Enemy → in der chained-enemy-Menge
+            knock_pos_by_target[target] = (e["victim_x"], e["victim_y"])
             if actor in sq_set and target and target not in sq_set:
                 currently_knocked_by_squad.add(target)
-
-        if et == "Revive":
-            # Revive konsumiert den vorherigen Knock unabhaengig vom Scope
+        elif et == "Revive":
+            # Position-Fallback fuer Revive (alte Daten ohne victim_x/y):
+            # die Position des Knock-Events verwenden.
+            revive_fallback_pos = knock_pos_by_target.get(target)
             last_knock_by_target.pop(target, None)
-            # Wenn Enemy revived wurde — Story-Bogen zu uns geschlossen
             currently_knocked_by_squad.discard(target)
-
-        if et == "Kill":
-            # Wenn Target ein chained-Enemy war — Story-Bogen schliesst sich
-            # mit dem Kill (egal wer ihn macht: wir, Squadmate, oder Stealer)
+        elif et == "Kill":
             currently_knocked_by_squad.discard(target)
 
         if not in_scope:
             continue
 
-        weapon_name = _weapon_label(weapon)[0] if weapon else None
-        dist_m = (round((e["distance"] or 0) / 100.0, 1)
-                  if e["distance"] else None)
-        victim_veh = _veh_label_for(target, ts)
-        shooter_veh = _veh_label_for(actor, ts)
+        vx = e["victim_x"]
+        vy = e["victim_y"]
+        if et == "Revive" and vx is None and revive_fallback_pos:
+            vx, vy = revive_fallback_pos
 
-        row = {
-            "tsMs":          ts,
-            "absTs":         _abs_ts_iso(ts),
-            "actorAccount":  actor,
-            "actorName":     _name_of(actor),
-            "actorSlot":     slot_by_acc.get(actor),
-            "actorTeamId":   team_by_acc.get(actor),
-            "actorTeamLabel": _team_label_for(actor),
-            "actorIsSquad":  actor in sq_set,
-            "targetAccount": target,
-            "targetName":    _name_of(target),
-            "targetSlot":    slot_by_acc.get(target),
-            "targetTeamId":  team_by_acc.get(target),
-            "targetTeamLabel": _team_label_for(target),
-            "targetIsSquad": target in sq_set,
-            "weapon":        weapon,
-            "weaponName":    weapon_name,
-            "distanceM":     dist_m,
-            "victimX":       e["victim_x"],
-            "victimY":       e["victim_y"],
-            "victimVehicleLabel":  victim_veh,
-            "shooterVehicleLabel": shooter_veh,
-        }
+        row = _row_skeleton(et, ts, actor, target, vx, vy, weapon,
+                             e["distance"])
 
         if et == "Knock":
             row["type"] = "knock"
@@ -1567,8 +1591,6 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         elif et == "Kill":
             knock_ev = last_knock_by_target.get(target)
             if knock_ev is None:
-                # Direkt-Kill (kein vorheriger Knock, oder Knock schon
-                # durch Revive konsumiert)
                 row["type"] = "kill"
             else:
                 k_actor = knock_ev["actor_account"]
@@ -1586,9 +1608,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                     row["knockerTeamId"]     = k_team
                     row["knockerTeamLabel"]  = _team_label_for(k_actor)
                     row["knockerIsSquad"]    = k_actor in sq_set
-            # Nach Kill: vorherigen Knock konsumieren (Target ist tot,
-            # Story-Bogen abgeschlossen)
             last_knock_by_target.pop(target, None)
+            knock_pos_by_target.pop(target, None)
 
         events_out.append(row)
 

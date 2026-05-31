@@ -117,47 +117,19 @@
     }
     if (best) return best.name;
 
-    // Phase 2: Multi-Tier-Fallback nach Distanz zur Polygon-Kante
-    //   <= 200m  -> "Very close to X"
-    //   <= 500m  -> "Near X"
-    //   sonst    -> null
-    // Wenn naechste Region im Tier <=200m liegt, werden alle anderen
-    // <=200m mitgenommen ("A and B"). Sonst analog fuer 500m.
-    // Wenn naechste >200m aber <=500m, wird kein "very close" gemischt
-    // mit "near" — nur ein Tier zaehlt (das des naechsten).
-    const TIER_VERY_CM = 20000;  // 200m
-    const TIER_NEAR_CM = 50000;  // 500m
-    const candidates = [];
+    // Phase 2: Single-Closest-Fallback. Nur 1 POI, keine Listen, keine
+    // Richtung (Richtungs-Logik war auf manchen Maps inkonsistent — User-
+    // Feedback). Cutoff 500m hart: drueber waere zu vage.
+    const NEAR_CM = 50000;  // 500m
+    let nearest = null;
+    let nearestD = Infinity;
     for (const r of regions) {
       if (!r.name) continue;
       const d = distToPoly(xCm, yCm, r.points);
-      if (d <= TIER_NEAR_CM) candidates.push({ name: r.name, d: d, points: r.points });
+      if (d < nearestD) { nearestD = d; nearest = r; }
     }
-    if (!candidates.length) return null;
-    candidates.sort((a, b) => a.d - b.d);
-    const closest = candidates[0].d;
-    const tierCutoff = closest <= TIER_VERY_CM ? TIER_VERY_CM : TIER_NEAR_CM;
-    const prefix = closest <= TIER_VERY_CM ? "Very close to " : "Near ";
-    // Alle Kandidaten innerhalb des selben Tiers (= <=tierCutoff)
-    // einsammeln. Duplikat-Namen filtern (z.B. nested 'Pochinki'-Boxen).
-    const seen = new Set();
-    const names = [];
-    for (const c of candidates) {
-      if (c.d > tierCutoff) break;
-      if (seen.has(c.name)) continue;
-      seen.add(c.name);
-      names.push(c.name);
-    }
-    // Richtung + Distanz vom Schwerpunkt des naechsten POI (= Spieler-
-    // Position relativ zum POI). Distanz = Kante in m (Closest-Edge).
-    const [cx, cy] = polyCentroid(candidates[0].points);
-    const dir = compassDir(xCm - cx, yCm - cy);
-    const distM = Math.max(1, Math.round(closest / 100));
-    const suffix = `, ${distM}m from ${dir}`;
-    let label;
-    if (names.length === 1)      label = prefix + names[0];
-    else if (names.length === 2) label = prefix + names[0] + " and " + names[1];
-    else                          label = prefix + names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
-    return label + suffix;
+    if (!nearest || nearestD > NEAR_CM) return null;
+    const distM = Math.max(1, Math.round(nearestD / 100));
+    return `Near ${nearest.name} (${distM}m)`;
   };
 })();

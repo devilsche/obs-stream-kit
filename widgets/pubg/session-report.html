@@ -1876,7 +1876,7 @@
       ["me",      "Me",      null],
       ["knocks",  "Knocks",  ["knock"]],
       ["kills",   "Kills",   ["kill", "kill_finish", "kill_steal"]],
-      ["revives", "Revives", ["revive"]],
+      ["revives", "Revives", ["revive", "revive_inferred"]],
     ];
 
     // Enemy-Team-Farben: deterministische Palette per team_id (saturated,
@@ -1964,6 +1964,8 @@
         }
         case "revive":
           return `${A} revived ${T}`;
+        case "revive_inferred":
+          return `${T} was revived (no telemetry trace)`;
         default:
           return `${A} ${ev.type} ${T}${meta}`;
       }
