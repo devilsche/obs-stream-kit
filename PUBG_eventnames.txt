@@ -1,0 +1,161 @@
+PUBG Telemetry Event Names — Stand 2026-05-31
+================================================
+
+Grundlage: 30 zufaellig gesampelte Matches aus dem HiDrive-Archiv des
+Streamers (PEX_LuCKoR, April–Mai 2026). Reicht fuer den Long-Tail nicht
+ganz aus (sehr seltene Events wie Comeback-Antenne fehlen ggf.).
+
+A) VON UNSEREM PARSER ERKANNT (pubg/telemetry.py::_normalize)
+------------------------------------------------------------
+Mappt PUBG-Event-Type (_T) → unser internes event_type-Label.
+
+  LogArmorDestroy           → ArmorDestroy
+  LogEmPickupLiftOff        → EmPickup            (Helicopter-Pickup)
+  LogHeal                   → Heal
+  LogItemPickup             → ItemPickup
+  LogMatchEnd               → MatchEnd
+  LogMatchStart             → MatchStart          (Plane-Takeoff = Zeit 0)
+  LogObjectDestroy          → ObjectDestroy
+  LogObjectInteraction      → ObjectInteraction   (Tueren, Tresore)
+  LogParachuteLanding       → Landing
+  LogPhaseChange            → PhaseChange
+  LogPlayerAttack           → Attack
+  LogPlayerKillV2           → Kill                (nur V2; Legacy ignoriert)
+  LogPlayerLogin            → Login               (Lobby-Join)
+  LogPlayerLogout           → Logout
+  LogPlayerMakeGroggy       → Knock
+  LogPlayerPosition         → Position
+  LogPlayerRedeploy         → Redeploy            (Comeback-Antenne)
+  LogPlayerRedeployStart    → Redeploy            (alias)
+  LogPlayerRevive           → Revive
+  LogPlayerTakeDamage       → TakeDamage
+  LogSwimEnd                → SwimEnd
+  LogSwimStart              → SwimStart
+  LogVehicleDestroy         → VehicleDestroy
+  LogVehicleLeave           → VehicleLeave
+  LogVehicleRide            → VehicleRide
+
+  Hinweis: Der Parser kennt auch "LogPlayerKill" (legacy) — wird in
+  aktuellen Matches aber NICHT mehr gefeuert, nur V2.
+
+
+B) IN ECHTEN TELEMETRIE-DATEN GESEHEN (Sample 30 Matches)
+---------------------------------------------------------
+Reihenfolge alphabetisch. (n) = Gesamt-Count im Sample.
+
+  LogArmorDestroy             (   1179)  [PARSED]
+  LogCarePackageLand          (    363)  [unparsed]
+  LogCarePackageSpawn         (    332)  [unparsed]
+  LogCharacterCarry           (     83)  [unparsed]  ← Body-Carry (Sniper-Loot)
+  LogEmPickupLiftOff          (     26)  [PARSED]    ← Helikopter-Pickup
+  LogGameStatePeriodic        (   2382)  [unparsed]
+  LogHeal                     (  61218)  [PARSED]
+  LogItemAttach               (  18041)  [unparsed]
+  LogItemDetach               (  17657)  [unparsed]
+  LogItemDrop                 (  15401)  [unparsed]
+  LogItemEquip                (  30419)  [unparsed]
+  LogItemPickup               (  76981)  [PARSED]
+  LogItemPickupFromCarepackage (    410) [unparsed]
+  LogItemPickupFromCustomPackage (  112) [unparsed]
+  LogItemPickupFromLootBox    (   7835)  [unparsed]
+  LogItemPickupFromVehicleTrunk (   94)  [unparsed]
+  LogItemPutToVehicleTrunk    (    163)  [unparsed]
+  LogItemUnequip              (  24940)  [unparsed]
+  LogItemUse                  (  20659)  [unparsed]
+  LogMatchDefinition          (     16)  [unparsed]  ← 1/Match, Map+Mode
+  LogMatchEnd                 (     16)  [PARSED]
+  LogMatchStart               (     16)  [PARSED]
+  LogObjectDestroy            (   4152)  [PARSED]
+  LogObjectInteraction        (  12576)  [PARSED]
+  LogParachuteLanding         (   3736)  [PARSED]
+  LogPhaseChange              (    222)  [PARSED]
+  LogPlayerAttack             ( 100944)  [PARSED]
+  LogPlayerCreate             (   1850)  [unparsed]  ← Player-Spawn
+  LogPlayerDestroyProp        (     21)  [unparsed]
+  LogPlayerKillV2             (   3042)  [PARSED]
+  LogPlayerLogin              (   1584)  [PARSED]
+  LogPlayerLogout             (   1616)  [PARSED]
+  LogPlayerMakeGroggy         (   3061)  [PARSED]
+  LogPlayerPosition           ( 131098)  [PARSED]
+  LogPlayerRevive             (    491)  [PARSED]
+  LogPlayerTakeDamage         ( 117018)  [PARSED]
+  LogPlayerUseFlareGun        (     16)  [unparsed]  ← Flare/Carepackage-Call
+  LogPlayerUseThrowable       (   4050)  [unparsed]
+  LogSpecialZoneInCharacters  (   6808)  [unparsed]
+  LogSwimEnd                  (    119)  [PARSED]
+  LogSwimStart                (    134)  [PARSED]
+  LogVaultStart               (   8240)  [unparsed]
+  LogVehicleDamage            (   7454)  [unparsed]
+  LogVehicleDestroy           (     46)  [PARSED]
+  LogVehicleLeave             (   4814)  [PARSED]
+  LogVehicleRide              (   4814)  [PARSED]
+  LogWeaponFireCount          (   8292)  [unparsed]
+  LogWheelDestroy             (    202)  [unparsed]
+
+
+C) GAP-ANALYSE: WAS WIR NICHT PARSEN
+------------------------------------
+Sortiert nach Sinnigkeit fuer unseren Stats-/Timeline-Stack.
+
+  HOCH RELEVANT (jetzt prioritaer):
+    LogCharacterCarry         — "X traegt Y" / Drop. Wichtig fuer Comeback-
+                                 BR-Mechanik (BlueChip-Carrying), Sniper-
+                                 Skill-Highlight (Body-Carry-Rescue).
+    LogPlayerUseFlareGun      — Flare-Gun: triggert Carepackage. Konnte
+                                 frueher auch Comeback-Antenne triggern,
+                                 in aktuellen Modi vermutlich nur Loot.
+    LogCarePackageLand        — Carepackage landet. (Loot-Highlight)
+    LogCarePackageSpawn       — Carepackage spawnt.
+    LogItemPickupFromCarepackage — Wer hat aus Carepackage gelootet.
+
+  MITTEL RELEVANT (Stats):
+    LogVehicleDamage          — Auto-Schaden (Crash-Stats).
+    LogWeaponFireCount        — Schuesse je Waffe je Spieler.
+    LogPlayerUseThrowable     — Granaten/Molly/Smoke geworfen.
+    LogVaultStart             — Vaulting (Wandhoch-Stats).
+    LogItemAttach/Detach      — Attachment-Wechsel (Loadout-Final).
+    LogItemEquip/Unequip      — Aktuelle Waffe je Zeitpunkt.
+
+  NIEDRIG RELEVANT:
+    LogGameStatePeriodic      — Server-State-Snapshots.
+    LogSpecialZoneInCharacters — Player in Special-Zone (Trainings-Map?).
+    LogItemDrop               — Item gedroppt.
+    LogPlayerCreate           — Player-Spawn (= 1x Login bereits abgedeckt).
+    LogPlayerDestroyProp      — Prop zerstoert.
+    LogWheelDestroy           — Reifen kaputt.
+    LogItemUse                — Consumable benutzt (Heal + Boost decken's ab).
+    LogMatchDefinition        — Match-Meta (Mode/Map; haben wir aus API).
+
+
+D) COMEBACK-BR / BLUECHIP-MECHANIK — RECHERCHE-STAND
+----------------------------------------------------
+User-Frage: Werden BlueChip-Uploads in Antenne + Helicopter-Rueckkehr
+in der Timeline sichtbar?
+
+Im Sample (30 Matches) gibt es:
+  - 0× LogPlayerRedeploy           ← Comeback-Antenne kommt nicht vor
+  - 26× LogEmPickupLiftOff         ← Helikopter-Pickup (eher: Boat-/Heli-
+                                      Mechanic auf Rondo/Deston)
+  - 83× LogCharacterCarry          ← Body-Carry (Sniper-Skill, NICHT
+                                      BlueChip-Upload)
+  - 16× LogPlayerUseFlareGun       ← Flare-Gun
+
+PUBG hat Comeback-BR auf manchen Maps (Rondo, Karakin) als
+"Comeback-Antenne" / "BR Tower": geknockte/tote Mates koennen via
+Tower zurueckkommen, indem Squadmates BlueChips an einem Detector
+hochladen.
+
+Aktuell sehen wir KEINE direkten Telemetrie-Events dafuer im Sample.
+Moegliche Erklaerungen:
+  1. Die Mechanik laeuft als LogObjectInteraction mit speziellem
+     objectType (zB "ComebackBRTower"), den wir nicht ueberpruefen.
+     Im Sample tauchen aber nur Door/VendingMachine/JukeBox auf.
+  2. Die Mechanik laeuft als LogPlayerRedeploy + LogEmPickupLiftOff,
+     aber in den 30 Sample-Matches kam keine Comeback-Antenne vor.
+  3. PUBG hat das in einem Update geaendert und es laeuft jetzt
+     komplett ueber LogEmPickupLiftOff (mit allen riders die zurueck-
+     kommen).
+
+NAECHSTER SCHRITT: gezielt ein Match heraussuchen, in dem ein Squadmate
+nachweislich wieder ins Spiel kam (z.B. Hat3 starb -> Hat3 lebte
+wieder), und die Telemetrie dieses Matches Event fuer Event durchsehen.
