@@ -1812,6 +1812,13 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                     row["knockerTeamId"]     = k_team
                     row["knockerTeamLabel"]  = _team_label_for(k_actor)
                     row["knockerIsSquad"]    = k_actor in sq_set
+                    row["knockerWeapon"]     = knock_ev["weapon"]
+                    row["knockerWeaponName"] = (
+                        _weapon_label(knock_ev["weapon"])[0]
+                        if knock_ev["weapon"] else None)
+                    row["knockerDistanceM"]  = (
+                        round((knock_ev["distance"] or 0) / 100.0, 1)
+                        if knock_ev["distance"] else None)
             if bled_out:
                 row["bledOut"] = True
                 # Knocker-Info auch bei bleedout setzen (PUBG attribuiert
