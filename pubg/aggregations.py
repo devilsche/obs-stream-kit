@@ -1796,17 +1796,29 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             row["type"] = "redeploy"
         elif et == "Kill":
             knock_ev = last_knock_by_target.get(target)
-            # damageTypeCategory aus PUBG-Payload (neue Daten) — praeziser
-            # als Waffen-ID-Heuristik. Bei NULL → Fallback auf Waffen-ID.
             dmg_reason = (e["damage_reason"] or "") if "damage_reason" in e.keys() else ""
             wid = weapon or ""
-            # Bleed-Out: wenn damage_reason gesetzt ist, ist es authoritative
-            # (PUBG-Payload). Sonst Heuristik mit TakeDamage-Events fuer
-            # alte Daten ohne damage_reason.
-            if dmg_reason:
-                bled_out = ("BleedOut" in dmg_reason)
-            else:
-                bled_out = bool(knock_ev) and _is_bleed_out(target, ts)
+            # TakeDamage-basierte Bleed-/Finisher-Erkennung:
+            # Suche letzten Damage von einem ANDEREN Akteur (nicht
+            # Selbst-Bleed-Ticks) in den letzten 2s vor dem Kill.
+            recent_other_damage = None
+            for d in dmg_by_target.get(target, []):
+                d_ts = d["timestamp_ms"]
+                if d_ts >= ts:
+                    break
+                if (ts - d_ts) > 2000:
+                    continue
+                d_actor = d["actor_account"]
+                if not d_actor or d_actor == target:
+                    continue  # PUBG None oder Selbst-Bleed-Tick
+                recent_other_damage = d  # latest non-self damage wins
+            # Bleed-Out: wenn vorher ein Knock UND in den letzten 2s
+            # KEIN non-self damage → ausgeblutet.
+            bled_out = bool(knock_ev) and recent_other_damage is None
+            # damage_reason kann es explizit override'n (selten direkt
+            # gesetzt von PUBG, aber wenn vorhanden vertrauen).
+            if dmg_reason and "BleedOut" in dmg_reason:
+                bled_out = True
             # Env-Death-Detection: damage_reason zuerst, dann Waffen-ID.
             # WICHTIG: Damage_BlueZoneGrenade ist eine GRANATE die der
             # Spieler wirft — NICHT die Zone. Damit Bluezone-Detection nur
@@ -1840,35 +1852,21 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 # Kein Akteur und kein Waffen-Marker — generisches "died".
                 row["type"] = "kill_self"
             else:
-                # Real-Finisher-Detection: PUBG schreibt Kill manchmal dem
-                # Knocker zu, auch wenn ein Squadmate den toedlichen Schuss
-                # abgegeben hat (Schaden=0 auf DBNO-HP zaehlt PUBG nicht
-                # als 'Damager'). Schauen in TakeDamage: gab es in den
-                # letzten 2s vor dem Kill einen ANDEREN Akteur als den
-                # PUBG-Killer? Dann ist DER der echte Finisher.
+                # Real-Finisher-Detection: wenn actor==knocker UND es einen
+                # non-self Damager in den letzten 2s gab (der NICHT der
+                # PUBG-Killer ist) → DER ist der echte Finisher (PUBG zaehlt
+                # damage=0 Treffer auf DBNO nicht). Bleed-Outs ueberspringen.
                 if (knock_ev and actor == knock_ev["actor_account"]
-                        and not bled_out):
-                    latest_other = None
-                    latest_other_ts = -1
-                    for d in dmg_by_target.get(target, []):
-                        d_ts = d["timestamp_ms"]
-                        if d_ts >= ts:
-                            break
-                        if (ts - d_ts) > 2000:
-                            continue
-                        d_actor = d["actor_account"]
-                        if (d_actor and d_actor != actor
-                                and d_ts > latest_other_ts):
-                            latest_other_ts = d_ts
-                            latest_other = d_actor
-                    if latest_other:
-                        actor = latest_other
-                        row["actorAccount"]   = actor
-                        row["actorName"]      = _name_of(actor)
-                        row["actorSlot"]      = slot_by_acc.get(actor)
-                        row["actorTeamId"]    = team_by_acc.get(actor)
-                        row["actorTeamLabel"] = _team_label_for(actor)
-                        row["actorIsSquad"]   = actor in sq_set
+                        and not bled_out
+                        and recent_other_damage
+                        and recent_other_damage["actor_account"] != actor):
+                    actor = recent_other_damage["actor_account"]
+                    row["actorAccount"]   = actor
+                    row["actorName"]      = _name_of(actor)
+                    row["actorSlot"]      = slot_by_acc.get(actor)
+                    row["actorTeamId"]    = team_by_acc.get(actor)
+                    row["actorTeamLabel"] = _team_label_for(actor)
+                    row["actorIsSquad"]   = actor in sq_set
                 # Subtype-Detection
                 if knock_ev is None:
                     row["type"] = "kill"
