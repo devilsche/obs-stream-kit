@@ -102,31 +102,38 @@ def _maybe_set_user_from_session(sid: str) -> None:
             g.user = dict(user)
             g.tenant_id = user["tenant_id"]
             sessions.touch(conn, sid)
-            # Admin-Impersonation via ?asTenant=<id>
+            # Admin-Impersonation via ?asTenant=<id-or-slug>
             if user["is_admin"]:
-                as_t = request.args.get("asTenant")
+                as_t = (request.args.get("asTenant") or "").strip()
                 if as_t:
-                    try:
+                    # Akzeptiert sowohl numerische ID als auch Slug.
+                    as_tid = None
+                    if as_t.isdigit():
                         as_tid = int(as_t)
-                    except (TypeError, ValueError):
-                        as_tid = None
-                    if as_tid and as_tid != user["tenant_id"]:
-                        with conn.cursor() as cur:
+                    with conn.cursor() as cur:
+                        if as_tid is not None:
                             cur.execute("""
                                 SELECT t.id, t.slug, u2.display_name
                                 FROM tenants t
                                 LEFT JOIN users u2 ON u2.id = t.owner_user_id
                                 WHERE t.id = %s
                             """, (as_tid,))
-                            t_row = cur.fetchone()
-                        if t_row:
-                            g.tenant_id = t_row["id"]
-                            g.tenant_impersonating = {
-                                "id": t_row["id"],
-                                "slug": t_row["slug"],
-                                "display_name": t_row["display_name"]
-                                                  or t_row["slug"],
-                            }
+                        else:
+                            cur.execute("""
+                                SELECT t.id, t.slug, u2.display_name
+                                FROM tenants t
+                                LEFT JOIN users u2 ON u2.id = t.owner_user_id
+                                WHERE t.slug = %s
+                            """, (as_t,))
+                        t_row = cur.fetchone()
+                    if t_row and t_row["id"] != user["tenant_id"]:
+                        g.tenant_id = t_row["id"]
+                        g.tenant_impersonating = {
+                            "id": t_row["id"],
+                            "slug": t_row["slug"],
+                            "display_name": t_row["display_name"]
+                                              or t_row["slug"],
+                        }
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()
