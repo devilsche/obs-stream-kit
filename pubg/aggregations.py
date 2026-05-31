@@ -1585,7 +1585,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     # letzten 3-5 Sekunden vor jedem Kill. Pull global einmalig, gruppieren
     # nach Target.
     dmg_rows = conn.execute("""
-        SELECT timestamp_ms, target_account, actor_account, damage
+        SELECT timestamp_ms, target_account, actor_account, damage, weapon,
+               actor_x, actor_y, victim_x, victim_y
         FROM telemetry_events
         WHERE match_id = ?
           AND event_type = 'TakeDamage'
@@ -1879,6 +1880,17 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                     row["actorTeamId"]    = team_by_acc.get(actor)
                     row["actorTeamLabel"] = _team_label_for(actor)
                     row["actorIsSquad"]   = actor in sq_set
+                    # Echte Waffe + Distanz vom Finisher-TakeDamage uebernehmen
+                    rod = recent_other_damage
+                    if rod["weapon"]:
+                        row["weapon"]     = rod["weapon"]
+                        row["weaponName"] = _weapon_label(rod["weapon"])[0]
+                    if (rod["actor_x"] is not None
+                            and rod["victim_x"] is not None):
+                        _dx = (rod["actor_x"] - rod["victim_x"]) / 100.0
+                        _dy = (rod["actor_y"] - rod["victim_y"]) / 100.0
+                        row["distanceM"] = round(
+                            (_dx*_dx + _dy*_dy) ** 0.5, 1)
                 # Subtype-Detection
                 if knock_ev is None:
                     row["type"] = "kill"
