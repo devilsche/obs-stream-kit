@@ -1747,17 +1747,20 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             else:
                 bled_out = bool(knock_ev) and _is_bleed_out(target, ts)
             # Env-Death-Detection: damage_reason zuerst, dann Waffen-ID.
+            # WICHTIG: Damage_BlueZoneGrenade ist eine GRANATE die der
+            # Spieler wirft — NICHT die Zone. Damit Bluezone-Detection nur
+            # die echte Ring-Damage (Damage_Bluezone) trifft.
             env_type = None
-            if "Bluezone" in dmg_reason:
+            if dmg_reason in ("Damage_Bluezone", "Damage_BlueZone"):
                 env_type = "kill_bluezone"
-            elif "BlackZone" in dmg_reason or "RedZone" in dmg_reason:
+            elif dmg_reason in ("Damage_BlackZone", "Damage_RedZone"):
                 env_type = "kill_redzone"
-            elif "Falling" in dmg_reason or "Damage_Fall" in dmg_reason:
+            elif dmg_reason in ("Damage_Falling", "Damage_Fall"):
                 env_type = "kill_fall"
-            elif "Drown" in dmg_reason:
+            elif "Drown" in dmg_reason or "Apnea" in dmg_reason:
                 env_type = "kill_drown"
-            elif ("VehicleHit" in dmg_reason
-                    or "Damage_VehicleCrashHit" in dmg_reason):
+            elif dmg_reason in ("Damage_VehicleHit",
+                                 "Damage_VehicleCrashHit"):
                 env_type = "kill_self_eject"
             # Fallback auf Waffen-ID (alte Daten ohne damage_reason)
             elif "RagdollPhysics" in wid or "Damage_HelpMeGroundFall" in wid:
