@@ -1751,12 +1751,12 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             if env_type:
                 row["type"] = env_type
             elif not actor:
-                # Kein Akteur, kein bekannter Env-Marker — wenn Opfer im
-                # Vehicle war, ist Sprung wahrscheinlich; sonst unbekannt.
-                if row.get("victimVehicleLabel"):
-                    row["type"] = "kill_self_eject"
-                else:
-                    row["type"] = "kill_self"
+                # Kein Akteur und kein Waffen-Marker — PUBG-Telemetrie gibt
+                # uns nicht genug Info um Zone/Fall/Drown/Eject zu unter-
+                # scheiden (damageTypeCategory wird nicht persistiert).
+                # Daher generisches "died". Keine falsche Inference aus
+                # victimVehicleLabel mehr.
+                row["type"] = "kill_self"
             elif knock_ev is None:
                 row["type"] = "kill"
             else:
