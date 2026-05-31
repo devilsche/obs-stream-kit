@@ -251,6 +251,10 @@ ALWAYS_KEEP_EVENTS = {
     "VehicleEnter", "VehicleLeave",
     # Comeback-Antenne — selten, aber relevant fuer die Timeline.
     "Redeploy",
+    # Revives global — auch Enemy-Revives auf chained-Enemies (die unser
+    # Squad geknockt hat) sollen in der Timeline als "X revived Y" mit
+    # echtem Namen erscheinen, nicht als inferred-revive.
+    "Revive",
 }
 
 # Position-Events fluten die DB (firet alle ~10s pro Spieler). Wir
