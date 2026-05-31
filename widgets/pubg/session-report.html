@@ -296,7 +296,23 @@
     }
     .md-mapcol { display: flex; flex-direction: column; gap: 6px; }
     .md-rightcol { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-    .md-rightcol .squad-table-wrap { max-height: 220px; overflow-y: auto; }
+    .md-rightcol .squad-table-wrap {
+      max-height: 220px;
+      overflow-x: auto;  /* horizontal scroll bei vielen Spalten / schmalem Viewport */
+      overflow-y: auto;
+    }
+    /* Mobile/Tablet: Map oben, Squad-Tabelle + Cards darunter (Stack) */
+    @media (max-width: 900px) {
+      .md-grid { grid-template-columns: 1fr; }
+      .md-mapwrap { width: 100%; height: auto; aspect-ratio: 1/1; max-width: 360px; }
+      .md-mapwrap canvas { width: 100%; height: 100%; }
+      .md-rightcol .squad-table-wrap { max-height: 280px; }
+    }
+    /* Sehr kleine Viewports: Tabelle eng aber lesbar */
+    @media (max-width: 480px) {
+      .md-squad-table { font-size: 0.82em; }
+      .md-squad-table th, .md-squad-table td { padding: 4px 4px; }
+    }
     .md-matchid {
       font-family: ui-monospace, "Cascadia Mono", monospace;
       font-size: 0.72em;
@@ -1120,14 +1136,17 @@
     }
     .md-tl-row {
       display: grid;
-      grid-template-columns: 78px minmax(90px, 160px) 1fr;
+      grid-template-columns: 70px minmax(220px, 320px) 1fr;
       gap: 10px;
       padding: 4px 6px;
       align-items: baseline;
       border-bottom: 1px solid rgba(255,255,255,0.04);
     }
     .md-tl-t   { color: var(--pubg-text); }
-    .md-tl-poi { color: var(--pubg-gold); font-size: 0.9em; }
+    .md-tl-poi {
+      color: var(--pubg-gold); font-size: 0.9em;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
     .md-tl-text {
       color: var(--pubg-text);
     }
