@@ -2035,7 +2035,10 @@
       ["kills",   "Kills",   ["kill", "kill_finish", "kill_steal", "kill_bleedout",
                               "kill_self_eject", "kill_fall", "kill_bluezone",
                               "kill_redzone", "kill_drown", "kill_self"]],
-      ["revives", "Revives", ["revive", "revive_inferred", "redeploy", "comeback"]],
+      ["revives", "Revives", ["revive", "revive_inferred", "redeploy",
+                                "comeback", "chip_pickup", "chip_drop",
+                                "chip_upload", "chip_upload_comeback",
+                                "chip_upload_carepackage"]],
     ];
 
     // Enemy-Team-Farben: HSL-Generativ. Multiplikator 67 (prim) gibt
@@ -2193,6 +2196,22 @@
             : `${A} used the revive antenna`;
         case "comeback":
           return `${A} dropped back in via Comeback Heli`;
+        case "chip_pickup":
+          return ev.targetName
+            ? `${A} picked up ${T}'s BlueChip`
+            : `${A} picked up a BlueChip`;
+        case "chip_drop":
+          return ev.targetName
+            ? `${A} dropped ${T}'s BlueChip`
+            : `${A} dropped a BlueChip`;
+        case "chip_upload_comeback":
+          return ev.targetName
+            ? `${A} uploaded ${T}'s BlueChip at the Comeback Tower`
+            : `${A} uploaded a squad BlueChip at the Comeback Tower`;
+        case "chip_upload_carepackage":
+          return `${A} uploaded an enemy BlueChip (Carepackage incoming)`;
+        case "chip_upload":
+          return `${A} uploaded a BlueChip at the Comeback Tower`;
         case "kill_self_eject": {
           const veh = ev.victimVehicleLabel
             ? ` from <b>${ev.victimVehicleLabel}</b>` : "";

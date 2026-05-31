@@ -1654,6 +1654,42 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         ORDER BY timestamp_ms ASC
     """, (match_id,)).fetchall()
 
+    # BlueChip-Mechanik (Comeback-BR). Drei Event-Phasen:
+    #   1) Pickup: Item_Bluechip_C als ItemPickup (vom Boden) ODER
+    #      ItemPickupBox (aus Body-LootBox; target_account = Owner direkt).
+    #   2) Drop: Spieler dropt den Chip wieder (selten, aber moeglich).
+    #   3) Upload: ItemUse mit Item_Bluechip_C = am Comeback-Tower verbraucht.
+    # ItemPickup ohne Owner-Info → Heuristik (closest dead squadmate
+    # within 60s, 500cm).
+    chip_pickup_rows = conn.execute("""
+        SELECT event_type, actor_account, target_account,
+               timestamp_ms, actor_x, actor_y
+        FROM telemetry_events
+        WHERE match_id = ?
+          AND event_type IN ('ItemPickup', 'ItemPickupBox')
+          AND weapon = 'Item_Bluechip_C'
+          AND timestamp_ms IS NOT NULL
+        ORDER BY timestamp_ms ASC
+    """, (match_id,)).fetchall()
+    chip_drop_rows = conn.execute("""
+        SELECT actor_account, timestamp_ms, actor_x, actor_y
+        FROM telemetry_events
+        WHERE match_id = ?
+          AND event_type = 'ItemDrop'
+          AND weapon = 'Item_Bluechip_C'
+          AND timestamp_ms IS NOT NULL
+        ORDER BY timestamp_ms ASC
+    """, (match_id,)).fetchall()
+    chip_upload_rows = conn.execute("""
+        SELECT actor_account, timestamp_ms, actor_x, actor_y
+        FROM telemetry_events
+        WHERE match_id = ?
+          AND event_type = 'ItemUse'
+          AND weapon = 'Item_Bluechip_C'
+          AND timestamp_ms IS NOT NULL
+        ORDER BY timestamp_ms ASC
+    """, (match_id,)).fetchall()
+
     # 1b) TakeDamage-Events fuer Bleed-Out-Heuristik. Brauchen nur die
     # letzten 3-5 Sekunden vor jedem Kill. Pull global einmalig, gruppieren
     # nach Target.
@@ -2055,6 +2091,148 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                                 None, cb["actor_x"], cb["actor_y"])
         cb_row["type"] = "comeback"
         events_out.append(cb_row)
+
+    # BlueChip-Tracking. Owner-Bestimmung:
+    #   * ItemPickupBox → creatorAccountId direkt (target_account in DB)
+    #   * ItemPickup → Heuristik: naechster toter Spieler (lobby-weit) im
+    #     Umkreis 5m und letzten 60s vor dem Pickup.
+    # Pro Spieler eine FIFO-Queue der gepickten Owners — bei Drop/Upload
+    # poppen wir den aeltesten. Dadurch koennen wir bei einem Upload
+    # klassifizieren: Squad-Chip → Comeback (toter Mate kommt zurueck),
+    # Enemy-Chip → Carepackage-Trigger.
+    all_deaths = conn.execute("""
+        SELECT timestamp_ms, target_account, victim_x, victim_y
+        FROM telemetry_events
+        WHERE match_id = ?
+          AND event_type = 'Kill'
+          AND target_account IS NOT NULL
+          AND victim_x IS NOT NULL
+          AND timestamp_ms IS NOT NULL
+        ORDER BY timestamp_ms ASC
+    """, (match_id,)).fetchall()
+
+    def _resolve_chip_owner(ts, px, py):
+        """Heuristik: naechster toter Spieler innerhalb 60s + 5m."""
+        if px is None or py is None:
+            return None
+        best_acc, best_dist2 = None, None
+        for d in all_deaths:
+            d_ts = d["timestamp_ms"]
+            if d_ts > ts or (ts - d_ts) > 60_000:
+                continue
+            d_x, d_y = d["victim_x"], d["victim_y"]
+            if d_x is None:
+                continue
+            dx, dy = d_x - px, d_y - py
+            dist2 = dx*dx + dy*dy
+            if dist2 > 500*500:
+                continue
+            if best_dist2 is None or dist2 < best_dist2:
+                best_dist2 = dist2
+                best_acc = d["target_account"]
+        return best_acc
+
+    # Alle chip-events (pickup, drop, upload) zeitlich gemischt verarbeiten
+    # damit die FIFO-Queue konsistent ist.
+    chip_events_mixed = []
+    for cp in chip_pickup_rows:
+        cp_owner = (cp["target_account"]
+                     if cp["event_type"] == "ItemPickupBox"
+                     else _resolve_chip_owner(cp["timestamp_ms"],
+                                                cp["actor_x"], cp["actor_y"]))
+        chip_events_mixed.append(
+            ("pickup", cp["timestamp_ms"], cp["actor_account"],
+             cp_owner, cp["actor_x"], cp["actor_y"]))
+    for dr in chip_drop_rows:
+        chip_events_mixed.append(
+            ("drop", dr["timestamp_ms"], dr["actor_account"],
+             None, dr["actor_x"], dr["actor_y"]))
+    for up in chip_upload_rows:
+        chip_events_mixed.append(
+            ("upload", up["timestamp_ms"], up["actor_account"],
+             None, up["actor_x"], up["actor_y"]))
+    chip_events_mixed.sort(key=lambda x: x[1])
+
+    # Dedup: PUBG feuert oft sowohl LogItemPickup (vom Boden) als auch
+    # LogItemPickupFromLootBox (aus Body-Box) fuer denselben physischen
+    # Pickup, wenige ms auseinander. Pro (actor, ts_bucket): wenn
+    # mindestens ein Event mit bekanntem Owner da ist, droppe alle mit
+    # owner=None aus diesem Bucket. Mehrere unterschiedliche Owner im
+    # selben Bucket bleiben erhalten (= echte Mehrfach-Pickups).
+    from collections import defaultdict
+    bucket_groups = defaultdict(list)
+    non_pickups = []
+    for ev in chip_events_mixed:
+        if ev[0] != "pickup":
+            non_pickups.append(ev); continue
+        bucket_groups[(ev[2], ev[1] // 1000)].append(ev)
+    deduped_pickups = []
+    for evs in bucket_groups.values():
+        has_owner = any(e[3] is not None for e in evs)
+        for e in evs:
+            if has_owner and e[3] is None:
+                continue
+            deduped_pickups.append(e)
+    chip_events_mixed = sorted(deduped_pickups + non_pickups, key=lambda x: x[1])
+
+    chip_queue = {}  # account → [owner_acc, ...] FIFO
+    matched_comebacks = set()  # bereits an Upload zugewiesene Comeback-Accounts
+    for kind, ts, acc, owner, px, py in chip_events_mixed:
+        if kind == "pickup":
+            chip_queue.setdefault(acc, []).append(owner)
+            if acc not in sq_set:
+                continue  # Enemy-Pickups: queue tracken aber nicht emitten
+            cr = _row_skeleton("BluechipPickup", ts, acc, owner, px, py)
+            cr["type"] = "chip_pickup"
+            events_out.append(cr)
+        elif kind == "drop":
+            q = chip_queue.get(acc) or []
+            owner = q.pop(0) if q else None
+            if acc not in sq_set:
+                continue
+            cr = _row_skeleton("BluechipDrop", ts, acc, owner, px, py)
+            cr["type"] = "chip_drop"
+            events_out.append(cr)
+        elif kind == "upload":
+            # Owner-Bestimmung WAHR: Wenn innerhalb der naechsten 5min
+            # ein Comeback-Drop eines toten Squadmates passiert, war
+            # genau DIESER Upload sein Chip. Sonst Enemy-Chip
+            # (Carepackage-Trigger).
+            #
+            # Wir halten die FIFO-Queue konsistent (pop), aber die
+            # Klassifikation kommt aus dem Match-mit-Comeback und nicht
+            # aus der Queue.
+            q = chip_queue.get(acc) or []
+            queue_owner = q.pop(0) if q else None
+            if acc not in sq_set:
+                continue
+            # Suche Squad-Comeback innerhalb 5min nach diesem Upload,
+            # der noch nicht zugeordnet ist.
+            matched_owner = None
+            for cb in comeback_rows:
+                cb_acc = cb["actor_account"]
+                cb_ts = cb["timestamp_ms"]
+                if cb_acc not in sq_set:
+                    continue
+                dt = cb_ts - ts
+                if dt < 0 or dt > 5 * 60 * 1000:
+                    continue
+                if cb_acc in matched_comebacks:
+                    continue
+                matched_owner = cb_acc
+                matched_comebacks.add(cb_acc)
+                break
+            owner = matched_owner or queue_owner
+            cr = _row_skeleton("BluechipUpload", ts, acc, owner, px, py)
+            if matched_owner:
+                cr["type"] = "chip_upload_comeback"
+            elif owner is not None and owner in sq_set:
+                cr["type"] = "chip_upload_comeback"
+            elif owner is not None:
+                cr["type"] = "chip_upload_carepackage"
+            else:
+                cr["type"] = "chip_upload"
+            events_out.append(cr)
 
     events_out.sort(key=lambda x: x["tsMs"] or 0)
 

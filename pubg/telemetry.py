@@ -172,11 +172,38 @@ def _normalize(event):
         base["damage"] = event.get("healAmount")
     elif et == "LogItemPickup":
         # Wichtig fuer PAYDAY (Loot-Counter: Geldsack, Schmuck, Goldbarren).
-        # Auch fuer BR interessant (Waffen-Pickup-Statistiken)
+        # Auch fuer BR interessant (Waffen-Pickup-Statistiken, BlueChips
+        # fuer Comeback-BR-Mechanik).
         base["event_type"] = "ItemPickup"
         base["actor_account"] = (event.get("character") or {}).get("accountId")
         item = event.get("item") or {}
         base["weapon"] = item.get("itemId")  # = z.B. "Item_MoneyBagged"
+        base["actor_x"], base["actor_y"] = _loc(event, "character")
+    elif et == "LogItemDrop":
+        # Spieler dropt Item — fuer BlueChip-Tracking relevant
+        # (Comeback-BR: wenn jemand den Chip vor dem Upload droppt).
+        base["event_type"] = "ItemDrop"
+        base["actor_account"] = (event.get("character") or {}).get("accountId")
+        item = event.get("item") or {}
+        base["weapon"] = item.get("itemId")
+        base["actor_x"], base["actor_y"] = _loc(event, "character")
+    elif et == "LogItemPickupFromLootBox":
+        # Pickup aus der Loot-Box eines toten Spielers. Wichtig:
+        # creatorAccountId = der TOTE Owner. Speziell fuer BlueChips
+        # = direkter Owner-Lookup ohne Heuristik.
+        base["event_type"] = "ItemPickupBox"
+        base["actor_account"] = (event.get("character") or {}).get("accountId")
+        base["target_account"] = event.get("creatorAccountId")
+        item = event.get("item") or {}
+        base["weapon"] = item.get("itemId")
+        base["actor_x"], base["actor_y"] = _loc(event, "character")
+    elif et == "LogItemUse":
+        # Item benutzt — Heals/Boosts UND der BlueChip-Upload am
+        # Comeback-Tower (item=Item_Bluechip_C).
+        base["event_type"] = "ItemUse"
+        base["actor_account"] = (event.get("character") or {}).get("accountId")
+        item = event.get("item") or {}
+        base["weapon"] = item.get("itemId")
         base["actor_x"], base["actor_y"] = _loc(event, "character")
     elif et == "LogObjectInteraction":
         # PAYDAY: Tueren oeffnen/schliessen, Tresore knacken
