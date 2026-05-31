@@ -1943,9 +1943,61 @@
       return `<b style="color:${color}">${name}</b>${teamSpan}`;
     }
 
+    // Attachment-Class-Names → kurze Klartextnamen (Tooltip)
+    function _attachLabel(itemId) {
+      // Sucht typische PUBG-Substrings (Scope/Comp/Grip/Mag/Suppr/etc.)
+      const id = (itemId || "").replace(/_C$/, "");
+      const NAMES = [
+        ["Scope15x",      "15x Scope"],
+        ["Scope8x",       "8x Scope"],
+        ["Scope6x",       "6x Scope"],
+        ["Scope4x",       "4x Scope"],
+        ["Scope3x",       "3x Scope"],
+        ["Scope2x",       "2x Scope"],
+        ["DotSight",      "Red Dot"],
+        ["HoloSight",     "Holo Sight"],
+        ["Aimpoint",      "Red Dot"],
+        ["Comp_5_56mm",   "Compensator (5.56)"],
+        ["Comp_7_62mm",   "Compensator (7.62)"],
+        ["Comp_Sniper",   "Compensator (Sniper)"],
+        ["Suppressor_5_56mm", "Suppressor (5.56)"],
+        ["Suppressor_7_62mm", "Suppressor (7.62)"],
+        ["Suppressor_Sniper", "Suppressor (Sniper)"],
+        ["FlashHider_5_56mm", "Flash Hider (5.56)"],
+        ["FlashHider_7_62mm", "Flash Hider (7.62)"],
+        ["FlashHider_Sniper", "Flash Hider (Sniper)"],
+        ["ExtendedQuickDraw", "Ext+QD Mag"],
+        ["Extended",      "Ext Mag"],
+        ["QuickDraw",     "QD Mag"],
+        ["Lightweight",   "Light Grip"],
+        ["AngledForeGrip", "Angled Grip"],
+        ["VerticalForeGrip", "Vertical Grip"],
+        ["HalfGrip",      "Half Grip"],
+        ["LaserSight",    "Laser"],
+        ["Stock_AR_Composite", "Tactical Stock"],
+        ["Stock_SR_Cheek",     "Cheek Pad"],
+        ["Stock_UMP",          "Tactical Stock"],
+        ["UpperRail",     "Sniper Rail"],
+        ["Bullet_Loops",  "Bullet Loops"],
+      ];
+      for (const [needle, label] of NAMES) {
+        if (id.includes(needle)) return label;
+      }
+      return id.replace(/^Item_Attach_Weapon_(Upper_|Lower_|Magazine_|Stock_|Muzzle_)?/, "")
+               .replace(/_/g, " ");
+    }
+
     function mdTlWeaponMeta(ev) {
       const parts = [];
-      if (ev.weaponName) parts.push(`with <b>${ev.weaponName}</b>`);
+      if (ev.weaponName) {
+        // Attachments als Tooltip auf die Waffe
+        let attachTitle = "";
+        if (ev.attachments && ev.attachments.length) {
+          const labels = ev.attachments.map(_attachLabel).join(", ");
+          attachTitle = ` title="${labels.replace(/"/g, "&quot;")}"`;
+        }
+        parts.push(`with <b${attachTitle}>${ev.weaponName}</b>`);
+      }
       if (ev.distanceM) parts.push(`· ${ev.distanceM.toFixed(0)}m`);
       // Fahrzeug-Kontext: Opfer war im Auto oder Schuetze schoss aus Auto
       if (ev.victimVehicleLabel) parts.push(`· victim in <b>${ev.victimVehicleLabel}</b>`);

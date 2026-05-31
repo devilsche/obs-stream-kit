@@ -1572,7 +1572,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     # eines toten Mate aus der Ferne).
     all_events_rows = conn.execute("""
         SELECT event_type, timestamp_ms, actor_account, target_account,
-               victim_x, victim_y, weapon, distance, damage_reason
+               victim_x, victim_y, weapon, distance, damage_reason,
+               attachments
         FROM telemetry_events
         WHERE match_id = ?
           AND event_type IN ('Kill', 'Knock', 'Revive', 'Redeploy')
@@ -1790,6 +1791,14 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
 
         row = _row_skeleton(et, ts, actor, target, vx, vy, weapon,
                              e["distance"])
+        # Attachments (JSON-Array von Item-Class-Names) durchreichen
+        _attach_raw = (e["attachments"] if "attachments" in e.keys() else None)
+        if _attach_raw:
+            try:
+                import json as _json_attach
+                row["attachments"] = _json_attach.loads(_attach_raw)
+            except Exception:
+                row["attachments"] = None
 
         if et == "Knock":
             row["type"] = "knock"

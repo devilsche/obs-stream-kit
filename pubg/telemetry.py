@@ -35,6 +35,7 @@ def _normalize(event):
             "weapon": None, "distance": None, "damage": None,
             "damage_reason": None,
             "seat_index": None,
+            "attachments": None,
             "payload_json": None}
     # Helper: extracts z + health for character-events (for landing-pin
     # heuristic; ground-events have z<800 and health>0).
@@ -82,6 +83,16 @@ def _normalize(event):
             finisher_info.get("damageTypeCategory")
             or info.get("damageTypeCategory")
             or event.get("damageTypeCategory"))
+        # Killer-Weapon-Attachments aus killerDamageInfo.additionalInfo
+        # (Liste der Item-Class-Names, z.B. 'Item_Attach_Weapon_Upper_Scope3x_C').
+        # finisherDamageInfo (wenn vorhanden) hat die Attachments des
+        # FINISHER-Schusses — bevorzugen.
+        attach_list = (finisher_info.get("additionalInfo")
+                        or info.get("additionalInfo")
+                        or [])
+        if attach_list:
+            import json as _json
+            base["attachments"] = _json.dumps(attach_list)
     elif et == "LogPlayerKill":
         # Legacy-Form — wird ignoriert. Siehe Kommentar oben.
         return None

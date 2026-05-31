@@ -117,15 +117,19 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
     damage          DOUBLE PRECISION,
     damage_reason   TEXT,
     seat_index      INTEGER,
+    attachments     TEXT,
     payload_json    TEXT
 );
--- Additive: damage_reason + seat_index kamen nach Schema-Erstellung dazu.
+-- Additive: damage_reason + seat_index + attachments kamen nach Schema-
+-- Erstellung dazu.
 -- damage_reason = damageTypeCategory aus PUBG-Payload (BleedOut, Bluezone,
 -- Falling, Drown, ...).
 -- seat_index = Sitzposition fuer VehicleEnter/VehicleLeave (0 = Fahrer).
--- Alte Rows NULL — kann via hidrive_refill nachgefuellt werden.
+-- attachments = JSON-Array der Killer-Weapon-Attachments (additionalInfo
+-- aus killerDamageInfo). Alte Rows NULL — via hidrive_refill nachfuellbar.
 ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS damage_reason TEXT;
 ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS seat_index INTEGER;
+ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS attachments TEXT;
 CREATE INDEX IF NOT EXISTS idx_tel_match
     ON telemetry_events(match_id);
 CREATE INDEX IF NOT EXISTS idx_tel_match_type
@@ -597,6 +601,7 @@ def insert_telemetry_events(conn, match_id: str, events: list) -> None:
         e.get("weapon"), e.get("distance"), e.get("damage"),
         e.get("damage_reason"),
         e.get("seat_index"),
+        e.get("attachments"),
         e.get("payload_json", "{}"),
     ) for e in events]
     with conn.cursor() as cur:
@@ -606,7 +611,7 @@ def insert_telemetry_events(conn, match_id: str, events: list) -> None:
             "(match_id, event_type, timestamp_ms, actor_account, "
             "target_account, actor_x, actor_y, actor_z, actor_health, "
             "victim_x, victim_y, weapon, distance, damage, damage_reason, "
-            "seat_index, payload_json) "
+            "seat_index, attachments, payload_json) "
             "VALUES %s",
             rows,
         )
