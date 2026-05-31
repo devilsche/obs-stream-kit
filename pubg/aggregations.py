@@ -1630,8 +1630,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     # eines toten Mate aus der Ferne).
     all_events_rows = conn.execute("""
         SELECT event_type, timestamp_ms, actor_account, target_account,
-               victim_x, victim_y, weapon, distance, damage_reason,
-               attachments
+               victim_x, victim_y, actor_x, actor_y,
+               weapon, distance, damage_reason, attachments
         FROM telemetry_events
         WHERE match_id = ?
           AND event_type IN ('Kill', 'Knock', 'Revive', 'Redeploy', 'Login')
@@ -1819,7 +1819,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     last_knock_by_target = {}  # target_account → Knock-Event-Row
 
     def _row_skeleton(et_row, ts_row, actor_row, target_row,
-                       vx, vy, weapon_row=None, dist_cm=None):
+                       vx, vy, weapon_row=None, dist_cm=None,
+                       ax=None, ay=None):
         """Gemeinsame Felder fuer eine Timeline-Row bauen.
         tsMs ist MATCH-RELATIV (ms ab Match-Start) — Frontend formatiert
         als MM:SS Ingame-Zeit."""
@@ -1848,6 +1849,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             "distanceM":     dist_m_local,
             "victimX":       vx,
             "victimY":       vy,
+            "actorX":        ax,
+            "actorY":        ay,
             "victimVehicleLabel":  _veh_label_for(target_row, ts_row),
             "shooterVehicleLabel": _veh_label_for(actor_row, ts_row),
         }
@@ -1933,7 +1936,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             vx, vy = revive_fallback_pos
 
         row = _row_skeleton(et, ts, actor, target, vx, vy, weapon,
-                             e["distance"])
+                             e["distance"],
+                             ax=e["actor_x"], ay=e["actor_y"])
         # Attachments (JSON-Array von Item-Class-Names) durchreichen
         _attach_raw = (e["attachments"] if "attachments" in e.keys() else None)
         if _attach_raw:

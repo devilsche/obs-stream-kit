@@ -1247,6 +1247,12 @@
       color: var(--pubg-gold); font-size: 0.9em;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
+    /* Sekundaerer POI (Victim-Standort bei langen Schuessen) — dezenter */
+    .md-tl-target-poi {
+      color: var(--pubg-muted);
+      font-size: 0.85em;
+      font-weight: 400;
+    }
     .md-tl-text {
       color: var(--pubg-text);
     }
@@ -2350,12 +2356,28 @@
       const displayMs = (ev.tsMs != null)
         ? ev.tsMs - (ctx.takeoffOffsetMs || 0) : null;
       const tCell = mdTlFmtMatchTime(displayMs);
-      // Join-Events haben keinen Ort; leere POI-Zelle statt '<unknown>'.
-      // Comeback/Chip-Events haben keinen victim_x/y (Spieler-Action,
-      // kein Target-Treffer) — Actor-Position als Fallback nutzen.
+      // POI-Logik je Event-Typ:
+      //   join → "Lobby"
+      //   kill/knock/finish/steal → Shooter-Pos (= wo DU standst); bei
+      //     Distanz > 200m und auflösbarem Victim-POI Zusatz "→ Target: X"
+      //   bleedout/self/fall/etc. → Victim-Pos
+      //   pickup/drop/upload/comeback → Actor-Pos
       let poi;
+      const isShooterEv = ev.type === "kill"
+                       || ev.type === "knock"
+                       || ev.type === "kill_finish"
+                       || ev.type === "kill_steal";
       if (ev.type === "join") {
         poi = "Lobby";
+      } else if (isShooterEv && ev.actorX != null) {
+        poi = mdTlPoi(ctx, ev.actorX, ev.actorY);
+        const distM = ev.distanceM || 0;
+        if (distM > 200 && ev.victimX != null) {
+          const victimPoi = mdTlPoi(ctx, ev.victimX, ev.victimY);
+          if (victimPoi && victimPoi !== "&lt;unknown&gt;" && victimPoi !== poi) {
+            poi += ` <span class="md-tl-target-poi">→ ${victimPoi}</span>`;
+          }
+        }
       } else {
         const px = (ev.victimX != null) ? ev.victimX : ev.actorX;
         const py = (ev.victimY != null) ? ev.victimY : ev.actorY;
