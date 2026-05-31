@@ -2077,32 +2077,104 @@
       return `${neg ? "-" : ""}${m}:${String(s).padStart(2, "0")}`;
     }
 
-    // Item-ID → kurzer Klartextname fuer Carepackage-Inhalt
+    // Item-ID → Klartextname fuer Carepackage-Inhalt.
+    // Reihenfolge wichtig: spezifischer Match vor generischem.
     function _carepkgItemLabel(id) {
       if (!id) return "?";
       const s = id.replace(/^Item_/, "").replace(/_C$/, "");
-      const NAMES = [
-        ["Weapon_L6", "L6"],
-        ["Weapon_M249", "M249"],
-        ["Weapon_AUG", "AUG"],
-        ["Weapon_Groza", "Groza"],
-        ["Weapon_AWM", "AWM"],
-        ["Weapon_MG3", "MG3"],
-        ["Weapon_Mk14", "Mk14"],
-        ["Weapon_Mk12", "Mk12"],
-        ["Weapon_FlareGun", "Flare Gun"],
-        ["Back_BlueBlocker_Lv3", "BlueChip Backpack Lv3"],
-        ["Back_BlueBlocker", "BlueChip Backpack"],
-        ["Back_C_01_Lv3", "Backpack Lv3"],
-        ["Back_C_01_Lv2", "Backpack Lv2"],
-        ["Head_E_01_Lv3", "Helmet Lv3"],
-        ["Armor_C_01_Lv3", "Vest Lv3"],
-        ["Ghillie", "Ghillie Suit"],
+      // 1) Schutz-Equipment (Head/Armor/Back) — Level extrahieren
+      let m = s.match(/^Head_[A-Z]_\d+_Lv(\d+)/);
+      if (m) return `Level ${m[1]} Helmet`;
+      m = s.match(/^Armor_[A-Z]_\d+_Lv(\d+)/);
+      if (m) return `Level ${m[1]} Vest`;
+      m = s.match(/^Back_[A-Z]_\d+_Lv(\d+)/);
+      if (m) return `Level ${m[1]} Backpack`;
+      m = s.match(/^Back_BlueBlocker(?:_Lv(\d+))?/);
+      if (m) return `BlueChip Backpack${m[1] ? " Lv" + m[1] : ""}`;
+      m = s.match(/^Ghillie/);
+      if (m) return "Ghillie Suit";
+      // 2) Heals + Boosts
+      const HEALS = {
+        "Heal_Bandage": "Bandage",
+        "Heal_FirstAid": "First Aid",
+        "Heal_MedKit": "Med Kit",
+        "Boost_EnergyDrink": "Energy Drink",
+        "Boost_PainKiller": "Painkiller",
+        "Boost_AdrenalineSyringe": "Adrenaline",
+      };
+      for (const k in HEALS) if (s.startsWith(k)) return HEALS[k];
+      // 3) Ammo
+      m = s.match(/^Ammo_(\d+)([Gg]uage|mm|ACP|Magnum|Flare|Bolt)/);
+      if (m) {
+        const cal = m[1] + (m[2].toLowerCase() === "guage" ? " Gauge" :
+                            m[2] === "mm" ? " mm" : " " + m[2]);
+        return `${cal} Ammo`;
+      }
+      // 4) Spezial-Items
+      const SPECIAL = {
+        "EmergencyPickup": "Emergency Pickup",
+        "Weapon_FlareGun": "Flare Gun",
+        "Weapon_PackageFlare": "Package Flare",
+        "Weapon_CoverStructDropHandFlare": "Drop Flare",
+        "Weapon_SmokeBomb": "Smoke Grenade",
+        "Weapon_Molotov": "Molotov",
+        "Weapon_Grenade": "Frag Grenade",
+        "Weapon_FlashBang": "Flash Bang",
+        "Weapon_BlueChipDetector": "BlueChip Detector",
+        "Special_Bluechip": "Personal BlueChip",
+        "Bluechip": "BlueChip",
+      };
+      for (const k in SPECIAL) if (s.includes(k)) return SPECIAL[k];
+      // 5) Waffen — kurze Namen
+      const WEAPONS = [
+        ["HK416", "M416"], ["M16A4", "M16A4"], ["AUG", "AUG"],
+        ["AK47", "AKM"], ["Beryl", "Beryl"], ["Groza", "Groza"],
+        ["SCAR-L", "SCAR-L"], ["G36C", "G36C"], ["QBZ", "QBZ"],
+        ["FAMAS", "FAMAS"], ["M249", "M249"], ["MG3", "MG3"],
+        ["DP28", "DP-28"], ["UMP", "UMP45"], ["Vector", "Vector"],
+        ["Tommy", "Tommy Gun"], ["UZI", "Uzi"], ["MP5K", "MP5K"],
+        ["BizonPP19", "PP-19 Bizon"], ["P90", "P90"], ["Mk47", "Mk47"],
+        ["JS9", "JS9"], ["AWM", "AWM"], ["L6", "L6"], ["Kar98k", "Kar98k"],
+        ["Mosin", "Mosin"], ["M24", "M24"], ["Win94", "Win94"], ["VSS", "VSS"],
+        ["Mk14", "Mk14"], ["Mk12", "Mk12"], ["SLR", "SLR"], ["SKS", "SKS"],
+        ["Mini14", "Mini 14"], ["QBU", "QBU"], ["S1897", "S1897"],
+        ["S686", "S686"], ["S12K", "S12K"], ["DBS", "DBS"], ["O12", "O12"],
+        ["Saiga", "Saiga 12K"], ["R45", "R45"], ["R1895", "R1895"],
+        ["P92", "P92"], ["P1911", "P1911"], ["P18C", "P18C"], ["DesertEagle", "Deagle"],
+        ["Sawnoff", "Sawed-Off"], ["Crossbow", "Crossbow"], ["Pan", "Pan"],
+        ["Machete", "Machete"], ["Crowbar", "Crowbar"], ["Sickle", "Sickle"],
       ];
-      for (const [needle, label] of NAMES) {
+      m = s.match(/^Weapon_([A-Za-z0-9_-]+?)(?:_v\d+)?(?:_Esports)?$/);
+      if (m) {
+        const wname = m[1];
+        for (const [needle, label] of WEAPONS) {
+          if (wname.includes(needle)) return label;
+        }
+        return wname.replace(/_/g, " ");
+      }
+      // 6) Attachments
+      const ATT = [
+        ["Scope15x", "15x Scope"], ["Scope8x", "8x Scope"],
+        ["Scope6x", "6x Scope"], ["Scope4x", "4x Scope"],
+        ["Scope3x", "3x Scope"], ["Scope2x", "2x Scope"],
+        ["DotSight", "Red Dot"], ["HoloSight", "Holo Sight"],
+        ["Aimpoint", "Red Dot"], ["DualOptic", "Tactical Optic"],
+        ["Comp_5_56", "Compensator (5.56)"], ["Comp_7_62", "Compensator (7.62)"],
+        ["Suppressor", "Suppressor"], ["FlashHider", "Flash Hider"],
+        ["QuickDraw", "QuickDraw Mag"], ["ExtendedQuickDraw", "QD Ext Mag"],
+        ["Extended", "Extended Mag"], ["Foregrip", "Vertical Grip"],
+        ["Angled", "Angled Grip"], ["HalfGrip", "Half Grip"],
+        ["Lightweight", "Light Grip"], ["LaserSight", "Laser"],
+        ["BulletLoops", "Bullet Loops"], ["CheekPad", "Cheek Pad"],
+        ["Stock_AR", "Tactical Stock"], ["PM2_01", "Tactical Optic"],
+      ];
+      for (const [needle, label] of ATT) {
         if (s.includes(needle)) return label;
       }
-      return s.replace(/^Weapon_/, "").replace(/_/g, " ");
+      // 7) Fallback: clean string
+      return s.replace(/^(Weapon|Attach_Weapon|Heal|Boost|Ammo|Back|Head|Armor)_/, "")
+              .replace(/_Lv(\d+)/, " Lv$1")
+              .replace(/_/g, " ");
     }
 
     function mdTlPoi(ctx, x, y) {
