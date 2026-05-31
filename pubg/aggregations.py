@@ -1421,6 +1421,41 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         ORDER BY timestamp_ms ASC
     """, (match_id,)).fetchall()
 
+    # 1b) TakeDamage-Events fuer Bleed-Out-Heuristik. Brauchen nur die
+    # letzten 3-5 Sekunden vor jedem Kill. Pull global einmalig, gruppieren
+    # nach Target.
+    dmg_rows = conn.execute("""
+        SELECT timestamp_ms, target_account, actor_account, damage
+        FROM telemetry_events
+        WHERE match_id = ?
+          AND event_type = 'TakeDamage'
+          AND timestamp_ms IS NOT NULL
+        ORDER BY timestamp_ms ASC
+    """, (match_id,)).fetchall()
+    dmg_by_target = {}
+    for d in dmg_rows:
+        tgt = d["target_account"]
+        if not tgt:
+            continue
+        dmg_by_target.setdefault(tgt, []).append(d)
+
+    def _is_bleed_out(victim_acc, kill_ts):
+        """Heuristik: hat das Opfer geblutet bis zum Tod, ohne signifikanten
+        Finisher-Schaden in der letzten Sekunde davor? Bleed-Ticks sind
+        klein (<=5 HP)."""
+        history = dmg_by_target.get(victim_acc, [])
+        BLEED_TICK_MAX = 5      # HP — alles drueber ist "echter" Schaden
+        WINDOW_MS = 1000        # 1s vor Kill (User-Vorgabe)
+        for d in history:
+            ts = d["timestamp_ms"]
+            if ts >= kill_ts:
+                break
+            if (kill_ts - ts) > WINDOW_MS:
+                continue
+            if (d["damage"] or 0) > BLEED_TICK_MAX:
+                return False
+        return True
+
     # 2) Dynamische Tracking-Menge der "noch offenen" Knocks unseres
     # Squads. Geht hier rein, wenn squad einen Enemy knockt; raus, sobald
     # der Enemy revived oder gekillt wird (Story-Bogen geschlossen).
@@ -1590,12 +1625,17 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             row["type"] = "revive"
         elif et == "Kill":
             knock_ev = last_knock_by_target.get(target)
+            # Bleed-Out-Heuristik: nur sinnvoll wenn vorher ein Knock war.
+            # Ohne Knock → Direkt-Kill, kann gar nicht bluten.
+            bled_out = bool(knock_ev) and _is_bleed_out(target, ts)
             if knock_ev is None:
                 row["type"] = "kill"
             else:
                 k_actor = knock_ev["actor_account"]
                 if k_actor == actor:
-                    row["type"] = "kill"
+                    # Gleicher Akteur wie der Knocker — Self-Finish oder
+                    # Bleed-Out (PUBG schreibt Bleed-Out-Kills dem Knocker zu)
+                    row["type"] = "kill_bleedout" if bled_out else "kill"
                 else:
                     k_team = team_by_acc.get(k_actor)
                     a_team = team_by_acc.get(actor)
@@ -1608,6 +1648,26 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                     row["knockerTeamId"]     = k_team
                     row["knockerTeamLabel"]  = _team_label_for(k_actor)
                     row["knockerIsSquad"]    = k_actor in sq_set
+            if bled_out:
+                row["bledOut"] = True
+                # Knocker-Info auch bei bleedout setzen (PUBG attribuiert
+                # den Kill dem Knocker → actor == knocker, aber wir wollen
+                # den Knocker-Kontext fuer den Frontend-Satz)
+                if knock_ev and "knockerAccount" not in row:
+                    k_actor = knock_ev["actor_account"]
+                    row["knockerAccount"]    = k_actor
+                    row["knockerName"]       = _name_of(k_actor)
+                    row["knockerSlot"]       = slot_by_acc.get(k_actor)
+                    row["knockerTeamId"]     = team_by_acc.get(k_actor)
+                    row["knockerTeamLabel"]  = _team_label_for(k_actor)
+                    row["knockerIsSquad"]    = k_actor in sq_set
+                    row["knockerWeapon"]     = knock_ev["weapon"]
+                    row["knockerWeaponName"] = (
+                        _weapon_label(knock_ev["weapon"])[0]
+                        if knock_ev["weapon"] else None)
+                    row["knockerDistanceM"]  = (
+                        round((knock_ev["distance"] or 0) / 100.0, 1)
+                        if knock_ev["distance"] else None)
             last_knock_by_target.pop(target, None)
             knock_pos_by_target.pop(target, None)
 

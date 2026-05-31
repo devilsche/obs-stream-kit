@@ -1875,7 +1875,7 @@
       ["all",     "All",     null],
       ["me",      "Me",      null],
       ["knocks",  "Knocks",  ["knock"]],
-      ["kills",   "Kills",   ["kill", "kill_finish", "kill_steal"]],
+      ["kills",   "Kills",   ["kill", "kill_finish", "kill_steal", "kill_bleedout"]],
       ["revives", "Revives", ["revive", "revive_inferred"]],
     ];
 
@@ -1954,6 +1954,15 @@
           return `${A} knocked ${T}${meta}`;
         case "kill":
           return `${A} killed ${T}${meta}`;
+        case "kill_bleedout": {
+          // Knocker-Info ist gleich Actor (PUBG attribuiert Bleed-Out
+          // dem Knocker) — aber wir nutzen die Knocker-Felder fuer die
+          // Original-Waffe und Distanz aus dem Knock.
+          const kw = ev.knockerWeaponName ? `with <b>${ev.knockerWeaponName}</b>` : "";
+          const kd = ev.knockerDistanceM ? `· ${ev.knockerDistanceM.toFixed(0)}m` : "";
+          const kCtx = (kw || kd) ? ` (knocked ${[kw, kd].filter(Boolean).join(" ")})` : "";
+          return `${T} bled out and died${kCtx}`;
+        }
         case "kill_finish": {
           const K = mdTlNameSpan(ev, "knocker", cba);
           return `${A} finished ${T} (knock by ${K})${meta}`;
