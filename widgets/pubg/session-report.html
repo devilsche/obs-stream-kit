@@ -1142,6 +1142,21 @@
       align-items: baseline;
       border-bottom: 1px solid rgba(255,255,255,0.04);
     }
+    .md-tl-row.md-tl-header {
+      color: var(--pubg-muted);
+      font-size: 0.72em;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      border-bottom: 1px solid var(--pubg-border);
+      padding-bottom: 6px;
+      margin-bottom: 4px;
+    }
+    .md-tl-row.md-tl-header .md-tl-t,
+    .md-tl-row.md-tl-header .md-tl-poi,
+    .md-tl-row.md-tl-header .md-tl-text {
+      color: var(--pubg-muted);
+    }
     .md-tl-t   { color: var(--pubg-text); }
     .md-tl-poi {
       color: var(--pubg-gold); font-size: 0.9em;
@@ -2106,12 +2121,17 @@
         </details>`;
       }
       const rows = events.map(ev => mdTlRowHtml(ev, ctx)).join("");
+      const header = `<div class="md-tl-row md-tl-header">
+          <span class="md-tl-t">Time</span>
+          <span class="md-tl-poi">Location</span>
+          <span class="md-tl-text">Event</span>
+        </div>`;
       return `<details class="md-timeline-details" open>
         <summary class="md-timeline__title">${chev} Timeline (${events.length} events)</summary>
         <div class="md-timeline__head">
           <div class="md-timeline__filters">${filters}</div>
         </div>
-        <div class="md-timeline__list">${rows}</div>
+        <div class="md-timeline__list">${header}${rows}</div>
       </details>`;
     }
 
