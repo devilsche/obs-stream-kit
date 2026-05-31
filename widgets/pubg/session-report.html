@@ -1991,6 +1991,15 @@
       }
       s.detail = md.detail;
       s.colorByAcc = md.colorByAcc;
+      // Map-Name nachträglich ins Host-Attribut schreiben — Panel-Mount
+      // setzt data-map="" leer, weil die Map erst aus md.detail.mapName
+      // bekannt ist. Ohne diesen Schritt liefert mdRenderBasemap
+      // (host.getAttribute("data-map") → "") keine Map-Image.
+      if (md.detail.mapName) {
+        host.setAttribute("data-map", md.detail.mapName);
+        // Map-Image vorab anstossen damit mdRenderBasemap nicht warten muss
+        mdMapImage(md.detail.mapName);
+      }
       // Squad-Tabelle aus Match-Detail-Response rendern.
       // Liefert das gleiche `<table>` wie zuvor fmtSquadDetail im
       // session-report-Kontext — aber datenbasiert aus md.detail.members
