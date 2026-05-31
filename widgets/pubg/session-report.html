@@ -2198,18 +2198,20 @@
           return `${A} dropped back in via Comeback Heli`;
         case "chip_pickup":
           return ev.targetName
-            ? `${A} picked up ${T}'s BlueChip`
+            ? `${A} picked up the BlueChip from ${T}`
             : `${A} picked up a BlueChip`;
         case "chip_drop":
           return ev.targetName
-            ? `${A} dropped ${T}'s BlueChip`
+            ? `${A} dropped the BlueChip from ${T}`
             : `${A} dropped a BlueChip`;
         case "chip_upload_comeback":
           return ev.targetName
             ? `${A} uploaded ${T}'s BlueChip at the Comeback Tower`
             : `${A} uploaded a squad BlueChip at the Comeback Tower`;
         case "chip_upload_carepackage":
-          return `${A} uploaded an enemy BlueChip (Carepackage incoming)`;
+          return ev.targetName
+            ? `${A} uploaded ${T}'s BlueChip (Carepackage incoming)`
+            : `${A} uploaded an enemy BlueChip (Carepackage incoming)`;
         case "chip_upload":
           return `${A} uploaded a BlueChip at the Comeback Tower`;
         case "kill_self_eject": {

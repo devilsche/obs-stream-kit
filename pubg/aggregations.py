@@ -2147,8 +2147,27 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
 
     # Alle chip-events (pickup, drop, upload) zeitlich gemischt verarbeiten
     # damit die FIFO-Queue konsistent ist.
-    chip_events_mixed = []
+    # PUBG-Quirk: pro physischen Bluechip-Pickup feuern BEIDE Events
+    # mit gleicher ts: LogItemPickup (target_account=NULL) UND
+    # LogItemPickupFromLootBox (target_account=Owner). Erst Bucket-
+    # weise dedupen: wenn fuer (actor, ts) ein Box-Event existiert,
+    # die losen Pickups droppen (sonst doppelte Timeline-Rows).
+    # Bucket = (actor, ts // 100) — PUBG feuert die Doubletten manchmal
+    # mit 1ms-Versatz, exakter ms-Match wuerde die nicht erwischen.
+    from collections import defaultdict
+    by_bucket = defaultdict(list)
     for cp in chip_pickup_rows:
+        by_bucket[(cp["actor_account"], cp["timestamp_ms"] // 100)].append(cp)
+    deduped_picks = []
+    for evs in by_bucket.values():
+        has_box = any(e["event_type"] == "ItemPickupBox" for e in evs)
+        for e in evs:
+            if has_box and e["event_type"] == "ItemPickup":
+                continue
+            deduped_picks.append(e)
+
+    chip_events_mixed = []
+    for cp in deduped_picks:
         cp_owner = (cp["target_account"]
                      if cp["event_type"] == "ItemPickupBox"
                      else _resolve_chip_owner(cp["timestamp_ms"],
@@ -2165,28 +2184,6 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             ("upload", up["timestamp_ms"], up["actor_account"],
              None, up["actor_x"], up["actor_y"]))
     chip_events_mixed.sort(key=lambda x: x[1])
-
-    # Dedup: PUBG feuert oft sowohl LogItemPickup (vom Boden) als auch
-    # LogItemPickupFromLootBox (aus Body-Box) fuer denselben physischen
-    # Pickup, wenige ms auseinander. Pro (actor, ts_bucket): wenn
-    # mindestens ein Event mit bekanntem Owner da ist, droppe alle mit
-    # owner=None aus diesem Bucket. Mehrere unterschiedliche Owner im
-    # selben Bucket bleiben erhalten (= echte Mehrfach-Pickups).
-    from collections import defaultdict
-    bucket_groups = defaultdict(list)
-    non_pickups = []
-    for ev in chip_events_mixed:
-        if ev[0] != "pickup":
-            non_pickups.append(ev); continue
-        bucket_groups[(ev[2], ev[1] // 1000)].append(ev)
-    deduped_pickups = []
-    for evs in bucket_groups.values():
-        has_owner = any(e[3] is not None for e in evs)
-        for e in evs:
-            if has_owner and e[3] is None:
-                continue
-            deduped_pickups.append(e)
-    chip_events_mixed = sorted(deduped_pickups + non_pickups, key=lambda x: x[1])
 
     chip_queue = {}  # account → [owner_acc, ...] FIFO
     matched_comebacks = set()  # bereits an Upload zugewiesene Comeback-Accounts
@@ -2220,20 +2217,26 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             if acc not in sq_set:
                 continue
             # Suche Squad-Comeback innerhalb 5min nach diesem Upload,
-            # der noch nicht zugeordnet ist.
+            # der noch nicht zugeordnet ist. Same-account comebacks
+            # zaehlen einzeln (matched_comebacks ist Set von (acc, ts)),
+            # damit Mehrfach-Comebacks korrekt gematched werden. Skip
+            # comebacks wo cb_acc == upload-actor (tot kann nicht
+            # uploaden — physikalisch unmoeglich).
             matched_owner = None
             for cb in comeback_rows:
                 cb_acc = cb["actor_account"]
                 cb_ts = cb["timestamp_ms"]
                 if cb_acc not in sq_set:
                     continue
+                if cb_acc == acc:
+                    continue
                 dt = cb_ts - ts
                 if dt < 0 or dt > 5 * 60 * 1000:
                     continue
-                if cb_acc in matched_comebacks:
+                if (cb_acc, cb_ts) in matched_comebacks:
                     continue
                 matched_owner = cb_acc
-                matched_comebacks.add(cb_acc)
+                matched_comebacks.add((cb_acc, cb_ts))
                 break
             owner = matched_owner or queue_owner
             cr = _row_skeleton("BluechipUpload", ts, acc, owner, px, py)
