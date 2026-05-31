@@ -1071,7 +1071,7 @@
     .md-timeline__head {
       display: flex; align-items: center; justify-content: space-between;
       flex-wrap: wrap; gap: 8px;
-      margin-bottom: 10px;
+      margin: 6px 0 14px;
     }
     .md-timeline__title {
       color: var(--pubg-gold);
@@ -1079,8 +1079,17 @@
       margin: 0;
       cursor: pointer;
       list-style: none;
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      user-select: none;
     }
+    .md-timeline__title:hover { background: rgba(255,255,255,0.04); }
     .md-timeline__title::-webkit-details-marker { display: none; }
+    .md-tl-chev { transition: transform 180ms ease; color: var(--pubg-muted); }
+    .md-timeline-details[open] > .md-timeline__title .md-tl-chev {
+      transform: rotate(180deg);
+    }
     .md-timeline__filters {
       display: inline-flex; gap: 6px; flex-wrap: wrap;
     }
@@ -2018,15 +2027,16 @@
       const filters = _MD_TIMELINE_FILTERS.map(([key, lbl]) =>
         `<button type="button" class="md-timeline__chip${key === "all" ? " is-active" : ""}"
                  data-tl-filter="${key}">${lbl}</button>`).join("");
+      const chev = `<span class="material-symbols-outlined md-tl-chev" aria-hidden="true">expand_more</span>`;
       if (!events || !events.length) {
         return `<details class="md-timeline-details" open>
-          <summary class="md-timeline__title">Timeline</summary>
+          <summary class="md-timeline__title">${chev} Timeline</summary>
           <div class="md-tl-empty">No squad events in this match.</div>
         </details>`;
       }
       const rows = events.map(ev => mdTlRowHtml(ev, ctx)).join("");
       return `<details class="md-timeline-details" open>
-        <summary class="md-timeline__title">Timeline (${events.length} events)</summary>
+        <summary class="md-timeline__title">${chev} Timeline (${events.length} events)</summary>
         <div class="md-timeline__head">
           <div class="md-timeline__filters">${filters}</div>
         </div>
