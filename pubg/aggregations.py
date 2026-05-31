@@ -1517,13 +1517,15 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     import datetime as _dt_evt
     from datetime import timezone as _tz_evt
 
-    # 1) Alle Knock/Kill/Revive-Events im Match (Lobby-weit) — Filter in Python.
+    # 1) Alle Knock/Kill/Revive/Redeploy-Events im Match (Lobby-weit) —
+    # Filter in Python. Redeploy = Comeback-Antenne (Wiederbelebung
+    # eines toten Mate aus der Ferne).
     all_events_rows = conn.execute("""
         SELECT event_type, timestamp_ms, actor_account, target_account,
                victim_x, victim_y, weapon, distance, damage_reason
         FROM telemetry_events
         WHERE match_id = ?
-          AND event_type IN ('Kill', 'Knock', 'Revive')
+          AND event_type IN ('Kill', 'Knock', 'Revive', 'Redeploy')
           AND timestamp_ms IS NOT NULL
         ORDER BY timestamp_ms ASC
     """, (match_id,)).fetchall()
@@ -1730,6 +1732,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             row["type"] = "knock"
         elif et == "Revive":
             row["type"] = "revive"
+        elif et == "Redeploy":
+            row["type"] = "redeploy"
         elif et == "Kill":
             knock_ev = last_knock_by_target.get(target)
             # damageTypeCategory aus PUBG-Payload (neue Daten) — praeziser

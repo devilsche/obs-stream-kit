@@ -1122,6 +1122,89 @@ def hidrive_refill(root: str, only_match: str = None) -> int:
     return 0
 
 
+def hidrive_refill_pg(root: str, only_match: str = None) -> int:
+    """PG-Variante von hidrive_refill: Telemetry-Events fuer alle Matches
+    auf HiDrive aus dem Raw-Archiv neu einspielen.
+
+    Telemetry-Tabelle ist GLOBAL (kein tenant_id) — refill pro match_id
+    deckt alle Tenants automatisch ab. Squad-Filter nutzt UNION ueber alle
+    Tenants die diese Match-ID in obs.matches haben.
+
+    Nutzung:
+        python -m pubg.cli hidrive-refill-pg
+        python -m pubg.cli hidrive-refill-pg --match MATCH_ID
+    """
+    from core.db import connect as core_connect
+    from pubg.db_pg import insert_telemetry_events
+    from pubg.hidrive_telemetry import download_raw, list_archived
+    from pubg.telemetry import filter_squad_events
+
+    secrets = os.path.join(root, ".secrets")
+    pg_conn = core_connect()
+    if pg_conn is None:
+        print("Konnte PG-Verbindung nicht aufbauen (DSN in .secrets / "
+              "OBS_KIT_PG_DSN?)")
+        return 1
+
+    # Match-IDs bestimmen — entweder aus HiDrive-Listing oder einzeln.
+    if only_match:
+        match_ids = [only_match]
+    else:
+        match_ids = list_archived(secrets)
+    print(f"{len(match_ids)} Match(es) auf HiDrive zum Refill.\n")
+
+    ok = 0; skip = 0; err = 0
+    for i, mid in enumerate(match_ids, 1):
+        # Squad-Union ueber alle Tenants die dieses Match haben.
+        with pg_conn.cursor() as cur:
+            cur.execute("""
+                SELECT DISTINCT mtm.account_id
+                FROM obs.match_team_mapping mtm
+                WHERE mtm.match_id = %s
+                  AND mtm.team_id IN (
+                    SELECT mtm_s.team_id
+                    FROM obs.match_team_mapping mtm_s
+                    JOIN obs.players p ON p.tenant_id = mtm_s.tenant_id
+                                       AND p.account_id = mtm_s.account_id
+                                       AND p.is_self = 1
+                    WHERE mtm_s.match_id = %s
+                  )
+            """, (mid, mid))
+            squad = {r["account_id"] for r in cur.fetchall()}
+        if not squad:
+            print(f"  [{i}/{len(match_ids)}] SKIP {mid[:20]} "
+                  "(kein Tenant-Squad im Match)")
+            skip += 1
+            continue
+
+        # Raw-Blob von HiDrive
+        raw = download_raw(mid, secrets)
+        if raw is None:
+            print(f"  [{i}/{len(match_ids)}] SKIP {mid[:20]} "
+                  "(nicht auf HiDrive)")
+            skip += 1
+            continue
+
+        # Filter + Normalisierung
+        events = list(filter_squad_events(raw, squad))
+
+        # Delete + Insert (Telemetry ist GLOBAL)
+        with pg_conn.cursor() as cur:
+            cur.execute("DELETE FROM obs.telemetry_events WHERE match_id = %s",
+                         (mid,))
+        pg_conn.commit()
+        if events:
+            insert_telemetry_events(pg_conn, mid, events)
+        print(f"  [{i}/{len(match_ids)}] {mid[:20]}  "
+              f"{len(raw)} raw → {len(events)} filtered  "
+              f"(squad={len(squad)})")
+        ok += 1
+
+    pg_conn.close()
+    print(f"\nFertig: {ok} refilled, {skip} skipped, {err} errors")
+    return 0
+
+
 def hidrive_backfill(root: str) -> int:
     """Uploadet alle Altmatches aus der lokalen SQLite-DB als rekonstruierte
     Telemetrie-Blobs auf HiDrive. Matches die schon archiviert sind werden
@@ -1397,6 +1480,9 @@ if __name__ == "__main__":
         # Optional: --match MATCH_ID fuer einzelnen Match
         mid = sys.argv[3] if len(sys.argv) > 3 and sys.argv[2] == "--match" else None
         sys.exit(hidrive_refill(root, only_match=mid))
+    elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-refill-pg":
+        mid = sys.argv[3] if len(sys.argv) > 3 and sys.argv[2] == "--match" else None
+        sys.exit(hidrive_refill_pg(root, only_match=mid))
     elif len(sys.argv) > 1 and sys.argv[1] == "refresh-maps":
         sys.exit(refresh_maps(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "refresh-assets":

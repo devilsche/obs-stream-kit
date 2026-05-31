@@ -1878,7 +1878,7 @@
       ["kills",   "Kills",   ["kill", "kill_finish", "kill_steal", "kill_bleedout",
                               "kill_self_eject", "kill_fall", "kill_bluezone",
                               "kill_redzone", "kill_drown", "kill_self"]],
-      ["revives", "Revives", ["revive", "revive_inferred"]],
+      ["revives", "Revives", ["revive", "revive_inferred", "redeploy"]],
     ];
 
     // Enemy-Team-Farben: HSL-Generativ. Multiplikator 67 (prim) gibt
@@ -1975,6 +1975,10 @@
           return `${A} revived ${T}`;
         case "revive_inferred":
           return `${T} was revived (no telemetry trace)`;
+        case "redeploy":
+          return ev.targetName
+            ? `${A} used the revive antenna for ${T}`
+            : `${A} used the revive antenna`;
         case "kill_self_eject": {
           const veh = ev.victimVehicleLabel
             ? ` from <b>${ev.victimVehicleLabel}</b>` : "";

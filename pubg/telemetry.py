@@ -122,6 +122,18 @@ def _normalize(event):
         base["distance"] = event.get("rideDistance")
         base["actor_x"], base["actor_y"] = _loc(event, "character")
         base["actor_z"], base["actor_health"] = _z_health(event, "character")
+    elif et in ("LogPlayerRedeploy", "LogPlayerRedeployStart"):
+        # Comeback-Antenne (Wiederhol-Antenne) — Squadmate aktiviert die
+        # Redeploy-Mechanik fuer einen Toten Mate.
+        base["event_type"] = "Redeploy"
+        ch = event.get("character") or event.get("reviver") or {}
+        base["actor_account"] = ch.get("accountId") if isinstance(ch, dict) else None
+        base["actor_x"], base["actor_y"] = _loc(event, "character")
+        # Optional target account (welcher Mate wird redeployed)
+        vt = event.get("victim") or event.get("redeployedPlayer") or {}
+        if isinstance(vt, dict):
+            base["target_account"] = vt.get("accountId")
+            base["victim_x"], base["victim_y"] = _loc(event, "victim")
     elif et == "LogVehicleDestroy":
         base["event_type"] = "VehicleDestroy"
         base["actor_account"] = (event.get("attacker") or {}).get("accountId")
@@ -237,6 +249,8 @@ ALWAYS_KEEP_EVENTS = {
     # Match relativ wenig Events (~50-300 in 100-Spieler-Lobby), also
     # verkraftbar.
     "VehicleEnter", "VehicleLeave",
+    # Comeback-Antenne — selten, aber relevant fuer die Timeline.
+    "Redeploy",
 }
 
 # Position-Events fluten die DB (firet alle ~10s pro Spieler). Wir
