@@ -1735,7 +1735,24 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             # Bleed-Out-Heuristik: nur sinnvoll wenn vorher ein Knock war.
             # Ohne Knock → Direkt-Kill, kann gar nicht bluten.
             bled_out = bool(knock_ev) and _is_bleed_out(target, ts)
-            if knock_ev is None:
+            # Self-Tod / kein Akteur → Vehicle-Eject, Fall, Zone, etc.
+            # PUBG-Telemetrie liefert actor=None und/oder spezielle Waffen-IDs.
+            wid = weapon or ""
+            if not actor:
+                if ("RagdollPhysics" in wid or "Damage_HelpMeGroundFall" in wid
+                        or row.get("victimVehicleLabel")):
+                    row["type"] = "kill_self_eject"
+                elif "Damage_Falling" in wid or "Damage_Instant_Fall" in wid:
+                    row["type"] = "kill_fall"
+                elif "BattleRoyale" in wid:
+                    row["type"] = "kill_bluezone"
+                elif "Bluezonebomb" in wid:
+                    row["type"] = "kill_redzone"
+                elif "Drown" in wid or "Apnea" in wid:
+                    row["type"] = "kill_drown"
+                else:
+                    row["type"] = "kill_self"
+            elif knock_ev is None:
                 row["type"] = "kill"
             else:
                 k_actor = knock_ev["actor_account"]

@@ -1875,7 +1875,9 @@
       ["all",     "All",     null],
       ["me",      "Me",      null],
       ["knocks",  "Knocks",  ["knock"]],
-      ["kills",   "Kills",   ["kill", "kill_finish", "kill_steal", "kill_bleedout"]],
+      ["kills",   "Kills",   ["kill", "kill_finish", "kill_steal", "kill_bleedout",
+                              "kill_self_eject", "kill_fall", "kill_bluezone",
+                              "kill_redzone", "kill_drown", "kill_self"]],
       ["revives", "Revives", ["revive", "revive_inferred"]],
     ];
 
@@ -1975,6 +1977,21 @@
           return `${A} revived ${T}`;
         case "revive_inferred":
           return `${T} was revived (no telemetry trace)`;
+        case "kill_self_eject": {
+          const veh = ev.victimVehicleLabel
+            ? ` from <b>${ev.victimVehicleLabel}</b>` : "";
+          return `${T} died after jumping${veh}`;
+        }
+        case "kill_fall":
+          return `${T} fell to their death`;
+        case "kill_bluezone":
+          return `${T} died in the Blue Zone`;
+        case "kill_redzone":
+          return `${T} died in the Red Zone`;
+        case "kill_drown":
+          return `${T} drowned`;
+        case "kill_self":
+          return `${T} died (unknown cause)`;
         default:
           return `${A} ${ev.type} ${T}${meta}`;
       }
