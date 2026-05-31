@@ -1034,23 +1034,33 @@
     .md-squad-table {
       width: 100%; border-collapse: collapse;
       margin-bottom: 12px;
-      font-size: 0.92em;
+      font-size: 0.9em;
+      font-variant-numeric: tabular-nums;
     }
     .md-squad-table th {
-      text-align: left; padding: 6px 8px;
+      text-align: right; padding: 6px 6px;
       color: var(--pubg-muted);
-      font-size: 0.78em; text-transform: uppercase;
+      font-size: 0.75em; text-transform: uppercase;
       letter-spacing: 0.05em;
       border-bottom: 1px solid rgba(255,255,255,0.1);
+      white-space: nowrap;
     }
+    .md-squad-table th:first-child { text-align: left; }
     .md-squad-table td {
-      padding: 6px 8px;
+      padding: 6px 6px;
       border-bottom: 1px solid rgba(255,255,255,0.04);
+      text-align: right;
+      white-space: nowrap;
     }
+    .md-squad-table td.md-st-name { text-align: left; }
+    .md-squad-table tr.self td { color: var(--pubg-gold); font-weight: 700; }
     .md-squad-table .md-dot {
       display: inline-block; width: 10px; height: 10px;
       border-radius: 50%; margin-right: 6px;
       vertical-align: -1px;
+    }
+    .md-squad-table .bot-kills {
+      color: var(--pubg-muted); font-size: 0.85em;
     }
     /* ─── Match-Detail Timeline ─────────────────────────────────────────── */
     .md-timeline {
@@ -1101,25 +1111,29 @@
     }
     .md-tl-row {
       display: grid;
-      grid-template-columns: 78px minmax(90px, 130px) 28px 1fr auto;
-      gap: 8px;
+      grid-template-columns: 78px minmax(90px, 160px) 1fr;
+      gap: 10px;
       padding: 4px 6px;
       align-items: baseline;
       border-bottom: 1px solid rgba(255,255,255,0.04);
     }
-    .md-tl-t      { color: var(--pubg-text); }
-    .md-tl-actor  { font-weight: 700; }
-    .md-tl-arrow  { color: var(--pubg-muted); text-align: center; }
-    .md-tl-rest b { color: var(--pubg-text); }
-    .md-tl-rest .md-tl-veh {
-      color: var(--pubg-gold);
-      font-size: 0.92em;
-      margin-left: 6px;
+    .md-tl-t   { color: var(--pubg-text); }
+    .md-tl-poi { color: var(--pubg-gold); font-size: 0.9em; }
+    .md-tl-text {
+      color: var(--pubg-text);
     }
-    .md-tl-meta {
-      color: var(--pubg-muted);
-      font-size: 0.85em;
-      white-space: nowrap;
+    .md-tl-text b { font-weight: 700; }
+    .md-tl-text .md-tl-teamtag {
+      display: inline-block;
+      margin-left: 3px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid;
+      font-size: 0.78em;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      background: rgba(255,255,255,0.03);
+      vertical-align: 1px;
     }
     .md-tl-empty {
       color: var(--pubg-muted);
@@ -1128,9 +1142,10 @@
     }
     @media (max-width: 600px) {
       .md-tl-row {
-        grid-template-columns: 64px minmax(80px, 1fr) 22px 1fr;
+        grid-template-columns: 64px 1fr;
       }
-      .md-tl-meta { grid-column: 1 / -1; padding-left: 86px; }
+      .md-tl-poi { grid-column: 1 / -1; padding-left: 74px; font-size: 0.82em; }
+      .md-tl-text { grid-column: 1 / -1; padding-left: 74px; }
     }
 
     /* ─── Monats-Gruppen in der Session-Picker-Liste ────────────────────── */
@@ -1809,93 +1824,164 @@
       btn.textContent = anyHidden ? "↺ Alle anzeigen" : "● Alle sichtbar";
     }
 
+    function _fmtSurvSec(secs) {
+      const m = Math.floor((secs||0)/60);
+      const s = (secs||0) % 60;
+      return `${m}:${String(s).padStart(2,"0")}`;
+    }
     function renderMdSquadTable(members, colorByAcc) {
       const rows = members.map(m => {
         const color = colorByAcc[m.accountId] || "#999";
-        const slotLbl = (m.slot != null) ? `Slot ${m.slot}` : "";
-        const lives = m.lives || [];
-        const totalKills = lives.reduce((n, l) =>
-          n + ((l.kills || []).length), 0);
-        const died = lives.some(l => l.death);
-        return `<tr>
-          <td><span class="md-dot" style="background:${color}"></span>
-              <b>${m.name}${m.isSelf ? " (du)" : ""}</b>
-              <span style="color:var(--pubg-muted);font-size:0.8em;margin-left:6px">${slotLbl}</span></td>
-          <td style="text-align:right">${totalKills}</td>
-          <td style="text-align:right">${died ? "✗" : "✓"}</td>
+        const place = (m.place != null) ? `#${m.place}` : "—";
+        const kills = m.kills || 0;
+        const bk    = m.botKills || 0;
+        const killsCell = bk
+          ? `${kills} <span class="bot-kills" title="${bk} davon Bot-Kills">(${bk})</span>`
+          : `${kills}`;
+        return `<tr${m.isSelf ? ' class="self"' : ""}>
+          <td class="md-st-name"><span class="md-dot" style="background:${color}"></span>
+              <b>${m.name}${m.isSelf ? " (du)" : ""}</b></td>
+          <td>${place}</td>
+          <td>${killsCell}</td>
+          <td>${m.headshotKills || 0}</td>
+          <td>${m.assists || 0}</td>
+          <td>${m.dbnos || 0}</td>
+          <td title="Wie oft wurde dieser Spieler wiederbelebt">${m.revivesReceived || 0}</td>
+          <td title="Wie oft hat dieser Spieler Squadmates wiederbelebt">${m.revivesGiven || 0}</td>
+          <td>${Math.round(m.damageDealt || 0)}</td>
+          <td>${_fmtSurvSec(m.timeSurvived)}</td>
         </tr>`;
       }).join("");
       return `<table class="md-squad-table">
-        <thead><tr><th>Member</th><th style="text-align:right">Kills</th><th style="text-align:right">Surv.</th></tr></thead>
+        <thead><tr>
+          <th>Member</th>
+          <th title="Platzierung">#</th>
+          <th>K</th>
+          <th title="Headshot Kills">HS</th>
+          <th title="Assists">Ass</th>
+          <th title="Down-But-Not-Out (Knocks gegeben)">DBNO</th>
+          <th title="Revives erhalten">REV&#x2190;</th>
+          <th title="Revives gegeben">REV&#x2192;</th>
+          <th>DMG</th>
+          <th>Surv</th>
+        </tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
     }
 
-    // ── Match-Detail Timeline (collapsible, gefiltert) ────────────────
-    const _MD_TIMELINE_TYPE_LABEL = {
-      knock_dealt:     ["knocked",       "&rarr;"],
-      knock_taken:     ["geknockt von",  "&larr;"],
-      kill_dealt:      ["killed",        "&rarr;"],
-      kill_taken:      ["gekillt von",   "&larr;"],
-      revive_given:    ["revived",       "&rarr;"],
-      revive_received: ["revived von",   "&larr;"],
-    };
+    // ── Match-Detail Timeline (englisch, natuerlichsprachlich) ────────
+    // Filter-Chips: All / Me / Knocks / Kills / Revives
     const _MD_TIMELINE_FILTERS = [
-      ["all",     "Alle",    null],
-      ["me",      "Du",      null],
-      ["knocks",  "Knocks",  ["knock_dealt", "knock_taken"]],
-      ["kills",   "Kills",   ["kill_dealt", "kill_taken"]],
-      ["revives", "Revives", ["revive_given", "revive_received"]],
+      ["all",     "All",     null],
+      ["me",      "Me",      null],
+      ["knocks",  "Knocks",  ["knock"]],
+      ["kills",   "Kills",   ["kill", "kill_finish", "kill_steal"]],
+      ["revives", "Revives", ["revive"]],
     ];
 
-    function mdTlFmtAbsClock(playedAtIso, msIntoMatch) {
-      if (!playedAtIso) return "?";
-      const start = Date.parse(playedAtIso);
-      if (isNaN(start)) return "?";
-      const d = new Date(start + (msIntoMatch || 0));
+    // Enemy-Team-Farben: deterministische Palette per team_id (saturated,
+    // visuell unterscheidbar von Squad-Slot-Farben gelb/rot/blau/gruen).
+    const _MD_ENEMY_TEAM_PALETTE = [
+      "#b794f6", "#fbd38d", "#76e4f7", "#f687b3",
+      "#9ae6b4", "#fc8181", "#d6bcfa", "#f6e05e",
+    ];
+    function mdTlEnemyTeamColor(teamId) {
+      if (teamId == null) return "var(--pubg-muted)";
+      const idx = Math.abs(teamId | 0) % _MD_ENEMY_TEAM_PALETTE.length;
+      return _MD_ENEMY_TEAM_PALETTE[idx];
+    }
+
+    function mdTlActorColor(ev, role, colorByAcc) {
+      // role: "actor" | "target" | "knocker"
+      const acc  = ev[role + "Account"];
+      const slot = ev[role + "Slot"];
+      const teamId = ev[role + "TeamId"];
+      const isSquad = ev[role + "IsSquad"];
+      if (isSquad) {
+        if (acc && colorByAcc && colorByAcc[acc]) return colorByAcc[acc];
+        if (slot >= 1 && slot <= MD_SLOT_COLORS.length)
+          return MD_SLOT_COLORS[slot - 1];
+      }
+      // Enemy → Team-Farbe
+      return mdTlEnemyTeamColor(teamId);
+    }
+
+    function mdTlFmtAbsClock(absIso) {
+      if (!absIso) return "?";
+      const d = new Date(absIso);
+      if (isNaN(d.getTime())) return "?";
       return `${String(d.getHours()).padStart(2,"0")}:` +
              `${String(d.getMinutes()).padStart(2,"0")}:` +
              `${String(d.getSeconds()).padStart(2,"0")}`;
     }
 
-    function mdTlPickColor(slot, colorByAcc, account) {
-      if (account && colorByAcc && colorByAcc[account]) return colorByAcc[account];
-      if (slot >= 1 && slot <= MD_SLOT_COLORS.length)
-        return MD_SLOT_COLORS[slot - 1];
-      return "var(--pubg-muted)";
+    function mdTlPoi(ctx, x, y) {
+      if (ctx.mapName && PubgUI.POI && PubgUI.POI.fromCoords
+          && x != null && y != null) {
+        const p = PubgUI.POI.fromCoords(ctx.mapName, x, y);
+        if (p) return p;
+      }
+      return "&lt;unknown&gt;";
+    }
+
+    function mdTlNameSpan(ev, role, colorByAcc) {
+      const name = ev[role + "Name"] || "?";
+      const color = mdTlActorColor(ev, role, colorByAcc);
+      const teamLbl = ev[role + "TeamLabel"];
+      const teamSpan = teamLbl
+        ? ` <span class="md-tl-teamtag" style="color:${color};border-color:${color}">${teamLbl}</span>`
+        : "";
+      return `<b style="color:${color}">${name}</b>${teamSpan}`;
+    }
+
+    function mdTlWeaponMeta(ev) {
+      const parts = [];
+      if (ev.weaponName) parts.push(`with <b>${ev.weaponName}</b>`);
+      if (ev.distanceM) parts.push(`· ${ev.distanceM.toFixed(0)}m`);
+      // Fahrzeug-Kontext: Opfer war im Auto oder Schuetze schoss aus Auto
+      if (ev.victimVehicleLabel) parts.push(`· victim in <b>${ev.victimVehicleLabel}</b>`);
+      if (ev.shooterVehicleLabel) parts.push(`· from <b>${ev.shooterVehicleLabel}</b>`);
+      return parts.length ? " " + parts.join(" ") : "";
+    }
+
+    function mdTlSentence(ev, ctx) {
+      const cba = ctx.colorByAcc;
+      const A = mdTlNameSpan(ev, "actor",  cba);
+      const T = mdTlNameSpan(ev, "target", cba);
+      const meta = mdTlWeaponMeta(ev);
+      switch (ev.type) {
+        case "knock":
+          return `${A} knocked ${T}${meta}`;
+        case "kill":
+          return `${A} killed ${T}${meta}`;
+        case "kill_finish": {
+          const K = mdTlNameSpan(ev, "knocker", cba);
+          return `${A} finished ${T} (knock by ${K})${meta}`;
+        }
+        case "kill_steal": {
+          const K = mdTlNameSpan(ev, "knocker", cba);
+          return `${A} stole the knock from ${K} — killed ${T}${meta}`;
+        }
+        case "revive":
+          return `${A} revived ${T}`;
+        default:
+          return `${A} ${ev.type} ${T}${meta}`;
+      }
     }
 
     function mdTlRowHtml(ev, ctx) {
-      const [verbLbl, arrow] = _MD_TIMELINE_TYPE_LABEL[ev.type] || [ev.type, "·"];
-      const tCell = mdTlFmtAbsClock(ctx.playedAt, ev.tsMs);
-      const actorColor = mdTlPickColor(ev.actorSlot, ctx.colorByAcc,
-                                        ev.actorAccount);
-      const actorName  = ev.actorName || "?";
-      const targetName = ev.targetName || "?";
-      // POI clientseitig aus victimX/Y
-      let poi = "";
-      if (ctx.mapName && PubgUI.POI && PubgUI.POI.fromCoords
-          && ev.victimX != null && ev.victimY != null) {
-        const p = PubgUI.POI.fromCoords(ctx.mapName, ev.victimX, ev.victimY);
-        if (p) poi = `<span class="md-tl-poi">· ${p}</span>`;
-      }
-      const vehVictim  = ev.victimVehicleLabel
-        ? ` <span class="md-tl-veh">aus <b>${ev.victimVehicleLabel}</b></span>`
-        : "";
-      const vehShooter = ev.shooterVehicleLabel
-        ? ` <span class="md-tl-veh">aus eigenem <b>${ev.shooterVehicleLabel}</b></span>`
-        : "";
-      const weapon = ev.weaponName ? `<b>${ev.weaponName}</b>` : "";
-      const dist   = ev.distanceM ? ` · ${ev.distanceM.toFixed(0)}m` : "";
-      const meta   = (weapon || dist) ? `${weapon}${dist}` : "";
+      const tCell = mdTlFmtAbsClock(ev.absTs);
+      const poi   = mdTlPoi(ctx, ev.victimX, ev.victimY);
+      const sentence = mdTlSentence(ev, ctx);
+      const myAccount = ctx.myAccount;
+      const involvesMe = ev.actorAccount === myAccount
+                      || ev.targetAccount === myAccount
+                      || ev.knockerAccount === myAccount;
       return `<div class="md-tl-row" data-ev-type="${ev.type}"
-                   data-ev-me="${ev.actorAccount === ctx.myAccount
-                                  || ev.targetAccount === ctx.myAccount}">
+                   data-ev-me="${involvesMe}">
         <span class="md-tl-t">${tCell}</span>
-        <span class="md-tl-actor" style="color:${actorColor}">${actorName}</span>
-        <span class="md-tl-arrow">${arrow}</span>
-        <span class="md-tl-rest">${verbLbl} <b>${targetName}</b>${vehVictim}${vehShooter} ${poi}</span>
-        <span class="md-tl-meta">${meta}</span>
+        <span class="md-tl-poi">${poi}</span>
+        <span class="md-tl-text">${sentence}</span>
       </div>`;
     }
 
@@ -1906,12 +1992,12 @@
       if (!events || !events.length) {
         return `<details class="md-timeline-details" open>
           <summary class="md-timeline__title">Timeline</summary>
-          <div class="md-tl-empty">Keine Squad-Events in diesem Match.</div>
+          <div class="md-tl-empty">No squad events in this match.</div>
         </details>`;
       }
       const rows = events.map(ev => mdTlRowHtml(ev, ctx)).join("");
       return `<details class="md-timeline-details" open>
-        <summary class="md-timeline__title">Timeline (${events.length} Events)</summary>
+        <summary class="md-timeline__title">Timeline (${events.length} events)</summary>
         <div class="md-timeline__head">
           <div class="md-timeline__filters">${filters}</div>
         </div>
@@ -2015,29 +2101,17 @@
         const mapLbl = PubgUI.fmtMap(md.detail.mapName);
         panelTitle.textContent = `Match · ${mapLbl}`;
       }
-      // Timeline-Sektion fuellen (nur sichtbar wenn Slide-In aktiv ist —
-      // dort gibt es <section id="mdTimelineSection">)
+      // Timeline-Sektion fuellen — absTs kommt jetzt direkt vom Backend
+      // (kein playedAt-Frontend-Lookup mehr).
       const tlSect = document.getElementById("mdTimelineSection");
       if (tlSect && md && md.detail) {
         tlSect.hidden = false;
         const myAcc = (md.detail.members.find(x => x.isSelf) || {}).accountId;
         const ctx = {
-          playedAt:    null,
-          mapName:     md.detail.mapName,
-          colorByAcc:  md.colorByAcc,
-          myAccount:   myAcc,
+          mapName:    md.detail.mapName,
+          colorByAcc: md.colorByAcc,
+          myAccount:  myAcc,
         };
-        // playedAt aus Session-Match-Liste suchen
-        const matchIdAttr = host.getAttribute("data-match-id");
-        try {
-          const sessMatch = (window._allMatchIds || []).indexOf(matchIdAttr);
-          if (sessMatch >= 0 && window._allMatchesByIdx
-              && window._allMatchesByIdx[sessMatch]) {
-            ctx.playedAt = PubgUI.matchStartIso(
-              window._allMatchesByIdx[sessMatch].matchEnd,
-              window._allMatchesByIdx[sessMatch].durationSec);
-          }
-        } catch (_) {}
         tlSect.innerHTML = renderMdTimeline(md.detail.events || [], ctx);
         wireMdTimelineFilters(tlSect, myAcc);
       }

@@ -1047,6 +1047,43 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     if not squad_accs:
         return {"matchId": match_id, "mapName": map_name, "members": [], "events": []}
 
+    # Squad-Stats-Batch — Participants-Tabelle + Telemetrie-Counter
+    # (revives received/given, bot-kills). Wird in out_members reingemergt.
+    _ph_sq = ",".join(["?"] * len(squad_accs))
+    parts_rows = conn.execute(
+        f"""SELECT account_id, kills, headshot_kills, assists, dbnos,
+                   damage_dealt, time_survived, place
+            FROM participants
+            WHERE tenant_id = ? AND match_id = ?
+              AND account_id IN ({_ph_sq})""",
+        (tenant_id, match_id, *squad_accs)).fetchall()
+    parts_by_acc = {r["account_id"]: r for r in parts_rows}
+    revives_received_by = {a: 0 for a in squad_accs}
+    revives_given_by    = {a: 0 for a in squad_accs}
+    bot_kills_by        = {a: 0 for a in squad_accs}
+    for r in conn.execute(
+        f"""SELECT actor_account, COUNT(*) AS c FROM telemetry_events
+            WHERE match_id = ? AND event_type='Revive'
+              AND actor_account IN ({_ph_sq})
+            GROUP BY actor_account""",
+        (match_id, *squad_accs)).fetchall():
+        revives_given_by[r["actor_account"]] = r["c"]
+    for r in conn.execute(
+        f"""SELECT target_account, COUNT(*) AS c FROM telemetry_events
+            WHERE match_id = ? AND event_type='Revive'
+              AND target_account IN ({_ph_sq})
+            GROUP BY target_account""",
+        (match_id, *squad_accs)).fetchall():
+        revives_received_by[r["target_account"]] = r["c"]
+    for r in conn.execute(
+        f"""SELECT actor_account, COUNT(*) AS c FROM telemetry_events
+            WHERE match_id = ? AND event_type='Kill'
+              AND actor_account IN ({_ph_sq})
+              AND target_account LIKE 'ai.%'
+            GROUP BY actor_account""",
+        (match_id, *squad_accs)).fetchall():
+        bot_kills_by[r["actor_account"]] = r["c"]
+
     veh_intervals_by_acc = {}
     out_members = []
     for mem in members_rows:
@@ -1332,13 +1369,26 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         revive_pts = [[r["actor_x"], r["actor_y"], r["timestamp_ms"]]
                        for r in revive_rows]
 
+        # Stat-Bundle aus participants + telemetry-Countern
+        _pr = parts_by_acc.get(acc) or {}
         out_members.append({
-            "accountId": acc,
-            "name":      mem["name"] or acc[:8],
-            "slot":      mem["slot"] if "slot" in mem.keys() else None,
-            "isSelf":    (acc == my_account_id),
-            "lives":     lives,
-            "revivePts": revive_pts,
+            "accountId":       acc,
+            "name":            mem["name"] or acc[:8],
+            "slot":            mem["slot"] if "slot" in mem.keys() else None,
+            "isSelf":          (acc == my_account_id),
+            "lives":           lives,
+            "revivePts":       revive_pts,
+            # Stat-Fields fuer die Squad-Tabelle im Slide-In Panel
+            "kills":           _pr.get("kills") or 0,
+            "headshotKills":   _pr.get("headshot_kills") or 0,
+            "assists":         _pr.get("assists") or 0,
+            "dbnos":           _pr.get("dbnos") or 0,
+            "damageDealt":     _pr.get("damage_dealt") or 0,
+            "timeSurvived":    _pr.get("time_survived") or 0,
+            "place":           _pr.get("place"),
+            "revivesReceived": revives_received_by.get(acc, 0),
+            "revivesGiven":    revives_given_by.get(acc, 0),
+            "botKills":        bot_kills_by.get(acc, 0),
         })
 
     # Sortierung: Self first, dann nach Slot (1..4), Slot=NULL als Fallback
@@ -1350,23 +1400,54 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         x["name"].lower(),
     ))
 
-    # Squad-weite Event-Liste fuer Match-Detail-Timeline. Holt Knock/Kill/
-    # Revive-Events bei denen actor ODER target ein Squad-Mitglied ist,
-    # chronologisch sortiert. Pro Event werden dealt/taken-Perspektive(n)
-    # in die finale Liste geschrieben.
-    ph_sq = ",".join(["?"] * len(squad_accs))
-    sq_events_rows = conn.execute(f"""
+    # ============================================================
+    # Squad-weite + chained-enemy Event-Liste fuer Match-Detail-Timeline.
+    # Eine Zeile pro Event (knock / kill / kill_finish / kill_steal /
+    # revive), mit Team-Label fuer Enemies und Wall-Clock-absTs.
+    # Chained-Enemy: wenn unser Squad einen Gegner geknockt hat, kommen
+    # dessen Folge-Events (Revive durch Teammate, Tod) auch in die Timeline.
+    # ============================================================
+    import datetime as _dt_evt
+    from datetime import timezone as _tz_evt
+
+    # 1) Alle Knock/Kill/Revive-Events im Match (Lobby-weit) — Filter in Python.
+    all_events_rows = conn.execute("""
         SELECT event_type, timestamp_ms, actor_account, target_account,
                victim_x, victim_y, weapon, distance
         FROM telemetry_events
         WHERE match_id = ?
           AND event_type IN ('Kill', 'Knock', 'Revive')
-          AND (actor_account IN ({ph_sq}) OR target_account IN ({ph_sq}))
           AND timestamp_ms IS NOT NULL
         ORDER BY timestamp_ms ASC
-    """, (match_id, *squad_accs, *squad_accs)).fetchall()
+    """, (match_id,)).fetchall()
 
-    # Name-Lookup fuer Actor/Target — Players + Match-Participants
+    # 2) Pre-Scan: alle Accounts die unser Squad geknockt hat.
+    sq_set = set(squad_accs)
+    knocked_by_squad = set()
+    for e in all_events_rows:
+        if e["event_type"] != "Knock":
+            continue
+        if e["actor_account"] in sq_set and e["target_account"]:
+            knocked_by_squad.add(e["target_account"])
+
+    # 3) Team-ID-Lookup fuer die ganze Lobby
+    team_rows = conn.execute("""
+        SELECT account_id, team_id FROM match_team_mapping
+        WHERE tenant_id = ? AND match_id = ?
+    """, (tenant_id, match_id)).fetchall()
+    team_by_acc = {r["account_id"]: r["team_id"] for r in team_rows}
+
+    def _team_label_for(acc):
+        """Team-Label fuer Enemies. None fuer Squad-Mates / unbekannt /
+        actor=None (Selbstmord-Event ohne Akteur)."""
+        if not acc or acc in sq_set:
+            return None
+        tid = team_by_acc.get(acc)
+        if tid is None:
+            return None
+        return f"Team #{tid}"
+
+    # 4) Name-Lookup (Cache)
     _name_cache = {}
     def _name_of(acc):
         if not acc:
@@ -1384,13 +1465,11 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         _name_cache[acc] = n
         return n
 
-    # Slot-Lookup nur fuer Squad-Members (out_members hat das schon)
     slot_by_acc = {mem["accountId"]: mem.get("slot") for mem in out_members}
 
     def _veh_label_for(acc, ts):
-        """Vehicle-Label fuer einen Squad-Member zum Zeitpunkt ts.
-        Non-Squad-Members liefern immer None (Vehicle-Intervalle nicht
-        gequeried)."""
+        """Vehicle-Label nur fuer Squad-Mates (intervals_by_acc enthaelt
+        keine Non-Squad)."""
         if not acc or acc not in veh_intervals_by_acc:
             return None
         for a, b, vid in veh_intervals_by_acc[acc]:
@@ -1401,57 +1480,107 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 return vid
         return None
 
-    sq_set = set(squad_accs)
+    def _abs_ts_iso(ts_ms):
+        """Wall-Clock-ISO fuer ts_ms (Offset ab Match-Start)."""
+        if match_start_ms is None or ts_ms is None:
+            return None
+        secs = (match_start_ms + ts_ms) / 1000.0
+        return _dt_evt.datetime.fromtimestamp(
+            secs, tz=_tz_evt.utc).isoformat().replace("+00:00", "Z")
+
+    # 5) Pro-Target: letzter unbeantworteter Knock — fuer Kill-Subtyping
+    # (kill / kill_finish / kill_steal). Revive loescht den Knock aus dem
+    # State, da das Opfer dann wieder oben war.
+    last_knock_by_target = {}  # target_account → Knock-Event-Row
     events_out = []
-    for e in sq_events_rows:
-        et = e["event_type"]
+    for e in all_events_rows:
+        et     = e["event_type"]
         actor  = e["actor_account"]
         target = e["target_account"]
         ts     = e["timestamp_ms"]
         weapon = e["weapon"]
+
+        # Scope: Squad-involved ODER chained-enemy
+        in_scope = (
+            (actor in sq_set) or (target in sq_set)
+            or (target in knocked_by_squad)
+        )
+
+        # Knock-State pflegen AUCH wenn nicht in scope (Lobby-Knocks koennen
+        # spaeter relevant werden wenn der geknockte Spieler von Squad gekillt
+        # wird → wir wollen 'stole the knock' korrekt erkennen).
+        if et == "Knock":
+            last_knock_by_target[target] = e
+
+        if et == "Revive":
+            # Revive konsumiert den vorherigen Knock unabhaengig vom Scope
+            last_knock_by_target.pop(target, None)
+
+        if not in_scope:
+            continue
+
         weapon_name = _weapon_label(weapon)[0] if weapon else None
         dist_m = (round((e["distance"] or 0) / 100.0, 1)
                   if e["distance"] else None)
         victim_veh = _veh_label_for(target, ts)
         shooter_veh = _veh_label_for(actor, ts)
-        # Pro Event je nach Squad-Perspektive 1 oder 2 Eintraege erzeugen.
-        # Type-Map: ("Kill", actor_in_squad) -> kill_dealt, etc.
-        perspectives = []
-        if et == "Kill":
-            if actor in sq_set:
-                perspectives.append("kill_dealt")
-            if target in sq_set:
-                perspectives.append("kill_taken")
-        elif et == "Knock":
-            if actor in sq_set:
-                perspectives.append("knock_dealt")
-            if target in sq_set:
-                perspectives.append("knock_taken")
+
+        row = {
+            "tsMs":          ts,
+            "absTs":         _abs_ts_iso(ts),
+            "actorAccount":  actor,
+            "actorName":     _name_of(actor),
+            "actorSlot":     slot_by_acc.get(actor),
+            "actorTeamId":   team_by_acc.get(actor),
+            "actorTeamLabel": _team_label_for(actor),
+            "actorIsSquad":  actor in sq_set,
+            "targetAccount": target,
+            "targetName":    _name_of(target),
+            "targetSlot":    slot_by_acc.get(target),
+            "targetTeamId":  team_by_acc.get(target),
+            "targetTeamLabel": _team_label_for(target),
+            "targetIsSquad": target in sq_set,
+            "weapon":        weapon,
+            "weaponName":    weapon_name,
+            "distanceM":     dist_m,
+            "victimX":       e["victim_x"],
+            "victimY":       e["victim_y"],
+            "victimVehicleLabel":  victim_veh,
+            "shooterVehicleLabel": shooter_veh,
+        }
+
+        if et == "Knock":
+            row["type"] = "knock"
         elif et == "Revive":
-            if actor in sq_set:
-                perspectives.append("revive_given")
-            if target in sq_set:
-                perspectives.append("revive_received")
-        for ptype in perspectives:
-            events_out.append({
-                "tsMs":          ts,
-                "type":          ptype,
-                "actorAccount":  actor,
-                "actorName":     _name_of(actor),
-                "actorSlot":     slot_by_acc.get(actor),
-                "targetAccount": target,
-                "targetName":    _name_of(target),
-                "targetSlot":    slot_by_acc.get(target),
-                "weapon":        weapon,
-                "weaponName":    weapon_name,
-                "distanceM":     dist_m,
-                "victimX":       e["victim_x"],
-                "victimY":       e["victim_y"],
-                "victimVehicleLabel":  victim_veh,
-                "shooterVehicleLabel": shooter_veh,
-            })
-    # Sortiert nach tsMs (sq_events_rows war schon sortiert, aber durch
-    # die 2-Perspektiven-Aufteilung leichte Reihenfolgewechsel moeglich)
+            row["type"] = "revive"
+        elif et == "Kill":
+            knock_ev = last_knock_by_target.get(target)
+            if knock_ev is None:
+                # Direkt-Kill (kein vorheriger Knock, oder Knock schon
+                # durch Revive konsumiert)
+                row["type"] = "kill"
+            else:
+                k_actor = knock_ev["actor_account"]
+                if k_actor == actor:
+                    row["type"] = "kill"
+                else:
+                    k_team = team_by_acc.get(k_actor)
+                    a_team = team_by_acc.get(actor)
+                    same_team = (
+                        k_team is not None and k_team == a_team)
+                    row["type"] = "kill_finish" if same_team else "kill_steal"
+                    row["knockerAccount"]    = k_actor
+                    row["knockerName"]       = _name_of(k_actor)
+                    row["knockerSlot"]       = slot_by_acc.get(k_actor)
+                    row["knockerTeamId"]     = k_team
+                    row["knockerTeamLabel"]  = _team_label_for(k_actor)
+                    row["knockerIsSquad"]    = k_actor in sq_set
+            # Nach Kill: vorherigen Knock konsumieren (Target ist tot,
+            # Story-Bogen abgeschlossen)
+            last_knock_by_target.pop(target, None)
+
+        events_out.append(row)
+
     events_out.sort(key=lambda x: x["tsMs"] or 0)
 
     return {
