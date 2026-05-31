@@ -343,6 +343,17 @@ def filter_squad_events(events, squad_account_ids):
                 continue
             yield norm
             continue
+        # BlueChip-Events (Pickup/Box/Drop/Use mit Item_Bluechip_C):
+        # ALLE Spieler behalten, nicht nur Squad. Begruendung: fuer
+        # die Inventar-Simulation muessen wir wissen welche Chips ein
+        # Enemy-Spieler bei sich hatte (er hatte ggf. enemy-chips
+        # eingesammelt), damit die Owner-Resolution stimmt wenn unser
+        # Squad spaeter seinen Body lootet. Sehr selten (~5-50/Match),
+        # billig.
+        if norm["weapon"] == "Item_Bluechip_C" and norm["event_type"] in (
+                "ItemPickup", "ItemPickupBox", "ItemDrop", "ItemUse"):
+            yield norm
+            continue
         # PAYDAY-relevante Events: nur Squad behalten, alle Phasen
         if norm["event_type"] in ("ItemPickup", "ObjectInteraction",
                                     "ObjectDestroy"):
