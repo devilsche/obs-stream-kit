@@ -1639,6 +1639,21 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         ORDER BY timestamp_ms ASC
     """, (match_id,)).fetchall()
 
+    # Comeback-BR (Rondo & Co): toter Mate kommt via Redeploy-Aircraft
+    # zurueck. PUBG-Telemetrie hat dafuer KEIN explizites Event — wir
+    # erkennen es am VehicleEnter mit vehicleId 'RedeployAircraft_*_C'
+    # (Tiger, Falcon, je nach Map). Wir emitten ein synthetisches
+    # "Comeback"-Event in die Timeline.
+    comeback_rows = conn.execute("""
+        SELECT actor_account, timestamp_ms, actor_x, actor_y
+        FROM telemetry_events
+        WHERE match_id = ?
+          AND event_type = 'VehicleEnter'
+          AND weapon LIKE 'RedeployAircraft_%'
+          AND timestamp_ms IS NOT NULL
+        ORDER BY timestamp_ms ASC
+    """, (match_id,)).fetchall()
+
     # 1b) TakeDamage-Events fuer Bleed-Out-Heuristik. Brauchen nur die
     # letzten 3-5 Sekunden vor jedem Kill. Pull global einmalig, gruppieren
     # nach Target.
@@ -2029,6 +2044,17 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             knock_pos_by_target.pop(target, None)
 
         events_out.append(row)
+
+    # Comeback-Drops (RedeployAircraft) ins events_out merge'n. Wir
+    # emitten pro Squadmate eine Zeile "X kam mit Comeback-Heli zurueck".
+    for cb in comeback_rows:
+        acc = cb["actor_account"]
+        if acc not in sq_set:
+            continue
+        cb_row = _row_skeleton("Comeback", cb["timestamp_ms"], acc,
+                                None, cb["actor_x"], cb["actor_y"])
+        cb_row["type"] = "comeback"
+        events_out.append(cb_row)
 
     events_out.sort(key=lambda x: x["tsMs"] or 0)
 
