@@ -117,9 +117,9 @@
     }
     if (best) return best.name;
 
-    // Phase 2: Single-Closest-Fallback. Nur 1 POI, keine Listen, keine
-    // Richtung (Richtungs-Logik war auf manchen Maps inkonsistent — User-
-    // Feedback). Cutoff 500m hart: drueber waere zu vage.
+    // Phase 2: Single-Closest-Fallback. Nur 1 POI (vermeidet Multi-POI-
+    // Richtungs-Konflikt, wenn z.B. 2 Orte im NO und 2 im SW sind).
+    // Richtung relativ zu DIESEM einen POI.
     const NEAR_CM = 50000;  // 500m
     let nearest = null;
     let nearestD = Infinity;
@@ -130,6 +130,8 @@
     }
     if (!nearest || nearestD > NEAR_CM) return null;
     const distM = Math.max(1, Math.round(nearestD / 100));
-    return `Near ${nearest.name} (${distM}m)`;
+    const [cx, cy] = polyCentroid(nearest.points);
+    const dir = compassDir(xCm - cx, yCm - cy);
+    return `Near ${nearest.name} (${distM}m ${dir})`;
   };
 })();
