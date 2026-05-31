@@ -550,6 +550,44 @@
     }
 
     /* Trend / Streaks / Achievements im Report */
+    /* Reserviert Platz waehrend async-Fetch laeuft — verhindert dass
+       Phases/Maps/Highlights nach unten springen wenn der Extras-Content
+       (Trend, Streaks, Achievements, Vehicle) reinpoppt. Wert deckt die
+       typische Hoehe (~Trend 150 + Streaks 100 + Achievements 200) ab.
+       Sobald echter Content drin ist, ueberschreibt der seinen Platz. */
+    .extras-placeholder {
+      min-height: 450px;
+    }
+    .extras-placeholder--filled {
+      min-height: 0;
+    }
+    /* Skeleton-Boxen waehrend Lade-Phase (CSS-only, kein JS-State). */
+    .extras-skeleton {
+      display: grid;
+      gap: 16px;
+      padding: 16px 0;
+    }
+    .extras-skel-box {
+      background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.03) 0%,
+        rgba(255, 255, 255, 0.08) 50%,
+        rgba(255, 255, 255, 0.03) 100%);
+      background-size: 200% 100%;
+      animation: extras-shimmer 1.4s linear infinite;
+      border-radius: 6px;
+    }
+    @keyframes extras-shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .extras-skel-box { animation: none; }
+    }
+    .extras-skel-trend { height: 140px; }
+    .extras-skel-streak { height: 90px; }
+    .extras-skel-ach { height: 180px; }
+
     .extras-h {
       margin: 24px 0 8px;
       color: var(--pubg-muted);
@@ -3138,8 +3176,16 @@
           </div>
         </div>` : "";
 
-      // Trend / Achievements / Streaks — extra Sektion mit eigenem Fetch
-      const extrasPlaceholder = `<div class="extras-placeholder"></div>`;
+      // Trend / Achievements / Streaks — extra Sektion mit eigenem Fetch.
+      // Skeleton mit reservierter Hoehe verhindert das Springen wenn der
+      // async Inhalt spaeter reinkommt.
+      const extrasPlaceholder = `<div class="extras-placeholder">
+          <div class="extras-skeleton" aria-hidden="true">
+            <div class="extras-skel-box extras-skel-trend"></div>
+            <div class="extras-skel-box extras-skel-streak"></div>
+            <div class="extras-skel-box extras-skel-ach"></div>
+          </div>
+        </div>`;
 
       root.innerHTML = `
         <h1>After-Session Report</h1>
@@ -3519,6 +3565,9 @@
       }
 
       placeholder.innerHTML = trendHtml + streaksHtml + achievementsHtml + vehicleHtml;
+      // Skeleton-Reserve-Hoehe entfernen, sobald echter Content drin ist —
+      // sonst klebt 450px Leerraum unten an wenn der Content kuerzer ist.
+      placeholder.classList.add("extras-placeholder--filled");
       // UI-State nach komplettem Re-Render wiederherstellen (Match-
       // Expands + Achievement-Details + Scroll).
       if (_pendingRestore) {
