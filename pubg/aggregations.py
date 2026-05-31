@@ -1837,39 +1837,66 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             if env_type:
                 row["type"] = env_type
             elif not actor:
-                # Kein Akteur und kein Waffen-Marker — PUBG-Telemetrie gibt
-                # uns nicht genug Info um Zone/Fall/Drown/Eject zu unter-
-                # scheiden (damageTypeCategory wird nicht persistiert).
-                # Daher generisches "died". Keine falsche Inference aus
-                # victimVehicleLabel mehr.
+                # Kein Akteur und kein Waffen-Marker — generisches "died".
                 row["type"] = "kill_self"
-            elif knock_ev is None:
-                row["type"] = "kill"
             else:
-                k_actor = knock_ev["actor_account"]
-                if k_actor == actor:
-                    # Gleicher Akteur wie der Knocker — Self-Finish oder
-                    # Bleed-Out (PUBG schreibt Bleed-Out-Kills dem Knocker zu)
-                    row["type"] = "kill_bleedout" if bled_out else "kill"
+                # Real-Finisher-Detection: PUBG schreibt Kill manchmal dem
+                # Knocker zu, auch wenn ein Squadmate den toedlichen Schuss
+                # abgegeben hat (Schaden=0 auf DBNO-HP zaehlt PUBG nicht
+                # als 'Damager'). Schauen in TakeDamage: gab es in den
+                # letzten 2s vor dem Kill einen ANDEREN Akteur als den
+                # PUBG-Killer? Dann ist DER der echte Finisher.
+                if (knock_ev and actor == knock_ev["actor_account"]
+                        and not bled_out):
+                    latest_other = None
+                    latest_other_ts = -1
+                    for d in dmg_by_target.get(target, []):
+                        d_ts = d["timestamp_ms"]
+                        if d_ts >= ts:
+                            break
+                        if (ts - d_ts) > 2000:
+                            continue
+                        d_actor = d["actor_account"]
+                        if (d_actor and d_actor != actor
+                                and d_ts > latest_other_ts):
+                            latest_other_ts = d_ts
+                            latest_other = d_actor
+                    if latest_other:
+                        actor = latest_other
+                        row["actorAccount"]   = actor
+                        row["actorName"]      = _name_of(actor)
+                        row["actorSlot"]      = slot_by_acc.get(actor)
+                        row["actorTeamId"]    = team_by_acc.get(actor)
+                        row["actorTeamLabel"] = _team_label_for(actor)
+                        row["actorIsSquad"]   = actor in sq_set
+                # Subtype-Detection
+                if knock_ev is None:
+                    row["type"] = "kill"
                 else:
-                    k_team = team_by_acc.get(k_actor)
-                    a_team = team_by_acc.get(actor)
-                    same_team = (
-                        k_team is not None and k_team == a_team)
-                    row["type"] = "kill_finish" if same_team else "kill_steal"
-                    row["knockerAccount"]    = k_actor
-                    row["knockerName"]       = _name_of(k_actor)
-                    row["knockerSlot"]       = slot_by_acc.get(k_actor)
-                    row["knockerTeamId"]     = k_team
-                    row["knockerTeamLabel"]  = _team_label_for(k_actor)
-                    row["knockerIsSquad"]    = k_actor in sq_set
-                    row["knockerWeapon"]     = knock_ev["weapon"]
-                    row["knockerWeaponName"] = (
-                        _weapon_label(knock_ev["weapon"])[0]
-                        if knock_ev["weapon"] else None)
-                    row["knockerDistanceM"]  = (
-                        round((knock_ev["distance"] or 0) / 100.0, 1)
-                        if knock_ev["distance"] else None)
+                    k_actor = knock_ev["actor_account"]
+                    if k_actor == actor:
+                        # Self-Finish (oder Bleed-Out — PUBG attribuiert
+                        # Bleed-Outs dem Knocker)
+                        row["type"] = "kill_bleedout" if bled_out else "kill"
+                    else:
+                        k_team = team_by_acc.get(k_actor)
+                        a_team = team_by_acc.get(actor)
+                        same_team = (
+                            k_team is not None and k_team == a_team)
+                        row["type"] = "kill_finish" if same_team else "kill_steal"
+                        row["knockerAccount"]    = k_actor
+                        row["knockerName"]       = _name_of(k_actor)
+                        row["knockerSlot"]       = slot_by_acc.get(k_actor)
+                        row["knockerTeamId"]     = k_team
+                        row["knockerTeamLabel"]  = _team_label_for(k_actor)
+                        row["knockerIsSquad"]    = k_actor in sq_set
+                        row["knockerWeapon"]     = knock_ev["weapon"]
+                        row["knockerWeaponName"] = (
+                            _weapon_label(knock_ev["weapon"])[0]
+                            if knock_ev["weapon"] else None)
+                        row["knockerDistanceM"]  = (
+                            round((knock_ev["distance"] or 0) / 100.0, 1)
+                            if knock_ev["distance"] else None)
             if bled_out:
                 row["bledOut"] = True
                 # Knocker-Info auch bei bleedout setzen (PUBG attribuiert
