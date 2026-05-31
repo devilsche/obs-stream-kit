@@ -2131,7 +2131,9 @@
         panelTitle.textContent = `Match · ${mapLbl}`;
       }
       // Timeline-Sektion fuellen — absTs kommt jetzt direkt vom Backend
-      // (kein playedAt-Frontend-Lookup mehr).
+      // (kein playedAt-Frontend-Lookup mehr). POI-Polygone werden async
+      // geladen — Render erst nachdem POI.ready resolved, sonst zeigen
+      // alle Zeilen '<unknown>' weil fromCoords noch nicht gefuettert ist.
       const tlSect = document.getElementById("mdTimelineSection");
       if (tlSect && md && md.detail) {
         tlSect.hidden = false;
@@ -2141,8 +2143,15 @@
           colorByAcc: md.colorByAcc,
           myAccount:  myAcc,
         };
-        tlSect.innerHTML = renderMdTimeline(md.detail.events || [], ctx);
-        wireMdTimelineFilters(tlSect, myAcc);
+        const _renderTl = () => {
+          tlSect.innerHTML = renderMdTimeline(md.detail.events || [], ctx);
+          wireMdTimelineFilters(tlSect, myAcc);
+        };
+        if (PubgUI.POI && PubgUI.POI.ready) {
+          PubgUI.POI.ready.then(_renderTl).catch(_renderTl);
+        } else {
+          _renderTl();
+        }
       }
       // Match-Zeitraum aus allen Pfaden ableiten
       let mStart = Infinity, mEnd = -Infinity;

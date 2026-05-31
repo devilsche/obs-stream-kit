@@ -1732,15 +1732,18 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
 
         # Inferred-Revive Szenarien (PUBG-Telemetrie liefert nicht immer
         # ein explizites Revive-Event — wir synthetisieren):
-        #   A) chained-Enemy handelt aktiv (Knock/Kill jemand) → revived
-        #   B) chained-Enemy wird ERNEUT geknockt → kann nur passieren
-        #      wenn er zwischendurch revived war
+        #   A) chained-Enemy knockt aktiv jemand → muss revived sein
+        #      (DBNO-Spieler kann nicht knocken)
+        #   B) chained-Enemy wird ERNEUT geknockt → war zwischendurch revived
+        # WICHTIG: Kill-Events NICHT als Beweis fuer aktive Handlung —
+        # PUBG attribuiert Bleed-Out-Kills dem Knocker, auch wenn dieser
+        # selbst DBNO ist (kein echtes Handeln).
         infer_who = None
-        if (et in ("Knock", "Kill")
-                and actor and actor in currently_knocked_by_squad):
-            infer_who = actor
-        elif et == "Knock" and target and target in currently_knocked_by_squad:
-            infer_who = target
+        if et == "Knock":
+            if actor and actor in currently_knocked_by_squad:
+                infer_who = actor
+            elif target and target in currently_knocked_by_squad:
+                infer_who = target
         if infer_who:
             knock_pos_target = knock_pos_by_target.get(infer_who)
             infer_vx = knock_pos_target[0] if knock_pos_target else None
