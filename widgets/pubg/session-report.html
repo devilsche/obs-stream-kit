@@ -1157,6 +1157,12 @@
     .md-tl-row.md-tl-header .md-tl-text {
       color: var(--pubg-muted);
     }
+    /* Lobby-Rows (vor Plane-Takeoff): zarter rendern, kursiv. */
+    .md-tl-row--lobby {
+      opacity: 0.65;
+      font-style: italic;
+    }
+    .md-tl-row--lobby .md-tl-t { color: var(--pubg-muted); }
     .md-tl-t   { color: var(--pubg-text); }
     .md-tl-poi {
       color: var(--pubg-gold); font-size: 0.9em;
@@ -1872,7 +1878,20 @@
       const s = (secs||0) % 60;
       return `${m}:${String(s).padStart(2,"0")}`;
     }
-    function renderMdSquadTable(members, colorByAcc) {
+    // Echter Todeszeitpunkt aus der Telemetrie (letztes life.death.tsMs).
+    // PUBG's time_survived stoppt beim Knock (DBNO), nicht beim Bleed-Out/
+    // Finisher → wir nehmen lieber den Telemetrie-Wert fuer Konsistenz
+    // mit der Timeline. Bezugspunkt = Plane-Takeoff (fallback: Lobby-Start).
+    function _mdMemberDeathSec(m, zeroMs) {
+      const lives = m.lives || [];
+      let lastDeath = null;
+      for (const l of lives) {
+        if (l.death && l.death.tsMs != null) lastDeath = l.death.tsMs;
+      }
+      if (lastDeath == null || zeroMs == null) return null;
+      return Math.max(0, Math.floor((lastDeath - zeroMs) / 1000));
+    }
+    function renderMdSquadTable(members, colorByAcc, zeroMs) {
       const rows = members.map(m => {
         const color = colorByAcc[m.accountId] || "#999";
         const place = (m.place != null) ? `#${m.place}` : "—";
@@ -1881,6 +1900,11 @@
         const killsCell = bk
           ? `${kills} <span class="bot-kills" title="${bk} davon Bot-Kills">(${bk})</span>`
           : `${kills}`;
+        // Echte Todeszeit aus Telemetrie; falls keine (Survivor): time_survived
+        const deathSec = _mdMemberDeathSec(m, zeroMs);
+        const survCell = (deathSec != null)
+          ? _fmtSurvSec(deathSec)
+          : _fmtSurvSec(m.timeSurvived);
         return `<tr${m.isSelf ? ' class="self"' : ""}>
           <td class="md-st-name"><span class="md-dot" style="background:${color}"></span>
               <b>${m.name}${m.isSelf ? " (du)" : ""}</b></td>
@@ -1892,7 +1916,7 @@
           <td title="Wie oft wurde dieser Spieler wiederbelebt">${m.revivesReceived || 0}</td>
           <td title="Wie oft hat dieser Spieler Squadmates wiederbelebt">${m.revivesGiven || 0}</td>
           <td>${Math.round(m.damageDealt || 0)}</td>
-          <td>${_fmtSurvSec(m.timeSurvived)}</td>
+          <td title="Match-Zeit bis zum tatsaechlichen Tod (Bleed-Out/Finisher); fuer Survivor PUBG's time_survived">${survCell}</td>
         </tr>`;
       }).join("");
       return `<table class="md-squad-table">
@@ -1917,6 +1941,7 @@
     const _MD_TIMELINE_FILTERS = [
       ["all",     "All",     null],
       ["me",      "Me",      null],
+      ["lobby",   "Lobby",   ["join"]],
       ["knocks",  "Knocks",  ["knock"]],
       ["kills",   "Kills",   ["kill", "kill_finish", "kill_steal", "kill_bleedout",
                               "kill_self_eject", "kill_fall", "kill_bluezone",
@@ -1950,12 +1975,14 @@
     }
 
     function mdTlFmtMatchTime(tsMs) {
-      // Ingame-Zeit seit Match-Start als M:SS / MM:SS.
+      // Ingame-Zeit relativ zum Plane-Takeoff (= 0). Werte vor Takeoff
+      // (Lobby/Insert) sind negativ und werden als "-M:SS" gerendert.
       if (tsMs == null) return "?";
-      const sec = Math.max(0, Math.floor(tsMs / 1000));
+      const neg = tsMs < 0;
+      const sec = Math.floor(Math.abs(tsMs) / 1000);
       const m = Math.floor(sec / 60);
       const s = sec % 60;
-      return `${m}:${String(s).padStart(2, "0")}`;
+      return `${neg ? "-" : ""}${m}:${String(s).padStart(2, "0")}`;
     }
 
     function mdTlPoi(ctx, x, y) {
@@ -2045,6 +2072,8 @@
       const T = mdTlNameSpan(ev, "target", cba);
       const meta = mdTlWeaponMeta(ev);
       switch (ev.type) {
+        case "join":
+          return `${A} joined the lobby`;
         case "knock":
           return `${A} knocked ${T}${meta}`;
         case "kill":
@@ -2094,14 +2123,23 @@
     }
 
     function mdTlRowHtml(ev, ctx) {
-      const tCell = mdTlFmtMatchTime(ev.tsMs);
-      const poi   = mdTlPoi(ctx, ev.victimX, ev.victimY);
+      // Takeoff-relativ: positive Werte = ingame nach Plane-Takeoff,
+      // negative = Lobby/Insert-Phase.
+      const displayMs = (ev.tsMs != null)
+        ? ev.tsMs - (ctx.takeoffOffsetMs || 0) : null;
+      const tCell = mdTlFmtMatchTime(displayMs);
+      // Join-Events haben keinen Ort; leere POI-Zelle statt '<unknown>'.
+      const poi   = (ev.type === "join")
+        ? "Lobby"
+        : mdTlPoi(ctx, ev.victimX, ev.victimY);
       const sentence = mdTlSentence(ev, ctx);
       const myAccount = ctx.myAccount;
       const involvesMe = ev.actorAccount === myAccount
                       || ev.targetAccount === myAccount
                       || ev.knockerAccount === myAccount;
-      return `<div class="md-tl-row" data-ev-type="${ev.type}"
+      const isLobby = (displayMs != null && displayMs < 0);
+      return `<div class="md-tl-row${isLobby ? ' md-tl-row--lobby' : ''}"
+                   data-ev-type="${ev.type}"
                    data-ev-me="${involvesMe}">
         <span class="md-tl-t">${tCell}</span>
         <span class="md-tl-poi">${poi}</span>
@@ -2223,7 +2261,9 @@
         `#mdSquadTableWrap_${CSS.escape(matchId)}`);
       if (tableWrap && md && md.detail && md.detail.members) {
         tableWrap.innerHTML = renderMdSquadTable(md.detail.members,
-                                                  md.colorByAcc);
+                                                  md.colorByAcc,
+                                                  md.detail.takeoffMs
+                                                    || md.detail.matchStartMs);
       }
       // Panel-Titel aktualisieren (Map + Match-Nr + Uhrzeit)
       const panelTitle = document.getElementById("mdPanelTitle");
@@ -2239,10 +2279,15 @@
       if (tlSect && md && md.detail) {
         tlSect.hidden = false;
         const myAcc = (md.detail.members.find(x => x.isSelf) || {}).accountId;
+        // Takeoff = Match-Zeit 0. ev.tsMs ist Lobby-relativ (vom Backend);
+        // wir verschieben um (takeoffMs - matchStartMs) ins Takeoff-Frame.
+        const takeoffOffsetMs = (md.detail.takeoffMs && md.detail.matchStartMs)
+          ? (md.detail.takeoffMs - md.detail.matchStartMs) : 0;
         const ctx = {
-          mapName:    md.detail.mapName,
-          colorByAcc: md.colorByAcc,
-          myAccount:  myAcc,
+          mapName:         md.detail.mapName,
+          colorByAcc:      md.colorByAcc,
+          myAccount:       myAcc,
+          takeoffOffsetMs: takeoffOffsetMs,
         };
         const _renderTl = () => {
           tlSect.innerHTML = renderMdTimeline(md.detail.events || [], ctx);

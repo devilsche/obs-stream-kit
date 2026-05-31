@@ -1028,6 +1028,19 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         except Exception:
             pass
 
+    # Plane-Takeoff = Match-Zeit 0. PUBG feuert LogMatchStart exakt zum
+    # Takeoff-Zeitpunkt — vor Takeoff (Lobby/Insert) sind die Match-Zeiten
+    # negativ. Fallback: match_start_ms (= Lobby-Start) wenn kein
+    # MatchStart-Event in der DB (alte Matches vor 2026-05-31).
+    takeoff_row = conn.execute(
+        "SELECT timestamp_ms FROM telemetry_events "
+        "WHERE match_id = ? AND event_type = 'MatchStart' "
+        "ORDER BY timestamp_ms ASC LIMIT 1",
+        (match_id,)).fetchone()
+    takeoff_ms = (takeoff_row["timestamp_ms"]
+                   if (takeoff_row and takeoff_row["timestamp_ms"])
+                   else match_start_ms)
+
     # Squad-Mitglieder
     team_row = conn.execute(
         "SELECT team_id FROM match_team_mapping "
@@ -1621,7 +1634,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                attachments
         FROM telemetry_events
         WHERE match_id = ?
-          AND event_type IN ('Kill', 'Knock', 'Revive', 'Redeploy')
+          AND event_type IN ('Kill', 'Knock', 'Revive', 'Redeploy', 'Login')
           AND timestamp_ms IS NOT NULL
         ORDER BY timestamp_ms ASC
     """, (match_id,)).fetchall()
@@ -1781,6 +1794,16 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         target = e["target_account"]
         ts     = e["timestamp_ms"]
         weapon = e["weapon"]
+
+        # Lobby-Joins fuer Squad-Members anzeigen (negative Match-Zeit
+        # relativ zum Takeoff). Non-Squad-Logins ignorieren — 100-Spieler-
+        # Lobby waere Flut.
+        if et == "Login":
+            if actor in sq_set:
+                join_row = _row_skeleton("Join", ts, actor, None, None, None)
+                join_row["type"] = "join"
+                events_out.append(join_row)
+            continue
 
         # Inferred-Revive Szenarien (PUBG-Telemetrie liefert nicht immer
         # ein explizites Revive-Event — wir synthetisieren):
@@ -2010,10 +2033,12 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     events_out.sort(key=lambda x: x["tsMs"] or 0)
 
     return {
-        "matchId": match_id,
-        "mapName": map_name,
-        "members": out_members,
-        "events":  events_out,
+        "matchId":      match_id,
+        "mapName":      map_name,
+        "matchStartMs": match_start_ms,
+        "takeoffMs":    takeoff_ms,
+        "members":      out_members,
+        "events":       events_out,
     }
 
 

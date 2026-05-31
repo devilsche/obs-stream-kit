@@ -201,6 +201,15 @@ def _normalize(event):
         base["event_type"] = "PhaseChange"
     elif et in ("LogMatchStart", "LogMatchEnd"):
         base["event_type"] = et.replace("Log", "")
+    elif et == "LogPlayerLogin":
+        # Lobby-Join. Erscheint mit negativer Match-Zeit (relativ zum
+        # Plane-Takeoff = MatchStart). Wir behalten's fuer ALLE
+        # Spieler — wenig Volumen, fuer Squad-Joines im Detail relevant.
+        base["event_type"] = "Login"
+        base["actor_account"] = event.get("accountId")
+    elif et == "LogPlayerLogout":
+        base["event_type"] = "Logout"
+        base["actor_account"] = event.get("accountId")
     else:
         return None
     return base
@@ -271,6 +280,9 @@ ALWAYS_KEEP_EVENTS = {
     # Squad geknockt hat) sollen in der Timeline als "X revived Y" mit
     # echtem Namen erscheinen, nicht als inferred-revive.
     "Revive",
+    # MatchStart liefert den Plane-Takeoff-Timestamp (= Match-Zeit 0).
+    # Login fuer Lobby-Join-Events (negative Match-Zeit).
+    "MatchStart", "Login",
 }
 
 # Position-Events fluten die DB (firet alle ~10s pro Spieler). Wir
