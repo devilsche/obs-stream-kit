@@ -4795,17 +4795,19 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
     dmg_by_match = {}
     if event_match_ids:
         ph = ",".join("?" * len(event_match_ids))
+        # telemetry_events ist global (kein tenant_id) — nur my_account_id
+        # + match-IDs als Parameter.
         kills_by_match = {r["match_id"]: r["k"] for r in conn.execute(
             f"SELECT match_id, COUNT(*) AS k FROM telemetry_events "
             f"WHERE event_type='Kill' AND actor_account=? "
             f"AND match_id IN ({ph}) GROUP BY match_id",
-            [tenant_id, my_account_id, *event_match_ids]).fetchall()}
+            [my_account_id, *event_match_ids]).fetchall()}
         dmg_by_match = {r["match_id"]: float(r["d"] or 0) for r in conn.execute(
             f"SELECT match_id, COALESCE(SUM(damage), 0) AS d "
             f"FROM telemetry_events "
             f"WHERE event_type='TakeDamage' AND actor_account=? "
             f"AND match_id IN ({ph}) GROUP BY match_id",
-            [tenant_id, my_account_id, *event_match_ids]).fetchall()}
+            [my_account_id, *event_match_ids]).fetchall()}
     for x in enriched:
         if not is_br_mode(x.get("game_mode")):
             x["effective_kills"]  = kills_by_match.get(x["match_id"], 0)

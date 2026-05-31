@@ -2688,11 +2688,13 @@
     });
 
     // Date-Range-Picker initialisieren mit aktuellen URL-Werten
-    function isoLocal(date) {
-      // Local-Date → "YYYY-MM-DD"
-      return date.toISOString().slice(0, 10);
-    }
     function pad(n) { return String(n).padStart(2, "0"); }
+    function isoLocal(date) {
+      // LOKALES Datum als "YYYY-MM-DD" — NIE toISOString() nutzen!
+      // toISOString liefert UTC; bei MESZ (+02:00) springt das Datum um
+      // einen Tag zurueck (1.5. 00:00 local → 30.4. 22:00 UTC).
+      return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
+    }
 
     if (FROM) {
       const d = new Date(FROM);
