@@ -1960,15 +1960,15 @@
           return `${T} bled out and died`;
         case "kill_finish": {
           const K = mdTlNameSpan(ev, "knocker", cba);
-          const kw = ev.knockerWeaponName ? `knocked with <b>${ev.knockerWeaponName}</b>` : "knocked";
+          const kw = ev.knockerWeaponName ? ` with <b>${ev.knockerWeaponName}</b>` : "";
           const kd = ev.knockerDistanceM ? ` · ${ev.knockerDistanceM.toFixed(0)}m` : "";
-          return `${A} finished ${T} (${kw}${kd} by ${K})${meta}`;
+          return `${A} finished ${T} (knocked by ${K}${kw}${kd})${meta}`;
         }
         case "kill_steal": {
           const K = mdTlNameSpan(ev, "knocker", cba);
-          const kw = ev.knockerWeaponName ? `knocked with <b>${ev.knockerWeaponName}</b>` : "knocked";
+          const kw = ev.knockerWeaponName ? ` with <b>${ev.knockerWeaponName}</b>` : "";
           const kd = ev.knockerDistanceM ? ` · ${ev.knockerDistanceM.toFixed(0)}m` : "";
-          return `${A} stole the knock from ${K} (${kw}${kd}) — killed ${T}${meta}`;
+          return `${A} stole the knock (knocked by ${K}${kw}${kd}) — killed ${T}${meta}`;
         }
         case "revive":
           return `${A} revived ${T}`;

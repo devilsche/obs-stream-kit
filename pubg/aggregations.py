@@ -1451,6 +1451,20 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             if key in seen_keys:
                 continue
             seen_keys.add(key)
+            # Fahrer = wer den Wagen zuerst betreten hat (PUBG-Telemetrie
+            # liefert kein explizites Fahrer-Flag).
+            driver = None
+            driver_start = float("inf")
+            for r_acc in riders:
+                for (rs, re_, rvid) in veh_intervals_by_acc.get(r_acc, []):
+                    if rvid != vid:
+                        continue
+                    re_x = re_ if re_ != float("inf") else (ep_end + 1)
+                    if rs < ep_end and re_x > ep_start:
+                        if rs < driver_start:
+                            driver_start = rs
+                            driver = r_acc
+                        break
             # Union aller Position-Events der Mitfahrer im Episoden-Intervall
             pts = []
             for r_acc in riders:
@@ -1464,6 +1478,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 "start":  ep_start,
                 "end":    ep_end,
                 "riders": list(riders),
+                "driver": driver,
                 "points": pts,
             })
 
