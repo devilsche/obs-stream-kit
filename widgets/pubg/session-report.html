@@ -868,6 +868,40 @@
       padding: 40px;
       font-style: italic;
     }
+    /* Tab-Switch zwischen Session-Picker und Custom-Range. Nur einer
+       von beiden ist sichtbar. Persistenz via URL-Param `view`. */
+    .view-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--pubg-border);
+    }
+    .view-tab {
+      background: transparent;
+      border: 1px solid transparent;
+      border-bottom: none;
+      color: var(--pubg-muted);
+      padding: 8px 18px;
+      font: inherit;
+      font-size: 0.95em;
+      cursor: pointer;
+      border-top-left-radius: 6px;
+      border-top-right-radius: 6px;
+      margin-bottom: -1px;
+      min-height: 32px;
+    }
+    .view-tab:hover { color: var(--pubg-text); background: rgba(94,42,121,0.15); }
+    .view-tab[aria-selected="true"] {
+      color: var(--pubg-gold);
+      background: rgba(0,0,0,0.3);
+      border-color: var(--pubg-border);
+      border-bottom-color: rgba(0,0,0,0.3);
+    }
+    .view-tab:focus-visible {
+      outline: 2px solid var(--pubg-gold);
+      outline-offset: 2px;
+    }
+    [role="tabpanel"][hidden] { display: none !important; }
     .range-picker {
       display: flex;
       align-items: center;
@@ -1298,11 +1332,20 @@
   </style>
 </head>
 <body>
-  <div class="range-picker">
-    <label>From</label>
+  <div class="view-tabs" role="tablist" aria-label="Report-Auswahl">
+    <button type="button" class="view-tab" role="tab"
+            data-view="sessions" id="tabSessions"
+            aria-controls="picker" aria-selected="true">Sessions</button>
+    <button type="button" class="view-tab" role="tab"
+            data-view="range" id="tabRange"
+            aria-controls="rangePicker" aria-selected="false">Custom Range</button>
+  </div>
+  <div class="range-picker" id="rangePicker"
+       role="tabpanel" aria-labelledby="tabRange" hidden>
+    <label for="dateFrom">From</label>
     <input type="date" id="dateFrom">
     <input type="time" id="timeFrom" value="00:00" step="60">
-    <label>To</label>
+    <label for="dateTo">To</label>
     <input type="date" id="dateTo">
     <input type="time" id="timeTo" value="23:59" step="60">
     <button class="apply" id="applyRange">Apply</button>
@@ -1314,7 +1357,8 @@
       <button class="preset" data-preset="all">All (DB)</button>
     </div>
   </div>
-  <div id="picker" class="session-picker" style="display:none"></div>
+  <div id="picker" class="session-picker"
+       role="tabpanel" aria-labelledby="tabSessions" style="display:none"></div>
   <div class="pubg-card report pubg-fade-in" id="report">
     <div class="empty">— wird geladen —</div>
   </div>
@@ -2706,6 +2750,58 @@
       document.getElementById("dateTo").value = isoLocal(d);
       document.getElementById("timeTo").value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
     }
+
+    // ── Tab-Switch: Sessions ↔ Custom Range ──────────────────────────
+    // Aktiver Tab kommt aus URL-Param `view` (Default abhaengig davon
+    // ob FROM/TO gesetzt sind: Custom Range wenn ja, sonst Sessions).
+    const _viewFromUrl = PubgUI.qs("view", "");
+    const _initialView = _viewFromUrl || ((FROM || TO) ? "range" : "sessions");
+    function setActiveView(v, persist) {
+      const isRange = (v === "range");
+      const tabRange    = document.getElementById("tabRange");
+      const tabSessions = document.getElementById("tabSessions");
+      const panelRange  = document.getElementById("rangePicker");
+      const panelPicker = document.getElementById("picker");
+      tabRange.setAttribute("aria-selected", isRange ? "true" : "false");
+      tabSessions.setAttribute("aria-selected", isRange ? "false" : "true");
+      panelRange.hidden = !isRange;
+      // Session-Picker hat altes inline display-handling; bleibt
+      // erhalten, wir steuern Sichtbarkeit aber via hidden-Attribut.
+      panelPicker.hidden = isRange;
+      if (persist) {
+        const u = new URL(location.href);
+        u.searchParams.set("view", v);
+        history.replaceState(null, "", u.toString());
+      }
+    }
+    setActiveView(_initialView, false);
+    document.querySelectorAll(".view-tab").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const v = btn.dataset.view;
+        // Wenn user auf Sessions zurueckklickt waehrend from/to noch in
+        // der URL haengen (vorher Custom Range gewaehlt), dann beide
+        // raus + reload — sonst zeigt der Report verwirrend gefilterte
+        // Daten obwohl der Sessions-Tab aktiv ist.
+        if (v === "sessions" && (FROM || TO)) {
+          const u = new URL(location.href);
+          u.searchParams.delete("from");
+          u.searchParams.delete("to");
+          u.searchParams.set("view", "sessions");
+          location.href = u.toString();
+          return;
+        }
+        setActiveView(v, true);
+      });
+      btn.addEventListener("keydown", (e) => {
+        // Pfeiltasten zwischen Tabs wechseln (WCAG-konform).
+        if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+          e.preventDefault();
+          const next = btn.dataset.view === "sessions" ? "range" : "sessions";
+          setActiveView(next, true);
+          document.getElementById(next === "range" ? "tabRange" : "tabSessions").focus();
+        }
+      });
+    });
 
     function applyRange(fromIso, toIso) {
       const u = new URL(location.href);
