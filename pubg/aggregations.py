@@ -2083,12 +2083,25 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
 
     # Comeback-Drops (RedeployAircraft) ins events_out merge'n. Wir
     # emitten pro Squadmate eine Zeile "X kam mit Comeback-Heli zurueck".
+    # Position-Anzeige: Spieler-Landing nach dem Heli-Drop (nicht der
+    # Heli-Spawn-Punkt der oft in einer leeren Zone in der Luft liegt).
+    member_by_acc = {m["accountId"]: m for m in out_members}
     for cb in comeback_rows:
         acc = cb["actor_account"]
         if acc not in sq_set:
             continue
+        # Landing-Position der naechsten Life nach diesem Comeback-Drop.
+        loc_x, loc_y = cb["actor_x"], cb["actor_y"]
+        mem = member_by_acc.get(acc)
+        if mem:
+            for life in (mem.get("lives") or []):
+                lg = (life or {}).get("landing") or {}
+                if lg.get("tsMs") and lg["tsMs"] >= cb["timestamp_ms"]:
+                    if lg.get("x") is not None:
+                        loc_x, loc_y = lg["x"], lg["y"]
+                    break
         cb_row = _row_skeleton("Comeback", cb["timestamp_ms"], acc,
-                                None, cb["actor_x"], cb["actor_y"])
+                                None, loc_x, loc_y)
         cb_row["type"] = "comeback"
         events_out.append(cb_row)
 

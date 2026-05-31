@@ -2239,9 +2239,16 @@
         ? ev.tsMs - (ctx.takeoffOffsetMs || 0) : null;
       const tCell = mdTlFmtMatchTime(displayMs);
       // Join-Events haben keinen Ort; leere POI-Zelle statt '<unknown>'.
-      const poi   = (ev.type === "join")
-        ? "Lobby"
-        : mdTlPoi(ctx, ev.victimX, ev.victimY);
+      // Comeback/Chip-Events haben keinen victim_x/y (Spieler-Action,
+      // kein Target-Treffer) — Actor-Position als Fallback nutzen.
+      let poi;
+      if (ev.type === "join") {
+        poi = "Lobby";
+      } else {
+        const px = (ev.victimX != null) ? ev.victimX : ev.actorX;
+        const py = (ev.victimY != null) ? ev.victimY : ev.actorY;
+        poi = mdTlPoi(ctx, px, py);
+      }
       const sentence = mdTlSentence(ev, ctx);
       const myAccount = ctx.myAccount;
       const involvesMe = ev.actorAccount === myAccount
