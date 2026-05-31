@@ -1084,7 +1084,36 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         (match_id, *squad_accs)).fetchall():
         bot_kills_by[r["actor_account"]] = r["c"]
 
+    # Vehicle-Intervalle fuer ALLE Spieler in der Lobby (nicht nur Squad)
+    # — sonst kann victimVehicleLabel fuer Enemy-Knocks/Kills nicht
+    # gesetzt werden. Bei einem 100er-Lobby sind das ~50-300 Events,
+    # vertretbar.
     veh_intervals_by_acc = {}
+    _veh_rows = conn.execute("""
+        SELECT actor_account, event_type, timestamp_ms, weapon
+        FROM telemetry_events
+        WHERE match_id = ?
+          AND event_type IN ('VehicleEnter', 'VehicleLeave')
+          AND timestamp_ms IS NOT NULL
+        ORDER BY timestamp_ms ASC
+    """, (match_id,)).fetchall()
+    _veh_evs_by = {}
+    for r in _veh_rows:
+        _veh_evs_by.setdefault(r["actor_account"], []).append(r)
+    for _acc, _evs in _veh_evs_by.items():
+        _cur_enter = None; _cur_veh = None
+        _ivals = []
+        for _e in _evs:
+            if _e["event_type"] == "VehicleEnter":
+                _cur_enter = _e["timestamp_ms"]
+                _cur_veh = _e["weapon"]
+            elif _e["event_type"] == "VehicleLeave" and _cur_enter is not None:
+                _ivals.append((_cur_enter, _e["timestamp_ms"], _cur_veh))
+                _cur_enter = None; _cur_veh = None
+        if _cur_enter is not None:
+            _ivals.append((_cur_enter, float("inf"), _cur_veh))
+        veh_intervals_by_acc[_acc] = _ivals
+
     out_members = []
     for mem in members_rows:
         acc = mem["account_id"]
