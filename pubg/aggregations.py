@@ -1421,14 +1421,11 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         ORDER BY timestamp_ms ASC
     """, (match_id,)).fetchall()
 
-    # 2) Pre-Scan: alle Accounts die unser Squad geknockt hat.
+    # 2) Dynamische Tracking-Menge der "noch offenen" Knocks unseres
+    # Squads. Geht hier rein, wenn squad einen Enemy knockt; raus, sobald
+    # der Enemy revived oder gekillt wird (Story-Bogen geschlossen).
     sq_set = set(squad_accs)
-    knocked_by_squad = set()
-    for e in all_events_rows:
-        if e["event_type"] != "Knock":
-            continue
-        if e["actor_account"] in sq_set and e["target_account"]:
-            knocked_by_squad.add(e["target_account"])
+    currently_knocked_by_squad = set()
 
     # 3) Team-ID-Lookup fuer die ganze Lobby
     team_rows = conn.execute("""
@@ -1500,10 +1497,14 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         ts     = e["timestamp_ms"]
         weapon = e["weapon"]
 
-        # Scope: Squad-involved ODER chained-enemy
+        # Scope: Squad-involved ODER chained-enemy (target ist gerade von
+        # uns geknockt und noch nicht revived/gekillt). WICHTIG: vor allen
+        # State-Updates evaluieren — sonst wuerde z.B. ein Knock-durch-Squad
+        # sich selbst in scope schreiben (er wuerde auch ohne dass squad-
+        # involved waere — was inkorrekt ist).
         in_scope = (
             (actor in sq_set) or (target in sq_set)
-            or (target in knocked_by_squad)
+            or (target in currently_knocked_by_squad)
         )
 
         # Knock-State pflegen AUCH wenn nicht in scope (Lobby-Knocks koennen
@@ -1511,10 +1512,20 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         # wird → wir wollen 'stole the knock' korrekt erkennen).
         if et == "Knock":
             last_knock_by_target[target] = e
+            # Knock durch uns auf einen Enemy → in der chained-enemy-Menge
+            if actor in sq_set and target and target not in sq_set:
+                currently_knocked_by_squad.add(target)
 
         if et == "Revive":
             # Revive konsumiert den vorherigen Knock unabhaengig vom Scope
             last_knock_by_target.pop(target, None)
+            # Wenn Enemy revived wurde — Story-Bogen zu uns geschlossen
+            currently_knocked_by_squad.discard(target)
+
+        if et == "Kill":
+            # Wenn Target ein chained-Enemy war — Story-Bogen schliesst sich
+            # mit dem Kill (egal wer ihn macht: wir, Squadmate, oder Stealer)
+            currently_knocked_by_squad.discard(target)
 
         if not in_scope:
             continue
