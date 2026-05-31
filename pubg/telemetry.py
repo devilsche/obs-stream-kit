@@ -34,6 +34,7 @@ def _normalize(event):
             "victim_x": None, "victim_y": None,
             "weapon": None, "distance": None, "damage": None,
             "damage_reason": None,
+            "seat_index": None,
             "payload_json": None}
     # Helper: extracts z + health for character-events (for landing-pin
     # heuristic; ground-events have z<800 and health>0).
@@ -116,12 +117,16 @@ def _normalize(event):
         base["weapon"] = (event.get("vehicle") or {}).get("vehicleId")
         base["actor_x"], base["actor_y"] = _loc(event, "character")
         base["actor_z"], base["actor_health"] = _z_health(event, "character")
+        # seatIndex: 0 = Fahrer, 1+ = Beifahrer. Sitzwechsel zeigen sich als
+        # VehicleLeave (alte seatIndex) + VehicleRide (neue seatIndex).
+        base["seat_index"] = event.get("seatIndex")
     elif et == "LogVehicleLeave":
         base["event_type"] = "VehicleLeave"
         base["actor_account"] = (event.get("character") or {}).get("accountId")
         base["distance"] = event.get("rideDistance")
         base["actor_x"], base["actor_y"] = _loc(event, "character")
         base["actor_z"], base["actor_health"] = _z_health(event, "character")
+        base["seat_index"] = event.get("seatIndex")
     elif et in ("LogPlayerRedeploy", "LogPlayerRedeployStart"):
         # Comeback-Antenne (Wiederhol-Antenne) — Squadmate aktiviert die
         # Redeploy-Mechanik fuer einen Toten Mate.

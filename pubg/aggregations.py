@@ -1420,6 +1420,21 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     for r in sq_pos_rows:
         pos_by_acc_unify.setdefault(r["actor_account"], []).append(r)
 
+    # VehicleEnter-Events mit seatIndex fuer Fahrer-Detection. seat_index=0
+    # ist der Fahrer; Beifahrer haben 1+. Sitzwechsel = Leave + neuer Ride.
+    ride_seat_rows = conn.execute(f"""
+        SELECT actor_account, weapon, timestamp_ms, seat_index
+        FROM telemetry_events
+        WHERE match_id = ?
+          AND event_type = 'VehicleEnter'
+          AND actor_account IN ({_ph_sq})
+          AND timestamp_ms IS NOT NULL
+        ORDER BY timestamp_ms ASC
+    """, (match_id, *squad_accs)).fetchall()
+    rides_by_acc = {}
+    for r in ride_seat_rows:
+        rides_by_acc.setdefault(r["actor_account"], []).append(r)
+
     # Shared-Vehicle-Episoden finden (≥2 Squad-Members, selber vid,
     # ueberlappendes Intervall)
     shared_episodes = []
@@ -1451,20 +1466,34 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             if key in seen_keys:
                 continue
             seen_keys.add(key)
-            # Fahrer = wer den Wagen zuerst betreten hat (PUBG-Telemetrie
-            # liefert kein explizites Fahrer-Flag).
+            # Fahrer = wer zuletzt mit seatIndex=0 ins Fahrzeug eingestiegen
+            # ist (handhabt Sitzwechsel). Fallback (alte Daten ohne
+            # seat_index): wer den Wagen zuerst betrat.
             driver = None
-            driver_start = float("inf")
+            driver_seat0_ts = -1
             for r_acc in riders:
-                for (rs, re_, rvid) in veh_intervals_by_acc.get(r_acc, []):
-                    if rvid != vid:
+                for r in rides_by_acc.get(r_acc, []):
+                    if r["weapon"] != vid:
                         continue
-                    re_x = re_ if re_ != float("inf") else (ep_end + 1)
-                    if rs < ep_end and re_x > ep_start:
-                        if rs < driver_start:
-                            driver_start = rs
+                    if r["timestamp_ms"] > ep_end:
+                        continue
+                    if r.get("seat_index") == 0:
+                        if r["timestamp_ms"] > driver_seat0_ts:
+                            driver_seat0_ts = r["timestamp_ms"]
                             driver = r_acc
-                        break
+            if driver is None:
+                # Fallback fuer alte Daten
+                driver_start = float("inf")
+                for r_acc in riders:
+                    for (rs, re_, rvid) in veh_intervals_by_acc.get(r_acc, []):
+                        if rvid != vid:
+                            continue
+                        re_x = re_ if re_ != float("inf") else (ep_end + 1)
+                        if rs < ep_end and re_x > ep_start:
+                            if rs < driver_start:
+                                driver_start = rs
+                                driver = r_acc
+                            break
             # Union aller Position-Events der Mitfahrer im Episoden-Intervall
             pts = []
             for r_acc in riders:
@@ -1482,8 +1511,11 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 "points": pts,
             })
 
-    # Pro Member: groundPath in jeder Life mit Episoden-Unified-Points
-    # rewriten (eigene Points im Intervall raus, Unified rein).
+    # Pro Member: groundPath in jeder Life rewriten.
+    # - Fahrer: Unified-Points im Shared-Intervall einsetzen (eigene Punkte
+    #   sind im Intervall ohnehin schon raus, weil wir sie filtern).
+    # - Passagier: KEINE Punkte im Shared-Intervall (Gap entsteht; auf der
+    #   Map wird so nur die Fahrer-Linie sichtbar).
     for mem in out_members:
         acc_u = mem["accountId"]
         my_eps = sorted(
@@ -1505,11 +1537,14 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                         break
                 if not in_ep:
                     new_gp.append(p)
-            # Unified episode points (geclippt auf Life-Bounds)
+            # Nur der Fahrer bekommt die Unified-Episode-Points einge-
+            # speist. Passagiere haben Gap → keine Linie auf der Map.
             gp_sorted_orig = sorted(gp, key=lambda p: p[2])
             life_t0 = gp_sorted_orig[0][2] if gp_sorted_orig else None
             life_t1 = gp_sorted_orig[-1][2] if gp_sorted_orig else None
             for ep in my_eps:
+                if ep.get("driver") != acc_u:
+                    continue  # Passagier: kein Pfad
                 if life_t0 is None:
                     break
                 seg_s = max(ep["start"], life_t0)
