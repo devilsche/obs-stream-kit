@@ -2187,14 +2187,30 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
 
     chip_queue = {}  # account → [owner_acc, ...] FIFO
     matched_comebacks = set()  # bereits an Upload zugewiesene Comeback-Accounts
+    last_pickup_by_acc = {}  # account → (idx_in_events_out, ts) — fuer Gruppierung
     for kind, ts, acc, owner, px, py in chip_events_mixed:
         if kind == "pickup":
             chip_queue.setdefault(acc, []).append(owner)
             if acc not in sq_set:
                 continue  # Enemy-Pickups: queue tracken aber nicht emitten
+            # Gruppieren mit vorherigem Pickup desselben Spielers fuer
+            # denselben Owner innerhalb 5s — wenn der Vorbesitzer mehrere
+            # Chips bei sich hatte (PUBG: alle bekommen creatorAccountId =
+            # der Tote, auch wenn ihre originalen Owner unterschiedlich
+            # waren).
+            last = last_pickup_by_acc.get(acc)
+            if last and (ts - last[1]) <= 5000:
+                prev = events_out[last[0]]
+                if (prev.get("type") == "chip_pickup"
+                        and prev.get("targetAccount") == owner):
+                    prev["chipCount"] = (prev.get("chipCount") or 1) + 1
+                    last_pickup_by_acc[acc] = (last[0], ts)
+                    continue
             cr = _row_skeleton("BluechipPickup", ts, acc, owner, px, py)
             cr["type"] = "chip_pickup"
+            cr["chipCount"] = 1
             events_out.append(cr)
+            last_pickup_by_acc[acc] = (len(events_out) - 1, ts)
         elif kind == "drop":
             q = chip_queue.get(acc) or []
             owner = q.pop(0) if q else None
