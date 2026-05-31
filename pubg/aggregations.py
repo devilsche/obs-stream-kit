@@ -1654,13 +1654,17 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         ORDER BY timestamp_ms ASC
     """, (match_id,)).fetchall()
 
-    # BlueChip-Mechanik (Comeback-BR). Drei Event-Phasen:
-    #   1) Pickup: Item_Bluechip_C als ItemPickup (vom Boden) ODER
-    #      ItemPickupBox (aus Body-LootBox; target_account = Owner direkt).
-    #   2) Drop: Spieler dropt den Chip wieder (selten, aber moeglich).
-    #   3) Upload: ItemUse mit Item_Bluechip_C = am Comeback-Tower verbraucht.
-    # ItemPickup ohne Owner-Info → Heuristik (closest dead squadmate
-    # within 60s, 500cm).
+    # BlueChip-Mechanik (Comeback-BR). PUBG's creatorAccountId in
+    # LogItemPickupFromLootBox ist NICHT der originale Chip-Owner — bei
+    # einem toten Spieler der mehrere Chips trug, schreibt PUBG ALLE Chips
+    # in seiner Box mit creatorAccountId = ihm selbst (die Original-Owner
+    # gehen verloren). Das In-Game-UI zeigt aber den echten Owner via
+    # Client-State.
+    #
+    # Loesung: wir simulieren das Inventar selbst. Pro Spieler eine FIFO-
+    # Queue der Chip-Original-Creators. Bei Tod fallen alle Chips an die
+    # Death-Position als ground_chips mit ihrem TRUE creator. Bei Pickup
+    # (vom Boden ODER aus Box) matchen wir zum naechsten ground_chip.
     chip_pickup_rows = conn.execute("""
         SELECT event_type, actor_account, target_account,
                timestamp_ms, actor_x, actor_y
@@ -2138,26 +2142,97 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         ORDER BY timestamp_ms ASC
     """, (match_id,)).fetchall()
 
-    def _resolve_chip_owner(ts, px, py):
-        """Heuristik: naechster toter Spieler innerhalb 60s + 5m."""
+    # Chip-Inventar-Simulation: pro Spieler eine FIFO-Queue von Chip-
+    # Creators. Bei Tod, Drop, Upload veraendert sich der Zustand.
+    # Liefert pro Pickup-Event den TRUE original creator.
+    chip_inv = {}  # account → [creator, ...] FIFO
+    ground_chips = []  # [(ts, x, y, creator), ...]
+    # Initialisierung: alle Lobby-Teilnehmer bekommen ihren eigenen Chip
+    # (Item_Special_Bluechip_C im Backpack ab match-start).
+    all_participants = conn.execute(
+        "SELECT DISTINCT account_id FROM match_team_mapping "
+        "WHERE match_id = ?",
+        (match_id,)).fetchall()
+    for p in all_participants:
+        chip_inv[p["account_id"]] = [p["account_id"]]
+
+    # Alle chip-relevanten Events chronologisch laden, dann state machine.
+    chip_state_rows = conn.execute("""
+        SELECT event_type, timestamp_ms, actor_account, target_account,
+               actor_x, actor_y, victim_x, victim_y, weapon
+        FROM telemetry_events
+        WHERE match_id = ?
+          AND ((event_type = 'Kill' AND target_account IS NOT NULL)
+            OR (event_type IN ('ItemPickup','ItemPickupBox','ItemDrop','ItemUse')
+                AND weapon = 'Item_Bluechip_C'))
+          AND timestamp_ms IS NOT NULL
+        ORDER BY timestamp_ms ASC, event_type ASC
+    """, (match_id,)).fetchall()
+
+    def _match_ground_chip(ts, px, py, time_window_ms=10*60_000,
+                            max_dist_cm=1000):
+        """Finde naechsten ground_chip-Index <= ts, in time-window + dist."""
         if px is None or py is None:
             return None
-        best_acc, best_dist2 = None, None
-        for d in all_deaths:
-            d_ts = d["timestamp_ms"]
-            if d_ts > ts or (ts - d_ts) > 60_000:
+        best_idx, best_dist2 = None, max_dist_cm * max_dist_cm
+        for i, (gt, gx, gy, _gc) in enumerate(ground_chips):
+            if gt > ts or (ts - gt) > time_window_ms:
                 continue
-            d_x, d_y = d["victim_x"], d["victim_y"]
-            if d_x is None:
+            if gx is None:
                 continue
-            dx, dy = d_x - px, d_y - py
-            dist2 = dx*dx + dy*dy
-            if dist2 > 500*500:
+            dx, dy = gx - px, gy - py
+            d2 = dx*dx + dy*dy
+            if d2 < best_dist2:
+                best_dist2 = d2
+                best_idx = i
+        return best_idx
+
+    # Resolvierte Owner pro Pickup-Event-ID (= (ts, actor)) speichern,
+    # damit chip_pickup_rows-Iteration weiter unten den Owner lesen kann.
+    pickup_resolved = {}  # (ts, actor) → resolved_creator
+    last_processed_pickup = None  # zum Dedup von (ItemPickup, ItemPickupBox) selbe ms
+
+    for ev in chip_state_rows:
+        et = ev["event_type"]
+        ts = ev["timestamp_ms"]
+        actor = ev["actor_account"]
+        if et == "Kill":
+            target = ev["target_account"]
+            vx, vy = ev["victim_x"], ev["victim_y"]
+            if target and vx is not None:
+                # Alle Chips im Inventar fallen an die Death-Position
+                for creator in chip_inv.get(target, []):
+                    ground_chips.append((ts, vx, vy, creator))
+                chip_inv[target] = []
+        elif et == "ItemDrop":
+            inv = chip_inv.setdefault(actor, [])
+            if inv:
+                creator = inv.pop(0)
+                ground_chips.append((ts, ev["actor_x"], ev["actor_y"],
+                                     creator))
+        elif et == "ItemUse":
+            inv = chip_inv.setdefault(actor, [])
+            if inv:
+                inv.pop(0)
+        elif et in ("ItemPickup", "ItemPickupBox"):
+            # Dedup: gleiche (actor, ts // 100ms) – PUBG feuert beide
+            # Events fuer denselben physischen Pickup. Box-Event ist
+            # autoritativ, aber unser Inventar-State soll nur EINMAL
+            # incrementiert werden.
+            bucket = (actor, ts // 100)
+            if last_processed_pickup == bucket:
                 continue
-            if best_dist2 is None or dist2 < best_dist2:
-                best_dist2 = dist2
-                best_acc = d["target_account"]
-        return best_acc
+            last_processed_pickup = bucket
+            # Suche zugehoerigen ground_chip
+            idx = _match_ground_chip(ts, ev["actor_x"], ev["actor_y"])
+            if idx is not None:
+                _, _, _, creator = ground_chips.pop(idx)
+            else:
+                # Kein Ground-Match — fallback auf PUBG's creator (Box)
+                # oder target_account (kann None sein bei loose Pickup).
+                creator = ev["target_account"]
+            chip_inv.setdefault(actor, []).append(creator)
+            pickup_resolved[(ts, actor)] = creator
 
     # Alle chip-events (pickup, drop, upload) zeitlich gemischt verarbeiten
     # damit die FIFO-Queue konsistent ist.
@@ -2182,10 +2257,12 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
 
     chip_events_mixed = []
     for cp in deduped_picks:
-        cp_owner = (cp["target_account"]
-                     if cp["event_type"] == "ItemPickupBox"
-                     else _resolve_chip_owner(cp["timestamp_ms"],
-                                                cp["actor_x"], cp["actor_y"]))
+        # Owner aus Inventar-Simulation (autoritativ, kennt true creator
+        # nach Multi-Hop-Transfers). Fallback auf creator aus Box-Event
+        # falls Simulation kein Match hatte.
+        cp_owner = pickup_resolved.get(
+            (cp["timestamp_ms"], cp["actor_account"]),
+            cp["target_account"])
         chip_events_mixed.append(
             ("pickup", cp["timestamp_ms"], cp["actor_account"],
              cp_owner, cp["actor_x"], cp["actor_y"]))
@@ -2246,6 +2323,20 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     chip_queue = {}  # account → [owner_acc, ...] FIFO
     matched_comebacks = set()  # bereits an Upload zugewiesene Comeback-Accounts
     last_pickup_by_acc = {}  # account → (idx_in_events_out, ts) — fuer Gruppierung
+    # Pre-compute pro Squad-Member: max # carepackage-uploads = floor((pickups - drops)/2).
+    # Verhindert Over-Attribution wenn mehrere Carepackages in der Lobby
+    # spawnen ohne dass wir wissen wer welches gerufen hat. Pickups/Drops
+    # zaehlen wir aus den deduped events.
+    pickups_by_acc = defaultdict(int)
+    drops_by_acc = defaultdict(int)
+    for ev in chip_events_mixed:
+        if ev[0] == "pickup":
+            pickups_by_acc[ev[2]] += 1
+        elif ev[0] == "drop":
+            drops_by_acc[ev[2]] += 1
+    max_carepkgs_by_acc = {a: max(0, (pickups_by_acc[a] - drops_by_acc[a]) // 2)
+                            for a in sq_set}
+    carepkg_count_by_acc = defaultdict(int)
     for kind, ts, acc, owner, px, py in chip_events_mixed:
         if kind == "pickup":
             chip_queue.setdefault(acc, []).append(owner)
@@ -2278,17 +2369,28 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             cr["type"] = "chip_drop"
             events_out.append(cr)
         elif kind == "carepkg":
-            # Synthetisches Upload-Event aus Carepackage-Spawn rueckwaerts
-            # attribuiert. Pop 2 Chips aus der Queue (= 2 enemy chips ->
-            # 1 carepackage). Klassifikation: immer enemy → carepackage.
-            q = chip_queue.get(acc) or []
-            for _ in range(2):
-                if q: q.pop(0)
-            if acc not in sq_set:
-                continue
-            cr = _row_skeleton("BluechipUpload", ts, acc, None, px, py)
+            # Synthetisches Upload-Event aus Carepackage-Spawn. Attribution
+            # nur valide wenn ein Squad-Member tatsaechlich >=2 Chips im
+            # Inventar hat UND sein max_carepkgs-Budget noch nicht
+            # ausgeschoepft ist.
+            candidates = [a for a in sq_set
+                          if len(chip_queue.get(a) or []) >= 2
+                          and carepkg_count_by_acc[a] < max_carepkgs_by_acc.get(a, 0)]
+            if not candidates:
+                continue  # niemand im Squad konnte das gewesen sein
+            if acc in candidates:
+                uploader = acc
+            else:
+                uploader = max(candidates, key=lambda a: len(chip_queue[a]))
+            carepkg_count_by_acc[uploader] += 1
+            q = chip_queue[uploader]
+            owner1 = q.pop(0)
+            owner2 = q.pop(0)
+            cr = _row_skeleton("BluechipUpload", ts, uploader, None, px, py)
             cr["type"] = "chip_upload_carepackage"
             cr["chipCount"] = 2
+            # Beide Chip-Owner separat in event (fuer Anzeige)
+            cr["chipOwners"] = [owner1, owner2]
             events_out.append(cr)
         elif kind == "upload":
             # Owner-Bestimmung WAHR: Wenn innerhalb der naechsten 5min
