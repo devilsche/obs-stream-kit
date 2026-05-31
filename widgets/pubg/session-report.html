@@ -880,22 +880,29 @@
       background: transparent;
       border: 1px solid transparent;
       border-bottom: none;
-      color: var(--pubg-muted);
+      /* Inaktiv: heller als --pubg-muted fuer ausreichenden Kontrast
+         gegen body-Hintergrund (WCAG 4.5:1). Aktiv = gold. */
+      color: var(--pubg-text);
+      opacity: 0.75;
       padding: 8px 18px;
       font: inherit;
       font-size: 0.95em;
+      font-weight: 500;
       cursor: pointer;
       border-top-left-radius: 6px;
       border-top-right-radius: 6px;
       margin-bottom: -1px;
       min-height: 32px;
+      transition: opacity 0.12s, background-color 0.12s;
     }
-    .view-tab:hover { color: var(--pubg-text); background: rgba(94,42,121,0.15); }
+    .view-tab:hover { opacity: 1; background: rgba(94,42,121,0.15); }
     .view-tab[aria-selected="true"] {
       color: var(--pubg-gold);
+      opacity: 1;
       background: rgba(0,0,0,0.3);
       border-color: var(--pubg-border);
       border-bottom-color: rgba(0,0,0,0.3);
+      font-weight: 600;
     }
     .view-tab:focus-visible {
       outline: 2px solid var(--pubg-gold);
