@@ -1391,14 +1391,121 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             "botKills":        bot_kills_by.get(acc, 0),
         })
 
-    # Sortierung: Self first, dann nach Slot (1..4), Slot=NULL als Fallback
-    # alphabetisch ans Ende. So entspricht die Reihenfolge im Frontend dem
-    # PUBG-In-Game-Roster.
+    # Sortierung: Slot 1..4 wie In-Game-Roster (Self steht NICHT
+    # automatisch oben — der Streamer ist halt der Slot den er hat).
+    # Slot=NULL als Fallback ans Ende, dann alphabetisch.
     out_members.sort(key=lambda x: (
-        0 if x["isSelf"] else 1,
         x["slot"] if x["slot"] is not None else 999,
         x["name"].lower(),
     ))
+
+    # ============================================================
+    # Shared-Vehicle-Pfad-Unifikation
+    # Wenn ≥2 Squad-Mates im selben Fahrzeug mit ueberlappenden
+    # VehicleEnter/Leave-Intervallen sind, werden ihre Position-Events
+    # in dem Intervall durch eine Union ersetzt → Linien sind deckungs-
+    # gleich auf der Map.
+    # ============================================================
+    sq_pos_rows = conn.execute(f"""
+        SELECT actor_account, actor_x, actor_y, timestamp_ms
+        FROM telemetry_events
+        WHERE match_id = ?
+          AND event_type = 'Position'
+          AND actor_account IN ({_ph_sq})
+          AND actor_x IS NOT NULL
+          AND timestamp_ms IS NOT NULL
+        ORDER BY timestamp_ms ASC
+    """, (match_id, *squad_accs)).fetchall()
+    pos_by_acc_unify = {}
+    for r in sq_pos_rows:
+        pos_by_acc_unify.setdefault(r["actor_account"], []).append(r)
+
+    # Shared-Vehicle-Episoden finden (≥2 Squad-Members, selber vid,
+    # ueberlappendes Intervall)
+    shared_episodes = []
+    seen_keys = set()
+    for a_outer in squad_accs:
+        for (s, e, vid) in veh_intervals_by_acc.get(a_outer, []):
+            if not vid:
+                continue
+            riders = {a_outer}
+            ep_start = s
+            ep_end   = e
+            # Open-ended (kein VehicleLeave): float('inf') als end_ts
+            if ep_end == float("inf"):
+                ep_end = ep_start + 10**11  # ~3 Jahre, faktisch unendlich
+            for b_other in squad_accs:
+                if b_other == a_outer:
+                    continue
+                for (s2, e2, vid2) in veh_intervals_by_acc.get(b_other, []):
+                    if vid2 != vid:
+                        continue
+                    e2x = e2 if e2 != float("inf") else (ep_end + 1)
+                    if s2 < ep_end and e2x > ep_start:
+                        riders.add(b_other)
+                        ep_start = min(ep_start, s2)
+                        ep_end   = max(ep_end, e2x)
+            if len(riders) < 2:
+                continue
+            key = (vid, frozenset(riders), ep_start, ep_end)
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            # Union aller Position-Events der Mitfahrer im Episoden-Intervall
+            pts = []
+            for r_acc in riders:
+                for p in pos_by_acc_unify.get(r_acc, []):
+                    ts = p["timestamp_ms"]
+                    if ep_start <= ts <= ep_end:
+                        pts.append([p["actor_x"], p["actor_y"], ts])
+            pts.sort(key=lambda x: x[2])
+            shared_episodes.append({
+                "vid":    vid,
+                "start":  ep_start,
+                "end":    ep_end,
+                "riders": list(riders),
+                "points": pts,
+            })
+
+    # Pro Member: groundPath in jeder Life mit Episoden-Unified-Points
+    # rewriten (eigene Points im Intervall raus, Unified rein).
+    for mem in out_members:
+        acc_u = mem["accountId"]
+        my_eps = sorted(
+            [ep for ep in shared_episodes if acc_u in ep["riders"]],
+            key=lambda ep: ep["start"])
+        if not my_eps:
+            continue
+        for life in mem["lives"]:
+            gp = life.get("groundPath") or []
+            if not gp:
+                continue
+            new_gp = []
+            for p in gp:
+                t = p[2]
+                in_ep = False
+                for ep in my_eps:
+                    if ep["start"] <= t <= ep["end"]:
+                        in_ep = True
+                        break
+                if not in_ep:
+                    new_gp.append(p)
+            # Unified episode points (geclippt auf Life-Bounds)
+            gp_sorted_orig = sorted(gp, key=lambda p: p[2])
+            life_t0 = gp_sorted_orig[0][2] if gp_sorted_orig else None
+            life_t1 = gp_sorted_orig[-1][2] if gp_sorted_orig else None
+            for ep in my_eps:
+                if life_t0 is None:
+                    break
+                seg_s = max(ep["start"], life_t0)
+                seg_e = min(ep["end"], life_t1)
+                if seg_s > seg_e:
+                    continue
+                for ux, uy, ut in ep["points"]:
+                    if seg_s <= ut <= seg_e:
+                        new_gp.append([ux, uy, ut])
+            new_gp.sort(key=lambda p: p[2])
+            life["groundPath"] = new_gp
 
     # ============================================================
     # Squad-weite + chained-enemy Event-Liste fuer Match-Detail-Timeline.
