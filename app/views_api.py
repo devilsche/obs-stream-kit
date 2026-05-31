@@ -77,6 +77,20 @@ def _build_pubg_registry(tenant_id):
     conn = _get_conn()
     try:
         creds = core_creds.get(conn, tenant_id)
+        # Fallback: wenn pubg_account_id in den Credentials nicht gesetzt
+        # ist (kommt vor wenn der User via Poller-Setup vor dem expliziten
+        # Account-Linking gefuettert wurde), Self-Player aus obs.players
+        # heranziehen.
+        my_acc = creds.pubg_account_id
+        if not my_acc:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT account_id FROM players "
+                    "WHERE tenant_id = %s AND is_self = 1 LIMIT 1",
+                    (tenant_id,))
+                row = cur.fetchone()
+                if row:
+                    my_acc = row["account_id"]
     finally:
         conn.close()
     client = None
@@ -85,7 +99,7 @@ def _build_pubg_registry(tenant_id):
                              platform=creds.pubg_platform or "steam")
     return EndpointRegistry(
         get_conn=lambda: SqliteCompatConn(_get_conn()),
-        my_account_id=creds.pubg_account_id,
+        my_account_id=my_acc,
         platform=creds.pubg_platform or "steam",
         cache=_TenantPrefixCache(_shared_pubg_cache(), tenant_id),
         client=client,
