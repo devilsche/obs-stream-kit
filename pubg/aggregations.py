@@ -2165,10 +2165,14 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         "SELECT DISTINCT account_id FROM match_team_mapping "
         "WHERE match_id = ?",
         (match_id,)).fetchall()
+    all_acc_set = {p["account_id"] for p in all_participants}
+    # KEINE Init mit Personal-Chip im Inventar — sonst weicht chip_inv
+    # vom chip_queue ab. Personal-Chip (creator=self) wird beim Tod
+    # in die loot_box gelegt (Kill-Handler).
     for p in all_participants:
-        inventory[p["account_id"]] = [p["account_id"]]
+        inventory[p["account_id"]] = []
 
-    chip_state_rows = conn.execute("""
+    chip_state_rows = list(conn.execute("""
         SELECT event_type, timestamp_ms, actor_account, target_account,
                actor_x, actor_y, victim_x, victim_y, weapon
         FROM telemetry_events
@@ -2178,7 +2182,102 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 AND weapon = 'Item_Bluechip_C'))
           AND timestamp_ms IS NOT NULL
         ORDER BY timestamp_ms ASC
-    """, (match_id,)).fetchall()
+    """, (match_id,)).fetchall())
+
+    # PUBG feuert LogItemUse fuer BlueChip nicht in allen Matches. Wenn
+    # ein Spieler 2 Chips am Tower hochlaedt aber kein LogItemUse-Event
+    # ankommt, weiss die Inventar-Simulation nichts vom Verbrauch — alle
+    # spaeteren Drops/Pickups bekommen falsche Creators (= aelteste Chips
+    # statt verbleibender). Wir generieren virtuelle ItemUse-Events aus
+    # erkannten stationaeren Tower-Phasen (Position kaum veraendert nach
+    # dem letzten Pickup).
+    _stationary_pos_rows = list(conn.execute("""
+        SELECT actor_account, timestamp_ms, actor_x, actor_y
+        FROM telemetry_events
+        WHERE match_id = ?
+          AND event_type = 'Position'
+          AND actor_account IS NOT NULL AND actor_x IS NOT NULL
+          AND timestamp_ms IS NOT NULL
+        ORDER BY timestamp_ms ASC
+    """, (match_id,)).fetchall())
+    _pos_by_acc_pre = {}
+    for r in _stationary_pos_rows:
+        _pos_by_acc_pre.setdefault(r["actor_account"], []).append(
+            (r["timestamp_ms"], r["actor_x"], r["actor_y"]))
+    _last_pickup_pre = {}
+    for cp in chip_pickup_rows:
+        a = cp["actor_account"]
+        ts_ = cp["timestamp_ms"]
+        _last_pickup_pre[a] = max(_last_pickup_pre.get(a, 0), ts_)
+    _has_logitemuse_per_acc = set()
+    for r in chip_state_rows:
+        if r["event_type"] == "ItemUse":
+            _has_logitemuse_per_acc.add(r["actor_account"])
+    def _stat_periods_simple(positions, after_ts,
+                               max_dist_cm=1500, min_dur_ms=15_000):
+        if after_ts is None: return []
+        seq = [p for p in positions if p[0] >= after_ts]
+        if not seq: return []
+        out = []; i = 0
+        while i < len(seq):
+            anchor_ts, ax, ay = seq[i]
+            j = i + 1
+            while j < len(seq):
+                _t, x, y = seq[j]
+                if (x-ax)**2 + (y-ay)**2 > max_dist_cm*max_dist_cm:
+                    break
+                j += 1
+            last_in = j - 1
+            if last_in > i and seq[last_in][0] - anchor_ts >= min_dur_ms:
+                out.append(anchor_ts)
+                i = last_in + 1
+            else:
+                i += 1
+        return out
+    _pickups_pre = {}; _drops_pre = {}
+    for cp in chip_pickup_rows:
+        _pickups_pre[cp["actor_account"]] = _pickups_pre.get(cp["actor_account"], 0) + 1
+    for dr in chip_drop_rows:
+        _drops_pre[dr["actor_account"]] = _drops_pre.get(dr["actor_account"], 0) + 1
+    # WICHTIG: Box+loose Pickups feuern oft als Paar → tatsaechliche
+    # Pickup-Anzahl ist (ItemPickupBox-Count) wenn vorhanden, sonst halbiert.
+    # Wir nehmen einfach (alle Pickup-Events // 2) wenn beide event_types
+    # vorkommen — sonst der direkte Count.
+    _picks_box_pre = {}; _picks_loose_pre = {}
+    for cp in chip_pickup_rows:
+        a = cp["actor_account"]
+        if cp["event_type"] == "ItemPickupBox":
+            _picks_box_pre[a] = _picks_box_pre.get(a, 0) + 1
+        else:
+            _picks_loose_pre[a] = _picks_loose_pre.get(a, 0) + 1
+    def _effective_picks(a):
+        # PUBG paaring: wenn box+loose etwa gleich → dedup. Sonst max.
+        return max(_picks_box_pre.get(a, 0), _picks_loose_pre.get(a, 0))
+    # Per Squad-Member: virtuelle ItemUse-Events fuer max_carepkgs
+    # erste stationaere Phasen NACH letzter Pickup-ts.
+    for acc in sq_set:
+        if acc in _has_logitemuse_per_acc:
+            continue  # echte LogItemUse-Events sind da, brauchen kein Stub
+        last_p = _last_pickup_pre.get(acc)
+        if last_p is None: continue
+        picks_eff = _effective_picks(acc)
+        drops_eff = _drops_pre.get(acc, 0)
+        max_uploads_2chip = max(0, (picks_eff - drops_eff) // 2)
+        if max_uploads_2chip == 0: continue
+        periods = _stat_periods_simple(_pos_by_acc_pre.get(acc, []), last_p)
+        for start_ts in periods[:max_uploads_2chip]:
+            # Zwei virtuelle ItemUse pro Tower-Stop (Carepackage = 2 chips).
+            for _ in range(2):
+                chip_state_rows.append({
+                    "event_type": "ItemUse",
+                    "timestamp_ms": start_ts,
+                    "actor_account": acc,
+                    "target_account": None,
+                    "actor_x": None, "actor_y": None,
+                    "victim_x": None, "victim_y": None,
+                    "weapon": "Item_Bluechip_C",
+                })
+    chip_state_rows.sort(key=lambda r: r["timestamp_ms"])
 
     # Dedup-Helper: PUBG feuert pro physischen Pickup BEIDE Events
     # (ItemPickup + ItemPickupBox) im selben 100ms-Bucket. Wir
@@ -2200,8 +2299,10 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         actor = ev["actor_account"]
         if et == "Kill":
             target = ev["target_account"]
-            # Inventar des Toten landet in seiner Death-Box (FIFO).
-            loot_boxes[target] = inventory.get(target, []) + loot_boxes.get(target, [])
+            # Inventar des Toten + sein Personal-Chip (Item_Special_Bluechip_C
+            # mit creator=self) landen in seiner Death-Box (FIFO).
+            personal = [target] if target in all_acc_set else []
+            loot_boxes[target] = personal + inventory.get(target, []) + loot_boxes.get(target, [])
             inventory[target] = []
         elif et == "ItemDrop":
             inv = inventory.setdefault(actor, [])
@@ -2218,26 +2319,41 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 continue
             processed_pickups.add(bucket)
             pair = pair_buckets.get(bucket, {})
+            def _match_dropped(px, py):
+                if px is None: return None, None
+                best_idx, best_d2 = None, 1000*1000  # 10m max
+                for i, (_t, dx, dy, _c) in enumerate(dropped):
+                    if dx is None: continue
+                    d2 = (dx-px)**2 + (dy-py)**2
+                    if d2 < best_d2:
+                        best_d2 = d2; best_idx = i
+                if best_idx is None:
+                    return None, None
+                return best_idx, dropped[best_idx][3]
             if "ItemPickupBox" in pair:
-                # Box-Pickup: pop FIFO aus loot_boxes[box_owner].
+                # Box-Pickup. Erst loot_boxes[box_owner] versuchen
+                # (= Body-Loot eines toten Spielers, autoritativ). Sonst:
+                # dropped-Pickup — lebender Spieler hat Chip weggeworfen
+                # und PUBG feuerte box-Event mit creator=dropper. Der
+                # Dropper ist NICHT der Original-Creator des Chips!
                 box_owner = pair["ItemPickupBox"]["target_account"]
                 box = loot_boxes.get(box_owner) or []
+                ev_box = pair["ItemPickupBox"]
                 if box:
                     creator = box.pop(0)
                 else:
-                    creator = box_owner  # Fallback: nimm Box-Owner als Creator
+                    idx, found = _match_dropped(ev_box["actor_x"], ev_box["actor_y"])
+                    if idx is not None:
+                        dropped.pop(idx)
+                        creator = found
+                    else:
+                        creator = box_owner  # ultimate fallback
             else:
                 # Lose Pickup: matche zum naechsten dropped chip via Distanz.
-                px, py = ev["actor_x"], ev["actor_y"]
-                best_idx, best_d2 = None, 1000*1000  # 10m max
-                if px is not None:
-                    for i, (_t, dx, dy, _c) in enumerate(dropped):
-                        if dx is None: continue
-                        d2 = (dx-px)**2 + (dy-py)**2
-                        if d2 < best_d2:
-                            best_d2 = d2; best_idx = i
-                if best_idx is not None:
-                    creator = dropped.pop(best_idx)[3]
+                idx, found = _match_dropped(ev["actor_x"], ev["actor_y"])
+                if idx is not None:
+                    dropped.pop(idx)
+                    creator = found
                 else:
                     creator = None
             inventory.setdefault(actor, []).append(creator)
