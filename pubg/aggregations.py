@@ -2300,43 +2300,53 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     for r in cp_pos_rows:
         pos_by_acc.setdefault(r["actor_account"], []).append(
             (r["timestamp_ms"], r["actor_x"], r["actor_y"]))
-    for cp in carepkg_rows:
-        cp_ts = cp["timestamp_ms"]
-        cp_x, cp_y = cp["actor_x"], cp["actor_y"]
-        cp_items = cp["attachments"]  # JSON list of item-IDs, fuer Anzeige
-        # Suche naechsten Squadmate, dessen letzte bekannte Position
-        # in den 90s vor cp_ts liegt. Distanz zum Spawn weniger relevant,
-        # weil Tower und Spawn weit auseinander sein koennen (Tower-Anruf
-        # triggert Spawn an anderem Ort) — wir nehmen einfach den Squad-
-        # member dessen Position-Stempel am dichtesten dran ist.
-        best_acc = None
-        best_dt = None
-        for acc in sq_set:
-            positions = pos_by_acc.get(acc, [])
-            for p_ts, _, _ in positions:
-                if p_ts > cp_ts:
-                    break
-                if cp_ts - p_ts > 90_000:
-                    continue
-                dt = cp_ts - p_ts
-                if best_dt is None or dt < best_dt:
-                    best_dt = dt
-                    best_acc = acc
-        # Emit nur wenn ein Squadmate attribuiert werden konnte
-        if best_acc:
-            chip_events_mixed.append(
-                ("carepkg", cp_ts, best_acc, None, cp_x, cp_y, cp_items))
-    chip_events_mixed.sort(key=lambda x: x[1])
 
-    chip_queue = {}  # account → [owner_acc, ...] FIFO
-    matched_comebacks = set()  # bereits an Upload zugewiesene Comeback-Accounts
-    last_pickup_by_acc = {}  # account → (idx_in_events_out, ts) — fuer Gruppierung
-    # Pre-compute pro Squad-Member: max # carepackage-uploads = floor((pickups - drops)/2).
-    # Verhindert Over-Attribution wenn mehrere Carepackages in der Lobby
-    # spawnen ohne dass wir wissen wer welches gerufen hat. Pickups/Drops
-    # zaehlen wir aus den deduped events.
-    pickups_by_acc = defaultdict(int)
-    drops_by_acc = defaultdict(int)
+    # Upload-Detection via stationaere Phasen nach den Pickups. Spieler
+    # muss am Tower stehen → Position bleibt fuer 15+ Sekunden in einem
+    # Radius von 5m. Per Squad-Member nur ihre N=max_carepkgs ersten
+    # stationaeren Phasen nach dem letzten Chip-Pickup verwerten.
+    last_pickup_ts_by_acc = {}
+    for cp in chip_pickup_rows:
+        a = cp["actor_account"]
+        ts_ = cp["timestamp_ms"]
+        last_pickup_ts_by_acc[a] = max(last_pickup_ts_by_acc.get(a, 0), ts_)
+
+    def _stationary_periods(positions, after_ts,
+                              max_dist_cm=1500, min_dur_ms=15_000):
+        """Findet stationaere Phasen (Position kaum veraendert) ab after_ts."""
+        if after_ts is None:
+            return []
+        seq = [p for p in positions if p[0] >= after_ts]
+        if not seq:
+            return []
+        out = []
+        i = 0
+        while i < len(seq):
+            anchor_ts, ax, ay = seq[i]
+            j = i + 1
+            while j < len(seq):
+                _t, x, y = seq[j]
+                dx, dy = x - ax, y - ay
+                if dx*dx + dy*dy > max_dist_cm*max_dist_cm:
+                    break
+                j += 1
+            last_in = j - 1
+            if last_in > i and seq[last_in][0] - anchor_ts >= min_dur_ms:
+                # Center = avg
+                xs = [p[1] for p in seq[i:last_in+1]]
+                ys = [p[2] for p in seq[i:last_in+1]]
+                out.append((anchor_ts, seq[last_in][0],
+                             sum(xs)/len(xs), sum(ys)/len(ys)))
+                i = last_in + 1
+            else:
+                i += 1
+        return out
+
+    # Budget pro Squad-Member: max # Carepackage-Uploads = (pickups -
+    # drops) // 2. Verhindert dass mehr Uploads attribuiert werden als
+    # der Spieler ueberhaupt machen konnte.
+    pickups_by_acc = _defaultdict(int)
+    drops_by_acc = _defaultdict(int)
     for ev in chip_events_mixed:
         if ev[0] == "pickup":
             pickups_by_acc[ev[2]] += 1
@@ -2344,7 +2354,36 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             drops_by_acc[ev[2]] += 1
     max_carepkgs_by_acc = {a: max(0, (pickups_by_acc[a] - drops_by_acc[a]) // 2)
                             for a in sq_set}
-    carepkg_count_by_acc = defaultdict(int)
+
+    # Pro Squad-Member: stationaere Tower-Phasen finden + Bluechip-
+    # Carepackages dazu matchen fuer Item-Info.
+    for acc in sq_set:
+        budget = max_carepkgs_by_acc.get(acc, 0)
+        if budget == 0:
+            continue
+        last_p = last_pickup_ts_by_acc.get(acc)
+        if last_p is None:
+            continue
+        positions = pos_by_acc.get(acc, [])
+        periods = _stationary_periods(positions, last_p)
+        for period in periods[:budget]:
+            start_ts, end_ts, avg_x, avg_y = period
+            # Suche zugehoeriges Bluechip-Carepackage (fuer Item-Anzeige)
+            matched_items = None
+            for cp in carepkg_rows:
+                cp_ts = cp["timestamp_ms"]
+                if start_ts - 30_000 <= cp_ts <= end_ts + 180_000:
+                    matched_items = cp["attachments"]
+                    break
+            chip_events_mixed.append(
+                ("carepkg", start_ts, acc, None, avg_x, avg_y,
+                 matched_items))
+    chip_events_mixed.sort(key=lambda x: x[1])
+
+    chip_queue = {}  # account → [owner_acc, ...] FIFO
+    matched_comebacks = set()  # bereits an Upload zugewiesene Comeback-Accounts
+    last_pickup_by_acc = {}  # account → (idx_in_events_out, ts) — fuer Gruppierung
+    carepkg_count_by_acc = _defaultdict(int)
     for kind, ts, acc, owner, px, py, extra in chip_events_mixed:
         if kind == "pickup":
             chip_queue.setdefault(acc, []).append(owner)
@@ -2394,6 +2433,9 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             q = chip_queue[uploader]
             owner1 = q.pop(0)
             owner2 = q.pop(0)
+            # px, py kommt vom stationaeren Tower-Stop (= wo der Spieler
+            # beim Upload tatsaechlich stand, nicht wo das Carepackage
+            # spaeter landet).
             cr = _row_skeleton("BluechipUpload", ts, uploader, None, px, py)
             cr["type"] = "chip_upload_carepackage"
             cr["chipCount"] = 2
