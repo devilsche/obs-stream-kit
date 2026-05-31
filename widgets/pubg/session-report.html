@@ -1881,16 +1881,14 @@
       ["revives", "Revives", ["revive", "revive_inferred"]],
     ];
 
-    // Enemy-Team-Farben: deterministische Palette per team_id (saturated,
-    // visuell unterscheidbar von Squad-Slot-Farben gelb/rot/blau/gruen).
-    const _MD_ENEMY_TEAM_PALETTE = [
-      "#b794f6", "#fbd38d", "#76e4f7", "#f687b3",
-      "#9ae6b4", "#fc8181", "#d6bcfa", "#f6e05e",
-    ];
+    // Enemy-Team-Farben: HSL-Generativ. Multiplikator 67 (prim) gibt
+    // schoenen Spread ueber den Farbkreis — Team 18 (126°) vs Team 26
+    // (302°) sind klar unterscheidbar. Funktioniert kollisionsfrei fuer
+    // Team-IDs 1..30+ (cycle: 360/gcd(67,360) = 360).
     function mdTlEnemyTeamColor(teamId) {
       if (teamId == null) return "var(--pubg-muted)";
-      const idx = Math.abs(teamId | 0) % _MD_ENEMY_TEAM_PALETTE.length;
-      return _MD_ENEMY_TEAM_PALETTE[idx];
+      const hue = (Math.abs(teamId | 0) * 67) % 360;
+      return `hsl(${hue}, 65%, 70%)`;
     }
 
     function mdTlActorColor(ev, role, colorByAcc) {
