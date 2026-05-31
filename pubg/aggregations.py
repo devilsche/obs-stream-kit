@@ -1636,12 +1636,16 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
 
     def _row_skeleton(et_row, ts_row, actor_row, target_row,
                        vx, vy, weapon_row=None, dist_cm=None):
-        """Gemeinsame Felder fuer eine Timeline-Row bauen."""
+        """Gemeinsame Felder fuer eine Timeline-Row bauen.
+        tsMs ist MATCH-RELATIV (ms ab Match-Start) — Frontend formatiert
+        als MM:SS Ingame-Zeit."""
         wn = _weapon_label(weapon_row)[0] if weapon_row else None
         dist_m_local = (round((dist_cm or 0) / 100.0, 1)
                         if dist_cm else None)
+        ts_rel = (ts_row - match_start_ms
+                   if (match_start_ms and ts_row) else ts_row)
         return {
-            "tsMs":          ts_row,
+            "tsMs":          ts_rel,
             "absTs":         _abs_ts_iso(ts_row),
             "actorAccount":  actor_row,
             "actorName":     _name_of(actor_row),
@@ -1676,22 +1680,28 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         ts     = e["timestamp_ms"]
         weapon = e["weapon"]
 
-        # Inferred-Revive: wenn ein chained-Enemy (noch in unserer
-        # "offen"-Menge) aktiv handelt (Knock/Kill jemand anderen),
-        # muss er zwischendurch revived worden sein. PUBG-Telemetrie
-        # liefert nicht IMMER ein Revive-Event — wir synthetisieren eins.
+        # Inferred-Revive Szenarien (PUBG-Telemetrie liefert nicht immer
+        # ein explizites Revive-Event — wir synthetisieren):
+        #   A) chained-Enemy handelt aktiv (Knock/Kill jemand) → revived
+        #   B) chained-Enemy wird ERNEUT geknockt → kann nur passieren
+        #      wenn er zwischendurch revived war
+        infer_who = None
         if (et in ("Knock", "Kill")
                 and actor and actor in currently_knocked_by_squad):
-            knock_pos_target = knock_pos_by_target.get(actor)
+            infer_who = actor
+        elif et == "Knock" and target and target in currently_knocked_by_squad:
+            infer_who = target
+        if infer_who:
+            knock_pos_target = knock_pos_by_target.get(infer_who)
             infer_vx = knock_pos_target[0] if knock_pos_target else None
             infer_vy = knock_pos_target[1] if knock_pos_target else None
             infer_row = _row_skeleton(
-                "Revive", ts, None, actor, infer_vx, infer_vy)
+                "Revive", ts, None, infer_who, infer_vx, infer_vy)
             infer_row["type"] = "revive_inferred"
             events_out.append(infer_row)
-            currently_knocked_by_squad.discard(actor)
-            last_knock_by_target.pop(actor, None)
-            knock_pos_by_target.pop(actor, None)
+            currently_knocked_by_squad.discard(infer_who)
+            last_knock_by_target.pop(infer_who, None)
+            knock_pos_by_target.pop(infer_who, None)
 
         # Scope: Squad-involved ODER chained-enemy (target ist gerade von
         # uns geknockt und noch nicht revived/gekillt).
