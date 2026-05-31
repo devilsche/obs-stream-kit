@@ -1520,7 +1520,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     # 1) Alle Knock/Kill/Revive-Events im Match (Lobby-weit) — Filter in Python.
     all_events_rows = conn.execute("""
         SELECT event_type, timestamp_ms, actor_account, target_account,
-               victim_x, victim_y, weapon, distance
+               victim_x, victim_y, weapon, distance, damage_reason
         FROM telemetry_events
         WHERE match_id = ?
           AND event_type IN ('Kill', 'Knock', 'Revive')
@@ -1732,13 +1732,31 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             row["type"] = "revive"
         elif et == "Kill":
             knock_ev = last_knock_by_target.get(target)
-            # Bleed-Out-Heuristik: nur sinnvoll wenn vorher ein Knock war.
-            bled_out = bool(knock_ev) and _is_bleed_out(target, ts)
+            # damageTypeCategory aus PUBG-Payload (neue Daten) — praeziser
+            # als Waffen-ID-Heuristik. Bei NULL → Fallback auf Waffen-ID.
+            dmg_reason = (e["damage_reason"] or "") if "damage_reason" in e.keys() else ""
             wid = weapon or ""
-            # Environment/Self-Tod: per Waffen-ID erkennen, unabhaengig
-            # vom Actor (Blue Zone hat manchmal actor=victim, manchmal None).
+            # Bleed-Out: zuerst damage_reason pruefen (authoritative),
+            # sonst Heuristik mit TakeDamage-Events.
+            if "BleedOut" in dmg_reason:
+                bled_out = True
+            else:
+                bled_out = bool(knock_ev) and _is_bleed_out(target, ts)
+            # Env-Death-Detection: damage_reason zuerst, dann Waffen-ID.
             env_type = None
-            if "RagdollPhysics" in wid or "Damage_HelpMeGroundFall" in wid:
+            if "Bluezone" in dmg_reason:
+                env_type = "kill_bluezone"
+            elif "BlackZone" in dmg_reason or "RedZone" in dmg_reason:
+                env_type = "kill_redzone"
+            elif "Falling" in dmg_reason or "Damage_Fall" in dmg_reason:
+                env_type = "kill_fall"
+            elif "Drown" in dmg_reason:
+                env_type = "kill_drown"
+            elif ("VehicleHit" in dmg_reason
+                    or "Damage_VehicleCrashHit" in dmg_reason):
+                env_type = "kill_self_eject"
+            # Fallback auf Waffen-ID (alte Daten ohne damage_reason)
+            elif "RagdollPhysics" in wid or "Damage_HelpMeGroundFall" in wid:
                 env_type = "kill_self_eject"
             elif "Damage_Falling" in wid or "Damage_Instant_Fall" in wid:
                 env_type = "kill_fall"

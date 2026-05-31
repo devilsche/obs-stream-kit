@@ -33,6 +33,7 @@ def _normalize(event):
             "actor_health": None,
             "victim_x": None, "victim_y": None,
             "weapon": None, "distance": None, "damage": None,
+            "damage_reason": None,
             "payload_json": None}
     # Helper: extracts z + health for character-events (for landing-pin
     # heuristic; ground-events have z<800 and health>0).
@@ -67,10 +68,19 @@ def _normalize(event):
         base["actor_account"] = (event.get("killer") or {}).get("accountId")
         base["target_account"] = (event.get("victim") or {}).get("accountId")
         info = event.get("killerDamageInfo") or {}
+        finisher_info = event.get("finisherDamageInfo") or {}
         base["weapon"] = info.get("damageCauserName") or event.get("damageCauserName")
         base["distance"] = info.get("distance") or event.get("distance")
         base["actor_x"], base["actor_y"] = _loc(event, "killer")
         base["victim_x"], base["victim_y"] = _loc(event, "victim")
+        # damageTypeCategory aus killerDamageInfo / finisherDamageInfo —
+        # erlaubt Zone/Fall/Drown/BleedOut/Eject zu unterscheiden ohne
+        # Heuristik. Bevorzuge finisherDamageInfo (= was den Spieler aus
+        # DBNO toetete) wenn vorhanden, sonst killerDamageInfo.
+        base["damage_reason"] = (
+            finisher_info.get("damageTypeCategory")
+            or info.get("damageTypeCategory")
+            or event.get("damageTypeCategory"))
     elif et == "LogPlayerKill":
         # Legacy-Form — wird ignoriert. Siehe Kommentar oben.
         return None

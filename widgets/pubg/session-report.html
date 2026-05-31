@@ -1906,13 +1906,13 @@
       return mdTlEnemyTeamColor(teamId);
     }
 
-    function mdTlFmtAbsClock(absIso) {
-      if (!absIso) return "?";
-      const d = new Date(absIso);
-      if (isNaN(d.getTime())) return "?";
-      return `${String(d.getHours()).padStart(2,"0")}:` +
-             `${String(d.getMinutes()).padStart(2,"0")}:` +
-             `${String(d.getSeconds()).padStart(2,"0")}`;
+    function mdTlFmtMatchTime(tsMs) {
+      // Ingame-Zeit seit Match-Start als M:SS / MM:SS.
+      if (tsMs == null) return "?";
+      const sec = Math.max(0, Math.floor(tsMs / 1000));
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return `${m}:${String(s).padStart(2, "0")}`;
     }
 
     function mdTlPoi(ctx, x, y) {
@@ -1996,7 +1996,7 @@
     }
 
     function mdTlRowHtml(ev, ctx) {
-      const tCell = mdTlFmtAbsClock(ev.absTs);
+      const tCell = mdTlFmtMatchTime(ev.tsMs);
       const poi   = mdTlPoi(ctx, ev.victimX, ev.victimY);
       const sentence = mdTlSentence(ev, ctx);
       const myAccount = ctx.myAccount;
