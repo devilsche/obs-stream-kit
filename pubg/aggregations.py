@@ -1495,11 +1495,27 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                                 driver = r_acc
                             break
             # Union aller Position-Events der Mitfahrer im Episoden-Intervall
+            # — ABER nur Positionen die in IHREM eigenen Vehicle-Intervall
+            # mit DIESEM vid liegen. Sonst kann ein kurzer Aussteiger/
+            # Schwimmer eine Position aus dem Wasser in die Driver-Linie
+            # einschleusen → Pin laeuft uebers Wasser.
             pts = []
             for r_acc in riders:
+                r_ivals = veh_intervals_by_acc.get(r_acc, [])
                 for p in pos_by_acc_unify.get(r_acc, []):
                     ts = p["timestamp_ms"]
-                    if ep_start <= ts <= ep_end:
+                    if ts < ep_start or ts > ep_end:
+                        continue
+                    # Check: war r_acc zum ts wirklich in DIESEM Fahrzeug?
+                    in_vehicle = False
+                    for (rs, re_, rvid) in r_ivals:
+                        if rvid != vid:
+                            continue
+                        re_x = re_ if re_ != float("inf") else (ep_end + 1)
+                        if rs <= ts <= re_x:
+                            in_vehicle = True
+                            break
+                    if in_vehicle:
                         pts.append([p["actor_x"], p["actor_y"], ts])
             pts.sort(key=lambda x: x[2])
             shared_episodes.append({
