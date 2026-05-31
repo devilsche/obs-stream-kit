@@ -216,6 +216,11 @@ def _normalize(event):
         loc = pkg.get("location") or {}
         base["actor_x"], base["actor_y"] = loc.get("x"), loc.get("y")
         base["actor_z"] = loc.get("z")
+        # Inhalt als JSON-Liste in attachments-Spalte (Item-IDs).
+        items = pkg.get("items") or []
+        item_ids = [i.get("itemId") for i in items if i.get("itemId")]
+        if item_ids:
+            base["attachments"] = json.dumps(item_ids)
     elif et == "LogObjectInteraction":
         # PAYDAY: Tueren oeffnen/schliessen, Tresore knacken
         base["event_type"] = "ObjectInteraction"

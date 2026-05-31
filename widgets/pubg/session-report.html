@@ -2077,6 +2077,34 @@
       return `${neg ? "-" : ""}${m}:${String(s).padStart(2, "0")}`;
     }
 
+    // Item-ID → kurzer Klartextname fuer Carepackage-Inhalt
+    function _carepkgItemLabel(id) {
+      if (!id) return "?";
+      const s = id.replace(/^Item_/, "").replace(/_C$/, "");
+      const NAMES = [
+        ["Weapon_L6", "L6"],
+        ["Weapon_M249", "M249"],
+        ["Weapon_AUG", "AUG"],
+        ["Weapon_Groza", "Groza"],
+        ["Weapon_AWM", "AWM"],
+        ["Weapon_MG3", "MG3"],
+        ["Weapon_Mk14", "Mk14"],
+        ["Weapon_Mk12", "Mk12"],
+        ["Weapon_FlareGun", "Flare Gun"],
+        ["Back_BlueBlocker_Lv3", "BlueChip Backpack Lv3"],
+        ["Back_BlueBlocker", "BlueChip Backpack"],
+        ["Back_C_01_Lv3", "Backpack Lv3"],
+        ["Back_C_01_Lv2", "Backpack Lv2"],
+        ["Head_E_01_Lv3", "Helmet Lv3"],
+        ["Armor_C_01_Lv3", "Vest Lv3"],
+        ["Ghillie", "Ghillie Suit"],
+      ];
+      for (const [needle, label] of NAMES) {
+        if (s.includes(needle)) return label;
+      }
+      return s.replace(/^Weapon_/, "").replace(/_/g, " ");
+    }
+
     function mdTlPoi(ctx, x, y) {
       if (ctx.mapName && PubgUI.POI && PubgUI.POI.fromCoords
           && x != null && y != null) {
@@ -2213,11 +2241,14 @@
             : `${A} uploaded a squad BlueChip at the Comeback Tower`;
         case "chip_upload_carepackage": {
           const n = ev.chipCount || 1;
-          if (ev.targetName)
-            return `${A} uploaded ${T}'s BlueChip (Carepackage incoming)`;
-          return (n > 1)
-            ? `${A} uploaded ${n} enemy BlueChips at the Tower (Carepackage incoming)`
-            : `${A} uploaded an enemy BlueChip (Carepackage incoming)`;
+          // Inhalt der Carepackage (Item-IDs → kurze Klartextnamen)
+          const items = (ev.packageItems || []).map(_carepkgItemLabel);
+          const contents = items.length
+            ? ` (${items.join(", ")})` : "";
+          const base = (n > 1)
+            ? `${A} uploaded ${n} enemy BlueChips at the Tower`
+            : `${A} uploaded an enemy BlueChip`;
+          return `${base}${contents}`;
         }
         case "chip_upload":
           return `${A} uploaded a BlueChip at the Comeback Tower`;
