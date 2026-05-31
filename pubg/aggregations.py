@@ -2180,7 +2180,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     # (ItemPickup + ItemPickupBox) im selben 100ms-Bucket. Wir
     # verarbeiten in der Simulation nur Box (autoritativ via box-owner);
     # lose ItemPickups verarbeiten wir nur wenn KEIN Box-Pendant da war.
-    pair_buckets = defaultdict(dict)  # (actor, ts//100) → {ItemPickup: row, ItemPickupBox: row}
+    from collections import defaultdict as _defaultdict
+    pair_buckets = _defaultdict(dict)  # (actor, ts//100) → {ItemPickup: row, ItemPickupBox: row}
     for ev in chip_state_rows:
         if ev["event_type"] in ("ItemPickup", "ItemPickupBox"):
             pair_buckets[(ev["actor_account"], ev["timestamp_ms"] // 100)][
@@ -2236,7 +2237,9 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 else:
                     creator = None
             inventory.setdefault(actor, []).append(creator)
-            pickup_resolved[(ts, actor)] = creator
+            # Key per (actor, ts // 100ms) — ItemPickup und ItemPickupBox
+            # haben oft 1ms Abstand. Lookup spaeter mit demselben Bucket.
+            pickup_resolved[bucket] = creator
 
     # Alle chip-events (pickup, drop, upload) zeitlich gemischt verarbeiten
     # damit die FIFO-Queue konsistent ist.
@@ -2263,9 +2266,9 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     for cp in deduped_picks:
         # Owner aus Inventar-Simulation (autoritativ, kennt true creator
         # nach Multi-Hop-Transfers). Fallback auf creator aus Box-Event
-        # falls Simulation kein Match hatte.
+        # falls Simulation kein Match hatte. Key = 100ms-Bucket.
         cp_owner = pickup_resolved.get(
-            (cp["timestamp_ms"], cp["actor_account"]),
+            (cp["actor_account"], cp["timestamp_ms"] // 100),
             cp["target_account"])
         chip_events_mixed.append(
             ("pickup", cp["timestamp_ms"], cp["actor_account"],
