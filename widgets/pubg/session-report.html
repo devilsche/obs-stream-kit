@@ -2257,7 +2257,14 @@
         }
         parts.push(`with <b${attachTitle}>${ev.weaponName}</b>`);
       }
-      if (ev.distanceM) parts.push(`· ${ev.distanceM.toFixed(0)}m`);
+      if (ev.distanceM) {
+        let distStr = `· ${ev.distanceM.toFixed(0)}m`;
+        // Bei Schuessen >200m: Victim-Ort als muted-Zusatz hinter Meterzahl
+        if (ev._victimPoi) {
+          distStr += ` <span class="md-tl-target-poi">(${ev._victimPoi})</span>`;
+        }
+        parts.push(distStr);
+      }
       // Fahrzeug-Kontext: Opfer war im Auto oder Schuetze schoss aus Auto
       if (ev.victimVehicleLabel) parts.push(`· victim in <b>${ev.victimVehicleLabel}</b>`);
       if (ev.shooterVehicleLabel) parts.push(`· from <b>${ev.shooterVehicleLabel}</b>`);
@@ -2359,7 +2366,8 @@
       // POI-Logik je Event-Typ:
       //   join → "Lobby"
       //   kill/knock/finish/steal → Shooter-Pos (= wo DU standst); bei
-      //     Distanz > 200m und auflösbarem Victim-POI Zusatz "→ Target: X"
+      //     Distanz > 200m wird der Victim-POI muted hinter die Meterzahl
+      //     im Satz angehaengt (nicht in der POI-Spalte).
       //   bleedout/self/fall/etc. → Victim-Pos
       //   pickup/drop/upload/comeback → Actor-Pos
       let poi;
@@ -2371,11 +2379,13 @@
         poi = "Lobby";
       } else if (isShooterEv && ev.actorX != null) {
         poi = mdTlPoi(ctx, ev.actorX, ev.actorY);
+        // Victim-POI fuer Satz-Zusatz (nur bei langen Schuessen)
         const distM = ev.distanceM || 0;
         if (distM > 200 && ev.victimX != null) {
-          const victimPoi = mdTlPoi(ctx, ev.victimX, ev.victimY);
-          if (victimPoi && victimPoi !== "&lt;unknown&gt;" && victimPoi !== poi) {
-            poi += ` <span class="md-tl-target-poi">→ ${victimPoi}</span>`;
+          const vp = mdTlPoi(ctx, ev.victimX, ev.victimY);
+          if (vp && vp !== "&lt;unknown&gt;" && vp !== poi) {
+            // Auf ev anheften, mdTlWeaponMeta haengt's hinter die Meterzahl
+            ev._victimPoi = vp;
           }
         }
       } else {
