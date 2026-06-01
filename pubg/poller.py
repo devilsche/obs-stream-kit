@@ -131,15 +131,25 @@ def ingest_match(conn, tenant_id: int, client, my_account_id: str,
         except Exception as e:
             print(f"[archive] tenant {tenant_id} match "
                   f"{parsed['match_id'][:16]}: {e}")
-    # Clan-Enrichment fuer Squad-Members. Global cached (7d TTL) — bei
-    # warmem Cache 0 API-Calls. Failure-tolerant: schluckt API-Errors
-    # damit der Match-Ingest nicht scheitert.
+    # Clan-Enrichment:
+    # 1) Squad sofort + synchron — sind nur 1-4 Spieler, cache-warm meist 0
+    #    API-Calls. Wir wollen sie definitiv bevor das Match-Detail
+    #    angeschaut wird.
+    # 2) Komplette Lobby (~100 Spieler) NUR enqueuen — Background-Worker
+    #    (process_queue im PollerThread) arbeitet das gedrosselt ab.
     try:
-        from pubg.clan_enrichment import enrich_account_ids
+        from pubg.clan_enrichment import enrich_account_ids, enqueue_unknown
         squad_accs = [p["account_id"] for p in parsed["squad_participants"]
                       if p.get("account_id")]
         if squad_accs:
             enrich_account_ids(conn, client, squad_accs)
+        # Lobby-Enqueue (= alle Account-IDs aus team_mapping). Schon vorhandene
+        # Eintraege in player_clans werden via ON CONFLICT geskippt.
+        lobby_accs = list({tm.get("account_id")
+                          for tm in (parsed.get("team_mapping") or [])
+                          if tm.get("account_id")})
+        if lobby_accs:
+            enqueue_unknown(conn, lobby_accs)
     except Exception as e:
         print(f"[clan-enrich] tenant {tenant_id} match "
               f"{parsed['match_id'][:16]}: {e}")
@@ -165,6 +175,15 @@ def run_single_tick(conn, tenant_id: int, client, my_player_name: str,
         except Exception as e:
             stats["errors"].append(f"match {mid}: {e}")
     stats["skipped"] = max(0, len(new_ids) - max_matches_per_tick)
+    # Drip-feed Background-Clan-Enrichment: pro Tenant pro Tick max 3
+    # Accounts → max 6 API-Calls. Bei 50 Tenants parallel = 150 Accounts
+    # /min lobby-weit, deutlich unter free 10 RPM pro Key. Bricht ueber
+    # mehrere Minuten den Backlog ab, ohne Polling zu blocken.
+    try:
+        from pubg.clan_enrichment import process_queue
+        process_queue(conn, client, max_count=3)
+    except Exception as e:
+        stats["errors"].append(f"clan-queue: {e}")
     return stats
 
 

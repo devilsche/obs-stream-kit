@@ -125,6 +125,50 @@ def ensure_clan(conn, client, clan_id: str,
     return row
 
 
+def enqueue_unknown(conn, account_ids) -> int:
+    """Schreibt NULL-Rows in player_clans fuer noch unbekannte Accounts.
+    Diese werden vom Background-Worker (process_queue) abgearbeitet.
+    Idempotent via ON CONFLICT DO NOTHING — vorhandene Mappings bleiben.
+    Returns Anzahl neu enqueued."""
+    n = 0
+    for acc in account_ids:
+        if not acc:
+            continue
+        cur = conn.execute(
+            "INSERT INTO player_clans (account_id, clan_id, updated_at) "
+            "VALUES (?, NULL, NULL) "
+            "ON CONFLICT (account_id) DO NOTHING",
+            (acc, ))
+        # psycopg2 cursor.rowcount nicht ueber alle Treiber zuverlaessig;
+        # fuer simple Statistik genuegt es zu zaehlen wir versucht haben.
+        n += 1
+    try:
+        conn.commit()
+    except Exception:
+        pass
+    return n
+
+
+def process_queue(conn, client, max_count: int = 3) -> int:
+    """Drip-feed Worker: pickt max_count noch-nie-aufgeloeste Accounts
+    aus player_clans (updated_at IS NULL) und fetched player+clan-Info.
+
+    Rate-Limit-konform: pro Call = 1-2 API-Requests, also max ~6/Tick.
+    Wird vom PollerThread pro Tenant pro Tick aufgerufen → spreads
+    workload ueber mehrere Tenants und Ticks."""
+    if client is None:
+        return 0
+    rows = conn.execute(
+        "SELECT account_id FROM player_clans "
+        "WHERE updated_at IS NULL "
+        "ORDER BY RANDOM() LIMIT ?", (max_count,)).fetchall()
+    accs = [r["account_id"] for r in rows]
+    if not accs:
+        return 0
+    enrich_account_ids(conn, client, accs)
+    return len(accs)
+
+
 def enrich_account_ids(conn, client, account_ids: list) -> dict:
     """Bulk-Enrichment: fuer eine Liste account_ids beide Lookups
     durchziehen. Returns {account_id: clan_dict_or_None} — clan_dict enthaelt
