@@ -391,14 +391,19 @@ async function loadMap(mapId) {
   mapImage.crossOrigin = "anonymous";
   mapImage.onload = () => render();
   const _staticBase = (window.__STATIC_BASE__ || "/widgets-static/").replace(/\/$/, "/");
+  // Im POI-Editor wollen wir die hoechste verfuegbare Aufloesung —
+  // praezise Polygon-Punkte setzen. Reihenfolge: _hd.webp > .webp > .png
   mapImage.onerror = () => {
     mapImage.onerror = () => {
-      statusEl.textContent = `⚠ Map ${mapId}.{png|webp} nicht gefunden`;
-      render();
+      mapImage.onerror = () => {
+        statusEl.textContent = `⚠ Map ${mapId}.{_hd.webp|webp|png} nicht gefunden`;
+        render();
+      };
+      mapImage.src = `${_staticBase}pubg/maps/${mapId}.png`;
     };
     mapImage.src = `${_staticBase}pubg/maps/${mapId}.webp`;
   };
-  mapImage.src = `${_staticBase}pubg/maps/${mapId}.png`;
+  mapImage.src = `${_staticBase}pubg/maps/${mapId}_hd.webp`;
   // Zoom/Pan auf Default zurueck wenn die Map wechselt
   view = { zoom: 1, panX: 0, panY: 0, tZoom: 1, tPanX: 0, tPanY: 0 };
   updateZoomBtn();
