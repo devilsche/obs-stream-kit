@@ -1,6 +1,7 @@
 """Widget-Routes: HTML mit Inject + statisches Asset-Serving unter /s/<token>/."""
 import os
 from flask import Blueprint, send_from_directory, current_app, g, request, abort
+from webcore.serving import inject_window_vars
 
 
 bp_widgets = Blueprint("widgets", __name__)
@@ -11,19 +12,6 @@ def _project_root() -> str:
     if root:
         return root
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-
-def _inject(html: str, token: str) -> str:
-    """Setzt window.__SERVE_BASE__ + window.__STATIC_BASE__ ein."""
-    script = (
-        f'<script>\n'
-        f'window.__SERVE_BASE__ = "/s/{token}/";\n'
-        f'window.__STATIC_BASE__ = "/widgets-static/";\n'
-        f'</script>'
-    )
-    if "</head>" in html:
-        return html.replace("</head>", script + "\n</head>", 1)
-    return script + "\n" + html
 
 
 @bp_widgets.route("/s/<token>/widgets/<path:filepath>")
@@ -61,6 +49,11 @@ def widget_file(token, filepath):
 
         with open(full_path, "r", encoding="utf-8") as f:
             html = f.read()
-        return _inject(html, token), 200, {"Content-Type": "text/html; charset=utf-8"}
+        variables = {
+            "__SERVE_BASE__": f"/s/{token}/",
+            "__STATIC_BASE__": "/widgets-static/",
+        }
+        return (inject_window_vars(html, variables), 200,
+                {"Content-Type": "text/html; charset=utf-8"})
 
     return send_from_directory(os.path.dirname(full_path), os.path.basename(full_path))
