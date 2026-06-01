@@ -1051,7 +1051,11 @@ function tick(wallNow) {
       document.getElementById("playPause").textContent = "▶";
     }
     // Follow-Mode: bei Zeit-Aenderung die Karte aufs Team re-centern
-    if (RS.followTeam != null) panToTeam(RS.followTeam);
+    // Follow-Mode: re-center + bbox-fit Zoom. Wenn der Mate via
+    // Comeback-Heli weit weg landet, wird automatisch rausgezoomt
+    // damit alle Team-Mates sichtbar sind. Wenn sie wieder zusammen-
+    // kommen, zoomt es zurueck.
+    if (RS.followTeam != null) zoomToTeam(RS.followTeam);
     syncScrubberAndClock();
     updateTeamListDeadState(RS.cursorMs);
     renderFrame();
