@@ -1031,7 +1031,8 @@ stageEl().addEventListener("wheel", e => {
   RS.view.tPanX = mx - hw - (mx - hw - RS.view.tPanX) * ratio;
   RS.view.tPanY = my - hh - (my - hh - RS.view.tPanY) * ratio;
   RS.view.tZoom = newZoom;
-  RS.followTeam = null;  // Manueller Zoom → Follow aus
+  // Wheel-Zoom laesst Follow aktiv — du kannst beim verfolgten Team
+  // einfach reinzoomen. Nur Drag (mousedown) bricht den Follow ab.
 }, { passive: false });
 
 let _drag = null;
