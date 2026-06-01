@@ -143,9 +143,9 @@ def require_session(view):
     @wraps(view)
     def wrapper(*args, **kwargs):
         if g.user is None:
-            return redirect("/app/login")
+            return redirect(current_app.config.get("LOGIN_URL", "/app/login"))
         if not g.user["is_approved"]:
-            return redirect("/app/pending")
+            return redirect(current_app.config.get("PENDING_URL", "/app/pending"))
         return view(*args, **kwargs)
     return wrapper
 
@@ -154,7 +154,7 @@ def require_admin(view):
     @wraps(view)
     def wrapper(*args, **kwargs):
         if g.user is None:
-            return redirect("/app/login")
+            return redirect(current_app.config.get("LOGIN_URL", "/app/login"))
         if not g.user["is_admin"]:
             abort(403)
         return view(*args, **kwargs)
@@ -166,8 +166,8 @@ def require_approved(view):
     @wraps(view)
     def wrapper(*args, **kwargs):
         if g.user is None:
-            return redirect("/app/login")
+            return redirect(current_app.config.get("LOGIN_URL", "/app/login"))
         if not g.user["is_approved"]:
-            return redirect("/app/pending")
+            return redirect(current_app.config.get("PENDING_URL", "/app/pending"))
         return view(*args, **kwargs)
     return wrapper

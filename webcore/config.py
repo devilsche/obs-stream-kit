@@ -40,6 +40,9 @@ class Config:
     OBSKIT_SID_COOKIE = "obskit_sid"
     SESSION_LIFETIME_DAYS = 30
 
+    LOGIN_URL = "/app/login"
+    PENDING_URL = "/app/pending"
+
 
 class TestingConfig(Config):
     TESTING = True
