@@ -8,10 +8,10 @@ from flask import (
     Blueprint, redirect, request, session, abort, g, current_app, make_response
 )
 
-from app.config import Config
-from app.twitch_client import exchange_code, get_user_info  # exposed for mock
-from app import sessions as srv_sessions
-from app.middleware import _get_conn
+from webcore.config import Config
+from webcore.twitch_client import exchange_code, get_user_info  # exposed for mock
+from webcore import sessions as srv_sessions
+from webcore.middleware import _get_conn
 
 
 bp_auth = Blueprint("auth", __name__)

@@ -2,9 +2,9 @@ from unittest.mock import patch
 import pytest
 
 from app import create_app
-from app.auth import bp_auth
-from app.middleware import register_middleware
-from app import sessions
+from webcore.auth import bp_auth
+from webcore.middleware import register_middleware
+from webcore import sessions
 
 
 def _make_app(conn):
@@ -31,8 +31,8 @@ def test_callback_creates_new_user_pending(pg_conn_test_setup):
     client = app.test_client()
     state_resp = client.get("/app/login")
     state = state_resp.headers["Location"].split("state=")[1].split("&")[0]
-    with patch("app.auth.exchange_code", return_value="acc_xyz"), \
-         patch("app.auth.get_user_info", return_value={
+    with patch("webcore.auth.exchange_code", return_value="acc_xyz"), \
+         patch("webcore.auth.get_user_info", return_value={
              "id": "555", "login": "neu", "display_name": "Neu",
              "avatar_url": "http://a", "email": "neu@x",
          }):
@@ -57,8 +57,8 @@ def test_callback_admin_claim(pg_conn_test_setup):
     client = app.test_client()
     state_resp = client.get("/app/login")
     state = state_resp.headers["Location"].split("state=")[1].split("&")[0]
-    with patch("app.auth.exchange_code", return_value="acc_xyz"), \
-         patch("app.auth.get_user_info", return_value={
+    with patch("webcore.auth.exchange_code", return_value="acc_xyz"), \
+         patch("webcore.auth.get_user_info", return_value={
              "id": "12345", "login": "admin", "display_name": "Admin",
              "avatar_url": "http://a", "email": "a@x",
          }):

@@ -3,15 +3,15 @@ import os
 from flask import Flask, jsonify
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from app.config import Config, TestingConfig
-from app.middleware import register_middleware
-from app.auth import bp_auth
+from webcore.config import Config, TestingConfig
+from webcore.middleware import register_middleware
+from webcore.auth import bp_auth
 from app.views_admin import bp_admin
 from app.views_widgets import bp_widgets
 from app.views_static import bp_static
 from app.views_api import bp_api
 from app.views_app import bp_app
-from app.metrics import register_metrics
+from webcore.metrics import register_metrics
 
 
 def create_app(testing: bool = False) -> Flask:

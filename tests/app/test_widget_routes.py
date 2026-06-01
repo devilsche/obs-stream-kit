@@ -1,5 +1,5 @@
 from app import create_app
-from app.middleware import register_middleware
+from webcore.middleware import register_middleware
 from app.views_widgets import bp_widgets
 from app.views_static import bp_static
 

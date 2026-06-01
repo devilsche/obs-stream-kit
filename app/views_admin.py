@@ -6,8 +6,8 @@ from flask import (
     Blueprint, redirect, request, render_template, g, current_app, abort
 )
 
-from app.middleware import require_admin, _get_conn
-from app import sessions as srv_sessions
+from webcore.middleware import require_admin, _get_conn
+from webcore import sessions as srv_sessions
 
 
 bp_admin = Blueprint("admin", __name__)

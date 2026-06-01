@@ -2,7 +2,7 @@ import os
 import time
 import pytest
 from core import db as core_db
-from app import sessions
+from webcore import sessions
 
 
 @pytest.fixture

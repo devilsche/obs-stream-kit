@@ -39,11 +39,11 @@ def widget_file(token, filepath):
     if filepath.endswith(".html"):
         # Credentials-Gate: blocke wenn der Tenant keine API-Keys
         # fuer die vom Widget benoetigte Domain hinterlegt hat.
-        from app.creds_gate import (required_domains, missing_domains,
+        from webcore.creds_gate import (required_domains, missing_domains,
                                       render_block_page)
         needed = required_domains("widgets/" + filepath)
         if needed and g.tenant_id is not None:
-            from app.middleware import _get_conn
+            from webcore.middleware import _get_conn
             from core import credentials as core_creds
             conn = _get_conn()
             try:

@@ -24,7 +24,7 @@ def pg_dsn_test():
 
 
 from core import db as core_db
-from app import sessions
+from webcore import sessions
 
 
 def _setup_schema(conn):

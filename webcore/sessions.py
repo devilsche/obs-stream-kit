@@ -6,7 +6,7 @@ Cookie enthaelt nur die Session-UUID; alle Daten sind server-side.
 import datetime as dt
 from typing import Optional
 
-from app.config import Config
+from webcore.config import Config
 
 
 def create(conn, user_id: int, user_agent: Optional[str] = None,

@@ -54,7 +54,7 @@ class PubgClient:
         })
         # Lazy import — Metriken-Modul ist optional fuer Tests/CLI.
         try:
-            from app.metrics import observe_external
+            from webcore.metrics import observe_external
             _obs_ctx = observe_external("pubg", metric_endpoint)
         except Exception:
             _obs_ctx = None
@@ -137,7 +137,7 @@ class PubgClient:
             "Accept-Encoding": "gzip",
         })
         try:
-            from app.metrics import observe_external
+            from webcore.metrics import observe_external
             _obs = observe_external("pubg", "telemetry")
         except Exception:
             _obs = None

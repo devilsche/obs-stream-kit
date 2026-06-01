@@ -9,7 +9,7 @@ ohne Cross-Tenant-Lecks (Tenant 1's Keys: 't1:...', Tenant 2's: 't2:...').
 """
 from flask import Blueprint, g, jsonify, abort, request, current_app
 
-from app.middleware import _get_conn
+from webcore.middleware import _get_conn
 
 
 bp_api = Blueprint("api", __name__)
@@ -153,7 +153,7 @@ def _dispatch(path: str, tenant_id: int, method: str = "GET",
     # sind — stattdessen sauberer 403 mit Hinweis.
     if domain in ("pubg", "steam"):
         from core import credentials as core_creds
-        from app.creds_gate import missing_domains
+        from webcore.creds_gate import missing_domains
         conn = _get_conn()
         try:
             creds = core_creds.get(conn, tenant_id)

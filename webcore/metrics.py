@@ -190,7 +190,7 @@ def register_metrics(app: Flask) -> None:
         if now - _db_cache["updated_at"] < 60:
             return
         try:
-            from app.middleware import _get_conn
+            from webcore.middleware import _get_conn
             conn = _get_conn()
             try:
                 with conn.cursor() as cur:

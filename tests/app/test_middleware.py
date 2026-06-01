@@ -2,7 +2,7 @@ import pytest
 from flask import g, Blueprint, jsonify
 
 from app import create_app
-from app.middleware import register_middleware, require_session, require_admin
+from webcore.middleware import register_middleware, require_session, require_admin
 
 
 def _make_app_with_routes(pg_conn_factory):

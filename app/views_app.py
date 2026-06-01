@@ -6,7 +6,7 @@ from flask import (
     abort, send_from_directory,
 )
 
-from app.middleware import require_session, _get_conn
+from webcore.middleware import require_session, _get_conn
 from core import credentials as core_creds
 
 
@@ -178,7 +178,7 @@ def tools_open(key):
         abort(404)
     # Credentials-Gate: blocke das Tool wenn der Tenant keine API-Keys
     # fuer die noetige Domain hinterlegt hat.
-    from app.creds_gate import (required_domains, missing_domains,
+    from webcore.creds_gate import (required_domains, missing_domains,
                                   render_block_page)
     needed = required_domains(tool["path"])
     if needed:

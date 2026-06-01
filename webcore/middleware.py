@@ -13,8 +13,8 @@ import re
 from functools import wraps
 from flask import g, request, redirect, abort, current_app
 
-from app.config import Config
-from app import sessions
+from webcore.config import Config
+from webcore import sessions
 from core import db as core_db
 
 

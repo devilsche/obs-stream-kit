@@ -49,7 +49,7 @@ class SteamClient:
             url, headers={"User-Agent": "obs-stream-kit/1.0"})
         # Metric-Endpoint = letztes Pfadsegment (z.B. GetPlayerAchievements)
         try:
-            from app.metrics import observe_external
+            from webcore.metrics import observe_external
             ep = path.rstrip("/").split("/")[-2] or "unknown"
             _obs = observe_external("steam", ep)
         except Exception:

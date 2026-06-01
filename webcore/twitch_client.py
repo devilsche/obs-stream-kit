@@ -4,7 +4,7 @@ Verwendet requests (Standard-Lib im venv). Keine Async-Komplikation.
 """
 import requests
 
-from app.config import Config
+from webcore.config import Config
 
 
 def exchange_code(code: str, client_id: str, client_secret: str,
