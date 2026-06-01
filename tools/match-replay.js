@@ -451,10 +451,34 @@ function buildPlayerTracks() {
       map[acc] = dedup;
     }
   }
-  // Comeback-Transit-Samples (Heli-Entry, Heli-Position) BLEIBEN im
-  // Track, damit der Pin den Spieler im Heli mitfliegen zeigt. Das
-  // Wandern vom Death-Spot zur Heli-Entry verhindert der death-aware
-  // Snap im _interpTrack (snap auf b wenn Tod zwischen a und b liegt).
+  // Comeback-Cleanup: zwischen einem Tod und dem ersten Heli-Entry
+  // (= RedeployAircraft vehicle_enter) ALLE Samples rausfiltern.
+  // Damit hat der Track nach dem Tod direkt nur noch: [..., death-pos,
+  // heli-entry, landing, ...]. Der death-aware Snap im _interpTrack
+  // sorgt fuer den INSTANT-Sprung Death→Heli (kein linearer Walk).
+  const heliEntersByAcc = {};
+  for (const ev of RS.replay.events) {
+    if (ev.type === "vehicle_enter" && ev.vehicleId
+        && /RedeployAircraft/.test(ev.vehicleId)
+        && ev.x != null) {
+      (heliEntersByAcc[ev.actorId] = heliEntersByAcc[ev.actorId] || [])
+        .push(ev.ts);
+    }
+  }
+  for (const acc of Object.keys(deaths)) {
+    const dts = (deaths[acc] || []).slice().sort((a, b) => a - b);
+    const hes = (heliEntersByAcc[acc] || []).slice().sort((a, b) => a - b);
+    for (const d of dts) {
+      const heli = hes.find(h => h > d);
+      if (!heli) continue;
+      // Samples mit ts > d UND ts < heli raus (= Spectator-Cam-
+      // Positions, intermediate cruise, etc.). Heli-Entry selbst bleibt.
+      tracks[acc] = (tracks[acc] || []).filter(
+        s => !(s.ts > d && s.ts < heli));
+      groundTracks[acc] = (groundTracks[acc] || []).filter(
+        s => !(s.ts > d && s.ts < heli));
+    }
+  }
   RS._tracks = tracks;
   RS._groundTracks = groundTracks;
   RS._deaths = deaths;
@@ -512,9 +536,10 @@ function _interpTrack(tr, ms, deaths) {
   for (let i = 1; i < tr.length; i++) {
     if (tr[i].ts >= ms) {
       const a = tr[i - 1], b = tr[i];
-      // Wenn ein Tod zwischen a und b liegt → Snap auf b (kein
-      // Wandern vom Death-Spot zur Comeback-Landing).
-      if (deaths && deaths.some(d => d > a.ts && d <= b.ts)) {
+      // Wenn ein Tod im Bereich [a.ts, b.ts] liegt → harter Snap auf b
+      // (Pin springt INSTANT zum naechsten Sample = Heli-Entry, kein
+      // linearer Walk vom Death-Spot zur Heli-Position).
+      if (deaths && deaths.some(d => d >= a.ts && d <= b.ts)) {
         return { x: b.x, y: b.y };
       }
       const f = (ms - a.ts) / Math.max(1, b.ts - a.ts);
