@@ -37,6 +37,28 @@ def widget_file(token, filepath):
         abort(404)
 
     if filepath.endswith(".html"):
+        # Credentials-Gate: blocke wenn der Tenant keine API-Keys
+        # fuer die vom Widget benoetigte Domain hinterlegt hat.
+        from app.creds_gate import (required_domains, missing_domains,
+                                      render_block_page)
+        needed = required_domains("widgets/" + filepath)
+        if needed and g.tenant_id is not None:
+            from app.middleware import _get_conn
+            from core import credentials as core_creds
+            conn = _get_conn()
+            try:
+                creds = core_creds.get(conn, g.tenant_id)
+            finally:
+                if "_PG_CONN_FACTORY" not in current_app.config:
+                    conn.close()
+            missing = missing_domains(creds, needed)
+            if missing:
+                # Browser-Sources haben keinen Cookie-Login, daher
+                # kein /app/setup-Link aus dem Widget — Hinweis genuegt.
+                return (render_block_page("widgets/" + filepath, missing,
+                                            setup_url="#"),
+                        200, {"Content-Type": "text/html; charset=utf-8"})
+
         with open(full_path, "r", encoding="utf-8") as f:
             html = f.read()
         return _inject(html, token), 200, {"Content-Type": "text/html; charset=utf-8"}

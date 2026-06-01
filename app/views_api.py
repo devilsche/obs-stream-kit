@@ -148,6 +148,23 @@ def _dispatch(path: str, tenant_id: int, method: str = "GET",
         return ({"tenant_id": tenant_id, "domain": domain},
                 200, "application/json")
 
+    # Credentials-Gate fuer API-Domain. Verhindert dass /api/pubg/* oder
+    # /api/steam/* eine 500-er bekommt wenn keine Credentials hinterlegt
+    # sind — stattdessen sauberer 403 mit Hinweis.
+    if domain in ("pubg", "steam"):
+        from core import credentials as core_creds
+        from app.creds_gate import missing_domains
+        conn = _get_conn()
+        try:
+            creds = core_creds.get(conn, tenant_id)
+        finally:
+            conn.close()
+        if missing_domains(creds, [domain]):
+            return ({"error": "credentials_required",
+                     "domain": domain,
+                     "message": f"{domain.upper()} credentials not set up"},
+                    403, "application/json")
+
     full_path = "/api/" + "/".join(parts)
     # Query-String wieder anhaengen — die Endpoint-Klasse erwartet einen
     # urlparse-baren Pfad und liest qs aus dem Query-Teil.

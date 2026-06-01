@@ -176,6 +176,22 @@ def tools_open(key):
     full_path = os.path.normpath(os.path.join(root, tool["path"]))
     if not full_path.startswith(root) or not os.path.exists(full_path):
         abort(404)
+    # Credentials-Gate: blocke das Tool wenn der Tenant keine API-Keys
+    # fuer die noetige Domain hinterlegt hat.
+    from app.creds_gate import (required_domains, missing_domains,
+                                  render_block_page)
+    needed = required_domains(tool["path"])
+    if needed:
+        conn = _get_conn()
+        try:
+            creds = core_creds.get(conn, g.tenant_id)
+        finally:
+            if "_PG_CONN_FACTORY" not in current_app.config:
+                conn.close()
+        missing = missing_domains(creds, needed)
+        if missing:
+            return (render_block_page(tool["path"], missing, "/app/"),
+                    200, {"Content-Type": "text/html; charset=utf-8"})
     with open(full_path, "r", encoding="utf-8") as f:
         html = f.read()
     # Bei Tools die als widgets/<domain>/*.html liegen (Alt-Bestand:
