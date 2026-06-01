@@ -192,6 +192,21 @@ CREATE TABLE IF NOT EXISTS player_season (
     PRIMARY KEY (tenant_id, account_id, season_id, mode)
 );
 
+CREATE TABLE IF NOT EXISTS clans (
+    clan_id        TEXT PRIMARY KEY,
+    clan_tag       TEXT,
+    clan_name      TEXT,
+    clan_level     INTEGER,
+    member_count   INTEGER,
+    updated_at     TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS player_clans (
+    account_id     TEXT PRIMARY KEY,
+    clan_id        TEXT,
+    updated_at     TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     tenant_id  INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     key        TEXT NOT NULL,

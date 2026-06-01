@@ -93,6 +93,18 @@ class PubgClient:
         url = f"{PUBG_BASE}/shards/{self.platform}/matches/{match_id}"
         return self._get_json(url, rate_limited=False, metric_endpoint="match")
 
+    def get_player_by_id(self, account_id: str) -> dict:
+        """Player-Details via account_id (liefert u.a. clanId in attributes).
+        Im Gegensatz zu get_player() (by name) hier direkter Lookup."""
+        url = f"{PUBG_BASE}/shards/{self.platform}/players/{account_id}"
+        return self._get_json(url, rate_limited=True,
+                              metric_endpoint="player_by_id")
+
+    def get_clan(self, clan_id: str) -> dict:
+        """Clan-Details: tag, name, level, member_count."""
+        url = f"{PUBG_BASE}/shards/{self.platform}/clans/{clan_id}"
+        return self._get_json(url, rate_limited=True, metric_endpoint="clan")
+
     def get_lifetime(self, account_id: str) -> dict:
         url = (f"{PUBG_BASE}/shards/{self.platform}/players/{account_id}"
                f"/seasons/lifetime")

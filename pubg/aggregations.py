@@ -1071,6 +1071,18 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
               AND account_id IN ({_ph_sq})""",
         (tenant_id, match_id, *squad_accs)).fetchall()
     parts_by_acc = {r["account_id"]: r for r in parts_rows}
+    # Clan-Info pro Squad-Member (one shot join statt n+1 in der Loop)
+    _clan_by_acc = {}
+    if squad_accs:
+        for r in conn.execute(
+                f"""SELECT pc.account_id, c.clan_tag, c.clan_name
+                    FROM player_clans pc
+                    LEFT JOIN clans c ON c.clan_id = pc.clan_id
+                    WHERE pc.account_id IN ({_ph_sq})""",
+                squad_accs).fetchall():
+            if r["clan_tag"]:
+                _clan_by_acc[r["account_id"]] = {
+                    "tag": r["clan_tag"], "name": r["clan_name"]}
     revives_received_by = {a: 0 for a in squad_accs}
     revives_given_by    = {a: 0 for a in squad_accs}
     bot_kills_by        = {a: 0 for a in squad_accs}
@@ -1431,6 +1443,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             "revivesReceived": revives_received_by.get(acc, 0),
             "revivesGiven":    revives_given_by.get(acc, 0),
             "botKills":        bot_kills_by.get(acc, 0),
+            "clan":            _clan_by_acc.get(acc),
         })
 
     # Sortierung: Slot 1..4 wie In-Game-Roster (Self steht NICHT
@@ -1790,6 +1803,27 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         _name_cache[acc] = n
         return n
 
+    # Clan-Lookup-Cache (player_clans → clans join). Wird per Account
+    # lazily aufgeloest, so dass enemy-Lookups die in Timeline auftauchen
+    # auch ihren Tag bekommen.
+    _clan_cache = {}
+    def _clan_of(acc):
+        if not acc:
+            return None
+        if acc in _clan_cache:
+            return _clan_cache[acc]
+        r = conn.execute("""
+            SELECT c.clan_tag, c.clan_name FROM player_clans pc
+            JOIN clans c ON c.clan_id = pc.clan_id
+            WHERE pc.account_id = ?
+        """, (acc,)).fetchone()
+        if r and r["clan_tag"]:
+            v = {"tag": r["clan_tag"], "name": r["clan_name"]}
+        else:
+            v = None
+        _clan_cache[acc] = v
+        return v
+
     slot_by_acc = {mem["accountId"]: mem.get("slot") for mem in out_members}
 
     def _veh_label_for(acc, ts):
@@ -1838,12 +1872,14 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             "actorTeamId":   team_by_acc.get(actor_row),
             "actorTeamLabel": _team_label_for(actor_row),
             "actorIsSquad":  actor_row in sq_set,
+            "actorClan":     _clan_of(actor_row),
             "targetAccount": target_row,
             "targetName":    _name_of(target_row),
             "targetSlot":    slot_by_acc.get(target_row),
             "targetTeamId":  team_by_acc.get(target_row),
             "targetTeamLabel": _team_label_for(target_row),
             "targetIsSquad": target_row in sq_set,
+            "targetClan":    _clan_of(target_row),
             "weapon":        weapon_row,
             "weaponName":    wn,
             "distanceM":     dist_m_local,

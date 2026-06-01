@@ -131,6 +131,18 @@ def ingest_match(conn, tenant_id: int, client, my_account_id: str,
         except Exception as e:
             print(f"[archive] tenant {tenant_id} match "
                   f"{parsed['match_id'][:16]}: {e}")
+    # Clan-Enrichment fuer Squad-Members. Global cached (7d TTL) — bei
+    # warmem Cache 0 API-Calls. Failure-tolerant: schluckt API-Errors
+    # damit der Match-Ingest nicht scheitert.
+    try:
+        from pubg.clan_enrichment import enrich_account_ids
+        squad_accs = [p["account_id"] for p in parsed["squad_participants"]
+                      if p.get("account_id")]
+        if squad_accs:
+            enrich_account_ids(conn, client, squad_accs)
+    except Exception as e:
+        print(f"[clan-enrich] tenant {tenant_id} match "
+              f"{parsed['match_id'][:16]}: {e}")
 
 
 def run_single_tick(conn, tenant_id: int, client, my_player_name: str,

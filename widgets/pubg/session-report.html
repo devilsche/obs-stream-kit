@@ -1257,6 +1257,14 @@
       color: var(--pubg-text);
     }
     .md-tl-text b { font-weight: 700; }
+    .md-tl-clantag {
+      display: inline-block;
+      color: var(--pubg-gold);
+      font-weight: 700;
+      font-size: 0.85em;
+      letter-spacing: 0.02em;
+      margin-right: 2px;
+    }
     .md-tl-text .md-tl-teamtag {
       display: inline-block;
       margin-left: 3px;
@@ -2002,7 +2010,7 @@
           : _fmtSurvSec(m.timeSurvived);
         return `<tr${m.isSelf ? ' class="self"' : ""}>
           <td class="md-st-name"><span class="md-dot" style="background:${color}"></span>
-              <b>${m.name}${m.isSelf ? " (du)" : ""}</b></td>
+              ${(m.clan && m.clan.tag) ? `<span class="md-tl-clantag" title="${(m.clan.name || "").replace(/"/g, "&quot;")}">[${m.clan.tag}]</span> ` : ""}<b>${m.name}${m.isSelf ? " (du)" : ""}</b></td>
           <td>${place}</td>
           <td>${killsCell}</td>
           <td>${m.headshotKills || 0}</td>
@@ -2199,7 +2207,13 @@
       const teamSpan = teamLbl
         ? ` <span class="md-tl-teamtag" style="color:${color};border-color:${color}">${teamLbl}</span>`
         : "";
-      return `<b style="color:${color}">${name}</b>${teamSpan}`;
+      // Clan-Tag dezent VOR dem Namen (z.B. [PEX] PEX_LuCKoR).
+      // Tooltip mit Vollnamen.
+      const clan = ev[role + "Clan"];
+      const clanPrefix = (clan && clan.tag)
+        ? `<span class="md-tl-clantag" title="${(clan.name || "").replace(/"/g, "&quot;")}">[${clan.tag}]</span> `
+        : "";
+      return `${clanPrefix}<b style="color:${color}">${name}</b>${teamSpan}`;
     }
 
     // Attachment-Class-Names → kurze Klartextnamen (Tooltip)
