@@ -1465,6 +1465,20 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         x["slot"] if x["slot"] is not None else 999,
         x["name"].lower(),
     ))
+    # Slot-Fallback fuer alte Matches ohne Slot-Info in match_team_mapping
+    # (52k+ Rows NULL pre-Slot-Schema). Wir vergeben aufsteigend 1..4
+    # an Member ohne echten Slot, sodass Frontend Slot-Farben anwenden
+    # kann. Self (= acc == my_account_id) bekommt bevorzugt Slot 1.
+    _used_slots = {m["slot"] for m in out_members if m["slot"] is not None}
+    _free_slots = [s for s in (1, 2, 3, 4) if s not in _used_slots]
+    # Erst Self ohne Slot
+    for m in out_members:
+        if m["slot"] is None and m.get("isSelf") and _free_slots:
+            m["slot"] = _free_slots.pop(0)
+    # Dann die anderen in member-order
+    for m in out_members:
+        if m["slot"] is None and _free_slots:
+            m["slot"] = _free_slots.pop(0)
 
     # ============================================================
     # Shared-Vehicle-Pfad-Unifikation
