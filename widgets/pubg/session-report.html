@@ -1276,6 +1276,7 @@
       margin-right: 2px;
     }
     .md-survived { color: var(--pubg-gold); }
+    .md-dim { color: var(--pubg-muted); font-size: 0.88em; }
     .md-tl-text .md-tl-teamtag {
       display: inline-block;
       margin-left: 3px;
@@ -2373,7 +2374,11 @@
         case "revive":
           return `${A} revived ${T}`;
         case "revive_inferred":
-          return `${T} was revived by a teammate`;
+          // Aus dem 2-Knock-Pattern hergeleitet (DBNO-Spieler kann nicht
+          // ein zweites Mal geknockt werden → muss dazwischen revived
+          // worden sein). PUBG fired LogPlayerRevive nicht zuverlaessig
+          // fuer Enemy-Revives → wir kennen den Reviver nicht.
+          return `${T} was revived <span class="md-dim">(inferred — reviver unknown)</span>`;
         case "redeploy":
           return ev.targetName
             ? `${A} used the revive antenna for ${T}`
