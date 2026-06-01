@@ -451,22 +451,10 @@ function buildPlayerTracks() {
       map[acc] = dedup;
     }
   }
-  // Comeback-Transit-Cleanup: Samples zwischen einem Tod und der
-  // nachfolgenden Landing-Position raus. Sonst wandert der Pin vom
-  // Death-Spot ueber die Heli-Entry-Position zur Landing — User will
-  // 'instant teleport' an den Landing-Spot.
-  for (const acc of Object.keys(deaths)) {
-    const dts = (deaths[acc] || []).slice().sort((a, b) => a - b);
-    const lts = (relands[acc] || []).slice().sort((a, b) => a - b);
-    for (const d of dts) {
-      const nextLanding = lts.find(l => l > d);
-      if (!nextLanding) continue;
-      tracks[acc] = (tracks[acc] || []).filter(
-        s => !(s.ts > d && s.ts < nextLanding));
-      groundTracks[acc] = (groundTracks[acc] || []).filter(
-        s => !(s.ts > d && s.ts < nextLanding));
-    }
-  }
+  // Comeback-Transit-Samples (Heli-Entry, Heli-Position) BLEIBEN im
+  // Track, damit der Pin den Spieler im Heli mitfliegen zeigt. Das
+  // Wandern vom Death-Spot zur Heli-Entry verhindert der death-aware
+  // Snap im _interpTrack (snap auf b wenn Tod zwischen a und b liegt).
   RS._tracks = tracks;
   RS._groundTracks = groundTracks;
   RS._deaths = deaths;
