@@ -1259,10 +1259,9 @@
     .md-tl-text b { font-weight: 700; }
     .md-tl-clantag {
       display: inline-block;
-      color: var(--pubg-gold);
       font-weight: 700;
-      font-size: 0.85em;
-      letter-spacing: 0.02em;
+      /* color + size inherit aus Klasse (md-slot-N / md-team-N) bzw.
+         vom Eltern-Element. Bewusst KEINE Hardcoded-Gold/Size. */
       margin-right: 2px;
     }
     .md-tl-text .md-tl-teamtag {
@@ -1270,7 +1269,7 @@
       margin-left: 3px;
       padding: 1px 6px;
       border-radius: 4px;
-      border: 1px solid;
+      border: 1px solid currentColor;
       font-size: 0.78em;
       font-weight: 700;
       letter-spacing: 0.03em;
@@ -2010,7 +2009,7 @@
           : _fmtSurvSec(m.timeSurvived);
         return `<tr${m.isSelf ? ' class="self"' : ""}>
           <td class="md-st-name"><span class="md-dot" style="background:${color}"></span>
-              ${(m.clan && m.clan.tag) ? `<span class="md-tl-clantag" title="${(m.clan.name || "").replace(/"/g, "&quot;")}">[${m.clan.tag}]</span> ` : ""}<b>${m.name}${m.isSelf ? " (du)" : ""}</b></td>
+              ${(m.clan && m.clan.tag) ? `<span class="md-tl-clantag" style="color:${color}" title="${(m.clan.name || "").replace(/"/g, "&quot;")}">[${m.clan.tag}]</span> ` : ""}<b style="color:${color}">${m.name}${m.isSelf ? " (du)" : ""}</b></td>
           <td>${place}</td>
           <td>${killsCell}</td>
           <td>${m.headshotKills || 0}</td>
@@ -2059,14 +2058,54 @@
     // schoenen Spread ueber den Farbkreis — Team 18 (126°) vs Team 26
     // (302°) sind klar unterscheidbar. Funktioniert kollisionsfrei fuer
     // Team-IDs 1..30+ (cycle: 360/gcd(67,360) = 360).
+    // CSS-Klassen-Generator. Slots haben fixe PUBG-Farben (gelb/rot/
+    // blau/gruen). Teams werden 1..100 via HSL-Rotation generiert mit
+    // 2 Lightness-Baendern + niedrigerer Saturation als Slots — so dass
+    // selbst bei aehnlichem Hue (z.B. Team mit ~60° Hue) klar von Slot 1
+    // (gelb, vollgesaettigt) unterscheidbar bleibt.
+    (function _injectTeamPalette() {
+      const css = [];
+      const SLOTS = ["#f2b705", "#ff5a3d", "#4ec9ff", "#3dd668"];
+      for (let i = 0; i < SLOTS.length; i++) {
+        css.push(`.md-slot-${i+1}{color:${SLOTS[i]};}`);
+      }
+      // 100 distinkte Team-Farben. Hue * Primzahl 67 = guter Spread.
+      // Alternierende Lightness 72%/60% gibt feine Variation auch bei
+      // visuell-naheliegenden Hues.
+      for (let i = 1; i <= 100; i++) {
+        const hue = (i * 67) % 360;
+        const l = (i % 2) ? 72 : 60;
+        css.push(`.md-team-${i}{color:hsl(${hue},55%,${l}%);}`);
+      }
+      css.push(`.md-muted-color{color:var(--pubg-muted);}`);
+      const style = document.createElement("style");
+      style.textContent = css.join("");
+      document.head.appendChild(style);
+    })();
+
+    function mdTlActorClass(ev, role) {
+      const slot   = ev[role + "Slot"];
+      const teamId = ev[role + "TeamId"];
+      const isSquad = ev[role + "IsSquad"];
+      if (isSquad && slot >= 1 && slot <= 4) return `md-slot-${slot}`;
+      if (teamId != null) {
+        // Modulo 100 stellt sicher dass exotische Team-IDs (>100) noch
+        // eine Klasse bekommen. Hat3-Squad bekommt Team-Id-Farbe wenn
+        // ein Match Slot-Info fehlen sollte.
+        const n = (Math.abs(teamId | 0) % 100) + 1;
+        return `md-team-${n}`;
+      }
+      return "md-muted-color";
+    }
+
     function mdTlEnemyTeamColor(teamId) {
       if (teamId == null) return "var(--pubg-muted)";
       const hue = (Math.abs(teamId | 0) * 67) % 360;
-      return `hsl(${hue}, 65%, 70%)`;
+      return `hsl(${hue}, 55%, 70%)`;
     }
 
     function mdTlActorColor(ev, role, colorByAcc) {
-      // role: "actor" | "target" | "knocker"
+      // Legacy: liefert inline color-string fuer .md-dot etc.
       const acc  = ev[role + "Account"];
       const slot = ev[role + "Slot"];
       const teamId = ev[role + "TeamId"];
@@ -2076,7 +2115,6 @@
         if (slot >= 1 && slot <= MD_SLOT_COLORS.length)
           return MD_SLOT_COLORS[slot - 1];
       }
-      // Enemy → Team-Farbe
       return mdTlEnemyTeamColor(teamId);
     }
 
@@ -2202,18 +2240,19 @@
 
     function mdTlNameSpan(ev, role, colorByAcc) {
       const name = ev[role + "Name"] || "?";
-      const color = mdTlActorColor(ev, role, colorByAcc);
+      const cls  = mdTlActorClass(ev, role);
       const teamLbl = ev[role + "TeamLabel"];
+      // Teamtag uebernimmt Player-Farbe via currentColor, Border auch.
       const teamSpan = teamLbl
-        ? ` <span class="md-tl-teamtag" style="color:${color};border-color:${color}">${teamLbl}</span>`
+        ? ` <span class="md-tl-teamtag ${cls}">${teamLbl}</span>`
         : "";
-      // Clan-Tag dezent VOR dem Namen (z.B. [PEX] PEX_LuCKoR).
-      // Tooltip mit Vollnamen.
+      // Clan-Tag VOR dem Namen — gleiche Farbe + gleiche Groesse wie der
+      // Name (uebernimmt via Klasse + Erbung). Tooltip = Voll-Clan-Name.
       const clan = ev[role + "Clan"];
       const clanPrefix = (clan && clan.tag)
-        ? `<span class="md-tl-clantag" title="${(clan.name || "").replace(/"/g, "&quot;")}">[${clan.tag}]</span> `
+        ? `<span class="md-tl-clantag ${cls}" title="${(clan.name || "").replace(/"/g, "&quot;")}">[${clan.tag}]</span> `
         : "";
-      return `${clanPrefix}<b style="color:${color}">${name}</b>${teamSpan}`;
+      return `${clanPrefix}<b class="${cls}">${name}</b>${teamSpan}`;
     }
 
     // Attachment-Class-Names → kurze Klartextnamen (Tooltip)
