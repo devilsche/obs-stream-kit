@@ -1458,27 +1458,29 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             "clan":            _clan_by_acc.get(acc),
         })
 
-    # Sortierung: Slot 1..4 wie In-Game-Roster (Self steht NICHT
-    # automatisch oben — der Streamer ist halt der Slot den er hat).
-    # Slot=NULL als Fallback ans Ende, dann alphabetisch.
+    # Slot-Fallback fuer alte Matches ohne Slot-Info in match_team_mapping
+    # (52k+ Rows NULL pre-Slot-Schema). Wir vergeben aufsteigend 1..4
+    # an Member ohne echten Slot — Self bekommt bevorzugt Slot 1.
+    # WICHTIG: VOR dem Sort, damit die spaetere Sortierung nach Slot
+    # auch die Fallback-Slots respektiert.
+    _used_slots = {m["slot"] for m in out_members if m["slot"] is not None}
+    _free_slots = [s for s in (1, 2, 3, 4) if s not in _used_slots]
+    for m in out_members:
+        if m["slot"] is None and m.get("isSelf") and _free_slots:
+            m["slot"] = _free_slots.pop(0)
+    # Dann alphabetisch innerhalb der Members ohne Slot fuer
+    # deterministische Vergabe.
+    for m in sorted([mm for mm in out_members
+                      if mm["slot"] is None],
+                     key=lambda x: x["name"].lower()):
+        if _free_slots:
+            m["slot"] = _free_slots.pop(0)
+
+    # Sortierung: Slot 1..4 wie In-Game-Roster.
     out_members.sort(key=lambda x: (
         x["slot"] if x["slot"] is not None else 999,
         x["name"].lower(),
     ))
-    # Slot-Fallback fuer alte Matches ohne Slot-Info in match_team_mapping
-    # (52k+ Rows NULL pre-Slot-Schema). Wir vergeben aufsteigend 1..4
-    # an Member ohne echten Slot, sodass Frontend Slot-Farben anwenden
-    # kann. Self (= acc == my_account_id) bekommt bevorzugt Slot 1.
-    _used_slots = {m["slot"] for m in out_members if m["slot"] is not None}
-    _free_slots = [s for s in (1, 2, 3, 4) if s not in _used_slots]
-    # Erst Self ohne Slot
-    for m in out_members:
-        if m["slot"] is None and m.get("isSelf") and _free_slots:
-            m["slot"] = _free_slots.pop(0)
-    # Dann die anderen in member-order
-    for m in out_members:
-        if m["slot"] is None and _free_slots:
-            m["slot"] = _free_slots.pop(0)
 
     # ============================================================
     # Shared-Vehicle-Pfad-Unifikation
