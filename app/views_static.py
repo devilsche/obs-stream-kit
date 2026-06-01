@@ -1,4 +1,8 @@
-"""Public static assets fuer Widgets (Maps, Sounds, Icons)."""
+"""Public static assets fuer Widgets (Maps, Sounds, Icons).
+
+Diese Files enthalten keine sensitiven Daten und werden ohne Token-Check
+ausgeliefert — sonst muesste jede Map-Tile durch die Tenant-Resolution.
+"""
 import os
 from flask import Blueprint, current_app
 from webcore.serving import serve_asset

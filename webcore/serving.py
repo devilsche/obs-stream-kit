@@ -22,7 +22,7 @@ def _safe_full_path(root: str, subdir: str, filepath: str):
     """Pfad innerhalb root/subdir auflösen, Traversal blocken. None wenn ungültig."""
     base = os.path.join(root, subdir)
     full = os.path.normpath(os.path.join(base, filepath))
-    if not full.startswith(base) or not os.path.isfile(full):
+    if not full.startswith(base + os.sep) or not os.path.isfile(full):
         return None
     return full
 

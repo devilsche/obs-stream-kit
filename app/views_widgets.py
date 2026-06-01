@@ -17,6 +17,8 @@ def _project_root() -> str:
 @bp_widgets.route("/s/<token>/widgets/<path:filepath>")
 def widget_file(token, filepath):
     root = _project_root()
+    # TODO(Task 7): inline traversal+open below könnte webcore.serving.
+    # serve_html_or_asset nutzen, sobald der Creds-Gate ausgelagert ist.
     full_path = os.path.normpath(os.path.join(root, "widgets", filepath))
     widgets_root = os.path.join(root, "widgets")
     if not full_path.startswith(widgets_root):
