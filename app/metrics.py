@@ -196,7 +196,9 @@ def register_metrics(app: Flask) -> None:
                 with conn.cursor() as cur:
                     cur.execute("SELECT COUNT(*) AS c FROM tenants")
                     tenants_total.set(int((cur.fetchone() or {}).get("c") or 0))
-                    cur.execute("SELECT COUNT(*) AS c FROM matches")
+                    # DISTINCT — gleiche match_id von mehreren Tenants
+                    # ingestet (Squad-Match) zaehlt nur einmal.
+                    cur.execute("SELECT COUNT(DISTINCT match_id) AS c FROM matches")
                     matches_total.set(int((cur.fetchone() or {}).get("c") or 0))
                     cur.execute(
                         "SELECT tenant_id, COUNT(*) AS c FROM matches "
