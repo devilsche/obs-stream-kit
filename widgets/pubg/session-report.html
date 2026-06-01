@@ -1265,6 +1265,7 @@
          vom Eltern-Element. Bewusst KEINE Hardcoded-Gold/Size. */
       margin-right: 2px;
     }
+    .md-survived { color: var(--pubg-gold); }
     .md-tl-text .md-tl-teamtag {
       display: inline-block;
       margin-left: 3px;
@@ -1919,7 +1920,7 @@
               row += ` <span class="md-died">— gestorben in <b>${deathP || "?"}</b> durch <b>${killer}</b> mit <b>${wn}</b>${dist}${vehTag}</span>`;
             }
           } else if (m.lives.length > 1) {
-            row += ` <span style="color:var(--pubg-gold)">— survived</span>`;
+            row += ` <span class="md-survived">— survived</span>`;
           }
           return `<div class="md-life">${row}</div>`;
         }).join("");
@@ -2092,11 +2093,13 @@
       const slot   = ev[role + "Slot"];
       const teamId = ev[role + "TeamId"];
       const isSquad = ev[role + "IsSquad"];
-      if (isSquad && slot >= 1 && slot <= 4) return `md-slot-${slot}`;
+      // Squad → IMMER Slot-Farbe (nie Team-Farbe). Slot 1..4 = PUBG-
+      // Plate-Farbe; ohne Slot dezent grau (kein Team-Hue!).
+      if (isSquad) {
+        return (slot >= 1 && slot <= 4) ? `md-slot-${slot}` : "md-muted-color";
+      }
       if (teamId != null) {
-        // Modulo 100 stellt sicher dass exotische Team-IDs (>100) noch
-        // eine Klasse bekommen. Hat3-Squad bekommt Team-Id-Farbe wenn
-        // ein Match Slot-Info fehlen sollte.
+        // Enemy → Team-Hue via deterministischer Klasse.
         const n = (Math.abs(teamId | 0) % 100) + 1;
         return `md-team-${n}`;
       }
