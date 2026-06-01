@@ -833,8 +833,38 @@ function renderFrame() {
   const accList = Object.keys(RS._accTeam);
   const sorted = [...accList.filter(a => a !== heroAcc),
                   ...accList.filter(a => a === heroAcc)];
+
+  // Pre-Pass: Gruppen von Team-Mates am SELBEN Spot finden (= Auto-
+  // Insassen nach Shared-Vehicle-Unifikation). Pro Gruppe spaeter nur
+  // EIN Name + "+N" rendern. Hero wird bevorzugter Leader, sonst der
+  // erste in sorted-Order.
+  const _grpByKey = {};
+  const _posOf = {};
   for (const acc of sorted) {
     const p = posAt(acc, ms);
+    if (!p) continue;
+    _posOf[acc] = p;
+    const tid = RS._accTeam[acc];
+    if (tid == null) continue;
+    const [px, py] = projToCanvas(p.x, p.y);
+    // 5px-Bucket: bei perfekt unifizierten Auto-Spuren liegen alle exakt
+    // auf einem Pixel. Tolerance fuer leichte Driften.
+    const key = `${tid}|${Math.round(px / 5)}|${Math.round(py / 5)}`;
+    (_grpByKey[key] = _grpByKey[key] || []).push(acc);
+  }
+  // Pro acc: ist er Leader seiner Gruppe? Und wie viele follower?
+  const _grpMeta = {};  // acc → {isLeader, count}
+  for (const accs of Object.values(_grpByKey)) {
+    if (accs.length < 2) continue;
+    // Hero bevorzugen, sonst erster Eintrag
+    const leader = accs.find(a => a === heroAcc) || accs[0];
+    for (const a of accs) {
+      _grpMeta[a] = { isLeader: a === leader, count: accs.length };
+    }
+  }
+
+  for (const acc of sorted) {
+    const p = _posOf[acc];
     if (!p) continue;
     const [px, py] = projToCanvas(p.x, p.y);
     const tid = RS._accTeam[acc];
@@ -864,12 +894,17 @@ function renderFrame() {
       ctx.font = "bold 8px DM Sans";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(String(tid), px, py);
-      // Name immer sichtbar
+      // Name immer sichtbar (Hero ist Leader bei Vehicle-Group)
       if (RS.toggles.names) {
-        ctx.fillStyle = "#fff";
-        ctx.font = `bold ${nameScale}px DM Sans`;
-        ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-        ctx.fillText((RS._accName[acc] || "") + botSuffix(acc), px + 10, py - 7);
+        const meta = _grpMeta[acc];
+        if (!meta || meta.isLeader) {
+          const suffix = (meta && meta.count > 1) ? ` +${meta.count - 1}` : "";
+          ctx.fillStyle = "#fff";
+          ctx.font = `bold ${nameScale}px DM Sans`;
+          ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+          ctx.fillText((RS._accName[acc] || "") + botSuffix(acc) + suffix,
+                       px + 10, py - 7);
+        }
       }
     } else {
       // Team-Farbe immer voll — kein Ausgrauen mehr. Stattdessen
@@ -888,10 +923,15 @@ function renderFrame() {
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(String(tid), px, py);
       if (RS.toggles.names) {
-        ctx.fillStyle = RS._teamColor[tid] || "#fff";
-        ctx.font = `${isFocusedTeam ? "bold " : ""}${nameScale}px DM Sans`;
-        ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-        ctx.fillText((RS._accName[acc] || "") + botSuffix(acc), px + 7, py - 5);
+        const meta = _grpMeta[acc];
+        if (!meta || meta.isLeader) {
+          const suffix = (meta && meta.count > 1) ? ` +${meta.count - 1}` : "";
+          ctx.fillStyle = RS._teamColor[tid] || "#fff";
+          ctx.font = `${isFocusedTeam ? "bold " : ""}${nameScale}px DM Sans`;
+          ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+          ctx.fillText((RS._accName[acc] || "") + botSuffix(acc) + suffix,
+                       px + 7, py - 5);
+        }
       }
     }
     ctx.globalAlpha = 1;
