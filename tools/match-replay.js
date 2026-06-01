@@ -451,6 +451,22 @@ function buildPlayerTracks() {
       map[acc] = dedup;
     }
   }
+  // Comeback-Transit-Cleanup: Samples zwischen einem Tod und der
+  // nachfolgenden Landing-Position raus. Sonst wandert der Pin vom
+  // Death-Spot ueber die Heli-Entry-Position zur Landing — User will
+  // 'instant teleport' an den Landing-Spot.
+  for (const acc of Object.keys(deaths)) {
+    const dts = (deaths[acc] || []).slice().sort((a, b) => a - b);
+    const lts = (relands[acc] || []).slice().sort((a, b) => a - b);
+    for (const d of dts) {
+      const nextLanding = lts.find(l => l > d);
+      if (!nextLanding) continue;
+      tracks[acc] = (tracks[acc] || []).filter(
+        s => !(s.ts > d && s.ts < nextLanding));
+      groundTracks[acc] = (groundTracks[acc] || []).filter(
+        s => !(s.ts > d && s.ts < nextLanding));
+    }
+  }
   RS._tracks = tracks;
   RS._groundTracks = groundTracks;
   RS._deaths = deaths;
@@ -500,7 +516,7 @@ function buildPlayerTracks() {
   }
 }
 
-function _interpTrack(tr, ms) {
+function _interpTrack(tr, ms, deaths) {
   if (!tr || !tr.length || ms < tr[0].ts) return null;
   if (ms >= tr[tr.length - 1].ts) {
     const l = tr[tr.length - 1]; return { x: l.x, y: l.y };
@@ -508,6 +524,11 @@ function _interpTrack(tr, ms) {
   for (let i = 1; i < tr.length; i++) {
     if (tr[i].ts >= ms) {
       const a = tr[i - 1], b = tr[i];
+      // Wenn ein Tod zwischen a und b liegt → Snap auf b (kein
+      // Wandern vom Death-Spot zur Comeback-Landing).
+      if (deaths && deaths.some(d => d > a.ts && d <= b.ts)) {
+        return { x: b.x, y: b.y };
+      }
       const f = (ms - a.ts) / Math.max(1, b.ts - a.ts);
       return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
     }
@@ -544,7 +565,7 @@ function posAt(acc, ms) {
   const SNAP_MS = 1500;
   if (ms < fs - SNAP_MS) {
     // Lobby: Spieler laufen auf der Karte — normaler Track
-    return _interpTrack(RS._tracks[acc], ms);
+    return _interpTrack(RS._tracks[acc], ms, RS._deaths[acc]);
   }
   if (ms < jts) {
     // Im Flieger (inkl. Snap-Fenster): Startpunkt oder mitfliegen
@@ -554,7 +575,7 @@ function posAt(acc, ms) {
     return null;
   }
   // Fallschirm / Boden: Ground-Track
-  return _interpTrack(RS._groundTracks[acc], ms);
+  return _interpTrack(RS._groundTracks[acc], ms, RS._deaths[acc]);
 }
 
 function markersUpTo(ms) {
