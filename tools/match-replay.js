@@ -434,7 +434,7 @@ function buildPlayerTracks() {
       pushSample(e.actorId, e.ts, e.ax, e.ay);
       pushSample(e.targetId, e.ts, e.tx, e.ty);
     } else if (e.type === "vehicle_enter" || e.type === "vehicle_leave") {
-      // Comeback-Heli capture (DummyTransportAircraft). actor_x/y NUR
+      // Comeback-Heli capture (RedeployAircraft_*_C). actor_x/y NUR
       // in neuen Matches (telemetry.py erweitert) — alte Matches: null.
       pushSample(e.actorId, e.ts, e.x, e.y);
     }
@@ -526,23 +526,35 @@ function _interpTrack(tr, ms, deaths) {
 
 function posAt(acc, ms) {
   // Tod-Check — Spieler ist tot wenn ein death-event vor ms und kein
-  // reland (LogParachuteLanding) danach. Plus Comeback-Heuristik: wenn
-  // nach dem Tod weitere Position-Events fuer diesen Spieler existieren
-  // (z.B. Comeback-Heli auf Taego), ist er nicht mehr tot — der naechste
-  // Track-Eintrag nach dem Death zaehlt als 'wieder da'.
+  // reland (LogParachuteLanding) bzw. kein Comeback-Heli-Entry danach.
+  // Im Toten-Zustand bleibt der Pin auf dem Death-Spot stehen (NICHT
+  // unsichtbar) — Spieler-Body liegt da bis er via Heli abgeholt wird.
   const dts = RS._deaths[acc] || [];
   const rts = RS._relands[acc] || [];
   const tr  = RS._tracks[acc] || [];
   let dead = false;
+  let deathTs = null;
   for (const d of dts) {
     if (d <= ms) {
       const reland = rts.some(r => r > d && r <= ms);
       const trackPos = tr.some(p => p.ts > d && p.ts <= ms);
-      if (!reland && !trackPos) dead = true;
-      else dead = false;
+      if (!reland && !trackPos) {
+        dead = true; deathTs = d;
+      } else {
+        dead = false; deathTs = null;
+      }
     }
   }
-  if (dead) return null;
+  if (dead) {
+    // Letztes Sample <= deathTs heraussuchen = Death-Spot.
+    let lastPre = null;
+    for (const p of tr) {
+      if (p.ts <= deathTs) lastPre = p;
+      else break;
+    }
+    if (lastPre) return { x: lastPre.x, y: lastPre.y };
+    return null;
+  }
 
   const fp  = RS.replay.flightPath;
   const fs  = RS._flightStart;   // Flugstart-Zeitpunkt
