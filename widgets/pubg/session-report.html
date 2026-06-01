@@ -1148,7 +1148,10 @@
       white-space: nowrap;
     }
     .md-squad-table td.md-st-name { text-align: left; }
-    .md-squad-table tr.self td { color: var(--pubg-gold); font-weight: 700; }
+    /* Self-Row: dezent hervorgehoben via Background-Tint statt Color —
+       sonst frisst color hier die Slot-Farben am Spielernamen (Slot 2
+       rot, Slot 4 gruen etc.). Font-weight bleibt fuer leichten Akzent. */
+    .md-squad-table tr.self td { font-weight: 700; background: rgba(242,183,5,0.06); }
     .md-squad-table .md-dot {
       display: inline-block; width: 10px; height: 10px;
       border-radius: 50%; margin-right: 6px;
@@ -2341,8 +2344,16 @@
         case "join":
           return `${A} joined the lobby`;
         case "knock":
+          // System-Events ohne Actor (Blue Zone, Train, Drowning etc.):
+          // Spieler "wurde geknockt von <cause>" statt "? knocked X with cause"
+          if (!ev.actorName && ev.weaponName) {
+            return `${T} was knocked by <b>${ev.weaponName}</b>`;
+          }
           return `${A} knocked ${T}${meta}`;
         case "kill":
+          if (!ev.actorName && ev.weaponName) {
+            return `${T} was killed by <b>${ev.weaponName}</b>`;
+          }
           return `${A} killed ${T}${meta}`;
         case "kill_bleedout":
           // Wer geknockt hat war (laut PUBG) der gleiche Actor — Knocker-

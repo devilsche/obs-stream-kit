@@ -413,6 +413,18 @@ _ENVIR_NAMES = {
     "Bluezonebomb_EffectActor_C":   "Red Zone",
     "Jerrycan":                     "Jerry Can (Boom)",
     "JerrycanFire":                 "Jerry Can (Fire)",
+    # PUBG-System-Actor (kein echter Spieler):
+    # TslGameModeBase = Game-Mode-System (meistens Blue Zone-Damage
+    # waehrend DBNO, fallschaden in der Zone, etc.)
+    "TslGameModeBase_BattleRoyaleBP_C":           "Blue Zone",
+    "RedZoneBombingField_Def_C":                  "Red Zone Bomb",
+    "RedZoneBombingField_Savage_C":               "Red Zone Bomb",
+    "BP_VK_Train_A_B_C":                          "Train",
+    "Buff_DecreaseBreathInApnea_C":               "Drowning",
+    # BlueChip-Carepackage-Drop (faellt auf Spieler) — verschiedene Map-Varianten
+    "BP_CarePackageDrop_Bluechip_C":              "BlueChip Care Package",
+    "BP_CarePackageDrop_Bluechip_DihorOtok_C":    "BlueChip Care Package",
+    "BP_CarePackageDrop_Bluechip_Neon_C":         "BlueChip Care Package",
 }
 
 
