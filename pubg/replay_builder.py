@@ -159,6 +159,7 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
                     "type": "vehicle_enter" if et == "LogVehicleRide" else "vehicle_leave",
                     "ts": ts, "actorId": acc, "x": nx, "y": ny,
                     "vehicleId": vehicle,
+                    "seatIndex": e.get("seatIndex"),
                 })
         elif et == "LogGameStatePeriodic":
             gs = e.get("gameState") or {}
@@ -181,6 +182,117 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
     return out, flight_pts
 
 
+def _unify_shared_vehicle_paths(events, team_mapping):
+    """Shared-Vehicle-Pfad-Unifikation fuer Replay.
+
+    Wenn >=2 Mitglieder DESSELBEN Teams im selben Fahrzeug mit
+    ueberlappenden Enter/Leave-Intervallen sind, ersetzen wir die
+    Position-Events der Mitfahrer waehrend dieses Intervalls durch
+    die des Fahrers (seat_index=0). Resultat: ihre Spuren liegen
+    exakt deckungsgleich auf der Karte statt unzaehliger ueber-
+    lappender Punkte.
+
+    Modifies `events` in place. team_mapping = {acc: tid}.
+    """
+    # 1) Per-Account VehicleEnter/Leave-Intervalle pro vid sammeln
+    enters = {}  # acc → [(ts, vid, seat), ...]
+    leaves = {}  # acc → [(ts, vid), ...]
+    for e in events:
+        if e["type"] == "vehicle_enter":
+            enters.setdefault(e["actorId"], []).append(
+                (e["ts"], e.get("vehicleId") or "", e.get("seatIndex")))
+        elif e["type"] == "vehicle_leave":
+            leaves.setdefault(e["actorId"], []).append(
+                (e["ts"], e.get("vehicleId") or ""))
+    # Intervalle pro acc bauen (paired enter/leave je vid)
+    intervals = {}  # acc → [(start, end, vid, seat), ...]
+    for acc, ents in enters.items():
+        for (ets, vid, seat) in ents:
+            # finde naechsten Leave fuer DIESES vid nach ets
+            lv_end = None
+            for (lts, lvid) in leaves.get(acc, []):
+                if lvid == vid and lts > ets:
+                    lv_end = lts
+                    break
+            if lv_end is None:
+                lv_end = float("inf")
+            intervals.setdefault(acc, []).append((ets, lv_end, vid, seat))
+    # 2) Shared-Episodes finden (>=2 team-mates, selber vid, overlap)
+    episodes = []
+    seen = set()
+    accs_sorted = sorted(intervals.keys())
+    for a in accs_sorted:
+        tid_a = team_mapping.get(a)
+        if tid_a is None:
+            continue
+        for (s, e, vid, seat_a) in intervals[a]:
+            riders = {a}
+            riders_seats = {a: seat_a}
+            ep_s, ep_e = s, e
+            for b in accs_sorted:
+                if b == a or team_mapping.get(b) != tid_a:
+                    continue
+                for (s2, e2, vid2, seat_b) in intervals[b]:
+                    if vid2 != vid:
+                        continue
+                    if s2 < ep_e and e2 > ep_s:
+                        riders.add(b)
+                        riders_seats[b] = seat_b
+                        ep_s = min(ep_s, s2)
+                        ep_e = max(ep_e, e2)
+            if len(riders) < 2:
+                continue
+            key = (vid, frozenset(riders), ep_s, ep_e)
+            if key in seen:
+                continue
+            seen.add(key)
+            # Fahrer = seat_index=0; sonst erster Einsteiger als Fallback
+            driver = None
+            for r in riders:
+                if riders_seats.get(r) == 0:
+                    driver = r
+                    break
+            if driver is None:
+                driver = min(riders,
+                              key=lambda r: next(
+                                  (s for (s, _, v, _x) in intervals[r] if v == vid),
+                                  float("inf")))
+            episodes.append((ep_s, ep_e, driver, riders - {driver}))
+    if not episodes:
+        return events
+    # 3) Fuer jede Episode: Position-Events des Drivers in dem Intervall
+    # raussuchen und fuer Passenger als Kopien einfuegen, die Original-
+    # Position-Events der Passenger in dem Intervall entfernen.
+    new_events = []
+    # Schneller Lookup: drop_set[acc] = set of ts of positions zu entfernen
+    drop_set = {}
+    add_events = []
+    for (ep_s, ep_e, driver, passengers) in episodes:
+        driver_pos = [(e["ts"], e["x"], e["y"]) for e in events
+                       if e["type"] == "position"
+                       and e["actorId"] == driver
+                       and ep_s <= e["ts"] <= ep_e]
+        for p in passengers:
+            # Markiere Passenger-Positions im Intervall zum Loeschen
+            for e in events:
+                if e["type"] != "position" or e["actorId"] != p:
+                    continue
+                if ep_s <= e["ts"] <= ep_e:
+                    drop_set.setdefault(p, set()).add(e["ts"])
+            # Driver-Positions als Passenger-Positions duplizieren
+            for (ts, x, y) in driver_pos:
+                add_events.append({"type": "position", "ts": ts,
+                                    "actorId": p, "x": x, "y": y})
+    for e in events:
+        if e["type"] == "position":
+            if e["ts"] in drop_set.get(e["actorId"], ()):
+                continue
+        new_events.append(e)
+    new_events.extend(add_events)
+    new_events.sort(key=lambda e: e["ts"])
+    return new_events
+
+
 def build_replay(raw_events, match_id, map_name, mapKm,
                  team_mapping, names, position_interval_ms=1000):
     """Top-Level: Raw-Blob → vollstaendiges Replay-Dict.
@@ -189,6 +301,9 @@ def build_replay(raw_events, match_id, map_name, mapKm,
     names:        {account_id: display_name}
     """
     events, flight_pts = extract_events(raw_events, mapKm, position_interval_ms)
+    # Shared-Vehicle-Pfade unifizieren (Team-Mitglieder im selben Auto
+    # bekommen alle die Driver-Trajektorie statt eigener Position-Events).
+    events = _unify_shared_vehicle_paths(events, team_mapping)
     # Teams aus team_mapping aufbauen
     by_team = {}
     for acc, tid in team_mapping.items():
