@@ -1153,6 +1153,7 @@
       display: inline-block; width: 10px; height: 10px;
       border-radius: 50%; margin-right: 6px;
       vertical-align: -1px;
+      background: currentColor;
     }
     .md-squad-table .bot-kills {
       color: var(--pubg-muted); font-size: 0.85em;
@@ -2007,9 +2008,13 @@
         const survCell = (deathSec != null)
           ? _fmtSurvSec(deathSec)
           : _fmtSurvSec(m.timeSurvived);
+        // Klassen-basiert: Slot 1..4 → md-slot-N, sonst Team-Hue
+        const cls = (m.slot >= 1 && m.slot <= 4)
+          ? `md-slot-${m.slot}`
+          : "md-muted-color";
         return `<tr${m.isSelf ? ' class="self"' : ""}>
-          <td class="md-st-name"><span class="md-dot" style="background:${color}"></span>
-              ${(m.clan && m.clan.tag) ? `<span class="md-tl-clantag" style="color:${color}" title="${(m.clan.name || "").replace(/"/g, "&quot;")}">[${m.clan.tag}]</span> ` : ""}<b style="color:${color}">${m.name}${m.isSelf ? " (du)" : ""}</b></td>
+          <td class="md-st-name"><span class="md-dot ${cls}"></span>
+              ${(m.clan && m.clan.tag) ? `<span class="md-tl-clantag ${cls}" title="${(m.clan.name || "").replace(/"/g, "&quot;")}">[${m.clan.tag}]</span> ` : ""}<b class="${cls}">${m.name}${m.isSelf ? " (du)" : ""}</b></td>
           <td>${place}</td>
           <td>${killsCell}</td>
           <td>${m.headshotKills || 0}</td>

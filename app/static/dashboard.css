@@ -23,6 +23,23 @@
   --nav-height: 56px;
 }
 
+/* Utility Classes — fuer Template-Reuse statt Inline-Styles. */
+.dim    { color: var(--text-dim); }
+.muted  { color: var(--text-muted); }
+.warn   { color: var(--warning); }
+.ok     { color: var(--success); }
+.bad    { color: var(--danger); }
+.text-sm { font-size: 13px; }
+.mt-16  { margin-top: 16px; }
+.mb-12  { margin: 0 0 12px; }
+
+.card--warning { border-color: var(--warning); }
+
+.btn-ghost {
+  background: var(--bg-deeper);
+  border: 1px solid var(--border);
+}
+
 * { box-sizing: border-box; }
 
 html, body {
