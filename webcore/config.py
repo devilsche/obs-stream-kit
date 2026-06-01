@@ -39,6 +39,7 @@ class Config:
 
     OBSKIT_SID_COOKIE = "obskit_sid"
     SESSION_LIFETIME_DAYS = 30
+    OBSKIT_COOKIE_DOMAIN = os.environ.get("OBS_KIT_COOKIE_DOMAIN") or None
 
     LOGIN_URL = "/app/login"
     PENDING_URL = "/app/pending"

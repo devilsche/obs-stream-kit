@@ -70,6 +70,7 @@ def callback():
         max_age=Config.SESSION_LIFETIME_DAYS * 86400,
         secure=not current_app.config.get("TESTING"),
         httponly=True, samesite="Lax",
+        domain=current_app.config.get("OBSKIT_COOKIE_DOMAIN"),
     )
     return resp
 
@@ -85,7 +86,10 @@ def logout():
             if "_PG_CONN_FACTORY" not in current_app.config:
                 conn.close()
     resp = make_response(redirect("/", code=302))
-    resp.delete_cookie(Config.OBSKIT_SID_COOKIE)
+    resp.delete_cookie(
+        Config.OBSKIT_SID_COOKIE,
+        domain=current_app.config.get("OBSKIT_COOKIE_DOMAIN"),
+    )
     return resp
 
 
