@@ -70,6 +70,44 @@ tenants_total = Gauge(
     "Number of tenants currently in the database",
     registry=REGISTRY,
 )
+matches_total = Gauge(
+    "obs_matches_total",
+    "Total matches ingested across all tenants",
+    registry=REGISTRY,
+)
+matches_per_tenant = Gauge(
+    "obs_matches_per_tenant",
+    "Matches ingested per tenant",
+    ["tenant"],
+    registry=REGISTRY,
+)
+players_total = Gauge(
+    "obs_players_total",
+    "Distinct players (account_ids) known to the database",
+    registry=REGISTRY,
+)
+telemetry_events_by_type = Gauge(
+    "obs_telemetry_events_by_type",
+    "Telemetry event count per event_type",
+    ["event_type"],
+    registry=REGISTRY,
+)
+clans_total = Gauge(
+    "obs_clans_total",
+    "Distinct clans resolved",
+    registry=REGISTRY,
+)
+db_size_bytes = Gauge(
+    "obs_db_size_bytes",
+    "Total Postgres database size in bytes (pg_database_size)",
+    registry=REGISTRY,
+)
+db_table_size_bytes = Gauge(
+    "obs_db_table_size_bytes",
+    "Size in bytes per table including indexes (pg_total_relation_size)",
+    ["table"],
+    registry=REGISTRY,
+)
 poller_last_tick_ts = Gauge(
     "obs_poller_last_tick_timestamp_seconds",
     "Unix timestamp of last poller tick per provider+tenant",
@@ -143,22 +181,67 @@ def register_metrics(app: Flask) -> None:
             pass
         return response
 
-    @app.route("/metrics")
-    def _metrics_endpoint():
-        # tenants_total bei jedem Scrape frisch berechnen (cheap).
+    # DB-Metrics Cache — wird alle 60s aktualisiert. Spart Last bei
+    # haeufigeren Prometheus-Scrapes.
+    _db_cache = {"updated_at": 0.0}
+
+    def _refresh_db_metrics():
+        now = time.time()
+        if now - _db_cache["updated_at"] < 60:
+            return
         try:
             from app.middleware import _get_conn
             conn = _get_conn()
             try:
                 with conn.cursor() as cur:
                     cur.execute("SELECT COUNT(*) AS c FROM tenants")
-                    row = cur.fetchone()
-                    tenants_total.set(int(row["c"]) if row else 0)
+                    tenants_total.set(int((cur.fetchone() or {}).get("c") or 0))
+                    cur.execute("SELECT COUNT(*) AS c FROM matches")
+                    matches_total.set(int((cur.fetchone() or {}).get("c") or 0))
+                    cur.execute(
+                        "SELECT tenant_id, COUNT(*) AS c FROM matches "
+                        "GROUP BY tenant_id")
+                    matches_per_tenant._metrics.clear()
+                    for r in cur.fetchall():
+                        matches_per_tenant.labels(str(r["tenant_id"])).set(
+                            int(r["c"] or 0))
+                    cur.execute(
+                        "SELECT COUNT(DISTINCT account_id) AS c FROM players")
+                    players_total.set(int((cur.fetchone() or {}).get("c") or 0))
+                    cur.execute("SELECT COUNT(*) AS c FROM clans")
+                    clans_total.set(int((cur.fetchone() or {}).get("c") or 0))
+                    cur.execute(
+                        "SELECT event_type, COUNT(*) AS c "
+                        "FROM telemetry_events GROUP BY event_type")
+                    telemetry_events_by_type._metrics.clear()
+                    for r in cur.fetchall():
+                        telemetry_events_by_type.labels(
+                            r["event_type"] or "?").set(int(r["c"] or 0))
+                    # DB-Groesse + per-Table-Groesse (inkl. Indexe).
+                    # Time-Series in Prometheus → Wachstum-Kurve in Grafana.
+                    cur.execute("SELECT pg_database_size(current_database()) AS s")
+                    db_size_bytes.set(int((cur.fetchone() or {}).get("s") or 0))
+                    cur.execute(
+                        "SELECT relname AS table, "
+                        "pg_total_relation_size(c.oid) AS s "
+                        "FROM pg_class c "
+                        "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                        "WHERE c.relkind='r' AND n.nspname='obs' "
+                        "ORDER BY s DESC")
+                    db_table_size_bytes._metrics.clear()
+                    for r in cur.fetchall():
+                        db_table_size_bytes.labels(r["table"]).set(
+                            int(r["s"] or 0))
             finally:
                 if "_PG_CONN_FACTORY" not in app.config:
                     conn.close()
+            _db_cache["updated_at"] = now
         except Exception:
             db_query_errors_total.labels("metrics").inc()
+
+    @app.route("/metrics")
+    def _metrics_endpoint():
+        _refresh_db_metrics()
         body = generate_latest(REGISTRY)
         return Response(body, mimetype=CONTENT_TYPE_LATEST)
 
