@@ -137,6 +137,11 @@ def _normalize(event):
         base["distance"] = event.get("rideDistance")
         base["actor_x"], base["actor_y"] = _loc(event, "character")
         base["actor_z"], base["actor_health"] = _z_health(event, "character")
+        # vehicleId ist im raw event vorhanden (vehicle.vehicleId), wurde
+        # vorher nicht abgegriffen → Interval-Matching im replay_builder
+        # konnte Enter→Leave nicht paaren → ep_end blieb inf, Unifikation
+        # ueberschrieb auch Positions NACH dem Aussteigen.
+        base["weapon"] = (event.get("vehicle") or {}).get("vehicleId")
         base["seat_index"] = event.get("seatIndex")
     elif et in ("LogPlayerRedeploy", "LogPlayerRedeployStart"):
         # Comeback-Antenne (Wiederhol-Antenne) — Squadmate aktiviert die
