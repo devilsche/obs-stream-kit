@@ -18,6 +18,10 @@ import datetime as _dt
 
 CACHE_TTL_DAYS = 7
 
+# Sentinel-Wert in player_clans.updated_at fuer "noch nicht verarbeitet"
+# (= im Queue). Schema-Constraint NOT NULL → echtes NULL geht nicht.
+QUEUE_SENTINEL = "1970-01-01T00:00:00Z"
+
 
 def _now_iso() -> str:
     return _dt.datetime.now(_dt.UTC).isoformat().replace("+00:00", "Z")
@@ -134,13 +138,11 @@ def enqueue_unknown(conn, account_ids) -> int:
     for acc in account_ids:
         if not acc:
             continue
-        cur = conn.execute(
+        conn.execute(
             "INSERT INTO player_clans (account_id, clan_id, updated_at) "
-            "VALUES (?, NULL, NULL) "
+            "VALUES (?, NULL, ?) "
             "ON CONFLICT (account_id) DO NOTHING",
-            (acc, ))
-        # psycopg2 cursor.rowcount nicht ueber alle Treiber zuverlaessig;
-        # fuer simple Statistik genuegt es zu zaehlen wir versucht haben.
+            (acc, QUEUE_SENTINEL))
         n += 1
     try:
         conn.commit()
@@ -160,8 +162,9 @@ def process_queue(conn, client, max_count: int = 3) -> int:
         return 0
     rows = conn.execute(
         "SELECT account_id FROM player_clans "
-        "WHERE updated_at IS NULL "
-        "ORDER BY RANDOM() LIMIT ?", (max_count,)).fetchall()
+        "WHERE updated_at = ? "
+        "ORDER BY RANDOM() LIMIT ?",
+        (QUEUE_SENTINEL, max_count)).fetchall()
     accs = [r["account_id"] for r in rows]
     if not accs:
         return 0
