@@ -160,10 +160,22 @@ def process_queue(conn, client, max_count: int = 3) -> int:
     workload ueber mehrere Tenants und Ticks."""
     if client is None:
         return 0
+    # Order: neueste Matches zuerst. Spieler die im letzten Spiel
+    # auftauchten kriegen ihre Clan-Tags als erstes — dort liegt
+    # die UI-Aufmerksamkeit. Alte Backlog-Accounts spaeter.
+    # NULLS LAST: Accounts ohne Match-Reference ans Ende.
     rows = conn.execute(
-        "SELECT account_id FROM player_clans "
-        "WHERE updated_at = ? "
-        "ORDER BY RANDOM() LIMIT ?",
+        "SELECT pc.account_id FROM player_clans pc "
+        "LEFT JOIN ("
+        "  SELECT mtm.account_id, MAX(m.played_at) AS last_seen "
+        "  FROM match_team_mapping mtm "
+        "  JOIN matches m ON m.match_id = mtm.match_id "
+        "    AND m.tenant_id = mtm.tenant_id "
+        "  GROUP BY mtm.account_id"
+        ") lp ON lp.account_id = pc.account_id "
+        "WHERE pc.updated_at = ? "
+        "ORDER BY lp.last_seen DESC NULLS LAST "
+        "LIMIT ?",
         (QUEUE_SENTINEL, max_count)).fetchall()
     accs = [r["account_id"] for r in rows]
     if not accs:
