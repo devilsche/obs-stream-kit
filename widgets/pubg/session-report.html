@@ -1152,6 +1152,13 @@
        sonst frisst color hier die Slot-Farben am Spielernamen (Slot 2
        rot, Slot 4 gruen etc.). Font-weight bleibt fuer leichten Akzent. */
     .md-squad-table tr.self td { font-weight: 700; background: rgba(242,183,5,0.06); }
+    /* Slot-Farben (1..4) statisch — JS-Inject ist unzuverlaessig
+       wenn CSS-Cascade-Reihenfolge eine Rolle spielt. */
+    .md-slot-1 { color: #f2b705 !important; }  /* Slot 1 — gelb */
+    .md-slot-2 { color: #ff5a3d !important; }  /* Slot 2 — rot/orange */
+    .md-slot-3 { color: #4ec9ff !important; }  /* Slot 3 — blau */
+    .md-slot-4 { color: #3dd668 !important; }  /* Slot 4 — gruen */
+    .md-muted-color { color: var(--pubg-muted); }
     .md-squad-table .md-dot {
       display: inline-block; width: 10px; height: 10px;
       border-radius: 50%; margin-right: 6px;
@@ -2072,21 +2079,15 @@
     // 2 Lightness-Baendern + niedrigerer Saturation als Slots — so dass
     // selbst bei aehnlichem Hue (z.B. Team mit ~60° Hue) klar von Slot 1
     // (gelb, vollgesaettigt) unterscheidbar bleibt.
+    // Team-Farben 1..100 dynamisch injiziert (zu viele fuer statisch).
+    // Slot-Klassen sind oben im statischen CSS-Block.
     (function _injectTeamPalette() {
       const css = [];
-      const SLOTS = ["#f2b705", "#ff5a3d", "#4ec9ff", "#3dd668"];
-      for (let i = 0; i < SLOTS.length; i++) {
-        css.push(`.md-slot-${i+1}{color:${SLOTS[i]};}`);
-      }
-      // 100 distinkte Team-Farben. Hue * Primzahl 67 = guter Spread.
-      // Alternierende Lightness 72%/60% gibt feine Variation auch bei
-      // visuell-naheliegenden Hues.
       for (let i = 1; i <= 100; i++) {
         const hue = (i * 67) % 360;
         const l = (i % 2) ? 72 : 60;
         css.push(`.md-team-${i}{color:hsl(${hue},55%,${l}%);}`);
       }
-      css.push(`.md-muted-color{color:var(--pubg-muted);}`);
       const style = document.createElement("style");
       style.textContent = css.join("");
       document.head.appendChild(style);
