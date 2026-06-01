@@ -20,3 +20,4 @@ widgets/pubg/assets/mapselection/
 # Visual-Companion-Sessions (Brainstorming-Mockups)
 
 .secrets*
+.claude/
