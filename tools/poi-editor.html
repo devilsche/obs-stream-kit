@@ -1270,7 +1270,9 @@ canvas.addEventListener("mouseleave", () => hidePinTooltip());
 canvas.addEventListener("wheel", (ev) => {
   ev.preventDefault();
   const factor = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
-  const newZoom = Math.max(0.5, Math.min(12, view.tZoom * factor));
+  // HD-Maps (8192px) erlauben tieferen Zoom — bis 32x nutzt die
+  // native Aufloesung pixel-genau aus.
+  const newZoom = Math.max(0.5, Math.min(32, view.tZoom * factor));
   const r = canvas.getBoundingClientRect();
   // Cursor relativ zum zentrierten Map-Quadrat (offset rausrechnen),
   // damit Zoom-to-cursor unter dem Maus-Cursor zentriert bleibt.

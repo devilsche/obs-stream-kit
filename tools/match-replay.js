@@ -217,9 +217,42 @@ function setFocus(teamId) {
     RS.view.tZoom = 1;
     RS.view.tPanX = 0;
     RS.view.tPanY = 0;
+    RS.followTeam = null;
   } else {
     zoomToTeam(RS.focusedTeam);
+    // Follow-Modus aktiv: bei Zeit-Aenderung wird die Karte
+    // automatisch zentriert (bis User selber pant/zoomt).
+    RS.followTeam = RS.focusedTeam;
   }
+}
+
+function panToTeam(teamId) {
+  // Wie zoomToTeam, aber laesst den aktuellen Zoom unangetastet —
+  // nur Pan auf das Team-Centroid. Fuer Follow-Mode-Frames.
+  const cnv = document.getElementById("map");
+  if (!cnv || !cnv.width) return;
+  const blob = getCal();
+  const cal = blob.pinCalibration || {};
+  const mapKm = blob.mapKm || 8;
+  const base = Math.min(cnv.width, cnv.height);
+  const offX = (cnv.width - base) / 2;
+  const offY = (cnv.height - base) / 2;
+  let sx = 0, sy = 0, n = 0;
+  for (const acc of Object.keys(RS._accTeam)) {
+    if (RS._accTeam[acc] !== teamId) continue;
+    const p = posAt(acc, RS.cursorMs);
+    if (!p) continue;
+    const [px, py] = applyCal(p.x, p.y, mapKm, cal);
+    sx += offX + px * base;
+    sy += offY + py * base;
+    n++;
+  }
+  if (!n) return;
+  const cx = sx / n;
+  const cy = sy / n;
+  const z = RS.view.tZoom;  // aktuellen Zoom-Target unveraendert lassen
+  RS.view.tPanX = -(cx - cnv.width / 2) * z;
+  RS.view.tPanY = -(cy - cnv.height / 2) * z;
 }
 
 function zoomToTeam(teamId) {
@@ -931,6 +964,8 @@ function tick(wallNow) {
       RS.playing = false;
       document.getElementById("playPause").textContent = "▶";
     }
+    // Follow-Mode: bei Zeit-Aenderung die Karte aufs Team re-centern
+    if (RS.followTeam != null) panToTeam(RS.followTeam);
     syncScrubberAndClock();
     updateTeamListDeadState(RS.cursorMs);
     renderFrame();
@@ -969,6 +1004,8 @@ document.getElementById("scrubber").addEventListener("input", () => {
   RS.cursorMs = f * RS.replay.durationMs;
   RS.playing = false;
   document.getElementById("playPause").textContent = "▶";
+  // Follow-Mode: auch bei manuellem Scrubber-Drag Karte aufs Team re-centern
+  if (RS.followTeam != null) panToTeam(RS.followTeam);
   syncScrubberAndClock();
   updateTeamListDeadState(RS.cursorMs);
   renderFrame();
@@ -994,12 +1031,14 @@ stageEl().addEventListener("wheel", e => {
   RS.view.tPanX = mx - hw - (mx - hw - RS.view.tPanX) * ratio;
   RS.view.tPanY = my - hh - (my - hh - RS.view.tPanY) * ratio;
   RS.view.tZoom = newZoom;
+  RS.followTeam = null;  // Manueller Zoom → Follow aus
 }, { passive: false });
 
 let _drag = null;
 stageEl().addEventListener("mousedown", e => {
   _drag = { x: e.clientX, y: e.clientY,
             px: RS.view.tPanX, py: RS.view.tPanY };
+  RS.followTeam = null;  // Manueller Pan → Follow aus
 });
 window.addEventListener("mousemove", e => {
   if (!_drag) return;
