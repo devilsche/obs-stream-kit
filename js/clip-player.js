@@ -63,7 +63,6 @@ var ClipPlayer = (function () {
     var clipMetaDetails  = document.getElementById('clipMetaDetails');
 
     var params       = new URLSearchParams(window.location.search);
-    var channel      = params.get('channel') || window.__TWITCH_CHANNEL__ || '';
     var manualClips  = params.get('clips');
     var clipCount    = parseInt(params.get('count'), 10) || 100;
 
@@ -195,7 +194,7 @@ var ClipPlayer = (function () {
     }
 
     function startPlayer(clipData) {
-      clips = clipData;
+      clips = clipData || [];
       if (clips.length === 0) {
         showError('Keine Clips gefunden');
         return;
