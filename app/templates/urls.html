@@ -70,6 +70,29 @@
 
     </div>
 
+    {% if overlays %}
+    <div class="card">
+      <h3>Overlay-Szenen</h3>
+      <p style="color: var(--text-dim); font-size: 13px;">Produktions-Overlays als OBS-Browser-Source. Jede URL einsetzen.</p>
+      <ul class="overlay-url-list">
+        {% for o in overlays %}
+        <li class="overlay-url-item">
+          <label for="ov-{{ o.key }}"><b>{{ o.label }}</b> <span style="color: var(--text-dim);">· {{ o.size }}</span></label>
+          <input id="ov-{{ o.key }}" class="overlay-url-field" type="text" readonly
+                 value="{{ overlay_base }}/s/{{ token }}/overlays/{{ o.file }}"
+                 aria-label="OBS-URL für {{ o.label }}"
+                 onfocus="this.select()">
+          {% if o.params %}
+          <small style="color: var(--text-dim);">Parameter:
+            {% for p in o.params %}<code>{{ p }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+          </small>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
     <div class="card">
       <h3>Streamer.bot</h3>
       <p>Replace previous <code>/api/pubg/...</code> URLs with <code>{{ base_url }}/s/{{ token }}/api/...</code> (drop the auth header).</p>

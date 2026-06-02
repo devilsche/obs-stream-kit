@@ -1,16 +1,16 @@
-# nginx Server-Block fuer die eigene Overlay-Domain
-# stream-overlay.com -> Overlays auf :9001, API durchgereicht an :9000 (stats)
+# nginx Server-Block — ALLES unter stream-overlay.com (eine Domain, ein Login).
+#
+# Etappe 1 der Konsolidierung:
+#   - Service 1 (app, :9000) ist das Hauptbackend: Dashboard, Login/OAuth, Admin,
+#     Widgets, Tools, PUBG/Steam-API, statische Assets.
+#   - Service 2 (overlay_app, :9001) liefert nur die Produktions-Overlays + Clip-API.
+#   - Ein Login-Cookie, host-only auf stream-overlay.com (greift fuer beide via nginx).
 #
 # Voraussetzungen:
-#   1. DNS A-Record "stream-overlay.com" auf den Server (erledigt)
-#   2. Eigenes TLS-Cert (separate Lineage, NICHT --expand an .info):
-#        certbot --nginx -d stream-overlay.com
-#      (legt das :443-Cert an; den API-Split unten danach einfuegen)
-#   3. Datei nach /etc/nginx/sites-available/stream-overlay.com kopieren,
-#      verlinken, testen, reloaden:
-#        ln -s /etc/nginx/sites-available/stream-overlay.com \
-#              /etc/nginx/sites-enabled/stream-overlay.com
-#        nginx -t && systemctl reload nginx
+#   - DNS A/AAAA "stream-overlay.com" -> Server (vorhanden)
+#   - Cert: /etc/letsencrypt/live/stream-overlay.com/  (vorhanden)
+#   - Twitch Dev Console: Redirect-URI https://stream-overlay.com/app/oauth/callback
+#   - Datei nach /etc/nginx/sites-available/stream-overlay.com, verlinken, nginx -t, reload.
 
 server {
     listen 80;
@@ -28,21 +28,26 @@ server {
     ssl_certificate     /etc/letsencrypt/live/stream-overlay.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/stream-overlay.com/privkey.pem;
 
-    # Nur die PUBG/Steam-Stats-API liegt auf Service 1 (stats-Backend, :9000).
-    # Der Twitch-Clip-Endpoint (/s/<token>/api/twitch/clips) gehoert dagegen zum
-    # Overlay-Service (Service 2) und faellt unten in "location /". Token im Pfad
-    # authentifiziert in beiden Faellen.
-    location ~ ^/s/[^/]+/api/(pubg|steam)/ {
-        proxy_pass         http://127.0.0.1:9000;
+    # Overlay-Auslieferung + Twitch-Clip-API -> Service 2 (:9001)
+    location ~ ^/s/[^/]+/(overlays|assets|js)/ {
+        proxy_pass         http://127.0.0.1:9001;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   X-Forwarded-For   $remote_addr;
+        proxy_set_header   X-Forwarded-Host  $host;
+    }
+    location ~ ^/s/[^/]+/api/twitch/ {
+        proxy_pass         http://127.0.0.1:9001;
         proxy_set_header   Host              $host;
         proxy_set_header   X-Forwarded-Proto $scheme;
         proxy_set_header   X-Forwarded-For   $remote_addr;
         proxy_set_header   X-Forwarded-Host  $host;
     }
 
-    # Overlays / Assets / JS / Twitch-Clips / Root -> Service 2 (:9001)
+    # Alles andere -> Service 1 (:9000): Dashboard, Login/OAuth, Admin, Widgets,
+    # Tools, PUBG/Steam-API (/s/<tok>/api/pubg|steam), statische Assets.
     location / {
-        proxy_pass         http://127.0.0.1:9001;
+        proxy_pass         http://127.0.0.1:9000;
         proxy_set_header   Host              $host;
         proxy_set_header   X-Forwarded-Proto $scheme;
         proxy_set_header   X-Forwarded-For   $remote_addr;

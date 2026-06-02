@@ -31,7 +31,7 @@ class Config:
     TWITCH_CLIENT_ID = _secret("Client-ID")
     TWITCH_CLIENT_SECRET = _secret("Client-Secret")
     TWITCH_CHANNEL = _secret("Twitch-Channel")
-    TWITCH_REDIRECT_URI = os.environ.get("OBS_KIT_OAUTH_REDIRECT") or "https://stats-overlay.info/app/oauth/callback"
+    TWITCH_REDIRECT_URI = os.environ.get("OBS_KIT_OAUTH_REDIRECT") or "https://stream-overlay.com/app/oauth/callback"
     TWITCH_AUTH_URL = "https://id.twitch.tv/oauth2/authorize"
     TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token"
     TWITCH_USERINFO_URL = "https://api.twitch.tv/helix/users"

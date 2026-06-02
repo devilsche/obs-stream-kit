@@ -146,9 +146,13 @@ def urls():
     project_root = current_app.config.get("_PROJECT_ROOT", ".")
     widgets_list = widget_catalog.get(project_root)
     base_url = request.url_root.rstrip("/")
+    # Alles laeuft unter einer Domain (stream-overlay.com) -> Overlay-URLs nutzen
+    # dieselbe Basis. Overlay-Szenen kommen aus dem geteilten Katalog.
+    from overlay_app.overlay_catalog import OVERLAYS
     return render_template("urls.html",
                            user=g.user, token=token,
-                           widgets=widgets_list, base_url=base_url)
+                           widgets=widgets_list, base_url=base_url,
+                           overlays=OVERLAYS, overlay_base=base_url)
 
 
 def _visible_tools():
