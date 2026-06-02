@@ -14,12 +14,15 @@
 
 server {
     listen 80;
+    listen [::]:80;
     server_name stream-overlay.com;
     return 301 https://$host$request_uri;
 }
 
 server {
-    listen 443 ssl http2;
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
     server_name stream-overlay.com;
 
     ssl_certificate     /etc/letsencrypt/live/stream-overlay.com/fullchain.pem;
