@@ -13,7 +13,6 @@
  *   <div class="clip-meta" id="clipMeta">...</div>  (optional)
  *
  * URL-Parameter (automatisch gelesen):
- *   ?channel=LuCKoR_HD&client_id=xxx&client_secret=xxx
  *   ?clips=Slug1,Slug2,Slug3
  *   &count=100&countdown=5
  */
@@ -64,9 +63,7 @@ var ClipPlayer = (function () {
     var clipMetaDetails  = document.getElementById('clipMetaDetails');
 
     var params       = new URLSearchParams(window.location.search);
-    var channel      = params.get('channel') || 'LuCKoR_HD';
-    var clientId     = params.get('client_id') || window.__TWITCH_CLIENT_ID__ || '';
-    var clientSecret = params.get('client_secret') || window.__TWITCH_CLIENT_SECRET__ || '';
+    var channel      = params.get('channel') || window.__TWITCH_CHANNEL__ || '';
     var manualClips  = params.get('clips');
     var clipCount    = parseInt(params.get('count'), 10) || 100;
 
@@ -218,53 +215,20 @@ var ClipPlayer = (function () {
       return;
     }
 
-    // API Modus
-    if (!clientId || !clientSecret) {
-      showError('client_id & client_secret fehlt');
-      return;
-    }
-
-    fetch('https://id.twitch.tv/oauth2/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'client_id=' + encodeURIComponent(clientId)
-        + '&client_secret=' + encodeURIComponent(clientSecret)
-        + '&grant_type=client_credentials'
-    })
-    .then(function (r) { return r.json(); })
-    .then(function (tokenData) {
-      if (!tokenData.access_token) throw new Error('Token-Fehler');
-      var token = tokenData.access_token;
-      var headers = { 'Client-ID': clientId, 'Authorization': 'Bearer ' + token };
-
-      return fetch('https://api.twitch.tv/helix/users?login=' + encodeURIComponent(channel), { headers: headers })
-        .then(function (r) { return r.json(); })
-        .then(function (userData) {
-          if (!userData.data || !userData.data.length) throw new Error('Kanal nicht gefunden');
-          return userData.data[0].id;
-        })
-        .then(function (bid) {
-          return fetch('https://api.twitch.tv/helix/clips?broadcaster_id=' + bid + '&first=' + clipCount, { headers: headers });
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (clipData) {
-          if (!clipData.data || !clipData.data.length) throw new Error('Keine Clips gefunden');
-          startPlayer(clipData.data.map(function (c) {
-            return {
-              id: c.id,
-              title: c.title || '',
-              duration: c.duration || 30,
-              createdAt: c.created_at || '',
-              views: c.view_count || 0,
-              creator: c.creator_name || ''
-            };
-          }));
-        });
-    })
-    .catch(function (err) {
-      console.error('ClipPlayer:', err);
-      showError(err.message || 'API-Fehler');
-    });
+    // API Modus — Clips kommen server-seitig (kein Secret im Browser).
+    var serveBase = window.__SERVE_BASE__ || '/';
+    var url = serveBase.replace(/\/+$/, '/') + 'api/twitch/clips?count=' + clipCount;
+    fetch(url, { credentials: 'omit' })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var list = (data && data.clips) || [];
+        if (!list.length) throw new Error('Keine Clips gefunden');
+        startPlayer(list);
+      })
+      .catch(function (err) {
+        console.error('ClipPlayer:', err);
+        showError(err.message || 'API-Fehler');
+      });
   }
 
   return { init: init };

@@ -613,14 +613,11 @@
      * Datei über lokalen Server laden: python3 -m http.server 8080
      *
      * URL-Parameter:
-     *   Automatisch (Twitch API):
-     *     ?channel=LuCKoR_HD&client_id=xxx&client_secret=xxx
-     *
      *   Manuell (Clip-Slugs):
      *     ?clips=Slug1,Slug2,Slug3
      *
      *   Optional:
-     *     &count=20       — Anzahl Clips (default: 20, max: 100)
+     *     &count=20       — Anzahl Clips (default: 100)
      *     &countdown=5    — Countdown-Sekunden zwischen Clips (default: 5)
      */
 
@@ -633,9 +630,6 @@
       document.body.style.height = H + 'px';
 
       var params        = new URLSearchParams(window.location.search);
-      var channel       = params.get('channel') || window.__TWITCH_CHANNEL__ || '';
-      var clientId      = params.get('client_id') || window.__TWITCH_CLIENT_ID__ || '';
-      var clientSecret  = params.get('client_secret') || window.__TWITCH_CLIENT_SECRET__ || '';
       var manualClips   = params.get('clips');
       var clipCount     = parseInt(params.get('count'), 10) || 100;
       var countdownSec  = parseInt(params.get('countdown'), 10) || 5;
@@ -798,7 +792,8 @@
         }, 1000);
       }
 
-      function startPlayer() {
+      function startPlayer(clipData) {
+        clips = clipData || [];
         if (clips.length === 0) {
           showError('Keine Clips gefunden');
           return;
@@ -813,76 +808,27 @@
         var ids = manualClips.split(',')
           .map(function (s) { return s.trim(); })
           .filter(function (s) { return s.length > 0; });
-        clips = ids.map(function (id) {
+        startPlayer(ids.map(function (id) {
           return { id: id, title: '', duration: 30 };
-        });
-        startPlayer();
+        }));
         return;
       }
 
-      // ── Twitch API Modus ───────────────────────────────────────
+      // ── API Modus — Clips kommen server-seitig (kein Secret im Browser) ──
 
-      if (!clientId || !clientSecret) {
-        showError('client_id & client_secret oder clips Parameter fehlt');
-        return;
-      }
-
-      fetch('https://id.twitch.tv/oauth2/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'client_id=' + encodeURIComponent(clientId)
-          + '&client_secret=' + encodeURIComponent(clientSecret)
-          + '&grant_type=client_credentials'
-      })
-      .then(function (r) { return r.json(); })
-      .then(function (tokenData) {
-        if (!tokenData.access_token) {
-          throw new Error('Token-Fehler: ' + (tokenData.message || 'unbekannt'));
-        }
-
-        var token = tokenData.access_token;
-        var headers = {
-          'Client-ID': clientId,
-          'Authorization': 'Bearer ' + token
-        };
-
-        return fetch('https://api.twitch.tv/helix/users?login=' + encodeURIComponent(channel), {
-          headers: headers
-        })
+      var serveBase = window.__SERVE_BASE__ || '/';
+      var url = serveBase.replace(/\/+$/, '/') + 'api/twitch/clips?count=' + clipCount;
+      fetch(url, { credentials: 'omit' })
         .then(function (r) { return r.json(); })
-        .then(function (userData) {
-          if (!userData.data || userData.data.length === 0) {
-            throw new Error('Kanal "' + channel + '" nicht gefunden');
-          }
-          return userData.data[0].id;
+        .then(function (data) {
+          var list = (data && data.clips) || [];
+          if (!list.length) throw new Error('Keine Clips gefunden');
+          startPlayer(list);
         })
-        .then(function (broadcasterId) {
-          return fetch('https://api.twitch.tv/helix/clips?broadcaster_id=' + broadcasterId
-            + '&first=' + clipCount, { headers: headers });
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (clipData) {
-          if (!clipData.data || clipData.data.length === 0) {
-            throw new Error('Keine Clips für "' + channel + '" gefunden');
-          }
-
-          clips = clipData.data.map(function (c) {
-            return {
-              id: c.id,
-              title: c.title || '',
-              duration: c.duration || 30,
-              createdAt: c.created_at || '',
-              views: c.view_count || 0
-            };
-          });
-
-          startPlayer();
+        .catch(function (err) {
+          console.error('ClipPlayer:', err);
+          showError(err.message || 'API-Fehler');
         });
-      })
-      .catch(function (err) {
-        console.error('Twitch API Fehler:', err);
-        showError(err.message || 'API-Fehler');
-      });
 
     })();
   </script>
