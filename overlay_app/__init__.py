@@ -31,6 +31,9 @@ def create_app(testing: bool = False) -> Flask:
     app.register_blueprint(bp_overlays)
     app.register_blueprint(bp_twitch)
 
+    from overlay_app.views_dashboard import bp_dashboard
+    app.register_blueprint(bp_dashboard)
+
     @app.route("/healthz")
     def healthz():
         return jsonify({"status": "ok"})

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Overlay-URLs{% endblock %}
+{% block body %}
+<h1>Deine Overlay-Browser-Sources</h1>
+{% if not token %}
+  <p class="warn" role="alert">Noch kein Token vergeben — der Admin muss deinen
+  Tenant erst freischalten.</p>
+{% else %}
+<p class="hint">Token: <code>{{ token }}</code> — kopiere eine URL als OBS
+Browser-Source.</p>
+<ul class="overlay-grid">
+  {% for o in overlays %}
+  <li class="overlay-card">
+    <h2>{{ o.label }}</h2>
+    <p class="size">{{ o.size }}</p>
+    <label for="url-{{ o.key }}">OBS-URL</label>
+    <input id="url-{{ o.key }}" class="url-field" type="text" readonly
+           value="{{ base_url }}/s/{{ token }}/overlays/{{ o.file }}">
+    {% if o.params %}
+    <p class="params">Parameter:
+      {% for p in o.params %}<code>{{ p }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+    </p>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

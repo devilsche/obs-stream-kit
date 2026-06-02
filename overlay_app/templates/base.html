@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Overlays{% endblock %} — stats-overlay.info</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='overlay.css') }}">
+</head>
+<body>
+  <a class="skip-link" href="#main">Zum Inhalt springen</a>
+  <header role="banner" class="topnav">
+    <span class="brand">stats-overlay.info · Overlays</span>
+    <a class="nav-link" href="https://stats-overlay.info/app/">Stats-Dashboard</a>
+  </header>
+  <main id="main" tabindex="-1">{% block body %}{% endblock %}</main>
+</body>
+</html>
