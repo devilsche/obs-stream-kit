@@ -2,24 +2,25 @@
 # Alles laeuft jetzt unter stream-overlay.com (eine Domain). stats-overlay.info
 # (inkl. www) ist nur noch ein 301-Redirect.
 #
-# Ersetzt den bisherigen stats-overlay.info-ServerBlock. Cert bleibt das
-# bestehende /etc/letsencrypt/live/stats-overlay.info/.
+# WICHTIG: certbot nutzt webroot (/var/www/html) fuer dieses Cert — die
+# acme-challenge-Location MUSS erhalten bleiben, sonst bricht das Renewal.
+# Cert bleibt das bestehende /etc/letsencrypt/live/stats-overlay.info/.
 
 server {
     listen 80;
-    listen [::]:80;
     server_name stats-overlay.info www.stats-overlay.info;
-    return 301 https://stream-overlay.com$request_uri;
+    location /.well-known/acme-challenge/ { root /var/www/html; }
+    location / { return 301 https://stream-overlay.com$request_uri; }
 }
 
 server {
     listen 443 ssl;
-    listen [::]:443 ssl;
     http2 on;
     server_name stats-overlay.info www.stats-overlay.info;
 
     ssl_certificate     /etc/letsencrypt/live/stats-overlay.info/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/stats-overlay.info/privkey.pem;
 
-    return 301 https://stream-overlay.com$request_uri;
+    location /.well-known/acme-challenge/ { root /var/www/html; }
+    location / { return 301 https://stream-overlay.com$request_uri; }
 }
