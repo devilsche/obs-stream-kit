@@ -23,6 +23,10 @@ def create_app(testing: bool = False) -> Flask:
     app.config["PENDING_URL"] = (
         os.environ.get("OBS_KIT_MAIN_PENDING_URL")
         or "https://stats-overlay.info/app/pending")
+    # Root-Redirect-Ziel: Overlay-URL-Uebersicht auf der Haupt-Domain.
+    app.config["MAIN_URLS_URL"] = (
+        os.environ.get("OBS_KIT_MAIN_URLS_URL")
+        or "https://stats-overlay.info/app/urls")
 
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_for=1)
 

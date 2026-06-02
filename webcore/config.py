@@ -41,6 +41,12 @@ class Config:
     SESSION_LIFETIME_DAYS = 30
     OBSKIT_COOKIE_DOMAIN = os.environ.get("OBS_KIT_COOKIE_DOMAIN") or None
 
+    # Produktions-Overlays laufen als eigener Service (Service 2) unter eigener
+    # Domain (z.B. stream-overlay.com). Die /app/urls-Seite gibt die Overlay-URLs
+    # mit dieser Basis aus. Fehlt die Var (lokal/Dev), faellt urls() auf den
+    # eigenen Host zurueck.
+    OVERLAY_BASE_URL = os.environ.get("OBS_KIT_OVERLAY_BASE_URL") or None
+
     LOGIN_URL = "/app/login"
     PENDING_URL = "/app/pending"
 
