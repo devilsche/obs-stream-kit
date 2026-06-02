@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Overlay-Service{% endblock %}
+{% block body %}
+<h1>Overlay-Service</h1>
+<p>Dies ist der Auslieferungs-Dienst für die Stream-Overlays. Dein eigenes
+   Overlay-Dashboard erreichst du über deine Token-URL.</p>
+
+<form id="tokenForm" class="token-form" action="#" method="get"
+      aria-label="Zum eigenen Overlay-Dashboard">
+  <label for="tokenInput">Dein Token</label>
+  <input id="tokenInput" name="token" type="text" inputmode="latin"
+         autocomplete="off" spellcheck="false"
+         placeholder="tok_…" required
+         pattern="[A-Za-z0-9_]+"
+         aria-describedby="tokenHint">
+  <button type="submit">Dashboard öffnen</button>
+  <p id="tokenHint" class="hint">Den Token findest du eingeloggt im
+     <a href="https://stats-overlay.info/app/urls">Stats-Dashboard unter „OBS URLs"</a>.</p>
+</form>
+
+<script>
+  document.getElementById("tokenForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var t = document.getElementById("tokenInput").value.trim();
+    if (/^[A-Za-z0-9_]+$/.test(t)) {
+      window.location.href = "/s/" + encodeURIComponent(t) + "/";
+    }
+  });
+</script>
+{% endblock %}

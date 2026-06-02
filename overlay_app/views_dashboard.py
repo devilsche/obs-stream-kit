@@ -1,17 +1,27 @@
-"""Service-2-Root (stream-overlay.com): kein eigenes Dashboard.
+"""Overlay-Dashboard (Service 2, stream-overlay.com) — TOKEN-basiert, KEIN Login.
 
-Das Login-Cookie ist auf die Stats-Domain (andere eTLD+1) gescoped und kommt
-auf der Overlay-Domain nicht an — ein eingeloggtes Dashboard ist hier also
-nicht moeglich. Der Root-Pfad leitet daher auf die Overlay-URL-Uebersicht der
-Stats-Domain um (dort liegen die tokenisierten URLs, eingeloggt erreichbar).
-Die Overlays selbst werden tokenbasiert unter /s/<token>/overlays/ bedient.
+Der Tenant ruft sein eigenes Dashboard ueber /s/<token>/ auf — derselbe Token
+wie fuer die Overlays selbst. Die Middleware validiert den Token (404 bei
+unbekannt) und setzt g.tenant_id. Bewusst KEIN OAuth/Cookie: ein Login-Cookie
+waere auf dieser eigenen TLD ohnehin nicht von stats-overlay.info aus gueltig
+(cross-TLD) — der Token im Pfad ist die saubere, schon etablierte Auth.
 """
-from flask import Blueprint, redirect, current_app
+from flask import Blueprint, render_template, request
+
+from overlay_app.overlay_catalog import OVERLAYS
 
 
 bp_dashboard = Blueprint("overlay_dashboard", __name__)
 
 
 @bp_dashboard.route("/")
-def dashboard():
-    return redirect(current_app.config["MAIN_URLS_URL"], code=302)
+def landing():
+    return render_template("overlay_landing.html")
+
+
+@bp_dashboard.route("/s/<token>/")
+def dashboard(token):
+    # Token ist durch die Middleware bereits validiert (sonst 404).
+    base_url = request.url_root.rstrip("/")
+    return render_template("overlay_dashboard.html",
+                           overlays=OVERLAYS, token=token, base_url=base_url)

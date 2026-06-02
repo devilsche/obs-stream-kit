@@ -146,16 +146,9 @@ def urls():
     project_root = current_app.config.get("_PROJECT_ROOT", ".")
     widgets_list = widget_catalog.get(project_root)
     base_url = request.url_root.rstrip("/")
-
-    # Produktions-Overlays liegen auf Service 2 unter eigener Domain
-    # (OBS_KIT_OVERLAY_BASE_URL, z.B. stream-overlay.com). Fehlt sie, faellt
-    # es auf den eigenen Host zurueck (lokal/Dev laeuft alles auf einem Host).
-    from overlay_app.overlay_catalog import OVERLAYS
-    overlay_base = current_app.config.get("OVERLAY_BASE_URL") or base_url
     return render_template("urls.html",
                            user=g.user, token=token,
-                           widgets=widgets_list, base_url=base_url,
-                           overlays=OVERLAYS, overlay_base=overlay_base)
+                           widgets=widgets_list, base_url=base_url)
 
 
 def _visible_tools():

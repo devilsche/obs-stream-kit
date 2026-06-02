@@ -813,10 +813,3 @@ th { color: var(--brand-gold); font-weight: 700; font-size: 0.85em;
     transition: none;
   }
 }
-
-/* ── Overlay-URL-Liste auf /app/urls (Service-2-Overlays, eigene Domain) ── */
-.overlay-url-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 14px; }
-.overlay-url-item { display: flex; flex-direction: column; gap: 4px; }
-.overlay-url-item label { font-size: 14px; }
-.overlay-url-field { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
-.overlay-url-item small { font-size: 12px; }
