@@ -45,3 +45,53 @@ def get_user_info(access_token: str, client_id: str) -> dict:
         "avatar_url": u.get("profile_image_url"),
         "email": u.get("email"),
     }
+
+
+TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token"
+TWITCH_HELIX = "https://api.twitch.tv/helix"
+
+
+def get_clips(client_id: str, client_secret: str, channel: str,
+              count: int = 100) -> list:
+    """App-Token holen, Channel -> broadcaster_id, Clips laden.
+
+    Returns Liste von {id,title,duration,createdAt,views,creator}.
+    Leere Liste wenn Channel unbekannt oder keine Clips.
+    """
+    from webcore.metrics import observe_external
+
+    count = max(1, min(int(count or 100), 100))
+    with observe_external("twitch", "oauth_token") as obs:
+        tr = requests.post(TWITCH_TOKEN_URL, data={
+            "client_id": client_id, "client_secret": client_secret,
+            "grant_type": "client_credentials"}, timeout=10)
+        obs.set_status(tr.status_code)
+    token = (tr.json() or {}).get("access_token")
+    if not token:
+        return []
+    headers = {"Client-ID": client_id, "Authorization": f"Bearer {token}"}
+
+    with observe_external("twitch", "users") as obs:
+        ur = requests.get(f"{TWITCH_HELIX}/users",
+                          params={"login": channel}, headers=headers, timeout=10)
+        obs.set_status(ur.status_code)
+    udata = (ur.json() or {}).get("data") or []
+    if not udata:
+        return []
+    broadcaster_id = udata[0]["id"]
+
+    with observe_external("twitch", "clips") as obs:
+        cr = requests.get(f"{TWITCH_HELIX}/clips",
+                          params={"broadcaster_id": broadcaster_id,
+                                  "first": count},
+                          headers=headers, timeout=10)
+        obs.set_status(cr.status_code)
+    cdata = (cr.json() or {}).get("data") or []
+    return [{
+        "id": c.get("id"),
+        "title": c.get("title") or "",
+        "duration": c.get("duration") or 30,
+        "createdAt": c.get("created_at") or "",
+        "views": c.get("view_count") or 0,
+        "creator": c.get("creator_name") or "",
+    } for c in cdata]
