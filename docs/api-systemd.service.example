@@ -1,0 +1,27 @@
+# obs-stream-kit API-Service (intern) — Daten/Auth + Hintergrund-Poller.
+#
+# Aktivieren auf dem Server:
+#   cp docs/api-systemd.service.example /etc/systemd/system/obs-api.service
+#   systemctl daemon-reload && systemctl enable --now obs-api.service
+#
+# Bindet NUR 127.0.0.1:9002 (serve_api.py setzt HOST=127.0.0.1) — von aussen
+# ausschliesslich ueber nginx-Pfad-Routing erreichbar.
+#
+# Logs:  journalctl -u obs-api.service -f
+
+[Unit]
+Description=obs-stream-kit API-Service (PUBG/Steam/Auth, intern)
+After=network-online.target
+
+[Service]
+Type=simple
+User=obskit
+WorkingDirectory=/opt/obs-stream-kit
+EnvironmentFile=/etc/obs-stream-kit.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/obs-stream-kit/serve_api.py 9002
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

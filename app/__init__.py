@@ -5,12 +5,11 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from webcore.config import Config, TestingConfig
 from webcore.middleware import register_middleware
-from webcore.auth import bp_auth
 from app.views_admin import bp_admin
 from app.views_widgets import bp_widgets
 from app.views_static import bp_static
-from app.views_api import bp_api
 from app.views_app import bp_app
+from overlay_app.views_overlays import bp_overlays
 from webcore.metrics import register_metrics
 
 
@@ -29,12 +28,13 @@ def create_app(testing: bool = False) -> Flask:
 
     register_middleware(app)
     register_metrics(app)
-    app.register_blueprint(bp_auth)
     app.register_blueprint(bp_admin)
     app.register_blueprint(bp_widgets)
     app.register_blueprint(bp_static)
-    app.register_blueprint(bp_api)
     app.register_blueprint(bp_app)
+    # Overlay-Auslieferung (frueher Service 2) ins Frontend integriert:
+    # /s/<token>/overlays|assets|js/...  (reines Datei-Serving, kein Template)
+    app.register_blueprint(bp_overlays)
 
     @app.route("/healthz")
     def healthz():

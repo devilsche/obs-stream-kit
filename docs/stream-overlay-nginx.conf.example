@@ -1,16 +1,12 @@
-# nginx Server-Block — ALLES unter stream-overlay.com (eine Domain, ein Login).
+# nginx — stream-overlay.com (eine Domain) mit interner API + Frontend (Etappe 2).
 #
-# Etappe 1 der Konsolidierung:
-#   - Service 1 (app, :9000) ist das Hauptbackend: Dashboard, Login/OAuth, Admin,
-#     Widgets, Tools, PUBG/Steam-API, statische Assets.
-#   - Service 2 (overlay_app, :9001) liefert nur die Produktions-Overlays + Clip-API.
-#   - Ein Login-Cookie, host-only auf stream-overlay.com (greift fuer beide via nginx).
+#   - API-Service (serve_api.py, 127.0.0.1:9002): OAuth-Login + PUBG/Steam/Twitch-Daten.
+#     Bindet NUR 127.0.0.1 — von aussen ausschliesslich ueber diese nginx-Pfade.
+#   - Frontend (serve.py, 127.0.0.1:9000): Dashboard, Admin, Widgets, Tools, Overlays.
+#   - Ein Login-Cookie, host-only auf stream-overlay.com.
 #
-# Voraussetzungen:
-#   - DNS A/AAAA "stream-overlay.com" -> Server (vorhanden)
-#   - Cert: /etc/letsencrypt/live/stream-overlay.com/  (vorhanden)
-#   - Twitch Dev Console: Redirect-URI https://stream-overlay.com/app/oauth/callback
-#   - Datei nach /etc/nginx/sites-available/stream-overlay.com, verlinken, nginx -t, reload.
+# Voraussetzungen: DNS + Cert fuer stream-overlay.com vorhanden; Twitch-Redirect-URI
+# https://stream-overlay.com/app/oauth/callback eingetragen.
 
 server {
     listen 80;
@@ -28,29 +24,23 @@ server {
     ssl_certificate     /etc/letsencrypt/live/stream-overlay.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/stream-overlay.com/privkey.pem;
 
-    # Overlay-Auslieferung + Twitch-Clip-API -> Service 2 (:9001)
-    location ~ ^/s/[^/]+/(overlays|assets|js)/ {
-        proxy_pass         http://127.0.0.1:9001;
-        proxy_set_header   Host              $host;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-        proxy_set_header   X-Forwarded-For   $remote_addr;
-        proxy_set_header   X-Forwarded-Host  $host;
-    }
-    location ~ ^/s/[^/]+/api/twitch/ {
-        proxy_pass         http://127.0.0.1:9001;
-        proxy_set_header   Host              $host;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-        proxy_set_header   X-Forwarded-For   $remote_addr;
-        proxy_set_header   X-Forwarded-Host  $host;
-    }
+    # Proxy-Header fuer alle locations (ProxyFix vertraut genau einem Hop).
+    proxy_set_header Host              $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For   $remote_addr;
+    proxy_set_header X-Forwarded-Host  $host;
 
-    # Alles andere -> Service 1 (:9000): Dashboard, Login/OAuth, Admin, Widgets,
-    # Tools, PUBG/Steam-API (/s/<tok>/api/pubg|steam), statische Assets.
-    location / {
-        proxy_pass         http://127.0.0.1:9000;
-        proxy_set_header   Host              $host;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-        proxy_set_header   X-Forwarded-For   $remote_addr;
-        proxy_set_header   X-Forwarded-Host  $host;
-    }
+    # ── API-Service (intern, :9002) ──────────────────────────────────────
+    # OAuth-Login/Logout/Callback (exakte Pfade)
+    location = /app/login          { proxy_pass http://127.0.0.1:9002; }
+    location = /app/logout         { proxy_pass http://127.0.0.1:9002; }
+    location = /app/oauth/callback { proxy_pass http://127.0.0.1:9002; }
+    # Tokenisierte Daten-API (pubg/steam/twitch)
+    location ~ ^/s/[^/]+/api/      { proxy_pass http://127.0.0.1:9002; }
+    # Cookie-API (Dashboard-interne Daten-Calls)
+    location /api/                 { proxy_pass http://127.0.0.1:9002; }
+
+    # ── Frontend (:9000) ─────────────────────────────────────────────────
+    # Dashboard, Admin, Settings, Tools, Widgets, Overlays, statische Assets.
+    location / { proxy_pass http://127.0.0.1:9000; }
 }

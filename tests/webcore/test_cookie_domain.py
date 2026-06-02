@@ -6,7 +6,8 @@ import uuid
 from contextlib import contextmanager
 from unittest import mock
 
-from app import create_app
+# OAuth/Cookie liegt im API-Service (bp_auth), nicht im Frontend.
+from api_app import create_app
 
 
 # ---------------------------------------------------------------------------
