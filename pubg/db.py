@@ -250,6 +250,10 @@ def init_schema(conn: sqlite3.Connection) -> None:
         # die behalten 0 — fuer den Live-Filter ist das unkritisch weil
         # Live ohnehin nur frische Eintraege ab Browser-Open zeigt.
         ("pubg_achievements_seen", "suppress_popup", "INTEGER NOT NULL DEFAULT 0"),
+        # tenant_id fuer Multi-Tenant-Kompatibilitaet in Test-DBs (sqlite).
+        # Postgres-Schema hat das nativ; sqlite-Test-DBs brauchen die Column
+        # damit _active (und andere Endpoints) WHERE tenant_id=? filtern koennen.
+        ("matches", "tenant_id", "INTEGER NOT NULL DEFAULT 1"),
     ]
     for table, col, typ in migrations:
         try:

@@ -1,46 +1,12 @@
 import datetime
 import json
-import subprocess
-import sys
-import time
 from urllib.parse import urlparse, parse_qs
 from pubg.db_pg import set_setting, get_setting
 from core.db_compat import SqliteCompatConn
 
-# ── Process-List-Check fuer PUBG (cross-platform) ─────────────────────────────
-# PUBG-Prozessname: 'TslGame.exe' (Windows) bzw. 'TslGame' (Linux/Mac via
-# Proton/Wine). Wird gecacht, damit ein hochfrequenter Endpoint-Aufruf
-# nicht jedes Mal subprocess startet.
-_PUBG_PROCESS_NAME = "TslGame"
-_proc_cache = {"running": False, "ts": 0.0}
-_PROC_CACHE_TTL_S = 5.0
+# Steam AppID fuer PUBG: Battlegrounds
+PUBG_STEAM_APPID = 578080
 
-
-def _is_pubg_running():
-    """True wenn TslGame-Prozess laeuft. 5s-Cache (subprocess-call ~50-100ms,
-    Cache vermeidet Last bei sekuendlichem Polling von Streamer.bot)."""
-    now = time.monotonic()
-    if now - _proc_cache["ts"] < _PROC_CACHE_TTL_S:
-        return _proc_cache["running"]
-    running = False
-    try:
-        if sys.platform.startswith("win"):
-            out = subprocess.check_output(
-                ["tasklist", "/FI", f"IMAGENAME eq {_PUBG_PROCESS_NAME}.exe"],
-                text=True, errors="ignore", timeout=3,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-            running = _PUBG_PROCESS_NAME.lower() in out.lower()
-        else:
-            r = subprocess.run(
-                ["pgrep", "-f", _PUBG_PROCESS_NAME],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                timeout=3)
-            running = (r.returncode == 0)
-    except Exception:
-        running = False
-    _proc_cache["running"] = running
-    _proc_cache["ts"] = now
-    return running
 from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_top_mates, compute_co_player,
                                 compute_mates, compute_map_distribution,
@@ -74,7 +40,8 @@ def _err(code, msg):
 
 class EndpointRegistry:
     def __init__(self, get_conn, my_account_id, platform, cache,
-                 client, poller_status, tenant_id: int):
+                 client, poller_status, tenant_id: int,
+                 steam_summary_fn=None):
         # SqliteCompat-Wrapper damit der bestehende sqlite-Style-Code
         # (conn.execute(sql).fetchall()) auf psycopg2 weiterhin funktioniert.
         # Echte ?->%s Konvertierung erfolgt im Wrapper.
@@ -86,6 +53,9 @@ class EndpointRegistry:
         self.client = client
         self.poller_status = poller_status
         self.tenant_id = tenant_id
+        # Callable -> Steam-Player-Summary-dict (gameid uvm.) oder wirft.
+        # None = keine Steam-Quelle -> _active faellt auf matchRecent zurueck.
+        self.steam_summary_fn = steam_summary_fn
         self._replay_cache = {}  # match_id → fertiges Replay-Dict (Session-Memory)
 
     def dispatch(self, method: str, path: str, body: bytes, headers: dict):
@@ -211,53 +181,68 @@ class EndpointRegistry:
         return _err(404, f"unknown route {path}")
 
     def _active(self, qs):
-        """Liefert {active: bool, ...} fuer Streamer.bot/IFTTT-style
-        If-Then-Else.
+        """active = pubgOpen (Steam) AND matchRecent (DB, < thresholdMin).
 
-        Detection (jede Bedingung allein reicht fuer active=true):
-          - processRunning: TslGame.exe laeuft GRAD (instant, lokal)
-          - matchRecent:    letzter Match juenger als thresholdMin
-                            (Default 30) - faengt 'grad nach Match-Ende
-                            mit OBS-Stats-Anzeige' ab
+        - PUBG offen (Steam gameid == 578080) -> active = matchRecent.
+        - PUBG zu                              -> active = false (kein DB-Query).
+        - Steam unbestimmbar (keine fn / Fehler / noSteam) -> Fallback:
+          active = matchRecent.
 
-        Override per Query:
-          ?thresholdMin=15  -> 15 Minuten Schwelle
-          ?thresholdSec=300 -> 5 Minuten Schwelle (in Sekunden)
-          ?noProcess=1      -> Process-Check ueberspringen (nur Match-Age)
+        Overrides: ?thresholdMin / ?thresholdSec / ?noSteam=1 / ?fakePubgOpen=0|1
         """
         threshold_min = float(qs.get("thresholdMin", 30))
         if "thresholdSec" in qs:
             threshold_min = float(qs["thresholdSec"]) / 60.0
-        skip_process = qs.get("noProcess") == "1"
 
-        process_running = False if skip_process else _is_pubg_running()
-
-        conn = self.get_conn()
-        row = conn.execute(
-            "SELECT MAX(played_at) AS last FROM matches WHERE tenant_id = ?",
-            (self.tenant_id,)
-        ).fetchone()
-        last_iso = row["last"] if row else None
-        age_min = None
-        match_recent = False
-        if last_iso:
+        # ── pubgOpen bestimmen: True / False / None(unbestimmbar) ──
+        pubg_open = None
+        steam_checked = False
+        if "fakePubgOpen" in qs:
+            pubg_open = qs.get("fakePubgOpen") == "1"
+            steam_checked = True
+        elif qs.get("noSteam") != "1" and self.steam_summary_fn is not None:
             try:
-                last_dt = datetime.datetime.fromisoformat(
-                    last_iso.replace("Z", "+00:00"))
-                now = datetime.datetime.now(datetime.timezone.utc)
-                age_min = round(
-                    (now - last_dt).total_seconds() / 60.0, 1)
-                match_recent = age_min < threshold_min
+                summary = self.steam_summary_fn() or {}
+                gid_raw = summary.get("gameid")
+                gid = int(gid_raw) if gid_raw else 0
+                pubg_open = (gid == PUBG_STEAM_APPID)
+                steam_checked = True
             except Exception:
-                pass
-        active = process_running or match_recent
+                pubg_open = None
+                steam_checked = False
+
+        # ── matchRecent nur wenn nicht kurzgeschlossen (PUBG sicher zu) ──
+        match_recent = False
+        last_iso = None
+        age_min = None
+        if pubg_open is not False:
+            conn = self.get_conn()
+            row = conn.execute(
+                "SELECT MAX(played_at) AS last FROM matches WHERE tenant_id = ?",
+                (self.tenant_id,)
+            ).fetchone()
+            last_iso = row["last"] if row else None
+            if last_iso:
+                try:
+                    last_dt = datetime.datetime.fromisoformat(
+                        last_iso.replace("Z", "+00:00"))
+                    now = datetime.datetime.now(datetime.timezone.utc)
+                    age_min = round((now - last_dt).total_seconds() / 60.0, 1)
+                    match_recent = age_min < threshold_min
+                except Exception:
+                    pass
+
+        # ── active-Entscheidung ──
+        active = match_recent if pubg_open is not False else False
+
         return _ok({
             "active": active,
-            "processRunning": process_running,
+            "pubgOpen": pubg_open,
             "matchRecent": match_recent,
             "lastMatchAt": last_iso,
             "lastMatchAgeMin": age_min,
             "thresholdMin": threshold_min,
+            "steamChecked": steam_checked,
         })
 
     def _session(self, qs=None):
