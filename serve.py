@@ -19,7 +19,8 @@ if len(sys.argv) > 1 and sys.argv[1] == "--pubg-cold-start":
     sys.exit(cold_start(ROOT))
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else 9000
-HOST = "0.0.0.0"
+# Nur intern binden — oeffentlicher Zugang ausschliesslich ueber nginx (TLS).
+HOST = "127.0.0.1"
 
 from app import create_app
 
