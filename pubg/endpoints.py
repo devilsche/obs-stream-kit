@@ -3,10 +3,6 @@ import json
 from urllib.parse import urlparse, parse_qs
 from pubg.db_pg import set_setting, get_setting
 from core.db_compat import SqliteCompatConn
-
-# Steam AppID fuer PUBG: Battlegrounds
-PUBG_STEAM_APPID = 578080
-
 from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_top_mates, compute_co_player,
                                 compute_mates, compute_map_distribution,
@@ -20,6 +16,9 @@ from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_hot_drop, compute_session_achievements,
                                 compute_vehicle_stats, compute_weapon_stats,
                                 compute_match_detail, is_br_mode)
+
+# Steam AppID fuer PUBG: Battlegrounds
+PUBG_STEAM_APPID = 578080
 
 
 def _json_default(o):

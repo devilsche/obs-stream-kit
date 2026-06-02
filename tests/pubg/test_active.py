@@ -3,9 +3,9 @@ import json
 from unittest.mock import MagicMock
 from pubg.db import connect, init_schema, upsert_player, insert_match
 from pubg.cache import TTLCache
-from pubg.endpoints import EndpointRegistry
+from pubg.endpoints import EndpointRegistry, PUBG_STEAM_APPID
 
-PUBG = 578080
+PUBG = PUBG_STEAM_APPID
 
 
 def _iso(minutes_ago):
