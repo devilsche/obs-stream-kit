@@ -35,7 +35,9 @@ rsync -avz --delete \
 echo "▶ Ownership → obskit (Service-User)"
 ssh -i "$SSH_KEY" "$SERVER" "chown -R obskit:obskit $REMOTE_DIR"
 
-echo "▶ Service neu starten"
-ssh -i "$SSH_KEY" "$SERVER" "systemctl restart obs-stream-kit && systemctl status obs-stream-kit --no-pager -l | head -20"
+echo "▶ Services neu starten (Service 1: obs-stream-kit :9000, Service 2: obs-overlays :9001)"
+ssh -i "$SSH_KEY" "$SERVER" "systemctl restart obs-stream-kit obs-overlays && systemctl status obs-overlays --no-pager -l | head -20"
 
-echo "✓ Deploy fertig — https://king-edition.de"
+# HINWEIS: Dieses Skript zeigt noch auf veraltete Werte (SERVER, SSH_KEY, Domain).
+# Aktuelle Prod-Werte: root@31.70.95.217, ~/.ssh/obskit, stats-overlay.info
+echo "✓ Deploy fertig — https://stats-overlay.info"

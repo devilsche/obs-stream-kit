@@ -1,0 +1,24 @@
+# obs-stream-kit Overlay-Service (Service 2)
+#
+# Aktivieren auf dem Server:
+#   cp docs/overlays-systemd.service.example /etc/systemd/system/obs-overlays.service
+#   systemctl daemon-reload && systemctl enable --now obs-overlays.service
+#
+# Logs:
+#   journalctl -u obs-overlays.service -f
+
+[Unit]
+Description=obs-stream-kit Overlay-Service (Service 2)
+After=network-online.target
+
+[Service]
+Type=simple
+User=obskit
+WorkingDirectory=/opt/obs-stream-kit
+EnvironmentFile=/etc/obs-stream-kit.env
+ExecStart=/usr/bin/python3 /opt/obs-stream-kit/serve_overlays.py 9001
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

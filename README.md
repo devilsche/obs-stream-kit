@@ -551,3 +551,75 @@ Pro Achievement wird der globale Unlock-Prozentsatz (1×/Tag) gepullt.
 Unlocks ≤ `rarePct%` (Default 5 %) bekommen im Popup einen pulsenden
 Gold-Glow + geänderten Ribbon-Text ("Rare Achievement Unlocked"). Im
 Feed wird ein **Rare**-Badge angezeigt.
+
+---
+
+## Deployment (Prod-Server)
+
+Der Dienst läuft auf `stats-overlay.info` und wird als zwei getrennte systemd-Services
+betrieben. Beide laufen unter dem Service-User `obskit`, lesen ihre Credentials aus
+`/etc/obs-stream-kit.env` und liegen unter `/opt/obs-stream-kit`.
+
+### Service 1 — stats-overlay.info (API + Dashboard + Widgets/Tools)
+
+| | |
+|-|-|
+| **Einstiegspunkt** | `serve.py` |
+| **Port** | `:9000` |
+| **systemd-Unit** | `obs-stream-kit.service` |
+| **Domain** | `stats-overlay.info` |
+
+Stellt die PUBG-/Steam-API-Endpoints, das Haupt-Dashboard, alle Widgets und die
+Browser-Tools bereit. **Login läuft ausschließlich über diese Domain.** Das
+Session-Cookie gilt cross-subdomain, da in `/etc/obs-stream-kit.env` gesetzt ist:
+
+```
+OBS_KIT_COOKIE_DOMAIN=.stats-overlay.info
+```
+
+### Service 2 — overlays.stats-overlay.info (Overlay-Service)
+
+| | |
+|-|-|
+| **Einstiegspunkt** | `serve_overlays.py` |
+| **Port** | `:9001` |
+| **systemd-Unit** | `obs-overlays.service` |
+| **Domain** | `overlays.stats-overlay.info` |
+
+Liefert die Produktions-Overlays (`starting-soon`, `brb-pause`, `stream-ending`,
+`just-chatting`, `gameplay`) aus dem Verzeichnis `overlays/`. Die Dateien werden
+token-scoped unter dem Pfad `overlays.stats-overlay.info/s/<token>/overlays/<datei>`
+ausgeliefert; der Twitch-Channel des Tenants und die Twitch-Client-ID werden
+server-seitig in jede Seite injiziert — kein Credential landet im Browser.
+
+Der BRB-Clip-Player ruft server-seitig den Endpoint
+`/s/<token>/api/twitch/clips` ab (kein Client-Secret im Browser-Quelltext).
+
+Weil das Session-Cookie cross-subdomain gilt, ist kein separater Login auf der
+Overlay-Domain nötig.
+
+### DNS + TLS
+
+1. A/AAAA-Record `overlays.stats-overlay.info` → IP des Servers anlegen.
+2. TLS-Zertifikat um die neue Subdomain erweitern:
+   ```bash
+   certbot --expand -d stats-overlay.info -d overlays.stats-overlay.info
+   ```
+3. nginx-Proxy-Block aktivieren (Vorlage: `docs/overlays-nginx.conf.example`).
+
+### systemd-Units aktivieren
+
+```bash
+# Service 2 (Overlay)
+cp docs/overlays-systemd.service.example /etc/systemd/system/obs-overlays.service
+systemctl daemon-reload
+systemctl enable --now obs-overlays.service
+systemctl status obs-overlays.service --no-pager -l
+
+# Service 1 (Hauptservice, falls noch nicht aktiv)
+# Vorlage: docs/pubg-systemd.service.example
+```
+
+Vorlagen-Dateien:
+- `docs/overlays-systemd.service.example` — systemd-Unit für Service 2
+- `docs/overlays-nginx.conf.example` — nginx Server-Block für `overlays.stats-overlay.info`
