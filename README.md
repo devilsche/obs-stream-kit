@@ -57,14 +57,11 @@ Automatischer Twitch Clip-Player mit Countdown-Overlay und BRB-Animation.
 
 | Parameter | Pflicht | Default | Beschreibung |
 |-----------|---------|---------|--------------|
-| `channel` | nein | aus `.secrets` (`Twitch-Channel:`) | Twitch-Kanalname; URL-Param überschreibt `.secrets` |
-| `client_id` | ja* | — | Twitch App Client-ID |
-| `client_secret` | ja* | — | Twitch App Client-Secret |
-| `clips` | ja* | — | Manuelle Clip-Slugs (kommagetrennt) |
+| `clips` | nein | — | Manuelle Clip-Slugs (kommagetrennt); überschreibt den Server-Abruf |
 | `count` | nein | `100` | Anzahl Clips (max 100) |
 | `countdown` | nein | `5` | Countdown-Sekunden zwischen Clips |
 
-\* Entweder `client_id` + `client_secret` (automatisch via Twitch API) ODER `clips` (manuell).
+Im Server-Betrieb werden die Clips server-seitig über `/s/<token>/api/twitch/clips` geladen — der Twitch-Channel und die App-Credentials des Tenants bleiben am Server, das Client-Secret landet **nie** im Browser. Der `clips`-Parameter erlaubt weiterhin einen manuellen Modus ohne Server-Abruf.
 
 **Features:**
 - Clips werden automatisch von der Twitch API geladen und zufällig abgespielt

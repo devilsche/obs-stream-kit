@@ -197,7 +197,7 @@ Empfohlen: **540×320**. Streamer.bot triggert: setzt URL → Source einblenden 
 
 Im Browser öffnen, **nicht** als Browser-Source. Layout responsiv.
 
-> Alte URL `scenes/stats.html?player=NAME` leitet automatisch hierher weiter.
+> Alte URL `overlays/stats.html?player=NAME` leitet automatisch hierher weiter.
 
 ---
 
