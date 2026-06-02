@@ -1,0 +1,46 @@
+# nginx Server-Block fuer die eigene Overlay-Domain
+# stream-overlay.com -> Overlays auf :9001, API durchgereicht an :9000 (stats)
+#
+# Voraussetzungen:
+#   1. DNS A-Record "stream-overlay.com" auf den Server (erledigt)
+#   2. Eigenes TLS-Cert (separate Lineage, NICHT --expand an .info):
+#        certbot --nginx -d stream-overlay.com
+#      (legt das :443-Cert an; den API-Split unten danach einfuegen)
+#   3. Datei nach /etc/nginx/sites-available/stream-overlay.com kopieren,
+#      verlinken, testen, reloaden:
+#        ln -s /etc/nginx/sites-available/stream-overlay.com \
+#              /etc/nginx/sites-enabled/stream-overlay.com
+#        nginx -t && systemctl reload nginx
+
+server {
+    listen 80;
+    server_name stream-overlay.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name stream-overlay.com;
+
+    ssl_certificate     /etc/letsencrypt/live/stream-overlay.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/stream-overlay.com/privkey.pem;
+
+    # API-Calls der Overlays (z.B. brb-pause -> /s/<token>/api/twitch/clips)
+    # gehen ans Backend auf stats (Service 1, :9000). Token im Pfad authentifiziert.
+    location ~ ^/s/[^/]+/api/ {
+        proxy_pass         http://127.0.0.1:9000;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   X-Forwarded-For   $remote_addr;
+        proxy_set_header   X-Forwarded-Host  $host;
+    }
+
+    # Overlays / Assets / JS -> Service 2 (:9001)
+    location / {
+        proxy_pass         http://127.0.0.1:9001;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   X-Forwarded-For   $remote_addr;
+        proxy_set_header   X-Forwarded-Host  $host;
+    }
+}
