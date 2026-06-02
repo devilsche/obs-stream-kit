@@ -7,6 +7,8 @@ Cache: module-level shared TTLCache, aber jeder Tenant kriegt einen
 Prefix-Wrapper. So bleibt das Speed-Win zwischen Requests erhalten
 ohne Cross-Tenant-Lecks (Tenant 1's Keys: 't1:...', Tenant 2's: 't2:...').
 """
+import time as _time
+
 from flask import Blueprint, g, jsonify, abort, request, current_app
 
 from webcore.middleware import _get_conn
@@ -19,6 +21,24 @@ bp_api = Blueprint("api", __name__)
 # zwischen ALLEN Requests geteilt. Tenant-Trennung passiert via Prefix-Wrapper.
 _SHARED_PUBG_CACHE = None
 _SHARED_STEAM_CACHE = None
+
+# Kurzlebiger per-Tenant-Cache fuer das Steam-Presence-Summary (gameid),
+# damit das sekuendliche Streamer.bot-Polling von /api/pubg/active nicht
+# jeden Tick einen Steam-API-Call ausloest. ~8s analog zum alten Prozess-Cache.
+_STEAM_PRESENCE_TTL_S = 8.0
+_steam_presence_cache = {}  # tenant_id -> (monotonic_ts, summary_dict)
+
+
+def _tenant_steam_summary(tenant_id, steam_client):
+    """Cached get_player_summaries(). Wirft die SteamApiError/Exception des
+    Clients weiter (der Aufrufer in _active faengt sie -> Fallback)."""
+    now = _time.monotonic()
+    hit = _steam_presence_cache.get(tenant_id)
+    if hit and now - hit[0] < _STEAM_PRESENCE_TTL_S:
+        return hit[1]
+    summary = steam_client.get_player_summaries()
+    _steam_presence_cache[tenant_id] = (now, summary)
+    return summary
 
 
 def _shared_pubg_cache():
@@ -97,6 +117,12 @@ def _build_pubg_registry(tenant_id):
     if creds.pubg_api_key:
         client = PubgClient(api_key=creds.pubg_api_key,
                              platform=creds.pubg_platform or "steam")
+    steam_summary_fn = None
+    if creds.steam_api_key and creds.steam_id:
+        from steam.api_client import SteamClient
+        _steam_client = SteamClient(api_key=creds.steam_api_key,
+                                    steam_id=creds.steam_id)
+        steam_summary_fn = lambda: _tenant_steam_summary(tenant_id, _steam_client)
     return EndpointRegistry(
         get_conn=lambda: SqliteCompatConn(_get_conn()),
         my_account_id=my_acc,
@@ -105,6 +131,7 @@ def _build_pubg_registry(tenant_id):
         client=client,
         poller_status=lambda: {"running": False},
         tenant_id=tenant_id,
+        steam_summary_fn=steam_summary_fn,
     )
 
 
