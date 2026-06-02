@@ -35,11 +35,11 @@ Alle Szenen sind **1920×1080 Fullscreen-Overlays**. In OBS einfach als Browser-
 
 | Datei | Beschreibung | OBS Browser-Source |
 |-------|-------------|--------------------|
-| `scenes/starting-soon.html` | Animierte Warteszene (looped) | 1920×1080 |
-| `scenes/brb-pause.html` | Pause mit automatischem Twitch Clip-Player | 1920×1080 |
-| `scenes/stream-ending.html` | Animierte Abschlussszene | 1920×1080 |
-| `scenes/gameplay.html` | Gameplay Overlay (transparenter Hintergrund mit Sparkles) | 1920×1080 |
-| `scenes/just-chatting.html` | Fullscreen-Kamera mit Chat-Bereich, Blitz-Arcs und Sparkles | 1920×1080 |
+| `overlays/starting-soon.html` | Animierte Warteszene (looped) | 1920×1080 |
+| `overlays/brb-pause.html` | Pause mit automatischem Twitch Clip-Player | 1920×1080 |
+| `overlays/stream-ending.html` | Animierte Abschlussszene | 1920×1080 |
+| `overlays/gameplay.html` | Gameplay Overlay (transparenter Hintergrund mit Sparkles) | 1920×1080 |
+| `overlays/just-chatting.html` | Fullscreen-Kamera mit Chat-Bereich, Blitz-Arcs und Sparkles | 1920×1080 |
 
 ### Starting Soon
 
@@ -409,7 +409,7 @@ Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
 | `chat-stats-popup.html` | Streamer.bot-driven Pop-up | `player`, `duration` (Sek) |
 
 Cross-Player-Web-View: `http://localhost:8080/widgets/pubg/coplayer.html?player=NAME`
-(alte URL `scenes/stats.html?player=NAME` leitet weiter)
+(alte URL `overlays/stats.html?player=NAME` leitet weiter)
 
 ### Browser-Tools
 
