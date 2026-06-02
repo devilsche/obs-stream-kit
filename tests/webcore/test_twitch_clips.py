@@ -73,3 +73,9 @@ def test_clips_endpoint_404_without_tenant():
     app = _twitch_app(tenant_id=None)
     r = app.test_client().get("/s/tok123/api/twitch/clips")
     assert r.status_code == 404
+
+
+def test_get_clips_network_error_returns_empty():
+    with mock.patch("webcore.twitch_client.requests.post",
+                    side_effect=Exception("boom")):
+        assert twitch_client.get_clips("cid", "csecret", "luckor", count=10) == []
