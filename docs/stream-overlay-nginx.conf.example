@@ -4,17 +4,32 @@
 #     Bindet NUR 127.0.0.1 — von aussen ausschliesslich ueber diese nginx-Pfade.
 #   - Frontend (serve.py, 127.0.0.1:9000): Dashboard, Admin, Widgets, Tools, Overlays.
 #   - Ein Login-Cookie, host-only auf stream-overlay.com.
+#   - www.stream-overlay.com -> 301 auf apex (Cert deckt beide ab, kein Wildcard noetig).
 #
-# Voraussetzungen: DNS + Cert fuer stream-overlay.com vorhanden; Twitch-Redirect-URI
-# https://stream-overlay.com/app/oauth/callback eingetragen.
+# Voraussetzungen: DNS A/AAAA fuer stream-overlay.com + www; Cert deckt beide
+# (certbot --expand -d stream-overlay.com -d www.stream-overlay.com);
+# Twitch-Redirect-URI https://stream-overlay.com/app/oauth/callback.
 
+# HTTP (beide Namen) -> HTTPS apex
 server {
     listen 80;
     listen [::]:80;
-    server_name stream-overlay.com;
-    return 301 https://$host$request_uri;
+    server_name stream-overlay.com www.stream-overlay.com;
+    return 301 https://stream-overlay.com$request_uri;
 }
 
+# HTTPS www -> apex (nutzt dasselbe Cert, das www mit abdeckt)
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name www.stream-overlay.com;
+    ssl_certificate     /etc/letsencrypt/live/stream-overlay.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/stream-overlay.com/privkey.pem;
+    return 301 https://stream-overlay.com$request_uri;
+}
+
+# HTTPS apex — der eigentliche Dienst
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
@@ -31,16 +46,12 @@ server {
     proxy_set_header X-Forwarded-Host  $host;
 
     # ── API-Service (intern, :9002) ──────────────────────────────────────
-    # OAuth-Login/Logout/Callback (exakte Pfade)
     location = /app/login          { proxy_pass http://127.0.0.1:9002; }
     location = /app/logout         { proxy_pass http://127.0.0.1:9002; }
     location = /app/oauth/callback { proxy_pass http://127.0.0.1:9002; }
-    # Tokenisierte Daten-API (pubg/steam/twitch)
     location ~ ^/s/[^/]+/api/      { proxy_pass http://127.0.0.1:9002; }
-    # Cookie-API (Dashboard-interne Daten-Calls)
     location /api/                 { proxy_pass http://127.0.0.1:9002; }
 
     # ── Frontend (:9000) ─────────────────────────────────────────────────
-    # Dashboard, Admin, Settings, Tools, Widgets, Overlays, statische Assets.
     location / { proxy_pass http://127.0.0.1:9000; }
 }
