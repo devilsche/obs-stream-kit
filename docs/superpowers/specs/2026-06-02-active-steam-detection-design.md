@@ -76,7 +76,7 @@ PUBG-läuft-Signal serverseitig über die Steam-Daten des Tenants:
 
 - Lädt die Steam-Creds des Tenants (`core.credentials`: `steam_id`,
   `steam_api_key`).
-- Baut/nutzt den vorhandenen Steam-Client (`steam/client.py`,
+- Baut/nutzt den vorhandenen Steam-Client (`steam/api_client.py`,
   `get_player_summaries`) und liest `gameid`.
 - `pubgOpen = (gameid == 578080)`. PUBG-AppID `578080` als benannte Konstante.
 - **Cache** gegen das sekündliche Streamer.bot-Polling: kurzlebiger Cache
