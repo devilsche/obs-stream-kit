@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editorial Highlight-Icon — Optionen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,ital,wght@9..144,0,500;9..144,0,600;9..144,1,500&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+<style>
+  :root{--bg:#f5f1e8;--surface:#fbf9f3;--ink:#1c1a16;--dim:#6b6457;--faint:#a8a092;--acc:#d4561f;--line:#d6cdba}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hanken Grotesk",sans-serif;-webkit-font-smoothing:antialiased}
+  header{padding:34px 30px 10px;border-bottom:1.5px solid var(--ink);max-width:1000px;margin:0 auto}
+  h1{font-family:"Fraunces";font-weight:600;font-style:italic;font-size:30px;margin:0}
+  header p{color:var(--dim);font-family:"JetBrains Mono";font-size:13px;margin:8px 0 0}
+  main{max-width:1000px;margin:0 auto;padding:26px 30px 70px;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}
+  .opt{background:var(--surface);border:1.5px solid var(--line);border-radius:4px;padding:24px 18px;text-align:center}
+  .opt.cur{border-color:var(--acc);box-shadow:0 6px 20px rgba(212,86,31,.12)}
+  .opt .ic{font-family:"Material Symbols Outlined";font-size:46px;color:var(--acc);line-height:1;text-shadow:0 0 14px rgba(212,86,31,.3)}
+  .opt .nm{font-family:"Fraunces";font-weight:600;font-size:18px;margin-top:14px}
+  .opt .id{font-family:"JetBrains Mono";font-size:11px;color:var(--faint);margin-top:5px}
+  .opt .ds{font-size:12.5px;color:var(--dim);margin-top:8px;line-height:1.45}
+  .tag{display:inline-block;font-family:"JetBrains Mono";font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);border:1px solid var(--acc);border-radius:3px;padding:2px 7px;margin-top:10px}
+  /* Highlight-Demo wie im Widget */
+  .demo{max-width:1000px;margin:0 auto;padding:0 30px 50px}
+  .demo .card{background:var(--surface);border:1.5px solid var(--line);border-radius:4px;padding:22px;width:320px;box-shadow:0 8px 26px rgba(28,26,22,.1)}
+  .demo .hd{font-family:"Fraunces";font-style:italic;font-weight:500;font-size:22px;display:flex;align-items:baseline;gap:8px}
+  .demo .hd .ic{font-family:"Material Symbols Outlined";font-size:20px;color:var(--acc);font-style:normal;text-shadow:0 0 12px rgba(212,86,31,.4)}
+  .demo .v{font-family:"Fraunces";font-weight:500;font-size:40px;margin-top:14px}
+  .demo .l{font-family:"JetBrains Mono";font-size:11px;color:var(--dim);letter-spacing:.06em;margin-top:4px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Editorial — Highlight-Icon</h1>
+  <p>// Kandidaten im Editorial-Look · aktuell: history_edu (Schriftrolle)</p>
+</header>
+<main>
+  <div class="opt cur"><div class="ic">history_edu</div><div class="nm">Schriftrolle</div><div class="id">history_edu</div><div class="ds">Schriftrolle mit Feder. Edel, schriftlich.</div><span class="tag">aktuell</span></div>
+  <div class="opt"><div class="ic">emoji_events</div><div class="nm">Pokal</div><div class="id">emoji_events</div><div class="ds">Klassischer Pokal — sofort als „Rekord/Sieg" lesbar.</div></div>
+  <div class="opt"><div class="ic">military_tech</div><div class="nm">Orden</div><div class="id">military_tech</div><div class="ds">Auszeichnung/Medaille mit Band. Wertig.</div></div>
+  <div class="opt"><div class="ic">diamond</div><div class="nm">Diamant</div><div class="id">diamond</div><div class="ds">Schlicht, edel, „Premium". Sehr klar.</div></div>
+  <div class="opt"><div class="ic">verified</div><div class="nm">Siegel</div><div class="id">verified</div><div class="ds">Häkchen im Siegel — „bestätigt/besonders".</div></div>
+  <div class="opt"><div class="ic">auto_stories</div><div class="nm">Buch</div><div class="id">auto_stories</div><div class="ds">Aufgeschlagenes Buch — magazin-/editorial-nah.</div></div>
+  <div class="opt"><div class="ic">newspaper</div><div class="nm">Zeitung</div><div class="id">newspaper</div><div class="ds">Zeitung — am direktesten „editorial".</div></div>
+  <div class="opt"><div class="ic">award_star</div><div class="nm">Auszeichnungs-Stern</div><div class="id">award_star</div><div class="ds">Stern im Siegel — Achievement, aber edler als der nackte Stern.</div></div>
+  <div class="opt"><div class="ic">local_library</div><div class="nm">Säule / Institut</div><div class="id">local_library</div><div class="ds">Klassische Säulen — sehr „editorial/klassisch".</div></div>
+  <div class="opt"><div class="ic">ink_pen</div><div class="nm">Feder</div><div class="id">ink_pen</div><div class="ds">Schreibfeder — schriftlich, dezent.</div></div>
+</main>
+<div class="demo">
+  <div class="card">
+    <div class="hd"><span class="ic">history_edu</span> Longshot <span style="font-family:'JetBrains Mono';font-size:12px;color:var(--acc);margin-left:auto">Rekord</span></div>
+    <div class="v">418 m</div><div class="l">weiteste Kill-Distanz</div>
+  </div>
+  <p style="font-family:'JetBrains Mono';font-size:12px;color:var(--dim);margin-top:14px">↑ so sieht's im Highlight aus (hier mit dem aktuellen history_edu). Sag mir den Namen, den du willst — dann setze ich ihn als Editorial-Highlight-Icon.</p>
+</div>
+</body>
+</html>
