@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="de" data-theme="terminal">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Widget aus Bausteinen · Career Card — 6 Themes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@600;700;800&family=Onest:wght@400;500;600&family=Archivo:wght@500;600;800;900&family=Space+Mono:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Fraunces:opsz,ital,wght@9..144,0,500;9..144,0,600;9..144,1,500;9..144,1,600&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+<style>
+  /* ════ EBENE 0 — Token je Theme (inkl. Form: radius, border-width) ════ */
+  :root, html[data-theme="terminal"]{
+    --theme-primary:#22e0d6; --theme-accent:#ff4d8d; --theme-accent-2:#ffb547;
+    --theme-bg:#070a0f; --theme-surface:#0c1118; --theme-surface-2:#0f151e; --theme-border:#23303f;
+    --theme-text:#d6e4ef; --theme-text-dim:#7488a0; --theme-text-faint:#4c5d72; --theme-ok:#22e0a0; --theme-on-primary:#070a0f;
+    --theme-font-display:"Chakra Petch",sans-serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:4px; --theme-border-width:1px; --theme-hot-icon:"bolt";
+  }
+  html[data-theme="aurora"]{
+    --theme-primary:#9d6bd0; --theme-accent:#f2b705; --theme-accent-2:#46d6ff;
+    --theme-bg:#0c0916; --theme-surface:rgba(34,22,54,.6); --theme-surface-2:rgba(45,29,68,.5); --theme-border:rgba(157,107,208,.32);
+    --theme-text:#efe9f6; --theme-text-dim:#a99cc0; --theme-text-faint:#6f6388; --theme-ok:#4be39a; --theme-on-primary:#fff;
+    --theme-font-display:"Syne",sans-serif; --theme-font-body:"Onest",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:18px; --theme-border-width:1px; --theme-hot-icon:"auto_awesome";
+  }
+  html[data-theme="midnight"]{
+    --theme-primary:#b8ff3c; --theme-accent:#3ce08a; --theme-accent-2:#7fae2b;
+    --theme-bg:#0a0e14; --theme-surface:#121927; --theme-surface-2:#16202f; --theme-border:#1f2b3d;
+    --theme-text:#e7eef7; --theme-text-dim:#8294ab; --theme-text-faint:#566377; --theme-ok:#3ce08a; --theme-on-primary:#0a0e14;
+    --theme-font-display:"Bricolage Grotesque",sans-serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:14px; --theme-border-width:1px; --theme-hot-icon:"bolt";
+  }
+  html[data-theme="editorial"]{
+    --theme-primary:#d4561f; --theme-accent:#d4561f; --theme-accent-2:#7a8450;
+    --theme-bg:#f5f1e8; --theme-surface:#fbf9f3; --theme-surface-2:#efe9dc; --theme-border:#d6cdba;
+    --theme-text:#1c1a16; --theme-text-dim:#6b6457; --theme-text-faint:#a8a092; --theme-ok:#5a7d3a; --theme-on-primary:#fff;
+    --theme-font-display:"Fraunces",serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:3px; --theme-border-width:1.5px; --theme-hot-icon:"workspace_premium";
+  }
+  html[data-theme="entry"]{
+    --theme-primary:#9d6bd0; --theme-accent:#f2b705; --theme-accent-2:#c9a0dc;
+    --theme-bg:#160a24; --theme-surface:rgba(20,12,30,.95); --theme-surface-2:#1f1430; --theme-border:rgba(94,42,121,.6);
+    --theme-text:#e8e0f0; --theme-text-dim:#8a7d99; --theme-text-faint:#6b5f7a; --theme-ok:#4be39a; --theme-on-primary:#fff;
+    --theme-font-display:"DM Sans",sans-serif; --theme-font-body:"DM Sans",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:8px; --theme-border-width:1px; --theme-hot-icon:"local_fire_department";
+  }
+  html[data-theme="swiss"]{
+    --theme-primary:#1f3aff; --theme-accent:#1f3aff; --theme-accent-2:#0d0d0d;
+    --theme-bg:#eceae4; --theme-surface:#ffffff; --theme-surface-2:#f4f2ec; --theme-border:#0d0d0d;
+    --theme-text:#0d0d0d; --theme-text-dim:#5c5c57; --theme-text-faint:#9a9a92; --theme-ok:#1faa55; --theme-on-primary:#fff;
+    --theme-font-display:"Archivo",sans-serif; --theme-font-body:"Archivo",sans-serif; --theme-font-mono:"Space Mono",monospace;
+    --theme-radius:0px; --theme-border-width:3px; --theme-hot-icon:"star";
+  }
+
+  /* ════ EBENE 1 — Bausteine (token-getrieben, theme-agnostisch) ════ */
+  .t-card{background:var(--theme-surface);border:var(--theme-border-width) solid var(--theme-border);
+    border-radius:var(--theme-radius);padding:22px;position:relative;width:340px}
+  .t-header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+    font-family:var(--theme-font-display);font-weight:600;font-size:18px;color:var(--theme-text);
+    padding-bottom:14px;border-bottom:var(--theme-border-width) solid var(--theme-border);margin-bottom:18px}
+  .t-range{font-family:var(--theme-font-mono);font-size:12px;color:var(--theme-primary);font-weight:400}
+  .t-stat-grid{display:flex;flex-wrap:wrap;gap:22px 34px}
+  .t-stat{display:flex;flex-direction:column;gap:5px}
+  .t-value{font-family:var(--theme-font-display);font-weight:700;font-size:38px;color:var(--theme-text);line-height:1}
+  .t-label{font-family:var(--theme-font-mono);font-size:11px;color:var(--theme-text-dim);letter-spacing:.06em}
+  .t-hot .t-value{color:var(--theme-accent)}
+  .t-hot-mark{display:inline-grid;place-items:center;vertical-align:-3px;margin-right:4px}
+  .t-hot-mark::before{font-family:"Material Symbols Outlined";content:var(--theme-hot-icon);font-size:18px;color:var(--theme-accent)}
+
+  /* ════ EBENE 2 — der CHARAKTER je Theme (Form, Typo, Deko, Glow) ════ */
+  /* — Terminal: scharf, Grid, Eck-Marker, Neon, UPPERCASE-mono — */
+  html[data-theme="terminal"] body::before{content:"";position:fixed;inset:0;z-index:-1;
+    background-image:linear-gradient(var(--theme-border) 1px,transparent 1px),linear-gradient(90deg,var(--theme-border) 1px,transparent 1px);
+    background-size:42px 42px;opacity:.3;mask-image:radial-gradient(circle at 50% 30%,#000,transparent 80%)}
+  html[data-theme="terminal"] .t-header{text-transform:uppercase;letter-spacing:.03em}
+  html[data-theme="terminal"] .t-label{text-transform:uppercase}
+  html[data-theme="terminal"] .t-card::after{content:"";position:absolute;right:0;top:0;width:14px;height:14px;
+    border-top:2px solid var(--theme-primary);border-right:2px solid var(--theme-primary)}
+  html[data-theme="terminal"] .t-hot .t-value{text-shadow:0 0 18px var(--theme-accent)}
+
+  /* — Aurora: rundes Glas, Mesh, weich, Gold-Werte — */
+  html[data-theme="aurora"] body::before{content:"";position:fixed;inset:0;z-index:-1;
+    background:radial-gradient(700px 520px at 18% 8%,rgba(123,63,160,.55),transparent 60%),radial-gradient(620px 480px at 85% 90%,rgba(242,183,5,.16),transparent 60%)}
+  html[data-theme="aurora"] .t-card{backdrop-filter:blur(18px) saturate(140%);box-shadow:0 16px 50px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.08)}
+  html[data-theme="aurora"] .t-value{color:var(--theme-accent)}
+  html[data-theme="aurora"] .t-header{font-weight:800;letter-spacing:-.01em}
+
+  /* — Midnight: rund, Lime-Glow — */
+  html[data-theme="midnight"] body::before{content:"";position:fixed;inset:0;z-index:-1;
+    background:radial-gradient(800px 520px at 80% 0%,rgba(184,255,60,.08),transparent 60%)}
+  html[data-theme="midnight"] .t-card{box-shadow:0 12px 36px rgba(0,0,0,.45)}
+  html[data-theme="midnight"] .t-header{font-weight:800;letter-spacing:-.02em}
+
+  /* — Editorial: hell, Serife KURSIV, dezent, gemischt-case — */
+  html[data-theme="editorial"] .t-card{box-shadow:0 8px 26px rgba(28,26,22,.1)}
+  html[data-theme="editorial"] .t-header{font-style:italic;font-weight:500;font-size:22px}
+  html[data-theme="editorial"] .t-value{font-weight:500;font-variant-numeric:oldstyle-nums}
+  html[data-theme="editorial"] .t-range{font-style:normal}
+
+  /* — Entry: rund, Purple-Glow, Gold-Werte, DM Sans — */
+  html[data-theme="entry"] body::before{content:"";position:fixed;inset:0;z-index:-1;
+    background:radial-gradient(820px 560px at 50% -8%,rgba(94,42,121,.55),transparent 60%)}
+  html[data-theme="entry"] .t-card{box-shadow:0 14px 40px rgba(0,0,0,.4)}
+  html[data-theme="entry"] .t-value{color:var(--theme-accent)}
+
+  /* — Swiss: 0 Radius, 3px-Kanten, RIESIGE Zahlen, versetzter harter Schatten, UPPERCASE — */
+  html[data-theme="swiss"] .t-card{box-shadow:8px 8px 0 var(--theme-border)}
+  html[data-theme="swiss"] .t-header{text-transform:uppercase;font-weight:900;font-size:20px;letter-spacing:-.02em}
+  html[data-theme="swiss"] .t-value{font-weight:900;font-size:54px;letter-spacing:-.03em}
+  html[data-theme="swiss"] .t-label{text-transform:uppercase;font-weight:700}
+  html[data-theme="swiss"] .t-range{color:var(--theme-text);font-weight:700}
+
+  /* ════ Bühne (nur diese Seite) ════ */
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--theme-bg);color:var(--theme-text);font-family:var(--theme-font-body),sans-serif;
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;-webkit-font-smoothing:antialiased;transition:background .25s}
+  .skip{position:absolute;left:-999px;background:var(--theme-primary);color:var(--theme-on-primary);padding:8px 14px}
+  .skip:focus{left:12px;top:12px}
+  :focus-visible{outline:2px solid var(--theme-primary);outline-offset:3px}
+  header.bar{width:100%;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:18px 26px;border-bottom:1px solid var(--theme-border);background:var(--theme-surface-2)}
+  header.bar h1{font-family:var(--theme-font-display);font-size:18px;margin:0;font-weight:700}
+  header.bar p{margin:3px 0 0;font-family:var(--theme-font-mono);font-size:12px;color:var(--theme-text-dim)}
+  .switcher{display:inline-flex;border:1px solid var(--theme-border);border-radius:var(--theme-radius);overflow:hidden;flex:none}
+  .switcher button{padding:10px 15px;background:none;border:0;border-right:1px solid var(--theme-border);
+    color:var(--theme-text-dim);font-family:var(--theme-font-mono);font-size:12px;cursor:pointer;min-height:42px}
+  .switcher button:last-child{border-right:0}
+  .switcher button[aria-pressed="true"]{background:var(--theme-primary);color:var(--theme-on-primary);font-weight:700}
+  .stage{flex:1;display:flex;flex-wrap:wrap;gap:30px;align-items:flex-start;justify-content:center;padding:54px 26px}
+  .note{font-family:var(--theme-font-mono);font-size:12px;color:var(--theme-text-faint);padding:0 26px 50px;text-align:center;max-width:720px}
+  @media (prefers-reduced-motion:reduce){body{transition:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#stage">Zum Inhalt springen</a>
+<header class="bar">
+  <div>
+    <h1>Career Card — ein Widget aus Bausteinen</h1>
+    <p>// gleiches t-* Markup · jedes Theme spielt Form + Typo + Deko voll aus</p>
+  </div>
+  <div class="switcher" role="group" aria-label="Theme wählen">
+    <button data-set="terminal" aria-pressed="true">Terminal</button>
+    <button data-set="aurora" aria-pressed="false">Aurora</button>
+    <button data-set="midnight" aria-pressed="false">Midnight</button>
+    <button data-set="editorial" aria-pressed="false">Editorial</button>
+    <button data-set="entry" aria-pressed="false">Entry</button>
+    <button data-set="swiss" aria-pressed="false">Swiss</button>
+  </div>
+</header>
+
+<main class="stage" id="stage">
+  <!-- Career Card -->
+  <div class="t-card">
+    <div class="t-header">Career <span class="t-range">Session</span></div>
+    <div class="t-stat-grid">
+      <div class="t-stat"><span class="t-value">12.4</span><span class="t-label">K/D</span></div>
+      <div class="t-stat"><span class="t-value">7</span><span class="t-label">Matches</span></div>
+      <div class="t-stat"><span class="t-value">3</span><span class="t-label">Wins</span></div>
+      <div class="t-stat t-hot"><span class="t-value"><span class="t-hot-mark" aria-hidden="true"></span>9</span><span class="t-label">Kills (best)</span></div>
+    </div>
+  </div>
+
+  <!-- Highlight Card -->
+  <div class="t-card t-hot" style="width:300px">
+    <div class="t-header"><span class="t-hot-mark" aria-hidden="true"></span>Longshot <span class="t-range">neuer Rekord</span></div>
+    <div class="t-stat"><span class="t-value">418 m</span><span class="t-label">weiteste Kill-Distanz</span></div>
+  </div>
+</main>
+
+<p class="note">Identisches HTML (t-card · t-header · t-stat · t-value · t-label · t-hot) — Swiss riesig &amp; kantig, Aurora rundes Glas, Editorial kursive Serife, Terminal Grid+Neon. Nicht nur Farbe: Radius, Border, Schatten, Typo-Wirkung, Deko und Highlight-Symbol kommen aus dem Theme.</p>
+
+<script>
+(function(){
+  const sw=document.querySelector('.switcher');
+  sw.addEventListener('click',function(e){const b=e.target.closest('button[data-set]');if(!b)return;
+    document.documentElement.dataset.theme=b.dataset.set;
+    sw.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',String(x===b));});});
+})();
+</script>
+</body>
+</html>
