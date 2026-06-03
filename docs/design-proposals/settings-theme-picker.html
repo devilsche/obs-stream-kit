@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en" data-theme="terminal">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings · Appearance — Theme Picker (6 Themes)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@600;700;800&family=Onest:wght@400;500;600&family=Archivo:wght@500;600;800;900&family=Space+Mono:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Fraunces:opsz,ital,wght@9..144,0,500;9..144,0,600;9..144,1,500;9..144,1,600&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+<style>
+  /* ════ EBENE 0 — Token je Theme. Gelten global (data-theme) UND lokal pro Kachel-Vorschau (data-preview) ════ */
+  html[data-theme="terminal"], [data-preview="terminal"]{
+    --theme-primary:#22e0d6; --theme-accent:#ff4d8d; --theme-accent-2:#ffb547;
+    --theme-bg:#070a0f; --theme-surface:#0c1118; --theme-surface-2:#0f151e; --theme-border:#23303f;
+    --theme-text:#d6e4ef; --theme-text-dim:#7488a0; --theme-text-faint:#4c5d72; --theme-ok:#22e0a0; --theme-on-primary:#070a0f;
+    --theme-font-display:"Chakra Petch",sans-serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:4px; --theme-border-width:1px;
+  }
+  html[data-theme="aurora"], [data-preview="aurora"]{
+    --theme-primary:#9d6bd0; --theme-accent:#f2b705; --theme-accent-2:#46d6ff;
+    --theme-bg:#0c0916; --theme-surface:rgba(34,22,54,.7); --theme-surface-2:rgba(45,29,68,.6); --theme-border:rgba(157,107,208,.32);
+    --theme-text:#efe9f6; --theme-text-dim:#a99cc0; --theme-text-faint:#6f6388; --theme-ok:#4be39a; --theme-on-primary:#fff;
+    --theme-font-display:"Syne",sans-serif; --theme-font-body:"Onest",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:18px; --theme-border-width:1px;
+  }
+  html[data-theme="midnight"], [data-preview="midnight"]{
+    --theme-primary:#b8ff3c; --theme-accent:#3ce08a; --theme-accent-2:#7fae2b;
+    --theme-bg:#0a0e14; --theme-surface:#121927; --theme-surface-2:#16202f; --theme-border:#1f2b3d;
+    --theme-text:#e7eef7; --theme-text-dim:#8294ab; --theme-text-faint:#566377; --theme-ok:#3ce08a; --theme-on-primary:#0a0e14;
+    --theme-font-display:"Bricolage Grotesque",sans-serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:14px; --theme-border-width:1px;
+  }
+  html[data-theme="editorial"], [data-preview="editorial"]{
+    --theme-primary:#d4561f; --theme-accent:#d4561f; --theme-accent-2:#7a8450;
+    --theme-bg:#f5f1e8; --theme-surface:#fbf9f3; --theme-surface-2:#efe9dc; --theme-border:#d6cdba;
+    --theme-text:#1c1a16; --theme-text-dim:#6b6457; --theme-text-faint:#a8a092; --theme-ok:#5a7d3a; --theme-on-primary:#fff;
+    --theme-font-display:"Fraunces",serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:3px; --theme-border-width:1.5px;
+  }
+  html[data-theme="entry"], [data-preview="entry"]{
+    --theme-primary:#9d6bd0; --theme-accent:#f2b705; --theme-accent-2:#c9a0dc;
+    --theme-bg:#160a24; --theme-surface:rgba(20,12,30,.95); --theme-surface-2:#1f1430; --theme-border:rgba(94,42,121,.6);
+    --theme-text:#e8e0f0; --theme-text-dim:#8a7d99; --theme-text-faint:#6b5f7a; --theme-ok:#4be39a; --theme-on-primary:#fff;
+    --theme-font-display:"DM Sans",sans-serif; --theme-font-body:"DM Sans",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:8px; --theme-border-width:1px;
+  }
+  html[data-theme="swiss"], [data-preview="swiss"]{
+    --theme-primary:#1f3aff; --theme-accent:#1f3aff; --theme-accent-2:#0d0d0d;
+    --theme-bg:#eceae4; --theme-surface:#ffffff; --theme-surface-2:#f4f2ec; --theme-border:#0d0d0d;
+    --theme-text:#0d0d0d; --theme-text-dim:#5c5c57; --theme-text-faint:#9a9a92; --theme-ok:#1faa55; --theme-on-primary:#fff;
+    --theme-font-display:"Archivo",sans-serif; --theme-font-body:"Archivo",sans-serif; --theme-font-mono:"Space Mono",monospace;
+    --theme-radius:0px; --theme-border-width:3px;
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--theme-bg);color:var(--theme-text);font-family:var(--theme-font-body),sans-serif;
+    min-height:100vh;-webkit-font-smoothing:antialiased;transition:background .25s,color .25s}
+  html[data-theme="entry"] body::before,html[data-theme="aurora"] body::before{content:"";position:fixed;inset:0;z-index:-1;
+    background:radial-gradient(900px 600px at 70% -10%,rgba(94,42,121,.5),transparent 60%)}
+  a{color:inherit}
+  .skip{position:absolute;left:-999px;background:var(--theme-primary);color:var(--theme-on-primary);padding:8px 14px;border-radius:var(--theme-radius)}
+  .skip:focus{left:12px;top:12px}
+  :focus-visible{outline:2px solid var(--theme-primary);outline-offset:3px}
+
+  /* ── Top bar + tabs (im aktiven Theme) ── */
+  header.bar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:16px 30px;
+    border-bottom:1px solid var(--theme-border);background:var(--theme-surface-2)}
+  header.bar .brand{font-family:var(--theme-font-display);font-weight:700;font-size:17px;display:flex;align-items:center;gap:9px}
+  header.bar .brand .ms{font-family:"Material Symbols Outlined";font-style:normal;color:var(--theme-primary);font-size:21px}
+  .tabs{display:inline-flex;gap:4px;margin-left:8px}
+  .tabs a{font-family:var(--theme-font-mono);font-size:12.5px;color:var(--theme-text-dim);text-decoration:none;
+    padding:8px 13px;border-radius:var(--theme-radius);min-height:36px;display:inline-flex;align-items:center}
+  .tabs a[aria-current="page"]{background:var(--theme-primary);color:var(--theme-on-primary);font-weight:700}
+  .who{margin-left:auto;display:inline-flex;align-items:center;gap:10px;font-family:var(--theme-font-mono);font-size:12.5px;color:var(--theme-text-dim)}
+  .who img{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--theme-border)}
+
+  main{max-width:1080px;margin:0 auto;padding:38px 30px 140px}
+  .sec-title{font-family:var(--theme-font-display);font-size:24px;font-weight:700;margin:0 0 6px}
+  html[data-theme="editorial"] .sec-title{font-style:italic;font-weight:600}
+  html[data-theme="swiss"] .sec-title{text-transform:uppercase;font-weight:900;letter-spacing:-.01em}
+  .sec-sub{color:var(--theme-text-dim);margin:0 0 26px;max-width:62ch;font-size:14.5px}
+
+  /* ── Tile-Grid ── */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px}
+  .tile{position:relative;text-align:left;cursor:pointer;padding:0;overflow:hidden;
+    background:var(--theme-surface);color:var(--theme-text);
+    border:var(--theme-border-width) solid var(--theme-border);border-radius:var(--theme-radius);
+    transition:transform .16s,border-color .16s,box-shadow .16s}
+  .tile:hover{transform:translateY(-3px)}
+  .tile:focus-visible{outline:2px solid var(--theme-primary);outline-offset:3px}
+  .tile[aria-pressed="true"]{border-color:var(--theme-primary);box-shadow:0 0 0 2px var(--theme-primary)}
+  html[data-theme="swiss"] .tile[aria-pressed="true"]{box-shadow:6px 6px 0 var(--theme-primary)}
+
+  .tile .check{position:absolute;top:12px;right:12px;z-index:2;font-family:"Material Symbols Outlined";font-style:normal;
+    font-size:24px;color:var(--theme-primary);opacity:0;transform:scale(.6);transition:.18s}
+  .tile[aria-pressed="true"] .check{opacity:1;transform:scale(1)}
+
+  /* Mini-Vorschau — rendert in EIGENEN Theme-Tokens (data-preview scope) */
+  .tp{display:block;background:var(--theme-bg);padding:16px;border-bottom:var(--theme-border-width) solid var(--theme-border)}
+  .tp-swatches{display:flex;gap:6px;margin-bottom:13px}
+  .tp-swatches span{width:24px;height:24px;border-radius:calc(var(--theme-radius) * .6);border:1px solid rgba(128,128,128,.25)}
+  .tp-card{background:var(--theme-surface);border:var(--theme-border-width) solid var(--theme-border);
+    border-radius:var(--theme-radius);padding:13px 15px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .tp-stat{display:flex;flex-direction:column;gap:2px}
+  .tp-val{font-family:var(--theme-font-display);font-weight:800;font-size:26px;color:var(--theme-accent);line-height:1}
+  html[data-theme] .tp-val{}
+  .tp-lab{font-family:var(--theme-font-mono);font-size:9.5px;color:var(--theme-text-dim);letter-spacing:.08em;text-transform:uppercase}
+  .tp-btn{font-family:var(--theme-font-body);font-weight:700;font-size:11px;padding:7px 12px;border-radius:var(--theme-radius);
+    background:var(--theme-primary);color:var(--theme-on-primary)}
+
+  /* Kachel-Fuß: Name im jeweiligen Display-Font, Vibe. Steht im aktiven Theme-Chrome. */
+  .tile .meta{padding:14px 16px 16px}
+  .tile .nm{font-weight:700;font-size:17px;margin:0 0 3px}
+  .tile .vibe{font-family:var(--theme-font-mono);font-size:11.5px;color:var(--theme-text-dim);margin:0;line-height:1.5}
+
+  /* ── Sticky Save-Leiste (aktives Theme) ── */
+  .savebar{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:14px 30px;background:var(--theme-surface-2);border-top:var(--theme-border-width) solid var(--theme-border)}
+  .savebar .status{font-family:var(--theme-font-mono);font-size:12.5px;color:var(--theme-text-dim)}
+  .savebar .status b{color:var(--theme-text);font-weight:700}
+  .savebar .spacer{flex:1}
+  .btn{display:inline-flex;align-items:center;gap:7px;font-family:var(--theme-font-body);font-weight:700;font-size:14px;
+    padding:11px 20px;min-height:44px;border-radius:var(--theme-radius);cursor:pointer;border:var(--theme-border-width) solid var(--theme-border);
+    background:var(--theme-surface);color:var(--theme-text)}
+  .btn--primary{background:var(--theme-primary);border-color:var(--theme-primary);color:var(--theme-on-primary)}
+  .btn--primary .ms{font-family:"Material Symbols Outlined";font-style:normal;font-size:18px}
+  .btn:focus-visible{outline:2px solid var(--theme-primary);outline-offset:2px}
+  html[data-theme="swiss"] .btn{text-transform:uppercase;font-weight:800}
+
+  @media (prefers-reduced-motion:reduce){body,.tile,.tile .check{transition:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#theme-grid">Skip to themes</a>
+
+<header class="bar">
+  <span class="brand"><span class="ms" aria-hidden="true">tune</span> stream-overlay</span>
+  <nav class="tabs" aria-label="Settings sections">
+    <a href="#">General</a>
+    <a href="#" aria-current="page">Appearance</a>
+    <a href="#">Overlays</a>
+    <a href="#">Account</a>
+  </nav>
+  <span class="who"><img src="https://static-cdn.jtvnw.net/jtv_user_pictures/placeholder.png" alt="" onerror="this.style.background='var(--theme-primary)';this.removeAttribute('src')"> PEX_LuCKoR</span>
+</header>
+
+<main>
+  <h1 class="sec-title">Theme</h1>
+  <p class="sec-sub">Pick one look for your whole account — it applies to every overlay, widget and tool at once. Each tile previews itself in its own colors, shapes and fonts.</p>
+
+  <div class="grid" id="theme-grid" role="group" aria-label="Choose a theme">
+
+    <button type="button" class="tile" data-theme-val="terminal" aria-pressed="true">
+      <span class="check ms" aria-hidden="true">check_circle</span>
+      <span class="tp" data-preview="terminal">
+        <span class="tp-swatches"><span style="background:#22e0d6"></span><span style="background:#ff4d8d"></span><span style="background:#ffb547"></span><span style="background:#0c1118"></span></span>
+        <span class="tp-card"><span class="tp-stat"><b class="tp-val">9.2</b><span class="tp-lab">K/D</span></span><span class="tp-btn">Live</span></span>
+      </span>
+      <span class="meta"><p class="nm" data-preview="terminal" style="font-family:var(--theme-font-display)">Terminal Signal</p><p class="vibe">Neon cyan/magenta, mono type, sharp edges. Technical &amp; gaming.</p></span>
+    </button>
+
+    <button type="button" class="tile" data-theme-val="aurora" aria-pressed="false">
+      <span class="check ms" aria-hidden="true">check_circle</span>
+      <span class="tp" data-preview="aurora">
+        <span class="tp-swatches"><span style="background:#9d6bd0"></span><span style="background:#f2b705"></span><span style="background:#46d6ff"></span><span style="background:#221636"></span></span>
+        <span class="tp-card"><span class="tp-stat"><b class="tp-val">9.2</b><span class="tp-lab">K/D</span></span><span class="tp-btn">Live</span></span>
+      </span>
+      <span class="meta"><p class="nm" data-preview="aurora" style="font-family:var(--theme-font-display)">Aurora Glass</p><p class="vibe">Purple/gold, glassy depth, soft rounding. Your brand, 2026.</p></span>
+    </button>
+
+    <button type="button" class="tile" data-theme-val="midnight" aria-pressed="false">
+      <span class="check ms" aria-hidden="true">check_circle</span>
+      <span class="tp" data-preview="midnight">
+        <span class="tp-swatches"><span style="background:#b8ff3c"></span><span style="background:#3ce08a"></span><span style="background:#7fae2b"></span><span style="background:#121927"></span></span>
+        <span class="tp-card"><span class="tp-stat"><b class="tp-val">9.2</b><span class="tp-lab">K/D</span></span><span class="tp-btn">Live</span></span>
+      </span>
+      <span class="meta"><p class="nm" data-preview="midnight" style="font-family:var(--theme-font-display)">Midnight Ops</p><p class="vibe">Electric lime on deep navy. Mission-control precision.</p></span>
+    </button>
+
+    <button type="button" class="tile" data-theme-val="editorial" aria-pressed="false">
+      <span class="check ms" aria-hidden="true">check_circle</span>
+      <span class="tp" data-preview="editorial">
+        <span class="tp-swatches"><span style="background:#d4561f"></span><span style="background:#7a8450"></span><span style="background:#fbf9f3"></span><span style="background:#1c1a16"></span></span>
+        <span class="tp-card"><span class="tp-stat"><b class="tp-val">9.2</b><span class="tp-lab">K/D</span></span><span class="tp-btn">Live</span></span>
+      </span>
+      <span class="meta"><p class="nm" data-preview="editorial" style="font-family:var(--theme-font-display);font-style:italic">Editorial Warm</p><p class="vibe">Warm paper, serif display, terracotta. Calm &amp; grown-up.</p></span>
+    </button>
+
+    <button type="button" class="tile" data-theme-val="entry" aria-pressed="false">
+      <span class="check ms" aria-hidden="true">check_circle</span>
+      <span class="tp" data-preview="entry">
+        <span class="tp-swatches"><span style="background:#9d6bd0"></span><span style="background:#f2b705"></span><span style="background:#c9a0dc"></span><span style="background:#1f1430"></span></span>
+        <span class="tp-card"><span class="tp-stat"><b class="tp-val">9.2</b><span class="tp-lab">K/D</span></span><span class="tp-btn">Live</span></span>
+      </span>
+      <span class="meta"><p class="nm" data-preview="entry" style="font-family:var(--theme-font-display)">Entry Classic</p><p class="vibe">Purple/gold, DM Sans, rounded glow. The familiar set.</p></span>
+    </button>
+
+    <button type="button" class="tile" data-theme-val="swiss" aria-pressed="false">
+      <span class="check ms" aria-hidden="true">check_circle</span>
+      <span class="tp" data-preview="swiss">
+        <span class="tp-swatches"><span style="background:#1f3aff"></span><span style="background:#0d0d0d"></span><span style="background:#ffffff"></span><span style="background:#eceae4"></span></span>
+        <span class="tp-card"><span class="tp-stat"><b class="tp-val">9.2</b><span class="tp-lab">K/D</span></span><span class="tp-btn">Live</span></span>
+      </span>
+      <span class="meta"><p class="nm" data-preview="swiss" style="font-family:var(--theme-font-display);text-transform:uppercase">Swiss Brutal</p><p class="vibe">Hard 3px rules, huge grotesk, one loud ultramarine.</p></span>
+    </button>
+
+  </div>
+</main>
+
+<div class="savebar">
+  <span class="status">Active theme: <b id="active-name">Terminal Signal</b> · applies to your whole account</span>
+  <span class="spacer"></span>
+  <button type="button" class="btn">Reset</button>
+  <button type="button" class="btn btn--primary"><span class="ms" aria-hidden="true">check</span> Save changes</button>
+</div>
+
+<script>
+(function(){
+  const grid=document.getElementById('theme-grid');
+  const nameEl=document.getElementById('active-name');
+  grid.addEventListener('click',function(e){
+    const tile=e.target.closest('.tile'); if(!tile) return;
+    document.documentElement.setAttribute('data-theme',tile.dataset.themeVal);
+    grid.querySelectorAll('.tile').forEach(t=>t.setAttribute('aria-pressed',String(t===tile)));
+    nameEl.textContent=tile.querySelector('.nm').textContent.trim();
+  });
+})();
+</script>
+</body>
+</html>
