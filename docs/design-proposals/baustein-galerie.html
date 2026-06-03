@@ -1,30 +1,44 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" data-theme="terminal">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Baustein-Galerie · Terminal-Theme — stream-overlay</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@600;700;800&family=Onest:wght@400;500;600&family=Archivo:wght@500;600;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
 <style>
   /* ════════════════════════════════════════════════════════════
      EBENE 0 — Token-Schnittstelle (hier: Terminal-Theme-Werte).
      Ein anderes Theme würde NUR diese Werte + die Ebene-2-Regeln tauschen.
      ════════════════════════════════════════════════════════════ */
-  :root{
+  :root, html[data-theme="terminal"]{
     --theme-primary:#22e0d6; --theme-accent:#ff4d8d; --theme-accent-2:#ffb547;
     --theme-bg:#070a0f; --theme-surface:#0c1118; --theme-surface-2:#0f151e; --theme-border:#23303f;
     --theme-text:#d6e4ef; --theme-text-dim:#7488a0; --theme-text-faint:#4c5d72;
     --theme-ok:#22e0a0; --theme-warn:#ffb547; --theme-danger:#ff4d6a;
-    --theme-font-display:"Chakra Petch",sans-serif;
-    --theme-font-body:"Hanken Grotesk",sans-serif;
-    --theme-font-mono:"JetBrains Mono",monospace;
-    --theme-radius:4px; --theme-border-width:1px;
-    --theme-shadow:0 8px 30px rgba(0,0,0,.4);
-    /* expressives Highlight-Symbol — pro Theme anders (Terminal: Blitz) */
+    --theme-font-display:"Chakra Petch",sans-serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:4px; --theme-border-width:1px; --theme-shadow:0 8px 30px rgba(0,0,0,.4);
     --theme-hot-icon:"bolt";
+  }
+  html[data-theme="aurora"]{
+    --theme-primary:#9d6bd0; --theme-accent:#f2b705; --theme-accent-2:#46d6ff;
+    --theme-bg:#0c0916; --theme-surface:rgba(34,22,54,.6); --theme-surface-2:rgba(45,29,68,.55); --theme-border:rgba(157,107,208,.32);
+    --theme-text:#efe9f6; --theme-text-dim:#a99cc0; --theme-text-faint:#6f6388;
+    --theme-ok:#4be39a; --theme-warn:#f2b705; --theme-danger:#ff6a8d;
+    --theme-font-display:"Syne",sans-serif; --theme-font-body:"Onest",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:16px; --theme-border-width:1px; --theme-shadow:0 10px 40px rgba(0,0,0,.35);
+    --theme-hot-icon:"auto_awesome";
+  }
+  html[data-theme="swiss"]{
+    --theme-primary:#1f3aff; --theme-accent:#1f3aff; --theme-accent-2:#0d0d0d;
+    --theme-bg:#eceae4; --theme-surface:#ffffff; --theme-surface-2:#f4f2ec; --theme-border:#0d0d0d;
+    --theme-text:#0d0d0d; --theme-text-dim:#5c5c57; --theme-text-faint:#9a9a92;
+    --theme-ok:#1faa55; --theme-warn:#bd6a00; --theme-danger:#d4361f;
+    --theme-font-display:"Archivo",sans-serif; --theme-font-body:"Archivo",sans-serif; --theme-font-mono:"Space Mono",monospace;
+    --theme-radius:0px; --theme-border-width:3px; --theme-shadow:6px 6px 0 #0d0d0d;
+    --theme-hot-icon:"star";
   }
 
   /* ════════════════════════════════════════════════════════════
@@ -104,12 +118,22 @@
      EBENE 2 — Terminal-Theme-Eigenheiten (pro Theme anders).
      Grid-Hintergrund + Eck-Marker auf Karten + Glow.
      ════════════════════════════════════════════════════════════ */
-  body{background:var(--theme-bg)}
-  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  body{background:var(--theme-bg);transition:background .25s}
+  /* — Terminal: Grid-Hintergrund + Eck-Marker auf Karten — */
+  html[data-theme="terminal"] body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
     background-image:linear-gradient(var(--theme-border) 1px,transparent 1px),linear-gradient(90deg,var(--theme-border) 1px,transparent 1px);
     background-size:46px 46px;opacity:.3;mask-image:radial-gradient(circle at 50% 0%,#000,transparent 85%)}
-  .t-card::after{content:"";position:absolute;right:0;top:0;width:12px;height:12px;
+  html[data-theme="terminal"] .t-card::after{content:"";position:absolute;right:0;top:0;width:12px;height:12px;
     border-top:2px solid var(--theme-primary);border-right:2px solid var(--theme-primary)}
+  /* — Aurora: Gradient-Mesh + Glassmorphism — */
+  html[data-theme="aurora"] body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:radial-gradient(600px 460px at 12% 8%,rgba(123,63,160,.5),transparent 60%),
+      radial-gradient(560px 440px at 88% 18%,rgba(70,214,255,.16),transparent 58%),
+      radial-gradient(640px 520px at 72% 100%,rgba(242,183,5,.14),transparent 60%)}
+  html[data-theme="aurora"] .t-card{backdrop-filter:blur(16px) saturate(130%);
+    box-shadow:0 10px 40px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.07)}
+  /* — Swiss: kein Overlay, harter versetzter Schatten — */
+  html[data-theme="swiss"] .t-card{box-shadow:6px 6px 0 var(--theme-border)}
 
   /* ════════════════════════════════════════════════════════════
      Galerie-Chrome (nur diese Seite)
@@ -123,6 +147,13 @@
   header.top{padding:30px 28px 18px;border-bottom:1px solid var(--theme-border)}
   header.top h1{font-family:var(--theme-font-display);font-weight:700;font-size:26px;text-transform:uppercase;letter-spacing:.02em;margin:0}
   header.top p{color:var(--theme-text-dim);font-family:var(--theme-font-mono);font-size:13px;margin:8px 0 0}
+  header.top .top-row{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
+  .switcher{display:inline-flex;border:var(--theme-border-width) solid var(--theme-border);border-radius:var(--theme-radius);overflow:hidden;flex:none}
+  .switcher button{padding:10px 17px;background:none;border:0;border-right:1px solid var(--theme-border);
+    color:var(--theme-text-dim);font-family:var(--theme-font-mono);font-size:13px;cursor:pointer;min-height:42px;transition:.14s}
+  .switcher button:last-child{border-right:0}
+  .switcher button:hover{color:var(--theme-text)}
+  .switcher button[aria-pressed="true"]{background:var(--theme-primary);color:var(--theme-bg);font-weight:700}
   main{max-width:1100px;margin:0 auto;padding:30px 28px 90px}
   .tokens{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:34px}
   .tok{display:flex;align-items:center;gap:9px;font-family:var(--theme-font-mono);font-size:11px;color:var(--theme-text-dim);
@@ -144,8 +175,17 @@
 <body>
 <a class="skip" href="#main">Zum Inhalt springen</a>
 <header class="top">
-  <h1>Baustein-Galerie</h1>
-  <p>// Terminal-Theme · ~17 t-* Bausteine · links Live, rechts Markup · Vorschau, nicht die App</p>
+  <div class="top-row">
+    <div>
+      <h1>Baustein-Galerie</h1>
+      <p>// dieselben ~17 t-* Bausteine — Theme rechts umschalten &rarr;</p>
+    </div>
+    <div class="switcher" role="group" aria-label="Theme wählen">
+      <button data-set="terminal" aria-pressed="true">Terminal</button>
+      <button data-set="aurora" aria-pressed="false">Aurora</button>
+      <button data-set="swiss" aria-pressed="false">Swiss</button>
+    </div>
+  </div>
 </header>
 <main id="main">
 
@@ -321,7 +361,17 @@
     </div>
   </section>
 
-  <p class="note">Dieselben Bausteine + ein anderes Theme-File = komplett anderer Look (Aurora/Swiss/…). Hier: Terminal.</p>
+  <p class="note">Oben rechts umschalten: dieselben Bausteine, anderer Token-Satz + Ebene-2 → komplett anderer Look. Auch das Highlight-Symbol wechselt (bolt/auto_awesome/star).</p>
 </main>
+<script>
+(function(){
+  const sw = document.querySelector('.switcher');
+  sw.addEventListener('click', function(e){
+    const b = e.target.closest('button[data-set]'); if(!b) return;
+    document.documentElement.dataset.theme = b.dataset.set;
+    sw.querySelectorAll('button').forEach(function(x){ x.setAttribute('aria-pressed', String(x===b)); });
+  });
+})();
+</script>
 </body>
 </html>
