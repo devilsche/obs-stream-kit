@@ -65,7 +65,7 @@
   .t-value{font-family:var(--theme-font-display);font-weight:700;font-size:38px;color:var(--theme-text);line-height:1}
   .t-label{font-family:var(--theme-font-mono);font-size:11px;color:var(--theme-text-dim);letter-spacing:.06em}
   .t-hot .t-value{color:var(--theme-accent)}
-  .t-hot-mark{display:inline-grid;place-items:center;vertical-align:-3px;margin-right:8px}
+  .t-hot-mark{display:inline-grid;place-items:center;vertical-align:-3px;margin-right:8px;position:relative}
   .t-hot-mark::before{font-family:"Material Symbols Outlined";content:var(--theme-hot-icon);font-size:18px;color:var(--theme-accent);
     display:inline-block;text-shadow:0 0 12px var(--theme-accent);animation:hot-pulse 2s ease-in-out infinite}
   /* Highlight-Icon: Glow + theme-eigene Eigenbewegung */
@@ -81,6 +81,21 @@
   html[data-theme="terminal"] .t-hot-mark::before,html[data-theme="midnight"] .t-hot-mark::before{animation:hot-zap 2.6s steps(1,end) infinite}
   html[data-theme="aurora"] .t-hot-mark::before{animation:hot-twinkle 2.4s ease-in-out infinite}
   @media (prefers-reduced-motion:reduce){.t-hot-mark::before{animation:none!important;text-shadow:0 0 12px var(--theme-accent)}}
+  /* Partikel ums Icon — opacity-Fade (kein hartes Popping), kleine Bahn (bleibt in der Card) */
+  .t-hot-mark i{position:absolute;left:50%;top:50%;width:3px;height:3px;border-radius:50%;
+    background:var(--theme-accent);box-shadow:0 0 6px var(--theme-accent);opacity:0;pointer-events:none}
+  .t-hot-mark i:nth-child(1){--dx:-11px;--dy:-13px;animation:spark 1.9s ease-out infinite}
+  .t-hot-mark i:nth-child(2){--dx:12px;--dy:-8px;animation:spark 1.9s ease-out .65s infinite}
+  .t-hot-mark i:nth-child(3){--dx:1px;--dy:-15px;animation:spark 1.9s ease-out 1.3s infinite}
+  @keyframes spark{0%{opacity:0;transform:translate(-50%,-50%) scale(.3)}
+    25%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) translate(var(--dx),var(--dy)) scale(1)}}
+  /* Terminal/Midnight: kurze, schnelle, kantige Sparks */
+  html[data-theme="terminal"] .t-hot-mark i,html[data-theme="midnight"] .t-hot-mark i{width:2px;height:6px;border-radius:1px;animation-duration:1.1s!important}
+  /* Aurora: langsames Funkeln */
+  html[data-theme="aurora"] .t-hot-mark i{animation-duration:2.6s!important}
+  /* Editorial/Swiss: bewusst KEINE Partikel (dezent) */
+  html[data-theme="editorial"] .t-hot-mark i,html[data-theme="swiss"] .t-hot-mark i{display:none}
+  @media (prefers-reduced-motion:reduce){.t-hot-mark i{display:none}}
 
   /* ════ EBENE 2 — der CHARAKTER je Theme (Form, Typo, Deko, Glow) ════ */
   /* — Terminal: scharf, Grid, Eck-Marker, Neon, UPPERCASE-mono — */
@@ -171,13 +186,13 @@
       <div class="t-stat"><span class="t-value">12.4</span><span class="t-label">K/D</span></div>
       <div class="t-stat"><span class="t-value">7</span><span class="t-label">Matches</span></div>
       <div class="t-stat"><span class="t-value">3</span><span class="t-label">Wins</span></div>
-      <div class="t-stat t-hot"><span class="t-value"><span class="t-hot-mark" aria-hidden="true"></span>9</span><span class="t-label">Kills (best)</span></div>
+      <div class="t-stat t-hot"><span class="t-value"><span class="t-hot-mark" aria-hidden="true"><i></i><i></i><i></i></span>9</span><span class="t-label">Kills (best)</span></div>
     </div>
   </div>
 
   <!-- Highlight Card -->
   <div class="t-card t-hot" style="width:340px">
-    <div class="t-header"><span><span class="t-hot-mark" aria-hidden="true"></span>Longshot</span> <span class="t-range">Rekord</span></div>
+    <div class="t-header"><span><span class="t-hot-mark" aria-hidden="true"><i></i><i></i><i></i></span>Longshot</span> <span class="t-range">Rekord</span></div>
     <div class="t-stat"><span class="t-value">418 m</span><span class="t-label">weiteste Kill-Distanz</span></div>
   </div>
 </main>
