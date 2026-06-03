@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design 4 · Terminal Signal — stream-overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#070a0f; --panel:#0c1118; --panel2:#0f151e; --line:#18222e; --line2:#23303f;
+    --txt:#d6e4ef; --dim:#7488a0; --faint:#4c5d72;
+    --cyan:#22e0d6; --mag:#ff4d8d; --amber:#ffb547; --ok:#22e0a0;
+  }
+  *{box-sizing:border-box}
+  html{color-scheme:dark}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:"Hanken Grotesk",sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased;position:relative}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:46px 46px;opacity:.35;
+    mask-image:radial-gradient(circle at 50% 0%,#000,transparent 80%)}
+  a{color:inherit;text-decoration:none}
+  .skip{position:absolute;left:-999px;background:var(--cyan);color:#070a0f;padding:8px 14px}
+  .skip:focus{left:12px;top:12px}
+  :focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+
+  .nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:24px;padding:13px 24px;
+    background:rgba(7,10,15,.9);backdrop-filter:blur(10px);border-bottom:1px solid var(--line2)}
+  .brand{display:flex;align-items:center;gap:10px;font-family:"Chakra Petch";font-weight:700;font-size:18px;letter-spacing:.02em;text-transform:uppercase}
+  .brand .b{color:var(--cyan)}
+  .brand .sq{width:10px;height:18px;background:var(--cyan);box-shadow:0 0 12px var(--cyan);animation:flick 3s infinite}
+  nav.links{display:flex;gap:2px;margin-left:8px}
+  nav.links a{padding:8px 14px;color:var(--dim);font-family:"JetBrains Mono";font-size:13px;font-weight:500;transition:.16s;min-height:36px;display:inline-flex;align-items:center;border:1px solid transparent}
+  nav.links a:hover{color:var(--txt)}
+  nav.links a[aria-current]{color:var(--cyan);border-color:var(--line2);background:var(--panel)}
+  nav.links a[aria-current]::before{content:"▸ "}
+  .right{margin-left:auto;display:flex;align-items:center;gap:12px;font-family:"JetBrains Mono";font-size:12px;color:var(--dim)}
+  .av{width:32px;height:32px;background:var(--panel2);border:1px solid var(--cyan);color:var(--cyan);display:grid;place-items:center;font-family:"Chakra Petch";font-weight:700}
+
+  main{max-width:1200px;margin:0 auto;padding:30px 24px 80px}
+  .hero{display:flex;justify-content:space-between;align-items:center;gap:24px;
+    border:1px solid var(--line2);background:linear-gradient(120deg,var(--panel),transparent);padding:22px 26px;margin-bottom:18px;
+    position:relative;animation:rise .5s both}
+  .hero::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--cyan);box-shadow:0 0 14px var(--cyan)}
+  .hero h1{font-family:"Chakra Petch";font-weight:700;font-size:clamp(26px,3.6vw,40px);margin:0;letter-spacing:.01em;text-transform:uppercase}
+  .hero h1 .c{color:var(--cyan)}
+  .hero .sub{font-family:"JetBrains Mono";font-size:12.5px;color:var(--dim);margin-top:6px}
+  .live{font-family:"JetBrains Mono";font-size:12px;color:var(--ok);border:1px solid var(--line2);padding:9px 14px;display:flex;align-items:center;gap:9px;background:var(--panel)}
+  .live .p{width:7px;height:7px;background:var(--ok);box-shadow:0 0 10px var(--ok);animation:blink 1.4s infinite}
+
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+  .stat{grid-column:span 3;border:1px solid var(--line2);background:var(--panel);padding:16px 18px;position:relative;animation:rise .5s both}
+  .stat .corner{position:absolute;right:0;top:0;width:14px;height:14px;border-top:2px solid var(--cyan);border-right:2px solid var(--cyan)}
+  .stat.m .corner{border-color:var(--mag)}.stat.a .corner{border-color:var(--amber)}
+  .stat .k{font-family:"JetBrains Mono";font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .stat .v{font-family:"Chakra Petch";font-weight:700;font-size:33px;margin-top:8px;line-height:1}
+  .stat.c .v{color:var(--cyan)}.stat.m .v{color:var(--mag)}.stat.a .v{color:var(--amber)}
+  .stat .v .u{font-size:14px;color:var(--dim)}
+  .stat .s{font-size:12.5px;color:var(--dim);margin-top:5px;font-family:"JetBrains Mono"}
+
+  .panel{grid-column:span 8;border:1px solid var(--line2);background:var(--panel);padding:0;animation:rise .5s .2s both}
+  .aside{grid-column:span 4;border:1px solid var(--line2);background:var(--panel);padding:0;animation:rise .5s .26s both}
+  .ph{display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--line2);background:var(--panel2)}
+  .ph h2{font-family:"Chakra Petch";font-weight:600;font-size:15px;margin:0;text-transform:uppercase;letter-spacing:.03em}
+  .ph .tag{font-family:"JetBrains Mono";font-size:11px;color:var(--cyan)}
+  .pad{padding:8px 12px}
+  .seg{font-family:"JetBrains Mono";font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--mag);padding:12px 8px 6px}
+  .url{display:flex;align-items:center;gap:12px;padding:10px 8px;border-bottom:1px solid var(--line);transition:.14s}
+  .url:hover{background:var(--panel2)}
+  .url:last-child{border-bottom:0}
+  .url .ix{font-family:"JetBrains Mono";font-size:11px;color:var(--faint);width:24px;flex:none}
+  .url .meta{flex:1;min-width:0}.url .meta b{font-size:14px;font-weight:600;font-family:"Chakra Petch"}
+  .url .meta code{display:block;font-family:"JetBrains Mono";font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .copy{flex:none;font-family:"JetBrains Mono";font-size:11px;color:var(--cyan);border:1px solid var(--line2);background:transparent;padding:7px 12px;cursor:pointer;transition:.14s;min-height:34px;text-transform:uppercase}
+  .copy:hover{background:var(--cyan);color:#070a0f}
+  .row{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-bottom:1px solid var(--line);font-family:"JetBrains Mono";font-size:13px}
+  .row:last-of-type{border-bottom:0}.row .lbl{color:var(--dim);display:flex;align-items:center;gap:9px}
+  .led{width:7px;height:7px;background:var(--ok);box-shadow:0 0 8px var(--ok)}.led.w{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+  .row .v{color:var(--ok)}.row .v.w{color:var(--amber)}
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;margin:14px 20px 18px;border:1px solid var(--cyan);background:rgba(34,224,214,.08);
+    color:var(--cyan);font-family:"Chakra Petch";font-weight:700;font-size:14px;padding:12px;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;transition:.16s}
+  .btn:hover{background:var(--cyan);color:#070a0f;box-shadow:0 0 24px rgba(34,224,214,.45)}
+  .legend{margin-top:34px;text-align:center;font-family:"JetBrains Mono";font-size:12px;color:var(--faint)}
+
+  @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+  @keyframes flick{0%,93%,100%{opacity:1}95%{opacity:.4}}
+  .stat:nth-child(1){animation-delay:.05s}.stat:nth-child(2){animation-delay:.1s}.stat:nth-child(3){animation-delay:.15s}.stat:nth-child(4){animation-delay:.2s}
+  @media (max-width:920px){.stat{grid-column:span 6}.panel,.aside{grid-column:span 12}nav.links{display:none}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Zum Inhalt springen</a>
+<header class="nav">
+  <div class="brand"><span class="sq" aria-hidden="true"></span>STREAM<span class="b">_</span>OVERLAY</div>
+  <nav class="links" aria-label="Hauptnavigation">
+    <a href="#" aria-current="page">dashboard</a><a href="#">obs_urls</a><a href="#">tools</a><a href="#">settings</a><a href="#">admin</a>
+  </nav>
+  <div class="right"><span>tok_a5df…</span><span class="av" aria-hidden="true">L</span></div>
+</header>
+
+<main id="main" tabindex="-1">
+  <div class="hero">
+    <div><h1>SYS · <span class="c">LuCKoR</span></h1><div class="sub">tenant=luckor // status=online // uplink=stable</div></div>
+    <span class="live"><span class="p" aria-hidden="true"></span>POLLER_LIVE · 2m</span>
+  </div>
+
+  <div class="grid">
+    <article class="stat c"><span class="corner" aria-hidden="true"></span><div class="k">last_match</div><div class="v">#1<span class="u">/64</span></div><div class="s">chicken · 9 kills</div></article>
+    <article class="stat m"><span class="corner" aria-hidden="true"></span><div class="k">session</div><div class="v">7</div><div class="s">matches played</div></article>
+    <article class="stat a"><span class="corner" aria-hidden="true"></span><div class="k">steam</div><div class="v">312</div><div class="s">achievements</div></article>
+    <article class="stat"><span class="corner" aria-hidden="true"></span><div class="k">sources</div><div class="v">12</div><div class="s">active in obs</div></article>
+
+    <section class="panel">
+      <div class="ph"><h2>OBS Browser-Sources</h2><span class="tag">12 active</span></div>
+      <div class="pad">
+        <div class="seg">// widgets</div>
+        <div class="url"><span class="ix">01</span><div class="meta"><b>Career Card</b><code>/s/tok…/widgets/pubg/career-card.html</code></div><button class="copy">copy</button></div>
+        <div class="url"><span class="ix">02</span><div class="meta"><b>Live Bar</b><code>/s/tok…/widgets/pubg/live-bar.html</code></div><button class="copy">copy</button></div>
+        <div class="url"><span class="ix">03</span><div class="meta"><b>Streak Counter</b><code>/s/tok…/widgets/pubg/streak-counter.html</code></div><button class="copy">copy</button></div>
+        <div class="seg">// overlays</div>
+        <div class="url"><span class="ix">04</span><div class="meta"><b>Starting Soon</b><code>/s/tok…/overlays/starting-soon.html</code></div><button class="copy">copy</button></div>
+        <div class="url"><span class="ix">05</span><div class="meta"><b>BRB / Pause</b><code>/s/tok…/overlays/brb-pause.html</code></div><button class="copy">copy</button></div>
+      </div>
+    </section>
+
+    <aside class="aside">
+      <div class="ph"><h2>System</h2><span class="tag">ok</span></div>
+      <div class="row"><span class="lbl"><span class="led" aria-hidden="true"></span>pubg_api</span><span class="v">connected</span></div>
+      <div class="row"><span class="lbl"><span class="led" aria-hidden="true"></span>steam_api</span><span class="v">connected</span></div>
+      <div class="row"><span class="lbl"><span class="led" aria-hidden="true"></span>poller</span><span class="v">running</span></div>
+      <div class="row"><span class="lbl"><span class="led w" aria-hidden="true"></span>ftp_pull</span><span class="v w">pending</span></div>
+      <button class="btn">open obs_urls →</button>
+    </aside>
+  </div>
+
+  <p class="legend">DESIGN 4 — „TERMINAL SIGNAL" · dark · Chakra Petch + JetBrains Mono · Cyan/Magenta-Neon, Grid</p>
+</main>
+</body>
+</html>

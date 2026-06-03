@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design 5 · Swiss Brutal — stream-overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Archivo+Narrow:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#eceae4; --paper:#ffffff; --ink:#0d0d0d; --soft:#5c5c57; --faint:#9a9a92;
+    --line:#0d0d0d; --acc:#1f3aff; --acc-ink:#fff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Archivo",sans-serif;line-height:1.4;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .skip{position:absolute;left:-999px;background:var(--acc);color:#fff;padding:8px 14px}
+  .skip:focus{left:10px;top:10px}
+  :focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+
+  .nav{display:flex;align-items:center;gap:0;border-bottom:3px solid var(--ink);background:var(--bg)}
+  .brand{font-family:"Archivo";font-weight:900;font-size:21px;letter-spacing:-.04em;text-transform:uppercase;padding:18px 22px;border-right:3px solid var(--ink)}
+  .brand .acc{color:var(--acc)}
+  nav.links{display:flex}
+  nav.links a{padding:0 20px;height:62px;display:inline-flex;align-items:center;font-family:"Archivo Narrow";font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:.03em;color:var(--soft);border-right:1px solid var(--ink);transition:.12s}
+  nav.links a:hover{background:var(--ink);color:#fff}
+  nav.links a[aria-current]{background:var(--acc);color:#fff}
+  .right{margin-left:auto;display:flex;align-items:center;height:62px}
+  .uchip{display:flex;align-items:center;gap:10px;padding:0 20px;height:100%;border-left:3px solid var(--ink);font-family:"Space Mono";font-size:13px}
+  .av{width:30px;height:30px;background:var(--acc);color:#fff;display:grid;place-items:center;font-family:"Archivo";font-weight:800;font-size:14px}
+
+  main{max-width:1240px;margin:0 auto;padding:0}
+  .hero{display:grid;grid-template-columns:1fr auto;border-bottom:3px solid var(--ink)}
+  .hero .l{padding:40px 22px 30px}
+  .ovl{font-family:"Space Mono";font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--acc);margin:0 0 14px}
+  h1{font-family:"Archivo";font-weight:900;font-size:clamp(40px,7vw,82px);line-height:.92;letter-spacing:-.045em;text-transform:uppercase;margin:0}
+  .hero .r{border-left:3px solid var(--ink);padding:22px;display:flex;flex-direction:column;justify-content:center;gap:6px;background:var(--ink);color:#fff;min-width:230px}
+  .hero .r .row{display:flex;justify-content:space-between;font-family:"Space Mono";font-size:13px;padding:5px 0}
+  .hero .r .row b{color:#7dff9e}
+
+  .figs{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:3px solid var(--ink)}
+  .fig{padding:22px;border-right:1px solid var(--ink);position:relative}
+  .fig:last-child{border-right:0}
+  .fig:nth-child(1){background:var(--acc);color:#fff}
+  .fig .n{font-family:"Archivo";font-weight:800;font-size:52px;line-height:.9;letter-spacing:-.04em}
+  .fig .n .u{font-size:18px;font-weight:600}
+  .fig .l{font-family:"Space Mono";font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-top:10px;color:var(--soft)}
+  .fig:nth-child(1) .l{color:rgba(255,255,255,.8)}
+
+  .cols{display:grid;grid-template-columns:1.6fr 1fr}
+  .panel{border-right:3px solid var(--ink)}
+  .ph{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:3px solid var(--ink)}
+  .ph h2{font-family:"Archivo";font-weight:800;font-size:20px;text-transform:uppercase;letter-spacing:-.02em;margin:0}
+  .ph .tag{font-family:"Space Mono";font-size:12px;background:var(--ink);color:#fff;padding:4px 9px}
+  .seg{font-family:"Space Mono";font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--acc);padding:14px 22px 6px}
+  .url{display:flex;align-items:center;gap:16px;padding:14px 22px;border-bottom:1px solid var(--ink);transition:.12s}
+  .url:hover{background:var(--ink);color:#fff}
+  .url:hover code,.url:hover .ix{color:rgba(255,255,255,.6)}
+  .url:hover .copy{background:#fff;color:var(--ink);border-color:#fff}
+  .ix{font-family:"Archivo";font-weight:800;font-size:18px;width:30px;flex:none}
+  .url .meta{flex:1;min-width:0}.url .meta b{font-family:"Archivo Narrow";font-weight:700;font-size:16px;text-transform:uppercase;letter-spacing:.01em}
+  .url .meta code{display:block;font-family:"Space Mono";font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .copy{flex:none;font-family:"Space Mono";font-size:11px;font-weight:700;text-transform:uppercase;color:var(--ink);border:2px solid var(--ink);background:transparent;padding:7px 12px;cursor:pointer;transition:.12s;min-height:34px}
+  .copy:hover{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .side .row{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;border-bottom:1px solid var(--ink);font-family:"Space Mono";font-size:13px}
+  .side .row .lbl{display:flex;align-items:center;gap:10px;text-transform:uppercase;font-size:12px;letter-spacing:.04em}
+  .sq{width:10px;height:10px;background:#1faa55}.sq.w{background:var(--acc)}
+  .btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;border:0;cursor:pointer;background:var(--acc);color:#fff;
+    font-family:"Archivo";font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:.02em;padding:20px;transition:.12s}
+  .btn:hover{background:var(--ink)}
+  .legend{padding:22px;border-top:3px solid var(--ink);font-family:"Space Mono";font-size:12px;color:var(--soft);text-align:center}
+
+  .rise{opacity:0;animation:rise .5s forwards}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .d1{animation-delay:.04s}.d2{animation-delay:.14s}.d3{animation-delay:.24s}
+  @media (max-width:880px){.hero{grid-template-columns:1fr}.hero .r{border-left:0;border-top:3px solid var(--ink)}.figs{grid-template-columns:repeat(2,1fr)}.fig:nth-child(2){border-right:0}.fig:nth-child(3),.fig:nth-child(4){border-top:1px solid var(--ink)}.cols{grid-template-columns:1fr}.panel{border-right:0;border-bottom:3px solid var(--ink)}nav.links{display:none}}
+  @media (prefers-reduced-motion:reduce){.rise{animation:none;opacity:1}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Zum Inhalt springen</a>
+<header class="nav">
+  <div class="brand">Stream<span class="acc">/</span>Overlay</div>
+  <nav class="links" aria-label="Hauptnavigation">
+    <a href="#" aria-current="page">Dashboard</a><a href="#">OBS URLs</a><a href="#">Tools</a><a href="#">Settings</a><a href="#">Admin</a>
+  </nav>
+  <div class="right"><span class="uchip"><span class="av" aria-hidden="true">L</span>LuCKoR</span></div>
+</header>
+
+<main id="main" tabindex="-1">
+  <div class="hero rise d1">
+    <div class="l"><p class="ovl">Dashboard / Session aktiv</p><h1>Guten<br>Stream.</h1></div>
+    <div class="r">
+      <div class="row"><span>PUBG_API</span><b>OK</b></div>
+      <div class="row"><span>STEAM_API</span><b>OK</b></div>
+      <div class="row"><span>POLLER</span><b>RUN·2m</b></div>
+      <div class="row"><span>FTP_PULL</span><span style="color:#ffd24d">PEND</span></div>
+    </div>
+  </div>
+
+  <div class="figs rise d2">
+    <div class="fig"><div class="n">#1</div><div class="l">Letztes Match · 9 K</div></div>
+    <div class="fig"><div class="n">07</div><div class="l">Matches / Session</div></div>
+    <div class="fig"><div class="n">312</div><div class="l">Steam Achievements</div></div>
+    <div class="fig"><div class="n">12<span class="u"> SRC</span></div><div class="l">Browser-Sources</div></div>
+  </div>
+
+  <div class="cols rise d3">
+    <section class="panel">
+      <div class="ph"><h2>OBS Browser-Sources</h2><span class="tag">tok_a5df…e26e</span></div>
+      <div class="seg">Widgets</div>
+      <div class="url"><span class="ix">01</span><div class="meta"><b>Career Card</b><code>/s/tok…/widgets/pubg/career-card.html</code></div><button class="copy">Copy</button></div>
+      <div class="url"><span class="ix">02</span><div class="meta"><b>Session Summary</b><code>/s/tok…/widgets/pubg/session-summary.html</code></div><button class="copy">Copy</button></div>
+      <div class="url"><span class="ix">03</span><div class="meta"><b>Top Mates</b><code>/s/tok…/widgets/pubg/top-mates.html</code></div><button class="copy">Copy</button></div>
+      <div class="seg">Overlays</div>
+      <div class="url"><span class="ix">04</span><div class="meta"><b>Starting Soon</b><code>/s/tok…/overlays/starting-soon.html</code></div><button class="copy">Copy</button></div>
+      <div class="url"><span class="ix">05</span><div class="meta"><b>BRB / Pause</b><code>/s/tok…/overlays/brb-pause.html</code></div><button class="copy">Copy</button></div>
+    </section>
+    <aside class="side">
+      <div class="ph"><h2>System</h2></div>
+      <div class="row"><span class="lbl"><span class="sq" aria-hidden="true"></span>PUBG API</span><span>connected</span></div>
+      <div class="row"><span class="lbl"><span class="sq" aria-hidden="true"></span>Steam API</span><span>connected</span></div>
+      <div class="row"><span class="lbl"><span class="sq" aria-hidden="true"></span>Poller</span><span>running</span></div>
+      <div class="row"><span class="lbl"><span class="sq w" aria-hidden="true"></span>FTP Pull</span><span>pending</span></div>
+      <button class="btn">OBS URLs →</button>
+    </aside>
+  </div>
+
+  <p class="legend">DESIGN 5 — „SWISS BRUTAL" · light · Archivo + Space Mono · Ultramarin-Akzent, Raster-Brutalismus</p>
+</main>
+</body>
+</html>

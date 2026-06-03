@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard-Design-Vorschläge — stream-overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0f1117;--card:#171a22;--line:#262b36;--txt:#e8ecf3;--dim:#8b94a6;--acc:#7dd3fc}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:"Hanken Grotesk",sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  :focus-visible{outline:2px solid var(--acc);outline-offset:3px;border-radius:8px}
+  header{max-width:1080px;margin:0 auto;padding:48px 24px 12px}
+  h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0 0 8px}
+  header p{color:var(--dim);margin:0;max-width:62ch}
+  header code{font-family:"JetBrains Mono";font-size:13px;color:var(--acc)}
+  .grid{max-width:1080px;margin:0 auto;padding:26px 24px 90px;display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;transition:.2s}
+  .tile:hover{border-color:#39414f;transform:translateY(-2px)}
+  .swatches{height:74px;display:flex}
+  .swatches span{flex:1}
+  .body{padding:18px 20px 20px;flex:1;display:flex;flex-direction:column}
+  .num{font-family:"JetBrains Mono";font-size:12px;color:var(--dim)}
+  .tile h2{font-size:20px;font-weight:800;letter-spacing:-.01em;margin:4px 0 6px}
+  .tile .vibe{color:var(--dim);font-size:14px;margin:0 0 14px;flex:1}
+  .specs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+  .specs span{font-family:"JetBrains Mono";font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:7px;padding:4px 9px}
+  .open{display:inline-flex;align-items:center;gap:8px;align-self:flex-start;background:var(--txt);color:var(--bg);font-weight:600;font-size:14px;text-decoration:none;padding:10px 16px;border-radius:10px;transition:.16s}
+  .open:hover{background:var(--acc)}
+  .note{max-width:1080px;margin:0 auto;padding:0 24px 60px;color:var(--dim);font-size:13.5px}
+  @media (max-width:720px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Dashboard-Design — 5 Richtungen</h1>
+  <p>Fünf eigenständige Stile für die <b>Dashboards</b> (Startseite, OBS-URLs, Settings, Admin). Jede Kachel öffnet ein voll funktionsfähiges Mockup derselben Ansicht. Widgets &amp; Overlays bekommen später eigene Themes. Klick dich durch — sag mir die Nummer(n), die dir gefallen.</p>
+</header>
+<main class="grid">
+  <article class="tile">
+    <div class="swatches" aria-hidden="true"><span style="background:#0a0e14"></span><span style="background:#121927"></span><span style="background:#b8ff3c"></span><span style="background:#3ce08a"></span></div>
+    <div class="body"><div class="num">01</div><h2>Midnight Ops</h2>
+      <p class="vibe">Dunkel, technisch-präzise. Electric-Lime-Akzent, Status-LEDs, scharfe Linien. „Mission-Control" für deinen Stream.</p>
+      <div class="specs"><span>Dark</span><span>Bricolage Grotesque</span><span>JetBrains Mono</span><span>Lime #b8ff3c</span></div>
+      <a class="open" href="1-midnight-ops.html">Öffnen →</a></div>
+  </article>
+  <article class="tile">
+    <div class="swatches" aria-hidden="true"><span style="background:#f5f1e8"></span><span style="background:#1c1a16"></span><span style="background:#d4561f"></span><span style="background:#7a8450"></span></div>
+    <div class="body"><div class="num">02</div><h2>Editorial Warm</h2>
+      <p class="vibe">Hell, ruhig, magazin-artig. Serifen-Display (Fraunces), warmes Papier, Terracotta. Edel und erwachsen statt „Gamer-bunt".</p>
+      <div class="specs"><span>Light</span><span>Fraunces</span><span>Hanken Grotesk</span><span>Terracotta #d4561f</span></div>
+      <a class="open" href="2-editorial-warm.html">Öffnen →</a></div>
+  </article>
+  <article class="tile">
+    <div class="swatches" aria-hidden="true"><span style="background:#0c0916"></span><span style="background:#7b3fa0"></span><span style="background:#f2b705"></span><span style="background:#46d6ff"></span></div>
+    <div class="body"><div class="num">03</div><h2>Aurora Glass</h2>
+      <p class="vibe">Dein Entry-Brand (Purple/Gold) modernisiert: Glassmorphism, Gradient-Mesh, sanfte Tiefe. Vertraut, aber 2026.</p>
+      <div class="specs"><span>Dark</span><span>Syne</span><span>Onest</span><span>Purple + Gold</span></div>
+      <a class="open" href="3-aurora-glass.html">Öffnen →</a></div>
+  </article>
+  <article class="tile">
+    <div class="swatches" aria-hidden="true"><span style="background:#070a0f"></span><span style="background:#22e0d6"></span><span style="background:#ff4d8d"></span><span style="background:#ffb547"></span></div>
+    <div class="body"><div class="num">04</div><h2>Terminal Signal</h2>
+      <p class="vibe">Cyberpunk-refined: Raster-Hintergrund, Neon-Cyan/Magenta, Mono-Typo, Eck-Marker. Technisch, gaming-affin, kontrolliert.</p>
+      <div class="specs"><span>Dark</span><span>Chakra Petch</span><span>JetBrains Mono</span><span>Cyan/Magenta</span></div>
+      <a class="open" href="4-terminal-signal.html">Öffnen →</a></div>
+  </article>
+  <article class="tile">
+    <div class="swatches" aria-hidden="true"><span style="background:#eceae4"></span><span style="background:#0d0d0d"></span><span style="background:#1f3aff"></span><span style="background:#ffffff"></span></div>
+    <div class="body"><div class="num">05</div><h2>Swiss Brutal</h2>
+      <p class="vibe">Schweizer Raster-Brutalismus: harte 3px-Linien, riesige Grotesk-Typo, ein knalliges Ultramarin. Kompromisslos, designbewusst.</p>
+      <div class="specs"><span>Light</span><span>Archivo</span><span>Space Mono</span><span>Ultramarin #1f3aff</span></div>
+      <a class="open" href="5-swiss-brutal.html">Öffnen →</a></div>
+  </article>
+</main>
+<p class="note">Alle Mockups sind statisches HTML mit echten Inhalten (deine Nav, PUBG/Steam-Status, OBS-URLs). Lokal öffnen: <code>docs/design-proposals/index.html</code> im Browser. Nichts davon ist deployt — reine Vorschau.</p>
+</body>
+</html>

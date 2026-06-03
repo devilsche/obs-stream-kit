@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design 2 · Editorial Warm — stream-overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,900&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f5f1e8; --paper:#fbf9f3; --ink:#1c1a16; --soft:#6b6457; --faint:#a8a092;
+    --line:#e4ddcf; --line2:#d6cdba;
+    --acc:#d4561f; --acc2:#7a8450; --gold:#bd8b2c;
+    --radius:4px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hanken Grotesk",sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .skip{position:absolute;left:-999px;background:var(--ink);color:var(--paper);padding:8px 14px}
+  .skip:focus{left:12px;top:12px}
+  :focus-visible{outline:2px solid var(--acc);outline-offset:3px}
+
+  .nav{display:flex;align-items:baseline;gap:34px;padding:22px 40px;border-bottom:1.5px solid var(--ink);background:var(--bg)}
+  .brand{font-family:"Fraunces";font-weight:900;font-size:23px;letter-spacing:-.02em}
+  .brand .dot{color:var(--acc)}
+  nav.links{display:flex;gap:26px;margin-left:6px}
+  nav.links a{font-size:14px;font-weight:600;color:var(--soft);padding:4px 0;border-bottom:2px solid transparent;transition:.18s;min-height:30px;display:inline-flex;align-items:center}
+  nav.links a:hover{color:var(--ink)}
+  nav.links a[aria-current]{color:var(--ink);border-bottom-color:var(--acc)}
+  .nav .right{margin-left:auto;display:flex;align-items:center;gap:14px;font-family:"JetBrains Mono";font-size:12px;color:var(--soft)}
+  .av{width:34px;height:34px;border-radius:50%;background:var(--ink);color:var(--paper);display:grid;place-items:center;font-family:"Fraunces";font-weight:600;font-size:15px}
+
+  main{max-width:1140px;margin:0 auto;padding:44px 40px 90px}
+  .kicker{font-family:"JetBrains Mono";font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--acc);margin:0 0 14px}
+  .hero{display:grid;grid-template-columns:1.4fr .9fr;gap:40px;align-items:end;padding-bottom:30px;border-bottom:1.5px solid var(--ink);margin-bottom:38px}
+  h1{font-family:"Fraunces";font-weight:500;font-size:clamp(38px,5.4vw,62px);line-height:1.02;letter-spacing:-.025em;margin:0}
+  h1 em{font-style:italic;color:var(--acc)}
+  .hero .meta{font-size:15px;color:var(--soft)}
+  .hero .meta .row{display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--line2)}
+  .hero .meta .row b{font-family:"JetBrains Mono";font-weight:500;color:var(--ink)}
+  .dotgreen{color:var(--acc2);font-weight:700}
+
+  .figs{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1.5px solid var(--ink);margin-bottom:38px}
+  .fig{padding:22px 24px;border-right:1px solid var(--line2)}
+  .fig:last-child{border-right:0}
+  .fig .n{font-family:"Fraunces";font-weight:600;font-size:46px;line-height:1;letter-spacing:-.03em}
+  .fig .n .u{font-size:17px;color:var(--soft);font-weight:400}
+  .fig .l{font-family:"JetBrains Mono";font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);margin-top:8px}
+  .fig.hl{background:var(--ink);color:var(--paper)}
+  .fig.hl .l{color:var(--faint)}
+  .fig.hl .n{color:#fff}
+
+  .cols{display:grid;grid-template-columns:1.5fr 1fr;gap:40px}
+  h2{font-family:"Fraunces";font-weight:600;font-size:25px;letter-spacing:-.01em;margin:0 0 4px}
+  .lead{color:var(--soft);font-size:14px;margin:0 0 20px}
+  .seg{font-family:"JetBrains Mono";font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);margin:26px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line2)}
+  .seg:first-of-type{margin-top:0}
+  .url{display:flex;align-items:baseline;gap:16px;padding:13px 0;border-bottom:1px solid var(--line)}
+  .url .idx{font-family:"Fraunces";font-style:italic;font-size:19px;color:var(--gold);flex:none;width:24px}
+  .url .meta{flex:1;min-width:0}
+  .url .meta b{font-size:15.5px;font-weight:600}
+  .url .meta code{display:block;font-family:"JetBrains Mono";font-size:11.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .copy{flex:none;font-family:"JetBrains Mono";font-size:12px;color:var(--ink);border:1.5px solid var(--ink);background:transparent;padding:7px 13px;cursor:pointer;transition:.16s;min-height:34px;border-radius:var(--radius)}
+  .copy:hover{background:var(--ink);color:var(--paper)}
+
+  .side{background:var(--paper);border:1.5px solid var(--ink);padding:26px}
+  .side .row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+  .side .row:first-of-type{border-top:0}
+  .side .row .lbl{color:var(--soft);font-size:14px}
+  .side .row .st{font-family:"JetBrains Mono";font-size:12px;display:flex;align-items:center;gap:8px}
+  .pill{width:8px;height:8px;border-radius:50%;background:var(--acc2)}
+  .pill.w{background:var(--gold)}
+  .btn{display:inline-flex;align-items:center;gap:9px;margin-top:22px;background:var(--acc);color:#fff;font-weight:700;font-size:14px;
+    padding:13px 22px;border:0;border-radius:var(--radius);cursor:pointer;font-family:"Hanken Grotesk";transition:.18s;width:100%;justify-content:center}
+  .btn:hover{background:#b8480f}
+  .legend{margin-top:46px;color:var(--faint);font-size:12px;font-family:"JetBrains Mono";text-align:center;letter-spacing:.05em}
+
+  .fade{opacity:0;animation:fade .7s forwards}
+  @keyframes fade{to{opacity:1}}
+  .d1{animation-delay:.05s}.d2{animation-delay:.18s}.d3{animation-delay:.3s}
+  @media (max-width:880px){.hero,.cols{grid-template-columns:1fr}.figs{grid-template-columns:repeat(2,1fr)}.fig:nth-child(2){border-right:0}nav.links{display:none}}
+  @media (prefers-reduced-motion:reduce){.fade{animation:none;opacity:1}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Zum Inhalt springen</a>
+<header class="nav">
+  <div class="brand">stream<span class="dot">·</span>overlay</div>
+  <nav class="links" aria-label="Hauptnavigation">
+    <a href="#" aria-current="page">Dashboard</a><a href="#">OBS URLs</a><a href="#">Tools</a><a href="#">Settings</a><a href="#">Admin</a>
+  </nav>
+  <div class="right"><span>luckor</span><span class="av" aria-hidden="true">L</span></div>
+</header>
+
+<main id="main" tabindex="-1">
+  <p class="kicker fade d1">Dashboard · Session aktiv</p>
+  <div class="hero fade d1">
+    <h1>Guten Stream,<br><em>LuCKoR.</em></h1>
+    <div class="meta">
+      <div class="row"><span>PUBG API</span><b class="dotgreen">connected</b></div>
+      <div class="row"><span>Steam API</span><b class="dotgreen">connected</b></div>
+      <div class="row"><span>Poller</span><b class="dotgreen">running · 2 min</b></div>
+    </div>
+  </div>
+
+  <div class="figs fade d2">
+    <div class="fig hl"><div class="n">#1</div><div class="l">Letztes Match · 9 Kills</div></div>
+    <div class="fig"><div class="n">7</div><div class="l">Matches / Session</div></div>
+    <div class="fig"><div class="n">312</div><div class="l">Steam Achievements</div></div>
+    <div class="fig"><div class="n">12<span class="u"> src</span></div><div class="l">Browser-Sources</div></div>
+  </div>
+
+  <div class="cols fade d3">
+    <section>
+      <h2>Deine OBS Browser-Sources</h2>
+      <p class="lead">Kopiere eine URL und füge sie in OBS als Browser-Source ein.</p>
+      <div class="seg">Widgets</div>
+      <div class="url"><span class="idx">i</span><div class="meta"><b>Career Card</b><code>/s/tok…/widgets/pubg/career-card.html</code></div><button class="copy">Kopieren</button></div>
+      <div class="url"><span class="idx">ii</span><div class="meta"><b>Session Summary</b><code>/s/tok…/widgets/pubg/session-summary.html</code></div><button class="copy">Kopieren</button></div>
+      <div class="url"><span class="idx">iii</span><div class="meta"><b>Streak Counter</b><code>/s/tok…/widgets/pubg/streak-counter.html</code></div><button class="copy">Kopieren</button></div>
+      <div class="seg">Overlays</div>
+      <div class="url"><span class="idx">iv</span><div class="meta"><b>Starting Soon</b><code>/s/tok…/overlays/starting-soon.html</code></div><button class="copy">Kopieren</button></div>
+      <div class="url"><span class="idx">v</span><div class="meta"><b>BRB / Pause</b><code>/s/tok…/overlays/brb-pause.html</code></div><button class="copy">Kopieren</button></div>
+    </section>
+    <aside class="side">
+      <h2 style="font-size:20px">System</h2>
+      <div class="row"><span class="lbl">PUBG API</span><span class="st"><span class="pill" aria-hidden="true"></span>connected</span></div>
+      <div class="row"><span class="lbl">Steam API</span><span class="st"><span class="pill" aria-hidden="true"></span>connected</span></div>
+      <div class="row"><span class="lbl">Poller</span><span class="st"><span class="pill" aria-hidden="true"></span>running</span></div>
+      <div class="row"><span class="lbl">FTP Pull</span><span class="st"><span class="pill w" aria-hidden="true"></span>pending</span></div>
+      <button class="btn">Zu den OBS URLs →</button>
+    </aside>
+  </div>
+
+  <p class="legend">DESIGN 2 — „EDITORIAL WARM" · light · Fraunces + Hanken Grotesk · Terracotta &amp; Olive</p>
+</main>
+</body>
+</html>

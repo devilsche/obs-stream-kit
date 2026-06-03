@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design 1 · Midnight Ops — stream-overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0e14; --bg2:#0e131c; --panel:#121927; --panel2:#16202f;
+    --line:#1f2b3d; --line2:#283648;
+    --txt:#e7eef7; --dim:#8294ab; --faint:#566377;
+    --acc:#b8ff3c; --acc-dim:#7fae2b; --ok:#3ce08a; --warn:#ffcf4d;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html{color-scheme:dark}
+  body{
+    margin:0; background:
+      radial-gradient(900px 500px at 85% -10%, rgba(184,255,60,.07), transparent 60%),
+      radial-gradient(700px 600px at -5% 110%, rgba(60,224,138,.05), transparent 55%),
+      var(--bg);
+    color:var(--txt); font-family:"Hanken Grotesk",sans-serif; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;text-decoration:none}
+  .skip{position:absolute;left:-999px;top:0;background:var(--acc);color:#0a0e14;padding:8px 14px;border-radius:8px;z-index:50}
+  .skip:focus{left:12px;top:12px}
+  :focus-visible{outline:2px solid var(--acc);outline-offset:3px;border-radius:6px}
+
+  /* top nav */
+  .nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:28px;
+    padding:14px 26px;background:rgba(10,14,20,.82);backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:11px;font-family:"Bricolage Grotesque";font-weight:800;font-size:19px;letter-spacing:-.02em}
+  .brand .dot{width:11px;height:11px;border-radius:3px;background:var(--acc);box-shadow:0 0 14px var(--acc);transform:rotate(45deg)}
+  .brand small{color:var(--acc);font-family:"JetBrains Mono";font-size:11px;font-weight:500;letter-spacing:.04em;opacity:.8}
+  nav.links{display:flex;gap:6px;margin-left:8px}
+  nav.links a{padding:8px 14px;border-radius:9px;color:var(--dim);font-weight:600;font-size:14px;transition:.18s;min-height:38px;display:inline-flex;align-items:center}
+  nav.links a:hover{color:var(--txt);background:var(--panel)}
+  nav.links a[aria-current]{color:var(--acc);background:var(--panel2)}
+  .nav .right{margin-left:auto;display:flex;align-items:center;gap:14px}
+  .chip{display:flex;align-items:center;gap:10px;padding:6px 12px 6px 6px;border:1px solid var(--line2);border-radius:999px;background:var(--panel)}
+  .chip .av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--acc),#3ce08a);display:grid;place-items:center;color:#0a0e14;font-weight:800;font-size:13px;font-family:"Bricolage Grotesque"}
+  .chip b{font-size:14px}
+
+  main{max-width:1180px;margin:0 auto;padding:34px 26px 80px}
+  .hero{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:30px;
+    opacity:0;animation:rise .6s .05s forwards}
+  .hero h1{font-family:"Bricolage Grotesque";font-weight:800;font-size:clamp(30px,4vw,46px);letter-spacing:-.03em;margin:0 0 6px;line-height:1}
+  .hero h1 .green{color:var(--acc)}
+  .hero p{margin:0;color:var(--dim);font-size:15px}
+  .live{display:inline-flex;align-items:center;gap:9px;font-family:"JetBrains Mono";font-size:12px;color:var(--ok);
+    border:1px solid var(--line2);background:var(--panel);padding:9px 14px;border-radius:10px}
+  .live .pulse{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 rgba(60,224,138,.6);animation:pulse 1.8s infinite}
+
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+  .card{grid-column:span 3;background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);
+    border-radius:var(--radius);padding:18px;position:relative;overflow:hidden;
+    opacity:0;animation:rise .6s forwards}
+  .card::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,var(--line2),transparent)}
+  .card .k{font-family:"JetBrains Mono";font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:7px}
+  .card .v{font-family:"Bricolage Grotesque";font-weight:800;font-size:34px;letter-spacing:-.02em;margin-top:10px;line-height:1}
+  .card .s{color:var(--dim);font-size:13px;margin-top:6px}
+  .card .v .u{font-size:15px;color:var(--dim);font-weight:600}
+  .led{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok)}
+  .led.warn{background:var(--warn);box-shadow:0 0 10px var(--warn)}
+
+  .panel{grid-column:span 8;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px;
+    opacity:0;animation:rise .6s .25s forwards}
+  .panel.aside{grid-column:span 4}
+  .ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .ph h2{font-family:"Bricolage Grotesque";font-weight:700;font-size:18px;margin:0;letter-spacing:-.01em}
+  .tag{font-family:"JetBrains Mono";font-size:11px;color:var(--acc);border:1px solid var(--acc-dim);padding:4px 9px;border-radius:7px;background:rgba(184,255,60,.06)}
+
+  .url{display:flex;align-items:center;gap:14px;padding:13px 0;border-top:1px solid var(--line)}
+  .url:first-of-type{border-top:0}
+  .url .ic{width:38px;height:38px;border-radius:10px;background:var(--panel2);border:1px solid var(--line2);display:grid;place-items:center;color:var(--acc);font-family:"JetBrains Mono";font-weight:500;font-size:13px;flex:none}
+  .url .meta{min-width:0;flex:1}
+  .url .meta b{font-size:14.5px;font-weight:600}
+  .url .meta code{display:block;font-family:"JetBrains Mono";font-size:11.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .copy{flex:none;border:1px solid var(--line2);background:var(--panel2);color:var(--dim);font-family:"JetBrains Mono";font-size:12px;
+    padding:8px 12px;border-radius:9px;cursor:pointer;transition:.18s;min-height:36px}
+  .copy:hover{color:var(--acc);border-color:var(--acc-dim);background:rgba(184,255,60,.07)}
+  .seg{font-family:"JetBrains Mono";font-size:11px;color:var(--faint);letter-spacing:.08em;text-transform:uppercase;margin:18px 0 4px}
+  .seg:first-child{margin-top:0}
+
+  .stat-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-top:1px solid var(--line)}
+  .stat-row:first-of-type{border-top:0}
+  .stat-row .lbl{color:var(--dim);font-size:14px;display:flex;align-items:center;gap:9px}
+  .stat-row .val{font-family:"JetBrains Mono";font-weight:500}
+  .btn{display:inline-flex;align-items:center;gap:8px;background:var(--acc);color:#0a0e14;font-weight:700;font-size:14px;
+    padding:11px 18px;border-radius:10px;border:0;cursor:pointer;font-family:"Hanken Grotesk";transition:.18s}
+  .btn:hover{box-shadow:0 0 24px rgba(184,255,60,.35);transform:translateY(-1px)}
+  .legend{margin-top:34px;color:var(--faint);font-size:12.5px;font-family:"JetBrains Mono";text-align:center}
+
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(60,224,138,.55)}70%{box-shadow:0 0 0 9px rgba(60,224,138,0)}100%{box-shadow:0 0 0 0 rgba(60,224,138,0)}}
+  .card:nth-child(1){animation-delay:.08s}.card:nth-child(2){animation-delay:.14s}.card:nth-child(3){animation-delay:.2s}.card:nth-child(4){animation-delay:.26s}
+  @media (max-width:920px){.card{grid-column:span 6}.panel,.panel.aside{grid-column:span 12}nav.links{display:none}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Zum Inhalt springen</a>
+<header class="nav">
+  <div class="brand"><span class="dot" aria-hidden="true"></span>stream-overlay<small>v2</small></div>
+  <nav class="links" aria-label="Hauptnavigation">
+    <a href="#" aria-current="page">Dashboard</a>
+    <a href="#">OBS URLs</a>
+    <a href="#">Tools</a>
+    <a href="#">Settings</a>
+    <a href="#">Admin</a>
+  </nav>
+  <div class="right">
+    <span class="chip"><span class="av" aria-hidden="true">L</span><b>LuCKoR</b></span>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+  <div class="hero">
+    <div>
+      <h1>Willkommen zurück, <span class="green">LuCKoR</span></h1>
+      <p>Tenant <code style="font-family:'JetBrains Mono';color:var(--dim)">luckor</code> · alle Systeme laufen</p>
+    </div>
+    <span class="live"><span class="pulse" aria-hidden="true"></span>POLLER LIVE · sync vor 2&nbsp;min</span>
+  </div>
+
+  <div class="grid">
+    <article class="card"><div class="k"><span class="led" aria-hidden="true"></span>PUBG</div><div class="v">7</div><div class="s">Matches diese Session</div></article>
+    <article class="card"><div class="k">Letztes Spiel</div><div class="v">#1<span class="u"> / 64</span></div><div class="s">Chicken Dinner · 9 Kills</div></article>
+    <article class="card"><div class="k"><span class="led" aria-hidden="true"></span>Steam</div><div class="v">312</div><div class="s">Achievements gesynct</div></article>
+    <article class="card"><div class="k">Browser-Sources</div><div class="v">12</div><div class="s">aktive Widgets &amp; Overlays</div></article>
+
+    <section class="panel">
+      <div class="ph"><h2>Deine OBS Browser-Sources</h2><span class="tag">tok_a5df…e26e</span></div>
+      <div class="seg">Widgets</div>
+      <div class="url"><span class="ic" aria-hidden="true">CC</span><div class="meta"><b>Career Card</b><code>stream-overlay.com/s/tok…/widgets/pubg/career-card.html</code></div><button class="copy">copy</button></div>
+      <div class="url"><span class="ic" aria-hidden="true">SS</span><div class="meta"><b>Session Summary</b><code>stream-overlay.com/s/tok…/widgets/pubg/session-summary.html</code></div><button class="copy">copy</button></div>
+      <div class="url"><span class="ic" aria-hidden="true">LB</span><div class="meta"><b>Live Bar</b><code>stream-overlay.com/s/tok…/widgets/pubg/live-bar.html</code></div><button class="copy">copy</button></div>
+      <div class="seg">Overlays</div>
+      <div class="url"><span class="ic" aria-hidden="true">BR</span><div class="meta"><b>BRB / Pause</b><code>stream-overlay.com/s/tok…/overlays/brb-pause.html</code></div><button class="copy">copy</button></div>
+      <div class="url"><span class="ic" aria-hidden="true">SO</span><div class="meta"><b>Starting Soon</b><code>stream-overlay.com/s/tok…/overlays/starting-soon.html</code></div><button class="copy">copy</button></div>
+    </section>
+
+    <aside class="panel aside">
+      <div class="ph"><h2>System</h2></div>
+      <div class="stat-row"><span class="lbl"><span class="led" aria-hidden="true"></span>PUBG API</span><span class="val">connected</span></div>
+      <div class="stat-row"><span class="lbl"><span class="led" aria-hidden="true"></span>Steam API</span><span class="val">connected</span></div>
+      <div class="stat-row"><span class="lbl"><span class="led" aria-hidden="true"></span>Poller</span><span class="val">running</span></div>
+      <div class="stat-row"><span class="lbl"><span class="led warn" aria-hidden="true"></span>FTP Pull</span><span class="val">pending</span></div>
+      <p style="margin:20px 0 0"><button class="btn">OBS URLs öffnen →</button></p>
+    </aside>
+  </div>
+
+  <p class="legend">DESIGN 1 — „MIDNIGHT OPS" · dark · Bricolage Grotesque + JetBrains Mono · Electric-Lime-Akzent</p>
+</main>
+</body>
+</html>
