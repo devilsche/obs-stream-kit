@@ -56,17 +56,31 @@
   /* ════ EBENE 1 — Bausteine (token-getrieben, theme-agnostisch) ════ */
   .t-card{background:var(--theme-surface);border:var(--theme-border-width) solid var(--theme-border);
     border-radius:var(--theme-radius);padding:22px;position:relative;width:340px}
-  .t-header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  .t-header{display:flex;justify-content:space-between;align-items:baseline;gap:8px 12px;flex-wrap:wrap;
     font-family:var(--theme-font-display);font-weight:600;font-size:18px;color:var(--theme-text);
     padding-bottom:14px;border-bottom:var(--theme-border-width) solid var(--theme-border);margin-bottom:18px}
-  .t-range{font-family:var(--theme-font-mono);font-size:12px;color:var(--theme-primary);font-weight:400}
+  .t-range{font-family:var(--theme-font-mono);font-size:12px;color:var(--theme-primary);font-weight:400;white-space:nowrap}
   .t-stat-grid{display:flex;flex-wrap:wrap;gap:22px 34px}
   .t-stat{display:flex;flex-direction:column;gap:5px}
   .t-value{font-family:var(--theme-font-display);font-weight:700;font-size:38px;color:var(--theme-text);line-height:1}
   .t-label{font-family:var(--theme-font-mono);font-size:11px;color:var(--theme-text-dim);letter-spacing:.06em}
   .t-hot .t-value{color:var(--theme-accent)}
   .t-hot-mark{display:inline-grid;place-items:center;vertical-align:-3px;margin-right:4px}
-  .t-hot-mark::before{font-family:"Material Symbols Outlined";content:var(--theme-hot-icon);font-size:18px;color:var(--theme-accent)}
+  .t-hot-mark::before{font-family:"Material Symbols Outlined";content:var(--theme-hot-icon);font-size:18px;color:var(--theme-accent);
+    display:inline-block;text-shadow:0 0 12px var(--theme-accent);animation:hot-pulse 2s ease-in-out infinite}
+  /* Highlight-Icon: Glow + theme-eigene Eigenbewegung */
+  @keyframes hot-pulse{0%,100%{text-shadow:0 0 8px var(--theme-accent)}50%{text-shadow:0 0 20px var(--theme-accent)}}
+  @keyframes hot-flame{0%,100%{opacity:1;transform:scale(1);text-shadow:0 0 10px var(--theme-accent)}
+    45%{opacity:.82;transform:scale(.93) translateY(1px);text-shadow:0 0 16px var(--theme-accent)}
+    70%{opacity:1;transform:scale(1.05);text-shadow:0 0 26px var(--theme-accent),0 0 9px var(--theme-accent-2)}}
+  @keyframes hot-zap{0%,90%,100%{opacity:1;text-shadow:0 0 12px var(--theme-accent)}
+    92%{opacity:.25;text-shadow:none}94%{opacity:1;text-shadow:0 0 26px var(--theme-accent)}96%{opacity:.45}}
+  @keyframes hot-twinkle{0%,100%{transform:scale(1) rotate(0);opacity:1}
+    50%{transform:scale(1.22) rotate(18deg);opacity:.85;text-shadow:0 0 22px var(--theme-accent)}}
+  html[data-theme="entry"] .t-hot-mark::before{animation:hot-flame 1.5s ease-in-out infinite}
+  html[data-theme="terminal"] .t-hot-mark::before,html[data-theme="midnight"] .t-hot-mark::before{animation:hot-zap 2.6s steps(1,end) infinite}
+  html[data-theme="aurora"] .t-hot-mark::before{animation:hot-twinkle 2.4s ease-in-out infinite}
+  @media (prefers-reduced-motion:reduce){.t-hot-mark::before{animation:none!important;text-shadow:0 0 12px var(--theme-accent)}}
 
   /* ════ EBENE 2 — der CHARAKTER je Theme (Form, Typo, Deko, Glow) ════ */
   /* — Terminal: scharf, Grid, Eck-Marker, Neon, UPPERCASE-mono — */
@@ -162,8 +176,8 @@
   </div>
 
   <!-- Highlight Card -->
-  <div class="t-card t-hot" style="width:300px">
-    <div class="t-header"><span class="t-hot-mark" aria-hidden="true"></span>Longshot <span class="t-range">neuer Rekord</span></div>
+  <div class="t-card t-hot" style="width:340px">
+    <div class="t-header"><span><span class="t-hot-mark" aria-hidden="true"></span>Longshot</span> <span class="t-range">Rekord</span></div>
     <div class="t-stat"><span class="t-value">418 m</span><span class="t-label">weiteste Kill-Distanz</span></div>
   </div>
 </main>
