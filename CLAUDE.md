@@ -76,6 +76,7 @@ Repo: github.com/devilsche/obs-stream-kit
 
 - **`widgets/<domain>/_<domain>.js`** und `_<domain>.css` — gemeinsame UI-Bausteine fuer Widgets innerhalb der Domain (z.B. `widgets/pubg/_pubg.js`).
 - Frontend ist **vanilla JS** — kein Build-Tool, kein Bundler, kein npm. Browser laedt direkt.
+- **KEINE Inline-Styles.** Niemals `style="..."` im Markup (auch nicht in Mockups/Demos). Alles Visuelle gehoert in `<style>` bzw. die `.css`-Datei, ueber Klassen/Selektoren. Werte, die sich pro Element unterscheiden, ueber Tokens/CSS-Custom-Properties (`--theme-*`, `:nth-child`, `data-*`-Scopes) loesen — nicht hartkodiert ins Attribut. Auch kein Inline-`style`-Setzen per JS-`onerror`/Handler.
 
 **Tests:**
 

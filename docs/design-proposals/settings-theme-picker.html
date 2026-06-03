@@ -73,7 +73,8 @@
     padding:8px 13px;border-radius:var(--theme-radius);min-height:36px;display:inline-flex;align-items:center}
   .tabs a[aria-current="page"]{background:var(--theme-primary);color:var(--theme-on-primary);font-weight:700}
   .who{margin-left:auto;display:inline-flex;align-items:center;gap:10px;font-family:var(--theme-font-mono);font-size:12.5px;color:var(--theme-text-dim)}
-  .who img{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--theme-border)}
+  .who .avatar{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;
+    background:var(--theme-primary);color:var(--theme-on-primary);font-family:var(--theme-font-display);font-weight:700;font-size:14px}
 
   main{max-width:1080px;margin:0 auto;padding:38px 30px 140px}
   .sec-title{font-family:var(--theme-font-display);font-size:24px;font-weight:700;margin:0 0 6px}
@@ -100,6 +101,10 @@
   .tp{display:block;background:var(--theme-bg);padding:16px;border-bottom:var(--theme-border-width) solid var(--theme-border)}
   .tp-swatches{display:flex;gap:6px;margin-bottom:13px}
   .tp-swatches span{width:24px;height:24px;border-radius:calc(var(--theme-radius) * .6);border:1px solid rgba(128,128,128,.25)}
+  .tp-swatches span:nth-child(1){background:var(--theme-primary)}
+  .tp-swatches span:nth-child(2){background:var(--theme-accent)}
+  .tp-swatches span:nth-child(3){background:var(--theme-accent-2)}
+  .tp-swatches span:nth-child(4){background:var(--theme-surface-2)}
   .tp-card{background:var(--theme-surface);border:var(--theme-border-width) solid var(--theme-border);
     border-radius:var(--theme-radius);padding:15px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
   .tp-stat{display:flex;flex-direction:column;gap:3px}
@@ -109,9 +114,11 @@
     background:var(--theme-primary);color:var(--theme-on-primary)}
 
   /* Kachel-Fuß: Name im jeweiligen Display-Font, Vibe. Steht im aktiven Theme-Chrome. */
-  .tile .meta{padding:14px 16px 16px}
-  .tile .nm{font-weight:700;font-size:17px;margin:0 0 3px}
-  .tile .vibe{font-family:var(--theme-font-mono);font-size:11.5px;color:var(--theme-text-dim);margin:0;line-height:1.5}
+  .tile .meta{display:block;padding:18px 18px 20px}
+  .tile .nm{font-family:var(--theme-font-display);font-weight:700;font-size:17px;margin:0 0 7px;line-height:1.15}
+  .tile .nm[data-preview="editorial"]{font-style:italic}
+  .tile .nm[data-preview="swiss"]{text-transform:uppercase}
+  .tile .vibe{font-family:var(--theme-font-mono);font-size:11.5px;color:var(--theme-text-dim);margin:0;line-height:1.55}
 
   /* ── Sticky Save-Leiste (aktives Theme) ── */
   .savebar{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
@@ -141,7 +148,7 @@
     <a href="#">Overlays</a>
     <a href="#">Account</a>
   </nav>
-  <span class="who"><img src="https://static-cdn.jtvnw.net/jtv_user_pictures/placeholder.png" alt="" onerror="this.style.background='var(--theme-primary)';this.removeAttribute('src')"> PEX_LuCKoR</span>
+  <span class="who"><span class="avatar" aria-hidden="true">P</span> PEX_LuCKoR</span>
 </header>
 
 <main>
@@ -153,55 +160,55 @@
     <button type="button" class="tile" data-theme-val="terminal" aria-pressed="true">
       <span class="check ms" aria-hidden="true">check_circle</span>
       <span class="tp" data-preview="terminal">
-        <span class="tp-swatches"><span style="background:#22e0d6"></span><span style="background:#ff4d8d"></span><span style="background:#ffb547"></span><span style="background:#0c1118"></span></span>
+        <span class="tp-swatches"><span></span><span></span><span></span><span></span></span>
         <span class="tp-card"><span class="tp-stat"><b class="tp-val">9.2</b><span class="tp-lab">K/D</span></span><span class="tp-btn">Live</span></span>
       </span>
-      <span class="meta"><p class="nm" data-preview="terminal" style="font-family:var(--theme-font-display)">Terminal Signal</p><p class="vibe">Neon cyan/magenta, mono type, sharp edges. Technical &amp; gaming.</p></span>
+      <span class="meta"><p class="nm" data-preview="terminal">Terminal Signal</p><p class="vibe">Neon cyan/magenta, mono type, sharp edges. Technical &amp; gaming.</p></span>
     </button>
 
     <button type="button" class="tile" data-theme-val="aurora" aria-pressed="false">
       <span class="check ms" aria-hidden="true">check_circle</span>
       <span class="tp" data-preview="aurora">
-        <span class="tp-swatches"><span style="background:#9d6bd0"></span><span style="background:#f2b705"></span><span style="background:#46d6ff"></span><span style="background:#221636"></span></span>
+        <span class="tp-swatches"><span></span><span></span><span></span><span></span></span>
         <span class="tp-card"><span class="tp-stat"><b class="tp-val">9.2</b><span class="tp-lab">K/D</span></span><span class="tp-btn">Live</span></span>
       </span>
-      <span class="meta"><p class="nm" data-preview="aurora" style="font-family:var(--theme-font-display)">Aurora Glass</p><p class="vibe">Purple/gold, glassy depth, soft rounding. Your brand, 2026.</p></span>
+      <span class="meta"><p class="nm" data-preview="aurora">Aurora Glass</p><p class="vibe">Purple/gold, glassy depth, soft rounding. Your brand, 2026.</p></span>
     </button>
 
     <button type="button" class="tile" data-theme-val="midnight" aria-pressed="false">
       <span class="check ms" aria-hidden="true">check_circle</span>
       <span class="tp" data-preview="midnight">
-        <span class="tp-swatches"><span style="background:#b8ff3c"></span><span style="background:#3ce08a"></span><span style="background:#7fae2b"></span><span style="background:#121927"></span></span>
+        <span class="tp-swatches"><span></span><span></span><span></span><span></span></span>
         <span class="tp-card"><span class="tp-stat"><b class="tp-val">9.2</b><span class="tp-lab">K/D</span></span><span class="tp-btn">Live</span></span>
       </span>
-      <span class="meta"><p class="nm" data-preview="midnight" style="font-family:var(--theme-font-display)">Midnight Ops</p><p class="vibe">Electric lime on deep navy. Mission-control precision.</p></span>
+      <span class="meta"><p class="nm" data-preview="midnight">Midnight Ops</p><p class="vibe">Electric lime on deep navy. Mission-control precision.</p></span>
     </button>
 
     <button type="button" class="tile" data-theme-val="editorial" aria-pressed="false">
       <span class="check ms" aria-hidden="true">check_circle</span>
       <span class="tp" data-preview="editorial">
-        <span class="tp-swatches"><span style="background:#d4561f"></span><span style="background:#7a8450"></span><span style="background:#fbf9f3"></span><span style="background:#1c1a16"></span></span>
+        <span class="tp-swatches"><span></span><span></span><span></span><span></span></span>
         <span class="tp-card"><span class="tp-stat"><b class="tp-val">9.2</b><span class="tp-lab">K/D</span></span><span class="tp-btn">Live</span></span>
       </span>
-      <span class="meta"><p class="nm" data-preview="editorial" style="font-family:var(--theme-font-display);font-style:italic">Editorial Warm</p><p class="vibe">Warm paper, serif display, terracotta. Calm &amp; grown-up.</p></span>
+      <span class="meta"><p class="nm" data-preview="editorial">Editorial Warm</p><p class="vibe">Warm paper, serif display, terracotta. Calm &amp; grown-up.</p></span>
     </button>
 
     <button type="button" class="tile" data-theme-val="entry" aria-pressed="false">
       <span class="check ms" aria-hidden="true">check_circle</span>
       <span class="tp" data-preview="entry">
-        <span class="tp-swatches"><span style="background:#9d6bd0"></span><span style="background:#f2b705"></span><span style="background:#c9a0dc"></span><span style="background:#1f1430"></span></span>
+        <span class="tp-swatches"><span></span><span></span><span></span><span></span></span>
         <span class="tp-card"><span class="tp-stat"><b class="tp-val">9.2</b><span class="tp-lab">K/D</span></span><span class="tp-btn">Live</span></span>
       </span>
-      <span class="meta"><p class="nm" data-preview="entry" style="font-family:var(--theme-font-display)">Entry Classic</p><p class="vibe">Purple/gold, DM Sans, rounded glow. The familiar set.</p></span>
+      <span class="meta"><p class="nm" data-preview="entry">Entry Classic</p><p class="vibe">Purple/gold, DM Sans, rounded glow. The familiar set.</p></span>
     </button>
 
     <button type="button" class="tile" data-theme-val="swiss" aria-pressed="false">
       <span class="check ms" aria-hidden="true">check_circle</span>
       <span class="tp" data-preview="swiss">
-        <span class="tp-swatches"><span style="background:#1f3aff"></span><span style="background:#0d0d0d"></span><span style="background:#ffffff"></span><span style="background:#eceae4"></span></span>
+        <span class="tp-swatches"><span></span><span></span><span></span><span></span></span>
         <span class="tp-card"><span class="tp-stat"><b class="tp-val">9.2</b><span class="tp-lab">K/D</span></span><span class="tp-btn">Live</span></span>
       </span>
-      <span class="meta"><p class="nm" data-preview="swiss" style="font-family:var(--theme-font-display);text-transform:uppercase">Swiss Brutal</p><p class="vibe">Hard 3px rules, huge grotesk, one loud ultramarine.</p></span>
+      <span class="meta"><p class="nm" data-preview="swiss">Swiss Brutal</p><p class="vibe">Hard 3px rules, huge grotesk, one loud ultramarine.</p></span>
     </button>
 
   </div>
