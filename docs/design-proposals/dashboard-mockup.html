@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dashboard-Mockup · Terminal Signal — stream-overlay</title>
+<title>Dashboard Mockup · Terminal Signal — stream-overlay</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -37,8 +37,11 @@
   .links button:hover{color:var(--txt)}
   .links button[aria-current="page"]{color:var(--cyan);border-color:var(--line2);background:var(--panel)}
   .links button[aria-current="page"]::before{content:"\25b8 "}
-  .nright{margin-left:auto;display:flex;align-items:center;gap:12px;font-family:"JetBrains Mono";font-size:12px;color:var(--dim)}
-  .av{width:32px;height:32px;background:var(--panel2);border:1px solid var(--cyan);color:var(--cyan);display:grid;place-items:center;font-family:"Chakra Petch";font-weight:700}
+  .nright{margin-left:auto;display:flex;align-items:center;gap:12px}
+  .chip{display:flex;align-items:center;gap:10px;padding:5px 15px 5px 5px;border:1px solid var(--line2);border-radius:999px;background:var(--panel)}
+  .chip .uav{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--ok));display:grid;place-items:center;color:#070a0f;font-weight:800;font-size:13px;font-family:"Chakra Petch";overflow:hidden;flex:none}
+  .chip .uav img{width:100%;height:100%;object-fit:cover;display:block}
+  .chip b{font-size:14px;color:var(--txt);font-weight:600}
 
   main{max-width:1240px;margin:0 auto;padding:26px 24px 90px}
   .view{display:none;animation:rise .35s both}
@@ -77,6 +80,10 @@
   .count:hover{color:var(--cyan)}
   .count .n{font-family:"Chakra Petch";font-weight:700;font-size:22px;color:var(--txt)}
   .count:hover .n{color:var(--cyan)}
+  .gstats{display:flex;flex-wrap:wrap;gap:16px 40px;padding:16px 18px 16px}
+  .gstat{display:flex;flex-direction:column;gap:5px}
+  .gstat .gn{font-family:"Chakra Petch";font-weight:700;font-size:30px;color:var(--amber);line-height:1;letter-spacing:.02em}
+  .gstat .gl{font-family:"JetBrains Mono";font-size:11px;color:var(--dim);letter-spacing:.05em}
 
   /* ── Sub-Tabs ── */
   .tabs{display:flex;gap:0;border:1px solid var(--line2);background:var(--panel);margin:6px 0 18px;overflow:hidden}
@@ -89,17 +96,17 @@
   .tabpanel{display:none}.tabpanel.active{display:block}
 
   /* ── Karten-Grid ── */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:15px}
   .card{border:1px solid var(--line2);background:var(--panel);text-align:left;cursor:pointer;transition:.14s;
-    display:flex;flex-direction:column;position:relative;padding:0;color:inherit;min-height:118px}
+    display:flex;flex-direction:column;position:relative;padding:0;color:inherit;min-height:140px}
   .card:hover{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan),0 8px 30px rgba(34,224,214,.1)}
   .card .corner{position:absolute;right:0;top:0;width:12px;height:12px;border-top:2px solid var(--line2);border-right:2px solid var(--line2);transition:.14s}
   .card:hover .corner{border-color:var(--cyan)}
-  .card .top{padding:14px 16px 10px;flex:1}
-  .card .cat{font-family:"JetBrains Mono";font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
-  .card .nm{font-family:"Chakra Petch";font-weight:600;font-size:16px;margin-top:6px}
-  .card .meta{font-family:"JetBrains Mono";font-size:11px;color:var(--dim);margin-top:5px}
-  .card .foot{border-top:1px solid var(--line);padding:9px 16px;display:flex;align-items:center;justify-content:space-between;font-family:"JetBrains Mono";font-size:11px;color:var(--cyan)}
+  .card .top{padding:18px 18px 14px;flex:1;display:flex;flex-direction:column;gap:9px}
+  .card .cat{font-family:"JetBrains Mono";font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);line-height:1.4}
+  .card .nm{font-family:"Hanken Grotesk";font-weight:600;font-size:17px;line-height:1.3;letter-spacing:.005em}
+  .card .meta{font-family:"JetBrains Mono";font-size:12px;color:var(--dim);line-height:1.6;letter-spacing:.02em}
+  .card .foot{border-top:1px solid var(--line);padding:12px 18px;display:flex;align-items:center;justify-content:space-between;font-family:"JetBrains Mono";font-size:11px;color:var(--cyan);gap:10px}
   .card .foot .copybtn{background:none;border:0;color:var(--dim);cursor:pointer;font-family:"JetBrains Mono";font-size:11px;text-transform:uppercase;padding:4px 0}
   .card .foot .copybtn:hover{color:var(--cyan)}
 
@@ -145,6 +152,8 @@
   .simple .field{margin:14px 0}
   .simple label{display:block;font-family:"JetBrains Mono";font-size:12px;color:var(--dim);margin-bottom:7px}
   .simple input{width:100%;max-width:380px;background:var(--bg);border:1px solid var(--line2);color:var(--txt);font-family:"JetBrains Mono";font-size:13px;padding:10px 13px;min-height:40px}
+  .simple .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:6px 26px}
+  .simple .fgrid input{max-width:none}
   .pro{margin-top:18px;border:1px dashed var(--line2);padding:16px 20px;color:var(--faint);font-family:"JetBrains Mono";font-size:12px}
   .pro b{color:var(--amber)}
 
@@ -169,18 +178,21 @@
 </style>
 </head>
 <body>
-<a class="skip" href="#main">Zum Inhalt springen</a>
+<a class="skip" href="#main">Skip to content</a>
 
 <header class="nav">
   <div class="brand"><span class="sq" aria-hidden="true"></span>STREAM<span class="b">_</span>OVERLAY</div>
-  <nav class="links" aria-label="Hauptnavigation">
+  <nav class="links" aria-label="Main navigation">
     <button data-view="dash" aria-current="page">dashboard</button>
     <button data-view="urls">urls</button>
     <button data-view="tools">tools</button>
     <button data-view="settings">settings</button>
     <button data-view="admin">admin</button>
   </nav>
-  <div class="nright"><span>tenant=luckor</span><span class="av" aria-hidden="true">L</span></div>
+  <div class="nright">
+    <!-- echte App: <img src="{{ user.avatar_url }}"> (Steam/Twitch), sonst Initial-Fallback -->
+    <span class="chip"><span class="uav" aria-hidden="true">L</span><b>LuCKoR</b></span>
+  </div>
 </header>
 
 <main id="main" tabindex="-1">
@@ -195,19 +207,20 @@
       <article class="ccard" style="grid-column:span 4"><span class="corner" aria-hidden="true"></span>
         <h2>API-Keys</h2>
         <div class="pad">
-          <div class="kv"><span class="lbl"><span class="led" aria-hidden="true"></span>PUBG</span><span class="v">hinterlegt</span></div>
-          <div class="kv"><span class="lbl"><span class="led" aria-hidden="true"></span>Steam</span><span class="v">hinterlegt</span></div>
-          <div class="kv"><span class="lbl"><span class="led" aria-hidden="true"></span>Twitch</span><span class="v">hinterlegt</span></div>
-          <div class="kv"><span class="lbl"><span class="led x" aria-hidden="true"></span>FTP</span><span class="v x">fehlt</span></div>
+          <div class="kv"><span class="lbl"><span class="led" aria-hidden="true"></span>PUBG</span><span class="v">set</span></div>
+          <div class="kv"><span class="lbl"><span class="led" aria-hidden="true"></span>Steam</span><span class="v">set</span></div>
+          <div class="kv"><span class="lbl"><span class="led" aria-hidden="true"></span>Twitch</span><span class="v">set</span></div>
+          <!-- admin-only: in der echten App via user.is_admin gated -->
+          <div class="kv"><span class="lbl"><span class="led" aria-hidden="true"></span>Telemetry&#8209;Backup <span style="color:var(--faint);font-size:10px;letter-spacing:.06em">· ADMIN</span></span><span class="v">active</span></div>
         </div>
       </article>
       <article class="ccard m" style="grid-column:span 4"><span class="corner" aria-hidden="true"></span>
         <h2>Poller</h2>
         <div class="pad">
           <div class="kv"><span class="lbl">Status</span><span class="v">running</span></div>
-          <div class="kv"><span class="lbl">Letzter Sync</span><span class="v" style="color:var(--txt)">vor 2 min</span></div>
-          <div class="kv"><span class="lbl">Matches heute</span><span class="v" style="color:var(--txt)">7</span></div>
-          <div class="kv"><span class="lbl">Letztes Spiel</span><span class="v" style="color:var(--mag)">#1 · 9K</span></div>
+          <div class="kv"><span class="lbl">Last sync</span><span class="v" style="color:var(--txt)">2 min ago</span></div>
+          <div class="kv"><span class="lbl">Matches today</span><span class="v" style="color:var(--txt)">7</span></div>
+          <div class="kv"><span class="lbl">Last match</span><span class="v" style="color:var(--mag)">#1 · 9K</span></div>
         </div>
       </article>
       <article class="ccard a" style="grid-column:span 4"><span class="corner" aria-hidden="true"></span>
@@ -216,24 +229,36 @@
           <div class="count" data-goto="widgets"><span>Widgets</span><span class="n">24</span></div>
           <div class="count" data-goto="overlays"><span>Overlays</span><span class="n">6</span></div>
           <div class="count" data-goto="alerts"><span>Alerts</span><span class="n">9</span></div>
-          <div class="count" data-goto="logos"><span>Logos / Deko</span><span class="n">5</span></div>
-          <div class="count" data-goto="stinger"><span>Stinger</span><span class="n">26</span></div>
+          <div class="count" data-goto="logos"><span>Look &amp; Decor</span><span class="n">3</span></div>
+          <div class="count" data-goto="memes"><span>Memes</span><span class="n">25</span></div>
+          <div class="count" data-goto="transition"><span>Transition</span><span class="n">1</span></div>
+        </div>
+      </article>
+      <article class="ccard a" style="grid-column:span 12"><span class="corner" aria-hidden="true"></span>
+        <h2 style="color:var(--amber);display:flex;justify-content:space-between">All tenants · global <span style="font-family:'JetBrains Mono';font-size:11px;color:var(--faint);font-weight:400">admin-only</span></h2>
+        <div class="pad gstats">
+          <div class="gstat"><span class="gn">2</span><span class="gl">Tenants</span></div>
+          <div class="gstat"><span class="gn">23</span><span class="gl">Matches today (all)</span></div>
+          <div class="gstat"><span class="gn">698</span><span class="gl">Matches total</span></div>
+          <div class="gstat"><span class="gn">999k</span><span class="gl">Telemetry events</span></div>
+          <div class="gstat"><span class="gn">431<span style="font-size:14px">&nbsp;MB</span></span><span class="gl">DB size</span></div>
         </div>
       </article>
     </div>
-    <p class="legend">Tipp: Klick auf eine Source-Zahl springt direkt in den passenden URL-Bereich.</p>
+    <p class="legend">Tip: click a source count to jump straight to that URL section. · "All tenants" is admin-only.</p>
   </section>
 
   <!-- ════ URLS ════ -->
   <section class="view" id="view-urls" aria-label="OBS URLs">
     <div class="crumb">URLs</div>
     <h1 class="title">OBS Browser-Sources</h1>
-    <div class="tabs" role="tablist" aria-label="Source-Typen">
+    <div class="tabs" role="tablist" aria-label="Source types">
       <button role="tab" aria-selected="true" data-tab="overlays">Overlays<span class="cnt">6</span></button>
       <button role="tab" aria-selected="false" data-tab="widgets">Widgets<span class="cnt">24</span></button>
-      <button role="tab" aria-selected="false" data-tab="logos">Logos<span class="cnt">5</span></button>
+      <button role="tab" aria-selected="false" data-tab="logos">Look &amp; Decor<span class="cnt">3</span></button>
       <button role="tab" aria-selected="false" data-tab="alerts">Alerts<span class="cnt">9</span></button>
-      <button role="tab" aria-selected="false" data-tab="stinger">Stinger<span class="cnt">26</span></button>
+      <button role="tab" aria-selected="false" data-tab="memes">Memes<span class="cnt">25</span></button>
+      <button role="tab" aria-selected="false" data-tab="transition">Transition<span class="cnt">1</span></button>
     </div>
 
     <div class="tabpanel active" id="tab-overlays" role="tabpanel">
@@ -248,41 +273,44 @@
     <div class="tabpanel" id="tab-alerts" role="tabpanel">
       <div class="grid" id="grid-alerts"></div>
     </div>
-    <div class="tabpanel" id="tab-stinger" role="tabpanel">
-      <div class="grid" id="grid-stinger"></div>
+    <div class="tabpanel" id="tab-memes" role="tabpanel">
+      <div class="grid" id="grid-memes"></div>
+    </div>
+    <div class="tabpanel" id="tab-transition" role="tabpanel">
+      <div class="grid" id="grid-transition"></div>
     </div>
   </section>
 
   <!-- ════ WIDGET-DETAIL ════ -->
-  <section class="view" id="view-detail" aria-label="Widget-Detail">
-    <button class="back" id="backBtn">&larr; zurueck zu <span id="backTo">Widgets</span></button>
+  <section class="view" id="view-detail" aria-label="Widget detail">
+    <button class="back" id="backBtn">&larr; back to <span id="backTo">Widgets</span></button>
     <div class="crumb">URLs / <span id="dCat">Widgets</span> / <b id="dName">Career Card</b></div>
     <div class="detail">
       <div>
         <div class="dbox">
-          <h2 id="dTitle">Career Card<span class="tag">konfigurieren</span></h2>
+          <h2 id="dTitle">Career Card<span class="tag">configure</span></h2>
           <div class="param">
-            <div class="plabel"><span>Zeitraum</span><span class="def">default: Session</span></div>
+            <div class="plabel"><span>Timeframe</span><span class="def">default: session</span></div>
             <div class="seg" data-param="range" data-default="session">
               <button aria-pressed="true" data-val="session">Session</button>
-              <button aria-pressed="false" data-val="week">Woche</button>
+              <button aria-pressed="false" data-val="week">Week</button>
               <button aria-pressed="false" data-val="all">All</button>
             </div>
           </div>
           <div class="param">
-            <div class="plabel"><span>Theme</span><span class="def">default: Dark</span></div>
+            <div class="plabel"><span>Theme</span><span class="def">default: dark</span></div>
             <div class="seg" data-param="theme" data-default="dark">
               <button aria-pressed="true" data-val="dark">Dark</button>
               <button aria-pressed="false" data-val="light">Light</button>
             </div>
           </div>
           <div class="param">
-            <div class="plabel"><span>Min. Kills</span><span class="def">default: 0</span></div>
-            <input class="num" type="number" min="0" value="0" data-param="minkills" data-default="0" aria-label="Minimale Kills">
+            <div class="plabel"><span>Min. kills</span><span class="def">default: 0</span></div>
+            <input class="num" type="number" min="0" value="0" data-param="minkills" data-default="0" aria-label="Minimum kills">
           </div>
           <div class="param">
-            <div class="plabel"><span>Akzentfarbe</span><span class="def">default: Cyan</span></div>
-            <div class="swatches" data-param="accent" data-default="cyan" role="group" aria-label="Akzentfarbe">
+            <div class="plabel"><span>Accent color</span><span class="def">default: cyan</span></div>
+            <div class="swatches" data-param="accent" data-default="cyan" role="group" aria-label="Accent color">
               <button class="sw" style="background:#22e0d6" aria-pressed="true" data-val="cyan" aria-label="Cyan"></button>
               <button class="sw" style="background:#ff4d8d" aria-pressed="false" data-val="magenta" aria-label="Magenta"></button>
               <button class="sw" style="background:#ffb547" aria-pressed="false" data-val="amber" aria-label="Amber"></button>
@@ -290,29 +318,29 @@
             </div>
           </div>
           <div class="param">
-            <div class="plabel"><span>Layout</span><span class="def">default: Voll</span></div>
+            <div class="plabel"><span>Layout</span><span class="def">default: full</span></div>
             <div class="seg" data-param="layout" data-default="full">
-              <button aria-pressed="true" data-val="full">Voll</button>
-              <button aria-pressed="false" data-val="compact">Kompakt</button>
+              <button aria-pressed="true" data-val="full">Full</button>
+              <button aria-pressed="false" data-val="compact">Compact</button>
             </div>
           </div>
         </div>
       </div>
       <div>
         <div class="dbox urlbox">
-          <div class="ul">// OBS-URL (aktualisiert sich live)</div>
+          <div class="ul">// OBS URL (updates live)</div>
           <div class="urlfield" id="liveUrl"></div>
           <div class="dactions">
-            <button class="btn" id="copyBtn">Kopieren</button>
-            <button class="btn ghost" id="previewBtn">Vorschau</button>
+            <button class="btn" id="copyBtn">Copy</button>
+            <button class="btn ghost" id="previewBtn">Preview</button>
             <button class="btn ghost" id="obsBtn">In OBS</button>
-            <span class="copied" id="copiedMsg">// kopiert</span>
+            <span class="copied" id="copiedMsg">// copied</span>
           </div>
         </div>
         <div class="dbox" style="margin-top:16px">
           <h2>Info</h2>
           <div class="param" style="font-family:'JetBrains Mono';font-size:12.5px;color:var(--dim);line-height:1.7">
-            Größe 460×210 · transparent<br>aktualisiert alle 30s · Token im Pfad
+            Size 460×210 · transparent<br>refreshes every 30s · token in path
           </div>
         </div>
       </div>
@@ -327,20 +355,24 @@
 
   <!-- ════ SETTINGS ════ -->
   <section class="view" id="view-settings" aria-label="Settings">
-    <div class="crumb">Settings</div><h1 class="title">Einstellungen</h1>
+    <div class="crumb">Settings</div><h1 class="title">Settings</h1>
     <div class="simple" style="margin-top:18px">
       <p>// PUBG</p>
-      <div class="field"><label for="s1">In-Game-Name</label><input id="s1" value="PEX_LuCKoR"></div>
-      <div class="field"><label for="s2">Plattform</label><input id="s2" value="steam"></div>
-      <div class="field"><label for="s3">API-Key</label><input id="s3" type="password" value="0000000000000000"></div>
-      <p style="margin-top:22px">// Steam</p>
-      <div class="field"><label for="s4">Steam-ID</label><input id="s4" value="7656119............"></div>
-      <div class="field"><label for="s5">API-Key</label><input id="s5" type="password" value="0000000000000000"></div>
-      <p style="margin-top:22px">// Anzeige</p>
-      <div class="field"><label for="s6">Default-Zeitraum</label>
-        <span class="seg" style="display:inline-flex"><button aria-pressed="true">Session</button><button aria-pressed="false">Woche</button><button aria-pressed="false">All</button></span>
+      <div class="fgrid">
+        <div class="field"><label for="s1">In-game name</label><input id="s1" value="PEX_LuCKoR"></div>
+        <div class="field"><label for="s2">Platform</label><input id="s2" value="steam"></div>
+        <div class="field"><label for="s3">API key</label><input id="s3" type="password" value="0000000000000000"></div>
       </div>
-      <div class="pro">[ Pro / Erweitert ] &mdash; externe DB &amp; eigener FTP-Storage pro Tenant. <b>admin-only, später.</b></div>
+      <p style="margin-top:22px">// Steam</p>
+      <div class="fgrid">
+        <div class="field"><label for="s4">Steam ID</label><input id="s4" value="7656119............"></div>
+        <div class="field"><label for="s5">API key</label><input id="s5" type="password" value="0000000000000000"></div>
+      </div>
+      <p style="margin-top:22px">// Display</p>
+      <div class="field"><label for="s6">Default timeframe</label>
+        <span class="seg" style="display:inline-flex"><button aria-pressed="true">Session</button><button aria-pressed="false">Week</button><button aria-pressed="false">All</button></span>
+      </div>
+      <div class="pro">[ Pro / Advanced ] &mdash; external DB &amp; own FTP storage per tenant. <b>admin-only, later.</b></div>
     </div>
   </section>
 
@@ -348,21 +380,21 @@
   <section class="view" id="view-admin" aria-label="Admin">
     <div class="crumb">Admin</div><h1 class="title">Admin</h1>
     <div class="simple" style="margin-top:18px">
-      <p>// Tenant-Verwaltung (nur du)</p>
+      <p>// Tenant management (you only)</p>
       <div class="kv" style="border-color:var(--line2)"><span class="lbl">LuCKoR</span><span class="v">approved · admin</span></div>
       <div class="kv"><span class="lbl">Hat3</span><span class="v">approved</span></div>
-      <div class="kv"><span class="lbl">new_user_42</span><span class="v x">pending — [freigeben]</span></div>
-      <p style="margin-top:22px">// „Als Tenant ansehen", POI-Editor, …</p>
+      <div class="kv"><span class="lbl">new_user_42</span><span class="v x">pending — [approve]</span></div>
+      <p style="margin-top:22px">// "View as tenant", POI Editor, …</p>
     </div>
   </section>
 
-  <p class="legend">DASHBOARD-MOCKKUP · „Terminal Signal" · klickbar: Top-Nav, URL-Sub-Tabs, Widget-Karte → Detail, Vorschau-Modal · reine Vorschau, nicht die echte App</p>
+  <p class="legend">DASHBOARD MOCKUP · "Terminal Signal" · clickable: top-nav, URL sub-tabs, widget card → detail, preview modal · preview only, not the live app</p>
 </main>
 
-<dialog id="previewModal" aria-label="Widget-Vorschau">
-  <div class="mhead"><h2 id="modalTitle">Vorschau · Career Card</h2><button class="mclose" id="modalClose">schliessen ✕</button></div>
+<dialog id="previewModal" aria-label="Widget preview">
+  <div class="mhead"><h2 id="modalTitle">Preview · Career Card</h2><button class="mclose" id="modalClose">close ✕</button></div>
   <div class="mbody">
-    <div class="fakewidget"><div class="fw-t">Career · Season</div><div class="fw-v" id="fwAccent">12.4 K/D</div><div class="fw-s">312 Matches · 9 Wins · 1878 Kills</div></div>
+    <div class="fakewidget"><div class="fw-t">Career · Season</div><div class="fw-v" id="fwAccent">12.4 K/D</div><div class="fw-s">312 matches · 9 wins · 1878 kills</div></div>
   </div>
 </dialog>
 
@@ -371,56 +403,59 @@
   // ── Daten (echte Source-Namen) ──
   const DATA = {
     overlays:[
-      {cat:"Szene",nm:"Starting Soon",file:"starting-soon.html",meta:"1920×1080 · title, countdown"},
-      {cat:"Szene",nm:"BRB / Pause",file:"brb-pause.html",meta:"1920×1080 · clips, countdown"},
-      {cat:"Szene",nm:"Stream Ending",file:"stream-ending.html",meta:"1920×1080 · title"},
-      {cat:"Szene",nm:"Just Chatting",file:"just-chatting.html",meta:"1920×1080"},
-      {cat:"Szene",nm:"Gameplay / Kamera",file:"gameplay.html",meta:"400×225"},
-      {cat:"Szene",nm:"Stats",file:"stats.html",meta:"1920×1080"},
+      {cat:"Scene",nm:"Starting Soon",file:"starting-soon.html",meta:"1920×1080 · title, countdown"},
+      {cat:"Scene",nm:"BRB / Pause",file:"brb-pause.html",meta:"1920×1080 · clips, countdown"},
+      {cat:"Scene",nm:"Stream Ending",file:"stream-ending.html",meta:"1920×1080 · title"},
+      {cat:"Scene",nm:"Just Chatting",file:"just-chatting.html",meta:"1920×1080"},
+      {cat:"Scene",nm:"Gameplay / Camera",file:"gameplay.html",meta:"400×225"},
+      {cat:"Scene",nm:"Stats",file:"stats.html",meta:"1920×1080"},
     ],
     widgets:[
-      {cat:"PUBG",nm:"Career Card",meta:"K/D, Wins, Kills",detail:true},
-      {cat:"PUBG",nm:"Session Summary",meta:"Matches der Session",detail:true},
-      {cat:"PUBG",nm:"Live Bar",meta:"Live-Leiste",detail:true},
-      {cat:"PUBG",nm:"Streak Counter",meta:"Win-/Kill-Streak",detail:true},
-      {cat:"PUBG",nm:"Top Mates",meta:"beste Mitspieler",detail:true},
-      {cat:"PUBG",nm:"Weapon Stats",meta:"Waffen-Statistik",detail:true},
-      {cat:"PUBG",nm:"Hot Drop",meta:"Landeplatz-Heatmap",detail:true},
-      {cat:"PUBG",nm:"Map Performance",meta:"pro Map",detail:true},
-      {cat:"Steam",nm:"Now Playing",meta:"aktuelles Spiel",detail:true},
-      {cat:"Steam",nm:"Achievement Feed",meta:"letzte Unlocks",detail:true},
+      {cat:"PUBG",nm:"Career Card",meta:"K/D, wins, kills",detail:true},
+      {cat:"PUBG",nm:"Session Summary",meta:"matches this session",detail:true},
+      {cat:"PUBG",nm:"Live Bar",meta:"live bar",detail:true},
+      {cat:"PUBG",nm:"Streak Counter",meta:"win/kill streak",detail:true},
+      {cat:"PUBG",nm:"Top Mates",meta:"top teammates",detail:true},
+      {cat:"PUBG",nm:"Weapon Stats",meta:"weapon statistics",detail:true},
+      {cat:"PUBG",nm:"Hot Drop",meta:"landing heatmap",detail:true},
+      {cat:"PUBG",nm:"Map Performance",meta:"per map",detail:true},
+      {cat:"Steam",nm:"Now Playing",meta:"current game",detail:true},
+      {cat:"Steam",nm:"Achievement Feed",meta:"recent unlocks",detail:true},
     ],
     logos:[
-      {cat:"Deko",nm:"Logo",file:"logo.html",meta:"animiertes Logo"},
-      {cat:"Deko",nm:"Webcam-Frame",file:"webcam-frame.html",meta:"Kamera-Rahmen"},
-      {cat:"Deko",nm:"Welcome",file:"welcome.html",meta:"Begrüßung"},
+      {cat:"Decor",nm:"Logo",file:"logo.html",meta:"animated logo"},
+      {cat:"Decor",nm:"Webcam Frame",file:"webcam-frame.html",meta:"camera frame"},
+      {cat:"Decor",nm:"Welcome",file:"welcome.html",meta:"welcome screen"},
     ],
     alerts:[
-      {cat:"Animation",nm:"Follow",file:"follow.html",meta:"neuer Follower"},
-      {cat:"Animation",nm:"Sub / Resub",file:"sub.html",meta:"Abo"},
-      {cat:"Animation",nm:"Bits / Cheer",file:"bits.html",meta:"Bits"},
-      {cat:"Animation",nm:"Raid",file:"raid.html",meta:"Raid"},
-      {cat:"Latest",nm:"Last Follower",file:"latest-follower.html",meta:"zuletzt gefolgt"},
-      {cat:"Goal",nm:"Sub-Goal",file:"subgoal.html",meta:"Abo-Ziel"},
-      {cat:"Goal",nm:"Tip-Goal",file:"tipgoal.html",meta:"Spenden-Ziel"},
+      {cat:"Animation",nm:"Follow",file:"follow.html",meta:"new follower"},
+      {cat:"Animation",nm:"Sub / Resub",file:"sub.html",meta:"subscription"},
+      {cat:"Animation",nm:"Bits / Cheer",file:"bits.html",meta:"bits"},
+      {cat:"Animation",nm:"Raid",file:"raid.html",meta:"raid"},
+      {cat:"Latest",nm:"Last Follower",file:"latest-follower.html",meta:"most recent follower"},
+      {cat:"Goal",nm:"Sub Goal",file:"subgoal.html",meta:"sub goal"},
+      {cat:"Goal",nm:"Tip Goal",file:"tipgoal.html",meta:"tip goal"},
     ],
-    stinger:[
-      {cat:"Transition",nm:"Kamehameha",file:"kamehameha.html",timing:"TP 1400ms · 2.4s"},
-      {cat:"Transition",nm:"Over 9000",file:"over-9000.html",timing:"TP 1200ms · 2.0s"},
-      {cat:"Transition",nm:"Explosion",file:"explosion.html",timing:"TP 900ms · 1.6s"},
-      {cat:"Transition",nm:"Lens Flare",file:"lens-flare.html",timing:"TP 700ms · 1.4s"},
-      {cat:"Transition",nm:"Engage",file:"engage.html",timing:"TP 1100ms · 1.9s"},
-      {cat:"Transition",nm:"Particle Swirl",file:"particle-swirl.html",timing:"TP 1000ms · 1.8s"},
+    memes:[
+      {cat:"Fullscreen FX",nm:"Kamehameha",file:"kamehameha.html",meta:"fullscreen · sound · 2.4s"},
+      {cat:"Fullscreen FX",nm:"Over 9000",file:"over-9000.html",meta:"fullscreen · sound · 2.0s"},
+      {cat:"Fullscreen FX",nm:"Explosion",file:"explosion.html",meta:"fullscreen · sound · 1.6s"},
+      {cat:"Fullscreen FX",nm:"Nani?!",file:"nani.html",meta:"fullscreen · sound · 1.5s"},
+      {cat:"Fullscreen FX",nm:"GG",file:"gg.html",meta:"fullscreen · sound · 1.8s"},
+      {cat:"Fullscreen FX",nm:"Engage",file:"engage.html",meta:"fullscreen · sound · 1.9s"},
+    ],
+    transition:[
+      {cat:"OBS scene transition",nm:"Stinger",file:"stinger.html",meta:"set as scene transition in OBS",timing:"TP 1200ms · 2.0s"},
     ],
     tools:[
-      {cat:"Tool",nm:"POI-Editor",meta:"Landeplätze pflegen"},
-      {cat:"Tool",nm:"Landing-Spots",meta:"Drop-Analyse"},
-      {cat:"Tool",nm:"Match-Replay",meta:"Match nachspielen"},
-      {cat:"Tool",nm:"Achievement-Browser",meta:"Steam-Erfolge"},
+      {cat:"Tool · ADMIN",nm:"POI Editor",meta:"manage drop spots · admin-only"},
+      {cat:"Tool",nm:"Landing Spots",meta:"drop analysis"},
+      {cat:"Tool",nm:"Match Replay",meta:"replay matches"},
+      {cat:"Tool",nm:"Achievement Browser",meta:"Steam achievements"},
     ],
   };
   const TOK = "tok_a5df…e26e";
-  const sub = {overlays:"overlays",alerts:"alerts",logos:"widgets",stinger:"stingers"};
+  const sub = {overlays:"overlays",alerts:"alerts",logos:"widgets",memes:"stingers",transition:"transitions"};
 
   // ── Karten rendern ──
   function cardHTML(type,it){
@@ -428,16 +463,16 @@
       ? "/s/"+TOK+"/widgets/"+(it.cat==="Steam"?"steam":"pubg")+"/"+(it.nm.toLowerCase().replace(/[^a-z]+/g,"-"))+".html"
       : "/s/"+TOK+"/"+(sub[type]||type)+"/"+(it.file||"");
     const foot = it.detail
-      ? '<span>einrichten →</span><span style="color:var(--faint)">'+(it.meta)+'</span>'
+      ? '<span>einrichten</span><span aria-hidden="true">&rarr;</span>'
       : (it.timing
           ? '<span style="color:var(--amber)">'+it.timing+'</span><button class="copybtn" data-copy="'+path+'">copy</button>'
-          : '<span style="color:var(--faint)">'+(it.meta||'')+'</span><button class="copybtn" data-copy="'+path+'">copy</button>');
+          : '<span></span><button class="copybtn" data-copy="'+path+'">copy</button>');
     return '<button class="card" '+(it.detail?'data-detail="'+it.nm+'" data-cat="'+it.cat+'"':'')+'>'
       +'<span class="corner" aria-hidden="true"></span>'
       +'<span class="top"><span class="cat">'+it.cat+'</span><span class="nm">'+it.nm+'</span><span class="meta">'+(it.meta||it.timing||'')+'</span></span>'
       +'<span class="foot">'+foot+'</span></button>';
   }
-  for(const t of ["overlays","widgets","logos","alerts","stinger","tools"]){
+  for(const t of ["overlays","widgets","logos","alerts","memes","transition","tools"]){
     const g=document.getElementById("grid-"+t); if(g) g.innerHTML=DATA[t].map(it=>cardHTML(t,it)).join("");
   }
 
@@ -476,7 +511,7 @@
   function openDetail(name,cat){
     document.getElementById("dName").textContent=name;
     document.getElementById("dTitle").firstChild.textContent=name;
-    document.getElementById("modalTitle").textContent="Vorschau · "+name;
+    document.getElementById("modalTitle").textContent="Preview · "+name;
     document.getElementById("dCat").textContent=cat||"Widgets";
     document.getElementById("backTo").textContent="Widgets";
     showView("detail"); buildUrl();
@@ -494,7 +529,7 @@
       if(val!=null&&val!==""&&val!==def) ps.push(g.dataset.param+"="+encodeURIComponent(val));
     });
     document.getElementById("liveUrl").textContent= ps.length? url+"?"+ps.join("&") : url;
-    // Akzent live in der Modal-Vorschau
+    // accent color live in the preview modal
     const acc={cyan:"#22e0d6",magenta:"#ff4d8d",amber:"#ffb547",purple:"#9d6bd0"};
     const sel=document.querySelector('[data-param="accent"] [aria-pressed="true"]');
     document.getElementById("fwAccent").style.color = sel?acc[sel.dataset.val]:"#22e0d6";
