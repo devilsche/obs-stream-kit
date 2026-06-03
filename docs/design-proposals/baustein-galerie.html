@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
 <style>
   /* ════════════════════════════════════════════════════════════
      EBENE 0 — Token-Schnittstelle (hier: Terminal-Theme-Werte).
@@ -22,6 +23,8 @@
     --theme-font-mono:"JetBrains Mono",monospace;
     --theme-radius:4px; --theme-border-width:1px;
     --theme-shadow:0 8px 30px rgba(0,0,0,.4);
+    /* expressives Highlight-Symbol — pro Theme anders (Terminal: Blitz) */
+    --theme-hot-icon:"bolt";
   }
 
   /* ════════════════════════════════════════════════════════════
@@ -71,7 +74,10 @@
   /* --- t-hot (Modifier) --- */
   .t-hot .t-value,.t-hot .t-row-value{color:var(--theme-accent)}
   .t-hot .t-value{text-shadow:0 0 18px var(--theme-accent)}
-  .t-hot .t-flame{color:var(--theme-accent)}
+  /* t-hot-mark: semantischer Highlight-Marker; Symbol kommt aus dem Theme-Token */
+  .t-hot-mark{display:inline-grid;place-items:center;vertical-align:-4px}
+  .t-hot-mark::before{font-family:"Material Symbols Outlined";content:var(--theme-hot-icon,"bolt");
+    font-size:20px;color:var(--theme-accent);text-shadow:0 0 14px var(--theme-accent)}
 
   /* Bedien-Bausteine */
   .t-button{font-family:var(--theme-font-display);font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.03em;
@@ -257,16 +263,17 @@
     <div class="demo">
       <div class="demo-render">
         <div class="t-card t-hot" style="min-width:300px">
-          <div class="t-header"><span class="t-flame">&#9650;</span> Longshot <span class="t-range">neuer Rekord</span></div>
+          <div class="t-header"><span class="t-hot-mark" aria-hidden="true"></span> Longshot <span class="t-range">neuer Rekord</span></div>
           <div class="t-stat"><span class="t-value">418 m</span><span class="t-label">weiteste Kill-Distanz</span></div>
         </div>
       </div>
-      <div class="demo-code"><div class="nm">// markup (Modifier auf t-card/t-stat/t-row)</div><pre>&lt;div class="<span class="t">t-card t-hot</span>"&gt;
-  &lt;div class="<span class="t">t-stat</span>"&gt;
-    &lt;span class="<span class="t">t-value</span>"&gt;418 m&lt;/span&gt;
-    &lt;span class="<span class="t">t-label</span>"&gt;weiteste Distanz&lt;/span&gt;
+      <div class="demo-code"><div class="nm">// markup (Modifier + theme-geliefertes Symbol)</div><pre>&lt;div class="<span class="t">t-card t-hot</span>"&gt;
+  &lt;div class="<span class="t">t-header</span>"&gt;
+    &lt;span class="<span class="t">t-hot-mark</span>"&gt;&lt;/span&gt; Longshot …
   &lt;/div&gt;
+  &lt;div class="<span class="t">t-stat</span>"&gt;…418 m…&lt;/div&gt;
 &lt;/div&gt;
+// Symbol via --theme-hot-icon (bolt/flame/star je Theme)
 // "über 400m?" entscheidet das Backend, nicht das Theme</pre></div>
     </div>
   </section>

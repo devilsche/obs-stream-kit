@@ -70,6 +70,22 @@ t-card > t-header(t-title "Career" + t-range "Session")
        + t-stat-grid( t-stat(12.4 / K/D)  t-stat(312 / Matches)  t-stat(9 / Wins) )
 ```
 
+## 4b. Expressive Icons (theme-spezifisch)
+Nicht nur Farben/Fonts variieren pro Theme — auch **expressive Symbole/Marker**.
+Ein festes Icon (z.B. glühende Flamme) passt zu Terminal, aber nicht zu Editorial/Mittelalter.
+- **Funktionale UI-Icons** (copy, settings, Pfeil, t-led): bleiben **konsistent** (Material Symbols,
+  nur gefärbt). Sonst Verwirrung.
+- **Expressive Marker** (Highlight `t-hot`, Achievement-Tiers, Milestones): **theme-geliefert**.
+  Das Widget markiert nur semantisch; Symbol + Effekt kommen aus dem Theme.
+- Mechanik (bleibt im Material-Symbols-System, kein Emoji — siehe [[feedback_no_emojis_use_google_icons]]):
+  ```css
+  .t-hot-mark::before{ font-family:"Material Symbols Outlined"; content:var(--theme-hot-icon); }
+  :root{ --theme-hot-icon:"bolt"; }                 /* Terminal: Blitz + Neon-Glow */
+  :root{ --theme-hot-icon:"local_fire_department"; } /* Entry: Flamme + warmes Glühen */
+  ```
+- Zusätzliche Theme-Tokens dafür: `--theme-hot-icon` (+ ggf. `--theme-hot-glow`/Effekt).
+  Bei Bedarf für wirklich custom Ikonografie: `--theme-hot-icon: url(<svg>)` via mask-image.
+
 ## 5. Theme-File-Schema
 Jedes Theme = **eine CSS-Datei**, die liefert:
 1. die Token-Werte (`:root{ --theme-*: ... }`)
