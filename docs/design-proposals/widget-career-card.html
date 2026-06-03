@@ -93,8 +93,14 @@
   html[data-theme="terminal"] .t-hot-mark i,html[data-theme="midnight"] .t-hot-mark i{width:2px;height:6px;border-radius:1px;animation-duration:1.1s!important}
   /* Aurora: langsames Funkeln */
   html[data-theme="aurora"] .t-hot-mark i{animation-duration:2.6s!important}
-  /* Editorial/Swiss: bewusst KEINE Partikel (dezent) */
-  html[data-theme="editorial"] .t-hot-mark i,html[data-theme="swiss"] .t-hot-mark i{display:none}
+  /* Editorial: bewusst KEINE Partikel (dezent) */
+  html[data-theme="editorial"] .t-hot-mark i{display:none}
+  /* Swiss: fliegende Sternchen, die sich drehen (Stern-Form via clip-path, kein Glow) */
+  @keyframes spark-spin{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(0)}
+    25%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) translate(var(--dx),var(--dy)) scale(1) rotate(240deg)}}
+  html[data-theme="swiss"] .t-hot-mark i{width:9px;height:9px;border-radius:0;background:var(--theme-primary);box-shadow:none;
+    clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
+    animation-name:spark-spin!important;animation-duration:2.3s!important}
   @media (prefers-reduced-motion:reduce){.t-hot-mark i{display:none}}
 
   /* ════ EBENE 2 — der CHARAKTER je Theme (Form, Typo, Deko, Glow) ════ */
