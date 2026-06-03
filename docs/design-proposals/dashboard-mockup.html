@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard-Mockup · Terminal Signal — stream-overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#070a0f; --panel:#0c1118; --panel2:#0f151e; --line:#18222e; --line2:#23303f;
+    --txt:#d6e4ef; --dim:#7488a0; --faint:#4c5d72;
+    --cyan:#22e0d6; --mag:#ff4d8d; --amber:#ffb547; --ok:#22e0a0;
+  }
+  *{box-sizing:border-box}
+  html{color-scheme:dark}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:"Hanken Grotesk",sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased;position:relative;min-height:100vh}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:46px 46px;opacity:.32;mask-image:radial-gradient(circle at 50% 0%,#000,transparent 82%)}
+  a{color:inherit;text-decoration:none}
+  button{font-family:inherit}
+  .skip{position:absolute;left:-999px;background:var(--cyan);color:#070a0f;padding:8px 14px;z-index:100}
+  .skip:focus{left:12px;top:12px}
+  :focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+
+  /* ── Top-Nav ── */
+  .nav{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:24px;padding:13px 24px;
+    background:rgba(7,10,15,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line2)}
+  .brand{display:flex;align-items:center;gap:10px;font-family:"Chakra Petch";font-weight:700;font-size:18px;letter-spacing:.02em;text-transform:uppercase}
+  .brand .b{color:var(--cyan)}
+  .brand .sq{width:10px;height:18px;background:var(--cyan);box-shadow:0 0 12px var(--cyan)}
+  .links{display:flex;gap:2px;margin-left:8px}
+  .links button{padding:8px 14px;color:var(--dim);font-family:"JetBrains Mono";font-size:13px;font-weight:500;
+    background:none;border:1px solid transparent;cursor:pointer;transition:.16s;min-height:36px}
+  .links button:hover{color:var(--txt)}
+  .links button[aria-current="page"]{color:var(--cyan);border-color:var(--line2);background:var(--panel)}
+  .links button[aria-current="page"]::before{content:"\25b8 "}
+  .nright{margin-left:auto;display:flex;align-items:center;gap:12px;font-family:"JetBrains Mono";font-size:12px;color:var(--dim)}
+  .av{width:32px;height:32px;background:var(--panel2);border:1px solid var(--cyan);color:var(--cyan);display:grid;place-items:center;font-family:"Chakra Petch";font-weight:700}
+
+  main{max-width:1240px;margin:0 auto;padding:26px 24px 90px}
+  .view{display:none;animation:rise .35s both}
+  .view.active{display:block}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+  .crumb{font-family:"JetBrains Mono";font-size:12px;color:var(--faint);margin-bottom:14px}
+  .crumb b{color:var(--cyan)}
+  h1.title{font-family:"Chakra Petch";font-weight:700;font-size:clamp(24px,3.4vw,34px);margin:0;text-transform:uppercase;letter-spacing:.01em}
+
+  /* ── Cockpit ── */
+  .hero{display:flex;justify-content:space-between;align-items:center;gap:24px;border:1px solid var(--line2);
+    background:linear-gradient(120deg,var(--panel),transparent);padding:20px 24px;margin-bottom:16px;position:relative}
+  .hero::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--cyan);box-shadow:0 0 14px var(--cyan)}
+  .hero h1{font-family:"Chakra Petch";font-weight:700;font-size:clamp(24px,3.6vw,36px);margin:0;text-transform:uppercase}
+  .hero h1 .c{color:var(--cyan)}
+  .hero .sub{font-family:"JetBrains Mono";font-size:12.5px;color:var(--dim);margin-top:6px}
+  .livebadge{font-family:"JetBrains Mono";font-size:12px;color:var(--ok);border:1px solid var(--line2);padding:9px 14px;display:flex;align-items:center;gap:9px;background:var(--panel);white-space:nowrap}
+  .livebadge .p{width:7px;height:7px;background:var(--ok);box-shadow:0 0 10px var(--ok);animation:blink 1.4s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+  .cgrid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+  .ccard{border:1px solid var(--line2);background:var(--panel);position:relative}
+  .ccard .corner{position:absolute;right:0;top:0;width:14px;height:14px;border-top:2px solid var(--cyan);border-right:2px solid var(--cyan)}
+  .ccard.m .corner{border-color:var(--mag)}.ccard.a .corner{border-color:var(--amber)}
+  .ccard h2{font-family:"Chakra Petch";font-weight:600;font-size:14px;margin:0;text-transform:uppercase;letter-spacing:.03em;padding:14px 18px;border-bottom:1px solid var(--line);color:var(--dim)}
+  .ccard .pad{padding:6px 18px 14px}
+  .kv{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-family:"JetBrains Mono";font-size:13px}
+  .kv:last-child{border-bottom:0}
+  .kv .lbl{color:var(--dim);display:flex;align-items:center;gap:9px}
+  .led{width:7px;height:7px;background:var(--ok);box-shadow:0 0 8px var(--ok);flex:none}
+  .led.x{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+  .kv .v{color:var(--ok)}.kv .v.x{color:var(--amber)}
+  .count{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--line);font-family:"JetBrains Mono";font-size:13px;color:var(--dim);cursor:pointer}
+  .count:last-child{border-bottom:0}
+  .count:hover{color:var(--cyan)}
+  .count .n{font-family:"Chakra Petch";font-weight:700;font-size:22px;color:var(--txt)}
+  .count:hover .n{color:var(--cyan)}
+
+  /* ── Sub-Tabs ── */
+  .tabs{display:flex;gap:0;border:1px solid var(--line2);background:var(--panel);margin:6px 0 18px;overflow:hidden}
+  .tabs button{flex:0 0 auto;padding:13px 22px;background:none;border:0;border-right:1px solid var(--line);color:var(--dim);
+    font-family:"Chakra Petch";font-weight:600;font-size:14px;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;transition:.14s;min-height:46px}
+  .tabs button:hover{color:var(--txt);background:var(--panel2)}
+  .tabs button[aria-selected="true"]{color:var(--cyan);background:var(--panel2);box-shadow:inset 0 -2px 0 var(--cyan)}
+  .tabs .cnt{font-family:"JetBrains Mono";font-size:11px;color:var(--faint);margin-left:7px}
+
+  .tabpanel{display:none}.tabpanel.active{display:block}
+
+  /* ── Karten-Grid ── */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+  .card{border:1px solid var(--line2);background:var(--panel);text-align:left;cursor:pointer;transition:.14s;
+    display:flex;flex-direction:column;position:relative;padding:0;color:inherit;min-height:118px}
+  .card:hover{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan),0 8px 30px rgba(34,224,214,.1)}
+  .card .corner{position:absolute;right:0;top:0;width:12px;height:12px;border-top:2px solid var(--line2);border-right:2px solid var(--line2);transition:.14s}
+  .card:hover .corner{border-color:var(--cyan)}
+  .card .top{padding:14px 16px 10px;flex:1}
+  .card .cat{font-family:"JetBrains Mono";font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .card .nm{font-family:"Chakra Petch";font-weight:600;font-size:16px;margin-top:6px}
+  .card .meta{font-family:"JetBrains Mono";font-size:11px;color:var(--dim);margin-top:5px}
+  .card .foot{border-top:1px solid var(--line);padding:9px 16px;display:flex;align-items:center;justify-content:space-between;font-family:"JetBrains Mono";font-size:11px;color:var(--cyan)}
+  .card .foot .copybtn{background:none;border:0;color:var(--dim);cursor:pointer;font-family:"JetBrains Mono";font-size:11px;text-transform:uppercase;padding:4px 0}
+  .card .foot .copybtn:hover{color:var(--cyan)}
+
+  /* ── Detailseite ── */
+  .back{display:inline-flex;align-items:center;gap:8px;background:none;border:1px solid var(--line2);color:var(--dim);
+    font-family:"JetBrains Mono";font-size:12px;padding:8px 14px;cursor:pointer;margin-bottom:16px;min-height:36px;text-transform:uppercase}
+  .back:hover{color:var(--cyan);border-color:var(--cyan)}
+  .detail{display:grid;grid-template-columns:1.3fr .9fr;gap:16px;align-items:start}
+  .dbox{border:1px solid var(--line2);background:var(--panel)}
+  .dbox h2{font-family:"Chakra Petch";font-weight:600;font-size:15px;margin:0;text-transform:uppercase;letter-spacing:.03em;
+    padding:15px 20px;border-bottom:1px solid var(--line);background:var(--panel2);display:flex;justify-content:space-between;align-items:center}
+  .dbox h2 .tag{font-family:"JetBrains Mono";font-size:11px;color:var(--cyan)}
+  .param{padding:16px 20px;border-bottom:1px solid var(--line)}
+  .param:last-child{border-bottom:0}
+  .param .plabel{font-family:"JetBrains Mono";font-size:12px;color:var(--dim);margin-bottom:9px;display:flex;justify-content:space-between}
+  .param .plabel .def{color:var(--faint)}
+  .seg{display:inline-flex;border:1px solid var(--line2);background:var(--bg)}
+  .seg button{padding:9px 16px;background:none;border:0;border-right:1px solid var(--line2);color:var(--dim);
+    font-family:"JetBrains Mono";font-size:12px;cursor:pointer;transition:.12s;min-height:38px}
+  .seg button:last-child{border-right:0}
+  .seg button:hover{color:var(--txt)}
+  .seg button[aria-pressed="true"]{background:var(--cyan);color:#070a0f;font-weight:700}
+  .num{width:120px;background:var(--bg);border:1px solid var(--line2);color:var(--txt);font-family:"JetBrains Mono";font-size:13px;padding:9px 12px;min-height:38px}
+  .swatches{display:inline-flex;gap:8px}
+  .sw{width:32px;height:32px;border:2px solid var(--line2);cursor:pointer;transition:.12s;background:none}
+  .sw[aria-pressed="true"]{border-color:#fff;box-shadow:0 0 0 2px var(--bg),0 0 0 3px #fff}
+
+  .urlbox{padding:18px 20px}
+  .urlbox .ul{font-family:"JetBrains Mono";font-size:12px;color:var(--faint);margin-bottom:8px}
+  .urlfield{background:var(--bg);border:1px solid var(--line2);padding:13px 15px;font-family:"JetBrains Mono";font-size:12.5px;
+    color:var(--cyan);word-break:break-all;line-height:1.6;border-left:2px solid var(--cyan)}
+  .dactions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--cyan);background:rgba(34,224,214,.08);
+    color:var(--cyan);font-family:"Chakra Petch";font-weight:700;font-size:13px;padding:11px 18px;cursor:pointer;text-transform:uppercase;letter-spacing:.03em;transition:.14s;min-height:42px}
+  .btn:hover{background:var(--cyan);color:#070a0f;box-shadow:0 0 22px rgba(34,224,214,.4)}
+  .btn.ghost{border-color:var(--line2);background:none;color:var(--dim)}
+  .btn.ghost:hover{color:var(--txt);border-color:var(--txt);box-shadow:none;background:none}
+  .copied{font-family:"JetBrains Mono";font-size:12px;color:var(--ok);margin-left:auto;align-self:center;opacity:0;transition:.2s}
+  .copied.show{opacity:1}
+
+  .simple{border:1px solid var(--line2);background:var(--panel);padding:22px 24px}
+  .simple p{color:var(--dim);font-family:"JetBrains Mono";font-size:13px}
+  .simple .field{margin:14px 0}
+  .simple label{display:block;font-family:"JetBrains Mono";font-size:12px;color:var(--dim);margin-bottom:7px}
+  .simple input{width:100%;max-width:380px;background:var(--bg);border:1px solid var(--line2);color:var(--txt);font-family:"JetBrains Mono";font-size:13px;padding:10px 13px;min-height:40px}
+  .pro{margin-top:18px;border:1px dashed var(--line2);padding:16px 20px;color:var(--faint);font-family:"JetBrains Mono";font-size:12px}
+  .pro b{color:var(--amber)}
+
+  /* ── Modal (native dialog) ── */
+  dialog{border:1px solid var(--cyan);background:var(--panel);color:var(--txt);padding:0;max-width:min(860px,92vw);width:100%;box-shadow:0 0 60px rgba(34,224,214,.25)}
+  dialog::backdrop{background:rgba(3,5,9,.78);backdrop-filter:blur(3px)}
+  .mhead{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line2);background:var(--panel2)}
+  .mhead h2{font-family:"Chakra Petch";font-weight:600;font-size:15px;margin:0;text-transform:uppercase}
+  .mclose{background:none;border:1px solid var(--line2);color:var(--dim);cursor:pointer;font-family:"JetBrains Mono";padding:6px 11px;min-height:34px}
+  .mclose:hover{color:var(--mag);border-color:var(--mag)}
+  .mbody{padding:18px;display:grid;place-items:center;min-height:300px;
+    background-image:linear-gradient(45deg,#0d1117 25%,transparent 25%),linear-gradient(-45deg,#0d1117 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#0d1117 75%),linear-gradient(-45deg,transparent 75%,#0d1117 75%);
+    background-size:22px 22px;background-position:0 0,0 11px,11px -11px,-11px 0}
+  .fakewidget{border:1px solid var(--cyan);background:rgba(7,10,15,.85);padding:22px 28px;text-align:center;box-shadow:0 0 30px rgba(34,224,214,.2)}
+  .fakewidget .fw-t{font-family:"Chakra Petch";font-weight:700;font-size:13px;color:var(--cyan);text-transform:uppercase;letter-spacing:.08em}
+  .fakewidget .fw-v{font-family:"Chakra Petch";font-weight:700;font-size:40px;margin-top:6px}
+  .fakewidget .fw-s{font-family:"JetBrains Mono";font-size:12px;color:var(--dim);margin-top:6px}
+
+  .legend{margin-top:36px;text-align:center;font-family:"JetBrains Mono";font-size:12px;color:var(--faint)}
+  @media (max-width:820px){.ccard{grid-column:span 12!important}.detail{grid-template-columns:1fr}.links{display:none}.tabs{flex-wrap:wrap}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Zum Inhalt springen</a>
+
+<header class="nav">
+  <div class="brand"><span class="sq" aria-hidden="true"></span>STREAM<span class="b">_</span>OVERLAY</div>
+  <nav class="links" aria-label="Hauptnavigation">
+    <button data-view="dash" aria-current="page">dashboard</button>
+    <button data-view="urls">urls</button>
+    <button data-view="tools">tools</button>
+    <button data-view="settings">settings</button>
+    <button data-view="admin">admin</button>
+  </nav>
+  <div class="nright"><span>tenant=luckor</span><span class="av" aria-hidden="true">L</span></div>
+</header>
+
+<main id="main" tabindex="-1">
+
+  <!-- ════ DASHBOARD / COCKPIT ════ -->
+  <section class="view active" id="view-dash" aria-label="Dashboard">
+    <div class="hero">
+      <div><h1>SYS · <span class="c">LuCKoR</span></h1><div class="sub">tenant=luckor // status=online // uplink=stable</div></div>
+      <span class="livebadge"><span class="p" aria-hidden="true"></span>POLLER_LIVE · 2m · 7 matches today</span>
+    </div>
+    <div class="cgrid">
+      <article class="ccard" style="grid-column:span 4"><span class="corner" aria-hidden="true"></span>
+        <h2>API-Keys</h2>
+        <div class="pad">
+          <div class="kv"><span class="lbl"><span class="led" aria-hidden="true"></span>PUBG</span><span class="v">hinterlegt</span></div>
+          <div class="kv"><span class="lbl"><span class="led" aria-hidden="true"></span>Steam</span><span class="v">hinterlegt</span></div>
+          <div class="kv"><span class="lbl"><span class="led" aria-hidden="true"></span>Twitch</span><span class="v">hinterlegt</span></div>
+          <div class="kv"><span class="lbl"><span class="led x" aria-hidden="true"></span>FTP</span><span class="v x">fehlt</span></div>
+        </div>
+      </article>
+      <article class="ccard m" style="grid-column:span 4"><span class="corner" aria-hidden="true"></span>
+        <h2>Poller</h2>
+        <div class="pad">
+          <div class="kv"><span class="lbl">Status</span><span class="v">running</span></div>
+          <div class="kv"><span class="lbl">Letzter Sync</span><span class="v" style="color:var(--txt)">vor 2 min</span></div>
+          <div class="kv"><span class="lbl">Matches heute</span><span class="v" style="color:var(--txt)">7</span></div>
+          <div class="kv"><span class="lbl">Letztes Spiel</span><span class="v" style="color:var(--mag)">#1 · 9K</span></div>
+        </div>
+      </article>
+      <article class="ccard a" style="grid-column:span 4"><span class="corner" aria-hidden="true"></span>
+        <h2>Browser-Sources</h2>
+        <div class="pad">
+          <div class="count" data-goto="widgets"><span>Widgets</span><span class="n">24</span></div>
+          <div class="count" data-goto="overlays"><span>Overlays</span><span class="n">6</span></div>
+          <div class="count" data-goto="alerts"><span>Alerts</span><span class="n">9</span></div>
+          <div class="count" data-goto="logos"><span>Logos / Deko</span><span class="n">5</span></div>
+          <div class="count" data-goto="stinger"><span>Stinger</span><span class="n">26</span></div>
+        </div>
+      </article>
+    </div>
+    <p class="legend">Tipp: Klick auf eine Source-Zahl springt direkt in den passenden URL-Bereich.</p>
+  </section>
+
+  <!-- ════ URLS ════ -->
+  <section class="view" id="view-urls" aria-label="OBS URLs">
+    <div class="crumb">URLs</div>
+    <h1 class="title">OBS Browser-Sources</h1>
+    <div class="tabs" role="tablist" aria-label="Source-Typen">
+      <button role="tab" aria-selected="true" data-tab="overlays">Overlays<span class="cnt">6</span></button>
+      <button role="tab" aria-selected="false" data-tab="widgets">Widgets<span class="cnt">24</span></button>
+      <button role="tab" aria-selected="false" data-tab="logos">Logos<span class="cnt">5</span></button>
+      <button role="tab" aria-selected="false" data-tab="alerts">Alerts<span class="cnt">9</span></button>
+      <button role="tab" aria-selected="false" data-tab="stinger">Stinger<span class="cnt">26</span></button>
+    </div>
+
+    <div class="tabpanel active" id="tab-overlays" role="tabpanel">
+      <div class="grid" id="grid-overlays"></div>
+    </div>
+    <div class="tabpanel" id="tab-widgets" role="tabpanel">
+      <div class="grid" id="grid-widgets"></div>
+    </div>
+    <div class="tabpanel" id="tab-logos" role="tabpanel">
+      <div class="grid" id="grid-logos"></div>
+    </div>
+    <div class="tabpanel" id="tab-alerts" role="tabpanel">
+      <div class="grid" id="grid-alerts"></div>
+    </div>
+    <div class="tabpanel" id="tab-stinger" role="tabpanel">
+      <div class="grid" id="grid-stinger"></div>
+    </div>
+  </section>
+
+  <!-- ════ WIDGET-DETAIL ════ -->
+  <section class="view" id="view-detail" aria-label="Widget-Detail">
+    <button class="back" id="backBtn">&larr; zurueck zu <span id="backTo">Widgets</span></button>
+    <div class="crumb">URLs / <span id="dCat">Widgets</span> / <b id="dName">Career Card</b></div>
+    <div class="detail">
+      <div>
+        <div class="dbox">
+          <h2 id="dTitle">Career Card<span class="tag">konfigurieren</span></h2>
+          <div class="param">
+            <div class="plabel"><span>Zeitraum</span><span class="def">default: Session</span></div>
+            <div class="seg" data-param="range" data-default="session">
+              <button aria-pressed="true" data-val="session">Session</button>
+              <button aria-pressed="false" data-val="week">Woche</button>
+              <button aria-pressed="false" data-val="all">All</button>
+            </div>
+          </div>
+          <div class="param">
+            <div class="plabel"><span>Theme</span><span class="def">default: Dark</span></div>
+            <div class="seg" data-param="theme" data-default="dark">
+              <button aria-pressed="true" data-val="dark">Dark</button>
+              <button aria-pressed="false" data-val="light">Light</button>
+            </div>
+          </div>
+          <div class="param">
+            <div class="plabel"><span>Min. Kills</span><span class="def">default: 0</span></div>
+            <input class="num" type="number" min="0" value="0" data-param="minkills" data-default="0" aria-label="Minimale Kills">
+          </div>
+          <div class="param">
+            <div class="plabel"><span>Akzentfarbe</span><span class="def">default: Cyan</span></div>
+            <div class="swatches" data-param="accent" data-default="cyan" role="group" aria-label="Akzentfarbe">
+              <button class="sw" style="background:#22e0d6" aria-pressed="true" data-val="cyan" aria-label="Cyan"></button>
+              <button class="sw" style="background:#ff4d8d" aria-pressed="false" data-val="magenta" aria-label="Magenta"></button>
+              <button class="sw" style="background:#ffb547" aria-pressed="false" data-val="amber" aria-label="Amber"></button>
+              <button class="sw" style="background:#9d6bd0" aria-pressed="false" data-val="purple" aria-label="Purple"></button>
+            </div>
+          </div>
+          <div class="param">
+            <div class="plabel"><span>Layout</span><span class="def">default: Voll</span></div>
+            <div class="seg" data-param="layout" data-default="full">
+              <button aria-pressed="true" data-val="full">Voll</button>
+              <button aria-pressed="false" data-val="compact">Kompakt</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="dbox urlbox">
+          <div class="ul">// OBS-URL (aktualisiert sich live)</div>
+          <div class="urlfield" id="liveUrl"></div>
+          <div class="dactions">
+            <button class="btn" id="copyBtn">Kopieren</button>
+            <button class="btn ghost" id="previewBtn">Vorschau</button>
+            <button class="btn ghost" id="obsBtn">In OBS</button>
+            <span class="copied" id="copiedMsg">// kopiert</span>
+          </div>
+        </div>
+        <div class="dbox" style="margin-top:16px">
+          <h2>Info</h2>
+          <div class="param" style="font-family:'JetBrains Mono';font-size:12.5px;color:var(--dim);line-height:1.7">
+            Größe 460×210 · transparent<br>aktualisiert alle 30s · Token im Pfad
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ TOOLS ════ -->
+  <section class="view" id="view-tools" aria-label="Tools">
+    <div class="crumb">Tools</div><h1 class="title">Tools</h1>
+    <div class="grid" style="margin-top:18px" id="grid-tools"></div>
+  </section>
+
+  <!-- ════ SETTINGS ════ -->
+  <section class="view" id="view-settings" aria-label="Settings">
+    <div class="crumb">Settings</div><h1 class="title">Einstellungen</h1>
+    <div class="simple" style="margin-top:18px">
+      <p>// PUBG</p>
+      <div class="field"><label for="s1">In-Game-Name</label><input id="s1" value="PEX_LuCKoR"></div>
+      <div class="field"><label for="s2">Plattform</label><input id="s2" value="steam"></div>
+      <div class="field"><label for="s3">API-Key</label><input id="s3" type="password" value="0000000000000000"></div>
+      <p style="margin-top:22px">// Steam</p>
+      <div class="field"><label for="s4">Steam-ID</label><input id="s4" value="7656119............"></div>
+      <div class="field"><label for="s5">API-Key</label><input id="s5" type="password" value="0000000000000000"></div>
+      <p style="margin-top:22px">// Anzeige</p>
+      <div class="field"><label for="s6">Default-Zeitraum</label>
+        <span class="seg" style="display:inline-flex"><button aria-pressed="true">Session</button><button aria-pressed="false">Woche</button><button aria-pressed="false">All</button></span>
+      </div>
+      <div class="pro">[ Pro / Erweitert ] &mdash; externe DB &amp; eigener FTP-Storage pro Tenant. <b>admin-only, später.</b></div>
+    </div>
+  </section>
+
+  <!-- ════ ADMIN ════ -->
+  <section class="view" id="view-admin" aria-label="Admin">
+    <div class="crumb">Admin</div><h1 class="title">Admin</h1>
+    <div class="simple" style="margin-top:18px">
+      <p>// Tenant-Verwaltung (nur du)</p>
+      <div class="kv" style="border-color:var(--line2)"><span class="lbl">LuCKoR</span><span class="v">approved · admin</span></div>
+      <div class="kv"><span class="lbl">Hat3</span><span class="v">approved</span></div>
+      <div class="kv"><span class="lbl">new_user_42</span><span class="v x">pending — [freigeben]</span></div>
+      <p style="margin-top:22px">// „Als Tenant ansehen", POI-Editor, …</p>
+    </div>
+  </section>
+
+  <p class="legend">DASHBOARD-MOCKKUP · „Terminal Signal" · klickbar: Top-Nav, URL-Sub-Tabs, Widget-Karte → Detail, Vorschau-Modal · reine Vorschau, nicht die echte App</p>
+</main>
+
+<dialog id="previewModal" aria-label="Widget-Vorschau">
+  <div class="mhead"><h2 id="modalTitle">Vorschau · Career Card</h2><button class="mclose" id="modalClose">schliessen ✕</button></div>
+  <div class="mbody">
+    <div class="fakewidget"><div class="fw-t">Career · Season</div><div class="fw-v" id="fwAccent">12.4 K/D</div><div class="fw-s">312 Matches · 9 Wins · 1878 Kills</div></div>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  // ── Daten (echte Source-Namen) ──
+  const DATA = {
+    overlays:[
+      {cat:"Szene",nm:"Starting Soon",file:"starting-soon.html",meta:"1920×1080 · title, countdown"},
+      {cat:"Szene",nm:"BRB / Pause",file:"brb-pause.html",meta:"1920×1080 · clips, countdown"},
+      {cat:"Szene",nm:"Stream Ending",file:"stream-ending.html",meta:"1920×1080 · title"},
+      {cat:"Szene",nm:"Just Chatting",file:"just-chatting.html",meta:"1920×1080"},
+      {cat:"Szene",nm:"Gameplay / Kamera",file:"gameplay.html",meta:"400×225"},
+      {cat:"Szene",nm:"Stats",file:"stats.html",meta:"1920×1080"},
+    ],
+    widgets:[
+      {cat:"PUBG",nm:"Career Card",meta:"K/D, Wins, Kills",detail:true},
+      {cat:"PUBG",nm:"Session Summary",meta:"Matches der Session",detail:true},
+      {cat:"PUBG",nm:"Live Bar",meta:"Live-Leiste",detail:true},
+      {cat:"PUBG",nm:"Streak Counter",meta:"Win-/Kill-Streak",detail:true},
+      {cat:"PUBG",nm:"Top Mates",meta:"beste Mitspieler",detail:true},
+      {cat:"PUBG",nm:"Weapon Stats",meta:"Waffen-Statistik",detail:true},
+      {cat:"PUBG",nm:"Hot Drop",meta:"Landeplatz-Heatmap",detail:true},
+      {cat:"PUBG",nm:"Map Performance",meta:"pro Map",detail:true},
+      {cat:"Steam",nm:"Now Playing",meta:"aktuelles Spiel",detail:true},
+      {cat:"Steam",nm:"Achievement Feed",meta:"letzte Unlocks",detail:true},
+    ],
+    logos:[
+      {cat:"Deko",nm:"Logo",file:"logo.html",meta:"animiertes Logo"},
+      {cat:"Deko",nm:"Webcam-Frame",file:"webcam-frame.html",meta:"Kamera-Rahmen"},
+      {cat:"Deko",nm:"Welcome",file:"welcome.html",meta:"Begrüßung"},
+    ],
+    alerts:[
+      {cat:"Animation",nm:"Follow",file:"follow.html",meta:"neuer Follower"},
+      {cat:"Animation",nm:"Sub / Resub",file:"sub.html",meta:"Abo"},
+      {cat:"Animation",nm:"Bits / Cheer",file:"bits.html",meta:"Bits"},
+      {cat:"Animation",nm:"Raid",file:"raid.html",meta:"Raid"},
+      {cat:"Latest",nm:"Last Follower",file:"latest-follower.html",meta:"zuletzt gefolgt"},
+      {cat:"Goal",nm:"Sub-Goal",file:"subgoal.html",meta:"Abo-Ziel"},
+      {cat:"Goal",nm:"Tip-Goal",file:"tipgoal.html",meta:"Spenden-Ziel"},
+    ],
+    stinger:[
+      {cat:"Transition",nm:"Kamehameha",file:"kamehameha.html",timing:"TP 1400ms · 2.4s"},
+      {cat:"Transition",nm:"Over 9000",file:"over-9000.html",timing:"TP 1200ms · 2.0s"},
+      {cat:"Transition",nm:"Explosion",file:"explosion.html",timing:"TP 900ms · 1.6s"},
+      {cat:"Transition",nm:"Lens Flare",file:"lens-flare.html",timing:"TP 700ms · 1.4s"},
+      {cat:"Transition",nm:"Engage",file:"engage.html",timing:"TP 1100ms · 1.9s"},
+      {cat:"Transition",nm:"Particle Swirl",file:"particle-swirl.html",timing:"TP 1000ms · 1.8s"},
+    ],
+    tools:[
+      {cat:"Tool",nm:"POI-Editor",meta:"Landeplätze pflegen"},
+      {cat:"Tool",nm:"Landing-Spots",meta:"Drop-Analyse"},
+      {cat:"Tool",nm:"Match-Replay",meta:"Match nachspielen"},
+      {cat:"Tool",nm:"Achievement-Browser",meta:"Steam-Erfolge"},
+    ],
+  };
+  const TOK = "tok_a5df…e26e";
+  const sub = {overlays:"overlays",alerts:"alerts",logos:"widgets",stinger:"stingers"};
+
+  // ── Karten rendern ──
+  function cardHTML(type,it){
+    const path = type==="widgets"
+      ? "/s/"+TOK+"/widgets/"+(it.cat==="Steam"?"steam":"pubg")+"/"+(it.nm.toLowerCase().replace(/[^a-z]+/g,"-"))+".html"
+      : "/s/"+TOK+"/"+(sub[type]||type)+"/"+(it.file||"");
+    const foot = it.detail
+      ? '<span>einrichten →</span><span style="color:var(--faint)">'+(it.meta)+'</span>'
+      : (it.timing
+          ? '<span style="color:var(--amber)">'+it.timing+'</span><button class="copybtn" data-copy="'+path+'">copy</button>'
+          : '<span style="color:var(--faint)">'+(it.meta||'')+'</span><button class="copybtn" data-copy="'+path+'">copy</button>');
+    return '<button class="card" '+(it.detail?'data-detail="'+it.nm+'" data-cat="'+it.cat+'"':'')+'>'
+      +'<span class="corner" aria-hidden="true"></span>'
+      +'<span class="top"><span class="cat">'+it.cat+'</span><span class="nm">'+it.nm+'</span><span class="meta">'+(it.meta||it.timing||'')+'</span></span>'
+      +'<span class="foot">'+foot+'</span></button>';
+  }
+  for(const t of ["overlays","widgets","logos","alerts","stinger","tools"]){
+    const g=document.getElementById("grid-"+t); if(g) g.innerHTML=DATA[t].map(it=>cardHTML(t,it)).join("");
+  }
+
+  // ── View-Switching ──
+  const views={dash:"view-dash",urls:"view-urls",tools:"view-tools",settings:"view-settings",admin:"view-admin",detail:"view-detail"};
+  function showView(v){
+    for(const k in views) document.getElementById(views[k]).classList.toggle("active",k===v);
+    document.querySelectorAll(".links button").forEach(b=>{
+      const on=(b.dataset.view===v)||(v==="detail"&&b.dataset.view==="urls");
+      if(on)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current");
+    });
+    document.getElementById("main").focus();
+    window.scrollTo(0,0);
+  }
+  document.querySelectorAll(".links button").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
+
+  // ── Sub-Tabs ──
+  function showTab(t){
+    document.querySelectorAll(".tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===t)));
+    document.querySelectorAll(".tabpanel").forEach(p=>p.classList.toggle("active",p.id==="tab-"+t));
+  }
+  document.querySelectorAll(".tabs button").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
+
+  // ── Cockpit-Counts → URL-Tab ──
+  document.querySelectorAll(".count").forEach(c=>c.addEventListener("click",()=>{showView("urls");showTab(c.dataset.goto);}));
+
+  // ── Karte → Detail / Copy ──
+  document.addEventListener("click",e=>{
+    const cp=e.target.closest(".copybtn");
+    if(cp){e.stopPropagation();flashCopy(cp,"copy ✓");return;}
+    const card=e.target.closest(".card[data-detail]");
+    if(card){openDetail(card.dataset.detail,card.dataset.cat);}
+  });
+
+  // ── Detailseite ──
+  function openDetail(name,cat){
+    document.getElementById("dName").textContent=name;
+    document.getElementById("dTitle").firstChild.textContent=name;
+    document.getElementById("modalTitle").textContent="Vorschau · "+name;
+    document.getElementById("dCat").textContent=cat||"Widgets";
+    document.getElementById("backTo").textContent="Widgets";
+    showView("detail"); buildUrl();
+  }
+  document.getElementById("backBtn").addEventListener("click",()=>{showView("urls");showTab("widgets");});
+
+  function buildUrl(){
+    const name=document.getElementById("dName").textContent.toLowerCase().replace(/[^a-z]+/g,"-");
+    let url="https://stream-overlay.com/s/"+TOK+"/widgets/pubg/"+name+".html";
+    const ps=[];
+    document.querySelectorAll("#view-detail [data-param]").forEach(g=>{
+      const def=g.dataset.default; let val=null;
+      if(g.classList.contains("num")) val=g.value;
+      else{const b=g.querySelector('[aria-pressed="true"]'); if(b)val=b.dataset.val;}
+      if(val!=null&&val!==""&&val!==def) ps.push(g.dataset.param+"="+encodeURIComponent(val));
+    });
+    document.getElementById("liveUrl").textContent= ps.length? url+"?"+ps.join("&") : url;
+    // Akzent live in der Modal-Vorschau
+    const acc={cyan:"#22e0d6",magenta:"#ff4d8d",amber:"#ffb547",purple:"#9d6bd0"};
+    const sel=document.querySelector('[data-param="accent"] [aria-pressed="true"]');
+    document.getElementById("fwAccent").style.color = sel?acc[sel.dataset.val]:"#22e0d6";
+  }
+  document.querySelectorAll("#view-detail .seg, #view-detail .swatches").forEach(g=>{
+    g.addEventListener("click",e=>{const b=e.target.closest("button[data-val]");if(!b)return;
+      g.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed","false"));
+      b.setAttribute("aria-pressed","true"); buildUrl();});
+  });
+  document.querySelector("#view-detail .num").addEventListener("input",buildUrl);
+
+  // ── Copy ──
+  function flashCopy(btn,txt){const o=btn.textContent;btn.textContent=txt;setTimeout(()=>btn.textContent=o,1100);}
+  document.getElementById("copyBtn").addEventListener("click",()=>{
+    const t=document.getElementById("liveUrl").textContent;
+    if(navigator.clipboard) navigator.clipboard.writeText(t).catch(()=>{});
+    const m=document.getElementById("copiedMsg");m.classList.add("show");setTimeout(()=>m.classList.remove("show"),1300);
+  });
+
+  // ── Modal ──
+  const modal=document.getElementById("previewModal");
+  document.getElementById("previewBtn").addEventListener("click",()=>modal.showModal());
+  document.getElementById("obsBtn").addEventListener("click",()=>modal.showModal());
+  document.getElementById("modalClose").addEventListener("click",()=>modal.close());
+  modal.addEventListener("click",e=>{const r=modal.querySelector(".mhead").getBoundingClientRect();
+    if(e.target===modal) modal.close();}); // backdrop
+})();
+</script>
+</body>
+</html>
