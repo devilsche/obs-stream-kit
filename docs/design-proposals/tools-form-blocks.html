@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="de" data-theme="terminal">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tool-Formulare aus Bausteinen — 6 Themes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@600;700;800&family=Onest:wght@400;500;600&family=Archivo:wght@500;600;800;900&family=Space+Mono:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Fraunces:opsz,ital,wght@9..144,0,500;9..144,0,600;9..144,1,500;9..144,1,600&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+<style>
+  /* ════ EBENE 0 — Token je Theme (inkl. Form: radius, border-width, danger) ════ */
+  :root, html[data-theme="terminal"]{
+    --theme-primary:#22e0d6; --theme-accent:#ff4d8d; --theme-accent-2:#ffb547;
+    --theme-bg:#070a0f; --theme-surface:#0c1118; --theme-surface-2:#0f151e; --theme-border:#23303f;
+    --theme-text:#d6e4ef; --theme-text-dim:#7488a0; --theme-text-faint:#4c5d72; --theme-ok:#22e0a0; --theme-danger:#ff4d6d; --theme-on-primary:#070a0f;
+    --theme-font-display:"Chakra Petch",sans-serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:4px; --theme-border-width:1px; --theme-hot-icon:"bolt";
+  }
+  html[data-theme="aurora"]{
+    --theme-primary:#9d6bd0; --theme-accent:#f2b705; --theme-accent-2:#46d6ff;
+    --theme-bg:#0c0916; --theme-surface:rgba(34,22,54,.6); --theme-surface-2:rgba(45,29,68,.5); --theme-border:rgba(157,107,208,.32);
+    --theme-text:#efe9f6; --theme-text-dim:#a99cc0; --theme-text-faint:#6f6388; --theme-ok:#4be39a; --theme-danger:#ff6b81; --theme-on-primary:#fff;
+    --theme-font-display:"Syne",sans-serif; --theme-font-body:"Onest",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:18px; --theme-border-width:1px; --theme-hot-icon:"auto_awesome";
+  }
+  html[data-theme="midnight"]{
+    --theme-primary:#b8ff3c; --theme-accent:#3ce08a; --theme-accent-2:#7fae2b;
+    --theme-bg:#0a0e14; --theme-surface:#121927; --theme-surface-2:#16202f; --theme-border:#1f2b3d;
+    --theme-text:#e7eef7; --theme-text-dim:#8294ab; --theme-text-faint:#566377; --theme-ok:#3ce08a; --theme-danger:#ff5c5c; --theme-on-primary:#0a0e14;
+    --theme-font-display:"Bricolage Grotesque",sans-serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:14px; --theme-border-width:1px; --theme-hot-icon:"bolt";
+  }
+  html[data-theme="editorial"]{
+    --theme-primary:#d4561f; --theme-accent:#d4561f; --theme-accent-2:#7a8450;
+    --theme-bg:#f5f1e8; --theme-surface:#fbf9f3; --theme-surface-2:#efe9dc; --theme-border:#d6cdba;
+    --theme-text:#1c1a16; --theme-text-dim:#6b6457; --theme-text-faint:#a8a092; --theme-ok:#5a7d3a; --theme-danger:#c0392b; --theme-on-primary:#fff;
+    --theme-font-display:"Fraunces",serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:3px; --theme-border-width:1.5px; --theme-hot-icon:"verified";
+  }
+  html[data-theme="entry"]{
+    --theme-primary:#9d6bd0; --theme-accent:#f2b705; --theme-accent-2:#c9a0dc;
+    --theme-bg:#160a24; --theme-surface:rgba(20,12,30,.95); --theme-surface-2:#1f1430; --theme-border:rgba(94,42,121,.6);
+    --theme-text:#e8e0f0; --theme-text-dim:#8a7d99; --theme-text-faint:#6b5f7a; --theme-ok:#4be39a; --theme-danger:#ff5c7a; --theme-on-primary:#fff;
+    --theme-font-display:"DM Sans",sans-serif; --theme-font-body:"DM Sans",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:8px; --theme-border-width:1px; --theme-hot-icon:"local_fire_department";
+  }
+  html[data-theme="swiss"]{
+    --theme-primary:#1f3aff; --theme-accent:#1f3aff; --theme-accent-2:#0d0d0d;
+    --theme-bg:#eceae4; --theme-surface:#ffffff; --theme-surface-2:#f4f2ec; --theme-border:#0d0d0d;
+    --theme-text:#0d0d0d; --theme-text-dim:#5c5c57; --theme-text-faint:#9a9a92; --theme-ok:#1faa55; --theme-danger:#e5251f; --theme-on-primary:#fff;
+    --theme-font-display:"Archivo",sans-serif; --theme-font-body:"Archivo",sans-serif; --theme-font-mono:"Space Mono",monospace;
+    --theme-radius:0px; --theme-border-width:3px; --theme-hot-icon:"star";
+  }
+
+  /* ════ EBENE 1 — Form-Bausteine (token-getrieben, theme-agnostisch) ════ */
+  .t-tool{background:var(--theme-surface);border:var(--theme-border-width) solid var(--theme-border);
+    border-radius:var(--theme-radius);width:440px;max-width:100%;overflow:hidden}
+  .t-tool-head{display:flex;align-items:center;gap:10px;padding:18px 22px;
+    border-bottom:var(--theme-border-width) solid var(--theme-border);
+    font-family:var(--theme-font-display);font-weight:700;font-size:18px;color:var(--theme-text)}
+  .t-tool-head .ms{font-family:"Material Symbols Outlined";font-style:normal;font-size:20px;color:var(--theme-primary)}
+  .t-tool-body{padding:22px;display:flex;flex-direction:column;gap:18px}
+
+  .t-field{display:flex;flex-direction:column;gap:7px}
+  .t-field-label{font-family:var(--theme-font-mono);font-size:12px;color:var(--theme-text-dim);letter-spacing:.04em}
+  .t-field-label .req{color:var(--theme-accent)}
+  .t-input,.t-select,.t-textarea{font-family:var(--theme-font-body);font-size:15px;color:var(--theme-text);
+    background:var(--theme-surface-2);border:var(--theme-border-width) solid var(--theme-border);
+    border-radius:var(--theme-radius);padding:11px 13px;min-height:44px;width:100%;transition:border-color .15s,box-shadow .15s}
+  .t-textarea{min-height:84px;resize:vertical;line-height:1.5}
+  .t-input::placeholder,.t-textarea::placeholder{color:var(--theme-text-faint)}
+  .t-input:hover,.t-select:hover,.t-textarea:hover{border-color:var(--theme-text-dim)}
+  .t-input:focus-visible,.t-select:focus-visible,.t-textarea:focus-visible{outline:2px solid var(--theme-primary);outline-offset:2px;border-color:var(--theme-primary)}
+  .t-input[aria-invalid="true"]{border-color:var(--theme-danger)}
+  .t-field-hint{font-family:var(--theme-font-mono);font-size:11px;color:var(--theme-text-faint)}
+  .t-field-error{display:flex;align-items:center;gap:5px;font-family:var(--theme-font-mono);font-size:11.5px;color:var(--theme-danger)}
+  .t-field-error .ms{font-family:"Material Symbols Outlined";font-style:normal;font-size:15px}
+
+  /* Select mit eigenem Chevron (kein nacktes OS-Dropdown) */
+  .t-select-wrap{position:relative;display:flex}
+  .t-select{appearance:none;-webkit-appearance:none;padding-right:40px;cursor:pointer}
+  .t-select-wrap::after{content:"expand_more";font-family:"Material Symbols Outlined";position:absolute;
+    right:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--theme-text-dim);font-size:20px}
+
+  .t-row{display:flex;gap:14px}
+  .t-row > *{flex:1}
+
+  /* Toggle (Switch) */
+  .t-toggle{display:inline-flex;align-items:center;gap:11px;cursor:pointer;font-family:var(--theme-font-body);
+    font-size:14px;color:var(--theme-text);min-height:32px}
+  .t-toggle input{position:absolute;opacity:0;width:1px;height:1px}
+  .t-toggle-track{position:relative;width:46px;height:26px;border-radius:999px;flex:none;
+    background:var(--theme-surface-2);border:var(--theme-border-width) solid var(--theme-border);transition:background .18s,border-color .18s}
+  .t-toggle-thumb{position:absolute;left:3px;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;
+    background:var(--theme-text-dim);transition:transform .18s,background .18s}
+  .t-toggle input:checked + .t-toggle-track{background:var(--theme-primary);border-color:var(--theme-primary)}
+  .t-toggle input:checked + .t-toggle-track .t-toggle-thumb{transform:translate(20px,-50%);background:var(--theme-on-primary)}
+  .t-toggle input:focus-visible + .t-toggle-track{outline:2px solid var(--theme-primary);outline-offset:2px}
+
+  /* Checkbox-Zeile (native + accent-color) */
+  .t-check{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-family:var(--theme-font-body);
+    font-size:14px;color:var(--theme-text);min-height:32px}
+  .t-check input{width:20px;height:20px;accent-color:var(--theme-primary);cursor:pointer}
+  .t-check input:focus-visible{outline:2px solid var(--theme-primary);outline-offset:2px}
+
+  /* Segmentierte Radios (Icon-Größe) */
+  .t-seg{border:0;margin:0;padding:0;min-width:0}
+  .t-seg legend{padding:0;margin-bottom:7px;font-family:var(--theme-font-mono);font-size:12px;color:var(--theme-text-dim);letter-spacing:.04em}
+  .t-seg-row{display:inline-flex;border:var(--theme-border-width) solid var(--theme-border);border-radius:var(--theme-radius);overflow:hidden}
+  .t-seg-row label{position:relative}
+  .t-seg-row input{position:absolute;opacity:0;width:1px;height:1px}
+  .t-seg-row span{display:grid;place-items:center;min-width:46px;min-height:40px;padding:0 4px;cursor:pointer;
+    font-family:var(--theme-font-mono);font-size:13px;color:var(--theme-text-dim);
+    border-right:var(--theme-border-width) solid var(--theme-border)}
+  .t-seg-row label:last-child span{border-right:0}
+  .t-seg-row input:checked + span{background:var(--theme-primary);color:var(--theme-on-primary);font-weight:700}
+  .t-seg-row input:focus-visible + span{outline:2px solid var(--theme-primary);outline-offset:-2px}
+
+  /* Buttons */
+  .t-btn{display:inline-flex;align-items:center;gap:7px;font-family:var(--theme-font-body);font-weight:600;font-size:14px;
+    padding:11px 18px;min-height:44px;border-radius:var(--theme-radius);cursor:pointer;
+    border:var(--theme-border-width) solid var(--theme-border);background:var(--theme-surface-2);color:var(--theme-text);transition:.15s}
+  .t-btn .ms{font-family:"Material Symbols Outlined";font-style:normal;font-size:18px}
+  .t-btn:hover{border-color:var(--theme-text-dim)}
+  .t-btn:focus-visible{outline:2px solid var(--theme-primary);outline-offset:2px}
+  .t-btn--primary{background:var(--theme-primary);border-color:var(--theme-primary);color:var(--theme-on-primary)}
+  .t-btn--primary:hover{filter:brightness(1.08)}
+  .t-btn--ghost{background:transparent}
+  .t-btn--danger{background:transparent;border-color:transparent;color:var(--theme-danger)}
+  .t-btn--danger:hover{border-color:var(--theme-danger)}
+  .t-btn-row{display:flex;align-items:center;gap:10px;padding-top:4px}
+  .t-btn-row .spacer{flex:1}
+
+  /* ════ EBENE 2 — Theme-Charakter (nicht nur Farbe) ════ */
+  /* Aurora: Glas-Panel, sanfter Glow-Fokus */
+  html[data-theme="aurora"] .t-tool{backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 18px 50px rgba(0,0,0,.45)}
+  html[data-theme="aurora"] .t-input:focus-visible,html[data-theme="aurora"] .t-select:focus-visible,
+  html[data-theme="aurora"] .t-textarea:focus-visible{box-shadow:0 0 0 4px rgba(157,107,208,.25)}
+  /* Editorial: kursive Serifen-Überschrift */
+  html[data-theme="editorial"] .t-tool-head{font-style:italic;font-weight:500;font-size:21px}
+  html[data-theme="editorial"] .t-tool{box-shadow:0 10px 30px rgba(28,26,22,.1)}
+  /* Terminal: Mono-Labels in Großbuchstaben, Neon-Fokus */
+  html[data-theme="terminal"] .t-field-label,html[data-theme="terminal"] .t-seg legend{text-transform:uppercase}
+  html[data-theme="terminal"] .t-input:focus-visible,html[data-theme="terminal"] .t-select:focus-visible,
+  html[data-theme="terminal"] .t-textarea:focus-visible{box-shadow:0 0 14px rgba(34,224,214,.4)}
+  /* Entry: Purple-Glow hinterm Panel, glühender Primary-Button */
+  html[data-theme="entry"] .t-tool{box-shadow:0 16px 46px rgba(0,0,0,.45)}
+  html[data-theme="entry"] .t-btn--primary{box-shadow:0 0 18px rgba(157,107,208,.5)}
+  /* Swiss: harte Kanten, versetzter Schatten, GROSSE fette Caps */
+  html[data-theme="swiss"] .t-tool{box-shadow:8px 8px 0 var(--theme-border)}
+  html[data-theme="swiss"] .t-tool-head{text-transform:uppercase;font-weight:900;letter-spacing:-.01em}
+  html[data-theme="swiss"] .t-field-label,html[data-theme="swiss"] .t-seg legend{text-transform:uppercase;font-weight:700;color:var(--theme-text)}
+  html[data-theme="swiss"] .t-btn{text-transform:uppercase;font-weight:800}
+  html[data-theme="swiss"] .t-input:focus-visible,html[data-theme="swiss"] .t-select:focus-visible,
+  html[data-theme="swiss"] .t-textarea:focus-visible{outline-offset:0;outline-width:3px}
+
+  /* ════ Bühne (nur diese Seite) ════ */
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--theme-bg);color:var(--theme-text);font-family:var(--theme-font-body),sans-serif;
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;-webkit-font-smoothing:antialiased;transition:background .25s}
+  html[data-theme="entry"] body::before,html[data-theme="aurora"] body::before{content:"";position:fixed;inset:0;z-index:-1;
+    background:radial-gradient(820px 560px at 50% -8%,rgba(94,42,121,.5),transparent 60%)}
+  .skip{position:absolute;left:-999px;background:var(--theme-primary);color:var(--theme-on-primary);padding:8px 14px;border-radius:var(--theme-radius)}
+  .skip:focus{left:12px;top:12px}
+  header.bar{width:100%;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:18px 26px;border-bottom:1px solid var(--theme-border);background:var(--theme-surface-2)}
+  header.bar h1{font-family:var(--theme-font-display);font-size:18px;margin:0;font-weight:700}
+  header.bar p{margin:3px 0 0;font-family:var(--theme-font-mono);font-size:12px;color:var(--theme-text-dim)}
+  .switcher{display:inline-flex;border:1px solid var(--theme-border);border-radius:var(--theme-radius);overflow:hidden;flex:none}
+  .switcher button{padding:10px 15px;background:none;border:0;border-right:1px solid var(--theme-border);
+    color:var(--theme-text-dim);font-family:var(--theme-font-mono);font-size:12px;cursor:pointer;min-height:42px}
+  .switcher button:last-child{border-right:0}
+  .switcher button:focus-visible{outline:2px solid var(--theme-primary);outline-offset:-2px}
+  .switcher button[aria-pressed="true"]{background:var(--theme-primary);color:var(--theme-on-primary);font-weight:700}
+  .stage{flex:1;display:flex;flex-wrap:wrap;gap:30px;align-items:flex-start;justify-content:center;padding:48px 26px}
+  .note{font-family:var(--theme-font-mono);font-size:12px;color:var(--theme-text-faint);padding:0 26px 50px;text-align:center;max-width:760px;line-height:1.7}
+  @media (prefers-reduced-motion:reduce){body,.t-input,.t-select,.t-textarea,.t-toggle-track,.t-toggle-thumb,.t-btn{transition:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#stage">Zum Inhalt springen</a>
+<header class="bar">
+  <div>
+    <h1>Tool-Formulare aus Bausteinen</h1>
+    <p>// gleiche t-field · t-input · t-select · t-toggle · t-btn — jedes Theme spielt Form + Fokus voll aus</p>
+  </div>
+  <div class="switcher" role="group" aria-label="Theme wählen">
+    <button data-set="terminal" aria-pressed="true">Terminal</button>
+    <button data-set="aurora" aria-pressed="false">Aurora</button>
+    <button data-set="midnight" aria-pressed="false">Midnight</button>
+    <button data-set="editorial" aria-pressed="false">Editorial</button>
+    <button data-set="entry" aria-pressed="false">Entry</button>
+    <button data-set="swiss" aria-pressed="false">Swiss</button>
+  </div>
+</header>
+
+<main class="stage" id="stage">
+  <form class="t-tool" lang="en" novalidate aria-label="Edit point of interest">
+    <div class="t-tool-head"><span class="ms" aria-hidden="true">location_on</span> Edit Point of Interest</div>
+    <div class="t-tool-body">
+
+      <div class="t-field">
+        <label class="t-field-label" for="poi-name">Name <span class="req" aria-hidden="true">*</span></label>
+        <input class="t-input" id="poi-name" type="text" value="Pochinki — North Block" autocomplete="off">
+      </div>
+
+      <div class="t-row">
+        <div class="t-field">
+          <label class="t-field-label" for="poi-type">Type</label>
+          <div class="t-select-wrap">
+            <select class="t-select" id="poi-type">
+              <option>Loot zone</option>
+              <option selected>Hot drop</option>
+              <option>Vehicle spawn</option>
+              <option>Sniper nest</option>
+            </select>
+          </div>
+        </div>
+        <div class="t-field">
+          <label class="t-field-label" for="poi-map">Map</label>
+          <div class="t-select-wrap">
+            <select class="t-select" id="poi-map">
+              <option selected>Erangel</option>
+              <option>Miramar</option>
+              <option>Taego</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="t-row">
+        <div class="t-field">
+          <label class="t-field-label" for="poi-x">X</label>
+          <input class="t-input" id="poi-x" type="number" value="412300">
+        </div>
+        <div class="t-field">
+          <label class="t-field-label" for="poi-y">Y</label>
+          <input class="t-input" id="poi-y" type="number" value="287100">
+        </div>
+        <div class="t-field">
+          <label class="t-field-label" for="poi-color">Marker color</label>
+          <input class="t-input" id="poi-color" type="text" value="#zz12" aria-invalid="true" aria-describedby="poi-color-err">
+          <span class="t-field-error" id="poi-color-err"><span class="ms" aria-hidden="true">error</span> Enter a valid hex color (e.g. #d4561f).</span>
+        </div>
+      </div>
+
+      <div class="t-field">
+        <label class="t-field-label" for="poi-desc">Description</label>
+        <textarea class="t-textarea" id="poi-desc" placeholder="Optional note shown on hover…">Three-story compound, frequent early fights.</textarea>
+        <span class="t-field-hint">Shown as a tooltip on the map overlay.</span>
+      </div>
+
+      <fieldset class="t-seg">
+        <legend>Icon size</legend>
+        <div class="t-seg-row">
+          <label><input type="radio" name="size" value="s"><span>S</span></label>
+          <label><input type="radio" name="size" value="m" checked><span>M</span></label>
+          <label><input type="radio" name="size" value="l"><span>L</span></label>
+        </div>
+      </fieldset>
+
+      <label class="t-toggle">
+        <input type="checkbox" checked>
+        <span class="t-toggle-track" aria-hidden="true"><span class="t-toggle-thumb"></span></span>
+        <span>Show on live overlay</span>
+      </label>
+
+      <label class="t-check">
+        <input type="checkbox" checked>
+        <span>Pin label always visible</span>
+      </label>
+
+      <div class="t-btn-row">
+        <button type="button" class="t-btn t-btn--danger"><span class="ms" aria-hidden="true">delete</span> Delete</button>
+        <span class="spacer"></span>
+        <button type="button" class="t-btn t-btn--ghost">Cancel</button>
+        <button type="submit" class="t-btn t-btn--primary"><span class="ms" aria-hidden="true">check</span> Save</button>
+      </div>
+
+    </div>
+  </form>
+</main>
+
+<p class="note">Identisches Formular-Markup (t-field · t-input · t-select · t-textarea · t-toggle · t-seg · t-btn) in allen 6 Themes — Radius, Rahmenstärke, Fokus-Stil (Neon-Glow / Glas / harte 3px-Kante), Label-Typo und Button-Charakter kommen ausschließlich aus dem Theme. Fehler-Feld nutzt aria-invalid + aria-describedby, jedes Control hat ein echtes &lt;label&gt;.</p>
+
+<script>
+(function(){
+  const sw=document.querySelector('.switcher');
+  sw.addEventListener('click',function(e){
+    const b=e.target.closest('button[data-set]'); if(!b) return;
+    document.documentElement.setAttribute('data-theme',b.dataset.set);
+    sw.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+  });
+})();
+</script>
+</body>
+</html>
