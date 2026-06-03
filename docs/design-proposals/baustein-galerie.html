@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Baustein-Galerie · Terminal-Theme — stream-overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* ════════════════════════════════════════════════════════════
+     EBENE 0 — Token-Schnittstelle (hier: Terminal-Theme-Werte).
+     Ein anderes Theme würde NUR diese Werte + die Ebene-2-Regeln tauschen.
+     ════════════════════════════════════════════════════════════ */
+  :root{
+    --theme-primary:#22e0d6; --theme-accent:#ff4d8d; --theme-accent-2:#ffb547;
+    --theme-bg:#070a0f; --theme-surface:#0c1118; --theme-surface-2:#0f151e; --theme-border:#23303f;
+    --theme-text:#d6e4ef; --theme-text-dim:#7488a0; --theme-text-faint:#4c5d72;
+    --theme-ok:#22e0a0; --theme-warn:#ffb547; --theme-danger:#ff4d6a;
+    --theme-font-display:"Chakra Petch",sans-serif;
+    --theme-font-body:"Hanken Grotesk",sans-serif;
+    --theme-font-mono:"JetBrains Mono",monospace;
+    --theme-radius:4px; --theme-border-width:1px;
+    --theme-shadow:0 8px 30px rgba(0,0,0,.4);
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     EBENE 1 — die BAUSTEINE (t-*). Nutzen NUR --theme-* Tokens.
+     Theme-agnostisch: in jedem Theme dasselbe Markup, anderer Look.
+     ════════════════════════════════════════════════════════════ */
+  /* --- t-card --- */
+  .t-card{background:var(--theme-surface);border:var(--theme-border-width) solid var(--theme-border);
+    border-radius:var(--theme-radius);padding:18px;position:relative}
+  /* --- t-header --- */
+  .t-header{display:flex;justify-content:space-between;align-items:baseline;
+    font-family:var(--theme-font-display);font-weight:600;font-size:15px;text-transform:uppercase;letter-spacing:.03em;
+    color:var(--theme-text);padding-bottom:10px;border-bottom:1px solid var(--theme-border);margin-bottom:14px}
+  .t-range{font-family:var(--theme-font-mono);font-size:12px;color:var(--theme-primary);text-transform:none;font-weight:400}
+  .t-sub{font-family:var(--theme-font-mono);font-size:12px;color:var(--theme-text-dim);text-transform:none}
+  /* --- t-stat --- */
+  .t-stat{display:flex;flex-direction:column;gap:5px}
+  .t-value{font-family:var(--theme-font-display);font-weight:700;font-size:34px;color:var(--theme-text);line-height:1}
+  .t-label{font-family:var(--theme-font-mono);font-size:11px;color:var(--theme-text-dim);text-transform:uppercase;letter-spacing:.08em}
+  .t-stat-grid{display:flex;gap:30px;flex-wrap:wrap}
+  /* --- t-list / t-row --- */
+  .t-list{display:flex;flex-direction:column}
+  .t-row{display:flex;align-items:center;gap:13px;padding:11px 0;border-top:1px solid var(--theme-border)}
+  .t-row:first-child{border-top:0}
+  .t-rank{font-family:var(--theme-font-display);font-weight:700;color:var(--theme-primary);width:22px;text-align:center}
+  .t-row-name{flex:1;color:var(--theme-text);font-weight:600}
+  .t-row-sub{display:block;font-family:var(--theme-font-mono);font-size:11px;color:var(--theme-text-faint);font-weight:400}
+  .t-row-value{font-family:var(--theme-font-mono);color:var(--theme-accent);font-weight:500}
+  /* --- t-badge --- */
+  .t-badge{display:inline-flex;align-items:center;font-family:var(--theme-font-mono);font-size:11px;text-transform:uppercase;
+    letter-spacing:.05em;color:var(--theme-primary);border:1px solid var(--theme-border);padding:4px 9px;border-radius:var(--theme-radius)}
+  /* --- t-led --- */
+  .t-led{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none;background:var(--theme-ok);box-shadow:0 0 8px var(--theme-ok)}
+  .t-led.warn{background:var(--theme-warn);box-shadow:0 0 8px var(--theme-warn)}
+  .t-led.danger{background:var(--theme-danger);box-shadow:0 0 8px var(--theme-danger)}
+  /* --- t-bar --- */
+  .t-bar{height:11px;background:var(--theme-surface-2);border:1px solid var(--theme-border);border-radius:var(--theme-radius);overflow:hidden}
+  .t-bar-fill{height:100%;background:linear-gradient(90deg,var(--theme-primary),var(--theme-accent))}
+  /* --- t-divider --- */
+  .t-divider{height:1px;background:var(--theme-border);margin:14px 0;border:0}
+  /* --- t-icon --- */
+  .t-icon{display:inline-grid;place-items:center;width:36px;height:36px;background:var(--theme-surface-2);
+    border:1px solid var(--theme-border);border-radius:var(--theme-radius);color:var(--theme-primary);
+    font-family:var(--theme-font-mono);font-size:13px;flex:none}
+  /* --- t-frame (dekorativer Rahmen, kein Karten-BG) --- */
+  .t-frame{border:2px solid var(--theme-primary);border-radius:var(--theme-radius);padding:6px;display:inline-block}
+  /* --- t-hot (Modifier) --- */
+  .t-hot .t-value,.t-hot .t-row-value{color:var(--theme-accent)}
+  .t-hot .t-value{text-shadow:0 0 18px var(--theme-accent)}
+  .t-hot .t-flame{color:var(--theme-accent)}
+
+  /* Bedien-Bausteine */
+  .t-button{font-family:var(--theme-font-display);font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.03em;
+    padding:11px 18px;border:1px solid var(--theme-primary);background:rgba(34,224,214,.08);color:var(--theme-primary);
+    border-radius:var(--theme-radius);cursor:pointer;transition:.14s;min-height:42px}
+  .t-button:hover{background:var(--theme-primary);color:var(--theme-bg)}
+  .t-button--ghost{border-color:var(--theme-border);color:var(--theme-text-dim);background:none}
+  .t-button--ghost:hover{color:var(--theme-text);border-color:var(--theme-text);background:none}
+  .t-field{display:flex;flex-direction:column;gap:7px}
+  .t-field label{font-family:var(--theme-font-mono);font-size:12px;color:var(--theme-text-dim)}
+  .t-input{background:var(--theme-bg);border:1px solid var(--theme-border);color:var(--theme-text);
+    padding:10px 13px;border-radius:var(--theme-radius);font-family:var(--theme-font-mono);font-size:13px;min-height:40px}
+  .t-seg{display:inline-flex;border:1px solid var(--theme-border);border-radius:var(--theme-radius);overflow:hidden}
+  .t-seg button{padding:9px 16px;background:none;border:0;border-right:1px solid var(--theme-border);
+    color:var(--theme-text-dim);font-family:var(--theme-font-mono);font-size:12px;cursor:pointer;min-height:38px}
+  .t-seg button:last-child{border-right:0}
+  .t-seg button[aria-pressed="true"]{background:var(--theme-primary);color:var(--theme-bg);font-weight:700}
+  .t-tab{display:flex;border-bottom:1px solid var(--theme-border)}
+  .t-tab button{padding:12px 18px;background:none;border:0;color:var(--theme-text-dim);
+    font-family:var(--theme-font-display);font-size:14px;text-transform:uppercase;letter-spacing:.02em;cursor:pointer;min-height:44px}
+  .t-tab button[aria-selected="true"]{color:var(--theme-primary);box-shadow:inset 0 -2px 0 var(--theme-primary)}
+
+  /* ════════════════════════════════════════════════════════════
+     EBENE 2 — Terminal-Theme-Eigenheiten (pro Theme anders).
+     Grid-Hintergrund + Eck-Marker auf Karten + Glow.
+     ════════════════════════════════════════════════════════════ */
+  body{background:var(--theme-bg)}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background-image:linear-gradient(var(--theme-border) 1px,transparent 1px),linear-gradient(90deg,var(--theme-border) 1px,transparent 1px);
+    background-size:46px 46px;opacity:.3;mask-image:radial-gradient(circle at 50% 0%,#000,transparent 85%)}
+  .t-card::after{content:"";position:absolute;right:0;top:0;width:12px;height:12px;
+    border-top:2px solid var(--theme-primary);border-right:2px solid var(--theme-primary)}
+
+  /* ════════════════════════════════════════════════════════════
+     Galerie-Chrome (nur diese Seite)
+     ════════════════════════════════════════════════════════════ */
+  *{box-sizing:border-box}
+  html{color-scheme:dark}
+  body{margin:0;color:var(--theme-text);font-family:var(--theme-font-body);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .skip{position:absolute;left:-999px;background:var(--theme-primary);color:var(--theme-bg);padding:8px 14px}
+  .skip:focus{left:12px;top:12px}
+  :focus-visible{outline:2px solid var(--theme-primary);outline-offset:2px}
+  header.top{padding:30px 28px 18px;border-bottom:1px solid var(--theme-border)}
+  header.top h1{font-family:var(--theme-font-display);font-weight:700;font-size:26px;text-transform:uppercase;letter-spacing:.02em;margin:0}
+  header.top p{color:var(--theme-text-dim);font-family:var(--theme-font-mono);font-size:13px;margin:8px 0 0}
+  main{max-width:1100px;margin:0 auto;padding:30px 28px 90px}
+  .tokens{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:34px}
+  .tok{display:flex;align-items:center;gap:9px;font-family:var(--theme-font-mono);font-size:11px;color:var(--theme-text-dim);
+    border:1px solid var(--theme-border);padding:6px 10px;border-radius:var(--theme-radius)}
+  .tok .sw{width:16px;height:16px;border-radius:3px;border:1px solid var(--theme-border)}
+  section.block{margin:0 0 30px}
+  .block > h2{font-family:var(--theme-font-mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--theme-primary);
+    margin:0 0 14px;padding-bottom:6px;border-bottom:1px solid var(--theme-border)}
+  .demo{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--theme-border);border-radius:var(--theme-radius);overflow:hidden;margin-bottom:14px}
+  .demo-render{padding:22px;display:flex;align-items:center;flex-wrap:wrap;gap:18px;background:var(--theme-surface-2)}
+  .demo-code{padding:18px 20px;background:#05070b;border-left:1px solid var(--theme-border);overflow:auto}
+  .demo-code .nm{font-family:var(--theme-font-mono);font-size:12px;color:var(--theme-accent-2);margin:0 0 8px}
+  .demo-code pre{margin:0;font-family:var(--theme-font-mono);font-size:11.5px;color:var(--theme-text-dim);white-space:pre-wrap;line-height:1.6}
+  .demo-code pre .t{color:var(--theme-primary)}
+  @media (max-width:760px){.demo{grid-template-columns:1fr}.demo-code{border-left:0;border-top:1px solid var(--theme-border)}}
+  .note{color:var(--theme-text-faint);font-family:var(--theme-font-mono);font-size:11px;margin:30px 0 0;text-align:center}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Zum Inhalt springen</a>
+<header class="top">
+  <h1>Baustein-Galerie</h1>
+  <p>// Terminal-Theme · ~17 t-* Bausteine · links Live, rechts Markup · Vorschau, nicht die App</p>
+</header>
+<main id="main">
+
+  <div class="tokens" aria-label="Theme-Tokens">
+    <span class="tok"><span class="sw" style="background:#22e0d6"></span>--theme-primary</span>
+    <span class="tok"><span class="sw" style="background:#ff4d8d"></span>--theme-accent</span>
+    <span class="tok"><span class="sw" style="background:#ffb547"></span>--theme-accent-2</span>
+    <span class="tok"><span class="sw" style="background:#0c1118"></span>--theme-surface</span>
+    <span class="tok"><span class="sw" style="background:#d6e4ef"></span>--theme-text</span>
+    <span class="tok">radius 4px · border 1px · Chakra Petch / Hanken / JetBrains Mono</span>
+  </div>
+
+  <!-- t-card + t-header -->
+  <section class="block">
+    <h2>t-card + t-header</h2>
+    <div class="demo">
+      <div class="demo-render">
+        <div class="t-card" style="min-width:280px">
+          <div class="t-header">Career <span class="t-range">Session</span></div>
+          <p style="margin:0;color:var(--theme-text-dim);font-family:var(--theme-font-mono);font-size:12px">Karten-Inhalt …</p>
+        </div>
+      </div>
+      <div class="demo-code"><div class="nm">// markup</div><pre>&lt;div class="<span class="t">t-card</span>"&gt;
+  &lt;div class="<span class="t">t-header</span>"&gt;Career
+    &lt;span class="<span class="t">t-range</span>"&gt;Session&lt;/span&gt;
+  &lt;/div&gt;
+  …
+&lt;/div&gt;</pre></div>
+    </div>
+  </section>
+
+  <!-- t-stat + t-stat-grid -->
+  <section class="block">
+    <h2>t-stat · t-stat-grid · t-value · t-label</h2>
+    <div class="demo">
+      <div class="demo-render">
+        <div class="t-stat-grid">
+          <div class="t-stat"><span class="t-value">12.4</span><span class="t-label">K/D</span></div>
+          <div class="t-stat"><span class="t-value">312</span><span class="t-label">Matches</span></div>
+          <div class="t-stat"><span class="t-value">9</span><span class="t-label">Wins</span></div>
+        </div>
+      </div>
+      <div class="demo-code"><div class="nm">// markup</div><pre>&lt;div class="<span class="t">t-stat-grid</span>"&gt;
+  &lt;div class="<span class="t">t-stat</span>"&gt;
+    &lt;span class="<span class="t">t-value</span>"&gt;12.4&lt;/span&gt;
+    &lt;span class="<span class="t">t-label</span>"&gt;K/D&lt;/span&gt;
+  &lt;/div&gt; …
+&lt;/div&gt;</pre></div>
+    </div>
+  </section>
+
+  <!-- t-list + t-row -->
+  <section class="block">
+    <h2>t-list · t-row · t-rank · t-row-name/-sub/-value</h2>
+    <div class="demo">
+      <div class="demo-render">
+        <div class="t-list" style="min-width:320px">
+          <div class="t-row"><span class="t-rank">1</span><span class="t-row-name">Hat3<span class="t-row-sub">42 matches</span></span><span class="t-row-value">3.2 KD</span></div>
+          <div class="t-row"><span class="t-rank">2</span><span class="t-row-name">PEX_LuCKoR<span class="t-row-sub">38 matches</span></span><span class="t-row-value">2.9 KD</span></div>
+          <div class="t-row"><span class="t-rank">3</span><span class="t-row-name">Mate3<span class="t-row-sub">30 matches</span></span><span class="t-row-value">2.1 KD</span></div>
+        </div>
+      </div>
+      <div class="demo-code"><div class="nm">// markup</div><pre>&lt;div class="<span class="t">t-list</span>"&gt;
+  &lt;div class="<span class="t">t-row</span>"&gt;
+    &lt;span class="<span class="t">t-rank</span>"&gt;1&lt;/span&gt;
+    &lt;span class="<span class="t">t-row-name</span>"&gt;Hat3
+      &lt;span class="<span class="t">t-row-sub</span>"&gt;42 matches&lt;/span&gt;&lt;/span&gt;
+    &lt;span class="<span class="t">t-row-value</span>"&gt;3.2 KD&lt;/span&gt;
+  &lt;/div&gt; …
+&lt;/div&gt;</pre></div>
+    </div>
+  </section>
+
+  <!-- t-badge t-led t-icon t-frame -->
+  <section class="block">
+    <h2>t-badge · t-led · t-icon · t-frame</h2>
+    <div class="demo">
+      <div class="demo-render">
+        <span class="t-badge">Ranked</span>
+        <span class="t-badge">Squad FPP</span>
+        <span style="display:inline-flex;align-items:center;gap:8px;color:var(--theme-text-dim);font-family:var(--theme-font-mono);font-size:12px"><span class="t-led"></span>ok</span>
+        <span style="display:inline-flex;align-items:center;gap:8px;color:var(--theme-text-dim);font-family:var(--theme-font-mono);font-size:12px"><span class="t-led warn"></span>warn</span>
+        <span style="display:inline-flex;align-items:center;gap:8px;color:var(--theme-text-dim);font-family:var(--theme-font-mono);font-size:12px"><span class="t-led danger"></span>danger</span>
+        <span class="t-icon">AKM</span>
+        <span class="t-frame"><span style="display:block;width:120px;height:68px;background:var(--theme-surface-2);display:grid;place-items:center;color:var(--theme-text-faint);font-family:var(--theme-font-mono);font-size:11px">webcam</span></span>
+      </div>
+      <div class="demo-code"><div class="nm">// markup</div><pre>&lt;span class="<span class="t">t-badge</span>"&gt;Ranked&lt;/span&gt;
+&lt;span class="<span class="t">t-led</span>"&gt;&lt;/span&gt;  (.warn / .danger)
+&lt;span class="<span class="t">t-icon</span>"&gt;AKM&lt;/span&gt;
+&lt;span class="<span class="t">t-frame</span>"&gt; …webcam… &lt;/span&gt;</pre></div>
+    </div>
+  </section>
+
+  <!-- t-bar t-divider -->
+  <section class="block">
+    <h2>t-bar · t-divider</h2>
+    <div class="demo">
+      <div class="demo-render" style="flex-direction:column;align-items:stretch;gap:6px">
+        <div style="display:flex;justify-content:space-between;font-family:var(--theme-font-mono);font-size:11px;color:var(--theme-text-dim)"><span>Kill-Goal</span><span>13 / 20</span></div>
+        <div class="t-bar"><div class="t-bar-fill" style="width:65%"></div></div>
+        <hr class="t-divider">
+        <div style="display:flex;justify-content:space-between;font-family:var(--theme-font-mono);font-size:11px;color:var(--theme-text-dim)"><span>Tip-Goal</span><span>€84 / €100</span></div>
+        <div class="t-bar"><div class="t-bar-fill" style="width:84%"></div></div>
+      </div>
+      <div class="demo-code"><div class="nm">// markup</div><pre>&lt;div class="<span class="t">t-bar</span>"&gt;
+  &lt;div class="<span class="t">t-bar-fill</span>" style="width:65%"&gt;&lt;/div&gt;
+&lt;/div&gt;
+&lt;hr class="<span class="t">t-divider</span>"&gt;</pre></div>
+    </div>
+  </section>
+
+  <!-- t-hot -->
+  <section class="block">
+    <h2>t-hot — Highlight-Modifier (Anzeige; Erkennung = separate Logik)</h2>
+    <div class="demo">
+      <div class="demo-render">
+        <div class="t-card t-hot" style="min-width:300px">
+          <div class="t-header"><span class="t-flame">&#9650;</span> Longshot <span class="t-range">neuer Rekord</span></div>
+          <div class="t-stat"><span class="t-value">418 m</span><span class="t-label">weiteste Kill-Distanz</span></div>
+        </div>
+      </div>
+      <div class="demo-code"><div class="nm">// markup (Modifier auf t-card/t-stat/t-row)</div><pre>&lt;div class="<span class="t">t-card t-hot</span>"&gt;
+  &lt;div class="<span class="t">t-stat</span>"&gt;
+    &lt;span class="<span class="t">t-value</span>"&gt;418 m&lt;/span&gt;
+    &lt;span class="<span class="t">t-label</span>"&gt;weiteste Distanz&lt;/span&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+// "über 400m?" entscheidet das Backend, nicht das Theme</pre></div>
+    </div>
+  </section>
+
+  <!-- Bedienung -->
+  <section class="block">
+    <h2>Bedienung: t-button · t-field/t-input · t-seg · t-tab</h2>
+    <div class="demo">
+      <div class="demo-render" style="flex-direction:column;align-items:stretch;gap:16px">
+        <div style="display:flex;gap:10px"><button class="t-button">Kopieren</button><button class="t-button t-button--ghost">Vorschau</button></div>
+        <div class="t-field"><label for="g1">In-game name</label><input id="g1" class="t-input" value="PEX_LuCKoR"></div>
+        <span class="t-seg"><button aria-pressed="true">Session</button><button aria-pressed="false">Week</button><button aria-pressed="false">All</button></span>
+        <div class="t-tab"><button aria-selected="true">Overlays</button><button aria-selected="false">Widgets</button><button aria-selected="false">Memes</button></div>
+      </div>
+      <div class="demo-code"><div class="nm">// markup</div><pre>&lt;button class="<span class="t">t-button</span>"&gt;Kopieren&lt;/button&gt;
+&lt;button class="<span class="t">t-button t-button--ghost</span>"&gt;…&lt;/button&gt;
+&lt;div class="<span class="t">t-field</span>"&gt;&lt;label&gt;…&lt;/label&gt;
+  &lt;input class="<span class="t">t-input</span>"&gt;&lt;/div&gt;
+&lt;span class="<span class="t">t-seg</span>"&gt;&lt;button aria-pressed&gt;…&lt;/span&gt;
+&lt;div class="<span class="t">t-tab</span>"&gt;&lt;button aria-selected&gt;…&lt;/div&gt;</pre></div>
+    </div>
+  </section>
+
+  <!-- Komposition -->
+  <section class="block">
+    <h2>Komposition — so wird ein echtes Widget gebaut (Career Card)</h2>
+    <div class="demo">
+      <div class="demo-render">
+        <div class="t-card" style="min-width:320px">
+          <div class="t-header">Career <span class="t-range">Session</span></div>
+          <div class="t-stat-grid">
+            <div class="t-stat"><span class="t-value">12.4</span><span class="t-label">K/D</span></div>
+            <div class="t-stat"><span class="t-value">7</span><span class="t-label">Matches</span></div>
+            <div class="t-stat t-hot" style="--x:1"><span class="t-value">9</span><span class="t-label">Kills (best)</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="demo-code"><div class="nm">// nur Komposition + Daten — KEIN eigenes Styling</div><pre>&lt;div class="<span class="t">t-card</span>"&gt;
+  &lt;div class="<span class="t">t-header</span>"&gt;Career
+    &lt;span class="<span class="t">t-range</span>"&gt;Session&lt;/span&gt;&lt;/div&gt;
+  &lt;div class="<span class="t">t-stat-grid</span>"&gt;
+    &lt;div class="<span class="t">t-stat</span>"&gt;…&lt;/div&gt; ×N
+  &lt;/div&gt;
+&lt;/div&gt;</pre></div>
+    </div>
+  </section>
+
+  <p class="note">Dieselben Bausteine + ein anderes Theme-File = komplett anderer Look (Aurora/Swiss/…). Hier: Terminal.</p>
+</main>
+</body>
+</html>
