@@ -56,7 +56,7 @@
     --theme-ok:#5a7d3a; --theme-warn:#bd6a00; --theme-danger:#c0392b;
     --theme-font-display:"Fraunces",serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
     --theme-radius:4px; --theme-border-width:1.5px; --theme-shadow:0 6px 22px rgba(28,26,22,.1);
-    --theme-hot-icon:"history_edu";
+    --theme-hot-icon:"verified";
   }
   html[data-theme="entry"]{
     --theme-primary:#9d6bd0; --theme-accent:#f2b705; --theme-accent-2:#c9a0dc;
@@ -117,7 +117,7 @@
   .t-hot .t-value{text-shadow:0 0 18px var(--theme-accent)}
   /* t-hot-mark: semantischer Highlight-Marker; Symbol kommt aus dem Theme-Token */
   .t-hot-mark{display:inline-grid;place-items:center;vertical-align:-4px}
-  .t-hot-mark::before{font-family:"Material Symbols Outlined";content:var(--theme-hot-icon,"bolt");
+  .t-hot-mark::before{font-family:"Material Symbols Outlined";font-style:normal;font-synthesis:none;content:var(--theme-hot-icon,"bolt");
     font-size:20px;color:var(--theme-accent);text-shadow:0 0 14px var(--theme-accent)}
 
   /* Bedien-Bausteine */
