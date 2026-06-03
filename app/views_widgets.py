@@ -1,7 +1,7 @@
 """Widget-Routes: HTML mit Inject + statisches Asset-Serving unter /s/<token>/."""
 import os
 from flask import Blueprint, send_from_directory, current_app, g, request, abort
-from webcore.serving import inject_window_vars
+from webcore.serving import inject_window_vars, inject_theme
 
 
 bp_widgets = Blueprint("widgets", __name__)
@@ -51,10 +51,26 @@ def widget_file(token, filepath):
 
         with open(full_path, "r", encoding="utf-8") as f:
             html = f.read()
+
+        # Theme des Tenants ermitteln (server-injiziert → kein FOUC).
+        # Default "entry" == aktueller Look, falls nichts gesetzt ist.
+        theme = "entry"
+        if g.tenant_id is not None:
+            from webcore.middleware import _get_conn
+            from pubg.db_pg import get_setting
+            conn = _get_conn()
+            try:
+                theme = get_setting(conn, g.tenant_id, "theme", "entry") or "entry"
+            finally:
+                if "_PG_CONN_FACTORY" not in current_app.config:
+                    conn.close()
+
         variables = {
             "__SERVE_BASE__": f"/s/{token}/",
             "__STATIC_BASE__": "/widgets-static/",
+            "__THEME__": theme,
         }
+        html = inject_theme(html, theme)
         return (inject_window_vars(html, variables), 200,
                 {"Content-Type": "text/html; charset=utf-8"})
 

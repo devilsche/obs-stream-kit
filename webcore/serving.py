@@ -4,7 +4,15 @@ Von Service 1 (Widgets/Tools) und Service 2 (Overlays) gemeinsam genutzt.
 """
 import json
 import os
+import re
 from flask import send_from_directory, abort
+
+
+# Erlaubte Theme-Namen (siehe widgets/_theme.css). Whitelist schuetzt die
+# Attribut-Injektion und faengt ungueltige/alte Werte ab → Fallback Default.
+ALLOWED_THEMES = ("entry", "terminal", "aurora", "midnight", "editorial", "swiss")
+
+_HTML_TAG_RE = re.compile(r"<html\b[^>]*>", re.IGNORECASE)
 
 
 def inject_window_vars(html: str, variables: dict) -> str:
@@ -16,6 +24,25 @@ def inject_window_vars(html: str, variables: dict) -> str:
     if "</head>" in html:
         return html.replace("</head>", script + "\n</head>", 1)
     return script + "\n" + html
+
+
+def inject_theme(html: str, theme: str) -> str:
+    """Setzt data-theme="<theme>" auf das erste <html>-Tag — server-seitig,
+    damit das Theme-CSS sofort greift (kein FOUC, kein JS noetig).
+
+    Ungueltige/leere Themes werden ignoriert → das CSS faellt auf den
+    :root-Default (Entry) zurueck. Idempotent: vorhandenes data-theme bleibt.
+    """
+    if not theme or theme not in ALLOWED_THEMES:
+        return html
+
+    def _add(m):
+        tag = m.group(0)
+        if "data-theme" in tag.lower():
+            return tag
+        return tag[:-1] + f' data-theme="{theme}">'
+
+    return _HTML_TAG_RE.sub(_add, html, count=1)
 
 
 def _safe_full_path(root: str, subdir: str, filepath: str):

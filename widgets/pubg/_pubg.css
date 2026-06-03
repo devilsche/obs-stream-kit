@@ -31,7 +31,9 @@
 
 body {
   margin: 0;
-  font-family: "DM Sans", system-ui, sans-serif;
+  /* Theme-Token mit Fallback: ohne geladenes _theme.css bleibt es "DM Sans"
+     (= bisheriger Look); mit Theme greift --theme-font-body. */
+  font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif);
   background: transparent;
   color: var(--pubg-text);
   -webkit-font-smoothing: antialiased;

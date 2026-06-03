@@ -1,0 +1,96 @@
+/* ════════════════════════════════════════════════════════════════════════
+   _theme.css — Theme-Fundament fuer alle Browser-Sources (Widgets/Overlays/Tools)
+   ────────────────────────────────────────────────────────────────────────
+   - Ebene 0: ~22 --theme-*-Tokens, ein Block je Theme (html[data-theme="x"]).
+   - Default (:root, ohne data-theme) == Entry == aktueller Look → null Regression.
+   - Alias-Layer am Ende: biegt bestehende --pubg-* auf die Theme-Tokens um, damit
+     vorhandene Widgets SOFORT themebar sind, ohne ihr CSS anzufassen.
+   Der Server injiziert data-theme="<tenant-theme>" aufs <html> (webcore/serving.py).
+   MUSS NACH _pubg.css geladen werden (gleiche :root-Spezifitaet → spaeter gewinnt).
+   ════════════════════════════════════════════════════════════════════════ */
+
+@import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=DM+Sans:wght@400;500;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@600;700;800&family=Onest:wght@400;500;600&family=Archivo:wght@500;600;800;900&family=Space+Mono:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Fraunces:opsz,ital,wght@9..144,0,500;9..144,0,600;9..144,1,500&display=swap");
+
+/* ── Default = Entry (aktueller Stand, falls keine Server-Injektion) ── */
+:root, html[data-theme="entry"] {
+  --theme-primary:#5e2a79; --theme-accent:#f2b705; --theme-accent-2:#c9a0dc; --theme-on-primary:#fff;
+  --theme-bg:#0a0510; --theme-surface:rgba(20,12,30,.95); --theme-surface-2:#1f1430; --theme-border:rgba(94,42,121,.6);
+  --theme-text:#e8e0f0; --theme-text-dim:#8a7d99; --theme-text-faint:#6b5f7a;
+  --theme-ok:#4be39a; --theme-warn:#f2b705; --theme-danger:#ff5c7a;
+  --theme-font-display:"DM Sans",system-ui,sans-serif; --theme-font-body:"DM Sans",system-ui,sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-radius:8px; --theme-border-width:1px; --theme-shadow:0 14px 40px rgba(0,0,0,.4);
+  --theme-hot-icon:"local_fire_department";
+  --theme-page-bg:linear-gradient(180deg,#1a0d2a 0%,#0a0510 100%);
+}
+
+html[data-theme="terminal"] {
+  --theme-primary:#22e0d6; --theme-accent:#ff4d8d; --theme-accent-2:#ffb547; --theme-on-primary:#070a0f;
+  --theme-bg:#070a0f; --theme-surface:#0c1118; --theme-surface-2:#0f151e; --theme-border:#23303f;
+  --theme-text:#d6e4ef; --theme-text-dim:#7488a0; --theme-text-faint:#4c5d72;
+  --theme-ok:#22e0a0; --theme-warn:#ffb547; --theme-danger:#ff4d6d;
+  --theme-font-display:"Chakra Petch",sans-serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-radius:4px; --theme-border-width:1px; --theme-shadow:0 0 0 1px rgba(34,224,214,.15),0 10px 30px rgba(0,0,0,.5);
+  --theme-hot-icon:"bolt";
+  --theme-page-bg:#070a0f;
+}
+
+html[data-theme="aurora"] {
+  --theme-primary:#9d6bd0; --theme-accent:#f2b705; --theme-accent-2:#46d6ff; --theme-on-primary:#fff;
+  --theme-bg:#0c0916; --theme-surface:rgba(34,22,54,.6); --theme-surface-2:rgba(45,29,68,.5); --theme-border:rgba(157,107,208,.32);
+  --theme-text:#efe9f6; --theme-text-dim:#a99cc0; --theme-text-faint:#6f6388;
+  --theme-ok:#4be39a; --theme-warn:#f2b705; --theme-danger:#ff6b81;
+  --theme-font-display:"Syne",sans-serif; --theme-font-body:"Onest",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-radius:18px; --theme-border-width:1px; --theme-shadow:0 18px 50px rgba(0,0,0,.45);
+  --theme-hot-icon:"auto_awesome";
+  --theme-page-bg:radial-gradient(900px 600px at 70% -10%,rgba(94,42,121,.55),#0c0916 60%);
+}
+
+html[data-theme="midnight"] {
+  --theme-primary:#b8ff3c; --theme-accent:#3ce08a; --theme-accent-2:#7fae2b; --theme-on-primary:#0a0e14;
+  --theme-bg:#0a0e14; --theme-surface:#121927; --theme-surface-2:#16202f; --theme-border:#1f2b3d;
+  --theme-text:#e7eef7; --theme-text-dim:#8294ab; --theme-text-faint:#566377;
+  --theme-ok:#3ce08a; --theme-warn:#ffcf3c; --theme-danger:#ff5c5c;
+  --theme-font-display:"Bricolage Grotesque",sans-serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-radius:14px; --theme-border-width:1px; --theme-shadow:0 14px 40px rgba(0,0,0,.5);
+  --theme-hot-icon:"bolt";
+  --theme-page-bg:#0a0e14;
+}
+
+html[data-theme="editorial"] {
+  --theme-primary:#d4561f; --theme-accent:#d4561f; --theme-accent-2:#7a8450; --theme-on-primary:#fff;
+  --theme-bg:#f5f1e8; --theme-surface:#fbf9f3; --theme-surface-2:#efe9dc; --theme-border:#d6cdba;
+  --theme-text:#1c1a16; --theme-text-dim:#6b6457; --theme-text-faint:#a8a092;
+  --theme-ok:#5a7d3a; --theme-warn:#bd6a00; --theme-danger:#c0392b;
+  --theme-font-display:"Fraunces",serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-radius:3px; --theme-border-width:1.5px; --theme-shadow:0 10px 30px rgba(28,26,22,.1);
+  --theme-hot-icon:"verified";
+  --theme-page-bg:#f5f1e8;
+}
+
+html[data-theme="swiss"] {
+  --theme-primary:#1f3aff; --theme-accent:#1f3aff; --theme-accent-2:#0d0d0d; --theme-on-primary:#fff;
+  --theme-bg:#eceae4; --theme-surface:#ffffff; --theme-surface-2:#f4f2ec; --theme-border:#0d0d0d;
+  --theme-text:#0d0d0d; --theme-text-dim:#5c5c57; --theme-text-faint:#9a9a92;
+  --theme-ok:#1faa55; --theme-warn:#bd6a00; --theme-danger:#e5251f;
+  --theme-font-display:"Archivo",sans-serif; --theme-font-body:"Archivo",sans-serif; --theme-font-mono:"Space Mono",monospace;
+  --theme-radius:0px; --theme-border-width:3px; --theme-shadow:8px 8px 0 #0d0d0d;
+  --theme-hot-icon:"star";
+  --theme-page-bg:#eceae4;
+}
+
+/* ── Alias-Layer ──────────────────────────────────────────────────────────
+   Biegt die bestehenden --pubg-*-Variablen (in _pubg.css definiert) auf die
+   Theme-Tokens um. Greift, weil dieses File NACH _pubg.css geladen wird:
+   gleiche :root-Spezifitaet, spaeteres Stylesheet gewinnt. Damit sind alle
+   PUBG-Widgets sofort theme-faehig (Farb-/Form-/Typo-Ebene), ohne dass ihr
+   eigenes CSS angefasst werden muss. */
+:root {
+  --pubg-purple:    var(--theme-primary);
+  --pubg-purple-bg: var(--theme-surface);
+  --pubg-gold:      var(--theme-accent);
+  --pubg-text:      var(--theme-text);
+  --pubg-muted:     var(--theme-text-dim);
+  --pubg-border:    var(--theme-border);
+  --pubg-radius:    var(--theme-radius);
+  --pubg-page-bg:   var(--theme-page-bg);
+}
