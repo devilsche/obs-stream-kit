@@ -15,7 +15,7 @@ voll themebar sein — ein Theme gestaltet alles um, auch komplett anders.
 ## 2. Token-Schnittstelle (~19 CSS-Custom-Properties, `--theme-*`)
 Alle Sources nutzen NUR diese. Jedes Theme-File füllt die Werte.
 ```
-Akzent   --theme-primary  --theme-accent  --theme-accent-2
+Akzent   --theme-primary  --theme-accent  --theme-accent-2  --theme-on-primary
 Flächen  --theme-bg  --theme-surface  --theme-surface-2  --theme-border
 Text     --theme-text  --theme-text-dim  --theme-text-faint
 Status   --theme-ok  --theme-warn  --theme-danger     (pro Theme eigene Werte)
