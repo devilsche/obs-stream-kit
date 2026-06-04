@@ -18,7 +18,7 @@
   // Ohne Theme = Flamme (Fallback). Nutzung: hotIf(value, threshold, formattedString).
   // Returns HTML — Caller muss innerHTML setzen, nicht textContent.
   PubgUI.hotWrap = (formatted) =>
-    `<span class="pubg-hot-mark" aria-hidden="true"></span><span class="pubg-hot">${formatted}</span>`;
+    `<span class="t-hot-mark" aria-hidden="true"><i></i><i></i><i></i></span><span class="pubg-hot">${formatted}</span>`;
   PubgUI.hotIf = (value, threshold, formatted) =>
     (value || 0) > threshold ? PubgUI.hotWrap(formatted) : formatted;
 
@@ -295,6 +295,15 @@
     else document.addEventListener("DOMContentLoaded", apply);
   };
   PubgUI._applyDock();
+
+  // ?theme=<name> — Debug/Preview-Override fuers LOKALE Testen aller Themes
+  // ohne Server-Injektion. In Produktion injiziert der Server data-theme aufs
+  // <html> (webcore/serving.py); dieser Param greift nur, wenn explizit gesetzt.
+  PubgUI._applyTheme = () => {
+    const t = PubgUI.qs("theme", "");
+    if (t) document.documentElement.setAttribute("data-theme", t);
+  };
+  PubgUI._applyTheme();
 
   PubgUI.animateNumber = function (el, targetValue, opts) {
     const o = opts || {};

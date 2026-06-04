@@ -116,23 +116,8 @@ body.pubg-stale-hidden > *:not(.pubg-filter-bar) { display: none !important; }
   50%      { text-shadow: 0 0 14px currentColor, 0 0 28px currentColor, 0 0 40px currentColor; }
 }
 
-/* Highlight-Marker: Symbol kommt aus dem Theme (--theme-hot-icon), Fallback Flamme.
-   Eigenbewegung je Theme in _theme.css (zap/twinkle/spin); Default = Flackern. */
-.pubg-hot-mark {
-  display: inline-grid;
-  place-items: center;
-  margin-right: 4px;
-  vertical-align: -3px;
-}
-.pubg-hot-mark::before {
-  font-family: "Material Symbols Outlined";
-  font-style: normal;
-  content: var(--theme-hot-icon, "local_fire_department");
-  font-size: 18px;
-  color: var(--theme-accent, #ff7a1f);
-  text-shadow: 0 0 8px currentColor;
-  animation: pubg-fire-flicker 0.6s ease-in-out infinite alternate;
-}
+/* Highlight-Marker .t-hot-mark (Symbol aus --theme-hot-icon + Partikel) lebt in
+   _blocks.css — wird von PubgUI.hotWrap() erzeugt. */
 
 @keyframes pubg-fire-flicker {
   0%   { transform: translateY(0)   scale(1.0); opacity: 1.0; }
