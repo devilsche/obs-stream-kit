@@ -6,10 +6,11 @@
   <title>Stinger Transition — Premium</title>
   <!-- Theme-Fundament: Tokens (--theme-*). data-theme kommt server-injiziert. -->
   <link rel="stylesheet" href="../widgets/_theme.css">
-  <!-- Feste Gaming-Font fuer den Stinger-Namen (unabhaengig vom Theme). -->
+  <!-- Wählbare Gaming-Fonts für den Stinger-Namen (Dashboard-Setting bzw.
+       Theme-Default via --theme-stinger-font). Alle Kandidaten vorgeladen. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Black+Ops+One&family=Teko:wght@700&family=Saira+Stencil+One&family=Bungee&family=Syncopate:wght@700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -94,7 +95,8 @@
       transform: translate(-50%, -50%);
       opacity: 0;
       z-index: 10;
-      font-family: 'Orbitron', sans-serif;
+      /* Dashboard-Override (--stinger-font) > Theme-Default (--theme-stinger-font) > Orbitron */
+      font-family: var(--stinger-font, var(--theme-stinger-font, "Orbitron", sans-serif));
       font-weight: 900;
       font-size: 150px;
       line-height: 1;
@@ -159,6 +161,12 @@
       var _params = new URLSearchParams(location.search);
       document.getElementById('logo-text').textContent =
         _params.get('name') || window.__TWITCH_CHANNEL__ || '';
+
+      /* Font: ?font= override > Dashboard-Setting (__STINGER_FONT__) > Theme-Default.
+         Als CSS-Custom-Property gesetzt (berechneter Wert, kein statisches Styling). */
+      var _font = _params.get('font') || window.__STINGER_FONT__ || '';
+      if (_font) document.documentElement.style.setProperty(
+        '--stinger-font', "'" + _font + "', sans-serif");
 
       /* ── Hintergrund: Fade-In über 20%, dann halten, am Ende ausblenden ── */
       document.getElementById('bg').animate([

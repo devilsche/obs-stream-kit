@@ -18,6 +18,7 @@
   --theme-text:#e8e0f0; --theme-text-dim:#8a7d99; --theme-text-faint:#6b5f7a;
   --theme-ok:#4be39a; --theme-warn:#f2b705; --theme-danger:#ff5c7a;
   --theme-font-display:"DM Sans",system-ui,sans-serif; --theme-font-body:"DM Sans",system-ui,sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-stinger-font:"Orbitron",sans-serif;
   --theme-radius:8px; --theme-border-width:1px; --theme-shadow:0 14px 40px rgba(0,0,0,.4);
   --theme-hot-icon:"local_fire_department";
   --theme-page-bg:linear-gradient(180deg,#1a0d2a 0%,#0a0510 100%);
@@ -29,6 +30,7 @@ html[data-theme="terminal"] {
   --theme-text:#d6e4ef; --theme-text-dim:#7488a0; --theme-text-faint:#4c5d72;
   --theme-ok:#22e0a0; --theme-warn:#ffb547; --theme-danger:#ff4d6d;
   --theme-font-display:"Chakra Petch",sans-serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-stinger-font:"Syncopate",sans-serif;
   --theme-radius:4px; --theme-border-width:1px; --theme-shadow:0 0 0 1px rgba(34,224,214,.15),0 10px 30px rgba(0,0,0,.5);
   --theme-hot-icon:"bolt";
   --theme-page-bg:#070a0f;
@@ -43,6 +45,7 @@ html[data-theme="aurora"] {
   --theme-text:#efe9f6; --theme-text-dim:#bbb0cf; --theme-text-faint:#8478a0;
   --theme-ok:#4be39a; --theme-warn:#f2b705; --theme-danger:#ff6b81;
   --theme-font-display:"Syne",sans-serif; --theme-font-body:"Onest",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-stinger-font:"Teko",sans-serif;
   --theme-radius:18px; --theme-border-width:1px; --theme-shadow:0 18px 50px rgba(0,0,0,.45);
   --theme-hot-icon:"auto_awesome";
   --theme-page-bg:radial-gradient(900px 600px at 70% -10%,rgba(94,42,121,.55),#0c0916 60%);
@@ -54,6 +57,7 @@ html[data-theme="midnight"] {
   --theme-text:#e7eef7; --theme-text-dim:#8294ab; --theme-text-faint:#566377;
   --theme-ok:#3ce08a; --theme-warn:#ffcf3c; --theme-danger:#ff5c5c;
   --theme-font-display:"Bricolage Grotesque",sans-serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-stinger-font:"Black Ops One",sans-serif;
   --theme-radius:14px; --theme-border-width:1px; --theme-shadow:0 14px 40px rgba(0,0,0,.5);
   --theme-hot-icon:"bolt";
   --theme-page-bg:#0a0e14;
@@ -65,6 +69,7 @@ html[data-theme="editorial"] {
   --theme-text:#1c1a16; --theme-text-dim:#6b6457; --theme-text-faint:#a8a092;
   --theme-ok:#5a7d3a; --theme-warn:#bd6a00; --theme-danger:#c0392b;
   --theme-font-display:"Fraunces",serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-stinger-font:"Saira Stencil One",sans-serif;
   --theme-radius:3px; --theme-border-width:1.5px; --theme-shadow:0 10px 30px rgba(28,26,22,.1);
   --theme-hot-icon:"verified";
   --theme-page-bg:#f5f1e8;
@@ -76,6 +81,7 @@ html[data-theme="azure"] {
   --theme-text:#dce8f7; --theme-text-dim:#8298b5; --theme-text-faint:#54677f;
   --theme-ok:#3ce0a0; --theme-warn:#ffc24d; --theme-danger:#ff5c6e;
   --theme-font-display:"Sora",sans-serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-stinger-font:"Orbitron",sans-serif;
   --theme-radius:10px; --theme-border-width:1px; --theme-shadow:0 14px 40px rgba(0,0,0,.5);
   --theme-hot-icon:"speed";
   --theme-page-bg:radial-gradient(820px 560px at 70% -10%,rgba(46,155,255,.22),#070d18 60%);
@@ -87,6 +93,7 @@ html[data-theme="swiss"] {
   --theme-text:#0d0d0d; --theme-text-dim:#5c5c57; --theme-text-faint:#9a9a92;
   --theme-ok:#1faa55; --theme-warn:#bd6a00; --theme-danger:#e5251f;
   --theme-font-display:"Archivo",sans-serif; --theme-font-body:"Archivo",sans-serif; --theme-font-mono:"Space Mono",monospace;
+  --theme-stinger-font:"Bungee",sans-serif;
   --theme-radius:0px; --theme-border-width:3px; --theme-shadow:8px 8px 0 #0d0d0d;
   --theme-hot-icon:"star";
   --theme-page-bg:#eceae4;

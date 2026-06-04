@@ -64,6 +64,19 @@
         <div class="dn-note">Gilt für dein ganzes Konto — alle Overlays, Widgets, Tools und das Dashboard.</div>
       </div>
       <div class="dn-field">
+        <label for="stinger_font">Stinger-Schrift</label>
+        <select id="stinger_font" name="stinger_font">
+          <option value=""                  {% if not prefs.stinger_font %}selected{% endif %}>Auto — passend zum Theme</option>
+          <option value="Orbitron"          {% if prefs.stinger_font == 'Orbitron' %}selected{% endif %}>Orbitron — futuristisch</option>
+          <option value="Black Ops One"     {% if prefs.stinger_font == 'Black Ops One' %}selected{% endif %}>Black Ops One — military</option>
+          <option value="Teko"              {% if prefs.stinger_font == 'Teko' %}selected{% endif %}>Teko — schmal/hoch</option>
+          <option value="Saira Stencil One" {% if prefs.stinger_font == 'Saira Stencil One' %}selected{% endif %}>Saira Stencil — Schablone</option>
+          <option value="Bungee"            {% if prefs.stinger_font == 'Bungee' %}selected{% endif %}>Bungee — fett/urban</option>
+          <option value="Syncopate"         {% if prefs.stinger_font == 'Syncopate' %}selected{% endif %}>Syncopate — edel-tech</option>
+        </select>
+        <div class="dn-note">Schrift für den Stinger-Namen (Chrome-Effekt). „Auto" nutzt die zum Theme passende Font.</div>
+      </div>
+      <div class="dn-field">
         <label for="default_range">Default-Range für Widgets</label>
         <select id="default_range" name="default_range">
           <option value="session" {% if prefs.default_range == 'session' %}selected{% endif %}>Session (aktuell/letzte)</option>

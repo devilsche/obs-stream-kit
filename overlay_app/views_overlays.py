@@ -32,10 +32,12 @@ def _serve_tenant_source(token, subdir, filepath):
         abort(404)
     creds = _tenant_creds(g.tenant_id)
     theme = "entry"
+    stinger_font = ""
     conn = _get_conn()
     try:
         from pubg.db_pg import get_setting
         theme = get_setting(conn, g.tenant_id, "theme", "entry") or "entry"
+        stinger_font = get_setting(conn, g.tenant_id, "stinger_font", "") or ""
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()
@@ -45,6 +47,7 @@ def _serve_tenant_source(token, subdir, filepath):
         "__TWITCH_CHANNEL__": creds.twitch_channel or "",
         "__TWITCH_CLIENT_ID__": creds.twitch_client_id or "",
         "__THEME__": theme,
+        "__STINGER_FONT__": stinger_font,
     }
     return serve_html_or_asset(_root(), subdir, filepath, variables, theme=theme)
 

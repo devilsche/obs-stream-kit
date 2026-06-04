@@ -135,6 +135,11 @@ def settings():
             if theme in ("entry", "terminal", "aurora", "midnight",
                          "editorial", "swiss", "azure"):
                 set_setting(conn, g.tenant_id, "theme", theme)
+            # Stinger-Font (Whitelist; "" = Theme-Default)
+            sfont = request.form.get("stinger_font", "")
+            if sfont in ("", "Orbitron", "Black Ops One", "Teko",
+                         "Saira Stencil One", "Bungee", "Syncopate"):
+                set_setting(conn, g.tenant_id, "stinger_font", sfont)
             return redirect("/app/settings?saved=1")
         creds = core_creds.get(conn, g.tenant_id)
         prefs = {
@@ -142,6 +147,7 @@ def settings():
                                           default="session"),
             "lang": get_setting(conn, g.tenant_id, "ui.lang", default="de"),
             "theme": get_setting(conn, g.tenant_id, "theme", default="entry"),
+            "stinger_font": get_setting(conn, g.tenant_id, "stinger_font", default=""),
         }
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
