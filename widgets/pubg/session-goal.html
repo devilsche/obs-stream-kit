@@ -113,7 +113,7 @@
         const remaining = METRIC === "kd"
           ? (TARGET - value).toFixed(2)
           : Math.max(0, Math.round(TARGET - value));
-        document.getElementById("meta").textContent =
+        document.getElementById("meta").innerHTML =
           (value >= TARGET) ? '<span class="material-symbols-outlined" aria-hidden="true">local_fire_department</span> Goal reached' : `${remaining} ${cfg.label} to go`;
 
         if (value >= TARGET && !KEEP) {
