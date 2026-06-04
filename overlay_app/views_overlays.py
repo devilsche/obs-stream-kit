@@ -25,17 +25,28 @@ def _tenant_creds(tenant_id: int):
 
 
 def _serve_tenant_source(token, subdir, filepath):
-    """HTML/Asset aus <subdir> token-scoped ausliefern (mit Window-Var-Inject)."""
+    """HTML/Asset aus <subdir> token-scoped ausliefern (mit Window-Var-Inject +
+    server-injiziertem Tenant-Theme, damit z.B. Alerts im hinterlegten Theme
+    statt im Entry-Look erscheinen)."""
     if g.tenant_id is None:
         abort(404)
     creds = _tenant_creds(g.tenant_id)
+    theme = "entry"
+    conn = _get_conn()
+    try:
+        from pubg.db_pg import get_setting
+        theme = get_setting(conn, g.tenant_id, "theme", "entry") or "entry"
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            conn.close()
     variables = {
         "__SERVE_BASE__": f"/s/{token}/",
         "__STATIC_BASE__": f"/s/{token}/",
         "__TWITCH_CHANNEL__": creds.twitch_channel or "",
         "__TWITCH_CLIENT_ID__": creds.twitch_client_id or "",
+        "__THEME__": theme,
     }
-    return serve_html_or_asset(_root(), subdir, filepath, variables)
+    return serve_html_or_asset(_root(), subdir, filepath, variables, theme=theme)
 
 
 @bp_overlays.route("/s/<token>/overlays/<path:filepath>")

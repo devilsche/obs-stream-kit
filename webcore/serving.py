@@ -64,14 +64,20 @@ def serve_asset(root: str, subdir: str, filepath: str):
     return send_from_directory(os.path.dirname(full), os.path.basename(full))
 
 
-def serve_html_or_asset(root: str, subdir: str, filepath: str, variables: dict):
-    """HTML-Dateien mit Inject ausliefern, alles andere als statisches Asset."""
+def serve_html_or_asset(root: str, subdir: str, filepath: str, variables: dict,
+                        theme: str = None):
+    """HTML-Dateien mit Inject ausliefern, alles andere als statisches Asset.
+    Mit `theme` wird server-seitig data-theme aufs <html> gesetzt (kein FOUC) —
+    no-cache, damit OBS/Browser kein veraltetes data-theme zwischenspeichert."""
     full = _safe_full_path(root, subdir, filepath)
     if full is None:
         abort(404)
     if filepath.endswith(".html"):
         with open(full, "r", encoding="utf-8") as f:
             html = f.read()
+        if theme:
+            html = inject_theme(html, theme)
         return (inject_window_vars(html, variables), 200,
-                {"Content-Type": "text/html; charset=utf-8"})
+                {"Content-Type": "text/html; charset=utf-8",
+                 "Cache-Control": "no-cache, must-revalidate"})
     return send_from_directory(os.path.dirname(full), os.path.basename(full))
