@@ -668,25 +668,36 @@ class EndpointRegistry:
                 raw = ApiClient(api_key="").get_telemetry(tele_url)
                 replay_source = "api"
             except Exception as e:
-                raw = None
-                api_err = f"{type(e).__name__}: {e}"
+                api_err = f"CDN: {type(e).__name__}: {e}"
+
+        # Fallback 2: weder HiDrive noch eine gespeicherte telemetry_url (Match
+        # nicht in der Tenant-DB — z.B. gemeinsame Runde, die fuer diesen Tenant
+        # nie gepollt wurde). Match frisch von der PUBG-API holen, telemetry_url
+        # daraus ziehen, dann vom CDN laden. /matches/{id} ist nicht rate-limited.
+        if not raw and self.client is not None:
+            try:
+                from pubg.match_parser import parse_match_response
+                parsed = parse_match_response(
+                    self.client.get_match(match_id), self.my_account_id)
+                if not map_name:
+                    map_name = parsed.get("map_name")
+                    if map_name:
+                        mapKm = _map_meta(map_name)
+                live_url = parsed.get("telemetry_url")
+                if live_url:
+                    raw = self.client.get_telemetry(live_url)
+                    replay_source = "api-live"
+            except Exception as e:
+                api_err = api_err or f"API: {type(e).__name__}: {e}"
+
         if not raw:
-            # Diagnostische 404 — macht sichtbar, an welcher Stelle es klemmt.
-            if not m_row:
-                return _err(404, "Match nicht in der DB dieses Tenants. "
-                                  "ID korrekt? Bei ?asTenant=… den richtigen "
-                                  "Tenant gewaehlt? (HiDrive hatte ebenfalls "
-                                  "kein Blob.)")
-            if not tele_url:
-                return _err(404, "Keine Telemetrie: HiDrive hat kein Blob und "
-                                  "in der DB ist keine telemetry_url hinterlegt "
-                                  "(Match evtl. vor dem Telemetrie-Tracking "
-                                  "importiert oder Poll lief damals fehl).")
+            # Diagnostische 404 — macht sichtbar, woran es liegt.
             if api_err:
-                return _err(404, f"Telemetrie-Download fehlgeschlagen "
-                                  f"(API-Fallback ueber telemetry_url): {api_err}")
-            return _err(404, "Keine Telemetrie verfuegbar (HiDrive + API "
-                              "beide leer).")
+                return _err(404, f"Telemetrie nicht ladbar: {api_err}")
+            return _err(404, "Keine Telemetrie verfuegbar — Match nicht auf "
+                              "HiDrive, keine telemetry_url in der DB, und die "
+                              "PUBG-API liefert nichts dazu (Match-ID korrekt? "
+                              ">14 Tage alt?).")
 
         # map_name aus Raw extrahieren wenn DB-Row fehlte
         if not map_name:
