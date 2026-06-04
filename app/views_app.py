@@ -137,8 +137,9 @@ def settings():
                 set_setting(conn, g.tenant_id, "theme", theme)
             # Stinger-Font (Whitelist; "" = Theme-Default)
             sfont = request.form.get("stinger_font", "")
-            if sfont in ("", "Orbitron", "Black Ops One", "Teko",
-                         "Saira Stencil One", "Bungee", "Syncopate"):
+            if sfont in ("", "Orbitron", "Russo One", "Black Ops One", "Audiowide",
+                         "Teko", "Saira Stencil One", "Wallpoet", "Bungee",
+                         "Chakra Petch", "Oxanium", "Rajdhani", "Syncopate"):
                 set_setting(conn, g.tenant_id, "stinger_font", sfont)
             return redirect("/app/settings?saved=1")
         creds = core_creds.get(conn, g.tenant_id)

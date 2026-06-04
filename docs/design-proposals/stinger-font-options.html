@@ -5,11 +5,10 @@
   <title>Stinger — Font-Auswahl (Chrome)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <!-- Kandidaten: kräftige Gaming/Display-Fonts (gut für Chrome-Relief) -->
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Russo+One&family=Black+Ops+One&family=Audiowide&family=Teko:wght@700&family=Saira+Stencil+One&family=Wallpoet&family=Bungee&family=Chakra+Petch:wght@700&family=Oxanium:wght@800&family=Rajdhani:wght@700&family=Syncopate:wght@700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --accent:  #2e9bff;   /* Azure-Demo (entspricht --theme-accent im Azure-Theme) */
+      --accent:  #2e9bff;
       --primary: #2e9bff;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -33,53 +32,117 @@
     .label b { color: #fff; font-size: 15px; display: block; margin-bottom: 3px; }
     .label .css { color: var(--accent); font-family: ui-monospace, monospace; font-size: 11px; }
 
-    /* Chrome-Effekt (identisch zum Stinger) */
-    .chrome {
-      font-size: 88px; line-height: 1; letter-spacing: 0.04em;
-      text-transform: uppercase; white-space: nowrap;
-      background: linear-gradient(180deg,
-        color-mix(in srgb, var(--accent) 35%, #ffffff) 0%,
-        #ffffff 12%, #d6dde4 30%, #9aa3ad 47%,
-        #4c555f 50%, #b9c2cc 53%, #ffffff 74%,
-        color-mix(in srgb, var(--accent) 45%, #aeb6bf) 100%);
-      -webkit-background-clip: text; background-clip: text;
-      color: transparent; -webkit-text-fill-color: transparent;
-      -webkit-text-stroke: 2px color-mix(in srgb, var(--primary) 55%, #000);
-      paint-order: stroke fill;
-      filter:
-        drop-shadow(0 2px 2px rgba(0,0,0,0.6))
-        drop-shadow(0 0 28px color-mix(in srgb, var(--accent) 75%, transparent));
+    /*
+     * Grid-Stack: alle drei Layer in derselben Zelle.
+     * DOM-Reihenfolge = Paint-Reihenfolge: glow → shadow → chrome.
+     * Kein filter auf .chrome — kein Fragmentieren.
+     */
+    .chrome-wrap {
+      display: inline-grid;
+      font-size: 88px;
+      line-height: 1;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .chrome-wrap > * { grid-area: 1 / 1; }
+
+    /* Layer 1: Glow-Halo */
+    .chrome-glow {
+      color: var(--accent);
+      filter: blur(18px);
+      opacity: 0.7;
+      pointer-events: none;
+      user-select: none;
     }
 
-    .f-orbitron  { font-family: 'Orbitron', sans-serif;       font-weight: 900; }
+    /* Layer 2: Tiefenschatten + Kontur — dunkler Layer, kein background-clip */
+    .chrome-shadow {
+      color: #000d1a;
+      filter: blur(1.5px);
+      transform: translateY(3px);
+      opacity: 0.75;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* Layer 3: Chrome-Gradient — kein filter, sauber auf allen Fonts */
+    .chrome {
+      background: linear-gradient(180deg,
+        color-mix(in srgb, var(--accent) 25%, #ffffff) 0%,
+        #ffffff 12%, #eaeff3 30%, #c2cad2 47%,
+        #7a8892 50%, #d4dce4 53%, #ffffff 74%,
+        color-mix(in srgb, var(--accent) 35%, #d0d8e0) 100%);
+      -webkit-background-clip: text; background-clip: text;
+      color: transparent; -webkit-text-fill-color: transparent;
+    }
+
+    /* Font-Klassen auf .chrome-wrap — alle Layer erben */
+    .f-orbitron  { font-family: 'Orbitron', sans-serif;          font-weight: 900; }
     .f-russo     { font-family: 'Russo One', sans-serif; }
     .f-blackops  { font-family: 'Black Ops One', sans-serif; }
     .f-audiowide { font-family: 'Audiowide', sans-serif; }
-    .f-teko      { font-family: 'Teko', sans-serif;           font-weight: 700; font-size: 110px; }
+    .f-teko      { font-family: 'Teko', sans-serif;              font-weight: 700; font-size: 110px; }
     .f-saira     { font-family: 'Saira Stencil One', sans-serif; }
     .f-wallpoet  { font-family: 'Wallpoet', sans-serif; }
-    .f-bungee    { font-family: 'Bungee', sans-serif;         font-size: 72px; }
-    .f-chakra    { font-family: 'Chakra Petch', sans-serif;   font-weight: 700; }
-    .f-oxanium   { font-family: 'Oxanium', sans-serif;        font-weight: 800; }
-    .f-rajdhani  { font-family: 'Rajdhani', sans-serif;       font-weight: 700; }
-    .f-syncopate { font-family: 'Syncopate', sans-serif;      font-weight: 700; font-size: 62px; }
+    .f-bungee    { font-family: 'Bungee', sans-serif;            font-size: 72px; }
+    .f-chakra    { font-family: 'Chakra Petch', sans-serif;      font-weight: 700; }
+    .f-oxanium   { font-family: 'Oxanium', sans-serif;           font-weight: 800; }
+    .f-rajdhani  { font-family: 'Rajdhani', sans-serif;          font-weight: 700; }
+    .f-syncopate { font-family: 'Syncopate', sans-serif;         font-weight: 700; font-size: 62px; }
   </style>
 </head>
 <body>
   <h1>Stinger-Name — Font-Auswahl im Chrome-Effekt</h1>
   <p class="hint">Beispiel-Name <code>LUCKOR_HD</code> · Azure-Demo-Farbe · sag mir die Nummer/Namen, dann setze ich die Font fix im Stinger.</p>
 
-  <div class="row"><div class="label"><b>1 · Orbitron</b>futuristisch, geometrisch (aktuell)<span class="css">Orbitron 900</span></div><div class="chrome f-orbitron">LUCKOR_HD</div></div>
-  <div class="row"><div class="label"><b>2 · Russo One</b>kräftig, breit, Impact<span class="css">Russo One</span></div><div class="chrome f-russo">LUCKOR_HD</div></div>
-  <div class="row"><div class="label"><b>3 · Black Ops One</b>military / action<span class="css">Black Ops One</span></div><div class="chrome f-blackops">LUCKOR_HD</div></div>
-  <div class="row"><div class="label"><b>4 · Audiowide</b>retro-futuristisch, tech<span class="css">Audiowide</span></div><div class="chrome f-audiowide">LUCKOR_HD</div></div>
-  <div class="row"><div class="label"><b>5 · Teko</b>schmal, hoch, modern<span class="css">Teko 700</span></div><div class="chrome f-teko">LUCKOR_HD</div></div>
-  <div class="row"><div class="label"><b>6 · Saira Stencil One</b>Stencil / Schablone<span class="css">Saira Stencil One</span></div><div class="chrome f-saira">LUCKOR_HD</div></div>
-  <div class="row"><div class="label"><b>7 · Wallpoet</b>kantig, sci-fi, technisch<span class="css">Wallpoet</span></div><div class="chrome f-wallpoet">LUCKOR_HD</div></div>
-  <div class="row"><div class="label"><b>8 · Bungee</b>fett, urban, sign-style<span class="css">Bungee</span></div><div class="chrome f-bungee">LUCKOR_HD</div></div>
-  <div class="row"><div class="label"><b>9 · Chakra Petch</b>tech, leicht eckig<span class="css">Chakra Petch 700</span></div><div class="chrome f-chakra">LUCKOR_HD</div></div>
-  <div class="row"><div class="label"><b>10 · Oxanium</b>gaming/esports, modern<span class="css">Oxanium 800</span></div><div class="chrome f-oxanium">LUCKOR_HD</div></div>
-  <div class="row"><div class="label"><b>11 · Rajdhani</b>clean, schmal, tech<span class="css">Rajdhani 700</span></div><div class="chrome f-rajdhani">LUCKOR_HD</div></div>
-  <div class="row"><div class="label"><b>12 · Syncopate</b>weit gesperrt, edel-tech<span class="css">Syncopate 700</span></div><div class="chrome f-syncopate">LUCKOR_HD</div></div>
+  <div class="row">
+    <div class="label"><b>1 · Orbitron</b>futuristisch, geometrisch (aktuell)<span class="css">Orbitron 900</span></div>
+    <div class="chrome-wrap f-orbitron"><div class="chrome-glow" aria-hidden="true">LUCKOR_HD</div><div class="chrome-shadow" aria-hidden="true">LUCKOR_HD</div><div class="chrome">LUCKOR_HD</div></div>
+  </div>
+  <div class="row">
+    <div class="label"><b>2 · Russo One</b>kräftig, breit, Impact<span class="css">Russo One</span></div>
+    <div class="chrome-wrap f-russo"><div class="chrome-glow" aria-hidden="true">LUCKOR_HD</div><div class="chrome-shadow" aria-hidden="true">LUCKOR_HD</div><div class="chrome">LUCKOR_HD</div></div>
+  </div>
+  <div class="row">
+    <div class="label"><b>3 · Black Ops One</b>military / action<span class="css">Black Ops One</span></div>
+    <div class="chrome-wrap f-blackops"><div class="chrome-glow" aria-hidden="true">LUCKOR_HD</div><div class="chrome-shadow" aria-hidden="true">LUCKOR_HD</div><div class="chrome">LUCKOR_HD</div></div>
+  </div>
+  <div class="row">
+    <div class="label"><b>4 · Audiowide</b>retro-futuristisch, tech<span class="css">Audiowide</span></div>
+    <div class="chrome-wrap f-audiowide"><div class="chrome-glow" aria-hidden="true">LUCKOR_HD</div><div class="chrome-shadow" aria-hidden="true">LUCKOR_HD</div><div class="chrome">LUCKOR_HD</div></div>
+  </div>
+  <div class="row">
+    <div class="label"><b>5 · Teko</b>schmal, hoch, modern<span class="css">Teko 700</span></div>
+    <div class="chrome-wrap f-teko"><div class="chrome-glow" aria-hidden="true">LUCKOR_HD</div><div class="chrome-shadow" aria-hidden="true">LUCKOR_HD</div><div class="chrome">LUCKOR_HD</div></div>
+  </div>
+  <div class="row">
+    <div class="label"><b>6 · Saira Stencil One</b>Stencil / Schablone<span class="css">Saira Stencil One</span></div>
+    <div class="chrome-wrap f-saira"><div class="chrome-glow" aria-hidden="true">LUCKOR_HD</div><div class="chrome-shadow" aria-hidden="true">LUCKOR_HD</div><div class="chrome">LUCKOR_HD</div></div>
+  </div>
+  <div class="row">
+    <div class="label"><b>7 · Wallpoet</b>kantig, sci-fi, technisch<span class="css">Wallpoet</span></div>
+    <div class="chrome-wrap f-wallpoet"><div class="chrome-glow" aria-hidden="true">LUCKOR_HD</div><div class="chrome-shadow" aria-hidden="true">LUCKOR_HD</div><div class="chrome">LUCKOR_HD</div></div>
+  </div>
+  <div class="row">
+    <div class="label"><b>8 · Bungee</b>fett, urban, sign-style<span class="css">Bungee</span></div>
+    <div class="chrome-wrap f-bungee"><div class="chrome-glow" aria-hidden="true">LUCKOR_HD</div><div class="chrome-shadow" aria-hidden="true">LUCKOR_HD</div><div class="chrome">LUCKOR_HD</div></div>
+  </div>
+  <div class="row">
+    <div class="label"><b>9 · Chakra Petch</b>tech, leicht eckig<span class="css">Chakra Petch 700</span></div>
+    <div class="chrome-wrap f-chakra"><div class="chrome-glow" aria-hidden="true">LUCKOR_HD</div><div class="chrome-shadow" aria-hidden="true">LUCKOR_HD</div><div class="chrome">LUCKOR_HD</div></div>
+  </div>
+  <div class="row">
+    <div class="label"><b>10 · Oxanium</b>gaming/esports, modern<span class="css">Oxanium 800</span></div>
+    <div class="chrome-wrap f-oxanium"><div class="chrome-glow" aria-hidden="true">LUCKOR_HD</div><div class="chrome-shadow" aria-hidden="true">LUCKOR_HD</div><div class="chrome">LUCKOR_HD</div></div>
+  </div>
+  <div class="row">
+    <div class="label"><b>11 · Rajdhani</b>clean, schmal, tech<span class="css">Rajdhani 700</span></div>
+    <div class="chrome-wrap f-rajdhani"><div class="chrome-glow" aria-hidden="true">LUCKOR_HD</div><div class="chrome-shadow" aria-hidden="true">LUCKOR_HD</div><div class="chrome">LUCKOR_HD</div></div>
+  </div>
+  <div class="row">
+    <div class="label"><b>12 · Syncopate</b>weit gesperrt, edel-tech<span class="css">Syncopate 700</span></div>
+    <div class="chrome-wrap f-syncopate"><div class="chrome-glow" aria-hidden="true">LUCKOR_HD</div><div class="chrome-shadow" aria-hidden="true">LUCKOR_HD</div><div class="chrome">LUCKOR_HD</div></div>
+  </div>
 </body>
 </html>

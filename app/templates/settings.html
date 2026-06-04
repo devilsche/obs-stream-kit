@@ -68,10 +68,16 @@
         <select id="stinger_font" name="stinger_font">
           <option value=""                  {% if not prefs.stinger_font %}selected{% endif %}>Auto — passend zum Theme</option>
           <option value="Orbitron"          {% if prefs.stinger_font == 'Orbitron' %}selected{% endif %}>Orbitron — futuristisch</option>
+          <option value="Russo One"         {% if prefs.stinger_font == 'Russo One' %}selected{% endif %}>Russo One — kräftig/breit</option>
           <option value="Black Ops One"     {% if prefs.stinger_font == 'Black Ops One' %}selected{% endif %}>Black Ops One — military</option>
+          <option value="Audiowide"         {% if prefs.stinger_font == 'Audiowide' %}selected{% endif %}>Audiowide — retro-tech</option>
           <option value="Teko"              {% if prefs.stinger_font == 'Teko' %}selected{% endif %}>Teko — schmal/hoch</option>
           <option value="Saira Stencil One" {% if prefs.stinger_font == 'Saira Stencil One' %}selected{% endif %}>Saira Stencil — Schablone</option>
+          <option value="Wallpoet"          {% if prefs.stinger_font == 'Wallpoet' %}selected{% endif %}>Wallpoet — kantig/sci-fi</option>
           <option value="Bungee"            {% if prefs.stinger_font == 'Bungee' %}selected{% endif %}>Bungee — fett/urban</option>
+          <option value="Chakra Petch"      {% if prefs.stinger_font == 'Chakra Petch' %}selected{% endif %}>Chakra Petch — tech/eckig</option>
+          <option value="Oxanium"           {% if prefs.stinger_font == 'Oxanium' %}selected{% endif %}>Oxanium — gaming/esports</option>
+          <option value="Rajdhani"          {% if prefs.stinger_font == 'Rajdhani' %}selected{% endif %}>Rajdhani — clean/schmal</option>
           <option value="Syncopate"         {% if prefs.stinger_font == 'Syncopate' %}selected{% endif %}>Syncopate — edel-tech</option>
         </select>
         <div class="dn-note">Schrift für den Stinger-Namen (Chrome-Effekt). „Auto" nutzt die zum Theme passende Font.</div>
