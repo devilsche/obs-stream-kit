@@ -312,7 +312,11 @@
   // ohne Server-Injektion. In Produktion injiziert der Server data-theme aufs
   // <html> (webcore/serving.py); dieser Param greift nur, wenn explizit gesetzt.
   PubgUI._applyTheme = () => {
-    const t = PubgUI.qs("theme", "");
+    // Theme robust setzen: ?theme=-Override > server-injiziertes window.__THEME__.
+    // So greift das Theme auch, wenn eine gecachte HTML kein data-theme am
+    // <html>-Tag hat (das __THEME__ steckt im frisch injizierten <script>).
+    const t = PubgUI.qs("theme", "")
+      || (typeof window.__THEME__ === "string" ? window.__THEME__ : "");
     if (t) document.documentElement.setAttribute("data-theme", t);
   };
   PubgUI._applyTheme();

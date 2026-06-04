@@ -71,7 +71,10 @@ def widget_file(token, filepath):
             "__THEME__": theme,
         }
         html = inject_theme(html, theme)
+        # no-cache: die HTML wird pro Request mit Token + Theme injiziert und darf
+        # nicht veraltet im Browser/OBS haengenbleiben (sonst altes/kein data-theme).
         return (inject_window_vars(html, variables), 200,
-                {"Content-Type": "text/html; charset=utf-8"})
+                {"Content-Type": "text/html; charset=utf-8",
+                 "Cache-Control": "no-cache, must-revalidate"})
 
     return send_from_directory(os.path.dirname(full_path), os.path.basename(full_path))
