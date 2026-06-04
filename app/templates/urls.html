@@ -323,7 +323,12 @@
     const status = document.getElementById("urlCopyStatus");
     const scope = switchesRoot || document.createElement("div");
 
-    function refresh() { urlText.textContent = buildUrl(base, scope); }
+    // _chromeUpdate wird ggf. unten belegt; refresh() ruft es immer nach dem URL-Update auf
+    let _chromeUpdate = null;
+    function refresh() {
+      urlText.textContent = buildUrl(base, scope);
+      if (_chromeUpdate) _chromeUpdate();
+    }
 
     // ── Chrome-Vorschau (Stinger) ─────────────────────────────
     if (meta && meta.chromePreview && document.getElementById("cpWrap")) {
@@ -347,7 +352,9 @@
         `;
         document.head.appendChild(st);
       }
-      function updateChrome() {
+      // Kein eigener Listener — refresh() ruft _chromeUpdate() auf, NACHDEM
+      // die aktive Klasse bereits gesetzt wurde. Kein Race mehr.
+      _chromeUpdate = function() {
         const nameGrp = scope.querySelector('[data-param="name"]');
         const nameInp = nameGrp && nameGrp.querySelector(".sw-input");
         const name = (nameInp && nameInp.value.trim()) || "PREVIEW";
@@ -360,10 +367,8 @@
         });
         const wrap = document.getElementById("cpWrap");
         if (wrap) wrap.style.fontFamily = font ? "'" + font + "', sans-serif" : "";
-      }
-      scope.querySelectorAll(".sw-btn").forEach(b => b.addEventListener("click", updateChrome));
-      scope.querySelectorAll(".sw-input").forEach(i => i.addEventListener("input", updateChrome));
-      updateChrome();
+      };
+      _chromeUpdate(); // initialer Zustand
     }
 
     if (switchesRoot) {
