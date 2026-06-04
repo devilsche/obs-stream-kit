@@ -3,12 +3,13 @@
 
 {# Eine Source-Karte fuers Grid. switches/params als Listen → im Markup als
    HTML-sicheres JSON (tojson escaped < > & ' → sicher im single-quote-Attr). #}
-{% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[]) %}
+{% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[], chrome_preview=False) %}
 <button type="button" class="url-card"
         data-kind="{{ kind }}" data-label="{{ label }}" data-cat="{{ cat }}"
         data-path="{{ path }}" data-base="{{ base }}"
         {% if size %}data-size="{{ size }}"{% endif %}
         {% if desc %}data-desc="{{ desc }}"{% endif %}
+        {% if chrome_preview %}data-chrome-preview="true"{% endif %}
         data-switches='{{ switches|tojson }}' data-params='{{ params|tojson }}'>
   <span class="url-card__corner" aria-hidden="true"></span>
   <span class="url-card__top">
@@ -116,7 +117,9 @@
           {% for t in transitions %}
           {{ src_card('overlay', 'Transition', t.label,
                       base_url ~ '/s/' ~ token ~ '/transitions/' ~ t.file, 'transitions/' ~ t.file,
-                      t.size, t.desc) }}
+                      t.size, t.desc,
+                      (t.switches or []), (t.params or []),
+                      t.chrome_preview|default(False)) }}
           {% endfor %}
         </div>
       </div>
@@ -254,11 +257,21 @@
 
     const label = escapeHtml(card.dataset.label);
     const desc = card.dataset.desc ? `<p class="url-dbox__desc">${escapeHtml(card.dataset.desc)}</p>` : "";
+    const hasChromePreview = card.dataset.chromePreview === "true";
 
     let tag, body;
     if (switches.length) {
       tag = "konfigurieren";
-      body = `<div class="url-switches" id="urlSwitches">${renderSwitches(switches)}</div>`;
+      const chromeHtml = hasChromePreview ? `
+        <div class="url-chrome-preview">
+          <div class="url-chrome-label">// Vorschau</div>
+          <div class="url-chrome-wrap" id="cpWrap">
+            <div class="url-chrome-glow"   id="cpGlow"   aria-hidden="true">PREVIEW</div>
+            <div class="url-chrome-shadow" id="cpShadow" aria-hidden="true">PREVIEW</div>
+            <div class="url-chrome-chrome" id="cpChrome">PREVIEW</div>
+          </div>
+        </div>` : "";
+      body = `<div class="url-switches" id="urlSwitches">${renderSwitches(switches)}</div>${chromeHtml}`;
     } else if (params.length) {
       tag = "Parameter";
       body = `<div class="url-param url-param--info">
@@ -294,7 +307,8 @@
       </div>`;
 
     wireDetail(base, { kind: card.dataset.kind, size: card.dataset.size,
-                       shownUrl: hasParamHints ? shownUrl : null });
+                       shownUrl: hasParamHints ? shownUrl : null,
+                       chromePreview: hasChromePreview });
     view.hidden = true;
     detailView.hidden = false;
     document.getElementById("urlBack").focus();
@@ -310,6 +324,47 @@
     const scope = switchesRoot || document.createElement("div");
 
     function refresh() { urlText.textContent = buildUrl(base, scope); }
+
+    // ── Chrome-Vorschau (Stinger) ─────────────────────────────
+    if (meta && meta.chromePreview && document.getElementById("cpWrap")) {
+      if (!document.getElementById("urlChromeFonts")) {
+        const lnk = document.createElement("link");
+        lnk.id = "urlChromeFonts"; lnk.rel = "stylesheet";
+        lnk.href = "https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Russo+One&family=Black+Ops+One&family=Audiowide&family=Teko:wght@700&family=Saira+Stencil+One&family=Wallpoet&family=Bungee&family=Chakra+Petch:wght@700&family=Oxanium:wght@800&family=Rajdhani:wght@700&family=Syncopate:wght@700&display=swap";
+        document.head.appendChild(lnk);
+      }
+      if (!document.getElementById("urlChromeStyles")) {
+        const st = document.createElement("style");
+        st.id = "urlChromeStyles";
+        st.textContent = `
+          .url-chrome-preview{margin-top:24px}
+          .url-chrome-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted,#888);margin-bottom:14px}
+          .url-chrome-wrap{display:inline-grid;font-size:60px;line-height:1;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;font-weight:900}
+          .url-chrome-wrap>*{grid-area:1/1}
+          .url-chrome-glow{color:var(--theme-accent,#f2b705);filter:blur(14px);opacity:.7;pointer-events:none;user-select:none}
+          .url-chrome-shadow{color:#000d1a;filter:blur(1.5px);transform:translateY(3px);opacity:.75;pointer-events:none;user-select:none}
+          .url-chrome-chrome{background:linear-gradient(180deg,color-mix(in srgb,var(--theme-accent,#f2b705) 25%,#fff) 0%,#fff 12%,#eaeff3 30%,#c2cad2 47%,#7a8892 50%,#d4dce4 53%,#fff 74%,color-mix(in srgb,var(--theme-accent,#f2b705) 35%,#d0d8e0) 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+        `;
+        document.head.appendChild(st);
+      }
+      function updateChrome() {
+        const nameGrp = scope.querySelector('[data-param="name"]');
+        const nameInp = nameGrp && nameGrp.querySelector(".sw-input");
+        const name = (nameInp && nameInp.value.trim()) || "PREVIEW";
+        const fontGrp = scope.querySelector('[data-param="font"]');
+        const fontBtn = fontGrp && fontGrp.querySelector(".sw-btn.active");
+        const font = (fontBtn && fontBtn.dataset.value) || "";
+        ["cpGlow", "cpShadow", "cpChrome"].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = name;
+        });
+        const wrap = document.getElementById("cpWrap");
+        if (wrap) wrap.style.fontFamily = font ? "'" + font + "', sans-serif" : "";
+      }
+      scope.querySelectorAll(".sw-btn").forEach(b => b.addEventListener("click", updateChrome));
+      scope.querySelectorAll(".sw-input").forEach(i => i.addEventListener("input", updateChrome));
+      updateChrome();
+    }
 
     if (switchesRoot) {
       switchesRoot.querySelectorAll(".sw-group").forEach(group => {

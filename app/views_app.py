@@ -184,9 +184,9 @@ def urls():
     base_url = request.url_root.rstrip("/")
     # Alles laeuft unter einer Domain (stream-overlay.com) -> Overlay-URLs nutzen
     # dieselbe Basis. Overlay-Szenen kommen aus dem geteilten Katalog.
-    from overlay_app.overlay_catalog import OVERLAYS, ALERTS, DECOR, list_dir_sources
+    from overlay_app.overlay_catalog import OVERLAYS, ALERTS, DECOR, TRANSITIONS, list_dir_sources
     stingers = list_dir_sources(project_root, "stingers", desc="Stinger-Transition mit Meme-Effekt.")
-    transitions = list_dir_sources(project_root, "transitions", desc="Konfigurierbarer Stinger-Transition-Player.")
+    transitions = TRANSITIONS
     return render_template("urls.html",
                            user=g.user, token=token,
                            widgets=widgets_list, base_url=base_url,

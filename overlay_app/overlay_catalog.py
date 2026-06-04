@@ -50,7 +50,46 @@ DECOR = [
 ]
 
 
-def list_dir_sources(root: str, subdir: str, size: str = "1920×1080", desc: str = ""):
+TRANSITIONS = [
+    {
+        "key": "stinger",
+        "label": "Stinger",
+        "file": "stinger.html",
+        "size": "1920×1080",
+        "desc": "Konfigurierbarer Stinger-Transition-Player.",
+        "params": [],
+        "chrome_preview": True,
+        "switches": [
+            {
+                "key": "name", "label": "Name", "type": "text",
+                "default": "", "placeholder": "z.B. LUCKOR_HD",
+                "tooltip": "Twitch-Channel (Override des Server-Defaults)",
+            },
+            {
+                "key": "font", "label": "Schrift", "type": "select", "default": "",
+                "options": [
+                    ["", "Auto"],
+                    ["Orbitron", "Orbitron"],
+                    ["Russo One", "Russo One"],
+                    ["Black Ops One", "Black Ops One"],
+                    ["Audiowide", "Audiowide"],
+                    ["Teko", "Teko"],
+                    ["Saira Stencil One", "Saira Stencil"],
+                    ["Wallpoet", "Wallpoet"],
+                    ["Bungee", "Bungee"],
+                    ["Chakra Petch", "Chakra Petch"],
+                    ["Oxanium", "Oxanium"],
+                    ["Rajdhani", "Rajdhani"],
+                    ["Syncopate", "Syncopate"],
+                ],
+            },
+        ],
+    },
+]
+
+
+def list_dir_sources(root: str, subdir: str, size: str = "1920×1080",
+                     desc: str = "", params: list = None):
     """Alle *.html in <root>/<subdir> als Source-Dicts (Label automatisch aus
     dem Dateinamen). Fuer dynamische Bereiche wie Stinger-Transitions, bei denen
     eine manuelle Pflege jeder einzelnen Datei unnoetiger Aufwand waere."""
@@ -59,5 +98,6 @@ def list_dir_sources(root: str, subdir: str, size: str = "1920×1080", desc: str
         fn = os.path.basename(path)
         key = fn[:-5]
         out.append({"key": key, "label": key.replace("-", " ").title(),
-                    "file": fn, "size": size, "desc": desc, "params": []})
+                    "file": fn, "size": size, "desc": desc,
+                    "params": list(params) if params else []})
     return out
