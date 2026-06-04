@@ -262,16 +262,7 @@
     let tag, body;
     if (switches.length) {
       tag = "konfigurieren";
-      const chromeHtml = hasChromePreview ? `
-        <div class="url-chrome-preview">
-          <div class="url-chrome-label">// Vorschau</div>
-          <div class="url-chrome-wrap" id="cpWrap">
-            <div class="url-chrome-glow"   id="cpGlow"   aria-hidden="true">PREVIEW</div>
-            <div class="url-chrome-shadow" id="cpShadow" aria-hidden="true">PREVIEW</div>
-            <div class="url-chrome-chrome" id="cpChrome">PREVIEW</div>
-          </div>
-        </div>` : "";
-      body = `<div class="url-switches" id="urlSwitches">${renderSwitches(switches)}</div>${chromeHtml}`;
+      body = `<div class="url-switches" id="urlSwitches">${renderSwitches(switches)}</div>`;
     } else if (params.length) {
       tag = "Parameter";
       body = `<div class="url-param url-param--info">
@@ -282,7 +273,16 @@
       tag = "OBS-Source";
       body = `<div class="url-param url-param--info">Keine Parameter — URL einfach als Browser-Source einsetzen.</div>`;
     }
-    const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${body}</div>`;
+    const chromeHtml = hasChromePreview ? `
+      <div class="url-dbox url-chrome-preview">
+        <div class="url-chrome-label">// Vorschau</div>
+        <div class="url-chrome-wrap" id="cpWrap">
+          <div class="url-chrome-glow"   id="cpGlow"   aria-hidden="true">PREVIEW</div>
+          <div class="url-chrome-shadow" id="cpShadow" aria-hidden="true">PREVIEW</div>
+          <div class="url-chrome-chrome" id="cpChrome">PREVIEW</div>
+        </div>
+      </div>` : "";
+    const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${body}</div>${chromeHtml}`;
 
     const infoBits = [];
     if (card.dataset.size) infoBits.push(escapeHtml(card.dataset.size) + " · transparent");
@@ -337,8 +337,8 @@
         const st = document.createElement("style");
         st.id = "urlChromeStyles";
         st.textContent = `
-          .url-chrome-preview{margin-top:24px}
-          .url-chrome-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted,#888);margin-bottom:14px}
+          .url-chrome-preview{overflow:visible!important;padding:20px 24px 28px}
+          .url-chrome-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted,#888);margin-bottom:16px}
           .url-chrome-wrap{display:inline-grid;font-size:60px;line-height:1;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;font-weight:900}
           .url-chrome-wrap>*{grid-area:1/1}
           .url-chrome-glow{color:var(--theme-accent,#f2b705);filter:blur(14px);opacity:.7;pointer-events:none;user-select:none}
