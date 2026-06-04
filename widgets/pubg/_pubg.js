@@ -30,7 +30,7 @@
         + '</svg>'
       : '';
     const cls = isAzure ? "t-hot-mark t-hot-mark--after t-hot-mark--gauge" : "t-hot-mark t-hot-mark--after";
-    return '<span class="' + cls + '" aria-hidden="true">' + gauge + '<i></i><i></i><i></i></span>';
+    return '<span class="' + cls + '" aria-hidden="true">' + gauge + '<i></i><i></i><i></i><i></i><i></i></span>';
   };
 
   // Highlight-Stufe aus aufsteigenden Schwellen [t1,t2,t3]: 0=keine .. 3=insane.

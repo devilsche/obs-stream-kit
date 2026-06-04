@@ -91,17 +91,21 @@ html[data-theme="swiss"] .t-hot-mark i{width:9px;height:9px;border-radius:0;back
 .t-hot--2 .t-hot-mark i{display:none}     /* Stufe 2: Icon, aber keine Partikel */
 /* Stufe 3 — Top-Look: Theme-Icon (Flamme/Blitz/Funkeln/…) bleibt, dazu max Glow +
    Puls + Sparkles. Unterscheidung zu Stufe 2 = Sterne + Pulsieren. */
-.t-hot--3 .pubg-hot{text-shadow:0 0 16px currentColor;animation:hot-pulse 2s ease-in-out infinite}
+.t-hot--3 .pubg-hot{display:inline-block;text-shadow:0 0 18px currentColor;animation:hot-pulse-3 1.5s ease-in-out infinite}
+@keyframes hot-pulse-3{0%,100%{transform:scale(1);text-shadow:0 0 10px currentColor}
+  50%{transform:scale(1.09);text-shadow:0 0 26px currentColor,0 0 10px currentColor}}
 /* Stufe-3-Partikel = drehende Sterne (Akzentfarbe). Robust: display erzwingen
    (schlaegt compact/editorial/reduced-motion display:none), nth-of-type (das Azure-
    Tacho-SVG verschiebt sonst die i-Indizes), Animation explizit setzen. */
 .t-hot--3 .t-hot-mark i{display:block!important;position:absolute;left:50%;top:50%;
-  width:7px;height:7px;border-radius:0;opacity:0;pointer-events:none;
-  background:var(--theme-accent);box-shadow:0 0 4px var(--theme-accent);
+  width:8px;height:8px;border-radius:0;opacity:0;pointer-events:none;
+  background:var(--theme-accent);box-shadow:0 0 5px var(--theme-accent);
   clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
-.t-hot--3 .t-hot-mark i:nth-of-type(1){--dx:-9px;--dy:-9px;animation:spark-spin 1.9s ease-out infinite}
-.t-hot--3 .t-hot-mark i:nth-of-type(2){--dx:9px;--dy:-6px;animation:spark-spin 1.9s ease-out .6s infinite}
-.t-hot--3 .t-hot-mark i:nth-of-type(3){--dx:1px;--dy:-11px;animation:spark-spin 1.9s ease-out 1.2s infinite}
+.t-hot--3 .t-hot-mark i:nth-of-type(1){--dx:-10px;--dy:-9px;animation:spark-spin 1.6s ease-out infinite}
+.t-hot--3 .t-hot-mark i:nth-of-type(2){--dx:10px;--dy:-7px;animation:spark-spin 1.6s ease-out .35s infinite}
+.t-hot--3 .t-hot-mark i:nth-of-type(3){--dx:0px;--dy:-12px;animation:spark-spin 1.6s ease-out .7s infinite}
+.t-hot--3 .t-hot-mark i:nth-of-type(4){--dx:-8px;--dy:4px;animation:spark-spin 1.6s ease-out 1.05s infinite}
+.t-hot--3 .t-hot-mark i:nth-of-type(5){--dx:9px;--dy:5px;animation:spark-spin 1.6s ease-out 1.3s infinite}
 @media (prefers-reduced-motion:reduce){.t-hot--3 .t-hot-mark i{display:none!important}}
 @media (prefers-reduced-motion:reduce){.t-hot--3 .pubg-hot{animation:none}}
 
