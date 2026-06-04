@@ -4,8 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
   <title>Stinger Transition — Premium</title>
+  <!-- Theme-Fundament: Tokens (--theme-*). data-theme kommt server-injiziert. -->
+  <link rel="stylesheet" href="../widgets/_theme.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* Alias auf Theme-Tokens — Fallback = bisheriger Entry-Look (Purple/Gold). */
+    :root {
+      --st-primary:  var(--theme-primary, #5e2a79);
+      --st-accent:   var(--theme-accent, #f2b705);
+      --st-accent-2: var(--theme-accent-2, #c985ff);
+      --st-bg-deep:  var(--theme-bg, #08040f);
+    }
 
     html, body {
       width: 1920px;
@@ -20,10 +30,10 @@
       top: 0; left: 0;
       width: 1920px; height: 1080px;
       background: radial-gradient(ellipse at 50% 50%,
-        rgba(155, 65, 225, 0.98) 0%,
-        rgba(94,  42, 121, 1)    28%,
-        rgba(25,   8,  48, 1)    62%,
-        rgba(8,    4,  16, 1)    100%
+        color-mix(in srgb, var(--st-accent-2) 98%, transparent) 0%,
+        var(--st-primary)                                       28%,
+        color-mix(in srgb, var(--st-primary) 35%, #000)         62%,
+        var(--st-bg-deep)                                       100%
       );
     }
     #glow {
@@ -33,9 +43,9 @@
       border-radius: 50%;
       opacity: 0;
       background: radial-gradient(circle,
-        rgba(255, 242, 140, 0.88) 0%,
-        rgba(242, 183,   5, 0.55) 22%,
-        rgba(140,  55, 200, 0.18) 56%,
+        color-mix(in srgb, var(--st-accent) 88%, #fff) 0%,
+        color-mix(in srgb, var(--st-accent) 55%, transparent) 22%,
+        color-mix(in srgb, var(--st-primary) 18%, transparent) 56%,
         transparent 78%
       );
     }
@@ -48,9 +58,9 @@
       width: 1920px; height: 1080px;
       opacity: 0;
       background: radial-gradient(circle at 50% 50%,
-        rgba(255, 252, 215, 0.95) 0%,
-        rgba(242, 183,   5, 0.65) 18%,
-        rgba(140,  50, 220, 0.22) 46%,
+        color-mix(in srgb, var(--st-accent) 95%, #fff) 0%,
+        color-mix(in srgb, var(--st-accent) 65%, transparent) 18%,
+        color-mix(in srgb, var(--st-primary) 22%, transparent) 46%,
         transparent 65%
       );
     }
@@ -60,8 +70,8 @@
       width: 1920px; height: 1080px;
       opacity: 0;
       box-shadow:
-        inset 0 0 100px 50px rgba(242, 183, 5, 0.25),
-        inset 0 0 200px 80px rgba(94, 42, 121, 0.35);
+        inset 0 0 100px 50px color-mix(in srgb, var(--st-accent) 25%, transparent),
+        inset 0 0 200px 80px color-mix(in srgb, var(--st-primary) 35%, transparent);
     }
     .ring { position: absolute; border-radius: 50%; opacity: 0; }
     .ray  {
@@ -78,14 +88,20 @@
       position: absolute;
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      width: 1100px;
-      height: auto;
       opacity: 0;
-      filter:
-        drop-shadow(0 0 30px rgba(242, 183, 5, 0.9))
-        drop-shadow(0 0 70px rgba(242, 183, 5, 0.5))
-        drop-shadow(0 0 120px rgba(140, 55, 200, 0.4));
       z-index: 10;
+      font-family: var(--theme-font-display, 'DM Sans', sans-serif);
+      font-weight: 900;
+      font-size: 150px;
+      line-height: 1;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+      text-transform: uppercase;
+      color: var(--st-accent);
+      text-shadow:
+        0 0 30px color-mix(in srgb, var(--st-accent) 90%, transparent),
+        0 0 70px color-mix(in srgb, var(--st-accent) 50%, transparent),
+        0 0 120px color-mix(in srgb, var(--st-primary) 40%, transparent);
     }
   </style>
 </head>
@@ -98,7 +114,7 @@
   <div id="sparkles"></div>
   <div id="flash"></div>
   <div id="frame"></div>
-  <img id="logo-text" src="../assets/logo_text_luckor_hd.png" alt="" />
+  <div id="logo-text"></div>
 
   <script>
     (function () {
@@ -106,6 +122,20 @@
 
       var CX = 960, CY = 540;
       var TOTAL = 3000;
+
+      /* Theme-Farben aus den Tokens lesen (Fallback = Entry Gold/Purple), damit
+         Rays/Ringe/Sparkles dem aktiven Theme folgen. */
+      var _cs = getComputedStyle(document.documentElement);
+      function _tok(n, fb) { return ((_cs.getPropertyValue(n) || '').trim()) || fb; }
+      var GOLD   = _tok('--theme-accent',   '#f2b705');
+      var PURPLE = _tok('--theme-primary',  '#5e2a79');
+      var ACC2   = _tok('--theme-accent-2', '#c985ff');
+      function mix(c, pct) { return 'color-mix(in srgb, ' + c + ' ' + pct + '%, transparent)'; }
+
+      /* Name: ?name= override, sonst der server-injizierte Twitch-Channel. */
+      var _params = new URLSearchParams(location.search);
+      document.getElementById('logo-text').textContent =
+        _params.get('name') || window.__TWITCH_CHANNEL__ || '';
 
       /* ── Hintergrund: Fade-In über 20%, dann halten, am Ende ausblenden ── */
       document.getElementById('bg').animate([
@@ -132,11 +162,9 @@
         ray.className = 'ray';
         var angle = (r / 20) * 360;
         var len   = 680 + Math.random() * 560;
-        var alpha = (0.22 + Math.random() * 0.58).toFixed(2);
+        var alpha = (22 + Math.random() * 58).toFixed(0);
         var gold  = Math.random() > 0.4;
-        var col   = gold
-          ? 'rgba(242,183,5,' + alpha + ')'
-          : 'rgba(190,120,255,' + alpha + ')';
+        var col   = gold ? mix(GOLD, alpha) : mix(ACC2, alpha);
         ray.style.width      = len.toFixed(0) + 'px';
         ray.style.background = 'linear-gradient(90deg,' + col + ',transparent)';
         ray.style.transform  = 'rotate(' + angle.toFixed(1) + 'deg)';
@@ -152,11 +180,11 @@
       /* ── Ringe ── */
       var ringsEl  = document.getElementById('rings');
       var ringDefs = [
-        { r: 140,  color: 'rgba(242,183,5,0.95)',    glow: 'rgba(242,183,5,0.65)',   bw: 3, dur: 1350, delay:  55 },
-        { r: 265,  color: 'rgba(180,90,255,0.78)',   glow: 'rgba(160,55,240,0.5)',   bw: 2, dur: 1450, delay: 145 },
-        { r: 410,  color: 'rgba(242,183,5,0.72)',    glow: 'rgba(242,183,5,0.42)',   bw: 3, dur: 1550, delay: 235 },
-        { r: 590,  color: 'rgba(200,110,255,0.52)',  glow: 'rgba(160,55,240,0.28)',  bw: 2, dur: 1650, delay: 315 },
-        { r: 820,  color: 'rgba(242,183,5,0.38)',    glow: 'rgba(242,183,5,0.18)',   bw: 2, dur: 1750, delay: 395 }
+        { r: 140,  color: mix(GOLD, 95), glow: mix(GOLD, 65), bw: 3, dur: 1350, delay:  55 },
+        { r: 265,  color: mix(ACC2, 78), glow: mix(ACC2, 50), bw: 2, dur: 1450, delay: 145 },
+        { r: 410,  color: mix(GOLD, 72), glow: mix(GOLD, 42), bw: 3, dur: 1550, delay: 235 },
+        { r: 590,  color: mix(ACC2, 52), glow: mix(ACC2, 28), bw: 2, dur: 1650, delay: 315 },
+        { r: 820,  color: mix(GOLD, 38), glow: mix(GOLD, 18), bw: 2, dur: 1750, delay: 395 }
       ];
       ringDefs.forEach(function (d) {
         var el = document.createElement('div');
@@ -209,17 +237,17 @@
           var rnd = Math.random();
           var col2, sh;
           if (rnd < 0.60) {
-            col2 = '#f2b705';
-            sh   = '0 0 ' + (size * 2.5).toFixed(0) + 'px 1px rgba(242,183,5,0.95),' +
-                   '0 0 ' + (size * 5).toFixed(0)   + 'px 2px rgba(242,183,5,0.4)';
+            col2 = GOLD;
+            sh   = '0 0 ' + (size * 2.5).toFixed(0) + 'px 1px ' + mix(GOLD, 95) + ',' +
+                   '0 0 ' + (size * 5).toFixed(0)   + 'px 2px ' + mix(GOLD, 40);
           } else if (rnd < 0.82) {
-            col2 = '#c985ff';
-            sh   = '0 0 ' + (size * 2.5).toFixed(0) + 'px 1px rgba(180,80,255,0.9),' +
-                   '0 0 ' + (size * 5).toFixed(0)   + 'px 2px rgba(160,60,240,0.35)';
+            col2 = ACC2;
+            sh   = '0 0 ' + (size * 2.5).toFixed(0) + 'px 1px ' + mix(ACC2, 90) + ',' +
+                   '0 0 ' + (size * 5).toFixed(0)   + 'px 2px ' + mix(ACC2, 35);
           } else {
-            col2 = '#fff8d0';
-            sh   = '0 0 ' + (size * 2.5).toFixed(0) + 'px 1px rgba(255,245,180,1),' +
-                   '0 0 ' + (size * 5).toFixed(0)   + 'px 2px rgba(242,183,5,0.45)';
+            col2 = 'color-mix(in srgb, ' + GOLD + ' 60%, #fff)';
+            sh   = '0 0 ' + (size * 2.5).toFixed(0) + 'px 1px ' + mix(GOLD, 95) + ',' +
+                   '0 0 ' + (size * 5).toFixed(0)   + 'px 2px ' + mix(GOLD, 45);
           }
 
           el.style.width      = Math.max(1, size).toFixed(1) + 'px';
