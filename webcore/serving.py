@@ -12,7 +12,9 @@ from flask import send_from_directory, abort
 # Attribut-Injektion und faengt ungueltige/alte Werte ab → Fallback Default.
 ALLOWED_THEMES = ("entry", "terminal", "aurora", "midnight", "editorial", "swiss", "azure")
 
-_HTML_TAG_RE = re.compile(r"<html\b[^>]*>", re.IGNORECASE)
+# Nur das ECHTE <html>-Tag treffen (am Zeilenanfang), nicht ein "<html>" das
+# zufaellig in einem Kommentar/Text steht.
+_HTML_TAG_RE = re.compile(r"(?m)^\s*<html\b[^>]*>", re.IGNORECASE)
 
 
 def inject_window_vars(html: str, variables: dict) -> str:

@@ -5,7 +5,7 @@
   Zeigt den Lifetime-Career eines konfigurierten Spielers (Default:
   Streamer-Account). Aus Theme-Bausteinen (t-*) komponiert — der Look
   (Farbe, Form, Typo, Deko, Highlight-Symbol) kommt komplett aus dem
-  per Server injizierten Theme (data-theme aufs <html>).
+  per Server injizierten Theme (data-theme aufs html-Element).
   Lokale Vorschau: ?theme=<name>&demo=1[&dock=1] testet alle Themes ohne
   Server-Injektion und mit Beispieldaten.
 -->
@@ -157,6 +157,16 @@
       document.getElementById("msRemain").textContent = info.remain;
       document.getElementById("msTarget").textContent = "#" + info.next;
       document.getElementById("msBar").style.width    = info.pct.toFixed(1) + "%";
+
+      // Rakete-Flourish: Animation NACH dem Font-Laden einmal sauber neu starten
+      // (sonst Timing-Versatz beim ersten Laden — sie erscheint mitten im Flug
+      // statt am Boden). Entspricht dem "F12-CSS-Touch"-Reflow-Restart.
+      if (info.hasRocket && document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(function () {
+          document.querySelectorAll("#msLabel .rocket, #msLabel .flame, #msLabel .smoke")
+            .forEach(function (el) { el.style.animation = "none"; void el.offsetWidth; el.style.animation = ""; });
+        });
+      }
     }
 
     if (DEMO) {
