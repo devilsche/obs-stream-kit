@@ -17,8 +17,20 @@
   // (.pubg-hot-mark::before in _pubg.css; Effekt je Theme in _theme.css).
   // Ohne Theme = Flamme (Fallback). Nutzung: hotIf(value, threshold, formattedString).
   // Returns HTML — Caller muss innerHTML setzen, nicht textContent.
-  PubgUI.hotWrap = (formatted) =>
-    `<span class="pubg-hot">${formatted}</span><span class="t-hot-mark t-hot-mark--after" aria-hidden="true"><i></i><i></i><i></i></span>`;
+  // Highlight-Marker. Standard: Symbol via CSS (::before, --theme-hot-icon).
+  // Azure-Sonder: echter SVG-Tacho mit rotierender Nadel (Gasstoss-Animation).
+  PubgUI.hotWrap = (formatted) => {
+    const isAzure = document.documentElement.getAttribute("data-theme") === "azure";
+    const gauge = isAzure
+      ? '<svg class="t-gauge" viewBox="0 0 24 24" aria-hidden="true">'
+        + '<path d="M4 18 A9 9 0 0 1 20 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.5"/>'
+        + '<circle cx="12" cy="18" r="1.7" fill="currentColor"/>'
+        + '<line class="needle" x1="12" y1="18" x2="12" y2="9.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>'
+        + '</svg>'
+      : '';
+    const cls = isAzure ? "t-hot-mark t-hot-mark--after t-hot-mark--gauge" : "t-hot-mark t-hot-mark--after";
+    return `<span class="pubg-hot">${formatted}</span><span class="${cls}" aria-hidden="true">${gauge}<i></i><i></i><i></i></span>`;
+  };
   PubgUI.hotIf = (value, threshold, formatted) =>
     (value || 0) > threshold ? PubgUI.hotWrap(formatted) : formatted;
 
@@ -304,6 +316,15 @@
     if (t) document.documentElement.setAttribute("data-theme", t);
   };
   PubgUI._applyTheme();
+
+  // Material-Symbol-Glyphen erst zeigen, wenn die Icon-Font geladen ist —
+  // sonst blitzt kurz der Fallback-Text (z.B. "rocket") auf und verschiebt das
+  // Layout (Raketen-Flourish saesse "daneben"). html.fonts-ready schaltet frei.
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => document.documentElement.classList.add("fonts-ready"));
+  } else {
+    document.documentElement.classList.add("fonts-ready");
+  }
 
   PubgUI.animateNumber = function (el, targetValue, opts) {
     const o = opts || {};

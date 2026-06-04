@@ -38,6 +38,17 @@
     }
     .milestone #msLabel { display: flex; align-items: center; gap: 5px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    /* Milestone-Icon (Pokal) auf Zeilengroesse — Standard-24px wuerde die Zeile aufblaehen. */
+    .milestone #msLabel .material-symbols-outlined { font-size: 15px; line-height: 1; }
+    /* GRAND: Rakete schwebt absolut (kein Layout-Platz, blaeht die Zeile nicht
+       auf) — der Text reserviert nur Icon-Breite per padding. Rakete fliegt frei
+       nach oben raus (overflow visible). transform:scale statt zoom (zoom
+       verschiebt die absolut positionierten Teile gegeneinander). */
+    .milestone.launch #msLabel { overflow: visible; position: relative; padding-left: 22px; }
+    .milestone.launch .t-launch {
+      position: absolute; left: -3px; bottom: 1px;
+      transform: scale(0.45); transform-origin: left bottom;
+    }
     .milestone .ms-target { color: var(--theme-text); white-space: nowrap; flex-shrink: 0; }
     .milestone .ms-target b { color: var(--theme-accent); font-variant-numeric: tabular-nums; }
     .milestone .bar {
@@ -83,6 +94,11 @@
     const DEMO = PubgUI.qs("demo", "") === "1";
     document.getElementById("player").textContent = PLAYER || "Self";
 
+    // Raketenstart-Flourish fuer den GRAND-CHICKEN-Milestone (.t-launch in _blocks.css).
+    const ROCKET = '<span class="t-launch" aria-hidden="true"><span class="rocket"><span class="flame"></span></span>'
+      + '<span class="smoke"></span><span class="smoke"></span><span class="smoke"></span>'
+      + '<span class="smoke"></span><span class="smoke"></span></span>';
+
     PubgUI.buildFilter([
       { key: "mode", label: "Mode", type: "select", default: "all",
         options: [["all","Alle Modi"],
@@ -100,10 +116,17 @@
       const pct = Math.max(0, Math.min(100, ((wins - prev) / 100) * 100));
       const isGrand = next % 1000 === 0;
       const isHalf  = !isGrand && next % 500 === 0;
+      // Verspielter Raketenstart nur in dazu passenden Themes — dezente Themes
+      // (z.B. Editorial: edel/ruhig) bekommen stattdessen den ruhigen Pokal.
+      const QUIET = ["editorial"];
+      const theme = document.documentElement.getAttribute("data-theme");
+      const trophy = '<span class="material-symbols-outlined icon-gold" aria-hidden="true">emoji_events</span>';
+      const hasRocket = isGrand && !QUIET.includes(theme);
+      const grandMark = hasRocket ? ROCKET : trophy;
       let label = "Next milestone";
-      if (isGrand) label = '<span class="material-symbols-outlined icon-gold" aria-hidden="true">emoji_events</span> GRAND CHICKEN incoming';
-      else if (isHalf) label = '<span class="material-symbols-outlined icon-gold" aria-hidden="true">emoji_events</span> Half-Grand incoming';
-      return { next, remain, pct, isGrand, isHalf, label };
+      if (isGrand) label = grandMark + ' GRAND CHICKEN incoming';
+      else if (isHalf) label = trophy + ' Half-Grand incoming';
+      return { next, remain, pct, isGrand, isHalf, hasRocket, label };
     }
 
     function render(d) {
@@ -128,6 +151,7 @@
       const info = nextMilestone(d.wins);
       ms.classList.add("show");
       ms.classList.toggle("close", info.remain <= 3);
+      ms.classList.toggle("launch", info.hasRocket);
       // innerHTML: info.label kann ein Material-Symbol-Icon enthalten (fester Code-String, kein User-Input).
       document.getElementById("msLabel").innerHTML  = info.label;
       document.getElementById("msRemain").textContent = info.remain;

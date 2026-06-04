@@ -77,7 +77,7 @@ html[data-theme="azure"] {
   --theme-ok:#3ce0a0; --theme-warn:#ffc24d; --theme-danger:#ff5c6e;
   --theme-font-display:"Sora",sans-serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
   --theme-radius:10px; --theme-border-width:1px; --theme-shadow:0 14px 40px rgba(0,0,0,.5);
-  --theme-hot-icon:"bolt";
+  --theme-hot-icon:"speed";
   --theme-page-bg:radial-gradient(820px 560px at 70% -10%,rgba(46,155,255,.22),#070d18 60%);
 }
 

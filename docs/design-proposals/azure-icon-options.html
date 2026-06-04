@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Azure Highlight-Icon — Optionen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+<style>
+  :root{--bg:#070d18;--surface:#0e1828;--surface2:#122036;--line:#243650;--primary:#2e9bff;
+    --accent:#4dd0ff;--text:#dce8f7;--dim:#8298b5;--faint:#54677f}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:"Hanken Grotesk",sans-serif;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(820px 560px at 75% -10%,rgba(46,155,255,.18),transparent 60%)}
+  header{max-width:1020px;margin:0 auto;padding:36px 30px 12px;border-bottom:1px solid var(--line)}
+  h1{font-family:"Sora";font-weight:700;font-size:28px;margin:0;letter-spacing:-.01em}
+  header p{color:var(--dim);font-family:"JetBrains Mono";font-size:13px;margin:8px 0 0}
+  main{max-width:1020px;margin:0 auto;padding:26px 30px 40px;
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:16px}
+  .opt{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:24px 18px;text-align:center}
+  .opt.cur{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 8px 24px rgba(46,155,255,.18)}
+  .opt .ic{font-family:"Material Symbols Outlined";font-size:46px;color:var(--accent);line-height:1;
+    text-shadow:0 0 16px rgba(77,208,255,.55)}
+  .opt .nm{font-family:"Sora";font-weight:600;font-size:17px;margin-top:14px}
+  .opt .id{font-family:"JetBrains Mono";font-size:11px;color:var(--faint);margin-top:5px}
+  .opt .ds{font-size:12.5px;color:var(--dim);margin-top:8px;line-height:1.45}
+  .tag{display:inline-block;font-family:"JetBrains Mono";font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:2px 7px;margin-top:10px}
+  .demo{max-width:1020px;margin:0 auto;padding:0 30px 60px}
+  .demo .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px 22px;width:300px;
+    box-shadow:0 14px 40px rgba(0,0,0,.5)}
+  .demo .lab{font-family:"JetBrains Mono";font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+  .demo .v{font-family:"Sora";font-weight:700;font-size:30px;margin-top:6px;color:var(--accent);display:flex;align-items:center;gap:8px}
+  .demo .v .ic{font-family:"Material Symbols Outlined";font-size:24px;text-shadow:0 0 14px var(--accent)}
+  .demo p{font-family:"JetBrains Mono";font-size:12px;color:var(--dim);margin-top:14px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Azure — Highlight-Icon</h1>
+  <p>// Kandidaten im Azure-Look · aktuell: bolt (Blitz)</p>
+</header>
+<main>
+  <div class="opt cur"><div class="ic">bolt</div><div class="nm">Blitz</div><div class="id">bolt</div><div class="ds">Elektrisch, schnell. Aktuell gesetzt.</div><span class="tag">aktuell</span></div>
+  <div class="opt"><div class="ic">electric_bolt</div><div class="nm">Power-Blitz</div><div class="id">electric_bolt</div><div class="ds">Fetterer Blitz — energiegeladener.</div></div>
+  <div class="opt"><div class="ic">auto_awesome</div><div class="nm">Funkeln</div><div class="id">auto_awesome</div><div class="ds">Sparkle — universelles „besonders".</div></div>
+  <div class="opt"><div class="ic">diamond</div><div class="nm">Diamant</div><div class="id">diamond</div><div class="ds">Kristall — edel, wertvoll, passt zum Blau.</div></div>
+  <div class="opt"><div class="ic">ac_unit</div><div class="nm">Schneeflocke</div><div class="id">ac_unit</div><div class="ds">Kühl, clean — sehr „azure".</div></div>
+  <div class="opt"><div class="ic">rocket_launch</div><div class="nm">Rakete</div><div class="id">rocket_launch</div><div class="ds">Aufstieg, Power — verspielt-cool.</div></div>
+  <div class="opt"><div class="ic">trending_up</div><div class="nm">Aufwärts</div><div class="id">trending_up</div><div class="ds">Trend/Rekord — datenbezogen.</div></div>
+  <div class="opt"><div class="ic">whatshot</div><div class="nm">On Fire</div><div class="id">whatshot</div><div class="ds">Flamme — „heiß", klassisch fürs Highlight.</div></div>
+  <div class="opt"><div class="ic">my_location</div><div class="nm">Zielkreuz</div><div class="id">my_location</div><div class="ds">Präzision — thematisch fürs Longshot.</div></div>
+  <div class="opt"><div class="ic">speed</div><div class="nm">Tacho</div><div class="id">speed</div><div class="ds">Performance, Spitzenwert.</div></div>
+  <div class="opt"><div class="ic">stars</div><div class="nm">Sterne</div><div class="id">stars</div><div class="ds">Auszeichnung, mehrfach.</div></div>
+  <div class="opt"><div class="ic">hub</div><div class="nm">Knoten</div><div class="id">hub</div><div class="ds">Netzwerk/tech — abstrakt-modern.</div></div>
+</main>
+<div class="demo">
+  <div class="card">
+    <div class="lab">Longest</div>
+    <div class="v">753m <span class="ic">bolt</span></div>
+  </div>
+  <p>↑ so sitzt's im Highlight (hier mit bolt). Sag mir den Namen, den du willst — dann setze ich ihn als Azure-Highlight-Icon (--theme-hot-icon).</p>
+</div>
+</body>
+</html>

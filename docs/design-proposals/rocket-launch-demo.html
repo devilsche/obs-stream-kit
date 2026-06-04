@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rocket-Launch — Animation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+<style>
+  :root{--bg:#070d18;--surface:#0e1828;--line:#243650;--text:#dce8f7;--dim:#8298b5;
+    --primary:#2e9bff;--accent:#4dd0ff}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);
+    font-family:"Sora",sans-serif;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(820px 560px at 70% -10%,rgba(46,155,255,.18),transparent 60%);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px}
+  h1{font-weight:700;font-size:24px;margin:0}
+  .note{font-family:"JetBrains Mono";font-size:12px;color:var(--dim);max-width:560px;text-align:center;line-height:1.7;padding:0 24px}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:18px 22px;width:300px;box-shadow:0 14px 40px rgba(0,0,0,.5)}
+  .lab{font-family:"JetBrains Mono";font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+  .val{font-weight:800;font-size:30px;color:var(--accent);margin-top:4px;display:flex;align-items:center;gap:10px}
+
+  /* Launch-Buehne — Rakete startet unten, baut Schub auf, schnellt dann hoch */
+  .launch{position:relative;width:46px;height:48px;flex:none}
+
+  .rocket{position:absolute;left:50%;bottom:2px;font-family:"Material Symbols Outlined";font-style:normal;
+    font-size:30px;color:var(--accent);text-shadow:0 0 12px var(--accent);will-change:transform,opacity;
+    transform:translateX(-50%);animation:rocket-fly 4.5s ease-in-out infinite}
+  .rocket::after{content:"rocket"}
+
+  /* Flackernde Schubflamme am Heck (fliegt im rocket-Container mit) */
+  .flame{position:absolute;left:50%;bottom:-7px;width:8px;height:13px;
+    background:radial-gradient(ellipse at 50% 22%,#eaf6ff,var(--accent) 48%,transparent 76%);
+    border-radius:50% 50% 50% 50%/38% 38% 72% 72%;
+    filter:drop-shadow(0 0 5px var(--accent));
+    animation:flame-flicker .1s ease-in-out infinite alternate, flame-life 4.5s linear infinite}
+
+  /* Qualm: zuendet, schwelt am Boden, grosser Ausstoss beim Abheben */
+  .smoke{position:absolute;left:50%;bottom:0;width:9px;height:9px;border-radius:50%;
+    background:radial-gradient(circle,rgba(180,210,255,.55),transparent 70%);
+    opacity:0;will-change:transform,opacity;animation:smoke-puff 4.5s ease-out infinite}
+  .smoke:nth-child(2){--sx:-10px}
+  .smoke:nth-child(3){--sx:9px}
+  .smoke:nth-child(4){--sx:-3px;width:13px;height:13px}
+  .smoke:nth-child(5){--sx:5px}
+  .smoke:nth-child(6){--sx:-13px;width:7px;height:7px}
+
+  @keyframes rocket-fly{
+    0%   {transform:translate(-50%,0);    opacity:1}   /* steht, zuendet */
+    8%   {transform:translate(calc(-50% - 1px),0)}     /* leichtes Zittern */
+    16%  {transform:translate(calc(-50% + 1px),0)}
+    24%  {transform:translate(calc(-50% - 1.2px),0)}
+    32%  {transform:translate(calc(-50% + 1.3px),0)}
+    39%  {transform:translate(calc(-50% - 1.7px),0)}   /* Zittern nimmt zu */
+    44%  {transform:translate(calc(-50% + 2px),1px)}
+    48%  {transform:translate(calc(-50% - 2.2px),1px)} /* maximale Spannung am Boden */
+    51%  {transform:translate(-50%,2px)}               /* kurz ducken */
+    64%  {transform:translate(-50%,-50px); opacity:1}  /* HOCHSCHNELLEN */
+    74%  {transform:translate(-50%,-82px); opacity:0}  /* hoch + ausblenden */
+    75%  {transform:translate(-50%,0);     opacity:0}  /* unsichtbar zuruecksetzen */
+    100% {transform:translate(-50%,0);     opacity:0}  /* Pause, dann Loop */
+  }
+  @keyframes flame-flicker{
+    from{transform:translateX(-50%) scale(1,1)}
+    to  {transform:translateX(-50%) scale(.78,1.3)}
+  }
+  @keyframes flame-life{
+    0%,5%  {opacity:0}
+    10%    {opacity:.7}      /* zuenden */
+    48%    {opacity:.85}     /* Schub am Boden */
+    51%    {opacity:1}       /* voller Schub beim Abheben */
+    64%    {opacity:1}
+    73%,100%{opacity:0}      /* aus */
+  }
+  @keyframes smoke-puff{
+    0%,5%   {opacity:0;transform:translate(-50%,0) scale(.3)}
+    12%     {opacity:.5;transform:translate(-50%,1px) scale(.9)}
+    46%     {opacity:.5;transform:translate(calc(-50% + var(--sx)),5px) scale(1.4)}  /* schwelt */
+    58%     {opacity:.9;transform:translate(calc(-50% + var(--sx)),16px) scale(2.1)} /* Abhub-Schub */
+    73%,100%{opacity:0;transform:translate(calc(-50% + var(--sx)),30px) scale(2.7)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .rocket{animation:none;opacity:1}
+    .flame{animation:flame-flicker .1s ease-in-out infinite alternate}
+    .smoke{display:none}
+  }
+</style>
+</head>
+<body>
+  <h1>Rocket Launch</h1>
+  <div class="card">
+    <div class="lab">Milestone</div>
+    <div class="val">#1000
+      <span class="launch" aria-hidden="true">
+        <span class="rocket"><span class="flame"></span></span>
+        <span class="smoke"></span><span class="smoke"></span><span class="smoke"></span>
+        <span class="smoke"></span><span class="smoke"></span>
+      </span>
+    </div>
+  </div>
+  <p class="note">Loop (4,5s): laengerer Boden-Moment — zittern + Qualm schwelt + Schubflamme baut auf
+    → Abhub, senkrecht hochschnellen → ausblenden → Pause → erneut. Flamme flackert durchgehend.
+    Reine CSS-Animation.</p>
+</body>
+</html>

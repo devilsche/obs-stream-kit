@@ -53,6 +53,15 @@
   50%{transform:scale(1.22) rotate(18deg);opacity:.85;text-shadow:0 0 22px var(--theme-accent)}}
 html[data-theme="entry"] .t-hot-mark::before{animation:hot-flame 1.5s ease-in-out infinite}
 html[data-theme="terminal"] .t-hot-mark::before,html[data-theme="midnight"] .t-hot-mark::before,html[data-theme="azure"] .t-hot-mark::before{animation:hot-zap 2.6s steps(1,end) infinite}
+/* Azure-Sonder: echter SVG-Tacho mit rotierender Nadel (Gasstoss-Gefuehl).
+   hotWrap fuegt das SVG + Klasse --gauge ein; das Font-Icon (::before) entfaellt dann. */
+.t-hot-mark--gauge::before{display:none}
+.t-gauge{width:19px;height:19px;display:block;color:var(--theme-accent);overflow:visible;
+  filter:drop-shadow(0 0 6px var(--theme-accent))}
+.t-gauge .needle{transform-box:view-box;transform-origin:12px 18px;animation:gauge-rev 3s ease-in-out infinite}
+@keyframes gauge-rev{0%,55%,100%{transform:rotate(-48deg)}68%{transform:rotate(52deg)}
+  74%{transform:rotate(40deg)}80%{transform:rotate(50deg)}90%{transform:rotate(-40deg)}}
+@media (prefers-reduced-motion:reduce){.t-gauge .needle{animation:none;transform:rotate(18deg)}}
 html[data-theme="aurora"] .t-hot-mark::before{animation:hot-twinkle 2.4s ease-in-out infinite}
 html[data-theme="editorial"] .t-hot-mark::before{animation:none;text-shadow:0 0 8px var(--theme-accent)}
 @media (prefers-reduced-motion:reduce){.t-hot-mark::before{animation:none!important;text-shadow:0 0 12px var(--theme-accent)}}
@@ -119,3 +128,55 @@ html[data-theme="swiss"] .t-value{font-weight:900;font-size:54px;letter-spacing:
 html[data-theme="swiss"] .t-stat-grid--compact .t-value{font-size:30px}
 html[data-theme="swiss"] .t-label{text-transform:uppercase;font-weight:700}
 html[data-theme="swiss"] .t-range{color:var(--theme-text);font-weight:700}
+
+/* ════ t-launch — Raketenstart-Flourish (z.B. Milestone "GRAND CHICKEN") ════
+   Theme-agnostisch: Rakete + Flamme in --theme-accent, Qualm in gedaempfter
+   Textfarbe (auf hellen + dunklen Themes sichtbar). Loop: Boden-Aufbau (zittern,
+   Qualm, Schubflamme) → Abhub/hochschnellen → ausblenden → Pause. */
+.t-launch{position:relative;display:inline-block;width:46px;height:48px;vertical-align:bottom;
+  visibility:hidden}                 /* erst zeigen wenn Icon-Font geladen (kein Fallback-Text-Versatz) */
+html.fonts-ready .t-launch{visibility:visible}
+.t-launch .rocket{position:absolute;left:50%;bottom:2px;font-family:"Material Symbols Outlined";font-style:normal;
+  font-size:30px;color:var(--theme-accent);text-shadow:0 0 12px var(--theme-accent);will-change:transform,opacity;
+  transform:translateX(-50%);animation:rocket-fly 4.5s ease-in-out infinite}
+.t-launch .rocket::after{content:"rocket"}
+.t-launch .flame{position:absolute;left:50%;bottom:-7px;width:8px;height:13px;
+  background:radial-gradient(ellipse at 50% 22%,#eaf6ff,var(--theme-accent) 48%,transparent 76%);
+  border-radius:50% 50% 50% 50%/38% 38% 72% 72%;filter:drop-shadow(0 0 5px var(--theme-accent));
+  animation:flame-flicker .1s ease-in-out infinite alternate, flame-life 4.5s linear infinite}
+.t-launch .smoke{position:absolute;left:50%;bottom:0;width:9px;height:9px;border-radius:50%;
+  background:radial-gradient(circle,color-mix(in srgb,var(--theme-text-dim) 60%,transparent),transparent 70%);
+  opacity:0;will-change:transform,opacity;animation:smoke-puff 4.5s ease-out infinite}
+.t-launch .smoke:nth-child(2){--sx:-10px}
+.t-launch .smoke:nth-child(3){--sx:9px}
+.t-launch .smoke:nth-child(4){--sx:-3px;width:13px;height:13px}
+.t-launch .smoke:nth-child(5){--sx:5px}
+.t-launch .smoke:nth-child(6){--sx:-13px;width:7px;height:7px}
+@keyframes rocket-fly{
+  0%   {transform:translate(-50%,0);    opacity:1}
+  8%   {transform:translate(calc(-50% - 1px),0)}
+  16%  {transform:translate(calc(-50% + 1px),0)}
+  24%  {transform:translate(calc(-50% - 1.2px),0)}
+  32%  {transform:translate(calc(-50% + 1.3px),0)}
+  39%  {transform:translate(calc(-50% - 1.7px),0)}
+  44%  {transform:translate(calc(-50% + 2px),1px)}
+  48%  {transform:translate(calc(-50% - 2.2px),1px)}
+  51%  {transform:translate(-50%,2px)}
+  64%  {transform:translate(-50%,-50px); opacity:1}
+  74%  {transform:translate(-50%,-82px); opacity:0}
+  75%  {transform:translate(-50%,0);     opacity:0}
+  100% {transform:translate(-50%,0);     opacity:0}
+}
+@keyframes flame-flicker{from{transform:translateX(-50%) scale(1,1)}to{transform:translateX(-50%) scale(.78,1.3)}}
+@keyframes flame-life{0%,5%{opacity:0}10%{opacity:.7}48%{opacity:.85}51%{opacity:1}64%{opacity:1}73%,100%{opacity:0}}
+@keyframes smoke-puff{
+  0%,5%   {opacity:0;transform:translate(-50%,0) scale(.3)}
+  12%     {opacity:.5;transform:translate(-50%,1px) scale(.9)}
+  46%     {opacity:.5;transform:translate(calc(-50% + var(--sx,0px)),5px) scale(1.4)}
+  58%     {opacity:.9;transform:translate(calc(-50% + var(--sx,0px)),16px) scale(2.1)}
+  73%,100%{opacity:0;transform:translate(calc(-50% + var(--sx,0px)),30px) scale(2.7)}
+}
+@media (prefers-reduced-motion:reduce){
+  .t-launch .rocket{animation:none;opacity:1}
+  .t-launch .smoke{display:none}
+}
