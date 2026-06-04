@@ -48,8 +48,29 @@ def landing():
 @require_session
 def dashboard():
     conn = _get_conn()
+    admin_stats = None
     try:
         creds = core_creds.get(conn, g.tenant_id)
+        # Source-Counts fuer den Cockpit-Schnellzugriff
+        from app import widget_catalog
+        from overlay_app.overlay_catalog import OVERLAYS
+        root = current_app.config.get("_PROJECT_ROOT", ".")
+        try:
+            widgets_count = len(widget_catalog.get(root))
+        except Exception:
+            widgets_count = 0
+        overlays_count = len(OVERLAYS)
+        # All-tenants-Kachel (admin-only): robuste Standard-Queries
+        if g.user.get("is_admin"):
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT count(*) AS c FROM tenants")
+                    tenants = cur.fetchone()["c"]
+                    cur.execute("SELECT pg_size_pretty(pg_database_size(current_database())) AS s")
+                    db_size = cur.fetchone()["s"]
+                admin_stats = {"tenants": tenants, "db_size": db_size}
+            except Exception:
+                admin_stats = None
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()
@@ -59,7 +80,9 @@ def dashboard():
         "any_missing": not (creds.pubg_name and creds.pubg_api_key
                             and creds.steam_id and creds.steam_api_key),
     }
-    return render_template("dashboard.html", user=g.user, cred_status=cred_status)
+    return render_template("dashboard.html", user=g.user, cred_status=cred_status,
+                           widgets_count=widgets_count, overlays_count=overlays_count,
+                           admin_stats=admin_stats)
 
 
 @bp_app.route("/app/pending")

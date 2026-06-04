@@ -48,30 +48,30 @@
       </div>
     </div>
 
-    <p class="sec">// Appearance</p>
-    <div class="dn-field">
-      <label for="theme">Theme</label>
-      <select id="theme" name="theme">
-        <option value="entry"     {% if prefs.theme == 'entry' %}selected{% endif %}>Entry — Purple/Gold</option>
-        <option value="azure"     {% if prefs.theme == 'azure' %}selected{% endif %}>Azure — Blau/Sky</option>
-        <option value="terminal"  {% if prefs.theme == 'terminal' %}selected{% endif %}>Terminal — Cyan/Magenta</option>
-        <option value="aurora"    {% if prefs.theme == 'aurora' %}selected{% endif %}>Aurora — Glas/Purple</option>
-        <option value="midnight"  {% if prefs.theme == 'midnight' %}selected{% endif %}>Midnight — Lime</option>
-        <option value="editorial" {% if prefs.theme == 'editorial' %}selected{% endif %}>Editorial — Warm/Serif</option>
-        <option value="swiss"     {% if prefs.theme == 'swiss' %}selected{% endif %}>Swiss — Ultramarin/Brutalist</option>
-      </select>
-      <div class="dn-note">Gilt für dein ganzes Konto — alle Overlays, Widgets, Tools und das Dashboard.</div>
-    </div>
-
-    <p class="sec">// Defaults</p>
-    <div class="dn-field">
-      <label for="default_range">Default-Range für Widgets</label>
-      <select id="default_range" name="default_range">
-        <option value="session" {% if prefs.default_range == 'session' %}selected{% endif %}>Session (aktuell/letzte)</option>
-        <option value="week"    {% if prefs.default_range == 'week'    %}selected{% endif %}>Letzte 7 Tage</option>
-        <option value="all"     {% if prefs.default_range == 'all'     %}selected{% endif %}>All-time (volle DB)</option>
-      </select>
-      <div class="dn-note">Greift für Widgets mit <code>?range=</code> — wenn die URL keinen Range setzt.</div>
+    <p class="sec">// Appearance &amp; Defaults</p>
+    <div class="dn-fgrid">
+      <div class="dn-field">
+        <label for="theme">Theme</label>
+        <select id="theme" name="theme">
+          <option value="entry"     {% if prefs.theme == 'entry' %}selected{% endif %}>Entry — Purple/Gold</option>
+          <option value="azure"     {% if prefs.theme == 'azure' %}selected{% endif %}>Azure — Blau/Sky</option>
+          <option value="terminal"  {% if prefs.theme == 'terminal' %}selected{% endif %}>Terminal — Cyan/Magenta</option>
+          <option value="aurora"    {% if prefs.theme == 'aurora' %}selected{% endif %}>Aurora — Glas/Purple</option>
+          <option value="midnight"  {% if prefs.theme == 'midnight' %}selected{% endif %}>Midnight — Lime</option>
+          <option value="editorial" {% if prefs.theme == 'editorial' %}selected{% endif %}>Editorial — Warm/Serif</option>
+          <option value="swiss"     {% if prefs.theme == 'swiss' %}selected{% endif %}>Swiss — Ultramarin/Brutalist</option>
+        </select>
+        <div class="dn-note">Gilt für dein ganzes Konto — alle Overlays, Widgets, Tools und das Dashboard.</div>
+      </div>
+      <div class="dn-field">
+        <label for="default_range">Default-Range für Widgets</label>
+        <select id="default_range" name="default_range">
+          <option value="session" {% if prefs.default_range == 'session' %}selected{% endif %}>Session (aktuell/letzte)</option>
+          <option value="week"    {% if prefs.default_range == 'week'    %}selected{% endif %}>Letzte 7 Tage</option>
+          <option value="all"     {% if prefs.default_range == 'all'     %}selected{% endif %}>All-time (volle DB)</option>
+        </select>
+        <div class="dn-note">Greift für Widgets mit <code>?range=</code> — wenn die URL keinen Range setzt.</div>
+      </div>
     </div>
 
     <div class="dn-actions">

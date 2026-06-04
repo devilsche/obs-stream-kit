@@ -39,13 +39,23 @@
     </article>
 
     <article class="dn-ccard a dn-c4"><span class="corner" aria-hidden="true"></span>
-      <h2>Schnellzugriff</h2>
+      <h2>Browser-Sources</h2>
       <div class="dn-pad">
-        <a class="dn-count" href="/app/urls"><span>OBS URLs</span><span class="n">→</span></a>
-        <a class="dn-count" href="/app/settings"><span>Settings</span><span class="n">→</span></a>
+        <a class="dn-count" href="/app/urls"><span>Widgets</span><span class="n">{{ widgets_count }}</span></a>
+        <a class="dn-count" href="/app/urls"><span>Overlays</span><span class="n">{{ overlays_count }}</span></a>
         <a class="dn-count" href="/app/tools"><span>Tools</span><span class="n">→</span></a>
       </div>
     </article>
+
+    {% if admin_stats %}
+    <article class="dn-ccard a dn-c12"><span class="corner" aria-hidden="true"></span>
+      <h2>All tenants · global · admin-only</h2>
+      <div class="dn-pad dn-gstats">
+        <div class="dn-gstat"><span class="gn">{{ admin_stats.tenants }}</span><span class="gl">Tenants</span></div>
+        <div class="dn-gstat"><span class="gn">{{ admin_stats.db_size }}</span><span class="gl">DB-Größe</span></div>
+      </div>
+    </article>
+    {% endif %}
 
     {% if cred_status.any_missing %}
     <article class="dn-ccard dn-c12"><span class="corner" aria-hidden="true"></span>
