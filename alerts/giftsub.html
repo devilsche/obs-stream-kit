@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
   <title>Gift Sub Alert</title>
+  <!-- Theme-Fundament: Tokens (--theme-*) + Alias. data-theme kommt server-
+       injiziert aufs <html> (sonst Entry-Default). -->
+  <link rel="stylesheet" href="../widgets/_theme.css">
   <style>
     @font-face {
       font-family: 'DM Sans';
@@ -19,12 +22,20 @@
       padding: 0;
     }
 
+    /* Alias auf die Theme-Tokens — Fallback = bisheriger Entry-Look. */
     :root {
-      --color-gold:        #f2b705;
-      --color-purple:      #5e2a79;
-      --color-purple-light: #d4b0e8;
-      --color-bg-dark:     #0d0d1a;
-      --color-text:        #ffffff;
+      --color-gold:         var(--theme-accent, #f2b705);
+      --color-purple:       var(--theme-primary, #5e2a79);
+      --color-bg-dark:      var(--theme-bg, #0d0d1a);
+      --color-text:         var(--theme-text, #ffffff);
+
+      /* Lila-/Purple-Akzente auf Theme-Tokens gemappt (Original-Entry-Werte
+         als Fallback hinter den Tokens). */
+      --color-accent-2:     var(--theme-accent-2);
+      --color-purple-dark:  color-mix(in srgb, var(--theme-primary, #5e2a79) 75%, #000);
+      --color-purple-mid:   color-mix(in srgb, var(--theme-primary, #5e2a79) 85%, #fff);
+      --color-purple-light: var(--theme-accent-2, #d4b0e8);
+      --color-purple-pale:  var(--theme-text, #f0e0f8);
     }
 
     /* ─── Keyframes ─────────────────────────────────────────────── */
@@ -74,7 +85,7 @@
       height: 1080px;
       overflow: hidden;
       background: transparent;
-      font-family: 'DM Sans', sans-serif;
+      font-family: var(--theme-font-body, 'DM Sans', sans-serif);
     }
 
     /* ─── Flash overlay ──────────────────────────────────────────── */
@@ -82,7 +93,7 @@
     .flash {
       position: absolute;
       inset: 0;
-      background: rgba(94, 42, 121, 0.3);
+      background: color-mix(in srgb, var(--color-purple) 30%, transparent);
       z-index: 10;
       animation: flashFade 0.2s ease-out 0s forwards;
     }
@@ -93,8 +104,8 @@
       position: absolute;
       inset: 0;
       background: radial-gradient(ellipse at center,
-        rgba(94, 42, 121, 0.7) 0%,
-        rgba(13, 13, 26, 0.95) 60%
+        color-mix(in srgb, var(--color-purple) 70%, transparent) 0%,
+        color-mix(in srgb, var(--color-bg-dark) 95%, transparent) 60%
       );
       z-index: 1;
       opacity: 0;
@@ -113,9 +124,9 @@
       height: 3px;
       background: linear-gradient(90deg,
         transparent 0%,
-        rgba(94, 42, 121, 0.6) 40%,
-        rgba(155, 85, 192, 0.9) 50%,
-        rgba(94, 42, 121, 0.6) 60%,
+        color-mix(in srgb, var(--color-purple) 60%, transparent) 40%,
+        color-mix(in srgb, var(--color-purple-mid) 90%, transparent) 50%,
+        color-mix(in srgb, var(--color-purple) 60%, transparent) 60%,
         transparent 100%
       );
       transform-origin: center center;
@@ -157,12 +168,13 @@
 
     .event-type {
       font-size: 18px;
-      color: #ffffff;
+      color: var(--color-text);
+      font-family: var(--theme-font-display, 'DM Sans', sans-serif);
       letter-spacing: 6px;
       text-transform: uppercase;
       text-shadow:
-        0 0 14px rgba(212, 176, 232, 1),
-        0 0 32px rgba(155, 85, 192, 0.85),
+        0 0 14px color-mix(in srgb, var(--color-purple-light) 100%, transparent),
+        0 0 32px color-mix(in srgb, var(--color-purple-mid) 85%, transparent),
         2px 2px 0 rgba(0, 0, 0, 0.6);
       margin-bottom: 14px;
     }
@@ -178,32 +190,35 @@
       text-transform: uppercase;
     }
     .tier-badge--1 {
-      background: rgba(94, 42, 121, 0.6);
-      border: 2px solid #c9a0dc;
-      color: #ffffff;
-      text-shadow: 0 0 10px rgba(201, 160, 220, 0.8);
+      background: color-mix(in srgb, var(--color-purple) 60%, transparent);
+      border: 2px solid var(--color-accent-2);
+      color: var(--color-text);
+      text-shadow: 0 0 10px color-mix(in srgb, var(--color-accent-2) 80%, transparent);
     }
     .tier-badge--2 {
-      background: rgba(94, 42, 121, 0.7);
-      border: 2px solid #d4b0e8;
-      color: #f0e0f8;
-      text-shadow: 0 0 12px rgba(201, 160, 220, 0.9);
+      background: color-mix(in srgb, var(--color-purple) 70%, transparent);
+      border: 2px solid var(--color-purple-light);
+      color: var(--color-purple-pale);
+      text-shadow: 0 0 12px color-mix(in srgb, var(--color-accent-2) 90%, transparent);
     }
     .tier-badge--3 {
-      background: linear-gradient(135deg, rgba(242, 183, 5, 0.3), rgba(94, 42, 121, 0.4));
-      border: 2px solid #f2b705;
-      color: #f2b705;
-      text-shadow: 0 0 14px rgba(242, 183, 5, 0.8);
+      background: linear-gradient(135deg,
+        color-mix(in srgb, var(--color-gold) 30%, transparent),
+        color-mix(in srgb, var(--color-purple) 40%, transparent));
+      border: 2px solid var(--color-gold);
+      color: var(--color-gold);
+      text-shadow: 0 0 14px color-mix(in srgb, var(--color-gold) 80%, transparent);
     }
 
     .username {
       font-size: 56px;
       font-weight: 900;
+      font-family: var(--theme-font-display, 'DM Sans', sans-serif);
       color: var(--color-text);
       text-shadow:
         0 0 20px rgba(255, 255, 255, 0.6),
-        0 0 50px rgba(94, 42, 121, 0.9),
-        0 0 80px rgba(155, 85, 192, 0.5);
+        0 0 50px color-mix(in srgb, var(--color-purple) 90%, transparent),
+        0 0 80px color-mix(in srgb, var(--color-purple-mid) 50%, transparent);
       margin-bottom: 20px;
     }
 
@@ -217,10 +232,11 @@
     .amount {
       font-size: 24px;
       font-weight: 700;
-      color: #ffffff;
+      font-family: var(--theme-font-display, 'DM Sans', sans-serif);
+      color: var(--color-text);
       text-shadow:
-        0 0 12px rgba(212, 176, 232, 1),
-        0 0 28px rgba(155, 85, 192, 0.85),
+        0 0 12px color-mix(in srgb, var(--color-purple-light) 100%, transparent),
+        0 0 28px color-mix(in srgb, var(--color-purple-mid) 85%, transparent),
         2px 2px 0 rgba(0, 0, 0, 0.5);
       letter-spacing: 2px;
     }
@@ -228,19 +244,19 @@
     .total {
       font-size: 16px;
       font-weight: 400;
-      color: rgba(212, 176, 232, 0.9);
+      color: color-mix(in srgb, var(--color-purple-light) 90%, transparent);
       letter-spacing: 3px;
       text-transform: uppercase;
       margin-top: 10px;
       text-shadow:
-        0 0 10px rgba(155, 85, 192, 0.8),
+        0 0 10px color-mix(in srgb, var(--color-purple-mid) 80%, transparent),
         1px 1px 0 rgba(0, 0, 0, 0.6);
     }
     body[data-size="large"] .total {
       font-size: 20px;
-      color: rgba(255, 220, 120, 0.95);
+      color: color-mix(in srgb, var(--color-gold) 95%, transparent);
       text-shadow:
-        0 0 12px rgba(242, 183, 5, 0.9),
+        0 0 12px color-mix(in srgb, var(--color-gold) 90%, transparent),
         2px 2px 0 rgba(0, 0, 0, 0.6);
     }
 
@@ -259,24 +275,24 @@
       letter-spacing: 14px;
       color: var(--color-gold);
       text-shadow:
-        0 0 16px rgba(255, 200, 60, 1),
-        0 0 36px rgba(242, 183, 5, 0.9),
+        0 0 16px color-mix(in srgb, var(--color-gold) 100%, #fff 25%),
+        0 0 36px color-mix(in srgb, var(--color-gold) 90%, transparent),
         3px 3px 0 rgba(0, 0, 0, 0.7);
     }
     body[data-size="large"] .username {
       font-size: 84px;
       text-shadow:
         0 0 24px rgba(255, 255, 255, 0.8),
-        0 0 60px rgba(242, 183, 5, 0.7),
-        0 0 100px rgba(155, 85, 192, 0.7);
+        0 0 60px color-mix(in srgb, var(--color-gold) 70%, transparent),
+        0 0 100px color-mix(in srgb, var(--color-purple-mid) 70%, transparent);
     }
     body[data-size="large"] .amount {
       font-size: 38px;
       font-weight: 900;
       color: var(--color-gold);
       text-shadow:
-        0 0 14px rgba(255, 200, 60, 1),
-        0 0 32px rgba(242, 183, 5, 0.85),
+        0 0 14px color-mix(in srgb, var(--color-gold) 100%, #fff 25%),
+        0 0 32px color-mix(in srgb, var(--color-gold) 85%, transparent),
         3px 3px 0 rgba(0, 0, 0, 0.7);
     }
     body[data-size="large"] .divider {
@@ -294,9 +310,9 @@
   <div class="bg"></div>
 
   <!-- Explosion lines -->
-  <div class="line line-1" style="--rot: 15deg;"></div>
-  <div class="line line-2" style="--rot: -20deg;"></div>
-  <div class="line line-3" style="--rot: 60deg;"></div>
+  <div class="line line-1"></div>
+  <div class="line line-2"></div>
+  <div class="line line-3"></div>
 
   <!-- Particles (generated by JS) -->
   <div id="particles"></div>
@@ -375,14 +391,24 @@
     // Partikel-Menge skaliert mit Gift-Sub-Menge
     const COUNT = size === 'large' ? 70 : size === 'medium' ? 45 : 25;
 
+    // Partikel-Farben aus den :root-Aliassen lesen (die selbst auf die
+    // Theme-Tokens zeigen, mit Entry-Werten als Fallback dahinter).
+    const _cs = getComputedStyle(document.documentElement);
+    const _tok = (name) => _cs.getPropertyValue(name).trim();
+    const C_PURPLE      = _tok('--color-purple');
+    const C_PURPLE_DARK = _tok('--color-purple-dark');
+    const C_PURPLE_MID  = _tok('--color-purple-mid');
+    const C_ACCENT_2    = _tok('--color-accent-2');
+    const C_GOLD        = _tok('--color-gold');
+
     // ~70% purple, ~30% gold for giftsub (purple theme — inverted ratio)
     const colors = [
-      '#5e2a79', '#5e2a79', '#5e2a79', '#5e2a79', '#5e2a79',
-      '#5e2a79', '#5e2a79', '#5e2a79', '#5e2a79', '#5e2a79',
-      '#7b3fa0', '#7b3fa0', '#7b3fa0', '#9b55c0', '#9b55c0',
-      '#c9a0dc', '#c9a0dc',
-      '#f2b705', '#f2b705', '#f2b705', '#f2b705', '#f2b705',
-      '#f2b705', '#f2b705', '#f2b705',
+      C_PURPLE, C_PURPLE, C_PURPLE, C_PURPLE, C_PURPLE,
+      C_PURPLE, C_PURPLE, C_PURPLE, C_PURPLE, C_PURPLE,
+      C_PURPLE_DARK, C_PURPLE_DARK, C_PURPLE_DARK, C_PURPLE_MID, C_PURPLE_MID,
+      C_ACCENT_2, C_ACCENT_2,
+      C_GOLD, C_GOLD, C_GOLD, C_GOLD, C_GOLD,
+      C_GOLD, C_GOLD, C_GOLD,
     ];
 
     for (let i = 0; i < COUNT; i++) {

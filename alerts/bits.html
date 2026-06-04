@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
   <title>Bits Alert</title>
+  <!-- Theme-Fundament: Tokens (--theme-*) + Alias. data-theme kommt server-
+       injiziert aufs <html> (sonst Entry-Default). -->
+  <link rel="stylesheet" href="../widgets/_theme.css">
   <style>
     @font-face {
       font-family: 'DM Sans';
@@ -19,13 +22,14 @@
       padding: 0;
     }
 
+    /* Alias auf die Theme-Tokens — Fallback = bisheriger Entry-Look. */
     :root {
-      --color-gold:       #f2b705;
-      --color-bg-dark:    #0d0d1a;
-      --color-bg-purple:  #1a0d2e;
-      --color-purple-glow: #5e2a79;
-      --color-text:       #ffffff;
-      --color-text-muted: #cccccc;
+      --color-gold:        var(--theme-accent, #f2b705);
+      --color-bg-dark:     var(--theme-bg, #0d0d1a);
+      --color-bg-purple:   var(--theme-surface, #1a0d2e);
+      --color-purple-glow: var(--theme-primary, #5e2a79);
+      --color-text:        var(--theme-text, #ffffff);
+      --color-text-muted:  var(--theme-text-dim, #cccccc);
     }
 
     /* ─── Keyframes ─────────────────────────────────────────────── */
@@ -45,13 +49,13 @@
     @keyframes glowPulse {
       0%, 100% {
         box-shadow:
-          0 0 40px rgba(242, 183, 5, 0.2),
-          0 0 80px rgba(94, 42, 121, 0.15);
+          0 0 40px color-mix(in srgb, var(--color-gold) 20%, transparent),
+          0 0 80px color-mix(in srgb, var(--color-purple-glow) 15%, transparent);
       }
       50% {
         box-shadow:
-          0 0 60px rgba(242, 183, 5, 0.45),
-          0 0 120px rgba(94, 42, 121, 0.35);
+          0 0 60px color-mix(in srgb, var(--color-gold) 45%, transparent),
+          0 0 120px color-mix(in srgb, var(--color-purple-glow) 35%, transparent);
       }
     }
 
@@ -67,7 +71,7 @@
       height: 1080px;
       overflow: hidden;
       background: transparent;
-      font-family: 'DM Sans', sans-serif;
+      font-family: var(--theme-font-body, 'DM Sans', sans-serif);
     }
 
     /* ─── Wrapper ────────────────────────────────────────────────── */
@@ -84,8 +88,10 @@
 
     .alert-box {
       position: relative;
-      background: linear-gradient(135deg, rgba(13, 13, 26, 0.95), rgba(26, 13, 46, 0.95));
-      border: 2px solid rgba(242, 183, 5, 0.6);
+      background: linear-gradient(135deg,
+        color-mix(in srgb, var(--color-bg-dark) 95%, transparent),
+        color-mix(in srgb, var(--color-bg-purple) 95%, transparent));
+      border: 2px solid color-mix(in srgb, var(--color-gold) 60%, transparent);
       border-radius: 14px;
       padding: 32px 48px;
       max-width: 50%;
@@ -110,7 +116,7 @@
       position: absolute;
       inset: 0;
       border-radius: 12px;
-      background: radial-gradient(ellipse at center, rgba(242, 183, 5, 0.08) 0%, transparent 70%);
+      background: radial-gradient(ellipse at center, color-mix(in srgb, var(--color-gold) 8%, transparent) 0%, transparent 70%);
       pointer-events: none;
     }
 
@@ -150,15 +156,17 @@
     .event-type {
       font-size: 13px;
       color: var(--color-gold);
+      font-family: var(--theme-font-display, 'DM Sans', sans-serif);
       letter-spacing: 4px;
       text-transform: uppercase;
-      text-shadow: 0 0 12px rgba(242, 183, 5, 0.7);
+      text-shadow: 0 0 12px color-mix(in srgb, var(--color-gold) 70%, transparent);
       margin-bottom: 12px;
     }
 
     .username {
       font-size: 36px;
       font-weight: 900;
+      font-family: var(--theme-font-display, 'DM Sans', sans-serif);
       color: var(--color-text);
       margin-bottom: 16px;
       opacity: 0;

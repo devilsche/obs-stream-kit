@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
   <title>Donation Alert</title>
+  <!-- Theme-Fundament: Tokens (--theme-*) + Alias. data-theme kommt server-
+       injiziert aufs <html> (sonst Entry-Default). -->
+  <link rel="stylesheet" href="../widgets/_theme.css">
   <style>
     @font-face {
       font-family: 'DM Sans';
@@ -19,15 +22,16 @@
       padding: 0;
     }
 
+    /* Alias auf die Theme-Tokens — Fallback = bisheriger Entry-Look. */
     :root {
-      --color-gold:        #f2b705;
-      --color-gold-light:  #ffd54f;
-      --color-bg-dark:     #0d0d1a;
-      --color-bg-purple:   #1a0d2e;
-      --color-purple:      #5e2a79;
-      --color-purple-light:#c9a0dc;
-      --color-text:        #ffffff;
-      --color-text-muted:  #cccccc;
+      --color-gold:        var(--theme-accent, #f2b705);
+      --color-gold-light:  var(--theme-accent, #ffd54f);
+      --color-bg-dark:     var(--theme-bg, #0d0d1a);
+      --color-bg-purple:   var(--theme-surface, #1a0d2e);
+      --color-purple:      var(--theme-primary, #5e2a79);
+      --color-purple-light:var(--theme-accent-2, #c9a0dc);
+      --color-text:        var(--theme-text, #ffffff);
+      --color-text-muted:  var(--theme-text-dim, #cccccc);
     }
 
     /* ─── Keyframes ─────────────────────────────────────────────── */
@@ -48,13 +52,13 @@
     @keyframes glowPulse {
       0%, 100% {
         box-shadow:
-          0 0 50px rgba(242, 183, 5, 0.25),
-          0 0 100px rgba(94, 42, 121, 0.15);
+          0 0 50px color-mix(in srgb, var(--color-gold) 25%, transparent),
+          0 0 100px color-mix(in srgb, var(--color-purple) 15%, transparent);
       }
       50% {
         box-shadow:
-          0 0 80px rgba(242, 183, 5, 0.5),
-          0 0 150px rgba(94, 42, 121, 0.35);
+          0 0 80px color-mix(in srgb, var(--color-gold) 50%, transparent),
+          0 0 150px color-mix(in srgb, var(--color-purple) 35%, transparent);
       }
     }
 
@@ -82,7 +86,7 @@
       height: 1080px;
       overflow: hidden;
       background: transparent;
-      font-family: 'DM Sans', sans-serif;
+      font-family: var(--theme-font-body, 'DM Sans', sans-serif);
     }
 
     /* ─── Wrapper ────────────────────────────────────────────────── */
@@ -99,8 +103,10 @@
 
     .alert-box {
       position: relative;
-      background: linear-gradient(135deg, rgba(13, 13, 26, 0.95), rgba(26, 13, 46, 0.95));
-      border: 2px solid rgba(242, 183, 5, 0.7);
+      background: linear-gradient(135deg,
+        color-mix(in srgb, var(--color-bg-dark) 95%, transparent),
+        color-mix(in srgb, var(--color-bg-purple) 95%, transparent));
+      border: 2px solid color-mix(in srgb, var(--color-gold) 70%, transparent);
       border-radius: 16px;
       padding: 44px 64px;
       max-width: 60%;
@@ -120,7 +126,7 @@
       position: absolute;
       inset: 0;
       border-radius: 14px;
-      background: radial-gradient(ellipse at center, rgba(242, 183, 5, 0.1) 0%, transparent 70%);
+      background: radial-gradient(ellipse at center, color-mix(in srgb, var(--color-gold) 10%, transparent) 0%, transparent 70%);
       pointer-events: none;
     }
 
@@ -145,15 +151,17 @@
     .event-type {
       font-size: 14px;
       color: var(--color-gold);
+      font-family: var(--theme-font-display, 'DM Sans', sans-serif);
       letter-spacing: 5px;
       text-transform: uppercase;
-      text-shadow: 0 0 14px rgba(242, 183, 5, 0.7);
+      text-shadow: 0 0 14px color-mix(in srgb, var(--color-gold) 70%, transparent);
       margin-bottom: 16px;
     }
 
     .amount {
       font-size: 56px;
       font-weight: 900;
+      font-family: var(--theme-font-display, 'DM Sans', sans-serif);
       color: var(--color-gold);
       margin-bottom: 8px;
       opacity: 0;
@@ -166,12 +174,13 @@
       animation: amountPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards,
                  shimmer 3s linear 1s infinite;
       text-shadow: none;
-      filter: drop-shadow(0 0 20px rgba(242, 183, 5, 0.5));
+      filter: drop-shadow(0 0 20px color-mix(in srgb, var(--color-gold) 50%, transparent));
     }
 
     .username {
       font-size: 28px;
       font-weight: 700;
+      font-family: var(--theme-font-display, 'DM Sans', sans-serif);
       color: var(--color-text);
       margin-bottom: 20px;
       opacity: 0;
