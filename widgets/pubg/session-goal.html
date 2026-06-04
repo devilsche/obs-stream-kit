@@ -51,6 +51,19 @@
     }
     .bar.done .fill { background: linear-gradient(90deg, #7be57b, #b9f59b); }
     .meta { color: var(--pubg-muted); font-size: 0.78em; margin-top: 8px; }
+    @keyframes flicker {
+      0%,100% { transform: scaleY(1)    rotate(-4deg); opacity: 1;    }
+      25%      { transform: scaleY(1.12) rotate( 3deg); opacity: 0.85; }
+      50%      { transform: scaleY(0.92) rotate(-2deg); opacity: 1;    }
+      75%      { transform: scaleY(1.08) rotate( 4deg); opacity: 0.9;  }
+    }
+    .meta .material-symbols-outlined {
+      color: #ff8c00;
+      display: inline-block;
+      transform-origin: bottom center;
+      animation: flicker 0.9s ease-in-out infinite;
+      vertical-align: middle;
+    }
   </style>
 </head>
 <body>
