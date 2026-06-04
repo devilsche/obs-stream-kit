@@ -1094,3 +1094,14 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
   container-type:inline-size;aspect-ratio:var(--ov-w,1920)/var(--ov-h,1080)}
 .dn-modal__body--overlay iframe{width:calc(var(--ov-w,1920)*1px);height:calc(var(--ov-h,1080)*1px);
   transform-origin:0 0;transform:scale(calc(100cqw / (var(--ov-w,1920)*1px)))}
+
+/* ── URL-Filter-Suchfeld + Empty-State ── */
+.url-search{display:flex;align-items:center;gap:8px;margin:0 0 18px;max-width:340px;
+  border:1px solid var(--border);background:var(--bg-elev);border-radius:var(--r-ctrl);padding:0 12px}
+.url-search:focus-within{border-color:var(--brand-purple)}
+.url-search .material-symbols-outlined{font-size:18px;color:var(--text-dim)}
+.url-search input{flex:1;min-width:0;background:none;border:0;outline:none;color:var(--text);
+  font:inherit;font-size:14px;padding:10px 4px;min-height:40px}
+.url-search input::placeholder{color:var(--text-dim)}
+.url-card[hidden]{display:none}
+.url-empty{font-family:var(--theme-font-mono,ui-monospace,monospace);color:var(--text-dim);text-align:center;padding:30px 0}

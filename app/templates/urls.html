@@ -44,8 +44,15 @@
                 aria-selected="false" tabindex="-1" aria-controls="urlpanel-decor">Look &amp; Decor<span class="url-tabs__cnt">{{ decor|length }}</span></button>
         <button type="button" role="tab" id="urltab-alerts" data-tab="alerts" data-label="Alerts"
                 aria-selected="false" tabindex="-1" aria-controls="urlpanel-alerts">Alerts<span class="url-tabs__cnt">{{ alerts|length }}</span></button>
+        <button type="button" role="tab" id="urltab-memes" data-tab="memes" data-label="Memes"
+                aria-selected="false" tabindex="-1" aria-controls="urlpanel-memes">Memes<span class="url-tabs__cnt">{{ stingers|length }}</span></button>
         <button type="button" role="tab" id="urltab-transition" data-tab="transition" data-label="Transition"
-                aria-selected="false" tabindex="-1" aria-controls="urlpanel-transition">Transition<span class="url-tabs__cnt">{{ transitions|length + stingers|length }}</span></button>
+                aria-selected="false" tabindex="-1" aria-controls="urlpanel-transition">Transition<span class="url-tabs__cnt">{{ transitions|length }}</span></button>
+      </div>
+
+      <div class="url-search">
+        <span class="material-symbols-outlined" aria-hidden="true">search</span>
+        <input type="search" id="urlFilter" placeholder="Im Bereich filtern…" aria-label="Sources im aktiven Bereich filtern" autocomplete="off">
       </div>
 
       {# ── Overlays ── #}
@@ -92,7 +99,18 @@
         </div>
       </div>
 
-      {# ── Transition / Stinger ── #}
+      {# ── Memes (Stinger-Effekte: Kamehameha, Over 9000, Picard …) ── #}
+      <div class="url-tabpanel" id="urlpanel-memes" role="tabpanel" aria-labelledby="urltab-memes" hidden>
+        <div class="url-grid">
+          {% for s in stingers %}
+          {{ src_card('overlay', 'Meme', s.label,
+                      base_url ~ '/s/' ~ token ~ '/stingers/' ~ s.file, 'stingers/' ~ s.file,
+                      s.size) }}
+          {% endfor %}
+        </div>
+      </div>
+
+      {# ── Transition (Stinger-Player) ── #}
       <div class="url-tabpanel" id="urlpanel-transition" role="tabpanel" aria-labelledby="urltab-transition" hidden>
         <div class="url-grid">
           {% for t in transitions %}
@@ -100,13 +118,10 @@
                       base_url ~ '/s/' ~ token ~ '/transitions/' ~ t.file, 'transitions/' ~ t.file,
                       t.size) }}
           {% endfor %}
-          {% for s in stingers %}
-          {{ src_card('overlay', 'Stinger', s.label,
-                      base_url ~ '/s/' ~ token ~ '/stingers/' ~ s.file, 'stingers/' ~ s.file,
-                      s.size) }}
-          {% endfor %}
         </div>
       </div>
+
+      <p class="url-empty" id="urlEmpty" hidden>Keine Source im Filter gefunden.</p>
     </section>
 
     {# ══ Detail-View (per JS eingeblendet) ══ #}
@@ -376,6 +391,7 @@
     document.querySelectorAll(".url-tabpanel").forEach(p => {
       p.hidden = p.id !== "urlpanel-" + name;
     });
+    applyFilter();
   }
   tabs.forEach(t => t.addEventListener("click", () => selectTab(t.dataset.tab)));
   tabBar.addEventListener("keydown", e => {
@@ -414,6 +430,32 @@
     previewModal.addEventListener("click", e => { if (e.target === previewModal) previewModal.close(); });
     previewModal.addEventListener("close", unload);
   }
+
+  // ── Karten alphabetisch sortieren (je Bereich) ───────────
+  document.querySelectorAll(".url-grid").forEach(grid => {
+    Array.from(grid.children)
+      .sort((a, b) => (a.dataset.label || "").localeCompare(b.dataset.label || "", "de"))
+      .forEach(c => grid.appendChild(c));
+  });
+
+  // ── Filter (wirkt auf den aktiven Bereich) ────────────────
+  const filter = document.getElementById("urlFilter");
+  const emptyMsg = document.getElementById("urlEmpty");
+  function applyFilter() {
+    if (!filter) return;
+    const q = (filter.value || "").toLowerCase().trim();
+    const panel = document.querySelector(".url-tabpanel:not([hidden])");
+    if (!panel) return;
+    let any = false;
+    panel.querySelectorAll(".url-card").forEach(card => {
+      const hay = ((card.dataset.label || "") + " " + (card.dataset.cat || "") + " " + (card.dataset.path || "")).toLowerCase();
+      const show = !q || hay.includes(q);
+      card.hidden = !show;
+      if (show) any = true;
+    });
+    if (emptyMsg) emptyMsg.hidden = any;
+  }
+  if (filter) filter.addEventListener("input", applyFilter);
 
   // ── Deep-Link (#src=<path>) ───────────────────────────────
   const m = (location.hash || "").match(/src=([^&]+)/);
