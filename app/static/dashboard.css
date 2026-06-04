@@ -953,7 +953,28 @@ html[data-theme="aurora"] .dn-ccard,html[data-theme="aurora"] .dn-hero{backdrop-
 .url-master__filter,.url-card-primary__url,.sw-input,.sw-btn,.overlay-url-field,
 .url-back-btn,.btn-copy-primary,.btn-preview-secondary,.url-cat__count{border-radius:var(--r-ctrl)}
 .url-detail__title,.url-configure__heading{font-family:var(--font-display)}
-.btn-copy-primary,.btn-preview-secondary{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.03em;font-size:13px}
+/* URL-Buttons = derselbe dn-btn-Stil wie im Rest (statt eigener Gold/Lila-Specials) */
+.btn-copy-primary,.btn-preview-secondary{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.03em;
+  font-size:13px;border-radius:var(--r-ctrl);border:1px solid var(--brand-purple)}
+.btn-copy-primary{background:color-mix(in srgb,var(--brand-purple) 12%,transparent);color:var(--brand-purple)}
+.btn-copy-primary:hover{background:var(--brand-purple);color:#fff;filter:none}
+.btn-preview-secondary{background:none;border-color:var(--border);color:var(--text-dim)}
+.btn-preview-secondary:hover{background:none;border-color:var(--text);color:var(--text)}
+
+/* Vorschau-Modal (dialog) — echtes Widget im iframe, Theme-Look + Schachbrett-BG */
+.dn-modal{border:1px solid var(--brand-purple);background:var(--bg-elev);color:var(--text);padding:0;
+  border-radius:var(--r-box);max-width:min(900px,94vw);width:100%;box-shadow:0 0 60px rgba(0,0,0,.6)}
+.dn-modal::backdrop{background:rgba(0,0,0,.7);backdrop-filter:blur(3px)}
+.dn-modal__head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:14px 18px;border-bottom:1px solid var(--border);background:var(--bg-deeper)}
+.dn-modal__head h2{margin:0;font-family:var(--font-display);font-size:16px;color:var(--brand-gold)}
+.dn-modal__close{background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:var(--r-ctrl);
+  font-family:var(--font-display);text-transform:uppercase;font-size:12px;padding:7px 12px;min-height:36px;cursor:pointer}
+.dn-modal__close:hover{color:var(--text);border-color:var(--text)}
+.dn-modal__body{height:min(60vh,520px);
+  background-image:linear-gradient(45deg,#0006 25%,transparent 25%),linear-gradient(-45deg,#0006 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#0006 75%),linear-gradient(-45deg,transparent 75%,#0006 75%);
+  background-size:24px 24px;background-position:0 0,0 12px,12px -12px,-12px 0}
+.dn-modal__body iframe{width:100%;height:100%;border:0;display:block;background:transparent}
 .url-card-primary__url{border-left:2px solid var(--brand-gold)}
 .url-cat[open] .url-cat__title{color:var(--brand-gold)}
 /* Eck-Marker auf der Detail-Karte (Mockup-Deko) — nur Nicht-entry, damit entry unveraendert bleibt */

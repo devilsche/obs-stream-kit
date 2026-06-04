@@ -102,6 +102,14 @@
   </main>
 </div>
 
+<dialog class="dn-modal" id="previewModal" aria-label="Widget-Vorschau">
+  <div class="dn-modal__head">
+    <h2 id="previewModalTitle">Vorschau</h2>
+    <button type="button" class="dn-modal__close" id="previewClose">schließen ✕</button>
+  </div>
+  <div class="dn-modal__body"><iframe id="previewFrame" title="Widget-Vorschau" loading="lazy"></iframe></div>
+</dialog>
+
 <script>
 (function () {
   const master = document.getElementById("urlMaster");
@@ -115,6 +123,15 @@
   const items = Array.from(master.querySelectorAll(".url-master__item"));
   const cats = Array.from(master.querySelectorAll(".url-cat"));
   const isMobile = () => window.matchMedia("(max-width: 1023px)").matches;
+
+  // Vorschau-Modal: schliessen + iframe entladen (stoppt Laden/Poll des Widgets)
+  const previewModal = document.getElementById("previewModal");
+  if (previewModal) {
+    const unload = () => { const f = document.getElementById("previewFrame"); if (f) f.src = "about:blank"; };
+    document.getElementById("previewClose").addEventListener("click", () => previewModal.close());
+    previewModal.addEventListener("click", (e) => { if (e.target === previewModal) previewModal.close(); });
+    previewModal.addEventListener("close", unload);
+  }
 
   // ── URL aus aktuell gerendertem Detail-Switches zusammenbauen
   function buildUrl(root) {
@@ -309,7 +326,12 @@
     });
 
     previewBtn.addEventListener("click", () => {
-      window.open(buildUrl(root), "_blank", "noopener");
+      const modal = document.getElementById("previewModal");
+      const frame = document.getElementById("previewFrame");
+      const t = document.querySelector(".url-detail__title");
+      document.getElementById("previewModalTitle").textContent = "Vorschau · " + (t ? t.textContent : "Widget");
+      frame.src = buildUrl(root);
+      modal.showModal();
     });
   }
 
