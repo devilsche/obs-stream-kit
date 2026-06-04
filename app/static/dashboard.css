@@ -985,15 +985,12 @@ html[data-theme="aurora"] .dn-ccard,html[data-theme="aurora"] .dn-hero{backdrop-
 html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;right:0;top:0;width:14px;height:14px;
   border-top:2px solid var(--brand-purple);border-right:2px solid var(--brand-purple);pointer-events:none}
 
-/* Parameter-/Mode-Selektoren als Segmented-Control (Mockup .seg-Stil) statt Pills */
-.url-switches .sw-controls{gap:0;flex-wrap:wrap;overflow:visible;max-width:100%}
-.url-switches .sw-btn{border-radius:0!important;background:var(--bg-card);color:var(--text-muted);
-  border:1px solid var(--border);border-right-width:0;padding:8px 12px;min-height:38px;white-space:nowrap;
+/* Parameter-/Mode-Selektoren als Pills mit Gap (wrapping-freundlich) */
+.url-switches .sw-controls{gap:6px;flex-wrap:wrap;overflow:visible;max-width:100%}
+.url-switches .sw-btn{border-radius:var(--r-ctrl)!important;background:var(--bg-card);color:var(--text-muted);
+  border:1px solid var(--border);padding:8px 12px;min-height:38px;white-space:nowrap;
   font-family:var(--font-display);font-size:11.5px;text-transform:uppercase;letter-spacing:.02em}
-.url-switches .sw-btn:first-child{border-top-left-radius:var(--r-ctrl)!important;border-bottom-left-radius:var(--r-ctrl)!important}
-.url-switches .sw-btn:last-child{border-right-width:1px;border-top-right-radius:var(--r-ctrl)!important;border-bottom-right-radius:var(--r-ctrl)!important}
 .url-switches .sw-btn.active{background:var(--brand-purple);color:var(--theme-on-primary,#fff);border-color:var(--brand-purple)}
-.url-switches .sw-btn.active + .sw-btn{border-left-color:var(--brand-purple)}
 
 /* ════════════════════════════════════════════════════════════════════════
    URLs-Seite — Mockup-Layout: Crumb + Titel + Sub-Tabs + Card-Grid + Detail.
