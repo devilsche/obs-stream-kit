@@ -138,6 +138,12 @@ html[data-theme="swiss"] .t-range{color:var(--theme-text);font-weight:700}
 .t-launch{position:relative;display:inline-block;width:46px;height:48px;vertical-align:bottom;
   visibility:hidden}                 /* erst zeigen wenn Icon-Font geladen (kein Fallback-Text-Versatz) */
 html.fonts-ready .t-launch{visibility:visible}
+/* Animation erst starten, wenn die Rakete sichtbar wird (fonts-ready) — sonst
+   erscheint sie mitten im Flug-Loop an einer "falschen" Stelle statt am Boden. */
+.t-launch .rocket,.t-launch .flame,.t-launch .smoke{animation-play-state:paused}
+html.fonts-ready .t-launch .rocket,
+html.fonts-ready .t-launch .flame,
+html.fonts-ready .t-launch .smoke{animation-play-state:running}
 .t-launch .rocket{position:absolute;left:50%;bottom:2px;font-family:"Material Symbols Outlined";font-style:normal;
   font-size:30px;color:var(--theme-accent);text-shadow:0 0 12px var(--theme-accent);will-change:transform,opacity;
   transform:translateX(-50%);animation:rocket-fly 4.5s ease-in-out infinite}
