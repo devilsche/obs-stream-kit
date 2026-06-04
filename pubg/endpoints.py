@@ -635,7 +635,7 @@ class EndpointRegistry:
 
         conn = self.get_conn()
         m_row = conn.execute(
-            "SELECT map_name FROM matches WHERE tenant_id = ? AND match_id = ?",
+            "SELECT map_name, telemetry_url FROM matches WHERE tenant_id = ? AND match_id = ?",
             (self.tenant_id, match_id,)).fetchone()
         # Match ist nicht in DB — kann sein dass es > 14 Tage alt ist und
         # aus der API-Liste gefallen ist, aber HiDrive hat das Blob evtl.
@@ -654,6 +654,19 @@ class EndpointRegistry:
         here = os.path.dirname(os.path.abspath(__file__))
         secrets = os.path.join(os.path.dirname(here), ".secrets")
         raw = hidrive_telemetry.download_raw(match_id, secrets)
+        replay_source = "hidrive"
+        # Fallback 1: HiDrive hat das Blob nicht (nie archiviert / HiDrive nicht
+        # konfiguriert) → direkt vom PUBG-Telemetrie-CDN laden. Die telemetry_url
+        # ist public (kein API-Key noetig) und steht in der matches-Tabelle,
+        # solange das Match im 14-Tage-Fenster der API liegt. Greift fuer JEDEN
+        # Tenant (auch gemeinsame Matches), nicht nur den Archiv-Owner.
+        if not raw and m_row and m_row["telemetry_url"]:
+            try:
+                from pubg.api_client import ApiClient
+                raw = ApiClient(api_key="").get_telemetry(m_row["telemetry_url"])
+                replay_source = "api"
+            except Exception:
+                raw = None
         if not raw:
             if not m_row:
                 return _err(404, "Match nicht gefunden — Match-ID korrekt? "
@@ -690,6 +703,7 @@ class EndpointRegistry:
 
         result = build_replay(
             raw, match_id, map_name, mapKm, team_mapping, names)
+        result["replaySource"] = replay_source  # hidrive | api (Debug/Transparenz)
         # Hero-Account + Team (eigener Spieler, is_self=1 in DB)
         from pubg.db_pg import get_self_player
         self_row = get_self_player(conn.raw, self.tenant_id)
