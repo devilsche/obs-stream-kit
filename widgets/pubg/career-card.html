@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="../_blocks.css">
   <style>
     body { padding: 20px; display: flex; align-items: center; }
-    .t-card { width: 360px; }
+    .t-card { width: 400px; }
 
     /* Milestone-Countdown — token-basiert. Bei <=3 Wins bis zum naechsten
        100er heller + Akzent-Glow + groesser. */
@@ -58,13 +58,13 @@
 <body>
   <div class="t-card pubg-fade-in">
     <div class="t-header"><span>Career</span> <span class="t-range" id="player">—</span></div>
-    <div class="t-stat-grid t-stat-grid--compact">
-      <div class="t-stat"><span class="t-value" id="kd">—</span><span class="t-label">K/D</span></div>
-      <div class="t-stat"><span class="t-value" id="wins">—</span><span class="t-label">Wins</span></div>
+    <div class="t-stat-grid t-stat-grid--cols3 t-stat-grid--compact">
       <div class="t-stat"><span class="t-value" id="matches">—</span><span class="t-label">Matches</span></div>
-      <div class="t-stat"><span class="t-value" id="kills">—</span><span class="t-label">Kills</span></div>
+      <div class="t-stat"><span class="t-value" id="wins">—</span><span class="t-label">Wins</span></div>
       <div class="t-stat"><span class="t-value" id="winpct">—</span><span class="t-label">Win %</span></div>
       <div class="t-stat"><span class="t-value" id="top10">—</span><span class="t-label">Top10 %</span></div>
+      <div class="t-stat"><span class="t-value" id="kd">—</span><span class="t-label">K/D</span></div>
+      <div class="t-stat"><span class="t-value" id="kills">—</span><span class="t-label">Kills</span></div>
       <div class="t-stat"><span class="t-value" id="hs">—</span><span class="t-label">Headshot</span></div>
       <div class="t-stat"><span class="t-value" id="longest">—</span><span class="t-label">Longest</span></div>
     </div>
@@ -110,7 +110,8 @@
       if (!d || !d.rounds_played) return;
       document.getElementById("matches").textContent = PubgUI.fmtNum(d.rounds_played);
       document.getElementById("wins").textContent = PubgUI.fmtNum(d.wins);
-      document.getElementById("kd").textContent = PubgUI.fmtKD(d.kd_ratio);
+      document.getElementById("kd").innerHTML =
+        PubgUI.hotIf(d.kd_ratio, 4, PubgUI.fmtKD(d.kd_ratio));
       document.getElementById("hs").textContent = PubgUI.fmtPct(d.headshot_rate);
       document.getElementById("winpct").textContent = PubgUI.fmtPct(d.win_rate);
       document.getElementById("top10").textContent = PubgUI.fmtPct(d.top10_rate);
@@ -136,7 +137,7 @@
 
     if (DEMO) {
       // Lokale Vorschau: Beispieldaten (Longest > 300 → Highlight sichtbar).
-      render({ rounds_played: 17000, wins: 904, kd_ratio: 1.51, headshot_rate: 24.1,
+      render({ rounds_played: 17000, wins: 904, kd_ratio: 5.2, headshot_rate: 24.1,
                win_rate: 5.3, top10_rate: 39.2, longest_kill: 753, kills: 24700 });
     } else {
       const params = new URLSearchParams({ mode: MODE });

@@ -10,7 +10,7 @@ from flask import send_from_directory, abort
 
 # Erlaubte Theme-Namen (siehe widgets/_theme.css). Whitelist schuetzt die
 # Attribut-Injektion und faengt ungueltige/alte Werte ab → Fallback Default.
-ALLOWED_THEMES = ("entry", "terminal", "aurora", "midnight", "editorial", "swiss")
+ALLOWED_THEMES = ("entry", "terminal", "aurora", "midnight", "editorial", "swiss", "azure")
 
 _HTML_TAG_RE = re.compile(r"<html\b[^>]*>", re.IGNORECASE)
 

@@ -18,7 +18,7 @@
   // Ohne Theme = Flamme (Fallback). Nutzung: hotIf(value, threshold, formattedString).
   // Returns HTML — Caller muss innerHTML setzen, nicht textContent.
   PubgUI.hotWrap = (formatted) =>
-    `<span class="t-hot-mark" aria-hidden="true"><i></i><i></i><i></i></span><span class="pubg-hot">${formatted}</span>`;
+    `<span class="pubg-hot">${formatted}</span><span class="t-hot-mark t-hot-mark--after" aria-hidden="true"><i></i><i></i><i></i></span>`;
   PubgUI.hotIf = (value, threshold, formatted) =>
     (value || 0) > threshold ? PubgUI.hotWrap(formatted) : formatted;
 

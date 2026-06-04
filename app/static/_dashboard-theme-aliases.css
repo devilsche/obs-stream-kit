@@ -11,7 +11,8 @@ html[data-theme="terminal"],
 html[data-theme="aurora"],
 html[data-theme="midnight"],
 html[data-theme="editorial"],
-html[data-theme="swiss"] {
+html[data-theme="swiss"],
+html[data-theme="azure"] {
   --brand-purple:        var(--theme-primary);
   --brand-purple-bright: var(--theme-accent-2);
   --brand-gold:          var(--theme-accent);
