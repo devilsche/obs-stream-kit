@@ -95,7 +95,7 @@
           {% for a in alerts %}
           {{ src_card('overlay', 'Alert', a.label,
                       base_url ~ '/s/' ~ token ~ '/alerts/' ~ a.file, 'alerts/' ~ a.file,
-                      a.size, a.desc, [], (a.params or [])) }}
+                      a.size, a.desc, (a.switches or []), (a.params or [])) }}
           {% endfor %}
         </div>
       </div>

@@ -22,21 +22,60 @@ OVERLAYS = [
 
 # Alert-Animationen — transparent, Vollbild. Die Parameter werden beim Triggern
 # (z.B. durch Streamer.bot) an die URL gehaengt, z.B. ?username=Foo&message=Bar.
+_TIER = {"key": "tier", "label": "Tier", "type": "select", "default": "1000",
+         "options": [["1000", "Tier 1"], ["2000", "Tier 2"], ["3000", "Tier 3"]]}
+
 ALERTS = [
-    {"key": "follow",   "label": "New Follower", "file": "follow.html",   "size": "1920×1080",
-     "desc": "Einmal-Animation bei neuem Follower.",        "params": ["username", "message"]},
-    {"key": "sub",      "label": "New Sub",      "file": "sub.html",      "size": "1920×1080",
-     "desc": "Einmal-Animation bei neuem Sub.",             "params": ["username", "tier", "message"]},
-    {"key": "resub",    "label": "Resub",        "file": "resub.html",    "size": "1920×1080",
-     "desc": "Einmal-Animation bei einem Resub.",           "params": ["username", "months", "tier", "message"]},
-    {"key": "giftsub",  "label": "Gift Sub",     "file": "giftsub.html",  "size": "1920×1080",
-     "desc": "Einmal-Animation bei Gift-Sub(s).",           "params": ["username", "amount", "total", "tier"]},
-    {"key": "bits",     "label": "Bits / Cheer", "file": "bits.html",     "size": "1920×1080",
-     "desc": "Einmal-Animation bei Bits / Cheer.",          "params": ["username", "amount", "message"]},
-    {"key": "raid",     "label": "Raid",         "file": "raid.html",     "size": "1920×1080",
-     "desc": "Einmal-Animation bei eingehendem Raid.",      "params": ["username", "viewers"]},
-    {"key": "donation", "label": "Donation",     "file": "donation.html", "size": "1920×1080",
-     "desc": "Einmal-Animation bei einer Donation.",        "params": ["username", "name", "amount", "message"]},
+    {"key": "follow", "label": "New Follower", "file": "follow.html", "size": "1920×1080",
+     "desc": "Einmal-Animation bei neuem Follower.", "params": [],
+     "switches": [
+         {"key": "username", "label": "Username",  "type": "text", "default": "", "placeholder": "z.B. CoolStreamer"},
+         {"key": "message",  "label": "Nachricht", "type": "text", "default": "", "placeholder": "Freue mich dabei!"},
+     ]},
+    {"key": "sub", "label": "New Sub", "file": "sub.html", "size": "1920×1080",
+     "desc": "Einmal-Animation bei neuem Sub.", "params": [],
+     "switches": [
+         {"key": "username", "label": "Username",  "type": "text", "default": "", "placeholder": "z.B. CoolStreamer"},
+         _TIER,
+         {"key": "message",  "label": "Nachricht", "type": "text", "default": "", "placeholder": "Danke!"},
+     ]},
+    {"key": "resub", "label": "Resub", "file": "resub.html", "size": "1920×1080",
+     "desc": "Einmal-Animation bei einem Resub.", "params": [],
+     "switches": [
+         {"key": "username", "label": "Username", "type": "text",   "default": "", "placeholder": "z.B. CoolStreamer"},
+         {"key": "months",   "label": "Monate",   "type": "number", "default": "3", "min": 1},
+         _TIER,
+         {"key": "message",  "label": "Nachricht", "type": "text",  "default": "", "placeholder": "Schon 3 Monate!"},
+     ]},
+    {"key": "giftsub", "label": "Gift Sub", "file": "giftsub.html", "size": "1920×1080",
+     "desc": "Einmal-Animation bei Gift-Sub(s).", "params": [],
+     "switches": [
+         {"key": "username", "label": "Schenker",  "type": "text",   "default": "", "placeholder": "z.B. CoolStreamer"},
+         {"key": "amount",   "label": "Anzahl",    "type": "number", "default": "1", "min": 1},
+         {"key": "total",    "label": "Gesamt",    "type": "number", "default": "5", "min": 1},
+         _TIER,
+     ]},
+    {"key": "bits", "label": "Bits / Cheer", "file": "bits.html", "size": "1920×1080",
+     "desc": "Einmal-Animation bei Bits / Cheer.", "params": [],
+     "switches": [
+         {"key": "username", "label": "Username",  "type": "text",   "default": "", "placeholder": "z.B. CoolStreamer"},
+         {"key": "amount",   "label": "Bits",      "type": "number", "default": "100", "min": 1},
+         {"key": "message",  "label": "Nachricht", "type": "text",   "default": "", "placeholder": "cheer100"},
+     ]},
+    {"key": "raid", "label": "Raid", "file": "raid.html", "size": "1920×1080",
+     "desc": "Einmal-Animation bei eingehendem Raid.", "params": [],
+     "switches": [
+         {"key": "username", "label": "Raider",   "type": "text",   "default": "", "placeholder": "z.B. BigStreamer"},
+         {"key": "viewers",  "label": "Zuschauer", "type": "number", "default": "50", "min": 1},
+     ]},
+    {"key": "donation", "label": "Donation", "file": "donation.html", "size": "1920×1080",
+     "desc": "Einmal-Animation bei einer Donation.", "params": [],
+     "switches": [
+         {"key": "username", "label": "Username",  "type": "text", "default": "", "placeholder": "z.B. CoolStreamer"},
+         {"key": "name",     "label": "Name",      "type": "text", "default": "", "placeholder": "z.B. Max Mustermann"},
+         {"key": "amount",   "label": "Betrag",    "type": "text", "default": "5.00", "placeholder": "5.00"},
+         {"key": "message",  "label": "Nachricht", "type": "text", "default": "", "placeholder": "Danke für den Stream!"},
+     ]},
 ]
 
 # Look & Decor — Deko-Elemente, liegen unter widgets/ (served via /widgets/).
