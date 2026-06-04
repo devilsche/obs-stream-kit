@@ -4,104 +4,86 @@
 <div class="layout">
   {% include "_sidebar.html" %}
   <main id="main-content" class="main" tabindex="-1">
-    <div class="topbar"><div class="greeting">OBS Browser-Source URLs</div></div>
-
-    <div class="card">
-      <h3>How it works</h3>
-      <p>Wähle links ein Widget aus. Rechts erscheint die kopierbare URL plus alle einstellbaren Parameter. Default-Werte bleiben aus der URL — picke einen abweichenden Wert um ihn als Query-Parameter anzuhängen.</p>
-      <p style="color: var(--text-dim); font-size: 13px;">Token: <code>{{ token }}</code> · {{ widgets|length }} widgets</p>
-    </div>
 
     {% if not token %}
-      <div class="card"><p style="color: var(--danger);">No token found — admin still has to set up your tenant.</p></div>
+    <div class="url-crumb">URLs</div>
+    <h1 class="url-title">OBS Browser-Sources</h1>
+    <div class="card"><p class="url-danger">Kein Token gefunden — der Admin muss deinen Tenant noch einrichten.</p></div>
     {% else %}
 
-    {% set grouped = {} %}
-    {% for cat, label, desc, path, switches in widgets %}
-      {% if cat not in grouped %}{% set _ = grouped.update({cat: []}) %}{% endif %}
-      {% set _ = grouped[cat].append((label, desc, path, switches)) %}
-    {% endfor %}
+    {# ══ URLS-Übersicht: Crumb + Titel + Sub-Tabs + Card-Grids ══ #}
+    <section class="url-view" id="urlView" aria-label="OBS-URLs">
+      <div class="url-crumb">URLs</div>
+      <h1 class="url-title">OBS Browser-Sources</h1>
 
-    <div class="url-layout">
+      <div class="url-tabs" role="tablist" aria-label="Source-Typen">
+        <button type="button" role="tab" id="urltab-overlays" aria-selected="true"
+                aria-controls="urlpanel-overlays" data-tab="overlays">Overlays<span class="url-tabs__cnt">{{ overlays|length }}</span></button>
+        <button type="button" role="tab" id="urltab-widgets" aria-selected="false" tabindex="-1"
+                aria-controls="urlpanel-widgets" data-tab="widgets">Widgets<span class="url-tabs__cnt">{{ widgets|length }}</span></button>
+      </div>
 
-      {# ── MASTER ──────────────────────────────────────── #}
-      <nav class="url-master" id="urlMaster"
-           role="navigation" aria-label="Widget list">
-        <input type="search" id="urlFilter"
-               class="url-master__filter"
-               placeholder="Filter widget…"
-               aria-label="Widget-Liste filtern">
-
-        {% for cat, items in grouped.items() %}
-        <details class="url-cat" open>
-          <summary class="url-cat__title">
-            <span>{{ cat }}</span>
-            <span class="url-cat__count">{{ items|length }}</span>
-          </summary>
-          {% for label, desc, path, switches in items %}
-          <button type="button"
-                  class="url-master__item"
-                  data-widget-id="{{ path }}"
-                  data-widget-cat="{{ cat }}"
-                  data-widget-label="{{ label }}"
-                  data-widget-desc="{{ desc }}"
-                  data-widget-path="{{ path }}"
-                  data-widget-base="{{ base_url }}/s/{{ token }}/widgets/{{ path }}"
-                  data-widget-switches='{{ switches | tojson | safe }}'>
-            {{ label }}
+      {# ── Overlays ── #}
+      <div class="url-tabpanel" id="urlpanel-overlays" role="tabpanel" aria-labelledby="urltab-overlays">
+        <div class="url-grid">
+          {% for o in overlays %}
+          <button type="button" class="url-card"
+                  data-kind="overlay"
+                  data-label="{{ o.label }}"
+                  data-cat="Overlay"
+                  data-path="overlays/{{ o.file }}"
+                  data-base="{{ overlay_base }}/s/{{ token }}/overlays/{{ o.file }}"
+                  data-size="{{ o.size }}"
+                  data-params='{{ (o.params or []) | tojson | safe }}'>
+            <span class="url-card__corner" aria-hidden="true"></span>
+            <span class="url-card__top">
+              <span class="url-card__cat">Overlay</span>
+              <span class="url-card__nm">{{ o.label }}</span>
+              <span class="url-card__meta">{{ o.size }}</span>
+            </span>
           </button>
           {% endfor %}
-        </details>
-        {% endfor %}
-
-        <div id="urlMasterEmpty" class="url-master__empty" hidden>
-          Kein Widget gefunden
         </div>
-      </nav>
+      </div>
 
-      {# ── DETAIL ──────────────────────────────────────── #}
-      <section class="url-detail" id="urlDetail" aria-live="off">
-        <button type="button" id="urlBackBtn" class="url-back-btn"
-                aria-label="Zurück zur Widget-Liste"><span class="material-symbols-outlined" aria-hidden="true">arrow_back</span> Zurück zur Liste</button>
-        <div id="urlDetailContent">
-          <div class="url-detail__empty">Wähle links ein Widget aus.</div>
+      {# ── Widgets ── #}
+      <div class="url-tabpanel" id="urlpanel-widgets" role="tabpanel" aria-labelledby="urltab-widgets" hidden>
+        <div class="url-grid">
+          {% for cat, label, desc, path, switches in widgets %}
+          <button type="button" class="url-card"
+                  data-kind="widget"
+                  data-label="{{ label }}"
+                  data-cat="{{ cat }}"
+                  data-desc="{{ desc }}"
+                  data-path="{{ path }}"
+                  data-base="{{ base_url }}/s/{{ token }}/widgets/{{ path }}"
+                  data-switches='{{ switches | tojson | safe }}'>
+            <span class="url-card__corner" aria-hidden="true"></span>
+            <span class="url-card__top">
+              <span class="url-card__cat">{{ cat }}</span>
+              <span class="url-card__nm">{{ label }}</span>
+              <span class="url-card__meta">{{ desc }}</span>
+            </span>
+          </button>
+          {% endfor %}
         </div>
-      </section>
+      </div>
+    </section>
 
-    </div>
-
-    {% if overlays %}
-    <div class="card">
-      <h3>Overlay-Szenen</h3>
-      <p style="color: var(--text-dim); font-size: 13px;">Produktions-Overlays als OBS-Browser-Source. Jede URL einsetzen.</p>
-      <ul class="overlay-url-list">
-        {% for o in overlays %}
-        <li class="overlay-url-item">
-          <label for="ov-{{ o.key }}"><b>{{ o.label }}</b> <span style="color: var(--text-dim);">· {{ o.size }}</span></label>
-          <input id="ov-{{ o.key }}" class="overlay-url-field" type="text" readonly
-                 value="{{ overlay_base }}/s/{{ token }}/overlays/{{ o.file }}"
-                 aria-label="OBS-URL für {{ o.label }}"
-                 onfocus="this.select()">
-          {% if o.params %}
-          <small style="color: var(--text-dim);">Parameter:
-            {% for p in o.params %}<code>{{ p }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
-          </small>
-          {% endif %}
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% endif %}
-
-    <div class="card">
-      <h3>Streamer.bot</h3>
-      <p>Replace previous <code>/api/pubg/...</code> URLs with <code>{{ base_url }}/s/{{ token }}/api/...</code> (drop the auth header).</p>
-    </div>
+    {# ══ Detail-View (per JS eingeblendet) ══ #}
+    <section class="url-view url-detailview" id="urlDetailView" aria-label="Source-Detail" hidden>
+      <button type="button" class="url-back" id="urlBack">
+        <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+        Zurück zu <span id="urlBackTo">Overlays</span></button>
+      <div class="url-crumb">URLs / <span id="urlDCat">Overlay</span> / <b id="urlDName">—</b></div>
+      <div class="url-detail-grid" id="urlDetailContent"></div>
+    </section>
 
     {% endif %}
   </main>
 </div>
 
+{# Preview-Modal — echtes Widget im iframe (dock=1 → eigener dunkler Grund) #}
 <dialog class="dn-modal" id="previewModal" aria-label="Widget-Vorschau">
   <div class="dn-modal__head">
     <h2 id="previewModalTitle">Vorschau</h2>
@@ -112,41 +94,35 @@
 
 <script>
 (function () {
-  const master = document.getElementById("urlMaster");
-  const detail = document.getElementById("urlDetailContent");
-  const detailSection = document.getElementById("urlDetail");
-  const backBtn = document.getElementById("urlBackBtn");
-  const filter = document.getElementById("urlFilter");
-  const masterEmpty = document.getElementById("urlMasterEmpty");
-  if (!master || !detail) return;
+  const view = document.getElementById("urlView");
+  const detailView = document.getElementById("urlDetailView");
+  const detailContent = document.getElementById("urlDetailContent");
+  if (!view) return; // kein Token → keine Übersicht gerendert
 
-  const items = Array.from(master.querySelectorAll(".url-master__item"));
-  const cats = Array.from(master.querySelectorAll(".url-cat"));
-  const isMobile = () => window.matchMedia("(max-width: 1023px)").matches;
-
-  // Vorschau-Modal: schliessen + iframe entladen (stoppt Laden/Poll des Widgets)
-  const previewModal = document.getElementById("previewModal");
-  if (previewModal) {
-    const unload = () => { const f = document.getElementById("previewFrame"); if (f) f.src = "about:blank"; };
-    document.getElementById("previewClose").addEventListener("click", () => previewModal.close());
-    previewModal.addEventListener("click", (e) => { if (e.target === previewModal) previewModal.close(); });
-    previewModal.addEventListener("close", unload);
+  // ── Helfer ────────────────────────────────────────────────
+  function escapeHtml(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function escapeAttr(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  }
+  function parseJSON(s, fallback) {
+    try { return JSON.parse(s || ""); } catch (_) { return fallback; }
   }
 
-  // ── URL aus aktuell gerendertem Detail-Switches zusammenbauen
-  function buildUrl(root) {
-    const base = root.dataset.base;
+  // ── URL aus Basis + aktiven Switches bauen ────────────────
+  function buildUrl(base, scope) {
     const params = [];
-    root.querySelectorAll(".sw-group").forEach(g => {
+    scope.querySelectorAll(".sw-group").forEach(g => {
       const def = g.dataset.default;
       let value = null;
       if (g.dataset.type === "select") {
         const active = g.querySelector(".sw-btn.active");
         if (active) value = active.dataset.value;
       } else if (g.dataset.type === "multiselect") {
-        const picks = Array.from(g.querySelectorAll(".sw-btn.active"))
-          .map(b => b.dataset.value);
-        value = picks.join(",");
+        value = Array.from(g.querySelectorAll(".sw-btn.active")).map(b => b.dataset.value).join(",");
       } else {
         const inp = g.querySelector(".sw-input");
         if (inp) value = inp.value.trim();
@@ -158,7 +134,7 @@
     return params.length ? base + "?" + params.join("&") : base;
   }
 
-  // ── Switches-HTML aus switches-Array bauen
+  // ── Switch-Controls-HTML aus switches-Array ───────────────
   function renderSwitches(switches) {
     if (!switches || !switches.length) return "";
     return switches.map(sw => {
@@ -177,7 +153,7 @@
                    data-value="${escapeAttr(value)}" aria-pressed="false">${escapeHtml(vlabel)}</button>`
         ).join("");
       } else if (sw.type === "text") {
-        controls = `<input type="text" class="sw-input" style="width:200px"
+        controls = `<input type="text" class="sw-input sw-input--wide"
                            value="${escapeAttr(sw.default || "")}"
                            placeholder="${escapeAttr(sw.placeholder || "")}">`;
       } else {
@@ -190,79 +166,80 @@
         controls = `<input type="number" class="sw-input"
                            value="${escapeAttr(sw.default)}" ${minAttr} ${maxAttr}>${presets}`;
       }
+      const def = (sw.default !== undefined && sw.default !== "")
+        ? `<span class="sw-def">default: ${escapeHtml(sw.default)}</span>` : "";
       return `
         <div class="sw-group"
              data-param="${escapeAttr(sw.key)}"
              data-default="${escapeAttr(sw.default)}"
              data-type="${escapeAttr(sw.type)}">
-          <span class="sw-label">${escapeHtml(sw.label)} ${tooltip}</span>
+          <span class="sw-label">${escapeHtml(sw.label)} ${tooltip}${def}</span>
           <div class="sw-controls">${controls}</div>
         </div>`;
     }).join("");
   }
 
-  function escapeHtml(s) {
-    return String(s == null ? "" : s)
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-  function escapeAttr(s) {
-    return String(s == null ? "" : s)
-      .replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-  }
+  // ── Detail-View für eine Card füllen ──────────────────────
+  let currentTab = "overlays";
 
-  // ── Detail-Panel rendern für ein Widget
-  function renderDetail(item) {
-    let switches;
-    try { switches = JSON.parse(item.dataset.widgetSwitches || "[]"); }
-    catch (_) { switches = []; }
+  function openDetail(card) {
+    const base = card.dataset.base;
+    const switches = parseJSON(card.dataset.switches, []);
+    const params = parseJSON(card.dataset.params, []);
 
-    const base = item.dataset.widgetBase;
-    const html = `
-      <div class="url-detail__header" data-base="${escapeAttr(base)}">
-        <div>
-          <span class="url-detail__cat">${escapeHtml(item.dataset.widgetCat)}</span>
-          <span class="url-detail__cat-sep">·</span>
-          <span class="url-detail__path">${escapeHtml(item.dataset.widgetPath)}</span>
+    document.getElementById("urlDCat").textContent = card.dataset.cat;
+    document.getElementById("urlDName").textContent = card.dataset.label;
+    document.getElementById("urlBackTo").textContent = currentTab === "widgets" ? "Widgets" : "Overlays";
+
+    const infoBits = [];
+    if (card.dataset.size) infoBits.push(escapeHtml(card.dataset.size) + " · transparent");
+    if (card.dataset.desc) infoBits.push(escapeHtml(card.dataset.desc));
+    if (params.length) infoBits.push("Parameter: " + params.map(p => `<code>${escapeHtml(p)}</code>`).join(", "));
+
+    const configCol = switches.length
+      ? `<div class="url-dbox">
+           <h2>${escapeHtml(card.dataset.label)} <span class="url-dbox__tag">konfigurieren</span></h2>
+           <div class="url-switches" id="urlSwitches">${renderSwitches(switches)}</div>
+         </div>`
+      : `<div class="url-dbox">
+           <h2>${escapeHtml(card.dataset.label)} <span class="url-dbox__tag">OBS-Source</span></h2>
+           <div class="url-param url-param--info">Keine konfigurierbaren Parameter — URL direkt als Browser-Source einsetzen.</div>
+         </div>`;
+
+    detailContent.innerHTML = `
+      <div class="url-detail-col">${configCol}</div>
+      <div class="url-detail-col">
+        <div class="url-dbox url-urlbox">
+          <div class="url-urlbox__cap">// OBS-URL (live)</div>
+          <div class="url-livefield" id="urlText">${escapeHtml(base)}</div>
+          <div class="url-dactions">
+            <button type="button" class="url-act" id="btnCopy"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span> Kopieren</button>
+            <button type="button" class="url-act ghost" id="btnPreview"><span class="material-symbols-outlined" aria-hidden="true">visibility</span> Preview</button>
+            <span class="url-copied" id="urlCopyStatus" role="status" aria-live="polite"></span>
+          </div>
         </div>
-        <h2 class="url-detail__title">${escapeHtml(item.dataset.widgetLabel)}</h2>
-        <p class="url-detail__desc">${escapeHtml(item.dataset.widgetDesc)}</p>
-      </div>
+        ${infoBits.length ? `<div class="url-dbox url-infobox">
+          <h2>Info</h2>
+          <div class="url-param url-param--info">${infoBits.join("<br>")}</div>
+        </div>` : ""}
+      </div>`;
 
-      <div class="url-card-primary" data-base="${escapeAttr(base)}">
-        <div class="url-card-primary__url" id="urlText">${escapeHtml(base)}</div>
-        <div class="url-card-primary__actions">
-          <button type="button" class="btn-copy-primary" id="btnCopy">
-            <span class="material-symbols-outlined" aria-hidden="true">content_copy</span> URL kopieren
-          </button>
-          <button type="button" class="btn-preview-secondary" id="btnPreview">
-            <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span> Preview öffnen
-          </button>
-        </div>
-        <div class="url-copy-status" id="urlCopyStatus" role="status" aria-live="polite"></div>
-      </div>
-
-      ${switches.length ? `
-        <h3 class="url-configure__heading">Configure</h3>
-        <div class="url-switches" id="urlSwitches">${renderSwitches(switches)}</div>
-      ` : ""}
-    `;
-    detail.innerHTML = html;
     wireDetail(base);
+    view.hidden = true;
+    detailView.hidden = false;
+    document.getElementById("urlBack").focus();
+    window.scrollTo(0, 0);
+    try { history.replaceState(null, "", "#src=" + encodeURIComponent(card.dataset.path)); } catch (_) {}
   }
 
-  // ── Event-Wiring im frisch gerenderten Detail
+  // ── Events im frisch gerenderten Detail verdrahten ────────
   function wireDetail(base) {
-    const urlText = document.getElementById("urlText");
-    const copyBtn = document.getElementById("btnCopy");
-    const previewBtn = document.getElementById("btnPreview");
-    const status = document.getElementById("urlCopyStatus");
     const switchesRoot = document.getElementById("urlSwitches");
+    const urlText = document.getElementById("urlText");
+    const status = document.getElementById("urlCopyStatus");
+    const scope = switchesRoot || document.createElement("div");
 
-    // Pseudo-Root mit dataset.base, damit buildUrl() funktioniert
-    const root = { dataset: { base: base }, querySelectorAll: sel =>
-      switchesRoot ? switchesRoot.querySelectorAll(sel) : [] };
-
-    function refresh() { urlText.textContent = buildUrl(root); }
+    function refresh() { urlText.textContent = buildUrl(base, scope); }
 
     if (switchesRoot) {
       switchesRoot.querySelectorAll(".sw-group").forEach(group => {
@@ -298,125 +275,103 @@
       });
     }
 
-    copyBtn.addEventListener("click", async () => {
-      const url = buildUrl(root);
-      try {
-        await navigator.clipboard.writeText(url);
+    document.getElementById("btnCopy").addEventListener("click", async () => {
+      const url = buildUrl(base, scope);
+      const done = () => {
         status.textContent = "URL kopiert.";
-        copyBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">check</span> Kopiert';
+        const btn = document.getElementById("btnCopy");
+        btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">check</span> Kopiert';
         setTimeout(() => {
-          copyBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">content_copy</span> URL kopieren';
+          btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">content_copy</span> Kopieren';
           status.textContent = "";
         }, 1500);
+      };
+      try {
+        await navigator.clipboard.writeText(url);
+        done();
       } catch (_) {
-        // Fallback: textarea + execCommand
         const ta = document.createElement("textarea");
-        ta.value = url;
-        ta.style.position = "fixed"; ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.select();
-        try {
-          document.execCommand("copy");
-          status.textContent = "URL kopiert.";
-        } catch (_) {
-          status.textContent = "Kopieren fehlgeschlagen — URL bitte manuell markieren.";
-        }
+        ta.value = url; ta.className = "url-copy-helper";
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand("copy"); done(); }
+        catch (_) { status.textContent = "Kopieren fehlgeschlagen — URL bitte manuell markieren."; }
         document.body.removeChild(ta);
       }
     });
 
-    previewBtn.addEventListener("click", () => {
+    document.getElementById("btnPreview").addEventListener("click", () => {
       const modal = document.getElementById("previewModal");
       const frame = document.getElementById("previewFrame");
-      const t = document.querySelector(".url-detail__title");
-      document.getElementById("previewModalTitle").textContent = "Vorschau · " + (t ? t.textContent : "Widget");
-      // dock=1 → Widget rendert seinen eigenen (dunklen) Dock-Hintergrund statt
-      // transparent auf hellem Modal durchzuscheinen.
-      const u = buildUrl(root);
+      document.getElementById("previewModalTitle").textContent =
+        "Vorschau · " + document.getElementById("urlDName").textContent;
+      // dock=1 → Widget bringt seinen eigenen dunklen Grund mit (kein durchscheinendes Weiß)
+      const u = buildUrl(base, scope);
       frame.src = u + (u.includes("?") ? "&" : "?") + "dock=1";
       modal.showModal();
     });
   }
 
-  // ── Master → Detail Switch
-  let lastSelectedId = null;
-  function selectItem(item, opts) {
-    opts = opts || {};
-    items.forEach(b => {
-      b.removeAttribute("aria-current");
+  // ── Sub-Tabs ──────────────────────────────────────────────
+  const tabBar = document.querySelector(".url-tabs");
+  const tabs = Array.from(tabBar.querySelectorAll("[role=tab]"));
+  function selectTab(name) {
+    currentTab = name;
+    tabs.forEach(t => {
+      const on = t.dataset.tab === name;
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      t.tabIndex = on ? 0 : -1;
     });
-    item.setAttribute("aria-current", "page");
-    lastSelectedId = item.dataset.widgetId;
-    renderDetail(item);
-    if (isMobile()) {
-      master.classList.add("is-hidden");
-      detailSection.classList.remove("is-hidden");
-      window.scrollTo(0, 0);
-    }
-    if (!opts.skipHash) {
-      try { history.replaceState(null, "",
-        "#widget=" + encodeURIComponent(item.dataset.widgetId)); } catch (_) {}
-    }
+    document.querySelectorAll(".url-tabpanel").forEach(p => {
+      p.hidden = p.id !== "urlpanel-" + name;
+    });
   }
-
-  items.forEach(item => {
-    item.addEventListener("click", () => selectItem(item));
-  });
-
-  // ── Back-Button (nur Mobile sichtbar)
-  backBtn.addEventListener("click", () => {
-    detailSection.classList.add("is-hidden");
-    master.classList.remove("is-hidden");
-    const last = lastSelectedId
-      ? master.querySelector(`[data-widget-id="${CSS.escape(lastSelectedId)}"]`)
-      : null;
-    if (last) last.focus();
-  });
-
-  // ── Tastatur-Navigation im Master (↑/↓/Enter)
-  master.addEventListener("keydown", (e) => {
-    if (!["ArrowDown", "ArrowUp"].includes(e.key)) return;
-    const focused = document.activeElement;
-    if (!focused || !focused.classList.contains("url-master__item")) return;
+  tabs.forEach(t => t.addEventListener("click", () => selectTab(t.dataset.tab)));
+  tabBar.addEventListener("keydown", e => {
+    if (!["ArrowRight", "ArrowLeft"].includes(e.key)) return;
     e.preventDefault();
-    const visible = items.filter(i => i.offsetParent !== null);
-    const idx = visible.indexOf(focused);
-    if (idx < 0) return;
-    const next = e.key === "ArrowDown"
-      ? visible[Math.min(idx + 1, visible.length - 1)]
-      : visible[Math.max(idx - 1, 0)];
-    if (next) next.focus();
+    const i = tabs.findIndex(t => t.getAttribute("aria-selected") === "true");
+    const n = e.key === "ArrowRight" ? (i + 1) % tabs.length : (i - 1 + tabs.length) % tabs.length;
+    selectTab(tabs[n].dataset.tab);
+    tabs[n].focus();
   });
 
-  // ── Filter
-  if (filter) {
-    filter.addEventListener("input", () => {
-      const q = filter.value.toLowerCase().trim();
-      let anyVisible = false;
-      items.forEach(item => {
-        const hay = (item.textContent + " " + item.dataset.widgetPath).toLowerCase();
-        const show = !q || hay.includes(q);
-        item.style.display = show ? "" : "none";
-        if (show) anyVisible = true;
-      });
-      // Bei aktiver Suche alle Kategorien aufklappen
-      if (q) cats.forEach(c => c.setAttribute("open", ""));
-      // Empty-State
-      masterEmpty.hidden = anyVisible || !q;
+  // ── Card → Detail ─────────────────────────────────────────
+  document.querySelectorAll(".url-card").forEach(card => {
+    card.addEventListener("click", () => {
+      currentTab = card.closest("#urlpanel-widgets") ? "widgets" : "overlays";
+      openDetail(card);
     });
+  });
+
+  // ── Zurück ────────────────────────────────────────────────
+  document.getElementById("urlBack").addEventListener("click", () => {
+    detailView.hidden = true;
+    view.hidden = false;
+    selectTab(currentTab);
+    const tabBtn = document.getElementById("urltab-" + currentTab);
+    if (tabBtn) tabBtn.focus();
+    try { history.replaceState(null, "", location.pathname); } catch (_) {}
+  });
+
+  // ── Preview-Modal schließen + iframe entladen ─────────────
+  const previewModal = document.getElementById("previewModal");
+  if (previewModal) {
+    const unload = () => { const f = document.getElementById("previewFrame"); if (f) f.src = "about:blank"; };
+    document.getElementById("previewClose").addEventListener("click", () => previewModal.close());
+    previewModal.addEventListener("click", e => { if (e.target === previewModal) previewModal.close(); });
+    previewModal.addEventListener("close", unload);
   }
 
-  // ── Deep-Link via Hash
-  const m = (location.hash || "").match(/widget=([^&]+)/);
-  const initial = m
-    ? master.querySelector(`[data-widget-id="${CSS.escape(decodeURIComponent(m[1]))}"]`)
-    : null;
-  if (initial) {
-    selectItem(initial, { skipHash: true });
-  } else if (!isMobile() && items.length) {
-    selectItem(items[0], { skipHash: true });
-  } else if (isMobile()) {
-    detailSection.classList.add("is-hidden");
+  // ── Deep-Link (#src=<path>) ───────────────────────────────
+  const m = (location.hash || "").match(/src=([^&]+)/);
+  if (m) {
+    const path = decodeURIComponent(m[1]);
+    const card = Array.from(document.querySelectorAll(".url-card"))
+      .find(c => c.dataset.path === path);
+    if (card) {
+      currentTab = card.closest("#urlpanel-widgets") ? "widgets" : "overlays";
+      openDetail(card);
+    }
   }
 })();
 </script>
