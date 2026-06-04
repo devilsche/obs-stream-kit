@@ -94,14 +94,24 @@
       font-weight: 900;
       font-size: 150px;
       line-height: 1;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.03em;
       white-space: nowrap;
       text-transform: uppercase;
-      color: var(--st-accent);
-      text-shadow:
-        0 0 30px color-mix(in srgb, var(--st-accent) 90%, transparent),
-        0 0 70px color-mix(in srgb, var(--st-accent) 50%, transparent),
-        0 0 120px color-mix(in srgb, var(--st-primary) 40%, transparent);
+      /* Chrome/Metallic: weisser Glanz oben → Accent → dunkel unten, auf den
+         Text geclippt. Glow + Tiefe via filter (wirkt korrekt mit clip:text). */
+      background: linear-gradient(180deg,
+        #ffffff 0%,
+        color-mix(in srgb, var(--st-accent) 30%, #fff) 30%,
+        var(--st-accent) 54%,
+        color-mix(in srgb, var(--st-accent) 55%, #000) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      -webkit-text-fill-color: transparent;
+      filter:
+        drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6))
+        drop-shadow(0 0 26px color-mix(in srgb, var(--st-accent) 75%, transparent))
+        drop-shadow(0 0 72px color-mix(in srgb, var(--st-primary) 45%, transparent));
     }
   </style>
 </head>
