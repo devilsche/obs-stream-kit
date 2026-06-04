@@ -43,7 +43,7 @@
 .t-hot-mark::before{font-family:"Material Symbols Outlined";font-style:normal;font-synthesis:none;
   content:var(--theme-hot-icon,"local_fire_department");font-size:18px;color:var(--theme-accent);
   display:inline-block;text-shadow:0 0 12px var(--theme-accent);animation:hot-pulse 2s ease-in-out infinite}
-@keyframes hot-pulse{0%,100%{text-shadow:0 0 8px var(--theme-accent)}50%{text-shadow:0 0 20px var(--theme-accent)}}
+@keyframes hot-pulse{0%,100%{text-shadow:0 0 8px currentColor}50%{text-shadow:0 0 20px currentColor}}
 @keyframes hot-flame{0%,100%{opacity:1;transform:scale(1);text-shadow:0 0 10px var(--theme-accent)}
   45%{opacity:.82;transform:scale(.93) translateY(1px);text-shadow:0 0 16px var(--theme-accent)}
   70%{opacity:1;transform:scale(1.05);text-shadow:0 0 26px var(--theme-accent),0 0 9px var(--theme-accent-2)}}
@@ -88,8 +88,12 @@ html[data-theme="swiss"] .t-hot-mark i{width:9px;height:9px;border-radius:0;back
 .t-hot{display:inline-flex;align-items:center}
 .t-hot--1 .pubg-hot{text-shadow:0 0 5px var(--theme-accent)}
 .t-hot--2 .pubg-hot{text-shadow:0 0 11px var(--theme-accent)}
-.t-hot--3 .pubg-hot{text-shadow:0 0 16px var(--theme-accent);animation:hot-pulse 2s ease-in-out infinite}
 .t-hot--2 .t-hot-mark i{display:none}     /* Stufe 2: Icon, aber keine Partikel */
+/* Stufe 3 — eigener Top-Look: zweite Akzentfarbe (--theme-accent-2) + Orden-Icon + Puls. */
+.t-hot--3 .pubg-hot{color:var(--theme-accent-2)!important;text-shadow:0 0 16px currentColor;animation:hot-pulse 2s ease-in-out infinite}
+.t-hot--3 .t-hot-mark::before{content:"military_tech";color:var(--theme-accent-2)}
+.t-hot--3 .t-gauge{color:var(--theme-accent-2)}
+.t-hot--3 .t-hot-mark i{background:var(--theme-accent-2);box-shadow:0 0 6px var(--theme-accent-2)}
 /* Stufe 3 im dichten Raster: Partikel mit kleiner Bahn (bleiben in der Zelle, Rand-Regel) */
 .t-stat-grid--compact .t-hot--3 .t-hot-mark i{display:block}
 .t-stat-grid--compact .t-hot--3 .t-hot-mark i:nth-child(1){--dx:-5px;--dy:-6px}
