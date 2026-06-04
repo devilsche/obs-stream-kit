@@ -106,7 +106,7 @@
           {% for s in stingers %}
           {{ src_card('overlay', 'Meme', s.label,
                       base_url ~ '/s/' ~ token ~ '/stingers/' ~ s.file, 'stingers/' ~ s.file,
-                      s.size, s.desc) }}
+                      s.size, s.desc, (s.switches or []), (s.params or [])) }}
           {% endfor %}
         </div>
       </div>

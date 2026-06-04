@@ -50,6 +50,24 @@ DECOR = [
 ]
 
 
+STINGER_META = {
+    "heart.html": {"switches": [
+        {"key": "name", "label": "Name", "type": "text",
+         "default": "Liebling", "placeholder": "z.B. LuCKoR_HD",
+         "tooltip": "Wird als Empfänger-Name im Herz-Stinger angezeigt"},
+    ]},
+    "lens-flare.html": {"switches": [
+        {"key": "n", "label": "Variante", "type": "select", "default": "1",
+         "options": [["1","1"],["2","2"],["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]],
+         "tooltip": "Sieben verschiedene Lens-Flare-Videos"},
+    ]},
+    "over-9000.html": {"switches": [
+        {"key": "level", "label": "Power Level", "type": "text",
+         "default": "9001", "placeholder": "z.B. 9001",
+         "tooltip": "Zahl die auf dem Bildschirm erscheint"},
+    ]},
+}
+
 TRANSITIONS = [
     {
         "key": "stinger",
@@ -89,7 +107,7 @@ TRANSITIONS = [
 
 
 def list_dir_sources(root: str, subdir: str, size: str = "1920×1080",
-                     desc: str = "", params: list = None):
+                     desc: str = "", params: list = None, switches_map: dict = None):
     """Alle *.html in <root>/<subdir> als Source-Dicts (Label automatisch aus
     dem Dateinamen). Fuer dynamische Bereiche wie Stinger-Transitions, bei denen
     eine manuelle Pflege jeder einzelnen Datei unnoetiger Aufwand waere."""
@@ -97,7 +115,9 @@ def list_dir_sources(root: str, subdir: str, size: str = "1920×1080",
     for path in sorted(glob.glob(os.path.join(root, subdir, "*.html"))):
         fn = os.path.basename(path)
         key = fn[:-5]
+        meta = (switches_map or {}).get(fn, {})
         out.append({"key": key, "label": key.replace("-", " ").title(),
                     "file": fn, "size": size, "desc": desc,
-                    "params": list(params) if params else []})
+                    "params": list(params) if params else [],
+                    "switches": meta.get("switches", [])})
     return out
