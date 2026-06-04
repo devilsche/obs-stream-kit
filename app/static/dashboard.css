@@ -963,7 +963,7 @@ html[data-theme="aurora"] .dn-ccard,html[data-theme="aurora"] .dn-hero{backdrop-
 
 /* Vorschau-Modal (dialog) — echtes Widget im iframe, Theme-Look + Schachbrett-BG */
 .dn-modal{border:1px solid var(--brand-purple);background:var(--bg-elev);color:var(--text);padding:0;
-  border-radius:var(--r-box);max-width:min(900px,94vw);width:100%;box-shadow:0 0 60px rgba(0,0,0,.6)}
+  border-radius:var(--r-box);max-width:min(1280px,92vw);width:100%;box-shadow:0 0 60px rgba(0,0,0,.6)}
 .dn-modal::backdrop{background:rgba(0,0,0,.7);backdrop-filter:blur(3px)}
 .dn-modal__head{display:flex;align-items:center;justify-content:space-between;gap:12px;
   padding:14px 18px;border-bottom:1px solid var(--border);background:var(--bg-deeper)}
@@ -977,7 +977,7 @@ html[data-theme="aurora"] .dn-ccard,html[data-theme="aurora"] .dn-hero{backdrop-
 .dn-modal__close:focus-visible{outline-color:var(--brand-purple)}
 /* Ruhiger dunkler Grund (kein Schachbrett, nicht "weiss") — das Widget bringt
    per dock=1 seinen eigenen Hintergrund mit und sitzt mittig darauf. */
-.dn-modal__body{height:min(70vh,600px);background:var(--bg-deeper);display:block}
+.dn-modal__body{height:min(82vh,820px);background:var(--bg-deeper);display:block}
 .dn-modal__body iframe{width:100%;height:100%;border:0;display:block;background:transparent}
 .url-card-primary__url{border-left:2px solid var(--brand-gold)}
 .url-cat[open] .url-cat__title{color:var(--brand-gold)}
@@ -1090,7 +1090,7 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
    in Originalgroesse abgeschnitten zu zeigen: das iframe rendert in Originalmasse
    (--ov-w/--ov-h, per JS aus der Source-Groesse), Container-Query-Einheit (cqw)
    skaliert es auf die Modal-Breite. Reines Verkleinern → kein Motion. */
-.dn-modal__body--overlay{padding:0;height:auto;display:block;overflow:hidden;background:#000;
+.dn-modal__body--overlay{padding:0;height:auto;max-height:82vh;display:block;overflow:hidden;background:#000;
   container-type:inline-size;aspect-ratio:var(--ov-w,1920)/var(--ov-h,1080)}
 .dn-modal__body--overlay iframe{width:calc(var(--ov-w,1920)*1px);height:calc(var(--ov-h,1080)*1px);
   transform-origin:0 0;transform:scale(calc(100cqw / (var(--ov-w,1920)*1px)))}
@@ -1105,3 +1105,13 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
 .url-search input::placeholder{color:var(--text-dim)}
 .url-card[hidden]{display:none}
 .url-empty{font-family:var(--theme-font-mono,ui-monospace,monospace);color:var(--text-dim);text-align:center;padding:30px 0}
+
+/* Detail: Beschreibung + Parameterliste (für Sources ohne UI-Regler, z.B. Alerts) */
+.url-dbox__desc{margin:0;padding:14px 20px 0;color:var(--text-muted);
+  font-family:var(--theme-font-mono,ui-monospace,monospace);font-size:12.5px;line-height:1.6}
+.url-param--info p{margin:0 0 6px}
+.url-param--info b{color:var(--text)}
+.url-paramlist{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;margin:10px 0 0}
+.url-paramlist li{margin:0}
+.url-paramlist code{color:var(--brand-purple);background:var(--bg-deeper);
+  border:1px solid var(--border);padding:3px 9px;border-radius:var(--r-ctrl);font-size:12px}

@@ -61,7 +61,7 @@
           {% for o in overlays %}
           {{ src_card('overlay', 'Overlay', o.label,
                       overlay_base ~ '/s/' ~ token ~ '/overlays/' ~ o.file, 'overlays/' ~ o.file,
-                      o.size, '', [], (o.params or [])) }}
+                      o.size, o.desc, [], (o.params or [])) }}
           {% endfor %}
         </div>
       </div>
@@ -83,7 +83,7 @@
           {% for d in decor %}
           {{ src_card('overlay', 'Decor', d.label,
                       base_url ~ '/s/' ~ token ~ '/widgets/' ~ d.file, d.file,
-                      d.size, '', [], (d.params or [])) }}
+                      d.size, d.desc, [], (d.params or [])) }}
           {% endfor %}
         </div>
       </div>
@@ -94,7 +94,7 @@
           {% for a in alerts %}
           {{ src_card('overlay', 'Alert', a.label,
                       base_url ~ '/s/' ~ token ~ '/alerts/' ~ a.file, 'alerts/' ~ a.file,
-                      a.size, '', [], (a.params or [])) }}
+                      a.size, a.desc, [], (a.params or [])) }}
           {% endfor %}
         </div>
       </div>
@@ -105,7 +105,7 @@
           {% for s in stingers %}
           {{ src_card('overlay', 'Meme', s.label,
                       base_url ~ '/s/' ~ token ~ '/stingers/' ~ s.file, 'stingers/' ~ s.file,
-                      s.size) }}
+                      s.size, s.desc) }}
           {% endfor %}
         </div>
       </div>
@@ -116,7 +116,7 @@
           {% for t in transitions %}
           {{ src_card('overlay', 'Transition', t.label,
                       base_url ~ '/s/' ~ token ~ '/transitions/' ~ t.file, 'transitions/' ~ t.file,
-                      t.size) }}
+                      t.size, t.desc) }}
           {% endfor %}
         </div>
       </div>
@@ -246,20 +246,28 @@
     const tabBtn = document.getElementById("urltab-" + currentTab);
     document.getElementById("urlBackTo").textContent = tabBtn ? tabBtn.dataset.label : "Übersicht";
 
+    const label = escapeHtml(card.dataset.label);
+    const desc = card.dataset.desc ? `<p class="url-dbox__desc">${escapeHtml(card.dataset.desc)}</p>` : "";
+
+    let tag, body;
+    if (switches.length) {
+      tag = "konfigurieren";
+      body = `<div class="url-switches" id="urlSwitches">${renderSwitches(switches)}</div>`;
+    } else if (params.length) {
+      tag = "Parameter";
+      body = `<div class="url-param url-param--info">
+          <p>Diese Source liest ihre Werte direkt aus der URL — typischerweise von <b>Streamer.bot</b> beim Triggern gesetzt (z.&nbsp;B. <code>?${escapeHtml(params[0])}=…</code>):</p>
+          <ul class="url-paramlist">${params.map(p => `<li><code>${escapeHtml(p)}</code></li>`).join("")}</ul>
+        </div>`;
+    } else {
+      tag = "OBS-Source";
+      body = `<div class="url-param url-param--info">Keine Parameter — URL einfach als Browser-Source einsetzen.</div>`;
+    }
+    const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${body}</div>`;
+
     const infoBits = [];
     if (card.dataset.size) infoBits.push(escapeHtml(card.dataset.size) + " · transparent");
-    if (card.dataset.desc) infoBits.push(escapeHtml(card.dataset.desc));
-    if (params.length) infoBits.push("Parameter: " + params.map(p => `<code>${escapeHtml(p)}</code>`).join(", "));
-
-    const configCol = switches.length
-      ? `<div class="url-dbox">
-           <h2>${escapeHtml(card.dataset.label)} <span class="url-dbox__tag">konfigurieren</span></h2>
-           <div class="url-switches" id="urlSwitches">${renderSwitches(switches)}</div>
-         </div>`
-      : `<div class="url-dbox">
-           <h2>${escapeHtml(card.dataset.label)} <span class="url-dbox__tag">OBS-Source</span></h2>
-           <div class="url-param url-param--info">Keine konfigurierbaren Parameter — URL direkt als Browser-Source einsetzen.</div>
-         </div>`;
+    infoBits.push("Token steckt in der URL · einfach als Browser-Source einsetzen");
 
     detailContent.innerHTML = `
       <div class="url-detail-col">${configCol}</div>

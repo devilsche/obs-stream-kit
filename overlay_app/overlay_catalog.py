@@ -4,37 +4,53 @@ import os
 
 OVERLAYS = [
     {"key": "starting-soon",  "label": "Starting Soon",  "file": "starting-soon.html",
-     "size": "1920×1080", "params": ["title", "countdown"]},
+     "size": "1920×1080", "desc": "Animierte „Gleich geht's los“-Szene.",
+     "params": ["title", "countdown"]},
     {"key": "brb-pause",      "label": "BRB / Pause",     "file": "brb-pause.html",
-     "size": "1920×1080", "params": ["count", "countdown", "clips"]},
+     "size": "1920×1080", "desc": "Pausen-Szene mit integriertem Twitch-Clip-Player.",
+     "params": ["count", "countdown", "clips"]},
     {"key": "stream-ending",  "label": "Stream Ending",   "file": "stream-ending.html",
-     "size": "1920×1080", "params": ["title"]},
+     "size": "1920×1080", "desc": "Animierte Abschluss-Szene zum Stream-Ende.",
+     "params": ["title"]},
     {"key": "just-chatting",  "label": "Just Chatting",   "file": "just-chatting.html",
-     "size": "1920×1080", "params": []},
+     "size": "1920×1080", "desc": "Vollbild-Kamera-Szene mit dezenter Deko.",
+     "params": []},
     {"key": "gameplay",       "label": "Gameplay / Kamera", "file": "gameplay.html",
-     "size": "400×225", "params": []},
+     "size": "400×225", "desc": "Kamera-Bereich fürs Gameplay-Overlay (16:9).",
+     "params": []},
 ]
 
-# Alert-Animationen (Streamer.bot-getriggert, transparent, Vollbild).
+# Alert-Animationen — transparent, Vollbild. Die Parameter werden beim Triggern
+# (z.B. durch Streamer.bot) an die URL gehaengt, z.B. ?username=Foo&message=Bar.
 ALERTS = [
-    {"key": "follow",   "label": "New Follower", "file": "follow.html",   "size": "1920×1080", "params": []},
-    {"key": "sub",      "label": "New Sub",      "file": "sub.html",      "size": "1920×1080", "params": []},
-    {"key": "resub",    "label": "Resub",        "file": "resub.html",    "size": "1920×1080", "params": []},
-    {"key": "giftsub",  "label": "Gift Sub",     "file": "giftsub.html",  "size": "1920×1080", "params": []},
-    {"key": "bits",     "label": "Bits / Cheer", "file": "bits.html",     "size": "1920×1080", "params": []},
-    {"key": "raid",     "label": "Raid",         "file": "raid.html",     "size": "1920×1080", "params": []},
-    {"key": "donation", "label": "Donation",     "file": "donation.html", "size": "1920×1080", "params": []},
+    {"key": "follow",   "label": "New Follower", "file": "follow.html",   "size": "1920×1080",
+     "desc": "Einmal-Animation bei neuem Follower.",        "params": ["username", "message"]},
+    {"key": "sub",      "label": "New Sub",      "file": "sub.html",      "size": "1920×1080",
+     "desc": "Einmal-Animation bei neuem Sub.",             "params": ["username", "tier", "message"]},
+    {"key": "resub",    "label": "Resub",        "file": "resub.html",    "size": "1920×1080",
+     "desc": "Einmal-Animation bei einem Resub.",           "params": ["username", "months", "tier", "message"]},
+    {"key": "giftsub",  "label": "Gift Sub",     "file": "giftsub.html",  "size": "1920×1080",
+     "desc": "Einmal-Animation bei Gift-Sub(s).",           "params": ["username", "amount", "total", "tier"]},
+    {"key": "bits",     "label": "Bits / Cheer", "file": "bits.html",     "size": "1920×1080",
+     "desc": "Einmal-Animation bei Bits / Cheer.",          "params": ["username", "amount", "message"]},
+    {"key": "raid",     "label": "Raid",         "file": "raid.html",     "size": "1920×1080",
+     "desc": "Einmal-Animation bei eingehendem Raid.",      "params": ["username", "viewers"]},
+    {"key": "donation", "label": "Donation",     "file": "donation.html", "size": "1920×1080",
+     "desc": "Einmal-Animation bei einer Donation.",        "params": ["username", "name", "amount", "message"]},
 ]
 
 # Look & Decor — Deko-Elemente, liegen unter widgets/ (served via /widgets/).
 DECOR = [
-    {"key": "logo",           "label": "Logo",           "file": "logo.html",           "size": "1920×1080", "params": []},
-    {"key": "webcam-frame",   "label": "Webcam Frame",   "file": "webcam-frame.html",   "size": "1920×1080", "params": []},
-    {"key": "tipgoal-banner", "label": "Tip-Goal Banner", "file": "tipgoal-banner.html", "size": "1920×1080", "params": []},
+    {"key": "logo",           "label": "Logo",            "file": "logo.html",           "size": "1920×1080",
+     "desc": "Logo-Einblendung.",                      "params": []},
+    {"key": "webcam-frame",   "label": "Webcam Frame",    "file": "webcam-frame.html",   "size": "1920×1080",
+     "desc": "Dekorativer Rahmen um die Kamera.",      "params": []},
+    {"key": "tipgoal-banner", "label": "Tip-Goal Banner", "file": "tipgoal-banner.html", "size": "1920×1080",
+     "desc": "Tip-Ziel als schmaler Banner.",          "params": []},
 ]
 
 
-def list_dir_sources(root: str, subdir: str, size: str = "1920×1080"):
+def list_dir_sources(root: str, subdir: str, size: str = "1920×1080", desc: str = ""):
     """Alle *.html in <root>/<subdir> als Source-Dicts (Label automatisch aus
     dem Dateinamen). Fuer dynamische Bereiche wie Stinger-Transitions, bei denen
     eine manuelle Pflege jeder einzelnen Datei unnoetiger Aufwand waere."""
@@ -43,5 +59,5 @@ def list_dir_sources(root: str, subdir: str, size: str = "1920×1080"):
         fn = os.path.basename(path)
         key = fn[:-5]
         out.append({"key": key, "label": key.replace("-", " ").title(),
-                    "file": fn, "size": size, "params": []})
+                    "file": fn, "size": size, "desc": desc, "params": []})
     return out
