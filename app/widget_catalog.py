@@ -57,6 +57,13 @@ WIDGET_META = [
     ("Steam",         "Now Playing",        "Currently played Steam game.",                                         "steam/now-playing.html"),
     ("Steam",         "Games Ticker",       "Owned-games ticker.",                                                  "steam/games-ticker.html"),
     # Achievement Browser ist ein Tool, kein OBS-Widget -> tools/achievement-browser.html, sichtbar unter /app/tools/
+
+    # Persistente Stream-Info-Sidepanels (Dauer-Anzeige, kein Einmal-Alert).
+    ("Follower & Goals", "Latest Follower", "Sidepanel: zeigt den letzten Follower (dauerhaft sichtbar).",          "latest-follower.html"),
+    ("Follower & Goals", "Latest Sub",      "Sidepanel: zeigt den letzten Sub (dauerhaft sichtbar).",               "latest-sub.html"),
+    ("Follower & Goals", "Latest Tip",      "Sidepanel: zeigt den letzten Tip/Donation (dauerhaft sichtbar).",      "latest-tip.html"),
+    ("Follower & Goals", "Sub Goal",        "Fortschrittsbalken Richtung Sub-Ziel.",                                "subgoal.html"),
+    ("Follower & Goals", "Tip Goal",        "Fortschrittsbalken Richtung Tip-Ziel.",                                "tipgoal.html"),
 ]
 
 
