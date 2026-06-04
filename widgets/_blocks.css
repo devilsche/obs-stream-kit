@@ -77,7 +77,7 @@ html[data-theme="terminal"] .t-hot-mark i,html[data-theme="midnight"] .t-hot-mar
 html[data-theme="aurora"] .t-hot-mark i{animation-duration:2.6s!important}
 html[data-theme="editorial"] .t-hot-mark i{display:none}
 @keyframes spark-spin{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(0)}
-  25%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) translate(var(--dx),var(--dy)) scale(1) rotate(240deg)}}
+  18%{opacity:1}60%{opacity:.9}100%{opacity:0;transform:translate(-50%,-50%) translate(var(--dx),var(--dy)) scale(1) rotate(300deg)}}
 html[data-theme="swiss"] .t-hot-mark i{width:9px;height:9px;border-radius:0;background:var(--theme-primary);box-shadow:none;
   clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
   animation-name:spark-spin!important;animation-duration:2.3s!important}
@@ -93,15 +93,17 @@ html[data-theme="swiss"] .t-hot-mark i{width:9px;height:9px;border-radius:0;back
    in jedem Theme — accent-2 war z.B. bei Swiss schwarz). */
 .t-hot--3 .pubg-hot{text-shadow:0 0 16px currentColor;animation:hot-pulse 2s ease-in-out infinite}
 .t-hot--3 .t-hot-mark::before{content:"military_tech"}
-/* Stufe-3-Partikel = kleine, drehende Sterne in der Akzentfarbe */
-.t-hot--3 .t-hot-mark i{background:var(--theme-accent);box-shadow:0 0 5px var(--theme-accent);border-radius:0;
-  clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
-  animation-name:spark-spin!important}
-/* Stufe 3 im dichten Raster: Partikel mit kleiner Bahn (bleiben in der Zelle, Rand-Regel) */
-.t-stat-grid--compact .t-hot--3 .t-hot-mark i{display:block;width:8px;height:8px}
-.t-stat-grid--compact .t-hot--3 .t-hot-mark i:nth-child(1){--dx:-9px;--dy:-9px}
-.t-stat-grid--compact .t-hot--3 .t-hot-mark i:nth-child(2){--dx:9px;--dy:-6px}
-.t-stat-grid--compact .t-hot--3 .t-hot-mark i:nth-child(3){--dx:1px;--dy:-11px}
+/* Stufe-3-Partikel = drehende Sterne (Akzentfarbe). Robust: display erzwingen
+   (schlaegt compact/editorial/reduced-motion display:none), nth-of-type (das Azure-
+   Tacho-SVG verschiebt sonst die i-Indizes), Animation explizit setzen. */
+.t-hot--3 .t-hot-mark i{display:block!important;position:absolute;left:50%;top:50%;
+  width:7px;height:7px;border-radius:0;opacity:0;pointer-events:none;
+  background:var(--theme-accent);box-shadow:0 0 4px var(--theme-accent);
+  clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.t-hot--3 .t-hot-mark i:nth-of-type(1){--dx:-9px;--dy:-9px;animation:spark-spin 1.9s ease-out infinite}
+.t-hot--3 .t-hot-mark i:nth-of-type(2){--dx:9px;--dy:-6px;animation:spark-spin 1.9s ease-out .6s infinite}
+.t-hot--3 .t-hot-mark i:nth-of-type(3){--dx:1px;--dy:-11px;animation:spark-spin 1.9s ease-out 1.2s infinite}
+@media (prefers-reduced-motion:reduce){.t-hot--3 .t-hot-mark i{display:none!important}}
 @media (prefers-reduced-motion:reduce){.t-hot--3 .pubg-hot{animation:none}}
 
 /* ════ EBENE 2 — der CHARAKTER je Theme (Form, Typo, Deko, Glow) ════ */
