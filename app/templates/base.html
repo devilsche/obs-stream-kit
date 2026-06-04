@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" data-theme="{{ theme|default('entry', true) }}">
 <head>
   <meta charset="utf-8">
   {# initial-scale=1, KEIN maximum-scale/user-scalable=no — Zoom muss erlaubt sein (WCAG 1.4.4) #}
@@ -7,6 +7,10 @@
   <meta name="color-scheme" content="dark">
   <title>{% block title %}stats-overlay.info{% endblock %}</title>
   <link rel="stylesheet" href="/static/dashboard.css">
+  {# Theme-System: Tokens (_theme.css) + Alias der Dashboard-Variablen.
+     Reihenfolge nach dashboard.css ist Pflicht; Alias greift nur fuer Themes != entry. #}
+  <link rel="stylesheet" href="/static/_theme.css">
+  <link rel="stylesheet" href="/static/_dashboard-theme-aliases.css">
   {# Material Symbols (Google) — Icons statt Emojis. Outlined-Variante. #}
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined">
 </head>

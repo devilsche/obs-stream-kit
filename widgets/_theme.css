@@ -97,3 +97,21 @@ html[data-theme="swiss"] {
   --pubg-radius:    var(--theme-radius);
   --pubg-page-bg:   var(--theme-page-bg);
 }
+
+/* ── Highlight-Icon (.pubg-hot-mark / t-hot): Symbol kommt aus --theme-hot-icon,
+   die Eigenbewegung ist je Theme verschieden. Greift, weil dieses File nach
+   _pubg.css laedt (ueberschreibt das Default-Flackern). ── */
+@keyframes theme-hot-zap     { 0%,90%,100%{opacity:1} 92%{opacity:.25} 94%{opacity:1} 97%{opacity:.4} }
+@keyframes theme-hot-twinkle { 0%,100%{transform:scale(1) rotate(0);opacity:1} 50%{transform:scale(1.15) rotate(10deg);opacity:.82} }
+@keyframes theme-hot-spin    { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+
+html[data-theme="terminal"] .pubg-hot-mark::before,
+html[data-theme="midnight"] .pubg-hot-mark::before { animation: theme-hot-zap 2.6s steps(1,end) infinite; }
+html[data-theme="aurora"]   .pubg-hot-mark::before { animation: theme-hot-twinkle 2.4s ease-in-out infinite; }
+html[data-theme="swiss"]    .pubg-hot-mark::before { animation: theme-hot-spin 6s linear infinite; }
+html[data-theme="editorial"] .pubg-hot-mark::before { animation: none; text-shadow: 0 0 6px currentColor; }
+/* entry/Default behaelt das Flammen-Flackern aus _pubg.css (pubg-fire-flicker). */
+
+@media (prefers-reduced-motion: reduce) {
+  .pubg-hot-mark::before { animation: none !important; }
+}

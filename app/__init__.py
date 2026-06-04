@@ -36,6 +36,28 @@ def create_app(testing: bool = False) -> Flask:
     # /s/<token>/overlays|assets|js/...  (reines Datei-Serving, kein Template)
     app.register_blueprint(bp_overlays)
 
+    @app.context_processor
+    def inject_theme_var():
+        """Stellt {{ theme }} allen Templates bereit (base.html setzt es aufs
+        <html>). Liest das Tenant-Theme aus der settings-Tabelle; faellt bei
+        fehlendem Login/DB-Problem sauber auf 'entry' (= aktueller Look) zurueck."""
+        from flask import g
+        theme = "entry"
+        tid = getattr(g, "tenant_id", None)
+        if tid is not None:
+            try:
+                from webcore.middleware import _get_conn
+                from pubg.db_pg import get_setting
+                conn = _get_conn()
+                try:
+                    theme = get_setting(conn, tid, "theme", "entry") or "entry"
+                finally:
+                    if "_PG_CONN_FACTORY" not in app.config:
+                        conn.close()
+            except Exception:
+                theme = "entry"
+        return {"theme": theme}
+
     @app.route("/healthz")
     def healthz():
         return jsonify({"status": "ok"})

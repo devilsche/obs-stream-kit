@@ -47,7 +47,9 @@
     .milestone .ms-target { color: var(--pubg-text); white-space: nowrap; flex-shrink: 0; }
     .milestone .ms-target b { color: var(--pubg-gold); font-variant-numeric: tabular-nums; }
     .milestone .bar {
-      height: 4px; background: rgba(255,255,255,0.08);
+      /* Themebar: dezenter Streifen in Textfarbe (funktioniert auf hellen
+         UND dunklen Themes, anders als das alte hartcodierte Weiss). */
+      height: 4px; background: color-mix(in srgb, var(--theme-text, #fff) 12%, transparent);
       border-radius: 2px; overflow: hidden;
     }
     .milestone .bar > i {
@@ -62,11 +64,11 @@
     }
     .milestone.close .ms-target { font-weight: 700; }
     .milestone.close .ms-target b {
-      text-shadow: 0 0 12px rgba(242, 183, 5, 0.7);
+      text-shadow: 0 0 12px var(--theme-accent, #f2b705);
       font-size: 1.15em;
     }
     .milestone.close .bar > i {
-      box-shadow: 0 0 10px rgba(242, 183, 5, 0.7);
+      box-shadow: 0 0 10px var(--theme-accent, #f2b705);
     }
     @keyframes msPulse {
       0%,100% { opacity: 1; }

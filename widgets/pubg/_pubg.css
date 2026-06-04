@@ -104,31 +104,33 @@ body.pubg-stale-hidden > *:not(.pubg-filter-bar) { display: none !important; }
 
 /* HOT — für überdurchschnittliche Werte (Synergy >=3 etc.) */
 .pubg-hot {
-  color: #ff7a1f !important;
-  text-shadow:
-    0 0 8px rgba(255, 122, 31, 0.7),
-    0 0 16px rgba(255, 60, 0, 0.4);
+  /* Theme-Token mit Orange-Fallback (Widgets ohne _theme.css = wie bisher).
+     Glow nutzt currentColor → faerbt sich automatisch mit dem Theme-Akzent. */
+  color: var(--theme-accent, #ff7a1f) !important;
+  text-shadow: 0 0 8px currentColor, 0 0 16px currentColor;
   animation: pubg-hot-pulse 2s ease-in-out infinite;
 }
 
 @keyframes pubg-hot-pulse {
-  0%, 100% {
-    text-shadow:
-      0 0 8px rgba(255, 122, 31, 0.7),
-      0 0 16px rgba(255, 60, 0, 0.4);
-  }
-  50% {
-    text-shadow:
-      0 0 14px rgba(255, 160, 60, 0.9),
-      0 0 28px rgba(255, 80, 0, 0.6),
-      0 0 40px rgba(255, 30, 0, 0.3);
-  }
+  0%, 100% { text-shadow: 0 0 8px currentColor, 0 0 16px currentColor; }
+  50%      { text-shadow: 0 0 14px currentColor, 0 0 28px currentColor, 0 0 40px currentColor; }
 }
 
-.pubg-fire {
-  display: inline-block;
+/* Highlight-Marker: Symbol kommt aus dem Theme (--theme-hot-icon), Fallback Flamme.
+   Eigenbewegung je Theme in _theme.css (zap/twinkle/spin); Default = Flackern. */
+.pubg-hot-mark {
+  display: inline-grid;
+  place-items: center;
   margin-right: 4px;
-  filter: drop-shadow(0 0 6px rgba(255, 100, 0, 0.6));
+  vertical-align: -3px;
+}
+.pubg-hot-mark::before {
+  font-family: "Material Symbols Outlined";
+  font-style: normal;
+  content: var(--theme-hot-icon, "local_fire_department");
+  font-size: 18px;
+  color: var(--theme-accent, #ff7a1f);
+  text-shadow: 0 0 8px currentColor;
   animation: pubg-fire-flicker 0.6s ease-in-out infinite alternate;
 }
 

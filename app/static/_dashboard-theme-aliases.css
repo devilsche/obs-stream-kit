@@ -1,0 +1,33 @@
+/* ════════════════════════════════════════════════════════════════════════
+   _dashboard-theme-aliases.css — biegt die Dashboard-Variablen (--brand-*,
+   --bg, --text* …) auf die Theme-Tokens (--theme-*) um.
+   ────────────────────────────────────────────────────────────────────────
+   WICHTIG: Der Alias gilt NUR fuer Themes != entry. Bei entry/Default greift
+   keine dieser Regeln → dashboard.css :root bleibt unveraendert → null
+   Regression gegenueber heute. _theme.css (Tokens) MUSS davor geladen sein,
+   diese Datei NACH dashboard.css (gleiche :root-Spezifitaet → spaeter gewinnt).
+   ════════════════════════════════════════════════════════════════════════ */
+html[data-theme="terminal"],
+html[data-theme="aurora"],
+html[data-theme="midnight"],
+html[data-theme="editorial"],
+html[data-theme="swiss"] {
+  --brand-purple:        var(--theme-primary);
+  --brand-purple-bright: var(--theme-accent-2);
+  --brand-gold:          var(--theme-accent);
+  --bg:                  var(--theme-bg);
+  --bg-elev:             var(--theme-surface);
+  --bg-elev-2:           var(--theme-surface-2);
+  --bg-deeper:           var(--theme-bg);
+  --bg-card:             var(--theme-surface);
+  --border:              var(--theme-border);
+  --border-strong:       var(--theme-border);
+  --text:                var(--theme-text);
+  --text-muted:          var(--theme-text-dim);
+  --text-dim:            var(--theme-text-faint);
+  --text-very-dim:       var(--theme-text-faint);
+  --success:             var(--theme-ok);
+  --danger:              var(--theme-danger);
+  --warning:             var(--theme-warn);
+  --focus:               var(--theme-accent);
+}

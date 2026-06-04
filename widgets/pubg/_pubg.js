@@ -13,12 +13,12 @@
 
   PubgUI.fmtPlace = (n) => (n == null ? "—" : "#" + n);
 
-  // Hot-Markierung: Flammen-Icon (Material Symbol local_fire_department)
-  // + Glow-Effekt (.pubg-fire / .pubg-hot in _pubg.css).
-  // Nutzung: hotIf(value, threshold, formattedString).
+  // Hot-Markierung: Highlight-Icon kommt aus dem Theme-Token --theme-hot-icon
+  // (.pubg-hot-mark::before in _pubg.css; Effekt je Theme in _theme.css).
+  // Ohne Theme = Flamme (Fallback). Nutzung: hotIf(value, threshold, formattedString).
   // Returns HTML — Caller muss innerHTML setzen, nicht textContent.
   PubgUI.hotWrap = (formatted) =>
-    `<span class="pubg-fire"><span class="material-symbols-outlined icon-sm" aria-hidden="true">local_fire_department</span></span><span class="pubg-hot">${formatted}</span>`;
+    `<span class="pubg-hot-mark" aria-hidden="true"></span><span class="pubg-hot">${formatted}</span>`;
   PubgUI.hotIf = (value, threshold, formatted) =>
     (value || 0) > threshold ? PubgUI.hotWrap(formatted) : formatted;
 
