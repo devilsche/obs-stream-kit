@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="de" data-theme="entry">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard-Cockpit — Live-Vorschau (echtes CSS, alle Themes)</title>
+<link rel="stylesheet" href="/app/static/dashboard.css">
+<link rel="stylesheet" href="/widgets/_theme.css">
+<link rel="stylesheet" href="/app/static/_dashboard-theme-aliases.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined">
+<style>
+  .tsw{position:fixed;top:10px;right:10px;z-index:200;display:flex;gap:4px;flex-wrap:wrap;
+    background:#0008;backdrop-filter:blur(6px);padding:6px;border-radius:8px;border:1px solid #fff3}
+  .tsw button{all:unset;cursor:pointer;font:600 12px/1 system-ui,sans-serif;color:#fff;
+    padding:7px 10px;border-radius:5px;min-height:32px;box-sizing:border-box}
+  .tsw button[aria-pressed="true"]{background:#fff;color:#111}
+</style>
+</head>
+<body class="dn">
+<div class="tsw" role="group" aria-label="Theme">
+  <button data-t="entry" aria-pressed="true">Entry</button>
+  <button data-t="terminal" aria-pressed="false">Terminal</button>
+  <button data-t="aurora" aria-pressed="false">Aurora</button>
+  <button data-t="midnight" aria-pressed="false">Midnight</button>
+  <button data-t="editorial" aria-pressed="false">Editorial</button>
+  <button data-t="swiss" aria-pressed="false">Swiss</button>
+  <button data-t="azure" aria-pressed="false">Azure</button>
+</div>
+
+<header class="dn-nav" role="banner">
+  <a class="dn-brand" href="#"><span class="sq" aria-hidden="true"></span>STREAM<span class="b">_</span>OVERLAY</a>
+  <nav class="dn-links" aria-label="Hauptnavigation">
+    <a href="#" aria-current="page">dashboard</a>
+    <a href="#">urls</a>
+    <a href="#">tools</a>
+    <a href="#">settings</a>
+    <a href="#">admin</a>
+    <a href="#">logout</a>
+  </nav>
+  <div class="dn-right">
+    <span class="dn-chip"><span class="uav" aria-hidden="true">P</span><b>PEX_LuCKoR</b></span>
+  </div>
+</header>
+
+<main class="dn-main">
+  <div class="dn-hero">
+    <div>
+      <h1>SYS · <span class="c">PEX_LuCKoR</span></h1>
+      <div class="sub">status=online // pubg=live // steam=live</div>
+    </div>
+    <span class="dn-livebadge"><span class="p" aria-hidden="true"></span>POLLER · LIVE · 7 matches today</span>
+  </div>
+
+  <div class="dn-cgrid">
+    <article class="dn-ccard dn-c4"><span class="corner" aria-hidden="true"></span>
+      <h2>API-Keys</h2>
+      <div class="dn-pad">
+        <div class="dn-kv"><span class="lbl"><span class="dn-led" aria-hidden="true"></span>PUBG</span><span class="v">set</span></div>
+        <div class="dn-kv"><span class="lbl"><span class="dn-led" aria-hidden="true"></span>Steam</span><span class="v">set</span></div>
+        <div class="dn-kv"><span class="lbl"><span class="dn-led" aria-hidden="true"></span>Twitch</span><span class="v">set</span></div>
+      </div>
+    </article>
+    <article class="dn-ccard m dn-c4"><span class="corner" aria-hidden="true"></span>
+      <h2>Status</h2>
+      <div class="dn-pad">
+        <div class="dn-kv"><span class="lbl">PUBG-Poller</span><span class="v">running</span></div>
+        <div class="dn-kv"><span class="lbl">Steam-Sync</span><span class="v">running</span></div>
+        <div class="dn-kv"><span class="lbl">Last match</span><span class="v n">#1 · 9K</span></div>
+      </div>
+    </article>
+    <article class="dn-ccard a dn-c4"><span class="corner" aria-hidden="true"></span>
+      <h2>Schnellzugriff</h2>
+      <div class="dn-pad">
+        <a class="dn-count" href="#"><span>OBS URLs</span><span class="n">→</span></a>
+        <a class="dn-count" href="#"><span>Settings</span><span class="n">→</span></a>
+        <a class="dn-count" href="#"><span>Tools</span><span class="n">→</span></a>
+      </div>
+    </article>
+    <article class="dn-ccard a dn-c12"><span class="corner" aria-hidden="true"></span>
+      <h2>All tenants · global · admin-only</h2>
+      <div class="dn-pad dn-gstats">
+        <div class="dn-gstat"><span class="gn">2</span><span class="gl">Tenants</span></div>
+        <div class="dn-gstat"><span class="gn">23</span><span class="gl">Matches today</span></div>
+        <div class="dn-gstat"><span class="gn">698</span><span class="gl">Matches total</span></div>
+        <div class="dn-gstat"><span class="gn">431&nbsp;MB</span><span class="gl">DB size</span></div>
+      </div>
+    </article>
+  </div>
+  <p class="dn-legend">Cockpit-Vorschau · echtes dashboard.css · alle 7 Themes oben umschaltbar.</p>
+</main>
+
+<script>
+  document.querySelector(".tsw").addEventListener("click", function(e){
+    var b = e.target.closest("button[data-t]"); if(!b) return;
+    document.documentElement.setAttribute("data-theme", b.dataset.t);
+    this.querySelectorAll("button").forEach(function(x){ x.setAttribute("aria-pressed", String(x===b)); });
+  });
+</script>
+</body>
+</html>

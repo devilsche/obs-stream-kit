@@ -1,43 +1,64 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — OBS Stream Kit{% endblock %}
 {% block body %}
-<div class="layout">
-  {% include "_sidebar.html" %}
-  <main id="main-content" class="main" tabindex="-1">
-    <div class="topbar">
-      <div class="user-chip">
-        {% if user.avatar_url %}<img src="{{ user.avatar_url }}" alt="">{% else %}<div class="user-chip__avatar-fallback" aria-hidden="true"></div>{% endif %}
-        <div class="greeting">Hi {{ user.display_name }}</div>
-      </div>
+{% include "_sidebar.html" %}
+<main id="main-content" class="dn dn-main" tabindex="-1">
+
+  <div class="dn-hero">
+    <div>
+      <h1>SYS · <span class="c">{{ user.display_name }}</span></h1>
+      <div class="sub">status=online //
+        pubg={% if cred_status.pubg_ready %}live{% else %}setup{% endif %} //
+        steam={% if cred_status.steam_ready %}live{% else %}setup{% endif %}</div>
     </div>
+    {% if cred_status.pubg_ready %}
+    <span class="dn-livebadge"><span class="p" aria-hidden="true"></span>POLLER · LIVE</span>
+    {% else %}
+    <span class="dn-livebadge"><span class="dn-led x" aria-hidden="true"></span>SETUP REQUIRED</span>
+    {% endif %}
+  </div>
+
+  <div class="dn-cgrid">
+
+    <article class="dn-ccard dn-c4"><span class="corner" aria-hidden="true"></span>
+      <h2>API-Keys</h2>
+      <div class="dn-pad">
+        <div class="dn-kv"><span class="lbl"><span class="dn-led {% if not cred_status.pubg_ready %}x{% endif %}" aria-hidden="true"></span>PUBG</span><span class="v {% if not cred_status.pubg_ready %}x{% endif %}">{% if cred_status.pubg_ready %}set{% else %}missing{% endif %}</span></div>
+        <div class="dn-kv"><span class="lbl"><span class="dn-led {% if not cred_status.steam_ready %}x{% endif %}" aria-hidden="true"></span>Steam</span><span class="v {% if not cred_status.steam_ready %}x{% endif %}">{% if cred_status.steam_ready %}set{% else %}missing{% endif %}</span></div>
+        <div class="dn-kv"><span class="lbl"><span class="dn-led" aria-hidden="true"></span>Twitch</span><span class="v">set</span></div>
+      </div>
+    </article>
+
+    <article class="dn-ccard m dn-c4"><span class="corner" aria-hidden="true"></span>
+      <h2>Status</h2>
+      <div class="dn-pad">
+        <div class="dn-kv"><span class="lbl">PUBG-Poller</span><span class="v {% if not cred_status.pubg_ready %}x{% endif %}">{% if cred_status.pubg_ready %}running{% else %}idle{% endif %}</span></div>
+        <div class="dn-kv"><span class="lbl">Steam-Sync</span><span class="v {% if not cred_status.steam_ready %}x{% endif %}">{% if cred_status.steam_ready %}running{% else %}idle{% endif %}</span></div>
+        <div class="dn-kv"><span class="lbl">Konto</span><span class="v n">{{ user.display_name }}</span></div>
+      </div>
+    </article>
+
+    <article class="dn-ccard a dn-c4"><span class="corner" aria-hidden="true"></span>
+      <h2>Schnellzugriff</h2>
+      <div class="dn-pad">
+        <a class="dn-count" href="/app/urls"><span>OBS URLs</span><span class="n">→</span></a>
+        <a class="dn-count" href="/app/settings"><span>Settings</span><span class="n">→</span></a>
+        <a class="dn-count" href="/app/tools"><span>Tools</span><span class="n">→</span></a>
+      </div>
+    </article>
 
     {% if cred_status.any_missing %}
-    <div class="card card--warning">
-      <h3 class="warn"><span class="material-symbols-outlined icon-warning" aria-hidden="true">warning</span> Configuration incomplete</h3>
-      <ul>
-        {% if not cred_status.pubg_ready %}
-        <li><a href="/app/settings">PUBG API key + in-game name missing</a> — the poller won't run.</li>
-        {% endif %}
-        {% if not cred_status.steam_ready %}
-        <li><a href="/app/settings">Steam API key + Steam ID missing</a> — no achievements.</li>
-        {% endif %}
-      </ul>
-    </div>
+    <article class="dn-ccard dn-c12"><span class="corner" aria-hidden="true"></span>
+      <h2>Konfiguration unvollständig</h2>
+      <div class="dn-pad">
+        {% if not cred_status.pubg_ready %}<div class="dn-kv"><span class="lbl"><span class="dn-led x" aria-hidden="true"></span>PUBG API-Key + In-Game-Name fehlen</span><a class="v x" href="/app/settings">einrichten →</a></div>{% endif %}
+        {% if not cred_status.steam_ready %}<div class="dn-kv"><span class="lbl"><span class="dn-led x" aria-hidden="true"></span>Steam API-Key + Steam-ID fehlen</span><a class="v x" href="/app/settings">einrichten →</a></div>{% endif %}
+      </div>
+    </article>
     {% endif %}
 
-    <div class="card">
-      <h3>Overview</h3>
-      <p class="mb-12">
-        Status:
-        {% if cred_status.pubg_ready %}<span class="ok"><span class="material-symbols-outlined icon-sm icon-success" aria-hidden="true">check_circle</span> PUBG</span>{% else %}<span class="warn"><span class="material-symbols-outlined icon-sm icon-warning" aria-hidden="true">hourglass_empty</span> PUBG</span>{% endif %}
-        ·
-        {% if cred_status.steam_ready %}<span class="ok"><span class="material-symbols-outlined icon-sm icon-success" aria-hidden="true">check_circle</span> Steam</span>{% else %}<span class="warn"><span class="material-symbols-outlined icon-sm icon-warning" aria-hidden="true">hourglass_empty</span> Steam</span>{% endif %}
-      </p>
-      <p>
-        <a href="/app/urls" class="btn"><span class="material-symbols-outlined" aria-hidden="true">link</span> My OBS URLs</a>
-        <a href="/app/settings" class="btn btn-ghost"><span class="material-symbols-outlined" aria-hidden="true">settings</span> Settings</a>
-      </p>
-    </div>
-  </main>
-</div>
+  </div>
+
+  <p class="dn-legend">Cockpit · weitere Live-Kacheln (Poller-Takt, Matches heute, Quellen-Zähler, Tenant-Stats) folgen.</p>
+</main>
 {% endblock %}

@@ -31,4 +31,51 @@ html[data-theme="azure"] {
   --danger:              var(--theme-danger);
   --warning:             var(--theme-warn);
   --focus:               var(--theme-accent);
+  /* Form/Typo: Rundung, Karten-Schatten, Schriften folgen dem Theme. */
+  --r-box:               var(--theme-radius);
+  --r-ctrl:              var(--theme-radius);
+  --card-shadow:         var(--theme-shadow);
+  --font-display:        var(--theme-font-display);
+  --font-body:           var(--theme-font-body);
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   EBENE 2 — Theme-Charakter fuer Dashboard-Komponenten (analog .t-card in
+   widgets/_blocks.css). NUR Themes != entry. Macht aus der Farb-/Font-Angleichung
+   den vollen Look (Glas, Grid, Eck-Marker, harte Kanten, Caps/Serife).
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* — Terminal: Grid-Hintergrund, Eck-Marker, UPPERCASE-Mono — */
+html[data-theme="terminal"] body{
+  background-image:linear-gradient(var(--border) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:44px 44px}
+html[data-theme="terminal"] .card{position:relative}
+html[data-theme="terminal"] .card::after{content:"";position:absolute;right:0;top:0;width:16px;height:16px;
+  border-top:2px solid var(--brand-purple);border-right:2px solid var(--brand-purple)}
+html[data-theme="terminal"] .card h2,html[data-theme="terminal"] .card h3,
+html[data-theme="terminal"] th{text-transform:uppercase;letter-spacing:.04em}
+
+/* — Aurora: Glas-Karten, Gradient-Mesh-Hintergrund — */
+html[data-theme="aurora"] body{
+  background-image:radial-gradient(700px 520px at 12% 4%,rgba(123,63,160,.45),transparent 60%),
+                   radial-gradient(620px 480px at 90% 96%,rgba(242,183,5,.12),transparent 60%)}
+html[data-theme="aurora"] .card{backdrop-filter:blur(16px) saturate(140%)}
+html[data-theme="aurora"] .card h2,html[data-theme="aurora"] .card h3{font-weight:800;letter-spacing:-.01em}
+
+/* — Midnight: dezenter Lime-Glow am Hintergrund — */
+html[data-theme="midnight"] body{
+  background-image:radial-gradient(800px 520px at 85% 0%,rgba(184,255,60,.06),transparent 60%)}
+html[data-theme="midnight"] .card h2,html[data-theme="midnight"] .card h3{font-weight:800;letter-spacing:-.02em}
+
+/* — Editorial: kursive Serifen-Headlines — */
+html[data-theme="editorial"] .card h2,html[data-theme="editorial"] .card h3,
+html[data-theme="editorial"] .greeting{font-style:italic;font-weight:500}
+
+/* — Swiss: RIESIGE fette Caps-Headlines, harte Caps-Labels — */
+html[data-theme="swiss"] .card h2,html[data-theme="swiss"] .card h3,
+html[data-theme="swiss"] .greeting{text-transform:uppercase;font-weight:900;letter-spacing:-.01em}
+html[data-theme="swiss"] th,html[data-theme="swiss"] label{text-transform:uppercase;font-weight:700}
+
+/* — Azure: subtiler Akzent-Glow an der Top-Nav (clean-tech) — */
+html[data-theme="azure"] .topnav{box-shadow:0 1px 0 color-mix(in srgb,var(--brand-purple) 40%,transparent)}

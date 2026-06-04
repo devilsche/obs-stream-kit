@@ -1,122 +1,98 @@
 {% extends "base.html" %}
 {% block title %}Settings — OBS Stream Kit{% endblock %}
 {% block body %}
-<div class="layout">
-  {% include "_sidebar.html" %}
-  <main id="main-content" class="main" tabindex="-1">
-    <div class="topbar"><div class="greeting">Settings</div></div>
+{% include "_sidebar.html" %}
+<main id="main-content" class="dn dn-main" tabindex="-1">
+  <div class="dn-crumb">Settings</div>
+  <h1 class="dn-title">Settings</h1>
 
-    {% if saved %}
-    <div class="card" style="border-color: var(--success); color: var(--success);"><span class="material-symbols-outlined icon-success" aria-hidden="true">check_circle</span> Saved</div>
-    {% endif %}
+  {% if saved %}
+  <div class="dn-saved"><span class="material-symbols-outlined icon-sm" aria-hidden="true">check_circle</span> Gespeichert</div>
+  {% endif %}
 
-    <form method="POST" class="card">
-      <h3>PUBG</h3>
-      <div class="form-row">
+  <form method="POST" class="dn-simple">
+    <p class="sec">// PUBG</p>
+    <div class="dn-fgrid">
+      <div class="dn-field">
         <label for="pubg_name">In-game name</label>
-        <input id="pubg_name" type="text" name="pubg_name" value="{{ creds.pubg_name or '' }}" placeholder="e.g. PEX_LuCKoR" autocomplete="off">
+        <input id="pubg_name" type="text" name="pubg_name" value="{{ creds.pubg_name or '' }}" placeholder="z.B. PEX_LuCKoR" autocomplete="off">
       </div>
-      <div class="form-row">
+      <div class="dn-field">
         <label for="pubg_platform">Platform</label>
         <select id="pubg_platform" name="pubg_platform">
-          <option value="">— pick one —</option>
+          <option value="">— wählen —</option>
           <option value="steam" {% if creds.pubg_platform == 'steam' %}selected{% endif %}>Steam</option>
           <option value="kakao" {% if creds.pubg_platform == 'kakao' %}selected{% endif %}>Kakao</option>
           <option value="psn" {% if creds.pubg_platform == 'psn' %}selected{% endif %}>PlayStation</option>
           <option value="xbox" {% if creds.pubg_platform == 'xbox' %}selected{% endif %}>Xbox</option>
         </select>
       </div>
-      <div class="form-row">
+      <div class="dn-field">
         <label for="pubg_api_key">API key</label>
-        <input id="pubg_api_key" name="pubg_api_key" type="password"
-               autocomplete="new-password"
-               placeholder="{% if creds.pubg_api_key %}(stored — leave blank to keep){% else %}from developer.pubg.com{% endif %}">
+        <input id="pubg_api_key" name="pubg_api_key" type="password" autocomplete="new-password"
+               placeholder="{% if creds.pubg_api_key %}(gespeichert — leer lassen zum Behalten){% else %}von developer.pubg.com{% endif %}">
       </div>
-
-      <h3>Steam</h3>
-      <div class="form-row">
-        <label for="steam_id">Steam ID (Steam64)</label>
-        <input id="steam_id" type="text" inputmode="numeric" pattern="[0-9]*"
-               name="steam_id" value="{{ creds.steam_id or '' }}"
-               placeholder="76561198..." autocomplete="off">
-      </div>
-      <div class="form-row">
-        <label for="steam_api_key">API key</label>
-        <input id="steam_api_key" name="steam_api_key" type="password"
-               autocomplete="new-password"
-               placeholder="{% if creds.steam_api_key %}(stored — leave blank to keep){% else %}from steamcommunity.com/dev{% endif %}">
-      </div>
-
-      <h3>Defaults</h3>
-      <div class="form-row">
-        <label for="default_range">Default-Range fuer Widgets</label>
-        <select id="default_range" name="default_range">
-          <option value="session" {% if prefs.default_range == 'session' %}selected{% endif %}>Session (current/last)</option>
-          <option value="week"    {% if prefs.default_range == 'week'    %}selected{% endif %}>Last 7 days</option>
-          <option value="all"     {% if prefs.default_range == 'all'     %}selected{% endif %}>All-time (full DB)</option>
-        </select>
-        <small style="color: var(--text-dim); display: block; margin-top: 4px;">
-          Greift fuer Widgets die <code>?range=</code> akzeptieren — wenn URL keinen Range explizit setzt.
-        </small>
-      </div>
-      <div class="form-row">
-        <label for="lang">Sprache</label>
-        <select id="lang" name="lang">
-          <option value="de" {% if prefs.lang == 'de' %}selected{% endif %}>Deutsch</option>
-          <option value="en" {% if prefs.lang == 'en' %}selected{% endif %}>English</option>
-        </select>
-        <small style="color: var(--text-dim); display: block; margin-top: 4px;">
-          Aktuell vorbereitet — Widgets/Tools rendern noch ueberwiegend in Englisch.
-        </small>
-      </div>
-
-      <div class="form-actions">
-        <button class="btn btn-gold" type="submit">Speichern</button>
-        <button class="btn" type="reset"
-                title="Setzt nur die noch nicht gespeicherten Eingaben zurueck">
-          Eingaben verwerfen
-        </button>
-      </div>
-    </form>
-
-    <div class="card">
-      <h3>Twitch-Account</h3>
-      <div class="form-row">
-        <label>Display Name</label>
-        <div style="color: var(--text); font-weight: 700;">{{ user.display_name }}</div>
-      </div>
-      <div class="form-row">
-        <label>Twitch User ID</label>
-        <div style="color: var(--text-muted); font-family: ui-monospace, monospace;">
-          {{ user.twitch_user_id }}
-        </div>
-      </div>
-      {% if user.avatar_url %}
-      <div class="form-row">
-        <label>Avatar</label>
-        <img src="{{ user.avatar_url }}" alt="Twitch-Avatar von {{ user.display_name }}"
-             width="64" height="64" style="border-radius: 8px; border: 1px solid var(--border);">
-      </div>
-      {% endif %}
-      <div class="form-row">
-        <label>Status</label>
-        <div>
-          {% if user.is_admin %}<span class="badge-admin">Admin</span>{% endif %}
-          {% if user.is_approved %}
-            <span style="color: var(--success);"><span class="material-symbols-outlined icon-sm icon-success" aria-hidden="true">check_circle</span> approved</span>
-          {% else %}
-            <span style="color: var(--warning);"><span class="material-symbols-outlined icon-sm icon-warning" aria-hidden="true">hourglass_empty</span> pending</span>
-          {% endif %}
-        </div>
-      </div>
-      <div class="form-actions">
-        <a class="btn" href="/app/login">Twitch-Token erneuern</a>
-      </div>
-      <p style="color: var(--text-dim); font-size: 0.85em; margin-top: 14px;">
-        Login-Token sind serverseitig sessioniert. "Erneuern" startet einen neuen Twitch-OAuth-Flow
-        (kann hilfreich sein wenn Display-Name oder Avatar gewechselt wurde).
-      </p>
     </div>
-  </main>
-</div>
+
+    <p class="sec">// Steam</p>
+    <div class="dn-fgrid">
+      <div class="dn-field">
+        <label for="steam_id">Steam ID (Steam64)</label>
+        <input id="steam_id" type="text" inputmode="numeric" pattern="[0-9]*" name="steam_id"
+               value="{{ creds.steam_id or '' }}" placeholder="76561198..." autocomplete="off">
+      </div>
+      <div class="dn-field">
+        <label for="steam_api_key">API key</label>
+        <input id="steam_api_key" name="steam_api_key" type="password" autocomplete="new-password"
+               placeholder="{% if creds.steam_api_key %}(gespeichert — leer lassen zum Behalten){% else %}von steamcommunity.com/dev{% endif %}">
+      </div>
+    </div>
+
+    <p class="sec">// Appearance</p>
+    <div class="dn-field">
+      <label for="theme">Theme</label>
+      <select id="theme" name="theme">
+        <option value="entry"     {% if prefs.theme == 'entry' %}selected{% endif %}>Entry — Purple/Gold</option>
+        <option value="azure"     {% if prefs.theme == 'azure' %}selected{% endif %}>Azure — Blau/Sky</option>
+        <option value="terminal"  {% if prefs.theme == 'terminal' %}selected{% endif %}>Terminal — Cyan/Magenta</option>
+        <option value="aurora"    {% if prefs.theme == 'aurora' %}selected{% endif %}>Aurora — Glas/Purple</option>
+        <option value="midnight"  {% if prefs.theme == 'midnight' %}selected{% endif %}>Midnight — Lime</option>
+        <option value="editorial" {% if prefs.theme == 'editorial' %}selected{% endif %}>Editorial — Warm/Serif</option>
+        <option value="swiss"     {% if prefs.theme == 'swiss' %}selected{% endif %}>Swiss — Ultramarin/Brutalist</option>
+      </select>
+      <div class="dn-note">Gilt für dein ganzes Konto — alle Overlays, Widgets, Tools und das Dashboard.</div>
+    </div>
+
+    <p class="sec">// Defaults</p>
+    <div class="dn-field">
+      <label for="default_range">Default-Range für Widgets</label>
+      <select id="default_range" name="default_range">
+        <option value="session" {% if prefs.default_range == 'session' %}selected{% endif %}>Session (aktuell/letzte)</option>
+        <option value="week"    {% if prefs.default_range == 'week'    %}selected{% endif %}>Letzte 7 Tage</option>
+        <option value="all"     {% if prefs.default_range == 'all'     %}selected{% endif %}>All-time (volle DB)</option>
+      </select>
+      <div class="dn-note">Greift für Widgets mit <code>?range=</code> — wenn die URL keinen Range setzt.</div>
+    </div>
+
+    <div class="dn-actions">
+      <button class="dn-btn" type="submit">Speichern</button>
+      <button class="dn-btn ghost" type="reset">Eingaben verwerfen</button>
+    </div>
+
+    <div class="dn-pro">[ Pro / Advanced ] — externe DB &amp; eigener FTP-Storage pro Tenant. <b>admin-only, später.</b></div>
+  </form>
+
+  <div class="dn-simple">
+    <p class="sec">// Twitch-Account</p>
+    <div class="dn-field"><label>Display Name</label><div>{{ user.display_name }}</div></div>
+    <div class="dn-field"><label>Twitch User ID</label><div>{{ user.twitch_user_id }}</div></div>
+    <div class="dn-field"><label>Status</label>
+      <div>
+        {% if user.is_admin %}<span class="dn-badge">Admin</span> {% endif %}
+        {% if user.is_approved %}approved{% else %}pending{% endif %}
+      </div>
+    </div>
+    <div class="dn-actions"><a class="dn-btn ghost" href="/app/login">Twitch-Token erneuern</a></div>
+  </div>
+</main>
 {% endblock %}

@@ -1,51 +1,20 @@
-{# Heisst weiter _sidebar.html aus Kompatibilitaet, ist jetzt aber eine
-   responsive Top-Nav mit Hamburger fuer Mobile. #}
-<header class="topnav" role="banner">
-  <div class="topnav-inner">
-    <a class="brand" href="/app/" aria-label="stats-overlay.info — Dashboard">
-      <span class="brand-dot" aria-hidden="true"></span>
-      <span class="brand-text">stats-overlay.info</span>
-    </a>
-    <button class="nav-toggle" type="button" aria-expanded="false"
-            aria-controls="primaryNav" aria-label="Menü öffnen">
-      <span class="nav-toggle-bar" aria-hidden="true"></span>
-      <span class="nav-toggle-bar" aria-hidden="true"></span>
-      <span class="nav-toggle-bar" aria-hidden="true"></span>
-    </button>
-    <nav id="primaryNav" class="primary-nav" aria-label="Hauptnavigation">
-      <ul>
-        <li><a href="/app/" {% if request.path == '/app/' %}aria-current="page"{% endif %}>Dashboard</a></li>
-        <li><a href="/app/settings" {% if request.path.startswith('/app/settings') %}aria-current="page"{% endif %}>Settings</a></li>
-        <li><a href="/app/urls" {% if request.path.startswith('/app/urls') %}aria-current="page"{% endif %}>OBS URLs</a></li>
-        <li><a href="/app/tools" {% if request.path.startswith('/app/tools') %}aria-current="page"{% endif %}>Tools</a></li>
-        {% if user.is_admin %}
-        <li class="admin-li"><a href="/admin/users" {% if request.path.startswith('/admin/users') %}aria-current="page"{% endif %}>Users</a></li>
-        <li class="admin-li"><a href="/admin/poi-editor" target="_blank" rel="noopener">POI Editor</a></li>
-        <li class="admin-li"><a href="/admin/" {% if request.path == '/admin/' %}aria-current="page"{% endif %}>Admin</a></li>
-        {% endif %}
-        <li class="logout-li"><a href="/app/logout">Logout</a></li>
-      </ul>
-    </nav>
+{# Top-Nav im Theme-/Mockup-Stil (dn-*). Theme-Wahl liegt in Settings. #}
+<header class="dn-nav" role="banner">
+  <a class="dn-brand" href="/app/" aria-label="stream-overlay — Dashboard">
+    <span class="sq" aria-hidden="true"></span>STREAM<span class="b">_</span>OVERLAY
+  </a>
+  <nav class="dn-links" aria-label="Hauptnavigation">
+    <a href="/app/" {% if request.path == '/app/' %}aria-current="page"{% endif %}>dashboard</a>
+    <a href="/app/urls" {% if request.path.startswith('/app/urls') %}aria-current="page"{% endif %}>urls</a>
+    <a href="/app/tools" {% if request.path.startswith('/app/tools') %}aria-current="page"{% endif %}>tools</a>
+    <a href="/app/settings" {% if request.path.startswith('/app/settings') %}aria-current="page"{% endif %}>settings</a>
+    {% if user.is_admin %}<a href="/admin/" {% if request.path.startswith('/admin') %}aria-current="page"{% endif %}>admin</a>{% endif %}
+    <a href="/app/logout">logout</a>
+  </nav>
+  <div class="dn-right">
+    <span class="dn-chip">
+      <span class="uav" aria-hidden="true">{% if user.avatar_url %}<img src="{{ user.avatar_url }}" alt="">{% else %}{{ (user.display_name or '?')[0]|upper }}{% endif %}</span>
+      <b>{{ user.display_name }}</b>
+    </span>
   </div>
 </header>
-<script>
-  // Hamburger-Toggle (klein, kein Framework)
-  (function () {
-    var btn = document.querySelector(".nav-toggle");
-    var nav = document.getElementById("primaryNav");
-    if (!btn || !nav) return;
-    btn.addEventListener("click", function () {
-      var open = nav.classList.toggle("is-open");
-      btn.setAttribute("aria-expanded", open ? "true" : "false");
-      btn.setAttribute("aria-label", open ? "Menü schließen" : "Menü öffnen");
-    });
-    // Esc schließt
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && nav.classList.contains("is-open")) {
-        nav.classList.remove("is-open");
-        btn.setAttribute("aria-expanded", "false");
-        btn.focus();
-      }
-    });
-  })();
-</script>

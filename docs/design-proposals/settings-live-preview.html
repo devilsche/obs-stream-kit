@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="de" data-theme="entry">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings — Live-Vorschau (echtes CSS, alle Themes)</title>
+<link rel="stylesheet" href="/app/static/dashboard.css">
+<link rel="stylesheet" href="/widgets/_theme.css">
+<link rel="stylesheet" href="/app/static/_dashboard-theme-aliases.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined">
+<style>
+  .tsw{position:fixed;top:10px;right:10px;z-index:200;display:flex;gap:4px;flex-wrap:wrap;
+    background:#0008;backdrop-filter:blur(6px);padding:6px;border-radius:8px;border:1px solid #fff3}
+  .tsw button{all:unset;cursor:pointer;font:600 12px/1 system-ui,sans-serif;color:#fff;
+    padding:7px 10px;border-radius:5px;min-height:32px;box-sizing:border-box}
+  .tsw button[aria-pressed="true"]{background:#fff;color:#111}
+</style>
+</head>
+<body class="dn">
+<div class="tsw" role="group" aria-label="Theme">
+  <button data-t="entry" aria-pressed="true">Entry</button>
+  <button data-t="terminal" aria-pressed="false">Terminal</button>
+  <button data-t="aurora" aria-pressed="false">Aurora</button>
+  <button data-t="midnight" aria-pressed="false">Midnight</button>
+  <button data-t="editorial" aria-pressed="false">Editorial</button>
+  <button data-t="swiss" aria-pressed="false">Swiss</button>
+  <button data-t="azure" aria-pressed="false">Azure</button>
+</div>
+
+<header class="dn-nav" role="banner">
+  <a class="dn-brand" href="#"><span class="sq" aria-hidden="true"></span>STREAM<span class="b">_</span>OVERLAY</a>
+  <nav class="dn-links" aria-label="Hauptnavigation">
+    <a href="#">dashboard</a><a href="#">urls</a><a href="#">tools</a>
+    <a href="#" aria-current="page">settings</a><a href="#">admin</a><a href="#">logout</a>
+  </nav>
+  <div class="dn-right"><span class="dn-chip"><span class="uav" aria-hidden="true">P</span><b>PEX_LuCKoR</b></span></div>
+</header>
+
+<main class="dn-main">
+  <div class="dn-crumb">Settings</div>
+  <h1 class="dn-title">Settings</h1>
+  <div class="dn-saved"><span class="material-symbols-outlined icon-sm" aria-hidden="true">check_circle</span> Gespeichert</div>
+
+  <form class="dn-simple" onsubmit="return false">
+    <p class="sec">// PUBG</p>
+    <div class="dn-fgrid">
+      <div class="dn-field"><label for="a1">In-game name</label><input id="a1" value="PEX_LuCKoR"></div>
+      <div class="dn-field"><label for="a2">Platform</label><select id="a2"><option>Steam</option></select></div>
+      <div class="dn-field"><label for="a3">API key</label><input id="a3" type="password" value="0000000000"></div>
+    </div>
+    <p class="sec">// Steam</p>
+    <div class="dn-fgrid">
+      <div class="dn-field"><label for="a4">Steam ID</label><input id="a4" value="7656119..."></div>
+      <div class="dn-field"><label for="a5">API key</label><input id="a5" type="password" value="0000000000"></div>
+    </div>
+    <p class="sec">// Appearance</p>
+    <div class="dn-field">
+      <label for="a6">Theme</label>
+      <select id="a6" onchange="document.documentElement.setAttribute('data-theme',this.value)">
+        <option value="entry">Entry — Purple/Gold</option>
+        <option value="azure">Azure — Blau/Sky</option>
+        <option value="terminal">Terminal — Cyan/Magenta</option>
+        <option value="aurora">Aurora — Glas/Purple</option>
+        <option value="midnight">Midnight — Lime</option>
+        <option value="editorial">Editorial — Warm/Serif</option>
+        <option value="swiss">Swiss — Ultramarin/Brutalist</option>
+      </select>
+      <div class="dn-note">Gilt für dein ganzes Konto — alle Overlays, Widgets, Tools und das Dashboard. (Hier zum Testen direkt umschaltend.)</div>
+    </div>
+    <p class="sec">// Defaults</p>
+    <div class="dn-field"><label for="a7">Default-Range für Widgets</label>
+      <select id="a7"><option>Session</option><option>Letzte 7 Tage</option><option>All-time</option></select></div>
+    <div class="dn-actions">
+      <button class="dn-btn" type="submit">Speichern</button>
+      <button class="dn-btn ghost" type="reset">Eingaben verwerfen</button>
+    </div>
+    <div class="dn-pro">[ Pro / Advanced ] — externe DB &amp; eigener FTP-Storage pro Tenant. <b>admin-only, später.</b></div>
+  </form>
+
+  <div class="dn-simple">
+    <p class="sec">// Twitch-Account</p>
+    <div class="dn-field"><label>Display Name</label><div>PEX_LuCKoR</div></div>
+    <div class="dn-field"><label>Status</label><div><span class="dn-badge">Admin</span> approved</div></div>
+    <div class="dn-actions"><a class="dn-btn ghost" href="#">Twitch-Token erneuern</a></div>
+  </div>
+</main>
+
+<script>
+  document.querySelector(".tsw").addEventListener("click", function(e){
+    var b = e.target.closest("button[data-t]"); if(!b) return;
+    document.documentElement.setAttribute("data-theme", b.dataset.t);
+    this.querySelectorAll("button").forEach(function(x){ x.setAttribute("aria-pressed", String(x===b)); });
+  });
+</script>
+</body>
+</html>

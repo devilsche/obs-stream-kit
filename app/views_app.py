@@ -107,12 +107,18 @@ def settings():
             lang = request.form.get("lang")
             if lang in ("de", "en"):
                 set_setting(conn, g.tenant_id, "ui.lang", lang)
+            # Theme (gilt fuers ganze Konto; Whitelist analog ALLOWED_THEMES)
+            theme = request.form.get("theme")
+            if theme in ("entry", "terminal", "aurora", "midnight",
+                         "editorial", "swiss", "azure"):
+                set_setting(conn, g.tenant_id, "theme", theme)
             return redirect("/app/settings?saved=1")
         creds = core_creds.get(conn, g.tenant_id)
         prefs = {
             "default_range": get_setting(conn, g.tenant_id, "ui.default_range",
                                           default="session"),
             "lang": get_setting(conn, g.tenant_id, "ui.lang", default="de"),
+            "theme": get_setting(conn, g.tenant_id, "theme", default="entry"),
         }
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
