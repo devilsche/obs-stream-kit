@@ -119,7 +119,7 @@
       const isGrand = next % 1000 === 0;
       const isHalf  = !isGrand && next % 500 === 0;
       let label = "Next milestone";
-      if (isGrand) label = '<span class="material-symbols-outlined icon-gold" aria-hidden="true">workspace_premium</span> GRAND CHICKEN incoming';
+      if (isGrand) label = '<span class="material-symbols-outlined icon-gold" aria-hidden="true">emoji_events</span> GRAND CHICKEN incoming';
       else if (isHalf) label = '<span class="material-symbols-outlined icon-gold" aria-hidden="true">emoji_events</span> Half-Grand incoming';
       return { next, remain, pct, isGrand, isHalf, label };
     }
@@ -146,7 +146,9 @@
       const info = nextMilestone(d.wins);
       ms.classList.add("show");
       ms.classList.toggle("close", info.remain <= 3);
-      document.getElementById("msLabel").textContent  = info.label;
+      // innerHTML: info.label kann Markup (Material-Symbol-Icon) enthalten.
+      // Quelle ist ein fester Code-String (kein User-Input) → kein XSS.
+      document.getElementById("msLabel").innerHTML  = info.label;
       document.getElementById("msRemain").textContent = info.remain;
       document.getElementById("msTarget").textContent = "#" + info.next;
       document.getElementById("msBar").style.width    = info.pct.toFixed(1) + "%";
