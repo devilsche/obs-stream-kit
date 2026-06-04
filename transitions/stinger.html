@@ -6,6 +6,10 @@
   <title>Stinger Transition — Premium</title>
   <!-- Theme-Fundament: Tokens (--theme-*). data-theme kommt server-injiziert. -->
   <link rel="stylesheet" href="../widgets/_theme.css">
+  <!-- Feste Gaming-Font fuer den Stinger-Namen (unabhaengig vom Theme). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@800;900&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -90,28 +94,37 @@
       transform: translate(-50%, -50%);
       opacity: 0;
       z-index: 10;
-      font-family: var(--theme-font-display, 'DM Sans', sans-serif);
+      font-family: 'Orbitron', sans-serif;
       font-weight: 900;
       font-size: 150px;
       line-height: 1;
-      letter-spacing: 0.03em;
+      letter-spacing: 0.04em;
       white-space: nowrap;
       text-transform: uppercase;
-      /* Chrome/Metallic: weisser Glanz oben → Accent → dunkel unten, auf den
-         Text geclippt. Glow + Tiefe via filter (wirkt korrekt mit clip:text). */
+      /* Echter Chrome: Silber-Verlauf mit hartem "Horizont-Bruch" bei 50%
+         (heller Himmel oben, dunkler Bruch, helle Boden-Reflexion unten) +
+         leichter Accent-Schimmer oben/unten. Auf den Text geclippt. */
       background: linear-gradient(180deg,
-        #ffffff 0%,
-        color-mix(in srgb, var(--st-accent) 30%, #fff) 30%,
-        var(--st-accent) 54%,
-        color-mix(in srgb, var(--st-accent) 55%, #000) 100%);
+        color-mix(in srgb, var(--st-accent) 35%, #ffffff) 0%,
+        #ffffff 12%,
+        #d6dde4 30%,
+        #9aa3ad 47%,
+        #4c555f 50%,
+        #b9c2cc 53%,
+        #ffffff 74%,
+        color-mix(in srgb, var(--st-accent) 45%, #aeb6bf) 100%);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
       -webkit-text-fill-color: transparent;
+      /* Kontur HINTER der Fuellung (paint-order) → Definition ohne den Verlauf
+         zu ueberdecken. Tiefe + Theme-Glow via filter (wirkt mit clip:text). */
+      -webkit-text-stroke: 2px color-mix(in srgb, var(--st-primary) 55%, #000);
+      paint-order: stroke fill;
       filter:
-        drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6))
-        drop-shadow(0 0 26px color-mix(in srgb, var(--st-accent) 75%, transparent))
-        drop-shadow(0 0 72px color-mix(in srgb, var(--st-primary) 45%, transparent));
+        drop-shadow(0 2px 2px rgba(0, 0, 0, 0.6))
+        drop-shadow(0 0 30px color-mix(in srgb, var(--st-accent) 80%, transparent))
+        drop-shadow(0 0 70px color-mix(in srgb, var(--st-primary) 50%, transparent));
     }
   </style>
 </head>
