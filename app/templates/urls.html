@@ -105,7 +105,7 @@
 <dialog class="dn-modal" id="previewModal" aria-label="Widget-Vorschau">
   <div class="dn-modal__head">
     <h2 id="previewModalTitle">Vorschau</h2>
-    <button type="button" class="dn-modal__close" id="previewClose">schließen ✕</button>
+    <button type="button" class="dn-modal__close" id="previewClose" aria-label="Vorschau schließen"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
   </div>
   <div class="dn-modal__body"><iframe id="previewFrame" title="Widget-Vorschau" loading="lazy"></iframe></div>
 </dialog>
@@ -330,7 +330,10 @@
       const frame = document.getElementById("previewFrame");
       const t = document.querySelector(".url-detail__title");
       document.getElementById("previewModalTitle").textContent = "Vorschau · " + (t ? t.textContent : "Widget");
-      frame.src = buildUrl(root);
+      // dock=1 → Widget rendert seinen eigenen (dunklen) Dock-Hintergrund statt
+      // transparent auf hellem Modal durchzuscheinen.
+      const u = buildUrl(root);
+      frame.src = u + (u.includes("?") ? "&" : "?") + "dock=1";
       modal.showModal();
     });
   }

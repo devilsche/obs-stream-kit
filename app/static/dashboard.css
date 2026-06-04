@@ -156,7 +156,7 @@ img { max-width: 100%; height: auto; }
 .primary-nav a:hover { background: var(--bg-elev); color: var(--text); }
 .primary-nav a[aria-current="page"] {
   background: var(--brand-purple);
-  color: #fff; font-weight: 700;
+  color: var(--theme-on-primary,#fff); font-weight: 700;
 }
 .primary-nav .admin-li a { color: var(--brand-gold); }
 .primary-nav .logout-li a { color: var(--text-dim); }
@@ -314,7 +314,7 @@ label { color: var(--text-muted); font-size: 0.9em; display: block; margin-botto
 }
 .url-tab:hover { background: var(--bg-elev); color: var(--text); }
 .url-tab.active {
-  background: var(--brand-purple); color: #fff;
+  background: var(--brand-purple); color: var(--theme-on-primary,#fff);
 }
 .url-tab-count {
   background: rgba(255,255,255,0.12);
@@ -634,7 +634,7 @@ th { color: var(--brand-gold); font-weight: 700; font-size: 0.85em;
 }
 .btn-preview-secondary:hover {
   background: var(--brand-purple);
-  color: #fff;
+  color: var(--theme-on-primary,#fff);
 }
 .btn-preview-secondary:focus-visible {
   outline: 2px solid var(--brand-gold);
@@ -703,7 +703,7 @@ th { color: var(--brand-gold); font-weight: 700; font-size: 0.85em;
 }
 .sw-btn.active {
   background: var(--brand-purple);
-  color: #fff;
+  color: var(--theme-on-primary,#fff);
   border-color: var(--brand-purple);
 }
 .sw-input {
@@ -957,7 +957,7 @@ html[data-theme="aurora"] .dn-ccard,html[data-theme="aurora"] .dn-hero{backdrop-
 .btn-copy-primary,.btn-preview-secondary{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.03em;
   font-size:13px;border-radius:var(--r-ctrl);border:1px solid var(--brand-purple)}
 .btn-copy-primary{background:color-mix(in srgb,var(--brand-purple) 12%,transparent);color:var(--brand-purple)}
-.btn-copy-primary:hover{background:var(--brand-purple);color:#fff;filter:none}
+.btn-copy-primary:hover{background:var(--brand-purple);color:var(--theme-on-primary,#fff);filter:none}
 .btn-preview-secondary{background:none;border-color:var(--border);color:var(--text-dim)}
 .btn-preview-secondary:hover{background:none;border-color:var(--text);color:var(--text)}
 
@@ -969,11 +969,12 @@ html[data-theme="aurora"] .dn-ccard,html[data-theme="aurora"] .dn-hero{backdrop-
   padding:14px 18px;border-bottom:1px solid var(--border);background:var(--bg-deeper)}
 .dn-modal__head h2{margin:0;font-family:var(--font-display);font-size:16px;color:var(--brand-gold)}
 .dn-modal__close{background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:var(--r-ctrl);
-  font-family:var(--font-display);text-transform:uppercase;font-size:12px;padding:7px 12px;min-height:36px;cursor:pointer}
+  display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;cursor:pointer}
+.dn-modal__close .material-symbols-outlined{font-size:20px}
 .dn-modal__close:hover{color:var(--text);border-color:var(--text)}
-.dn-modal__body{height:min(60vh,520px);
-  background-image:linear-gradient(45deg,#0006 25%,transparent 25%),linear-gradient(-45deg,#0006 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#0006 75%),linear-gradient(-45deg,transparent 75%,#0006 75%);
-  background-size:24px 24px;background-position:0 0,0 12px,12px -12px,-12px 0}
+/* Ruhiger dunkler Grund (kein Schachbrett, nicht "weiss") — das Widget bringt
+   per dock=1 seinen eigenen Hintergrund mit und sitzt mittig darauf. */
+.dn-modal__body{height:min(70vh,600px);background:var(--bg-deeper);display:block}
 .dn-modal__body iframe{width:100%;height:100%;border:0;display:block;background:transparent}
 .url-card-primary__url{border-left:2px solid var(--brand-gold)}
 .url-cat[open] .url-cat__title{color:var(--brand-gold)}
@@ -982,11 +983,11 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
   border-top:2px solid var(--brand-purple);border-right:2px solid var(--brand-purple);pointer-events:none}
 
 /* Parameter-/Mode-Selektoren als Segmented-Control (Mockup .seg-Stil) statt Pills */
-.url-switches .sw-controls{gap:0;flex-wrap:wrap}
+.url-switches .sw-controls{gap:0;flex-wrap:nowrap;overflow-x:auto;max-width:100%}
 .url-switches .sw-btn{border-radius:0!important;background:var(--bg-card);color:var(--text-muted);
-  border:1px solid var(--border);border-right-width:0;padding:9px 15px;min-height:38px;
-  font-family:var(--font-display);font-size:12px;text-transform:uppercase;letter-spacing:.02em}
+  border:1px solid var(--border);border-right-width:0;padding:8px 12px;min-height:38px;white-space:nowrap;
+  font-family:var(--font-display);font-size:11.5px;text-transform:uppercase;letter-spacing:.02em}
 .url-switches .sw-btn:first-child{border-top-left-radius:var(--r-ctrl)!important;border-bottom-left-radius:var(--r-ctrl)!important}
 .url-switches .sw-btn:last-child{border-right-width:1px;border-top-right-radius:var(--r-ctrl)!important;border-bottom-right-radius:var(--r-ctrl)!important}
-.url-switches .sw-btn.active{background:var(--brand-purple);color:#fff;border-color:var(--brand-purple)}
+.url-switches .sw-btn.active{background:var(--brand-purple);color:var(--theme-on-primary,#fff);border-color:var(--brand-purple)}
 .url-switches .sw-btn.active + .sw-btn{border-left-color:var(--brand-purple)}
