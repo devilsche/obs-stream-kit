@@ -857,7 +857,7 @@ th { color: var(--brand-gold); font-weight: 700; font-size: 0.85em;
 .dn-right{margin-left:auto;display:flex;align-items:center;gap:12px}
 .dn-chip{display:flex;align-items:center;gap:10px;padding:5px 15px 5px 5px;border:1px solid var(--theme-border);
   border-radius:999px;background:var(--theme-surface)}
-.dn-chip .uav{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--theme-primary),var(--theme-ok));
+.dn-chip .uav{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--theme-primary),var(--theme-accent));
   display:grid;place-items:center;color:var(--theme-on-primary);font-weight:800;font-size:13px;
   font-family:var(--theme-font-display);overflow:hidden;flex:none}
 .dn-chip .uav img{width:100%;height:100%;object-fit:cover;display:block}
