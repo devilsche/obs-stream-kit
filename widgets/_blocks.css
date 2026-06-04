@@ -110,7 +110,9 @@ html[data-theme="midnight"] .t-card{box-shadow:0 12px 36px rgba(0,0,0,.45)}
 html[data-theme="midnight"] .t-header{font-weight:800;letter-spacing:-.02em}
 
 /* — Editorial: hell, Serife KURSIV, dezent, gemischt-case — */
-html[data-theme="editorial"] .t-card{box-shadow:0 8px 26px rgba(28,26,22,.1)}
+/* Helle Karte als transparentes Overlay: dunkle Kontur + kraeftiger Schatten,
+   damit sie auf jedem Hintergrund (hell/dunkel/Gameplay) abhebt. */
+html[data-theme="editorial"] .t-card{box-shadow:0 10px 30px rgba(28,26,22,.32),0 0 0 1px rgba(28,26,22,.16)}
 html[data-theme="editorial"] .t-header{font-style:italic;font-weight:500;font-size:22px}
 html[data-theme="editorial"] .t-value{font-weight:500;font-variant-numeric:oldstyle-nums}
 html[data-theme="editorial"] .t-range{font-style:normal}
