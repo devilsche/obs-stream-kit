@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stinger — Font-Auswahl (Chrome)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Kandidaten: kräftige Gaming/Display-Fonts (gut für Chrome-Relief) -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Russo+One&family=Black+Ops+One&family=Audiowide&family=Teko:wght@700&family=Saira+Stencil+One&family=Wallpoet&family=Bungee&family=Chakra+Petch:wght@700&family=Oxanium:wght@800&family=Rajdhani:wght@700&family=Syncopate:wght@700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --accent:  #2e9bff;   /* Azure-Demo (entspricht --theme-accent im Azure-Theme) */
+      --primary: #2e9bff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(ellipse at 50% 30%, #16243a 0%, #0a0f1a 60%, #05070d 100%);
+      color: #cfd6e0;
+      font-family: system-ui, sans-serif;
+      padding: 40px 32px 80px;
+      min-height: 100vh;
+    }
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; color: #fff; }
+    .hint { font-size: 13px; color: #8a93a3; margin-bottom: 36px; }
+    .hint code { color: var(--accent); background: #ffffff10; padding: 2px 7px; border-radius: 4px; }
+    .row {
+      display: flex; align-items: center; gap: 24px;
+      padding: 26px 28px; border-bottom: 1px solid #ffffff12;
+    }
+    .label {
+      flex: 0 0 200px; font-size: 13px; color: #9aa3b3; line-height: 1.5;
+    }
+    .label b { color: #fff; font-size: 15px; display: block; margin-bottom: 3px; }
+    .label .css { color: var(--accent); font-family: ui-monospace, monospace; font-size: 11px; }
+
+    /* Chrome-Effekt (identisch zum Stinger) */
+    .chrome {
+      font-size: 88px; line-height: 1; letter-spacing: 0.04em;
+      text-transform: uppercase; white-space: nowrap;
+      background: linear-gradient(180deg,
+        color-mix(in srgb, var(--accent) 35%, #ffffff) 0%,
+        #ffffff 12%, #d6dde4 30%, #9aa3ad 47%,
+        #4c555f 50%, #b9c2cc 53%, #ffffff 74%,
+        color-mix(in srgb, var(--accent) 45%, #aeb6bf) 100%);
+      -webkit-background-clip: text; background-clip: text;
+      color: transparent; -webkit-text-fill-color: transparent;
+      -webkit-text-stroke: 2px color-mix(in srgb, var(--primary) 55%, #000);
+      paint-order: stroke fill;
+      filter:
+        drop-shadow(0 2px 2px rgba(0,0,0,0.6))
+        drop-shadow(0 0 28px color-mix(in srgb, var(--accent) 75%, transparent));
+    }
+
+    .f-orbitron  { font-family: 'Orbitron', sans-serif;       font-weight: 900; }
+    .f-russo     { font-family: 'Russo One', sans-serif; }
+    .f-blackops  { font-family: 'Black Ops One', sans-serif; }
+    .f-audiowide { font-family: 'Audiowide', sans-serif; }
+    .f-teko      { font-family: 'Teko', sans-serif;           font-weight: 700; font-size: 110px; }
+    .f-saira     { font-family: 'Saira Stencil One', sans-serif; }
+    .f-wallpoet  { font-family: 'Wallpoet', sans-serif; }
+    .f-bungee    { font-family: 'Bungee', sans-serif;         font-size: 72px; }
+    .f-chakra    { font-family: 'Chakra Petch', sans-serif;   font-weight: 700; }
+    .f-oxanium   { font-family: 'Oxanium', sans-serif;        font-weight: 800; }
+    .f-rajdhani  { font-family: 'Rajdhani', sans-serif;       font-weight: 700; }
+    .f-syncopate { font-family: 'Syncopate', sans-serif;      font-weight: 700; font-size: 62px; }
+  </style>
+</head>
+<body>
+  <h1>Stinger-Name — Font-Auswahl im Chrome-Effekt</h1>
+  <p class="hint">Beispiel-Name <code>LUCKOR_HD</code> · Azure-Demo-Farbe · sag mir die Nummer/Namen, dann setze ich die Font fix im Stinger.</p>
+
+  <div class="row"><div class="label"><b>1 · Orbitron</b>futuristisch, geometrisch (aktuell)<span class="css">Orbitron 900</span></div><div class="chrome f-orbitron">LUCKOR_HD</div></div>
+  <div class="row"><div class="label"><b>2 · Russo One</b>kräftig, breit, Impact<span class="css">Russo One</span></div><div class="chrome f-russo">LUCKOR_HD</div></div>
+  <div class="row"><div class="label"><b>3 · Black Ops One</b>military / action<span class="css">Black Ops One</span></div><div class="chrome f-blackops">LUCKOR_HD</div></div>
+  <div class="row"><div class="label"><b>4 · Audiowide</b>retro-futuristisch, tech<span class="css">Audiowide</span></div><div class="chrome f-audiowide">LUCKOR_HD</div></div>
+  <div class="row"><div class="label"><b>5 · Teko</b>schmal, hoch, modern<span class="css">Teko 700</span></div><div class="chrome f-teko">LUCKOR_HD</div></div>
+  <div class="row"><div class="label"><b>6 · Saira Stencil One</b>Stencil / Schablone<span class="css">Saira Stencil One</span></div><div class="chrome f-saira">LUCKOR_HD</div></div>
+  <div class="row"><div class="label"><b>7 · Wallpoet</b>kantig, sci-fi, technisch<span class="css">Wallpoet</span></div><div class="chrome f-wallpoet">LUCKOR_HD</div></div>
+  <div class="row"><div class="label"><b>8 · Bungee</b>fett, urban, sign-style<span class="css">Bungee</span></div><div class="chrome f-bungee">LUCKOR_HD</div></div>
+  <div class="row"><div class="label"><b>9 · Chakra Petch</b>tech, leicht eckig<span class="css">Chakra Petch 700</span></div><div class="chrome f-chakra">LUCKOR_HD</div></div>
+  <div class="row"><div class="label"><b>10 · Oxanium</b>gaming/esports, modern<span class="css">Oxanium 800</span></div><div class="chrome f-oxanium">LUCKOR_HD</div></div>
+  <div class="row"><div class="label"><b>11 · Rajdhani</b>clean, schmal, tech<span class="css">Rajdhani 700</span></div><div class="chrome f-rajdhani">LUCKOR_HD</div></div>
+  <div class="row"><div class="label"><b>12 · Syncopate</b>weit gesperrt, edel-tech<span class="css">Syncopate 700</span></div><div class="chrome f-syncopate">LUCKOR_HD</div></div>
+</body>
+</html>
