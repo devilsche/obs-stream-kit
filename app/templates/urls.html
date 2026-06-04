@@ -240,6 +240,12 @@
     const base = card.dataset.base;
     const switches = parseJSON(card.dataset.switches, []);
     const params = parseJSON(card.dataset.params, []);
+    // Sources ohne UI-Regler aber mit Parametern (z.B. Alerts): die URL mit
+    // {Platzhaltern} zeigen, damit klar ist, was Streamer.bot beim Triggern setzt.
+    const hasParamHints = !switches.length && params.length > 0;
+    const shownUrl = hasParamHints
+      ? base + "?" + params.map(p => p + "={" + p + "}").join("&")
+      : base;
 
     document.getElementById("urlDCat").textContent = card.dataset.cat;
     document.getElementById("urlDName").textContent = card.dataset.label;
@@ -273,8 +279,8 @@
       <div class="url-detail-col">${configCol}</div>
       <div class="url-detail-col">
         <div class="url-dbox url-urlbox">
-          <div class="url-urlbox__cap">// OBS-URL (live)</div>
-          <div class="url-livefield" id="urlText">${escapeHtml(base)}</div>
+          <div class="url-urlbox__cap">${hasParamHints ? "// OBS-URL — {Platzhalter} ersetzt Streamer.bot beim Triggern" : "// OBS-URL (live)"}</div>
+          <div class="url-livefield" id="urlText">${escapeHtml(shownUrl)}</div>
           <div class="url-dactions">
             <button type="button" class="url-act" id="btnCopy"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span> Kopieren</button>
             <button type="button" class="url-act ghost" id="btnPreview"><span class="material-symbols-outlined" aria-hidden="true">visibility</span> Preview</button>
@@ -287,7 +293,8 @@
         </div>` : ""}
       </div>`;
 
-    wireDetail(base, { kind: card.dataset.kind, size: card.dataset.size });
+    wireDetail(base, { kind: card.dataset.kind, size: card.dataset.size,
+                       shownUrl: hasParamHints ? shownUrl : null });
     view.hidden = true;
     detailView.hidden = false;
     document.getElementById("urlBack").focus();
@@ -339,7 +346,7 @@
     }
 
     document.getElementById("btnCopy").addEventListener("click", async () => {
-      const url = buildUrl(base, scope);
+      const url = (meta && meta.shownUrl) || buildUrl(base, scope);
       const done = () => {
         status.textContent = "URL kopiert.";
         const btn = document.getElementById("btnCopy");
