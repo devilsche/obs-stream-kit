@@ -24,8 +24,8 @@ def _tenant_creds(tenant_id: int):
             conn.close()
 
 
-@bp_overlays.route("/s/<token>/overlays/<path:filepath>")
-def overlay_file(token, filepath):
+def _serve_tenant_source(token, subdir, filepath):
+    """HTML/Asset aus <subdir> token-scoped ausliefern (mit Window-Var-Inject)."""
     if g.tenant_id is None:
         abort(404)
     creds = _tenant_creds(g.tenant_id)
@@ -35,7 +35,27 @@ def overlay_file(token, filepath):
         "__TWITCH_CHANNEL__": creds.twitch_channel or "",
         "__TWITCH_CLIENT_ID__": creds.twitch_client_id or "",
     }
-    return serve_html_or_asset(_root(), "overlays", filepath, variables)
+    return serve_html_or_asset(_root(), subdir, filepath, variables)
+
+
+@bp_overlays.route("/s/<token>/overlays/<path:filepath>")
+def overlay_file(token, filepath):
+    return _serve_tenant_source(token, "overlays", filepath)
+
+
+@bp_overlays.route("/s/<token>/alerts/<path:filepath>")
+def alert_file(token, filepath):
+    return _serve_tenant_source(token, "alerts", filepath)
+
+
+@bp_overlays.route("/s/<token>/stingers/<path:filepath>")
+def stinger_file(token, filepath):
+    return _serve_tenant_source(token, "stingers", filepath)
+
+
+@bp_overlays.route("/s/<token>/transitions/<path:filepath>")
+def transition_file(token, filepath):
+    return _serve_tenant_source(token, "transitions", filepath)
 
 
 # Relative ../assets/ und ../js/ aus den Overlay-HTMLs token-scoped bedienen.

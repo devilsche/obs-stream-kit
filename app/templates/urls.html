@@ -1,5 +1,24 @@
 {% extends "base.html" %}
 {% block title %}OBS URLs — OBS Stream Kit{% endblock %}
+
+{# Eine Source-Karte fuers Grid. switches/params als Listen → im Markup als
+   HTML-sicheres JSON (tojson escaped < > & ' → sicher im single-quote-Attr). #}
+{% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[]) %}
+<button type="button" class="url-card"
+        data-kind="{{ kind }}" data-label="{{ label }}" data-cat="{{ cat }}"
+        data-path="{{ path }}" data-base="{{ base }}"
+        {% if size %}data-size="{{ size }}"{% endif %}
+        {% if desc %}data-desc="{{ desc }}"{% endif %}
+        data-switches='{{ switches|tojson }}' data-params='{{ params|tojson }}'>
+  <span class="url-card__corner" aria-hidden="true"></span>
+  <span class="url-card__top">
+    <span class="url-card__cat">{{ cat }}</span>
+    <span class="url-card__nm">{{ label }}</span>
+    {% if desc or size %}<span class="url-card__meta">{{ desc or size }}</span>{% endif %}
+  </span>
+</button>
+{% endmacro %}
+
 {% block body %}
 <div class="layout">
   {% include "_sidebar.html" %}
@@ -17,31 +36,25 @@
       <h1 class="url-title">OBS Browser-Sources</h1>
 
       <div class="url-tabs" role="tablist" aria-label="Source-Typen">
-        <button type="button" role="tab" id="urltab-overlays" aria-selected="true"
-                aria-controls="urlpanel-overlays" data-tab="overlays">Overlays<span class="url-tabs__cnt">{{ overlays|length }}</span></button>
-        <button type="button" role="tab" id="urltab-widgets" aria-selected="false" tabindex="-1"
-                aria-controls="urlpanel-widgets" data-tab="widgets">Widgets<span class="url-tabs__cnt">{{ widgets|length }}</span></button>
+        <button type="button" role="tab" id="urltab-overlays" data-tab="overlays" data-label="Overlays"
+                aria-selected="true" aria-controls="urlpanel-overlays">Overlays<span class="url-tabs__cnt">{{ overlays|length }}</span></button>
+        <button type="button" role="tab" id="urltab-widgets" data-tab="widgets" data-label="Widgets"
+                aria-selected="false" tabindex="-1" aria-controls="urlpanel-widgets">Widgets<span class="url-tabs__cnt">{{ widgets|length }}</span></button>
+        <button type="button" role="tab" id="urltab-decor" data-tab="decor" data-label="Look &amp; Decor"
+                aria-selected="false" tabindex="-1" aria-controls="urlpanel-decor">Look &amp; Decor<span class="url-tabs__cnt">{{ decor|length }}</span></button>
+        <button type="button" role="tab" id="urltab-alerts" data-tab="alerts" data-label="Alerts"
+                aria-selected="false" tabindex="-1" aria-controls="urlpanel-alerts">Alerts<span class="url-tabs__cnt">{{ alerts|length }}</span></button>
+        <button type="button" role="tab" id="urltab-transition" data-tab="transition" data-label="Transition"
+                aria-selected="false" tabindex="-1" aria-controls="urlpanel-transition">Transition<span class="url-tabs__cnt">{{ transitions|length + stingers|length }}</span></button>
       </div>
 
       {# ── Overlays ── #}
       <div class="url-tabpanel" id="urlpanel-overlays" role="tabpanel" aria-labelledby="urltab-overlays">
         <div class="url-grid">
           {% for o in overlays %}
-          <button type="button" class="url-card"
-                  data-kind="overlay"
-                  data-label="{{ o.label }}"
-                  data-cat="Overlay"
-                  data-path="overlays/{{ o.file }}"
-                  data-base="{{ overlay_base }}/s/{{ token }}/overlays/{{ o.file }}"
-                  data-size="{{ o.size }}"
-                  data-params='{{ (o.params or []) | tojson | safe }}'>
-            <span class="url-card__corner" aria-hidden="true"></span>
-            <span class="url-card__top">
-              <span class="url-card__cat">Overlay</span>
-              <span class="url-card__nm">{{ o.label }}</span>
-              <span class="url-card__meta">{{ o.size }}</span>
-            </span>
-          </button>
+          {{ src_card('overlay', 'Overlay', o.label,
+                      overlay_base ~ '/s/' ~ token ~ '/overlays/' ~ o.file, 'overlays/' ~ o.file,
+                      o.size, '', [], (o.params or [])) }}
           {% endfor %}
         </div>
       </div>
@@ -50,21 +63,47 @@
       <div class="url-tabpanel" id="urlpanel-widgets" role="tabpanel" aria-labelledby="urltab-widgets" hidden>
         <div class="url-grid">
           {% for cat, label, desc, path, switches in widgets %}
-          <button type="button" class="url-card"
-                  data-kind="widget"
-                  data-label="{{ label }}"
-                  data-cat="{{ cat }}"
-                  data-desc="{{ desc }}"
-                  data-path="{{ path }}"
-                  data-base="{{ base_url }}/s/{{ token }}/widgets/{{ path }}"
-                  data-switches='{{ switches | tojson | safe }}'>
-            <span class="url-card__corner" aria-hidden="true"></span>
-            <span class="url-card__top">
-              <span class="url-card__cat">{{ cat }}</span>
-              <span class="url-card__nm">{{ label }}</span>
-              <span class="url-card__meta">{{ desc }}</span>
-            </span>
-          </button>
+          {{ src_card('widget', cat, label,
+                      base_url ~ '/s/' ~ token ~ '/widgets/' ~ path, path,
+                      '', desc, switches) }}
+          {% endfor %}
+        </div>
+      </div>
+
+      {# ── Look & Decor (liegen unter widgets/) ── #}
+      <div class="url-tabpanel" id="urlpanel-decor" role="tabpanel" aria-labelledby="urltab-decor" hidden>
+        <div class="url-grid">
+          {% for d in decor %}
+          {{ src_card('overlay', 'Decor', d.label,
+                      base_url ~ '/s/' ~ token ~ '/widgets/' ~ d.file, d.file,
+                      d.size, '', [], (d.params or [])) }}
+          {% endfor %}
+        </div>
+      </div>
+
+      {# ── Alerts ── #}
+      <div class="url-tabpanel" id="urlpanel-alerts" role="tabpanel" aria-labelledby="urltab-alerts" hidden>
+        <div class="url-grid">
+          {% for a in alerts %}
+          {{ src_card('overlay', 'Alert', a.label,
+                      base_url ~ '/s/' ~ token ~ '/alerts/' ~ a.file, 'alerts/' ~ a.file,
+                      a.size, '', [], (a.params or [])) }}
+          {% endfor %}
+        </div>
+      </div>
+
+      {# ── Transition / Stinger ── #}
+      <div class="url-tabpanel" id="urlpanel-transition" role="tabpanel" aria-labelledby="urltab-transition" hidden>
+        <div class="url-grid">
+          {% for t in transitions %}
+          {{ src_card('overlay', 'Transition', t.label,
+                      base_url ~ '/s/' ~ token ~ '/transitions/' ~ t.file, 'transitions/' ~ t.file,
+                      t.size) }}
+          {% endfor %}
+          {% for s in stingers %}
+          {{ src_card('overlay', 'Stinger', s.label,
+                      base_url ~ '/s/' ~ token ~ '/stingers/' ~ s.file, 'stingers/' ~ s.file,
+                      s.size) }}
           {% endfor %}
         </div>
       </div>
@@ -189,7 +228,8 @@
 
     document.getElementById("urlDCat").textContent = card.dataset.cat;
     document.getElementById("urlDName").textContent = card.dataset.label;
-    document.getElementById("urlBackTo").textContent = currentTab === "widgets" ? "Widgets" : "Overlays";
+    const tabBtn = document.getElementById("urltab-" + currentTab);
+    document.getElementById("urlBackTo").textContent = tabBtn ? tabBtn.dataset.label : "Übersicht";
 
     const infoBits = [];
     if (card.dataset.size) infoBits.push(escapeHtml(card.dataset.size) + " · transparent");
@@ -308,12 +348,12 @@
       const u = buildUrl(base, scope);
       const dim = String((meta && meta.size) || "").split(/[×x]/).map(n => parseInt(n.trim(), 10));
       if (meta && meta.kind === "overlay" && dim[0] && dim[1]) {
-        // Fullscreen-Overlay: in Originalmaßen rendern + per CSS (cqw) auf die
+        // Fullscreen-Source: in Originalmaßen rendern + per CSS (cqw) auf die
         // Modal-Breite herunterskalieren statt abgeschnitten 1:1 zu zeigen.
         body.classList.add("dn-modal__body--overlay");
         body.style.setProperty("--ov-w", dim[0]);  // berechneter Skalierungs-Token, kein statisches Styling
         body.style.setProperty("--ov-h", dim[1]);
-        frame.src = u;  // Overlay bringt seinen eigenen Vollbild-Hintergrund mit
+        frame.src = u;  // Source bringt ihren eigenen Vollbild-Hintergrund mit
       } else {
         // Widget: 1:1 mit dock=1 → eigener dunkler Grund statt durchscheinendem Weiß
         body.classList.remove("dn-modal__body--overlay");
@@ -350,7 +390,8 @@
   // ── Card → Detail ─────────────────────────────────────────
   document.querySelectorAll(".url-card").forEach(card => {
     card.addEventListener("click", () => {
-      currentTab = card.closest("#urlpanel-widgets") ? "widgets" : "overlays";
+      const panel = card.closest(".url-tabpanel");
+      if (panel) currentTab = panel.id.replace("urlpanel-", "");
       openDetail(card);
     });
   });
@@ -381,7 +422,8 @@
     const card = Array.from(document.querySelectorAll(".url-card"))
       .find(c => c.dataset.path === path);
     if (card) {
-      currentTab = card.closest("#urlpanel-widgets") ? "widgets" : "overlays";
+      const panel = card.closest(".url-tabpanel");
+      if (panel) currentTab = panel.id.replace("urlpanel-", "");
       openDetail(card);
     }
   }
