@@ -942,3 +942,20 @@ html[data-theme="aurora"] .dn-ccard,html[data-theme="aurora"] .dn-hero{backdrop-
   font-family:var(--theme-font-mono);font-size:13px;border-radius:var(--theme-radius);display:flex;align-items:center;gap:8px}
 .dn-badge{display:inline-block;background:var(--theme-accent);color:var(--theme-on-primary);padding:2px 8px;
   border-radius:calc(var(--theme-radius) * .5);font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:700}
+
+/* ════════════════════════════════════════════════════════════════════════
+   URLs-Seite — Mockup-/Theme-Look. Farben sind via Alias schon themebar;
+   hier: Radius (--r-box/--r-ctrl), Display/Mono-Typo, Button-Stil (uppercase),
+   Akzent-Markierungen + Eck-Marker. Master-Detail-Struktur + JS bleiben.
+   ════════════════════════════════════════════════════════════════════════ */
+.url-master,.url-detail,.url-card-primary{border-radius:var(--r-box)}
+.url-detail{position:relative;box-shadow:var(--card-shadow)}
+.url-master__filter,.url-card-primary__url,.sw-input,.sw-btn,.overlay-url-field,
+.url-back-btn,.btn-copy-primary,.btn-preview-secondary,.url-cat__count{border-radius:var(--r-ctrl)}
+.url-detail__title,.url-configure__heading{font-family:var(--font-display)}
+.btn-copy-primary,.btn-preview-secondary{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.03em;font-size:13px}
+.url-card-primary__url{border-left:2px solid var(--brand-gold)}
+.url-cat[open] .url-cat__title{color:var(--brand-gold)}
+/* Eck-Marker auf der Detail-Karte (Mockup-Deko) — nur Nicht-entry, damit entry unveraendert bleibt */
+html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;right:0;top:0;width:14px;height:14px;
+  border-top:2px solid var(--brand-purple);border-right:2px solid var(--brand-purple);pointer-events:none}
