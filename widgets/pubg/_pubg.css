@@ -104,16 +104,9 @@ body.pubg-stale-hidden > *:not(.pubg-filter-bar) { display: none !important; }
 
 /* HOT — für überdurchschnittliche Werte (Synergy >=3 etc.) */
 .pubg-hot {
-  /* Theme-Token mit Orange-Fallback (Widgets ohne _theme.css = wie bisher).
-     Glow nutzt currentColor → faerbt sich automatisch mit dem Theme-Akzent. */
+  /* Highlight-Wert: Akzentfarbe. Glow/Puls je Stufe steuert .t-hot--1/2/3
+     in _blocks.css (gestuftes Highlight-System, PubgUI.hot). */
   color: var(--theme-accent, #ff7a1f) !important;
-  text-shadow: 0 0 8px currentColor, 0 0 16px currentColor;
-  animation: pubg-hot-pulse 2s ease-in-out infinite;
-}
-
-@keyframes pubg-hot-pulse {
-  0%, 100% { text-shadow: 0 0 8px currentColor, 0 0 16px currentColor; }
-  50%      { text-shadow: 0 0 14px currentColor, 0 0 28px currentColor, 0 0 40px currentColor; }
 }
 
 /* Highlight-Marker .t-hot-mark (Symbol aus --theme-hot-icon + Partikel) lebt in

@@ -75,10 +75,11 @@
       <div class="t-stat"><span class="t-value" id="matches">—</span><span class="t-label">Matches</span></div>
       <div class="t-stat"><span class="t-value" id="wins">—</span><span class="t-label">Wins</span></div>
       <div class="t-stat"><span class="t-value" id="winpct">—</span><span class="t-label">Win %</span></div>
-      <div class="t-stat"><span class="t-value" id="top10">—</span><span class="t-label">Top10 %</span></div>
       <div class="t-stat"><span class="t-value" id="kd">—</span><span class="t-label">K/D</span></div>
       <div class="t-stat"><span class="t-value" id="kills">—</span><span class="t-label">Kills</span></div>
+      <div class="t-stat"><span class="t-value" id="dmg">—</span><span class="t-label">Ø Damage</span></div>
       <div class="t-stat"><span class="t-value" id="hs">—</span><span class="t-label">Headshot</span></div>
+      <div class="t-stat"><span class="t-value" id="top10">—</span><span class="t-label">Top10 %</span></div>
       <div class="t-stat"><span class="t-value" id="longest">—</span><span class="t-label">Longest</span></div>
     </div>
     <div class="milestone" id="milestone">
@@ -131,18 +132,25 @@
       return { next, remain, pct, isGrand, isHalf, hasRocket, label };
     }
 
+    // Highlight-Schwellen je Wert [Stufe1, Stufe2, Stufe3] — zentral, gestuft.
+    const HOT = {
+      matches: [5000, 10000, 20000], wins: [200, 500, 1000], winpct: [5, 10, 18],
+      kd: [1.5, 2.5, 4.0], kills: [10000, 20000, 30000], dmg: [150, 250, 350],
+      hs: [20, 30, 42], top10: [35, 50, 65], longest: [250, 450, 700],
+    };
+
     function render(d) {
       if (!d || !d.rounds_played) return;
-      document.getElementById("matches").textContent = PubgUI.fmtNum(d.rounds_played);
-      document.getElementById("wins").textContent = PubgUI.fmtNum(d.wins);
-      document.getElementById("kd").innerHTML =
-        PubgUI.hotIf(d.kd_ratio, 4, PubgUI.fmtKD(d.kd_ratio));
-      document.getElementById("hs").textContent = PubgUI.fmtPct(d.headshot_rate);
-      document.getElementById("winpct").textContent = PubgUI.fmtPct(d.win_rate);
-      document.getElementById("top10").textContent = PubgUI.fmtPct(d.top10_rate);
-      document.getElementById("longest").innerHTML =
-        PubgUI.hotIf(d.longest_kill, 300, Math.round(d.longest_kill || 0) + "m");
-      document.getElementById("kills").textContent = PubgUI.fmtNum(d.kills);
+      const $ = (id) => document.getElementById(id);
+      $("matches").innerHTML = PubgUI.hot(d.rounds_played, HOT.matches, PubgUI.fmtNum(d.rounds_played));
+      $("wins").innerHTML    = PubgUI.hot(d.wins, HOT.wins, PubgUI.fmtNum(d.wins));
+      $("winpct").innerHTML  = PubgUI.hot(d.win_rate, HOT.winpct, PubgUI.fmtPct(d.win_rate));
+      $("kd").innerHTML      = PubgUI.hot(d.kd_ratio, HOT.kd, PubgUI.fmtKD(d.kd_ratio));
+      $("kills").innerHTML   = PubgUI.hot(d.kills, HOT.kills, PubgUI.fmtNum(d.kills));
+      $("dmg").innerHTML     = PubgUI.hot(d.avg_damage, HOT.dmg, Math.round(d.avg_damage || 0));
+      $("hs").innerHTML      = PubgUI.hot(d.headshot_rate, HOT.hs, PubgUI.fmtPct(d.headshot_rate));
+      $("top10").innerHTML   = PubgUI.hot(d.top10_rate, HOT.top10, PubgUI.fmtPct(d.top10_rate));
+      $("longest").innerHTML = PubgUI.hot(d.longest_kill, HOT.longest, Math.round(d.longest_kill || 0) + "m");
 
       // Milestone-Countdown. Erst ab 50+ Wins anzeigen.
       const ms = document.getElementById("milestone");
@@ -174,7 +182,7 @@
     if (DEMO) {
       // Lokale Vorschau: Beispieldaten (Longest > 300 → Highlight sichtbar).
       render({ rounds_played: 17000, wins: 904, kd_ratio: 5.2, headshot_rate: 24.1,
-               win_rate: 5.3, top10_rate: 39.2, longest_kill: 753, kills: 24700 });
+               win_rate: 5.3, top10_rate: 39.2, longest_kill: 753, kills: 24700, avg_damage: 290 });
     } else {
       const params = new URLSearchParams({ mode: MODE });
       if (PLAYER) params.set("player", PLAYER);

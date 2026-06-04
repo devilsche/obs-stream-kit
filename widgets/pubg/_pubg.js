@@ -19,7 +19,8 @@
   // Returns HTML — Caller muss innerHTML setzen, nicht textContent.
   // Highlight-Marker. Standard: Symbol via CSS (::before, --theme-hot-icon).
   // Azure-Sonder: echter SVG-Tacho mit rotierender Nadel (Gasstoss-Animation).
-  PubgUI.hotWrap = (formatted) => {
+  // Highlight-Marker (Symbol + Partikel). Azure-Sonder: SVG-Tacho mit Nadel.
+  PubgUI._hotMark = () => {
     const isAzure = document.documentElement.getAttribute("data-theme") === "azure";
     const gauge = isAzure
       ? '<svg class="t-gauge" viewBox="0 0 24 24" aria-hidden="true">'
@@ -29,8 +30,29 @@
         + '</svg>'
       : '';
     const cls = isAzure ? "t-hot-mark t-hot-mark--after t-hot-mark--gauge" : "t-hot-mark t-hot-mark--after";
-    return `<span class="pubg-hot">${formatted}</span><span class="${cls}" aria-hidden="true">${gauge}<i></i><i></i><i></i></span>`;
+    return '<span class="' + cls + '" aria-hidden="true">' + gauge + '<i></i><i></i><i></i></span>';
   };
+
+  // Highlight-Stufe aus aufsteigenden Schwellen [t1,t2,t3]: 0=keine .. 3=insane.
+  PubgUI.hotTier = (value, t) => {
+    value = value || 0;
+    if (value >= t[2]) return 3;
+    if (value >= t[1]) return 2;
+    if (value >= t[0]) return 1;
+    return 0;
+  };
+  // Gestuftes Highlight: Stufe 1 Glow · Stufe 2 +Icon · Stufe 3 +Partikel/Puls.
+  PubgUI.hot = (value, thresholds, formatted) => {
+    const tier = PubgUI.hotTier(value, thresholds);
+    if (!tier) return formatted;
+    return '<span class="t-hot t-hot--' + tier + '">'
+      + '<span class="pubg-hot">' + formatted + '</span>'
+      + (tier >= 2 ? PubgUI._hotMark() : '')
+      + '</span>';
+  };
+  // Rueckwaerts-kompatibel (andere Widgets): binaer = hoechste Stufe.
+  PubgUI.hotWrap = (formatted) =>
+    '<span class="t-hot t-hot--3"><span class="pubg-hot">' + formatted + '</span>' + PubgUI._hotMark() + '</span>';
   PubgUI.hotIf = (value, threshold, formatted) =>
     (value || 0) > threshold ? PubgUI.hotWrap(formatted) : formatted;
 

@@ -83,6 +83,20 @@ html[data-theme="swiss"] .t-hot-mark i{width:9px;height:9px;border-radius:0;back
   animation-name:spark-spin!important;animation-duration:2.3s!important}
 @media (prefers-reduced-motion:reduce){.t-hot-mark i{display:none}}
 
+/* ── Highlight-Stufen (t-hot--1/2/3) — von PubgUI.hot() gesetzt, theme-getrieben.
+   Stufe 1: dezenter Glow · Stufe 2: +Icon, staerkerer Glow · Stufe 3: +Partikel + Puls. ── */
+.t-hot{display:inline-flex;align-items:center}
+.t-hot--1 .pubg-hot{text-shadow:0 0 5px var(--theme-accent)}
+.t-hot--2 .pubg-hot{text-shadow:0 0 11px var(--theme-accent)}
+.t-hot--3 .pubg-hot{text-shadow:0 0 16px var(--theme-accent);animation:hot-pulse 2s ease-in-out infinite}
+.t-hot--2 .t-hot-mark i{display:none}     /* Stufe 2: Icon, aber keine Partikel */
+/* Stufe 3 im dichten Raster: Partikel mit kleiner Bahn (bleiben in der Zelle, Rand-Regel) */
+.t-stat-grid--compact .t-hot--3 .t-hot-mark i{display:block}
+.t-stat-grid--compact .t-hot--3 .t-hot-mark i:nth-child(1){--dx:-5px;--dy:-6px}
+.t-stat-grid--compact .t-hot--3 .t-hot-mark i:nth-child(2){--dx:5px;--dy:-4px}
+.t-stat-grid--compact .t-hot--3 .t-hot-mark i:nth-child(3){--dx:0px;--dy:-7px}
+@media (prefers-reduced-motion:reduce){.t-hot--3 .pubg-hot{animation:none}}
+
 /* ════ EBENE 2 — der CHARAKTER je Theme (Form, Typo, Deko, Glow) ════ */
 /* body::before-Hintergruende NUR im Dock/Dashboard-Kontext (body.dock) —
    transparente OBS-Overlays bleiben unangetastet. */
