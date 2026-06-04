@@ -224,7 +224,7 @@
         </div>` : ""}
       </div>`;
 
-    wireDetail(base);
+    wireDetail(base, { kind: card.dataset.kind, size: card.dataset.size });
     view.hidden = true;
     detailView.hidden = false;
     document.getElementById("urlBack").focus();
@@ -233,7 +233,7 @@
   }
 
   // ── Events im frisch gerenderten Detail verdrahten ────────
-  function wireDetail(base) {
+  function wireDetail(base, meta) {
     const switchesRoot = document.getElementById("urlSwitches");
     const urlText = document.getElementById("urlText");
     const status = document.getElementById("urlCopyStatus");
@@ -302,11 +302,23 @@
     document.getElementById("btnPreview").addEventListener("click", () => {
       const modal = document.getElementById("previewModal");
       const frame = document.getElementById("previewFrame");
+      const body = modal.querySelector(".dn-modal__body");
       document.getElementById("previewModalTitle").textContent =
         "Vorschau · " + document.getElementById("urlDName").textContent;
-      // dock=1 → Widget bringt seinen eigenen dunklen Grund mit (kein durchscheinendes Weiß)
       const u = buildUrl(base, scope);
-      frame.src = u + (u.includes("?") ? "&" : "?") + "dock=1";
+      const dim = String((meta && meta.size) || "").split(/[×x]/).map(n => parseInt(n.trim(), 10));
+      if (meta && meta.kind === "overlay" && dim[0] && dim[1]) {
+        // Fullscreen-Overlay: in Originalmaßen rendern + per CSS (cqw) auf die
+        // Modal-Breite herunterskalieren statt abgeschnitten 1:1 zu zeigen.
+        body.classList.add("dn-modal__body--overlay");
+        body.style.setProperty("--ov-w", dim[0]);  // berechneter Skalierungs-Token, kein statisches Styling
+        body.style.setProperty("--ov-h", dim[1]);
+        frame.src = u;  // Overlay bringt seinen eigenen Vollbild-Hintergrund mit
+      } else {
+        // Widget: 1:1 mit dock=1 → eigener dunkler Grund statt durchscheinendem Weiß
+        body.classList.remove("dn-modal__body--overlay");
+        frame.src = u + (u.includes("?") ? "&" : "?") + "dock=1";
+      }
       modal.showModal();
     });
   }
