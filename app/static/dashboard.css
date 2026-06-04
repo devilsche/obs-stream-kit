@@ -971,7 +971,10 @@ html[data-theme="aurora"] .dn-ccard,html[data-theme="aurora"] .dn-hero{backdrop-
 .dn-modal__close{background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:var(--r-ctrl);
   display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;cursor:pointer}
 .dn-modal__close .material-symbols-outlined{font-size:20px}
-.dn-modal__close:hover{color:var(--text);border-color:var(--text)}
+/* Eigener Hover/Focus (Secondary-Look) — sonst erbt der Button die generische
+   button:hover-Fuellung (--brand-purple-bright) bzw. den globalen Gold-Focus. */
+.dn-modal__close:hover{background:transparent;color:var(--text);border-color:var(--text)}
+.dn-modal__close:focus-visible{outline-color:var(--brand-purple)}
 /* Ruhiger dunkler Grund (kein Schachbrett, nicht "weiss") — das Widget bringt
    per dock=1 seinen eigenen Hintergrund mit und sitzt mittig darauf. */
 .dn-modal__body{height:min(70vh,600px);background:var(--bg-deeper);display:block}
