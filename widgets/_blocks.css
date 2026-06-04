@@ -89,10 +89,9 @@ html[data-theme="swiss"] .t-hot-mark i{width:9px;height:9px;border-radius:0;back
 .t-hot--1 .pubg-hot{text-shadow:0 0 5px var(--theme-accent)}
 .t-hot--2 .pubg-hot{text-shadow:0 0 11px var(--theme-accent)}
 .t-hot--2 .t-hot-mark i{display:none}     /* Stufe 2: Icon, aber keine Partikel */
-/* Stufe 3 — eigener Top-Look: Orden-Icon + max Glow + Puls (Akzentfarbe, leuchtet
-   in jedem Theme — accent-2 war z.B. bei Swiss schwarz). */
+/* Stufe 3 — Top-Look: Theme-Icon (Flamme/Blitz/Funkeln/…) bleibt, dazu max Glow +
+   Puls + Sparkles. Unterscheidung zu Stufe 2 = Sterne + Pulsieren. */
 .t-hot--3 .pubg-hot{text-shadow:0 0 16px currentColor;animation:hot-pulse 2s ease-in-out infinite}
-.t-hot--3 .t-hot-mark::before{content:"military_tech"}
 /* Stufe-3-Partikel = drehende Sterne (Akzentfarbe). Robust: display erzwingen
    (schlaegt compact/editorial/reduced-motion display:none), nth-of-type (das Azure-
    Tacho-SVG verschiebt sonst die i-Indizes), Animation explizit setzen. */
