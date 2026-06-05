@@ -22,6 +22,7 @@
       background: transparent;
       font-family: 'DM Sans', sans-serif;
     }
+    body.dock { background: linear-gradient(180deg, #1a0d2a 0%, #0a0510 100%) !important; }
 
     @keyframes bannerGlow {
       0%, 100% { box-shadow: 0 0 14px rgba(242,183,5,0.35), 0 0 32px rgba(242,183,5,0.2), 0 0 0 1px rgba(242,183,5,0.3) inset; }
@@ -165,6 +166,7 @@
   <script>
     (function () {
       var params = new URLSearchParams(window.location.search);
+      if (params.get('dock') === '1') document.body.classList.add('dock');
       var title = params.get('title') || 'Tip Goal';
       var current = parseFloat((params.get('current') || '0').replace(',', '.')) || 0;
       var goal    = parseFloat((params.get('goal')    || '100').replace(',', '.')) || 100;

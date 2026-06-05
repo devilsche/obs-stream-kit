@@ -70,10 +70,12 @@ WIDGET_SWITCHES = {
         {"key": "durationMs", "label": "Dauer (ms)", "type": "number", "default": "8000", "min": 1000},
     ],
     "tipgoal-banner.html": [
-        {"key": "title",    "label": "Titel",   "type": "text", "default": "Tip Goal", "placeholder": "Tip Goal"},
-        {"key": "current",  "label": "Aktuell", "type": "text", "default": "0",        "placeholder": "0"},
-        {"key": "goal",     "label": "Ziel",    "type": "text", "default": "100",      "placeholder": "100"},
-        {"key": "currency", "label": "Währung", "type": "text", "default": "€",        "placeholder": "€"},
+        {"key": "title",    "label": "Titel",        "type": "text",   "default": "Tip Goal", "placeholder": "Tip Goal"},
+        {"key": "current",  "label": "Aktuell",      "type": "text",   "default": "0",        "placeholder": "0"},
+        {"key": "goal",     "label": "Ziel",         "type": "text",   "default": "100",      "placeholder": "100"},
+        {"key": "currency", "label": "Währung",      "type": "text",   "default": "€",        "placeholder": "€"},
+        {"key": "dock",     "label": "Hintergrund",  "type": "select", "default": "0",
+         "options": [["0", "Transparent (OBS)"], ["1", "Mit Hintergrund (Dock)"]]},
     ],
 }
 
