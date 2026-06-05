@@ -3,10 +3,11 @@
 
 {# Eine Source-Karte fuers Grid. switches/params als Listen → im Markup als
    HTML-sicheres JSON (tojson escaped < > & ' → sicher im single-quote-Attr). #}
-{% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[], chrome_preview=False, hint='') %}
+{% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[], chrome_preview=False, hint='', tab='') %}
 <button type="button" class="url-card"
         data-kind="{{ kind }}" data-label="{{ label }}" data-cat="{{ cat }}"
         data-path="{{ path }}" data-base="{{ base }}"
+        {% if tab %}data-tab="{{ tab }}"{% endif %}
         {% if size %}data-size="{{ size }}"{% endif %}
         {% if desc %}data-desc="{{ desc }}"{% endif %}
         {% if hint %}data-hint="{{ hint }}"{% endif %}
@@ -59,87 +60,44 @@
                 aria-selected="false" tabindex="-1" aria-controls="urlpanel-transition">Transition<span class="url-tabs__cnt">{{ transitions|length }}</span></button>
       </div>
 
-      {# ── Overlays ── #}
-      <div class="url-tabpanel" id="urlpanel-overlays" role="tabpanel" aria-labelledby="urltab-overlays">
-        <div class="url-grid">
-          {% for o in overlays %}
-          {{ src_card('overlay', 'Overlay', o.label,
-                      overlay_base ~ '/s/' ~ token ~ '/overlays/' ~ o.file, 'overlays/' ~ o.file,
-                      o.size, o.desc, [], (o.params or [])) }}
-          {% endfor %}
-        </div>
-      </div>
-
-      {# ── Widgets ── #}
-      <div class="url-tabpanel" id="urlpanel-widgets" role="tabpanel" aria-labelledby="urltab-widgets" hidden>
-        <div class="url-grid">
-          {% for cat, label, desc, path, switches, hint in widgets %}
-          {{ src_card('widget', cat, label,
-                      base_url ~ '/s/' ~ token ~ '/widgets/' ~ path, path,
-                      '', desc, switches, [], False, hint) }}
-          {% endfor %}
-        </div>
-      </div>
-
-      {# ── Look & Decor (liegen unter widgets/) ── #}
-      <div class="url-tabpanel" id="urlpanel-decor" role="tabpanel" aria-labelledby="urltab-decor" hidden>
-        <div class="url-grid">
-          {% for d in decor %}
-          {{ src_card('overlay', 'Decor', d.label,
-                      base_url ~ '/s/' ~ token ~ '/widgets/' ~ d.file, d.file,
-                      d.size, d.desc, (d.switches or []), (d.params or [])) }}
-          {% endfor %}
-        </div>
-      </div>
-
-      {# ── Alerts ── #}
-      <div class="url-tabpanel" id="urlpanel-alerts" role="tabpanel" aria-labelledby="urltab-alerts" hidden>
-        <div class="url-grid">
-          {% for a in alerts %}
-          {{ src_card('overlay', 'Alert', a.label,
-                      base_url ~ '/s/' ~ token ~ '/alerts/' ~ a.file, 'alerts/' ~ a.file,
-                      a.size, a.desc, (a.switches or []), (a.params or [])) }}
-          {% endfor %}
-        </div>
-      </div>
-
-      {# ── Memes (Stinger-Effekte: Kamehameha, Over 9000, Picard …) ── #}
-      <div class="url-tabpanel" id="urlpanel-memes" role="tabpanel" aria-labelledby="urltab-memes" hidden>
-        <div class="url-grid">
-          {% for s in stingers %}
-          {{ src_card('overlay', 'Meme', s.label,
-                      base_url ~ '/s/' ~ token ~ '/stingers/' ~ s.file, 'stingers/' ~ s.file,
-                      s.size, s.desc, (s.switches or []), (s.params or [])) }}
-          {% endfor %}
-        </div>
-      </div>
-
-      {# ── Effects ── #}
-      <div class="url-tabpanel" id="urlpanel-effects" role="tabpanel" aria-labelledby="urltab-effects" hidden>
-        <div class="url-grid">
-          {% for e in effects %}
-          {{ src_card('overlay', 'Effect', e.label,
-                      base_url ~ '/s/' ~ token ~ '/effects/' ~ e.file, 'effects/' ~ e.file,
-                      e.size, e.desc, (e.switches or []), (e.params or [])) }}
-          {% endfor %}
-        </div>
-      </div>
-
-      {# ── Transition (Stinger-Player) ── #}
-      <div class="url-tabpanel" id="urlpanel-transition" role="tabpanel" aria-labelledby="urltab-transition" hidden>
-        <div class="url-grid">
-          {% for t in transitions %}
-          {{ src_card('overlay', 'Transition', t.label,
-                      base_url ~ '/s/' ~ token ~ '/transitions/' ~ t.file, 'transitions/' ~ t.file,
-                      t.size, t.desc,
-                      (t.switches or []), (t.params or []),
-                      t.chrome_preview|default(False)) }}
-          {% endfor %}
-        </div>
-      </div>
-
-      <div id="urlSearchResults" hidden>
-        <div class="url-grid" id="urlSearchGrid"></div>
+      {# ── Ein Grid — alle Karten mit data-tab ── #}
+      <div class="url-grid" id="urlGrid">
+        {% for o in overlays %}
+        {{ src_card('overlay','Overlay',o.label,
+                    overlay_base~'/s/'~token~'/overlays/'~o.file,'overlays/'~o.file,
+                    o.size,o.desc,[],o.params or [],False,'','overlays') }}
+        {% endfor %}
+        {% for cat,label,desc,path,switches,hint in widgets %}
+        {{ src_card('widget',cat,label,
+                    base_url~'/s/'~token~'/widgets/'~path,path,
+                    '',desc,switches,[],False,hint,'widgets') }}
+        {% endfor %}
+        {% for d in decor %}
+        {{ src_card('overlay','Decor',d.label,
+                    base_url~'/s/'~token~'/widgets/'~d.file,d.file,
+                    d.size,d.desc,d.switches or [],d.params or [],False,'','decor') }}
+        {% endfor %}
+        {% for a in alerts %}
+        {{ src_card('overlay','Alert',a.label,
+                    base_url~'/s/'~token~'/alerts/'~a.file,'alerts/'~a.file,
+                    a.size,a.desc,a.switches or [],a.params or [],False,'','alerts') }}
+        {% endfor %}
+        {% for s in stingers %}
+        {{ src_card('overlay','Meme',s.label,
+                    base_url~'/s/'~token~'/stingers/'~s.file,'stingers/'~s.file,
+                    s.size,s.desc,s.switches or [],s.params or [],False,'','memes') }}
+        {% endfor %}
+        {% for e in effects %}
+        {{ src_card('overlay','Effect',e.label,
+                    base_url~'/s/'~token~'/effects/'~e.file,'effects/'~e.file,
+                    e.size,e.desc,e.switches or [],e.params or [],False,'','effects') }}
+        {% endfor %}
+        {% for t in transitions %}
+        {{ src_card('overlay','Transition',t.label,
+                    base_url~'/s/'~token~'/transitions/'~t.file,'transitions/'~t.file,
+                    t.size,t.desc,t.switches or [],t.params or [],
+                    t.chrome_preview|default(False),'','transition') }}
+        {% endfor %}
       </div>
       <p class="url-empty" id="urlEmpty" hidden>No source found.</p>
     </section>
@@ -771,9 +729,12 @@
     });
   }
 
-  // ── Sub-Tabs ──────────────────────────────────────────────
-  const tabBar = document.querySelector(".url-tabs");
-  const tabs = Array.from(tabBar.querySelectorAll("[role=tab]"));
+  // ── Ein Grid — alle Karten mit data-tab ──────────────────
+  const grid    = document.getElementById("urlGrid");
+  const allCards = Array.from(grid.querySelectorAll(".url-card"));
+  const tabBar  = document.querySelector(".url-tabs");
+  const tabs    = Array.from(tabBar.querySelectorAll("[role=tab]"));
+
   function selectTab(name) {
     currentTab = name;
     tabs.forEach(t => {
@@ -781,26 +742,23 @@
       t.setAttribute("aria-selected", on ? "true" : "false");
       t.tabIndex = on ? 0 : -1;
     });
-    document.querySelectorAll(".url-tabpanel").forEach(p => {
-      p.hidden = p.id !== "urlpanel-" + name;
-    });
-    applyFilter();
+    allCards.forEach(c => c.hidden = c.dataset.tab !== name);
+    if (filter) filter.value = "";
+    if (emptyMsg) emptyMsg.hidden = true;
   }
   tabs.forEach(t => t.addEventListener("click", () => selectTab(t.dataset.tab)));
   tabBar.addEventListener("keydown", e => {
-    if (!["ArrowRight", "ArrowLeft"].includes(e.key)) return;
+    if (!["ArrowRight","ArrowLeft"].includes(e.key)) return;
     e.preventDefault();
     const i = tabs.findIndex(t => t.getAttribute("aria-selected") === "true");
-    const n = e.key === "ArrowRight" ? (i + 1) % tabs.length : (i - 1 + tabs.length) % tabs.length;
-    selectTab(tabs[n].dataset.tab);
-    tabs[n].focus();
+    const n = e.key === "ArrowRight" ? (i+1)%tabs.length : (i-1+tabs.length)%tabs.length;
+    selectTab(tabs[n].dataset.tab); tabs[n].focus();
   });
 
   // ── Card → Detail ─────────────────────────────────────────
-  document.querySelectorAll(".url-card").forEach(card => {
+  allCards.forEach(card => {
     card.addEventListener("click", () => {
-      const panel = card.closest(".url-tabpanel");
-      if (panel) currentTab = panel.id.replace("urlpanel-", "");
+      if (card.dataset.tab) currentTab = card.dataset.tab;
       openDetail(card);
     });
   });
@@ -824,97 +782,34 @@
     previewModal.addEventListener("close", unload);
   }
 
-  // ── Karten alphabetisch sortieren (je Bereich) ───────────
-  document.querySelectorAll(".url-grid").forEach(grid => {
-    Array.from(grid.children)
-      .sort((a, b) => (a.dataset.label || "").localeCompare(b.dataset.label || "", "de"))
-      .forEach(c => grid.appendChild(c));
-  });
+  // ── Karten einmalig alphabetisch sortieren ───────────────
+  allCards.sort((a,b) => (a.dataset.label||"").localeCompare(b.dataset.label||""))
+          .forEach(c => grid.appendChild(c));
 
-  // ── Filter — global über alle Tabs ───────────────────────
-  const filter        = document.getElementById("urlFilter");
-  const emptyMsg      = document.getElementById("urlEmpty");
-  const searchResults = document.getElementById("urlSearchResults");
-  const searchGrid    = document.getElementById("urlSearchGrid");
-  const allPanels     = Array.from(document.querySelectorAll(".url-tabpanel"));
-  const allTabs       = Array.from(document.querySelectorAll(".url-tabs [role='tab']"));
-
-  function restoreNormal() {
-    // Clones aus dem Suchgrid entfernen, Panels zurücksetzen
-    if (searchGrid) searchGrid.innerHTML = "";
-    if (searchResults) searchResults.hidden = true;
-    allPanels.forEach(p => { p.querySelectorAll(".url-card").forEach(c => c.hidden = false); });
-    const activeTab = allTabs.find(t => t.getAttribute("aria-selected") === "true");
-    const activeId  = activeTab && activeTab.getAttribute("aria-controls");
-    allPanels.forEach(p => p.hidden = p.id !== activeId);
-    if (emptyMsg) emptyMsg.hidden = true;
-  }
+  // ── Filter ────────────────────────────────────────────────
+  const filter  = document.getElementById("urlFilter");
+  const emptyMsg = document.getElementById("urlEmpty");
 
   function applyFilter() {
-    if (!filter) return;
     const q = (filter.value || "").toLowerCase().trim();
-    if (q.length < 3) { restoreNormal(); return; }
+    if (q.length < 3) { selectTab(currentTab); return; }
 
-    // Treffer aus allen Panels sammeln + alphabetisch sortieren
-    const hits = [];
-    allPanels.forEach(p => {
-      p.querySelectorAll(".url-card").forEach(card => {
-        const hay = ((card.dataset.label || "") + " " + (card.dataset.cat || "") + " " + (card.dataset.path || "") + " " + (card.dataset.desc || "")).toLowerCase();
-        if (hay.includes(q)) hits.push({ card, panel: p });
-      });
+    const hits = allCards.filter(c => {
+      const hay = ((c.dataset.label||"")+" "+(c.dataset.cat||"")+" "+(c.dataset.desc||"")+" "+(c.dataset.path||"")).toLowerCase();
+      return hay.includes(q);
     });
-    hits.sort((a, b) => (a.card.dataset.label || "").localeCompare(b.card.dataset.label || ""));
 
-    if (hits.length === 0) {
-      restoreNormal();
-      const activeTab = allTabs.find(t => t.getAttribute("aria-selected") === "true");
-      const activeId  = activeTab && activeTab.getAttribute("aria-controls");
-      allPanels.forEach(p => p.hidden = p.id !== activeId);
-      if (emptyMsg) emptyMsg.hidden = false;
-      return;
-    }
+    allCards.forEach(c => c.hidden = !hits.includes(c));
 
-    const panels = new Set(hits.map(h => h.panel));
+    const tabsHit = new Set(hits.map(c => c.dataset.tab));
+    tabs.forEach(t => {
+      const on = tabsHit.size === 1 && t.dataset.tab === [...tabsHit][0];
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      t.tabIndex = on ? 0 : -1;
+    });
+    if (tabsHit.size === 1) currentTab = [...tabsHit][0];
 
-    if (panels.size === 1) {
-      // Nur ein Tab — Tab aktivieren, normal anzeigen
-      if (searchGrid) searchGrid.innerHTML = "";
-      if (searchResults) searchResults.hidden = true;
-      const targetPanel = [...panels][0];
-      const targetTab   = allTabs.find(t => t.getAttribute("aria-controls") === targetPanel.id);
-      allPanels.forEach(p => { p.hidden = p !== targetPanel; });
-      // Karten alphabetisch im Grid neu ordnen
-      const grid = targetPanel.querySelector(".url-grid");
-      if (grid) {
-        hits.filter(h => h.panel === targetPanel)
-            .forEach(({ card }) => { card.hidden = false; grid.appendChild(card); });
-        targetPanel.querySelectorAll(".url-card").forEach(c => {
-          if (!hits.some(h => h.card === c)) c.hidden = true;
-        });
-      }
-      allTabs.forEach(t => {
-        const sel = t === targetTab;
-        t.setAttribute("aria-selected", sel ? "true" : "false");
-        t.setAttribute("tabindex",       sel ? "0" : "-1");
-      });
-      if (emptyMsg) emptyMsg.hidden = true;
-    } else {
-      // Mehrere Tabs — alle Treffer in flachen Grid klonen
-      allPanels.forEach(p => p.hidden = true);
-      allTabs.forEach(t => { t.setAttribute("aria-selected","false"); t.setAttribute("tabindex","-1"); });
-      if (searchGrid) {
-        searchGrid.innerHTML = "";
-        hits.forEach(({ card }) => {
-          const clone = card.cloneNode(true);
-          clone.hidden = false;
-          // Klick auf Klon → originale Karte klicken (behält Event-Listener)
-          clone.addEventListener("click", () => card.click());
-          searchGrid.appendChild(clone);
-        });
-      }
-      if (searchResults) searchResults.hidden = false;
-      if (emptyMsg) emptyMsg.hidden = true;
-    }
+    if (emptyMsg) emptyMsg.hidden = hits.length > 0;
   }
 
   if (filter) filter.addEventListener("input", applyFilter);
@@ -926,8 +821,7 @@
     const card = Array.from(document.querySelectorAll(".url-card"))
       .find(c => c.dataset.path === path);
     if (card) {
-      const panel = card.closest(".url-tabpanel");
-      if (panel) currentTab = panel.id.replace("urlpanel-", "");
+      if (card.dataset.tab) currentTab = card.dataset.tab;
       openDetail(card);
     }
   }
