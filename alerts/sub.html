@@ -7,6 +7,7 @@
   <!-- Theme-Fundament: Tokens (--theme-*) + Alias. data-theme kommt server-
        injiziert aufs <html> (sonst Entry-Default). -->
   <link rel="stylesheet" href="../widgets/_theme.css">
+  <link rel="stylesheet" href="../widgets/_blocks.css">
   <style>
     @font-face {
       font-family: 'DM Sans';
@@ -179,13 +180,13 @@
     .tier-badge--1 {
       background: color-mix(in srgb, var(--color-purple-glow) 60%, transparent);
       border: 2px solid var(--color-accent);
-      color: var(--color-text);
+      color: var(--color-accent-2, var(--color-text));
       text-shadow: 0 0 10px color-mix(in srgb, var(--color-accent) 80%, transparent);
     }
     .tier-badge--2 {
       background: color-mix(in srgb, var(--color-purple-glow) 70%, transparent);
       border: 2px solid color-mix(in srgb, var(--color-accent) 70%, white);
-      color: color-mix(in srgb, var(--color-accent) 35%, white);
+      color: var(--color-accent-2, var(--color-text));
       text-shadow: 0 0 12px color-mix(in srgb, var(--color-accent) 90%, transparent);
     }
     .tier-badge--3 {
@@ -201,11 +202,12 @@
       font-size: 36px;
       font-weight: 900;
       font-family: var(--theme-font-display, 'DM Sans', sans-serif);
-      color: var(--color-text);
+      color: var(--color-accent-2, var(--color-text));
       margin-bottom: 16px;
       opacity: 0;
       animation: fadeIn 0.4s ease 0.3s forwards;
     }
+    .username .pubg-hot { color: var(--color-accent-2, var(--color-text)) !important; }
 
     .divider {
       width: 80px;
@@ -248,7 +250,7 @@
     var message  = params.get('message')  || 'Danke für den Sub!';
     var tier     = params.get('tier') || '1';
 
-    document.querySelector('.username').textContent = username;
+    document.querySelector(".username").innerHTML = "<span class=\"t-hot t-hot--3\"><span class=\"pubg-hot\">" + username + "</span><span class=\"t-hot-mark t-hot-mark--after\" aria-hidden=\"true\"><i></i><i></i><i></i><i></i><i></i></span></span>";
     document.querySelector('.alert-message').textContent = message;
 
     // Tier normalisieren: "1000"→"1", " 3"→"3", "Tier 2"→"2", "Prime"→"prime"
