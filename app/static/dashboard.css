@@ -978,6 +978,11 @@ html[data-theme="aurora"] .dn-ccard,html[data-theme="aurora"] .dn-hero{backdrop-
 /* Ruhiger dunkler Grund (kein Schachbrett, nicht "weiss") — das Widget bringt
    per dock=1 seinen eigenen Hintergrund mit und sitzt mittig darauf. */
 .dn-modal__body{height:min(82vh,820px);background:var(--bg-deeper);display:block}
+.dn-modal__body--checker{
+  background-color:#e8e8e8 !important;
+  background-image:repeating-conic-gradient(#d0d0d0 0% 25%,#e8e8e8 0% 50%) !important;
+  background-size:20px 20px !important;
+}
 .dn-modal__body iframe{width:100%;height:100%;border:0;display:block;background:transparent}
 .url-card-primary__url{border-left:2px solid var(--brand-gold)}
 .url-cat[open] .url-cat__title{color:var(--brand-gold)}
@@ -1113,7 +1118,10 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
    in Originalgroesse abgeschnitten zu zeigen: das iframe rendert in Originalmasse
    (--ov-w/--ov-h, per JS aus der Source-Groesse), Container-Query-Einheit (cqw)
    skaliert es auf die Modal-Breite. Reines Verkleinern → kein Motion. */
-.dn-modal__body--overlay{padding:0;height:auto;max-height:82vh;display:block;overflow:hidden;background:#000;
+.dn-modal__body--overlay{padding:0;height:auto;max-height:82vh;display:block;overflow:hidden;
+  background-color:#e8e8e8;
+  background-image:repeating-conic-gradient(#d0d0d0 0% 25%,#e8e8e8 0% 50%);
+  background-size:20px 20px;
   container-type:inline-size;aspect-ratio:var(--ov-w,1920)/var(--ov-h,1080)}
 .dn-modal__body--overlay iframe{width:calc(var(--ov-w,1920)*1px);height:calc(var(--ov-h,1080)*1px);
   transform-origin:0 0;transform:scale(calc(100cqw / (var(--ov-w,1920)*1px)))}

@@ -705,15 +705,20 @@
       const u = buildUrl(base, scope);
       const dim = String((meta && meta.size) || "").split(/[×x]/).map(n => parseInt(n.trim(), 10));
       if (meta && meta.kind === "overlay" && dim[0] && dim[1]) {
-        // Fullscreen-Source: in Originalmaßen rendern + per CSS (cqw) auf die
-        // Modal-Breite herunterskalieren statt abgeschnitten 1:1 zu zeigen.
+        // Fullscreen transparent source: scaled down, checkerboard background.
         body.classList.add("dn-modal__body--overlay");
-        body.style.setProperty("--ov-w", dim[0]);  // berechneter Skalierungs-Token, kein statisches Styling
+        body.classList.remove("dn-modal__body--checker");
+        body.style.setProperty("--ov-w", dim[0]);
         body.style.setProperty("--ov-h", dim[1]);
-        frame.src = u;  // Source bringt ihren eigenen Vollbild-Hintergrund mit
-      } else {
-        // Widget: 1:1 mit dock=1 → eigener dunkler Grund statt durchscheinendem Weiß
+        frame.src = u;
+      } else if (meta && meta.kind === "overlay") {
+        // Compact transparent source (no fixed dimensions): checkerboard, no dock.
         body.classList.remove("dn-modal__body--overlay");
+        body.classList.add("dn-modal__body--checker");
+        frame.src = u;
+      } else {
+        // Widget: dock=1 adds its own dark background.
+        body.classList.remove("dn-modal__body--overlay", "dn-modal__body--checker");
         frame.src = u + (u.includes("?") ? "&" : "?") + "dock=1";
       }
       modal.showModal();
