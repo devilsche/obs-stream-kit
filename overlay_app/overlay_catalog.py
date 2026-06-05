@@ -124,6 +124,8 @@ TRANSITIONS = [
         "chrome_preview": False,
         "switches": [
             {"key": "name",   "label": "Name",      "type": "text",   "default": "Luke", "placeholder": "e.g. Luke"},
+            {"key": "colors", "label": "Colors",    "type": "select", "default": "default",
+             "options": [["default", "Default (warm forest)"], ["theme", "Theme colors"]]},
             {"key": "font",   "label": "Font",      "type": "select", "default": "", "options": _PET_FONTS},
             {"key": "kicker", "label": "Nickname",  "type": "text",   "default": "✦ Heartbreaker ✦", "placeholder": "e.g. ✦ Heartbreaker ✦"},
             {"key": "img",    "label": "Image URL", "type": "text",   "default": "",

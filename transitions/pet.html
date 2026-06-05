@@ -27,9 +27,16 @@
       font-family: 'DM Sans', sans-serif;
     }
 
+    /* Default: warm forest gold */
     :root {
+      --pet-accent:  #f2b705;
+      --pet-primary: #3c5520;
+    }
+    /* Theme mode: follow active theme tokens */
+    html.pet-theme {
       --pet-accent:  var(--theme-accent,  #f2b705);
       --pet-primary: var(--theme-primary, #3c5520);
+    }
       --kicker-in:   0.40s;
       --pet-in:      0.30s;
       --name-in:     0.55s;
@@ -256,6 +263,9 @@
       var params = new URLSearchParams(window.location.search);
 
       /* ── Parameter auslesen ── */
+      if (params.get('colors') === 'theme')
+        document.documentElement.classList.add('pet-theme');
+
       var petName    = params.get('name')   || 'Luke';
       var fontParam  = params.get('font')   || '';
       var kickerText = params.get('kicker') || '✦ Herzensbrecher ✦';
