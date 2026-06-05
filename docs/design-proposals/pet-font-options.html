@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pet Stinger — Font Candidates</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Dancing+Script:wght@400;700&family=Great+Vibes&family=Satisfy&family=Sacramento&family=Lobster&family=Lobster+Two:ital@1&family=Caveat:wght@700&family=Kaushan+Script&family=Courgette&family=Yellowtail&family=Allura&family=Cookie&family=Merienda:wght@700&display=swap" rel="stylesheet">
+  <style>
+    :root { --accent: #f2b705; --bg: #0a0510; --card: rgba(255,255,255,0.04); --border: rgba(242,183,5,0.2); }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: #cfd6e0; font-family: system-ui, sans-serif; padding: 40px 32px 80px; min-height: 100vh; }
+    h1 { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+    .hint { font-size: 13px; color: #7a8393; margin-bottom: 32px; }
+
+    .name-input-wrap { margin-bottom: 32px; display: flex; align-items: center; gap: 12px; }
+    .name-input-wrap label { font-size: 13px; color: #9aa3b3; white-space: nowrap; }
+    .name-input-wrap input {
+      background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+      color: #fff; padding: 8px 14px; border-radius: 6px; font-size: 15px;
+      width: 280px; outline: none;
+    }
+    .name-input-wrap input:focus { border-color: var(--accent); }
+
+    .row {
+      display: flex; align-items: center; gap: 24px;
+      padding: 22px 28px; border-bottom: 1px solid rgba(255,255,255,0.07);
+      cursor: pointer; transition: background .15s;
+    }
+    .row:hover { background: rgba(242,183,5,0.05); }
+    .row.selected { background: rgba(242,183,5,0.08); border-left: 3px solid var(--accent); padding-left: 25px; }
+    .label { flex: 0 0 180px; font-size: 13px; color: #8a93a3; line-height: 1.6; }
+    .label b { color: #fff; font-size: 14px; display: block; margin-bottom: 2px; }
+    .label .css { color: var(--accent); font-family: ui-monospace, monospace; font-size: 11px; }
+    .preview {
+      font-size: 72px; line-height: 1; color: var(--accent);
+      text-shadow: 0 0 20px rgba(242,183,5,0.55), 0 0 50px rgba(255,160,60,0.3);
+      white-space: nowrap;
+    }
+
+    .selected-info {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: rgba(10,5,16,0.95); border-top: 1px solid var(--border);
+      padding: 14px 32px; display: flex; align-items: center; gap: 16px;
+      backdrop-filter: blur(8px);
+    }
+    .selected-info .sel-label { font-size: 13px; color: #7a8393; }
+    .selected-info .sel-name { font-size: 16px; color: #fff; font-weight: 600; }
+    .selected-info .sel-value { font-family: ui-monospace, monospace; font-size: 12px; color: var(--accent); background: rgba(242,183,5,0.1); padding: 3px 10px; border-radius: 4px; }
+    .copy-btn {
+      margin-left: auto; background: rgba(242,183,5,0.15); border: 1px solid var(--accent);
+      color: var(--accent); padding: 7px 18px; border-radius: 6px; cursor: pointer;
+      font-size: 13px; font-weight: 600;
+    }
+    .copy-btn:hover { background: rgba(242,183,5,0.25); }
+  </style>
+</head>
+<body>
+  <h1>Pet Stinger — Font Candidates</h1>
+  <p class="hint">Click a row to select · the font value is shown at the bottom and can be copied directly into the URL picker.</p>
+
+  <div class="name-input-wrap">
+    <label for="nameInput">Preview name:</label>
+    <input id="nameInput" type="text" value="Luke" placeholder="e.g. Luke">
+  </div>
+
+  <div id="fontList"></div>
+
+  <div class="selected-info" id="selInfo">
+    <span class="sel-label">Selected:</span>
+    <span class="sel-name" id="selName">—</span>
+    <span class="sel-value" id="selValue">—</span>
+    <button class="copy-btn" id="copyBtn">Copy font value</button>
+  </div>
+
+  <script>
+    const FONTS = [
+      { name: "Pacifico",       css: "Pacifico",              weight: 400, desc: "rounded & fun" },
+      { name: "Dancing Script", css: "Dancing Script",         weight: 700, desc: "elegant cursive" },
+      { name: "Great Vibes",    css: "Great Vibes",            weight: 400, desc: "romantic flourish" },
+      { name: "Satisfy",        css: "Satisfy",               weight: 400, desc: "casual script" },
+      { name: "Sacramento",     css: "Sacramento",             weight: 400, desc: "thin & airy" },
+      { name: "Lobster",        css: "Lobster",               weight: 400, desc: "bold & playful" },
+      { name: "Lobster Two",    css: "Lobster Two",           weight: 400, style: "italic", desc: "italic bold variant" },
+      { name: "Caveat",         css: "Caveat",                weight: 700, desc: "handwritten feel" },
+      { name: "Kaushan Script", css: "Kaushan Script",        weight: 400, desc: "confident script" },
+      { name: "Courgette",      css: "Courgette",             weight: 400, desc: "soft & rounded" },
+      { name: "Yellowtail",     css: "Yellowtail",            weight: 400, desc: "retro brush" },
+      { name: "Allura",         css: "Allura",                weight: 400, desc: "delicate flourish" },
+      { name: "Cookie",         css: "Cookie",                weight: 400, desc: "sweet & friendly" },
+      { name: "Merienda",       css: "Merienda",              weight: 700, desc: "bold serif-script" },
+    ];
+
+    const list = document.getElementById("fontList");
+    const nameInput = document.getElementById("nameInput");
+    const selName = document.getElementById("selName");
+    const selValue = document.getElementById("selValue");
+    let selectedRow = null;
+
+    function buildRows() {
+      list.innerHTML = "";
+      FONTS.forEach((f, i) => {
+        const row = document.createElement("div");
+        row.className = "row";
+        row.dataset.css = f.css;
+        row.innerHTML = `
+          <div class="label">
+            <b>${i + 1} · ${f.name}</b>
+            <span>${f.desc}</span>
+            <span class="css">${f.css}${f.weight !== 400 ? " " + f.weight : ""}${f.style ? " italic" : ""}</span>
+          </div>
+          <div class="preview" style="font-family:'${f.css}',cursive;font-weight:${f.weight || 400};${f.style ? "font-style:italic;" : ""}"></div>`;
+        row.addEventListener("click", () => selectRow(row, f));
+        list.appendChild(row);
+      });
+      updatePreviews();
+    }
+
+    function updatePreviews() {
+      const name = nameInput.value.trim() || "Preview";
+      list.querySelectorAll(".preview").forEach(el => el.textContent = name);
+    }
+
+    function selectRow(row, f) {
+      if (selectedRow) selectedRow.classList.remove("selected");
+      row.classList.add("selected");
+      selectedRow = row;
+      selName.textContent = f.name;
+      selValue.textContent = f.css;
+    }
+
+    document.getElementById("copyBtn").addEventListener("click", () => {
+      const val = selValue.textContent;
+      if (val === "—") return;
+      navigator.clipboard.writeText(val).then(() => {
+        const btn = document.getElementById("copyBtn");
+        btn.textContent = "Copied!";
+        setTimeout(() => btn.textContent = "Copy font value", 1400);
+      });
+    });
+
+    nameInput.addEventListener("input", updatePreviews);
+    buildRows();
+  </script>
+</body>
+</html>
