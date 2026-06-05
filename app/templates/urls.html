@@ -747,7 +747,7 @@
           // Force body to shrink to natural content width
           const shrink = doc.createElement('style');
           shrink.id = 'preview-shrink';
-          shrink.textContent = 'html,body{width:max-content!important;min-width:0!important;white-space:nowrap!important;}';
+          shrink.textContent = 'html,body{width:max-content!important;min-width:0!important;}';
           if (!doc.getElementById('preview-shrink')) doc.head.appendChild(shrink);
           // Read natural dimensions after layout
           requestAnimationFrame(() => {
