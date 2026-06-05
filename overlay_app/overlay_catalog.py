@@ -79,8 +79,8 @@ ALERTS = [
 DECOR = [
     {"key": "logo",           "label": "Logo",            "file": "logo.html",           "size": "1920×1080",
      "desc": "Logo overlay.",                          "params": [], "switches": []},
-    {"key": "webcam-frame",   "label": "Webcam Frame",    "file": "webcam-frame.html",   "size": "1920×1080",
-     "desc": "Decorative frame around the camera.",    "params": [], "switches": [
+    {"key": "webcam-frame",   "label": "Webcam Frame",    "file": "webcam-frame.html",   "size": "",
+     "desc": "Decorative frame around the camera. Canvas = camera size + 100px padding on each side.", "params": [], "switches": [
          {"key": "colors", "label": "Colors", "type": "select", "default": "default",
           "options": [["default", "Default (purple/gold)"], ["theme", "Theme colors"]]},
          {"key": "width",  "label": "Width",  "type": "number", "default": "400", "min": 100},

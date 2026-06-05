@@ -329,7 +329,7 @@
         </div>
         ${infoBits.length ? `<div class="url-dbox url-infobox">
           <h2>Info</h2>
-          <div class="url-param url-param--info">${infoBits.join("<br>")}</div>
+          <div class="url-param url-param--info" id="urlSizeInfo">${infoBits.join("<br>")}</div>
         </div>` : ""}
       </div>`;
 
@@ -610,6 +610,31 @@
       });
     }
 
+    // Dynamische Größe für Widgets mit width/height-Switches (z.B. webcam-frame)
+    const wGrp = switchesRoot && switchesRoot.querySelector('[data-param="width"]');
+    const hGrp = switchesRoot && switchesRoot.querySelector('[data-param="height"]');
+    if (wGrp && hGrp) {
+      const wInp = wGrp.querySelector(".sw-input");
+      const hInp = hGrp.querySelector(".sw-input");
+      const sizeEl = document.getElementById("urlSizeInfo");
+      function updateSizeInfo() {
+        const w = (parseInt(wInp?.value) || 400) + 100;
+        const h = (parseInt(hInp?.value) || 225) + 100;
+        if (sizeEl) sizeEl.textContent = w + "×" + h + " px · transparent";
+        meta._dynW = w; meta._dynH = h;
+      }
+      // 16:9 coupling
+      if (wInp) wInp.addEventListener("input", () => {
+        if (hInp) hInp.value = Math.round(parseInt(wInp.value || "400") * 9 / 16);
+        updateSizeInfo(); refresh();
+      });
+      if (hInp) hInp.addEventListener("input", () => {
+        if (wInp) wInp.value = Math.round(parseInt(hInp.value || "225") * 16 / 9);
+        updateSizeInfo(); refresh();
+      });
+      updateSizeInfo();
+    }
+
     // URL einmal mit den (ggf. aus localStorage geladenen) Werten aktualisieren
     refresh();
 
@@ -703,7 +728,9 @@
       document.getElementById("previewModalTitle").textContent =
         "Vorschau · " + document.getElementById("urlDName").textContent;
       const u = buildUrl(base, scope);
-      const dim = String((meta && meta.size) || "").split(/[×x]/).map(n => parseInt(n.trim(), 10));
+      const dim = meta._dynW
+        ? [meta._dynW, meta._dynH]
+        : String((meta && meta.size) || "").split(/[×x]/).map(n => parseInt(n.trim(), 10));
       const isOverlay = meta && meta.kind === "overlay";
       body.classList.toggle("dn-modal__body--overlay", !!(isOverlay && dim[0] && dim[1]));
       body.classList.remove("dn-modal__body--checker");
