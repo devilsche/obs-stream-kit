@@ -39,7 +39,7 @@
 
       <div class="url-search">
         <span class="material-symbols-outlined" aria-hidden="true">search</span>
-        <input type="search" id="urlFilter" placeholder="Search all sources…" aria-label="Search all sources" autocomplete="off">
+        <input type="search" id="urlFilter" placeholder="Search sources… e.g. &quot;career&quot;, &quot;sub&quot;, &quot;overlay&quot;" aria-label="Search all sources" autocomplete="off">
       </div>
 
       <div class="url-tabs" role="tablist" aria-label="Source-Typen">
@@ -853,7 +853,7 @@
   function applyFilter() {
     if (!filter) return;
     const q = (filter.value || "").toLowerCase().trim();
-    if (!q) { restoreNormal(); return; }
+    if (q.length < 3) { restoreNormal(); return; }
 
     // Treffer aus allen Panels sammeln + alphabetisch sortieren
     const hits = [];
