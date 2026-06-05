@@ -8,6 +8,7 @@
        injiziert aufs <html> (sonst Entry-Default). -->
   <link rel="stylesheet" href="../widgets/_theme.css">
   <link rel="stylesheet" href="../widgets/_blocks.css">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
   <style>
     @font-face {
       font-family: 'DM Sans';
@@ -252,7 +253,7 @@
     var tier     = params.get('tier') || '1';
 
     document.querySelector('.event-type').textContent    = 'Resub \u2014 ' + months + ' Monate';
-    document.querySelector('.username').textContent      = username;
+    // Username nach tierNum gesetzt (weiter unten)
     document.querySelector('.alert-message').textContent = message;
 
     var rawTier = tier.trim().toLowerCase().replace('tier', '').trim();
@@ -265,6 +266,15 @@
     var tierNames = { '1': 'Tier 1', '2': 'Tier 2', '3': 'Tier 3', 'prime': 'Prime' };
     badge.textContent = tierNames[tierNum] || 'Tier ' + tierNum;
     badge.className = 'tier-badge tier-badge--' + (tierNum === 'prime' ? '1' : tierNum);
+
+    var hotLevel = (tierNum === '3') ? 3 : (tierNum === '2') ? 2 : 0;
+    var nameEl = document.querySelector('.username');
+    if (hotLevel > 0) {
+      var mark = '<span class="t-hot-mark t-hot-mark--after" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>';
+      nameEl.innerHTML = '<span class="t-hot t-hot--' + hotLevel + '"><span class="pubg-hot">' + username + '</span>' + mark + '</span>';
+    } else {
+      nameEl.textContent = username;
+    }
   </script>
 
 </body>
