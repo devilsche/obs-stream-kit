@@ -92,11 +92,6 @@ STINGER_META = {
          "default": "", "placeholder": "e.g. Darling",
          "tooltip": "Shown as the recipient name in the heart stinger"},
     ]},
-    "lens-flare.html": {"switches": [
-        {"key": "n", "label": "Variant", "type": "select", "default": "1",
-         "options": [["1","1"],["2","2"],["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]],
-         "tooltip": "Seven different lens flare videos"},
-    ]},
     "over-9000.html": {"switches": [
         {"key": "level", "label": "Power Level", "type": "text",
          "default": "9001", "placeholder": "e.g. 9001",
@@ -112,6 +107,14 @@ _PET_FONTS = [
     ["Yellowtail", "Yellowtail"], ["Allura", "Allura"], ["Cookie", "Cookie"],
     ["Merienda", "Merienda"],
 ]
+
+EFFECT_META = {
+    "lens-flare.html": {"switches": [
+        {"key": "n", "label": "Variant", "type": "select", "default": "1",
+         "options": [["1","1"],["2","2"],["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]],
+         "tooltip": "Seven different lens flare videos"},
+    ]},
+}
 
 TRANSITIONS = [
     {

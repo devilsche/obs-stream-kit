@@ -48,6 +48,8 @@
                 aria-selected="false" tabindex="-1" aria-controls="urlpanel-alerts">Alerts<span class="url-tabs__cnt">{{ alerts|length }}</span></button>
         <button type="button" role="tab" id="urltab-memes" data-tab="memes" data-label="Memes"
                 aria-selected="false" tabindex="-1" aria-controls="urlpanel-memes">Memes<span class="url-tabs__cnt">{{ stingers|length }}</span></button>
+        <button type="button" role="tab" id="urltab-effects" data-tab="effects" data-label="Effects"
+                aria-selected="false" tabindex="-1" aria-controls="urlpanel-effects">Effects<span class="url-tabs__cnt">{{ effects|length }}</span></button>
         <button type="button" role="tab" id="urltab-transition" data-tab="transition" data-label="Transition"
                 aria-selected="false" tabindex="-1" aria-controls="urlpanel-transition">Transition<span class="url-tabs__cnt">{{ transitions|length }}</span></button>
       </div>
@@ -108,6 +110,17 @@
           {{ src_card('overlay', 'Meme', s.label,
                       base_url ~ '/s/' ~ token ~ '/stingers/' ~ s.file, 'stingers/' ~ s.file,
                       s.size, s.desc, (s.switches or []), (s.params or [])) }}
+          {% endfor %}
+        </div>
+      </div>
+
+      {# ── Effects ── #}
+      <div class="url-tabpanel" id="urlpanel-effects" role="tabpanel" aria-labelledby="urltab-effects" hidden>
+        <div class="url-grid">
+          {% for e in effects %}
+          {{ src_card('overlay', 'Effect', e.label,
+                      base_url ~ '/s/' ~ token ~ '/effects/' ~ e.file, 'effects/' ~ e.file,
+                      e.size, e.desc, (e.switches or []), (e.params or [])) }}
           {% endfor %}
         </div>
       </div>
