@@ -740,24 +740,32 @@
           doc.head.appendChild(st);
         } catch(_) {}
       }
-      // Checkerboard + Auto-Größe für alle Sources
       function afterLoad() {
         injectChecker(frame.contentDocument);
-        // Für Sources ohne feste Größe: Content-Dimensionen auslesen und skalieren
-        if (!dim[0] || !dim[1]) {
-          try {
-            const doc = frame.contentDocument;
-            const cw = doc.body.scrollWidth  || doc.documentElement.scrollWidth  || 1920;
-            const ch = doc.body.scrollHeight || doc.documentElement.scrollHeight || 200;
-            body.classList.remove("dn-modal__body--checker");
-            body.classList.add("dn-modal__body--overlay");
-            body.style.setProperty("--ov-w", cw);
-            body.style.setProperty("--ov-h", ch);
-          } catch(_) {}
-        }
+        try {
+          const doc = frame.contentDocument;
+          const cw = doc.body.scrollWidth  || doc.documentElement.scrollWidth  || dim[0] || 1920;
+          const ch = doc.body.scrollHeight || doc.documentElement.scrollHeight || dim[1] || 200;
+          // Scale so widget fits in 80% of viewport
+          const scale = Math.min(1,
+            Math.min(window.innerWidth * 0.8 / cw, window.innerHeight * 0.8 / ch));
+          const dispW = Math.round(cw * scale);
+          const dispH = Math.round(ch * scale);
+          // Modal body = content + 10% padding, centered
+          body.classList.remove("dn-modal__body--overlay", "dn-modal__body--checker");
+          body.style.cssText = (body.style.cssText || "") +
+            `;width:${Math.round(dispW*1.1)}px;height:${Math.round(dispH*1.1)}px;` +
+            `display:flex;align-items:center;justify-content:center;` +
+            `background-color:#3a3a3a;` +
+            `background-image:repeating-conic-gradient(#2a2a2a 0% 25%,#3a3a3a 0% 50%);` +
+            `background-size:20px 20px;`;
+          frame.style.cssText =
+            `width:${cw}px;height:${ch}px;flex-shrink:0;border:0;` +
+            `transform-origin:center;transform:scale(${scale.toFixed(4)});`;
+        } catch(_) {}
       }
       frame.onload = afterLoad;
-      setTimeout(afterLoad, 400);
+      setTimeout(afterLoad, 500);
       modal.showModal();
     });
   }
