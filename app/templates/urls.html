@@ -284,7 +284,7 @@
           <div class="url-chrome-chrome" id="cpChrome">PREVIEW</div>
         </div>
       </div>` : "";
-    const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${body}</div>${chromeHtml}${hint}`;
+    const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${chromeHtml}`;
 
     const infoBits = [];
     if (card.dataset.size) infoBits.push(escapeHtml(card.dataset.size) + " · transparent");
