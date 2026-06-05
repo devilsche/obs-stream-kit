@@ -107,7 +107,7 @@
         color-mix(in srgb, var(--color-bg-dark) 95%, transparent),
         color-mix(in srgb, var(--color-bg-purple) 95%, transparent));
       border: 2px solid color-mix(in srgb, var(--color-gold) 70%, transparent);
-      border-radius: 16px;
+      border-radius: var(--theme-radius, 16px);
       padding: 44px 64px;
       max-width: 60%;
       min-width: 500px;
@@ -125,7 +125,7 @@
       content: '';
       position: absolute;
       inset: 0;
-      border-radius: 14px;
+      border-radius: var(--theme-radius, 14px);
       background: radial-gradient(ellipse at center, color-mix(in srgb, var(--color-gold) 10%, transparent) 0%, transparent 70%);
       pointer-events: none;
     }
@@ -230,13 +230,19 @@
 
   <script>
     var params   = new URLSearchParams(window.location.search);
-    var username = params.get('username') || params.get('name') || 'Jemand';
-    var amount   = params.get('amount') || '1,00 €';
-    var message  = params.get('message') || '';
+    var username = params.get('username') || '';
+    var realname = params.get('name')     || '';
+    var amount   = params.get('amount')   || '1,00 €';
+    var message  = params.get('message')  || '';
+
+    // Show "von USERNAME · Realname" or just whichever is set
+    var displayLine = username && realname
+      ? 'von ' + username + ' · ' + realname
+      : 'von ' + (username || realname || 'Anonymous');
 
     document.querySelector('.amount').textContent = amount;
-    document.querySelector('.username').textContent = 'von ' + username;
-    document.querySelector('.alert-message').textContent = message || 'Danke für die Unterstützung!';
+    document.querySelector('.username').textContent = displayLine;
+    document.querySelector('.alert-message').textContent = message || 'Thanks for the support!';
   </script>
 
 </body>

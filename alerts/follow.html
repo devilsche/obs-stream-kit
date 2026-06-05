@@ -92,7 +92,7 @@
         color-mix(in srgb, var(--color-bg-dark) 95%, transparent),
         color-mix(in srgb, var(--color-bg-purple) 95%, transparent));
       border: 2px solid color-mix(in srgb, var(--color-gold) 60%, transparent);
-      border-radius: 14px;
+      border-radius: var(--theme-radius, 14px);
       padding: 32px 48px;
       max-width: 50%;
       text-align: center;
@@ -115,7 +115,7 @@
       content: '';
       position: absolute;
       inset: 0;
-      border-radius: 12px;
+      border-radius: var(--theme-radius, 12px);
       background: radial-gradient(ellipse at center, color-mix(in srgb, var(--color-gold) 8%, transparent) 0%, transparent 70%);
       pointer-events: none;
     }
@@ -126,7 +126,7 @@
       content: '';
       position: absolute;
       inset: 0;
-      border-radius: 14px;
+      border-radius: var(--theme-radius, 14px);
       pointer-events: none;
     }
 
