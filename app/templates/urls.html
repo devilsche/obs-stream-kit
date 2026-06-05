@@ -753,25 +753,25 @@
             }
           } catch(_) {}
 
-          // Widget-Größe ermitteln
-          const cw = Math.max(doc.body.scrollWidth || doc.documentElement.scrollWidth, 40);
-          const ch = Math.max(doc.body.scrollHeight || doc.documentElement.scrollHeight, 20);
+          // Widget-Größe: Katalog-Größe bevorzugen (fullscreen etc.), sonst DOM-Messung
+          const cw = (dim[0] && dim[1]) ? dim[0]
+            : Math.max(doc.body.scrollWidth || doc.documentElement.scrollWidth, 40);
+          const ch = (dim[0] && dim[1]) ? dim[1]
+            : Math.max(doc.body.scrollHeight || doc.documentElement.scrollHeight, 20);
 
           const ww = window.innerWidth;
           const wh = window.innerHeight;
 
-          let scale, mw, mh;
+          let scale;
           if (cw <= ww * 1.2 && ch <= wh * 1.2) {
-            // Widget passt: 1:1 zeigen, Modal = Widget + 10%
-            scale = 1;
-            mw = Math.ceil(cw * 1.1 / 100) * 100;
-            mh = Math.ceil(ch * 1.1 / 100) * 100;
+            scale = 1; // passt: 1:1
           } else {
-            // Widget zu groß: auf 80% des Fensters skalieren
+            // zu groß: kleinstes scale das beides in 80% des Fensters passt — Ratio bleibt
             scale = Math.min(ww * 0.8 / cw, wh * 0.8 / ch);
-            mw = Math.round(ww * 0.8);
-            mh = Math.round(wh * 0.8);
           }
+          // Modal = skaliertes Widget + 10%, Ratio beibehalten
+          const mw = Math.ceil(cw * scale * 1.1 / 100) * 100;
+          const mh = Math.ceil(ch * scale * 1.1 / 100) * 100;
 
           body.classList.remove("dn-modal__body--overlay","dn-modal__body--checker");
           body.style.cssText = `;width:${mw}px;height:${mh}px;` +
