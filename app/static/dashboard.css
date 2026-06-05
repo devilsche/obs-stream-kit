@@ -1132,7 +1132,7 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
   max-width:calc(var(--ov-w,1920)*1px);
   container-type:inline-size;aspect-ratio:var(--ov-w,1920)/var(--ov-h,1080)}
 .dn-modal__body--overlay iframe{width:calc(var(--ov-w,1920)*1px);height:calc(var(--ov-h,1080)*1px);
-  transform-origin:0 0;transform:scale(calc(100cqw / (var(--ov-w,1920)*1px)))}
+  transform-origin:0 0;transform:scale(min(1, calc(100cqw / (var(--ov-w,1920)*1px))))}
 
 /* ── URL-Filter-Suchfeld + Empty-State ── */
 .url-search{display:flex;align-items:center;gap:8px;margin:0 0 18px;max-width:340px;
