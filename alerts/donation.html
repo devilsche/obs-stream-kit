@@ -237,8 +237,8 @@
 
     // Show "von USERNAME · Realname" or just whichever is set
     var displayLine = username && realname
-      ? 'von ' + username + ' · ' + realname
-      : 'von ' + (username || realname || 'Anonymous');
+      ? 'from ' + username + ' · ' + realname
+      : 'from ' + (username || realname || 'Anonymous');
 
     document.querySelector('.amount').textContent = amount;
     document.querySelector('.username').textContent = displayLine;

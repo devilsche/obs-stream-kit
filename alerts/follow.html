@@ -210,7 +210,7 @@
   <script>
     const params   = new URLSearchParams(window.location.search);
     const username = params.get('username') || 'Viewer';
-    const message  = params.get('message')  || 'Willkommen im Stream!';
+    const message  = params.get('message')  || 'Welcome to the stream!';
 
     document.querySelector('.username').textContent      = username;
     document.querySelector('.alert-message').textContent = message;

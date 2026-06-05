@@ -249,10 +249,10 @@
     var params   = new URLSearchParams(window.location.search);
     var username = params.get('username') || 'Viewer';
     var months   = params.get('months')   || '1';
-    var message  = params.get('message')  || months + ' Monate dabei!';
+    var message  = params.get('message')  || months + ' months on board!';
     var tier     = params.get('tier') || '1';
 
-    document.querySelector('.event-type').textContent    = 'Resub \u2014 ' + months + ' Monate';
+    document.querySelector('.event-type').textContent    = 'Resub — ' + months + ' months';
     // Username nach tierNum gesetzt (weiter unten)
     document.querySelector('.alert-message').textContent = message;
 
