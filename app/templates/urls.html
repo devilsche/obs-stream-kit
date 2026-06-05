@@ -272,8 +272,17 @@
     const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${chromeHtml}`;
 
     const infoBits = [];
-    if (card.dataset.size) infoBits.push(escapeHtml(card.dataset.size));
-    infoBits.push("Token is embedded in the URL — add directly as OBS Browser Source");
+    const sz = card.dataset.size || "";
+    if (sz) {
+      infoBits.push('<strong>OBS Browser Source size:</strong> ' + escapeHtml(sz) + ' px');
+    } else if (meta && meta._dynW) {
+      infoBits.push('<strong>OBS Browser Source size:</strong> ' + meta._dynW + '×' + meta._dynH + ' px (based on current settings)');
+    }
+    const isTransparent = card.dataset.kind === 'overlay';
+    infoBits.push(isTransparent
+      ? '<strong>Background:</strong> Transparent — layer over your scene as an overlay'
+      : '<strong>Background:</strong> Has own background — use as standalone scene source');
+    infoBits.push("Token is in the URL — paste directly into OBS as Browser Source");
 
     detailContent.innerHTML = `
       <div class="url-detail-col">${configCol}</div>
