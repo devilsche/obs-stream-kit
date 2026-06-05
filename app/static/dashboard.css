@@ -963,7 +963,7 @@ html[data-theme="aurora"] .dn-ccard,html[data-theme="aurora"] .dn-hero{backdrop-
 
 /* Vorschau-Modal (dialog) — echtes Widget im iframe, Theme-Look + Schachbrett-BG */
 .dn-modal{border:1px solid var(--brand-purple);background:var(--bg-elev);color:var(--text);padding:0;
-  border-radius:var(--r-box);max-width:min(1280px,92vw);width:100%;box-shadow:0 0 60px rgba(0,0,0,.6)}
+  border-radius:var(--r-box);max-width:min(1280px,92vw);width:fit-content;box-shadow:0 0 60px rgba(0,0,0,.6)}
 .dn-modal::backdrop{background:rgba(0,0,0,.7);backdrop-filter:blur(3px)}
 .dn-modal__head{display:flex;align-items:center;justify-content:space-between;gap:12px;
   padding:14px 18px;border-bottom:1px solid var(--border);background:var(--bg-deeper)}
