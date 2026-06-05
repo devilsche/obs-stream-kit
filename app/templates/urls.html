@@ -754,13 +754,21 @@
             try {
               const cw = Math.max(doc.body.offsetWidth, 80);
               const ch = Math.max(doc.body.offsetHeight, 20);
-              // Remove shrink style — let content render normally
               shrink.remove();
               // Scale only if too large for 80% of viewport
               const scale = Math.min(1,
                 Math.min(window.innerWidth * 0.8 / cw, window.innerHeight * 0.8 / ch));
-              const mw = Math.round(cw * scale * 1.1);
-              const mh = Math.round(ch * scale * 1.1);
+              const scaledW = cw * scale;
+              const scaledH = ch * scale;
+              // Width: +10%, rounded UP to nearest 100
+              const mw = Math.ceil(scaledW * 1.1 / 100) * 100;
+              const mh = Math.ceil(scaledH * 1.1 / 100) * 100;
+              // Prevent scrollbars inside iframe
+              try {
+                const ns = doc.createElement('style');
+                ns.textContent = 'html,body{overflow:hidden!important;}';
+                doc.head.appendChild(ns);
+              } catch(_) {}
               body.classList.remove("dn-modal__body--overlay", "dn-modal__body--checker");
               body.style.cssText = `;width:${mw}px;height:${mh}px;` +
                 `display:flex;align-items:center;justify-content:center;overflow:hidden;` +
