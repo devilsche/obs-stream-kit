@@ -97,9 +97,9 @@
           -2 3 -2 0 -0.25
         " result="chroma"/>
         <feComponentTransfer in="chroma" result="alphaRamp">
-          <feFuncA type="linear" slope="-3" intercept="1.4"/>
+          <feFuncA type="linear" slope="-4" intercept="1.4"/>
         </feComponentTransfer>
-        <feGaussianBlur in="alphaRamp" stdDeviation="2" result="mask"/>
+        <feGaussianBlur in="alphaRamp" stdDeviation="1" result="mask"/>
         <feComposite in="SourceGraphic" in2="mask" operator="in" result="keyed"/>
         <!-- Despill: reduce green tint in remaining pixels -->
         <feColorMatrix in="keyed" type="matrix" values="
