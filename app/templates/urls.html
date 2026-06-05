@@ -4,7 +4,7 @@
 {# Eine Source-Karte fuers Grid. switches/params als Listen → im Markup als
    HTML-sicheres JSON (tojson escaped < > & ' → sicher im single-quote-Attr). #}
 {% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[], chrome_preview=False, hint='', tab='') %}
-<button type="button" class="url-card"
+<button type="button" class="url-card" hidden
         data-kind="{{ kind }}" data-label="{{ label }}" data-cat="{{ cat }}"
         data-path="{{ path }}" data-base="{{ base }}"
         {% if tab %}data-tab="{{ tab }}"{% endif %}
