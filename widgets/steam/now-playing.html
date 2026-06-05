@@ -57,6 +57,18 @@
       box-sizing: border-box;
     }
     .game-cover.fit-cover { object-fit: cover; padding: 0; }
+    .cover-placeholder {
+      display: none;
+      position: absolute;
+      inset: 0;
+      font-family: "Material Symbols Outlined";
+      font-size: 32px;
+      color: var(--pubg-muted, #888);
+      align-items: center;
+      justify-content: center;
+    }
+    .game-cover-wrap.no-cover .cover-placeholder { display: flex; }
+    .game-cover-wrap.no-cover .game-cover { display: none; }
 
     /* Avatar rechts: Circle mit Gold-Border, optional Frame drueber. */
     .avatar-area {
@@ -196,6 +208,7 @@
   <div class="pubg-card panel pubg-fade-in" id="panel">
     <div class="game-cover-wrap">
       <img class="game-cover" id="gameCover" alt="">
+      <span class="cover-placeholder" id="coverPlaceholder" aria-hidden="true">sports_esports</span>
     </div>
     <div class="info">
       <div class="name" id="name">—</div>
@@ -407,20 +420,18 @@
         cover.onerror = () => {
           srcIdx++;
           if (srcIdx < allSources.length) {
-            // Bei wide rects (capsule/header) auf object-fit:cover umschalten
-            cover.classList.toggle(
-              "fit-cover", srcIdx >= logoSources.length);
+            cover.classList.toggle("fit-cover", srcIdx >= logoSources.length);
             cover.src = allSources[srcIdx];
           } else {
-            cover.style.display = "none";
             cover.onerror = null;
+            cover.parentElement.classList.add("no-cover");
           }
         };
         cover.classList.remove("fit-cover");
+        cover.parentElement.classList.remove("no-cover");
         cover.src = allSources[0];
-        cover.style.display = "";
       } else {
-        cover.style.display = "none";
+        cover.parentElement.classList.add("no-cover");
       }
 
       // Card-Background: library_600x900 (portrait) bevorzugt, Header
