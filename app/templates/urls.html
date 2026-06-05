@@ -740,35 +740,45 @@
           doc.head.appendChild(st);
         } catch(_) {}
       }
-      function afterLoad() {
-        injectChecker(frame.contentDocument);
+      function sizeFrame() {
         try {
           const doc = frame.contentDocument;
-          // Echte Content-Größe: erstes Kind-Element (nicht viewport-breite body)
-          const el = doc.body.firstElementChild || doc.body;
-          const rect = el.getBoundingClientRect();
-          const cw = Math.round(rect.width)  || dim[0] || 400;
-          const ch = Math.round(rect.height) || dim[1] || 200;
-          // Scale so widget fits in 80% of viewport
-          const scale = Math.min(1,
-            Math.min(window.innerWidth * 0.8 / cw, window.innerHeight * 0.8 / ch));
-          const dispW = Math.round(cw * scale);
-          const dispH = Math.round(ch * scale);
-          // Modal body = content + 10% padding, centered
-          body.classList.remove("dn-modal__body--overlay", "dn-modal__body--checker");
-          body.style.cssText = (body.style.cssText || "") +
-            `;width:${Math.round(dispW*1.1)}px;height:${Math.round(dispH*1.1)}px;` +
-            `display:flex;align-items:center;justify-content:center;` +
-            `background-color:#3a3a3a;` +
-            `background-image:repeating-conic-gradient(#2a2a2a 0% 25%,#3a3a3a 0% 50%);` +
-            `background-size:20px 20px;`;
-          frame.style.cssText =
-            `width:${cw}px;height:${ch}px;flex-shrink:0;border:0;` +
-            `transform-origin:center;transform:scale(${scale.toFixed(4)});`;
+          if (!doc || !doc.body) return;
+          // Force body to shrink to natural content width
+          const shrink = doc.createElement('style');
+          shrink.id = 'preview-shrink';
+          shrink.textContent = 'html,body{width:max-content!important;min-width:0!important;white-space:nowrap!important;}';
+          if (!doc.getElementById('preview-shrink')) doc.head.appendChild(shrink);
+          // Read natural dimensions after layout
+          requestAnimationFrame(() => {
+            try {
+              const cw = Math.max(doc.body.offsetWidth, 80);
+              const ch = Math.max(doc.body.offsetHeight, 20);
+              // Remove shrink style — let content render normally
+              shrink.remove();
+              // Scale only if too large for 80% of viewport
+              const scale = Math.min(1,
+                Math.min(window.innerWidth * 0.8 / cw, window.innerHeight * 0.8 / ch));
+              const mw = Math.round(cw * scale * 1.1);
+              const mh = Math.round(ch * scale * 1.1);
+              body.classList.remove("dn-modal__body--overlay", "dn-modal__body--checker");
+              body.style.cssText = `;width:${mw}px;height:${mh}px;` +
+                `display:flex;align-items:center;justify-content:center;overflow:hidden;` +
+                `background-color:#3a3a3a;` +
+                `background-image:repeating-conic-gradient(#2a2a2a 0% 25%,#3a3a3a 0% 50%);` +
+                `background-size:20px 20px;`;
+              frame.style.cssText = `width:${cw}px;height:${ch}px;flex-shrink:0;border:0;` +
+                `transform-origin:center center;transform:scale(${scale.toFixed(4)});`;
+            } catch(_) {}
+          });
         } catch(_) {}
       }
+      function afterLoad() {
+        injectChecker(frame.contentDocument);
+        setTimeout(sizeFrame, 200);
+      }
       frame.onload = afterLoad;
-      setTimeout(afterLoad, 500);
+      setTimeout(() => { injectChecker(frame.contentDocument); sizeFrame(); }, 600);
       modal.showModal();
     });
   }
