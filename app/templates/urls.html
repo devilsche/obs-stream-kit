@@ -744,32 +744,29 @@
         try {
           const doc = frame.contentDocument;
           if (!doc || !doc.body) return;
-          // Force body to shrink to natural content width
-          const shrink = doc.createElement('style');
-          shrink.id = 'preview-shrink';
-          shrink.textContent = 'html,body{width:max-content!important;min-width:0!important;}';
-          if (!doc.getElementById('preview-shrink')) doc.head.appendChild(shrink);
-          // Read natural dimensions after layout
+          // Fixed preview width (use catalog size if set, else 480px)
+          const previewW = dim[0] || 480;
+          frame.style.width  = previewW + 'px';
+          frame.style.height = '2000px';
           requestAnimationFrame(() => {
             try {
-              const cw = Math.max(doc.body.offsetWidth, 80);
-              const ch = Math.max(doc.body.offsetHeight, 20);
-              shrink.remove();
-              // Scale only if too large for 80% of viewport
+              const cw = previewW;
+              const ch = Math.max(
+                doc.body.scrollHeight || doc.documentElement.scrollHeight, 20);
               const scale = Math.min(1,
-                Math.min(window.innerWidth * 0.8 / cw, window.innerHeight * 0.8 / ch));
-              const scaledW = cw * scale;
-              const scaledH = ch * scale;
-              // Width: +10%, rounded UP to nearest 100
-              const mw = Math.ceil(scaledW * 1.1 / 100) * 100;
-              const mh = Math.ceil(scaledH * 1.1 / 100) * 100;
-              // Prevent scrollbars inside iframe
+                Math.min(window.innerWidth  * 0.8 / cw,
+                         window.innerHeight * 0.8 / ch));
+              const mw = Math.ceil(cw * scale * 1.1 / 100) * 100;
+              const mh = Math.ceil(ch * scale * 1.1 / 100) * 100;
               try {
-                const ns = doc.createElement('style');
-                ns.textContent = 'html,body{overflow:hidden!important;}';
-                doc.head.appendChild(ns);
+                if (!doc.getElementById('preview-noscroll')) {
+                  const ns = doc.createElement('style');
+                  ns.id = 'preview-noscroll';
+                  ns.textContent = 'html,body{overflow:hidden!important;}';
+                  doc.head.appendChild(ns);
+                }
               } catch(_) {}
-              body.classList.remove("dn-modal__body--overlay", "dn-modal__body--checker");
+              body.classList.remove("dn-modal__body--overlay","dn-modal__body--checker");
               body.style.cssText = `;width:${mw}px;height:${mh}px;` +
                 `display:flex;align-items:center;justify-content:center;overflow:hidden;` +
                 `background-color:#3a3a3a;` +
