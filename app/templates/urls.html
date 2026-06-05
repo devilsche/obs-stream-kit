@@ -275,8 +275,15 @@
     const sz = card.dataset.size || "";
     if (sz) {
       infoBits.push('<strong>OBS Browser Source size:</strong> ' + escapeHtml(sz) + ' px');
-    } else if (meta && meta._dynW) {
-      infoBits.push('<strong>OBS Browser Source size:</strong> ' + meta._dynW + '×' + meta._dynH + ' px (based on current settings)');
+    } else {
+      // Dynamische Größe aus width/height-Switches berechnen
+      const wSw = switches.find(s => s.key === "width");
+      const hSw = switches.find(s => s.key === "height");
+      if (wSw && hSw) {
+        const dw = (parseInt(wSw.default) || 400) + 100;
+        const dh = (parseInt(hSw.default) || 225) + 100;
+        infoBits.push('<strong>OBS Browser Source size:</strong> ' + dw + '×' + dh + ' px (default — adjusts with settings)');
+      }
     }
     const isTransparent = card.dataset.kind === 'overlay';
     infoBits.push(isTransparent
@@ -778,12 +785,7 @@
   allCards.forEach(card => {
     card.addEventListener("click", () => {
       if (card.dataset.tab) currentTab = card.dataset.tab;
-      try {
-        openDetail(card);
-      } catch(e) {
-        console.error("openDetail error:", e, card.dataset.label, card.dataset.tab);
-        alert("Debug: " + e.message + " | " + card.dataset.label);
-      }
+      openDetail(card);
     });
   });
 
