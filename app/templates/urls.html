@@ -740,22 +740,6 @@
           doc.head.appendChild(st);
         } catch(_) {}
       }
-      function applySize(cw, ch) {
-        const scale = Math.min(1,
-          Math.min(window.innerWidth  * 0.8 / cw,
-                   window.innerHeight * 0.8 / ch));
-        const mw = Math.ceil(cw * scale * 1.1 / 100) * 100;
-        const mh = Math.ceil(ch * scale * 1.1 / 100) * 100;
-        body.classList.remove("dn-modal__body--overlay","dn-modal__body--checker");
-        body.style.cssText = `;width:${mw}px;height:${mh}px;` +
-          `display:flex;align-items:center;justify-content:center;overflow:hidden;` +
-          `background-color:#3a3a3a;` +
-          `background-image:repeating-conic-gradient(#2a2a2a 0% 25%,#3a3a3a 0% 50%);` +
-          `background-size:20px 20px;`;
-        frame.style.cssText = `width:${cw}px;height:${ch}px;flex-shrink:0;border:0;` +
-          `transform-origin:center center;transform:scale(${scale.toFixed(4)});`;
-      }
-
       function sizeFrame() {
         try {
           const doc = frame.contentDocument;
@@ -769,29 +753,34 @@
             }
           } catch(_) {}
 
-          if (dim[0] && dim[1]) {
-            // Catalog hat explizite Größe → direkt verwenden
-            applySize(dim[0], dim[1]);
-            return;
+          // Widget-Größe ermitteln
+          const cw = Math.max(doc.body.scrollWidth || doc.documentElement.scrollWidth, 40);
+          const ch = Math.max(doc.body.scrollHeight || doc.documentElement.scrollHeight, 20);
+
+          const ww = window.innerWidth;
+          const wh = window.innerHeight;
+
+          let scale, mw, mh;
+          if (cw <= ww * 1.2 && ch <= wh * 1.2) {
+            // Widget passt: 1:1 zeigen, Modal = Widget + 10%
+            scale = 1;
+            mw = Math.ceil(cw * 1.1 / 100) * 100;
+            mh = Math.ceil(ch * 1.1 / 100) * 100;
+          } else {
+            // Widget zu groß: auf 80% des Fensters skalieren
+            scale = Math.min(ww * 0.8 / cw, wh * 0.8 / ch);
+            mw = Math.round(ww * 0.8);
+            mh = Math.round(wh * 0.8);
           }
 
-          // Pass 1: natürliche Breite ermitteln (scrollWidth bei aktueller Breite)
-          frame.style.height = '2000px';
-          requestAnimationFrame(() => {
-            try {
-              const cw = Math.max(
-                doc.body.scrollWidth || doc.documentElement.scrollWidth, 80);
-              // Pass 2: Höhe bei dieser Breite messen
-              frame.style.width = cw + 'px';
-              requestAnimationFrame(() => {
-                try {
-                  const ch = Math.max(
-                    doc.body.scrollHeight || doc.documentElement.scrollHeight, 20);
-                  applySize(cw, ch);
-                } catch(_) {}
-              });
-            } catch(_) {}
-          });
+          body.classList.remove("dn-modal__body--overlay","dn-modal__body--checker");
+          body.style.cssText = `;width:${mw}px;height:${mh}px;` +
+            `display:flex;align-items:center;justify-content:center;overflow:hidden;` +
+            `background-color:#3a3a3a;` +
+            `background-image:repeating-conic-gradient(#2a2a2a 0% 25%,#3a3a3a 0% 50%);` +
+            `background-size:20px 20px;`;
+          frame.style.cssText = `width:${cw}px;height:${ch}px;flex-shrink:0;border:0;` +
+            `transform-origin:center center;transform:scale(${scale.toFixed(4)});`;
         } catch(_) {}
       }
       function afterLoad() {
