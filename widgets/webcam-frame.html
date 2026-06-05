@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <title>Webcam Frame</title>
   <link rel="stylesheet" href="_theme.css">
+  <link rel="stylesheet" href="_blocks.css">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
   <style>
     :root {
@@ -46,44 +47,18 @@
     @keyframes arcFlicker3 { 0%,100%{opacity:.6} 25%{opacity:.9} 50%{opacity:.2} 75%{opacity:.7} }
     @keyframes arcFlicker4 { 0%,100%{opacity:.5} 20%{opacity:.85} 55%{opacity:.3} 80%{opacity:.7} }
 
-    /* Hot-icon nodes on the arc */
-    @keyframes icon-wobble {
-      0%,100% { transform:translate(-50%,-50%) rotate(-10deg) scale(1);
-                filter:drop-shadow(0 0 5px var(--frame-accent)) drop-shadow(0 0 12px var(--frame-accent)); }
-      50%     { transform:translate(-50%,-50%) rotate(10deg) scale(1.15);
-                filter:drop-shadow(0 0 10px var(--frame-accent)) drop-shadow(0 0 24px var(--frame-accent)); }
-    }
-    @keyframes gauge-gas {
-      0%   { transform: rotate(-65deg); }
-      100% { transform: rotate(65deg); }
-    }
-
-    .spark-icon {
+    /* Hot-mark nodes positioned along the arc */
+    .arc-hotmark {
       position: absolute;
-      font-family: "Material Symbols Outlined";
-      font-size: 20px;
-      line-height: 1;
-      color: var(--frame-accent);
-      pointer-events: none;
-      z-index: 4;
-      animation: icon-wobble 1.1s ease-in-out infinite;
-    }
-
-    /* Azure gauge */
-    .spark-gauge {
-      position: absolute;
-      width: 22px; height: 22px;
       transform: translate(-50%, -50%);
-      color: var(--frame-accent);
-      overflow: visible;
       pointer-events: none;
       z-index: 4;
-      filter: drop-shadow(0 0 6px var(--frame-accent));
     }
-    .spark-gauge .needle {
-      transform-box: view-box;
-      transform-origin: 12px 18px;
-      animation: gauge-gas 0.32s ease-in-out infinite alternate;
+    /* Azure: Nadel gibt Gas — schneller als der normale 3s-Takt */
+    .arc-hotmark .t-gauge .needle {
+      animation-duration: 0.35s !important;
+      animation-timing-function: ease-in-out !important;
+      animation-direction: alternate !important;
     }
 
     /* Particle container */
@@ -221,37 +196,30 @@
 
     var useTheme = params.get('colors') === 'theme';
     var isAzure  = document.documentElement.getAttribute('data-theme') === 'azure';
-    var cs = getComputedStyle(document.documentElement);
-    var hotIcon = useTheme && !isAzure
-      ? ((cs.getPropertyValue('--theme-hot-icon') || '"local_fire_department"').replace(/['"]/g,'').trim() || 'local_fire_department')
-      : null;
 
-    function makeGauge() {
-      var g = document.createElement('div');
-      g.className = 'spark-gauge';
-      g.style.opacity = '0';
-      g.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22">'
-        + '<path d="M4 18 A9 9 0 0 1 20 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.4"/>'
-        + '<circle cx="12" cy="18" r="2" fill="currentColor"/>'
-        + '<line class="needle" x1="12" y1="18" x2="12" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'
-        + '</svg>';
-      return g;
+    function makeHotMark() {
+      // Same structure as PubgUI._hotMark() — t-hot-mark with 5 <i> sparks
+      var wrap = document.createElement('div');
+      wrap.className = 'arc-hotmark';
+      wrap.style.opacity = '0';
+      var cls = 't-hot-mark' + (isAzure ? ' t-hot-mark--gauge' : '');
+      var gauge = isAzure
+        ? '<svg class="t-gauge" viewBox="0 0 24 24" aria-hidden="true">'
+          + '<path d="M4 18 A9 9 0 0 1 20 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.5"/>'
+          + '<circle cx="12" cy="18" r="1.7" fill="currentColor"/>'
+          + '<line class="needle" x1="12" y1="18" x2="12" y2="9.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>'
+          + '</svg>'
+        : '';
+      wrap.innerHTML = '<span class="' + cls + '" aria-hidden="true">' + gauge + '<i></i><i></i><i></i><i></i><i></i></span>';
+      return wrap;
     }
 
     var SPARK_COUNT = 6;
     var sparkEls = [];
     for (var i = 0; i < SPARK_COUNT; i++) {
-      if (useTheme && isAzure) {
-        // Azure: SVG gauge giving gas
-        var el = makeGauge();
-        iconCon.appendChild(el);
-        sparkEls.push(el);
-      } else if (useTheme) {
-        // Theme: Material Symbols hot icon with wobble
-        var el = document.createElement('span');
-        el.className = 'spark-icon';
-        el.textContent = hotIcon;
-        el.style.opacity = '0';
+      if (useTheme) {
+        // Theme: full t-hot-mark element (handles icon + sparks + animations via _blocks.css)
+        var el = makeHotMark();
         iconCon.appendChild(el);
         sparkEls.push(el);
       } else {
@@ -267,6 +235,7 @@
 
     function animateIcon(el, initialDelay) {
       var isSvg = el.tagName && el.tagName.toLowerCase() === 'circle';
+
       function cycle() {
         var pl = polylines[Math.floor(Math.random()*polylines.length)].el;
         var pos = randomPointOnPolyline(pl);
