@@ -48,8 +48,6 @@ WIDGET_SWITCHES = {
     "pubg/coplayer.html": [
         {"key": "player", "label": "Spieler", "type": "text", "default": "",
          "placeholder": "z.B. PEX_LuCKoR", "tooltip": "PUBG-Name des Mitspielers — leer = alle"},
-        {"key": "dock", "label": "Hintergrund", "type": "select", "default": "0",
-         "options": [["0", "Transparent (OBS)"], ["1", "Mit Hintergrund (Dock)"]]},
     ],
     "pubg/milestone-celebrate.html": [
         {"key": "n",     "label": "Chicken-Nr.", "type": "number", "default": "", "min": 1,
@@ -380,6 +378,23 @@ def _normalize_switches(switches: list, content: str) -> list:
     return out
 
 
+# Reine Overlay-Widgets — kein dock (immer OBS Browser Source, kein Custom Dock).
+_NO_DOCK = {
+    "pubg/live-bar.html", "pubg/streak-counter.html", "pubg/mates.html",
+    "pubg/milestone-celebrate.html", "pubg/news-ticker.html",
+    "pubg/post-match-card.html", "pubg/trend-indicator.html",
+    "pubg/top-mates-slider.html", "pubg/flyout-full.html",
+    "pubg/chat-stats-popup.html",
+    "steam/achievement-popup.html", "steam/popup.html",
+}
+
+_DOCK_SW = {
+    "key": "dock", "label": "Hintergrund", "type": "select", "default": "0",
+    "options": [["0", "Transparent (OBS)"], ["1", "Mit Hintergrund (Dock)"]],
+    "tooltip": "Transparent für OBS Browser Source; Mit Hintergrund für Custom Docks im Browser.",
+}
+
+
 def build(project_root: str) -> list:
     """Liest pro Widget die buildFilter-Schemas + liefert die fuer urls.html
     aufbereitete Liste:  (kategorie, label, desc, pfad, switches[])"""
@@ -398,6 +413,11 @@ def build(project_root: str) -> list:
             except Exception:
                 switches = list(WIDGET_SWITCHES.get(path, []))
         switches = _normalize_switches(switches, content)
+        # Dock-Switch automatisch anhaengen: alle Widgets die _pubg.js laden,
+        # ausser reine Overlays. Kein Duplikat wenn bereits manuell gesetzt.
+        if ("_pubg.js" in content and path not in _NO_DOCK
+                and not any(s["key"] == "dock" for s in switches)):
+            switches.append(_DOCK_SW)
         out.append((cat, label, desc, path, switches))
     return out
 
