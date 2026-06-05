@@ -1080,6 +1080,15 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
   text-transform:none;letter-spacing:0;font-weight:400;display:flex;align-items:center;gap:7px}
 .url-switches .sw-def{color:var(--text-dim);font-size:11px}
 .url-switches .sw-input--wide{width:200px;max-width:100%}
+.sw-upload-btn{display:inline-flex;align-items:center;justify-content:center;
+  width:36px;height:36px;border-radius:var(--r-ctrl);border:1px solid var(--border);
+  background:var(--bg-card);color:var(--text-muted);cursor:pointer;flex-shrink:0;
+  vertical-align:middle;margin-left:6px;transition:border-color .15s,color .15s}
+.sw-upload-btn:hover{border-color:var(--brand-purple);color:var(--brand-purple)}
+.sw-upload-btn .material-symbols-outlined{font-size:18px;pointer-events:none}
+.sw-upload-btn input[type=file]{position:absolute;width:0;height:0;opacity:0;pointer-events:none}
+.sw-upload-status{font-size:11px;color:var(--text-muted);margin-left:6px;vertical-align:middle}
+.sw-upload-status.ok{color:#4caf50}.sw-upload-status.err{color:#f44336}
 
 @media (max-width:820px){.url-detail-grid{grid-template-columns:1fr}}
 

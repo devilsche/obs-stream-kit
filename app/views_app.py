@@ -158,6 +158,67 @@ def settings():
                            saved=request.args.get("saved"))
 
 
+@bp_app.route("/app/assets/pet-image", methods=["POST"])
+@require_session
+def upload_pet_image():
+    """Nimmt ein Bild-Upload, prüft Qualität, konvertiert zu WebP, speichert tenant-spezifisch."""
+    import hashlib, io
+    from PIL import Image
+
+    f = request.files.get("image")
+    if not f:
+        return jsonify({"error": "Kein Bild übermittelt"}), 400
+
+    data = f.read(20 * 1024 * 1024 + 1)  # max 20 MB lesen
+    if len(data) > 20 * 1024 * 1024:
+        return jsonify({"error": "Bild zu groß — max. 20 MB"}), 400
+
+    try:
+        img = Image.open(io.BytesIO(data))
+        img.verify()
+        img = Image.open(io.BytesIO(data))  # nach verify() neu öffnen
+    except Exception:
+        return jsonify({"error": "Ungültiges Bildformat"}), 400
+
+    w, h = img.size
+    min_dim = min(w, h)
+    if min_dim < 300:
+        return jsonify({
+            "error": f"Auflösung zu niedrig ({w}×{h}px) — mindestens 300×300 px benötigt"
+        }), 400
+
+    # Auf Quadrat zentriert zuschneiden
+    left   = (w - min_dim) // 2
+    top    = (h - min_dim) // 2
+    img    = img.crop((left, top, left + min_dim, top + min_dim))
+    img    = img.resize((600, 600), Image.LANCZOS)
+    img    = img.convert("RGB")
+
+    buf = io.BytesIO()
+    img.save(buf, format="WEBP", quality=88, method=4)
+    webp_bytes = buf.getvalue()
+
+    # Speichern unter data/pet-images/<tenant_id>_<hash>.webp
+    root     = current_app.config.get("_PROJECT_ROOT", ".")
+    out_dir  = os.path.join(root, "data", "pet-images")
+    os.makedirs(out_dir, exist_ok=True)
+    fname    = f"{g.tenant_id}_{hashlib.sha256(webp_bytes).hexdigest()[:12]}.webp"
+    out_path = os.path.join(out_dir, fname)
+    with open(out_path, "wb") as fp:
+        fp.write(webp_bytes)
+
+    url = request.url_root.rstrip("/") + "/app/assets/pet-images/" + fname
+    return jsonify({"url": url, "size": f"{w}×{h}px → 600×600 WebP"})
+
+
+@bp_app.route("/app/assets/pet-images/<path:filename>")
+@require_session
+def serve_pet_image(filename):
+    root    = current_app.config.get("_PROJECT_ROOT", ".")
+    out_dir = os.path.join(root, "data", "pet-images")
+    return send_from_directory(out_dir, filename)
+
+
 @bp_app.route("/app/urls")
 @require_session
 def urls():

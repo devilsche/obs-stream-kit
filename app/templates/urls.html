@@ -211,9 +211,15 @@
                    data-value="${escapeAttr(value)}" aria-pressed="false">${escapeHtml(vlabel)}</button>`
         ).join("");
       } else if (sw.type === "text") {
-        controls = `<input type="text" class="sw-input sw-input--wide"
+        const isImg = sw.key === "img";
+        controls = `<input type="text" class="sw-input sw-input--wide${isImg ? " sw-img-input" : ""}"
                            value="${escapeAttr(sw.default || "")}"
-                           placeholder="${escapeAttr(sw.placeholder || "")}">`;
+                           placeholder="${escapeAttr(sw.placeholder || "")}">` +
+          (isImg ? `<label class="sw-upload-btn" title="Bild hochladen + als WebP speichern">
+            <span class="material-symbols-outlined" aria-hidden="true">upload</span>
+            <input type="file" class="sw-upload-file" accept="image/*" aria-label="Bild hochladen">
+          </label>
+          <span class="sw-upload-status" aria-live="polite"></span>` : "");
       } else {
         const minAttr = sw.min !== undefined ? `min="${sw.min}"` : "";
         const maxAttr = sw.max !== undefined ? `max="${sw.max}"` : "";
@@ -371,6 +377,35 @@
         if (wrap) wrap.style.fontFamily = font ? "'" + font + "', sans-serif" : "";
       };
       _chromeUpdate(); // initialer Zustand
+    }
+
+    // ── Bild-Upload für img-Switches ─────────────────────────
+    if (switchesRoot) {
+      switchesRoot.querySelectorAll(".sw-upload-file").forEach(fileInput => {
+        fileInput.addEventListener("change", async () => {
+          const file = fileInput.files[0];
+          if (!file) return;
+          const status = fileInput.closest(".sw-group").querySelector(".sw-upload-status");
+          const textInp = fileInput.closest(".sw-group").querySelector(".sw-img-input");
+          status.textContent = "Lädt…";
+          status.className = "sw-upload-status";
+          const fd = new FormData();
+          fd.append("image", file);
+          try {
+            const res = await fetch("/app/assets/pet-image", { method: "POST", body: fd });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || res.status);
+            textInp.value = json.url;
+            status.textContent = json.size + " — gespeichert";
+            status.className = "sw-upload-status ok";
+            refresh();
+          } catch(e) {
+            status.textContent = e.message;
+            status.className = "sw-upload-status err";
+          }
+          fileInput.value = "";
+        });
+      });
     }
 
     if (switchesRoot) {
