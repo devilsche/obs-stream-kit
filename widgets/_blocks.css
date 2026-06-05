@@ -78,9 +78,8 @@ html[data-theme="aurora"] .t-hot-mark i{animation-duration:2.6s!important}
 html[data-theme="editorial"] .t-hot-mark i{display:none}
 @keyframes spark-spin{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(0)}
   18%{opacity:1}60%{opacity:.9}100%{opacity:0;transform:translate(-50%,-50%) translate(var(--dx),var(--dy)) scale(1) rotate(300deg)}}
-html[data-theme="swiss"] .t-hot-mark i{width:9px;height:9px;border-radius:0;background:var(--theme-primary);box-shadow:none;
-  clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
-  animation-name:spark-spin!important;animation-duration:2.3s!important}
+html[data-theme="swiss"] .t-hot-mark i{width:8px;height:8px;border-radius:0;background:var(--theme-accent);box-shadow:none;
+  animation-duration:1.4s!important}
 @media (prefers-reduced-motion:reduce){.t-hot-mark i{display:none}}
 
 /* ── Highlight-Stufen (t-hot--1/2/3) — von PubgUI.hot() gesetzt, theme-getrieben.
