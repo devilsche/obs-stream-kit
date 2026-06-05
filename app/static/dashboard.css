@@ -1110,7 +1110,7 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
 .url-param--info b{color:var(--text)}
 .url-paramlist{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;margin:10px 0 0}
 .url-paramlist li{margin:0}
-.url-hint{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;
+.url-hint{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;margin-top:12px;
   border-top:1px solid color-mix(in srgb,var(--theme-accent,#f2b705) 35%,transparent);
   border-bottom:1px solid color-mix(in srgb,var(--theme-accent,#f2b705) 35%,transparent);
   background:color-mix(in srgb,var(--theme-accent,#f2b705) 8%,transparent);

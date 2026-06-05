@@ -382,7 +382,17 @@ def _normalize_switches(switches: list, content: str) -> list:
 
 # Hinweistexte die im URL-Detail als Info-Box erscheinen (kein reiner desc-Text).
 WIDGET_HINTS = {
-    "steam/now-playing.html": "Nur sichtbar wenn gerade ein Steam-Spiel läuft — blendet sich automatisch aus wenn nichts gespielt wird.",
+    # Auto-hide
+    "steam/now-playing.html":        "Nur sichtbar wenn gerade ein Steam-Spiel läuft — blendet sich automatisch aus wenn nichts gespielt wird.",
+    "pubg/live-bar.html":            "Nur sichtbar während einer aktiven Session — blendet sich zwischen Matches automatisch aus.",
+    "pubg/post-match-card.html":     "Blendet sich bei veralteten Daten automatisch aus. OBS-Source-Toggle steuert die Sichtbarkeit nach einem Match.",
+    "pubg/news-ticker.html":         "Versteckt sich bei inaktiver Session (außer mit ?focus=lifetime). Rotiert alle 60 Sekunden zwischen Session- und Lifetime-Snippets.",
+    "pubg/session-goal.html":        "Blendet sich 60 Sekunden nach Erreichen des Ziels automatisch aus — mit ?keepAfterDone=1 dauerhaft sichtbar.",
+    # Event-triggered / einmalige Animationen
+    "pubg/milestone-celebrate.html": "Einmalige Animation — feuert automatisch bei einem neuen Chicken-Dinner das eine 100er-Marke überschreitet. Verwendet localStorage um Doppel-Trigger zu verhindern.",
+    "pubg/chat-stats-popup.html":    "Wird per Chat-Befehl oder Streamer.bot mit ?player= ausgelöst — verschwindet nach konfigurierbarer Dauer (Standard 12 s).",
+    "steam/achievement-popup.html":  "Einmalige Animation pro Achievement — pollt alle 5 s, spielt Unlocks nacheinander ab (8 s pro Stück). Seltene Achievements lösen stärkere Effekte aus.",
+    "steam/popup.html":              "Kombiniert Now-Playing und Achievement-Popup mit Prioritäts-Queue — ein eingehendes Achievement unterbricht das laufende Now-Playing.",
 }
 
 # Reine Overlay-Widgets — kein dock (immer OBS Browser Source, kein Custom Dock).
