@@ -305,6 +305,7 @@
           <div class="url-dactions">
             <button type="button" class="url-act" id="btnCopy"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span> Kopieren</button>
             <button type="button" class="url-act ghost" id="btnPreview"><span class="material-symbols-outlined" aria-hidden="true">visibility</span> Preview</button>
+            ${switches.length ? `<button type="button" class="url-act ghost" id="btnReset" title="Gespeicherte Einstellungen zurücksetzen"><span class="material-symbols-outlined" aria-hidden="true">restart_alt</span></button>` : ""}
             <span class="url-copied" id="urlCopyStatus" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -316,7 +317,8 @@
 
     wireDetail(base, { kind: card.dataset.kind, size: card.dataset.size,
                        shownUrl: hasParamHints ? shownUrl : null,
-                       chromePreview: hasChromePreview });
+                       chromePreview: hasChromePreview,
+                       path: card.dataset.path });
     view.hidden = true;
     detailView.hidden = false;
     document.getElementById("urlBack").focus();
@@ -330,11 +332,92 @@
     const urlText = document.getElementById("urlText");
     const status = document.getElementById("urlCopyStatus");
     const scope = switchesRoot || document.createElement("div");
+    const lsKey = meta && meta.path ? "url-sw:" + meta.path : null;
+
+    // ── localStorage: gespeicherte Werte laden + in Felder eintragen ──
+    function lsLoad() {
+      if (!lsKey) return;
+      let saved;
+      try { saved = JSON.parse(localStorage.getItem(lsKey) || "{}"); } catch(_) { saved = {}; }
+      if (!saved || !Object.keys(saved).length) return;
+      scope.querySelectorAll(".sw-group").forEach(group => {
+        const key = group.dataset.param;
+        if (!(key in saved)) return;
+        const v = saved[key];
+        if (group.dataset.type === "select") {
+          group.querySelectorAll(".sw-btn").forEach(b => {
+            const active = b.dataset.value === v;
+            b.classList.toggle("active", active);
+            b.setAttribute("aria-pressed", active ? "true" : "false");
+          });
+        } else if (group.dataset.type === "multiselect") {
+          const vals = v.split(",");
+          group.querySelectorAll(".sw-btn").forEach(b => {
+            const active = vals.includes(b.dataset.value);
+            b.classList.toggle("active", active);
+            b.setAttribute("aria-pressed", active ? "true" : "false");
+          });
+        } else {
+          const inp = group.querySelector(".sw-input");
+          if (inp) inp.value = v;
+        }
+      });
+    }
+
+    function lsSave() {
+      if (!lsKey) return;
+      const saved = {};
+      scope.querySelectorAll(".sw-group").forEach(group => {
+        const key = group.dataset.param;
+        const def = group.dataset.default;
+        let v = null;
+        if (group.dataset.type === "select") {
+          const active = group.querySelector(".sw-btn.active");
+          if (active) v = active.dataset.value;
+        } else if (group.dataset.type === "multiselect") {
+          v = Array.from(group.querySelectorAll(".sw-btn.active")).map(b => b.dataset.value).join(",");
+        } else {
+          const inp = group.querySelector(".sw-input");
+          if (inp) v = inp.value.trim();
+        }
+        if (v !== null && v !== def) saved[key] = v;
+      });
+      if (Object.keys(saved).length)
+        localStorage.setItem(lsKey, JSON.stringify(saved));
+      else
+        localStorage.removeItem(lsKey);
+    }
+
+    function lsReset() {
+      if (lsKey) localStorage.removeItem(lsKey);
+      scope.querySelectorAll(".sw-group").forEach(group => {
+        const def = group.dataset.default;
+        if (group.dataset.type === "select") {
+          group.querySelectorAll(".sw-btn").forEach(b => {
+            const active = b.dataset.value === def;
+            b.classList.toggle("active", active);
+            b.setAttribute("aria-pressed", active ? "true" : "false");
+          });
+        } else if (group.dataset.type === "multiselect") {
+          group.querySelectorAll(".sw-btn").forEach(b => {
+            b.classList.remove("active");
+            b.setAttribute("aria-pressed", "false");
+          });
+        } else {
+          const inp = group.querySelector(".sw-input");
+          if (inp) inp.value = def || "";
+        }
+      });
+      refresh();
+    }
+
+    lsLoad();
 
     // _chromeUpdate wird ggf. unten belegt; refresh() ruft es immer nach dem URL-Update auf
     let _chromeUpdate = null;
     function refresh() {
       urlText.textContent = buildUrl(base, scope);
+      lsSave();
       if (_chromeUpdate) _chromeUpdate();
     }
 
@@ -441,6 +524,9 @@
         });
       });
     }
+
+    const resetBtn = document.getElementById("btnReset");
+    if (resetBtn) resetBtn.addEventListener("click", lsReset);
 
     document.getElementById("btnCopy").addEventListener("click", async () => {
       const url = (meta && meta.shownUrl) || buildUrl(base, scope);
