@@ -74,12 +74,12 @@
           <feFuncA type="discrete" tableValues="1 0"/>
         </feComponentTransfer>
         <feComposite in="SourceGraphic" in2="mask" operator="in" result="keyed"/>
-        <!-- Despill: reduce green tint in remaining pixels -->
+        <!-- Force snow pixels to pure white, keep alpha -->
         <feColorMatrix in="keyed" type="matrix" values="
-          1    0    0    0 0
-          0.35 0.3  0.35 0 0
-          0    0    1    0 0
-          0    0    0    1 0
+          0 0 0 0 1
+          0 0 0 0 1
+          0 0 0 0 1
+          0 0 0 1 0
         "/>
       </filter>
     </defs>

@@ -72,6 +72,11 @@ def transition_file(token, filepath):
     return _serve_tenant_source(token, "transitions", filepath)
 
 
+@bp_overlays.route("/s/<token>/effects/<path:filepath>")
+def effect_file(token, filepath):
+    return _serve_tenant_source(token, "effects", filepath)
+
+
 # Relative ../assets/ und ../js/ aus den Overlay-HTMLs token-scoped bedienen.
 @bp_overlays.route("/s/<token>/assets/<path:filepath>")
 def overlay_assets(token, filepath):
