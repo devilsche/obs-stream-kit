@@ -106,7 +106,7 @@
       background: linear-gradient(135deg,
         color-mix(in srgb, var(--color-bg-dark) 95%, transparent),
         color-mix(in srgb, var(--color-bg-purple) 95%, transparent));
-      border: 2px solid color-mix(in srgb, var(--color-gold) 70%, transparent);
+      border: 2px solid var(--color-gold);
       border-radius: var(--theme-radius, 16px);
       padding: 44px 64px;
       max-width: 60%;
@@ -130,21 +130,26 @@
       pointer-events: none;
     }
 
-    /* ─── Gold corner accents ────────────────────────────────────── */
-
-    .corner {
+    /* ─── Side accent lines (leave corners free) ─────────────────── */
+    .side-line {
       position: absolute;
-      background: var(--color-gold);
+      background: color-mix(in srgb, var(--color-gold) 60%, transparent);
     }
-
-    .corner-tl-h { top: -2px;    left:   calc(-2px + var(--theme-radius, 0px)); width: 28px; height: 2px; }
-    .corner-tl-v { top:   calc(-2px + var(--theme-radius, 0px)); left:  -2px;  width: 2px;  height: 28px; }
-    .corner-tr-h { top: -2px;    right:  calc(-2px + var(--theme-radius, 0px)); width: 28px; height: 2px; }
-    .corner-tr-v { top:   calc(-2px + var(--theme-radius, 0px)); right: -2px;  width: 2px;  height: 28px; }
-    .corner-bl-h { bottom: -2px; left:   calc(-2px + var(--theme-radius, 0px)); width: 28px; height: 2px; }
-    .corner-bl-v { bottom: calc(-2px + var(--theme-radius, 0px)); left:  -2px; width: 2px;  height: 28px; }
-    .corner-br-h { bottom: -2px; right:  calc(-2px + var(--theme-radius, 0px)); width: 28px; height: 2px; }
-    .corner-br-v { bottom: calc(-2px + var(--theme-radius, 0px)); right: -2px; width: 2px;  height: 28px; }
+    /* Gap from corner = max(20px, border-radius) */
+    .side-t, .side-b {
+      height: 2px;
+      left:  max(20px, var(--theme-radius, 0px));
+      right: max(20px, var(--theme-radius, 0px));
+    }
+    .side-l, .side-r {
+      width: 2px;
+      top:    max(20px, var(--theme-radius, 0px));
+      bottom: max(20px, var(--theme-radius, 0px));
+    }
+    .side-t { top: -2px; }
+    .side-b { bottom: -2px; }
+    .side-l { left: -2px; }
+    .side-r { right: -2px; }
 
     /* ─── Content ────────────────────────────────────────────────── */
 
@@ -211,14 +216,10 @@
 
   <div class="wrapper">
     <div class="alert-box">
-      <span class="corner corner-tl-h"></span>
-      <span class="corner corner-tl-v"></span>
-      <span class="corner corner-tr-h"></span>
-      <span class="corner corner-tr-v"></span>
-      <span class="corner corner-bl-h"></span>
-      <span class="corner corner-bl-v"></span>
-      <span class="corner corner-br-h"></span>
-      <span class="corner corner-br-v"></span>
+      <span class="side-line side-t"></span>
+      <span class="side-line side-b"></span>
+      <span class="side-line side-l"></span>
+      <span class="side-line side-r"></span>
 
       <div class="event-type">Donation</div>
       <div class="amount"></div>
