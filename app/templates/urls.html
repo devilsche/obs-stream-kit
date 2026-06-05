@@ -238,7 +238,11 @@
              data-default="${escapeAttr(sw.default)}"
              data-type="${escapeAttr(sw.type)}">
           <span class="sw-label">${escapeHtml(sw.label)} ${tooltip}${def}</span>
-          <div class="sw-controls">${controls}</div>
+          <div class="sw-controls">${controls}
+            <button type="button" class="sw-reset-btn" title="Reset to default" aria-label="Reset ${escapeAttr(sw.label)} to default" style="display:none">
+              <span class="material-symbols-outlined" aria-hidden="true">restart_alt</span>
+            </button>
+          </div>
         </div>`;
     }).join("");
   }
@@ -588,6 +592,58 @@
 
     const resetBtn = document.getElementById("btnReset");
     if (resetBtn) resetBtn.addEventListener("click", lsReset);
+
+    // ── Reset-Button pro Switch-Row ───────────────────────────
+    if (switchesRoot) {
+      switchesRoot.querySelectorAll(".sw-group").forEach(group => {
+        const def     = group.dataset.default || "";
+        const type    = group.dataset.type;
+        const rowReset = group.querySelector(".sw-reset-btn");
+        if (!rowReset) return;
+
+        function getCurrentVal() {
+          if (type === "select") {
+            const a = group.querySelector(".sw-btn.active");
+            return a ? a.dataset.value : def;
+          } else if (type === "multiselect") {
+            return Array.from(group.querySelectorAll(".sw-btn.active")).map(b => b.dataset.value).join(",");
+          } else {
+            const inp = group.querySelector(".sw-input");
+            return inp ? inp.value : def;
+          }
+        }
+
+        function checkDirty() {
+          rowReset.style.display = getCurrentVal() !== def ? "" : "none";
+        }
+
+        function resetRow() {
+          if (type === "select") {
+            group.querySelectorAll(".sw-btn").forEach(b => {
+              const active = b.dataset.value === def;
+              b.classList.toggle("active", active);
+              b.setAttribute("aria-pressed", active ? "true" : "false");
+            });
+          } else if (type === "multiselect") {
+            group.querySelectorAll(".sw-btn").forEach(b => {
+              b.classList.remove("active");
+              b.setAttribute("aria-pressed", "false");
+            });
+          } else {
+            const inp = group.querySelector(".sw-input");
+            if (inp) inp.value = def;
+          }
+          checkDirty();
+          refresh();
+        }
+
+        rowReset.addEventListener("click", resetRow);
+        // dirty-check bei jeder Änderung
+        group.querySelectorAll(".sw-btn").forEach(b => b.addEventListener("click", checkDirty));
+        group.querySelectorAll(".sw-input").forEach(i => i.addEventListener("input", checkDirty));
+        checkDirty();
+      });
+    }
 
     document.getElementById("btnCopy").addEventListener("click", async () => {
       const url = (meta && meta.shownUrl) || buildUrl(base, scope);
