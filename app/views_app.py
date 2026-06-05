@@ -199,9 +199,17 @@ def upload_pet_image():
     webp_bytes = buf.getvalue()
 
     # Speichern unter data/pet-images/<tenant_id>_<hash>.webp
+    # Alte Bilder desselben Tenants vorher löschen (nur neuestes behalten).
     root     = current_app.config.get("_PROJECT_ROOT", ".")
     out_dir  = os.path.join(root, "data", "pet-images")
     os.makedirs(out_dir, exist_ok=True)
+    prefix = f"{g.tenant_id}_"
+    for old in os.listdir(out_dir):
+        if old.startswith(prefix) and old.endswith(".webp"):
+            try:
+                os.remove(os.path.join(out_dir, old))
+            except OSError:
+                pass
     fname    = f"{g.tenant_id}_{hashlib.sha256(webp_bytes).hexdigest()[:12]}.webp"
     out_path = os.path.join(out_dir, fname)
     with open(out_path, "wb") as fp:

@@ -541,7 +541,8 @@
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || res.status);
             textInp.value = json.url;
-            status.textContent = json.size + " — gespeichert";
+            textInp.dispatchEvent(new Event("input", {bubbles: true}));
+            status.textContent = json.size + " — saved";
             status.className = "sw-upload-status ok";
             refresh();
           } catch(e) {
