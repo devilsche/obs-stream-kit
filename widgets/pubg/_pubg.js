@@ -33,6 +33,36 @@
     return '<span class="' + cls + '" aria-hidden="true">' + gauge + '<i></i><i></i><i></i><i></i><i></i></span>';
   };
 
+  /**
+   * makeHotMarkEl(opts) — positionierbares t-hot-mark DOM-Element.
+   *
+   * Baut denselben Markup wie _hotMark() auf, verpackt ihn in ein absolut
+   * positionierbares Wrapper-Div. Nutzer ruft .setPos(x, y) auf, um das
+   * Element zu platzieren.
+   *
+   * opts.extraClass  — zusätzliche CSS-Klassen auf dem Wrapper (String)
+   * opts.style       — zusätzliche CSS-Styles (Object, z.B. { zIndex: 4 })
+   *
+   * Returned object: { el, setPos(x, y) }
+   *   el      — das DOM-Element (für appendChild)
+   *   setPos  — setzt left/top so dass der Mittelpunkt auf (x, y) liegt
+   */
+  PubgUI.makeHotMarkEl = function(opts) {
+    opts = opts || {};
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'position:absolute;transform:translate(-50%,-50%);pointer-events:none;opacity:0';
+    if (opts.extraClass) wrap.className = opts.extraClass;
+    if (opts.style) Object.assign(wrap.style, opts.style);
+    wrap.innerHTML = PubgUI._hotMark();
+    return {
+      el: wrap,
+      setPos: function(x, y) {
+        wrap.style.left = x.toFixed(1) + 'px';
+        wrap.style.top  = y.toFixed(1) + 'px';
+      }
+    };
+  };
+
   // Highlight-Stufe aus aufsteigenden Schwellen [t1,t2,t3]: 0=keine .. 3=insane.
   PubgUI.hotTier = (value, t) => {
     value = value || 0;

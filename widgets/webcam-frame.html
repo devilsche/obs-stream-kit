@@ -6,6 +6,7 @@
   <link rel="stylesheet" href="_theme.css">
   <link rel="stylesheet" href="_blocks.css">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+  <script src="pubg/_pubg.js"></script>
   <style>
     :root {
       --frame-primary: #5e2a79;
@@ -195,33 +196,15 @@
     }
 
     var useTheme = params.get('colors') === 'theme';
-    var isAzure  = document.documentElement.getAttribute('data-theme') === 'azure';
-
-    function makeHotMark() {
-      // Same structure as PubgUI._hotMark() — t-hot-mark with 5 <i> sparks
-      var wrap = document.createElement('div');
-      wrap.className = 'arc-hotmark';
-      wrap.style.opacity = '0';
-      var cls = 't-hot-mark' + (isAzure ? ' t-hot-mark--gauge' : '');
-      var gauge = isAzure
-        ? '<svg class="t-gauge" viewBox="0 0 24 24" aria-hidden="true">'
-          + '<path d="M4 18 A9 9 0 0 1 20 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.5"/>'
-          + '<circle cx="12" cy="18" r="1.7" fill="currentColor"/>'
-          + '<line class="needle" x1="12" y1="18" x2="12" y2="9.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>'
-          + '</svg>'
-        : '';
-      wrap.innerHTML = '<span class="' + cls + '" aria-hidden="true">' + gauge + '<i></i><i></i><i></i><i></i><i></i></span>';
-      return wrap;
-    }
 
     var SPARK_COUNT = 6;
     var sparkEls = [];
     for (var i = 0; i < SPARK_COUNT; i++) {
       if (useTheme) {
-        // Theme: full t-hot-mark element (handles icon + sparks + animations via _blocks.css)
-        var el = makeHotMark();
-        iconCon.appendChild(el);
-        sparkEls.push(el);
+        // Theme: PubgUI.makeHotMarkEl() — zentrale Komponente aus _pubg.js
+        var hm = PubgUI.makeHotMarkEl({ extraClass: 'arc-hotmark' });
+        iconCon.appendChild(hm.el);
+        sparkEls.push(hm);
       } else {
         // Default: SVG circle on the arc
         var c = document.createElementNS(svgNS, 'circle');
@@ -234,26 +217,37 @@
     }
 
     function animateIcon(el, initialDelay) {
-      var isSvg = el.tagName && el.tagName.toLowerCase() === 'circle';
+      // el is either an SVG circle element, or a {el, setPos} object from makeHotMarkEl
+      var isHotMark = el && typeof el.setPos === 'function';
+      var domEl = isHotMark ? el.el : el;
+      var isSvg = !isHotMark && domEl.tagName && domEl.tagName.toLowerCase() === 'circle';
 
       function cycle() {
         var pl = polylines[Math.floor(Math.random()*polylines.length)].el;
         var pos = randomPointOnPolyline(pl);
         if (isSvg) {
-          el.setAttribute('cx', pos.x.toFixed(1));
-          el.setAttribute('cy', pos.y.toFixed(1));
-          el.animate([{opacity:0},{opacity:1}],{duration:600,fill:'forwards'}).onfinish = function(){
+          domEl.setAttribute('cx', pos.x.toFixed(1));
+          domEl.setAttribute('cy', pos.y.toFixed(1));
+          domEl.animate([{opacity:0},{opacity:1}],{duration:600,fill:'forwards'}).onfinish = function(){
             setTimeout(function(){
-              el.animate([{opacity:1},{opacity:0}],{duration:600,fill:'forwards'}).onfinish = cycle;
+              domEl.animate([{opacity:1},{opacity:0}],{duration:600,fill:'forwards'}).onfinish = cycle;
             }, 700+Math.random()*800);
           };
+        } else if (isHotMark) {
+          el.setPos(pos.x, pos.y);
+          domEl.animate([{opacity:0,transform:'translate(-50%,-50%) scale(0.4)'},{opacity:1,transform:'translate(-50%,-50%) scale(1)'}],
+            {duration:500,fill:'forwards'}).onfinish = function(){
+            setTimeout(function(){
+              domEl.animate([{opacity:1},{opacity:0}],{duration:500,fill:'forwards'}).onfinish = cycle;
+            }, 800+Math.random()*900);
+          };
         } else {
-          el.style.left = pos.x.toFixed(1)+'px';
-          el.style.top  = pos.y.toFixed(1)+'px';
-          el.animate([{opacity:0,transform:'translate(-50%,-50%) scale(0.5)'},{opacity:1,transform:'translate(-50%,-50%) scale(1)'}],
+          domEl.style.left = pos.x.toFixed(1)+'px';
+          domEl.style.top  = pos.y.toFixed(1)+'px';
+          domEl.animate([{opacity:0,transform:'translate(-50%,-50%) scale(0.5)'},{opacity:1,transform:'translate(-50%,-50%) scale(1)'}],
             {duration:600,fill:'forwards'}).onfinish = function(){
             setTimeout(function(){
-              el.animate([{opacity:1},{opacity:0}],{duration:600,fill:'forwards'}).onfinish = cycle;
+              domEl.animate([{opacity:1},{opacity:0}],{duration:600,fill:'forwards'}).onfinish = cycle;
             }, 700+Math.random()*800);
           };
         }
