@@ -730,10 +730,12 @@
   }
 
   // ── Ein Grid — alle Karten mit data-tab ──────────────────
-  const grid    = document.getElementById("urlGrid");
+  const grid     = document.getElementById("urlGrid");
   const allCards = Array.from(grid.querySelectorAll(".url-card"));
-  const tabBar  = document.querySelector(".url-tabs");
-  const tabs    = Array.from(tabBar.querySelectorAll("[role=tab]"));
+  const tabBar   = document.querySelector(".url-tabs");
+  const tabs     = Array.from(tabBar.querySelectorAll("[role=tab]"));
+  const filter   = document.getElementById("urlFilter");
+  const emptyMsg = document.getElementById("urlEmpty");
 
   function selectTab(name) {
     currentTab = name;
@@ -787,9 +789,6 @@
   selectTab(currentTab);
 
   // ── Filter ────────────────────────────────────────────────
-  const filter  = document.getElementById("urlFilter");
-  const emptyMsg = document.getElementById("urlEmpty");
-
   function applyFilter() {
     const q = (filter.value || "").toLowerCase().trim();
     if (q.length < 3) { selectTab(currentTab); return; }
