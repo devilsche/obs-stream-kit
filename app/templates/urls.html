@@ -279,6 +279,7 @@
           <div class="url-img-preview__name" id="imgPreviewName">Luke</div>
         </div>` : "";
       body = `<div class="url-switches" id="urlSwitches">${renderSwitches(switches)}</div>${imgPreviewHtml}`;
+      // Font-Preview wird in wireDetail per DOM nach dem font-Switch injiziert
     } else if (params.length) {
       tag = "Parameter";
       body = `<div class="url-param url-param--info">
@@ -420,6 +421,39 @@
     }
 
     lsLoad();
+
+    // ── Font-Preview direkt nach dem font-Switch ──────────────
+    if (switchesRoot) {
+      const fontGroup = switchesRoot.querySelector('[data-param="font"]');
+      if (fontGroup) {
+        const fp = document.createElement("div");
+        fp.id = "urlFontPreview";
+        fp.className = "url-font-preview";
+        fontGroup.insertAdjacentElement("afterend", fp);
+        function updateFontPreview() {
+          const nameGrp = switchesRoot.querySelector('[data-param="name"]');
+          const nameInp = nameGrp && nameGrp.querySelector(".sw-input");
+          const text = (nameInp && nameInp.value.trim()) || "Preview";
+          const active = fontGroup.querySelector(".sw-btn.active");
+          const font = active ? active.dataset.value : "";
+          fp.textContent = text;
+          fp.style.fontFamily = font ? "'" + font + "', cursive, sans-serif" : "";
+        }
+        // Lazy-load Google Fonts für Pet-Fonts
+        if (!document.getElementById("urlPetFonts")) {
+          const lnk = document.createElement("link");
+          lnk.id = "urlPetFonts"; lnk.rel = "stylesheet";
+          lnk.href = "https://fonts.googleapis.com/css2?family=Pacifico&family=Dancing+Script:wght@700&family=Great+Vibes&family=Satisfy&family=Sacramento&family=Lobster&display=swap";
+          document.head.appendChild(lnk);
+        }
+        fontGroup.querySelectorAll(".sw-btn").forEach(b =>
+          b.addEventListener("click", () => setTimeout(updateFontPreview, 0)));
+        const nameGrp2 = switchesRoot.querySelector('[data-param="name"]');
+        if (nameGrp2) nameGrp2.querySelector(".sw-input") &&
+          nameGrp2.querySelector(".sw-input").addEventListener("input", updateFontPreview);
+        updateFontPreview();
+      }
+    }
 
     // ── Bild-Vorschau (img-Switch) ────────────────────────────
     function updateImgPreview() {
