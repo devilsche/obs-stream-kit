@@ -122,7 +122,7 @@ WIDGET_META = [
     ("Steam",         "Achievement Feed",   "Achievement-unlock ticker (rotating list).",                           "steam/achievement-feed.html"),
     ("Steam",         "Achievement Popup",  "Animation on a fresh unlock.",                                         "steam/achievement-popup.html"),
     ("Steam",         "Combined Popup",     "Combined now-playing + achievement popup.",                            "steam/popup.html"),
-    ("Steam",         "Now Playing",        "Currently played Steam game.",                                         "steam/now-playing.html"),
+    ("Steam",         "Now Playing",        "Nur sichtbar wenn gerade ein Steam-Spiel läuft — blendet sich automatisch aus wenn nichts gespielt wird.", "steam/now-playing.html"),
     ("Steam",         "Games Ticker",       "Owned-games ticker.",                                                  "steam/games-ticker.html"),
     # Achievement Browser ist ein Tool, kein OBS-Widget -> tools/achievement-browser.html, sichtbar unter /app/tools/
 
