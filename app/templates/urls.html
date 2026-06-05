@@ -37,6 +37,11 @@
       <div class="url-crumb">URLs</div>
       <h1 class="url-title">OBS Browser-Sources</h1>
 
+      <div class="url-search">
+        <span class="material-symbols-outlined" aria-hidden="true">search</span>
+        <input type="search" id="urlFilter" placeholder="Search all sources…" aria-label="Search all sources" autocomplete="off">
+      </div>
+
       <div class="url-tabs" role="tablist" aria-label="Source-Typen">
         <button type="button" role="tab" id="urltab-overlays" data-tab="overlays" data-label="Overlays"
                 aria-selected="true" aria-controls="urlpanel-overlays">Overlays<span class="url-tabs__cnt">{{ overlays|length }}</span></button>
@@ -52,11 +57,6 @@
                 aria-selected="false" tabindex="-1" aria-controls="urlpanel-effects">Effects<span class="url-tabs__cnt">{{ effects|length }}</span></button>
         <button type="button" role="tab" id="urltab-transition" data-tab="transition" data-label="Transition"
                 aria-selected="false" tabindex="-1" aria-controls="urlpanel-transition">Transition<span class="url-tabs__cnt">{{ transitions|length }}</span></button>
-      </div>
-
-      <div class="url-search">
-        <span class="material-symbols-outlined" aria-hidden="true">search</span>
-        <input type="search" id="urlFilter" placeholder="Im Bereich filtern…" aria-label="Sources im aktiven Bereich filtern" autocomplete="off">
       </div>
 
       {# ── Overlays ── #}
@@ -828,23 +828,70 @@
       .forEach(c => grid.appendChild(c));
   });
 
-  // ── Filter (wirkt auf den aktiven Bereich) ────────────────
-  const filter = document.getElementById("urlFilter");
+  // ── Filter — global über alle Tabs ───────────────────────
+  const filter  = document.getElementById("urlFilter");
   const emptyMsg = document.getElementById("urlEmpty");
+  const allPanels = Array.from(document.querySelectorAll(".url-tabpanel"));
+  const allTabs   = Array.from(document.querySelectorAll(".url-tabs [role='tab']"));
+
   function applyFilter() {
     if (!filter) return;
     const q = (filter.value || "").toLowerCase().trim();
-    const panel = document.querySelector(".url-tabpanel:not([hidden])");
-    if (!panel) return;
-    let any = false;
-    panel.querySelectorAll(".url-card").forEach(card => {
-      const hay = ((card.dataset.label || "") + " " + (card.dataset.cat || "") + " " + (card.dataset.path || "")).toLowerCase();
-      const show = !q || hay.includes(q);
-      card.hidden = !show;
-      if (show) any = true;
+
+    if (!q) {
+      // No query: restore normal tab state — show only active panel
+      allPanels.forEach(p => {
+        p.querySelectorAll(".url-card").forEach(c => c.hidden = false);
+      });
+      const activeTab = allTabs.find(t => t.getAttribute("aria-selected") === "true");
+      const activeId  = activeTab && activeTab.getAttribute("aria-controls");
+      allPanels.forEach(p => p.hidden = p.id !== activeId);
+      if (emptyMsg) emptyMsg.hidden = true;
+      return;
+    }
+
+    // Search all panels, collect which ones have hits
+    const panelsWithHits = new Set();
+    let totalHits = 0;
+    allPanels.forEach(p => {
+      let hits = 0;
+      p.querySelectorAll(".url-card").forEach(card => {
+        const hay = ((card.dataset.label || "") + " " + (card.dataset.cat || "") + " " + (card.dataset.path || "") + " " + (card.dataset.desc || "")).toLowerCase();
+        const show = hay.includes(q);
+        card.hidden = !show;
+        if (show) { hits++; totalHits++; }
+      });
+      if (hits > 0) panelsWithHits.add(p);
     });
-    if (emptyMsg) emptyMsg.hidden = any;
+
+    if (totalHits === 0) {
+      // Nothing found: keep current panel, show empty msg
+      const activeTab = allTabs.find(t => t.getAttribute("aria-selected") === "true");
+      const activeId  = activeTab && activeTab.getAttribute("aria-controls");
+      allPanels.forEach(p => p.hidden = p.id !== activeId);
+      if (emptyMsg) emptyMsg.hidden = false;
+    } else if (panelsWithHits.size === 1) {
+      // Single tab: activate it
+      const targetPanel = [...panelsWithHits][0];
+      const targetTab   = allTabs.find(t => t.getAttribute("aria-controls") === targetPanel.id);
+      allPanels.forEach(p => p.hidden = p !== targetPanel);
+      allTabs.forEach(t => {
+        const sel = t === targetTab;
+        t.setAttribute("aria-selected", sel ? "true" : "false");
+        t.setAttribute("tabindex",       sel ? "0" : "-1");
+      });
+      if (emptyMsg) emptyMsg.hidden = true;
+    } else {
+      // Multiple tabs: show all panels with hits, no tab active
+      allPanels.forEach(p => p.hidden = !panelsWithHits.has(p));
+      allTabs.forEach(t => {
+        t.setAttribute("aria-selected", "false");
+        t.setAttribute("tabindex", "-1");
+      });
+      if (emptyMsg) emptyMsg.hidden = true;
+    }
   }
+
   if (filter) filter.addEventListener("input", applyFilter);
 
   // ── Deep-Link (#src=<path>) ───────────────────────────────
