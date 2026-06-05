@@ -285,11 +285,7 @@
         infoBits.push('<strong>OBS Browser Source size:</strong> ' + dw + '×' + dh + ' px (default — adjusts with settings)');
       }
     }
-    const isTransparent = card.dataset.kind === 'overlay';
-    infoBits.push(isTransparent
-      ? '<strong>Background:</strong> Transparent — layer over your scene as an overlay'
-      : '<strong>Background:</strong> Has own background — use as standalone scene source');
-    infoBits.push("Token is in the URL — paste directly into OBS as Browser Source");
+    infoBits.push("Paste the URL into OBS → Properties → URL — set size to match above");
 
     detailContent.innerHTML = `
       <div class="url-detail-col">${configCol}</div>
@@ -721,6 +717,7 @@
         body.style.setProperty("--ov-h", meta._dynH);
       } else {
         body.classList.remove("dn-modal__body--overlay");
+        body.classList.add("dn-modal__body--checker");
       }
       frame.src = u;
       // Inject checkerboard directly into the iframe body (same-origin).
@@ -743,13 +740,9 @@
           doc.head.appendChild(st);
         } catch(_) {}
       }
-      if (isOverlay) {
-        frame.onload = () => { injectChecker(frame.contentDocument); };
-        // Fallback: try after a short delay in case onload already fired
-        setTimeout(() => injectChecker(frame.contentDocument), 300);
-      } else {
-        frame.onload = null;
-      }
+      // Checkerboard für alle Sources — injectChecker entscheidet selbst ob transparent
+      frame.onload = () => { injectChecker(frame.contentDocument); };
+      setTimeout(() => injectChecker(frame.contentDocument), 400);
       modal.showModal();
     });
   }
