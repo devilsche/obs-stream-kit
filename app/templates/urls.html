@@ -778,7 +778,12 @@
   allCards.forEach(card => {
     card.addEventListener("click", () => {
       if (card.dataset.tab) currentTab = card.dataset.tab;
-      openDetail(card);
+      try {
+        openDetail(card);
+      } catch(e) {
+        console.error("openDetail error:", e, card.dataset.label, card.dataset.tab);
+        alert("Debug: " + e.message + " | " + card.dataset.label);
+      }
     });
   });
 
