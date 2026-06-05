@@ -40,10 +40,16 @@ WIDGET_SWITCHES = {
         {"key": "goal",    "label": "Ziel",    "type": "number", "default": "50", "min": 1},
     ],
     "tipgoal.html": [
-        {"key": "title",    "label": "Titel",    "type": "text", "default": "Tip Goal",  "placeholder": "Tip Goal"},
-        {"key": "current",  "label": "Aktuell",  "type": "text", "default": "0",         "placeholder": "0"},
-        {"key": "goal",     "label": "Ziel",     "type": "text", "default": "100",       "placeholder": "100"},
-        {"key": "currency", "label": "Währung",  "type": "text", "default": "€",         "placeholder": "€"},
+        {"key": "title",    "label": "Titel",   "type": "text", "default": "Tip Goal", "placeholder": "Tip Goal"},
+        {"key": "current",  "label": "Aktuell", "type": "text", "default": "0",        "placeholder": "0"},
+        {"key": "goal",     "label": "Ziel",    "type": "text", "default": "100",      "placeholder": "100"},
+        {"key": "currency", "label": "Währung", "type": "text", "default": "€",        "placeholder": "€"},
+    ],
+    "tipgoal-banner.html": [
+        {"key": "title",    "label": "Titel",   "type": "text", "default": "Tip Goal", "placeholder": "Tip Goal"},
+        {"key": "current",  "label": "Aktuell", "type": "text", "default": "0",        "placeholder": "0"},
+        {"key": "goal",     "label": "Ziel",    "type": "text", "default": "100",      "placeholder": "100"},
+        {"key": "currency", "label": "Währung", "type": "text", "default": "€",        "placeholder": "€"},
     ],
 }
 
