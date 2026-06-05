@@ -740,9 +740,24 @@
           doc.head.appendChild(st);
         } catch(_) {}
       }
-      // Checkerboard für alle Sources — injectChecker entscheidet selbst ob transparent
-      frame.onload = () => { injectChecker(frame.contentDocument); };
-      setTimeout(() => injectChecker(frame.contentDocument), 400);
+      // Checkerboard + Auto-Größe für alle Sources
+      function afterLoad() {
+        injectChecker(frame.contentDocument);
+        // Für Sources ohne feste Größe: Content-Dimensionen auslesen und skalieren
+        if (!dim[0] || !dim[1]) {
+          try {
+            const doc = frame.contentDocument;
+            const cw = doc.body.scrollWidth  || doc.documentElement.scrollWidth  || 1920;
+            const ch = doc.body.scrollHeight || doc.documentElement.scrollHeight || 200;
+            body.classList.remove("dn-modal__body--checker");
+            body.classList.add("dn-modal__body--overlay");
+            body.style.setProperty("--ov-w", cw);
+            body.style.setProperty("--ov-h", ch);
+          } catch(_) {}
+        }
+      }
+      frame.onload = afterLoad;
+      setTimeout(afterLoad, 400);
       modal.showModal();
     });
   }
