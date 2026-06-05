@@ -65,7 +65,7 @@
         {% for o in overlays %}
         {{ src_card('overlay','Overlay',o.label,
                     overlay_base~'/s/'~token~'/overlays/'~o.file,'overlays/'~o.file,
-                    o.size,o.desc,[],o.params or [],False,'','overlays') }}
+                    o.size,o.desc,(o.switches or []),(o.params or []),False,'','overlays') }}
         {% endfor %}
         {% for cat,label,desc,path,switches,hint in widgets %}
         {{ src_card('widget',cat,label,
@@ -272,8 +272,8 @@
     const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${chromeHtml}`;
 
     const infoBits = [];
-    if (card.dataset.size) infoBits.push(escapeHtml(card.dataset.size) + " · transparent");
-    infoBits.push("Token steckt in der URL · einfach als Browser-Source einsetzen");
+    if (card.dataset.size) infoBits.push(escapeHtml(card.dataset.size));
+    infoBits.push("Token is embedded in the URL — add directly as OBS Browser Source");
 
     detailContent.innerHTML = `
       <div class="url-detail-col">${configCol}</div>
@@ -709,6 +709,9 @@
         try {
           if (!doc || !doc.head) return;
           if (doc.getElementById("preview-checker")) return;
+          // Nur injizieren wenn body wirklich transparent ist
+          const bg = getComputedStyle(doc.body).backgroundColor;
+          if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return;
           const st = doc.createElement("style");
           st.id = "preview-checker";
           st.textContent = `html,body{
