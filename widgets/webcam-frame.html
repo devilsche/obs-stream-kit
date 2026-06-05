@@ -5,7 +5,14 @@
   <title>Webcam Frame</title>
   <link rel="stylesheet" href="../_theme.css">
   <style>
+    /* Default: Entry look (hardcoded) */
     :root {
+      --frame-primary: #5e2a79;
+      --frame-accent:  #f2b705;
+      --frame-accent2: #c9a0dc;
+    }
+    /* Theme mode: follow active theme tokens */
+    html.use-theme {
       --frame-primary: var(--theme-primary,  #5e2a79);
       --frame-accent:  var(--theme-accent,   #f2b705);
       --frame-accent2: var(--theme-accent-2, #c9a0dc);
@@ -110,6 +117,8 @@
     'use strict';
 
     var params  = new URLSearchParams(window.location.search);
+    if (params.get('colors') === 'theme')
+      document.documentElement.classList.add('use-theme');
     var camW    = parseInt(params.get('width'),  10) || 400;
     var camH    = parseInt(params.get('height'), 10) || 225;
     var padding = 50;
