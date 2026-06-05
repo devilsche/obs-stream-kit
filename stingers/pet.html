@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <script src="../js/stinger-ready.js"></script>
+  <title>Pet Stinger</title>
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: block;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    :root {
+      --kicker-in:   0.40s;
+      --pet-in:      0.30s;
+      --name-in:     0.55s;
+      --stage-out:   3.20s;
+      --time-offset: 0s;
+      --pet-img-url: url('../assets/stingers/luke.jpg');
+    }
+
+    html.paused *, html.paused *::before, html.paused *::after {
+      animation-play-state: paused !important;
+    }
+
+    @keyframes bgFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes petIn {
+      0%   { transform: translate(-50%, -50%) scale(0.2) rotate(-8deg); opacity: 0; filter: blur(20px) saturate(1.1) contrast(1.05); }
+      60%  { transform: translate(-50%, -50%) scale(1.08) rotate(2deg); opacity: 1; filter: blur(0) saturate(1.1) contrast(1.05); }
+      80%  { transform: translate(-50%, -50%) scale(0.96) rotate(-1deg); filter: blur(0) saturate(1.1) contrast(1.05); }
+      100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; filter: blur(0) saturate(1.1) contrast(1.05); }
+    }
+    @keyframes ringSpin {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to   { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+    @keyframes ringFadeIn {
+      from { opacity: 0; transform: translate(-50%, -50%) scale(0.6) rotate(0deg); }
+      to   { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+    }
+    @keyframes nameSlideIn {
+      0%   { transform: translateX(-50%) translateY(40px) scale(0.9); opacity: 0; }
+      60%  { transform: translateX(-50%) translateY(-8px) scale(1.05); opacity: 1; }
+      100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+    }
+    @keyframes kickerFadeIn {
+      from { transform: translateX(-50%) translateY(16px); opacity: 0; }
+      to   { transform: translateX(-50%) translateY(0); opacity: 1; }
+    }
+    @keyframes emojiFloat {
+      0%   { transform: translate(0, 30px) scale(0) rotate(var(--start-rot)); opacity: 0; }
+      40%  { opacity: 1; transform: translate(calc(var(--dx) * 0.5), calc(-20px + var(--dy) * 0.5)) scale(1) rotate(var(--mid-rot)); }
+      100% { transform: translate(var(--dx), calc(-140px + var(--dy))) scale(1.05) rotate(var(--end-rot)); opacity: 0; }
+    }
+    @keyframes pulse {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); }
+      50%      { transform: translate(-50%, -50%) scale(1.04); }
+    }
+    @keyframes fadeOutAll {
+      from { opacity: 1; }
+      to   { opacity: 0; }
+    }
+
+    .forest-bg {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 50% 60%,
+        rgba(60, 85, 45, 0.55) 0%,
+        rgba(35, 48, 25, 0.85) 45%,
+        rgba(18, 22, 14, 0.95) 90%);
+      z-index: 1; opacity: 0;
+      animation: bgFadeIn 0.4s ease-out forwards;
+    }
+    .rays {
+      position: absolute; inset: 0;
+      background:
+        linear-gradient(100deg, transparent 20%, rgba(255,210,120,0.08) 35%, transparent 45%),
+        linear-gradient(80deg,  transparent 50%, rgba(255,210,120,0.06) 62%, transparent 72%),
+        linear-gradient(110deg, transparent 70%, rgba(255,210,120,0.05) 80%, transparent 88%);
+      z-index: 2; opacity: 0; mix-blend-mode: screen;
+      animation: bgFadeIn 0.6s ease-out 0.1s forwards;
+    }
+    .halo-ring {
+      position: absolute; top: 50%; left: 50%;
+      width: 720px; height: 720px; border-radius: 50%;
+      transform: translate(-50%, -50%) scale(0.6); opacity: 0;
+      background: radial-gradient(circle at center,
+        rgba(255,190,90,0.35) 0%, rgba(255,150,50,0.2) 35%, transparent 70%);
+      z-index: 3;
+      animation: ringFadeIn 0.5s ease-out 0.15s forwards, pulse 2.4s ease-in-out 0.7s infinite;
+    }
+    .accent-ring {
+      position: absolute; top: 50%; left: 50%;
+      width: 700px; height: 700px; border-radius: 50%;
+      border: 3px dashed rgba(242,183,5,0.55);
+      transform: translate(-50%, -50%) rotate(0deg); opacity: 0; z-index: 4;
+      animation: bgFadeIn 0.5s ease-out 0.3s forwards, ringSpin 24s linear infinite;
+    }
+    .pet-img {
+      position: absolute; top: 50%; left: 50%;
+      width: 620px; height: 620px;
+      transform: translate(-50%, -50%) scale(0.2) rotate(-8deg);
+      border-radius: 50%;
+      background: var(--pet-img-url) center/cover no-repeat;
+      z-index: 5; opacity: 0;
+      filter: saturate(1.1) contrast(1.05);
+      box-shadow:
+        0 0 40px rgba(255,160,60,0.5),
+        0 0 90px rgba(200,100,30,0.35),
+        inset 0 0 60px rgba(0,0,0,0.35);
+      mask-image: radial-gradient(circle at center, black 55%, transparent 95%);
+      -webkit-mask-image: radial-gradient(circle at center, black 55%, transparent 95%);
+      animation: petIn 0.7s cubic-bezier(0.22,1.4,0.36,1) calc(var(--pet-in) - var(--time-offset)) forwards;
+    }
+    .emojis-layer {
+      position: absolute; top: 0; left: 0;
+      width: 1920px; height: 1080px;
+      z-index: 6; pointer-events: none;
+    }
+    .emoji-el {
+      position: absolute; line-height: 1; opacity: 0;
+      animation: emojiFloat var(--dur, 2.3s) ease-out forwards;
+    }
+    .name {
+      position: absolute;
+      top: calc(50% + 350px); left: 50%;
+      transform: translateX(-50%) translateY(40px) scale(0.9);
+      font-size: 180px; font-weight: 900; color: #f2b705;
+      letter-spacing: -2px; line-height: 1; white-space: nowrap;
+      text-transform: uppercase; z-index: 7; opacity: 0;
+      -webkit-text-stroke: 4px #2a1a0a;
+      text-shadow: 8px 8px 0 rgba(0,0,0,0.6), 0 0 30px rgba(242,183,5,0.7), 0 0 60px rgba(255,160,60,0.5);
+      animation: nameSlideIn 0.55s cubic-bezier(0.22,1.6,0.36,1) calc(var(--name-in) - var(--time-offset)) forwards;
+    }
+    .kicker {
+      position: absolute;
+      top: calc(50% - 430px); left: 50%;
+      transform: translateX(-50%) translateY(16px);
+      font-size: 38px; font-weight: 700; color: #ffffff;
+      letter-spacing: 14px; text-transform: uppercase;
+      z-index: 7; opacity: 0;
+      text-shadow: 0 0 16px rgba(255,190,90,0.9), 2px 2px 0 rgba(0,0,0,0.6);
+      animation: kickerFadeIn 0.4s ease-out calc(var(--kicker-in) - var(--time-offset)) forwards;
+    }
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOutAll 0.5s ease-in var(--stage-out) forwards;
+    }
+
+    .tune-panel {
+      position: fixed; top: 80px; right: 16px; width: 420px;
+      background: rgba(20,10,30,0.92); border: 2px solid #f2b705;
+      padding: 16px; border-radius: 10px; color: #f2b705;
+      font-family: 'Courier New', monospace; font-size: 13px;
+      z-index: 1000; display: none; box-shadow: 0 0 30px rgba(242,183,5,0.4);
+    }
+    .tune-panel.visible { display: block; }
+    .tune-panel h2 { font-size: 16px; margin-bottom: 12px; letter-spacing: 2px; text-transform: uppercase; }
+    .tune-panel table { width: 100%; border-collapse: collapse; }
+    .tune-panel th, .tune-panel td { padding: 4px 6px; text-align: left; border-bottom: 1px solid rgba(242,183,5,0.2); }
+    .tune-panel th { font-size: 11px; text-transform: uppercase; }
+    .tune-panel input {
+      width: 70px; background: rgba(242,183,5,0.1); border: 1px solid rgba(242,183,5,0.4);
+      color: #f2b705; padding: 3px 6px; font-family: inherit; font-size: 12px;
+      text-align: right; border-radius: 3px;
+    }
+    .tune-panel input:focus { outline: 1px solid #f2b705; }
+    .tune-panel tr.clickable { cursor: pointer; }
+    .tune-panel tr.clickable:hover { background: rgba(242,183,5,0.15); }
+    .tune-panel tr.clickable:hover .tune-label { color: #fff; }
+    .tune-panel .tune-label { font-size: 11px; color: rgba(255,220,150,0.75); max-width: 200px; }
+    .tune-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .tune-btn {
+      flex: 1; background: rgba(242,183,5,0.15); border: 1px solid #f2b705;
+      color: #f2b705; padding: 8px 10px; font-family: inherit; font-size: 12px;
+      font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+      border-radius: 4px; cursor: pointer;
+    }
+    .tune-btn:hover { background: rgba(242,183,5,0.3); }
+    .tune-btn.reset { border-color: #ff8888; color: #ff8888; }
+    .tune-btn.reset:hover { background: rgba(255,136,136,0.2); }
+    .time-indicator {
+      position: fixed; bottom: 16px; right: 16px;
+      background: rgba(20,10,30,0.85); border: 1px solid #f2b705;
+      color: #f2b705; padding: 6px 14px; font-family: 'Courier New', monospace;
+      font-size: 14px; z-index: 1000; display: none; border-radius: 4px;
+    }
+    .time-indicator.visible { display: block; }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="forest-bg"></div>
+    <div class="rays"></div>
+    <div class="kicker" id="kickerEl">&#10022; Herzensbrecher &#10022;</div>
+    <div class="halo-ring"></div>
+    <div class="accent-ring"></div>
+    <div class="pet-img" id="petImg"></div>
+    <div class="emojis-layer" id="emojisLayer"></div>
+    <div class="name" id="nameEl">Luke</div>
+  </div>
+
+  <div class="tune-panel" id="tunePanel">
+    <h2>Pet Tune Mode</h2>
+    <table id="tuneTable"></table>
+    <div class="tune-actions">
+      <button class="tune-btn" id="applyBtn">&gt; Apply</button>
+      <button class="tune-btn" id="copyBtn">&#128203; Copy</button>
+      <button class="tune-btn reset" id="resetBtn">Reset</button>
+    </div>
+    <div style="margin-top:14px;border-top:1px solid rgba(242,183,5,0.3);padding-top:12px;">
+      <div style="font-size:11px;text-transform:uppercase;margin-bottom:6px;">Playback</div>
+      <div class="tune-actions" style="margin-top:6px;">
+        <button class="tune-btn" id="pauseBtn">&#9208; Pause</button>
+        <button class="tune-btn" id="replayBtn">&#8634; Replay</button>
+      </div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:6px;font-size:11px;">
+        <span>Von:</span>
+        <input type="number" id="fromInput" value="0" step="0.05" min="0" max="5" style="width:60px">
+        <span>Bis:</span>
+        <input type="number" id="toInput" value="3" step="0.05" min="0" max="5" style="width:60px">
+        <button class="tune-btn" id="segmentBtn" style="flex:0 0 auto;padding:6px 12px;">&#9658; Play</button>
+      </div>
+    </div>
+  </div>
+  <div class="time-indicator" id="timeInd">t = 0.00s</div>
+
+  <script>
+    (function () {
+      'use strict';
+      var params = new URLSearchParams(window.location.search);
+
+      /* ── Parameter auslesen ── */
+      var petName    = params.get('name')   || 'Luke';
+      var kickerText = params.get('kicker') || '✦ Herzensbrecher ✦';
+      var imgUrl     = params.get('img')    || '';
+      var emojiRaw   = params.get('emojis') || '♥,🐾'; /* ♥,🐾 */
+      var EMOJIS     = emojiRaw.split(',').map(function(e){ return e.trim(); }).filter(Boolean);
+      if (!EMOJIS.length) EMOJIS = ['♥', '🐾'];
+
+      /* Name + Kicker setzen */
+      document.getElementById('nameEl').textContent   = petName;
+      document.getElementById('kickerEl').textContent = kickerText;
+
+      /* Bild setzen */
+      if (imgUrl) {
+        document.documentElement.style.setProperty(
+          '--pet-img-url', 'url("' + imgUrl.replace(/"/g, '%22') + '")');
+      }
+
+      /* ── Timing ── */
+      var DEFAULTS = { 'kicker-in': 0.40, 'pet-in': 0.30, 'name-in': 0.55, 'stage-out': 3.20 };
+      var LABELS   = { 'kicker-in': 'Kicker IN', 'pet-in': 'Bild IN', 'name-in': 'Name IN', 'stage-out': 'Fade-Out' };
+      var KEYS     = ['kicker-in','pet-in','name-in','stage-out'];
+      var STORAGE  = 'pet-tune-values';
+      var saved    = {};
+      try { var raw = localStorage.getItem(STORAGE); if (raw) saved = JSON.parse(raw); } catch(_) {}
+      function val(k) { return saved[k] !== undefined ? saved[k] : DEFAULTS[k]; }
+      function applyToRoot() {
+        var root = document.documentElement;
+        KEYS.forEach(function(k){ root.style.setProperty('--' + k, val(k) + 's'); });
+      }
+      applyToRoot();
+
+      /* ── Emojis spawnen ── */
+      var layer  = document.getElementById('emojisLayer');
+      var COUNT  = 28;
+      for (var i = 0; i < COUNT; i++) {
+        var el    = document.createElement('div');
+        el.className = 'emoji-el';
+        var emoji = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+        var size  = (22 + Math.random() * 34).toFixed(0);
+        var x     = 80  + Math.random() * 1760;
+        var y     = 100 + Math.random() * 880;
+        var sRot  = (Math.random() * 40 - 20) + 'deg';
+        var mRot  = (Math.random() * 40 - 20) + 'deg';
+        var eRot  = (Math.random() * 80 - 40) + 'deg';
+        var dx    = (Math.random() * 80 - 40) + 'px';
+        var dy    = (Math.random() * 50 - 25) + 'px';
+        var delay = (0.4 + Math.random() * 2.0).toFixed(2) + 's';
+        var dur   = (1.8 + Math.random() * 1.0).toFixed(2) + 's';
+        var glow  = 'rgba(242,183,5,0.7)';
+        el.textContent = emoji;
+        el.setAttribute('style',
+          'left:' + x + 'px;top:' + y + 'px;' +
+          'font-size:' + size + 'px;' +
+          'text-shadow:0 0 ' + Math.round(size * 0.5) + 'px ' + glow + ';' +
+          '--start-rot:' + sRot + ';--mid-rot:' + mRot + ';--end-rot:' + eRot + ';' +
+          '--dx:' + dx + ';--dy:' + dy + ';' +
+          '--dur:' + dur + ';' +
+          'animation-delay:' + delay + ';');
+        layer.appendChild(el);
+      }
+
+      /* ── Tune-Panel ── */
+      var tuneMode = params.get('tune') === '1';
+      if (!tuneMode) return;
+
+      var table = document.getElementById('tuneTable');
+      var header = document.createElement('tr');
+      header.innerHTML = '<th>Event</th><th>Zeit</th>';
+      table.appendChild(header);
+
+      KEYS.forEach(function(k) {
+        var tr = document.createElement('tr');
+        tr.className = 'clickable';
+        var tdL = document.createElement('td');
+        tdL.className = 'tune-label';
+        tdL.textContent = LABELS[k];
+        tr.appendChild(tdL);
+        var td = document.createElement('td');
+        var inp = document.createElement('input');
+        inp.type = 'number'; inp.step = '0.05'; inp.min = '0'; inp.max = '5';
+        inp.value = val(k); inp.dataset.key = k;
+        td.appendChild(inp); tr.appendChild(td);
+        tr.addEventListener('click', function(e) {
+          if (e.target.tagName === 'INPUT') return;
+          var from = Math.max(0, val(k) - 0.2).toFixed(2);
+          document.getElementById('fromInput').value = from;
+          document.getElementById('toInput').value   = (val(k) + 0.6).toFixed(2);
+        });
+        table.appendChild(tr);
+      });
+
+      document.getElementById('tunePanel').classList.add('visible');
+      document.getElementById('timeInd').classList.add('visible');
+
+      function currentVals() {
+        var v = {};
+        document.querySelectorAll('.tune-panel input[data-key]').forEach(function(i){ v[i.dataset.key] = parseFloat(i.value)||0; });
+        return v;
+      }
+      function apply()  { localStorage.setItem(STORAGE, JSON.stringify(currentVals())); location.reload(); }
+      function reset()  { localStorage.removeItem(STORAGE); location.reload(); }
+      document.getElementById('applyBtn').addEventListener('click', apply);
+      document.getElementById('resetBtn').addEventListener('click', reset);
+      document.getElementById('copyBtn').addEventListener('click', function() {
+        var v = currentVals();
+        var text = 'Pet Tune:\n' + KEYS.map(function(k){ return LABELS[k] + ': ' + v[k].toFixed(2) + 's'; }).join('\n');
+        navigator.clipboard && navigator.clipboard.writeText(text);
+      });
+
+      var html = document.documentElement;
+      var pauseBtn = document.getElementById('pauseBtn');
+      function setPaused(p) {
+        if (p) { html.classList.add('paused'); pauseBtn.innerHTML = '&#9654; Resume'; }
+        else   { html.classList.remove('paused'); pauseBtn.innerHTML = '&#9208; Pause'; }
+      }
+      document.getElementById('pauseBtn').addEventListener('click', function(){ setPaused(!html.classList.contains('paused')); });
+
+      function resetAnim(off) {
+        html.style.setProperty('--time-offset', (off||0) + 's');
+        var s = document.querySelector('.stage');
+        s.parentNode.replaceChild(s.cloneNode(true), s);
+        html.classList.remove('paused');
+        pauseBtn.innerHTML = '&#9208; Pause';
+      }
+      document.getElementById('replayBtn').addEventListener('click', function(){ resetAnim(0); });
+      document.getElementById('segmentBtn').addEventListener('click', function() {
+        var from = parseFloat(document.getElementById('fromInput').value)||0;
+        var to   = parseFloat(document.getElementById('toInput').value)||val('stage-out');
+        if (to <= from) return;
+        resetAnim(from);
+        setTimeout(function(){ setPaused(true); }, (to - from) * 1000);
+      });
+      document.addEventListener('keydown', function(e) {
+        if (e.target.tagName === 'INPUT') return;
+        if (e.key === ' ') { e.preventDefault(); setPaused(!html.classList.contains('paused')); }
+        else if (e.key === 'r' || e.key === 'R') resetAnim(0);
+        else if (e.key === 's' || e.key === 'S') apply();
+      });
+
+      var startRef = null;
+      var timeInd = document.getElementById('timeInd');
+      (function tick() {
+        if (html.classList.contains('stinger-loading')) { requestAnimationFrame(tick); return; }
+        if (startRef === null) startRef = performance.now();
+        var t = html.classList.contains('paused') ? 0 : (performance.now() - startRef) / 1000;
+        timeInd.textContent = 't = ' + t.toFixed(2) + 's';
+        requestAnimationFrame(tick);
+      })();
+    })();
+  </script>
+
+</body>
+</html>

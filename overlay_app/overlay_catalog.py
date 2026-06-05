@@ -90,6 +90,18 @@ DECOR = [
 
 
 STINGER_META = {
+    "pet.html": {"switches": [
+        {"key": "name",   "label": "Name",     "type": "text", "default": "Luke",
+         "placeholder": "z.B. Luke"},
+        {"key": "kicker", "label": "Kosename", "type": "text", "default": "✦ Herzensbrecher ✦",
+         "placeholder": "z.B. ✦ Herzensbrecher ✦"},
+        {"key": "img",    "label": "Bild-URL", "type": "text", "default": "",
+         "placeholder": "https://... oder file:///C:/...",
+         "tooltip": "URL zum Tier-Bild. Lokal: file:///C:/Pfad/zum/Bild.jpg"},
+        {"key": "emojis", "label": "Emojis",   "type": "text", "default": "♥,🐾",
+         "placeholder": "♥,🐾,🐶",
+         "tooltip": "Komma-getrennte Emojis die um das Bild fliegen"},
+    ]},
     "heart.html": {"switches": [
         {"key": "name", "label": "Name", "type": "text",
          "default": "Liebling", "placeholder": "z.B. LuCKoR_HD",
