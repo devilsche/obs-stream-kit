@@ -69,14 +69,6 @@ WIDGET_SWITCHES = {
          "placeholder": "e.g. PEX_LuCKoR", "tooltip": "Normally set by a chat command"},
         {"key": "durationMs", "label": "Duration (ms)", "type": "number", "default": "8000", "min": 1000},
     ],
-    "tipgoal-banner.html": [
-        {"key": "title",    "label": "Title",      "type": "text",   "default": "Tip Goal", "placeholder": "Tip Goal"},
-        {"key": "current",  "label": "Current",    "type": "text",   "default": "0",        "placeholder": "0"},
-        {"key": "goal",     "label": "Goal",       "type": "text",   "default": "100",      "placeholder": "100"},
-        {"key": "currency", "label": "Currency",   "type": "text",   "default": "€",        "placeholder": "€"},
-        {"key": "dock",     "label": "Background", "type": "select", "default": "0",
-         "options": [["0", "Transparent (OBS)"], ["1", "With background (Dock)"]]},
-    ],
 }
 
 # (kategorie, label, beschreibung, path)
