@@ -81,15 +81,11 @@ DECOR = [
      "desc": "Logo overlay.",                          "params": [], "switches": []},
     {"key": "webcam-frame",   "label": "Webcam Frame",    "file": "webcam-frame.html",   "size": "",
      "desc": "Decorative frame around the camera. Canvas = camera size + 100px padding on each side.", "params": [], "switches": [
-         {"key": "colors", "label": "Colors", "type": "select", "default": "default",
-          "options": [["default", "Default (purple/gold)"], ["theme", "Theme colors"]]},
          {"key": "width",  "label": "Width",  "type": "number", "default": "400", "min": 100},
          {"key": "height", "label": "Height", "type": "number", "default": "225", "min": 50},
      ]},
     {"key": "tipgoal-banner", "label": "Tip-Goal Banner", "file": "tipgoal-banner.html", "size": "600×180",
      "desc": "Tip goal as a slim progress banner.",    "params": [], "switches": [
-         {"key": "colors",   "label": "Colors",   "type": "select", "default": "default",
-          "options": [["default", "Default (purple/gold)"], ["theme", "Theme colors"]]},
          {"key": "title",    "label": "Title",    "type": "text",   "default": "Tip Goal", "placeholder": "Tip Goal"},
          {"key": "current",  "label": "Current",  "type": "text",   "default": "0",        "placeholder": "0"},
          {"key": "goal",     "label": "Goal",     "type": "text",   "default": "100",      "placeholder": "100"},

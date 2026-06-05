@@ -25,7 +25,7 @@
     /* Alias auf die Theme-Tokens — Fallback = bisheriger Entry-Look. */
     :root {
       --color-gold:        var(--theme-accent, #f2b705);
-      --color-bg-dark:     var(--theme-bg, #0d0d1a);
+      --color-bg-dark:     color-mix(in srgb, var(--theme-primary, #0d0d1a) 85%, #000);
       --color-bg-purple:   var(--theme-surface, #1a0d2e);
       --color-purple-glow: var(--theme-primary, #5e2a79);
       --color-text:        var(--theme-text, #ffffff);

@@ -118,8 +118,7 @@
     'use strict';
 
     var params  = new URLSearchParams(window.location.search);
-    if (params.get('colors') === 'theme')
-      document.documentElement.classList.add('use-theme');
+    document.documentElement.classList.add('use-theme');
 
     var camW    = parseInt(params.get('width'),  10) || 400;
     var camH    = parseInt(params.get('height'), 10) || 225;

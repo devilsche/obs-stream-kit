@@ -188,8 +188,8 @@
   <script>
     (function () {
       var params   = new URLSearchParams(window.location.search);
-      if (params.get('dock')   === '1')     document.body.classList.add('dock');
-      if (params.get('colors') === 'theme') document.documentElement.classList.add('use-theme');
+      if (params.get('dock') === '1') document.body.classList.add('dock');
+      document.documentElement.classList.add('use-theme');
 
       var title    = params.get('title')    || 'Tip Goal';
       var current  = parseFloat((params.get('current') || '0').replace(',', '.'))   || 0;

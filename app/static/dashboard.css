@@ -1129,6 +1129,7 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
   background-color:#505050;
   background-image:repeating-conic-gradient(#3a3a3a 0% 25%,#505050 0% 50%);
   background-size:20px 20px;
+  max-width:calc(var(--ov-w,1920)*1px);
   container-type:inline-size;aspect-ratio:var(--ov-w,1920)/var(--ov-h,1080)}
 .dn-modal__body--overlay iframe{width:calc(var(--ov-w,1920)*1px);height:calc(var(--ov-h,1080)*1px);
   transform-origin:0 0;transform:scale(calc(100cqw / (var(--ov-w,1920)*1px)))}
