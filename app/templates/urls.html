@@ -782,9 +782,10 @@
     previewModal.addEventListener("close", unload);
   }
 
-  // ── Karten einmalig alphabetisch sortieren ───────────────
+  // ── Karten einmalig alphabetisch sortieren + initialen Tab anwenden ─
   allCards.sort((a,b) => (a.dataset.label||"").localeCompare(b.dataset.label||""))
           .forEach(c => grid.appendChild(c));
+  selectTab(currentTab);
 
   // ── Filter ────────────────────────────────────────────────
   const filter  = document.getElementById("urlFilter");
