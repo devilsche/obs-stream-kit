@@ -281,6 +281,9 @@
       { key: "playersPollMs", label: "Players poll (ms)", type: "range",
         min: 30000, max: 300000, default: 60000,
         tooltip: "How often to refresh the live player count." },
+      { key: "fakeAppId", label: "Preview App-ID", type: "text", default: "",
+        placeholder: "z.B. 578080 (PUBG)",
+        tooltip: "Steam App-ID fuer Preview/Demo — zeigt das Spiel ohne dass es gerade gespielt wird." },
     ]);
 
     function fmtHours(min) {

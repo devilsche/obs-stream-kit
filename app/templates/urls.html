@@ -3,12 +3,13 @@
 
 {# Eine Source-Karte fuers Grid. switches/params als Listen → im Markup als
    HTML-sicheres JSON (tojson escaped < > & ' → sicher im single-quote-Attr). #}
-{% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[], chrome_preview=False) %}
+{% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[], chrome_preview=False, hint='') %}
 <button type="button" class="url-card"
         data-kind="{{ kind }}" data-label="{{ label }}" data-cat="{{ cat }}"
         data-path="{{ path }}" data-base="{{ base }}"
         {% if size %}data-size="{{ size }}"{% endif %}
         {% if desc %}data-desc="{{ desc }}"{% endif %}
+        {% if hint %}data-hint="{{ hint }}"{% endif %}
         {% if chrome_preview %}data-chrome-preview="true"{% endif %}
         data-switches='{{ switches|tojson }}' data-params='{{ params|tojson }}'>
   <span class="url-card__corner" aria-hidden="true"></span>
@@ -70,10 +71,10 @@
       {# ── Widgets ── #}
       <div class="url-tabpanel" id="urlpanel-widgets" role="tabpanel" aria-labelledby="urltab-widgets" hidden>
         <div class="url-grid">
-          {% for cat, label, desc, path, switches in widgets %}
+          {% for cat, label, desc, path, switches, hint in widgets %}
           {{ src_card('widget', cat, label,
                       base_url ~ '/s/' ~ token ~ '/widgets/' ~ path, path,
-                      '', desc, switches) }}
+                      '', desc, switches, [], False, hint) }}
           {% endfor %}
         </div>
       </div>
@@ -257,6 +258,7 @@
 
     const label = escapeHtml(card.dataset.label);
     const desc = card.dataset.desc ? `<p class="url-dbox__desc">${escapeHtml(card.dataset.desc)}</p>` : "";
+    const hint = card.dataset.hint ? `<div class="url-hint"><span class="material-symbols-outlined" aria-hidden="true">info</span>${escapeHtml(card.dataset.hint)}</div>` : "";
     const hasChromePreview = card.dataset.chromePreview === "true";
 
     let tag, body;
@@ -282,7 +284,7 @@
           <div class="url-chrome-chrome" id="cpChrome">PREVIEW</div>
         </div>
       </div>` : "";
-    const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${body}</div>${chromeHtml}`;
+    const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${body}</div>${chromeHtml}${hint}`;
 
     const infoBits = [];
     if (card.dataset.size) infoBits.push(escapeHtml(card.dataset.size) + " · transparent");

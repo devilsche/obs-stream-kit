@@ -1110,5 +1110,10 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
 .url-param--info b{color:var(--text)}
 .url-paramlist{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;margin:10px 0 0}
 .url-paramlist li{margin:0}
+.url-hint{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;border-radius:var(--r-box);
+  border:1px solid color-mix(in srgb,var(--brand-purple) 40%,transparent);
+  background:color-mix(in srgb,var(--brand-purple) 8%,transparent);
+  color:var(--text-muted);font-size:13px;line-height:1.5}
+.url-hint .material-symbols-outlined{font-size:18px;color:var(--brand-purple);flex-shrink:0;margin-top:1px}
 .url-paramlist code{color:var(--brand-purple);background:var(--bg-deeper);
   border:1px solid var(--border);padding:3px 9px;border-radius:var(--r-ctrl);font-size:12px}

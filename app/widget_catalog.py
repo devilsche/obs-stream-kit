@@ -122,7 +122,7 @@ WIDGET_META = [
     ("Steam",         "Achievement Feed",   "Achievement-unlock ticker (rotating list).",                           "steam/achievement-feed.html"),
     ("Steam",         "Achievement Popup",  "Animation on a fresh unlock.",                                         "steam/achievement-popup.html"),
     ("Steam",         "Combined Popup",     "Combined now-playing + achievement popup.",                            "steam/popup.html"),
-    ("Steam",         "Now Playing",        "Nur sichtbar wenn gerade ein Steam-Spiel läuft — blendet sich automatisch aus wenn nichts gespielt wird.", "steam/now-playing.html"),
+    ("Steam",         "Now Playing",        "Aktuell gespieltes Steam-Spiel.", "steam/now-playing.html"),
     ("Steam",         "Games Ticker",       "Owned-games ticker.",                                                  "steam/games-ticker.html"),
     # Achievement Browser ist ein Tool, kein OBS-Widget -> tools/achievement-browser.html, sichtbar unter /app/tools/
 
@@ -380,6 +380,11 @@ def _normalize_switches(switches: list, content: str) -> list:
     return out
 
 
+# Hinweistexte die im URL-Detail als Info-Box erscheinen (kein reiner desc-Text).
+WIDGET_HINTS = {
+    "steam/now-playing.html": "Nur sichtbar wenn gerade ein Steam-Spiel läuft — blendet sich automatisch aus wenn nichts gespielt wird.",
+}
+
 # Reine Overlay-Widgets — kein dock (immer OBS Browser Source, kein Custom Dock).
 _NO_DOCK = {
     "pubg/live-bar.html", "pubg/streak-counter.html", "pubg/mates.html",
@@ -420,7 +425,8 @@ def build(project_root: str) -> list:
         if ("_pubg.js" in content and path not in _NO_DOCK
                 and not any(s["key"] == "dock" for s in switches)):
             switches.append(_DOCK_SW)
-        out.append((cat, label, desc, path, switches))
+        hint = WIDGET_HINTS.get(path, "")
+        out.append((cat, label, desc, path, switches, hint))
     return out
 
 
