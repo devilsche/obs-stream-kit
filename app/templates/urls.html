@@ -457,16 +457,13 @@
         ip.id = "urlImgThumb";
         ip.className = "url-img-thumb";
         imgGroup.insertAdjacentElement("afterend", ip);
+        // Standard-Bild aus der Basis-URL ableiten (stingers/pet.html → assets/stingers/luke.jpg)
+        const defaultImgUrl = base.replace(/stingers\/[^?#]+$/, "assets/stingers/luke.jpg");
         function updateImgThumb() {
           const inp = imgGroup.querySelector(".sw-input");
           const url = inp ? inp.value.trim() : "";
-          if (url) {
-            ip.style.backgroundImage = "url(" + JSON.stringify(url) + ")";
-            ip.style.display = "";
-          } else {
-            ip.style.backgroundImage = "";
-            ip.style.display = "none";
-          }
+          ip.style.backgroundImage = "url(" + JSON.stringify(url || defaultImgUrl) + ")";
+          ip.style.display = "";
         }
         const imgInp = imgGroup.querySelector(".sw-input");
         if (imgInp) ["input","change","paste"].forEach(ev =>
