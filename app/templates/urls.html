@@ -445,6 +445,30 @@
           nameGrp2.querySelector(".sw-input").addEventListener("input", updateFontPreview);
         updateFontPreview();
       }
+
+      // ── Bild-Vorschau direkt unter dem img-Switch ─────────────
+      const imgGroup = switchesRoot.querySelector('[data-param="img"]');
+      if (imgGroup) {
+        const ip = document.createElement("div");
+        ip.id = "urlImgThumb";
+        ip.className = "url-img-thumb";
+        imgGroup.insertAdjacentElement("afterend", ip);
+        function updateImgThumb() {
+          const inp = imgGroup.querySelector(".sw-input");
+          const url = inp ? inp.value.trim() : "";
+          if (url) {
+            ip.style.backgroundImage = "url(" + JSON.stringify(url) + ")";
+            ip.style.display = "";
+          } else {
+            ip.style.backgroundImage = "";
+            ip.style.display = "none";
+          }
+        }
+        const imgInp = imgGroup.querySelector(".sw-input");
+        if (imgInp) ["input","change","paste"].forEach(ev =>
+          imgInp.addEventListener(ev, () => setTimeout(updateImgThumb, 0)));
+        updateImgThumb();
+      }
     }
 
     // _chromeUpdate wird ggf. unten belegt; refresh() ruft es immer nach dem URL-Update auf
