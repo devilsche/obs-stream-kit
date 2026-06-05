@@ -427,13 +427,22 @@
         fp.className = "url-font-preview";
         fontGroup.insertAdjacentElement("afterend", fp);
         function updateFontPreview() {
-          const nameGrp = switchesRoot.querySelector('[data-param="name"]');
-          const nameInp = nameGrp && nameGrp.querySelector(".sw-input");
+          const nameGrp   = switchesRoot.querySelector('[data-param="name"]');
+          const nameInp   = nameGrp && nameGrp.querySelector(".sw-input");
+          const colorsGrp = switchesRoot.querySelector('[data-param="colors"]');
+          const colorsBtn = colorsGrp && colorsGrp.querySelector(".sw-btn.active");
+          const isTheme   = colorsBtn && colorsBtn.dataset.value === "theme";
           const text = (nameInp && nameInp.value.trim()) || "Preview";
           const active = fontGroup.querySelector(".sw-btn.active");
           const font = active ? active.dataset.value : "";
           fp.textContent = text;
           fp.style.fontFamily = font ? "'" + font + "', cursive, sans-serif" : "";
+          fp.style.color = isTheme
+            ? getComputedStyle(document.documentElement).getPropertyValue("--theme-primary").trim() || "#f2b705"
+            : "#f2b705";
+          fp.style.textShadow = isTheme
+            ? "0 0 18px color-mix(in srgb, var(--theme-primary) 60%, transparent)"
+            : "0 0 18px rgba(242,183,5,.6), 0 0 40px rgba(255,160,60,.3)";
         }
         // Lazy-load Google Fonts für Pet-Fonts
         if (!document.getElementById("urlPetFonts")) {
@@ -443,6 +452,9 @@
           document.head.appendChild(lnk);
         }
         fontGroup.querySelectorAll(".sw-btn").forEach(b =>
+          b.addEventListener("click", () => setTimeout(updateFontPreview, 0)));
+        const colorsGrp2 = switchesRoot.querySelector('[data-param="colors"]');
+        if (colorsGrp2) colorsGrp2.querySelectorAll(".sw-btn").forEach(b =>
           b.addEventListener("click", () => setTimeout(updateFontPreview, 0)));
         const nameGrp2 = switchesRoot.querySelector('[data-param="name"]');
         if (nameGrp2) nameGrp2.querySelector(".sw-input") &&
@@ -458,7 +470,7 @@
         ip.className = "url-img-thumb";
         imgGroup.insertAdjacentElement("afterend", ip);
         // Standard-Bild aus der Basis-URL ableiten (stingers/pet.html → assets/stingers/luke.jpg)
-        const defaultImgUrl = base.replace(/stingers\/[^?#]+$/, "assets/stingers/luke.jpg");
+        const defaultImgUrl = base.replace(/(?:stingers|transitions)\/[^?#]+$/, "assets/stingers/luke.jpg");
         function updateImgThumb() {
           const inp = imgGroup.querySelector(".sw-input");
           const url = inp ? inp.value.trim() : "";
