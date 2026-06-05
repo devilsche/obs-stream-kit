@@ -11,6 +11,31 @@ import re
 from typing import Optional
 
 
+# Manuelle Switch-Definitionen fuer Widgets ohne buildFilter (z.B. reine JS-Widgets).
+# Fallback: wird genutzt wenn buildFilter nichts liefert.
+_TIER_SW = {"key": "tier", "label": "Tier", "type": "select", "default": "1",
+             "options": [["1", "Tier 1"], ["2", "Tier 2"], ["3", "Tier 3"]]}
+
+WIDGET_SWITCHES = {
+    "latest-follower.html": [
+        {"key": "name", "label": "Username", "type": "text",
+         "default": "", "placeholder": "z.B. CoolStreamer",
+         "tooltip": "Wird von Streamer.bot gesetzt — hier zum Testen"},
+    ],
+    "latest-sub.html": [
+        {"key": "name", "label": "Username", "type": "text",
+         "default": "", "placeholder": "z.B. CoolStreamer",
+         "tooltip": "Wird von Streamer.bot gesetzt — hier zum Testen"},
+        _TIER_SW,
+    ],
+    "latest-tip.html": [
+        {"key": "name",   "label": "Username", "type": "text",
+         "default": "", "placeholder": "z.B. CoolStreamer"},
+        {"key": "amount", "label": "Betrag",   "type": "text",
+         "default": "", "placeholder": "z.B. 5,00 €"},
+    ],
+}
+
 # (kategorie, label, beschreibung, path)
 WIDGET_META = [
     ("PUBG · Stats", "Career Card",          "Career stats: K/D, wins, top 10 — current season.",                    "pubg/career-card.html"),
@@ -325,8 +350,10 @@ def build(project_root: str) -> list:
                 with open(full, "r", encoding="utf-8") as fp:
                     content = fp.read()
                 switches = _extract_schema_from_html(content)
+                if not switches:
+                    switches = list(WIDGET_SWITCHES.get(path, []))
             except Exception:
-                switches = []
+                switches = list(WIDGET_SWITCHES.get(path, []))
         switches = _normalize_switches(switches, content)
         out.append((cat, label, desc, path, switches))
     return out
