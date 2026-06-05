@@ -27,22 +27,25 @@
       font-family: 'DM Sans', sans-serif;
     }
 
-    /* Default: warm forest gold */
+    /* Default: warm forest — gold accent, green bg, warm rays */
     :root {
-      --pet-accent:  #f2b705;
-      --pet-primary: #3c5520;
+      --pet-bg:        #3c5520;
+      --pet-accent:    #f2b705;
+      --pet-secondary: rgba(255, 210, 120, 0.08);
+      --pet-name:      #f2b705;
+      --kicker-in:     0.40s;
+      --pet-in:        0.30s;
+      --name-in:       0.55s;
+      --stage-out:     3.20s;
+      --time-offset:   0s;
+      --pet-img-url:   url('../assets/stingers/luke.jpg');
     }
-    /* Theme mode: follow active theme tokens */
+    /* Theme mode: bg=theme-bg, name=primary, rays=accent-2, ring=accent */
     html.pet-theme {
-      --pet-accent:  var(--theme-accent,  #f2b705);
-      --pet-primary: var(--theme-primary, #3c5520);
-    }
-      --kicker-in:   0.40s;
-      --pet-in:      0.30s;
-      --name-in:     0.55s;
-      --stage-out:   3.20s;
-      --time-offset: 0s;
-      --pet-img-url: url('../assets/stingers/luke.jpg');
+      --pet-bg:        var(--theme-bg,      #08040f);
+      --pet-accent:    var(--theme-accent,  #f2b705);
+      --pet-secondary: var(--theme-accent-2, rgba(255,210,120,0.08));
+      --pet-name:      var(--theme-primary, #f2b705);
     }
 
     html.paused *, html.paused *::before, html.paused *::after {
@@ -93,18 +96,18 @@
     .forest-bg {
       position: absolute; inset: 0;
       background: radial-gradient(ellipse at 50% 60%,
-        color-mix(in srgb, var(--pet-primary) 55%, transparent) 0%,
-        color-mix(in srgb, var(--pet-primary) 85%, #000) 45%,
-        color-mix(in srgb, var(--pet-primary) 95%, #000) 90%);
+        color-mix(in srgb, var(--pet-bg) 55%, transparent) 0%,
+        color-mix(in srgb, var(--pet-bg) 85%, #000) 45%,
+        color-mix(in srgb, var(--pet-bg) 95%, #000) 90%);
       z-index: 1; opacity: 0;
       animation: bgFadeIn 0.4s ease-out forwards;
     }
     .rays {
       position: absolute; inset: 0;
       background:
-        linear-gradient(100deg, transparent 20%, rgba(255,210,120,0.08) 35%, transparent 45%),
-        linear-gradient(80deg,  transparent 50%, rgba(255,210,120,0.06) 62%, transparent 72%),
-        linear-gradient(110deg, transparent 70%, rgba(255,210,120,0.05) 80%, transparent 88%);
+        linear-gradient(100deg, transparent 20%, var(--pet-secondary) 35%, transparent 45%),
+        linear-gradient(80deg,  transparent 50%, var(--pet-secondary) 62%, transparent 72%),
+        linear-gradient(110deg, transparent 70%, var(--pet-secondary) 80%, transparent 88%);
       z-index: 2; opacity: 0; mix-blend-mode: screen;
       animation: bgFadeIn 0.6s ease-out 0.1s forwards;
     }
@@ -154,13 +157,13 @@
       position: absolute;
       top: calc(50% + 360px); left: 50%;
       transform: translateX(-50%) translateY(40px) scale(0.9);
-      font-size: 130px; font-weight: 700; color: var(--pet-accent);
+      font-size: 130px; font-weight: 700; color: var(--pet-name);
       letter-spacing: 2px; line-height: 1; white-space: nowrap;
       z-index: 7; opacity: 0;
       text-shadow:
-        0 0 24px color-mix(in srgb, var(--pet-accent) 85%, transparent),
-        0 0 55px color-mix(in srgb, var(--pet-accent) 55%, transparent),
-        0 0 90px color-mix(in srgb, var(--pet-accent) 30%, transparent);
+        0 0 24px color-mix(in srgb, var(--pet-name) 85%, transparent),
+        0 0 55px color-mix(in srgb, var(--pet-name) 55%, transparent),
+        0 0 90px color-mix(in srgb, var(--pet-name) 30%, transparent);
       animation: nameSlideIn 0.55s cubic-bezier(0.22,1.6,0.36,1) calc(var(--name-in) - var(--time-offset)) forwards;
     }
     .kicker {
