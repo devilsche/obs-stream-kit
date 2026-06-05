@@ -266,11 +266,20 @@
     const desc = card.dataset.desc ? `<p class="url-dbox__desc">${escapeHtml(card.dataset.desc)}</p>` : "";
     const hint = card.dataset.hint ? `<div class="url-hint"><span class="material-symbols-outlined" aria-hidden="true">info</span>${escapeHtml(card.dataset.hint)}</div>` : "";
     const hasChromePreview = card.dataset.chromePreview === "true";
+    const hasImgPreview = switches.some(s => s.key === "img");
 
     let tag, body;
     if (switches.length) {
       tag = "konfigurieren";
-      body = `<div class="url-switches" id="urlSwitches">${renderSwitches(switches)}</div>`;
+      const imgPreviewHtml = hasImgPreview ? `
+        <div class="url-dbox url-img-preview" id="urlImgPreview">
+          <div class="url-img-preview__ring"></div>
+          <div class="url-img-preview__circle" id="imgPreviewCircle"></div>
+          <div class="url-img-preview__empty" id="imgPreviewEmpty">
+            <span class="material-symbols-outlined" aria-hidden="true">pets</span>
+          </div>
+        </div>` : "";
+      body = `<div class="url-switches" id="urlSwitches">${renderSwitches(switches)}</div>${imgPreviewHtml}`;
     } else if (params.length) {
       tag = "Parameter";
       body = `<div class="url-param url-param--info">
@@ -413,11 +422,54 @@
 
     lsLoad();
 
+    // ── Bild-Vorschau (img-Switch) ────────────────────────────
+    function updateImgPreview() {
+      const circle = document.getElementById("imgPreviewCircle");
+      const empty  = document.getElementById("imgPreviewEmpty");
+      if (!circle) return;
+      const imgGrp = scope.querySelector('[data-param="img"]');
+      const inp    = imgGrp && imgGrp.querySelector(".sw-input");
+      const url    = inp ? inp.value.trim() : "";
+      if (url) {
+        circle.style.backgroundImage = "url(" + JSON.stringify(url) + ")";
+        circle.style.display = "";
+        if (empty) empty.style.display = "none";
+      } else {
+        circle.style.backgroundImage = "";
+        circle.style.display = "none";
+        if (empty) empty.style.display = "";
+      }
+    }
+    if (!document.getElementById("urlImgPreviewStyles")) {
+      const st = document.createElement("style");
+      st.id = "urlImgPreviewStyles";
+      st.textContent = `
+        .url-img-preview{position:relative;display:flex;align-items:center;justify-content:center;
+          height:180px;overflow:visible!important;background:radial-gradient(ellipse at 50% 60%,
+          rgba(60,85,45,.45) 0%,rgba(18,22,14,.9) 100%)}
+        .url-img-preview__ring{position:absolute;width:148px;height:148px;border-radius:50%;
+          border:2px dashed rgba(242,183,5,.5);animation:spin 24s linear infinite}
+        @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+        .url-img-preview__circle{width:130px;height:130px;border-radius:50%;
+          background:center/cover no-repeat;
+          box-shadow:0 0 24px rgba(255,160,60,.5),0 0 60px rgba(200,100,30,.3);
+          mask-image:radial-gradient(circle at center,#000 55%,transparent 95%);
+          -webkit-mask-image:radial-gradient(circle at center,#000 55%,transparent 95%)}
+        .url-img-preview__empty{display:flex;align-items:center;justify-content:center;
+          width:130px;height:130px;border-radius:50%;
+          border:2px solid rgba(242,183,5,.25);color:rgba(242,183,5,.4)}
+        .url-img-preview__empty .material-symbols-outlined{font-size:48px}
+      `;
+      document.head.appendChild(st);
+    }
+    updateImgPreview();
+
     // _chromeUpdate wird ggf. unten belegt; refresh() ruft es immer nach dem URL-Update auf
     let _chromeUpdate = null;
     function refresh() {
       urlText.textContent = buildUrl(base, scope);
       lsSave();
+      updateImgPreview();
       if (_chromeUpdate) _chromeUpdate();
     }
 
@@ -522,6 +574,12 @@
             refresh();
           });
         });
+        // img-Input sofort live-preview aktualisieren (auch bei paste)
+        if (group.dataset.param === "img") {
+          const imgInp = group.querySelector(".sw-input");
+          if (imgInp) ["input","change","paste"].forEach(ev =>
+            imgInp.addEventListener(ev, () => setTimeout(updateImgPreview, 0)));
+        }
       });
     }
 
