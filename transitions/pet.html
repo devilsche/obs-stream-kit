@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
   <script src="../js/stinger-ready.js"></script>
+  <link rel="stylesheet" href="../widgets/_theme.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Dancing+Script:wght@700&family=Great+Vibes&family=Satisfy&family=Sacramento&family=Lobster&family=Lobster+Two:ital@1&family=Caveat:wght@700&family=Kaushan+Script&family=Courgette&family=Yellowtail&family=Allura&family=Cookie&family=Merienda:wght@700&display=swap" rel="stylesheet">
@@ -27,6 +28,8 @@
     }
 
     :root {
+      --pet-accent:  var(--theme-accent,  #f2b705);
+      --pet-primary: var(--theme-primary, #3c5520);
       --kicker-in:   0.40s;
       --pet-in:      0.30s;
       --name-in:     0.55s;
@@ -83,9 +86,9 @@
     .forest-bg {
       position: absolute; inset: 0;
       background: radial-gradient(ellipse at 50% 60%,
-        rgba(60, 85, 45, 0.55) 0%,
-        rgba(35, 48, 25, 0.85) 45%,
-        rgba(18, 22, 14, 0.95) 90%);
+        color-mix(in srgb, var(--pet-primary) 55%, transparent) 0%,
+        color-mix(in srgb, var(--pet-primary) 85%, #000) 45%,
+        color-mix(in srgb, var(--pet-primary) 95%, #000) 90%);
       z-index: 1; opacity: 0;
       animation: bgFadeIn 0.4s ease-out forwards;
     }
@@ -103,14 +106,15 @@
       width: 720px; height: 720px; border-radius: 50%;
       transform: translate(-50%, -50%) scale(0.6); opacity: 0;
       background: radial-gradient(circle at center,
-        rgba(255,190,90,0.35) 0%, rgba(255,150,50,0.2) 35%, transparent 70%);
+        color-mix(in srgb, var(--pet-accent) 35%, transparent) 0%,
+        color-mix(in srgb, var(--pet-accent) 20%, transparent) 35%, transparent 70%);
       z-index: 3;
       animation: ringFadeIn 0.5s ease-out 0.15s forwards, pulse 2.4s ease-in-out 0.7s infinite;
     }
     .accent-ring {
       position: absolute; top: 50%; left: 50%;
       width: 700px; height: 700px; border-radius: 50%;
-      border: 3px dashed rgba(242,183,5,0.55);
+      border: 3px dashed color-mix(in srgb, var(--pet-accent) 55%, transparent);
       transform: translate(-50%, -50%) rotate(0deg); opacity: 0; z-index: 4;
       animation: bgFadeIn 0.5s ease-out 0.3s forwards, ringSpin 24s linear infinite;
     }
@@ -123,8 +127,8 @@
       z-index: 5; opacity: 0;
       filter: saturate(1.1) contrast(1.05);
       box-shadow:
-        0 0 40px rgba(255,160,60,0.5),
-        0 0 90px rgba(200,100,30,0.35),
+        0 0 40px color-mix(in srgb, var(--pet-accent) 50%, transparent),
+        0 0 90px color-mix(in srgb, var(--pet-accent) 35%, transparent),
         inset 0 0 60px rgba(0,0,0,0.35);
       mask-image: radial-gradient(circle at center, black 55%, transparent 95%);
       -webkit-mask-image: radial-gradient(circle at center, black 55%, transparent 95%);
@@ -143,13 +147,13 @@
       position: absolute;
       top: calc(50% + 360px); left: 50%;
       transform: translateX(-50%) translateY(40px) scale(0.9);
-      font-size: 130px; font-weight: 700; color: #f2b705;
+      font-size: 130px; font-weight: 700; color: var(--pet-accent);
       letter-spacing: 2px; line-height: 1; white-space: nowrap;
       z-index: 7; opacity: 0;
       text-shadow:
-        0 0 24px rgba(242,183,5,0.85),
-        0 0 55px rgba(255,160,60,0.55),
-        0 0 90px rgba(255,120,30,0.3);
+        0 0 24px color-mix(in srgb, var(--pet-accent) 85%, transparent),
+        0 0 55px color-mix(in srgb, var(--pet-accent) 55%, transparent),
+        0 0 90px color-mix(in srgb, var(--pet-accent) 30%, transparent);
       animation: nameSlideIn 0.55s cubic-bezier(0.22,1.6,0.36,1) calc(var(--name-in) - var(--time-offset)) forwards;
     }
     .kicker {
@@ -236,9 +240,9 @@
         <button class="tune-btn" id="replayBtn">&#8634; Replay</button>
       </div>
       <div style="margin-top:10px;display:flex;align-items:center;gap:6px;font-size:11px;">
-        <span>Von:</span>
+        <span>From:</span>
         <input type="number" id="fromInput" value="0" step="0.05" min="0" max="5" style="width:60px">
-        <span>Bis:</span>
+        <span>To:</span>
         <input type="number" id="toInput" value="3" step="0.05" min="0" max="5" style="width:60px">
         <button class="tune-btn" id="segmentBtn" style="flex:0 0 auto;padding:6px 12px;">&#9658; Play</button>
       </div>
@@ -277,7 +281,7 @@
 
       /* ── Timing ── */
       var DEFAULTS = { 'kicker-in': 0.40, 'pet-in': 0.30, 'name-in': 0.55, 'stage-out': 3.20 };
-      var LABELS   = { 'kicker-in': 'Kicker IN', 'pet-in': 'Bild IN', 'name-in': 'Name IN', 'stage-out': 'Fade-Out' };
+      var LABELS   = { 'kicker-in': 'Kicker IN', 'pet-in': 'Image IN', 'name-in': 'Name IN', 'stage-out': 'Fade Out' };
       var KEYS     = ['kicker-in','pet-in','name-in','stage-out'];
       var STORAGE  = 'pet-tune-values';
       var saved    = {};

@@ -87,39 +87,9 @@ DECOR = [
 
 
 STINGER_META = {
-    "pet.html": {"switches": [
-        {"key": "name",   "label": "Name",      "type": "text", "default": "Luke",
-         "placeholder": "e.g. Luke"},
-        {"key": "font",   "label": "Font",      "type": "select", "default": "",
-         "options": [
-             ["", "Auto (DM Sans)"],
-             ["Pacifico",        "Pacifico"],
-             ["Dancing Script",  "Dancing Script"],
-             ["Great Vibes",     "Great Vibes"],
-             ["Satisfy",         "Satisfy"],
-             ["Sacramento",      "Sacramento"],
-             ["Lobster",         "Lobster"],
-             ["Lobster Two",     "Lobster Two"],
-             ["Caveat",          "Caveat"],
-             ["Kaushan Script",  "Kaushan Script"],
-             ["Courgette",       "Courgette"],
-             ["Yellowtail",      "Yellowtail"],
-             ["Allura",          "Allura"],
-             ["Cookie",          "Cookie"],
-             ["Merienda",        "Merienda"],
-         ]},
-        {"key": "kicker", "label": "Nickname",  "type": "text", "default": "✦ Heartbreaker ✦",
-         "placeholder": "e.g. ✦ Heartbreaker ✦"},
-        {"key": "img",    "label": "Image URL", "type": "text", "default": "",
-         "placeholder": "https://... or file:///C:/...",
-         "tooltip": "URL to the pet image. Local: file:///C:/path/to/image.jpg"},
-        {"key": "emojis", "label": "Emojis",    "type": "text", "default": "♥,🐾",
-         "placeholder": "♥,🐾,🐶",
-         "tooltip": "Comma-separated emojis that float around the image"},
-    ]},
     "heart.html": {"switches": [
         {"key": "name", "label": "Name", "type": "text",
-         "default": "Darling", "placeholder": "e.g. LuCKoR_HD",
+         "default": "", "placeholder": "e.g. Darling",
          "tooltip": "Shown as the recipient name in the heart stinger"},
     ]},
     "lens-flare.html": {"switches": [
@@ -134,7 +104,35 @@ STINGER_META = {
     ]},
 }
 
+_PET_FONTS = [
+    ["", "Auto (DM Sans)"], ["Pacifico", "Pacifico"], ["Dancing Script", "Dancing Script"],
+    ["Great Vibes", "Great Vibes"], ["Satisfy", "Satisfy"], ["Sacramento", "Sacramento"],
+    ["Lobster", "Lobster"], ["Lobster Two", "Lobster Two"], ["Caveat", "Caveat"],
+    ["Kaushan Script", "Kaushan Script"], ["Courgette", "Courgette"],
+    ["Yellowtail", "Yellowtail"], ["Allura", "Allura"], ["Cookie", "Cookie"],
+    ["Merienda", "Merienda"],
+]
+
 TRANSITIONS = [
+    {
+        "key": "pet",
+        "label": "Pet",
+        "file": "pet.html",
+        "size": "1920×1080",
+        "desc": "Personalised pet stinger — name, font, image and floating emojis.",
+        "params": [],
+        "chrome_preview": False,
+        "switches": [
+            {"key": "name",   "label": "Name",      "type": "text",   "default": "Luke", "placeholder": "e.g. Luke"},
+            {"key": "font",   "label": "Font",      "type": "select", "default": "", "options": _PET_FONTS},
+            {"key": "kicker", "label": "Nickname",  "type": "text",   "default": "✦ Heartbreaker ✦", "placeholder": "e.g. ✦ Heartbreaker ✦"},
+            {"key": "img",    "label": "Image URL", "type": "text",   "default": "",
+             "placeholder": "https://... or file:///C:/...",
+             "tooltip": "URL to the pet image. Local: file:///C:/path/to/image.jpg"},
+            {"key": "emojis", "label": "Emojis",   "type": "text",   "default": "♥,🐾",
+             "placeholder": "♥,🐾,🐶", "tooltip": "Comma-separated emojis that float around the image"},
+        ],
+    },
     {
         "key": "stinger",
         "label": "Stinger",
