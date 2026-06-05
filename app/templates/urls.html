@@ -748,14 +748,11 @@
         try {
           if (!doc || !doc.head) return;
           if (doc.getElementById("preview-checker")) return;
-          const cs = getComputedStyle(document.documentElement);
-          const c1 = cs.getPropertyValue("--theme-primary").trim()  || "#3a3a3a";
-          const c2 = cs.getPropertyValue("--theme-accent-2").trim() || "#505050";
           const st = doc.createElement("style");
           st.id = "preview-checker";
           st.textContent = `html,body{
-            background-color:${c2} !important;
-            background-image:repeating-conic-gradient(color-mix(in srgb,${c1} 60%,#000) 0% 25%,color-mix(in srgb,${c2} 60%,#000) 0% 50%) !important;
+            background-color:#3a3a3a !important;
+            background-image:repeating-conic-gradient(#2a2a2a 0% 25%,#3a3a3a 0% 50%) !important;
             background-size:20px 20px !important;}`;
           doc.head.appendChild(st);
         } catch(_) {}
