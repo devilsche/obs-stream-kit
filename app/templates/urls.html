@@ -744,22 +744,26 @@
         frame.src = u + (u.includes("?") ? "&" : "?") + "dock=1";
       }
       // Inject checkerboard directly into the iframe body (same-origin).
+      function injectChecker(doc) {
+        try {
+          if (!doc || !doc.head) return;
+          if (doc.getElementById("preview-checker")) return;
+          const cs = getComputedStyle(document.documentElement);
+          const c1 = cs.getPropertyValue("--theme-primary").trim()  || "#3a3a3a";
+          const c2 = cs.getPropertyValue("--theme-accent-2").trim() || "#505050";
+          const st = doc.createElement("style");
+          st.id = "preview-checker";
+          st.textContent = `html,body{
+            background-color:${c2} !important;
+            background-image:repeating-conic-gradient(color-mix(in srgb,${c1} 60%,#000) 0% 25%,color-mix(in srgb,${c2} 60%,#000) 0% 50%) !important;
+            background-size:20px 20px !important;}`;
+          doc.head.appendChild(st);
+        } catch(_) {}
+      }
       if (isOverlay) {
-        frame.onload = () => {
-          try {
-            const doc = frame.contentDocument;
-            if (!doc) return;
-            const st = doc.createElement("style");
-            st.id = "preview-checker";
-            st.textContent = `
-              html, body {
-                background-color: #505050 !important;
-                background-image: repeating-conic-gradient(#3a3a3a 0% 25%, #505050 0% 50%) !important;
-                background-size: 20px 20px !important;
-              }`;
-            doc.head.appendChild(st);
-          } catch(_) {}
-        };
+        frame.onload = () => { injectChecker(frame.contentDocument); };
+        // Fallback: try after a short delay in case onload already fired
+        setTimeout(() => injectChecker(frame.contentDocument), 300);
       } else {
         frame.onload = null;
       }

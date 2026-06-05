@@ -4,31 +4,24 @@
   <meta charset="UTF-8" />
   <title>Webcam Frame</title>
   <link rel="stylesheet" href="_theme.css">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
   <style>
-    /* Default: Entry look (hardcoded) */
     :root {
       --frame-primary: #5e2a79;
       --frame-accent:  #f2b705;
       --frame-accent2: #c9a0dc;
+      --frame-hot-icon: "local_fire_department";
     }
-    /* Theme mode: follow active theme tokens */
     html.use-theme {
       --frame-primary: var(--theme-primary,  #5e2a79);
       --frame-accent:  var(--theme-accent,   #f2b705);
       --frame-accent2: var(--theme-accent-2, #c9a0dc);
+      --frame-hot-icon: var(--theme-hot-icon, "local_fire_department");
     }
 
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      overflow: hidden;
-      background: transparent;
-    }
-
-    .canvas {
-      position: relative;
-      background: transparent;
-    }
+    body { overflow: hidden; background: transparent; }
+    .canvas { position: relative; background: transparent; }
 
     .cam-cutout {
       position: absolute;
@@ -37,19 +30,11 @@
       border-radius: 4px;
     }
 
-    .lightning-layer {
-      position: absolute;
-      pointer-events: none;
-      z-index: 2;
-    }
+    .lightning-layer { position: absolute; pointer-events: none; z-index: 2; }
 
-    .arc {
-      fill: none;
-      stroke-width: 2;
-      filter: url(#lightning-glow);
-    }
-    .arc-primary   { stroke: var(--frame-accent2); }
-    .arc-accent    { stroke: var(--frame-accent); }
+    .arc { fill: none; stroke-width: 2; filter: url(#lightning-glow); }
+    .arc-primary { stroke: var(--frame-accent2); }
+    .arc-accent  { stroke: var(--frame-accent); }
 
     .arc-top    { animation: arcFlicker1 4s   ease-in-out infinite; }
     .arc-left   { animation: arcFlicker2 3.5s ease-in-out infinite; }
@@ -61,12 +46,20 @@
     @keyframes arcFlicker3 { 0%,100%{opacity:.6} 25%{opacity:.9} 50%{opacity:.2} 75%{opacity:.7} }
     @keyframes arcFlicker4 { 0%,100%{opacity:.5} 20%{opacity:.85} 55%{opacity:.3} 80%{opacity:.7} }
 
-    .spark-point {
-      fill: var(--frame-accent);
-      filter: url(#lightning-glow);
+    /* Hot-icon nodes on the arc */
+    .spark-icon {
+      position: absolute;
+      font-family: "Material Symbols Outlined";
+      font-size: 18px;
+      line-height: 1;
+      color: var(--frame-accent);
+      filter: drop-shadow(0 0 6px var(--frame-accent));
+      pointer-events: none;
+      z-index: 4;
+      transform: translate(-50%, -50%);
     }
 
-    /* Hot-icon style particles */
+    /* Particle container */
     #particle-container {
       position: absolute;
       inset: 0;
@@ -76,21 +69,28 @@
     }
 
     @keyframes hot-spark {
-      0%   { transform: translate(0, 0) scale(1); opacity: 1; }
-      100% { transform: translate(var(--sdx), var(--sdy)) scale(0); opacity: 0; }
+      0%   { transform: translate(0,0) scale(1); opacity: 1; }
+      100% { transform: translate(var(--sdx),var(--sdy)) scale(0); opacity: 0; }
+    }
+    @keyframes spark-spin {
+      0%   { transform: translate(0,0) scale(1) rotate(0deg); opacity: 1; }
+      100% { transform: translate(var(--sdx),var(--sdy)) scale(0) rotate(180deg); opacity: 0; }
     }
 
     .frame-particle {
       position: absolute;
-      width: 3px;
-      height: 3px;
+      width: 4px; height: 4px;
       border-radius: 50%;
       background: var(--frame-accent);
-      box-shadow: 0 0 4px var(--frame-accent);
+      box-shadow: 0 0 5px var(--frame-accent);
       pointer-events: none;
       animation: hot-spark var(--dur, 0.7s) ease-out forwards;
     }
-    .frame-particle.p2 { background: var(--frame-accent2); box-shadow: 0 0 4px var(--frame-accent2); }
+    .frame-particle.p2 {
+      background: var(--frame-accent2);
+      box-shadow: 0 0 5px var(--frame-accent2);
+      animation-name: spark-spin;
+    }
   </style>
 </head>
 <body>
@@ -101,14 +101,12 @@
       <defs>
         <filter id="lightning-glow">
           <feGaussianBlur stdDeviation="2.5" result="blur"/>
-          <feMerge>
-            <feMergeNode in="blur"/>
-            <feMergeNode in="SourceGraphic"/>
-          </feMerge>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
       </defs>
     </svg>
 
+    <div id="icon-container" style="position:absolute;inset:0;pointer-events:none;z-index:4;overflow:visible"></div>
     <div id="particle-container"></div>
   </div>
 
@@ -119,6 +117,7 @@
     var params  = new URLSearchParams(window.location.search);
     if (params.get('colors') === 'theme')
       document.documentElement.classList.add('use-theme');
+
     var camW    = parseInt(params.get('width'),  10) || 400;
     var camH    = parseInt(params.get('height'), 10) || 225;
     var padding = 50;
@@ -128,22 +127,18 @@
     var canvas  = document.getElementById('canvas');
     var cutout  = document.getElementById('camCutout');
     var svg     = document.getElementById('lightningSvg');
+    var iconCon = document.getElementById('icon-container');
 
     document.body.style.width  = canvasW + 'px';
     document.body.style.height = canvasH + 'px';
-
     var meta = document.createElement('meta');
     meta.name = 'viewport';
-    meta.content = 'width=' + canvasW + ', height=' + canvasH;
+    meta.content = 'width=' + canvasW + ',height=' + canvasH;
     document.head.appendChild(meta);
 
     canvas.style.width  = canvasW + 'px';
     canvas.style.height = canvasH + 'px';
-
-    cutout.style.left   = padding + 'px';
-    cutout.style.top    = padding + 'px';
-    cutout.style.width  = camW + 'px';
-    cutout.style.height = camH + 'px';
+    cutout.style.cssText = 'left:' + padding + 'px;top:' + padding + 'px;width:' + camW + 'px;height:' + camH + 'px;';
 
     svg.setAttribute('width',   canvasW);
     svg.setAttribute('height',  canvasH);
@@ -151,19 +146,12 @@
     svg.style.cssText = 'left:0;top:0;width:' + canvasW + 'px;height:' + canvasH + 'px;';
 
     function zigzagPoints(x1, y1, x2, y2, segments) {
-      var pts = [];
-      var dx = x2 - x1, dy = y2 - y1;
-      var len = Math.sqrt(dx*dx + dy*dy);
-      var px = -dy / len, py = dx / len;
+      var pts = [], dx = x2-x1, dy = y2-y1, len = Math.sqrt(dx*dx+dy*dy);
+      var px = -dy/len, py = dx/len;
       for (var i = 0; i <= segments; i++) {
-        var t = i / segments;
-        var bx = x1 + dx * t, by = y1 + dy * t;
-        if (i === 0 || i === segments) {
-          pts.push(bx.toFixed(1) + ',' + by.toFixed(1));
-        } else {
-          var off = (Math.random() * 2 - 1) * 5;
-          pts.push((bx + px*off).toFixed(1) + ',' + (by + py*off).toFixed(1));
-        }
+        var t = i/segments, bx = x1+dx*t, by = y1+dy*t;
+        if (i === 0 || i === segments) { pts.push(bx.toFixed(1)+','+by.toFixed(1)); }
+        else { var o=(Math.random()*2-1)*5; pts.push((bx+px*o).toFixed(1)+','+(by+py*o).toFixed(1)); }
       }
       return pts.join(' ');
     }
@@ -172,98 +160,114 @@
     var svgNS = 'http://www.w3.org/2000/svg';
 
     var edges = [
-      { cls: 'arc arc-primary arc-top',    x1: fx,    y1: fy,    x2: fx+fw, y2: fy    },
-      { cls: 'arc arc-accent arc-bottom',  x1: fx,    y1: fy+fh, x2: fx+fw, y2: fy+fh },
-      { cls: 'arc arc-primary arc-left',   x1: fx,    y1: fy,    x2: fx,    y2: fy+fh },
-      { cls: 'arc arc-accent arc-right',   x1: fx+fw, y1: fy,    x2: fx+fw, y2: fy+fh },
+      { cls: 'arc arc-primary arc-top',    x1:fx,    y1:fy,    x2:fx+fw, y2:fy    },
+      { cls: 'arc arc-accent arc-bottom',  x1:fx,    y1:fy+fh, x2:fx+fw, y2:fy+fh },
+      { cls: 'arc arc-primary arc-left',   x1:fx,    y1:fy,    x2:fx,    y2:fy+fh },
+      { cls: 'arc arc-accent arc-right',   x1:fx+fw, y1:fy,    x2:fx+fw, y2:fy+fh },
     ];
-
     var polylines = [];
     edges.forEach(function(e) {
       var pl = document.createElementNS(svgNS, 'polyline');
       pl.setAttribute('class', e.cls);
       pl.setAttribute('points', zigzagPoints(e.x1, e.y1, e.x2, e.y2, segs));
       svg.appendChild(pl);
-      polylines.push({ el: pl, x1: e.x1, y1: e.y1, x2: e.x2, y2: e.y2 });
+      polylines.push({ el: pl, nx: e.nx, ny: e.ny });
     });
 
-    /* Spark circles on arcs */
+    // Border segments with outward normals
+    var borderSegs = [
+      { x1:fx, y1:fy,    x2:fx+fw, y2:fy,    nx:0,  ny:-1 },
+      { x1:fx, y1:fy+fh, x2:fx+fw, y2:fy+fh, nx:0,  ny:1  },
+      { x1:fx, y1:fy,    x2:fx,    y2:fy+fh, nx:-1, ny:0  },
+      { x1:fx+fw, y1:fy, x2:fx+fw, y2:fy+fh, nx:1,  ny:0  },
+    ];
+
     function parsePoints(pl) {
-      return pl.getAttribute('points').trim().split(/\s+/).map(function(s) {
-        var p = s.split(','); return { x: parseFloat(p[0]), y: parseFloat(p[1]) };
+      return pl.getAttribute('points').trim().split(/\s+/).map(function(s){
+        var p=s.split(','); return {x:parseFloat(p[0]),y:parseFloat(p[1])};
       });
     }
     function randomPointOnPolyline(pl) {
-      var pts = parsePoints(pl);
-      var i = Math.floor(Math.random() * (pts.length - 1));
-      var t = Math.random();
-      return { x: pts[i].x + (pts[i+1].x - pts[i].x)*t, y: pts[i].y + (pts[i+1].y - pts[i].y)*t };
+      var pts=parsePoints(pl), i=Math.floor(Math.random()*(pts.length-1)), t=Math.random();
+      return {x:pts[i].x+(pts[i+1].x-pts[i].x)*t, y:pts[i].y+(pts[i+1].y-pts[i].y)*t};
     }
+
+    var useTheme = params.get('colors') === 'theme';
+    var cs = getComputedStyle(document.documentElement);
+    var hotIcon = useTheme
+      ? ((cs.getPropertyValue('--theme-hot-icon') || '"local_fire_department"').replace(/['"]/g,'').trim() || 'local_fire_department')
+      : null;
 
     var SPARK_COUNT = 6;
+    var sparkEls = [];
     for (var i = 0; i < SPARK_COUNT; i++) {
-      (function(idx) {
+      if (useTheme) {
+        // Theme: Material Symbols hot icon
+        var el = document.createElement('span');
+        el.className = 'spark-icon';
+        el.textContent = hotIcon;
+        el.style.opacity = '0';
+        iconCon.appendChild(el);
+        sparkEls.push(el);
+      } else {
+        // Default: SVG circle on the arc
         var c = document.createElementNS(svgNS, 'circle');
-        c.setAttribute('class', 'spark-point');
-        c.setAttribute('r', '2.5');
+        c.setAttribute('r', '3');
         c.setAttribute('cx', '0'); c.setAttribute('cy', '0');
-        c.style.opacity = '0';
+        c.style.cssText = 'fill:var(--frame-accent);filter:url(#lightning-glow);opacity:0';
         svg.appendChild(c);
-        function cycle() {
-          var pl = polylines[Math.floor(Math.random() * polylines.length)].el;
-          var pos = randomPointOnPolyline(pl);
-          c.setAttribute('cx', pos.x.toFixed(1));
-          c.setAttribute('cy', pos.y.toFixed(1));
-          c.animate([{opacity:0},{opacity:1}], {duration:800, fill:'forwards'}).onfinish = function() {
-            setTimeout(function() {
-              c.animate([{opacity:1},{opacity:0}], {duration:800, fill:'forwards'}).onfinish = cycle;
-            }, 800 + Math.random()*700);
+        sparkEls.push(c);
+      }
+    }
+
+    function animateIcon(el, initialDelay) {
+      var isSvg = el.namespaceURI && el.namespaceURI.indexOf('svg') >= 0;
+      function cycle() {
+        var pl = polylines[Math.floor(Math.random()*polylines.length)].el;
+        var pos = randomPointOnPolyline(pl);
+        if (isSvg) {
+          el.setAttribute('cx', pos.x.toFixed(1));
+          el.setAttribute('cy', pos.y.toFixed(1));
+          el.animate([{opacity:0},{opacity:1}],{duration:600,fill:'forwards'}).onfinish = function(){
+            setTimeout(function(){
+              el.animate([{opacity:1},{opacity:0}],{duration:600,fill:'forwards'}).onfinish = cycle;
+            }, 700+Math.random()*800);
+          };
+        } else {
+          el.style.left = pos.x.toFixed(1)+'px';
+          el.style.top  = pos.y.toFixed(1)+'px';
+          el.animate([{opacity:0,transform:'translate(-50%,-50%) scale(0.5)'},{opacity:1,transform:'translate(-50%,-50%) scale(1)'}],
+            {duration:600,fill:'forwards'}).onfinish = function(){
+            setTimeout(function(){
+              el.animate([{opacity:1},{opacity:0}],{duration:600,fill:'forwards'}).onfinish = cycle;
+            }, 700+Math.random()*800);
           };
         }
-        setTimeout(cycle, idx * 500 + Math.random() * 500);
-      })(i);
+      }
+      setTimeout(cycle, initialDelay);
     }
+    sparkEls.forEach(function(el, idx){ animateIcon(el, idx*500 + Math.random()*500); });
 
-    /* Hot-icon style particles along the frame border */
-    var pContainer = document.getElementById('particle-container');
-
-    // Frame border segments with outward normal direction
-    var borderSegs = [
-      { x1: fx, y1: fy,    x2: fx+fw, y2: fy,    nx: 0,  ny: -1 }, // top
-      { x1: fx, y1: fy+fh, x2: fx+fw, y2: fy+fh, nx: 0,  ny:  1 }, // bottom
-      { x1: fx, y1: fy,    x2: fx,    y2: fy+fh, nx: -1, ny:  0 }, // left
-      { x1: fx+fw, y1: fy, x2: fx+fw, y2: fy+fh, nx:  1, ny:  0 }, // right
-    ];
-
+    // Hot-icon style spark particles along the border
+    var pCon = document.getElementById('particle-container');
     function spawnParticle() {
-      var seg = borderSegs[Math.floor(Math.random() * borderSegs.length)];
-      var t   = Math.random();
-      var px  = seg.x1 + (seg.x2 - seg.x1) * t;
-      var py  = seg.y1 + (seg.y2 - seg.y1) * t;
-
-      var dist = 12 + Math.random() * 20;
-      var spread = (Math.random() - 0.5) * 16;
-      // Outward direction + slight spread along edge
-      var sdx = (seg.nx * dist + seg.ny * spread).toFixed(1) + 'px';
-      var sdy = (seg.ny * dist - seg.nx * spread).toFixed(1) + 'px';
-      var dur = (0.5 + Math.random() * 0.5).toFixed(2) + 's';
-
+      var seg = borderSegs[Math.floor(Math.random()*borderSegs.length)];
+      var t = Math.random();
+      var px = seg.x1 + (seg.x2-seg.x1)*t;
+      var py = seg.y1 + (seg.y2-seg.y1)*t;
+      var dist = 10 + Math.random()*18;
+      var spread = (Math.random()-0.5)*14;
+      var sdx = (seg.nx*dist + seg.ny*spread).toFixed(1)+'px';
+      var sdy = (seg.ny*dist - seg.nx*spread).toFixed(1)+'px';
+      var dur = (0.4+Math.random()*0.5).toFixed(2)+'s';
       var el = document.createElement('div');
-      el.className = 'frame-particle' + (Math.random() > 0.5 ? ' p2' : '');
-      el.style.cssText =
-        'left:' + px.toFixed(1) + 'px;' +
-        'top:'  + py.toFixed(1) + 'px;' +
-        '--sdx:' + sdx + ';' +
-        '--sdy:' + sdy + ';' +
-        '--dur:' + dur + ';';
-      pContainer.appendChild(el);
-      setTimeout(function() { el.remove(); }, parseFloat(dur) * 1000 + 50);
+      el.className = 'frame-particle'+(Math.random()>0.5?' p2':'');
+      el.setAttribute('style','left:'+px.toFixed(1)+'px;top:'+py.toFixed(1)+'px;--sdx:'+sdx+';--sdy:'+sdy+';--dur:'+dur+';');
+      pCon.appendChild(el);
+      setTimeout(function(){ el.remove(); }, parseFloat(dur)*1000+50);
     }
-
-    // Spawn particles at intervals
-    setInterval(spawnParticle, 80);
-    // Initial burst
-    for (var j = 0; j < 8; j++) setTimeout(spawnParticle, j * 40);
+    setInterval(spawnParticle, 70);
+    for (var j=0; j<10; j++) setTimeout(spawnParticle, j*30);
 
   })();
   </script>
