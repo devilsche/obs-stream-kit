@@ -743,7 +743,6 @@
       t.tabIndex = on ? 0 : -1;
     });
     allCards.forEach(c => c.hidden = c.dataset.tab !== name);
-    if (filter) filter.value = "";
     if (emptyMsg) emptyMsg.hidden = true;
   }
   tabs.forEach(t => t.addEventListener("click", () => selectTab(t.dataset.tab)));
