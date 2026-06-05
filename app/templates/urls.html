@@ -87,7 +87,7 @@
           {% for d in decor %}
           {{ src_card('overlay', 'Decor', d.label,
                       base_url ~ '/s/' ~ token ~ '/widgets/' ~ d.file, d.file,
-                      d.size, d.desc, [], (d.params or [])) }}
+                      d.size, d.desc, (d.switches or []), (d.params or [])) }}
           {% endfor %}
         </div>
       </div>

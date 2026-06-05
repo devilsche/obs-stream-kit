@@ -17,12 +17,6 @@ _TIER_SW = {"key": "tier", "label": "Tier", "type": "select", "default": "1",
              "options": [["1", "Tier 1"], ["2", "Tier 2"], ["3", "Tier 3"]]}
 
 WIDGET_SWITCHES = {
-    "webcam-frame.html": [
-        {"key": "colors", "label": "Colors", "type": "select", "default": "default",
-         "options": [["default", "Default (Entry purple/gold)"], ["theme", "Theme colors"]]},
-        {"key": "width",  "label": "Width",  "type": "number", "default": "400", "min": 100},
-        {"key": "height", "label": "Height", "type": "number", "default": "225", "min": 50},
-    ],
     "latest-follower.html": [
         {"key": "name", "label": "Username", "type": "text",
          "default": "", "placeholder": "e.g. CoolStreamer",
