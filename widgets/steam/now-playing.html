@@ -281,9 +281,12 @@
       { key: "playersPollMs", label: "Players poll (ms)", type: "range",
         min: 30000, max: 300000, default: 60000,
         tooltip: "How often to refresh the live player count." },
+      { key: "mock", label: "Demo-Ansicht", type: "select", default: "0",
+        options: [["0", "Live"], ["1", "Demo (kein API-Call)"]],
+        tooltip: "Demo-Modus zeigt Beispieldaten ohne Steam-API — ideal fuer die Vorschau." },
       { key: "fakeAppId", label: "Preview App-ID", type: "text", default: "",
         placeholder: "z.B. 578080 (PUBG)",
-        tooltip: "Steam App-ID fuer Preview/Demo — zeigt das Spiel ohne dass es gerade gespielt wird." },
+        tooltip: "Steam App-ID fuer Preview — zeigt dieses Spiel statt des aktuell laufenden." },
     ]);
 
     function fmtHours(min) {
