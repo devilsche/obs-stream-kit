@@ -740,40 +740,56 @@
           doc.head.appendChild(st);
         } catch(_) {}
       }
+      function applySize(cw, ch) {
+        const scale = Math.min(1,
+          Math.min(window.innerWidth  * 0.8 / cw,
+                   window.innerHeight * 0.8 / ch));
+        const mw = Math.ceil(cw * scale * 1.1 / 100) * 100;
+        const mh = Math.ceil(ch * scale * 1.1 / 100) * 100;
+        body.classList.remove("dn-modal__body--overlay","dn-modal__body--checker");
+        body.style.cssText = `;width:${mw}px;height:${mh}px;` +
+          `display:flex;align-items:center;justify-content:center;overflow:hidden;` +
+          `background-color:#3a3a3a;` +
+          `background-image:repeating-conic-gradient(#2a2a2a 0% 25%,#3a3a3a 0% 50%);` +
+          `background-size:20px 20px;`;
+        frame.style.cssText = `width:${cw}px;height:${ch}px;flex-shrink:0;border:0;` +
+          `transform-origin:center center;transform:scale(${scale.toFixed(4)});`;
+      }
+
       function sizeFrame() {
         try {
           const doc = frame.contentDocument;
           if (!doc || !doc.body) return;
-          // Fixed preview width (use catalog size if set, else 480px)
-          const previewW = dim[0] || 480;
-          frame.style.width  = previewW + 'px';
+          try {
+            if (!doc.getElementById('preview-noscroll')) {
+              const ns = doc.createElement('style');
+              ns.id = 'preview-noscroll';
+              ns.textContent = 'html,body{overflow:hidden!important;}';
+              doc.head.appendChild(ns);
+            }
+          } catch(_) {}
+
+          if (dim[0] && dim[1]) {
+            // Catalog hat explizite Größe → direkt verwenden
+            applySize(dim[0], dim[1]);
+            return;
+          }
+
+          // Pass 1: natürliche Breite ermitteln (scrollWidth bei aktueller Breite)
           frame.style.height = '2000px';
           requestAnimationFrame(() => {
             try {
-              const cw = previewW;
-              const ch = Math.max(
-                doc.body.scrollHeight || doc.documentElement.scrollHeight, 20);
-              const scale = Math.min(1,
-                Math.min(window.innerWidth  * 0.8 / cw,
-                         window.innerHeight * 0.8 / ch));
-              const mw = Math.ceil(cw * scale * 1.1 / 100) * 100;
-              const mh = Math.ceil(ch * scale * 1.1 / 100) * 100;
-              try {
-                if (!doc.getElementById('preview-noscroll')) {
-                  const ns = doc.createElement('style');
-                  ns.id = 'preview-noscroll';
-                  ns.textContent = 'html,body{overflow:hidden!important;}';
-                  doc.head.appendChild(ns);
-                }
-              } catch(_) {}
-              body.classList.remove("dn-modal__body--overlay","dn-modal__body--checker");
-              body.style.cssText = `;width:${mw}px;height:${mh}px;` +
-                `display:flex;align-items:center;justify-content:center;overflow:hidden;` +
-                `background-color:#3a3a3a;` +
-                `background-image:repeating-conic-gradient(#2a2a2a 0% 25%,#3a3a3a 0% 50%);` +
-                `background-size:20px 20px;`;
-              frame.style.cssText = `width:${cw}px;height:${ch}px;flex-shrink:0;border:0;` +
-                `transform-origin:center center;transform:scale(${scale.toFixed(4)});`;
+              const cw = Math.max(
+                doc.body.scrollWidth || doc.documentElement.scrollWidth, 80);
+              // Pass 2: Höhe bei dieser Breite messen
+              frame.style.width = cw + 'px';
+              requestAnimationFrame(() => {
+                try {
+                  const ch = Math.max(
+                    doc.body.scrollHeight || doc.documentElement.scrollHeight, 20);
+                  applySize(cw, ch);
+                } catch(_) {}
+              });
             } catch(_) {}
           });
         } catch(_) {}
