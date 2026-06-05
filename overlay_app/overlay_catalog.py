@@ -93,6 +93,15 @@ STINGER_META = {
     "pet.html": {"switches": [
         {"key": "name",   "label": "Name",     "type": "text", "default": "Luke",
          "placeholder": "z.B. Luke"},
+        {"key": "font",   "label": "Schrift",  "type": "select", "default": "",
+         "options": [
+             ["", "Auto"], ["Orbitron", "Orbitron"], ["Russo One", "Russo One"],
+             ["Black Ops One", "Black Ops One"], ["Audiowide", "Audiowide"],
+             ["Teko", "Teko"], ["Saira Stencil One", "Saira Stencil"],
+             ["Wallpoet", "Wallpoet"], ["Bungee", "Bungee"],
+             ["Chakra Petch", "Chakra Petch"], ["Oxanium", "Oxanium"],
+             ["Rajdhani", "Rajdhani"], ["Syncopate", "Syncopate"],
+         ]},
         {"key": "kicker", "label": "Kosename", "type": "text", "default": "✦ Herzensbrecher ✦",
          "placeholder": "z.B. ✦ Herzensbrecher ✦"},
         {"key": "img",    "label": "Bild-URL", "type": "text", "default": "",

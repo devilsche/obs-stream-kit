@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
   <script src="../js/stinger-ready.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Russo+One&family=Black+Ops+One&family=Audiowide&family=Teko:wght@700&family=Saira+Stencil+One&family=Wallpoet&family=Bungee&family=Chakra+Petch:wght@700&family=Oxanium:wght@800&family=Rajdhani:wght@700&family=Syncopate:wght@700&display=swap" rel="stylesheet">
   <title>Pet Stinger</title>
   <style>
     @font-face {
@@ -248,6 +251,7 @@
 
       /* ── Parameter auslesen ── */
       var petName    = params.get('name')   || 'Luke';
+      var fontParam  = params.get('font')   || '';
       var kickerText = params.get('kicker') || '✦ Herzensbrecher ✦';
       var imgUrl     = params.get('img')    || '';
       var emojiRaw   = params.get('emojis') || '♥,🐾'; /* ♥,🐾 */
@@ -257,6 +261,11 @@
       /* Name + Kicker setzen */
       document.getElementById('nameEl').textContent   = petName;
       document.getElementById('kickerEl').textContent = kickerText;
+
+      /* Font für den Namen */
+      if (fontParam) {
+        document.getElementById('nameEl').style.fontFamily = "'" + fontParam + "', 'DM Sans', sans-serif";
+      }
 
       /* Bild setzen */
       if (imgUrl) {
