@@ -138,7 +138,10 @@
         </div>
       </div>
 
-      <p class="url-empty" id="urlEmpty" hidden>Keine Source im Filter gefunden.</p>
+      <div id="urlSearchResults" hidden>
+        <div class="url-grid" id="urlSearchGrid"></div>
+      </div>
+      <p class="url-empty" id="urlEmpty" hidden>No source found.</p>
     </section>
 
     {# ══ Detail-View (per JS eingeblendet) ══ #}
@@ -829,52 +832,66 @@
   });
 
   // ── Filter — global über alle Tabs ───────────────────────
-  const filter  = document.getElementById("urlFilter");
-  const emptyMsg = document.getElementById("urlEmpty");
-  const allPanels = Array.from(document.querySelectorAll(".url-tabpanel"));
-  const allTabs   = Array.from(document.querySelectorAll(".url-tabs [role='tab']"));
+  const filter        = document.getElementById("urlFilter");
+  const emptyMsg      = document.getElementById("urlEmpty");
+  const searchResults = document.getElementById("urlSearchResults");
+  const searchGrid    = document.getElementById("urlSearchGrid");
+  const allPanels     = Array.from(document.querySelectorAll(".url-tabpanel"));
+  const allTabs       = Array.from(document.querySelectorAll(".url-tabs [role='tab']"));
+
+  function restoreNormal() {
+    // Clones aus dem Suchgrid entfernen, Panels zurücksetzen
+    if (searchGrid) searchGrid.innerHTML = "";
+    if (searchResults) searchResults.hidden = true;
+    allPanels.forEach(p => { p.querySelectorAll(".url-card").forEach(c => c.hidden = false); });
+    const activeTab = allTabs.find(t => t.getAttribute("aria-selected") === "true");
+    const activeId  = activeTab && activeTab.getAttribute("aria-controls");
+    allPanels.forEach(p => p.hidden = p.id !== activeId);
+    if (emptyMsg) emptyMsg.hidden = true;
+  }
 
   function applyFilter() {
     if (!filter) return;
     const q = (filter.value || "").toLowerCase().trim();
+    if (!q) { restoreNormal(); return; }
 
-    if (!q) {
-      // No query: restore normal tab state — show only active panel
-      allPanels.forEach(p => {
-        p.querySelectorAll(".url-card").forEach(c => c.hidden = false);
-      });
-      const activeTab = allTabs.find(t => t.getAttribute("aria-selected") === "true");
-      const activeId  = activeTab && activeTab.getAttribute("aria-controls");
-      allPanels.forEach(p => p.hidden = p.id !== activeId);
-      if (emptyMsg) emptyMsg.hidden = true;
-      return;
-    }
-
-    // Search all panels, collect which ones have hits
-    const panelsWithHits = new Set();
-    let totalHits = 0;
+    // Treffer aus allen Panels sammeln + alphabetisch sortieren
+    const hits = [];
     allPanels.forEach(p => {
-      let hits = 0;
       p.querySelectorAll(".url-card").forEach(card => {
         const hay = ((card.dataset.label || "") + " " + (card.dataset.cat || "") + " " + (card.dataset.path || "") + " " + (card.dataset.desc || "")).toLowerCase();
-        const show = hay.includes(q);
-        card.hidden = !show;
-        if (show) { hits++; totalHits++; }
+        if (hay.includes(q)) hits.push({ card, panel: p });
       });
-      if (hits > 0) panelsWithHits.add(p);
     });
+    hits.sort((a, b) => (a.card.dataset.label || "").localeCompare(b.card.dataset.label || ""));
 
-    if (totalHits === 0) {
-      // Nothing found: keep current panel, show empty msg
+    if (hits.length === 0) {
+      restoreNormal();
       const activeTab = allTabs.find(t => t.getAttribute("aria-selected") === "true");
       const activeId  = activeTab && activeTab.getAttribute("aria-controls");
       allPanels.forEach(p => p.hidden = p.id !== activeId);
       if (emptyMsg) emptyMsg.hidden = false;
-    } else if (panelsWithHits.size === 1) {
-      // Single tab: activate it
-      const targetPanel = [...panelsWithHits][0];
+      return;
+    }
+
+    const panels = new Set(hits.map(h => h.panel));
+
+    if (panels.size === 1) {
+      // Nur ein Tab — Tab aktivieren, normal anzeigen
+      if (searchGrid) searchGrid.innerHTML = "";
+      if (searchResults) searchResults.hidden = true;
+      const targetPanel = [...panels][0];
       const targetTab   = allTabs.find(t => t.getAttribute("aria-controls") === targetPanel.id);
-      allPanels.forEach(p => p.hidden = p !== targetPanel);
+      allPanels.forEach(p => { p.hidden = p !== targetPanel; });
+      // Karten alphabetisch im Grid neu ordnen
+      const grid = targetPanel.querySelector(".url-grid");
+      if (grid) {
+        hits.filter(h => h.panel === targetPanel)
+            .forEach(({ card }) => { card.hidden = false; grid.appendChild(card); });
+        targetPanel.querySelectorAll(".url-card").forEach(c => {
+          if (!hits.some(h => h.card === c)) c.hidden = true;
+        });
+      }
       allTabs.forEach(t => {
         const sel = t === targetTab;
         t.setAttribute("aria-selected", sel ? "true" : "false");
@@ -882,12 +899,20 @@
       });
       if (emptyMsg) emptyMsg.hidden = true;
     } else {
-      // Multiple tabs: show all panels with hits, no tab active
-      allPanels.forEach(p => p.hidden = !panelsWithHits.has(p));
-      allTabs.forEach(t => {
-        t.setAttribute("aria-selected", "false");
-        t.setAttribute("tabindex", "-1");
-      });
+      // Mehrere Tabs — alle Treffer in flachen Grid klonen
+      allPanels.forEach(p => p.hidden = true);
+      allTabs.forEach(t => { t.setAttribute("aria-selected","false"); t.setAttribute("tabindex","-1"); });
+      if (searchGrid) {
+        searchGrid.innerHTML = "";
+        hits.forEach(({ card }) => {
+          const clone = card.cloneNode(true);
+          clone.hidden = false;
+          // Klick auf Klon → originale Karte klicken (behält Event-Listener)
+          clone.addEventListener("click", () => card.click());
+          searchGrid.appendChild(clone);
+        });
+      }
+      if (searchResults) searchResults.hidden = false;
       if (emptyMsg) emptyMsg.hidden = true;
     }
   }
