@@ -704,22 +704,37 @@
         "Vorschau · " + document.getElementById("urlDName").textContent;
       const u = buildUrl(base, scope);
       const dim = String((meta && meta.size) || "").split(/[×x]/).map(n => parseInt(n.trim(), 10));
-      if (meta && meta.kind === "overlay" && dim[0] && dim[1]) {
-        // Fullscreen transparent source: scaled down, checkerboard background.
-        body.classList.add("dn-modal__body--overlay");
-        body.classList.remove("dn-modal__body--checker");
+      const isOverlay = meta && meta.kind === "overlay";
+      body.classList.toggle("dn-modal__body--overlay", !!(isOverlay && dim[0] && dim[1]));
+      body.classList.remove("dn-modal__body--checker");
+      if (isOverlay && dim[0] && dim[1]) {
         body.style.setProperty("--ov-w", dim[0]);
         body.style.setProperty("--ov-h", dim[1]);
         frame.src = u;
-      } else if (meta && meta.kind === "overlay") {
-        // Compact transparent source (no fixed dimensions): checkerboard, no dock.
-        body.classList.remove("dn-modal__body--overlay");
-        body.classList.add("dn-modal__body--checker");
+      } else if (isOverlay) {
         frame.src = u;
       } else {
-        // Widget: dock=1 adds its own dark background.
-        body.classList.remove("dn-modal__body--overlay", "dn-modal__body--checker");
         frame.src = u + (u.includes("?") ? "&" : "?") + "dock=1";
+      }
+      // Inject checkerboard directly into the iframe body (same-origin).
+      if (isOverlay) {
+        frame.onload = () => {
+          try {
+            const doc = frame.contentDocument;
+            if (!doc) return;
+            const st = doc.createElement("style");
+            st.id = "preview-checker";
+            st.textContent = `
+              html, body {
+                background-color: #505050 !important;
+                background-image: repeating-conic-gradient(#3a3a3a 0% 25%, #505050 0% 50%) !important;
+                background-size: 20px 20px !important;
+              }`;
+            doc.head.appendChild(st);
+          } catch(_) {}
+        };
+      } else {
+        frame.onload = null;
       }
       modal.showModal();
     });
