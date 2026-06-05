@@ -48,6 +48,8 @@ WIDGET_SWITCHES = {
     "pubg/coplayer.html": [
         {"key": "player", "label": "Spieler", "type": "text", "default": "",
          "placeholder": "z.B. PEX_LuCKoR", "tooltip": "PUBG-Name des Mitspielers — leer = alle"},
+        {"key": "dock", "label": "Hintergrund", "type": "select", "default": "0",
+         "options": [["0", "Transparent (OBS)"], ["1", "Mit Hintergrund (Dock)"]]},
     ],
     "pubg/milestone-celebrate.html": [
         {"key": "n",     "label": "Chicken-Nr.", "type": "number", "default": "", "min": 1,
