@@ -583,6 +583,9 @@
       });
     }
 
+    // URL einmal mit den (ggf. aus localStorage geladenen) Werten aktualisieren
+    refresh();
+
     const resetBtn = document.getElementById("btnReset");
     if (resetBtn) resetBtn.addEventListener("click", lsReset);
 
