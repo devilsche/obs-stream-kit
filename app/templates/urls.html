@@ -744,8 +744,11 @@
         injectChecker(frame.contentDocument);
         try {
           const doc = frame.contentDocument;
-          const cw = doc.body.scrollWidth  || doc.documentElement.scrollWidth  || dim[0] || 1920;
-          const ch = doc.body.scrollHeight || doc.documentElement.scrollHeight || dim[1] || 200;
+          // Echte Content-Größe: erstes Kind-Element (nicht viewport-breite body)
+          const el = doc.body.firstElementChild || doc.body;
+          const rect = el.getBoundingClientRect();
+          const cw = Math.round(rect.width)  || dim[0] || 400;
+          const ch = Math.round(rect.height) || dim[1] || 200;
           // Scale so widget fits in 80% of viewport
           const scale = Math.min(1,
             Math.min(window.innerWidth * 0.8 / cw, window.innerHeight * 0.8 / ch));
