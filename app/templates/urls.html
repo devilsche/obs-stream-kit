@@ -239,7 +239,7 @@
              data-type="${escapeAttr(sw.type)}">
           <span class="sw-label">${escapeHtml(sw.label)} ${tooltip}${def}</span>
           <div class="sw-controls">${controls}
-            <button type="button" class="sw-reset-btn" title="Reset to default" aria-label="Reset ${escapeAttr(sw.label)} to default" style="display:none">
+            <button type="button" class="sw-reset-btn" title="Reset to default" aria-label="Reset ${escapeAttr(sw.label)} to default">
               <span class="material-symbols-outlined" aria-hidden="true">restart_alt</span>
             </button>
           </div>
@@ -612,7 +612,7 @@
         }
 
         function checkDirty() {
-          rowReset.style.display = getCurrentVal() !== def ? "" : "none";
+          rowReset.classList.toggle("is-dirty", getCurrentVal() !== def);
         }
 
         function resetRow() {
@@ -621,6 +621,7 @@
               const active = b.dataset.value === def;
               b.classList.toggle("active", active);
               b.setAttribute("aria-pressed", active ? "true" : "false");
+              if (active) setTimeout(() => b.dispatchEvent(new Event("click", {bubbles: true})), 0);
             });
           } else if (type === "multiselect") {
             group.querySelectorAll(".sw-btn").forEach(b => {
@@ -629,7 +630,10 @@
             });
           } else {
             const inp = group.querySelector(".sw-input");
-            if (inp) inp.value = def;
+            if (inp) {
+              inp.value = def;
+              inp.dispatchEvent(new Event("input", {bubbles: true}));
+            }
           }
           checkDirty();
           refresh();

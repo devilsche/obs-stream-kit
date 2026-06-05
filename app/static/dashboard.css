@@ -1081,10 +1081,12 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
 .url-switches .sw-def{color:var(--text-dim);font-size:11px}
 .url-switches .sw-input--wide{width:200px;max-width:100%}
 .sw-reset-btn{display:inline-flex;align-items:center;justify-content:center;
-  width:28px;height:28px;flex-shrink:0;border-radius:var(--r-ctrl);
+  width:28px;height:38px;flex-shrink:0;border-radius:var(--r-ctrl);
   border:1px solid transparent;background:transparent;color:var(--text-dim);
-  cursor:pointer;transition:color .15s,border-color .15s,background .15s;margin-left:4px;
-  vertical-align:middle}
+  cursor:pointer;transition:color .15s,border-color .15s,background .15s,opacity .15s;
+  margin-left:4px;vertical-align:middle;
+  opacity:0;pointer-events:none}
+.sw-reset-btn.is-dirty{opacity:1;pointer-events:auto}
 .sw-reset-btn:hover{color:var(--theme-accent,#f2b705);border-color:var(--theme-accent,#f2b705);
   background:color-mix(in srgb,var(--theme-accent,#f2b705) 8%,transparent)}
 .sw-reset-btn .material-symbols-outlined{font-size:16px;pointer-events:none}
