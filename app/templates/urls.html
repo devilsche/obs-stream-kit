@@ -702,17 +702,20 @@
         ? [meta._dynW, meta._dynH]
         : String((meta && meta.size) || "").split(/[×x]/).map(n => parseInt(n.trim(), 10));
       const isOverlay = meta && meta.kind === "overlay";
-      body.classList.toggle("dn-modal__body--overlay", !!(isOverlay && dim[0] && dim[1]));
+      // Scale down large sources; never add dock=1 — checkerboard handles transparency
       body.classList.remove("dn-modal__body--checker");
-      if (isOverlay && dim[0] && dim[1]) {
+      if (dim[0] && dim[1]) {
+        body.classList.add("dn-modal__body--overlay");
         body.style.setProperty("--ov-w", dim[0]);
         body.style.setProperty("--ov-h", dim[1]);
-        frame.src = u;
-      } else if (isOverlay) {
-        frame.src = u;
+      } else if (meta._dynW) {
+        body.classList.add("dn-modal__body--overlay");
+        body.style.setProperty("--ov-w", meta._dynW);
+        body.style.setProperty("--ov-h", meta._dynH);
       } else {
-        frame.src = u + (u.includes("?") ? "&" : "?") + "dock=1";
+        body.classList.remove("dn-modal__body--overlay");
       }
+      frame.src = u;
       // Inject checkerboard directly into the iframe body (same-origin).
       function injectChecker(doc) {
         try {
