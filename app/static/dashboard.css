@@ -1091,7 +1091,7 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
 .url-switches .sw-label{font-family:var(--theme-font-mono,ui-monospace,monospace);font-size:12px;color:var(--text-muted);
   text-transform:none;letter-spacing:0;font-weight:400;display:flex;align-items:center;gap:7px}
 .url-switches .sw-def{color:var(--text-dim);font-size:11px}
-.url-switches .sw-input--wide{width:200px;max-width:100%}
+.url-switches .sw-input--wide{flex:1 1 120px;min-width:80px}
 .sw-reset-btn{display:inline-flex;align-items:center;justify-content:center;
   width:28px;height:38px;flex-shrink:0;border-radius:var(--r-ctrl);
   border:1px solid transparent;background:transparent;color:var(--text-dim);
