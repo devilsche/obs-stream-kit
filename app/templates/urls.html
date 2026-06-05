@@ -709,9 +709,12 @@
         try {
           if (!doc || !doc.head) return;
           if (doc.getElementById("preview-checker")) return;
-          // Nur injizieren wenn body wirklich transparent ist
-          const bg = getComputedStyle(doc.body).backgroundColor;
-          if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return;
+          // Nur injizieren wenn body und html wirklich transparent sind (kein Gradient)
+          const bs = getComputedStyle(doc.body);
+          const hs = getComputedStyle(doc.documentElement);
+          const hasBodyBg = (bs.backgroundColor !== 'rgba(0, 0, 0, 0)') || (bs.backgroundImage && bs.backgroundImage !== 'none');
+          const hasHtmlBg = (hs.backgroundColor !== 'rgba(0, 0, 0, 0)') || (hs.backgroundImage && hs.backgroundImage !== 'none');
+          if (hasBodyBg || hasHtmlBg) return;
           const st = doc.createElement("style");
           st.id = "preview-checker";
           st.textContent = `html,body{
