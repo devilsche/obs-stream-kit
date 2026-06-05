@@ -88,7 +88,7 @@ html[data-theme="azure"] {
 }
 
 html[data-theme="swiss"] {
-  --theme-primary:#1a7a3c; --theme-accent:#e5251f; --theme-accent-2:#ffcc00; --theme-on-primary:#fff;
+  --theme-primary:#1a7a3c; --theme-accent:#4be39a; --theme-accent-2:#ffcc00; --theme-on-primary:#fff;
   --theme-bg:#eceae4; --theme-surface:#ffffff; --theme-surface-2:#f4f2ec; --theme-border:#0d0d0d;
   --theme-text:#0d0d0d; --theme-text-dim:#5c5c57; --theme-text-faint:#9a9a92;
   --theme-ok:#1faa55; --theme-warn:#bd6a00; --theme-danger:#e5251f;
