@@ -388,6 +388,13 @@ WIDGET_HINTS = {
     "pubg/post-match-card.html":     "Blendet sich bei veralteten Daten automatisch aus. OBS-Source-Toggle steuert die Sichtbarkeit nach einem Match.",
     "pubg/news-ticker.html":         "Versteckt sich bei inaktiver Session (außer mit ?focus=lifetime). Rotiert alle 60 Sekunden zwischen Session- und Lifetime-Snippets.",
     "pubg/session-goal.html":        "Blendet sich 60 Sekunden nach Erreichen des Ziels automatisch aus — mit ?keepAfterDone=1 dauerhaft sichtbar.",
+    # Auto-hide (Session-abhängig)
+    "pubg/first-fight.html":         "Blendet sich aus wenn keine aktive Session läuft. Zeigt die First-Fight-Rate der aktuellen oder letzten Session.",
+    "pubg/hot-drop.html":            "Blendet sich aus wenn keine aktive Session läuft. Zeigt Landing-Positionen nur für Matches der aktuellen Session.",
+    "pubg/session-summary.html":     "Blendet sich aus wenn keine aktive Session läuft — komplett leer zwischen Sessions.",
+    "pubg/session-lobbies.html":     "Blendet sich aus wenn keine aktive Session läuft. Zeigt Lobby-Stärke der letzten Matches.",
+    "pubg/session-achievements.html": "Bleibt auch zwischen Sessions sichtbar (zeigt zuletzt freigeschaltete Achievements). Aktualisiert sich alle 30 Sekunden.",
+    "pubg/weapon-stats.html":        "Blendet sich aus wenn keine aktive Session läuft. Zeigt Waffen-Stats nur für die aktuelle Session.",
     # Event-triggered / einmalige Animationen
     "pubg/milestone-celebrate.html": "Einmalige Animation — feuert automatisch bei einem neuen Chicken-Dinner das eine 100er-Marke überschreitet. Verwendet localStorage um Doppel-Trigger zu verhindern.",
     "pubg/chat-stats-popup.html":    "Wird per Chat-Befehl oder Streamer.bot mit ?player= ausgelöst — verschwindet nach konfigurierbarer Dauer (Standard 12 s).",

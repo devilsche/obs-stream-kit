@@ -281,14 +281,19 @@ class SteamEndpointRegistry:
     # ── Now-Playing mit Playtime + Achievement-Progress ────────────────────
     def _now_playing(self, qs):
         fake_app_raw = qs.get("fakeAppId")
-        try:
-            summary = self._cached("summary", self.client.get_player_summaries)
-        except SteamApiError as e:
-            # Bei fakeAppId-Preview weitermachen mit leerem summary —
-            # Avatar/Persona sind dann nicht sichtbar, aber Spiel-Daten schon.
+        if self.client is None:
             if not fake_app_raw:
-                return _err(502, str(e))
+                return _err(502, "no Steam credentials configured")
             summary = {}
+        else:
+            try:
+                summary = self._cached("summary", self.client.get_player_summaries)
+            except SteamApiError as e:
+                # Bei fakeAppId-Preview weitermachen mit leerem summary —
+                # Avatar/Persona fehlen, aber Spiel-Daten werden geladen.
+                if not fake_app_raw:
+                    return _err(502, str(e))
+                summary = {}
 
         # Test-Override: ?fakeAppId=578080[&fakeGame=NAME] simuliert das
         # Spiel als 'gerade aktiv', alle anderen Felder bleiben real
