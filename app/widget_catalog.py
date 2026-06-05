@@ -34,6 +34,17 @@ WIDGET_SWITCHES = {
         {"key": "amount", "label": "Betrag",   "type": "text",
          "default": "", "placeholder": "z.B. 5,00 €"},
     ],
+    "subgoal.html": [
+        {"key": "title",   "label": "Titel",   "type": "text",   "default": "Sub Goal", "placeholder": "Sub Goal"},
+        {"key": "current", "label": "Aktuell", "type": "number", "default": "23", "min": 0},
+        {"key": "goal",    "label": "Ziel",    "type": "number", "default": "50", "min": 1},
+    ],
+    "tipgoal.html": [
+        {"key": "title",    "label": "Titel",    "type": "text", "default": "Tip Goal",  "placeholder": "Tip Goal"},
+        {"key": "current",  "label": "Aktuell",  "type": "text", "default": "0",         "placeholder": "0"},
+        {"key": "goal",     "label": "Ziel",     "type": "text", "default": "100",       "placeholder": "100"},
+        {"key": "currency", "label": "Währung",  "type": "text", "default": "€",         "placeholder": "€"},
+    ],
 }
 
 # (kategorie, label, beschreibung, path)
