@@ -45,6 +45,30 @@ WIDGET_SWITCHES = {
         {"key": "goal",     "label": "Ziel",    "type": "text", "default": "100",      "placeholder": "100"},
         {"key": "currency", "label": "Währung", "type": "text", "default": "€",        "placeholder": "€"},
     ],
+    "pubg/coplayer.html": [
+        {"key": "player", "label": "Spieler", "type": "text", "default": "",
+         "placeholder": "z.B. PEX_LuCKoR", "tooltip": "PUBG-Name des Mitspielers — leer = alle"},
+    ],
+    "pubg/milestone-celebrate.html": [
+        {"key": "n",     "label": "Chicken-Nr.", "type": "number", "default": "", "min": 1,
+         "tooltip": "Override: Chicken-Nummer erzwingen (sonst auto aus DB)"},
+        {"key": "wait",  "label": "Wartezeit (s)", "type": "number", "default": "15", "min": 0},
+        {"key": "force", "label": "Force-Show", "type": "select", "default": "0",
+         "options": [["0", "Normal"], ["1", "Sofort zeigen"]]},
+        {"key": "mute",  "label": "Ton", "type": "select", "default": "0",
+         "options": [["0", "Mit Ton"], ["1", "Stumm"]]},
+    ],
+    "pubg/lookup.html": [
+        {"key": "player", "label": "Spieler", "type": "text", "default": "",
+         "placeholder": "z.B. PEX_LuCKoR", "tooltip": "Füllt das Suchfeld vor"},
+        {"key": "embed",  "label": "Modus", "type": "select", "default": "0",
+         "options": [["0", "Normal"], ["1", "Embed (kein Header)"]]},
+    ],
+    "pubg/chat-stats-popup.html": [
+        {"key": "player",     "label": "Spieler",    "type": "text",   "default": "",
+         "placeholder": "z.B. PEX_LuCKoR", "tooltip": "Wird normalerweise vom Chat-Command gesetzt"},
+        {"key": "durationMs", "label": "Dauer (ms)", "type": "number", "default": "8000", "min": 1000},
+    ],
     "tipgoal-banner.html": [
         {"key": "title",    "label": "Titel",   "type": "text", "default": "Tip Goal", "placeholder": "Tip Goal"},
         {"key": "current",  "label": "Aktuell", "type": "text", "default": "0",        "placeholder": "0"},
