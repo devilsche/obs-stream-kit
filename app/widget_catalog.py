@@ -19,63 +19,63 @@ _TIER_SW = {"key": "tier", "label": "Tier", "type": "select", "default": "1",
 WIDGET_SWITCHES = {
     "latest-follower.html": [
         {"key": "name", "label": "Username", "type": "text",
-         "default": "", "placeholder": "z.B. CoolStreamer",
-         "tooltip": "Wird von Streamer.bot gesetzt — hier zum Testen"},
+         "default": "", "placeholder": "e.g. CoolStreamer",
+         "tooltip": "The widget shows whoever is passed as ?name=. In production this is set by Streamer.bot before the source is shown."},
     ],
     "latest-sub.html": [
         {"key": "name", "label": "Username", "type": "text",
-         "default": "", "placeholder": "z.B. CoolStreamer",
-         "tooltip": "Wird von Streamer.bot gesetzt — hier zum Testen"},
+         "default": "", "placeholder": "e.g. CoolStreamer",
+         "tooltip": "The widget shows whoever is passed as ?name=. In production this is set by Streamer.bot before the source is shown."},
         _TIER_SW,
     ],
     "latest-tip.html": [
         {"key": "name",   "label": "Username", "type": "text",
-         "default": "", "placeholder": "z.B. CoolStreamer"},
-        {"key": "amount", "label": "Betrag",   "type": "text",
-         "default": "", "placeholder": "z.B. 5,00 €"},
+         "default": "", "placeholder": "e.g. CoolStreamer"},
+        {"key": "amount", "label": "Amount",   "type": "text",
+         "default": "", "placeholder": "e.g. 5.00 €"},
     ],
     "subgoal.html": [
-        {"key": "title",   "label": "Titel",   "type": "text",   "default": "Sub Goal", "placeholder": "Sub Goal"},
-        {"key": "current", "label": "Aktuell", "type": "number", "default": "23", "min": 0},
-        {"key": "goal",    "label": "Ziel",    "type": "number", "default": "50", "min": 1},
+        {"key": "title",   "label": "Title",   "type": "text",   "default": "Sub Goal", "placeholder": "Sub Goal"},
+        {"key": "current", "label": "Current", "type": "number", "default": "23", "min": 0},
+        {"key": "goal",    "label": "Goal",    "type": "number", "default": "50", "min": 1},
     ],
     "tipgoal.html": [
-        {"key": "title",    "label": "Titel",   "type": "text", "default": "Tip Goal", "placeholder": "Tip Goal"},
-        {"key": "current",  "label": "Aktuell", "type": "text", "default": "0",        "placeholder": "0"},
-        {"key": "goal",     "label": "Ziel",    "type": "text", "default": "100",      "placeholder": "100"},
-        {"key": "currency", "label": "Währung", "type": "text", "default": "€",        "placeholder": "€"},
+        {"key": "title",    "label": "Title",    "type": "text", "default": "Tip Goal", "placeholder": "Tip Goal"},
+        {"key": "current",  "label": "Current",  "type": "text", "default": "0",        "placeholder": "0"},
+        {"key": "goal",     "label": "Goal",     "type": "text", "default": "100",      "placeholder": "100"},
+        {"key": "currency", "label": "Currency", "type": "text", "default": "€",        "placeholder": "€"},
     ],
     "pubg/coplayer.html": [
-        {"key": "player", "label": "Spieler", "type": "text", "default": "",
-         "placeholder": "z.B. PEX_LuCKoR", "tooltip": "PUBG-Name des Mitspielers — leer = alle"},
+        {"key": "player", "label": "Player", "type": "text", "default": "",
+         "placeholder": "e.g. PEX_LuCKoR", "tooltip": "PUBG name of the co-player — empty = all"},
     ],
     "pubg/milestone-celebrate.html": [
-        {"key": "n",     "label": "Chicken-Nr.", "type": "number", "default": "", "min": 1,
-         "tooltip": "Override: Chicken-Nummer erzwingen (sonst auto aus DB)"},
-        {"key": "wait",  "label": "Wartezeit (s)", "type": "number", "default": "15", "min": 0},
-        {"key": "force", "label": "Force-Show", "type": "select", "default": "0",
-         "options": [["0", "Normal"], ["1", "Sofort zeigen"]]},
-        {"key": "mute",  "label": "Ton", "type": "select", "default": "0",
-         "options": [["0", "Mit Ton"], ["1", "Stumm"]]},
+        {"key": "n",     "label": "Chicken #",  "type": "number", "default": "", "min": 1,
+         "tooltip": "Override: force a specific chicken number (otherwise auto from DB)"},
+        {"key": "wait",  "label": "Wait (s)",   "type": "number", "default": "15", "min": 0},
+        {"key": "force", "label": "Force Show", "type": "select", "default": "0",
+         "options": [["0", "Normal"], ["1", "Force show"]]},
+        {"key": "mute",  "label": "Sound",      "type": "select", "default": "0",
+         "options": [["0", "Sound on"], ["1", "Muted"]]},
     ],
     "pubg/lookup.html": [
-        {"key": "player", "label": "Spieler", "type": "text", "default": "",
-         "placeholder": "z.B. PEX_LuCKoR", "tooltip": "Füllt das Suchfeld vor"},
-        {"key": "embed",  "label": "Modus", "type": "select", "default": "0",
-         "options": [["0", "Normal"], ["1", "Embed (kein Header)"]]},
+        {"key": "player", "label": "Player", "type": "text", "default": "",
+         "placeholder": "e.g. PEX_LuCKoR", "tooltip": "Pre-fills the search field"},
+        {"key": "embed",  "label": "Mode",   "type": "select", "default": "0",
+         "options": [["0", "Normal"], ["1", "Embed (no header)"]]},
     ],
     "pubg/chat-stats-popup.html": [
-        {"key": "player",     "label": "Spieler",    "type": "text",   "default": "",
-         "placeholder": "z.B. PEX_LuCKoR", "tooltip": "Wird normalerweise vom Chat-Command gesetzt"},
-        {"key": "durationMs", "label": "Dauer (ms)", "type": "number", "default": "8000", "min": 1000},
+        {"key": "player",     "label": "Player",       "type": "text",   "default": "",
+         "placeholder": "e.g. PEX_LuCKoR", "tooltip": "Normally set by a chat command"},
+        {"key": "durationMs", "label": "Duration (ms)", "type": "number", "default": "8000", "min": 1000},
     ],
     "tipgoal-banner.html": [
-        {"key": "title",    "label": "Titel",        "type": "text",   "default": "Tip Goal", "placeholder": "Tip Goal"},
-        {"key": "current",  "label": "Aktuell",      "type": "text",   "default": "0",        "placeholder": "0"},
-        {"key": "goal",     "label": "Ziel",         "type": "text",   "default": "100",      "placeholder": "100"},
-        {"key": "currency", "label": "Währung",      "type": "text",   "default": "€",        "placeholder": "€"},
-        {"key": "dock",     "label": "Hintergrund",  "type": "select", "default": "0",
-         "options": [["0", "Transparent (OBS)"], ["1", "Mit Hintergrund (Dock)"]]},
+        {"key": "title",    "label": "Title",      "type": "text",   "default": "Tip Goal", "placeholder": "Tip Goal"},
+        {"key": "current",  "label": "Current",    "type": "text",   "default": "0",        "placeholder": "0"},
+        {"key": "goal",     "label": "Goal",       "type": "text",   "default": "100",      "placeholder": "100"},
+        {"key": "currency", "label": "Currency",   "type": "text",   "default": "€",        "placeholder": "€"},
+        {"key": "dock",     "label": "Background", "type": "select", "default": "0",
+         "options": [["0", "Transparent (OBS)"], ["1", "With background (Dock)"]]},
     ],
 }
 
@@ -94,7 +94,7 @@ WIDGET_META = [
     ("PUBG · Mates",  "Mates Carousel",      "Squad-mates carousel for the gameplay overlay.",                       "pubg/mates.html"),
     ("PUBG · Mates",  "Coplayer",            "Who plays with you (incl. partial sessions).",                         "pubg/coplayer.html"),
     ("PUBG · Mates",  "Top Mates",           "Best synergy mates by team K/D.",                                      "pubg/top-mates.html"),
-    ("PUBG · Mates",  "Top Vehicle Hunters", "Leaderboard: wer schiesst die meisten Gegner aus dem Fahrzeug (oder wird selbst geholt).", "pubg/top-hunters.html"),
+    ("PUBG · Mates",  "Top Vehicle Hunters", "Leaderboard: most enemies shot out of vehicles (or knocked yourself).", "pubg/top-hunters.html"),
     ("PUBG · Mates",  "Top Mates Slider",    "Top mates as auto-rotating slider.",                                   "pubg/top-mates-slider.html"),
     ("PUBG · Mates",  "Mates Flyout",        "Detail flyout with mate stats.",                                       "pubg/flyout-full.html"),
     ("PUBG · Mates",  "Anti-Mates",          "Players you play worst with.",                                         "pubg/anti-mates.html"),
@@ -122,16 +122,16 @@ WIDGET_META = [
     ("Steam",         "Achievement Feed",   "Achievement-unlock ticker (rotating list).",                           "steam/achievement-feed.html"),
     ("Steam",         "Achievement Popup",  "Animation on a fresh unlock.",                                         "steam/achievement-popup.html"),
     ("Steam",         "Combined Popup",     "Combined now-playing + achievement popup.",                            "steam/popup.html"),
-    ("Steam",         "Now Playing",        "Aktuell gespieltes Steam-Spiel.", "steam/now-playing.html"),
+    ("Steam",         "Now Playing",        "Currently played Steam game.", "steam/now-playing.html"),
     ("Steam",         "Games Ticker",       "Owned-games ticker.",                                                  "steam/games-ticker.html"),
     # Achievement Browser ist ein Tool, kein OBS-Widget -> tools/achievement-browser.html, sichtbar unter /app/tools/
 
     # Persistente Stream-Info-Sidepanels (Dauer-Anzeige, kein Einmal-Alert).
-    ("Follower & Goals", "Latest Follower", "Sidepanel: zeigt den letzten Follower (dauerhaft sichtbar).",          "latest-follower.html"),
-    ("Follower & Goals", "Latest Sub",      "Sidepanel: zeigt den letzten Sub (dauerhaft sichtbar).",               "latest-sub.html"),
-    ("Follower & Goals", "Latest Tip",      "Sidepanel: zeigt den letzten Tip/Donation (dauerhaft sichtbar).",      "latest-tip.html"),
-    ("Follower & Goals", "Sub Goal",        "Fortschrittsbalken Richtung Sub-Ziel.",                                "subgoal.html"),
-    ("Follower & Goals", "Tip Goal",        "Fortschrittsbalken Richtung Tip-Ziel.",                                "tipgoal.html"),
+    ("Follower & Goals", "Latest Follower", "Sidepanel: shows the latest follower (always visible).",              "latest-follower.html"),
+    ("Follower & Goals", "Latest Sub",      "Sidepanel: shows the latest subscriber (always visible).",             "latest-sub.html"),
+    ("Follower & Goals", "Latest Tip",      "Sidepanel: shows the latest tip/donation (always visible).",           "latest-tip.html"),
+    ("Follower & Goals", "Sub Goal",        "Progress bar toward the sub goal.",                                    "subgoal.html"),
+    ("Follower & Goals", "Tip Goal",        "Progress bar toward the tip goal.",                                    "tipgoal.html"),
 ]
 
 
@@ -382,24 +382,27 @@ def _normalize_switches(switches: list, content: str) -> list:
 
 # Hinweistexte die im URL-Detail als Info-Box erscheinen (kein reiner desc-Text).
 WIDGET_HINTS = {
+    # Parameter-driven (Streamer.bot sets URL params before triggering)
+    "latest-follower.html": "Displays whoever is passed as ?name=. Set this URL as a browser source and let Streamer.bot update the URL with the actual follower name on each event.",
+    "latest-sub.html":      "Displays whoever is passed as ?name= and ?tier=. Set this URL as a browser source and let Streamer.bot update the URL with the subscriber name and tier on each event.",
+    "latest-tip.html":      "Displays whoever is passed as ?name= and ?amount=. Set this URL as a browser source and let Streamer.bot update the URL with the donor name and amount on each event.",
     # Auto-hide
-    "steam/now-playing.html":        "Nur sichtbar wenn gerade ein Steam-Spiel läuft — blendet sich automatisch aus wenn nichts gespielt wird.",
-    "pubg/live-bar.html":            "Nur sichtbar während einer aktiven Session — blendet sich zwischen Matches automatisch aus.",
-    "pubg/post-match-card.html":     "Blendet sich bei veralteten Daten automatisch aus. OBS-Source-Toggle steuert die Sichtbarkeit nach einem Match.",
-    "pubg/news-ticker.html":         "Versteckt sich bei inaktiver Session (außer mit ?focus=lifetime). Rotiert alle 60 Sekunden zwischen Session- und Lifetime-Snippets.",
-    "pubg/session-goal.html":        "Blendet sich 60 Sekunden nach Erreichen des Ziels automatisch aus — mit ?keepAfterDone=1 dauerhaft sichtbar.",
-    # Auto-hide (Session-abhängig)
-    "pubg/first-fight.html":         "Blendet sich aus wenn keine aktive Session läuft. Zeigt die First-Fight-Rate der aktuellen oder letzten Session.",
-    "pubg/hot-drop.html":            "Blendet sich aus wenn keine aktive Session läuft. Zeigt Landing-Positionen nur für Matches der aktuellen Session.",
-    "pubg/session-summary.html":     "Blendet sich aus wenn keine aktive Session läuft — komplett leer zwischen Sessions.",
-    "pubg/session-lobbies.html":     "Blendet sich aus wenn keine aktive Session läuft. Zeigt Lobby-Stärke der letzten Matches.",
-    "pubg/session-achievements.html": "Bleibt auch zwischen Sessions sichtbar (zeigt zuletzt freigeschaltete Achievements). Aktualisiert sich alle 30 Sekunden.",
-    "pubg/weapon-stats.html":        "Blendet sich aus wenn keine aktive Session läuft. Zeigt Waffen-Stats nur für die aktuelle Session.",
-    # Event-triggered / einmalige Animationen
-    "pubg/milestone-celebrate.html": "Einmalige Animation — feuert automatisch bei einem neuen Chicken-Dinner das eine 100er-Marke überschreitet. Verwendet localStorage um Doppel-Trigger zu verhindern.",
-    "pubg/chat-stats-popup.html":    "Wird per Chat-Befehl oder Streamer.bot mit ?player= ausgelöst — verschwindet nach konfigurierbarer Dauer (Standard 12 s).",
-    "steam/achievement-popup.html":  "Einmalige Animation pro Achievement — pollt alle 5 s, spielt Unlocks nacheinander ab (8 s pro Stück). Seltene Achievements lösen stärkere Effekte aus.",
-    "steam/popup.html":              "Kombiniert Now-Playing und Achievement-Popup mit Prioritäts-Queue — ein eingehendes Achievement unterbricht das laufende Now-Playing.",
+    "steam/now-playing.html":         "Only visible when a Steam game is running — hides automatically when nothing is being played.",
+    "pubg/live-bar.html":             "Only visible during an active session — hides automatically between matches.",
+    "pubg/post-match-card.html":      "Hides automatically when data becomes stale. OBS source toggle controls visibility after a match.",
+    "pubg/news-ticker.html":          "Hides when no session is active (unless ?focus=lifetime). Rotates between session and lifetime snippets every 60 seconds.",
+    "pubg/session-goal.html":         "Hides automatically 60 seconds after the goal is reached — use ?keepAfterDone=1 to keep it visible.",
+    "pubg/first-fight.html":          "Hides when no active session is running. Shows the first-fight rate for the current or last session.",
+    "pubg/hot-drop.html":             "Hides when no active session is running. Shows landing positions only for the current session's matches.",
+    "pubg/session-summary.html":      "Hides when no active session is running — completely empty between sessions.",
+    "pubg/session-lobbies.html":      "Hides when no active session is running. Shows lobby strength of recent matches.",
+    "pubg/session-achievements.html": "Stays visible between sessions (shows last unlocked achievements). Refreshes every 30 seconds.",
+    "pubg/weapon-stats.html":         "Hides when no active session is running. Shows weapon stats for the current session only.",
+    # Event-triggered / one-shot animations
+    "pubg/milestone-celebrate.html":  "One-shot animation — fires automatically when a new chicken dinner crosses a 100-mark. Uses localStorage to prevent double-triggers.",
+    "pubg/chat-stats-popup.html":     "Triggered by a chat command or Streamer.bot with ?player= — disappears after a configurable duration (default 12 s).",
+    "steam/achievement-popup.html":   "One-shot animation per achievement — polls every 5 s, plays unlocks sequentially (8 s each). Rare achievements trigger stronger effects.",
+    "steam/popup.html":               "Combines Now-Playing and Achievement popup with a priority queue — an incoming achievement interrupts the running Now-Playing.",
 }
 
 # Reine Overlay-Widgets — kein dock (immer OBS Browser Source, kein Custom Dock).
@@ -413,9 +416,9 @@ _NO_DOCK = {
 }
 
 _DOCK_SW = {
-    "key": "dock", "label": "Hintergrund", "type": "select", "default": "0",
-    "options": [["0", "Transparent (OBS)"], ["1", "Mit Hintergrund (Dock)"]],
-    "tooltip": "Transparent für OBS Browser Source; Mit Hintergrund für Custom Docks im Browser.",
+    "key": "dock", "label": "Background", "type": "select", "default": "0",
+    "options": [["0", "Transparent (OBS)"], ["1", "With background (Dock)"]],
+    "tooltip": "Transparent for OBS Browser Source; with background for custom docks in the browser.",
 }
 
 
