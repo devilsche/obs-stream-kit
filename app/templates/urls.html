@@ -830,9 +830,14 @@
   document.getElementById("urlBack").addEventListener("click", () => {
     detailView.hidden = true;
     view.hidden = false;
-    selectTab(currentTab);
-    const tabBtn = document.getElementById("urltab-" + currentTab);
-    if (tabBtn) tabBtn.focus();
+    // Filter neu anwenden falls noch etwas eingegeben ist
+    if (filter && filter.value.trim().length >= 3) {
+      applyFilter();
+    } else {
+      selectTab(currentTab);
+      const tabBtn = document.getElementById("urltab-" + currentTab);
+      if (tabBtn) tabBtn.focus();
+    }
     try { history.replaceState(null, "", location.pathname); } catch (_) {}
   });
 
