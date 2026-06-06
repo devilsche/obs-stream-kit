@@ -20,13 +20,13 @@
     }
 
     :root {
-      --color-purple:       #5e2a79;
-      --color-purple-light: #c9a0dc;
-      --color-gold:         #f2b705;
-      --color-bg-dark:      #0d0d1a;
-      --color-bg-purple:    #1a0d2e;
-      --color-text:         #ffffff;
-      --color-text-muted:   #888888;
+      --color-purple:       var(--theme-primary,  #5e2a79);
+      --color-purple-light: var(--theme-accent-2, #c9a0dc);
+      --color-gold:         var(--theme-accent,   #f2b705);
+      --color-bg-dark:      var(--theme-bg,       #0d0d1a);
+      --color-bg-purple:    var(--theme-surface,  #1a0d2e);
+      --color-text:         var(--theme-text,     #ffffff);
+      --color-text-muted:   var(--theme-text-dim, #888888);
     }
 
     /* ─── Keyframes ─────────────────────────────────────────────── */
@@ -48,8 +48,8 @@
     }
 
     @keyframes glowPulse {
-      0%, 100% { opacity: 1; text-shadow: 0 0 30px rgba(242, 183, 5, 0.4); }
-      50%       { opacity: 1; text-shadow: 0 0 50px rgba(242, 183, 5, 0.6), 0 0 80px rgba(242, 183, 5, 0.3); }
+      0%, 100% { opacity: 1; text-shadow: 0 0 30px color-mix(in srgb, var(--color-gold) 40%, transparent); }
+      50%       { opacity: 1; text-shadow: 0 0 50px color-mix(in srgb, var(--color-gold) 60%, transparent), 0 0 80px color-mix(in srgb, var(--color-gold) 30%, transparent); }
     }
 
     @keyframes floatDown {
@@ -92,7 +92,7 @@
       height: 1080px;
       overflow: hidden;
       font-family: 'DM Sans', sans-serif;
-      background: linear-gradient(135deg, #0d0d1a 0%, #1a0d2e 50%, #0d0d1a 100%);
+      background: linear-gradient(135deg, var(--color-bg-dark) 0%, var(--color-bg-purple) 50%, var(--color-bg-dark) 100%);
       color: var(--color-text);
       position: relative;
       display: flex;
@@ -154,14 +154,14 @@
     .particle--p1 {
       width: 8px; height: 8px;
       background: var(--color-purple);
-      box-shadow: 0 0 10px 3px rgba(94, 42, 121, 0.7);
+      box-shadow: 0 0 10px 3px color-mix(in srgb, var(--color-purple) 70%, transparent);
       top: 12%; left: 8%;
       animation: floatDown 14s ease-in-out infinite;
     }
     .particle--p2 {
       width: 6px; height: 6px;
       background: var(--color-purple);
-      box-shadow: 0 0 8px 2px rgba(94, 42, 121, 0.6);
+      box-shadow: 0 0 8px 2px color-mix(in srgb, var(--color-purple) 60%, transparent);
       top: 68%; left: 14%;
       animation: floatDown3 16s ease-in-out infinite;
       animation-delay: -4s;
@@ -169,7 +169,7 @@
     .particle--p3 {
       width: 10px; height: 10px;
       background: var(--color-purple);
-      box-shadow: 0 0 14px 4px rgba(94, 42, 121, 0.65);
+      box-shadow: 0 0 14px 4px color-mix(in srgb, var(--color-purple) 65%, transparent);
       top: 35%; left: 78%;
       animation: floatDown2 18s ease-in-out infinite;
       animation-delay: -8s;
@@ -177,7 +177,7 @@
     .particle--p4 {
       width: 7px; height: 7px;
       background: var(--color-purple);
-      box-shadow: 0 0 10px 3px rgba(94, 42, 121, 0.6);
+      box-shadow: 0 0 10px 3px color-mix(in srgb, var(--color-purple) 60%, transparent);
       top: 22%; left: 55%;
       animation: floatDown4 15s ease-in-out infinite;
       animation-delay: -5s;
@@ -185,7 +185,7 @@
     .particle--p5 {
       width: 5px; height: 5px;
       background: var(--color-purple);
-      box-shadow: 0 0 7px 2px rgba(94, 42, 121, 0.55);
+      box-shadow: 0 0 7px 2px color-mix(in srgb, var(--color-purple) 55%, transparent);
       top: 55%; left: 88%;
       animation: floatDown5 13s ease-in-out infinite;
       animation-delay: -3s;
@@ -193,7 +193,7 @@
     .particle--p6 {
       width: 6px; height: 6px;
       background: var(--color-purple);
-      box-shadow: 0 0 8px 2px rgba(94, 42, 121, 0.65);
+      box-shadow: 0 0 8px 2px color-mix(in srgb, var(--color-purple) 65%, transparent);
       top: 48%; left: 35%;
       animation: floatDown3 9s ease-in-out infinite;
       animation-delay: -2s;
@@ -201,7 +201,7 @@
     .particle--p7 {
       width: 9px; height: 9px;
       background: var(--color-purple);
-      box-shadow: 0 0 12px 3px rgba(94, 42, 121, 0.7);
+      box-shadow: 0 0 12px 3px color-mix(in srgb, var(--color-purple) 70%, transparent);
       top: 78%; left: 62%;
       animation: floatDown 10s ease-in-out infinite;
       animation-delay: -6s;
@@ -211,7 +211,7 @@
     .particle--g1 {
       width: 6px; height: 6px;
       background: var(--color-gold);
-      box-shadow: 0 0 10px 3px rgba(242, 183, 5, 0.75);
+      box-shadow: 0 0 10px 3px color-mix(in srgb, var(--color-gold) 75%, transparent);
       top: 18%; left: 6%;
       animation: floatDown2 17s ease-in-out infinite;
       animation-delay: -6s;
@@ -219,7 +219,7 @@
     .particle--g2 {
       width: 8px; height: 8px;
       background: var(--color-gold);
-      box-shadow: 0 0 12px 3px rgba(242, 183, 5, 0.7);
+      box-shadow: 0 0 12px 3px color-mix(in srgb, var(--color-gold) 70%, transparent);
       top: 8%; left: 48%;
       animation: floatDown4 20s ease-in-out infinite;
       animation-delay: -7s;
@@ -227,7 +227,7 @@
     .particle--g3 {
       width: 5px; height: 5px;
       background: var(--color-gold);
-      box-shadow: 0 0 7px 2px rgba(242, 183, 5, 0.65);
+      box-shadow: 0 0 7px 2px color-mix(in srgb, var(--color-gold) 65%, transparent);
       top: 42%; left: 85%;
       animation: floatDown 14s ease-in-out infinite;
       animation-delay: -4s;
@@ -235,7 +235,7 @@
     .particle--g4 {
       width: 9px; height: 9px;
       background: var(--color-gold);
-      box-shadow: 0 0 13px 4px rgba(242, 183, 5, 0.7);
+      box-shadow: 0 0 13px 4px color-mix(in srgb, var(--color-gold) 70%, transparent);
       top: 15%; left: 92%;
       animation: floatDown3 12s ease-in-out infinite;
       animation-delay: -2s;
@@ -243,7 +243,7 @@
     .particle--g5 {
       width: 7px; height: 7px;
       background: var(--color-gold);
-      box-shadow: 0 0 10px 3px rgba(242, 183, 5, 0.6);
+      box-shadow: 0 0 10px 3px color-mix(in srgb, var(--color-gold) 60%, transparent);
       top: 60%; left: 28%;
       animation: floatDown5 19s ease-in-out infinite;
       animation-delay: -9s;
@@ -251,7 +251,7 @@
     .particle--g6 {
       width: 5px; height: 5px;
       background: var(--color-gold);
-      box-shadow: 0 0 8px 2px rgba(242, 183, 5, 0.7);
+      box-shadow: 0 0 8px 2px color-mix(in srgb, var(--color-gold) 70%, transparent);
       top: 32%; left: 25%;
       animation: floatDown4 8s ease-in-out infinite;
       animation-delay: -3s;
@@ -259,7 +259,7 @@
     .particle--g7 {
       width: 7px; height: 7px;
       background: var(--color-gold);
-      box-shadow: 0 0 11px 3px rgba(242, 183, 5, 0.65);
+      box-shadow: 0 0 11px 3px color-mix(in srgb, var(--color-gold) 65%, transparent);
       top: 65%; left: 70%;
       animation: floatDown2 9s ease-in-out infinite;
       animation-delay: -5s;
@@ -294,22 +294,22 @@
     @keyframes titleBreathe {
       0%, 100% {
         opacity: 1; letter-spacing: 12px;
-        text-shadow: 0 0 20px rgba(94,42,121,0.7), 0 0 50px rgba(201,160,220,0.4);
+        text-shadow: 0 0 20px color-mix(in srgb, var(--color-purple) 70%, transparent), 0 0 50px color-mix(in srgb, var(--color-purple-light) 40%, transparent);
       }
       50% {
         opacity: 1; letter-spacing: 15px;
-        text-shadow: 0 0 35px rgba(94,42,121,1.0), 0 0 80px rgba(201,160,220,0.65), 0 0 130px rgba(94,42,121,0.45);
+        text-shadow: 0 0 35px color-mix(in srgb, var(--color-purple) 100%, transparent), 0 0 80px color-mix(in srgb, var(--color-purple-light) 65%, transparent), 0 0 130px color-mix(in srgb, var(--color-purple) 45%, transparent);
       }
     }
 
     @keyframes titleBreathGold {
       0%, 100% {
         opacity: 1; letter-spacing: 12px;
-        text-shadow: 0 0 30px rgba(242,183,5,0.4);
+        text-shadow: 0 0 30px color-mix(in srgb, var(--color-gold) 40%, transparent);
       }
       50% {
         opacity: 1; letter-spacing: 15px;
-        text-shadow: 0 0 55px rgba(242,183,5,0.75), 0 0 100px rgba(242,183,5,0.35);
+        text-shadow: 0 0 55px color-mix(in srgb, var(--color-gold) 75%, transparent), 0 0 100px color-mix(in srgb, var(--color-gold) 35%, transparent);
       }
     }
 
@@ -323,8 +323,8 @@
     }
 
     @keyframes clipBreathe {
-      0%, 100% { transform: translateZ(0) scale(1);      box-shadow: 0 0 20px rgba(94, 42, 121, 0.25); }
-      50%       { transform: translateZ(0) scale(1.010);  box-shadow: 0 0 55px rgba(94, 42, 121, 0.6); }
+      0%, 100% { transform: translateZ(0) scale(1);      box-shadow: 0 0 20px color-mix(in srgb, var(--color-purple) 25%, transparent); }
+      50%       { transform: translateZ(0) scale(1.010);  box-shadow: 0 0 55px color-mix(in srgb, var(--color-purple) 60%, transparent); }
     }
 
     .clip-player {
@@ -362,7 +362,7 @@
 
     .countdown-overlay {
       position: absolute; inset: 0;
-      background: rgba(13, 13, 26, 0.92);
+      background: color-mix(in srgb, var(--color-bg-dark) 92%, transparent);
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
       gap: 14px; z-index: 15;
@@ -372,11 +372,11 @@
     .countdown-overlay--visible { opacity: 1; }
     .countdown__label { font-size: 11px; font-weight: 400; letter-spacing: 3px; text-transform: uppercase; color: var(--color-gold); }
     .countdown__title { font-size: 15px; font-weight: 700; color: var(--color-text); text-align: center; max-width: 90%; line-height: 1.3; }
-    .countdown__timer { font-size: 48px; font-weight: 900; color: var(--color-gold); text-shadow: 0 0 12px rgba(242, 183, 5, 0.3); }
+    .countdown__timer { font-size: 48px; font-weight: 900; color: var(--color-gold); text-shadow: 0 0 12px color-mix(in srgb, var(--color-gold) 30%, transparent); }
 
-    .countdown__timer.boom-3 { color: var(--color-gold); text-shadow: 0 0 10px rgba(242, 183, 5, 0.4); animation: cboom3 0.4s cubic-bezier(0.22, 1.2, 0.36, 1); }
-    .countdown__timer.boom-2 { color: var(--color-gold); text-shadow: 0 0 16px rgba(242, 183, 5, 0.6); animation: cboom2 0.45s cubic-bezier(0.22, 1.2, 0.36, 1); }
-    .countdown__timer.boom-1 { color: var(--color-gold); text-shadow: 0 0 24px rgba(242, 183, 5, 0.8); animation: cboom1 0.5s cubic-bezier(0.22, 1.2, 0.36, 1); }
+    .countdown__timer.boom-3 { color: var(--color-gold); text-shadow: 0 0 10px color-mix(in srgb, var(--color-gold) 40%, transparent); animation: cboom3 0.4s cubic-bezier(0.22, 1.2, 0.36, 1); }
+    .countdown__timer.boom-2 { color: var(--color-gold); text-shadow: 0 0 16px color-mix(in srgb, var(--color-gold) 60%, transparent); animation: cboom2 0.45s cubic-bezier(0.22, 1.2, 0.36, 1); }
+    .countdown__timer.boom-1 { color: var(--color-gold); text-shadow: 0 0 24px color-mix(in srgb, var(--color-gold) 80%, transparent); animation: cboom1 0.5s cubic-bezier(0.22, 1.2, 0.36, 1); }
 
     @keyframes cboom3 { 0% { transform: scale(1.3); opacity: 0.5; } 50% { transform: scale(0.95); opacity: 1; } 100% { transform: scale(1); } }
     @keyframes cboom2 { 0% { transform: scale(1.6); opacity: 0.4; } 50% { transform: scale(0.93); opacity: 1; } 70% { transform: scale(1.03); } 100% { transform: scale(1); } }
@@ -386,7 +386,7 @@
     .clip-meta--visible { opacity: 1; }
     .clip-meta__title { flex: 1; font-size: 13px; font-weight: 700; color: var(--color-gold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .clip-meta__detail { font-size: 11px; color: var(--color-text-muted); white-space: nowrap; display: flex; align-items: center; gap: 5px; }
-    .clip-meta__dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(94, 42, 121, 0.6); }
+    .clip-meta__dot { width: 3px; height: 3px; border-radius: 50%; background: color-mix(in srgb, var(--color-purple) 60%, transparent); }
 
     .title-danke {
       font-size: 48px;
@@ -550,7 +550,7 @@
         titleDanke.style.animation = 'fadeIn 1.5s ease-out forwards';
         await delay(600);
         titleZuschauen.style.animation = 'fadeIn 1.5s ease-out forwards';
-        titleZuschauen.style.textShadow = '0 0 30px rgba(242, 183, 5, 0.4)';
+        titleZuschauen.style.textShadow = '0 0 30px color-mix(in srgb, var(--color-gold) 40%, transparent)';
         await delay(400);
         divider.style.opacity = '1';
         subtitle.style.animation = 'fadeInUp 0.8s ease-out forwards';
@@ -617,7 +617,7 @@
           });
           clone.querySelector('.title-danke').style.opacity = '1';
           clone.querySelector('.title-zuschauen').style.opacity = '1';
-          clone.querySelector('.title-zuschauen').style.textShadow = '0 0 30px rgba(242, 183, 5, 0.4)';
+          clone.querySelector('.title-zuschauen').style.textShadow = '0 0 30px color-mix(in srgb, var(--color-gold) 40%, transparent)';
           clone.querySelector('.subtitle').style.opacity = '1';
           clone.classList.remove('content--glitch');
           slice.appendChild(clone);

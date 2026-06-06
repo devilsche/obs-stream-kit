@@ -20,12 +20,12 @@
     }
 
     :root {
-      --color-purple:     #5e2a79;
-      --color-gold:       #f2b705;
-      --color-bg-dark:    #0d0d1a;
-      --color-bg-purple:  #1a0d2e;
-      --color-text:       #ffffff;
-      --color-text-muted: #888888;
+      --color-purple:     var(--theme-primary,  #5e2a79);
+      --color-gold:       var(--theme-accent,   #f2b705);
+      --color-bg-dark:    var(--theme-bg,       #0d0d1a);
+      --color-bg-purple:  var(--theme-surface,  #1a0d2e);
+      --color-text:       var(--theme-text,     #ffffff);
+      --color-text-muted: var(--theme-text-dim, #888888);
     }
 
     /* ─── Keyframes ─────────────────────────────────────────────── */
@@ -109,7 +109,7 @@
       position: absolute;
       top: 0; left: 0; right: 0;
       height: 54px; /* 5% von 1080 */
-      background: linear-gradient(135deg, #0d0d1a 0%, #1a0d2e 50%, #0d0d1a 100%);
+      background: linear-gradient(135deg, var(--color-bg-dark) 0%, var(--color-bg-purple) 50%, var(--color-bg-dark) 100%);
     }
 
     /* Unterer Streifen: volle Breite, unter dem Cam-Loch */
@@ -117,7 +117,7 @@
       position: absolute;
       bottom: 0; left: 0; right: 0;
       height: 54px; /* 5% von 1080 */
-      background: linear-gradient(135deg, #0d0d1a 0%, #1a0d2e 50%, #0d0d1a 100%);
+      background: linear-gradient(135deg, var(--color-bg-dark) 0%, var(--color-bg-purple) 50%, var(--color-bg-dark) 100%);
       background-position: 0 -1026px; /* Gradient fortsetzen */
     }
 
@@ -127,7 +127,7 @@
       top: 54px; left: 0;
       width: 58px; /* 3% von 1920 */
       height: 972px; /* 90% von 1080 */
-      background: linear-gradient(135deg, #0d0d1a 0%, #1a0d2e 50%, #0d0d1a 100%);
+      background: linear-gradient(135deg, var(--color-bg-dark) 0%, var(--color-bg-purple) 50%, var(--color-bg-dark) 100%);
       background-position: 0 -54px;
     }
 
@@ -138,7 +138,7 @@
       left: 1030px; /* 58px + 972px */
       right: 0;
       height: 972px;
-      background: linear-gradient(135deg, #0d0d1a 0%, #1a0d2e 50%, #0d0d1a 100%);
+      background: linear-gradient(135deg, var(--color-bg-dark) 0%, var(--color-bg-purple) 50%, var(--color-bg-dark) 100%);
       background-position: -1030px -54px; /* Gradient nahtlos fortsetzen */
     }
 
@@ -213,9 +213,9 @@
       left: 3%;
       height: 90%;
       aspect-ratio: 1 / 1;
-      border: 2px solid rgba(94, 42, 121, 0.6);
+      border: 2px solid color-mix(in srgb, var(--color-purple) 60%, transparent);
       border-radius: 10px;
-      box-shadow: 0 0 25px rgba(94, 42, 121, 0.3);
+      box-shadow: 0 0 25px color-mix(in srgb, var(--color-purple) 30%, transparent);
       background: transparent;
       z-index: 5;
     }
@@ -311,11 +311,11 @@
       width: 38%;
       bottom: 5%;
       border-radius: 10px;
-      border: 1px solid rgba(242, 183, 5, 0.3);
-      box-shadow: 0 0 30px rgba(242, 183, 5, 0.1), inset 0 0 30px rgba(242, 183, 5, 0.05);
+      border: 1px solid color-mix(in srgb, var(--color-gold) 30%, transparent);
+      box-shadow: 0 0 30px color-mix(in srgb, var(--color-gold) 10%, transparent), inset 0 0 30px color-mix(in srgb, var(--color-gold) 5%, transparent);
       background:
-        linear-gradient(135deg, rgba(242, 183, 5, 0.25), rgba(242, 183, 5, 0.15) 50%, rgba(242, 183, 5, 0.05)),
-        radial-gradient(ellipse at center, rgba(242, 183, 5, 0.2), rgba(242, 183, 5, 0.08) 50%, transparent 80%);
+        linear-gradient(135deg, color-mix(in srgb, var(--color-gold) 25%, transparent), color-mix(in srgb, var(--color-gold) 15%, transparent) 50%, color-mix(in srgb, var(--color-gold) 5%, transparent)),
+        radial-gradient(ellipse at center, color-mix(in srgb, var(--color-gold) 20%, transparent), color-mix(in srgb, var(--color-gold) 8%, transparent) 50%, transparent 80%);
       z-index: 5;
       display: flex;
       flex-direction: column;
@@ -323,7 +323,7 @@
 
     .chat-header {
       padding: 14px 18px;
-      border-bottom: 1px solid rgba(242, 183, 5, 0.2);
+      border-bottom: 1px solid color-mix(in srgb, var(--color-gold) 20%, transparent);
       flex-shrink: 0;
     }
 
@@ -333,7 +333,7 @@
       color: #f2b705;
       letter-spacing: 3px;
       text-transform: uppercase;
-      text-shadow: 0 0 10px rgba(242, 183, 5, 0.5), 0 0 20px rgba(242, 183, 5, 0.2);
+      text-shadow: 0 0 10px color-mix(in srgb, var(--color-gold) 50%, transparent), 0 0 20px color-mix(in srgb, var(--color-gold) 20%, transparent);
     }
 
     .chat-body {
@@ -389,14 +389,14 @@
     .particle--g1 {
       width: 7px; height: 7px;
       background: #f2b705;
-      box-shadow: 0 0 14px 3px rgba(242, 183, 5, 0.7);
+      box-shadow: 0 0 14px 3px color-mix(in srgb, var(--color-gold) 70%, transparent);
       top: 8%; left: 15%;
       animation: float1 20s ease-in-out infinite;
     }
     .particle--p1 {
       width: 8px; height: 8px;
       background: #5e2a79;
-      box-shadow: 0 0 18px 4px rgba(94, 42, 121, 0.65);
+      box-shadow: 0 0 18px 4px color-mix(in srgb, var(--color-purple) 65%, transparent);
       top: 30%; left: 62%;
       animation: float2 25s ease-in-out infinite;
       animation-delay: -7s;
@@ -404,7 +404,7 @@
     .particle--g2 {
       width: 5px; height: 5px;
       background: #f2b705;
-      box-shadow: 0 0 10px 2px rgba(242, 183, 5, 0.6);
+      box-shadow: 0 0 10px 2px color-mix(in srgb, var(--color-gold) 60%, transparent);
       top: 75%; left: 20%;
       animation: float3 18s ease-in-out infinite;
       animation-delay: -3s;
@@ -412,7 +412,7 @@
     .particle--p2 {
       width: 6px; height: 6px;
       background: #5e2a79;
-      box-shadow: 0 0 14px 3px rgba(94, 42, 121, 0.6);
+      box-shadow: 0 0 14px 3px color-mix(in srgb, var(--color-purple) 60%, transparent);
       top: 55%; left: 80%;
       animation: float4 28s ease-in-out infinite;
       animation-delay: -12s;
@@ -420,7 +420,7 @@
     .particle--g3 {
       width: 5px; height: 5px;
       background: #f2b705;
-      box-shadow: 0 0 10px 2px rgba(242, 183, 5, 0.55);
+      box-shadow: 0 0 10px 2px color-mix(in srgb, var(--color-gold) 55%, transparent);
       top: 90%; left: 50%;
       animation: float5 15s ease-in-out infinite;
       animation-delay: -5s;
@@ -428,7 +428,7 @@
     .particle--p3 {
       width: 7px; height: 7px;
       background: #5e2a79;
-      box-shadow: 0 0 16px 3px rgba(94, 42, 121, 0.6);
+      box-shadow: 0 0 16px 3px color-mix(in srgb, var(--color-purple) 60%, transparent);
       top: 18%; left: 45%;
       animation: float1 30s ease-in-out infinite;
       animation-delay: -18s;
@@ -436,7 +436,7 @@
     .particle--g4 {
       width: 6px; height: 6px;
       background: #f2b705;
-      box-shadow: 0 0 12px 3px rgba(242, 183, 5, 0.6);
+      box-shadow: 0 0 12px 3px color-mix(in srgb, var(--color-gold) 60%, transparent);
       top: 65%; left: 38%;
       animation: float3 22s ease-in-out infinite;
       animation-delay: -9s;
