@@ -35,6 +35,8 @@
       --color-text-muted:  var(--theme-text-dim, #cccccc);
     }
 
+    .hiding { animation: bounceOut 0.4s ease-in both !important; }
+
     /* ─── Keyframes ─────────────────────────────────────────────── */
 
     @keyframes bounceIn {
@@ -116,8 +118,7 @@
 
       animation:
         bounceIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both,
-        glowPulse 4s ease-in-out 0.7s infinite,
-        bounceOut 0.4s ease-in 6s both;
+        glowPulse 4s ease-in-out 0.7s infinite;
     }
 
     /* ─── Inner radial glow ─────────────────────────────────────── */
@@ -232,6 +233,8 @@
 
   <script>
     var params   = new URLSearchParams(window.location.search);
+    var _dur = parseInt(params.get("duration") || "6", 10);
+    setTimeout(function(){ var el=document.querySelector(".alert-box"); if(el) el.classList.add("hiding"); }, _dur*1000);
     var username = params.get('username') || '';
     var realname = params.get('name')     || '';
     var amount   = params.get('amount')   || '1,00 €';

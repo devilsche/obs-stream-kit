@@ -32,6 +32,8 @@
       --color-purple-bright: color-mix(in srgb, var(--theme-primary, #5e2a79) 80%, #fff);
     }
 
+    .hiding { animation: contentOut 0.6s ease-in forwards !important; }
+
     /* ─── Keyframes ─────────────────────────────────────────────── */
 
     @keyframes flashFade {
@@ -181,8 +183,7 @@
       opacity: 0;
       white-space: nowrap;
       animation:
-        contentIn  0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards,
-        contentOut 0.6s ease-in 6s forwards;
+        contentIn  0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards;
     }
 
     .event-type {
@@ -257,6 +258,8 @@
   <script>
     /* ─── URL params ─────────────────────────────────────────────── */
     const params   = new URLSearchParams(window.location.search);
+    var _dur = parseInt(params.get("duration") || "6", 10);
+    setTimeout(function(){ var el=document.querySelector(".content"); if(el) el.classList.add("hiding"); }, _dur*1000);
     const username = params.get('username') || 'Raider';
     const viewers  = params.get('viewers')  || '0';
 

@@ -40,6 +40,8 @@
       --color-purple-pale:  var(--theme-text, #f0e0f8);
     }
 
+    .hiding { animation: contentOut 0.6s ease-in forwards !important; }
+
     /* ─── Keyframes ─────────────────────────────────────────────── */
 
     @keyframes flashFade {
@@ -189,8 +191,7 @@
       opacity: 0;
       white-space: nowrap;
       animation:
-        contentIn  0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards,
-        contentOut 0.6s ease-in 6s forwards;
+        contentIn  0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards;
     }
 
     .event-type {
@@ -362,6 +363,8 @@
   <script>
     /* ─── URL params ─────────────────────────────────────────────── */
     const params   = new URLSearchParams(window.location.search);
+    var _dur = parseInt(params.get("duration") || "6", 10);
+    setTimeout(function(){ var el=document.querySelector(".content"); if(el) el.classList.add("hiding"); }, _dur*1000);
     const username = params.get('username') || 'Gifter';
     const amount   = params.get('amount')   || '1';
     const tier     = params.get('tier')     || '1';
