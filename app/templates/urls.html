@@ -780,8 +780,8 @@
           const headerEl = modal.querySelector(".dn-modal__head");
           const headerH = headerEl ? headerEl.offsetHeight : 52;
           const availH = wh - headerH;
-          // Immer auf 90% des verfügbaren Raums skalieren — Ratio beibehalten
-          const scale = Math.min(maxW / cw, (availH * 0.9) / ch);
+          // Nie hochskalieren — nur runter wenn zu groß; Modal passt sich Inhalt an
+          const scale = Math.min(1, maxW / cw, (availH * 0.9) / ch);
           const mwVw = (scale * cw / ww * 100).toFixed(2);
           const mhVh = (scale * ch / availH * 100).toFixed(2);
 
