@@ -5,6 +5,7 @@
   <title>Steam Achievement Popup</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../pubg/_pubg.css">
+  <link rel="stylesheet" href="../_theme.css">
   <style>
     /* Pop-up zentriert, slide-up Animation. Pollt /api/steam/recent-unlocks
        alle 5s. Bei neuen Unlocks: queue, anzeigen 8s pro Achievement, dann
@@ -29,7 +30,7 @@
     .icon {
       width: 64px; height: 64px;
       border-radius: 8px;
-      background: rgba(0,0,0,0.3);
+      background: color-mix(in srgb, var(--pubg-bg, #0a0510) 60%, transparent);
       border: 1px solid var(--pubg-gold);
       object-fit: contain;
       flex-shrink: 0;
@@ -40,7 +41,7 @@
     .icon-emoji {
       width: 64px; height: 64px;
       border-radius: 8px;
-      background: rgba(94, 42, 121, 0.4);
+      background: color-mix(in srgb, var(--pubg-primary, #5e2a79) 40%, transparent);
       border: 1px solid var(--pubg-gold);
       flex-shrink: 0;
       box-shadow: 0 0 12px rgba(242, 183, 5, 0.35);
@@ -54,7 +55,7 @@
       display: inline-block;
       padding: 2px 8px;
       background: var(--pubg-gold);
-      color: #1a0d2a;
+      color: var(--pubg-bg, #1a0d2a);
       font-weight: 700;
       font-size: 0.7em;
       letter-spacing: 0.1em;
