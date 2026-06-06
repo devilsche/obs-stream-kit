@@ -10,6 +10,7 @@ import threading
 
 _started = False
 _lock = threading.Lock()
+_steam_poller = None  # Globale Referenz für views_api
 
 
 def _pubg_client_factory(api_key: str, platform: str):
@@ -45,9 +46,11 @@ def start_pollers(root_dir: str):
     print("[poller-startup] PUBG-Poller gestartet")
 
     # Steam
+    global _steam_poller
     steam_thread = SteamPoller(
         client_factory=_steam_client_factory,
         root_dir=root_dir,
     )
     steam_thread.start()
+    _steam_poller = steam_thread
     print("[poller-startup] Steam-Poller gestartet")

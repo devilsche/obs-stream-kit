@@ -151,10 +151,11 @@ def _build_steam_registry(tenant_id):
         client = SteamClient(api_key=creds.steam_api_key,
                              steam_id=creds.steam_id,
                              language="english")
+    from app.poller_startup import _steam_poller
     return SteamEndpointRegistry(
         client=client,
         db_connect_fn=lambda: SqliteCompatConn(_get_conn()),
-        poller=None,
+        poller=_steam_poller,
         root_dir=current_app.config.get("_PROJECT_ROOT") or ".",
         tenant_id=tenant_id,
     )
