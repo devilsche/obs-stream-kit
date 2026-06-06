@@ -33,7 +33,7 @@ WIDGET_PREVIEW_SIZES = {
     "pubg/chicken-together.html":   (360, 360),
     "pubg/squad-compare.html":      (480, 360),
     # PUBG Maps
-    "pubg/map-performance.html":    (600, 480),
+    "pubg/map-performance.html":    (1200, 620),
     "pubg/chicken-map.html":        (380, 400),
     "pubg/map-distribution.html":   (280, 320),
     "pubg/hot-drop.html":           (460, 400),

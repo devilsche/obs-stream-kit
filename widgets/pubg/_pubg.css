@@ -110,7 +110,13 @@ body.pubg-stale-hidden > *:not(.pubg-filter-bar) { display: none !important; }
 }
 
 /* Highlight-Marker .t-hot-mark (Symbol aus --theme-hot-icon + Partikel) lebt in
-   _blocks.css — wird von PubgUI.hotWrap() erzeugt. */
+   _blocks.css — wird von PubgUI.hotWrap() erzeugt.
+   Innerhalb von Stat-Values: Icon klein und inline neben dem Wert. */
+.pubg-stat-value .t-hot { display: inline-flex; align-items: center; line-height: 1; }
+.pubg-stat-value .t-hot-mark { font-size: 0.55em; margin-left: 2px; vertical-align: middle; }
+/* Auch in Tabellen-Zellen (z.B. map-performance) */
+td .t-hot { display: inline-flex; align-items: center; line-height: 1; }
+td .t-hot-mark { font-size: 0.6em; margin-left: 2px; }
 
 @keyframes pubg-fire-flicker {
   0%   { transform: translateY(0)   scale(1.0); opacity: 1.0; }
