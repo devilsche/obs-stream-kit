@@ -1,5 +1,16 @@
 """API-Routes — sowohl /api/* (Cookie) als auch /s/<token>/api/* (Token).
 
+def _pubg_status():
+    try:
+        from app.poller_startup import _pubg_poller
+        if _pubg_poller and hasattr(_pubg_poller, "status"):
+            return _pubg_poller.status()
+        return {"running": _pubg_poller is not None and _pubg_poller.is_alive()}
+    except Exception:
+        return {"running": False}
+
+"""API-Routes — sowohl /api/* (Cookie) als auch /s/<token>/api/* (Token).
+
 Beide Routen-Familien rufen dieselben Handler — die Middleware hat
 g.tenant_id schon gesetzt, wir reichen es einfach durch.
 
@@ -129,7 +140,7 @@ def _build_pubg_registry(tenant_id):
         platform=creds.pubg_platform or "steam",
         cache=_TenantPrefixCache(_shared_pubg_cache(), tenant_id),
         client=client,
-        poller_status=lambda: {"running": False},
+        poller_status=_pubg_status,
         tenant_id=tenant_id,
         steam_summary_fn=steam_summary_fn,
     )

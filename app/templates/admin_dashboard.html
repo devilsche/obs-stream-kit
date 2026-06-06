@@ -1,18 +1,28 @@
 {% extends "base.html" %}
 {% block title %}Admin — OBS Stream Kit{% endblock %}
 {% block body %}
-<div class="layout">
-  {% include "_sidebar.html" %}
-  <main id="main-content" class="main" tabindex="-1">
-    <div class="topbar"><div class="greeting">Admin</div></div>
-    <div class="card">
-      <h3>Sections</h3>
-      <ul>
-        <li><a href="/admin/users">User approval queue</a></li>
-        <li><a href="/admin/poi-editor" target="_blank" rel="noopener">POI editor</a></li>
-        <li><span class="dim">System status — coming soon</span></li>
-      </ul>
+{% include "_sidebar.html" %}
+<main id="main-content" class="dn dn-main" tabindex="-1">
+  <div class="dn-crumb">Admin</div>
+  <h1 class="dn-title">Admin</h1>
+
+  <div class="dn-simple">
+    <p class="sec">// Sections</p>
+    <div class="dn-field">
+      <a class="dn-btn" href="/admin/users">
+        <span class="material-symbols-outlined icon-sm" aria-hidden="true">manage_accounts</span>
+        User approval queue
+      </a>
     </div>
-  </main>
-</div>
+    <div class="dn-field">
+      <a class="dn-btn ghost" href="/admin/poi-editor" target="_blank" rel="noopener">
+        <span class="material-symbols-outlined icon-sm" aria-hidden="true">map</span>
+        POI Editor
+      </a>
+    </div>
+    <div class="dn-field">
+      <div class="dn-note">System status — coming soon</div>
+    </div>
+  </div>
+</main>
 {% endblock %}

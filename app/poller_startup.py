@@ -10,7 +10,8 @@ import threading
 
 _started = False
 _lock = threading.Lock()
-_steam_poller = None  # Globale Referenz für views_api
+_steam_poller = None   # Globale Referenz für views_api
+_pubg_poller  = None   # Globale Referenz für views_api
 
 
 def _pubg_client_factory(api_key: str, platform: str):
@@ -36,6 +37,7 @@ def start_pollers(root_dir: str):
     from pubg.cache import TTLCache
 
     # PUBG
+    global _pubg_poller
     pubg_cache = TTLCache(ttl_secs=30)
     pubg_thread = PollerThread(
         client_factory=_pubg_client_factory,
@@ -43,6 +45,7 @@ def start_pollers(root_dir: str):
         cache=pubg_cache,
     )
     pubg_thread.start()
+    _pubg_poller = pubg_thread
     print("[poller-startup] PUBG-Poller gestartet")
 
     # Steam

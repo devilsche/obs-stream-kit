@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Pending approval — OBS Stream Kit{% endblock %}
 {% block body %}
-<div class="pending">
-  <div class="pending-card">
+<div class="dn-pending">
+  <div class="dn-pending-card">
     <h1>Hi {{ user.display_name }}</h1>
     <p>Your account is registered and waiting for admin approval.</p>
-    <p style="color: var(--text-dim); font-size: 13px;">Once approved, you'll be redirected to the dashboard automatically.</p>
-    <p style="margin-top: 24px;"><a href="/app/logout" class="btn btn-sm">Logout</a></p>
+    <p>Once approved, you'll be redirected automatically.</p>
+    <a href="/app/logout" class="dn-btn ghost">Logout</a>
   </div>
 </div>
 <script>

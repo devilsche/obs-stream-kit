@@ -334,21 +334,22 @@ label { color: var(--text-muted); font-size: 0.9em; display: block; margin-botto
 
 button, .btn {
   display: inline-flex; align-items: center; gap: 8px;
-  background: var(--brand-purple);
-  color: #fff;
-  border: 1px solid var(--brand-purple-bright);
-  border-radius: var(--r-ctrl);
+  background: var(--theme-primary, var(--brand-purple));
+  color: var(--theme-on-primary, #fff);
+  border: 1px solid var(--theme-primary, var(--brand-purple-bright));
+  border-radius: var(--theme-radius, var(--r-ctrl));
   padding: 10px 16px;
   font: inherit; font-weight: 600;
   min-height: 44px;
   cursor: pointer;
   text-decoration: none;
 }
-button:hover, .btn:hover { background: var(--brand-purple-bright); }
+button:hover, .btn:hover { background: color-mix(in srgb,var(--theme-primary,var(--brand-purple-bright)) 80%,#fff); }
 button[disabled], .btn[disabled] { opacity: 0.55; cursor: not-allowed; }
-.btn-gold { background: var(--brand-gold); color: #1a0d2a; border-color: #c69704; }
-.btn-gold:hover { background: #ffd02e; }
-.btn-danger { background: #5c2020; border-color: #8a3030; color: #ffd5d5; }
+.btn-gold { background: var(--theme-accent,var(--brand-gold)); color: var(--theme-on-primary,#1a0d2a); border-color: var(--theme-accent,#c69704); }
+.btn-gold:hover { background: color-mix(in srgb,var(--theme-accent,#f2b705) 80%,#fff); }
+.btn-danger { background: color-mix(in srgb,var(--theme-danger,#ff5c7a) 15%,transparent); border-color: var(--theme-danger,#ff5c7a); color: var(--theme-danger,#ff5c7a); }
+.btn-danger:hover { background: var(--theme-danger,#ff5c7a); color: #fff; }
 
 .btn-twitch {
   display: inline-flex; align-items: center; gap: 12px;
@@ -934,6 +935,10 @@ html[data-theme="aurora"] .dn-ccard,html[data-theme="aurora"] .dn-hero{backdrop-
 .dn-btn:hover{background:var(--theme-primary);color:var(--theme-on-primary);box-shadow:0 0 22px color-mix(in srgb,var(--theme-primary) 35%,transparent)}
 .dn-btn.ghost{border-color:var(--theme-border);background:none;color:var(--theme-text-dim)}
 .dn-btn.ghost:hover{color:var(--theme-text);border-color:var(--theme-text);box-shadow:none;background:none}
+.dn-btn.danger{border-color:var(--theme-danger);background:color-mix(in srgb,var(--theme-danger) 10%,transparent);color:var(--theme-danger)}
+.dn-btn.danger:hover{background:var(--theme-danger);color:#fff;box-shadow:0 0 18px color-mix(in srgb,var(--theme-danger) 35%,transparent)}
+.dn-btn.accent{border-color:var(--theme-accent);background:color-mix(in srgb,var(--theme-accent) 10%,transparent);color:var(--theme-accent)}
+.dn-btn.accent:hover{background:var(--theme-accent);color:var(--theme-on-primary);box-shadow:0 0 18px color-mix(in srgb,var(--theme-accent) 35%,transparent)}
 .dn-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
 .dn-pro{margin-top:18px;border:1px dashed var(--theme-border);padding:16px 20px;color:var(--theme-text-faint);
   font-family:var(--theme-font-mono);font-size:12px;border-radius:var(--theme-radius)}
@@ -942,6 +947,25 @@ html[data-theme="aurora"] .dn-ccard,html[data-theme="aurora"] .dn-hero{backdrop-
   font-family:var(--theme-font-mono);font-size:13px;border-radius:var(--theme-radius);display:flex;align-items:center;gap:8px}
 .dn-badge{display:inline-block;background:var(--theme-accent);color:var(--theme-on-primary);padding:2px 8px;
   border-radius:calc(var(--theme-radius) * .5);font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:700}
+.dn-table-wrap{overflow-x:auto;margin:0}
+.dn-table{width:100%;border-collapse:collapse;font-size:13px}
+.dn-table th{font-family:var(--theme-font-mono);font-size:11px;color:var(--theme-text-dim);
+  text-transform:uppercase;letter-spacing:.06em;text-align:left;
+  padding:8px 14px;border-bottom:2px solid var(--theme-border)}
+.dn-table td{padding:10px 14px;border-bottom:1px solid var(--theme-border);vertical-align:middle}
+.dn-table tr:last-child td{border-bottom:none}
+.dn-table tr:hover td{background:color-mix(in srgb,var(--theme-primary) 5%,transparent)}
+.dn-table .dn-btn{padding:4px 10px;font-size:11px}
+.dn-badge--ok{background:var(--theme-ok,#4be39a);color:#0d0d0d}
+.dn-badge--warn{background:var(--theme-warning,#f2b705);color:#1a0d00}
+.dn-pending{display:flex;align-items:center;justify-content:center;min-height:60vh}
+.dn-pending-card{max-width:520px;width:100%;border:1px solid var(--theme-border);
+  background:var(--theme-surface);padding:40px 36px;text-align:center}
+.dn-pending-card h1{font-family:var(--theme-font-display);font-size:clamp(22px,3vw,28px);margin:0 0 16px}
+.dn-pending-card p{color:var(--theme-text-dim);font-size:14px;margin:0 0 10px;line-height:1.6}
+.dn-pending-card p:last-of-type{margin-bottom:24px}
+.dn-inline-form{display:inline-block}
+.avatar-sm{width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle}
 
 /* ════════════════════════════════════════════════════════════════════════
    URLs-Seite — Mockup-/Theme-Look. Farben sind via Alias schon themebar;
