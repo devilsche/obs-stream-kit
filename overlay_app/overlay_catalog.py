@@ -32,7 +32,7 @@ _TIER = {"key": "tier", "label": "Tier", "type": "select", "default": "1000",
          "options": [["1000", "Tier 1"], ["2000", "Tier 2"], ["3000", "Tier 3"]]}
 
 ALERTS = [
-    {"key": "follow", "label": "New Follower", "file": "follow.html", "size": "1920×1080", "preview_size": (1920, 1080),
+    {"key": "follow", "label": "New Follower", "file": "follow.html", "size": "1920×1080", "preview_size": (800, 500),
      "desc": "One-shot animation on new follower.", "params": [],
      "switches": [
          {"key": "username", "label": "Username", "type": "text", "default": "", "placeholder": "e.g. CoolStreamer"},
@@ -41,7 +41,7 @@ ALERTS = [
          "tooltip": "Seconds before the alert disappears"},
     
      ]},
-    {"key": "sub", "label": "New Sub", "file": "sub.html", "size": "1920×1080", "preview_size": (1920, 1080),
+    {"key": "sub", "label": "New Sub", "file": "sub.html", "size": "1920×1080", "preview_size": (800, 500),
      "desc": "One-shot animation on new subscription.", "params": [],
      "switches": [
          {"key": "username", "label": "Username", "type": "text", "default": "", "placeholder": "e.g. CoolStreamer"},
@@ -51,7 +51,7 @@ ALERTS = [
          "tooltip": "Seconds before the alert disappears"},
     
      ]},
-    {"key": "resub", "label": "Resub", "file": "resub.html", "size": "1920×1080", "preview_size": (1920, 1080),
+    {"key": "resub", "label": "Resub", "file": "resub.html", "size": "1920×1080", "preview_size": (800, 500),
      "desc": "One-shot animation on resub.", "params": [],
      "switches": [
          {"key": "username", "label": "Username", "type": "text",   "default": "", "placeholder": "e.g. CoolStreamer"},
@@ -73,7 +73,7 @@ ALERTS = [
          "tooltip": "Seconds before the alert disappears"},
     
      ]},
-    {"key": "bits", "label": "Bits / Cheer", "file": "bits.html", "size": "1920×1080", "preview_size": (1920, 1080),
+    {"key": "bits", "label": "Bits / Cheer", "file": "bits.html", "size": "1920×1080", "preview_size": (800, 500),
      "desc": "One-shot animation on bits / cheer.", "params": [],
      "switches": [
          {"key": "username", "label": "Username", "type": "text",   "default": "", "placeholder": "e.g. CoolStreamer"},
@@ -92,7 +92,7 @@ ALERTS = [
          "tooltip": "Seconds before the alert disappears"},
     
      ]},
-    {"key": "donation", "label": "Donation", "file": "donation.html", "size": "1920×1080", "preview_size": (1920, 1080),
+    {"key": "donation", "label": "Donation", "file": "donation.html", "size": "1920×1080", "preview_size": (800, 500),
      "desc": "One-shot animation on donation.", "params": [],
      "switches": [
          {"key": "username", "label": "Username", "type": "text", "default": "", "placeholder": "e.g. CoolStreamer"},

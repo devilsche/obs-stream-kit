@@ -774,21 +774,19 @@
           const maxW = ww * 0.9;
           const maxH = wh * 0.9;
 
-          let scale, mw, mh;
+          let scale;
           if (cw * 1.1 <= maxW && ch * 1.1 <= maxH) {
-            // Passt: 1:1 mit 10% Padding
-            scale = 1;
-            mw = Math.ceil(cw * 1.1 / 100) * 100;
-            mh = Math.ceil(ch * 1.1 / 100) * 100;
+            scale = 1; // passt: 1:1 + 10% Padding
           } else {
-            // Zu groß: skalieren damit es in 90% des Fensters passt, kein Extra-Padding
             scale = Math.min(maxW / cw, maxH / ch);
-            mw = Math.round(cw * scale);
-            mh = Math.round(ch * scale);
           }
+          // Modal-Größe in vw/vh — keine festen px-Werte
+          const pad = scale < 1 ? 1 : 1.1;
+          const mwVw = (scale * cw * pad / ww * 100).toFixed(2);
+          const mhVh = (scale * ch * pad / wh * 100).toFixed(2);
 
           body.classList.remove("dn-modal__body--overlay","dn-modal__body--checker");
-          body.style.cssText = `;width:${mw}px;height:${mh}px;` +
+          body.style.cssText = `;width:${mwVw}vw;height:${mhVh}vh;` +
             `display:flex;align-items:center;justify-content:center;overflow:hidden;` +
             `background:#1a1a1a;`;
           frame.style.cssText = `width:${cw}px;height:${ch}px;flex-shrink:0;border:0;` +
