@@ -99,16 +99,17 @@
           : "";
         return `<span class="mapcell">${img}${PubgUI.fmtMap(r.map)}</span>`;
       }],
-      ["matches",        "Matches", r => r.matches],
-      ["wins",           "Wins",    r => r.wins || "—"],
-      ["kills",          "Kills",   r => PubgUI.hotIf(r.kills, 300, r.kills)],
-      ["kd",             "K/D",     r => r.kd.toFixed(2)],
-      ["winRate",        "Win%",    r => r.winRate.toFixed(0) + "%"],
-      ["avgKills",       "Ø Kills", r => r.avgKills.toFixed(1)],
-      ["avgDamage",      "Ø DMG",   r => Math.round(r.avgDamage)],
+      // Per-map aggregate thresholds (calibrated for map-specific totals)
+      ["matches",        "Matches", r => PubgUI.hot(r.matches,      [100, 500, 1000],  r.matches)],
+      ["wins",           "Wins",    r => PubgUI.hot(r.wins,          [10,   50,  100],  r.wins || "—")],
+      ["kills",          "Kills",   r => PubgUI.hot(r.kills,         [300, 1000, 2500], r.kills)],
+      ["kd",             "K/D",     r => PubgUI.hot(r.kd,            [1.5,  2.5,  4.0], r.kd.toFixed(2))],
+      ["winRate",        "Win%",    r => PubgUI.hot(r.winRate,       [7.5,   10,   15], r.winRate.toFixed(0) + "%")],
+      ["avgKills",       "Ø Kills", r => PubgUI.hot(r.avgKills,      [4,      6,    9], r.avgKills.toFixed(1))],
+      ["avgDamage",      "Ø DMG",   r => PubgUI.hot(r.avgDamage,    [250,  400,  550], Math.round(r.avgDamage))],
       ["avgPlace",       "Ø Place", r => "#" + r.avgPlace.toFixed(1)],
       ["avgSurvivedSec", "Ø Surv",  r => fmtSurv(r.avgSurvivedSec)],
-      ["longestKill",    "Longest", r => PubgUI.hotIf(r.longestKill, 300, Math.round(r.longestKill) + "m")],
+      ["longestKill",    "Longest", r => PubgUI.hot(r.longestKill,  [400,  600,  750], Math.round(r.longestKill) + "m")],
     ];
 
     let _rowsCache = [];
