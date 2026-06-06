@@ -26,12 +26,14 @@ def _tenant_creds(tenant_id: int):
 def clips(token):
     if g.tenant_id is None:
         abort(404)
+    from webcore.config import Config
     creds = _tenant_creds(g.tenant_id)
-    if not (creds.twitch_client_id and creds.twitch_client_secret
-            and creds.twitch_channel):
+    # Per-tenant credentials → fall back to global .secrets
+    client_id     = creds.twitch_client_id     or Config.TWITCH_CLIENT_ID
+    client_secret = creds.twitch_client_secret  or Config.TWITCH_CLIENT_SECRET
+    channel       = creds.twitch_channel        or Config.TWITCH_CHANNEL
+    if not (client_id and client_secret and channel):
         return jsonify({"clips": []})
     count = request.args.get("count", type=int) or 100
-    data = twitch_client.get_clips(
-        creds.twitch_client_id, creds.twitch_client_secret,
-        creds.twitch_channel, count=count)
+    data = twitch_client.get_clips(client_id, client_secret, channel, count=count)
     return jsonify({"clips": data})
