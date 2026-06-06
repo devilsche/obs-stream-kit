@@ -74,19 +74,25 @@ def admin_approve(user_id: int):
             row = cur.fetchone()
             if row is None:
                 return redirect("/admin/users")
-            slug = _unique_slug(conn, _slugify(row["display_name"]))
-            cur.execute("""
-                INSERT INTO tenants (owner_user_id, slug, display_name)
-                VALUES (%s, %s, %s) RETURNING id
-            """, (user_id, slug, row["display_name"]))
-            tid = cur.fetchone()["id"]
+            # Tenant nur anlegen wenn noch keiner existiert (Schutz vor Doppel-Approve)
             cur.execute(
-                "INSERT INTO tenant_credentials (tenant_id) VALUES (%s)", (tid,)
+                "SELECT id FROM tenants WHERE owner_user_id = %s", (user_id,)
             )
-            cur.execute("""
-                INSERT INTO widget_tokens (token, tenant_id, label)
-                VALUES (%s, %s, 'Default')
-            """, (_gen_token(), tid))
+            existing = cur.fetchone()
+            if existing is None:
+                slug = _unique_slug(conn, _slugify(row["display_name"]))
+                cur.execute("""
+                    INSERT INTO tenants (owner_user_id, slug, display_name)
+                    VALUES (%s, %s, %s) RETURNING id
+                """, (user_id, slug, row["display_name"]))
+                tid = cur.fetchone()["id"]
+                cur.execute(
+                    "INSERT INTO tenant_credentials (tenant_id) VALUES (%s)", (tid,)
+                )
+                cur.execute("""
+                    INSERT INTO widget_tokens (token, tenant_id, label)
+                    VALUES (%s, %s, 'Default')
+                """, (_gen_token(), tid))
         conn.commit()
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
