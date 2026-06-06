@@ -1600,6 +1600,7 @@ class SteamEndpointRegistry:
                       AND app_id=? AND achievement_api_name=?
                 """, (self.tenant_id, self.client.steam_id, ap, api))
                 n += cur.rowcount
+            conn.commit()
             return _ok({
                 "reset": n,
                 "appId": app_id,
