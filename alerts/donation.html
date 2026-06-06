@@ -52,13 +52,13 @@
     @keyframes glowPulse {
       0%, 100% {
         box-shadow:
-          0 0 50px color-mix(in srgb, var(--color-gold) 25%, transparent),
-          0 0 100px color-mix(in srgb, var(--color-purple) 15%, transparent);
+          0 0 40px color-mix(in srgb, var(--color-gold) 30%, transparent),
+          0 0 90px color-mix(in srgb, var(--color-purple) 18%, transparent);
       }
       50% {
         box-shadow:
-          0 0 80px color-mix(in srgb, var(--color-gold) 50%, transparent),
-          0 0 150px color-mix(in srgb, var(--color-purple) 35%, transparent);
+          0 0 60px color-mix(in srgb, var(--color-gold) 45%, transparent),
+          0 0 120px color-mix(in srgb, var(--color-purple) 28%, transparent);
       }
     }
 
@@ -115,7 +115,7 @@
 
       animation:
         bounceIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both,
-        glowPulse 2s ease-in-out 0.7s infinite,
+        glowPulse 4s ease-in-out 0.7s infinite,
         bounceOut 0.4s ease-in 6s both;
     }
 
@@ -186,7 +186,7 @@
       font-size: 28px;
       font-weight: 700;
       font-family: var(--theme-font-display, 'DM Sans', sans-serif);
-      color: var(--color-purple-light);
+      color: var(--color-text);
       margin-bottom: 20px;
       opacity: 0;
       animation: fadeIn 0.4s ease 0.5s forwards;
