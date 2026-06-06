@@ -37,6 +37,9 @@ ALERTS = [
      "switches": [
          {"key": "username", "label": "Username", "type": "text", "default": "", "placeholder": "e.g. CoolStreamer"},
          {"key": "message",  "label": "Message",  "type": "text", "default": "", "placeholder": "Glad to be here!"},
+        {"key": "duration", "label": "Duration (s)", "type": "number", "default": "6", "min": 1,
+         "tooltip": "Seconds before the alert disappears"},
+    
      ]},
     {"key": "sub", "label": "New Sub", "file": "sub.html", "size": "1920×1080",
      "desc": "One-shot animation on new subscription.", "params": [],
@@ -44,6 +47,9 @@ ALERTS = [
          {"key": "username", "label": "Username", "type": "text", "default": "", "placeholder": "e.g. CoolStreamer"},
          _TIER,
          {"key": "message",  "label": "Message",  "type": "text", "default": "", "placeholder": "Thanks!"},
+        {"key": "duration", "label": "Duration (s)", "type": "number", "default": "6", "min": 1,
+         "tooltip": "Seconds before the alert disappears"},
+    
      ]},
     {"key": "resub", "label": "Resub", "file": "resub.html", "size": "1920×1080",
      "desc": "One-shot animation on resub.", "params": [],
@@ -52,6 +58,9 @@ ALERTS = [
          {"key": "months",   "label": "Months",   "type": "number", "default": "3", "min": 1},
          _TIER,
          {"key": "message",  "label": "Message",  "type": "text",   "default": "", "placeholder": "3 months already!"},
+        {"key": "duration", "label": "Duration (s)", "type": "number", "default": "6", "min": 1,
+         "tooltip": "Seconds before the alert disappears"},
+    
      ]},
     {"key": "giftsub", "label": "Gift Sub", "file": "giftsub.html", "size": "1920×1080",
      "desc": "One-shot animation on gift sub(s).", "params": [],
@@ -60,6 +69,9 @@ ALERTS = [
          {"key": "amount",   "label": "Count",  "type": "number", "default": "1", "min": 1},
          {"key": "total",    "label": "Total",  "type": "number", "default": "5", "min": 1},
          _TIER,
+        {"key": "duration", "label": "Duration (s)", "type": "number", "default": "6", "min": 1,
+         "tooltip": "Seconds before the alert disappears"},
+    
      ]},
     {"key": "bits", "label": "Bits / Cheer", "file": "bits.html", "size": "1920×1080",
      "desc": "One-shot animation on bits / cheer.", "params": [],
@@ -67,12 +79,18 @@ ALERTS = [
          {"key": "username", "label": "Username", "type": "text",   "default": "", "placeholder": "e.g. CoolStreamer"},
          {"key": "amount",   "label": "Bits",     "type": "number", "default": "100", "min": 1},
          {"key": "message",  "label": "Message",  "type": "text",   "default": "", "placeholder": "cheer100"},
+        {"key": "duration", "label": "Duration (s)", "type": "number", "default": "6", "min": 1,
+         "tooltip": "Seconds before the alert disappears"},
+    
      ]},
     {"key": "raid", "label": "Raid", "file": "raid.html", "size": "1920×1080",
      "desc": "One-shot animation on incoming raid.", "params": [],
      "switches": [
          {"key": "username", "label": "Raider",  "type": "text",   "default": "", "placeholder": "e.g. BigStreamer"},
          {"key": "viewers",  "label": "Viewers", "type": "number", "default": "50", "min": 1},
+        {"key": "duration", "label": "Duration (s)", "type": "number", "default": "6", "min": 1,
+         "tooltip": "Seconds before the alert disappears"},
+    
      ]},
     {"key": "donation", "label": "Donation", "file": "donation.html", "size": "1920×1080",
      "desc": "One-shot animation on donation.", "params": [],
@@ -81,6 +99,9 @@ ALERTS = [
          {"key": "name",     "label": "Name",     "type": "text", "default": "", "placeholder": "e.g. Max Mustermann"},
          {"key": "amount",   "label": "Amount",   "type": "text", "default": "5.00", "placeholder": "5.00"},
          {"key": "message",  "label": "Message",  "type": "text", "default": "", "placeholder": "Thanks for the stream!"},
+        {"key": "duration", "label": "Duration (s)", "type": "number", "default": "6", "min": 1,
+         "tooltip": "Seconds before the alert disappears"},
+    
      ]},
 ]
 
