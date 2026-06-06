@@ -30,7 +30,7 @@ WIDGET_PREVIEW_SIZES = {
     "pubg/top-mates-slider.html":   (320, 200),
     "pubg/flyout-full.html":        (480, 480),
     "pubg/anti-mates.html":         (320, 360),
-    "pubg/chicken-together.html":   (360, 360),
+    "pubg/chicken-together.html":   (520, 400),
     "pubg/squad-compare.html":      (480, 360),
     # PUBG Maps
     "pubg/map-performance.html":    (1200, 620),
