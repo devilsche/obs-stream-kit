@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=1920, height=1080" />
   <title>Welcome</title>
   <style>
+    :root {
+      --c-gold:     var(--theme-accent,   var(--c-gold));
+      --c-primary:  var(--theme-primary,  var(--c-primary));
+      --c-accent2:  var(--theme-accent-2, var(--c-accent2));
+      --c-bg:       var(--theme-bg,       var(--c-bg));
+      --c-surface:  var(--theme-surface,  var(--c-surface));
+      --c-text:     var(--theme-text,     #ffffff);
+      --c-muted:    var(--theme-text-dim, #888888);
+    }
+
     @font-face {
       font-family: 'DM Sans';
       src: url('../assets/DM-Sans.woff2') format('woff2');
@@ -43,25 +53,25 @@
         rgba(18, 10, 32, 0.92) 0%,
         rgba(38, 20, 56, 0.92) 100%
       );
-      border: 1px solid rgba(155, 85, 192, 0.35);
+      border: 1px solid color-mix(in srgb,var(--c-primary) 35%,transparent);
       border-radius: 12px;
       padding: 18px 44px 20px;
       text-align: center;
       max-width: 560px;
       box-shadow:
         0 4px 24px rgba(0, 0, 0, 0.55),
-        0 0 18px rgba(94, 42, 121, 0.3);
+        0 0 18px color-mix(in srgb,var(--c-primary) 30%,transparent);
     }
 
     .kicker {
       font-size: 16px;
       font-weight: 700;
-      color: #f2b705;
+      color: var(--c-gold);
       letter-spacing: 6px;
       text-transform: uppercase;
       text-shadow:
-        0 0 10px rgba(242, 183, 5, 0.8),
-        0 0 20px rgba(242, 183, 5, 0.4);
+        0 0 10px color-mix(in srgb,var(--c-gold) 80%,transparent),
+        0 0 20px color-mix(in srgb,var(--c-gold) 40%,transparent);
       margin-bottom: 6px;
     }
 
@@ -80,7 +90,7 @@
       width: 120px;
       height: 2px;
       margin: 8px auto 0;
-      background: linear-gradient(90deg, transparent, #f2b705, transparent);
+      background: linear-gradient(90deg, transparent, var(--c-gold), transparent);
     }
 
     .badge {
@@ -93,12 +103,12 @@
       letter-spacing: 1px;
       color: #ffffff;
       padding: 4px 10px;
-      border: 1px solid #c9a0dc;
+      border: 1px solid var(--c-accent2);
       border-radius: 4px;
-      background: #5e2a79;
+      background: var(--c-primary);
       transform: rotate(-8deg);
-      text-shadow: 0 0 6px rgba(155, 85, 192, 0.8);
-      box-shadow: 0 0 12px rgba(94, 42, 121, 0.6);
+      text-shadow: 0 0 6px color-mix(in srgb,var(--c-primary) 80%,transparent);
+      box-shadow: 0 0 12px color-mix(in srgb,var(--c-primary) 60%,transparent);
       text-transform: uppercase;
     }
 
@@ -162,8 +172,8 @@
       var CANVAS_H = 1080;
       var EDGE_MARGIN = 40;
       var BURST_COLORS = [
-        '#f2b705', '#ffd84d', '#ffb800',       // Gold-Varianten
-        '#5e2a79', '#c9a0dc', '#9b55c0',       // Lila-Varianten
+        'var(--c-gold)', '#ffd84d', '#ffb800',       // Gold-Varianten
+        'var(--c-primary)', 'var(--c-accent2)', 'color-mix(in srgb,var(--c-primary) 70%,#fff)',       // Lila-Varianten
         '#ff6b9d', '#ffa5c4',                   // Pink-Varianten
         '#4ea9ff', '#a8e4ff',                   // Blau-Highlight
         '#ffffff', '#ffffff'

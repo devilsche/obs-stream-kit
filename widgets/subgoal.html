@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=500, height=120" />
   <title>Sub Goal</title>
   <style>
+    :root {
+      --c-gold:     var(--theme-accent,   var(--c-gold));
+      --c-primary:  var(--theme-primary,  var(--c-primary));
+      --c-accent2:  var(--theme-accent-2, var(--c-accent2));
+      --c-bg:       var(--theme-bg,       var(--c-bg));
+      --c-surface:  var(--theme-surface,  var(--c-surface));
+      --c-text:     var(--theme-text,     #ffffff);
+      --c-muted:    var(--theme-text-dim, var(--c-muted));
+    }
+
     @font-face {
       font-family: 'DM Sans';
       src: url('../assets/DM-Sans.woff2') format('woff2');
@@ -28,8 +38,8 @@
     }
 
     @keyframes widgetGlow {
-      0%, 100% { box-shadow: 0 0 8px rgba(94,42,121,0.2), 0 0 20px rgba(94,42,121,0.1); }
-      50% { box-shadow: 0 0 15px rgba(94,42,121,0.5), 0 0 35px rgba(94,42,121,0.2); }
+      0%, 100% { box-shadow: 0 0 8px color-mix(in srgb,var(--c-primary) 20%,transparent), 0 0 20px color-mix(in srgb,var(--c-primary) 10%,transparent); }
+      50% { box-shadow: 0 0 15px color-mix(in srgb,var(--c-primary) 50%,transparent), 0 0 35px color-mix(in srgb,var(--c-primary) 20%,transparent); }
     }
 
     .widget-box {
@@ -40,14 +50,14 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
-      background: rgba(13, 13, 26, 0.95);
-      border: 1px solid rgba(94, 42, 121, 0.3);
-      border-left: 3px solid #5e2a79;
+      background: color-mix(in srgb,var(--c-bg) 95%,transparent);
+      border: 1px solid color-mix(in srgb,var(--c-primary) 30%,transparent);
+      border-left: 3px solid var(--c-primary);
       border-radius: 0 8px 8px 0;
       padding: 12px 24px;
       min-width: 320px;
       max-width: 400px;
-      box-shadow: 0 0 20px rgba(94, 42, 121, 0.15);
+      box-shadow: 0 0 20px color-mix(in srgb,var(--c-primary) 15%,transparent);
       animation: widgetGlow 3s ease-in-out infinite;
     }
 
@@ -59,7 +69,7 @@
 
     .widget-label {
       font-size: 10px;
-      color: #c9a0dc;
+      color: var(--c-accent2);
       letter-spacing: 2px;
       text-transform: uppercase;
       white-space: nowrap;
@@ -75,12 +85,12 @@
       white-space: nowrap;
       flex-shrink: 0;
     }
-    .widget-count .current { color: #c9a0dc; }
+    .widget-count .current { color: var(--c-accent2); }
     .widget-count .sep     { color: rgba(255, 255, 255, 0.5); margin: 0 3px; }
 
     .progress-track {
       height: 6px;
-      background: rgba(94, 42, 121, 0.3);
+      background: color-mix(in srgb,var(--c-primary) 30%,transparent);
       border-radius: 3px;
       overflow: hidden;
     }
@@ -88,9 +98,9 @@
     .progress-fill {
       height: 100%;
       width: 0%;
-      background: linear-gradient(90deg, #5e2a79, #f2b705);
+      background: linear-gradient(90deg, var(--c-primary), var(--c-gold));
       border-radius: 3px;
-      box-shadow: 0 0 8px rgba(242, 183, 5, 0.5);
+      box-shadow: 0 0 8px color-mix(in srgb,var(--c-gold) 50%,transparent);
       transition: width 1s ease 400ms;
     }
   </style>

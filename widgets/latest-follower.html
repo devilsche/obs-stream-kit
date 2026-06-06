@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=500, height=100" />
   <title>Latest Follower</title>
   <style>
+    :root {
+      --c-gold:     var(--theme-accent,   var(--c-gold));
+      --c-primary:  var(--theme-primary,  var(--c-primary));
+      --c-accent2:  var(--theme-accent-2, var(--c-accent2));
+      --c-bg:       var(--theme-bg,       var(--c-bg));
+      --c-surface:  var(--theme-surface,  var(--c-surface));
+      --c-text:     var(--theme-text,     #ffffff);
+      --c-muted:    var(--theme-text-dim, var(--c-muted));
+    }
+
     @font-face {
       font-family: 'DM Sans';
       src: url('../assets/DM-Sans.woff2') format('woff2');
@@ -28,8 +38,8 @@
     }
 
     @keyframes widgetGlow {
-      0%, 100% { box-shadow: 0 0 8px rgba(242,183,5,0.2), 0 0 20px rgba(242,183,5,0.1); }
-      50% { box-shadow: 0 0 15px rgba(242,183,5,0.5), 0 0 35px rgba(242,183,5,0.2); }
+      0%, 100% { box-shadow: 0 0 8px color-mix(in srgb,var(--c-gold) 20%,transparent), 0 0 20px color-mix(in srgb,var(--c-gold) 10%,transparent); }
+      50% { box-shadow: 0 0 15px color-mix(in srgb,var(--c-gold) 50%,transparent), 0 0 35px color-mix(in srgb,var(--c-gold) 20%,transparent); }
     }
 
     .widget-box {
@@ -40,14 +50,14 @@
       display: flex;
       align-items: center;
       gap: 16px;
-      background: rgba(13, 13, 26, 0.95);
-      border: 1px solid rgba(242, 183, 5, 0.3);
-      border-left: 3px solid #f2b705;
+      background: color-mix(in srgb,var(--c-bg) 95%,transparent);
+      border: 1px solid color-mix(in srgb,var(--c-gold) 30%,transparent);
+      border-left: 3px solid var(--c-gold);
       border-radius: 0 8px 8px 0;
       padding: 12px 24px;
       min-width: 320px;
       max-width: 400px;
-      box-shadow: 0 0 20px rgba(242, 183, 5, 0.15);
+      box-shadow: 0 0 20px color-mix(in srgb,var(--c-gold) 15%,transparent);
       animation: widgetGlow 3s ease-in-out infinite;
     }
 
@@ -59,7 +69,7 @@
 
     .widget-label {
       font-size: 10px;
-      color: #f2b705;
+      color: var(--c-gold);
       letter-spacing: 2px;
       text-transform: uppercase;
       white-space: nowrap;

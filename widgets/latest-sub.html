@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=500, height=100" />
   <title>Latest Sub</title>
   <style>
+    :root {
+      --c-gold:     var(--theme-accent,   var(--c-gold));
+      --c-primary:  var(--theme-primary,  var(--c-primary));
+      --c-accent2:  var(--theme-accent-2, var(--c-accent2));
+      --c-bg:       var(--theme-bg,       var(--c-bg));
+      --c-surface:  var(--theme-surface,  var(--c-surface));
+      --c-text:     var(--theme-text,     #ffffff);
+      --c-muted:    var(--theme-text-dim, var(--c-muted));
+    }
+
     @font-face {
       font-family: 'DM Sans';
       src: url('../assets/DM-Sans.woff2') format('woff2');
@@ -28,8 +38,8 @@
     }
 
     @keyframes widgetGlow {
-      0%, 100% { box-shadow: 0 0 8px rgba(94,42,121,0.2), 0 0 20px rgba(94,42,121,0.1); }
-      50% { box-shadow: 0 0 15px rgba(94,42,121,0.5), 0 0 35px rgba(94,42,121,0.2); }
+      0%, 100% { box-shadow: 0 0 8px color-mix(in srgb,var(--c-primary) 20%,transparent), 0 0 20px color-mix(in srgb,var(--c-primary) 10%,transparent); }
+      50% { box-shadow: 0 0 15px color-mix(in srgb,var(--c-primary) 50%,transparent), 0 0 35px color-mix(in srgb,var(--c-primary) 20%,transparent); }
     }
 
     .widget-box {
@@ -41,14 +51,14 @@
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      background: rgba(13, 13, 26, 0.95);
-      border: 1px solid rgba(94, 42, 121, 0.3);
-      border-left: 3px solid #5e2a79;
+      background: color-mix(in srgb,var(--c-bg) 95%,transparent);
+      border: 1px solid color-mix(in srgb,var(--c-primary) 30%,transparent);
+      border-left: 3px solid var(--c-primary);
       border-radius: 0 8px 8px 0;
       padding: 12px 24px;
       min-width: 320px;
       max-width: 400px;
-      box-shadow: 0 0 20px rgba(94, 42, 121, 0.15);
+      box-shadow: 0 0 20px color-mix(in srgb,var(--c-primary) 15%,transparent);
       animation: widgetGlow 3s ease-in-out infinite;
     }
 
@@ -60,7 +70,7 @@
 
     .widget-label {
       font-size: 10px;
-      color: #c9a0dc;
+      color: var(--c-accent2);
       letter-spacing: 2px;
       text-transform: uppercase;
       white-space: nowrap;
@@ -84,19 +94,19 @@
     }
 
     .widget-tier--1 {
-      background: rgba(94, 42, 121, 0.5);
-      border: 1px solid #c9a0dc;
+      background: color-mix(in srgb,var(--c-primary) 50%,transparent);
+      border: 1px solid var(--c-accent2);
       color: #ffffff;
     }
     .widget-tier--2 {
-      background: rgba(94, 42, 121, 0.6);
-      border: 1px solid #d4b0e8;
-      color: #e8d0f5;
+      background: color-mix(in srgb,var(--c-primary) 60%,transparent);
+      border: 1px solid var(--c-accent2);
+      color: color-mix(in srgb,var(--c-accent2) 80%,#fff);
     }
     .widget-tier--3 {
-      background: linear-gradient(135deg, rgba(242, 183, 5, 0.3), rgba(94, 42, 121, 0.4));
-      border: 1px solid #f2b705;
-      color: #f2b705;
+      background: linear-gradient(135deg, color-mix(in srgb,var(--c-gold) 30%,transparent), color-mix(in srgb,var(--c-primary) 40%,transparent));
+      border: 1px solid var(--c-gold);
+      color: var(--c-gold);
     }
   </style>
   <link rel="stylesheet" href="_theme.css">

@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=400, height=152" />
   <title>Animiertes Logo</title>
   <style>
+    :root {
+      --c-gold:     var(--theme-accent,   var(--c-gold));
+      --c-primary:  var(--theme-primary,  var(--c-primary));
+      --c-accent2:  var(--theme-accent-2, var(--c-accent2));
+      --c-bg:       var(--theme-bg,       var(--c-bg));
+      --c-surface:  var(--theme-surface,  var(--c-surface));
+      --c-text:     var(--theme-text,     #ffffff);
+      --c-muted:    var(--theme-text-dim, #888888);
+    }
+
     *, *::before, *::after {
       margin: 0;
       padding: 0;
@@ -88,12 +98,12 @@
       // --- Glow-Farbe ---
       var GLOW_PRESETS = {
         purple: {
-          from: 'drop-shadow(0 0 8px rgba(94,42,121,0.8)) drop-shadow(0 0 20px rgba(94,42,121,0.4))',
-          to:   'drop-shadow(0 0 12px rgba(94,42,121,0.9)) drop-shadow(0 0 30px rgba(94,42,121,0.5))'
+          from: 'drop-shadow(0 0 8px color-mix(in srgb,var(--c-primary) 80%,transparent)) drop-shadow(0 0 20px color-mix(in srgb,var(--c-primary) 40%,transparent))',
+          to:   'drop-shadow(0 0 12px color-mix(in srgb,var(--c-primary) 90%,transparent)) drop-shadow(0 0 30px color-mix(in srgb,var(--c-primary) 50%,transparent))'
         },
         gold: {
-          from: 'drop-shadow(0 0 8px rgba(242,183,5,0.8)) drop-shadow(0 0 20px rgba(242,183,5,0.4))',
-          to:   'drop-shadow(0 0 12px rgba(242,183,5,0.9)) drop-shadow(0 0 30px rgba(242,183,5,0.5))'
+          from: 'drop-shadow(0 0 8px color-mix(in srgb,var(--c-gold) 80%,transparent)) drop-shadow(0 0 20px color-mix(in srgb,var(--c-gold) 40%,transparent))',
+          to:   'drop-shadow(0 0 12px color-mix(in srgb,var(--c-gold) 90%,transparent)) drop-shadow(0 0 30px color-mix(in srgb,var(--c-gold) 50%,transparent))'
         }
       };
 
@@ -118,7 +128,7 @@
         glowFrom = GLOW_PRESETS.gold.from;
         glowTo = GLOW_PRESETS.gold.to;
       } else if (glowParam && glowParam.match(/^#?[0-9a-fA-F]{6}$/)) {
-        // Custom Hex-Farbe: ?glow=#ff0000 oder ?glow=ff0000
+        // Custom Hex-Farbe: ?glow=var(--c-gold) oder ?glow=ff0000
         var custom = hexToGlow(glowParam);
         glowFrom = custom.from;
         glowTo = custom.to;
