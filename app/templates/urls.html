@@ -3,7 +3,7 @@
 
 {# Eine Source-Karte fuers Grid. switches/params als Listen → im Markup als
    HTML-sicheres JSON (tojson escaped < > & ' → sicher im single-quote-Attr). #}
-{% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[], chrome_preview=False, hint='', tab='') %}
+{% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[], chrome_preview=False, hint='', tab='', preview_size=None) %}
 <button type="button" class="url-card" hidden
         data-kind="{{ kind }}" data-label="{{ label }}" data-cat="{{ cat }}"
         data-path="{{ path }}" data-base="{{ base }}"
@@ -12,6 +12,7 @@
         {% if desc %}data-desc="{{ desc }}"{% endif %}
         {% if hint %}data-hint="{{ hint }}"{% endif %}
         {% if chrome_preview %}data-chrome-preview="true"{% endif %}
+        {% if preview_size %}data-preview-w="{{ preview_size[0] }}" data-preview-h="{{ preview_size[1] }}"{% endif %}
         data-switches='{{ switches|tojson }}' data-params='{{ params|tojson }}'>
   <span class="url-card__corner" aria-hidden="true"></span>
   <span class="url-card__top">
@@ -65,22 +66,25 @@
         {% for o in overlays %}
         {{ src_card('overlay','Overlay',o.label,
                     overlay_base~'/s/'~token~'/overlays/'~o.file,'overlays/'~o.file,
-                    o.size,o.desc,(o.switches or []),(o.params or []),False,'','overlays') }}
+                    o.size,o.desc,(o.switches or []),(o.params or []),False,'','overlays',
+                    o.preview_size|default(None)) }}
         {% endfor %}
-        {% for cat,label,desc,path,switches,hint in widgets %}
+        {% for cat,label,desc,path,switches,hint,preview_size in widgets %}
         {{ src_card('widget',cat,label,
                     base_url~'/s/'~token~'/widgets/'~path,path,
-                    '',desc,switches,[],False,hint,'widgets') }}
+                    '',desc,switches,[],False,hint,'widgets',preview_size) }}
         {% endfor %}
         {% for d in decor %}
         {{ src_card('overlay','Decor',d.label,
                     base_url~'/s/'~token~'/widgets/'~d.file,d.file,
-                    d.size,d.desc,d.switches or [],d.params or [],False,'','decor') }}
+                    d.size,d.desc,d.switches or [],d.params or [],False,'','decor',
+                    d.preview_size|default(None)) }}
         {% endfor %}
         {% for a in alerts %}
         {{ src_card('overlay','Alert',a.label,
                     base_url~'/s/'~token~'/alerts/'~a.file,'alerts/'~a.file,
-                    a.size,a.desc,a.switches or [],a.params or [],False,'','alerts') }}
+                    a.size,a.desc,a.switches or [],a.params or [],False,'','alerts',
+                    a.preview_size|default(None)) }}
         {% endfor %}
         {% for s in stingers %}
         {{ src_card('overlay','Meme',s.label,
@@ -96,7 +100,8 @@
         {{ src_card('overlay','Transition',t.label,
                     base_url~'/s/'~token~'/transitions/'~t.file,'transitions/'~t.file,
                     t.size,t.desc,t.switches or [],t.params or [],
-                    t.chrome_preview|default(False),'','transition') }}
+                    t.chrome_preview|default(False),'','transition',
+                    t.preview_size|default(None)) }}
         {% endfor %}
       </div>
       <p class="url-empty" id="urlEmpty" hidden>No source found.</p>
@@ -272,17 +277,20 @@
     const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${chromeHtml}`;
 
     const infoBits = [];
+    const pw = parseInt(card.dataset.previewW || "0");
+    const ph = parseInt(card.dataset.previewH || "0");
     const sz = card.dataset.size || "";
-    if (sz) {
-      infoBits.push('<strong>OBS Browser Source size:</strong> ' + escapeHtml(sz) + ' px');
+    if (pw && ph) {
+      infoBits.push('<strong>OBS Browser Source:</strong> ' + pw + '×' + ph + ' px');
+    } else if (sz) {
+      infoBits.push('<strong>OBS Browser Source:</strong> ' + escapeHtml(sz) + ' px');
     } else {
-      // Dynamische Größe aus width/height-Switches berechnen
       const wSw = switches.find(s => s.key === "width");
       const hSw = switches.find(s => s.key === "height");
       if (wSw && hSw) {
         const dw = (parseInt(wSw.default) || 400) + 100;
         const dh = (parseInt(hSw.default) || 225) + 100;
-        infoBits.push('<strong>OBS Browser Source size:</strong> ' + dw + '×' + dh + ' px (default — adjusts with settings)');
+        infoBits.push('<strong>OBS Browser Source:</strong> ' + dw + '×' + dh + ' px (adjusts with settings)');
       }
     }
     infoBits.push("Paste the URL into OBS → Properties → URL — set size to match above");
@@ -753,11 +761,13 @@
             }
           } catch(_) {}
 
-          // Widget-Größe: Katalog-Größe bevorzugen (fullscreen etc.), sonst DOM-Messung
-          const cw = (dim[0] && dim[1]) ? dim[0]
-            : Math.max(doc.body.scrollWidth || doc.documentElement.scrollWidth, 40);
-          const ch = (dim[0] && dim[1]) ? dim[1]
-            : Math.max(doc.body.scrollHeight || doc.documentElement.scrollHeight, 20);
+          // preview_size aus Katalog > size-Feld > DOM-Messung
+          const pw = parseInt(card.dataset.previewW || "0");
+          const ph = parseInt(card.dataset.previewH || "0");
+          const cw = pw || (dim[0] && dim[1] ? dim[0]
+            : Math.max(doc.body.scrollWidth || doc.documentElement.scrollWidth, 40));
+          const ch = ph || (dim[0] && dim[1] ? dim[1]
+            : Math.max(doc.body.scrollHeight || doc.documentElement.scrollHeight, 20));
 
           const ww = window.innerWidth;
           const wh = window.innerHeight;

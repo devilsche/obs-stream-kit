@@ -11,6 +11,60 @@ import re
 from typing import Optional
 
 
+# Preview-Größen für den URL-Picker (width, height in px).
+# Widgets ohne Eintrag: Auto-Detect via scrollWidth/scrollHeight.
+WIDGET_PREVIEW_SIZES = {
+    # PUBG Stats
+    "pubg/career-card.html":        (400, 520),
+    "pubg/live-bar.html":           (520,  44),
+    "pubg/streak-counter.html":     (320,  80),
+    "pubg/first-fight.html":        (400, 320),
+    "pubg/weapon-stats.html":       (380, 420),
+    "pubg/season-history.html":     (480, 480),
+    "pubg/trend-indicator.html":    (240,  80),
+    # PUBG Mates
+    "pubg/mates.html":              (400,  90),
+    "pubg/coplayer.html":           (720, 480),
+    "pubg/top-mates.html":          (320, 360),
+    "pubg/top-hunters.html":        (320, 360),
+    "pubg/top-mates-slider.html":   (320, 200),
+    "pubg/flyout-full.html":        (480, 480),
+    "pubg/anti-mates.html":         (320, 360),
+    "pubg/chicken-together.html":   (360, 360),
+    "pubg/squad-compare.html":      (480, 360),
+    # PUBG Maps
+    "pubg/map-performance.html":    (400, 320),
+    "pubg/chicken-map.html":        (380, 400),
+    "pubg/map-distribution.html":   (280, 320),
+    "pubg/hot-drop.html":           (460, 400),
+    # PUBG Match
+    "pubg/post-match-card.html":    (400, 320),
+    "pubg/session-summary.html":    (400, 280),
+    "pubg/session-goal.html":       (400,  80),
+    "pubg/session-lobbies.html":    (400, 280),
+    "pubg/payday-stats.html":       (400, 280),
+    # PUBG Achievements
+    "pubg/milestone-celebrate.html":(1920,1080),
+    "pubg/session-achievements.html":(400, 360),
+    # PUBG News
+    "pubg/news-ticker.html":        (920,  44),
+    "pubg/lookup.html":             (720, 560),
+    "pubg/chat-stats-popup.html":   (480, 200),
+    # Steam
+    "steam/achievement-feed.html":  (400, 200),
+    "steam/achievement-popup.html": (500, 110),
+    "steam/popup.html":             (500, 110),
+    "steam/now-playing.html":       (480, 110),
+    "steam/games-ticker.html":      (480,  90),
+    # Follower & Goals
+    "welcome.html":                 (1920,1080),
+    "latest-follower.html":         (500, 110),
+    "latest-sub.html":              (500, 110),
+    "latest-tip.html":              (500, 110),
+    "subgoal.html":                 (500, 130),
+    "tipgoal.html":                 (500, 130),
+}
+
 # Manuelle Switch-Definitionen fuer Widgets ohne buildFilter (z.B. reine JS-Widgets).
 # Fallback: wird genutzt wenn buildFilter nichts liefert.
 _TIER_SW = {"key": "tier", "label": "Tier", "type": "select", "default": "1",
@@ -444,7 +498,8 @@ def build(project_root: str) -> list:
                 and not any(s["key"] == "dock" for s in switches)):
             switches.append(_DOCK_SW)
         hint = WIDGET_HINTS.get(path, "")
-        out.append((cat, label, desc, path, switches, hint))
+        preview_size = WIDGET_PREVIEW_SIZES.get(path)
+        out.append((cat, label, desc, path, switches, hint, preview_size))
     return out
 
 

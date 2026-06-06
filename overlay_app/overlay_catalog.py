@@ -3,12 +3,12 @@ import glob
 import os
 
 OVERLAYS = [
-    {"key": "starting-soon",  "label": "Starting Soon",  "file": "starting-soon.html",
+    {"key": "starting-soon",  "label": "Starting Soon",  "file": "starting-soon.html", "preview_size": (1920,1080),
      "size": "1920×1080", "desc": "Animated 'Starting Soon' scene.", "params": [], "switches": [
          {"key": "hold", "label": "Hold (s)", "type": "number", "default": "20", "min": 5,
           "tooltip": "Seconds to stay on screen before fading out"},
      ]},
-    {"key": "brb-pause",      "label": "BRB / Pause",     "file": "brb-pause.html",
+    {"key": "brb-pause",      "label": "BRB / Pause",     "file": "brb-pause.html", "preview_size": (1920,1080),
      "size": "1920×1080", "desc": "Break scene with integrated Twitch clip player.", "params": [], "switches": [
          {"key": "count",     "label": "Clip count",  "type": "number", "default": "3",  "min": 1},
          {"key": "countdown", "label": "Countdown",   "type": "number", "default": "0",  "min": 0,
@@ -16,14 +16,14 @@ OVERLAYS = [
          {"key": "clips",     "label": "Clip filter", "type": "text",   "default": "",
           "tooltip": "Comma-separated clip IDs or empty for random"},
      ]},
-    {"key": "stream-ending",  "label": "Stream Ending",   "file": "stream-ending.html",
+    {"key": "stream-ending",  "label": "Stream Ending",   "file": "stream-ending.html", "preview_size": (1920,1080),
      "size": "1920×1080", "desc": "Animated stream-ending scene.", "params": [], "switches": [
          {"key": "hold", "label": "Hold (s)", "type": "number", "default": "20", "min": 5},
      ]},
-    {"key": "just-chatting",  "label": "Just Chatting",   "file": "just-chatting.html",
+    {"key": "just-chatting",  "label": "Just Chatting",   "file": "just-chatting.html", "preview_size": (1920,1080),
      "size": "1920×1080", "desc": "Fullscreen camera scene with subtle decoration.",
      "params": [], "switches": []},
-    {"key": "gameplay",       "label": "Gameplay / Camera", "file": "gameplay.html",
+    {"key": "gameplay",       "label": "Gameplay / Camera", "file": "gameplay.html", "preview_size": (400,225),
      "size": "400×225", "desc": "Camera area for the gameplay overlay (16:9).",
      "params": [], "switches": []},
 ]
@@ -32,7 +32,7 @@ _TIER = {"key": "tier", "label": "Tier", "type": "select", "default": "1000",
          "options": [["1000", "Tier 1"], ["2000", "Tier 2"], ["3000", "Tier 3"]]}
 
 ALERTS = [
-    {"key": "follow", "label": "New Follower", "file": "follow.html", "size": "1920×1080",
+    {"key": "follow", "label": "New Follower", "file": "follow.html", "size": "1920×1080", "preview_size": (700, 420),
      "desc": "One-shot animation on new follower.", "params": [],
      "switches": [
          {"key": "username", "label": "Username", "type": "text", "default": "", "placeholder": "e.g. CoolStreamer"},
@@ -41,7 +41,7 @@ ALERTS = [
          "tooltip": "Seconds before the alert disappears"},
     
      ]},
-    {"key": "sub", "label": "New Sub", "file": "sub.html", "size": "1920×1080",
+    {"key": "sub", "label": "New Sub", "file": "sub.html", "size": "1920×1080", "preview_size": (700, 420),
      "desc": "One-shot animation on new subscription.", "params": [],
      "switches": [
          {"key": "username", "label": "Username", "type": "text", "default": "", "placeholder": "e.g. CoolStreamer"},
@@ -51,7 +51,7 @@ ALERTS = [
          "tooltip": "Seconds before the alert disappears"},
     
      ]},
-    {"key": "resub", "label": "Resub", "file": "resub.html", "size": "1920×1080",
+    {"key": "resub", "label": "Resub", "file": "resub.html", "size": "1920×1080", "preview_size": (700, 420),
      "desc": "One-shot animation on resub.", "params": [],
      "switches": [
          {"key": "username", "label": "Username", "type": "text",   "default": "", "placeholder": "e.g. CoolStreamer"},
@@ -62,7 +62,7 @@ ALERTS = [
          "tooltip": "Seconds before the alert disappears"},
     
      ]},
-    {"key": "giftsub", "label": "Gift Sub", "file": "giftsub.html", "size": "1920×1080",
+    {"key": "giftsub", "label": "Gift Sub", "file": "giftsub.html", "size": "1920×1080", "preview_size": (700, 420),
      "desc": "One-shot animation on gift sub(s).", "params": [],
      "switches": [
          {"key": "username", "label": "Gifter", "type": "text",   "default": "", "placeholder": "e.g. CoolStreamer"},
@@ -73,7 +73,7 @@ ALERTS = [
          "tooltip": "Seconds before the alert disappears"},
     
      ]},
-    {"key": "bits", "label": "Bits / Cheer", "file": "bits.html", "size": "1920×1080",
+    {"key": "bits", "label": "Bits / Cheer", "file": "bits.html", "size": "1920×1080", "preview_size": (700, 420),
      "desc": "One-shot animation on bits / cheer.", "params": [],
      "switches": [
          {"key": "username", "label": "Username", "type": "text",   "default": "", "placeholder": "e.g. CoolStreamer"},
@@ -83,7 +83,7 @@ ALERTS = [
          "tooltip": "Seconds before the alert disappears"},
     
      ]},
-    {"key": "raid", "label": "Raid", "file": "raid.html", "size": "1920×1080",
+    {"key": "raid", "label": "Raid", "file": "raid.html", "size": "1920×1080", "preview_size": (700, 420),
      "desc": "One-shot animation on incoming raid.", "params": [],
      "switches": [
          {"key": "username", "label": "Raider",  "type": "text",   "default": "", "placeholder": "e.g. BigStreamer"},
@@ -92,7 +92,7 @@ ALERTS = [
          "tooltip": "Seconds before the alert disappears"},
     
      ]},
-    {"key": "donation", "label": "Donation", "file": "donation.html", "size": "1920×1080",
+    {"key": "donation", "label": "Donation", "file": "donation.html", "size": "1920×1080", "preview_size": (700, 420),
      "desc": "One-shot animation on donation.", "params": [],
      "switches": [
          {"key": "username", "label": "Username", "type": "text", "default": "", "placeholder": "e.g. CoolStreamer"},
