@@ -4,113 +4,110 @@
 {% include "_sidebar.html" %}
 <main id="main-content" class="dn dn-main" tabindex="-1">
   <div class="dn-crumb">Settings / API Docs</div>
-  <h1 class="dn-title">API Documentation</h1>
+  <h1 class="dn-title">API Reference</h1>
 
   <div class="dn-simple">
     <p class="sec">// Base URL</p>
     <div class="dn-field">
       <label>Your token-scoped base URL</label>
       {% if token %}
-      <div style="font-family:var(--theme-font-mono,monospace);font-size:13px;color:var(--theme-accent,#f2b705);word-break:break-all">
-        {{ base_url }}/s/{{ token }}/
+      <div style="font-family:var(--theme-font-mono,monospace);font-size:13px;color:var(--theme-accent,#f2b705);word-break:break-all;user-select:all">
+        {{ base_url }}/s/{{ token }}/api/
       </div>
-      <div class="dn-note">All API calls use this prefix. The token authenticates your tenant — keep it private.</div>
       {% else %}
-      <div class="dn-note" style="color:var(--theme-danger,#ff5c7a)">No token found. Ask an admin to set up your tenant.</div>
+      <div class="dn-note" style="color:var(--theme-danger,#ff5c7a)">No token found.</div>
       {% endif %}
+      <div class="dn-note">All endpoints below are prefixed with this URL. Token authenticates your tenant — keep it private.</div>
     </div>
   </div>
 
   {% if token %}
   <div class="dn-simple">
-    <p class="sec">// Alerts — Streamer.bot Integration</p>
-    <div class="dn-note" style="margin-bottom:16px">
-      In Streamer.bot: <strong>Actions → Browser Source → Set URL</strong> with the alert URL + query params.
-      Streamer.bot sets <code>{username}</code>, <code>{amount}</code> etc. automatically from the event.
-    </div>
-    {% for a in alerts %}
-    <div class="dn-field">
-      <label>{{ a.label }}</label>
-      <div style="font-family:var(--theme-font-mono,monospace);font-size:12px;word-break:break-all;color:var(--text-muted,#888)">
-        {{ base_url }}/s/{{ token }}/alerts/{{ a.file }}{% if a.switches %}?{% for sw in a.switches %}{{ sw.key }}={{'{'}}{{ sw.key }}{{'}'}}{% if not loop.last %}&amp;{% endif %}{% endfor %}{% endif %}
-      </div>
-      {% if a.switches %}
-      <div class="dn-note">
-        Params: {% for sw in a.switches %}<code>{{ sw.key }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
-      </div>
-      {% endif %}
-    </div>
-    {% endfor %}
-  </div>
-
-  <div class="dn-simple">
     <p class="sec">// Steam API</p>
+
     <div class="dn-field">
-      <label>GET /api/steam/now-playing</label>
-      <div class="dn-note">Current Steam game. Optional: <code>?fakeAppId=578080</code> for testing.</div>
+      <label><code>GET api/steam/now-playing</code></label>
+      <div class="dn-note">Current Steam game, avatar, playtime, achievement progress.<br>
+        Optional: <code>?fakeAppId=578080</code> — simulate a game for testing.<br>
+        Optional: <code>?demo=1</code> — show mock data without API call.</div>
     </div>
+
     <div class="dn-field">
-      <label>GET /api/steam/recent-unlocks</label>
-      <div class="dn-note">Undisplayed achievement unlocks. <code>?markDisplayed=1</code> marks them as seen.</div>
+      <label><code>GET api/steam/recent-unlocks</code></label>
+      <div class="dn-note">Achievements unlocked since last check (not yet displayed).<br>
+        <code>?markDisplayed=1</code> — mark returned unlocks as seen (prevents double-firing).</div>
     </div>
+
     <div class="dn-field">
-      <label>GET /api/steam/replay-achievements</label>
-      <div class="dn-note">Re-trigger an achievement popup. <code>?appId=N&amp;apiName=X&amp;limit=1</code></div>
+      <label><code>GET api/steam/replay-achievements</code></label>
+      <div class="dn-note">Re-queue an achievement for the popup widget.<br>
+        <code>?appId=N&amp;apiName=X&amp;limit=1</code> — specific achievement.<br>
+        <code>?onlyRare=1&amp;rarePct=5</code> — only rare ones.</div>
     </div>
+
     <div class="dn-field">
-      <label>GET /api/steam/clips</label>
-      <div class="dn-note">Your Twitch clips for the BRB scene. <code>?count=N</code></div>
+      <label><code>GET api/steam/clips</code></label>
+      <div class="dn-note">Your Twitch clips (used by BRB scene).<br>
+        <code>?count=N</code> — max number of clips (default 100).</div>
+    </div>
+
+    <div class="dn-field">
+      <label><code>GET api/steam/status</code></label>
+      <div class="dn-note">Poller health — last sync time, achievement count, errors.
+        <a href="/s/{{ token }}/api/steam/status" target="_blank" class="dn-btn ghost" style="margin-left:8px;font-size:12px">Open ↗</a>
+      </div>
     </div>
   </div>
 
   <div class="dn-simple">
     <p class="sec">// PUBG API</p>
+
     <div class="dn-field">
-      <label>GET /api/pubg/session</label>
-      <div class="dn-note">Current session stats (kills, damage, wins, matches).</div>
+      <label><code>GET api/pubg/session</code></label>
+      <div class="dn-note">Current session aggregate — kills, damage, wins, matches.</div>
     </div>
+
     <div class="dn-field">
-      <label>GET /api/pubg/session-matches</label>
-      <div class="dn-note">All matches of the current session. <code>?range=session|week|all</code></div>
+      <label><code>GET api/pubg/session-matches</code></label>
+      <div class="dn-note">Individual matches of current session.<br>
+        <code>?range=session|week|all</code></div>
     </div>
+
     <div class="dn-field">
-      <label>GET /api/pubg/last-match</label>
-      <div class="dn-note">Most recent match with full stats.</div>
+      <label><code>GET api/pubg/last-match</code></label>
+      <div class="dn-note">Most recent match with full stats, map, squad.</div>
     </div>
+
     <div class="dn-field">
-      <label>GET /api/pubg/career-lifetime</label>
+      <label><code>GET api/pubg/career-lifetime</code></label>
       <div class="dn-note">All-time career stats from PUBG API.</div>
     </div>
+
     <div class="dn-field">
-      <label>GET /api/pubg/recent-achievements</label>
-      <div class="dn-note">Undisplayed PUBG milestones. <code>?markDisplayed=1</code></div>
+      <label><code>GET api/pubg/map-performance</code></label>
+      <div class="dn-note">Per-map aggregate stats.<br>
+        <code>?range=session|week|all</code></div>
     </div>
+
     <div class="dn-field">
-      <label>GET /api/pubg/status</label>
-      <div class="dn-note">Health check — poller state, last match time, DB stats.</div>
+      <label><code>GET api/pubg/recent-achievements</code></label>
+      <div class="dn-note">Undisplayed PUBG session milestones.<br>
+        <code>?markDisplayed=1</code></div>
+    </div>
+
+    <div class="dn-field">
+      <label><code>GET api/pubg/status</code></label>
+      <div class="dn-note">Health check — poller state, last match ingested, DB row counts.
+        <a href="/s/{{ token }}/api/pubg/status" target="_blank" class="dn-btn ghost" style="margin-left:8px;font-size:12px">Open ↗</a>
+      </div>
     </div>
   </div>
 
   <div class="dn-simple">
-    <p class="sec">// Streamer.bot Quickstart</p>
+    <p class="sec">// Widgets &amp; Alerts</p>
     <div class="dn-field">
-      <label>Follow alert</label>
-      <div class="dn-note">
-        Trigger: <em>Twitch Follow</em><br>
-        Action: <em>Set Browser Source URL</em><br>
-        URL: <code>{{ base_url }}/s/{{ token }}/alerts/follow.html?username=%user%&amp;message=Welcome!</code>
-      </div>
-    </div>
-    <div class="dn-field">
-      <label>Sub alert</label>
-      <div class="dn-note">
-        URL: <code>{{ base_url }}/s/{{ token }}/alerts/sub.html?username=%user%&amp;tier=%tier%&amp;message=%message%</code>
-      </div>
-    </div>
-    <div class="dn-field">
-      <label>Donation alert</label>
-      <div class="dn-note">
-        URL: <code>{{ base_url }}/s/{{ token }}/alerts/donation.html?username=%user%&amp;name=%name%&amp;amount=%amount%&amp;message=%message%</code>
+      <div class="dn-note">Widget URLs, alert parameters and Streamer.bot integration are documented on the
+        <a href="/app/urls" style="color:var(--theme-accent,#f2b705)">URLs page</a>.
       </div>
     </div>
   </div>
