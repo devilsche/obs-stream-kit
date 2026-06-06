@@ -776,16 +776,14 @@
           const maxW = ww * 0.9;
           const maxH = wh * 0.9;
 
-          let scale;
-          if (cw * 1.1 <= maxW && ch * 1.1 <= maxH) {
-            scale = 1; // passt: 1:1 + 10% Padding
-          } else {
-            scale = Math.min(maxW / cw, maxH / ch);
-          }
-          // Modal-Größe in vw/vh — keine festen px-Werte
-          const pad = scale < 1 ? 1 : 1.1;
-          const mwVw = (scale * cw * pad / ww * 100).toFixed(2);
-          const mhVh = (scale * ch * pad / wh * 100).toFixed(2);
+          // Modal-Header-Höhe einberechnen
+          const headerEl = modal.querySelector(".dn-modal__head");
+          const headerH = headerEl ? headerEl.offsetHeight : 52;
+          const availH = wh - headerH;
+          // Immer auf 90% des verfügbaren Raums skalieren — Ratio beibehalten
+          const scale = Math.min(maxW / cw, (availH * 0.9) / ch);
+          const mwVw = (scale * cw / ww * 100).toFixed(2);
+          const mhVh = (scale * ch / availH * 100).toFixed(2);
 
           body.classList.remove("dn-modal__body--overlay","dn-modal__body--checker");
           body.style.cssText = `;width:${mwVw}vw;height:${mhVh}vh;` +
