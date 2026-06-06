@@ -771,17 +771,21 @@
 
           const ww = window.innerWidth;
           const wh = window.innerHeight;
+          const maxW = ww * 0.9;
+          const maxH = wh * 0.9;
 
-          let scale;
-          if (cw <= ww * 1.2 && ch <= wh * 1.2) {
-            scale = 1; // passt: 1:1
+          let scale, mw, mh;
+          if (cw * 1.1 <= maxW && ch * 1.1 <= maxH) {
+            // Passt: 1:1 mit 10% Padding
+            scale = 1;
+            mw = Math.ceil(cw * 1.1 / 100) * 100;
+            mh = Math.ceil(ch * 1.1 / 100) * 100;
           } else {
-            // zu groß: kleinstes scale das beides in 80% des Fensters passt — Ratio bleibt
-            scale = Math.min(ww * 0.8 / cw, wh * 0.8 / ch);
+            // Zu groß: skalieren damit es in 90% des Fensters passt, kein Extra-Padding
+            scale = Math.min(maxW / cw, maxH / ch);
+            mw = Math.round(cw * scale);
+            mh = Math.round(ch * scale);
           }
-          // Modal = skaliertes Widget + 10%, Ratio beibehalten
-          const mw = Math.ceil(cw * scale * 1.1 / 100) * 100;
-          const mh = Math.ceil(ch * scale * 1.1 / 100) * 100;
 
           body.classList.remove("dn-modal__body--overlay","dn-modal__body--checker");
           body.style.cssText = `;width:${mw}px;height:${mh}px;` +
