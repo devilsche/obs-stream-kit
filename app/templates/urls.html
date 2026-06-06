@@ -317,7 +317,9 @@
     wireDetail(base, { kind: card.dataset.kind, size: card.dataset.size,
                        shownUrl: hasParamHints ? shownUrl : null,
                        chromePreview: hasChromePreview,
-                       path: card.dataset.path });
+                       path: card.dataset.path,
+                       previewW: parseInt(card.dataset.previewW || '0'),
+                       previewH: parseInt(card.dataset.previewH || '0') });
     view.hidden = true;
     detailView.hidden = false;
     document.getElementById("urlBack").focus();
@@ -762,8 +764,8 @@
           } catch(_) {}
 
           // preview_size aus Katalog > size-Feld > DOM-Messung
-          const pw = parseInt(card.dataset.previewW || "0");
-          const ph = parseInt(card.dataset.previewH || "0");
+          const pw = meta.previewW || 0;
+          const ph = meta.previewH || 0;
           const cw = pw || (dim[0] && dim[1] ? dim[0]
             : Math.max(doc.body.scrollWidth || doc.documentElement.scrollWidth, 40));
           const ch = ph || (dim[0] && dim[1] ? dim[1]
