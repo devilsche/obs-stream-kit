@@ -24,6 +24,7 @@
 
     /* Alias auf die Theme-Tokens — Fallback = bisheriger Entry-Look. */
     :root {
+      --color-bg-purple: var(--theme-surface, #1a0d2e);
       --alert-out: 6s;
       --color-gold:         var(--theme-accent, #f2b705);
       --color-purple:       var(--theme-primary, #5e2a79);
@@ -151,9 +152,34 @@
       animation: particleExplode var(--dur, 1.2s) ease-out var(--delay, 0.3s) forwards;
     }
 
+
+    /* ─── Side accent lines (leave corners free) ─────────────────── */
+    .side-line {
+      position: absolute;
+      background: var(--color-bg-purple);
+    }
+    .side-t, .side-b {
+      height: 2px;
+      left:  max(20px, var(--theme-radius, 0px));
+      right: max(20px, var(--theme-radius, 0px));
+    }
+    .side-l, .side-r {
+      width: 2px;
+      top:    max(20px, var(--theme-radius, 0px));
+      bottom: max(20px, var(--theme-radius, 0px));
+    }
+    .side-t { top: -2px; }
+    .side-b { bottom: -2px; }
+    .side-l { left: -2px; }
+    .side-r { right: -2px; }
+
     /* ─── Content ────────────────────────────────────────────────── */
 
     .content {
+      overflow: visible;
+      border: 2px solid var(--color-gold);
+      border-radius: var(--theme-radius, 0px);
+      padding: 32px 48px;
       position: absolute;
       top: 50%;
       left: 50%;
@@ -164,7 +190,7 @@
       white-space: nowrap;
       animation:
         contentIn  0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards,
-        contentOut 1s ease-in 4s forwards;
+        contentOut 0.6s ease-in var(--alert-out) forwards;
     }
 
     .event-type {
@@ -320,6 +346,11 @@
 
   <!-- Content -->
   <div class="content">
+      <span class="side-line side-t"></span>
+      <span class="side-line side-b"></span>
+      <span class="side-line side-l"></span>
+      <span class="side-line side-r"></span>
+
     <div class="event-type">Gift Subs</div>
     <div class="tier-badge" id="tierBadge"></div>
     <div class="username" id="username"></div>
