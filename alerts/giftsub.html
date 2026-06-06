@@ -394,11 +394,11 @@
     // Amount-Text (hier steht die Zahl)
     var amountText;
     if (amountNum === 1) {
-      amountText = 'verschenkt einen Sub!';
+      amountText = 'gifted a sub!';
     } else if (size === 'large') {
-      amountText = amountNum + ' Subs verschenkt! 🎉';
+      amountText = amountNum + ' subs gifted! 🎉';
     } else {
-      amountText = amountNum + ' Subs verschenkt!';
+      amountText = amountNum + ' subs gifted!';
     }
     document.getElementById('username').textContent = username;
     document.getElementById('amount').textContent   = amountText;
@@ -407,7 +407,7 @@
     var totalNum = parseInt(total, 10) || 0;
     var totalEl = document.getElementById('total');
     if (totalNum > 0) {
-      totalEl.textContent = 'Insgesamt ' + totalNum + ' Subs verschenkt';
+      totalEl.textContent = 'Total: ' + totalNum + ' subs gifted';
     } else {
       totalEl.style.display = 'none';
     }
