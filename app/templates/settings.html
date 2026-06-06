@@ -95,5 +95,37 @@
     </div>
     <div class="dn-actions"><a class="dn-btn ghost" href="/app/login">Twitch-Token erneuern</a></div>
   </div>
+
+  {% if api_token %}
+  <div class="dn-simple">
+    <p class="sec">// Streamer.bot / API Integration</p>
+    <div class="dn-field">
+      <label>Base URL</label>
+      <div style="font-family:var(--theme-font-mono,monospace);font-size:13px;word-break:break-all;color:var(--theme-accent,#f2b705)">
+        {{ base_url }}/s/{{ api_token }}/
+      </div>
+    </div>
+    <div class="dn-field">
+      <label>Health / Status</label>
+      <div>
+        <a class="dn-btn ghost" href="/s/{{ api_token }}/api/pubg/status" target="_blank">
+          <span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle">monitor_heart</span>
+          PUBG Status
+        </a>
+        <a class="dn-btn ghost" href="/s/{{ api_token }}/api/steam/status" target="_blank" style="margin-left:8px">
+          <span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle">monitor_heart</span>
+          Steam Status
+        </a>
+      </div>
+    </div>
+    <div class="dn-field">
+      <label>Example — Alert trigger</label>
+      <div class="dn-note">
+        Set browser source URL in Streamer.bot:<br>
+        <code>{{ base_url }}/s/{{ api_token }}/alerts/follow.html?username={username}&amp;message={message}</code>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 </main>
 {% endblock %}

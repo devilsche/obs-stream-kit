@@ -153,9 +153,23 @@ def settings():
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()
+    # Token für API-URL-Anzeige
+    try:
+        with _get_conn() as tc:
+            with tc.cursor() as cur:
+                cur.execute(
+                    "SELECT token FROM widget_tokens WHERE tenant_id=%s AND revoked_at IS NULL ORDER BY created_at LIMIT 1",
+                    (g.tenant_id,))
+                row = cur.fetchone()
+                api_token = row["token"] if row else None
+    except Exception:
+        api_token = None
+
+    base_url = request.url_root.rstrip("/")
     return render_template("settings.html",
                            user=g.user, creds=creds, prefs=prefs,
-                           saved=request.args.get("saved"))
+                           saved=request.args.get("saved"),
+                           api_token=api_token, base_url=base_url)
 
 
 @bp_app.route("/app/assets/pet-image", methods=["POST"])
