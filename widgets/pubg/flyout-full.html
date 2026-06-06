@@ -35,9 +35,8 @@
     .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
     .stat-grid .cell { display: flex; flex-direction: column; }
     .stat-grid .cell .pubg-stat-value { font-size: 1.4em; }
-    /* t-hot icon: inline neben dem Wert, nicht darunter */
-    .stat-grid .pubg-stat-value .t-hot { display: inline-flex; align-items: center; line-height: 1; }
-    .stat-grid .pubg-stat-value .t-hot-mark { font-size: 0.65em; margin-left: 3px; }
+    /* t-hot: globale Regel aus _pubg.css greift — Zellen hier rechtsbündig */
+    .stat-grid .cell { align-items: flex-end; }
 
     .controls { display: flex; align-items: center; gap: 12px; padding-top: 10px; }
     .controls input[type=range] { flex: 1; }
