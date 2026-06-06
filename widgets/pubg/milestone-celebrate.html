@@ -32,7 +32,13 @@
       font-weight: 100 900;
       font-display: block;
     }
-    html, body {
+:root {
+      --mc-gold:    var(--theme-accent,   var(--mc-gold));
+      --mc-primary: var(--theme-primary,  var(--mc-primary));
+      --mc-bg:      var(--theme-bg,       var(--mc-bg));
+      --mc-surface: var(--theme-surface,  var(--mc-surface));
+    }
+        html, body {
       width: 1920px; height: 1080px;
       margin: 0; overflow: hidden;
       background: transparent;
@@ -55,9 +61,9 @@
       position: absolute; inset: 0;
       background:
         radial-gradient(ellipse at center,
-          rgba(94, 42, 121, 0.85) 0%,
-          rgba(40, 15, 70, 0.92) 45%,
-          rgba(13, 6, 26, 0.98) 90%);
+          color-mix(in srgb,var(--mc-primary) 85%,transparent) 0%,
+          color-mix(in srgb,var(--mc-bg) 92%,transparent) 45%,
+          color-mix(in srgb,var(--mc-bg) 98%,transparent) 90%);
       animation: bgIn 0.6s ease-out forwards;
       opacity: 0;
     }
@@ -69,7 +75,7 @@
       height: 6px;
       background: linear-gradient(90deg,
         transparent, var(--pubg-gold) 30%, var(--pubg-gold) 70%, transparent);
-      box-shadow: 0 0 24px rgba(242,183,5,0.7);
+      box-shadow: 0 0 24px color-mix(in srgb,var(--mc-gold) 70%,transparent);
       opacity: 0;
       animation: bgIn 0.5s ease-out 0.4s forwards;
     }
@@ -82,7 +88,7 @@
       transform: translate(-50%, 40px) scale(0.4);
       font-size: 120px;
       opacity: 0;
-      filter: drop-shadow(0 0 30px rgba(242,183,5,0.8));
+      filter: drop-shadow(0 0 30px color-mix(in srgb,var(--mc-gold) 80%,transparent));
       animation: crownIn 0.7s cubic-bezier(0.22,1.6,0.36,1) 0.8s forwards,
                  crownBob 3.2s ease-in-out 1.6s infinite;
     }
@@ -103,13 +109,13 @@
       letter-spacing: -8px;
       line-height: 1;
       color: var(--pubg-gold);
-      -webkit-text-stroke: 4px #2a0f4a;
+      -webkit-text-stroke: 4px color-mix(in srgb,var(--mc-primary) 40%,#000);
       text-shadow:
-        0 0 40px rgba(242,183,5,0.7),
-        0 0 100px rgba(242,183,5,0.4),
-        8px 8px 0 #1a0d2a;
+        0 0 40px color-mix(in srgb,var(--mc-gold) 70%,transparent),
+        0 0 100px color-mix(in srgb,var(--mc-gold) 40%,transparent),
+        8px 8px 0 var(--mc-surface);
       opacity: 0;
-      background: linear-gradient(90deg, #ffb84a, #fff2a8, #ffb84a);
+      background: linear-gradient(90deg, color-mix(in srgb,var(--mc-gold) 80%,#fff), #fff2a8, color-mix(in srgb,var(--mc-gold) 80%,#fff));
       background-size: 250% 100%;
       -webkit-background-clip: text;
       background-clip: text;
@@ -169,7 +175,7 @@
       color: var(--pubg-gold);
       font-variant-numeric: tabular-nums;
       line-height: 1;
-      text-shadow: 0 0 10px rgba(242,183,5,0.5);
+      text-shadow: 0 0 10px color-mix(in srgb,var(--mc-gold) 50%,transparent);
     }
     .stats .l {
       display: block;
@@ -284,7 +290,7 @@
     // Konfetti generieren — Gold, Purple, Weiss in zufaelligen Bahnen.
     (function makeConfetti() {
       const host = document.getElementById("confetti");
-      const colors = ["#f2b705", "#fff2a8", "#a974d4", "#5e2a79", "#ffffff"];
+      const colors = ["var(--mc-gold)", "#fff2a8", "color-mix(in srgb,var(--mc-primary) 70%,#fff)", "var(--mc-primary)", "#ffffff"];
       const COUNT = 110;
       for (let i = 0; i < COUNT; i++) {
         const el = document.createElement("div");
