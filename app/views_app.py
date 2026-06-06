@@ -172,6 +172,27 @@ def settings():
                            api_token=api_token, base_url=base_url)
 
 
+@bp_app.route("/app/api-docs")
+@require_session
+def api_docs():
+    from overlay_app.overlay_catalog import ALERTS
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT token FROM widget_tokens WHERE tenant_id=%s AND revoked_at IS NULL ORDER BY created_at LIMIT 1",
+                (g.tenant_id,))
+            row = cur.fetchone()
+            token = row["token"] if row else None
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            conn.close()
+    return render_template("api_docs.html",
+                           user=g.user, token=token,
+                           base_url=request.url_root.rstrip("/"),
+                           alerts=ALERTS)
+
+
 @bp_app.route("/app/assets/pet-image", methods=["POST"])
 @require_session
 def upload_pet_image():
