@@ -345,6 +345,17 @@ def tools_open(key):
                     200, {"Content-Type": "text/html; charset=utf-8"})
     with open(full_path, "r", encoding="utf-8") as f:
         html = f.read()
+    # Theme auf <html data-theme="..."> setzen — ohne das greifen
+    # alle html[data-theme="X"]-Selektoren in _theme.css nicht.
+    from webcore.serving import inject_theme
+    from pubg.db_pg import get_setting
+    conn2 = _get_conn()
+    try:
+        theme = get_setting(conn2, g.tenant_id, "theme", "entry") or "entry"
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            conn2.close()
+    html = inject_theme(html, theme)
     # Bei Tools die als widgets/<domain>/*.html liegen (Alt-Bestand:
     # session-report, poi-editor) zeigen die relativen Asset-Pfade
     # (_pubg.css, _pubg.js, _pubg_pois.js) auf das gleiche Verzeichnis.
