@@ -112,11 +112,13 @@ body.pubg-stale-hidden > *:not(.pubg-filter-bar) { display: none !important; }
 /* Highlight-Marker .t-hot-mark (Symbol aus --theme-hot-icon + Partikel) lebt in
    _blocks.css — wird von PubgUI.hotWrap() erzeugt.
    Innerhalb von Stat-Values: Icon klein und inline neben dem Wert. */
-/* t-hot: Icon DAVOR dem Wert, beide inline */
+/* t-hot: inline-flex in allen Kontexten */
 .pubg-stat-value .t-hot,
 td .t-hot { display: inline-flex; align-items: center; line-height: 1; }
-.pubg-stat-value .t-hot-mark,
+/* Icon VOR dem Wert nur in Tabellen */
 td .t-hot-mark { order: -1; font-size: 0.55em; margin-right: 3px; margin-left: 0; }
+/* Icon NACH dem Wert in .cell (Zusammenfassung oben) */
+.pubg-stat-value .t-hot-mark { font-size: 0.55em; margin-left: 3px; margin-right: 0; }
 /* Stat-Values in Tabellen rechtsbündig — nicht in flex-column .cell */
 td .pubg-stat-value { text-align: right; display: block; }
 
