@@ -90,3 +90,12 @@ def overlay_js(token, filepath):
     if g.tenant_id is None:
         abort(404)
     return serve_asset(_root(), "js", filepath)
+
+
+# Relative ../widgets/ aus Overlay-HTMLs token-scoped bedienen
+# (z.B. _theme.css, _pubg.css, _blocks.css die per ../ referenziert werden).
+@bp_overlays.route("/s/<token>/widgets/<path:filepath>")
+def overlay_widgets_static(token, filepath):
+    if g.tenant_id is None:
+        abort(404)
+    return serve_asset(_root(), "widgets", filepath)
