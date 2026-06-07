@@ -117,8 +117,8 @@ body.pubg-stale-hidden > *:not(.pubg-filter-bar) { display: none !important; }
 td .t-hot { display: inline-flex; align-items: center; line-height: 1; }
 .pubg-stat-value .t-hot-mark,
 td .t-hot-mark { order: -1; font-size: 0.55em; margin-right: 3px; margin-left: 0; }
-/* Stat-Values rechtsbündig */
-.pubg-stat-value { text-align: right; display: block; }
+/* Stat-Values in Tabellen rechtsbündig — nicht in flex-column .cell */
+td .pubg-stat-value { text-align: right; display: block; }
 
 @keyframes pubg-fire-flicker {
   0%   { transform: translateY(0)   scale(1.0); opacity: 1.0; }

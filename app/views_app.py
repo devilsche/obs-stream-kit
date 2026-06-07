@@ -360,14 +360,15 @@ def tools_open(key):
             html = html.replace(
                 f'src="{asset}"',
                 f'src="/widgets-static/{domain}/{asset}"')
-        # Shared Assets direkt unter widgets/ (kein Domain-Prefix)
+        # Shared Assets direkt unter widgets/ — mit oder ohne ../-Prefix
         for asset in ("_theme.css", "_blocks.css"):
-            html = html.replace(
-                f'href="{asset}"',
-                f'href="/widgets-static/{asset}"')
-            html = html.replace(
-                f'src="{asset}"',
-                f'src="/widgets-static/{asset}"')
+            for prefix in ("../", ""):
+                html = html.replace(
+                    f'href="{prefix}{asset}"',
+                    f'href="/widgets-static/{asset}"')
+                html = html.replace(
+                    f'src="{prefix}{asset}"',
+                    f'src="/widgets-static/{asset}"')
     # Tools laufen cookie-authenticated, kein Token — alle /api/-Calls
     # gehen direkt an die Cookie-Routes mit g.tenant_id aus der Session.
     inject = (
