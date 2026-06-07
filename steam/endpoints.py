@@ -1426,9 +1426,12 @@ class SteamEndpointRegistry:
                 SELECT s.app_id, s.achievement_api_name, s.unlocked_at,
                        s.display_name, s.description, s.icon_url,
                        s.displayed_at,
-                       sch.game_name, sch.global_pct_json
+                       COALESCE(sch.game_name, og.name) AS game_name,
+                       sch.global_pct_json
                 FROM steam_achievements_seen s
                 LEFT JOIN steam_app_schema sch ON sch.app_id = s.app_id
+                LEFT JOIN steam_owned_games og
+                       ON og.app_id = s.app_id AND og.steam_id = s.steam_id
                 WHERE s.tenant_id = ? AND s.steam_id = ?
                   AND s.app_id >= 0
             """
