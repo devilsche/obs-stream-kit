@@ -316,8 +316,8 @@
       <input id="rarePctInput" type="number" min="1" max="50" value="10" style="width: 60px;">
     </div>
     <div class="grp">
-      <label title="Only show achievements that were added since this page was opened — handy for checking during a stream whether a just-triggered achievement has arrived in the DB.">
-        <input id="liveOnly" type="checkbox" style="vertical-align:middle;margin-right:4px"> Live only
+      <label title="Only show achievements/milestones from the current session (PUBG: matches since session start; Steam: unlocked since session start).">
+        <input id="sessionOnly" type="checkbox" style="vertical-align:middle;margin-right:4px"> Session only
       </label>
     </div>
     <div class="grp">
@@ -363,10 +363,9 @@
     // Keys (appId:apiName) der Achievements die NEU dazukommen (via
     // Auto-Refresh) bekommen einen 4s-Flash. Set wird konsumiert.
     let freshKeys = new Set();
-    // 'Live'-Modus: snapshot beim ersten Load — alles was DANACH dazu
-    // kommt zaehlt als 'live geholt'. Toggle blendet alles andere aus.
-    let initialKeys = null;            // Set<key> nach erstem load()
-    let liveOnly = false;
+    // Session-Filter: zeigt nur Achievements/Milestones aus der laufenden Session.
+    let sessionOnly = false;
+    let sessionCutoffMs = null;   // Unix-ms — wird beim ersten Load gesetzt
     // Landings pro Match — Map<matchId, {x,y,mapName,name}> meiner
     // eigenen Landing-Position. Wird lazy gefuellt + im Popover als POI
     // angezeigt. Fingerabdruck: myName aus /api/pubg/db-info.
@@ -388,7 +387,7 @@
     const sortSel  = document.getElementById("sortSelect");
     const rareIn   = document.getElementById("rarePctInput");
     const langSel  = document.getElementById("langSelect");
-    const liveChk  = document.getElementById("liveOnly");
+    const sessionChk = document.getElementById("sessionOnly");
 
     function fmtDate(unixSec) {
       if (!unixSec) return "—";
@@ -540,13 +539,19 @@
     function applyFilters() {
       RARE_PCT = parseFloat(rareIn.value) || 10;
       let view = all.slice();
-      // Live-Filter: nur Achievements zeigen, die SEIT Oeffnen dieser
-      // Seite neu dazugekommen sind UND wirklich poppen koennen
-      // (suppressed=true sind Tier-Cascade-Eintraege die nie im Stream
-      // erscheinen — z.B. kills_5 bei einem 9-Kill-Match).
-      if (liveOnly && initialKeys) {
-        view = view.filter(a => !initialKeys.has(a.appId + ":" + a.apiName));
-        view = view.filter(a => !a.suppressed);
+      // Session-Filter: nur Achievements/Milestones aus der laufenden Session.
+      // PUBG: playedAt (ISO-String) >= sessionCutoff; Steam: unlockedAt (Unix-s) >= cutoff.
+      if (sessionOnly && sessionCutoffMs) {
+        view = view.filter(a => {
+          const isPubg = a.source === "pubg" || a.appId === -2;
+          if (isPubg) {
+            if (!a.playedAt) return false;
+            return new Date(a.playedAt).getTime() >= sessionCutoffMs;
+          } else {
+            if (!a.unlockedAt) return false;
+            return a.unlockedAt * 1000 >= sessionCutoffMs;
+          }
+        });
       }
       if (filterGame) {
         view = view.filter(a => String(a.appId) === filterGame);
@@ -678,8 +683,8 @@
       applyFilters();
     });
     rareIn.addEventListener("change", () => applyFilters());
-    liveChk.addEventListener("change", (e) => {
-      liveOnly = e.target.checked;
+    sessionChk.addEventListener("change", (e) => {
+      sessionOnly = e.target.checked;
       applyFilters();
     });
     langSel.addEventListener("change", async (e) => {
@@ -764,10 +769,25 @@
       };
     }
 
+    async function fetchSessionCutoff() {
+      try {
+        const matches = await PubgUI.fetchJson(
+          (window.__SERVE_BASE__||"/") + "api/pubg/session-matches?range=session");
+        if (matches && matches.length) {
+          // Frühestes Match der Session = Cutoff
+          const earliest = matches.reduce((a, b) =>
+            (a.playedAt || "") < (b.playedAt || "") ? a : b);
+          if (earliest.playedAt) {
+            sessionCutoffMs = new Date(earliest.playedAt).getTime();
+          }
+        }
+      } catch (e) { /* silent — Session-Filter zeigt dann nichts */ }
+    }
+
     async function load(showSpinner = true) {
       if (showSpinner) document.body.classList.add("loading");
       try {
-        const data = await fetchAll();
+        const [data] = await Promise.all([fetchAll(), fetchSessionCutoff()]);
         all = data.achievements;
         games = data.games;
         rebuildGameDropdown();
@@ -781,7 +801,7 @@
 
     // Auto-Refresh: alle REFRESH_MS sek silent neu pullen + neue
     // Achievements als 'brand-new' markieren. Kein Spinner, kein
-    // Disable — laueft im Hintergrund.
+    // Disable — laueft im Hintergrund. Session-Cutoff mitaktualisieren.
     async function autoRefresh() {
       // Pause Refresh waehrend User das Dropdown offen hat — Rebuild
       // wuerde es zumachen.
@@ -792,7 +812,7 @@
       if (achPov.classList.contains("show")) return;
       let data;
       try {
-        data = await fetchAll();
+        [data] = await Promise.all([fetchAll(), fetchSessionCutoff()]);
       } catch (e) {
         return;
       }
