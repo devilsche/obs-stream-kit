@@ -917,7 +917,7 @@ html[data-theme="aurora"] .dn-ccard,html[data-theme="aurora"] .dn-hero{backdrop-
 .dn-title{font-family:var(--theme-font-display);font-weight:700;font-size:clamp(24px,3.4vw,34px);margin:0 0 18px;
   text-transform:uppercase;letter-spacing:.01em;color:var(--theme-text)}
 .dn-simple{border:1px solid var(--theme-border);background:var(--theme-surface);padding:22px 24px;
-  border-radius:var(--theme-radius);box-shadow:var(--card-shadow)}
+  border-radius:var(--theme-radius);box-shadow:var(--card-shadow);margin-bottom:20px}
 .dn-simple .sec{color:var(--theme-text-dim);font-family:var(--theme-font-mono);font-size:13px;margin:24px 0 8px}
 .dn-simple .sec:first-of-type{margin-top:0}
 .dn-field{margin:14px 0}
