@@ -4218,6 +4218,23 @@
     document.addEventListener("DOMContentLoaded", () => {
       const m = (location.hash || "").match(/match=([^&]+)/);
       if (m) mdPanelOpen(decodeURIComponent(m[1]));
+
+      // Auto-Reload wenn der Poller neue Matches meldet
+      let _lastPollAt = null;
+      setInterval(async () => {
+        try {
+          const s = await PubgUI.fetchJson(
+            (window.__SERVE_BASE__ || "/") + "api/pubg/status");
+          const pollAt = s && s.lastPollAt;
+          if (!pollAt) return;
+          const anyNew = Object.values(s.perTenant || {})
+            .some(t => (t.newMatches || 0) > 0);
+          if (anyNew && _lastPollAt && pollAt !== _lastPollAt) {
+            location.reload();
+          }
+          _lastPollAt = pollAt;
+        } catch (_) {}
+      }, 60_000);
     });
 
   </script>
