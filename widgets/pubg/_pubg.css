@@ -14,17 +14,27 @@
 .material-symbols-outlined.icon-danger { color: #ff7a7a; }
 
 :root {
-  --pubg-purple: #5e2a79;
+  /* Hartkodierte Fallbacks (Entry-Theme) — werden von Theme-Tokens überschrieben */
+  --pubg-purple:    #5e2a79;
   --pubg-purple-bg: rgba(20, 12, 30, 0.95);
-  --pubg-gold: #f2b705;
-  --pubg-text: #e8e0f0;
-  --pubg-muted: #8a7d99;
-  --pubg-border: rgba(94, 42, 121, 0.6);
-  --pubg-radius: 8px;
-  /* Page-Background-Gradient fuer Web-Views / Custom Docks (von oben
-     dunkel-purple zu fast-schwarz). Nicht zu verwechseln mit
-     --pubg-purple-bg (das ist die semitransparente Card-Farbe). */
-  --pubg-page-bg: linear-gradient(180deg, #1a0d2a 0%, #0a0510 100%);
+  --pubg-gold:      #f2b705;
+  --pubg-text:      #e8e0f0;
+  --pubg-muted:     #8a7d99;
+  --pubg-border:    rgba(94, 42, 121, 0.6);
+  --pubg-radius:    8px;
+  --pubg-page-bg:   linear-gradient(180deg, #1a0d2a 0%, #0a0510 100%);
+}
+/* Theme-Tokens auf --pubg-Aliases mappen — greift sobald _theme.css geladen
+   und data-theme gesetzt ist. Überschreibt die :root-Fallbacks oben. */
+html[data-theme] {
+  --pubg-purple:    var(--theme-primary);
+  --pubg-gold:      var(--theme-accent);
+  --pubg-text:      var(--theme-text);
+  --pubg-muted:     var(--theme-text-dim);
+  --pubg-border:    var(--theme-border);
+  --pubg-radius:    var(--theme-radius);
+  --pubg-purple-bg: color-mix(in srgb, var(--theme-surface) 95%, transparent);
+  --pubg-page-bg:   linear-gradient(180deg, var(--theme-surface) 0%, var(--theme-bg) 100%);
 }
 
 * { box-sizing: border-box; }
