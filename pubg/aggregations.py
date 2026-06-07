@@ -4199,11 +4199,22 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
                 })
 
             # --- Got killed by a vehicle ---
+            # Nur echte Fahrzeug-Hits zaehlen (damage_reason=Damage_Vehicle
+            # oder weapon matched bekannte Vehicle-Pattern). BP_%  allein
+            # wuerde Molotovs, Feuer, Care-Packages etc. einschliessen.
             vdeath = (conn.execute("""
                 SELECT COUNT(*) AS c FROM telemetry_events
                 WHERE match_id=? AND event_type='Kill'
                   AND target_account=?
-                  AND weapon LIKE 'BP_%'
+                  AND (damage_reason='Damage_Vehicle'
+                       OR weapon LIKE '%Mirado%' OR weapon LIKE '%PickupTruck%'
+                       OR weapon LIKE '%Motorbike%' OR weapon LIKE '%Dacia%'
+                       OR weapon LIKE '%Uaz%' OR weapon LIKE '%Niva%'
+                       OR weapon LIKE '%BearV2%' OR weapon LIKE '%PonyCoupe%'
+                       OR weapon LIKE '%CoupeRB%' OR weapon LIKE '%Blanc%'
+                       OR weapon LIKE '%PicoBus%' OR weapon LIKE '%Van_%'
+                       OR weapon LIKE '%BRDM%' OR weapon LIKE '%Pillar_Car%'
+                       OR weapon LIKE '%Buggy%')
             """, (mid, my_account_id)).fetchone() or {}).get("c", 0)
             if vdeath > 0:
                 out.append({
