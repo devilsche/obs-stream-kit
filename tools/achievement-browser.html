@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
   <meta charset="utf-8">
   <title>Achievement Browser — Click to Replay</title>
@@ -13,15 +13,15 @@
        cappen, vertikal weiter scrollbar (Browser-Liste). */
     body { overflow-x: hidden; }
     body {
-      background: var(--pubg-page-bg);
-      color: var(--pubg-text);
+      background: var(--theme-bg);
+      color: var(--theme-text);
       font-family: "DM Sans", sans-serif;
       padding: 20px;
       min-height: 100vh;
     }
-    h1 { color: var(--pubg-gold); margin: 0 0 4px; }
+    h1 { color: var(--theme-accent); margin: 0 0 4px; }
     .intro {
-      color: var(--pubg-muted);
+      color: var(--theme-text-dim);
       margin: 0 0 18px;
       max-width: 800px;
       line-height: 1.5;
@@ -39,7 +39,7 @@
       border-radius: var(--theme-radius);
     }
     .toolbar label {
-      color: var(--pubg-muted);
+      color: var(--theme-text-dim);
       font-size: 0.78em;
       letter-spacing: 0.06em;
       text-transform: uppercase;
@@ -55,10 +55,10 @@
     }
     .toolbar .stats {
       margin-left: auto;
-      color: var(--pubg-muted);
+      color: var(--theme-text-dim);
       font-size: 0.85em;
     }
-    .toolbar .stats b { color: var(--pubg-gold); }
+    .toolbar .stats b { color: var(--theme-accent); }
 
     .grid {
       display: grid;
@@ -100,7 +100,7 @@
     /* Neuankoemmlinge via Auto-Refresh — 4s sanftes Gold-Glow */
     .tile.brand-new {
       animation: brandNewFlash 4s ease-out;
-      border-color: var(--pubg-gold);
+      border-color: var(--theme-accent);
     }
     @keyframes brandNewFlash {
       0%   { box-shadow: 0 0 24px color-mix(in srgb,var(--theme-accent) 90%,transparent); }
@@ -110,7 +110,7 @@
       width: 48px; height: 48px;
       flex-shrink: 0;
       border-radius: 4px;
-      border: 1px solid var(--pubg-border);
+      border: 1px solid var(--theme-border);
       background: color-mix(in srgb,var(--theme-bg) 50%,transparent);
       object-fit: cover;
     }
@@ -128,7 +128,7 @@
     }
     .tile-body { flex: 1; min-width: 0; }
     .tile-game {
-      color: var(--pubg-muted);
+      color: var(--theme-text-dim);
       font-size: 0.7em;
       letter-spacing: 0.06em;
       text-transform: uppercase;
@@ -137,7 +137,7 @@
       text-overflow: ellipsis;
     }
     .tile-name {
-      color: var(--pubg-gold);
+      color: var(--theme-accent);
       font-weight: 700;
       font-size: 0.95em;
       margin: 2px 0 4px;
@@ -146,7 +146,7 @@
       text-overflow: ellipsis;
     }
     .tile-desc {
-      color: var(--pubg-text);
+      color: var(--theme-text);
       font-size: 0.78em;
       line-height: 1.3;
       margin-bottom: 6px;
@@ -161,10 +161,10 @@
       gap: 8px;
       flex-wrap: wrap;
       font-size: 0.72em;
-      color: var(--pubg-muted);
+      color: var(--theme-text-dim);
     }
-    .tile-meta .pct b { color: var(--pubg-text); }
-    .tile-meta .pct.rare-pct b { color: var(--pubg-gold); }
+    .tile-meta .pct b { color: var(--theme-text); }
+    .tile-meta .pct.rare-pct b { color: var(--theme-accent); }
     .tile-meta .date { font-variant-numeric: tabular-nums; }
     .tile-meta .rare-badge {
       display: inline-block;
@@ -205,9 +205,9 @@
       z-index: 1000;
     }
     .toast.show { opacity: 1; transform: translateY(0); }
-    .toast b { color: var(--pubg-gold); }
+    .toast b { color: var(--theme-accent); }
     .empty {
-      color: var(--pubg-muted);
+      color: var(--theme-text-dim);
       font-style: italic;
       text-align: center;
       padding: 32px;
@@ -260,10 +260,10 @@
       white-space: pre-line;
     }
     .ach-popover .pov-title {
-      color: var(--pubg-gold); font-weight: 700;
+      color: var(--theme-accent); font-weight: 700;
       margin-bottom: 4px; font-size: 1.05em;
     }
-    .ach-popover .pov-meta { color: var(--pubg-muted); font-size: 0.95em; }
+    .ach-popover .pov-meta { color: var(--theme-text-dim); font-size: 0.95em; }
     .ach-popover.show { display: block; }
   </style>
 </head>
@@ -273,9 +273,9 @@
     All achievements stored in the DB. Filterable per game.
     <b>Click a tile</b> to mark the achievement as "unseen" — the
     <a id="lnkAchPopup" href="#"
-    target="_blank" style="color:var(--pubg-gold)">achievement-popup widget</a>
+    target="_blank" style="color:var(--theme-accent)">achievement-popup widget</a>
     or the <a id="lnkCombinedPopup" href="#"
-    target="_blank" style="color:var(--pubg-gold)">combined-popup</a>
+    target="_blank" style="color:var(--theme-accent)">combined-popup</a>
     will fire it on the next poll with sound + animation. Handy for testing
     or for stream recaps of individual highlights.
     <script>
