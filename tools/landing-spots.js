@@ -152,18 +152,18 @@ async function refresh() {
 function ensureMapImage() {
   const name = LS.mapName === "Erangel_Main" ? "Baltic_Main" : LS.mapName;
   if (LS.mapImg && LS._imgName === name) return Promise.resolve();
-  // High-Res .png zuerst (api-assets via refresh-maps, wie Session-Report),
-  // .webp als Fallback.
+  const base = "/widgets-static/pubg/maps/" + name;
+  const candidates = [base + "_hd.webp", base + ".png", base + ".webp"];
   return new Promise(res => {
-    const img = new Image();
-    img.onload = () => { LS.mapImg = img; LS._imgName = name; res(); };
-    img.onerror = () => {
-      const img2 = new Image();
-      img2.onload = () => { LS.mapImg = img2; LS._imgName = name; res(); };
-      img2.onerror = () => { LS.mapImg = null; res(); };
-      img2.src = "/widgets/pubg/maps/" + name + ".webp";
-    };
-    img.src = "/widgets/pubg/maps/" + name + ".png";
+    let i = 0;
+    function tryNext() {
+      if (i >= candidates.length) { LS.mapImg = null; res(); return; }
+      const img = new Image();
+      img.onload = () => { LS.mapImg = img; LS._imgName = name; res(); };
+      img.onerror = () => { i++; tryNext(); };
+      img.src = candidates[i++];
+    }
+    tryNext();
   });
 }
 
