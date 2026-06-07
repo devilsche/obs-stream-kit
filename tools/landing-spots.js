@@ -193,7 +193,8 @@ function renderHeatmap() {
   fitCanvas();
   const cnv = document.getElementById("heat");
   const ctx = cnv.getContext("2d");
-  ctx.fillStyle = "#0d061a";
+  ctx.fillStyle = getComputedStyle(document.documentElement)
+    .getPropertyValue("--theme-bg").trim() || "#0d061a";
   ctx.fillRect(0, 0, cnv.width, cnv.height);
   // Basemap quadratisch
   if (LS.mapImg) {
