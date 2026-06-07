@@ -352,6 +352,7 @@ def tools_open(key):
     # absolute /widgets-static/<domain>/...
     if tool["path"].startswith("widgets/"):
         domain = tool["path"].split("/")[1]
+        # Domain-spezifische Assets
         for asset in ("_pubg.css", "_pubg.js", "_pubg_pois.js"):
             html = html.replace(
                 f'href="{asset}"',
@@ -359,6 +360,14 @@ def tools_open(key):
             html = html.replace(
                 f'src="{asset}"',
                 f'src="/widgets-static/{domain}/{asset}"')
+        # Shared Assets direkt unter widgets/ (kein Domain-Prefix)
+        for asset in ("_theme.css", "_blocks.css"):
+            html = html.replace(
+                f'href="{asset}"',
+                f'href="/widgets-static/{asset}"')
+            html = html.replace(
+                f'src="{asset}"',
+                f'src="/widgets-static/{asset}"')
     # Tools laufen cookie-authenticated, kein Token — alle /api/-Calls
     # gehen direkt an die Cookie-Routes mit g.tenant_id aus der Session.
     inject = (
