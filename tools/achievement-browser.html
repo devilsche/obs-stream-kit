@@ -34,9 +34,9 @@
       flex-wrap: wrap;
       margin-bottom: 16px;
       padding: 10px 12px;
-      background: rgba(0, 0, 0, 0.35);
-      border: 1px solid var(--pubg-border);
-      border-radius: 6px;
+      background: color-mix(in srgb,var(--theme-surface) 60%,transparent);
+      border: 1px solid var(--theme-border);
+      border-radius: var(--theme-radius);
     }
     .toolbar label {
       color: var(--pubg-muted);
@@ -45,9 +45,9 @@
       text-transform: uppercase;
     }
     .toolbar select, .toolbar input {
-      background: rgba(0, 0, 0, 0.4);
-      color: var(--pubg-text);
-      border: 1px solid var(--pubg-border);
+      background: var(--theme-surface);
+      color: var(--theme-text);
+      border: 1px solid var(--theme-border);
       padding: 4px 8px;
       border-radius: 4px;
       font-family: inherit;
@@ -66,8 +66,8 @@
       gap: 10px;
     }
     .tile {
-      background: rgba(0, 0, 0, 0.4);
-      border: 1px solid var(--pubg-border);
+      background: color-mix(in srgb,var(--theme-surface) 60%,transparent);
+      border: 1px solid var(--theme-border);
       border-radius: 6px;
       padding: 10px 12px;
       cursor: pointer;
@@ -79,23 +79,23 @@
       overflow: hidden;
     }
     .tile:hover {
-      border-color: var(--pubg-gold);
-      background: rgba(94, 42, 121, 0.2);
+      border-color: var(--theme-accent);
+      background: color-mix(in srgb,var(--theme-primary) 20%,transparent);
       transform: translateY(-1px);
     }
     .tile.rare {
-      border-color: rgba(242, 183, 5, 0.5);
-      box-shadow: 0 0 8px rgba(242, 183, 5, 0.15);
+      border-color: color-mix(in srgb,var(--theme-accent) 50%,transparent);
+      box-shadow: 0 0 8px color-mix(in srgb,var(--theme-accent) 15%,transparent);
     }
     .tile.rare:hover {
-      box-shadow: 0 0 14px rgba(242, 183, 5, 0.4);
+      box-shadow: 0 0 14px color-mix(in srgb,var(--theme-accent) 40%,transparent);
     }
     .tile.fresh-triggered {
       animation: triggerFlash 1.2s ease-out;
     }
     @keyframes triggerFlash {
-      0%   { background: rgba(242, 183, 5, 0.6); }
-      100% { background: rgba(0, 0, 0, 0.4); }
+      0%   { background: color-mix(in srgb,var(--theme-accent) 60%,transparent); }
+      100% { background: color-mix(in srgb,var(--theme-surface) 60%,transparent); }
     }
     /* Neuankoemmlinge via Auto-Refresh — 4s sanftes Gold-Glow */
     .tile.brand-new {
@@ -103,15 +103,15 @@
       border-color: var(--pubg-gold);
     }
     @keyframes brandNewFlash {
-      0%   { box-shadow: 0 0 24px rgba(242, 183, 5, 0.9); }
-      100% { box-shadow: 0 0 0 rgba(242, 183, 5, 0); }
+      0%   { box-shadow: 0 0 24px color-mix(in srgb,var(--theme-accent) 90%,transparent); }
+      100% { box-shadow: 0 0 0 transparent; }
     }
     .tile-icon {
       width: 48px; height: 48px;
       flex-shrink: 0;
       border-radius: 4px;
       border: 1px solid var(--pubg-border);
-      background: rgba(0, 0, 0, 0.5);
+      background: color-mix(in srgb,var(--theme-bg) 50%,transparent);
       object-fit: cover;
     }
     /* Wenn das 'icon' ein Emoji ist (PUBG-Session-Milestones), rendern
@@ -120,8 +120,8 @@
       width: 48px; height: 48px;
       flex-shrink: 0;
       border-radius: 4px;
-      border: 1px solid var(--pubg-border);
-      background: rgba(94, 42, 121, 0.35);
+      border: 1px solid var(--theme-border);
+      background: color-mix(in srgb,var(--theme-primary) 35%,transparent);
       display: flex; align-items: center; justify-content: center;
       font-size: 28px;
       line-height: 1;
@@ -168,8 +168,8 @@
     .tile-meta .date { font-variant-numeric: tabular-nums; }
     .tile-meta .rare-badge {
       display: inline-block;
-      background: var(--pubg-gold);
-      color: #1a0d2a;
+      background: var(--theme-accent);
+      color: var(--theme-on-primary);
       font-weight: 700;
       letter-spacing: 0.08em;
       padding: 0 6px;
@@ -177,27 +177,27 @@
       text-transform: uppercase;
       font-size: 0.85em;
     }
-    .tile-meta .rare-badge.mythic    { background: linear-gradient(90deg, #a85cd9, #d8b4ff); color: #1a0d2a; }
+    .tile-meta .rare-badge.mythic    { background: linear-gradient(90deg, #a85cd9, #d8b4ff); color: var(--theme-on-primary); }
     .tile-meta .rare-badge.legendary {
       background: linear-gradient(90deg, #ff5028, #ffc828, #ff5028);
       background-size: 200% 100%;
       animation: legendaryShimmer 2.5s linear infinite;
-      color: #1a0d2a;
+      color: var(--theme-on-primary);
     }
     @keyframes legendaryShimmer {
       0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; }
     }
-    .tile.mythic { border-color: #a85cd9; box-shadow: 0 0 16px rgba(168,92,217,0.45); }
-    .tile.legendary { border-color: #ffc828; box-shadow: 0 0 18px rgba(255,160,40,0.55); }
+    .tile.mythic { border-color: #a85cd9; box-shadow: 0 0 16px color-mix(in srgb,#a85cd9 45%,transparent); }
+    .tile.legendary { border-color: #ffc828; box-shadow: 0 0 18px color-mix(in srgb,#ffc828 55%,transparent); }
     .toast {
       position: fixed;
       bottom: 24px; right: 24px;
-      background: rgba(26, 13, 42, 0.95);
-      color: var(--pubg-text);
+      background: color-mix(in srgb,var(--theme-surface) 95%,transparent);
+      color: var(--theme-text);
       padding: 10px 16px;
-      border-radius: 6px;
-      border: 1px solid var(--pubg-gold);
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+      border-radius: var(--theme-radius);
+      border: 1px solid var(--theme-accent);
+      box-shadow: var(--theme-shadow, 0 4px 16px rgba(0,0,0,0.6));
       opacity: 0;
       transform: translateY(20px);
       transition: opacity 0.3s, transform 0.3s;
@@ -241,22 +241,22 @@
     body.loading .loading-overlay { display: flex; }
     .spinner {
       width: 48px; height: 48px;
-      border: 4px solid rgba(94, 42, 121, 0.3);
-      border-top-color: var(--pubg-gold);
+      border: 4px solid color-mix(in srgb,var(--theme-primary) 30%,transparent);
+      border-top-color: var(--theme-accent);
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
-      box-shadow: 0 0 24px rgba(0, 0, 0, 0.6);
+      box-shadow: var(--theme-shadow, 0 0 24px rgba(0,0,0,0.6));
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     /* Floating Popover bei Hover */
     .ach-popover {
       position: fixed; display: none;
-      background: #0d061a; color: var(--pubg-text);
-      border: 1px solid var(--pubg-gold);
-      border-radius: 5px; padding: 10px 12px;
+      background: var(--theme-surface); color: var(--theme-text);
+      border: 1px solid var(--theme-accent);
+      border-radius: var(--theme-radius); padding: 10px 12px;
       font-size: 0.78em; line-height: 1.5; max-width: 360px;
       z-index: 9999; pointer-events: none;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+      box-shadow: var(--theme-shadow, 0 4px 14px rgba(0,0,0,0.6));
       white-space: pre-line;
     }
     .ach-popover .pov-title {

@@ -385,7 +385,8 @@ window.addEventListener("resize", () => { resizeCanvas(); renderFrame(); });
 
 function drawBasemap(ctx) {
   const cnv = document.getElementById("map");
-  ctx.fillStyle = "#0d061a";
+  ctx.fillStyle = getComputedStyle(document.documentElement)
+    .getPropertyValue("--theme-bg").trim() || "#0d061a";
   ctx.fillRect(0, 0, cnv.width, cnv.height);
   if (!_mapImg) return;
   // Hochwertiges Resampling: ohne 'high' wird das HD-Webp matschig
