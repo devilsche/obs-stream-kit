@@ -201,10 +201,6 @@
       <div class="game" id="game"></div>
     </div>
   </div>
-  <audio id="soundCommon"    src="sounds/lvlup.wav" preload="auto"></audio>
-  <audio id="soundRare"      src="sounds/biglvlup.wav" preload="auto"></audio>
-  <audio id="soundMythic"    src="sounds/mystique.mp3" preload="auto"></audio>
-  <audio id="soundLegendary" src="sounds/legendary.mp3" preload="auto"></audio>
   <script src="../pubg/_pubg.js"></script>
   <script>
     // ?duration=8 (Sekunden Anzeige pro Unlock), ?gap=1.5 (Sek Pause zwischen)
@@ -254,37 +250,45 @@
       if (pct <= 10) return "rare";
       return "common";
     }
+    // Web Audio API — umgeht OBS-Chromium-Autoplay-Block komplett.
+    // <audio>.play() schlägt ohne User-Interaction fehl; AudioContext nicht.
+    const _actx = new (window.AudioContext || window.webkitAudioContext)();
+    const _bufs = {};
+    const SOUND_FILES = {
+      legendary: "sounds/legendary.mp3",
+      mythic:    "sounds/mystique.mp3",
+      rare:      "sounds/biglvlup.wav",
+      common:    "sounds/lvlup.wav",
+    };
+    const SOUND_FALLBACK = { legendary: "mythic", mythic: "rare", rare: "common" };
+    (async () => {
+      for (const [key, url] of Object.entries(SOUND_FILES)) {
+        try {
+          const resp = await fetch(url);
+          if (!resp.ok) continue;
+          const arr  = await resp.arrayBuffer();
+          _bufs[key] = await _actx.decodeAudioData(arr);
+        } catch (_) {}
+      }
+    })();
     function playSound(tier) {
       if (!SOUND_ON) return;
-      const idMap = {
-        legendary: "soundLegendary",
-        mythic:    "soundMythic",
-        rare:      "soundRare",
-        common:    "soundCommon",
+      const _play = (key) => {
+        const buf = _bufs[key];
+        if (!buf) {
+          if (SOUND_FALLBACK[key]) _play(SOUND_FALLBACK[key]);
+          return;
+        }
+        if (_actx.state === "suspended") _actx.resume();
+        const src  = _actx.createBufferSource();
+        const gain = _actx.createGain();
+        src.buffer = buf;
+        gain.gain.value = VOLUME;
+        src.connect(gain);
+        gain.connect(_actx.destination);
+        src.start(0);
       };
-      let el = document.getElementById(idMap[tier] || "soundCommon");
-      // Falls die tier-spezifische Datei fehlt (404 == el.error nach load):
-      // fallback eine Stufe runter
-      const fallback = { legendary: "soundMythic", mythic: "soundRare",
-                          rare: "soundCommon" };
-      const tryPlay = (audio, fbId) => {
-        if (!audio) return;
-        try {
-          audio.volume = VOLUME;
-          audio.currentTime = 0;
-          const p = audio.play();
-          if (p && p.catch) {
-            p.catch(() => {
-              if (fbId) tryPlay(document.getElementById(fbId), null);
-            });
-          }
-        } catch (e) { /* silent */ }
-      };
-      // Wenn das Audio-Element 'error' Status hat, gleich Fallback
-      if (el && el.error) {
-        el = document.getElementById(fallback[tier]) || el;
-      }
-      tryPlay(el, fallback[tier] ? idMap[fallback[tier]] : null);
+      _play(tier in _bufs || SOUND_FALLBACK[tier] ? tier : "common");
     }
 
     const popup = document.getElementById("popup");
