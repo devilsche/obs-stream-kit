@@ -6,23 +6,98 @@
   <div class="dn-crumb">Admin</div>
   <h1 class="dn-title">Admin</h1>
 
+  {% if stats %}
+
+  <div class="dn-cgrid">
+
+    <article class="dn-ccard dn-c4"><span class="corner" aria-hidden="true"></span>
+      <h2>Tenants &amp; Users</h2>
+      <div class="dn-pad">
+        <div class="dn-kv"><span class="lbl">Tenants</span><span class="v n">{{ stats.tenants }}</span></div>
+        <div class="dn-kv"><span class="lbl"><span class="dn-led" aria-hidden="true"></span>Approved</span><span class="v n">{{ stats.users_approved }}</span></div>
+        <div class="dn-kv"><span class="lbl"><span class="dn-led x" aria-hidden="true"></span>Pending</span><span class="v {% if stats.users_pending > 0 %}x{% endif %}">{{ stats.users_pending }}</span></div>
+      </div>
+    </article>
+
+    <article class="dn-ccard m dn-c4"><span class="corner" aria-hidden="true"></span>
+      <h2>PUBG-Daten</h2>
+      <div class="dn-pad">
+        <div class="dn-kv"><span class="lbl">Matches</span><span class="v n">{{ stats.matches }}</span></div>
+        <div class="dn-kv"><span class="lbl">Telemetry Events</span><span class="v n">{{ stats.telemetry_events }}</span></div>
+        <div class="dn-kv"><span class="lbl">Players</span><span class="v n">{{ stats.players }}</span></div>
+      </div>
+    </article>
+
+    <article class="dn-ccard a dn-c4"><span class="corner" aria-hidden="true"></span>
+      <h2>Datenbank</h2>
+      <div class="dn-pad">
+        <div class="dn-kv"><span class="lbl">DB-Größe</span><span class="v n">{{ stats.db_size }}</span></div>
+        <div class="dn-kv"><span class="lbl">Steam Achievements</span><span class="v n">{{ stats.steam_achievements }}</span></div>
+      </div>
+    </article>
+
+    <article class="dn-ccard dn-c6"><span class="corner" aria-hidden="true"></span>
+      <h2>PUBG-Poller</h2>
+      <div class="dn-pad">
+        {% if pubg_status %}
+          <div class="dn-kv"><span class="lbl">Status</span>
+            <span class="v {% if pubg_status.get('polling') == 'ok' %}n{% elif pubg_status.get('polling') == 'error' %}x{% endif %}">
+              {{ pubg_status.get("polling", "—") }}
+            </span>
+          </div>
+          <div class="dn-kv"><span class="lbl">Letzter Poll</span><span class="v">{{ pubg_status.get("lastPollAt") or "—" }}</span></div>
+          {% for tid, t in pubg_status.get("perTenant", {}).items() %}
+          <div class="dn-kv"><span class="lbl">Tenant {{ tid }}</span>
+            <span class="v {% if t.get('polling') == 'ok' %}n{% else %}x{% endif %}">
+              +{{ t.get("newMatches", 0) }} matches · {{ t.get("polling", "—") }}
+            </span>
+          </div>
+          {% endfor %}
+          {% if pubg_status.get("errors") %}
+          <div class="dn-kv"><span class="lbl x">Fehler</span><span class="v x">{{ pubg_status.errors | join(", ") }}</span></div>
+          {% endif %}
+        {% else %}
+          <div class="dn-kv"><span class="lbl x">Status</span><span class="v x">nicht gestartet</span></div>
+        {% endif %}
+      </div>
+    </article>
+
+    <article class="dn-ccard dn-c6"><span class="corner" aria-hidden="true"></span>
+      <h2>Steam-Poller</h2>
+      <div class="dn-pad">
+        {% if steam_status %}
+          {% for tid, s in steam_status.items() %}
+          <div class="dn-kv"><span class="lbl">Tenant {{ tid }}</span>
+            <span class="v {% if s.get('running') %}n{% else %}x{% endif %}">
+              {% if s.get("running") %}running{% else %}idle{% endif %}
+              {% if s.get("currentGame") %} · {{ s.currentGame }}{% endif %}
+            </span>
+          </div>
+          <div class="dn-kv"><span class="lbl">Letzter Sync</span><span class="v">{{ s.get("lastCheck") or "—" }}</span></div>
+          {% endfor %}
+        {% else %}
+          <div class="dn-kv"><span class="lbl x">Status</span><span class="v x">nicht gestartet</span></div>
+        {% endif %}
+      </div>
+    </article>
+
+  </div>
+
+  {% endif %}
+
   <div class="dn-simple">
-    <p class="sec">// Sections</p>
-    <div class="dn-field">
+    <p class="sec">// Navigation</p>
+    <div class="dn-actions">
       <a class="dn-btn" href="/admin/users">
         <span class="material-symbols-outlined icon-sm" aria-hidden="true">manage_accounts</span>
-        User approval queue
+        User approval{% if stats and stats.users_pending > 0 %} ({{ stats.users_pending }} pending){% endif %}
       </a>
-    </div>
-    <div class="dn-field">
       <a class="dn-btn ghost" href="/admin/poi-editor" target="_blank" rel="noopener">
         <span class="material-symbols-outlined icon-sm" aria-hidden="true">map</span>
         POI Editor
       </a>
     </div>
-    <div class="dn-field">
-      <div class="dn-note">System status — coming soon</div>
-    </div>
   </div>
+
 </main>
 {% endblock %}

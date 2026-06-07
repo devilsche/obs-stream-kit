@@ -37,7 +37,44 @@ def _unique_slug(conn, base: str) -> str:
 @bp_admin.route("/admin/")
 @require_admin
 def admin_home():
-    return render_template("admin_dashboard.html", user=g.user)
+    conn = _get_conn()
+    stats = {}
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT count(*) AS c FROM tenants")
+            stats["tenants"] = cur.fetchone()["c"]
+            cur.execute("SELECT count(*) AS c FROM users WHERE is_approved")
+            stats["users_approved"] = cur.fetchone()["c"]
+            cur.execute("SELECT count(*) AS c FROM users WHERE NOT is_approved")
+            stats["users_pending"] = cur.fetchone()["c"]
+            cur.execute("SELECT count(*) AS c FROM matches")
+            stats["matches"] = cur.fetchone()["c"]
+            cur.execute("SELECT count(*) AS c FROM telemetry_events")
+            stats["telemetry_events"] = cur.fetchone()["c"]
+            cur.execute("SELECT count(*) AS c FROM players")
+            stats["players"] = cur.fetchone()["c"]
+            cur.execute("SELECT pg_size_pretty(pg_database_size(current_database())) AS s")
+            stats["db_size"] = cur.fetchone()["s"]
+            # Steam achievements
+            try:
+                cur.execute("SELECT count(*) AS c FROM steam_achievement_states")
+                stats["steam_achievements"] = cur.fetchone()["c"]
+            except Exception:
+                stats["steam_achievements"] = "—"
+    except Exception as e:
+        stats["error"] = str(e)
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            conn.close()
+
+    # Poller-Status
+    from app.poller_startup import _pubg_poller, _steam_poller
+    pubg_status = _pubg_poller.status() if _pubg_poller and hasattr(_pubg_poller, "status") else {}
+    steam_status = _steam_poller.status_all() if _steam_poller and hasattr(_steam_poller, "status_all") else {}
+
+    return render_template("admin_dashboard.html", user=g.user,
+                           stats=stats, pubg_status=pubg_status,
+                           steam_status=steam_status)
 
 
 @bp_admin.route("/admin/users")
