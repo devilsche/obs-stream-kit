@@ -461,11 +461,18 @@
       const isFresh = freshKeys.has(key);
 
       // Icon: URL = <img>, Emoji = Text-Div
+      // Fallback-Emoji aus DB für den onerror-Fall (icon-Feld)
+      const fallbackIcon = a.icon || "";
       let iconHtml;
       if (!icon) {
-        iconHtml = `<div class="tile-icon"></div>`;
+        iconHtml = fallbackIcon
+          ? `<div class="tile-icon-emoji">${fallbackIcon}</div>`
+          : `<div class="tile-icon"></div>`;
       } else if (isIconUrl(icon)) {
-        iconHtml = `<img class="tile-icon" src="${icon}" alt="" onerror="this.style.display='none'">`;
+        const fb = fallbackIcon
+          ? `this.outerHTML='<div class=\\"tile-icon-emoji\\">${fallbackIcon}</div>'`
+          : `this.style.display='none'`;
+        iconHtml = `<img class="tile-icon" src="${icon}" alt="" onerror="${fb}">`;
       } else {
         iconHtml = `<div class="tile-icon-emoji">${icon}</div>`;
       }

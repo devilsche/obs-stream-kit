@@ -1852,6 +1852,7 @@ class EndpointRegistry:
                 "displayName":   self._localize_label(r["label"], aid, lang),
                 "description":   self._ach_description(aid, lang),
                 "iconUrl":       (self.PUBG_ICON_URLS.get(aid) or r["icon"]),
+                "icon":          r["icon"],
                 "unlockedAt":    _iso_to_ts(r["played_at"]),
                 "playedAt":      r["played_at"],
                 "sessionPct":    session_pct,
