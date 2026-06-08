@@ -461,11 +461,14 @@
       const isFresh = freshKeys.has(key);
 
       // Icon: URL = <img>, Emoji = Text-Div
+      if (a.appId === -2 && (a.achievementId||"").startsWith("vehicle"))
+        console.log("[icon]", a.achievementId, "iconUrl=", a.iconUrl, "icon=", a.icon);
       let iconHtml;
       if (!icon) {
         iconHtml = `<div class="tile-icon"></div>`;
       } else if (isIconUrl(icon)) {
-        iconHtml = `<img class="tile-icon" src="${icon}" alt="" data-fallback="${(a.icon||"").replace(/"/g,"&quot;")}">`;
+        const src = icon + (icon.includes("achievements/") ? "?v=2" : "");
+        iconHtml = `<img class="tile-icon" src="${src}" alt="" data-fallback="${(a.icon||"").replace(/"/g,"&quot;")}">`;
       } else {
         iconHtml = `<div class="tile-icon-emoji">${icon}</div>`;
       }
