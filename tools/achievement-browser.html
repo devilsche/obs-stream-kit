@@ -461,18 +461,11 @@
       const isFresh = freshKeys.has(key);
 
       // Icon: URL = <img>, Emoji = Text-Div
-      // Fallback-Emoji aus DB für den onerror-Fall (icon-Feld)
-      const fallbackIcon = a.icon || "";
       let iconHtml;
       if (!icon) {
-        iconHtml = fallbackIcon
-          ? `<div class="tile-icon-emoji">${fallbackIcon}</div>`
-          : `<div class="tile-icon"></div>`;
+        iconHtml = `<div class="tile-icon"></div>`;
       } else if (isIconUrl(icon)) {
-        const fb = fallbackIcon
-          ? `this.outerHTML='<div class=\\"tile-icon-emoji\\">${fallbackIcon}</div>'`
-          : `this.style.display='none'`;
-        iconHtml = `<img class="tile-icon" src="${icon}" alt="" onerror="${fb}">`;
+        iconHtml = `<img class="tile-icon" src="${icon}" alt="" data-fallback="${(a.icon||"").replace(/"/g,"&quot;")}">`;
       } else {
         iconHtml = `<div class="tile-icon-emoji">${icon}</div>`;
       }
@@ -630,6 +623,20 @@
         showToast(`<b>✗ Error:</b> ${e.message || e}`);
       }
     }
+
+    gridEl.addEventListener("error", (e) => {
+      const img = e.target;
+      if (img.tagName !== "IMG" || !img.classList.contains("tile-icon")) return;
+      const fb = img.dataset.fallback;
+      if (fb) {
+        const div = document.createElement("div");
+        div.className = "tile-icon-emoji";
+        div.textContent = fb;
+        img.replaceWith(div);
+      } else {
+        img.style.display = "none";
+      }
+    }, true);
 
     gridEl.addEventListener("click", (e) => {
       const tile = e.target.closest(".tile");
