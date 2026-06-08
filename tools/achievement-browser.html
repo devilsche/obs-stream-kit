@@ -372,14 +372,6 @@
   <script>
     let RARE_PCT = 10;
     let all = [];          // alle Achievements aus der API
-    // Client-seitige Icon-Map für PUBG-Milestones — unabhängig vom API-Cache.
-    const PUBG_ICONS = {};
-    async function loadPubgIcons() {
-      try {
-        const r = await fetch((window.__SERVE_BASE__||"/") + "api/pubg/icon-urls", {cache:"no-store"});
-        if (r.ok) Object.assign(PUBG_ICONS, await r.json());
-      } catch(_) {}
-    }
 
     let games = [];        // unique games {appId, name, count}
     let filterGame = "";   // appId or ""
@@ -469,16 +461,9 @@
       const key = a.appId + ":" + a.apiName;
       const isFresh = freshKeys.has(key);
 
-      // Icon: PUBG nutzt client-seitige Map (PUBG_ICONS) als Quelle der Wahrheit,
-      // Steam nutzt a.iconUrl. Dadurch sind Icons unabhängig vom API-Cache.
-      const isPubgAch = a.source === "pubg" || a.appId === -2;
-      const resolvedIcon = isPubgAch
-        ? (PUBG_ICONS[a.achievementId] || a.iconUrl || a.icon || "")
-        : (icon || "");
+      const resolvedIcon = a.iconUrl || "";
       let iconHtml;
-      if (!resolvedIcon) {
-        iconHtml = `<div class="tile-icon"></div>`;
-      } else if (isIconUrl(resolvedIcon)) {
+      if (isIconUrl(resolvedIcon)) {
         iconHtml = `<img class="tile-icon" src="${resolvedIcon}" alt="">`;
       } else {
         iconHtml = `<div class="tile-icon"></div>`;
@@ -973,7 +958,7 @@
         ? prefetchLandingsAndPois() : Promise.resolve();
       const poiReadyP = (PubgUI && PubgUI.POI && PubgUI.POI.ready)
         ? PubgUI.POI.ready.catch(() => null) : Promise.resolve();
-      await Promise.all([syncLangFromServer(), loadPubgIcons()]);
+      await syncLangFromServer();
       await load();
       // Snapshot der Keys NACH dem ersten erfolgreichen Load — alles
       // was danach via autoRefresh dazu kommt, gilt als 'live'.
