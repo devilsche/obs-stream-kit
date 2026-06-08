@@ -373,14 +373,13 @@
     let RARE_PCT = 10;
     let all = [];          // alle Achievements aus der API
     // Client-seitige Icon-Map für PUBG-Milestones — unabhängig vom API-Cache.
-    // Wird bei Seiten-Load einmal vom Server geholt und nie gecacht.
     const PUBG_ICONS = {};
-    (async () => {
+    async function loadPubgIcons() {
       try {
         const r = await fetch((window.__SERVE_BASE__||"/") + "api/pubg/icon-urls", {cache:"no-store"});
         if (r.ok) Object.assign(PUBG_ICONS, await r.json());
       } catch(_) {}
-    })();
+    }
 
     let games = [];        // unique games {appId, name, count}
     let filterGame = "";   // appId or ""
@@ -974,7 +973,7 @@
         ? prefetchLandingsAndPois() : Promise.resolve();
       const poiReadyP = (PubgUI && PubgUI.POI && PubgUI.POI.ready)
         ? PubgUI.POI.ready.catch(() => null) : Promise.resolve();
-      await syncLangFromServer();
+      await Promise.all([syncLangFromServer(), loadPubgIcons()]);
       await load();
       // Snapshot der Keys NACH dem ersten erfolgreichen Load — alles
       // was danach via autoRefresh dazu kommt, gilt als 'live'.
