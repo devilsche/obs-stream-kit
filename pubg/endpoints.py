@@ -1356,7 +1356,7 @@ class EndpointRegistry:
         "vehicle_kill":            "/widgets-static/pubg/assets/achievements/vehicle_kill.png",
         "vehicle_death":           "/widgets-static/pubg/assets/achievements/vehicle_death.png",
         "vehicle_gunkill":         "/widgets-static/pubg/assets/achievements/vehicle_gunkill.png",
-        "vehicle_eject_kill":      "/widgets-static/pubg/assets/achievements/vehicle_gunkill.png",
+        "vehicle_eject_kill":      "/widgets-static/pubg/assets/achievements/vehicle_eject_kill.png",
         "vehicle_eject_death":     "/widgets-static/pubg/assets/achievements/vehicle_eject_death.png",
     }
 
