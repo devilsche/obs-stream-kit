@@ -4233,7 +4233,6 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
                 ORDER BY timestamp_ms ASC
             """, (mid, my_account_id)).fetchall()
             if ve_events:
-                # Baue Intervalle: (enter_ms, leave_ms)
                 intervals = []
                 enter_ms = None
                 for e in ve_events:
@@ -4260,6 +4259,57 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
                             "id": "vehicle_gunkill",
                             "label": f"Drive-By · {driveby_n}×",
                             "icon": "🔫",
+                            "matchId": mid, "playedAt": played,
+                        })
+
+            # --- Kill/Knock while target is IN a vehicle (driver or passenger) ---
+            # Alle VehicleEnter/Leave fuer Targets die ich gekillt/geknockt habe.
+            my_kill_events = conn.execute("""
+                SELECT target_account, timestamp_ms, event_type FROM telemetry_events
+                WHERE match_id=? AND actor_account=?
+                  AND event_type IN ('Kill','Knock')
+            """, (mid, my_account_id)).fetchall()
+            if my_kill_events:
+                target_accs = list({r["target_account"] for r in my_kill_events
+                                    if r["target_account"]})
+                if target_accs:
+                    _ph = ",".join("?" * len(target_accs))
+                    veh_rows = conn.execute(f"""
+                        SELECT actor_account, event_type, timestamp_ms
+                        FROM telemetry_events
+                        WHERE match_id=? AND event_type IN ('VehicleEnter','VehicleLeave')
+                          AND actor_account IN ({_ph})
+                        ORDER BY timestamp_ms ASC
+                    """, [mid] + target_accs).fetchall()
+                    # Intervall pro Target-Account aufbauen
+                    veh_by_acc = {}
+                    for v in veh_rows:
+                        acc = v["actor_account"]
+                        veh_by_acc.setdefault(acc, []).append(v)
+                    ivs = {}
+                    for acc, evs in veh_by_acc.items():
+                        _enter = None
+                        _ivs = []
+                        for v in evs:
+                            if v["event_type"] == "VehicleEnter":
+                                _enter = v["timestamp_ms"]
+                            elif v["event_type"] == "VehicleLeave" and _enter:
+                                _ivs.append((_enter, v["timestamp_ms"]))
+                                _enter = None
+                        if _enter:
+                            _ivs.append((_enter, 10**15))
+                        ivs[acc] = _ivs
+                    eject_n = sum(
+                        1 for r in my_kill_events
+                        if r["target_account"] and r["timestamp_ms"] and
+                           any(a <= r["timestamp_ms"] <= b
+                               for a, b in ivs.get(r["target_account"], []))
+                    )
+                    if eject_n > 0:
+                        out.append({
+                            "id": "vehicle_eject_kill",
+                            "label": f"Carjacked · {eject_n}×",
+                            "icon": "💥",
                             "matchId": mid, "playedAt": played,
                         })
     except Exception:

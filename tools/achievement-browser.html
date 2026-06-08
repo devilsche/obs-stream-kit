@@ -560,9 +560,8 @@
       // PUBG: playedAt (ISO-String) >= sessionCutoff; Steam: unlockedAt (Unix-s) >= cutoff.
       if (sessionOnly && sessionCutoffMs) {
         view = view.filter(a => {
+          if (a.suppressed) return false;
           const isPubg = a.source === "pubg" || a.appId === -2;
-          // PUBG: playedAt (ISO-String) oder unlockedAt (Unix-s)
-          // Steam: unlockedAt (Unix-s)
           const tsMs = isPubg
             ? (a.playedAt ? new Date(a.playedAt).getTime() : (a.unlockedAt ? a.unlockedAt * 1000 : 0))
             : (a.unlockedAt ? a.unlockedAt * 1000 : 0);
@@ -846,10 +845,12 @@
       } catch (e) {
         return;
       }
-      // Partial-Failure: einer der Endpoints (Steam oder PUBG) hat
-      // gefailed. Wir wuerden sonst all[] auf einen unvollstaendigen
-      // Stand setzen → Anzeige togglet zwischen voll und reduziert.
-      if (data.partial) return;
+      // Partial-Failure: einen der Endpoints (Steam oder PUBG) haben
+      // gefailed — vorhandene Daten behalten, nichts ueberschreiben.
+      if (data.partial) {
+        applyFilters(); // Filter neu anwenden (z.B. session cutoff aktualisiert)
+        return;
+      }
       const newAll = data.achievements;
       const oldKeys = new Set(all.map(a => a.appId + ":" + a.apiName));
       const truly_new = newAll.filter(a =>
