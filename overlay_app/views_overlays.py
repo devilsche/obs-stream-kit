@@ -77,6 +77,14 @@ def effect_file(token, filepath):
     return _serve_tenant_source(token, "effects", filepath)
 
 
+# /widgets-static/ public ohne Token — damit Achievement-Icons und andere
+# Widget-Assets von stream-overlay.com aus erreichbar sind (stats-overlay.info
+# redirectet hierher, aber der Overlay-Service hat diese Route sonst nicht).
+@bp_overlays.route("/widgets-static/<path:filepath>")
+def widgets_static_public(filepath):
+    return serve_asset(_root(), "widgets", filepath)
+
+
 # Relative ../assets/ und ../js/ aus den Overlay-HTMLs token-scoped bedienen.
 @bp_overlays.route("/s/<token>/assets/<path:filepath>")
 def overlay_assets(token, filepath):
