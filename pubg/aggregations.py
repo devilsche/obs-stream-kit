@@ -4312,6 +4312,44 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
                             "icon": "💥",
                             "matchId": mid, "playedAt": played,
                         })
+
+            # --- Got killed/knocked while IN a vehicle (self) ---
+            self_in_veh = conn.execute("""
+                SELECT event_type, timestamp_ms FROM telemetry_events
+                WHERE match_id=? AND actor_account=?
+                  AND event_type IN ('VehicleEnter','VehicleLeave')
+                ORDER BY timestamp_ms ASC
+            """, (mid, my_account_id)).fetchall()
+            if self_in_veh:
+                _enter = None
+                _ivs = []
+                for v in self_in_veh:
+                    if v["event_type"] == "VehicleEnter":
+                        _enter = v["timestamp_ms"]
+                    elif v["event_type"] == "VehicleLeave" and _enter:
+                        _ivs.append((_enter, v["timestamp_ms"]))
+                        _enter = None
+                if _enter:
+                    _ivs.append((_enter, 10**15))
+                if _ivs:
+                    hits = conn.execute("""
+                        SELECT timestamp_ms FROM telemetry_events
+                        WHERE match_id=? AND target_account=?
+                          AND event_type IN ('Kill','Knock')
+                          AND damage_reason NOT IN ('Damage_Vehicle')
+                    """, (mid, my_account_id)).fetchall()
+                    eject_deaths = sum(
+                        1 for h in hits
+                        if h["timestamp_ms"] and
+                           any(a <= h["timestamp_ms"] <= b for a, b in _ivs)
+                    )
+                    if eject_deaths > 0:
+                        out.append({
+                            "id": "vehicle_eject_death",
+                            "label": f"Ejected · {eject_deaths}×",
+                            "icon": "💥",
+                            "matchId": mid, "playedAt": played,
+                        })
     except Exception:
         pass
 

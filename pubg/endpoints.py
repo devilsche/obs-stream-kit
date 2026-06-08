@@ -964,7 +964,9 @@ class EndpointRegistry:
             "redzone_death":           "Killed by the red zone bomb",
             "vehicle_kill":            "Ran over and killed an enemy",
             "vehicle_death":           "Got run over by a vehicle",
-            "vehicle_gunkill":         "Killed an enemy while driving",
+            "vehicle_gunkill":         "Killed or knocked an enemy while you were driving",
+            "vehicle_eject_kill":      "Killed or knocked an enemy who was driving or riding",
+            "vehicle_eject_death":     "Got killed or knocked while driving or riding a vehicle",
             "first_hot_drop":          "First hot drop in the session",
             "hot_drop_match":          "Multiple hot drops in a row — no cold drop in between",
             "hot_drop_match_survived": "Multiple hot drops survived in a row",
@@ -1017,7 +1019,9 @@ class EndpointRegistry:
             "redzone_death":           "Von der Roten Zone bombardiert",
             "vehicle_kill":            "Gegner überfahren",
             "vehicle_death":           "Von Fahrzeug überfahren worden",
-            "vehicle_gunkill":         "Gegner beim Fahren erschossen",
+            "vehicle_gunkill":         "Gegner erschossen oder geknockt während du fährst",
+            "vehicle_eject_kill":      "Gegner erschossen oder geknockt während er fährt oder mitfährt",
+            "vehicle_eject_death":     "Selbst aus dem Fahrzeug rausgeschossen oder geknockt worden",
             "first_hot_drop":          "Erstes Hot-Drop der Session",
             "hot_drop_match":          "Mehrere Hot-Drops in Folge — kein Cold-Drop dazwischen",
             "hot_drop_match_survived": "Mehrere Hot-Drops in Folge überlebt",
@@ -1217,6 +1221,8 @@ class EndpointRegistry:
         "vehicle_kill":            61,
         "vehicle_death":           62,
         "vehicle_gunkill":         63,
+        "vehicle_eject_kill":      64,
+        "vehicle_eject_death":     65,
     }
 
     # Kanonische Labels fuer aggregierte Darstellung. Die in der DB
@@ -1276,6 +1282,8 @@ class EndpointRegistry:
         "vehicle_kill":            "Road Rage",
         "vehicle_death":           "Speed Bump",
         "vehicle_gunkill":         "Drive-By",
+        "vehicle_eject_kill":      "Carjacked",
+        "vehicle_eject_death":     "Ejected",
     }
 
     # PUBG-Achievement-Icon-URLs. Komplettes Set fuer alle 44 Milestones
@@ -1344,10 +1352,12 @@ class EndpointRegistry:
         "ghost_operative":         "/widgets-static/pubg/icons/ghost_operative.png",
         "window_smasher":          "/widgets-static/pubg/icons/window_smasher.png",
         # Sonder-Milestones: Redzone, Fahrzeug
-        "redzone_death":           None,   # kein eigenes Icon → Emoji 💥
-        "vehicle_kill":            None,   # 🚗
-        "vehicle_death":           None,   # 🚗
-        "vehicle_gunkill":         None,   # 🔫
+        "redzone_death":           None,
+        "vehicle_kill":            "/widgets-static/pubg/assets/achievements/vehicle_kill.png",
+        "vehicle_death":           "/widgets-static/pubg/assets/achievements/vehicle_death.png",
+        "vehicle_gunkill":         "/widgets-static/pubg/assets/achievements/vehicle_gunkill.png",
+        "vehicle_eject_kill":      "/widgets-static/pubg/assets/achievements/vehicle_gunkill.png",
+        "vehicle_eject_death":     "/widgets-static/pubg/assets/achievements/vehicle_eject_death.png",
     }
 
     def _current_lang(self):
