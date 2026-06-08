@@ -259,6 +259,23 @@
       box-shadow: var(--theme-shadow, 0 4px 14px rgba(0,0,0,0.6));
       white-space: pre-line;
     }
+    /* Pfeil — zeigt auf den Cursor. --arrow-y steuert vertikale Position,
+       data-side="left"/"right" steuert auf welcher Seite er sitzt. */
+    .ach-popover::before {
+      content: "";
+      position: absolute;
+      top: var(--arrow-y, 18px);
+      transform: translateY(-50%);
+      border: 7px solid transparent;
+    }
+    .ach-popover[data-side="left"]::before {
+      left: -14px;
+      border-right-color: var(--theme-accent);
+    }
+    .ach-popover[data-side="right"]::before {
+      right: -14px;
+      border-left-color: var(--theme-accent);
+    }
     .ach-popover .pov-title {
       color: var(--theme-accent); font-weight: 700;
       margin-bottom: 4px; font-size: 1.05em;
@@ -632,18 +649,32 @@
       achPosition(e);
     }
     function achPosition(e) {
-      const r = achPov.getBoundingClientRect();
+      const GAP = 14, MARGIN = 8;
+      const pw = achPov.offsetWidth || 360;
+      const ph = achPov.offsetHeight || 100;
       const vw = innerWidth, vh = innerHeight;
-      let x = e.clientX + 14;
-      if (x + r.width + 8 > vw) {
-        x = e.clientX - r.width - 14;
-        if (x < 8) x = 8;
+      const cx = e.clientX, cy = e.clientY;
+
+      // Seite: rechts bevorzugt, links wenn kein Platz
+      let side, x;
+      if (cx + GAP + pw + MARGIN <= vw) {
+        side = "left";   // Pfeil links am Popover, Popover rechts vom Cursor
+        x = cx + GAP;
+      } else {
+        side = "right";  // Pfeil rechts am Popover, Popover links vom Cursor
+        x = cx - GAP - pw;
+        if (x < MARGIN) x = MARGIN;
       }
-      let y = e.clientY + 14;
-      if (y + r.height + 8 > vh) {
-        y = e.clientY - r.height - 14;
-        if (y < 8) y = 8;
-      }
+
+      // Vertikal: Cursor mittig im Popover, dann klemmen
+      let y = cy - ph / 2;
+      y = Math.max(MARGIN, Math.min(vh - ph - MARGIN, y));
+
+      // Pfeil-Y relativ zum Popover (zeigt auf Cursor)
+      const arrowY = Math.max(12, Math.min(ph - 12, cy - y));
+
+      achPov.dataset.side = side;
+      achPov.style.setProperty("--arrow-y", arrowY + "px");
       achPov.style.left = x + "px";
       achPov.style.top  = y + "px";
     }
