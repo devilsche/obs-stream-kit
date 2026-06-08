@@ -1,5 +1,14 @@
 """API-Routes — sowohl /api/* (Cookie) als auch /s/<token>/api/* (Token).
 
+Beide Routen-Familien rufen dieselben Handler — die Middleware hat
+g.tenant_id schon gesetzt, wir reichen es einfach durch.
+
+Cache: module-level shared TTLCache, aber jeder Tenant kriegt einen
+Prefix-Wrapper. So bleibt das Speed-Win zwischen Requests erhalten
+ohne Cross-Tenant-Lecks (Tenant 1's Keys: 't1:...', Tenant 2's: 't2:...').
+"""
+
+
 def _pubg_status():
     try:
         from app.poller_startup import _pubg_poller
@@ -8,16 +17,6 @@ def _pubg_status():
         return {"running": _pubg_poller is not None and _pubg_poller.is_alive()}
     except Exception:
         return {"running": False}
-
-"""API-Routes — sowohl /api/* (Cookie) als auch /s/<token>/api/* (Token).
-
-Beide Routen-Familien rufen dieselben Handler — die Middleware hat
-g.tenant_id schon gesetzt, wir reichen es einfach durch.
-
-Cache: module-level shared TTLCache, aber jeder Tenant kriegt einen
-Prefix-Wrapper. So bleibt das Speed-Win zwischen Requests erhalten
-ohne Cross-Tenant-Lecks (Tenant 1's Keys: 't1:...', Tenant 2's: 't2:...').
-"""
 import time as _time
 
 from flask import Blueprint, g, jsonify, abort, request, current_app
