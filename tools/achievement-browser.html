@@ -372,6 +372,16 @@
   <script>
     let RARE_PCT = 10;
     let all = [];          // alle Achievements aus der API
+    // Client-seitige Icon-Map für PUBG-Milestones — unabhängig vom API-Cache.
+    // Wird bei Seiten-Load einmal vom Server geholt und nie gecacht.
+    const PUBG_ICONS = {};
+    (async () => {
+      try {
+        const r = await fetch((window.__SERVE_BASE__||"/") + "api/pubg/icon-urls", {cache:"no-store"});
+        if (r.ok) Object.assign(PUBG_ICONS, await r.json());
+      } catch(_) {}
+    })();
+
     let games = [];        // unique games {appId, name, count}
     let filterGame = "";   // appId or ""
     let searchText = "";
@@ -460,17 +470,19 @@
       const key = a.appId + ":" + a.apiName;
       const isFresh = freshKeys.has(key);
 
-      // Icon: URL = <img>, Emoji = Text-Div
-      if (a.appId === -2 && (a.achievementId||"").startsWith("vehicle"))
-        console.log("[icon]", a.achievementId, "iconUrl=", a.iconUrl, "icon=", a.icon);
+      // Icon: PUBG nutzt client-seitige Map (PUBG_ICONS) als Quelle der Wahrheit,
+      // Steam nutzt a.iconUrl. Dadurch sind Icons unabhängig vom API-Cache.
+      const isPubgAch = a.source === "pubg" || a.appId === -2;
+      const resolvedIcon = isPubgAch
+        ? (PUBG_ICONS[a.achievementId] || a.iconUrl || a.icon || "")
+        : (icon || "");
       let iconHtml;
-      if (!icon) {
+      if (!resolvedIcon) {
         iconHtml = `<div class="tile-icon"></div>`;
-      } else if (isIconUrl(icon)) {
-        const src = icon + (icon.includes("achievements/") ? "?v=2" : "");
-        iconHtml = `<img class="tile-icon" src="${src}" alt="" data-fallback="${(a.icon||"").replace(/"/g,"&quot;")}">`;
+      } else if (isIconUrl(resolvedIcon)) {
+        iconHtml = `<img class="tile-icon" src="${resolvedIcon}" alt="" data-fallback="${(a.icon||"").replace(/"/g,"&quot;")}">`;
       } else {
-        iconHtml = `<div class="tile-icon-emoji">${icon}</div>`;
+        iconHtml = `<div class="tile-icon-emoji">${resolvedIcon}</div>`;
       }
 
       // Meta-Zeile: gleiches Pattern fuer Steam + PUBG.
@@ -597,11 +609,51 @@
       else if (sortMode === "name") view.sort((x, y) =>
         (x.displayName || x.apiName || "").localeCompare(y.displayName || y.apiName || ""));
 
-      gridEl.innerHTML = view.length
-        ? view.map(tileHtml).join("")
-        : `<div class="empty" style="grid-column: 1 / -1;">No achievements match these filters.</div>`;
+      // Lazy rendering — erst PAGE_SIZE Tiles, Rest per IntersectionObserver
+      const PAGE_SIZE = 60;
+      _currentView = view;
+      _renderedCount = 0;
+      gridEl.innerHTML = "";
+      if (!view.length) {
+        gridEl.innerHTML = `<div class="empty" style="grid-column:1/-1">No achievements match these filters.</div>`;
+      } else {
+        _renderMore();
+      }
       statsEl.innerHTML = `<b>${view.length}</b> / ${all.length} Achievements`;
     }
+
+    let _currentView = [];
+    let _renderedCount = 0;
+    const PAGE_SIZE = 60;
+
+    function _renderMore() {
+      const batch = _currentView.slice(_renderedCount, _renderedCount + PAGE_SIZE);
+      if (!batch.length) { _sentinel && _sentinel.remove(); return; }
+      const frag = document.createDocumentFragment();
+      batch.forEach(a => {
+        const div = document.createElement("div");
+        div.innerHTML = tileHtml(a);
+        frag.appendChild(div.firstElementChild);
+      });
+      // Sentinel vor dem Anhängen entfernen falls vorhanden
+      if (_sentinel && _sentinel.parentNode) _sentinel.remove();
+      gridEl.appendChild(frag);
+      _renderedCount += batch.length;
+      if (_renderedCount < _currentView.length) {
+        _sentinel = document.createElement("div");
+        _sentinel.style.cssText = "grid-column:1/-1;height:1px";
+        gridEl.appendChild(_sentinel);
+        _observer.observe(_sentinel);
+      }
+    }
+
+    let _sentinel = null;
+    const _observer = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) {
+        _observer.disconnect();
+        _renderMore();
+      }
+    }, { rootMargin: "200px" });
 
     async function triggerReplay(appId, apiName, tileEl, source) {
       try {

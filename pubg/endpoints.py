@@ -114,6 +114,8 @@ class EndpointRegistry:
             return self._recent_achievements(qs)
         if route == ("GET", "/api/pubg/achievements-list"):
             return self._achievements_list(qs)
+        if route == ("GET", "/api/pubg/icon-urls"):
+            return _ok(self.PUBG_ICON_URLS)
         if route == ("GET", "/api/pubg/replay-achievement"):
             return self._replay_achievement(qs)
         if route == ("GET", "/api/pubg/detect-achievements"):
