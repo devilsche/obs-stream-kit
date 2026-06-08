@@ -561,13 +561,12 @@
       if (sessionOnly && sessionCutoffMs) {
         view = view.filter(a => {
           const isPubg = a.source === "pubg" || a.appId === -2;
-          if (isPubg) {
-            if (!a.playedAt) return false;
-            return new Date(a.playedAt).getTime() >= sessionCutoffMs;
-          } else {
-            if (!a.unlockedAt) return false;
-            return a.unlockedAt * 1000 >= sessionCutoffMs;
-          }
+          // PUBG: playedAt (ISO-String) oder unlockedAt (Unix-s)
+          // Steam: unlockedAt (Unix-s)
+          const tsMs = isPubg
+            ? (a.playedAt ? new Date(a.playedAt).getTime() : (a.unlockedAt ? a.unlockedAt * 1000 : 0))
+            : (a.unlockedAt ? a.unlockedAt * 1000 : 0);
+          return tsMs >= sessionCutoffMs;
         });
       }
       if (filterGame) {

@@ -1843,6 +1843,7 @@ class EndpointRegistry:
                 "description":   self._ach_description(aid, lang),
                 "iconUrl":       (self.PUBG_ICON_URLS.get(aid) or r["icon"]),
                 "unlockedAt":    _iso_to_ts(r["played_at"]),
+                "playedAt":      r["played_at"],
                 "sessionPct":    session_pct,
                 "matchPct":      match_pct,
                 "displayed":     r["displayed_at"] is not None,
