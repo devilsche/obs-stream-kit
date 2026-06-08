@@ -480,9 +480,9 @@
       if (!resolvedIcon) {
         iconHtml = `<div class="tile-icon"></div>`;
       } else if (isIconUrl(resolvedIcon)) {
-        iconHtml = `<img class="tile-icon" src="${resolvedIcon}" alt="" data-fallback="${(a.icon||"").replace(/"/g,"&quot;")}">`;
+        iconHtml = `<img class="tile-icon" src="${resolvedIcon}" alt="">`;
       } else {
-        iconHtml = `<div class="tile-icon-emoji">${resolvedIcon}</div>`;
+        iconHtml = `<div class="tile-icon"></div>`;
       }
 
       // Meta-Zeile: gleiches Pattern fuer Steam + PUBG.
@@ -682,15 +682,9 @@
     gridEl.addEventListener("error", (e) => {
       const img = e.target;
       if (img.tagName !== "IMG" || !img.classList.contains("tile-icon")) return;
-      const fb = img.dataset.fallback;
-      if (fb) {
-        const div = document.createElement("div");
-        div.className = "tile-icon-emoji";
-        div.textContent = fb;
-        img.replaceWith(div);
-      } else {
-        img.style.display = "none";
-      }
+      const div = document.createElement("div");
+      div.className = "tile-icon";
+      img.replaceWith(div);
     }, true);
 
     gridEl.addEventListener("click", (e) => {
