@@ -587,6 +587,20 @@ Das Spiel feuert VehicleLeave durch Schaden kurz BEVOR Kill/Knock
 registriert wird — ohne Slack werden diese Kills nicht erkannt."""
 
 
+def _merge_veh_intervals(intervals):
+    """Führt benachbarte Intervalle zusammen wo Leave-ts == Enter-ts
+    (Seat-Wechsel). Funktioniert für 2- und 3-Tupel (a,b) oder (a,b,veh)."""
+    if not intervals:
+        return intervals
+    merged = [list(intervals[0])]
+    for iv in intervals[1:]:
+        if iv[0] == merged[-1][1]:  # Nahtloser Anschluss = Seat-Wechsel
+            merged[-1][1] = iv[1]  # Ende verlängern
+        else:
+            merged.append(list(iv))
+    return [tuple(m) for m in merged]
+
+
 def _in_veh_interval(ts, intervals, slack=VEH_EJECT_SLACK_MS):
     """True wenn ts innerhalb eines VehicleEnter/Leave-Intervalls liegt.
     slack=100ms fängt die Race-Condition ab bei der VehicleLeave durch
@@ -600,24 +614,39 @@ def _build_veh_intervals(events, acc):
     """Baut VehicleEnter/Leave-Intervalle für account acc aus einer
     Event-Liste. Jedes Intervall: (enter_ts, leave_ts, vehicle_id).
 
-    Seat-Wechsel (VehicleLeave + VehicleEnter im gleichen ms) werden
-    als ein durchgehendes Intervall behandelt — kein falsches Split."""
-    intervals = []
-    cur_enter = cur_veh = None
+    Seat-Wechsel: PUBG feuert VehicleLeave + VehicleEnter (oder umgekehrt)
+    am gleichen Timestamp. Das Leave beendet das Intervall NICHT wenn
+    unmittelbar danach (selber ms) ein Enter folgt."""
+    # Nur Events dieses Accounts herausfiltern
+    acc_events = []
     for e in events:
         actor = e.get("actor") or e.get("actor_account")
         if actor != acc:
             continue
         etype = e.get("type") or e.get("event_type")
         ts = e.get("ts") or e.get("timestamp_ms")
-        veh = e.get("weapon")
+        if etype in ("VehicleEnter", "VehicleLeave"):
+            acc_events.append((ts, etype, e.get("weapon")))
+
+    intervals = []
+    cur_enter = cur_veh = None
+    for i, (ts, etype, veh) in enumerate(acc_events):
         if etype == "VehicleEnter":
             if cur_enter is None:
                 cur_enter, cur_veh = ts, veh
-            # sonst: Seat-Wechsel = bereits drin, Enter ignorieren
+            # Enter während bereits drin → Seat-Wechsel, ignorieren
         elif etype == "VehicleLeave" and cur_enter is not None:
-            intervals.append((cur_enter, ts, cur_veh))
-            cur_enter = cur_veh = None
+            # Prüfe ob sofort danach ein Enter am gleichen Timestamp → Seat-Wechsel
+            next_is_enter_same_ts = (
+                i + 1 < len(acc_events) and
+                acc_events[i + 1][0] == ts and
+                acc_events[i + 1][1] == "VehicleEnter"
+            )
+            if next_is_enter_same_ts:
+                pass  # Seat-Wechsel: Intervall läuft weiter
+            else:
+                intervals.append((cur_enter, ts, cur_veh))
+                cur_enter = cur_veh = None
     if cur_enter is not None:
         intervals.append((cur_enter, 10**15, cur_veh))
     return intervals
@@ -678,6 +707,7 @@ def _compute_player_vehicle_evictions(conn, tenant_id: int, account_id, match_id
                     cur = None
         if cur is not None:
             intervals_self.append((cur, INF))
+        intervals_self = _merge_veh_intervals(intervals_self)
         # Targets (Gegner): iteriere ueber alle distinct accounts die
         # mal ein VehicleEnter haben — nur die brauchen wir fuer dealt.
         for e in events:
@@ -698,7 +728,7 @@ def _compute_player_vehicle_evictions(conn, tenant_id: int, account_id, match_id
                     cur2 = None
             if cur2 is not None:
                 ivals.append((cur2, INF))
-            intervals_targets[e["actor"]] = ivals
+            intervals_targets[e["actor"]] = _merge_veh_intervals(ivals)
 
         def _in(ts, ivals):
             return _in_veh_interval(ts, ivals)
@@ -1194,7 +1224,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 _cur_enter = None; _cur_veh = None
         if _cur_enter is not None:
             _ivals.append((_cur_enter, float("inf"), _cur_veh))
-        veh_intervals_by_acc[_acc] = _ivals
+        veh_intervals_by_acc[_acc] = _merge_veh_intervals(_ivals)
 
     out_members = []
     for mem in members_rows:
@@ -1233,7 +1263,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         if _cur_enter is not None:
             veh_intervals.append((_cur_enter, float("inf"), _cur_veh))
 
-        veh_intervals_by_acc[acc] = list(veh_intervals)
+        veh_intervals_by_acc[acc] = _merge_veh_intervals(list(veh_intervals))
 
         def _vehicle_label_at(ts):
             """Wenn der Member zum Zeitpunkt ts im Fahrzeug war: Klartext
@@ -2907,7 +2937,7 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
                 cur_veh = None
         if cur is not None:
             ivals.append((cur, INF, cur_veh))
-        return ivals
+        return _merge_veh_intervals(ivals)
 
     def _vehicle_in_intervals(ts, intervals):
         """Returns vehicle class if ts inside an interval (+ eject slack), else None."""
