@@ -13,6 +13,8 @@
   .canvas-wrap { position: relative; background: repeating-conic-gradient(#3a3a3a 0% 25%,#2a2a2a 0% 50%) 0 0/20px 20px;
                  border: 1px solid var(--theme-border); border-radius: var(--theme-radius); overflow: hidden; }
   canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+  .existing img { cursor: pointer; }
+  button, .btn { cursor: pointer; }
   .sidebar { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
   .panel { background: var(--theme-surface); border: 1px solid var(--theme-border);
            border-radius: var(--theme-radius); padding: 14px; }
@@ -216,6 +218,8 @@ function hitHandle(mx, my) {
   return null;
 }
 
+const CURSOR_MAP = { tl:"nw-resize", tr:"ne-resize", bl:"sw-resize", br:"se-resize", move:"move" };
+
 cvs.addEventListener("mousedown", e => {
   if (!img) return;
   const {x, y} = canvasToImg(e.clientX, e.clientY);
@@ -230,8 +234,13 @@ cvs.addEventListener("mousedown", e => {
 });
 
 cvs.addEventListener("mousemove", e => {
-  if (!drag || !img) return;
+  if (!img) return;
   const {x, y} = canvasToImg(e.clientX, e.clientY);
+  if (!drag) {
+    const hit = hitHandle(x, y);
+    cvs.style.cursor = CURSOR_MAP[hit] || "crosshair";
+    return;
+  }
   const dx = x - drag.startX, dy = y - drag.startY;
   const o = drag.origCrop;
   if (drag.type === "new") {
