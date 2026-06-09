@@ -3871,7 +3871,15 @@
           const matchT = fmtMatchTime(ev.tsMs);
           const absT = fmtAbsClock(ev.playedAt, ev.tsMs);
           const where = poi ? `<span class="ve-poi">${poi}</span>` : "";
-          const kindLbl = ev.kind === "knock_died" ? "knocked→tot" : "kill";
+          const KIND_LABELS = {
+            eject_knock: "rausgeschossen (knock)",
+            eject_kill:  "rausgeschossen (kill)",
+            driveby_knock: "Drive-By (knock)",
+            driveby_kill:  "Drive-By (kill)",
+            knock_died: "knocked→tot",
+            kill: "kill",
+          };
+          const kindLbl = KIND_LABELS[ev.kind] || ev.kind || "kill";
           const verb = role === "dealt"
             ? `→ ${opp}` : `durch ${opp}`;
           // Match-Header beim Wechsel der matchId davorhängen
@@ -3906,7 +3914,14 @@
           const who = m.name;
           const blocks = [];
           if (dealt > 0) {
-            blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span> hat <b>${dealt}</b> rausgeschossen</summary>${evRows(m.eventsDealt || [], "dealt")}</details>`);
+            const evDealt = m.eventsDealt || [];
+            const nEject   = evDealt.filter(e => (e.kind||"").startsWith("eject")).length;
+            const nDriveby = evDealt.filter(e => (e.kind||"").startsWith("driveby")).length;
+            const parts2 = [];
+            if (nEject)   parts2.push(`<b>${nEject}</b> rausgeschossen`);
+            if (nDriveby) parts2.push(`<b>${nDriveby}</b> beim Fahren abgeknallt`);
+            const summary = parts2.join(", ") || `<b>${dealt}</b> Vehicle-Kill`;
+            blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span> ${summary}</summary>${evRows(evDealt, "dealt")}</details>`);
           }
           if (taken > 0) {
             blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm" aria-hidden="true">skull</span> wurde <b>${taken}</b> mal rausgeschossen</summary>${evRows(m.eventsTaken || [], "taken")}</details>`);

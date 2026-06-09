@@ -2978,16 +2978,16 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
                                 else opp_intervals.get(target, []))
                 actor_veh  = _vehicle_in_intervals(ts, actor_ivals)   # Drive-By
                 target_veh = _vehicle_in_intervals(ts, target_ivals)  # Eject-Kill
-                veh = target_veh or actor_veh  # eines von beiden reicht
-                if t == "Kill" and veh is not None:
+                veh = target_veh or actor_veh
+                if veh is None: pass
+                elif t == "Kill":
+                    kind = "eject_kill" if target_veh else "driveby_kill"
                     _ensure(actor)["evictionsDealt"] += 1
-                    _add_event(actor, "eventsDealt", "kill",
-                                mid, e, target, veh)
-                elif t == "Knock" and veh is not None:
-                    # Knock zählt immer — egal ob revival folgt
+                    _add_event(actor, "eventsDealt", kind, mid, e, target, veh)
+                elif t == "Knock":
+                    kind = "eject_knock" if target_veh else "driveby_knock"
                     _ensure(actor)["evictionsDealt"] += 1
-                    _add_event(actor, "eventsDealt", "knock_died",
-                                mid, e, target, veh)
+                    _add_event(actor, "eventsDealt", kind, mid, e, target, veh)
 
             # === TAKEN: target=squad-member, member im vehicle ===
             if target in squad:
