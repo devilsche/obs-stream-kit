@@ -1855,12 +1855,14 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     slot_by_acc = {mem["accountId"]: mem.get("slot") for mem in out_members}
 
     def _veh_label_for(acc, ts):
-        """Vehicle-Label nur fuer Squad-Mates (intervals_by_acc enthaelt
-        keine Non-Squad)."""
+        """Vehicle-Label fuer beliebige Accounts. 100ms Puffer nach
+        VehicleLeave damit eject-Kills (VehicleLeave durch Schaden kurz
+        vor dem Kill-Event) korrekt erkannt werden."""
         if not acc or acc not in veh_intervals_by_acc:
             return None
+        VEH_EJECT_SLACK_MS = 100
         for a, b, vid in veh_intervals_by_acc[acc]:
-            if a <= ts <= b and vid:
+            if a <= ts <= b + VEH_EJECT_SLACK_MS and vid:
                 for needle, label in _VEHICLE_PATTERNS:
                     if needle in vid:
                         return label
@@ -4299,10 +4301,11 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
                         if _enter:
                             _ivs.append((_enter, 10**15))
                         ivs[acc] = _ivs
+                    VEH_SLACK = 100  # ms Puffer nach VehicleLeave (eject-Kill)
                     eject_n = sum(
                         1 for r in my_kill_events
                         if r["target_account"] and r["timestamp_ms"] and
-                           any(a <= r["timestamp_ms"] <= b
+                           any(a <= r["timestamp_ms"] <= b + VEH_SLACK
                                for a, b in ivs.get(r["target_account"], []))
                     )
                     if eject_n > 0:
@@ -4341,7 +4344,7 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
                     eject_deaths = sum(
                         1 for h in hits
                         if h["timestamp_ms"] and
-                           any(a <= h["timestamp_ms"] <= b for a, b in _ivs)
+                           any(a <= h["timestamp_ms"] <= b + 100 for a, b in _ivs)
                     )
                     if eject_deaths > 0:
                         out.append({
