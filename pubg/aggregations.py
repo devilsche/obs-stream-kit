@@ -2938,10 +2938,6 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
         return None
 
     for mid, squad in squad_per_match.items():
-        import sys
-        sleep = "account.2f1429abc6404a8980a041fe5eddf4ee"
-        if "c21c6d3c" in mid:
-            print(f"[DBG] mid={mid[:8]} squad_has_sleep={sleep in squad} events={len(events_per_match.get(mid,[]))} knock_for_sleep={sum(1 for e in events_per_match.get(mid,[]) if e.get('target')==sleep and e.get('type')=='Knock')}", file=sys.stderr)
         events = events_per_match.get(mid, [])
         # Vehicle-Intervalle pro Squad-Member (fuer 'taken')
         intervals_by = {}
@@ -3002,26 +2998,16 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
             if target in squad:
                 m_ivals = intervals_by[target]
                 veh = _vehicle_in_intervals(ts, m_ivals)
-                if target and "2f1429abc6404a8980a041fe5eddf4ee" in target:
-                    import sys
-                    print(f"[DBG TAKEN] mid={mid[:8]} t={t} ts={ts} veh={veh}", file=sys.stderr)
                 if t == "Kill" and veh is not None:
                     _ensure(target)["evictionsTaken"] += 1
                     _add_event(target, "eventsTaken", "kill",
                                 mid, e, actor, veh)
                 elif t == "Knock" and veh is not None:
-                    if _knock_leads_to_death(ts, target):
-                        kill_in_veh = False
-                        for later in events:
-                            if (later["type"] == "Kill" and later["target"] == target
-                                    and later["ts"] and later["ts"] > ts):
-                                kill_in_veh = _in_intervals(
-                                    later["ts"], m_ivals)
-                                break
-                        if not kill_in_veh:
-                            _ensure(target)["evictionsTaken"] += 1
-                            _add_event(target, "eventsTaken", "knock_died",
-                                        mid, e, actor, veh)
+                    # Rausschießen zählt auch wenn man revived wird —
+                    # der Eject selbst ist das Event, nicht der Tod.
+                    _ensure(target)["evictionsTaken"] += 1
+                    _add_event(target, "eventsTaken", "knock_died",
+                                mid, e, actor, veh)
 
     # Detail-Listen pro Member chronologisch sortieren
     for s in stats.values():
