@@ -250,6 +250,15 @@ def _admin_json_guard():
 
 @bp_admin.route("/admin/icon-crop/save", methods=["POST"])
 def admin_icon_crop_save():
+    try:
+        return _admin_icon_crop_save_impl()
+    except Exception as e:
+        import traceback
+        current_app.logger.error("icon-crop-save failed: %s\n%s", e, traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
+
+def _admin_icon_crop_save_impl():
     err, status = _admin_json_guard()
     if err:
         return err, status
