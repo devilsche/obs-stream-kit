@@ -77,6 +77,8 @@
 </head>
 <body>
 <h1>Icon Crop Editor</h1>
+<div id="toast"></div>
+<div id="iconHoverPreview"><img id="iconHoverImg" src="" alt=""></div>
 <div class="layout">
   <div class="canvas-wrap" id="canvasWrap">
     <canvas id="cvs"></canvas>
@@ -369,7 +371,7 @@ async function saveIcon() {
   fd.append("circular", document.getElementById("circular").checked ? "1" : "0");
   try {
     const res = await fetch((window.__SERVE_BASE__||"/") + "admin/icon-crop/save",
-      { method:"POST", body:fd, credentials:"same-origin" });
+      { method:"POST", body:fd, credentials:"include" });
     if (!res.ok && res.headers.get("content-type")?.includes("text/html")) {
       showMsg("Auth error — please reload the page.", "err"); return;
     }
@@ -407,7 +409,7 @@ function filterIcons() {
 async function loadExisting() {
   try {
     const r = await fetch((window.__SERVE_BASE__||"/") + "admin/icon-crop/list",
-      { credentials:"same-origin" });
+      { credentials:"include" });
     if (!r.ok) { console.warn("icon-list failed", r.status); return; }
     const ct = r.headers.get("content-type")||"";
     if (!ct.includes("json")) { console.warn("icon-list: no JSON", ct); return; }
@@ -433,7 +435,5 @@ document.getElementById("existingIcons").addEventListener("mouseleave", () => {
 });
 loadExisting();
 </script>
-<div id="toast"></div>
-<div id="iconHoverPreview"><img id="iconHoverImg" src="" alt=""></div>
 </body>
 </html>
