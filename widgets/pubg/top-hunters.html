@@ -37,6 +37,10 @@
     td.dealt b, td.taken b { font-size: 1.15em; }
     td.per-match { color: var(--pubg-muted); font-size: 0.82em; font-variant-numeric: tabular-nums; }
     td.driveby b { color: var(--pubg-gold); font-size: 1.15em; }
+    th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    th.sortable:hover { color: var(--pubg-gold); }
+    th.sortable.active { color: var(--pubg-gold); }
+    .sort-arrow { font-size: 0.7em; margin-left: 2px; opacity: 0.7; }
     td.dealt b { color: var(--pubg-gold); }
     td.taken b { color: #ff7a7a; }
     .empty { color: var(--pubg-muted); font-style: italic; text-align: center;
@@ -72,80 +76,100 @@
     PubgUI.buildFilter([
       { key: "range", label: "Range", type: "select", default: "session",
         options: [["session", "Session"], ["week", "7 days"], ["all", "Database"]] },
-      { key: "sort", label: "Sort by", type: "select", default: "dealt",
-        options: [["dealt", "dealt"], ["taken", "taken"], ["ratio", "ratio"]],
-        tooltip: "dealt = wer am meisten rausgeschossen hat. taken = wer am " +
-                  "oeftesten geholt wurde. ratio = dealt/taken (hoeher = besser)." },
       { key: "limit", label: "Max rows", type: "range", default: 10,
         min: 3, max: 30, presets: [5, 10, 15, 20] },
       { key: "minEvents", label: "Min events", type: "range", default: 1,
         min: 1, max: 20, presets: [1, 2, 5] },
     ]);
 
+    let _sortKey = SORT;
+    let _sortDir = -1; // -1 = desc
+
     function rankRows(members) {
       const items = members.filter(m =>
         (m.evictionsDealt || 0) + (m.evictionsTaken || 0) >= MIN_EVENTS);
       items.forEach(m => {
-        const d = m.evictionsDealt || 0;
-        const t = m.evictionsTaken || 0;
-        m._ratio = d / Math.max(t, 1);
+        const evD = m.eventsDealt || [];
+        m._nEject   = evD.filter(e => (e.kind||"").startsWith("eject")).length;
+        m._nDriveby = evD.filter(e => (e.kind||"").startsWith("driveby")).length;
+        m._ratio = (m.evictionsDealt || 0) / Math.max(m.evictionsTaken || 0, 1);
       });
-      items.sort((a, b) => {
-        if (SORT === "taken") return (b.evictionsTaken || 0) - (a.evictionsTaken || 0);
-        if (SORT === "ratio") return b._ratio - a._ratio;
-        return (b.evictionsDealt || 0) - (a.evictionsDealt || 0);
-      });
+      sortItems(items);
       return items.slice(0, LIMIT);
+    }
+
+    function sortItems(items) {
+      const dir = _sortDir;
+      items.sort((a, b) => {
+        let va, vb;
+        switch (_sortKey) {
+          case "eject":   va = a._nEject;        vb = b._nEject;        break;
+          case "driveby": va = a._nDriveby;       vb = b._nDriveby;      break;
+          case "taken":   va = a.evictionsTaken || 0; vb = b.evictionsTaken || 0; break;
+          case "ratio":   va = a._ratio;          vb = b._ratio;         break;
+          case "matches": va = a.matches || 0;    vb = b.matches || 0;   break;
+          default:        va = a.evictionsDealt || 0; vb = b.evictionsDealt || 0;
+        }
+        return dir * (vb - va);
+      });
+    }
+
+    let _lastRows = [];
+
+    function render(rows) {
+        const cont = document.getElementById("content");
+        if (!rows.length) {
+          cont.innerHTML = `<div class="empty">No vehicle action in this range.</div>`;
+          return;
+        }
+        const S = _sortKey, D = _sortDir;
+        const th = (key, label, tip) =>
+          `<th data-sort="${key}" title="${tip}" class="sortable${S===key?' active':''}">` +
+          `${label}<span class="sort-arrow">${S===key?(D<0?'▼':'▲'):''}</span></th>`;
+        cont.innerHTML = `
+          <table>
+            <thead><tr>
+              <th>#</th><th>Player</th>
+              ${th("eject",  `<span class="material-symbols-outlined icon-sm" aria-label="Ejected from vehicle">eject</span>`,       "Ejected enemy from vehicle")}
+              ${th("driveby",`<span class="material-symbols-outlined icon-sm" aria-label="Drive-By kill">directions_car</span>`,     "Drive-By — killed while driving")}
+              ${th("taken",  `<span class="material-symbols-outlined icon-sm" aria-label="Got ejected">personal_injury</span>`,      "Got ejected from vehicle")}
+              ${th("dealt",  "dealt%", "Total dealt / matches")}
+              ${th("ratio",  "ratio",  "dealt / max(taken,1)")}
+              ${th("matches","M",      "Matches in range")}
+            </tr></thead>
+            <tbody>
+              ${rows.map((m, i) => {
+                const d = m.evictionsDealt || 0, t = m.evictionsTaken || 0, mx = m.matches || 1;
+                return `
+                <tr class="${m.isSelf ? 'self' : ''}">
+                  <td class="rank">${i+1}.</td>
+                  <td class="name">${m.name||"—"}</td>
+                  <td class="dealt"><b>${m._nEject}</b></td>
+                  <td class="driveby"><b>${m._nDriveby}</b></td>
+                  <td class="taken"><b>${t}</b></td>
+                  <td class="per-match">${Math.round(d/mx*100)}%</td>
+                  <td>${m._ratio.toFixed(1)}</td>
+                  <td class="matches">${mx}</td>
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table>`;
+        cont.querySelector("thead").addEventListener("click", e => {
+          const th2 = e.target.closest("th[data-sort]");
+          if (!th2) return;
+          const key = th2.dataset.sort;
+          if (_sortKey === key) _sortDir *= -1; else { _sortKey = key; _sortDir = -1; }
+          sortItems(_lastRows);
+          render(_lastRows);
+        });
     }
 
     async function refresh() {
       try {
         const data = await PubgUI.fetchJson(
           (window.__SERVE_BASE__||"/") + `api/pubg/vehicle-stats?range=${RANGE}`);
-        const rows = rankRows((data && data.members) || []);
-        const cont = document.getElementById("content");
-        if (!rows.length) {
-          cont.innerHTML = `<div class="empty">Noch keine Vehicle-Action in dieser Range.</div>`;
-          return;
-        }
-        cont.innerHTML = `
-          <table>
-            <thead><tr>
-              <th>#</th><th>Player</th>
-              <th title="Gegner aus Fahrzeug rausgeschossen"><span class="material-symbols-outlined icon-sm" aria-hidden="true">eject</span></th>
-              <th title="Drive-By — beim Fahren abgeknallt"><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span></th>
-              <th title="Selbst rausgeschossen worden"><span class="material-symbols-outlined icon-sm" aria-hidden="true">personal_injury</span></th>
-              <th title="dealt (eject+driveby) / Matches">Ø/M</th>
-              <th title="taken / Matches">taken%</th>
-              <th title="(eject+driveby) / max(taken,1)">ratio</th>
-              <th title="Matches im Range">M</th>
-            </tr></thead>
-            <tbody>
-              ${rows.map((m, i) => {
-                const d  = m.evictionsDealt || 0;
-                const t  = m.evictionsTaken || 0;
-                const mx = m.matches || 1;
-                const evD = m.eventsDealt || [];
-                const nEject   = evD.filter(e => (e.kind||"").startsWith("eject")).length;
-                const nDriveby = evD.filter(e => (e.kind||"").startsWith("driveby")).length;
-                return `
-                <tr class="${m.isSelf ? 'self' : ''}">
-                  <td class="rank">${i + 1}.</td>
-                  <td class="name">${m.name || "—"}</td>
-                  <td class="dealt"><b>${nEject}</b></td>
-                  <td class="driveby"><b>${nDriveby}</b></td>
-                  <td class="taken"><b>${t}</b></td>
-                  <td class="per-match">${Math.round(d / mx * 100)}%</td>
-                  <td class="per-match">${Math.round(t / mx * 100)}%</td>
-                  <td>${m._ratio.toFixed(1)}</td>
-                  <td class="matches">${mx}</td>
-                </tr>`;
-              }).join("")}
-            </tbody>
-          </table>
-          <div class="sub" style="margin-top:8px">
-            Quelle: Vehicle-Eviction-Events (Kill/Knock auf Spieler im Fahrzeug).
-          </div>`;
+        _lastRows = rankRows((data && data.members) || []);
+        render(_lastRows);
       } catch (e) {
         document.getElementById("content").innerHTML =
           `<div class="empty"><span class="material-symbols-outlined icon-sm icon-danger" aria-hidden="true">error</span> ${e.message || e}</div>`;
