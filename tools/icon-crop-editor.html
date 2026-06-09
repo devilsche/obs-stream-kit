@@ -358,6 +358,21 @@ function showMsg(t, type) {
 }
 
 // ── Vorhandene Icons ─────────────────────────────────────────────────────────
+let _allIcons = [];
+
+function filterIcons() {
+  const q = (document.getElementById("iconFilter").value || "").toLowerCase();
+  const wrap2 = document.getElementById("existingIcons");
+  const v = Date.now();
+  const list = q.length >= 2 ? _allIcons.filter(ic => ic.name.includes(q)) : _allIcons;
+  wrap2.innerHTML = list.map(ic => `
+    <div style="text-align:center;width:64px">
+      <img src="${ic.url}?v=${v}" title="${ic.name}"
+           onclick="document.getElementById('outName').value='${ic.name}';showMsg('Name set: ${ic.name}','ok')"
+           onerror="this.style.opacity=0.3">
+      <div style="font-size:9px;color:var(--theme-text-faint);word-break:break-all;margin-top:2px">${ic.name}</div>
+    </div>`).join("");
+}
 async function loadExisting() {
   try {
     const r = await fetch((window.__SERVE_BASE__||"/") + "admin/icon-crop/list",
