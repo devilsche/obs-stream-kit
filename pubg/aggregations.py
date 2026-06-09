@@ -2970,29 +2970,24 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
             t  = e["type"]; ts = e["ts"]
             if ts is None: continue
             actor = e["actor"]; target = e["target"]
-            # === DEALT: actor=squad-member, target im vehicle ===
+            # === DEALT: actor=squad-member ===
             if actor in squad and target:
+                actor_ivals = intervals_by.get(actor, [])
                 target_ivals = (intervals_by.get(target)
                                 if target in squad
                                 else opp_intervals.get(target, []))
-                veh = _vehicle_in_intervals(ts, target_ivals)
+                actor_veh  = _vehicle_in_intervals(ts, actor_ivals)   # Drive-By
+                target_veh = _vehicle_in_intervals(ts, target_ivals)  # Eject-Kill
+                veh = target_veh or actor_veh  # eines von beiden reicht
                 if t == "Kill" and veh is not None:
                     _ensure(actor)["evictionsDealt"] += 1
                     _add_event(actor, "eventsDealt", "kill",
                                 mid, e, target, veh)
                 elif t == "Knock" and veh is not None:
-                    if _knock_leads_to_death(ts, target):
-                        kill_in_veh = False
-                        for later in events:
-                            if (later["type"] == "Kill" and later["target"] == target
-                                    and later["ts"] and later["ts"] > ts):
-                                kill_in_veh = _in_intervals(
-                                    later["ts"], target_ivals)
-                                break
-                        if not kill_in_veh:
-                            _ensure(actor)["evictionsDealt"] += 1
-                            _add_event(actor, "eventsDealt", "knock_died",
-                                        mid, e, target, veh)
+                    # Knock zählt immer — egal ob revival folgt
+                    _ensure(actor)["evictionsDealt"] += 1
+                    _add_event(actor, "eventsDealt", "knock_died",
+                                mid, e, target, veh)
 
             # === TAKEN: target=squad-member, member im vehicle ===
             if target in squad:
