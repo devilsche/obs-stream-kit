@@ -581,6 +581,43 @@ def compute_weapon_stats(conn, tenant_id: int, my_account_id, range_key="session
     return out
 
 
+VEH_EJECT_SLACK_MS = 100
+"""Millisekunden-Puffer nach VehicleLeave für Eject-Kill-Erkennung.
+Das Spiel feuert VehicleLeave durch Schaden kurz BEVOR Kill/Knock
+registriert wird — ohne Slack werden diese Kills nicht erkannt."""
+
+
+def _in_veh_interval(ts, intervals, slack=VEH_EJECT_SLACK_MS):
+    """True wenn ts innerhalb eines VehicleEnter/Leave-Intervalls liegt.
+    slack=100ms fängt die Race-Condition ab bei der VehicleLeave durch
+    Schaden kurz vor dem Kill-Event auftritt."""
+    if ts is None:
+        return False
+    return any(a <= ts <= b + slack for a, b, *_ in intervals)
+
+
+def _build_veh_intervals(events, acc):
+    """Baut VehicleEnter/Leave-Intervalle für account acc aus einer
+    Event-Liste. Jedes Intervall: (enter_ts, leave_ts, vehicle_id)."""
+    intervals = []
+    cur_enter = cur_veh = None
+    for e in events:
+        actor = e.get("actor") or e.get("actor_account")
+        if actor != acc:
+            continue
+        etype = e.get("type") or e.get("event_type")
+        ts = e.get("ts") or e.get("timestamp_ms")
+        veh = e.get("weapon")
+        if etype == "VehicleEnter":
+            cur_enter, cur_veh = ts, veh
+        elif etype == "VehicleLeave" and cur_enter is not None:
+            intervals.append((cur_enter, ts, cur_veh))
+            cur_enter = cur_veh = None
+    if cur_enter is not None:
+        intervals.append((cur_enter, 10**15, cur_veh))
+    return intervals
+
+
 def _compute_player_vehicle_evictions(conn, tenant_id: int, account_id, match_ids):
     """Wie oft hat dieser Spieler andere 'rausgeschossen' und wie oft
     wurde er selbst rausgeschossen — ueber die gegebenen Matches.
@@ -656,8 +693,8 @@ def _compute_player_vehicle_evictions(conn, tenant_id: int, account_id, match_id
                 ivals.append((cur2, INF))
             intervals_targets[e["actor"]] = ivals
 
-        def _in(ts, ivals, slack=100):
-            return any(a <= ts <= b + slack for a, b in ivals) if ts is not None else False
+        def _in(ts, ivals):
+            return _in_veh_interval(ts, ivals)
 
         for e in events:
             t  = e["type"]; ts = e["ts"]
@@ -1860,9 +1897,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         vor dem Kill-Event) korrekt erkannt werden."""
         if not acc or acc not in veh_intervals_by_acc:
             return None
-        VEH_EJECT_SLACK_MS = 100
         for a, b, vid in veh_intervals_by_acc[acc]:
-            if a <= ts <= b + VEH_EJECT_SLACK_MS and vid:
+            if _in_veh_interval(ts, [(a, b, vid)]) and vid:
                 for needle, label in _VEHICLE_PATTERNS:
                     if needle in vid:
                         return label
@@ -2842,11 +2878,7 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
         })
 
     def _in_intervals(ts, intervals):
-        for ival in intervals:
-            a, b = ival[0], ival[1]
-            if a <= ts <= b:
-                return True
-        return False
+        return _in_veh_interval(ts, intervals)
 
     def _build_intervals(events, acc):
         """Returns list of (start_ts, end_ts, vehicle_class)."""
@@ -4301,12 +4333,11 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
                         if _enter:
                             _ivs.append((_enter, 10**15))
                         ivs[acc] = _ivs
-                    VEH_SLACK = 100  # ms Puffer nach VehicleLeave (eject-Kill)
                     eject_n = sum(
                         1 for r in my_kill_events
                         if r["target_account"] and r["timestamp_ms"] and
-                           any(a <= r["timestamp_ms"] <= b + VEH_SLACK
-                               for a, b in ivs.get(r["target_account"], []))
+                           _in_veh_interval(r["timestamp_ms"],
+                                            ivs.get(r["target_account"], []))
                     )
                     if eject_n > 0:
                         out.append({
@@ -4343,8 +4374,7 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
                     """, (mid, my_account_id)).fetchall()
                     eject_deaths = sum(
                         1 for h in hits
-                        if h["timestamp_ms"] and
-                           any(a <= h["timestamp_ms"] <= b + 100 for a, b in _ivs)
+                        if _in_veh_interval(h["timestamp_ms"], _ivs)
                     )
                     if eject_deaths > 0:
                         out.append({
