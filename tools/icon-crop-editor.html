@@ -52,6 +52,19 @@
                   background: repeating-conic-gradient(#3a3a3a 0% 25%,#2a2a2a 0% 50%) 0 0/8px 8px;
                   display: block; }
   .existing img:hover { border-color: var(--theme-accent); }
+  #iconHoverPreview {
+    display: none; position: fixed; inset: 0;
+    align-items: center; justify-content: center;
+    pointer-events: none; z-index: 9999;
+  }
+  #iconHoverPreview.show { display: flex; }
+  #iconHoverPreview img {
+    width: 256px; height: 256px; object-fit: contain;
+    background: repeating-conic-gradient(#3a3a3a 0% 25%,#2a2a2a 0% 50%) 0 0/16px 16px;
+    border: 2px solid var(--theme-accent);
+    border-radius: var(--theme-radius);
+    box-shadow: var(--theme-shadow, 0 8px 32px rgba(0,0,0,0.6));
+  }
 </style>
 </head>
 <body>
@@ -397,7 +410,21 @@ async function loadExisting() {
 }
 
 document.getElementById("iconFilter").addEventListener("input", filterIcons);
+
+const _hoverPreview = document.getElementById("iconHoverPreview");
+const _hoverImg     = document.getElementById("iconHoverImg");
+document.getElementById("existingIcons").addEventListener("mouseover", e => {
+  const img = e.target.closest("img");
+  if (!img) return;
+  _hoverImg.src = img.src;
+  _hoverPreview.classList.add("show");
+});
+document.getElementById("existingIcons").addEventListener("mouseout", e => {
+  if (!e.relatedTarget?.closest("#existingIcons"))
+    _hoverPreview.classList.remove("show");
+});
 loadExisting();
 </script>
+<div id="iconHoverPreview"><img id="iconHoverImg" src="" alt=""></div>
 </body>
 </html>
