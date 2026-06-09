@@ -43,6 +43,7 @@
   .msg.ok  { background: color-mix(in srgb,var(--theme-ok)     12%,transparent); color: var(--theme-ok); }
   .msg.err { background: color-mix(in srgb,var(--theme-danger)  12%,transparent); color: var(--theme-danger); }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #iconFilter { margin-bottom: 10px; }
   .existing { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
   .existing img { width: 48px; height: 48px; object-fit: contain; cursor: pointer;
                   border: 2px solid transparent; border-radius: var(--theme-radius);
@@ -108,8 +109,8 @@
 
     <div class="panel">
       <h2>Vorhandene Icons</h2>
-      <input type="search" id="iconFilter" placeholder="Suchen… z.B. vehicle, chicken"
-             oninput="filterIcons()" style="margin-bottom:8px">
+      <input type="text" id="iconFilter" placeholder="Suchen… z.B. vehicle, chicken"
+             oninput="filterIcons()">
       <div class="existing" id="existingIcons"></div>
     </div>
 
