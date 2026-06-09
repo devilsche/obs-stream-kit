@@ -119,7 +119,7 @@
               ${rows.map((m, i) => `
                 <tr class="${m.isSelf ? 'self' : ''}">
                   <td class="rank">${i + 1}.</td>
-                  <td class="name">${m.isSelf ? "Du" : (m.name || "—")}</td>
+                  <td class="name">${m.name || "—"}</td>
                   <td class="dealt"><b>${m.evictionsDealt || 0}</b></td>
                   <td class="taken"><b>${m.evictionsTaken || 0}</b></td>
                   <td>${m._ratio.toFixed(1)}</td>

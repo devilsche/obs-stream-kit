@@ -1895,7 +1895,7 @@
         const color = s.colorByAcc[m.accountId] || "#999";
         const active = s.hiddenAccs.has(m.accountId) ? " hidden" : "";
         const selfCls = m.isSelf ? " md-self" : "";
-        const who = m.isSelf ? "Du" : m.name;
+        const who = m.name;
         // Overall-Badge: alive falls letztes Leben ohne Death, sonst der letzte Death
         let badge = '<span class="md-badge alive">ueberlebt</span>';
         if (m.lives && m.lives.length) {
@@ -3903,7 +3903,7 @@
           const dealt = m.evictionsDealt || 0;
           const taken = m.evictionsTaken || 0;
           if (!dealt && !taken) continue;
-          const who = m.isSelf ? "Du" : m.name;
+          const who = m.name;
           const blocks = [];
           if (dealt > 0) {
             blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span> hat <b>${dealt}</b> rausgeschossen</summary>${evRows(m.eventsDealt || [], "dealt")}</details>`);
@@ -4097,7 +4097,7 @@
       }
       let txt = "?";
       const member = s.detail.members.find(m => m.accountId === hit.acc);
-      const memberName = member && (member.isSelf ? "Du" : member.name);
+      const memberName = member && (member.name);
       const lifeSuffix = (member && member.lives.length > 1)
         ? ` ${hit.lifeIdx}` : "";
       if (hit.kind === "landing") txt = `${memberName} • Landing${lifeSuffix}`;
