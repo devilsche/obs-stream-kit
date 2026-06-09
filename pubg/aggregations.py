@@ -656,8 +656,8 @@ def _compute_player_vehicle_evictions(conn, tenant_id: int, account_id, match_id
                 ivals.append((cur2, INF))
             intervals_targets[e["actor"]] = ivals
 
-        def _in(ts, ivals):
-            return any(a <= ts <= b for a, b in ivals) if ts is not None else False
+        def _in(ts, ivals, slack=100):
+            return any(a <= ts <= b + slack for a, b in ivals) if ts is not None else False
 
         for e in events:
             t  = e["type"]; ts = e["ts"]
