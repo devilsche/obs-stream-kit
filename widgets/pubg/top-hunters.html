@@ -106,6 +106,7 @@
           case "eject":   va = a._nEject;        vb = b._nEject;        break;
           case "driveby": va = a._nDriveby;       vb = b._nDriveby;      break;
           case "taken":   va = a.evictionsTaken || 0; vb = b.evictionsTaken || 0; break;
+          case "dealt":   va = (a.evictionsDealt||0)/Math.max(a.matches||1,1); vb = (b.evictionsDealt||0)/Math.max(b.matches||1,1); break;
           case "ratio":   va = a._ratio;          vb = b._ratio;         break;
           case "matches": va = a.matches || 0;    vb = b.matches || 0;   break;
           default:        va = a.evictionsDealt || 0; vb = b.evictionsDealt || 0;
