@@ -2926,24 +2926,9 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
         return _in_veh_interval(ts, intervals)
 
     def _build_intervals(events, acc):
-        """Returns list of (start_ts, end_ts, vehicle_class)."""
-        cur = None
-        cur_veh = None
-        ivals = []
-        for e in events:
-            if e["actor"] != acc:
-                continue
-            if e["type"] == "VehicleEnter":
-                if cur is None:
-                    cur = e["ts"]
-                    cur_veh = e.get("weapon")  # vehicleId
-            elif e["type"] == "VehicleLeave" and cur is not None:
-                ivals.append((cur, e["ts"], cur_veh))
-                cur = None
-                cur_veh = None
-        if cur is not None:
-            ivals.append((cur, INF, cur_veh))
-        return _merge_veh_intervals(ivals)
+        """Returns list of (start_ts, end_ts, vehicle_class).
+        Delegiert an _build_veh_intervals für korrektes Seat-Wechsel-Handling."""
+        return _build_veh_intervals(events, acc)
 
     def _vehicle_in_intervals(ts, intervals):
         """Returns vehicle class if ts inside an interval (+ eject slack), else None."""
