@@ -423,14 +423,13 @@ document.getElementById("iconFilter").addEventListener("input", filterIcons);
 const _hoverPreview = document.getElementById("iconHoverPreview");
 const _hoverImg     = document.getElementById("iconHoverImg");
 document.getElementById("existingIcons").addEventListener("mouseover", e => {
-  const img = e.target.closest("img");
+  const img = e.target.closest("img.tile-icon, .existing img");
   if (!img) return;
   _hoverImg.src = img.src;
   _hoverPreview.classList.add("show");
 });
-document.getElementById("existingIcons").addEventListener("mouseout", e => {
-  if (!e.relatedTarget?.closest("#existingIcons"))
-    _hoverPreview.classList.remove("show");
+document.getElementById("existingIcons").addEventListener("mouseleave", () => {
+  _hoverPreview.classList.remove("show");
 });
 loadExisting();
 </script>
