@@ -128,9 +128,9 @@
                   <td class="rank">${i + 1}.</td>
                   <td class="name">${m.name || "—"}</td>
                   <td class="dealt"><b>${d}</b></td>
-                  <td class="per-match">${(d / mx).toFixed(2)}</td>
+                  <td class="per-match">${Math.round(d / mx * 100)}%</td>
                   <td class="taken"><b>${t}</b></td>
-                  <td class="per-match">${(t / mx).toFixed(2)}</td>
+                  <td class="per-match">${Math.round(t / mx * 100)}%</td>
                   <td>${m._ratio.toFixed(1)}</td>
                   <td class="matches">${mx}</td>
                 </tr>`;
