@@ -1,35 +1,36 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
 <meta charset="utf-8">
 <title>PUBG POI-Editor</title>
+<link rel="stylesheet" href="_theme.css">
 <link rel="stylesheet" href="_pubg.css">
 <style>
   * { box-sizing: border-box; }
   body {
-    background: #1a0d2a;
-    color: #e8e0f0;
+    background: var(--theme-bg);
+    color: var(--theme-text);
     font-family: "DM Sans", system-ui, sans-serif;
     margin: 0;
     padding: 14px;
   }
-  h1 { color: #f2b705; margin: 0 0 6px; font-size: 1.3em; }
+  h1 { color: var(--theme-accent); margin: 0 0 6px; font-size: 1.3em; }
   .topbar {
     display: flex; gap: 10px; flex-wrap: wrap;
     align-items: center; margin-bottom: 10px;
   }
-  .topbar label { color: #8a7d99; font-size: 0.85em; }
+  .topbar label { color: var(--theme-text-dim); font-size: 0.85em; }
   .mode-tabs {
     display: inline-flex; gap: 0;
-    border: 1px solid #5e2a79; border-radius: 6px; overflow: hidden;
+    border: 1px solid var(--theme-primary); border-radius: 6px; overflow: hidden;
   }
   .mode-tabs .tab {
-    background: transparent; color: #c0b0d0;
+    background: transparent; color: var(--theme-text-dim);
     border: none; border-radius: 0;
     padding: 6px 12px; font-size: 0.85em;
   }
-  .mode-tabs .tab:hover { background: rgba(94,42,121,0.55); }
-  .mode-tabs .tab.active { background: #f2b705; color: #1a0d2a; font-weight: 700; }
+  .mode-tabs .tab:hover { background: color-mix(in srgb,var(--theme-primary) 55%,transparent); }
+  .mode-tabs .tab.active { background: var(--theme-accent); color: var(--theme-on-primary); font-weight: 700; }
   .tools-group { display: inline-flex; gap: 10px; flex-wrap: wrap; align-items: center; }
   /* Mode-Sichtbarkeit: Topbar hat nur das Wesentliche. Panel rechts
      zeigt entweder Regions-Tools+Liste oder Calibration-Controls. */
@@ -39,7 +40,7 @@
   .panel-buttons {
     display: flex; flex-wrap: wrap; gap: 6px;
     padding-bottom: 10px; margin-bottom: 10px;
-    border-bottom: 1px solid #5e2a79;
+    border-bottom: 1px solid var(--theme-primary);
   }
   .cal-grid {
     display: grid;
@@ -49,15 +50,15 @@
   }
   .cal-grid label {
     display: flex; flex-direction: column; gap: 3px;
-    color: #8a7d99; font-size: 0.72em;
+    color: var(--theme-text-dim); font-size: 0.72em;
     text-transform: uppercase; letter-spacing: 0.06em;
   }
   .cal-grid input { width: 100%; box-sizing: border-box; }
   .cal-grid .cal-row-full { grid-column: 1 / -1; }
   select, input, button {
-    background: rgba(94,42,121,0.55);
-    color: #f2b705;
-    border: 1px solid #5e2a79;
+    background: color-mix(in srgb,var(--theme-primary) 55%,transparent);
+    color: var(--theme-accent);
+    border: 1px solid var(--theme-primary);
     border-radius: 4px;
     padding: 5px 9px;
     font: inherit;
@@ -66,21 +67,21 @@
   /* Open-state der Dropdown-Liste (Browser-Default war unleserlich
      mit dem gold text-color-Inherit). */
   select option {
-    background: #1a0d2a;
-    color: #e8e0f0;
+    background: var(--theme-bg);
+    color: var(--theme-text);
   }
   select option:checked,
   select option:hover {
-    background: #5e2a79;
-    color: #f2b705;
+    background: var(--theme-primary);
+    color: var(--theme-accent);
   }
-  button:hover { background: rgba(94,42,121,0.85); cursor: pointer; }
-  button.secondary { color: #c0b0d0; }
-  button.danger { color: #ff8a8a; border-color: #663030; }
-  button.active { background: #f2b705; color: #1a0d2a; }
-  button.save { background: #2a6b2a; color: #fff; border-color: #1a4a1a; }
-  button.save:hover { background: #3a8b3a; }
-  input { color: #e8e0f0; }
+  button:hover { background: color-mix(in srgb,var(--theme-primary) 85%,transparent); cursor: pointer; }
+  button.secondary { color: var(--theme-text-dim); }
+  button.danger { color: var(--theme-danger); border-color: var(--theme-danger); }
+  button.active { background: var(--theme-accent); color: var(--theme-on-primary); }
+  button.save { background: var(--theme-ok); color: var(--theme-on-primary); border-color: var(--theme-ok); }
+  button.save:hover { background: color-mix(in srgb,var(--theme-ok) 80%,#fff); }
+  input { color: var(--theme-text); }
   .wrap {
     display: grid;
     grid-template-columns: 1fr 360px;
@@ -89,8 +90,8 @@
   }
   .canvas-host {
     position: relative;
-    background-color: #0d061a;
-    border: 1px solid #5e2a79;
+    background-color: var(--theme-bg);
+    border: 1px solid var(--theme-primary);
     border-radius: 6px;
     overflow: hidden;
     /* Host = Rechteck, fuellt die Grid-Spalte komplett. Canvas DOM-Element
@@ -103,8 +104,8 @@
   }
   canvas { display: block; width: 100%; height: 100%; cursor: crosshair; background: transparent; }
   .panel {
-    background: rgba(0,0,0,0.35);
-    border: 1px solid #5e2a79;
+    background: color-mix(in srgb,var(--theme-surface) 60%,transparent);
+    border: 1px solid var(--theme-primary);
     border-radius: 6px;
     padding: 10px;
     position: sticky;
@@ -124,15 +125,15 @@
     max-height: 40vh;
   }
   .panel h3 {
-    margin: 0 0 6px; color: #f2b705;
+    margin: 0 0 6px; color: var(--theme-accent);
     font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.08em;
   }
   .hint {
-    color: #8a7d99; font-size: 0.7em;
+    color: var(--theme-text-dim); font-size: 0.7em;
     line-height: 1.4;
     margin: 4px 0 8px;
     padding: 6px 8px;
-    background: rgba(255,255,255,0.04);
+    background: color-mix(in srgb,var(--theme-surface) 40%,transparent);
     border-radius: 3px;
   }
   .region-row {
@@ -145,45 +146,45 @@
     margin-bottom: 2px;
     font-size: 0.82em;
   }
-  .region-row.selected { background: rgba(242,183,5,0.18); }
-  .region-row:hover { background: rgba(94,42,121,0.35); cursor: pointer; }
-  .region-row .name { color: #e8e0f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .region-row.selected { background: color-mix(in srgb,var(--theme-accent) 18%,transparent); }
+  .region-row:hover { background: color-mix(in srgb,var(--theme-primary) 35%,transparent); cursor: pointer; }
+  .region-row .name { color: var(--theme-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .region-row .badge {
-    color: #8a7d99; font-size: 0.75em;
+    color: var(--theme-text-dim); font-size: 0.75em;
     font-variant-numeric: tabular-nums;
   }
   .edit-block {
     margin-top: 12px;
     padding-top: 10px;
-    border-top: 1px solid #5e2a79;
+    border-top: 1px solid var(--theme-primary);
   }
   .edit-block label {
     display: block;
-    color: #8a7d99; font-size: 0.75em;
+    color: var(--theme-text-dim); font-size: 0.75em;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     margin-top: 6px;
   }
   .edit-block input { width: 100%; }
-  .stat-line { color: #8a7d99; font-size: 0.75em; margin-top: 4px; }
+  .stat-line { color: var(--theme-text-dim); font-size: 0.75em; margin-top: 4px; }
   #pinTooltip {
     position: fixed;
     pointer-events: none;
-    background: rgba(13, 6, 26, 0.95);
-    border: 1px solid #f2b705;
+    background: color-mix(in srgb,var(--theme-bg) 95%,transparent);
+    border: 1px solid var(--theme-accent);
     border-radius: 4px;
     padding: 6px 9px;
     font-size: 0.75em;
-    color: #e8e0f0;
+    color: var(--theme-text);
     line-height: 1.4;
     z-index: 1000;
     display: none;
     max-width: 280px;
     box-shadow: 0 2px 12px rgba(0,0,0,0.7);
   }
-  #pinTooltip b { color: #f2b705; font-variant-numeric: tabular-nums; }
+  #pinTooltip b { color: var(--theme-accent); font-variant-numeric: tabular-nums; }
   #pinTooltip .row { display: flex; gap: 6px; }
-  #pinTooltip .row .lbl { color: #8a7d99; min-width: 56px; }
+  #pinTooltip .row .lbl { color: var(--theme-text-dim); min-width: 56px; }
 </style>
 </head>
 <body>
@@ -582,10 +583,14 @@ function labelScreenPx() {
   return Math.max(8, Math.min(12, 12 / view.zoom));
 }
 
+// Theme-Farben für Canvas aus CSS-Variablen lesen
+const _cs = () => getComputedStyle(document.documentElement);
+const _tv = (v, fb) => _cs().getPropertyValue(v).trim() || fb;
+
 // ─── Render ────────────────────────────────────────────────────────────────
 function render() {
   fitCanvas();
-  ctx.fillStyle = "#0d061a";
+  ctx.fillStyle = _tv("--theme-bg", "#0d061a");
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   // Centering-Translate VOR Zoom/Pan: Map sitzt zentriert quadratisch im
   // Rechteck. Beim Reinzoomen wachsen Map-Inhalte ueber den Quadrat-Rand
@@ -621,8 +626,8 @@ function render() {
     const alphaLine = 0.85 * (0.25 + 0.75 * zfade);
     const alphaText = 0.95 * (0.30 + 0.70 * zfade);
     const fontPx = Math.max(8, labelScreenPx() * 0.85) / view.zoom;
-    ctx.strokeStyle = `rgba(242,183,5,${alphaLine})`;
-    ctx.fillStyle = `rgba(242,183,5,${alphaText})`;
+    ctx.strokeStyle = `color-mix(in srgb,${_tv('--theme-accent','#f2b705')} ${Math.round(alphaLine*100)}%,transparent)`;
+    ctx.fillStyle = `color-mix(in srgb,${_tv('--theme-accent','#f2b705')} ${Math.round(alphaText*100)}%,transparent)`;
     ctx.lineWidth = lw;
     ctx.font = `${fontPx}px DM Sans, sans-serif`;
     ctx.textBaseline = "top";
@@ -654,10 +659,10 @@ function render() {
     for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
     ctx.closePath();
     ctx.fillStyle = i === selectedIdx
-      ? "rgba(242,183,5,0.30)"
-      : (r.name ? "rgba(94,42,121,0.30)" : "rgba(160,160,160,0.18)");
+      ? `color-mix(in srgb,${_tv("--theme-accent","#f2b705")} 30%,transparent)`
+      : (r.name ? `color-mix(in srgb,${_tv("--theme-primary","#5e2a79")} 30%,transparent)` : "rgba(160,160,160,0.18)");
     ctx.fill();
-    ctx.strokeStyle = i === selectedIdx ? "#f2b705" : (r.name ? "#5e2a79" : "#666");
+    ctx.strokeStyle = i === selectedIdx ? _tv("--theme-accent","#f2b705") : (r.name ? _tv("--theme-primary","#5e2a79") : "#666");
     ctx.lineWidth = i === selectedIdx
       ? Math.max(0.5, 2 / view.zoom) / view.zoom
       : Math.max(0.5, 1 / view.zoom) / view.zoom;
@@ -665,7 +670,7 @@ function render() {
     if (r.name) {
       const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
       const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
-      ctx.fillStyle = "#f2b705";
+      ctx.fillStyle = _tv("--theme-accent","#f2b705");
       ctx.font = `${Math.max(8, labelScreenPx() * 0.92) / view.zoom}px DM Sans, sans-serif`;
       ctx.textAlign = "center";
       ctx.fillText(r.name, cx, cy);
@@ -675,8 +680,8 @@ function render() {
     // bei hoher Zoom-Stufe nicht zu gross werden.
     if (i === selectedIdx) {
       const hs = 4 / view.zoom;
-      ctx.fillStyle = "#f2b705";
-      ctx.strokeStyle = "#1a0d2a";
+      ctx.fillStyle = _tv("--theme-accent","#f2b705");
+      ctx.strokeStyle = _tv("--theme-bg","#1a0d2a");
       ctx.lineWidth = Math.max(0.5, 1.5 / view.zoom) / view.zoom;
       for (const [x, y] of pts) {
         ctx.fillRect(x - hs, y - hs, hs * 2, hs * 2);
@@ -691,13 +696,13 @@ function render() {
     ctx.beginPath();
     ctx.moveTo(pts[0][0], pts[0][1]);
     for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
-    ctx.strokeStyle = "#f2b705";
+    ctx.strokeStyle = _tv("--theme-accent","#f2b705");
     ctx.setLineDash([4 / view.zoom, 3 / view.zoom]);
     ctx.lineWidth = Math.max(0.5, 1.5 / view.zoom) / view.zoom;
     ctx.stroke();
     ctx.setLineDash([]);
     // Vertex dots — Radius zoom-skaliert wie bei den fertigen Polygonen
-    ctx.fillStyle = "#f2b705";
+    ctx.fillStyle = _tv("--theme-accent","#f2b705");
     const vr = 3 / view.zoom;
     for (const [x, y] of pts) {
       ctx.beginPath(); ctx.arc(x, y, vr, 0, Math.PI * 2); ctx.fill();
@@ -710,7 +715,7 @@ function render() {
     const y = Math.min(drawStart[1], drawCurrent[1]);
     const w = Math.abs(drawCurrent[0] - drawStart[0]);
     const h = Math.abs(drawCurrent[1] - drawStart[1]);
-    ctx.strokeStyle = "#f2b705";
+    ctx.strokeStyle = _tv("--theme-accent","#f2b705");
     ctx.setLineDash([4, 3]);
     ctx.strokeRect(x, y, w, h);
     ctx.setLineDash([]);
@@ -806,7 +811,7 @@ function render() {
     if (calSelectedEvent) {
       const [ex, ey] = worldToCanvas(calSelectedEvent.x, calSelectedEvent.y);
       const xs = 7 / view.zoom;
-      ctx.strokeStyle = "#f2b705";
+      ctx.strokeStyle = _tv("--theme-accent","#f2b705");
       ctx.lineWidth = 2.5 / view.zoom;
       ctx.beginPath();
       ctx.moveTo(ex - xs, ey - xs); ctx.lineTo(ex + xs, ey + xs);

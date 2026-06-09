@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Icon Crop Editor</title>
+<link rel="stylesheet" href="_theme.css">
+<link rel="stylesheet" href="_pubg.css">
+<style>
+  body { margin: 0; padding: 20px; background: var(--theme-bg); color: var(--theme-text);
+         font-family: var(--theme-font-body,"DM Sans",sans-serif); }
+  h1 { color: var(--theme-accent); margin: 0 0 16px; font-size: 1.4em; }
+  .layout { display: grid; grid-template-columns: 1fr 320px; gap: 20px; height: calc(100vh - 80px); }
+  .canvas-wrap { position: relative; background: repeating-conic-gradient(#3a3a3a 0% 25%,#2a2a2a 0% 50%) 0 0/20px 20px;
+                 border: 1px solid var(--theme-border); border-radius: var(--theme-radius); overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+  .sidebar { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+  .panel { background: var(--theme-surface); border: 1px solid var(--theme-border);
+           border-radius: var(--theme-radius); padding: 14px; }
+  .panel h2 { margin: 0 0 10px; font-size: 0.85em; color: var(--theme-text-dim);
+              text-transform: uppercase; letter-spacing: .06em; font-family: var(--theme-font-mono); }
+  label { display: block; font-size: 0.8em; color: var(--theme-text-dim); margin-bottom: 4px; margin-top: 8px; }
+  label:first-of-type { margin-top: 0; }
+  input[type=text], input[type=number] { width: 100%; background: var(--theme-bg);
+    border: 1px solid var(--theme-border); color: var(--theme-text); padding: 6px 8px;
+    border-radius: var(--theme-radius); font-family: inherit; font-size: 0.9em; box-sizing: border-box; }
+  input[type=file] { display: none; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px;
+         border: 1px solid var(--theme-primary); background: color-mix(in srgb,var(--theme-primary) 10%,transparent);
+         color: var(--theme-primary); border-radius: var(--theme-radius); cursor: pointer;
+         font-family: var(--theme-font-display,"DM Sans",sans-serif); font-weight: 700;
+         font-size: 0.82em; text-transform: uppercase; letter-spacing: .04em; width: 100%; justify-content: center; }
+  .btn:hover { background: var(--theme-primary); color: var(--theme-on-primary); }
+  .btn.accent { border-color: var(--theme-accent); background: color-mix(in srgb,var(--theme-accent) 10%,transparent); color: var(--theme-accent); }
+  .btn.accent:hover { background: var(--theme-accent); color: var(--theme-on-primary); }
+  .btn.ok { border-color: var(--theme-ok); background: color-mix(in srgb,var(--theme-ok) 10%,transparent); color: var(--theme-ok); }
+  .btn.ok:hover { background: var(--theme-ok); color: var(--theme-on-primary); }
+  .preview-wrap { text-align: center; }
+  .preview-wrap img { width: 128px; height: 128px; object-fit: contain;
+                      background: repeating-conic-gradient(#3a3a3a 0% 25%,#2a2a2a 0% 50%) 0 0/12px 12px;
+                      border: 1px solid var(--theme-border); border-radius: var(--theme-radius); }
+  .coords { font-family: var(--theme-font-mono); font-size: 0.75em; color: var(--theme-text-faint); margin-top: 6px; }
+  .msg { padding: 8px 10px; border-radius: var(--theme-radius); font-size: 0.82em; margin-top: 6px; }
+  .msg.ok  { background: color-mix(in srgb,var(--theme-ok)     12%,transparent); color: var(--theme-ok); }
+  .msg.err { background: color-mix(in srgb,var(--theme-danger)  12%,transparent); color: var(--theme-danger); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .existing { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .existing img { width: 48px; height: 48px; object-fit: contain; cursor: pointer;
+                  border: 2px solid transparent; border-radius: var(--theme-radius);
+                  background: repeating-conic-gradient(#3a3a3a 0% 25%,#2a2a2a 0% 50%) 0 0/8px 8px; }
+  .existing img:hover { border-color: var(--theme-accent); }
+</style>
+</head>
+<body>
+<h1>Icon Crop Editor</h1>
+<div class="layout">
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="cvs"></canvas>
+  </div>
+  <div class="sidebar">
+
+    <div class="panel">
+      <h2>Bild laden</h2>
+      <input type="file" id="fileInput" accept="image/*">
+      <button class="btn" onclick="document.getElementById('fileInput').click()">
+        Bild öffnen
+      </button>
+      <label style="margin-top:8px">oder URL</label>
+      <input type="text" id="urlInput" placeholder="https://... oder /widgets-static/...">
+      <button class="btn" style="margin-top:6px" onclick="loadFromUrl()">URL laden</button>
+    </div>
+
+    <div class="panel">
+      <h2>Crop-Box</h2>
+      <p style="font-size:0.78em;color:var(--theme-text-dim);margin:0 0 8px">
+        Klicken + Ziehen auf dem Bild um die Crop-Box zu setzen. Ecken zum Resizen ziehen.
+      </p>
+      <div class="row2">
+        <div><label>X</label><input type="number" id="cx" value="0" oninput="applyCoordsInput()"></div>
+        <div><label>Y</label><input type="number" id="cy" value="0" oninput="applyCoordsInput()"></div>
+        <div><label>Breite</label><input type="number" id="cw" value="256" oninput="applyCoordsInput()"></div>
+        <div><label>Höhe</label><input type="number" id="ch" value="256" oninput="applyCoordsInput()"></div>
+      </div>
+      <label>Padding (px)</label>
+      <input type="number" id="padding" value="10" min="0" max="200" oninput="renderCanvas()">
+      <label style="margin-top:8px">
+        <input type="checkbox" id="forceSquare" checked onchange="renderCanvas()"> Quadratisch erzwingen
+      </label>
+    </div>
+
+    <div class="panel">
+      <h2>Export</h2>
+      <label>Ausgabe-Dateiname</label>
+      <input type="text" id="outName" placeholder="vehicle_gunkill" value="">
+      <label>Ausgabe-Größe (px)</label>
+      <input type="number" id="outSize" value="256" min="32" max="512">
+      <div class="preview-wrap" style="margin-top:10px">
+        <img id="preview" src="" alt="Preview" style="display:none">
+        <div class="coords" id="coordsInfo"></div>
+      </div>
+      <button class="btn accent" style="margin-top:10px" onclick="updatePreview()">Preview</button>
+      <button class="btn ok" style="margin-top:6px" onclick="saveIcon()">Speichern</button>
+      <div id="msg"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Vorhandene Icons</h2>
+      <div class="existing" id="existingIcons"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const cvs = document.getElementById("cvs");
+const ctx = cvs.getContext("2d");
+const wrap = document.getElementById("canvasWrap");
+
+let img = null, imgW = 0, imgH = 0;
+let crop = { x: 0, y: 0, w: 256, h: 256 };
+let drag = null; // {type:"move"|"tl"|"tr"|"bl"|"br", startX, startY, origCrop}
+let scale = 1, offX = 0, offY = 0;
+
+// ── Bild laden ──────────────────────────────────────────────────────────────
+document.getElementById("fileInput").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  const url = URL.createObjectURL(f);
+  loadImg(url);
+});
+
+function loadFromUrl() {
+  const u = document.getElementById("urlInput").value.trim();
+  if (u) loadImg(u);
+}
+
+function loadImg(src) {
+  const i = new Image();
+  i.crossOrigin = "anonymous";
+  i.onload = () => {
+    img = i; imgW = i.width; imgH = i.height;
+    crop = { x: 0, y: 0, w: imgW, h: imgH };
+    fitView();
+    renderCanvas();
+    syncInputs();
+  };
+  i.onerror = () => showMsg("Bild konnte nicht geladen werden.", "err");
+  i.src = src;
+}
+
+function fitView() {
+  const cw = wrap.clientWidth, ch = wrap.clientHeight;
+  scale = Math.min(cw / imgW, ch / imgH, 1);
+  offX = (cw - imgW * scale) / 2;
+  offY = (ch - imgH * scale) / 2;
+  cvs.width  = cw; cvs.height = ch;
+}
+
+// ── Render ──────────────────────────────────────────────────────────────────
+function renderCanvas() {
+  if (!img) return;
+  ctx.clearRect(0, 0, cvs.width, cvs.height);
+  ctx.drawImage(img, offX, offY, imgW * scale, imgH * scale);
+
+  // Außerhalb abdunkeln
+  const cx = offX + crop.x * scale, cy2 = offY + crop.y * scale;
+  const cw = crop.w * scale, ch = crop.h * scale;
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(0, 0, cvs.width, cy2);
+  ctx.fillRect(0, cy2 + ch, cvs.width, cvs.height);
+  ctx.fillRect(0, cy2, cx, ch);
+  ctx.fillRect(cx + cw, cy2, cvs.width - cx - cw, ch);
+
+  // Crop-Rahmen
+  const cs = getComputedStyle(document.documentElement);
+  const accent = cs.getPropertyValue("--theme-accent").trim() || "#f2b705";
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(cx, cy2, cw, ch);
+
+  // Ecken-Handles
+  const H = 8;
+  ctx.fillStyle = accent;
+  [[cx,cy2],[cx+cw,cy2],[cx,cy2+ch],[cx+cw,cy2+ch]].forEach(([hx,hy]) => {
+    ctx.fillRect(hx-H/2, hy-H/2, H, H);
+  });
+
+  // Padding visualisieren
+  const pad = parseInt(document.getElementById("padding").value)||0;
+  if (pad > 0) {
+    ctx.strokeStyle = "rgba(255,255,255,0.3)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4,4]);
+    ctx.strokeRect(cx + pad*scale, cy2 + pad*scale, cw - pad*2*scale, ch - pad*2*scale);
+    ctx.setLineDash([]);
+  }
+}
+
+// ── Maus-Interaktion ────────────────────────────────────────────────────────
+function canvasToImg(ex, ey) {
+  const r = cvs.getBoundingClientRect();
+  return { x: (ex - r.left - offX) / scale, y: (ey - r.top  - offY) / scale };
+}
+
+function hitHandle(mx, my) {
+  const H = 8 / scale;
+  const cx = crop.x, cy2 = crop.y, cw = crop.w, ch = crop.h;
+  const handles = { tl:[cx,cy2], tr:[cx+cw,cy2], bl:[cx,cy2+ch], br:[cx+cw,cy2+ch] };
+  for (const [k,[hx,hy]] of Object.entries(handles))
+    if (Math.abs(mx-hx) < H && Math.abs(my-hy) < H) return k;
+  if (mx>cx && mx<cx+cw && my>cy2 && my<cy2+ch) return "move";
+  return null;
+}
+
+cvs.addEventListener("mousedown", e => {
+  if (!img) return;
+  const {x, y} = canvasToImg(e.clientX, e.clientY);
+  const hit = hitHandle(x, y);
+  if (hit) {
+    drag = { type: hit, startX: x, startY: y, origCrop: {...crop} };
+  } else {
+    // Neue Box aufziehen
+    drag = { type: "new", startX: x, startY: y };
+  }
+  e.preventDefault();
+});
+
+cvs.addEventListener("mousemove", e => {
+  if (!drag || !img) return;
+  const {x, y} = canvasToImg(e.clientX, e.clientY);
+  const dx = x - drag.startX, dy = y - drag.startY;
+  const o = drag.origCrop;
+  if (drag.type === "new") {
+    crop = {
+      x: Math.min(drag.startX, x),
+      y: Math.min(drag.startY, y),
+      w: Math.abs(x - drag.startX),
+      h: Math.abs(y - drag.startY),
+    };
+    if (document.getElementById("forceSquare").checked) {
+      const s = Math.max(crop.w, crop.h);
+      crop.w = crop.h = s;
+    }
+  } else if (drag.type === "move") {
+    crop.x = Math.max(0, Math.min(imgW - o.w, o.x + dx));
+    crop.y = Math.max(0, Math.min(imgH - o.h, o.y + dy));
+  } else {
+    let {x:ox,y:oy,w:ow,h:oh} = o;
+    if (drag.type === "tl") { crop={x:ox+dx,y:oy+dy,w:ow-dx,h:oh-dy}; }
+    if (drag.type === "tr") { crop={x:ox,   y:oy+dy,w:ow+dx,h:oh-dy}; }
+    if (drag.type === "bl") { crop={x:ox+dx,y:oy,   w:ow-dx,h:oh+dy}; }
+    if (drag.type === "br") { crop={x:ox,   y:oy,   w:ow+dx,h:oh+dy}; }
+    if (document.getElementById("forceSquare").checked) {
+      const s = Math.max(Math.abs(crop.w), Math.abs(crop.h));
+      crop.w = crop.h = s;
+    }
+    crop.w = Math.max(8, crop.w); crop.h = Math.max(8, crop.h);
+  }
+  clampCrop();
+  syncInputs();
+  renderCanvas();
+});
+
+cvs.addEventListener("mouseup", () => { drag = null; });
+cvs.addEventListener("mouseleave", () => { drag = null; });
+
+function clampCrop() {
+  crop.x = Math.max(0, crop.x);
+  crop.y = Math.max(0, crop.y);
+  crop.w = Math.min(imgW - crop.x, Math.max(8, crop.w));
+  crop.h = Math.min(imgH - crop.y, Math.max(8, crop.h));
+}
+
+function syncInputs() {
+  ["cx","cy","cw","ch"].forEach((id,i)=>{
+    document.getElementById(id).value = Math.round([crop.x,crop.y,crop.w,crop.h][i]);
+  });
+  document.getElementById("coordsInfo").textContent =
+    `${Math.round(crop.x)},${Math.round(crop.y)} · ${Math.round(crop.w)}×${Math.round(crop.h)}`;
+}
+
+function applyCoordsInput() {
+  crop.x = parseInt(document.getElementById("cx").value)||0;
+  crop.y = parseInt(document.getElementById("cy").value)||0;
+  crop.w = parseInt(document.getElementById("cw").value)||256;
+  crop.h = parseInt(document.getElementById("ch").value)||256;
+  clampCrop(); renderCanvas();
+}
+
+window.addEventListener("resize", () => { if (img) { fitView(); renderCanvas(); } });
+
+// ── Preview ──────────────────────────────────────────────────────────────────
+function getCropCanvas() {
+  const pad  = parseInt(document.getElementById("padding").value)||0;
+  const size = parseInt(document.getElementById("outSize").value)||256;
+  const sq   = document.getElementById("forceSquare").checked;
+  let {x,y,w,h} = crop;
+  // padding herausschneiden
+  x += pad; y += pad; w -= 2*pad; h -= 2*pad;
+  if (sq) { const s = Math.min(w,h); x+=(w-s)/2; y+=(h-s)/2; w=h=s; }
+  w = Math.max(1,w); h = Math.max(1,h);
+
+  const off = document.createElement("canvas");
+  off.width = off.height = size;
+  const c = off.getContext("2d");
+  c.drawImage(img, x, y, w, h, 0, 0, size, size);
+  return off;
+}
+
+function updatePreview() {
+  if (!img) return showMsg("Kein Bild geladen.", "err");
+  const c = getCropCanvas();
+  const prev = document.getElementById("preview");
+  prev.src = c.toDataURL("image/png");
+  prev.style.display = "";
+  syncInputs();
+}
+
+// ── Speichern ────────────────────────────────────────────────────────────────
+async function saveIcon() {
+  if (!img) return showMsg("Kein Bild geladen.", "err");
+  const name = document.getElementById("outName").value.trim();
+  if (!name) return showMsg("Dateiname fehlt.", "err");
+  const c = getCropCanvas();
+  const blob = await new Promise(r => c.toBlob(r, "image/png"));
+  const fd = new FormData();
+  fd.append("image", blob, name + ".png");
+  fd.append("name", name);
+  try {
+    const res = await fetch((window.__SERVE_BASE__||"/") + "admin/icon-crop/save", { method:"POST", body:fd });
+    const j = await res.json();
+    if (j.error) showMsg(j.error, "err");
+    else { showMsg(`Gespeichert: ${j.path}`, "ok"); loadExisting(); }
+  } catch(e) { showMsg("Fehler: " + e.message, "err"); }
+}
+
+function showMsg(t, type) {
+  const el = document.getElementById("msg");
+  el.className = "msg " + (type||"ok");
+  el.textContent = t;
+  setTimeout(() => el.textContent = "", 4000);
+}
+
+// ── Vorhandene Icons ─────────────────────────────────────────────────────────
+async function loadExisting() {
+  try {
+    const r = await fetch((window.__SERVE_BASE__||"/") + "admin/icon-crop/list");
+    const j = await r.json();
+    const wrap2 = document.getElementById("existingIcons");
+    wrap2.innerHTML = (j.icons||[]).map(ic =>
+      `<img src="${ic.url}?v=${Date.now()}" title="${ic.name}" onclick="document.getElementById('outName').value='${ic.name}'">`
+    ).join("");
+  } catch(_) {}
+}
+
+loadExisting();
+</script>
+</body>
+</html>

@@ -3,7 +3,8 @@ import os
 import re
 import secrets
 from flask import (
-    Blueprint, redirect, request, render_template, g, current_app, abort
+    Blueprint, redirect, request, render_template, g, current_app, abort,
+    jsonify, send_from_directory
 )
 
 from webcore.middleware import require_admin, _get_conn
@@ -182,23 +183,89 @@ def admin_poi_editor():
         abort(404)
     with open(src, "r", encoding="utf-8") as f:
         html = f.read()
-    # Relative Asset-Pfade (_pubg.css, _pubg.js, _pubg_pois.js) auf
-    # absolute /widgets-static/pubg/ umschreiben — analog tools_open().
     for asset in ("_pubg.css", "_pubg.js", "_pubg_pois.js"):
-        html = html.replace(
-            f'href="{asset}"',
-            f'href="/widgets-static/pubg/{asset}"')
-        html = html.replace(
-            f'src="{asset}"',
-            f'src="/widgets-static/pubg/{asset}"')
+        html = html.replace(f'href="{asset}"', f'href="/widgets-static/pubg/{asset}"')
+        html = html.replace(f'src="{asset}"',  f'src="/widgets-static/pubg/{asset}"')
+    for asset in ("_theme.css", "_blocks.css"):
+        for prefix in ("../", ""):
+            html = html.replace(f'href="{prefix}{asset}"', f'href="/widgets-static/{asset}"')
+    from webcore.serving import inject_theme
+    from pubg.db_pg import get_setting
+    conn2 = _get_conn()
+    try:
+        theme = get_setting(conn2, g.tenant_id, "theme", "entry") or "entry"
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            conn2.close()
+    html = inject_theme(html, theme)
     inject = (
         '<script>\n'
         'window.__SERVE_BASE__ = "/";\n'
         'window.__STATIC_BASE__ = "/widgets-static/";\n'
         '</script>'
     )
-    if "</head>" in html:
-        html = html.replace("</head>", inject + "\n</head>", 1)
-    else:
-        html = inject + "\n" + html
+    html = html.replace("</head>", inject + "\n</head>", 1)
     return html, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+# ── Icon Crop Editor ──────────────────────────────────────────────────────────
+
+@bp_admin.route("/admin/icon-crop")
+@require_admin
+def admin_icon_crop():
+    root = current_app.config.get("_PROJECT_ROOT") or os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__)))
+    src = os.path.join(root, "tools", "icon-crop-editor.html")
+    if not os.path.exists(src):
+        abort(404)
+    with open(src, "r", encoding="utf-8") as f:
+        html = f.read()
+    for asset in ("_theme.css", "_blocks.css"):
+        html = html.replace(f'href="{asset}"', f'href="/widgets-static/{asset}"')
+    for asset in ("_pubg.css", "_pubg.js"):
+        html = html.replace(f'href="{asset}"', f'href="/widgets-static/pubg/{asset}"')
+        html = html.replace(f'src="{asset}"', f'src="/widgets-static/pubg/{asset}"')
+    inject = '<script>\nwindow.__SERVE_BASE__ = "/";\n</script>'
+    html = html.replace("</head>", inject + "\n</head>", 1)
+    return html, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@bp_admin.route("/admin/icon-crop/save", methods=["POST"])
+@require_admin
+def admin_icon_crop_save():
+    import io
+    from PIL import Image
+    name = request.form.get("name", "").strip()
+    if not name or not re.match(r"^[a-zA-Z0-9_\-]+$", name):
+        return jsonify({"error": "Ungültiger Dateiname"}), 400
+    f = request.files.get("image")
+    if not f:
+        return jsonify({"error": "Kein Bild übermittelt"}), 400
+    try:
+        img = Image.open(io.BytesIO(f.read())).convert("RGBA")
+    except Exception:
+        return jsonify({"error": "Ungültiges Bildformat"}), 400
+    root = current_app.config.get("_PROJECT_ROOT") or os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__)))
+    out_dir = os.path.join(root, "widgets", "pubg", "assets", "achievements")
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, name + ".png")
+    img.save(out_path, "PNG", optimize=True)
+    return jsonify({"path": f"/widgets-static/pubg/assets/achievements/{name}.png"})
+
+
+@bp_admin.route("/admin/icon-crop/list")
+@require_admin
+def admin_icon_crop_list():
+    root = current_app.config.get("_PROJECT_ROOT") or os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__)))
+    icons_dir = os.path.join(root, "widgets", "pubg", "assets", "achievements")
+    icons = []
+    if os.path.exists(icons_dir):
+        for fn in sorted(os.listdir(icons_dir)):
+            if fn.endswith(".png") and fn != "carstuff.png":
+                icons.append({
+                    "name": fn[:-4],
+                    "url": f"/widgets-static/pubg/assets/achievements/{fn}",
+                })
+    return jsonify({"icons": icons})
