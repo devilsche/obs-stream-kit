@@ -61,56 +61,55 @@
   <div class="sidebar">
 
     <div class="panel">
-      <h2>Bild laden</h2>
+      <h2>Load Image</h2>
       <input type="file" id="fileInput" accept="image/*">
       <button class="btn" onclick="document.getElementById('fileInput').click()">
-        Bild öffnen
+        Open image
       </button>
-      <label style="margin-top:8px">oder URL</label>
+      <label style="margin-top:8px">or URL</label>
       <input type="text" id="urlInput" placeholder="https://... oder /widgets-static/...">
-      <button class="btn" style="margin-top:6px" onclick="loadFromUrl()">URL laden</button>
+      <button class="btn" style="margin-top:6px" onclick="loadFromUrl()">Load URL</button>
     </div>
 
     <div class="panel">
-      <h2>Crop-Box</h2>
+      <h2>Crop Box</h2>
       <p style="font-size:0.78em;color:var(--theme-text-dim);margin:0 0 8px">
-        Klicken + Ziehen auf dem Bild um die Crop-Box zu setzen. Ecken zum Resizen ziehen.
+        Click and drag on the image to set the crop box. Drag corners to resize.
       </p>
       <div class="row2">
         <div><label>X</label><input type="number" id="cx" value="0" oninput="applyCoordsInput()"></div>
         <div><label>Y</label><input type="number" id="cy" value="0" oninput="applyCoordsInput()"></div>
-        <div><label>Breite</label><input type="number" id="cw" value="256" oninput="applyCoordsInput()"></div>
-        <div><label>Höhe</label><input type="number" id="ch" value="256" oninput="applyCoordsInput()"></div>
+        <div><label>Width</label><input type="number" id="cw" value="256" oninput="applyCoordsInput()"></div>
+        <div><label>Height</label><input type="number" id="ch" value="256" oninput="applyCoordsInput()"></div>
       </div>
       <label>Padding (px)</label>
       <input type="number" id="padding" value="10" min="0" max="200" oninput="renderCanvas()">
       <label style="margin-top:8px">
-        <input type="checkbox" id="forceSquare" checked onchange="renderCanvas()"> Quadratisch erzwingen
+        <input type="checkbox" id="forceSquare" checked onchange="renderCanvas()"> Force square
       </label>
       <label>
-        <input type="checkbox" id="circular" onchange="updatePreview()"> Rund ausschneiden (Kreis)
+        <input type="checkbox" id="circular" onchange="updatePreview()"> Circular crop
       </label>
     </div>
 
     <div class="panel">
       <h2>Export</h2>
-      <label>Ausgabe-Dateiname</label>
+      <label>Output filename</label>
       <input type="text" id="outName" placeholder="vehicle_gunkill" value="">
-      <label>Ausgabe-Größe (px)</label>
+      <label>Output size (px)</label>
       <input type="number" id="outSize" value="256" min="32" max="512">
       <div class="preview-wrap" style="margin-top:10px">
         <img id="preview" src="" alt="Preview" style="display:none">
         <div class="coords" id="coordsInfo"></div>
       </div>
       <button class="btn accent" style="margin-top:10px" onclick="updatePreview()">Preview</button>
-      <button class="btn ok" style="margin-top:6px" onclick="saveIcon()">Speichern</button>
+      <button class="btn ok" style="margin-top:6px" onclick="saveIcon()">Save</button>
       <div id="msg"></div>
     </div>
 
     <div class="panel">
-      <h2>Vorhandene Icons</h2>
-      <input type="text" id="iconFilter" placeholder="Suchen… z.B. vehicle, chicken"
-             oninput="filterIcons()">
+      <h2>Existing Icons</h2>
+      <input type="text" id="iconFilter" placeholder="Search… e.g. vehicle, chicken">
       <div class="existing" id="existingIcons"></div>
     </div>
 
@@ -149,7 +148,7 @@ function loadImg(src) {
     renderCanvas();
     syncInputs();
   };
-  i.onerror = () => showMsg("Bild konnte nicht geladen werden.", "err");
+  i.onerror = () => showMsg("Image could not be loaded.", "err")
   i.src = src;
 }
 
@@ -320,7 +319,7 @@ function getCropCanvas() {
 }
 
 function updatePreview() {
-  if (!img) return showMsg("Kein Bild geladen.", "err");
+  if (!img) return showMsg("No image loaded.", "err");
   const c = getCropCanvas();
   const prev = document.getElementById("preview");
   prev.src = c.toDataURL("image/png");
@@ -330,9 +329,9 @@ function updatePreview() {
 
 // ── Speichern ────────────────────────────────────────────────────────────────
 async function saveIcon() {
-  if (!img) return showMsg("Kein Bild geladen.", "err");
+  if (!img) return showMsg("No image loaded.", "err");
   const name = document.getElementById("outName").value.trim();
-  if (!name) return showMsg("Dateiname fehlt.", "err");
+  if (!name) return showMsg("Filename missing.", "err");
   const c = getCropCanvas();
   const blob = await new Promise(r => c.toBlob(r, "image/png"));
   const fd = new FormData();
@@ -343,11 +342,11 @@ async function saveIcon() {
     const res = await fetch((window.__SERVE_BASE__||"/") + "admin/icon-crop/save",
       { method:"POST", body:fd, credentials:"same-origin" });
     if (!res.ok && res.headers.get("content-type")?.includes("text/html")) {
-      showMsg("Auth-Fehler — bitte Seite neu laden", "err"); return;
+      showMsg("Auth error — please reload the page.", "err"); return;
     }
     const j = await res.json();
     if (j.error) showMsg(j.error, "err");
-    else { showMsg(`Gespeichert: ${j.path}`, "ok"); await loadExisting(); }
+    else { showMsg(`Saved: ${j.path}`, "ok"); await loadExisting(); }
   } catch(e) { showMsg("Fehler: " + e.message, "err"); }
 }
 
@@ -373,6 +372,7 @@ async function loadExisting() {
   } catch(e) { console.warn("loadExisting failed", e); }
 }
 
+document.getElementById("iconFilter").addEventListener("input", filterIcons);
 loadExisting();
 </script>
 </body>
