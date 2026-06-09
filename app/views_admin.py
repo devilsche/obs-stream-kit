@@ -225,6 +225,15 @@ def admin_icon_crop():
     for asset in ("_pubg.css", "_pubg.js"):
         html = html.replace(f'href="{asset}"', f'href="/widgets-static/pubg/{asset}"')
         html = html.replace(f'src="{asset}"', f'src="/widgets-static/pubg/{asset}"')
+    from webcore.serving import inject_theme
+    from pubg.db_pg import get_setting
+    conn2 = _get_conn()
+    try:
+        theme = get_setting(conn2, g.tenant_id, "theme", "entry") or "entry"
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            conn2.close()
+    html = inject_theme(html, theme)
     inject = '<script>\nwindow.__SERVE_BASE__ = "/";\n</script>'
     html = html.replace("</head>", inject + "\n</head>", 1)
     return html, 200, {"Content-Type": "text/html; charset=utf-8"}

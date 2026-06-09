@@ -362,10 +362,14 @@ async function loadExisting() {
   try {
     const r = await fetch((window.__SERVE_BASE__||"/") + "admin/icon-crop/list",
       { credentials:"same-origin" });
+    if (!r.ok) { console.warn("icon-list failed", r.status); return; }
+    const ct = r.headers.get("content-type")||"";
+    if (!ct.includes("json")) { console.warn("icon-list: no JSON", ct); return; }
     const j = await r.json();
+    if (j.error) { console.warn("icon-list error:", j.error); return; }
     _allIcons = j.icons || [];
     filterIcons();
-  } catch(_) {}
+  } catch(e) { console.warn("loadExisting failed", e); }
 }
 
 loadExisting();
