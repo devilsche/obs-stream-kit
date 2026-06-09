@@ -41,9 +41,17 @@
                       background: repeating-conic-gradient(#3a3a3a 0% 25%,#2a2a2a 0% 50%) 0 0/12px 12px;
                       border: 1px solid var(--theme-border); border-radius: var(--theme-radius); }
   .coords { font-family: var(--theme-font-mono); font-size: 0.75em; color: var(--theme-text-faint); margin-top: 6px; }
-  .msg { padding: 8px 10px; border-radius: var(--theme-radius); font-size: 0.82em; margin-top: 6px; }
-  .msg.ok  { background: color-mix(in srgb,var(--theme-ok)     12%,transparent); color: var(--theme-ok); }
-  .msg.err { background: color-mix(in srgb,var(--theme-danger)  12%,transparent); color: var(--theme-danger); }
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    padding: 10px 16px; border-radius: var(--theme-radius);
+    font-size: 0.85em; font-weight: 600; z-index: 10000;
+    pointer-events: none; opacity: 0;
+    transition: opacity 0.25s, transform 0.25s;
+    transform: translateY(8px);
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.ok  { background: color-mix(in srgb,var(--theme-ok)     15%,var(--theme-surface)); color: var(--theme-ok); border: 1px solid var(--theme-ok); }
+  #toast.err { background: color-mix(in srgb,var(--theme-danger)  15%,var(--theme-surface)); color: var(--theme-danger); border: 1px solid var(--theme-danger); }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   #iconFilter { margin-bottom: 10px; }
   .existing { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
@@ -119,7 +127,6 @@
       </div>
       <button class="btn accent" style="margin-top:10px" onclick="updatePreview()">Preview</button>
       <button class="btn ok" style="margin-top:6px" onclick="saveIcon()">Save</button>
-      <div id="msg"></div>
     </div>
 
     <div class="panel">
@@ -372,11 +379,13 @@ async function saveIcon() {
   } catch(e) { showMsg("Fehler: " + e.message, "err"); }
 }
 
+let _toastTimer;
 function showMsg(t, type) {
-  const el = document.getElementById("msg");
-  el.className = "msg " + (type||"ok");
+  const el = document.getElementById("toast");
+  clearTimeout(_toastTimer);
   el.textContent = t;
-  setTimeout(() => el.textContent = "", 4000);
+  el.className = (type || "ok") + " show";
+  _toastTimer = setTimeout(() => el.classList.remove("show"), 3000);
 }
 
 // ── Vorhandene Icons ─────────────────────────────────────────────────────────
@@ -425,6 +434,7 @@ document.getElementById("existingIcons").addEventListener("mouseout", e => {
 });
 loadExisting();
 </script>
+<div id="toast"></div>
 <div id="iconHoverPreview"><img id="iconHoverImg" src="" alt=""></div>
 </body>
 </html>

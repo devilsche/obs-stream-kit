@@ -255,7 +255,6 @@ def admin_icon_crop_save():
         return err, status
     import io
     from PIL import Image, ImageDraw
-    import numpy as np
     name = request.form.get("name", "").strip()
     if not name or not re.match(r"^[a-zA-Z0-9_\-]+$", name):
         return jsonify({"error": "Ungültiger Dateiname"}), 400
