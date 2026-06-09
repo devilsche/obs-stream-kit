@@ -43,10 +43,11 @@
   .msg.ok  { background: color-mix(in srgb,var(--theme-ok)     12%,transparent); color: var(--theme-ok); }
   .msg.err { background: color-mix(in srgb,var(--theme-danger)  12%,transparent); color: var(--theme-danger); }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .existing { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .existing { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
   .existing img { width: 48px; height: 48px; object-fit: contain; cursor: pointer;
                   border: 2px solid transparent; border-radius: var(--theme-radius);
-                  background: repeating-conic-gradient(#3a3a3a 0% 25%,#2a2a2a 0% 50%) 0 0/8px 8px; }
+                  background: repeating-conic-gradient(#3a3a3a 0% 25%,#2a2a2a 0% 50%) 0 0/8px 8px;
+                  display: block; }
   .existing img:hover { border-color: var(--theme-accent); }
 </style>
 </head>
@@ -84,6 +85,9 @@
       <input type="number" id="padding" value="10" min="0" max="200" oninput="renderCanvas()">
       <label style="margin-top:8px">
         <input type="checkbox" id="forceSquare" checked onchange="renderCanvas()"> Quadratisch erzwingen
+      </label>
+      <label>
+        <input type="checkbox" id="circular" onchange="updatePreview()"> Rund ausschneiden (Kreis)
       </label>
     </div>
 
@@ -289,11 +293,11 @@ window.addEventListener("resize", () => { if (img) { fitView(); renderCanvas(); 
 
 // ── Preview ──────────────────────────────────────────────────────────────────
 function getCropCanvas() {
-  const pad  = parseInt(document.getElementById("padding").value)||0;
-  const size = parseInt(document.getElementById("outSize").value)||256;
-  const sq   = document.getElementById("forceSquare").checked;
+  const pad      = parseInt(document.getElementById("padding").value)||0;
+  const size     = parseInt(document.getElementById("outSize").value)||256;
+  const sq       = document.getElementById("forceSquare").checked;
+  const circular = document.getElementById("circular").checked;
   let {x,y,w,h} = crop;
-  // padding herausschneiden
   x += pad; y += pad; w -= 2*pad; h -= 2*pad;
   if (sq) { const s = Math.min(w,h); x+=(w-s)/2; y+=(h-s)/2; w=h=s; }
   w = Math.max(1,w); h = Math.max(1,h);
@@ -301,7 +305,14 @@ function getCropCanvas() {
   const off = document.createElement("canvas");
   off.width = off.height = size;
   const c = off.getContext("2d");
+  if (circular) {
+    c.save();
+    c.beginPath();
+    c.arc(size/2, size/2, size/2, 0, Math.PI*2);
+    c.clip();
+  }
   c.drawImage(img, x, y, w, h, 0, 0, size, size);
+  if (circular) c.restore();
   return off;
 }
 
@@ -324,8 +335,13 @@ async function saveIcon() {
   const fd = new FormData();
   fd.append("image", blob, name + ".png");
   fd.append("name", name);
+  fd.append("circular", document.getElementById("circular").checked ? "1" : "0");
   try {
-    const res = await fetch((window.__SERVE_BASE__||"/") + "admin/icon-crop/save", { method:"POST", body:fd });
+    const res = await fetch((window.__SERVE_BASE__||"/") + "admin/icon-crop/save",
+      { method:"POST", body:fd, credentials:"same-origin" });
+    if (!res.ok && res.headers.get("content-type")?.includes("text/html")) {
+      showMsg("Auth-Fehler — bitte Seite neu laden", "err"); return;
+    }
     const j = await res.json();
     if (j.error) showMsg(j.error, "err");
     else { showMsg(`Gespeichert: ${j.path}`, "ok"); loadExisting(); }
@@ -342,12 +358,18 @@ function showMsg(t, type) {
 // ── Vorhandene Icons ─────────────────────────────────────────────────────────
 async function loadExisting() {
   try {
-    const r = await fetch((window.__SERVE_BASE__||"/") + "admin/icon-crop/list");
+    const r = await fetch((window.__SERVE_BASE__||"/") + "admin/icon-crop/list",
+      { credentials:"same-origin" });
     const j = await r.json();
     const wrap2 = document.getElementById("existingIcons");
-    wrap2.innerHTML = (j.icons||[]).map(ic =>
-      `<img src="${ic.url}?v=${Date.now()}" title="${ic.name}" onclick="document.getElementById('outName').value='${ic.name}'">`
-    ).join("");
+    const v = Date.now();
+    wrap2.innerHTML = (j.icons||[]).map(ic => `
+      <div style="text-align:center;width:64px">
+        <img src="${ic.url}?v=${v}" title="${ic.name}"
+             onclick="document.getElementById('outName').value='${ic.name}';showMsg('Name gesetzt: ${ic.name}','ok')"
+             onerror="this.style.opacity=0.3">
+        <div style="font-size:9px;color:var(--theme-text-faint);word-break:break-all;margin-top:2px">${ic.name}</div>
+      </div>`).join("");
   } catch(_) {}
 }
 

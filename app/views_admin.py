@@ -230,14 +230,27 @@ def admin_icon_crop():
     return html, 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
+def _admin_json_guard():
+    """Gibt (None, None) wenn Admin — sonst (response, status) als JSON-Fehler."""
+    if g.user is None:
+        return jsonify({"error": "unauthenticated"}), 401
+    if not g.user.get("is_admin"):
+        return jsonify({"error": "forbidden"}), 403
+    return None, None
+
+
 @bp_admin.route("/admin/icon-crop/save", methods=["POST"])
-@require_admin
 def admin_icon_crop_save():
+    err, status = _admin_json_guard()
+    if err:
+        return err, status
     import io
-    from PIL import Image
+    from PIL import Image, ImageDraw
+    import numpy as np
     name = request.form.get("name", "").strip()
     if not name or not re.match(r"^[a-zA-Z0-9_\-]+$", name):
         return jsonify({"error": "Ungültiger Dateiname"}), 400
+    circular = request.form.get("circular", "0") == "1"
     f = request.files.get("image")
     if not f:
         return jsonify({"error": "Kein Bild übermittelt"}), 400
@@ -245,6 +258,14 @@ def admin_icon_crop_save():
         img = Image.open(io.BytesIO(f.read())).convert("RGBA")
     except Exception:
         return jsonify({"error": "Ungültiges Bildformat"}), 400
+    if circular:
+        # Kreismaske: weicher Rand via Anti-Aliasing (4x oversample)
+        sz = img.size[0]
+        big = sz * 4
+        mask = Image.new("L", (big, big), 0)
+        ImageDraw.Draw(mask).ellipse((0, 0, big - 1, big - 1), fill=255)
+        mask = mask.resize((sz, sz), Image.LANCZOS)
+        img.putalpha(mask)
     root = current_app.config.get("_PROJECT_ROOT") or os.path.dirname(
         os.path.dirname(os.path.abspath(__file__)))
     out_dir = os.path.join(root, "widgets", "pubg", "assets", "achievements")
@@ -255,17 +276,29 @@ def admin_icon_crop_save():
 
 
 @bp_admin.route("/admin/icon-crop/list")
-@require_admin
 def admin_icon_crop_list():
+    err, status = _admin_json_guard()
+    if err:
+        return err, status
     root = current_app.config.get("_PROJECT_ROOT") or os.path.dirname(
         os.path.dirname(os.path.abspath(__file__)))
-    icons_dir = os.path.join(root, "widgets", "pubg", "assets", "achievements")
+    # Alle PUBG_ICON_URLS keys + tatsächliche Dateien in icons/ und achievements/
+    from pubg.endpoints import EndpointRegistry
+    all_icon_urls = EndpointRegistry.PUBG_ICON_URLS
     icons = []
-    if os.path.exists(icons_dir):
-        for fn in sorted(os.listdir(icons_dir)):
+    seen = set()
+    for key, url in sorted(all_icon_urls.items()):
+        if url:
+            icons.append({"name": key, "url": url, "has_file": True})
+            seen.add(key)
+    # Zusätzliche Dateien in achievements/ die noch nicht in PUBG_ICON_URLS
+    ach_dir = os.path.join(root, "widgets", "pubg", "assets", "achievements")
+    if os.path.exists(ach_dir):
+        for fn in sorted(os.listdir(ach_dir)):
             if fn.endswith(".png") and fn != "carstuff.png":
-                icons.append({
-                    "name": fn[:-4],
-                    "url": f"/widgets-static/pubg/assets/achievements/{fn}",
-                })
+                n = fn[:-4]
+                if n not in seen:
+                    icons.append({"name": n,
+                                  "url": f"/widgets-static/pubg/assets/achievements/{fn}",
+                                  "has_file": True})
     return jsonify({"icons": icons})
