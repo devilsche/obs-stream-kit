@@ -114,6 +114,25 @@
       background: color-mix(in srgb,var(--theme-bg) 50%,transparent);
       object-fit: cover;
     }
+    .tile-icon.pubg-milestone {
+      border-radius: 50%;
+      border: none;
+      animation: browserMilestoneGlow 2s ease-in-out infinite;
+    }
+    @keyframes browserMilestoneGlow {
+      0%, 100% {
+        box-shadow:
+          0 0 8px  color-mix(in srgb, var(--theme-accent) 70%, transparent),
+          0 0 18px color-mix(in srgb, var(--theme-accent) 40%, transparent),
+          0 0 32px color-mix(in srgb, var(--theme-primary) 25%, transparent);
+      }
+      50% {
+        box-shadow:
+          0 0 12px color-mix(in srgb, var(--theme-accent) 95%, transparent),
+          0 0 28px color-mix(in srgb, var(--theme-accent) 65%, transparent),
+          0 0 52px color-mix(in srgb, var(--theme-primary) 45%, transparent);
+      }
+    }
     /* Wenn das 'icon' ein Emoji ist (PUBG-Session-Milestones), rendern
        als Text-Div statt <img>. Gleiches Quadrat, Emoji zentriert. */
     .tile-icon-emoji {
@@ -462,9 +481,11 @@
       const isFresh = freshKeys.has(key);
 
       const resolvedIcon = a.iconUrl || "";
+      const isPubgMilestone = a.source === "pubg" || a.appId === -2;
+      const iconClass = isPubgMilestone ? "tile-icon pubg-milestone" : "tile-icon";
       let iconHtml;
       if (isIconUrl(resolvedIcon)) {
-        iconHtml = `<img class="tile-icon" src="${resolvedIcon}" alt="">`;
+        iconHtml = `<img class="${iconClass}" src="${resolvedIcon}" alt="">`;
       } else {
         iconHtml = `<div class="tile-icon"></div>`;
       }
