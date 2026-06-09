@@ -598,7 +598,10 @@ def _in_veh_interval(ts, intervals, slack=VEH_EJECT_SLACK_MS):
 
 def _build_veh_intervals(events, acc):
     """Baut VehicleEnter/Leave-Intervalle für account acc aus einer
-    Event-Liste. Jedes Intervall: (enter_ts, leave_ts, vehicle_id)."""
+    Event-Liste. Jedes Intervall: (enter_ts, leave_ts, vehicle_id).
+
+    Seat-Wechsel (VehicleLeave + VehicleEnter im gleichen ms) werden
+    als ein durchgehendes Intervall behandelt — kein falsches Split."""
     intervals = []
     cur_enter = cur_veh = None
     for e in events:
@@ -609,7 +612,9 @@ def _build_veh_intervals(events, acc):
         ts = e.get("ts") or e.get("timestamp_ms")
         veh = e.get("weapon")
         if etype == "VehicleEnter":
-            cur_enter, cur_veh = ts, veh
+            if cur_enter is None:
+                cur_enter, cur_veh = ts, veh
+            # sonst: Seat-Wechsel = bereits drin, Enter ignorieren
         elif etype == "VehicleLeave" and cur_enter is not None:
             intervals.append((cur_enter, ts, cur_veh))
             cur_enter = cur_veh = None
@@ -666,7 +671,8 @@ def _compute_player_vehicle_evictions(conn, tenant_id: int, account_id, match_id
         for e in events:
             if e["actor"] == account_id:
                 if e["type"] == "VehicleEnter":
-                    cur = e["ts"]
+                    if cur is None:
+                        cur = e["ts"]  # Seat-Wechsel: zweites Enter ignorieren
                 elif e["type"] == "VehicleLeave" and cur is not None:
                     intervals_self.append((cur, e["ts"]))
                     cur = None
@@ -685,7 +691,8 @@ def _compute_player_vehicle_evictions(conn, tenant_id: int, account_id, match_id
                 if ev["actor"] != e["actor"]:
                     continue
                 if ev["type"] == "VehicleEnter":
-                    cur2 = ev["ts"]
+                    if cur2 is None:
+                        cur2 = ev["ts"]
                 elif ev["type"] == "VehicleLeave" and cur2 is not None:
                     ivals.append((cur2, ev["ts"]))
                     cur2 = None
@@ -1179,8 +1186,9 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         _ivals = []
         for _e in _evs:
             if _e["event_type"] == "VehicleEnter":
-                _cur_enter = _e["timestamp_ms"]
-                _cur_veh = _e["weapon"]
+                if _cur_enter is None:
+                    _cur_enter = _e["timestamp_ms"]
+                    _cur_veh = _e["weapon"]
             elif _e["event_type"] == "VehicleLeave" and _cur_enter is not None:
                 _ivals.append((_cur_enter, _e["timestamp_ms"], _cur_veh))
                 _cur_enter = None; _cur_veh = None
@@ -2889,8 +2897,9 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
             if e["actor"] != acc:
                 continue
             if e["type"] == "VehicleEnter":
-                cur = e["ts"]
-                cur_veh = e.get("weapon")  # vehicleId
+                if cur is None:
+                    cur = e["ts"]
+                    cur_veh = e.get("weapon")  # vehicleId
             elif e["type"] == "VehicleLeave" and cur is not None:
                 ivals.append((cur, e["ts"], cur_veh))
                 cur = None
