@@ -1223,8 +1223,9 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             if _e["actor_account"] != acc:
                 continue
             if _e["event_type"] == "VehicleEnter":
-                _cur_enter = _e["timestamp_ms"]
-                _cur_veh   = _e["weapon"]
+                if _cur_enter is None:  # Seat-Wechsel: zweites Enter ignorieren
+                    _cur_enter = _e["timestamp_ms"]
+                    _cur_veh   = _e["weapon"]
             elif _e["event_type"] == "VehicleLeave" and _cur_enter is not None:
                 veh_intervals.append((_cur_enter, _e["timestamp_ms"], _cur_veh))
                 _cur_enter = None
@@ -1240,7 +1241,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             if ts is None:
                 return None
             for a, b, vid in veh_intervals:
-                if a <= ts <= b and vid:
+                if a <= ts <= b + VEH_EJECT_SLACK_MS and vid:
                     for needle, label in _VEHICLE_PATTERNS:
                         if needle in vid:
                             return label
