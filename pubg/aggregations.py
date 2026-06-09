@@ -634,15 +634,21 @@ def _build_veh_intervals(events, acc):
         if etype == "VehicleEnter":
             if cur_enter is None:
                 cur_enter, cur_veh = ts, veh
-            # Enter während bereits drin → Seat-Wechsel, ignorieren
+            # Enter während bereits drin → Seat-Wechsel Enter, ignorieren
         elif etype == "VehicleLeave" and cur_enter is not None:
-            # Prüfe ob sofort danach ein Enter am gleichen Timestamp → Seat-Wechsel
+            # Seat-Wechsel-Leave erkennen: Leave am gleichen Timestamp wie
+            # ein vorheriges oder nachfolgendes Enter → Intervall läuft weiter
+            prev_is_enter_same_ts = (
+                i > 0 and
+                acc_events[i - 1][0] == ts and
+                acc_events[i - 1][1] == "VehicleEnter"
+            )
             next_is_enter_same_ts = (
                 i + 1 < len(acc_events) and
                 acc_events[i + 1][0] == ts and
                 acc_events[i + 1][1] == "VehicleEnter"
             )
-            if next_is_enter_same_ts:
+            if prev_is_enter_same_ts or next_is_enter_same_ts:
                 pass  # Seat-Wechsel: Intervall läuft weiter
             else:
                 intervals.append((cur_enter, ts, cur_veh))
