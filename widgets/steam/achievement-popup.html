@@ -37,28 +37,24 @@
       flex-shrink: 0;
       box-shadow: 0 0 12px color-mix(in srgb, var(--pubg-gold) 35%, transparent);
     }
-    /* PUBG-Milestones: rund mit pulsierendem Glow */
+    /* PUBG-Milestones: rund, kein Border, sanft atmender Glow */
     .icon.pubg-milestone {
       border-radius: 50%;
-      border-color: var(--theme-accent, var(--pubg-gold));
-      box-shadow:
-        0 0 10px  color-mix(in srgb, var(--theme-accent, var(--pubg-gold)) 60%, transparent),
-        0 0 24px  color-mix(in srgb, var(--theme-accent, var(--pubg-gold)) 35%, transparent),
-        0 0 48px  color-mix(in srgb, var(--theme-primary, var(--pubg-purple)) 25%, transparent);
-      animation: milestoneGlow 2.5s ease-in-out infinite;
+      border: none;
+      animation: milestoneGlow 2s ease-in-out infinite;
     }
     @keyframes milestoneGlow {
       0%, 100% {
         box-shadow:
-          0 0 10px color-mix(in srgb, var(--theme-accent, var(--pubg-gold)) 60%, transparent),
-          0 0 24px color-mix(in srgb, var(--theme-accent, var(--pubg-gold)) 35%, transparent),
-          0 0 48px color-mix(in srgb, var(--theme-primary, var(--pubg-purple)) 25%, transparent);
+          0 0 12px color-mix(in srgb, var(--theme-accent, var(--pubg-gold)) 70%, transparent),
+          0 0 28px color-mix(in srgb, var(--theme-accent, var(--pubg-gold)) 45%, transparent),
+          0 0 52px color-mix(in srgb, var(--theme-primary, var(--pubg-purple)) 30%, transparent);
       }
       50% {
         box-shadow:
-          0 0 16px color-mix(in srgb, var(--theme-accent, var(--pubg-gold)) 90%, transparent),
-          0 0 40px color-mix(in srgb, var(--theme-accent, var(--pubg-gold)) 60%, transparent),
-          0 0 80px color-mix(in srgb, var(--theme-primary, var(--pubg-purple)) 45%, transparent);
+          0 0 18px color-mix(in srgb, var(--theme-accent, var(--pubg-gold)) 95%, transparent),
+          0 0 42px color-mix(in srgb, var(--theme-accent, var(--pubg-gold)) 70%, transparent),
+          0 0 80px color-mix(in srgb, var(--theme-primary, var(--pubg-purple)) 50%, transparent);
       }
     }
     /* Emoji-Variante fuer PUBG-Milestones (Icon ist ein Emoji-Char,
