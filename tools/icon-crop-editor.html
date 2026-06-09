@@ -108,6 +108,8 @@
 
     <div class="panel">
       <h2>Vorhandene Icons</h2>
+      <input type="search" id="iconFilter" placeholder="Suchen… z.B. vehicle, chicken"
+             oninput="filterIcons()" style="margin-bottom:8px">
       <div class="existing" id="existingIcons"></div>
     </div>
 
@@ -344,7 +346,7 @@ async function saveIcon() {
     }
     const j = await res.json();
     if (j.error) showMsg(j.error, "err");
-    else { showMsg(`Gespeichert: ${j.path}`, "ok"); loadExisting(); }
+    else { showMsg(`Gespeichert: ${j.path}`, "ok"); await loadExisting(); }
   } catch(e) { showMsg("Fehler: " + e.message, "err"); }
 }
 
@@ -361,15 +363,8 @@ async function loadExisting() {
     const r = await fetch((window.__SERVE_BASE__||"/") + "admin/icon-crop/list",
       { credentials:"same-origin" });
     const j = await r.json();
-    const wrap2 = document.getElementById("existingIcons");
-    const v = Date.now();
-    wrap2.innerHTML = (j.icons||[]).map(ic => `
-      <div style="text-align:center;width:64px">
-        <img src="${ic.url}?v=${v}" title="${ic.name}"
-             onclick="document.getElementById('outName').value='${ic.name}';showMsg('Name gesetzt: ${ic.name}','ok')"
-             onerror="this.style.opacity=0.3">
-        <div style="font-size:9px;color:var(--theme-text-faint);word-break:break-all;margin-top:2px">${ic.name}</div>
-      </div>`).join("");
+    _allIcons = j.icons || [];
+    filterIcons();
   } catch(_) {}
 }
 
