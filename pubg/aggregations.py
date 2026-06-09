@@ -2900,9 +2900,9 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
         return ivals
 
     def _vehicle_in_intervals(ts, intervals):
-        """Returns vehicle class if ts inside an interval, else None."""
+        """Returns vehicle class if ts inside an interval (+ eject slack), else None."""
         for a, b, veh in intervals:
-            if a <= ts <= b:
+            if a <= ts <= b + VEH_EJECT_SLACK_MS:
                 return veh
         return None
 
