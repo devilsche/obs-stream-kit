@@ -36,6 +36,7 @@
     td.matches { color: var(--pubg-muted); font-size: 0.85em; }
     td.dealt b, td.taken b { font-size: 1.15em; }
     td.per-match { color: var(--pubg-muted); font-size: 0.82em; font-variant-numeric: tabular-nums; }
+    .dealt-split { color: var(--pubg-muted); font-size: 0.75em; font-weight: 400; margin-left: 3px; }
     td.dealt b { color: var(--pubg-gold); }
     td.taken b { color: #ff7a7a; }
     .empty { color: var(--pubg-muted); font-style: italic; text-align: center;
@@ -111,23 +112,31 @@
           <table>
             <thead><tr>
               <th>#</th><th>Player</th>
-              <th title="Gegner aus dem Fahrzeug eliminiert">dealt</th>
+              <th title="Rausgeschossen + Drive-By">dealt</th>
               <th title="dealt / Matches">Ø/M</th>
               <th title="Selbst aus dem Fahrzeug geholt">taken</th>
               <th title="taken / Matches">Ø/M</th>
               <th title="dealt / max(taken, 1)">ratio</th>
-              <th title="Matches mit Squad-Member im Range">matches</th>
+              <th title="Matches im Range">matches</th>
             </tr></thead>
             <tbody>
               ${rows.map((m, i) => {
-                const d = m.evictionsDealt || 0;
-                const t = m.evictionsTaken || 0;
+                const d  = m.evictionsDealt || 0;
+                const t  = m.evictionsTaken || 0;
                 const mx = m.matches || 1;
+                const evD = m.eventsDealt || [];
+                const nEject   = evD.filter(e => (e.kind||"").startsWith("eject")).length;
+                const nDriveby = evD.filter(e => (e.kind||"").startsWith("driveby")).length;
+                const dealtTip = [
+                  nEject   ? `${nEject} rausgeschossen`       : "",
+                  nDriveby ? `${nDriveby} beim Fahren geknallt` : "",
+                ].filter(Boolean).join(" + ") || d + " dealt";
                 return `
                 <tr class="${m.isSelf ? 'self' : ''}">
                   <td class="rank">${i + 1}.</td>
                   <td class="name">${m.name || "—"}</td>
-                  <td class="dealt"><b>${d}</b></td>
+                  <td class="dealt" title="${dealtTip}"><b>${d}</b>
+                    ${nEject && nDriveby ? `<span class="dealt-split">(${nEject}↑${nDriveby}⚡)</span>` : ""}</td>
                   <td class="per-match">${Math.round(d / mx * 100)}%</td>
                   <td class="taken"><b>${t}</b></td>
                   <td class="per-match">${Math.round(t / mx * 100)}%</td>
