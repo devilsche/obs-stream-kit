@@ -44,18 +44,15 @@
       animation: milestoneGlow 2s ease-in-out infinite;
     }
     @keyframes milestoneGlow {
-      0%, 100% {
-        box-shadow:
-          0 0 12px color-mix(in srgb, var(--theme-accent, var(--pubg-gold)) 70%, transparent),
-          0 0 28px color-mix(in srgb, var(--theme-accent, var(--pubg-gold)) 45%, transparent),
-          0 0 52px color-mix(in srgb, var(--theme-primary, var(--pubg-purple)) 30%, transparent);
-      }
-      50% {
-        box-shadow:
-          0 0 18px color-mix(in srgb, var(--theme-accent, var(--pubg-gold)) 95%, transparent),
-          0 0 42px color-mix(in srgb, var(--theme-accent, var(--pubg-gold)) 70%, transparent),
-          0 0 80px color-mix(in srgb, var(--theme-primary, var(--pubg-purple)) 50%, transparent);
-      }
+      0%   { filter: brightness(1.0) drop-shadow(0 0 6px var(--theme-accent, var(--pubg-gold))); }
+      12%  { filter: brightness(1.1) drop-shadow(0 0 10px var(--theme-accent, var(--pubg-gold))); }
+      25%  { filter: brightness(1.25) drop-shadow(0 0 16px var(--theme-accent, var(--pubg-gold))); }
+      37%  { filter: brightness(1.4) drop-shadow(0 0 22px var(--theme-accent, var(--pubg-gold))); }
+      50%  { filter: brightness(1.5) drop-shadow(0 0 28px var(--theme-accent, var(--pubg-gold))); }
+      63%  { filter: brightness(1.4) drop-shadow(0 0 22px var(--theme-accent, var(--pubg-gold))); }
+      75%  { filter: brightness(1.25) drop-shadow(0 0 16px var(--theme-accent, var(--pubg-gold))); }
+      87%  { filter: brightness(1.1) drop-shadow(0 0 10px var(--theme-accent, var(--pubg-gold))); }
+      100% { filter: brightness(1.0) drop-shadow(0 0 6px var(--theme-accent, var(--pubg-gold))); }
     }
     /* Emoji-Variante fuer PUBG-Milestones (Icon ist ein Emoji-Char,
        kein URL). Selbe Box, Emoji zentriert. */
