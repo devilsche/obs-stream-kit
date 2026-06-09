@@ -898,13 +898,22 @@
       } catch (e) {
         return;
       }
-      // Partial-Failure: einen der Endpoints (Steam oder PUBG) haben
-      // gefailed — vorhandene Daten behalten, nichts ueberschreiben.
+      // Partial-Failure: ein Endpoint failed — trotzdem die gelungenen
+      // Teile mergen. Existierende Einträge der fehlgeschlagenen Quelle
+      // (Steam appId>=0 oder PUBG appId=-2) aus all[] behalten.
+      let newAll;
       if (data.partial) {
-        applyFilters(); // Filter neu anwenden (z.B. session cutoff aktualisiert)
-        return;
+        const hasSteam = data.achievements.some(a => a.appId >= 0);
+        const hasPubg  = data.achievements.some(a => a.appId === -2);
+        newAll = [
+          ...(hasSteam ? data.achievements.filter(a => a.appId >= 0)
+                       : all.filter(a => a.appId >= 0)),
+          ...(hasPubg  ? data.achievements.filter(a => a.appId === -2)
+                       : all.filter(a => a.appId === -2)),
+        ];
+      } else {
+        newAll = data.achievements;
       }
-      const newAll = data.achievements;
       const oldKeys = new Set(all.map(a => a.appId + ":" + a.apiName));
       const truly_new = newAll.filter(a =>
         !oldKeys.has(a.appId + ":" + a.apiName));
