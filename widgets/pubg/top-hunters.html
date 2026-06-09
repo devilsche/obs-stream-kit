@@ -37,6 +37,7 @@
     td.dealt b, td.taken b { font-size: 1.15em; }
     td.per-match { color: var(--pubg-muted); font-size: 0.82em; font-variant-numeric: tabular-nums; }
     .dealt-split { color: var(--pubg-muted); font-size: 0.75em; font-weight: 400; margin-left: 3px; }
+    .dealt-split .material-symbols-outlined { font-size: 11px; vertical-align: middle; }
     td.dealt b { color: var(--pubg-gold); }
     td.taken b { color: #ff7a7a; }
     .empty { color: var(--pubg-muted); font-style: italic; text-align: center;
@@ -136,7 +137,7 @@
                   <td class="rank">${i + 1}.</td>
                   <td class="name">${m.name || "—"}</td>
                   <td class="dealt" title="${dealtTip}"><b>${d}</b>
-                    ${nEject && nDriveby ? `<span class="dealt-split">(${nEject}↑${nDriveby}⚡)</span>` : ""}</td>
+                    ${nEject && nDriveby ? `<span class="dealt-split">(<span class="material-symbols-outlined">eject</span>${nEject} <span class="material-symbols-outlined">directions_car</span>${nDriveby})</span>` : ""}</td>
                   <td class="per-match">${Math.round(d / mx * 100)}%</td>
                   <td class="taken"><b>${t}</b></td>
                   <td class="per-match">${Math.round(t / mx * 100)}%</td>
