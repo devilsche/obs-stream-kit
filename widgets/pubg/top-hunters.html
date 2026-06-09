@@ -36,8 +36,7 @@
     td.matches { color: var(--pubg-muted); font-size: 0.85em; }
     td.dealt b, td.taken b { font-size: 1.15em; }
     td.per-match { color: var(--pubg-muted); font-size: 0.82em; font-variant-numeric: tabular-nums; }
-    .dealt-split { color: var(--pubg-muted); font-size: 0.75em; font-weight: 400; margin-left: 3px; }
-    .dealt-split .material-symbols-outlined { font-size: 11px; vertical-align: middle; }
+    td.driveby b { color: var(--pubg-gold); font-size: 1.15em; }
     td.dealt b { color: var(--pubg-gold); }
     td.taken b { color: #ff7a7a; }
     .empty { color: var(--pubg-muted); font-style: italic; text-align: center;
@@ -113,12 +112,13 @@
           <table>
             <thead><tr>
               <th>#</th><th>Player</th>
-              <th title="Rausgeschossen + Drive-By">dealt</th>
-              <th title="dealt / Matches">Ø/M</th>
-              <th title="Selbst aus dem Fahrzeug geholt">taken</th>
-              <th title="taken / Matches">Ø/M</th>
-              <th title="dealt / max(taken, 1)">ratio</th>
-              <th title="Matches im Range">matches</th>
+              <th title="Gegner aus Fahrzeug rausgeschossen"><span class="material-symbols-outlined icon-sm" aria-hidden="true">eject</span></th>
+              <th title="Drive-By — beim Fahren abgeknallt"><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span></th>
+              <th title="Selbst rausgeschossen worden"><span class="material-symbols-outlined icon-sm" aria-hidden="true">personal_injury</span></th>
+              <th title="dealt (eject+driveby) / Matches">Ø/M</th>
+              <th title="taken / Matches">taken%</th>
+              <th title="(eject+driveby) / max(taken,1)">ratio</th>
+              <th title="Matches im Range">M</th>
             </tr></thead>
             <tbody>
               ${rows.map((m, i) => {
@@ -128,18 +128,14 @@
                 const evD = m.eventsDealt || [];
                 const nEject   = evD.filter(e => (e.kind||"").startsWith("eject")).length;
                 const nDriveby = evD.filter(e => (e.kind||"").startsWith("driveby")).length;
-                const dealtTip = [
-                  nEject   ? `${nEject} rausgeschossen`       : "",
-                  nDriveby ? `${nDriveby} beim Fahren geknallt` : "",
-                ].filter(Boolean).join(" + ") || d + " dealt";
                 return `
                 <tr class="${m.isSelf ? 'self' : ''}">
                   <td class="rank">${i + 1}.</td>
                   <td class="name">${m.name || "—"}</td>
-                  <td class="dealt" title="${dealtTip}"><b>${d}</b>
-                    ${nEject && nDriveby ? `<span class="dealt-split">(<span class="material-symbols-outlined">eject</span>${nEject} <span class="material-symbols-outlined">directions_car</span>${nDriveby})</span>` : ""}</td>
-                  <td class="per-match">${Math.round(d / mx * 100)}%</td>
+                  <td class="dealt"><b>${nEject}</b></td>
+                  <td class="driveby"><b>${nDriveby}</b></td>
                   <td class="taken"><b>${t}</b></td>
+                  <td class="per-match">${Math.round(d / mx * 100)}%</td>
                   <td class="per-match">${Math.round(t / mx * 100)}%</td>
                   <td>${m._ratio.toFixed(1)}</td>
                   <td class="matches">${mx}</td>
