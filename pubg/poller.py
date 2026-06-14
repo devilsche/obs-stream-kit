@@ -664,8 +664,24 @@ def poll_tenant(conn, tenant_id: int, client_factory,
     except Exception as e:
         t_stats = {"processed": 0, "errors": [f"telemetry-batch: {e}"]}
 
+    # Session-Milestone-Detection — server-seitig nach neuen Matches ODER
+    # neu verarbeiteter Telemetrie (manche Milestones, z.B. Hot Drop oder
+    # Kill-Tiers, brauchen Telemetrie-Events, die erst im Backlog-Tick
+    # nachkommen). Frueher rein browser-getriggert -> Auto-Polling sah keine
+    # neuen Milestones. Schreibt neue in pubg_achievements_seen (Popup-faehig);
+    # der Cache wird vom PollerThread bei genau dieser Bedingung invalidiert.
+    detect_errors = []
+    ach_detected = 0
+    if m_stats["new_matches"] > 0 or t_stats["processed"] > 0:
+        try:
+            from pubg.aggregations import detect_and_store_session_achievements
+            ach_detected = detect_and_store_session_achievements(
+                conn, tenant_id, my_account_id)
+        except Exception as e:
+            detect_errors.append(f"achievement-detect: {e}")
+
     all_errors = (m_stats["errors"] + l_stats["errors"] + s_stats["errors"]
-                  + b_stats["errors"] + t_stats["errors"])
+                  + b_stats["errors"] + t_stats["errors"] + detect_errors)
     return {
         "polling": "ok" if not all_errors else "degraded",
         "tenantId": tenant_id,
@@ -676,6 +692,7 @@ def poll_tenant(conn, tenant_id: int, client_factory,
         "seasonBackfilled": b_stats["backfilled"],
         "currentSeasonId": s_stats.get("seasonId"),
         "telemetryProcessed": t_stats["processed"],
+        "achievementsDetected": ach_detected,
     }
 
 

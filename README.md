@@ -477,7 +477,10 @@ Action 5: Source ausblenden
 GET http://localhost:8080/api/pubg/status
 ```
 Liefert `{polling, lastPollAt, errors, newMatches, lifetimeRefreshed,
-telemetryProcessed, rateLimitRemaining}`. Brauchbar für ein internes Dashboard
+telemetryProcessed, achievementsDetected, rateLimitRemaining}`. Der Poller
+erkennt PUBG-Session-Milestones serverseitig automatisch — nach jedem neuen
+Match bzw. nachgelieferter Telemetrie (`achievementsDetected` = Anzahl neu
+erkannter). Brauchbar für ein internes Dashboard
 oder zum Debuggen.
 
 ### Live-Detection für Szenen-Automation
