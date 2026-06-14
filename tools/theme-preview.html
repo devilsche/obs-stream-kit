@@ -5,6 +5,9 @@
   <title>Theme-Vorschau · Gothic / Mittelalter</title>
   <link rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined">
+  <!-- Schrift-Kandidaten fuer den Vergleich (zusaetzlich zu denen aus _theme.css) -->
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Grenze+Gotisch:wght@400;600;700&family=Metamorphous&family=UnifrakturCook:wght@700&family=Pirata+One&family=Almendra+Display&display=swap">
   <link rel="stylesheet" href="/widgets-static/_theme.css">
   <style>
     html, body { margin: 0; min-height: 100vh; }
@@ -125,6 +128,25 @@
     .ornament p { margin: 0; color: var(--theme-text-dim); }
     .ornament[data-empty] { display: none; }
 
+    /* ── Schrift-Vergleich ── */
+    .fonts { grid-column: 1 / -1; }
+    .font-sample { padding: 14px 0; border-bottom: 1px solid var(--theme-border); }
+    .font-sample:last-child { border-bottom: none; }
+    .font-sample .name { display: block; font-family: var(--theme-font-mono, monospace);
+                         font-size: .72rem; color: var(--theme-text-dim);
+                         letter-spacing: .05em; margin-bottom: 2px; }
+    .font-sample .big { font-size: 2rem; line-height: 1.1; color: var(--theme-text); }
+    .font-sample .small { font-size: 1rem; color: var(--theme-text-dim); }
+    .fs-imfell   { font-family: "IM Fell English", serif; }
+    .fs-medieval { font-family: "MedievalSharp", serif; }
+    .fs-grenze   { font-family: "Grenze Gotisch", serif; }
+    .fs-metamorph{ font-family: "Metamorphous", serif; }
+    .fs-unifraktur { font-family: "UnifrakturCook", serif; }
+    .fs-pirata   { font-family: "Pirata One", serif; }
+    .fs-almendra { font-family: "Almendra Display", serif; }
+    .fs-cinzel   { font-family: "Cinzel", serif; }
+    .fs-cinzeldec{ font-family: "Cinzel Decorative", serif; }
+
     *:focus-visible { outline: 3px solid var(--theme-accent); outline-offset: 2px; }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { transition-duration: .01ms !important; }
@@ -149,6 +171,52 @@
   </header>
 
   <main id="main" class="grid">
+    <section class="card fonts" aria-labelledby="h-fonts">
+      <h2 id="h-fonts">Schrift-Vergleich — welche gefällt dir?</h2>
+      <p class="lede">Gleicher Text in allen Kandidaten. Sag mir einfach den Namen
+        (steht klein über jeder Zeile). Erbt die Farben des aktuellen Themes.</p>
+      <div class="font-sample">
+        <span class="name">IM Fell English — (dein Favorit bei Barriere)</span>
+        <div class="big fs-imfell">LuCKoR</div>
+        <div class="small fs-imfell">Khorinis — 1 247 Matches · 3.8 K/D</div>
+      </div>
+      <div class="font-sample">
+        <span class="name">MedievalSharp</span>
+        <div class="big fs-medieval">LuCKoR</div>
+        <div class="small fs-medieval">Khorinis — 1 247 Matches · 3.8 K/D</div>
+      </div>
+      <div class="font-sample">
+        <span class="name">Grenze Gotisch</span>
+        <div class="big fs-grenze">LuCKoR</div>
+        <div class="small fs-grenze">Khorinis — 1 247 Matches · 3.8 K/D</div>
+      </div>
+      <div class="font-sample">
+        <span class="name">Metamorphous</span>
+        <div class="big fs-metamorph">LuCKoR</div>
+        <div class="small fs-metamorph">Khorinis — 1 247 Matches · 3.8 K/D</div>
+      </div>
+      <div class="font-sample">
+        <span class="name">UnifrakturCook (echte Fraktur)</span>
+        <div class="big fs-unifraktur">LuCKoR</div>
+        <div class="small fs-unifraktur">Khorinis — 1 247 Matches · 3.8 K/D</div>
+      </div>
+      <div class="font-sample">
+        <span class="name">Pirata One</span>
+        <div class="big fs-pirata">LuCKoR</div>
+        <div class="small fs-pirata">Khorinis — 1 247 Matches · 3.8 K/D</div>
+      </div>
+      <div class="font-sample">
+        <span class="name">Almendra Display</span>
+        <div class="big fs-almendra">LuCKoR</div>
+        <div class="small fs-almendra">Khorinis — 1 247 Matches · 3.8 K/D</div>
+      </div>
+      <div class="font-sample">
+        <span class="name">Cinzel (aktuell) · Cinzel Decorative</span>
+        <div class="big fs-cinzel">LuCKoR</div>
+        <div class="small fs-cinzeldec">Khorinis — 1 247 Matches · 3.8 K/D</div>
+      </div>
+    </section>
+
     <section class="card" aria-labelledby="h-career">
       <h2 id="h-career">Career-Card</h2>
       <div class="career">
