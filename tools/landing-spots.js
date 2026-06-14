@@ -323,6 +323,8 @@ function renderPoiList() {
     return;
   }
   const maxTotal = Math.max(1, ...LS.data.pois.map(p => p.total));
+  // Ausgewählte Spieler → Orte mit deren Landings sollen aufgeklappt starten.
+  const selectedAccs = LS.players.filter(Boolean).map(p => p.accountId);
   host.innerHTML = LS.data.pois.map(poi => {
     const players = Object.entries(poi.byPlayer)
       .sort((a, b) => b[1].count - a[1].count)
@@ -330,14 +332,17 @@ function renderPoiList() {
         `<div class="poi-player"><span>${v.name}${botMark(acc)}</span>`
         + `<span>${v.count}× · ${v.pct}%</span></div>`).join("");
     const w = Math.round(poi.total / maxTotal * 100);
+    const open = selectedAccs.length && selectedAccs.some(a => poi.byPlayer[a]);
     return `
-      <div class="poi" data-poi="${poi.name}">
-        <div class="poi-head">
-          <span>${poi.name}</span><span>${poi.total}×</span>
-        </div>
-        <div class="bar" style="width:${w}%" role="presentation"></div>
-        ${players}
-      </div>`;
+      <details class="poi" data-poi="${poi.name}"${open ? " open" : ""}>
+        <summary>
+          <div class="poi-head">
+            <span>${poi.name}</span><span>${poi.total}×</span>
+          </div>
+          <div class="bar" style="--w:${w}%" role="presentation"></div>
+        </summary>
+        <div class="poi-players">${players}</div>
+      </details>`;
   }).join("");
 }
 
