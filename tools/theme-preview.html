@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="gothic-oldcamp">
+<head>
+  <meta charset="utf-8">
+  <title>Theme-Vorschau · Gothic / Mittelalter</title>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined">
+  <link rel="stylesheet" href="/widgets-static/_theme.css">
+  <style>
+    html, body { margin: 0; min-height: 100vh; }
+    body {
+      background: var(--theme-page-bg);
+      color: var(--theme-text);
+      font-family: var(--theme-font-body, sans-serif);
+      padding: 24px clamp(16px, 4vw, 56px) 64px;
+      box-sizing: border-box;
+    }
+    a.skip-link {
+      position: absolute; left: 8px; top: -40px; z-index: 100;
+      background: var(--theme-accent); color: var(--theme-on-primary);
+      padding: 8px 14px; border-radius: var(--theme-radius);
+      transition: top .15s;
+    }
+    a.skip-link:focus { top: 8px; }
+
+    h1, h2, h3 { font-family: var(--theme-font-display, serif); margin: 0; }
+    h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: .03em; }
+    h2 { font-size: 1.3rem; margin-bottom: 12px; }
+    .lede { color: var(--theme-text-dim); margin: 6px 0 0; max-width: 60ch; }
+
+    header.page { display: flex; flex-wrap: wrap; gap: 20px;
+                  align-items: flex-end; justify-content: space-between;
+                  margin-bottom: 28px; }
+
+    /* ── Theme-Switcher ── */
+    .switcher { display: flex; flex-wrap: wrap; gap: 8px; }
+    .switcher button {
+      font-family: var(--theme-font-body, sans-serif);
+      font-size: .9rem; cursor: pointer; min-height: 36px; padding: 6px 14px;
+      color: var(--theme-text);
+      background: var(--theme-surface-2);
+      border: var(--theme-border-width) solid var(--theme-border);
+      border-radius: var(--theme-radius);
+    }
+    .switcher button[aria-pressed="true"] {
+      background: var(--theme-primary); color: var(--theme-on-primary);
+      border-color: var(--theme-accent);
+    }
+
+    /* ── Layout-Grid ── */
+    .grid { display: grid; gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+
+    .card {
+      background-color: var(--theme-surface);
+      background-image: var(--theme-texture);
+      background-repeat: repeat;
+      border: var(--theme-border-width) solid var(--theme-border);
+      border-radius: var(--theme-radius);
+      box-shadow: var(--theme-shadow);
+      padding: 20px;
+    }
+
+    /* ── Career-Card ── */
+    .career { display: flex; gap: 16px; align-items: center; }
+    .avatar {
+      width: 64px; height: 64px; flex: none;
+      border-radius: var(--theme-radius);
+      background: var(--theme-primary); color: var(--theme-on-primary);
+      display: grid; place-items: center;
+      font-family: var(--theme-font-display, serif); font-size: 1.6rem;
+      border: var(--theme-border-width) solid var(--theme-accent);
+    }
+    .career .stats { display: flex; gap: 18px; margin-top: 6px; }
+    .career .stat b { font-family: var(--theme-font-display, serif);
+                      font-size: 1.4rem; color: var(--theme-accent); }
+    .career .stat span { display: block; font-size: .78rem;
+                         color: var(--theme-text-dim); }
+
+    /* ── Tabelle ── */
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { text-align: left; padding: 7px 10px;
+             border-bottom: 1px solid var(--theme-border); }
+    th { font-family: var(--theme-font-display, serif);
+         color: var(--theme-accent); font-weight: 700; }
+    tbody tr:last-child td { border-bottom: none; }
+    td.num { text-align: right; font-family: var(--theme-font-mono, monospace); }
+
+    /* ── Buttons + Badges ── */
+    .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+    .btn {
+      font-family: var(--theme-font-body, sans-serif); font-size: .92rem;
+      cursor: pointer; min-height: 40px; padding: 8px 18px;
+      border-radius: var(--theme-radius);
+      border: var(--theme-border-width) solid var(--theme-accent);
+    }
+    .btn.primary { background: var(--theme-primary); color: var(--theme-on-primary); }
+    .btn.ghost   { background: transparent; color: var(--theme-text);
+                   border-color: var(--theme-border); }
+    .badges { display: flex; flex-wrap: wrap; gap: 8px; }
+    .badge { font-size: .8rem; padding: 4px 10px; border-radius: var(--theme-radius);
+             font-weight: 600; }
+    .badge.ok     { background: var(--theme-ok);     color: var(--theme-on-primary); }
+    .badge.warn   { background: var(--theme-warn);   color: var(--theme-on-primary); }
+    .badge.danger { background: var(--theme-danger); color: #fff; }
+
+    /* ── Alert-Box ── */
+    .alert { display: flex; gap: 12px; align-items: center;
+             border-left: 4px solid var(--theme-danger);
+             background: var(--theme-surface-2); padding: 12px 16px;
+             border-radius: var(--theme-radius); }
+    .hot-icon { font-family: "Material Symbols Outlined"; font-size: 1.6rem;
+                color: var(--theme-accent); line-height: 1; }
+    .hot-icon::before { content: var(--theme-hot-icon); }
+
+    /* ── Ornament-Rahmen-Demo ── */
+    .ornament {
+      border: 17px solid transparent;
+      border-image: var(--theme-frame);
+      background-color: var(--theme-surface);
+      background-image: var(--theme-texture); background-repeat: repeat;
+      padding: 18px; border-radius: var(--theme-radius);
+      min-height: 90px;
+    }
+    .ornament p { margin: 0; color: var(--theme-text-dim); }
+    .ornament[data-empty] { display: none; }
+
+    *:focus-visible { outline: 3px solid var(--theme-accent); outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Zum Inhalt springen</a>
+
+  <header class="page">
+    <div>
+      <h1>Theme-Vorschau</h1>
+      <p class="lede">Drei Gothic/Mittelalter-Themes auf Beispiel-Komponenten.
+        Wähle ein Theme — Farben, Schrift, Form, Glow und Ornamente reagieren live.</p>
+    </div>
+    <nav class="switcher" aria-label="Theme wählen">
+      <button type="button" data-set-theme="gothic-oldcamp" aria-pressed="true">Altes Lager</button>
+      <button type="button" data-set-theme="gothic-barrier" aria-pressed="false">Die Barriere</button>
+      <button type="button" data-set-theme="gothic-sect" aria-pressed="false">Schläfer-Tempel</button>
+      <button type="button" data-set-theme="entry" aria-pressed="false">Entry (Referenz)</button>
+    </nav>
+  </header>
+
+  <main id="main" class="grid">
+    <section class="card" aria-labelledby="h-career">
+      <h2 id="h-career">Career-Card</h2>
+      <div class="career">
+        <div class="avatar" aria-hidden="true">LK</div>
+        <div>
+          <strong>LuCKoR</strong>
+          <div class="stats">
+            <div class="stat"><b>1 247</b><span>Matches</span></div>
+            <div class="stat"><b>3.8</b><span>K/D</span></div>
+            <div class="stat"><b>214</b><span>Chicken</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-table">
+      <h2 id="h-table">Top Hunters</h2>
+      <table>
+        <thead>
+          <tr><th scope="col">Spieler</th><th scope="col">Kills</th><th scope="col">Dealt %</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>LuCKoR</td><td class="num">42</td><td class="num">31 %</td></tr>
+          <tr><td>Hat3</td><td class="num">38</td><td class="num">28 %</td></tr>
+          <tr><td>MateA</td><td class="num">19</td><td class="num">22 %</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card" aria-labelledby="h-controls">
+      <h2 id="h-controls">Buttons &amp; Badges</h2>
+      <div class="btn-row">
+        <button type="button" class="btn primary">Primär</button>
+        <button type="button" class="btn ghost">Sekundär</button>
+      </div>
+      <div class="badges">
+        <span class="badge ok">Sieg</span>
+        <span class="badge warn">Top 10</span>
+        <span class="badge danger">Eliminiert</span>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-alert">
+      <h2 id="h-alert">Alert &amp; Hot-Icon</h2>
+      <div class="alert">
+        <span class="hot-icon" aria-hidden="true"></span>
+        <span>Hot Drop — 5 Teams im Umkreis von 300 m!</span>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-ornament">
+      <h2 id="h-ornament">Ornament-Rahmen</h2>
+      <div class="ornament">
+        <p>Verzierte Eck-Beschläge (border-image) + Textur-Overlay.
+          Nur bei den Gothic-Themes sichtbar.</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const root = document.documentElement;
+    const buttons = document.querySelectorAll("[data-set-theme]");
+    buttons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const theme = btn.dataset.setTheme;
+        root.setAttribute("data-theme", theme);
+        buttons.forEach(b =>
+          b.setAttribute("aria-pressed", String(b === btn)));
+      });
+    });
+  </script>
+</body>
+</html>

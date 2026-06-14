@@ -9,7 +9,7 @@
    MUSS NACH _pubg.css geladen werden (gleiche :root-Spezifitaet → spaeter gewinnt).
    ════════════════════════════════════════════════════════════════════════ */
 
-@import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=DM+Sans:wght@400;500;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@600;700;800&family=Onest:wght@400;500;600&family=Archivo:wght@500;600;800;900&family=Space+Mono:wght@400;700&family=Sora:wght@500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Fraunces:opsz,ital,wght@9..144,0,500;9..144,0,600;9..144,1,500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=DM+Sans:wght@400;500;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@600;700;800&family=Onest:wght@400;500;600&family=Archivo:wght@500;600;800;900&family=Space+Mono:wght@400;700&family=Sora:wght@500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Fraunces:opsz,ital,wght@9..144,0,500;9..144,0,600;9..144,1,500&family=Cinzel:wght@500;600;700&family=Cinzel+Decorative:wght@700;900&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=IM+Fell+English:ital@0;1&family=Marcellus&display=swap");
 
 /* ── Default = Entry (aktueller Stand, falls keine Server-Injektion) ── */
 :root, html[data-theme="entry"] {
@@ -22,6 +22,10 @@
   --theme-radius:8px; --theme-border-width:1px; --theme-shadow:0 14px 40px rgba(0,0,0,.4);
   --theme-hot-icon:"local_fire_department";
   --theme-page-bg:linear-gradient(180deg,#1a0d2a 0%,#0a0510 100%);
+  /* Ornament-Tokens — Default none; nur die Gothic-Themes setzen echte Werte.
+     --theme-frame: border-image-Quelle (verzierte Eck-Beschlaege).
+     --theme-texture: dezenter Hintergrund-Overlay (Leder/Nebel/Stein). */
+  --theme-frame:none; --theme-texture:none;
 }
 
 html[data-theme="terminal"] {
@@ -97,6 +101,52 @@ html[data-theme="swiss"] {
   --theme-radius:0px; --theme-border-width:3px; --theme-shadow:8px 8px 0 #0d0d0d;
   --theme-hot-icon:"star";
   --theme-page-bg:#eceae4;
+}
+
+/* ── Gothic / Mittelalter-Themes (Spiel-inspiriert) ───────────────────────── */
+html[data-theme="gothic-oldcamp"] {
+  /* Altes Lager — Erzbarone: Leder, Bronze, Gold, Fackelfeuer. */
+  --theme-primary:#b9762f; --theme-accent:#e0a93e; --theme-accent-2:#8a5a2b; --theme-on-primary:#1a1008;
+  --theme-bg:#130c07; --theme-surface:#1f150c; --theme-surface-2:#2a1d10; --theme-border:#6b4a24;
+  --theme-text:#ece0c8; --theme-text-dim:#b09a76; --theme-text-faint:#7d6b4e;
+  --theme-ok:#8a9a3c; --theme-warn:#e0a93e; --theme-danger:#b5302a;
+  --theme-font-display:"Cinzel",serif; --theme-font-body:"EB Garamond",serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-stinger-font:"Cinzel",serif;
+  --theme-radius:2px; --theme-border-width:2.5px; --theme-shadow:0 14px 40px rgba(0,0,0,.6);
+  --theme-hot-icon:"swords";
+  --theme-page-bg:radial-gradient(900px 600px at 50% -10%,rgba(185,118,47,.28),#130c07 60%);
+  --theme-frame:url("/widgets-static/assets/frames/gothic-oldcamp-frame.svg") 34 / 17px / 0 stretch;
+  --theme-texture:url("/widgets-static/assets/frames/gothic-oldcamp-texture.svg");
+}
+
+html[data-theme="gothic-barrier"] {
+  /* Sumpflager / Die Barriere — Magie & Schwefel: giftgruen, mystisch. */
+  --theme-primary:#7fc23a; --theme-accent:#b6e84a; --theme-accent-2:#4a8f5c; --theme-on-primary:#08120a;
+  --theme-bg:#080d0a; --theme-surface:#101a12; --theme-surface-2:#16241a; --theme-border:#3c6b3a;
+  --theme-text:#dfeed6; --theme-text-dim:#93ab8e; --theme-text-faint:#637a60;
+  --theme-ok:#7fc23a; --theme-warn:#cfe04a; --theme-danger:#d4622a;
+  --theme-font-display:"Cinzel",serif; --theme-font-body:"IM Fell English",serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-stinger-font:"Cinzel",serif;
+  --theme-radius:3px; --theme-border-width:2px; --theme-shadow:0 0 24px rgba(127,194,58,.18),0 14px 40px rgba(0,0,0,.6);
+  --theme-hot-icon:"local_fire_department";
+  --theme-page-bg:radial-gradient(1000px 700px at 70% -10%,rgba(127,194,58,.30),#080d0a 62%);
+  --theme-frame:url("/widgets-static/assets/frames/gothic-barrier-frame.svg") 34 / 17px / 0 stretch;
+  --theme-texture:url("/widgets-static/assets/frames/gothic-barrier-texture.svg");
+}
+
+html[data-theme="gothic-sect"] {
+  /* Schlaefer-Tempel / Sekte — Wueste, Obsidian, Opferfeuer: archaisch-hart. */
+  --theme-primary:#c2682f; --theme-accent:#e0913a; --theme-accent-2:#7a3b3b; --theme-on-primary:#160d10;
+  --theme-bg:#0f0a10; --theme-surface:#1b1118; --theme-surface-2:#251820; --theme-border:#6e4530;
+  --theme-text:#ecd9c2; --theme-text-dim:#ab917a; --theme-text-faint:#786052;
+  --theme-ok:#9a8a3c; --theme-warn:#e0913a; --theme-danger:#c0322a;
+  --theme-font-display:"Cinzel Decorative",serif; --theme-font-body:"Marcellus",serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-stinger-font:"Cinzel Decorative",serif;
+  --theme-radius:0px; --theme-border-width:2px; --theme-shadow:0 14px 44px rgba(0,0,0,.7);
+  --theme-hot-icon:"local_fire_department";
+  --theme-page-bg:linear-gradient(0deg,rgba(194,104,47,.22) 0%,#0f0a10 45%);
+  --theme-frame:url("/widgets-static/assets/frames/gothic-sect-frame.svg") 34 / 17px / 0 stretch;
+  --theme-texture:url("/widgets-static/assets/frames/gothic-sect-texture.svg");
 }
 
 /* ── Alias-Layer ──────────────────────────────────────────────────────────

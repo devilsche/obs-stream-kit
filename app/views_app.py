@@ -31,6 +31,11 @@ TOOLS = [
      "desc": "Full-screen browser through all Steam + PUBG achievements. Click a tile to re-trigger the popup.",
      "path": "tools/achievement-browser.html",
      "admin_only": False},
+    {"key": "theme-preview",
+     "label": "Theme-Vorschau",
+     "desc": "Vorschau der Gothic/Mittelalter-Themes auf Beispiel-Komponenten — Farben, Schrift, Form, Ornamente.",
+     "path": "tools/theme-preview.html",
+     "admin_only": True},
 ]
 
 
