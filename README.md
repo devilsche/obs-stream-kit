@@ -480,6 +480,31 @@ Liefert `{polling, lastPollAt, errors, newMatches, lifetimeRefreshed,
 telemetryProcessed, rateLimitRemaining}`. Brauchbar für ein internes Dashboard
 oder zum Debuggen.
 
+### Live-Detection für Szenen-Automation
+
+```
+GET http://localhost:8080/api/pubg/active
+```
+
+Zwei **unabhängige** Signale, gedacht für sekündliches Streamer.bot-Polling
+(z.B. automatischer Szenen-Wechsel):
+
+- **`active`** — läuft PUBG laut Steam? (`gameid == 578080`)
+  `true` / `false` / `null` (wenn Steam nicht abfragbar ist). Unabhängig vom
+  letzten Match.
+- **`matchRecent`** — ist das letzte Match jünger als `thresholdMin` (Default
+  30)? Wird **immer** aus der DB berechnet, auch wenn PUBG geschlossen ist.
+
+Weitere Felder: `pubgOpen` (Alias für `active`, rückwärtskompatibel),
+`lastMatchAt`, `lastMatchAgeMin`, `thresholdMin`, `steamChecked`.
+
+| Parameter | Beschreibung |
+|-----------|-------------|
+| `thresholdMin` | Schwelle für `matchRecent` in Minuten (Default 30) |
+| `thresholdSec` | Schwelle in Sekunden (überschreibt `thresholdMin`) |
+| `noSteam=1` | Steam-Abfrage überspringen → `active: null` |
+| `fakePubgOpen=0\|1` | Steam-Status für Tests/Debug erzwingen |
+
 ### Rate-Limit
 
 Default 10 RPM reicht für 1-2 Matches/Min steady-state. Bei häufigen

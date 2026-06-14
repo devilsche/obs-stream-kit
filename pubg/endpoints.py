@@ -182,12 +182,12 @@ class EndpointRegistry:
         return _err(404, f"unknown route {path}")
 
     def _active(self, qs):
-        """active = pubgOpen (Steam) AND matchRecent (DB, < thresholdMin).
+        """Zwei unabhaengige Signale fuer Streamer.bot:
 
-        - PUBG offen (Steam gameid == 578080) -> active = matchRecent.
-        - PUBG zu                              -> active = false (kein DB-Query).
-        - Steam unbestimmbar (keine fn / Fehler / noSteam) -> Fallback:
-          active = matchRecent.
+        - active     = laeuft PUBG laut Steam? (gameid == 578080)
+                       True / False / None(unbestimmbar, Steam nicht abfragbar)
+        - matchRecent = ist das letzte Match juenger als thresholdMin?
+                        immer aus der DB berechnet, unabhaengig von active.
 
         Overrides: ?thresholdMin / ?thresholdSec / ?noSteam=1 / ?fakePubgOpen=0|1
         """
@@ -195,50 +195,46 @@ class EndpointRegistry:
         if "thresholdSec" in qs:
             threshold_min = float(qs["thresholdSec"]) / 60.0
 
-        # ── pubgOpen bestimmen: True / False / None(unbestimmbar) ──
-        pubg_open = None
+        # ── active = pubgOpen bestimmen: True / False / None(unbestimmbar) ──
+        active = None
         steam_checked = False
         if "fakePubgOpen" in qs:
-            pubg_open = qs.get("fakePubgOpen") == "1"
+            active = qs.get("fakePubgOpen") == "1"
             steam_checked = True
         elif qs.get("noSteam") != "1" and self.steam_summary_fn is not None:
             try:
                 summary = self.steam_summary_fn() or {}
                 gid_raw = summary.get("gameid")
                 gid = int(gid_raw) if gid_raw else 0
-                pubg_open = (gid == PUBG_STEAM_APPID)
+                active = (gid == PUBG_STEAM_APPID)
                 steam_checked = True
             except Exception:
-                pubg_open = None
+                active = None
                 steam_checked = False
 
-        # ── matchRecent nur wenn nicht kurzgeschlossen (PUBG sicher zu) ──
+        # ── matchRecent immer aus der DB berechnen ──
         match_recent = False
         last_iso = None
         age_min = None
-        if pubg_open is not False:
-            conn = self.get_conn()
-            row = conn.execute(
-                "SELECT MAX(played_at) AS last FROM matches WHERE tenant_id = ?",
-                (self.tenant_id,)
-            ).fetchone()
-            last_iso = row["last"] if row else None
-            if last_iso:
-                try:
-                    last_dt = datetime.datetime.fromisoformat(
-                        last_iso.replace("Z", "+00:00"))
-                    now = datetime.datetime.now(datetime.timezone.utc)
-                    age_min = round((now - last_dt).total_seconds() / 60.0, 1)
-                    match_recent = age_min < threshold_min
-                except Exception:
-                    pass
-
-        # ── active-Entscheidung ──
-        active = match_recent if pubg_open is not False else False
+        conn = self.get_conn()
+        row = conn.execute(
+            "SELECT MAX(played_at) AS last FROM matches WHERE tenant_id = ?",
+            (self.tenant_id,)
+        ).fetchone()
+        last_iso = row["last"] if row else None
+        if last_iso:
+            try:
+                last_dt = datetime.datetime.fromisoformat(
+                    last_iso.replace("Z", "+00:00"))
+                now = datetime.datetime.now(datetime.timezone.utc)
+                age_min = round((now - last_dt).total_seconds() / 60.0, 1)
+                match_recent = age_min < threshold_min
+            except Exception:
+                pass
 
         return _ok({
             "active": active,
-            "pubgOpen": pubg_open,
+            "pubgOpen": active,   # Alias (rueckwaertskompatibel) — identisch zu active
             "matchRecent": match_recent,
             "lastMatchAt": last_iso,
             "lastMatchAgeMin": age_min,

@@ -52,39 +52,37 @@ def _call(reg, query=""):
     return json.loads(body)
 
 
-def test_pubg_open_and_recent_match_is_active(tmp_db_path):
+def test_active_is_pubg_open_independent_of_match(tmp_db_path):
     conn = _setup(tmp_db_path)
     _add_match(conn, "m1", 5)
     reg = _registry(conn, steam_summary_fn=lambda: {"gameid": str(PUBG)})
     out = _call(reg)
-    assert out["active"] is True
-    assert out["pubgOpen"] is True
+    assert out["active"] is True              # PUBG laeuft laut Steam
+    assert out["pubgOpen"] is True            # Alias == active
     assert out["matchRecent"] is True
     assert out["steamChecked"] is True
 
 
-def test_pubg_open_but_no_recent_match_inactive(tmp_db_path):
+def test_active_stays_true_even_without_recent_match(tmp_db_path):
     conn = _setup(tmp_db_path)
     _add_match(conn, "m_old", 120)
     reg = _registry(conn, steam_summary_fn=lambda: {"gameid": str(PUBG)})
     out = _call(reg)
-    assert out["active"] is False
-    assert out["pubgOpen"] is True
-    assert out["matchRecent"] is False
+    assert out["active"] is True              # PUBG laeuft -> active, egal wie alt das Match
+    assert out["matchRecent"] is False        # letztes Match > 30 min
 
 
-def test_pubg_closed_is_inactive_and_short_circuits_db(tmp_db_path):
+def test_pubg_closed_is_inactive_but_match_recent_still_computed(tmp_db_path):
     conn = _setup(tmp_db_path)
     _add_match(conn, "m1", 5)  # frischer Match, aber PUBG zu
     reg = _registry(conn, steam_summary_fn=lambda: {"gameid": "730"})  # CS, nicht PUBG
     out = _call(reg)
-    assert out["active"] is False
-    assert out["pubgOpen"] is False
-    assert out["matchRecent"] is False        # nicht evaluiert -> false
-    assert out["lastMatchAt"] is None         # Kurzschluss: kein DB-Query
+    assert out["active"] is False             # PUBG laeuft nicht
+    assert out["matchRecent"] is True         # wird jetzt IMMER berechnet
+    assert out["lastMatchAt"] is not None     # kein Kurzschluss mehr
 
 
-def test_steam_unavailable_falls_back_to_match_recent(tmp_db_path):
+def test_steam_unavailable_active_is_null(tmp_db_path):
     conn = _setup(tmp_db_path)
     _add_match(conn, "m1", 5)
 
@@ -93,23 +91,23 @@ def test_steam_unavailable_falls_back_to_match_recent(tmp_db_path):
 
     reg = _registry(conn, steam_summary_fn=boom)
     out = _call(reg)
-    assert out["active"] is True              # Fallback: active = matchRecent
+    assert out["active"] is None              # Steam unbestimmbar -> null
     assert out["pubgOpen"] is None
-    assert out["matchRecent"] is True
+    assert out["matchRecent"] is True         # unabhaengig weiter berechnet
     assert out["steamChecked"] is False
 
 
-def test_no_steam_fn_falls_back_to_match_recent(tmp_db_path):
+def test_no_steam_fn_active_is_null(tmp_db_path):
     conn = _setup(tmp_db_path)
     _add_match(conn, "m1", 5)
     reg = _registry(conn, steam_summary_fn=None)
     out = _call(reg)
-    assert out["active"] is True
-    assert out["pubgOpen"] is None
+    assert out["active"] is None
+    assert out["matchRecent"] is True
     assert out["steamChecked"] is False
 
 
-def test_no_steam_query_override_skips_steam(tmp_db_path):
+def test_no_steam_query_override_active_is_null(tmp_db_path):
     conn = _setup(tmp_db_path)
     _add_match(conn, "m1", 5)
     called = {"n": 0}
@@ -121,8 +119,8 @@ def test_no_steam_query_override_skips_steam(tmp_db_path):
     reg = _registry(conn, steam_summary_fn=fn)
     out = _call(reg, "noSteam=1")
     assert called["n"] == 0                    # Steam nicht abgefragt
-    assert out["active"] is True               # nur matchRecent
-    assert out["pubgOpen"] is None
+    assert out["active"] is None               # unbestimmbar -> null
+    assert out["matchRecent"] is True          # weiter berechnet
 
 
 def test_fake_pubg_open_override(tmp_db_path):
