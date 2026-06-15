@@ -27,8 +27,9 @@
       align-items: center;
       position: relative;
       overflow: hidden;
-      /* Game-Hero als Background, durch Dimmung lesbar gemacht. */
-      background-color: rgba(26, 13, 42, 0.6);
+      /* Game-Hero als Background, durch Dimmung lesbar gemacht. Tönung folgt
+         dem Theme (--theme-bg) statt hardcoded Purple. */
+      background-color: color-mix(in srgb, var(--theme-bg, #1a0d2a) 60%, transparent);
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
@@ -310,8 +311,11 @@
     function setPanelHero(url) {
       const panel = document.getElementById("panel");
       if (url) {
+        // Dimm-Tönung aus dem Theme (--theme-bg) statt hardcoded Purple.
+        const dimPct = Math.round(HERO_DIM * 100);
+        const dim = `color-mix(in srgb, var(--theme-bg, #1a0d2a) ${dimPct}%, transparent)`;
         panel.style.backgroundImage =
-          `linear-gradient(rgba(26,13,42,${HERO_DIM}), rgba(26,13,42,${HERO_DIM})), url("${url}")`;
+          `linear-gradient(${dim}, ${dim}), url("${url}")`;
       } else {
         panel.style.backgroundImage = "";
       }
