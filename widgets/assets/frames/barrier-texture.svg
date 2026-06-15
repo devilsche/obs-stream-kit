@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
-  <!-- Nebelschwaden: weiche diagonale Baender, sehr dezent gruen. -->
-  <g stroke="#7fc23a" stroke-opacity="0.05" fill="none" stroke-width="9" stroke-linecap="round">
-    <path d="M-10 30 Q40 10 70 34 T140 38"/>
-    <path d="M-10 68 Q35 50 72 72 T140 78"/>
-    <path d="M-10 104 Q45 88 78 108 T140 110"/>
-  </g>
-</svg>
