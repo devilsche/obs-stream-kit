@@ -28,7 +28,7 @@ Hintergrund-Glow **und** echte Ornamente (verzierte Rahmen-Ecken + Textur-Overla
 
 Alle Paletten sind auf WCAG-Kontrast geprüft (Body-`text` auf `bg`/`surface` ≥ 4.5:1).
 
-### 1 · `gothic-oldcamp` — „Altes Lager" (Erzbarone)
+### 1 · `oldcamp` — „Altes Lager" (Erzbarone)
 Warm, Leder, Bronze, Fackelfeuer.
 ```
 --theme-primary:#b9762f; --theme-accent:#e0a93e; --theme-accent-2:#8a5a2b; --theme-on-primary:#1a1008;
@@ -43,7 +43,7 @@ Warm, Leder, Bronze, Fackelfeuer.
 --theme-frame:<oldcamp-svg>; --theme-texture:<leder-overlay>;
 ```
 
-### 2 · `gothic-barrier` — „Sumpflager / Die Barriere" (Magie & Schwefel)
+### 2 · `barrier` — „Sumpflager / Die Barriere" (Magie & Schwefel)
 Mystisch, giftgrün, magischer Barriere-Glow.
 ```
 --theme-primary:#7fc23a; --theme-accent:#b6e84a; --theme-accent-2:#4a8f5c; --theme-on-primary:#08120a;
@@ -58,7 +58,7 @@ Mystisch, giftgrün, magischer Barriere-Glow.
 --theme-frame:<barrier-svg>; --theme-texture:<nebel-overlay>;
 ```
 
-### 3 · `gothic-sect` — „Schläfer-Tempel / Sekte" (Wüste & Opferfeuer)
+### 3 · `sect` — „Schläfer-Tempel / Sekte" (Wüste & Opferfeuer)
 Obsidian, Wüstensand, Glut, archaisch-hart.
 ```
 --theme-primary:#c2682f; --theme-accent:#e0913a; --theme-accent-2:#7a3b3b; --theme-on-primary:#160d10;

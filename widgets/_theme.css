@@ -104,7 +104,7 @@ html[data-theme="swiss"] {
 }
 
 /* ── Gothic / Mittelalter-Themes (Spiel-inspiriert) ───────────────────────── */
-html[data-theme="gothic-oldcamp"] {
+html[data-theme="oldcamp"] {
   /* Altes Lager — Erzbarone: Leder, Bronze, Gold, Fackelfeuer. */
   --theme-primary:#b9762f; --theme-accent:#e0a93e; --theme-accent-2:#8a5a2b; --theme-on-primary:#1a1008;
   --theme-bg:#130c07; --theme-surface:#1f150c; --theme-surface-2:#2a1d10; --theme-border:#6b4a24;
@@ -115,11 +115,11 @@ html[data-theme="gothic-oldcamp"] {
   --theme-radius:2px; --theme-border-width:2.5px; --theme-shadow:0 14px 40px rgba(0,0,0,.6);
   --theme-hot-icon:"swords";
   --theme-page-bg:radial-gradient(900px 600px at 50% -10%,rgba(185,118,47,.28),#130c07 60%);
-  --theme-frame:url("/widgets-static/assets/frames/gothic-oldcamp-frame.svg") 34 / 17px / 0 stretch;
-  --theme-texture:url("/widgets-static/assets/frames/gothic-oldcamp-texture.svg");
+  --theme-frame:url("/widgets-static/assets/frames/oldcamp-frame.svg") 34 / 17px / 0 stretch;
+  --theme-texture:url("/widgets-static/assets/frames/oldcamp-texture.svg");
 }
 
-html[data-theme="gothic-barrier"] {
+html[data-theme="barrier"] {
   /* Sumpflager / Die Barriere — Magie & Schwefel: giftgruen, mystisch. */
   --theme-primary:#7fc23a; --theme-accent:#b6e84a; --theme-accent-2:#4a8f5c; --theme-on-primary:#08120a;
   --theme-bg:#080d0a; --theme-surface:#101a12; --theme-surface-2:#16241a; --theme-border:#3c6b3a;
@@ -130,11 +130,11 @@ html[data-theme="gothic-barrier"] {
   --theme-radius:3px; --theme-border-width:2px; --theme-shadow:0 0 24px rgba(127,194,58,.18),0 14px 40px rgba(0,0,0,.6);
   --theme-hot-icon:"local_fire_department";
   --theme-page-bg:radial-gradient(1000px 700px at 70% -10%,rgba(127,194,58,.30),#080d0a 62%);
-  --theme-frame:url("/widgets-static/assets/frames/gothic-barrier-frame.svg") 34 / 17px / 0 stretch;
-  --theme-texture:url("/widgets-static/assets/frames/gothic-barrier-texture.svg");
+  --theme-frame:url("/widgets-static/assets/frames/barrier-frame.svg") 34 / 17px / 0 stretch;
+  --theme-texture:url("/widgets-static/assets/frames/barrier-texture.svg");
 }
 
-html[data-theme="gothic-sect"] {
+html[data-theme="sect"] {
   /* Schlaefer-Tempel / Sekte — Wueste, Obsidian, Opferfeuer: archaisch-hart. */
   --theme-primary:#c2682f; --theme-accent:#e0913a; --theme-accent-2:#7a3b3b; --theme-on-primary:#160d10;
   --theme-bg:#0f0a10; --theme-surface:#1b1118; --theme-surface-2:#251820; --theme-border:#6e4530;
@@ -145,8 +145,8 @@ html[data-theme="gothic-sect"] {
   --theme-radius:0px; --theme-border-width:2px; --theme-shadow:0 14px 44px rgba(0,0,0,.7);
   --theme-hot-icon:"local_fire_department";
   --theme-page-bg:linear-gradient(0deg,rgba(194,104,47,.22) 0%,#0f0a10 45%);
-  --theme-frame:url("/widgets-static/assets/frames/gothic-sect-frame.svg") 34 / 17px / 0 stretch;
-  --theme-texture:url("/widgets-static/assets/frames/gothic-sect-texture.svg");
+  --theme-frame:url("/widgets-static/assets/frames/sect-frame.svg") 34 / 17px / 0 stretch;
+  --theme-texture:url("/widgets-static/assets/frames/sect-texture.svg");
 }
 
 /* ── Alias-Layer ──────────────────────────────────────────────────────────

@@ -33,7 +33,7 @@ TOOLS = [
      "admin_only": False},
     {"key": "theme-preview",
      "label": "Theme-Vorschau",
-     "desc": "Vorschau der Gothic/Mittelalter-Themes auf Beispiel-Komponenten — Farben, Schrift, Form, Ornamente.",
+     "desc": "Vorschau der Mittelalter-Themes auf Beispiel-Komponenten — Farben, Schrift, Form, Ornamente.",
      "path": "tools/theme-preview.html",
      "admin_only": True},
 ]
@@ -138,13 +138,15 @@ def settings():
             # Theme (gilt fuers ganze Konto; Whitelist analog ALLOWED_THEMES)
             theme = request.form.get("theme")
             if theme in ("entry", "terminal", "aurora", "midnight",
-                         "editorial", "swiss", "azure"):
+                         "editorial", "swiss", "azure",
+                         "oldcamp", "barrier", "sect"):
                 set_setting(conn, g.tenant_id, "theme", theme)
             # Stinger-Font (Whitelist; "" = Theme-Default)
             sfont = request.form.get("stinger_font", "")
             if sfont in ("", "Orbitron", "Russo One", "Black Ops One", "Audiowide",
                          "Teko", "Saira Stencil One", "Wallpoet", "Bungee",
-                         "Chakra Petch", "Oxanium", "Rajdhani", "Syncopate"):
+                         "Chakra Petch", "Oxanium", "Rajdhani", "Syncopate",
+                         "Metamorphous", "MedievalSharp", "Cinzel Decorative"):
                 set_setting(conn, g.tenant_id, "stinger_font", sfont)
             return redirect("/app/settings?saved=1")
         creds = core_creds.get(conn, g.tenant_id)

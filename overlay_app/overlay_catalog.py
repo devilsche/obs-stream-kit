@@ -145,6 +145,7 @@ _PET_FONTS = [
     ["Kaushan Script", "Kaushan Script"], ["Courgette", "Courgette"],
     ["Yellowtail", "Yellowtail"], ["Allura", "Allura"], ["Cookie", "Cookie"],
     ["Merienda", "Merienda"],
+    ["Cinzel Decorative", "Cinzel Decorative"],
 ]
 
 EFFECT_META = {
@@ -207,6 +208,9 @@ TRANSITIONS = [
                     ["Oxanium", "Oxanium"],
                     ["Rajdhani", "Rajdhani"],
                     ["Syncopate", "Syncopate"],
+                    ["Metamorphous", "Metamorphous"],
+                    ["MedievalSharp", "MedievalSharp"],
+                    ["Cinzel Decorative", "Cinzel Decorative"],
                 ],
             },
         ],
