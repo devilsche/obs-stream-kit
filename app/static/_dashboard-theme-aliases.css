@@ -86,9 +86,9 @@ html[data-theme="azure"] .topnav{box-shadow:0 1px 0 color-mix(in srgb,var(--bran
 /* — Mittelalter (Old Camp / Barrier / Sect): Ornament-Rahmen (Eck-Beschlaege)
      + Textur-Overlay auf den Karten, analog zu den OBS-Widgets (.pubg-card/
      .t-card). Headlines folgen via --font-display der Serifen-/Display-Schrift. */
-html[data-theme="oldcamp"] .card,
-html[data-theme="barrier"] .card,
-html[data-theme="sect"] .card{
+html[data-theme="oldcamp"] .card, html[data-theme="oldcamp"] .dn-ccard,
+html[data-theme="barrier"] .card, html[data-theme="barrier"] .dn-ccard,
+html[data-theme="sect"]    .card, html[data-theme="sect"]    .dn-ccard{
   border:var(--theme-frame-width,var(--theme-border-width)) solid var(--border);
   border-image:var(--theme-frame);
   background-image:var(--theme-texture);
