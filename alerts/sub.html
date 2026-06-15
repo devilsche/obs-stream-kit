@@ -180,16 +180,16 @@
     }
 
     .tier-badge--1 {
-      background: color-mix(in srgb, var(--color-purple-glow) 60%, transparent);
+      background: color-mix(in srgb, var(--color-purple-glow) 75%, transparent);
       border: 2px solid var(--color-accent);
-      color: var(--color-accent);
-      text-shadow: 0 0 10px color-mix(in srgb, var(--color-accent) 80%, transparent);
+      color: var(--color-text);
+      text-shadow: 0 0 8px color-mix(in srgb, var(--color-accent) 55%, transparent);
     }
     .tier-badge--2 {
-      background: color-mix(in srgb, var(--color-purple-glow) 70%, transparent);
+      background: color-mix(in srgb, var(--color-purple-glow) 82%, transparent);
       border: 2px solid color-mix(in srgb, var(--color-accent) 70%, white);
-      color: var(--color-accent);
-      text-shadow: 0 0 12px color-mix(in srgb, var(--color-accent) 90%, transparent);
+      color: var(--color-text);
+      text-shadow: 0 0 8px color-mix(in srgb, var(--color-accent) 60%, transparent);
     }
     .tier-badge--3 {
       background: linear-gradient(135deg,
@@ -209,7 +209,12 @@
       opacity: 0;
       animation: fadeIn 0.4s ease 0.3s forwards;
     }
-    .username .pubg-hot { color: var(--color-accent) !important; }
+    /* Name immer hell + ohne verwaschenen Glow lesbar; das Tier-Highlight
+       transportiert das Hot-Icon daneben, nicht der Name-Text selbst. */
+    .username .t-hot, .username .pubg-hot {
+      color: var(--color-text) !important;
+      text-shadow: none !important;
+    }
 
     .divider {
       width: 80px;
