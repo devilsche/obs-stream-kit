@@ -43,7 +43,7 @@ WIDGET_PREVIEW_SIZES = {
     "pubg/session-goal.html":       (400,  80),
     "pubg/session-lobbies.html":    (400, 280),
     "pubg/payday-stats.html":       (400, 280),
-    "pubg/deathmatch-stats.html":   (340, 360),
+    "pubg/deathmatch-stats.html":   (480, 470),
     # PUBG Achievements
     "pubg/milestone-celebrate.html":(1920,1080),
     "pubg/session-achievements.html":(400, 360),
