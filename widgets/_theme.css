@@ -117,7 +117,7 @@ html[data-theme="oldcamp"] {
   --theme-page-bg:radial-gradient(900px 600px at 50% -10%,rgba(185,118,47,.28),#130c07 60%);
   --theme-frame:url("/widgets-static/assets/frames/oldcamp-frame.svg") 34 / 17px / 0 stretch;
   --theme-frame-width:17px;
-  --theme-texture:radial-gradient(135% 115% at 50% -10%, rgba(224,169,62,.07), transparent 62%);
+  --theme-texture:url("/widgets-static/assets/frames/oldcamp-texture.svg");
 }
 
 html[data-theme="barrier"] {
@@ -149,7 +149,7 @@ html[data-theme="sect"] {
   --theme-page-bg:linear-gradient(0deg,rgba(194,104,47,.22) 0%,#0f0a10 45%);
   --theme-frame:url("/widgets-static/assets/frames/sect-frame.svg") 34 / 17px / 0 stretch;
   --theme-frame-width:17px;
-  --theme-texture:radial-gradient(140% 120% at 50% 112%, rgba(194,104,47,.09), transparent 60%);
+  --theme-texture:url("/widgets-static/assets/frames/sect-texture.svg");
 }
 
 /* ── Alias-Layer ──────────────────────────────────────────────────────────

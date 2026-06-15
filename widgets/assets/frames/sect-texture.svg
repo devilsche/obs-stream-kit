@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="110" height="110" viewBox="0 0 110 110">
+  <!-- Stein-Maserung: kantige Risse, sehr dezent. -->
+  <g stroke="#c2682f" stroke-opacity="0.055" fill="none" stroke-width="1.4" stroke-linejoin="miter">
+    <path d="M8 0 L14 22 L6 40 L18 60 L10 82 L20 110"/>
+    <path d="M52 0 L46 18 L58 34 L48 58 L60 78 L50 110"/>
+    <path d="M92 0 L100 24 L88 44 L98 66 L86 88 L96 110"/>
+    <path d="M14 22 L40 28 M58 34 L80 30 M48 58 L70 64 M88 44 L70 64"/>
+  </g>
+</svg>
