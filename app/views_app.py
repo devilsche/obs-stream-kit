@@ -148,6 +148,10 @@ def settings():
                          "Chakra Petch", "Oxanium", "Rajdhani", "Syncopate",
                          "Metamorphous", "MedievalSharp", "Cinzel Decorative"):
                 set_setting(conn, g.tenant_id, "stinger_font", sfont)
+            # Highlight-Quelle für die Szenen-Overlays (Clips vs Steam-Media)
+            hsrc = request.form.get("highlight_source")
+            if hsrc in ("clips", "steam_media"):
+                set_setting(conn, g.tenant_id, "highlight_source", hsrc)
             return redirect("/app/settings?saved=1")
         creds = core_creds.get(conn, g.tenant_id)
         prefs = {
@@ -156,6 +160,8 @@ def settings():
             "lang": get_setting(conn, g.tenant_id, "ui.lang", default="de"),
             "theme": get_setting(conn, g.tenant_id, "theme", default="entry"),
             "stinger_font": get_setting(conn, g.tenant_id, "stinger_font", default=""),
+            "highlight_source": get_setting(conn, g.tenant_id, "highlight_source",
+                                            default="clips"),
         }
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:

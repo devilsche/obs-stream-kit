@@ -68,6 +68,15 @@
       </div>
 
       <div class="dn-field">
+        <label for="highlight_source">Highlight-Quelle (Szenen-Overlays)</label>
+        <select id="highlight_source" name="highlight_source">
+          <option value="clips"       {% if prefs.highlight_source == 'clips' %}selected{% endif %}>Twitch-Clips</option>
+          <option value="steam_media" {% if prefs.highlight_source == 'steam_media' %}selected{% endif %}>Steam-Media des laufenden Spiels (Trailer + Screenshots)</option>
+        </select>
+        <div class="dn-note">Steam-Media greift nur, wenn ein Spiel läuft — sonst automatisch Twitch-Clips.</div>
+      </div>
+
+      <div class="dn-field">
         <label for="default_range">Default-Range für Widgets</label>
         <select id="default_range" name="default_range">
           <option value="session" {% if prefs.default_range == 'session' %}selected{% endif %}>Session (aktuell/letzte)</option>

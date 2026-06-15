@@ -340,7 +340,9 @@
       animation: clipBreathe 9s ease-in-out infinite;
     }
 
-    .clip-player iframe {
+    .clip-player iframe,
+    .clip-player video,
+    .clip-player img.steam-shot {
       width: 100%;
       height: 100%;
       border: none;
@@ -348,6 +350,7 @@
       opacity: 1;
       transition: opacity 0.8s ease;
     }
+    .clip-player img.steam-shot { object-fit: cover; }
     .clip-player iframe.fade-out { opacity: 0; }
 
     .clip-player .clip-placeholder {

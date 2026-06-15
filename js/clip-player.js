@@ -203,31 +203,126 @@ var ClipPlayer = (function () {
       loadClip(0);
     }
 
-    // Manueller Modus
-    if (manualClips) {
-      var ids = manualClips.split(',')
-        .map(function (s) { return s.trim(); })
-        .filter(function (s) { return s.length > 0; });
-      startPlayer(ids.map(function (id) {
-        return { id: id, title: '', duration: 30 };
-      }));
-      return;
+    var serveBase    = (window.__SERVE_BASE__ || '/').replace(/\/+$/, '/');
+    var screenshotMs = (parseInt(params.get('screenshotSec'), 10) || 10) * 1000;
+
+    function startClipFlow() {
+      // Manueller Modus
+      if (manualClips) {
+        var ids = manualClips.split(',')
+          .map(function (s) { return s.trim(); })
+          .filter(function (s) { return s.length > 0; });
+        startPlayer(ids.map(function (id) {
+          return { id: id, title: '', duration: 30 };
+        }));
+        return;
+      }
+      // API Modus — Clips kommen server-seitig (kein Secret im Browser).
+      var url = serveBase + 'api/twitch/clips?count=' + clipCount;
+      fetch(url, { credentials: 'omit' })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var list = (data && data.clips) || [];
+          if (!list.length) throw new Error('Keine Clips gefunden');
+          startPlayer(list);
+        })
+        .catch(function (err) {
+          console.error('ClipPlayer:', err);
+          showError(err.message || 'API-Fehler');
+        });
     }
 
-    // API Modus — Clips kommen server-seitig (kein Secret im Browser).
-    var serveBase = window.__SERVE_BASE__ || '/';
-    var url = serveBase.replace(/\/+$/, '/') + 'api/twitch/clips?count=' + clipCount;
-    fetch(url, { credentials: 'omit' })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        var list = (data && data.clips) || [];
-        if (!list.length) throw new Error('Keine Clips gefunden');
-        startPlayer(list);
-      })
-      .catch(function (err) {
-        console.error('ClipPlayer:', err);
-        showError(err.message || 'API-Fehler');
+    // ─── Steam-Media-Modus (Trailer via hls.js + Screenshot-Slideshow) ───
+    var hlsLoading = null;
+    function ensureHls() {
+      if (window.Hls) return Promise.resolve(window.Hls);
+      if (hlsLoading) return hlsLoading;
+      hlsLoading = new Promise(function (resolve, reject) {
+        var s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js';
+        s.onload = function () { resolve(window.Hls); };
+        s.onerror = function () { reject(new Error('hls.js load failed')); };
+        document.head.appendChild(s);
       });
+      return hlsLoading;
+    }
+
+    function startSteamMedia(media) {
+      var playlist = [];
+      (media.trailers || []).forEach(function (t) {
+        if (t.hls) playlist.push({ type: 'trailer', hls: t.hls, name: t.name });
+      });
+      (media.screenshots || []).forEach(function (url) {
+        playlist.push({ type: 'shot', url: url });
+      });
+      if (!playlist.length) { startClipFlow(); return; }
+      if (placeholder) placeholder.style.display = 'none';
+      shuffle(playlist);
+      var idx = 0;
+
+      function clearStage() {
+        var old = container.querySelector('iframe, video, img.steam-shot');
+        if (old) old.remove();
+      }
+      function next() { idx = (idx + 1) % playlist.length; play(idx); }
+
+      function play(i) {
+        var item = playlist[i % playlist.length];
+        clearStage();
+        if (clipMetaTitle) clipMetaTitle.textContent = item.name || 'Steam Highlight';
+        if (clipMetaDetails) clipMetaDetails.textContent = '';
+        if (clipMeta) clipMeta.classList.add('clip-meta--visible');
+
+        if (item.type === 'shot') {
+          var img = document.createElement('img');
+          img.className = 'steam-shot';
+          img.src = item.url;
+          container.appendChild(img);
+          setTimeout(next, screenshotMs);
+          return;
+        }
+        // Trailer: HLS-Video
+        var video = document.createElement('video');
+        video.muted = (muted === false) ? false : true; // Default stumm in OBS
+        video.autoplay = true; video.playsInline = true;
+        container.appendChild(video);
+        var advanced = false;
+        function adv() { if (advanced) return; advanced = true; next(); }
+        video.addEventListener('ended', adv);
+        video.addEventListener('error', function () { setTimeout(adv, 200); });
+        // Sicherheitsnetz falls Stream haengt
+        var guard = setTimeout(adv, 90000);
+        video.addEventListener('ended', function () { clearTimeout(guard); });
+
+        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = item.hls; video.play().catch(function () {});
+        } else {
+          ensureHls().then(function (Hls) {
+            if (Hls.isSupported()) {
+              var hls = new Hls();
+              hls.loadSource(item.hls);
+              hls.attachMedia(video);
+              hls.on(Hls.Events.MANIFEST_PARSED, function () { video.play().catch(function () {}); });
+              hls.on(Hls.Events.ERROR, function (e, d) { if (d && d.fatal) adv(); });
+            } else { adv(); }
+          }).catch(function () { adv(); });
+        }
+      }
+      play(0);
+    }
+
+    // ─── Quelle entscheiden: Steam-Media (falls aktiv + Spiel laeuft) sonst Clips ───
+    fetch(serveBase + 'api/steam/highlight-media', { credentials: 'omit' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.source === 'steam'
+            && ((d.trailers && d.trailers.length) || (d.screenshots && d.screenshots.length))) {
+          startSteamMedia(d);
+        } else {
+          startClipFlow();
+        }
+      })
+      .catch(function () { startClipFlow(); });
   }
 
   return { init: init };
