@@ -48,7 +48,12 @@
       border-image: var(--theme-frame);
       border-radius: inherit;
       pointer-events: none;
+      /* Glow folgt den Ornament-Formen (drop-shadow auf den border-image-Pixeln),
+         nicht ein rechteckiger box-shadow um die ganze Box. Pro Theme getoken. */
+      filter: var(--theme-frame-glow, none);
     }
+    /* Glow-Vergleich: body.no-glow schaltet den Schein global ab. */
+    body.no-glow .orn::after { filter: none; }
 
     /* Demo-Boxen mit echten Theme-Tokens. */
     .demo-card {
@@ -139,6 +144,9 @@
       <button type="button" data-theme="sect" aria-pressed="false">Sect Camp</button>
       <button type="button" data-theme="entry" aria-pressed="false">Entry (kein Ornament)</button>
     </nav>
+    <nav class="switcher" aria-label="Glow">
+      <button type="button" id="glowToggle" aria-pressed="true">Glow an</button>
+    </nav>
   </header>
 
   <h2>Große Karte</h2>
@@ -203,6 +211,12 @@
       root.setAttribute("data-theme", b.dataset.theme);
       btns.forEach(x => x.setAttribute("aria-pressed", String(x === b)));
     }));
+    const glow = document.getElementById("glowToggle");
+    glow.addEventListener("click", () => {
+      const off = document.body.classList.toggle("no-glow");
+      glow.setAttribute("aria-pressed", String(!off));   // pressed = Glow an
+      glow.textContent = off ? "Glow aus" : "Glow an";
+    });
   </script>
 </body>
 </html>
