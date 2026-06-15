@@ -1,98 +1,81 @@
 <!DOCTYPE html>
-<html lang="de">
+<!--
+  PUBG Deathmatch (TDM) Card
+  ────────────────────────────────────────────────────────────────────
+  Career-artige Stat-Karte fuer den Team-Deathmatch-Modus (game_mode 'tdm').
+  Kills/Deaths kommen aus der Telemetrie, Damage aus den participant-Stats
+  (siehe compute_deathmatch_stats). Look komplett aus dem Theme (t-* Bausteine).
+  Lokale Vorschau: ?theme=<name>&demo=1[&dock=1] ohne Server-Injektion.
+-->
+<html>
 <head>
   <meta charset="utf-8">
-  <title>Deathmatch Stats</title>
+  <title>PUBG Deathmatch</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
   <link rel="stylesheet" href="_pubg.css">
   <link rel="stylesheet" href="../_theme.css">
+  <link rel="stylesheet" href="../_blocks.css">
   <style>
-    html, body { margin: 0; padding: 0; }
-    body { padding: 8px; min-height: 100vh; box-sizing: border-box; }
-    body.dock { background: var(--pubg-page-bg); padding: 10px; height: 100vh; overflow: hidden; }
-    .panel { width: 100%; min-width: 320px; padding: 14px 16px; }
-    .panel h3 { margin: 0 0 12px; font-size: 0.9em; letter-spacing: 0.08em;
-                color: var(--pubg-muted); text-transform: uppercase; }
-    .panel h3 .icon-gold { color: var(--pubg-gold); vertical-align: -4px; }
-    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-    th, td { padding: 6px 8px; text-align: right; }
-    th:first-child, td:first-child, th:nth-child(2), td.name { text-align: left; }
-    th { color: var(--pubg-gold); font-size: 0.78em; text-transform: uppercase;
-         letter-spacing: 0.05em; border-bottom: 1px solid var(--pubg-border); }
-    td.rank { color: var(--pubg-muted); width: 26px; }
-    td.name { color: var(--pubg-text); }
-    td.kd b { color: var(--pubg-gold); font-size: 1.1em; }
-    tr.self td { color: var(--pubg-gold); font-weight: 700; }
-    tbody tr:not(:last-child) td { border-bottom: 1px solid rgba(127,127,127,0.12); }
-    .empty { color: var(--pubg-muted); font-style: italic; text-align: center; padding: 20px 0; }
-    .sub { color: var(--pubg-muted); font-size: 0.75em; margin-top: 8px; }
+    body { padding: 20px; display: flex; align-items: center; }
+    .t-card { width: 400px; }
+    html[data-theme="swiss"] .t-card { width: 460px; }
+    .empty { color: var(--theme-text-dim); font-style: italic; }
   </style>
 </head>
 <body>
-  <div class="pubg-header" id="pubgHeader"></div>
-  <div class="pubg-card panel pubg-fade-in">
-    <h3><span class="material-symbols-outlined icon-gold" aria-hidden="true">swords</span> Deathmatch — Top Killers</h3>
-    <div id="content"><div class="empty">— loading —</div></div>
+  <div class="t-card pubg-fade-in">
+    <div class="t-header"><span>Deathmatch</span> <span class="t-range" id="who">—</span></div>
+    <div class="t-stat-grid t-stat-grid--cols3 t-stat-grid--compact" id="grid">
+      <div class="t-stat"><span class="t-value" id="rounds">—</span><span class="t-label">Rounds</span></div>
+      <div class="t-stat"><span class="t-value" id="kills">—</span><span class="t-label">Kills</span></div>
+      <div class="t-stat"><span class="t-value" id="deaths">—</span><span class="t-label">Deaths</span></div>
+      <div class="t-stat"><span class="t-value" id="kd">—</span><span class="t-label">K/D</span></div>
+      <div class="t-stat"><span class="t-value" id="avgk">—</span><span class="t-label">Ø Kills/R</span></div>
+      <div class="t-stat"><span class="t-value" id="avgdmg">—</span><span class="t-label">Ø Damage</span></div>
+    </div>
   </div>
   <script src="_pubg.js"></script>
   <script>
-    const RANGE = PubgUI.qs("range", "session");
-    const LIMIT = parseInt(PubgUI.qs("limit", "10"), 10) || 10;
+    const RANGE = PubgUI.qs("range", "all");
+    const DEMO  = PubgUI.qs("demo", "") === "1";
 
-    PubgUI.renderHeader(document.getElementById("pubgHeader"),
-      "Deathmatch", RANGE);
     PubgUI.buildFilter([
-      { key: "range", label: "Range", type: "select", default: "session",
+      { key: "range", label: "Range", type: "select", default: "all",
         options: [["session", "Session"], ["week", "7 days"], ["all", "Database"]] },
-      { key: "limit", label: "Max rows", type: "range", default: 10,
-        min: 3, max: 30, presets: [5, 10, 15, 20] },
     ]);
 
-    const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
-      c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    // Highlight-Schwellen [Stufe1, Stufe2, Stufe3] — gestuft, dezent.
+    const HOT = { kills: [50, 150, 300], kd: [1.0, 1.5, 2.5], avgk: [8, 12, 18] };
 
     function render(data) {
-      const cont = document.getElementById("content");
       const players = (data && data.players) || [];
-      if (!players.length) {
-        cont.innerHTML = `<div class="empty">No deathmatch rounds in this range.</div>`;
+      const self = players.find(p => p.isSelf) || players[0];
+      const $ = (id) => document.getElementById(id);
+      if (!self) {
+        $("who").textContent = "—";
+        document.getElementById("grid").innerHTML =
+          `<div class="empty">No deathmatch rounds in this range.</div>`;
         return;
       }
-      const rows = players.slice(0, LIMIT).map((p, i) => `
-        <tr class="${p.isSelf ? "self" : ""}">
-          <td class="rank">${i + 1}</td>
-          <td class="name">${esc(p.name)}</td>
-          <td>${p.kills}</td>
-          <td>${p.deaths}</td>
-          <td class="kd"><b>${Number(p.kd).toFixed(2)}</b></td>
-          <td>${Math.round(p.damage).toLocaleString("en")}</td>
-          <td>${p.matches}</td>
-        </tr>`).join("");
-      cont.innerHTML = `
-        <table>
-          <thead><tr>
-            <th>#</th><th>Player</th><th>Kills</th><th>Deaths</th>
-            <th>K/D</th><th>DMG</th><th>Rounds</th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-        <div class="sub">${data.matchCount} round${data.matchCount === 1 ? "" : "s"} ·
-          team ${data.totals.teamKills} kills / ${data.totals.teamDeaths} deaths</div>`;
+      const rounds = self.matches || 0;
+      const avgK = self.kills / Math.max(rounds, 1);
+      const avgD = self.damage / Math.max(rounds, 1);
+      $("who").textContent = self.name;
+      $("rounds").textContent = PubgUI.fmtNum(rounds);
+      $("kills").innerHTML  = PubgUI.hot(self.kills, HOT.kills, PubgUI.fmtNum(self.kills));
+      $("deaths").textContent = PubgUI.fmtNum(self.deaths);
+      $("kd").innerHTML     = PubgUI.hot(self.kd, HOT.kd, PubgUI.fmtKD(self.kd));
+      $("avgk").innerHTML   = PubgUI.hot(avgK, HOT.avgk, avgK.toFixed(1));
+      $("avgdmg").textContent = Math.round(avgD).toLocaleString("en");
     }
 
-    async function load() {
-      try {
-        const data = await PubgUI.fetchJson(
-          (window.__SERVE_BASE__ || "/") + "api/pubg/deathmatch-stats?range=" +
-          encodeURIComponent(RANGE));
-        render(data);
-      } catch (e) {
-        document.getElementById("content").innerHTML =
-          `<div class="empty">Load failed: ${esc(e.message || e)}</div>`;
-      }
+    if (DEMO) {
+      render({ players: [{ isSelf: true, name: "Das_Flip-Flop", kills: 105,
+               deaths: 63, kd: 1.67, damage: 13369, matches: 6 }] });
+    } else {
+      PubgUI.poll((window.__SERVE_BASE__ || "/") + "api/pubg/deathmatch-stats?range=" +
+        encodeURIComponent(RANGE), 60 * 1000, render, console.error);
     }
-    load();
   </script>
 </body>
 </html>
