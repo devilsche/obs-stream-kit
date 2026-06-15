@@ -3588,6 +3588,96 @@ def compute_payday_stats(conn, tenant_id: int, my_account_id, range_key="all",
             "labels": PAYDAY_LOOT_LABELS}
 
 
+def compute_deathmatch_stats(conn, tenant_id: int, my_account_id, range_key="all",
+                             from_iso=None, to_iso=None):
+    """Bestenliste der Team-Deathmatch-Runden (game_mode 'tdm').
+
+    PUBG speichert nur das eigene Team in `participants`; Kills + Deaths kommen
+    daher aus der Telemetrie (LogPlayerKillV2 -> actor_account=Kill,
+    target_account=Death), Damage/Headshots/Assists aus den participant-
+    Summary-Stats. Bestenliste = alle Spieler, die je mit dem Self-Player im
+    Team waren, sortiert nach Kills. Returns
+      { players: [{accountId, name, kills, deaths, kd, damage, headshots,
+                   assists, matches, isSelf}], matchCount, totals }
+    """
+    cutoff = (_range_filter(conn, tenant_id, range_key)
+              if range_key != "all" else "1970-01-01T00:00:00Z")
+    if from_iso:
+        cutoff = from_iso
+    where = ("m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ? "
+             "AND m.game_mode = 'tdm'")
+    params = [tenant_id, my_account_id, cutoff]
+    if to_iso:
+        where += " AND m.played_at <= ?"
+        params.append(to_iso)
+
+    mids = [r["match_id"] for r in conn.execute(f"""
+        SELECT DISTINCT m.match_id
+        FROM matches m
+        JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
+        WHERE {where}
+    """, params).fetchall()]
+    if not mids:
+        return {"players": [], "matchCount": 0, "totals": {}}
+    ph = ",".join("?" * len(mids))
+
+    # Team-Roster + Summary-Stats (Damage/Headshots/Assists) aus participants.
+    roster = {}
+    for r in conn.execute(f"""
+        SELECT account_id, MAX(name) AS name,
+               COALESCE(SUM(damage_dealt), 0) AS damage,
+               COALESCE(SUM(headshot_kills), 0) AS headshots,
+               COALESCE(SUM(assists), 0) AS assists,
+               COUNT(*) AS matches
+        FROM participants
+        WHERE tenant_id = ? AND match_id IN ({ph})
+        GROUP BY account_id
+    """, [tenant_id] + mids).fetchall():
+        roster[r["account_id"]] = {
+            "name": r["name"], "damage": round(r["damage"] or 0),
+            "headshots": r["headshots"] or 0, "assists": r["assists"] or 0,
+            "matches": r["matches"], "kills": 0, "deaths": 0}
+
+    # Kills + Deaths aus der (globalen) Telemetrie, per match_id auf die
+    # tdm-Matches dieses Tenants begrenzt. Gegner-Events (actor/target nicht
+    # im eigenen Roster) werden ignoriert.
+    for r in conn.execute(f"""
+        SELECT actor_account AS acc, COUNT(*) AS n FROM telemetry_events
+        WHERE event_type = 'Kill' AND actor_account IS NOT NULL
+          AND match_id IN ({ph})
+        GROUP BY actor_account
+    """, mids).fetchall():
+        if r["acc"] in roster:
+            roster[r["acc"]]["kills"] = r["n"]
+    for r in conn.execute(f"""
+        SELECT target_account AS acc, COUNT(*) AS n FROM telemetry_events
+        WHERE event_type = 'Kill' AND target_account IS NOT NULL
+          AND match_id IN ({ph})
+        GROUP BY target_account
+    """, mids).fetchall():
+        if r["acc"] in roster:
+            roster[r["acc"]]["deaths"] = r["n"]
+
+    players = []
+    for acc, p in roster.items():
+        kd = round(p["kills"] / p["deaths"], 2) if p["deaths"] else float(p["kills"])
+        players.append({
+            "accountId": acc, "name": p["name"], "kills": p["kills"],
+            "deaths": p["deaths"], "kd": kd, "damage": p["damage"],
+            "headshots": p["headshots"], "assists": p["assists"],
+            "matches": p["matches"], "isSelf": acc == my_account_id})
+    players.sort(key=lambda x: (-x["kills"], -x["kd"]))
+
+    return {
+        "players": players,
+        "matchCount": len(mids),
+        "totals": {
+            "teamKills": sum(p["kills"] for p in players),
+            "teamDeaths": sum(p["deaths"] for p in players),
+        },
+    }
+
+
 def compute_map_performance(conn, tenant_id: int, my_account_id, range_key="all"):
     """Pro Map: Matches, Wins, K/D, Ø Kills/DMG/Place/Surv.
     range_key: 'session' | 'day' | 'week' | 'all'."""

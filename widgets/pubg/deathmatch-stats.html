@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Deathmatch Stats</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <link rel="stylesheet" href="../_theme.css">
+  <style>
+    html, body { margin: 0; padding: 0; }
+    body { padding: 8px; min-height: 100vh; box-sizing: border-box; }
+    body.dock { background: var(--pubg-page-bg); padding: 10px; height: 100vh; overflow: hidden; }
+    .panel { width: 100%; min-width: 320px; padding: 14px 16px; }
+    .panel h3 { margin: 0 0 12px; font-size: 0.9em; letter-spacing: 0.08em;
+                color: var(--pubg-muted); text-transform: uppercase; }
+    .panel h3 .icon-gold { color: var(--pubg-gold); vertical-align: -4px; }
+    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    th, td { padding: 6px 8px; text-align: right; }
+    th:first-child, td:first-child, th:nth-child(2), td.name { text-align: left; }
+    th { color: var(--pubg-gold); font-size: 0.78em; text-transform: uppercase;
+         letter-spacing: 0.05em; border-bottom: 1px solid var(--pubg-border); }
+    td.rank { color: var(--pubg-muted); width: 26px; }
+    td.name { color: var(--pubg-text); }
+    td.kd b { color: var(--pubg-gold); font-size: 1.1em; }
+    tr.self td { color: var(--pubg-gold); font-weight: 700; }
+    tbody tr:not(:last-child) td { border-bottom: 1px solid rgba(127,127,127,0.12); }
+    .empty { color: var(--pubg-muted); font-style: italic; text-align: center; padding: 20px 0; }
+    .sub { color: var(--pubg-muted); font-size: 0.75em; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="pubg-header" id="pubgHeader"></div>
+  <div class="pubg-card panel pubg-fade-in">
+    <h3><span class="material-symbols-outlined icon-gold" aria-hidden="true">swords</span> Deathmatch — Top Killers</h3>
+    <div id="content"><div class="empty">— loading —</div></div>
+  </div>
+  <script src="_pubg.js"></script>
+  <script>
+    const RANGE = PubgUI.qs("range", "session");
+    const LIMIT = parseInt(PubgUI.qs("limit", "10"), 10) || 10;
+
+    PubgUI.renderHeader(document.getElementById("pubgHeader"),
+      "Deathmatch", RANGE);
+    PubgUI.buildFilter([
+      { key: "range", label: "Range", type: "select", default: "session",
+        options: [["session", "Session"], ["week", "7 days"], ["all", "Database"]] },
+      { key: "limit", label: "Max rows", type: "range", default: 10,
+        min: 3, max: 30, presets: [5, 10, 15, 20] },
+    ]);
+
+    const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
+      c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+    function render(data) {
+      const cont = document.getElementById("content");
+      const players = (data && data.players) || [];
+      if (!players.length) {
+        cont.innerHTML = `<div class="empty">No deathmatch rounds in this range.</div>`;
+        return;
+      }
+      const rows = players.slice(0, LIMIT).map((p, i) => `
+        <tr class="${p.isSelf ? "self" : ""}">
+          <td class="rank">${i + 1}</td>
+          <td class="name">${esc(p.name)}</td>
+          <td>${p.kills}</td>
+          <td>${p.deaths}</td>
+          <td class="kd"><b>${Number(p.kd).toFixed(2)}</b></td>
+          <td>${Math.round(p.damage).toLocaleString("en")}</td>
+          <td>${p.matches}</td>
+        </tr>`).join("");
+      cont.innerHTML = `
+        <table>
+          <thead><tr>
+            <th>#</th><th>Player</th><th>Kills</th><th>Deaths</th>
+            <th>K/D</th><th>DMG</th><th>Rounds</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="sub">${data.matchCount} round${data.matchCount === 1 ? "" : "s"} ·
+          team ${data.totals.teamKills} kills / ${data.totals.teamDeaths} deaths</div>`;
+    }
+
+    async function load() {
+      try {
+        const data = await PubgUI.fetchJson(
+          (window.__SERVE_BASE__ || "/") + "api/pubg/deathmatch-stats?range=" +
+          encodeURIComponent(RANGE));
+        render(data);
+      } catch (e) {
+        document.getElementById("content").innerHTML =
+          `<div class="empty">Load failed: ${esc(e.message || e)}</div>`;
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

@@ -43,6 +43,7 @@ WIDGET_PREVIEW_SIZES = {
     "pubg/session-goal.html":       (400,  80),
     "pubg/session-lobbies.html":    (400, 280),
     "pubg/payday-stats.html":       (400, 280),
+    "pubg/deathmatch-stats.html":   (340, 360),
     # PUBG Achievements
     "pubg/milestone-celebrate.html":(1920,1080),
     "pubg/session-achievements.html":(400, 360),
@@ -162,6 +163,7 @@ WIDGET_META = [
     ("PUBG · Match",  "Session Goal",        "Progress toward the configured session goal.",                         "pubg/session-goal.html"),
     ("PUBG · Match",  "Session Lobbies",     "Lobby-strength of recent matches.",                                    "pubg/session-lobbies.html"),
     ("PUBG · Match",  "Payday Stats",        "Damage paid out by enemy faction.",                                    "pubg/payday-stats.html"),
+    ("PUBG · Match",  "Deathmatch Stats",    "Team-Deathmatch (TDM) leaderboard — kills, deaths, K/D, damage.",       "pubg/deathmatch-stats.html"),
 
     ("PUBG · Achievements", "Milestone Celebrate",   "Big celebration overlay — fires only after a fresh chicken-dinner crossing a 100-mark.", "pubg/milestone-celebrate.html"),
     ("PUBG · Achievements", "Session Achievements",  "Achievements unlocked in the current session.",                "pubg/session-achievements.html"),

@@ -98,6 +98,8 @@ class EndpointRegistry:
             return self._hot_drop(qs)
         if route == ("GET", "/api/pubg/payday-stats"):
             return self._payday_stats(qs)
+        if route == ("GET", "/api/pubg/deathmatch-stats"):
+            return self._deathmatch_stats(qs)
         if route == ("GET", "/api/pubg/landings"):
             return self._landings(qs)
         if route == ("GET", "/api/pubg/player-search"):
@@ -579,6 +581,21 @@ class EndpointRegistry:
             lambda: compute_payday_stats(conn, self.tenant_id, self.my_account_id,
                                          range_key,
                                          from_iso=from_iso, to_iso=to_iso),
+        ))
+
+    def _deathmatch_stats(self, qs):
+        """Team-Deathmatch-Bestenliste (game_mode 'tdm') — Kills/Deaths aus
+        Telemetrie, Damage aus participant-Stats. Range default 'session'."""
+        from pubg.aggregations import compute_deathmatch_stats
+        conn = self.get_conn()
+        range_key = qs.get("range", "session")
+        from_iso = qs.get("from")
+        to_iso = qs.get("to")
+        cache_key = f"deathmatch-stats:{range_key}:{from_iso or ''}:{to_iso or ''}"
+        return _ok(self.cache.get_or_compute(
+            cache_key,
+            lambda: compute_deathmatch_stats(conn, self.tenant_id, self.my_account_id,
+                                             range_key, from_iso=from_iso, to_iso=to_iso),
         ))
 
     def _match_detail(self, qs):

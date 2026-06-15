@@ -254,6 +254,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
         # Postgres-Schema hat das nativ; sqlite-Test-DBs brauchen die Column
         # damit _active (und andere Endpoints) WHERE tenant_id=? filtern koennen.
         ("matches", "tenant_id", "INTEGER NOT NULL DEFAULT 1"),
+        ("participants", "tenant_id", "INTEGER NOT NULL DEFAULT 1"),
     ]
     for table, col, typ in migrations:
         try:
