@@ -24,7 +24,7 @@
       height: 1080px;
       overflow: hidden;
       background: transparent;
-      font-family: 'DM Sans', sans-serif;
+      font-family: var(--theme-font-body, 'DM Sans', sans-serif);
     }
 
     /* Default: warm forest — gold accent, green bg, warm rays */
@@ -185,7 +185,7 @@
       position: fixed; top: 80px; right: 16px; width: 420px;
       background: rgba(20,10,30,0.92); border: 2px solid #f2b705;
       padding: 16px; border-radius: 10px; color: #f2b705;
-      font-family: 'Courier New', monospace; font-size: 13px;
+      font-family: var(--theme-font-mono, 'Courier New', monospace); font-size: 13px;
       z-index: 1000; display: none; box-shadow: 0 0 30px rgba(242,183,5,0.4);
     }
     .tune-panel.visible { display: block; }
@@ -216,7 +216,7 @@
     .time-indicator {
       position: fixed; bottom: 16px; right: 16px;
       background: rgba(20,10,30,0.85); border: 1px solid #f2b705;
-      color: #f2b705; padding: 6px 14px; font-family: 'Courier New', monospace;
+      color: #f2b705; padding: 6px 14px; font-family: var(--theme-font-mono, 'Courier New', monospace);
       font-size: 14px; z-index: 1000; display: none; border-radius: 4px;
     }
     .time-indicator.visible { display: block; }

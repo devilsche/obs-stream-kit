@@ -9,7 +9,7 @@
     body {
       background: var(--pubg-page-bg);
       min-height: 100vh; padding: 24px;
-      font-family: "DM Sans", system-ui, sans-serif;
+      font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif);
       color: var(--pubg-text);
     }
     h1 { color: var(--pubg-gold); margin: 0 0 6px; }
@@ -83,7 +83,7 @@
     }
     .tile-params li code {
       color: var(--pubg-gold);
-      font-family: "DM Sans", monospace;
+      font-family: var(--theme-font-mono, monospace);
       font-weight: 700;
       min-width: 110px;
       flex-shrink: 0;
