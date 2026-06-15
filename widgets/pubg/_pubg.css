@@ -67,8 +67,16 @@ body.dock {
 }
 
 .pubg-card {
-  background: var(--pubg-purple-bg);
-  border: 1px solid var(--pubg-border);
+  background-color: var(--pubg-purple-bg);
+  /* Ornament-Textur-Overlay (Leder/Nebel/Stein) — none ausser bei den
+     Themes, die --theme-texture setzen → keine Regression. */
+  background-image: var(--theme-texture);
+  background-repeat: repeat;
+  /* Ornament-Rahmen: bei Ornament-Themes setzt --theme-frame ein border-image
+     + --theme-frame-width den noetigen Rand; sonst normale duenne Border
+     (border-image:none laesst border-color/-width greifen). */
+  border: var(--theme-frame-width, var(--theme-border-width, 1px)) solid var(--pubg-border);
+  border-image: var(--theme-frame);
   border-radius: var(--pubg-radius);
   padding: 10px 14px;
   backdrop-filter: blur(2px);

@@ -116,6 +116,7 @@ html[data-theme="oldcamp"] {
   --theme-hot-icon:"swords";
   --theme-page-bg:radial-gradient(900px 600px at 50% -10%,rgba(185,118,47,.28),#130c07 60%);
   --theme-frame:url("/widgets-static/assets/frames/oldcamp-frame.svg") 34 / 17px / 0 stretch;
+  --theme-frame-width:17px;
   --theme-texture:url("/widgets-static/assets/frames/oldcamp-texture.svg");
 }
 
@@ -131,6 +132,7 @@ html[data-theme="barrier"] {
   --theme-hot-icon:"water_drop";
   --theme-page-bg:radial-gradient(1000px 700px at 70% -10%,rgba(127,194,58,.30),#080d0a 62%);
   --theme-frame:url("/widgets-static/assets/frames/barrier-frame.svg") 34 / 17px / 0 stretch;
+  --theme-frame-width:17px;
   --theme-texture:url("/widgets-static/assets/frames/barrier-texture.svg");
 }
 
@@ -146,6 +148,7 @@ html[data-theme="sect"] {
   --theme-hot-icon:"temple_hindu";
   --theme-page-bg:linear-gradient(0deg,rgba(194,104,47,.22) 0%,#0f0a10 45%);
   --theme-frame:url("/widgets-static/assets/frames/sect-frame.svg") 34 / 17px / 0 stretch;
+  --theme-frame-width:17px;
   --theme-texture:url("/widgets-static/assets/frames/sect-texture.svg");
 }
 
