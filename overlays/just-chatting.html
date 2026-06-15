@@ -20,8 +20,8 @@
     }
 
     :root {
-      --color-purple:     var(--theme-primary,  #5e2a79);
-      --color-gold:       var(--theme-accent,   #f2b705);
+      --color-purple:     var(--theme-primary,  var(--theme-primary, #5e2a79));
+      --color-gold:       var(--theme-accent,   var(--theme-accent, #f2b705));
       --color-bg-dark:    var(--theme-bg,       #0d0d1a);
       --color-bg-purple:  var(--theme-surface,  #1a0d2e);
       --color-text:       var(--theme-text,     #ffffff);
@@ -160,7 +160,7 @@
       height: 3px;
       background: linear-gradient(
         90deg,
-        #5e2a79, #f2b705, #5e2a79, #f2b705, #5e2a79
+        var(--theme-primary, #5e2a79), var(--theme-accent, #f2b705), var(--theme-primary, #5e2a79), var(--theme-accent, #f2b705), var(--theme-primary, #5e2a79)
       );
       background-size: 200% 100%;
       animation: borderSlide 4s linear infinite;
@@ -173,7 +173,7 @@
       height: 3px;
       background: linear-gradient(
         90deg,
-        #f2b705, #5e2a79, #f2b705, #5e2a79, #f2b705
+        var(--theme-accent, #f2b705), var(--theme-primary, #5e2a79), var(--theme-accent, #f2b705), var(--theme-primary, #5e2a79), var(--theme-accent, #f2b705)
       );
       background-size: 200% 100%;
       animation: borderSlideReverse 4s linear infinite;
@@ -186,7 +186,7 @@
       width: 3px;
       background: linear-gradient(
         180deg,
-        #5e2a79, #f2b705, #5e2a79, #f2b705, #5e2a79
+        var(--theme-primary, #5e2a79), var(--theme-accent, #f2b705), var(--theme-primary, #5e2a79), var(--theme-accent, #f2b705), var(--theme-primary, #5e2a79)
       );
       background-size: 100% 200%;
       animation: borderSlideV 4s linear infinite;
@@ -199,7 +199,7 @@
       width: 3px;
       background: linear-gradient(
         180deg,
-        #f2b705, #5e2a79, #f2b705, #5e2a79, #f2b705
+        var(--theme-accent, #f2b705), var(--theme-primary, #5e2a79), var(--theme-accent, #f2b705), var(--theme-primary, #5e2a79), var(--theme-accent, #f2b705)
       );
       background-size: 100% 200%;
       animation: borderSlideVReverse 4s linear infinite;
@@ -225,7 +225,7 @@
     .cam-frame::after {
       content: '';
       position: absolute;
-      background: #f2b705;
+      background: var(--theme-accent, #f2b705);
     }
 
     /* top-left horizontal + vertical via pseudo + sibling divs */
@@ -235,7 +235,7 @@
       left: -2px;
       width: 30px;
       height: 2px;
-      background: #f2b705;
+      background: var(--theme-accent, #f2b705);
       border-radius: 1px;
     }
     .cam-frame .corner-tl-v {
@@ -244,7 +244,7 @@
       left: -2px;
       width: 2px;
       height: 30px;
-      background: #f2b705;
+      background: var(--theme-accent, #f2b705);
       border-radius: 1px;
     }
     .cam-frame .corner-tr-h {
@@ -253,7 +253,7 @@
       right: -2px;
       width: 30px;
       height: 2px;
-      background: #f2b705;
+      background: var(--theme-accent, #f2b705);
       border-radius: 1px;
     }
     .cam-frame .corner-tr-v {
@@ -262,7 +262,7 @@
       right: -2px;
       width: 2px;
       height: 30px;
-      background: #f2b705;
+      background: var(--theme-accent, #f2b705);
       border-radius: 1px;
     }
     .cam-frame .corner-bl-h {
@@ -271,7 +271,7 @@
       left: -2px;
       width: 30px;
       height: 2px;
-      background: #f2b705;
+      background: var(--theme-accent, #f2b705);
       border-radius: 1px;
     }
     .cam-frame .corner-bl-v {
@@ -280,7 +280,7 @@
       left: -2px;
       width: 2px;
       height: 30px;
-      background: #f2b705;
+      background: var(--theme-accent, #f2b705);
       border-radius: 1px;
     }
     .cam-frame .corner-br-h {
@@ -289,7 +289,7 @@
       right: -2px;
       width: 30px;
       height: 2px;
-      background: #f2b705;
+      background: var(--theme-accent, #f2b705);
       border-radius: 1px;
     }
     .cam-frame .corner-br-v {
@@ -298,7 +298,7 @@
       right: -2px;
       width: 2px;
       height: 30px;
-      background: #f2b705;
+      background: var(--theme-accent, #f2b705);
       border-radius: 1px;
     }
 
@@ -330,7 +330,7 @@
     .chat-header-label {
       font-size: 14px;
       font-weight: 700;
-      color: #f2b705;
+      color: var(--theme-accent, #f2b705);
       letter-spacing: 3px;
       text-transform: uppercase;
       text-shadow: 0 0 10px color-mix(in srgb, var(--color-gold) 50%, transparent), 0 0 20px color-mix(in srgb, var(--color-gold) 20%, transparent);
@@ -354,7 +354,7 @@
       left: 8%;
       width: 200px;
       height: 1px;
-      background: linear-gradient(90deg, transparent, #5e2a79, transparent);
+      background: linear-gradient(90deg, transparent, var(--theme-primary, #5e2a79), transparent);
       opacity: 0.35;
     }
 
@@ -363,7 +363,7 @@
       left: 55%;
       width: 120px;
       height: 1px;
-      background: linear-gradient(90deg, transparent, #f2b705, transparent);
+      background: linear-gradient(90deg, transparent, var(--theme-accent, #f2b705), transparent);
       opacity: 0.2;
       transform: rotate(-15deg);
     }
@@ -373,7 +373,7 @@
       left: 50%;
       width: 80px;
       height: 1px;
-      background: linear-gradient(90deg, transparent, #5e2a79, transparent);
+      background: linear-gradient(90deg, transparent, var(--theme-primary, #5e2a79), transparent);
       opacity: 0.25;
     }
 
@@ -388,14 +388,14 @@
 
     .particle--g1 {
       width: 7px; height: 7px;
-      background: #f2b705;
+      background: var(--theme-accent, #f2b705);
       box-shadow: 0 0 14px 3px color-mix(in srgb, var(--color-gold) 70%, transparent);
       top: 8%; left: 15%;
       animation: float1 20s ease-in-out infinite;
     }
     .particle--p1 {
       width: 8px; height: 8px;
-      background: #5e2a79;
+      background: var(--theme-primary, #5e2a79);
       box-shadow: 0 0 18px 4px color-mix(in srgb, var(--color-purple) 65%, transparent);
       top: 30%; left: 62%;
       animation: float2 25s ease-in-out infinite;
@@ -403,7 +403,7 @@
     }
     .particle--g2 {
       width: 5px; height: 5px;
-      background: #f2b705;
+      background: var(--theme-accent, #f2b705);
       box-shadow: 0 0 10px 2px color-mix(in srgb, var(--color-gold) 60%, transparent);
       top: 75%; left: 20%;
       animation: float3 18s ease-in-out infinite;
@@ -411,7 +411,7 @@
     }
     .particle--p2 {
       width: 6px; height: 6px;
-      background: #5e2a79;
+      background: var(--theme-primary, #5e2a79);
       box-shadow: 0 0 14px 3px color-mix(in srgb, var(--color-purple) 60%, transparent);
       top: 55%; left: 80%;
       animation: float4 28s ease-in-out infinite;
@@ -419,7 +419,7 @@
     }
     .particle--g3 {
       width: 5px; height: 5px;
-      background: #f2b705;
+      background: var(--theme-accent, #f2b705);
       box-shadow: 0 0 10px 2px color-mix(in srgb, var(--color-gold) 55%, transparent);
       top: 90%; left: 50%;
       animation: float5 15s ease-in-out infinite;
@@ -427,7 +427,7 @@
     }
     .particle--p3 {
       width: 7px; height: 7px;
-      background: #5e2a79;
+      background: var(--theme-primary, #5e2a79);
       box-shadow: 0 0 16px 3px color-mix(in srgb, var(--color-purple) 60%, transparent);
       top: 18%; left: 45%;
       animation: float1 30s ease-in-out infinite;
@@ -435,7 +435,7 @@
     }
     .particle--g4 {
       width: 6px; height: 6px;
-      background: #f2b705;
+      background: var(--theme-accent, #f2b705);
       box-shadow: 0 0 12px 3px color-mix(in srgb, var(--color-gold) 60%, transparent);
       top: 65%; left: 38%;
       animation: float3 22s ease-in-out infinite;
@@ -531,19 +531,19 @@
     <!-- Lightning arcs -->
     <svg class="cam-arcs" viewBox="0 0 100 100" preserveAspectRatio="none">
       <polyline id="arc-top" points="2,2 15,4 30,1 45,3 60,1 75,4 90,2 98,2"
-        fill="none" stroke="#c9a0dc" stroke-width="1.5"
+        fill="none" stroke="var(--theme-accent-2, #c9a0dc)" stroke-width="1.5"
         vector-effect="non-scaling-stroke" filter="url(#arcGlow)"
         style="animation: flickerTop 3.5s ease-in-out infinite" />
       <polyline id="arc-bottom" points="2,98 18,96 35,99 50,97 65,99 80,96 95,98 98,98"
-        fill="none" stroke="#f2b705" stroke-width="1.5"
+        fill="none" stroke="var(--theme-accent, #f2b705)" stroke-width="1.5"
         vector-effect="non-scaling-stroke" filter="url(#arcGlow)"
         style="animation: flickerBottom 4s ease-in-out infinite" />
       <polyline id="arc-left" points="2,2 4,15 1,30 3,50 1,70 4,85 2,98"
-        fill="none" stroke="#c9a0dc" stroke-width="1.5"
+        fill="none" stroke="var(--theme-accent-2, #c9a0dc)" stroke-width="1.5"
         vector-effect="non-scaling-stroke" filter="url(#arcGlow)"
         style="animation: flickerLeft 4.5s ease-in-out infinite" />
       <polyline id="arc-right" points="98,2 96,20 99,40 97,55 99,75 96,90 98,98"
-        fill="none" stroke="#f2b705" stroke-width="1.5"
+        fill="none" stroke="var(--theme-accent, #f2b705)" stroke-width="1.5"
         vector-effect="non-scaling-stroke" filter="url(#arcGlow)"
         style="animation: flickerRight 3s ease-in-out infinite" />
     </svg>
@@ -586,12 +586,12 @@
     (function () {
       var SVG_NS = 'http://www.w3.org/2000/svg';
       var arcs = [
-        { id: 'arc-top',    color: '#c9a0dc' },
-        { id: 'arc-bottom', color: '#f2b705' },
-        { id: 'arc-left',   color: '#c9a0dc' },
-        { id: 'arc-right',  color: '#f2b705' },
-        { id: 'arc-top',    color: '#c9a0dc' },
-        { id: 'arc-bottom', color: '#f2b705' }
+        { id: 'arc-top',    color: 'var(--theme-accent-2, #c9a0dc)' },
+        { id: 'arc-bottom', color: 'var(--theme-accent, #f2b705)' },
+        { id: 'arc-left',   color: 'var(--theme-accent-2, #c9a0dc)' },
+        { id: 'arc-right',  color: 'var(--theme-accent, #f2b705)' },
+        { id: 'arc-top',    color: 'var(--theme-accent-2, #c9a0dc)' },
+        { id: 'arc-bottom', color: 'var(--theme-accent, #f2b705)' }
       ];
 
       var svg = document.querySelector('.cam-arcs');

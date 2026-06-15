@@ -69,6 +69,11 @@ body.dock {
 /* Flache Bar-/Ticker-Widgets: KEIN dicker Ornament-Rahmen (border-image ~17px
    frisst bei geringer Hoehe via border-box fast den ganzen Content) — nur eine
    dezente Border. An flache Widgets als zusaetzliche Klasse haengen. */
+/* ZWISCHENSTAND: flache Bar-/Ticker-Widgets bekommen vorerst KEINEN Ornament-
+   Rahmen (der volle border-image fraesse via border-box den Content) — nur eine
+   dezente Border, Content garantiert lesbar. Der „richtige" Ornament-Look fuer
+   flache Widgets (Overlay-Rahmen, Glow) wird separat im Ornament-Design-Thema
+   geloest. */
 .pubg-card.pubg-flat {
   border-image: none;
   border-width: var(--theme-border-width, 1px);

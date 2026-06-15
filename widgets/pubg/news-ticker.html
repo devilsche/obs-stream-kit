@@ -18,10 +18,6 @@
       font-size: 0.95em;
       overflow: hidden;
       position: relative;
-      /* Flacher Ticker: KEIN dicker Ornament-Rahmen (--theme-frame/17px) — der
-         frisst bei 36px Höhe (border-box) fast den ganzen Content. Dünne Border. */
-      border-image: none;
-      border-width: var(--theme-border-width, 1px);
     }
     .ticker .slot {
       position: absolute; left: 18px; right: 18px;
@@ -44,7 +40,7 @@
   </style>
 </head>
 <body>
-  <div class="pubg-card ticker">
+  <div class="pubg-card pubg-flat ticker">
     <div class="slot active" id="slot"></div>
   </div>
   <script src="_pubg.js"></script>
