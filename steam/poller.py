@@ -304,6 +304,17 @@ class SteamPoller(threading.Thread):
         genre_names = [g.get("description") for g in genres
                         if g.get("description")]
 
+        # Game-Media (Trailer/Screenshots) fuer das Highlight-Media-Feature.
+        # Separater Storefront-Call; bei Fehler einfach ohne Media speichern.
+        media_json = None
+        try:
+            media = client.get_app_media(app_id)
+            if media.get("trailers") or media.get("screenshots"):
+                media_json = json.dumps(media)
+        except SteamApiError as e:
+            with self._lock:
+                state["lastError"] = f"app-media {app_id}: {e}"
+
         upsert_app_details(
             conn, app_id,
             header_image=data.get("header_image"),
@@ -312,6 +323,7 @@ class SteamPoller(threading.Thread):
             is_multiplayer=bool(cat_set & MULTIPLAYER_CATEGORY_IDS),
             category_ids=",".join(str(c) for c in category_ids),
             genre_names=",".join(genre_names),
+            media_json=media_json,
         )
 
         if self.root_dir and data.get("header_image"):

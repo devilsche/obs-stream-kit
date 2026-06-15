@@ -222,3 +222,32 @@ class SteamClient:
         if not block.get("success"):
             return {}
         return block.get("data") or {}
+
+    def get_app_media(self, app_id: int) -> dict:
+        """Storefront-API: Trailer (HLS) + Screenshots fuer ein Spiel.
+        Kein API-Key noetig. Returns
+          {"trailers": [{"id","name","hls","thumbnail"}], "screenshots": [url,...]}
+        Trailer kommen als HLS-Stream (hls_h264) -> Player braucht hls.js."""
+        url = (f"https://store.steampowered.com/api/appdetails"
+               f"?appids={app_id}&filters=movies,screenshots")
+        req = urllib.request.Request(
+            url, headers={"User-Agent": "obs-stream-kit/1.0"})
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                data = json.loads(r.read().decode("utf-8"))
+        except Exception as e:
+            raise SteamApiError(f"Storefront media {app_id}: {e}") from e
+        block = data.get(str(app_id)) or {}
+        if not block.get("success"):
+            return {"trailers": [], "screenshots": []}
+        d = block.get("data") or {}
+        trailers = [
+            {"id": m.get("id"), "name": m.get("name"),
+             "hls": m.get("hls_h264"), "thumbnail": m.get("thumbnail")}
+            for m in (d.get("movies") or []) if m.get("hls_h264")
+        ]
+        screenshots = [
+            s.get("path_full") for s in (d.get("screenshots") or [])
+            if s.get("path_full")
+        ]
+        return {"trailers": trailers, "screenshots": screenshots}

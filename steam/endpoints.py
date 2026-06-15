@@ -242,6 +242,8 @@ class SteamEndpointRegistry:
         route = u.path
         if route == "/api/steam/now-playing":
             return self._now_playing(qs)
+        if route == "/api/steam/highlight-media":
+            return self._highlight_media(qs)
         if route == "/api/steam/recently-played":
             return self._recently_played()
         if route == "/api/steam/owned-games":
@@ -1205,6 +1207,47 @@ class SteamEndpointRegistry:
             conn.close()
 
     # ── Language Setting (persistent) ──────────────────────────────────────
+    def _highlight_media(self, qs):
+        """Quelle fuer den Highlight-Player in den Szenen-Overlays.
+        Returns {source:"clips"} ODER
+                {source:"steam", appId, trailers:[...], screenshots:[...]}.
+        Steam-Media nur wenn highlight_source=='steam_media', ein Spiel laeuft
+        (now-playing) UND Media gecacht ist — sonst Fallback clips."""
+        from pubg.db_pg import get_setting
+        from steam.db_pg import get_app_details_row
+        conn = self.db_connect()
+        try:
+            source = (get_setting(conn, self.tenant_id,
+                                  "highlight_source", "clips") or "clips")
+            if source != "steam_media":
+                return _ok({"source": "clips"})
+            app_id = None
+            if self.poller:
+                try:
+                    app_id = self.poller.status().get("currentAppId")
+                except Exception:
+                    app_id = None
+            if not app_id:
+                return _ok({"source": "clips"})
+            row = get_app_details_row(conn, app_id)
+            media = None
+            if row and row["media_json"]:
+                try:
+                    media = json.loads(row["media_json"])
+                except Exception:
+                    media = None
+            if not media or (not media.get("trailers")
+                             and not media.get("screenshots")):
+                return _ok({"source": "clips"})
+            return _ok({"source": "steam", "appId": app_id,
+                        "trailers": media.get("trailers", []),
+                        "screenshots": media.get("screenshots", [])})
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
     def _language_setting(self, qs):
         """GET ohne Param: returnt aktuell gesetzte Sprache.
         GET mit ?lang=X: setzt + persistiert die neue Sprache, gilt fuer

@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS steam_app_details (
   is_multiplayer INTEGER NOT NULL DEFAULT 0, -- categories 1/27/36/38
   category_ids TEXT,                          -- comma-list
   genre_names TEXT,                           -- comma-list
+  media_json TEXT,                            -- {trailers:[...], screenshots:[...]}
   cached_at INTEGER NOT NULL
 );
 """
@@ -105,6 +106,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
         "ALTER TABLE steam_app_schema ADD COLUMN global_pct_json TEXT",
         "ALTER TABLE steam_app_schema "
             "ADD COLUMN global_pct_cached_at INTEGER",
+        "ALTER TABLE steam_app_details ADD COLUMN media_json TEXT",
     ):
         try:
             conn.execute(stmt)
@@ -263,15 +265,17 @@ def upsert_app_details(conn, app_id: int,
                        is_coop: bool = False,
                        is_multiplayer: bool = False,
                        category_ids: str = None,
-                       genre_names: str = None) -> None:
+                       genre_names: str = None,
+                       media_json: str = None) -> None:
     # COALESCE-Preserve: wenn Storefront ein Game spaeter nicht mehr
     # ausliefert (z.B. UT2004 — delisted), keine bestehenden Daten mit
     # NULL ueberschreiben. Neue Werte gewinnen wenn vorhanden.
     conn.execute("""
         INSERT INTO steam_app_details
           (app_id, header_image, short_description,
-           is_coop, is_multiplayer, category_ids, genre_names, cached_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))
+           is_coop, is_multiplayer, category_ids, genre_names,
+           media_json, cached_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))
         ON CONFLICT(app_id) DO UPDATE SET
           header_image=COALESCE(excluded.header_image, header_image),
           short_description=COALESCE(excluded.short_description, short_description),
@@ -279,10 +283,11 @@ def upsert_app_details(conn, app_id: int,
           is_multiplayer=excluded.is_multiplayer,
           category_ids=COALESCE(excluded.category_ids, category_ids),
           genre_names=COALESCE(excluded.genre_names, genre_names),
+          media_json=COALESCE(excluded.media_json, media_json),
           cached_at=excluded.cached_at
     """, (app_id, header_image, short_description,
           int(bool(is_coop)), int(bool(is_multiplayer)),
-          category_ids, genre_names))
+          category_ids, genre_names, media_json))
 
 
 def get_app_details_row(conn, app_id: int):

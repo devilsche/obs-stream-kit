@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS steam_app_details (
     is_multiplayer    INTEGER NOT NULL DEFAULT 0,
     category_ids      TEXT,
     genre_names       TEXT,
+    media_json        TEXT,
     cached_at         BIGINT NOT NULL
 );
 """
@@ -98,6 +99,9 @@ MULTIPLAYER_CATEGORY_IDS = {1, 27, 36, 38}
 def init_schema(conn):
     with conn.cursor() as cur:
         cur.execute(PG_SCHEMA)
+        # Idempotente Migration fuer bestehende DBs (Spalte nachruesten).
+        cur.execute("ALTER TABLE steam_app_details "
+                    "ADD COLUMN IF NOT EXISTS media_json TEXT")
     conn.commit()
 
 
@@ -231,14 +235,16 @@ def upsert_app_details(conn, app_id: int,
                        is_coop: bool = False,
                        is_multiplayer: bool = False,
                        category_ids: Optional[str] = None,
-                       genre_names: Optional[str] = None) -> None:
+                       genre_names: Optional[str] = None,
+                       media_json: Optional[str] = None) -> None:
     raw = _raw(conn)
     with raw.cursor() as cur:
         cur.execute("""
             INSERT INTO steam_app_details
               (app_id, header_image, short_description,
-               is_coop, is_multiplayer, category_ids, genre_names, cached_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s,
+               is_coop, is_multiplayer, category_ids, genre_names,
+               media_json, cached_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s,
                     EXTRACT(EPOCH FROM now())::BIGINT)
             ON CONFLICT (app_id) DO UPDATE SET
               header_image = COALESCE(EXCLUDED.header_image,
@@ -251,10 +257,12 @@ def upsert_app_details(conn, app_id: int,
                                        steam_app_details.category_ids),
               genre_names = COALESCE(EXCLUDED.genre_names,
                                       steam_app_details.genre_names),
+              media_json = COALESCE(EXCLUDED.media_json,
+                                     steam_app_details.media_json),
               cached_at = EXCLUDED.cached_at
         """, (app_id, header_image, short_description,
               int(bool(is_coop)), int(bool(is_multiplayer)),
-              category_ids, genre_names))
+              category_ids, genre_names, media_json))
     raw.commit()
 
 
