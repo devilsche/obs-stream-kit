@@ -48,12 +48,7 @@
       border-image: var(--theme-frame);
       border-radius: inherit;
       pointer-events: none;
-      /* Glow folgt den Ornament-Formen (drop-shadow auf den border-image-Pixeln),
-         nicht ein rechteckiger box-shadow um die ganze Box. Pro Theme getoken. */
-      filter: var(--theme-frame-glow, none);
     }
-    /* Glow-Vergleich: body.no-glow schaltet den Schein global ab. */
-    body.no-glow .orn::after { filter: none; }
 
     /* Demo-Boxen mit echten Theme-Tokens. */
     .demo-card {
@@ -127,6 +122,16 @@
     .sw-prim { background: var(--theme-primary); color: var(--theme-on-primary); }
     .sw-acc  { background: var(--theme-accent); color: var(--theme-on-primary); }
 
+    /* Hot-Icon-Demo: Highlight-Werte in den drei Stufen, gross genug damit
+       Glow/Animation/Partikel des --theme-hot-icon sichtbar sind. */
+    .hot-demo { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-end; }
+    .hot-demo .col { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .hot-demo .caption { color: var(--theme-text-dim); font-family: var(--theme-font-mono, monospace);
+                         font-size: .75rem; }
+    .hot-demo .pubg-hot { font-size: 2.4rem; font-weight: 700; color: var(--theme-accent);
+                          font-family: var(--theme-font-display, serif); }
+    .hot-demo .t-hot-mark::before { font-size: 30px; }
+
     *:focus-visible { outline: 3px solid var(--theme-accent); outline-offset: 2px; }
   </style>
 </head>
@@ -144,9 +149,6 @@
       <button type="button" data-theme="sect" aria-pressed="false">Sect Camp</button>
       <button type="button" data-theme="entry" aria-pressed="false">Entry (kein Ornament)</button>
     </nav>
-    <nav class="switcher" aria-label="Glow">
-      <button type="button" id="glowToggle" aria-pressed="true">Glow an</button>
-    </nav>
   </header>
 
   <h2>Große Karte</h2>
@@ -155,6 +157,25 @@
     <div class="demo-card orn">
       <h3>Career</h3>
       <p>Matches 1 247 · K/D 3.8 · Chicken 214 · Längster Kill 612 m</p>
+    </div>
+  </div>
+
+  <h2>Hot-Icon / Highlight (Stufe 1 · 2 · 3)</h2>
+  <p class="note">--theme-hot-icon + Glow/Puls + Partikel. Aktuell Gothic-Themes: generischer hot-pulse</p>
+  <div class="row">
+    <div class="hot-demo">
+      <div class="col">
+        <span class="t-hot t-hot--1"><span class="pubg-hot">2.1</span></span>
+        <span class="caption">Stufe 1 — Glow</span>
+      </div>
+      <div class="col">
+        <span class="t-hot t-hot--2"><span class="pubg-hot">3.4</span><span class="t-hot-mark t-hot-mark--after"><i></i><i></i><i></i></span></span>
+        <span class="caption">Stufe 2 — + Icon</span>
+      </div>
+      <div class="col">
+        <span class="t-hot t-hot--3"><span class="pubg-hot">5.8</span><span class="t-hot-mark t-hot-mark--after"><i></i><i></i><i></i><i></i><i></i></span></span>
+        <span class="caption">Stufe 3 — + Puls + Partikel</span>
+      </div>
     </div>
   </div>
 
@@ -211,12 +232,6 @@
       root.setAttribute("data-theme", b.dataset.theme);
       btns.forEach(x => x.setAttribute("aria-pressed", String(x === b)));
     }));
-    const glow = document.getElementById("glowToggle");
-    glow.addEventListener("click", () => {
-      const off = document.body.classList.toggle("no-glow");
-      glow.setAttribute("aria-pressed", String(!off));   // pressed = Glow an
-      glow.textContent = off ? "Glow aus" : "Glow an";
-    });
   </script>
 </body>
 </html>
