@@ -92,11 +92,17 @@
 
     /* ─── Layout ─────────────────────────────────────────────────── */
 
+    /* Headlines/markante Texte folgen der Display-Schrift des Themes,
+       Fliesstext der Body-Schrift (body unten). */
+    .sidebar__brb, .sidebar__brb-expanded, .sidebar__subtitle,
+    .countdown__title, .clip-meta__title {
+      font-family: var(--theme-font-display, 'DM Sans', sans-serif);
+    }
     body {
       width: 1920px;
       height: 1080px;
       overflow: hidden;
-      font-family: 'DM Sans', sans-serif;
+      font-family: var(--theme-font-body, 'DM Sans', sans-serif);
       background: linear-gradient(135deg, var(--color-bg-dark) 0%, var(--color-bg-purple) 50%, var(--color-bg-dark) 100%);
       color: var(--color-text);
       position: relative;
