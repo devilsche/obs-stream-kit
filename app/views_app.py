@@ -36,6 +36,11 @@ TOOLS = [
      "desc": "Vorschau der Mittelalter-Themes auf Beispiel-Komponenten — Farben, Schrift, Form, Ornamente.",
      "path": "tools/theme-preview.html",
      "admin_only": True},
+    {"key": "ornament-preview",
+     "label": "Ornament-Vorschau",
+     "desc": "Ornament-Rahmen (als Overlay), Textur + Background pro Theme auf verschiedenen Widget-Größen — Design-Basis.",
+     "path": "tools/ornament-preview.html",
+     "admin_only": True},
 ]
 
 

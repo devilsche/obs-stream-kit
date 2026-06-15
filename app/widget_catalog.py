@@ -55,7 +55,7 @@ WIDGET_PREVIEW_SIZES = {
     "steam/achievement-feed.html":  (400, 200),
     "steam/achievement-popup.html": (500, 110),
     "steam/popup.html":             (500, 110),
-    "steam/now-playing.html":       (480, 110),
+    "steam/now-playing.html":       (520, 200),
     "steam/games-ticker.html":      (480,  90),
     # Follower & Goals
     "welcome.html":                 (1920,1080),

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="oldcamp">
+<head>
+  <meta charset="utf-8">
+  <title>Ornament-Design-Vorschau</title>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="/widgets-static/_theme.css">
+  <link rel="stylesheet" href="/widgets-static/pubg/_pubg.css">
+  <link rel="stylesheet" href="/widgets-static/_blocks.css">
+  <style>
+    html, body { margin: 0; }
+    body {
+      background: var(--theme-page-bg);
+      color: var(--theme-text);
+      font-family: var(--theme-font-body, sans-serif);
+      padding: 24px clamp(16px, 4vw, 48px) 80px;
+      box-sizing: border-box;
+    }
+    h1 { font-family: var(--theme-font-display, serif); font-size: 1.9rem; margin: 0 0 4px; }
+    .lede { color: var(--theme-text-dim); margin: 0 0 24px; max-width: 70ch; }
+    h2 { font-family: var(--theme-font-display, serif); font-size: 1.15rem;
+         margin: 28px 0 4px; color: var(--theme-accent); }
+    .note { color: var(--theme-text-dim); font-size: .82rem; margin: 0 0 14px;
+            font-family: var(--theme-font-mono, monospace); }
+
+    header.page { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between;
+                  align-items: flex-end; margin-bottom: 20px; }
+    .switcher { display: flex; flex-wrap: wrap; gap: 8px; }
+    .switcher button {
+      font-family: var(--theme-font-body, sans-serif); font-size: .9rem; cursor: pointer;
+      min-height: 36px; padding: 6px 14px; color: var(--theme-text);
+      background: var(--theme-surface-2); border: 1px solid var(--theme-border);
+      border-radius: var(--theme-radius);
+    }
+    .switcher button[aria-pressed="true"] {
+      background: var(--theme-primary); color: var(--theme-on-primary); border-color: var(--theme-accent);
+    }
+
+    .row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+
+    /* ── Ornament-Rahmen als OVERLAY (::after) — liegt auf dem Rand, ohne den
+       Content zu verschieben oder die Box-Maße zu ändern. Genau der Ansatz
+       fürs finale System. Nur Gothic-Themes (--theme-frame gesetzt). ── */
+    .orn { position: relative; }
+    .orn::after {
+      content: ""; position: absolute; inset: 0;
+      border: var(--theme-frame-width, 0px) solid transparent;
+      border-image: var(--theme-frame);
+      border-radius: inherit;
+      pointer-events: none;
+    }
+
+    /* Demo-Boxen mit echten Theme-Tokens. */
+    .demo-card {
+      width: 320px; background-color: var(--theme-surface);
+      background-image: var(--theme-texture); background-repeat: repeat;
+      border: var(--theme-border-width, 1px) solid var(--theme-border);
+      border-radius: var(--theme-radius); box-shadow: var(--theme-shadow);
+      padding: 18px; box-sizing: border-box;
+    }
+    .demo-card h3 { font-family: var(--theme-font-display, serif); margin: 0 0 8px; color: var(--theme-text); }
+    .demo-card p { margin: 0; color: var(--theme-text-dim); font-size: .9rem; }
+
+    .demo-bar {
+      width: 460px; height: 44px; display: flex; align-items: center; padding: 0 16px;
+      background-color: var(--theme-surface); background-image: var(--theme-texture);
+      border: var(--theme-border-width, 1px) solid var(--theme-border);
+      border-radius: var(--theme-radius); box-sizing: border-box; gap: 10px; overflow: hidden;
+    }
+    .demo-bar .label { color: var(--theme-accent); font-weight: 700; letter-spacing: .1em;
+                       font-family: var(--theme-font-display, serif); white-space: nowrap; }
+    .demo-bar .val { white-space: nowrap; }
+
+    /* now-playing-artig: 520×200, Hero-BG gedimmt mit --theme-bg */
+    .demo-now {
+      width: 520px; height: 200px; box-sizing: border-box;
+      background-color: color-mix(in srgb, var(--theme-bg) 55%, #444);
+      background-image: var(--theme-texture);
+      border: var(--theme-border-width, 1px) solid var(--theme-border);
+      border-radius: var(--theme-radius); display: flex; align-items: center; gap: 16px; padding: 18px;
+    }
+    .demo-now .av { width: 84px; height: 84px; flex: none; border-radius: var(--theme-radius);
+                    background: var(--theme-primary); border: 2px solid var(--theme-accent);
+                    display: grid; place-items: center; font-family: var(--theme-font-display, serif);
+                    font-size: 1.6rem; color: var(--theme-on-primary); }
+    .demo-now .nm { font-family: var(--theme-font-display, serif); font-size: 1.5rem; color: var(--theme-accent); }
+    .demo-now .gm { color: var(--theme-text); font-size: 1.1rem; }
+    .demo-now .mt { color: var(--theme-text-dim); font-size: .85rem; margin-top: 4px; }
+
+    /* Cam-Overlay-Ausschnitt (16:9). page-bg + Ornament-Overlay rundum. */
+    .demo-cam {
+      width: 480px; height: 270px; box-sizing: border-box;
+      background: var(--theme-page-bg);
+      border: var(--theme-border-width, 1px) solid var(--theme-border);
+      border-radius: var(--theme-radius); position: relative; overflow: hidden;
+    }
+    .demo-cam .camlabel { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+                          color: var(--theme-text-dim); font-family: var(--theme-font-mono, monospace); }
+
+    /* Chat-Overlay-Ausschnitt mit den schrägen Deko-Mustern (wie just-chatting). */
+    .demo-chat {
+      width: 480px; height: 200px; box-sizing: border-box; position: relative; overflow: hidden;
+      background: linear-gradient(135deg, var(--theme-bg) 0%, var(--theme-surface) 50%, var(--theme-bg) 100%);
+      border-radius: var(--theme-radius);
+    }
+    .demo-chat .stripe { position: absolute; height: 200%; width: 10px; top: -50%;
+                         transform: rotate(18deg); opacity: .5; }
+    .demo-chat .s1 { left: 8%;  background: var(--theme-primary); }
+    .demo-chat .s2 { left: 12%; background: var(--theme-accent); }
+    .demo-chat .s3 { right: 9%; background: var(--theme-accent); }
+    .demo-chat .s4 { right: 13%; background: var(--theme-primary); }
+    .demo-chat .chatlabel { position: absolute; left: 24px; bottom: 18px;
+                            color: var(--theme-text-dim); font-family: var(--theme-font-mono, monospace); }
+
+    /* Texture/Background-Swatches */
+    .swatch { width: 150px; height: 90px; border-radius: var(--theme-radius);
+              border: 1px solid var(--theme-border); box-sizing: border-box;
+              display: grid; place-items: end center; padding-bottom: 6px;
+              font-family: var(--theme-font-mono, monospace); font-size: .72rem; color: var(--theme-text-dim); }
+    .sw-bg   { background: var(--theme-page-bg); }
+    .sw-surf { background-color: var(--theme-surface); background-image: var(--theme-texture); background-repeat: repeat; }
+    .sw-prim { background: var(--theme-primary); color: var(--theme-on-primary); }
+    .sw-acc  { background: var(--theme-accent); color: var(--theme-on-primary); }
+
+    *:focus-visible { outline: 3px solid var(--theme-accent); outline-offset: 2px; }
+  </style>
+</head>
+<body>
+  <header class="page">
+    <div>
+      <h1>Ornament-Design-Vorschau</h1>
+      <p class="lede">Aktueller Stand pro Theme: Rahmen (als Overlay — liegt auf dem Rand,
+        ohne Maße/Content zu verschieben), Textur und Background auf verschiedenen
+        Widget-Größen. Abstimmungs-Basis fürs Ornament-System.</p>
+    </div>
+    <nav class="switcher" aria-label="Theme">
+      <button type="button" data-theme="oldcamp" aria-pressed="true">Old Camp</button>
+      <button type="button" data-theme="barrier" aria-pressed="false">Barrier</button>
+      <button type="button" data-theme="sect" aria-pressed="false">Sect Camp</button>
+      <button type="button" data-theme="entry" aria-pressed="false">Entry (kein Ornament)</button>
+    </nav>
+  </header>
+
+  <h2>Große Karte</h2>
+  <p class="note">.t-card — Rahmen als Overlay (.orn), Textur als Background</p>
+  <div class="row">
+    <div class="demo-card orn">
+      <h3>Career</h3>
+      <p>Matches 1 247 · K/D 3.8 · Chicken 214 · Längster Kill 612 m</p>
+    </div>
+  </div>
+
+  <h2>Flache Bar (z.B. News-Ticker, 460×44)</h2>
+  <p class="note">Rahmen als Overlay — Content bleibt voll lesbar, Maße unverändert</p>
+  <div class="row">
+    <div class="demo-bar orn">
+      <span class="label">SESSION</span>
+      <span class="val">3 Chicken Dinners · K/D 2.4 · Längster Kill 412 m</span>
+    </div>
+  </div>
+
+  <h2>Now Playing (520×200, Rahmen als Overlay)</h2>
+  <p class="note">Box-Maße bleiben 520×200, Ornament liegt drüber</p>
+  <div class="row">
+    <div class="demo-now orn">
+      <div class="av" aria-hidden="true">LK</div>
+      <div>
+        <div class="nm">LuCKoR</div>
+        <div class="gm">Gothic 1 Remake</div>
+        <div class="mt">vor 2 Std · 14 / 30 Achievements</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Cam-Overlay-Ausschnitt (16:9)</h2>
+  <p class="note">Background = page-bg, Ornament-Rahmen rundum (Overlay)</p>
+  <div class="row">
+    <div class="demo-cam orn"><span class="camlabel">CAM 480×270</span></div>
+  </div>
+
+  <h2>Chat-Overlay-Ausschnitt</h2>
+  <p class="note">Schräge Deko-Muster (theme-getoken) + Ornament-Rahmen (Overlay)</p>
+  <div class="row">
+    <div class="demo-chat orn">
+      <span class="stripe s1"></span><span class="stripe s2"></span>
+      <span class="stripe s3"></span><span class="stripe s4"></span>
+      <span class="chatlabel">CHAT</span>
+    </div>
+  </div>
+
+  <h2>Background / Farben pro Theme</h2>
+  <div class="row">
+    <div class="swatch sw-bg">page-bg</div>
+    <div class="swatch sw-surf">surface + texture</div>
+    <div class="swatch sw-prim">primary</div>
+    <div class="swatch sw-acc">accent</div>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const btns = document.querySelectorAll("[data-theme]");
+    btns.forEach(b => b.addEventListener("click", () => {
+      root.setAttribute("data-theme", b.dataset.theme);
+      btns.forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    }));
+  </script>
+</body>
+</html>
