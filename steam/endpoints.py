@@ -1239,7 +1239,16 @@ class SteamEndpointRegistry:
             if not media or (not media.get("trailers")
                              and not media.get("screenshots")):
                 return _ok({"source": "clips"})
+            game_name = None
+            try:
+                from steam.db_pg import get_app_schema
+                srow = get_app_schema(conn, app_id)
+                if srow:
+                    game_name = srow["game_name"]
+            except Exception:
+                game_name = None
             return _ok({"source": "steam", "appId": app_id,
+                        "gameName": game_name,
                         "trailers": media.get("trailers", []),
                         "screenshots": media.get("screenshots", [])})
         finally:

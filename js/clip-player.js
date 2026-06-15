@@ -269,8 +269,11 @@ var ClipPlayer = (function () {
       function play(i) {
         var item = playlist[i % playlist.length];
         clearStage();
-        if (clipMetaTitle) clipMetaTitle.textContent = item.name || 'Steam Highlight';
-        if (clipMetaDetails) clipMetaDetails.textContent = '';
+        if (clipMetaTitle) clipMetaTitle.textContent = media.gameName || 'Steam Highlight';
+        if (clipMetaDetails) {
+          clipMetaDetails.textContent = (item.type === 'trailer')
+            ? (item.name || 'Trailer') : 'Screenshot';
+        }
         if (clipMeta) clipMeta.classList.add('clip-meta--visible');
 
         if (item.type === 'shot') {

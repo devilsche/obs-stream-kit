@@ -21,11 +21,16 @@
     }
     .ticker .slot {
       position: absolute; left: 18px; right: 18px;
+      /* vertikal zentriert — sonst schneidet overflow:hidden hoehere
+         (Serifen-)Theme-Schriften unten ab. line-height knapp halten. */
+      top: 50%;
+      line-height: 1.1;
+      white-space: nowrap;
       transition: opacity 0.5s, transform 0.5s;
     }
-    .ticker .slot.out { opacity: 0; transform: translateY(-12px); }
-    .ticker .slot.in  { opacity: 0; transform: translateY(12px); }
-    .ticker .slot.active { opacity: 1; transform: translateY(0); }
+    .ticker .slot.out    { opacity: 0; transform: translateY(calc(-50% - 12px)); }
+    .ticker .slot.in     { opacity: 0; transform: translateY(calc(-50% + 12px)); }
+    .ticker .slot.active { opacity: 1; transform: translateY(-50%); }
     .ticker .label {
       color: var(--pubg-gold);
       font-weight: 700;
