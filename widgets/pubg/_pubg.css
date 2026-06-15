@@ -66,6 +66,14 @@ body.dock {
   min-height: 100vh;
 }
 
+/* Flache Bar-/Ticker-Widgets: KEIN dicker Ornament-Rahmen (border-image ~17px
+   frisst bei geringer Hoehe via border-box fast den ganzen Content) — nur eine
+   dezente Border. An flache Widgets als zusaetzliche Klasse haengen. */
+.pubg-card.pubg-flat {
+  border-image: none;
+  border-width: var(--theme-border-width, 1px);
+}
+
 .pubg-card {
   background-color: var(--pubg-purple-bg);
   /* Ornament-Textur-Overlay (Leder/Nebel/Stein) — none ausser bei den
