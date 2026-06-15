@@ -10,7 +10,8 @@
    ════════════════════════════════════════════════════════════════════════ */
 
 /* ════ EBENE 1 — Bausteine (token-getrieben, theme-agnostisch) ════ */
-.t-card{background:var(--theme-surface);border:var(--theme-border-width) solid var(--theme-border);
+.t-card{background-color:var(--theme-surface);background-image:var(--theme-texture);background-repeat:repeat;
+  border:var(--theme-frame-width,var(--theme-border-width)) solid var(--theme-border);border-image:var(--theme-frame);
   border-radius:var(--theme-radius);padding:22px;position:relative}
 .t-header{display:flex;justify-content:space-between;align-items:baseline;gap:8px 12px;flex-wrap:wrap;
   font-family:var(--theme-font-display);font-weight:600;font-size:18px;color:var(--theme-text);
