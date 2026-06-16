@@ -212,7 +212,9 @@
       top: 5%;
       left: 3%;
       height: 90%;
-      aspect-ratio: 1 / 1;
+      /* width statt aspect-ratio: 50.625% von 1920 = 972px = height (quadratisch).
+         aspect-ratio bricht das border-image-Ornament am ::after (Chromium-Bug). */
+      width: 50.625%;
       border: 2px solid color-mix(in srgb, var(--color-purple) 60%, transparent);
       border-radius: 10px;
       box-shadow: 0 0 25px color-mix(in srgb, var(--color-purple) 30%, transparent);
@@ -220,12 +222,23 @@
       z-index: 5;
     }
 
-    /* Gold corner accents */
-    .cam-frame::before,
+    /* Ornament-Rahmen als Overlay (konsolidiert, wie die Widgets). Greift nur
+       bei Themes mit --theme-frame (Gothic) — sonst border-image:none → der
+       transparente border bleibt unsichtbar und die Gold-Ecken (corner-*) tragen.
+       Groessere Rahmenbreite, weil der Cam-Frame ~972px gross ist (17px-Beschlaege
+       waeren winzig). */
     .cam-frame::after {
       content: '';
       position: absolute;
-      background: var(--theme-accent, #f2b705);
+      inset: -2px;
+      background-image: var(--theme-corner-tl, none), var(--theme-corner-tr, none),
+                        var(--theme-corner-bl, none), var(--theme-corner-br, none);
+      background-position: top left, top right, bottom left, bottom right;
+      background-size: var(--theme-frame-corner, 28px);
+      background-repeat: no-repeat;
+      border-radius: inherit;
+      pointer-events: none;
+      z-index: 6;
     }
 
     /* top-left horizontal + vertical via pseudo + sibling divs */
@@ -320,6 +333,20 @@
       display: flex;
       flex-direction: column;
     }
+    /* Ornament-Rahmen als Overlay (konsolidiert). Nur bei --theme-frame (Gothic). */
+    .chat-area::after {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      background-image: var(--theme-corner-tl, none), var(--theme-corner-tr, none),
+                        var(--theme-corner-bl, none), var(--theme-corner-br, none);
+      background-position: top left, top right, bottom left, bottom right;
+      background-size: var(--theme-frame-corner, 28px);
+      background-repeat: no-repeat;
+      border-radius: inherit;
+      pointer-events: none;
+      z-index: 6;
+    }
 
     .chat-header {
       padding: 14px 18px;
@@ -334,6 +361,27 @@
       letter-spacing: 3px;
       text-transform: uppercase;
       text-shadow: 0 0 10px color-mix(in srgb, var(--color-gold) 50%, transparent), 0 0 20px color-mix(in srgb, var(--color-gold) 20%, transparent);
+    }
+
+    /* ─── Gothic-Themes: Ornament-Rahmen statt Gold-Ecken/Standard-Border ───
+       Nur oldcamp/barrier/sect. Die Gold-Eck-Striche + dünnen Borders weg,
+       damit ausschließlich der gezackte Ornament-Rahmen (border-image, oben am
+       ::after) trägt. Alle anderen Themes (Entry etc.) unverändert. */
+    html:is([data-theme="oldcamp"],[data-theme="barrier"],[data-theme="sect"]) .cam-frame > [class*="corner-"] {
+      display: none;
+    }
+    html:is([data-theme="oldcamp"],[data-theme="barrier"],[data-theme="sect"]) .cam-frame {
+      border-color: var(--theme-border);
+      box-shadow: 0 0 25px color-mix(in srgb, var(--theme-primary) 25%, transparent);
+    }
+    html:is([data-theme="oldcamp"],[data-theme="barrier"],[data-theme="sect"]) .chat-area {
+      border-color: var(--theme-border);
+    }
+    /* Lightning-Arcs (der „schräge Kram") + schräge Accent-Linie passen nicht zum
+       Mittelalter-Ornament → bei Gothic raus. Partikel/Sparkles bleiben. */
+    html:is([data-theme="oldcamp"],[data-theme="barrier"],[data-theme="sect"]) .cam-arcs,
+    html:is([data-theme="oldcamp"],[data-theme="barrier"],[data-theme="sect"]) .accent-line {
+      display: none;
     }
 
     .chat-body {

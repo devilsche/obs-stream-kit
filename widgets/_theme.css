@@ -13,6 +13,12 @@
 
 /* ── Default = Entry (aktueller Stand, falls keine Server-Injektion) ── */
 :root, html[data-theme="entry"] {
+  /* Ornament-Eck-Beschlaege: EINHEITLICHE, groessenunabhaengige Pixelgroesse fuer
+     ALLE Sources (Karten, flache Bars, Cam/Chat-Overlays). Gilt global ueber alle
+     Themes — egal ob die Source 500x200 oder 800x1000 ist, die Ecken sind gleich
+     gross. Nur wirksam bei Themes mit --theme-frame (Gothic). NICHT 34px (= SVG-
+     slice, triggert einen border-image-Renderbug → Ecken verschwinden). */
+  --theme-frame-corner:28px;
   --theme-primary:#5e2a79; --theme-accent:#f2b705; --theme-accent-2:#c9a0dc; --theme-on-primary:#fff;
   --theme-bg:#0a0510; --theme-surface:rgba(20,12,30,.95); --theme-surface-2:#1f1430; --theme-border:rgba(94,42,121,.6);
   --theme-text:#e8e0f0; --theme-text-dim:#8a7d99; --theme-text-faint:#6b5f7a;
@@ -117,6 +123,10 @@ html[data-theme="oldcamp"] {
   --theme-page-bg:radial-gradient(900px 600px at 50% -10%,rgba(185,118,47,.28),#130c07 60%);
   --theme-frame:url("/widgets-static/assets/frames/oldcamp-frame.svg") 34 / 17px / 0 stretch;
   --theme-frame-width:17px;
+  --theme-corner-tl:url("/widgets-static/assets/frames/corners/oldcamp-tl.svg");
+  --theme-corner-tr:url("/widgets-static/assets/frames/corners/oldcamp-tr.svg");
+  --theme-corner-bl:url("/widgets-static/assets/frames/corners/oldcamp-bl.svg");
+  --theme-corner-br:url("/widgets-static/assets/frames/corners/oldcamp-br.svg");
   --theme-texture:url("/widgets-static/assets/frames/oldcamp-texture.svg");
 }
 
@@ -133,6 +143,10 @@ html[data-theme="barrier"] {
   --theme-page-bg:radial-gradient(1000px 700px at 70% -10%,rgba(127,194,58,.30),#080d0a 62%);
   --theme-frame:url("/widgets-static/assets/frames/barrier-frame.svg") 34 / 17px / 0 stretch;
   --theme-frame-width:17px;
+  --theme-corner-tl:url("/widgets-static/assets/frames/corners/barrier-tl.svg");
+  --theme-corner-tr:url("/widgets-static/assets/frames/corners/barrier-tr.svg");
+  --theme-corner-bl:url("/widgets-static/assets/frames/corners/barrier-bl.svg");
+  --theme-corner-br:url("/widgets-static/assets/frames/corners/barrier-br.svg");
   --theme-texture:radial-gradient(135% 115% at 68% -12%, rgba(127,194,58,.09), transparent 62%);
 }
 
@@ -149,6 +163,10 @@ html[data-theme="sect"] {
   --theme-page-bg:linear-gradient(0deg,rgba(194,104,47,.22) 0%,#0f0a10 45%);
   --theme-frame:url("/widgets-static/assets/frames/sect-frame.svg") 34 / 17px / 0 stretch;
   --theme-frame-width:17px;
+  --theme-corner-tl:url("/widgets-static/assets/frames/corners/sect-tl.svg");
+  --theme-corner-tr:url("/widgets-static/assets/frames/corners/sect-tr.svg");
+  --theme-corner-bl:url("/widgets-static/assets/frames/corners/sect-bl.svg");
+  --theme-corner-br:url("/widgets-static/assets/frames/corners/sect-br.svg");
   --theme-texture:url("/widgets-static/assets/frames/sect-texture.svg");
 }
 

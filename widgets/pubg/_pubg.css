@@ -89,8 +89,16 @@ body.dock {
 }
 .pubg-card::before {
   content: ""; position: absolute; inset: 0;
-  border: var(--theme-frame-width, 0px) solid transparent;
-  border-image: var(--theme-frame);
+  /* Ornament = 4 feste Eck-Beschlaege als background-image (groessenunabhaengig,
+     immer --theme-frame-corner gross — egal wie gross die Source ist). Ersetzt
+     border-image (das bei grossen Boxen >~900px die Ecken verliert). Die durch-
+     gehende Kantenlinie traegt der duenne echte border der Karte. Nur Gothic
+     (corner-Tokens gesetzt); sonst none → unsichtbar. */
+  background-image: var(--theme-corner-tl, none), var(--theme-corner-tr, none),
+                    var(--theme-corner-bl, none), var(--theme-corner-br, none);
+  background-position: top left, top right, bottom left, bottom right;
+  background-size: var(--theme-frame-corner, 28px);
+  background-repeat: no-repeat;
   border-radius: inherit;
   pointer-events: none;
 }
