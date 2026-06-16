@@ -87,19 +87,23 @@
     .demo-now .gm { color: var(--theme-text); font-size: 1.1rem; }
     .demo-now .mt { color: var(--theme-text-dim); font-size: .85rem; margin-top: 4px; }
 
-    /* Cam-Overlay-Ausschnitt (16:9). page-bg + Ornament-Overlay rundum. */
+    /* Cam-Overlay (gameplay): Kamera-Bereich mit Ornament-Rahmen rundum. Der
+       "Video"-Inhalt ist nur ein neutraler Platzhalter — in OBS liegt die echte
+       Kamera drunter, das Overlay zeichnet nur den Rahmen. */
     .demo-cam {
-      width: 480px; height: 270px; box-sizing: border-box;
-      background: var(--theme-page-bg);
+      width: 400px; height: 225px; box-sizing: border-box;
+      background: repeating-linear-gradient(45deg,#2b2b30 0 14px,#26262b 14px 28px);
       border: var(--theme-border-width, 1px) solid var(--theme-border);
       border-radius: var(--theme-radius); position: relative; overflow: hidden;
     }
     .demo-cam .camlabel { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
-                          color: var(--theme-text-dim); font-family: var(--theme-font-mono, monospace); }
+                          color: #9a9aa2; font-family: var(--theme-font-mono, monospace); }
 
-    /* Chat-Overlay-Ausschnitt mit den schrägen Deko-Mustern (wie just-chatting). */
-    .demo-chat {
-      width: 480px; height: 200px; box-sizing: border-box; position: relative; overflow: hidden;
+    /* Chat-Overlay-Ausschnitt. Zwei Varianten zum Vergleich:
+       .demo-chat = IST (schräge gleitende Deko-Muster wie just-chatting),
+       .demo-chat-orn = NEU (nur der Ornament-Rahmen, keine schrägen Muster). */
+    .demo-chat, .demo-chat-orn {
+      width: 380px; height: 200px; box-sizing: border-box; position: relative; overflow: hidden;
       background: linear-gradient(135deg, var(--theme-bg) 0%, var(--theme-surface) 50%, var(--theme-bg) 100%);
       border-radius: var(--theme-radius);
     }
@@ -109,8 +113,9 @@
     .demo-chat .s2 { left: 12%; background: var(--theme-accent); }
     .demo-chat .s3 { right: 9%; background: var(--theme-accent); }
     .demo-chat .s4 { right: 13%; background: var(--theme-primary); }
-    .demo-chat .chatlabel { position: absolute; left: 24px; bottom: 18px;
-                            color: var(--theme-text-dim); font-family: var(--theme-font-mono, monospace); }
+    .demo-chat .chatlabel, .demo-chat-orn .chatlabel {
+      position: absolute; left: 24px; bottom: 18px;
+      color: var(--theme-text-dim); font-family: var(--theme-font-mono, monospace); }
 
     /* Texture/Background-Swatches */
     .swatch { width: 150px; height: 90px; border-radius: var(--theme-radius);
@@ -201,19 +206,22 @@
     </div>
   </div>
 
-  <h2>Cam-Overlay-Ausschnitt (16:9)</h2>
-  <p class="note">Background = page-bg, Ornament-Rahmen rundum (Overlay)</p>
+  <h2>Cam-Overlay (gameplay, 400×225)</h2>
+  <p class="note">Kamera-Bereich mit Ornament-Rahmen rundum — Video liegt in OBS drunter (hier Platzhalter)</p>
   <div class="row">
-    <div class="demo-cam orn"><span class="camlabel">CAM 480×270</span></div>
+    <div class="demo-cam orn"><span class="camlabel">WEBCAM</span></div>
   </div>
 
-  <h2>Chat-Overlay-Ausschnitt</h2>
-  <p class="note">Schräge Deko-Muster (theme-getoken) + Ornament-Rahmen (Overlay)</p>
+  <h2>Chat-Overlay — IST vs. NEU</h2>
+  <p class="note">Links: bisherige schräge Deko-Muster · Rechts: nur Ornament-Rahmen (Overlay)</p>
   <div class="row">
-    <div class="demo-chat orn">
+    <div class="demo-chat">
       <span class="stripe s1"></span><span class="stripe s2"></span>
       <span class="stripe s3"></span><span class="stripe s4"></span>
-      <span class="chatlabel">CHAT</span>
+      <span class="chatlabel">IST · schräge Muster</span>
+    </div>
+    <div class="demo-chat-orn orn">
+      <span class="chatlabel">NEU · Ornament</span>
     </div>
   </div>
 
