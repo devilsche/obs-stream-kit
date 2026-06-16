@@ -249,6 +249,18 @@
       transform: translateZ(0);
     }
 
+    /* Ornament-Eckbeschläge (feste Größe, größenunabhängig) — nur Gothic-Themes
+       (corner-Tokens gesetzt); sonst unsichtbar, der theme-gefärbte Border trägt. */
+    .clip-container::after {
+      content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+      background-image: var(--theme-corner-tl, none), var(--theme-corner-tr, none),
+                        var(--theme-corner-bl, none), var(--theme-corner-br, none);
+      background-position: top left, top right, bottom left, bottom right;
+      background-size: var(--theme-frame-corner, 28px);
+      background-repeat: no-repeat;
+      border-radius: inherit;
+    }
+
     .clip-container iframe,
     .clip-container video,
     .clip-container img.steam-shot {

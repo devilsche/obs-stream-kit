@@ -339,6 +339,16 @@
       will-change: transform;
       animation: clipBreathe 9s ease-in-out infinite;
     }
+    /* Ornament-Eckbeschläge (feste Größe) — nur Gothic-Themes; sonst unsichtbar. */
+    .clip-player::after {
+      content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+      background-image: var(--theme-corner-tl, none), var(--theme-corner-tr, none),
+                        var(--theme-corner-bl, none), var(--theme-corner-br, none);
+      background-position: top left, top right, bottom left, bottom right;
+      background-size: var(--theme-frame-corner, 28px);
+      background-repeat: no-repeat;
+      border-radius: inherit;
+    }
 
     .clip-player iframe,
     .clip-player video,
