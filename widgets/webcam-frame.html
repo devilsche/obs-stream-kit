@@ -43,9 +43,13 @@
     }
 
     .lightning-layer { position: absolute; pointer-events: none; z-index: 2; }
-    /* Gothic: der zackige Lightning-Layer (entry-Deko) raus → Ornament-Rahmen trägt. */
+    /* Gothic: der zackige Lightning-Layer (entry-Deko) raus → Ornament-Rahmen trägt;
+       eckiger Theme-Radius statt der runden 4px. */
     html:is([data-theme="oldcamp"],[data-theme="barrier"],[data-theme="sect"]) .lightning-layer {
       display: none;
+    }
+    html:is([data-theme="oldcamp"],[data-theme="barrier"],[data-theme="sect"]) .cam-cutout {
+      border-radius: var(--theme-radius);
     }
 
     .arc { fill: none; stroke-width: 2; filter: url(#lightning-glow); }

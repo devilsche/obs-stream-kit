@@ -349,6 +349,10 @@
       background-repeat: no-repeat;
       border-radius: inherit;
     }
+    /* Gothic: eckiger Theme-Radius statt des runden 8px. */
+    html:is([data-theme="oldcamp"],[data-theme="barrier"],[data-theme="sect"]) .clip-player {
+      border-radius: var(--theme-radius);
+    }
 
     .clip-player iframe,
     .clip-player video,

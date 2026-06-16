@@ -260,6 +260,10 @@
       background-repeat: no-repeat;
       border-radius: inherit;
     }
+    /* Gothic: eckiger Theme-Radius statt des runden 10px (Old Camp/Sect eckig). */
+    html:is([data-theme="oldcamp"],[data-theme="barrier"],[data-theme="sect"]) .clip-container {
+      border-radius: var(--theme-radius);
+    }
 
     .clip-container iframe,
     .clip-container video,
