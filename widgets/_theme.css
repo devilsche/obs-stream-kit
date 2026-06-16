@@ -187,3 +187,19 @@ html[data-theme="sect"] {
   --pubg-page-bg:   var(--theme-page-bg);
 }
 /* Bausteine (t-*) inkl. Highlight-Marker + Eigenbewegung je Theme: siehe _blocks.css. */
+
+/* ── Ornament-Eckbeschläge als wiederverwendbare Utility ───────────────────
+   Für Container, deren ::before/::after schon belegt sind (z.B. Alerts): ein
+   leeres Child-Element <i class="theme-corners"> reinlegen. Liegt als Overlay
+   (inset:0) über dem Rand, 4 feste Eck-Grafiken in --theme-frame-corner-Größe,
+   größenunabhängig. Nur Gothic (corner-Tokens gesetzt); sonst unsichtbar.
+   Eltern-Element muss position:relative sein. */
+.theme-corners {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  border-radius: inherit;
+  background-image: var(--theme-corner-tl, none), var(--theme-corner-tr, none),
+                    var(--theme-corner-bl, none), var(--theme-corner-br, none);
+  background-position: top left, top right, bottom left, bottom right;
+  background-size: var(--theme-frame-corner, 28px);
+  background-repeat: no-repeat;
+}
