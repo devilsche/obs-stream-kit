@@ -66,33 +66,33 @@ body.dock {
   min-height: 100vh;
 }
 
-/* Flache Bar-/Ticker-Widgets: KEIN dicker Ornament-Rahmen (border-image ~17px
-   frisst bei geringer Hoehe via border-box fast den ganzen Content) — nur eine
-   dezente Border. An flache Widgets als zusaetzliche Klasse haengen. */
-/* ZWISCHENSTAND: flache Bar-/Ticker-Widgets bekommen vorerst KEINEN Ornament-
-   Rahmen (der volle border-image fraesse via border-box den Content) — nur eine
-   dezente Border, Content garantiert lesbar. Der „richtige" Ornament-Look fuer
-   flache Widgets (Overlay-Rahmen, Glow) wird separat im Ornament-Design-Thema
-   geloest. */
-.pubg-card.pubg-flat {
-  border-image: none;
-  border-width: var(--theme-border-width, 1px);
-}
-
+/* ── Ornament-System (konsolidiert) ────────────────────────────────────────
+   EIN Mechanismus fuer ALLE Karten UND flachen Bars: der Ornament-Rahmen ist
+   KEIN echter border mehr, sondern ein ::before-Overlay (position:absolute,
+   border-image). Es liegt auf dem Rand OHNE die Box-Maße zu aendern oder den
+   Content zu verschieben — damit faellt der fruehere .pubg-flat-Sonderfall weg
+   (flache Widgets bekommen jetzt dasselbe Ornament). Greift nur bei Themes mit
+   --theme-frame; sonst border-image:none → Overlay unsichtbar, der duenne echte
+   border traegt. ::before (statt ::after) vermeidet Kollision mit theme-eigenen
+   .t-card::after-Deko (z.B. terminal). */
 .pubg-card {
+  position: relative;
   background-color: var(--pubg-purple-bg);
   /* Ornament-Textur-Overlay (Leder/Nebel/Stein) — none ausser bei den
      Themes, die --theme-texture setzen → keine Regression. */
   background-image: var(--theme-texture);
   background-repeat: repeat;
-  /* Ornament-Rahmen: bei Ornament-Themes setzt --theme-frame ein border-image
-     + --theme-frame-width den noetigen Rand; sonst normale duenne Border
-     (border-image:none laesst border-color/-width greifen). */
-  border: var(--theme-frame-width, var(--theme-border-width, 1px)) solid var(--pubg-border);
-  border-image: var(--theme-frame);
+  border: var(--theme-border-width, 1px) solid var(--pubg-border);
   border-radius: var(--pubg-radius);
   padding: 10px 14px;
   backdrop-filter: blur(2px);
+}
+.pubg-card::before {
+  content: ""; position: absolute; inset: 0;
+  border: var(--theme-frame-width, 0px) solid transparent;
+  border-image: var(--theme-frame);
+  border-radius: inherit;
+  pointer-events: none;
 }
 
 .pubg-stat-value {
