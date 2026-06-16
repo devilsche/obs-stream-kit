@@ -87,6 +87,11 @@ body.dock {
   padding: 10px 14px;
   backdrop-filter: blur(2px);
 }
+/* Flache Bar-Widgets (live-bar, news-ticker ~36–40px hoch): die 28px-Eck-
+   beschläge erdrücken den Content. Kleinerer Eck-Wert, der in die geringe Höhe
+   passt — die normalen Karten bleiben bei --theme-frame-corner (28px). */
+.pubg-card.pubg-bar { --theme-frame-corner: 12px; }
+
 .pubg-card::before {
   content: ""; position: absolute; inset: 0;
   /* Ornament = 4 feste Eck-Beschlaege als background-image (groessenunabhaengig,
