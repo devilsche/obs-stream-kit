@@ -5857,14 +5857,17 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             **squad_lobby,
         }
 
-    # Total-Aggregate
-    n = len(enriched)
-    wins = sum(1 for x in enriched if (x["place"] or 99) == 1)
-    total_kills = sum(x["kills"] or 0 for x in enriched)
-    total_damage = sum(x["damage_dealt"] or 0 for x in enriched)
-    total_surv = sum(x["time_survived"] or 0 for x in enriched)
-    # Squad+Lobby-Aggregate über alle Matches der Range
-    totals_squad_lobby = _squad_lobby_for([x["match_id"] for x in enriched])
+    # Total-Aggregate — NUR Battle-Royale. TDM/Event-Matches dürfen in der
+    # Match-Liste auftauchen, verfälschen aber NICHT die BR-K/D (TDM hat echte
+    # kills in participants, die sonst die kills/(matches-wins)-Formel sprengen).
+    br_ms = [x for x in enriched if is_br_mode(x.get("game_mode"))]
+    n = len(br_ms)
+    wins = sum(1 for x in br_ms if (x["place"] or 99) == 1)
+    total_kills = sum(x["kills"] or 0 for x in br_ms)
+    total_damage = sum(x["damage_dealt"] or 0 for x in br_ms)
+    total_surv = sum(x["time_survived"] or 0 for x in br_ms)
+    # Squad+Lobby-Aggregate über die BR-Matches der Range
+    totals_squad_lobby = _squad_lobby_for([x["match_id"] for x in br_ms])
 
     totals = {
         "matches": n,
@@ -5873,20 +5876,40 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         "damage": total_damage,
         "avgKills": total_kills / n if n else 0,
         "avgDamage": total_damage / n if n else 0,
-        "avgPlace": sum(x["place"] or 0 for x in enriched) / n if n else 0,
+        "avgPlace": sum(x["place"] or 0 for x in br_ms) / n if n else 0,
         "avgSurvivedSec": total_surv / n if n else 0,
-        "kd": total_kills / max(n - wins, 1),
-        "headshots": sum(x["headshot_kills"] or 0 for x in enriched),
-        "assists": sum(x["assists"] or 0 for x in enriched),
-        "dbnos": sum(x["dbnos"] or 0 for x in enriched),
+        "kd": total_kills / max(n - wins, 1) if n else 0,
+        "headshots": sum(x["headshot_kills"] or 0 for x in br_ms),
+        "assists": sum(x["assists"] or 0 for x in br_ms),
+        "dbnos": sum(x["dbnos"] or 0 for x in br_ms),
         "totalSurvivedSec": total_surv,
-        "longestKill": max((x["longest_kill"] or 0 for x in enriched), default=0),
+        "longestKill": max((x["longest_kill"] or 0 for x in br_ms), default=0),
         "startTime": _match_start(enriched[0]),
         "endTime": enriched[-1]["played_at"],
-        "uniqueMaps": len({x["map_name"] for x in enriched}),
+        "uniqueMaps": len({x["map_name"] for x in br_ms}),
         # Squad+Lobby-Aggregate (basiert auf match_team_mapping)
         **totals_squad_lobby,
     }
+
+    # TDM-Block (eigener K/D, getrennt von BR). Kills aus participants (TDM
+    # trackt das eigene Team echt), Deaths aus der Telemetrie (Kill-Event mit
+    # target_account=ich). Nur gesetzt, wenn TDM-Matches in der Range sind.
+    tdm_ms = [x for x in enriched if (x.get("game_mode") or "") == "tdm"]
+    if tdm_ms:
+        tdm_kills = sum(x["kills"] or 0 for x in tdm_ms)
+        tdm_ids = [x["match_id"] for x in tdm_ms]
+        ph = ",".join("?" * len(tdm_ids))
+        drow = conn.execute(
+            f"SELECT COUNT(*) AS d FROM telemetry_events "
+            f"WHERE event_type='Kill' AND target_account=? "
+            f"AND match_id IN ({ph})", [my_account_id, *tdm_ids]).fetchone()
+        tdm_deaths = (drow["d"] if drow else 0) or 0
+        totals["tdm"] = {
+            "matches": len(tdm_ms),
+            "kills": tdm_kills,
+            "deaths": tdm_deaths,
+            "kd": (tdm_kills / tdm_deaths) if tdm_deaths else float(tdm_kills),
+        }
 
     # Map-Performance: pro Map → Matches, Wins, K/D, Avg DMG, Avg Place
     # Events werden separat markiert. KD ist nur in BR-Modi sinnvoll;

@@ -3282,9 +3282,11 @@
         : `${outD.slice(0,5)} ${PubgUI.fmtTime(squadOutIso)}`;
       const numStr = matchNum != null ? `<span class="num">#${matchNum}</span> ` : "";
       const isEvent = !!m.isEvent;
-      // Event-Matches: Place + Kills/DMG/Surv ausgrauen, Event-Badge in Map-Spalte
+      const isTdm = (m.mode || "") === "tdm";
+      // Event-Matches: Place + Kills/DMG/Surv ausgrauen, Badge in Map-Spalte.
+      // TDM bekommt ein eigenes „TDM"-Badge statt des generischen „EVENT".
       const placeCell = isEvent
-        ? `<span class="place event-badge" title="${m.mode || 'event'}">EVENT</span>`
+        ? `<span class="place event-badge" title="${m.mode || 'event'}">${isTdm ? 'TDM' : 'EVENT'}</span>`
         : `<span class="place">#${m.place}</span>`;
       const dimAttr = isEvent ? ' data-event="1"' : '';
       return `
@@ -3383,6 +3385,7 @@
           <div class="cell"><span class="pubg-stat-value">${t.kills}</span><span class="pubg-stat-label">Kills</span></div>
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtNum(Math.round(t.damage))}</span><span class="pubg-stat-label">Damage</span></div>
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.kd)}</span><span class="pubg-stat-label">K/D</span></div>
+          ${t.tdm ? `<div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.tdm.kd)}</span><span class="pubg-stat-label">TDM K/D</span></div>` : ""}
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.squadKd || 0)}</span><span class="pubg-stat-label">Squad K/D</span></div>
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.lobbyTop3Kd || 0)}</span><span class="pubg-stat-label">Top-3 Lobby K/D</span></div>
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.avgKills)}</span><span class="pubg-stat-label">Ø My Kills/Match</span></div>
