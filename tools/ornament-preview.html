@@ -44,8 +44,13 @@
     .orn { position: relative; }
     .orn::after {
       content: ""; position: absolute; inset: 0;
-      border: var(--theme-frame-width, 0px) solid transparent;
-      border-image: var(--theme-frame);
+      /* 4 feste Eck-Beschläge (background-image, --theme-frame-corner gross),
+         größenunabhängig — identisch zum Live-Mechanismus (.pubg-card::before). */
+      background-image: var(--theme-corner-tl, none), var(--theme-corner-tr, none),
+                        var(--theme-corner-bl, none), var(--theme-corner-br, none);
+      background-position: top left, top right, bottom left, bottom right;
+      background-size: var(--theme-frame-corner, 28px);
+      background-repeat: no-repeat;
       border-radius: inherit;
       pointer-events: none;
     }
