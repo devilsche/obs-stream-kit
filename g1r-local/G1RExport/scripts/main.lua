@@ -395,12 +395,18 @@ end
 -- GameplayTag (FGameplayTag). Wir lesen dessen TagName als String. Enum-Werte
 -- (EPlayerGuild): 0 None,1 Templars,2 Novices,3 MagesWater,4 Mercenaries,
 -- 5 Rogues,6 MagesFire,7 Guards,8 Shadows.
+-- BP_GetCharacterState verträgt KEINE Mehrfachaufrufe pro tick (Guild UND Waffen riefen
+-- es → "entweder Guild oder Weapon"). Daher den State pro tick cachen: erster Aufruf holt,
+-- alle weiteren nutzen den Cache. Cache wird im tick zu Beginn invalidiert (setCharStateDirty).
+local CachedState = nil
+local function setCharStateDirty() CachedState = nil end
 local function getCharacterState(char)
+    if isValid(CachedState) then return CachedState end
     local s = nil
     pcall(function() s = char:BP_GetCharacterState() end)
-    if isValid(s) then return s end
+    if isValid(s) then CachedState = s; return s end
     pcall(function() s = char.m_CharacterState end)
-    if isValid(s) then return s end
+    if isValid(s) then CachedState = s; return s end
     return nil
 end
 
@@ -475,14 +481,15 @@ end
 
 -- Erste Waffe aus einem TSet (GetAll*Weapons) + Anzahl Elemente (Diagnose).
 local function firstWeaponFromSet(set)
-    if not isValid(set) then return nil, -1 end   -- -1 = Set ungültig
+    if set == nil then return nil, -1 end   -- TSet hat kein IsValid() → nur nil prüfen
     local found, n = nil, 0
-    pcall(function()
+    local ok = pcall(function()
         set:ForEach(function(el)
             n = n + 1
             if found == nil then found = defName(unwrap(el)) end
         end)
     end)
+    if not ok then return found, -2 end   -- ForEach am TSet nicht möglich
     return found, n
 end
 
@@ -744,6 +751,7 @@ end
 
 -- ── Schreib-Schleife ────────────────────────────────────────────────────────
 local function tick()
+    setCharStateDirty()  -- CharacterState-Cache pro tick frisch holen (1 Aufruf, beide Reader teilen ihn)
     local char = getPlayer()
     if not char then return end
     -- Beim Spiel-Schließen / Hauptmenü räumt die Engine die Objekte ab. Prüfen, ob
