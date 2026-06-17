@@ -1,4 +1,14 @@
 {
-  "_comment": "Klassenname -> {de, en}. G1R nutzt die Original-Gothic-Namen mit Kategorie-Praefix: ItFo_=Food, ItMi_=Misc (Gold/Erz), ItPo_=Potion, ItMw_=Nahkampf, ItRw_=Fernkampf, ItAr_=Armor, ItRu_=Rune, ItSc_=Scroll, ItKe_=Key. Die echten Namen stehen in /state unter items[].name. Fehlt ein Eintrag, strippt server.py das Praefix als Fallback (ItFo_Carrot -> 'Carrot'). Hier echte DE-Namen ergaenzen und server.py neu starten.",
-  "ItFo_Carrot": { "de": "Karotte", "en": "Carrot" }
+  "_comment": "Klassenname -> {de, en}. G1R nutzt die Original-Gothic-Namen mit Kategorie-Praefix: ItFo_=Food, ItMi_=Misc, ItPo_=Potion, ItMw_=Nahkampf, ItRw_=Fernkampf, ItAr_=Rune/Scroll, ItAt_=Trophaee. Die echten Namen stehen in /state unter items[].name. Quelle der Namen: gothic-remake.wikily.gg (interne Codes stehen in den Icon-Pfaden, z.B. T_ItemIcon_ItAt_Shadow_06.webp). Fehlt ein Eintrag, strippt server.py das Praefix als Fallback (ItFo_Carrot -> 'Carrot').",
+  "ItFo_Carrot":       { "de": "Karotte", "en": "Carrot" },
+
+  "ItAt_Shadow_01":    { "de": "Fell eines Schattenläufers",        "en": "Shadowbeast's skin" },
+  "ItAt_Shadow_02":    { "de": "Horn eines Schattenläufers",        "en": "Shadowbeast's horn" },
+  "ItAt_Shadow_03":    { "de": "Zahn eines Schattenläufers",        "en": "Shadowbeast's fang" },
+  "ItAt_Shadow_04":    { "de": "Rückgrat eines Schattenläufers",    "en": "Shadowbeast's spine" },
+  "ItAt_Shadow_05":    { "de": "Horn eines großen Schattenläufers", "en": "Horn of a Great Shadowbeast" },
+  "ItAt_Shadow_06":    { "de": "Fell eines Frost-Schattenläufers",  "en": "Frost Shadowbeast's skin" },
+
+  "ItAt_Scavenger_01": { "de": "Zähne eines Beißers",          "en": "Scavenger's teeth" },
+  "ItAt_Scavenger_02": { "de": "Schädelplatte eines Beißers",  "en": "Scavenger's skull plate" }
 }
