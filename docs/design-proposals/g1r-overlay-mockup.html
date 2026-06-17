@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>G1R Overlay — Mockups</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Cinzel:wght@600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+  <style>
+    :root {
+      --c-accent:  #f2b705;
+      --c-primary: #5e2a79;
+      --c-bg:      #0a0510;
+      --c-surface: #1f1430;
+      --c-surface2:#2a1c42;
+      --c-text:    #e8e0f0;
+      --c-muted:   #8a7d99;
+      --c-border:  rgba(94,42,121,.65);
+      --c-good:    #4be39a;
+      --c-bad:     #e3564b;
+      --c-rec:     #ff9d3c;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(1200px 600px at 50% -10%, #1a0e2b, #070310 60%);
+      color: var(--c-text); font-family: "DM Sans", system-ui, sans-serif;
+      padding: 40px 24px 80px; min-height: 100vh;
+    }
+    .page { max-width: 980px; margin: 0 auto; }
+    h1 { font-family: "Cinzel", serif; color: var(--c-accent); font-size: 1.7rem;
+         letter-spacing: .04em; margin-bottom: 6px; }
+    .intro { color: var(--c-muted); margin-bottom: 36px; max-width: 70ch; line-height: 1.5; }
+    .block { margin-bottom: 44px; }
+    .block > h2 { font-family: "Cinzel", serif; color: var(--c-text); font-size: 1.15rem;
+                  margin-bottom: 4px; }
+    .block > .desc { color: var(--c-muted); font-size: .9rem; margin-bottom: 14px; }
+    .size { color: var(--c-accent); font-size: .78rem; font-family: ui-monospace, monospace; }
+    .stage { background: #060309; border: 1px dashed rgba(255,255,255,.08);
+             border-radius: 10px; padding: 22px; display: flex; flex-direction: column;
+             gap: 16px; align-items: flex-start; }
+    .ico { font-family: "Material Symbols Rounded"; font-size: 1em; vertical-align: -2px; }
+
+    /* ─── Gemeinsamer Ornament-Look (Entry) ─── */
+    .card { background: linear-gradient(180deg, var(--c-surface), var(--c-bg));
+            border: 1px solid var(--c-border); border-radius: 8px; position: relative; }
+    .card::before { content: ""; position: absolute; inset: 0; border-radius: 8px;
+            pointer-events: none; box-shadow: inset 0 0 0 1px rgba(242,183,5,.12); }
+    .lbl { color: var(--c-muted); text-transform: uppercase; letter-spacing: .12em;
+           font-size: .62rem; }
+
+    /* ─── 1) LIVEBAR (horizontal, PUBG-Stil) ─── */
+    .livebar { display: inline-flex; align-items: center; gap: 0; height: 46px;
+               padding: 0 16px; border-left: 3px solid var(--c-accent); white-space: nowrap; }
+    .livebar .it { display: inline-flex; align-items: baseline; gap: 6px; padding: 0 13px; }
+    .livebar .v { color: var(--c-text); font-weight: 700; font-size: 1.05rem;
+                  font-variant-numeric: tabular-nums; }
+    .livebar .v.good { color: var(--c-good); } .livebar .v.bad { color: var(--c-bad); }
+    .livebar .k { color: var(--c-muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; }
+    .livebar .sep { color: var(--c-border); }
+    .livebar .clock { color: var(--c-accent); font-weight: 700; font-variant-numeric: tabular-nums;
+                      display: inline-flex; align-items: center; gap: 5px; padding-left: 13px; }
+
+    /* ─── 2) NEWS-TICKER ─── */
+    .ticker { width: 760px; max-width: 100%; height: 40px; display: flex; align-items: center;
+              gap: 12px; padding: 0 14px; border-left: 3px solid var(--c-accent); overflow: hidden; }
+    .ticker .tag { background: var(--c-primary); color: #fff; font-size: .62rem; font-weight: 700;
+                   text-transform: uppercase; letter-spacing: .1em; padding: 3px 8px; border-radius: 4px; flex: none; }
+    .ticker .run { color: var(--c-text); font-size: .92rem; white-space: nowrap; }
+    .ticker .run b { color: var(--c-accent); }
+    .ticker .run .dot { color: var(--c-muted); margin: 0 10px; }
+
+    /* ─── 3) CAREER-CARD ─── */
+    .career { width: 360px; padding: 18px 20px 20px; }
+    .career .head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .career .crest { width: 42px; height: 42px; border-radius: 8px; flex: none;
+                     background: radial-gradient(circle at 30% 25%, var(--c-primary), #1a0e2b);
+                     border: 1px solid var(--c-accent); display: grid; place-items: center;
+                     color: var(--c-accent); font-size: 1.4rem; }
+    .career .who .name { font-family: "Cinzel", serif; color: var(--c-accent); font-size: 1.2rem; }
+    .career .who .sub { color: var(--c-muted); font-size: .8rem; }
+    .career .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; margin-bottom: 16px; }
+    .career .stat { display: flex; justify-content: space-between; align-items: baseline;
+                    border-bottom: 1px solid rgba(255,255,255,.06); padding-bottom: 4px; }
+    .career .stat .n { color: var(--c-muted); font-size: .82rem; }
+    .career .stat .b { color: var(--c-text); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .career .section-lbl { color: var(--c-muted); text-transform: uppercase; letter-spacing: .12em;
+                           font-size: .6rem; margin: 4px 0 8px; }
+    .career .res { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+    .career .res span { background: var(--c-surface2); border: 1px solid var(--c-border);
+                        border-radius: 5px; padding: 2px 8px; font-size: .76rem; }
+    .career .res b { color: var(--c-accent); font-variant-numeric: tabular-nums; }
+    .career .totals, .career .records { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+    .career .totals .t, .career .records .r { display: flex; justify-content: space-between; font-size: .82rem; }
+    .career .totals .t .b { color: var(--c-text); font-weight: 700; }
+    .career .records .r .b { color: var(--c-rec); font-weight: 700; }
+    .career .gear { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.07);
+                    display: grid; gap: 6px; }
+    .career .gear .row { display: flex; justify-content: space-between; align-items: baseline; font-size: .85rem; }
+    .career .gear .row .n { color: var(--c-muted); }
+    .career .gear .row .b { color: var(--c-text); font-weight: 500; }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <h1>Gothic 1 — Overlay-Mockups</h1>
+    <p class="intro">Drei Bausteine für OBS, Entry-Look (Purple/Gold, DM Sans, Cinzel-Headlines).
+      Beispieldaten. Alles unabhängig platzierbar. Sag mir pro Baustein: passt / anders.</p>
+
+    <!-- 1) LIVEBAR -->
+    <section class="block">
+      <h2>1 · Livebar <span class="size">≈ 720 × 46 px</span></h2>
+      <p class="desc">Horizontale Dauer-Leiste wie die PUBG-Livebar — Wert + Label, durch Punkte getrennt.
+        Schlank, läuft am unteren Rand mit.</p>
+      <div class="stage">
+        <div class="card livebar">
+          <span class="it"><span class="v">12</span><span class="k">Level</span></span>
+          <span class="sep">·</span>
+          <span class="it"><span class="v">1.842</span><span class="k">Schritte</span></span>
+          <span class="sep">·</span>
+          <span class="it"><span class="v bad">340</span><span class="k">DMG aus</span></span>
+          <span class="sep">·</span>
+          <span class="it"><span class="v">120</span><span class="k">erhalten</span></span>
+          <span class="sep">·</span>
+          <span class="it"><span class="v">80</span><span class="k">Mana&nbsp;verbr.</span></span>
+          <span class="sep">·</span>
+          <span class="it"><span class="v good">+45</span><span class="k">HP-Regen</span></span>
+          <span class="sep">·</span>
+          <span class="it"><span class="v good">+30</span><span class="k">Mana-Regen</span></span>
+          <span class="clock"><span class="ico">schedule</span>14:32</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2) NEWS-TICKER -->
+    <section class="block">
+      <h2>2 · News-Ticker <span class="size">≈ 760 × 40 px</span></h2>
+      <p class="desc">Laufband, das durch die Infos rotiert: Stats, Session-Werte, Strecke,
+        stärkste Waffe, stärkster nutzbarer Zauber.</p>
+      <div class="stage">
+        <div class="card ticker">
+          <span class="tag">G1 Live</span>
+          <span class="run">
+            STR <b>25</b> · GES <b>18</b> · HP <b>280/400</b> · Mana <b>60/120</b>
+            <span class="dot">◆</span>
+            Session: <b>1.2 km</b> gelaufen · <b>340</b> DMG ausgeteilt · <b>120</b> einstecken müssen
+            <span class="dot">◆</span>
+            Stärkste Waffe: <b>Richtschwert</b> · Stärkster Zauber: <b>Eispfeil</b>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3) CAREER-CARD -->
+    <section class="block">
+      <h2>3 · Career-Card <span class="size">≈ 360 × 480 px</span></h2>
+      <p class="desc">Detail-Tafel (wie die PUBG-Career-Card): Stats, Resistenzen, Gesamt-Werte
+        (persistent über alle Sessions), Rekorde und aktuelle Ausrüstung.</p>
+      <div class="stage">
+        <div class="card career">
+          <div class="head">
+            <div class="crest"><span class="ico">shield</span></div>
+            <div class="who">
+              <div class="name">Namenloser Held</div>
+              <div class="sub">Gardist · Altes Lager · Lv 12</div>
+            </div>
+          </div>
+
+          <div class="grid">
+            <div class="stat"><span class="n">Stärke</span><span class="b">25</span></div>
+            <div class="stat"><span class="n">Geschick</span><span class="b">18</span></div>
+            <div class="stat"><span class="n">HP</span><span class="b">280 / 400</span></div>
+            <div class="stat"><span class="n">Mana</span><span class="b">60 / 120</span></div>
+            <div class="stat"><span class="n">Magie-Kreis</span><span class="b">2</span></div>
+            <div class="stat"><span class="n">Lernpunkte</span><span class="b">5</span></div>
+          </div>
+
+          <div class="section-lbl">Resistenzen</div>
+          <div class="res">
+            <span>Feuer <b>40</b></span><span>Eis <b>20</b></span><span>Schnitt <b>30</b></span>
+            <span>Stich <b>25</b></span><span>Wucht <b>15</b></span>
+          </div>
+
+          <div class="section-lbl">Insgesamt (alle Sessions)</div>
+          <div class="totals">
+            <div class="t"><span class="n">Strecke</span><span class="b">37,4 km</span></div>
+            <div class="t"><span class="n">Schritte</span><span class="b">49.880</span></div>
+            <div class="t"><span class="n">DMG aus</span><span class="b">12.350</span></div>
+            <div class="t"><span class="n">DMG rein</span><span class="b">6.120</span></div>
+          </div>
+
+          <div class="section-lbl">Rekorde</div>
+          <div class="records">
+            <div class="r"><span class="n">Härtester Schlag</span><span class="b">88</span></div>
+            <div class="r"><span class="n">Härtester Treffer</span><span class="b">64</span></div>
+            <div class="r"><span class="n">Weiteste Strecke</span><span class="b">3,1 km</span></div>
+            <div class="r"><span class="n">Max Mana/Schlag</span><span class="b">42</span></div>
+          </div>
+
+          <div class="gear">
+            <div class="row"><span class="n">Stärkste Waffe</span><span class="b">Richtschwert</span></div>
+            <div class="row"><span class="n">Stärkster Zauber</span><span class="b">Eispfeil</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
