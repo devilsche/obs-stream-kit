@@ -62,6 +62,11 @@
     </div>
 
     <div>
+      <div class="label">Waffe (Nah / Fern)</div>
+      <div class="pos" id="weapon"><span class="offline">—</span></div>
+    </div>
+
+    <div>
       <div class="label">Aktiver Zauber</div>
       <div class="guild" id="spell"><span class="offline">—</span></div>
     </div>
@@ -96,6 +101,7 @@
     var dot = document.getElementById('dot');
     var guildEl = document.getElementById('guild');
     var spellEl = document.getElementById('spell');
+    var weaponEl = document.getElementById('weapon');
     var posEl = document.getElementById('pos');
     var distEl = document.getElementById('dist');
     var statsEl = document.getElementById('stats');
@@ -107,6 +113,7 @@
       posEl.innerHTML = '<span class="offline">' + (msg || '— warte auf G1R —') + '</span>';
       guildEl.innerHTML = '<span class="offline">—</span>';
       spellEl.innerHTML = '<span class="offline">—</span>';
+      weaponEl.innerHTML = '<span class="offline">—</span>';
       distEl.innerHTML = '<span class="offline">—</span>';
       statsEl.innerHTML = '<span class="offline">—</span>';
       itemsEl.innerHTML = '';
@@ -135,6 +142,9 @@
       dot.classList.add('live');
       guildEl.textContent = d.guild || 'Keine Gilde';
       spellEl.textContent = d.spellDisplay || d.spell || 'Kein Zauber';
+      var melee = d.weaponMeleeDisplay || d.weaponMelee;
+      var ranged = d.weaponRangedDisplay || d.weaponRanged;
+      weaponEl.textContent = (melee || '–') + ' / ' + (ranged || '–');
       if (d.pos) {
         posEl.innerHTML =
           '<span><span class="axis">X</span><b>' + Math.round(d.pos.x) + '</b></span>' +

@@ -87,7 +87,10 @@ end
 
 local function shortName(fullName)
     if not fullName then return "Item" end
-    return string.match(fullName, "%.([^%.]+)$") or fullName
+    local s = string.match(fullName, "%.([^%.]+)$") or fullName
+    -- Klassen-/Default-Objekte: 'Default__ItMw_1H_Sword_01_C' -> 'ItMw_1H_Sword_01'
+    s = s:gsub("^Default__", ""):gsub("_C$", "")
+    return s
 end
 
 -- ── Inventar-Lesen: vollständiger mods-g1r-Helper-Stack (1:1 adaptiert) ──────
@@ -432,6 +435,29 @@ local function readSpell(char)
     return name
 end
 
+-- ── Ausgerüstete Waffe(n) lesen ─────────────────────────────────────────────
+-- InventoryComponent:GetFirstEquippedMeleeWeapon → WeaponMeleeDefinition,
+-- GetFirstEquippedRangedWeapon → WeaponRangedDefinition. GetFullName → shortName
+-- → Klassenname (ItMw_*/ItRw_*), den server.py via item_names.json übersetzt.
+local function defName(def)
+    if not isValid(def) then return nil end
+    local ok, full = pcall(function() return def:GetFullName() end)
+    if not ok or not full then return nil end
+    local n = shortName(full)
+    if n == "" or n == "Item" then return nil end
+    return n
+end
+
+local function readWeapons(char)
+    local inv = nil
+    pcall(function() inv = char:GetInventory() end)
+    if not isValid(inv) then return nil, nil end
+    local melee, ranged
+    pcall(function() melee = defName(inv:GetFirstEquippedMeleeWeapon()) end)
+    pcall(function() ranged = defName(inv:GetFirstEquippedRangedWeapon()) end)
+    return melee, ranged
+end
+
 -- ── JSON (minimal, nur für unsere Struktur) ─────────────────────────────────
 local function jsonEsc(s)
     return (tostring(s):gsub('[\\"%z\1-\31]', function(c)
@@ -439,7 +465,7 @@ local function jsonEsc(s)
     end):gsub('\\u0022', '\\"'):gsub('\\u005c', '\\\\'))
 end
 
-local function buildJson(pos, items, distCm, stats, guild, spell)
+local function buildJson(pos, items, distCm, stats, guild, spell, weaponMelee, weaponRanged)
     local parts = {}
     parts[#parts+1] = '"ok":true'
     if guild and guild ~= "" then
@@ -451,6 +477,16 @@ local function buildJson(pos, items, distCm, stats, guild, spell)
         parts[#parts+1] = string.format('"spell":"%s"', jsonEsc(spell))
     else
         parts[#parts+1] = '"spell":null'
+    end
+    if weaponMelee and weaponMelee ~= "" then
+        parts[#parts+1] = string.format('"weaponMelee":"%s"', jsonEsc(weaponMelee))
+    else
+        parts[#parts+1] = '"weaponMelee":null'
+    end
+    if weaponRanged and weaponRanged ~= "" then
+        parts[#parts+1] = string.format('"weaponRanged":"%s"', jsonEsc(weaponRanged))
+    else
+        parts[#parts+1] = '"weaponRanged":null'
     end
     if pos then
         parts[#parts+1] = string.format('"pos":{"x":%.1f,"y":%.1f,"z":%.1f}', pos.x, pos.y, pos.z)
@@ -515,7 +551,9 @@ local function tick()
     pcall(function() guild = readGuild(char) end)
     local spell
     pcall(function() spell = readSpell(char) end)
-    local json = buildJson(pos, items or {}, totalDistCm, stats or {}, guild, spell)
+    local weaponMelee, weaponRanged
+    pcall(function() weaponMelee, weaponRanged = readWeapons(char) end)
+    local json = buildJson(pos, items or {}, totalDistCm, stats or {}, guild, spell, weaponMelee, weaponRanged)
     local f = io.open(OUTPUT_PATH, "w")
     if f then f:write(json); f:close() end
 end
