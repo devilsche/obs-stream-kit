@@ -178,7 +178,13 @@ local function tick()
     if not char then return end
     local pos, items
     pcall(function() pos = readPosition(char) end)
-    pcall(function() items = readInventory(char) or {} end)
+    -- Items vorerst DEAKTIVIERT: G1R-Inventar-Reflection (ScriptStruct m_Slots)
+    -- braucht den vollen mods-g1r-Helper-Stack (UnwrapValue/GetArrayElement) bzw.
+    -- den UI-Weg (GetItemNameByPos). readInventory() bleibt im File für später.
+    -- Zum Reaktivieren: nächste Zeile durch
+    --   pcall(function() items = readInventory(char) or {} end)
+    -- ersetzen.
+    items = {}
     local json = buildJson(pos, items or {})
     local f = io.open(OUTPUT_PATH, "w")
     if f then f:write(json); f:close() end
@@ -190,4 +196,4 @@ LoopAsync(POLL_INTERVAL_MS, function()
     return false  -- nie stoppen
 end)
 
-print("[G1RExport] geladen — schreibt nach " .. OUTPUT_PATH)
+print("[G1RExport] geladen — schreibt nach " .. OUTPUT_PATH .. "\n")
