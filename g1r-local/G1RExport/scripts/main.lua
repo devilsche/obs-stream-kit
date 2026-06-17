@@ -178,10 +178,12 @@ local function tick()
     if not char then return end
     local pos, items
     pcall(function() pos = readPosition(char) end)
-    -- Items: scheiterten an ScriptStruct-Reflection unter UE4SS 3.0.1-326. Test
-    -- mit neuerer Build (z.B. 3.0.1-970) — ggf. greift der m_Slots-Zugriff jetzt.
-    -- Falls weiter Log-Spam/leer: diese Zeile durch  items = {}  ersetzen (deaktivieren).
-    pcall(function() items = readInventory(char) or {} end)
+    -- Items DEAKTIVIERT: m_Slots liegt in einem ScriptStruct, UE4SS kann dessen
+    -- Member nicht direkt lesen (getestet mit Build 3.0.1-326 UND 3.0.1-970).
+    -- Lösung später = mods-g1r-Helper-Stack (UnwrapValue/GetArrayElement) 1:1 oder
+    -- UI-Weg GetItemNameByPos. readInventory() bleibt im File. Reaktivieren:
+    --   pcall(function() items = readInventory(char) or {} end)
+    items = {}
     local json = buildJson(pos, items or {})
     local f = io.open(OUTPUT_PATH, "w")
     if f then f:write(json); f:close() end
