@@ -1,14 +1,2307 @@
 {
-  "_comment": "Klassenname -> {de, en}. G1R nutzt die Original-Gothic-Namen mit Kategorie-Praefix: ItFo_=Food, ItMi_=Misc, ItPo_=Potion, ItMw_=Nahkampf, ItRw_=Fernkampf, ItAr_=Rune/Scroll, ItAt_=Trophaee. Die echten Namen stehen in /state unter items[].name. Quelle der Namen: gothic-remake.wikily.gg (interne Codes stehen in den Icon-Pfaden, z.B. T_ItemIcon_ItAt_Shadow_06.webp). Fehlt ein Eintrag, strippt server.py das Praefix als Fallback (ItFo_Carrot -> 'Carrot').",
-  "ItFo_Carrot":       { "de": "Karotte", "en": "Carrot" },
-
-  "ItAt_Shadow_01":    { "de": "Fell eines Schattenläufers",        "en": "Shadowbeast's skin" },
-  "ItAt_Shadow_02":    { "de": "Horn eines Schattenläufers",        "en": "Shadowbeast's horn" },
-  "ItAt_Shadow_03":    { "de": "Zahn eines Schattenläufers",        "en": "Shadowbeast's fang" },
-  "ItAt_Shadow_04":    { "de": "Rückgrat eines Schattenläufers",    "en": "Shadowbeast's spine" },
-  "ItAt_Shadow_05":    { "de": "Horn eines großen Schattenläufers", "en": "Horn of a Great Shadowbeast" },
-  "ItAt_Shadow_06":    { "de": "Fell eines Frost-Schattenläufers",  "en": "Frost Shadowbeast's skin" },
-
-  "ItAt_Scavenger_01": { "de": "Zähne eines Beißers",          "en": "Scavenger's teeth" },
-  "ItAt_Scavenger_02": { "de": "Schädelplatte eines Beißers",  "en": "Scavenger's skull plate" }
+ "_comment": "Klassenname -> {de,en}. Quelle: gothic-remake.wikily.gg (interne Codes aus den Icon-Pfaden T_ItemIcon_<code>.webp). server.py uebersetzt items[].name darueber; fehlt ein Eintrag, strippt es das Praefix als Fallback. lang via ?lang=de|en.",
+ "Crw_Armor_H": {
+  "de": "Crawler-Plattenrüstung",
+  "en": "Crawler Plate Armor"
+ },
+ "Ebr_Armor_H_01": {
+  "de": "Gomez' Rüstung",
+  "en": "Gomez' Armor"
+ },
+ "Ebr_Armor_H_02": {
+  "de": "Schwere Erzbaron-Rüstung",
+  "en": "Heavy Ore Baron Armor"
+ },
+ "Ebr_Armor_M": {
+  "de": "Repräsentationsrobe",
+  "en": "Robe of State"
+ },
+ "Grd_Armor": {
+  "de": "Rüstung des Aufsehers",
+  "en": "Warder's Armor"
+ },
+ "Grd_Armor_Bot_H_01": {
+  "de": "Stahl-Knieschoner und Beinschienen I",
+  "en": "Steel Kneepads and Greaves I"
+ },
+ "Grd_Armor_Bot_H_02": {
+  "de": "Stahl-Knieschoner und Beinschienen II",
+  "en": "Steel Kneepads and Greaves II"
+ },
+ "Grd_Armor_Bot_L_01": {
+  "de": "Leder-Knieschoner und Stiefel I",
+  "en": "Leather Kneepads and Boots I"
+ },
+ "Grd_Armor_Bot_L_02": {
+  "de": "Leder-Knieschoner und Stiefel II",
+  "en": "Leather Kneepads and Boots II"
+ },
+ "Grd_Armor_Bot_M_01": {
+  "de": "Stahl-Knieschoner und verstärkte Stiefel I",
+  "en": "Steel Kneepads and Reinforced Boots I"
+ },
+ "Grd_Armor_Bot_M_02": {
+  "de": "Stahl-Knieschoner und verstärkte Stiefel II",
+  "en": "Steel Kneepads and Reinforced Boots II"
+ },
+ "Grd_Armor_Mid_H_01": {
+  "de": "Kampfhandschuhe und Beintaschen I",
+  "en": "Battle Gloves and Tassets I"
+ },
+ "Grd_Armor_Mid_H_02": {
+  "de": "Kampfhandschuhe und Beintaschen II",
+  "en": "Battle Gloves and Tassets II"
+ },
+ "Grd_Armor_Mid_L_01": {
+  "de": "Armschienen und Gürtel I",
+  "en": "Bracers and Belt I"
+ },
+ "Grd_Armor_Mid_L_02": {
+  "de": "Armschienen und Gürtel II",
+  "en": "Bracers and Belt II"
+ },
+ "Grd_Armor_Mid_M_01": {
+  "de": "Verstärkte Armschienen und Beintaschen I",
+  "en": "Reinforced Bracers and Tassets I"
+ },
+ "Grd_Armor_Mid_M_02": {
+  "de": "Verstärkte Armschienen und Beintaschen II",
+  "en": "Reinforced Bracers and Tassets II"
+ },
+ "Grd_Armor_Top_H_01": {
+  "de": "Brustplatte",
+  "en": "Breastplate"
+ },
+ "Grd_Armor_Top_H_02": {
+  "de": "Schattenläufer-Brustplatte",
+  "en": "Shadowbeast Breastplate"
+ },
+ "Grd_Armor_Top_L_01": {
+  "de": "Schulterstücke I",
+  "en": "Pauldrons I"
+ },
+ "Grd_Armor_Top_L_02": {
+  "de": "Schulterstücke II",
+  "en": "Pauldrons II"
+ },
+ "Grd_Armor_Top_M_01": {
+  "de": "Schulterstücke und Plattengarden I",
+  "en": "Pauldrons and Plated Guards I"
+ },
+ "Grd_Armor_Top_M_02": {
+  "de": "Schulterstücke und Plattengarden II",
+  "en": "Pauldrons and Plated Guards II"
+ },
+ "ItAr_Rune_BreathOfDeath": {
+  "de": "Rune: Atem des Todes",
+  "en": "Breath of Death"
+ },
+ "ItAr_Rune_TeleportToMagiciansOfFire": {
+  "de": "Rune: Teleport zu den Feuermagiern",
+  "en": "Teleport to the Fire Mages"
+ },
+ "ItAr_Rune_TeleportToMagiciansOfWater": {
+  "de": "Rune: Teleport zu den Wassermagiern",
+  "en": "Teleport to the Water Mages"
+ },
+ "ItAr_Rune_TeleportToNecromancer": {
+  "de": "Rune: Teleport zum Nekromanten",
+  "en": "Teleport to the Necromancer"
+ },
+ "ItAr_Rune_TeleportToSunkenTower": {
+  "de": "Rune: Teleport zum versunkenen Turm",
+  "en": "Rune 'Teleport to the Sunken Tower'"
+ },
+ "ItAr_Rune_TeleportToSwampCamp": {
+  "de": "Rune: Teleport ins Sumpflager",
+  "en": "Teleport to the Swamp Camp"
+ },
+ "ItAr_Rune_UrizielWaveOfDeath": {
+  "de": "Rune: Urizels Todeswelle",
+  "en": "Uriziel's Wave of Death"
+ },
+ "ItAr_Scroll_BallLightning": {
+  "de": "Schriftrolle: Blitzkugel",
+  "en": "Ball Lightning"
+ },
+ "ItAr_Scroll_ChainLightning": {
+  "de": "Schriftrolle: Kettenblitz",
+  "en": "Chain Lightning"
+ },
+ "ItAr_Scroll_Charm": {
+  "de": "Schriftrolle: Bezauberung",
+  "en": "Charm"
+ },
+ "ItAr_Scroll_Control": {
+  "de": "Schriftrolle: Kontrolle",
+  "en": "Control"
+ },
+ "ItAr_Scroll_DeathToTheUndead": {
+  "de": "Schriftrolle: Tod den Untoten",
+  "en": "Death to the Undead"
+ },
+ "ItAr_Scroll_Fear": {
+  "de": "Schriftrolle: Angst",
+  "en": "Fear"
+ },
+ "ItAr_Scroll_FireBall": {
+  "de": "Schriftrolle: Feuerball",
+  "en": "Fireball"
+ },
+ "ItAr_Scroll_FireBolt": {
+  "de": "Schriftrolle: Feuerpfeil",
+  "en": "Fire Bolt"
+ },
+ "ItAr_Scroll_FireRain": {
+  "de": "Schriftrolle: Feuerregen",
+  "en": "Rain of Fire"
+ },
+ "ItAr_Scroll_FistOfWind": {
+  "de": "Schriftrolle: Faust des Windes",
+  "en": "Fist of Wind"
+ },
+ "ItAr_Scroll_Heal": {
+  "de": "Schriftrolle: Heilung",
+  "en": "Healing"
+ },
+ "ItAr_Scroll_IceBlock": {
+  "de": "Schriftrolle: Eisblock",
+  "en": "Ice Block"
+ },
+ "ItAr_Scroll_IceBolt": {
+  "de": "Schriftrolle: Eispfeil",
+  "en": "Ice Bolt"
+ },
+ "ItAr_Scroll_IceWave": {
+  "de": "Schriftrolle: Eiswelle",
+  "en": "Wave of Ice"
+ },
+ "ItAr_Scroll_InnosPray": {
+  "de": "Schriftrolle: Gebet zu Innos",
+  "en": "Pray to Innos"
+ },
+ "ItAr_Scroll_Light": {
+  "de": "Schriftrolle: Licht",
+  "en": "Light"
+ },
+ "ItAr_Scroll_Pyrokinesis": {
+  "de": "Schriftrolle: Pyrokinese",
+  "en": "Pyrokinesis"
+ },
+ "ItAr_Scroll_Shrink": {
+  "de": "Schriftrolle: Monster schrumpfen",
+  "en": "Shrink Monster"
+ },
+ "ItAr_Scroll_Sleep": {
+  "de": "Schriftrolle: Schlaf",
+  "en": "Sleep"
+ },
+ "ItAr_Scroll_StormFist": {
+  "de": "Schriftrolle: Sturmfaust",
+  "en": "Storm Fist"
+ },
+ "ItAr_Scroll_StormOfFire": {
+  "de": "Schriftrolle: Feuersturm",
+  "en": "Storm of Fire"
+ },
+ "ItAr_Scroll_SummonArmyOfDarkness": {
+  "de": "Schriftrolle: Armee der Finsternis beschwören",
+  "en": "Summon Army of Darkness"
+ },
+ "ItAr_Scroll_SummonDemon": {
+  "de": "Schriftrolle: Dämon beschwören",
+  "en": "Summon Demon"
+ },
+ "ItAr_Scroll_SummonGolem": {
+  "de": "Schriftrolle: Golem beschwören",
+  "en": "Summon Golem"
+ },
+ "ItAr_Scroll_SummonSkeletons": {
+  "de": "Schriftrolle: Skelette beschwören",
+  "en": "Summon Skeletons"
+ },
+ "ItAr_Scroll_Telekinesis": {
+  "de": "Schriftrolle: Telekinese",
+  "en": "Telekinesis"
+ },
+ "ItAr_Scroll_TransformBiter": {
+  "de": "Schriftrolle: Verwandlung in Beißer",
+  "en": "Transform into Biter"
+ },
+ "ItAr_Scroll_TransformBloodfly": {
+  "de": "Schriftrolle: Verwandlung in Blutfliege",
+  "en": "Transform into Bloodfly"
+ },
+ "ItAr_Scroll_TransformBloodhound": {
+  "de": "Schriftrolle: Verwandlung in Bluthund",
+  "en": "Transform into Bloodhound"
+ },
+ "ItAr_Scroll_TransformFireLizard": {
+  "de": "Schriftrolle: Verwandlung in Feuerechse",
+  "en": "Transform into Fire Lizard"
+ },
+ "ItAr_Scroll_TransformHarpy": {
+  "de": "Schriftrolle: Verwandlung in Harpyie",
+  "en": "Transform into Harpy"
+ },
+ "ItAr_Scroll_TransformLizard": {
+  "de": "Schriftrolle: Verwandlung in Echse",
+  "en": "Transform into Lizard"
+ },
+ "ItAr_Scroll_TransformLurker": {
+  "de": "Schriftrolle: Verwandlung in Lauerer",
+  "en": "Transform into Lurker"
+ },
+ "ItAr_Scroll_TransformMeatbug": {
+  "de": "Schriftrolle: Verwandlung in Fleischwanze",
+  "en": "Transform into Meatbug"
+ },
+ "ItAr_Scroll_TransformMinecrawler": {
+  "de": "Schriftrolle: Verwandlung in Minecrawler",
+  "en": "Transform into Minecrawler"
+ },
+ "ItAr_Scroll_TransformMolerat": {
+  "de": "Schriftrolle: Verwandlung in Molchratte",
+  "en": "Transform into Molerat"
+ },
+ "ItAr_Scroll_TransformOrcDog": {
+  "de": "Schriftrolle: Verwandlung in Orkhund",
+  "en": "Transform into Orc Dog"
+ },
+ "ItAr_Scroll_TransformRazor": {
+  "de": "Schriftrolle: Verwandlung in Scherge",
+  "en": "Transform into Razor"
+ },
+ "ItAr_Scroll_TransformScavenger": {
+  "de": "Schriftrolle: Verwandlung in Scavenger",
+  "en": "Transform into Scavenger"
+ },
+ "ItAr_Scroll_TransformShadowbeast": {
+  "de": "Schriftrolle: Verwandlung in Schattenläufer",
+  "en": "Transform into Shadowbeast"
+ },
+ "ItAr_Scroll_TransformSnapper": {
+  "de": "Schriftrolle: Verwandlung in Snapper",
+  "en": "Transform into Snapper"
+ },
+ "ItAr_Scroll_TransformSwampshark": {
+  "de": "Schriftrolle: Verwandlung in Sumpfhai",
+  "en": "Transform into Swampshark"
+ },
+ "ItAr_Scroll_TransformWolf": {
+  "de": "Schriftrolle: Verwandlung in Wolf",
+  "en": "Transform into Wolf"
+ },
+ "ItAt_Amulet_Brotherhood": {
+  "de": "Zeichen der Bruderschaft",
+  "en": "Sign of the Brotherhood"
+ },
+ "ItAt_Amulet_Dexterity_01": {
+  "de": "Amulett der Geschicklichkeit",
+  "en": "Amulet of Agility"
+ },
+ "ItAt_Amulet_Dexterity_02": {
+  "de": "Amulett der Geschicklichkeit",
+  "en": "Amulet of Dexterity"
+ },
+ "ItAt_Amulet_Enlight": {
+  "de": "Amulett der Erleuchtung",
+  "en": "Amulet of Enlightenment"
+ },
+ "ItAt_Amulet_Fire": {
+  "de": "Amulett der Flammen",
+  "en": "Amulet of Flames"
+ },
+ "ItAt_Amulet_Innos": {
+  "de": "Innos' Gnade",
+  "en": "Innos' Grace"
+ },
+ "ItAt_Amulet_Life": {
+  "de": "Amulett der Lebenskraft",
+  "en": "Amulet of Life Force"
+ },
+ "ItAt_Amulet_Magic_01": {
+  "de": "Amulett der Magie",
+  "en": "Amulet of Magic"
+ },
+ "ItAt_Amulet_Magic_02": {
+  "de": "Amulett der spirituellen Kraft",
+  "en": "Amulet of Spiritual Power"
+ },
+ "ItAt_Amulet_Magicfire": {
+  "de": "Amulett der Läuterung",
+  "en": "Amulet of Purification"
+ },
+ "ItAt_Amulet_Neks": {
+  "de": "Amulett der Totenwache",
+  "en": "Amulet of the Dead Guard"
+ },
+ "ItAt_Amulet_Orc": {
+  "de": "Ork-Talisman",
+  "en": "Orc Talisman"
+ },
+ "ItAt_Amulet_OrcMummy": {
+  "de": "Orkisches Grabamulett",
+  "en": "Orcish Burial Amulet"
+ },
+ "ItAt_Amulet_Power": {
+  "de": "Amulett der Macht",
+  "en": "Amulet of Might"
+ },
+ "ItAt_Amulet_Projectile": {
+  "de": "Amulett der Eichenhaut",
+  "en": "Amulet of Oak Skin"
+ },
+ "ItAt_Amulet_Protection": {
+  "de": "Amulett der Erzhaut",
+  "en": "Amulet of Ore Skin"
+ },
+ "ItAt_Amulet_Ranged": {
+  "de": "Amulett der Steinhaut",
+  "en": "Amulet of Stone Skin"
+ },
+ "ItAt_Amulet_Strong_01": {
+  "de": "Amulett der Kraft",
+  "en": "Amulet of Power"
+ },
+ "ItAt_Amulet_Strong_02": {
+  "de": "Amulett der Stärke",
+  "en": "Amulet of Strength"
+ },
+ "ItAt_Amulet_Ulu_Talisman": {
+  "de": "Seltsames Amulett",
+  "en": "Strange Amulet"
+ },
+ "ItAt_Amulet_Water": {
+  "de": "Amulett des Boten",
+  "en": "Messenger's Amulet"
+ },
+ "ItAt_Amulet_Weapon": {
+  "de": "Rüstungs-Amulett",
+  "en": "Armor Amulet"
+ },
+ "ItAt_Biter_02": {
+  "de": "Zahn eines Beißers",
+  "en": "Biter's fang"
+ },
+ "ItAt_Biter_03": {
+  "de": "Fell eines Beißers",
+  "en": "Biter's skin"
+ },
+ "ItAt_Bloodfly_01": {
+  "de": "Flügel einer Blutfliege",
+  "en": "Bloodfly's wings"
+ },
+ "ItAt_Bloodfly_02": {
+  "de": "Stachel einer Blutfliege",
+  "en": "Bloodfly's stinger"
+ },
+ "ItAt_Bloodfly_03": {
+  "de": "Giftdrüse einer Blutfliege",
+  "en": "Bloodfly's poison gland"
+ },
+ "ItAt_Bloodhound_01": {
+  "de": "Zähne eines Bluthunds",
+  "en": "Bloodhound's teeth"
+ },
+ "ItAt_Bloodhound_02": {
+  "de": "Fell eines Bluthunds",
+  "en": "Bloodhound's skin"
+ },
+ "ItAt_Crawler_01": {
+  "de": "Mandibeln eines Minecrawlers",
+  "en": "Minecrawler's mandibles"
+ },
+ "ItAt_Crawler_02": {
+  "de": "Panzerplatte eines Minecrawlers",
+  "en": "Minecrawler's plate"
+ },
+ "ItAt_Crawlerqueen": {
+  "de": "Minecrawler-Ei",
+  "en": "Minecrawler's egg"
+ },
+ "ItAt_Damlurker_01": {
+  "de": "Klauen eines Dammlauerers",
+  "en": "Dam Lurker's claws"
+ },
+ "ItAt_Firegolem_01": {
+  "de": "Herz eines Feuergolems",
+  "en": "Heart of a Fire Golem"
+ },
+ "ItAt_Firegolem_02": {
+  "de": "Obsidiankern",
+  "en": "Obsidian core"
+ },
+ "ItAt_Firelizard_01": {
+  "de": "Feuerzunge",
+  "en": "Tongue of Fire"
+ },
+ "ItAt_Firelizard_02": {
+  "de": "Feuergiftdrüse",
+  "en": "Fire venom gland"
+ },
+ "ItAt_Firelizard_03": {
+  "de": "Feuriges Rückensegel",
+  "en": "Fiery spine sail"
+ },
+ "ItAt_Firelizard_04": {
+  "de": "Fell einer Feuerechse",
+  "en": "Fire Lizard's skin"
+ },
+ "ItAt_Firelizard_05": {
+  "de": "Erlesene Feuerzunge",
+  "en": "Prime Tongue of Fire"
+ },
+ "ItAt_Harpy_01": {
+  "de": "Feder",
+  "en": "Feather"
+ },
+ "ItAt_Harpy_02": {
+  "de": "Harpyienkralle",
+  "en": "Harpy talon"
+ },
+ "ItAt_Icegolem_01": {
+  "de": "Herz eines Eisgolems",
+  "en": "Heart of an Ice Golem"
+ },
+ "ItAt_Icegolem_02": {
+  "de": "Kristallsplitter",
+  "en": "Crystal shard"
+ },
+ "ItAt_Lizard_01": {
+  "de": "Klaue einer Echse",
+  "en": "Lizard's claw"
+ },
+ "ItAt_Lizard_02": {
+  "de": "Fell einer Echse",
+  "en": "Lizard's skin"
+ },
+ "ItAt_Lizard_03": {
+  "de": "Knochenschuppe einer Echse",
+  "en": "Lizard's bone scute"
+ },
+ "ItAt_Lurker_01": {
+  "de": "Klauen eines Lauerers",
+  "en": "Lurker's claws"
+ },
+ "ItAt_Lurker_02": {
+  "de": "Fell eines Lauerers",
+  "en": "Lurker's skin"
+ },
+ "ItAt_Lurker_03": {
+  "de": "Kieme eines Lauerers",
+  "en": "Lurker's gill"
+ },
+ "ItAt_Minecrawlerqueen_01": {
+  "de": "Pheromondrüse der Königin",
+  "en": "Queen's pheromone gland"
+ },
+ "ItAt_Orcdog_01": {
+  "de": "Zahn eines Orkhunds",
+  "en": "Orc Dog's fang"
+ },
+ "ItAt_Orcdog_02": {
+  "de": "Fell eines Orkhunds",
+  "en": "Orc Dog's skin"
+ },
+ "ItAt_Razor_01": {
+  "de": "Klaue eines Razors",
+  "en": "Razor's claw"
+ },
+ "ItAt_Razor_02": {
+  "de": "Hautplatte eines Razors",
+  "en": "Razor's dermal plate"
+ },
+ "ItAt_Ring_Enlight": {
+  "de": "Ring der Erleuchtung",
+  "en": "Ring of Enlightenment"
+ },
+ "ItAt_Ring_Fire_01": {
+  "de": "Ring des Feuerschutzes",
+  "en": "Ring of Flame Protection"
+ },
+ "ItAt_Ring_Fire_02": {
+  "de": "Schutz vor Feuer",
+  "en": "Protection of Fire"
+ },
+ "ItAt_Ring_Life_01": {
+  "de": "Ring des Lebens",
+  "en": "Ring of Life"
+ },
+ "ItAt_Ring_Life_02": {
+  "de": "Ring des größeren Lebens",
+  "en": "Ring of Greater Life"
+ },
+ "ItAt_Ring_Magic_01": {
+  "de": "Ring der Magie",
+  "en": "Ring of Magic"
+ },
+ "ItAt_Ring_Magic_02": {
+  "de": "Ring der spirituellen Kraft",
+  "en": "Ring of Spiritual Power"
+ },
+ "ItAt_Ring_Magic_03": {
+  "de": "Ring der Verteidigung",
+  "en": "Ring of Defense"
+ },
+ "ItAt_Ring_Magicfire_01": {
+  "de": "Ring der Läuterung",
+  "en": "Ring of Purification"
+ },
+ "ItAt_Ring_Magicfire_02": {
+  "de": "Ring der Unverwundbarkeit",
+  "en": "Ring of Invincibility"
+ },
+ "ItAt_Ring_Mordrag": {
+  "de": "Mordrags Ring",
+  "en": "Mordrag's Ring"
+ },
+ "ItAt_Ring_Power": {
+  "de": "Kriegerring der Macht",
+  "en": "Warrior's Ring of Power"
+ },
+ "ItAt_Ring_Projectile_01": {
+  "de": "Ring der Holzhaut",
+  "en": "Ring of Wooden Skin"
+ },
+ "ItAt_Ring_Projectile_02": {
+  "de": "Ring der Steinhaut",
+  "en": "Ring of Stone Skin"
+ },
+ "ItAt_Ring_Ranged_01": {
+  "de": "Ring der Standhaftigkeit",
+  "en": "Ring of Steadfastness"
+ },
+ "ItAt_Ring_Ranged_02": {
+  "de": "Ring der Unanfechtbarkeit",
+  "en": "Ring of Impeachability"
+ },
+ "ItAt_Ring_Scatty": {
+  "de": "Scattys Ring",
+  "en": "Scatty's Ring"
+ },
+ "ItAt_Ring_Skill_01": {
+  "de": "Ring der geringeren Geschicklichkeit",
+  "en": "Ring of Lesser Dexterity"
+ },
+ "ItAt_Ring_Skill_02": {
+  "de": "Ring der größeren Geschicklichkeit",
+  "en": "Ring of Greater Dexterity"
+ },
+ "ItAt_Ring_Strong_01": {
+  "de": "Ring der Macht",
+  "en": "Ring of Power"
+ },
+ "ItAt_Ring_Strong_02": {
+  "de": "Ring der Stärke",
+  "en": "Ring of Strength"
+ },
+ "ItAt_Ring_Total_01": {
+  "de": "Ring der geringeren Unverwundbarkeit",
+  "en": "Ring of Lesser Invincibility"
+ },
+ "ItAt_Ring_Total_02": {
+  "de": "Ring der größeren Unverwundbarkeit",
+  "en": "Ring of Greater Invincibility"
+ },
+ "ItAt_Ring_Weapon_01": {
+  "de": "Ring der Eisenhaut",
+  "en": "Ring of Iron Skin"
+ },
+ "ItAt_Ring_Weapon_02": {
+  "de": "Ring der Erzhaut",
+  "en": "Ring of Ore Skin"
+ },
+ "ItAt_Scavenger_01": {
+  "de": "Zähne eines Scavengers",
+  "en": "Scavenger's teeth"
+ },
+ "ItAt_Scavenger_02": {
+  "de": "Schädelplatte eines Scavengers",
+  "en": "Scavenger's skull plate"
+ },
+ "ItAt_Shadow_01": {
+  "de": "Fell eines Schattenläufers",
+  "en": "Shadowbeast's skin"
+ },
+ "ItAt_Shadow_02": {
+  "de": "Horn eines Schattenläufers",
+  "en": "Shadowbeast's horn"
+ },
+ "ItAt_Shadow_03": {
+  "de": "Zahn eines Schattenläufers",
+  "en": "Shadowbeast's fang"
+ },
+ "ItAt_Shadow_04": {
+  "de": "Stachel eines Schattenläufers",
+  "en": "Shadowbeast's spine"
+ },
+ "ItAt_Shadow_05": {
+  "de": "Horn eines Großen Schattenläufers",
+  "en": "Horn of a Great Shadowbeast"
+ },
+ "ItAt_Shadow_06": {
+  "de": "Fell eines Frost-Schattenläufers",
+  "en": "Frost Shadowbeast's skin"
+ },
+ "ItAt_Snapper_01": {
+  "de": "Klaue eines Schnappers",
+  "en": "Snapper's claw"
+ },
+ "ItAt_Snapper_02": {
+  "de": "Zähne eines Schnappers",
+  "en": "Snapper's teeth"
+ },
+ "ItAt_Stonegolem_01": {
+  "de": "Herz eines Steingolems",
+  "en": "Heart of a Stone Golem"
+ },
+ "ItAt_Stonegolem_02": {
+  "de": "Erzdurchzogene Wurzel",
+  "en": "Ore-infused root"
+ },
+ "ItAt_Swampshark_01": {
+  "de": "Fell eines Sumpfhais",
+  "en": "Swampshark's skin"
+ },
+ "ItAt_Swampshark_02": {
+  "de": "Zähne eines Sumpfhais",
+  "en": "Swampshark's teeth"
+ },
+ "ItAt_Swampshark_03": {
+  "de": "Chitinplatte eines Sumpfhais",
+  "en": "Swampshark's chitin plate"
+ },
+ "ItAt_Swampshark_04": {
+  "de": "Zähne einer Sumpfhai-Mutter",
+  "en": "Teeth of a Swampshark Mother"
+ },
+ "ItAt_Teeth_01": {
+  "de": "Zähne",
+  "en": "Teeth"
+ },
+ "ItAt_Troll_01": {
+  "de": "Fell eines Trolls",
+  "en": "Troll's skin"
+ },
+ "ItAt_Troll_02": {
+  "de": "Stoßzahn eines Trolls",
+  "en": "Troll's tusk"
+ },
+ "ItAt_Troll_03": {
+  "de": "Erlesener Trollstoßzahn",
+  "en": "Prime Troll Tusk"
+ },
+ "ItAt_Wolf_01": {
+  "de": "Fell eines Wolfs",
+  "en": "Wolf's skin"
+ },
+ "ItAt_Wolf_02": {
+  "de": "Zahn eines Wolfs",
+  "en": "Wolf's fang"
+ },
+ "ItAt_Wolf_03": {
+  "de": "Klauen eines Wolfs",
+  "en": "Wolf's claws"
+ },
+ "ItFo_Apple": {
+  "de": "Apfel",
+  "en": "Apple"
+ },
+ "ItFo_Cabbage": {
+  "de": "Kohl",
+  "en": "Cabbage"
+ },
+ "ItFo_Carrot": {
+  "de": "Karotte",
+  "en": "Carrot"
+ },
+ "ItFo_Cheese": {
+  "de": "Käse",
+  "en": "Cheese"
+ },
+ "ItFo_Crawlersoup": {
+  "de": "Minecrawler-Suppe",
+  "en": "Minecrawler Soup"
+ },
+ "ItFo_DragonsbreathStew": {
+  "de": "Drachenatem-Eintopf",
+  "en": "Dragonsbreath Stew"
+ },
+ "ItFo_Grilledscavenger": {
+  "de": "Gebratenes Scavengerfleisch",
+  "en": "Grilled Scavenger Meat"
+ },
+ "ItFo_Lemon": {
+  "de": "Zitrone",
+  "en": "Lemon"
+ },
+ "ItFo_Loaf": {
+  "de": "Brot",
+  "en": "Bread"
+ },
+ "ItFo_Meatbugragout": {
+  "de": "Fleischwanz-Ragout",
+  "en": "Meatbug Ragout"
+ },
+ "ItFo_Meatbugsauteed": {
+  "de": "Sautierter Fleischwanz",
+  "en": "Sautéed Meatbug"
+ },
+ "ItFo_MushroomStew": {
+  "de": "Pilzeintopf",
+  "en": "Mushroom Stew"
+ },
+ "ItFo_Mutton_01": {
+  "de": "Gebratenes Fleisch",
+  "en": "Grilled Meat"
+ },
+ "ItFo_Mutton_02": {
+  "de": "Schinken",
+  "en": "Ham"
+ },
+ "ItFo_Muttonraw": {
+  "de": "Rohes Fleisch",
+  "en": "Raw Meat"
+ },
+ "ItFo_Onion": {
+  "de": "Zwiebel",
+  "en": "Onion"
+ },
+ "ItFo_Ottostew": {
+  "de": "Brocks Eintopf",
+  "en": "Brock's Stew"
+ },
+ "ItFo_Pear": {
+  "de": "Birne",
+  "en": "Pear"
+ },
+ "ItFo_Plants_Berrys_01": {
+  "de": "Wilde Beeren",
+  "en": "Wild berries"
+ },
+ "ItFo_Plants_Bloodwood_01": {
+  "de": "Blutbuchen-Samen",
+  "en": "Copper Beech Seed"
+ },
+ "ItFo_Plants_Coral": {
+  "de": "Rotdorn",
+  "en": "Redspine"
+ },
+ "ItFo_Plants_Darkshade": {
+  "de": "Dunkelschatten",
+  "en": "Darkshade"
+ },
+ "ItFo_Plants_Dewleaf": {
+  "de": "Höhlentaublatt",
+  "en": "Cavern Dewleaf"
+ },
+ "ItFo_Plants_Duskbell": {
+  "de": "Dämmerglocke",
+  "en": "Duskbell"
+ },
+ "ItFo_Plants_Flameberry_01": {
+  "de": "Flammendorn",
+  "en": "Flame Thorn"
+ },
+ "ItFo_Plants_Herb_01": {
+  "de": "Schwache Heilkräuter",
+  "en": "Mild Healing Herbs"
+ },
+ "ItFo_Plants_Herb_02": {
+  "de": "Heilkräuter",
+  "en": "Healing Herbs"
+ },
+ "ItFo_Plants_Herb_03": {
+  "de": "Starke Heilkräuter",
+  "en": "Strong Healing Herbs"
+ },
+ "ItFo_Plants_Lobelia": {
+  "de": "Königsflut",
+  "en": "Kingstide"
+ },
+ "ItFo_Plants_Mistcap": {
+  "de": "Nebelkappe",
+  "en": "Mistcap"
+ },
+ "ItFo_Plants_Mountainmoss_01": {
+  "de": "Bergmoos",
+  "en": "Mountain Moss"
+ },
+ "ItFo_Plants_Mountainmoss_02": {
+  "de": "Grabmoos",
+  "en": "Grave Moss"
+ },
+ "ItFo_Plants_Mushroom_01": {
+  "de": "Höllenpilz",
+  "en": "Hellcap"
+ },
+ "ItFo_Plants_Mushroom_02": {
+  "de": "Sklavenbrot",
+  "en": "Slave's Bread"
+ },
+ "ItFo_Plants_Nightshadow_01": {
+  "de": "Solanaceae",
+  "en": "Solanaceae"
+ },
+ "ItFo_Plants_Nightshadow_02": {
+  "de": "Lunanaceae",
+  "en": "Lunanaceae"
+ },
+ "ItFo_Plants_OrcSpore": {
+  "de": "Orksporen",
+  "en": "Orc Spore"
+ },
+ "ItFo_Plants_Orcherb_01": {
+  "de": "Eichenblatt",
+  "en": "Oak Leaf"
+ },
+ "ItFo_Plants_Orcherb_02": {
+  "de": "Orkblatt",
+  "en": "Orc Leaf"
+ },
+ "ItFo_Plants_Ravenherb_01": {
+  "de": "Rabenkraut",
+  "en": "Raven Herbs"
+ },
+ "ItFo_Plants_Ravenherb_02": {
+  "de": "Dunkle Kräuter",
+  "en": "Dark Herbs"
+ },
+ "ItFo_Plants_Seraphis_01": {
+  "de": "Seraphis",
+  "en": "Seraphis"
+ },
+ "ItFo_Plants_Siren": {
+  "de": "Sirenenhaar",
+  "en": "Siren's Hair"
+ },
+ "ItFo_Plants_Stoneroot_01": {
+  "de": "Steinwurzel",
+  "en": "Stoneroot"
+ },
+ "ItFo_Plants_Stoneroot_02": {
+  "de": "Drachenwurzel",
+  "en": "Dragonroot"
+ },
+ "ItFo_Plants_Trollbane": {
+  "de": "Trollbann-Nessel",
+  "en": "Trollbane Nettle"
+ },
+ "ItFo_Plants_Velayis_01": {
+  "de": "Velayis",
+  "en": "Velayis"
+ },
+ "ItFo_Plants_Widow": {
+  "de": "Witwenschleier",
+  "en": "Widow's Veil"
+ },
+ "ItFo_Potato": {
+  "de": "Kartoffel",
+  "en": "Potato"
+ },
+ "ItFo_Potion_Beer": {
+  "de": "Bier",
+  "en": "Beer"
+ },
+ "ItFo_Potion_Booze": {
+  "de": "Reisschnaps",
+  "en": "Rice Schnapps"
+ },
+ "ItFo_Potion_Dex_01": {
+  "de": "Essenz der Geschicklichkeit",
+  "en": "Essence of Dexterity"
+ },
+ "ItFo_Potion_Dex_02": {
+  "de": "Extrakt der Geschicklichkeit",
+  "en": "Extract of Dexterity"
+ },
+ "ItFo_Potion_Dex_03": {
+  "de": "Elixier der Geschicklichkeit",
+  "en": "Elixir of Dexterity"
+ },
+ "ItFo_Potion_Haste_01": {
+  "de": "Trank der Behändigkeit",
+  "en": "Potion of Swiftness"
+ },
+ "ItFo_Potion_Haste_02": {
+  "de": "Trank der Schnelligkeit",
+  "en": "Potion of Velocity"
+ },
+ "ItFo_Potion_Haste_03": {
+  "de": "Trank der Eile",
+  "en": "Potion of Haste"
+ },
+ "ItFo_Potion_Health_01": {
+  "de": "Essenz der Heilung",
+  "en": "Essence of Healing"
+ },
+ "ItFo_Potion_Health_02": {
+  "de": "Extrakt der Heilung",
+  "en": "Extract of Healing"
+ },
+ "ItFo_Potion_Health_03": {
+  "de": "Elixier der Heilung",
+  "en": "Elixir of Healing"
+ },
+ "ItFo_Potion_Health_Perma_01": {
+  "de": "Essenz des Lebens",
+  "en": "Essence of Life"
+ },
+ "ItFo_Potion_Health_Perma_02": {
+  "de": "Extrakt des Lebens",
+  "en": "Extract of Life"
+ },
+ "ItFo_Potion_Health_Perma_03": {
+  "de": "Elixier des Lebens",
+  "en": "Elixir of Life"
+ },
+ "ItFo_Potion_Health_Quick": {
+  "de": "Trank der schnellen Heilung",
+  "en": "Potion of Quick Healing"
+ },
+ "ItFo_Potion_Mana_01": {
+  "de": "Essenz der Magieenergie",
+  "en": "Essence of Magic Energy"
+ },
+ "ItFo_Potion_Mana_02": {
+  "de": "Extrakt der Magieenergie",
+  "en": "Extract of Magic Energy"
+ },
+ "ItFo_Potion_Mana_03": {
+  "de": "Elixier der Magieenergie",
+  "en": "Elixir of Magic Energy"
+ },
+ "ItFo_Potion_Mana_Perma_01": {
+  "de": "Essenz des Geistes",
+  "en": "Essence of Spirit"
+ },
+ "ItFo_Potion_Mana_Perma_02": {
+  "de": "Extrakt des Geistes",
+  "en": "Extract of Spirit"
+ },
+ "ItFo_Potion_Mana_Perma_03": {
+  "de": "Elixier des Geistes",
+  "en": "Elixir of Spirit"
+ },
+ "ItFo_Potion_Master_01": {
+  "de": "Trank der Macht",
+  "en": "Potion of Power"
+ },
+ "ItFo_Potion_Master_02": {
+  "de": "Trank der Überlegenheit",
+  "en": "Potion of Supremacy"
+ },
+ "ItFo_Potion_Orcmedicine": {
+  "de": "Orkmedizin",
+  "en": "Orc Medicine"
+ },
+ "ItFo_Potion_Strength_01": {
+  "de": "Essenz der Stärke",
+  "en": "Essence of Strength"
+ },
+ "ItFo_Potion_Strength_02": {
+  "de": "Extrakt der Stärke",
+  "en": "Extract of Strength"
+ },
+ "ItFo_Potion_Strength_03": {
+  "de": "Elixier der Stärke",
+  "en": "Elixir of Strength"
+ },
+ "ItFo_Potion_Strongbeer": {
+  "de": "Starkbier",
+  "en": "Strong Beer"
+ },
+ "ItFo_Potion_Strongbeer_Magic_EE": {
+  "de": "Stern des Ostens",
+  "en": "Star of the East"
+ },
+ "ItFo_Potion_Water_01": {
+  "de": "Wasser",
+  "en": "Water"
+ },
+ "ItFo_Potion_Wine": {
+  "de": "Wein",
+  "en": "Wine"
+ },
+ "ItFo_Rice": {
+  "de": "Reis",
+  "en": "Rice"
+ },
+ "ItFo_Sausage": {
+  "de": "Wurst",
+  "en": "Sausage"
+ },
+ "ItFo_SeaforestBrew": {
+  "de": "Seetang-Sud",
+  "en": "Seaforest Brew"
+ },
+ "ItFo_Soup": {
+  "de": "Wurzelsuppe",
+  "en": "Root Soup"
+ },
+ "ItFo_SyraRecipe": {
+  "de": "Syras Baron-Eintopf",
+  "en": "Syra's Baron Stew"
+ },
+ "ItFo_Whitemeat": {
+  "de": "Rohes weißes Fleisch",
+  "en": "Raw White Meat"
+ },
+ "ItFo_Wineberrys_01": {
+  "de": "Weintrauben",
+  "en": "Grapes"
+ },
+ "ItKe_AbandonedGallery_01": {
+  "de": "Schlüssel zur Galerie",
+  "en": "Gallery key"
+ },
+ "ItKe_AbandonedMine_01": {
+  "de": "Schlüssel zur verlassenen Mine",
+  "en": "Abandoned Mine key"
+ },
+ "ItKe_BanditCell": {
+  "de": "Zellenschlüssel",
+  "en": "Cell key"
+ },
+ "ItKe_Berg_01": {
+  "de": "Truhenschlüssel der Bergfeste",
+  "en": "Mountain Fortress chest key"
+ },
+ "ItKe_CaptainShip": {
+  "de": "Schlüssel des Kapitänsschiffs",
+  "en": "Captain Ship key"
+ },
+ "ItKe_Cavalorn_01": {
+  "de": "Cavalorns Schlüssel",
+  "en": "Cavalorn's key"
+ },
+ "ItKe_CellarCages_01": {
+  "de": "Kellerschlüssel",
+  "en": "Cellar key"
+ },
+ "ItKe_Dungeonkey": {
+  "de": "Verliesschlüssel",
+  "en": "Dungeon key"
+ },
+ "ItKe_FireMagesRoom": {
+  "de": "Schlüssel zu den Gemächern der Feuermagier",
+  "en": "Fire Mages Chambers key"
+ },
+ "ItKe_FiskStorage": {
+  "de": "Schlüssel zu Fisks Lager",
+  "en": "Fisk's storage key"
+ },
+ "ItKe_Focus_04": {
+  "de": "Schlüssel zur Klosterruine",
+  "en": "Monastery ruin key"
+ },
+ "ItKe_Focus_05": {
+  "de": "Schlüssel zum Steinkreis",
+  "en": "Stone circle key"
+ },
+ "ItKe_Freemine": {
+  "de": "Schlüssel zur Freien Mine",
+  "en": "Free Mine key"
+ },
+ "ItKe_GomezCastleMaster": {
+  "de": "Gomez' Generalschlüssel",
+  "en": "Gomez' master key"
+ },
+ "ItKe_Gomez_01": {
+  "de": "Gomez' Schlüssel",
+  "en": "Gomez' key"
+ },
+ "ItKe_GraveyardLever": {
+  "de": "Ork-Hebel",
+  "en": "Orc lever"
+ },
+ "ItKe_Kalom_01": {
+  "de": "Laborschlüssel",
+  "en": "Lab Key"
+ },
+ "ItKe_LeeDoor": {
+  "de": "Lees Schlüssel",
+  "en": "Lee's key"
+ },
+ "ItKe_LootCage_01": {
+  "de": "Schlüssel zur Tauschzone",
+  "en": "Exchange Zone key"
+ },
+ "ItKe_MerchantCellarDoor": {
+  "de": "Santinos Schlüssel",
+  "en": "Santino's key"
+ },
+ "ItKe_Om_02": {
+  "de": "Schlüssel zu Aarons Truhe",
+  "en": "Aaron's chest key"
+ },
+ "ItKe_Om_03": {
+  "de": "Schlüssel zu Ulberts Truhe",
+  "en": "Ulbert's chest key"
+ },
+ "ItKe_OrcGraveyard": {
+  "de": "Schlüssel zum Orkfriedhof",
+  "en": "Orc Graveyard key"
+ },
+ "ItKe_OrcGraveyardPiece_01": {
+  "de": "Halber Schlüssel (Orkfriedhof 1)",
+  "en": "Half a key (Orc Graveyard 1)"
+ },
+ "ItKe_OrcGraveyardPiece_02": {
+  "de": "Halber Schlüssel (Orkfriedhof 2)",
+  "en": "Half a key (Orc Graveyard 2)"
+ },
+ "ItKe_Quentin_01": {
+  "de": "Schlüssel zur Beutehöhle der Banditen",
+  "en": "Outlaws' Loot Cave key"
+ },
+ "ItKe_RavenTower": {
+  "de": "Schlüssel zum Rabenturm",
+  "en": "Raven Tower key"
+ },
+ "ItKe_Ricelord_01": {
+  "de": "Schlüssel des Reisfürsten",
+  "en": "Rice Lord's key"
+ },
+ "ItKe_Smith_01": {
+  "de": "Eisenschlüssel",
+  "en": "Iron key"
+ },
+ "ItKe_Storage_01": {
+  "de": "Lagerschlüssel",
+  "en": "Storage key"
+ },
+ "ItKe_Sunkentower": {
+  "de": "Truhenschlüssel des versunkenen Turms",
+  "en": "Sunken Tower chest key"
+ },
+ "ItKe_TavernDoor": {
+  "de": "Tavernenschlüssel",
+  "en": "Tavern key"
+ },
+ "ItKe_Tower_01": {
+  "de": "Schlüssel zum zerbrochenen Turm",
+  "en": "Broken Tower key"
+ },
+ "ItMi_Alchemy_Alcohol_01": {
+  "de": "Reiner Alkohol",
+  "en": "Pure alcohol"
+ },
+ "ItMi_Alchemy_Flask": {
+  "de": "Laborkolben",
+  "en": "Lab flask"
+ },
+ "ItMi_Alchemy_Moleratlubric_01": {
+  "de": "Moleratschmiere",
+  "en": "Molerat grease"
+ },
+ "ItMi_Alchemy_Quicksilver_01": {
+  "de": "Quecksilber",
+  "en": "Mercury"
+ },
+ "ItMi_Alchemy_Salt_01": {
+  "de": "Salz",
+  "en": "Salt"
+ },
+ "ItMi_Alchemy_Sulphur_01": {
+  "de": "Schwefel",
+  "en": "Sulfur"
+ },
+ "ItMi_Alchemy_Syranoil_01": {
+  "de": "Syranisches Öl",
+  "en": "Syrianic oil"
+ },
+ "ItMi_Candle_01": {
+  "de": "Kerze",
+  "en": "Candle"
+ },
+ "ItMi_Coop": {
+  "de": "Holzlöffel",
+  "en": "Wooden spoon"
+ },
+ "ItMi_Hammer": {
+  "de": "Hammer",
+  "en": "Hammer"
+ },
+ "ItMi_Inscription_Parchment": {
+  "de": "Pergament",
+  "en": "Parchment"
+ },
+ "ItMi_Joint_02": {
+  "de": "Nordländer Schwarzer",
+  "en": "Northern Dark"
+ },
+ "ItMi_Joint_03": {
+  "de": "Traumruf",
+  "en": "Dreamcall"
+ },
+ "ItMi_JudgeHat": {
+  "de": "Richterhut",
+  "en": "Judge's Hat"
+ },
+ "ItMi_Lute": {
+  "de": "Laute",
+  "en": "Lute"
+ },
+ "ItMi_Oldcoin_01": {
+  "de": "Münze",
+  "en": "Coin"
+ },
+ "ItMi_Orenugget": {
+  "de": "Erznugget",
+  "en": "Ore Nugget"
+ },
+ "ItMi_Plants_Swampherb_01": {
+  "de": "Sumpfkraut",
+  "en": "Swampweed"
+ },
+ "ItMi_Smith_Blade_Arming": {
+  "de": "Klinge eines Schwerts",
+  "en": "Arming Blade"
+ },
+ "ItMi_Smith_Blade_Flamberge": {
+  "de": "Flamberge-Klinge",
+  "en": "Flamberge Blade"
+ },
+ "ItMi_Smith_Blade_Great": {
+  "de": "Große Klinge",
+  "en": "Great Blade"
+ },
+ "ItMi_Smith_Blade_Long": {
+  "de": "Lange Klinge",
+  "en": "Long Blade"
+ },
+ "ItMi_Smith_Blade_Short": {
+  "de": "Kurze Klinge",
+  "en": "Short Blade"
+ },
+ "ItMi_Smith_Blade_Sickle": {
+  "de": "Sichelklinge",
+  "en": "Sickle Blade"
+ },
+ "ItMi_Smith_Blade_Singleedge": {
+  "de": "Einschneidige Klinge",
+  "en": "Single-Edged Blade"
+ },
+ "ItMi_Smith_Gold": {
+  "de": "Gold",
+  "en": "Gold"
+ },
+ "ItMi_Smith_Head_Battleaxe": {
+  "de": "Streitaxtkopf",
+  "en": "Battleaxe Head"
+ },
+ "ItMi_Smith_Head_Broadaxe": {
+  "de": "Breitaxtkopf",
+  "en": "Broadaxe Head"
+ },
+ "ItMi_Smith_Head_Club": {
+  "de": "Keulenkopf",
+  "en": "Club Head"
+ },
+ "ItMi_Smith_Head_Fledged": {
+  "de": "Gefiederter Kopf",
+  "en": "Fledged Head"
+ },
+ "ItMi_Smith_Head_Greatbattleaxe": {
+  "de": "Großer Streitaxtkopf",
+  "en": "Great Battleaxe Head"
+ },
+ "ItMi_Smith_Head_Hammer": {
+  "de": "Hammerkopf",
+  "en": "Hammer Head"
+ },
+ "ItMi_Smith_Head_Morningstar": {
+  "de": "Morgensternkopf",
+  "en": "Morningstar Head"
+ },
+ "ItMi_Smith_Head_Pickaxe": {
+  "de": "Spitzhackenkopf",
+  "en": "Pickaxe Head"
+ },
+ "ItMi_Smith_Head_Poleaxe": {
+  "de": "Hellebardenkopf",
+  "en": "Poleaxe Head"
+ },
+ "ItMi_Smith_Head_Scythe": {
+  "de": "Sensenkopf",
+  "en": "Scythe Head"
+ },
+ "ItMi_Smith_Head_Warhammer": {
+  "de": "Kriegshammerkopf",
+  "en": "Warhammer Head"
+ },
+ "ItMi_Smith_Iron": {
+  "de": "Eisen",
+  "en": "Iron"
+ },
+ "ItMi_Smith_Ironwood": {
+  "de": "Eisenholz",
+  "en": "Iron wood"
+ },
+ "ItMi_Smith_Leatherstraps": {
+  "de": "Lederstreifen",
+  "en": "Leather strips"
+ },
+ "ItMi_Smith_Oak": {
+  "de": "Eichenholz",
+  "en": "Oak wood"
+ },
+ "ItMi_Smith_Obsidian": {
+  "de": "Obsidian",
+  "en": "Obsidian"
+ },
+ "ItMi_Smith_Petrifiedwood": {
+  "de": "Versteinertes Holz",
+  "en": "Petrified wood"
+ },
+ "ItMi_Smith_Ruby": {
+  "de": "Rubin",
+  "en": "Ruby"
+ },
+ "ItMi_Smith_Steel": {
+  "de": "Stahl",
+  "en": "Steel"
+ },
+ "ItMi_Smith_Swordblade": {
+  "de": "Klinge",
+  "en": "Blade"
+ },
+ "ItMi_Smith_Swordbladehot": {
+  "de": "Glühende Klinge",
+  "en": "Glowing Blade"
+ },
+ "ItMi_Smith_Swordraw": {
+  "de": "Rohstahl",
+  "en": "Raw Steel"
+ },
+ "ItMi_Smith_Swordrawhot": {
+  "de": "Glühender Stahl",
+  "en": "Glowing Steel"
+ },
+ "ItMi_Smith_Willow": {
+  "de": "Weidenholz",
+  "en": "Willow wood"
+ },
+ "ItMi_Specialjoint": {
+  "de": "Traumruf (zubereitet)",
+  "en": "Dreamcall (prepared)"
+ },
+ "ItMi_Stomper": {
+  "de": "Sumpfkraut-Stampfer",
+  "en": "Swampweed masher"
+ },
+ "ItMi_Stuff_Alarmhorn": {
+  "de": "Horn",
+  "en": "Horn"
+ },
+ "ItMi_Stuff_Amphore_01": {
+  "de": "Amphore",
+  "en": "Amphora"
+ },
+ "ItMi_Stuff_Barbknife_01": {
+  "de": "Rasiermesser",
+  "en": "Razor"
+ },
+ "ItMi_Stuff_Brush": {
+  "de": "Bürste",
+  "en": "Brush"
+ },
+ "ItMi_Stuff_Candlestick_01": {
+  "de": "Kerzenständer",
+  "en": "Candlestick"
+ },
+ "ItMi_Stuff_Cup_01": {
+  "de": "Becher",
+  "en": "Tumbler"
+ },
+ "ItMi_Stuff_Cup_02": {
+  "de": "Kelch",
+  "en": "Goblet"
+ },
+ "ItMi_Stuff_Gearwheel_01": {
+  "de": "Zahnrad",
+  "en": "Cog"
+ },
+ "ItMi_Stuff_Idologront_01": {
+  "de": "Statue",
+  "en": "Statue"
+ },
+ "ItMi_Stuff_Idolsleeper_01": {
+  "de": "Figur",
+  "en": "Figurine"
+ },
+ "ItMi_Stuff_Mug_01": {
+  "de": "Krug",
+  "en": "Jug"
+ },
+ "ItMi_Stuff_Pan_01": {
+  "de": "Pfanne",
+  "en": "Pan"
+ },
+ "ItMi_Stuff_Pipe_01": {
+  "de": "Pfeife",
+  "en": "Pipe"
+ },
+ "ItMi_Stuff_Plate_01": {
+  "de": "Teller",
+  "en": "Plate"
+ },
+ "ItMi_Stuff_Silverware_01": {
+  "de": "Besteck",
+  "en": "Cutlery"
+ },
+ "ItMi_Wedel": {
+  "de": "Palmwedel",
+  "en": "Palm frond"
+ },
+ "ItMs_UrizielGem": {
+  "de": "Uriziel-Edelstein",
+  "en": "Uriziel Gem"
+ },
+ "ItMw_1H_Axe_01": {
+  "de": "Axt",
+  "en": "Axe"
+ },
+ "ItMw_1H_Axe_02": {
+  "de": "Schädelspalter",
+  "en": "Skullcleaver"
+ },
+ "ItMw_1H_Axe_03": {
+  "de": "Knochenbrecher",
+  "en": "Bonebreaker"
+ },
+ "ItMw_1H_Axe_Bran": {
+  "de": "Axt mit blauem Griff",
+  "en": "Blue Handle Axe"
+ },
+ "ItMw_1H_Axe_Cord": {
+  "de": "Cords Spalter",
+  "en": "Cord's Cleaver"
+ },
+ "ItMw_1H_Axe_Hatchet_01": {
+  "de": "Handaxt",
+  "en": "Handaxe"
+ },
+ "ItMw_1H_Axe_Lares": {
+  "de": "Lares' Axt",
+  "en": "Lares' Axe"
+ },
+ "ItMw_1H_Axe_Old_01": {
+  "de": "Verwitterte Axt",
+  "en": "Withered Axe"
+ },
+ "ItMw_1H_Axe_Sickle_01": {
+  "de": "Sichel",
+  "en": "Sickle"
+ },
+ "ItMw_1H_Axe_Silas": {
+  "de": "Silas' Axt",
+  "en": "Silas' Axe"
+ },
+ "ItMw_1H_Mace_01": {
+  "de": "Morgenstern",
+  "en": "Morning Star"
+ },
+ "ItMw_1H_Mace_02": {
+  "de": "Stachelkolben",
+  "en": "Sting Mace"
+ },
+ "ItMw_1H_Mace_03": {
+  "de": "Blutfliegenstachel",
+  "en": "Bloodfly Sting"
+ },
+ "ItMw_1H_Mace_04": {
+  "de": "Stahlzunge",
+  "en": "Steel Tongue"
+ },
+ "ItMw_1H_Mace_Club_01": {
+  "de": "Keule",
+  "en": "Club"
+ },
+ "ItMw_1H_Mace_Fortuno": {
+  "de": "Fortunos Keule",
+  "en": "Fortuno's Club"
+ },
+ "ItMw_1H_Mace_Lester": {
+  "de": "Lesters Vermittler",
+  "en": "Lester's Mediator"
+ },
+ "ItMw_1H_Mace_Light_01": {
+  "de": "Knüppel",
+  "en": "Club"
+ },
+ "ItMw_1H_Mace_Nailmace_01": {
+  "de": "Nagelkeule",
+  "en": "Nail Club"
+ },
+ "ItMw_1H_Mace_Namib": {
+  "de": "Namibs Keule",
+  "en": "Namib's Club"
+ },
+ "ItMw_1H_Mace_Orun": {
+  "de": "Oruns Keule",
+  "en": "Orun's Club"
+ },
+ "ItMw_1H_Mace_Poker_01": {
+  "de": "Schürhaken",
+  "en": "Poker"
+ },
+ "ItMw_1H_Mace_Sledgehammer_01": {
+  "de": "Schmiedehammer",
+  "en": "Smith's Hammer"
+ },
+ "ItMw_1H_Mace_War_01": {
+  "de": "Streitkolben",
+  "en": "Mace"
+ },
+ "ItMw_1H_Mace_War_02": {
+  "de": "Stahlstreitkolben",
+  "en": "Steel Mace"
+ },
+ "ItMw_1H_Mace_War_03": {
+  "de": "Steinbrecher",
+  "en": "Stonecrusher"
+ },
+ "ItMw_1H_Mace_Warhammer_01": {
+  "de": "Orkhammer",
+  "en": "Orc Hammer"
+ },
+ "ItMw_1H_Mace_Warhammer_02": {
+  "de": "Kriegshammer",
+  "en": "Warhammer"
+ },
+ "ItMw_1H_Mace_Warhammer_03": {
+  "de": "Hammer Gottes",
+  "en": "God's Hammer"
+ },
+ "ItMw_1H_Sword_01": {
+  "de": "Grobes Schwert",
+  "en": "Crude Sword"
+ },
+ "ItMw_1H_Sword_02": {
+  "de": "Richtschwert",
+  "en": "Judgment Sword"
+ },
+ "ItMw_1H_Sword_03": {
+  "de": "Schwert des Wächters",
+  "en": "Warder's Sword"
+ },
+ "ItMw_1H_Sword_04": {
+  "de": "Kampfschwert",
+  "en": "Battlesword"
+ },
+ "ItMw_1H_Sword_05": {
+  "de": "Kriegsschwert",
+  "en": "War Sword"
+ },
+ "ItMw_1H_Sword_Arto": {
+  "de": "Artos Schwert",
+  "en": "Arto's Sword"
+ },
+ "ItMw_1H_Sword_Bastard_01": {
+  "de": "Rostiges Bastardschwert",
+  "en": "Rusty Bastard Sword"
+ },
+ "ItMw_1H_Sword_Bastard_02": {
+  "de": "Schlächter",
+  "en": "Butcher"
+ },
+ "ItMw_1H_Sword_Bastard_03": {
+  "de": "Henker",
+  "en": "Executioner"
+ },
+ "ItMw_1H_Sword_Bastard_04": {
+  "de": "Berserkerschwert",
+  "en": "Berserker's Sword"
+ },
+ "ItMw_1H_Sword_Broad_01": {
+  "de": "Breitschwert",
+  "en": "Broadsword"
+ },
+ "ItMw_1H_Sword_Broad_02": {
+  "de": "Urteil des Kriegers",
+  "en": "Warrior's Verdict"
+ },
+ "ItMw_1H_Sword_Broad_03": {
+  "de": "Flüstern des Sturms",
+  "en": "Storm's Whisper"
+ },
+ "ItMw_1H_Sword_Broad_04": {
+  "de": "Hand des Wächters",
+  "en": "Warder's Hand"
+ },
+ "ItMw_1H_Sword_Kalom": {
+  "de": "Kaloms Schwert",
+  "en": "Kalom's Sword"
+ },
+ "ItMw_1H_Sword_Lightguard_01": {
+  "de": "Schwert der Leichten Garde",
+  "en": "Light Guard's Sword"
+ },
+ "ItMw_1H_Sword_Long_01": {
+  "de": "Langschwert",
+  "en": "Longsword"
+ },
+ "ItMw_1H_Sword_Long_02": {
+  "de": "Schwert der Angst",
+  "en": "Sword of Fear"
+ },
+ "ItMw_1H_Sword_Long_03": {
+  "de": "Schwert des Hasses",
+  "en": "Sword of Hate"
+ },
+ "ItMw_1H_Sword_Long_04": {
+  "de": "Schwert des Sieges",
+  "en": "Sword of Victory"
+ },
+ "ItMw_1H_Sword_Long_05": {
+  "de": "Schwert des Todes",
+  "en": "Sword of Death"
+ },
+ "ItMw_1H_Sword_Old_01": {
+  "de": "Rostiges Schwert",
+  "en": "Rusty Sword"
+ },
+ "ItMw_1H_Sword_Old_02": {
+  "de": "Altes Schwert",
+  "en": "Old Sword"
+ },
+ "ItMw_1H_Sword_Paw": {
+  "de": "Paws Hieb",
+  "en": "Paw's Punch"
+ },
+ "ItMw_1H_Sword_Raven": {
+  "de": "Ravens Rechte",
+  "en": "Raven's Right"
+ },
+ "ItMw_1H_Sword_Scar": {
+  "de": "Scars Schwert",
+  "en": "Scar's Sword"
+ },
+ "ItMw_1H_Sword_Scythe_01": {
+  "de": "Schnitter",
+  "en": "Cutter"
+ },
+ "ItMw_1H_Sword_Short_01": {
+  "de": "Kurzschwert",
+  "en": "Shortsword"
+ },
+ "ItMw_1H_Sword_Short_02": {
+  "de": "Bauernwehr",
+  "en": "Farmer's Defense"
+ },
+ "ItMw_1H_Sword_Short_03": {
+  "de": "Lurkerbiss",
+  "en": "Lurker's Bite"
+ },
+ "ItMw_1H_Sword_Short_04": {
+  "de": "Dorn der Wunden",
+  "en": "Thorn of Wounds"
+ },
+ "ItMw_1H_Sword_Short_05": {
+  "de": "Disziplin des Buddlers",
+  "en": "Digger's Discipline"
+ },
+ "ItMw_1H_Sword_Whistler": {
+  "de": "Whistlers Schwert",
+  "en": "Whistler's Sword"
+ },
+ "ItMw_1H_Torch": {
+  "de": "Fackel",
+  "en": "Torch"
+ },
+ "ItMw_2H_Axe_Gorn": {
+  "de": "Gorns Rache",
+  "en": "Gorn's Revenge"
+ },
+ "ItMw_2H_Axe_Heavy_01": {
+  "de": "Streitaxt",
+  "en": "War Axe"
+ },
+ "ItMw_2H_Axe_Heavy_02": {
+  "de": "Stimme des Kriegers",
+  "en": "Warrior's Voice"
+ },
+ "ItMw_2H_Axe_Heavy_03": {
+  "de": "Barbarenfaust",
+  "en": "Barbarian's Fist"
+ },
+ "ItMw_2H_Axe_Heavy_04": {
+  "de": "Trollfaust",
+  "en": "Troll Fist"
+ },
+ "ItMw_2H_Axe_Lee": {
+  "de": "Lees Axt",
+  "en": "Lee's Axe"
+ },
+ "ItMw_2H_Axe_Light_01": {
+  "de": "Leichte Streitaxt",
+  "en": "Light Battleaxe"
+ },
+ "ItMw_2H_Axe_Light_02": {
+  "de": "Donnerschlag",
+  "en": "Thunderstrike"
+ },
+ "ItMw_2H_Axe_Light_03": {
+  "de": "Zermalmer",
+  "en": "Smash"
+ },
+ "ItMw_2H_Axe_Old_01": {
+  "de": "Alte Streitaxt",
+  "en": "Old Battleaxe"
+ },
+ "ItMw_2H_Axe_Old_02": {
+  "de": "Bluternter",
+  "en": "Blood Harvester"
+ },
+ "ItMw_2H_Axe_Old_03": {
+  "de": "Alter Richter",
+  "en": "Old Judge"
+ },
+ "ItMw_2H_Axe_Orc_01": {
+  "de": "Krush Pach",
+  "en": "Krush Pach"
+ },
+ "ItMw_2H_Axe_Orc_02": {
+  "de": "Krush Ur-Rok",
+  "en": "Krush Ur-Rok"
+ },
+ "ItMw_2H_Axe_Orc_03": {
+  "de": "Krush Agash",
+  "en": "Krush Agash"
+ },
+ "ItMw_2H_Axe_Orc_04": {
+  "de": "Krush Brok-Dar",
+  "en": "Krush Brok-Dar"
+ },
+ "ItMw_2H_Axe_Orik": {
+  "de": "Oriks Axt",
+  "en": "Orik's Axe"
+ },
+ "ItMw_2H_Axe_Pickaxe": {
+  "de": "Spitzhacke",
+  "en": "Pickaxe"
+ },
+ "ItMw_2H_Axe_Torlof": {
+  "de": "Torlofs Axt",
+  "en": "Torlof's Axe"
+ },
+ "ItMw_2H_Mace_Orc_01": {
+  "de": "Krush Karrok",
+  "en": "Krush Karrok"
+ },
+ "ItMw_2H_Staff_02": {
+  "de": "Sha-Ba-Nakk",
+  "en": "Sha-Ba-Nakk"
+ },
+ "ItMw_2H_Staff_Orc": {
+  "de": "Grachtnakk",
+  "en": "Grachtnakk"
+ },
+ "ItMw_2H_Staff_Scepter": {
+  "de": "Zepter",
+  "en": "Scepter"
+ },
+ "ItMw_2H_Staff_Ulumulu": {
+  "de": "Ulu-Mulu",
+  "en": "Ulu-Mulu"
+ },
+ "ItMw_2H_Sword_01": {
+  "de": "Zweihänder",
+  "en": "Two-Hander"
+ },
+ "ItMw_2H_Sword_02": {
+  "de": "Heldenklinge",
+  "en": "Hero's Blade"
+ },
+ "ItMw_2H_Sword_03": {
+  "de": "Blutklinge",
+  "en": "Blood Blade"
+ },
+ "ItMw_2H_Sword_Heavy_01": {
+  "de": "Schwerer Zweihänder",
+  "en": "Heavy Two-Hander"
+ },
+ "ItMw_2H_Sword_Heavy_02": {
+  "de": "Stahl der Wut",
+  "en": "Rage Steel"
+ },
+ "ItMw_2H_Sword_Heavy_03": {
+  "de": "Stahl des Zorns",
+  "en": "Wrath Steel"
+ },
+ "ItMw_2H_Sword_Heavy_04": {
+  "de": "Stahl der Rache",
+  "en": "Revenge Steel"
+ },
+ "ItMw_2H_Sword_Innos": {
+  "de": "Klaue Beliars",
+  "en": "Claw of Beliar"
+ },
+ "ItMw_2H_Sword_Light_01": {
+  "de": "Leichter Zweihänder",
+  "en": "Light Two-Hander"
+ },
+ "ItMw_2H_Sword_Light_02": {
+  "de": "Klinge des Hüters",
+  "en": "Custodian's Blade"
+ },
+ "ItMw_2H_Sword_Light_03": {
+  "de": "Söldnerklinge",
+  "en": "Mercenary's Blade"
+ },
+ "ItMw_2H_Sword_Light_04": {
+  "de": "Königsklinge",
+  "en": "King's Blade"
+ },
+ "ItMw_2H_Sword_Light_05": {
+  "de": "Dämonische Klinge",
+  "en": "Demonic Blade"
+ },
+ "ItMw_2H_Sword_Old_01": {
+  "de": "Rostiger Zweihänder",
+  "en": "Rusty Two-Hander"
+ },
+ "ItMw_2H_Sword_Orc_01": {
+  "de": "Krush Varrok",
+  "en": "Krush Varrok"
+ },
+ "ItMw_2H_Sword_Thorus": {
+  "de": "Thorus' Schwert",
+  "en": "Thorus' Sword"
+ },
+ "ItMw_2H_Sword_Uriziel_01": {
+  "de": "Seltsames Schwert",
+  "en": "Strange Sword"
+ },
+ "ItMw_2H_Sword_Uriziel_02": {
+  "de": "Uriziel",
+  "en": "Uriziel"
+ },
+ "ItMw_2H_Sword_Wind": {
+  "de": "Roter Wind",
+  "en": "Red Wind"
+ },
+ "ItRw_Bow_Diego": {
+  "de": "Diegos Bogen",
+  "en": "Diego's Bow"
+ },
+ "ItRw_Bow_Long_01": {
+  "de": "Langbogen",
+  "en": "Longbow"
+ },
+ "ItRw_Bow_Long_02": {
+  "de": "Heckenbogen",
+  "en": "Hedge Bow"
+ },
+ "ItRw_Bow_Long_03": {
+  "de": "Weidenbogen",
+  "en": "Willow Bow"
+ },
+ "ItRw_Bow_Long_04": {
+  "de": "Eichenbogen",
+  "en": "Oak Bow"
+ },
+ "ItRw_Bow_Long_05": {
+  "de": "Wolfsreißer",
+  "en": "Wolfshredder"
+ },
+ "ItRw_Bow_Long_06": {
+  "de": "Windbrecher",
+  "en": "Windbreaker"
+ },
+ "ItRw_Bow_Long_07": {
+  "de": "Armeebogen",
+  "en": "Army Bow"
+ },
+ "ItRw_Bow_Long_08": {
+  "de": "Hornbogen",
+  "en": "Horn Bow"
+ },
+ "ItRw_Bow_Long_09": {
+  "de": "Nimrods Bogen",
+  "en": "Nimrod Bow"
+ },
+ "ItRw_Bow_Long_10": {
+  "de": "Haennos Weidenbogen",
+  "en": "Haenno's Willow Bow"
+ },
+ "ItRw_Bow_Long_11": {
+  "de": "Haennos Eichenbogen",
+  "en": "Haenno's Oak Bow"
+ },
+ "ItRw_Bow_Long_12": {
+  "de": "Haennos Eisenholzbogen",
+  "en": "Haenno's Ironwood Bow"
+ },
+ "ItRw_Bow_Small_01": {
+  "de": "Kurzbogen",
+  "en": "Shortbow"
+ },
+ "ItRw_Bow_Small_02": {
+  "de": "Reiterbogen",
+  "en": "Rider's Bow"
+ },
+ "ItRw_Bow_Small_03": {
+  "de": "Feldbogen",
+  "en": "Field Bow"
+ },
+ "ItRw_Bow_Small_04": {
+  "de": "Jagdbogen",
+  "en": "Hunting Bow"
+ },
+ "ItRw_Bow_Small_05": {
+  "de": "Knochenbogen",
+  "en": "Bone Bow"
+ },
+ "ItRw_Bow_War_01": {
+  "de": "Kriegsbogen",
+  "en": "War Bow"
+ },
+ "ItRw_Bow_War_02": {
+  "de": "Orkjäger",
+  "en": "Orcchaser"
+ },
+ "ItRw_Bow_War_03": {
+  "de": "Sturmbogen",
+  "en": "Storm Bow"
+ },
+ "ItRw_Bow_War_04": {
+  "de": "Dämonenbogen",
+  "en": "Demon Bow"
+ },
+ "ItRw_Bow_War_05": {
+  "de": "Bogen des Todes",
+  "en": "Bow of Death"
+ },
+ "ItRw_Bow_Wolf": {
+  "de": "Wolfsbogen",
+  "en": "Wolf's Bow"
+ },
+ "ItRw_Crossbow_01": {
+  "de": "Leichte Armbrust",
+  "en": "Light Crossbow"
+ },
+ "ItRw_Crossbow_02": {
+  "de": "Armbrust",
+  "en": "Crossbow"
+ },
+ "ItRw_Crossbow_03": {
+  "de": "Schwere Armbrust",
+  "en": "Heavy Crossbow"
+ },
+ "ItRw_Crossbow_04": {
+  "de": "Kriegsarmbrust",
+  "en": "Crossbow of War"
+ },
+ "Kdf_Armor_H": {
+  "de": "Hohe Robe des Feuers",
+  "en": "High Robe of Fire"
+ },
+ "Kdf_Armor_L": {
+  "de": "Robe des Feuers",
+  "en": "Fire Robe"
+ },
+ "Kdw_Armor_L": {
+  "de": "Robe des Wassers",
+  "en": "Water Robe"
+ },
+ "Law_Armor": {
+  "de": "Robe des Richters",
+  "en": "Judge's Robe"
+ },
+ "Nov_Armor": {
+  "de": "Novizen-Rüstung",
+  "en": "Novice's Armor"
+ },
+ "Nov_Armor_Bot_L_01": {
+  "de": "Beinwickel",
+  "en": "Leg Wrappings"
+ },
+ "Nov_Armor_Mid_M_01": {
+  "de": "Gürtel der Bruderschaft",
+  "en": "Brotherhood Belt"
+ },
+ "Nov_Armor_Top_H_01": {
+  "de": "Verstärkte Schulterpolster",
+  "en": "Reinforced Shoulderpads"
+ },
+ "Nov_Armor_Top_M_01": {
+  "de": "Leinenhemd",
+  "en": "Linen Shirt"
+ },
+ "Ore_Armor_H": {
+  "de": "Verbesserte Erzrüstung",
+  "en": "Improved Ore Armor"
+ },
+ "Ore_Armor_M": {
+  "de": "Alte Erzrüstung",
+  "en": "Ancient Ore Armor"
+ },
+ "Org_Armor": {
+  "de": "Banditen-Rüstung",
+  "en": "Bandit's Dress"
+ },
+ "Org_Armor_Bot_H_01": {
+  "de": "Pelzgefütterte Leder-Beinschienen I",
+  "en": "Fur Lined Leather Greaves I"
+ },
+ "Org_Armor_Bot_H_02": {
+  "de": "Pelzgefütterte Leder-Beinschienen II",
+  "en": "Fur Lined Leather Greaves II"
+ },
+ "Org_Armor_Bot_L_01": {
+  "de": "Stiefel I",
+  "en": "Boots I"
+ },
+ "Org_Armor_Bot_L_02": {
+  "de": "Stiefel II",
+  "en": "Boots II"
+ },
+ "Org_Armor_Bot_M_01": {
+  "de": "Leder-Beinschienen I",
+  "en": "Leather Greaves I"
+ },
+ "Org_Armor_Bot_M_02": {
+  "de": "Leder-Beinschienen II",
+  "en": "Leather Greaves II"
+ },
+ "Org_Armor_Mid_H_01": {
+  "de": "Plattierter Ledergürtel und Armschienen I",
+  "en": "Plated Leather Belt and Bracers I"
+ },
+ "Org_Armor_Mid_H_02": {
+  "de": "Plattierter Ledergürtel und Armschienen II",
+  "en": "Plated Leather Belt and Bracers II"
+ },
+ "Org_Armor_Mid_L_01": {
+  "de": "Ledergürtel und Armschienen I",
+  "en": "Leather Belt and Bracers I"
+ },
+ "Org_Armor_Mid_L_02": {
+  "de": "Ledergürtel und Armschienen II",
+  "en": "Leather Belt and Bracers II"
+ },
+ "Org_Armor_Mid_M_01": {
+  "de": "Genieteter Ledergürtel und Armschienen I",
+  "en": "Studded Leather Belt and Bracers I"
+ },
+ "Org_Armor_Mid_M_02": {
+  "de": "Genieteter Ledergürtel und Armschienen II",
+  "en": "Studded Leather Belt and Bracers II"
+ },
+ "Org_Armor_Top_H_01": {
+  "de": "Felljacke und Schulterpolster I",
+  "en": "Fur Jerkin and Shoulderpads I"
+ },
+ "Org_Armor_Top_H_02": {
+  "de": "Felljacke und Schulterpolster II",
+  "en": "Fur Jerkin and Shoulderpads II"
+ },
+ "Org_Armor_Top_L_02": {
+  "de": "Fellweste II",
+  "en": "Fur Vest II"
+ },
+ "Org_Armor_Top_M_01": {
+  "de": "Felljacke I",
+  "en": "Fur Jerkin I"
+ },
+ "Org_Armor_Top_M_02": {
+  "de": "Felljacke II",
+  "en": "Fur Jerkin II"
+ },
+ "Ryl_Armor": {
+  "de": "Rüstung der Königsgarde",
+  "en": "Royal Guard Armor"
+ },
+ "Sld_Armor": {
+  "de": "Söldner-Rüstung",
+  "en": "Mercenary's Armor"
+ },
+ "Sld_Armor_Bot_H_01": {
+  "de": "Stahl-Beinschienen und gepolsterte Beinlinge I",
+  "en": "Steel Greaves and Padded Leggings I"
+ },
+ "Sld_Armor_Bot_H_02": {
+  "de": "Stahl-Beinschienen und gepolsterte Beinlinge II",
+  "en": "Steel Greaves and Padded Leggings II"
+ },
+ "Sld_Armor_Bot_L_01": {
+  "de": "Stahl-Knieschoner I",
+  "en": "Steel Kneepads I"
+ },
+ "Sld_Armor_Bot_L_02": {
+  "de": "Stahl-Knieschoner II",
+  "en": "Steel Kneepads II"
+ },
+ "Sld_Armor_Bot_M_01": {
+  "de": "Stahl-Beinschienen I",
+  "en": "Steel Greaves I"
+ },
+ "Sld_Armor_Bot_M_02": {
+  "de": "Stahl-Beinschienen II",
+  "en": "Steel Greaves II"
+ },
+ "Sld_Armor_Mid_H_01": {
+  "de": "Gürtel und Stahl-Armschienen und Beintaschen I",
+  "en": "Belt and Steel Bracers and Tassets I"
+ },
+ "Sld_Armor_Mid_H_02": {
+  "de": "Gürtel und Stahl-Armschienen und Beintaschen II",
+  "en": "Belt and Steel Bracers and Tassets II"
+ },
+ "Sld_Armor_Mid_L_01": {
+  "de": "Gürtel und Leder-Armschienen I",
+  "en": "Belt and Leather Bracers I"
+ },
+ "Sld_Armor_Mid_L_02": {
+  "de": "Gürtel und Leder-Armschienen II",
+  "en": "Belt and Leather Bracers II"
+ },
+ "Sld_Armor_Mid_M_01": {
+  "de": "Gürtel und Stahl-Armschienen I",
+  "en": "Belt and Steel Bracers I"
+ },
+ "Sld_Armor_Mid_M_02": {
+  "de": "Gürtel und Stahl-Armschienen II",
+  "en": "Belt and Steel Bracers II"
+ },
+ "Sld_Armor_Top_H_01": {
+  "de": "Pelzgefütterte Brustplatte I",
+  "en": "Fur Lined Breastplate I"
+ },
+ "Sld_Armor_Top_H_02": {
+  "de": "Pelzgefütterte Brustplatte II",
+  "en": "Fur Lined Breastplate II"
+ },
+ "Sld_Armor_Top_L_02": {
+  "de": "Leder-Schulterstück II",
+  "en": "Leather Shoulderpad II"
+ },
+ "Sld_Armor_Top_M_01": {
+  "de": "Pelzgefüttertes Stahl-Schulterstück I",
+  "en": "Fur Lined Steel Shoulderpad I"
+ },
+ "Sld_Armor_Top_M_02": {
+  "de": "Pelzgefüttertes Stahl-Schulterstück II",
+  "en": "Fur Lined Steel Shoulderpad II"
+ },
+ "Stt_Armor": {
+  "de": "Schatten-Rüstung",
+  "en": "Shadow's Dress"
+ },
+ "Stt_Armor_Bot_H_01": {
+  "de": "Hohe Stiefel und gepolsterte Beinlinge I",
+  "en": "High Boots and Padded Leggings I"
+ },
+ "Stt_Armor_Bot_H_02": {
+  "de": "Hohe Stiefel und gepolsterte Beinlinge II",
+  "en": "High Boots and Padded Leggings II"
+ },
+ "Stt_Armor_Bot_L_01": {
+  "de": "Stiefel I",
+  "en": "Boots I"
+ },
+ "Stt_Armor_Bot_L_02": {
+  "de": "Stiefel II",
+  "en": "Boots II"
+ },
+ "Stt_Armor_Bot_M_01": {
+  "de": "Hohe Stiefel I",
+  "en": "High Boots I"
+ },
+ "Stt_Armor_Bot_M_02": {
+  "de": "Hohe Stiefel II",
+  "en": "High Boots II"
+ },
+ "Stt_Armor_Mid_H_01": {
+  "de": "Gürtel und verstärkte Handschuhe I",
+  "en": "Belt and Reinforced Gloves I"
+ },
+ "Stt_Armor_Mid_H_02": {
+  "de": "Gürtel und verstärkte Handschuhe II",
+  "en": "Belt and Reinforced Gloves II"
+ },
+ "Stt_Armor_Mid_L_01": {
+  "de": "Gürtel I",
+  "en": "Belt I"
+ },
+ "Stt_Armor_Mid_L_02": {
+  "de": "Gürtel II",
+  "en": "Belt II"
+ },
+ "Stt_Armor_Mid_M_01": {
+  "de": "Gürtel und Lederhandschuhe I",
+  "en": "Belt and Leather Gloves I"
+ },
+ "Stt_Armor_Mid_M_02": {
+  "de": "Gürtel und Lederhandschuhe II",
+  "en": "Belt and Leather Gloves II"
+ },
+ "Stt_Armor_Top_H_01": {
+  "de": "Nietenweste und Kettenhemd I",
+  "en": "Studded Vest and Mail Shirt I"
+ },
+ "Stt_Armor_Top_H_02": {
+  "de": "Nietenweste und Kettenhemd II",
+  "en": "Studded Vest and Mail Shirt II"
+ },
+ "Stt_Armor_Top_L_01": {
+  "de": "Lederweste I",
+  "en": "Leather Vest I"
+ },
+ "Stt_Armor_Top_L_02": {
+  "de": "Lederweste II",
+  "en": "Leather Vest II"
+ },
+ "Stt_Armor_Top_M_01": {
+  "de": "Nietenweste I",
+  "en": "Studded Vest I"
+ },
+ "Stt_Armor_Top_M_02": {
+  "de": "Nietenweste II",
+  "en": "Studded Vest II"
+ },
+ "Tpl_Armor": {
+  "de": "Templer-Rüstung",
+  "en": "Templar's Armor"
+ },
+ "Tpl_Armor_Bot_H_01": {
+  "de": "Stahl-Beinschienen und Knieschoner",
+  "en": "Steel Greaves and Kneepads"
+ },
+ "Tpl_Armor_Bot_L_01": {
+  "de": "Stahl-Beinschienen",
+  "en": "Steel Greaves"
+ },
+ "Tpl_Armor_Mid_H_01": {
+  "de": "Plattierte Armschienen und Gürtel",
+  "en": "Plated Bracers and Belt"
+ },
+ "Tpl_Armor_Mid_L_01": {
+  "de": "Leder-Armschienen",
+  "en": "Leather Bracers"
+ },
+ "Tpl_Armor_Mid_M_01": {
+  "de": "Plattierte Armschienen",
+  "en": "Plated Bracers"
+ },
+ "Tpl_Armor_Top_H_01": {
+  "de": "Lamellen-Brustplatte und Schulterpolster",
+  "en": "Lamellar Breastplate and Shoulderpads"
+ },
+ "Tpl_Armor_Top_M_01": {
+  "de": "Lamellen-Wams und Schulterpolster",
+  "en": "Lamellar Tabard and Shoulderpads"
+ },
+ "Vlk_Armor_L": {
+  "de": "Leichte Buddler-Hose",
+  "en": "Digger's Light Trousers"
+ },
+ "Vlk_Armor_M": {
+  "de": "Buddler-Hose",
+  "en": "Digger's Trousers"
+ }
 }
