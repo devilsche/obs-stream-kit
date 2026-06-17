@@ -54,7 +54,6 @@ local killNews    = {}    -- jüngste Events {type=, n=}, max MAX_NEWS
 local MAX_NEWS    = 12
 local diagDone    = false  -- einmaliges Diagnose-Log
 local killDbg     = ""      -- temporäres Diagnose-Feld für die Kill-Map
-local testDbg     = "(Strg+Shift+T drücken)"  -- Ergebnis des Waffe/Zauber-Tests (Game-Thread)
 
 local function isValid(o)
     return o and pcall(function() return o:IsValid() end) and o:IsValid()
@@ -672,7 +671,7 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack
     end
     parts[#parts+1] = '"killNews":[' .. table.concat(np, ",") .. ']'
     -- Temporäres Diagnose-Feld (Kills) — wird nach dem Fix wieder entfernt.
-    parts[#parts+1] = string.format('"dbg":"K[%s] T[%s]"', jsonEsc(killDbg or ""), jsonEsc(testDbg or ""))
+    parts[#parts+1] = string.format('"dbg":"K[%s]"', jsonEsc(killDbg or ""))
     if pos then
         parts[#parts+1] = string.format('"pos":{"x":%.1f,"y":%.1f,"z":%.1f}', pos.x, pos.y, pos.z)
     else
@@ -824,20 +823,4 @@ pcall(function()
     end)
 end)
 
--- ── Test-Hotkey: Strg+Shift+T → Waffe + Zauber sicher prüfen (Game-Thread) ──
--- Key-Handler läuft auf dem Game-Thread. Testet die crashenden Reader in pcall und
--- schreibt das Ergebnis ins /state (Feld "dbg" → T[...]). So sehen wir OHNE Crash, ob
--- die Aufrufe auf dem Game-Thread funktionieren (dann war's der LoopAsync-Thread).
-pcall(function()
-    RegisterKeyBind(Key.T, { ModifierKey.CONTROL, ModifierKey.SHIFT }, function()
-        local char = getPlayer()
-        if not char then testDbg = "kein Player"; return end
-        local okW, w = pcall(readWeapon, char)
-        local okS, s = pcall(readSpell, char)
-        testDbg = string.format("weapon=%s:%s spell=%s:%s",
-            tostring(okW), tostring(w), tostring(okS), tostring(s))
-        print("[G1RExport][TEST] " .. testDbg .. "\n")
-    end)
-end)
-
-print("[G1RExport] geladen — schreibt nach " .. OUTPUT_PATH .. " · Dump: Strg+Shift+J · Test: Strg+Shift+T\n")
+print("[G1RExport] geladen — schreibt nach " .. OUTPUT_PATH .. " · Dump-Hotkey: Strg+Shift+J\n")

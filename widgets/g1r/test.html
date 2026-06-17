@@ -68,7 +68,7 @@
     </div>
 
     <div>
-      <div class="label">Waffe</div>
+      <div class="label">Waffen (dabei)</div>
       <div class="guild" id="weapon"><span class="offline">—</span></div>
     </div>
 
@@ -206,7 +206,12 @@
       dot.classList.add('live');
       guildEl.textContent = d.guild || 'Keine Gilde';
       spellEl.textContent = d.spellDisplay || d.spell || 'Kein Zauber';
-      weaponEl.textContent = d.weaponDisplay || d.weapon || 'Keine Waffe';
+      // Waffen crashfrei aus dem Inventar filtern (ItMw_=Nahkampf, ItRw_=Fernkampf).
+      // Der direkte Engine-Weg (GetEquipedWeaponDefinition) crasht, die Items sind sicher.
+      var weapons = (d.items || []).filter(function (it) { return /^It[MR]w_/.test(it.name || ''); });
+      weaponEl.textContent = weapons.length
+        ? weapons.map(function (it) { return it.display || it.name; }).join(', ')
+        : 'keine Waffe dabei';
       attackEl.textContent = d.attackDisplay || d.attack || '—';
       if (d.pos) {
         posEl.innerHTML =
