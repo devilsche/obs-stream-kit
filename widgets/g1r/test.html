@@ -57,6 +57,11 @@
       <div class="pos" id="pos"><span class="offline">— warte auf G1R —</span></div>
     </div>
 
+    <div>
+      <div class="label">Strecke (diese Session)</div>
+      <div class="pos" id="dist"><span class="offline">—</span></div>
+    </div>
+
     <div class="items">
       <div class="label">Inventar (<span id="itemCount">0</span>)</div>
       <ul id="items"></ul>
@@ -71,12 +76,14 @@
 
     var dot = document.getElementById('dot');
     var posEl = document.getElementById('pos');
+    var distEl = document.getElementById('dist');
     var itemsEl = document.getElementById('items');
     var itemCountEl = document.getElementById('itemCount');
 
     function setOffline(msg) {
       dot.classList.remove('live');
       posEl.innerHTML = '<span class="offline">' + (msg || '— warte auf G1R —') + '</span>';
+      distEl.innerHTML = '<span class="offline">—</span>';
       itemsEl.innerHTML = '';
       itemCountEl.textContent = '0';
     }
@@ -90,6 +97,11 @@
           '<span><span class="axis">Z</span><b>' + Math.round(d.pos.z) + '</b></span>';
       } else {
         posEl.innerHTML = '<span class="offline">keine Position</span>';
+      }
+      if (d.distanceM !== undefined) {
+        distEl.innerHTML =
+          '<span><b>' + d.distanceM.toFixed(1) + '</b> m</span>' +
+          '<span><span class="axis">~</span><b>' + (d.steps || 0) + '</b> Schritte</span>';
       }
       var items = d.items || [];
       itemCountEl.textContent = items.length;

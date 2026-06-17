@@ -25,6 +25,10 @@ local POLL_INTERVAL_MS = 250   -- ~4×/s; für flüssigere Position runter (z.B.
 
 -- ── State ──────────────────────────────────────────────────────────────────
 local CachedPlayer = nil
+local totalDistCm  = 0      -- aufsummierte horizontale Laufstrecke (cm), ab Mod-Start
+local lastPos      = nil    -- letzte Position für die Delta-Berechnung
+local MAX_STEP_CM  = 1000   -- Delta/Tick > 10 m → Teleport/Ladezone → ignorieren
+local STEP_LEN_M   = 0.75   -- grobe Schrittlänge für die Schritt-Schätzung
 
 local function isValid(o)
     return o and pcall(function() return o:IsValid() end) and o:IsValid()
@@ -244,7 +248,7 @@ local function jsonEsc(s)
     end):gsub('\\u0022', '\\"'):gsub('\\u005c', '\\\\'))
 end
 
-local function buildJson(pos, items)
+local function buildJson(pos, items, distCm)
     local parts = {}
     parts[#parts+1] = '"ok":true'
     if pos then
@@ -252,6 +256,8 @@ local function buildJson(pos, items)
     else
         parts[#parts+1] = '"pos":null'
     end
+    local meters = (distCm or 0) / 100
+    parts[#parts+1] = string.format('"distanceM":%.1f,"steps":%d', meters, math.floor(meters / STEP_LEN_M))
     local it = {}
     for _, item in ipairs(items) do
         it[#it+1] = string.format('{"name":"%s","count":%d}', jsonEsc(item.name), item.count)
@@ -266,10 +272,19 @@ local function tick()
     if not char then return end
     local pos, items
     pcall(function() pos = readPosition(char) end)
+    -- Laufstrecke aufsummieren (horizontal; Teleports/Ladezonen über MAX_STEP_CM raus).
+    if pos then
+        if lastPos then
+            local dx, dy = pos.x - lastPos.x, pos.y - lastPos.y
+            local d = math.sqrt(dx * dx + dy * dy)
+            if d <= MAX_STEP_CM then totalDistCm = totalDistCm + d end
+        end
+        lastPos = pos
+    end
     -- Items via vollständigem mods-g1r-Helper-Stack (unwrap/arrGet) — entpackt die
     -- RemoteUnrealParam-Wrapper, umgeht so den ScriptStruct-m_Slots-Stolperstein.
     pcall(function() items = readInventory(char) or {} end)
-    local json = buildJson(pos, items or {})
+    local json = buildJson(pos, items or {}, totalDistCm)
     local f = io.open(OUTPUT_PATH, "w")
     if f then f:write(json); f:close() end
 end
