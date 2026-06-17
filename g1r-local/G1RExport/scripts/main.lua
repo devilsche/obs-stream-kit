@@ -488,10 +488,22 @@ end
 
 -- Temporäres Diagnose-Feld (zeigt im /state, warum Waffen evtl. nil sind).
 local weaponDbg = ""
+-- Das InventoryComponent kommt NICHT von char:GetInventory() (liefert für den Spieler
+-- nil), sondern vom CharacterState (GothicCharacterState:InventoryComponent).
+-- getCharacterState() läuft bereits zuverlässig (Gilden-Reader).
+local function getInventoryComp(char)
+    local state = getCharacterState(char)
+    local ic = nil
+    if state then pcall(function() ic = state.InventoryComponent end) end
+    if isValid(ic) then return ic end
+    pcall(function() ic = char:GetInventory() end)  -- Fallback
+    if isValid(ic) then return ic end
+    return nil
+end
+
 local function readWeapons(char)
     weaponDbg = ""
-    local inv = nil
-    pcall(function() inv = char:GetInventory() end)
+    local inv = getInventoryComp(char)
     if not isValid(inv) then weaponDbg = "no-inv"; return nil, nil end
     local invName = "?"
     pcall(function() invName = inv:GetClass():GetFName():ToString() end)
@@ -585,6 +597,7 @@ local function readKillMap()
     local map = nil
     pcall(function() map = subsys:GetCreatureKillCounterMap() end)
     if map == nil then killDbg = "map-nil"; return nil end
+    pcall(function() map = unwrap(map) end)  -- evtl. RemoteUnrealParam-Wrapper entpacken
     local out, any, n = {}, false, 0
     local ok = pcall(function()
         map:ForEach(function(k, v)
