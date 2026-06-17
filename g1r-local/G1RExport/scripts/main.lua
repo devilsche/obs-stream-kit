@@ -40,8 +40,13 @@ local MAX_STAT_JUMP = 500
 -- VORSICHT: diese beiden machen Engine-Zugriffe, die HART crashen können (nicht
 -- per pcall fangbar). Beide stehen daher auf false, bis in-game einzeln verifiziert.
 -- Zum Testen GENAU EINEN auf true setzen, Spiel neu starten, schauen ob's crasht.
-local READ_CLOCK = false   -- GameTimeSubsystem:GetCurrentClockTime + ClockTimeLibrary:GetHour
-local READ_KILLS = false   -- PuzzlesSubsystem:GetCreatureKillCounterMap (TMap:ForEach)
+-- Diese Reader wurden in-game nie bestätigt und machen Engine-Zugriffe. Alle aus,
+-- bis einzeln verifiziert. Zum Testen GENAU EINEN auf true, Spiel neu starten.
+local READ_SPELL   = false  -- MagicScriptLibrary:GetSpellConfigGivenACharacter
+local READ_WEAPONS = false  -- InventoryComponent:GetFirstEquipped*Weapon + GetFullName
+local READ_ATTACK  = false  -- DataModuleLibrary:GetCombatDataModule:GetCurrentAttackDirection
+local READ_CLOCK   = false  -- GameTimeSubsystem:GetCurrentClockTime + ClockTimeLibrary:GetHour
+local READ_KILLS   = false  -- PuzzlesSubsystem:GetCreatureKillCounterMap (TMap:ForEach)
 local killBase    = nil   -- Map-Snapshot beim ersten Read (für Session-Summe)
 local lastKillMap = nil   -- letzte Map (für News-Delta)
 local killNews    = {}    -- jüngste Events {type=, n=}, max MAX_NEWS
@@ -750,20 +755,23 @@ local function tick()
     local guild
     pcall(function() guild = readGuild(char) end)
     local spell
-    pcall(function() spell = readSpell(char) end)
+    if READ_SPELL then pcall(function() spell = readSpell(char) end) end
     local weaponMelee, weaponRanged
-    pcall(function() weaponMelee, weaponRanged = readWeapons(char) end)
+    if READ_WEAPONS then pcall(function() weaponMelee, weaponRanged = readWeapons(char) end) end
     local attack
-    pcall(function() attack = readAttack(char) end)
+    if READ_ATTACK then pcall(function() attack = readAttack(char) end) end
     -- Einmaliges Diagnose-Log (Stufe 2). Steht VOR den riskanten Readern und nutzt nur
     -- FindFirstOf (sicher) — kommt also auch dann, wenn clock/kills deaktiviert sind.
     if not diagDone then
         diagDone = true
         pcall(function()
+            -- FindFirstOf NUR wenn das Flag an ist (sonst kein Engine-Zugriff → sicher).
+            local ts = READ_CLOCK and tostring(isValid(getTimeSubsys())) or "(aus)"
+            local pz = READ_KILLS and tostring(isValid(getPuzzles())) or "(aus)"
             print(string.format(
-                "[G1RExport] Diag Stufe2: GameTimeSubsystem=%s PuzzlesSubsystem=%s READ_CLOCK=%s READ_KILLS=%s\n",
-                tostring(isValid(getTimeSubsys())), tostring(isValid(getPuzzles())),
-                tostring(READ_CLOCK), tostring(READ_KILLS)))
+                "[G1RExport] Diag: tick laeuft. SPELL=%s WEAPONS=%s ATTACK=%s CLOCK=%s KILLS=%s | GameTime=%s Puzzles=%s\n",
+                tostring(READ_SPELL), tostring(READ_WEAPONS), tostring(READ_ATTACK),
+                tostring(READ_CLOCK), tostring(READ_KILLS), ts, pz))
         end)
     end
     local clock
