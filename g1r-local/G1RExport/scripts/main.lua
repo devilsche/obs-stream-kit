@@ -40,13 +40,14 @@ local MAX_STAT_JUMP = 500
 -- VORSICHT: diese beiden machen Engine-Zugriffe, die HART crashen können (nicht
 -- per pcall fangbar). Beide stehen daher auf false, bis in-game einzeln verifiziert.
 -- Zum Testen GENAU EINEN auf true setzen, Spiel neu starten, schauen ob's crasht.
--- Diese Reader wurden in-game nie bestätigt und machen Engine-Zugriffe. Alle aus,
--- bis einzeln verifiziert. Zum Testen GENAU EINEN auf true, Spiel neu starten.
-local READ_SPELL   = false  -- MagicScriptLibrary:GetSpellConfigGivenACharacter
-local READ_WEAPONS = false  -- InventoryComponent:GetFirstEquipped*Weapon + GetFullName
-local READ_ATTACK  = false  -- DataModuleLibrary:GetCombatDataModule:GetCurrentAttackDirection
-local READ_CLOCK   = false  -- GameTimeSubsystem:GetCurrentClockTime + ClockTimeLibrary:GetHour
-local READ_KILLS   = false  -- PuzzlesSubsystem:GetCreatureKillCounterMap (TMap:ForEach)
+-- In-game verifiziert (2026-06-17): Waffen/Schlag/Uhr/Kills laufen sauber → an.
+-- readSpell CRASHT hart (GetSpellConfigGivenACharacter, vermutl. interner null-deref
+-- ohne aktiven Zauber) → aus, bis sicherer Weg gefunden.
+local READ_SPELL   = false  -- CRASHT — MagicScriptLibrary:GetSpellConfigGivenACharacter
+local READ_WEAPONS = true   -- InventoryComponent:GetFirstEquipped*Weapon + GetFullName
+local READ_ATTACK  = true   -- DataModuleLibrary:GetCombatDataModule:GetCurrentAttackDirection
+local READ_CLOCK   = true   -- GameTimeSubsystem:GetCurrentClockTime + ClockTimeLibrary:GetHour
+local READ_KILLS   = true   -- PuzzlesSubsystem:GetCreatureKillCounterMap (TMap:ForEach)
 local killBase    = nil   -- Map-Snapshot beim ersten Read (für Session-Summe)
 local lastKillMap = nil   -- letzte Map (für News-Delta)
 local killNews    = {}    -- jüngste Events {type=, n=}, max MAX_NEWS
