@@ -385,6 +385,15 @@ end
 local function tick()
     local char = getPlayer()
     if not char then return end
+    -- Beim Spiel-Schließen / Hauptmenü räumt die Engine die Objekte ab. Prüfen, ob
+    -- die Welt noch lebt — sonst Cache leeren und NICHTS tun (verhindert Zugriffe auf
+    -- halb-zerstörte Objekte, die beim Shutdown sonst einen Fehler werfen).
+    local worldOk = false
+    pcall(function()
+        local w = char:GetWorld()
+        worldOk = w ~= nil and w:IsValid()
+    end)
+    if not worldOk then CachedPlayer = nil; lastPos = nil; return end
     local pos, items
     pcall(function() pos = readPosition(char) end)
     -- Laufstrecke aufsummieren (horizontal; Teleports/Ladezonen über MAX_STEP_CM raus).
@@ -410,7 +419,11 @@ end
 
 -- UE4SS-Loop: alle POLL_INTERVAL_MS einmal schreiben.
 LoopAsync(POLL_INTERVAL_MS, function()
-    pcall(tick)
+    -- Bei einem Fehler im tick (z.B. Objekt beim Shutdown gerade abgeräumt) den
+    -- Player-Cache leeren, damit der nächste Durchlauf nicht erneut auf ein totes
+    -- Objekt zugreift.
+    local ok = pcall(tick)
+    if not ok then CachedPlayer = nil; lastPos = nil end
     return false  -- nie stoppen
 end)
 
