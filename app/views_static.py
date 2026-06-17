@@ -24,3 +24,9 @@ def widget_static(filepath):
 @bp_static.route("/tools-static/<path:filepath>")
 def tools_static(filepath):
     return serve_asset(_root(), "tools", filepath)
+
+
+@bp_static.route("/design-proposals/<path:filepath>")
+def design_proposals(filepath):
+    # Statische Design-Mockups (docs/design-proposals/) zum Durchklicken im Browser.
+    return serve_asset(_root(), os.path.join("docs", "design-proposals"), filepath)
