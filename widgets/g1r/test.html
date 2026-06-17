@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=420, height=360" />
+  <title>G1R Live (Test)</title>
+  <link rel="stylesheet" href="../_theme.css" />
+  <style>
+    :root {
+      --c-accent:  var(--theme-accent,   #f2b705);
+      --c-primary: var(--theme-primary,  #5e2a79);
+      --c-bg:      var(--theme-bg,       #0a0510);
+      --c-surface: var(--theme-surface,  #1f1430);
+      --c-text:    var(--theme-text,     #e8e0f0);
+      --c-muted:   var(--theme-text-dim, #8a7d99);
+      --c-border:  var(--theme-border,   rgba(94,42,121,.6));
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 420px; height: 360px; overflow: hidden; background: transparent;
+                 font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif); }
+    .card {
+      position: absolute; inset: 8px;
+      background: var(--c-bg);
+      border: 1px solid var(--c-border);
+      border-left: 3px solid var(--c-accent);
+      border-radius: var(--theme-radius, 8px);
+      padding: 14px 18px; color: var(--c-text);
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .head { display: flex; align-items: baseline; justify-content: space-between; }
+    .title { font-family: var(--theme-font-display, serif); font-size: 1.1rem; color: var(--c-accent);
+             letter-spacing: .06em; text-transform: uppercase; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #777; flex: none; }
+    .dot.live { background: #4be39a; box-shadow: 0 0 8px #4be39a; }
+    .label { font-size: .7rem; color: var(--c-muted); text-transform: uppercase; letter-spacing: .1em; }
+    .pos { display: flex; gap: 14px; font-family: var(--theme-font-mono, monospace); font-size: 1.1rem; }
+    .pos b { color: var(--c-accent); font-variant-numeric: tabular-nums; }
+    .pos .axis { color: var(--c-muted); margin-right: 4px; }
+    .items { flex: 1; overflow: hidden; }
+    .items ul { list-style: none; display: flex; flex-direction: column; gap: 2px; max-height: 200px; overflow: hidden; }
+    .items li { display: flex; justify-content: space-between; font-size: .9rem;
+                border-bottom: 1px solid var(--c-border); padding: 2px 0; }
+    .items li .n { color: var(--c-text); }
+    .items li .c { color: var(--c-accent); font-variant-numeric: tabular-nums; }
+    .offline { color: var(--c-muted); font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="head">
+      <span class="title">Gothic 1 — Live</span>
+      <span class="dot" id="dot" title="Verbindung"></span>
+    </div>
+
+    <div>
+      <div class="label">Position (cm)</div>
+      <div class="pos" id="pos"><span class="offline">— warte auf G1R —</span></div>
+    </div>
+
+    <div class="items">
+      <div class="label">Inventar (<span id="itemCount">0</span>)</div>
+      <ul id="items"></ul>
+    </div>
+  </div>
+
+  <script>
+    // Lokaler Proxy auf dem Spiel-PC. Port via ?port= überschreibbar.
+    var PORT = new URLSearchParams(location.search).get('port') || '9210';
+    var URL  = 'http://localhost:' + PORT + '/state';
+    var INTERVAL = 400;
+
+    var dot = document.getElementById('dot');
+    var posEl = document.getElementById('pos');
+    var itemsEl = document.getElementById('items');
+    var itemCountEl = document.getElementById('itemCount');
+
+    function setOffline(msg) {
+      dot.classList.remove('live');
+      posEl.innerHTML = '<span class="offline">' + (msg || '— warte auf G1R —') + '</span>';
+      itemsEl.innerHTML = '';
+      itemCountEl.textContent = '0';
+    }
+
+    function render(d) {
+      dot.classList.add('live');
+      if (d.pos) {
+        posEl.innerHTML =
+          '<span><span class="axis">X</span><b>' + Math.round(d.pos.x) + '</b></span>' +
+          '<span><span class="axis">Y</span><b>' + Math.round(d.pos.y) + '</b></span>' +
+          '<span><span class="axis">Z</span><b>' + Math.round(d.pos.z) + '</b></span>';
+      } else {
+        posEl.innerHTML = '<span class="offline">keine Position</span>';
+      }
+      var items = d.items || [];
+      itemCountEl.textContent = items.length;
+      itemsEl.innerHTML = items.slice(0, 12).map(function (it) {
+        return '<li><span class="n">' + it.name + '</span><span class="c">×' + it.count + '</span></li>';
+      }).join('');
+    }
+
+    function poll() {
+      fetch(URL, { credentials: 'omit' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d && d.ok) render(d);
+          else setOffline(d && d.reason === 'stale' ? '— Spiel pausiert —' : '— warte auf G1R —');
+        })
+        .catch(function () { setOffline('— lokaler Proxy nicht erreichbar —'); });
+    }
+
+    poll();
+    setInterval(poll, INTERVAL);
+  </script>
+</body>
+</html>
