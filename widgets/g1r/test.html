@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=420, height=360" />
+  <meta name="viewport" content="width=420, height=540" />
   <title>G1R Live (Test)</title>
   <link rel="stylesheet" href="../_theme.css" />
   <style>
@@ -16,7 +16,7 @@
       --c-border:  var(--theme-border,   rgba(94,42,121,.6));
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 420px; height: 360px; overflow: hidden; background: transparent;
+    html, body { width: 420px; height: 540px; overflow: hidden; background: transparent;
                  font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif); }
     .card {
       position: absolute; inset: 8px;
@@ -42,6 +42,9 @@
                 border-bottom: 1px solid var(--c-border); padding: 2px 0; }
     .items li .n { color: var(--c-text); }
     .items li .c { color: var(--c-accent); font-variant-numeric: tabular-nums; }
+    .statgrid { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .9rem; }
+    .statgrid .s { color: var(--c-muted); }
+    .statgrid .s b { color: var(--c-accent); font-variant-numeric: tabular-nums; margin-left: 3px; }
     .offline { color: var(--c-muted); font-size: .9rem; }
   </style>
 </head>
@@ -62,6 +65,11 @@
       <div class="pos" id="dist"><span class="offline">—</span></div>
     </div>
 
+    <div>
+      <div class="label">Stats</div>
+      <div class="statgrid" id="stats"><span class="offline">—</span></div>
+    </div>
+
     <div class="items">
       <div class="label">Inventar (<span id="itemCount">0</span>)</div>
       <ul id="items"></ul>
@@ -77,6 +85,7 @@
     var dot = document.getElementById('dot');
     var posEl = document.getElementById('pos');
     var distEl = document.getElementById('dist');
+    var statsEl = document.getElementById('stats');
     var itemsEl = document.getElementById('items');
     var itemCountEl = document.getElementById('itemCount');
 
@@ -84,8 +93,27 @@
       dot.classList.remove('live');
       posEl.innerHTML = '<span class="offline">' + (msg || '— warte auf G1R —') + '</span>';
       distEl.innerHTML = '<span class="offline">—</span>';
+      statsEl.innerHTML = '<span class="offline">—</span>';
       itemsEl.innerHTML = '';
       itemCountEl.textContent = '0';
+    }
+
+    function renderStats(s) {
+      if (!s) { statsEl.innerHTML = '<span class="offline">—</span>'; return; }
+      var out = [];
+      function add(label, val) {
+        if (val !== undefined && val !== null) out.push('<span class="s">' + label + '<b>' + Math.round(val) + '</b></span>');
+      }
+      function pair(label, v, vMax) {
+        if (v === undefined) return;
+        out.push('<span class="s">' + label + '<b>' + Math.round(v) + (vMax !== undefined ? '/' + Math.round(vMax) : '') + '</b></span>');
+      }
+      add('Level', s.level); add('XP', s.xp); add('Lernpkt', s.learnPts);
+      add('STR', s.strength); add('GES', s.dexterity);
+      pair('HP', s.hp, s.hpMax); pair('Mana', s.mana, s.manaMax); add('Kreis', s.magicCircle);
+      add('Feuer', s.resFire); add('Eis', s.resIce); add('Schnitt', s.resEdge);
+      add('Stich', s.resPoint); add('Wucht', s.resBlunt); add('Energie', s.resEnergy); add('Wind', s.resWind);
+      statsEl.innerHTML = out.length ? out.join('') : '<span class="offline">keine Stats</span>';
     }
 
     function render(d) {
@@ -103,6 +131,7 @@
           '<span><b>' + d.distanceM.toFixed(1) + '</b> m</span>' +
           '<span><span class="axis">~</span><b>' + (d.steps || 0) + '</b> Schritte</span>';
       }
+      renderStats(d.stats);
       var items = d.items || [];
       itemCountEl.textContent = items.length;
       itemsEl.innerHTML = items.slice(0, 12).map(function (it) {

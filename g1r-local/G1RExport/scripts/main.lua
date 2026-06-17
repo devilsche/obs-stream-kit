@@ -241,6 +241,75 @@ local function readInventory(char)
     return items
 end
 
+-- ── Stats lesen (GAS, Pattern aus mods-g1r stats.lua) ──────────────────────
+-- AIGASLibrary:GetAttributeValue(Character, SetClass, FName). SetClass via
+-- StaticFindObject(SetPath), Attr-Name als FName. Klasse/Fraktion/Lager ist in
+-- G1R NICHT auslesbar (kein Weg im Repo) — daher nicht dabei.
+local AIGAS = nil
+local function getGas()
+    if not AIGAS then pcall(function() AIGAS = StaticFindObject("/Script/G1R.Default__AIGASLibrary") end) end
+    return AIGAS
+end
+
+local classCache = {}
+local function findClass(path)
+    if classCache[path] == nil then
+        local ok, c = pcall(function() return StaticFindObject(path) end)
+        classCache[path] = (ok and c) or false
+    end
+    return classCache[path] or nil
+end
+
+-- FName-Helper: UEHelpers bevorzugt, sonst globaler FName-Konstruktor, sonst String.
+local UEHelpers = nil
+pcall(function() UEHelpers = require("UEHelpers") end)
+local function fname(name)
+    if UEHelpers and UEHelpers.FindFName then
+        local ok, fn = pcall(function() return UEHelpers.FindFName(name) end)
+        if ok and fn then return fn end
+    end
+    local ok, fn = pcall(function() return FName(name) end)
+    if ok and fn then return fn end
+    return name
+end
+
+-- Auswahl der wichtigsten Stats fürs Overlay (label, AttributeSet-Pfad, Attribut).
+local STAT_DEFS = {
+    { "level",      "/Script/G1R.AttributeSet_LevelProgression", "Level" },
+    { "xp",         "/Script/G1R.AttributeSet_LevelProgression", "Experience" },
+    { "learnPts",   "/Script/G1R.AttributeSet_LevelProgression", "SkillPoints" },
+    { "strength",   "/Script/G1R.AttributeSet_Strength",         "Strength" },
+    { "dexterity",  "/Script/G1R.AttributeSet_Dexterity",        "Dexterity" },
+    { "hp",         "/Script/G1R.AttributeSet_Health",           "Health" },
+    { "hpMax",      "/Script/G1R.AttributeSet_Health",           "MaxHealth" },
+    { "mana",       "/Script/G1R.AttributeSet_Mana",             "Mana" },
+    { "manaMax",    "/Script/G1R.AttributeSet_Mana",             "MaxMana" },
+    { "magicCircle","/Script/G1R.AttributeSet_Mana",             "MagicianLevel" },
+    { "resFire",    "/Script/G1R.AttributeSet_Armor",            "Resistance_Fire" },
+    { "resIce",     "/Script/G1R.AttributeSet_Armor",            "Resistance_Ice" },
+    { "resEdge",    "/Script/G1R.AttributeSet_Armor",            "Resistance_Edge" },
+    { "resPoint",   "/Script/G1R.AttributeSet_Armor",            "Resistance_Point" },
+    { "resBlunt",   "/Script/G1R.AttributeSet_Armor",            "Resistance_Blunt" },
+    { "resEnergy",  "/Script/G1R.AttributeSet_Armor",            "Resistance_Energy" },
+    { "resWind",    "/Script/G1R.AttributeSet_Armor",            "Resistance_Wind" },
+}
+
+local function readStats(char)
+    local out = {}
+    local gas = getGas()
+    if not (gas and isValid(gas)) then return out end
+    for _, d in ipairs(STAT_DEFS) do
+        local setClass = findClass(d[2])
+        if setClass then
+            local ok, v = pcall(function()
+                return gas:GetAttributeValue(char, setClass, fname(d[3]))
+            end)
+            if ok and type(v) == "number" then out[d[1]] = v end
+        end
+    end
+    return out
+end
+
 -- ── JSON (minimal, nur für unsere Struktur) ─────────────────────────────────
 local function jsonEsc(s)
     return (tostring(s):gsub('[\\"%z\1-\31]', function(c)
@@ -248,7 +317,7 @@ local function jsonEsc(s)
     end):gsub('\\u0022', '\\"'):gsub('\\u005c', '\\\\'))
 end
 
-local function buildJson(pos, items, distCm)
+local function buildJson(pos, items, distCm, stats)
     local parts = {}
     parts[#parts+1] = '"ok":true'
     if pos then
@@ -258,6 +327,12 @@ local function buildJson(pos, items, distCm)
     end
     local meters = (distCm or 0) / 100
     parts[#parts+1] = string.format('"distanceM":%.1f,"steps":%d', meters, math.floor(meters / STEP_LEN_M))
+    -- Stats als Objekt {label:wert,...}
+    local st = {}
+    for k, v in pairs(stats or {}) do
+        st[#st+1] = string.format('"%s":%s', k, tostring(v))
+    end
+    parts[#parts+1] = '"stats":{' .. table.concat(st, ",") .. '}'
     local it = {}
     for _, item in ipairs(items) do
         it[#it+1] = string.format('{"name":"%s","count":%d}', jsonEsc(item.name), item.count)
@@ -284,7 +359,9 @@ local function tick()
     -- Items via vollständigem mods-g1r-Helper-Stack (unwrap/arrGet) — entpackt die
     -- RemoteUnrealParam-Wrapper, umgeht so den ScriptStruct-m_Slots-Stolperstein.
     pcall(function() items = readInventory(char) or {} end)
-    local json = buildJson(pos, items or {}, totalDistCm)
+    local stats
+    pcall(function() stats = readStats(char) or {} end)
+    local json = buildJson(pos, items or {}, totalDistCm, stats or {})
     local f = io.open(OUTPUT_PATH, "w")
     if f then f:write(json); f:close() end
 end
