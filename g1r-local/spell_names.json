@@ -1,0 +1,40 @@
+{
+  "_comment": "Zauber-Tag -> {de,en}. Der Mod liefert den GameplayTag (z.B. 'SpellCategory.Spell_Fireball'). server.py nimmt den Teil nach dem letzten Punkt, entfernt das 'Spell_'-Praefix und normalisiert (klein, nur a-z0-9) -> Schluessel hier ebenso normalisiert gematcht, daher sind Schreibweisen/Unterstriche egal. Fehlt ein Eintrag, wird der Name lesbar gemacht (Fallback). Quelle der Klarnamen: Gothic-1-Zauber.",
+  "Fireball":            { "de": "Feuerball",                  "en": "Fireball" },
+  "Firebolt":            { "de": "Feuerpfeil",                 "en": "Fire Bolt" },
+  "Pyrokinesis":         { "de": "Pyrokinese",                 "en": "Pyrokinesis" },
+  "RainOfFire":          { "de": "Feuerregen",                 "en": "Rain of Fire" },
+  "FireRain":            { "de": "Feuerregen",                 "en": "Rain of Fire" },
+  "StormOfFire":         { "de": "Feuersturm",                 "en": "Storm of Fire" },
+  "Inferno":             { "de": "Inferno",                    "en": "Inferno" },
+
+  "IceBolt":             { "de": "Eispfeil",                   "en": "Ice Bolt" },
+  "IceBlock":            { "de": "Eisblock",                   "en": "Ice Block" },
+  "IceWave":             { "de": "Eiswelle",                   "en": "Wave of Ice" },
+  "WaveOfIce":           { "de": "Eiswelle",                   "en": "Wave of Ice" },
+
+  "BallLightning":       { "de": "Blitzkugel",                 "en": "Ball Lightning" },
+  "ChainLightning":      { "de": "Kettenblitz",                "en": "Chain Lightning" },
+
+  "Heal":                { "de": "Heilung",                    "en": "Healing" },
+  "Healing":             { "de": "Heilung",                    "en": "Healing" },
+  "Light":               { "de": "Licht",                      "en": "Light" },
+  "Telekinesis":         { "de": "Telekinese",                 "en": "Telekinesis" },
+  "Sleep":               { "de": "Schlaf",                     "en": "Sleep" },
+  "Fear":                { "de": "Angst",                      "en": "Fear" },
+  "Charm":               { "de": "Bezauberung",                "en": "Charm" },
+  "Control":             { "de": "Kontrolle",                  "en": "Control" },
+  "Shrink":              { "de": "Monster schrumpfen",         "en": "Shrink Monster" },
+  "ShrinkMonster":       { "de": "Monster schrumpfen",         "en": "Shrink Monster" },
+  "FistOfWind":          { "de": "Faust des Windes",           "en": "Fist of Wind" },
+  "StormFist":           { "de": "Sturmfaust",                 "en": "Storm Fist" },
+  "DeathToTheUndead":    { "de": "Tod den Untoten",            "en": "Death to the Undead" },
+  "InnosPray":           { "de": "Gebet zu Innos",             "en": "Pray to Innos" },
+  "PrayToInnos":         { "de": "Gebet zu Innos",             "en": "Pray to Innos" },
+
+  "SummonDemon":         { "de": "Dämon beschwören",                "en": "Summon Demon" },
+  "SummonGolem":         { "de": "Golem beschwören",                "en": "Summon Golem" },
+  "SummonSkeletons":     { "de": "Skelette beschwören",             "en": "Summon Skeletons" },
+  "SummonSkeleton":      { "de": "Skelette beschwören",             "en": "Summon Skeletons" },
+  "SummonArmyOfDarkness":{ "de": "Armee der Finsternis beschwören", "en": "Summon Army of Darkness" }
+}

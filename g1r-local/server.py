@@ -43,6 +43,27 @@ def _load_item_names():
 
 ITEM_NAMES = _load_item_names()
 
+# Zauber-Namen analog. Schlüssel werden normalisiert (klein, nur a-z0-9), damit
+# Schreibweisen/Unterstriche egal sind ('Spell_Fireball' == 'FireBall' == 'fireball').
+SPELL_NAMES_FILE = os.environ.get(
+    "G1R_SPELL_NAMES", os.path.join(os.path.dirname(os.path.abspath(__file__)), "spell_names.json"))
+
+
+def _norm_spell(s):
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
+
+
+def _load_spell_names():
+    try:
+        with open(SPELL_NAMES_FILE, "r", encoding="utf-8") as fh:
+            raw = json.load(fh)
+        return {_norm_spell(k): v for k, v in raw.items() if not k.startswith("_")}
+    except Exception:
+        return {}
+
+
+SPELL_NAMES = _load_spell_names()
+
 
 def _prettify(cls_name):
     """Fallback ohne Mapping. G1R nutzt die Original-Gothic-Namen mit zweistelligem
@@ -63,12 +84,18 @@ def _translate(cls_name, lang):
     return _prettify(cls_name)
 
 
-def _spell_display(tag):
-    """Aktiver-Zauber-Tag lesbar machen, z.B. 'SpellCategory.Fireball' -> 'Fireball'.
-    Echtes DE-Mapping folgt, sobald die realen Tag-Werte aus dem Spiel bekannt sind."""
+def _spell_display(tag, lang):
+    """Aktiver-Zauber-Tag -> Klarname, z.B. 'SpellCategory.Spell_Fireball' -> 'Feuerball'.
+    Teil nach letztem Punkt, 'Spell_'-Praefix weg, normalisiert im spell_names.json
+    nachschlagen; fehlt der Eintrag, Name lesbar machen (Fallback)."""
     if not tag:
         return None
-    last = str(tag).split(".")[-1].replace("_", " ")
+    suffix = str(tag).split(".")[-1]
+    suffix = re.sub(r"^Spell_", "", suffix, flags=re.IGNORECASE)
+    entry = SPELL_NAMES.get(_norm_spell(suffix))
+    if entry:
+        return entry.get(lang) or entry.get(DEFAULT_LANG) or entry.get("en") or suffix
+    last = suffix.replace("_", " ")
     last = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", last)  # CamelCase trennen
     return last.strip() or str(tag)
 
@@ -109,7 +136,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not it.get("display"):
                         it["display"] = _translate(it.get("name"), lang)
                 if data.get("spell"):
-                    data["spellDisplay"] = _spell_display(data.get("spell"))
+                    data["spellDisplay"] = _spell_display(data.get("spell"), lang)
                 data["lang"] = lang
                 payload = data
             else:
