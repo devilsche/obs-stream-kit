@@ -44,10 +44,10 @@ local MAX_STAT_JUMP = 500
 -- readSpell CRASHT hart (GetSpellConfigGivenACharacter, vermutl. interner null-deref
 -- ohne aktiven Zauber) → aus, bis sicherer Weg gefunden.
 local READ_SPELL   = false  -- CRASHT — MagicScriptLibrary:GetSpellConfigGivenACharacter
-local READ_WEAPONS = true   -- InventoryComponent:GetFirstEquipped*Weapon + GetFullName
-local READ_ATTACK  = true   -- DataModuleLibrary:GetCombatDataModule:GetCurrentAttackDirection
-local READ_CLOCK   = true   -- GameTimeSubsystem:GetCurrentClockTime + ClockTimeLibrary:GetHour
-local READ_KILLS   = true   -- PuzzlesSubsystem:GetCreatureKillCounterMap (TMap:ForEach)
+local READ_WEAPONS = false  -- CRASHT — GetEquipedWeaponDefinition (null-deref?); CharacterState-Weg = Gilde-Konflikt
+local READ_ATTACK  = true   -- läuft — DataModuleLibrary:GetCombatDataModule:GetCurrentAttackDirection
+local READ_CLOCK   = true   -- läuft — GameTimeSubsystem:GetCurrentClockTime + ClockTimeLibrary:GetHour
+local READ_KILLS   = true   -- läuft (aber Map liefert noch keine Daten) — PuzzlesSubsystem:GetCreatureKillCounterMap
 local killBase    = nil   -- Map-Snapshot beim ersten Read (für Session-Summe)
 local lastKillMap = nil   -- letzte Map (für News-Delta)
 local killNews    = {}    -- jüngste Events {type=, n=}, max MAX_NEWS
