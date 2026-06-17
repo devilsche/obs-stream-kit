@@ -1,5 +1,4 @@
 {
-  "_comment": "Klassenname -> {de, en}. Die Klassennamen stehen in /state unter items[].name (z.B. 'ItemGold'). Fehlt ein Eintrag, baut server.py einen lesbaren Fallback (ItemSword_Rusty -> 'Sword Rusty'). Hier echte Namen ergaenzen und server.py neu starten. Quelle fuer Klarnamen z.B. gothic-remake.wiki / gamerguides.",
-  "ItemGold": { "de": "Gold", "en": "Gold" },
-  "ItemApple": { "de": "Apfel", "en": "Apple" }
+  "_comment": "Klassenname -> {de, en}. G1R nutzt die Original-Gothic-Namen mit Kategorie-Praefix: ItFo_=Food, ItMi_=Misc (Gold/Erz), ItPo_=Potion, ItMw_=Nahkampf, ItRw_=Fernkampf, ItAr_=Armor, ItRu_=Rune, ItSc_=Scroll, ItKe_=Key. Die echten Namen stehen in /state unter items[].name. Fehlt ein Eintrag, strippt server.py das Praefix als Fallback (ItFo_Carrot -> 'Carrot'). Hier echte DE-Namen ergaenzen und server.py neu starten.",
+  "ItFo_Carrot": { "de": "Karotte", "en": "Carrot" }
 }

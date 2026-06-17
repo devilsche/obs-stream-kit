@@ -45,8 +45,12 @@ ITEM_NAMES = _load_item_names()
 
 
 def _prettify(cls_name):
-    """Fallback ohne Mapping: 'ItemSword_Rusty' → 'Sword Rusty'."""
-    s = re.sub(r"^Item_?", "", cls_name or "")
+    """Fallback ohne Mapping. G1R nutzt die Original-Gothic-Namen mit zweistelligem
+    Kategorie-Praefix: ItFo_ (Food), ItMi_ (Misc/Gold/Erz), ItPo_ (Potion), ItMw_/
+    ItRw_ (Nah-/Fernkampfwaffe), ItAr_ (Armor), ItRu_/ItSc_ (Rune/Scroll), ItKe_
+    (Key) usw. Praefix raus, Rest lesbar machen: 'ItFo_Carrot' → 'Carrot'."""
+    s = re.sub(r"^It[A-Za-z]{2}_", "", cls_name or "")  # Gothic-Kategorie-Praefix
+    s = re.sub(r"^Item_?", "", s)                        # generisches Item-Praefix
     s = s.replace("_", " ")
     s = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", s)  # CamelCase trennen
     return s.strip() or (cls_name or "Item")
