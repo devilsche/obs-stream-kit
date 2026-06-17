@@ -89,7 +89,11 @@ class Handler(BaseHTTPRequestHandler):
                     data = json.load(fh)
                 data["ageSec"] = round(age, 1)
                 for it in (data.get("items") or []):
-                    it["display"] = _translate(it.get("name"), lang)
+                    # Liefert der Mod schon einen lokalisierten Namen (UI-Weg,
+                    # GetItemNameByPos = Spielsprache), den NICHT antasten. Nur den
+                    # Container-Fallback (technischer Klassenname) uebersetzen.
+                    if not it.get("display"):
+                        it["display"] = _translate(it.get("name"), lang)
                 data["lang"] = lang
                 payload = data
             else:

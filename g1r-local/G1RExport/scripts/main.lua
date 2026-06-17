@@ -209,7 +209,52 @@ local function getMainVirtualData(container)
     return nil
 end
 
-local function readInventory(char)
+-- ── Inventar (UI-Weg, lokalisierte Namen) ──────────────────────────────────
+-- GothicCharacter:GetInventory() -> InventoryBase (bzw. InventoryMain mit
+-- GetInventoryBase()). InventoryBase hat eine By-Pos-API mit dem LOKALISIERTEN
+-- Namen direkt aus dem Spiel (GetItemNameByPos -> FText -> :ToString()), d.h.
+-- automatisch in Spielsprache (Deutsch) — KEIN Mapping nötig. Belegt im
+-- Object-Dump: ItemsNum, GetItemNameByPos(int), GetItemAmountByPos(int),
+-- IsItemValidByPos(int). Liefert {display=<DE-Name>, count}.
+local function readInventoryUI(char)
+    if not isValid(char) then return nil end
+    local ok, inv = pcall(function() return char:GetInventory() end)
+    if not (ok and isValid(inv)) then return nil end
+
+    -- GetInventory kann ein InventoryMain (UI-Wrapper) ODER direkt ein
+    -- InventoryBase sein. InventoryMain hat GetInventoryBase() -> Daten-Schicht.
+    local base = inv
+    pcall(function()
+        local b = inv:GetInventoryBase()
+        if isValid(b) then base = b end
+    end)
+
+    local n = nil
+    pcall(function() n = base:ItemsNum() end)
+    if not n or n <= 0 then return nil end   -- nil -> tick fällt auf Container-Weg zurück
+
+    local items = {}
+    for i = 0, n - 1 do
+        pcall(function()
+            local valid = true
+            pcall(function() valid = base:IsItemValidByPos(i) end)
+            if valid == false then return end
+            local nameTxt; pcall(function() nameTxt = base:GetItemNameByPos(i) end)
+            local name
+            if nameTxt then pcall(function() name = nameTxt:ToString() end) end
+            if not name or name == "" then return end
+            local cnt = 1
+            pcall(function() cnt = base:GetItemAmountByPos(i) or 1 end)
+            items[#items + 1] = { display = name, count = cnt }
+        end)
+    end
+    return items
+end
+
+-- ── Inventar (Fallback: Container-Daten, technische Klassennamen) ───────────
+-- Greift, falls der UI-Weg am Build nichts liefert. Namen sind Klassennamen
+-- (z.B. ItemGold) -> server.py übersetzt sie via item_names.json.
+local function readInventoryContainer(char)
     local items = {}
     local lib = getLib()
     if not (lib and isValid(lib)) then return items end
@@ -239,6 +284,13 @@ local function readInventory(char)
         end
     end
     return items
+end
+
+-- UI-Weg bevorzugt (lokalisierte Namen), sonst Container-Fallback.
+local function readInventory(char)
+    local ui = readInventoryUI(char)
+    if ui ~= nil then return ui end
+    return readInventoryContainer(char)
 end
 
 -- ── Stats lesen (GAS, Pattern aus mods-g1r stats.lua) ──────────────────────
@@ -375,7 +427,16 @@ local function buildJson(pos, items, distCm, stats, guild)
     parts[#parts+1] = '"stats":{' .. table.concat(st, ",") .. '}'
     local it = {}
     for _, item in ipairs(items) do
-        it[#it+1] = string.format('{"name":"%s","count":%d}', jsonEsc(item.name), item.count)
+        -- UI-Weg liefert "display" (lokalisierter DE-Name), Container-Fallback "name"
+        -- (Klassenname, von server.py übersetzt). Beide Felder optional mitschreiben.
+        local fields = { string.format('"count":%d', item.count or 1) }
+        if item.name and item.name ~= "" then
+            fields[#fields+1] = string.format('"name":"%s"', jsonEsc(item.name))
+        end
+        if item.display and item.display ~= "" then
+            fields[#fields+1] = string.format('"display":"%s"', jsonEsc(item.display))
+        end
+        it[#it+1] = "{" .. table.concat(fields, ",") .. "}"
     end
     parts[#parts+1] = '"items":[' .. table.concat(it, ",") .. ']'
     return "{" .. table.concat(parts, ",") .. "}"

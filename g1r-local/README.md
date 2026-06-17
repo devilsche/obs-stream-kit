@@ -70,8 +70,13 @@ Größe: 420×360. Das Widget lädt von prod, fetcht aber `http://localhost:9210
   HTTPS-Seite (Private Network Access). Der Server setzt `Access-Control-Allow-Private-Network`;
   falls es trotzdem hakt, das Widget testweise lokal laden statt von prod.
 
+## Item-Namen (Deutsch)
+Der Mod liest den **lokalisierten Namen direkt aus dem Spiel** (`GothicCharacter:GetInventory`
+→ `InventoryBase:GetItemNameByPos`), also automatisch in deiner Spielsprache (Deutsch). Kein
+Mapping nötig. Schlägt dieser Weg am Build fehl, fällt der Mod auf die Container-Daten zurück
+(technische Klassennamen wie `ItemGold`) — die übersetzt `server.py` dann via `item_names.json`
+(`?lang=de|en`). Das `item_names.json` ist also nur noch der Fallback-Notnagel.
+
 ## Status
-Prototyp. Server + Widget lokal verifiziert (Mock-Daten). Der Lua-Mod ist **ungetestet**
-(kein Spiel zur Hand) — Position via `K2_GetActorLocation` und das Inventar-Auslesen am
-echten Build verifizieren. Item-Namen sind technische Klassennamen (z.B. `ItemSword_Rusty`);
-ein Klarname-Mapping kommt später, ebenso die Karte.
+Prototyp. Server + Widget lokal verifiziert (Mock-Daten). Position via `K2_GetActorLocation`
+und das Inventar (UI-Weg `InventoryBase`, DE-Namen) am echten Build bestätigen. Karte kommt später.
