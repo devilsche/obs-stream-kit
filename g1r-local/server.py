@@ -125,6 +125,46 @@ def _attack_display(tag, lang):
     return last.strip() or str(tag)
 
 
+# Kreatur-Namen (Kill-Map-Keys) -> DE/EN. Keys werden normalisiert gematcht; die
+# echten Roh-Keys zeigt das Diagnose-Log im UE4SS.log, dann hier ergaenzen.
+_CREATURE = {
+    "wolf": {"de": "Wolf", "en": "Wolf"},
+    "warg": {"de": "Warg", "en": "Warg"},
+    "scavenger": {"de": "Scavenger", "en": "Scavenger"},
+    "shadowbeast": {"de": "Schattenläufer", "en": "Shadowbeast"},
+    "snapper": {"de": "Schnapper", "en": "Snapper"},
+    "lurker": {"de": "Lauerer", "en": "Lurker"},
+    "molerat": {"de": "Molerat", "en": "Molerat"},
+    "bloodfly": {"de": "Blutfliege", "en": "Bloodfly"},
+    "bloodhound": {"de": "Bluthund", "en": "Bloodhound"},
+    "minecrawler": {"de": "Minecrawler", "en": "Minecrawler"},
+    "crawler": {"de": "Minecrawler", "en": "Minecrawler"},
+    "lizard": {"de": "Echse", "en": "Lizard"},
+    "firelizard": {"de": "Feuerechse", "en": "Fire Lizard"},
+    "razor": {"de": "Scherge", "en": "Razor"},
+    "troll": {"de": "Troll", "en": "Troll"},
+    "harpy": {"de": "Harpyie", "en": "Harpy"},
+    "swampshark": {"de": "Sumpfhai", "en": "Swampshark"},
+    "orcdog": {"de": "Orkhund", "en": "Orc Dog"},
+    "skeleton": {"de": "Skelett", "en": "Skeleton"},
+    "golem": {"de": "Golem", "en": "Golem"},
+    "demon": {"de": "Dämon", "en": "Demon"},
+    "orc": {"de": "Ork", "en": "Orc"},
+}
+
+
+def _creature_display(name, lang):
+    """Kill-Map-Key -> Klarname. Strippt gängige Präfixe, normalisiert, schlägt nach."""
+    if not name:
+        return None
+    base = re.sub(r"^(NPC_|Creature_|Mon_|BP_|Monster_)", "", str(name), flags=re.IGNORECASE)
+    entry = _CREATURE.get(_norm_spell(base))
+    if entry:
+        return entry.get(lang) or entry.get(DEFAULT_LANG) or entry.get("en")
+    pretty = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", base.replace("_", " "))
+    return pretty.strip() or str(name)
+
+
 class Handler(BaseHTTPRequestHandler):
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", ALLOW_ORIGIN)
@@ -169,6 +209,16 @@ class Handler(BaseHTTPRequestHandler):
                     data["weaponRangedDisplay"] = _translate(data["weaponRanged"], lang)
                 if data.get("attack"):
                     data["attackDisplay"] = _attack_display(data.get("attack"), lang)
+                # Kills: Typ-Namen uebersetzen ({rohTyp:n} -> {DE-Typ:n}).
+                if isinstance(data.get("kills"), dict):
+                    data["killsDisplay"] = {
+                        _creature_display(t, lang): n for t, n in data["kills"].items()}
+                # News-Ticker: pro Event fertigen Text bauen ("3x Wolf erledigt").
+                if isinstance(data.get("killNews"), list):
+                    verb = "slain" if lang == "en" else "erledigt"
+                    for ev in data["killNews"]:
+                        name = _creature_display(ev.get("type"), lang)
+                        ev["text"] = f"{ev.get('n', 1)}× {name} {verb}"
                 data["lang"] = lang
                 payload = data
             else:

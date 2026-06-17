@@ -47,12 +47,18 @@
     .statgrid .s { color: var(--c-muted); }
     .statgrid .s b { color: var(--c-accent); font-variant-numeric: tabular-nums; margin-left: 3px; }
     .offline { color: var(--c-muted); font-size: .9rem; }
+    .clock { margin-left: auto; margin-right: 10px; font-family: var(--theme-font-mono, monospace);
+             font-size: 1rem; color: var(--c-accent); font-variant-numeric: tabular-nums; }
+    .ticker { list-style: none; display: flex; flex-direction: column; gap: 2px; max-height: 88px; overflow: hidden; }
+    .ticker li { font-size: .85rem; color: var(--c-text); border-left: 2px solid var(--c-accent); padding-left: 6px; }
+    .ticker li .c { color: var(--c-accent); font-variant-numeric: tabular-nums; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="head">
       <span class="title">Gothic 1 — Live</span>
+      <span class="clock" id="clock"></span>
       <span class="dot" id="dot" title="Verbindung"></span>
     </div>
 
@@ -92,6 +98,16 @@
     </div>
 
     <div>
+      <div class="label">Erledigt (Session)</div>
+      <div class="statgrid" id="kills"><span class="offline">—</span></div>
+    </div>
+
+    <div>
+      <div class="label">News</div>
+      <ul class="ticker" id="news"></ul>
+    </div>
+
+    <div>
       <div class="label">Stats</div>
       <div class="statgrid" id="stats"><span class="offline">—</span></div>
     </div>
@@ -114,6 +130,9 @@
     var weaponEl = document.getElementById('weapon');
     var attackEl = document.getElementById('attack');
     var sessionEl = document.getElementById('session');
+    var clockEl = document.getElementById('clock');
+    var killsEl = document.getElementById('kills');
+    var newsEl = document.getElementById('news');
     var posEl = document.getElementById('pos');
     var distEl = document.getElementById('dist');
     var statsEl = document.getElementById('stats');
@@ -128,6 +147,9 @@
       weaponEl.innerHTML = '<span class="offline">—</span>';
       attackEl.innerHTML = '<span class="offline">—</span>';
       sessionEl.innerHTML = '<span class="offline">—</span>';
+      clockEl.textContent = '';
+      killsEl.innerHTML = '<span class="offline">—</span>';
+      newsEl.innerHTML = '';
       distEl.innerHTML = '<span class="offline">—</span>';
       statsEl.innerHTML = '<span class="offline">—</span>';
       itemsEl.innerHTML = '';
@@ -164,6 +186,22 @@
       sessionEl.innerHTML = out.join('');
     }
 
+    function renderKills(k) {
+      if (!k) { killsEl.innerHTML = '<span class="offline">—</span>'; return; }
+      var out = [];
+      Object.keys(k).forEach(function (typ) {
+        out.push('<span class="s">' + typ + '<b>' + k[typ] + '</b></span>');
+      });
+      killsEl.innerHTML = out.length ? out.join('') : '<span class="offline">noch keine</span>';
+    }
+
+    function renderNews(arr) {
+      if (!arr || !arr.length) { newsEl.innerHTML = ''; return; }
+      newsEl.innerHTML = arr.slice().reverse().slice(0, 6).map(function (ev) {
+        return '<li>' + (ev.text || (ev.n + '× ' + ev.type)) + '</li>';
+      }).join('');
+    }
+
     function render(d) {
       dot.classList.add('live');
       guildEl.textContent = d.guild || 'Keine Gilde';
@@ -187,6 +225,13 @@
       }
       renderStats(d.stats);
       renderSession(d.session);
+      if (d.clock && typeof d.clock.hour === 'number') {
+        clockEl.textContent = ('0' + d.clock.hour).slice(-2) + ':' + ('0' + (d.clock.minute || 0)).slice(-2);
+      } else {
+        clockEl.textContent = '';
+      }
+      renderKills(d.killsDisplay || d.kills);
+      renderNews(d.killNews);
       var items = d.items || [];
       itemCountEl.textContent = items.length;
       itemsEl.innerHTML = items.slice(0, 12).map(function (it) {

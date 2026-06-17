@@ -36,6 +36,13 @@ local lastHp, lastMana, lastXp = nil, nil, nil
 -- Sprünge größer als das = Laden/Level-up/Respawn, nicht als Schaden/Regen zählen.
 local MAX_STAT_JUMP = 500
 
+-- Stufe 2: Kill-Counter + News-Ticker + Ingame-Uhr (Live-Subsysteme).
+local killBase    = nil   -- Map-Snapshot beim ersten Read (für Session-Summe)
+local lastKillMap = nil   -- letzte Map (für News-Delta)
+local killNews    = {}    -- jüngste Events {type=, n=}, max MAX_NEWS
+local MAX_NEWS    = 12
+local diagDone    = false  -- einmaliges Diagnose-Log
+
 local function isValid(o)
     return o and pcall(function() return o:IsValid() end) and o:IsValid()
 end
@@ -488,6 +495,104 @@ local function readAttack(char)
     return name
 end
 
+-- ── Ingame-Uhr ──────────────────────────────────────────────────────────────
+-- GameTimeSubsystem:GetCurrentClockTime() (parameterlos) → ClockTime,
+-- ClockTimeLibrary:GetHour/GetMinute(ClockTime) → int. Subsystem als Live-Instanz
+-- via FindFirstOf (NICHT Default__/CDO — das hätte keinen State).
+local TIMESUBSYS, CLOCKLIB = nil, nil
+local function getTimeSubsys()
+    if not isValid(TIMESUBSYS) then
+        pcall(function() TIMESUBSYS = FindFirstOf("GameTimeSubsystem") end)
+    end
+    return TIMESUBSYS
+end
+local function getClockLib()
+    if not CLOCKLIB then
+        pcall(function() CLOCKLIB = StaticFindObject("/Script/G1R.Default__ClockTimeLibrary") end)
+    end
+    return CLOCKLIB
+end
+
+local function readClock()
+    local ts = getTimeSubsys()
+    if not isValid(ts) then return nil end
+    local ct = nil
+    pcall(function() ct = ts:GetCurrentClockTime() end)
+    if ct == nil then return nil end
+    local lib = getClockLib()
+    if not (lib and isValid(lib)) then return nil end
+    local hour, minute
+    pcall(function() hour = lib:GetHour(ct) end)
+    pcall(function() minute = lib:GetMinute(ct) end)
+    if type(hour) ~= "number" then return nil end
+    return { hour = hour, minute = (type(minute) == "number" and minute) or 0 }
+end
+
+-- ── Kill-Counter (Map Kreatur→Anzahl) + News-Ticker ─────────────────────────
+-- PuzzlesSubsystem:GetCreatureKillCounterMap() → TMap<Name,Int>. Live-Instanz via
+-- FindFirstOf. Map pro Tick lesen; Session = jetzt − Snapshot; Anstieg = News-Event.
+local PUZZLES = nil
+local function getPuzzles()
+    if not isValid(PUZZLES) then
+        pcall(function() PUZZLES = FindFirstOf("PuzzlesSubsystem") end)
+    end
+    return PUZZLES
+end
+
+-- Liest die rohe Kill-Map als Lua-Tabelle {nameString = count} oder nil.
+local function readKillMap()
+    local subsys = getPuzzles()
+    if not isValid(subsys) then return nil end
+    local map = nil
+    pcall(function() map = subsys:GetCreatureKillCounterMap() end)
+    if map == nil then return nil end
+    local out, any = {}, false
+    local ok = pcall(function()
+        map:ForEach(function(k, v)
+            local key = unwrap(k)
+            local val = unwrap(v)
+            if key ~= nil then
+                local ks
+                pcall(function() ks = key:ToString() end)
+                ks = ks or tostring(key)
+                if ks and ks ~= "" then out[ks] = tonumber(val) or 0; any = true end
+            end
+        end)
+    end)
+    if not ok then return nil end
+    if not any then return {} end
+    return out
+end
+
+-- Aktualisiert Session-Kills + News-Queue aus der aktuellen Map. Gibt die
+-- Session-Kill-Tabelle zurück (jetzt − Baseline), oder nil wenn Map nicht lesbar.
+local function updateKills()
+    local map = readKillMap()
+    if map == nil then return nil end
+    if killBase == nil then
+        -- Erster Read: Baseline setzen, noch keine News (Vergangenheit nicht zählen).
+        killBase = map
+        lastKillMap = map
+        return {}
+    end
+    -- News: Anstieg gegenüber dem letzten Tick.
+    for typ, cnt in pairs(map) do
+        local prev = (lastKillMap and lastKillMap[typ]) or 0
+        if cnt > prev then
+            killNews[#killNews + 1] = { type = typ, n = cnt - prev }
+            while #killNews > MAX_NEWS do table.remove(killNews, 1) end
+        end
+    end
+    lastKillMap = map
+    -- Session-Summe = jetzt − Baseline.
+    local out = {}
+    for typ, cnt in pairs(map) do
+        local base = killBase[typ] or 0
+        if cnt > base then out[typ] = cnt - base end
+    end
+    return out
+end
+
 -- ── JSON (minimal, nur für unsere Struktur) ─────────────────────────────────
 local function jsonEsc(s)
     return (tostring(s):gsub('[\\"%z\1-\31]', function(c)
@@ -495,7 +600,7 @@ local function jsonEsc(s)
     end):gsub('\\u0022', '\\"'):gsub('\\u005c', '\\\\'))
 end
 
-local function buildJson(pos, items, distCm, stats, guild, spell, weaponMelee, weaponRanged, attack)
+local function buildJson(pos, items, distCm, stats, guild, spell, weaponMelee, weaponRanged, attack, clock, kills, news)
     local parts = {}
     parts[#parts+1] = '"ok":true'
     if guild and guild ~= "" then
@@ -523,6 +628,27 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weaponMelee, w
     else
         parts[#parts+1] = '"attack":null'
     end
+    if clock and type(clock.hour) == "number" then
+        parts[#parts+1] = string.format('"clock":{"hour":%d,"minute":%d}', clock.hour, clock.minute or 0)
+    else
+        parts[#parts+1] = '"clock":null'
+    end
+    -- Session-Kills als Objekt {typ:anzahl}
+    if kills then
+        local kp = {}
+        for typ, n in pairs(kills) do
+            kp[#kp+1] = string.format('"%s":%d', jsonEsc(typ), n)
+        end
+        parts[#parts+1] = '"kills":{' .. table.concat(kp, ",") .. '}'
+    else
+        parts[#parts+1] = '"kills":null'
+    end
+    -- News-Ticker als Array [{type,n},...]
+    local np = {}
+    for _, ev in ipairs(news or {}) do
+        np[#np+1] = string.format('{"type":"%s","n":%d}', jsonEsc(ev.type), ev.n)
+    end
+    parts[#parts+1] = '"killNews":[' .. table.concat(np, ",") .. ']'
     if pos then
         parts[#parts+1] = string.format('"pos":{"x":%.1f,"y":%.1f,"z":%.1f}', pos.x, pos.y, pos.z)
     else
@@ -624,7 +750,25 @@ local function tick()
     pcall(function() weaponMelee, weaponRanged = readWeapons(char) end)
     local attack
     pcall(function() attack = readAttack(char) end)
-    local json = buildJson(pos, items or {}, totalDistCm, stats or {}, guild, spell, weaponMelee, weaponRanged, attack)
+    local clock
+    pcall(function() clock = readClock() end)
+    local kills
+    pcall(function() kills = updateKills() end)
+    -- Einmaliges Diagnose-Log (Stufe 2): sehen, ob die Live-Subsysteme greifen.
+    if not diagDone then
+        diagDone = true
+        pcall(function()
+            local km = lastKillMap or {}
+            local keys = {}
+            for k in pairs(km) do keys[#keys+1] = k; if #keys >= 8 then break end end
+            print(string.format(
+                "[G1RExport] Diag Stufe2: GameTimeSubsystem=%s PuzzlesSubsystem=%s clock=%s killMapKeys=%s\n",
+                tostring(isValid(getTimeSubsys())), tostring(isValid(getPuzzles())),
+                tostring(clock ~= nil), table.concat(keys, ", ")))
+        end)
+    end
+    local json = buildJson(pos, items or {}, totalDistCm, stats or {}, guild, spell,
+                           weaponMelee, weaponRanged, attack, clock, kills, killNews)
     local f = io.open(OUTPUT_PATH, "w")
     if f then f:write(json); f:close() end
 end
