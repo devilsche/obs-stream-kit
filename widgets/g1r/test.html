@@ -98,16 +98,6 @@
     </div>
 
     <div>
-      <div class="label">Erledigt (Session)</div>
-      <div class="statgrid" id="kills"><span class="offline">—</span></div>
-    </div>
-
-    <div>
-      <div class="label">News</div>
-      <ul class="ticker" id="news"></ul>
-    </div>
-
-    <div>
       <div class="label">Stats</div>
       <div class="statgrid" id="stats"><span class="offline">—</span></div>
     </div>
@@ -131,8 +121,6 @@
     var attackEl = document.getElementById('attack');
     var sessionEl = document.getElementById('session');
     var clockEl = document.getElementById('clock');
-    var killsEl = document.getElementById('kills');
-    var newsEl = document.getElementById('news');
     var posEl = document.getElementById('pos');
     var distEl = document.getElementById('dist');
     var statsEl = document.getElementById('stats');
@@ -148,8 +136,6 @@
       attackEl.innerHTML = '<span class="offline">—</span>';
       sessionEl.innerHTML = '<span class="offline">—</span>';
       clockEl.textContent = '';
-      killsEl.innerHTML = '<span class="offline">—</span>';
-      newsEl.innerHTML = '';
       distEl.innerHTML = '<span class="offline">—</span>';
       statsEl.innerHTML = '<span class="offline">—</span>';
       itemsEl.innerHTML = '';
@@ -184,22 +170,6 @@
       add('Mana verbr.', s.manaSpent); add('Mana regen.', s.manaRegen);
       add('XP', s.xpGained); add('Schritte', s.steps);
       sessionEl.innerHTML = out.join('');
-    }
-
-    function renderKills(k) {
-      if (!k) { killsEl.innerHTML = '<span class="offline">—</span>'; return; }
-      var out = [];
-      Object.keys(k).forEach(function (typ) {
-        out.push('<span class="s">' + typ + '<b>' + k[typ] + '</b></span>');
-      });
-      killsEl.innerHTML = out.length ? out.join('') : '<span class="offline">noch keine</span>';
-    }
-
-    function renderNews(arr) {
-      if (!arr || !arr.length) { newsEl.innerHTML = ''; return; }
-      newsEl.innerHTML = arr.slice().reverse().slice(0, 6).map(function (ev) {
-        return '<li>' + (ev.text || (ev.n + '× ' + ev.type)) + '</li>';
-      }).join('');
     }
 
     function render(d) {
@@ -237,8 +207,6 @@
       } else {
         clockEl.textContent = '';
       }
-      renderKills(d.killsDisplay || d.kills);
-      renderNews(d.killNews);
       var items = d.items || [];
       itemCountEl.textContent = items.length;
       itemsEl.innerHTML = items.slice(0, 12).map(function (it) {

@@ -1,13 +1,26 @@
-# G1R Local Proxy — Prototyp (Items + Position)
+# G1R Local Proxy — Gothic-1-Remake Live-Daten ins OBS-Overlay
 
-Schlanker Test, um Gothic-1-Remake-Live-Daten (**Inventar + Welt-Position**) ins
-OBS-Overlay zu bringen. Läuft komplett lokal auf dem Spiel-PC. **Karte/Marker
-kommt später** — dieser Prototyp zeigt die Position nur als Rohzahlen (X/Y/Z in cm),
-was zugleich die Vorarbeit für die spätere Karten-Kalibrierung ist.
+Liest Live-Daten aus Gothic 1 Remake (via UE4SS-Lua-Mod) und bringt sie ins OBS-Overlay.
+Läuft komplett lokal auf dem Spiel-PC.
 
 ```
 [G1R + UE4SS-Mod] → schreibt g1r-state.json → [server.py @ localhost:9210] → [OBS-Widget]
 ```
+
+## Was das Widget zeigt (Stand 2026-06-17)
+**Stabil:** Position (X/Y/Z cm) · Laufstrecke + Schritte · Stats (Level/XP/STR/GES/HP/Mana/
+Resistenzen) · Session-Zähler (Schaden/HP-Regen/Mana-Verbrauch/-Regen/XP) · Gilde · Schlag
+(Schlagrichtung) · Ingame-Uhr · Inventar (deutsche Namen, 576-Item-Mapping) · Waffen + Zauber/
+Runen „dabei" (aus dem Inventar gefiltert).
+
+**Nicht möglich am aktuellen G1R-Build:** „aktiver Zauber" und „geführte Waffe" als Live-Wert —
+die Engine-Funktionen (`GetSpellConfigGivenACharacter`, `GetEquipedWeaponDefinition`) lösen einen
+harten C++-Crash aus (auch auf dem Game-Thread, nicht per `pcall` fangbar). Ebenso die exakte
+Hotbar-Belegung 0–9 (`QuickMemoryItems` = TMap<Enum,Struct>, crasht). Deshalb wird stattdessen
+crashfrei aus dem Inventar gefiltert, was der Spieler an Waffen/Zaubern dabei hat. Kill-Ticker:
+`PuzzlesSubsystem`-Map liefert keine Daten → aus (ein Death-Hook wäre der saubere Weg, später).
+
+**Karte/Marker:** kommt später (Position liegt als Rohzahlen vor = Vorarbeit für die Kalibrierung).
 
 ## Teile
 - `G1RExport/scripts/main.lua` — UE4SS-Lua-Mod (liest Inventar + Position, schreibt JSON)

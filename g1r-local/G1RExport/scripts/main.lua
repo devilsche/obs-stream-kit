@@ -36,24 +36,22 @@ local lastHp, lastMana, lastXp = nil, nil, nil
 -- Sprünge größer als das = Laden/Level-up/Respawn, nicht als Schaden/Regen zählen.
 local MAX_STAT_JUMP = 500
 
--- Stufe 2: Kill-Counter + News-Ticker + Ingame-Uhr (Live-Subsysteme).
--- VORSICHT: diese beiden machen Engine-Zugriffe, die HART crashen können (nicht
--- per pcall fangbar). Beide stehen daher auf false, bis in-game einzeln verifiziert.
--- Zum Testen GENAU EINEN auf true setzen, Spiel neu starten, schauen ob's crasht.
--- In-game verifiziert (2026-06-17): Waffen/Schlag/Uhr/Kills laufen sauber → an.
--- readSpell CRASHT hart (GetSpellConfigGivenACharacter, vermutl. interner null-deref
--- ohne aktiven Zauber) → aus, bis sicherer Weg gefunden.
+-- Optionale Reader (Stand 2026-06-17, in-game verifiziert).
+-- An: Schlag (Schlagrichtung) + Uhr laufen stabil.
+-- Aus: SPELL + WEAPONS crashen HART am G1R-Build (GetSpellConfigGivenACharacter /
+--   GetEquipedWeaponDefinition = C++-AccessViolation, auch auf dem Game-Thread, nicht
+--   per pcall fangbar). KILLS läuft zwar, aber die Map (PuzzlesSubsystem) liefert keine
+--   Daten → aus. Waffen/Zauber zeigt das Widget stattdessen crashfrei aus dem Inventar.
 local READ_SPELL   = false  -- CRASHT — MagicScriptLibrary:GetSpellConfigGivenACharacter
-local READ_WEAPONS = false  -- CRASHT — GetEquipedWeaponDefinition (null-deref?); CharacterState-Weg = Gilde-Konflikt
-local READ_ATTACK  = true   -- läuft — DataModuleLibrary:GetCombatDataModule:GetCurrentAttackDirection
-local READ_CLOCK   = true   -- läuft — GameTimeSubsystem:GetCurrentClockTime + ClockTimeLibrary:GetHour
-local READ_KILLS   = true   -- läuft (aber Map liefert noch keine Daten) — PuzzlesSubsystem:GetCreatureKillCounterMap
+local READ_WEAPONS = false  -- CRASHT — DataModule_Combat:GetEquipedWeaponDefinition
+local READ_ATTACK  = true   -- läuft — DataModule_Combat:GetCurrentAttackDirection
+local READ_CLOCK   = true   -- läuft — GameTimeSubsystem:GetCurrentClockTime
+local READ_KILLS   = false  -- Map liefert keine Daten (PuzzlesSubsystem) → aus
 local killBase    = nil   -- Map-Snapshot beim ersten Read (für Session-Summe)
 local lastKillMap = nil   -- letzte Map (für News-Delta)
 local killNews    = {}    -- jüngste Events {type=, n=}, max MAX_NEWS
 local MAX_NEWS    = 12
 local diagDone    = false  -- einmaliges Diagnose-Log
-local killDbg     = ""      -- temporäres Diagnose-Feld für die Kill-Map
 
 local function isValid(o)
     return o and pcall(function() return o:IsValid() end) and o:IsValid()
@@ -565,15 +563,14 @@ end
 -- Liest die rohe Kill-Map als Lua-Tabelle {nameString = count} oder nil.
 local function readKillMap()
     local subsys = getPuzzles()
-    if not isValid(subsys) then killDbg = "no-subsys"; return nil end
+    if not isValid(subsys) then return nil end
     local map = nil
     pcall(function() map = subsys:GetCreatureKillCounterMap() end)
-    if map == nil then killDbg = "map-nil"; return nil end
+    if map == nil then return nil end
     pcall(function() map = unwrap(map) end)  -- evtl. RemoteUnrealParam-Wrapper entpacken
-    local out, any, n = {}, false, 0
+    local out, any = {}, false
     local ok = pcall(function()
         map:ForEach(function(k, v)
-            n = n + 1
             local key = unwrap(k)
             local val = unwrap(v)
             if key ~= nil then
@@ -584,8 +581,7 @@ local function readKillMap()
             end
         end)
     end)
-    if not ok then killDbg = "foreach-err(n=" .. n .. ")"; return nil end
-    killDbg = "entries=" .. n
+    if not ok then return nil end
     if not any then return {} end
     return out
 end
@@ -670,8 +666,6 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack
         np[#np+1] = string.format('{"type":"%s","n":%d}', jsonEsc(ev.type), ev.n)
     end
     parts[#parts+1] = '"killNews":[' .. table.concat(np, ",") .. ']'
-    -- Temporäres Diagnose-Feld (Kills) — wird nach dem Fix wieder entfernt.
-    parts[#parts+1] = string.format('"dbg":"K[%s]"', jsonEsc(killDbg or ""))
     if pos then
         parts[#parts+1] = string.format('"pos":{"x":%.1f,"y":%.1f,"z":%.1f}', pos.x, pos.y, pos.z)
     else
