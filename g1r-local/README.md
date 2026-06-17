@@ -22,11 +22,26 @@ was zugleich die Vorarbeit für die spätere Karten-Kalibrierung ist.
 - Den Ordner (z.B. `C:\obs-g1r\`) vorher anlegen.
 
 ### 2. UE4SS-Mod installieren
-Voraussetzung: UE4SS (RE-UE4SS) für Gothic 1 Remake installiert (siehe nexusmods.com/gothic1remake).
-- Ordner `G1RExport` nach `<Gothic1Remake>/.../Binaries/Win64/ue4ss/Mods/` kopieren
-  (genauer Pfad je nach UE4SS-Version — dort liegen die anderen Mods).
-- In `Mods/mods.txt` eine Zeile ergänzen: `G1RExport : 1`
-- Spiel starten. In der UE4SS-Konsole sollte stehen: `[G1RExport] geladen — schreibt nach …`
+Voraussetzung: **UE4SS (RE-UE4SS) für Gothic 1 Remake** muss installiert sein
+(passende Version: nexusmods.com/gothic1remake/articles/6). UE4SS gehört in:
+```
+steamapps\common\Gothic 1 Remake\G1R\Binaries\Win64\
+```
+(NICHT ins Spiel-Root — sonst Crash / Mods werden ignoriert.) Dort liegt dann der Ordner `ue4ss\Mods\`.
+
+- Ordner **`G1RExport`** kopieren nach:
+  `…\Gothic 1 Remake\G1R\Binaries\Win64\ue4ss\Mods\G1RExport\`
+  (daneben liegen schon UE4SS-Standard-Mods wie `BPModLoaderMod`, `Keybinds`).
+- **Aktivierung:** Die mitgelieferte leere Datei `enabled.txt` im Ordner `G1RExport`
+  reicht — UE4SS lädt den Mod dann automatisch. (Alternativ in `Mods\mods.txt` die
+  Zeile `G1RExport : 1` ergänzen.)
+- Endstruktur:
+  ```
+  …\Win64\ue4ss\Mods\G1RExport\enabled.txt
+  …\Win64\ue4ss\Mods\G1RExport\scripts\main.lua
+  ```
+- Spiel starten. In der UE4SS-Konsole (Standard: Taste **`~`** / über `UE4SS-settings.ini`)
+  sollte stehen: `[G1RExport] geladen — schreibt nach …`
 
 ### 3. Lokalen Server starten
 ```
