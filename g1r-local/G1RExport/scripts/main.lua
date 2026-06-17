@@ -310,6 +310,41 @@ local function readStats(char)
     return out
 end
 
+-- ── Gilde lesen (GothicCharacterState:GetGuild → FGameplayTag) ──────────────
+-- Im Dump belegt: GothicCharacterState hat GetGuild(); Rückgabe ist ein
+-- GameplayTag (FGameplayTag). Wir lesen dessen TagName als String. Enum-Werte
+-- (EPlayerGuild): 0 None,1 Templars,2 Novices,3 MagesWater,4 Mercenaries,
+-- 5 Rogues,6 MagesFire,7 Guards,8 Shadows.
+local function getCharacterState(char)
+    local s = nil
+    pcall(function() s = char:BP_GetCharacterState() end)
+    if isValid(s) then return s end
+    pcall(function() s = char.m_CharacterState end)
+    if isValid(s) then return s end
+    return nil
+end
+
+local function readGuild(char)
+    local state = getCharacterState(char)
+    if not state then return nil end
+    local ok, tag = pcall(function() return state:GetGuild() end)
+    if not ok or tag == nil then return nil end
+    -- tag = FGameplayTag → .TagName (FName) → String. Mehrere Zugriffe defensiv.
+    local name = nil
+    pcall(function()
+        local tn = tag.TagName
+        if tn ~= nil then
+            local ok2, str = pcall(function() return tn:ToString() end)
+            name = (ok2 and str) or tostring(tn)
+        end
+    end)
+    if (not name) or name == "" then
+        -- Fallback: ganzes Tag als String
+        pcall(function() name = tostring(tag) end)
+    end
+    return name
+end
+
 -- ── JSON (minimal, nur für unsere Struktur) ─────────────────────────────────
 local function jsonEsc(s)
     return (tostring(s):gsub('[\\"%z\1-\31]', function(c)
@@ -317,9 +352,14 @@ local function jsonEsc(s)
     end):gsub('\\u0022', '\\"'):gsub('\\u005c', '\\\\'))
 end
 
-local function buildJson(pos, items, distCm, stats)
+local function buildJson(pos, items, distCm, stats, guild)
     local parts = {}
     parts[#parts+1] = '"ok":true'
+    if guild and guild ~= "" then
+        parts[#parts+1] = string.format('"guild":"%s"', jsonEsc(guild))
+    else
+        parts[#parts+1] = '"guild":null'
+    end
     if pos then
         parts[#parts+1] = string.format('"pos":{"x":%.1f,"y":%.1f,"z":%.1f}', pos.x, pos.y, pos.z)
     else
@@ -361,7 +401,9 @@ local function tick()
     pcall(function() items = readInventory(char) or {} end)
     local stats
     pcall(function() stats = readStats(char) or {} end)
-    local json = buildJson(pos, items or {}, totalDistCm, stats or {})
+    local guild
+    pcall(function() guild = readGuild(char) end)
+    local json = buildJson(pos, items or {}, totalDistCm, stats or {}, guild)
     local f = io.open(OUTPUT_PATH, "w")
     if f then f:write(json); f:close() end
 end

@@ -33,6 +33,7 @@
     .dot { width: 9px; height: 9px; border-radius: 50%; background: #777; flex: none; }
     .dot.live { background: #4be39a; box-shadow: 0 0 8px #4be39a; }
     .label { font-size: .7rem; color: var(--c-muted); text-transform: uppercase; letter-spacing: .1em; }
+    .guild { font-family: var(--theme-font-display, serif); font-size: 1.35rem; color: var(--c-accent); }
     .pos { display: flex; gap: 14px; font-family: var(--theme-font-mono, monospace); font-size: 1.1rem; }
     .pos b { color: var(--c-accent); font-variant-numeric: tabular-nums; }
     .pos .axis { color: var(--c-muted); margin-right: 4px; }
@@ -53,6 +54,11 @@
     <div class="head">
       <span class="title">Gothic 1 — Live</span>
       <span class="dot" id="dot" title="Verbindung"></span>
+    </div>
+
+    <div>
+      <div class="label">Gilde</div>
+      <div class="guild" id="guild"><span class="offline">—</span></div>
     </div>
 
     <div>
@@ -83,6 +89,7 @@
     var INTERVAL = 400;
 
     var dot = document.getElementById('dot');
+    var guildEl = document.getElementById('guild');
     var posEl = document.getElementById('pos');
     var distEl = document.getElementById('dist');
     var statsEl = document.getElementById('stats');
@@ -92,6 +99,7 @@
     function setOffline(msg) {
       dot.classList.remove('live');
       posEl.innerHTML = '<span class="offline">' + (msg || '— warte auf G1R —') + '</span>';
+      guildEl.innerHTML = '<span class="offline">—</span>';
       distEl.innerHTML = '<span class="offline">—</span>';
       statsEl.innerHTML = '<span class="offline">—</span>';
       itemsEl.innerHTML = '';
@@ -118,6 +126,7 @@
 
     function render(d) {
       dot.classList.add('live');
+      guildEl.textContent = d.guild || 'Keine Gilde';
       if (d.pos) {
         posEl.innerHTML =
           '<span><span class="axis">X</span><b>' + Math.round(d.pos.x) + '</b></span>' +

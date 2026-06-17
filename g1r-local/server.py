@@ -114,4 +114,10 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     print(f"[g1r-local] liest {STATE_FILE}")
     print(f"[g1r-local] serviert http://localhost:{PORT}/state  (Strg+C zum Beenden)")
-    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        print("\n[g1r-local] beendet.")
+    finally:
+        srv.server_close()
