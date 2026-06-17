@@ -43,13 +43,11 @@ local MAX_STAT_JUMP = 500
 -- In-game verifiziert (2026-06-17): Waffen/Schlag/Uhr/Kills laufen sauber → an.
 -- readSpell CRASHT hart (GetSpellConfigGivenACharacter, vermutl. interner null-deref
 -- ohne aktiven Zauber) → aus, bis sicherer Weg gefunden.
--- Seit dem Game-Thread-Umbau (ExecuteInGameThread) sollten alle wieder sicher sein.
--- Bei erneutem Crash GENAU EINEN auf false setzen, um den Verursacher zu isolieren.
-local READ_SPELL   = true   -- MagicScriptLibrary:GetSpellConfigGivenACharacter
-local READ_WEAPONS = true   -- DataModuleLibrary:GetCombatDataModule:GetEquipedWeaponDefinition
-local READ_ATTACK  = true   -- DataModuleLibrary:GetCombatDataModule:GetCurrentAttackDirection
-local READ_CLOCK   = true   -- GameTimeSubsystem:GetCurrentClockTime + ClockTimeLibrary:GetHour
-local READ_KILLS   = true   -- PuzzlesSubsystem:GetCreatureKillCounterMap (TMap:ForEach)
+local READ_SPELL   = false  -- CRASHT — MagicScriptLibrary:GetSpellConfigGivenACharacter
+local READ_WEAPONS = false  -- CRASHT — GetEquipedWeaponDefinition (null-deref?); CharacterState-Weg = Gilde-Konflikt
+local READ_ATTACK  = true   -- läuft — DataModuleLibrary:GetCombatDataModule:GetCurrentAttackDirection
+local READ_CLOCK   = true   -- läuft — GameTimeSubsystem:GetCurrentClockTime + ClockTimeLibrary:GetHour
+local READ_KILLS   = true   -- läuft (aber Map liefert noch keine Daten) — PuzzlesSubsystem:GetCreatureKillCounterMap
 local killBase    = nil   -- Map-Snapshot beim ersten Read (für Session-Summe)
 local lastKillMap = nil   -- letzte Map (für News-Delta)
 local killNews    = {}    -- jüngste Events {type=, n=}, max MAX_NEWS
@@ -59,15 +57,6 @@ local killDbg     = ""      -- temporäres Diagnose-Feld für die Kill-Map
 
 local function isValid(o)
     return o and pcall(function() return o:IsValid() end) and o:IsValid()
-end
-
--- Wie isValid, schließt aber CDO/Default-Objekte aus (Name enthält "Default__").
--- Wichtig für Subsysteme: FindFirstOf liefert sonst evtl. das leere CDO. (mods-g1r-Pattern)
-local function isLive(o)
-    if not isValid(o) then return false end
-    local ok, name = pcall(function() return o:GetFullName() end)
-    if ok and name and string.find(name, "Default__", 1, true) then return false end
-    return true
 end
 
 -- ── Player-Pawn cachen (Pattern aus mods-g1r main.lua + stats.lua) ──────────
@@ -533,25 +522,11 @@ end
 -- GameTimeSubsystem:GetCurrentClockTime() (parameterlos) → ClockTime,
 -- ClockTimeLibrary:GetHour/GetMinute(ClockTime) → int. Subsystem als Live-Instanz
 -- via FindFirstOf (NICHT Default__/CDO — das hätte keinen State).
--- Sucht die LIVE-Instanz einer Klasse (kein CDO). FindFirstOf zuerst; ist das ein CDO,
--- über FindAllOf die erste echte Instanz nehmen.
-local function findLiveInstance(className)
-    local inst = nil
-    pcall(function() inst = FindFirstOf(className) end)
-    if isLive(inst) then return inst end
-    local all = nil
-    pcall(function() all = FindAllOf(className) end)
-    if all then
-        for _, o in ipairs(all) do
-            if isLive(o) then return o end
-        end
-    end
-    return nil
-end
-
 local TIMESUBSYS, CLOCKLIB = nil, nil
 local function getTimeSubsys()
-    if not isLive(TIMESUBSYS) then TIMESUBSYS = findLiveInstance("GameTimeSubsystem") end
+    if not isValid(TIMESUBSYS) then
+        pcall(function() TIMESUBSYS = FindFirstOf("GameTimeSubsystem") end)
+    end
     return TIMESUBSYS
 end
 local function getClockLib()
@@ -581,7 +556,9 @@ end
 -- FindFirstOf. Map pro Tick lesen; Session = jetzt − Snapshot; Anstieg = News-Event.
 local PUZZLES = nil
 local function getPuzzles()
-    if not isLive(PUZZLES) then PUZZLES = findLiveInstance("PuzzlesSubsystem") end
+    if not isValid(PUZZLES) then
+        pcall(function() PUZZLES = FindFirstOf("PuzzlesSubsystem") end)
+    end
     return PUZZLES
 end
 
@@ -821,16 +798,13 @@ local function tick()
     if f then f:write(json); f:close() end
 end
 
--- UE4SS-Loop: alle POLL_INTERVAL_MS einmal. WICHTIG: LoopAsync läuft auf einem EIGENEN
--- Thread, UE4SS-Reflection ist aber NICHT thread-safe → alle Engine-Zugriffe (der ganze
--- tick) müssen auf dem Game-Thread laufen. ExecuteInGameThread schiebt sie dorthin.
--- (Belegt durch mods-g1r/inventory.lua RunOnGameThread — behebt die harten Crashes.)
+-- UE4SS-Loop: alle POLL_INTERVAL_MS einmal schreiben.
 LoopAsync(POLL_INTERVAL_MS, function()
-    ExecuteInGameThread(function()
-        -- Bei Fehler im tick (z.B. Objekt beim Shutdown abgeräumt) Caches leeren.
-        local ok = pcall(tick)
-        if not ok then CachedPlayer = nil; lastPos = nil; lastHp = nil; lastMana = nil; lastXp = nil end
-    end)
+    -- Bei einem Fehler im tick (z.B. Objekt beim Shutdown gerade abgeräumt) den
+    -- Player-Cache leeren, damit der nächste Durchlauf nicht erneut auf ein totes
+    -- Objekt zugreift.
+    local ok = pcall(tick)
+    if not ok then CachedPlayer = nil; lastPos = nil end
     return false  -- nie stoppen
 end)
 
