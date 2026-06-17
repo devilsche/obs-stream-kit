@@ -63,6 +63,16 @@ def _translate(cls_name, lang):
     return _prettify(cls_name)
 
 
+def _spell_display(tag):
+    """Aktiver-Zauber-Tag lesbar machen, z.B. 'SpellCategory.Fireball' -> 'Fireball'.
+    Echtes DE-Mapping folgt, sobald die realen Tag-Werte aus dem Spiel bekannt sind."""
+    if not tag:
+        return None
+    last = str(tag).split(".")[-1].replace("_", " ")
+    last = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", last)  # CamelCase trennen
+    return last.strip() or str(tag)
+
+
 class Handler(BaseHTTPRequestHandler):
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", ALLOW_ORIGIN)
@@ -98,6 +108,8 @@ class Handler(BaseHTTPRequestHandler):
                     # Container-Fallback (technischer Klassenname) uebersetzen.
                     if not it.get("display"):
                         it["display"] = _translate(it.get("name"), lang)
+                if data.get("spell"):
+                    data["spellDisplay"] = _spell_display(data.get("spell"))
                 data["lang"] = lang
                 payload = data
             else:

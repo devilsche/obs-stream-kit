@@ -62,6 +62,11 @@
     </div>
 
     <div>
+      <div class="label">Aktiver Zauber</div>
+      <div class="guild" id="spell"><span class="offline">—</span></div>
+    </div>
+
+    <div>
       <div class="label">Position (cm)</div>
       <div class="pos" id="pos"><span class="offline">— warte auf G1R —</span></div>
     </div>
@@ -90,6 +95,7 @@
 
     var dot = document.getElementById('dot');
     var guildEl = document.getElementById('guild');
+    var spellEl = document.getElementById('spell');
     var posEl = document.getElementById('pos');
     var distEl = document.getElementById('dist');
     var statsEl = document.getElementById('stats');
@@ -100,6 +106,7 @@
       dot.classList.remove('live');
       posEl.innerHTML = '<span class="offline">' + (msg || '— warte auf G1R —') + '</span>';
       guildEl.innerHTML = '<span class="offline">—</span>';
+      spellEl.innerHTML = '<span class="offline">—</span>';
       distEl.innerHTML = '<span class="offline">—</span>';
       statsEl.innerHTML = '<span class="offline">—</span>';
       itemsEl.innerHTML = '';
@@ -127,6 +134,7 @@
     function render(d) {
       dot.classList.add('live');
       guildEl.textContent = d.guild || 'Keine Gilde';
+      spellEl.textContent = d.spellDisplay || d.spell || 'Kein Zauber';
       if (d.pos) {
         posEl.innerHTML =
           '<span><span class="axis">X</span><b>' + Math.round(d.pos.x) + '</b></span>' +

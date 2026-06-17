@@ -397,6 +397,41 @@ local function readGuild(char)
     return name
 end
 
+-- ── Aktiver Zauber lesen ────────────────────────────────────────────────────
+-- MagicScriptLibrary:GetSpellConfigGivenACharacter(char) → SpellConfig, dann
+-- SpellConfig:GetSpellCategoryTag() → FGameplayTag → .TagName (roh, z.B.
+-- "SpellCategory.Fireball"). Kein Zauber gewählt → nil. server.py mappt den Tag.
+-- Selbes Tag-Pattern wie readGuild. Library als Singleton via StaticFindObject.
+local MAGICLIB = nil
+local function getMagicLib()
+    if not MAGICLIB then
+        pcall(function() MAGICLIB = StaticFindObject("/Script/G1R.Default__MagicScriptLibrary") end)
+    end
+    return MAGICLIB
+end
+
+local function readSpell(char)
+    local lib = getMagicLib()
+    if not (lib and isValid(lib)) then return nil end
+    local ok, cfg = pcall(function() return lib:GetSpellConfigGivenACharacter(char) end)
+    if not (ok and isValid(cfg)) then return nil end
+    local ok2, tag = pcall(function() return cfg:GetSpellCategoryTag() end)
+    if not ok2 or tag == nil then return nil end
+    local name = nil
+    pcall(function()
+        local tn = tag.TagName
+        if tn ~= nil then
+            local ok3, str = pcall(function() return tn:ToString() end)
+            name = (ok3 and str) or tostring(tn)
+        end
+    end)
+    if (not name) or name == "" then
+        pcall(function() name = tostring(tag) end)
+    end
+    if (not name) or name == "" or name == "None" then return nil end
+    return name
+end
+
 -- ── JSON (minimal, nur für unsere Struktur) ─────────────────────────────────
 local function jsonEsc(s)
     return (tostring(s):gsub('[\\"%z\1-\31]', function(c)
@@ -404,13 +439,18 @@ local function jsonEsc(s)
     end):gsub('\\u0022', '\\"'):gsub('\\u005c', '\\\\'))
 end
 
-local function buildJson(pos, items, distCm, stats, guild)
+local function buildJson(pos, items, distCm, stats, guild, spell)
     local parts = {}
     parts[#parts+1] = '"ok":true'
     if guild and guild ~= "" then
         parts[#parts+1] = string.format('"guild":"%s"', jsonEsc(guild))
     else
         parts[#parts+1] = '"guild":null'
+    end
+    if spell and spell ~= "" then
+        parts[#parts+1] = string.format('"spell":"%s"', jsonEsc(spell))
+    else
+        parts[#parts+1] = '"spell":null'
     end
     if pos then
         parts[#parts+1] = string.format('"pos":{"x":%.1f,"y":%.1f,"z":%.1f}', pos.x, pos.y, pos.z)
@@ -473,7 +513,9 @@ local function tick()
     pcall(function() stats = readStats(char) or {} end)
     local guild
     pcall(function() guild = readGuild(char) end)
-    local json = buildJson(pos, items or {}, totalDistCm, stats or {}, guild)
+    local spell
+    pcall(function() spell = readSpell(char) end)
+    local json = buildJson(pos, items or {}, totalDistCm, stats or {}, guild, spell)
     local f = io.open(OUTPUT_PATH, "w")
     if f then f:write(json); f:close() end
 end
