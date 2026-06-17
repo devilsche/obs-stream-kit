@@ -135,7 +135,7 @@
       var items = d.items || [];
       itemCountEl.textContent = items.length;
       itemsEl.innerHTML = items.slice(0, 12).map(function (it) {
-        return '<li><span class="n">' + it.name + '</span><span class="c">×' + it.count + '</span></li>';
+        return '<li><span class="n">' + (it.display || it.name) + '</span><span class="c">×' + it.count + '</span></li>';
       }).join('');
     }
 

@@ -1,0 +1,5 @@
+{
+  "_comment": "Klassenname -> {de, en}. Die Klassennamen stehen in /state unter items[].name (z.B. 'ItemGold'). Fehlt ein Eintrag, baut server.py einen lesbaren Fallback (ItemSword_Rusty -> 'Sword Rusty'). Hier echte Namen ergaenzen und server.py neu starten. Quelle fuer Klarnamen z.B. gothic-remake.wiki / gamerguides.",
+  "ItemGold": { "de": "Gold", "en": "Gold" },
+  "ItemApple": { "de": "Apfel", "en": "Apple" }
+}

@@ -372,4 +372,19 @@ LoopAsync(POLL_INTERVAL_MS, function()
     return false  -- nie stoppen
 end)
 
-print("[G1RExport] geladen — schreibt nach " .. OUTPUT_PATH .. "\n")
+-- ── Dump-Hotkey: Strg+Shift+J → kompletter Object-Dump für Reverse Engineering ──
+-- Schreibt UE4SS_ObjectDump.txt (im selben Ordner wie UE4SS.log). Damit lässt sich
+-- z.B. nach Faction/Guild/Camp/Reputation am GothicPlayerCharacter suchen.
+pcall(function()
+    RegisterKeyBind(Key.J, { ModifierKey.CONTROL, ModifierKey.SHIFT }, function()
+        print("[G1RExport] Object-Dump gestartet (Strg+Shift+J) — kann ein paar Sekunden dauern, Spiel stockt kurz ...\n")
+        local ok, err = pcall(function() DumpAllObjects() end)
+        if ok then
+            print("[G1RExport] Object-Dump FERTIG → UE4SS_ObjectDump.txt (im selben Ordner wie UE4SS.log)\n")
+        else
+            print("[G1RExport] Object-Dump FEHLER: " .. tostring(err) .. "\n")
+        end
+    end)
+end)
+
+print("[G1RExport] geladen — schreibt nach " .. OUTPUT_PATH .. " · Dump-Hotkey: Strg+Shift+J\n")

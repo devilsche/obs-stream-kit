@@ -13,7 +13,9 @@ Läuft komplett lokal — es verlässt nichts den PC.
 """
 import json
 import os
+import re
 import time
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 # ── Konfiguration ──────────────────────────────────────────────────────────
@@ -24,6 +26,37 @@ STATE_FILE = os.environ.get("G1R_STATE_FILE", r"C:\obs-g1r\g1r-state.json")
 STALE_AFTER_S = 10
 # Welche Origin darf zugreifen? "*" ist am einfachsten (rein lokal, kein Risiko).
 ALLOW_ORIGIN = "*"
+# Item-Namen-Übersetzung: Klassenname → {de, en}. Externes File, erweiterbar
+# ohne server.py anzufassen. Sprache pro Request via ?lang=de|en (Default de).
+ITEM_NAMES_FILE = os.environ.get(
+    "G1R_ITEM_NAMES", os.path.join(os.path.dirname(os.path.abspath(__file__)), "item_names.json"))
+DEFAULT_LANG = "de"
+
+
+def _load_item_names():
+    try:
+        with open(ITEM_NAMES_FILE, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return {}
+
+
+ITEM_NAMES = _load_item_names()
+
+
+def _prettify(cls_name):
+    """Fallback ohne Mapping: 'ItemSword_Rusty' → 'Sword Rusty'."""
+    s = re.sub(r"^Item_?", "", cls_name or "")
+    s = s.replace("_", " ")
+    s = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", s)  # CamelCase trennen
+    return s.strip() or (cls_name or "Item")
+
+
+def _translate(cls_name, lang):
+    entry = ITEM_NAMES.get(cls_name)
+    if entry:
+        return entry.get(lang) or entry.get(DEFAULT_LANG) or entry.get("en") or _prettify(cls_name)
+    return _prettify(cls_name)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -46,6 +79,8 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        lang = (qs.get("lang") or [DEFAULT_LANG])[0]
         payload = {"ok": False, "reason": "no-data"}
         try:
             age = time.time() - os.path.getmtime(STATE_FILE)
@@ -53,6 +88,9 @@ class Handler(BaseHTTPRequestHandler):
                 with open(STATE_FILE, "r", encoding="utf-8") as fh:
                     data = json.load(fh)
                 data["ageSec"] = round(age, 1)
+                for it in (data.get("items") or []):
+                    it["display"] = _translate(it.get("name"), lang)
+                data["lang"] = lang
                 payload = data
             else:
                 payload = {"ok": False, "reason": "stale", "ageSec": round(age, 1)}
