@@ -53,6 +53,7 @@ local lastKillMap = nil   -- letzte Map (für News-Delta)
 local killNews    = {}    -- jüngste Events {type=, n=}, max MAX_NEWS
 local MAX_NEWS    = 12
 local diagDone    = false  -- einmaliges Diagnose-Log
+local killDbg     = ""      -- temporäres Diagnose-Feld für die Kill-Map
 
 local function isValid(o)
     return o and pcall(function() return o:IsValid() end) and o:IsValid()
@@ -472,33 +473,40 @@ local function defName(def)
     return n
 end
 
--- Erste Waffe aus einem TSet (GetAll*Weapons). ForEach wie bei der Kill-Map (TMap),
--- Elemente per unwrap entpacken. Defensiv: bei Fehler nil.
+-- Erste Waffe aus einem TSet (GetAll*Weapons) + Anzahl Elemente (Diagnose).
 local function firstWeaponFromSet(set)
-    if not isValid(set) then return nil end
-    local found = nil
+    if not isValid(set) then return nil, -1 end   -- -1 = Set ungültig
+    local found, n = nil, 0
     pcall(function()
         set:ForEach(function(el)
-            if found == nil then
-                local w = unwrap(el)
-                found = defName(w)
-            end
+            n = n + 1
+            if found == nil then found = defName(unwrap(el)) end
         end)
     end)
-    return found
+    return found, n
 end
 
+-- Temporäres Diagnose-Feld (zeigt im /state, warum Waffen evtl. nil sind).
+local weaponDbg = ""
 local function readWeapons(char)
+    weaponDbg = ""
     local inv = nil
     pcall(function() inv = char:GetInventory() end)
-    if not isValid(inv) then return nil, nil end
+    if not isValid(inv) then weaponDbg = "no-inv"; return nil, nil end
+    local invName = "?"
+    pcall(function() invName = inv:GetClass():GetFName():ToString() end)
+    local fem, fer
+    pcall(function() fem = inv:GetFirstEquippedMeleeWeapon() end)
+    pcall(function() fer = inv:GetFirstEquippedRangedWeapon() end)
     local melee, ranged
-    -- Bevorzugt die GEZÜCKTE Waffe (GetFirstEquipped); ist keine in der Hand,
-    -- die erste AUSGERÜSTETE aus dem Set (deckt z.B. die Armbrust im Slot ab).
-    pcall(function() melee = defName(inv:GetFirstEquippedMeleeWeapon()) end)
-    if not melee then pcall(function() melee = firstWeaponFromSet(inv:GetAllMeleeWeapons()) end) end
-    pcall(function() ranged = defName(inv:GetFirstEquippedRangedWeapon()) end)
-    if not ranged then pcall(function() ranged = firstWeaponFromSet(inv:GetAllRangedWeapons()) end) end
+    pcall(function() melee = defName(fem) end)
+    local mSet, rSet, mN, rN = nil, nil, "?", "?"
+    if not melee then pcall(function() mSet, mN = firstWeaponFromSet(inv:GetAllMeleeWeapons()); melee = mSet end) end
+    pcall(function() ranged = defName(fer) end)
+    if not ranged then pcall(function() rSet, rN = firstWeaponFromSet(inv:GetAllRangedWeapons()); ranged = rSet end) end
+    weaponDbg = string.format("inv=%s fem=%s fer=%s setM=%s setR=%s melee=%s ranged=%s",
+        invName, tostring(isValid(fem)), tostring(isValid(fer)),
+        tostring(mN), tostring(rN), tostring(melee), tostring(ranged))
     return melee, ranged
 end
 
@@ -573,13 +581,14 @@ end
 -- Liest die rohe Kill-Map als Lua-Tabelle {nameString = count} oder nil.
 local function readKillMap()
     local subsys = getPuzzles()
-    if not isValid(subsys) then return nil end
+    if not isValid(subsys) then killDbg = "no-subsys"; return nil end
     local map = nil
     pcall(function() map = subsys:GetCreatureKillCounterMap() end)
-    if map == nil then return nil end
-    local out, any = {}, false
+    if map == nil then killDbg = "map-nil"; return nil end
+    local out, any, n = {}, false, 0
     local ok = pcall(function()
         map:ForEach(function(k, v)
+            n = n + 1
             local key = unwrap(k)
             local val = unwrap(v)
             if key ~= nil then
@@ -590,7 +599,8 @@ local function readKillMap()
             end
         end)
     end)
-    if not ok then return nil end
+    if not ok then killDbg = "foreach-err(n=" .. n .. ")"; return nil end
+    killDbg = "entries=" .. n
     if not any then return {} end
     return out
 end
@@ -680,6 +690,8 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weaponMelee, w
         np[#np+1] = string.format('{"type":"%s","n":%d}', jsonEsc(ev.type), ev.n)
     end
     parts[#parts+1] = '"killNews":[' .. table.concat(np, ",") .. ']'
+    -- Temporäres Diagnose-Feld (Waffen + Kills) — wird nach dem Fix wieder entfernt.
+    parts[#parts+1] = string.format('"dbg":"W[%s] K[%s]"', jsonEsc(weaponDbg or ""), jsonEsc(killDbg or ""))
     if pos then
         parts[#parts+1] = string.format('"pos":{"x":%.1f,"y":%.1f,"z":%.1f}', pos.x, pos.y, pos.z)
     else
