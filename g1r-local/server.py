@@ -100,6 +100,31 @@ def _spell_display(tag, lang):
     return last.strip() or str(tag)
 
 
+# Schlagrichtung: Tag-Suffix (z.B. "AttackDirection.Left") -> DE/EN.
+_ATTACK_DIR = {
+    "left":    {"de": "Schlag links",  "en": "Strike left"},
+    "right":   {"de": "Schlag rechts", "en": "Strike right"},
+    "forward": {"de": "Stich",         "en": "Thrust"},
+    "front":   {"de": "Stich",         "en": "Thrust"},
+    "top":     {"de": "Schlag oben",   "en": "Strike top"},
+    "up":      {"de": "Schlag oben",   "en": "Strike top"},
+    "down":    {"de": "Schlag unten",  "en": "Strike down"},
+    "back":    {"de": "Rückhand",      "en": "Backhand"},
+}
+
+
+def _attack_display(tag, lang):
+    """Schlagrichtungs-Tag -> Klarname, z.B. 'AttackDirection.Left' -> 'Schlag links'."""
+    if not tag:
+        return None
+    suffix = str(tag).split(".")[-1]
+    entry = _ATTACK_DIR.get(_norm_spell(suffix))
+    if entry:
+        return entry.get(lang) or entry.get(DEFAULT_LANG) or entry.get("en")
+    last = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", suffix.replace("_", " "))
+    return last.strip() or str(tag)
+
+
 class Handler(BaseHTTPRequestHandler):
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", ALLOW_ORIGIN)
@@ -142,6 +167,8 @@ class Handler(BaseHTTPRequestHandler):
                     data["weaponMeleeDisplay"] = _translate(data["weaponMelee"], lang)
                 if data.get("weaponRanged"):
                     data["weaponRangedDisplay"] = _translate(data["weaponRanged"], lang)
+                if data.get("attack"):
+                    data["attackDisplay"] = _attack_display(data.get("attack"), lang)
                 data["lang"] = lang
                 payload = data
             else:

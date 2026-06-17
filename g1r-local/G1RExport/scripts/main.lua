@@ -458,6 +458,30 @@ local function readWeapons(char)
     return melee, ranged
 end
 
+-- ── Laufender Schlag (Schlagrichtung) ───────────────────────────────────────
+-- DataModuleLibrary:GetCombatDataModule(char) → DataModule_Combat, dann
+-- GetCurrentAttackDirection() → FGameplayTag → .TagName (z.B. "AttackDirection.Left").
+-- Nur während eines Angriffs gesetzt, sonst nil (flackert bei ~250ms-Poll). Selbes
+-- Tag-Pattern wie readGuild/readSpell; Library = DataModuleLibrary (schon via getLib()).
+local function readAttack(char)
+    local lib = getLib()
+    if not (lib and isValid(lib)) then return nil end
+    local ok, combat = pcall(function() return lib:GetCombatDataModule(char) end)
+    if not (ok and isValid(combat)) then return nil end
+    local ok2, tag = pcall(function() return combat:GetCurrentAttackDirection() end)
+    if not ok2 or tag == nil then return nil end
+    local name = nil
+    pcall(function()
+        local tn = tag.TagName
+        if tn ~= nil then
+            local ok3, str = pcall(function() return tn:ToString() end)
+            name = (ok3 and str) or tostring(tn)
+        end
+    end)
+    if (not name) or name == "" or name == "None" then return nil end
+    return name
+end
+
 -- ── JSON (minimal, nur für unsere Struktur) ─────────────────────────────────
 local function jsonEsc(s)
     return (tostring(s):gsub('[\\"%z\1-\31]', function(c)
@@ -465,7 +489,7 @@ local function jsonEsc(s)
     end):gsub('\\u0022', '\\"'):gsub('\\u005c', '\\\\'))
 end
 
-local function buildJson(pos, items, distCm, stats, guild, spell, weaponMelee, weaponRanged)
+local function buildJson(pos, items, distCm, stats, guild, spell, weaponMelee, weaponRanged, attack)
     local parts = {}
     parts[#parts+1] = '"ok":true'
     if guild and guild ~= "" then
@@ -487,6 +511,11 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weaponMelee, w
         parts[#parts+1] = string.format('"weaponRanged":"%s"', jsonEsc(weaponRanged))
     else
         parts[#parts+1] = '"weaponRanged":null'
+    end
+    if attack and attack ~= "" then
+        parts[#parts+1] = string.format('"attack":"%s"', jsonEsc(attack))
+    else
+        parts[#parts+1] = '"attack":null'
     end
     if pos then
         parts[#parts+1] = string.format('"pos":{"x":%.1f,"y":%.1f,"z":%.1f}', pos.x, pos.y, pos.z)
@@ -553,7 +582,9 @@ local function tick()
     pcall(function() spell = readSpell(char) end)
     local weaponMelee, weaponRanged
     pcall(function() weaponMelee, weaponRanged = readWeapons(char) end)
-    local json = buildJson(pos, items or {}, totalDistCm, stats or {}, guild, spell, weaponMelee, weaponRanged)
+    local attack
+    pcall(function() attack = readAttack(char) end)
+    local json = buildJson(pos, items or {}, totalDistCm, stats or {}, guild, spell, weaponMelee, weaponRanged, attack)
     local f = io.open(OUTPUT_PATH, "w")
     if f then f:write(json); f:close() end
 end

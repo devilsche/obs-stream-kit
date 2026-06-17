@@ -67,6 +67,11 @@
     </div>
 
     <div>
+      <div class="label">Schlag</div>
+      <div class="guild" id="attack"><span class="offline">—</span></div>
+    </div>
+
+    <div>
       <div class="label">Aktiver Zauber</div>
       <div class="guild" id="spell"><span class="offline">—</span></div>
     </div>
@@ -102,6 +107,7 @@
     var guildEl = document.getElementById('guild');
     var spellEl = document.getElementById('spell');
     var weaponEl = document.getElementById('weapon');
+    var attackEl = document.getElementById('attack');
     var posEl = document.getElementById('pos');
     var distEl = document.getElementById('dist');
     var statsEl = document.getElementById('stats');
@@ -114,6 +120,7 @@
       guildEl.innerHTML = '<span class="offline">—</span>';
       spellEl.innerHTML = '<span class="offline">—</span>';
       weaponEl.innerHTML = '<span class="offline">—</span>';
+      attackEl.innerHTML = '<span class="offline">—</span>';
       distEl.innerHTML = '<span class="offline">—</span>';
       statsEl.innerHTML = '<span class="offline">—</span>';
       itemsEl.innerHTML = '';
@@ -145,6 +152,7 @@
       var melee = d.weaponMeleeDisplay || d.weaponMelee;
       var ranged = d.weaponRangedDisplay || d.weaponRanged;
       weaponEl.textContent = (melee || '–') + ' / ' + (ranged || '–');
+      attackEl.textContent = d.attackDisplay || d.attack || '—';
       if (d.pos) {
         posEl.innerHTML =
           '<span><span class="axis">X</span><b>' + Math.round(d.pos.x) + '</b></span>' +
