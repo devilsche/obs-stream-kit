@@ -58,7 +58,6 @@ WIDGET_PREVIEW_SIZES = {
     "steam/now-playing.html":       (520, 200),
     "steam/games-ticker.html":      (480,  90),
     # Follower & Goals
-    "welcome.html":                 (1920,1080),
     "latest-follower.html":         (500, 110),
     "latest-sub.html":              (500, 110),
     "latest-tip.html":              (500, 110),
@@ -72,11 +71,6 @@ _TIER_SW = {"key": "tier", "label": "Tier", "type": "select", "default": "1",
              "options": [["1", "Tier 1"], ["2", "Tier 2"], ["3", "Tier 3"]]}
 
 WIDGET_SWITCHES = {
-    "welcome.html": [
-        {"key": "name", "label": "Name", "type": "text", "default": "",
-         "placeholder": "e.g. NewViewer42",
-         "tooltip": "Viewer name — set by Streamer.bot before showing the source"},
-    ],
     "latest-follower.html": [
         {"key": "name", "label": "Username", "type": "text",
          "default": "", "placeholder": "e.g. CoolStreamer",
@@ -180,7 +174,6 @@ WIDGET_META = [
     # Achievement Browser ist ein Tool, kein OBS-Widget -> tools/achievement-browser.html, sichtbar unter /app/tools/
 
     # Persistente Stream-Info-Sidepanels (Dauer-Anzeige, kein Einmal-Alert).
-    ("Follower & Goals", "Welcome",         "Welcome overlay — shown when a viewer is greeted.",                   "welcome.html"),
     ("Follower & Goals", "Latest Follower", "Sidepanel: shows the latest follower (always visible).",              "latest-follower.html"),
     ("Follower & Goals", "Latest Sub",      "Sidepanel: shows the latest subscriber (always visible).",             "latest-sub.html"),
     ("Follower & Goals", "Latest Tip",      "Sidepanel: shows the latest tip/donation (always visible).",           "latest-tip.html"),

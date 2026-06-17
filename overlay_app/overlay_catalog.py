@@ -101,7 +101,13 @@ ALERTS = [
          {"key": "message",  "label": "Message",  "type": "text", "default": "", "placeholder": "Thanks for the stream!"},
         {"key": "duration", "label": "Duration (s)", "type": "number", "default": "6", "min": 1,
          "tooltip": "Seconds before the alert disappears"},
-    
+
+     ]},
+    {"key": "welcome", "label": "Welcome", "file": "welcome.html", "size": "1920×1080", "preview_size": (800, 500),
+     "desc": "Greeting overlay shown when a viewer is welcomed.", "params": [],
+     "switches": [
+         {"key": "name", "label": "Name", "type": "text", "default": "", "placeholder": "e.g. NewViewer42",
+          "tooltip": "Viewer name — set by Streamer.bot before showing the source"},
      ]},
 ]
 

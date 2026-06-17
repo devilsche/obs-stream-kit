@@ -50,8 +50,8 @@
     .widget-box {
       position: relative;
       background: linear-gradient(135deg,
-        rgba(18, 10, 32, 0.92) 0%,
-        rgba(38, 20, 56, 0.92) 100%
+        color-mix(in srgb, var(--c-bg) 92%, transparent) 0%,
+        color-mix(in srgb, var(--c-surface) 92%, transparent) 100%
       );
       border: 1px solid color-mix(in srgb,var(--c-primary) 35%,transparent);
       border-radius: 12px;
@@ -78,7 +78,7 @@
     .name {
       font-size: 44px;
       font-weight: 900;
-      color: #ffffff;
+      color: var(--c-text);
       line-height: 1;
       max-width: 520px;
       white-space: nowrap;
@@ -101,7 +101,7 @@
       font-size: 11px;
       font-weight: 700;
       letter-spacing: 1px;
-      color: #ffffff;
+      color: var(--c-text);
       padding: 4px 10px;
       border: 1px solid var(--c-accent2);
       border-radius: 4px;
@@ -127,14 +127,18 @@
     }
     .burst-particle.circle { border-radius: 50%; }
     .burst-particle.rect   { border-radius: 2px; }
+
+    .fx-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+    .fx-layer.sparkle { z-index: 4; }
+    .fx-layer.burst   { z-index: 1; }
   </style>
-  <link rel="stylesheet" href="_theme.css">
+  <link rel="stylesheet" href="../widgets/_theme.css">
 </head>
 <body>
 
-  <div id="sparkle-container" style="position:absolute;inset:0;z-index:4;overflow:hidden;pointer-events:none;"></div>
+  <div id="sparkle-container" class="fx-layer sparkle"></div>
 
-  <div id="burst-container" style="position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none;"></div>
+  <div id="burst-container" class="fx-layer burst"></div>
 
   <div class="content">
     <div class="widget-box">

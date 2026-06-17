@@ -152,7 +152,7 @@ Die Browser-Source muss ca. **100px breiter** und **100px höher** als die Cam-G
 
 | | |
 |-|-|
-| **Datei** | `widgets/welcome.html` |
+| **Datei** | `alerts/welcome.html` |
 | **Beschreibung** | Fullscreen-Alert für Erstbesucher im Chat — Name-Box mittig, Sparkles über den gesamten Canvas, Pop-Burst beim Einblenden |
 | **Interner Canvas** | 1920×1080 |
 | **OBS Browser-Source** | 1920×1080 (Fullscreen) |
@@ -170,7 +170,7 @@ Die Browser-Source muss ca. **100px breiter** und **100px höher** als die Cam-G
 4. Per Streamer.bot bei First-Chat-Event die URL setzen (`?name=%user%`) und die Source einblenden
 5. Nach X Sekunden Source wieder ausblenden (OBS übernimmt die Animation)
 
-**Beispiel:** `widgets/welcome.html?name=NeuerChatter`
+**Beispiel:** `alerts/welcome.html?name=NeuerChatter`
 
 ### Info-Widgets
 
