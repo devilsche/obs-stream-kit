@@ -78,7 +78,7 @@
     </div>
 
     <div>
-      <div class="label">Aktiver Zauber</div>
+      <div class="label">Zauber / Runen (dabei)</div>
       <div class="guild" id="spell"><span class="offline">—</span></div>
     </div>
 
@@ -205,7 +205,11 @@
     function render(d) {
       dot.classList.add('live');
       guildEl.textContent = d.guild || 'Keine Gilde';
-      spellEl.textContent = d.spellDisplay || d.spell || 'Kein Zauber';
+      // Zauber/Runen crashfrei aus dem Inventar (ItAr_ = Runen + Schriftrollen).
+      var spells = (d.items || []).filter(function (it) { return /^ItAr_/.test(it.name || ''); });
+      spellEl.textContent = spells.length
+        ? spells.map(function (it) { return it.display || it.name; }).join(', ')
+        : 'keine dabei';
       // Waffen crashfrei aus dem Inventar filtern (ItMw_=Nahkampf, ItRw_=Fernkampf).
       // Der direkte Engine-Weg (GetEquipedWeaponDefinition) crasht, die Items sind sicher.
       var weapons = (d.items || []).filter(function (it) { return /^It[MR]w_/.test(it.name || ''); });
