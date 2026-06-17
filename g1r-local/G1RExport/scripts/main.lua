@@ -472,13 +472,33 @@ local function defName(def)
     return n
 end
 
+-- Erste Waffe aus einem TSet (GetAll*Weapons). ForEach wie bei der Kill-Map (TMap),
+-- Elemente per unwrap entpacken. Defensiv: bei Fehler nil.
+local function firstWeaponFromSet(set)
+    if not isValid(set) then return nil end
+    local found = nil
+    pcall(function()
+        set:ForEach(function(el)
+            if found == nil then
+                local w = unwrap(el)
+                found = defName(w)
+            end
+        end)
+    end)
+    return found
+end
+
 local function readWeapons(char)
     local inv = nil
     pcall(function() inv = char:GetInventory() end)
     if not isValid(inv) then return nil, nil end
     local melee, ranged
+    -- Bevorzugt die GEZÜCKTE Waffe (GetFirstEquipped); ist keine in der Hand,
+    -- die erste AUSGERÜSTETE aus dem Set (deckt z.B. die Armbrust im Slot ab).
     pcall(function() melee = defName(inv:GetFirstEquippedMeleeWeapon()) end)
+    if not melee then pcall(function() melee = firstWeaponFromSet(inv:GetAllMeleeWeapons()) end) end
     pcall(function() ranged = defName(inv:GetFirstEquippedRangedWeapon()) end)
+    if not ranged then pcall(function() ranged = firstWeaponFromSet(inv:GetAllRangedWeapons()) end) end
     return melee, ranged
 end
 
