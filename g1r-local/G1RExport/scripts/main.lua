@@ -30,6 +30,12 @@ local lastPos      = nil    -- letzte Position für die Delta-Berechnung
 local MAX_STEP_CM  = 1000   -- Delta/Tick > 10 m → Teleport/Ladezone → ignorieren
 local STEP_LEN_M   = 0.75   -- grobe Schrittlänge für die Schritt-Schätzung
 
+-- Session-Zähler: aus HP/Mana/XP-Deltas aufsummiert (analog Strecke), ab Mod-Start.
+local sess = { damageTaken = 0, healthRegen = 0, manaSpent = 0, manaRegen = 0, xpGained = 0 }
+local lastHp, lastMana, lastXp = nil, nil, nil
+-- Sprünge größer als das = Laden/Level-up/Respawn, nicht als Schaden/Regen zählen.
+local MAX_STAT_JUMP = 500
+
 local function isValid(o)
     return o and pcall(function() return o:IsValid() end) and o:IsValid()
 end
@@ -523,7 +529,14 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weaponMelee, w
         parts[#parts+1] = '"pos":null'
     end
     local meters = (distCm or 0) / 100
-    parts[#parts+1] = string.format('"distanceM":%.1f,"steps":%d', meters, math.floor(meters / STEP_LEN_M))
+    local steps = math.floor(meters / STEP_LEN_M)
+    parts[#parts+1] = string.format('"distanceM":%.1f,"steps":%d', meters, steps)
+    -- Session-Zähler (ab Mod-Start): Schaden/Regen/Mana-Verbrauch/XP + Strecke/Schritte.
+    parts[#parts+1] = string.format(
+        '"session":{"damageTaken":%d,"healthRegen":%d,"manaSpent":%d,"manaRegen":%d,"xpGained":%d,"steps":%d,"distanceM":%.1f}',
+        math.floor(sess.damageTaken + 0.5), math.floor(sess.healthRegen + 0.5),
+        math.floor(sess.manaSpent + 0.5), math.floor(sess.manaRegen + 0.5),
+        math.floor(sess.xpGained + 0.5), steps, meters)
     -- Stats als Objekt {label:wert,...}
     local st = {}
     for k, v in pairs(stats or {}) do
@@ -559,7 +572,7 @@ local function tick()
         local w = char:GetWorld()
         worldOk = w ~= nil and w:IsValid()
     end)
-    if not worldOk then CachedPlayer = nil; lastPos = nil; return end
+    if not worldOk then CachedPlayer = nil; lastPos = nil; lastHp = nil; lastMana = nil; lastXp = nil; return end
     local pos, items
     pcall(function() pos = readPosition(char) end)
     -- Laufstrecke aufsummieren (horizontal; Teleports/Ladezonen über MAX_STEP_CM raus).
@@ -576,6 +589,33 @@ local function tick()
     pcall(function() items = readInventory(char) or {} end)
     local stats
     pcall(function() stats = readStats(char) or {} end)
+    -- Session-Zähler aus den Stat-Deltas: HP runter = Schaden, HP rauf = Regen;
+    -- Mana runter = Verbrauch, rauf = Regen; XP rauf = Zuwachs. Große Sprünge
+    -- (Laden/Level-up/Respawn) über MAX_STAT_JUMP ignorieren.
+    if stats then
+        local hp, mana, xp = stats.hp, stats.mana, stats.xp
+        if hp ~= nil and lastHp ~= nil then
+            local d = hp - lastHp
+            if math.abs(d) <= MAX_STAT_JUMP then
+                if d < 0 then sess.damageTaken = sess.damageTaken - d
+                elseif d > 0 then sess.healthRegen = sess.healthRegen + d end
+            end
+        end
+        if hp ~= nil then lastHp = hp end
+        if mana ~= nil and lastMana ~= nil then
+            local d = mana - lastMana
+            if math.abs(d) <= MAX_STAT_JUMP then
+                if d < 0 then sess.manaSpent = sess.manaSpent - d
+                elseif d > 0 then sess.manaRegen = sess.manaRegen + d end
+            end
+        end
+        if mana ~= nil then lastMana = mana end
+        if xp ~= nil and lastXp ~= nil then
+            local d = xp - lastXp
+            if d > 0 then sess.xpGained = sess.xpGained + d end  -- nur Zuwachs
+        end
+        if xp ~= nil then lastXp = xp end
+    end
     local guild
     pcall(function() guild = readGuild(char) end)
     local spell

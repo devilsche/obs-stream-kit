@@ -87,6 +87,11 @@
     </div>
 
     <div>
+      <div class="label">Diese Session</div>
+      <div class="statgrid" id="session"><span class="offline">—</span></div>
+    </div>
+
+    <div>
       <div class="label">Stats</div>
       <div class="statgrid" id="stats"><span class="offline">—</span></div>
     </div>
@@ -108,6 +113,7 @@
     var spellEl = document.getElementById('spell');
     var weaponEl = document.getElementById('weapon');
     var attackEl = document.getElementById('attack');
+    var sessionEl = document.getElementById('session');
     var posEl = document.getElementById('pos');
     var distEl = document.getElementById('dist');
     var statsEl = document.getElementById('stats');
@@ -121,6 +127,7 @@
       spellEl.innerHTML = '<span class="offline">—</span>';
       weaponEl.innerHTML = '<span class="offline">—</span>';
       attackEl.innerHTML = '<span class="offline">—</span>';
+      sessionEl.innerHTML = '<span class="offline">—</span>';
       distEl.innerHTML = '<span class="offline">—</span>';
       statsEl.innerHTML = '<span class="offline">—</span>';
       itemsEl.innerHTML = '';
@@ -145,6 +152,18 @@
       statsEl.innerHTML = out.length ? out.join('') : '<span class="offline">keine Stats</span>';
     }
 
+    function renderSession(s) {
+      if (!s) { sessionEl.innerHTML = '<span class="offline">—</span>'; return; }
+      var out = [];
+      function add(label, val) {
+        out.push('<span class="s">' + label + '<b>' + Math.round(val || 0) + '</b></span>');
+      }
+      add('Schaden', s.damageTaken); add('HP regen.', s.healthRegen);
+      add('Mana verbr.', s.manaSpent); add('Mana regen.', s.manaRegen);
+      add('XP', s.xpGained); add('Schritte', s.steps);
+      sessionEl.innerHTML = out.join('');
+    }
+
     function render(d) {
       dot.classList.add('live');
       guildEl.textContent = d.guild || 'Keine Gilde';
@@ -167,6 +186,7 @@
           '<span><span class="axis">~</span><b>' + (d.steps || 0) + '</b> Schritte</span>';
       }
       renderStats(d.stats);
+      renderSession(d.session);
       var items = d.items || [];
       itemCountEl.textContent = items.length;
       itemsEl.innerHTML = items.slice(0, 12).map(function (it) {
