@@ -86,6 +86,19 @@ local function shortName(fullName)
     return string.match(fullName, "%.([^%.]+)$") or fullName
 end
 
+-- Robuste TArray-Iteration: ForEach (UE4SS-nativ) bevorzugt, sonst Index-Loop.
+local function arrForEach(arr, fn)
+    if not arr then return end
+    local okFE = pcall(function() arr:ForEach(function(i, elemWrap)
+        local el = elemWrap; pcall(function() el = elemWrap:get() end)
+        fn(i, el)
+    end) end)
+    if okFE then return end
+    local n = 0; pcall(function() n = arr:GetArrayNum() end)
+    if n == 0 then pcall(function() n = #arr end) end
+    for i = 0, n - 1 do pcall(function() fn(i, arr[i]) end) end
+end
+
 local function readInventory(char)
     local items = {}
     local lib = getLib()
@@ -96,31 +109,43 @@ local function readInventory(char)
     end)
     if not (ok and isValid(container)) then return items end
 
-    -- Slots über die (build-abhängigen) Pfade suchen; defensiv mit pcall.
-    local slots = nil
+    -- VirtualData für den MainContainer finden (Pattern aus mods-g1r inventory.lua):
+    -- NICHT m_Values[INVENTORY_MAIN] (das ist der ENUM-Wert, kein Index!), sondern
+    -- a) prüfen ob m_Values direkt m_Slots trägt, sonst
+    -- b) in m_Keys den Index finden, wo key == INVENTORY_MAIN → m_Values[Index].
+    local vd = nil
     pcall(function()
-        local vd = container.m_Inventory.m_Values[INVENTORY_MAIN]
-        if vd then slots = vd.m_Slots end
+        local inv = container.m_Inventory
+        local values = inv.m_Values
+        local sok, s = pcall(function() return values.m_Slots end)
+        if sok and s then vd = values; return end
+        local keys = inv.m_Keys
+        arrForEach(keys, function(idx, key)
+            if vd then return end
+            local kv = key
+            if type(key) ~= "number" then pcall(function() kv = key.Value end) end
+            if kv == INVENTORY_MAIN then
+                pcall(function() vd = values[idx] end)
+            end
+        end)
     end)
-    if not slots then
-        pcall(function() slots = container:GetItemsIn(INVENTORY_MAIN).m_Slots end)
-    end
+    if not vd then return items end
+
+    local slots = nil
+    pcall(function() slots = vd.m_Slots end)
     if not slots then return items end
 
-    local count = 0
-    pcall(function() count = #slots end)
-    for i = 1, count do
+    arrForEach(slots, function(_, slot)
         pcall(function()
-            local slot = slots[i]
-            local sd   = slot.m_SlotData
-            local n    = sd.m_ItemCount or 0
+            local sd  = slot.m_SlotData
+            local n   = sd.m_ItemCount or 0
             if n and n > 0 then
                 local cls  = sd.m_ItemDefinition
                 local full = cls and select(2, pcall(function() return cls:GetFullName() end))
                 items[#items + 1] = { name = shortName(full), count = n }
             end
         end)
-    end
+    end)
     return items
 end
 
