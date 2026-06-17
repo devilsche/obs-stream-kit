@@ -466,10 +466,9 @@ local function readSpell(char)
     return name
 end
 
--- ── Ausgerüstete Waffe(n) lesen ─────────────────────────────────────────────
--- InventoryComponent:GetFirstEquippedMeleeWeapon → WeaponMeleeDefinition,
--- GetFirstEquippedRangedWeapon → WeaponRangedDefinition. GetFullName → shortName
--- → Klassenname (ItMw_*/ItRw_*), den server.py via item_names.json übersetzt.
+-- ── Ausgerüstete Waffe lesen ────────────────────────────────────────────────
+-- defName: WeaponDefinition/Item-Klasse → Klassenname (ItMw_*/ItRw_*), den server.py
+-- via item_names.json übersetzt. shortName strippt Default__/_C.
 local function defName(def)
     if not isValid(def) then return nil end
     local ok, full = pcall(function() return def:GetFullName() end)
@@ -479,54 +478,20 @@ local function defName(def)
     return n
 end
 
--- Erste Waffe aus einem TSet (GetAll*Weapons) + Anzahl Elemente (Diagnose).
-local function firstWeaponFromSet(set)
-    if set == nil then return nil, -1 end   -- TSet hat kein IsValid() → nur nil prüfen
-    local found, n = nil, 0
-    local ok = pcall(function()
-        set:ForEach(function(el)
-            n = n + 1
-            if found == nil then found = defName(unwrap(el)) end
-        end)
-    end)
-    if not ok then return found, -2 end   -- ForEach am TSet nicht möglich
-    return found, n
-end
-
--- Temporäres Diagnose-Feld (zeigt im /state, warum Waffen evtl. nil sind).
-local weaponDbg = ""
--- Das InventoryComponent kommt NICHT von char:GetInventory() (liefert für den Spieler
--- nil), sondern vom CharacterState (GothicCharacterState:InventoryComponent).
--- getCharacterState() läuft bereits zuverlässig (Gilden-Reader).
-local function getInventoryComp(char)
-    local state = getCharacterState(char)
-    local ic = nil
-    if state then pcall(function() ic = state.InventoryComponent end) end
-    if isValid(ic) then return ic end
-    pcall(function() ic = char:GetInventory() end)  -- Fallback
-    if isValid(ic) then return ic end
-    return nil
-end
-
-local function readWeapons(char)
-    weaponDbg = ""
-    local inv = getInventoryComp(char)
-    if not isValid(inv) then weaponDbg = "no-inv"; return nil, nil end
-    local invName = "?"
-    pcall(function() invName = inv:GetClass():GetFName():ToString() end)
-    local fem, fer
-    pcall(function() fem = inv:GetFirstEquippedMeleeWeapon() end)
-    pcall(function() fer = inv:GetFirstEquippedRangedWeapon() end)
-    local melee, ranged
-    pcall(function() melee = defName(fem) end)
-    local mSet, rSet, mN, rN = nil, nil, "?", "?"
-    if not melee then pcall(function() mSet, mN = firstWeaponFromSet(inv:GetAllMeleeWeapons()); melee = mSet end) end
-    pcall(function() ranged = defName(fer) end)
-    if not ranged then pcall(function() rSet, rN = firstWeaponFromSet(inv:GetAllRangedWeapons()); ranged = rSet end) end
-    weaponDbg = string.format("inv=%s fem=%s fer=%s setM=%s setR=%s melee=%s ranged=%s",
-        invName, tostring(isValid(fem)), tostring(isValid(fer)),
-        tostring(mN), tostring(rN), tostring(melee), tostring(ranged))
-    return melee, ranged
+-- Die aktuell geführte Waffe über das Combat-DataModule (GetEquipedWeaponDefinition).
+-- BEWUSST NICHT über CharacterState.InventoryComponent — das kollidiert mit dem
+-- Gilden-Reader (beide am selben State → "entweder Guild oder Weapon"). Das Combat-Modul
+-- läuft über DataModuleLibrary (wie readAttack) und ist konfliktfrei. Liefert die gerade
+-- geführte Waffe (Schwert ODER Armbrust, je nachdem was in der Hand ist).
+local function readWeapon(char)
+    local lib = getLib()
+    if not (lib and isValid(lib)) then return nil end
+    local combat = nil
+    pcall(function() combat = lib:GetCombatDataModule(char) end)
+    if not isValid(combat) then return nil end
+    local def = nil
+    pcall(function() def = combat:GetEquipedWeaponDefinition() end)
+    return defName(def)
 end
 
 -- ── Laufender Schlag (Schlagrichtung) ───────────────────────────────────────
@@ -661,7 +626,7 @@ local function jsonEsc(s)
     end):gsub('\\u0022', '\\"'):gsub('\\u005c', '\\\\'))
 end
 
-local function buildJson(pos, items, distCm, stats, guild, spell, weaponMelee, weaponRanged, attack, clock, kills, news)
+local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack, clock, kills, news)
     local parts = {}
     parts[#parts+1] = '"ok":true'
     if guild and guild ~= "" then
@@ -674,15 +639,10 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weaponMelee, w
     else
         parts[#parts+1] = '"spell":null'
     end
-    if weaponMelee and weaponMelee ~= "" then
-        parts[#parts+1] = string.format('"weaponMelee":"%s"', jsonEsc(weaponMelee))
+    if weapon and weapon ~= "" then
+        parts[#parts+1] = string.format('"weapon":"%s"', jsonEsc(weapon))
     else
-        parts[#parts+1] = '"weaponMelee":null'
-    end
-    if weaponRanged and weaponRanged ~= "" then
-        parts[#parts+1] = string.format('"weaponRanged":"%s"', jsonEsc(weaponRanged))
-    else
-        parts[#parts+1] = '"weaponRanged":null'
+        parts[#parts+1] = '"weapon":null'
     end
     if attack and attack ~= "" then
         parts[#parts+1] = string.format('"attack":"%s"', jsonEsc(attack))
@@ -710,8 +670,8 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weaponMelee, w
         np[#np+1] = string.format('{"type":"%s","n":%d}', jsonEsc(ev.type), ev.n)
     end
     parts[#parts+1] = '"killNews":[' .. table.concat(np, ",") .. ']'
-    -- Temporäres Diagnose-Feld (Waffen + Kills) — wird nach dem Fix wieder entfernt.
-    parts[#parts+1] = string.format('"dbg":"W[%s] K[%s]"', jsonEsc(weaponDbg or ""), jsonEsc(killDbg or ""))
+    -- Temporäres Diagnose-Feld (Kills) — wird nach dem Fix wieder entfernt.
+    parts[#parts+1] = string.format('"dbg":"K[%s]"', jsonEsc(killDbg or ""))
     if pos then
         parts[#parts+1] = string.format('"pos":{"x":%.1f,"y":%.1f,"z":%.1f}', pos.x, pos.y, pos.z)
     else
@@ -810,8 +770,8 @@ local function tick()
     pcall(function() guild = readGuild(char) end)
     local spell
     if READ_SPELL then pcall(function() spell = readSpell(char) end) end
-    local weaponMelee, weaponRanged
-    if READ_WEAPONS then pcall(function() weaponMelee, weaponRanged = readWeapons(char) end) end
+    local weapon
+    if READ_WEAPONS then pcall(function() weapon = readWeapon(char) end) end
     local attack
     if READ_ATTACK then pcall(function() attack = readAttack(char) end) end
     -- Einmaliges Diagnose-Log (Stufe 2). Steht VOR den riskanten Readern und nutzt nur
@@ -833,7 +793,7 @@ local function tick()
     local kills
     if READ_KILLS then pcall(function() kills = updateKills() end) end
     local json = buildJson(pos, items or {}, totalDistCm, stats or {}, guild, spell,
-                           weaponMelee, weaponRanged, attack, clock, kills, killNews)
+                           weapon, attack, clock, kills, killNews)
     local f = io.open(OUTPUT_PATH, "w")
     if f then f:write(json); f:close() end
 end

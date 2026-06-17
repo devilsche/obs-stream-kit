@@ -202,11 +202,9 @@ class Handler(BaseHTTPRequestHandler):
                         it["display"] = _translate(it.get("name"), lang)
                 if data.get("spell"):
                     data["spellDisplay"] = _spell_display(data.get("spell"), lang)
-                # Ausgeruestete Waffen: Klassennamen (ItMw_*/ItRw_*) wie Items uebersetzen.
-                if data.get("weaponMelee"):
-                    data["weaponMeleeDisplay"] = _translate(data["weaponMelee"], lang)
-                if data.get("weaponRanged"):
-                    data["weaponRangedDisplay"] = _translate(data["weaponRanged"], lang)
+                # Gefuehrte Waffe: Klassenname (ItMw_*/ItRw_*) wie Items uebersetzen.
+                if data.get("weapon"):
+                    data["weaponDisplay"] = _translate(data["weapon"], lang)
                 if data.get("attack"):
                     data["attackDisplay"] = _attack_display(data.get("attack"), lang)
                 # Kills: Typ-Namen uebersetzen ({rohTyp:n} -> {DE-Typ:n}).

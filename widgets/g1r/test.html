@@ -68,8 +68,8 @@
     </div>
 
     <div>
-      <div class="label">Waffe (Nah / Fern)</div>
-      <div class="pos" id="weapon"><span class="offline">—</span></div>
+      <div class="label">Waffe</div>
+      <div class="guild" id="weapon"><span class="offline">—</span></div>
     </div>
 
     <div>
@@ -206,9 +206,7 @@
       dot.classList.add('live');
       guildEl.textContent = d.guild || 'Keine Gilde';
       spellEl.textContent = d.spellDisplay || d.spell || 'Kein Zauber';
-      var melee = d.weaponMeleeDisplay || d.weaponMelee;
-      var ranged = d.weaponRangedDisplay || d.weaponRanged;
-      weaponEl.textContent = (melee || '–') + ' / ' + (ranged || '–');
+      weaponEl.textContent = d.weaponDisplay || d.weapon || 'Keine Waffe';
       attackEl.textContent = d.attackDisplay || d.attack || '—';
       if (d.pos) {
         posEl.innerHTML =
