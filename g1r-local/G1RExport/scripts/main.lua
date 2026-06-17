@@ -37,6 +37,11 @@ local lastHp, lastMana, lastXp = nil, nil, nil
 local MAX_STAT_JUMP = 500
 
 -- Stufe 2: Kill-Counter + News-Ticker + Ingame-Uhr (Live-Subsysteme).
+-- VORSICHT: diese beiden machen Engine-Zugriffe, die HART crashen können (nicht
+-- per pcall fangbar). Beide stehen daher auf false, bis in-game einzeln verifiziert.
+-- Zum Testen GENAU EINEN auf true setzen, Spiel neu starten, schauen ob's crasht.
+local READ_CLOCK = false   -- GameTimeSubsystem:GetCurrentClockTime + ClockTimeLibrary:GetHour
+local READ_KILLS = false   -- PuzzlesSubsystem:GetCreatureKillCounterMap (TMap:ForEach)
 local killBase    = nil   -- Map-Snapshot beim ersten Read (für Session-Summe)
 local lastKillMap = nil   -- letzte Map (für News-Delta)
 local killNews    = {}    -- jüngste Events {type=, n=}, max MAX_NEWS
@@ -750,23 +755,21 @@ local function tick()
     pcall(function() weaponMelee, weaponRanged = readWeapons(char) end)
     local attack
     pcall(function() attack = readAttack(char) end)
-    local clock
-    pcall(function() clock = readClock() end)
-    local kills
-    pcall(function() kills = updateKills() end)
-    -- Einmaliges Diagnose-Log (Stufe 2): sehen, ob die Live-Subsysteme greifen.
+    -- Einmaliges Diagnose-Log (Stufe 2). Steht VOR den riskanten Readern und nutzt nur
+    -- FindFirstOf (sicher) — kommt also auch dann, wenn clock/kills deaktiviert sind.
     if not diagDone then
         diagDone = true
         pcall(function()
-            local km = lastKillMap or {}
-            local keys = {}
-            for k in pairs(km) do keys[#keys+1] = k; if #keys >= 8 then break end end
             print(string.format(
-                "[G1RExport] Diag Stufe2: GameTimeSubsystem=%s PuzzlesSubsystem=%s clock=%s killMapKeys=%s\n",
+                "[G1RExport] Diag Stufe2: GameTimeSubsystem=%s PuzzlesSubsystem=%s READ_CLOCK=%s READ_KILLS=%s\n",
                 tostring(isValid(getTimeSubsys())), tostring(isValid(getPuzzles())),
-                tostring(clock ~= nil), table.concat(keys, ", ")))
+                tostring(READ_CLOCK), tostring(READ_KILLS)))
         end)
     end
+    local clock
+    if READ_CLOCK then pcall(function() clock = readClock() end) end
+    local kills
+    if READ_KILLS then pcall(function() kills = updateKills() end) end
     local json = buildJson(pos, items or {}, totalDistCm, stats or {}, guild, spell,
                            weaponMelee, weaponRanged, attack, clock, kills, killNews)
     local f = io.open(OUTPUT_PATH, "w")
