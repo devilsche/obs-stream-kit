@@ -86,66 +86,154 @@ local function shortName(fullName)
     return string.match(fullName, "%.([^%.]+)$") or fullName
 end
 
--- Robuste TArray-Iteration: ForEach (UE4SS-nativ) bevorzugt, sonst Index-Loop.
-local function arrForEach(arr, fn)
-    if not arr then return end
-    local okFE = pcall(function() arr:ForEach(function(i, elemWrap)
-        local el = elemWrap; pcall(function() el = elemWrap:get() end)
-        fn(i, el)
-    end) end)
-    if okFE then return end
-    local n = 0; pcall(function() n = arr:GetArrayNum() end)
-    if n == 0 then pcall(function() n = #arr end) end
-    for i = 0, n - 1 do pcall(function() fn(i, arr[i]) end) end
+-- ── Inventar-Lesen: vollständiger mods-g1r-Helper-Stack (1:1 adaptiert) ──────
+-- Kern: m_Slots IST direkt lesbar — aber Array-Elemente kommen als
+-- RemoteUnrealParam/LocalUnrealParam-Wrapper, die VOR dem Member-Zugriff mit
+-- UnwrapValue (:get() rekursiv) entpackt werden müssen. Sonst ScriptStruct-Fehler.
+
+local function isParamWrapper(v)
+    if type(v) ~= "userdata" or not v.type then return false end
+    local ok, t = pcall(function() return v:type() end)
+    return ok and (t == "RemoteUnrealParam" or t == "LocalUnrealParam")
+end
+
+local function unwrap(v)
+    if v == nil then return nil end
+    if isParamWrapper(v) then
+        local ok, u = pcall(function() return v:get() end)
+        if ok and u ~= nil then return unwrap(u) end
+    end
+    return v
+end
+
+local function arrLen(arr)
+    if arr == nil then return 0 end
+    local ok, n = pcall(function() return arr:GetArrayNum() end)
+    if ok and type(n) == "number" then return n end
+    if type(arr) == "table" then return #arr end
+    return 0
+end
+
+local function arrGet(arr, idx)
+    local ok, el = pcall(function() return arr[idx] end)
+    if ok then return unwrap(el) end
+    if type(arr) == "table" then return unwrap(arr[idx + 1]) end
+    return nil
+end
+
+local function iterItems(items, visitor)
+    if items == nil then return end
+    local n = arrLen(items)
+    for i = 0, n - 1 do
+        local ok, raw = pcall(function() return items[i] end)
+        if ok then
+            local it = unwrap(raw)
+            if it and visitor(i, it) then return end
+        end
+    end
+end
+
+local function invTypeEquals(a, b)
+    if a == nil or b == nil then return false end
+    if a == b then return true end
+    local an, bn = tonumber(tostring(a)), tonumber(tostring(b))
+    return an ~= nil and bn ~= nil and an == bn
+end
+
+local function readInvType(vd)
+    if not vd then return nil end
+    local ok, t = pcall(function() return vd.m_InventoryType end)
+    if ok then return t end
+    return nil
+end
+
+-- Findet das VirtualData-Objekt (mit m_Slots) im ContainerVirtualDataArray.
+-- 4 Fallback-Pfade wie mods-g1r GetMainContainerVirtualData.
+local function getMainVirtualData(container)
+    if not container then return nil end
+    local ok, invMap = pcall(function() return container.m_Inventory end)
+    if not ok or invMap == nil then return nil end
+    local vok, values = pcall(function() return invMap.m_Values end)
+    if vok and values then
+        -- 1: m_Values trägt m_Slots direkt
+        local dok, ds = pcall(function() return values.m_Slots end)
+        if dok and ds then return values end
+        -- 2: m_Values.Items → InventoryType==MAIN, sonst erstes mit Slots
+        local iok, items = pcall(function() return values.Items end)
+        if iok and items then
+            local found = nil
+            iterItems(items, function(_, data)
+                if found then return true end
+                if invTypeEquals(readInvType(data), INVENTORY_MAIN) then
+                    found = unwrap(data); return true
+                end
+                return false
+            end)
+            if found then return found end
+            local n = arrLen(items)
+            for i = 0, n - 1 do
+                local data = unwrap(arrGet(items, i))
+                if data then
+                    local sok, s = pcall(function() return data.m_Slots end)
+                    if sok and s and arrLen(s) > 0 then return data end
+                end
+            end
+        end
+        -- 3: m_Values direkt iterieren
+        if values.GetArrayNum then
+            local n = values:GetArrayNum()
+            for i = 0, n - 1 do
+                local data = unwrap(arrGet(values, i))
+                if data then
+                    local sok, s = pcall(function() return data.m_Slots end)
+                    if sok and s and arrLen(s) > 0 then return data end
+                end
+            end
+        end
+    end
+    -- 4: Keys/Values-Map
+    local kok, keys = pcall(function() return invMap.m_Keys end)
+    if kok and keys and vok and values then
+        local kn = arrLen(keys)
+        for i = 0, kn - 1 do
+            if invTypeEquals(arrGet(keys, i), INVENTORY_MAIN) then
+                local data = arrGet(values, i)
+                if data then return unwrap(data) end
+            end
+        end
+    end
+    return nil
 end
 
 local function readInventory(char)
     local items = {}
     local lib = getLib()
     if not (lib and isValid(lib)) then return items end
-
-    local ok, container = pcall(function()
-        return lib:GetContainerDataModule(char)
-    end)
+    local ok, container = pcall(function() return lib:GetContainerDataModule(char) end)
     if not (ok and isValid(container)) then return items end
 
-    -- VirtualData für den MainContainer finden (Pattern aus mods-g1r inventory.lua):
-    -- NICHT m_Values[INVENTORY_MAIN] (das ist der ENUM-Wert, kein Index!), sondern
-    -- a) prüfen ob m_Values direkt m_Slots trägt, sonst
-    -- b) in m_Keys den Index finden, wo key == INVENTORY_MAIN → m_Values[Index].
-    local vd = nil
-    pcall(function()
-        local inv = container.m_Inventory
-        local values = inv.m_Values
-        local sok, s = pcall(function() return values.m_Slots end)
-        if sok and s then vd = values; return end
-        local keys = inv.m_Keys
-        arrForEach(keys, function(idx, key)
-            if vd then return end
-            local kv = key
-            if type(key) ~= "number" then pcall(function() kv = key.Value end) end
-            if kv == INVENTORY_MAIN then
-                pcall(function() vd = values[idx] end)
-            end
-        end)
-    end)
+    local vd = getMainVirtualData(container)
     if not vd then return items end
 
-    local slots = nil
-    pcall(function() slots = vd.m_Slots end)
-    if not slots then return items end
+    local sok, slots = pcall(function() return vd.m_Slots end)
+    if not sok or slots == nil then return items end
 
-    arrForEach(slots, function(_, slot)
-        pcall(function()
-            local sd  = slot.m_SlotData
-            local n   = sd.m_ItemCount or 0
-            if n and n > 0 then
-                local cls  = sd.m_ItemDefinition
-                local full = cls and select(2, pcall(function() return cls:GetFullName() end))
-                items[#items + 1] = { name = shortName(full), count = n }
-            end
-        end)
-    end)
+    local n = arrLen(slots)
+    for i = 0, n - 1 do
+        local item = arrGet(slots, i)   -- WICHTIG: arrGet entpackt den Wrapper
+        if item then
+            pcall(function()
+                local sd = item.m_SlotData
+                local cnt = 0
+                pcall(function() cnt = sd.m_ItemCount or 0 end)
+                if cnt and cnt > 0 then
+                    local cls; pcall(function() cls = sd.m_ItemDefinition end)
+                    local full = cls and select(2, pcall(function() return cls:GetFullName() end))
+                    items[#items + 1] = { name = shortName(full), count = cnt }
+                end
+            end)
+        end
+    end
     return items
 end
 
@@ -178,12 +266,9 @@ local function tick()
     if not char then return end
     local pos, items
     pcall(function() pos = readPosition(char) end)
-    -- Items DEAKTIVIERT: m_Slots liegt in einem ScriptStruct, UE4SS kann dessen
-    -- Member nicht direkt lesen (getestet mit Build 3.0.1-326 UND 3.0.1-970).
-    -- Lösung später = mods-g1r-Helper-Stack (UnwrapValue/GetArrayElement) 1:1 oder
-    -- UI-Weg GetItemNameByPos. readInventory() bleibt im File. Reaktivieren:
-    --   pcall(function() items = readInventory(char) or {} end)
-    items = {}
+    -- Items via vollständigem mods-g1r-Helper-Stack (unwrap/arrGet) — entpackt die
+    -- RemoteUnrealParam-Wrapper, umgeht so den ScriptStruct-m_Slots-Stolperstein.
+    pcall(function() items = readInventory(char) or {} end)
     local json = buildJson(pos, items or {})
     local f = io.open(OUTPUT_PATH, "w")
     if f then f:write(json); f:close() end
