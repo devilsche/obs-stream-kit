@@ -40,8 +40,10 @@ steamapps\common\Gothic 1 Remake\G1R\Binaries\Win64\
   …\Win64\ue4ss\Mods\G1RExport\enabled.txt
   …\Win64\ue4ss\Mods\G1RExport\scripts\main.lua
   ```
-- Spiel starten. In der UE4SS-Konsole (Standard: Taste **`~`** / über `UE4SS-settings.ini`)
-  sollte stehen: `[G1RExport] geladen — schreibt nach …`
+- Spiel starten. Prüfen, ob der Mod lädt: die Datei **`…\G1R\Binaries\Win64\UE4SS.log`**
+  öffnen und nach `[G1RExport] geladen` suchen. (Alternativ das UE4SS-Konsolenfenster — nur
+  sichtbar, wenn in `UE4SS-settings.ini` unter `[Debug]` `GuiConsoleVisible = 1` gesetzt ist.
+  NICHT die In-Game-`~`-Konsole, das ist die UE-Spielkonsole.)
 
 ### 3. Lokalen Server starten
 ```
