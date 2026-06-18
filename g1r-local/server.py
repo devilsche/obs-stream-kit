@@ -43,6 +43,30 @@ def _load_item_names():
 
 ITEM_NAMES = _load_item_names()
 
+
+def _load_json_map(path):
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return {k: v for k, v in json.load(fh).items() if not k.startswith("_")}
+    except Exception:
+        return {}
+
+
+# Waffen-Schaden aus dem Wiki: Klassenname -> Schaden. Dient dazu, aus dem
+# Inventar die staerkste Waffe zu bestimmen (strongest_weapon).
+WEAPON_DAMAGE = _load_json_map(os.path.join(os.path.dirname(os.path.abspath(__file__)), "weapon_damage.json"))
+
+
+def strongest_weapon(items):
+    """Liefert den Klassennamen der Inventar-Waffe mit dem hoechsten Wiki-Schaden,
+    oder None wenn keins der Items in WEAPON_DAMAGE steht."""
+    best, best_dmg = None, -1
+    for it in (items or []):
+        dmg = WEAPON_DAMAGE.get(it.get("name"))
+        if dmg is not None and dmg > best_dmg:
+            best, best_dmg = it.get("name"), dmg
+    return best
+
 # Zauber-Namen analog. Schlüssel werden normalisiert (klein, nur a-z0-9), damit
 # Schreibweisen/Unterstriche egal sind ('Spell_Fireball' == 'FireBall' == 'fireball').
 SPELL_NAMES_FILE = os.environ.get(
@@ -200,6 +224,11 @@ class Handler(BaseHTTPRequestHandler):
                     # Container-Fallback (technischer Klassenname) uebersetzen.
                     if not it.get("display"):
                         it["display"] = _translate(it.get("name"), lang)
+                # Staerkste Waffe im Inventar (Klassenname x Wiki-Schaden).
+                sw = strongest_weapon(data.get("items"))
+                if sw:
+                    data["strongestWeapon"] = sw
+                    data["strongestWeaponDisplay"] = _translate(sw, lang)
                 if data.get("spell"):
                     data["spellDisplay"] = _spell_display(data.get("spell"), lang)
                 # Gefuehrte Waffe: Klassenname (ItMw_*/ItRw_*) wie Items uebersetzen.
