@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=720, height=46" />
+  <title>G1R Livebar</title>
+  <link rel="stylesheet" href="../_theme.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+  <style>
+    :root {
+      --c-accent:  var(--theme-accent,   #f2b705);
+      --c-primary: var(--theme-primary,  #5e2a79);
+      --c-bg:      var(--theme-bg,       #0a0510);
+      --c-surface: var(--theme-surface,  #1f1430);
+      --c-text:    var(--theme-text,     #e8e0f0);
+      --c-muted:   var(--theme-text-dim, #8a7d99);
+      --c-border:  var(--theme-border,   rgba(94,42,121,.65));
+      --c-good:    #4be39a;
+      --c-bad:     #e3564b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 720px; height: 46px; overflow: hidden; background: transparent;
+                 font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif); }
+
+    .card { background: linear-gradient(180deg, var(--c-surface), var(--c-bg));
+            border: 1px solid var(--c-border); border-radius: var(--theme-radius, 8px); position: relative; }
+    .card::before { content: ""; position: absolute; inset: 0; border-radius: var(--theme-radius, 8px);
+            pointer-events: none; box-shadow: inset 0 0 0 1px rgba(242,183,5,.12); }
+
+    .livebar { display: flex; align-items: center; gap: 0; height: 46px; width: 720px;
+               padding: 0 16px; border-left: 3px solid var(--c-accent); white-space: nowrap; }
+    .livebar .it { display: inline-flex; align-items: baseline; gap: 6px; padding: 0 13px; }
+    .livebar .v { color: var(--c-text); font-weight: 700; font-size: 1.05rem;
+                  font-variant-numeric: tabular-nums; }
+    .livebar .v.good { color: var(--c-good); }
+    .livebar .v.bad { color: var(--c-bad); }
+    .livebar .k { color: var(--c-muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; }
+    .livebar .sep { color: var(--c-border); }
+    .livebar .clock { color: var(--c-accent); font-weight: 700; font-variant-numeric: tabular-nums;
+                      display: inline-flex; align-items: center; gap: 5px; padding-left: 13px; margin-left: auto; }
+    .ico { font-family: "Material Symbols Rounded"; font-size: 1em; vertical-align: -2px; }
+    .offline { color: var(--c-muted); font-weight: 400; }
+  </style>
+</head>
+<body>
+  <div class="card livebar" id="bar">
+    <span class="it"><span class="v" id="level">—</span><span class="k">Level</span></span>
+    <span class="sep">·</span>
+    <span class="it"><span class="v" id="steps">—</span><span class="k">Steps</span></span>
+    <span class="sep">·</span>
+    <span class="it"><span class="v bad" id="dmgOut">—</span><span class="k">DMG out</span></span>
+    <span class="sep">·</span>
+    <span class="it"><span class="v" id="dmgTaken">—</span><span class="k">taken</span></span>
+    <span class="sep">·</span>
+    <span class="it"><span class="v" id="manaUsed">—</span><span class="k">Mana&nbsp;used</span></span>
+    <span class="sep">·</span>
+    <span class="it"><span class="v good" id="hpRegen">—</span><span class="k">HP regen</span></span>
+    <span class="sep">·</span>
+    <span class="it"><span class="v good" id="manaRegen">—</span><span class="k">Mana regen</span></span>
+    <span class="clock" id="clock"></span>
+  </div>
+
+  <script>
+    // Local proxy on the game PC. Port via ?port= override.
+    var PORT = new URLSearchParams(location.search).get('port') || '9210';
+    var URL  = 'http://localhost:' + PORT + '/state?lang=en';
+    var INTERVAL = 400;
+
+    var bar = document.getElementById('bar');
+    var levelEl = document.getElementById('level');
+    var stepsEl = document.getElementById('steps');
+    var dmgOutEl = document.getElementById('dmgOut');
+    var dmgTakenEl = document.getElementById('dmgTaken');
+    var manaUsedEl = document.getElementById('manaUsed');
+    var hpRegenEl = document.getElementById('hpRegen');
+    var manaRegenEl = document.getElementById('manaRegen');
+    var clockEl = document.getElementById('clock');
+
+    function num(v) {
+      return (v === undefined || v === null) ? '–' : Math.round(v).toLocaleString('en-US');
+    }
+    function signed(v) {
+      return (v === undefined || v === null) ? '–' : '+' + Math.round(v).toLocaleString('en-US');
+    }
+
+    function setOffline() {
+      bar.classList.add('offline');
+      levelEl.textContent = '—';
+      stepsEl.textContent = '—';
+      dmgOutEl.textContent = '—';
+      dmgTakenEl.textContent = '—';
+      manaUsedEl.textContent = '—';
+      hpRegenEl.textContent = '—';
+      manaRegenEl.textContent = '—';
+      clockEl.textContent = '';
+    }
+
+    function render(d) {
+      bar.classList.remove('offline');
+      var stats = d.stats || {};
+      var sess = d.session || {};
+      levelEl.textContent = num(stats.level);
+      stepsEl.textContent = num(sess.steps);
+      dmgOutEl.textContent = num(d.session_damageDealt !== undefined && d.session_damageDealt !== null ? d.session_damageDealt : 0);
+      dmgTakenEl.textContent = num(sess.damageTaken);
+      manaUsedEl.textContent = num(sess.manaSpent);
+      hpRegenEl.textContent = signed(sess.healthRegen);
+      manaRegenEl.textContent = signed(sess.manaRegen);
+      if (d.clock && typeof d.clock.hour === 'number') {
+        clockEl.innerHTML = '<span class="ico">schedule</span>' +
+          ('0' + d.clock.hour).slice(-2) + ':' + ('0' + (d.clock.minute || 0)).slice(-2);
+      } else {
+        clockEl.textContent = '';
+      }
+    }
+
+    function poll() {
+      fetch(URL, { credentials: 'omit' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d && d.ok) render(d);
+          else setOffline();
+        })
+        .catch(function () { setOffline(); });
+    }
+
+    poll();
+    setInterval(poll, INTERVAL);
+  </script>
+</body>
+</html>
