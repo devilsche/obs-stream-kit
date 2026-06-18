@@ -57,6 +57,10 @@ WIDGET_PREVIEW_SIZES = {
     "steam/popup.html":             (500, 110),
     "steam/now-playing.html":       (520, 200),
     "steam/games-ticker.html":      (480,  90),
+    # Gothic 1 Remake (lokaler Proxy, ?port=)
+    "g1r/livebar.html":             (720,  46),
+    "g1r/news-ticker.html":         (760,  40),
+    "g1r/career-card.html":         (360, 480),
     # Follower & Goals
     "latest-follower.html":         (500, 110),
     "latest-sub.html":              (500, 110),
@@ -172,6 +176,11 @@ WIDGET_META = [
     ("Steam",         "Now Playing",        "Currently played Steam game.", "steam/now-playing.html"),
     ("Steam",         "Games Ticker",       "Owned-games ticker.",                                                  "steam/games-ticker.html"),
     # Achievement Browser ist ein Tool, kein OBS-Widget -> tools/achievement-browser.html, sichtbar unter /app/tools/
+
+    # Gothic 1 Remake (lokaler Proxy, Browser-Source mit ?port=9210)
+    ("Gothic 1",      "Livebar",            "Live bar: level, steps, damage out/taken, mana, regen, clock.",        "g1r/livebar.html"),
+    ("Gothic 1",      "News Ticker",        "Rotating ticker: stats, session totals, distance, strongest weapon/spell.", "g1r/news-ticker.html"),
+    ("Gothic 1",      "Career Card",        "Detail card: stats, resistances, lifetime totals, records, gear.",     "g1r/career-card.html"),
 
     # Persistente Stream-Info-Sidepanels (Dauer-Anzeige, kein Einmal-Alert).
     ("Follower & Goals", "Latest Follower", "Sidepanel: shows the latest follower (always visible).",              "latest-follower.html"),

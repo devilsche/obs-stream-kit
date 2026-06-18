@@ -23,9 +23,27 @@ crashfrei aus dem Inventar gefiltert, was der Spieler an Waffen/Zaubern dabei ha
 **Karte/Marker:** kommt später (Position liegt als Rohzahlen vor = Vorarbeit für die Kalibrierung).
 
 ## Teile
-- `G1RExport/scripts/main.lua` — UE4SS-Lua-Mod (liest Inventar + Position, schreibt JSON)
-- `server.py` — lokaler Mini-Server (liest JSON, serviert `http://localhost:9210/state`, CORS)
-- Widget: `widgets/g1r/test.html` (liegt im Haupt-Repo, wird von prod serviert)
+- `G1RExport/scripts/main.lua` — UE4SS-Lua-Mod (liest Live-Daten, schreibt `g1r-state.json`
+  + persistente Gesamtwerte/Rekorde nach `g1r-totals.json`)
+- `server.py` — lokaler Mini-Server (`http://localhost:9210/state`, CORS). Reichert an: stärkste
+  Waffe (`weapon_damage.json`), stärkster nutzbarer Zauber (`spell_circle.json` + magicCircle),
+  Item/Zauber-Namen (`item_names.json`/`spell_names.json`), `?lang=de|en`. Steamname via
+  Env-Var `G1R_STEAM_NAME`.
+- `weapon_damage.json` / `spell_circle.json` — Wiki-Mappings (Schaden bzw. benötigter Kreis).
+- Widgets (im Haupt-Repo, prod-serviert, alle theme-fähig + englisch, `?port=9210`):
+  - `widgets/g1r/livebar.html` (720×46) — Level/Schritte/Schaden/Mana/Uhr
+  - `widgets/g1r/news-ticker.html` (760×40) — Stats/Session/stärkste Waffe+Zauber (Laufband)
+  - `widgets/g1r/career-card.html` (360×480) — Stats/Resistenzen/Gesamtwerte/Rekorde/Ausrüstung
+  - `widgets/g1r/test.html` — Diagnose-Liste (alle Rohfelder)
+
+### g1r-totals.json (persistente Gesamtwerte)
+Liegt neben `g1r-state.json`. Der Mod summiert hier über ALLE Sessions: Schaden/Regen/Mana/XP/
+Strecke/Schritte + Rekorde (härtester Treffer, max Mana/Tick, weiteste Strecke). Beim Start
+geladen, alle ~10 s geschrieben. Löschen = Gesamtwerte zurücksetzen.
+
+### Ausgeteilter Schaden (optional)
+`READ_DMG_OUT` in `main.lua` (Default **aus**) aktiviert einen Damage-Hook. Engine-Eingriff →
+erst in-game testen; bei Crash aus lassen (alles andere läuft crashfrei weiter).
 
 ## Setup
 
