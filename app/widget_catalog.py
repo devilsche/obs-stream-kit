@@ -6,6 +6,7 @@ Setting-Switch in einem Widget einbaut, taucht er automatisch auf der
 
 Cache: einmal beim Boot gescannt + ggf. on-demand refresh ueber `refresh()`.
 """
+import json
 import os
 import re
 from typing import Optional
@@ -317,6 +318,23 @@ def _extract_schema_from_html(content: str) -> list:
     return out
 
 
+# JSON-Insel <script type="application/json" id="params"> → Schema-Liste.
+# Bevorzugte Parameter-Quelle (Teil B); robust gegen Attribut-Reihenfolge.
+_ISLAND_RE = re.compile(r"<script\b([^>]*)>(.*?)</script>", re.DOTALL | re.IGNORECASE)
+
+
+def _extract_params_island(content: str) -> list:
+    for attrs, body in _ISLAND_RE.findall(content or ""):
+        low = attrs.lower()
+        if ('id="params"' in low or "id='params'" in low) and "application/json" in low:
+            try:
+                data = json.loads(body.strip())
+                return data if isinstance(data, list) else []
+            except Exception:
+                return []
+    return []
+
+
 _cache: Optional[list] = None
 
 
@@ -494,7 +512,9 @@ def build(project_root: str) -> list:
             try:
                 with open(full, "r", encoding="utf-8") as fp:
                     content = fp.read()
-                switches = _extract_schema_from_html(content)
+                switches = _extract_params_island(content)        # NEU: Insel bevorzugt
+                if not switches:
+                    switches = _extract_schema_from_html(content)  # Fallback: buildFilter
                 if not switches:
                     switches = list(WIDGET_SWITCHES.get(path, []))
             except Exception:
