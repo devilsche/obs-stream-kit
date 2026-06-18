@@ -82,6 +82,7 @@ local MAX_NEWS    = 12
 local diagDone    = false  -- einmaliges Diagnose-Log
 local guildDiagDone = false -- einmalige Gilden-Diagnose (Root-Cause "keine Gilde")
 local guildDiagTicks = 0    -- zählt Ticks bis State gültig (Timing vs. echter Fehler)
+local saveDiagDone = false  -- einmalige Save-Kennungs-Diagnose (GameInstance/SaveSystem)
 
 local function isValid(o)
     return o and pcall(function() return o:IsValid() end) and o:IsValid()
@@ -910,6 +911,21 @@ local function tick()
                     tostring(ok1), tostring(r1), tostring(ok2), tostring(r2), tostring(isValid(char))))
             end)
         end
+    end
+    if not saveDiagDone then
+        saveDiagDone = true
+        pcall(function()
+            local gi, gs = "(nil)", "(nil)"
+            pcall(function()
+                local inst = FindFirstOf("GothicGameInstance") or FindFirstOf("GameInstance")
+                if inst then gi = tostring(inst:GetFullName()) end
+            end)
+            pcall(function()
+                local sgs = FindFirstOf("GothicSaveGameSystem") or FindFirstOf("SaveGameSystem")
+                if sgs then gs = tostring(sgs:GetFullName()) end
+            end)
+            print(string.format("[G1RExport] Save-Diag: GameInstance=%q SaveSys=%q\n", gi, gs))
+        end)
     end
     local spell
     if READ_SPELL then pcall(function() spell = readSpell(char) end) end
