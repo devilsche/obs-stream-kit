@@ -19,3 +19,11 @@ def test_strongest_usable_spell_respects_circle():
 def test_strongest_usable_spell_none_when_circle_too_low():
     srv.SPELL_CIRCLE = {"ItAr_Rune_Fireball": 2}
     assert srv.strongest_usable_spell([{"name": "ItAr_Rune_Fireball"}], 0) is None
+
+
+def test_strongest_usable_spell_rune_matches_scroll_entry():
+    # spell_circle.json listet meist nur Scroll-Varianten; eine Rune im Inventar
+    # muss den Scroll-Kreis-Eintrag desselben Zaubers treffen.
+    srv.SPELL_CIRCLE = {"ItAr_Scroll_Fireball": 2}
+    items = [{"name": "ItAr_Rune_Fireball"}]
+    assert srv.strongest_usable_spell(items, 3) == "ItAr_Rune_Fireball"

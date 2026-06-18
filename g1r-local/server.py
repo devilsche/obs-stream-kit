@@ -74,16 +74,26 @@ def strongest_weapon(items):
 SPELL_CIRCLE = _load_json_map(os.path.join(os.path.dirname(os.path.abspath(__file__)), "spell_circle.json"))
 
 
+def _norm_arcane(name):
+    """ItAr_Scroll_FireBall / ItAr_Rune_Fireball -> 'fireball' — macht den Kreis-Lookup
+    Rune/Scroll-agnostisch (spell_circle.json listet meist nur die Scroll-Variante,
+    der Spieler trägt aber evtl. die Rune desselben Zaubers)."""
+    s = re.sub(r"^ItAr_(Scroll|Rune)_", "", name or "", flags=re.IGNORECASE)
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
 def strongest_usable_spell(items, magic_circle):
     """Liefert den Klassennamen der nutzbaren Inventar-Rune mit dem hoechsten
-    Kreis (<= magicCircle), oder None wenn keine nutzbar ist."""
+    Kreis (<= magicCircle), oder None wenn keine nutzbar ist. Rune/Scroll-agnostisch."""
     try:
         mc = int(magic_circle)
     except (TypeError, ValueError):
         return None
+    # Normalisierte Sicht auf SPELL_CIRCLE, damit Rune wie Scroll matcht.
+    norm = {_norm_arcane(k): v for k, v in SPELL_CIRCLE.items()}
     best, best_circle = None, 0
     for it in (items or []):
-        circ = SPELL_CIRCLE.get(it.get("name"))
+        circ = norm.get(_norm_arcane(it.get("name")))
         if circ is not None and circ <= mc and circ > best_circle:
             best, best_circle = it.get("name"), circ
     return best
