@@ -14,17 +14,11 @@
                  font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif); }
 
     .t-card.ticker { padding: 0 14px; height: 40px; width: 760px; display: flex; align-items: center;
-                     gap: 12px; overflow: hidden; border-left-width: 3px;
-                     border-left-color: var(--theme-accent, #f2b705); }
+                     gap: 12px; overflow: hidden; }
     .tag { background: var(--theme-primary, #5e2a79); color: var(--theme-text, #fff); font-size: .62rem;
            font-weight: 700; text-transform: uppercase; letter-spacing: .1em; padding: 3px 8px;
            border-radius: 4px; flex: none; }
 
-    /* Marquee: viewport masks, track scrolls. Text duplicated → seamless loop. */
-    .mask { flex: 1; overflow: hidden; position: relative; height: 40px; display: flex; align-items: center;
-            -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
-            mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%); }
-    .track { display: inline-flex; white-space: nowrap; will-change: transform; animation: marquee 26s linear infinite; }
     .run { color: var(--theme-text, #e8e0f0); font-size: .92rem; white-space: nowrap; padding-right: 48px; }
     .run b { color: var(--theme-accent, #f2b705); font-variant-numeric: tabular-nums; }
     .run .dot { color: var(--theme-text-dim, #8a7d99); margin: 0 10px; }
@@ -32,18 +26,13 @@
 
     /* Stale (Spiel kurz weg): letzter Text bleibt stehen, nur gedimmt. */
     .stale { opacity: .5; transition: opacity .4s ease; }
-    @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-    @media (prefers-reduced-motion: reduce) {
-      .track { animation: none; }
-      .track .run + .run { display: none; }
-    }
   </style>
 </head>
 <body>
-  <div class="t-card ticker">
+  <div class="t-card t-card--accent ticker">
     <span class="tag">G1 Live</span>
-    <div class="mask">
-      <div class="track" id="track">
+    <div class="t-ticker">
+      <div class="t-ticker-track" id="track">
         <span class="run" id="run"><span class="offline">— waiting for G1R —</span></span>
         <span class="run" id="runCopy" aria-hidden="true"><span class="offline">— waiting for G1R —</span></span>
       </div>
