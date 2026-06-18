@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=760, height=40" />
+  <title>G1R News-Ticker</title>
+  <link rel="stylesheet" href="../_theme.css" />
+  <style>
+    :root {
+      --c-accent:  var(--theme-accent,   #f2b705);
+      --c-primary: var(--theme-primary,  #5e2a79);
+      --c-bg:      var(--theme-bg,       #0a0510);
+      --c-surface: var(--theme-surface,  #1f1430);
+      --c-text:    var(--theme-text,     #e8e0f0);
+      --c-muted:   var(--theme-text-dim, #8a7d99);
+      --c-border:  var(--theme-border,   rgba(94,42,121,.65));
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 760px; height: 40px; overflow: hidden; background: transparent;
+                 font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif); }
+
+    .card { background: linear-gradient(180deg, var(--c-surface), var(--c-bg));
+            border: 1px solid var(--c-border); border-radius: var(--theme-radius, 8px); position: relative; }
+    .card::before { content: ""; position: absolute; inset: 0; border-radius: var(--theme-radius, 8px);
+            pointer-events: none; box-shadow: inset 0 0 0 1px rgba(242,183,5,.12); }
+
+    .ticker { width: 760px; height: 40px; display: flex; align-items: center; gap: 12px;
+              padding: 0 14px; border-left: 3px solid var(--c-accent); overflow: hidden; }
+    .ticker .tag { background: var(--c-primary); color: #fff; font-size: .62rem; font-weight: 700;
+                   text-transform: uppercase; letter-spacing: .1em; padding: 3px 8px; border-radius: 4px; flex: none; }
+
+    /* Marquee: viewport masks, track scrolls. The text is duplicated so the
+       loop is seamless (translateX(-50%) lands exactly on the copy). */
+    .mask { flex: 1; overflow: hidden; position: relative; height: 40px;
+            display: flex; align-items: center;
+            -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+            mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%); }
+    .track { display: inline-flex; white-space: nowrap; will-change: transform;
+             animation: marquee 26s linear infinite; }
+    .run { color: var(--c-text); font-size: .92rem; white-space: nowrap; padding-right: 48px; }
+    .run b { color: var(--c-accent); font-variant-numeric: tabular-nums; }
+    .run .dot { color: var(--c-muted); margin: 0 10px; }
+    .run .offline { color: var(--c-muted); }
+
+    @keyframes marquee {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .track { animation: none; }
+      /* Static: show only the first copy, no scrolling. */
+      .track .run + .run { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card ticker">
+    <span class="tag">G1 Live</span>
+    <div class="mask">
+      <div class="track" id="track">
+        <span class="run" id="run"><span class="offline">— waiting for G1R —</span></span>
+        <span class="run" id="runCopy" aria-hidden="true"><span class="offline">— waiting for G1R —</span></span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Local proxy on the game PC. Port via ?port= override.
+    var PORT = new URLSearchParams(location.search).get('port') || '9210';
+    var URL  = 'http://localhost:' + PORT + '/state?lang=en';
+    var INTERVAL = 400;
+
+    var runEl = document.getElementById('run');
+    var runCopyEl = document.getElementById('runCopy');
+
+    function num(v) {
+      return (v === undefined || v === null) ? '–' : Math.round(v).toLocaleString('en-US');
+    }
+    function pair(v, vMax) {
+      if (v === undefined || v === null) return '–';
+      return num(v) + (vMax !== undefined && vMax !== null ? '/' + num(vMax) : '');
+    }
+    function b(v) { return '<b>' + v + '</b>'; }
+
+    function setOffline() {
+      var html = '<span class="offline">— waiting for G1R —</span>';
+      runEl.innerHTML = html;
+      runCopyEl.innerHTML = html;
+    }
+
+    function render(d) {
+      var stats = d.stats || {};
+      var sess = d.session || {};
+      var groups = [];
+
+      // Stats
+      groups.push(
+        'STR ' + b(num(stats.strength)) +
+        ' · DEX ' + b(num(stats.dexterity)) +
+        ' · HP ' + b(pair(stats.hp, stats.hpMax)) +
+        ' · Mana ' + b(pair(stats.mana, stats.manaMax))
+      );
+
+      // Session — distance in metres, converted to km (1 decimal).
+      var distM = (d.distanceM !== undefined && d.distanceM !== null) ? d.distanceM
+                : (sess.distanceM !== undefined && sess.distanceM !== null) ? sess.distanceM : null;
+      var km = (distM === null) ? '–' : (distM / 1000).toFixed(1);
+      var dmgDealt = (d.session_damageDealt !== undefined && d.session_damageDealt !== null)
+                   ? d.session_damageDealt : 0;
+      groups.push(
+        'Session: ' + b(km + ' km') + ' walked' +
+        ' · ' + b(num(dmgDealt)) + ' DMG dealt' +
+        ' · ' + b(num(sess.damageTaken)) + ' taken'
+      );
+
+      // Gear
+      groups.push(
+        'Strongest weapon: ' + b(d.strongestWeaponDisplay || '—') +
+        ' · Strongest spell: ' + b(d.strongestSpellDisplay || '—')
+      );
+
+      var html = groups.join('<span class="dot">◆</span>');
+      runEl.innerHTML = html;
+      runCopyEl.innerHTML = html;
+    }
+
+    function poll() {
+      fetch(URL, { credentials: 'omit' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d && d.ok) render(d);
+          else setOffline();
+        })
+        .catch(function () { setOffline(); });
+    }
+
+    poll();
+    setInterval(poll, INTERVAL);
+  </script>
+</body>
+</html>
