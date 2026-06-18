@@ -81,6 +81,7 @@ local killNews    = {}    -- jüngste Events {type=, n=}, max MAX_NEWS
 local MAX_NEWS    = 12
 local diagDone    = false  -- einmaliges Diagnose-Log
 local guildDiagDone = false -- einmalige Gilden-Diagnose (Root-Cause "keine Gilde")
+local guildDiagTicks = 0    -- zählt Ticks bis State gültig (Timing vs. echter Fehler)
 
 local function isValid(o)
     return o and pcall(function() return o:IsValid() end) and o:IsValid()
@@ -878,11 +879,13 @@ local function tick()
     -- roh liefert und was readGuild daraus macht. So lässt sich "keine Gilde" als
     -- "noch keiner Gilde beigetreten" (None) vs. "Reader kaputt" unterscheiden.
     if not guildDiagDone then
-        guildDiagDone = true
-        pcall(function()
-            local st = getCharacterState(char)
-            local rawTag, rawType = "(nil)", "(nil)"
-            if st then
+        guildDiagTicks = guildDiagTicks + 1
+        local st = getCharacterState(char)
+        if isValid(st) then
+            -- State endlich da → echtes GetGuild-Ergebnis loggen (das ist die Wahrheit).
+            guildDiagDone = true
+            pcall(function()
+                local rawTag, rawType = "(nil)", "(nil)"
                 pcall(function()
                     local t = st:GetGuild()
                     rawType = type(t)
@@ -891,11 +894,22 @@ local function tick()
                         pcall(function() rawTag = t.TagName:ToString() end)
                     end
                 end)
-            end
-            print(string.format(
-                "[G1RExport] Guild-Diag: state=%s GetGuild.type=%s rawTag=%q readGuild=%q\n",
-                tostring(isValid(st)), tostring(rawType), tostring(rawTag), tostring(guild)))
-        end)
+                print(string.format(
+                    "[G1RExport] Guild-Diag: state=OK nach %d Ticks GetGuild.type=%s rawTag=%q readGuild=%q\n",
+                    guildDiagTicks, tostring(rawType), tostring(rawTag), tostring(guild)))
+            end)
+        elseif guildDiagTicks >= 40 then
+            -- ~10s und immer noch kein State → die verschluckten Roh-Fehler einfangen,
+            -- um BP_GetCharacterState (wirft?) von m_CharacterState (nil?) zu trennen.
+            guildDiagDone = true
+            pcall(function()
+                local ok1, r1 = pcall(function() return char:BP_GetCharacterState() end)
+                local ok2, r2 = pcall(function() return char.m_CharacterState end)
+                print(string.format(
+                    "[G1RExport] Guild-Diag: State nach ~10s nil | BP_GetCharacterState ok=%s val=%s | m_CharacterState ok=%s val=%s | charValid=%s\n",
+                    tostring(ok1), tostring(r1), tostring(ok2), tostring(r2), tostring(isValid(char))))
+            end)
+        end
     end
     local spell
     if READ_SPELL then pcall(function() spell = readSpell(char) end) end
