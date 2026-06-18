@@ -225,7 +225,11 @@
   }
 
   // ── Detail-View für eine Card füllen ──────────────────────
-  let currentTab = "pubg";
+  // Domain aus der URL (?d=… aus der Top-Nav), sonst Default pubg.
+  let currentTab = (function () {
+    var d = new URLSearchParams(location.search).get("d");
+    return ["pubg", "steam", "g1r", "stream", "decor"].indexOf(d) >= 0 ? d : "pubg";
+  })();
 
   function openDetail(card) {
     const base = card.dataset.base;

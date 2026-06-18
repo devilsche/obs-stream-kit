@@ -3,9 +3,16 @@
   <a class="dn-brand" href="/app/" aria-label="stream-overlay — Dashboard">
     <span class="sq" aria-hidden="true"></span>STREAM<span class="b">_</span>OVERLAY
   </a>
+  {# Domain-first: die Spiel-/Anbindungs-Cluster führen direkt in /app/urls in den
+     passenden Domain-Tab (?d=…). 'urls' als eigener Punkt entfällt. #}
+  {% set urld = request.args.get('d') or 'pubg' %}
+  {% set on_urls = request.path.startswith('/app/urls') %}
   <nav class="dn-links" aria-label="Hauptnavigation">
     <a href="/app/" {% if request.path == '/app/' %}aria-current="page"{% endif %}>dashboard</a>
-    <a href="/app/urls" {% if request.path.startswith('/app/urls') %}aria-current="page"{% endif %}>urls</a>
+    <a href="/app/urls?d=pubg" {% if on_urls and urld == 'pubg' %}aria-current="page"{% endif %}>PUBG</a>
+    <a href="/app/urls?d=steam" {% if on_urls and urld == 'steam' %}aria-current="page"{% endif %}>Steam</a>
+    <a href="/app/urls?d=g1r" {% if on_urls and urld == 'g1r' %}aria-current="page"{% endif %}>Gothic&nbsp;1</a>
+    <a href="/app/urls?d=stream" {% if on_urls and urld == 'stream' %}aria-current="page"{% endif %}>Stream</a>
     <a href="/app/tools" {% if request.path.startswith('/app/tools') %}aria-current="page"{% endif %}>tools</a>
     <a href="/app/settings" {% if request.path.startswith('/app/settings') %}aria-current="page"{% endif %}>settings</a>
     {% if user.is_admin %}<a href="/admin/" {% if request.path.startswith('/admin') %}aria-current="page"{% endif %}>admin</a>{% endif %}
