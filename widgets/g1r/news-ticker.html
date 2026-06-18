@@ -30,6 +30,8 @@
     .run .dot { color: var(--theme-text-dim, #8a7d99); margin: 0 10px; }
     .run .offline { color: var(--theme-text-dim, #8a7d99); }
 
+    /* Stale (Spiel kurz weg): letzter Text bleibt stehen, nur gedimmt. */
+    .stale { opacity: .5; transition: opacity .4s ease; }
     @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
     @media (prefers-reduced-motion: reduce) {
       .track { animation: none; }
@@ -109,12 +111,20 @@
     }
 
     // Subscription statt Polling: EventSource abonniert /events, reconnectet selbst.
+    var card = document.querySelector('.ticker');
+    var everOk = false;
+    function goStale() {
+      // Nach erstem Render: letzten Text stehen lassen, nur dimmen. Vorher: leer.
+      if (everOk) card.classList.add('stale');
+      else setOffline();
+    }
     var es = new EventSource(BASE + '/events?lang=en');
     es.onmessage = function (e) {
       var d; try { d = JSON.parse(e.data); } catch (_) { return; }
-      if (d && d.ok) render(d); else setOffline();
+      if (d && d.ok) { everOk = true; card.classList.remove('stale'); render(d); }
+      else goStale();
     };
-    es.onerror = function () { setOffline(); };
+    es.onerror = goStale;
   </script>
 </body>
 </html>

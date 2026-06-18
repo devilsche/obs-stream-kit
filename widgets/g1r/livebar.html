@@ -30,6 +30,8 @@
              display: inline-flex; align-items: center; gap: 5px; padding-left: 13px; margin-left: auto; }
     .ico { font-family: "Material Symbols Rounded"; font-size: 1em; vertical-align: -2px; }
     .offline .v, .offline .clock { color: var(--theme-text-dim, #8a7d99); font-weight: 400; }
+    /* Stale (Spiel kurz weg): letzte Werte bleiben stehen, nur gedimmt. */
+    .stale { opacity: .5; transition: opacity .4s ease; }
   </style>
 </head>
 <body>
@@ -98,12 +100,20 @@
 
     // Subscription statt Polling: EventSource abonniert /events, der Proxy pusht
     // bei jeder Änderung. EventSource reconnectet bei Verbindungsabbruch selbst.
+    var everOk = false;
+    function goStale() {
+      // Nach erstem Render: letzte Werte STEHEN lassen, nur dimmen (Spiel kurz
+      // im Hintergrund/pausiert → Daten kommen wieder). Vor dem 1. Render: leer.
+      if (everOk) bar.classList.add('stale');
+      else setOffline();
+    }
     var es = new EventSource(BASE + '/events?lang=en');
     es.onmessage = function (e) {
       var d; try { d = JSON.parse(e.data); } catch (_) { return; }
-      if (d && d.ok) render(d); else setOffline();
+      if (d && d.ok) { everOk = true; bar.classList.remove('stale'); render(d); }
+      else goStale();
     };
-    es.onerror = function () { setOffline(); };
+    es.onerror = goStale;
   </script>
 </body>
 </html>

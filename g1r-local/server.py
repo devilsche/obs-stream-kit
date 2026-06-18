@@ -22,8 +22,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 PORT = 9210
 # MUSS mit OUTPUT_PATH im Lua-Mod (G1RExport/scripts/main.lua) übereinstimmen.
 STATE_FILE = os.environ.get("G1R_STATE_FILE", r"C:\obs-g1r\g1r-state.json")
-# Älter als das → als "offline" behandeln (Spiel zu / Mod pausiert).
-STALE_AFTER_S = 10
+# Älter als das → als "offline" behandeln (Spiel zu / Mod pausiert). Großzügig,
+# damit kurzes Alt-Tab/Pausieren das Overlay nicht leert (Widget dimmt statt blank).
+STALE_AFTER_S = 60
 # Welche Origin darf zugreifen? "*" ist am einfachsten (rein lokal, kein Risiko).
 ALLOW_ORIGIN = "*"
 # Item-Namen-Übersetzung: Klassenname → {de, en}. Externes File, erweiterbar
