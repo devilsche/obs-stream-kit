@@ -8,6 +8,14 @@
   <link rel="stylesheet" href="../_theme.css" />
   <link rel="stylesheet" href="../_blocks.css" />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+  <script type="application/json" id="params">
+[ {"key":"port","label":"Proxy-Port","type":"text","group":"Verbindung","default":"9210"},
+  {"key":"scope","label":"Scope","type":"select","group":"Anzeige","default":"all",
+   "options":[["session","Session"],["all","All"]]},
+  {"key":"lang","label":"Sprache","type":"select","group":"Anzeige","default":"en",
+   "options":[["en","English"],["de","Deutsch"]]} ]
+</script>
+<script src="../_params.js"></script>
   <style>
     :root { --c-rec: var(--theme-warn, #ff9d3c); }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -104,11 +112,10 @@
   <script>
     // Lokaler Proxy auf dem Spiel-PC. Port via ?port=. Scope via ?scope=session|all
     // (Default all = Karriere). KEIN Mischen: alle Totals UND Records folgen dem Scope.
-    var params = new URLSearchParams(location.search);
-    var PORT  = params.get('port') || '9210';
-    var SCOPE = (params.get('scope') || 'all').toLowerCase();
+    var P = Params.values(Params.readParams());
+    var PORT = P.port, SCOPE = (P.scope || 'all').toLowerCase(), LANG = P.lang || 'en';
     var USE_ALL = (SCOPE !== 'session');
-    var BASE  = 'http://localhost:' + PORT;
+    var BASE = 'http://localhost:' + PORT;
 
     var DASH = '—';
     function $(id) { return document.getElementById(id); }
@@ -195,7 +202,7 @@
       if (everOk) document.body.classList.add('stale');
       else setOffline();
     }
-    var es = new EventSource(BASE + '/events?lang=en');
+    var es = new EventSource(BASE + '/events?lang=' + LANG);
     es.onmessage = function (e) {
       var d; try { d = JSON.parse(e.data); } catch (_) { return; }
       if (d && d.ok) { everOk = true; document.body.classList.remove('stale'); render(d); }
