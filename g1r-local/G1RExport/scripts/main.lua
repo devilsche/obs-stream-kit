@@ -79,6 +79,7 @@ local killBase    = nil   -- Map-Snapshot beim ersten Read (für Session-Summe)
 local lastKillMap = nil   -- letzte Map (für News-Delta)
 local killNews    = {}    -- jüngste Events {type=, n=}, max MAX_NEWS
 local MAX_NEWS    = 12
+local pendingEvents = {}    -- rohe Event-Liste seit dem letzten Schreiben (hit_dealt/hit_taken/kill)
 local diagDone    = false  -- einmaliges Diagnose-Log
 local guildDiagDone = false -- einmalige Gilden-Diagnose (Root-Cause "keine Gilde")
 local guildDiagTicks = 0    -- zählt Ticks bis State gültig (Timing vs. echter Fehler)
@@ -119,6 +120,7 @@ if READ_DMG_OUT then
                         totals.damageDealt = totals.damageDealt + num
                         if num > sess.recHardestDealt then sess.recHardestDealt = num end
                         if num > totals.recHardestDealt then totals.recHardestDealt = num end
+                        pendingEvents[#pendingEvents+1] = { kind = "hit_dealt", value = math.floor(num + 0.5) }
                         break
                     end
                 end
@@ -665,8 +667,10 @@ local function updateKills()
     for typ, cnt in pairs(map) do
         local prev = (lastKillMap and lastKillMap[typ]) or 0
         if cnt > prev then
-            killNews[#killNews + 1] = { type = typ, n = cnt - prev }
+            local n = cnt - prev
+            killNews[#killNews + 1] = { type = typ, n = n }
             while #killNews > MAX_NEWS do table.remove(killNews, 1) end
+            pendingEvents[#pendingEvents+1] = { kind = "kill", value = n, meta = { type = typ } }
         end
     end
     lastKillMap = map
@@ -781,6 +785,17 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack
         it[#it+1] = "{" .. table.concat(fields, ",") .. "}"
     end
     parts[#parts+1] = '"items":[' .. table.concat(it, ",") .. ']'
+    parts[#parts+1] = '"saveKey":null'
+    local evParts = {}
+    for _, ev in ipairs(pendingEvents) do
+        if ev.kind == "kill" then
+            evParts[#evParts+1] = string.format('{"kind":"kill","value":%d,"meta":{"type":"%s"}}',
+                math.floor((ev.value or 1)), jsonEsc(tostring(ev.meta and ev.meta.type or "")))
+        else
+            evParts[#evParts+1] = string.format('{"kind":"%s","value":%d}', ev.kind, math.floor(ev.value or 0))
+        end
+    end
+    parts[#parts+1] = '"events":[' .. table.concat(evParts, ",") .. ']'
     return "{" .. table.concat(parts, ",") .. "}"
 end
 
@@ -844,6 +859,7 @@ local function tick()
                         totals.damageTaken = totals.damageTaken - d
                         if -d > sess.recHardestTaken then sess.recHardestTaken = -d end
                         if -d > totals.recHardestTaken then totals.recHardestTaken = -d end
+                        pendingEvents[#pendingEvents+1] = { kind = "hit_taken", value = math.floor(-d + 0.5) }
                     elseif d > 0 then
                         sess.healthRegen = sess.healthRegen + d
                         totals.healthRegen = totals.healthRegen + d
@@ -954,7 +970,7 @@ local function tick()
     local json = buildJson(pos, items or {}, totalDistCm, stats or {}, guild, spell,
                            weapon, attack, clock, kills, killNews)
     local f = io.open(OUTPUT_PATH, "w")
-    if f then f:write(json); f:close() end
+    if f then f:write(json); f:close(); pendingEvents = {} end
     -- Gesamt-Werte nicht jeden Tick schreiben (I/O), nur ~alle 10 s.
     lastTotalsWrite = lastTotalsWrite + 1
     if lastTotalsWrite >= 40 then
