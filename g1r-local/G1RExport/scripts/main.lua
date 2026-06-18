@@ -36,6 +36,25 @@ local lastHp, lastMana, lastXp = nil, nil, nil
 -- Sprünge größer als das = Laden/Level-up/Respawn, nicht als Schaden/Regen zählen.
 local MAX_STAT_JUMP = 500
 
+-- ── Persistente Gesamt-Werte (über ALLE Sessions) + Rekorde ─────────────────
+-- Beim Mod-Start aus g1r-totals.json laden, Session-Deltas drauf addieren,
+-- periodisch zurückschreiben. recHardestDealt/damageDealt werden nur gefüllt,
+-- wenn der Damage-Hook (READ_DMG_OUT) aktiv ist.
+local TOTALS_PATH = [[C:\obs-g1r\g1r-totals.json]]
+local totals = { damageTaken=0, healthRegen=0, manaSpent=0, manaRegen=0, xpGained=0,
+                 distanceM=0, steps=0, damageDealt=0,
+                 recHardestTaken=0, recManaTick=0, recRunM=0, recHardestDealt=0 }
+local sessDamageDealt = 0   -- ausgeteilter Schaden DIESER Session (Damage-Hook)
+pcall(function()
+    local f = io.open(TOTALS_PATH, "r"); if not f then return end
+    local s = f:read("*a"); f:close()
+    for k in pairs(totals) do
+        local n = s:match('"' .. k .. '"%s*:%s*(-?%d+%.?%d*)')
+        if n then totals[k] = tonumber(n) end
+    end
+end)
+local lastTotalsWrite = 0
+
 -- Optionale Reader (Stand 2026-06-17, in-game verifiziert).
 -- An: Schlag (Schlagrichtung) + Uhr laufen stabil.
 -- Aus: SPELL + WEAPONS crashen HART am G1R-Build (GetSpellConfigGivenACharacter /
@@ -47,6 +66,7 @@ local READ_WEAPONS = false  -- CRASHT — DataModule_Combat:GetEquipedWeaponDefi
 local READ_ATTACK  = true   -- läuft — DataModule_Combat:GetCurrentAttackDirection
 local READ_CLOCK   = true   -- läuft — GameTimeSubsystem:GetCurrentClockTime
 local READ_KILLS   = false  -- Map liefert keine Daten (PuzzlesSubsystem) → aus
+local READ_DMG_OUT = false  -- ausgeteilter Schaden via Damage-Hook (Engine-Eingriff) → erst in-game testen
 local killBase    = nil   -- Map-Snapshot beim ersten Read (für Session-Summe)
 local lastKillMap = nil   -- letzte Map (für News-Delta)
 local killNews    = {}    -- jüngste Events {type=, n=}, max MAX_NEWS
@@ -62,6 +82,38 @@ RegisterHook("/Script/Engine.PlayerController:ClientRestart", function(self, New
     local ok, pawn = pcall(function() return NewPawn:get() end)
     if ok and isValid(pawn) then CachedPlayer = pawn end
 end)
+
+-- ── Damage-Hook: ausgeteilter Schaden (NUR wenn READ_DMG_OUT) ───────────────
+-- Engine-Eingriff → hinter Flag, alles in pcall. Die genaue Argument-Form von
+-- ApplyDamageTo ist am Build noch zu verifizieren: beim ersten Treffer wird die
+-- Args-Anzahl geloggt und ein numerischer Wert best-effort als Schaden genommen.
+-- Sobald die echte Arg-Position bekannt ist, hier gezielt extrahieren.
+local dmgHookDiag = false
+if READ_DMG_OUT then
+    pcall(function()
+        RegisterHook("/Script/G1R.GothicGASLibrary:ApplyDamageTo", function(...)
+            pcall(function()
+                local args = { ... }
+                if not dmgHookDiag then
+                    dmgHookDiag = true
+                    print("[G1RExport] DMG-Hook feuerte, #args=" .. tostring(#args) .. "\n")
+                end
+                for i = 2, #args do
+                    local v = args[i]
+                    local num = nil
+                    pcall(function() num = v:get() end)
+                    if type(num) ~= "number" then num = (type(v) == "number") and v or nil end
+                    if num and num > 0 then
+                        sessDamageDealt = sessDamageDealt + num
+                        totals.damageDealt = totals.damageDealt + num
+                        if num > totals.recHardestDealt then totals.recHardestDealt = num end
+                        break
+                    end
+                end
+            end)
+        end)
+    end)
+end
 
 local function getPlayer()
     if isValid(CachedPlayer) then return CachedPlayer end
@@ -680,6 +732,18 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack
         math.floor(sess.damageTaken + 0.5), math.floor(sess.healthRegen + 0.5),
         math.floor(sess.manaSpent + 0.5), math.floor(sess.manaRegen + 0.5),
         math.floor(sess.xpGained + 0.5), steps, meters)
+    parts[#parts+1] = string.format('"session_damageDealt":%d', math.floor(sessDamageDealt + 0.5))
+    -- Persistente Gesamt-Werte (alle Sessions).
+    parts[#parts+1] = string.format(
+        '"totals":{"damageTaken":%d,"healthRegen":%d,"manaSpent":%d,"manaRegen":%d,"xpGained":%d,"distanceM":%.1f,"steps":%d,"damageDealt":%d}',
+        math.floor(totals.damageTaken+0.5), math.floor(totals.healthRegen+0.5), math.floor(totals.manaSpent+0.5),
+        math.floor(totals.manaRegen+0.5), math.floor(totals.xpGained+0.5), totals.distanceM, totals.steps,
+        math.floor(totals.damageDealt+0.5))
+    -- Rekorde.
+    parts[#parts+1] = string.format(
+        '"records":{"hardestTaken":%d,"manaTick":%d,"runM":%.1f,"hardestDealt":%d}',
+        math.floor(totals.recHardestTaken+0.5), math.floor(totals.recManaTick+0.5),
+        totals.recRunM, math.floor(totals.recHardestDealt+0.5))
     -- Stats als Objekt {label:wert,...}
     local st = {}
     for k, v in pairs(stats or {}) do
@@ -724,10 +788,17 @@ local function tick()
         if lastPos then
             local dx, dy = pos.x - lastPos.x, pos.y - lastPos.y
             local d = math.sqrt(dx * dx + dy * dy)
-            if d <= MAX_STEP_CM then totalDistCm = totalDistCm + d end
+            if d <= MAX_STEP_CM then
+                totalDistCm = totalDistCm + d
+                totals.distanceM = totals.distanceM + d / 100
+                totals.steps = math.floor(totals.distanceM / STEP_LEN_M)
+            end
         end
         lastPos = pos
     end
+    -- Rekord "weiteste Strecke" = höchste Session-Strecke (totalDistCm seit Mod-Start).
+    local sessM = totalDistCm / 100
+    if sessM > totals.recRunM then totals.recRunM = sessM end
     -- Items via vollständigem mods-g1r-Helper-Stack (unwrap/arrGet) — entpackt die
     -- RemoteUnrealParam-Wrapper, umgeht so den ScriptStruct-m_Slots-Stolperstein.
     pcall(function() items = readInventory(char) or {} end)
@@ -741,22 +812,34 @@ local function tick()
         if hp ~= nil and lastHp ~= nil then
             local d = hp - lastHp
             if math.abs(d) <= MAX_STAT_JUMP then
-                if d < 0 then sess.damageTaken = sess.damageTaken - d
-                elseif d > 0 then sess.healthRegen = sess.healthRegen + d end
+                if d < 0 then
+                    sess.damageTaken = sess.damageTaken - d
+                    totals.damageTaken = totals.damageTaken - d
+                    if -d > totals.recHardestTaken then totals.recHardestTaken = -d end
+                elseif d > 0 then
+                    sess.healthRegen = sess.healthRegen + d
+                    totals.healthRegen = totals.healthRegen + d
+                end
             end
         end
         if hp ~= nil then lastHp = hp end
         if mana ~= nil and lastMana ~= nil then
             local d = mana - lastMana
             if math.abs(d) <= MAX_STAT_JUMP then
-                if d < 0 then sess.manaSpent = sess.manaSpent - d
-                elseif d > 0 then sess.manaRegen = sess.manaRegen + d end
+                if d < 0 then
+                    sess.manaSpent = sess.manaSpent - d
+                    totals.manaSpent = totals.manaSpent - d
+                    if -d > totals.recManaTick then totals.recManaTick = -d end
+                elseif d > 0 then
+                    sess.manaRegen = sess.manaRegen + d
+                    totals.manaRegen = totals.manaRegen + d
+                end
             end
         end
         if mana ~= nil then lastMana = mana end
         if xp ~= nil and lastXp ~= nil then
             local d = xp - lastXp
-            if d > 0 then sess.xpGained = sess.xpGained + d end  -- nur Zuwachs
+            if d > 0 then sess.xpGained = sess.xpGained + d; totals.xpGained = totals.xpGained + d end
         end
         if xp ~= nil then lastXp = xp end
     end
@@ -790,6 +873,15 @@ local function tick()
                            weapon, attack, clock, kills, killNews)
     local f = io.open(OUTPUT_PATH, "w")
     if f then f:write(json); f:close() end
+    -- Gesamt-Werte nicht jeden Tick schreiben (I/O), nur ~alle 10 s.
+    lastTotalsWrite = lastTotalsWrite + 1
+    if lastTotalsWrite >= 40 then
+        lastTotalsWrite = 0
+        local tp = {}
+        for k, v in pairs(totals) do tp[#tp+1] = string.format('"%s":%.2f', k, v) end
+        local tf = io.open(TOTALS_PATH, "w")
+        if tf then tf:write("{" .. table.concat(tp, ",") .. "}"); tf:close() end
+    end
 end
 
 -- UE4SS-Loop: alle POLL_INTERVAL_MS einmal schreiben.
