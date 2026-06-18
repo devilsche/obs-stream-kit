@@ -15,17 +15,15 @@
     html, body { width: 1040px; height: 46px; overflow: hidden; background: transparent;
                  font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif); }
 
-    /* .t-card liefert Fläche/Border/Ornament — hier nur auf Bar-Maße trimmen. */
-    .t-card.bar { padding: 0 16px; height: 46px; display: flex; align-items: center; gap: 0;
-                  width: 100%; white-space: nowrap; border-left-width: 3px;
-                  border-left-color: var(--theme-accent, #f2b705); }
+    /* .t-card liefert Fläche/Border/Ornament; .t-bar Flex/Padding; .t-card--accent Akzentkante. */
+    #bar { height: 46px; width: 1040px; }
 
     .it { display: inline-flex; align-items: baseline; gap: 6px; padding: 0 13px; }
     .v { color: var(--theme-text, #e8e0f0); font-weight: 700; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
     .v.good { color: var(--c-good); }
     .v.bad { color: var(--c-bad); }
     .k { color: var(--theme-text-dim, #8a7d99); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; }
-    .sep { color: var(--theme-border, rgba(94,42,121,.65)); }
+    /* .t-sep Farbe kommt aus .t-bar .t-sep in _blocks.css */
     .clock { color: var(--theme-accent, #f2b705); font-weight: 700; font-variant-numeric: tabular-nums;
              display: inline-flex; align-items: center; gap: 5px; padding-left: 13px; margin-left: auto; }
     .ico { font-family: "Material Symbols Rounded"; font-size: 1em; vertical-align: -2px; }
@@ -35,19 +33,19 @@
   </style>
 </head>
 <body>
-  <div class="t-card bar" id="bar">
+  <div class="t-card t-bar t-card--accent" id="bar">
     <span class="it"><span class="v" id="level">—</span><span class="k">Level</span></span>
-    <span class="sep">·</span>
+    <span class="t-sep">·</span>
     <span class="it"><span class="v" id="steps">—</span><span class="k">Steps</span></span>
-    <span class="sep">·</span>
+    <span class="t-sep">·</span>
     <span class="it"><span class="v bad" id="dmgOut">—</span><span class="k">DMG out</span></span>
-    <span class="sep">·</span>
+    <span class="t-sep">·</span>
     <span class="it"><span class="v" id="dmgTaken">—</span><span class="k">taken</span></span>
-    <span class="sep">·</span>
+    <span class="t-sep">·</span>
     <span class="it"><span class="v" id="manaUsed">—</span><span class="k">Mana&nbsp;used</span></span>
-    <span class="sep">·</span>
+    <span class="t-sep">·</span>
     <span class="it"><span class="v good" id="hpRegen">—</span><span class="k">HP regen</span></span>
-    <span class="sep">·</span>
+    <span class="t-sep">·</span>
     <span class="it"><span class="v good" id="manaRegen">—</span><span class="k">Mana regen</span></span>
     <span class="clock" id="clock"></span>
   </div>
