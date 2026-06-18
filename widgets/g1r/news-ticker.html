@@ -7,6 +7,12 @@
   <!-- Theme-Fundament: Tokens (_theme.css) VOR den Bausteinen (_blocks.css). -->
   <link rel="stylesheet" href="../_theme.css" />
   <link rel="stylesheet" href="../_blocks.css" />
+  <script type="application/json" id="params">
+[ {"key":"port","label":"Proxy-Port","type":"text","group":"Verbindung","default":"9210"},
+  {"key":"lang","label":"Sprache","type":"select","group":"Anzeige","default":"en",
+   "options":[["en","English"],["de","Deutsch"]]} ]
+</script>
+  <script src="../_params.js"></script>
   <style>
     /* Nur Widget-spezifisches Layout. Rahmen/Fläche/Ornament kommen aus .t-card. */
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -40,8 +46,9 @@
   </div>
 
   <script>
-    // Lokaler Proxy auf dem Spiel-PC. Port via ?port= override.
-    var PORT = new URLSearchParams(location.search).get('port') || '9210';
+    // Lokaler Proxy auf dem Spiel-PC. Port + Sprache via JSON-Insel + _params.js.
+    var P = Params.values(Params.readParams());
+    var PORT = P.port, LANG = P.lang || 'en';
     var BASE = 'http://localhost:' + PORT;
 
     var runEl = document.getElementById('run');
@@ -107,7 +114,7 @@
       if (everOk) card.classList.add('stale');
       else setOffline();
     }
-    var es = new EventSource(BASE + '/events?lang=en');
+    var es = new EventSource(BASE + '/events?lang=' + LANG);
     es.onmessage = function (e) {
       var d; try { d = JSON.parse(e.data); } catch (_) { return; }
       if (d && d.ok) { everOk = true; card.classList.remove('stale'); render(d); }
