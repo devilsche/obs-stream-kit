@@ -92,8 +92,8 @@ local dmgHookDiag = false
 if READ_DMG_OUT then
     pcall(function()
         RegisterHook("/Script/G1R.GothicGASLibrary:ApplyDamageTo", function(...)
+            local args = { ... }   -- '...' nur in DIESER vararg-Funktion gültig (nicht im inneren pcall)
             pcall(function()
-                local args = { ... }
                 if not dmgHookDiag then
                     dmgHookDiag = true
                     print("[G1RExport] DMG-Hook feuerte, #args=" .. tostring(#args) .. "\n")
