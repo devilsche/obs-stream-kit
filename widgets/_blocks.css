@@ -132,6 +132,42 @@ html[data-theme="swiss"] .t-hot-mark i{width:8px;height:8px;border-radius:0;back
 @media (prefers-reduced-motion:reduce){.t-hot--3 .t-hot-mark i{display:none!important}}
 @media (prefers-reduced-motion:reduce){.t-hot--3 .pubg-hot{animation:none}}
 
+/* ── t-bar: horizontale Live-Leiste (kompakt). Fläche/Rahmen via .t-card. ── */
+.t-bar{display:flex;align-items:center;gap:0;padding:0 16px;white-space:nowrap}
+.t-bar .t-sep{color:var(--theme-border)}
+
+/* ── t-card--accent: Akzent-Kante links (statt hartkodiertem border-left). ── */
+.t-card--accent{border-left-width:3px;border-left-color:var(--theme-accent)}
+
+/* ── t-ticker: Marquee mit Rand-Fade. Track 2× befüllen (nahtloser Loop). ── */
+.t-ticker{overflow:hidden;display:flex;align-items:center;flex:1;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%);
+  mask-image:linear-gradient(90deg,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%)}
+.t-ticker-track{display:inline-flex;white-space:nowrap;will-change:transform;animation:t-marquee 26s linear infinite}
+@keyframes t-marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.t-ticker-track{animation:none}.t-ticker-track > * + *{display:none}}
+
+/* ── t-kv: Key-Value-Zeile (Label links, Wert rechts). ── */
+.t-kv{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:.85rem}
+.t-kv .t-kv-k{color:var(--theme-text-dim)}
+.t-kv .t-kv-v{color:var(--theme-text);font-weight:700;font-variant-numeric:tabular-nums}
+
+/* ── t-chip: kleine Wert-Plakette. ── */
+.t-chip{display:inline-flex;align-items:center;gap:6px;background:var(--theme-surface-2);
+  border:var(--theme-border-width) solid var(--theme-border);border-radius:5px;
+  padding:2px 8px;font-size:.76rem;color:var(--theme-text)}
+.t-chip b{color:var(--theme-accent);font-variant-numeric:tabular-nums;font-weight:700}
+
+/* ── t-crest: Icon/Wappen-Badge (Material-Symbol, Akzent). ── */
+.t-crest{width:42px;height:42px;border-radius:8px;flex:none;display:grid;place-items:center;
+  background:radial-gradient(circle at 30% 25%,var(--theme-primary),#1a0e2b);
+  border:var(--theme-border-width) solid var(--theme-accent);color:var(--theme-accent);font-size:1.5rem}
+
+/* ── t-flyin: Einflug-Animation (Alerts). ── */
+@keyframes t-flyin{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:none}}
+.t-flyin{animation:t-flyin .45s cubic-bezier(.2,.8,.2,1) both}
+@media (prefers-reduced-motion:reduce){.t-flyin{animation:none}}
+
 /* ════ EBENE 2 — der CHARAKTER je Theme (Form, Typo, Deko, Glow) ════ */
 /* body::before-Hintergruende NUR im Dock/Dashboard-Kontext (body.dock) —
    transparente OBS-Overlays bleiben unangetastet. */
