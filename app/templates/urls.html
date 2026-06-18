@@ -809,6 +809,8 @@
   const filter   = document.getElementById("urlFilter");
   const emptyMsg = document.getElementById("urlEmpty");
 
+  function clearHeaders() { grid.querySelectorAll(".url-group").forEach(h => h.remove()); }
+
   function selectTab(name) {
     currentTab = name;
     tabs.forEach(t => {
@@ -816,7 +818,22 @@
       t.setAttribute("aria-selected", on ? "true" : "false");
       t.tabIndex = on ? 0 : -1;
     });
-    allCards.forEach(c => c.hidden = c.dataset.tab !== name);
+    clearHeaders();
+    let lastCat = null;
+    allCards.forEach(c => {
+      const show = c.dataset.tab === name;
+      c.hidden = !show;
+      if (show) {
+        const cat = c.dataset.cat || "";
+        if (cat !== lastCat) {                        // Sektions-Überschrift je Kategorie (Level 2)
+          const h = document.createElement("div");
+          h.className = "url-group";
+          h.textContent = cat.replace(/^.*·\s*/, ""); // "PUBG · Stats" → "Stats"
+          grid.insertBefore(h, c);
+          lastCat = cat;
+        }
+      }
+    });
     if (emptyMsg) emptyMsg.hidden = true;
   }
   tabs.forEach(t => t.addEventListener("click", () => selectTab(t.dataset.tab)));
@@ -861,8 +878,12 @@
   }
 
   // ── Karten einmalig alphabetisch sortieren + initialen Tab anwenden ─
-  allCards.sort((a,b) => (a.dataset.label||"").localeCompare(b.dataset.label||""))
-          .forEach(c => grid.appendChild(c));
+  // Nach Domain → Kategorie → Label gruppieren (Basis für Sektions-Überschriften).
+  allCards.sort((a,b) =>
+      (a.dataset.tab||"").localeCompare(b.dataset.tab||"")
+      || (a.dataset.cat||"").localeCompare(b.dataset.cat||"")
+      || (a.dataset.label||"").localeCompare(b.dataset.label||""))
+    .forEach(c => grid.appendChild(c));
   selectTab(currentTab);
 
   // ── Filter ────────────────────────────────────────────────
@@ -870,6 +891,7 @@
     const q = (filter.value || "").toLowerCase().trim();
     if (q.length < 3) { selectTab(currentTab); return; }
 
+    clearHeaders();   // Suche zeigt Treffer domain-übergreifend → keine Sektions-Header
     const hits = allCards.filter(c => {
       const hay = ((c.dataset.label||"")+" "+(c.dataset.cat||"")+" "+(c.dataset.desc||"")+" "+(c.dataset.path||"")).toLowerCase();
       return hay.includes(q);

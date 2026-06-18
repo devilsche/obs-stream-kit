@@ -1055,6 +1055,9 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
 
 /* ── Card-Grid ── */
 .url-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:15px}
+.url-group{grid-column:1/-1;font-weight:600;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--text-muted,#888);padding:14px 2px 5px;border-bottom:1px solid var(--border);margin-top:6px}
+.url-group:first-child{margin-top:0;padding-top:2px}
 .url-card{border:1px solid var(--border);background:var(--bg-elev);text-align:left;cursor:pointer;font:inherit;
   display:flex;flex-direction:column;position:relative;padding:0;color:inherit;min-height:138px;
   border-radius:var(--r-box);transition:border-color .14s,box-shadow .14s}
