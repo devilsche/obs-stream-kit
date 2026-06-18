@@ -11,6 +11,7 @@ Stop:   Strg+C
 
 Läuft komplett lokal — es verlässt nichts den PC.
 """
+import collections
 import json
 import os
 import re
@@ -335,6 +336,34 @@ def _creature_display(name, lang):
         return entry.get(lang) or entry.get(DEFAULT_LANG) or entry.get("en")
     pretty = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", base.replace("_", " "))
     return pretty.strip() or str(name)
+
+
+class Forwarder:
+    """Puffert Ingest-Pakete und schickt sie an Prod; übersteht Offline-Phasen."""
+    def __init__(self, prod_url, token, maxlen=500):
+        self.prod_url = prod_url
+        self.token = token
+        self.buffer = collections.deque(maxlen=maxlen)
+        self._seq = 0
+
+    def enqueue(self, snapshot, events, save_key=None):
+        self._seq += 1
+        self.buffer.append(json.dumps({
+            "client_seq": self._seq, "save_key": save_key,
+            "snapshot": snapshot, "events": events or [],
+        }).encode("utf-8"))
+
+    def flush_once(self, post_fn):
+        if not self.buffer:
+            return
+        body = self.buffer[0]
+        headers = {"Content-Type": "application/json", "X-Tenant-Token": self.token}
+        try:
+            status = post_fn(self.prod_url, headers, body)
+        except Exception:
+            return  # Netz weg -> beim nächsten Mal erneut
+        if status == 200:
+            self.buffer.popleft()
 
 
 class Handler(BaseHTTPRequestHandler):
