@@ -284,6 +284,9 @@ class Handler(BaseHTTPRequestHandler):
                     for ev in data["killNews"]:
                         name = _creature_display(ev.get("type"), lang)
                         ev["text"] = f"{ev.get('n', 1)}× {name} {verb}"
+                steam = os.environ.get("G1R_STEAM_NAME", "")
+                if steam:
+                    data["steamName"] = steam
                 data["lang"] = lang
                 payload = data
             else:

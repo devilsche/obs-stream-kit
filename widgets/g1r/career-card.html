@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=360, height=480" />
+  <title>G1R Career-Card</title>
+  <link rel="stylesheet" href="../_theme.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+  <style>
+    :root {
+      --c-accent:   var(--theme-accent,   #f2b705);
+      --c-primary:  var(--theme-primary,  #5e2a79);
+      --c-bg:       var(--theme-bg,       #0a0510);
+      --c-surface:  var(--theme-surface,  #1f1430);
+      --c-surface2: var(--theme-surface2, #2a1c42);
+      --c-text:     var(--theme-text,     #e8e0f0);
+      --c-muted:    var(--theme-text-dim, #8a7d99);
+      --c-border:   var(--theme-border,   rgba(94,42,121,.65));
+      --c-rec:      var(--theme-record,   #ff9d3c);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 360px; height: 480px; overflow: hidden; background: transparent;
+                 font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif); }
+
+    .card { background: linear-gradient(180deg, var(--c-surface), var(--c-bg));
+            border: 1px solid var(--c-border); border-radius: var(--theme-radius, 8px); position: relative; }
+    .card::before { content: ""; position: absolute; inset: 0; border-radius: var(--theme-radius, 8px);
+            pointer-events: none; box-shadow: inset 0 0 0 1px rgba(242,183,5,.12); }
+
+    .career { width: 360px; height: 480px; padding: 18px 20px 20px; border-left: 3px solid var(--c-accent); }
+
+    .head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .crest { width: 42px; height: 42px; border-radius: 8px; flex: none;
+             background: radial-gradient(circle at 30% 25%, var(--c-primary), #1a0e2b);
+             border: 1px solid var(--c-accent); display: grid; place-items: center;
+             color: var(--c-accent); font-size: 1.4rem; }
+    .who .name { font-family: var(--theme-font-display, "Cinzel", serif); color: var(--c-accent); font-size: 1.2rem; }
+    .who .sub { color: var(--c-muted); font-size: .8rem; }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; margin-bottom: 16px; }
+    .stat { display: flex; justify-content: space-between; align-items: baseline;
+            border-bottom: 1px solid rgba(255,255,255,.06); padding-bottom: 4px; }
+    .stat .n { color: var(--c-muted); font-size: .82rem; }
+    .stat .b { color: var(--c-text); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    .section-lbl { color: var(--c-muted); text-transform: uppercase; letter-spacing: .12em;
+                   font-size: .6rem; margin: 4px 0 8px; }
+
+    .res { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+    .res span { background: var(--c-surface2); border: 1px solid var(--c-border);
+                border-radius: 5px; padding: 2px 8px; font-size: .76rem; color: var(--c-text); }
+    .res b { color: var(--c-accent); font-variant-numeric: tabular-nums; }
+
+    .totals, .records { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-bottom: 4px; }
+    .totals .t, .records .r { display: flex; justify-content: space-between; font-size: .82rem; }
+    .totals .t .n, .records .r .n { color: var(--c-muted); }
+    .totals .t .b { color: var(--c-text); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .records .r .b { color: var(--c-rec); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    .gear { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.07);
+            display: grid; gap: 6px; }
+    .gear .row { display: flex; justify-content: space-between; align-items: baseline; font-size: .85rem; }
+    .gear .row .n { color: var(--c-muted); }
+    .gear .row .b { color: var(--c-text); font-weight: 500; }
+
+    .ico { font-family: "Material Symbols Rounded"; font-size: 1em; line-height: 1; }
+
+    body.offline .who .name { color: var(--c-muted); }
+  </style>
+</head>
+<body>
+  <div class="card career">
+    <div class="head">
+      <div class="crest"><span class="ico">shield</span></div>
+      <div class="who">
+        <div class="name" id="name">—</div>
+        <div class="sub" id="sub">—</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="stat"><span class="n">Strength</span><span class="b" id="strength">—</span></div>
+      <div class="stat"><span class="n">Dexterity</span><span class="b" id="dexterity">—</span></div>
+      <div class="stat"><span class="n">HP</span><span class="b" id="hp">—</span></div>
+      <div class="stat"><span class="n">Mana</span><span class="b" id="mana">—</span></div>
+      <div class="stat"><span class="n">Magic circle</span><span class="b" id="magicCircle">—</span></div>
+      <div class="stat"><span class="n">Learn points</span><span class="b" id="learnPts">—</span></div>
+    </div>
+
+    <div class="section-lbl">Resistances</div>
+    <div class="res" id="res">
+      <span>Fire <b id="resFire">—</b></span><span>Ice <b id="resIce">—</b></span><span>Edge <b id="resEdge">—</b></span>
+      <span>Point <b id="resPoint">—</b></span><span>Blunt <b id="resBlunt">—</b></span>
+    </div>
+
+    <div class="section-lbl">Total (all sessions)</div>
+    <div class="totals">
+      <div class="t"><span class="n">Distance</span><span class="b" id="totDistance">—</span></div>
+      <div class="t"><span class="n">Steps</span><span class="b" id="totSteps">—</span></div>
+      <div class="t"><span class="n">DMG out</span><span class="b" id="totDmgOut">—</span></div>
+      <div class="t"><span class="n">DMG in</span><span class="b" id="totDmgIn">—</span></div>
+    </div>
+
+    <div class="section-lbl">Records</div>
+    <div class="records">
+      <div class="r"><span class="n">Hardest hit</span><span class="b" id="recHit">—</span></div>
+      <div class="r"><span class="n">Hardest taken</span><span class="b" id="recTaken">—</span></div>
+      <div class="r"><span class="n">Longest run</span><span class="b" id="recRun">—</span></div>
+      <div class="r"><span class="n">Max mana/cast</span><span class="b" id="recMana">—</span></div>
+    </div>
+
+    <div class="gear">
+      <div class="row"><span class="n">Strongest weapon</span><span class="b" id="gearWeapon">—</span></div>
+      <div class="row"><span class="n">Strongest spell</span><span class="b" id="gearSpell">—</span></div>
+    </div>
+  </div>
+
+  <script>
+    // Local proxy on the game PC. Port via ?port= override.
+    var PORT = new URLSearchParams(location.search).get('port') || '9210';
+    var URL  = 'http://localhost:' + PORT + '/state?lang=en';
+    var INTERVAL = 1000;
+
+    var DASH = '—';
+    function $(id) { return document.getElementById(id); }
+
+    function num(v) {
+      return (v === undefined || v === null) ? DASH : Math.round(v).toLocaleString('en-US');
+    }
+    function pair(v, vMax) {
+      if (v === undefined || v === null) return DASH;
+      return num(v) + (vMax !== undefined && vMax !== null ? ' / ' + num(vMax) : '');
+    }
+    function km(v) {
+      return (v === undefined || v === null) ? DASH : (v / 1000).toFixed(1) + ' km';
+    }
+
+    var FIELDS = ['name','sub','strength','dexterity','hp','mana','magicCircle','learnPts',
+      'resFire','resIce','resEdge','resPoint','resBlunt',
+      'totDistance','totSteps','totDmgOut','totDmgIn',
+      'recHit','recTaken','recRun','recMana','gearWeapon','gearSpell'];
+
+    function setOffline() {
+      document.body.classList.add('offline');
+      $('name').textContent = 'Hero';
+      FIELDS.forEach(function (id) { if (id !== 'name') $(id).textContent = DASH; });
+    }
+
+    function render(d) {
+      document.body.classList.remove('offline');
+      var stats = d.stats || {};
+      var totals = d.totals || {};
+      var records = d.records || {};
+
+      $('name').textContent = d.steamName || 'Hero';
+      var guild = d.guild || DASH;
+      var lvl = (stats.level === undefined || stats.level === null) ? DASH : num(stats.level);
+      $('sub').textContent = guild + ' · Lv ' + lvl;
+
+      $('strength').textContent = num(stats.strength);
+      $('dexterity').textContent = num(stats.dexterity);
+      $('hp').textContent = pair(stats.hp, stats.hpMax);
+      $('mana').textContent = pair(stats.mana, stats.manaMax);
+      $('magicCircle').textContent = num(stats.magicCircle);
+      $('learnPts').textContent = num(stats.learnPts);
+
+      $('resFire').textContent = num(stats.resFire);
+      $('resIce').textContent = num(stats.resIce);
+      $('resEdge').textContent = num(stats.resEdge);
+      $('resPoint').textContent = num(stats.resPoint);
+      $('resBlunt').textContent = num(stats.resBlunt);
+
+      $('totDistance').textContent = km(totals.distanceM);
+      $('totSteps').textContent = num(totals.steps);
+      $('totDmgOut').textContent = num(totals.damageDealt);
+      $('totDmgIn').textContent = num(totals.damageTaken);
+
+      $('recHit').textContent = num(records.hardestDealt);
+      $('recTaken').textContent = num(records.hardestTaken);
+      $('recRun').textContent = km(records.runM);
+      $('recMana').textContent = num(records.manaTick);
+
+      $('gearWeapon').textContent = d.strongestWeaponDisplay || DASH;
+      $('gearSpell').textContent = d.strongestSpellDisplay || DASH;
+    }
+
+    function poll() {
+      fetch(URL, { credentials: 'omit' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d && d.ok) render(d);
+          else setOffline();
+        })
+        .catch(function () { setOffline(); });
+    }
+
+    poll();
+    setInterval(poll, INTERVAL);
+  </script>
+</body>
+</html>
