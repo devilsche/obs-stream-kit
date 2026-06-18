@@ -10,3 +10,12 @@ def test_strongest_weapon_picks_highest_damage():
 def test_strongest_weapon_none_when_no_weapon():
     srv.WEAPON_DAMAGE = {"ItMw_1H_Sword_01": 8}
     assert srv.strongest_weapon([{"name": "ItFo_Apple"}]) is None
+
+def test_strongest_usable_spell_respects_circle():
+    srv.SPELL_CIRCLE = {"ItAr_Rune_FireBolt": 1, "ItAr_Rune_Fireball": 2, "ItAr_Rune_BreathOfDeath": 6}
+    items = [{"name": "ItAr_Rune_FireBolt"}, {"name": "ItAr_Rune_Fireball"}, {"name": "ItAr_Rune_BreathOfDeath"}]
+    assert srv.strongest_usable_spell(items, 2) == "ItAr_Rune_Fireball"
+
+def test_strongest_usable_spell_none_when_circle_too_low():
+    srv.SPELL_CIRCLE = {"ItAr_Rune_Fireball": 2}
+    assert srv.strongest_usable_spell([{"name": "ItAr_Rune_Fireball"}], 0) is None

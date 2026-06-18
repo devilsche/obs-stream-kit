@@ -67,6 +67,28 @@ def strongest_weapon(items):
             best, best_dmg = it.get("name"), dmg
     return best
 
+
+# Zauber-Kreise: Klassenname -> benoetigter Magie-Kreis (1-6). Eine Rune ist
+# nutzbar, wenn ihr Kreis <= magicCircle des Spielers. Dient dazu, aus dem
+# Inventar den staerksten nutzbaren Zauber zu bestimmen.
+SPELL_CIRCLE = _load_json_map(os.path.join(os.path.dirname(os.path.abspath(__file__)), "spell_circle.json"))
+
+
+def strongest_usable_spell(items, magic_circle):
+    """Liefert den Klassennamen der nutzbaren Inventar-Rune mit dem hoechsten
+    Kreis (<= magicCircle), oder None wenn keine nutzbar ist."""
+    try:
+        mc = int(magic_circle)
+    except (TypeError, ValueError):
+        return None
+    best, best_circle = None, 0
+    for it in (items or []):
+        circ = SPELL_CIRCLE.get(it.get("name"))
+        if circ is not None and circ <= mc and circ > best_circle:
+            best, best_circle = it.get("name"), circ
+    return best
+
+
 # Zauber-Namen analog. Schlüssel werden normalisiert (klein, nur a-z0-9), damit
 # Schreibweisen/Unterstriche egal sind ('Spell_Fireball' == 'FireBall' == 'fireball').
 SPELL_NAMES_FILE = os.environ.get(
@@ -229,6 +251,12 @@ class Handler(BaseHTTPRequestHandler):
                 if sw:
                     data["strongestWeapon"] = sw
                     data["strongestWeaponDisplay"] = _translate(sw, lang)
+                # Staerkster nutzbarer Zauber (Rune im Inventar x Kreis-Abgleich).
+                mc = (data.get("stats") or {}).get("magicCircle", 0)
+                ss = strongest_usable_spell(data.get("items"), mc)
+                if ss:
+                    data["strongestSpell"] = ss
+                    data["strongestSpellDisplay"] = _translate(ss, lang)
                 if data.get("spell"):
                     data["spellDisplay"] = _spell_display(data.get("spell"), lang)
                 # Gefuehrte Waffe: Klassenname (ItMw_*/ItRw_*) wie Items uebersetzen.
