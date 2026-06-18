@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="entry">
+<head>
+  <meta charset="utf-8">
+  <title>Komponenten-Vorschau · t-* Bausteine</title>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+  <link rel="stylesheet" href="/widgets-static/_theme.css">
+  <link rel="stylesheet" href="/widgets-static/_blocks.css">
+  <style>
+    /* ── Seiten-Layout ── */
+    html, body {
+      margin: 0;
+      min-height: 100vh;
+    }
+    body {
+      background: var(--theme-page-bg);
+      color: var(--theme-text);
+      font-family: var(--theme-font-body, sans-serif);
+      padding: 24px clamp(16px, 4vw, 56px) 64px;
+      box-sizing: border-box;
+    }
+
+    .skip-link {
+      position: absolute;
+      left: 8px;
+      top: -40px;
+      z-index: 100;
+      background: var(--theme-accent);
+      color: var(--theme-on-primary);
+      padding: 8px 14px;
+      border-radius: var(--theme-radius);
+      transition: top .15s;
+    }
+    .skip-link:focus { top: 8px; }
+
+    /* ── Seiten-Header ── */
+    .page-header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 32px;
+    }
+    .page-title {
+      font-family: var(--theme-font-display, sans-serif);
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 700;
+      margin: 0;
+    }
+    .page-lede {
+      color: var(--theme-text-dim);
+      margin: 6px 0 0;
+      max-width: 60ch;
+    }
+
+    /* ── Theme-Switcher ── */
+    .switcher {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .switcher button {
+      font-family: var(--theme-font-body, sans-serif);
+      font-size: .9rem;
+      cursor: pointer;
+      min-height: 36px;
+      min-width: 24px;
+      padding: 6px 14px;
+      color: var(--theme-text);
+      background: var(--theme-surface-2);
+      border: var(--theme-border-width) solid var(--theme-border);
+      border-radius: var(--theme-radius);
+    }
+    .switcher button[aria-pressed="true"] {
+      background: var(--theme-primary);
+      color: var(--theme-on-primary);
+      border-color: var(--theme-accent);
+    }
+
+    /* ── Katalog-Grid ── */
+    .catalog {
+      display: grid;
+      gap: 32px;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    }
+    .catalog-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .catalog-section--wide {
+      grid-column: 1 / -1;
+    }
+    .section-label {
+      font-family: var(--theme-font-mono, monospace);
+      font-size: .72rem;
+      letter-spacing: .08em;
+      color: var(--theme-accent);
+      text-transform: uppercase;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--theme-border);
+    }
+
+    /* ── t-bar Demo: Flex-Zeile mit Gap-Items ── */
+    .bar-demo-items {
+      display: contents;
+    }
+    .bar-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      font-family: var(--theme-font-mono, monospace);
+      font-size: .83rem;
+      color: var(--theme-text);
+    }
+    .bar-item .bar-key {
+      color: var(--theme-text-dim);
+      font-size: .76rem;
+    }
+    .bar-item .bar-val {
+      color: var(--theme-accent);
+      font-weight: 700;
+    }
+
+    /* ── Ticker-Demo: feste Höhe, damit der Overflow sichtbar ist ── */
+    .ticker-demo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      background: var(--theme-surface);
+      background-image: var(--theme-texture);
+      border: var(--theme-border-width) solid var(--theme-border);
+      border-radius: var(--theme-radius);
+      height: 38px;
+      padding: 0;
+    }
+    .ticker-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 20px;
+      font-family: var(--theme-font-mono, monospace);
+      font-size: .82rem;
+      color: var(--theme-text-dim);
+      white-space: nowrap;
+    }
+    .ticker-item strong {
+      color: var(--theme-text);
+      font-weight: 700;
+    }
+
+    /* ── t-kv Block ── */
+    .kv-block {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    /* ── t-chip Row ── */
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    /* ── t-crest Row ── */
+    .crest-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+    .crest-label {
+      font-family: var(--theme-font-mono, monospace);
+      font-size: .76rem;
+      color: var(--theme-text-dim);
+    }
+
+    /* ── t-flyin Demo ── */
+    .flyin-demo {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .flyin-trigger {
+      font-family: var(--theme-font-body, sans-serif);
+      font-size: .9rem;
+      cursor: pointer;
+      min-height: 36px;
+      min-width: 24px;
+      padding: 6px 16px;
+      color: var(--theme-on-primary);
+      background: var(--theme-primary);
+      border: var(--theme-border-width) solid var(--theme-accent);
+      border-radius: var(--theme-radius);
+      align-self: flex-start;
+    }
+    .flyin-demo-target {
+      display: none;
+    }
+    .flyin-demo-target.is-visible {
+      display: block;
+    }
+
+    /* ── Fokus global ── */
+    *:focus-visible {
+      outline: 3px solid var(--theme-accent);
+      outline-offset: 2px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Zum Inhalt springen</a>
+
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">Komponenten-Vorschau</h1>
+      <p class="page-lede">Lebender Katalog aller <code>t-*</code>-Bausteine aus
+        <code>_blocks.css</code>. Theme-Switcher oder URL-Parameter
+        <code>?theme=…</code> für Screenshots.</p>
+    </div>
+    <nav class="switcher" aria-label="Theme wählen">
+      <button type="button" data-set-theme="entry"    aria-pressed="true" >Entry</button>
+      <button type="button" data-set-theme="oldcamp"  aria-pressed="false">Old Camp</button>
+      <button type="button" data-set-theme="terminal" aria-pressed="false">Terminal</button>
+      <button type="button" data-set-theme="swiss"    aria-pressed="false">Swiss</button>
+      <button type="button" data-set-theme="aurora"   aria-pressed="false">Aurora</button>
+      <button type="button" data-set-theme="midnight" aria-pressed="false">Midnight</button>
+      <button type="button" data-set-theme="editorial" aria-pressed="false">Editorial</button>
+      <button type="button" data-set-theme="barrier"  aria-pressed="false">Barrier</button>
+      <button type="button" data-set-theme="sect"     aria-pressed="false">Sect</button>
+    </nav>
+  </header>
+
+  <main id="main" class="catalog">
+
+    <!-- ── t-card + t-header + t-range ── -->
+    <section class="catalog-section" aria-labelledby="lbl-card">
+      <h2 class="section-label" id="lbl-card">.t-card · .t-header · .t-range</h2>
+      <article class="t-card" aria-label="Beispiel-Karte Standard">
+        <header class="t-header">
+          Letzte Session
+          <span class="t-range">01.06 – 16.06.2026</span>
+        </header>
+        <p>Inhalt der Karte — Hintergrund, Rahmen und Radius reagieren live auf den Theme-Wechsel.</p>
+      </article>
+    </section>
+
+    <!-- ── t-card--accent ── -->
+    <section class="catalog-section" aria-labelledby="lbl-accent">
+      <h2 class="section-label" id="lbl-accent">.t-card.t-card--accent</h2>
+      <article class="t-card t-card--accent" aria-label="Akzent-Karte">
+        <header class="t-header">
+          Highlight-Match
+          <span class="t-range">Solo-FPP</span>
+        </header>
+        <p>Akzent-Kante links (3 px, <code>--theme-accent</code>) — Kennzeichnung für wichtige Einträge.</p>
+      </article>
+    </section>
+
+    <!-- ── t-stat-grid ── -->
+    <section class="catalog-section" aria-labelledby="lbl-stat">
+      <h2 class="section-label" id="lbl-stat">.t-stat-grid · .t-stat · .t-value · .t-label · .t-hot</h2>
+      <article class="t-card" aria-label="Statistik-Karte">
+        <header class="t-header">
+          Session-Statistiken
+          <span class="t-range">Letzte 10 Matches</span>
+        </header>
+        <div class="t-stat-grid">
+          <div class="t-stat">
+            <span class="t-value">247</span>
+            <span class="t-label">Kills</span>
+          </div>
+          <div class="t-stat">
+            <span class="t-value">3.8</span>
+            <span class="t-label">K/D</span>
+          </div>
+          <div class="t-stat t-hot t-hot--2">
+            <span class="t-hot-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="t-value pubg-hot">14</span>
+            <span class="t-label">Chicken Dinner</span>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ── t-stat-grid--cols3--compact ── -->
+    <section class="catalog-section" aria-labelledby="lbl-compact">
+      <h2 class="section-label" id="lbl-compact">.t-stat-grid--cols3.t-stat-grid--compact</h2>
+      <article class="t-card" aria-label="Kompaktes Raster">
+        <header class="t-header">
+          Career-Übersicht
+        </header>
+        <div class="t-stat-grid t-stat-grid--cols3 t-stat-grid--compact">
+          <div class="t-stat">
+            <span class="t-value">1 247</span>
+            <span class="t-label">Matches</span>
+          </div>
+          <div class="t-stat">
+            <span class="t-value">42</span>
+            <span class="t-label">Top-1</span>
+          </div>
+          <div class="t-stat">
+            <span class="t-value">3.8</span>
+            <span class="t-label">K/D</span>
+          </div>
+          <div class="t-stat">
+            <span class="t-value">214</span>
+            <span class="t-label">Kills/Match</span>
+          </div>
+          <div class="t-stat">
+            <span class="t-value">68 %</span>
+            <span class="t-label">Survival</span>
+          </div>
+          <div class="t-stat t-hot t-hot--1">
+            <span class="t-value pubg-hot">9.1</span>
+            <span class="t-label">Avg Dmg</span>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ── t-bar ── -->
+    <section class="catalog-section catalog-section--wide" aria-labelledby="lbl-bar">
+      <h2 class="section-label" id="lbl-bar">.t-bar · .t-sep</h2>
+      <article class="t-card" aria-label="Horizontale Live-Leiste">
+        <div class="t-bar" role="list" aria-label="Live-Statusleiste">
+          <div class="bar-item" role="listitem">
+            <span class="bar-key">Match</span>
+            <span class="bar-val">#1 247</span>
+          </div>
+          <span class="t-sep" aria-hidden="true">·</span>
+          <div class="bar-item" role="listitem">
+            <span class="bar-key">Map</span>
+            <span class="bar-val">Erangel</span>
+          </div>
+          <span class="t-sep" aria-hidden="true">·</span>
+          <div class="bar-item" role="listitem">
+            <span class="bar-key">Kills</span>
+            <span class="bar-val">12</span>
+          </div>
+          <span class="t-sep" aria-hidden="true">·</span>
+          <div class="bar-item" role="listitem">
+            <span class="bar-key">Platz</span>
+            <span class="bar-val">#3</span>
+          </div>
+          <span class="t-sep" aria-hidden="true">·</span>
+          <div class="bar-item" role="listitem">
+            <span class="bar-key">Dmg</span>
+            <span class="bar-val">842</span>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ── t-ticker ── -->
+    <section class="catalog-section catalog-section--wide" aria-labelledby="lbl-ticker">
+      <h2 class="section-label" id="lbl-ticker">.t-ticker · .t-ticker-track</h2>
+      <div class="ticker-demo-wrap" role="marquee" aria-label="Laufende Ereignisse">
+        <div class="t-ticker">
+          <div class="t-ticker-track" aria-hidden="true">
+            <!-- Track 2× befüllen für nahtlosen Loop -->
+            <span class="ticker-item"><strong>Hat3</strong> 12 Kills · Damage 920</span>
+            <span class="ticker-item"><strong>LuCKoR</strong> Chicken Dinner! #14</span>
+            <span class="ticker-item"><strong>MateA</strong> 8 Kills · Top-3</span>
+            <span class="ticker-item"><strong>Hat3</strong> Hot Drop Erangel School</span>
+            <span class="ticker-item"><strong>LuCKoR</strong> Sniper Ace · 500m Kill</span>
+            <span class="ticker-item"><strong>Hat3</strong> 12 Kills · Damage 920</span>
+            <span class="ticker-item"><strong>LuCKoR</strong> Chicken Dinner! #14</span>
+            <span class="ticker-item"><strong>MateA</strong> 8 Kills · Top-3</span>
+            <span class="ticker-item"><strong>Hat3</strong> Hot Drop Erangel School</span>
+            <span class="ticker-item"><strong>LuCKoR</strong> Sniper Ace · 500m Kill</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── t-kv ── -->
+    <section class="catalog-section" aria-labelledby="lbl-kv">
+      <h2 class="section-label" id="lbl-kv">.t-kv · .t-kv-k · .t-kv-v</h2>
+      <article class="t-card" aria-label="Key-Value-Liste">
+        <header class="t-header">Match-Details</header>
+        <dl class="kv-block">
+          <div class="t-kv">
+            <dt class="t-kv-k">Modus</dt>
+            <dd class="t-kv-v">Squad FPP</dd>
+          </div>
+          <div class="t-kv">
+            <dt class="t-kv-k">Map</dt>
+            <dd class="t-kv-v">Erangel</dd>
+          </div>
+          <div class="t-kv">
+            <dt class="t-kv-k">Platzierung</dt>
+            <dd class="t-kv-v">#3 / 100</dd>
+          </div>
+          <div class="t-kv">
+            <dt class="t-kv-k">Dauer</dt>
+            <dd class="t-kv-v">32:14</dd>
+          </div>
+          <div class="t-kv">
+            <dt class="t-kv-k">Kills</dt>
+            <dd class="t-kv-v">12</dd>
+          </div>
+        </dl>
+      </article>
+    </section>
+
+    <!-- ── t-chip ── -->
+    <section class="catalog-section" aria-labelledby="lbl-chip">
+      <h2 class="section-label" id="lbl-chip">.t-chip</h2>
+      <article class="t-card" aria-label="Chip-Plaketten">
+        <header class="t-header">Auszeichnungen</header>
+        <div class="chip-row">
+          <span class="t-chip">Kills <b>12</b></span>
+          <span class="t-chip">Dmg <b>842</b></span>
+          <span class="t-chip">K/D <b>3.8</b></span>
+          <span class="t-chip">Top-1 <b>14×</b></span>
+          <span class="t-chip">Win-Rate <b>11 %</b></span>
+          <span class="t-chip">Matches <b>1 247</b></span>
+        </div>
+      </article>
+    </section>
+
+    <!-- ── t-crest ── -->
+    <section class="catalog-section" aria-labelledby="lbl-crest">
+      <h2 class="section-label" id="lbl-crest">.t-crest</h2>
+      <article class="t-card" aria-label="Wappen-Badges">
+        <header class="t-header">Embleme</header>
+        <div class="crest-row">
+          <div class="t-crest" aria-label="Schild">
+            <span class="material-symbols-rounded" aria-hidden="true">shield</span>
+          </div>
+          <div class="t-crest" aria-label="Stern">
+            <span class="material-symbols-rounded" aria-hidden="true">star</span>
+          </div>
+          <div class="t-crest" aria-label="Blitz">
+            <span class="material-symbols-rounded" aria-hidden="true">bolt</span>
+          </div>
+          <div class="t-crest" aria-label="Flagge">
+            <span class="material-symbols-rounded" aria-hidden="true">flag</span>
+          </div>
+          <span class="crest-label">42×42 px · radial-gradient + border</span>
+        </div>
+      </article>
+    </section>
+
+    <!-- ── t-hot-mark (alle Stufen) ── -->
+    <section class="catalog-section" aria-labelledby="lbl-hot">
+      <h2 class="section-label" id="lbl-hot">.t-hot · .t-hot-mark · Stufen 1–3</h2>
+      <article class="t-card" aria-label="Highlight-Stufen">
+        <header class="t-header">Hot-Highlights</header>
+        <div class="t-stat-grid">
+          <div class="t-stat t-hot t-hot--1">
+            <span class="t-value pubg-hot">3.8</span>
+            <span class="t-label">K/D · Stufe 1</span>
+          </div>
+          <div class="t-stat t-hot t-hot--2">
+            <span class="t-hot-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="t-value pubg-hot">14</span>
+            <span class="t-label">Chicken · Stufe 2</span>
+          </div>
+          <div class="t-stat t-hot t-hot--3">
+            <span class="t-hot-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+            <span class="t-value pubg-hot">842</span>
+            <span class="t-label">Dmg · Stufe 3</span>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ── t-flyin ── -->
+    <section class="catalog-section" aria-labelledby="lbl-flyin">
+      <h2 class="section-label" id="lbl-flyin">.t-flyin</h2>
+      <article class="t-card" aria-label="Einflug-Animation">
+        <header class="t-header">Alert-Einflug</header>
+        <div class="flyin-demo">
+          <p class="page-lede">Klick triggert die Animation neu (via Klassen-Wechsel).</p>
+          <button type="button" class="flyin-trigger" aria-controls="flyin-demo-box">
+            Animation abspielen
+          </button>
+          <div class="t-flyin flyin-demo-target is-visible t-card t-card--accent"
+               id="flyin-demo-box"
+               aria-live="polite">
+            <strong>Neuer Follower:</strong> FlyIn_Demo fährt ein.
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ── t-launch (Rakete) ── -->
+    <section class="catalog-section" aria-labelledby="lbl-launch">
+      <h2 class="section-label" id="lbl-launch">.t-launch</h2>
+      <article class="t-card" aria-label="Raketen-Flourish">
+        <header class="t-header">Grand-Chicken-Flourish</header>
+        <div class="t-stat-grid">
+          <div class="t-stat">
+            <div class="t-launch" aria-label="Rakete">
+              <span class="rocket" aria-hidden="true"></span>
+              <span class="flame" aria-hidden="true"></span>
+              <span class="smoke" aria-hidden="true"></span>
+              <span class="smoke" aria-hidden="true"></span>
+              <span class="smoke" aria-hidden="true"></span>
+            </div>
+            <span class="t-label">Raketenstart</span>
+          </div>
+        </div>
+      </article>
+    </section>
+
+  </main>
+
+  <script>
+    // ── Theme-Switcher ──
+    const root = document.documentElement;
+    const buttons = document.querySelectorAll("[data-set-theme]");
+
+    function applyTheme(theme) {
+      root.setAttribute("data-theme", theme);
+      buttons.forEach(b =>
+        b.setAttribute("aria-pressed", String(b.dataset.setTheme === theme)));
+    }
+
+    buttons.forEach(btn => {
+      btn.addEventListener("click", () => applyTheme(btn.dataset.setTheme));
+    });
+
+    // URL-Parameter ?theme=<name> für Screenshots
+    const urlTheme = new URLSearchParams(location.search).get("theme");
+    if (urlTheme) applyTheme(urlTheme);
+
+    // ── t-flyin: Klassen-Wechsel für Animations-Replay ──
+    const flyinTrigger = document.querySelector(".flyin-trigger");
+    const flyinTarget  = document.querySelector("#flyin-demo-box");
+    if (flyinTrigger && flyinTarget) {
+      flyinTrigger.addEventListener("click", () => {
+        flyinTarget.classList.remove("t-flyin");
+        // reflow erzwingen, dann Klasse zurücksetzen
+        void flyinTarget.offsetWidth;
+        flyinTarget.classList.add("t-flyin");
+      });
+    }
+
+    // ── t-launch: fonts-ready-Klasse setzen, sobald Icons geladen ──
+    if (document.fonts) {
+      document.fonts.ready.then(() => root.classList.add("fonts-ready"));
+    } else {
+      root.classList.add("fonts-ready");
+    }
+  </script>
+</body>
+</html>

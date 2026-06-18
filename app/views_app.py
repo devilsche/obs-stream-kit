@@ -41,6 +41,11 @@ TOOLS = [
      "desc": "Ornament-Rahmen (als Overlay), Textur + Background pro Theme auf verschiedenen Widget-Größen — Design-Basis.",
      "path": "tools/ornament-preview.html",
      "admin_only": True},
+    {"key": "component-preview",
+     "label": "Komponenten-Vorschau",
+     "desc": "Lebender Katalog aller t-*-Bausteine in jedem Theme — Referenz + Abnahme.",
+     "path": "tools/component-preview.html",
+     "admin_only": True},
 ]
 
 
