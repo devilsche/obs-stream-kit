@@ -44,21 +44,18 @@
         <input type="search" id="urlFilter" placeholder="Search sources… e.g. &quot;career&quot;, &quot;sub&quot;, &quot;overlay&quot;" aria-label="Search all sources" autocomplete="off">
       </div>
 
-      <div class="url-tabs" role="tablist" aria-label="Source-Typen">
-        <button type="button" role="tab" id="urltab-overlays" data-tab="overlays" data-label="Overlays"
-                aria-selected="true" aria-controls="urlpanel-overlays">Overlays<span class="url-tabs__cnt">{{ overlays|length }}</span></button>
-        <button type="button" role="tab" id="urltab-widgets" data-tab="widgets" data-label="Widgets"
-                aria-selected="false" tabindex="-1" aria-controls="urlpanel-widgets">Widgets<span class="url-tabs__cnt">{{ widgets|length }}</span></button>
+      {# Domain-first: Bereiche statt Quell-Typen. Karten tragen data-tab=Domain. #}
+      <div class="url-tabs" role="tablist" aria-label="Bereiche">
+        <button type="button" role="tab" id="urltab-pubg" data-tab="pubg" data-label="PUBG"
+                aria-selected="true" aria-controls="urlGrid">PUBG</button>
+        <button type="button" role="tab" id="urltab-steam" data-tab="steam" data-label="Steam"
+                aria-selected="false" tabindex="-1" aria-controls="urlGrid">Steam</button>
+        <button type="button" role="tab" id="urltab-g1r" data-tab="g1r" data-label="Gothic 1"
+                aria-selected="false" tabindex="-1" aria-controls="urlGrid">Gothic&nbsp;1</button>
+        <button type="button" role="tab" id="urltab-stream" data-tab="stream" data-label="Stream"
+                aria-selected="false" tabindex="-1" aria-controls="urlGrid">Stream</button>
         <button type="button" role="tab" id="urltab-decor" data-tab="decor" data-label="Look &amp; Decor"
-                aria-selected="false" tabindex="-1" aria-controls="urlpanel-decor">Look &amp; Decor<span class="url-tabs__cnt">{{ decor|length }}</span></button>
-        <button type="button" role="tab" id="urltab-alerts" data-tab="alerts" data-label="Alerts"
-                aria-selected="false" tabindex="-1" aria-controls="urlpanel-alerts">Alerts<span class="url-tabs__cnt">{{ alerts|length }}</span></button>
-        <button type="button" role="tab" id="urltab-memes" data-tab="memes" data-label="Memes"
-                aria-selected="false" tabindex="-1" aria-controls="urlpanel-memes">Memes<span class="url-tabs__cnt">{{ stingers|length }}</span></button>
-        <button type="button" role="tab" id="urltab-effects" data-tab="effects" data-label="Effects"
-                aria-selected="false" tabindex="-1" aria-controls="urlpanel-effects">Effects<span class="url-tabs__cnt">{{ effects|length }}</span></button>
-        <button type="button" role="tab" id="urltab-transition" data-tab="transition" data-label="Transition"
-                aria-selected="false" tabindex="-1" aria-controls="urlpanel-transition">Transition<span class="url-tabs__cnt">{{ transitions|length }}</span></button>
+                aria-selected="false" tabindex="-1" aria-controls="urlGrid">Look&nbsp;&amp;&nbsp;Decor</button>
       </div>
 
       {# ── Ein Grid — alle Karten mit data-tab ── #}
@@ -66,13 +63,14 @@
         {% for o in overlays %}
         {{ src_card('overlay','Overlay',o.label,
                     overlay_base~'/s/'~token~'/overlays/'~o.file,'overlays/'~o.file,
-                    o.size,o.desc,(o.switches or []),(o.params or []),False,'','overlays',
+                    o.size,o.desc,(o.switches or []),(o.params or []),False,'','stream',
                     o.preview_size|default(None)) }}
         {% endfor %}
         {% for cat,label,desc,path,switches,hint,preview_size in widgets %}
+        {% set dom = 'pubg' if cat.startswith('PUBG') else ('steam' if cat == 'Steam' else ('g1r' if cat == 'Gothic 1' else 'stream')) %}
         {{ src_card('widget',cat,label,
                     base_url~'/s/'~token~'/widgets/'~path,path,
-                    '',desc,switches,[],False,hint,'widgets',preview_size) }}
+                    '',desc,switches,[],False,hint,dom,preview_size) }}
         {% endfor %}
         {% for d in decor %}
         {{ src_card('overlay','Decor',d.label,
@@ -83,24 +81,24 @@
         {% for a in alerts %}
         {{ src_card('overlay','Alert',a.label,
                     base_url~'/s/'~token~'/alerts/'~a.file,'alerts/'~a.file,
-                    a.size,a.desc,a.switches or [],a.params or [],False,'','alerts',
+                    a.size,a.desc,a.switches or [],a.params or [],False,'','stream',
                     a.preview_size|default(None)) }}
         {% endfor %}
         {% for s in stingers %}
         {{ src_card('overlay','Meme',s.label,
                     base_url~'/s/'~token~'/stingers/'~s.file,'stingers/'~s.file,
-                    s.size,s.desc,s.switches or [],s.params or [],False,'','memes') }}
+                    s.size,s.desc,s.switches or [],s.params or [],False,'','stream') }}
         {% endfor %}
         {% for e in effects %}
         {{ src_card('overlay','Effect',e.label,
                     base_url~'/s/'~token~'/effects/'~e.file,'effects/'~e.file,
-                    e.size,e.desc,e.switches or [],e.params or [],False,'','effects') }}
+                    e.size,e.desc,e.switches or [],e.params or [],False,'','decor') }}
         {% endfor %}
         {% for t in transitions %}
         {{ src_card('overlay','Transition',t.label,
                     base_url~'/s/'~token~'/transitions/'~t.file,'transitions/'~t.file,
                     t.size,t.desc,t.switches or [],t.params or [],
-                    t.chrome_preview|default(False),'','transition',
+                    t.chrome_preview|default(False),'','stream',
                     t.preview_size|default(None)) }}
         {% endfor %}
       </div>
@@ -227,7 +225,7 @@
   }
 
   // ── Detail-View für eine Card füllen ──────────────────────
-  let currentTab = "overlays";
+  let currentTab = "pubg";
 
   function openDetail(card) {
     const base = card.dataset.base;
