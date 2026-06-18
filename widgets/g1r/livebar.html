@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=720, height=46" />
+  <meta name="viewport" content="width=1040, height=46" />
   <title>G1R Livebar</title>
   <link rel="stylesheet" href="../_theme.css" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
@@ -19,7 +19,7 @@
       --c-bad:     #e3564b;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 720px; height: 46px; overflow: hidden; background: transparent;
+    html, body { width: 1040px; height: 46px; overflow: hidden; background: transparent;
                  font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif); }
 
     .card { background: linear-gradient(180deg, var(--c-surface), var(--c-bg));
@@ -27,8 +27,9 @@
     .card::before { content: ""; position: absolute; inset: 0; border-radius: var(--theme-radius, 8px);
             pointer-events: none; box-shadow: inset 0 0 0 1px rgba(242,183,5,.12); }
 
-    .livebar { display: flex; align-items: center; gap: 0; height: 46px; width: 720px;
+    .livebar { display: flex; align-items: center; gap: 0; height: 46px; width: 100%;
                padding: 0 16px; border-left: 3px solid var(--c-accent); white-space: nowrap; }
+    .livebar .clock { margin-left: auto; }
     .livebar .it { display: inline-flex; align-items: baseline; gap: 6px; padding: 0 13px; }
     .livebar .v { color: var(--c-text); font-weight: 700; font-size: 1.05rem;
                   font-variant-numeric: tabular-nums; }
