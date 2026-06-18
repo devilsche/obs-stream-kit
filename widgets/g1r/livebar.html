@@ -63,8 +63,9 @@
 
   <script>
     // Local proxy on the game PC. Port via ?port= override.
-    var PORT = new URLSearchParams(location.search).get('port') || '9210';
-    var URL  = 'http://localhost:' + PORT + '/state?lang=en';
+    var PORT  = new URLSearchParams(location.search).get('port') || '9210';
+    var SCOPE = (new URLSearchParams(location.search).get('scope') || 'session').toLowerCase();
+    var URL   = 'http://localhost:' + PORT + '/state?lang=en';
     var INTERVAL = 400;
 
     var bar = document.getElementById('bar');
@@ -99,14 +100,16 @@
     function render(d) {
       bar.classList.remove('offline');
       var stats = d.stats || {};
-      var sess = d.session || {};
+      // scope: 'session' = Werte dieser Session, 'all' = persistente Gesamtwerte (d.totals).
+      var src = (SCOPE === 'all') ? (d.totals || {}) : (d.session || {});
+      var dmgOut = (SCOPE === 'all') ? src.damageDealt : d.session_damageDealt;
       levelEl.textContent = num(stats.level);
-      stepsEl.textContent = num(sess.steps);
-      dmgOutEl.textContent = num(d.session_damageDealt !== undefined && d.session_damageDealt !== null ? d.session_damageDealt : 0);
-      dmgTakenEl.textContent = num(sess.damageTaken);
-      manaUsedEl.textContent = num(sess.manaSpent);
-      hpRegenEl.textContent = signed(sess.healthRegen);
-      manaRegenEl.textContent = signed(sess.manaRegen);
+      stepsEl.textContent = num(src.steps);
+      dmgOutEl.textContent = num(dmgOut !== undefined && dmgOut !== null ? dmgOut : 0);
+      dmgTakenEl.textContent = num(src.damageTaken);
+      manaUsedEl.textContent = num(src.manaSpent);
+      hpRegenEl.textContent = signed(src.healthRegen);
+      manaRegenEl.textContent = signed(src.manaRegen);
       if (d.clock && typeof d.clock.hour === 'number') {
         clockEl.innerHTML = '<span class="ico">schedule</span>' +
           ('0' + d.clock.hour).slice(-2) + ':' + ('0' + (d.clock.minute || 0)).slice(-2);
