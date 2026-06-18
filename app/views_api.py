@@ -171,6 +171,13 @@ def _build_steam_registry(tenant_id):
     )
 
 
+def _build_g1r_registry(tenant_id):
+    """Frische G1rEndpointRegistry pro Request. Rohe Conn rein — die Registry
+    wrappt selbst (SqliteCompatConn nur fuer Postgres, sqlite bleibt nativ)."""
+    from g1r.endpoints import G1rEndpointRegistry
+    return G1rEndpointRegistry(get_conn=lambda: _get_conn(), tenant_id=tenant_id)
+
+
 def _dispatch(path: str, tenant_id: int, method: str = "GET",
               body: bytes = b""):
     """Routet /pubg/<sub> oder /steam/<sub> zur richtigen Registry.
@@ -225,6 +232,16 @@ def _dispatch(path: str, tenant_id: int, method: str = "GET",
         except Exception as e:  # noqa: BLE001
             current_app.logger.exception("steam dispatch failed")
             return ({"error": f"steam_dispatch_failed: {e}"}, 500,
+                    "application/json")
+    elif domain == "g1r":
+        # G1R braucht KEIN Credentials-Gate — nur Tenant-Token (oben aufgeloest).
+        try:
+            reg = _build_g1r_registry(tenant_id)
+            return reg.dispatch(method, full_path, body,
+                                dict(request.headers))
+        except Exception as e:  # noqa: BLE001
+            current_app.logger.exception("g1r dispatch failed")
+            return ({"error": f"g1r_dispatch_failed: {e}"}, 500,
                     "application/json")
 
     abort(404)
