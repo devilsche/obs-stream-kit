@@ -14,38 +14,28 @@
     html, body { width: 360px; height: 480px; overflow: hidden; background: transparent;
                  font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif); }
 
-    /* .t-card liefert Fläche/Border/Ornament. Hier dichteres Padding + Akzentkante. */
-    .t-card.career { width: 360px; height: 480px; padding: 16px 18px;
-                     border-left-width: 3px; border-left-color: var(--theme-accent, #f2b705); }
+    /* .t-card liefert Fläche/Border/Ornament. Hier dichteres Padding. */
+    .t-card.career { width: 360px; height: 480px; padding: 16px 18px; }
 
     .head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-    .crest { width: 42px; height: 42px; border-radius: 8px; flex: none;
-             background: radial-gradient(circle at 30% 25%, var(--theme-primary, #5e2a79), #1a0e2b);
-             border: 1px solid var(--theme-accent, #f2b705); display: grid; place-items: center;
-             color: var(--theme-accent, #f2b705); font-size: 1.5rem; }
     .who .name { font-family: var(--theme-font-display, "Cinzel", serif); color: var(--theme-accent, #f2b705); font-size: 1.2rem; }
     .who .sub { color: var(--theme-text-dim, #8a7d99); font-size: .8rem; }
-
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 18px; margin-bottom: 12px; }
-    .stat { display: flex; justify-content: space-between; align-items: baseline;
-            border-bottom: 1px solid rgba(255,255,255,.06); padding-bottom: 3px; }
-    .stat .n { color: var(--theme-text-dim, #8a7d99); font-size: .82rem; }
-    .stat .b { color: var(--theme-text, #e8e0f0); font-weight: 700; font-variant-numeric: tabular-nums; }
 
     .section-lbl { color: var(--theme-text-dim, #8a7d99); text-transform: uppercase; letter-spacing: .12em;
                    font-size: .6rem; margin: 0 0 7px; display: flex; justify-content: space-between; align-items: baseline; }
     .section-lbl .scope { color: var(--theme-accent, #f2b705); letter-spacing: .08em; }
 
     .res { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-    .res span { background: var(--theme-surface-2, #2a1c42); border: 1px solid var(--theme-border, rgba(94,42,121,.65));
-                border-radius: 5px; padding: 2px 8px; font-size: .76rem; color: var(--theme-text, #e8e0f0); }
-    .res b { color: var(--theme-accent, #f2b705); font-variant-numeric: tabular-nums; }
 
-    .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
-    .kv .row { display: flex; justify-content: space-between; font-size: .82rem; }
-    .kv .row .n { color: var(--theme-text-dim, #8a7d99); }
-    .kv .row .b { color: var(--theme-text, #e8e0f0); font-weight: 700; font-variant-numeric: tabular-nums; }
-    .kv.records .row .b { color: var(--c-rec); }
+    /* Records-Werte in Akzentfarbe (warn). */
+    .kv-records .t-kv-v { color: var(--c-rec); }
+
+    /* Stats-Raster: 2 Spalten, Zeilen mit Trennlinie. */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 18px; margin-bottom: 12px; }
+    .grid .t-kv { border-bottom: 1px solid rgba(255,255,255,.06); padding-bottom: 3px; }
+
+    /* Totals/Records/Gear: 2 Spalten. */
+    .kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
 
     /* Records bekommen klaren Abstand + Trennlinie nach oben, damit sie als
        eigene Kategorie lesbar sind und nicht an "Damage dealt" kleben. */
@@ -58,9 +48,9 @@
   </style>
 </head>
 <body>
-  <div class="t-card career">
+  <div class="t-card t-card--accent career">
     <div class="head">
-      <div class="crest"><span class="ico" id="crest">person</span></div>
+      <div class="t-crest"><span class="ico" id="crest">person</span></div>
       <div class="who">
         <div class="name" id="name">—</div>
         <div class="sub" id="sub">—</div>
@@ -68,45 +58,45 @@
     </div>
 
     <div class="grid">
-      <div class="stat"><span class="n">Strength</span><span class="b" id="strength">—</span></div>
-      <div class="stat"><span class="n">Dexterity</span><span class="b" id="dexterity">—</span></div>
-      <div class="stat"><span class="n">HP</span><span class="b" id="hp">—</span></div>
-      <div class="stat"><span class="n">Mana</span><span class="b" id="mana">—</span></div>
-      <div class="stat"><span class="n">Magic circle</span><span class="b" id="magicCircle">—</span></div>
-      <div class="stat"><span class="n">Learn points</span><span class="b" id="learnPts">—</span></div>
+      <div class="t-kv"><span class="t-kv-k">Strength</span><span class="t-kv-v" id="strength">—</span></div>
+      <div class="t-kv"><span class="t-kv-k">Dexterity</span><span class="t-kv-v" id="dexterity">—</span></div>
+      <div class="t-kv"><span class="t-kv-k">HP</span><span class="t-kv-v" id="hp">—</span></div>
+      <div class="t-kv"><span class="t-kv-k">Mana</span><span class="t-kv-v" id="mana">—</span></div>
+      <div class="t-kv"><span class="t-kv-k">Magic circle</span><span class="t-kv-v" id="magicCircle">—</span></div>
+      <div class="t-kv"><span class="t-kv-k">Learn points</span><span class="t-kv-v" id="learnPts">—</span></div>
     </div>
 
     <div class="section-lbl">Resistances</div>
     <div class="res">
-      <span>Fire <b id="resFire">—</b></span><span>Ice <b id="resIce">—</b></span><span>Edge <b id="resEdge">—</b></span>
-      <span>Point <b id="resPoint">—</b></span><span>Blunt <b id="resBlunt">—</b></span>
+      <span class="t-chip">Fire <b id="resFire">—</b></span><span class="t-chip">Ice <b id="resIce">—</b></span><span class="t-chip">Edge <b id="resEdge">—</b></span>
+      <span class="t-chip">Point <b id="resPoint">—</b></span><span class="t-chip">Blunt <b id="resBlunt">—</b></span>
     </div>
 
     <div class="block">
       <div class="section-lbl">Totals <span class="scope" id="scopeLbl">lifetime</span></div>
-      <div class="kv">
-        <div class="row"><span class="n">Distance</span><span class="b" id="totDistance">—</span></div>
-        <div class="row"><span class="n">Steps</span><span class="b" id="totSteps">—</span></div>
-        <div class="row"><span class="n">Damage dealt</span><span class="b" id="totDmgOut">—</span></div>
-        <div class="row"><span class="n">Damage taken</span><span class="b" id="totDmgIn">—</span></div>
+      <div class="kv-grid">
+        <div class="t-kv"><span class="t-kv-k">Distance</span><span class="t-kv-v" id="totDistance">—</span></div>
+        <div class="t-kv"><span class="t-kv-k">Steps</span><span class="t-kv-v" id="totSteps">—</span></div>
+        <div class="t-kv"><span class="t-kv-k">Damage dealt</span><span class="t-kv-v" id="totDmgOut">—</span></div>
+        <div class="t-kv"><span class="t-kv-k">Damage taken</span><span class="t-kv-v" id="totDmgIn">—</span></div>
       </div>
     </div>
 
     <div class="block">
       <div class="section-lbl">Records <span class="scope" id="scopeLbl2">lifetime</span></div>
-      <div class="kv records">
-        <div class="row"><span class="n">Hardest hit dealt</span><span class="b" id="recHit">—</span></div>
-        <div class="row"><span class="n">Hardest hit taken</span><span class="b" id="recTaken">—</span></div>
-        <div class="row"><span class="n">Longest run</span><span class="b" id="recRun">—</span></div>
-        <div class="row"><span class="n">Max mana/tick</span><span class="b" id="recMana">—</span></div>
+      <div class="kv-grid kv-records">
+        <div class="t-kv"><span class="t-kv-k">Hardest hit dealt</span><span class="t-kv-v" id="recHit">—</span></div>
+        <div class="t-kv"><span class="t-kv-k">Hardest hit taken</span><span class="t-kv-v" id="recTaken">—</span></div>
+        <div class="t-kv"><span class="t-kv-k">Longest run</span><span class="t-kv-v" id="recRun">—</span></div>
+        <div class="t-kv"><span class="t-kv-k">Max mana/tick</span><span class="t-kv-v" id="recMana">—</span></div>
       </div>
     </div>
 
     <div class="block">
-      <div class="kv">
-        <div class="row"><span class="n">Strongest melee</span><span class="b" id="gearMelee">—</span></div>
-        <div class="row"><span class="n">Strongest ranged</span><span class="b" id="gearRanged">—</span></div>
-        <div class="row"><span class="n">Strongest spell</span><span class="b" id="gearSpell">—</span></div>
+      <div class="kv-grid">
+        <div class="t-kv"><span class="t-kv-k">Strongest melee</span><span class="t-kv-v" id="gearMelee">—</span></div>
+        <div class="t-kv"><span class="t-kv-k">Strongest ranged</span><span class="t-kv-v" id="gearRanged">—</span></div>
+        <div class="t-kv"><span class="t-kv-k">Strongest spell</span><span class="t-kv-v" id="gearSpell">—</span></div>
       </div>
     </div>
   </div>
