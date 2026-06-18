@@ -15,8 +15,10 @@ import collections
 import json
 import os
 import re
+import threading
 import time
 import urllib.parse
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 # ── Konfiguration ──────────────────────────────────────────────────────────
@@ -431,9 +433,70 @@ class Handler(BaseHTTPRequestHandler):
         pass  # leise
 
 
+# ── Prod-Forwarding (optional) ───────────────────────────────────────────────
+# Versendet die Daten zusätzlich an die Prod-DB-API. Aktiv NUR wenn G1R_INGEST_URL
+# gesetzt ist (volle Token-URL, z.B. https://stream-overlay.com/s/<token>/api/g1r/ingest).
+# Ohne die Env-Var bleibt der Proxy reiner Lokal-Server wie bisher.
+_SNAPSHOT_MAP = {
+    "level": ("stats", "level"), "xp": ("stats", "xp"),
+    "hp": ("stats", "hp"), "hp_max": ("stats", "hpMax"),
+    "mana": ("stats", "mana"), "mana_max": ("stats", "manaMax"),
+    "strength": ("stats", "strength"), "dexterity": ("stats", "dexterity"),
+    "magic_circle": ("stats", "magicCircle"), "learn_pts": ("stats", "learnPts"),
+    "res_fire": ("stats", "resFire"), "res_ice": ("stats", "resIce"),
+    "res_edge": ("stats", "resEdge"), "res_point": ("stats", "resPoint"),
+    "res_blunt": ("stats", "resBlunt"),
+    "distance_m": ("session", "distanceM"), "steps": ("session", "steps"),
+}
+
+
+def snapshot_from_payload(p):
+    """build_payload-Output auf die g1r_sample-Snapshot-Felder abbilden."""
+    snap = {col: (p.get(grp) or {}).get(key) for col, (grp, key) in _SNAPSHOT_MAP.items()}
+    snap["guild_key"] = p.get("guildKey")
+    snap["strongest_melee"] = p.get("strongestMelee")
+    snap["strongest_melee_dmg"] = p.get("strongestMeleeDmg")
+    snap["strongest_ranged"] = p.get("strongestRanged")
+    snap["strongest_ranged_dmg"] = p.get("strongestRangedDmg")
+    snap["strongest_spell"] = p.get("strongestSpell")
+    return snap
+
+
+def _real_post(url, headers, body):
+    req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+    with urllib.request.urlopen(req, timeout=5) as r:
+        return getattr(r, "status", None) or r.getcode()
+
+
+def _forward_loop(fw, interval=2.0):
+    """Pollt die State-Datei; bei jeder NEUEN Mod-Schreibung (mtime-Wechsel) genau
+    ein Paket an Prod schicken (Dedup gegen Retries macht der Server via client_seq)."""
+    last_mtime = 0
+    while True:
+        try:
+            m = os.path.getmtime(STATE_FILE)
+        except OSError:
+            m = 0
+        if m and m != last_mtime:
+            p = build_payload(DEFAULT_LANG)
+            if p.get("ok"):
+                fw.enqueue(snapshot_from_payload(p), p.get("events") or [], p.get("saveKey"))
+                last_mtime = m
+        try:
+            fw.flush_once(_real_post)
+        except Exception:
+            pass
+        time.sleep(interval)
+
+
 if __name__ == "__main__":
     print(f"[g1r-local] liest {STATE_FILE}")
     print(f"[g1r-local] serviert http://localhost:{PORT}/state  (Strg+C zum Beenden)")
+    _ingest_url = os.environ.get("G1R_INGEST_URL")
+    if _ingest_url:
+        _fw = Forwarder(_ingest_url, os.environ.get("G1R_INGEST_TOKEN", ""))
+        threading.Thread(target=_forward_loop, args=(_fw,), daemon=True).start()
+        print(f"[g1r-local] Prod-Forwarding aktiv → {_ingest_url}")
     srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     try:
         srv.serve_forever()
