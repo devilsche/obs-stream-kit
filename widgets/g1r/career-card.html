@@ -4,74 +4,61 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=360, height=480" />
   <title>G1R Career-Card</title>
+  <!-- Theme-Fundament: Tokens (_theme.css) VOR den Bausteinen (_blocks.css). -->
   <link rel="stylesheet" href="../_theme.css" />
+  <link rel="stylesheet" href="../_blocks.css" />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
   <style>
-    :root {
-      --c-accent:   var(--theme-accent,   #f2b705);
-      --c-primary:  var(--theme-primary,  #5e2a79);
-      --c-bg:       var(--theme-bg,       #0a0510);
-      --c-surface:  var(--theme-surface,  #1f1430);
-      --c-surface2: var(--theme-surface-2, #2a1c42);
-      --c-text:     var(--theme-text,     #e8e0f0);
-      --c-muted:    var(--theme-text-dim, #8a7d99);
-      --c-border:   var(--theme-border,   rgba(94,42,121,.65));
-      --c-rec:      var(--theme-warn,     #ff9d3c);
-    }
+    :root { --c-rec: var(--theme-warn, #ff9d3c); }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 360px; height: 480px; overflow: hidden; background: transparent;
                  font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif); }
 
-    .card { background: linear-gradient(180deg, var(--c-surface), var(--c-bg));
-            border: 1px solid var(--c-border); border-radius: var(--theme-radius, 8px); position: relative; }
-    .card::before { content: ""; position: absolute; inset: 0; border-radius: var(--theme-radius, 8px);
-            pointer-events: none; box-shadow: inset 0 0 0 1px rgba(242,183,5,.12); }
+    /* .t-card liefert Fläche/Border/Ornament. Hier dichteres Padding + Akzentkante. */
+    .t-card.career { width: 360px; height: 480px; padding: 16px 18px;
+                     border-left-width: 3px; border-left-color: var(--theme-accent, #f2b705); }
 
-    .career { width: 360px; height: 480px; padding: 18px 20px 20px; border-left: 3px solid var(--c-accent); }
-
-    .head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
     .crest { width: 42px; height: 42px; border-radius: 8px; flex: none;
-             background: radial-gradient(circle at 30% 25%, var(--c-primary), #1a0e2b);
-             border: 1px solid var(--c-accent); display: grid; place-items: center;
-             color: var(--c-accent); font-size: 1.4rem; }
-    .who .name { font-family: var(--theme-font-display, "Cinzel", serif); color: var(--c-accent); font-size: 1.2rem; }
-    .who .sub { color: var(--c-muted); font-size: .8rem; }
+             background: radial-gradient(circle at 30% 25%, var(--theme-primary, #5e2a79), #1a0e2b);
+             border: 1px solid var(--theme-accent, #f2b705); display: grid; place-items: center;
+             color: var(--theme-accent, #f2b705); font-size: 1.5rem; }
+    .who .name { font-family: var(--theme-font-display, "Cinzel", serif); color: var(--theme-accent, #f2b705); font-size: 1.2rem; }
+    .who .sub { color: var(--theme-text-dim, #8a7d99); font-size: .8rem; }
 
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; margin-bottom: 16px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 18px; margin-bottom: 12px; }
     .stat { display: flex; justify-content: space-between; align-items: baseline;
-            border-bottom: 1px solid rgba(255,255,255,.06); padding-bottom: 4px; }
-    .stat .n { color: var(--c-muted); font-size: .82rem; }
-    .stat .b { color: var(--c-text); font-weight: 700; font-variant-numeric: tabular-nums; }
+            border-bottom: 1px solid rgba(255,255,255,.06); padding-bottom: 3px; }
+    .stat .n { color: var(--theme-text-dim, #8a7d99); font-size: .82rem; }
+    .stat .b { color: var(--theme-text, #e8e0f0); font-weight: 700; font-variant-numeric: tabular-nums; }
 
-    .section-lbl { color: var(--c-muted); text-transform: uppercase; letter-spacing: .12em;
-                   font-size: .6rem; margin: 4px 0 8px; }
+    .section-lbl { color: var(--theme-text-dim, #8a7d99); text-transform: uppercase; letter-spacing: .12em;
+                   font-size: .6rem; margin: 0 0 7px; display: flex; justify-content: space-between; align-items: baseline; }
+    .section-lbl .scope { color: var(--theme-accent, #f2b705); letter-spacing: .08em; }
 
-    .res { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
-    .res span { background: var(--c-surface2); border: 1px solid var(--c-border);
-                border-radius: 5px; padding: 2px 8px; font-size: .76rem; color: var(--c-text); }
-    .res b { color: var(--c-accent); font-variant-numeric: tabular-nums; }
+    .res { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .res span { background: var(--theme-surface-2, #2a1c42); border: 1px solid var(--theme-border, rgba(94,42,121,.65));
+                border-radius: 5px; padding: 2px 8px; font-size: .76rem; color: var(--theme-text, #e8e0f0); }
+    .res b { color: var(--theme-accent, #f2b705); font-variant-numeric: tabular-nums; }
 
-    .totals, .records { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-bottom: 4px; }
-    .totals .t, .records .r { display: flex; justify-content: space-between; font-size: .82rem; }
-    .totals .t .n, .records .r .n { color: var(--c-muted); }
-    .totals .t .b { color: var(--c-text); font-weight: 700; font-variant-numeric: tabular-nums; }
-    .records .r .b { color: var(--c-rec); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+    .kv .row { display: flex; justify-content: space-between; font-size: .82rem; }
+    .kv .row .n { color: var(--theme-text-dim, #8a7d99); }
+    .kv .row .b { color: var(--theme-text, #e8e0f0); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .kv.records .row .b { color: var(--c-rec); }
 
-    .gear { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.07);
-            display: grid; gap: 6px; }
-    .gear .row { display: flex; justify-content: space-between; align-items: baseline; font-size: .85rem; }
-    .gear .row .n { color: var(--c-muted); }
-    .gear .row .b { color: var(--c-text); font-weight: 500; }
+    /* Records bekommen klaren Abstand + Trennlinie nach oben, damit sie als
+       eigene Kategorie lesbar sind und nicht an "Damage dealt" kleben. */
+    .block { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
 
     .ico { font-family: "Material Symbols Rounded"; font-size: 1em; line-height: 1; }
-
-    body.offline .who .name { color: var(--c-muted); }
+    body.offline .who .name { color: var(--theme-text-dim, #8a7d99); }
   </style>
 </head>
 <body>
-  <div class="card career">
+  <div class="t-card career">
     <div class="head">
-      <div class="crest"><span class="ico">shield</span></div>
+      <div class="crest"><span class="ico" id="crest">person</span></div>
       <div class="who">
         <div class="name" id="name">—</div>
         <div class="sub" id="sub">—</div>
@@ -88,74 +75,98 @@
     </div>
 
     <div class="section-lbl">Resistances</div>
-    <div class="res" id="res">
+    <div class="res">
       <span>Fire <b id="resFire">—</b></span><span>Ice <b id="resIce">—</b></span><span>Edge <b id="resEdge">—</b></span>
       <span>Point <b id="resPoint">—</b></span><span>Blunt <b id="resBlunt">—</b></span>
     </div>
 
-    <div class="section-lbl">Total (all sessions)</div>
-    <div class="totals">
-      <div class="t"><span class="n">Distance</span><span class="b" id="totDistance">—</span></div>
-      <div class="t"><span class="n">Steps</span><span class="b" id="totSteps">—</span></div>
-      <div class="t"><span class="n">DMG out</span><span class="b" id="totDmgOut">—</span></div>
-      <div class="t"><span class="n">DMG in</span><span class="b" id="totDmgIn">—</span></div>
+    <div class="block">
+      <div class="section-lbl">Totals <span class="scope" id="scopeLbl">lifetime</span></div>
+      <div class="kv">
+        <div class="row"><span class="n">Distance</span><span class="b" id="totDistance">—</span></div>
+        <div class="row"><span class="n">Steps</span><span class="b" id="totSteps">—</span></div>
+        <div class="row"><span class="n">Damage dealt</span><span class="b" id="totDmgOut">—</span></div>
+        <div class="row"><span class="n">Damage taken</span><span class="b" id="totDmgIn">—</span></div>
+      </div>
     </div>
 
-    <div class="section-lbl">Records</div>
-    <div class="records">
-      <div class="r"><span class="n">Hardest hit</span><span class="b" id="recHit">—</span></div>
-      <div class="r"><span class="n">Hardest taken</span><span class="b" id="recTaken">—</span></div>
-      <div class="r"><span class="n">Longest run</span><span class="b" id="recRun">—</span></div>
-      <div class="r"><span class="n">Max mana/cast</span><span class="b" id="recMana">—</span></div>
+    <div class="block">
+      <div class="section-lbl">Records <span class="scope" id="scopeLbl2">lifetime</span></div>
+      <div class="kv records">
+        <div class="row"><span class="n">Hardest hit dealt</span><span class="b" id="recHit">—</span></div>
+        <div class="row"><span class="n">Hardest hit taken</span><span class="b" id="recTaken">—</span></div>
+        <div class="row"><span class="n">Longest run</span><span class="b" id="recRun">—</span></div>
+        <div class="row"><span class="n">Max mana/tick</span><span class="b" id="recMana">—</span></div>
+      </div>
     </div>
 
-    <div class="gear">
-      <div class="row"><span class="n">Strongest weapon</span><span class="b" id="gearWeapon">—</span></div>
-      <div class="row"><span class="n">Strongest spell</span><span class="b" id="gearSpell">—</span></div>
+    <div class="block">
+      <div class="kv">
+        <div class="row"><span class="n">Strongest melee</span><span class="b" id="gearMelee">—</span></div>
+        <div class="row"><span class="n">Strongest ranged</span><span class="b" id="gearRanged">—</span></div>
+        <div class="row"><span class="n">Strongest spell</span><span class="b" id="gearSpell">—</span></div>
+      </div>
     </div>
   </div>
 
   <script>
-    // Local proxy on the game PC. Port via ?port= override.
-    var PORT = new URLSearchParams(location.search).get('port') || '9210';
-    var URL  = 'http://localhost:' + PORT + '/state?lang=en';
-    var INTERVAL = 1000;
+    // Lokaler Proxy auf dem Spiel-PC. Port via ?port=. Scope via ?scope=session|all
+    // (Default all = Karriere). KEIN Mischen: alle Totals UND Records folgen dem Scope.
+    var params = new URLSearchParams(location.search);
+    var PORT  = params.get('port') || '9210';
+    var SCOPE = (params.get('scope') || 'all').toLowerCase();
+    var USE_ALL = (SCOPE !== 'session');
+    var BASE  = 'http://localhost:' + PORT;
 
     var DASH = '—';
     function $(id) { return document.getElementById(id); }
-
-    function num(v) {
-      return (v === undefined || v === null) ? DASH : Math.round(v).toLocaleString('en-US');
-    }
+    function num(v) { return (v === undefined || v === null) ? DASH : Math.round(v).toLocaleString('en-US'); }
     function pair(v, vMax) {
       if (v === undefined || v === null) return DASH;
       return num(v) + (vMax !== undefined && vMax !== null ? ' / ' + num(vMax) : '');
     }
-    function km(v) {
-      return (v === undefined || v === null) ? DASH : (v / 1000).toFixed(1) + ' km';
+    function km(v) { return (v === undefined || v === null) ? DASH : (v / 1000).toFixed(1) + ' km'; }
+    function gear(name, dmg) {
+      if (!name) return DASH;
+      return name + (dmg !== undefined && dmg !== null ? ' · ' + num(dmg) : '');
     }
 
-    var FIELDS = ['name','sub','strength','dexterity','hp','mana','magicCircle','learnPts',
+    // Gilden-Wappen: stabiler guildKey (server.py) → Material-Symbol. Kein echtes
+    // Heraldik-Asset (gibt es frei nicht) — thematisches, theme-fähiges Icon.
+    var GUILD_ICON = {
+      guards: 'shield', fire_mage: 'local_fire_department', water_mage: 'water_drop',
+      mercenaries: 'swords', templars: 'self_improvement', novices: 'spa',
+      rogues: 'theater_comedy', shadows: 'dark_mode'
+    };
+
+    var SCOPE_TXT = USE_ALL ? 'lifetime' : 'session';
+    $('scopeLbl').textContent = SCOPE_TXT;
+    $('scopeLbl2').textContent = SCOPE_TXT;
+
+    var FIELDS = ['sub','strength','dexterity','hp','mana','magicCircle','learnPts',
       'resFire','resIce','resEdge','resPoint','resBlunt',
       'totDistance','totSteps','totDmgOut','totDmgIn',
-      'recHit','recTaken','recRun','recMana','gearWeapon','gearSpell'];
+      'recHit','recTaken','recRun','recMana','gearMelee','gearRanged','gearSpell'];
 
     function setOffline() {
       document.body.classList.add('offline');
       $('name').textContent = 'Hero';
-      FIELDS.forEach(function (id) { if (id !== 'name') $(id).textContent = DASH; });
+      $('crest').textContent = 'person';
+      FIELDS.forEach(function (id) { $(id).textContent = DASH; });
     }
 
     function render(d) {
       document.body.classList.remove('offline');
       var stats = d.stats || {};
-      var totals = d.totals || {};
-      var records = d.records || {};
+      // Scope-treu: Totals + Records BEIDE aus derselben Range (session ODER all).
+      var tot = USE_ALL ? (d.totals || {}) : (d.session || {});
+      var rec = USE_ALL ? (d.records || {}) : (d.sessionRecords || {});
+      var dmgOut = USE_ALL ? tot.damageDealt : d.session_damageDealt;
 
       $('name').textContent = d.steamName || 'Hero';
-      var guild = d.guild || DASH;
+      $('crest').textContent = GUILD_ICON[d.guildKey] || 'person';
       var lvl = (stats.level === undefined || stats.level === null) ? DASH : num(stats.level);
-      $('sub').textContent = guild + ' · Lv ' + lvl;
+      $('sub').textContent = (d.guildName || 'Adventurer') + ' · Lv ' + lvl;
 
       $('strength').textContent = num(stats.strength);
       $('dexterity').textContent = num(stats.dexterity);
@@ -170,32 +181,28 @@
       $('resPoint').textContent = num(stats.resPoint);
       $('resBlunt').textContent = num(stats.resBlunt);
 
-      $('totDistance').textContent = km(totals.distanceM);
-      $('totSteps').textContent = num(totals.steps);
-      $('totDmgOut').textContent = num(totals.damageDealt);
-      $('totDmgIn').textContent = num(totals.damageTaken);
+      $('totDistance').textContent = km(tot.distanceM);
+      $('totSteps').textContent = num(tot.steps);
+      $('totDmgOut').textContent = num(dmgOut);
+      $('totDmgIn').textContent = num(tot.damageTaken);
 
-      $('recHit').textContent = num(records.hardestDealt);
-      $('recTaken').textContent = num(records.hardestTaken);
-      $('recRun').textContent = km(records.runM);
-      $('recMana').textContent = num(records.manaTick);
+      $('recHit').textContent = num(rec.hardestDealt);
+      $('recTaken').textContent = num(rec.hardestTaken);
+      $('recRun').textContent = km(rec.runM);
+      $('recMana').textContent = num(rec.manaTick);
 
-      $('gearWeapon').textContent = d.strongestWeaponDisplay || DASH;
+      $('gearMelee').textContent = gear(d.strongestMeleeDisplay, d.strongestMeleeDmg);
+      $('gearRanged').textContent = gear(d.strongestRangedDisplay, d.strongestRangedDmg);
       $('gearSpell').textContent = d.strongestSpellDisplay || DASH;
     }
 
-    function poll() {
-      fetch(URL, { credentials: 'omit' })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-          if (d && d.ok) render(d);
-          else setOffline();
-        })
-        .catch(function () { setOffline(); });
-    }
-
-    poll();
-    setInterval(poll, INTERVAL);
+    // Subscription statt Polling: EventSource abonniert /events, reconnectet selbst.
+    var es = new EventSource(BASE + '/events?lang=en');
+    es.onmessage = function (e) {
+      var d; try { d = JSON.parse(e.data); } catch (_) { return; }
+      if (d && d.ok) render(d); else setOffline();
+    };
+    es.onerror = function () { setOffline(); };
   </script>
 </body>
 </html>

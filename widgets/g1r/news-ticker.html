@@ -4,58 +4,41 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=760, height=40" />
   <title>G1R News-Ticker</title>
+  <!-- Theme-Fundament: Tokens (_theme.css) VOR den Bausteinen (_blocks.css). -->
   <link rel="stylesheet" href="../_theme.css" />
+  <link rel="stylesheet" href="../_blocks.css" />
   <style>
-    :root {
-      --c-accent:  var(--theme-accent,   #f2b705);
-      --c-primary: var(--theme-primary,  #5e2a79);
-      --c-bg:      var(--theme-bg,       #0a0510);
-      --c-surface: var(--theme-surface,  #1f1430);
-      --c-text:    var(--theme-text,     #e8e0f0);
-      --c-muted:   var(--theme-text-dim, #8a7d99);
-      --c-border:  var(--theme-border,   rgba(94,42,121,.65));
-    }
+    /* Nur Widget-spezifisches Layout. Rahmen/Fläche/Ornament kommen aus .t-card. */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 760px; height: 40px; overflow: hidden; background: transparent;
                  font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif); }
 
-    .card { background: linear-gradient(180deg, var(--c-surface), var(--c-bg));
-            border: 1px solid var(--c-border); border-radius: var(--theme-radius, 8px); position: relative; }
-    .card::before { content: ""; position: absolute; inset: 0; border-radius: var(--theme-radius, 8px);
-            pointer-events: none; box-shadow: inset 0 0 0 1px rgba(242,183,5,.12); }
+    .t-card.ticker { padding: 0 14px; height: 40px; width: 760px; display: flex; align-items: center;
+                     gap: 12px; overflow: hidden; border-left-width: 3px;
+                     border-left-color: var(--theme-accent, #f2b705); }
+    .tag { background: var(--theme-primary, #5e2a79); color: var(--theme-text, #fff); font-size: .62rem;
+           font-weight: 700; text-transform: uppercase; letter-spacing: .1em; padding: 3px 8px;
+           border-radius: 4px; flex: none; }
 
-    .ticker { width: 760px; height: 40px; display: flex; align-items: center; gap: 12px;
-              padding: 0 14px; border-left: 3px solid var(--c-accent); overflow: hidden; }
-    .ticker .tag { background: var(--c-primary); color: #fff; font-size: .62rem; font-weight: 700;
-                   text-transform: uppercase; letter-spacing: .1em; padding: 3px 8px; border-radius: 4px; flex: none; }
-
-    /* Marquee: viewport masks, track scrolls. The text is duplicated so the
-       loop is seamless (translateX(-50%) lands exactly on the copy). */
-    .mask { flex: 1; overflow: hidden; position: relative; height: 40px;
-            display: flex; align-items: center;
+    /* Marquee: viewport masks, track scrolls. Text duplicated → seamless loop. */
+    .mask { flex: 1; overflow: hidden; position: relative; height: 40px; display: flex; align-items: center;
             -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
             mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%); }
-    .track { display: inline-flex; white-space: nowrap; will-change: transform;
-             animation: marquee 26s linear infinite; }
-    .run { color: var(--c-text); font-size: .92rem; white-space: nowrap; padding-right: 48px; }
-    .run b { color: var(--c-accent); font-variant-numeric: tabular-nums; }
-    .run .dot { color: var(--c-muted); margin: 0 10px; }
-    .run .offline { color: var(--c-muted); }
+    .track { display: inline-flex; white-space: nowrap; will-change: transform; animation: marquee 26s linear infinite; }
+    .run { color: var(--theme-text, #e8e0f0); font-size: .92rem; white-space: nowrap; padding-right: 48px; }
+    .run b { color: var(--theme-accent, #f2b705); font-variant-numeric: tabular-nums; }
+    .run .dot { color: var(--theme-text-dim, #8a7d99); margin: 0 10px; }
+    .run .offline { color: var(--theme-text-dim, #8a7d99); }
 
-    @keyframes marquee {
-      from { transform: translateX(0); }
-      to   { transform: translateX(-50%); }
-    }
-
+    @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
     @media (prefers-reduced-motion: reduce) {
       .track { animation: none; }
-      /* Static: show only the first copy, no scrolling. */
       .track .run + .run { display: none; }
     }
   </style>
 </head>
 <body>
-  <div class="card ticker">
+  <div class="t-card ticker">
     <span class="tag">G1 Live</span>
     <div class="mask">
       <div class="track" id="track">
@@ -66,22 +49,24 @@
   </div>
 
   <script>
-    // Local proxy on the game PC. Port via ?port= override.
+    // Lokaler Proxy auf dem Spiel-PC. Port via ?port= override.
     var PORT = new URLSearchParams(location.search).get('port') || '9210';
-    var URL  = 'http://localhost:' + PORT + '/state?lang=en';
-    var INTERVAL = 400;
+    var BASE = 'http://localhost:' + PORT;
 
     var runEl = document.getElementById('run');
     var runCopyEl = document.getElementById('runCopy');
 
-    function num(v) {
-      return (v === undefined || v === null) ? '–' : Math.round(v).toLocaleString('en-US');
-    }
+    function num(v) { return (v === undefined || v === null) ? '–' : Math.round(v).toLocaleString('en-US'); }
     function pair(v, vMax) {
       if (v === undefined || v === null) return '–';
       return num(v) + (vMax !== undefined && vMax !== null ? '/' + num(vMax) : '');
     }
     function b(v) { return '<b>' + v + '</b>'; }
+    // "Söldnerklinge (73)" — Schaden anhängen, wenn bekannt.
+    function gear(name, dmg) {
+      if (!name) return '—';
+      return name + (dmg !== undefined && dmg !== null ? ' (' + num(dmg) + ')' : '');
+    }
 
     function setOffline() {
       var html = '<span class="offline">— waiting for G1R —</span>';
@@ -94,7 +79,6 @@
       var sess = d.session || {};
       var groups = [];
 
-      // Stats
       groups.push(
         'STR ' + b(num(stats.strength)) +
         ' · DEX ' + b(num(stats.dexterity)) +
@@ -102,22 +86,21 @@
         ' · Mana ' + b(pair(stats.mana, stats.manaMax))
       );
 
-      // Session — distance in metres, converted to km (1 decimal).
-      var distM = (d.distanceM !== undefined && d.distanceM !== null) ? d.distanceM
-                : (sess.distanceM !== undefined && sess.distanceM !== null) ? sess.distanceM : null;
+      var distM = (sess.distanceM !== undefined && sess.distanceM !== null) ? sess.distanceM
+                : (d.distanceM !== undefined && d.distanceM !== null) ? d.distanceM : null;
       var km = (distM === null) ? '–' : (distM / 1000).toFixed(1);
-      var dmgDealt = (d.session_damageDealt !== undefined && d.session_damageDealt !== null)
-                   ? d.session_damageDealt : 0;
+      var dmgDealt = (d.session_damageDealt !== undefined && d.session_damageDealt !== null) ? d.session_damageDealt : 0;
       groups.push(
         'Session: ' + b(km + ' km') + ' walked' +
         ' · ' + b(num(dmgDealt)) + ' DMG dealt' +
         ' · ' + b(num(sess.damageTaken)) + ' taken'
       );
 
-      // Gear
+      // Stärkste Waffe getrennt nach Melee / Ranged / Magic.
       groups.push(
-        'Strongest weapon: ' + b(d.strongestWeaponDisplay || '—') +
-        ' · Strongest spell: ' + b(d.strongestSpellDisplay || '—')
+        'Melee: ' + b(gear(d.strongestMeleeDisplay, d.strongestMeleeDmg)) +
+        ' · Ranged: ' + b(gear(d.strongestRangedDisplay, d.strongestRangedDmg)) +
+        ' · Spell: ' + b(d.strongestSpellDisplay || '—')
       );
 
       var html = groups.join('<span class="dot">◆</span>');
@@ -125,18 +108,13 @@
       runCopyEl.innerHTML = html;
     }
 
-    function poll() {
-      fetch(URL, { credentials: 'omit' })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-          if (d && d.ok) render(d);
-          else setOffline();
-        })
-        .catch(function () { setOffline(); });
-    }
-
-    poll();
-    setInterval(poll, INTERVAL);
+    // Subscription statt Polling: EventSource abonniert /events, reconnectet selbst.
+    var es = new EventSource(BASE + '/events?lang=en');
+    es.onmessage = function (e) {
+      var d; try { d = JSON.parse(e.data); } catch (_) { return; }
+      if (d && d.ok) render(d); else setOffline();
+    };
+    es.onerror = function () { setOffline(); };
   </script>
 </body>
 </html>

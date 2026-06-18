@@ -57,15 +57,30 @@ def _load_json_map(path):
 WEAPON_DAMAGE = _load_json_map(os.path.join(os.path.dirname(os.path.abspath(__file__)), "weapon_damage.json"))
 
 
-def strongest_weapon(items):
-    """Liefert den Klassennamen der Inventar-Waffe mit dem hoechsten Wiki-Schaden,
-    oder None wenn keins der Items in WEAPON_DAMAGE steht."""
+def _strongest_by_prefix(items, prefix):
+    """Klassenname der Inventar-Waffe mit hoechstem Wiki-Schaden, beschraenkt auf
+    Items deren Klassenname mit prefix beginnt (ItMw_ = Nahkampf, ItRw_ = Fernkampf).
+    Liefert (name, dmg) oder (None, None)."""
+    pre = prefix.lower()
     best, best_dmg = None, -1
     for it in (items or []):
-        dmg = WEAPON_DAMAGE.get(it.get("name"))
+        nm = it.get("name") or ""
+        if not nm.lower().startswith(pre):
+            continue
+        dmg = WEAPON_DAMAGE.get(nm)
         if dmg is not None and dmg > best_dmg:
-            best, best_dmg = it.get("name"), dmg
-    return best
+            best, best_dmg = nm, dmg
+    return (best, best_dmg if best is not None else None)
+
+
+def strongest_melee(items):
+    """Staerkste Nahkampfwaffe (ItMw_). (name, dmg) oder (None, None)."""
+    return _strongest_by_prefix(items, "ItMw_")
+
+
+def strongest_ranged(items):
+    """Staerkste Fernkampfwaffe (ItRw_: Bogen/Armbrust). (name, dmg) oder (None, None)."""
+    return _strongest_by_prefix(items, "ItRw_")
 
 
 # Zauber-Kreise: Klassenname -> benoetigter Magie-Kreis (1-6). Eine Rune ist
@@ -97,6 +112,106 @@ def strongest_usable_spell(items, magic_circle):
         if circ is not None and circ <= mc and circ > best_circle:
             best, best_circle = it.get("name"), circ
     return best
+
+
+# ── Gilde: Rohtag (z.B. "Guild.Guards", "EPlayerGuild::MagesWater") → stabiler
+# Key + lokalisierter Name. Substring-tolerant, weil das exakte Tag-Format des
+# Engine-Calls noch nicht feststeht. Key steuert im Widget das Wappen-Symbol.
+GUILD_NAMES = {
+    "guards":      {"de": "Gardist",       "en": "Guard"},
+    "fire_mage":   {"de": "Feuermagier",   "en": "Fire Mage"},
+    "water_mage":  {"de": "Wassermagier",  "en": "Water Mage"},
+    "mercenaries": {"de": "Söldner",       "en": "Mercenary"},
+    "templars":    {"de": "Templer",       "en": "Templar"},
+    "novices":     {"de": "Novize",        "en": "Novice"},
+    "rogues":      {"de": "Bandit",        "en": "Rogue"},
+    "shadows":     {"de": "Schatten",      "en": "Shadow"},
+}
+# Reihenfolge: spezifischere Treffer (mageswater/magesfire) vor generischen (water/fire).
+_GUILD_MATCH = [
+    ("mageswater", "water_mage"), ("magesfire", "fire_mage"),
+    ("guard", "guards"), ("templ", "templars"), ("novice", "novices"),
+    ("mercenar", "mercenaries"), ("rogue", "rogues"), ("shadow", "shadows"),
+    ("water", "water_mage"), ("fire", "fire_mage"),
+]
+
+
+def map_guild(raw):
+    """Rohen Gilden-Tag auf einen stabilen Key abbilden. None bei leer/keine Gilde."""
+    if not raw:
+        return None
+    low = re.sub(r"[^a-z]", "", str(raw).lower())
+    if not low or "none" in low:
+        return None
+    for sub, key in _GUILD_MATCH:
+        if sub in low:
+            return key
+    return None
+
+
+def build_payload(lang):
+    """State-Datei lesen und anreichern (Uebersetzungen, staerkste Waffen/Zauber,
+    Gilde). Liefert das fertige Dict — gemeinsam fuer /state und /events."""
+    try:
+        age = time.time() - os.path.getmtime(STATE_FILE)
+    except FileNotFoundError:
+        return {"ok": False, "reason": "no-file"}
+    except OSError as exc:
+        return {"ok": False, "reason": f"stat-error: {exc}"}
+    if age > STALE_AFTER_S:
+        return {"ok": False, "reason": "stale", "ageSec": round(age, 1)}
+    try:
+        with open(STATE_FILE, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except Exception as exc:  # JSON halb geschrieben o.ä. → kurz später ok
+        return {"ok": False, "reason": f"read-error: {exc}"}
+
+    data["ageSec"] = round(age, 1)
+    for it in (data.get("items") or []):
+        # Mod liefert teils schon lokalisierten Namen (Spielsprache) — nicht antasten.
+        if not it.get("display"):
+            it["display"] = _translate(it.get("name"), lang)
+    # Staerkste Waffe getrennt nach Kategorie — Nahkampf/Fernkampf sind nicht
+    # vergleichbar (Armbrust 60 vs. Klinge 73), also je eigener Bestwert + Schaden.
+    melee, melee_dmg = strongest_melee(data.get("items"))
+    if melee:
+        data["strongestMelee"] = melee
+        data["strongestMeleeDisplay"] = _translate(melee, lang)
+        data["strongestMeleeDmg"] = melee_dmg
+    ranged, ranged_dmg = strongest_ranged(data.get("items"))
+    if ranged:
+        data["strongestRanged"] = ranged
+        data["strongestRangedDisplay"] = _translate(ranged, lang)
+        data["strongestRangedDmg"] = ranged_dmg
+    mc = (data.get("stats") or {}).get("magicCircle", 0)
+    ss = strongest_usable_spell(data.get("items"), mc)
+    if ss:
+        data["strongestSpell"] = ss
+        data["strongestSpellDisplay"] = _translate(ss, lang)
+    # Gilde: Rohtag -> stabiler Key (steuert Wappen-Symbol) + lokalisierter Name.
+    gk = map_guild(data.get("guild"))
+    if gk:
+        data["guildKey"] = gk
+        data["guildName"] = (GUILD_NAMES.get(gk) or {}).get(lang) or gk
+    if data.get("spell"):
+        data["spellDisplay"] = _spell_display(data.get("spell"), lang)
+    if data.get("weapon"):
+        data["weaponDisplay"] = _translate(data["weapon"], lang)
+    if data.get("attack"):
+        data["attackDisplay"] = _attack_display(data.get("attack"), lang)
+    if isinstance(data.get("kills"), dict):
+        data["killsDisplay"] = {
+            _creature_display(t, lang): n for t, n in data["kills"].items()}
+    if isinstance(data.get("killNews"), list):
+        verb = "slain" if lang == "en" else "erledigt"
+        for ev in data["killNews"]:
+            name = _creature_display(ev.get("type"), lang)
+            ev["text"] = f"{ev.get('n', 1)}× {name} {verb}"
+    steam = os.environ.get("G1R_STEAM_NAME", "")
+    if steam:
+        data["steamName"] = steam
+    data["lang"] = lang
+    return data
 
 
 # Zauber-Namen analog. Schlüssel werden normalisiert (klein, nur a-z0-9), damit
@@ -235,74 +350,52 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path.split("?")[0] != "/state":
+        route = self.path.split("?")[0]
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        lang = (qs.get("lang") or [DEFAULT_LANG])[0]
+        if route == "/state":
+            self._serve_state(lang)
+        elif route == "/events":
+            self._serve_events(lang)
+        else:
             self.send_response(404)
             self._cors()
             self.end_headers()
-            return
 
-        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-        lang = (qs.get("lang") or [DEFAULT_LANG])[0]
-        payload = {"ok": False, "reason": "no-data"}
-        try:
-            age = time.time() - os.path.getmtime(STATE_FILE)
-            if age <= STALE_AFTER_S:
-                with open(STATE_FILE, "r", encoding="utf-8") as fh:
-                    data = json.load(fh)
-                data["ageSec"] = round(age, 1)
-                for it in (data.get("items") or []):
-                    # Liefert der Mod schon einen lokalisierten Namen (UI-Weg,
-                    # GetItemNameByPos = Spielsprache), den NICHT antasten. Nur den
-                    # Container-Fallback (technischer Klassenname) uebersetzen.
-                    if not it.get("display"):
-                        it["display"] = _translate(it.get("name"), lang)
-                # Staerkste Waffe im Inventar (Klassenname x Wiki-Schaden).
-                sw = strongest_weapon(data.get("items"))
-                if sw:
-                    data["strongestWeapon"] = sw
-                    data["strongestWeaponDisplay"] = _translate(sw, lang)
-                # Staerkster nutzbarer Zauber (Rune im Inventar x Kreis-Abgleich).
-                mc = (data.get("stats") or {}).get("magicCircle", 0)
-                ss = strongest_usable_spell(data.get("items"), mc)
-                if ss:
-                    data["strongestSpell"] = ss
-                    data["strongestSpellDisplay"] = _translate(ss, lang)
-                if data.get("spell"):
-                    data["spellDisplay"] = _spell_display(data.get("spell"), lang)
-                # Gefuehrte Waffe: Klassenname (ItMw_*/ItRw_*) wie Items uebersetzen.
-                if data.get("weapon"):
-                    data["weaponDisplay"] = _translate(data["weapon"], lang)
-                if data.get("attack"):
-                    data["attackDisplay"] = _attack_display(data.get("attack"), lang)
-                # Kills: Typ-Namen uebersetzen ({rohTyp:n} -> {DE-Typ:n}).
-                if isinstance(data.get("kills"), dict):
-                    data["killsDisplay"] = {
-                        _creature_display(t, lang): n for t, n in data["kills"].items()}
-                # News-Ticker: pro Event fertigen Text bauen ("3x Wolf erledigt").
-                if isinstance(data.get("killNews"), list):
-                    verb = "slain" if lang == "en" else "erledigt"
-                    for ev in data["killNews"]:
-                        name = _creature_display(ev.get("type"), lang)
-                        ev["text"] = f"{ev.get('n', 1)}× {name} {verb}"
-                steam = os.environ.get("G1R_STEAM_NAME", "")
-                if steam:
-                    data["steamName"] = steam
-                data["lang"] = lang
-                payload = data
-            else:
-                payload = {"ok": False, "reason": "stale", "ageSec": round(age, 1)}
-        except FileNotFoundError:
-            payload = {"ok": False, "reason": "no-file"}
-        except Exception as exc:  # JSON halb geschrieben o.ä. → kurz später ok
-            payload = {"ok": False, "reason": f"read-error: {exc}"}
-
-        body = json.dumps(payload).encode("utf-8")
+    def _serve_state(self, lang):
+        # Einmal-Snapshot (Polling-Fallback / Debug). Widgets nutzen /events.
+        body = json.dumps(build_payload(lang)).encode("utf-8")
         self.send_response(200)
         self._cors()
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _serve_events(self, lang):
+        # Server-Sent Events: das Widget abonniert /events einmalig, der Server
+        # pusht den Payload bei jeder Aenderung (kein Netzwerk-Polling mehr).
+        # Heartbeat alle 15s haelt die Verbindung wach. ThreadingHTTPServer →
+        # ein Thread je Client, ein haengender Stream blockiert die anderen nicht.
+        self.send_response(200)
+        self._cors()
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+        last, last_beat = None, time.time()
+        try:
+            while True:
+                body = json.dumps(build_payload(lang))
+                now = time.time()
+                if body != last or (now - last_beat) >= 15:
+                    self.wfile.write(("data: " + body + "\n\n").encode("utf-8"))
+                    self.wfile.flush()
+                    last, last_beat = body, now
+                time.sleep(0.25)
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            return  # Client (OBS-Quelle/Tab) geschlossen → Thread sauber beenden
 
     def log_message(self, *args):
         pass  # leise

@@ -179,8 +179,8 @@ WIDGET_META = [
 
     # Gothic 1 Remake (lokaler Proxy, Browser-Source mit ?port=9210)
     ("Gothic 1",      "Livebar",            "Live bar: level, steps, damage out/taken, mana, regen, clock.",        "g1r/livebar.html"),
-    ("Gothic 1",      "News Ticker",        "Rotating ticker: stats, session totals, distance, strongest weapon/spell.", "g1r/news-ticker.html"),
-    ("Gothic 1",      "Career Card",        "Detail card: stats, resistances, lifetime totals, records, gear.",     "g1r/career-card.html"),
+    ("Gothic 1",      "News Ticker",        "Rotating ticker: stats, session totals, distance, strongest melee/ranged/spell.", "g1r/news-ticker.html"),
+    ("Gothic 1",      "Career Card",        "Detail card: stats, resistances, scope totals + records, gear, guild crest.", "g1r/career-card.html"),
 
     # Persistente Stream-Info-Sidepanels (Dauer-Anzeige, kein Einmal-Alert).
     ("Follower & Goals", "Latest Follower", "Sidepanel: shows the latest follower (always visible).",              "latest-follower.html"),
@@ -459,6 +459,10 @@ WIDGET_HINTS = {
     "pubg/chat-stats-popup.html":     "Triggered by a chat command or Streamer.bot with ?player= — disappears after a configurable duration (default 12 s).",
     "steam/achievement-popup.html":   "One-shot animation per achievement — polls every 5 s, plays unlocks sequentially (8 s each). Rare achievements trigger stronger effects.",
     "steam/popup.html":               "Combines Now-Playing and Achievement popup with a priority queue — an incoming achievement interrupts the running Now-Playing.",
+    # Gothic 1 Remake — lokaler Proxy (g1r-local/server.py) auf dem Spiel-PC.
+    "g1r/livebar.html":               "Subscribes to the local G1R proxy via Server-Sent Events (no polling). Port via ?port=9210, ?scope=session|all (default session), ?lang=en. Shows offline until the proxy + UE4SS mod run.",
+    "g1r/news-ticker.html":           "Subscribes to the local G1R proxy (SSE). Rotating marquee of stats, session totals and strongest melee/ranged/spell. Port via ?port=9210.",
+    "g1r/career-card.html":           "Subscribes to the local G1R proxy (SSE). ?scope=session|all (default all) keeps totals AND records in one range — no mixing. Guild crest is derived from the in-game guild. Port via ?port=9210.",
 }
 
 # Reine Overlay-Widgets — kein dock (immer OBS Browser Source, kein Custom Dock).

@@ -25,15 +25,21 @@ crashfrei aus dem Inventar gefiltert, was der Spieler an Waffen/Zaubern dabei ha
 ## Teile
 - `G1RExport/scripts/main.lua` — UE4SS-Lua-Mod (liest Live-Daten, schreibt `g1r-state.json`
   + persistente Gesamtwerte/Rekorde nach `g1r-totals.json`)
-- `server.py` — lokaler Mini-Server (`http://localhost:9210/state`, CORS). Reichert an: stärkste
-  Waffe (`weapon_damage.json`), stärkster nutzbarer Zauber (`spell_circle.json` + magicCircle),
-  Item/Zauber-Namen (`item_names.json`/`spell_names.json`), `?lang=de|en`. Steamname via
+- `server.py` — lokaler Mini-Server (CORS). Zwei Endpoints:
+  - `GET /state` — Einmal-Snapshot (Debug/Fallback).
+  - `GET /events` — **Server-Sent Events**: Widgets abonnieren, der Server pusht bei jeder
+    Änderung (kein Netzwerk-Polling). Heartbeat alle 15 s.
+  Reichert an: stärkste **Nahkampf-/Fernkampfwaffe getrennt** (`weapon_damage.json`, je mit
+  Schadenswert), stärkster nutzbarer Zauber (`spell_circle.json` + magicCircle), Item/Zauber-Namen
+  (`item_names.json`/`spell_names.json`), Gilde → `guildKey`+Name. `?lang=de|en`. Steamname via
   Env-Var `G1R_STEAM_NAME`.
 - `weapon_damage.json` / `spell_circle.json` — Wiki-Mappings (Schaden bzw. benötigter Kreis).
-- Widgets (im Haupt-Repo, prod-serviert, alle theme-fähig + englisch, `?port=9210`):
-  - `widgets/g1r/livebar.html` (720×46) — Level/Schritte/Schaden/Mana/Uhr
-  - `widgets/g1r/news-ticker.html` (760×40) — Stats/Session/stärkste Waffe+Zauber (Laufband)
-  - `widgets/g1r/career-card.html` (360×480) — Stats/Resistenzen/Gesamtwerte/Rekorde/Ausrüstung
+- Widgets (im Haupt-Repo, prod-serviert, alle theme-fähig + englisch, Ornament-Rahmen via `.t-card`,
+  Subscription via SSE, `?port=9210`):
+  - `widgets/g1r/livebar.html` (1040×46) — Level/Schritte/Schaden/Mana/Regen/Uhr, `?scope=session|all`
+  - `widgets/g1r/news-ticker.html` (760×40) — Stats/Session/Melee+Ranged+Zauber (Laufband)
+  - `widgets/g1r/career-card.html` (360×480) — Stats/Resistenzen + **ein** Scope (`?scope=session|all`,
+    Default `all`) für Gesamtwerte UND Rekorde, Ausrüstung, Gilden-Wappen
   - `widgets/g1r/test.html` — Diagnose-Liste (alle Rohfelder)
 
 ### g1r-totals.json (persistente Gesamtwerte)

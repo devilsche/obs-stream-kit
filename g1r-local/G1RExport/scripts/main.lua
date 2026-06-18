@@ -31,10 +31,18 @@ local MAX_STEP_CM  = 1000   -- Delta/Tick > 10 m → Teleport/Ladezone → ignor
 local STEP_LEN_M   = 0.75   -- grobe Schrittlänge für die Schritt-Schätzung
 
 -- Session-Zähler: aus HP/Mana/XP-Deltas aufsummiert (analog Strecke), ab Mod-Start.
-local sess = { damageTaken = 0, healthRegen = 0, manaSpent = 0, manaRegen = 0, xpGained = 0 }
+-- Eigene Session-Rekorde (rec*) damit die Career-Card pro Scope sauber bleibt
+-- (session ODER all — nicht mischen): scope=session zeigt diese, scope=all die totals.
+local sess = { damageTaken = 0, healthRegen = 0, manaSpent = 0, manaRegen = 0, xpGained = 0,
+               recHardestTaken = 0, recManaTick = 0, recRunM = 0, recHardestDealt = 0 }
 local lastHp, lastMana, lastXp = nil, nil, nil
 -- Sprünge größer als das = Laden/Level-up/Respawn, nicht als Schaden/Regen zählen.
 local MAX_STAT_JUMP = 500
+-- Nach (Wieder-)Eintritt in eine gültige Welt füllt das Spiel HP/Mana über mehrere
+-- Ticks auf (und beim Schließen fällt es ab). Diese künstlichen Deltas NICHT als
+-- Regen/Schaden zählen: so viele Ticks Warmup überspringen (tick ~250ms → ~3s).
+local WARMUP_TICKS = 12
+local warmup = WARMUP_TICKS
 
 -- ── Persistente Gesamt-Werte (über ALLE Sessions) + Rekorde ─────────────────
 -- Beim Mod-Start aus g1r-totals.json laden, Session-Deltas drauf addieren,
@@ -72,6 +80,7 @@ local lastKillMap = nil   -- letzte Map (für News-Delta)
 local killNews    = {}    -- jüngste Events {type=, n=}, max MAX_NEWS
 local MAX_NEWS    = 12
 local diagDone    = false  -- einmaliges Diagnose-Log
+local guildDiagDone = false -- einmalige Gilden-Diagnose (Root-Cause "keine Gilde")
 
 local function isValid(o)
     return o and pcall(function() return o:IsValid() end) and o:IsValid()
@@ -106,6 +115,7 @@ if READ_DMG_OUT then
                     if num and num > 0 then
                         sessDamageDealt = sessDamageDealt + num
                         totals.damageDealt = totals.damageDealt + num
+                        if num > sess.recHardestDealt then sess.recHardestDealt = num end
                         if num > totals.recHardestDealt then totals.recHardestDealt = num end
                         break
                     end
@@ -733,6 +743,11 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack
         math.floor(sess.manaSpent + 0.5), math.floor(sess.manaRegen + 0.5),
         math.floor(sess.xpGained + 0.5), steps, meters)
     parts[#parts+1] = string.format('"session_damageDealt":%d', math.floor(sessDamageDealt + 0.5))
+    -- Session-Rekorde (spiegelt "records", aber nur diese Session) → Career-Card scope=session.
+    parts[#parts+1] = string.format(
+        '"sessionRecords":{"hardestTaken":%d,"manaTick":%d,"runM":%.1f,"hardestDealt":%d}',
+        math.floor(sess.recHardestTaken+0.5), math.floor(sess.recManaTick+0.5),
+        sess.recRunM, math.floor(sess.recHardestDealt+0.5))
     -- Persistente Gesamt-Werte (alle Sessions).
     parts[#parts+1] = string.format(
         '"totals":{"damageTaken":%d,"healthRegen":%d,"manaSpent":%d,"manaRegen":%d,"xpGained":%d,"distanceM":%.1f,"steps":%d,"damageDealt":%d}',
@@ -780,7 +795,11 @@ local function tick()
         local w = char:GetWorld()
         worldOk = w ~= nil and w:IsValid()
     end)
-    if not worldOk then CachedPlayer = nil; lastPos = nil; lastHp = nil; lastMana = nil; lastXp = nil; return end
+    if not worldOk then
+        CachedPlayer = nil; lastPos = nil; lastHp = nil; lastMana = nil; lastXp = nil
+        warmup = WARMUP_TICKS  -- beim nächsten gültigen Tick erst Baseline aufbauen
+        return
+    end
     local pos, items
     pcall(function() pos = readPosition(char) end)
     -- Laufstrecke aufsummieren (horizontal; Teleports/Ladezonen über MAX_STEP_CM raus).
@@ -798,6 +817,7 @@ local function tick()
     end
     -- Rekord "weiteste Strecke" = höchste Session-Strecke (totalDistCm seit Mod-Start).
     local sessM = totalDistCm / 100
+    if sessM > sess.recRunM then sess.recRunM = sessM end
     if sessM > totals.recRunM then totals.recRunM = sessM end
     -- Items via vollständigem mods-g1r-Helper-Stack (unwrap/arrGet) — entpackt die
     -- RemoteUnrealParam-Wrapper, umgeht so den ScriptStruct-m_Slots-Stolperstein.
@@ -809,42 +829,74 @@ local function tick()
     -- (Laden/Level-up/Respawn) über MAX_STAT_JUMP ignorieren.
     if stats then
         local hp, mana, xp = stats.hp, stats.mana, stats.xp
-        if hp ~= nil and lastHp ~= nil then
-            local d = hp - lastHp
-            if math.abs(d) <= MAX_STAT_JUMP then
-                if d < 0 then
-                    sess.damageTaken = sess.damageTaken - d
-                    totals.damageTaken = totals.damageTaken - d
-                    if -d > totals.recHardestTaken then totals.recHardestTaken = -d end
-                elseif d > 0 then
-                    sess.healthRegen = sess.healthRegen + d
-                    totals.healthRegen = totals.healthRegen + d
+        if warmup > 0 then
+            -- Warmup nach Welt-Load/Schließen: Baseline mitführen, Deltas NICHT zählen
+            -- (das Auffüllen/Abfallen von HP/Mana ist kein echter Regen/Schaden).
+            warmup = warmup - 1
+        else
+            if hp ~= nil and lastHp ~= nil then
+                local d = hp - lastHp
+                if math.abs(d) <= MAX_STAT_JUMP then
+                    if d < 0 then
+                        sess.damageTaken = sess.damageTaken - d
+                        totals.damageTaken = totals.damageTaken - d
+                        if -d > sess.recHardestTaken then sess.recHardestTaken = -d end
+                        if -d > totals.recHardestTaken then totals.recHardestTaken = -d end
+                    elseif d > 0 then
+                        sess.healthRegen = sess.healthRegen + d
+                        totals.healthRegen = totals.healthRegen + d
+                    end
                 end
             end
+            if mana ~= nil and lastMana ~= nil then
+                local d = mana - lastMana
+                if math.abs(d) <= MAX_STAT_JUMP then
+                    if d < 0 then
+                        sess.manaSpent = sess.manaSpent - d
+                        totals.manaSpent = totals.manaSpent - d
+                        if -d > sess.recManaTick then sess.recManaTick = -d end
+                        if -d > totals.recManaTick then totals.recManaTick = -d end
+                    elseif d > 0 then
+                        sess.manaRegen = sess.manaRegen + d
+                        totals.manaRegen = totals.manaRegen + d
+                    end
+                end
+            end
+            if xp ~= nil and lastXp ~= nil then
+                local d = xp - lastXp
+                if d > 0 then sess.xpGained = sess.xpGained + d; totals.xpGained = totals.xpGained + d end
+            end
         end
+        -- Baseline IMMER aktualisieren (auch im Warmup), damit der erste echte Delta sauber ist.
         if hp ~= nil then lastHp = hp end
-        if mana ~= nil and lastMana ~= nil then
-            local d = mana - lastMana
-            if math.abs(d) <= MAX_STAT_JUMP then
-                if d < 0 then
-                    sess.manaSpent = sess.manaSpent - d
-                    totals.manaSpent = totals.manaSpent - d
-                    if -d > totals.recManaTick then totals.recManaTick = -d end
-                elseif d > 0 then
-                    sess.manaRegen = sess.manaRegen + d
-                    totals.manaRegen = totals.manaRegen + d
-                end
-            end
-        end
         if mana ~= nil then lastMana = mana end
-        if xp ~= nil and lastXp ~= nil then
-            local d = xp - lastXp
-            if d > 0 then sess.xpGained = sess.xpGained + d; totals.xpGained = totals.xpGained + d end
-        end
         if xp ~= nil then lastXp = xp end
     end
     local guild
     pcall(function() guild = readGuild(char) end)
+    -- Einmalige Gilden-Diagnose: zeigt, ob der CharacterState da ist, was GetGuild
+    -- roh liefert und was readGuild daraus macht. So lässt sich "keine Gilde" als
+    -- "noch keiner Gilde beigetreten" (None) vs. "Reader kaputt" unterscheiden.
+    if not guildDiagDone then
+        guildDiagDone = true
+        pcall(function()
+            local st = getCharacterState(char)
+            local rawTag, rawType = "(nil)", "(nil)"
+            if st then
+                pcall(function()
+                    local t = st:GetGuild()
+                    rawType = type(t)
+                    rawTag = tostring(t)
+                    if type(t) == "userdata" and t.TagName ~= nil then
+                        pcall(function() rawTag = t.TagName:ToString() end)
+                    end
+                end)
+            end
+            print(string.format(
+                "[G1RExport] Guild-Diag: state=%s GetGuild.type=%s rawTag=%q readGuild=%q\n",
+                tostring(isValid(st)), tostring(rawType), tostring(rawTag), tostring(guild)))
+        end)
+    end
     local spell
     if READ_SPELL then pcall(function() spell = readSpell(char) end) end
     local weapon
