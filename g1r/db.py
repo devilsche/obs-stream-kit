@@ -60,3 +60,55 @@ def init_schema(conn):
 
 def _now_iso():
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _insert_run(conn, tenant_id, save_key, detection, label):
+    row = conn.execute(
+        "INSERT INTO g1r_run(tenant_id, save_key, started_at, label, detection, created_at) "
+        "VALUES(?,?,?,?,?,?) RETURNING id",
+        (tenant_id, save_key, _now_iso(), label, detection, _now_iso()),
+    ).fetchone()
+    conn.commit()
+    return row[0]
+
+
+def _active_run(conn, tenant_id):
+    return conn.execute(
+        "SELECT id, save_key FROM g1r_run WHERE tenant_id=? "
+        "ORDER BY (ended_at IS NULL) DESC, id DESC LIMIT 1",
+        (tenant_id,),
+    ).fetchone()
+
+
+def latest_sample_level(conn, tenant_id, run_id):
+    r = conn.execute(
+        "SELECT level FROM g1r_sample WHERE tenant_id=? AND run_id=? ORDER BY id DESC LIMIT 1",
+        (tenant_id, run_id),
+    ).fetchone()
+    return (r["level"] if r and r["level"] is not None else 0)
+
+
+def _end_run(conn, tenant_id, run_id):
+    conn.execute("UPDATE g1r_run SET ended_at=? WHERE tenant_id=? AND id=?",
+                 (_now_iso(), tenant_id, run_id))
+    conn.commit()
+
+
+def assign_run(conn, tenant_id, save_key, snapshot, *, force_new=False, label=None):
+    if force_new:
+        return _insert_run(conn, tenant_id, save_key, "manual", label)
+    active = _active_run(conn, tenant_id)
+    if active is None:
+        return _insert_run(conn, tenant_id, save_key, "save" if save_key else "heuristic", label)
+    if save_key:
+        if active["save_key"] == save_key:
+            return active["id"]
+        _end_run(conn, tenant_id, active["id"])
+        return _insert_run(conn, tenant_id, save_key, "save", label)
+    lvl = snapshot.get("level") or 0
+    xp = snapshot.get("xp") or 0
+    prev_lvl = latest_sample_level(conn, tenant_id, active["id"])
+    if lvl <= 2 and xp <= 200 and prev_lvl >= 5:
+        _end_run(conn, tenant_id, active["id"])
+        return _insert_run(conn, tenant_id, None, "heuristic", label)
+    return active["id"]
