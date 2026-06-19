@@ -19,8 +19,10 @@
     html, body { width: 760px; height: 40px; overflow: hidden; background: transparent;
                  font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif); }
 
+    /* KEIN overflow:hidden hier — das clippt die Ornament-Ecken (.t-card::before).
+       Der Marquee wird vom inneren .t-ticker geclippt. */
     .t-card.ticker { padding: 0 14px; height: 40px; width: 760px; display: flex; align-items: center;
-                     gap: 12px; overflow: hidden; }
+                     gap: 12px; }
     .tag { background: var(--theme-primary, #5e2a79); color: var(--theme-text, #fff); font-size: .62rem;
            font-weight: 700; text-transform: uppercase; letter-spacing: .1em; padding: 3px 8px;
            border-radius: 4px; flex: none; }
