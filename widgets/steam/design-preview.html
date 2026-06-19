@@ -43,7 +43,7 @@
     .variant-desc code {
       color: var(--pubg-gold);
       font-family: var(--theme-font-mono, monospace);
-      background: rgba(0,0,0,0.4); padding: 1px 4px;
+      background: color-mix(in srgb, var(--theme-bg, #000) 40%, transparent); padding: 1px 4px;
       border-radius: 3px;
     }
 
@@ -64,7 +64,7 @@
       border-radius: 5px;
       border: 1px solid var(--pubg-border);
       background: var(--demo-cover) center/cover;
-      background-color: rgba(0,0,0,0.5);
+      background-color: color-mix(in srgb, var(--theme-bg, #000) 50%, transparent);
       z-index: 2;
     }
     .info {
@@ -129,7 +129,7 @@
     /* ── VARIANT C: Game-Hero als BG + Avatar Inset ────────────── */
     .card-c {
       background-image:
-        linear-gradient(rgba(26,13,42,0.78), rgba(26,13,42,0.78)),
+        linear-gradient(color-mix(in srgb, var(--theme-bg, #1a0d2a) 78%, transparent), color-mix(in srgb, var(--theme-bg, #1a0d2a) 78%, transparent)),
         var(--demo-header);
       background-size: cover;
       background-position: center;
@@ -140,7 +140,7 @@
       border-radius: 50%;
       border: 2px solid var(--pubg-gold);
       background: var(--demo-avatar) center/cover;
-      box-shadow: 0 0 12px rgba(242,183,5,0.4);
+      box-shadow: 0 0 12px color-mix(in srgb, var(--theme-accent, #f2b705) 40%, transparent);
       z-index: 2;
     }
 
@@ -183,7 +183,7 @@
     /* ── VARIANT F: Hero-BG + Faded Avatar rechts (Combo) ──────── */
     .card-f {
       background-image:
-        linear-gradient(rgba(26,13,42,0.82), rgba(26,13,42,0.82)),
+        linear-gradient(color-mix(in srgb, var(--theme-bg, #1a0d2a) 82%, transparent), color-mix(in srgb, var(--theme-bg, #1a0d2a) 82%, transparent)),
         var(--demo-header);
       background-size: cover;
       background-position: center;

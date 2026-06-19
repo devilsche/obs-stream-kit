@@ -16,12 +16,15 @@
   .card {
     position: relative;
     background:
-      linear-gradient(135deg, rgba(26,13,42,0.92) 0%, rgba(26,13,42,0.78) 60%, rgba(26,13,42,0.92) 100%),
+      linear-gradient(135deg,
+        color-mix(in srgb, var(--theme-surface, #1a0d2a) 92%, transparent) 0%,
+        color-mix(in srgb, var(--theme-surface, #1a0d2a) 78%, transparent) 60%,
+        color-mix(in srgb, var(--theme-surface, #1a0d2a) 92%, transparent) 100%),
       url("./backgounds/payday.jpg") center/cover;
-    border: var(--theme-border-width, 1px) solid rgba(216, 180, 255, 0.45);
+    border: var(--theme-border-width, 1px) solid color-mix(in srgb, var(--theme-accent-2, #d8b4ff) 45%, transparent);
     border-radius: 8px;
     padding: 14px 16px;
-    box-shadow: 0 0 20px rgba(216, 180, 255, 0.18);
+    box-shadow: 0 0 20px color-mix(in srgb, var(--theme-accent-2, #d8b4ff) 18%, transparent);
     overflow: hidden;
   }
   /* Ornament-Rahmen als Overlay (konsolidiert). ::before ist hier mit dem
@@ -43,8 +46,8 @@
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(ellipse at top right, rgba(216,180,255,0.18), transparent 50%),
-      radial-gradient(ellipse at bottom left, rgba(94,42,121,0.35), transparent 60%);
+      radial-gradient(ellipse at top right, color-mix(in srgb, var(--theme-accent-2, #d8b4ff) 18%, transparent), transparent 50%),
+      radial-gradient(ellipse at bottom left, color-mix(in srgb, var(--theme-primary, #5e2a79) 35%, transparent), transparent 60%);
     pointer-events: none;
   }
   .card > * { position: relative; z-index: 1; }
@@ -55,7 +58,7 @@
     margin-bottom: 10px;
   }
   .title {
-    color: #e0c8ff;
+    color: var(--theme-accent-2, #e0c8ff);
     font-size: 1.15em;
     font-weight: 700;
     letter-spacing: 0.04em;
@@ -65,11 +68,11 @@
     font-size: 0.78em;
   }
   .match {
-    border: 1px solid rgba(216, 180, 255, 0.35);
+    border: 1px solid color-mix(in srgb, var(--theme-accent-2, #d8b4ff) 35%, transparent);
     border-radius: 6px;
     padding: 10px 12px;
     margin-bottom: 10px;
-    background: rgba(13, 6, 26, 0.72);
+    background: color-mix(in srgb, var(--theme-bg, #0d061a) 72%, transparent);
     backdrop-filter: blur(2px);
   }
   .match-head {
@@ -97,12 +100,12 @@
   }
   .stat {
     padding: 5px 8px;
-    background: rgba(216, 180, 255, 0.10);
+    background: color-mix(in srgb, var(--theme-accent-2, #d8b4ff) 10%, transparent);
     border-radius: 4px;
     text-align: center;
   }
   .stat .v {
-    color: #e0c8ff;
+    color: var(--theme-accent-2, #e0c8ff);
     font-size: 1.15em;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
@@ -124,12 +127,12 @@
     align-items: center;
     gap: 3px;
     padding: 2px 8px;
-    background: rgba(216, 180, 255, 0.14);
-    border: 1px solid rgba(216, 180, 255, 0.4);
+    background: color-mix(in srgb, var(--theme-accent-2, #d8b4ff) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--theme-accent-2, #d8b4ff) 40%, transparent);
     border-radius: 11px;
     font-size: 0.78em;
   }
-  .badge b { color: #e0c8ff; font-variant-numeric: tabular-nums; }
+  .badge b { color: var(--theme-accent-2, #e0c8ff); font-variant-numeric: tabular-nums; }
   .extras {
     display: flex;
     gap: 12px;
@@ -220,9 +223,9 @@ function render(d) {
     <div class="head">
       <span class="title"><span class="material-symbols-outlined" aria-hidden="true">theater_comedy</span> Event / Heist Stats</span>
       <span class="subtitle">${n} match${n > 1 ? "es" : ""} · ${RANGE}
-        &nbsp;·&nbsp; Ø <b style="color:#e0c8ff">${avgK.toFixed(1)}</b> K
-        &nbsp;·&nbsp; Ø <b style="color:#e0c8ff">${Math.round(avgD)}</b> DMG
-        &nbsp;·&nbsp; Ø <b style="color:#e0c8ff">${avgL.toFixed(1)}</b> Loot
+        &nbsp;·&nbsp; Ø <b style="color:var(--theme-accent-2,#e0c8ff)">${avgK.toFixed(1)}</b> K
+        &nbsp;·&nbsp; Ø <b style="color:var(--theme-accent-2,#e0c8ff)">${Math.round(avgD)}</b> DMG
+        &nbsp;·&nbsp; Ø <b style="color:var(--theme-accent-2,#e0c8ff)">${avgL.toFixed(1)}</b> Loot
       </span>
     </div>
     ${matchesHtml}

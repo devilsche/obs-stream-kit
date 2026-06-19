@@ -109,7 +109,7 @@
       letter-spacing: -8px;
       line-height: 1;
       color: var(--pubg-gold);
-      -webkit-text-stroke: 4px color-mix(in srgb,var(--mc-primary) 40%,#000);
+      -webkit-text-stroke: 4px color-mix(in srgb,var(--mc-primary) 40%,var(--theme-bg, #000));
       text-shadow:
         0 0 40px color-mix(in srgb,var(--mc-gold) 70%,transparent),
         0 0 100px color-mix(in srgb,var(--mc-gold) 40%,transparent),
@@ -180,7 +180,7 @@
     .stats .l {
       display: block;
       font-size: 18px;
-      color: rgba(255,255,255,0.7);
+      color: var(--theme-text-dim, rgba(255,255,255,0.7));
       letter-spacing: 0.18em;
       text-transform: uppercase;
       margin-top: 8px;

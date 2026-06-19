@@ -19,7 +19,7 @@
   <style>
     html, body { margin: 0; padding: 0; }
     body { padding: 8px; min-height: 100vh; box-sizing: border-box; }
-    body.dock { background: #0d061a; padding: 10px; height: 100vh; overflow: hidden; }
+    body.dock { background: var(--theme-bg, #0d061a); padding: 10px; height: 100vh; overflow: hidden; }
     .panel { width: 100%; min-width: 320px; padding: 14px 16px; }
     .panel h3 {
       margin: 0 0 12px; font-size: 0.9em; letter-spacing: 0.08em;
@@ -28,7 +28,7 @@
     table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
     th, td { padding: 6px 8px; text-align: right; }
     th { color: var(--pubg-gold); font-size: 0.78em; text-transform: uppercase;
-         letter-spacing: 0.05em; border-bottom: 1px solid rgba(94,42,121,0.5); }
+         letter-spacing: 0.05em; border-bottom: 1px solid color-mix(in srgb, var(--theme-primary, #5e2a79) 50%, transparent); }
     th:first-child, td:first-child { text-align: left; }
     tr.self td { color: var(--pubg-gold); font-weight: 700; }
     td.rank { color: var(--pubg-muted); width: 28px; }
@@ -42,7 +42,7 @@
     th.sortable.active { color: var(--pubg-gold); }
     .sort-arrow { font-size: 0.7em; margin-left: 2px; opacity: 0.7; }
     td.dealt b { color: var(--pubg-gold); }
-    td.taken b { color: #ff7a7a; }
+    td.taken b { color: var(--theme-danger, #ff7a7a); }
     .empty { color: var(--pubg-muted); font-style: italic; text-align: center;
              padding: 20px 0; }
     .sub { color: var(--pubg-muted); font-size: 0.75em; }

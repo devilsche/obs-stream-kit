@@ -19,7 +19,7 @@
     /* OBS-Dock-Modus: dunkler Hintergrund + Card oben links statt
        Anker unten. Aktivierung via ?dock=1. */
     body.dock {
-      background: #0d061a;
+      background: var(--theme-bg, #0d061a);
       justify-content: flex-start;
       padding: 10px;
     }
@@ -39,7 +39,7 @@
       font-weight: 700;
       color: var(--pubg-gold);
       font-variant-numeric: tabular-nums;
-      text-shadow: 0 0 14px rgba(242, 183, 5, 0.4);
+      text-shadow: 0 0 14px color-mix(in srgb, var(--theme-accent, #f2b705) 40%, transparent);
     }
     .label { color: var(--pubg-muted); font-size: 0.85em; }
     .row {
@@ -61,12 +61,12 @@
       background: var(--pubg-muted);
       opacity: 0.45;
     }
-    .markers .m.hot   { background: #ff7a1f; opacity: 1; }
-    .markers .m.died  { background: #e57b7b; opacity: 0.7; }
+    .markers .m.hot   { background: var(--theme-accent, #ff7a1f); opacity: 1; }
+    .markers .m.died  { background: var(--theme-danger, #e57b7b); opacity: 0.7; }
     /* Solo tot, Team ueberlebt: eigener Farbton (lila, brand-purple),
        weil rot/orange-Mix bei 10x10px nicht unterscheidbar ist. */
     .markers .m.died.team-saved {
-      background: #a974d4;
+      background: var(--theme-accent-2, #a974d4);
       opacity: 1;
     }
     .meta { color: var(--pubg-muted); font-size: 0.78em; margin-top: 8px; }
@@ -84,10 +84,10 @@
       width: 8px; height: 8px; border-radius: 2px;
       background: var(--pubg-muted); opacity: 0.45;
     }
-    .legend .swatch.hot  { background: #ff7a1f; opacity: 1; }
-    .legend .swatch.died { background: #e57b7b; opacity: 0.7; }
+    .legend .swatch.hot  { background: var(--theme-accent, #ff7a1f); opacity: 1; }
+    .legend .swatch.died { background: var(--theme-danger, #e57b7b); opacity: 0.7; }
     .legend .swatch.team-saved {
-      background: #a974d4;
+      background: var(--theme-accent-2, #a974d4);
       opacity: 1;
     }
     .legend .hint { opacity: 0.7; font-style: italic; }
@@ -96,7 +96,7 @@
     .popover {
       position: fixed;
       display: none;
-      background: #0d061a;
+      background: var(--theme-bg, #0d061a);
       border: 1px solid var(--pubg-gold, #f2b705);
       border-radius: 5px;
       padding: 10px 12px;

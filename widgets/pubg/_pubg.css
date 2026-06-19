@@ -11,7 +11,7 @@
 .material-symbols-outlined.icon-lg { font-size: 32px; vertical-align: -7px; }
 .material-symbols-outlined.icon-gold { color: var(--pubg-gold); }
 .material-symbols-outlined.icon-muted { color: var(--pubg-muted); }
-.material-symbols-outlined.icon-danger { color: #ff7a7a; }
+.material-symbols-outlined.icon-danger { color: var(--theme-danger, #ff7a7a); }
 
 :root {
   /* Hartkodierte Fallbacks (Entry-Theme) — werden von Theme-Tokens überschrieben */
@@ -136,7 +136,7 @@ body.dock {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.pubg-error { color: #e57b7b; font-size: 0.85em; }
+.pubg-error { color: var(--theme-danger, #e57b7b); font-size: 0.85em; }
 
 /* Stale-Hide: Body wird per Klasse versteckt; die Filter-Bar (falls
    eingeblendet) bleibt sichtbar — der Nutzer kann ignoreStale togglen

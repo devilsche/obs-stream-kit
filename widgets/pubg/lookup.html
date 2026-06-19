@@ -45,7 +45,7 @@
     }
     .search-row input {
       flex: 1;
-      background: rgba(0,0,0,0.4);
+      background: var(--theme-surface-2, rgba(0,0,0,0.4));
       color: var(--pubg-text);
       border: 1px solid var(--pubg-border);
       padding: 8px 12px;
@@ -55,7 +55,7 @@
     }
     .search-row button {
       background: var(--pubg-gold);
-      color: #1a0d2a;
+      color: var(--theme-on-primary, #1a0d2a);
       border: none;
       padding: 8px 18px;
       border-radius: 4px;
@@ -92,14 +92,14 @@
       text-transform: uppercase;
       letter-spacing: 0.06em;
       font-size: 0.85em;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
+      border-bottom: 1px solid color-mix(in srgb, var(--theme-text, #fff) 10%, transparent);
     }
     .modes-table td {
       padding: 4px 8px;
       text-align: right;
     }
     .modes-table td:first-child { text-align: left; color: var(--pubg-text); }
-    .err { color: #e57b7b; padding: 14px; }
+    .err { color: var(--theme-danger, #e57b7b); padding: 14px; }
 
     /* ?embed=1 → versteckt die komplette Search-Card (Title, Hint,
        Input, Button). Damit bleiben nur die Result-Cards. */

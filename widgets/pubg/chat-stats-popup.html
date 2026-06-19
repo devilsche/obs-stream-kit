@@ -21,7 +21,7 @@
       display: inline-block;
       padding: 3px 10px;
       background: var(--pubg-gold);
-      color: #1a0d2a;
+      color: var(--theme-on-primary, #1a0d2a);
       font-weight: 700;
       font-size: 0.72em;
       letter-spacing: 0.1em;
@@ -51,7 +51,7 @@
       color: var(--pubg-muted);
       margin-top: 14px;
       padding-top: 14px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      border-top: 1px solid color-mix(in srgb, var(--theme-text, #fff) 8%, transparent);
     }
     .popup .career.tight {
       border-top: none;

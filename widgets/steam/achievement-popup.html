@@ -62,7 +62,7 @@
       background: color-mix(in srgb, var(--pubg-primary, #5e2a79) 40%, transparent);
       border: 1px solid var(--pubg-gold);
       flex-shrink: 0;
-      box-shadow: 0 0 12px rgba(242, 183, 5, 0.35);
+      box-shadow: 0 0 12px color-mix(in srgb, var(--theme-accent, #f2b705) 35%, transparent);
       display: flex; align-items: center; justify-content: center;
       font-size: 38px;
       line-height: 1;
@@ -145,7 +145,7 @@
       background: linear-gradient(90deg,
         var(--theme-primary, #5e2a79),
         var(--theme-accent-2, #c9a0dc));
-      color: #fff;
+      color: var(--theme-on-primary, #fff);
     }
 
     /* Legendary (≤1%) — primary + accent animated */
@@ -171,7 +171,7 @@
         var(--theme-accent-2, #c9a0dc),
         var(--theme-primary, #5e2a79));
       background-size: 300% auto;
-      color: #fff;
+      color: var(--theme-on-primary, #fff);
       animation: legendaryRibbon 3s linear infinite;
     }
 

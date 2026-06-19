@@ -27,7 +27,7 @@
       text-align: center;
       padding: 10px 6px 8px;
       border-radius: 6px;
-      background: rgba(255,255,255,0.03);
+      background: color-mix(in srgb, var(--theme-text, #fff) 3%, transparent);
     }
     .kd-cell .v {
       font-size: 1.85em;
@@ -38,7 +38,7 @@
     }
     .kd-cell.me .v {
       color: var(--pubg-gold);
-      text-shadow: 0 0 14px rgba(242, 183, 5, 0.35);
+      text-shadow: 0 0 14px color-mix(in srgb, var(--theme-accent, #f2b705) 35%, transparent);
     }
     .kd-cell .l {
       color: var(--pubg-muted);
@@ -51,8 +51,8 @@
     .row { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.9em; }
     .row b { color: var(--pubg-text); font-variant-numeric: tabular-nums; }
     .row .label { color: var(--pubg-muted); }
-    .diff-pos { color: #7be57b; }
-    .diff-neg { color: #e57b7b; }
+    .diff-pos { color: var(--theme-ok, #7be57b); }
+    .diff-neg { color: var(--theme-danger, #e57b7b); }
     .meta { color: var(--pubg-muted); font-size: 0.78em; margin-top: 8px; }
     .hint { color: var(--pubg-muted); font-size: 0.72em; margin-top: 6px; line-height: 1.3; }
   </style>

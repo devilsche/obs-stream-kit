@@ -25,7 +25,7 @@
     .cell {
       padding: 10px 12px;
       border-radius: 6px;
-      background: rgba(94, 42, 121, 0.18);
+      background: color-mix(in srgb, var(--theme-primary, #5e2a79) 18%, transparent);
       border: 1px solid var(--pubg-border);
     }
     .cell .label {
@@ -51,8 +51,8 @@
       font-size: 0.95em;
       font-variant-numeric: tabular-nums;
     }
-    .delta-pos { color: #7be57b; }
-    .delta-neg { color: #e57b7b; }
+    .delta-pos { color: var(--theme-ok, #7be57b); }
+    .delta-neg { color: var(--theme-danger, #e57b7b); }
     .delta-zero { color: var(--pubg-muted); }
     .meta { color: var(--pubg-muted); font-size: 0.78em; margin-top: 12px; }
   </style>

@@ -44,13 +44,13 @@
       text-transform: uppercase;
       letter-spacing: 0.06em;
       font-size: 0.85em;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
+      border-bottom: 1px solid color-mix(in srgb, var(--theme-text, #fff) 10%, transparent);
     }
     th:first-child { text-align: left; }
     td {
       padding: 6px 8px;
       text-align: right;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
+      border-bottom: 1px solid color-mix(in srgb, var(--theme-text, #fff) 4%, transparent);
     }
     td:first-child { text-align: left; color: var(--pubg-text); }
     tr.win td { color: var(--pubg-gold); }
@@ -173,7 +173,7 @@
     function showError(e) {
       console.error(e);
       document.getElementById("content").innerHTML =
-        `<div class="empty" style="color:#e57b7b"><span class="material-symbols-outlined icon-sm" aria-hidden="true">error</span> API error: ${e.message || e}<br>` +
+        `<div class="empty" style="color:var(--theme-danger,#e57b7b)"><span class="material-symbols-outlined icon-sm" aria-hidden="true">error</span> API error: ${e.message || e}<br>` +
         `<small style="opacity:0.7">Endpoint /api/pubg/map-performance erreichbar? ` +
         `Server ggf. neu starten falls gerade gepullt.</small></div>`;
     }

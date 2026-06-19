@@ -79,7 +79,7 @@
     .widget-name {
       font-size: 18px;
       font-weight: 700;
-      color: #ffffff;
+      color: var(--theme-text, #ffffff);
       white-space: nowrap;
     }
 
@@ -91,7 +91,7 @@
       padding: 5px 14px;
       border-radius: 14px;
       flex-shrink: 0;
-      background: linear-gradient(135deg, color-mix(in srgb,var(--c-gold) 35%,transparent), rgba(255, 160, 20, 0.25));
+      background: linear-gradient(135deg, color-mix(in srgb,var(--c-gold) 35%,transparent), color-mix(in srgb,var(--theme-accent, #f2b705) 25%,transparent));
       border: 1px solid var(--c-gold);
       color: var(--c-gold);
       text-shadow: 0 0 8px color-mix(in srgb,var(--c-gold) 50%,transparent);

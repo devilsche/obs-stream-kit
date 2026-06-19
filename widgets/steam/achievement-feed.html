@@ -46,7 +46,7 @@
     .icon {
       width: 56px; height: 56px;
       border-radius: 6px;
-      background: rgba(0,0,0,0.3);
+      background: color-mix(in srgb, var(--theme-bg, #000) 30%, transparent);
       border: 1px solid var(--pubg-border);
       object-fit: contain;
       flex-shrink: 0;
@@ -83,15 +83,15 @@
       padding: 1px 6px;
       border-radius: 3px;
       background: var(--pubg-gold);
-      color: #1a0d2a;
+      color: var(--theme-on-primary, #1a0d2a);
       font-weight: 700;
       text-transform: uppercase;
     }
     /* Rare-Variante: Icon glueht gold */
     .slot.rare .icon {
-      border-color: #fff8d0;
-      box-shadow: 0 0 14px rgba(242, 183, 5, 0.5),
-                  0 0 28px rgba(242, 183, 5, 0.25);
+      border-color: var(--theme-accent, #fff8d0);
+      box-shadow: 0 0 14px color-mix(in srgb, var(--theme-accent, #f2b705) 50%, transparent),
+                  0 0 28px color-mix(in srgb, var(--theme-accent, #f2b705) 25%, transparent);
     }
     .slot.rare .pct b { color: var(--pubg-gold); }
     .empty {

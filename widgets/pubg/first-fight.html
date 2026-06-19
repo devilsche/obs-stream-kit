@@ -19,7 +19,7 @@
     /* OBS-Dock-Modus: dunkler Hintergrund + Card oben links statt
        Anker unten. Aktivierung via ?dock=1. */
     body.dock {
-      background: #0d061a;
+      background: var(--theme-bg, #0d061a);
       justify-content: flex-start;
       padding: 10px;
     }
@@ -78,10 +78,10 @@
     }
     /* Vier Faelle (gleich wie hot-drop): grau cold, orange Solo alive,
        lila Solo tot/Team alive, rot beide tot. */
-    .spark span.s          { background: #ff7a1f; opacity: 1; }
-    .spark span.team-saved { background: #a974d4; opacity: 1; }
-    .spark span.d          { background: #e57b7b; opacity: 0.7; }
-    .spark span.fled       { background: #f2b705; opacity: 0.55; }
+    .spark span.s          { background: var(--theme-accent, #ff7a1f); opacity: 1; }
+    .spark span.team-saved { background: var(--theme-accent-2, #a974d4); opacity: 1; }
+    .spark span.d          { background: var(--theme-danger, #e57b7b); opacity: 0.7; }
+    .spark span.fled       { background: var(--theme-warn, #f2b705); opacity: 0.55; }
     .legend {
       display: flex;
       flex-wrap: wrap;
@@ -96,12 +96,12 @@
       width: 8px; height: 8px; border-radius: 2px;
       background: var(--pubg-muted); opacity: 0.45;
     }
-    .legend .swatch.s          { background: #ff7a1f; opacity: 1; }
-    .legend .swatch.team-saved { background: #a974d4; opacity: 1; }
+    .legend .swatch.s          { background: var(--theme-accent, #ff7a1f); opacity: 1; }
+    .legend .swatch.team-saved { background: var(--theme-accent-2, #a974d4); opacity: 1; }
     /* Popover bei Hover */
     .popover {
       position: fixed; display: none;
-      background: #0d061a; color: var(--pubg-text);
+      background: var(--theme-bg, #0d061a); color: var(--pubg-text);
       border: 1px solid var(--pubg-gold, #f2b705);
       border-radius: 5px; padding: 10px 12px;
       font-size: 0.78em; line-height: 1.5; max-width: 320px;
@@ -114,8 +114,8 @@
       margin-bottom: 4px; font-size: 1.05em;
     }
     .popover.show { display: block; }
-    .legend .swatch.d          { background: #e57b7b; opacity: 0.7; }
-    .legend .swatch.fled       { background: #f2b705; opacity: 0.55; }
+    .legend .swatch.d          { background: var(--theme-danger, #e57b7b); opacity: 0.7; }
+    .legend .swatch.fled       { background: var(--theme-warn, #f2b705); opacity: 0.55; }
   </style>
 </head>
 <body>

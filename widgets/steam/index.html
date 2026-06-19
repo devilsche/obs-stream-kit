@@ -29,7 +29,7 @@
     }
     a.tile {
       display: block;
-      background: rgba(0, 0, 0, 0.4);
+      background: color-mix(in srgb, var(--theme-bg, #000) 40%, transparent);
       border: 1px solid var(--pubg-border);
       border-radius: 8px;
       padding: 14px 18px 16px;
@@ -39,7 +39,7 @@
     }
     a.tile:hover {
       border-color: var(--pubg-gold);
-      background: rgba(94, 42, 121, 0.18);
+      background: color-mix(in srgb, var(--theme-primary, #5e2a79) 18%, transparent);
       transform: translateY(-1px);
     }
     .tile-title {
@@ -64,7 +64,7 @@
       display: inline-block;
       font-size: 0.75em;
       color: var(--pubg-text);
-      background: rgba(94, 42, 121, 0.35);
+      background: color-mix(in srgb, var(--theme-primary, #5e2a79) 35%, transparent);
       border: 1px solid var(--pubg-border);
       border-radius: 4px;
       padding: 2px 8px;
@@ -74,7 +74,7 @@
     .tile-size b { color: var(--pubg-gold); font-variant-numeric: tabular-nums; }
     .tile-params {
       margin: 0; padding: 0; list-style: none;
-      border-top: 1px solid rgba(94, 42, 121, 0.3);
+      border-top: 1px solid color-mix(in srgb, var(--theme-primary, #5e2a79) 30%, transparent);
       padding-top: 8px;
     }
     .tile-params li {
@@ -94,7 +94,7 @@
 
     /* API + Test-Trigger als Liste, kein Grid nötig. */
     .urlbox {
-      padding: 14px 18px; background: rgba(0,0,0,0.3);
+      padding: 14px 18px; background: color-mix(in srgb, var(--theme-bg, #000) 30%, transparent);
       border: 1px solid var(--pubg-border);
       border-radius: 8px; margin-bottom: 12px;
       font-size: 0.85em;
@@ -105,7 +105,7 @@
     }
     .urlbox a:hover { text-decoration: underline; }
     .urlbox .pill {
-      display: inline-block; background: rgba(94, 42, 121, 0.3);
+      display: inline-block; background: color-mix(in srgb, var(--theme-primary, #5e2a79) 30%, transparent);
       border: 1px solid var(--pubg-border);
       border-radius: 999px; padding: 1px 8px; font-size: 0.7em;
       color: var(--pubg-text); margin-left: 6px;
@@ -114,13 +114,13 @@
       display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;
     }
     .triggers button {
-      background: var(--pubg-gold); color: #1a0d2a;
+      background: var(--pubg-gold); color: var(--theme-on-primary, #1a0d2a);
       border: none; padding: 8px 14px; border-radius: 5px;
       font-weight: 700; cursor: pointer; font-family: inherit;
       font-size: 0.85em; letter-spacing: 0.05em;
     }
     .triggers button.secondary {
-      background: rgba(94, 42, 121, 0.4); color: var(--pubg-text);
+      background: color-mix(in srgb, var(--theme-primary, #5e2a79) 40%, transparent); color: var(--pubg-text);
       border: 1px solid var(--pubg-border);
     }
     .triggers button:hover { opacity: 0.85; }

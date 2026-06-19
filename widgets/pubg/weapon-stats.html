@@ -22,7 +22,7 @@
     }
     /* OBS-Source (?dock=1): fixe Hoehe + Card oben. */
     body.dock {
-      background: #0d061a;
+      background: var(--theme-bg, #0d061a);
       padding: 10px;
       height: 100vh;
       overflow: hidden;
@@ -45,7 +45,7 @@
       margin-bottom: 10px;
     }
     .filter-cats button {
-      background: rgba(0,0,0,0.4);
+      background: var(--theme-surface-2, rgba(0,0,0,0.4));
       color: var(--pubg-muted);
       border: 1px solid var(--pubg-border);
       padding: 3px 9px;
@@ -83,7 +83,7 @@
     table.ws thead th.active { color: var(--pubg-gold); }
     table.ws tbody td {
       padding: 7px 6px;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
+      border-bottom: 1px solid color-mix(in srgb, var(--theme-text, #fff) 5%, transparent);
     }
     table.ws tbody tr:last-child td { border-bottom: 0; }
     :root { --wicon-size: 48px; }

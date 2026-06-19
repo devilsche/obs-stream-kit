@@ -27,10 +27,10 @@
     .grid-line  { stroke: var(--pubg-border); stroke-dasharray: 2 4; opacity: 0.4; }
     .data-line  { fill: none; stroke: var(--pubg-gold); stroke-width: 2;
                   stroke-linejoin: round; stroke-linecap: round;
-                  filter: drop-shadow(0 0 4px rgba(242,183,5,0.4)); }
+                  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--theme-accent, #f2b705) 40%, transparent)); }
     .data-area  { fill: url(#area-grad); opacity: 0.35; }
-    .dot        { fill: var(--pubg-gold); stroke: #2a1238; stroke-width: 1.5; }
-    .dot:hover  { fill: #fff; }
+    .dot        { fill: var(--pubg-gold); stroke: var(--theme-bg, #2a1238); stroke-width: 1.5; }
+    .dot:hover  { fill: var(--theme-text, #fff); }
     .seasons-row { display: grid; grid-template-columns: repeat(7, 1fr);
                    gap: 4px; margin-top: 12px; font-size: 0.72em;
                    color: var(--pubg-muted); }
@@ -41,7 +41,7 @@
                      color: var(--pubg-muted); padding: 4px 10px; border-radius: 3px;
                      cursor: pointer; font-family: inherit; letter-spacing: 0.06em;
                      text-transform: uppercase; font-size: 11px; font-weight: 700; }
-    .legend button.active { background: rgba(242,183,5,0.15);
+    .legend button.active { background: color-mix(in srgb, var(--theme-accent, #f2b705) 15%, transparent);
                             border-color: var(--pubg-gold);
                             color: var(--pubg-gold); }
     .summary { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr;
@@ -52,7 +52,7 @@
     .summary .value { color: var(--pubg-gold); font-weight: 700; font-size: 1.1em;
                       font-variant-numeric: tabular-nums; }
     .tooltip { position: absolute; pointer-events: none; padding: 6px 10px;
-               background: rgba(20, 12, 30, 0.95); border: 1px solid var(--pubg-gold);
+               background: color-mix(in srgb, var(--theme-surface, #140c1e) 95%, transparent); border: 1px solid var(--pubg-gold);
                border-radius: 4px; font-size: 0.78em; white-space: nowrap;
                opacity: 0; transition: opacity 0.12s; z-index: 10;
                transform: translate(-50%, -110%); }
@@ -68,8 +68,8 @@
       <svg class="chart-svg" id="chart" viewBox="0 0 720 280" preserveAspectRatio="none">
         <defs>
           <linearGradient id="area-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stop-color="#f2b705" stop-opacity="0.5"/>
-            <stop offset="100%" stop-color="#f2b705" stop-opacity="0"/>
+            <stop offset="0%"   stop-color="var(--theme-accent, #f2b705)" stop-opacity="0.5"/>
+            <stop offset="100%" stop-color="var(--theme-accent, #f2b705)" stop-opacity="0"/>
           </linearGradient>
         </defs>
         <g id="grid"></g>

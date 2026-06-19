@@ -20,7 +20,7 @@
     body.compact .pubg-stat-label { font-size: 0.65em; }
 
     .section {
-      border-top: 1px solid rgba(255,255,255,0.07);
+      border-top: 1px solid color-mix(in srgb, var(--theme-text, #fff) 7%, transparent);
       padding: 12px 0;
     }
     .section:first-child { border-top: none; padding-top: 0; }
@@ -62,7 +62,7 @@
     }
 
     .controls select {
-      background: rgba(0,0,0,0.3); color: var(--pubg-text);
+      background: var(--theme-surface-2, rgba(0,0,0,0.3)); color: var(--pubg-text);
       border: 1px solid var(--pubg-border); padding: 4px 6px; border-radius: 4px;
     }
   </style>
@@ -279,7 +279,7 @@
 
     function renderTopMates(list) {
       document.getElementById("topmates").innerHTML = list.length ? list.map((m,i) => `
-        <div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
+        <div style="padding:6px 0;border-bottom:1px solid color-mix(in srgb,var(--theme-text,#fff) 5%,transparent)">
           <div class="pubg-row">
             <span style="color:var(--pubg-gold);width:18px;font-weight:700">${i+1}</span>
             <span style="flex:1;font-weight:700">${m.name}</span>
