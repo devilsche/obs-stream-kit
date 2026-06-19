@@ -18,6 +18,7 @@ html[data-theme="barrier"],
 html[data-theme="sect"] {
   --brand-purple:        var(--theme-primary);
   --brand-purple-bright: var(--theme-accent-2);
+  --brand-ink:           var(--theme-accent);
   --brand-gold:          var(--theme-accent);
   --bg:                  var(--theme-bg);
   --bg-elev:             var(--theme-surface);
