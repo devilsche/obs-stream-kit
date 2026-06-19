@@ -59,7 +59,7 @@ WIDGET_PREVIEW_SIZES = {
     "steam/now-playing.html":       (520, 200),
     "steam/games-ticker.html":      (480,  90),
     # Gothic 1 Remake (lokaler Proxy, ?port=)
-    "g1r/livebar.html":             (1040, 46),
+    "g1r/livebar.html":             (1040, 36),
     "g1r/news-ticker.html":         (760,  40),
     "g1r/career-card.html":         (360, 480),
     # Follower & Goals

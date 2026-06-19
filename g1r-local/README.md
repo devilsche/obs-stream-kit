@@ -36,7 +36,7 @@ crashfrei aus dem Inventar gefiltert, was der Spieler an Waffen/Zaubern dabei ha
 - `weapon_damage.json` / `spell_circle.json` — Wiki-Mappings (Schaden bzw. benötigter Kreis).
 - Widgets (im Haupt-Repo, prod-serviert, alle theme-fähig + englisch, Ornament-Rahmen via `.t-card`,
   Subscription via SSE, `?port=9210`):
-  - `widgets/g1r/livebar.html` (1040×46) — Level/Schritte/Schaden/Mana/Regen/Uhr, `?scope=session|all`
+  - `widgets/g1r/livebar.html` (1040×36) — Level/Schritte/Schaden/Mana/Regen/Uhr, `?scope=session|all`
   - `widgets/g1r/news-ticker.html` (760×40) — Stats/Session/Melee+Ranged+Zauber (Laufband)
   - `widgets/g1r/career-card.html` (360×480) — Stats/Resistenzen + **ein** Scope (`?scope=session|all`,
     Default `all`) für Gesamtwerte UND Rekorde, Ausrüstung, Gilden-Wappen
