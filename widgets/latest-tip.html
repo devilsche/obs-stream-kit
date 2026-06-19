@@ -96,10 +96,11 @@
       padding: 5px 14px;
       border-radius: 14px;
       flex-shrink: 0;
-      background: linear-gradient(135deg, color-mix(in srgb,var(--c-gold) 35%,transparent), color-mix(in srgb,var(--theme-accent, #f2b705) 25%,transparent));
+      /* Deckend: solid Primary + Gold-Rahmen (Geld-Feel) + on-primary-Text →
+         lesbar in jedem Theme, auch über heller editorial-Box. */
+      background: var(--c-primary);
       border: 1px solid var(--c-gold);
-      color: var(--c-gold);
-      text-shadow: 0 0 8px color-mix(in srgb,var(--c-gold) 50%,transparent);
+      color: var(--theme-on-primary, #fff);
       box-shadow: 0 0 12px color-mix(in srgb,var(--c-gold) 30%,transparent);
     }
   </style>
