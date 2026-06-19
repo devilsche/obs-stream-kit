@@ -1,0 +1,5 @@
+/* ── t-badge: gefüllte Plakette (Primary-Fläche, on-primary-Schrift). z.B. Ticker-Label.
+   on-primary ist der Token, der lesbar AUF dem Primary sitzt (themeweit AA-geprüft). ── */
+.t-badge{background:var(--theme-primary);color:var(--theme-on-primary);
+  font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;
+  padding:3px 8px;border-radius:4px;flex:none}
