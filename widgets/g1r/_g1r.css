@@ -31,7 +31,11 @@ body.g1r-livebar { width: 1040px; height: auto; }
 body.g1r-ticker { width: 760px; height: 40px; }
 /* KEIN overflow:hidden auf der Card — das clippt die Ornament-Ecken; der Marquee
    wird vom inneren .t-ticker geclippt. */
-.g1r-ticker .t-card.ticker { padding: 0 36px; height: 40px; width: 760px; display: flex; align-items: center; gap: 12px; }
+.g1r-ticker .t-card.ticker { padding: 0 16px; height: 40px; width: 760px; display: flex; align-items: center; gap: 12px; }
+/* Ornament-Themes (Eck-Ornamente) → mehr horizontales Padding, sonst 16px. */
+html[data-theme="oldcamp"] .g1r-ticker .t-card.ticker,
+html[data-theme="barrier"] .g1r-ticker .t-card.ticker,
+html[data-theme="sect"] .g1r-ticker .t-card.ticker { padding: 0 36px; }
 .g1r-ticker .tag { background: var(--theme-primary, #5e2a79); color: var(--theme-text, #fff); font-size: .62rem;
                    font-weight: 700; text-transform: uppercase; letter-spacing: .1em; padding: 3px 8px; border-radius: 4px; flex: none; }
 .g1r-ticker .run { color: var(--theme-text, #e8e0f0); font-size: .92rem; white-space: nowrap; padding-right: 48px; }
