@@ -14,7 +14,7 @@
   {# Material Symbols (Google) — Icons statt Emojis. Outlined-Variante. #}
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined">
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
   {% if g.tenant_impersonating %}
   <div class="impersonation-banner" role="status">

@@ -179,6 +179,18 @@ img { max-width: 100%; height: auto; }
 
 /* ====== Layout / Main ================================================ */
 .layout { display: block; }
+
+/* ── App-Shell: kein Body-Scroll auf Desktop — fixe Top-Nav, der Inhalt scrollt
+   intern. Deckt beide Seitenstrukturen ab: <body><nav><main.dn-main> und
+   <body><div.layout><nav><main.main>. Mobile (<769px) bleibt normal scrollbar. ── */
+@media (min-width: 769px) {
+  body.app-shell { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  body.app-shell .dn-nav { flex: 0 0 auto; }
+  body.app-shell .impersonation-banner { flex: 0 0 auto; }
+  body.app-shell > .dn-main { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  body.app-shell > .layout { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  body.app-shell > .layout > .main { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+}
 .main {
   max-width: 1400px; margin: 0 auto;
   padding: 20px 16px 64px;
