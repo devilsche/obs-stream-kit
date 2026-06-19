@@ -117,19 +117,21 @@
       user-select: none;
     }
 
-    /* Layer 2: Akzent-Schatten (theme-accent statt hartem Dunkel) */
+    /* Layer 2: dunkler Tiefenschatten — Trennung vom akzent-getönten Hintergrund */
     #logo-shadow {
-      color: var(--st-accent);
+      color: color-mix(in srgb, var(--st-primary) 25%, #000);
       filter: blur(2px);
-      transform: translateY(1px);
-      opacity: 0.75;
+      transform: translateY(2px);
+      opacity: 0.85;
       pointer-events: none;
       user-select: none;
     }
 
-    /* Layer 3: solider Theme-Akzent (kein Chrome-Metallic mehr) */
+    /* Layer 3: heller Akzent-Fill (accent → Weiß getönt). Der Stinger-BG ist IMMER
+       dunkel, daher muss der Text hell sein, sonst blendet er (v.a. dunkle-accent-
+       Themes wie editorial). Akzent-Identität kommt aus Glow (Layer 1) + Tönung. */
     #logo-chrome {
-      color: var(--st-accent);
+      color: color-mix(in srgb, var(--st-accent) 32%, #fff);
     }
   </style>
 </head>
