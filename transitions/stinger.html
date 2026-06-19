@@ -104,7 +104,6 @@
       line-height: 1;
       letter-spacing: 0.04em;
       white-space: nowrap;
-      text-transform: uppercase;
     }
     /* Alle Layer in dieselbe Grid-Zelle stapeln */
     #logo-text > * { grid-area: 1 / 1; }
@@ -168,6 +167,8 @@
       /* Name: ?name= override, sonst der server-injizierte Twitch-Channel. */
       var _params = new URLSearchParams(location.search);
       var _name = _params.get('name') || window.__TWITCH_CHANNEL__ || '';
+      // Großschreibung in JS — ß bleibt ß (CSS text-transform:uppercase würde ß→SS machen).
+      _name = Array.from(_name).map(function (c) { return c === 'ß' ? 'ß' : c.toUpperCase(); }).join('');
       document.getElementById('logo-glow').textContent   = _name;
       document.getElementById('logo-shadow').textContent = _name;
       document.getElementById('logo-chrome').textContent = _name;
