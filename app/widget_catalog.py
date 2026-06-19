@@ -61,7 +61,7 @@ WIDGET_PREVIEW_SIZES = {
     # Gothic 1 Remake (lokaler Proxy, ?port=)
     "g1r/livebar.html":             (900, 40),
     "g1r/news-ticker.html":         (760,  40),
-    "g1r/career-card.html":         (360, 480),
+    "g1r/career-card.html":         (360, 580),
     # Follower & Goals
     "latest-follower.html":         (500, 110),
     "latest-sub.html":              (500, 110),

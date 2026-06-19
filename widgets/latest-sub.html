@@ -98,18 +98,20 @@
       flex-shrink: 0;
     }
 
+    /* Deckender Primary-Hintergrund (kein color-mix mit transparent) — sonst scheint
+       in hellen Themes (editorial) die Box durch und on-primary-Text säuft ab. */
     .widget-tier--1 {
-      background: color-mix(in srgb,var(--c-primary) 50%,transparent);
+      background: var(--c-primary);
       border: 1px solid var(--c-accent2);
       color: var(--theme-on-primary, #fff);
     }
     .widget-tier--2 {
-      background: color-mix(in srgb,var(--c-primary) 60%,transparent);
+      background: var(--c-primary);
       border: 1px solid var(--c-accent2);
       color: var(--theme-on-primary, #fff);
     }
     .widget-tier--3 {
-      background: linear-gradient(135deg, color-mix(in srgb,var(--c-gold) 30%,transparent), color-mix(in srgb,var(--c-primary) 40%,transparent));
+      background: var(--c-primary);
       border: 1px solid var(--c-gold);
       color: var(--theme-on-primary, #fff);
     }
