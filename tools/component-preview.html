@@ -9,6 +9,7 @@
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
   <link rel="stylesheet" href="/widgets-static/_theme.css">
   <link rel="stylesheet" href="/widgets-static/_blocks.css">
+  <link rel="stylesheet" href="/widgets-static/g1r/_g1r.css">
   <style>
     /* ── Seiten-Layout ── */
     html, body {
@@ -105,54 +106,8 @@
       border-bottom: 1px solid var(--theme-border);
     }
 
-    /* ── t-bar Demo: Flex-Zeile mit Gap-Items ── */
-    .bar-demo-items {
-      display: contents;
-    }
-    .bar-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 16px;
-      font-family: var(--theme-font-mono, monospace);
-      font-size: .83rem;
-      color: var(--theme-text);
-    }
-    .bar-item .bar-key {
-      color: var(--theme-text-dim);
-      font-size: .76rem;
-    }
-    .bar-item .bar-val {
-      color: var(--theme-accent);
-      font-weight: 700;
-    }
-
-    /* ── Ticker-Demo: feste Höhe, damit der Overflow sichtbar ist ── */
-    .ticker-demo-wrap {
-      display: flex;
-      align-items: center;
-      gap: 0;
-      background: var(--theme-surface);
-      background-image: var(--theme-texture);
-      border: var(--theme-border-width) solid var(--theme-border);
-      border-radius: var(--theme-radius);
-      height: 38px;
-      padding: 0;
-    }
-    .ticker-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 0 20px;
-      font-family: var(--theme-font-mono, monospace);
-      font-size: .82rem;
-      color: var(--theme-text-dim);
-      white-space: nowrap;
-    }
-    .ticker-item strong {
-      color: var(--theme-text);
-      font-weight: 700;
-    }
+    /* Bar/Ticker werden über die ECHTEN Widget-Klassen (_g1r.css) gerendert —
+       keine Demo-eigenen Styles mehr (sonst divergiert die Vorschau vom Widget). */
 
     /* ── t-kv Block ── */
     .kv-block {
@@ -334,30 +289,16 @@
     <section class="catalog-section catalog-section--wide" aria-labelledby="lbl-bar">
       <h2 class="section-label" id="lbl-bar">.t-bar · .t-sep</h2>
       <article class="t-card" aria-label="Horizontale Live-Leiste">
-        <div class="t-bar" role="list" aria-label="Live-Statusleiste">
-          <div class="bar-item" role="listitem">
-            <span class="bar-key">Match</span>
-            <span class="bar-val">#1 247</span>
-          </div>
-          <span class="t-sep" aria-hidden="true">·</span>
-          <div class="bar-item" role="listitem">
-            <span class="bar-key">Map</span>
-            <span class="bar-val">Erangel</span>
-          </div>
-          <span class="t-sep" aria-hidden="true">·</span>
-          <div class="bar-item" role="listitem">
-            <span class="bar-key">Kills</span>
-            <span class="bar-val">12</span>
-          </div>
-          <span class="t-sep" aria-hidden="true">·</span>
-          <div class="bar-item" role="listitem">
-            <span class="bar-key">Platz</span>
-            <span class="bar-val">#3</span>
-          </div>
-          <span class="t-sep" aria-hidden="true">·</span>
-          <div class="bar-item" role="listitem">
-            <span class="bar-key">Dmg</span>
-            <span class="bar-val">842</span>
+        <div class="g1r-livebar">
+          <div class="t-card t-bar t-card--accent" role="list" aria-label="Live-Statusleiste">
+            <span class="it" role="listitem"><span class="v">12</span><span class="k">Kills</span></span>
+            <span class="t-sep" aria-hidden="true">·</span>
+            <span class="it" role="listitem"><span class="v bad">842</span><span class="k">DMG out</span></span>
+            <span class="t-sep" aria-hidden="true">·</span>
+            <span class="it" role="listitem"><span class="v">3 400</span><span class="k">Steps</span></span>
+            <span class="t-sep" aria-hidden="true">·</span>
+            <span class="it" role="listitem"><span class="v good">+120</span><span class="k">HP regen</span></span>
+            <span class="clock">14:30</span>
           </div>
         </div>
       </article>
@@ -366,20 +307,14 @@
     <!-- ── t-ticker ── -->
     <section class="catalog-section catalog-section--wide" aria-labelledby="lbl-ticker">
       <h2 class="section-label" id="lbl-ticker">.t-ticker · .t-ticker-track</h2>
-      <div class="ticker-demo-wrap" role="marquee" aria-label="Laufende Ereignisse">
-        <div class="t-ticker">
-          <div class="t-ticker-track" aria-hidden="true">
-            <!-- Track 2× befüllen für nahtlosen Loop -->
-            <span class="ticker-item"><strong>Hat3</strong> 12 Kills · Damage 920</span>
-            <span class="ticker-item"><strong>LuCKoR</strong> Chicken Dinner! #14</span>
-            <span class="ticker-item"><strong>MateA</strong> 8 Kills · Top-3</span>
-            <span class="ticker-item"><strong>Hat3</strong> Hot Drop Erangel School</span>
-            <span class="ticker-item"><strong>LuCKoR</strong> Sniper Ace · 500m Kill</span>
-            <span class="ticker-item"><strong>Hat3</strong> 12 Kills · Damage 920</span>
-            <span class="ticker-item"><strong>LuCKoR</strong> Chicken Dinner! #14</span>
-            <span class="ticker-item"><strong>MateA</strong> 8 Kills · Top-3</span>
-            <span class="ticker-item"><strong>Hat3</strong> Hot Drop Erangel School</span>
-            <span class="ticker-item"><strong>LuCKoR</strong> Sniper Ace · 500m Kill</span>
+      <div class="g1r-ticker">
+        <div class="t-card t-card--accent ticker">
+          <span class="tag">G1 Live</span>
+          <div class="t-ticker">
+            <div class="t-ticker-track" aria-hidden="true">
+              <span class="run">STR <b>80</b> · HP <b>250/280</b> · Mana <b>90/120</b><span class="dot">◆</span>Melee: <b>Söldnerklinge (73)</b><span class="dot">◆</span></span>
+              <span class="run">STR <b>80</b> · HP <b>250/280</b> · Mana <b>90/120</b><span class="dot">◆</span>Melee: <b>Söldnerklinge (73)</b><span class="dot">◆</span></span>
+            </div>
           </div>
         </div>
       </div>
