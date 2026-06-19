@@ -239,9 +239,7 @@
     const label = escapeHtml(card.dataset.label);
     const desc = card.dataset.desc ? `<p class="url-dbox__desc">${escapeHtml(card.dataset.desc)}</p>` : "";
     const hint = card.dataset.hint ? `<div class="url-hint"><span class="material-symbols-outlined" aria-hidden="true">info</span>${escapeHtml(card.dataset.hint)}</div>` : "";
-    // Inline-„Chrome"-Vorschau entfernt — redundant zur echten Stinger-Vorschau
-    // (PREVIEW öffnet transitions/stinger.html). Der Stinger selbst ist theme-accent.
-    const hasChromePreview = false;
+    const hasChromePreview = card.dataset.chromePreview === "true";
 
     let tag, body;
     if (switches.length) {
@@ -407,8 +405,10 @@
 
     lsLoad();
 
-    // ── Font-Preview direkt nach dem font-Switch ──────────────
-    if (switchesRoot) {
+    // ── Font-Preview direkt nach dem font-Switch (Pet-Script-Fonts) ──────────────
+    // NICHT bei Stinger-Karten (chrome_preview) — die haben ihre eigene url-chrome-
+    // Vorschau mit den Display-Fonts; die Pet-Font-Vorschau lädt die falschen Fonts.
+    if (switchesRoot && !hasChromePreview) {
       const fontGroup = switchesRoot.querySelector('[data-param="font"]');
       if (fontGroup) {
         const fp = document.createElement("div");
@@ -498,8 +498,8 @@
           .url-chrome-wrap{display:inline-grid;font-size:60px;line-height:1;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;font-weight:900}
           .url-chrome-wrap>*{grid-area:1/1}
           .url-chrome-glow{color:var(--theme-accent,#f2b705);filter:blur(14px);opacity:.7;pointer-events:none;user-select:none}
-          .url-chrome-shadow{color:var(--theme-accent,#f2b705);filter:blur(1.5px);transform:translateY(1px);opacity:.75;pointer-events:none;user-select:none}
-          .url-chrome-chrome{color:var(--theme-accent,#f2b705)}
+          .url-chrome-shadow{color:color-mix(in srgb,var(--theme-primary,#5e2a79) 50%,#000);filter:blur(1.5px);transform:translateY(2px);opacity:.85;pointer-events:none;user-select:none}
+          .url-chrome-chrome{color:color-mix(in srgb,var(--theme-accent,#f2b705) 32%,#fff)}
         `;
         document.head.appendChild(st);
       }
