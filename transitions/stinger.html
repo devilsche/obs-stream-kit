@@ -118,31 +118,19 @@
       user-select: none;
     }
 
-    /* Layer 2: Tiefenschatten — solid dunkel, kein background-clip, kein Fragmentieren */
+    /* Layer 2: Akzent-Schatten (theme-accent statt hartem Dunkel) */
     #logo-shadow {
-      color: #000d1a;
+      color: var(--st-accent);
       filter: blur(2px);
-      transform: translateY(4px);
+      transform: translateY(1px);
       opacity: 0.75;
       pointer-events: none;
       user-select: none;
     }
 
-    /* Layer 3: Chrome-Gradient — kein filter, sauber auf allen Fonts */
+    /* Layer 3: solider Theme-Akzent (kein Chrome-Metallic mehr) */
     #logo-chrome {
-      background: linear-gradient(180deg,
-        color-mix(in srgb, var(--st-accent) 25%, #ffffff) 0%,
-        #ffffff 12%,
-        #eaeff3 30%,
-        #c2cad2 47%,
-        #7a8892 50%,
-        #d4dce4 53%,
-        #ffffff 74%,
-        color-mix(in srgb, var(--st-accent) 35%, #d0d8e0) 100%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      -webkit-text-fill-color: transparent;
+      color: var(--st-accent);
     }
   </style>
 </head>

@@ -239,7 +239,9 @@
     const label = escapeHtml(card.dataset.label);
     const desc = card.dataset.desc ? `<p class="url-dbox__desc">${escapeHtml(card.dataset.desc)}</p>` : "";
     const hint = card.dataset.hint ? `<div class="url-hint"><span class="material-symbols-outlined" aria-hidden="true">info</span>${escapeHtml(card.dataset.hint)}</div>` : "";
-    const hasChromePreview = card.dataset.chromePreview === "true";
+    // Inline-„Chrome"-Vorschau entfernt — redundant zur echten Stinger-Vorschau
+    // (PREVIEW öffnet transitions/stinger.html). Der Stinger selbst ist theme-accent.
+    const hasChromePreview = false;
 
     let tag, body;
     if (switches.length) {
