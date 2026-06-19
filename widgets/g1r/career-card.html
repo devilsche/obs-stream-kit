@@ -16,46 +16,9 @@
    "options":[["en","English"],["de","Deutsch"]]} ]
 </script>
 <script src="../_params.js"></script>
-  <style>
-    :root { --c-rec: var(--theme-warn, #ff9d3c); }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 360px; height: 480px; overflow: hidden; background: transparent;
-                 font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif); }
-
-    /* .t-card liefert Fläche/Border/Ornament. Hier dichteres Padding. */
-    .t-card.career { width: 360px; height: 480px; padding: 16px 18px; }
-
-    .head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-    .who .name { font-family: var(--theme-font-display, "Cinzel", serif); color: var(--theme-accent, #f2b705); font-size: 1.2rem; }
-    .who .sub { color: var(--theme-text-dim, #8a7d99); font-size: .8rem; }
-
-    .section-lbl { color: var(--theme-text-dim, #8a7d99); text-transform: uppercase; letter-spacing: .12em;
-                   font-size: .6rem; margin: 0 0 7px; display: flex; justify-content: space-between; align-items: baseline; }
-    .section-lbl .scope { color: var(--theme-accent, #f2b705); letter-spacing: .08em; }
-
-    .res { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-
-    /* Records-Werte in Akzentfarbe (warn). */
-    .kv-records .t-kv-v { color: var(--c-rec); }
-
-    /* Stats-Raster: 2 Spalten, Zeilen mit Trennlinie. */
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 18px; margin-bottom: 12px; }
-    .grid .t-kv { border-bottom: 1px solid rgba(255,255,255,.06); padding-bottom: 3px; }
-
-    /* Totals/Records/Gear: 2 Spalten. */
-    .kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
-
-    /* Records bekommen klaren Abstand + Trennlinie nach oben, damit sie als
-       eigene Kategorie lesbar sind und nicht an "Damage dealt" kleben. */
-    .block { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
-
-    .ico { font-family: "Material Symbols Rounded"; font-size: 1em; line-height: 1; }
-    body.offline .who .name { color: var(--theme-text-dim, #8a7d99); }
-    /* Stale (Spiel kurz weg): letzte Werte bleiben stehen, nur gedimmt. */
-    body.stale { opacity: .5; transition: opacity .4s ease; }
-  </style>
+  <link rel="stylesheet" href="_g1r.css" />
 </head>
-<body>
+<body class="g1r-career">
   <div class="t-card t-card--accent career">
     <div class="head">
       <div class="t-crest"><span class="ico" id="crest">person</span></div>

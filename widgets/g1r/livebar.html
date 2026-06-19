@@ -16,32 +16,9 @@
    "options":[["en","English"],["de","Deutsch"]]} ]
 </script>
 <script src="../_params.js"></script>
-  <style>
-    /* Nur Widget-spezifisches Layout. Rahmen/Fläche/Ornament kommen aus .t-card. */
-    :root { --c-good: #4be39a; --c-bad: #e3564b; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 1040px; height: auto; overflow: hidden; background: transparent;
-                 font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif); }
-
-    /* .t-card liefert Fläche/Border/Ornament; .t-bar Flex. Höhe = Inhalt + 4px Padding
-       (kein fixer Wert → wächst mit dickerem Theme-Rand, z.B. swiss). */
-    #bar { width: 1040px; padding: 4px 8px; }
-
-    .it { display: inline-flex; align-items: baseline; gap: 6px; padding: 0 13px; }
-    .v { color: var(--theme-text, #e8e0f0); font-weight: 700; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
-    .v.good { color: var(--c-good); }
-    .v.bad { color: var(--c-bad); }
-    .k { color: var(--theme-text-dim, #8a7d99); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; }
-    /* .t-sep Farbe kommt aus .t-bar .t-sep in _blocks.css */
-    .clock { color: var(--theme-accent, #f2b705); font-weight: 700; font-variant-numeric: tabular-nums;
-             display: inline-flex; align-items: center; gap: 5px; padding-left: 13px; margin-left: auto; }
-    .ico { font-family: "Material Symbols Rounded"; font-size: 1em; vertical-align: -2px; }
-    .offline .v, .offline .clock { color: var(--theme-text-dim, #8a7d99); font-weight: 400; }
-    /* Stale (Spiel kurz weg): letzte Werte bleiben stehen, nur gedimmt. */
-    .stale { opacity: .5; transition: opacity .4s ease; }
-  </style>
+  <link rel="stylesheet" href="_g1r.css" />
 </head>
-<body>
+<body class="g1r-livebar">
   <div class="t-card t-bar t-card--accent" id="bar">
     <span class="it"><span class="v" id="level">—</span><span class="k">Level</span></span>
     <span class="t-sep">·</span>

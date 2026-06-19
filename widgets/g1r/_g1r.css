@@ -1,0 +1,59 @@
+/* ════════════════════════════════════════════════════════════════════════
+   _g1r.css — Widget-spezifisches Layout der G1R-Overlays (livebar/news-ticker/
+   career-card). Rahmen/Fläche/Ornament/Bausteine kommen aus _theme.css + _blocks.css;
+   hier nur das pro-Widget-Layout, gescopet über die Body-Klasse (g1r-livebar /
+   g1r-ticker / g1r-career), damit die unterschiedlichen Canvas-Größen sich nicht
+   beißen. NACH _theme.css + _blocks.css laden.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Geteilte Basis ── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: transparent; overflow: hidden;
+       font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif); }
+:root { --c-good: #4be39a; --c-bad: #e3564b; --c-rec: var(--theme-warn, #ff9d3c); }
+
+/* ════ Livebar (1040 × Inhalt+4px) ════ */
+body.g1r-livebar { width: 1040px; height: auto; }
+.g1r-livebar #bar { width: 1040px; padding: 4px 8px; }
+.g1r-livebar .it { display: inline-flex; align-items: baseline; gap: 6px; padding: 0 13px; }
+.g1r-livebar .v { color: var(--theme-text, #e8e0f0); font-weight: 700; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.g1r-livebar .v.good { color: var(--c-good); }
+.g1r-livebar .v.bad { color: var(--c-bad); }
+.g1r-livebar .k { color: var(--theme-text-dim, #8a7d99); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; }
+.g1r-livebar .clock { color: var(--theme-accent, #f2b705); font-weight: 700; font-variant-numeric: tabular-nums;
+                      display: inline-flex; align-items: center; gap: 5px; padding-left: 13px; margin-left: auto; }
+.g1r-livebar .ico { font-family: "Material Symbols Rounded"; font-size: 1em; vertical-align: -2px; }
+.g1r-livebar .offline .v, .g1r-livebar .offline .clock { color: var(--theme-text-dim, #8a7d99); font-weight: 400; }
+.g1r-livebar .stale { opacity: .5; transition: opacity .4s ease; }
+
+/* ════ News-Ticker (760 × 40) ════ */
+body.g1r-ticker { width: 760px; height: 40px; }
+/* KEIN overflow:hidden auf der Card — das clippt die Ornament-Ecken; der Marquee
+   wird vom inneren .t-ticker geclippt. */
+.g1r-ticker .t-card.ticker { padding: 0 14px; height: 40px; width: 760px; display: flex; align-items: center; gap: 12px; }
+.g1r-ticker .tag { background: var(--theme-primary, #5e2a79); color: var(--theme-text, #fff); font-size: .62rem;
+                   font-weight: 700; text-transform: uppercase; letter-spacing: .1em; padding: 3px 8px; border-radius: 4px; flex: none; }
+.g1r-ticker .run { color: var(--theme-text, #e8e0f0); font-size: .92rem; white-space: nowrap; padding-right: 48px; }
+.g1r-ticker .run b { color: var(--theme-accent, #f2b705); font-variant-numeric: tabular-nums; }
+.g1r-ticker .run .dot { color: var(--theme-text-dim, #8a7d99); margin: 0 10px; }
+.g1r-ticker .run .offline { color: var(--theme-text-dim, #8a7d99); }
+.g1r-ticker .stale { opacity: .5; transition: opacity .4s ease; }
+
+/* ════ Career-Card (360 × 480) ════ */
+body.g1r-career { width: 360px; height: 480px; }
+.g1r-career .t-card.career { width: 360px; height: 480px; padding: 16px 18px; }
+.g1r-career .head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.g1r-career .who .name { font-family: var(--theme-font-display, "Cinzel", serif); color: var(--theme-accent, #f2b705); font-size: 1.2rem; }
+.g1r-career .who .sub { color: var(--theme-text-dim, #8a7d99); font-size: .8rem; }
+.g1r-career .section-lbl { color: var(--theme-text-dim, #8a7d99); text-transform: uppercase; letter-spacing: .12em;
+                           font-size: .6rem; margin: 0 0 7px; display: flex; justify-content: space-between; align-items: baseline; }
+.g1r-career .section-lbl .scope { color: var(--theme-accent, #f2b705); letter-spacing: .08em; }
+.g1r-career .res { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.g1r-career .kv-records .t-kv-v { color: var(--c-rec); }
+.g1r-career .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 18px; margin-bottom: 12px; }
+.g1r-career .grid .t-kv { border-bottom: 1px solid rgba(255,255,255,.06); padding-bottom: 3px; }
+.g1r-career .kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+.g1r-career .block { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
+.g1r-career .ico { font-family: "Material Symbols Rounded"; font-size: 1em; line-height: 1; }
+.g1r-career.offline .who .name { color: var(--theme-text-dim, #8a7d99); }
+.g1r-career.stale { opacity: .5; transition: opacity .4s ease; }

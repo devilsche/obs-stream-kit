@@ -13,30 +13,9 @@
    "options":[["en","English"],["de","Deutsch"]]} ]
 </script>
   <script src="../_params.js"></script>
-  <style>
-    /* Nur Widget-spezifisches Layout. Rahmen/Fläche/Ornament kommen aus .t-card. */
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 760px; height: 40px; overflow: hidden; background: transparent;
-                 font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif); }
-
-    /* KEIN overflow:hidden hier — das clippt die Ornament-Ecken (.t-card::before).
-       Der Marquee wird vom inneren .t-ticker geclippt. */
-    .t-card.ticker { padding: 0 14px; height: 40px; width: 760px; display: flex; align-items: center;
-                     gap: 12px; }
-    .tag { background: var(--theme-primary, #5e2a79); color: var(--theme-text, #fff); font-size: .62rem;
-           font-weight: 700; text-transform: uppercase; letter-spacing: .1em; padding: 3px 8px;
-           border-radius: 4px; flex: none; }
-
-    .run { color: var(--theme-text, #e8e0f0); font-size: .92rem; white-space: nowrap; padding-right: 48px; }
-    .run b { color: var(--theme-accent, #f2b705); font-variant-numeric: tabular-nums; }
-    .run .dot { color: var(--theme-text-dim, #8a7d99); margin: 0 10px; }
-    .run .offline { color: var(--theme-text-dim, #8a7d99); }
-
-    /* Stale (Spiel kurz weg): letzter Text bleibt stehen, nur gedimmt. */
-    .stale { opacity: .5; transition: opacity .4s ease; }
-  </style>
+  <link rel="stylesheet" href="_g1r.css" />
 </head>
-<body>
+<body class="g1r-ticker">
   <div class="t-card t-card--accent ticker">
     <span class="tag">G1 Live</span>
     <div class="t-ticker">
