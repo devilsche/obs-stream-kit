@@ -52,12 +52,17 @@
       justify-content: space-between;
       gap: 16px;
       background: color-mix(in srgb,var(--c-bg) 95%,transparent);
-      border: 1px solid color-mix(in srgb,var(--c-primary) 30%,transparent);
-      border-left: 3px solid var(--c-primary);
-      border-radius: 0 8px 8px 0;
+      border: 1px solid var(--theme-border, #2a1f3a);
+      border-radius: 8px;
       padding: 12px 24px;
       min-width: 320px;
       max-width: 400px;
+    }
+    /* ?accent=1 → farbige Akzent-Kante + Glow-Puls. Default: aus (schlicht). */
+    body.accent .widget-box {
+      border-color: color-mix(in srgb,var(--c-primary) 30%,transparent);
+      border-left: 3px solid var(--c-primary);
+      border-radius: 0 8px 8px 0;
       box-shadow: 0 0 20px color-mix(in srgb,var(--c-primary) 15%,transparent);
       animation: widgetGlow 3s ease-in-out infinite;
     }
@@ -123,6 +128,8 @@
 
   <script>
     var params = new URLSearchParams(window.location.search);
+    // ?accent=1|true|on → farbige Akzent-Kante + Glow (Default: aus).
+    if (/^(1|true|yes|on)$/i.test(params.get('accent') || '')) document.body.classList.add('accent');
     var name = params.get('name') || 'NightOwl';
     var tier = params.get('tier') || '1';
 
