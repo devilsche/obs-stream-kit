@@ -53,41 +53,45 @@ def missing_domains(creds, needed: Iterable[str]) -> list:
 
 
 def render_block_page(asset_path: str, missing: list,
-                       setup_url: str = "/app/setup") -> str:
-    """Sperrseite — minimales HTML, dezent, Hinweis auf Setup."""
+                       setup_url: str = "/app/setup", theme: str = "entry") -> str:
+    """Sperrseite — minimales HTML, dezent, Hinweis auf Setup. Theme-fähig:
+    lädt _theme.css + setzt data-theme, Farben über --theme-*-Tokens (Hardcoded-
+    Fallback = Entry), damit die Seite zum Tenant-Theme passt (nicht fix Entry)."""
     label = ", ".join(d.upper() for d in missing)
     return f"""<!doctype html>
-<html lang="en">
+<html lang="en" data-theme="{theme}">
 <head>
 <meta charset="utf-8">
 <title>Credentials required</title>
+<link rel="stylesheet" href="/widgets-static/_theme.css">
 <style>
   body {{
     margin: 0; padding: 0;
     background: rgba(0,0,0,0.85);
-    color: #e8e0f0;
-    font: 14px/1.5 system-ui, sans-serif;
+    color: var(--theme-text, #e8e0f0);
+    font: 14px/1.5 var(--theme-font-body, system-ui, sans-serif);
     display: flex; align-items: center; justify-content: center;
     min-height: 100vh;
   }}
   .card {{
-    background: #1a0d2e;
-    border: 1px solid #5e2a79;
-    border-radius: 8px;
+    background: var(--theme-surface, #1a0d2e);
+    border: var(--theme-border-width, 1px) solid var(--theme-border, #5e2a79);
+    border-radius: var(--theme-radius, 8px);
     padding: 24px 28px;
     max-width: 480px;
     text-align: center;
   }}
   .card h1 {{
     margin: 0 0 12px;
-    color: #f2b705;
+    color: var(--theme-accent, #f2b705);
+    font-family: var(--theme-font-display, inherit);
     font-size: 1.1em;
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }}
-  .card p {{ margin: 8px 0; color: #c8bcd6; }}
+  .card p {{ margin: 8px 0; color: var(--theme-text-dim, #c8bcd6); }}
   .card code {{
-    color: #f2b705;
+    color: var(--theme-accent, #f2b705);
     background: rgba(0,0,0,0.4);
     padding: 2px 6px;
     border-radius: 3px;
@@ -96,14 +100,14 @@ def render_block_page(asset_path: str, missing: list,
     display: inline-block;
     margin-top: 14px;
     padding: 8px 18px;
-    background: #5e2a79;
-    color: #fff;
+    background: var(--theme-primary, #5e2a79);
+    color: var(--theme-on-primary, #fff);
     text-decoration: none;
     border-radius: 5px;
     font-weight: 600;
   }}
-  .card a:hover {{ background: #7a3a96; }}
-  .path {{ color: #8a7d99; font-size: 0.85em; margin-top: 12px; }}
+  .card a:hover {{ filter: brightness(1.15); }}
+  .path {{ color: var(--theme-text-dim, #8a7d99); font-size: 0.85em; margin-top: 12px; }}
 </style>
 </head>
 <body>

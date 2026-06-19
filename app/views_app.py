@@ -363,12 +363,14 @@ def tools_open(key):
         conn = _get_conn()
         try:
             creds = core_creds.get(conn, g.tenant_id)
+            from pubg.db_pg import get_setting
+            gate_theme = get_setting(conn, g.tenant_id, "theme", "entry") or "entry"
         finally:
             if "_PG_CONN_FACTORY" not in current_app.config:
                 conn.close()
         missing = missing_domains(creds, needed)
         if missing:
-            return (render_block_page(tool["path"], missing, "/app/"),
+            return (render_block_page(tool["path"], missing, "/app/", theme=gate_theme),
                     200, {"Content-Type": "text/html; charset=utf-8"})
     with open(full_path, "r", encoding="utf-8") as f:
         html = f.read()

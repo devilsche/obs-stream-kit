@@ -38,6 +38,8 @@ def widget_file(token, filepath):
             conn = _get_conn()
             try:
                 creds = core_creds.get(conn, g.tenant_id)
+                from pubg.db_pg import get_setting
+                gate_theme = get_setting(conn, g.tenant_id, "theme", "entry") or "entry"
             finally:
                 if "_PG_CONN_FACTORY" not in current_app.config:
                     conn.close()
@@ -46,7 +48,7 @@ def widget_file(token, filepath):
                 # Browser-Sources haben keinen Cookie-Login, daher
                 # kein /app/setup-Link aus dem Widget — Hinweis genuegt.
                 return (render_block_page("widgets/" + filepath, missing,
-                                            setup_url="#"),
+                                            setup_url="#", theme=gate_theme),
                         200, {"Content-Type": "text/html; charset=utf-8"})
 
         with open(full_path, "r", encoding="utf-8") as f:
