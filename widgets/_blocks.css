@@ -163,11 +163,6 @@ html[data-theme="swiss"] .t-hot-mark i{width:8px;height:8px;border-radius:0;back
   background:radial-gradient(circle at 30% 25%,var(--theme-surface-2,#2a1c42),var(--theme-surface,#1f1430));
   border:var(--theme-border-width) solid var(--theme-accent);color:var(--theme-accent);font-size:1.5rem}
 
-/* ── t-flyin: Einflug-Animation (Alerts). ── */
-@keyframes t-flyin{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:none}}
-.t-flyin{animation:t-flyin .45s cubic-bezier(.2,.8,.2,1) both}
-@media (prefers-reduced-motion:reduce){.t-flyin{animation:none}}
-
 /* ════ EBENE 2 — der CHARAKTER je Theme (Form, Typo, Deko, Glow) ════ */
 /* body::before-Hintergruende NUR im Dock/Dashboard-Kontext (body.dock) —
    transparente OBS-Overlays bleiben unangetastet. */
@@ -233,10 +228,11 @@ html.fonts-ready .t-launch .smoke{animation-play-state:running}
   font-size:30px;color:var(--theme-accent);text-shadow:0 0 12px var(--theme-accent);will-change:transform,opacity;
   transform:translateX(-50%);animation:rocket-fly 4.5s ease-in-out infinite}
 .t-launch .rocket::after{content:"rocket"}
-.t-launch .flame{position:absolute;left:50%;bottom:-7px;width:8px;height:13px;
+.t-launch .flame{position:absolute;left:50%;bottom:-2px;width:8px;height:13px;
   background:radial-gradient(ellipse at 50% 22%,#eaf6ff,var(--theme-accent) 48%,transparent 76%);
   border-radius:50% 50% 50% 50%/38% 38% 72% 72%;filter:drop-shadow(0 0 5px var(--theme-accent));
-  animation:flame-flicker .1s ease-in-out infinite alternate, flame-life 4.5s linear infinite}
+  /* flame-rise steigt per bottom synchron mit rocket-fly (transform) → Flamme bleibt an der Rakete. */
+  animation:flame-flicker .1s ease-in-out infinite alternate, flame-rise 4.5s ease-in-out infinite, flame-life 4.5s linear infinite}
 .t-launch .smoke{position:absolute;left:50%;bottom:0;width:9px;height:9px;border-radius:50%;
   background:radial-gradient(circle,color-mix(in srgb,var(--theme-text-dim) 60%,transparent),transparent 70%);
   opacity:0;will-change:transform,opacity;animation:smoke-puff 4.5s ease-out infinite}
@@ -262,6 +258,9 @@ html.fonts-ready .t-launch .smoke{animation-play-state:running}
 }
 @keyframes flame-flicker{from{transform:translateX(-50%) scale(1,1)}to{transform:translateX(-50%) scale(.78,1.3)}}
 @keyframes flame-life{0%,5%{opacity:0}10%{opacity:.7}48%{opacity:.85}51%{opacity:1}64%{opacity:1}73%,100%{opacity:0}}
+/* Flamme steigt synchron zur Rakete (rocket-fly: 64%→-50px, 74%→-82px). bottom statt
+   transform → kollidiert nicht mit flame-flicker (scale). Basis -2px. */
+@keyframes flame-rise{0%,51%{bottom:-2px}64%{bottom:48px}74%{bottom:80px}75%,100%{bottom:-2px}}
 @keyframes smoke-puff{
   0%,5%   {opacity:0;transform:translate(-50%,0) scale(.3)}
   12%     {opacity:.5;transform:translate(-50%,1px) scale(.9)}
@@ -271,5 +270,6 @@ html.fonts-ready .t-launch .smoke{animation-play-state:running}
 }
 @media (prefers-reduced-motion:reduce){
   .t-launch .rocket{animation:none;opacity:1}
+  .t-launch .flame{animation:none;bottom:-2px}
   .t-launch .smoke{display:none}
 }

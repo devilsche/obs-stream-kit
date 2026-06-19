@@ -136,32 +136,6 @@
       color: var(--theme-text-dim);
     }
 
-    /* ── t-flyin Demo ── */
-    .flyin-demo {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .flyin-trigger {
-      font-family: var(--theme-font-body, sans-serif);
-      font-size: .9rem;
-      cursor: pointer;
-      min-height: 36px;
-      min-width: 24px;
-      padding: 6px 16px;
-      color: var(--theme-on-primary);
-      background: var(--theme-primary);
-      border: var(--theme-border-width) solid var(--theme-accent);
-      border-radius: var(--theme-radius);
-      align-self: flex-start;
-    }
-    .flyin-demo-target {
-      display: none;
-    }
-    .flyin-demo-target.is-visible {
-      display: block;
-    }
-
     /* ── Fokus global ── */
     *:focus-visible {
       outline: 3px solid var(--theme-accent);
@@ -407,25 +381,6 @@
       </article>
     </section>
 
-    <!-- ── t-flyin ── -->
-    <section class="catalog-section" aria-labelledby="lbl-flyin">
-      <h2 class="section-label" id="lbl-flyin">.t-flyin</h2>
-      <article class="t-card" aria-label="Einflug-Animation">
-        <header class="t-header">Alert-Einflug</header>
-        <div class="flyin-demo">
-          <p class="page-lede">Klick triggert die Animation neu (via Klassen-Wechsel).</p>
-          <button type="button" class="flyin-trigger" aria-controls="flyin-demo-box">
-            Animation abspielen
-          </button>
-          <div class="t-flyin flyin-demo-target is-visible t-card"
-               id="flyin-demo-box"
-               aria-live="polite">
-            <strong>Neuer Follower:</strong> FlyIn_Demo fährt ein.
-          </div>
-        </div>
-      </article>
-    </section>
-
     <!-- ── t-launch (Rakete) ── -->
     <section class="catalog-section" aria-labelledby="lbl-launch">
       <h2 class="section-label" id="lbl-launch">.t-launch</h2>
@@ -466,18 +421,6 @@
     // URL-Parameter ?theme=<name> für Screenshots
     const urlTheme = new URLSearchParams(location.search).get("theme");
     if (urlTheme) applyTheme(urlTheme);
-
-    // ── t-flyin: Klassen-Wechsel für Animations-Replay ──
-    const flyinTrigger = document.querySelector(".flyin-trigger");
-    const flyinTarget  = document.querySelector("#flyin-demo-box");
-    if (flyinTrigger && flyinTarget) {
-      flyinTrigger.addEventListener("click", () => {
-        flyinTarget.classList.remove("t-flyin");
-        // reflow erzwingen, dann Klasse zurücksetzen
-        void flyinTarget.offsetWidth;
-        flyinTarget.classList.add("t-flyin");
-      });
-    }
 
     // ── t-launch: fonts-ready-Klasse setzen, sobald Icons geladen ──
     if (document.fonts) {
