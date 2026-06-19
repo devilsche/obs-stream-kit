@@ -47,6 +47,8 @@
 
       {# ── Ein Grid — alle Karten mit data-tab ── #}
       <div class="url-grid" id="urlGrid">
+        {% if not pubg_ready %}<div class="url-credhint" data-tab="pubg" hidden><span class="material-symbols-outlined" aria-hidden="true">key_off</span> PUBG-API-Key fehlt — unter <a href="/app/settings">Settings</a> eintragen, damit die PUBG-Widgets Daten zeigen. Die URLs funktionieren, bleiben aber leer/offline.</div>{% endif %}
+        {% if not steam_ready %}<div class="url-credhint" data-tab="steam" hidden><span class="material-symbols-outlined" aria-hidden="true">key_off</span> Steam-Key + ID fehlen — unter <a href="/app/settings">Settings</a> eintragen, damit die Steam-Widgets Daten zeigen.</div>{% endif %}
         {% for o in overlays %}
         {{ src_card('overlay','Overlay',o.label,
                     overlay_base~'/s/'~token~'/overlays/'~o.file,'overlays/'~o.file,
@@ -825,6 +827,7 @@
         }
       }
     });
+    document.querySelectorAll(".url-credhint").forEach(h => { h.hidden = h.dataset.tab !== name; });
     if (emptyMsg) emptyMsg.hidden = true;
   }
   tabs.forEach(t => t.addEventListener("click", () => selectTab(t.dataset.tab)));
@@ -883,6 +886,7 @@
     if (q.length < 3) { selectTab(currentTab); return; }
 
     clearHeaders();   // Suche zeigt Treffer domain-übergreifend → keine Sektions-Header
+    document.querySelectorAll(".url-credhint").forEach(h => h.hidden = true);
     const hits = allCards.filter(c => {
       const hay = ((c.dataset.label||"")+" "+(c.dataset.cat||"")+" "+(c.dataset.desc||"")+" "+(c.dataset.path||"")).toLowerCase();
       return hay.includes(q);

@@ -1058,6 +1058,12 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
 .url-group{grid-column:1/-1;font-weight:600;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
   color:var(--text-muted,#888);padding:14px 2px 5px;border-bottom:1px solid var(--border);margin-top:6px}
 .url-group:first-child{margin-top:0;padding-top:2px}
+.url-credhint{grid-column:1/-1;display:flex;align-items:center;gap:8px;
+  background:color-mix(in srgb,var(--theme-warn,#ff9d3c) 12%,transparent);
+  border:1px solid color-mix(in srgb,var(--theme-warn,#ff9d3c) 45%,transparent);
+  color:var(--text);border-radius:var(--r-box,10px);padding:10px 14px;font-size:13px;line-height:1.4}
+.url-credhint a{color:var(--theme-accent,#f2b705)}
+.url-credhint .material-symbols-outlined{color:var(--theme-warn,#ff9d3c);flex:none}
 .url-card{border:1px solid var(--border);background:var(--bg-elev);text-align:left;cursor:pointer;font:inherit;
   display:flex;flex-direction:column;position:relative;padding:0;color:inherit;min-height:138px;
   border-radius:var(--r-box);transition:border-color .14s,box-shadow .14s}

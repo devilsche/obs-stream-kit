@@ -299,9 +299,12 @@ def urls():
             """, (g.tenant_id,))
             row = cur.fetchone()
             token = row["token"] if row else None
+        creds = core_creds.get(conn, g.tenant_id)
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()
+    pubg_ready = bool(creds.pubg_name and creds.pubg_api_key)
+    steam_ready = bool(creds.steam_id and creds.steam_api_key)
 
     # Widget switches come directly from each widget's `buildFilter([...])`
     # call in its HTML — single source of truth (see app/widget_catalog.py).
@@ -319,6 +322,7 @@ def urls():
     transitions = TRANSITIONS
     return render_template("urls.html",
                            user=g.user, token=token,
+                           pubg_ready=pubg_ready, steam_ready=steam_ready,
                            widgets=widgets_list, base_url=base_url,
                            overlays=OVERLAYS, overlay_base=base_url,
                            alerts=ALERTS, decor=DECOR,
