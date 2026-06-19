@@ -1,0 +1,4 @@
+/* ── t-kv: Key-Value-Zeile (Label links, Wert rechts). ── */
+.t-kv{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:.85rem}
+.t-kv .t-kv-k{color:var(--theme-text-dim)}
+.t-kv .t-kv-v{color:var(--theme-text);font-weight:700;font-variant-numeric:tabular-nums}

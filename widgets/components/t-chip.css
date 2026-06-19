@@ -1,0 +1,5 @@
+/* ── t-chip: kleine Wert-Plakette. ── */
+.t-chip{display:inline-flex;align-items:center;gap:6px;background:var(--theme-surface-2);
+  border:var(--theme-border-width) solid var(--theme-border);border-radius:5px;
+  padding:2px 8px;font-size:.76rem;color:var(--theme-text)}
+.t-chip b{color:var(--theme-accent);font-variant-numeric:tabular-nums;font-weight:700}

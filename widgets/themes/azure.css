@@ -1,0 +1,11 @@
+html[data-theme="azure"] {
+  --theme-primary:#2e9bff; --theme-accent:#4dd0ff; --theme-accent-2:#8b9eff; --theme-on-primary:#04111f;
+  --theme-bg:#070d18; --theme-surface:#0e1828; --theme-surface-2:#122036; --theme-border:#243650;
+  --theme-text:#dce8f7; --theme-text-dim:#8298b5; --theme-text-faint:#54677f;
+  --theme-ok:#3ce0a0; --theme-warn:#ffc24d; --theme-danger:#ff5c6e;
+  --theme-font-display:"Sora",sans-serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-stinger-font:"Orbitron",sans-serif;
+  --theme-radius:10px; --theme-border-width:1px; --theme-shadow:0 14px 40px rgba(0,0,0,.5);
+  --theme-hot-icon:"speed";
+  --theme-page-bg:radial-gradient(820px 560px at 70% -10%,rgba(46,155,255,.22),#070d18 60%);
+}

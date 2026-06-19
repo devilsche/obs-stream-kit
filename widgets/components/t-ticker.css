@@ -1,0 +1,7 @@
+/* ── t-ticker: Marquee mit Rand-Fade. Track 2× befüllen (nahtloser Loop). ── */
+.t-ticker{overflow:hidden;display:flex;align-items:center;flex:1;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%);
+  mask-image:linear-gradient(90deg,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%)}
+.t-ticker-track{display:inline-flex;white-space:nowrap;will-change:transform;animation:t-marquee 26s linear infinite}
+@keyframes t-marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.t-ticker-track{animation:none}.t-ticker-track > * + *{display:none}}

@@ -1,0 +1,18 @@
+html[data-theme="aurora"] {
+  /* Surface deutlich deckender als im Mockup (.6 → .9): Widgets liegen auf
+     transparentem OBS-Hintergrund / Gameplay, eine zu glasige Flaeche wuerde
+     auswaschen. Leichte Transluzenz bleibt fuer den Glas-Charakter. */
+  --theme-primary:#430088; --theme-accent:#f2b705; --theme-accent-2:#46d6ff; --theme-on-primary:#fffc00;
+  --theme-bg:#0c0916; --theme-surface:rgba(28,18,46,.9); --theme-surface-2:rgba(40,26,60,.82); --theme-border:rgba(157,107,208,.5);
+  --theme-text:#efe9f6; --theme-text-dim:#bbb0cf; --theme-text-faint:#8478a0;
+  --theme-ok:#4be39a; --theme-warn:#f2b705; --theme-danger:#ff6b81;
+  --theme-font-display:"Syne",sans-serif; --theme-font-body:"Onest",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-stinger-font:"Teko",sans-serif;
+  --theme-radius:18px; --theme-border-width:1px; --theme-shadow:0 18px 50px rgba(0,0,0,.45);
+  --theme-hot-icon:"auto_awesome";
+  --theme-page-bg:radial-gradient(900px 600px at 70% -10%,rgba(94,42,121,.55),#0c0916 60%);
+}
+
+/* — Aurora: rundes Glas, Mesh, weich, Gold-Werte — */
+html[data-theme="aurora"] body.dock::before{content:"";position:fixed;inset:0;z-index:-1;
+  background:radial-gradient(700px 520px at 18% 8%,rgba(123,63,160,.55),transparent 60%),radial-gradient(620px 480px at 85% 90%,rgba(242,183,5,.16),transparent 60%)}

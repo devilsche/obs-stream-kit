@@ -1,0 +1,26 @@
+/* ── Default = Entry (aktueller Stand, falls keine Server-Injektion) ── */
+:root, html[data-theme="entry"] {
+  /* Ornament-Eck-Beschlaege: EINHEITLICHE, groessenunabhaengige Pixelgroesse fuer
+     ALLE Sources (Karten, flache Bars, Cam/Chat-Overlays). Gilt global ueber alle
+     Themes — egal ob die Source 500x200 oder 800x1000 ist, die Ecken sind gleich
+     gross. Nur wirksam bei Themes mit --theme-frame (Gothic). NICHT 34px (= SVG-
+     slice, triggert einen border-image-Renderbug → Ecken verschwinden). */
+  --theme-frame-corner:28px;
+  --theme-primary:#5e2a79; --theme-accent:#f2b705; --theme-accent-2:#c9a0dc; --theme-on-primary:#fff;
+  --theme-bg:#0a0510; --theme-surface:rgba(20,12,30,.95); --theme-surface-2:#1f1430; --theme-border:rgba(94,42,121,.6);
+  --theme-text:#e8e0f0; --theme-text-dim:#8a7d99; --theme-text-faint:#6b5f7a;
+  --theme-ok:#4be39a; --theme-warn:#f2b705; --theme-danger:#ff5c7a;
+  --theme-font-display:"DM Sans",system-ui,sans-serif; --theme-font-body:"DM Sans",system-ui,sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-stinger-font:"Orbitron",sans-serif;
+  --theme-radius:8px; --theme-border-width:1px; --theme-shadow:0 14px 40px rgba(0,0,0,.4);
+  --theme-hot-icon:"local_fire_department";
+  --theme-page-bg:linear-gradient(180deg,#1a0d2a 0%,#0a0510 100%);
+  /* Ornament-Tokens — Default none; nur die Gothic-Themes setzen echte Werte.
+     --theme-frame: border-image-Quelle (verzierte Eck-Beschlaege).
+     --theme-texture: dezenter Hintergrund-Overlay (Leder/Nebel/Stein). */
+  --theme-frame:none; --theme-texture:none;
+}
+
+/* — Entry: rund, Purple-Glow, Gold-Werte, DM Sans — */
+html[data-theme="entry"] body.dock::before{content:"";position:fixed;inset:0;z-index:-1;
+  background:radial-gradient(820px 560px at 50% -8%,rgba(94,42,121,.55),transparent 60%)}

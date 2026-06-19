@@ -1,0 +1,11 @@
+html[data-theme="swiss"] {
+  --theme-primary:#1a7a3c; --theme-accent:#4be39a; --theme-accent-2:#ffcc00; --theme-on-primary:#fff;
+  --theme-bg:#eceae4; --theme-surface:#ffffff; --theme-surface-2:#f4f2ec; --theme-border:#0d0d0d;
+  --theme-text:#0d0d0d; --theme-text-dim:#5c5c57; --theme-text-faint:#9a9a92;
+  --theme-ok:#1faa55; --theme-warn:#bd6a00; --theme-danger:#e5251f;
+  --theme-font-display:"Archivo",sans-serif; --theme-font-body:"Archivo",sans-serif; --theme-font-mono:"Space Mono",monospace;
+  --theme-stinger-font:"Bungee",sans-serif;
+  --theme-radius:0px; --theme-border-width:3px; --theme-shadow:8px 8px 0 #0d0d0d;
+  --theme-hot-icon:"star";
+  --theme-page-bg:#eceae4;
+}

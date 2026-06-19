@@ -1,0 +1,55 @@
+.t-card{background-color:var(--theme-surface);background-image:var(--theme-texture);background-repeat:repeat;
+  border:var(--theme-border-width) solid var(--theme-border);
+  border-radius:var(--theme-radius);padding:22px;position:relative}
+/* Ornament-Rahmen als Overlay (konsolidiert, siehe _pubg.css). ::before, damit
+   theme-eigene .t-card::after-Deko (terminal) unberuehrt bleibt. */
+.t-card::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background-image:var(--theme-corner-tl,none),var(--theme-corner-tr,none),var(--theme-corner-bl,none),var(--theme-corner-br,none);
+  background-position:top left,top right,bottom left,bottom right;
+  background-size:var(--theme-frame-corner,28px);background-repeat:no-repeat}
+.t-header{display:flex;justify-content:space-between;align-items:baseline;gap:8px 12px;flex-wrap:wrap;
+  font-family:var(--theme-font-display);font-weight:600;font-size:18px;color:var(--theme-text);
+  padding-bottom:14px;border-bottom:var(--theme-border-width) solid var(--theme-border);margin-bottom:18px}
+.t-range{font-family:var(--theme-font-mono);font-size:12px;color:var(--theme-accent);font-weight:500;white-space:nowrap}
+
+/* ── t-card--accent: Akzent-Kante links (statt hartkodiertem border-left). ── */
+.t-card--accent{border-left-width:3px;border-left-color:var(--theme-accent)}
+
+html[data-theme="terminal"] .t-header{text-transform:uppercase;letter-spacing:.03em}
+html[data-theme="terminal"] .t-card::after{content:"";position:absolute;right:0;top:0;width:14px;height:14px;
+  border-top:2px solid var(--theme-primary);border-right:2px solid var(--theme-primary)}
+
+html[data-theme="aurora"] .t-card{backdrop-filter:blur(18px) saturate(140%);box-shadow:0 16px 50px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.08)}
+html[data-theme="aurora"] .t-header{font-weight:800;letter-spacing:-.01em}
+
+html[data-theme="midnight"] .t-card{box-shadow:0 12px 36px rgba(0,0,0,.45)}
+html[data-theme="midnight"] .t-header{font-weight:800;letter-spacing:-.02em}
+
+/* — Editorial: hell, Serife KURSIV, dezent, gemischt-case — */
+/* Helle Karte als transparentes Overlay: dunkle Kontur + kraeftiger Schatten,
+   damit sie auf jedem Hintergrund (hell/dunkel/Gameplay) abhebt. */
+html[data-theme="editorial"] .t-card{box-shadow:0 10px 30px rgba(28,26,22,.32),0 0 0 1px rgba(28,26,22,.16)}
+html[data-theme="editorial"] .t-header{font-style:italic;font-weight:500;font-size:22px}
+html[data-theme="editorial"] .t-range{font-style:normal}
+
+html[data-theme="entry"] .t-card{box-shadow:0 14px 40px rgba(0,0,0,.4)}
+
+html[data-theme="swiss"] .t-card{box-shadow:8px 8px 0 var(--theme-border)}
+html[data-theme="swiss"] .t-header{text-transform:uppercase;font-weight:900;font-size:20px;letter-spacing:-.02em}
+html[data-theme="swiss"] .t-range{color:var(--theme-text);font-weight:700}
+
+/* ── Ornament-Eckbeschläge als wiederverwendbare Utility ───────────────────
+   Für Container, deren ::before/::after schon belegt sind (z.B. Alerts): ein
+   leeres Child-Element <i class="theme-corners"> reinlegen. Liegt als Overlay
+   (inset:0) über dem Rand, 4 feste Eck-Grafiken in --theme-frame-corner-Größe,
+   größenunabhängig. Nur Gothic (corner-Tokens gesetzt); sonst unsichtbar.
+   Eltern-Element muss position:relative sein. */
+.theme-corners {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  border-radius: inherit;
+  background-image: var(--theme-corner-tl, none), var(--theme-corner-tr, none),
+                    var(--theme-corner-bl, none), var(--theme-corner-br, none);
+  background-position: top left, top right, bottom left, bottom right;
+  background-size: var(--theme-frame-corner, 28px);
+  background-repeat: no-repeat;
+}

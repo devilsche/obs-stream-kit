@@ -1,0 +1,24 @@
+.t-stat-grid{display:flex;flex-wrap:wrap;gap:22px 34px}
+.t-stat{display:flex;flex-direction:column;gap:5px}
+.t-value{font-family:var(--theme-font-display);font-weight:700;font-size:38px;color:var(--theme-text);line-height:1;white-space:nowrap}
+.t-label{font-family:var(--theme-font-mono);font-size:11px;color:var(--theme-text-dim);letter-spacing:.06em}
+
+/* Kompakter Modus fuer datenreiche Karten (z.B. Career mit 8 Werten):
+   gleicher Charakter (Font/Weight/Uppercase je Theme), aber kleinere Zahlen. */
+.t-stat-grid--compact .t-value{font-size:23px}
+.t-stat-grid--compact .t-label{font-size:10px}
+/* Ausgerichtete Spalten-Raster (statt flex-wrap) fuer datenreiche Karten. */
+.t-stat-grid--cols3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px 14px}
+.t-stat-grid--cols4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px 14px}
+
+html[data-theme="terminal"] .t-label{text-transform:uppercase}
+
+html[data-theme="aurora"] .t-value{color:var(--theme-accent)}
+
+html[data-theme="editorial"] .t-value{font-weight:500;font-variant-numeric:oldstyle-nums}
+
+html[data-theme="entry"] .t-value{color:var(--theme-accent)}
+
+html[data-theme="swiss"] .t-value{font-weight:900;font-size:54px;letter-spacing:-.03em}
+html[data-theme="swiss"] .t-stat-grid--compact .t-value{font-size:30px}
+html[data-theme="swiss"] .t-label{text-transform:uppercase;font-weight:700}

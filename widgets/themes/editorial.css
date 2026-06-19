@@ -1,0 +1,11 @@
+html[data-theme="editorial"] {
+  --theme-primary:#932d01; --theme-accent:#932d01; --theme-accent-2:#7a8450; --theme-on-primary:#fff;
+  --theme-bg:#f5f1e8; --theme-surface:#fbf9f3; --theme-surface-2:#efe9dc; --theme-border:#d6cdba;
+  --theme-text:#1c1a16; --theme-text-dim:#6b6457; --theme-text-faint:#a8a092;
+  --theme-ok:#5a7d3a; --theme-warn:#bd6a00; --theme-danger:#c0392b;
+  --theme-font-display:"Fraunces",serif; --theme-font-body:"Hanken Grotesk",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-stinger-font:"Saira Stencil One",sans-serif;
+  --theme-radius:3px; --theme-border-width:1.5px; --theme-shadow:0 10px 30px rgba(28,26,22,.1);
+  --theme-hot-icon:"verified";
+  --theme-page-bg:#f5f1e8;
+}

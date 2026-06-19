@@ -1,0 +1,17 @@
+/* ── Alias-Layer ──────────────────────────────────────────────────────────
+   Biegt die bestehenden --pubg-*-Variablen (in _pubg.css definiert) auf die
+   Theme-Tokens um. Greift, weil dieses File NACH _pubg.css geladen wird:
+   gleiche :root-Spezifitaet, spaeteres Stylesheet gewinnt. Damit sind alle
+   PUBG-Widgets sofort theme-faehig (Farb-/Form-/Typo-Ebene), ohne dass ihr
+   eigenes CSS angefasst werden muss. */
+:root {
+  --pubg-purple:    var(--theme-primary);
+  --pubg-purple-bg: var(--theme-surface);
+  --pubg-gold:      var(--theme-accent);
+  --pubg-text:      var(--theme-text);
+  --pubg-muted:     var(--theme-text-dim);
+  --pubg-border:    var(--theme-border);
+  --pubg-radius:    var(--theme-radius);
+  --pubg-page-bg:   var(--theme-page-bg);
+}
+/* Bausteine (t-*) inkl. Highlight-Marker + Eigenbewegung je Theme: siehe _blocks.css. */

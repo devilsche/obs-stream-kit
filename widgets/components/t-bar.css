@@ -1,0 +1,5 @@
+/* ── t-bar: horizontale Live-Leiste (kompakt). Fläche/Rahmen via .t-card. ── */
+.t-bar{display:flex;align-items:center;gap:0;padding:0 16px;white-space:nowrap;height:40px;width:fit-content}
+/* Ornament-Themes (Eck-Ornamente ragen rein) → mehr horizontales Padding, sonst 16px. */
+html[data-theme="oldcamp"] .t-bar,html[data-theme="barrier"] .t-bar,html[data-theme="sect"] .t-bar{padding:0 36px}
+.t-bar .t-sep{color:var(--theme-border)}
