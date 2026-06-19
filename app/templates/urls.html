@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% block title %}OBS URLs — OBS Stream Kit{% endblock %}
-{% block body_class %}app-shell{% endblock %}
 
 {# Eine Source-Karte fuers Grid. switches/params als Listen → im Markup als
    HTML-sicheres JSON (tojson escaped < > & ' → sicher im single-quote-Attr). #}
@@ -45,19 +44,6 @@
         <input type="search" id="urlFilter" placeholder="Search sources… e.g. &quot;career&quot;, &quot;sub&quot;, &quot;overlay&quot;" aria-label="Search all sources" autocomplete="off">
       </div>
 
-      {# Domain-first: Bereiche statt Quell-Typen. Karten tragen data-tab=Domain. #}
-      <div class="url-tabs" role="tablist" aria-label="Bereiche">
-        <button type="button" role="tab" id="urltab-pubg" data-tab="pubg" data-label="PUBG"
-                aria-selected="true" aria-controls="urlGrid">PUBG</button>
-        <button type="button" role="tab" id="urltab-steam" data-tab="steam" data-label="Steam"
-                aria-selected="false" tabindex="-1" aria-controls="urlGrid">Steam</button>
-        <button type="button" role="tab" id="urltab-g1r" data-tab="g1r" data-label="Gothic 1"
-                aria-selected="false" tabindex="-1" aria-controls="urlGrid">Gothic&nbsp;1</button>
-        <button type="button" role="tab" id="urltab-stream" data-tab="stream" data-label="Stream"
-                aria-selected="false" tabindex="-1" aria-controls="urlGrid">Stream</button>
-        <button type="button" role="tab" id="urltab-decor" data-tab="decor" data-label="Look &amp; Decor"
-                aria-selected="false" tabindex="-1" aria-controls="urlGrid">Look&nbsp;&amp;&nbsp;Decor</button>
-      </div>
 
       {# ── Ein Grid — alle Karten mit data-tab ── #}
       <div class="url-grid" id="urlGrid">
@@ -809,8 +795,8 @@
   // ── Ein Grid — alle Karten mit data-tab ──────────────────
   const grid     = document.getElementById("urlGrid");
   const allCards = Array.from(grid.querySelectorAll(".url-card"));
-  const tabBar   = document.querySelector(".url-tabs");
-  const tabs     = Array.from(tabBar.querySelectorAll("[role=tab]"));
+  const tabBar   = document.querySelector(".url-tabs");   // entfällt — Domain kommt aus der Top-Nav (?d=)
+  const tabs     = tabBar ? Array.from(tabBar.querySelectorAll("[role=tab]")) : [];
   const filter   = document.getElementById("urlFilter");
   const emptyMsg = document.getElementById("urlEmpty");
 
@@ -842,7 +828,7 @@
     if (emptyMsg) emptyMsg.hidden = true;
   }
   tabs.forEach(t => t.addEventListener("click", () => selectTab(t.dataset.tab)));
-  tabBar.addEventListener("keydown", e => {
+  if (tabBar) tabBar.addEventListener("keydown", e => {
     if (!["ArrowRight","ArrowLeft"].includes(e.key)) return;
     e.preventDefault();
     const i = tabs.findIndex(t => t.getAttribute("aria-selected") === "true");
