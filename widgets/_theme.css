@@ -74,7 +74,7 @@ html[data-theme="midnight"] {
 }
 
 html[data-theme="editorial"] {
-  --theme-primary:#d4561f; --theme-accent:#d4561f; --theme-accent-2:#7a8450; --theme-on-primary:#fff;
+  --theme-primary:#932d01; --theme-accent:#932d01; --theme-accent-2:#7a8450; --theme-on-primary:#fff;
   --theme-bg:#f5f1e8; --theme-surface:#fbf9f3; --theme-surface-2:#efe9dc; --theme-border:#d6cdba;
   --theme-text:#1c1a16; --theme-text-dim:#6b6457; --theme-text-faint:#a8a092;
   --theme-ok:#5a7d3a; --theme-warn:#bd6a00; --theme-danger:#c0392b;
