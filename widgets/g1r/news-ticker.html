@@ -4,19 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=760, height=40" />
   <title>G1R News-Ticker</title>
-  <!-- Theme-Fundament: Tokens (_theme.css) VOR den Bausteinen (_blocks.css). -->
+  <!-- Theme-Tokens + Bausteine + OBS-Basis. Kein Widget-eigenes CSS mehr. -->
   <link rel="stylesheet" href="../_theme.css" />
   <link rel="stylesheet" href="../_blocks.css" />
+  <link rel="stylesheet" href="../obs.css" />
   <script type="application/json" id="params">
 [ {"key":"port","label":"Proxy-Port","type":"text","group":"Verbindung","default":"9210"},
   {"key":"lang","label":"Sprache","type":"select","group":"Anzeige","default":"en",
    "options":[["en","English"],["de","Deutsch"]]} ]
 </script>
   <script src="../_params.js"></script>
-  <link rel="stylesheet" href="_g1r.css" />
 </head>
-<body class="g1r-ticker">
-  <div class="t-card t-card--accent ticker">
+<body>
+  <div class="t-card t-card--accent t-ticker-wrap" id="card">
     <span class="t-badge">G1 Live</span>
     <div class="t-ticker">
       <div class="t-ticker-track" id="track">
@@ -88,17 +88,17 @@
     }
 
     // Subscription statt Polling: EventSource abonniert /events, reconnectet selbst.
-    var card = document.querySelector('.ticker');
+    var card = document.getElementById('card');
     var everOk = false;
     function goStale() {
       // Nach erstem Render: letzten Text stehen lassen, nur dimmen. Vorher: leer.
-      if (everOk) card.classList.add('stale');
+      if (everOk) card.classList.add('is-stale');
       else setOffline();
     }
     var es = new EventSource(BASE + '/events?lang=' + LANG);
     es.onmessage = function (e) {
       var d; try { d = JSON.parse(e.data); } catch (_) { return; }
-      if (d && d.ok) { everOk = true; card.classList.remove('stale'); render(d); }
+      if (d && d.ok) { everOk = true; card.classList.remove('is-stale'); render(d); }
       else goStale();
     };
     es.onerror = goStale;

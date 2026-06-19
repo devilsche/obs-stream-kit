@@ -5,3 +5,15 @@
 .t-ticker-track{display:inline-flex;white-space:nowrap;will-change:transform;animation:t-marquee 26s linear infinite}
 @keyframes t-marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @media (prefers-reduced-motion:reduce){.t-ticker-track{animation:none}.t-ticker-track > * + *{display:none}}
+
+/* Äußere Ticker-Zeile: Badge + Marquee nebeneinander. Breite 100% (Marquee-Fenster =
+   Source-Breite), Padding/Ornament wie flache Bar, Höhe inhaltsgetrieben. */
+.t-ticker-wrap{display:flex;align-items:center;gap:12px;width:100%;padding:6px 16px}
+html[data-theme="oldcamp"] .t-ticker-wrap,
+html[data-theme="barrier"] .t-ticker-wrap,
+html[data-theme="sect"] .t-ticker-wrap{padding:6px 36px}
+/* Marquee-Inhalt (eine .run-Zeile, 2x im Track fuer nahtlosen Loop). */
+.t-ticker .run{color:var(--theme-text);font-size:.92rem;white-space:nowrap;padding-right:48px}
+.t-ticker .run b{color:var(--theme-accent);font-variant-numeric:tabular-nums}
+.t-ticker .run .dot{color:var(--theme-text-dim);margin:0 10px}
+.t-ticker .run .offline{color:var(--theme-text-dim)}

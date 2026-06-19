@@ -1,0 +1,22 @@
+/* ════════════════════════════════════════════════════════════════════════
+   obs.css — geteilte Basis für OBS-Browser-Sources. Domain-agnostisch
+   (g1r/pubg/steam egal). NUR von OBS-Overlays laden, NICHT von Dashboard/Tools
+   (die brauchen einen normalen, scrollbaren Body).
+   Die Größe einer Source kommt aus <meta viewport> + der OBS-Source-Dimension —
+   NICHT aus CSS. Widgets sind fit-content / 100%-of-viewport, keine fixen Pixel.
+   ════════════════════════════════════════════════════════════════════════ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: transparent; overflow: hidden;
+       font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif); }
+
+/* Inline-Icon (Material Symbol, fließt im Text mit) */
+.ico { font-family: "Material Symbols Rounded"; font-size: 1em; line-height: 1; vertical-align: -2px; }
+
+/* Layout-Utilities */
+.t-fill { width: 100%; }
+.t-push { margin-left: auto; }
+.t-stack > * + * { margin-top: 12px; }
+
+/* Zustände */
+.is-stale { opacity: .5; transition: opacity .4s ease; }
+.is-offline { opacity: .6; }

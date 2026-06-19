@@ -14,6 +14,8 @@
 
 /* ── t-card--accent: Akzent-Kante links (statt hartkodiertem border-left). ── */
 .t-card--accent{border-left-width:3px;border-left-color:var(--theme-accent)}
+/* ── t-card--snug: kompakteres Padding (dichte Karten wie Career). ── */
+.t-card--snug{padding:16px 18px}
 
 html[data-theme="terminal"] .t-header{text-transform:uppercase;letter-spacing:.03em}
 html[data-theme="terminal"] .t-card::after{content:"";position:absolute;right:0;top:0;width:14px;height:14px;

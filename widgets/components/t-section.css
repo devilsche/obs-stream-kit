@@ -1,0 +1,6 @@
+/* ── t-section: abgesetzter Block mit Trennlinie oben + Section-Label. ── */
+.t-section { margin-top: 14px; padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--theme-text) 8%, transparent); }
+.t-section-label { color: var(--theme-text-dim); text-transform: uppercase; letter-spacing: .12em;
+  font-size: .6rem; margin: 0 0 7px; display: flex; justify-content: space-between; align-items: baseline; }
+.t-section-label .scope { color: var(--theme-accent); letter-spacing: .08em; }

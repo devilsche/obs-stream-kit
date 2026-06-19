@@ -1,0 +1,3 @@
+/* ── t-title / t-subtitle: Überschrift + Unterzeile (z.B. Career-Kopf). ── */
+.t-title { font-family: var(--theme-font-display); color: var(--theme-accent); font-size: 1.2rem; line-height: 1.1; }
+.t-subtitle { color: var(--theme-text-dim); font-size: .8rem; }

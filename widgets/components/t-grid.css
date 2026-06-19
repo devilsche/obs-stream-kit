@@ -1,0 +1,6 @@
+/* ── t-grid: Raster für KV-Paare / Stats. ── */
+.t-grid { display: grid; gap: 7px 16px; }
+.t-grid--2 { grid-template-columns: 1fr 1fr; }
+/* --ruled: dünne Trennlinie unter jeder Zeile. --rec: Werte in Rekord-Farbe (warn). */
+.t-grid--ruled .t-kv { border-bottom: 1px solid color-mix(in srgb, var(--theme-text) 6%, transparent); padding-bottom: 3px; }
+.t-grid--rec .t-kv-v { color: var(--theme-warn); }

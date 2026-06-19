@@ -9,7 +9,6 @@
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
   <link rel="stylesheet" href="/widgets-static/_theme.css">
   <link rel="stylesheet" href="/widgets-static/_blocks.css">
-  <link rel="stylesheet" href="/widgets-static/g1r/_g1r.css">
   <style>
     /* ── Seiten-Layout ── */
     html, body {
@@ -106,8 +105,8 @@
       border-bottom: 1px solid var(--theme-border);
     }
 
-    /* Bar/Ticker werden über die ECHTEN Widget-Klassen (_g1r.css) gerendert —
-       keine Demo-eigenen Styles mehr (sonst divergiert die Vorschau vom Widget). */
+    /* Bar/Ticker/Career nutzen ausschließlich die echten t-*-Bausteine aus
+       _blocks.css — keine Demo-eigenen Styles (sonst divergiert die Vorschau). */
 
     /* ── t-kv Block ── */
     .kv-block {
@@ -262,29 +261,26 @@
     <!-- ── t-bar ── -->
     <section class="catalog-section catalog-section--wide" aria-labelledby="lbl-bar">
       <h2 class="section-label" id="lbl-bar">.t-bar · .t-sep</h2>
-      <article class="t-card t-bar g1r-livebar" role="list" aria-label="Horizontale Live-Leiste">
-        <span class="it" role="listitem"><span class="v">12</span><span class="k">Kills</span></span>
+      <article class="t-card t-bar" role="list" aria-label="Horizontale Live-Leiste">
+        <span class="t-metric" role="listitem"><span class="t-metric-v">12</span><span class="t-metric-k">Kills</span></span>
         <span class="t-sep" aria-hidden="true">·</span>
-        <span class="it" role="listitem"><span class="v bad">842</span><span class="k">DMG out</span></span>
+        <span class="t-metric" role="listitem"><span class="t-metric-v t-metric-v--bad">842</span><span class="t-metric-k">DMG out</span></span>
         <span class="t-sep" aria-hidden="true">·</span>
-        <span class="it" role="listitem"><span class="v">3 400</span><span class="k">Steps</span></span>
+        <span class="t-metric" role="listitem"><span class="t-metric-v">3 400</span><span class="t-metric-k">Steps</span></span>
         <span class="t-sep" aria-hidden="true">·</span>
-        <span class="it" role="listitem"><span class="v good">+120</span><span class="k">HP regen</span></span>
-        <span class="clock">14:30</span>
+        <span class="t-metric" role="listitem"><span class="t-metric-v t-metric-v--good">+120</span><span class="t-metric-k">HP regen</span></span>
       </article>
     </section>
 
     <!-- ── t-ticker ── -->
     <section class="catalog-section catalog-section--wide" aria-labelledby="lbl-ticker">
       <h2 class="section-label" id="lbl-ticker">.t-ticker · .t-ticker-track</h2>
-      <div class="g1r-ticker">
-        <div class="t-card ticker">
-          <span class="t-badge">G1 Live</span>
-          <div class="t-ticker">
-            <div class="t-ticker-track" aria-hidden="true">
-              <span class="run">STR <b>80</b> · HP <b>250/280</b> · Mana <b>90/120</b><span class="dot">◆</span>Melee: <b>Söldnerklinge (73)</b><span class="dot">◆</span></span>
-              <span class="run">STR <b>80</b> · HP <b>250/280</b> · Mana <b>90/120</b><span class="dot">◆</span>Melee: <b>Söldnerklinge (73)</b><span class="dot">◆</span></span>
-            </div>
+      <div class="t-card t-ticker-wrap">
+        <span class="t-badge">G1 Live</span>
+        <div class="t-ticker">
+          <div class="t-ticker-track" aria-hidden="true">
+            <span class="run">STR <b>80</b> · HP <b>250/280</b> · Mana <b>90/120</b><span class="dot">◆</span>Melee: <b>Söldnerklinge (73)</b><span class="dot">◆</span></span>
+            <span class="run">STR <b>80</b> · HP <b>250/280</b> · Mana <b>90/120</b><span class="dot">◆</span>Melee: <b>Söldnerklinge (73)</b><span class="dot">◆</span></span>
           </div>
         </div>
       </div>

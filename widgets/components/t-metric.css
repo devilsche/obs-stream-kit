@@ -1,0 +1,7 @@
+/* ── t-metric: inline Wert + Label (z.B. Live-Leisten-Item). ── */
+.t-metric { display: inline-flex; align-items: baseline; gap: 6px; }
+.t-metric-v { color: var(--theme-text); font-weight: 700; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.t-metric-v--good { color: var(--theme-ok); }
+.t-metric-v--bad { color: var(--theme-danger); }
+.t-metric-v--accent { color: var(--theme-accent); }
+.t-metric-k { color: var(--theme-text-dim); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; }
