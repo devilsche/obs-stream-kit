@@ -111,16 +111,16 @@ html[data-theme="swiss"] {
 
 /* ── Gothic / Mittelalter-Themes (Spiel-inspiriert) ───────────────────────── */
 html[data-theme="oldcamp"] {
-  /* Altes Lager — Erzbarone: Leder, Bronze, Gold, Fackelfeuer. */
-  --theme-primary:#b9762f; --theme-accent:#e0a93e; --theme-accent-2:#8a5a2b; --theme-on-primary:#1a1008;
-  --theme-bg:#130c07; --theme-surface:#1f150c; --theme-surface-2:#2a1d10; --theme-border:#6b4a24;
-  --theme-text:#ece0c8; --theme-text-dim:#b09a76; --theme-text-faint:#7d6b4e;
-  --theme-ok:#8a9a3c; --theme-warn:#e0a93e; --theme-danger:#b5302a;
+  /* Altes Lager — Feuermagier: Glut, Lava, brennendes Rot-Orange. */
+  --theme-primary:#c2401d; --theme-accent:#ef7d2a; --theme-accent-2:#8a2f1e; --theme-on-primary:#1a0c06;
+  --theme-bg:#120705; --theme-surface:#1f0f0a; --theme-surface-2:#2a140d; --theme-border:#7a3320;
+  --theme-text:#f0ddc8; --theme-text-dim:#c0987a; --theme-text-faint:#8a6450;
+  --theme-ok:#8a9a3c; --theme-warn:#ef9a2e; --theme-danger:#d4302a;
   --theme-font-display:"Metamorphous",serif; --theme-font-body:"EB Garamond",serif; --theme-font-mono:"JetBrains Mono",monospace;
   --theme-stinger-font:"Metamorphous",serif;
-  --theme-radius:2px; --theme-border-width:2.5px; --theme-shadow:0 14px 40px rgba(0,0,0,.6);
-  --theme-hot-icon:"swords";
-  --theme-page-bg:radial-gradient(900px 600px at 50% -10%,rgba(185,118,47,.28),#130c07 60%);
+  --theme-radius:2px; --theme-border-width:2.5px; --theme-shadow:0 0 26px rgba(194,64,29,.22),0 14px 40px rgba(0,0,0,.6);
+  --theme-hot-icon:"local_fire_department";
+  --theme-page-bg:radial-gradient(900px 600px at 50% -10%,rgba(194,64,29,.30),#120705 60%);
   --theme-frame:url("/widgets-static/assets/frames/oldcamp-frame.svg") 34 / 17px / 0 stretch;
   --theme-frame-width:17px;
   --theme-corner-tl:url("/widgets-static/assets/frames/corners/oldcamp-tl.svg");
@@ -131,36 +131,36 @@ html[data-theme="oldcamp"] {
 }
 
 html[data-theme="barrier"] {
-  /* Sumpflager / Die Barriere — Magie & Schwefel: giftgruen, mystisch. */
-  --theme-primary:#7fc23a; --theme-accent:#b6e84a; --theme-accent-2:#4a8f5c; --theme-on-primary:#08120a;
-  --theme-bg:#080d0a; --theme-surface:#101a12; --theme-surface-2:#16241a; --theme-border:#3c6b3a;
-  --theme-text:#dfeed6; --theme-text-dim:#93ab8e; --theme-text-faint:#637a60;
-  --theme-ok:#7fc23a; --theme-warn:#cfe04a; --theme-danger:#d4622a;
+  /* Sumpflager / Die Barriere — Wassermagier: Lagune & Magie, mystisches Blau. */
+  --theme-primary:#2f8fcf; --theme-accent:#5fcdef; --theme-accent-2:#2f6f93; --theme-on-primary:#06101a;
+  --theme-bg:#070c12; --theme-surface:#0f1a24; --theme-surface-2:#15242f; --theme-border:#356a82;
+  --theme-text:#d6e8f2; --theme-text-dim:#8fa9b8; --theme-text-faint:#5f7682;
+  --theme-ok:#3fc2a8; --theme-warn:#d8b84a; --theme-danger:#d4553a;
   --theme-font-display:"MedievalSharp",serif; --theme-font-body:"IM Fell English",serif; --theme-font-mono:"JetBrains Mono",monospace;
   --theme-stinger-font:"MedievalSharp",serif;
-  --theme-radius:3px; --theme-border-width:2px; --theme-shadow:0 0 24px rgba(127,194,58,.18),0 14px 40px rgba(0,0,0,.6);
+  --theme-radius:3px; --theme-border-width:2px; --theme-shadow:0 0 24px rgba(47,143,207,.20),0 14px 40px rgba(0,0,0,.6);
   --theme-hot-icon:"water_drop";
-  --theme-page-bg:radial-gradient(1000px 700px at 70% -10%,rgba(127,194,58,.30),#080d0a 62%);
+  --theme-page-bg:radial-gradient(1000px 700px at 70% -10%,rgba(47,143,207,.30),#070c12 62%);
   --theme-frame:url("/widgets-static/assets/frames/barrier-frame.svg") 34 / 17px / 0 stretch;
   --theme-frame-width:17px;
   --theme-corner-tl:url("/widgets-static/assets/frames/corners/barrier-tl.svg");
   --theme-corner-tr:url("/widgets-static/assets/frames/corners/barrier-tr.svg");
   --theme-corner-bl:url("/widgets-static/assets/frames/corners/barrier-bl.svg");
   --theme-corner-br:url("/widgets-static/assets/frames/corners/barrier-br.svg");
-  --theme-texture:radial-gradient(135% 115% at 68% -12%, rgba(127,194,58,.09), transparent 62%);
+  --theme-texture:radial-gradient(135% 115% at 68% -12%, rgba(47,143,207,.10), transparent 62%);
 }
 
 html[data-theme="sect"] {
-  /* Schlaefer-Tempel / Sekte — Wueste, Obsidian, Opferfeuer: archaisch-hart. */
-  --theme-primary:#c2682f; --theme-accent:#e0913a; --theme-accent-2:#7a3b3b; --theme-on-primary:#160d10;
-  --theme-bg:#0f0a10; --theme-surface:#1b1118; --theme-surface-2:#251820; --theme-border:#6e4530;
-  --theme-text:#ecd9c2; --theme-text-dim:#ab917a; --theme-text-faint:#786052;
-  --theme-ok:#9a8a3c; --theme-warn:#e0913a; --theme-danger:#c0322a;
+  /* Schlaefer-Tempel / Sekte — Sumpfkraut & Obsidian: archaisch-hartes Gruen. */
+  --theme-primary:#4f9b3c; --theme-accent:#8fd24a; --theme-accent-2:#3a6b35; --theme-on-primary:#0a140a;
+  --theme-bg:#0a0f09; --theme-surface:#141b12; --theme-surface-2:#1d251a; --theme-border:#496e3a;
+  --theme-text:#dde9d2; --theme-text-dim:#97aa8c; --theme-text-faint:#647760;
+  --theme-ok:#6fcf5f; --theme-warn:#cfe04a; --theme-danger:#c0322a;
   --theme-font-display:"Cinzel Decorative",serif; --theme-font-body:"Marcellus",serif; --theme-font-mono:"JetBrains Mono",monospace;
   --theme-stinger-font:"Cinzel Decorative",serif;
-  --theme-radius:0px; --theme-border-width:2px; --theme-shadow:0 14px 44px rgba(0,0,0,.7);
+  --theme-radius:0px; --theme-border-width:2px; --theme-shadow:0 0 22px rgba(79,155,60,.16),0 14px 44px rgba(0,0,0,.7);
   --theme-hot-icon:"cannabis";
-  --theme-page-bg:linear-gradient(0deg,rgba(194,104,47,.22) 0%,#0f0a10 45%);
+  --theme-page-bg:linear-gradient(0deg,rgba(79,155,60,.22) 0%,#0a0f09 45%);
   --theme-frame:url("/widgets-static/assets/frames/sect-frame.svg") 34 / 17px / 0 stretch;
   --theme-frame-width:17px;
   --theme-corner-tl:url("/widgets-static/assets/frames/corners/sect-tl.svg");

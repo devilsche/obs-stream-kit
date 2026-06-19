@@ -1,18 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
   <!-- Schlaefer-Tempel: gemeisselte, harte Stein-Winkel mit Kerben. Keine Rundung. -->
-  <g stroke="#6e4530" stroke-width="3">
+  <g stroke="#496e3a" stroke-width="3">
     <line x1="34" y1="6" x2="86" y2="6"/>
     <line x1="34" y1="114" x2="86" y2="114"/>
     <line x1="6" y1="34" x2="6" y2="86"/>
     <line x1="114" y1="34" x2="114" y2="86"/>
   </g>
-  <g stroke="#c2682f" stroke-width="4.5" stroke-linejoin="miter">
+  <g stroke="#4f9b3c" stroke-width="4.5" stroke-linejoin="miter">
     <path d="M6 30 L6 6 L30 6"/>
     <path d="M90 6 L114 6 L114 30"/>
     <path d="M114 90 L114 114 L90 114"/>
     <path d="M30 114 L6 114 L6 90"/>
   </g>
-  <g fill="#e0913a">
+  <g fill="#8fd24a">
     <path d="M14 14 L22 14 L14 22 Z"/>
     <path d="M106 14 L98 14 L106 22 Z"/>
     <path d="M106 106 L98 106 L106 98 Z"/>

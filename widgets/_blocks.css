@@ -58,9 +58,9 @@
   92%{opacity:.25;text-shadow:none}94%{opacity:1;text-shadow:0 0 26px var(--theme-accent)}96%{opacity:.45}}
 @keyframes hot-twinkle{0%,100%{transform:scale(1) rotate(0);opacity:1}
   50%{transform:scale(1.22) rotate(18deg);opacity:.85;text-shadow:0 0 22px var(--theme-accent)}}
-/* Gothic-Charaktere: oldcamp = unruhige Fackel (asymmetrisch, schnell, bronze),
-   barrier = mystisches Atmen (langsam, weich, grün), sect = Opferfeuer (dramatisch,
-   dunkelroter accent-2-Unterton). */
+/* Gothic-Charaktere: oldcamp = unruhige Fackel (Feuermagier, schnell, glut-rot),
+   barrier = mystisches Atmen (Wassermagier, langsam, weich, blau), sect = Glimmen
+   (Sumpfkraut, grün). */
 @keyframes hot-torch{0%{transform:scale(1) rotate(-1deg);text-shadow:0 0 9px var(--theme-accent)}
   20%{transform:scale(1.04) rotate(1.5deg);text-shadow:0 0 16px var(--theme-accent),0 0 6px var(--theme-accent-2)}
   40%{transform:scale(.97) rotate(-1.5deg);text-shadow:0 0 8px var(--theme-accent)}

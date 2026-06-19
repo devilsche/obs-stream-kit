@@ -1,18 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
   <!-- Die Barriere: gluehende Runen-Ecken. Kanten = duenne moosgruene Linie. -->
-  <g stroke="#3c6b3a" stroke-width="2.5">
+  <g stroke="#356a82" stroke-width="2.5">
     <line x1="34" y1="7" x2="86" y2="7"/>
     <line x1="34" y1="113" x2="86" y2="113"/>
     <line x1="7" y1="34" x2="7" y2="86"/>
     <line x1="113" y1="34" x2="113" y2="86"/>
   </g>
-  <g stroke="#7fc23a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+  <g stroke="#2f8fcf" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
     <path d="M7 28 L7 7 L28 7"/>
     <path d="M92 7 L113 7 L113 28"/>
     <path d="M113 92 L113 113 L92 113"/>
     <path d="M28 113 L7 113 L7 92"/>
   </g>
-  <g stroke="#b6e84a" stroke-width="2.5" stroke-linecap="round">
+  <g stroke="#5fcdef" stroke-width="2.5" stroke-linecap="round">
     <path d="M14 14 L22 22 M22 14 L14 22"/>
     <path d="M106 14 L98 22 M98 14 L106 22"/>
     <path d="M106 106 L98 98 M98 106 L106 98"/>
