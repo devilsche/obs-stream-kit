@@ -79,7 +79,7 @@
     .widget-name {
       font-size: 18px;
       font-weight: 700;
-      color: #ffffff;
+      color: var(--c-text);
       white-space: nowrap;
     }
 
@@ -96,17 +96,17 @@
     .widget-tier--1 {
       background: color-mix(in srgb,var(--c-primary) 50%,transparent);
       border: 1px solid var(--c-accent2);
-      color: #ffffff;
+      color: var(--theme-on-primary, #fff);
     }
     .widget-tier--2 {
       background: color-mix(in srgb,var(--c-primary) 60%,transparent);
       border: 1px solid var(--c-accent2);
-      color: color-mix(in srgb,var(--c-accent2) 80%,#fff);
+      color: var(--theme-on-primary, #fff);
     }
     .widget-tier--3 {
       background: linear-gradient(135deg, color-mix(in srgb,var(--c-gold) 30%,transparent), color-mix(in srgb,var(--c-primary) 40%,transparent));
       border: 1px solid var(--c-gold);
-      color: var(--c-gold);
+      color: var(--theme-on-primary, #fff);
     }
   </style>
   <link rel="stylesheet" href="_theme.css">
