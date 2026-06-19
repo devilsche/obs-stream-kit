@@ -315,15 +315,31 @@ var ClipPlayer = (function () {
     }
 
     // ─── Quelle entscheiden: Steam-Media (falls aktiv + Spiel laeuft) sonst Clips ───
-    fetch(serveBase + 'api/steam/highlight-media', { credentials: 'omit' })
+    // Signatur aus Quelle+Spiel+Media-Mengen — aendert sie sich (Spiel gestartet/
+    // gewechselt/gestoppt oder Media frisch gecacht), laedt die Source sauber neu.
+    function mediaSig(d) {
+      return (d && d.source) + ':' + ((d && d.appId) || '')
+        + ':' + ((d && d.trailers && d.trailers.length) || 0)
+        + 'x' + ((d && d.screenshots && d.screenshots.length) || 0);
+    }
+    var HIGHLIGHT_URL = serveBase + 'api/steam/highlight-media';
+    fetch(HIGHLIGHT_URL, { credentials: 'omit' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        var sig0 = mediaSig(d);
         if (d && d.source === 'steam'
             && ((d.trailers && d.trailers.length) || (d.screenshots && d.screenshots.length))) {
           startSteamMedia(d);
         } else {
           startClipFlow();
         }
+        // Re-Poll: Spielwechsel/-stopp → Quelle hat sich geaendert → Szene neu laden.
+        setInterval(function () {
+          fetch(HIGHLIGHT_URL, { credentials: 'omit' })
+            .then(function (r) { return r.json(); })
+            .then(function (d2) { if (mediaSig(d2) !== sig0) location.reload(); })
+            .catch(function () {});
+        }, 45000);
       })
       .catch(function () { startClipFlow(); });
   }

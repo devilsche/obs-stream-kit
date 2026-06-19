@@ -1230,6 +1230,23 @@ class SteamEndpointRegistry:
             if not app_id:
                 return _ok({"source": "clips"})
             row = get_app_details_row(conn, app_id)
+            if row is None:
+                # Laufendes Spiel noch nie gesynct (z.B. nicht in der Library) →
+                # Media on-demand holen + cachen. Upsert IMMER (auch bei Fehler =
+                # leer), setzt cached_at → kein Re-Fetch-Storm beim 45s-Re-Poll.
+                mj = None
+                try:
+                    m = self.client.get_app_media(app_id)
+                    if m.get("trailers") or m.get("screenshots"):
+                        mj = json.dumps(m)
+                except Exception:
+                    mj = None
+                try:
+                    from steam.db_pg import upsert_app_details
+                    upsert_app_details(conn, app_id, media_json=mj)
+                    row = get_app_details_row(conn, app_id)
+                except Exception:
+                    row = None
             media = None
             if row and row["media_json"]:
                 try:
