@@ -50,7 +50,7 @@ html[data-theme="aurora"] {
   /* Surface deutlich deckender als im Mockup (.6 → .9): Widgets liegen auf
      transparentem OBS-Hintergrund / Gameplay, eine zu glasige Flaeche wuerde
      auswaschen. Leichte Transluzenz bleibt fuer den Glas-Charakter. */
-  --theme-primary:#9d6bd0; --theme-accent:#f2b705; --theme-accent-2:#46d6ff; --theme-on-primary:#fff;
+  --theme-primary:#9d6bd0; --theme-accent:#f2b705; --theme-accent-2:#46d6ff; --theme-on-primary:#380057;
   --theme-bg:#0c0916; --theme-surface:rgba(28,18,46,.9); --theme-surface-2:rgba(40,26,60,.82); --theme-border:rgba(157,107,208,.5);
   --theme-text:#efe9f6; --theme-text-dim:#bbb0cf; --theme-text-faint:#8478a0;
   --theme-ok:#4be39a; --theme-warn:#f2b705; --theme-danger:#ff6b81;
