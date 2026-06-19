@@ -239,7 +239,10 @@ html.fonts-ready .t-launch .smoke{animation-play-state:running}
             flame-wobble 4.5s ease-in-out infinite, flame-life 4.5s linear infinite}
 .t-launch .smoke{position:absolute;left:50%;bottom:0;width:9px;height:9px;border-radius:50%;
   background:radial-gradient(circle,color-mix(in srgb,var(--theme-text-dim) 60%,transparent),transparent 70%);
-  opacity:0;will-change:transform,opacity;animation:smoke-puff 4.5s ease-out infinite}
+  opacity:0;will-change:transform,opacity,left;
+  /* smoke-lean = gedämpfter Lean-Bias (halbe Amplitude der Rakete, weich): Qualm tritt
+     mehr zur Wackel-Seite aus, ohne hart mitzuwackeln. left ≠ transform → kein Konflikt. */
+  animation:smoke-puff 4.5s ease-out infinite, smoke-lean 4.5s ease-in-out infinite}
 .t-launch .smoke:nth-child(2){--sx:-10px}
 .t-launch .smoke:nth-child(3){--sx:9px}
 .t-launch .smoke:nth-child(4){--sx:-3px;width:13px;height:13px}
@@ -268,6 +271,8 @@ html.fonts-ready .t-launch .smoke{animation-play-state:running}
 /* Flamme wackelt mit der Rakete (spiegelt rocket-fly X-Shake 0–51%) über left, da
    transform schon Flicker macht. Ab 51% mittig (Rakete steigt nur noch vertikal). */
 @keyframes flame-wobble{0%{left:50%}8%{left:calc(50% - 1px)}16%{left:calc(50% + 1px)}24%{left:calc(50% - 1.2px)}32%{left:calc(50% + 1.3px)}39%{left:calc(50% - 1.7px)}44%{left:calc(50% + 2px)}48%{left:calc(50% - 2.2px)}51%,100%{left:50%}}
+/* Smoke lehnt gedämpft (~halbe Amplitude) Richtung Rakete-Lean — Bias, kein Jitter. */
+@keyframes smoke-lean{0%{left:50%}8%{left:calc(50% - .5px)}16%{left:calc(50% + .5px)}24%{left:calc(50% - .6px)}32%{left:calc(50% + .65px)}39%{left:calc(50% - .9px)}44%{left:calc(50% + 1px)}48%{left:calc(50% - 1.1px)}51%,100%{left:50%}}
 @keyframes smoke-puff{
   0%,5%   {opacity:0;transform:translate(-50%,0) scale(.3)}
   12%     {opacity:.5;transform:translate(-50%,1px) scale(.9)}
