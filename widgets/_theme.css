@@ -1,2 +1,5 @@
-/* Shim → widgets/themes/master.css (pro Theme eine Datei). */
-@import url("themes/master.css");
+/* Shim → widgets/themes/master.css (pro Theme eine Datei).
+   ABSOLUTER Pfad: dieser Shim wird auch als /static/_theme.css (Dashboard-Symlink)
+   geladen, wo themes/ NICHT danebenliegt — ein relativer @import würde 404en.
+   /widgets-static/ ist ein Public-Prefix, von jedem Origin/Mount erreichbar. */
+@import url("/widgets-static/themes/master.css");

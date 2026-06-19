@@ -1,2 +1,4 @@
-/* Shim → widgets/components/master.css (pro Komponente eine Datei). */
-@import url("components/master.css");
+/* Shim → widgets/components/master.css (pro Komponente eine Datei).
+   ABSOLUTER Pfad (wie _theme.css): falls der Shim von einem Mount ohne danebenliegendes
+   components/ geladen wird, würde ein relativer @import 404en. /widgets-static/ ist Public. */
+@import url("/widgets-static/components/master.css");
