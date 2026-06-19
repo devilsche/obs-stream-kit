@@ -36,7 +36,7 @@ body.g1r-ticker { width: 760px; height: 40px; }
 html[data-theme="oldcamp"] .g1r-ticker .t-card.ticker,
 html[data-theme="barrier"] .g1r-ticker .t-card.ticker,
 html[data-theme="sect"] .g1r-ticker .t-card.ticker { padding: 0 36px; }
-.g1r-ticker .tag { background: var(--theme-primary, #5e2a79); color: var(--theme-text, #fff); font-size: .62rem;
+.g1r-ticker .tag { background: var(--theme-primary, #5e2a79); color: var(--theme-on-primary, #fff); font-size: .62rem;
                    font-weight: 700; text-transform: uppercase; letter-spacing: .1em; padding: 3px 8px; border-radius: 4px; flex: none; }
 .g1r-ticker .run { color: var(--theme-text, #e8e0f0); font-size: .92rem; white-space: nowrap; padding-right: 48px; }
 .g1r-ticker .run b { color: var(--theme-accent, #f2b705); font-variant-numeric: tabular-nums; }
