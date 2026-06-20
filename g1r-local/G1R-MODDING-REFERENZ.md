@@ -41,16 +41,23 @@ UObject-Klassen/-Funktionen aus dem **UE4SS Object-Dump** — NICHT raten.
 | **`saveKey`** | `FindFirstOf("PersistentDataSubsystem"):GetCurrentProfileId()` → Int | ✅ (neu verdrahtet) |
 | `session` / `totals` / `records` | im Mod aus Stat-Deltas berechnet (+ persistiert in `g1r-totals.json`) | ✅ |
 | `strongestMelee/Ranged/Spell` | **Proxy `server.py`** aus `items` (Präfix `ItMw_`/`ItRw_` + `weapon_damage.json` + `magicCircle`) | ✅ (Proxy, nicht Mod) |
-| `spell` (aktiver Zauber) | `MagicScriptLibrary:GetSpellConfigGivenACharacter` | ❌ **CRASHT** → `READ_SPELL=false` |
-| `weapon` (Live-Waffe) | `DataModule_Combat:GetEquipedWeaponDefinition` | ❌ **CRASHT** → `READ_WEAPONS=false` |
-| `kills` | `PuzzlesSubsystem:GetCreatureKillCounterMap` | ❌ liefert keine Daten → `READ_KILLS=false` |
-| `damageDealt` (ausgeteilt) | Damage-Hook (Engine-Eingriff) | ❌ `READ_DMG_OUT=false` (in-game testen) |
+| `weapon` (Live-Waffe) | `CarryComponent:GetEquippedItemDefinition` | 🔶 **gebaut, gated** → `READ_CARRY=false` (in-game freischalten) |
+| `kills` (Hook) | `AIAgentCharacter:HandleDefeated(DefeatingCharacterActor)` | 🔶 **gebaut, gated** → `READ_KILLS_HOOK=false` |
+| `combo` | `DataModule_Combat:GetAttackCount` → Int | 🔶 **gebaut, gated** → `READ_COMBO=false` |
+| `damageDealt` (ausgeteilt) | `MeleeWeaponVisual:OnDamageDealt(Target, relativeDamage)` | 🔶 **gebaut, gated** → `READ_DMG_OUT=false` (melee-only) |
+| `spell` (aktiver Zauber) | `MagicScriptLibrary:GetSpellConfigGivenACharacter` | ❌ **CRASHT** → `READ_SPELL=false` (Ersatz offen) |
+| `weapon` (alt) | `DataModule_Combat:GetEquipedWeaponDefinition` | ❌ **CRASHT** → `READ_WEAPONS=false` (durch CarryComponent ersetzt) |
+| `kills` (alt) | `PuzzlesSubsystem:GetCreatureKillCounterMap` | ❌ liefert keine Daten → `READ_KILLS=false` (durch Hook ersetzt) |
 
-**Heißt:** Stats, Inventar, Gilde, Uhr, Distanz/Steps, Session/Totals/Records (außer
-ausgeteiltem Schaden), saveKey kommen. Aktiver Zauber + Live-Waffe + Kills + ausgeteilter
-Schaden fehlen noch (Crash/keine Daten).
+**Heißt:** Stats, Inventar, Gilde, Uhr, Distanz/Steps, Session/Totals/Records, saveKey laufen
+fest. Live-Waffe (CarryComponent), Kills (HandleDefeated-Hook), Combo (GetAttackCount) und
+ausgeteilter Schaden (OnDamageDealt-Hook) sind **gebaut, aber Default AUS** — in dieser
+Reihenfolge in-game einzeln freischalten und UE4SS.log beobachten (Bisection):
+`READ_KILLS_HOOK` → `READ_CARRY` → `READ_COMBO` → `READ_DMG_OUT`. Jeder loggt beim ersten
+Feuern eine Diagnose (Causer/Component-Pfad/self-Kette), die offene Filter belegt. Aktiver
+Zauber bleibt offen (kein crashfreier Ersatz gefunden).
 
-### Lösungswege für die offenen Reader (aus dem Dump, verifiziert — noch nicht im Mod)
+### Lösungswege für die offenen Reader (aus dem Dump, verifiziert — jetzt gated im Mod)
 - **Live-Waffe UND aktiver Zauber** → `CarryComponent:GetEquippedItemDefinition()` → ItemDefinition
   (ObjectProperty). Das ist der **ausgerüstete In-Hand-Gegenstand** — Waffe ODER Rune/Scroll —
   also EIN Call statt der zwei crashenden DataModule/MagicScriptLibrary-Wege. Klassennamen-Präfix

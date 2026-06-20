@@ -50,9 +50,16 @@ local warmup = WARMUP_TICKS
 -- wenn der Damage-Hook (READ_DMG_OUT) aktiv ist.
 local TOTALS_PATH = [[C:\obs-g1r\g1r-totals.json]]
 local totals = { damageTaken=0, healthRegen=0, manaSpent=0, manaRegen=0, xpGained=0,
-                 distanceM=0, steps=0, damageDealt=0,
+                 distanceM=0, steps=0, damageDealt=0, kills=0,
                  recHardestTaken=0, recManaTick=0, recRunM=0, recHardestDealt=0 }
 local sessDamageDealt = 0   -- ausgeteilter Schaden DIESER Session (Damage-Hook)
+-- Hook-basierte Kills (READ_KILLS_HOOK): {creatureType=count} dieser Session + Gesamt-Session-Zahl.
+-- Ersetzt die tote PuzzlesSubsystem-Map; gleiches Map-Format → Widget/News bleiben unverändert.
+local hookKills = {}
+local sessKills = 0
+local killHookDiag = false   -- erster Kill loggt #args + Causer (Spieler-Filter belegen)
+local dmgOutDiag = false      -- erster Treffer loggt self-Kette (Spieler-Filter belegen)
+local combo = nil            -- laufender Combo-/Schlagzähler (READ_COMBO), Int oder nil
 pcall(function()
     local f = io.open(TOTALS_PATH, "r"); if not f then return end
     local s = f:read("*a"); f:close()
@@ -75,6 +82,18 @@ local READ_ATTACK  = true   -- läuft — DataModule_Combat:GetCurrentAttackDire
 local READ_CLOCK   = true   -- läuft — GameTimeSubsystem:GetCurrentClockTime
 local READ_KILLS   = false  -- Map liefert keine Daten (PuzzlesSubsystem) → aus
 local READ_DMG_OUT = false  -- ausgeteilter Schaden via Damage-Hook (Engine-Eingriff) → erst in-game testen
+-- ── Neue Reader/Hooks aus dem Object-Dump (alle erst in-game zu verifizieren) ──
+-- Reihenfolge zum Freischalten (eins nach dem anderen, UE4SS.log beobachten):
+--   1) READ_KILLS_HOOK  — AIAgentCharacter:HandleDefeated(DefeatingCharacterActor); Causer==Spieler → Kill.
+--                         Ersatz für die tote PuzzlesSubsystem-Map. Erster Kill loggt #args + Causer-Name.
+--   2) READ_CARRY       — CarryComponent:GetEquippedItemDefinition → geführte Waffe (crashfrei, statt DataModule).
+--                         Erster Read loggt, über welchen Pfad die Component gefunden wurde.
+--   3) READ_COMBO       — DataModule_Combat:GetAttackCount → laufender Combo-/Schlagzähler (Int).
+--   4) READ_DMG_OUT     — MeleeWeaponVisual:OnDamageDealt(Target, relativeDamage:float). MELEE-only.
+--                         Erster Treffer loggt self-Kette, damit der Spieler-Filter belegbar wird.
+local READ_KILLS_HOOK = false
+local READ_CARRY      = false
+local READ_COMBO      = false
 local killBase    = nil   -- Map-Snapshot beim ersten Read (für Session-Summe)
 local lastKillMap = nil   -- letzte Map (für News-Delta)
 local killNews    = {}    -- jüngste Events {type=, n=}, max MAX_NEWS
@@ -95,39 +114,11 @@ RegisterHook("/Script/Engine.PlayerController:ClientRestart", function(self, New
     if ok and isValid(pawn) then CachedPlayer = pawn end
 end)
 
--- ── Damage-Hook: ausgeteilter Schaden (NUR wenn READ_DMG_OUT) ───────────────
--- Engine-Eingriff → hinter Flag, alles in pcall. Die genaue Argument-Form von
--- ApplyDamageTo ist am Build noch zu verifizieren: beim ersten Treffer wird die
--- Args-Anzahl geloggt und ein numerischer Wert best-effort als Schaden genommen.
--- Sobald die echte Arg-Position bekannt ist, hier gezielt extrahieren.
-local dmgHookDiag = false
-if READ_DMG_OUT then
-    pcall(function()
-        RegisterHook("/Script/G1R.GothicGASLibrary:ApplyDamageTo", function(...)
-            local args = { ... }   -- '...' nur in DIESER vararg-Funktion gültig (nicht im inneren pcall)
-            pcall(function()
-                if not dmgHookDiag then
-                    dmgHookDiag = true
-                    print("[G1RExport] DMG-Hook feuerte, #args=" .. tostring(#args) .. "\n")
-                end
-                for i = 2, #args do
-                    local v = args[i]
-                    local num = nil
-                    pcall(function() num = v:get() end)
-                    if type(num) ~= "number" then num = (type(v) == "number") and v or nil end
-                    if num and num > 0 then
-                        sessDamageDealt = sessDamageDealt + num
-                        totals.damageDealt = totals.damageDealt + num
-                        if num > sess.recHardestDealt then sess.recHardestDealt = num end
-                        if num > totals.recHardestDealt then totals.recHardestDealt = num end
-                        pendingEvents[#pendingEvents+1] = { kind = "hit_dealt", value = math.floor(num + 0.5) }
-                        break
-                    end
-                end
-            end)
-        end)
-    end)
-end
+-- Hinweis: Die Engine-Hooks (Damage-Out via MeleeWeaponVisual:OnDamageDealt und
+-- Kills via AIAgentCharacter:HandleDefeated) brauchen shortName + Player-Vergleich
+-- und werden darum weiter unten registriert (Abschnitt "Engine-Hooks"), wo alle
+-- Helfer definiert sind. Der alte ApplyDamageTo-Hook ist raus: HitData trägt laut
+-- Object-Dump KEINEN Schadenswert (nur WeaponUsed/Impact/Deflect/Parry).
 
 local function getPlayer()
     if isValid(CachedPlayer) then return CachedPlayer end
@@ -582,6 +573,63 @@ local function readAttack(char)
     return name
 end
 
+-- ── Geführte Waffe via CarryComponent (READ_CARRY, crashfrei) ───────────────
+-- Object-Dump: CarryComponent:GetEquippedItemDefinition() → ItemDefinition. Das ist
+-- der crashfreie Ersatz für DataModule_Combat:GetEquipedWeaponDefinition (AccessViolation).
+-- Die Component hängt am Spieler-Pawn; der Zugriffspfad ist am Build zu verifizieren —
+-- darum mehrere defensive Wege + einmaliges Diag, welcher griff.
+local carryDiag = false
+local CARRY_CLASS = nil
+local function getCarryComponent(char)
+    -- 1: direkter Getter
+    local c = nil
+    pcall(function() c = char:GetCarryComponent() end)
+    if isValid(c) then return c, "GetCarryComponent" end
+    -- 2: Property-Namen
+    pcall(function() c = char.CarryComponent end)
+    if isValid(c) then return c, "CarryComponent" end
+    pcall(function() c = char.m_CarryComponent end)
+    if isValid(c) then return c, "m_CarryComponent" end
+    -- 3: GetComponentByClass mit der CarryComponent-Klasse
+    if CARRY_CLASS == nil then
+        CARRY_CLASS = findClass("/Script/G1R.CarryComponent") or false
+    end
+    if CARRY_CLASS then
+        pcall(function() c = char:GetComponentByClass(CARRY_CLASS) end)
+        if isValid(c) then return c, "GetComponentByClass" end
+    end
+    return nil, nil
+end
+
+local function readCarryWeapon(char)
+    local comp, via = getCarryComponent(char)
+    if not carryDiag then
+        carryDiag = true
+        pcall(function()
+            print(string.format("[G1RExport] Carry-Diag: component via=%s valid=%s\n",
+                tostring(via), tostring(isValid(comp))))
+        end)
+    end
+    if not isValid(comp) then return nil end
+    local def = nil
+    pcall(function() def = comp:GetEquippedItemDefinition() end)
+    return defName(def)
+end
+
+-- ── Combo-/Schlagzähler via DataModule_Combat:GetAttackCount (READ_COMBO) ─────
+-- Gleiches Modul wie readAttack (läuft stabil). GetAttackCount → Int. Semantik
+-- (laufende Combo vs. Gesamt-Schläge) ist in-game zu deuten; wir geben den Rohwert raus.
+local function readCombo(char)
+    local lib = getLib()
+    if not (lib and isValid(lib)) then return nil end
+    local ok, comb = pcall(function() return lib:GetCombatDataModule(char) end)
+    if not (ok and isValid(comb)) then return nil end
+    local n = nil
+    pcall(function() n = comb:GetAttackCount() end)
+    if type(n) == "number" then return n end
+    return nil
+end
+
 -- ── Ingame-Uhr ──────────────────────────────────────────────────────────────
 -- GameTimeSubsystem:GetCurrentClockTime() (parameterlos) → ClockTime,
 -- ClockTimeLibrary:GetHour/GetMinute(ClockTime) → int. Subsystem als Live-Instanz
@@ -703,7 +751,7 @@ local function readSaveKey()
     return cachedSaveKey
 end
 
-local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack, clock, kills, news)
+local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack, clock, kills, news, combo)
     local parts = {}
     parts[#parts+1] = '"ok":true'
     if guild and guild ~= "" then
@@ -725,6 +773,11 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack
         parts[#parts+1] = string.format('"attack":"%s"', jsonEsc(attack))
     else
         parts[#parts+1] = '"attack":null'
+    end
+    if type(combo) == "number" then
+        parts[#parts+1] = string.format('"combo":%d', math.floor(combo + 0.5))
+    else
+        parts[#parts+1] = '"combo":null'
     end
     if clock and type(clock.hour) == "number" then
         parts[#parts+1] = string.format('"clock":{"hour":%d,"minute":%d}', clock.hour, clock.minute or 0)
@@ -762,6 +815,7 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack
         math.floor(sess.manaSpent + 0.5), math.floor(sess.manaRegen + 0.5),
         math.floor(sess.xpGained + 0.5), steps, meters)
     parts[#parts+1] = string.format('"session_damageDealt":%d', math.floor(sessDamageDealt + 0.5))
+    parts[#parts+1] = string.format('"session_kills":%d', math.floor(sessKills + 0.5))
     -- Session-Rekorde (spiegelt "records", aber nur diese Session) → Career-Card scope=session.
     parts[#parts+1] = string.format(
         '"sessionRecords":{"hardestTaken":%d,"manaTick":%d,"runM":%.1f,"hardestDealt":%d}',
@@ -769,10 +823,10 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack
         sess.recRunM, math.floor(sess.recHardestDealt+0.5))
     -- Persistente Gesamt-Werte (alle Sessions).
     parts[#parts+1] = string.format(
-        '"totals":{"damageTaken":%d,"healthRegen":%d,"manaSpent":%d,"manaRegen":%d,"xpGained":%d,"distanceM":%.1f,"steps":%d,"damageDealt":%d}',
+        '"totals":{"damageTaken":%d,"healthRegen":%d,"manaSpent":%d,"manaRegen":%d,"xpGained":%d,"distanceM":%.1f,"steps":%d,"damageDealt":%d,"kills":%d}',
         math.floor(totals.damageTaken+0.5), math.floor(totals.healthRegen+0.5), math.floor(totals.manaSpent+0.5),
         math.floor(totals.manaRegen+0.5), math.floor(totals.xpGained+0.5), totals.distanceM, totals.steps,
-        math.floor(totals.damageDealt+0.5))
+        math.floor(totals.damageDealt+0.5), math.floor((totals.kills or 0)+0.5))
     -- Rekorde.
     parts[#parts+1] = string.format(
         '"records":{"hardestTaken":%d,"manaTick":%d,"runM":%.1f,"hardestDealt":%d}',
@@ -964,6 +1018,10 @@ local function tick()
     if READ_SPELL then pcall(function() spell = readSpell(char) end) end
     local weapon
     if READ_WEAPONS then pcall(function() weapon = readWeapon(char) end) end
+    -- CarryComponent-Weg bevorzugt, wenn an (crashfrei). Überschreibt den alten Reader nur,
+    -- wenn er tatsächlich etwas liefert.
+    if READ_CARRY then pcall(function() local w = readCarryWeapon(char); if w then weapon = w end end) end
+    if READ_COMBO then pcall(function() combo = readCombo(char) end) else combo = nil end
     local attack
     if READ_ATTACK then pcall(function() attack = readAttack(char) end) end
     -- Einmaliges Diagnose-Log (Stufe 2). Steht VOR den riskanten Readern und nutzt nur
@@ -983,9 +1041,13 @@ local function tick()
     local clock
     if READ_CLOCK then pcall(function() clock = readClock() end) end
     local kills
-    if READ_KILLS then pcall(function() kills = updateKills() end) end
+    if READ_KILLS_HOOK then
+        kills = hookKills            -- Hook-Zähler (echte Kills, Causer==Spieler)
+    elseif READ_KILLS then
+        pcall(function() kills = updateKills() end)   -- alter Map-Weg (PuzzlesSubsystem, tot)
+    end
     local json = buildJson(pos, items or {}, totalDistCm, stats or {}, guild, spell,
-                           weapon, attack, clock, kills, killNews)
+                           weapon, attack, clock, kills, killNews, combo)
     local f = io.open(OUTPUT_PATH, "w")
     if f then f:write(json); f:close(); pendingEvents = {} end
     -- Gesamt-Werte nicht jeden Tick schreiben (I/O), nur ~alle 10 s.
@@ -997,6 +1059,97 @@ local function tick()
         local tf = io.open(TOTALS_PATH, "w")
         if tf then tf:write("{" .. table.concat(tp, ",") .. "}"); tf:close() end
     end
+end
+
+-- ── Engine-Hooks (Kills + ausgeteilter Schaden) ─────────────────────────────
+-- Beide hängen am Spiel-Code → strikt hinter Flags + alles in pcall. Sie laufen auf
+-- dem Game-Thread; ein Fehler hier darf den tick nicht reißen. Stehen NACH allen
+-- Helfern (shortName/getPlayer/isValid), damit die Upvalues gültig sind.
+
+-- Vergleicht einen (ggf. gewrappten) Actor mit dem Spieler-Pawn über den vollen Namen.
+local function isPlayerActor(actor)
+    local a = unwrap(actor)
+    if not isValid(a) then return false end
+    local p = getPlayer()
+    if not isValid(p) then return false end
+    if a == p then return true end
+    local an, pn
+    pcall(function() an = a:GetFullName() end)
+    pcall(function() pn = p:GetFullName() end)
+    return an ~= nil and an == pn
+end
+
+-- Kills: AIAgentCharacter:HandleDefeated(DefeatingCharacterActor). self = sterbender
+-- Gegner, Arg = wer ihn besiegt hat. Causer == Spieler → echter Kill. Ersetzt die tote
+-- PuzzlesSubsystem-Map; gleiches {typ:anzahl}-Format → Widget/News unverändert.
+if READ_KILLS_HOOK then
+    pcall(function()
+        RegisterHook("/Script/G1R.AIAgentCharacter:HandleDefeated", function(self, DefeatingCharacterActor)
+            pcall(function()
+                local causer = DefeatingCharacterActor
+                if not killHookDiag then
+                    killHookDiag = true
+                    local cn = "(nil)"
+                    pcall(function() cn = unwrap(causer):GetFullName() end)
+                    print(string.format("[G1RExport] Kill-Hook feuerte. Causer=%q isPlayer=%s\n",
+                        tostring(cn), tostring(isPlayerActor(causer))))
+                end
+                if not isPlayerActor(causer) then return end
+                local dying = unwrap(self)
+                local typ = "Creature"
+                pcall(function() typ = shortName(dying:GetFullName()) end)
+                hookKills[typ] = (hookKills[typ] or 0) + 1
+                sessKills = sessKills + 1
+                totals.kills = (totals.kills or 0) + 1
+                killNews[#killNews + 1] = { type = typ, n = 1 }
+                while #killNews > MAX_NEWS do table.remove(killNews, 1) end
+                pendingEvents[#pendingEvents + 1] = { kind = "kill", value = 1, meta = { type = typ } }
+            end)
+        end)
+    end)
+end
+
+-- Ausgeteilter Schaden: MeleeWeaponVisual:OnDamageDealt(Target, relativeDamage:float).
+-- MELEE-only (kein Bogen/Armbrust/Zauber). self = WeaponVisual; ohne sauberen Träger-
+-- Bezug ist der Spieler-Filter unsicher → erster Treffer loggt die self-Kette, damit der
+-- Filter belegbar wird. Solange ungefiltert: NUR zählen, wenn self über die Owner-Kette
+-- auf den Spieler zeigt (sonst würde fremder Mob-Schaden mitgezählt).
+local function visualBelongsToPlayer(weaponVisual)
+    local cur = unwrap(weaponVisual)
+    for _ = 1, 4 do
+        if not isValid(cur) then return false end
+        if isPlayerActor(cur) then return true end
+        local nxt = nil
+        pcall(function() nxt = cur:GetOwner() end)
+        cur = unwrap(nxt)
+        if not cur then return false end
+    end
+    return false
+end
+
+if READ_DMG_OUT then
+    pcall(function()
+        RegisterHook("/Script/G1R.MeleeWeaponVisual:OnDamageDealt", function(self, Target, relativeDamage)
+            pcall(function()
+                local dmg = unwrap(relativeDamage)
+                if type(dmg) ~= "number" then return end
+                local mine = visualBelongsToPlayer(self)
+                if not dmgOutDiag then
+                    dmgOutDiag = true
+                    local sn = "(nil)"
+                    pcall(function() sn = unwrap(self):GetFullName() end)
+                    print(string.format("[G1RExport] DmgOut-Hook feuerte. self=%q relativeDamage=%s belongsToPlayer=%s\n",
+                        tostring(sn), tostring(dmg), tostring(mine)))
+                end
+                if not mine or dmg <= 0 then return end
+                sessDamageDealt = sessDamageDealt + dmg
+                totals.damageDealt = totals.damageDealt + dmg
+                if dmg > sess.recHardestDealt then sess.recHardestDealt = dmg end
+                if dmg > totals.recHardestDealt then totals.recHardestDealt = dmg end
+                pendingEvents[#pendingEvents + 1] = { kind = "hit_dealt", value = math.floor(dmg + 0.5) }
+            end)
+        end)
+    end)
 end
 
 -- UE4SS-Loop: alle POLL_INTERVAL_MS einmal schreiben.
