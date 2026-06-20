@@ -690,6 +690,19 @@ local function jsonEsc(s)
     end):gsub('\\u0022', '\\"'):gsub('\\u005c', '\\\\'))
 end
 
+-- ── Run-/Profil-Kennung (saveKey) ──────────────────────────────────────────
+-- PersistentDataSubsystem (GameInstanceSubsystem) hat GetCurrentProfileId()→Int.
+-- Quelle: UE4SS Object-Dump (siehe G1R-MODDING-REFERENZ.md). Profil wechselt nur
+-- beim Laden eines anderen Spielstands → letzten Wert cachen (FindFirstOf ist nicht gratis).
+local cachedSaveKey = nil
+local function readSaveKey()
+    local pds = FindFirstOf("PersistentDataSubsystem")
+    if not isValid(pds) then return cachedSaveKey end
+    local ok, id = pcall(function() return pds:GetCurrentProfileId() end)
+    if ok and type(id) == "number" then cachedSaveKey = id end
+    return cachedSaveKey
+end
+
 local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack, clock, kills, news)
     local parts = {}
     parts[#parts+1] = '"ok":true'
@@ -785,7 +798,11 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack
         it[#it+1] = "{" .. table.concat(fields, ",") .. "}"
     end
     parts[#parts+1] = '"items":[' .. table.concat(it, ",") .. ']'
-    parts[#parts+1] = '"saveKey":null'
+    -- saveKey = aktuelle Profil-/Run-ID aus PersistentDataSubsystem (GameInstanceSubsystem;
+    -- Quelle: Object-Dump, GetCurrentProfileId → Int). Profil ändert sich nur bei
+    -- Spielstand-Wechsel → Wert cachen. Run-Erkennung im Backend nutzt das.
+    local sk = readSaveKey()
+    parts[#parts+1] = (sk ~= nil) and string.format('"saveKey":%d', sk) or '"saveKey":null'
     local evParts = {}
     for _, ev in ipairs(pendingEvents) do
         if ev.kind == "kill" then
