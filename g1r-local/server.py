@@ -15,6 +15,7 @@ import collections
 import json
 import os
 import re
+import sys
 import threading
 import time
 import urllib.parse
@@ -126,6 +127,15 @@ def _norm_arcane(name):
     return re.sub(r"[^a-z0-9]", "", s.lower())
 
 
+def ore_count(items):
+    """Summe der Erznuggets (ItMi_Orenugget) im Inventar — die Gothic-Waehrung 'Erz'."""
+    total = 0
+    for it in (items or []):
+        if (it.get("name") or "").lower() == "itmi_orenugget":
+            total += it.get("count") or 0
+    return total
+
+
 def strongest_usable_spell(items, magic_circle):
     """Liefert den Klassennamen der nutzbaren Inventar-Rune mit dem hoechsten
     Kreis (<= magicCircle), oder None wenn keine nutzbar ist. Rune/Scroll-agnostisch."""
@@ -222,6 +232,8 @@ def build_payload(lang):
     if ss:
         data["strongestSpell"] = ss
         data["strongestSpellDisplay"] = _translate(ss, lang)
+    # Erz (Erznugget) — Gothic-Waehrung, Summe aus dem Inventar.
+    data["ore"] = ore_count(data.get("items"))
     # Gilde: Rohtag -> stabiler Key (steuert Wappen-Symbol) + lokalisierter Name.
     gk = map_guild(data.get("guild"))
     if gk:
@@ -427,27 +439,30 @@ class Handler(BaseHTTPRequestHandler):
     def _serve_state(self, lang):
         # Einmal-Snapshot (Polling-Fallback / Debug). Widgets nutzen /events.
         body = json.dumps(build_payload(lang)).encode("utf-8")
-        self.send_response(200)
-        self._cors()
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except (ConnectionError, OSError):
+            return  # Client hat vorher getrennt → nichts zu tun
 
     def _serve_events(self, lang):
         # Server-Sent Events: das Widget abonniert /events einmalig, der Server
         # pusht den Payload bei jeder Aenderung (kein Netzwerk-Polling mehr).
         # Heartbeat alle 15s haelt die Verbindung wach. ThreadingHTTPServer →
         # ein Thread je Client, ein haengender Stream blockiert die anderen nicht.
-        self.send_response(200)
-        self._cors()
-        self.send_header("Content-Type", "text/event-stream")
-        self.send_header("Cache-Control", "no-cache")
-        self.send_header("Connection", "keep-alive")
-        self.send_header("X-Accel-Buffering", "no")
-        self.end_headers()
         last, last_beat = None, time.time()
         try:
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("X-Accel-Buffering", "no")
+            self.end_headers()
             while True:
                 body = json.dumps(build_payload(lang))
                 now = time.time()
@@ -519,6 +534,17 @@ def _forward_loop(fw, interval=2.0):
         time.sleep(interval)
 
 
+class QuietThreadingHTTPServer(ThreadingHTTPServer):
+    """Wie ThreadingHTTPServer, aber Verbindungs-Abbrüche (Browser/OBS schließt die
+    SSE-Verbindung → WinError 10053 / Broken Pipe) werden still verworfen statt als
+    Traceback nach stderr gedruckt. Echte Fehler kommen weiter durch."""
+    def handle_error(self, request, client_address):
+        exc = sys.exc_info()[1]
+        if isinstance(exc, (ConnectionError, BrokenPipeError)):
+            return
+        super().handle_error(request, client_address)
+
+
 if __name__ == "__main__":
     print(f"[g1r-local] liest {STATE_FILE}")
     print(f"[g1r-local] serviert http://localhost:{PORT}/state  (Strg+C zum Beenden)")
@@ -527,7 +553,7 @@ if __name__ == "__main__":
         _fw = Forwarder(_ingest_url, os.environ.get("G1R_INGEST_TOKEN", ""))
         threading.Thread(target=_forward_loop, args=(_fw,), daemon=True).start()
         print(f"[g1r-local] Prod-Forwarding aktiv → {_ingest_url}")
-    srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    srv = QuietThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

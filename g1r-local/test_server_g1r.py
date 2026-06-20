@@ -67,6 +67,14 @@ def test_equipped_weapon_folded_into_strongest(tmp_path):
     assert d["strongestMeleeDmg"] == 73
 
 
+def test_ore_count_sums_orenuggets():
+    items = [{"name": "ItMi_Orenugget", "count": 137}, {"name": "ItFo_Apple", "count": 3},
+             {"name": "itmi_orenugget", "count": 13}]   # Gross-/Kleinschreibung egal
+    assert srv.ore_count(items) == 150
+    assert srv.ore_count([]) == 0
+    assert srv.ore_count(None) == 0
+
+
 def test_no_equipped_weapon_uses_bag_only(tmp_path):
     # Ohne READ_CARRY (weapon null) bleibt es beim Beutel-Bestwert.
     import json
