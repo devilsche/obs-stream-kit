@@ -1230,10 +1230,15 @@ class SteamEndpointRegistry:
             if not app_id:
                 return _ok({"source": "clips"})
             row = get_app_details_row(conn, app_id)
-            if row is None:
-                # Laufendes Spiel noch nie gesynct (z.B. nicht in der Library) →
-                # Media on-demand holen + cachen. Upsert IMMER (auch bei Fehler =
-                # leer), setzt cached_at → kein Re-Fetch-Storm beim 45s-Re-Poll.
+            # Media fürs laufende Spiel on-demand holen, wenn sie FEHLT — egal ob
+            # nie gesynct (row None) ODER gesynct-aber-leer (z.B. früherer Fehlschlag,
+            # oder Owned-Games-Poller hat das Spiel noch nicht erreicht). Stale-Guard
+            # (>600s seit cached_at) verhindert Re-Fetch-Storm beim 45s-Re-Poll;
+            # is_coop/is_multiplayer der bestehenden Row erhalten (Upsert clobbert sonst).
+            media_empty = (row is None) or (not row["media_json"])
+            cached_at = row["cached_at"] if row else None
+            if media_empty and (cached_at is None
+                                or (time.time() - cached_at) > 600):
                 mj = None
                 try:
                     m = self.client.get_app_media(app_id)
@@ -1243,10 +1248,13 @@ class SteamEndpointRegistry:
                     mj = None
                 try:
                     from steam.db_pg import upsert_app_details
-                    upsert_app_details(conn, app_id, media_json=mj)
+                    upsert_app_details(
+                        conn, app_id, media_json=mj,
+                        is_coop=bool(row["is_coop"]) if row else False,
+                        is_multiplayer=bool(row["is_multiplayer"]) if row else False)
                     row = get_app_details_row(conn, app_id)
                 except Exception:
-                    row = None
+                    pass
             media = None
             if row and row["media_json"]:
                 try:
