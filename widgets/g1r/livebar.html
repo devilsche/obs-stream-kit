@@ -36,7 +36,8 @@
     <span class="t-sep">·</span>
     <span class="t-metric"><span class="t-metric-v t-metric-v--accent" id="ore">—</span><span class="t-metric-k">Ore</span></span>
     <span class="t-sep">·</span>
-    <span class="t-metric-v t-metric-v--accent" id="clock"></span>
+    <span class="t-metric"><span class="t-metric-v t-metric-v--accent" id="hand">—</span><span class="t-metric-k">In hand</span></span>
+    <span class="t-metric-v t-metric-v--accent t-bar__clock" id="clock"></span>
   </div>
 
   <script>
@@ -54,6 +55,7 @@
     var hpRegenEl = document.getElementById('hpRegen');
     var manaRegenEl = document.getElementById('manaRegen');
     var oreEl = document.getElementById('ore');
+    var handEl = document.getElementById('hand');
     var clockEl = document.getElementById('clock');
 
     function num(v) { return (v === undefined || v === null) ? '–' : Math.round(v).toLocaleString('en-US'); }
@@ -61,7 +63,7 @@
 
     function setOffline() {
       bar.classList.add('is-offline');
-      [levelEl, stepsEl, dmgOutEl, dmgTakenEl, manaUsedEl, hpRegenEl, manaRegenEl, oreEl].forEach(function (el) { el.textContent = '—'; });
+      [levelEl, stepsEl, dmgOutEl, dmgTakenEl, manaUsedEl, hpRegenEl, manaRegenEl, oreEl, handEl].forEach(function (el) { el.textContent = '—'; });
       clockEl.textContent = '';
     }
 
@@ -79,6 +81,7 @@
       hpRegenEl.textContent = signed(src.healthRegen);
       manaRegenEl.textContent = signed(src.manaRegen);
       oreEl.textContent = num(d.ore);
+      handEl.textContent = d.weaponDisplay || d.weapon || '—';
       if (d.clock && typeof d.clock.hour === 'number') {
         clockEl.innerHTML = '<span class="ico">schedule</span>' +
           ('0' + d.clock.hour).slice(-2) + ':' + ('0' + (d.clock.minute || 0)).slice(-2);
