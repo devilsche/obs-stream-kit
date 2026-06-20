@@ -63,6 +63,11 @@ Zauber bleibt offen (kein crashfreier Ersatz gefunden).
   also EIN Call statt der zwei crashenden DataModule/MagicScriptLibrary-Wege. Klassennamen-Präfix
   klassifizieren (`ItMw_`/`ItRw_` = Waffe, Rune/Scroll = Zauber). CarryComponent sitzt am Char
   (Component; via GetComponentByClass o.ä.). Ersetzt `GetEquipedWeaponDefinition` + `GetSpellConfigGivenACharacter`.
+  - **WICHTIG — Beutel ≠ Hand (2026-06-20 verifiziert):** `GothicCharacter:GetInventory()` (der
+    Item-Reader) liefert NUR den **Beutel-Inhalt**, NICHT die gerade geführte Waffe. CarryComponent
+    ist also der **einzige** Weg an die ausgerüstete Waffe. Konkretes Symptom ohne READ_CARRY:
+    die Career-Card zeigte „Schnitter 15" (Ersatz-Sense aus dem Beutel) statt der geführten 73er,
+    weil die stärkste Waffe nur aus `items[]` (= Beutel) berechnet wird und die In-Hand-Waffe dort fehlt.
 - **Kills (mit Täter-Zuordnung)** → Hook `AIAgentCharacter:HandleDefeated(DefeatingCharacterActor)`.
   Feuert, wenn ein Gegner besiegt wird; `DefeatingCharacterActor` = wer ihn besiegt hat → auf
   Spieler filtern = echter Kill. Der besiegte `AIAgentCharacter` liefert auch den Kill-Feed-Typ.
@@ -81,6 +86,15 @@ Zauber bleibt offen (kein crashfreier Ersatz gefunden).
 - **Ziel/Gegner:** `GetMagnetTarget()` → anvisierter Gegner (Object), `GetMagnetTargetHurtComponent()` → dessen
   HP-Component, `GetLastAttackerCharacter()` → letzter Angreifer. Material für „aktuelles Ziel + HP"-Widget.
 - Region/Ort: `TerritorySubsystem` (ungenutzt). Item-Gold-Wert: `InventoryBase:GetItemValueByPos(i)`.
+
+### Stärkste Waffe — Beutel + geführte Waffe zusammenführen (so kommt man dran)
+- Quelle „stärkste Waffe" heute: `server.py` `strongest_melee/ranged(items)` matcht die `items[]`-
+  Klassennamen (Beutel) gegen `weapon_damage.json` (Wiki-Schaden), Bestwert je Präfix `ItMw_`/`ItRw_`.
+- **Lücke:** `items[]` = nur Beutel → die **geführte** Waffe fehlt (siehe oben). Fix (gebaut,
+  commit 7ee6da4): `build_payload` mischt `state.weapon` (aus READ_CARRY) als Kandidaten in die
+  Rechnung, bevor der Bestwert bestimmt wird. **Voraussetzung: READ_CARRY an**, sonst bleibt's beim
+  Beutel-Bestwert. Greift die geführte Waffe nicht im Mapping, fällt sie wieder raus → dann Klassennamen
+  in `weapon_damage.json` ergänzen (Diag: `state.weapon`-Rohwert aus `http://localhost:9210/state`).
 
 ### Stärkste Waffe aus ECHTEN Spielwerten (statt hartkodierter `weapon_damage.json`)
 - Pro Inventar-Slot: `InventoryBase:GetBaseConfigByPos(i)` → Item-Definition (ObjectProperty).
