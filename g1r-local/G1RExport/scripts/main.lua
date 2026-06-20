@@ -91,9 +91,9 @@ local READ_DMG_OUT = false  -- ausgeteilter Schaden via Damage-Hook (Engine-Eing
 --   3) READ_COMBO       — DataModule_Combat:GetAttackCount → laufender Combo-/Schlagzähler (Int).
 --   4) READ_DMG_OUT     — MeleeWeaponVisual:OnDamageDealt(Target, relativeDamage:float). MELEE-only.
 --                         Erster Treffer loggt self-Kette, damit der Spieler-Filter belegbar wird.
-local READ_KILLS_HOOK = false
-local READ_CARRY      = false
-local READ_COMBO      = false
+local READ_KILLS_HOOK = false  -- ungetestet (Hook bei Kill) → einzeln via g1r-flags.txt testen
+local READ_CARRY      = true   -- läuft: geführte Waffe + "in hand" (CarryComponent)
+local READ_COMBO      = true   -- läuft: GetAttackCount (gleiches Modul wie attack)
 
 -- ── Lokale Flag-Overrides (überleben Pull/Kopieren) ─────────────────────────
 -- Problem: beim Aktualisieren der main.lua stehen die Flags wieder auf Default false →

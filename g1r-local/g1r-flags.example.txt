@@ -1,19 +1,20 @@
-# G1R Mod — lokale Flag-Overrides
-# Diese Datei nach  C:\obs-g1r\g1r-flags.txt  kopieren und anpassen.
-# Sie ueberlebt Pull/Kopieren der main.lua -> deine freigeschalteten Reader bleiben an.
-# Nur hier gesetzte Flags ueberschreiben die Default-Werte in main.lua. # = Kommentar.
+# G1R Mod — lokale Flag-Overrides (OPTIONAL)
+#
+# Die Defaults in main.lua sind schon richtig gesetzt:
+#   AN:  READ_ATTACK, READ_CLOCK, READ_CARRY (Waffe/in-hand), READ_COMBO
+#   AUS: READ_SPELL, READ_WEAPONS (crashen hart), READ_KILLS (tote Map),
+#        READ_KILLS_HOOK, READ_DMG_OUT (ungetestet)
+#
+# Du brauchst diese Datei NUR, wenn du etwas anders willst als die Defaults —
+# z.B. einen ungetesteten Reader einzeln scharf schalten, ohne main.lua anzufassen.
+# Dann nach  C:\obs-g1r\g1r-flags.txt  kopieren. Pull/Kopieren der main.lua aendert
+# diese Datei NICHT. Format: KEY=true/false je Zeile, # = Kommentar.
 
-# --- Laeuft stabil ---
-READ_CARRY=true
-READ_COMBO=true
+# Beispiel: den Kill-Hook zum Testen einzeln aktivieren
+# READ_KILLS_HOOK=true
 
-# --- Erst EINZELN in-game testen (Crash-Verdacht), sonst aus lassen ---
-READ_KILLS_HOOK=false
-READ_DMG_OUT=false
+# Beispiel: ausgeteilten Schaden (melee) testen
+# READ_DMG_OUT=true
 
-# --- MUSS aus bleiben: crasht HART am aktuellen Build ---
-READ_SPELL=false
-READ_WEAPONS=false
-
-# --- Tote Datenquelle (PuzzlesSubsystem leer) -> nutze READ_KILLS_HOOK statt dessen ---
-READ_KILLS=false
+# NIE auf true setzen (crasht hart am aktuellen Build):
+# READ_SPELL / READ_WEAPONS
