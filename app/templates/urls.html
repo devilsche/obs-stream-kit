@@ -408,7 +408,7 @@
     // ── Font-Preview direkt nach dem font-Switch (Pet-Script-Fonts) ──────────────
     // NICHT bei Stinger-Karten (chrome_preview) — die haben ihre eigene url-chrome-
     // Vorschau mit den Display-Fonts; die Pet-Font-Vorschau lädt die falschen Fonts.
-    if (switchesRoot && !hasChromePreview) {
+    if (switchesRoot && !meta.chromePreview) {
       const fontGroup = switchesRoot.querySelector('[data-param="font"]');
       if (fontGroup) {
         const fp = document.createElement("div");
