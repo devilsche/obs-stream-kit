@@ -66,6 +66,20 @@ Schaden fehlen noch (Crash/keine Daten).
 - UE4SS-Hooks: `RegisterHook("/Script/G1R.<Klasse>:<Func>", function(ctx, ...) ... end)`. Engine-
   Werte im Hook ggf. unwrap (RemoteUnrealParam → `:get()`). Alle drei noch in-game zu verifizieren.
 
+### Stärkste Waffe aus ECHTEN Spielwerten (statt hartkodierter `weapon_damage.json`)
+- Pro Inventar-Slot: `InventoryBase:GetBaseConfigByPos(i)` → Item-Definition (ObjectProperty).
+- Schaden: `WeaponDefinition:GetAllDamages()` (parameterlos) → **Map<DamageType→Float>** ODER Feld
+  `WeaponDefinition:m_DamageBase` (ebenfalls Map<Typ→Float>) → Werte **summieren** = Gesamtschaden.
+  (`GetDamage(DamageType)` braucht einen Struct-Typ-Param → UE4SS-fummelig, meiden.)
+- Gold-Wert direkt pro Slot: `GetItemValueByPos(i)` → Int.
+- Melee/Ranged sauber über die **Definition-Klasse** `WeaponMeleeDefinition` / `WeaponRangedDefinition`
+  (statt Präfix-Raten `ItMw_`/`ItRw_`). Weitere: `GetCriticalMultiplier`, `GetSuperArmorDamage`.
+- → Der Mod könnte damage+value je Item direkt mitschicken → `weapon_damage.json` (Wiki-Tabelle)
+  entfällt, „stärkste Melee/Ranged" aus echten In-Game-Werten.
+- **Zauber:** KEIN einfaches Schadensfeld pro Rune (Zauber = GameplayAbility). „Stärkster nutzbarer
+  Zauber" bleibt magic-circle-basiert (`spell_circle.json`); `GameplayAbilityMagicBase:GetCurrentSpellLevel`
+  gilt nur fürs aktive Ability, nicht pro Inventar-Rune. Realistische Quelle hier = der Kreis-Filter.
+
 ## Kernklassen
 
 ### GameInstance
