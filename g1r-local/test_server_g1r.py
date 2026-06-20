@@ -43,3 +43,40 @@ def test_strongest_usable_spell_rune_matches_scroll_entry():
     srv.SPELL_CIRCLE = {"ItAr_Scroll_Fireball": 2}
     items = [{"name": "ItAr_Rune_Fireball"}]
     assert srv.strongest_usable_spell(items, 3) == "ItAr_Rune_Fireball"
+
+
+def test_equipped_weapon_folded_into_strongest(tmp_path):
+    # Die ausgeruestete Waffe (READ_CARRY → state.weapon) steckt NICHT im Beutel,
+    # muss aber beim "staerksten" gewinnen — sonst zeigt die Card nur die Ersatz-Sense.
+    import json, time
+    srv.WEAPON_DAMAGE = {"ItMw_1H_Sword_Scythe_01": 15, "ItMw_2H_Sword_Light_03": 73}
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({
+        "ok": True,
+        "items": [{"name": "ItMw_1H_Sword_Scythe_01", "count": 1}],   # nur die Sense im Beutel
+        "weapon": "ItMw_2H_Sword_Light_03",                            # 73er in der Hand
+    }), encoding="utf-8")
+    old = srv.STATE_FILE
+    srv.STATE_FILE = str(p)
+    try:
+        d = srv.build_payload("de")
+    finally:
+        srv.STATE_FILE = old
+    assert d["ok"] is True
+    assert d["strongestMelee"] == "ItMw_2H_Sword_Light_03"
+    assert d["strongestMeleeDmg"] == 73
+
+
+def test_no_equipped_weapon_uses_bag_only(tmp_path):
+    # Ohne READ_CARRY (weapon null) bleibt es beim Beutel-Bestwert.
+    import json
+    srv.WEAPON_DAMAGE = {"ItMw_1H_Sword_Scythe_01": 15}
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"ok": True, "items": [{"name": "ItMw_1H_Sword_Scythe_01"}]}), encoding="utf-8")
+    old = srv.STATE_FILE
+    srv.STATE_FILE = str(p)
+    try:
+        d = srv.build_payload("de")
+    finally:
+        srv.STATE_FILE = old
+    assert d["strongestMelee"] == "ItMw_1H_Sword_Scythe_01" and d["strongestMeleeDmg"] == 15

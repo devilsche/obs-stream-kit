@@ -202,12 +202,17 @@ def build_payload(lang):
             it["display"] = _translate(it.get("name"), lang)
     # Staerkste Waffe getrennt nach Kategorie — Nahkampf/Fernkampf sind nicht
     # vergleichbar (Armbrust 60 vs. Klinge 73), also je eigener Bestwert + Schaden.
-    melee, melee_dmg = strongest_melee(data.get("items"))
+    # Die AUSGERUESTETE Waffe (READ_CARRY → data.weapon) steckt NICHT im Beutel-Inventar
+    # (sie ist in der Hand), wuerde sonst beim Staerksten fehlen → als Kandidat zumischen.
+    weapon_items = list(data.get("items") or [])
+    if data.get("weapon"):
+        weapon_items.append({"name": data["weapon"]})
+    melee, melee_dmg = strongest_melee(weapon_items)
     if melee:
         data["strongestMelee"] = melee
         data["strongestMeleeDisplay"] = _translate(melee, lang)
         data["strongestMeleeDmg"] = melee_dmg
-    ranged, ranged_dmg = strongest_ranged(data.get("items"))
+    ranged, ranged_dmg = strongest_ranged(weapon_items)
     if ranged:
         data["strongestRanged"] = ranged
         data["strongestRangedDisplay"] = _translate(ranged, lang)
