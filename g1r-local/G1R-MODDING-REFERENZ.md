@@ -66,6 +66,15 @@ Schaden fehlen noch (Crash/keine Daten).
 - UE4SS-Hooks: `RegisterHook("/Script/G1R.<Klasse>:<Func>", function(ctx, ...) ... end)`. Engine-
   Werte im Hook ggf. unwrap (RemoteUnrealParam → `:get()`). Alle drei noch in-game zu verifizieren.
 
+### Combat-Extras (auf `DataModule_Combat` — selbe Klasse wie das laufende `GetCurrentAttackDirection`, also crashfrei)
+- **Combo:** `GetAttackCount()` → Int (einfachster Combo-/Hit-Zähler → „längste Combo dieser Session/Run").
+  `GetCurrentCombo()` → Object (Combo-Objekt, für Details). `GetCurrentAttackHandle`/`GetCurrentAttack`.
+- **Block/Parade:** `GetBlockState()` → Struct, `GetCurrentParryDirection()` → Struct, `GetDefeatingAttackDirection()`.
+  (Struct-Felder in-game auslesen; Int-Combo ist der leichteste Einstieg.)
+- **Ziel/Gegner:** `GetMagnetTarget()` → anvisierter Gegner (Object), `GetMagnetTargetHurtComponent()` → dessen
+  HP-Component, `GetLastAttackerCharacter()` → letzter Angreifer. Material für „aktuelles Ziel + HP"-Widget.
+- Region/Ort: `TerritorySubsystem` (ungenutzt). Item-Gold-Wert: `InventoryBase:GetItemValueByPos(i)`.
+
 ### Stärkste Waffe aus ECHTEN Spielwerten (statt hartkodierter `weapon_damage.json`)
 - Pro Inventar-Slot: `InventoryBase:GetBaseConfigByPos(i)` → Item-Definition (ObjectProperty).
 - Schaden: `WeaponDefinition:GetAllDamages()` (parameterlos) → **Map<DamageType→Float>** ODER Feld
