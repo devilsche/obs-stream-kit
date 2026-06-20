@@ -94,6 +94,39 @@ local READ_DMG_OUT = false  -- ausgeteilter Schaden via Damage-Hook (Engine-Eing
 local READ_KILLS_HOOK = false
 local READ_CARRY      = false
 local READ_COMBO      = false
+
+-- ── Lokale Flag-Overrides (überleben Pull/Kopieren) ─────────────────────────
+-- Problem: beim Aktualisieren der main.lua stehen die Flags wieder auf Default false →
+-- in-game freigeschaltete Reader gehen verloren. Lösung: optionale Datei
+--   C:\obs-g1r\g1r-flags.txt   mit Zeilen wie  READ_CARRY=true  (# = Kommentar).
+-- Die Datei wird NICHT von Git/Kopieren angefasst → deine Einstellungen bleiben.
+-- Nur dort gesetzte Flags überschreiben den Default; alles andere bleibt wie oben.
+do
+    local f = io.open([[C:\obs-g1r\g1r-flags.txt]], "r")
+    if f then
+        local s = f:read("*a"); f:close()
+        local function ov(cur, name)
+            -- Zeilenanfang verankern, damit READ_KILLS nicht in READ_KILLS_HOOK matcht.
+            local v = s:match("\n%s*" .. name .. "%s*=%s*(%a+)")
+                   or s:match("^%s*" .. name .. "%s*=%s*(%a+)")
+            if v then return v:lower() == "true" end
+            return cur
+        end
+        READ_SPELL      = ov(READ_SPELL,      "READ_SPELL")
+        READ_WEAPONS    = ov(READ_WEAPONS,    "READ_WEAPONS")
+        READ_ATTACK     = ov(READ_ATTACK,     "READ_ATTACK")
+        READ_CLOCK      = ov(READ_CLOCK,      "READ_CLOCK")
+        READ_KILLS      = ov(READ_KILLS,      "READ_KILLS")
+        READ_DMG_OUT    = ov(READ_DMG_OUT,    "READ_DMG_OUT")
+        READ_KILLS_HOOK = ov(READ_KILLS_HOOK, "READ_KILLS_HOOK")
+        READ_CARRY      = ov(READ_CARRY,      "READ_CARRY")
+        READ_COMBO      = ov(READ_COMBO,      "READ_COMBO")
+        print(string.format(
+            "[G1RExport] Flag-Overrides aus g1r-flags.txt: CARRY=%s COMBO=%s KILLS_HOOK=%s DMG_OUT=%s\n",
+            tostring(READ_CARRY), tostring(READ_COMBO), tostring(READ_KILLS_HOOK), tostring(READ_DMG_OUT)))
+    end
+end
+
 local killBase    = nil   -- Map-Snapshot beim ersten Read (für Session-Summe)
 local lastKillMap = nil   -- letzte Map (für News-Delta)
 local killNews    = {}    -- jüngste Events {type=, n=}, max MAX_NEWS

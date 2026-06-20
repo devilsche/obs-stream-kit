@@ -1,0 +1,19 @@
+# G1R Mod — lokale Flag-Overrides
+# Diese Datei nach  C:\obs-g1r\g1r-flags.txt  kopieren und anpassen.
+# Sie ueberlebt Pull/Kopieren der main.lua -> deine freigeschalteten Reader bleiben an.
+# Nur hier gesetzte Flags ueberschreiben die Default-Werte in main.lua. # = Kommentar.
+
+# --- Laeuft stabil ---
+READ_CARRY=true
+READ_COMBO=true
+
+# --- Erst EINZELN in-game testen (Crash-Verdacht), sonst aus lassen ---
+READ_KILLS_HOOK=false
+READ_DMG_OUT=false
+
+# --- MUSS aus bleiben: crasht HART am aktuellen Build ---
+READ_SPELL=false
+READ_WEAPONS=false
+
+# --- Tote Datenquelle (PuzzlesSubsystem leer) -> nutze READ_KILLS_HOOK statt dessen ---
+READ_KILLS=false
