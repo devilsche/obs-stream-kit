@@ -917,10 +917,15 @@ local function tick()
     -- (Laden/Level-up/Respawn) über MAX_STAT_JUMP ignorieren.
     if stats then
         local hp, mana, xp = stats.hp, stats.mana, stats.xp
-        if warmup > 0 then
-            -- Warmup nach Welt-Load/Schließen: Baseline mitführen, Deltas NICHT zählen
-            -- (das Auffüllen/Abfallen von HP/Mana ist kein echter Regen/Schaden).
-            warmup = warmup - 1
+        -- Teardown-Schutz: beim Spiel-Schließen/Hauptmenü baut die Engine die Attribute
+        -- ab (hpMax fällt auf 0/ungültig) BEVOR worldOk umschlägt → der HP/Mana-Abfall
+        -- darf NICHT als Schaden/Mana-Verbrauch zählen. Unplausible Stats → wie Warmup.
+        local sane = type(stats.hpMax) == "number" and stats.hpMax > 0
+        if warmup > 0 or not sane then
+            -- Warmup nach Welt-Load/Schließen ODER Teardown: Baseline mitführen, Deltas
+            -- NICHT zählen (Auffüllen/Abfallen von HP/Mana ist kein echter Regen/Schaden).
+            if warmup > 0 then warmup = warmup - 1 end
+            if not sane then warmup = WARMUP_TICKS end  -- bei Re-Entry erst sauber rebaselinen
         else
             if hp ~= nil and lastHp ~= nil then
                 local d = hp - lastHp
