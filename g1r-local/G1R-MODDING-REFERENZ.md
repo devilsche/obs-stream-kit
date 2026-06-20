@@ -48,8 +48,23 @@ UObject-Klassen/-Funktionen aus dem **UE4SS Object-Dump** — NICHT raten.
 
 **Heißt:** Stats, Inventar, Gilde, Uhr, Distanz/Steps, Session/Totals/Records (außer
 ausgeteiltem Schaden), saveKey kommen. Aktiver Zauber + Live-Waffe + Kills + ausgeteilter
-Schaden fehlen noch (Crash/keine Daten) — Kandidaten zum Nachschlagen im Dump:
-alternative Kill-Zähler, ein nicht-crashender Waffen-Getter, Spell-API ohne Character-Param.
+Schaden fehlen noch (Crash/keine Daten).
+
+### Lösungswege für die offenen Reader (aus dem Dump, verifiziert — noch nicht im Mod)
+- **Live-Waffe UND aktiver Zauber** → `CarryComponent:GetEquippedItemDefinition()` → ItemDefinition
+  (ObjectProperty). Das ist der **ausgerüstete In-Hand-Gegenstand** — Waffe ODER Rune/Scroll —
+  also EIN Call statt der zwei crashenden DataModule/MagicScriptLibrary-Wege. Klassennamen-Präfix
+  klassifizieren (`ItMw_`/`ItRw_` = Waffe, Rune/Scroll = Zauber). CarryComponent sitzt am Char
+  (Component; via GetComponentByClass o.ä.). Ersetzt `GetEquipedWeaponDefinition` + `GetSpellConfigGivenACharacter`.
+- **Kills (mit Täter-Zuordnung)** → Hook `AIAgentCharacter:HandleDefeated(DefeatingCharacterActor)`.
+  Feuert, wenn ein Gegner besiegt wird; `DefeatingCharacterActor` = wer ihn besiegt hat → auf
+  Spieler filtern = echter Kill. Der besiegte `AIAgentCharacter` liefert auch den Kill-Feed-Typ.
+  (Death-Hook statt des leeren `PuzzlesSubsystem`-Maps.) Alternativ Killer-Seite:
+  `GameplayAbility_CharacterAI:BP_HandleKilledCharacter(KilledCharacter, UsedWeapon)`.
+- **Ausgeteilter Schaden** → Hook `MeleeWeaponVisual:OnDamageDealt(Target, relativeDamage:float)`.
+  `relativeDamage` aufsummieren; auf Spieler-Waffe filtern (Owner prüfen, da auch Gegner-Visuals feuern).
+- UE4SS-Hooks: `RegisterHook("/Script/G1R.<Klasse>:<Func>", function(ctx, ...) ... end)`. Engine-
+  Werte im Hook ggf. unwrap (RemoteUnrealParam → `:get()`). Alle drei noch in-game zu verifizieren.
 
 ## Kernklassen
 
