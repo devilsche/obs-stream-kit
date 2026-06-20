@@ -21,6 +21,31 @@ import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+
+# ── .env laden (optional) ──────────────────────────────────────────────────
+# Liest eine .env NEBEN dieser Datei (g1r-local/.env), Format KEY=VALUE pro Zeile
+# (# = Kommentar). Echte Umgebungsvariablen haben Vorrang — eine .env überschreibt
+# nichts, was schon gesetzt ist. Kein externes Paket nötig (kein python-dotenv).
+def _load_dotenv():
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except OSError:
+        return
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, val = line.split("=", 1)
+        key = key.strip()
+        val = val.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = val
+
+
+_load_dotenv()
+
 # ── Konfiguration ──────────────────────────────────────────────────────────
 PORT = 9210
 # MUSS mit OUTPUT_PATH im Lua-Mod (G1RExport/scripts/main.lua) übereinstimmen.

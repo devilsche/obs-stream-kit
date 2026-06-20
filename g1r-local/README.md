@@ -47,9 +47,29 @@ Liegt neben `g1r-state.json`. Der Mod summiert hier über ALLE Sessions: Schaden
 Strecke/Schritte + Rekorde (härtester Treffer, max Mana/Tick, weiteste Strecke). Beim Start
 geladen, alle ~10 s geschrieben. Löschen = Gesamtwerte zurücksetzen.
 
-### Ausgeteilter Schaden (optional)
-`READ_DMG_OUT` in `main.lua` (Default **aus**) aktiviert einen Damage-Hook. Engine-Eingriff →
-erst in-game testen; bei Crash aus lassen (alles andere läuft crashfrei weiter).
+### Optionale Reader/Hooks (alle Default **aus**, in dieser Reihenfolge einzeln freischalten)
+Im Kopf von `main.lua` stehen Flags für aus dem UE4SS-Object-Dump gebaute, aber noch nicht
+in-game verifizierte Reader. Engine-Eingriffe → einer nach dem anderen aktivieren, dabei
+`UE4SS.log` beobachten (jeder loggt beim ersten Feuern eine Diagnose). Bei Crash wieder aus:
+1. `READ_KILLS_HOOK` — Kills via `AIAgentCharacter:HandleDefeated` (Causer == Spieler). Ersetzt
+   die tote `PuzzlesSubsystem`-Map.
+2. `READ_CARRY` — geführte Waffe via `CarryComponent:GetEquippedItemDefinition` (crashfrei,
+   statt des hart crashenden `GetEquipedWeaponDefinition`).
+3. `READ_COMBO` — Combo-/Schlagzähler via `DataModule_Combat:GetAttackCount`.
+4. `READ_DMG_OUT` — ausgeteilter Schaden via `MeleeWeaponVisual:OnDamageDealt` (nur Nahkampf).
+
+### Prod-Forwarding aktivieren (.env) — Live-Daten in die Career-/Run-DB
+Standardmäßig bleibt alles lokal. Optional schickt der Server jeden Mod-Schnappschuss zusätzlich
+an die Prod-DB-API, damit Runs/Records/Career serverseitig wachsen. Dafür eine Datei **`.env`**
+in **diesen Ordner** legen (neben `server.py`) — `server.py` liest sie beim Start automatisch
+(`.env.example` als Vorlage kopieren):
+```
+G1R_INGEST_URL=https://stream-overlay.com/s/<dein-token>/api/g1r/ingest
+G1R_STEAM_NAME=PEX_LuCKoR
+```
+Die **fertige Zeile mit deinem Token** gibt's im Dashboard: URLs-Seite → Tab **„Gothic 1"** →
+Setup-Block → **„.env kopieren"**. Beim Start muss `[g1r-local] Prod-Forwarding aktiv → …`
+im Log stehen. (Echte Umgebungsvariablen haben Vorrang vor der `.env`.)
 
 ## Setup
 

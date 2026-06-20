@@ -49,6 +49,20 @@
       <div class="url-grid" id="urlGrid">
         {% if not pubg_ready %}<div class="url-credhint" data-tab="pubg" hidden><span class="material-symbols-outlined" aria-hidden="true">key_off</span> PUBG-API-Key fehlt — unter <a href="/app/settings">Settings</a> eintragen, damit die PUBG-Widgets Daten zeigen. Die URLs funktionieren, bleiben aber leer/offline.</div>{% endif %}
         {% if not steam_ready %}<div class="url-credhint" data-tab="steam" hidden><span class="material-symbols-outlined" aria-hidden="true">key_off</span> Steam-Key + ID fehlen — unter <a href="/app/settings">Settings</a> eintragen, damit die Steam-Widgets Daten zeigen.</div>{% endif %}
+        {# ── Gothic 1: Setup-Block (.env zum Kopieren für das Prod-Forwarding) ── #}
+        <div class="url-g1r-setup" data-tab="g1r" hidden>
+          <div class="url-g1r-setup__head">
+            <span class="material-symbols-outlined" aria-hidden="true">terminal</span>
+            <b>Gothic-Live-Daten — Setup</b>
+          </div>
+          <p class="url-g1r-setup__txt">Datei <code>.env</code> in den Ordner <code>g1r-local/</code> legen (neben <code>server.py</code>) und das hier einfügen — <code>server.py</code> liest sie beim Start automatisch. Danach <code>server.py</code> neu starten; im Log muss <code>Prod-Forwarding aktiv</code> erscheinen.</p>
+          <pre class="url-g1r-setup__env" id="g1rEnv"><code>G1R_INGEST_URL={{ base_url }}/s/{{ token }}/api/g1r/ingest
+G1R_STEAM_NAME=</code></pre>
+          <div class="url-g1r-setup__foot">
+            <button type="button" class="url-act" id="g1rEnvCopy"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span> .env kopieren</button>
+            <span class="url-copied" id="g1rEnvStatus" role="status" aria-live="polite"></span>
+          </div>
+        </div>
         {% for o in overlays %}
         {{ src_card('overlay','Overlay',o.label,
                     overlay_base~'/s/'~token~'/overlays/'~o.file,'overlays/'~o.file,
@@ -829,7 +843,7 @@
         }
       }
     });
-    document.querySelectorAll(".url-credhint").forEach(h => { h.hidden = h.dataset.tab !== name; });
+    document.querySelectorAll(".url-credhint, .url-g1r-setup").forEach(h => { h.hidden = h.dataset.tab !== name; });
     if (emptyMsg) emptyMsg.hidden = true;
   }
   tabs.forEach(t => t.addEventListener("click", () => selectTab(t.dataset.tab)));
@@ -840,6 +854,24 @@
     const n = e.key === "ArrowRight" ? (i+1)%tabs.length : (i-1+tabs.length)%tabs.length;
     selectTab(tabs[n].dataset.tab); tabs[n].focus();
   });
+
+  // ── G1R: .env-Block kopieren ──────────────────────────────
+  const g1rCopyBtn = document.getElementById("g1rEnvCopy");
+  if (g1rCopyBtn) {
+    g1rCopyBtn.addEventListener("click", async () => {
+      const txt = (document.getElementById("g1rEnv")?.textContent || "").trim();
+      const st = document.getElementById("g1rEnvStatus");
+      const done = () => { if (st) { st.textContent = "Kopiert!"; setTimeout(() => { st.textContent = ""; }, 2000); } };
+      try { await navigator.clipboard.writeText(txt); done(); }
+      catch (_) {
+        const ta = document.createElement("textarea");
+        ta.value = txt; ta.className = "url-copy-helper";
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand("copy"); done(); } catch (e2) {}
+        document.body.removeChild(ta);
+      }
+    });
+  }
 
   // ── Card → Detail ─────────────────────────────────────────
   allCards.forEach(card => {
@@ -888,7 +920,7 @@
     if (q.length < 3) { selectTab(currentTab); return; }
 
     clearHeaders();   // Suche zeigt Treffer domain-übergreifend → keine Sektions-Header
-    document.querySelectorAll(".url-credhint").forEach(h => h.hidden = true);
+    document.querySelectorAll(".url-credhint, .url-g1r-setup").forEach(h => h.hidden = true);
     const hits = allCards.filter(c => {
       const hay = ((c.dataset.label||"")+" "+(c.dataset.cat||"")+" "+(c.dataset.desc||"")+" "+(c.dataset.path||"")).toLowerCase();
       return hay.includes(q);
