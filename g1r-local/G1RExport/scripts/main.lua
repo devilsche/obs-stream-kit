@@ -1605,6 +1605,7 @@ pcall(function()
                     local slots; pcall(function() slots = vd.m_Slots end)
                     local sn = arrLen(slots)
                     add("     m_Slots count = " .. tostring(sn))
+                    local spellProbed = false
                     for i = 0, sn - 1 do
                         local item = arrGet(slots, i)
                         if item then
@@ -1618,6 +1619,23 @@ pcall(function()
                                     add(string.format("     [%d] %s x%d cdo=%s dmg=%s", i,
                                         tostring(shortName(full)), cnt,
                                         tostring(isValid(cdo)), tostring(damageOfDefinition(cdo))))
+                                    -- SPELL-PROBE: bei der ERSTEN Rune (ItAr_) die Kandidaten-
+                                    -- Wege zum Zauber-Schaden testen (Feld existiert? Objekt? Wert?).
+                                    local nml = (shortName(full) or ""):lower()
+                                    if nml:find("itar") and not spellProbed and isValid(cdo) then
+                                        spellProbed = true
+                                        local pb = {}
+                                        local function tst(lbl, fn) local v; pcall(function() v=fn() end)
+                                            pb[#pb+1] = lbl.."="..(isValid(v) and "OBJ" or tostring(v)) end
+                                        tst("DmgMagicCircleProg", function() return cdo.m_DamageMagicCircleProgression end)
+                                        tst("SpellConfig", function() return cdo.m_SpellConfig end)
+                                        tst("Spell", function() return cdo.m_Spell end)
+                                        tst("SpellDefinition", function() return cdo.m_SpellDefinition end)
+                                        tst("GetSpellConfig", function() return cdo:GetSpellConfig() end)
+                                        local dc; pcall(function() dc = cdo:GetDamageByCharacterMagicCircle(char) end)
+                                        pb[#pb+1] = "GetDmgByCircle(char)="..tostring(dc)
+                                        add("     SPELL-PROBE ["..tostring(shortName(full)).."]: "..table.concat(pb," | "))
+                                    end
                                 end
                             end)
                         end
