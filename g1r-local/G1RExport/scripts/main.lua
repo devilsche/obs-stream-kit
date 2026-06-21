@@ -1687,6 +1687,21 @@ pcall(function()
                                         tst("GetSpellConfig", function() return cdo:GetSpellConfig() end)
                                         local dc; pcall(function() dc = cdo:GetDamageByCharacterMagicCircle(char) end)
                                         pb[#pb+1] = "GetDmgByCircle(char)="..tostring(dc)
+                                        -- Eine Stufe tiefer: m_SpellConfig ist eine KLASSE → ihr CDO → Schaden-Felder.
+                                        local scCls; pcall(function() scCls = cdo.m_SpellConfig end)
+                                        local scCdo = classCDO(scCls)
+                                        pb[#pb+1] = "SpellConfigCDO="..tostring(isValid(scCdo))
+                                        if isValid(scCdo) then
+                                            local function t2(lbl, fn) local v; pcall(function() v=fn() end)
+                                                pb[#pb+1]=lbl.."="..(isValid(v) and "OBJ" or tostring(v)) end
+                                            t2("sc.m_SpellLevels", function() return scCdo.m_SpellLevels end)
+                                            t2("sc.m_DmgMagicCircleProg", function() return scCdo.m_DamageMagicCircleProgression end)
+                                            t2("sc.m_Projectile", function() return scCdo.m_Projectile end)
+                                            t2("sc.m_SpellProjectile", function() return scCdo.m_SpellProjectile end)
+                                            t2("sc.m_ProjectileDefinition", function() return scCdo.m_ProjectileDefinition end)
+                                            local d2; pcall(function() d2 = scCdo:GetDamageByCharacterMagicCircle(char) end)
+                                            pb[#pb+1] = "sc.GetDmgByCircle="..tostring(d2)
+                                        end
                                         add("     SPELL-PROBE ["..tostring(shortName(full)).."]: "..table.concat(pb," | "))
                                     end
                                 end
