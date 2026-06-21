@@ -97,7 +97,10 @@ def _strongest_by_prefix(items, prefix):
         nm = it.get("name") or ""
         if not nm.lower().startswith(pre):
             continue
-        dmg = WEAPON_DAMAGE.get(nm)
+        # Echter Mod-Schaden (it.dmg, live aus dem Spiel) bevorzugt, sonst Wiki-Tabelle.
+        dmg = it.get("dmg")
+        if dmg is None:
+            dmg = WEAPON_DAMAGE.get(nm)
         if dmg is not None and dmg > best_dmg:
             best, best_dmg = nm, dmg
     return (best, best_dmg if best is not None else None)
@@ -221,11 +224,11 @@ def build_payload(lang):
         low = nm.lower()
         if low.startswith("itmw"):
             it["wType"] = "melee"
-            if WEAPON_DAMAGE.get(nm) is not None:
-                it["dmg"] = WEAPON_DAMAGE[nm]
+            if it.get("dmg") is None and WEAPON_DAMAGE.get(nm) is not None:
+                it["dmg"] = WEAPON_DAMAGE[nm]   # Fallback: Mod lieferte keinen Live-Schaden
         elif low.startswith("itrw"):
             it["wType"] = "ranged"
-            if WEAPON_DAMAGE.get(nm) is not None:
+            if it.get("dmg") is None and WEAPON_DAMAGE.get(nm) is not None:
                 it["dmg"] = WEAPON_DAMAGE[nm]
         elif low.startswith("itar"):
             it["wType"] = "spell"

@@ -114,7 +114,7 @@ local READ_KILLS_HOOK = false  -- ungetestet (Hook bei Kill) → einzeln via g1r
 local READ_CARRY      = true   -- läuft: geführte Waffe + "in hand" (CarryComponent)
 local READ_COMBO      = true   -- läuft: GetAttackCount (gleiches Modul wie attack)
 local READ_STATE      = true   -- Reiten/Wasser/Verwandelt (Mount/AnimInstance). Lief auf dem Game-Thread (seit ExecuteInGameThread) crashfrei — steuert u.a. die Reitstrecke
-local READ_ITEMDMG    = false  -- AUS: Live-Schaden ueber das CDO greift am Build NICHT (GetClassDefaultObject/GetAllDamages = nil). Schaden+Typ macht stattdessen server.py aus den Klassennamen (weapon_damage.json) — die Container-Items tragen den Klassennamen.
+local READ_ITEMDMG    = true   -- ECHTER Waffenschaden live: classCDO (StaticFindObject Default__) + m_DamageBase/GetAllDamages. In-game verifiziert (Axt 50, Armbrust 60). Patch-fest, ersetzt weapon_damage.json.
 
 -- ── Lokale Flag-Overrides (überleben Pull/Kopieren) ─────────────────────────
 -- Problem: beim Aktualisieren der main.lua stehen die Flags wieder auf Default false →
@@ -521,6 +521,9 @@ local function damageOfDefinition(cdo)
     end)
     return any and sum or nil
 end
+-- Waffenschaden je Klassenname cachen — statisch, also nur EINMAL per Waffe das CDO
+-- holen + Map summieren (sonst jeder Scan StaticFindObject+ForEach = unnoetige Last).
+local clsDmgCache = {}
 -- Ergaenzt ein Item (in-place) um wType/dmg aus seiner KLASSE (Container-Weg).
 local function annotateItemFromClass(cls, it)
     if not isValid(cls) then return end
@@ -528,18 +531,22 @@ local function annotateItemFromClass(cls, it)
     pcall(function() cfgName = shortName(cls:GetFullName()) end)
     local cat = weaponCategoryOf(cfgName)
     if cat then it.wType = cat end
-    -- Schaden vom CDO (GetAllDamages-Map summiert) — nur fuer Waffen.
-    if cat then
-        local cdo = classCDO(cls)
-        local dmg = damageOfDefinition(cdo)
-        if dmg then it.dmg = math.floor(dmg + 0.5) end
-        if not itemDmgDiag then
-            itemDmgDiag = true
-            pcall(function()
-                print(string.format("[G1RExport] ItemDmg-Diag: cfg=%q wType=%s cdo=%s dmg=%s\n",
-                    tostring(cfgName), tostring(cat), tostring(isValid(cdo)), tostring(it.dmg)))
-            end)
+    if cat and cfgName then
+        local dmg = clsDmgCache[cfgName]
+        if dmg == nil then
+            local cdo = classCDO(cls)
+            local d = damageOfDefinition(cdo)
+            dmg = d or false   -- false = schon versucht, kein Schaden (nicht jeden Scan neu)
+            clsDmgCache[cfgName] = dmg
+            if not itemDmgDiag then
+                itemDmgDiag = true
+                pcall(function()
+                    print(string.format("[G1RExport] ItemDmg-Diag: cfg=%q wType=%s cdo=%s dmg=%s\n",
+                        tostring(cfgName), tostring(cat), tostring(isValid(cdo)), tostring(d)))
+                end)
+            end
         end
+        if dmg then it.dmg = math.floor(dmg + 0.5) end
     end
 end
 
