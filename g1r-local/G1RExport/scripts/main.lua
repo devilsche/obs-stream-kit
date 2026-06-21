@@ -1662,6 +1662,25 @@ pcall(function()
                 add("Weg3 Carry equipped = " .. tostring(shortName(cfull))
                     .. " cdo=" .. tostring(isValid(ccdo))
                     .. " dmg=" .. tostring(damageOfDefinition(ccdo)))
+                -- Weg 4: AIInventoryLibrary:GetItemInSlot(char, slot) — ausgeruestete Slot-Items
+                -- (MeleeSlot/RangedSlot etc.). Findet die ausgeruestete Waffe, egal ob gezogen.
+                local ailib = nil
+                pcall(function() ailib = StaticFindObject("/Script/G1R.Default__AIInventoryLibrary") end)
+                add("Weg4 AIInventoryLibrary valid = " .. tostring(isValid(ailib)))
+                if isValid(ailib) then
+                    for slot = 0, 14 do
+                        local cls2 = nil
+                        pcall(function() cls2 = ailib:GetItemInSlot(char, slot) end)
+                        if isValid(cls2) then
+                            local fn2; pcall(function() fn2 = cls2:GetFullName() end)
+                            local nm2 = shortName(fn2)
+                            if nm2 and nm2 ~= "" and nm2 ~= "Item" then
+                                add(string.format("     slot[%d] = %s dmg=%s", slot,
+                                    tostring(nm2), tostring(damageOfDefinition(classCDO(cls2)))))
+                            end
+                        end
+                    end
+                end
                 local f = io.open([[C:\obs-g1r\g1r-debug.txt]], "w")
                 if f then f:write(table.concat(L, "\n") .. "\n"); f:close() end
             end)
