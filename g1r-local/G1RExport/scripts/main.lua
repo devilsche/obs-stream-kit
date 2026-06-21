@@ -174,16 +174,20 @@ end)
 -- Object-Dump KEINEN Schadenswert (nur WeaponUsed/Impact/Deflect/Parry).
 
 local function getPlayer()
+    -- IMMER den echten Spieler-Charakter bevorzugen. Beim Reiten steuert der Controller
+    -- das REITTIER (PlayerController.Pawn = Reittier, und der ClientRestart-Hook cacht es)
+    -- → dann fehlten alle Spieler-Stats/Gilde (Widgets inaktiv) UND die Reit-Erkennung
+    -- (GetMountComponent am Reittier statt am Spieler) schlug fehl. GothicPlayerCharacter
+    -- ist auch beim Reiten der Spieler (er sitzt nur auf dem Reittier).
+    local ok, p = pcall(function() return FindFirstOf("GothicPlayerCharacter") end)
+    if ok and isValid(p) then CachedPlayer = p; return p end
+    -- Fallbacks: Cache, dann Controller-Pawn.
     if isValid(CachedPlayer) then return CachedPlayer end
-    -- Fallback 1: PlayerController.Pawn
-    local ok, pc = pcall(function() return FindFirstOf("PlayerController") end)
-    if ok and isValid(pc) then
-        local ok2, pawn = pcall(function() return pc.Pawn end)
-        if ok2 and isValid(pawn) then CachedPlayer = pawn; return pawn end
+    local ok2, pc = pcall(function() return FindFirstOf("PlayerController") end)
+    if ok2 and isValid(pc) then
+        local ok3, pawn = pcall(function() return pc.Pawn end)
+        if ok3 and isValid(pawn) then return pawn end
     end
-    -- Fallback 2: GothicPlayerCharacter direkt (belegt aus mods-g1r)
-    local ok3, p = pcall(function() return FindFirstOf("GothicPlayerCharacter") end)
-    if ok3 and isValid(p) then CachedPlayer = p; return p end
     return nil
 end
 
@@ -761,6 +765,7 @@ end
 -- Reiten über GothicCharacter:GetMountComponent → GetMountCharacter (gültig = reitet).
 -- Alles defensiv (pcall); fehlt etwas, bleibt das jeweilige Flag false.
 local stateDiag = false
+local lastRidingLog = nil   -- letzter geloggter riding-Zustand (loggt bei Aenderung)
 local function getAnimInstance(char)
     local mesh = nil
     pcall(function() mesh = char.Mesh end)            -- Engine.Character:Mesh
@@ -793,6 +798,16 @@ local function readState(char)
         pcall(function()
             print(string.format("[G1RExport] State-Diag: anim=%s inWater=%s transformed=%s riding=%s\n",
                 tostring(anim ~= nil), tostring(st.inWater), tostring(st.transformed), tostring(st.riding)))
+        end)
+    end
+    -- Bei jedem riding-Wechsel loggen (zeigt, ob Auf-/Absteigen erkannt wird + welcher char).
+    if st.riding ~= lastRidingLog then
+        lastRidingLog = st.riding
+        pcall(function()
+            local cn = "(nil)"
+            pcall(function() cn = char:GetFullName() end)
+            print(string.format("[G1RExport] State-Change: riding=%s char=%q\n",
+                tostring(st.riding), tostring(cn)))
         end)
     end
     return st
