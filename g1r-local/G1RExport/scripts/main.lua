@@ -1598,9 +1598,7 @@ pcall(function()
                     local slots; pcall(function() slots = vd.m_Slots end)
                     local sn = arrLen(slots)
                     add("     m_Slots count = " .. tostring(sn))
-                    local shown = 0
                     for i = 0, sn - 1 do
-                        if shown >= 15 then break end
                         local item = arrGet(slots, i)
                         if item then
                             pcall(function()
@@ -1613,7 +1611,6 @@ pcall(function()
                                     add(string.format("     [%d] %s x%d cdo=%s dmg=%s", i,
                                         tostring(shortName(full)), cnt,
                                         tostring(isValid(cdo)), tostring(damageOfDefinition(cdo))))
-                                    shown = shown + 1
                                 end
                             end)
                         end
