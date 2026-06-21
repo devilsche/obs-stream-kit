@@ -1529,4 +1529,69 @@ pcall(function()
     end)
 end)
 
-print("[G1RExport] geladen — schreibt nach " .. OUTPUT_PATH .. " · Dump-Hotkey: Strg+Shift+J\n")
+-- ── Inventar-Debug-Snapshot: Strg+Shift+I → C:\obs-g1r\g1r-debug.txt ────────
+-- Schreibt einen Live-Schnappschuss ALLER Inventar-Zugriffswege + Schaden pro Slot.
+-- Gedacht zum Draufdruecken WENN man bei seiner Waffe/seinem Inventar steht. Loest das
+-- Problem, dass das UE4SS.log nur einmalige Diags zeigt — hier gibt's einen frischen Dump
+-- auf Knopfdruck (ueber die Diag-Box hochladbar). Laeuft auf dem Game-Thread.
+pcall(function()
+    RegisterKeyBind(Key.I, { ModifierKey.CONTROL, ModifierKey.SHIFT }, function()
+        ExecuteInGameThread(function()
+            pcall(function()
+                local L = {}
+                local function add(s) L[#L+1] = s end
+                local char = getPlayer()
+                local cn = "(nil)"; if char then pcall(function() cn = char:GetFullName() end) end
+                add("char = " .. tostring(cn))
+                -- Weg 1: GetInventory (UI-Weg, braucht offenes Inventar)
+                local inv; pcall(function() inv = char:GetInventory() end)
+                add("Weg1 GetInventory valid = " .. tostring(isValid(inv)))
+                if isValid(inv) then
+                    local base = inv
+                    pcall(function() local b = inv:GetInventoryBase(); if isValid(b) then base = b end end)
+                    local n; pcall(function() n = base:ItemsNum() end)
+                    add("     InventoryBase ItemsNum = " .. tostring(n))
+                end
+                -- Weg 2: Container-DataModule (m_Slots tragen m_ItemDefinition direkt)
+                local lib = getLib()
+                local container; if lib then pcall(function() container = lib:GetContainerDataModule(char) end) end
+                add("Weg2 ContainerDataModule valid = " .. tostring(isValid(container)))
+                local vd = container and getMainVirtualData(container) or nil
+                add("     VirtualData valid = " .. tostring(vd ~= nil))
+                if vd then
+                    local slots; pcall(function() slots = vd.m_Slots end)
+                    local sn = arrLen(slots)
+                    add("     m_Slots count = " .. tostring(sn))
+                    local shown = 0
+                    for i = 0, sn - 1 do
+                        if shown >= 15 then break end
+                        local item = arrGet(slots, i)
+                        if item then
+                            pcall(function()
+                                local sd = item.m_SlotData
+                                local cnt = 0; pcall(function() cnt = sd.m_ItemCount or 0 end)
+                                if cnt and cnt > 0 then
+                                    local cls; pcall(function() cls = sd.m_ItemDefinition end)
+                                    local full; pcall(function() full = cls:GetFullName() end)
+                                    add(string.format("     [%d] %s x%d dmg=%s", i,
+                                        tostring(shortName(full)), cnt, tostring(damageSumOf(cls))))
+                                    shown = shown + 1
+                                end
+                            end)
+                        end
+                    end
+                end
+                -- Weg 3: CarryComponent (gefuehrte Waffe)
+                local comp = getCarryComponent(char)
+                local cdef; if comp then pcall(function() cdef = comp:GetEquippedItemDefinition() end) end
+                local cfull; if cdef then pcall(function() cfull = cdef:GetFullName() end) end
+                add("Weg3 Carry equipped = " .. tostring(shortName(cfull)) .. " dmg=" .. tostring(damageSumOf(cdef)))
+                local f = io.open([[C:\obs-g1r\g1r-debug.txt]], "w")
+                if f then f:write(table.concat(L, "\n") .. "\n"); f:close() end
+            end)
+        end)
+        print("[G1RExport] Debug-Snapshot geschrieben -> C:\\obs-g1r\\g1r-debug.txt (Strg+Shift+I)\n")
+    end)
+end)
+
+print("[G1RExport] geladen — schreibt nach " .. OUTPUT_PATH .. " · Dump: Strg+Shift+J · Inv-Debug: Strg+Shift+I\n")
