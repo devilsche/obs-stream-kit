@@ -94,7 +94,7 @@ local READ_DMG_OUT = false  -- ausgeteilter Schaden via Damage-Hook (Engine-Eing
 local READ_KILLS_HOOK = false  -- ungetestet (Hook bei Kill) → einzeln via g1r-flags.txt testen
 local READ_CARRY      = true   -- läuft: geführte Waffe + "in hand" (CarryComponent)
 local READ_COMBO      = true   -- läuft: GetAttackCount (gleiches Modul wie attack)
-local READ_STATE      = true   -- Zustand: im Wasser/verwandelt/reitet (GothicAnimInstance + MountComponent)
+local READ_STATE      = false  -- ungetestet (Mesh:GetAnimInstance) → einzeln via g1r-flags.txt testen
 
 -- ── Lokale Flag-Overrides (überleben Pull/Kopieren) ─────────────────────────
 -- Problem: beim Aktualisieren der main.lua stehen die Flags wieder auf Default false →
