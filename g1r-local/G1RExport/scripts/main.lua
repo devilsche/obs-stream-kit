@@ -62,6 +62,10 @@ local sessKills = 0
 local killDiagN = 0          -- zaehlt geloggte Kill-Hook-Feuerungen (erste 8, Spieler vs NPC)
 local dmgOutDiagN = 0          -- zaehlt geloggte DmgOut-Hook-Feuerungen (erste 8, self + Filter)
 local combo = nil            -- laufender Combo-/Schlagzähler (READ_COMBO), Int oder nil
+local modTicks = 0           -- tick-Zaehler ab Mod-Start (fuer Kill-Hook-Warmup, s.u.)
+local KILL_WARMUP_TICKS = 20 -- erste ~8s (bei 400ms) keine Kills zaehlen: beim Welt-Laden
+                             -- meldet das Spiel alle bereits-toten NPCs als 'defeated' nach
+                             -- (Batch, gleiche ms, generischer Causer) — das sind keine echten Kills.
 local lastEquippedWeapon = nil  -- zuletzt GEFUEHRTE Waffe (gecacht): bleibt erhalten, wenn die
                                 -- Waffe gesteckt wird (Carry liefert dann Faust). Fuer "staerkste
                                 -- Waffe", damit die ausgeruestete (Equip-Slot, nicht im Beutel) zaehlt.
@@ -1267,6 +1271,7 @@ end
 
 -- ── Schreib-Schleife ────────────────────────────────────────────────────────
 local function tick()
+    modTicks = modTicks + 1   -- Laufzeit-Zaehler (Kill-Hook-Warmup)
     setCharStateDirty()  -- CharacterState-Cache pro tick frisch holen (1 Aufruf, beide Reader teilen ihn)
     local char = getPlayer()
     if not char then return end
@@ -1510,6 +1515,9 @@ if READ_KILLS_HOOK then
     pcall(function()
         RegisterHook("/Script/G1R.AIAgentCharacter:HandleDefeated", function(self, DefeatingCharacterActor)
             pcall(function()
+                -- Warmup: beim Welt-Laden feuert HandleDefeated fuer alle bereits-toten NPCs
+                -- (Batch) → ignorieren, sonst Falsch-Kills + Diag-Slots voll vor echtem Kampf.
+                if modTicks < KILL_WARMUP_TICKS then return end
                 local causer = DefeatingCharacterActor
                 -- Die ersten Kills loggen (Causer-Kurzname + isPlayer), damit Spieler- von
                 -- NPC-Kills unterscheidbar sind (erster war ein NPC-vs-NPC-Kill).
@@ -1750,6 +1758,6 @@ end)
 
 -- BUILD-Marke: zeigt im Log, WELCHE main.lua-Version geladen ist (gegen "alter Mod
 -- noch drauf"-Verwechslung). Bei jeder relevanten Aenderung hochzaehlen.
-local MOD_BUILD = "2026-06-22-killdiag3"
+local MOD_BUILD = "2026-06-22-killwarmup"
 print("[G1RExport] geladen BUILD=" .. MOD_BUILD .. " — schreibt nach " .. OUTPUT_PATH
     .. " · Dump: Strg+Shift+J · Inv-Debug: Strg+Shift+I\n")
