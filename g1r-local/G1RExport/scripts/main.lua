@@ -515,12 +515,25 @@ end
 -- kompletter Scan durch ist, wird cachedItems atomar getauscht (Widget sieht nie ein
 -- halbes Inventar). base wird jeden Tick frisch geholt (billig); bricht ein Read ab
 -- (z.B. beim Reiten -> kein normales Inventar), bleibt der letzte komplette Stand stehen.
+local invDiag = false
 local function readInventoryBatch(char)
     if not isValid(char) then return end
     local ok, inv = pcall(function() return char:GetInventory() end)
-    if not (ok and isValid(inv)) then return end
     local base = inv
-    pcall(function() local b = inv:GetInventoryBase(); if isValid(b) then base = b end end)
+    if ok and isValid(inv) then
+        pcall(function() local b = inv:GetInventoryBase(); if isValid(b) then base = b end end)
+    end
+    -- Einmalige Inventar-Diag: zeigt, ob GetInventory/Base/ItemsNum am Spieler greifen.
+    if not invDiag then
+        invDiag = true
+        pcall(function()
+            local n = "(skip)"
+            if isValid(base) then local nn; pcall(function() nn = base:ItemsNum() end); n = tostring(nn) end
+            print(string.format("[G1RExport] Inv-Diag: GetInventory=%s base=%s ItemsNum=%s\n",
+                tostring(ok and isValid(inv)), tostring(isValid(base)), n))
+        end)
+    end
+    if not (ok and isValid(inv)) then return end
 
     if not invScanActive then
         if invCooldown > 0 then invCooldown = invCooldown - 1; return end
