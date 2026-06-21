@@ -260,6 +260,13 @@ def build_payload(lang):
     if ss:
         data["strongestSpell"] = ss
         data["strongestSpellDisplay"] = _translate(ss, lang)
+        # Zauber haben KEINEN festen Schaden (laden auf etc.) → statt dmg den Magie-Kreis.
+        _circ = SPELL_CIRCLE.get(ss)
+        if _circ is None:
+            _norm = {_norm_arcane(k): v for k, v in SPELL_CIRCLE.items()}
+            _circ = _norm.get(_norm_arcane(ss))
+        if _circ is not None:
+            data["strongestSpellCircle"] = _circ
     # Erz (Erznugget) — Gothic-Waehrung, Summe aus dem Inventar.
     data["ore"] = ore_count(data.get("items"))
     # Gilde: Rohtag -> stabiler Key (steuert Wappen-Symbol) + lokalisierter Name.

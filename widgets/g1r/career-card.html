@@ -158,7 +158,10 @@
 
       $('gearMelee').textContent = gear(d.strongestMeleeDisplay, d.strongestMeleeDmg);
       $('gearRanged').textContent = gear(d.strongestRangedDisplay, d.strongestRangedDmg);
-      $('gearSpell').textContent = d.strongestSpellDisplay || DASH;
+      // Zauber: kein dmg (laden auf etc.) → Magie-Kreis als Staerke-Indikator.
+      $('gearSpell').textContent = d.strongestSpellDisplay
+        ? d.strongestSpellDisplay + (d.strongestSpellCircle ? ' · C' + d.strongestSpellCircle : '')
+        : DASH;
     }
 
     // Subscription statt Polling: EventSource abonniert /events, reconnectet selbst.
