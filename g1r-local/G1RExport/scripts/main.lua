@@ -780,34 +780,38 @@ end
 
 local function readState(char)
     local st = { inWater = false, transformed = false, riding = false }
+    -- riding ROBUST ueber Pawn-Identitaet: der GESTEUERTE Pawn (PlayerController.Pawn) ist
+    -- beim Reiten das Reittier — also ungleich dem Spieler-Charakter (char). Keine Mount-API
+    -- noetig (deren Getter greifen am Build nicht, wie GetCarryComponent).
+    local charName, pawnName = nil, nil
+    pcall(function() charName = char:GetFullName() end)
+    pcall(function()
+        local pc = FindFirstOf("PlayerController")
+        if isValid(pc) then
+            local pawn = pc.Pawn
+            if isValid(pawn) then pcall(function() pawnName = pawn:GetFullName() end) end
+        end
+    end)
+    if charName and pawnName and charName ~= pawnName then st.riding = true end
+    -- inWater/transformed via AnimInstance (Bonus; greift am Build evtl. nicht → bleibt false).
     local anim = getAnimInstance(char)
     if anim then
         pcall(function() if anim.m_IsInWater == true then st.inWater = true end end)
         pcall(function() if anim.bIsTransformed == true then st.transformed = true end end)
     end
-    pcall(function()
-        local mc = char:GetMountComponent()
-        if isValid(mc) then
-            local rider = nil
-            pcall(function() rider = mc:GetMountCharacter() end)
-            if isValid(rider) then st.riding = true end
-        end
-    end)
     if not stateDiag then
         stateDiag = true
         pcall(function()
-            print(string.format("[G1RExport] State-Diag: anim=%s inWater=%s transformed=%s riding=%s\n",
-                tostring(anim ~= nil), tostring(st.inWater), tostring(st.transformed), tostring(st.riding)))
+            print(string.format("[G1RExport] State-Diag: anim=%s riding=%s char=%q pawn=%q\n",
+                tostring(anim ~= nil), tostring(st.riding), tostring(charName), tostring(pawnName)))
         end)
     end
-    -- Bei jedem riding-Wechsel loggen (zeigt, ob Auf-/Absteigen erkannt wird + welcher char).
+    -- Bei jedem riding-Wechsel loggen: zeigt char (was getPlayer liefert) + gesteuerten Pawn.
     if st.riding ~= lastRidingLog then
         lastRidingLog = st.riding
         pcall(function()
-            local cn = "(nil)"
-            pcall(function() cn = char:GetFullName() end)
-            print(string.format("[G1RExport] State-Change: riding=%s char=%q\n",
-                tostring(st.riding), tostring(cn)))
+            print(string.format("[G1RExport] State-Change: riding=%s char=%q pawn=%q\n",
+                tostring(st.riding), tostring(charName), tostring(pawnName)))
         end)
     end
     return st
