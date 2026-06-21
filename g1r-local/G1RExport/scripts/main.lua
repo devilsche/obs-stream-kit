@@ -553,6 +553,41 @@ local function annotateItemFromClass(cls, it)
     end
 end
 
+-- ── Ausgeruestete Slot-Waffen/Runen (AIInventoryLibrary:GetItemInSlot) ───────
+-- Die ausgeruestete Waffe/Rune liegt im Equip-Slot (MeleeSlot=3/RangedSlot/Spell), NICHT
+-- im Beutel-Container → fehlte bisher in items[]. GetItemInSlot(char, slot) gibt die
+-- Item-KLASSE je Slot. Wir lesen alle Slots, nehmen Waffen/Runen (Praefix) als equipped-
+-- Items mit (echtem) Schaden. Slot 0..14 deckt Melee/Ranged/Spell/QuickItems ab.
+local AILIB = nil
+local function getAILib()
+    if not AILIB then pcall(function() AILIB = StaticFindObject("/Script/G1R.Default__AIInventoryLibrary") end) end
+    return AILIB
+end
+local function readEquippedSlots(char)
+    local out = {}
+    local ail = getAILib()
+    if not (ail and isValid(ail)) then return out end
+    for slot = 0, 14 do
+        local cls = nil
+        pcall(function() cls = ail:GetItemInSlot(char, slot) end)
+        if isValid(cls) then
+            local full = nil
+            pcall(function() full = cls:GetFullName() end)
+            local nm = shortName(full)
+            if nm then
+                local low = nm:lower()
+                if (low:find("itmw") or low:find("itrw") or low:find("itar"))
+                   and not low:find("humanfist") and not low:find("noweapon") then
+                    local it = { name = nm, count = 1, equipped = true }
+                    if READ_ITEMDMG then pcall(function() annotateItemFromClass(cls, it) end) end
+                    out[#out + 1] = it
+                end
+            end
+        end
+    end
+    return out
+end
+
 -- ── Inventar gehaeppchelt lesen (gegen Frame-Ruckler) ───────────────────────
 -- Liest pro Aufruf max INV_BATCH Items und sammelt sie in invScanBuf. Erst wenn ein
 -- kompletter Scan durch ist, wird cachedItems atomar getauscht (Widget sieht nie ein
@@ -618,6 +653,11 @@ local function readInventoryBatch(char)
     end
 
     if invScanIdx >= invScanN then
+        -- Ausgeruestete Slot-Waffen/Runen (Equip-Slots, nicht im Beutel) dazu, damit die
+        -- stärkste Waffe/Rune sie beruecksichtigt (z.B. ausgeruestetes Schwert 73).
+        pcall(function()
+            for _, it in ipairs(readEquippedSlots(char)) do invScanBuf[#invScanBuf + 1] = it end
+        end)
         cachedItems = invScanBuf      -- atomarer Tausch: kompletter Scan fertig
         invScanBuf = nil
         invScanActive = false
