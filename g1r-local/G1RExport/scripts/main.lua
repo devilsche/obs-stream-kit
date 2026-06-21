@@ -1515,10 +1515,12 @@ if READ_KILLS_HOOK then
                 -- NPC-Kills unterscheidbar sind (erster war ein NPC-vs-NPC-Kill).
                 if killDiagN < 8 then
                     killDiagN = killDiagN + 1
-                    local cn = "(nil)"
+                    local sn, cn, pn = "(nil)", "(nil)", "(nil)"
+                    pcall(function() sn = shortName(unwrap(self):GetFullName()) end)
                     pcall(function() cn = shortName(unwrap(causer):GetFullName()) end)
-                    print(string.format("[G1RExport] Kill-Hook #%d: Causer=%q isPlayer=%s\n",
-                        killDiagN, tostring(cn), tostring(isPlayerActor(causer))))
+                    pcall(function() pn = shortName(getPlayer():GetFullName()) end)
+                    print(string.format("[G1RExport] Kill-Hook #%d: dying=%q causer=%q player=%q isPlayer=%s\n",
+                        killDiagN, tostring(sn), tostring(cn), tostring(pn), tostring(isPlayerActor(causer))))
                 end
                 if not isPlayerActor(causer) then return end
                 local dying = unwrap(self)
@@ -1748,6 +1750,6 @@ end)
 
 -- BUILD-Marke: zeigt im Log, WELCHE main.lua-Version geladen ist (gegen "alter Mod
 -- noch drauf"-Verwechslung). Bei jeder relevanten Aenderung hochzaehlen.
-local MOD_BUILD = "2026-06-22-killdiag2"
+local MOD_BUILD = "2026-06-22-killdiag3"
 print("[G1RExport] geladen BUILD=" .. MOD_BUILD .. " — schreibt nach " .. OUTPUT_PATH
     .. " · Dump: Strg+Shift+J · Inv-Debug: Strg+Shift+I\n")
