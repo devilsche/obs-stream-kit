@@ -481,32 +481,37 @@ local function weaponCategoryOf(cfgName)
     if low:find("itrw") or low:find("ranged") then return "ranged" end
     return nil
 end
--- Ergaenzt ein Item (in-place) um dmg/wType/equipped, gelesen aus seiner Definition.
-local function annotateItem(base, i, it)
-    local cfg = nil
-    pcall(function() cfg = base:GetBaseConfigByPos(i) end)
-    cfg = unwrap(cfg)
+-- Default-Objekt (CDO) einer Item-KLASSE holen — auf der Klasse selbst gibt es kein
+-- GetAllDamages (m_ItemDefinition ist eine ClassProperty); die Schadenswerte leben auf
+-- dem CDO. GetClassDefaultObject ist der UE4SS-Weg.
+local function classCDO(cls)
+    if not isValid(cls) then return nil end
+    local cdo = nil
+    pcall(function() cdo = cls:GetClassDefaultObject() end)
+    if isValid(cdo) then return cdo end
+    pcall(function() cdo = cls:GetDefaultObject() end)
+    if isValid(cdo) then return cdo end
+    return nil
+end
+-- Ergaenzt ein Item (in-place) um wType/dmg aus seiner KLASSE (Container-Weg).
+local function annotateItemFromClass(cls, it)
+    if not isValid(cls) then return end
     local cfgName = nil
-    if isValid(cfg) then pcall(function() cfgName = shortName(cfg:GetFullName()) end) end
+    pcall(function() cfgName = shortName(cls:GetFullName()) end)
     local cat = weaponCategoryOf(cfgName)
-    local dmg = cat and damageSumOf(cfg) or nil   -- Schaden nur fuer Waffen
     if cat then it.wType = cat end
-    if dmg then it.dmg = math.floor(dmg + 0.5) end
-    -- Slot-Typ: MeleeSlot=3 / RangedSlot=4 = ausgeruestet (gesteckt).
-    local slot = nil
-    pcall(function() slot = base:GetItemInventoryTypeByPos(i) end)
-    local slotS = slot ~= nil and tostring(slot) or ""
-    if slotS:find("Melee") or slotS:find("Ranged") or slot == 3 or slot == 4 then
-        it.equipped = true
-    end
-    -- Beim ERSTEN annotierten Item loggen (auch wenn keine Waffe) → zeigt, ob
-    -- GetBaseConfigByPos/GetAllDamages am Build ueberhaupt greifen.
-    if not itemDmgDiag then
-        itemDmgDiag = true
-        pcall(function()
-            print(string.format("[G1RExport] ItemDmg-Diag: cfgValid=%s cfg=%q wType=%s dmg=%s slot=%q\n",
-                tostring(isValid(cfg)), tostring(cfgName), tostring(it.wType), tostring(it.dmg), slotS))
-        end)
+    -- Schaden vom CDO (GetAllDamages-Map summiert) — nur fuer Waffen.
+    if cat then
+        local cdo = classCDO(cls)
+        local dmg = cdo and damageSumOf(cdo) or nil
+        if dmg then it.dmg = math.floor(dmg + 0.5) end
+        if not itemDmgDiag then
+            itemDmgDiag = true
+            pcall(function()
+                print(string.format("[G1RExport] ItemDmg-Diag: cfg=%q wType=%s cdo=%s dmg=%s\n",
+                    tostring(cfgName), tostring(cat), tostring(isValid(cdo)), tostring(it.dmg)))
+            end)
+        end
     end
 end
 
@@ -515,32 +520,29 @@ end
 -- kompletter Scan durch ist, wird cachedItems atomar getauscht (Widget sieht nie ein
 -- halbes Inventar). base wird jeden Tick frisch geholt (billig); bricht ein Read ab
 -- (z.B. beim Reiten -> kein normales Inventar), bleibt der letzte komplette Stand stehen.
-local invDiag = false
+-- Container-Weg: GetContainerDataModule → getMainVirtualData → m_Slots (jeder Slot
+-- traegt m_SlotData.m_ItemDefinition = Item-KLASSE). char:GetInventory() ist fuer den
+-- Spieler nil (UI-Weg, nur bei offenem Inventar) — der Container-Weg liefert alle Items
+-- (im Debug-Snapshot bestaetigt: m_Slots=296). Namen sind Klassennamen → server.py
+-- uebersetzt via item_names.json. Laeuft auf dem Game-Thread (kein Reit-Race mehr).
 local function readInventoryBatch(char)
     if not isValid(char) then return end
-    local ok, inv = pcall(function() return char:GetInventory() end)
-    local base = inv
-    if ok and isValid(inv) then
-        pcall(function() local b = inv:GetInventoryBase(); if isValid(b) then base = b end end)
-    end
-    -- Einmalige Inventar-Diag: zeigt, ob GetInventory/Base/ItemsNum am Spieler greifen.
-    if not invDiag then
-        invDiag = true
-        pcall(function()
-            local n = "(skip)"
-            if isValid(base) then local nn; pcall(function() nn = base:ItemsNum() end); n = tostring(nn) end
-            print(string.format("[G1RExport] Inv-Diag: GetInventory=%s base=%s ItemsNum=%s\n",
-                tostring(ok and isValid(inv)), tostring(isValid(base)), n))
-        end)
-    end
-    if not (ok and isValid(inv)) then return end
+    local lib = getLib()
+    if not (lib and isValid(lib)) then return end
+    local container = nil
+    pcall(function() container = lib:GetContainerDataModule(char) end)
+    if not isValid(container) then return end
+    local vd = getMainVirtualData(container)
+    if not vd then return end
+    local slots = nil
+    pcall(function() slots = vd.m_Slots end)
+    if slots == nil then return end
 
     if not invScanActive then
         if invCooldown > 0 then invCooldown = invCooldown - 1; return end
-        local n = nil
-        pcall(function() n = base:ItemsNum() end)
-        if not n or n <= 0 then
-            cachedItems = cachedItems or {}   -- kein Inventar (z.B. Reiten) -> letzten Stand halten
+        local n = arrLen(slots)
+        if n <= 0 then
+            cachedItems = cachedItems or {}
             invCooldown = INV_COOLDOWN
             return
         end
@@ -551,19 +553,25 @@ local function readInventoryBatch(char)
     while invScanIdx < invScanN and done < INV_BATCH do
         local i = invScanIdx
         pcall(function()
-            local valid = true
-            pcall(function() valid = base:IsItemValidByPos(i) end)
-            if valid ~= false then
-                local nameTxt; pcall(function() nameTxt = base:GetItemNameByPos(i) end)
-                local name
-                if nameTxt then pcall(function() name = nameTxt:ToString() end) end
-                if name and name ~= "" then
-                    local cnt = 1
-                    pcall(function() cnt = base:GetItemAmountByPos(i) or 1 end)
-                    local it = { display = name, count = cnt }
-                    -- Schaden+Typ+equipped live aus der Definition (gated, am Build zu testen).
-                    if READ_ITEMDMG then pcall(function() annotateItem(base, i, it) end) end
-                    invScanBuf[#invScanBuf + 1] = it
+            local item = arrGet(slots, i)   -- entpackt den RemoteUnrealParam-Wrapper
+            if item then
+                local sd = item.m_SlotData
+                local cnt = 0
+                pcall(function() cnt = sd.m_ItemCount or 0 end)
+                if cnt and cnt > 0 then
+                    local cls = nil
+                    pcall(function() cls = sd.m_ItemDefinition end)
+                    local full = cls and select(2, pcall(function() return cls:GetFullName() end))
+                    local nm = shortName(full)
+                    if nm and nm ~= "" and nm ~= "Item" then
+                        local it = { name = nm, count = cnt }
+                        -- Faust-/Pseudo-Eintraege (HumanFist_NoWeapon_*) rausfiltern.
+                        local low = nm:lower()
+                        if not (low:find("humanfist") or low:find("noweapon")) then
+                            if READ_ITEMDMG then pcall(function() annotateItemFromClass(cls, it) end) end
+                            invScanBuf[#invScanBuf + 1] = it
+                        end
+                    end
                 end
             end
         end)
@@ -1573,8 +1581,10 @@ pcall(function()
                                 if cnt and cnt > 0 then
                                     local cls; pcall(function() cls = sd.m_ItemDefinition end)
                                     local full; pcall(function() full = cls:GetFullName() end)
-                                    add(string.format("     [%d] %s x%d dmg=%s", i,
-                                        tostring(shortName(full)), cnt, tostring(damageSumOf(cls))))
+                                    add(string.format("     [%d] %s x%d dmgDirekt=%s dmgCDO=%s cdo=%s", i,
+                                        tostring(shortName(full)), cnt,
+                                        tostring(damageSumOf(cls)), tostring(damageSumOf(classCDO(cls))),
+                                        tostring(isValid(classCDO(cls)))))
                                     shown = shown + 1
                                 end
                             end)
@@ -1585,7 +1595,9 @@ pcall(function()
                 local comp = getCarryComponent(char)
                 local cdef; if comp then pcall(function() cdef = comp:GetEquippedItemDefinition() end) end
                 local cfull; if cdef then pcall(function() cfull = cdef:GetFullName() end) end
-                add("Weg3 Carry equipped = " .. tostring(shortName(cfull)) .. " dmg=" .. tostring(damageSumOf(cdef)))
+                add("Weg3 Carry equipped = " .. tostring(shortName(cfull))
+                    .. " dmgDirekt=" .. tostring(damageSumOf(cdef))
+                    .. " dmgCDO=" .. tostring(damageSumOf(classCDO(cdef))))
                 local f = io.open([[C:\obs-g1r\g1r-debug.txt]], "w")
                 if f then f:write(table.concat(L, "\n") .. "\n"); f:close() end
             end)
