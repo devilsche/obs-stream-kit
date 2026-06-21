@@ -94,6 +94,7 @@ local READ_DMG_OUT = false  -- ausgeteilter Schaden via Damage-Hook (Engine-Eing
 local READ_KILLS_HOOK = false  -- ungetestet (Hook bei Kill) → einzeln via g1r-flags.txt testen
 local READ_CARRY      = true   -- läuft: geführte Waffe + "in hand" (CarryComponent)
 local READ_COMBO      = true   -- läuft: GetAttackCount (gleiches Modul wie attack)
+local READ_STATE      = true   -- Zustand: im Wasser/verwandelt/reitet (GothicAnimInstance + MountComponent)
 
 -- ── Lokale Flag-Overrides (überleben Pull/Kopieren) ─────────────────────────
 -- Problem: beim Aktualisieren der main.lua stehen die Flags wieder auf Default false →
@@ -121,6 +122,7 @@ do
         READ_KILLS_HOOK = ov(READ_KILLS_HOOK, "READ_KILLS_HOOK")
         READ_CARRY      = ov(READ_CARRY,      "READ_CARRY")
         READ_COMBO      = ov(READ_COMBO,      "READ_COMBO")
+        READ_STATE      = ov(READ_STATE,      "READ_STATE")
         print(string.format(
             "[G1RExport] Flag-Overrides aus g1r-flags.txt: CARRY=%s COMBO=%s KILLS_HOOK=%s DMG_OUT=%s\n",
             tostring(READ_CARRY), tostring(READ_COMBO), tostring(READ_KILLS_HOOK), tostring(READ_DMG_OUT)))
@@ -646,7 +648,18 @@ local function readCarryWeapon(char)
     if not isValid(comp) then return nil end
     local def = nil
     pcall(function() def = comp:GetEquippedItemDefinition() end)
-    return defName(def)
+    local name = defName(def)
+    -- Im Wasser/Schwimmen steckt die Engine die Waffe weg → CarryComponent liefert eine
+    -- Faust-/Pseudowaffe ("Human Fist No Weapon Water Walking" o.ä.). Das ist KEINE
+    -- echte Waffe → rausfiltern, damit "in hand" dann sauber leer bleibt statt Müll.
+    if name then
+        local low = name:lower()
+        if low:find("fist") or low:find("noweapon") or low:find("no_weapon")
+           or low:find("unarmed") or low:find("humanfist") then
+            return nil
+        end
+    end
+    return name
 end
 
 -- ── Combo-/Schlagzähler via DataModule_Combat:GetAttackCount (READ_COMBO) ─────
@@ -661,6 +674,49 @@ local function readCombo(char)
     pcall(function() n = comb:GetAttackCount() end)
     if type(n) == "number" then return n end
     return nil
+end
+
+-- ── Spieler-Zustand: im Wasser / verwandelt / reitet (READ_STATE) ───────────
+-- Object-Dump: GothicAnimInstance trägt die Bool-Flags (m_IsInWater, bIsTransformed),
+-- erreichbar über den Mesh (Engine.Character:Mesh → SkeletalMeshComponent:GetAnimInstance).
+-- Reiten über GothicCharacter:GetMountComponent → GetMountCharacter (gültig = reitet).
+-- Alles defensiv (pcall); fehlt etwas, bleibt das jeweilige Flag false.
+local stateDiag = false
+local function getAnimInstance(char)
+    local mesh = nil
+    pcall(function() mesh = char.Mesh end)            -- Engine.Character:Mesh
+    if not isValid(mesh) then
+        pcall(function() mesh = char:GetMesh() end)    -- Fallback-Getter
+    end
+    if not isValid(mesh) then return nil end
+    local anim = nil
+    pcall(function() anim = mesh:GetAnimInstance() end)
+    return isValid(anim) and anim or nil
+end
+
+local function readState(char)
+    local st = { inWater = false, transformed = false, riding = false }
+    local anim = getAnimInstance(char)
+    if anim then
+        pcall(function() if anim.m_IsInWater == true then st.inWater = true end end)
+        pcall(function() if anim.bIsTransformed == true then st.transformed = true end end)
+    end
+    pcall(function()
+        local mc = char:GetMountComponent()
+        if isValid(mc) then
+            local rider = nil
+            pcall(function() rider = mc:GetMountCharacter() end)
+            if isValid(rider) then st.riding = true end
+        end
+    end)
+    if not stateDiag then
+        stateDiag = true
+        pcall(function()
+            print(string.format("[G1RExport] State-Diag: anim=%s inWater=%s transformed=%s riding=%s\n",
+                tostring(anim ~= nil), tostring(st.inWater), tostring(st.transformed), tostring(st.riding)))
+        end)
+    end
+    return st
 end
 
 -- ── Ingame-Uhr ──────────────────────────────────────────────────────────────
@@ -784,7 +840,7 @@ local function readSaveKey()
     return cachedSaveKey
 end
 
-local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack, clock, kills, news, combo)
+local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack, clock, kills, news, combo, state)
     local parts = {}
     parts[#parts+1] = '"ok":true'
     if guild and guild ~= "" then
@@ -811,6 +867,13 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack
         parts[#parts+1] = string.format('"combo":%d', math.floor(combo + 0.5))
     else
         parts[#parts+1] = '"combo":null'
+    end
+    if type(state) == "table" then
+        parts[#parts+1] = string.format('"state":{"inWater":%s,"transformed":%s,"riding":%s}',
+            tostring(state.inWater == true), tostring(state.transformed == true),
+            tostring(state.riding == true))
+    else
+        parts[#parts+1] = '"state":null'
     end
     if clock and type(clock.hour) == "number" then
         parts[#parts+1] = string.format('"clock":{"hour":%d,"minute":%d}', clock.hour, clock.minute or 0)
@@ -1060,6 +1123,8 @@ local function tick()
     -- wenn er tatsächlich etwas liefert.
     if READ_CARRY then pcall(function() local w = readCarryWeapon(char); if w then weapon = w end end) end
     if READ_COMBO then pcall(function() combo = readCombo(char) end) else combo = nil end
+    local state
+    if READ_STATE then pcall(function() state = readState(char) end) end
     local attack
     if READ_ATTACK then pcall(function() attack = readAttack(char) end) end
     -- Einmaliges Diagnose-Log (Stufe 2). Steht VOR den riskanten Readern und nutzt nur
@@ -1085,7 +1150,7 @@ local function tick()
         pcall(function() kills = updateKills() end)   -- alter Map-Weg (PuzzlesSubsystem, tot)
     end
     local json = buildJson(pos, items or {}, totalDistCm, stats or {}, guild, spell,
-                           weapon, attack, clock, kills, killNews, combo)
+                           weapon, attack, clock, kills, killNews, combo, state)
     local f = io.open(OUTPUT_PATH, "w")
     if f then f:write(json); f:close(); pendingEvents = {} end
     -- Gesamt-Werte nicht jeden Tick schreiben (I/O), nur ~alle 10 s.

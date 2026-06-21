@@ -81,7 +81,11 @@
       hpRegenEl.textContent = signed(src.healthRegen);
       manaRegenEl.textContent = signed(src.manaRegen);
       oreEl.textContent = num(d.ore);
-      handEl.textContent = d.weaponDisplay || d.weapon || '—';
+      // Zustand hat Vorrang vor der Waffe: im Wasser/verwandelt/reitend ist die Waffe
+      // weggesteckt (CarryComponent liefert dann eh nichts Sinnvolles).
+      var st = d.state || {};
+      var stateLabel = st.transformed ? 'Transformed' : (st.riding ? 'Riding' : (st.inWater ? 'In water' : null));
+      handEl.textContent = stateLabel || d.weaponDisplay || d.weapon || '—';
       if (d.clock && typeof d.clock.hour === 'number') {
         clockEl.innerHTML = '<span class="ico">schedule</span>' +
           ('0' + d.clock.hour).slice(-2) + ':' + ('0' + (d.clock.minute || 0)).slice(-2);
