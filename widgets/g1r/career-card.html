@@ -158,9 +158,10 @@
 
       $('gearMelee').textContent = gear(d.strongestMeleeDisplay, d.strongestMeleeDmg);
       $('gearRanged').textContent = gear(d.strongestRangedDisplay, d.strongestRangedDmg);
-      // Zauber: kein dmg (laden auf etc.) → Magie-Kreis als Staerke-Indikator.
+      // Zauber: Schaden (Max, inkl. Aufladen) wenn bekannt, sonst Magie-Kreis als Indikator.
       $('gearSpell').textContent = d.strongestSpellDisplay
-        ? d.strongestSpellDisplay + (d.strongestSpellCircle ? ' · C' + d.strongestSpellCircle : '')
+        ? d.strongestSpellDisplay + (d.strongestSpellDmg != null ? ' · ' + num(d.strongestSpellDmg)
+            : (d.strongestSpellCircle ? ' · C' + d.strongestSpellCircle : ''))
         : DASH;
     }
 

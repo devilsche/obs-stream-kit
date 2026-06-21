@@ -120,14 +120,31 @@ def strongest_ranged(items):
 # nutzbar, wenn ihr Kreis <= magicCircle des Spielers. Dient dazu, aus dem
 # Inventar den staerksten nutzbaren Zauber zu bestimmen.
 SPELL_CIRCLE = _load_json_map(os.path.join(os.path.dirname(os.path.abspath(__file__)), "spell_circle.json"))
+# Zauber-Daten (Kreis + Schaden) aus der kuratierten Tabelle — der Schaden ist live am
+# Build NICHT erreichbar (SpellConfig-CDO zu), darum aus spell_data.json. Keys normalisiert
+# (EN-Name), dmg = Max (inkl. scaling_stages bei aufladbaren wie Kugelblitz/Windfaust).
+SPELL_DATA = _load_json_map(os.path.join(os.path.dirname(os.path.abspath(__file__)), "spell_data.json"))
 
 
 def _norm_arcane(name):
-    """ItAr_Scroll_FireBall / ItAr_Rune_Fireball -> 'fireball' — macht den Kreis-Lookup
-    Rune/Scroll-agnostisch (spell_circle.json listet meist nur die Scroll-Variante,
-    der Spieler trägt aber evtl. die Rune desselben Zaubers)."""
+    """ItAr_Scroll_FireBall / ItAr_Rune_Fireball -> 'fireball' — macht den Lookup
+    Rune/Scroll-agnostisch (Tabellen listen den Zauber einmal, der Spieler traegt
+    Rune ODER Scroll desselben Zaubers)."""
     s = re.sub(r"^ItAr_(Scroll|Rune)_", "", name or "", flags=re.IGNORECASE)
     return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def _spell_info(name):
+    """{circle, dmg} fuer einen Zauber-Klassennamen — aus spell_data.json (Schaden + Kreis),
+    sonst spell_circle.json (nur Kreis). nil-Felder wenn unbekannt."""
+    n = _norm_arcane(name)
+    d = SPELL_DATA.get(n)
+    if isinstance(d, dict):
+        return {"circle": d.get("circle"), "dmg": d.get("dmg")}
+    circ = SPELL_CIRCLE.get(name)
+    if circ is None:
+        circ = {_norm_arcane(k): v for k, v in SPELL_CIRCLE.items()}.get(n)
+    return {"circle": circ, "dmg": None}
 
 
 def ore_count(items):
@@ -140,20 +157,30 @@ def ore_count(items):
 
 
 def strongest_usable_spell(items, magic_circle):
-    """Liefert den Klassennamen der nutzbaren Inventar-Rune mit dem hoechsten
-    Kreis (<= magicCircle), oder None wenn keine nutzbar ist. Rune/Scroll-agnostisch."""
+    """Staerkste NUTZBARE Inventar-Rune: unter den nutzbaren (Kreis <= magicCircle) die
+    mit dem hoechsten Schaden; ohne Schadenswerte als Fallback der hoechste Kreis.
+    Liefert (name, dmg, circle) oder (None, None, None). Rune/Scroll-agnostisch."""
     try:
         mc = int(magic_circle)
     except (TypeError, ValueError):
-        return None
-    # Normalisierte Sicht auf SPELL_CIRCLE, damit Rune wie Scroll matcht.
-    norm = {_norm_arcane(k): v for k, v in SPELL_CIRCLE.items()}
-    best, best_circle = None, 0
+        mc = 0
+    best, best_dmg, best_circle = None, -1, -1
     for it in (items or []):
-        circ = norm.get(_norm_arcane(it.get("name")))
-        if circ is not None and circ <= mc and circ > best_circle:
-            best, best_circle = it.get("name"), circ
-    return best
+        nm = it.get("name") or ""
+        if not nm.lower().startswith("itar"):
+            continue
+        info = _spell_info(nm)
+        circ = info.get("circle")
+        if circ is None or circ > mc:        # nicht nutzbar (zu hoher Kreis)
+            continue
+        dmg = info.get("dmg")
+        # Ranking: hoechster Schaden; bei Gleichstand/ohne Schaden hoechster Kreis.
+        score_dmg = dmg if isinstance(dmg, (int, float)) else -1
+        if score_dmg > best_dmg or (score_dmg == best_dmg and circ > best_circle):
+            best, best_dmg, best_circle = nm, score_dmg, circ
+    if best is None:
+        return (None, None, None)
+    return (best, (best_dmg if best_dmg >= 0 else None), best_circle)
 
 
 # ── Gilde: Rohtag (z.B. "Guild.Guards", "EPlayerGuild::MagesWater") → stabiler
@@ -232,13 +259,12 @@ def build_payload(lang):
                 it["dmg"] = WEAPON_DAMAGE[nm]
         elif low.startswith("itar"):
             it["wType"] = "spell"
-            circ = SPELL_CIRCLE.get(nm)
-            if circ is None:  # Rune/Scroll-agnostisch
-                norm = {_norm_arcane(k): v for k, v in SPELL_CIRCLE.items()}
-                circ = norm.get(_norm_arcane(nm))
-            if circ is not None:
-                it["circle"] = circ
-                it["usable"] = circ <= (mc_for_items or 0)
+            info = _spell_info(nm)   # circle + dmg (Max, inkl. scaling) aus spell_data.json
+            if info.get("circle") is not None:
+                it["circle"] = info["circle"]
+                it["usable"] = info["circle"] <= (mc_for_items or 0)
+            if info.get("dmg") is not None:
+                it["dmg"] = info["dmg"]
     # Staerkste Waffe getrennt nach Kategorie — Nahkampf/Fernkampf sind nicht
     # vergleichbar (Armbrust 60 vs. Klinge 73), also je eigener Bestwert + Schaden.
     # Die AUSGERUESTETE Waffe (READ_CARRY → data.weapon) steckt NICHT im Beutel-Inventar
@@ -262,17 +288,14 @@ def build_payload(lang):
     mc = (data.get("stats") or {}).get("magicCircle", 0)
     # Auch hier die in-Hand-Rune (data.weapon) zumischen — sonst kommt strongestSpell
     # nicht, wenn die Rune gerade in der Hand statt im Beutel ist (wie bei melee/ranged).
-    ss = strongest_usable_spell(weapon_items, mc)
+    ss, ss_dmg, ss_circle = strongest_usable_spell(weapon_items, mc)
     if ss:
         data["strongestSpell"] = ss
         data["strongestSpellDisplay"] = _translate(ss, lang)
-        # Zauber haben KEINEN festen Schaden (laden auf etc.) → statt dmg den Magie-Kreis.
-        _circ = SPELL_CIRCLE.get(ss)
-        if _circ is None:
-            _norm = {_norm_arcane(k): v for k, v in SPELL_CIRCLE.items()}
-            _circ = _norm.get(_norm_arcane(ss))
-        if _circ is not None:
-            data["strongestSpellCircle"] = _circ
+        if ss_dmg is not None:
+            data["strongestSpellDmg"] = ss_dmg     # Max-Schaden (inkl. scaling) aus spell_data.json
+        if ss_circle is not None:
+            data["strongestSpellCircle"] = ss_circle
     # Erz (Erznugget) — Gothic-Waehrung, Summe aus dem Inventar.
     data["ore"] = ore_count(data.get("items"))
     # Gilde: Rohtag -> stabiler Key (steuert Wappen-Symbol) + lokalisierter Name.

@@ -1,0 +1,61 @@
+{
+  "firebolt": {
+    "circle": 1,
+    "dmg": 30
+  },
+  "fireball": {
+    "circle": 3,
+    "dmg": 120,
+    "scalable": true
+  },
+  "stormoffire": {
+    "circle": 4,
+    "dmg": 200,
+    "scalable": true
+  },
+  "rainoffire": {
+    "circle": 5,
+    "dmg": 150
+  },
+  "icebolt": {
+    "circle": 1,
+    "dmg": 20
+  },
+  "balllightning": {
+    "circle": 2,
+    "dmg": 80,
+    "scalable": true
+  },
+  "iceblock": {
+    "circle": 3,
+    "dmg": 30
+  },
+  "chainlightning": {
+    "circle": 4
+  },
+  "fistofwind": {
+    "circle": 2,
+    "dmg": 40,
+    "scalable": true
+  },
+  "sleep": {
+    "circle": 2
+  },
+  "pyrokinesis": {
+    "circle": 3
+  },
+  "charm": {
+    "circle": 3
+  },
+  "stormfist": {
+    "circle": 4,
+    "dmg": 60,
+    "scalable": true
+  },
+  "destroyundead": {
+    "circle": 4
+  },
+  "breathofdeath": {
+    "circle": 6
+  }
+}
