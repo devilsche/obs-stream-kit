@@ -228,7 +228,9 @@ def build_payload(lang):
         data["strongestRangedDisplay"] = _translate(ranged, lang)
         data["strongestRangedDmg"] = ranged_dmg
     mc = (data.get("stats") or {}).get("magicCircle", 0)
-    ss = strongest_usable_spell(data.get("items"), mc)
+    # Auch hier die in-Hand-Rune (data.weapon) zumischen — sonst kommt strongestSpell
+    # nicht, wenn die Rune gerade in der Hand statt im Beutel ist (wie bei melee/ranged).
+    ss = strongest_usable_spell(weapon_items, mc)
     if ss:
         data["strongestSpell"] = ss
         data["strongestSpellDisplay"] = _translate(ss, lang)
