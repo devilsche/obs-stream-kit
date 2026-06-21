@@ -495,11 +495,13 @@ local function annotateItem(base, i, it)
     if slotS:find("Melee") or slotS:find("Ranged") or slot == 3 or slot == 4 then
         it.equipped = true
     end
-    if not itemDmgDiag and (it.dmg or it.wType) then
+    -- Beim ERSTEN annotierten Item loggen (auch wenn keine Waffe) → zeigt, ob
+    -- GetBaseConfigByPos/GetAllDamages am Build ueberhaupt greifen.
+    if not itemDmgDiag then
         itemDmgDiag = true
         pcall(function()
-            print(string.format("[G1RExport] ItemDmg-Diag: cfg=%q wType=%s dmg=%s slot=%q\n",
-                tostring(cfgName), tostring(it.wType), tostring(it.dmg), slotS))
+            print(string.format("[G1RExport] ItemDmg-Diag: cfgValid=%s cfg=%q wType=%s dmg=%s slot=%q\n",
+                tostring(isValid(cfg)), tostring(cfgName), tostring(it.wType), tostring(it.dmg), slotS))
         end)
     end
 end
@@ -1340,9 +1342,10 @@ local function tick()
             local ts = READ_CLOCK and tostring(isValid(getTimeSubsys())) or "(aus)"
             local pz = READ_KILLS and tostring(isValid(getPuzzles())) or "(aus)"
             print(string.format(
-                "[G1RExport] Diag: tick laeuft. SPELL=%s WEAPONS=%s ATTACK=%s CLOCK=%s KILLS=%s | GameTime=%s Puzzles=%s\n",
-                tostring(READ_SPELL), tostring(READ_WEAPONS), tostring(READ_ATTACK),
-                tostring(READ_CLOCK), tostring(READ_KILLS), ts, pz))
+                "[G1RExport] Diag: tick laeuft. ATTACK=%s CLOCK=%s KILLS=%s CARRY=%s COMBO=%s STATE=%s ITEMDMG=%s | GameTime=%s Puzzles=%s\n",
+                tostring(READ_ATTACK), tostring(READ_CLOCK), tostring(READ_KILLS),
+                tostring(READ_CARRY), tostring(READ_COMBO), tostring(READ_STATE),
+                tostring(READ_ITEMDMG), ts, pz))
         end)
     end
     local clock
