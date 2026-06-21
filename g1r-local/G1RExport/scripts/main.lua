@@ -114,7 +114,7 @@ local READ_KILLS_HOOK = false  -- ungetestet (Hook bei Kill) → einzeln via g1r
 local READ_CARRY      = true   -- läuft: geführte Waffe + "in hand" (CarryComponent)
 local READ_COMBO      = true   -- läuft: GetAttackCount (gleiches Modul wie attack)
 local READ_STATE      = true   -- Reiten/Wasser/Verwandelt (Mount/AnimInstance). Lief auf dem Game-Thread (seit ExecuteInGameThread) crashfrei — steuert u.a. die Reitstrecke
-local READ_ITEMDMG    = false  -- pro Item echten Schaden+Typ live (GetBaseConfigByPos/GetAllDamages) → staerkste Waffe aus echten Werten. Erst in-game testen (Definition-Reflection)
+local READ_ITEMDMG    = false  -- AUS: Live-Schaden ueber das CDO greift am Build NICHT (GetClassDefaultObject/GetAllDamages = nil). Schaden+Typ macht stattdessen server.py aus den Klassennamen (weapon_damage.json) — die Container-Items tragen den Klassennamen.
 
 -- ── Lokale Flag-Overrides (überleben Pull/Kopieren) ─────────────────────────
 -- Problem: beim Aktualisieren der main.lua stehen die Flags wieder auf Default false →

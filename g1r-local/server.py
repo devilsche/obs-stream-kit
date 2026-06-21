@@ -210,10 +210,32 @@ def build_payload(lang):
         return {"ok": False, "reason": f"read-error: {exc}"}
 
     data["ageSec"] = round(age, 1)
+    mc_for_items = (data.get("stats") or {}).get("magicCircle", 0)
     for it in (data.get("items") or []):
         # Mod liefert teils schon lokalisierten Namen (Spielsprache) — nicht antasten.
         if not it.get("display"):
             it["display"] = _translate(it.get("name"), lang)
+        # Schaden + Typ pro Item anreichern (Live-CDO geht am Build nicht → aus dem
+        # Klassennamen via weapon_damage.json / spell_circle.json). Klassenname = it.name.
+        nm = it.get("name") or ""
+        low = nm.lower()
+        if low.startswith("itmw"):
+            it["wType"] = "melee"
+            if WEAPON_DAMAGE.get(nm) is not None:
+                it["dmg"] = WEAPON_DAMAGE[nm]
+        elif low.startswith("itrw"):
+            it["wType"] = "ranged"
+            if WEAPON_DAMAGE.get(nm) is not None:
+                it["dmg"] = WEAPON_DAMAGE[nm]
+        elif low.startswith("itar"):
+            it["wType"] = "spell"
+            circ = SPELL_CIRCLE.get(nm)
+            if circ is None:  # Rune/Scroll-agnostisch
+                norm = {_norm_arcane(k): v for k, v in SPELL_CIRCLE.items()}
+                circ = norm.get(_norm_arcane(nm))
+            if circ is not None:
+                it["circle"] = circ
+                it["usable"] = circ <= (mc_for_items or 0)
     # Staerkste Waffe getrennt nach Kategorie — Nahkampf/Fernkampf sind nicht
     # vergleichbar (Armbrust 60 vs. Klinge 73), also je eigener Bestwert + Schaden.
     # Die AUSGERUESTETE Waffe (READ_CARRY → data.weapon) steckt NICHT im Beutel-Inventar
