@@ -21,7 +21,7 @@
 -- Wohin die JSON geschrieben wird. MUSS mit server.py (STATE_FILE) übereinstimmen.
 -- Doppelte Backslashes unter Windows. Beispiel:
 local OUTPUT_PATH = [[C:\obs-g1r\g1r-state.json]]
-local POLL_INTERVAL_MS = 250   -- ~4×/s; für flüssigere Position runter (z.B. 100)
+local POLL_INTERVAL_MS = 400   -- langsamer = kleineres Thread-Race-Fenster bei Engine-Zugriffen (war 250)
 
 -- ── State ──────────────────────────────────────────────────────────────────
 local CachedPlayer = nil
@@ -173,6 +173,10 @@ end
 -- K2_GetActorLocation (BlueprintCallable) ist der robusteste Reflection-Weg.
 -- Fallbacks falls am G1R-Build anders reflektiert. Werte in cm (UE5).
 local function readPosition(char)
+    -- Frisch revalidieren: beim Reiten/Pawn-Wechsel kann char zwischen getPlayer()
+    -- und hier ungültig werden → K2_GetActorLocation auf totem Objekt = C++-Crash
+    -- (Crashdump Stack 1). Abgeräumte Objekte hier abfangen, statt blind zu lesen.
+    if not isValid(char) then return nil end
     local function tryLoc(fn)
         local ok, loc = pcall(fn)
         if ok and loc and loc.X ~= nil then
@@ -404,11 +408,15 @@ local function readInventoryContainer(char)
     return items
 end
 
--- UI-Weg bevorzugt (lokalisierte Namen), sonst Container-Fallback.
+-- NUR der UI-Weg (lokalisierte Namen). Der Container-Fallback (getMainVirtualData,
+-- ScriptStruct-Reflection) ist DEAKTIVIERT: beim Reiten steuert man das Reittier,
+-- das hat kein normales Inventar → UI liefert nil → der Fallback lief auf den
+-- Reit-Pawn-Container → C++-Crash (im Crashdump als Stack 2 belegt). UI-Weg reicht;
+-- bei leer → leere Liste statt Crash-Fallback.
 local function readInventory(char)
     local ui = readInventoryUI(char)
     if ui ~= nil then return ui end
-    return readInventoryContainer(char)
+    return {}
 end
 
 -- ── Stats lesen (GAS, Pattern aus mods-g1r stats.lua) ──────────────────────
