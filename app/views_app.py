@@ -46,6 +46,11 @@ TOOLS = [
      "desc": "Lebender Katalog aller t-*-Bausteine in jedem Theme — Referenz + Abnahme.",
      "path": "tools/component-preview.html",
      "admin_only": True},
+    {"key": "diag",
+     "label": "G1R Diagnose",
+     "desc": "UE4SS-Log + Crashdump vom Spiel-PC hochladen (kein Datei-Kopieren).",
+     "path": "tools/g1r-diag.html",
+     "admin_only": True},
 ]
 
 
@@ -275,6 +280,45 @@ def upload_pet_image():
 
     url = request.url_root.rstrip("/") + "/app/assets/pet-images/" + fname
     return jsonify({"url": url, "size": f"{w}×{h}px → 600×600 WebP"})
+
+
+@bp_app.route("/app/tools/diag/upload", methods=["POST"])
+@require_session
+def diag_upload():
+    """G1R-Diagnose-Upload (admin-only): nimmt Log-Text und/oder eine Crashdump-Datei,
+    legt sie unter data/diag/ mit FESTEN Namen ab (ueberschreibt den letzten Upload,
+    bleibt 'temporaer'; kein user-controlled Pfad → kein Path-Traversal)."""
+    if not g.user.get("is_admin"):
+        abort(403)
+    root = current_app.config.get("_PROJECT_ROOT") or os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__)))
+    out_dir = os.path.join(root, "data", "diag")
+    os.makedirs(out_dir, exist_ok=True)
+
+    resp = {}
+    log = request.form.get("log")
+    if log:
+        log_bytes = log.encode("utf-8")
+        with open(os.path.join(out_dir, "g1r-diag-log.txt"), "wb") as fp:
+            fp.write(log_bytes)
+        resp["log_bytes"] = len(log_bytes)
+
+    f = request.files.get("dump")
+    if f and f.filename:
+        # Groessen-Limit 300 MB (Content-Length vorab pruefen → kein RAM-Blowup).
+        MAX = 300 * 1024 * 1024
+        if request.content_length and request.content_length > MAX:
+            return jsonify({"error": "Datei zu groß — max. 300 MB"}), 400
+        dump_path = os.path.join(out_dir, "g1r-diag.dmp")
+        f.save(dump_path)                      # werkzeug streamt auf Disk
+        try:
+            resp["dump_bytes"] = os.path.getsize(dump_path)
+        except OSError:
+            resp["dump_bytes"] = 0
+
+    if not resp:
+        return jsonify({"error": "Nichts übermittelt"}), 400
+    return jsonify({"ok": True, **resp})
 
 
 @bp_app.route("/app/assets/pet-images/<path:filename>")
