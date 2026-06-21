@@ -244,8 +244,11 @@ def build_payload(lang):
     # Die AUSGERUESTETE Waffe (READ_CARRY → data.weapon) steckt NICHT im Beutel-Inventar
     # (sie ist in der Hand), wuerde sonst beim Staerksten fehlen → als Kandidat zumischen.
     weapon_items = list(data.get("items") or [])
-    if data.get("weapon"):
-        weapon_items.append({"name": data["weapon"]})
+    # equippedWeapon (gecachte ausgeruestete Waffe, bleibt beim Stecken) + weapon (live).
+    # Beide als Kandidaten — die ausgeruestete liegt im Equip-Slot, nicht im Beutel-items.
+    for _w in (data.get("equippedWeapon"), data.get("weapon")):
+        if _w:
+            weapon_items.append({"name": _w})
     melee, melee_dmg = strongest_melee(weapon_items)
     if melee:
         data["strongestMelee"] = melee

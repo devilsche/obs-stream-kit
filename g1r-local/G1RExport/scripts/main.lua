@@ -62,6 +62,9 @@ local sessKills = 0
 local killHookDiag = false   -- erster Kill loggt #args + Causer (Spieler-Filter belegen)
 local dmgOutDiag = false      -- erster Treffer loggt self-Kette (Spieler-Filter belegen)
 local combo = nil            -- laufender Combo-/Schlagzähler (READ_COMBO), Int oder nil
+local lastEquippedWeapon = nil  -- zuletzt GEFUEHRTE Waffe (gecacht): bleibt erhalten, wenn die
+                                -- Waffe gesteckt wird (Carry liefert dann Faust). Fuer "staerkste
+                                -- Waffe", damit die ausgeruestete (Equip-Slot, nicht im Beutel) zaehlt.
 pcall(function()
     local f = io.open(TOTALS_PATH, "r"); if not f then return end
     local s = f:read("*a"); f:close()
@@ -1097,6 +1100,13 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack
     else
         parts[#parts+1] = '"weapon":null'
     end
+    -- Zuletzt gefuehrte (ausgeruestete) Waffe, gecacht — fuer "staerkste Waffe", da die
+    -- ausgeruestete Waffe nicht im Beutel-Container (items) steht.
+    if lastEquippedWeapon and lastEquippedWeapon ~= "" then
+        parts[#parts+1] = string.format('"equippedWeapon":"%s"', jsonEsc(lastEquippedWeapon))
+    else
+        parts[#parts+1] = '"equippedWeapon":null'
+    end
     if attack and attack ~= "" then
         parts[#parts+1] = string.format('"attack":"%s"', jsonEsc(attack))
     else
@@ -1388,7 +1398,10 @@ local function tick()
     if READ_WEAPONS then pcall(function() weapon = readWeapon(char) end) end
     -- CarryComponent-Weg bevorzugt, wenn an (crashfrei). Überschreibt den alten Reader nur,
     -- wenn er tatsächlich etwas liefert.
-    if READ_CARRY then pcall(function() local w = readCarryWeapon(char); if w then weapon = w end end) end
+    -- weapon = LIVE gefuehrte Waffe (fuer "in hand"; leer wenn gesteckt). lastEquippedWeapon
+    -- = gecacht (bleibt beim Stecken) → fuer "staerkste Waffe", da die ausgeruestete Waffe
+    -- im Equip-Slot liegt und NICHT im Beutel-Container (items) auftaucht.
+    if READ_CARRY then pcall(function() local w = readCarryWeapon(char); if w then weapon = w; lastEquippedWeapon = w end end) end
     if READ_COMBO then pcall(function() combo = readCombo(char) end) else combo = nil end
     local state = st   -- bereits frueh gelesen (fuer die Reit-/Lauf-Strecken-Zuordnung)
     local attack
