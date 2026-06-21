@@ -164,7 +164,14 @@ end
 -- ── Player-Pawn cachen (Pattern aus mods-g1r main.lua + stats.lua) ──────────
 RegisterHook("/Script/Engine.PlayerController:ClientRestart", function(self, NewPawn)
     local ok, pawn = pcall(function() return NewPawn:get() end)
-    if ok and isValid(pawn) then CachedPlayer = pawn end
+    if ok and isValid(pawn) then
+        -- NUR den Spieler cachen, NICHT ein Reittier: beim Aufsteigen feuert ClientRestart
+        -- mit dem Reittier-Pawn (AIAgentCharacter_..._Rideable) → das wuerde den Cache
+        -- verderben (Stats/Gilde weg). Der Spieler-Pawn heisst PlayerCharacter*.
+        local full = nil
+        pcall(function() full = pawn:GetFullName() end)
+        if full and full:find("PlayerCharacter") then CachedPlayer = pawn end
+    end
 end)
 
 -- Hinweis: Die Engine-Hooks (Damage-Out via MeleeWeaponVisual:OnDamageDealt und
@@ -174,15 +181,12 @@ end)
 -- Object-Dump KEINEN Schadenswert (nur WeaponUsed/Impact/Deflect/Parry).
 
 local function getPlayer()
-    -- IMMER den echten Spieler-Charakter bevorzugen. Beim Reiten steuert der Controller
-    -- das REITTIER (PlayerController.Pawn = Reittier, und der ClientRestart-Hook cacht es)
-    -- → dann fehlten alle Spieler-Stats/Gilde (Widgets inaktiv) UND die Reit-Erkennung
-    -- (GetMountComponent am Reittier statt am Spieler) schlug fehl. GothicPlayerCharacter
-    -- ist auch beim Reiten der Spieler (er sitzt nur auf dem Reittier).
+    -- Cache zuerst (FindFirstOf JEDEN Tick ruckelt massiv — durchsucht den Objekt-Index).
+    -- Der Spieler-Pawn wechselt nicht; der ClientRestart-Hook cacht nur den Spieler
+    -- (nicht das Reittier, siehe Hook). isValid faengt abgeraeumte Pawns (Reload).
+    if isValid(CachedPlayer) then return CachedPlayer end
     local ok, p = pcall(function() return FindFirstOf("GothicPlayerCharacter") end)
     if ok and isValid(p) then CachedPlayer = p; return p end
-    -- Fallbacks: Cache, dann Controller-Pawn.
-    if isValid(CachedPlayer) then return CachedPlayer end
     local ok2, pc = pcall(function() return FindFirstOf("PlayerController") end)
     if ok2 and isValid(pc) then
         local ok3, pawn = pcall(function() return pc.Pawn end)
@@ -766,6 +770,20 @@ end
 -- Alles defensiv (pcall); fehlt etwas, bleibt das jeweilige Flag false.
 local stateDiag = false
 local lastRidingLog = nil   -- letzter geloggter riding-Zustand (loggt bei Aenderung)
+local CachedPC = nil        -- PlayerController gecacht (FindFirstOf jeden Tick ruckelt)
+local function getControlledPawnName()
+    -- Name des gerade gesteuerten Pawns (beim Reiten das Reittier). PC gecacht.
+    if not isValid(CachedPC) then
+        pcall(function() CachedPC = FindFirstOf("PlayerController") end)
+    end
+    if not isValid(CachedPC) then return nil end
+    local name = nil
+    pcall(function()
+        local pawn = CachedPC.Pawn
+        if isValid(pawn) then name = pawn:GetFullName() end
+    end)
+    return name
+end
 local function getAnimInstance(char)
     local mesh = nil
     pcall(function() mesh = char.Mesh end)            -- Engine.Character:Mesh
@@ -785,13 +803,7 @@ local function readState(char)
     -- noetig (deren Getter greifen am Build nicht, wie GetCarryComponent).
     local charName, pawnName = nil, nil
     pcall(function() charName = char:GetFullName() end)
-    pcall(function()
-        local pc = FindFirstOf("PlayerController")
-        if isValid(pc) then
-            local pawn = pc.Pawn
-            if isValid(pawn) then pcall(function() pawnName = pawn:GetFullName() end) end
-        end
-    end)
+    pawnName = getControlledPawnName()   -- PC gecacht (kein FindFirstOf jeden Tick)
     if charName and pawnName and charName ~= pawnName then st.riding = true end
     -- inWater/transformed via AnimInstance (Bonus; greift am Build evtl. nicht → bleibt false).
     local anim = getAnimInstance(char)
