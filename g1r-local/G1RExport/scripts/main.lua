@@ -52,13 +52,14 @@ local warmup = WARMUP_TICKS
 -- wenn der Damage-Hook (READ_DMG_OUT) aktiv ist.
 local TOTALS_PATH = [[C:\obs-g1r\g1r-totals.json]]
 local totals = { damageTaken=0, healthRegen=0, manaSpent=0, manaRegen=0, xpGained=0,
-                 distanceM=0, steps=0, damageDealt=0, kills=0, rideDistanceM=0,
+                 distanceM=0, steps=0, damageDealt=0, kills=0, hits=0, rideDistanceM=0,
                  recHardestTaken=0, recManaTick=0, recRunM=0, recHardestDealt=0 }
 local sessDamageDealt = 0   -- ausgeteilter Schaden DIESER Session (Damage-Hook)
 -- Hook-basierte Kills (READ_KILLS_HOOK): {creatureType=count} dieser Session + Gesamt-Session-Zahl.
 -- Ersetzt die tote PuzzlesSubsystem-Map; gleiches Map-Format → Widget/News bleiben unverändert.
 local hookKills = {}
 local sessKills = 0
+local sessHits = 0           -- Spieler-Treffer dieser Session (ApplyDamageTo-Hit-Hook)
 local killDiagN = 0          -- zaehlt geloggte Kill-Hook-Feuerungen (erste 8, Spieler vs NPC)
 local dmgOutDiagN = 0          -- zaehlt geloggte DmgOut-Hook-Feuerungen (erste 8, self + Filter)
 local combo = nil            -- laufender Combo-/Schlagzähler (READ_COMBO), Int oder nil
@@ -1563,26 +1564,42 @@ local function visualBelongsToPlayer(weaponVisual)
     return false
 end
 
+-- HIT-Hook: GothicGASLibrary:ApplyDamageTo feuert bei JEDEM Treffer (Melee/Range/Zauber),
+-- nicht nur Nahkampf. Args: Source, Instigator, DamageCauser, Target, HitData, … (statische
+-- Library-Funktion → erster Callback-Arg ist evtl. ein Context). Wir loggen die ersten 8
+-- Treffer mit allen Actor-Args + Spieler-Check, um die Arg-Position des Angreifers (Spieler)
+-- zu finden. HitData traegt keinen Schadenswert → erstmal nur HIT zaehlen (kein dmg).
 if READ_DMG_OUT then
     pcall(function()
-        RegisterHook("/Script/G1R.MeleeWeaponVisual:OnDamageDealt", function(self, Target, relativeDamage)
+        RegisterHook("/Script/G1R.GothicGASLibrary:ApplyDamageTo", function(...)
+            local args = { ... }
             pcall(function()
-                local dmg = unwrap(relativeDamage)
-                if type(dmg) ~= "number" then return end
-                local mine = visualBelongsToPlayer(self)
                 if dmgOutDiagN < 8 then
                     dmgOutDiagN = dmgOutDiagN + 1
-                    local sn = "(nil)"
-                    pcall(function() sn = shortName(unwrap(self):GetFullName()) end)
-                    print(string.format("[G1RExport] DmgOut-Hook #%d: self=%q dmg=%s belongsToPlayer=%s\n",
-                        dmgOutDiagN, tostring(sn), tostring(dmg), tostring(mine)))
+                    local parts = {}
+                    for i = 1, math.min(#args, 5) do
+                        local nm, isP = "?", "?"
+                        pcall(function()
+                            local a = unwrap(args[i])
+                            nm = shortName(a:GetFullName())
+                            isP = tostring(isPlayerActor(a))
+                        end)
+                        parts[#parts + 1] = string.format("arg%d=%s(p=%s)", i, tostring(nm), isP)
+                    end
+                    print(string.format("[G1RExport] Hit-Hook #%d: %s\n",
+                        dmgOutDiagN, table.concat(parts, " ")))
                 end
-                if not mine or dmg <= 0 then return end
-                sessDamageDealt = sessDamageDealt + dmg
-                totals.damageDealt = totals.damageDealt + dmg
-                if dmg > sess.recHardestDealt then sess.recHardestDealt = dmg end
-                if dmg > totals.recHardestDealt then totals.recHardestDealt = dmg end
-                pendingEvents[#pendingEvents + 1] = { kind = "hit_dealt", value = math.floor(dmg + 0.5) }
+                -- Spieler-Treffer zaehlen: einer der ersten Actor-Args (Source/Instigator/
+                -- DamageCauser) ist der Spieler. Wir pruefen die ersten Args auf isPlayerActor.
+                local mine = false
+                for i = 1, math.min(#args, 4) do
+                    if isPlayerActor(unwrap(args[i])) then mine = true; break end
+                end
+                if mine then
+                    sessHits = sessHits + 1
+                    totals.hits = (totals.hits or 0) + 1
+                    pendingEvents[#pendingEvents + 1] = { kind = "hit_dealt", value = 1 }
+                end
             end)
         end)
     end)
@@ -1758,6 +1775,6 @@ end)
 
 -- BUILD-Marke: zeigt im Log, WELCHE main.lua-Version geladen ist (gegen "alter Mod
 -- noch drauf"-Verwechslung). Bei jeder relevanten Aenderung hochzaehlen.
-local MOD_BUILD = "2026-06-22-killwarmup"
+local MOD_BUILD = "2026-06-22-hithook"
 print("[G1RExport] geladen BUILD=" .. MOD_BUILD .. " — schreibt nach " .. OUTPUT_PATH
     .. " · Dump: Strg+Shift+J · Inv-Debug: Strg+Shift+I\n")
