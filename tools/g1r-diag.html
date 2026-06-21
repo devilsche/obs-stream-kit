@@ -96,7 +96,16 @@
 
       setStatus('Lädt hoch …', '');
       fetch('/app/tools/diag/upload', { method: 'POST', body: fd })
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (r) {
+          // Antwort kann HTML sein (413 zu groß, 302 Login) → nicht blind JSON parsen.
+          var ct = r.headers.get('content-type') || '';
+          if (ct.indexOf('application/json') === -1) {
+            if (r.status === 413) throw new Error('Datei zu groß für den Server (nginx-Limit). Erst nur das Log ohne .dmp probieren.');
+            if (r.status === 302 || r.status === 401) throw new Error('Nicht eingeloggt — erst im Dashboard als Admin anmelden.');
+            throw new Error('Server-Antwort HTTP ' + r.status + ' (kein JSON).');
+          }
+          return r.json().then(function (j) { return { ok: r.ok, j: j }; });
+        })
         .then(function (res) {
           if (res.ok) {
             var parts = [];
@@ -107,7 +116,7 @@
             setStatus('Fehler: ' + (res.j.error || 'Upload fehlgeschlagen'), 'err');
           }
         })
-        .catch(function () { setStatus('Netzwerkfehler beim Upload.', 'err'); });
+        .catch(function (err) { setStatus(err.message || 'Netzwerkfehler beim Upload.', 'err'); });
     });
   </script>
 </body>
