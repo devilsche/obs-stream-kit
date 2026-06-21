@@ -59,8 +59,8 @@ local sessDamageDealt = 0   -- ausgeteilter Schaden DIESER Session (Damage-Hook)
 -- Ersetzt die tote PuzzlesSubsystem-Map; gleiches Map-Format → Widget/News bleiben unverändert.
 local hookKills = {}
 local sessKills = 0
-local killHookDiag = false   -- erster Kill loggt #args + Causer (Spieler-Filter belegen)
-local dmgOutDiag = false      -- erster Treffer loggt self-Kette (Spieler-Filter belegen)
+local killDiagN = 0          -- zaehlt geloggte Kill-Hook-Feuerungen (erste 8, Spieler vs NPC)
+local dmgOutDiagN = 0          -- zaehlt geloggte DmgOut-Hook-Feuerungen (erste 8, self + Filter)
 local combo = nil            -- laufender Combo-/Schlagzähler (READ_COMBO), Int oder nil
 local lastEquippedWeapon = nil  -- zuletzt GEFUEHRTE Waffe (gecacht): bleibt erhalten, wenn die
                                 -- Waffe gesteckt wird (Carry liefert dann Faust). Fuer "staerkste
@@ -1511,12 +1511,14 @@ if READ_KILLS_HOOK then
         RegisterHook("/Script/G1R.AIAgentCharacter:HandleDefeated", function(self, DefeatingCharacterActor)
             pcall(function()
                 local causer = DefeatingCharacterActor
-                if not killHookDiag then
-                    killHookDiag = true
+                -- Die ersten Kills loggen (Causer-Kurzname + isPlayer), damit Spieler- von
+                -- NPC-Kills unterscheidbar sind (erster war ein NPC-vs-NPC-Kill).
+                if killDiagN < 8 then
+                    killDiagN = killDiagN + 1
                     local cn = "(nil)"
-                    pcall(function() cn = unwrap(causer):GetFullName() end)
-                    print(string.format("[G1RExport] Kill-Hook feuerte. Causer=%q isPlayer=%s\n",
-                        tostring(cn), tostring(isPlayerActor(causer))))
+                    pcall(function() cn = shortName(unwrap(causer):GetFullName()) end)
+                    print(string.format("[G1RExport] Kill-Hook #%d: Causer=%q isPlayer=%s\n",
+                        killDiagN, tostring(cn), tostring(isPlayerActor(causer))))
                 end
                 if not isPlayerActor(causer) then return end
                 local dying = unwrap(self)
@@ -1558,12 +1560,12 @@ if READ_DMG_OUT then
                 local dmg = unwrap(relativeDamage)
                 if type(dmg) ~= "number" then return end
                 local mine = visualBelongsToPlayer(self)
-                if not dmgOutDiag then
-                    dmgOutDiag = true
+                if dmgOutDiagN < 8 then
+                    dmgOutDiagN = dmgOutDiagN + 1
                     local sn = "(nil)"
-                    pcall(function() sn = unwrap(self):GetFullName() end)
-                    print(string.format("[G1RExport] DmgOut-Hook feuerte. self=%q relativeDamage=%s belongsToPlayer=%s\n",
-                        tostring(sn), tostring(dmg), tostring(mine)))
+                    pcall(function() sn = shortName(unwrap(self):GetFullName()) end)
+                    print(string.format("[G1RExport] DmgOut-Hook #%d: self=%q dmg=%s belongsToPlayer=%s\n",
+                        dmgOutDiagN, tostring(sn), tostring(dmg), tostring(mine)))
                 end
                 if not mine or dmg <= 0 then return end
                 sessDamageDealt = sessDamageDealt + dmg
