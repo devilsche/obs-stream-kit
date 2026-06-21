@@ -18,3 +18,4 @@
 
 # NIE auf true setzen (crasht hart am aktuellen Build):
 # READ_SPELL / READ_WEAPONS
+# READ_STATE  (crasht beim Reiten/Verwandeln — Pawn-Wechsel)
