@@ -25,7 +25,8 @@ local POLL_INTERVAL_MS = 400   -- langsamer = kleineres Thread-Race-Fenster bei 
 
 -- ── State ──────────────────────────────────────────────────────────────────
 local CachedPlayer = nil
-local totalDistCm  = 0      -- aufsummierte horizontale Laufstrecke (cm), ab Mod-Start
+local totalDistCm  = 0      -- aufsummierte horizontale Laufstrecke (cm, zu Fuss), ab Mod-Start
+local rideDistCm   = 0      -- aufsummierte Reitstrecke (cm, auf dem Reittier), getrennt von der Laufstrecke
 local lastPos      = nil    -- letzte Position für die Delta-Berechnung
 local MAX_STEP_CM  = 1000   -- Delta/Tick > 10 m → Teleport/Ladezone → ignorieren
 local STEP_LEN_M   = 0.75   -- grobe Schrittlänge für die Schritt-Schätzung
@@ -50,7 +51,7 @@ local warmup = WARMUP_TICKS
 -- wenn der Damage-Hook (READ_DMG_OUT) aktiv ist.
 local TOTALS_PATH = [[C:\obs-g1r\g1r-totals.json]]
 local totals = { damageTaken=0, healthRegen=0, manaSpent=0, manaRegen=0, xpGained=0,
-                 distanceM=0, steps=0, damageDealt=0, kills=0,
+                 distanceM=0, steps=0, damageDealt=0, kills=0, rideDistanceM=0,
                  recHardestTaken=0, recManaTick=0, recRunM=0, recHardestDealt=0 }
 local sessDamageDealt = 0   -- ausgeteilter Schaden DIESER Session (Damage-Hook)
 -- Hook-basierte Kills (READ_KILLS_HOOK): {creatureType=count} dieser Session + Gesamt-Session-Zahl.
@@ -111,7 +112,7 @@ local READ_DMG_OUT = false  -- ausgeteilter Schaden via Damage-Hook (Engine-Eing
 local READ_KILLS_HOOK = false  -- ungetestet (Hook bei Kill) → einzeln via g1r-flags.txt testen
 local READ_CARRY      = true   -- läuft: geführte Waffe + "in hand" (CarryComponent)
 local READ_COMBO      = true   -- läuft: GetAttackCount (gleiches Modul wie attack)
-local READ_STATE      = false  -- CRASHT beim Reiten/Verwandeln (Pawn-Wechsel → Mount/AnimInstance-Zugriff) → AUS lassen
+local READ_STATE      = true   -- Reiten/Wasser/Verwandelt (Mount/AnimInstance). Lief auf dem Game-Thread (seit ExecuteInGameThread) crashfrei — steuert u.a. die Reitstrecke
 
 -- ── Lokale Flag-Overrides (überleben Pull/Kopieren) ─────────────────────────
 -- Problem: beim Aktualisieren der main.lua stehen die Flags wieder auf Default false →
@@ -984,10 +985,10 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack
     parts[#parts+1] = string.format('"distanceM":%.1f,"steps":%d', meters, steps)
     -- Session-Zähler (ab Mod-Start): Schaden/Regen/Mana-Verbrauch/XP + Strecke/Schritte.
     parts[#parts+1] = string.format(
-        '"session":{"damageTaken":%d,"healthRegen":%d,"manaSpent":%d,"manaRegen":%d,"xpGained":%d,"steps":%d,"distanceM":%.1f}',
+        '"session":{"damageTaken":%d,"healthRegen":%d,"manaSpent":%d,"manaRegen":%d,"xpGained":%d,"steps":%d,"distanceM":%.1f,"rideDistanceM":%.1f}',
         math.floor(sess.damageTaken + 0.5), math.floor(sess.healthRegen + 0.5),
         math.floor(sess.manaSpent + 0.5), math.floor(sess.manaRegen + 0.5),
-        math.floor(sess.xpGained + 0.5), steps, meters)
+        math.floor(sess.xpGained + 0.5), steps, meters, rideDistCm / 100)
     parts[#parts+1] = string.format('"session_damageDealt":%d', math.floor(sessDamageDealt + 0.5))
     parts[#parts+1] = string.format('"session_kills":%d', math.floor(sessKills + 0.5))
     -- Session-Rekorde (spiegelt "records", aber nur diese Session) → Career-Card scope=session.
@@ -997,10 +998,10 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack
         sess.recRunM, math.floor(sess.recHardestDealt+0.5))
     -- Persistente Gesamt-Werte (alle Sessions).
     parts[#parts+1] = string.format(
-        '"totals":{"damageTaken":%d,"healthRegen":%d,"manaSpent":%d,"manaRegen":%d,"xpGained":%d,"distanceM":%.1f,"steps":%d,"damageDealt":%d,"kills":%d}',
+        '"totals":{"damageTaken":%d,"healthRegen":%d,"manaSpent":%d,"manaRegen":%d,"xpGained":%d,"distanceM":%.1f,"steps":%d,"damageDealt":%d,"kills":%d,"rideDistanceM":%.1f}',
         math.floor(totals.damageTaken+0.5), math.floor(totals.healthRegen+0.5), math.floor(totals.manaSpent+0.5),
         math.floor(totals.manaRegen+0.5), math.floor(totals.xpGained+0.5), totals.distanceM, totals.steps,
-        math.floor(totals.damageDealt+0.5), math.floor((totals.kills or 0)+0.5))
+        math.floor(totals.damageDealt+0.5), math.floor((totals.kills or 0)+0.5), totals.rideDistanceM or 0)
     -- Rekorde.
     parts[#parts+1] = string.format(
         '"records":{"hardestTaken":%d,"manaTick":%d,"runM":%.1f,"hardestDealt":%d}',
@@ -1064,17 +1065,27 @@ local function tick()
         warmup = WARMUP_TICKS  -- beim nächsten gültigen Tick erst Baseline aufbauen
         return
     end
+    -- Zustand (Reiten/Wasser/Verwandelt) FRUEH lesen → steuert die Strecken-Zuordnung.
+    local st
+    if READ_STATE then pcall(function() st = readState(char) end) end
+    local riding = (st and st.riding) or false
     local pos, items
     pcall(function() pos = readPosition(char) end)
-    -- Laufstrecke aufsummieren (horizontal; Teleports/Ladezonen über MAX_STEP_CM raus).
+    -- Strecke aufsummieren (horizontal; Teleports/Ladezonen über MAX_STEP_CM raus).
+    -- Beim Reiten zaehlt das Delta als REITstrecke, sonst als Laufstrecke (zu Fuss).
     if pos then
         if lastPos then
             local dx, dy = pos.x - lastPos.x, pos.y - lastPos.y
             local d = math.sqrt(dx * dx + dy * dy)
             if d <= MAX_STEP_CM then
-                totalDistCm = totalDistCm + d
-                totals.distanceM = totals.distanceM + d / 100
-                totals.steps = math.floor(totals.distanceM / STEP_LEN_M)
+                if riding then
+                    rideDistCm = rideDistCm + d
+                    totals.rideDistanceM = (totals.rideDistanceM or 0) + d / 100
+                else
+                    totalDistCm = totalDistCm + d
+                    totals.distanceM = totals.distanceM + d / 100
+                    totals.steps = math.floor(totals.distanceM / STEP_LEN_M)
+                end
             end
         end
         lastPos = pos
@@ -1203,8 +1214,7 @@ local function tick()
     -- wenn er tatsächlich etwas liefert.
     if READ_CARRY then pcall(function() local w = readCarryWeapon(char); if w then weapon = w end end) end
     if READ_COMBO then pcall(function() combo = readCombo(char) end) else combo = nil end
-    local state
-    if READ_STATE then pcall(function() state = readState(char) end) end
+    local state = st   -- bereits frueh gelesen (fuer die Reit-/Lauf-Strecken-Zuordnung)
     local attack
     if READ_ATTACK then pcall(function() attack = readAttack(char) end) end
     -- Einmaliges Diagnose-Log (Stufe 2). Steht VOR den riskanten Readern und nutzt nur
