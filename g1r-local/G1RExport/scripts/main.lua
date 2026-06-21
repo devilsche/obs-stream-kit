@@ -123,7 +123,11 @@ local READ_ITEMDMG    = false  -- pro Item echten Schaden+Typ live (GetBaseConfi
 -- Die Datei wird NICHT von Git/Kopieren angefasst → deine Einstellungen bleiben.
 -- Nur dort gesetzte Flags überschreiben den Default; alles andere bleibt wie oben.
 do
-    local f = io.open([[C:\obs-g1r\g1r-flags.txt]], "r")
+    local FLAGS_PATH = [[C:\obs-g1r\g1r-flags.txt]]
+    local f = io.open(FLAGS_PATH, "r")
+    if not f then
+        print("[G1RExport] g1r-flags.txt NICHT gefunden unter " .. FLAGS_PATH .. " → nur main.lua-Defaults\n")
+    end
     if f then
         local s = f:read("*a"); f:close()
         local function ov(cur, name)
