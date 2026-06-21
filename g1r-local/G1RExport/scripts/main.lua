@@ -69,6 +69,11 @@ pcall(function()
     end
 end)
 local lastTotalsWrite = 0
+-- Producer/Consumer: der tick (Game-Thread) BAUT die JSON-Strings und legt sie hier ab;
+-- das eigentliche Datei-Schreiben (Disk-I/O) macht der Loop-Thread. So blockiert die
+-- langsame Disk-I/O NICHT den Game-Thread (sonst Frame-Ruckler im Spiel).
+local pendingJson = nil
+local pendingTotals = nil
 
 -- Optionale Reader (Stand 2026-06-17, in-game verifiziert).
 -- An: Schlag (Schlagrichtung) + Uhr laufen stabil.
@@ -1159,16 +1164,17 @@ local function tick()
     end
     local json = buildJson(pos, items or {}, totalDistCm, stats or {}, guild, spell,
                            weapon, attack, clock, kills, killNews, combo, state)
-    local f = io.open(OUTPUT_PATH, "w")
-    if f then f:write(json); f:close(); pendingEvents = {} end
-    -- Gesamt-Werte nicht jeden Tick schreiben (I/O), nur ~alle 10 s.
+    -- NICHT hier schreiben (Game-Thread!) — nur den String ablegen; der Loop-Thread
+    -- schreibt ihn auf Disk. pendingEvents leeren (sind im json schon drin).
+    pendingJson = json
+    pendingEvents = {}
+    -- Gesamt-Werte nur ~alle 24 s als String ablegen (Loop-Thread schreibt).
     lastTotalsWrite = lastTotalsWrite + 1
     if lastTotalsWrite >= 40 then
         lastTotalsWrite = 0
         local tp = {}
         for k, v in pairs(totals) do tp[#tp+1] = string.format('"%s":%.2f', k, v) end
-        local tf = io.open(TOTALS_PATH, "w")
-        if tf then tf:write("{" .. table.concat(tp, ",") .. "}"); tf:close() end
+        pendingTotals = "{" .. table.concat(tp, ",") .. "}"
     end
 end
 
@@ -1273,13 +1279,27 @@ end
 -- vorherige Task noch nicht durch ist (Spiel pausiert/Game-Thread langsam).
 local tickRunning = false
 LoopAsync(POLL_INTERVAL_MS, function()
-    if tickRunning then return false end   -- vorheriger Game-Thread-Tick läuft noch → diesen Poll überspringen
-    tickRunning = true
-    ExecuteInGameThread(function()
-        local ok = pcall(tick)
-        if not ok then CachedPlayer = nil; lastPos = nil end
-        tickRunning = false
-    end)
+    -- 1. Disk-I/O im LOOP-Thread (nicht Game-Thread → keine Frame-Ruckler im Spiel).
+    if pendingJson then
+        local f = io.open(OUTPUT_PATH, "w")
+        if f then f:write(pendingJson); f:close() end
+        pendingJson = nil
+    end
+    if pendingTotals then
+        local tf = io.open(TOTALS_PATH, "w")
+        if tf then tf:write(pendingTotals); tf:close() end
+        pendingTotals = nil
+    end
+    -- 2. Engine-Reads + JSON-Bauen auf dem GAME-THREAD (thread-safe). Ein Task pro Poll,
+    --    Überlapp-Guard falls der vorige noch läuft (Spiel pausiert/Game-Thread langsam).
+    if not tickRunning then
+        tickRunning = true
+        ExecuteInGameThread(function()
+            local ok = pcall(tick)
+            if not ok then CachedPlayer = nil; lastPos = nil end
+            tickRunning = false
+        end)
+    end
     return false  -- nie stoppen
 end)
 

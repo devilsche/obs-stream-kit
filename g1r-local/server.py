@@ -175,6 +175,10 @@ _GUILD_MATCH = [
 ]
 
 
+# Letzter gueltiger Gilden-Key (haelt die Anzeige stabil, wenn GetGuild kurz nichts liefert).
+_GUILD_CACHE = {"key": None}
+
+
 def map_guild(raw):
     """Rohen Gilden-Tag auf einen stabilen Key abbilden. None bei leer/keine Gilde."""
     if not raw:
@@ -237,7 +241,13 @@ def build_payload(lang):
     # Erz (Erznugget) — Gothic-Waehrung, Summe aus dem Inventar.
     data["ore"] = ore_count(data.get("items"))
     # Gilde: Rohtag -> stabiler Key (steuert Wappen-Symbol) + lokalisierter Name.
+    # GetGuild() liefert direkt nach dem Laden (State noch nicht voll) teils nichts →
+    # den letzten GUELTIGEN Key cachen, damit die Gilde nicht auf "Adventurer" flackert.
     gk = map_guild(data.get("guild"))
+    if gk:
+        _GUILD_CACHE["key"] = gk
+    else:
+        gk = _GUILD_CACHE["key"]
     if gk:
         data["guildKey"] = gk
         data["guildName"] = (GUILD_NAMES.get(gk) or {}).get(lang) or gk
