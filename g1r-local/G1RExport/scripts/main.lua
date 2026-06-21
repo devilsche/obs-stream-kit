@@ -1658,7 +1658,7 @@ pcall(function()
                     local slots; pcall(function() slots = vd.m_Slots end)
                     local sn = arrLen(slots)
                     add("     m_Slots count = " .. tostring(sn))
-                    local spellProbed = false
+                    local spellProbes = 0
                     for i = 0, sn - 1 do
                         local item = arrGet(slots, i)
                         if item then
@@ -1675,8 +1675,8 @@ pcall(function()
                                     -- SPELL-PROBE: bei der ERSTEN Rune (ItAr_) die Kandidaten-
                                     -- Wege zum Zauber-Schaden testen (Feld existiert? Objekt? Wert?).
                                     local nml = (shortName(full) or ""):lower()
-                                    if nml:find("itar") and not spellProbed and isValid(cdo) then
-                                        spellProbed = true
+                                    if nml:find("itar") and spellProbes < 6 and isValid(cdo) then
+                                        spellProbes = spellProbes + 1
                                         local pb = {}
                                         local function tst(lbl, fn) local v; pcall(function() v=fn() end)
                                             pb[#pb+1] = lbl.."="..(isValid(v) and "OBJ" or tostring(v)) end
