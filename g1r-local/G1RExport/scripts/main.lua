@@ -491,7 +491,35 @@ local function classCDO(cls)
     if isValid(cdo) then return cdo end
     pcall(function() cdo = cls:GetDefaultObject() end)
     if isValid(cdo) then return cdo end
+    -- Fallback: CDO ueber den Default__-Pfad finden. GetFullName(cls) =
+    -- "BlueprintGeneratedClass /Game/.../X.X_C" → CDO = "/Game/.../X.Default__X_C".
+    local full = nil
+    pcall(function() full = cls:GetFullName() end)
+    if full then
+        local path = full:match("%s(.+)$") or full
+        local cdoPath = path:gsub("%.([^%.]+)$", ".Default__%1")
+        pcall(function() cdo = StaticFindObject(cdoPath) end)
+        if isValid(cdo) then return cdo end
+    end
     return nil
+end
+-- Schaden einer Definition: GetAllDamages() ODER das Feld m_DamageBase (Map<Typ→Float>).
+local function damageOfDefinition(cdo)
+    if not isValid(cdo) then return nil end
+    local d = damageSumOf(cdo)             -- versucht GetAllDamages()
+    if d then return d end
+    local mb = nil
+    pcall(function() mb = cdo.m_DamageBase end)   -- Feld-Map
+    if mb == nil then return nil end
+    pcall(function() mb = unwrap(mb) end)
+    local sum, any = 0, false
+    pcall(function()
+        mb:ForEach(function(_, v)
+            local val = unwrap(v)
+            if type(val) == "number" then sum = sum + val; any = true end
+        end)
+    end)
+    return any and sum or nil
 end
 -- Ergaenzt ein Item (in-place) um wType/dmg aus seiner KLASSE (Container-Weg).
 local function annotateItemFromClass(cls, it)
@@ -503,7 +531,7 @@ local function annotateItemFromClass(cls, it)
     -- Schaden vom CDO (GetAllDamages-Map summiert) — nur fuer Waffen.
     if cat then
         local cdo = classCDO(cls)
-        local dmg = cdo and damageSumOf(cdo) or nil
+        local dmg = damageOfDefinition(cdo)
         if dmg then it.dmg = math.floor(dmg + 0.5) end
         if not itemDmgDiag then
             itemDmgDiag = true
@@ -1581,10 +1609,10 @@ pcall(function()
                                 if cnt and cnt > 0 then
                                     local cls; pcall(function() cls = sd.m_ItemDefinition end)
                                     local full; pcall(function() full = cls:GetFullName() end)
-                                    add(string.format("     [%d] %s x%d dmgDirekt=%s dmgCDO=%s cdo=%s", i,
+                                    local cdo = classCDO(cls)
+                                    add(string.format("     [%d] %s x%d cdo=%s dmg=%s", i,
                                         tostring(shortName(full)), cnt,
-                                        tostring(damageSumOf(cls)), tostring(damageSumOf(classCDO(cls))),
-                                        tostring(isValid(classCDO(cls)))))
+                                        tostring(isValid(cdo)), tostring(damageOfDefinition(cdo))))
                                     shown = shown + 1
                                 end
                             end)
@@ -1595,9 +1623,10 @@ pcall(function()
                 local comp = getCarryComponent(char)
                 local cdef; if comp then pcall(function() cdef = comp:GetEquippedItemDefinition() end) end
                 local cfull; if cdef then pcall(function() cfull = cdef:GetFullName() end) end
+                local ccdo = classCDO(cdef)
                 add("Weg3 Carry equipped = " .. tostring(shortName(cfull))
-                    .. " dmgDirekt=" .. tostring(damageSumOf(cdef))
-                    .. " dmgCDO=" .. tostring(damageSumOf(classCDO(cdef))))
+                    .. " cdo=" .. tostring(isValid(ccdo))
+                    .. " dmg=" .. tostring(damageOfDefinition(ccdo)))
                 local f = io.open([[C:\obs-g1r\g1r-debug.txt]], "w")
                 if f then f:write(table.concat(L, "\n") .. "\n"); f:close() end
             end)
