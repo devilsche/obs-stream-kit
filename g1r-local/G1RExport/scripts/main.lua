@@ -28,6 +28,7 @@ local CachedPlayer = nil
 local totalDistCm  = 0      -- aufsummierte horizontale Laufstrecke (cm, zu Fuss), ab Mod-Start
 local rideDistCm   = 0      -- aufsummierte Reitstrecke (cm, auf dem Reittier), getrennt von der Laufstrecke
 local lastPos      = nil    -- letzte Position für die Delta-Berechnung
+local prevRiding   = false   -- riding-Zustand des letzten Ticks (Pawn-Wechsel erkennen)
 local MAX_STEP_CM  = 1000   -- Delta/Tick > 10 m → Teleport/Ladezone → ignorieren
 local STEP_LEN_M   = 0.75   -- grobe Schrittlänge für die Schritt-Schätzung
 
@@ -771,17 +772,22 @@ end
 local stateDiag = false
 local lastRidingLog = nil   -- letzter geloggter riding-Zustand (loggt bei Aenderung)
 local CachedPC = nil        -- PlayerController gecacht (FindFirstOf jeden Tick ruckelt)
-local function getControlledPawnName()
-    -- Name des gerade gesteuerten Pawns (beim Reiten das Reittier). PC gecacht.
+local function getControlledPawn()
+    -- Der gerade GESTEUERTE Pawn: zu Fuss der Spieler, beim Reiten das Reittier — also
+    -- der, der sich durch die Welt bewegt (wichtig fuer die Strecke). PC gecacht.
     if not isValid(CachedPC) then
         pcall(function() CachedPC = FindFirstOf("PlayerController") end)
     end
     if not isValid(CachedPC) then return nil end
+    local pawn = nil
+    pcall(function() pawn = CachedPC.Pawn end)
+    return isValid(pawn) and pawn or nil
+end
+local function getControlledPawnName()
+    local pawn = getControlledPawn()
+    if not pawn then return nil end
     local name = nil
-    pcall(function()
-        local pawn = CachedPC.Pawn
-        if isValid(pawn) then name = pawn:GetFullName() end
-    end)
+    pcall(function() name = pawn:GetFullName() end)
     return name
 end
 local function getAnimInstance(char)
@@ -1101,7 +1107,13 @@ local function tick()
     if READ_STATE then pcall(function() st = readState(char) end) end
     local riding = (st and st.riding) or false
     local pos, items
-    pcall(function() pos = readPosition(char) end)
+    -- Position vom GESTEUERTEN Pawn (beim Reiten das Reittier, das sich bewegt — der
+    -- Spieler-Pawn ist drangeheftet und bewegt sich nicht eigenstaendig). Sonst Spieler.
+    local movePawn = getControlledPawn() or char
+    pcall(function() pos = readPosition(movePawn) end)
+    -- Beim Auf-/Absteigen wechselt der gelesene Pawn (Spieler <-> Reittier) → der
+    -- Positionssprung darf NICHT als Strecke zaehlen. lastPos verwerfen beim Wechsel.
+    if riding ~= prevRiding then lastPos = nil; prevRiding = riding end
     -- Strecke aufsummieren (horizontal; Teleports/Ladezonen über MAX_STEP_CM raus).
     -- Beim Reiten zaehlt das Delta als REITstrecke, sonst als Laufstrecke (zu Fuss).
     if pos then
