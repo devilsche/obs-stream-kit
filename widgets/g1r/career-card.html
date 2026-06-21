@@ -12,9 +12,7 @@
   <script type="application/json" id="params">
 [ {"key":"port","label":"Proxy-Port","type":"text","group":"Verbindung","default":"9210"},
   {"key":"scope","label":"Scope","type":"select","group":"Anzeige","default":"all",
-   "options":[["session","Session"],["all","All"]]},
-  {"key":"lang","label":"Sprache","type":"select","group":"Anzeige","default":"en",
-   "options":[["en","English"],["de","Deutsch"]]} ]
+   "options":[["session","Session"],["all","All"]]} ]
 </script>
 <script src="../_params.js"></script>
 </head>
@@ -78,7 +76,10 @@
     // Lokaler Proxy auf dem Spiel-PC. Port via ?port=. Scope via ?scope=session|all
     // (Default all = Karriere). KEIN Mischen: alle Totals UND Records folgen dem Scope.
     var P = Params.values(Params.readParams());
-    var PORT = P.port, SCOPE = (P.scope || 'all').toLowerCase(), LANG = P.lang || 'en';
+    // Career-Card ist die Show-Karte fuers (englischsprachige) Publikum → IMMER englisch,
+    // unabhaengig von einem evtl. in der OBS-URL gesetzten ?lang=. (Gilde + Waffennamen
+    // kamen sonst deutsch durch, wenn die URL lang=de trug.)
+    var PORT = P.port, SCOPE = (P.scope || 'all').toLowerCase(), LANG = 'en';
     var USE_ALL = (SCOPE !== 'session');
     var BASE = 'http://localhost:' + PORT;
 
