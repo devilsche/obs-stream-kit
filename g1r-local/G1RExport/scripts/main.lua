@@ -114,6 +114,7 @@ local READ_KILLS_HOOK = false  -- ungetestet (Hook bei Kill) → einzeln via g1r
 local READ_CARRY      = true   -- läuft: geführte Waffe + "in hand" (CarryComponent)
 local READ_COMBO      = true   -- läuft: GetAttackCount (gleiches Modul wie attack)
 local READ_STATE      = true   -- Reiten/Wasser/Verwandelt (Mount/AnimInstance). Lief auf dem Game-Thread (seit ExecuteInGameThread) crashfrei — steuert u.a. die Reitstrecke
+local READ_ITEMDMG    = false  -- pro Item echten Schaden+Typ live (GetBaseConfigByPos/GetAllDamages) → staerkste Waffe aus echten Werten. Erst in-game testen (Definition-Reflection)
 
 -- ── Lokale Flag-Overrides (überleben Pull/Kopieren) ─────────────────────────
 -- Problem: beim Aktualisieren der main.lua stehen die Flags wieder auf Default false →
@@ -142,6 +143,7 @@ do
         READ_CARRY      = ov(READ_CARRY,      "READ_CARRY")
         READ_COMBO      = ov(READ_COMBO,      "READ_COMBO")
         READ_STATE      = ov(READ_STATE,      "READ_STATE")
+        READ_ITEMDMG    = ov(READ_ITEMDMG,    "READ_ITEMDMG")
         print(string.format(
             "[G1RExport] Flag-Overrides aus g1r-flags.txt: CARRY=%s COMBO=%s KILLS_HOOK=%s DMG_OUT=%s\n",
             tostring(READ_CARRY), tostring(READ_COMBO), tostring(READ_KILLS_HOOK), tostring(READ_DMG_OUT)))
@@ -446,6 +448,62 @@ local function readInventory(char)
     return {}
 end
 
+-- ── Item-Schaden + Typ live (READ_ITEMDMG) ──────────────────────────────────
+-- Pro Inventar-Position die ItemDefinition holen (GetBaseConfigByPos) und daraus den
+-- ECHTEN Gesamtschaden (GetAllDamages → Map<Typ→Float> summiert) + Waffenkategorie lesen.
+-- So kommt die staerkste Waffe aus echten In-Game-Werten (statt weapon_damage.json) und
+-- die ausgeruestete (gesteckte) Waffe ist als Item mit Schaden dabei. Alles defensiv;
+-- am Build noch zu verifizieren (Definition-Reflection) → erste Waffe wird geloggt.
+local itemDmgDiag = false
+local function damageSumOf(cfg)
+    if not isValid(cfg) then return nil end
+    local map = nil
+    pcall(function() map = cfg:GetAllDamages() end)
+    if map == nil then return nil end
+    pcall(function() map = unwrap(map) end)
+    local sum, any = 0, false
+    pcall(function()
+        map:ForEach(function(_, v)
+            local val = unwrap(v)
+            if type(val) == "number" then sum = sum + val; any = true end
+        end)
+    end)
+    return any and sum or nil
+end
+local function weaponCategoryOf(cfgName)
+    if not cfgName then return nil end
+    local low = cfgName:lower()
+    if low:find("itmw") or low:find("melee") then return "melee" end
+    if low:find("itrw") or low:find("ranged") then return "ranged" end
+    return nil
+end
+-- Ergaenzt ein Item (in-place) um dmg/wType/equipped, gelesen aus seiner Definition.
+local function annotateItem(base, i, it)
+    local cfg = nil
+    pcall(function() cfg = base:GetBaseConfigByPos(i) end)
+    cfg = unwrap(cfg)
+    local cfgName = nil
+    if isValid(cfg) then pcall(function() cfgName = shortName(cfg:GetFullName()) end) end
+    local cat = weaponCategoryOf(cfgName)
+    local dmg = cat and damageSumOf(cfg) or nil   -- Schaden nur fuer Waffen
+    if cat then it.wType = cat end
+    if dmg then it.dmg = math.floor(dmg + 0.5) end
+    -- Slot-Typ: MeleeSlot=3 / RangedSlot=4 = ausgeruestet (gesteckt).
+    local slot = nil
+    pcall(function() slot = base:GetItemInventoryTypeByPos(i) end)
+    local slotS = slot ~= nil and tostring(slot) or ""
+    if slotS:find("Melee") or slotS:find("Ranged") or slot == 3 or slot == 4 then
+        it.equipped = true
+    end
+    if not itemDmgDiag and (it.dmg or it.wType) then
+        itemDmgDiag = true
+        pcall(function()
+            print(string.format("[G1RExport] ItemDmg-Diag: cfg=%q wType=%s dmg=%s slot=%q\n",
+                tostring(cfgName), tostring(it.wType), tostring(it.dmg), slotS))
+        end)
+    end
+end
+
 -- ── Inventar gehaeppchelt lesen (gegen Frame-Ruckler) ───────────────────────
 -- Liest pro Aufruf max INV_BATCH Items und sammelt sie in invScanBuf. Erst wenn ein
 -- kompletter Scan durch ist, wird cachedItems atomar getauscht (Widget sieht nie ein
@@ -483,7 +541,10 @@ local function readInventoryBatch(char)
                 if name and name ~= "" then
                     local cnt = 1
                     pcall(function() cnt = base:GetItemAmountByPos(i) or 1 end)
-                    invScanBuf[#invScanBuf + 1] = { display = name, count = cnt }
+                    local it = { display = name, count = cnt }
+                    -- Schaden+Typ+equipped live aus der Definition (gated, am Build zu testen).
+                    if READ_ITEMDMG then pcall(function() annotateItem(base, i, it) end) end
+                    invScanBuf[#invScanBuf + 1] = it
                 end
             end
         end)
@@ -1060,6 +1121,16 @@ local function buildJson(pos, items, distCm, stats, guild, spell, weapon, attack
         end
         if item.display and item.display ~= "" then
             fields[#fields+1] = string.format('"display":"%s"', jsonEsc(item.display))
+        end
+        -- Live-Waffenwerte (READ_ITEMDMG): echter Schaden, Kategorie, ausgeruestet.
+        if type(item.dmg) == "number" then
+            fields[#fields+1] = string.format('"dmg":%d', item.dmg)
+        end
+        if item.wType then
+            fields[#fields+1] = string.format('"wType":"%s"', jsonEsc(item.wType))
+        end
+        if item.equipped then
+            fields[#fields+1] = '"equipped":true'
         end
         it[#it+1] = "{" .. table.concat(fields, ",") .. "}"
     end
