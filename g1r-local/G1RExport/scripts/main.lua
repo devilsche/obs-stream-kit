@@ -1264,12 +1264,22 @@ if READ_DMG_OUT then
 end
 
 -- UE4SS-Loop: alle POLL_INTERVAL_MS einmal schreiben.
+-- WICHTIG (Thread-Safety): der GESAMTE tick (alle Engine-Reads) läuft auf dem
+-- UE-GAME-THREAD via ExecuteInGameThread. UE4SS-Reflection ist NICHT thread-safe —
+-- aus dem LoopAsync-Thread direkt zu lesen crasht hart (C++-AV in z.B.
+-- K2_GetActorLocation), v.a. bei Pawn-Umbau (Reiten/Item-Wechsel). Crashdumps
+-- belegten readPosition als Crasher. Hier nur EIN Game-Thread-Task pro Poll
+-- (kein Per-Reader-Dispatch → keine Queue-Flutung), mit Überlapp-Guard, falls der
+-- vorherige Task noch nicht durch ist (Spiel pausiert/Game-Thread langsam).
+local tickRunning = false
 LoopAsync(POLL_INTERVAL_MS, function()
-    -- Bei einem Fehler im tick (z.B. Objekt beim Shutdown gerade abgeräumt) den
-    -- Player-Cache leeren, damit der nächste Durchlauf nicht erneut auf ein totes
-    -- Objekt zugreift.
-    local ok = pcall(tick)
-    if not ok then CachedPlayer = nil; lastPos = nil end
+    if tickRunning then return false end   -- vorheriger Game-Thread-Tick läuft noch → diesen Poll überspringen
+    tickRunning = true
+    ExecuteInGameThread(function()
+        local ok = pcall(tick)
+        if not ok then CachedPlayer = nil; lastPos = nil end
+        tickRunning = false
+    end)
     return false  -- nie stoppen
 end)
 
