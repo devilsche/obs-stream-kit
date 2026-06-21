@@ -97,32 +97,31 @@ local invCooldown = 0        -- Ticks bis zum naechsten Scan-Start
 local INV_BATCH = 10         -- Items pro Tick
 local INV_COOLDOWN = 8       -- Ticks Pause zwischen kompletten Scans (~3.2s bei 400ms)
 
--- Optionale Reader (Stand 2026-06-17, in-game verifiziert).
--- An: Schlag (Schlagrichtung) + Uhr laufen stabil.
--- Aus: SPELL + WEAPONS crashen HART am G1R-Build (GetSpellConfigGivenACharacter /
---   GetEquipedWeaponDefinition = C++-AccessViolation, auch auf dem Game-Thread, nicht
---   per pcall fangbar). KILLS läuft zwar, aber die Map (PuzzlesSubsystem) liefert keine
---   Daten → aus. Waffen/Zauber zeigt das Widget stattdessen crashfrei aus dem Inventar.
-local READ_SPELL   = false  -- CRASHT — MagicScriptLibrary:GetSpellConfigGivenACharacter
-local READ_WEAPONS = false  -- CRASHT — DataModule_Combat:GetEquipedWeaponDefinition
-local READ_ATTACK  = true   -- läuft — DataModule_Combat:GetCurrentAttackDirection
-local READ_CLOCK   = true   -- läuft — GameTimeSubsystem:GetCurrentClockTime
-local READ_KILLS   = false  -- Map liefert keine Daten (PuzzlesSubsystem) → aus
-local READ_DMG_OUT = false  -- ausgeteilter Schaden via Damage-Hook (Engine-Eingriff) → erst in-game testen
--- ── Neue Reader/Hooks aus dem Object-Dump (alle erst in-game zu verifizieren) ──
--- Reihenfolge zum Freischalten (eins nach dem anderen, UE4SS.log beobachten):
---   1) READ_KILLS_HOOK  — AIAgentCharacter:HandleDefeated(DefeatingCharacterActor); Causer==Spieler → Kill.
---                         Ersatz für die tote PuzzlesSubsystem-Map. Erster Kill loggt #args + Causer-Name.
---   2) READ_CARRY       — CarryComponent:GetEquippedItemDefinition → geführte Waffe (crashfrei, statt DataModule).
---                         Erster Read loggt, über welchen Pfad die Component gefunden wurde.
---   3) READ_COMBO       — DataModule_Combat:GetAttackCount → laufender Combo-/Schlagzähler (Int).
---   4) READ_DMG_OUT     — MeleeWeaponVisual:OnDamageDealt(Target, relativeDamage:float). MELEE-only.
---                         Erster Treffer loggt self-Kette, damit der Spieler-Filter belegbar wird.
-local READ_KILLS_HOOK = false  -- ungetestet (Hook bei Kill) → einzeln via g1r-flags.txt testen
-local READ_CARRY      = true   -- läuft: geführte Waffe + "in hand" (CarryComponent)
-local READ_COMBO      = true   -- läuft: GetAttackCount (gleiches Modul wie attack)
-local READ_STATE      = true   -- Reiten/Wasser/Verwandelt (Mount/AnimInstance). Lief auf dem Game-Thread (seit ExecuteInGameThread) crashfrei — steuert u.a. die Reitstrecke
-local READ_ITEMDMG    = true   -- ECHTER Waffenschaden live: classCDO (StaticFindObject Default__) + m_DamageBase/GetAllDamages. In-game verifiziert (Axt 50, Armbrust 60). Patch-fest, ersetzt weapon_damage.json.
+-- ── Reader-Flags (Stand 2026-06-22, in-game verifiziert) ────────────────────
+-- LÄUFT (Default an): ATTACK, CLOCK, CARRY (Waffe/in-hand), COMBO, STATE (Reiten/Wasser/
+--   verwandelt), ITEMDMG (echter Waffenschaden je Item via CDO). Plus: Position/Strecke/
+--   Reitstrecke, Stats, Gilde, Inventar, Erz, erhaltener Schaden (HP-Delta) — alles ohne Flag.
+--
+-- BUILD-VERSCHLOSSEN (Default aus, NICHT aktivieren — gruendlich getestet, gehen am
+--   aktuellen G1R-Build NICHT; der Spieler-Schaden/-Kill-Pfad laeuft ueber AngelScript,
+--   das UE4SS nicht hookt). Code bleibt gated, falls ein Patch sie mal oeffnet:
+--   • READ_SPELL    — MagicScriptLibrary:GetSpellConfigGivenACharacter = C++-Crash.
+--   • READ_WEAPONS  — DataModule_Combat:GetEquipedWeaponDefinition = C++-Crash (CarryComponent ersetzt es).
+--   • READ_KILLS    — PuzzlesSubsystem-Map leer.
+--   • READ_KILLS_HOOK — HandleDefeated feuert nur Lade-Batches, Causer NIE der Spieler (nutzlos).
+--   • READ_DMG_OUT  — ApplyDamageTo/OnDamageDealt feuern bei Spieler-Treffern NICHT.
+--   (Zauber-Schaden ebenso zu: SpellConfig-CDO nicht erreichbar.)
+local READ_ATTACK     = true
+local READ_CLOCK      = true
+local READ_CARRY      = true   -- geführte Waffe + "in hand" (CarryComponent)
+local READ_COMBO      = true   -- GetAttackCount (gleiches Modul wie attack)
+local READ_STATE      = true   -- Reiten/Wasser/verwandelt (Mount/AnimInstance, Game-Thread)
+local READ_ITEMDMG    = true   -- echter Waffenschaden je Item via CDO (patch-fest)
+local READ_SPELL      = false  -- BUILD-VERSCHLOSSEN (C++-Crash)
+local READ_WEAPONS    = false  -- BUILD-VERSCHLOSSEN (C++-Crash)
+local READ_KILLS      = false  -- BUILD-VERSCHLOSSEN (Map leer)
+local READ_KILLS_HOOK = false  -- BUILD-VERSCHLOSSEN (HandleDefeated: nur Batch, Causer nie Spieler)
+local READ_DMG_OUT    = false  -- BUILD-VERSCHLOSSEN (ApplyDamageTo/OnDamageDealt feuern bei Spieler-Treffern nicht)
 
 -- ── Lokale Flag-Overrides (überleben Pull/Kopieren) ─────────────────────────
 -- Problem: beim Aktualisieren der main.lua stehen die Flags wieder auf Default false →
@@ -1775,6 +1774,6 @@ end)
 
 -- BUILD-Marke: zeigt im Log, WELCHE main.lua-Version geladen ist (gegen "alter Mod
 -- noch drauf"-Verwechslung). Bei jeder relevanten Aenderung hochzaehlen.
-local MOD_BUILD = "2026-06-22-hithook"
+local MOD_BUILD = "2026-06-22-cleanup"
 print("[G1RExport] geladen BUILD=" .. MOD_BUILD .. " — schreibt nach " .. OUTPUT_PATH
     .. " · Dump: Strg+Shift+J · Inv-Debug: Strg+Shift+I\n")

@@ -1,21 +1,21 @@
 # G1R Mod — lokale Flag-Overrides (OPTIONAL)
 #
-# Die Defaults in main.lua sind schon richtig gesetzt:
-#   AN:  READ_ATTACK, READ_CLOCK, READ_CARRY (Waffe/in-hand), READ_COMBO
-#   AUS: READ_SPELL, READ_WEAPONS (crashen hart), READ_KILLS (tote Map),
-#        READ_KILLS_HOOK, READ_DMG_OUT (ungetestet)
+# Die Defaults in main.lua sind schon richtig gesetzt — diese Datei brauchst du nur,
+# wenn du etwas anders willst. Nach  C:\obs-g1r\g1r-flags.txt  kopieren. Format:
+# KEY=true/false je Zeile, # = Kommentar. Ueberlebt Pull/Kopieren der main.lua.
 #
-# Du brauchst diese Datei NUR, wenn du etwas anders willst als die Defaults —
-# z.B. einen ungetesteten Reader einzeln scharf schalten, ohne main.lua anzufassen.
-# Dann nach  C:\obs-g1r\g1r-flags.txt  kopieren. Pull/Kopieren der main.lua aendert
-# diese Datei NICHT. Format: KEY=true/false je Zeile, # = Kommentar.
-
-# Beispiel: den Kill-Hook zum Testen einzeln aktivieren
-# READ_KILLS_HOOK=true
-
-# Beispiel: ausgeteilten Schaden (melee) testen
-# READ_DMG_OUT=true
-
-# NIE auf true setzen (crasht hart am aktuellen Build):
-# READ_SPELL / READ_WEAPONS
-# READ_STATE  (crasht beim Reiten/Verwandeln — Pawn-Wechsel)
+# LÄUFT (per Default an, kein Eintrag noetig):
+#   READ_ATTACK, READ_CLOCK, READ_CARRY (Waffe/in-hand), READ_COMBO,
+#   READ_STATE (Reiten/Wasser/verwandelt), READ_ITEMDMG (echter Waffenschaden)
+#   + Position/Strecke/Reitstrecke, Stats, Gilde, Inventar, Erz, erhaltener Schaden.
+#
+# BUILD-VERSCHLOSSEN — NICHT auf true setzen (gruendlich getestet, gehen am aktuellen
+# G1R-Build NICHT; Spieler-Schaden/-Kills laufen ueber AngelScript, fuer UE4SS unsichtbar):
+#   READ_SPELL      (C++-Crash)
+#   READ_WEAPONS    (C++-Crash)
+#   READ_KILLS      (PuzzlesSubsystem-Map leer)
+#   READ_KILLS_HOOK (HandleDefeated: nur Lade-Batch, Causer nie der Spieler)
+#   READ_DMG_OUT    (ApplyDamageTo/OnDamageDealt feuern bei Spieler-Treffern nicht)
+#
+# Optional: Steam-Anzeigename fuers Widget
+# G1R_STEAM_NAME=PEX_LuCKoR
