@@ -74,6 +74,12 @@ local lastTotalsWrite = 0
 -- langsame Disk-I/O NICHT den Game-Thread (sonst Frame-Ruckler im Spiel).
 local pendingJson = nil
 local pendingTotals = nil
+-- Inventar ist der teuerste Read (Iteration über ALLE Items × mehrere Engine-Calls) und
+-- aendert sich selten → nicht jeden Tick lesen, sondern nur alle INV_EVERY Ticks; dazwischen
+-- die gecachten Items. Halbiert die Game-Thread-Spitzenlast → weniger Frame-Ruckler.
+local cachedItems = nil
+local invTick = 0
+local INV_EVERY = 8   -- bei POLL 400ms ~alle 3.2s
 
 -- Optionale Reader (Stand 2026-06-17, in-game verifiziert).
 -- An: Schlag (Schlagrichtung) + Uhr laufen stabil.
@@ -994,6 +1000,7 @@ local function tick()
     end)
     if not worldOk then
         CachedPlayer = nil; lastPos = nil; lastHp = nil; lastMana = nil; lastXp = nil
+        cachedItems = nil  -- nach Reload Items frisch lesen (nicht den alten Welt-Stand zeigen)
         warmup = WARMUP_TICKS  -- beim nächsten gültigen Tick erst Baseline aufbauen
         return
     end
@@ -1016,9 +1023,14 @@ local function tick()
     local sessM = totalDistCm / 100
     if sessM > sess.recRunM then sess.recRunM = sessM end
     if sessM > totals.recRunM then totals.recRunM = sessM end
-    -- Items via vollständigem mods-g1r-Helper-Stack (unwrap/arrGet) — entpackt die
-    -- RemoteUnrealParam-Wrapper, umgeht so den ScriptStruct-m_Slots-Stolperstein.
-    pcall(function() items = readInventory(char) or {} end)
+    -- Items gedrosselt lesen (teuerster Read, aendert sich selten): erster Tick + alle
+    -- INV_EVERY Ticks neu, sonst die gecachten. Spart Game-Thread-Frame-Zeit → weniger Ruckler.
+    invTick = invTick + 1
+    if cachedItems == nil or invTick >= INV_EVERY then
+        invTick = 0
+        pcall(function() cachedItems = readInventory(char) or {} end)
+    end
+    items = cachedItems or {}
     local stats
     pcall(function() stats = readStats(char) or {} end)
     -- Session-Zähler aus den Stat-Deltas: HP runter = Schaden, HP rauf = Regen;
