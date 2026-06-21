@@ -24,6 +24,8 @@
     <span class="t-sep">·</span>
     <span class="t-metric"><span class="t-metric-v" id="steps">—</span><span class="t-metric-k">Steps</span></span>
     <span class="t-sep">·</span>
+    <span class="t-metric"><span class="t-metric-v t-metric-v--accent" id="ride">—</span><span class="t-metric-k">Ride</span></span>
+    <span class="t-sep">·</span>
     <span class="t-metric"><span class="t-metric-v t-metric-v--bad" id="dmgOut">—</span><span class="t-metric-k">DMG out</span></span>
     <span class="t-sep">·</span>
     <span class="t-metric"><span class="t-metric-v" id="dmgTaken">—</span><span class="t-metric-k">taken</span></span>
@@ -49,6 +51,7 @@
     var bar = document.getElementById('bar');
     var levelEl = document.getElementById('level');
     var stepsEl = document.getElementById('steps');
+    var rideEl = document.getElementById('ride');
     var dmgOutEl = document.getElementById('dmgOut');
     var dmgTakenEl = document.getElementById('dmgTaken');
     var manaUsedEl = document.getElementById('manaUsed');
@@ -60,10 +63,15 @@
 
     function num(v) { return (v === undefined || v === null) ? '–' : Math.round(v).toLocaleString('en-US'); }
     function signed(v) { return (v === undefined || v === null) ? '–' : '+' + Math.round(v).toLocaleString('en-US'); }
+    // Distanz lesbar: < 1 km in m, sonst in km mit einer Nachkommastelle.
+    function dist(m) {
+      if (m === undefined || m === null) return '–';
+      return m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(1) + ' km';
+    }
 
     function setOffline() {
       bar.classList.add('is-offline');
-      [levelEl, stepsEl, dmgOutEl, dmgTakenEl, manaUsedEl, hpRegenEl, manaRegenEl, oreEl, handEl].forEach(function (el) { el.textContent = '—'; });
+      [levelEl, stepsEl, rideEl, dmgOutEl, dmgTakenEl, manaUsedEl, hpRegenEl, manaRegenEl, oreEl, handEl].forEach(function (el) { el.textContent = '—'; });
       clockEl.textContent = '';
     }
 
@@ -74,6 +82,7 @@
       var src = (SCOPE === 'all') ? (d.totals || {}) : (d.session || {});
       var dmgOut = (SCOPE === 'all') ? src.damageDealt : d.session_damageDealt;
       levelEl.textContent = num(stats.level);
+      rideEl.textContent = dist(src.rideDistanceM);
       stepsEl.textContent = num(src.steps);
       dmgOutEl.textContent = num(dmgOut !== undefined && dmgOut !== null ? dmgOut : 0);
       dmgTakenEl.textContent = num(src.damageTaken);
