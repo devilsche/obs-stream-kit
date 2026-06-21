@@ -1746,4 +1746,8 @@ pcall(function()
     end)
 end)
 
-print("[G1RExport] geladen — schreibt nach " .. OUTPUT_PATH .. " · Dump: Strg+Shift+J · Inv-Debug: Strg+Shift+I\n")
+-- BUILD-Marke: zeigt im Log, WELCHE main.lua-Version geladen ist (gegen "alter Mod
+-- noch drauf"-Verwechslung). Bei jeder relevanten Aenderung hochzaehlen.
+local MOD_BUILD = "2026-06-22-killdiag2"
+print("[G1RExport] geladen BUILD=" .. MOD_BUILD .. " — schreibt nach " .. OUTPUT_PATH
+    .. " · Dump: Strg+Shift+J · Inv-Debug: Strg+Shift+I\n")
