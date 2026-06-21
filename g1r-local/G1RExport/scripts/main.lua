@@ -74,12 +74,18 @@ local lastTotalsWrite = 0
 -- langsame Disk-I/O NICHT den Game-Thread (sonst Frame-Ruckler im Spiel).
 local pendingJson = nil
 local pendingTotals = nil
--- Inventar ist der teuerste Read (Iteration über ALLE Items × mehrere Engine-Calls) und
--- aendert sich selten → nicht jeden Tick lesen, sondern nur alle INV_EVERY Ticks; dazwischen
--- die gecachten Items. Halbiert die Game-Thread-Spitzenlast → weniger Frame-Ruckler.
-local cachedItems = nil
-local invTick = 0
-local INV_EVERY = 8   -- bei POLL 400ms ~alle 3.2s
+-- Inventar in HAEPPCHEN lesen (Batching): pro Tick nur INV_BATCH Items statt alle auf
+-- einmal. Sonst entsteht beim kompletten Read ein dicker Frame-Ruckler (~alle 3s spuerbar);
+-- gehaeppchelt sind es viele winzige. cachedItems (das im Widget gezeigte Inventar) wird
+-- erst getauscht, wenn ein kompletter Scan durch ist → nie ein halbes Inventar.
+local cachedItems = nil      -- letztes KOMPLETTES Inventar
+local invScanBuf = nil       -- Puffer des laufenden Scans
+local invScanIdx = 0         -- naechster zu lesender Item-Index
+local invScanN = 0           -- Item-Anzahl zu Scan-Beginn
+local invScanActive = false  -- laeuft gerade ein Scan?
+local invCooldown = 0        -- Ticks bis zum naechsten Scan-Start
+local INV_BATCH = 10         -- Items pro Tick
+local INV_COOLDOWN = 8       -- Ticks Pause zwischen kompletten Scans (~3.2s bei 400ms)
 
 -- Optionale Reader (Stand 2026-06-17, in-game verifiziert).
 -- An: Schlag (Schlagrichtung) + Uhr laufen stabil.
@@ -428,6 +434,59 @@ local function readInventory(char)
     local ui = readInventoryUI(char)
     if ui ~= nil then return ui end
     return {}
+end
+
+-- ── Inventar gehaeppchelt lesen (gegen Frame-Ruckler) ───────────────────────
+-- Liest pro Aufruf max INV_BATCH Items und sammelt sie in invScanBuf. Erst wenn ein
+-- kompletter Scan durch ist, wird cachedItems atomar getauscht (Widget sieht nie ein
+-- halbes Inventar). base wird jeden Tick frisch geholt (billig); bricht ein Read ab
+-- (z.B. beim Reiten -> kein normales Inventar), bleibt der letzte komplette Stand stehen.
+local function readInventoryBatch(char)
+    if not isValid(char) then return end
+    local ok, inv = pcall(function() return char:GetInventory() end)
+    if not (ok and isValid(inv)) then return end
+    local base = inv
+    pcall(function() local b = inv:GetInventoryBase(); if isValid(b) then base = b end end)
+
+    if not invScanActive then
+        if invCooldown > 0 then invCooldown = invCooldown - 1; return end
+        local n = nil
+        pcall(function() n = base:ItemsNum() end)
+        if not n or n <= 0 then
+            cachedItems = cachedItems or {}   -- kein Inventar (z.B. Reiten) -> letzten Stand halten
+            invCooldown = INV_COOLDOWN
+            return
+        end
+        invScanN = n; invScanIdx = 0; invScanBuf = {}; invScanActive = true
+    end
+
+    local done = 0
+    while invScanIdx < invScanN and done < INV_BATCH do
+        local i = invScanIdx
+        pcall(function()
+            local valid = true
+            pcall(function() valid = base:IsItemValidByPos(i) end)
+            if valid ~= false then
+                local nameTxt; pcall(function() nameTxt = base:GetItemNameByPos(i) end)
+                local name
+                if nameTxt then pcall(function() name = nameTxt:ToString() end) end
+                if name and name ~= "" then
+                    local cnt = 1
+                    pcall(function() cnt = base:GetItemAmountByPos(i) or 1 end)
+                    invScanBuf[#invScanBuf + 1] = { display = name, count = cnt }
+                end
+            end
+        end)
+        invScanIdx = invScanIdx + 1
+        done = done + 1
+    end
+
+    if invScanIdx >= invScanN then
+        cachedItems = invScanBuf      -- atomarer Tausch: kompletter Scan fertig
+        invScanBuf = nil
+        invScanActive = false
+        invCooldown = INV_COOLDOWN
+    end
 end
 
 -- ── Stats lesen (GAS, Pattern aus mods-g1r stats.lua) ──────────────────────
@@ -1000,7 +1059,8 @@ local function tick()
     end)
     if not worldOk then
         CachedPlayer = nil; lastPos = nil; lastHp = nil; lastMana = nil; lastXp = nil
-        cachedItems = nil  -- nach Reload Items frisch lesen (nicht den alten Welt-Stand zeigen)
+        -- nach Reload Items frisch scannen (nicht den alten Welt-Stand zeigen)
+        cachedItems = nil; invScanActive = false; invScanBuf = nil; invCooldown = 0
         warmup = WARMUP_TICKS  -- beim nächsten gültigen Tick erst Baseline aufbauen
         return
     end
@@ -1023,13 +1083,8 @@ local function tick()
     local sessM = totalDistCm / 100
     if sessM > sess.recRunM then sess.recRunM = sessM end
     if sessM > totals.recRunM then totals.recRunM = sessM end
-    -- Items gedrosselt lesen (teuerster Read, aendert sich selten): erster Tick + alle
-    -- INV_EVERY Ticks neu, sonst die gecachten. Spart Game-Thread-Frame-Zeit → weniger Ruckler.
-    invTick = invTick + 1
-    if cachedItems == nil or invTick >= INV_EVERY then
-        invTick = 0
-        pcall(function() cachedItems = readInventory(char) or {} end)
-    end
+    -- Items gehaeppchelt lesen (max INV_BATCH/Tick) → kein dicker Frame-Ruckler.
+    pcall(function() readInventoryBatch(char) end)
     items = cachedItems or {}
     local stats
     pcall(function() stats = readStats(char) or {} end)
