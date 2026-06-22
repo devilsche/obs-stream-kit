@@ -1,0 +1,660 @@
+[
+ {
+  "file": "ItMw_1H_Axe_Cord.webp",
+  "icon_src": "g1r-items-cords-cleaver.webp",
+  "slug": "cords-cleaver",
+  "dumpId": "ItMw_1H_Axe_Cord",
+  "name_en": "Cord's Cleaver"
+ },
+ {
+  "file": "ItMw_1H_Axe_Sickle_01.webp",
+  "icon_src": "g1r-items-sickle.webp",
+  "slug": "sickle",
+  "dumpId": "ItMw_1H_Axe_Sickle_01",
+  "name_en": "Sickle"
+ },
+ {
+  "file": "ItMw_1H_Mace_Fortuno.webp",
+  "icon_src": "g1r-items-fortunos-club.webp",
+  "slug": "fortunos-club",
+  "dumpId": "ItMw_1H_Mace_Fortuno",
+  "name_en": "Fortuno's Club"
+ },
+ {
+  "file": "ItMw_1H_Mace_Orun.webp",
+  "icon_src": "g1r-items-oruns-club.webp",
+  "slug": "oruns-club",
+  "dumpId": "ItMw_1H_Mace_Orun",
+  "name_en": "Orun's Club"
+ },
+ {
+  "file": "ItMw_1H_Sword_Arto.webp",
+  "icon_src": "g1r-items-artos-sword.webp",
+  "slug": "artos-sword",
+  "dumpId": "ItMw_1H_Sword_Arto",
+  "name_en": "Arto's Sword"
+ },
+ {
+  "file": "ItMw_1H_Sword_Kalom.webp",
+  "icon_src": "g1r-items-kaloms-sword.webp",
+  "slug": "kaloms-sword",
+  "dumpId": "ItMw_1H_Sword_Kalom",
+  "name_en": "Kalom's Sword"
+ },
+ {
+  "file": "ItMw_1H_Sword_Paw.webp",
+  "icon_src": "g1r-items-paws-punch.webp",
+  "slug": "paws-punch",
+  "dumpId": "ItMw_1H_Sword_Paw",
+  "name_en": "Paw's Punch"
+ },
+ {
+  "file": "ItMw_1H_Sword_Raven.webp",
+  "icon_src": "g1r-items-ravens-right.webp",
+  "slug": "ravens-right",
+  "dumpId": "ItMw_1H_Sword_Raven",
+  "name_en": "Raven's Right"
+ },
+ {
+  "file": "ItMw_1H_Sword_Scar.webp",
+  "icon_src": "g1r-items-scars-sword.webp",
+  "slug": "scars-sword",
+  "dumpId": "ItMw_1H_Sword_Scar",
+  "name_en": "Scar's Sword"
+ },
+ {
+  "file": "ItMw_2H_Axe_Gorn.webp",
+  "icon_src": "g1r-items-gorns-revenge.webp",
+  "slug": "gorns-revenge",
+  "dumpId": "ItMw_2H_Axe_Gorn",
+  "name_en": "Gorn's Revenge"
+ },
+ {
+  "file": "ItMw_2H_Axe_Lee.webp",
+  "icon_src": "g1r-items-lees-axe.webp",
+  "slug": "lees-axe",
+  "dumpId": "ItMw_2H_Axe_Lee",
+  "name_en": "Lee's Axe"
+ },
+ {
+  "file": "ItMw_2H_Axe_Orik.webp",
+  "icon_src": "g1r-items-oriks-axe.webp",
+  "slug": "oriks-axe",
+  "dumpId": "ItMw_2H_Axe_Orik",
+  "name_en": "Orik's Axe"
+ },
+ {
+  "file": "ItMw_2H_Axe_Pickaxe.webp",
+  "icon_src": "g1r-items-pickaxe.webp",
+  "slug": "pickaxe",
+  "dumpId": "ItMw_2H_Axe_Pickaxe",
+  "name_en": "Pickaxe"
+ },
+ {
+  "file": "ItMw_2H_Axe_Torlof.webp",
+  "icon_src": "g1r-items-torlofs-axe.webp",
+  "slug": "torlofs-axe",
+  "dumpId": "ItMw_2H_Axe_Torlof",
+  "name_en": "Torlof's Axe"
+ },
+ {
+  "file": "ItMw_2H_Sword_Beliar.webp",
+  "icon_src": "g1r-items-claw-of-beliar.webp",
+  "slug": "claw-of-beliar",
+  "dumpId": "ItMw_2H_Sword_Beliar",
+  "name_en": "Claw of Beliar"
+ },
+ {
+  "file": "ItMw_2H_Sword_Innos.webp",
+  "icon_src": "g1r-items-innos-rage.webp",
+  "slug": "innos-rage",
+  "dumpId": "ItMw_2H_Sword_Innos",
+  "name_en": "Innos' Rage"
+ },
+ {
+  "file": "ItMw_2H_Sword_Uriziel_01.webp",
+  "icon_src": "g1r-items-uriziel.webp",
+  "slug": "uriziel",
+  "dumpId": "ItMw_2H_Sword_Uriziel_01",
+  "name_en": "Uriziel"
+ },
+ {
+  "file": "army-bow.webp",
+  "icon_src": "g1r-items-army-bow.webp",
+  "slug": "army-bow",
+  "dumpId": null,
+  "name_en": "Army Bow"
+ },
+ {
+  "file": "barbarians-fist.webp",
+  "icon_src": "g1r-items-barbarians-fist.webp",
+  "slug": "barbarians-fist",
+  "dumpId": null,
+  "name_en": "Barbarian's Fist"
+ },
+ {
+  "file": "battlesword.webp",
+  "icon_src": "g1r-items-battlesword.webp",
+  "slug": "battlesword",
+  "dumpId": null,
+  "name_en": "Battlesword"
+ },
+ {
+  "file": "berserkers-sword.webp",
+  "icon_src": "g1r-items-berserkers-sword.webp",
+  "slug": "berserkers-sword",
+  "dumpId": null,
+  "name_en": "Berserker's Sword"
+ },
+ {
+  "file": "blood-blade.webp",
+  "icon_src": "g1r-items-blood-blade.webp",
+  "slug": "blood-blade",
+  "dumpId": null,
+  "name_en": "Blood Blade"
+ },
+ {
+  "file": "blood-harvester.webp",
+  "icon_src": "g1r-items-blood-harvester.webp",
+  "slug": "blood-harvester",
+  "dumpId": null,
+  "name_en": "Blood Harvester"
+ },
+ {
+  "file": "blue-handle-axe.webp",
+  "icon_src": "g1r-items-blue-handle-axe.webp",
+  "slug": "blue-handle-axe",
+  "dumpId": null,
+  "name_en": "Blue Handle Axe"
+ },
+ {
+  "file": "bone-bow.webp",
+  "icon_src": "g1r-items-bone-bow.webp",
+  "slug": "bone-bow",
+  "dumpId": null,
+  "name_en": "Bone Bow"
+ },
+ {
+  "file": "bonebreaker.webp",
+  "icon_src": "g1r-items-bonebreaker.webp",
+  "slug": "bonebreaker",
+  "dumpId": null,
+  "name_en": "Bonebreaker"
+ },
+ {
+  "file": "bow-of-death.webp",
+  "icon_src": "g1r-items-bow-of-death.webp",
+  "slug": "bow-of-death",
+  "dumpId": null,
+  "name_en": "Bow of Death"
+ },
+ {
+  "file": "broadsword.webp",
+  "icon_src": "g1r-items-broadsword.webp",
+  "slug": "broadsword",
+  "dumpId": null,
+  "name_en": "Broadsword"
+ },
+ {
+  "file": "club.webp",
+  "icon_src": "g1r-items-club.webp",
+  "slug": "club",
+  "dumpId": null,
+  "name_en": "Club"
+ },
+ {
+  "file": "crossbow-of-war.webp",
+  "icon_src": "g1r-items-crossbow-of-war.webp",
+  "slug": "crossbow-of-war",
+  "dumpId": null,
+  "name_en": "Crossbow of War"
+ },
+ {
+  "file": "crude-sword.webp",
+  "icon_src": "g1r-items-crude-sword.webp",
+  "slug": "crude-sword",
+  "dumpId": null,
+  "name_en": "Crude Sword"
+ },
+ {
+  "file": "custodians-blade.webp",
+  "icon_src": "g1r-items-custodians-blade.webp",
+  "slug": "custodians-blade",
+  "dumpId": null,
+  "name_en": "Custodian's Blade"
+ },
+ {
+  "file": "cutter.webp",
+  "icon_src": "g1r-items-cutter.webp",
+  "slug": "cutter",
+  "dumpId": null,
+  "name_en": "Cutter"
+ },
+ {
+  "file": "demon-bow.webp",
+  "icon_src": "g1r-items-demon-bow.webp",
+  "slug": "demon-bow",
+  "dumpId": null,
+  "name_en": "Demon Bow"
+ },
+ {
+  "file": "demonic-blade.webp",
+  "icon_src": "g1r-items-demonic-blade.webp",
+  "slug": "demonic-blade",
+  "dumpId": null,
+  "name_en": "Demonic Blade"
+ },
+ {
+  "file": "diggers-discipline.webp",
+  "icon_src": "g1r-items-diggers-discipline.webp",
+  "slug": "diggers-discipline",
+  "dumpId": null,
+  "name_en": "Digger's Discipline"
+ },
+ {
+  "file": "executioner.webp",
+  "icon_src": "g1r-items-executioner.webp",
+  "slug": "executioner",
+  "dumpId": null,
+  "name_en": "Executioner"
+ },
+ {
+  "file": "farmers-defense.webp",
+  "icon_src": "g1r-items-farmers-defense.webp",
+  "slug": "farmers-defense",
+  "dumpId": null,
+  "name_en": "Farmer's Defense"
+ },
+ {
+  "file": "field-bow.webp",
+  "icon_src": "g1r-items-field-bow.webp",
+  "slug": "field-bow",
+  "dumpId": null,
+  "name_en": "Field Bow"
+ },
+ {
+  "file": "gods-hammer.webp",
+  "icon_src": "g1r-items-gods-hammer.webp",
+  "slug": "gods-hammer",
+  "dumpId": null,
+  "name_en": "God's Hammer"
+ },
+ {
+  "file": "grachtnakk.webp",
+  "icon_src": "g1r-items-grachtnakk.webp",
+  "slug": "grachtnakk",
+  "dumpId": null,
+  "name_en": "Grachtnakk"
+ },
+ {
+  "file": "haennos-ironwood-bow.webp",
+  "icon_src": "g1r-items-haennos-ironwood-bow.webp",
+  "slug": "haennos-ironwood-bow",
+  "dumpId": null,
+  "name_en": "Haenno's Ironwood Bow"
+ },
+ {
+  "file": "haennos-oak-bow.webp",
+  "icon_src": "g1r-items-haennos-oak-bow.webp",
+  "slug": "haennos-oak-bow",
+  "dumpId": null,
+  "name_en": "Haenno's Oak Bow"
+ },
+ {
+  "file": "haennos-willow-bow.webp",
+  "icon_src": "g1r-items-haennos-willow-bow.webp",
+  "slug": "haennos-willow-bow",
+  "dumpId": null,
+  "name_en": "Haenno's Willow Bow"
+ },
+ {
+  "file": "handaxe.webp",
+  "icon_src": "g1r-items-handaxe.webp",
+  "slug": "handaxe",
+  "dumpId": null,
+  "name_en": "Handaxe"
+ },
+ {
+  "file": "heavy-crossbow.webp",
+  "icon_src": "g1r-items-heavy-crossbow.webp",
+  "slug": "heavy-crossbow",
+  "dumpId": null,
+  "name_en": "Heavy Crossbow"
+ },
+ {
+  "file": "heavy-two-hander.webp",
+  "icon_src": "g1r-items-heavy-two-hander.webp",
+  "slug": "heavy-two-hander",
+  "dumpId": null,
+  "name_en": "Heavy Two-Hander"
+ },
+ {
+  "file": "hedge-bow.webp",
+  "icon_src": "g1r-items-hedge-bow.webp",
+  "slug": "hedge-bow",
+  "dumpId": null,
+  "name_en": "Hedge Bow"
+ },
+ {
+  "file": "heros-blade.webp",
+  "icon_src": "g1r-items-heros-blade.webp",
+  "slug": "heros-blade",
+  "dumpId": null,
+  "name_en": "Hero's Blade"
+ },
+ {
+  "file": "judgment-sword.webp",
+  "icon_src": "g1r-items-judgment-sword.webp",
+  "slug": "judgment-sword",
+  "dumpId": null,
+  "name_en": "Judgment Sword"
+ },
+ {
+  "file": "krush-brok-dar.webp",
+  "icon_src": "g1r-items-krush-brok-dar.webp",
+  "slug": "krush-brok-dar",
+  "dumpId": null,
+  "name_en": "Krush Brok-Dar"
+ },
+ {
+  "file": "krush-ur-rok.webp",
+  "icon_src": "g1r-items-krush-ur-rok.webp",
+  "slug": "krush-ur-rok",
+  "dumpId": null,
+  "name_en": "Krush Ur-Rok"
+ },
+ {
+  "file": "light-crossbow.webp",
+  "icon_src": "g1r-items-light-crossbow.webp",
+  "slug": "light-crossbow",
+  "dumpId": null,
+  "name_en": "Light Crossbow"
+ },
+ {
+  "file": "light-guards-sword.webp",
+  "icon_src": "g1r-items-light-guards-sword.webp",
+  "slug": "light-guards-sword",
+  "dumpId": null,
+  "name_en": "Light Guard's Sword"
+ },
+ {
+  "file": "light-two-hander.webp",
+  "icon_src": "g1r-items-light-two-hander.webp",
+  "slug": "light-two-hander",
+  "dumpId": null,
+  "name_en": "Light Two-Hander"
+ },
+ {
+  "file": "longbow.webp",
+  "icon_src": "g1r-items-longbow.webp",
+  "slug": "longbow",
+  "dumpId": null,
+  "name_en": "Longbow"
+ },
+ {
+  "file": "longsword.webp",
+  "icon_src": "g1r-items-longsword.webp",
+  "slug": "longsword",
+  "dumpId": null,
+  "name_en": "Longsword"
+ },
+ {
+  "file": "lurkers-bite.webp",
+  "icon_src": "g1r-items-lurkers-bite.webp",
+  "slug": "lurkers-bite",
+  "dumpId": null,
+  "name_en": "Lurker's Bite"
+ },
+ {
+  "file": "mace.webp",
+  "icon_src": "g1r-items-mace.webp",
+  "slug": "mace",
+  "dumpId": null,
+  "name_en": "Mace"
+ },
+ {
+  "file": "morning-star.webp",
+  "icon_src": "g1r-items-morning-star.webp",
+  "slug": "morning-star",
+  "dumpId": null,
+  "name_en": "Morning Star"
+ },
+ {
+  "file": "nimrod-bow.webp",
+  "icon_src": "g1r-items-nimrod-bow.webp",
+  "slug": "nimrod-bow",
+  "dumpId": null,
+  "name_en": "Nimrod Bow"
+ },
+ {
+  "file": "old-sword.webp",
+  "icon_src": "g1r-items-old-sword.webp",
+  "slug": "old-sword",
+  "dumpId": null,
+  "name_en": "Old Sword"
+ },
+ {
+  "file": "orc-hammer.webp",
+  "icon_src": "g1r-items-orc-hammer.webp",
+  "slug": "orc-hammer",
+  "dumpId": null,
+  "name_en": "Orc Hammer"
+ },
+ {
+  "file": "orcchaser.webp",
+  "icon_src": "g1r-items-orcchaser.webp",
+  "slug": "orcchaser",
+  "dumpId": null,
+  "name_en": "Orcchaser"
+ },
+ {
+  "file": "poker.webp",
+  "icon_src": "g1r-items-poker.webp",
+  "slug": "poker",
+  "dumpId": null,
+  "name_en": "Poker"
+ },
+ {
+  "file": "rage-steel.webp",
+  "icon_src": "g1r-items-rage-steel.webp",
+  "slug": "rage-steel",
+  "dumpId": null,
+  "name_en": "Rage Steel"
+ },
+ {
+  "file": "revenge-steel.webp",
+  "icon_src": "g1r-items-revenge-steel.webp",
+  "slug": "revenge-steel",
+  "dumpId": null,
+  "name_en": "Revenge Steel"
+ },
+ {
+  "file": "rusty-bastard-sword.webp",
+  "icon_src": "g1r-items-rusty-bastard-sword.webp",
+  "slug": "rusty-bastard-sword",
+  "dumpId": null,
+  "name_en": "Rusty Bastard Sword"
+ },
+ {
+  "file": "rusty-two-hander.webp",
+  "icon_src": "g1r-items-rusty-two-hander.webp",
+  "slug": "rusty-two-hander",
+  "dumpId": null,
+  "name_en": "Rusty Two-Hander"
+ },
+ {
+  "file": "shortbow.webp",
+  "icon_src": "g1r-items-shortbow.webp",
+  "slug": "shortbow",
+  "dumpId": null,
+  "name_en": "Shortbow"
+ },
+ {
+  "file": "shortsword.webp",
+  "icon_src": "g1r-items-shortsword.webp",
+  "slug": "shortsword",
+  "dumpId": null,
+  "name_en": "Shortsword"
+ },
+ {
+  "file": "skullcleaver.webp",
+  "icon_src": "g1r-items-skullcleaver.webp",
+  "slug": "skullcleaver",
+  "dumpId": null,
+  "name_en": "Skullcleaver"
+ },
+ {
+  "file": "smash.webp",
+  "icon_src": "g1r-items-smash.webp",
+  "slug": "smash",
+  "dumpId": null,
+  "name_en": "Smash"
+ },
+ {
+  "file": "steel-tongue.webp",
+  "icon_src": "g1r-items-steel-tongue.webp",
+  "slug": "steel-tongue",
+  "dumpId": null,
+  "name_en": "Steel Tongue"
+ },
+ {
+  "file": "storm-bow.webp",
+  "icon_src": "g1r-items-storm-bow.webp",
+  "slug": "storm-bow",
+  "dumpId": null,
+  "name_en": "Storm Bow"
+ },
+ {
+  "file": "storms-whisper.webp",
+  "icon_src": "g1r-items-storms-whisper.webp",
+  "slug": "storms-whisper",
+  "dumpId": null,
+  "name_en": "Storm's Whisper"
+ },
+ {
+  "file": "sword-of-death.webp",
+  "icon_src": "g1r-items-sword-of-death.webp",
+  "slug": "sword-of-death",
+  "dumpId": null,
+  "name_en": "Sword of Death"
+ },
+ {
+  "file": "sword-of-fear.webp",
+  "icon_src": "g1r-items-sword-of-fear.webp",
+  "slug": "sword-of-fear",
+  "dumpId": null,
+  "name_en": "Sword of Fear"
+ },
+ {
+  "file": "sword-of-hate.webp",
+  "icon_src": "g1r-items-sword-of-hate.webp",
+  "slug": "sword-of-hate",
+  "dumpId": null,
+  "name_en": "Sword of Hate"
+ },
+ {
+  "file": "sword-of-victory.webp",
+  "icon_src": "g1r-items-sword-of-victory.webp",
+  "slug": "sword-of-victory",
+  "dumpId": null,
+  "name_en": "Sword of Victory"
+ },
+ {
+  "file": "thorn-of-wounds.webp",
+  "icon_src": "g1r-items-thorn-of-wounds.webp",
+  "slug": "thorn-of-wounds",
+  "dumpId": null,
+  "name_en": "Thorn of Wounds"
+ },
+ {
+  "file": "thunderstrike.webp",
+  "icon_src": "g1r-items-thunderstrike.webp",
+  "slug": "thunderstrike",
+  "dumpId": null,
+  "name_en": "Thunderstrike"
+ },
+ {
+  "file": "war-axe.webp",
+  "icon_src": "g1r-items-war-axe.webp",
+  "slug": "war-axe",
+  "dumpId": null,
+  "name_en": "War Axe"
+ },
+ {
+  "file": "war-bow.webp",
+  "icon_src": "g1r-items-war-bow.webp",
+  "slug": "war-bow",
+  "dumpId": null,
+  "name_en": "War Bow"
+ },
+ {
+  "file": "war-sword.webp",
+  "icon_src": "g1r-items-war-sword.webp",
+  "slug": "war-sword",
+  "dumpId": null,
+  "name_en": "War Sword"
+ },
+ {
+  "file": "warders-hand.webp",
+  "icon_src": "g1r-items-warders-hand.webp",
+  "slug": "warders-hand",
+  "dumpId": null,
+  "name_en": "Warder's Hand"
+ },
+ {
+  "file": "warders-sword.webp",
+  "icon_src": "g1r-items-warders-sword.webp",
+  "slug": "warders-sword",
+  "dumpId": null,
+  "name_en": "Warder's Sword"
+ },
+ {
+  "file": "warriors-verdict.webp",
+  "icon_src": "g1r-items-warriors-verdict.webp",
+  "slug": "warriors-verdict",
+  "dumpId": null,
+  "name_en": "Warrior's Verdict"
+ },
+ {
+  "file": "warriors-voice.webp",
+  "icon_src": "g1r-items-warriors-voice.webp",
+  "slug": "warriors-voice",
+  "dumpId": null,
+  "name_en": "Warrior's Voice"
+ },
+ {
+  "file": "willow-bow.webp",
+  "icon_src": "g1r-items-willow-bow.webp",
+  "slug": "willow-bow",
+  "dumpId": null,
+  "name_en": "Willow Bow"
+ },
+ {
+  "file": "windbreaker.webp",
+  "icon_src": "g1r-items-windbreaker.webp",
+  "slug": "windbreaker",
+  "dumpId": null,
+  "name_en": "Windbreaker"
+ },
+ {
+  "file": "withered-axe.webp",
+  "icon_src": "g1r-items-withered-axe.webp",
+  "slug": "withered-axe",
+  "dumpId": null,
+  "name_en": "Withered Axe"
+ },
+ {
+  "file": "wolfshredder.webp",
+  "icon_src": "g1r-items-wolfshredder.webp",
+  "slug": "wolfshredder",
+  "dumpId": null,
+  "name_en": "Wolfshredder"
+ },
+ {
+  "file": "wrath-steel.webp",
+  "icon_src": "g1r-items-wrath-steel.webp",
+  "slug": "wrath-steel",
+  "dumpId": null,
+  "name_en": "Wrath Steel"
+ }
+]
