@@ -1,0 +1,1036 @@
+{
+  "Nahkampf": {
+    "1H Äxte": [
+      {
+        "id": "ItMw_1H_Axe_01",
+        "label": "1H Axe 01"
+      },
+      {
+        "id": "ItMw_1H_Axe_02",
+        "label": "1H Axe 02"
+      },
+      {
+        "id": "ItMw_1H_Axe_03",
+        "label": "1H Axe 03"
+      },
+      {
+        "id": "ItMw_1H_Axe_Bran",
+        "label": "1H Axe Bran"
+      },
+      {
+        "id": "ItMw_1H_Axe_Cord",
+        "label": "1H Axe Cord"
+      },
+      {
+        "id": "ItMw_1H_Axe_Hatchet_01",
+        "label": "1H Axe Hatchet 01"
+      },
+      {
+        "id": "ItMw_1H_Axe_Lares",
+        "label": "1H Axe Lares"
+      },
+      {
+        "id": "ItMw_1H_Axe_Old_01",
+        "label": "1H Axe Old 01"
+      },
+      {
+        "id": "ItMw_1H_Axe_Sickle_01",
+        "label": "1H Axe Sickle 01"
+      },
+      {
+        "id": "ItMw_1H_Axe_Silas",
+        "label": "1H Axe Silas"
+      }
+    ],
+    "1H Streitkolben & Hämmer": [
+      {
+        "id": "ItMw_1H_Mace_01",
+        "label": "1H Mace 01"
+      },
+      {
+        "id": "ItMw_1H_Mace_02",
+        "label": "1H Mace 02"
+      },
+      {
+        "id": "ItMw_1H_Mace_03",
+        "label": "1H Mace 03"
+      },
+      {
+        "id": "ItMw_1H_Mace_04",
+        "label": "1H Mace 04"
+      },
+      {
+        "id": "ItMw_1H_Mace_Club_01",
+        "label": "1H Mace Club 01"
+      },
+      {
+        "id": "ItMw_1H_Mace_Fortuno",
+        "label": "1H Mace Fortuno"
+      },
+      {
+        "id": "ItMw_1H_Mace_Lester",
+        "label": "1H Mace Lester"
+      },
+      {
+        "id": "ItMw_1H_Mace_Lester_Sleeper",
+        "label": "1H Mace Lester Sleeper"
+      },
+      {
+        "id": "ItMw_1H_Mace_Light_01",
+        "label": "1H Mace Light 01"
+      },
+      {
+        "id": "ItMw_1H_Mace_Nailmace_01",
+        "label": "1H Mace Nailmace 01"
+      },
+      {
+        "id": "ItMw_1H_Mace_Namib",
+        "label": "1H Mace Namib"
+      },
+      {
+        "id": "ItMw_1H_Mace_Orun",
+        "label": "1H Mace Orun"
+      },
+      {
+        "id": "ItMw_1H_Mace_Poker_01",
+        "label": "1H Mace Poker 01"
+      },
+      {
+        "id": "ItMw_1H_Mace_Sledgehammer_01",
+        "label": "1H Mace Sledgehammer 01"
+      },
+      {
+        "id": "ItMw_1H_Mace_War_01",
+        "label": "1H Mace War 01"
+      },
+      {
+        "id": "ItMw_1H_Mace_War_02",
+        "label": "1H Mace War 02"
+      },
+      {
+        "id": "ItMw_1H_Mace_War_03",
+        "label": "1H Mace War 03"
+      },
+      {
+        "id": "ItMw_1H_Mace_Warhammer_01",
+        "label": "1H Mace Warhammer 01"
+      },
+      {
+        "id": "ItMw_1H_Mace_Warhammer_02",
+        "label": "1H Mace Warhammer 02"
+      },
+      {
+        "id": "ItMw_1H_Mace_Warhammer_03",
+        "label": "1H Mace Warhammer 03"
+      }
+    ],
+    "1H Schwerter": [
+      {
+        "id": "ItMw_1H_Sword_01",
+        "label": "1H Sword 01"
+      },
+      {
+        "id": "ItMw_1H_Sword_01_Xardas_Sleeper",
+        "label": "1H Sword 01 Xardas Sleeper"
+      },
+      {
+        "id": "ItMw_1H_Sword_02",
+        "label": "1H Sword 02"
+      },
+      {
+        "id": "ItMw_1H_Sword_03",
+        "label": "1H Sword 03"
+      },
+      {
+        "id": "ItMw_1H_Sword_04",
+        "label": "1H Sword 04"
+      },
+      {
+        "id": "ItMw_1H_Sword_04_Diego_Sleeper",
+        "label": "1H Sword 04 Diego Sleeper"
+      },
+      {
+        "id": "ItMw_1H_Sword_05",
+        "label": "1H Sword 05"
+      },
+      {
+        "id": "ItMw_1H_Sword_05_Darrion",
+        "label": "1H Sword 05 Darrion"
+      },
+      {
+        "id": "ItMw_1H_Sword_Arto",
+        "label": "1H Sword Arto"
+      },
+      {
+        "id": "ItMw_1H_Sword_Bastard_01",
+        "label": "1H Sword Bastard 01"
+      },
+      {
+        "id": "ItMw_1H_Sword_Bastard_02",
+        "label": "1H Sword Bastard 02"
+      },
+      {
+        "id": "ItMw_1H_Sword_Bastard_03",
+        "label": "1H Sword Bastard 03"
+      },
+      {
+        "id": "ItMw_1H_Sword_Bastard_04",
+        "label": "1H Sword Bastard 04"
+      },
+      {
+        "id": "ItMw_1H_Sword_Broad_01",
+        "label": "1H Sword Broad 01"
+      },
+      {
+        "id": "ItMw_1H_Sword_Broad_02",
+        "label": "1H Sword Broad 02"
+      },
+      {
+        "id": "ItMw_1H_Sword_Broad_03",
+        "label": "1H Sword Broad 03"
+      },
+      {
+        "id": "ItMw_1H_Sword_Broad_04",
+        "label": "1H Sword Broad 04"
+      },
+      {
+        "id": "ItMw_1H_Sword_Kalom",
+        "label": "1H Sword Kalom"
+      },
+      {
+        "id": "ItMw_1H_Sword_Lightguard_01",
+        "label": "1H Sword Lightguard 01"
+      },
+      {
+        "id": "ItMw_1H_Sword_Long_01",
+        "label": "1H Sword Long 01"
+      },
+      {
+        "id": "ItMw_1H_Sword_Long_02",
+        "label": "1H Sword Long 02"
+      },
+      {
+        "id": "ItMw_1H_Sword_Long_03",
+        "label": "1H Sword Long 03"
+      },
+      {
+        "id": "ItMw_1H_Sword_Long_04",
+        "label": "1H Sword Long 04"
+      },
+      {
+        "id": "ItMw_1H_Sword_Long_05",
+        "label": "1H Sword Long 05"
+      },
+      {
+        "id": "ItMw_1H_Sword_Old_01",
+        "label": "1H Sword Old 01"
+      },
+      {
+        "id": "ItMw_1H_Sword_Old_01_PlayerPlayTest",
+        "label": "1H Sword Old 01 PlayerPlayTest"
+      },
+      {
+        "id": "ItMw_1H_Sword_Old_02",
+        "label": "1H Sword Old 02"
+      },
+      {
+        "id": "ItMw_1H_Sword_Paw",
+        "label": "1H Sword Paw"
+      },
+      {
+        "id": "ItMw_1H_Sword_QA",
+        "label": "1H Sword QA"
+      },
+      {
+        "id": "ItMw_1H_Sword_Raven",
+        "label": "1H Sword Raven"
+      },
+      {
+        "id": "ItMw_1H_Sword_Scar",
+        "label": "1H Sword Scar"
+      },
+      {
+        "id": "ItMw_1H_Sword_Scythe_01",
+        "label": "1H Sword Scythe 01"
+      },
+      {
+        "id": "ItMw_1H_Sword_Short_01",
+        "label": "1H Sword Short 01"
+      },
+      {
+        "id": "ItMw_1H_Sword_Short_02",
+        "label": "1H Sword Short 02"
+      },
+      {
+        "id": "ItMw_1H_Sword_Short_03",
+        "label": "1H Sword Short 03"
+      },
+      {
+        "id": "ItMw_1H_Sword_Short_04",
+        "label": "1H Sword Short 04"
+      },
+      {
+        "id": "ItMw_1H_Sword_Short_05",
+        "label": "1H Sword Short 05"
+      },
+      {
+        "id": "ItMw_1H_Sword_Whistler",
+        "label": "1H Sword Whistler"
+      }
+    ],
+    "Fackeln": [
+      {
+        "id": "ItMw_1H_Torch",
+        "label": "1H Torch"
+      },
+      {
+        "id": "ItMw_1H_Torch_Gob",
+        "label": "1H Torch Gob"
+      },
+      {
+        "id": "ItMw_1H_Torch_World",
+        "label": "1H Torch World"
+      }
+    ],
+    "2H Äxte": [
+      {
+        "id": "ItMw_2H_Axe_Gorn",
+        "label": "2H Axe Gorn"
+      },
+      {
+        "id": "ItMw_2H_Axe_Gorn_Sleeper",
+        "label": "2H Axe Gorn Sleeper"
+      },
+      {
+        "id": "ItMw_2H_Axe_Heavy_01",
+        "label": "2H Axe Heavy 01"
+      },
+      {
+        "id": "ItMw_2H_Axe_Heavy_02",
+        "label": "2H Axe Heavy 02"
+      },
+      {
+        "id": "ItMw_2H_Axe_Heavy_03",
+        "label": "2H Axe Heavy 03"
+      },
+      {
+        "id": "ItMw_2H_Axe_Heavy_04",
+        "label": "2H Axe Heavy 04"
+      },
+      {
+        "id": "ItMw_2H_Axe_Lee",
+        "label": "2H Axe Lee"
+      },
+      {
+        "id": "ItMw_2H_Axe_Light_01",
+        "label": "2H Axe Light 01"
+      },
+      {
+        "id": "ItMw_2H_Axe_Light_02",
+        "label": "2H Axe Light 02"
+      },
+      {
+        "id": "ItMw_2H_Axe_Light_03",
+        "label": "2H Axe Light 03"
+      },
+      {
+        "id": "ItMw_2H_Axe_Old_01",
+        "label": "2H Axe Old 01"
+      },
+      {
+        "id": "ItMw_2H_Axe_Old_02",
+        "label": "2H Axe Old 02"
+      },
+      {
+        "id": "ItMw_2H_Axe_Old_03",
+        "label": "2H Axe Old 03"
+      },
+      {
+        "id": "ItMw_2H_Axe_Orc_01",
+        "label": "2H Axe Orc 01"
+      },
+      {
+        "id": "ItMw_2H_Axe_Orc_01_vOrc",
+        "label": "2H Axe Orc 01 vOrc"
+      },
+      {
+        "id": "ItMw_2H_Axe_Orc_01_vOrc_Sleeper",
+        "label": "2H Axe Orc 01 vOrc Sleeper"
+      },
+      {
+        "id": "ItMw_2H_Axe_Orc_02",
+        "label": "2H Axe Orc 02"
+      },
+      {
+        "id": "ItMw_2H_Axe_Orc_02_vOrc",
+        "label": "2H Axe Orc 02 vOrc"
+      },
+      {
+        "id": "ItMw_2H_Axe_Orc_02_vOrc_Sleeper",
+        "label": "2H Axe Orc 02 vOrc Sleeper"
+      },
+      {
+        "id": "ItMw_2H_Axe_Orc_03",
+        "label": "2H Axe Orc 03"
+      },
+      {
+        "id": "ItMw_2H_Axe_Orc_03_vOrc",
+        "label": "2H Axe Orc 03 vOrc"
+      },
+      {
+        "id": "ItMw_2H_Axe_Orc_03_vOrc_Sleeper",
+        "label": "2H Axe Orc 03 vOrc Sleeper"
+      },
+      {
+        "id": "ItMw_2H_Axe_Orc_04",
+        "label": "2H Axe Orc 04"
+      },
+      {
+        "id": "ItMw_2H_Axe_Orc_04_vOrc",
+        "label": "2H Axe Orc 04 vOrc"
+      },
+      {
+        "id": "ItMw_2H_Axe_Orc_04_vOrc_Sleeper",
+        "label": "2H Axe Orc 04 vOrc Sleeper"
+      },
+      {
+        "id": "ItMw_2H_Axe_Orik",
+        "label": "2H Axe Orik"
+      },
+      {
+        "id": "ItMw_2H_Axe_Pickaxe",
+        "label": "2H Axe Pickaxe"
+      },
+      {
+        "id": "ItMw_2H_Axe_Torlof",
+        "label": "2H Axe Torlof"
+      }
+    ],
+    "2H Streitkolben": [
+      {
+        "id": "ItMw_2H_Mace_Orc_01",
+        "label": "2H Mace Orc 01"
+      },
+      {
+        "id": "ItMw_2H_Mace_Orc_01_vOrc",
+        "label": "2H Mace Orc 01 vOrc"
+      },
+      {
+        "id": "ItMw_2H_Mace_Orc_01_vOrc_Sleeper",
+        "label": "2H Mace Orc 01 vOrc Sleeper"
+      }
+    ],
+    "2H Zepter": [
+      {
+        "id": "ItMw_2H_Scepter_Skeletonmage",
+        "label": "2H Scepter Skeletonmage"
+      }
+    ],
+    "2H Stäbe": [
+      {
+        "id": "ItMw_2H_Staff_02",
+        "label": "2H Staff 02"
+      },
+      {
+        "id": "ItMw_2H_Staff_Orc",
+        "label": "2H Staff Orc"
+      },
+      {
+        "id": "ItMw_2H_Staff_Orc_vOrc",
+        "label": "2H Staff Orc vOrc"
+      },
+      {
+        "id": "ItMw_2H_Staff_Orc_vOrc_Fireball",
+        "label": "2H Staff Orc vOrc Fireball"
+      },
+      {
+        "id": "ItMw_2H_Staff_Scepter",
+        "label": "2H Staff Scepter"
+      },
+      {
+        "id": "ItMw_2H_Staff_Ulumulu",
+        "label": "2H Staff Ulumulu"
+      },
+      {
+        "id": "ItMw_2H_Staff_Unorc",
+        "label": "2H Staff Unorc"
+      },
+      {
+        "id": "ItMw_2H_Staff_Unorc_GVArushat_vOrc",
+        "label": "2H Staff Unorc GVArushat vOrc"
+      },
+      {
+        "id": "ItMw_2H_Staff_Unorc_VHashor_vOrc",
+        "label": "2H Staff Unorc VHashor vOrc"
+      },
+      {
+        "id": "ItMw_2H_Staff_Unorc_VKasorg_vOrc",
+        "label": "2H Staff Unorc VKasorg vOrc"
+      },
+      {
+        "id": "ItMw_2H_Staff_Unorc_VRuuushk_vOrc",
+        "label": "2H Staff Unorc VRuuushk vOrc"
+      },
+      {
+        "id": "ItMw_2H_Staff_Unorc_VUnhilqt_vOrc",
+        "label": "2H Staff Unorc VUnhilqt vOrc"
+      },
+      {
+        "id": "ItMw_2H_Staff_Unorc_vOrc",
+        "label": "2H Staff Unorc vOrc"
+      },
+      {
+        "id": "ItMw_2H_Staff_Unorc_vOrc_BallLighting",
+        "label": "2H Staff Unorc vOrc BallLighting"
+      },
+      {
+        "id": "ItMw_2H_Staff_Unorc_vOrc_BreathOfDeath",
+        "label": "2H Staff Unorc vOrc BreathOfDeath"
+      },
+      {
+        "id": "ItMw_2H_Staff_Unorc_vOrc_ChainLighting",
+        "label": "2H Staff Unorc vOrc ChainLighting"
+      },
+      {
+        "id": "ItMw_2H_Staff_Unorc_vOrc_Pyrokinesis",
+        "label": "2H Staff Unorc vOrc Pyrokinesis"
+      },
+      {
+        "id": "ItMw_2H_Staff_Unorc_vOrc_StormOfFire",
+        "label": "2H Staff Unorc vOrc StormOfFire"
+      }
+    ],
+    "2H Schwerter": [
+      {
+        "id": "ItMw_2H_Sword_01",
+        "label": "2H Sword 01"
+      },
+      {
+        "id": "ItMw_2H_Sword_02",
+        "label": "2H Sword 02"
+      },
+      {
+        "id": "ItMw_2H_Sword_03",
+        "label": "2H Sword 03"
+      },
+      {
+        "id": "ItMw_2H_Sword_Beliar",
+        "label": "2H Sword Beliar"
+      },
+      {
+        "id": "ItMw_2H_Sword_Heavy_01",
+        "label": "2H Sword Heavy 01"
+      },
+      {
+        "id": "ItMw_2H_Sword_Heavy_02",
+        "label": "2H Sword Heavy 02"
+      },
+      {
+        "id": "ItMw_2H_Sword_Heavy_03",
+        "label": "2H Sword Heavy 03"
+      },
+      {
+        "id": "ItMw_2H_Sword_Heavy_04",
+        "label": "2H Sword Heavy 04"
+      },
+      {
+        "id": "ItMw_2H_Sword_Innos",
+        "label": "2H Sword Innos"
+      },
+      {
+        "id": "ItMw_2H_Sword_Light_01",
+        "label": "2H Sword Light 01"
+      },
+      {
+        "id": "ItMw_2H_Sword_Light_01_Stone",
+        "label": "2H Sword Light 01 Stone"
+      },
+      {
+        "id": "ItMw_2H_Sword_Light_02",
+        "label": "2H Sword Light 02"
+      },
+      {
+        "id": "ItMw_2H_Sword_Light_03",
+        "label": "2H Sword Light 03"
+      },
+      {
+        "id": "ItMw_2H_Sword_Light_04",
+        "label": "2H Sword Light 04"
+      },
+      {
+        "id": "ItMw_2H_Sword_Light_05",
+        "label": "2H Sword Light 05"
+      },
+      {
+        "id": "ItMw_2H_Sword_Old_01",
+        "label": "2H Sword Old 01"
+      },
+      {
+        "id": "ItMw_2H_Sword_Orc_01",
+        "label": "2H Sword Orc 01"
+      },
+      {
+        "id": "ItMw_2H_Sword_Orc_01_vOrc",
+        "label": "2H Sword Orc 01 vOrc"
+      },
+      {
+        "id": "ItMw_2H_Sword_Orc_01_vOrc_Sleeper",
+        "label": "2H Sword Orc 01 vOrc Sleeper"
+      },
+      {
+        "id": "ItMw_2H_Sword_Thorus",
+        "label": "2H Sword Thorus"
+      },
+      {
+        "id": "ItMw_2H_Sword_Uriziel_01",
+        "label": "2H Sword Uriziel 01"
+      },
+      {
+        "id": "ItMw_2H_Sword_Uriziel_02",
+        "label": "2H Sword Uriziel 02"
+      },
+      {
+        "id": "ItMw_2H_Sword_Uriziel_03",
+        "label": "2H Sword Uriziel 03"
+      },
+      {
+        "id": "ItMw_2H_Sword_Wind",
+        "label": "2H Sword Wind"
+      }
+    ],
+    "Schmiede-Rohlinge": [
+      {
+        "id": "ItMw_Smith_IntermediateSword_01",
+        "label": "Smith IntermediateSword 01"
+      },
+      {
+        "id": "ItMw_Smith_IntermediateSword_02",
+        "label": "Smith IntermediateSword 02"
+      },
+      {
+        "id": "ItMw_Smith_IntermediateSword_03",
+        "label": "Smith IntermediateSword 03"
+      },
+      {
+        "id": "ItMw_Smith_IntermediateSword_04",
+        "label": "Smith IntermediateSword 04"
+      }
+    ]
+  },
+  "Fernkampf": {
+    "Bögen": [
+      {
+        "id": "ItRw_Bow_Diego",
+        "label": "Bow Diego"
+      },
+      {
+        "id": "ItRw_Bow_Diego_Sleeper",
+        "label": "Bow Diego Sleeper"
+      },
+      {
+        "id": "ItRw_Bow_Long_01",
+        "label": "Bow Long 01"
+      },
+      {
+        "id": "ItRw_Bow_Long_02",
+        "label": "Bow Long 02"
+      },
+      {
+        "id": "ItRw_Bow_Long_03",
+        "label": "Bow Long 03"
+      },
+      {
+        "id": "ItRw_Bow_Long_04",
+        "label": "Bow Long 04"
+      },
+      {
+        "id": "ItRw_Bow_Long_05",
+        "label": "Bow Long 05"
+      },
+      {
+        "id": "ItRw_Bow_Long_06",
+        "label": "Bow Long 06"
+      },
+      {
+        "id": "ItRw_Bow_Long_07",
+        "label": "Bow Long 07"
+      },
+      {
+        "id": "ItRw_Bow_Long_08",
+        "label": "Bow Long 08"
+      },
+      {
+        "id": "ItRw_Bow_Long_09",
+        "label": "Bow Long 09"
+      },
+      {
+        "id": "ItRw_Bow_Long_10",
+        "label": "Bow Long 10"
+      },
+      {
+        "id": "ItRw_Bow_Long_11",
+        "label": "Bow Long 11"
+      },
+      {
+        "id": "ItRw_Bow_Long_12",
+        "label": "Bow Long 12"
+      },
+      {
+        "id": "ItRw_Bow_QA",
+        "label": "Bow QA"
+      },
+      {
+        "id": "ItRw_Bow_Small_01",
+        "label": "Bow Small 01"
+      },
+      {
+        "id": "ItRw_Bow_Small_02",
+        "label": "Bow Small 02"
+      },
+      {
+        "id": "ItRw_Bow_Small_03",
+        "label": "Bow Small 03"
+      },
+      {
+        "id": "ItRw_Bow_Small_04",
+        "label": "Bow Small 04"
+      },
+      {
+        "id": "ItRw_Bow_Small_05",
+        "label": "Bow Small 05"
+      },
+      {
+        "id": "ItRw_Bow_War_01",
+        "label": "Bow War 01"
+      },
+      {
+        "id": "ItRw_Bow_War_02",
+        "label": "Bow War 02"
+      },
+      {
+        "id": "ItRw_Bow_War_03",
+        "label": "Bow War 03"
+      },
+      {
+        "id": "ItRw_Bow_War_04",
+        "label": "Bow War 04"
+      },
+      {
+        "id": "ItRw_Bow_War_05",
+        "label": "Bow War 05"
+      },
+      {
+        "id": "ItRw_Bow_Wolf",
+        "label": "Bow Wolf"
+      }
+    ],
+    "Armbrüste": [
+      {
+        "id": "ItRw_Crossbow_01",
+        "label": "Crossbow 01"
+      },
+      {
+        "id": "ItRw_Crossbow_02",
+        "label": "Crossbow 02"
+      },
+      {
+        "id": "ItRw_Crossbow_03",
+        "label": "Crossbow 03"
+      },
+      {
+        "id": "ItRw_Crossbow_04",
+        "label": "Crossbow 04"
+      }
+    ]
+  },
+  "Arkan": {
+    "Runen": [
+      {
+        "id": "ItAr_Rune_BallLightning",
+        "label": "Rune BallLightning"
+      },
+      {
+        "id": "ItAr_Rune_BreathOfDeath",
+        "label": "Rune BreathOfDeath"
+      },
+      {
+        "id": "ItAr_Rune_ChainLightning",
+        "label": "Rune ChainLightning"
+      },
+      {
+        "id": "ItAr_Rune_Charm",
+        "label": "Rune Charm"
+      },
+      {
+        "id": "ItAr_Rune_Control",
+        "label": "Rune Control"
+      },
+      {
+        "id": "ItAr_Rune_DeathToTheUndead",
+        "label": "Rune DeathToTheUndead"
+      },
+      {
+        "id": "ItAr_Rune_FireBall",
+        "label": "Rune FireBall"
+      },
+      {
+        "id": "ItAr_Rune_FireBall_MiltenSleeper",
+        "label": "Rune FireBall MiltenSleeper"
+      },
+      {
+        "id": "ItAr_Rune_FireBall_MiltenSleeper_Player",
+        "label": "Rune FireBall MiltenSleeper Player"
+      },
+      {
+        "id": "ItAr_Rune_FireBolt",
+        "label": "Rune FireBolt"
+      },
+      {
+        "id": "ItAr_Rune_FireRain",
+        "label": "Rune FireRain"
+      },
+      {
+        "id": "ItAr_Rune_FistOfWind",
+        "label": "Rune FistOfWind"
+      },
+      {
+        "id": "ItAr_Rune_Heal",
+        "label": "Rune Heal"
+      },
+      {
+        "id": "ItAr_Rune_IceBlock",
+        "label": "Rune IceBlock"
+      },
+      {
+        "id": "ItAr_Rune_IceBolt",
+        "label": "Rune IceBolt"
+      },
+      {
+        "id": "ItAr_Rune_IceWave",
+        "label": "Rune IceWave"
+      },
+      {
+        "id": "ItAr_Rune_Light",
+        "label": "Rune Light"
+      },
+      {
+        "id": "ItAr_Rune_Pyrokinesis",
+        "label": "Rune Pyrokinesis"
+      },
+      {
+        "id": "ItAr_Rune_Sleep",
+        "label": "Rune Sleep"
+      },
+      {
+        "id": "ItAr_Rune_StormFist",
+        "label": "Rune StormFist"
+      },
+      {
+        "id": "ItAr_Rune_StormOfFire",
+        "label": "Rune StormOfFire"
+      },
+      {
+        "id": "ItAr_Rune_Telekinesis",
+        "label": "Rune Telekinesis"
+      },
+      {
+        "id": "ItAr_Rune_TeleportToMagiciansOfFire",
+        "label": "Rune TeleportToMagiciansOfFire"
+      },
+      {
+        "id": "ItAr_Rune_TeleportToMagiciansOfWater",
+        "label": "Rune TeleportToMagiciansOfWater"
+      },
+      {
+        "id": "ItAr_Rune_TeleportToNecromancer",
+        "label": "Rune TeleportToNecromancer"
+      },
+      {
+        "id": "ItAr_Rune_TeleportToSunkenTower",
+        "label": "Rune TeleportToSunkenTower"
+      },
+      {
+        "id": "ItAr_Rune_TeleportToSwampCamp",
+        "label": "Rune TeleportToSwampCamp"
+      },
+      {
+        "id": "ItAr_Rune_UrizielWaveOfDeath",
+        "label": "Rune UrizielWaveOfDeath"
+      }
+    ],
+    "Schriftrollen": [
+      {
+        "id": "ItAr_Scroll_BallLightning",
+        "label": "Scroll BallLightning"
+      },
+      {
+        "id": "ItAr_Scroll_ChainLightning",
+        "label": "Scroll ChainLightning"
+      },
+      {
+        "id": "ItAr_Scroll_Charm",
+        "label": "Scroll Charm"
+      },
+      {
+        "id": "ItAr_Scroll_Control",
+        "label": "Scroll Control"
+      },
+      {
+        "id": "ItAr_Scroll_DeathToTheUndead",
+        "label": "Scroll DeathToTheUndead"
+      },
+      {
+        "id": "ItAr_Scroll_Fear",
+        "label": "Scroll Fear"
+      },
+      {
+        "id": "ItAr_Scroll_FireBall",
+        "label": "Scroll FireBall"
+      },
+      {
+        "id": "ItAr_Scroll_FireBolt",
+        "label": "Scroll FireBolt"
+      },
+      {
+        "id": "ItAr_Scroll_FireRain",
+        "label": "Scroll FireRain"
+      },
+      {
+        "id": "ItAr_Scroll_FistOfWind",
+        "label": "Scroll FistOfWind"
+      },
+      {
+        "id": "ItAr_Scroll_Heal",
+        "label": "Scroll Heal"
+      },
+      {
+        "id": "ItAr_Scroll_IceBlock",
+        "label": "Scroll IceBlock"
+      },
+      {
+        "id": "ItAr_Scroll_IceBolt",
+        "label": "Scroll IceBolt"
+      },
+      {
+        "id": "ItAr_Scroll_IceWave",
+        "label": "Scroll IceWave"
+      },
+      {
+        "id": "ItAr_Scroll_InnosPray",
+        "label": "Scroll InnosPray"
+      },
+      {
+        "id": "ItAr_Scroll_Light",
+        "label": "Scroll Light"
+      },
+      {
+        "id": "ItAr_Scroll_Pyrokinesis",
+        "label": "Scroll Pyrokinesis"
+      },
+      {
+        "id": "ItAr_Scroll_Shrink",
+        "label": "Scroll Shrink"
+      },
+      {
+        "id": "ItAr_Scroll_Sleep",
+        "label": "Scroll Sleep"
+      },
+      {
+        "id": "ItAr_Scroll_StormFist",
+        "label": "Scroll StormFist"
+      },
+      {
+        "id": "ItAr_Scroll_StormOfFire",
+        "label": "Scroll StormOfFire"
+      },
+      {
+        "id": "ItAr_Scroll_SummonArmyOfDarkness",
+        "label": "Scroll SummonArmyOfDarkness"
+      },
+      {
+        "id": "ItAr_Scroll_SummonDemon",
+        "label": "Scroll SummonDemon"
+      },
+      {
+        "id": "ItAr_Scroll_SummonGolem",
+        "label": "Scroll SummonGolem"
+      },
+      {
+        "id": "ItAr_Scroll_SummonSkeletons",
+        "label": "Scroll SummonSkeletons"
+      },
+      {
+        "id": "ItAr_Scroll_Telekinesis",
+        "label": "Scroll Telekinesis"
+      },
+      {
+        "id": "ItAr_Scroll_TransformBiter",
+        "label": "Scroll TransformBiter"
+      },
+      {
+        "id": "ItAr_Scroll_TransformBloodfly",
+        "label": "Scroll TransformBloodfly"
+      },
+      {
+        "id": "ItAr_Scroll_TransformBloodhound",
+        "label": "Scroll TransformBloodhound"
+      },
+      {
+        "id": "ItAr_Scroll_TransformFireLizard",
+        "label": "Scroll TransformFireLizard"
+      },
+      {
+        "id": "ItAr_Scroll_TransformHarpy",
+        "label": "Scroll TransformHarpy"
+      },
+      {
+        "id": "ItAr_Scroll_TransformLizard",
+        "label": "Scroll TransformLizard"
+      },
+      {
+        "id": "ItAr_Scroll_TransformLurker",
+        "label": "Scroll TransformLurker"
+      },
+      {
+        "id": "ItAr_Scroll_TransformMeatbug",
+        "label": "Scroll TransformMeatbug"
+      },
+      {
+        "id": "ItAr_Scroll_TransformMinecrawler",
+        "label": "Scroll TransformMinecrawler"
+      },
+      {
+        "id": "ItAr_Scroll_TransformMolerat",
+        "label": "Scroll TransformMolerat"
+      },
+      {
+        "id": "ItAr_Scroll_TransformOrcDog",
+        "label": "Scroll TransformOrcDog"
+      },
+      {
+        "id": "ItAr_Scroll_TransformRazor",
+        "label": "Scroll TransformRazor"
+      },
+      {
+        "id": "ItAr_Scroll_TransformScavenger",
+        "label": "Scroll TransformScavenger"
+      },
+      {
+        "id": "ItAr_Scroll_TransformShadowbeast",
+        "label": "Scroll TransformShadowbeast"
+      },
+      {
+        "id": "ItAr_Scroll_TransformSnapper",
+        "label": "Scroll TransformSnapper"
+      },
+      {
+        "id": "ItAr_Scroll_TransformSwampshark",
+        "label": "Scroll TransformSwampshark"
+      },
+      {
+        "id": "ItAr_Scroll_TransformWolf",
+        "label": "Scroll TransformWolf"
+      }
+    ]
+  }
+}

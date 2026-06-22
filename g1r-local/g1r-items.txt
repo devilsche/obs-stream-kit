@@ -1,0 +1,280 @@
+# NAHKAMPF
+## 1H Äxte (10)
+ItMw_1H_Axe_01          —  1H Axe 01
+ItMw_1H_Axe_02          —  1H Axe 02
+ItMw_1H_Axe_03          —  1H Axe 03
+ItMw_1H_Axe_Bran        —  1H Axe Bran
+ItMw_1H_Axe_Cord        —  1H Axe Cord
+ItMw_1H_Axe_Hatchet_01  —  1H Axe Hatchet 01
+ItMw_1H_Axe_Lares       —  1H Axe Lares
+ItMw_1H_Axe_Old_01      —  1H Axe Old 01
+ItMw_1H_Axe_Sickle_01   —  1H Axe Sickle 01
+ItMw_1H_Axe_Silas       —  1H Axe Silas
+
+## 1H Streitkolben & Hämmer (20)
+ItMw_1H_Mace_01               —  1H Mace 01
+ItMw_1H_Mace_02               —  1H Mace 02
+ItMw_1H_Mace_03               —  1H Mace 03
+ItMw_1H_Mace_04               —  1H Mace 04
+ItMw_1H_Mace_Club_01          —  1H Mace Club 01
+ItMw_1H_Mace_Fortuno          —  1H Mace Fortuno
+ItMw_1H_Mace_Lester           —  1H Mace Lester
+ItMw_1H_Mace_Lester_Sleeper   —  1H Mace Lester Sleeper
+ItMw_1H_Mace_Light_01         —  1H Mace Light 01
+ItMw_1H_Mace_Nailmace_01      —  1H Mace Nailmace 01
+ItMw_1H_Mace_Namib            —  1H Mace Namib
+ItMw_1H_Mace_Orun             —  1H Mace Orun
+ItMw_1H_Mace_Poker_01         —  1H Mace Poker 01
+ItMw_1H_Mace_Sledgehammer_01  —  1H Mace Sledgehammer 01
+ItMw_1H_Mace_War_01           —  1H Mace War 01
+ItMw_1H_Mace_War_02           —  1H Mace War 02
+ItMw_1H_Mace_War_03           —  1H Mace War 03
+ItMw_1H_Mace_Warhammer_01     —  1H Mace Warhammer 01
+ItMw_1H_Mace_Warhammer_02     —  1H Mace Warhammer 02
+ItMw_1H_Mace_Warhammer_03     —  1H Mace Warhammer 03
+
+## 1H Schwerter (38)
+ItMw_1H_Sword_01                     —  1H Sword 01
+ItMw_1H_Sword_01_Xardas_Sleeper      —  1H Sword 01 Xardas Sleeper
+ItMw_1H_Sword_02                     —  1H Sword 02
+ItMw_1H_Sword_03                     —  1H Sword 03
+ItMw_1H_Sword_04                     —  1H Sword 04
+ItMw_1H_Sword_04_Diego_Sleeper       —  1H Sword 04 Diego Sleeper
+ItMw_1H_Sword_05                     —  1H Sword 05
+ItMw_1H_Sword_05_Darrion             —  1H Sword 05 Darrion
+ItMw_1H_Sword_Arto                   —  1H Sword Arto
+ItMw_1H_Sword_Bastard_01             —  1H Sword Bastard 01
+ItMw_1H_Sword_Bastard_02             —  1H Sword Bastard 02
+ItMw_1H_Sword_Bastard_03             —  1H Sword Bastard 03
+ItMw_1H_Sword_Bastard_04             —  1H Sword Bastard 04
+ItMw_1H_Sword_Broad_01               —  1H Sword Broad 01
+ItMw_1H_Sword_Broad_02               —  1H Sword Broad 02
+ItMw_1H_Sword_Broad_03               —  1H Sword Broad 03
+ItMw_1H_Sword_Broad_04               —  1H Sword Broad 04
+ItMw_1H_Sword_Kalom                  —  1H Sword Kalom
+ItMw_1H_Sword_Lightguard_01          —  1H Sword Lightguard 01
+ItMw_1H_Sword_Long_01                —  1H Sword Long 01
+ItMw_1H_Sword_Long_02                —  1H Sword Long 02
+ItMw_1H_Sword_Long_03                —  1H Sword Long 03
+ItMw_1H_Sword_Long_04                —  1H Sword Long 04
+ItMw_1H_Sword_Long_05                —  1H Sword Long 05
+ItMw_1H_Sword_Old_01                 —  1H Sword Old 01
+ItMw_1H_Sword_Old_01_PlayerPlayTest  —  1H Sword Old 01 PlayerPlayTest
+ItMw_1H_Sword_Old_02                 —  1H Sword Old 02
+ItMw_1H_Sword_Paw                    —  1H Sword Paw
+ItMw_1H_Sword_QA                     —  1H Sword QA
+ItMw_1H_Sword_Raven                  —  1H Sword Raven
+ItMw_1H_Sword_Scar                   —  1H Sword Scar
+ItMw_1H_Sword_Scythe_01              —  1H Sword Scythe 01
+ItMw_1H_Sword_Short_01               —  1H Sword Short 01
+ItMw_1H_Sword_Short_02               —  1H Sword Short 02
+ItMw_1H_Sword_Short_03               —  1H Sword Short 03
+ItMw_1H_Sword_Short_04               —  1H Sword Short 04
+ItMw_1H_Sword_Short_05               —  1H Sword Short 05
+ItMw_1H_Sword_Whistler               —  1H Sword Whistler
+
+## Fackeln (3)
+ItMw_1H_Torch        —  1H Torch
+ItMw_1H_Torch_Gob    —  1H Torch Gob
+ItMw_1H_Torch_World  —  1H Torch World
+
+## 2H Äxte (28)
+ItMw_2H_Axe_Gorn                 —  2H Axe Gorn
+ItMw_2H_Axe_Gorn_Sleeper         —  2H Axe Gorn Sleeper
+ItMw_2H_Axe_Heavy_01             —  2H Axe Heavy 01
+ItMw_2H_Axe_Heavy_02             —  2H Axe Heavy 02
+ItMw_2H_Axe_Heavy_03             —  2H Axe Heavy 03
+ItMw_2H_Axe_Heavy_04             —  2H Axe Heavy 04
+ItMw_2H_Axe_Lee                  —  2H Axe Lee
+ItMw_2H_Axe_Light_01             —  2H Axe Light 01
+ItMw_2H_Axe_Light_02             —  2H Axe Light 02
+ItMw_2H_Axe_Light_03             —  2H Axe Light 03
+ItMw_2H_Axe_Old_01               —  2H Axe Old 01
+ItMw_2H_Axe_Old_02               —  2H Axe Old 02
+ItMw_2H_Axe_Old_03               —  2H Axe Old 03
+ItMw_2H_Axe_Orc_01               —  2H Axe Orc 01
+ItMw_2H_Axe_Orc_01_vOrc          —  2H Axe Orc 01 vOrc
+ItMw_2H_Axe_Orc_01_vOrc_Sleeper  —  2H Axe Orc 01 vOrc Sleeper
+ItMw_2H_Axe_Orc_02               —  2H Axe Orc 02
+ItMw_2H_Axe_Orc_02_vOrc          —  2H Axe Orc 02 vOrc
+ItMw_2H_Axe_Orc_02_vOrc_Sleeper  —  2H Axe Orc 02 vOrc Sleeper
+ItMw_2H_Axe_Orc_03               —  2H Axe Orc 03
+ItMw_2H_Axe_Orc_03_vOrc          —  2H Axe Orc 03 vOrc
+ItMw_2H_Axe_Orc_03_vOrc_Sleeper  —  2H Axe Orc 03 vOrc Sleeper
+ItMw_2H_Axe_Orc_04               —  2H Axe Orc 04
+ItMw_2H_Axe_Orc_04_vOrc          —  2H Axe Orc 04 vOrc
+ItMw_2H_Axe_Orc_04_vOrc_Sleeper  —  2H Axe Orc 04 vOrc Sleeper
+ItMw_2H_Axe_Orik                 —  2H Axe Orik
+ItMw_2H_Axe_Pickaxe              —  2H Axe Pickaxe
+ItMw_2H_Axe_Torlof               —  2H Axe Torlof
+
+## 2H Streitkolben (3)
+ItMw_2H_Mace_Orc_01               —  2H Mace Orc 01
+ItMw_2H_Mace_Orc_01_vOrc          —  2H Mace Orc 01 vOrc
+ItMw_2H_Mace_Orc_01_vOrc_Sleeper  —  2H Mace Orc 01 vOrc Sleeper
+
+## 2H Zepter (1)
+ItMw_2H_Scepter_Skeletonmage  —  2H Scepter Skeletonmage
+
+## 2H Stäbe (18)
+ItMw_2H_Staff_02                        —  2H Staff 02
+ItMw_2H_Staff_Orc                       —  2H Staff Orc
+ItMw_2H_Staff_Orc_vOrc                  —  2H Staff Orc vOrc
+ItMw_2H_Staff_Orc_vOrc_Fireball         —  2H Staff Orc vOrc Fireball
+ItMw_2H_Staff_Scepter                   —  2H Staff Scepter
+ItMw_2H_Staff_Ulumulu                   —  2H Staff Ulumulu
+ItMw_2H_Staff_Unorc                     —  2H Staff Unorc
+ItMw_2H_Staff_Unorc_GVArushat_vOrc      —  2H Staff Unorc GVArushat vOrc
+ItMw_2H_Staff_Unorc_VHashor_vOrc        —  2H Staff Unorc VHashor vOrc
+ItMw_2H_Staff_Unorc_VKasorg_vOrc        —  2H Staff Unorc VKasorg vOrc
+ItMw_2H_Staff_Unorc_VRuuushk_vOrc       —  2H Staff Unorc VRuuushk vOrc
+ItMw_2H_Staff_Unorc_VUnhilqt_vOrc       —  2H Staff Unorc VUnhilqt vOrc
+ItMw_2H_Staff_Unorc_vOrc                —  2H Staff Unorc vOrc
+ItMw_2H_Staff_Unorc_vOrc_BallLighting   —  2H Staff Unorc vOrc BallLighting
+ItMw_2H_Staff_Unorc_vOrc_BreathOfDeath  —  2H Staff Unorc vOrc BreathOfDeath
+ItMw_2H_Staff_Unorc_vOrc_ChainLighting  —  2H Staff Unorc vOrc ChainLighting
+ItMw_2H_Staff_Unorc_vOrc_Pyrokinesis    —  2H Staff Unorc vOrc Pyrokinesis
+ItMw_2H_Staff_Unorc_vOrc_StormOfFire    —  2H Staff Unorc vOrc StormOfFire
+
+## 2H Schwerter (24)
+ItMw_2H_Sword_01                   —  2H Sword 01
+ItMw_2H_Sword_02                   —  2H Sword 02
+ItMw_2H_Sword_03                   —  2H Sword 03
+ItMw_2H_Sword_Beliar               —  2H Sword Beliar
+ItMw_2H_Sword_Heavy_01             —  2H Sword Heavy 01
+ItMw_2H_Sword_Heavy_02             —  2H Sword Heavy 02
+ItMw_2H_Sword_Heavy_03             —  2H Sword Heavy 03
+ItMw_2H_Sword_Heavy_04             —  2H Sword Heavy 04
+ItMw_2H_Sword_Innos                —  2H Sword Innos
+ItMw_2H_Sword_Light_01             —  2H Sword Light 01
+ItMw_2H_Sword_Light_01_Stone       —  2H Sword Light 01 Stone
+ItMw_2H_Sword_Light_02             —  2H Sword Light 02
+ItMw_2H_Sword_Light_03             —  2H Sword Light 03
+ItMw_2H_Sword_Light_04             —  2H Sword Light 04
+ItMw_2H_Sword_Light_05             —  2H Sword Light 05
+ItMw_2H_Sword_Old_01               —  2H Sword Old 01
+ItMw_2H_Sword_Orc_01               —  2H Sword Orc 01
+ItMw_2H_Sword_Orc_01_vOrc          —  2H Sword Orc 01 vOrc
+ItMw_2H_Sword_Orc_01_vOrc_Sleeper  —  2H Sword Orc 01 vOrc Sleeper
+ItMw_2H_Sword_Thorus               —  2H Sword Thorus
+ItMw_2H_Sword_Uriziel_01           —  2H Sword Uriziel 01
+ItMw_2H_Sword_Uriziel_02           —  2H Sword Uriziel 02
+ItMw_2H_Sword_Uriziel_03           —  2H Sword Uriziel 03
+ItMw_2H_Sword_Wind                 —  2H Sword Wind
+
+## Schmiede-Rohlinge (4)
+ItMw_Smith_IntermediateSword_01  —  Smith IntermediateSword 01
+ItMw_Smith_IntermediateSword_02  —  Smith IntermediateSword 02
+ItMw_Smith_IntermediateSword_03  —  Smith IntermediateSword 03
+ItMw_Smith_IntermediateSword_04  —  Smith IntermediateSword 04
+
+# FERNKAMPF
+## Bögen (26)
+ItRw_Bow_Diego          —  Bow Diego
+ItRw_Bow_Diego_Sleeper  —  Bow Diego Sleeper
+ItRw_Bow_Long_01        —  Bow Long 01
+ItRw_Bow_Long_02        —  Bow Long 02
+ItRw_Bow_Long_03        —  Bow Long 03
+ItRw_Bow_Long_04        —  Bow Long 04
+ItRw_Bow_Long_05        —  Bow Long 05
+ItRw_Bow_Long_06        —  Bow Long 06
+ItRw_Bow_Long_07        —  Bow Long 07
+ItRw_Bow_Long_08        —  Bow Long 08
+ItRw_Bow_Long_09        —  Bow Long 09
+ItRw_Bow_Long_10        —  Bow Long 10
+ItRw_Bow_Long_11        —  Bow Long 11
+ItRw_Bow_Long_12        —  Bow Long 12
+ItRw_Bow_QA             —  Bow QA
+ItRw_Bow_Small_01       —  Bow Small 01
+ItRw_Bow_Small_02       —  Bow Small 02
+ItRw_Bow_Small_03       —  Bow Small 03
+ItRw_Bow_Small_04       —  Bow Small 04
+ItRw_Bow_Small_05       —  Bow Small 05
+ItRw_Bow_War_01         —  Bow War 01
+ItRw_Bow_War_02         —  Bow War 02
+ItRw_Bow_War_03         —  Bow War 03
+ItRw_Bow_War_04         —  Bow War 04
+ItRw_Bow_War_05         —  Bow War 05
+ItRw_Bow_Wolf           —  Bow Wolf
+
+## Armbrüste (4)
+ItRw_Crossbow_01  —  Crossbow 01
+ItRw_Crossbow_02  —  Crossbow 02
+ItRw_Crossbow_03  —  Crossbow 03
+ItRw_Crossbow_04  —  Crossbow 04
+
+# ARKAN
+## Runen (28)
+ItAr_Rune_BallLightning                  —  Rune BallLightning
+ItAr_Rune_BreathOfDeath                  —  Rune BreathOfDeath
+ItAr_Rune_ChainLightning                 —  Rune ChainLightning
+ItAr_Rune_Charm                          —  Rune Charm
+ItAr_Rune_Control                        —  Rune Control
+ItAr_Rune_DeathToTheUndead               —  Rune DeathToTheUndead
+ItAr_Rune_FireBall                       —  Rune FireBall
+ItAr_Rune_FireBall_MiltenSleeper         —  Rune FireBall MiltenSleeper
+ItAr_Rune_FireBall_MiltenSleeper_Player  —  Rune FireBall MiltenSleeper Player
+ItAr_Rune_FireBolt                       —  Rune FireBolt
+ItAr_Rune_FireRain                       —  Rune FireRain
+ItAr_Rune_FistOfWind                     —  Rune FistOfWind
+ItAr_Rune_Heal                           —  Rune Heal
+ItAr_Rune_IceBlock                       —  Rune IceBlock
+ItAr_Rune_IceBolt                        —  Rune IceBolt
+ItAr_Rune_IceWave                        —  Rune IceWave
+ItAr_Rune_Light                          —  Rune Light
+ItAr_Rune_Pyrokinesis                    —  Rune Pyrokinesis
+ItAr_Rune_Sleep                          —  Rune Sleep
+ItAr_Rune_StormFist                      —  Rune StormFist
+ItAr_Rune_StormOfFire                    —  Rune StormOfFire
+ItAr_Rune_Telekinesis                    —  Rune Telekinesis
+ItAr_Rune_TeleportToMagiciansOfFire      —  Rune TeleportToMagiciansOfFire
+ItAr_Rune_TeleportToMagiciansOfWater     —  Rune TeleportToMagiciansOfWater
+ItAr_Rune_TeleportToNecromancer          —  Rune TeleportToNecromancer
+ItAr_Rune_TeleportToSunkenTower          —  Rune TeleportToSunkenTower
+ItAr_Rune_TeleportToSwampCamp            —  Rune TeleportToSwampCamp
+ItAr_Rune_UrizielWaveOfDeath             —  Rune UrizielWaveOfDeath
+
+## Schriftrollen (43)
+ItAr_Scroll_BallLightning         —  Scroll BallLightning
+ItAr_Scroll_ChainLightning        —  Scroll ChainLightning
+ItAr_Scroll_Charm                 —  Scroll Charm
+ItAr_Scroll_Control               —  Scroll Control
+ItAr_Scroll_DeathToTheUndead      —  Scroll DeathToTheUndead
+ItAr_Scroll_Fear                  —  Scroll Fear
+ItAr_Scroll_FireBall              —  Scroll FireBall
+ItAr_Scroll_FireBolt              —  Scroll FireBolt
+ItAr_Scroll_FireRain              —  Scroll FireRain
+ItAr_Scroll_FistOfWind            —  Scroll FistOfWind
+ItAr_Scroll_Heal                  —  Scroll Heal
+ItAr_Scroll_IceBlock              —  Scroll IceBlock
+ItAr_Scroll_IceBolt               —  Scroll IceBolt
+ItAr_Scroll_IceWave               —  Scroll IceWave
+ItAr_Scroll_InnosPray             —  Scroll InnosPray
+ItAr_Scroll_Light                 —  Scroll Light
+ItAr_Scroll_Pyrokinesis           —  Scroll Pyrokinesis
+ItAr_Scroll_Shrink                —  Scroll Shrink
+ItAr_Scroll_Sleep                 —  Scroll Sleep
+ItAr_Scroll_StormFist             —  Scroll StormFist
+ItAr_Scroll_StormOfFire           —  Scroll StormOfFire
+ItAr_Scroll_SummonArmyOfDarkness  —  Scroll SummonArmyOfDarkness
+ItAr_Scroll_SummonDemon           —  Scroll SummonDemon
+ItAr_Scroll_SummonGolem           —  Scroll SummonGolem
+ItAr_Scroll_SummonSkeletons       —  Scroll SummonSkeletons
+ItAr_Scroll_Telekinesis           —  Scroll Telekinesis
+ItAr_Scroll_TransformBiter        —  Scroll TransformBiter
+ItAr_Scroll_TransformBloodfly     —  Scroll TransformBloodfly
+ItAr_Scroll_TransformBloodhound   —  Scroll TransformBloodhound
+ItAr_Scroll_TransformFireLizard   —  Scroll TransformFireLizard
+ItAr_Scroll_TransformHarpy        —  Scroll TransformHarpy
+ItAr_Scroll_TransformLizard       —  Scroll TransformLizard
+ItAr_Scroll_TransformLurker       —  Scroll TransformLurker
+ItAr_Scroll_TransformMeatbug      —  Scroll TransformMeatbug
+ItAr_Scroll_TransformMinecrawler  —  Scroll TransformMinecrawler
+ItAr_Scroll_TransformMolerat      —  Scroll TransformMolerat
+ItAr_Scroll_TransformOrcDog       —  Scroll TransformOrcDog
+ItAr_Scroll_TransformRazor        —  Scroll TransformRazor
+ItAr_Scroll_TransformScavenger    —  Scroll TransformScavenger
+ItAr_Scroll_TransformShadowbeast  —  Scroll TransformShadowbeast
+ItAr_Scroll_TransformSnapper      —  Scroll TransformSnapper
+ItAr_Scroll_TransformSwampshark   —  Scroll TransformSwampshark
+ItAr_Scroll_TransformWolf         —  Scroll TransformWolf
