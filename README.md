@@ -417,6 +417,7 @@ auf das Backend; kein Streaming nötig.
 |---|---|---|
 | `tools/match-replay.html` | Animierter Replay eines PUBG-Matches auf der Karte | Browser-Tab |
 | `tools/landing-spots.html` | Heatmap + Scatter der Landeorte pro Karte und Spieler-Konstellation | Browser-Tab / 1920×1080 |
+| `tools/g1r-database.html` | Vollständiger G1R-Item-Katalog aus dem Object-Dump (Nah-/Fernkampf, Runen, Schriftrollen) mit Live-Suche | Browser-Tab (admin) |
 
 #### tools/match-replay.html
 

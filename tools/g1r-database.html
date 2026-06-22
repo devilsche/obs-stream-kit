@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>G1R-Datenbank — Waffen, Runen, Schriftrollen</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
+  <link rel="stylesheet" href="/widgets-static/_theme.css" />
+  <link rel="stylesheet" href="/widgets-static/_blocks.css" />
+  <style>
+    html, body { margin: 0; min-height: 100vh; }
+    body {
+      background: var(--theme-page-bg, #14101a);
+      color: var(--theme-text, #ece6f2);
+      font-family: var(--theme-font-body, system-ui, sans-serif);
+      padding: 24px clamp(16px, 4vw, 56px) 64px;
+      box-sizing: border-box;
+    }
+    .skip-link {
+      position: absolute; left: 8px; top: -48px; z-index: 100;
+      background: var(--theme-accent, #f2b705);
+      color: var(--theme-on-primary, #1a1020);
+      padding: 8px 14px; border-radius: var(--theme-radius, 8px);
+      transition: top .15s;
+    }
+    .skip-link:focus { top: 8px; }
+
+    .page-header { margin-bottom: 8px; }
+    .page-title {
+      font-family: var(--theme-font-display, serif);
+      font-size: clamp(1.6rem, 4vw, 2.4rem); font-weight: 700; margin: 0;
+    }
+    .page-lede { color: var(--theme-text-dim, #b6a9c6); margin: 6px 0 0; max-width: 70ch; }
+    .page-lede b { color: var(--theme-text, #ece6f2); }
+
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: flex-end;
+      margin: 24px 0 8px; position: sticky; top: 0; z-index: 20;
+      background: var(--theme-page-bg, #14101a); padding: 12px 0;
+    }
+    .search { display: flex; flex-direction: column; gap: 4px; flex: 1 1 280px; }
+    .search label { font-size: .82rem; color: var(--theme-text-dim, #b6a9c6); }
+    .search input {
+      font: inherit; color: var(--theme-text, #ece6f2);
+      background: var(--theme-surface-2, #221a2c);
+      border: var(--theme-border-width, 1px) solid var(--theme-border, #43374f);
+      border-radius: var(--theme-radius, 8px);
+      padding: 10px 14px; min-height: 24px; width: 100%; box-sizing: border-box;
+    }
+    .search input:focus-visible {
+      outline: 3px solid var(--theme-accent, #f2b705); outline-offset: 2px;
+    }
+    .result-count { margin: 0; color: var(--theme-text-dim, #b6a9c6); font-size: .9rem; white-space: nowrap; }
+
+    .catnav { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 24px; padding: 0; list-style: none; }
+    .catnav a {
+      display: inline-flex; align-items: center; gap: 6px; min-height: 24px;
+      padding: 6px 12px; border-radius: 999px; text-decoration: none;
+      color: var(--theme-text, #ece6f2);
+      background: var(--theme-surface-2, #221a2c);
+      border: var(--theme-border-width, 1px) solid var(--theme-border, #43374f);
+    }
+    .catnav a:focus-visible { outline: 3px solid var(--theme-accent, #f2b705); outline-offset: 2px; }
+    .catnav a b { color: var(--theme-accent, #f2b705); }
+
+    .cat-section { margin: 0 0 40px; }
+    .cat-h { font-family: var(--theme-font-display, serif); font-size: 1.5rem; margin: 0 0 16px; }
+    .group-grid {
+      display: grid; gap: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    }
+    .group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .group-head h3 { margin: 0; }
+    .count-badge {
+      font-size: .8rem; color: var(--theme-on-primary, #1a1020);
+      background: var(--theme-accent, #f2b705);
+      border-radius: 999px; padding: 2px 9px; font-weight: 700;
+    }
+    ul.t-chips { list-style: none; padding: 0; margin: 0; }
+    .t-chip { word-break: break-word; }
+    .is-hidden { display: none !important; }
+    .no-results { color: var(--theme-text-dim, #b6a9c6); font-style: italic; margin: 24px 0; }
+    @media (prefers-reduced-motion: reduce) { .skip-link { transition: none; } }
+
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Zum Inhalt springen</a>
+
+  <header class="page-header">
+    <h1 class="page-title">G1R-Datenbank</h1>
+    <p class="page-lede">
+      Vollstaendiger Item-Katalog aus dem UE4SS Object-Dump &mdash; Nahkampf, Fernkampf,
+      Runen &amp; Schriftrollen. <b id="totalCount">0</b> Klassen, roh inkl. Boss-, Ork- und Test-Varianten.
+    </p>
+  </header>
+
+  <div class="toolbar">
+    <div class="search">
+      <label for="q">Suche (Name oder ID)</label>
+      <input type="search" id="q" placeholder="z. B. Uriziel, Sword, FireBall" autocomplete="off" />
+    </div>
+    <p class="result-count" id="resultCount" aria-live="polite"></p>
+  </div>
+
+  <ul class="catnav" id="catnav" aria-label="Kategorien"></ul>
+
+  <main id="main"></main>
+
+  <script type="application/json" id="catalog">{"Nahkampf":{"1H Äxte":[{"id":"ItMw_1H_Axe_01","label":"1H Axe 01"},{"id":"ItMw_1H_Axe_02","label":"1H Axe 02"},{"id":"ItMw_1H_Axe_03","label":"1H Axe 03"},{"id":"ItMw_1H_Axe_Bran","label":"1H Axe Bran"},{"id":"ItMw_1H_Axe_Cord","label":"1H Axe Cord"},{"id":"ItMw_1H_Axe_Hatchet_01","label":"1H Axe Hatchet 01"},{"id":"ItMw_1H_Axe_Lares","label":"1H Axe Lares"},{"id":"ItMw_1H_Axe_Old_01","label":"1H Axe Old 01"},{"id":"ItMw_1H_Axe_Sickle_01","label":"1H Axe Sickle 01"},{"id":"ItMw_1H_Axe_Silas","label":"1H Axe Silas"}],"1H Streitkolben & Hämmer":[{"id":"ItMw_1H_Mace_01","label":"1H Mace 01"},{"id":"ItMw_1H_Mace_02","label":"1H Mace 02"},{"id":"ItMw_1H_Mace_03","label":"1H Mace 03"},{"id":"ItMw_1H_Mace_04","label":"1H Mace 04"},{"id":"ItMw_1H_Mace_Club_01","label":"1H Mace Club 01"},{"id":"ItMw_1H_Mace_Fortuno","label":"1H Mace Fortuno"},{"id":"ItMw_1H_Mace_Lester","label":"1H Mace Lester"},{"id":"ItMw_1H_Mace_Lester_Sleeper","label":"1H Mace Lester Sleeper"},{"id":"ItMw_1H_Mace_Light_01","label":"1H Mace Light 01"},{"id":"ItMw_1H_Mace_Nailmace_01","label":"1H Mace Nailmace 01"},{"id":"ItMw_1H_Mace_Namib","label":"1H Mace Namib"},{"id":"ItMw_1H_Mace_Orun","label":"1H Mace Orun"},{"id":"ItMw_1H_Mace_Poker_01","label":"1H Mace Poker 01"},{"id":"ItMw_1H_Mace_Sledgehammer_01","label":"1H Mace Sledgehammer 01"},{"id":"ItMw_1H_Mace_War_01","label":"1H Mace War 01"},{"id":"ItMw_1H_Mace_War_02","label":"1H Mace War 02"},{"id":"ItMw_1H_Mace_War_03","label":"1H Mace War 03"},{"id":"ItMw_1H_Mace_Warhammer_01","label":"1H Mace Warhammer 01"},{"id":"ItMw_1H_Mace_Warhammer_02","label":"1H Mace Warhammer 02"},{"id":"ItMw_1H_Mace_Warhammer_03","label":"1H Mace Warhammer 03"}],"1H Schwerter":[{"id":"ItMw_1H_Sword_01","label":"1H Sword 01"},{"id":"ItMw_1H_Sword_01_Xardas_Sleeper","label":"1H Sword 01 Xardas Sleeper"},{"id":"ItMw_1H_Sword_02","label":"1H Sword 02"},{"id":"ItMw_1H_Sword_03","label":"1H Sword 03"},{"id":"ItMw_1H_Sword_04","label":"1H Sword 04"},{"id":"ItMw_1H_Sword_04_Diego_Sleeper","label":"1H Sword 04 Diego Sleeper"},{"id":"ItMw_1H_Sword_05","label":"1H Sword 05"},{"id":"ItMw_1H_Sword_05_Darrion","label":"1H Sword 05 Darrion"},{"id":"ItMw_1H_Sword_Arto","label":"1H Sword Arto"},{"id":"ItMw_1H_Sword_Bastard_01","label":"1H Sword Bastard 01"},{"id":"ItMw_1H_Sword_Bastard_02","label":"1H Sword Bastard 02"},{"id":"ItMw_1H_Sword_Bastard_03","label":"1H Sword Bastard 03"},{"id":"ItMw_1H_Sword_Bastard_04","label":"1H Sword Bastard 04"},{"id":"ItMw_1H_Sword_Broad_01","label":"1H Sword Broad 01"},{"id":"ItMw_1H_Sword_Broad_02","label":"1H Sword Broad 02"},{"id":"ItMw_1H_Sword_Broad_03","label":"1H Sword Broad 03"},{"id":"ItMw_1H_Sword_Broad_04","label":"1H Sword Broad 04"},{"id":"ItMw_1H_Sword_Kalom","label":"1H Sword Kalom"},{"id":"ItMw_1H_Sword_Lightguard_01","label":"1H Sword Lightguard 01"},{"id":"ItMw_1H_Sword_Long_01","label":"1H Sword Long 01"},{"id":"ItMw_1H_Sword_Long_02","label":"1H Sword Long 02"},{"id":"ItMw_1H_Sword_Long_03","label":"1H Sword Long 03"},{"id":"ItMw_1H_Sword_Long_04","label":"1H Sword Long 04"},{"id":"ItMw_1H_Sword_Long_05","label":"1H Sword Long 05"},{"id":"ItMw_1H_Sword_Old_01","label":"1H Sword Old 01"},{"id":"ItMw_1H_Sword_Old_01_PlayerPlayTest","label":"1H Sword Old 01 PlayerPlayTest"},{"id":"ItMw_1H_Sword_Old_02","label":"1H Sword Old 02"},{"id":"ItMw_1H_Sword_Paw","label":"1H Sword Paw"},{"id":"ItMw_1H_Sword_QA","label":"1H Sword QA"},{"id":"ItMw_1H_Sword_Raven","label":"1H Sword Raven"},{"id":"ItMw_1H_Sword_Scar","label":"1H Sword Scar"},{"id":"ItMw_1H_Sword_Scythe_01","label":"1H Sword Scythe 01"},{"id":"ItMw_1H_Sword_Short_01","label":"1H Sword Short 01"},{"id":"ItMw_1H_Sword_Short_02","label":"1H Sword Short 02"},{"id":"ItMw_1H_Sword_Short_03","label":"1H Sword Short 03"},{"id":"ItMw_1H_Sword_Short_04","label":"1H Sword Short 04"},{"id":"ItMw_1H_Sword_Short_05","label":"1H Sword Short 05"},{"id":"ItMw_1H_Sword_Whistler","label":"1H Sword Whistler"}],"Fackeln":[{"id":"ItMw_1H_Torch","label":"1H Torch"},{"id":"ItMw_1H_Torch_Gob","label":"1H Torch Gob"},{"id":"ItMw_1H_Torch_World","label":"1H Torch World"}],"2H Äxte":[{"id":"ItMw_2H_Axe_Gorn","label":"2H Axe Gorn"},{"id":"ItMw_2H_Axe_Gorn_Sleeper","label":"2H Axe Gorn Sleeper"},{"id":"ItMw_2H_Axe_Heavy_01","label":"2H Axe Heavy 01"},{"id":"ItMw_2H_Axe_Heavy_02","label":"2H Axe Heavy 02"},{"id":"ItMw_2H_Axe_Heavy_03","label":"2H Axe Heavy 03"},{"id":"ItMw_2H_Axe_Heavy_04","label":"2H Axe Heavy 04"},{"id":"ItMw_2H_Axe_Lee","label":"2H Axe Lee"},{"id":"ItMw_2H_Axe_Light_01","label":"2H Axe Light 01"},{"id":"ItMw_2H_Axe_Light_02","label":"2H Axe Light 02"},{"id":"ItMw_2H_Axe_Light_03","label":"2H Axe Light 03"},{"id":"ItMw_2H_Axe_Old_01","label":"2H Axe Old 01"},{"id":"ItMw_2H_Axe_Old_02","label":"2H Axe Old 02"},{"id":"ItMw_2H_Axe_Old_03","label":"2H Axe Old 03"},{"id":"ItMw_2H_Axe_Orc_01","label":"2H Axe Orc 01"},{"id":"ItMw_2H_Axe_Orc_01_vOrc","label":"2H Axe Orc 01 vOrc"},{"id":"ItMw_2H_Axe_Orc_01_vOrc_Sleeper","label":"2H Axe Orc 01 vOrc Sleeper"},{"id":"ItMw_2H_Axe_Orc_02","label":"2H Axe Orc 02"},{"id":"ItMw_2H_Axe_Orc_02_vOrc","label":"2H Axe Orc 02 vOrc"},{"id":"ItMw_2H_Axe_Orc_02_vOrc_Sleeper","label":"2H Axe Orc 02 vOrc Sleeper"},{"id":"ItMw_2H_Axe_Orc_03","label":"2H Axe Orc 03"},{"id":"ItMw_2H_Axe_Orc_03_vOrc","label":"2H Axe Orc 03 vOrc"},{"id":"ItMw_2H_Axe_Orc_03_vOrc_Sleeper","label":"2H Axe Orc 03 vOrc Sleeper"},{"id":"ItMw_2H_Axe_Orc_04","label":"2H Axe Orc 04"},{"id":"ItMw_2H_Axe_Orc_04_vOrc","label":"2H Axe Orc 04 vOrc"},{"id":"ItMw_2H_Axe_Orc_04_vOrc_Sleeper","label":"2H Axe Orc 04 vOrc Sleeper"},{"id":"ItMw_2H_Axe_Orik","label":"2H Axe Orik"},{"id":"ItMw_2H_Axe_Pickaxe","label":"2H Axe Pickaxe"},{"id":"ItMw_2H_Axe_Torlof","label":"2H Axe Torlof"}],"2H Streitkolben":[{"id":"ItMw_2H_Mace_Orc_01","label":"2H Mace Orc 01"},{"id":"ItMw_2H_Mace_Orc_01_vOrc","label":"2H Mace Orc 01 vOrc"},{"id":"ItMw_2H_Mace_Orc_01_vOrc_Sleeper","label":"2H Mace Orc 01 vOrc Sleeper"}],"2H Zepter":[{"id":"ItMw_2H_Scepter_Skeletonmage","label":"2H Scepter Skeletonmage"}],"2H Stäbe":[{"id":"ItMw_2H_Staff_02","label":"2H Staff 02"},{"id":"ItMw_2H_Staff_Orc","label":"2H Staff Orc"},{"id":"ItMw_2H_Staff_Orc_vOrc","label":"2H Staff Orc vOrc"},{"id":"ItMw_2H_Staff_Orc_vOrc_Fireball","label":"2H Staff Orc vOrc Fireball"},{"id":"ItMw_2H_Staff_Scepter","label":"2H Staff Scepter"},{"id":"ItMw_2H_Staff_Ulumulu","label":"2H Staff Ulumulu"},{"id":"ItMw_2H_Staff_Unorc","label":"2H Staff Unorc"},{"id":"ItMw_2H_Staff_Unorc_GVArushat_vOrc","label":"2H Staff Unorc GVArushat vOrc"},{"id":"ItMw_2H_Staff_Unorc_VHashor_vOrc","label":"2H Staff Unorc VHashor vOrc"},{"id":"ItMw_2H_Staff_Unorc_VKasorg_vOrc","label":"2H Staff Unorc VKasorg vOrc"},{"id":"ItMw_2H_Staff_Unorc_VRuuushk_vOrc","label":"2H Staff Unorc VRuuushk vOrc"},{"id":"ItMw_2H_Staff_Unorc_VUnhilqt_vOrc","label":"2H Staff Unorc VUnhilqt vOrc"},{"id":"ItMw_2H_Staff_Unorc_vOrc","label":"2H Staff Unorc vOrc"},{"id":"ItMw_2H_Staff_Unorc_vOrc_BallLighting","label":"2H Staff Unorc vOrc BallLighting"},{"id":"ItMw_2H_Staff_Unorc_vOrc_BreathOfDeath","label":"2H Staff Unorc vOrc BreathOfDeath"},{"id":"ItMw_2H_Staff_Unorc_vOrc_ChainLighting","label":"2H Staff Unorc vOrc ChainLighting"},{"id":"ItMw_2H_Staff_Unorc_vOrc_Pyrokinesis","label":"2H Staff Unorc vOrc Pyrokinesis"},{"id":"ItMw_2H_Staff_Unorc_vOrc_StormOfFire","label":"2H Staff Unorc vOrc StormOfFire"}],"2H Schwerter":[{"id":"ItMw_2H_Sword_01","label":"2H Sword 01"},{"id":"ItMw_2H_Sword_02","label":"2H Sword 02"},{"id":"ItMw_2H_Sword_03","label":"2H Sword 03"},{"id":"ItMw_2H_Sword_Beliar","label":"2H Sword Beliar"},{"id":"ItMw_2H_Sword_Heavy_01","label":"2H Sword Heavy 01"},{"id":"ItMw_2H_Sword_Heavy_02","label":"2H Sword Heavy 02"},{"id":"ItMw_2H_Sword_Heavy_03","label":"2H Sword Heavy 03"},{"id":"ItMw_2H_Sword_Heavy_04","label":"2H Sword Heavy 04"},{"id":"ItMw_2H_Sword_Innos","label":"2H Sword Innos"},{"id":"ItMw_2H_Sword_Light_01","label":"2H Sword Light 01"},{"id":"ItMw_2H_Sword_Light_01_Stone","label":"2H Sword Light 01 Stone"},{"id":"ItMw_2H_Sword_Light_02","label":"2H Sword Light 02"},{"id":"ItMw_2H_Sword_Light_03","label":"2H Sword Light 03"},{"id":"ItMw_2H_Sword_Light_04","label":"2H Sword Light 04"},{"id":"ItMw_2H_Sword_Light_05","label":"2H Sword Light 05"},{"id":"ItMw_2H_Sword_Old_01","label":"2H Sword Old 01"},{"id":"ItMw_2H_Sword_Orc_01","label":"2H Sword Orc 01"},{"id":"ItMw_2H_Sword_Orc_01_vOrc","label":"2H Sword Orc 01 vOrc"},{"id":"ItMw_2H_Sword_Orc_01_vOrc_Sleeper","label":"2H Sword Orc 01 vOrc Sleeper"},{"id":"ItMw_2H_Sword_Thorus","label":"2H Sword Thorus"},{"id":"ItMw_2H_Sword_Uriziel_01","label":"2H Sword Uriziel 01"},{"id":"ItMw_2H_Sword_Uriziel_02","label":"2H Sword Uriziel 02"},{"id":"ItMw_2H_Sword_Uriziel_03","label":"2H Sword Uriziel 03"},{"id":"ItMw_2H_Sword_Wind","label":"2H Sword Wind"}],"Schmiede-Rohlinge":[{"id":"ItMw_Smith_IntermediateSword_01","label":"Smith IntermediateSword 01"},{"id":"ItMw_Smith_IntermediateSword_02","label":"Smith IntermediateSword 02"},{"id":"ItMw_Smith_IntermediateSword_03","label":"Smith IntermediateSword 03"},{"id":"ItMw_Smith_IntermediateSword_04","label":"Smith IntermediateSword 04"}]},"Fernkampf":{"Bögen":[{"id":"ItRw_Bow_Diego","label":"Bow Diego"},{"id":"ItRw_Bow_Diego_Sleeper","label":"Bow Diego Sleeper"},{"id":"ItRw_Bow_Long_01","label":"Bow Long 01"},{"id":"ItRw_Bow_Long_02","label":"Bow Long 02"},{"id":"ItRw_Bow_Long_03","label":"Bow Long 03"},{"id":"ItRw_Bow_Long_04","label":"Bow Long 04"},{"id":"ItRw_Bow_Long_05","label":"Bow Long 05"},{"id":"ItRw_Bow_Long_06","label":"Bow Long 06"},{"id":"ItRw_Bow_Long_07","label":"Bow Long 07"},{"id":"ItRw_Bow_Long_08","label":"Bow Long 08"},{"id":"ItRw_Bow_Long_09","label":"Bow Long 09"},{"id":"ItRw_Bow_Long_10","label":"Bow Long 10"},{"id":"ItRw_Bow_Long_11","label":"Bow Long 11"},{"id":"ItRw_Bow_Long_12","label":"Bow Long 12"},{"id":"ItRw_Bow_QA","label":"Bow QA"},{"id":"ItRw_Bow_Small_01","label":"Bow Small 01"},{"id":"ItRw_Bow_Small_02","label":"Bow Small 02"},{"id":"ItRw_Bow_Small_03","label":"Bow Small 03"},{"id":"ItRw_Bow_Small_04","label":"Bow Small 04"},{"id":"ItRw_Bow_Small_05","label":"Bow Small 05"},{"id":"ItRw_Bow_War_01","label":"Bow War 01"},{"id":"ItRw_Bow_War_02","label":"Bow War 02"},{"id":"ItRw_Bow_War_03","label":"Bow War 03"},{"id":"ItRw_Bow_War_04","label":"Bow War 04"},{"id":"ItRw_Bow_War_05","label":"Bow War 05"},{"id":"ItRw_Bow_Wolf","label":"Bow Wolf"}],"Armbrüste":[{"id":"ItRw_Crossbow_01","label":"Crossbow 01"},{"id":"ItRw_Crossbow_02","label":"Crossbow 02"},{"id":"ItRw_Crossbow_03","label":"Crossbow 03"},{"id":"ItRw_Crossbow_04","label":"Crossbow 04"}]},"Arkan":{"Runen":[{"id":"ItAr_Rune_BallLightning","label":"Rune BallLightning"},{"id":"ItAr_Rune_BreathOfDeath","label":"Rune BreathOfDeath"},{"id":"ItAr_Rune_ChainLightning","label":"Rune ChainLightning"},{"id":"ItAr_Rune_Charm","label":"Rune Charm"},{"id":"ItAr_Rune_Control","label":"Rune Control"},{"id":"ItAr_Rune_DeathToTheUndead","label":"Rune DeathToTheUndead"},{"id":"ItAr_Rune_FireBall","label":"Rune FireBall"},{"id":"ItAr_Rune_FireBall_MiltenSleeper","label":"Rune FireBall MiltenSleeper"},{"id":"ItAr_Rune_FireBall_MiltenSleeper_Player","label":"Rune FireBall MiltenSleeper Player"},{"id":"ItAr_Rune_FireBolt","label":"Rune FireBolt"},{"id":"ItAr_Rune_FireRain","label":"Rune FireRain"},{"id":"ItAr_Rune_FistOfWind","label":"Rune FistOfWind"},{"id":"ItAr_Rune_Heal","label":"Rune Heal"},{"id":"ItAr_Rune_IceBlock","label":"Rune IceBlock"},{"id":"ItAr_Rune_IceBolt","label":"Rune IceBolt"},{"id":"ItAr_Rune_IceWave","label":"Rune IceWave"},{"id":"ItAr_Rune_Light","label":"Rune Light"},{"id":"ItAr_Rune_Pyrokinesis","label":"Rune Pyrokinesis"},{"id":"ItAr_Rune_Sleep","label":"Rune Sleep"},{"id":"ItAr_Rune_StormFist","label":"Rune StormFist"},{"id":"ItAr_Rune_StormOfFire","label":"Rune StormOfFire"},{"id":"ItAr_Rune_Telekinesis","label":"Rune Telekinesis"},{"id":"ItAr_Rune_TeleportToMagiciansOfFire","label":"Rune TeleportToMagiciansOfFire"},{"id":"ItAr_Rune_TeleportToMagiciansOfWater","label":"Rune TeleportToMagiciansOfWater"},{"id":"ItAr_Rune_TeleportToNecromancer","label":"Rune TeleportToNecromancer"},{"id":"ItAr_Rune_TeleportToSunkenTower","label":"Rune TeleportToSunkenTower"},{"id":"ItAr_Rune_TeleportToSwampCamp","label":"Rune TeleportToSwampCamp"},{"id":"ItAr_Rune_UrizielWaveOfDeath","label":"Rune UrizielWaveOfDeath"}],"Schriftrollen":[{"id":"ItAr_Scroll_BallLightning","label":"Scroll BallLightning"},{"id":"ItAr_Scroll_ChainLightning","label":"Scroll ChainLightning"},{"id":"ItAr_Scroll_Charm","label":"Scroll Charm"},{"id":"ItAr_Scroll_Control","label":"Scroll Control"},{"id":"ItAr_Scroll_DeathToTheUndead","label":"Scroll DeathToTheUndead"},{"id":"ItAr_Scroll_Fear","label":"Scroll Fear"},{"id":"ItAr_Scroll_FireBall","label":"Scroll FireBall"},{"id":"ItAr_Scroll_FireBolt","label":"Scroll FireBolt"},{"id":"ItAr_Scroll_FireRain","label":"Scroll FireRain"},{"id":"ItAr_Scroll_FistOfWind","label":"Scroll FistOfWind"},{"id":"ItAr_Scroll_Heal","label":"Scroll Heal"},{"id":"ItAr_Scroll_IceBlock","label":"Scroll IceBlock"},{"id":"ItAr_Scroll_IceBolt","label":"Scroll IceBolt"},{"id":"ItAr_Scroll_IceWave","label":"Scroll IceWave"},{"id":"ItAr_Scroll_InnosPray","label":"Scroll InnosPray"},{"id":"ItAr_Scroll_Light","label":"Scroll Light"},{"id":"ItAr_Scroll_Pyrokinesis","label":"Scroll Pyrokinesis"},{"id":"ItAr_Scroll_Shrink","label":"Scroll Shrink"},{"id":"ItAr_Scroll_Sleep","label":"Scroll Sleep"},{"id":"ItAr_Scroll_StormFist","label":"Scroll StormFist"},{"id":"ItAr_Scroll_StormOfFire","label":"Scroll StormOfFire"},{"id":"ItAr_Scroll_SummonArmyOfDarkness","label":"Scroll SummonArmyOfDarkness"},{"id":"ItAr_Scroll_SummonDemon","label":"Scroll SummonDemon"},{"id":"ItAr_Scroll_SummonGolem","label":"Scroll SummonGolem"},{"id":"ItAr_Scroll_SummonSkeletons","label":"Scroll SummonSkeletons"},{"id":"ItAr_Scroll_Telekinesis","label":"Scroll Telekinesis"},{"id":"ItAr_Scroll_TransformBiter","label":"Scroll TransformBiter"},{"id":"ItAr_Scroll_TransformBloodfly","label":"Scroll TransformBloodfly"},{"id":"ItAr_Scroll_TransformBloodhound","label":"Scroll TransformBloodhound"},{"id":"ItAr_Scroll_TransformFireLizard","label":"Scroll TransformFireLizard"},{"id":"ItAr_Scroll_TransformHarpy","label":"Scroll TransformHarpy"},{"id":"ItAr_Scroll_TransformLizard","label":"Scroll TransformLizard"},{"id":"ItAr_Scroll_TransformLurker","label":"Scroll TransformLurker"},{"id":"ItAr_Scroll_TransformMeatbug","label":"Scroll TransformMeatbug"},{"id":"ItAr_Scroll_TransformMinecrawler","label":"Scroll TransformMinecrawler"},{"id":"ItAr_Scroll_TransformMolerat","label":"Scroll TransformMolerat"},{"id":"ItAr_Scroll_TransformOrcDog","label":"Scroll TransformOrcDog"},{"id":"ItAr_Scroll_TransformRazor","label":"Scroll TransformRazor"},{"id":"ItAr_Scroll_TransformScavenger","label":"Scroll TransformScavenger"},{"id":"ItAr_Scroll_TransformShadowbeast","label":"Scroll TransformShadowbeast"},{"id":"ItAr_Scroll_TransformSnapper","label":"Scroll TransformSnapper"},{"id":"ItAr_Scroll_TransformSwampshark","label":"Scroll TransformSwampshark"},{"id":"ItAr_Scroll_TransformWolf","label":"Scroll TransformWolf"}]}}</script>
+  <script>
+    (function () {
+      var DATA = JSON.parse(document.getElementById('catalog').textContent);
+      var main = document.getElementById('main');
+      var nav = document.getElementById('catnav');
+      var resultCount = document.getElementById('resultCount');
+      var TOTAL = 0;
+
+      function slug(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, '-'); }
+
+      Object.keys(DATA).forEach(function (catName) {
+        var groups = DATA[catName];
+        var catTotal = 0;
+        Object.keys(groups).forEach(function (g) { catTotal += groups[g].length; });
+        TOTAL += catTotal;
+
+        var navLi = document.createElement('li');
+        var navA = document.createElement('a');
+        navA.href = '#sec-' + slug(catName);
+        navA.innerHTML = catName + ' <b>' + catTotal + '</b>';
+        navLi.appendChild(navA); nav.appendChild(navLi);
+
+        var sec = document.createElement('section');
+        sec.className = 'cat-section'; sec.id = 'sec-' + slug(catName);
+        sec.setAttribute('aria-labelledby', 'h-' + slug(catName));
+        var h2 = document.createElement('h2');
+        h2.className = 'cat-h'; h2.id = 'h-' + slug(catName); h2.textContent = catName;
+        sec.appendChild(h2);
+
+        var grid = document.createElement('div'); grid.className = 'group-grid';
+        Object.keys(groups).forEach(function (groupName) {
+          var items = groups[groupName];
+          var card = document.createElement('article');
+          card.className = 't-card group';
+          var head = document.createElement('div'); head.className = 'group-head';
+          var h3 = document.createElement('h3'); h3.className = 't-section-label'; h3.textContent = groupName;
+          var badge = document.createElement('span'); badge.className = 'count-badge';
+          badge.textContent = items.length;
+          head.appendChild(h3); head.appendChild(badge); card.appendChild(head);
+
+          var ul = document.createElement('ul'); ul.className = 't-chips';
+          items.forEach(function (it) {
+            var li = document.createElement('li');
+            var chip = document.createElement('span');
+            chip.className = 't-chip'; chip.textContent = it.label;
+            chip.title = it.id;
+            li.dataset.search = (it.label + ' ' + it.id).toLowerCase();
+            li.appendChild(chip); ul.appendChild(li);
+          });
+          card.appendChild(ul); grid.appendChild(card);
+        });
+        sec.appendChild(grid); main.appendChild(sec);
+      });
+
+      document.getElementById('totalCount').textContent = TOTAL;
+
+      var q = document.getElementById('q');
+      function applyFilter() {
+        var term = q.value.trim().toLowerCase();
+        var shown = 0;
+        document.querySelectorAll('.cat-section').forEach(function (sec) {
+          var secVisible = 0;
+          sec.querySelectorAll('.group').forEach(function (card) {
+            var groupVisible = 0;
+            card.querySelectorAll('li').forEach(function (li) {
+              var match = !term || li.dataset.search.indexOf(term) !== -1;
+              li.classList.toggle('is-hidden', !match);
+              if (match) groupVisible++;
+            });
+            card.classList.toggle('is-hidden', groupVisible === 0);
+            secVisible += groupVisible;
+          });
+          sec.classList.toggle('is-hidden', secVisible === 0);
+          shown += secVisible;
+        });
+        resultCount.textContent = shown === TOTAL
+          ? TOTAL + ' Eintraege'
+          : shown + ' von ' + TOTAL;
+      }
+      q.addEventListener('input', applyFilter);
+      applyFilter();
+    })();
+
+  </script>
+</body>
+</html>

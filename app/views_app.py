@@ -51,6 +51,11 @@ TOOLS = [
      "desc": "UE4SS-Log + Crashdump vom Spiel-PC hochladen (kein Datei-Kopieren).",
      "path": "tools/g1r-diag.html",
      "admin_only": True},
+    {"key": "g1r-database",
+     "label": "G1R Datenbank",
+     "desc": "Vollständiger Item-Katalog aus dem Object-Dump — alle Waffen (Nah-/Fernkampf), Runen und Schriftrollen, mit Suche.",
+     "path": "tools/g1r-database.html",
+     "admin_only": True},
 ]
 
 
