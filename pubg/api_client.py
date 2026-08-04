@@ -1,5 +1,7 @@
 import gzip
+import hashlib
 import json
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -10,7 +12,9 @@ PUBG_BASE = "https://api.pubg.com"
 
 
 class RateLimitError(Exception):
-    pass
+    def __init__(self, message: str, retry_after: int = None):
+        super().__init__(message)
+        self.retry_after = retry_after
 
 
 class ApiError(Exception):
@@ -39,13 +43,77 @@ class RateLimiter:
         self._purge()
         return self.max - len(self._timestamps)
 
+    def sync_remaining(self, server_remaining: int) -> None:
+        """Lokales Budget an die Server-Wahrheit angleichen.
+
+        Nur nach unten: der Server kennt auch Requests, die andere Prozesse
+        mit demselben Key gemacht haben. Nach oben zu korrigieren waere
+        gefaehrlich, weil unsere eigenen Timestamps sonst verloren gingen.
+        """
+        self._purge()
+        deficit = self.remaining() - int(server_remaining)
+        now = time.monotonic()
+        for _ in range(max(0, deficit)):
+            self._timestamps.append(now)
+
+
+# Rate-Limits gelten pro API-Key, nicht pro Objekt. Der Poller baut je Tick
+# einen neuen Client — ein instanzgebundener Limiter wuerde sein Zeitfenster
+# darum bei jedem Tick zuruecksetzen und faktisch nichts begrenzen.
+_SHARED_LIMITERS: dict = {}
+_LIMITER_LOCK = threading.Lock()
+
+
+def _shared_limiter(api_key: str, max_requests: int,
+                    window_secs: int) -> RateLimiter:
+    # Key gehasht ablegen, damit das Secret nicht als Dict-Key herumliegt.
+    digest = hashlib.sha256((api_key or "").encode("utf-8")).hexdigest()
+    with _LIMITER_LOCK:
+        limiter = _SHARED_LIMITERS.get(digest)
+        if limiter is None:
+            limiter = RateLimiter(max_requests, window_secs)
+            _SHARED_LIMITERS[digest] = limiter
+        else:
+            # Konfiguration nachziehen, aber die bereits verbrauchten
+            # Timestamps behalten — genau darum geht es beim Teilen.
+            limiter.max = max_requests
+            limiter.window = window_secs
+        return limiter
+
+
+def reset_shared_limiters() -> None:
+    """Nur fuer Tests — verwirft alle geteilten Limiter."""
+    with _LIMITER_LOCK:
+        _SHARED_LIMITERS.clear()
+
+
+def _retry_after_secs(headers) -> int:
+    """Wartezeit aus Retry-After, sonst aus X-RateLimit-Reset (UNIX-Zeit).
+
+    PUBG setzt in der Praxis nicht immer beides; ohne Angabe ist eine
+    Minute die dokumentierte Fensterlaenge.
+    """
+    if headers is None:
+        return 60
+    try:
+        raw = headers.get("Retry-After")
+        if raw is not None:
+            return max(0, int(raw))
+        reset = headers.get("X-RateLimit-Reset")
+        if reset is not None:
+            return max(0, int(int(reset) - time.time()))
+    except (TypeError, ValueError, AttributeError):
+        pass
+    return 60
+
 
 class PubgClient:
     def __init__(self, api_key: str, platform: str = "steam",
                  rate_limiter_max: int = 10, rate_limiter_window: int = 60):
         self.api_key = api_key
         self.platform = platform
-        self.limiter = RateLimiter(rate_limiter_max, rate_limiter_window)
+        self.limiter = _shared_limiter(api_key, rate_limiter_max,
+                                       rate_limiter_window)
 
     def _raw_get(self, url: str, metric_endpoint: str = "unknown") -> bytes:
         req = urllib.request.Request(url, headers={
@@ -64,10 +132,16 @@ class PubgClient:
             with urllib.request.urlopen(req, timeout=15) as resp:
                 if _obs_ctx is not None:
                     _obs_ctx.set_status(resp.status)
+                self._sync_limiter_from_headers(getattr(resp, "headers", None))
                 return resp.read()
         except urllib.error.HTTPError as e:
             if _obs_ctx is not None:
                 _obs_ctx.set_status(e.code)
+            if e.code == 429:
+                raise RateLimitError(
+                    "PUBG-Rate-Limit erreicht",
+                    retry_after=_retry_after_secs(e.headers),
+                ) from e
             raise ApiError(f"HTTP {e.code}: {e.reason}") from e
         except urllib.error.URLError as e:
             if _obs_ctx is not None:
@@ -76,6 +150,25 @@ class PubgClient:
         finally:
             if _obs_ctx is not None:
                 _obs_ctx.__exit__(None, None, None)
+
+    def _sync_limiter_from_headers(self, headers) -> None:
+        """X-RateLimit-Remaining des Servers uebernehmen.
+
+        Der Server zaehlt auch Requests mit, die andere Prozesse mit
+        demselben Key abgesetzt haben — seine Zahl ist die verlaesslichere.
+        """
+        if not headers:
+            return
+        try:
+            raw = headers.get("X-RateLimit-Remaining")
+        except AttributeError:
+            return
+        if raw is None:
+            return
+        try:
+            self.limiter.sync_remaining(int(raw))
+        except (TypeError, ValueError):
+            pass
 
     def _get_json(self, url: str, rate_limited: bool = True,
                   metric_endpoint: str = "unknown") -> dict:
