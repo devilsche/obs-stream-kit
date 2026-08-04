@@ -5,7 +5,6 @@ from core.db_compat import SqliteCompatConn
 from pubg import db_pg
 from pubg.cache import TTLCache
 from pubg.endpoints import EndpointRegistry
-from tests.pubg.test_db_pg_tenant import pg  # noqa: F401  (Fixture-Reuse)
 
 
 def _registry(conn, tenant_id, my_account_id="account.haupt"):
@@ -32,7 +31,7 @@ def _seed_two_accounts(conn, tenant_id):
                              account_id="account.zweit")
 
 
-def test_accounts_endpoint_lists_tracked(pg):  # noqa: F811
+def test_accounts_endpoint_lists_tracked(pg):
     conn, t1, _ = pg
     _seed_two_accounts(conn, t1)
     reg = _registry(SqliteCompatConn(conn), t1)
@@ -43,7 +42,7 @@ def test_accounts_endpoint_lists_tracked(pg):  # noqa: F811
     assert body["accounts"][0]["isPrimary"] is True
 
 
-def test_account_param_switches_perspective(pg):  # noqa: F811
+def test_account_param_switches_perspective(pg):
     conn, t1, _ = pg
     _seed_two_accounts(conn, t1)
     reg = _registry(SqliteCompatConn(conn), t1)
@@ -51,7 +50,7 @@ def test_account_param_switches_perspective(pg):  # noqa: F811
     assert reg.my_account_id == "account.zweit"
 
 
-def test_account_param_accepts_account_id(pg):  # noqa: F811
+def test_account_param_accepts_account_id(pg):
     conn, t1, _ = pg
     _seed_two_accounts(conn, t1)
     reg = _registry(SqliteCompatConn(conn), t1)
@@ -59,7 +58,7 @@ def test_account_param_accepts_account_id(pg):  # noqa: F811
     assert reg.my_account_id == "account.zweit"
 
 
-def test_unknown_account_is_rejected(pg):  # noqa: F811
+def test_unknown_account_is_rejected(pg):
     """Ein nicht verfolgter Account darf nicht stillschweigend zum
     Primaer-Account werden — sonst zeigt das Widget falsche Zahlen."""
     conn, t1, _ = pg
@@ -69,7 +68,7 @@ def test_unknown_account_is_rejected(pg):  # noqa: F811
     assert resp[1] == 400
 
 
-def test_cache_is_scoped_per_account(pg):  # noqa: F811
+def test_cache_is_scoped_per_account(pg):
     """Ohne Account-Scope wuerde der zweite Account die Zahlen des ersten
     aus dem Cache bekommen."""
     conn, t1, _ = pg
@@ -105,7 +104,7 @@ def _patch_session(monkey_values):
     return ep, orig
 
 
-def test_account_all_sums_additive_fields(pg):  # noqa: F811
+def test_account_all_sums_additive_fields(pg):
     conn, t1, _ = pg
     _seed_two_accounts(conn, t1)
     values = {
@@ -147,7 +146,7 @@ def test_account_all_sums_additive_fields(pg):  # noqa: F811
     assert body["accountScope"] == "all"
 
 
-def test_account_all_headshot_pct_is_kill_weighted(pg):  # noqa: F811
+def test_account_all_headshot_pct_is_kill_weighted(pg):
     """20 Kills mit 50% und 5 Kills mit 20% ergeben nicht 35%."""
     conn, t1, _ = pg
     _seed_two_accounts(conn, t1)
@@ -165,7 +164,7 @@ def test_account_all_headshot_pct_is_kill_weighted(pg):  # noqa: F811
     assert round(body["headshotPct"], 4) == round((10 + 1) / 25 * 100, 4)
 
 
-def test_account_all_rejected_where_not_summable(pg):  # noqa: F811
+def test_account_all_rejected_where_not_summable(pg):
     """Season-Rang und aehnliche Kennzahlen lassen sich nicht addieren."""
     conn, t1, _ = pg
     _seed_two_accounts(conn, t1)

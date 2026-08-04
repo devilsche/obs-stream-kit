@@ -1,17 +1,62 @@
-from pubg.db import (connect, init_schema, upsert_player, insert_match,
-                     insert_participants, set_setting, upsert_lifetime,
-                     insert_telemetry_events)
+"""Aggregationen gegen Postgres (der produktive Pfad).
+
+Frueher liefen diese Tests gegen pubg/db.py (SQLite) — das ist seit der
+PG-Migration deprecated, aggregations.py spricht laengst %s-Platzhalter.
+Die Schreib-Helfer unten binden die tenant_id, damit die Testkoerper
+unveraendert bleiben konnten.
+"""
+import pytest
+
+from pubg import db_pg
 from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_top_mates, compute_co_player,
                                 compute_mates, compute_map_distribution,
                                 compute_first_fight_rate, compute_squad_compare)
 
 
-def _setup(tmp_db_path):
-    conn = connect(tmp_db_path)
-    init_schema(conn)
-    upsert_player(conn, "account.A", "PEX_LuCKoR", "steam", True)
-    return conn
+CONN = None
+T = None
+
+
+@pytest.fixture(autouse=True)
+def _bind(pg_compat):
+    """Bindet Verbindung + Tenant fuer die Helfer dieses Moduls."""
+    global CONN, T
+    CONN, T = pg_compat[0], pg_compat[1]
+    yield
+    CONN, T = None, None
+
+
+def upsert_player(conn, account_id, name, platform, is_self=False):
+    db_pg.upsert_player(conn.raw, T, account_id, name, platform,
+                        1 if is_self else 0)
+
+
+def insert_match(conn, match_id, map_name, mode, is_ranked, duration,
+                 played_at, telemetry_url):
+    db_pg.insert_match(conn.raw, T, match_id, map_name, mode, is_ranked,
+                       duration, played_at, telemetry_url)
+
+
+def insert_participants(conn, match_id, rows):
+    db_pg.insert_participants(conn.raw, T, match_id, rows)
+
+
+def set_setting(conn, key, value):
+    db_pg.set_setting(conn.raw, T, key, value)
+
+
+def upsert_lifetime(conn, account_id, mode, stats):
+    db_pg.upsert_lifetime(conn.raw, T, account_id, mode, stats)
+
+
+def insert_telemetry_events(conn, match_id, events):
+    db_pg.insert_telemetry_events(conn.raw, match_id, events)
+
+
+def _setup(_unused=None):
+    upsert_player(CONN, "account.A", "PEX_LuCKoR", "steam", True)
+    return CONN
 
 
 def _add_match(conn, mid, played_at, kills, dmg, place, mate_count=1, mode="squad-fpp"):
@@ -34,13 +79,13 @@ def _add_match(conn, mid, played_at, kills, dmg, place, mate_count=1, mode="squa
     insert_participants(conn, mid, parts)
 
 
-def test_session_stats_aggregates_after_session_start(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_session_stats_aggregates_after_session_start():
+    conn = _setup()
     set_setting(conn, "sessionStartedAt", "2026-05-04T18:00:00Z")
     _add_match(conn, "m1", "2026-05-04T17:00:00Z", 5, 500.0, 3)
     _add_match(conn, "m2", "2026-05-04T18:30:00Z", 4, 400.0, 1)
     _add_match(conn, "m3", "2026-05-04T19:00:00Z", 6, 600.0, 5)
-    s = compute_session_stats(conn, "account.A")
+    s = compute_session_stats(conn, T, "account.A")
     assert s["matches"] == 2
     assert s["kills"] == 10
     assert s["damage"] == 1000.0
@@ -49,8 +94,8 @@ def test_session_stats_aggregates_after_session_start(tmp_db_path):
     assert s["kpm"] == 5.0  # 10 kills / 2 matches
 
 
-def test_session_stats_includes_extended_fields(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_session_stats_includes_extended_fields():
+    conn = _setup()
     set_setting(conn, "sessionStartedAt", "2026-05-04T00:00:00Z")
     insert_match(conn, "ext1", "Erangel_Main", "squad-fpp", False, 1800,
                  "2026-05-04T18:00:00Z", None)
@@ -62,7 +107,7 @@ def test_session_stats_includes_extended_fields(tmp_db_path):
         "swim_distance": 50.0, "weapons_acquired": 8, "heals": 5, "boosts": 7,
         "team_kills": 0,
     }])
-    s = compute_session_stats(conn, "account.A")
+    s = compute_session_stats(conn, T, "account.A")
     assert s["totalBoosts"] == 7
     assert s["totalHeals"] == 5
     assert s["totalRevives"] == 2
@@ -72,19 +117,19 @@ def test_session_stats_includes_extended_fields(tmp_db_path):
     assert abs(s["swimKm"] - 0.05) < 0.001
 
 
-def test_last_match_returns_squad_with_self_first(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_last_match_returns_squad_with_self_first():
+    conn = _setup()
     set_setting(conn, "sessionStartedAt", "2026-05-04T18:00:00Z")
     _add_match(conn, "m1", "2026-05-04T18:00:00Z", 4, 412.0, 3, mate_count=2)
-    lm = compute_last_match(conn, "account.A")
+    lm = compute_last_match(conn, T, "account.A")
     assert lm["matchId"] == "m1"
     assert lm["map"] == "Erangel_Main"
     assert lm["myStats"]["kills"] == 4
     assert len(lm["mates"]) == 2
 
 
-def test_top_mates_filters_by_min_matches(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_top_mates_filters_by_min_matches():
+    conn = _setup()
     upsert_player(conn, "account.MA", "MateA", "steam", False)
     for i in range(12):
         insert_match(conn, f"a{i}", "Erangel_Main", "squad-fpp", False, 1800,
@@ -103,15 +148,15 @@ def test_top_mates_filters_by_min_matches(tmp_db_path):
              "swim_distance": 0.0, "weapons_acquired": 0, "heals": 0, "boosts": 0,
              "team_kills": 0},
         ])
-    result = compute_top_mates(conn, "account.A",
+    result = compute_top_mates(conn, T, "account.A",
                                 sort_by="mostPlayed", limit=5, min_matches=10)
     assert len(result) == 1
     assert result[0]["name"] == "MateA"
     assert result[0]["sharedMatches"] == 12
 
 
-def test_co_player_combines_shared_and_career(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_co_player_combines_shared_and_career():
+    conn = _setup()
     upsert_player(conn, "account.B", "MateA", "steam", False)
     _add_match(conn, "m1", "2026-05-04T18:00:00Z", 4, 400.0, 3, mate_count=0)
     insert_participants(conn, "m1", [{
@@ -126,13 +171,13 @@ def test_co_player_combines_shared_and_career(tmp_db_path):
         "kills": 12000, "kd_ratio": 1.5, "headshot_kills": 2000,
         "headshot_rate": 16.0, "avg_damage": 250.0, "longest_kill": 500.0,
         "time_survived_sec": 80000})
-    cp = compute_co_player(conn, "account.A", "MateA")
+    cp = compute_co_player(conn, T, "account.A", "MateA")
     assert cp["sharedHistory"]["matches"] == 1
     assert cp["careerLifetime"]["wins"] == 412
 
 
-def test_mates_today_aggregates_per_mate(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_mates_today_aggregates_per_mate():
+    conn = _setup()
     upsert_player(conn, "account.MA", "MateA", "steam", False)
     set_setting(conn, "sessionStartedAt", "2026-05-04T00:00:00Z")
     for i in range(3):
@@ -145,14 +190,14 @@ def test_mates_today_aggregates_per_mate(tmp_db_path):
             "swim_distance": 0.0, "weapons_acquired": 0, "heals": 0, "boosts": 0,
             "team_kills": 0,
         }])
-    result = compute_mates(conn, "account.A", range_key="session")
+    result = compute_mates(conn, T, "account.A", range_key="session")
     assert len(result) == 1
     assert result[0]["name"] == "MateA"
     assert result[0]["sharedMatchesToday"] == 3
 
 
-def test_map_distribution_counts_by_range(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_map_distribution_counts_by_range():
+    conn = _setup()
     set_setting(conn, "sessionStartedAt", "2026-05-04T00:00:00Z")
     for i in range(3):
         _add_match(conn, f"e{i}", f"2026-05-04T1{i}:00:00Z", 2, 200.0, 5)
@@ -166,7 +211,7 @@ def test_map_distribution_counts_by_range(tmp_db_path):
         "swim_distance": 0.0, "weapons_acquired": 5, "heals": 0, "boosts": 0,
         "team_kills": 0,
     }])
-    out = compute_map_distribution(conn, "account.A", range_key="session")
+    out = compute_map_distribution(conn, T, "account.A", range_key="session")
     erangel = next(x for x in out if x["map"] == "Erangel_Main")
     assert erangel["count"] == 3
     miramar = next(x for x in out if x["map"] == "Miramar_Main")
@@ -174,10 +219,10 @@ def test_map_distribution_counts_by_range(tmp_db_path):
     assert miramar["wins"] == 1
 
 
-def test_first_fight_rate_aggregates(tmp_db_path):
+def test_first_fight_rate_aggregates():
     """First-Fight-Win-Rate: Squad gewinnt wenn am Fight-Ende mind. 1 Member
     noch lebt (kein Squad-Member als Kill-Victim im Fight-Cluster)."""
-    conn = _setup(tmp_db_path)
+    conn = _setup()
     set_setting(conn, "sessionStartedAt", "2026-05-04T00:00:00Z")
     # Solo-Squad: nur account.A, mate_count=0 → squad_ids = {A}
     for i in range(4):
@@ -197,7 +242,9 @@ def test_first_fight_rate_aggregates(tmp_db_path):
          "victim_x": 1100.0, "victim_y": 1000.0, "weapon": "Beryl",
          "distance": 50.0, "damage": None, "payload_json": "{}"},
     ])
-    # m2: kein engagement → nicht gezählt
+    # m2: keine Combat-Events — zaehlt seit der 'fled'-Behandlung mit
+    #     (aggregations.py: Matches ohne detektierbaren Fight gelten als
+    #     Disengage, nicht als 'nicht stattgefunden')
     # m3: A killt Enemy → WIN
     insert_telemetry_events(conn, "f3", [
         {"event_type": "Kill", "timestamp_ms": 1500, "actor_account": "account.A",
@@ -205,15 +252,15 @@ def test_first_fight_rate_aggregates(tmp_db_path):
          "victim_x": 600.0, "victim_y": 500.0, "weapon": "Beryl",
          "distance": 50.0, "damage": None, "payload_json": "{}"},
     ])
-    res = compute_first_fight_rate(conn, "account.A", range_key="session")
-    assert res["total"] == 3
+    res = compute_first_fight_rate(conn, T, "account.A", range_key="session")
+    assert res["total"] == 4          # 3 mit Events + m2 als 'fled'
     assert res["survived"] == 2
-    assert abs(res["rate"] - (2/3)*100) < 0.1
+    assert abs(res["rate"] - (2/4)*100) < 0.1
 
 
-def test_first_fight_cluster_multi_team(tmp_db_path):
+def test_first_fight_cluster_multi_team():
     """Multi-Team-Fight: 3 Teams beteiligt, unser Squad überlebt."""
-    conn = _setup(tmp_db_path)
+    conn = _setup()
     set_setting(conn, "sessionStartedAt", "2026-05-04T00:00:00Z")
     insert_match(conn, "mt1", "Erangel_Main", "squad-fpp", False, 1800,
                   "2026-05-04T18:00:00Z", None)
@@ -282,7 +329,7 @@ def test_first_fight_cluster_multi_team(tmp_db_path):
          "weapon": "M4", "distance": 100.0, "damage": None,
          "payload_json": "{}"},
     ])
-    res = compute_first_fight_rate(conn, "account.A", range_key="session")
+    res = compute_first_fight_rate(conn, T, "account.A", range_key="session")
     assert res["total"] == 1
     assert res["survived"] == 1     # Squad lebt → WIN
     # Neue Semantik: nur OPPONENT-Teams die uns direkt angegriffen haben.
@@ -294,45 +341,62 @@ def test_first_fight_cluster_multi_team(tmp_db_path):
 from pubg.aggregations import compute_landing_spots
 
 
-def _seed_landings(tmp_db_path):
-    conn = connect(tmp_db_path)
-    init_schema(conn)
+def _seed_landings():
+    """Zwei Matches mit unterschiedlicher Squad-Konstellation.
+
+    Schreibt ueber die DAOs statt per Roh-SQL — die Tabellen tragen seit
+    der PG-Migration eine tenant_id.
+    """
+    conn = CONN
     upsert_player(conn, "acc.A", "LuCKoR", "steam", True)
     upsert_player(conn, "acc.B", "Mate1", "steam", False)
     upsert_player(conn, "acc.C", "Rando", "steam", False)
+
+    def _part(acc, name, team_id):
+        return {"account_id": acc, "name": name, "team_id": team_id,
+                "place": 5, "kills": 0, "headshot_kills": 0, "assists": 0,
+                "dbnos": 0, "revives": 0, "damage_dealt": 0.0,
+                "longest_kill": 0.0, "time_survived": 0, "walk_distance": 0.0,
+                "ride_distance": 0.0, "swim_distance": 0.0,
+                "weapons_acquired": 0, "heals": 0, "boosts": 0,
+                "team_kills": 0}
+
     # Match 1: A + B im Team 1
-    conn.execute("INSERT INTO matches (match_id, played_at, map_name, game_mode) "
-                 "VALUES ('m1','2026-05-01T10:00:00Z','Baltic_Main','squad')")
-    for acc, tid in [("acc.A", 1), ("acc.B", 1)]:
-        conn.execute("INSERT INTO match_team_mapping (match_id, account_id, team_id) "
-                     "VALUES (?,?,?)", ("m1", acc, tid))
-        conn.execute("INSERT INTO participants (match_id, account_id, name, team_id) "
-                     "VALUES (?,?,?,?)", ("m1", acc,
-                     "LuCKoR" if acc == "acc.A" else "Mate1", tid))
+    insert_match(conn, "m1", "Baltic_Main", "squad", False, 1800,
+                 "2026-05-01T10:00:00Z", None)
+    insert_participants(conn, "m1", [_part("acc.A", "LuCKoR", 1),
+                                      _part("acc.B", "Mate1", 1)])
+    db_pg.insert_team_mapping(conn.raw, T, "m1", [
+        {"account_id": "acc.A", "team_id": 1},
+        {"account_id": "acc.B", "team_id": 1}])
     # A landet bei (400000,400000), B bei (410000,410000)
-    conn.execute("INSERT INTO telemetry_events "
-                 "(match_id, event_type, timestamp_ms, actor_account, actor_x, actor_y, actor_z, actor_health) "
-                 "VALUES ('m1','Landing',1000,'acc.A',400000,400000,100,90)")
-    conn.execute("INSERT INTO telemetry_events "
-                 "(match_id, event_type, timestamp_ms, actor_account, actor_x, actor_y, actor_z, actor_health) "
-                 "VALUES ('m1','Landing',1000,'acc.B',410000,410000,100,90)")
+    insert_telemetry_events(conn, "m1", [
+        {"event_type": "Landing", "timestamp_ms": 1000,
+         "actor_account": "acc.A", "actor_x": 400000.0, "actor_y": 400000.0,
+         "actor_z": 100.0, "actor_health": 90.0},
+        {"event_type": "Landing", "timestamp_ms": 1000,
+         "actor_account": "acc.B", "actor_x": 410000.0, "actor_y": 410000.0,
+         "actor_z": 100.0, "actor_health": 90.0}])
+
     # Match 2: A + C im Team 1 (andere Konstellation)
-    conn.execute("INSERT INTO matches (match_id, played_at, map_name, game_mode) "
-                 "VALUES ('m2','2026-05-02T10:00:00Z','Baltic_Main','squad')")
-    for acc, tid in [("acc.A", 1), ("acc.C", 1)]:
-        conn.execute("INSERT INTO match_team_mapping (match_id, account_id, team_id) "
-                     "VALUES (?,?,?)", ("m2", acc, tid))
-    conn.execute("INSERT INTO telemetry_events "
-                 "(match_id, event_type, timestamp_ms, actor_account, actor_x, actor_y, actor_z, actor_health) "
-                 "VALUES ('m2','Landing',1000,'acc.A',600000,600000,100,90)")
-    conn.commit()
+    insert_match(conn, "m2", "Baltic_Main", "squad", False, 1800,
+                 "2026-05-02T10:00:00Z", None)
+    insert_participants(conn, "m2", [_part("acc.A", "LuCKoR", 1),
+                                      _part("acc.C", "Rando", 1)])
+    db_pg.insert_team_mapping(conn.raw, T, "m2", [
+        {"account_id": "acc.A", "team_id": 1},
+        {"account_id": "acc.C", "team_id": 1}])
+    insert_telemetry_events(conn, "m2", [
+        {"event_type": "Landing", "timestamp_ms": 1000,
+         "actor_account": "acc.A", "actor_x": 600000.0, "actor_y": 600000.0,
+         "actor_z": 100.0, "actor_health": 90.0}])
     return conn
 
 
-def test_landing_spots_filters_by_constellation(tmp_db_path):
-    conn = _seed_landings(tmp_db_path)
+def test_landing_spots_filters_by_constellation():
+    conn = _seed_landings()
     # Filter: A + B zusammen → nur Match 1 zaehlt
-    res = compute_landing_spots(conn, "Baltic_Main", ["acc.A", "acc.B"])
+    res = compute_landing_spots(conn, T, "Baltic_Main", ["acc.A", "acc.B"])
     accs_with_points = {p["accountId"] for p in res["scatterPoints"]}
     assert "acc.A" in accs_with_points
     assert "acc.B" in accs_with_points
@@ -342,17 +406,17 @@ def test_landing_spots_filters_by_constellation(tmp_db_path):
     assert res["totalMatches"] == 1
 
 
-def test_landing_spots_single_player_all_matches(tmp_db_path):
-    conn = _seed_landings(tmp_db_path)
+def test_landing_spots_single_player_all_matches():
+    conn = _seed_landings()
     # Nur A → beide Matches
-    res = compute_landing_spots(conn, "Baltic_Main", ["acc.A"])
+    res = compute_landing_spots(conn, T, "Baltic_Main", ["acc.A"])
     a_points = [p for p in res["scatterPoints"] if p["accountId"] == "acc.A"]
     assert len(a_points) == 2
     assert res["totalMatches"] == 2
 
 
-def test_landing_spots_route_filter_excludes_far_pois(tmp_db_path):
-    conn = _seed_landings(tmp_db_path)
+def test_landing_spots_route_filter_excludes_far_pois():
+    conn = _seed_landings()
     # Flugroute fuer m1: zwei Cruise-Position-Events (z>=150000) entlang
     # der Linie x=400000 (vertikal). POI bei (400000,400000) liegt drauf
     # (0km Querdistanz), also bleibt er drin.
@@ -370,7 +434,7 @@ def test_landing_spots_route_filter_excludes_far_pois(tmp_db_path):
         {"name": "FarAway",  "points": [[10000,10000],[30000,10000],
                                         [30000,30000],[10000,30000]]},
     ]}
-    res = compute_landing_spots(conn, "Baltic_Main", ["acc.A"],
+    res = compute_landing_spots(conn, T, "Baltic_Main", ["acc.A"],
                                 pois_blob=pois, route_filter=True)
     # m1-Landung (400000,400000) ist auf der Route → bleibt.
     # m2 hat keine Cruise-Events → routeUnknown → bleibt ebenfalls.
@@ -378,8 +442,8 @@ def test_landing_spots_route_filter_excludes_far_pois(tmp_db_path):
     assert "OnRoute" in poi_names
 
 
-def test_squad_compare_table(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_squad_compare_table():
+    conn = _setup()
     upsert_player(conn, "account.MA", "MateA", "steam", False)
     upsert_player(conn, "account.MB", "MateB", "steam", False)
     insert_match(conn, "sc1", "Erangel_Main", "squad-fpp", False, 1800,
@@ -396,6 +460,6 @@ def test_squad_compare_table(tmp_db_path):
          "walk_distance": 0.0, "ride_distance": 0.0, "swim_distance": 0.0,
          "weapons_acquired": 0, "heals": 0, "boosts": 0, "team_kills": 0},
     ])
-    res = compute_squad_compare(conn, "account.A", ["PEX_LuCKoR", "MateA"], 5)
+    res = compute_squad_compare(conn, T, "account.A", ["PEX_LuCKoR", "MateA"], 5)
     assert len(res["matchTable"]) == 1
     assert res["matchTable"][0]["cells"]["MateA"]["kills"] == 3

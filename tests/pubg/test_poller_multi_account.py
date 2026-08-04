@@ -7,7 +7,6 @@ import pytest
 
 from core.db_compat import SqliteCompatConn
 from pubg import db_pg, poller
-from tests.pubg.test_db_pg_tenant import pg  # noqa: F401  (Fixture-Reuse)
 
 
 FIXTURES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fixtures")
@@ -50,7 +49,7 @@ def _players_payload(entries):
     ]}
 
 
-def test_all_accounts_resolved_in_one_request(pg):  # noqa: F811
+def test_all_accounts_resolved_in_one_request(pg):
     """Drei Accounts duerfen nur einen rate-limited /players-Call kosten."""
     conn, t1, _ = pg
     for n in ("Haupt", "Zweit", "Dritt"):
@@ -66,7 +65,7 @@ def test_all_accounts_resolved_in_one_request(pg):  # noqa: F811
     assert sorted(client.player_calls[0].split(",")) == ["Dritt", "Haupt", "Zweit"]
 
 
-def test_resolved_account_ids_are_persisted(pg):  # noqa: F811
+def test_resolved_account_ids_are_persisted(pg):
     conn, t1, _ = pg
     db_pg.add_tracked_player(conn, t1, "Haupt", platform="steam")
     client = _StubClient(_players_payload([("Haupt", "account.abc123", [])]))
@@ -74,7 +73,7 @@ def test_resolved_account_ids_are_persisted(pg):  # noqa: F811
     assert db_pg.list_tracked_players(conn, t1)[0]["account_id"] == "account.abc123"
 
 
-def test_unknown_account_is_reported_not_crashing(pg):  # noqa: F811
+def test_unknown_account_is_reported_not_crashing(pg):
     """Ein Tippfehler im Namen darf die anderen Accounts nicht mitreissen."""
     conn, t1, _ = pg
     db_pg.add_tracked_player(conn, t1, "Echt", platform="steam")
@@ -84,7 +83,7 @@ def test_unknown_account_is_reported_not_crashing(pg):  # noqa: F811
     assert [r["name"] for r in resolved] == ["Echt"]
 
 
-def test_new_matches_collected_across_accounts(pg):  # noqa: F811
+def test_new_matches_collected_across_accounts(pg):
     conn, t1, _ = pg
     db_pg.add_tracked_player(conn, t1, "Haupt", platform="steam")
     db_pg.add_tracked_player(conn, t1, "Zweit", platform="steam")
@@ -97,7 +96,7 @@ def test_new_matches_collected_across_accounts(pg):  # noqa: F811
     assert sorted(client.match_calls) == ["m1", "m2", "m3"]
 
 
-def test_same_match_from_two_accounts_fetched_once(pg):  # noqa: F811
+def test_same_match_from_two_accounts_fetched_once(pg):
     """Spielen zwei eigene Accounts dasselbe Match, darf es nicht doppelt
     geladen werden."""
     conn, t1, _ = pg
@@ -112,7 +111,7 @@ def test_same_match_from_two_accounts_fetched_once(pg):  # noqa: F811
     assert stats["new_matches"] == 1
 
 
-def test_participants_stored_for_every_own_account_in_match(pg):  # noqa: F811
+def test_participants_stored_for_every_own_account_in_match(pg):
     """Beide eigenen Accounts muessen als Teilnehmer auftauchen, sonst
     fehlt einem von beiden das Match in seiner Auswertung."""
     conn, t1, _ = pg
@@ -125,7 +124,7 @@ def test_participants_stored_for_every_own_account_in_match(pg):  # noqa: F811
     assert "account.abc123" in accs and "account.def456" in accs
 
 
-def test_ingest_match_still_accepts_single_account_id(pg):  # noqa: F811
+def test_ingest_match_still_accepts_single_account_id(pg):
     """Rueckwaertskompatibel — Bestandsaufrufer uebergeben einen String."""
     conn, t1, _ = pg
     poller.ingest_match(conn, t1, _StubClient(), "account.abc123", "m1")
@@ -158,7 +157,7 @@ def _ensure_cred_row(conn, tid):
     conn.commit()
 
 
-def test_poll_tenant_polls_all_accounts_with_one_player_call(pg):  # noqa: F811
+def test_poll_tenant_polls_all_accounts_with_one_player_call(pg):
     conn, t1, _ = pg
     _ensure_cred_row(conn, t1)
     from core import credentials
@@ -177,7 +176,7 @@ def test_poll_tenant_polls_all_accounts_with_one_player_call(pg):  # noqa: F811
     assert len(client.player_calls) == 1
 
 
-def test_poll_tenant_caches_primary_account_id(pg):  # noqa: F811
+def test_poll_tenant_caches_primary_account_id(pg):
     """Der Primaer-Account landet in den Credentials — Bestandscode liest
     ihn von dort."""
     conn, t1, _ = pg

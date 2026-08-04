@@ -2,10 +2,9 @@
 import pytest
 
 from pubg import db_pg
-from tests.pubg.test_db_pg_tenant import pg  # noqa: F401  (Fixture-Reuse)
 
 
-def test_add_and_list_tracked(pg):  # noqa: F811
+def test_add_and_list_tracked(pg):
     conn, t1, _ = pg
     db_pg.add_tracked_player(conn, t1, "PEX_LuCKoR", platform="steam",
                              is_primary=True)
@@ -15,7 +14,7 @@ def test_add_and_list_tracked(pg):  # noqa: F811
     assert [r["is_primary"] for r in rows] == [True, False]
 
 
-def test_tracked_players_are_tenant_isolated(pg):  # noqa: F811
+def test_tracked_players_are_tenant_isolated(pg):
     conn, t1, t2 = pg
     db_pg.add_tracked_player(conn, t1, "Meiner", platform="steam")
     db_pg.add_tracked_player(conn, t2, "Fremder", platform="steam")
@@ -23,14 +22,14 @@ def test_tracked_players_are_tenant_isolated(pg):  # noqa: F811
     assert [r["name"] for r in db_pg.list_tracked_players(conn, t2)] == ["Fremder"]
 
 
-def test_add_same_name_twice_is_idempotent(pg):  # noqa: F811
+def test_add_same_name_twice_is_idempotent(pg):
     conn, t1, _ = pg
     db_pg.add_tracked_player(conn, t1, "Doppelt", platform="steam")
     db_pg.add_tracked_player(conn, t1, "Doppelt", platform="steam")
     assert len(db_pg.list_tracked_players(conn, t1)) == 1
 
 
-def test_set_primary_is_exclusive(pg):  # noqa: F811
+def test_set_primary_is_exclusive(pg):
     """Nur ein Account darf primaer sein — Umsetzen raeumt den alten ab."""
     conn, t1, _ = pg
     db_pg.add_tracked_player(conn, t1, "Erster", platform="steam",
@@ -42,7 +41,7 @@ def test_set_primary_is_exclusive(pg):  # noqa: F811
     assert prim == ["Zweiter"]
 
 
-def test_remove_tracked_player(pg):  # noqa: F811
+def test_remove_tracked_player(pg):
     conn, t1, _ = pg
     db_pg.add_tracked_player(conn, t1, "Weg", platform="steam")
     db_pg.add_tracked_player(conn, t1, "Bleibt", platform="steam")
@@ -50,7 +49,7 @@ def test_remove_tracked_player(pg):  # noqa: F811
     assert [r["name"] for r in db_pg.list_tracked_players(conn, t1)] == ["Bleibt"]
 
 
-def test_set_account_id_fills_in_resolved_id(pg):  # noqa: F811
+def test_set_account_id_fills_in_resolved_id(pg):
     """Der Poller traegt die aufgeloeste account_id nach."""
     conn, t1, _ = pg
     db_pg.add_tracked_player(conn, t1, "NochOhneId", platform="steam")
@@ -59,7 +58,7 @@ def test_set_account_id_fills_in_resolved_id(pg):  # noqa: F811
     assert db_pg.list_tracked_players(conn, t1)[0]["account_id"] == "account.abc123"
 
 
-def test_backfill_creates_primary_from_credentials(pg):  # noqa: F811
+def test_backfill_creates_primary_from_credentials(pg):
     """Bestandstenants ohne Liste bekommen ihren bisherigen Namen als primaer."""
     conn, t1, _ = pg
     db_pg.backfill_tracked_players(conn, t1, "AltName", "steam", "account.old")
@@ -70,7 +69,7 @@ def test_backfill_creates_primary_from_credentials(pg):  # noqa: F811
     assert rows[0]["account_id"] == "account.old"
 
 
-def test_backfill_does_not_touch_existing_list(pg):  # noqa: F811
+def test_backfill_does_not_touch_existing_list(pg):
     conn, t1, _ = pg
     db_pg.add_tracked_player(conn, t1, "Gewaehlt", platform="steam",
                              is_primary=True)

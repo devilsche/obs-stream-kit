@@ -1,32 +1,89 @@
+"""Endpoint-Dispatch gegen Postgres (der produktive Pfad).
+
+Frueher gegen pubg/db.py (SQLite) — seit der PG-Migration deprecated.
+Die Schreib-Helfer binden die tenant_id, damit die Testkoerper
+unveraendert bleiben konnten.
+"""
 import json
 from unittest.mock import MagicMock
-from pubg.db import (connect, init_schema, upsert_player, set_setting,
-                     get_setting, upsert_lifetime)
+
+import pytest
+
+from pubg import db_pg
 from pubg.cache import TTLCache
 from pubg.endpoints import EndpointRegistry
 
 
-def _setup(tmp_db_path):
-    conn = connect(tmp_db_path)
-    init_schema(conn)
-    upsert_player(conn, "account.A", "PEX_LuCKoR", "steam", True)
-    return conn
+CONN = None
+T = None
+
+
+@pytest.fixture(autouse=True)
+def _bind(pg_compat):
+    global CONN, T
+    CONN, T = pg_compat[0], pg_compat[1]
+    yield
+    CONN, T = None, None
+
+
+def upsert_player(conn, account_id, name, platform, is_self=False):
+    db_pg.upsert_player(conn.raw, T, account_id, name, platform,
+                        1 if is_self else 0)
+
+
+def set_setting(conn, key, value):
+    db_pg.set_setting(conn.raw, T, key, value)
+
+
+def get_setting(conn, key, default=None):
+    return db_pg.get_setting(conn.raw, T, key, default)
+
+
+def upsert_lifetime(conn, account_id, mode, stats):
+    db_pg.upsert_lifetime(conn.raw, T, account_id, mode, stats)
+
+
+def _insert_match(conn, match_id, played_at, map_name="Baltic_Main",
+                  game_mode="squad"):
+    db_pg.insert_match(conn.raw, T, match_id, map_name, game_mode, False,
+                       1800, played_at, None)
+
+
+def _insert_participant(conn, match_id, account_id, name, team_id=1,
+                        place=1, kills=0):
+    db_pg.insert_participants(conn.raw, T, match_id, [{
+        "account_id": account_id, "name": name, "team_id": team_id,
+        "place": place, "kills": kills, "headshot_kills": 0, "assists": 0,
+        "dbnos": 0, "revives": 0, "damage_dealt": 0.0, "longest_kill": 0.0,
+        "time_survived": 0, "walk_distance": 0.0, "ride_distance": 0.0,
+        "swim_distance": 0.0, "weapons_acquired": 0, "heals": 0, "boosts": 0,
+        "team_kills": 0}])
+
+
+def _insert_team_mapping(conn, match_id, account_id, team_id):
+    db_pg.insert_team_mapping(conn.raw, T, match_id,
+                              [{"account_id": account_id, "team_id": team_id}])
+
+
+def _setup(_unused=None):
+    upsert_player(CONN, "account.A", "PEX_LuCKoR", "steam", True)
+    return CONN
 
 
 def _registry(conn):
     return EndpointRegistry(
-        get_conn=lambda: conn,
+        get_conn=lambda: conn.raw,
         my_account_id="account.A",
         platform="steam",
         cache=TTLCache(ttl_secs=30),
         client=MagicMock(),
         poller_status=lambda: {"polling": "ok"},
-        tenant_id=1,
+        tenant_id=T,
     )
 
 
-def test_session_endpoint_returns_json(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_session_endpoint_returns_json():
+    conn = _setup()
     set_setting(conn, "sessionStartedAt", "2026-05-04T00:00:00Z")
     reg = _registry(conn)
     body, code, ctype = reg.dispatch("GET", "/api/pubg/session", b"", {})
@@ -35,31 +92,31 @@ def test_session_endpoint_returns_json(tmp_db_path):
     assert "kills" in payload
 
 
-def test_status_endpoint(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_status_endpoint():
+    conn = _setup()
     reg = _registry(conn)
     body, code, _ = reg.dispatch("GET", "/api/pubg/status", b"", {})
     assert code == 200
     assert json.loads(body)["polling"] == "ok"
 
 
-def test_session_reset_endpoint(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_session_reset_endpoint():
+    conn = _setup()
     reg = _registry(conn)
     body, code, _ = reg.dispatch("POST", "/api/pubg/session/reset", b"", {})
     assert code == 200
     assert get_setting(conn, "sessionStartedAt") is not None
 
 
-def test_unknown_route_returns_404(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_unknown_route_returns_404():
+    conn = _setup()
     reg = _registry(conn)
     body, code, _ = reg.dispatch("GET", "/api/pubg/foo", b"", {})
     assert code == 404
 
 
-def test_top_mates_endpoint(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_top_mates_endpoint():
+    conn = _setup()
     reg = _registry(conn)
     body, code, _ = reg.dispatch("GET",
         "/api/pubg/top-mates?sortBy=avgPlace&limit=5&minMatches=10",
@@ -68,8 +125,8 @@ def test_top_mates_endpoint(tmp_db_path):
     assert isinstance(json.loads(body), list)
 
 
-def test_co_player_endpoint_unknown(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_co_player_endpoint_unknown():
+    conn = _setup()
     reg = _registry(conn)
     body, code, _ = reg.dispatch("GET", "/api/pubg/co-player/Unknown", b"", {})
     assert code == 200
@@ -77,8 +134,8 @@ def test_co_player_endpoint_unknown(tmp_db_path):
     assert "error" in payload
 
 
-def test_career_lifetime_endpoint_with_player_param(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_career_lifetime_endpoint_with_player_param():
+    conn = _setup()
     upsert_player(conn, "account.B", "MateA", "steam", False)
     upsert_lifetime(conn, "account.B", "all", {"rounds_played": 100,
         "wins": 5, "top10s": 30, "win_rate": 5.0, "top10_rate": 30.0,
@@ -92,8 +149,8 @@ def test_career_lifetime_endpoint_with_player_param(tmp_db_path):
     assert json.loads(body)["wins"] == 5
 
 
-def test_settings_get_returns_all(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_settings_get_returns_all():
+    conn = _setup()
     set_setting(conn, "minMatchesForTopMates", "10")
     reg = _registry(conn)
     body, code, _ = reg.dispatch("GET", "/api/pubg/settings", b"", {})
@@ -102,8 +159,8 @@ def test_settings_get_returns_all(tmp_db_path):
     assert payload["minMatchesForTopMates"] == "10"
 
 
-def test_settings_post_persists(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_settings_post_persists():
+    conn = _setup()
     reg = _registry(conn)
     body_in = json.dumps({"key": "minMatchesForTopMates", "value": "15"}).encode()
     body, code, _ = reg.dispatch("POST", "/api/pubg/settings", body_in, {})
@@ -111,29 +168,28 @@ def test_settings_post_persists(tmp_db_path):
     assert get_setting(conn, "minMatchesForTopMates") == "15"
 
 
-def test_stamm_crew_add_and_list(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_stamm_crew_is_not_implemented():
+    """stamm_crew wurde bei der PG-Migration nicht mitgenommen — die Tabelle
+    fehlt im PG_SCHEMA, die Routen sind bewusste 501-Stubs. Der Test haelt
+    diesen Zustand fest, damit ein spaeteres Aktivieren auffaellt."""
+    conn = _setup()
     upsert_player(conn, "account.MA", "MateA", "steam", False)
     reg = _registry(conn)
     body_in = json.dumps({"add": "MateA"}).encode()
-    body, code, _ = reg.dispatch("POST", "/api/pubg/stamm-crew", body_in, {})
-    assert code == 200
+    _, code, _ = reg.dispatch("POST", "/api/pubg/stamm-crew", body_in, {})
+    assert code == 501
+    # GET ist ein Leer-Stub, damit Widgets nicht auf einen Fehler laufen
     body, code, _ = reg.dispatch("GET", "/api/pubg/stamm-crew", b"", {})
-    assert "MateA" in body.decode()
+    assert code == 200
+    assert json.loads(body) == []
 
 
 # ── Task 5: /api/pubg/matches-list ───────────────────────────────────────────
 
-def test_matches_list_returns_recent(tmp_db_path):
-    conn = _setup(tmp_db_path)
-    conn.execute(
-        "INSERT INTO matches (match_id, played_at, map_name, game_mode) "
-        "VALUES (?,?,?,?)",
-        ("m1", "2026-05-26T10:00:00Z", "Baltic_Main", "squad"))
-    conn.execute(
-        "INSERT INTO participants (match_id, account_id, name, team_id, place, kills) "
-        "VALUES (?,?,?,?,?,?)",
-        ("m1", "account.A", "PEX_LuCKoR", 3, 2, 5))
+def test_matches_list_returns_recent():
+    conn = _setup()
+    _insert_match(conn, "m1", "2026-05-26T10:00:00Z", "Baltic_Main", "squad")
+    _insert_participant(conn, "m1", "account.A", "PEX_LuCKoR", 3, 2, 5)
     conn.commit()
     reg = _registry(conn)
     body, code, _ = reg.dispatch("GET", "/api/pubg/matches-list?limit=10", b"", {})
@@ -150,25 +206,18 @@ def test_matches_list_returns_recent(tmp_db_path):
 from unittest.mock import patch
 
 
-def test_match_replay_requires_match_id(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_match_replay_requires_match_id():
+    conn = _setup()
     reg = _registry(conn)
     body, code, _ = reg.dispatch("GET", "/api/pubg/match-replay", b"", {})
     assert code == 400
 
 
-def test_match_replay_builds_and_caches(tmp_db_path):
-    conn = _setup(tmp_db_path)
-    conn.execute(
-        "INSERT INTO matches (match_id, played_at, map_name, game_mode) "
-        "VALUES (?,?,?,?)",
-        ("m1", "2026-05-26T10:00:00Z", "Baltic_Main", "squad"))
-    conn.execute(
-        "INSERT INTO match_team_mapping (match_id, account_id, team_id) "
-        "VALUES (?,?,?)", ("m1", "account.A", 1))
-    conn.execute(
-        "INSERT INTO match_team_mapping (match_id, account_id, team_id) "
-        "VALUES (?,?,?)", ("m1", "account.B", 2))
+def test_match_replay_builds_and_caches():
+    conn = _setup()
+    _insert_match(conn, "m1", "2026-05-26T10:00:00Z", "Baltic_Main", "squad")
+    _insert_team_mapping(conn, "m1", "account.A", 1)
+    _insert_team_mapping(conn, "m1", "account.B", 2)
     conn.commit()
 
     raw = [
@@ -196,11 +245,9 @@ def test_match_replay_builds_and_caches(tmp_db_path):
         assert dl.call_count == 1
 
 
-def test_match_replay_404_when_no_telemetry(tmp_db_path):
-    conn = _setup(tmp_db_path)
-    conn.execute(
-        "INSERT INTO matches (match_id, played_at, map_name, game_mode) "
-        "VALUES (?,?,?,?)", ("m2", "2026-05-26T10:00:00Z", "Baltic_Main", "squad"))
+def test_match_replay_404_when_no_telemetry():
+    conn = _setup()
+    _insert_match(conn, "m2", "2026-05-26T10:00:00Z", "Baltic_Main", "squad")
     conn.commit()
     reg = _registry(conn)
     with patch("pubg.hidrive_telemetry.download_raw", return_value=None):
@@ -209,8 +256,8 @@ def test_match_replay_404_when_no_telemetry(tmp_db_path):
         assert code == 404
 
 
-def test_player_search_matches_prefix(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_player_search_matches_prefix():
+    conn = _setup()
     upsert_player(conn, "account.B", "Mate1", "steam", False)
     upsert_player(conn, "account.C", "LuckyGuy", "steam", False)
     conn.commit()
@@ -224,24 +271,22 @@ def test_player_search_matches_prefix(tmp_db_path):
     assert "Mate1" not in names
 
 
-def test_player_search_empty_query_returns_empty(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_player_search_empty_query_returns_empty():
+    conn = _setup()
     reg = _registry(conn)
     body, code, _ = reg.dispatch("GET", "/api/pubg/player-search?q=", b"", {})
     assert code == 200
     assert json.loads(body) == []
 
 
-def test_landing_heatmap_endpoint(tmp_db_path):
-    conn = _setup(tmp_db_path)
-    conn.execute("INSERT INTO matches (match_id, played_at, map_name, game_mode) "
-                 "VALUES ('m1','2026-05-01T10:00:00Z','Baltic_Main','squad')")
-    conn.execute("INSERT INTO match_team_mapping (match_id, account_id, team_id) "
-                 "VALUES ('m1','account.A',1)")
-    conn.execute("INSERT INTO telemetry_events "
-                 "(match_id, event_type, timestamp_ms, actor_account, actor_x, actor_y, actor_z, actor_health) "
-                 "VALUES ('m1','Landing',1000,'account.A',400000,400000,100,90)")
-    conn.commit()
+def test_landing_heatmap_endpoint():
+    conn = _setup()
+    _insert_match(conn, "m1", "2026-05-01T10:00:00Z")
+    _insert_team_mapping(conn, "m1", "account.A", 1)
+    db_pg.insert_telemetry_events(conn.raw, "m1", [
+        {"event_type": "Landing", "timestamp_ms": 1000,
+         "actor_account": "account.A", "actor_x": 400000.0,
+         "actor_y": 400000.0, "actor_z": 100.0, "actor_health": 90.0}])
     reg = _registry(conn)
     body, code, _ = reg.dispatch(
         "GET", "/api/pubg/landing-heatmap?map=Baltic_Main&p0=account.A", b"", {})
@@ -251,8 +296,8 @@ def test_landing_heatmap_endpoint(tmp_db_path):
     assert len(payload["scatterPoints"]) == 1
 
 
-def test_landing_heatmap_requires_map(tmp_db_path):
-    conn = _setup(tmp_db_path)
+def test_landing_heatmap_requires_map():
+    conn = _setup()
     reg = _registry(conn)
     body, code, _ = reg.dispatch("GET", "/api/pubg/landing-heatmap", b"", {})
     assert code == 400

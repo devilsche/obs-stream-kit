@@ -1,15 +1,54 @@
-from pubg.db import (connect, init_schema, upsert_player, insert_match,
-                     insert_participants, insert_telemetry_events,
-                     insert_team_mapping)
+"""Match-Detail gegen Postgres (der produktive Pfad).
+
+Frueher gegen pubg/db.py (SQLite) — seit der PG-Migration deprecated.
+Die Schreib-Helfer binden die tenant_id, damit die Testkoerper
+unveraendert bleiben konnten.
+"""
+import pytest
+
+from pubg import db_pg
 from pubg.aggregations import compute_match_detail
 
 
-def _setup(tmp_db_path):
-    conn = connect(tmp_db_path)
-    init_schema(conn)
-    upsert_player(conn, "account.A", "PEX_LuCKoR", "steam", True)
-    upsert_player(conn, "account.B", "Mate1", "steam", False)
-    return conn
+CONN = None
+T = None
+
+
+@pytest.fixture(autouse=True)
+def _bind(pg_compat):
+    global CONN, T
+    CONN, T = pg_compat[0], pg_compat[1]
+    yield
+    CONN, T = None, None
+
+
+def upsert_player(conn, account_id, name, platform, is_self=False):
+    db_pg.upsert_player(conn.raw, T, account_id, name, platform,
+                        1 if is_self else 0)
+
+
+def insert_match(conn, match_id, map_name, mode, is_ranked, duration,
+                 played_at, telemetry_url):
+    db_pg.insert_match(conn.raw, T, match_id, map_name, mode, is_ranked,
+                       duration, played_at, telemetry_url)
+
+
+def insert_participants(conn, match_id, rows):
+    db_pg.insert_participants(conn.raw, T, match_id, rows)
+
+
+def insert_team_mapping(conn, match_id, rows):
+    db_pg.insert_team_mapping(conn.raw, T, match_id, rows)
+
+
+def insert_telemetry_events(conn, match_id, events):
+    db_pg.insert_telemetry_events(conn.raw, match_id, events)
+
+
+def _setup(_unused=None):
+    upsert_player(CONN, "account.A", "PEX_LuCKoR", "steam", True)
+    upsert_player(CONN, "account.B", "Mate1", "steam", False)
+    return CONN
 
 
 def _basic_match(conn, mid="m1", played_at="2026-05-15T18:00:00Z"):
@@ -32,9 +71,9 @@ def _basic_match(conn, mid="m1", played_at="2026-05-15T18:00:00Z"):
     return mid
 
 
-def test_lives_single_life_wraps_landing_and_death(tmp_db_path):
+def test_lives_single_life_wraps_landing_and_death():
     """Standard-Match (1 Leben): lives[0] enthaelt Landing+Death+Kills."""
-    conn = _setup(tmp_db_path)
+    conn = _setup()
     mid = _basic_match(conn)
     events = [
         # Plane-Cruise erreicht (z>=150000) bei ts=5000
@@ -76,7 +115,7 @@ def test_lives_single_life_wraps_landing_and_death(tmp_db_path):
          "payload_json": None},
     ]
     insert_telemetry_events(conn, mid, events)
-    d = compute_match_detail(conn, "account.A", mid)
+    d = compute_match_detail(conn, T, "account.A", mid)
     me = next(m for m in d["members"] if m["isSelf"])
     assert "lives" in me, "members[].lives field fehlt"
     assert len(me["lives"]) == 1
@@ -108,9 +147,9 @@ def test_lives_single_life_wraps_landing_and_death(tmp_db_path):
         assert pt[2] >= 60000 and pt[2] <= 700000
 
 
-def test_lives_survival_has_no_death(tmp_db_path):
+def test_lives_survival_has_no_death():
     """Member ueberlebt: lives[0].death == None."""
-    conn = _setup(tmp_db_path)
+    conn = _setup()
     mid = _basic_match(conn)
     events = [
         {"event_type": "Position", "timestamp_ms": 5000,
@@ -133,16 +172,16 @@ def test_lives_survival_has_no_death(tmp_db_path):
          "payload_json": None},
     ]
     insert_telemetry_events(conn, mid, events)
-    d = compute_match_detail(conn, "account.A", mid)
+    d = compute_match_detail(conn, T, "account.A", mid)
     me = next(m for m in d["members"] if m["isSelf"])
     assert len(me["lives"]) == 1
     assert me["lives"][0]["death"] is None
 
 
-def test_lives_comeback_creates_two_lives(tmp_db_path):
+def test_lives_comeback_creates_two_lives():
     """Comeback-Modus: nach Death im selben Match wieder Plane+Landing.
     lives[0] = erstes Leben (mit Death), lives[1] = zweites Leben."""
-    conn = _setup(tmp_db_path)
+    conn = _setup()
     mid = _basic_match(conn)
     events = [
         # Leben 1: Plane → Landing → Death
@@ -186,7 +225,7 @@ def test_lives_comeback_creates_two_lives(tmp_db_path):
          "payload_json": None},
     ]
     insert_telemetry_events(conn, mid, events)
-    d = compute_match_detail(conn, "account.A", mid)
+    d = compute_match_detail(conn, T, "account.A", mid)
     me = next(m for m in d["members"] if m["isSelf"])
     assert len(me["lives"]) == 2, f"Erwarte 2 Lives, bekommen {len(me['lives'])}"
     l1, l2 = me["lives"]
@@ -199,10 +238,10 @@ def test_lives_comeback_creates_two_lives(tmp_db_path):
     assert l2["death"] is None
 
 
-def test_path_timestamps_inside_lives(tmp_db_path):
+def test_path_timestamps_inside_lives():
     """Pfade in lives[].planeRoute und lives[].groundPath sind
     [x, y, ts_ms] 3-Tupel und chronologisch sortiert."""
-    conn = _setup(tmp_db_path)
+    conn = _setup()
     mid = _basic_match(conn)
     events = [
         {"event_type": "Position", "timestamp_ms": 5000,
@@ -231,7 +270,7 @@ def test_path_timestamps_inside_lives(tmp_db_path):
          "payload_json": None},
     ]
     insert_telemetry_events(conn, mid, events)
-    d = compute_match_detail(conn, "account.A", mid)
+    d = compute_match_detail(conn, T, "account.A", mid)
     me = next(m for m in d["members"] if m["isSelf"])
     life = me["lives"][0]
     for pt in life["planeRoute"]:

@@ -601,9 +601,12 @@ class EndpointRegistry:
         q = (qs.get("q") or "").strip()
         if not q:
             return _ok([])
+        # ILIKE statt LIKE: unter SQLite war LIKE fuer ASCII case-insensitiv,
+        # unter Postgres nicht — seit der Migration fand die Suche Namen mit
+        # abweichender Gross-/Kleinschreibung nicht mehr ("Luc" → PEX_LuCKoR).
         rows = conn.execute(
             "SELECT account_id, name FROM players "
-            "WHERE tenant_id = ? AND name LIKE ? ORDER BY name LIMIT 20",
+            "WHERE tenant_id = ? AND name ILIKE ? ORDER BY name LIMIT 20",
             (self.tenant_id, f"%{q}%",)).fetchall()
         return _ok([{"accountId": r["account_id"], "name": r["name"]}
                     for r in rows if r["name"]])

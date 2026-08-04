@@ -224,8 +224,8 @@ def test_telemetry_roundtrip_and_marks(pg):
          "actor_account": "a1", "actor_x": 1.0, "actor_y": 2.0,
          "actor_z": 3.0, "payload_json": "{}"},
     ]
-    db_pg.insert_telemetry_events(conn, t1, "m-tel", events)
-    rows = db_pg.get_telemetry_for_match(conn, t1, "m-tel")
+    db_pg.insert_telemetry_events(conn, "m-tel", events)
+    rows = db_pg.get_telemetry_for_match(conn, "m-tel")
     assert len(rows) == 2
     types = {r["event_type"] for r in rows}
     assert types == {"Kill", "Landing"}
