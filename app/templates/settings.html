@@ -10,13 +10,56 @@
   <div class="dn-saved"><span class="material-symbols-outlined icon-sm" aria-hidden="true">check_circle</span> Gespeichert</div>
   {% endif %}
 
+  <section class="dn-simple" aria-labelledby="acc-head">
+    <p class="sec" id="acc-head">// PUBG-Accounts</p>
+    <p class="dn-note">Alle gelisteten Accounts werden gepollt. Der primäre Account
+      ist die Standardquelle für Widgets ohne <code>account</code>-Parameter.</p>
+
+    {% if tracked %}
+    <ul class="dn-acclist">
+      {% for t in tracked %}
+      <li class="dn-accrow">
+        <span class="dn-accname">{{ t.name }}</span>
+        {% if t.is_primary %}
+        <span class="dn-accbadge">
+          <span class="material-symbols-outlined icon-sm" aria-hidden="true">star</span>Primär
+        </span>
+        {% else %}
+        <form method="POST" action="/app/settings/accounts" class="dn-accform">
+          <input type="hidden" name="action" value="primary">
+          <input type="hidden" name="name" value="{{ t.name }}">
+          <button type="submit" class="dn-btn ghost"
+                  aria-label="{{ t.name }} als primären Account setzen">Als primär</button>
+        </form>
+        <form method="POST" action="/app/settings/accounts" class="dn-accform">
+          <input type="hidden" name="action" value="remove">
+          <input type="hidden" name="name" value="{{ t.name }}">
+          <button type="submit" class="dn-btn danger"
+                  aria-label="{{ t.name }} entfernen">Entfernen</button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    <form method="POST" action="/app/settings/accounts" class="dn-accadd">
+      <input type="hidden" name="action" value="add">
+      <div class="dn-field">
+        <label for="new_account">Weiteren Account hinzufügen</label>
+        <input id="new_account" name="name" type="text" autocomplete="off" required
+               aria-describedby="new_account_hint">
+        <p class="dn-note" id="new_account_hint">In-game name, z.B. PEX_LuCKoR.
+          Matches der letzten 14 Tage werden nachgeladen, ältere sind bei PUBG
+          nicht mehr abrufbar.</p>
+      </div>
+      <button type="submit" class="dn-btn accent">Hinzufügen</button>
+    </form>
+  </section>
+
   <form method="POST" class="dn-simple">
     <p class="sec">// PUBG</p>
     <div class="dn-fgrid">
-      <div class="dn-field">
-        <label for="pubg_name">In-game name</label>
-        <input id="pubg_name" type="text" name="pubg_name" value="{{ creds.pubg_name or '' }}" placeholder="z.B. PEX_LuCKoR" autocomplete="off">
-      </div>
       <div class="dn-field">
         <label for="pubg_platform">Platform</label>
         <select id="pubg_platform" name="pubg_platform">

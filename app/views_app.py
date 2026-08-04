@@ -174,6 +174,12 @@ def settings():
                 set_setting(conn, g.tenant_id, "highlight_source", hsrc)
             return redirect("/app/settings?saved=1")
         creds = core_creds.get(conn, g.tenant_id)
+        # Bestandskonten haben nur den Einzel-Namen in den Credentials —
+        # der wird beim ersten Aufruf zum primaeren Eintrag der Liste.
+        from pubg.db_pg import backfill_tracked_players, list_tracked_players
+        backfill_tracked_players(conn, g.tenant_id, creds.pubg_name,
+                                 creds.pubg_platform, creds.pubg_account_id)
+        tracked = list_tracked_players(conn, g.tenant_id)
         prefs = {
             "default_range": get_setting(conn, g.tenant_id, "ui.default_range",
                                           default="session"),
@@ -201,8 +207,51 @@ def settings():
     base_url = request.url_root.rstrip("/")
     return render_template("settings.html",
                            user=g.user, creds=creds, prefs=prefs,
+                           tracked=tracked,
                            saved=request.args.get("saved"),
                            api_token=api_token, base_url=base_url)
+
+
+@bp_app.route("/app/settings/accounts", methods=["POST"])
+@require_session
+def settings_accounts():
+    """Verfolgte PUBG-Accounts pflegen (add / remove / primary).
+
+    Eigener Endpoint statt Teil des Settings-Formulars: HTML erlaubt keine
+    verschachtelten Forms, und das Hinzufuegen eines Accounts soll nicht
+    die uebrigen Einstellungen mitspeichern.
+    """
+    from pubg.db_pg import (add_tracked_player, list_tracked_players,
+                            remove_tracked_player, set_primary_tracked_player)
+    action = request.form.get("action")
+    name = (request.form.get("name") or "").strip()
+    if not name:
+        return redirect("/app/settings")
+    conn = _get_conn()
+    try:
+        creds = core_creds.get(conn, g.tenant_id)
+        if action == "add":
+            # Der erste Account wird primaer — sonst bliebe creds.pubg_name
+            # leer und das creds_gate wuerde alle Widgets blockieren.
+            first = not list_tracked_players(conn, g.tenant_id)
+            add_tracked_player(conn, g.tenant_id, name,
+                               platform=creds.pubg_platform,
+                               is_primary=first)
+            if first:
+                core_creds.set_pubg(conn, g.tenant_id, name=name)
+        elif action == "remove":
+            remove_tracked_player(conn, g.tenant_id, name)
+        elif action == "primary":
+            set_primary_tracked_player(conn, g.tenant_id, name)
+            # Bestehender Ein-Account-Code liest weiterhin creds.pubg_name —
+            # der Primaer-Account bleibt dessen Quelle. account_id gehoert zum
+            # alten Namen und wird vom Poller neu aufgeloest.
+            core_creds.set_pubg(conn, g.tenant_id, name=name)
+            core_creds.clear_pubg_account_id(conn, g.tenant_id)
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            conn.close()
+    return redirect("/app/settings?saved=1")
 
 
 @bp_app.route("/app/api-docs")

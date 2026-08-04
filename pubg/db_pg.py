@@ -34,6 +34,23 @@ CREATE TABLE IF NOT EXISTS players (
     PRIMARY KEY (tenant_id, account_id)
 );
 
+-- Welche Accounts ein Tenant bewusst verfolgt (eigene Zweit-Accounts).
+-- Abgrenzung zu `players`: dort landet jeder, der in einem Match auftaucht;
+-- hier nur die, deren Matches aktiv gepollt werden sollen.
+CREATE TABLE IF NOT EXISTS tracked_players (
+    tenant_id   INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    account_id  TEXT,
+    platform    TEXT,
+    is_primary  BOOLEAN NOT NULL DEFAULT FALSE,
+    added_at    TEXT NOT NULL,
+    PRIMARY KEY (tenant_id, name)
+);
+
+-- Hoechstens ein primaerer Account je Tenant.
+CREATE UNIQUE INDEX IF NOT EXISTS tracked_players_one_primary
+    ON tracked_players (tenant_id) WHERE is_primary;
+
 CREATE TABLE IF NOT EXISTS matches (
     tenant_id         INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     match_id          TEXT NOT NULL,
@@ -320,6 +337,104 @@ def upsert_player(conn, tenant_id: int, account_id: str, name: str,
                     last_polled_at = EXCLUDED.last_polled_at
         """, (tenant_id, account_id, name, platform, is_self_int, now, now))
     conn.commit()
+
+
+# ── Verfolgte Accounts ──────────────────────────────────────────────────────
+
+
+def list_tracked_players(conn, tenant_id: int) -> list:
+    """Verfolgte Accounts, primaerer zuerst, danach in Anlage-Reihenfolge."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT name, account_id, platform, is_primary, added_at
+            FROM tracked_players
+            WHERE tenant_id = %s
+            ORDER BY is_primary DESC, added_at, name
+        """, (tenant_id,))
+        return [dict(r) for r in cur.fetchall()]
+
+
+def add_tracked_player(conn, tenant_id: int, name: str, platform: str = None,
+                       account_id: str = None, is_primary: bool = False) -> None:
+    """Account aufnehmen. Erneutes Anlegen desselben Namens aktualisiert nur
+    Plattform/account_id — das Primaer-Flag bleibt unberuehrt (dafuer gibt es
+    set_primary_tracked_player)."""
+    if is_primary:
+        _clear_primary(conn, tenant_id)
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO tracked_players (tenant_id, name, account_id, platform,
+                                         is_primary, added_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (tenant_id, name) DO UPDATE
+                SET platform   = COALESCE(EXCLUDED.platform, tracked_players.platform),
+                    account_id = COALESCE(EXCLUDED.account_id, tracked_players.account_id)
+        """, (tenant_id, name, account_id, platform, is_primary, _now_iso()))
+    conn.commit()
+
+
+def remove_tracked_player(conn, tenant_id: int, name: str) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "DELETE FROM tracked_players WHERE tenant_id = %s AND name = %s",
+            (tenant_id, name),
+        )
+    conn.commit()
+
+
+def _clear_primary(conn, tenant_id: int) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE tracked_players SET is_primary = FALSE "
+            "WHERE tenant_id = %s AND is_primary",
+            (tenant_id,),
+        )
+
+
+def set_primary_tracked_player(conn, tenant_id: int, name: str) -> None:
+    """Primaer-Flag exklusiv auf `name` setzen."""
+    _clear_primary(conn, tenant_id)
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE tracked_players SET is_primary = TRUE "
+            "WHERE tenant_id = %s AND name = %s",
+            (tenant_id, name),
+        )
+    conn.commit()
+
+
+def set_tracked_account_id(conn, tenant_id: int, name: str,
+                           account_id: str) -> None:
+    """Vom Poller aufgeloeste account_id nachtragen."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE tracked_players SET account_id = %s "
+            "WHERE tenant_id = %s AND name = %s",
+            (account_id, tenant_id, name),
+        )
+    conn.commit()
+
+
+def backfill_tracked_players(conn, tenant_id: int, name: str,
+                             platform: str = None,
+                             account_id: str = None) -> bool:
+    """Bestandstenants: bisherigen Einzel-Account als primaeren uebernehmen.
+
+    Nur wenn die Liste noch leer ist — eine gepflegte Liste wird nie
+    ueberschrieben. Returns True wenn etwas angelegt wurde.
+    """
+    if not name:
+        return False
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM tracked_players WHERE tenant_id = %s LIMIT 1",
+            (tenant_id,),
+        )
+        if cur.fetchone():
+            return False
+    add_tracked_player(conn, tenant_id, name, platform=platform,
+                       account_id=account_id, is_primary=True)
+    return True
 
 
 def get_player_by_name(conn, tenant_id: int, name: str):

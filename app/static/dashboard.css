@@ -957,6 +957,24 @@ html[data-theme="aurora"] .dn-ccard,html[data-theme="aurora"] .dn-hero{backdrop-
 .dn-table tr:last-child td{border-bottom:none}
 .dn-table tr:hover td{background:color-mix(in srgb,var(--theme-primary) 5%,transparent)}
 .dn-table .dn-btn{padding:4px 10px;font-size:11px}
+/* Liste der verfolgten PUBG-Accounts (Settings) */
+.dn-acclist{list-style:none;margin:14px 0 18px;padding:0;
+  border:1px solid var(--theme-border)}
+.dn-accrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:10px 14px;border-bottom:1px solid var(--theme-border)}
+.dn-accrow:last-child{border-bottom:none}
+.dn-accname{flex:1 1 180px;font-family:var(--theme-font-mono);font-size:14px;
+  color:var(--theme-text);word-break:break-all}
+.dn-accform{margin:0}
+/* Primaer-Kennzeichnung mit Icon UND Text — nicht nur ueber Farbe */
+.dn-accbadge{display:inline-flex;align-items:center;gap:6px;min-height:24px;
+  padding:3px 10px;border:1px solid var(--theme-accent);
+  background:color-mix(in srgb,var(--theme-accent) 12%,transparent);
+  color:var(--theme-accent);font-family:var(--theme-font-mono);font-size:11px}
+.dn-acclist .dn-btn{min-height:24px;padding:4px 12px;font-size:11px}
+.dn-accadd{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.dn-accadd .dn-field{margin:0;flex:1 1 260px}
+
 .dn-badge--ok{background:var(--theme-ok);color:var(--theme-bg)}
 .dn-badge--warn{background:var(--theme-warn);color:var(--theme-bg)}
 .dn-pending{display:flex;align-items:center;justify-content:center;min-height:60vh}

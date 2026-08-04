@@ -69,6 +69,22 @@ def set_pubg(conn, tenant_id: int, *, name=None, platform=None,
     conn.commit()
 
 
+def clear_pubg_account_id(conn, tenant_id: int) -> None:
+    """Gecachte account_id verwerfen.
+
+    set_pubg() arbeitet mit COALESCE und kann darum nichts loeschen. Beim
+    Wechsel des Primaer-Accounts muss die ID aber weg, sonst gehoert sie
+    zum alten Namen.
+    """
+    with conn.cursor() as cur:
+        cur.execute("""
+            UPDATE tenant_credentials
+            SET pubg_account_id = NULL, updated_at = now()
+            WHERE tenant_id = %s
+        """, (tenant_id,))
+    conn.commit()
+
+
 def set_twitch(conn, tenant_id: int, *, channel=None, client_id=None,
                client_secret=None):
     key = crypto.load_master_key()
