@@ -54,6 +54,7 @@ def callback():
     conn = _get_conn()
     try:
         user = _lookup_or_create_user(conn, info)
+        _sync_twitch_channel(conn, user["id"], info.get("login"))
         sid = srv_sessions.create(
             conn, user_id=user["id"],
             user_agent=request.headers.get("User-Agent"),
@@ -91,6 +92,28 @@ def logout():
         domain=current_app.config.get("OBSKIT_COOKIE_DOMAIN"),
     )
     return resp
+
+
+def _sync_twitch_channel(conn, user_id: int, login: str) -> None:
+    """Clip-Channel des eigenen Tenants aus dem Login-Namen befuellen.
+
+    Nur wenn noch nichts hinterlegt ist — ein bewusst eingetragener
+    Fremd-Channel bleibt unangetastet. Ohne das faellt der Clip-Abruf auf
+    den globalen .secrets-Channel zurueck und fremde Tenants saehen die
+    Clips des Admins.
+    """
+    if not login:
+        return
+    with conn.cursor() as cur:
+        cur.execute("""
+            UPDATE tenant_credentials tc
+            SET twitch_channel = %s, updated_at = now()
+            FROM tenants t
+            WHERE t.id = tc.tenant_id
+              AND t.owner_user_id = %s
+              AND (tc.twitch_channel IS NULL OR tc.twitch_channel = '')
+        """, (login, user_id))
+    conn.commit()
 
 
 def _lookup_or_create_user(conn, info: dict) -> dict:

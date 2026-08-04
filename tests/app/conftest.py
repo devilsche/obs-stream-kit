@@ -35,6 +35,9 @@ def _setup_schema(conn):
         cur.execute("CREATE SCHEMA obs AUTHORIZATION obs_stream")
         with open(os.path.join(base, "schema.sql")) as f:
             cur.execute(f.read())
+        # schema_v2 definiert Views auf den PUBG-Tabellen — die muessen vorher da sein
+        from pubg.db_pg import PG_SCHEMA
+        cur.execute(PG_SCHEMA)
         with open(os.path.join(base, "schema_v2.sql")) as f:
             cur.execute(f.read())
     conn.commit()

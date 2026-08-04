@@ -86,3 +86,43 @@ def test_logout_clears_session_and_cookie(pg_conn_test_setup):
     resp = client.get("/app/logout")
     assert resp.status_code == 302
     assert sessions.lookup(conn, sid) is None
+
+
+def test_callback_fills_empty_twitch_channel_from_login(pg_conn_test_setup):
+    """Login setzt den Clip-Channel des eigenen Tenants, wenn er leer ist."""
+    conn, tid, *_ = pg_conn_test_setup
+    app = _make_app(conn)
+    client = app.test_client()
+    state = client.get("/app/login").headers["Location"].split("state=")[1].split("&")[0]
+    with patch("webcore.auth.exchange_code", return_value="acc_xyz"), \
+         patch("webcore.auth.get_user_info", return_value={
+             "id": "999999", "login": "testuser", "display_name": "TestUser",
+             "avatar_url": "http://a", "email": "t@x",
+         }):
+        client.get(f"/app/oauth/callback?code=c1&state={state}")
+    with conn.cursor() as cur:
+        cur.execute("SELECT twitch_channel FROM tenant_credentials WHERE tenant_id = %s",
+                    (tid,))
+        assert cur.fetchone()["twitch_channel"] == "testuser"
+
+
+def test_callback_keeps_manually_set_twitch_channel(pg_conn_test_setup):
+    """Ein bewusst eingetragener Fremd-Channel wird vom Login nicht ueberschrieben."""
+    conn, tid, *_ = pg_conn_test_setup
+    with conn.cursor() as cur:
+        cur.execute("UPDATE tenant_credentials SET twitch_channel = 'anderer' "
+                    "WHERE tenant_id = %s", (tid,))
+    conn.commit()
+    app = _make_app(conn)
+    client = app.test_client()
+    state = client.get("/app/login").headers["Location"].split("state=")[1].split("&")[0]
+    with patch("webcore.auth.exchange_code", return_value="acc_xyz"), \
+         patch("webcore.auth.get_user_info", return_value={
+             "id": "999999", "login": "testuser", "display_name": "TestUser",
+             "avatar_url": "http://a", "email": "t@x",
+         }):
+        client.get(f"/app/oauth/callback?code=c1&state={state}")
+    with conn.cursor() as cur:
+        cur.execute("SELECT twitch_channel FROM tenant_credentials WHERE tenant_id = %s",
+                    (tid,))
+        assert cur.fetchone()["twitch_channel"] == "anderer"

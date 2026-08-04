@@ -50,15 +50,21 @@ def get_user_info(access_token: str, client_id: str) -> dict:
 TWITCH_HELIX = "https://api.twitch.tv/helix"
 
 
-def get_clips(client_id: str, client_secret: str, channel: str,
-              count: int = 100) -> list:
+def get_clips(client_id: str, client_secret: str, channel: str = None,
+              count: int = 100, broadcaster_id: str = None) -> list:
     """App-Token holen, Channel -> broadcaster_id, Clips laden.
+
+    Ist `broadcaster_id` gesetzt (aus users.twitch_user_id), entfaellt der
+    /helix/users-Lookup — spart einen Call und ist immun gegen Namensaenderungen.
+    Sonst wird `channel` als Login-Name aufgeloest.
 
     Returns Liste von {id,title,duration,createdAt,views,creator}.
     Leere Liste wenn Channel unbekannt, keine Clips oder Netzwerkfehler.
     """
     from webcore.metrics import observe_external
 
+    if not broadcaster_id and not channel:
+        return []
     count = max(1, min(int(count or 100), 100))
     try:
         with observe_external("twitch", "oauth_token") as obs:
@@ -73,17 +79,19 @@ def get_clips(client_id: str, client_secret: str, channel: str,
         return []
     headers = {"Client-ID": client_id, "Authorization": f"Bearer {token}"}
 
-    try:
-        with observe_external("twitch", "users") as obs:
-            ur = requests.get(f"{TWITCH_HELIX}/users",
-                              params={"login": channel}, headers=headers, timeout=10)
-            obs.set_status(ur.status_code)
-        udata = (ur.json() or {}).get("data") or []
-    except Exception:
-        return []
-    if not udata:
-        return []
-    broadcaster_id = udata[0]["id"]
+    if not broadcaster_id:
+        try:
+            with observe_external("twitch", "users") as obs:
+                ur = requests.get(f"{TWITCH_HELIX}/users",
+                                  params={"login": channel}, headers=headers,
+                                  timeout=10)
+                obs.set_status(ur.status_code)
+            udata = (ur.json() or {}).get("data") or []
+        except Exception:
+            return []
+        if not udata:
+            return []
+        broadcaster_id = udata[0]["id"]
 
     try:
         with observe_external("twitch", "clips") as obs:

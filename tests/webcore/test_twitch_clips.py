@@ -79,3 +79,60 @@ def test_get_clips_network_error_returns_empty():
     with mock.patch("webcore.twitch_client.requests.post",
                     side_effect=Exception("boom")):
         assert twitch_client.get_clips("cid", "csecret", "luckor", count=10) == []
+
+
+# --- broadcaster_id-Pfad + Tenant-Isolation ---
+
+def test_get_clips_with_broadcaster_id_skips_users_lookup():
+    """broadcaster_id gegeben → nur der Clips-Call, kein /helix/users."""
+    clips_resp = _resp({"data": [{"id": "ClipZ", "title": "T", "duration": 10,
+                                  "created_at": "", "view_count": 1,
+                                  "creator_name": "C"}]})
+    with mock.patch("webcore.twitch_client.requests.post",
+                    return_value=_resp({"access_token": "AT"})), \
+         mock.patch("webcore.twitch_client.requests.get",
+                    return_value=clips_resp) as get:
+        clips = twitch_client.get_clips("cid", "csecret", None, count=10,
+                                        broadcaster_id="4711")
+    assert [c["id"] for c in clips] == ["ClipZ"]
+    assert get.call_count == 1
+    assert get.call_args.kwargs["params"]["broadcaster_id"] == "4711"
+
+
+def test_get_clips_without_channel_and_broadcaster_returns_empty():
+    with mock.patch("webcore.twitch_client.requests.post",
+                    return_value=_resp({"access_token": "AT"})):
+        assert twitch_client.get_clips("cid", "csecret", None, count=10) == []
+
+
+def test_clips_endpoint_uses_owner_broadcaster_id():
+    """Ohne expliziten Channel haengt der Abruf am Tenant-Owner,
+    nicht am globalen .secrets-Channel."""
+    class _NoChannel:
+        twitch_client_id = "cid"
+        twitch_client_secret = "csecret"
+        twitch_channel = None
+    app = _twitch_app(tenant_id=7)
+    with _mock.patch("webcore.views_twitch._tenant_creds", return_value=_NoChannel()), \
+         _mock.patch("webcore.views_twitch._owner_twitch_id", return_value="99887"), \
+         _mock.patch("webcore.views_twitch.twitch_client.get_clips",
+                     return_value=[]) as gc:
+        r = app.test_client().get("/s/tok123/api/twitch/clips")
+    assert r.status_code == 200
+    assert gc.call_args.kwargs["broadcaster_id"] == "99887"
+
+
+def test_clips_endpoint_no_global_channel_fallback_for_foreign_tenant():
+    """Fremder Tenant ohne eigenen Channel bekommt leere Liste statt Admin-Clips."""
+    class _Empty:
+        twitch_client_id = None
+        twitch_client_secret = None
+        twitch_channel = None
+    app = _twitch_app(tenant_id=7)
+    with _mock.patch("webcore.views_twitch._tenant_creds", return_value=_Empty()), \
+         _mock.patch("webcore.views_twitch._owner_twitch_id", return_value=None), \
+         _mock.patch("webcore.views_twitch.twitch_client.get_clips") as gc:
+        r = app.test_client().get("/s/tok123/api/twitch/clips")
+    assert r.status_code == 200
+    assert r.get_json()["clips"] == []
+    gc.assert_not_called()
