@@ -386,6 +386,31 @@ HTML-Widgets als Browser-Sources rendern.
 5. **`serve.py` als Always-on-Service**: siehe `docs/pubg-systemd.service.example`.
 6. **Browser-Sources** in OBS einfügen (Tabelle unten).
 
+### Mehrere Accounts
+
+Unter **Settings → PUBG-Accounts** lassen sich beliebig viele eigene In-game-Namen
+hinterlegen. Alle werden gepollt; einer davon ist der **primäre** und die
+Standardquelle für Widgets ohne `account`-Parameter.
+
+Der Poller löst sämtliche Accounts in **einem** `/players`-Request auf (PUBG erlaubt
+10 Namen je Filter) — zusätzliche Accounts kosten also keinen weiteren Request des
+10-RPM-Budgets. Match-Details und Telemetrie sind bei PUBG ohnehin limitfrei; ein
+gemeinsam gespieltes Match wird nur einmal geladen.
+
+| Parameter | Wirkung |
+|---|---|
+| `?account=<name>` | Widget zeigt diesen Account (gilt für alle PUBG-Widgets) |
+| `?account=<accountId>` | dasselbe, über die PUBG-Account-ID |
+| `?account=all` | Summe über alle Accounts — **nur** `api/pubg/session` |
+
+`account=all` addiert Matches, Kills, Damage, Wins und die übrigen additiven Werte;
+K/D, Kills/Match und Kopftreffer-Quote werden aus den Summen neu berechnet (nicht
+gemittelt). **Season-Rang und RP lassen sich nicht summieren** — sie gehören zu genau
+einem Account und tauchen in der Summenansicht nicht auf.
+
+Neue Accounts liefern nur Matches der letzten **14 Tage** — ältere gibt die PUBG-API
+nicht mehr heraus, lediglich Season-Aggregate reichen weiter zurück.
+
 ### Browser-Source-Komponenten
 
 Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.

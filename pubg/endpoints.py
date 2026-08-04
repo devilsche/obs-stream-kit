@@ -37,6 +37,36 @@ def _err(code, msg):
     return json.dumps({"error": msg}).encode("utf-8"), code, "application/json"
 
 
+class _AccountScopedCache:
+    """Legt Cache-Eintraege eines Nicht-Primaer-Accounts unter eigenem Key ab.
+
+    Die Registry wird je Request neu gebaut, der Cache aber ist
+    prozessweit geteilt — ohne diesen Scope wuerde ein Zweit-Account die
+    Zahlen des Primaer-Accounts serviert bekommen.
+    """
+
+    def __init__(self, inner, account_id: str):
+        self._inner = inner
+        self._prefix = f"acc:{account_id}:"
+
+    def get_or_compute(self, key, compute_fn, ttl=None):
+        return self._inner.get_or_compute(self._prefix + key, compute_fn,
+                                          ttl=ttl)
+
+    def get(self, key):
+        return self._inner.get(self._prefix + key)
+
+    def set(self, key, value, ttl=None):
+        return self._inner.set(self._prefix + key, value, ttl=ttl)
+
+    def invalidate(self, key=None):
+        return self._inner.invalidate(
+            None if key is None else self._prefix + key)
+
+    def __getattr__(self, item):
+        return getattr(self._inner, item)
+
+
 class EndpointRegistry:
     def __init__(self, get_conn, my_account_id, platform, cache,
                  client, poller_status, tenant_id: int,
@@ -57,10 +87,128 @@ class EndpointRegistry:
         self.steam_summary_fn = steam_summary_fn
         self._replay_cache = {}  # match_id → fertiges Replay-Dict (Session-Memory)
 
+    def _tracked(self):
+        from pubg.db_pg import list_tracked_players
+        conn = self.get_conn()
+        raw = conn.raw if isinstance(conn, SqliteCompatConn) else conn
+        return list_tracked_players(raw, self.tenant_id)
+
+    # Felder, die sich ueber Accounts hinweg schlicht addieren lassen.
+    _SUMMABLE = ("matches", "kills", "damage", "wins", "top10s",
+                 "totalBoosts", "totalHeals", "totalRevives",
+                 "totalWeaponsAcquired", "totalAssists", "totalDbnos",
+                 "totalSurvivedSec", "walkKm", "rideKm", "swimKm")
+
+    def _merge_session_stats(self, parts: list) -> dict:
+        """Session-Zahlen mehrerer Accounts zu einer Gesamtsicht fuegen.
+
+        Verhaeltnisse werden aus den Summen neu berechnet statt gemittelt —
+        ein Durchschnitt aus K/D-Werten waere schlicht falsch gewichtet.
+        Nicht sinnvoll summierbare Kennzahlen (Season-Rang, RP) tauchen in
+        dieser Sicht bewusst nicht auf.
+        """
+        merged = {}
+        for field in self._SUMMABLE:
+            vals = [p.get(field) for p in parts if p.get(field) is not None]
+            if vals:
+                merged[field] = sum(vals)
+        places = [p["bestPlace"] for p in parts
+                  if p.get("bestPlace") is not None]
+        if places:
+            merged["bestPlace"] = min(places)
+        longest = [p["longestKill"] for p in parts
+                   if p.get("longestKill") is not None]
+        if longest:
+            merged["longestKill"] = max(longest)
+        starts = [p["sessionStartedAt"] for p in parts
+                  if p.get("sessionStartedAt")]
+        if starts:
+            merged["sessionStartedAt"] = min(starts)
+        modes = [p.get("sessionMode") for p in parts if p.get("sessionMode")]
+        if modes:
+            merged["sessionMode"] = modes[0]
+
+        matches = merged.get("matches", 0)
+        kills = merged.get("kills", 0)
+        merged["kd"] = kills / max(matches - merged.get("wins", 0), 1)
+        merged["kpm"] = kills / max(matches, 1)
+        # Kopftreffer-Quote nach Kills gewichten, nicht die Prozente mitteln.
+        hs = sum((p.get("headshotPct") or 0) * (p.get("kills") or 0) / 100.0
+                 for p in parts)
+        merged["headshotPct"] = (hs / kills * 100) if kills else 0
+
+        maps = {}
+        for p in parts:
+            for entry in p.get("mapBreakdown") or []:
+                maps[entry["map"]] = maps.get(entry["map"], 0) + entry["count"]
+        merged["mapBreakdown"] = [{"map": m, "count": c}
+                                  for m, c in sorted(maps.items(),
+                                                     key=lambda kv: -kv[1])]
+        merged["accountScope"] = "all"
+        return merged
+
+    def _session_all_accounts(self, qs):
+        conn = self.get_conn()
+        range_key = (qs or {}).get("range", "session")
+        accounts = [t["account_id"] for t in self._tracked() if t["account_id"]]
+        if not accounts:
+            return _err(409, "keine aufgeloesten Accounts")
+        parts = [compute_session_stats(conn, self.tenant_id, acc, range_key)
+                 for acc in accounts]
+        return _ok(self.cache.get_or_compute(
+            f"session-all:{range_key}",
+            lambda: self._merge_session_stats([p for p in parts if p]),
+        ))
+
+    def _apply_account_param(self, qs):
+        """?account=<name|account_id> schaltet die Perspektive um.
+
+        Der Cache wird dabei mit-umgeschaltet — sonst bekaeme der zweite
+        Account die gecachten Zahlen des ersten. Ein nicht verfolgter Wert
+        wird abgelehnt statt still auf den Primaer-Account zu fallen.
+        """
+        wanted = (qs or {}).get("account")
+        if not wanted:
+            return None
+        if wanted == "all":
+            # Summierbar ist bislang nur die Session-Sicht; alles andere
+            # waere geraten (Season-Rang, letztes Match, Streaks).
+            return None
+        for t in self._tracked():
+            if wanted == t["account_id"] or \
+                    wanted.lower() == (t["name"] or "").lower():
+                if not t["account_id"]:
+                    return _err(409, f"account '{wanted}' noch nicht aufgeloest")
+                if t["account_id"] != self.my_account_id:
+                    self.my_account_id = t["account_id"]
+                    self.cache = _AccountScopedCache(self.cache,
+                                                     t["account_id"])
+                return None
+        return _err(400, f"unbekannter account '{wanted}'")
+
+    def _accounts(self):
+        return _ok({"accounts": [
+            {"name": t["name"], "accountId": t["account_id"],
+             "isPrimary": bool(t["is_primary"])}
+            for t in self._tracked()
+        ]})
+
     def dispatch(self, method: str, path: str, body: bytes, headers: dict):
         u = urlparse(path)
         route = (method, u.path)
         qs = {k: v[0] for k, v in parse_qs(u.query).items()}
+
+        if route == ("GET", "/api/pubg/accounts"):
+            return self._accounts()
+        err = self._apply_account_param(qs)
+        if err is not None:
+            return err
+        if qs.get("account") == "all":
+            if route != ("GET", "/api/pubg/session"):
+                return _err(400, "account=all wird nur von /api/pubg/session "
+                                 "unterstuetzt — andere Kennzahlen sind nicht "
+                                 "ueber Accounts summierbar")
+            return self._session_all_accounts(qs)
 
         if route == ("GET", "/api/pubg/session"):
             return self._session(qs)

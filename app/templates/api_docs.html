@@ -63,8 +63,16 @@
     <p class="sec">// PUBG API</p>
 
     <div class="dn-field">
+      <label><code>GET api/pubg/accounts</code></label>
+      <div class="dn-note">Tracked PUBG accounts of this tenant — name, accountId, isPrimary.</div>
+    </div>
+
+    <div class="dn-field">
       <label><code>GET api/pubg/session</code></label>
-      <div class="dn-note">Current session aggregate — kills, damage, wins, matches.</div>
+      <div class="dn-note">Current session aggregate — kills, damage, wins, matches.<br>
+        <code>?account=&lt;name|accountId&gt;</code> switches perspective (works on all
+        PUBG endpoints), <code>?account=all</code> sums the additive figures across
+        accounts — session endpoint only, since rank and RP cannot be added up.</div>
     </div>
 
     <div class="dn-field">

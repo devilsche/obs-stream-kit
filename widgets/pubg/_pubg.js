@@ -172,10 +172,29 @@
   })();
   PubgUI._AS_TENANT = _AS_TENANT;
 
+  // Account-Perspektive: wurde die Page mit ?account=<name|id|all> geladen,
+  // gilt das fuer ALLE API-Calls des Widgets. Ohne Angabe entscheidet das
+  // Backend (primaerer Account).
+  const _ACCOUNT = (() => {
+    try {
+      const m = (window.location.search || "").match(/[?&]account=([^&]+)/);
+      return m ? decodeURIComponent(m[1]) : null;
+    } catch (_) { return null; }
+  })();
+  PubgUI._ACCOUNT = _ACCOUNT;
+
   function _withAsTenant(url) {
-    if (!_AS_TENANT) return url;
-    const sep = url.includes("?") ? "&" : "?";
-    return url + sep + "asTenant=" + encodeURIComponent(_AS_TENANT);
+    let out = url;
+    if (_AS_TENANT) {
+      out += (out.includes("?") ? "&" : "?")
+           + "asTenant=" + encodeURIComponent(_AS_TENANT);
+    }
+    // Nicht doppelt anhaengen, falls der Aufrufer den Parameter selbst setzt.
+    if (_ACCOUNT && !/[?&]account=/.test(out)) {
+      out += (out.includes("?") ? "&" : "?")
+           + "account=" + encodeURIComponent(_ACCOUNT);
+    }
+    return out;
   }
 
   PubgUI.fetchJson = async (url, timeoutMs = 10000) => {
