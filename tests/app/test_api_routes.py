@@ -6,7 +6,6 @@ from app.views_api import bp_api
 def _make_app(conn):
     app = create_app(testing=True)
     app.config["_PG_CONN_FACTORY"] = lambda: conn
-    register_middleware(app)
     app.register_blueprint(bp_api)
     return app
 
@@ -23,7 +22,7 @@ def test_api_via_session_cookie(pg_conn_test_setup):
     conn, tenant_id, _, sid = pg_conn_test_setup
     app = _make_app(conn)
     client = app.test_client()
-    client.set_cookie("localhost", "obskit_sid", sid)
+    client.set_cookie("obskit_sid", sid, domain="localhost")
     resp = client.get("/api/pubg/healthz-tenant")
     assert resp.status_code == 200
     assert resp.json["tenant_id"] == tenant_id

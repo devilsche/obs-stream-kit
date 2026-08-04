@@ -17,6 +17,10 @@ def pg_conn(pg_dsn_test):
     with open(os.path.join(base, "schema.sql")) as f:
         with conn.cursor() as cur:
             cur.execute(f.read())
+    # schema_v2 definiert Views auf den PUBG-Tabellen — die muessen vorher da sein
+    from pubg.db_pg import PG_SCHEMA
+    with conn.cursor() as cur:
+        cur.execute(PG_SCHEMA)
     with open(os.path.join(base, "schema_v2.sql")) as f:
         with conn.cursor() as cur:
             cur.execute(f.read())

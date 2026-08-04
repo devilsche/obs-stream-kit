@@ -6,8 +6,6 @@ from app.views_admin import bp_admin
 def _make_app(conn):
     app = create_app(testing=True)
     app.config["_PG_CONN_FACTORY"] = lambda: conn
-    register_middleware(app)
-    app.register_blueprint(bp_admin)
     return app
 
 
@@ -23,7 +21,7 @@ def test_approve_creates_tenant(pg_conn_test_setup):
 
     app = _make_app(conn)
     client = app.test_client()
-    client.set_cookie("localhost", "obskit_sid", admin_sid)
+    client.set_cookie("obskit_sid", admin_sid, domain="localhost")
     resp = client.post(f"/admin/users/{pending_uid}/approve")
     assert resp.status_code == 302
 
@@ -54,7 +52,7 @@ def test_deny_keeps_is_approved_false(pg_conn_test_setup):
 
     app = _make_app(conn)
     client = app.test_client()
-    client.set_cookie("localhost", "obskit_sid", admin_sid)
+    client.set_cookie("obskit_sid", admin_sid, domain="localhost")
     resp = client.post(f"/admin/users/{uid}/deny")
     assert resp.status_code == 302
 
@@ -71,6 +69,6 @@ def test_non_admin_403(pg_conn_test_setup_non_admin):
     conn, _, _, sid = pg_conn_test_setup_non_admin
     app = _make_app(conn)
     client = app.test_client()
-    client.set_cookie("localhost", "obskit_sid", sid)
+    client.set_cookie("obskit_sid", sid, domain="localhost")
     resp = client.post("/admin/users/9999/approve")
     assert resp.status_code == 403

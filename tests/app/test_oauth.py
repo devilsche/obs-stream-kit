@@ -10,7 +10,6 @@ from webcore import sessions
 def _make_app(conn):
     app = create_app(testing=True)
     app.config["_PG_CONN_FACTORY"] = lambda: conn
-    register_middleware(app)
     app.register_blueprint(bp_auth)
     return app
 
@@ -82,7 +81,7 @@ def test_logout_clears_session_and_cookie(pg_conn_test_setup):
     conn, _, _, sid = pg_conn_test_setup
     app = _make_app(conn)
     client = app.test_client()
-    client.set_cookie("localhost", "obskit_sid", sid)
+    client.set_cookie("obskit_sid", sid, domain="localhost")
     resp = client.get("/app/logout")
     assert resp.status_code == 302
     assert sessions.lookup(conn, sid) is None

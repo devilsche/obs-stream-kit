@@ -8,7 +8,6 @@ from webcore.middleware import register_middleware, require_session, require_adm
 def _make_app_with_routes(pg_conn_factory):
     app = create_app(testing=True)
     app.config["_PG_CONN_FACTORY"] = pg_conn_factory
-    register_middleware(app)
     bp = Blueprint("test", __name__)
 
     @bp.route("/s/<token>/ping")
@@ -56,7 +55,7 @@ def test_app_route_with_valid_session(pg_conn_test_setup):
     conn, tenant_id, _, session_id = pg_conn_test_setup
     app = _make_app_with_routes(lambda: conn)
     client = app.test_client()
-    client.set_cookie("localhost", "obskit_sid", session_id)
+    client.set_cookie("obskit_sid", session_id, domain="localhost")
     resp = client.get("/app/ping")
     assert resp.status_code == 200
     assert resp.json["tenant_id"] == tenant_id
@@ -66,7 +65,7 @@ def test_admin_route_blocks_non_admin(pg_conn_test_setup_non_admin):
     conn, _, _, session_id = pg_conn_test_setup_non_admin
     app = _make_app_with_routes(lambda: conn)
     client = app.test_client()
-    client.set_cookie("localhost", "obskit_sid", session_id)
+    client.set_cookie("obskit_sid", session_id, domain="localhost")
     resp = client.get("/admin/ping")
     assert resp.status_code == 403
 
@@ -75,7 +74,7 @@ def test_unapproved_user_redirected_to_pending(pg_conn_test_setup_unapproved):
     conn, _, _, session_id = pg_conn_test_setup_unapproved
     app = _make_app_with_routes(lambda: conn)
     client = app.test_client()
-    client.set_cookie("localhost", "obskit_sid", session_id)
+    client.set_cookie("obskit_sid", session_id, domain="localhost")
     resp = client.get("/app/ping")
     assert resp.status_code == 302
     assert "/app/pending" in resp.headers["Location"]

@@ -8,14 +8,15 @@ def _make_app(conn, root_dir):
     app = create_app(testing=True)
     app.config["_PG_CONN_FACTORY"] = lambda: conn
     app.config["_PROJECT_ROOT"] = str(root_dir)
-    register_middleware(app)
-    app.register_blueprint(bp_widgets)
-    app.register_blueprint(bp_static)
     return app
 
 
 def test_widget_html_injects_serve_base(pg_conn_test_setup, tmp_path):
-    conn, _, token, _ = pg_conn_test_setup
+    conn, tid, token, _ = pg_conn_test_setup
+    # Ohne PUBG-Credentials liefert das creds_gate die Setup-Seite statt des Widgets
+    from core import credentials as core_creds
+    core_creds.set_pubg(conn, tid, name="Tester", platform="steam",
+                        api_key="key-123")
     (tmp_path / "widgets" / "pubg").mkdir(parents=True)
     (tmp_path / "widgets" / "pubg" / "last-match.html").write_text(
         "<html><head></head><body>HI</body></html>"
