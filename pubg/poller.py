@@ -21,6 +21,7 @@ from pubg.db_pg import (upsert_player, insert_match, insert_participants,
                         insert_team_mapping, mark_match_schema,
                         get_matches_needing_match_schema_update,
                         get_setting, set_setting,
+                        list_tracked_players, set_tracked_account_id,
                         CURRENT_MATCH_SCHEMA)
 from pubg.match_parser import (parse_match_response, parse_lifetime_response,
                                 aggregate_lifetime_modes,
@@ -29,6 +30,10 @@ from pubg.match_parser import (parse_match_response, parse_lifetime_response,
 
 def _iso_utc_now():
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# PUBG erlaubt hoechstens 10 Namen je filter[playerNames]-Request.
+PLAYER_FILTER_MAX = 10
 
 
 # ---------------------------------------------------------------------------
@@ -102,22 +107,42 @@ def _ftp_upload_telemetry(tenant_id: int, match_id: str,
 # Match-Ingest
 # ---------------------------------------------------------------------------
 
-def ingest_match(conn, tenant_id: int, client, my_account_id: str,
+def ingest_match(conn, tenant_id: int, client, my_account_id,
                  match_id: str) -> None:
     """Laedt + persistiert ein einzelnes Match fuer einen Tenant.
-    `/matches/{id}` ist nicht rate-limited."""
+    `/matches/{id}` ist nicht rate-limited.
+
+    `my_account_id` ist entweder eine account_id oder eine Liste davon
+    (mehrere verfolgte Accounts). Spielen zwei eigene Accounts dasselbe
+    Match in verschiedenen Teams, wird fuer jeden dessen Squad gespeichert
+    — sonst fehlte einem von beiden das Match in seiner Auswertung.
+    """
+    own_ids = ([my_account_id] if isinstance(my_account_id, str)
+               else [a for a in (my_account_id or []) if a])
+    if not own_ids:
+        raise ValueError("ingest_match ohne eigene account_id")
     m_payload = client.get_match(match_id)
-    parsed = parse_match_response(m_payload, my_account_id)
+
+    primary = parse_match_response(m_payload, own_ids[0])
+    lobby = {t["account_id"] for t in primary.get("team_mapping", [])}
+    present = [a for a in own_ids if a in lobby] or own_ids[:1]
+
+    parsed = primary
     insert_match(conn, tenant_id, parsed["match_id"], parsed["map_name"],
                  parsed["game_mode"], parsed.get("is_ranked", False),
                  parsed["duration_secs"], parsed["played_at"],
                  parsed.get("telemetry_url"))
-    for p in parsed["squad_participants"]:
-        upsert_player(conn, tenant_id, p["account_id"], p["name"],
-                      client.platform,
-                      is_self=(p["account_id"] == my_account_id))
-    insert_participants(conn, tenant_id, parsed["match_id"],
-                        parsed["squad_participants"])
+    own_set = set(own_ids)
+    for acc in present:
+        # Erneutes Parsen kostet keinen API-Call — nur die Squad-Sicht
+        # unterscheidet sich je nach Blickwinkel.
+        view = primary if acc == own_ids[0] else parse_match_response(m_payload, acc)
+        for p in view["squad_participants"]:
+            upsert_player(conn, tenant_id, p["account_id"], p["name"],
+                          client.platform,
+                          is_self=(p["account_id"] in own_set))
+        insert_participants(conn, tenant_id, view["match_id"],
+                            view["squad_participants"])
     if parsed.get("team_mapping"):
         insert_team_mapping(conn, tenant_id, parsed["match_id"],
                             parsed["team_mapping"])
@@ -153,6 +178,95 @@ def ingest_match(conn, tenant_id: int, client, my_account_id: str,
     except Exception as e:
         print(f"[clan-enrich] tenant {tenant_id} match "
               f"{parsed['match_id'][:16]}: {e}")
+
+
+def resolve_tracked_accounts(conn, tenant_id: int, client) -> list:
+    """Alle verfolgten Accounts in EINEM /players-Call aufloesen.
+
+    Der Endpoint akzeptiert mehrere Namen je Request (filter[playerNames]),
+    liefert je Spieler dessen Match-Liste mit und ist der einzige
+    rate-limitierte Teil des Match-Pollings. N Accounts kosten damit einen
+    Request, nicht N.
+
+    Returns [{"name","account_id","match_ids","is_primary"}] — nur fuer
+    Accounts, die die API auch kennt. PUBG begrenzt den Filter auf 10 Namen,
+    darum in Bloecken.
+    """
+    tracked = list_tracked_players(conn, tenant_id)
+    if not tracked:
+        return []
+    resolved = []
+    for chunk in [tracked[i:i + PLAYER_FILTER_MAX]
+                  for i in range(0, len(tracked), PLAYER_FILTER_MAX)]:
+        payload = client.get_player(",".join(t["name"] for t in chunk))
+        by_name = {}
+        for entry in (payload or {}).get("data", []):
+            nm = (entry.get("attributes") or {}).get("name")
+            if not nm:
+                continue
+            rels = ((entry.get("relationships") or {}).get("matches")
+                    or {}).get("data") or []
+            by_name[nm.lower()] = (entry.get("id"),
+                                   [r["id"] for r in rels])
+        for t in chunk:
+            hit = by_name.get((t["name"] or "").lower())
+            if not hit:
+                continue  # Name unbekannt (Tippfehler/geloescht) — Rest laeuft weiter
+            account_id, match_ids = hit
+            if account_id and account_id != t["account_id"]:
+                set_tracked_account_id(conn, tenant_id, t["name"],
+                                       account_id)
+            resolved.append({"name": t["name"], "account_id": account_id,
+                             "match_ids": match_ids,
+                             "is_primary": t["is_primary"]})
+    return resolved
+
+
+def run_single_tick_multi(conn, tenant_id: int, client,
+                          max_matches_per_tick: int = 5) -> dict:
+    """Polling-Iteration ueber alle verfolgten Accounts eines Tenants."""
+    stats = {"new_matches": 0, "errors": [], "skipped": 0, "accounts": 0,
+             "own_account_ids": [], "primary_account_id": None}
+    try:
+        resolved = resolve_tracked_accounts(conn, tenant_id, client)
+    except Exception as e:
+        stats["errors"].append(f"players: {e}")
+        return stats
+    if not resolved:
+        stats["errors"].append("keine aufloesbaren Accounts")
+        return stats
+    stats["accounts"] = len(resolved)
+    own_ids = [r["account_id"] for r in resolved if r["account_id"]]
+    stats["own_account_ids"] = own_ids
+    stats["primary_account_id"] = next(
+        (r["account_id"] for r in resolved if r["is_primary"]),
+        own_ids[0] if own_ids else None)
+
+    # Match-IDs aller Accounts zusammenfuehren; ein gemeinsames Match darf
+    # nur einmal geladen werden.
+    seen = set()
+    ordered_ids = []
+    for r in resolved:
+        for mid in r["match_ids"]:
+            if mid not in seen:
+                seen.add(mid)
+                ordered_ids.append(mid)
+
+    known = get_known_match_ids(conn, tenant_id)
+    new_ids = [mid for mid in ordered_ids if mid not in known]
+    for mid in new_ids[:max_matches_per_tick]:
+        try:
+            ingest_match(conn, tenant_id, client, own_ids, mid)
+            stats["new_matches"] += 1
+        except Exception as e:
+            stats["errors"].append(f"match {mid}: {e}")
+    stats["skipped"] = max(0, len(new_ids) - max_matches_per_tick)
+    try:
+        from pubg.clan_enrichment import process_queue
+        process_queue(conn, client, max_count=3)
+    except Exception as e:
+        stats["errors"].append(f"clan-queue: {e}")
+    return stats
 
 
 def run_single_tick(conn, tenant_id: int, client, my_player_name: str,
@@ -304,7 +418,8 @@ def refresh_seasons(conn, tenant_id: int, client, min_matches: int = 5,
 
 
 def backfill_missing_seasons(conn, tenant_id: int, client,
-                             max_per_tick: int = 1) -> dict:
+                             max_per_tick: int = 1,
+                             account_id: str = None) -> dict:
     """Holt eine missing historische Season pro Tick fuer SELF.
 
     Strategie:
@@ -314,15 +429,20 @@ def backfill_missing_seasons(conn, tenant_id: int, client,
     - Picke die neueste verbleibende → fetch → store. Bei Fehler in Skip-Liste.
 
     Cost: ~1 API-Call/min. Over Zeit catched alle holbaren Seasons.
+
+    `account_id` waehlt den Account explizit — der Aufrufer rotiert damit
+    ueber mehrere verfolgte Accounts, statt dass hier ein beliebiger
+    is_self-Eintrag gewinnt.
     """
     import json
-    # SELF account_id holen
-    self_row = conn.execute(
-        "SELECT account_id FROM players WHERE tenant_id=? AND is_self=1 LIMIT 1",
-        (tenant_id,)).fetchone()
-    if not self_row:
-        return {"backfilled": 0, "errors": []}
-    acc_id = self_row["account_id"]
+    acc_id = account_id
+    if not acc_id:
+        self_row = conn.execute(
+            "SELECT account_id FROM players WHERE tenant_id=? AND is_self=1 LIMIT 1",
+            (tenant_id,)).fetchone()
+        if not self_row:
+            return {"backfilled": 0, "errors": []}
+        acc_id = self_row["account_id"]
 
     # Skip-Liste laden
     skip_row = conn.execute(
@@ -511,14 +631,16 @@ def _process_one_telemetry(conn, tenant_id: int, client, my_account_id, row):
     except Exception:
         pass  # HiDrive/Admin-Check-Fehler duerfen Fetch nicht blockieren
 
+    # my_account_id darf eine ID oder eine Liste eigener IDs sein.
+    own_ids = ({my_account_id} if isinstance(my_account_id, str)
+               else {a for a in (my_account_id or []) if a})
     squad = _squad_account_ids_for_match(conn, tenant_id, row["match_id"])
-    if my_account_id not in squad:
-        squad.add(my_account_id)
+    squad |= own_ids
     # Spielernamen aus den Raw-Events upserten (Lobby-Gegner).
     try:
         from pubg.telemetry import extract_player_names
         for acc, nm in extract_player_names(raw).items():
-            if acc and nm and acc != my_account_id:
+            if acc and nm and acc not in own_ids:
                 upsert_player(conn, tenant_id, acc, nm, client.platform,
                               is_self=False)
     except Exception:
@@ -628,23 +750,22 @@ def poll_tenant(conn, tenant_id: int, client_factory,
                 "tenantId": tenant_id}
     client = client_factory(creds.pubg_api_key,
                             creds.pubg_platform or "steam")
-    # account_id aus credentials (gecached) oder vom client nachziehen
-    my_account_id = creds.pubg_account_id
-    if not my_account_id:
-        try:
-            payload = client.get_player(creds.pubg_name)
-            ids = list({p.get("id") for p in payload.get("data", [])
-                        if isinstance(p, dict)})
-            my_account_id = ids[0] if ids else None
-        except Exception as e:
-            return {"polling": "error", "tenantId": tenant_id,
-                    "errors": [f"player-lookup: {e}"]}
-        if not my_account_id:
-            return {"polling": "error", "tenantId": tenant_id,
-                    "errors": ["account-id-unknown"]}
+    # Bestandstenants, die die Settings noch nicht geoeffnet haben, haben
+    # ihren Einzel-Account nur in den Credentials stehen.
+    from pubg.db_pg import backfill_tracked_players
+    backfill_tracked_players(conn, tenant_id, creds.pubg_name,
+                             creds.pubg_platform, creds.pubg_account_id)
 
-    m_stats = run_single_tick(conn, tenant_id, client, creds.pubg_name,
-                              my_account_id, match_max)
+    m_stats = run_single_tick_multi(conn, tenant_id, client, match_max)
+    own_ids = m_stats.get("own_account_ids") or []
+    if not own_ids:
+        return {"polling": "error", "tenantId": tenant_id,
+                "errors": m_stats["errors"] or ["account-id-unknown"]}
+    # Primaerer Account bleibt der Bezugspunkt fuer alles, was (noch) mit
+    # genau einer account_id arbeitet.
+    my_account_id = m_stats.get("primary_account_id") or own_ids[0]
+    if my_account_id != creds.pubg_account_id:
+        credentials.set_pubg(conn, tenant_id, account_id=my_account_id)
     l_stats = refresh_lifetimes(conn, tenant_id, client, lifetime_min,
                                 lifetime_max)
     try:
@@ -654,13 +775,23 @@ def poll_tenant(conn, tenant_id: int, client_factory,
         s_stats = {"refreshed": 0, "errors": [f"season-batch: {e}"],
                    "seasonId": None}
     try:
+        # Ein Season-Backfill je Tick, reihum ueber die Accounts — so
+        # bleibt der Verbrauch konstant, egal wie viele es sind.
+        rot_key = "pubg.season_backfill_rotation"
+        try:
+            rot = int(get_setting(conn, tenant_id, rot_key, "0") or 0)
+        except (TypeError, ValueError):
+            rot = 0
+        acc_for_backfill = own_ids[rot % len(own_ids)]
+        set_setting(conn, tenant_id, rot_key, str((rot + 1) % len(own_ids)))
         b_stats = backfill_missing_seasons(conn, tenant_id, client,
-                                            max_per_tick=1)
+                                            max_per_tick=1,
+                                            account_id=acc_for_backfill)
     except Exception as e:
         b_stats = {"backfilled": 0, "errors": [f"season-backfill: {e}"]}
     try:
         t_stats = process_telemetry_backlog(conn, tenant_id, client,
-                                             my_account_id, 3)
+                                             own_ids, 3)
     except Exception as e:
         t_stats = {"processed": 0, "errors": [f"telemetry-batch: {e}"]}
 
@@ -673,12 +804,15 @@ def poll_tenant(conn, tenant_id: int, client_factory,
     detect_errors = []
     ach_detected = 0
     if m_stats["new_matches"] > 0 or t_stats["processed"] > 0:
-        try:
-            from pubg.aggregations import detect_and_store_session_achievements
-            ach_detected = detect_and_store_session_achievements(
-                conn, tenant_id, my_account_id)
-        except Exception as e:
-            detect_errors.append(f"achievement-detect: {e}")
+        # Je Account einzeln — gespielt wird immer nur mit einem, aber
+        # welcher das war, weiss der Poller hier nicht.
+        from pubg.aggregations import detect_and_store_session_achievements
+        for acc in own_ids:
+            try:
+                ach_detected += detect_and_store_session_achievements(
+                    conn, tenant_id, acc)
+            except Exception as e:
+                detect_errors.append(f"achievement-detect {acc[:12]}: {e}")
 
     all_errors = (m_stats["errors"] + l_stats["errors"] + s_stats["errors"]
                   + b_stats["errors"] + t_stats["errors"] + detect_errors)

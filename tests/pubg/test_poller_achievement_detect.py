@@ -23,9 +23,15 @@ def _patch_subfuncs(new_matches=0, telemetry_processed=0):
         "credentials": patch.object(poller.credentials, "get",
                                     return_value=_creds()),
         "single_tick": patch.object(
-            poller, "run_single_tick",
+            poller, "run_single_tick_multi",
             return_value={"new_matches": new_matches, "errors": [],
-                          "skipped": 0}),
+                          "skipped": 0, "accounts": 1,
+                          "own_account_ids": ["account.A"],
+                          "primary_account_id": "account.A"}),
+        "tracked_backfill": patch("pubg.db_pg.backfill_tracked_players",
+                                  return_value=False),
+        "set_pubg": patch.object(poller.credentials, "set_pubg",
+                                 return_value=None),
         "lifetimes": patch.object(
             poller, "refresh_lifetimes",
             return_value={"refreshed": 0, "errors": []}),
@@ -48,6 +54,7 @@ def _run_poll_tenant(new_matches, telemetry_processed):
     detect = MagicMock(return_value=new_matches + telemetry_processed)
     client_factory = lambda *a, **k: MagicMock(platform="steam")
     with patches["credentials"], patches["single_tick"], \
+         patches["tracked_backfill"], patches["set_pubg"], \
          patches["lifetimes"], patches["seasons"], patches["backfill"], \
          patches["telemetry"], \
          patch("pubg.aggregations.detect_and_store_session_achievements",
@@ -85,6 +92,7 @@ def test_detect_failure_does_not_crash_poll():
     boom = MagicMock(side_effect=RuntimeError("detect boom"))
     client_factory = lambda *a, **k: MagicMock(platform="steam")
     with patches["credentials"], patches["single_tick"], \
+         patches["tracked_backfill"], patches["set_pubg"], \
          patches["lifetimes"], patches["seasons"], patches["backfill"], \
          patches["telemetry"], \
          patch("pubg.aggregations.detect_and_store_session_achievements",

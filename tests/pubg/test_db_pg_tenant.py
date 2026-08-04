@@ -24,6 +24,10 @@ def pg():
     with conn.cursor() as cur:
         cur.execute(schema_sql)
         cur.execute(db_pg.PG_SCHEMA)
+        # schema_v2 haengt an den PUBG-Tabellen (Views wie qualified_co_players)
+        with open(os.path.join(os.path.dirname(init.__file__),
+                               "schema_v2.sql")) as f2:
+            cur.execute(f2.read())
         cur.execute(
             "INSERT INTO users (display_name, is_admin) VALUES ('A',TRUE) RETURNING id"
         )
