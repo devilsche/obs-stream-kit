@@ -364,8 +364,10 @@
       opacity: 1;
       transition: opacity 0.8s ease;
     }
-    .clip-player img.steam-shot { object-fit: cover; }
-    .clip-player iframe.fade-out { opacity: 0; }
+    .clip-player img.steam-shot,
+    .clip-player video.clip-video { object-fit: cover; }
+    .clip-player iframe.fade-out,
+    .clip-player video.fade-out { opacity: 0; }
 
     .clip-player .clip-placeholder {
       display: flex;

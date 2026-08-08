@@ -61,10 +61,16 @@ Automatischer Twitch Clip-Player mit Countdown-Overlay und BRB-Animation.
 | `count` | nein | `100` | Anzahl Clips (max 100) |
 | `countdown` | nein | `5` | Countdown-Sekunden zwischen Clips |
 
-Im Server-Betrieb werden die Clips server-seitig über `/s/<token>/api/twitch/clips` geladen — der Twitch-Channel und die App-Credentials des Tenants bleiben am Server, das Client-Secret landet **nie** im Browser. Der `clips`-Parameter erlaubt weiterhin einen manuellen Modus ohne Server-Abruf.
+Im Server-Betrieb werden die Clips server-seitig über `/s/<token>/api/twitch/clips` geladen — der Twitch-Channel und die App-Credentials des Tenants bleiben am Server, das Client-Secret landet **nie** im Browser. Der `clips`-Parameter schränkt den Abruf auf die genannten Slugs ein (`?slugs=…` am selben Endpoint); auch dieser Modus braucht den Server, weil nur er die abspielbaren Clip-URLs holen kann.
 
 **Features:**
 - Clips werden automatisch von der Twitch API geladen und zufällig abgespielt
+- Wiedergabe als natives `<video>` (kein Twitch-iframe) — dadurch kein
+  „Start Watching"-Interstitial bei Kanälen mit Content Classification Labels
+- Weitergeschaltet wird am tatsächlichen Clip-Ende (`ended`), nicht per Timer —
+  kein zu früher Countdown mehr, wenn ein Clip verzögert startet
+- Läuft Autoplay mit Ton in einem normalen Browser-Tab nicht an, spielt der Clip
+  stumm weiter statt zu warten; in OBS bleibt der Ton erhalten
 - Meta-Bar unter dem Video zeigt Clip-Titel, Datum und Views
 - Countdown-Overlay mit Boom-Drop-Effekt (3/2/1) zwischen Clips
 - BRB-Text mit Wave-Pulse-Animation + BE/RIGHT/BACK Stamp-Wechsel
@@ -645,6 +651,13 @@ server-seitig in jede Seite injiziert — kein Credential landet im Browser.
 
 Der BRB-Clip-Player ruft server-seitig den Endpoint
 `/s/<token>/api/twitch/clips` ab (kein Client-Secret im Browser-Quelltext).
+Der Endpoint liefert zu jedem Clip eine direkte, signierte MP4-URL (`mp4`) mit;
+die Overlays spielen den Clip damit in einem eigenen `<video>`-Element statt im
+`clips.twitch.tv`-iframe. Grund: Kanäle mit **Content Classification Labels**
+bekommen im iframe ein „Start Watching"-Interstitial vorgeschaltet, das auf
+einen Klick wartet — im Overlay klickt niemand, der Clip bliebe stehen.
+Mit `?slugs=A,B,C` liefert derselbe Endpoint gezielt einzelne Clips (nutzt der
+`clips`-Parameter der Overlays).
 
 Weil das Session-Cookie cross-subdomain gilt, ist kein separater Login auf der
 Overlay-Domain nötig.

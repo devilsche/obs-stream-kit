@@ -26,15 +26,11 @@ var ClipPlayer = (function () {
     return arr;
   }
 
-  function buildEmbedUrl(slug, muted) {
-    var host = window.location.hostname;
-    var parents = [host, 'localhost', '127.0.0.1', 'absolute'];
-    var parentParam = parents.map(function (p) { return '&parent=' + p; }).join('');
-    return 'https://clips.twitch.tv/embed?clip=' + encodeURIComponent(slug)
-      + parentParam
-      + '&autoplay=true'
-      + '&muted=' + (muted ? 'true' : 'false');
-  }
+  // Clips laufen als direktes <video> statt im clips.twitch.tv-iframe:
+  // Kanaele mit Content Classification Labels bekommen im Embed ein
+  // "Start Watching"-Interstitial vorgeschaltet, das auf einen Klick wartet —
+  // im Overlay klickt niemand. Die signierte MP4-URL liefert der Server als
+  // clip.mp4 mit.
 
   function formatDate(iso) {
     if (!iso) return '';
@@ -50,7 +46,6 @@ var ClipPlayer = (function () {
     opts = opts || {};
     var containerId  = opts.containerId || 'clipContainer';
     var muted        = opts.muted !== undefined ? opts.muted : false;
-    var extraDelay   = opts.extraDelay || 700;
     var countdownSec = opts.countdown || parseInt(new URLSearchParams(window.location.search).get('countdown'), 10) || 5;
 
     var container        = document.getElementById(containerId);
@@ -139,14 +134,17 @@ var ClipPlayer = (function () {
       if (countdownOverlay) countdownOverlay.classList.remove('countdown-overlay--visible');
       if (clipTimer) clearTimeout(clipTimer);
 
-      var oldIframe = container.querySelector('iframe');
-      if (oldIframe) oldIframe.remove();
+      var old = container.querySelector('video.clip-video');
+      if (old) { old.removeAttribute('src'); old.remove(); }
 
-      var iframe = document.createElement('iframe');
-      iframe.src = buildEmbedUrl(clip.id, muted);
-      iframe.allow = 'autoplay; fullscreen';
-      iframe.allowFullscreen = true;
-      container.appendChild(iframe);
+      var video = document.createElement('video');
+      video.className = 'clip-video';
+      video.src = clip.mp4;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.muted = !!muted;
+      video.preload = 'auto';
+      container.appendChild(video);
 
       showMeta(clip);
 
@@ -156,45 +154,50 @@ var ClipPlayer = (function () {
         if (settled) return;
         settled = true;
         clearTimeout(clipTimer);
-        clearTimeout(noLoadTimer);
-        window.removeEventListener('message', onTwitchMsg);
+        clearTimeout(stallTimer);
         hideMeta();
         if (fade) {
-          iframe.classList.add('fade-out');
-          setTimeout(function () { iframe.remove(); showCountdown(index); }, 800);
+          video.classList.add('fade-out');
+          setTimeout(function () {
+            video.removeAttribute('src'); video.remove(); showCountdown(index);
+          }, 800);
         } else {
-          iframe.remove();
+          video.removeAttribute('src'); video.remove();
           showCountdown(index);
         }
       }
 
-      function onTwitchMsg(e) {
-        if (!e.data) return;
-        var d;
-        try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch (ex) { return; }
-        if (d && d.eventName === 'ERROR') goNext(false);
+      // Kommt binnen 12s kein Playback zustande (Netzwerk, abgelaufener Token),
+      // wird der Clip uebersprungen statt die Szene haengen zu lassen.
+      var stallTimer = setTimeout(function () { goNext(false); }, 12000);
+
+      video.addEventListener('playing', function () { clearTimeout(stallTimer); });
+      // Das echte Ende des Videos schaltet weiter — kein Timer auf clip.duration
+      // mehr, der schon waehrend des Pufferns lief und zu frueh ablief.
+      video.addEventListener('ended', function () { goNext(true); });
+      video.addEventListener('error', function () { goNext(false); });
+
+      var started = video.play();
+      if (started && started.catch) {
+        started.catch(function () {
+          // Autoplay mit Ton blockiert der Browser ohne Nutzerinteraktion
+          // (in OBS nicht, im normalen Tab schon) — dann stumm weiterlaufen,
+          // statt auf einen Klick zu warten, der nie kommt.
+          if (!video.muted) {
+            video.muted = true;
+            var retry = video.play();
+            if (retry && retry.catch) retry.catch(function () { goNext(false); });
+          } else {
+            goNext(false);
+          }
+        });
       }
-      window.addEventListener('message', onTwitchMsg);
-
-      // Fallback: iframe lädt gar nicht (Netzwerk-Fehler etc.)
-      var noLoadTimer = setTimeout(function () { goNext(false); }, 12000);
-
-      iframe.addEventListener('load', function () {
-        clearTimeout(noLoadTimer);
-        var durationMs = Math.ceil(clip.duration) * 1000 + extraDelay;
-        clipTimer = setTimeout(function () {
-          if (settled) return;
-          settled = true;
-          window.removeEventListener('message', onTwitchMsg);
-          iframe.classList.add('fade-out');
-          hideMeta();
-          setTimeout(function () { showCountdown(index); }, 800);
-        }, durationMs);
-      });
     }
 
     function startPlayer(clipData) {
-      clips = clipData || [];
+      // Ohne abspielbare MP4-URL ist ein Clip nicht darstellbar (geloescht,
+      // oder der Token-Abruf hat fuer ihn nichts geliefert) — raus damit.
+      clips = (clipData || []).filter(function (c) { return c && c.mp4; });
       if (clips.length === 0) {
         showError('Keine Clips gefunden');
         return;
@@ -207,18 +210,12 @@ var ClipPlayer = (function () {
     var screenshotMs = (parseInt(params.get('screenshotSec'), 10) || 10) * 1000;
 
     function startClipFlow() {
-      // Manueller Modus
-      if (manualClips) {
-        var ids = manualClips.split(',')
-          .map(function (s) { return s.trim(); })
-          .filter(function (s) { return s.length > 0; });
-        startPlayer(ids.map(function (id) {
-          return { id: id, title: '', duration: 30 };
-        }));
-        return;
-      }
-      // API Modus — Clips kommen server-seitig (kein Secret im Browser).
-      var url = serveBase + 'api/twitch/clips?count=' + clipCount;
+      // Clips kommen server-seitig (kein Secret im Browser, und nur der Server
+      // kann die signierten MP4-URLs holen) — auch im manuellen Modus, dort
+      // eingeschraenkt auf die genannten Slugs.
+      var url = manualClips
+        ? serveBase + 'api/twitch/clips?slugs=' + encodeURIComponent(manualClips)
+        : serveBase + 'api/twitch/clips?count=' + clipCount;
       fetch(url, { credentials: 'omit' })
         .then(function (r) { return r.json(); })
         .then(function (data) {

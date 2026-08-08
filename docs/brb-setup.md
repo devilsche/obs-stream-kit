@@ -33,18 +33,31 @@ https://overlays.stats-overlay.info/s/<token>/overlays/brb-pause.html
 
 | Parameter | Pflicht | Default | Beschreibung |
 |-----------|---------|---------|--------------|
-| `clips` | nein | — | Manuelle Clip-Slugs (kommagetrennt); überschreibt den Server-Abruf |
+| `clips` | nein | — | Feste Clip-Slugs (kommagetrennt) statt der zufälligen Auswahl |
 | `count` | nein | `100` | Anzahl Clips (max 100) |
 | `countdown` | nein | `5` | Countdown-Sekunden zwischen Clips |
 
 Channel + App-Credentials werden server-seitig aufgelöst — es gibt **keine**
 `client_id`/`client_secret`/`channel`-URL-Parameter mehr.
 
-### Manueller Modus (ohne Server-Abruf)
+### Feste Clip-Auswahl
 
 ```
 https://overlays.stats-overlay.info/s/<token>/overlays/brb-pause.html?clips=SlugA,SlugB,SlugC
 ```
+
+Auch hier läuft der Abruf über den Server (`/api/twitch/clips?slugs=…`) — nur er
+kann die abspielbaren Clip-URLs beschaffen.
+
+### Warum kein Twitch-iframe mehr
+
+Die Overlays spielen Clips als natives `<video>` mit einer direkten,
+signierten MP4-URL. Das offizielle `clips.twitch.tv`-Embed schiebt bei Kanälen
+mit **Content Classification Labels** (z. B. „Drugs, Intoxication", „Violent and
+Graphic Depictions") ein „Start Watching"-Interstitial davor, das auf einen Klick
+wartet. In einer OBS-Browser-Source klickt niemand — der Clip bliebe für immer
+stehen, während der Countdown weiterläuft. Ohne iframe entfällt das Gate, und
+weitergeschaltet wird am echten Video-Ende statt per Timer.
 
 ## 3. OBS Einrichtung
 

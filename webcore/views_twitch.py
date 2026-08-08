@@ -55,7 +55,16 @@ def clips(token):
     broadcaster_id = None if channel else _owner_twitch_id(g.tenant_id)
     if not channel and not broadcaster_id and g.tenant_id == 1:
         channel = Config.TWITCH_CHANNEL  # Admin-Tenant vor OAuth-Claim
-    if not (client_id and client_secret) or not (channel or broadcaster_id):
+    if not (client_id and client_secret):
+        return jsonify({"clips": []})
+    # Feste Slug-Liste (?clips=A,B,C im Overlay) braucht weder Channel noch
+    # Owner-ID — die Clips sind ja schon benannt.
+    slugs = [s.strip() for s in (request.args.get("slugs") or "").split(",")
+             if s.strip()]
+    if slugs:
+        return jsonify({"clips": twitch_client.get_clips_by_ids(
+            client_id, client_secret, slugs)})
+    if not (channel or broadcaster_id):
         return jsonify({"clips": []})
     count = request.args.get("count", type=int) or 100
     data = twitch_client.get_clips(client_id, client_secret, channel,
