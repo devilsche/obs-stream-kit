@@ -61,20 +61,34 @@ GQL_CLIP_TOKEN_HASH = (
     "36b89d2507fce29e5ca551df756d27c1cfe079e2609642b4390aa4c35796eb11")
 
 
+# Twitch beantwortet zu grosse GQL-Batches gar nicht mehr — ab etwa 35
+# Operationen kippt die komplette Antwort, nicht nur der Ueberhang. 30 liegt
+# sicher darunter; 100 Clips sind damit vier Requests.
+GQL_BATCH_SIZE = 30
+
+
 def get_clip_mp4_urls(slugs: list) -> dict:
     """Slug -> signierte MP4-URL (hoechste verfuegbare Qualitaet).
 
-    Ein Batch-Request fuer alle Slugs. Die Tokens sind rund 20 h gueltig,
-    liegen also laenger als jede Overlay-Session.
+    Fragt in Haeppchen von GQL_BATCH_SIZE an. Die Tokens sind rund 20 h
+    gueltig, liegen also laenger als jede Overlay-Session.
 
-    Fehlende oder geloeschte Clips fehlen im Ergebnis; bei Netzwerk- oder
-    Formatfehlern kommt ein leeres dict zurueck — der Aufrufer behaelt seine
-    Clip-Liste und faellt lediglich ohne mp4-Feld zurueck.
+    Fehlende oder geloeschte Clips fehlen im Ergebnis, ein fehlgeschlagener
+    Chunk kostet nur seine eigenen URLs — der Aufrufer behaelt seine
+    Clip-Liste und faellt fuer die betroffenen Clips ohne mp4-Feld zurueck.
     """
+    slugs = [s for s in (slugs or []) if s]
+    out = {}
+    for i in range(0, len(slugs), GQL_BATCH_SIZE):
+        out.update(_clip_mp4_batch(slugs[i:i + GQL_BATCH_SIZE]))
+    return out
+
+
+def _clip_mp4_batch(slugs: list) -> dict:
+    """Ein GQL-Batch-Request. Siehe get_clip_mp4_urls."""
     from urllib.parse import quote
     from webcore.metrics import observe_external
 
-    slugs = [s for s in (slugs or []) if s]
     if not slugs:
         return {}
     ops = [{

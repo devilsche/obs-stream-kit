@@ -67,6 +67,39 @@ def test_get_clip_mp4_urls_batches_all_slugs_in_one_request():
     assert len(post.call_args.kwargs["json"]) == 3
 
 
+def test_get_clip_mp4_urls_chunks_large_batches():
+    """Twitch beantwortet zu grosse GQL-Batches gar nicht (ab ~35 Ops kippt
+    die ganze Antwort) — deshalb in Haeppchen anfragen."""
+    slugs = [f"S{i}" for i in range(70)]
+
+    def _by_size(*a, **kw):
+        return _resp([_gql_ok("x") for _ in kw["json"]])
+
+    post = mock.Mock(side_effect=_by_size)
+    with mock.patch("webcore.twitch_client.requests.post", post):
+        urls = twitch_client.get_clip_mp4_urls(slugs)
+    assert len(urls) == 70
+    assert post.call_count == 3
+    assert all(len(c.kwargs["json"]) <= 30 for c in post.call_args_list)
+
+
+def test_get_clip_mp4_urls_partial_chunk_failure_keeps_rest():
+    """Faellt ein Chunk aus, bleiben die URLs der anderen erhalten."""
+    slugs = [f"S{i}" for i in range(45)]
+    calls = []
+
+    def _flaky(*a, **kw):
+        calls.append(kw["json"])
+        if len(calls) == 1:
+            raise Exception("boom")
+        return _resp([_gql_ok("x") for _ in kw["json"]])
+
+    with mock.patch("webcore.twitch_client.requests.post", side_effect=_flaky):
+        urls = twitch_client.get_clip_mp4_urls(slugs)
+    assert len(urls) == 15          # nur der zweite Chunk
+    assert set(urls) == set(slugs[30:])
+
+
 def test_get_clip_mp4_urls_skips_clips_without_data():
     body = [_gql_ok("A"), {"data": {"clip": None}}]
     with mock.patch("webcore.twitch_client.requests.post",
