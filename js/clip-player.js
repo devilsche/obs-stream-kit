@@ -175,7 +175,25 @@ var ClipPlayer = (function () {
       // Das echte Ende des Videos schaltet weiter — kein Timer auf clip.duration
       // mehr, der schon waehrend des Pufferns lief und zu frueh ablief.
       video.addEventListener('ended', function () { goNext(true); });
-      video.addEventListener('error', function () { goNext(false); });
+
+      var audioRetried = false;
+      video.addEventListener('error', function () {
+        // Kann die Browser-Engine kein Audio-Geraet oeffnen (in OBS je nach
+        // Audio-Einstellung der Source), wirft sie sofort DECODE /
+        // AUDIO_RENDERER_ERROR — das Video selbst ist heil. Ohne diesen
+        // Rueckfall wuerde die Szene stumm durch die ganze Clip-Liste rasen.
+        if (!audioRetried && !video.muted) {
+          audioRetried = true;
+          clearTimeout(stallTimer);
+          stallTimer = setTimeout(function () { goNext(false); }, 12000);
+          video.muted = true;
+          video.src = clip.mp4;
+          var again = video.play();
+          if (again && again.catch) again.catch(function () { goNext(false); });
+          return;
+        }
+        goNext(false);
+      });
 
       var started = video.play();
       if (started && started.catch) {
