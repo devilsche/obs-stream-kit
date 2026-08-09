@@ -514,12 +514,9 @@
       gap: 20px;
       opacity: 0;
       transition: opacity 0.6s ease;
-      background: linear-gradient(180deg,
-        color-mix(in srgb, var(--color-purple) 12%, transparent) 0%,
-        transparent 100%
-      );
-      border-bottom-left-radius: 10px;
-      border-bottom-right-radius: 10px;
+      /* Kein eigener Verlauf hinter der Meta-Zeile: er verlief nur vertikal
+         und riss an den Seitenkanten hart ab. Der Verlauf um den Clip-Bereich
+         traegt den Uebergang bereits. */
     }
 
     .clip-meta--visible {

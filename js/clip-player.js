@@ -60,6 +60,10 @@ var ClipPlayer = (function () {
     var params       = new URLSearchParams(window.location.search);
     var manualClips  = params.get('clips');
     var clipCount    = parseInt(params.get('count'), 10) || 100;
+    // Der letzte Frame bleibt kurz stehen, bevor ausgeblendet wird — sonst
+    // reisst die Pointe des Clips direkt ins Wegblenden.
+    var endHoldMs    = (opts.endHold !== undefined ? opts.endHold
+                        : parseFloat(params.get('endHold')) || 1.5) * 1000;
 
     var clips = [];
     var currentIndex = 0;
@@ -174,7 +178,9 @@ var ClipPlayer = (function () {
       video.addEventListener('playing', function () { clearTimeout(stallTimer); });
       // Das echte Ende des Videos schaltet weiter — kein Timer auf clip.duration
       // mehr, der schon waehrend des Pufferns lief und zu frueh ablief.
-      video.addEventListener('ended', function () { goNext(true); });
+      video.addEventListener('ended', function () {
+        clipTimer = setTimeout(function () { goNext(true); }, endHoldMs);
+      });
 
       var audioRetried = false;
       video.addEventListener('error', function () {

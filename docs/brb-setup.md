@@ -36,6 +36,7 @@ https://overlays.stats-overlay.info/s/<token>/overlays/brb-pause.html
 | `clips` | nein | — | Feste Clip-Slugs (kommagetrennt) statt der zufälligen Auswahl |
 | `count` | nein | `100` | Anzahl Clips (max 100) |
 | `countdown` | nein | `5` | Countdown-Sekunden zwischen Clips |
+| `endHold` | nein | `1.5` | Sekunden, die der letzte Frame nach Clip-Ende stehen bleibt, bevor ausgeblendet wird |
 
 Channel + App-Credentials werden server-seitig aufgelöst — es gibt **keine**
 `client_id`/`client_secret`/`channel`-URL-Parameter mehr.
