@@ -49,6 +49,17 @@ https://overlays.stats-overlay.info/s/<token>/overlays/brb-pause.html?clips=Slug
 Auch hier läuft der Abruf über den Server (`/api/twitch/clips?slugs=…`) — nur er
 kann die abspielbaren Clip-URLs beschaffen.
 
+### Wenn das Bild fehlt und nur der Countdown läuft
+
+Stellst du die Audio-Einstellung der Browser-Source um („Audio über OBS
+steuern"), kann die Browser-Engine bis zum **Neustart von OBS** kein
+Audio-Ausgabegerät mehr öffnen. Sie wirft dann beim Start jedes Clips sofort
+`MEDIA_ERR_DECODE / AUDIO_RENDERER_ERROR` — das Video selbst ist in Ordnung.
+
+Der Player fängt das ab und spielt den Clip beim zweiten Versuch stumm, damit
+die Szene nicht ohne Bild durch die Clip-Liste rast. **Willst du den Ton
+zurück, starte OBS neu.**
+
 ### Warum kein Twitch-iframe mehr
 
 Die Overlays spielen Clips als natives `<video>` mit einer direkten,
