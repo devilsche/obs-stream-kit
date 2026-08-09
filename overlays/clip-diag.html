@@ -24,6 +24,7 @@
   <dl id="out"></dl>
   <video id="v1" muted playsinline></video>
   <video id="v2" muted playsinline></video>
+  <video id="v3" playsinline></video>
   <p class="hint">Diese Seite meldet ihr Ergebnis automatisch an den Server.
      Sie kann nach der Fehlersuche entfernt werden.</p>
 
@@ -94,7 +95,15 @@
           var c = (d.clips || [])[0];
           if (!c || !c.mp4) { results.clip = 'keine mp4-URL vom Server'; row('Clip-URL', results.clip, false); report(); return; }
           row('Clip-URL erhalten', c.mp4.slice(0, 40) + '...');
-          testVideo(document.getElementById('v2'), c.mp4, 'Twitch-Clip (CloudFront)', 'clip', report);
+          testVideo(document.getElementById('v2'), c.mp4, 'Twitch-Clip stumm', 'clip', function () {
+            // Der eigentliche Verdacht: die Szenen starten mit Ton. Blockiert
+            // OBS das, meldet play() entweder NotAllowedError — oder gar nichts
+            // und das Video bleibt einfach stehen.
+            var v3 = document.getElementById('v3');
+            v3.muted = false;
+            v3.volume = 1;
+            testVideo(v3, c.mp4, 'Twitch-Clip MIT TON', 'unmuted', report);
+          });
         })
         .catch(function (e) { results.clip = 'API-Fehler: ' + e.message; row('Clip-URL', results.clip, false); report(); });
     });
