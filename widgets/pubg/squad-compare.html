@@ -38,9 +38,23 @@
         tooltip: "How many of the most recent shared matches to compare." },
     ]);
 
+    // Spielernamen stammen aus dem URL-Parameter und werden per innerHTML
+    // gesetzt — ohne Escaping waere das ein XSS-Vektor.
+    const esc = s => String(s).replace(/[&<>"']/g,
+      c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
     function render(d) {
-      const head = ["Map / Datum", ...d.players].map(h => `<th>${h}</th>`).join("");
+      const head = ["Map / Datum", ...d.players].map(h => `<th>${esc(h)}</th>`).join("");
       document.getElementById("head").innerHTML = head;
+      const unknown = d.unknownPlayers || [];
+      if (unknown.length) {
+        // Ein unbekannter Name macht jede gemeinsame Auswahl leer — das muss
+        // als Grund sichtbar sein, sonst sieht es aus wie "nie zusammen gespielt".
+        document.getElementById("body").innerHTML =
+          `<tr><td class="pubg-error" colspan="${d.players.length + 1}">` +
+          `Unbekannte Spieler: ${unknown.map(esc).join(", ")}</td></tr>`;
+        return;
+      }
       const body = d.matchTable.map(row => {
         const cells = d.players.map(p => {
           const c = row.cells[p];
@@ -50,7 +64,8 @@
         }).join("");
         return `<tr><td>${PubgUI.fmtMap(row.map)} · ${PubgUI.fmtDate(row.playedAt)} ${PubgUI.fmtTime(row.playedAt)}</td>${cells}</tr>`;
       }).join("");
-      document.getElementById("body").innerHTML = body || `<tr><td>—</td></tr>`;
+      document.getElementById("body").innerHTML = body ||
+        `<tr><td colspan="${d.players.length + 1}">Keine gemeinsamen Matches gefunden</td></tr>`;
     }
 
     if (PLAYERS.length) {

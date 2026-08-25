@@ -434,11 +434,18 @@ Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
 | `session-summary.html` | Vollformat Stream-Ending | `hideMaps=1`, `hideMates=1` |
 | `career-card.html` | Lifetime-Anzeige | `player`, `mode=all\|squad-fpp\|...` |
 | `news-ticker.html` | Marquee-Bar mit rotierenden Snippets | `rotateMs` |
-| `squad-compare.html` | 4er-Vergleichs-Tabelle | `players=A,B,C,D`, `matches` |
+| `squad-compare.html` | Vergleich über die letzten **gemeinsamen** Squad-Matches | `players=A,B,C,D`, `matches` |
 | `chat-stats-popup.html` | Streamer.bot-driven Pop-up | `player`, `duration` (Sek) |
 
 Cross-Player-Web-View: `http://localhost:8080/widgets/pubg/coplayer.html?player=NAME`
 (alte URL `overlays/stats.html?player=NAME` leitet weiter)
+
+**squad-compare** zeigt die letzten `matches` Partien, in denen **alle** unter `players`
+genannten Spieler gemeinsam in **einem Squad** waren — es sucht dafür so weit zurück wie
+nötig, statt die letzten eigenen Matches zu nehmen. Der eigene Account wird nicht
+erzwungen: zwei Mates lassen sich auch vergleichen, wenn man selbst nicht dabei war.
+Gegner-Begegnungen in derselben Lobby zählen nicht (dafür wäre ein eigenes
+„Lobby Compare" nötig). Unbekannte Namen werden als solche gemeldet.
 
 ### Browser-Tools
 

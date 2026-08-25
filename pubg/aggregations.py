@@ -6282,23 +6282,50 @@ def compute_chickens_together(conn, tenant_id: int, my_account_id, min_wins=1, m
 
 
 def compute_squad_compare(conn, tenant_id: int, my_account_id, player_names, last_n=5):
+    """Die letzten last_n Matches in denen ALLE genannten Spieler GEMEINSAM im
+    selben Squad waren.
+
+    Der eigene Account wird bewusst nicht erzwungen — zwei Mates lassen sich
+    auch vergleichen wenn man selbst nicht dabei war. Gegner in derselben Lobby
+    zaehlen nicht: alle Genannten muessen dieselbe team_id haben (fuer
+    Lobby-Begegnungen waere match_team_mapping die Quelle, nicht participants).
+
+    Unbekannte Namen landen in "unknownPlayers", damit das Frontend sie als
+    solche kennzeichnen kann statt still eine Leerspalte zu rendern.
+    """
     targets = [n.strip() for n in player_names if n.strip()]
     if not targets:
-        return {"players": [], "matchTable": []}
+        return {"players": [], "matchTable": [], "unknownPlayers": []}
 
     rows = conn.execute(f"""
         SELECT p.account_id, p.name FROM players p
         WHERE p.tenant_id = ? AND p.name IN ({",".join(["?"]*len(targets))})
     """, [tenant_id] + targets).fetchall()
     name_to_acc = {r["name"]: r["account_id"] for r in rows}
+    unknown = [n for n in targets if n not in name_to_acc]
+    if unknown:
+        # Ohne Account-Id kann der Spieler in keinem Match gefunden werden —
+        # eine "gemeinsame" Auswahl waere zwangsläufig leer.
+        return {"players": targets, "matchTable": [], "unknownPlayers": unknown}
 
-    cutoff_q = conn.execute("""
+    # Ein EXISTS je Spieler: das Match zaehlt nur wenn jeder von ihnen drin ist.
+    # Der Team-Vergleich haengt sich an den ersten Spieler als Referenz, damit
+    # alle in EINEM Squad sind und nicht bloss in derselben Lobby.
+    accs = [name_to_acc[n] for n in targets]
+    ref, rest = accs[0], accs[1:]
+    exists_sql = "".join(
+        """ AND EXISTS (SELECT 1 FROM participants px
+                        WHERE px.tenant_id = m.tenant_id AND px.match_id = m.match_id
+                          AND px.account_id = ? AND px.team_id = ref.team_id)"""
+        for _ in rest)
+    cutoff_q = conn.execute(f"""
         SELECT m.match_id, m.map_name, m.played_at
         FROM matches m
-        JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
-        WHERE m.tenant_id = ? AND pa.account_id = ?
+        JOIN participants ref ON ref.match_id = m.match_id
+             AND ref.tenant_id = m.tenant_id AND ref.account_id = ?
+        WHERE m.tenant_id = ?{exists_sql}
         ORDER BY m.played_at DESC LIMIT ?
-    """, (tenant_id, my_account_id, last_n)).fetchall()
+    """, [ref, tenant_id] + rest + [last_n]).fetchall()
 
     table = []
     for mid_row in cutoff_q:
@@ -6317,7 +6344,7 @@ def compute_squad_compare(conn, tenant_id: int, my_account_id, player_names, las
                       "map": mid_row["map_name"],
                       "playedAt": mid_row["played_at"],
                       "cells": cells})
-    return {"players": targets, "matchTable": table}
+    return {"players": targets, "matchTable": table, "unknownPlayers": []}
 
 
 def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob=None,

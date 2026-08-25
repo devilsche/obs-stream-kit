@@ -463,3 +463,83 @@ def test_squad_compare_table():
     res = compute_squad_compare(conn, T, "account.A", ["PEX_LuCKoR", "MateA"], 5)
     assert len(res["matchTable"]) == 1
     assert res["matchTable"][0]["cells"]["MateA"]["kills"] == 3
+
+
+def _sc_part(account_id, name, team_id, kills=1, place=5):
+    """Minimaler participants-Row fuer die squad-compare-Tests."""
+    return {"account_id": account_id, "name": name, "team_id": team_id,
+            "place": place, "kills": kills, "headshot_kills": 0, "assists": 0,
+            "dbnos": 0, "revives": 0, "damage_dealt": 100.0 * kills,
+            "longest_kill": 0.0, "time_survived": 1200, "walk_distance": 0.0,
+            "ride_distance": 0.0, "swim_distance": 0.0, "weapons_acquired": 0,
+            "heals": 0, "boosts": 0, "team_kills": 0}
+
+
+def test_squad_compare_only_shared_matches():
+    """Nur Matches in denen ALLE Genannten waren — nicht einfach die letzten
+    Matches des eigenen Accounts (sonst stehen dort Zeilen voller Luecken)."""
+    conn = _setup()
+    upsert_player(conn, "account.MA", "MateA", "steam", False)
+    upsert_player(conn, "account.MB", "MateB", "steam", False)
+    # Aelteres Match: beide Mates dabei.
+    insert_match(conn, "sc_shared", "Erangel_Main", "squad-fpp", False, 1800,
+                 "2026-05-01T18:00:00Z", None)
+    insert_participants(conn, "sc_shared", [
+        _sc_part("account.A", "PEX_LuCKoR", 1, kills=2),
+        _sc_part("account.MA", "MateA", 1, kills=3),
+        _sc_part("account.MB", "MateB", 1, kills=4),
+    ])
+    # Neueres Match: nur MateA — darf NICHT auftauchen, obwohl es neuer ist.
+    insert_match(conn, "sc_solo", "Erangel_Main", "squad-fpp", False, 1800,
+                 "2026-05-09T18:00:00Z", None)
+    insert_participants(conn, "sc_solo", [
+        _sc_part("account.A", "PEX_LuCKoR", 1, kills=9),
+        _sc_part("account.MA", "MateA", 1, kills=9),
+    ])
+
+    res = compute_squad_compare(conn, T, "account.A", ["MateA", "MateB"], 5)
+    assert [r["matchId"] for r in res["matchTable"]] == ["sc_shared"]
+    assert res["matchTable"][0]["cells"]["MateB"]["kills"] == 4
+
+
+def test_squad_compare_ignores_own_account_unless_named():
+    """Der eigene Account wird nicht erzwungen: zwei Mates lassen sich auch
+    dann vergleichen, wenn man selbst nicht in der Liste steht."""
+    conn = _setup()
+    upsert_player(conn, "account.MA", "MateA", "steam", False)
+    upsert_player(conn, "account.MB", "MateB", "steam", False)
+    insert_match(conn, "sc_nome", "Erangel_Main", "squad-fpp", False, 1800,
+                 "2026-05-02T18:00:00Z", None)
+    insert_participants(conn, "sc_nome", [
+        _sc_part("account.MA", "MateA", 4, kills=1),
+        _sc_part("account.MB", "MateB", 4, kills=2),
+    ])
+    res = compute_squad_compare(conn, T, "account.A", ["MateA", "MateB"], 5)
+    assert [r["matchId"] for r in res["matchTable"]] == ["sc_nome"]
+
+
+def test_squad_compare_requires_same_team():
+    """Gegner in derselben Lobby zaehlen nicht — nur echte gemeinsame Squads."""
+    conn = _setup()
+    upsert_player(conn, "account.MA", "MateA", "steam", False)
+    upsert_player(conn, "account.MB", "MateB", "steam", False)
+    insert_match(conn, "sc_enemy", "Erangel_Main", "squad-fpp", False, 1800,
+                 "2026-05-03T18:00:00Z", None)
+    insert_participants(conn, "sc_enemy", [
+        # account.A mit drin, damit die Auswahl das Match ueberhaupt sieht —
+        # ausgefiltert werden darf es allein wegen der team_id-Differenz.
+        _sc_part("account.A", "PEX_LuCKoR", 2, kills=0),
+        _sc_part("account.MA", "MateA", 2, kills=1),
+        _sc_part("account.MB", "MateB", 7, kills=8),   # anderes Team
+    ])
+    res = compute_squad_compare(conn, T, "account.A", ["MateA", "MateB"], 5)
+    assert res["matchTable"] == []
+
+
+def test_squad_compare_reports_unknown_names():
+    """Unbekannte Namen werden gemeldet statt still eine Leerspalte zu liefern."""
+    conn = _setup()
+    upsert_player(conn, "account.MA", "MateA", "steam", False)
+    res = compute_squad_compare(conn, T, "account.A", ["MateA", "GibtsNicht"], 5)
+    assert res["unknownPlayers"] == ["GibtsNicht"]
+    assert res["matchTable"] == []
