@@ -5,13 +5,11 @@
   },
   "fireball": {
     "circle": 3,
-    "dmg": 120,
-    "scalable": true
+    "dmg": 120
   },
   "stormoffire": {
     "circle": 4,
-    "dmg": 200,
-    "scalable": true
+    "dmg": 200
   },
   "rainoffire": {
     "circle": 5,
@@ -23,8 +21,7 @@
   },
   "balllightning": {
     "circle": 2,
-    "dmg": 80,
-    "scalable": true
+    "dmg": 80
   },
   "iceblock": {
     "circle": 3,
@@ -35,8 +32,7 @@
   },
   "fistofwind": {
     "circle": 2,
-    "dmg": 40,
-    "scalable": true
+    "dmg": 40
   },
   "sleep": {
     "circle": 2
@@ -49,8 +45,7 @@
   },
   "stormfist": {
     "circle": 4,
-    "dmg": 60,
-    "scalable": true
+    "dmg": 60
   },
   "destroyundead": {
     "circle": 4

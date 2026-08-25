@@ -85,35 +85,51 @@ def _load_json_map(path):
 # Waffen-Schaden aus dem Wiki: Klassenname -> Schaden. Dient dazu, aus dem
 # Inventar die staerkste Waffe zu bestimmen (strongest_weapon).
 WEAPON_DAMAGE = _load_json_map(os.path.join(os.path.dirname(os.path.abspath(__file__)), "weapon_damage.json"))
+# Waffen-Tabelle mit id (= Klassenname) → {dmg, reqStat 'str'/'dex', reqVal}. Liefert die
+# Voraussetzung fuer den NUTZBAR-Filter (Stärke/Geschick). Nur die ~30 Eigennamen-Waffen;
+# generische ohne Eintrag gelten als nutzbar (kein bekanntes Requirement).
+WEAPON_DATA = _load_json_map(os.path.join(os.path.dirname(os.path.abspath(__file__)), "weapon_data.json"))
 
 
-def _strongest_by_prefix(items, prefix):
-    """Klassenname der Inventar-Waffe mit hoechstem Wiki-Schaden, beschraenkt auf
-    Items deren Klassenname mit prefix beginnt (ItMw_ = Nahkampf, ItRw_ = Fernkampf).
-    Liefert (name, dmg) oder (None, None)."""
+def _weapon_usable(name, stats):
+    """Ist die Waffe mit dem Spieler-Stat nutzbar? Requirement aus weapon_data (per id).
+    Unbekannt → True (kein bekanntes Requirement, nicht ausschliessen)."""
+    d = WEAPON_DATA.get(name)
+    if not isinstance(d, dict) or d.get("reqVal") is None:
+        return True
+    stat = (stats or {}).get("strength" if d.get("reqStat") == "str" else "dexterity") or 0
+    return stat >= d["reqVal"]
+
+
+def _strongest_by_prefix(items, prefix, stats):
+    """Staerkste NUTZBARE Waffe (Requirement <= Spieler-Stat) mit hoechstem Schaden, je
+    Praefix (ItMw_=Nahkampf, ItRw_=Fernkampf). Schaden: Mod-Live (it.dmg) bevorzugt, sonst
+    weapon_data, sonst weapon_damage.json. Liefert (name, dmg) oder (None, None)."""
     pre = prefix.lower()
     best, best_dmg = None, -1
     for it in (items or []):
         nm = it.get("name") or ""
         if not nm.lower().startswith(pre):
             continue
-        # Echter Mod-Schaden (it.dmg, live aus dem Spiel) bevorzugt, sonst Wiki-Tabelle.
+        if not _weapon_usable(nm, stats):     # zu hohe Stärke/Geschick-Voraussetzung → raus
+            continue
         dmg = it.get("dmg")
         if dmg is None:
-            dmg = WEAPON_DAMAGE.get(nm)
+            d = WEAPON_DATA.get(nm)
+            dmg = (d.get("dmg") if isinstance(d, dict) else None) or WEAPON_DAMAGE.get(nm)
         if dmg is not None and dmg > best_dmg:
             best, best_dmg = nm, dmg
     return (best, best_dmg if best is not None else None)
 
 
-def strongest_melee(items):
-    """Staerkste Nahkampfwaffe (ItMw_). (name, dmg) oder (None, None)."""
-    return _strongest_by_prefix(items, "ItMw_")
+def strongest_melee(items, stats=None):
+    """Staerkste NUTZBARE Nahkampfwaffe (ItMw_, Requirement <= Stärke)."""
+    return _strongest_by_prefix(items, "ItMw_", stats)
 
 
-def strongest_ranged(items):
-    """Staerkste Fernkampfwaffe (ItRw_: Bogen/Armbrust). (name, dmg) oder (None, None)."""
-    return _strongest_by_prefix(items, "ItRw_")
+def strongest_ranged(items, stats=None):
+    """Staerkste NUTZBARE Fernkampfwaffe (ItRw_, Requirement <= Geschick)."""
+    return _strongest_by_prefix(items, "ItRw_", stats)
 
 
 # Zauber-Kreise: Klassenname -> benoetigter Magie-Kreis (1-6). Eine Rune ist
@@ -249,14 +265,12 @@ def build_payload(lang):
         # Klassennamen via weapon_damage.json / spell_circle.json). Klassenname = it.name.
         nm = it.get("name") or ""
         low = nm.lower()
-        if low.startswith("itmw"):
-            it["wType"] = "melee"
-            if it.get("dmg") is None and WEAPON_DAMAGE.get(nm) is not None:
-                it["dmg"] = WEAPON_DAMAGE[nm]   # Fallback: Mod lieferte keinen Live-Schaden
-        elif low.startswith("itrw"):
-            it["wType"] = "ranged"
-            if it.get("dmg") is None and WEAPON_DAMAGE.get(nm) is not None:
-                it["dmg"] = WEAPON_DAMAGE[nm]
+        if low.startswith("itmw") or low.startswith("itrw"):
+            it["wType"] = "melee" if low.startswith("itmw") else "ranged"
+            if it.get("dmg") is None:
+                d = WEAPON_DATA.get(nm)
+                it["dmg"] = (d.get("dmg") if isinstance(d, dict) else None) or WEAPON_DAMAGE.get(nm)
+            it["usable"] = _weapon_usable(nm, data.get("stats"))   # Requirement <= Stärke/Geschick
         elif low.startswith("itar"):
             it["wType"] = "spell"
             info = _spell_info(nm)   # circle + dmg (Max, inkl. scaling) aus spell_data.json
@@ -275,12 +289,13 @@ def build_payload(lang):
     for _w in (data.get("equippedWeapon"), data.get("weapon")):
         if _w:
             weapon_items.append({"name": _w})
-    melee, melee_dmg = strongest_melee(weapon_items)
+    _stats = data.get("stats") or {}
+    melee, melee_dmg = strongest_melee(weapon_items, _stats)   # NUTZBAR-Filter via Stärke
     if melee:
         data["strongestMelee"] = melee
         data["strongestMeleeDisplay"] = _translate(melee, lang)
         data["strongestMeleeDmg"] = melee_dmg
-    ranged, ranged_dmg = strongest_ranged(weapon_items)
+    ranged, ranged_dmg = strongest_ranged(weapon_items, _stats)   # NUTZBAR-Filter via Geschick
     if ranged:
         data["strongestRanged"] = ranged
         data["strongestRangedDisplay"] = _translate(ranged, lang)

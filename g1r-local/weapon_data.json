@@ -1,0 +1,152 @@
+{
+  "ItMw_1H_Sword_Scar": {
+    "dmg": 85,
+    "reqStat": "str",
+    "reqVal": 70
+  },
+  "ItMw_1H_Sword_Kalom": {
+    "dmg": 70,
+    "reqStat": "str",
+    "reqVal": 55
+  },
+  "ItMw_1H_Sword_Raven": {
+    "dmg": 70,
+    "reqStat": "str",
+    "reqVal": 55
+  },
+  "ItMw_1H_Sword_Bastard_04": {
+    "dmg": 66,
+    "reqStat": "str",
+    "reqVal": 54
+  },
+  "ItMw_1H_Sword_Arto": {
+    "dmg": 65,
+    "reqStat": "str",
+    "reqVal": 54
+  },
+  "ItMw_1H_Sword_Bastard_03": {
+    "dmg": 65,
+    "reqStat": "str",
+    "reqVal": 53
+  },
+  "ItMw_1H_Sword_Broad_01": {
+    "dmg": 55,
+    "reqStat": "str",
+    "reqVal": 45
+  },
+  "ItMw_2H_Sword_InnosRage": {
+    "dmg": 110,
+    "reqStat": "str",
+    "reqVal": 95
+  },
+  "ItMw_2H_Sword_BeliarClaw": {
+    "dmg": 110,
+    "reqStat": "str",
+    "reqVal": 95
+  },
+  "ItMw_2H_Sword_RedWind": {
+    "dmg": 105,
+    "reqStat": "str",
+    "reqVal": 90
+  },
+  "ItMw_2H_Sword_Revenge": {
+    "dmg": 90,
+    "reqStat": "str",
+    "reqVal": 75
+  },
+  "ItMw_2H_Sword_Thorus": {
+    "dmg": 90,
+    "reqStat": "str",
+    "reqVal": 75
+  },
+  "ItMw_2H_Sword_Uriziel": {
+    "dmg": 90,
+    "reqStat": "str",
+    "reqVal": 30
+  },
+  "ItMw_2H_Sword_Heavy_01": {
+    "dmg": 86,
+    "reqStat": "str",
+    "reqVal": 71
+  },
+  "ItMw_2H_Sword_Mercenary": {
+    "dmg": 73,
+    "reqStat": "str",
+    "reqVal": 58
+  },
+  "ItMw_2H_Sword_Custodian": {
+    "dmg": 71,
+    "reqStat": "str",
+    "reqVal": 56
+  },
+  "ItMw_2H_Sword_Light_03": {
+    "dmg": 52,
+    "reqStat": "str",
+    "reqVal": 50
+  },
+  "ItMw_2H_Axe_Lee": {
+    "dmg": 105,
+    "reqStat": "str",
+    "reqVal": 90
+  },
+  "ItMw_2H_Axe_Gorn": {
+    "dmg": 100,
+    "reqStat": "str",
+    "reqVal": 85
+  },
+  "ItMw_2H_Axe_Torlof": {
+    "dmg": 99,
+    "reqStat": "str",
+    "reqVal": 84
+  },
+  "ItMw_1H_Axe_Lares": {
+    "dmg": 65,
+    "reqStat": "str",
+    "reqVal": 52
+  },
+  "ItMw_1H_Axe_Silas": {
+    "dmg": 55,
+    "reqStat": "str",
+    "reqVal": 45
+  },
+  "ItRw_Crossbow_04": {
+    "dmg": 120,
+    "reqStat": "dex",
+    "reqVal": 80
+  },
+  "ItRw_Crossbow_03": {
+    "dmg": 108,
+    "reqStat": "dex",
+    "reqVal": 70
+  },
+  "ItRw_Crossbow_02": {
+    "dmg": 102,
+    "reqStat": "dex",
+    "reqVal": 65
+  },
+  "ItRw_Crossbow_01": {
+    "dmg": 60,
+    "reqStat": "dex",
+    "reqVal": 30
+  },
+  "ItRw_Bow_Long_09": {
+    "dmg": 110,
+    "reqStat": "dex",
+    "reqVal": 75
+  },
+  "ItRw_Bow_Long_06": {
+    "dmg": 95,
+    "reqStat": "dex",
+    "reqVal": 65
+  },
+  "ItRw_Bow_Long_01": {
+    "dmg": 80,
+    "reqStat": "dex",
+    "reqVal": 55
+  },
+  "ItRw_Bow_Small_01": {
+    "dmg": 25,
+    "reqStat": "dex",
+    "reqVal": 15
+  }
+}
