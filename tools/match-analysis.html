@@ -52,6 +52,8 @@
     th { font-size: 0.72em; color: var(--theme-text-dim); text-transform: uppercase;
          letter-spacing: 0.08em; font-weight: 700; }
     td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    /* Quoten aus winzigen Stichproben sind kein Ergebnis — abgesetzt zeigen. */
+    td.weak-sample { opacity: 0.45; font-style: italic; }
     th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
     th.sortable:hover { color: var(--theme-accent); }
     th.sortable.active { color: var(--theme-accent); }
@@ -166,6 +168,10 @@
       wallbangs: "Hits through walls",
     };
 
+    // Unter so vielen Einschlaegen ist jede Quote Rauschen: 2 von 3 Treffern
+    // sind 66,7% Kopftreffer und sagen trotzdem nichts.
+    const WEAK_SAMPLE = 10;
+
     function limbPct(p) {
       const z = p.zones || {};
       const l = (z.ArmShot || 0) + (z.LegShot || 0) + (z.PelvisShot || 0);
@@ -250,8 +256,10 @@
           <td class="num">${p.shots}</td>
           <td class="num">${p.hitAttacks}</td><td class="num">${p.accuracy.toFixed(1)}</td>
           <td class="num">${p.emptyShotPct == null ? "—" : p.emptyShotPct.toFixed(0)}</td>
-          <td class="num">${p.headshotRate.toFixed(1)}</td>
-          <td class="num">${limbPct(p).toFixed(1)}</td>
+          <td class="num${p.hits < WEAK_SAMPLE ? " weak-sample" : ""}"
+              title="${(p.zones||{}).HeadShot || 0}/${p.hits}">${p.hits ? p.headshotRate.toFixed(1) : "—"}</td>
+          <td class="num${p.hits < WEAK_SAMPLE ? " weak-sample" : ""}"
+              title="${p.hits} Treffer">${p.hits ? limbPct(p).toFixed(1) : "—"}</td>
           <td class="num">${p.kills}</td><td class="num">${Math.round(p.damage)}</td>
           <td>${badge}</td></tr>`;
       }).join("");
@@ -269,9 +277,14 @@
       document.getElementById("stats").innerHTML = [
         ["Shots", p.shots], ["Landed", p.hitAttacks],
         ["Team", p.teamId ?? "—"],
-        ["Accuracy", p.accuracy.toFixed(1) + " %"],
+        ["Accuracy", p.shots
+            ? `${p.accuracy.toFixed(1)} % (${p.hitAttacks}/${p.shots})`
+            : "—"],
         ["Shots w/o target", p.emptyShotPct == null ? "—" : p.emptyShotPct.toFixed(0) + " %"],
-        ["Impacts", p.hits], ["Headshots", p.headshotRate.toFixed(1) + " %"],
+        ["Impacts", p.hits],
+        ["Headshots", p.hits
+            ? `${p.headshotRate.toFixed(1)} % (${(p.zones || {}).HeadShot || 0}/${p.hits})`
+            : "—"],
         ["Kills", p.kills], ["Knocks", p.knocks],
         ["Damage", Math.round(p.damage)],
         ["Through walls", p.wallbangs],
@@ -302,10 +315,14 @@
           <td>${esc(ZONE_LABEL[k.zone] || k.zone || "?")}</td></tr>`).join("")
         : `<tr><td colspan="5">Keine Kills</td></tr>`;
 
-      document.getElementById("note").textContent = an && an.flags.length
+      const weakNote = p.hits > 0 && p.hits < WEAK_SAMPLE
+        ? `Only ${p.hits} impact${p.hits === 1 ? "" : "s"} — percentages below are `
+          + `noise, not a result. Anomaly detection ignores players under 30 impacts.`
+        : "";
+      document.getElementById("note").textContent = weakNote || (an && an.flags.length
         ? "Note: anomalies are statistical patterns, not proof. Small samples can "
           + "mislead — a solid conclusion needs several matches of the same player."
-        : "";
+        : "");
     }
 
     // Fuellen und Oeffnen sind getrennt: beim Sortieren wird nur die Auswahl
