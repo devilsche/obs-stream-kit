@@ -733,3 +733,20 @@ def test_thrown_weapons_map_from_both_forms():
 def test_known_aliases_are_merged():
     """Win1894 im Attack-Event ist die Win94."""
     assert normalize_weapon("Item_Weapon_Win1894_C") == normalize_weapon("WeapWin94_C")
+
+
+def test_molotov_fire_counts_as_molotov():
+    """Ein Molotov toetet ueber das Feuer, nicht ueber den Aufschlag: PUBG
+    schreibt BP_MolotovFireDebuff_C als Verursacher. Getrennt gefuehrt sah
+    es aus, als haette der Molotov fast keine Kills (13 gegen 240)."""
+    assert normalize_weapon("BP_MolotovFireDebuff_C") == "Molotov"
+    assert normalize_weapon("ProjMolotov_C") == "Molotov"
+    ev = [_kill("A", "X", weapon="BP_MolotovFireDebuff_C"),
+          _kill("A", "Y", weapon="ProjMolotov_C")]
+    assert analyse(ev)["players"]["A"]["weapons"]["Molotov"]["kills"] == 2
+
+
+def test_generic_fire_stays_separate_from_molotov():
+    """Allgemeines Feuer kann auch von Fahrzeugen oder Kanistern kommen —
+    das darf dem Molotov nicht zugerechnet werden."""
+    assert normalize_weapon("BP_FireEffectController_C") != "Molotov"

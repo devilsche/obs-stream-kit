@@ -521,6 +521,9 @@ _WEAPON_ALIASES = {
     # (Einschlag) — beide muessen auf denselben Namen fallen.
     "weapgrenade_c":                "ProjGrenade_C",
     "weapmolotov_c":                "ProjMolotov_C",
+    # Der Molotov toetet ueber das Feuer, nicht ueber den Aufschlag —
+    # getrennt gefuehrt stand er bei 13 statt 253 Kills.
+    "bp_molotovfiredebuff_c":       "ProjMolotov_C",
     "weapc4_c":                     "ProjC4_C",
     "weapstickygrenade_c":          "ProjStickyGrenade_C",
     "weappanzerfaust100m_c":        "PanzerFaust100M_Projectile_C",
