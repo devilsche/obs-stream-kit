@@ -359,13 +359,16 @@
         .filter(([, w]) => w.hits > 0 || w.shots > 0)
         .sort((a, b) => b[1].hits - a[1].hits || b[1].shots - a[1].shots);
       document.getElementById("weapons").innerHTML = weapons.length
-        ? `<div class="legend">Weapons used</div><div class="weapon-list">`
+        ? `<div class="legend">Weapons used — damage counts gun hits only, so `
+          + `throwables show 0</div><div class="weapon-list">`
           + weapons.map(([w, v]) =>
             `<span class="weapon-chip" tabindex="0" data-w="${esc(w)}"
-              title="Hover to highlight this weapon's share in the zone bars. Shotguns produce one impact per pellet, so impacts can exceed shots.">`
+              title="Hover to highlight this weapon's share in the zone bars. Ø dmg is per impact — it varies with hit zone and the victim's helmet/vest. Shotguns produce one impact per pellet, so impacts can exceed shots.">`
             + `<span class="wc-n">${esc(w)}</span>`
             + `<span class="wc-v">${v.shots} shot${v.shots === 1 ? "" : "s"}`
-            + ` · ${v.hits} impact${v.hits === 1 ? "" : "s"}</span></span>`).join("")
+            + ` · ${v.hits} impact${v.hits === 1 ? "" : "s"}`
+            + `${v.damage ? ` · ${Math.round(v.damage)} dmg (Ø ${v.avgDamage})` : ""}`
+            + `</span></span>`).join("")
           + `</div>`
         : "";
       WEAPON_ZONES = Object.fromEntries(weapons.map(([w, v]) => [w, v.zones || {}]));

@@ -490,3 +490,34 @@ def test_weapon_zones_sum_to_player_zones():
         for z, n in w.get("zones", {}).items():
             total[z] = total.get(z, 0) + n
     assert total == p["zones"]
+
+
+def test_weapon_breakdown_carries_damage():
+    """Schaden pro Waffe — haengt von Zone und Helm ab, deshalb ist der
+    Schnitt pro Einschlag aussagekraeftiger als die Summe."""
+    ev = [_attack("A", "Item_Weapon_ACE32_C", aid=1),
+          _attack("A", "Item_Weapon_M24_C", aid=2),
+          _damage("A", "B", weapon="WeapACE32_C", damage=30.0, aid=1),
+          _damage("A", "B", weapon="WeapACE32_C", damage=20.0, aid=1),
+          _damage("A", "B", weapon="WeapM24_C", damage=90.0, aid=2)]
+    w = analyse(ev)["players"]["A"]["weapons"]
+    assert w["ACE32"]["damage"] == pytest.approx(50.0)
+    assert w["ACE32"]["avgDamage"] == pytest.approx(25.0)     # 50 / 2 Einschlaege
+    assert w["M24"]["damage"] == pytest.approx(90.0)
+    assert w["M24"]["avgDamage"] == pytest.approx(90.0)
+
+
+def test_weapon_damage_sums_to_player_damage():
+    ev = [_attack("A", aid=1),
+          _damage("A", "B", weapon="WeapACE32_C", damage=30.0, aid=1),
+          _damage("A", "B", weapon="WeapM24_C", damage=90.0, aid=2)]
+    p = analyse(ev)["players"]["A"]
+    assert sum(w["damage"] for w in p["weapons"].values()) == pytest.approx(p["damage"])
+
+
+def test_weapon_without_hits_has_zero_avg_damage():
+    """Granaten/Molotov tauchen als Schuss ohne Treffer auf — kein Div/0."""
+    ev = [_attack("A", "Item_Weapon_Grenade_C", aid=1)]
+    w = analyse(ev)["players"]["A"]["weapons"]["Grenade"]
+    assert w["damage"] == 0
+    assert w["avgDamage"] == 0
