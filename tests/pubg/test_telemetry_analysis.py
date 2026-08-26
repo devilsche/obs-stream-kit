@@ -625,3 +625,29 @@ def test_account_id_none_when_absent():
            "_D": "2026-07-26T23:11:58Z", "attacker": {"name": "Ghost"},
            "weapon": {"itemId": "Item_Weapon_ACE32_C"}}]
     assert analyse(ev)["players"]["Ghost"]["accountId"] is None
+
+
+def test_effective_damage_picks_the_meaningful_denominator():
+    """Bei einer AR ist Schaden je Einschlag der Wert; bei Schrot je
+    treffendem Schuss. Erkennbar an den Daten selbst: mehr Einschlaege als
+    getroffene Schuesse heisst Splitterwaffe — kein Waffen-Mapping noetig."""
+    # AR: ein Einschlag je Schuss
+    ev = [_attack("A", "Item_Weapon_ACE32_C", aid=1),
+          _damage("A", "B", weapon="WeapACE32_C", damage=30.0, aid=1)]
+    w = analyse(ev)["players"]["A"]["weapons"]["ACE32"]
+    assert w["splits"] is False
+    assert w["avgDamageEffective"] == pytest.approx(w["avgDamage"])
+
+    # Schrot: 9 Pellets aus einem Schuss
+    ev = [_attack("A", "Item_Weapon_Berreta686_C", aid=7)]
+    ev += [_damage("A", "B", weapon="WeapBerreta686_C", damage=11.0, aid=7)
+           for _ in range(9)]
+    w = analyse(ev)["players"]["A"]["weapons"]["S686"]
+    assert w["splits"] is True
+    assert w["avgDamageEffective"] == pytest.approx(99.0)   # nicht 11.0
+
+
+def test_splits_flag_false_without_hits():
+    w = analyse([_attack("A", "Item_Weapon_Grenade_C", aid=1)])["players"]["A"]["weapons"]["Grenade"]
+    assert w["splits"] is False
+    assert w["avgDamageEffective"] == 0

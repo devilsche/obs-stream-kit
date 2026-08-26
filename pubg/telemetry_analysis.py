@@ -167,6 +167,16 @@ def _weapon_out(v: dict) -> dict:
         # der Wert, der Schrot mit AR/DMR vergleichbar macht.
         "avgDamagePerLandedShot": (round(v["damage"] / hit_attacks, 1)
                                    if hit_attacks else 0),
+        # Splitterwaffe? Mehr Einschlaege als getroffene Schuesse heisst,
+        # ein Schuss erzeugt mehrere Treffer (Schrot). Datengetrieben, damit
+        # keine Waffenliste gepflegt werden muss.
+        "splits": v["hits"] > hit_attacks > 0,
+        # Der Wert, den man tatsaechlich lesen will: bei Schrot je treffendem
+        # Schuss, sonst je Einschlag. Bei Einzelprojektilen sind beide gleich.
+        "avgDamageEffective": (
+            round(v["damage"] / hit_attacks, 1)
+            if v["hits"] > hit_attacks > 0 and hit_attacks
+            else (round(v["damage"] / v["hits"], 1) if v["hits"] else 0)),
         "topZone": top,
         "topZonePct": (round(100.0 * zones[top] / total_z, 1)
                        if top and total_z else 0),

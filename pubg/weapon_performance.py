@@ -169,6 +169,11 @@ def _finish(acc: dict) -> dict:
     acc["avgDamagePerLandedShot"] = round(acc["damage"] / landed, 1) if landed else 0.0
     acc["avgDamagePerShot"] = round(acc["damage"] / shots, 1) if shots else 0.0
     acc["headshotRate"] = round(100.0 * zones.get("HeadShot", 0) / hits, 1) if hits else 0.0
+    # Siehe telemetry_analysis: Splitterwaffen erkennt man daran, dass mehr
+    # Einschlaege als getroffene Schuesse anfallen.
+    acc["splits"] = hits > landed > 0
+    acc["avgDamageEffective"] = (acc["avgDamagePerLandedShot"] if acc["splits"]
+                                 else acc["avgDamage"])
     acc["topZone"] = top
     acc["topZonePct"] = round(100.0 * zones[top] / total_z, 1) if top and total_z else 0.0
     acc["damage"] = round(acc["damage"], 1)
