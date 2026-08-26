@@ -21,6 +21,15 @@ DISTANCE_BUCKETS = ((0, 25), (25, 50), (50, 100), (100, 200), (200, None))
 #: Fahrzeug und Molotov sagen nichts ueber Aim aus.
 GUN_CATEGORY = "Damage_Gun"
 
+#: Ab dieser Distanz (m) ist kein Gegner mehr plausibel treffbar. Ein Schuss
+#: ohne Gegner darin ist ein "Leerschuss" — relevant, weil sich damit die
+#: eigene Accuracy druecken laesst.
+TARGET_RANGE_M = 300.0
+
+#: Positions-Events kommen alle ~10 s. Fuer die Naehe-Pruefung wird deshalb
+#: in 10-s-Faechern gesucht, mit einem Fach Toleranz nach vorn und hinten.
+POS_BUCKET_S = 10
+
 
 def normalize_weapon(raw):
     """Vereinheitlicht die zwei Schreibweisen derselben Waffe.
@@ -64,8 +73,60 @@ def _loc(participant):
     return (x, y) if x is not None and y is not None else (None, None)
 
 
+def _parse_ts(iso):
+    """ISO-Zeitstempel -> Sekunden. None bei Murks, damit ein einzelnes
+    kaputtes Event nicht die ganze Auswertung kippt."""
+    if not iso:
+        return None
+    try:
+        import datetime
+        return datetime.datetime.fromisoformat(
+            str(iso).replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return None
+
+
+def _position_index(events):
+    """{zeit-fach: [(name, teamId, x, y)]} aller LEBENDEN Spieler."""
+    idx = defaultdict(list)
+    for e in events or []:
+        if e.get("_T") != "LogPlayerPosition":
+            continue
+        c = e.get("character") or {}
+        loc = c.get("location") or {}
+        if not c.get("name") or loc.get("x") is None or loc.get("y") is None:
+            continue
+        if (c.get("health") or 0) <= 0:
+            continue                       # Tote sind keine Ziele
+        t = _parse_ts(e.get("_D"))
+        if t is None:
+            continue
+        idx[int(t // POS_BUCKET_S)].append(
+            (c["name"], c.get("teamId"), loc["x"], loc["y"]))
+    return idx
+
+
+def _enemy_within(idx, t, x, y, shooter, team, max_m=TARGET_RANGE_M):
+    """War zum Schusszeitpunkt ein lebender GEGNER in Reichweite?
+    None = keine Positionsdaten in der Naehe, also keine Aussage moeglich."""
+    if t is None or not idx:
+        return None
+    b = int(t // POS_BUCKET_S)
+    seen = False
+    for bb in (b - 1, b, b + 1):
+        for name, tid, px, py in idx.get(bb, ()):
+            seen = True
+            if name == shooter:
+                continue
+            if team is not None and tid == team:
+                continue          # eigenes Team ist kein Ziel
+            if math.dist((x, y), (px, py)) / 100.0 <= max_m:
+                return True
+    return False if seen else None
+
+
 def _new_player():
-    return {"shots": 0, "hits": 0, "hit_attacks": set(), "hits_no_id": 0,
+    return {"shots": 0, "shots_with_target": 0, "shots_judged": 0, "hits": 0, "hit_attacks": set(), "hits_no_id": 0,
             "damage": 0.0, "kills": 0, "knocks": 0,
             "wallbangs": 0, "hitsOnBots": 0, "hitsOnHumans": 0,
             "zones": defaultdict(int),
@@ -77,6 +138,15 @@ def analyse(events) -> dict:
     """Wertet die Event-Liste aus. Siehe Modul-Docstring."""
     players = defaultdict(_new_player)
     kills = []
+    pos_idx = _position_index(events)
+    # Team-Zuordnung aus allen Events sammeln — LogPlayerAttack fuehrt die
+    # teamId nicht immer mit.
+    team_of = {}
+    for e in events or []:
+        for f in ("character", "attacker", "victim", "killer", "finisher"):
+            q = e.get(f) or {}
+            if q.get("name") and q.get("teamId") is not None:
+                team_of.setdefault(q["name"], q["teamId"])
 
     for e in events or []:
         t = e.get("_T")
@@ -89,6 +159,17 @@ def analyse(events) -> dict:
                 continue
             p = players[name]
             p["shots"] += 1
+            # Leerschuss-Pruefung: Accuracy laesst sich druecken, indem man
+            # ohne Gegner in Reichweite schiesst. Die Zonenverteilung ist
+            # dagegen immun — sie kennt nur Treffer.
+            loc = (e.get("attacker") or {}).get("location") or {}
+            if loc.get("x") is not None:
+                near = _enemy_within(pos_idx, _parse_ts(e.get("_D")),
+                                     loc["x"], loc["y"], name, team_of.get(name))
+                if near is not None:
+                    p["shots_judged"] += 1
+                    if near:
+                        p["shots_with_target"] += 1
             w = normalize_weapon((e.get("weapon") or {}).get("itemId"))
             if w:
                 p["weapons"][w]["shots"] += 1
@@ -173,6 +254,10 @@ def analyse(events) -> dict:
         total_zone = sum(zones.values())
         out[name] = {
             "shots": shots,
+            "shotsWithTarget": p["shots_with_target"],
+            "emptyShotPct": (round(100.0 * (p["shots_judged"] - p["shots_with_target"])
+                                   / p["shots_judged"], 1)
+                             if p["shots_judged"] else None),
             "hits": hits,                 # Einschlaege — Basis der Zonenverteilung
             "hitAttacks": hit_attacks,    # getroffene Schuesse — Basis der Accuracy
             "accuracy": (round(min(100.0, 100.0 * hit_attacks / shots), 1)
@@ -192,3 +277,97 @@ def analyse(events) -> dict:
             "byDistance": {b: dict(v) for b, v in p["byDistance"].items()},
         }
     return {"players": out, "kills": kills}
+
+
+# ── Auffaelligkeits-Bewertung ───────────────────────────────────────────────
+
+#: Zonen, die beim Sprayen durch Rueckstoss-Streuung zwangslaeufig anfallen.
+LIMB_ZONES = ("ArmShot", "LegShot", "PelvisShot")
+
+#: Unterhalb dieser Einschlagzahl ist jede Aussage Rauschen.
+MIN_HITS_FOR_JUDGEMENT = 30
+
+
+def _binom_cdf(k: int, n: int, p: float) -> float:
+    """P(X <= k) fuer Binomial(n, p). Kein scipy im Projekt, also selbst."""
+    if n <= 0:
+        return 1.0
+    p = min(max(p, 1e-9), 1 - 1e-9)
+    return sum(math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(k + 1))
+
+
+def flag_anomalies(analysis: dict, min_hits: int = MIN_HITS_FOR_JUDGEMENT) -> dict:
+    """Sucht Spieler, deren TREFFERMUSTER nicht zu menschlichem Zielen passt.
+
+    Das entscheidende Signal ist nicht ein hoher Wert, sondern ein unnatuerliches
+    Muster. Ein sehr guter Spieler hat hohe Accuracy UND normale Streuung; ein
+    Aim-Assist zieht auf einen festen Koerperpunkt und laesst Arme, Beine und
+    Becken praktisch aus. Geprueft wird deshalb gegen die Referenz DIESES
+    Matches — kein fester Schwellwert, der je nach Map und Spielweise driftet.
+
+    Zweites Signal: eine Kopftrefferquote, die mit der Entfernung STEIGT. Auf
+    Distanz ist ein Kopf ein kleineres Ziel; menschlich faellt die Quote.
+
+    Weil hier viele Spieler gleichzeitig getestet werden, steht die
+    Bonferroni-Schwelle im Ergebnis: ohne sie findet man in jedem grossen Feld
+    einen scheinbaren Ausreisser.
+
+    Returns {name: {limbPct, expectedLimbPct, pValue, bonferroniThreshold,
+    tested, significantCorrected, flags:[...]}} — nur fuer Spieler mit
+    mindestens `min_hits` Einschlaegen.
+    """
+    players = (analysis or {}).get("players") or {}
+    candidates = {n: p for n, p in players.items() if p.get("hits", 0) >= min_hits}
+    if len(candidates) < 3:
+        # Zu wenig Vergleichsbasis — ein Spieler waere sein eigener Massstab.
+        return {}
+
+    total_hits = sum(p["hits"] for p in candidates.values())
+    total_limb = sum(sum(p["zones"].get(z, 0) for z in LIMB_ZONES)
+                     for p in candidates.values())
+    ref = (total_limb / total_hits) if total_hits else 0.0
+    threshold = 0.01 / len(candidates)
+
+    out = {}
+    for name, p in candidates.items():
+        hits = p["hits"]
+        limb = sum(p["zones"].get(z, 0) for z in LIMB_ZONES)
+        pval = _binom_cdf(limb, hits, ref) if ref > 0 else 1.0
+        flags = []
+        if pval < threshold:
+            flags.append("narrow_hit_pattern")
+        if p.get("wallbangs", 0) > 0:
+            flags.append("wallbangs")
+
+        # Kopftrefferquote nah vs. fern — nur bewerten wenn beide Seiten
+        # ueberhaupt Substanz haben.
+        near = p["byDistance"].get("0-25", {})
+        far_hits = far_hs = 0
+        for b in ("50-100", "100-200", "200+"):
+            v = p["byDistance"].get(b) or {}
+            far_hits += v.get("hits", 0)
+            far_hs += v.get("headshots", 0)
+        # Nur mit belastbarer Stichprobe UND statistischem Test: mit einem
+        # blossen Faktor-Kriterium feuerte das Flag bei 27 von 29 Spielern,
+        # weil 8 ferne Treffer jede Quote zufaellig aussehen lassen.
+        if near.get("hits", 0) >= 20 and far_hits >= 20:
+            near_rate = near.get("headshots", 0) / near["hits"]
+            far_rate = far_hs / far_hits
+            # P(mindestens so viele ferne Kopftreffer wie beobachtet, wenn die
+            # NAHE Rate gaelte). Klein = die Steigerung ist kein Zufall.
+            p_more = 1.0 - _binom_cdf(far_hs - 1, far_hits, max(near_rate, 0.01))
+            if far_rate > near_rate * 2 and p_more < 0.01:
+                flags.append("headshot_rate_rises_with_distance")
+
+        out[name] = {
+            "hits": hits,
+            "limbHits": limb,
+            "limbPct": round(100.0 * limb / hits, 1),
+            "expectedLimbPct": round(100.0 * ref, 1),
+            "pValue": pval,
+            "bonferroniThreshold": threshold,
+            "tested": len(candidates),
+            "significantCorrected": pval < threshold,
+            "flags": flags,
+        }
+    return out

@@ -225,6 +225,8 @@ class EndpointRegistry:
             return self._lobby_avg_kd(qs)
         if route == ("GET", "/api/pubg/squad-kd"):
             return self._squad_kd(qs)
+        if route == ("GET", "/api/pubg/match-analysis"):
+            return self._match_analysis(qs)
         if route == ("GET", "/api/pubg/strongest-opponent"):
             return self._strongest_opponent(qs)
         if route == ("GET", "/api/pubg/streaks"):
@@ -752,6 +754,46 @@ class EndpointRegistry:
             lambda: compute_deathmatch_stats(conn, self.tenant_id, self.my_account_id,
                                              range_key, from_iso=from_iso, to_iso=to_iso),
         ))
+
+    def _match_analysis(self, qs):
+        """Telemetrie-Analyse eines Matches: Accuracy, Trefferzonen,
+        Kill-Timeline, Auffaelligkeiten. Quelle ist die Roh-Telemetrie
+        (HiDrive → API), nicht die DB — deshalb auch fuer Matches nutzbar,
+        deren Events wir nie eingelesen haben.
+
+        Teuer (Download + ~40k Events), daher gecached.
+        """
+        match_id = (qs.get("matchId") or "").strip()
+        if not match_id:
+            return _err(400, "matchId required")
+        conn = self.get_conn()
+        row = conn.execute(
+            "SELECT telemetry_url, map_name, played_at FROM matches "
+            "WHERE tenant_id = ? AND match_id = ?",
+            (self.tenant_id, match_id)).fetchone()
+
+        def _build():
+            from pubg.telemetry_source import load_telemetry, TelemetryUnavailable
+            from pubg.telemetry_analysis import analyse, flag_anomalies
+            url = row["telemetry_url"] if row else None
+            try:
+                res = load_telemetry(match_id, telemetry_url=url)
+            except TelemetryUnavailable as e:
+                return {"error": str(e)}
+            data = analyse(res.events)
+            data["anomalies"] = flag_anomalies(data)
+            data["matchId"] = match_id
+            data["source"] = res.source
+            data["eventCount"] = len(res.events)
+            if row:
+                data["map"] = row["map_name"]
+                data["playedAt"] = row["played_at"]
+            return data
+
+        data = self.cache.get_or_compute(f"match-analysis:{match_id}", _build)
+        if data.get("error"):
+            return _err(404, data["error"])
+        return _ok(data)
 
     def _match_detail(self, qs):
         conn = self.get_conn()

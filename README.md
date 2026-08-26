@@ -467,6 +467,42 @@ auf das Backend; kein Streaming nötig.
 | `tools/match-replay.html` | Animierter Replay eines PUBG-Matches auf der Karte | Browser-Tab |
 | `tools/landing-spots.html` | Heatmap + Scatter der Landeorte pro Karte und Spieler-Konstellation | Browser-Tab / 1920×1080 |
 | `tools/g1r-database.html` | Vollständiger G1R-Item-Katalog aus dem Object-Dump (Nah-/Fernkampf, Runen, Schriftrollen) mit Live-Suche | Browser-Tab (admin) |
+| `tools/match-analysis.html` | Telemetrie-Auswertung eines Matches: Accuracy, Trefferzonen, Kill-Timeline, Auffälligkeiten | Browser-Tab |
+
+#### tools/match-analysis.html
+
+Wertet die **Roh-Telemetrie** eines Matches aus — unabhängig davon, ob wir seine Events
+je in die DB eingelesen haben. Aufruf mit `?matchId=<uuid>`, optional `&player=<name>`.
+
+Datenquelle in dieser Reihenfolge:
+
+1. **HiDrive-Archiv** (`pubg/hidrive_telemetry.py`) — Telemetrie ist unveränderlich, ein
+   archiviertes Match ändert sich nie. Kein externer Call, kein Rate-Limit.
+2. **PUBG-API** — nur solange die CDN-Datei existiert. Gemessen am 2026-08-26: Matches ab
+   dem 09.08. abrufbar, alles davor `403`. Das sind rund **17 Tage**, nicht 14.
+3. Was von der API kommt, wird direkt ins Archiv hochgeladen — sonst ist es nach Ablauf
+   der Retention endgültig weg.
+
+Pro Spieler: Schüsse, getroffene Schüsse, Accuracy, komplette Trefferzonen-Verteilung,
+Headshot-Rate, Wallbangs, Schaden, Treffer auf Bots vs. Menschen, Waffen und
+Distanzverteilung. Dazu eine Kill-Timeline mit Zeit, Ort, Waffe, Distanz und Trefferzone.
+
+**Auffälligkeiten** (`flag_anomalies`) suchen nach dem *Muster*, nicht nach hohen Werten:
+Beim Sprayen streut der Rückstoß über den ganzen Körper, Arm-, Bein- und Beckentreffer
+sind unvermeidlich. Fehlen sie fast völlig, passt das nicht zu menschlichem Zielen.
+Geprüft wird per Binomialtest gegen die Referenz **desselben Matches** — kein fester
+Schwellwert, der je nach Map und Spielweise driftet. Weil dabei viele Spieler gleichzeitig
+getestet werden, steht die Bonferroni-Schwelle im Ergebnis; ohne sie findet man in jedem
+großen Feld einen scheinbaren Ausreißer.
+
+Gegen Manipulation abgesichert: Wer seine Accuracy drücken will, kann ins Leere schießen.
+Deshalb wird pro Schuss geprüft, ob überhaupt ein lebender Gegner in 300 m war
+(`emptyShotPct`, aus den Positions-Events im 10-Sekunden-Raster). Das Kernsignal — die
+Zonenverteilung — ist ohnehin immun, weil es nur Treffer kennt.
+
+> Auffälligkeiten sind statistische Muster, **kein Beweis**. Bei kleinen Stichproben
+> können sie täuschen. Ein hoher Einzelwert allein sagt fast nichts — sehr gute Spieler
+> haben hohe Accuracy *und* normale Streuung.
 
 #### tools/match-replay.html
 

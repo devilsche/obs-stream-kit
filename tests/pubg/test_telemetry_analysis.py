@@ -210,3 +210,175 @@ def test_missing_attack_id_still_counts_as_hit():
     p = analyse(ev)["players"]["A"]
     assert p["hits"] == 1
     assert p["hitAttacks"] == 1
+
+
+# ── Auffaelligkeits-Bewertung ───────────────────────────────────────────────
+
+from pubg.telemetry_analysis import flag_anomalies
+
+
+def _spray(name, n_hits, limb_share, hs=0):
+    """n_hits Einschlaege mit gegebenem Gliedmassen-Anteil."""
+    ev = [_attack(name, aid=i) for i in range(n_hits)]
+    limbs = int(n_hits * limb_share)
+    for i in range(n_hits):
+        if i < limbs:
+            z = "ArmShot" if i % 2 else "LegShot"
+        elif i < limbs + hs:
+            z = "HeadShot"
+        else:
+            z = "TorsoShot"
+        ev.append(_damage(name, "Opfer", reason=z, aid=i))
+    return ev
+
+
+def test_flags_hit_pattern_that_is_too_narrow():
+    """Kernsignal: beim Sprayen streut der Rueckstoss ueber den ganzen Koerper.
+    Fast nur Torso/Kopf passt nicht zu einer Automatikwaffe."""
+    ev = []
+    for i in range(6):                        # Referenzfeld: ~33% Gliedmassen
+        ev += _spray(f"Normal{i}", 60, 0.33)
+    ev += _spray("Verdaechtig", 60, 0.02)     # praktisch keine Gliedmassen
+    res = flag_anomalies(analyse(ev), min_hits=30)
+    assert "Verdaechtig" in res
+    assert res["Verdaechtig"]["limbPct"] < 5
+    assert res["Verdaechtig"]["pValue"] < 0.001
+    assert "narrow_hit_pattern" in res["Verdaechtig"]["flags"]
+
+
+def test_normal_players_are_not_flagged():
+    ev = []
+    for i in range(6):
+        ev += _spray(f"Normal{i}", 60, 0.33)
+    res = flag_anomalies(analyse(ev), min_hits=30)
+    for name, r in res.items():
+        assert "narrow_hit_pattern" not in r["flags"], name
+
+
+def test_small_samples_are_skipped():
+    """Unter min_hits ist jede Aussage Rauschen — lieber gar nicht bewerten."""
+    ev = []
+    for i in range(6):
+        ev += _spray(f"Normal{i}", 60, 0.33)
+    ev += _spray("Wenig", 5, 0.0)
+    res = flag_anomalies(analyse(ev), min_hits=30)
+    assert "Wenig" not in res
+
+
+def test_multiple_testing_correction_is_reported():
+    """Wer viele Spieler durchtestet, findet zwangslaeufig Ausreisser. Die
+    Bonferroni-Schwelle muss im Ergebnis stehen, sonst ist p wertlos."""
+    ev = []
+    for i in range(6):
+        ev += _spray(f"Normal{i}", 60, 0.33)
+    ev += _spray("Verdaechtig", 60, 0.02)
+    res = flag_anomalies(analyse(ev), min_hits=30)
+    r = res["Verdaechtig"]
+    assert r["tested"] == len(res)
+    assert r["bonferroniThreshold"] == pytest.approx(0.01 / r["tested"])
+    assert r["significantCorrected"] is (r["pValue"] < r["bonferroniThreshold"])
+
+
+def test_wallbangs_are_flagged_separately():
+    ev = _spray("Waller", 40, 0.30)
+    ev += [_damage("Waller", "Opfer", wall=True, aid=900+i) for i in range(4)]
+    for i in range(6):
+        ev += _spray(f"Normal{i}", 60, 0.33)
+    res = flag_anomalies(analyse(ev), min_hits=30)
+    assert "wallbangs" in res["Waller"]["flags"]
+
+
+def test_no_reference_data_yields_no_flags():
+    """Ein einzelner Spieler ist sein eigenes Referenzfeld — das ergibt
+    keine Aussage und darf nicht in einen Vorwurf laufen."""
+    res = flag_anomalies(analyse(_spray("Allein", 60, 0.02)), min_hits=30)
+    assert res.get("Allein", {}).get("flags", []) == [] or res == {}
+
+
+def _dist_hits(name, near_hits, near_hs, far_hits, far_hs):
+    """Treffer nah (10 m) und fern (80 m) mit vorgegebenen Kopftreffern."""
+    ev = []
+    aid = 5000
+    for i in range(near_hits):
+        aid += 1
+        ev.append(_attack(name, aid=aid))
+        ev.append(_damage(name, "O", reason="HeadShot" if i < near_hs else "TorsoShot",
+                          vy=1100.0, aid=aid))
+    for i in range(far_hits):
+        aid += 1
+        ev.append(_attack(name, aid=aid))
+        ev.append(_damage(name, "O", reason="HeadShot" if i < far_hs else "TorsoShot",
+                          vy=8100.0, aid=aid))
+    return ev
+
+
+def test_distance_headshot_flag_needs_a_real_sample():
+    """Bei 8 fernen Treffern ist jede Quote Rauschen — mit dem alten
+    Faktor-1.5-Kriterium feuerte das Flag bei 27 von 29 Markierungen."""
+    ev = _dist_hits("Zufall", near_hits=20, near_hs=2, far_hits=8, far_hs=2)
+    for i in range(5):
+        ev += _spray(f"Normal{i}", 60, 0.33)
+    res = flag_anomalies(analyse(ev), min_hits=25)
+    assert "headshot_rate_rises_with_distance" not in res.get("Zufall", {}).get("flags", [])
+
+
+def test_distance_headshot_flag_fires_on_a_clear_case():
+    """Deutlich: nah kaum Kopftreffer, fern fast nur — und genug Daten."""
+    ev = _dist_hits("Klar", near_hits=40, near_hs=2, far_hits=30, far_hs=18)
+    for i in range(5):
+        ev += _spray(f"Normal{i}", 60, 0.33)
+    res = flag_anomalies(analyse(ev), min_hits=25)
+    assert "headshot_rate_rises_with_distance" in res["Klar"]["flags"]
+
+
+# ── Leerschuss-Erkennung ────────────────────────────────────────────────────
+
+def _pos(name, team, x, y, t="2026-07-26T23:12:00Z", health=100):
+    return {"_T": "LogPlayerPosition", "_D": t,
+            "character": {"name": name, "teamId": team, "health": health,
+                          "accountId": "account." + name,
+                          "location": {"x": x, "y": y}}}
+
+
+def _attack_at(name, x, y, t="2026-07-26T23:12:00Z", aid=1):
+    e = _attack(name, t=t, aid=aid)
+    e["attacker"]["location"] = {"x": x, "y": y}
+    e["attacker"]["teamId"] = 1
+    return e
+
+
+def test_shot_with_enemy_in_range_is_not_empty():
+    ev = [_pos("A", 1, 0.0, 0.0), _pos("Gegner", 2, 5000.0, 0.0),   # 50 m
+          _attack_at("A", 0.0, 0.0)]
+    p = analyse(ev)["players"]["A"]
+    assert p["shotsWithTarget"] == 1
+    assert p["emptyShotPct"] == pytest.approx(0.0)
+
+
+def test_shot_without_any_enemy_nearby_counts_as_empty():
+    """Wer ohne Gegner in Reichweite schiesst, druckt seine Accuracy —
+    das ist selbst ein Signal."""
+    ev = [_pos("A", 1, 0.0, 0.0), _pos("Weit", 2, 500000.0, 0.0),   # 5 km
+          _attack_at("A", 0.0, 0.0)]
+    p = analyse(ev)["players"]["A"]
+    assert p["shotsWithTarget"] == 0
+    assert p["emptyShotPct"] == pytest.approx(100.0)
+
+
+def test_teammates_do_not_count_as_targets():
+    ev = [_pos("A", 1, 0.0, 0.0), _pos("Mate", 1, 5000.0, 0.0),
+          _attack_at("A", 0.0, 0.0)]
+    assert analyse(ev)["players"]["A"]["emptyShotPct"] == pytest.approx(100.0)
+
+
+def test_dead_players_do_not_count_as_targets():
+    ev = [_pos("A", 1, 0.0, 0.0), _pos("Leiche", 2, 5000.0, 0.0, health=0),
+          _attack_at("A", 0.0, 0.0)]
+    assert analyse(ev)["players"]["A"]["emptyShotPct"] == pytest.approx(100.0)
+
+
+def test_without_position_data_no_empty_shot_claim():
+    """Ohne Positions-Events darf niemand als Leerschuetze dastehen."""
+    ev = [_attack("A", aid=1), _damage("A", "B", aid=1)]
+    p = analyse(ev)["players"]["A"]
+    assert p["emptyShotPct"] is None

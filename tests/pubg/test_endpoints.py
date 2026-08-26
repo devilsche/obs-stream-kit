@@ -339,3 +339,21 @@ def test_performance_history_endpoint_player_is_case_insensitive():
         body, code, _ = reg.dispatch("GET",
             f"/api/pubg/performance-history?player={variant}", b"", {})
         assert code == 200, f"{variant} -> {code}"
+
+
+def test_match_analysis_requires_match_id():
+    conn = _setup()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/match-analysis", b"", {})
+    assert code == 400
+
+
+def test_match_analysis_reports_unavailable_telemetry():
+    """Kein Archiv-Eintrag und keine telemetry_url -> 404 mit Begruendung,
+    kein Stacktrace."""
+    conn = _setup()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET",
+        "/api/pubg/match-analysis?matchId=gibtsnicht", b"", {})
+    assert code == 404
+    assert "gibtsnicht" in json.loads(body).get("error", "")

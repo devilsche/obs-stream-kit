@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<!--
+  PUBG Match-Analyse
+  ────────────────────────────────────────────────────────────────────
+  Wertet die ROH-Telemetrie eines Matches aus — Accuracy, Trefferzonen,
+  Kill-Timeline, Auffälligkeiten. Quelle ist HiDrive (Archiv), sonst die
+  PUBG-API; die DB wird nur für map/played_at gelesen.
+
+  Browser-Tool, KEINE OBS-Source: tools/, nicht widgets/.
+
+  URL-Params:
+    matchId  — Pflicht
+    player   — vorausgewählter Spieler
+-->
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Match-Analyse</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../widgets/pubg/_pubg.css">
+  <link rel="stylesheet" href="../widgets/_theme.css">
+  <style>
+    body { padding: 20px; max-width: 1180px; margin: 0 auto; }
+    h1 { font-size: 1.1em; letter-spacing: 0.08em; text-transform: uppercase;
+         color: var(--pubg-gold); margin: 0 0 4px; }
+    .sub { color: var(--pubg-muted); font-size: 0.8em; margin-bottom: 16px; }
+    .card { padding: 16px 18px; margin-bottom: 16px; }
+    .bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;
+           margin-bottom: 16px; }
+    label { display: flex; flex-direction: column; gap: 4px;
+            color: var(--pubg-muted); font-size: 0.72em; font-weight: 700;
+            letter-spacing: 0.08em; text-transform: uppercase; }
+    input, select { background: var(--theme-surface, #140c1e);
+                    border: 1px solid var(--pubg-border);
+                    color: var(--theme-text, #fff); padding: 7px 9px;
+                    border-radius: 3px; font-family: inherit; font-size: 0.9rem;
+                    min-height: 24px; min-width: 240px; }
+    button { background: color-mix(in srgb, var(--theme-accent, #f2b705) 15%, transparent);
+             border: 1px solid var(--pubg-gold); color: var(--pubg-gold);
+             padding: 8px 16px; border-radius: 3px; cursor: pointer;
+             font-family: inherit; font-weight: 700; letter-spacing: 0.06em;
+             text-transform: uppercase; font-size: 11px; min-height: 24px; }
+    button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 2px solid var(--pubg-gold); outline-offset: 2px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.86em; }
+    th, td { padding: 5px 8px; text-align: left;
+             border-bottom: 1px solid rgba(255,255,255,0.06); }
+    th { font-size: 0.72em; color: var(--pubg-muted); text-transform: uppercase;
+         letter-spacing: 0.08em; font-weight: 700; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tbody tr.sel { background: color-mix(in srgb, var(--theme-accent, #f2b705) 10%, transparent); }
+    tbody tr[tabindex] { cursor: pointer; }
+    tbody tr[tabindex]:hover { background: rgba(255,255,255,0.04); }
+    .scroll { overflow-x: auto; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+             gap: 10px; margin-bottom: 14px; }
+    .stats div { display: flex; flex-direction: column; gap: 2px; }
+    .stats .l { color: var(--pubg-muted); font-size: 0.7em; font-weight: 700;
+                letter-spacing: 0.08em; text-transform: uppercase; }
+    .stats .v { color: var(--pubg-gold); font-weight: 700; font-size: 1.15em;
+                font-variant-numeric: tabular-nums; }
+    .zone-row { display: flex; align-items: center; gap: 8px; margin: 3px 0;
+                font-size: 0.85em; }
+    .zone-row .n { width: 92px; color: var(--pubg-muted); }
+    .zone-row .track { flex: 1; height: 12px; background: rgba(255,255,255,0.07);
+                       border-radius: 2px; overflow: hidden; }
+    .zone-row .fill { height: 100%; background: var(--pubg-gold);
+                      width: var(--pct, 0%); }
+    .zone-row .fill.ref { background: var(--pubg-muted); opacity: 0.55; }
+    .zone-row .p { width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
+    .flag { display: inline-block; padding: 2px 8px; border-radius: 3px;
+            font-size: 0.72em; font-weight: 700; letter-spacing: 0.05em;
+            border: 1px solid var(--theme-danger, #e57b7b);
+            color: var(--theme-danger, #e57b7b); margin-right: 6px; }
+    .flag.weak { border-color: var(--pubg-muted); color: var(--pubg-muted); }
+    .note { color: var(--pubg-muted); font-size: 0.78em; line-height: 1.45;
+            margin-top: 10px; }
+    .legend { color: var(--pubg-muted); font-size: 0.72em; margin-top: 6px; }
+    .err { color: var(--theme-danger, #e57b7b); }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <h1>PUBG Match-Analyse</h1>
+  <div class="sub" id="sub">Telemetrie-Auswertung aus dem Archiv oder der PUBG-API</div>
+
+  <div class="bar">
+    <label for="mid">Match-ID
+      <input id="mid" type="text" placeholder="z.B. a0b6a159-93e3-47af-a92e-55e23092057c">
+    </label>
+    <button type="button" id="go">Analysieren</button>
+  </div>
+
+  <div class="pubg-card card" id="status">Match-ID eingeben und analysieren.</div>
+
+  <div class="pubg-card card" id="anomalyCard" hidden>
+    <h2 class="l">Auffälligkeiten</h2>
+    <div id="anomalies"></div>
+  </div>
+
+  <div class="pubg-card card" id="tableCard" hidden>
+    <div class="scroll">
+      <table>
+        <thead><tr>
+          <th>Spieler</th><th class="num">Schuss</th><th class="num">Treffer</th>
+          <th class="num">Acc %</th><th class="num">Leer %</th><th class="num">HS %</th>
+          <th class="num">Glied %</th><th class="num">Kills</th>
+          <th class="num">Schaden</th><th>Auffällig</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="legend">Zeile anklicken für Details. „Glied %" = Arm-, Bein- und
+      Beckentreffer — beim Sprayen unvermeidlich, bei Aim-Assist auffällig niedrig.
+      „Leer %" = Schüsse ohne Gegner in 300 m; damit lässt sich die eigene Accuracy
+      künstlich drücken. Die Zonenverteilung ist dagegen immun, sie kennt nur Treffer.</div>
+  </div>
+
+  <div class="pubg-card card" id="detailCard" hidden>
+    <h2 id="who"></h2>
+    <div class="stats" id="stats"></div>
+    <div id="zones"></div>
+    <div class="scroll" id="killWrap">
+      <table>
+        <thead><tr>
+          <th>Zeit</th><th>Opfer</th><th>Waffe</th>
+          <th class="num">Distanz</th><th>Zone</th>
+        </tr></thead>
+        <tbody id="kills"></tbody>
+      </table>
+    </div>
+    <div class="note" id="note"></div>
+  </div>
+
+  <script src="../widgets/pubg/_pubg.js"></script>
+  <script>
+    const BASE = window.__SERVE_BASE__ || "/";
+    const esc = PubgUI.esc;
+    let DATA = null, SEL = null;
+
+    const ZONE_LABEL = { HeadShot: "Kopf", TorsoShot: "Torso", ArmShot: "Arme",
+                         LegShot: "Beine", PelvisShot: "Becken" };
+    const FLAG_TEXT = {
+      narrow_hit_pattern: "Trefferbild zu schmal",
+      headshot_rate_rises_with_distance: "Kopftreffer steigen mit Distanz",
+      wallbangs: "Treffer durch Wände",
+    };
+
+    function limbPct(p) {
+      const z = p.zones || {};
+      const l = (z.ArmShot || 0) + (z.LegShot || 0) + (z.PelvisShot || 0);
+      return p.hits ? (100 * l / p.hits) : 0;
+    }
+
+    function renderAnomalies() {
+      const an = DATA.anomalies || {};
+      const hits = Object.entries(an).filter(([, r]) => r.flags && r.flags.length);
+      const card = document.getElementById("anomalyCard");
+      if (!hits.length) {
+        card.hidden = false;
+        document.getElementById("anomalies").textContent =
+          "Keine auffälligen Treffermuster in diesem Match.";
+        return;
+      }
+      hits.sort((a, b) => a[1].pValue - b[1].pValue);
+      document.getElementById("anomalies").innerHTML = hits.map(([n, r]) => {
+        const flags = r.flags.map(f =>
+          `<span class="flag${r.significantCorrected ? "" : " weak"}">${esc(FLAG_TEXT[f] || f)}</span>`).join("");
+        return `<div class="zone-row"><b>${esc(n)}</b> ${flags}
+          <span class="p">${r.limbPct}%</span>
+          <span class="n">statt ${r.expectedLimbPct}% erwartet</span></div>
+          <div class="legend">p = ${r.pValue.toExponential(1)} ·
+            ${r.significantCorrected
+              ? "hält der Korrektur für " + r.tested + " getestete Spieler stand"
+              : "fällt bei " + r.tested + " getesteten Spielern durch die Mehrfachtest-Korrektur"}</div>`;
+      }).join("");
+      card.hidden = false;
+    }
+
+    function renderTable() {
+      const an = DATA.anomalies || {};
+      const rows = Object.entries(DATA.players)
+        .filter(([, p]) => p.shots >= 20 || p.kills > 0)
+        .sort((a, b) => b[1].accuracy - a[1].accuracy);
+      document.getElementById("rows").innerHTML = rows.map(([n, p]) => {
+        const fl = (an[n] && an[n].flags) || [];
+        const badge = fl.length
+          ? `<span class="flag${an[n].significantCorrected ? "" : " weak"}">${fl.length}</span>` : "";
+        return `<tr tabindex="0" data-p="${esc(n)}">
+          <td>${esc(n)}</td><td class="num">${p.shots}</td>
+          <td class="num">${p.hitAttacks}</td><td class="num">${p.accuracy.toFixed(1)}</td>
+          <td class="num">${p.emptyShotPct == null ? "—" : p.emptyShotPct.toFixed(0)}</td>
+          <td class="num">${p.headshotRate.toFixed(1)}</td>
+          <td class="num">${limbPct(p).toFixed(1)}</td>
+          <td class="num">${p.kills}</td><td class="num">${Math.round(p.damage)}</td>
+          <td>${badge}</td></tr>`;
+      }).join("");
+      document.getElementById("tableCard").hidden = false;
+    }
+
+    function renderDetail(name) {
+      const p = DATA.players[name];
+      if (!p) return;
+      SEL = name;
+      [...document.querySelectorAll("#rows tr")].forEach(tr =>
+        tr.classList.toggle("sel", tr.dataset.p === name));
+      document.getElementById("who").textContent = name;
+      const an = (DATA.anomalies || {})[name];
+      document.getElementById("stats").innerHTML = [
+        ["Schüsse", p.shots], ["Getroffen", p.hitAttacks],
+        ["Accuracy", p.accuracy.toFixed(1) + " %"],
+        ["Schuss ohne Ziel", p.emptyShotPct == null ? "—" : p.emptyShotPct.toFixed(0) + " %"],
+        ["Einschläge", p.hits], ["Kopftreffer", p.headshotRate.toFixed(1) + " %"],
+        ["Kills", p.kills], ["Knocks", p.knocks],
+        ["Schaden", Math.round(p.damage)],
+        ["Durch Wand", p.wallbangs],
+        ["Treffer Bots", p.hitsOnBots], ["Treffer Spieler", p.hitsOnHumans],
+      ].map(([l, v]) => `<div><span class="l">${esc(l)}</span><span class="v">${esc(v)}</span></div>`).join("");
+
+      const ref = an ? an.expectedLimbPct : null;
+      const zp = p.zonePct || {};
+      const order = ["HeadShot", "TorsoShot", "ArmShot", "LegShot", "PelvisShot"];
+      document.getElementById("zones").innerHTML =
+        `<div class="legend">Trefferzonen (${p.hits} Einschläge)</div>` +
+        order.filter(z => zp[z] != null).map(z =>
+          `<div class="zone-row"><span class="n">${esc(ZONE_LABEL[z] || z)}</span>
+            <span class="track"><span class="fill" data-pct="${zp[z]}"></span></span>
+            <span class="p">${zp[z]}%</span></div>`).join("") +
+        (ref != null ? `<div class="legend">Gliedmaßen gesamt:
+            <b>${an.limbPct}%</b> — im Match erwartet: ${ref}%</div>` : "");
+      // Breiten über Custom-Property statt Inline-Style setzen.
+      [...document.querySelectorAll("#zones .fill")].forEach(el =>
+        el.style.setProperty("--pct", el.dataset.pct + "%"));
+
+      const ks = (DATA.kills || []).filter(k => k.killer === name);
+      document.getElementById("kills").innerHTML = ks.length ? ks.map(k =>
+        `<tr><td>${esc((k.time || "").slice(11, 19))}</td>
+          <td>${esc(k.victim)}${k.victimIsBot ? " <span class='legend'>(Bot)</span>" : ""}</td>
+          <td>${esc(k.weapon || "?")}</td>
+          <td class="num">${k.distanceM == null ? "—" : k.distanceM.toFixed(0) + " m"}</td>
+          <td>${esc(ZONE_LABEL[k.zone] || k.zone || "?")}</td></tr>`).join("")
+        : `<tr><td colspan="5">Keine Kills</td></tr>`;
+
+      document.getElementById("note").textContent = an && an.flags.length
+        ? "Hinweis: Auffälligkeiten sind statistische Muster, kein Beweis. "
+          + "Kleine Stichproben können täuschen — für eine belastbare Aussage "
+          + "braucht es mehrere Matches desselben Spielers."
+        : "";
+      document.getElementById("detailCard").hidden = false;
+    }
+
+    document.getElementById("rows").addEventListener("click", e => {
+      const tr = e.target.closest("tr[data-p]");
+      if (tr) renderDetail(tr.dataset.p);
+    });
+    document.getElementById("rows").addEventListener("keydown", e => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const tr = e.target.closest("tr[data-p]");
+      if (tr) { e.preventDefault(); renderDetail(tr.dataset.p); }
+    });
+
+    async function run() {
+      const mid = document.getElementById("mid").value.trim();
+      if (!mid) return;
+      const st = document.getElementById("status");
+      st.classList.remove("err");
+      st.textContent = "Lade Telemetrie … (kann einige Sekunden dauern)";
+      ["anomalyCard", "tableCard", "detailCard"].forEach(id =>
+        document.getElementById(id).hidden = true);
+      try {
+        DATA = await PubgUI.fetchJson(
+          BASE + "api/pubg/match-analysis?matchId=" + encodeURIComponent(mid), 120000);
+        st.textContent = `${DATA.eventCount.toLocaleString("de-DE")} Events · Quelle: `
+          + (DATA.source === "hidrive" ? "HiDrive-Archiv" : "PUBG-API")
+          + (DATA.map ? ` · ${PubgUI.fmtMap(DATA.map)}` : "")
+          + (DATA.playedAt ? ` · ${PubgUI.fmtDate(DATA.playedAt)} ${PubgUI.fmtTime(DATA.playedAt)}` : "");
+        renderAnomalies();
+        renderTable();
+        const pre = PubgUI.qs("player", "");
+        if (pre && DATA.players[pre]) renderDetail(pre);
+      } catch (err) {
+        st.classList.add("err");
+        st.textContent = String(err && err.message || err).includes("404")
+          ? "Keine Telemetrie für dieses Match — weder im Archiv noch über die API "
+            + "(die PUBG-API hält Matches nur rund 17 Tage vor)."
+          : "Analyse fehlgeschlagen: " + (err && err.message || err);
+      }
+    }
+
+    document.getElementById("go").addEventListener("click", run);
+    document.getElementById("mid").addEventListener("keydown", e => {
+      if (e.key === "Enter") run();
+    });
+    const q = PubgUI.qs("matchId", "");
+    if (q) { document.getElementById("mid").value = q; run(); }
+  </script>
+</body>
+</html>
