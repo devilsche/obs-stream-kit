@@ -669,3 +669,21 @@ def test_weapon_kills_appear_even_without_attack_events():
     die Waffe nicht verschwinden lassen."""
     w = analyse([_kill("A", "X", weapon="WeapKar98k_C")])["players"]["A"]["weapons"]
     assert w["Kar98k"]["kills"] == 1
+
+
+def test_skin_variants_map_to_the_base_weapon():
+    """Duncans M416 ist ein Skin (Sanhok, Loot-LKW) mit denselben Werten.
+    Die beiden Event-Typen nennen ihn UNTERSCHIEDLICH aufgebaut —
+    Item_Weapon_Duncans_M416_C gegen WeapDuncansHK416_C. Ohne Mapping
+    landen Schuesse und Treffer unter zwei Namen und keine Quote stimmt."""
+    assert normalize_weapon("Item_Weapon_Duncans_M416_C") == "M416"
+    assert normalize_weapon("WeapDuncansHK416_C") == "M416"
+    assert normalize_weapon("Item_Weapon_Duncans_M416_C") == normalize_weapon("WeapDuncansHK416_C")
+
+
+def test_heist_variants_stay_separate():
+    """HR-Varianten stammen aus dem heistroyale-Modus und haben rund den
+    doppelten Schaden — die duerfen NICHT mit der Basiswaffe verschmelzen."""
+    assert normalize_weapon("WeapHK416_HR_C") != "M416"
+    assert "Heist" in normalize_weapon("WeapHK416_HR_C")
+    assert "M416" in normalize_weapon("WeapHK416_HR_C")

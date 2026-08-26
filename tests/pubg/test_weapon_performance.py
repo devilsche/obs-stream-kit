@@ -170,3 +170,39 @@ def test_to_db_rows_needs_account_ids():
     a = {"players": {"Ghost": {"teamId": 1, "isBot": False,
                                "weapons": {"AKM": _w(5, 1, 1, 20.0)}}}}
     assert to_db_rows(a, account_ids={}) == []
+
+
+# ── Waffen-Kategorien ───────────────────────────────────────────────────────
+
+from pubg.weapon_performance import weapon_categories, weapons_in_category
+
+
+def test_categories_are_derived_from_the_existing_table():
+    """Die Kategorie steht schon in WEAPON_NAMES — kein Schema-Change noetig."""
+    cats = weapon_categories()
+    assert "ar" in cats and "dmr" in cats and "sniper" in cats
+    assert cats["ar"]["label"]           # jede Kategorie hat eine Beschriftung
+    assert cats["sniper"]["count"] > 0
+
+
+def test_weapons_in_category_returns_ingame_names():
+    """Gefiltert wird gegen die Namen in der DB, also die aus dem Spiel."""
+    ars = weapons_in_category("ar")
+    assert "M416" in ars and "Beryl" in ars
+    assert "Kar98k" not in ars
+    snipers = weapons_in_category("sniper")
+    assert "Kar98k" in snipers and "AWM" in snipers
+
+
+def test_unknown_category_is_empty_not_an_error():
+    assert weapons_in_category("laser") == []
+
+
+def test_categories_do_not_overlap_for_the_common_ones():
+    """Eine Waffe darf nicht in zwei Kampf-Kategorien stehen, sonst zaehlt
+    der Filter doppelt."""
+    seen = {}
+    for cat in ("ar", "dmr", "sniper", "smg", "lmg", "shotgun", "pistol"):
+        for w in weapons_in_category(cat):
+            assert w not in seen, f"{w} in {cat} und {seen.get(w)}"
+            seen[w] = cat

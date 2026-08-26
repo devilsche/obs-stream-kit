@@ -907,7 +907,8 @@ def get_matches_without_weapon_stats(conn, tenant_id: int, limit: int = 100000) 
 
 def aggregate_weapon_stats(conn, tenant_id: int, since: str,
                            account_id: str = None, player_name: str = None,
-                           weapon: str = None, group_by: str = "weapon",
+                           weapon: str = None, weapons=None,
+                           group_by: str = "weapon",
                            include_bots: bool = True, limit: int = 200) -> list:
     """Fasst ueber einen Zeitraum zusammen — je Waffe oder je Spieler.
 
@@ -924,6 +925,8 @@ def aggregate_weapon_stats(conn, tenant_id: int, since: str,
         where.append("LOWER(w.player_name) = LOWER(%s)"); params.append(player_name)
     if weapon:
         where.append("w.weapon = %s"); params.append(weapon)
+    if weapons:
+        where.append("w.weapon = ANY(%s)"); params.append(list(weapons))
     if not include_bots:
         where.append("w.is_bot = FALSE")
     params.append(limit)

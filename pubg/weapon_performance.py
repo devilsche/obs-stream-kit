@@ -81,6 +81,43 @@ def squad_slice(analysis: dict, player: str) -> dict:
             "map": (analysis or {}).get("map")}
 
 
+#: Beschriftung und Reihenfolge der Waffen-Kategorien fuer die Oberflaeche.
+#: Die Zuordnung Waffe -> Kategorie steht bereits in WEAPON_NAMES, deshalb
+#: braucht es dafuer keine eigene Spalte in der DB.
+CATEGORY_LABELS = [
+    ("ar",        "AR"),
+    ("dmr",       "DMR"),
+    ("sniper",    "Sniper"),
+    ("smg",       "SMG"),
+    ("lmg",       "LMG"),
+    ("shotgun",   "Shotgun"),
+    ("pistol",    "Pistol"),
+    ("throwable", "Throwable"),
+    ("melee",     "Melee"),
+]
+
+
+def _weapons_by_category() -> dict:
+    from pubg.aggregations import WEAPON_NAMES
+    out = {}
+    for name, cat in WEAPON_NAMES.values():
+        out.setdefault(cat, set()).add(name)
+    return out
+
+
+def weapon_categories() -> dict:
+    """{key: {label, count}} in Anzeige-Reihenfolge — fuer die Filter-Chips."""
+    by = _weapons_by_category()
+    return {key: {"label": label, "count": len(by.get(key, ()))}
+            for key, label in CATEGORY_LABELS if by.get(key)}
+
+
+def weapons_in_category(category: str) -> list:
+    """Die Namen AUS DEM SPIEL, gegen die in der DB gefiltert wird.
+    Unbekannte Kategorie -> leere Liste, kein Fehler."""
+    return sorted(_weapons_by_category().get(category, ()))
+
+
 #: analyse()-Zonennamen -> Spaltennamen der Tabelle.
 _ZONE_COL = {"HeadShot": "head", "TorsoShot": "torso", "ArmShot": "arm",
              "LegShot": "leg", "PelvisShot": "pelvis"}

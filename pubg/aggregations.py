@@ -309,6 +309,10 @@ WEAPON_NAMES = {
     # Assault Rifles
     "WeapHK416_C":          ("M416",        "ar"),
     "WeapDuncansHK416_C":   ("M416",        "ar"),  # Marketplace-Skin
+    # Der Attack-Event nennt denselben Skin anders aufgebaut als der
+    # Damage-Event (Duncans_M416 gegen DuncansHK416). Ohne diese Zeile
+    # landen Schuesse und Treffer unter zwei Namen und keine Quote stimmt.
+    "WeapDuncans_M416_C":   ("M416",        "ar"),
     "WeapBerylM762_C":      ("Beryl",       "ar"),
     "WeapAK47_C":           ("AKM",         "ar"),
     "WeapSCAR-L_C":         ("SCAR-L",      "ar"),
@@ -512,6 +516,16 @@ def _weapon_label(weapon_id):
     # Explizite Lookups zuerst
     if weapon_id in WEAPON_NAMES:
         return WEAPON_NAMES[weapon_id]
+    # heistroyale-Varianten (_HR_): dieselbe Waffenfamilie, aber eigene
+    # Werte — im gemessenen Match rund doppelter Schaden je Treffer. Nicht
+    # mit der Basiswaffe verschmelzen, aber lesbar benennen.
+    if "_HR_" in weapon_id or weapon_id.endswith("_HR"):
+        base = weapon_id.replace("_HR_", "_").replace("_HR", "")
+        if not base.endswith("_C"):
+            base += "_C"
+        label, cat = _weapon_label(base)
+        if label != "Unknown":
+            return (f"{label} (Heist)", cat)
     if weapon_id in _ENVIR_NAMES:
         return (_ENVIR_NAMES[weapon_id], "envir")
     # Vehicle-Pattern matchen — fasst Skin-Varianten zusammen

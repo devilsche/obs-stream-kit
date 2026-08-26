@@ -68,6 +68,7 @@
     tbody tr[tabindex] { cursor: pointer; }
     tbody tr[tabindex]:hover { background: color-mix(in srgb, var(--theme-text) 6%, transparent); }
     .scroll { overflow-x: auto; }
+    .chips { margin: 4px 0 12px; }
     .legend { color: var(--theme-text-dim); font-size: 0.72em; margin-top: 8px;
               line-height: 1.45; }
     .warn { color: var(--theme-warn); }
@@ -103,6 +104,12 @@
         <input id="fWeapon" type="text" placeholder="e.g. Kar98k — empty = all">
       </label>
     </div>
+    <div>
+      <span class="legend">Weapon class</span>
+      <div class="switch chips" id="catSwitch" role="group" aria-label="Weapon class">
+        <button type="button" data-cat="" aria-pressed="true">All</button>
+      </div>
+    </div>
     <div class="legend" id="status">Loading …</div>
   </div>
 
@@ -126,6 +133,7 @@
 
     let RANGE = PubgUI.qs("range", "session");
     let GROUP = PubgUI.qs("groupBy", "weapon");
+    let CAT   = PubgUI.qs("category", "");
     let DATA = null, SORT_KEY = "damage", SORT_DIR = -1;
 
     function cols() {
@@ -205,12 +213,15 @@
       const wp = document.getElementById("fWeapon").value.trim();
       if (pl) params.set("player", pl);
       if (wp) params.set("weapon", wp);
+      if (CAT) params.set("category", CAT);
       try {
         DATA = await PubgUI.fetchJson(BASE + "api/pubg/weapon-performance?" + params, 60000);
         const who = DATA.player ? `player ${DATA.player}` : (pl ? `player ${pl}` : "me");
         st.textContent = `${RANGE} · grouped by ${DATA.groupBy}`
+          + (DATA.category ? ` · class ${DATA.category.toUpperCase()}` : "")
           + (DATA.weapon ? ` · weapon ${DATA.weapon}` : "")
           + ` · ${DATA.player || pl ? who : "own account"}`;
+        renderChips();
         render();
       } catch (e) {
         st.classList.add("err");
@@ -219,6 +230,28 @@
         document.getElementById("tableCard").hidden = true;
       }
     }
+
+    // Chips aus den Kategorien, die der Server kennt — die Zuordnung lebt
+    // in WEAPON_NAMES, nicht hier.
+    function renderChips() {
+      const box = document.getElementById("catSwitch");
+      if (box.dataset.built) { press(box, "cat", CAT); return; }
+      const cats = DATA.categories || {};
+      box.innerHTML = `<button type="button" data-cat="">All</button>`
+        + Object.entries(cats).map(([k, v]) =>
+            `<button type="button" data-cat="${esc(k)}" title="${v.count} weapons">`
+            + `${esc(v.label)}</button>`).join("");
+      box.dataset.built = "1";
+      press(box, "cat", CAT);
+    }
+
+    document.getElementById("catSwitch").addEventListener("click", e => {
+      const b = e.target.closest("button[data-cat]");
+      if (!b || b.dataset.cat === CAT) return;
+      CAT = b.dataset.cat;
+      press(e.currentTarget, "cat", CAT);
+      load();
+    });
 
     function press(container, attr, value) {
       [...container.querySelectorAll("button")].forEach(b =>

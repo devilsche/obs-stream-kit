@@ -127,3 +127,17 @@ def test_matches_with_stats_is_reported(pg_compat):
     todo = db_pg.get_matches_without_weapon_stats(conn.raw, t)
     ids = {r["match_id"] for r in todo}
     assert "m12" in ids and "m11" not in ids
+
+
+def test_filter_by_weapon_list(pg_compat):
+    """Kategorie-Filter laeuft ueber eine Waffenliste — so braucht die
+    Tabelle keine eigene Kategorie-Spalte."""
+    conn, t = pg_compat[0], pg_compat[1]
+    _match(conn, t, "mc1", "2026-08-01T18:00:00Z")
+    db_pg.upsert_weapon_stats(conn.raw, t, "mc1", [
+        _rows(weapon="M416", shots=10),
+        _rows(weapon="Kar98k", shots=20),
+        _rows(weapon="Beryl", shots=30)])
+    out = db_pg.aggregate_weapon_stats(conn.raw, t, since="1970-01-01T00:00:00Z",
+                                       weapons=["M416", "Beryl"], group_by="weapon")
+    assert {r["weapon"] for r in out} == {"M416", "Beryl"}

@@ -770,7 +770,9 @@ class EndpointRegistry:
         Matches meldet `matchesPending`, nachzuholen per Backfill-CLI.
         """
         from pubg.aggregations import _range_filter
-        from pubg.weapon_performance import db_rows_to_display
+        from pubg.weapon_performance import (db_rows_to_display,
+                                             weapon_categories,
+                                             weapons_in_category)
         from pubg import db_pg
 
         range_key = (qs.get("range") or "session").strip()
@@ -783,7 +785,13 @@ class EndpointRegistry:
         conn = self.get_conn()
         player = (qs.get("player") or "").strip()
         weapon = (qs.get("weapon") or "").strip()
+        category = (qs.get("category") or "").strip()
         include_bots = qs.get("bots") == "1"
+        # Kategorie -> Liste der Waffennamen. Die Zuordnung steht in
+        # WEAPON_NAMES, deshalb braucht die Tabelle keine eigene Spalte.
+        weapon_list = weapons_in_category(category) if category else None
+        if category and not weapon_list:
+            return _err(400, f"unknown category: {category}")
 
         # Ohne Filter waere "je Waffe" die Summe ueber alle 100 Lobby-Spieler
         # und damit ohne Aussage — dann auf den eigenen Account einschraenken.
@@ -796,7 +804,7 @@ class EndpointRegistry:
         rows = db_pg.aggregate_weapon_stats(
             conn.raw, self.tenant_id, since=cutoff,
             account_id=account_id, player_name=player or None,
-            weapon=weapon or None, group_by=group_by,
+            weapon=weapon or None, weapons=weapon_list, group_by=group_by,
             include_bots=include_bots)
 
         pending = conn.execute("""
@@ -813,6 +821,8 @@ class EndpointRegistry:
             "groupBy": group_by,
             "player": player or None,
             "weapon": weapon or None,
+            "category": category or None,
+            "categories": weapon_categories(),
             "matchesPending": (pending or {}).get("n", 0) or 0,
         })
 
