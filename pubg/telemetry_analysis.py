@@ -154,9 +154,14 @@ def _weapon_out(v: dict) -> dict:
         "accuracy": (round(min(100.0, 100.0 * hit_attacks / v["shots"]), 1)
                      if v["shots"] else 0),
         "damage": round(v["damage"], 1),
-        # Schnitt pro Einschlag: haengt an Zone und Helm, deshalb
-        # aussagekraeftiger als die Summe.
+        # Zwei Schnitte, weil sie verschiedene Fragen beantworten:
+        # je Einschlag zeigt die Wucht eines Treffers (Zone, Helm, Weste),
+        # je abgegebenem Schuss den effektiven Ertrag — bei Schrot zaehlt
+        # eine ganze Ladung als ein Schuss, und Fehlschuesse druecken den
+        # Wert, was bei AR/DMR den Vergleich erst fair macht.
         "avgDamage": round(v["damage"] / v["hits"], 1) if v["hits"] else 0,
+        "avgDamagePerShot": (round(v["damage"] / v["shots"], 1)
+                             if v["shots"] else 0),
         "topZone": top,
         "topZonePct": (round(100.0 * zones[top] / total_z, 1)
                        if top and total_z else 0),

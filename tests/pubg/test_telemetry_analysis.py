@@ -552,3 +552,33 @@ def test_weapon_top_zone_none_without_hits():
     w = analyse(ev)["players"]["A"]["weapons"]["Grenade"]
     assert w["topZone"] is None
     assert w["accuracy"] == 0
+
+
+def test_weapon_damage_per_shot_alongside_per_impact():
+    """Bei Schrot ist Schaden je EINSCHLAG irrefuehrend (ein Pellet), je
+    SCHUSS trifft es: 9 Pellets à 11 sind ein Schuss mit 99 Schaden."""
+    ev = [_attack("A", "Item_Weapon_Berreta686_C", aid=7)]
+    ev += [_damage("A", "B", weapon="WeapBerreta686_C", damage=11.0, aid=7)
+           for _ in range(9)]
+    w = analyse(ev)["players"]["A"]["weapons"]["S686"]
+    assert w["avgDamage"] == pytest.approx(11.0)        # je Einschlag
+    assert w["avgDamagePerShot"] == pytest.approx(99.0)  # je abgegebenem Schuss
+
+
+def test_damage_per_shot_is_the_same_as_per_impact_for_single_projectiles():
+    """Bei AR/DMR faellt ein Einschlag je Schuss an — beide Werte gleich,
+    solange jeder Schuss trifft."""
+    ev = [_attack("A", "Item_Weapon_M24_C", aid=1),
+          _damage("A", "B", weapon="WeapM24_C", damage=90.0, aid=1)]
+    w = analyse(ev)["players"]["A"]["weapons"]["M24"]
+    assert w["avgDamage"] == pytest.approx(90.0)
+    assert w["avgDamagePerShot"] == pytest.approx(90.0)
+
+
+def test_damage_per_shot_counts_misses():
+    """Fehlschuesse druecken den Wert je Schuss — genau das ist der Sinn."""
+    ev = [_attack("A", aid=1), _attack("A", aid=2),
+          _damage("A", "B", damage=30.0, aid=1)]
+    w = analyse(ev)["players"]["A"]["weapons"]["ACE32"]
+    assert w["avgDamage"] == pytest.approx(30.0)         # je Treffer
+    assert w["avgDamagePerShot"] == pytest.approx(15.0)  # 30 auf 2 Schuss
