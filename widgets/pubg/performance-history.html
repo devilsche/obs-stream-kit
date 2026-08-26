@@ -68,10 +68,14 @@
                pointer-events: none; padding: 6px 10px;
                background: color-mix(in srgb, var(--theme-surface, #140c1e) 95%, transparent);
                border: 1px solid var(--pubg-gold);
-               border-radius: 4px; font-size: 0.78em; white-space: nowrap;
+               border-radius: 4px; font-size: 0.78em;
+               /* Passt der Tooltip nicht in den Chart, bricht er um statt
+                  ueber den Rand hinauszuragen — clampen allein reicht dann nicht. */
+               max-width: calc(100% - 8px); white-space: normal;
                opacity: 0; transition: opacity 0.12s; z-index: 10;
                transform: translate(-50%, -110%); }
     .tooltip.show { opacity: 1; }
+    .tooltip.below { transform: translate(-50%, 10%); }
     .tooltip b { color: var(--pubg-gold); }
     .tooltip span { color: var(--pubg-muted); }
     .tooltip b.tt-active { color: var(--pubg-gold); }

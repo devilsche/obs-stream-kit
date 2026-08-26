@@ -643,6 +643,29 @@
   //   fmtY       — Formatter fuer Y-Achse und Ticks
   //   activeRow  — Label aus rows das im Tooltip hervorgehoben wird
   //   maxXLabels — X-Labels ausduennen (default 12)
+  // Haelt den Chart-Tooltip im sichtbaren Bereich. Er haengt per
+  // translate(-50%, -110%) mittig UEBER dem Punkt — ohne Korrektur ragt er
+  // am linken/rechten Rand aus dem .chart-wrap und wird abgeschnitten.
+  // Reine Rechnung ohne DOM-Zugriff, damit sie testbar bleibt.
+  //   dotX/dotY  — Punktmitte bzw. Punktoberkante, relativ zum Wrap
+  //   ttW/ttH    — gemessene Tooltip-Groesse
+  //   wrapW      — Breite des .chart-wrap
+  // Liefert {x, y, flip}: flip=true heisst "unter den Punkt geklappt",
+  // weil oben kein Platz war.
+  PubgUI.clampTooltip = function(dotX, dotY, ttW, ttH, wrapW, margin) {
+    const m = margin == null ? 4 : margin;
+    const half = ttW / 2;
+    let x = dotX;
+    // Passt der Tooltip ueberhaupt nicht, bleibt er zentriert — clampen
+    // wuerde ihn sonst auf der Gegenseite wieder rausschieben.
+    if (ttW + 2 * m <= wrapW) {
+      x = Math.min(Math.max(dotX, half + m), wrapW - half - m);
+    }
+    // -110% braucht ttH*1.1 Platz oberhalb des Punktes.
+    const flip = (dotY - ttH * 1.1) < m;
+    return { x: x, y: dotY, flip: flip };
+  };
+
   PubgUI.lineChart = function(opts) {
     const svg = opts.svg, tt = opts.tooltip, pts = opts.points || [];
     const fmtY = opts.fmtY || (v => String(Math.round(v || 0)));
@@ -707,9 +730,15 @@
           // Position ueber Custom-Props statt Inline-Style (siehe .tooltip-CSS).
           const wrap = c.closest(".chart-wrap").getBoundingClientRect();
           const r = c.getBoundingClientRect();
-          tt.style.setProperty("--tt-x", (r.left + r.width / 2 - wrap.left) + "px");
-          tt.style.setProperty("--tt-y", (r.top - wrap.top) + "px");
+          // show ZUERST, sonst misst offsetWidth/Height den noch leeren Zustand.
           tt.classList.add("show");
+          const pos = PubgUI.clampTooltip(
+            r.left + r.width / 2 - wrap.left,   // Punktmitte im Wrap
+            r.top - wrap.top,                   // Punktoberkante im Wrap
+            tt.offsetWidth, tt.offsetHeight, wrap.width);
+          tt.classList.toggle("below", pos.flip);
+          tt.style.setProperty("--tt-x", pos.x + "px");
+          tt.style.setProperty("--tt-y", (pos.flip ? pos.y + r.height : pos.y) + "px");
         });
         c.addEventListener("mouseleave", () => tt.classList.remove("show"));
       }
