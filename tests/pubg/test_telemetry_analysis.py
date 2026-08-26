@@ -582,3 +582,30 @@ def test_damage_per_shot_counts_misses():
     w = analyse(ev)["players"]["A"]["weapons"]["ACE32"]
     assert w["avgDamage"] == pytest.approx(30.0)         # je Treffer
     assert w["avgDamagePerShot"] == pytest.approx(15.0)  # 30 auf 2 Schuss
+
+
+def test_damage_per_landed_shot():
+    """Dritter Schnitt: je TREFFENDEM Schuss. Bei Schrot zaehlt ein Schuss
+    als Treffer, sobald mindestens ein Pellet sitzt — der gesamte Schaden
+    dieses Schusses geht ihm zu."""
+    ev = [_attack("A", "Item_Weapon_Berreta686_C", aid=7),
+          _attack("A", "Item_Weapon_Berreta686_C", aid=8)]      # Fehlschuss
+    ev += [_damage("A", "B", weapon="WeapBerreta686_C", damage=11.0, aid=7)
+           for _ in range(9)]
+    w = analyse(ev)["players"]["A"]["weapons"]["S686"]
+    assert w["avgDamage"] == pytest.approx(11.0)          # je Pellet
+    assert w["avgDamagePerShot"] == pytest.approx(49.5)   # 99 auf 2 Schuss
+    assert w["avgDamagePerLandedShot"] == pytest.approx(99.0)  # 99 auf 1 Treffer
+
+
+def test_damage_per_landed_shot_ignores_misses():
+    ev = [_attack("A", aid=1), _attack("A", aid=2), _attack("A", aid=3),
+          _damage("A", "B", damage=30.0, aid=1)]
+    w = analyse(ev)["players"]["A"]["weapons"]["ACE32"]
+    assert w["avgDamagePerShot"] == pytest.approx(10.0)        # 30 auf 3 Schuss
+    assert w["avgDamagePerLandedShot"] == pytest.approx(30.0)  # 30 auf 1 Treffer
+
+
+def test_damage_per_landed_shot_zero_without_hits():
+    w = analyse([_attack("A", "Item_Weapon_Grenade_C", aid=1)])["players"]["A"]["weapons"]["Grenade"]
+    assert w["avgDamagePerLandedShot"] == 0

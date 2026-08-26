@@ -162,6 +162,11 @@ def _weapon_out(v: dict) -> dict:
         "avgDamage": round(v["damage"] / v["hits"], 1) if v["hits"] else 0,
         "avgDamagePerShot": (round(v["damage"] / v["shots"], 1)
                              if v["shots"] else 0),
+        # Je TREFFENDEM Schuss: bei Schrot zaehlt ein Schuss als Treffer,
+        # sobald ein Pellet sitzt — der volle Schaden geht ihm zu. Das ist
+        # der Wert, der Schrot mit AR/DMR vergleichbar macht.
+        "avgDamagePerLandedShot": (round(v["damage"] / hit_attacks, 1)
+                                   if hit_attacks else 0),
         "topZone": top,
         "topZonePct": (round(100.0 * zones[top] / total_z, 1)
                        if top and total_z else 0),

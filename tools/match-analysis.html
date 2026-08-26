@@ -269,6 +269,7 @@
       { key: "acc",    label: "Acc %",   num: true,  val: r => r.accuracy },
       { key: "zone",   label: "Top zone", num: false, val: r => r.topZonePct },
       { key: "avgdmg", label: "Ø/impact", num: true,  val: r => r.avgDamage },
+      { key: "dphit",  label: "Ø/landed", num: true, val: r => r.avgDamagePerLandedShot },
       { key: "dpshot", label: "Ø/shot",  num: true,  val: r => r.avgDamagePerShot },
       { key: "dmg",    label: "Damage",  num: true,  val: r => r.damage },
     ];
@@ -317,6 +318,7 @@
           <td class="num">${r.shots ? r.accuracy.toFixed(1) : "—"}</td>
           <td class="${weak ? "weak-sample" : ""}">${zone}</td>
           <td class="num${weak ? " weak-sample" : ""}">${r.hits ? r.avgDamage.toFixed(1) : "—"}</td>
+          <td class="num${weak ? " weak-sample" : ""}">${r.hitAttacks ? r.avgDamagePerLandedShot.toFixed(1) : "—"}</td>
           <td class="num${weak ? " weak-sample" : ""}">${r.shots ? r.avgDamagePerShot.toFixed(1) : "—"}</td>
           <td class="num">${Math.round(r.damage)}</td>
         </tr>`;
@@ -438,12 +440,13 @@
           + `throwables show 0</div><div class="weapon-list">`
           + weapons.map(([w, v]) =>
             `<span class="weapon-chip" tabindex="0" data-w="${esc(w)}"
-              title="Hover to highlight this weapon's share in the zone bars. Ø/impact is the force of a single hit (zone, helmet, vest); Ø/shot is the effective yield per trigger pull and counts misses. Shotguns produce one impact per pellet, so impacts can exceed shots.">`
+              title="Hover to highlight this weapon's share in the zone bars. Ø/impact = force of a single hit (zone, helmet, vest). Ø/landed = damage per shot that connected — for shotguns a shot counts once even if several pellets hit. Ø/shot = effective yield per trigger pull, misses included. Shotguns produce one impact per pellet, so impacts can exceed shots.">`
             + `<span class="wc-n">${esc(w)}</span>`
             + `<span class="wc-v">${v.shots} shot${v.shots === 1 ? "" : "s"}`
             + ` · ${v.hits} impact${v.hits === 1 ? "" : "s"}`
             + `${v.damage ? ` · ${Math.round(v.damage)} dmg`
-                 + ` (Ø ${v.avgDamage}/impact, ${v.avgDamagePerShot}/shot)` : ""}`
+                 + ` (Ø ${v.avgDamage}/impact, ${v.avgDamagePerLandedShot}/landed shot,`
+                 + ` ${v.avgDamagePerShot}/shot)` : ""}`
             + `</span></span>`).join("")
           + `</div>`
         : "";
