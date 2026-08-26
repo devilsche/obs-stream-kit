@@ -134,7 +134,8 @@ def _new_player():
             "damage": 0.0, "kills": 0, "knocks": 0,
             "wallbangs": 0, "hitsOnBots": 0, "hitsOnHumans": 0,
             "zones": defaultdict(int),
-            "weapons": defaultdict(lambda: {"shots": 0, "hits": 0}),
+            "weapons": defaultdict(lambda: {"shots": 0, "hits": 0,
+                                            "zones": defaultdict(int)}),
             "byDistance": defaultdict(lambda: {"hits": 0, "headshots": 0})}
 
 
@@ -227,6 +228,8 @@ def analyse(events) -> dict:
             w = normalize_weapon(e.get("damageCauserName"))
             if w:
                 p["weapons"][w]["hits"] += 1
+                if zone:
+                    p["weapons"][w]["zones"][zone] += 1
             ax, ay = _loc(attacker)
             vx, vy = _loc(victim)
             if None not in (ax, ay, vx, vy):
@@ -303,7 +306,9 @@ def analyse(events) -> dict:
                         for z, n in zones.items()} if total_zone else {},
             "headshotRate": (round(100.0 * zones.get("HeadShot", 0) / hits, 1)
                              if hits else 0.0),
-            "weapons": {w: dict(v) for w, v in p["weapons"].items()},
+            "weapons": {w: {"shots": v["shots"], "hits": v["hits"],
+                            "zones": dict(v["zones"])}
+                        for w, v in p["weapons"].items()},
             "byDistance": {b: dict(v) for b, v in p["byDistance"].items()},
         }
     return {"players": out, "kills": kills,

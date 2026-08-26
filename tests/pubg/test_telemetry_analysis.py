@@ -130,8 +130,8 @@ def test_weapon_breakdown_joins_shots_and_hits():
     ev += [_damage("A", "B", weapon="WeapACE32_C") for _ in range(3)]
     ev += [_damage("A", "B", weapon="WeapM24_C")]
     w = analyse(ev)["players"]["A"]["weapons"]
-    assert w["ACE32"] == {"shots": 8, "hits": 3}
-    assert w["M24"] == {"shots": 2, "hits": 1}
+    assert (w["ACE32"]["shots"], w["ACE32"]["hits"]) == (8, 3)
+    assert (w["M24"]["shots"], w["M24"]["hits"]) == (2, 1)
 
 
 def test_distance_buckets_use_hit_geometry():
@@ -462,3 +462,31 @@ def test_roster_size_zero_without_create_events():
     r = analyse([_attack("A", aid=1)])
     assert r["rosterSize"] == 0
     assert r["playersWithoutEvents"] == []
+
+
+def test_weapon_breakdown_carries_hit_zones():
+    """Pro Waffe die Trefferzonen — sonst laesst sich nicht zeigen, WOMIT
+    jemand wo getroffen hat."""
+    ev = [_attack("A", "Item_Weapon_ACE32_C", aid=i) for i in range(5)]
+    ev += [_damage("A", "B", weapon="WeapACE32_C", reason="HeadShot", aid=1),
+           _damage("A", "B", weapon="WeapACE32_C", reason="TorsoShot", aid=2),
+           _damage("A", "B", weapon="WeapACE32_C", reason="TorsoShot", aid=3)]
+    ev += [_attack("A", "Item_Weapon_M24_C", aid=90)]
+    ev += [_damage("A", "B", weapon="WeapM24_C", reason="HeadShot", aid=90)]
+    w = analyse(ev)["players"]["A"]["weapons"]
+    assert w["ACE32"]["zones"] == {"HeadShot": 1, "TorsoShot": 2}
+    assert w["M24"]["zones"] == {"HeadShot": 1}
+
+
+def test_weapon_zones_sum_to_player_zones():
+    """Die Waffen-Aufschluesselung muss zur Gesamtverteilung passen."""
+    ev = [_attack("A", "Item_Weapon_ACE32_C", aid=1),
+          _attack("A", "Item_Weapon_M24_C", aid=2),
+          _damage("A", "B", weapon="WeapACE32_C", reason="ArmShot", aid=1),
+          _damage("A", "B", weapon="WeapM24_C", reason="ArmShot", aid=2)]
+    p = analyse(ev)["players"]["A"]
+    total = {}
+    for w in p["weapons"].values():
+        for z, n in w.get("zones", {}).items():
+            total[z] = total.get(z, 0) + n
+    assert total == p["zones"]

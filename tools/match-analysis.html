@@ -84,7 +84,21 @@
                        background: color-mix(in srgb, var(--theme-text) 9%, transparent);
                        border-radius: 2px; overflow: hidden; }
     .zone-row .fill { display: block; height: 100%; background: var(--theme-accent);
-                      width: var(--pct, 0%); min-width: 2px; }
+                      width: var(--pct, 0%); min-width: 2px; position: relative; }
+    /* Anteil der gehoverten Waffe — liegt IM Gesamtbalken, gleicher Nenner. */
+    .zone-row .fill-hl { display: block; height: 100%; width: var(--pct-hl, 0%);
+                         background: var(--theme-text); opacity: 0.85; }
+    .weapon-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+    .weapon-chip { display: inline-flex; align-items: baseline; gap: 6px;
+                   border: 1px solid color-mix(in srgb, var(--theme-text) 18%, transparent);
+                   border-radius: 3px; padding: 3px 9px; font-size: 0.82em;
+                   cursor: default; min-height: 24px; }
+    .weapon-chip:hover, .weapon-chip:focus-visible {
+      border-color: var(--theme-accent); color: var(--theme-accent);
+      outline: none; }
+    .weapon-chip .wc-n { font-weight: 700; }
+    .weapon-chip .wc-v { color: var(--theme-text-dim); font-size: 0.9em;
+                         font-variant-numeric: tabular-nums; }
     .zone-row .fill.ref { background: var(--theme-text-dim); opacity: 0.55; }
     .zone-row .p { width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
     .flag { display: inline-block; padding: 2px 8px; border-radius: 3px;
@@ -158,6 +172,7 @@
     <div class="t-section-label" id="who"></div>
     <div class="t-stat-grid t-stat-grid--compact" id="stats"></div>
     <div id="zones"></div>
+    <div id="weapons"></div>
     <div class="scroll" id="killWrap">
       <table>
         <thead><tr>
@@ -175,6 +190,7 @@
     const BASE = window.__SERVE_BASE__ || "/";
     const esc = PubgUI.esc;
     let DATA = null, SEL = null, MY_TEAM = null;
+    let WEAPON_ZONES = {}, HITS_TOTAL = 0;
 
     const ZONE_LABEL = { HeadShot: "Head", TorsoShot: "Torso", ArmShot: "Arms",
                          LegShot: "Legs", PelvisShot: "Pelvis" };
@@ -328,12 +344,32 @@
         `<div class="legend">Hit zones (${p.hits} impacts)</div>` +
         order.filter(z => zp[z] != null).map(z =>
           `<div class="zone-row"><span class="n">${esc(ZONE_LABEL[z] || z)}</span>
-            <span class="track"><span class="fill" data-pct="${zp[z]}"></span></span>
+            <span class="track"><span class="fill" data-pct="${zp[z]}"
+              data-zone="${esc(z)}"><span class="fill-hl"></span></span></span>
             <span class="p">${zp[z]}%</span></div>`).join("") +
         (ref != null ? `<div class="legend">Limbs total: <b>${an.limbPct}%</b> — expected in this match: ${ref}%</div>` : "");
       // Breiten über Custom-Property statt Inline-Style setzen.
       [...document.querySelectorAll("#zones .fill")].forEach(el =>
         el.style.setProperty("--pct", el.dataset.pct + "%"));
+
+      // Genutzte Waffen. Hover hebt in JEDEM Zonen-Balken den Anteil dieser
+      // Waffe hervor — gleicher Nenner wie die Gesamtquote, dadurch liegt das
+      // Segment massstabsgetreu im Balken.
+      const weapons = Object.entries(p.weapons || {})
+        .filter(([, w]) => w.hits > 0 || w.shots > 0)
+        .sort((a, b) => b[1].hits - a[1].hits || b[1].shots - a[1].shots);
+      document.getElementById("weapons").innerHTML = weapons.length
+        ? `<div class="legend">Weapons used</div><div class="weapon-list">`
+          + weapons.map(([w, v]) =>
+            `<span class="weapon-chip" tabindex="0" data-w="${esc(w)}"
+              title="Hover to highlight this weapon's share in the zone bars. Shotguns produce one impact per pellet, so impacts can exceed shots.">`
+            + `<span class="wc-n">${esc(w)}</span>`
+            + `<span class="wc-v">${v.shots} shot${v.shots === 1 ? "" : "s"}`
+            + ` · ${v.hits} impact${v.hits === 1 ? "" : "s"}</span></span>`).join("")
+          + `</div>`
+        : "";
+      WEAPON_ZONES = Object.fromEntries(weapons.map(([w, v]) => [w, v.zones || {}]));
+      HITS_TOTAL = p.hits || 0;
 
       const ks = (DATA.kills || []).filter(k => k.killer === name);
       document.getElementById("kills").innerHTML = ks.length ? ks.map(k =>
@@ -480,6 +516,33 @@
           : "Analysis failed: " + (err && err.message || err);
       }
     }
+
+    function highlightWeapon(w) {
+      const zones = (w && WEAPON_ZONES[w]) || null;
+      document.querySelectorAll("#zones .fill").forEach(fill => {
+        const hl = fill.querySelector(".fill-hl");
+        if (!hl) return;
+        if (!zones || !HITS_TOTAL) { hl.style.setProperty("--pct-hl", "0%"); return; }
+        const zoneTotalPct = Number(fill.dataset.pct) || 0;
+        const wPct = 100 * (zones[fill.dataset.zone] || 0) / HITS_TOTAL;
+        // Anteil INNERHALB des Zonenbalkens, damit das Segment passt.
+        hl.style.setProperty("--pct-hl",
+          zoneTotalPct ? (100 * wPct / zoneTotalPct).toFixed(1) + "%" : "0%");
+      });
+    }
+    const _weapBox = document.getElementById("weapons");
+    _weapBox.addEventListener("mouseover", e => {
+      const c = e.target.closest(".weapon-chip");
+      if (c) highlightWeapon(c.dataset.w);
+    });
+    _weapBox.addEventListener("mouseout", e => {
+      if (e.target.closest(".weapon-chip")) highlightWeapon(null);
+    });
+    _weapBox.addEventListener("focusin", e => {
+      const c = e.target.closest(".weapon-chip");
+      if (c) highlightWeapon(c.dataset.w);
+    });
+    _weapBox.addEventListener("focusout", () => highlightWeapon(null));
 
     const _dlg = document.getElementById("detailModal");
     document.getElementById("modalClose").addEventListener("click", () => _dlg.close());
