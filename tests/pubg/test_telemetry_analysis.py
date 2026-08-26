@@ -431,3 +431,34 @@ def test_bot_flag_also_from_high_team_id():
     ev = [_kill("A", "BotB")]
     ev[0]["victim"]["teamId"] = 200
     assert analyse(ev)["players"]["BotB"]["isBot"] is True
+
+
+def _create(name, team=1, acc=None):
+    return {"_T": "LogPlayerCreate", "_D": "2026-07-26T23:00:00Z",
+            "character": {"name": name, "teamId": team,
+                          "accountId": acc or ("account." + name)}}
+
+
+def test_roster_covers_players_without_any_combat_events():
+    """LogPlayerCreate ist das vollstaendige Teilnehmer-Roster. Wer nie
+    schiesst, trifft oder stirbt, fehlte vorher komplett — real 3 von 100."""
+    ev = [_create("Stumm"), _create("Kaempfer"), _attack("Kaempfer", aid=1)]
+    r = analyse(ev)
+    assert "Stumm" in r["players"]
+    assert r["players"]["Stumm"]["shots"] == 0
+    assert r["players"]["Stumm"]["teamId"] == 1
+    assert r["rosterSize"] == 2
+
+
+def test_players_without_events_are_reported_separately():
+    """Damit das Tool schreiben kann, fuer wen keine Daten vorliegen."""
+    ev = [_create("Stumm"), _create("Kaempfer"), _attack("Kaempfer", aid=1)]
+    r = analyse(ev)
+    assert r["playersWithoutEvents"] == ["Stumm"]
+
+
+def test_roster_size_zero_without_create_events():
+    """Aeltere Telemetrie ohne LogPlayerCreate darf nicht crashen."""
+    r = analyse([_attack("A", aid=1)])
+    assert r["rosterSize"] == 0
+    assert r["playersWithoutEvents"] == []

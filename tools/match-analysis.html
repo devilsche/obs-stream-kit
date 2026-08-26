@@ -54,6 +54,7 @@
     td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     /* Quoten aus winzigen Stichproben sind kein Ergebnis — abgesetzt zeigen. */
     td.weak-sample { opacity: 0.45; font-style: italic; }
+    tbody tr.nodata td { opacity: 0.5; }
     .inline-tog { display: inline-flex; flex-direction: row; align-items: center;
                   gap: 5px; text-transform: none; letter-spacing: 0; font-weight: 400;
                   margin-right: 10px; cursor: pointer; }
@@ -274,8 +275,12 @@
           ? `<span class="flag${an[n].significantCorrected ? "" : " weak"}">${fl.length}</span>` : "";
         // Eigenes Team hervorheben — sonst sucht man sich in 100 Zeilen tot.
         const mine = MY_TEAM != null && p.teamId === MY_TEAM;
-        return `<tr tabindex="0" data-p="${esc(n)}" class="${mine ? "own" : ""}">
-          <td>${esc(n)}${p.isBot ? ' <span class="bot-tag">bot</span>' : ""}</td>
+        // Kein einziges Kampf-Event: dafuer liegt nichts vor, das ist etwas
+        // anderes als "hat schlecht gespielt".
+        const noData = p.shots === 0 && p.hits === 0 && p.kills === 0 && p.knocks === 0;
+        return `<tr tabindex="0" data-p="${esc(n)}" class="${mine ? "own" : ""}${noData ? " nodata" : ""}">
+          <td>${esc(n)}${p.isBot ? ' <span class="bot-tag">bot</span>' : ""}`
+          + `${noData ? ' <span class="bot-tag" title="No combat events in the telemetry">no data</span>' : ""}</td>
           <td class="num team">${p.teamId ?? "—"}</td>
           <td class="num">${p.shots}</td>
           <td class="num">${p.hitAttacks}</td><td class="num">${p.accuracy.toFixed(1)}</td>
@@ -339,7 +344,11 @@
           <td>${esc(ZONE_LABEL[k.zone] || k.zone || "?")}</td></tr>`).join("")
         : `<tr><td colspan="5">Keine Kills</td></tr>`;
 
-      const weakNote = p.hits > 0 && p.hits < WEAK_SAMPLE
+      const noData = p.shots === 0 && p.hits === 0 && p.kills === 0 && p.knocks === 0;
+      const weakNote = noData
+        ? "No combat events for this player in the telemetry — they appear in the "
+          + "participant roster but never fired, hit or died on record."
+        : p.hits > 0 && p.hits < WEAK_SAMPLE
         ? `Only ${p.hits} impact${p.hits === 1 ? "" : "s"} — percentages below are `
           + `noise, not a result. Anomaly detection ignores players under 30 impacts.`
         : "";

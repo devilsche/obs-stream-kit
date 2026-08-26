@@ -143,6 +143,16 @@ def analyse(events) -> dict:
     players = defaultdict(_new_player)
     kills = []
     pos_idx = _position_index(events)
+    # LogPlayerCreate ist das vollstaendige Teilnehmer-Roster. Ohne das fehlen
+    # Spieler, die nie schiessen, treffen oder sterben — in einem gemessenen
+    # Match 3 von 100.
+    roster = set()
+    for e in events or []:
+        if e.get("_T") == "LogPlayerCreate":
+            n = (e.get("character") or {}).get("name")
+            if n:
+                roster.add(n)
+                players[n]           # anlegen, damit sie in der Ausgabe stehen
     # Team-Zuordnung aus allen Events sammeln — LogPlayerAttack fuehrt die
     # teamId nicht immer mit.
     team_of = {}
@@ -258,6 +268,12 @@ def analyse(events) -> dict:
 
     kills.sort(key=lambda k: k["time"] or "")
 
+    # Wer im Roster steht, aber keinerlei Kampf-Events hat: dafuer liegt
+    # schlicht nichts vor — das gehoert ausgewiesen, nicht verschwiegen.
+    without = sorted(n for n, p in players.items()
+                     if p["shots"] == 0 and p["hits"] == 0
+                     and p["kills"] == 0 and p["knocks"] == 0)
+
     out = {}
     for name, p in players.items():
         hits, shots = p["hits"], p["shots"]
@@ -290,7 +306,9 @@ def analyse(events) -> dict:
             "weapons": {w: dict(v) for w, v in p["weapons"].items()},
             "byDistance": {b: dict(v) for b, v in p["byDistance"].items()},
         }
-    return {"players": out, "kills": kills}
+    return {"players": out, "kills": kills,
+            "rosterSize": len(roster),
+            "playersWithoutEvents": without}
 
 
 # ── Auffaelligkeits-Bewertung ───────────────────────────────────────────────
