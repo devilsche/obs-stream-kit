@@ -1039,7 +1039,9 @@ const KILLFEED_MS   = 8000;   // Sichtdauer in REPLAY-Zeit
 const KILLFEED_MAX  = 5;      // mehr Zeilen verdecken die Karte
 
 function _kfWeapon(w) {
-  return (w || "?").replace(/^Weap/, "").replace(/_C$/, "");
+  // Der Replay-Endpoint liefert bereits den Namen aus dem Spiel
+  // (WEAPON_NAMES in aggregations.py), hier ist nichts mehr zu strippen.
+  return w || "?";
 }
 
 function renderKillfeed(ms) {
@@ -1241,7 +1243,7 @@ function hitTest(mx, my) {
     if (Math.hypot(ex - mx, ey - my) <= 8) {
       const verb = e.type === "kill" ? "killed" : "knocked";
       const dist = e.distance != null ? Math.round(e.distance / 100) + "m" : "?";
-      const wp = (e.weapon || "?").replace(/^Weap/, "").replace(/_C$/, "");
+      const wp = e.weapon || "?";
       const poi = poiAt(e.tx, e.ty);
       const loc = poi ? ` · ${poi}` : "";
       return `${RS._accName[e.targetId] || "?"} ${verb} by `

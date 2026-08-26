@@ -85,7 +85,11 @@
             margin-top: 10px; }
     .legend { color: var(--theme-text-dim); font-size: 0.72em; margin-top: 6px; }
     .err { color: var(--theme-warn); }
-    dialog#detailModal { max-width: min(860px, 92vw); width: 100%;
+    dialog#detailModal {
+      /* .t-card setzt margin-bottom und kippt damit die Zentrierung, die
+         <dialog> ueber margin:auto herstellt — hier explizit zurueckholen. */
+      margin: auto; max-height: 86vh; overflow: auto;
+      max-width: min(860px, 92vw); width: 100%;
       border: 1px solid color-mix(in srgb, var(--theme-text) 20%, transparent);
       color: var(--theme-text); position: relative; }
     dialog#detailModal::backdrop { background: rgb(0 0 0 / 0.6); }

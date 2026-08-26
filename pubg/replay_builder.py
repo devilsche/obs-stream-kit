@@ -46,6 +46,11 @@ def _loc(obj):
     return loc.get("x"), loc.get("y")
 
 
+def _weapon_label(weapon_id):
+    from pubg.aggregations import _weapon_label as _wl
+    return _wl(weapon_id)
+
+
 def extract_events(raw_events, mapKm, position_interval_ms=1000):
     """Raw PUBG-Events → flache, sortierte Replay-Event-Liste fuer ALLE
     Spieler. Position-Events werden pro Spieler auf position_interval_ms
@@ -140,7 +145,10 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
                 "actorId": actor.get("accountId"),
                 "targetId": victim.get("accountId"),
                 "ax": ax, "ay": ay, "tx": tx, "ty": ty,
-                "weapon": weapon, "distance": distance,
+                # Name aus dem Spiel statt interner ID: WeapFNFal_C ist im
+                # Spiel die SLR, WeapHK416_C die M416.
+                "weapon": _weapon_label(weapon)[0] if weapon else None,
+                "distance": distance,
             })
             if typ == "kill":
                 out.append({"type": "death", "ts": ts,

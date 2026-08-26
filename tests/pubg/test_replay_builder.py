@@ -116,9 +116,11 @@ def test_extract_events_hit_has_both_endpoints():
 
 
 def test_extract_events_kill_has_weapon_distance():
+    """Waffe kommt als Name AUS DEM SPIEL, nicht als interne ID —
+    WeapAK47_C heisst dort AKM, WeapFNFal_C heisst SLR."""
     events, _ = extract_events(_raw_fixture(), mapKm=8, position_interval_ms=1000)
     kill = next(e for e in events if e["type"] == "kill")
-    assert kill["weapon"] == "WeapAK47_C"
+    assert kill["weapon"] == "AKM"
     assert kill["distance"] == 5000
 
 

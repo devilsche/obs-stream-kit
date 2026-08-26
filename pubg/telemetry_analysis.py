@@ -32,22 +32,26 @@ POS_BUCKET_S = 10
 
 
 def normalize_weapon(raw):
-    """Vereinheitlicht die zwei Schreibweisen derselben Waffe.
+    """Liefert den Namen AUS DEM SPIEL, egal in welcher Schreibweise die
+    Waffe im Event steht.
 
-    Attack-Events nennen sie `Item_Weapon_ACE32_C`, Damage-Events
-    `WeapACE32_C`. Ohne das laesst sich keine Trefferquote pro Waffe bilden.
-    Unbekannte Muster (Fahrzeuge, Umwelt) werden nur vom `_C`-Suffix befreit.
+    Zwei Probleme auf einmal: Attack-Events nennen sie `Item_Weapon_HK416_C`,
+    Damage-Events `WeapHK416_C` — ohne Vereinheitlichung laesst sich keine
+    Trefferquote pro Waffe bilden. Und die internen IDs sind nicht die Namen
+    aus dem Spiel: FNFal heisst SLR, HK416 heisst M416, Berreta686 heisst
+    S686. Dafuer gibt es WEAPON_NAMES in aggregations.py, gepflegt aus
+    pubg/api-assets.
     """
     if not raw:
         return None
     name = str(raw)
-    if name.endswith("_C"):
-        name = name[:-2]
+    # Attack-Schreibweise auf die Damage-Schreibweise ziehen, weil die
+    # Nachschlagetabelle darauf aufgebaut ist.
     if name.startswith("Item_Weapon_"):
-        name = name[len("Item_Weapon_"):]
-    elif name.startswith("Weap"):
-        name = name[len("Weap"):]
-    return name or None
+        name = "Weap" + name[len("Item_Weapon_"):]
+    from pubg.aggregations import _weapon_label
+    label = _weapon_label(name)[0]
+    return label or None
 
 
 def _bucket_label(lo, hi):

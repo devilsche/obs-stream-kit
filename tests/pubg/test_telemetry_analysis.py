@@ -51,11 +51,23 @@ def test_normalize_weapon_unifies_both_spellings():
     assert normalize_weapon("Item_Weapon_ACE32_C") == normalize_weapon("WeapACE32_C")
 
 
+def test_normalize_weapon_uses_ingame_names():
+    """Die internen IDs sind nicht die Namen aus dem Spiel: FNFal heisst
+    SLR, HK416 heisst M416. Dafuer gibt es WEAPON_NAMES in aggregations."""
+    assert normalize_weapon("WeapFNFal_C") == "SLR"
+    assert normalize_weapon("Item_Weapon_FNFal_C") == "SLR"
+    assert normalize_weapon("WeapHK416_C") == "M416"
+    assert normalize_weapon("Item_Weapon_HK416_C") == "M416"
+    assert normalize_weapon("WeapBerreta686_C") == "S686"
+    assert normalize_weapon("WeapWinchester_C") == "S1897"
+    assert normalize_weapon("WeapSawnoff_C") == "Sawed-off"
+
+
 def test_normalize_weapon_survives_junk():
     assert normalize_weapon(None) is None
     assert normalize_weapon("") is None
-    # Fahrzeuge/Umwelt tauchen als damageCauserName auf — unveraendert lassen
-    assert normalize_weapon("Dacia_A_03_v2_C") == "Dacia_A_03_v2"
+    # Fahrzeuge tauchen als damageCauserName auf — bekommen ihr Label
+    assert normalize_weapon("Dacia_A_03_v2_C")
 
 
 # ── Kernkennzahlen ──────────────────────────────────────────────────────────
