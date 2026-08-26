@@ -645,6 +645,21 @@ def _process_one_telemetry(conn, tenant_id: int, client, my_account_id, row):
                               is_self=False)
     except Exception:
         pass
+    # Waffen-Kennzahlen fuer ALLE Lobby-Spieler ablegen (match_weapon_stats).
+    # Muss hier passieren, solange die ROHEN Events da sind: das gefilterte
+    # Set unten enthaelt nur Squad-Events und damit keine Attack-Events der
+    # Gegner — ohne die gibt es keine Accuracy.
+    try:
+        from pubg.telemetry_analysis import analyse as _analyse
+        from pubg.weapon_performance import to_db_rows as _to_rows
+        from pubg.db_pg import upsert_weapon_stats as _upsert_ws
+        _rows = _to_rows(_analyse(raw))
+        if _rows:
+            _upsert_ws(conn.raw if isinstance(conn, SqliteCompatConn) else conn,
+                       tenant_id, row["match_id"], _rows)
+    except Exception:
+        pass  # Waffen-Statistik ist Beiwerk, darf den Fetch nicht kippen
+
     events = list(filter_squad_events(raw, squad))
     # Bei Re-Fetch alte events loeschen → keine Doubletten. Telemetrie
     # ist global, kein tenant_id-Filter.

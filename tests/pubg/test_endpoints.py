@@ -357,3 +357,29 @@ def test_match_analysis_reports_unavailable_telemetry():
         "/api/pubg/match-analysis?matchId=gibtsnicht", b"", {})
     assert code == 404
     assert "gibtsnicht" in json.loads(body).get("error", "")
+
+
+def test_weapon_performance_rejects_bad_range():
+    conn = _setup()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET",
+        "/api/pubg/weapon-performance?range=century", b"", {})
+    assert code == 400
+
+
+def test_weapon_performance_rejects_bad_groupby():
+    conn = _setup()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET",
+        "/api/pubg/weapon-performance?groupBy=galaxy", b"", {})
+    assert code == 400
+
+
+def test_weapon_performance_without_matches_is_empty_not_error():
+    conn = _setup()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET",
+        "/api/pubg/weapon-performance?range=all", b"", {})
+    assert code == 200
+    d = json.loads(body)
+    assert d["rows"] == [] and d["matchesPending"] == 0

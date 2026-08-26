@@ -113,6 +113,42 @@ ALTER TABLE match_team_mapping ADD COLUMN IF NOT EXISTS slot INTEGER;
 CREATE INDEX IF NOT EXISTS idx_mtm_tenant_match
     ON match_team_mapping(tenant_id, match_id);
 
+-- Waffen-Kennzahlen je Match/Spieler/Waffe, aus der Roh-Telemetrie berechnet.
+-- Beantwortet Fragen, fuer die man sonst jedes Mal alle Matches neu durch-
+-- rechnen muesste: "letzte Session von Spieler XY, welche Waffen/Accuracy"
+-- und "was macht Waffe X im Schnitt ueber alle Spieler".
+-- player_name ist bewusst denormalisiert: Gegner stehen meist nicht in
+-- players, sind aber genau die, nach denen gesucht wird.
+CREATE TABLE IF NOT EXISTS match_weapon_stats (
+    tenant_id    INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    match_id     TEXT NOT NULL,
+    account_id   TEXT NOT NULL,
+    player_name  TEXT,
+    team_id      INTEGER,
+    is_bot       BOOLEAN DEFAULT FALSE,
+    weapon       TEXT NOT NULL,
+    shots        INTEGER DEFAULT 0,
+    hit_attacks  INTEGER DEFAULT 0,   -- getroffene Schuesse (Accuracy-Basis)
+    hits         INTEGER DEFAULT 0,   -- Einschlaege (Schrot: pro Pellet)
+    damage       DOUBLE PRECISION DEFAULT 0,
+    kills        INTEGER DEFAULT 0,
+    head         INTEGER DEFAULT 0,
+    torso        INTEGER DEFAULT 0,
+    arm          INTEGER DEFAULT 0,
+    leg          INTEGER DEFAULT 0,
+    pelvis       INTEGER DEFAULT 0,
+    PRIMARY KEY (tenant_id, match_id, account_id, weapon)
+);
+CREATE INDEX IF NOT EXISTS idx_mws_tenant_account
+    ON match_weapon_stats(tenant_id, account_id);
+CREATE INDEX IF NOT EXISTS idx_mws_tenant_weapon
+    ON match_weapon_stats(tenant_id, weapon);
+CREATE INDEX IF NOT EXISTS idx_mws_tenant_name
+    ON match_weapon_stats(tenant_id, LOWER(player_name));
+CREATE INDEX IF NOT EXISTS idx_mws_tenant_match
+    ON match_weapon_stats(tenant_id, match_id);
+
+
 -- telemetry_events: GLOBAL (no tenant_id). Wenn zwei Tenants im selben
 -- Match sind, wird die Telemetrie einmal gespeichert. Sichtbarkeit
 -- kommt durch den Join mit matches (das hat tenant_id).
@@ -814,3 +850,96 @@ def mark_telemetry_schema(conn, tenant_id: int, match_id: str,
             (v, tenant_id, match_id),
         )
     conn.commit()
+
+
+# ── match_weapon_stats ──────────────────────────────────────────────────────
+
+_MWS_COLS = ("account_id", "player_name", "team_id", "is_bot", "weapon",
+             "shots", "hit_attacks", "hits", "damage", "kills",
+             "head", "torso", "arm", "leg", "pelvis")
+
+
+def upsert_weapon_stats(conn, tenant_id: int, match_id: str, rows) -> None:
+    """Schreibt die Waffen-Zeilen eines Matches. Idempotent — ein zweiter
+    Backfill-Lauf ueberschreibt, statt zu verdoppeln."""
+    if not rows:
+        return
+    values = []
+    for r in rows:
+        values.append((tenant_id, match_id) + tuple(r.get(c) for c in _MWS_COLS))
+    cols = "tenant_id, match_id, " + ", ".join(_MWS_COLS)
+    updates = ", ".join(f"{c}=EXCLUDED.{c}" for c in _MWS_COLS
+                        if c not in ("account_id", "weapon"))
+    with conn.cursor() as cur:
+        execute_values(
+            cur,
+            f"INSERT INTO match_weapon_stats ({cols}) VALUES %s "
+            f"ON CONFLICT (tenant_id, match_id, account_id, weapon) "
+            f"DO UPDATE SET {updates}",
+            values,
+        )
+    conn.commit()
+
+
+def get_weapon_stats_for_match(conn, tenant_id: int, match_id: str) -> list:
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM match_weapon_stats "
+                    "WHERE tenant_id=%s AND match_id=%s",
+                    (tenant_id, match_id))
+        return [dict(r) for r in cur.fetchall()]
+
+
+def get_matches_without_weapon_stats(conn, tenant_id: int, limit: int = 100000) -> list:
+    """Matches, fuer die noch keine Waffen-Zeilen existieren — Arbeitsliste
+    fuer den Backfill. Nur solche mit telemetry_url, sonst ist nichts zu holen."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT m.match_id, m.telemetry_url, m.played_at, m.map_name
+            FROM matches m
+            WHERE m.tenant_id = %s
+              AND NOT EXISTS (SELECT 1 FROM match_weapon_stats w
+                              WHERE w.tenant_id = m.tenant_id
+                                AND w.match_id = m.match_id)
+            ORDER BY m.played_at DESC LIMIT %s
+        """, (tenant_id, limit))
+        return [dict(r) for r in cur.fetchall()]
+
+
+def aggregate_weapon_stats(conn, tenant_id: int, since: str,
+                           account_id: str = None, player_name: str = None,
+                           weapon: str = None, group_by: str = "weapon",
+                           include_bots: bool = True, limit: int = 200) -> list:
+    """Fasst ueber einen Zeitraum zusammen — je Waffe oder je Spieler.
+
+    Quoten werden bewusst NICHT hier gebildet: die Rohsummen kommen zurueck,
+    die Prozente rechnet der Aufrufer. So kann ein 5-Schuss-Match nicht
+    genauso schwer wiegen wie eines mit 200.
+    """
+    key = "player_name, account_id" if group_by == "player" else "weapon"
+    where = ["w.tenant_id = %s", "m.played_at >= %s"]
+    params = [tenant_id, since]
+    if account_id:
+        where.append("w.account_id = %s"); params.append(account_id)
+    if player_name:
+        where.append("LOWER(w.player_name) = LOWER(%s)"); params.append(player_name)
+    if weapon:
+        where.append("w.weapon = %s"); params.append(weapon)
+    if not include_bots:
+        where.append("w.is_bot = FALSE")
+    params.append(limit)
+    with conn.cursor() as cur:
+        cur.execute(f"""
+            SELECT {key},
+                   SUM(w.shots) AS shots, SUM(w.hit_attacks) AS hit_attacks,
+                   SUM(w.hits) AS hits, SUM(w.damage) AS damage,
+                   SUM(w.kills) AS kills, COUNT(DISTINCT w.match_id) AS matches,
+                   SUM(w.head) AS head, SUM(w.torso) AS torso, SUM(w.arm) AS arm,
+                   SUM(w.leg) AS leg, SUM(w.pelvis) AS pelvis
+            FROM match_weapon_stats w
+            JOIN matches m ON m.tenant_id = w.tenant_id AND m.match_id = w.match_id
+            WHERE {" AND ".join(where)}
+            GROUP BY {key}
+            ORDER BY SUM(w.damage) DESC
+            LIMIT %s
+        """, params)
+        return [dict(r) for r in cur.fetchall()]

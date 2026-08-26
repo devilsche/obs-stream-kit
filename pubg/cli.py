@@ -1205,6 +1205,64 @@ def hidrive_refill_pg(root: str, only_match: str = None) -> int:
     return 0
 
 
+def weapon_stats_backfill(root: str, args=None) -> int:
+    """Rechnet match_weapon_stats fuer Matches nach, die noch keine haben.
+
+    Quelle ist die Roh-Telemetrie ueber HiDrive → PUBG-API. Die API haelt nur
+    rund 17 Tage vor, alles Aeltere haengt am Archiv — was dort fehlt, laesst
+    sich nicht nachrechnen und wird uebersprungen.
+
+    Gemessen ~0.9 s je Match (Download + Analyse).
+
+    Nutzung:
+        python -m pubg.cli weapon-stats-backfill [--tenant N] [--limit N]
+    """
+    import time
+    from core.db import connect
+    from core.db_compat import SqliteCompatConn
+    from pubg import db_pg
+    from pubg.telemetry_source import load_telemetry, TelemetryUnavailable
+    from pubg.telemetry_analysis import analyse
+    from pubg.weapon_performance import to_db_rows
+
+    args = args or []
+    def _opt(name, default=None):
+        if name in args:
+            i = args.index(name)
+            return args[i + 1] if i + 1 < len(args) else default
+        return default
+    tenant_id = int(_opt("--tenant", "1"))
+    limit = int(_opt("--limit", "100000"))
+
+    raw = connect()
+    conn = SqliteCompatConn(raw)
+    todo = db_pg.get_matches_without_weapon_stats(raw, tenant_id, limit=limit)
+    print(f"Tenant {tenant_id}: {len(todo)} Matches ohne Waffen-Statistik")
+    ok = skipped = 0
+    t0 = time.time()
+    for i, row in enumerate(todo, 1):
+        mid = row["match_id"]
+        try:
+            res = load_telemetry(mid, telemetry_url=row.get("telemetry_url"))
+            rows = to_db_rows(analyse(res.events))
+            if rows:
+                db_pg.upsert_weapon_stats(raw, tenant_id, mid, rows)
+                ok += 1
+            else:
+                skipped += 1
+        except (TelemetryUnavailable, Exception) as e:
+            skipped += 1
+            if i <= 5:
+                print(f"  uebersprungen {mid[:8]}: {e}")
+        if i % 25 == 0:
+            rate = i / max(time.time() - t0, 0.001)
+            print(f"  {i}/{len(todo)}  ok={ok} skip={skipped}  "
+                  f"{rate:.1f}/s  ETA {(len(todo)-i)/max(rate,0.01)/60:.0f} min")
+    print(f"fertig: {ok} gerechnet, {skipped} uebersprungen, "
+          f"{time.time()-t0:.0f}s")
+    return 0
+
+
 def hidrive_backfill(root: str) -> int:
     """Uploadet alle Altmatches aus der lokalen SQLite-DB als rekonstruierte
     Telemetrie-Blobs auf HiDrive. Matches die schon archiviert sind werden
@@ -1462,6 +1520,8 @@ if __name__ == "__main__":
     elif len(sys.argv) > 1 and sys.argv[1] == "purge-before":
         date_arg = sys.argv[2] if len(sys.argv) > 2 else None
         sys.exit(purge_before(root, date_arg))
+    elif len(sys.argv) > 1 and sys.argv[1] == "weapon-stats-backfill":
+        sys.exit(weapon_stats_backfill(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-backfill":
         sys.exit(hidrive_backfill(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "backfill-pcts":

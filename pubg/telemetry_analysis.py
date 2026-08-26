@@ -193,6 +193,7 @@ def analyse(events) -> dict:
     # teamId nicht immer mit.
     team_of = {}
     bot_of = {}
+    acc_of = {}
     for e in events or []:
         for f in ("character", "attacker", "victim", "killer", "finisher"):
             q = e.get(f) or {}
@@ -200,6 +201,8 @@ def analyse(events) -> dict:
                 continue
             if q.get("teamId") is not None:
                 team_of.setdefault(q["name"], q["teamId"])
+            if q.get("accountId"):
+                acc_of.setdefault(q["name"], q["accountId"])
             # Zwei Signale, die sich decken (siehe aggregations.py):
             # ai.-accountId und team_id >= 200.
             if _is_bot(q) or (q.get("teamId") or 0) >= 200:
@@ -326,6 +329,7 @@ def analyse(events) -> dict:
         zones = dict(p["zones"])
         total_zone = sum(zones.values())
         out[name] = {
+            "accountId": acc_of.get(name),
             "teamId": team_of.get(name),
             "isBot": bool(bot_of.get(name)),
             "shots": shots,

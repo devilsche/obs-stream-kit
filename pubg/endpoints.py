@@ -225,6 +225,8 @@ class EndpointRegistry:
             return self._lobby_avg_kd(qs)
         if route == ("GET", "/api/pubg/squad-kd"):
             return self._squad_kd(qs)
+        if route == ("GET", "/api/pubg/weapon-performance"):
+            return self._weapon_performance(qs)
         if route == ("GET", "/api/pubg/match-analysis"):
             return self._match_analysis(qs)
         if route == ("GET", "/api/pubg/strongest-opponent"):
@@ -754,6 +756,65 @@ class EndpointRegistry:
             lambda: compute_deathmatch_stats(conn, self.tenant_id, self.my_account_id,
                                              range_key, from_iso=from_iso, to_iso=to_iso),
         ))
+
+    def _weapon_performance(self, qs):
+        """Waffen-Performance ueber einen Zeitraum, aus match_weapon_stats.
+
+        Zwei Fragen, ein Endpoint:
+          groupBy=weapon + player -> "letzte Session von XY: welche Waffen,
+                                      welche Accuracy, welche Zonen"
+          groupBy=player + weapon -> "was macht Waffe X im Schnitt, ueber
+                                      alle Spieler im Zeitraum"
+
+        Die Tabelle wird beim Telemetrie-Verarbeiten gefuellt; fehlende
+        Matches meldet `matchesPending`, nachzuholen per Backfill-CLI.
+        """
+        from pubg.aggregations import _range_filter
+        from pubg.weapon_performance import db_rows_to_display
+        from pubg import db_pg
+
+        range_key = (qs.get("range") or "session").strip()
+        if range_key not in ("session", "day", "week", "all"):
+            return _err(400, "range must be one of: session, day, week, all")
+        group_by = (qs.get("groupBy") or "weapon").strip()
+        if group_by not in ("weapon", "player"):
+            return _err(400, "groupBy must be one of: weapon, player")
+
+        conn = self.get_conn()
+        player = (qs.get("player") or "").strip()
+        weapon = (qs.get("weapon") or "").strip()
+        include_bots = qs.get("bots") == "1"
+
+        # Ohne Filter waere "je Waffe" die Summe ueber alle 100 Lobby-Spieler
+        # und damit ohne Aussage — dann auf den eigenen Account einschraenken.
+        account_id = None
+        if group_by == "weapon" and not player and not weapon:
+            account_id = self.my_account_id
+
+        cutoff = (_range_filter(conn, self.tenant_id, range_key)
+                  if range_key != "all" else "1970-01-01T00:00:00Z")
+        rows = db_pg.aggregate_weapon_stats(
+            conn.raw, self.tenant_id, since=cutoff,
+            account_id=account_id, player_name=player or None,
+            weapon=weapon or None, group_by=group_by,
+            include_bots=include_bots)
+
+        pending = conn.execute("""
+            SELECT COUNT(*) AS n FROM matches m
+            WHERE m.tenant_id = ? AND m.played_at >= ?
+              AND NOT EXISTS (SELECT 1 FROM match_weapon_stats w
+                              WHERE w.tenant_id = m.tenant_id
+                                AND w.match_id = m.match_id)
+        """, (self.tenant_id, cutoff)).fetchone()
+
+        return _ok({
+            "rows": db_rows_to_display(rows, group_by),
+            "range": range_key,
+            "groupBy": group_by,
+            "player": player or None,
+            "weapon": weapon or None,
+            "matchesPending": (pending or {}).get("n", 0) or 0,
+        })
 
     def _match_analysis(self, qs):
         """Telemetrie-Analyse eines Matches: Accuracy, Trefferzonen,

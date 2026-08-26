@@ -609,3 +609,19 @@ def test_damage_per_landed_shot_ignores_misses():
 def test_damage_per_landed_shot_zero_without_hits():
     w = analyse([_attack("A", "Item_Weapon_Grenade_C", aid=1)])["players"]["A"]["weapons"]["Grenade"]
     assert w["avgDamagePerLandedShot"] == 0
+
+
+def test_player_account_id_is_reported():
+    """Fuer die Persistenz braucht es den Primaerschluessel, nicht nur den
+    Namen — Namen aendern sich, account_ids nicht."""
+    ev = [_kill("A", "Opfer")]
+    r = analyse(ev)["players"]
+    assert r["A"]["accountId"] == "account.A"
+    assert r["Opfer"]["accountId"] == "account.Opfer"
+
+
+def test_account_id_none_when_absent():
+    ev = [{"_T": "LogPlayerAttack", "attackType": "Weapon", "attackId": 1,
+           "_D": "2026-07-26T23:11:58Z", "attacker": {"name": "Ghost"},
+           "weapon": {"itemId": "Item_Weapon_ACE32_C"}}]
+    assert analyse(ev)["players"]["Ghost"]["accountId"] is None
