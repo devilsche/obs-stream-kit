@@ -70,6 +70,16 @@ def _bucket_for(meters):
     return None
 
 
+def _is_monster(participant):
+    """PVE-Monster wie der Baer sind keine Spieler: PUBG fuehrt sie mit
+    accountId `Monster.…` und type `monster_…`, und sie stehen mit im
+    Roster (real 131 statt 100 Teilnehmer). Treffer auf sie sind keine
+    Zielleistung — 130 Schuss in einen Baeren ergaben 88% Accuracy."""
+    p = participant or {}
+    return (str(p.get("accountId") or "").startswith("Monster.")
+            or str(p.get("type") or "").startswith("monster"))
+
+
 def _is_bot(participant):
     """PUBG fuehrt Bots mit account_id-Praefix `ai.` (siehe auch die
     team_id>=200-Heuristik in aggregations.py — beide decken sich)."""
@@ -203,8 +213,9 @@ def analyse(events) -> dict:
     roster = set()
     for e in events or []:
         if e.get("_T") == "LogPlayerCreate":
-            n = (e.get("character") or {}).get("name")
-            if n:
+            ch = e.get("character") or {}
+            n = ch.get("name")
+            if n and not _is_monster(ch):
                 roster.add(n)
                 players[n]           # anlegen, damit sie in der Ausgabe stehen
     # Team-Zuordnung aus allen Events sammeln — LogPlayerAttack fuehrt die
@@ -261,6 +272,8 @@ def analyse(events) -> dict:
                 continue
             if e.get("damageTypeCategory") != GUN_CATEGORY:
                 continue
+            if _is_monster(victim):
+                continue          # Baer & Co. sind keine Zielleistung
             p = players[name]
             p["hits"] += 1
             # Accuracy braucht SCHUESSE, nicht Einschlaege: eine Schrotladung
@@ -279,7 +292,11 @@ def analyse(events) -> dict:
             else:
                 p["hitsOnHumans"] += 1
             zone = e.get("damageReason")
-            if zone:
+            # "NonSpecific" ist keine Koerperzone (Fahrzeug-Insassen, Objekte).
+            # Solche Treffer duerfen den Nenner der Zonenverteilung nicht
+            # aufblaehen, sonst wirkt das Trefferbild kuenstlich schmal —
+            # genau der Wert, an dem die Auffaelligkeits-Erkennung haengt.
+            if zone and zone != "NonSpecific":
                 p["zones"][zone] += 1
             w = normalize_weapon(e.get("damageCauserName"))
             if w:
@@ -310,6 +327,8 @@ def analyse(events) -> dict:
             kname, vname = killer.get("name"), victim.get("name")
             if not kname or not vname or kname == vname:
                 continue     # Suizid/Zonentod hat keinen echten Killer
+            if _is_monster(victim):
+                continue     # ein erlegter Baer ist kein Spieler-Kill
             info = e.get("killerDamageInfo") or e.get("finishDamageInfo") or {}
             kx, ky = _loc(killer)
             dist_cm = info.get("distance")

@@ -750,3 +750,52 @@ def test_generic_fire_stays_separate_from_molotov():
     """Allgemeines Feuer kann auch von Fahrzeugen oder Kanistern kommen —
     das darf dem Molotov nicht zugerechnet werden."""
     assert normalize_weapon("BP_FireEffectController_C") != "Molotov"
+
+
+def _monster(name="Bear"):
+    return {"name": name, "accountId": "Monster.Bear-6", "teamId": 0,
+            "type": "monster_bear", "location": {"x": 100.0, "y": 100.0}}
+
+
+def test_monsters_are_not_players():
+    """PVE-Monster stehen mit im Roster (Bear, accountId Monster.Bear-6).
+    Als Spieler gezaehlt blaehen sie die Lobby auf — real 131 statt 100."""
+    ev = [{"_T": "LogPlayerCreate", "_D": "2026-07-26T23:00:00Z",
+           "character": _monster()},
+          _create("Echter")]
+    r = analyse(ev)
+    assert "Bear" not in r["players"]
+    assert r["rosterSize"] == 1
+
+
+def test_hits_on_monsters_do_not_count_as_aim_performance():
+    """130 Schuss in einen Baeren ergaben 88% Accuracy und 0 Kills — das ist
+    keine Zielleistung gegen Spieler."""
+    ev = [_attack("A", aid=1), _attack("A", aid=2)]
+    ev.append({"_T": "LogPlayerTakeDamage", "damageTypeCategory": "Damage_Gun",
+               "damageReason": "NonSpecific", "damage": 40.0, "attackId": 1,
+               "damageCauserName": "WeapMG3_C",
+               "attacker": {"name": "A", "accountId": "account.A",
+                            "location": {"x": 0.0, "y": 0.0}},
+               "victim": _monster()})
+    ev.append(_damage("A", "B", aid=2))
+    p = analyse(ev)["players"]["A"]
+    assert p["hits"] == 1              # nur der Treffer am Spieler
+    assert p["accuracy"] == pytest.approx(50.0)
+
+
+def test_zoneless_hits_are_excluded_from_the_zone_share():
+    """Treffer ohne Trefferzone (NonSpecific) duerfen den Nenner der
+    Zonenverteilung nicht aufblaehen — sonst sieht ein Spieler mit vielen
+    solchen Treffern kuenstlich 'schmal' aus."""
+    ev = [_attack("A", aid=i) for i in range(4)]
+    ev += [_damage("A", "B", reason="TorsoShot", aid=0),
+           _damage("A", "B", reason="ArmShot", aid=1),
+           _damage("A", "B", reason="NonSpecific", aid=2),
+           _damage("A", "B", reason="NonSpecific", aid=3)]
+    p = analyse(ev)["players"]["A"]
+    assert p["hits"] == 4
+    # Zonen-Prozente beziehen sich auf die 2 Treffer MIT Zone
+    assert p["zonePct"]["TorsoShot"] == pytest.approx(50.0)
+    assert p["zonePct"]["ArmShot"] == pytest.approx(50.0)
+    assert "NonSpecific" not in p["zonePct"]
