@@ -146,11 +146,18 @@ def analyse(events) -> dict:
     # Team-Zuordnung aus allen Events sammeln — LogPlayerAttack fuehrt die
     # teamId nicht immer mit.
     team_of = {}
+    bot_of = {}
     for e in events or []:
         for f in ("character", "attacker", "victim", "killer", "finisher"):
             q = e.get(f) or {}
-            if q.get("name") and q.get("teamId") is not None:
+            if not q.get("name"):
+                continue
+            if q.get("teamId") is not None:
                 team_of.setdefault(q["name"], q["teamId"])
+            # Zwei Signale, die sich decken (siehe aggregations.py):
+            # ai.-accountId und team_id >= 200.
+            if _is_bot(q) or (q.get("teamId") or 0) >= 200:
+                bot_of[q["name"]] = True
 
     for e in events or []:
         t = e.get("_T")
@@ -259,6 +266,7 @@ def analyse(events) -> dict:
         total_zone = sum(zones.values())
         out[name] = {
             "teamId": team_of.get(name),
+            "isBot": bool(bot_of.get(name)),
             "shots": shots,
             "shotsWithTarget": p["shots_with_target"],
             "emptyShotPct": (round(100.0 * (p["shots_judged"] - p["shots_with_target"])

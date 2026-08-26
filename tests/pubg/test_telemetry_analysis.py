@@ -414,3 +414,20 @@ def test_victim_only_players_still_appear():
     r = analyse([_kill("A", "Opfer1")])["players"]
     assert "Opfer1" in r
     assert r["Opfer1"]["shots"] == 0
+
+
+def test_players_are_marked_as_bots():
+    """Bots stehen mit in der Lobby — in einer 97-Zeilen-Tabelle muss man sie
+    unterscheiden koennen. PUBG kennzeichnet sie ueber ai.-accountId, die
+    team_id>=200-Heuristik aus aggregations.py deckt sich damit."""
+    ev = [_kill("Mensch", "Opfer")]
+    ev[0]["victim"]["accountId"] = "ai.42"
+    r = analyse(ev)["players"]
+    assert r["Opfer"]["isBot"] is True
+    assert r["Mensch"]["isBot"] is False
+
+
+def test_bot_flag_also_from_high_team_id():
+    ev = [_kill("A", "BotB")]
+    ev[0]["victim"]["teamId"] = 200
+    assert analyse(ev)["players"]["BotB"]["isBot"] is True

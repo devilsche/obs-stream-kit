@@ -54,6 +54,14 @@
     td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     /* Quoten aus winzigen Stichproben sind kein Ergebnis — abgesetzt zeigen. */
     td.weak-sample { opacity: 0.45; font-style: italic; }
+    .inline-tog { display: inline-flex; flex-direction: row; align-items: center;
+                  gap: 5px; text-transform: none; letter-spacing: 0; font-weight: 400;
+                  margin-right: 10px; cursor: pointer; }
+    .inline-tog input { min-width: 0; }
+    .bot-tag { font-size: 0.7em; color: var(--theme-text-dim);
+               border: 1px solid color-mix(in srgb, var(--theme-text) 20%, transparent);
+               border-radius: 2px; padding: 0 4px; margin-left: 4px;
+               text-transform: uppercase; letter-spacing: 0.05em; }
     th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
     th.sortable:hover { color: var(--theme-accent); }
     th.sortable.active { color: var(--theme-accent); }
@@ -130,6 +138,13 @@
         <thead id="head"><tr></tr></thead>
         <tbody id="rows"></tbody>
       </table>
+    </div>
+    <div class="legend">
+      <label class="inline-tog"><input type="checkbox" id="tglFired" checked>
+        Only players who fired</label>
+      <label class="inline-tog"><input type="checkbox" id="tglBots">
+        Show bots</label>
+      <span id="rowCount"></span>
     </div>
     <div class="legend">Click a row for details. "Limb %" = arm, leg and pelvis hits — unavoidable when
       spraying, suspiciously low with aim assist. "Empty %" = shots with no enemy within
@@ -235,8 +250,14 @@
     function renderTable() {
       const an = DATA.anomalies || {};
       const col = COLS.find(c => c.key === SORT_KEY) || COLS[3];
-      const rows = Object.entries(DATA.players)
-        .filter(([, p]) => p.shots >= 20 || p.kills > 0)
+      // Wer nie geschossen hat, ist trotzdem Teil des Matches — frueher
+      // fielen diese Spieler stumm raus. Jetzt optional ausblendbar.
+      const onlyFired = document.getElementById("tglFired").checked;
+      const showBots = document.getElementById("tglBots").checked;
+      const all = Object.entries(DATA.players);
+      const rows = all
+        .filter(([, p]) => showBots || !p.isBot)
+        .filter(([, p]) => !onlyFired || p.shots > 0)
         .sort((a, b) => {
           const va = col.val(a[0], a[1], an), vb = col.val(b[0], b[1], an);
           if (va < vb) return -SORT_DIR;
@@ -244,6 +265,9 @@
           return a[0].localeCompare(b[0]);   // stabile Reihenfolge bei Gleichstand
         });
       renderHead();
+      document.getElementById("rowCount").textContent =
+        rows.length === all.length ? `${all.length} players`
+                                   : `${rows.length} of ${all.length} players`;
       document.getElementById("rows").innerHTML = rows.map(([n, p]) => {
         const fl = (an[n] && an[n].flags) || [];
         const badge = fl.length
@@ -251,7 +275,7 @@
         // Eigenes Team hervorheben — sonst sucht man sich in 100 Zeilen tot.
         const mine = MY_TEAM != null && p.teamId === MY_TEAM;
         return `<tr tabindex="0" data-p="${esc(n)}" class="${mine ? "own" : ""}">
-          <td>${esc(n)}</td>
+          <td>${esc(n)}${p.isBot ? ' <span class="bot-tag">bot</span>' : ""}</td>
           <td class="num team">${p.teamId ?? "—"}</td>
           <td class="num">${p.shots}</td>
           <td class="num">${p.hitAttacks}</td><td class="num">${p.accuracy.toFixed(1)}</td>
@@ -276,7 +300,7 @@
       const an = (DATA.anomalies || {})[name];
       document.getElementById("stats").innerHTML = [
         ["Shots", p.shots], ["Landed", p.hitAttacks],
-        ["Team", p.teamId ?? "—"],
+        ["Team", (p.teamId ?? "—") + (p.isBot ? " (bot)" : "")],
         ["Accuracy", p.shots
             ? `${p.accuracy.toFixed(1)} % (${p.hitAttacks}/${p.shots})`
             : "—"],
@@ -345,6 +369,16 @@
       const again = document.querySelector(`#head th[data-sort="${key}"]`);
       if (again) again.focus();
     }
+    document.getElementById("tglBots").addEventListener("change", () => {
+      renderTable();
+      if (SEL) [...document.querySelectorAll("#rows tr")].forEach(tr =>
+        tr.classList.toggle("sel", tr.dataset.p === SEL));
+    });
+    document.getElementById("tglFired").addEventListener("change", () => {
+      renderTable();
+      if (SEL) [...document.querySelectorAll("#rows tr")].forEach(tr =>
+        tr.classList.toggle("sel", tr.dataset.p === SEL));
+    });
     document.getElementById("head").addEventListener("click", e => {
       const th = e.target.closest("th[data-sort]");
       if (th) onSort(th);
