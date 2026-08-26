@@ -196,6 +196,7 @@ def _merge(acc: dict, w: dict) -> None:
 
 
 def _finish(acc: dict) -> dict:
+    from pubg.telemetry_analysis import PELLET_RATIO
     shots, hits, landed = acc["shots"], acc["hits"], acc["hitAttacks"]
     zones = acc["zones"]
     total_z = sum(zones.values())
@@ -208,7 +209,7 @@ def _finish(acc: dict) -> dict:
     acc["headshotRate"] = round(100.0 * zones.get("HeadShot", 0) / hits, 1) if hits else 0.0
     # Siehe telemetry_analysis: Splitterwaffen erkennt man daran, dass mehr
     # Einschlaege als getroffene Schuesse anfallen.
-    acc["splits"] = hits > landed > 0
+    acc["splits"] = landed > 0 and hits >= landed * PELLET_RATIO
     acc["avgDamageEffective"] = (acc["avgDamagePerLandedShot"] if acc["splits"]
                                  else acc["avgDamage"])
     acc["topZone"] = top

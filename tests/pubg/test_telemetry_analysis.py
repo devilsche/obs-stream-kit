@@ -518,7 +518,7 @@ def test_weapon_damage_sums_to_player_damage():
 def test_weapon_without_hits_has_zero_avg_damage():
     """Granaten/Molotov tauchen als Schuss ohne Treffer auf — kein Div/0."""
     ev = [_attack("A", "Item_Weapon_Grenade_C", aid=1)]
-    w = analyse(ev)["players"]["A"]["weapons"]["Grenade"]
+    w = analyse(ev)["players"]["A"]["weapons"]["Granate"]
     assert w["damage"] == 0
     assert w["avgDamage"] == 0
 
@@ -549,7 +549,7 @@ def test_weapon_top_zone_is_reported():
 
 def test_weapon_top_zone_none_without_hits():
     ev = [_attack("A", "Item_Weapon_Grenade_C", aid=1)]
-    w = analyse(ev)["players"]["A"]["weapons"]["Grenade"]
+    w = analyse(ev)["players"]["A"]["weapons"]["Granate"]
     assert w["topZone"] is None
     assert w["accuracy"] == 0
 
@@ -607,7 +607,7 @@ def test_damage_per_landed_shot_ignores_misses():
 
 
 def test_damage_per_landed_shot_zero_without_hits():
-    w = analyse([_attack("A", "Item_Weapon_Grenade_C", aid=1)])["players"]["A"]["weapons"]["Grenade"]
+    w = analyse([_attack("A", "Item_Weapon_Grenade_C", aid=1)])["players"]["A"]["weapons"]["Granate"]
     assert w["avgDamagePerLandedShot"] == 0
 
 
@@ -648,7 +648,7 @@ def test_effective_damage_picks_the_meaningful_denominator():
 
 
 def test_splits_flag_false_without_hits():
-    w = analyse([_attack("A", "Item_Weapon_Grenade_C", aid=1)])["players"]["A"]["weapons"]["Grenade"]
+    w = analyse([_attack("A", "Item_Weapon_Grenade_C", aid=1)])["players"]["A"]["weapons"]["Granate"]
     assert w["splits"] is False
     assert w["avgDamageEffective"] == 0
 
@@ -687,3 +687,49 @@ def test_heist_variants_stay_separate():
     assert normalize_weapon("WeapHK416_HR_C") != "M416"
     assert "Heist" in normalize_weapon("WeapHK416_HR_C")
     assert "M416" in normalize_weapon("WeapHK416_HR_C")
+
+
+def test_rare_penetration_does_not_make_an_ar_a_pellet_weapon():
+    """Eine Kugel kann durch zwei Gegner gehen — real liegen ARs damit bei
+    1.000 bis 1.007 Einschlaegen je getroffenem Schuss, Schrotflinten bei
+    4.9 bis 5.1. Ein blosses 'mehr als eins' hat ARs faelschlich als
+    Splitterwaffe markiert."""
+    ev = []
+    for i in range(200):                       # 200 Schuss, 200 Treffer
+        ev.append(_attack("A", "Item_Weapon_BerylM762_C", aid=i))
+        ev.append(_damage("A", "B", weapon="WeapBerylM762_C", aid=i))
+    ev.append(_damage("A", "C", weapon="WeapBerylM762_C", aid=0))   # Durchschuss
+    w = analyse(ev)["players"]["A"]["weapons"]["Beryl"]
+    assert w["hits"] == 201 and w["hitAttacks"] == 200
+    assert w["splits"] is False
+    assert w["avgDamageEffective"] == pytest.approx(w["avgDamage"])
+
+
+def test_shotgun_is_still_detected_as_pellet_weapon():
+    ev = [_attack("A", "Item_Weapon_Berreta686_C", aid=7)]
+    ev += [_damage("A", "B", weapon="WeapBerreta686_C", aid=7) for _ in range(9)]
+    w = analyse(ev)["players"]["A"]["weapons"]["S686"]
+    assert w["splits"] is True
+
+
+def test_weapon_lookup_is_case_insensitive():
+    """PUBG schreibt dieselbe Waffe je nach Event anders: WeapFAMASG2_C im
+    Attack-Event, WeapFamasG2_C in der Nachschlagetabelle. Dadurch landeten
+    23947 Schuesse unter 'FAMASG2' und 2860 Treffer unter 'FAMAS' — beide
+    Zeilen ohne Aussage."""
+    assert normalize_weapon("Item_Weapon_FAMASG2_C") == "FAMAS"
+    assert normalize_weapon("WeapFamasG2_C") == "FAMAS"
+    assert normalize_weapon("Item_Weapon_FAMASG2_C") == normalize_weapon("WeapFamasG2_C")
+
+
+def test_thrown_weapons_map_from_both_forms():
+    """Wurfwaffen haben eine Waffen- UND eine Projektil-ID: Item_Weapon_
+    Grenade_C beim Wurf, ProjGrenade_C beim Einschlag."""
+    assert normalize_weapon("Item_Weapon_Grenade_C") == normalize_weapon("ProjGrenade_C")
+    assert normalize_weapon("Item_Weapon_Molotov_C") == normalize_weapon("ProjMolotov_C")
+    assert normalize_weapon("Item_Weapon_C4_C") == normalize_weapon("ProjC4_C")
+
+
+def test_known_aliases_are_merged():
+    """Win1894 im Attack-Event ist die Win94."""
+    assert normalize_weapon("Item_Weapon_Win1894_C") == normalize_weapon("WeapWin94_C")

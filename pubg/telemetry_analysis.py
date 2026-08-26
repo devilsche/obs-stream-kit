@@ -17,6 +17,11 @@ from collections import defaultdict
 #: Distanz-Eimer in Metern. Offen nach oben beim letzten.
 DISTANCE_BUCKETS = ((0, 25), (25, 50), (50, 100), (100, 200), (200, None))
 
+#: Ab wie vielen Einschlaegen je getroffenem Schuss eine Waffe als
+#: Splitterwaffe gilt. Gemessen ueber 1010 Matches: Schrot 4.86-5.12,
+#: jede andere Waffe 1.000-1.007. Die Grenze liegt bewusst dazwischen.
+PELLET_RATIO = 1.5
+
 #: Nur echter Waffenschaden zaehlt als Zielleistung — Blauzone, Sturz,
 #: Fahrzeug und Molotov sagen nichts ueber Aim aus.
 GUN_CATEGORY = "Damage_Gun"
@@ -169,15 +174,16 @@ def _weapon_out(v: dict) -> dict:
         # der Wert, der Schrot mit AR/DMR vergleichbar macht.
         "avgDamagePerLandedShot": (round(v["damage"] / hit_attacks, 1)
                                    if hit_attacks else 0),
-        # Splitterwaffe? Mehr Einschlaege als getroffene Schuesse heisst,
-        # ein Schuss erzeugt mehrere Treffer (Schrot). Datengetrieben, damit
-        # keine Waffenliste gepflegt werden muss.
-        "splits": v["hits"] > hit_attacks > 0,
+        # Splitterwaffe? Datengetrieben statt per Waffenliste. Die Schwelle
+        # ist gemessen: Schrotflinten liegen bei 4.9-5.1 Einschlaegen je
+        # getroffenem Schuss, ARs bei 1.000-1.007 (seltene Durchschuesse
+        # durch zwei Gegner). Ein blosses ">1" haette ARs erwischt.
+        "splits": hit_attacks > 0 and v["hits"] >= hit_attacks * PELLET_RATIO,
         # Der Wert, den man tatsaechlich lesen will: bei Schrot je treffendem
         # Schuss, sonst je Einschlag. Bei Einzelprojektilen sind beide gleich.
         "avgDamageEffective": (
             round(v["damage"] / hit_attacks, 1)
-            if v["hits"] > hit_attacks > 0 and hit_attacks
+            if hit_attacks > 0 and v["hits"] >= hit_attacks * PELLET_RATIO
             else (round(v["damage"] / v["hits"], 1) if v["hits"] else 0)),
         "topZone": top,
         "topZonePct": (round(100.0 * zones[top] / total_z, 1)

@@ -363,6 +363,7 @@ WEAPON_NAMES = {
     # LMGs
     "WeapM249_C":           ("M249",        "lmg"),
     "WeapMG3_C":            ("MG3",         "lmg"),
+    "WeapRPD_C":            ("RPD",         "lmg"),
     "WeapDP28_C":           ("DP-28",       "lmg"),
     # Pistols
     "WeapM1911_C":          ("P1911",       "pistol"),
@@ -507,15 +508,46 @@ def _death_cause_label(death_ev, victim_acc, weapon_id, weapon_name,
     return None
 
 
+#: Case-insensitiver Index auf WEAPON_NAMES. PUBG schreibt dieselbe Waffe je
+#: nach Event unterschiedlich (WeapFAMASG2_C gegen WeapFamasG2_C) — ohne das
+#: landen Schuesse und Treffer unter zwei Namen.
+_WEAPON_NAMES_CI = None
+
+#: IDs, die sich nicht nur in der Schreibweise unterscheiden. Links die Form
+#: aus dem Attack-Event, rechts der Schluessel in WEAPON_NAMES.
+_WEAPON_ALIASES = {
+    "weapwin1894_c":                "WeapWin94_C",
+    # Wurfwaffen haben eine Waffen-ID (Wurf) und eine Projektil-ID
+    # (Einschlag) — beide muessen auf denselben Namen fallen.
+    "weapgrenade_c":                "ProjGrenade_C",
+    "weapmolotov_c":                "ProjMolotov_C",
+    "weapc4_c":                     "ProjC4_C",
+    "weapstickygrenade_c":          "ProjStickyGrenade_C",
+    "weappanzerfaust100m_c":        "PanzerFaust100M_Projectile_C",
+}
+
+
+def _weapon_ci_lookup(weapon_id):
+    global _WEAPON_NAMES_CI
+    if _WEAPON_NAMES_CI is None:
+        _WEAPON_NAMES_CI = {k.lower(): v for k, v in WEAPON_NAMES.items()}
+    key = str(weapon_id).lower()
+    alias = _WEAPON_ALIASES.get(key)
+    if alias:
+        return WEAPON_NAMES.get(alias)
+    return _WEAPON_NAMES_CI.get(key)
+
+
 def _weapon_label(weapon_id):
     if not weapon_id or weapon_id == "None":
         return ("Unknown", "other")
     # Punch / Melee mit Faust — PUBG kodiert das ueber den Player-Mesh
     if weapon_id in ("PlayerFemale_A_C", "PlayerMale_A_C"):
         return ("Faust", "melee")
-    # Explizite Lookups zuerst
-    if weapon_id in WEAPON_NAMES:
-        return WEAPON_NAMES[weapon_id]
+    # Explizite Lookups zuerst — case-insensitiv, siehe _weapon_ci_lookup.
+    hit = _weapon_ci_lookup(weapon_id)
+    if hit:
+        return hit
     # heistroyale-Varianten (_HR_): dieselbe Waffenfamilie, aber eigene
     # Werte — im gemessenen Match rund doppelter Schaden je Treffer. Nicht
     # mit der Basiswaffe verschmelzen, aber lesbar benennen.
