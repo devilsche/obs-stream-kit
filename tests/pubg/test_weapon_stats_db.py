@@ -141,3 +141,26 @@ def test_filter_by_weapon_list(pg_compat):
     out = db_pg.aggregate_weapon_stats(conn.raw, t, since="1970-01-01T00:00:00Z",
                                        weapons=["M416", "Beryl"], group_by="weapon")
     assert {r["weapon"] for r in out} == {"M416", "Beryl"}
+
+
+def test_stale_rows_disappear_when_a_weapon_is_renamed(pg_compat):
+    """Aendert sich das Waffen-Mapping, darf die alte Zeile nicht liegen
+    bleiben: der Waffenname ist Teil des Schluessels, ein reines UPSERT
+    wuerde die alte Zeile nie anfassen. Real passiert mit 'Duncans M416',
+    das nach dem Fix zu 'M416' wurde — die Leiche blieb mit 0 Treffern."""
+    conn, t = pg_compat[0], pg_compat[1]
+    _match(conn, t, "mr1", "2026-08-01T18:00:00Z")
+    db_pg.upsert_weapon_stats(conn.raw, t, "mr1", [_rows(weapon="Duncans M416")])
+    db_pg.upsert_weapon_stats(conn.raw, t, "mr1", [_rows(weapon="M416")])
+    out = db_pg.get_weapon_stats_for_match(conn.raw, t, "mr1")
+    assert {r["weapon"] for r in out} == {"M416"}
+
+
+def test_other_matches_are_untouched_by_a_rewrite(pg_compat):
+    conn, t = pg_compat[0], pg_compat[1]
+    _match(conn, t, "mr2", "2026-08-01T18:00:00Z")
+    _match(conn, t, "mr3", "2026-08-02T18:00:00Z")
+    db_pg.upsert_weapon_stats(conn.raw, t, "mr2", [_rows(weapon="AKM")])
+    db_pg.upsert_weapon_stats(conn.raw, t, "mr3", [_rows(weapon="M416")])
+    db_pg.upsert_weapon_stats(conn.raw, t, "mr3", [_rows(weapon="Beryl")])
+    assert {r["weapon"] for r in db_pg.get_weapon_stats_for_match(conn.raw, t, "mr2")} == {"AKM"}

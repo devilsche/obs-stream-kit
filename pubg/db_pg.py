@@ -860,10 +860,19 @@ _MWS_COLS = ("account_id", "player_name", "team_id", "is_bot", "weapon",
 
 
 def upsert_weapon_stats(conn, tenant_id: int, match_id: str, rows) -> None:
-    """Schreibt die Waffen-Zeilen eines Matches. Idempotent — ein zweiter
-    Backfill-Lauf ueberschreibt, statt zu verdoppeln."""
+    """Schreibt die Waffen-Zeilen eines Matches — ersetzt den kompletten
+    Satz des Matches.
+
+    Bewusst DELETE + INSERT statt reinem UPSERT: der Waffenname gehoert zum
+    Schluessel, also wuerde eine Mapping-Aenderung die alte Zeile nie
+    anfassen. Real passiert, als "Duncans M416" zu "M416" wurde — die alte
+    Zeile blieb mit ihren Schuessen und null Treffern liegen.
+    """
     if not rows:
         return
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM match_weapon_stats "
+                    "WHERE tenant_id=%s AND match_id=%s", (tenant_id, match_id))
     values = []
     for r in rows:
         values.append((tenant_id, match_id) + tuple(r.get(c) for c in _MWS_COLS))
