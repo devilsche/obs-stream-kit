@@ -238,6 +238,7 @@ def analyse(events) -> dict:
                 "x": kx, "y": ky,
             })
             players[kname]["kills"] += 1
+            players[vname]        # Opfer anlegen: wer nur stirbt, fehlt sonst
 
         elif t == "LogPlayerMakeGroggy":
             name = (e.get("attacker") or {}).get("name")
@@ -253,6 +254,7 @@ def analyse(events) -> dict:
         zones = dict(p["zones"])
         total_zone = sum(zones.values())
         out[name] = {
+            "teamId": team_of.get(name),
             "shots": shots,
             "shotsWithTarget": p["shots_with_target"],
             "emptyShotPct": (round(100.0 * (p["shots_judged"] - p["shots_with_target"])

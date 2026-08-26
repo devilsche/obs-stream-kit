@@ -15,9 +15,9 @@
     player   — empty = self
     groupBy  — session (default), day, month
     metric   — kd (default), winrate, dmg, kills, matches
-    limit    — Anzahl Punkte (default 20)
+    limit    — number of points (default 20)
 -->
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <title>PUBG Performance History</title>
@@ -114,13 +114,13 @@
       <div class="tooltip" id="tooltip" role="status"></div>
     </div>
     <div class="toolbar">
-      <span class="switch-label" id="lbl-group">Zeitraum</span>
+      <span class="switch-label" id="lbl-group">Range</span>
       <div class="switch" id="group-switch" role="group" aria-labelledby="lbl-group">
         <button type="button" data-group="session" aria-pressed="true">Session</button>
-        <button type="button" data-group="day" aria-pressed="false">Tag</button>
-        <button type="button" data-group="month" aria-pressed="false">Monat</button>
+        <button type="button" data-group="day" aria-pressed="false">Day</button>
+        <button type="button" data-group="month" aria-pressed="false">Month</button>
       </div>
-      <span class="switch-label" id="lbl-metric">Metrik</span>
+      <span class="switch-label" id="lbl-metric">Metric</span>
       <div class="switch" id="metric-switch" role="group" aria-labelledby="lbl-metric">
         <button type="button" data-metric="kd" aria-pressed="true">K / D</button>
         <button type="button" data-metric="winrate" aria-pressed="false">Win %</button>
@@ -141,15 +141,15 @@
     document.getElementById("player").textContent = PLAYER || "Self";
 
     PubgUI.buildFilter([
-      { key: "groupBy", label: "Zeitraum", type: "select", default: "session",
-        options: [["session","Session"],["day","Tag"],["month","Monat"]],
-        tooltip: "Session = Pause laenger als 4h beginnt eine neue." },
-      { key: "metric", label: "Metrik", type: "select", default: "kd",
+      { key: "groupBy", label: "Range", type: "select", default: "session",
+        options: [["session","Session"],["day","Day"],["month","Month"]],
+        tooltip: "Session = a break longer than 4h starts a new one." },
+      { key: "metric", label: "Metric", type: "select", default: "kd",
         options: [["kd","K/D"],["winrate","Win %"],["dmg","Ø DMG"],
                   ["kills","Kills"],["matches","Matches"]] },
-      { key: "limit", label: "Punkte", type: "range", min: 5, max: 60, default: 20,
-        tooltip: "Wie viele der juengsten Zeitraeume angezeigt werden." },
-      { key: "player", label: "Player", type: "text", placeholder: "leer = self" },
+      { key: "limit", label: "Points", type: "range", min: 5, max: 60, default: 20,
+        tooltip: "How many of the most recent periods to show." },
+      { key: "player", label: "Player", type: "text", placeholder: "empty = self" },
     ]);
 
     // fmt MUSS einen String liefern — die Y-Achse rendert das direkt.
@@ -157,8 +157,8 @@
       kd:      { get: g => g.kd,      fmt: v => Number(v || 0).toFixed(2),         label: "K/D" },
       winrate: { get: g => g.winrate, fmt: v => Number(v || 0).toFixed(1) + "%",   label: "Win %" },
       dmg:     { get: g => g.avgDmg,  fmt: v => String(Math.round(v || 0)),        label: "Ø DMG" },
-      kills:   { get: g => g.kills,   fmt: v => Math.round(v || 0).toLocaleString("de-DE"), label: "Kills" },
-      matches: { get: g => g.matches, fmt: v => Math.round(v || 0).toLocaleString("de-DE"), label: "Matches" },
+      kills:   { get: g => g.kills,   fmt: v => Math.round(v || 0).toLocaleString("en-US"), label: "Kills" },
+      matches: { get: g => g.matches, fmt: v => Math.round(v || 0).toLocaleString("en-US"), label: "Matches" },
     };
 
     // X-Achsen-Label je Gruppierung: Sessions brauchen Datum + Uhrzeit,
@@ -176,7 +176,7 @@
         chart.classList.add("is-hidden");
         document.getElementById("summary").innerHTML =
           "<div><span class='label'>Status</span><span class='value is-note'>" +
-          "Keine Matches im Zeitraum</span></div>";
+          "No matches in range</span></div>";
         return;
       }
       chart.classList.remove("is-hidden");
@@ -191,7 +191,7 @@
           x: xLabel(g),
           y: def.get(g) || 0,
           title: xLabel(g),
-          sub: g.matches + (g.matches === 1 ? " Match" : " Matches"),
+          sub: g.matches + (g.matches === 1 ? " match" : " matches"),
           rows: [
             ["K/D",     METRICS.kd.fmt(g.kd)],
             ["Win %",   METRICS.winrate.fmt(g.winrate)],
@@ -209,15 +209,15 @@
       // sonst zaehlt eine 2-Match-Session so viel wie eine mit 30.
       const overallKd = totalKills / Math.max(totalMatches - totalWins, 1);
       const best = [...groups].sort((a, b) => b.kd - a.kd)[0];
-      const unit = { session: "Sessions", day: "Tage", month: "Monate" }[GROUP];
+      const unit = { session: "Sessions", day: "Days", month: "Months" }[GROUP];
       document.getElementById("summary").innerHTML = `
         <div><span class="label">${unit}</span>
              <span class="value">${groups.length}</span></div>
         <div><span class="label">Matches Σ</span>
-             <span class="value">${totalMatches.toLocaleString("de-DE")}</span></div>
-        <div><span class="label">K/D gesamt</span>
+             <span class="value">${totalMatches.toLocaleString("en-US")}</span></div>
+        <div><span class="label">Overall K/D</span>
              <span class="value">${overallKd.toFixed(2)}</span></div>
-        <div><span class="label">Beste K/D</span>
+        <div><span class="label">Best K/D</span>
              <span class="value">${best.kd.toFixed(2)} <small>${xLabel(best)}</small></span></div>
       `;
     }

@@ -785,6 +785,11 @@ class EndpointRegistry:
             data["matchId"] = match_id
             data["source"] = res.source
             data["eventCount"] = len(res.events)
+            # Eigener Spielername, damit das Tool das eigene Team absetzen kann.
+            me = conn.execute(
+                "SELECT name FROM players WHERE tenant_id = ? AND account_id = ?",
+                (self.tenant_id, self.my_account_id)).fetchone()
+            data["myName"] = me["name"] if me else None
             if row:
                 data["map"] = row["map_name"]
                 data["playedAt"] = row["played_at"]

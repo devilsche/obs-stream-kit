@@ -1019,13 +1019,74 @@ function renderFrame() {
 }
 
 // Toggle-Checkboxen verdrahten
-["Kills", "Knocks", "Streaks", "Zones", "Names", "Grid"].forEach(k => {
+["Kills", "Knocks", "Streaks", "Zones", "Names", "Killfeed", "Grid"].forEach(k => {
   const cb = document.getElementById("tgl" + k);
+  if (!cb) return;
   cb.addEventListener("change", () => {
     RS.toggles[k.toLowerCase()] = cb.checked;
     renderFrame();
+    if (k === "Killfeed" || k === "Kills" || k === "Knocks") renderKillfeed(RS.cursorMs);
   });
 });
+
+
+// ── Killfeed ────────────────────────────────────────────────────────────────
+// Wie im Spiel: oben rechts, ein Eintrag pro Kill/Knock, der nach ein paar
+// Sekunden verschwindet. Bewusst aus dem Zeitfenster um cursorMs berechnet
+// statt aus einer Queue — so stimmt die Anzeige auch nach einem Sprung im
+// Scrubber oder beim Rueckwaerts-Scrubben.
+const KILLFEED_MS   = 8000;   // Sichtdauer in REPLAY-Zeit
+const KILLFEED_MAX  = 5;      // mehr Zeilen verdecken die Karte
+
+function _kfWeapon(w) {
+  return (w || "?").replace(/^Weap/, "").replace(/_C$/, "");
+}
+
+function renderKillfeed(ms) {
+  const box = document.getElementById("killfeed");
+  if (!box) return;
+  if (!RS.replay || !RS.replay.events || RS.toggles.killfeed === false) {
+    box.innerHTML = "";
+    return;
+  }
+  const from = ms - KILLFEED_MS;
+  const rows = [];
+  for (const e of RS.replay.events) {
+    if (e.ts > ms) break;                       // Events sind sortiert
+    if (e.ts < from) continue;
+    if (e.type === "kill" && RS.toggles.kills === false) continue;
+    if (e.type === "knock" && RS.toggles.knocks === false) continue;
+    if (e.type !== "kill" && e.type !== "knock") continue;
+    rows.push(e);
+  }
+  const shown = rows.slice(-KILLFEED_MAX);
+  box.innerHTML = shown.map(e => {
+    const aTeam = RS._accTeam[e.actorId], vTeam = RS._accTeam[e.targetId];
+    const aCol = RS._teamColor[aTeam] || "var(--theme-accent)";
+    const vCol = RS._teamColor[vTeam] || "var(--theme-text-dim)";
+    const mine = RS.followTeam != null &&
+                 (aTeam === RS.followTeam || vTeam === RS.followTeam);
+    const dist = e.distance != null ? Math.round(e.distance / 100) + " m" : "";
+    const verb = e.type === "kill" ? "killed" : "knocked";
+    // Aeltere Eintraege verblassen linear ueber das Zeitfenster.
+    const fade = Math.max(0.35, 1 - (ms - e.ts) / KILLFEED_MS);
+    const esc = PubgUI.esc;
+    return `<div class="kf-row ${e.type === "knock" ? "knock" : ""} ${mine ? "mine" : ""}"
+      data-a="${aCol}" data-v="${vCol}" data-fade="${fade.toFixed(2)}">
+      <span class="kf-name a">${esc(RS._accName[e.actorId] || "?")}</span>
+      <span class="kf-mid">${verb}</span>
+      <span class="kf-name v">${esc(RS._accName[e.targetId] || "?")}</span>
+      <span class="kf-mid">${esc(_kfWeapon(e.weapon))}</span>
+      <span class="kf-dist">${dist}</span>
+    </div>`;
+  }).join("");
+  // Farben/Deckkraft ueber Custom-Properties, nicht als Inline-Style.
+  box.querySelectorAll(".kf-row").forEach(el => {
+    el.style.setProperty("--kf-col", el.dataset.a);
+    el.style.setProperty("--kf-col-v", el.dataset.v);
+    el.style.setProperty("--kf-fade", el.dataset.fade);
+  });
+}
 
 // --- Task 10: Wiedergabe-Steuerung ---
 
@@ -1060,6 +1121,7 @@ function tick(wallNow) {
     syncScrubberAndClock();
     updateTeamListDeadState(RS.cursorMs);
     renderFrame();
+    renderKillfeed(RS.cursorMs);
   } else if (animating) {
     renderFrame();
   }
@@ -1100,6 +1162,7 @@ document.getElementById("scrubber").addEventListener("input", () => {
   syncScrubberAndClock();
   updateTeamListDeadState(RS.cursorMs);
   renderFrame();
+  renderKillfeed(RS.cursorMs);   // auch beim Scrubben, nicht nur im Playback
 });
 
 document.getElementById("speedSelect").addEventListener("change", e => {

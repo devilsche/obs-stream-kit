@@ -12,7 +12,7 @@
     matchId  — Pflicht
     player   — vorausgewählter Spieler
 -->
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <title>PUBG Match-Analyse</title>
@@ -52,6 +52,13 @@
     th { font-size: 0.72em; color: var(--theme-text-dim); text-transform: uppercase;
          letter-spacing: 0.08em; font-weight: 700; }
     td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    th.sortable:hover { color: var(--theme-accent); }
+    th.sortable.active { color: var(--theme-accent); }
+    th.sortable:focus-visible { outline: 2px solid var(--theme-accent); outline-offset: -2px; }
+    .sort-arrow { font-size: 0.7em; margin-left: 2px; opacity: 0.7; }
+    tbody tr.own td.team, tbody tr.own td:first-child { color: var(--theme-accent); }
+    tbody tr.own { background: color-mix(in srgb, var(--theme-accent) 7%, transparent); }
     tbody tr.sel { background: color-mix(in srgb, var(--theme-accent) 10%, transparent); }
     tbody tr[tabindex] { cursor: pointer; }
     tbody tr[tabindex]:hover { background: color-mix(in srgb, var(--theme-text) 6%, transparent); }
@@ -60,10 +67,13 @@
     .zone-row { display: flex; align-items: center; gap: 8px; margin: 3px 0;
                 font-size: 0.85em; }
     .zone-row .n { width: 92px; color: var(--theme-text-dim); }
-    .zone-row .track { flex: 1; height: 12px; background: color-mix(in srgb, var(--theme-text) 9%, transparent);
+    /* display:block ist Pflicht: <span> ist inline, dort greifen weder
+       width noch height — der Balken blieb unsichtbar. */
+    .zone-row .track { display: block; flex: 1; height: 12px;
+                       background: color-mix(in srgb, var(--theme-text) 9%, transparent);
                        border-radius: 2px; overflow: hidden; }
-    .zone-row .fill { height: 100%; background: var(--theme-accent);
-                      width: var(--pct, 0%); }
+    .zone-row .fill { display: block; height: 100%; background: var(--theme-accent);
+                      width: var(--pct, 0%); min-width: 2px; }
     .zone-row .fill.ref { background: var(--theme-text-dim); opacity: 0.55; }
     .zone-row .p { width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
     .flag { display: inline-block; padding: 2px 8px; border-radius: 3px;
@@ -75,79 +85,81 @@
             margin-top: 10px; }
     .legend { color: var(--theme-text-dim); font-size: 0.72em; margin-top: 6px; }
     .err { color: var(--theme-warn); }
+    dialog#detailModal { max-width: min(860px, 92vw); width: 100%;
+      border: 1px solid color-mix(in srgb, var(--theme-text) 20%, transparent);
+      color: var(--theme-text); position: relative; }
+    dialog#detailModal::backdrop { background: rgb(0 0 0 / 0.6); }
+    .modal-close { position: absolute; top: 8px; right: 8px; padding: 4px 10px;
+                   min-width: 24px; min-height: 24px; }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   </style>
 </head>
 <body>
   <h1 class="t-title">PUBG Match-Analyse</h1>
-  <div class="t-subtitle" id="sub">Telemetrie-Auswertung aus dem Archiv oder der PUBG-API</div>
+  <div class="t-subtitle" id="sub">Telemetry analysis from the archive or the PUBG API</div>
 
   <div class="bar">
     <label for="matchSelect">Match <span id="matchCount"></span>
       <select id="matchSelect" size="1"></select>
     </label>
     <label for="matchFilter">Filter
-      <input id="matchFilter" type="text" placeholder="Datum, Map, Kills …">
+      <input id="matchFilter" type="text" placeholder="date, map, kills …">
     </label>
-    <label for="mid">oder Match-ID
-      <input id="mid" type="text" placeholder="fremdes Match (UUID)">
+    <label for="mid">or match ID
+      <input id="mid" type="text" placeholder="external match (UUID)">
     </label>
-    <button type="button" id="go">Analysieren</button>
+    <button type="button" id="go">Analyze</button>
   </div>
 
-  <div class="t-card" id="status">Match-ID eingeben und analysieren.</div>
+  <div class="t-card" id="status">Pick a match and analyze.</div>
 
   <div class="t-card" id="anomalyCard" hidden>
-    <div class="t-section-label">Auffälligkeiten</div>
+    <div class="t-section-label">Anomalies</div>
     <div id="anomalies"></div>
   </div>
 
   <div class="t-card" id="tableCard" hidden>
     <div class="scroll">
       <table>
-        <thead><tr>
-          <th>Spieler</th><th class="num">Schuss</th><th class="num">Treffer</th>
-          <th class="num">Acc %</th><th class="num">Leer %</th><th class="num">HS %</th>
-          <th class="num">Glied %</th><th class="num">Kills</th>
-          <th class="num">Schaden</th><th>Auffällig</th>
-        </tr></thead>
+        <thead id="head"><tr></tr></thead>
         <tbody id="rows"></tbody>
       </table>
     </div>
-    <div class="legend">Zeile anklicken für Details. „Glied %" = Arm-, Bein- und
-      Beckentreffer — beim Sprayen unvermeidlich, bei Aim-Assist auffällig niedrig.
-      „Leer %" = Schüsse ohne Gegner in 300 m; damit lässt sich die eigene Accuracy
-      künstlich drücken. Die Zonenverteilung ist dagegen immun, sie kennt nur Treffer.</div>
+    <div class="legend">Click a row for details. "Limb %" = arm, leg and pelvis hits — unavoidable when
+      spraying, suspiciously low with aim assist. "Empty %" = shots with no enemy within
+      300 m, which can be used to deflate one\u2019s own accuracy. The zone distribution is
+      immune to that, it only counts hits.</div>
   </div>
 
-  <div class="t-card" id="detailCard" hidden>
+  <dialog class="t-card" id="detailModal">
+    <button type="button" class="modal-close" id="modalClose" aria-label="Close">✕</button>
     <div class="t-section-label" id="who"></div>
     <div class="t-stat-grid t-stat-grid--compact" id="stats"></div>
     <div id="zones"></div>
     <div class="scroll" id="killWrap">
       <table>
         <thead><tr>
-          <th>Zeit</th><th>Opfer</th><th>Waffe</th>
-          <th class="num">Distanz</th><th>Zone</th>
+          <th>Time</th><th>Victim</th><th>Weapon</th>
+          <th class="num">Distance</th><th>Zone</th>
         </tr></thead>
         <tbody id="kills"></tbody>
       </table>
     </div>
     <div class="note" id="note"></div>
-  </div>
+  </dialog>
 
   <script src="/widgets-static/pubg/_pubg.js"></script>
   <script>
     const BASE = window.__SERVE_BASE__ || "/";
     const esc = PubgUI.esc;
-    let DATA = null, SEL = null;
+    let DATA = null, SEL = null, MY_TEAM = null;
 
-    const ZONE_LABEL = { HeadShot: "Kopf", TorsoShot: "Torso", ArmShot: "Arme",
-                         LegShot: "Beine", PelvisShot: "Becken" };
+    const ZONE_LABEL = { HeadShot: "Head", TorsoShot: "Torso", ArmShot: "Arms",
+                         LegShot: "Legs", PelvisShot: "Pelvis" };
     const FLAG_TEXT = {
-      narrow_hit_pattern: "Trefferbild zu schmal",
-      headshot_rate_rises_with_distance: "Kopftreffer steigen mit Distanz",
-      wallbangs: "Treffer durch Wände",
+      narrow_hit_pattern: "Hit pattern too narrow",
+      headshot_rate_rises_with_distance: "Headshot rate rises with distance",
+      wallbangs: "Hits through walls",
     };
 
     function limbPct(p) {
@@ -163,7 +175,7 @@
       if (!hits.length) {
         card.hidden = false;
         document.getElementById("anomalies").textContent =
-          "Keine auffälligen Treffermuster in diesem Match.";
+          "No suspicious hit patterns in this match.";
         return;
       }
       hits.sort((a, b) => a[1].pValue - b[1].pValue);
@@ -172,26 +184,66 @@
           `<span class="flag${r.significantCorrected ? "" : " weak"}">${esc(FLAG_TEXT[f] || f)}</span>`).join("");
         return `<div class="zone-row"><b>${esc(n)}</b> ${flags}
           <span class="p">${r.limbPct}%</span>
-          <span class="n">statt ${r.expectedLimbPct}% erwartet</span></div>
+          <span class="n">vs ${r.expectedLimbPct}% expected</span></div>
           <div class="legend">p = ${r.pValue.toExponential(1)} ·
             ${r.significantCorrected
-              ? "hält der Korrektur für " + r.tested + " getestete Spieler stand"
-              : "fällt bei " + r.tested + " getesteten Spielern durch die Mehrfachtest-Korrektur"}</div>`;
+              ? "holds up for " + r.tested + " tested players"
+              : "fails multiple-testing correction across " + r.tested + " players"}</div>`;
       }).join("");
       card.hidden = false;
     }
 
+    // Spaltendefinition an einer Stelle: Beschriftung, Ausrichtung und der
+    // Wert, nach dem sortiert wird. Muster wie in widgets/pubg/top-hunters.
+    const COLS = [
+      { key: "name",     label: "Player",  num: false, val: (n) => n.toLowerCase() },
+      { key: "team",     label: "Team",     num: true,  val: (n, p) => p.teamId ?? 9999 },
+      { key: "shots",    label: "Shots",   num: true,  val: (n, p) => p.shots },
+      { key: "hits",     label: "Hits",  num: true,  val: (n, p) => p.hitAttacks },
+      { key: "accuracy", label: "Acc %",    num: true,  val: (n, p) => p.accuracy },
+      { key: "empty",    label: "Empty %",   num: true,  val: (n, p) => p.emptyShotPct ?? -1 },
+      { key: "hs",       label: "HS %",     num: true,  val: (n, p) => p.headshotRate },
+      { key: "limb",     label: "Limb %",  num: true,  val: (n, p) => limbPct(p) },
+      { key: "kills",    label: "Kills",    num: true,  val: (n, p) => p.kills },
+      { key: "damage",   label: "Damage",  num: true,  val: (n, p) => p.damage },
+      { key: "flags",    label: "Flags", num: false,
+        val: (n, p, an) => ((an[n] && an[n].flags) || []).length },
+    ];
+    let SORT_KEY = "accuracy", SORT_DIR = -1;
+
+    function renderHead() {
+      document.getElementById("head").innerHTML = "<tr>" + COLS.map(c => {
+        const active = c.key === SORT_KEY;
+        const arrow = active ? (SORT_DIR < 0 ? "▼" : "▲") : "";
+        const aria = active ? (SORT_DIR < 0 ? "descending" : "ascending") : "none";
+        return `<th data-sort="${c.key}" tabindex="0" aria-sort="${aria}"
+          class="sortable${c.num ? " num" : ""}${active ? " active" : ""}">`
+          + `${esc(c.label)}<span class="sort-arrow">${arrow}</span></th>`;
+      }).join("") + "</tr>";
+    }
+
     function renderTable() {
       const an = DATA.anomalies || {};
+      const col = COLS.find(c => c.key === SORT_KEY) || COLS[3];
       const rows = Object.entries(DATA.players)
         .filter(([, p]) => p.shots >= 20 || p.kills > 0)
-        .sort((a, b) => b[1].accuracy - a[1].accuracy);
+        .sort((a, b) => {
+          const va = col.val(a[0], a[1], an), vb = col.val(b[0], b[1], an);
+          if (va < vb) return -SORT_DIR;
+          if (va > vb) return SORT_DIR;
+          return a[0].localeCompare(b[0]);   // stabile Reihenfolge bei Gleichstand
+        });
+      renderHead();
       document.getElementById("rows").innerHTML = rows.map(([n, p]) => {
         const fl = (an[n] && an[n].flags) || [];
         const badge = fl.length
           ? `<span class="flag${an[n].significantCorrected ? "" : " weak"}">${fl.length}</span>` : "";
-        return `<tr tabindex="0" data-p="${esc(n)}">
-          <td>${esc(n)}</td><td class="num">${p.shots}</td>
+        // Eigenes Team hervorheben — sonst sucht man sich in 100 Zeilen tot.
+        const mine = MY_TEAM != null && p.teamId === MY_TEAM;
+        return `<tr tabindex="0" data-p="${esc(n)}" class="${mine ? "own" : ""}">
+          <td>${esc(n)}</td>
+          <td class="num team">${p.teamId ?? "—"}</td>
+          <td class="num">${p.shots}</td>
           <td class="num">${p.hitAttacks}</td><td class="num">${p.accuracy.toFixed(1)}</td>
           <td class="num">${p.emptyShotPct == null ? "—" : p.emptyShotPct.toFixed(0)}</td>
           <td class="num">${p.headshotRate.toFixed(1)}</td>
@@ -211,14 +263,15 @@
       document.getElementById("who").textContent = name;
       const an = (DATA.anomalies || {})[name];
       document.getElementById("stats").innerHTML = [
-        ["Schüsse", p.shots], ["Getroffen", p.hitAttacks],
+        ["Shots", p.shots], ["Landed", p.hitAttacks],
+        ["Team", p.teamId ?? "—"],
         ["Accuracy", p.accuracy.toFixed(1) + " %"],
-        ["Schuss ohne Ziel", p.emptyShotPct == null ? "—" : p.emptyShotPct.toFixed(0) + " %"],
-        ["Einschläge", p.hits], ["Kopftreffer", p.headshotRate.toFixed(1) + " %"],
+        ["Shots w/o target", p.emptyShotPct == null ? "—" : p.emptyShotPct.toFixed(0) + " %"],
+        ["Impacts", p.hits], ["Headshots", p.headshotRate.toFixed(1) + " %"],
         ["Kills", p.kills], ["Knocks", p.knocks],
-        ["Schaden", Math.round(p.damage)],
-        ["Durch Wand", p.wallbangs],
-        ["Treffer Bots", p.hitsOnBots], ["Treffer Spieler", p.hitsOnHumans],
+        ["Damage", Math.round(p.damage)],
+        ["Through walls", p.wallbangs],
+        ["Hits on bots", p.hitsOnBots], ["Hits on players", p.hitsOnHumans],
       ].map(([l, v]) => `<div class="t-stat"><span class="t-value">${esc(v)}</span>`
         + `<span class="t-label">${esc(l)}</span></div>`).join("");
 
@@ -226,13 +279,12 @@
       const zp = p.zonePct || {};
       const order = ["HeadShot", "TorsoShot", "ArmShot", "LegShot", "PelvisShot"];
       document.getElementById("zones").innerHTML =
-        `<div class="legend">Trefferzonen (${p.hits} Einschläge)</div>` +
+        `<div class="legend">Hit zones (${p.hits} impacts)</div>` +
         order.filter(z => zp[z] != null).map(z =>
           `<div class="zone-row"><span class="n">${esc(ZONE_LABEL[z] || z)}</span>
             <span class="track"><span class="fill" data-pct="${zp[z]}"></span></span>
             <span class="p">${zp[z]}%</span></div>`).join("") +
-        (ref != null ? `<div class="legend">Gliedmaßen gesamt:
-            <b>${an.limbPct}%</b> — im Match erwartet: ${ref}%</div>` : "");
+        (ref != null ? `<div class="legend">Limbs total: <b>${an.limbPct}%</b> — expected in this match: ${ref}%</div>` : "");
       // Breiten über Custom-Property statt Inline-Style setzen.
       [...document.querySelectorAll("#zones .fill")].forEach(el =>
         el.style.setProperty("--pct", el.dataset.pct + "%"));
@@ -247,12 +299,31 @@
         : `<tr><td colspan="5">Keine Kills</td></tr>`;
 
       document.getElementById("note").textContent = an && an.flags.length
-        ? "Hinweis: Auffälligkeiten sind statistische Muster, kein Beweis. "
-          + "Kleine Stichproben können täuschen — für eine belastbare Aussage "
-          + "braucht es mehrere Matches desselben Spielers."
+        ? "Note: anomalies are statistical patterns, not proof. Small samples can "
+          + "mislead — a solid conclusion needs several matches of the same player."
         : "";
-      document.getElementById("detailCard").hidden = false;
+      const dlg = document.getElementById("detailModal");
+      if (!dlg.open) dlg.showModal();
     }
+
+    function onSort(th) {
+      const key = th.dataset.sort;
+      if (SORT_KEY === key) SORT_DIR *= -1;
+      else { SORT_KEY = key; SORT_DIR = (key === "name") ? 1 : -1; }
+      renderTable();
+      if (SEL) renderDetail(SEL);        // Auswahl-Markierung mitziehen
+      const again = document.querySelector(`#head th[data-sort="${key}"]`);
+      if (again) again.focus();
+    }
+    document.getElementById("head").addEventListener("click", e => {
+      const th = e.target.closest("th[data-sort]");
+      if (th) onSort(th);
+    });
+    document.getElementById("head").addEventListener("keydown", e => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const th = e.target.closest("th[data-sort]");
+      if (th) { e.preventDefault(); onSort(th); }
+    });
 
     document.getElementById("rows").addEventListener("click", e => {
       const tr = e.target.closest("tr[data-p]");
@@ -308,16 +379,22 @@
       if (!mid) return;
       const st = document.getElementById("status");
       st.classList.remove("err");
-      st.textContent = "Lade Telemetrie … (kann einige Sekunden dauern)";
-      ["anomalyCard", "tableCard", "detailCard"].forEach(id =>
+      st.textContent = "Loading telemetry … (may take a few seconds)";
+      ["anomalyCard", "tableCard"].forEach(id =>
         document.getElementById(id).hidden = true);
+      const dlg = document.getElementById("detailModal");
+      if (dlg.open) dlg.close();
       try {
         DATA = await PubgUI.fetchJson(
           BASE + "api/pubg/match-analysis?matchId=" + encodeURIComponent(mid), 120000);
-        st.textContent = `${DATA.eventCount.toLocaleString("de-DE")} Events · Quelle: `
-          + (DATA.source === "hidrive" ? "HiDrive-Archiv" : "PUBG-API")
+        st.textContent = `${DATA.eventCount.toLocaleString("en-US")} Events · Quelle: `
+          + (DATA.source === "hidrive" ? "HiDrive archive" : "PUBG-API")
           + (DATA.map ? ` · ${PubgUI.fmtMap(DATA.map)}` : "")
           + (DATA.playedAt ? ` · ${PubgUI.fmtDate(DATA.playedAt)} ${PubgUI.fmtTime(DATA.playedAt)}` : "");
+        // Eigenes Team aus dem injizierten Tenant-Namen ableiten, damit die
+        // eigenen Leute farblich abgesetzt sind.
+        const me = DATA.myName || "";
+        MY_TEAM = (me && DATA.players[me]) ? DATA.players[me].teamId : null;
         renderAnomalies();
         renderTable();
         const pre = PubgUI.qs("player", "");
@@ -325,12 +402,14 @@
       } catch (err) {
         st.classList.add("err");
         st.textContent = String(err && err.message || err).includes("404")
-          ? "Keine Telemetrie für dieses Match — weder im Archiv noch über die API "
-            + "(die PUBG-API hält Matches nur rund 17 Tage vor)."
-          : "Analyse fehlgeschlagen: " + (err && err.message || err);
+          ? "No telemetry for this match — neither archived nor via the API "
+            + "(the PUBG API keeps matches for about 17 days)."
+          : "Analysis failed: " + (err && err.message || err);
       }
     }
 
+    document.getElementById("modalClose").addEventListener("click", () =>
+      document.getElementById("detailModal").close());
     document.getElementById("go").addEventListener("click", run);
     document.getElementById("mid").addEventListener("keydown", e => {
       if (e.key === "Enter") run();

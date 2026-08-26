@@ -382,3 +382,23 @@ def test_without_position_data_no_empty_shot_claim():
     ev = [_attack("A", aid=1), _damage("A", "B", aid=1)]
     p = analyse(ev)["players"]["A"]
     assert p["emptyShotPct"] is None
+
+
+def test_team_id_is_reported_per_player():
+    """Ohne Team laesst sich in der Tabelle nicht erkennen, wer Gegner war."""
+    ev = [_kill("A", "Opfer1")]          # killer teamId 19, victim teamId 4
+    r = analyse(ev)["players"]
+    assert r["A"]["teamId"] == 19
+    assert r["Opfer1"]["teamId"] == 4
+
+
+def test_team_id_is_none_when_unknown():
+    ev = [_attack("A", aid=1)]
+    assert analyse(ev)["players"]["A"]["teamId"] is None
+
+
+def test_victim_only_players_still_appear():
+    """Wer nur stirbt und nie schiesst, gehoert trotzdem in die Auswertung."""
+    r = analyse([_kill("A", "Opfer1")])["players"]
+    assert "Opfer1" in r
+    assert r["Opfer1"]["shots"] == 0
