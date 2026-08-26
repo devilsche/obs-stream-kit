@@ -306,6 +306,12 @@
         ? "Note: anomalies are statistical patterns, not proof. Small samples can "
           + "mislead — a solid conclusion needs several matches of the same player."
         : "";
+    }
+
+    // Fuellen und Oeffnen sind getrennt: beim Sortieren wird nur die Auswahl
+    // nachgezogen, ohne das Modal wieder aufzureissen.
+    function openDetail(name) {
+      renderDetail(name);
       const dlg = document.getElementById("detailModal");
       if (!dlg.open) dlg.showModal();
     }
@@ -315,7 +321,10 @@
       if (SORT_KEY === key) SORT_DIR *= -1;
       else { SORT_KEY = key; SORT_DIR = (key === "name") ? 1 : -1; }
       renderTable();
-      if (SEL) renderDetail(SEL);        // Auswahl-Markierung mitziehen
+      // Nur die Zeilen-Markierung nachziehen — renderDetail wuerde das
+      // Modal wieder oeffnen, obwohl der Nutzer nur sortieren wollte.
+      if (SEL) [...document.querySelectorAll("#rows tr")].forEach(tr =>
+        tr.classList.toggle("sel", tr.dataset.p === SEL));
       const again = document.querySelector(`#head th[data-sort="${key}"]`);
       if (again) again.focus();
     }
@@ -331,12 +340,12 @@
 
     document.getElementById("rows").addEventListener("click", e => {
       const tr = e.target.closest("tr[data-p]");
-      if (tr) renderDetail(tr.dataset.p);
+      if (tr) openDetail(tr.dataset.p);
     });
     document.getElementById("rows").addEventListener("keydown", e => {
       if (e.key !== "Enter" && e.key !== " ") return;
       const tr = e.target.closest("tr[data-p]");
-      if (tr) { e.preventDefault(); renderDetail(tr.dataset.p); }
+      if (tr) { e.preventDefault(); openDetail(tr.dataset.p); }
     });
 
     // Match-Liste wie im match-replay: Auswahl + Textfilter. Das ID-Feld
@@ -402,7 +411,7 @@
         renderAnomalies();
         renderTable();
         const pre = PubgUI.qs("player", "");
-        if (pre && DATA.players[pre]) renderDetail(pre);
+        if (pre && DATA.players[pre]) openDetail(pre);
       } catch (err) {
         st.classList.add("err");
         st.textContent = String(err && err.message || err).includes("404")
@@ -412,8 +421,17 @@
       }
     }
 
-    document.getElementById("modalClose").addEventListener("click", () =>
-      document.getElementById("detailModal").close());
+    const _dlg = document.getElementById("detailModal");
+    document.getElementById("modalClose").addEventListener("click", () => _dlg.close());
+    _dlg.addEventListener("click", e => {
+      // Der Backdrop gehoert zum dialog-Element — ein Klick darauf liegt
+      // ausserhalb seiner Box.
+      if (e.target !== _dlg) return;
+      const r = _dlg.getBoundingClientRect();
+      const inside = e.clientX >= r.left && e.clientX <= r.right
+                  && e.clientY >= r.top  && e.clientY <= r.bottom;
+      if (!inside) _dlg.close();
+    });
     document.getElementById("go").addEventListener("click", run);
     document.getElementById("mid").addEventListener("keydown", e => {
       if (e.key === "Enter") run();
