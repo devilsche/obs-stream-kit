@@ -652,6 +652,11 @@
   //   wrapW      — Breite des .chart-wrap
   // Liefert {x, y, flip}: flip=true heisst "unter den Punkt geklappt",
   // weil oben kein Platz war.
+  // HTML-Escape fuer Werte die per innerHTML/Template-String ins Markup
+  // gehen — Spielernamen kommen aus der PUBG-API, nicht aus unserem Code.
+  PubgUI.esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g,
+    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
   PubgUI.clampTooltip = function(dotX, dotY, ttW, ttH, wrapW, margin) {
     const m = margin == null ? 4 : margin;
     const half = ttW / 2;

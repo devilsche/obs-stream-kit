@@ -63,18 +63,19 @@
     <div class="kd-grid">
       <div class="kd-cell me"><div class="v" id="myKd">—</div><div class="l">Your K/D</div></div>
       <div class="kd-cell"><div class="v" id="squadKd">—</div><div class="l">Squad K/D</div></div>
-      <div class="kd-cell"><div class="v" id="top3Kd">—</div><div class="l">Top-3 Lobby K/D</div></div>
+    </div>
+    <div class="row">
+      <span class="label">Stärkster Gegner</span>
+      <b id="topOpp">—</b>
     </div>
     <div class="row">
       <span class="label">You vs Squad</span>
       <b id="diffSquad">—</b>
     </div>
-    <div class="row">
-      <span class="label">You vs Top-3 Lobby</span>
-      <b id="diffTop3">—</b>
-    </div>
     <div class="meta" id="meta">— Matches</div>
-    <div class="hint">Top-3 Lobby K/D = Ø K/D der drei Top-Fragger pro Match (Lobby-Schwierigkeits-Indikator).</div>
+    <div class="hint">Stärkster Gegner = meiste Kills eines einzelnen Gegners in der Range.
+      Bewusst ein Ausreisser: Lobby-Durchschnitte sind über mehrere Matches nahezu
+      konstant und sagen nichts aus.</div>
   </div>
   <script src="_pubg.js"></script>
   <script>
@@ -95,35 +96,37 @@
       el.className = v >= 0 ? "diff-pos" : "diff-neg";
     }
 
-    function render(squad, top3) {
+    function render(squad, opp) {
       const matches = (squad && squad.matches) || 0;
       if (!squad || matches === 0) {
-        ["myKd","squadKd","top3Kd","diffSquad","diffTop3"].forEach(id =>
+        ["myKd","squadKd","topOpp","diffSquad"].forEach(id =>
           document.getElementById(id).textContent = "—");
         document.getElementById("meta").textContent = "no matches in range";
         return;
       }
       const myKd = squad.myKd || 0;
       const squadKd = squad.squadKd || 0;
-      const top3Kd = (top3 && top3.top3Kd) || 0;
-      const top3N = (top3 && top3.matches) || 0;
       document.getElementById("myKd").textContent = myKd.toFixed(2);
       document.getElementById("squadKd").textContent = squadKd.toFixed(2);
-      document.getElementById("top3Kd").textContent = top3N > 0 ? top3Kd.toFixed(2) : "—";
       fmtDiff(document.getElementById("diffSquad"), myKd - squadKd);
-      fmtDiff(document.getElementById("diffTop3"),
-              top3N > 0 ? (myKd - top3Kd) : null);
+      // Gegnername kommt aus der DB — textContent statt innerHTML.
+      const oppEl = document.getElementById("topOpp");
+      if (opp && opp.kills != null) {
+        oppEl.textContent = `${opp.name} · ${opp.kills} Kills`;
+      } else {
+        oppEl.textContent = "—";
+      }
       document.getElementById("meta").textContent =
-        `${matches} ${matches === 1 ? "Match" : "Matches"} in range · Top-3 aus ${top3N}`;
+        `${matches} ${matches === 1 ? "Match" : "Matches"} in range`;
     }
 
     function tick() {
       Promise.all([
         PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/squad-kd?range=${RANGE}`),
-        PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/lobby-top3-kd?range=${RANGE}`),
-      ]).then(([sq, t3]) => {
+        PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/strongest-opponent?range=${RANGE}`),
+      ]).then(([sq, opp]) => {
         if (RANGE === "session") PubgUI.hideIfStale();
-        render(sq, t3);
+        render(sq, opp);
       }).catch(console.error);
     }
     if (RANGE === "session") PubgUI.hideIfStale();

@@ -12,7 +12,8 @@ from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_top_mates, compute_co_player,
                                 compute_mates, compute_map_distribution,
                                 compute_first_fight_rate, compute_squad_compare,
-                                compute_performance_history)
+                                compute_performance_history,
+                                compute_strongest_opponent)
 
 
 CONN = None
@@ -623,3 +624,67 @@ def test_performance_history_empty_is_safe():
     conn = _setup()
     res = compute_performance_history(conn, T, "account.A", "day", 10)
     assert res["groups"] == []
+
+
+def _so_mapping(conn, match_id, rows):
+    """rows: [(account_id, team_id, kills)] -> Lobby-Mapping schreiben."""
+    db_pg.insert_team_mapping(conn.raw, T, match_id, [
+        {"account_id": a, "team_id": t, "kills": k, "place": 5,
+         "time_survived": 1200} for a, t, k in rows])
+
+
+def test_strongest_opponent_ignores_own_squad():
+    """Der eigene Squad ist kein Gegner — auch wenn er am meisten Kills hat.
+    (compute_lobby_top3_kd zaehlte ihn frueher mit.)"""
+    conn = _setup()
+    upsert_player(conn, "account.MATE", "MateA", "steam", False)
+    upsert_player(conn, "account.OPP", "BadGuy", "steam", False)
+    insert_match(conn, "so1", "Erangel_Main", "squad-fpp", False, 1800,
+                 "2026-05-01T18:00:00Z", None)
+    insert_participants(conn, "so1", [_sc_part("account.A", "PEX_LuCKoR", 1)])
+    _so_mapping(conn, "so1", [
+        ("account.A",    1, 12),   # ich — darf nicht gewinnen
+        ("account.MATE", 1, 15),   # mein Mate — auch nicht
+        ("account.OPP",  4,  9),
+    ])
+    r = compute_strongest_opponent(conn, T, "account.A", match_ids=["so1"])
+    assert r["name"] == "BadGuy"
+    assert r["kills"] == 9
+
+
+def test_strongest_opponent_picks_max_over_matches():
+    conn = _setup()
+    upsert_player(conn, "account.O1", "Gegner1", "steam", False)
+    upsert_player(conn, "account.O2", "Gegner2", "steam", False)
+    for mid, ts, k1, k2 in (("so2", "2026-05-01T18:00:00Z", 3, 4),
+                            ("so3", "2026-05-01T19:00:00Z", 11, 2)):
+        insert_match(conn, mid, "Erangel_Main", "squad-fpp", False, 1800, ts, None)
+        insert_participants(conn, mid, [_sc_part("account.A", "PEX_LuCKoR", 1)])
+        _so_mapping(conn, mid, [("account.A", 1, 5),
+                                ("account.O1", 2, k1), ("account.O2", 3, k2)])
+    r = compute_strongest_opponent(conn, T, "account.A", match_ids=["so2", "so3"])
+    assert r["name"] == "Gegner1"
+    assert r["kills"] == 11
+    assert r["matchId"] == "so3"
+
+
+def test_strongest_opponent_without_lobby_mapping_is_none():
+    """Matches ohne Lobby-Mapping duerfen keinen Fantasie-Gegner liefern."""
+    conn = _setup()
+    insert_match(conn, "so4", "Erangel_Main", "squad-fpp", False, 1800,
+                 "2026-05-01T18:00:00Z", None)
+    insert_participants(conn, "so4", [_sc_part("account.A", "PEX_LuCKoR", 1)])
+    r = compute_strongest_opponent(conn, T, "account.A", match_ids=["so4"])
+    assert r is None
+
+
+def test_strongest_opponent_falls_back_to_account_id():
+    """Unbekannter Gegner: lieber gekuerzte account_id als gar nichts."""
+    conn = _setup()
+    insert_match(conn, "so5", "Erangel_Main", "squad-fpp", False, 1800,
+                 "2026-05-01T18:00:00Z", None)
+    insert_participants(conn, "so5", [_sc_part("account.A", "PEX_LuCKoR", 1)])
+    _so_mapping(conn, "so5", [("account.A", 1, 2), ("account.UNKNOWN", 9, 7)])
+    r = compute_strongest_opponent(conn, T, "account.A", match_ids=["so5"])
+    assert r["kills"] == 7
+    assert r["name"]

@@ -3267,83 +3267,59 @@ def compute_streaks(conn, tenant_id: int, my_account_id, range_key="session"):
     }
 
 
-def compute_lobby_top3_kd(conn, tenant_id: int, my_account_id, range_key="session",
-                            match_ids=None):
-    """Lobby-Skill-Indikator via Top-3-Fragger pro Match.
-    Pro Match: Top-3 nach Kills in der Lobby, ihre Round-K/D nehmen
-    (kills/max(deaths,1)) und mitteln. Über alle Matches der Range
-    nochmal mitteln. Plus Top-3-Avg-Kills als Vergleichswert.
+def compute_strongest_opponent(conn, tenant_id: int, my_account_id,
+                               range_key="session", match_ids=None):
+    """Der stärkste einzelne GEGNER im Zeitraum — ein Ausreisser, kein Mittelwert.
 
-    Hohe Zahl = harte Lobby (Top-Fragger schreddern). Braucht nur
-    match_team_mapping (kein Career-Fetch).
+    Bewusst ein Maximum: Durchschnitte über die Lobby sind auf Phasen- oder
+    Session-Ebene praktisch konstant (Mittelung über ~96 Spieler und N Matches
+    zieht jeden Wert zum Populationsmittel). Der Spitzenwert behält Varianz und
+    ist als Highlight lesbar — als Vergleichszahl zwischen unterschiedlich
+    langen Phasen taugt er dagegen nicht, weil ein Maximum mit N wächst.
 
-    `match_ids` optional: wenn gesetzt, range_key wird ignoriert.
+    Der eigene Squad ist ausgenommen (gleiche team_id wie ich im Match).
 
-    Liefert: {top3Kd, top3Kills, matches, perMatch}
+    Liefert {name, accountId, kills, matchId, playedAt} oder None, wenn kein
+    Match ein Lobby-Mapping hat.
     """
     if match_ids is None:
         cutoff = (_range_filter(conn, tenant_id, range_key)
                   if range_key != "all" else "1970-01-01T00:00:00Z")
-        matches = conn.execute("""
-            SELECT m.match_id, m.played_at, m.duration_secs
-            FROM matches m
-            WHERE m.tenant_id = ? AND m.match_id IN (
-                SELECT match_id FROM participants WHERE tenant_id = ? AND account_id = ?
-            ) AND m.played_at >= ?
-            ORDER BY m.played_at ASC
+        rows = conn.execute("""
+            SELECT match_id FROM matches
+            WHERE tenant_id = ? AND match_id IN (
+                SELECT match_id FROM participants
+                WHERE tenant_id = ? AND account_id = ?
+            ) AND played_at >= ?
         """, (tenant_id, tenant_id, my_account_id, cutoff)).fetchall()
-    else:
-        if not match_ids:
-            return {"top3Kd": 0, "top3Kills": 0, "matches": 0, "perMatch": []}
-        ph = ",".join("?" * len(match_ids))
-        matches = conn.execute(
-            f"SELECT match_id, played_at, duration_secs FROM matches "
-            f"WHERE tenant_id = ? AND match_id IN ({ph}) ORDER BY played_at ASC",
-            [tenant_id] + match_ids,
-        ).fetchall()
+        match_ids = [r["match_id"] for r in rows]
+    if not match_ids:
+        return None
 
-    per_match = []
-    sum_kd = 0.0
-    sum_kills = 0.0
-    n = 0
-    for m in matches:
-        top3 = conn.execute("""
-            SELECT kills, place, time_survived
-            FROM match_team_mapping
-            WHERE tenant_id = ? AND match_id = ? AND kills IS NOT NULL
-            ORDER BY kills DESC
-            LIMIT 3
-        """, (tenant_id, m["match_id"],)).fetchall()
-        if len(top3) < 3:
-            continue
-        dur = m["duration_secs"] or 0
-        kds = []
-        for r in top3:
-            k = r["kills"] or 0
-            if r["time_survived"] is not None and dur:
-                died = r["time_survived"] < dur - 5
-            else:
-                died = (r["place"] or 99) != 1
-            # K/D = kills/deaths. Tot=1 Death, lebt=keine Deaths → K/D = k
-            # (in beiden Fällen mathematisch k, aber als K/D-Semantik klar)
-            kds.append(k / max(1 if died else 0, 1) if died else k)
-        match_kd = sum(kds) / 3
-        match_kills = sum(r["kills"] or 0 for r in top3) / 3
-        per_match.append({
-            "matchId": m["match_id"],
-            "playedAt": m["played_at"],
-            "top3Kd": match_kd,
-            "top3Kills": match_kills,
-        })
-        sum_kd += match_kd
-        sum_kills += match_kills
-        n += 1
-
+    ph = ",".join("?" * len(match_ids))
+    # me: mein Team im jeweiligen Match — alles mit derselben team_id fliegt raus.
+    row = conn.execute(f"""
+        SELECT o.account_id, o.kills, o.match_id, m.played_at, p.name
+        FROM match_team_mapping o
+        JOIN match_team_mapping me
+          ON me.tenant_id = o.tenant_id AND me.match_id = o.match_id
+         AND me.account_id = ?
+        JOIN matches m ON m.tenant_id = o.tenant_id AND m.match_id = o.match_id
+        LEFT JOIN players p ON p.tenant_id = o.tenant_id AND p.account_id = o.account_id
+        WHERE o.tenant_id = ? AND o.match_id IN ({ph})
+          AND o.kills IS NOT NULL
+          AND (o.team_id IS NULL OR me.team_id IS NULL OR o.team_id <> me.team_id)
+        ORDER BY o.kills DESC, m.played_at ASC
+        LIMIT 1
+    """, [my_account_id, tenant_id] + list(match_ids)).fetchone()
+    if not row or row["kills"] is None:
+        return None
     return {
-        "top3Kd": (sum_kd / n) if n else 0,
-        "top3Kills": (sum_kills / n) if n else 0,
-        "matches": n,
-        "perMatch": per_match,
+        "name": row["name"] or (row["account_id"] or "")[:12],
+        "accountId": row["account_id"],
+        "kills": row["kills"],
+        "matchId": row["match_id"],
+        "playedAt": row["played_at"],
     }
 
 
@@ -5768,15 +5744,14 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         out = {"squadKills": 0, "squadKd": 0, "squadKillsPerMatch": 0,
                "squadMatchesWithMapping": 0,
                "lobbyKd": 0, "lobbyMatchesWithMapping": 0,
-               "lobbyTop3Kd": 0, "lobbyTop3Kills": 0,
-               "lobbyTop3Matches": 0}
+               "strongestOpponent": None}
         if not match_ids:
             return out
-        # Top-3-Lobby-Indikator (separat vom Squad-Aggregat)
-        top3 = compute_lobby_top3_kd(conn, tenant_id, my_account_id, match_ids=match_ids)
-        out["lobbyTop3Kd"] = top3["top3Kd"]
-        out["lobbyTop3Kills"] = top3["top3Kills"]
-        out["lobbyTop3Matches"] = top3["matches"]
+        # Staerkster einzelner Gegner statt eines Lobby-Durchschnitts: Mittelwerte
+        # ueber die Lobby sind auf Phasen-Ebene praktisch konstant (~5-9 Kills,
+        # 10% Streuung), der Spitzenwert streut dagegen ueber 30%.
+        out["strongestOpponent"] = compute_strongest_opponent(
+            conn, tenant_id, my_account_id, match_ids=match_ids)
         ph_id = ",".join("?" * len(match_ids))
         # Squad-Aggregate (mit time_survived basiertem Death-Count)
         sq_rows = conn.execute(f"""
