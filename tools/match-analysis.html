@@ -17,72 +17,68 @@
   <meta charset="utf-8">
   <title>PUBG Match-Analyse</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../widgets/pubg/_pubg.css">
-  <link rel="stylesheet" href="../widgets/_theme.css">
+  <link rel="stylesheet" href="/widgets-static/_theme.css">
+  <link rel="stylesheet" href="/widgets-static/_blocks.css">
+  <link rel="stylesheet" href="/widgets-static/pubg/_pubg.css">
   <style>
-    body { padding: 20px; max-width: 1180px; margin: 0 auto; }
-    h1 { font-size: 1.1em; letter-spacing: 0.08em; text-transform: uppercase;
-         color: var(--pubg-gold); margin: 0 0 4px; }
-    .sub { color: var(--pubg-muted); font-size: 0.8em; margin-bottom: 16px; }
-    .card { padding: 16px 18px; margin-bottom: 16px; }
+    /* Nur Seiten-Layout und das, was die t-*-Bausteine nicht abdecken
+       (Tabellen, Zonen-Balken). Karten, Ueberschriften und Stat-Bloecke
+       kommen aus widgets/components/ ueber _blocks.css. */
+    body { padding: 20px; max-width: 1180px; margin: 0 auto;
+           background: var(--theme-bg); color: var(--theme-text); }
+    .t-card { padding: 16px 18px; margin-bottom: 16px; }
     .bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;
            margin-bottom: 16px; }
     label { display: flex; flex-direction: column; gap: 4px;
-            color: var(--pubg-muted); font-size: 0.72em; font-weight: 700;
+            color: var(--theme-text-dim); font-size: 0.72em; font-weight: 700;
             letter-spacing: 0.08em; text-transform: uppercase; }
-    input, select { background: var(--theme-surface, #140c1e);
-                    border: 1px solid var(--pubg-border);
-                    color: var(--theme-text, #fff); padding: 7px 9px;
+    input, select { background: var(--theme-surface);
+                    border: 1px solid color-mix(in srgb, var(--theme-text) 15%, transparent);
+                    color: var(--theme-text); padding: 7px 9px;
                     border-radius: 3px; font-family: inherit; font-size: 0.9rem;
                     min-height: 24px; min-width: 240px; }
-    button { background: color-mix(in srgb, var(--theme-accent, #f2b705) 15%, transparent);
-             border: 1px solid var(--pubg-gold); color: var(--pubg-gold);
+    button { background: color-mix(in srgb, var(--theme-accent) 15%, transparent);
+             border: 1px solid var(--theme-accent); color: var(--theme-accent);
              padding: 8px 16px; border-radius: 3px; cursor: pointer;
              font-family: inherit; font-weight: 700; letter-spacing: 0.06em;
              text-transform: uppercase; font-size: 11px; min-height: 24px; }
     button:focus-visible, input:focus-visible, select:focus-visible {
-      outline: 2px solid var(--pubg-gold); outline-offset: 2px; }
+      outline: 2px solid var(--theme-accent); outline-offset: 2px; }
     table { width: 100%; border-collapse: collapse; font-size: 0.86em; }
     th, td { padding: 5px 8px; text-align: left;
-             border-bottom: 1px solid rgba(255,255,255,0.06); }
-    th { font-size: 0.72em; color: var(--pubg-muted); text-transform: uppercase;
+             border-bottom: 1px solid color-mix(in srgb, var(--theme-text) 8%, transparent); }
+    th { font-size: 0.72em; color: var(--theme-text-dim); text-transform: uppercase;
          letter-spacing: 0.08em; font-weight: 700; }
     td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-    tbody tr.sel { background: color-mix(in srgb, var(--theme-accent, #f2b705) 10%, transparent); }
+    tbody tr.sel { background: color-mix(in srgb, var(--theme-accent) 10%, transparent); }
     tbody tr[tabindex] { cursor: pointer; }
-    tbody tr[tabindex]:hover { background: rgba(255,255,255,0.04); }
+    tbody tr[tabindex]:hover { background: color-mix(in srgb, var(--theme-text) 6%, transparent); }
     .scroll { overflow-x: auto; }
-    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-             gap: 10px; margin-bottom: 14px; }
-    .stats div { display: flex; flex-direction: column; gap: 2px; }
-    .stats .l { color: var(--pubg-muted); font-size: 0.7em; font-weight: 700;
-                letter-spacing: 0.08em; text-transform: uppercase; }
-    .stats .v { color: var(--pubg-gold); font-weight: 700; font-size: 1.15em;
-                font-variant-numeric: tabular-nums; }
+    #stats { margin-bottom: 14px; }
     .zone-row { display: flex; align-items: center; gap: 8px; margin: 3px 0;
                 font-size: 0.85em; }
-    .zone-row .n { width: 92px; color: var(--pubg-muted); }
-    .zone-row .track { flex: 1; height: 12px; background: rgba(255,255,255,0.07);
+    .zone-row .n { width: 92px; color: var(--theme-text-dim); }
+    .zone-row .track { flex: 1; height: 12px; background: color-mix(in srgb, var(--theme-text) 9%, transparent);
                        border-radius: 2px; overflow: hidden; }
-    .zone-row .fill { height: 100%; background: var(--pubg-gold);
+    .zone-row .fill { height: 100%; background: var(--theme-accent);
                       width: var(--pct, 0%); }
-    .zone-row .fill.ref { background: var(--pubg-muted); opacity: 0.55; }
+    .zone-row .fill.ref { background: var(--theme-text-dim); opacity: 0.55; }
     .zone-row .p { width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
     .flag { display: inline-block; padding: 2px 8px; border-radius: 3px;
             font-size: 0.72em; font-weight: 700; letter-spacing: 0.05em;
-            border: 1px solid var(--theme-danger, #e57b7b);
-            color: var(--theme-danger, #e57b7b); margin-right: 6px; }
-    .flag.weak { border-color: var(--pubg-muted); color: var(--pubg-muted); }
-    .note { color: var(--pubg-muted); font-size: 0.78em; line-height: 1.45;
+            border: 1px solid var(--theme-warn);
+            color: var(--theme-warn); margin-right: 6px; }
+    .flag.weak { border-color: var(--theme-text-dim); color: var(--theme-text-dim); }
+    .note { color: var(--theme-text-dim); font-size: 0.78em; line-height: 1.45;
             margin-top: 10px; }
-    .legend { color: var(--pubg-muted); font-size: 0.72em; margin-top: 6px; }
-    .err { color: var(--theme-danger, #e57b7b); }
+    .legend { color: var(--theme-text-dim); font-size: 0.72em; margin-top: 6px; }
+    .err { color: var(--theme-warn); }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   </style>
 </head>
 <body>
-  <h1>PUBG Match-Analyse</h1>
-  <div class="sub" id="sub">Telemetrie-Auswertung aus dem Archiv oder der PUBG-API</div>
+  <h1 class="t-title">PUBG Match-Analyse</h1>
+  <div class="t-subtitle" id="sub">Telemetrie-Auswertung aus dem Archiv oder der PUBG-API</div>
 
   <div class="bar">
     <label for="mid">Match-ID
@@ -91,14 +87,14 @@
     <button type="button" id="go">Analysieren</button>
   </div>
 
-  <div class="pubg-card card" id="status">Match-ID eingeben und analysieren.</div>
+  <div class="t-card" id="status">Match-ID eingeben und analysieren.</div>
 
-  <div class="pubg-card card" id="anomalyCard" hidden>
-    <h2 class="l">Auffälligkeiten</h2>
+  <div class="t-card" id="anomalyCard" hidden>
+    <div class="t-section-label">Auffälligkeiten</div>
     <div id="anomalies"></div>
   </div>
 
-  <div class="pubg-card card" id="tableCard" hidden>
+  <div class="t-card" id="tableCard" hidden>
     <div class="scroll">
       <table>
         <thead><tr>
@@ -116,9 +112,9 @@
       künstlich drücken. Die Zonenverteilung ist dagegen immun, sie kennt nur Treffer.</div>
   </div>
 
-  <div class="pubg-card card" id="detailCard" hidden>
-    <h2 id="who"></h2>
-    <div class="stats" id="stats"></div>
+  <div class="t-card" id="detailCard" hidden>
+    <div class="t-section-label" id="who"></div>
+    <div class="t-stat-grid t-stat-grid--compact" id="stats"></div>
     <div id="zones"></div>
     <div class="scroll" id="killWrap">
       <table>
@@ -132,7 +128,7 @@
     <div class="note" id="note"></div>
   </div>
 
-  <script src="../widgets/pubg/_pubg.js"></script>
+  <script src="/widgets-static/pubg/_pubg.js"></script>
   <script>
     const BASE = window.__SERVE_BASE__ || "/";
     const esc = PubgUI.esc;
@@ -215,7 +211,8 @@
         ["Schaden", Math.round(p.damage)],
         ["Durch Wand", p.wallbangs],
         ["Treffer Bots", p.hitsOnBots], ["Treffer Spieler", p.hitsOnHumans],
-      ].map(([l, v]) => `<div><span class="l">${esc(l)}</span><span class="v">${esc(v)}</span></div>`).join("");
+      ].map(([l, v]) => `<div class="t-stat"><span class="t-value">${esc(v)}</span>`
+        + `<span class="t-label">${esc(l)}</span></div>`).join("");
 
       const ref = an ? an.expectedLimbPct : null;
       const zp = p.zonePct || {};
