@@ -2626,10 +2626,15 @@ class EndpointRegistry:
         account_id = self.my_account_id
         player = (qs.get("player") or "").strip()
         if player:
+            # Case-insensitiv: Nicknames tippt niemand zuverlaessig exakt so,
+            # wie PUBG sie speichert. Exakter Treffer gewinnt, damit zwei
+            # Namen die sich nur in der Schreibweise unterscheiden nicht
+            # zufaellig aufeinander abgebildet werden.
             row = conn.execute(
                 "SELECT account_id FROM players "
-                "WHERE tenant_id = ? AND (name = ? OR account_id = ?) LIMIT 1",
-                (self.tenant_id, player, player)).fetchone()
+                "WHERE tenant_id = ? AND (LOWER(name) = LOWER(?) OR account_id = ?) "
+                "ORDER BY CASE WHEN name = ? THEN 0 ELSE 1 END LIMIT 1",
+                (self.tenant_id, player, player, player)).fetchone()
             if not row:
                 return _err(404, f"unknown player: {player}")
             account_id = row["account_id"]

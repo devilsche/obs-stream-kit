@@ -222,6 +222,19 @@
       `;
     }
 
+    // Fehler muessen sichtbar sein: sonst zeigt das Widget bei einem
+    // Tippfehler im Spielernamen einfach eine leere Flaeche.
+    function showError(err) {
+      console.error(err);
+      const msg = String((err && err.message) || err).includes("404")
+        ? (PLAYER ? `Spieler "${PLAYER}" nicht gefunden` : "Keine Daten gefunden")
+        : "Daten konnten nicht geladen werden";
+      document.getElementById("chart").classList.add("is-hidden");
+      document.getElementById("summary").innerHTML =
+        `<div><span class="label">Fehler</span><span class="value is-note"></span></div>`;
+      document.querySelector("#summary .value").textContent = msg;
+    }
+
     function setPressed(container, attr, value) {
       [...container.querySelectorAll("button")].forEach(b =>
         b.setAttribute("aria-pressed", String(b.dataset[attr] === value)));
@@ -233,7 +246,7 @@
       PubgUI.poll((window.__SERVE_BASE__ || "/") + `api/pubg/performance-history?${params}`,
                   5 * 60 * 1000,
                   d => { window.__lastData = d; render(d); },
-                  console.error);
+                  showError);
     }
 
     document.getElementById("group-switch").addEventListener("click", e => {

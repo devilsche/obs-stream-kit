@@ -327,3 +327,15 @@ def test_performance_history_endpoint_unknown_player():
     body, code, _ = reg.dispatch("GET",
         "/api/pubg/performance-history?player=GibtsNicht", b"", {})
     assert code == 404
+
+
+def test_performance_history_endpoint_player_is_case_insensitive():
+    """Nicknames tippt man selten mit exakter Gross-/Kleinschreibung —
+    'nipplz' muss denselben Account finden wie 'Nipplz'."""
+    conn = _setup()
+    upsert_player(conn, "account.MA", "Nipplz", "steam", False)
+    reg = _registry(conn)
+    for variant in ("Nipplz", "nipplz", "NIPPLZ"):
+        body, code, _ = reg.dispatch("GET",
+            f"/api/pubg/performance-history?player={variant}", b"", {})
+        assert code == 200, f"{variant} -> {code}"
