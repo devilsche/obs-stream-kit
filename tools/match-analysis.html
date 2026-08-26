@@ -148,6 +148,12 @@
   </div>
 
   <div class="t-card" id="tableCard" hidden>
+    <div class="legend">
+      <label class="inline-tog"><input type="radio" name="view" id="viewPlayers" checked>
+        By player</label>
+      <label class="inline-tog"><input type="radio" name="view" id="viewWeapons">
+        By weapon</label>
+    </div>
     <div class="scroll">
       <table>
         <thead id="head"><tr></tr></thead>
@@ -252,6 +258,73 @@
         val: (n, p, an) => ((an[n] && an[n].flags) || []).length },
     ];
     let SORT_KEY = "accuracy", SORT_DIR = -1;
+
+    // Zweite Ansicht: eine Zeile je Spieler UND Waffe. Beantwortet
+    // "womit hat wer wo getroffen, wie genau und wie hart".
+    const WCOLS = [
+      { key: "name",   label: "Player",  num: false, val: r => r.name.toLowerCase() },
+      { key: "weapon", label: "Weapon",  num: false, val: r => r.weapon.toLowerCase() },
+      { key: "shots",  label: "Shots",   num: true,  val: r => r.shots },
+      { key: "hits",   label: "Impacts", num: true,  val: r => r.hits },
+      { key: "acc",    label: "Acc %",   num: true,  val: r => r.accuracy },
+      { key: "zone",   label: "Top zone", num: false, val: r => r.topZonePct },
+      { key: "avgdmg", label: "Ø dmg",   num: true,  val: r => r.avgDamage },
+      { key: "dmg",    label: "Damage",  num: true,  val: r => r.damage },
+    ];
+    let WSORT_KEY = "dmg", WSORT_DIR = -1;
+
+    function weaponRows() {
+      const showBots = document.getElementById("tglBots").checked;
+      const out = [];
+      for (const [name, p] of Object.entries(DATA.players)) {
+        if (!showBots && p.isBot) continue;
+        for (const [w, v] of Object.entries(p.weapons || {})) {
+          if (!v.shots && !v.hits) continue;
+          out.push({ name, weapon: w, teamId: p.teamId, isBot: p.isBot, ...v });
+        }
+      }
+      return out;
+    }
+
+    function renderWeaponTable() {
+      const col = WCOLS.find(c => c.key === WSORT_KEY) || WCOLS[7];
+      const rows = weaponRows().sort((a, b) => {
+        const va = col.val(a), vb = col.val(b);
+        if (va < vb) return -WSORT_DIR;
+        if (va > vb) return WSORT_DIR;
+        return a.name.localeCompare(b.name);
+      });
+      document.getElementById("head").innerHTML = "<tr>" + WCOLS.map(c => {
+        const active = c.key === WSORT_KEY;
+        const arrow = active ? (WSORT_DIR < 0 ? "▼" : "▲") : "";
+        const aria = active ? (WSORT_DIR < 0 ? "descending" : "ascending") : "none";
+        return `<th data-wsort="${c.key}" tabindex="0" aria-sort="${aria}"
+          class="sortable${c.num ? " num" : ""}${active ? " active" : ""}">`
+          + `${esc(c.label)}<span class="sort-arrow">${arrow}</span></th>`;
+      }).join("") + "</tr>";
+      document.getElementById("rowCount").textContent = `${rows.length} weapon entries`;
+      document.getElementById("rows").innerHTML = rows.map(r => {
+        const mine = MY_TEAM != null && r.teamId === MY_TEAM;
+        const weak = r.hits < WEAK_SAMPLE;
+        const zone = r.topZone
+          ? `${esc(ZONE_LABEL[r.topZone] || r.topZone)} ${r.topZonePct.toFixed(0)}%` : "—";
+        return `<tr tabindex="0" data-p="${esc(r.name)}" class="${mine ? "own" : ""}">
+          <td>${esc(r.name)}${r.isBot ? ' <span class="bot-tag">bot</span>' : ""}</td>
+          <td>${esc(r.weapon)}</td>
+          <td class="num">${r.shots}</td>
+          <td class="num">${r.hits}</td>
+          <td class="num">${r.shots ? r.accuracy.toFixed(1) : "—"}</td>
+          <td class="${weak ? "weak-sample" : ""}">${zone}</td>
+          <td class="num${weak ? " weak-sample" : ""}">${r.hits ? r.avgDamage.toFixed(1) : "—"}</td>
+          <td class="num">${Math.round(r.damage)}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    function renderCurrentView() {
+      if (document.getElementById("viewWeapons").checked) renderWeaponTable();
+      else renderTable();
+    }
 
     function renderHead() {
       document.getElementById("head").innerHTML = "<tr>" + COLS.map(c => {
@@ -417,25 +490,40 @@
       const again = document.querySelector(`#head th[data-sort="${key}"]`);
       if (again) again.focus();
     }
+    ["viewPlayers", "viewWeapons"].forEach(id =>
+      document.getElementById(id).addEventListener("change", renderCurrentView));
     document.getElementById("tglBots").addEventListener("change", () => {
-      renderTable();
+      renderCurrentView();
       if (SEL) [...document.querySelectorAll("#rows tr")].forEach(tr =>
         tr.classList.toggle("sel", tr.dataset.p === SEL));
     });
     document.getElementById("tglFired").addEventListener("change", () => {
-      renderTable();
+      renderCurrentView();
       if (SEL) [...document.querySelectorAll("#rows tr")].forEach(tr =>
         tr.classList.toggle("sel", tr.dataset.p === SEL));
     });
     document.getElementById("head").addEventListener("click", e => {
       const th = e.target.closest("th[data-sort]");
-      if (th) onSort(th);
+      if (th) return onSort(th);
+      const wth = e.target.closest("th[data-wsort]");
+      if (wth) onWSort(wth);
     });
     document.getElementById("head").addEventListener("keydown", e => {
       if (e.key !== "Enter" && e.key !== " ") return;
       const th = e.target.closest("th[data-sort]");
-      if (th) { e.preventDefault(); onSort(th); }
+      if (th) { e.preventDefault(); return onSort(th); }
+      const wth = e.target.closest("th[data-wsort]");
+      if (wth) { e.preventDefault(); onWSort(wth); }
     });
+
+    function onWSort(th) {
+      const key = th.dataset.wsort;
+      if (WSORT_KEY === key) WSORT_DIR *= -1;
+      else { WSORT_KEY = key; WSORT_DIR = (key === "name" || key === "weapon") ? 1 : -1; }
+      renderWeaponTable();
+      const again = document.querySelector(`#head th[data-wsort="${key}"]`);
+      if (again) again.focus();
+    }
 
     document.getElementById("rows").addEventListener("click", e => {
       const tr = e.target.closest("tr[data-p]");
@@ -508,7 +596,7 @@
         const me = DATA.myName || "";
         MY_TEAM = (me && DATA.players[me]) ? DATA.players[me].teamId : null;
         renderAnomalies();
-        renderTable();
+        renderCurrentView();
         const pre = PubgUI.qs("player", "");
         if (pre && DATA.players[pre]) openDetail(pre);
       } catch (err) {

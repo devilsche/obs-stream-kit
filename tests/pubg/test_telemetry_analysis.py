@@ -521,3 +521,34 @@ def test_weapon_without_hits_has_zero_avg_damage():
     w = analyse(ev)["players"]["A"]["weapons"]["Grenade"]
     assert w["damage"] == 0
     assert w["avgDamage"] == 0
+
+
+def test_weapon_accuracy_uses_attacks_not_pellets():
+    """Accuracy pro Waffe braucht getroffene SCHUESSE. Mit Einschlaegen
+    gerechnet käme bei Schrot über 100% heraus (9 Pellets je Schuss)."""
+    ev = [_attack("A", "Item_Weapon_Berreta686_C", aid=7),
+          _attack("A", "Item_Weapon_Berreta686_C", aid=8)]
+    ev += [_damage("A", "B", weapon="WeapBerreta686_C", aid=7) for _ in range(9)]
+    w = analyse(ev)["players"]["A"]["weapons"]["S686"]
+    assert w["shots"] == 2
+    assert w["hits"] == 9          # Einschlaege
+    assert w["hitAttacks"] == 1    # getroffene Schuesse
+    assert w["accuracy"] == pytest.approx(50.0)
+    assert w["accuracy"] <= 100.0
+
+
+def test_weapon_top_zone_is_reported():
+    """Wo die meisten Treffer sassen — je Waffe."""
+    ev = [_attack("A", aid=1)]
+    ev += [_damage("A", "B", reason="TorsoShot", aid=1) for _ in range(4)]
+    ev += [_damage("A", "B", reason="HeadShot", aid=1)]
+    w = analyse(ev)["players"]["A"]["weapons"]["ACE32"]
+    assert w["topZone"] == "TorsoShot"
+    assert w["topZonePct"] == pytest.approx(80.0)
+
+
+def test_weapon_top_zone_none_without_hits():
+    ev = [_attack("A", "Item_Weapon_Grenade_C", aid=1)]
+    w = analyse(ev)["players"]["A"]["weapons"]["Grenade"]
+    assert w["topZone"] is None
+    assert w["accuracy"] == 0

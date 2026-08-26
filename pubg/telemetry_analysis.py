@@ -135,8 +135,33 @@ def _new_player():
             "wallbangs": 0, "hitsOnBots": 0, "hitsOnHumans": 0,
             "zones": defaultdict(int),
             "weapons": defaultdict(lambda: {"shots": 0, "hits": 0, "damage": 0.0,
+                                            "hit_attacks": set(), "hits_no_id": 0,
                                             "zones": defaultdict(int)}),
             "byDistance": defaultdict(lambda: {"hits": 0, "headshots": 0})}
+
+
+def _weapon_out(v: dict) -> dict:
+    """Ausgabe-Form einer Waffe: Rohwerte plus die drei abgeleiteten Groessen,
+    die man beim Vergleich tatsaechlich liest."""
+    hit_attacks = len(v["hit_attacks"]) + v["hits_no_id"]
+    zones = dict(v["zones"])
+    top = max(zones.items(), key=lambda t: t[1])[0] if zones else None
+    total_z = sum(zones.values())
+    return {
+        "shots": v["shots"],
+        "hits": v["hits"],                 # Einschlaege (Schrot: pro Pellet)
+        "hitAttacks": hit_attacks,         # getroffene Schuesse
+        "accuracy": (round(min(100.0, 100.0 * hit_attacks / v["shots"]), 1)
+                     if v["shots"] else 0),
+        "damage": round(v["damage"], 1),
+        # Schnitt pro Einschlag: haengt an Zone und Helm, deshalb
+        # aussagekraeftiger als die Summe.
+        "avgDamage": round(v["damage"] / v["hits"], 1) if v["hits"] else 0,
+        "topZone": top,
+        "topZonePct": (round(100.0 * zones[top] / total_z, 1)
+                       if top and total_z else 0),
+        "zones": zones,
+    }
 
 
 def analyse(events) -> dict:
@@ -227,10 +252,16 @@ def analyse(events) -> dict:
                 p["zones"][zone] += 1
             w = normalize_weapon(e.get("damageCauserName"))
             if w:
-                p["weapons"][w]["hits"] += 1
-                p["weapons"][w]["damage"] += e.get("damage") or 0.0
+                wp = p["weapons"][w]
+                wp["hits"] += 1
+                wp["damage"] += e.get("damage") or 0.0
+                # Wie oben: Accuracy zaehlt Schuesse, nicht Pellets.
+                if aid is None or aid == -1:
+                    wp["hits_no_id"] += 1
+                else:
+                    wp["hit_attacks"].add(aid)
                 if zone:
-                    p["weapons"][w]["zones"][zone] += 1
+                    wp["zones"][zone] += 1
             ax, ay = _loc(attacker)
             vx, vy = _loc(victim)
             if None not in (ax, ay, vx, vy):
@@ -307,14 +338,7 @@ def analyse(events) -> dict:
                         for z, n in zones.items()} if total_zone else {},
             "headshotRate": (round(100.0 * zones.get("HeadShot", 0) / hits, 1)
                              if hits else 0.0),
-            "weapons": {w: {"shots": v["shots"], "hits": v["hits"],
-                            "damage": round(v["damage"], 1),
-                            # Schnitt pro Einschlag: haengt an Zone und Helm,
-                            # deshalb aussagekraeftiger als die Summe.
-                            "avgDamage": (round(v["damage"] / v["hits"], 1)
-                                          if v["hits"] else 0),
-                            "zones": dict(v["zones"])}
-                        for w, v in p["weapons"].items()},
+            "weapons": {w: _weapon_out(v) for w, v in p["weapons"].items()},
             "byDistance": {b: dict(v) for b, v in p["byDistance"].items()},
         }
     return {"players": out, "kills": kills,
