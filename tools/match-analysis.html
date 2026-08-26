@@ -32,6 +32,8 @@
     label { display: flex; flex-direction: column; gap: 4px;
             color: var(--theme-text-dim); font-size: 0.72em; font-weight: 700;
             letter-spacing: 0.08em; text-transform: uppercase; }
+    select { max-width: 420px; }
+    #matchFilter, #mid { min-width: 190px; }
     input, select { background: var(--theme-surface);
                     border: 1px solid color-mix(in srgb, var(--theme-text) 15%, transparent);
                     color: var(--theme-text); padding: 7px 9px;
@@ -81,8 +83,14 @@
   <div class="t-subtitle" id="sub">Telemetrie-Auswertung aus dem Archiv oder der PUBG-API</div>
 
   <div class="bar">
-    <label for="mid">Match-ID
-      <input id="mid" type="text" placeholder="z.B. a0b6a159-93e3-47af-a92e-55e23092057c">
+    <label for="matchSelect">Match <span id="matchCount"></span>
+      <select id="matchSelect" size="1"></select>
+    </label>
+    <label for="matchFilter">Filter
+      <input id="matchFilter" type="text" placeholder="Datum, Map, Kills …">
+    </label>
+    <label for="mid">oder Match-ID
+      <input id="mid" type="text" placeholder="fremdes Match (UUID)">
     </label>
     <button type="button" id="go">Analysieren</button>
   </div>
@@ -256,8 +264,47 @@
       if (tr) { e.preventDefault(); renderDetail(tr.dataset.p); }
     });
 
+    // Match-Liste wie im match-replay: Auswahl + Textfilter. Das ID-Feld
+    // bleibt fuer Matches, die nicht in unserer DB stehen.
+    let MATCH_ITEMS = [];
+
+    function renderOptions(filter) {
+      const sel = document.getElementById("matchSelect");
+      const cnt = document.getElementById("matchCount");
+      const f = (filter || "").toLowerCase().trim();
+      const list = f ? MATCH_ITEMS.filter(it => it.lower.includes(f)) : MATCH_ITEMS;
+      const prev = sel.value;
+      sel.innerHTML = list.map(it =>
+        `<option value="${esc(it.matchId)}">${esc(it.text)}</option>`).join("");
+      if (list.some(it => it.matchId === prev)) sel.value = prev;
+      cnt.textContent = f ? `(${list.length}/${MATCH_ITEMS.length})`
+                          : `(${MATCH_ITEMS.length})`;
+    }
+
+    async function loadMatchList() {
+      const sel = document.getElementById("matchSelect");
+      try {
+        const list = await PubgUI.fetchJson(BASE + "api/pubg/matches-list?limit=2000");
+        if (!Array.isArray(list) || !list.length) {
+          sel.innerHTML = `<option value="">keine Matches in der DB</option>`;
+          return;
+        }
+        MATCH_ITEMS = list.map(m => {
+          const dt = new Date(m.playedAt).toLocaleString("de-DE",
+            { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+          const text = `${dt} · ${PubgUI.fmtMap(m.mapName)} · #${m.place ?? "?"} · ${m.kills ?? "?"}K`;
+          return { matchId: m.matchId, text, lower: text.toLowerCase() };
+        });
+        renderOptions("");
+      } catch (e) {
+        sel.innerHTML = `<option value="">Liste nicht ladbar: ${esc(e.message || e)}</option>`;
+      }
+    }
+
     async function run() {
-      const mid = document.getElementById("mid").value.trim();
+      // Eine getippte ID hat Vorrang, sonst das ausgewaehlte Match.
+      const typed = document.getElementById("mid").value.trim();
+      const mid = typed || document.getElementById("matchSelect").value;
       if (!mid) return;
       const st = document.getElementById("status");
       st.classList.remove("err");
@@ -288,8 +335,19 @@
     document.getElementById("mid").addEventListener("keydown", e => {
       if (e.key === "Enter") run();
     });
-    const q = PubgUI.qs("matchId", "");
-    if (q) { document.getElementById("mid").value = q; run(); }
+    document.getElementById("matchFilter").addEventListener("input", e =>
+      renderOptions(e.target.value));
+    document.getElementById("matchSelect").addEventListener("change", run);
+
+    loadMatchList().then(() => {
+      const q = PubgUI.qs("matchId", "");
+      if (q) {
+        const sel = document.getElementById("matchSelect");
+        if (MATCH_ITEMS.some(it => it.matchId === q)) sel.value = q;
+        else document.getElementById("mid").value = q;
+        run();
+      }
+    });
   </script>
 </body>
 </html>
