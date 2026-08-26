@@ -101,7 +101,7 @@ def to_db_rows(analysis: dict, account_ids: dict = None) -> list:
         if not acc:
             continue
         for weapon, w in (p.get("weapons") or {}).items():
-            if not (w.get("shots") or w.get("hits")):
+            if not (w.get("shots") or w.get("hits") or w.get("kills")):
                 continue          # nie benutzt — keine Zeile wert
             zones = w.get("zones") or {}
             row = {"account_id": acc, "player_name": name,

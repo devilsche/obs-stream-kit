@@ -135,6 +135,7 @@ def _new_player():
             "wallbangs": 0, "hitsOnBots": 0, "hitsOnHumans": 0,
             "zones": defaultdict(int),
             "weapons": defaultdict(lambda: {"shots": 0, "hits": 0, "damage": 0.0,
+                                            "kills": 0,
                                             "hit_attacks": set(), "hits_no_id": 0,
                                             "zones": defaultdict(int)}),
             "byDistance": defaultdict(lambda: {"hits": 0, "headshots": 0})}
@@ -149,6 +150,7 @@ def _weapon_out(v: dict) -> dict:
     total_z = sum(zones.values())
     return {
         "shots": v["shots"],
+        "kills": v.get("kills", 0),
         "hits": v["hits"],                 # Einschlaege (Schrot: pro Pellet)
         "hitAttacks": hit_attacks,         # getroffene Schuesse
         "accuracy": (round(min(100.0, 100.0 * hit_attacks / v["shots"]), 1)
@@ -317,6 +319,11 @@ def analyse(events) -> dict:
                 "x": kx, "y": ky,
             })
             players[kname]["kills"] += 1
+            # Kills auch der WAFFE zuordnen — sonst steht in der
+            # Waffen-Auswertung ueberall 0.
+            kw = normalize_weapon(info.get("damageCauserName"))
+            if kw:
+                players[kname]["weapons"][kw]["kills"] += 1
             players[vname]        # Opfer anlegen: wer nur stirbt, fehlt sonst
 
         elif t == "LogPlayerMakeGroggy":

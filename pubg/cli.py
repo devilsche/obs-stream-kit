@@ -1215,7 +1215,10 @@ def weapon_stats_backfill(root: str, args=None) -> int:
     Gemessen ~0.9 s je Match (Download + Analyse).
 
     Nutzung:
-        python -m pubg.cli weapon-stats-backfill [--tenant N] [--limit N]
+        python -m pubg.cli weapon-stats-backfill [--tenant N] [--limit N] [--force]
+
+    --force rechnet auch Matches neu, die schon Zeilen haben (idempotent
+    dank ON CONFLICT DO UPDATE) — noetig nach Aenderungen an der Analyse.
     """
     import time
     from core.db import connect
@@ -1233,10 +1236,20 @@ def weapon_stats_backfill(root: str, args=None) -> int:
         return default
     tenant_id = int(_opt("--tenant", "1"))
     limit = int(_opt("--limit", "100000"))
+    force = "--force" in args     # auch schon gerechnete Matches neu machen
 
     raw = connect()
     conn = SqliteCompatConn(raw)
-    todo = db_pg.get_matches_without_weapon_stats(raw, tenant_id, limit=limit)
+    if force:
+        with raw.cursor() as cur:
+            cur.execute("""
+                SELECT match_id, telemetry_url, played_at, map_name
+                FROM matches WHERE tenant_id = %s
+                ORDER BY played_at DESC LIMIT %s
+            """, (tenant_id, limit))
+            todo = [dict(r) for r in cur.fetchall()]
+    else:
+        todo = db_pg.get_matches_without_weapon_stats(raw, tenant_id, limit=limit)
     print(f"Tenant {tenant_id}: {len(todo)} Matches ohne Waffen-Statistik")
     ok = skipped = 0
     t0 = time.time()

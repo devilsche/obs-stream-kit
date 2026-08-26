@@ -651,3 +651,21 @@ def test_splits_flag_false_without_hits():
     w = analyse([_attack("A", "Item_Weapon_Grenade_C", aid=1)])["players"]["A"]["weapons"]["Grenade"]
     assert w["splits"] is False
     assert w["avgDamageEffective"] == 0
+
+
+def test_weapon_carries_its_own_kills():
+    """Kills je Waffe — sonst steht in der Waffen-Auswertung ueberall 0."""
+    ev = [_kill("A", "X", weapon="WeapACE32_C"),
+          _kill("A", "Y", weapon="WeapACE32_C"),
+          _kill("A", "Z", weapon="WeapM24_C")]
+    w = analyse(ev)["players"]["A"]["weapons"]
+    assert w["ACE32"]["kills"] == 2
+    assert w["M24"]["kills"] == 1
+    assert analyse(ev)["players"]["A"]["kills"] == 3
+
+
+def test_weapon_kills_appear_even_without_attack_events():
+    """Ein Kill ohne zugehoerige Attack-Events (gefilterte Telemetrie) darf
+    die Waffe nicht verschwinden lassen."""
+    w = analyse([_kill("A", "X", weapon="WeapKar98k_C")])["players"]["A"]["weapons"]
+    assert w["Kar98k"]["kills"] == 1
