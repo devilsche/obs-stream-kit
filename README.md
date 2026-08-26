@@ -468,6 +468,29 @@ auf das Backend; kein Streaming nötig.
 | `tools/landing-spots.html` | Heatmap + Scatter der Landeorte pro Karte und Spieler-Konstellation | Browser-Tab / 1920×1080 |
 | `tools/g1r-database.html` | Vollständiger G1R-Item-Katalog aus dem Object-Dump (Nah-/Fernkampf, Runen, Schriftrollen) mit Live-Suche | Browser-Tab (admin) |
 | `tools/match-analysis.html` | Telemetrie-Auswertung eines Matches: Accuracy, Trefferzonen, Kill-Timeline, Auffälligkeiten | Browser-Tab |
+| `tools/weapon-performance.html` | Dieselben Kennzahlen über einen **Zeitraum** — je Waffe oder je Spieler | Browser-Tab |
+
+#### tools/weapon-performance.html
+
+Waffen-Kennzahlen über einen **Zeitraum** statt über ein einzelnes Match: `?range=session|day|week|all`.
+Zwei Blickrichtungen über `groupBy`:
+
+- `weapon` — „womit treffe ich am besten", eine Zeile je Waffe
+- `player` — „wer trifft womit am besten", eine Zeile je Spieler
+
+Dazu Filter `player=` und `weapon=`. Also etwa `range=session&player=Nipplz` für „letzte Session
+von Nipplz" oder `range=all&weapon=Kar98k&groupBy=player` für „was macht die Kar98k, über alle
+Spieler". Ein Klick auf eine Zeile setzt den passenden Filter und dreht die Sicht um.
+
+Datenquelle ist die Tabelle `match_weapon_stats`, gefüllt beim Telemetrie-Fetch. Für die Historie:
+
+```bash
+python -m pubg.cli weapon-stats-backfill [--tenant N] [--limit N]
+```
+
+Rund 0,9 s je Match (Download aus dem Archiv plus Analyse). Was nicht im HiDrive-Archiv liegt und
+älter als die API-Retention ist, lässt sich nicht nachrechnen und wird übersprungen. Wie viele
+Matches im gewählten Zeitraum noch fehlen, steht unter der Tabelle.
 
 #### tools/match-analysis.html
 

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<!--
+  PUBG Weapon Performance
+  ────────────────────────────────────────────────────────────────────
+  Waffen-Kennzahlen über einen ZEITRAUM (Session / Tag / Woche / alles),
+  nicht über ein einzelnes Match — dafür gibt es tools/match-analysis.html.
+
+  Quelle ist die Tabelle match_weapon_stats, gefüllt beim Telemetrie-Fetch
+  bzw. per `python -m pubg.cli weapon-stats-backfill`.
+
+  Zwei Blickrichtungen:
+    groupBy=weapon  — "womit treffe ich am besten" (je Waffe)
+    groupBy=player  — "wer trifft womit am besten" (je Spieler)
+  Dazu Filter auf einen Spieler oder eine Waffe. Also z.B.:
+    "letzte Session von Nipplz"      -> range=session, player=Nipplz
+    "was macht die Kar98k, alltime"  -> range=all, weapon=Kar98k, groupBy=player
+
+  Browser-Tool, KEINE OBS-Source.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Weapon Performance</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/widgets-static/_theme.css">
+  <link rel="stylesheet" href="/widgets-static/_blocks.css">
+  <link rel="stylesheet" href="/widgets-static/pubg/_pubg.css">
+  <style>
+    body { padding: 20px; max-width: 1180px; margin: 0 auto;
+           background: var(--theme-bg); color: var(--theme-text); }
+    .t-card { padding: 16px 18px; margin-bottom: 16px; }
+    .bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;
+           margin-bottom: 14px; }
+    label { display: flex; flex-direction: column; gap: 4px;
+            color: var(--theme-text-dim); font-size: 0.72em; font-weight: 700;
+            letter-spacing: 0.08em; text-transform: uppercase; }
+    input { background: var(--theme-surface);
+            border: 1px solid color-mix(in srgb, var(--theme-text) 15%, transparent);
+            color: var(--theme-text); padding: 7px 9px; border-radius: 3px;
+            font-family: inherit; font-size: 0.9rem; min-height: 24px;
+            min-width: 170px; }
+    input:focus-visible { outline: 2px solid var(--theme-accent); outline-offset: 2px; }
+    .switch { display: flex; gap: 6px; flex-wrap: wrap; }
+    .switch button { background: transparent;
+                     border: 1px solid color-mix(in srgb, var(--theme-text) 15%, transparent);
+                     color: var(--theme-text-dim); padding: 7px 12px;
+                     border-radius: 3px; cursor: pointer; font-family: inherit;
+                     letter-spacing: 0.06em; text-transform: uppercase;
+                     font-size: 11px; font-weight: 700; min-height: 24px; }
+    .switch button:hover { color: var(--theme-text); }
+    .switch button:focus-visible { outline: 2px solid var(--theme-accent);
+                                   outline-offset: 2px; }
+    .switch button[aria-pressed="true"] {
+      background: color-mix(in srgb, var(--theme-accent) 15%, transparent);
+      border-color: var(--theme-accent); color: var(--theme-accent); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.86em; }
+    th, td { padding: 5px 8px; text-align: left;
+             border-bottom: 1px solid color-mix(in srgb, var(--theme-text) 8%, transparent); }
+    th { font-size: 0.72em; color: var(--theme-text-dim); text-transform: uppercase;
+         letter-spacing: 0.08em; font-weight: 700; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    th.sortable:hover, th.sortable.active { color: var(--theme-accent); }
+    th.sortable:focus-visible { outline: 2px solid var(--theme-accent);
+                                outline-offset: -2px; }
+    .sort-arrow { font-size: 0.7em; margin-left: 2px; opacity: 0.7; }
+    td.weak-sample { opacity: 0.45; font-style: italic; }
+    tbody tr[tabindex] { cursor: pointer; }
+    tbody tr[tabindex]:hover { background: color-mix(in srgb, var(--theme-text) 6%, transparent); }
+    .scroll { overflow-x: auto; }
+    .legend { color: var(--theme-text-dim); font-size: 0.72em; margin-top: 8px;
+              line-height: 1.45; }
+    .warn { color: var(--theme-warn); }
+    .err { color: var(--theme-warn); }
+  </style>
+</head>
+<body>
+  <h1 class="t-title">PUBG Weapon Performance</h1>
+  <div class="t-subtitle">Accuracy, hit zones and damage over a time range</div>
+
+  <div class="t-card">
+    <div class="bar">
+      <div>
+        <span class="legend">Range</span>
+        <div class="switch" id="rangeSwitch" role="group" aria-label="Time range">
+          <button type="button" data-range="session" aria-pressed="true">Session</button>
+          <button type="button" data-range="day" aria-pressed="false">Today</button>
+          <button type="button" data-range="week" aria-pressed="false">7 days</button>
+          <button type="button" data-range="all" aria-pressed="false">All</button>
+        </div>
+      </div>
+      <div>
+        <span class="legend">Group by</span>
+        <div class="switch" id="groupSwitch" role="group" aria-label="Grouping">
+          <button type="button" data-group="weapon" aria-pressed="true">Weapon</button>
+          <button type="button" data-group="player" aria-pressed="false">Player</button>
+        </div>
+      </div>
+      <label for="fPlayer">Player filter
+        <input id="fPlayer" type="text" placeholder="e.g. Nipplz — empty = me">
+      </label>
+      <label for="fWeapon">Weapon filter
+        <input id="fWeapon" type="text" placeholder="e.g. Kar98k — empty = all">
+      </label>
+    </div>
+    <div class="legend" id="status">Loading …</div>
+  </div>
+
+  <div class="t-card" id="tableCard" hidden>
+    <div class="scroll">
+      <table>
+        <thead id="head"><tr></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="legend" id="foot"></div>
+  </div>
+
+  <script src="/widgets-static/pubg/_pubg.js"></script>
+  <script>
+    const BASE = window.__SERVE_BASE__ || "/";
+    const esc = PubgUI.esc;
+    const WEAK_SAMPLE = 10;
+    const ZONE_LABEL = { HeadShot: "Head", TorsoShot: "Torso", ArmShot: "Arms",
+                         LegShot: "Legs", PelvisShot: "Pelvis" };
+
+    let RANGE = PubgUI.qs("range", "session");
+    let GROUP = PubgUI.qs("groupBy", "weapon");
+    let DATA = null, SORT_KEY = "damage", SORT_DIR = -1;
+
+    function cols() {
+      const first = GROUP === "player"
+        ? { key: "player_name", label: "Player", num: false, val: r => (r.player_name || "").toLowerCase() }
+        : { key: "weapon", label: "Weapon", num: false, val: r => (r.weapon || "").toLowerCase() };
+      return [
+        first,
+        { key: "matches",  label: "Matches", num: true, val: r => r.matches },
+        { key: "shots",    label: "Shots",   num: true, val: r => r.shots },
+        { key: "hits",     label: "Impacts", num: true, val: r => r.hits },
+        { key: "accuracy", label: "Acc %",   num: true, val: r => r.accuracy },
+        { key: "hs",       label: "HS %",    num: true, val: r => r.headshotRate },
+        { key: "zone",     label: "Top zone", num: false, val: r => r.topZonePct },
+        { key: "avgdmg",   label: "Ø dmg",   num: true, val: r => r.avgDamageEffective },
+        { key: "kills",    label: "Kills",   num: true, val: r => r.kills },
+        { key: "damage",   label: "Damage",  num: true, val: r => r.damage },
+      ];
+    }
+
+    function render() {
+      const C = cols();
+      const col = C.find(c => c.key === SORT_KEY) || C[C.length - 1];
+      const rows = [...(DATA.rows || [])].sort((a, b) => {
+        const va = col.val(a), vb = col.val(b);
+        if (va < vb) return -SORT_DIR;
+        if (va > vb) return SORT_DIR;
+        return 0;
+      });
+      document.getElementById("head").innerHTML = "<tr>" + C.map(c => {
+        const active = c.key === SORT_KEY;
+        const arrow = active ? (SORT_DIR < 0 ? "▼" : "▲") : "";
+        const aria = active ? (SORT_DIR < 0 ? "descending" : "ascending") : "none";
+        return `<th data-sort="${c.key}" tabindex="0" aria-sort="${aria}"
+          class="sortable${c.num ? " num" : ""}${active ? " active" : ""}">`
+          + `${esc(c.label)}<span class="sort-arrow">${arrow}</span></th>`;
+      }).join("") + "</tr>";
+
+      document.getElementById("rows").innerHTML = rows.length ? rows.map(r => {
+        const weak = r.hits < WEAK_SAMPLE;
+        const zone = r.topZone
+          ? `${esc(ZONE_LABEL[r.topZone] || r.topZone)} ${r.topZonePct.toFixed(0)}%` : "—";
+        const label = GROUP === "player" ? (r.player_name || "—") : (r.weapon || "—");
+        // Klick setzt den passenden Filter — so kommt man von "welche Waffe"
+        // zu "wer nutzt sie" und zurueck.
+        return `<tr tabindex="0" data-v="${esc(label)}">
+          <td>${esc(label)}</td>
+          <td class="num">${r.matches}</td>
+          <td class="num">${r.shots}</td>
+          <td class="num">${r.hits}</td>
+          <td class="num">${r.shots ? r.accuracy.toFixed(1) : "—"}</td>
+          <td class="num${weak ? " weak-sample" : ""}">${r.hits ? r.headshotRate.toFixed(1) : "—"}</td>
+          <td class="${weak ? "weak-sample" : ""}">${zone}</td>
+          <td class="num${weak ? " weak-sample" : ""}"
+              title="${r.splits ? "per landed shot (pellet weapon)" : "per hit"}"
+              >${r.hits ? r.avgDamageEffective.toFixed(1) : "—"}${r.splits ? " *" : ""}</td>
+          <td class="num">${r.kills}</td>
+          <td class="num">${Math.round(r.damage)}</td>
+        </tr>`;
+      }).join("") : `<tr><td colspan="${C.length}">No data for this range.</td></tr>`;
+
+      const pend = DATA.matchesPending || 0;
+      document.getElementById("foot").innerHTML =
+        `${rows.length} rows · Ø dmg is per hit, for pellet weapons (*) per landed shot.`
+        + ` Click a row to filter by it.`
+        + (pend ? ` <span class="warn">${pend} match${pend === 1 ? "" : "es"} in this`
+                  + ` range not processed yet — run weapon-stats-backfill.</span>` : "");
+      document.getElementById("tableCard").hidden = false;
+    }
+
+    async function load() {
+      const st = document.getElementById("status");
+      st.classList.remove("err");
+      st.textContent = "Loading …";
+      const params = new URLSearchParams({ range: RANGE, groupBy: GROUP });
+      const pl = document.getElementById("fPlayer").value.trim();
+      const wp = document.getElementById("fWeapon").value.trim();
+      if (pl) params.set("player", pl);
+      if (wp) params.set("weapon", wp);
+      try {
+        DATA = await PubgUI.fetchJson(BASE + "api/pubg/weapon-performance?" + params, 60000);
+        const who = DATA.player ? `player ${DATA.player}` : (pl ? `player ${pl}` : "me");
+        st.textContent = `${RANGE} · grouped by ${DATA.groupBy}`
+          + (DATA.weapon ? ` · weapon ${DATA.weapon}` : "")
+          + ` · ${DATA.player || pl ? who : "own account"}`;
+        render();
+      } catch (e) {
+        st.classList.add("err");
+        st.textContent = String(e && e.message || e).includes("404")
+          ? "Unknown player." : "Could not load: " + (e && e.message || e);
+        document.getElementById("tableCard").hidden = true;
+      }
+    }
+
+    function press(container, attr, value) {
+      [...container.querySelectorAll("button")].forEach(b =>
+        b.setAttribute("aria-pressed", String(b.dataset[attr] === value)));
+    }
+
+    document.getElementById("rangeSwitch").addEventListener("click", e => {
+      const b = e.target.closest("button[data-range]");
+      if (!b || b.dataset.range === RANGE) return;
+      RANGE = b.dataset.range;
+      press(e.currentTarget, "range", RANGE);
+      load();
+    });
+    document.getElementById("groupSwitch").addEventListener("click", e => {
+      const b = e.target.closest("button[data-group]");
+      if (!b || b.dataset.group === GROUP) return;
+      GROUP = b.dataset.group;
+      press(e.currentTarget, "group", GROUP);
+      SORT_KEY = "damage";
+      load();
+    });
+    ["fPlayer", "fWeapon"].forEach(id =>
+      document.getElementById(id).addEventListener("keydown", e => {
+        if (e.key === "Enter") load();
+      }));
+
+    document.getElementById("head").addEventListener("click", e => {
+      const th = e.target.closest("th[data-sort]");
+      if (th) onSort(th);
+    });
+    document.getElementById("head").addEventListener("keydown", e => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const th = e.target.closest("th[data-sort]");
+      if (th) { e.preventDefault(); onSort(th); }
+    });
+    function onSort(th) {
+      const key = th.dataset.sort;
+      if (SORT_KEY === key) SORT_DIR *= -1;
+      else { SORT_KEY = key; SORT_DIR = (key === "weapon" || key === "player_name") ? 1 : -1; }
+      render();
+      const again = document.querySelector(`#head th[data-sort="${key}"]`);
+      if (again) again.focus();
+    }
+
+    // Zeile anklicken: nach diesem Wert filtern und die Sicht umdrehen.
+    document.getElementById("rows").addEventListener("click", e => {
+      const tr = e.target.closest("tr[data-v]");
+      if (!tr) return;
+      if (GROUP === "weapon") {
+        document.getElementById("fWeapon").value = tr.dataset.v;
+        GROUP = "player";
+      } else {
+        document.getElementById("fPlayer").value = tr.dataset.v;
+        GROUP = "weapon";
+      }
+      press(document.getElementById("groupSwitch"), "group", GROUP);
+      load();
+    });
+
+    press(document.getElementById("rangeSwitch"), "range", RANGE);
+    press(document.getElementById("groupSwitch"), "group", GROUP);
+    const qp = PubgUI.qs("player", ""), qw = PubgUI.qs("weapon", "");
+    if (qp) document.getElementById("fPlayer").value = qp;
+    if (qw) document.getElementById("fWeapon").value = qw;
+    load();
+  </script>
+</body>
+</html>
