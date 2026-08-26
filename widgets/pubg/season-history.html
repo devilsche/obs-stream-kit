@@ -55,9 +55,15 @@
                pointer-events: none; padding: 6px 10px;
                background: color-mix(in srgb, var(--theme-surface, #140c1e) 95%, transparent); border: 1px solid var(--pubg-gold);
                border-radius: 4px; font-size: 0.78em;
-               /* Passt der Tooltip nicht in den Chart, bricht er um statt
-                  ueber den Rand hinauszuragen — clampen allein reicht dann nicht. */
-               max-width: calc(100% - 8px); white-space: normal;
+               /* width:max-content ist Pflicht: absolut positioniert mit
+                  gesetztem left waere die verfuegbare Breite nur noch
+                  (Wrap - left) — am rechten Rand schrumpft der Tooltip sonst
+                  zur Saeule. max-width greift erst, wenn er wirklich breiter
+                  als der Chart ist, und laesst ihn dann umbrechen. */
+               width: max-content; max-width: calc(100% - 8px);
+               /* ohne border-box zaehlt max-width nur die Content-Box —
+                  Padding + Border kaemen obendrauf und der Deckel waere wirkungslos */
+               box-sizing: border-box; white-space: normal;
                opacity: 0; transition: opacity 0.12s; z-index: 10;
                transform: translate(-50%, -110%); }
     .tooltip.show { opacity: 1; }
