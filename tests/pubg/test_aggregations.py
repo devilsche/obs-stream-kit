@@ -11,7 +11,8 @@ from pubg import db_pg
 from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_top_mates, compute_co_player,
                                 compute_mates, compute_map_distribution,
-                                compute_first_fight_rate, compute_squad_compare)
+                                compute_first_fight_rate, compute_squad_compare,
+                                compute_performance_history)
 
 
 CONN = None
@@ -543,3 +544,82 @@ def test_squad_compare_reports_unknown_names():
     res = compute_squad_compare(conn, T, "account.A", ["MateA", "GibtsNicht"], 5)
     assert res["unknownPlayers"] == ["GibtsNicht"]
     assert res["matchTable"] == []
+
+
+def _ph_match(conn, mid, played_at, kills, place, dmg=200.0):
+    """Ein Match des eigenen Accounts fuer die performance-history-Tests."""
+    insert_match(conn, mid, "Erangel_Main", "squad-fpp", False, 1800, played_at, None)
+    insert_participants(conn, mid, [_sc_part("account.A", "PEX_LuCKoR", 1,
+                                             kills=kills, place=place)])
+
+
+def test_performance_history_groups_by_day():
+    conn = _setup()
+    _ph_match(conn, "ph1", "2026-05-01T18:00:00Z", 3, 5)
+    _ph_match(conn, "ph2", "2026-05-01T20:00:00Z", 5, 1)   # Win → kein Tod
+    _ph_match(conn, "ph3", "2026-05-02T19:00:00Z", 1, 9)
+    res = compute_performance_history(conn, T, "account.A", "day", 10)
+    labels = [g["label"] for g in res["groups"]]
+    assert labels == ["2026-05-01", "2026-05-02"]
+    # Tag 1: 8 Kills, 2 Matches, 1 Win → deaths = 1 → KD 8.0
+    assert res["groups"][0]["kills"] == 8
+    assert res["groups"][0]["matches"] == 2
+    assert res["groups"][0]["kd"] == pytest.approx(8.0)
+    assert res["groups"][0]["winrate"] == pytest.approx(50.0)
+
+
+def test_performance_history_groups_by_month():
+    conn = _setup()
+    _ph_match(conn, "pm1", "2026-05-30T18:00:00Z", 2, 4)
+    _ph_match(conn, "pm2", "2026-06-01T18:00:00Z", 4, 4)
+    res = compute_performance_history(conn, T, "account.A", "month", 10)
+    assert [g["label"] for g in res["groups"]] == ["2026-05", "2026-06"]
+
+
+def test_performance_history_session_splits_on_gap():
+    """Pause > sessionGapHours trennt Sessions, kuerzere Pause nicht."""
+    conn = _setup()
+    set_setting(conn, "sessionGapHours", "4")
+    _ph_match(conn, "ps1", "2026-05-01T18:00:00Z", 1, 8)
+    _ph_match(conn, "ps2", "2026-05-01T20:00:00Z", 2, 6)   # +2h → gleiche Session
+    _ph_match(conn, "ps3", "2026-05-02T04:00:00Z", 3, 2)   # +8h → neue Session
+    res = compute_performance_history(conn, T, "account.A", "session", 10)
+    assert len(res["groups"]) == 2
+    assert res["groups"][0]["matches"] == 2
+    assert res["groups"][1]["matches"] == 1
+
+
+def test_performance_history_session_respects_gap_setting():
+    """Die Gap-Schwelle kommt aus denselben Settings wie der session-report."""
+    conn = _setup()
+    set_setting(conn, "sessionGapHours", "12")
+    _ph_match(conn, "pg1", "2026-05-01T18:00:00Z", 1, 8)
+    _ph_match(conn, "pg2", "2026-05-02T04:00:00Z", 3, 2)   # +10h < 12h → eine Session
+    res = compute_performance_history(conn, T, "account.A", "session", 10)
+    assert len(res["groups"]) == 1
+    assert res["groups"][0]["matches"] == 2
+
+
+def test_performance_history_limit_keeps_most_recent():
+    """limit schneidet auf die letzten N Gruppen — chronologisch aufsteigend."""
+    conn = _setup()
+    for i, day in enumerate(["01", "02", "03", "04"]):
+        _ph_match(conn, f"pl{i}", f"2026-05-{day}T18:00:00Z", i, 5)
+    res = compute_performance_history(conn, T, "account.A", "day", 2)
+    assert [g["label"] for g in res["groups"]] == ["2026-05-03", "2026-05-04"]
+
+
+def test_performance_history_kd_counts_deaths_not_matches():
+    """KD = kills / (matches - wins), wie compute_session_stats — nicht kills/matches."""
+    conn = _setup()
+    _ph_match(conn, "pk1", "2026-05-01T18:00:00Z", 4, 1)   # Win
+    _ph_match(conn, "pk2", "2026-05-01T19:00:00Z", 2, 7)
+    res = compute_performance_history(conn, T, "account.A", "day", 10)
+    # 6 Kills, 2 Matches, 1 Win → deaths = 1 → KD 6.0 (nicht 3.0)
+    assert res["groups"][0]["kd"] == pytest.approx(6.0)
+
+
+def test_performance_history_empty_is_safe():
+    conn = _setup()
+    res = compute_performance_history(conn, T, "account.A", "day", 10)
+    assert res["groups"] == []

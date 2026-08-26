@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<!--
+  PUBG Performance-History
+  ────────────────────────────────────────────────────────────────────
+  Linien-Chart über die eigenen Matches, gruppiert nach Session, Tag oder
+  Monat. Ergänzt season-history (das über PUBG-Season-Aggregate läuft) um
+  die feinen Zeitachsen — hier kommen die Zahlen aus den Match-Zeilen.
+  Datenquelle: /api/pubg/performance-history?groupBy=<g>&limit=<n>.
+
+  "Session" = Gap-Segmentierung: eine Pause länger als sessionGapHours
+  (default 4h) beginnt eine neue Session — dieselbe Regel wie im
+  session-report, damit die Zahlen zusammenpassen.
+
+  URL-Params:
+    player   — empty = self
+    groupBy  — session (default), day, month
+    metric   — kd (default), winrate, dmg, kills, matches
+    limit    — Anzahl Punkte (default 20)
+-->
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Performance History</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_pubg.css">
+  <link rel="stylesheet" href="../_theme.css">
+  <style>
+    body { padding: 20px; }
+    .card { width: 760px; padding: 18px 22px; }
+    .chart-wrap { position: relative; }
+    .chart-svg { width: 100%; height: 280px; display: block; }
+    .chart-svg.is-hidden { display: none; }
+    .axis-label { fill: var(--pubg-muted); font-size: 10px; letter-spacing: 0.08em; }
+    .grid-line  { stroke: var(--pubg-border); stroke-dasharray: 2 4; opacity: 0.4; }
+    .data-line  { fill: none; stroke: var(--pubg-gold); stroke-width: 2;
+                  stroke-linejoin: round; stroke-linecap: round;
+                  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--theme-accent, #f2b705) 40%, transparent)); }
+    .data-area  { fill: url(#area-grad); opacity: 0.35; }
+    .dot        { fill: var(--pubg-gold); stroke: var(--theme-bg, #2a1238); stroke-width: 1.5; }
+    .dot:hover  { fill: var(--theme-text, #fff); }
+    .toolbar { display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
+               margin-top: 12px; }
+    .switch { display: flex; gap: 6px; flex-wrap: wrap; }
+    .switch-label { color: var(--pubg-muted); font-size: 0.72em; font-weight: 700;
+                    letter-spacing: 0.08em; text-transform: uppercase;
+                    align-self: center; }
+    .switch button { background: transparent; border: 1px solid var(--pubg-border);
+                     color: var(--pubg-muted); padding: 6px 10px; border-radius: 3px;
+                     cursor: pointer; font-family: inherit; letter-spacing: 0.06em;
+                     text-transform: uppercase; font-size: 11px; font-weight: 700;
+                     min-height: 24px; }
+    .switch button:hover { color: var(--theme-text, #fff); }
+    .switch button:focus-visible { outline: 2px solid var(--pubg-gold);
+                                   outline-offset: 2px; }
+    .switch button[aria-pressed="true"] {
+      background: color-mix(in srgb, var(--theme-accent, #f2b705) 15%, transparent);
+      border-color: var(--pubg-gold); color: var(--pubg-gold); }
+    .summary { margin-top: 14px; display: grid; grid-template-columns: repeat(4, 1fr);
+               gap: 10px; padding-top: 12px; border-top: 1px solid var(--pubg-border); }
+    .summary div { display: flex; flex-direction: column; gap: 2px; }
+    .summary .label { color: var(--pubg-muted); font-size: 0.72em;
+                      letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; }
+    .summary .value { color: var(--pubg-gold); font-weight: 700; font-size: 1.1em;
+                      font-variant-numeric: tabular-nums; }
+    .summary .value.is-note { font-size: 0.9em; }
+    .summary .value small { color: var(--pubg-muted); font-size: 0.7em; }
+    .tooltip { position: absolute; left: var(--tt-x, 0); top: var(--tt-y, 0);
+               pointer-events: none; padding: 6px 10px;
+               background: color-mix(in srgb, var(--theme-surface, #140c1e) 95%, transparent);
+               border: 1px solid var(--pubg-gold);
+               border-radius: 4px; font-size: 0.78em; white-space: nowrap;
+               opacity: 0; transition: opacity 0.12s; z-index: 10;
+               transform: translate(-50%, -110%); }
+    .tooltip.show { opacity: 1; }
+    .tooltip b { color: var(--pubg-gold); }
+    .tooltip span { color: var(--pubg-muted); }
+    .tooltip b.tt-active { color: var(--pubg-gold); }
+    .tooltip .tt-sub { color: var(--pubg-muted); font-size: 0.85em; }
+    @media (prefers-reduced-motion: reduce) {
+      .tooltip { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="pubg-card card pubg-fade-in">
+    <div class="pubg-header">PERFORMANCE · <b id="player">—</b></div>
+    <div class="chart-wrap">
+      <svg class="chart-svg" id="chart" viewBox="0 0 720 280" preserveAspectRatio="none"
+           role="img" aria-labelledby="chart-title">
+        <title id="chart-title">Leistungsverlauf als Liniendiagramm</title>
+        <defs>
+          <linearGradient id="area-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="var(--theme-accent, #f2b705)" stop-opacity="0.5"/>
+            <stop offset="100%" stop-color="var(--theme-accent, #f2b705)" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <g id="grid"></g>
+        <g id="y-labels"></g>
+        <g id="x-labels"></g>
+        <path id="area" class="data-area" d=""/>
+        <polyline id="line" class="data-line" points=""/>
+        <g id="dots"></g>
+      </svg>
+      <div class="tooltip" id="tooltip" role="status"></div>
+    </div>
+    <div class="toolbar">
+      <span class="switch-label" id="lbl-group">Zeitraum</span>
+      <div class="switch" id="group-switch" role="group" aria-labelledby="lbl-group">
+        <button type="button" data-group="session" aria-pressed="true">Session</button>
+        <button type="button" data-group="day" aria-pressed="false">Tag</button>
+        <button type="button" data-group="month" aria-pressed="false">Monat</button>
+      </div>
+      <span class="switch-label" id="lbl-metric">Metrik</span>
+      <div class="switch" id="metric-switch" role="group" aria-labelledby="lbl-metric">
+        <button type="button" data-metric="kd" aria-pressed="true">K / D</button>
+        <button type="button" data-metric="winrate" aria-pressed="false">Win %</button>
+        <button type="button" data-metric="dmg" aria-pressed="false">Ø DMG</button>
+        <button type="button" data-metric="kills" aria-pressed="false">Kills</button>
+        <button type="button" data-metric="matches" aria-pressed="false">Matches</button>
+      </div>
+    </div>
+    <div class="summary" id="summary"></div>
+  </div>
+
+  <script src="_pubg.js"></script>
+  <script>
+    const PLAYER = PubgUI.qs("player", "");
+    const LIMIT  = parseInt(PubgUI.qs("limit", 20), 10) || 20;
+    let GROUP    = PubgUI.qs("groupBy", "session");
+    let METRIC   = PubgUI.qs("metric", "kd");
+    document.getElementById("player").textContent = PLAYER || "Self";
+
+    PubgUI.buildFilter([
+      { key: "groupBy", label: "Zeitraum", type: "select", default: "session",
+        options: [["session","Session"],["day","Tag"],["month","Monat"]],
+        tooltip: "Session = Pause laenger als 4h beginnt eine neue." },
+      { key: "metric", label: "Metrik", type: "select", default: "kd",
+        options: [["kd","K/D"],["winrate","Win %"],["dmg","Ø DMG"],
+                  ["kills","Kills"],["matches","Matches"]] },
+      { key: "limit", label: "Punkte", type: "range", min: 5, max: 60, default: 20,
+        tooltip: "Wie viele der juengsten Zeitraeume angezeigt werden." },
+      { key: "player", label: "Player", type: "text", placeholder: "leer = self" },
+    ]);
+
+    // fmt MUSS einen String liefern — die Y-Achse rendert das direkt.
+    const METRICS = {
+      kd:      { get: g => g.kd,      fmt: v => Number(v || 0).toFixed(2),         label: "K/D" },
+      winrate: { get: g => g.winrate, fmt: v => Number(v || 0).toFixed(1) + "%",   label: "Win %" },
+      dmg:     { get: g => g.avgDmg,  fmt: v => String(Math.round(v || 0)),        label: "Ø DMG" },
+      kills:   { get: g => g.kills,   fmt: v => Math.round(v || 0).toLocaleString("de-DE"), label: "Kills" },
+      matches: { get: g => g.matches, fmt: v => Math.round(v || 0).toLocaleString("de-DE"), label: "Matches" },
+    };
+
+    // X-Achsen-Label je Gruppierung: Sessions brauchen Datum + Uhrzeit,
+    // Tage/Monate sind schon selbsterklaerend.
+    function xLabel(g) {
+      if (GROUP === "month") return g.label;                    // 2026-05
+      if (GROUP === "day")   return g.label.slice(5);           // 05-14
+      return PubgUI.fmtDate(g.from) + " " + PubgUI.fmtTime(g.from);
+    }
+
+    function render(data) {
+      const groups = (data && data.groups) || [];
+      const chart = document.getElementById("chart");
+      if (!groups.length) {
+        chart.classList.add("is-hidden");
+        document.getElementById("summary").innerHTML =
+          "<div><span class='label'>Status</span><span class='value is-note'>" +
+          "Keine Matches im Zeitraum</span></div>";
+        return;
+      }
+      chart.classList.remove("is-hidden");
+
+      const def = METRICS[METRIC] || METRICS.kd;
+      PubgUI.lineChart({
+        svg: chart,
+        tooltip: document.getElementById("tooltip"),
+        fmtY: def.fmt,
+        activeRow: def.label,
+        points: groups.map(g => ({
+          x: xLabel(g),
+          y: def.get(g) || 0,
+          title: xLabel(g),
+          sub: g.matches + (g.matches === 1 ? " Match" : " Matches"),
+          rows: [
+            ["K/D",     METRICS.kd.fmt(g.kd)],
+            ["Win %",   METRICS.winrate.fmt(g.winrate)],
+            ["Ø DMG",   METRICS.dmg.fmt(g.avgDmg)],
+            ["Kills",   METRICS.kills.fmt(g.kills)],
+            ["Matches", METRICS.matches.fmt(g.matches)],
+          ],
+        })),
+      });
+
+      const totalMatches = groups.reduce((a, g) => a + g.matches, 0);
+      const totalKills   = groups.reduce((a, g) => a + g.kills, 0);
+      const totalWins    = groups.reduce((a, g) => a + g.wins, 0);
+      // Gesamt-K/D ueber alle Gruppen — nicht der Mittelwert der Gruppen-K/Ds,
+      // sonst zaehlt eine 2-Match-Session so viel wie eine mit 30.
+      const overallKd = totalKills / Math.max(totalMatches - totalWins, 1);
+      const best = [...groups].sort((a, b) => b.kd - a.kd)[0];
+      const unit = { session: "Sessions", day: "Tage", month: "Monate" }[GROUP];
+      document.getElementById("summary").innerHTML = `
+        <div><span class="label">${unit}</span>
+             <span class="value">${groups.length}</span></div>
+        <div><span class="label">Matches Σ</span>
+             <span class="value">${totalMatches.toLocaleString("de-DE")}</span></div>
+        <div><span class="label">K/D gesamt</span>
+             <span class="value">${overallKd.toFixed(2)}</span></div>
+        <div><span class="label">Beste K/D</span>
+             <span class="value">${best.kd.toFixed(2)} <small>${xLabel(best)}</small></span></div>
+      `;
+    }
+
+    function setPressed(container, attr, value) {
+      [...container.querySelectorAll("button")].forEach(b =>
+        b.setAttribute("aria-pressed", String(b.dataset[attr] === value)));
+    }
+
+    function load() {
+      const params = new URLSearchParams({ groupBy: GROUP, limit: LIMIT });
+      if (PLAYER) params.set("player", PLAYER);
+      PubgUI.poll((window.__SERVE_BASE__ || "/") + `api/pubg/performance-history?${params}`,
+                  5 * 60 * 1000,
+                  d => { window.__lastData = d; render(d); },
+                  console.error);
+    }
+
+    document.getElementById("group-switch").addEventListener("click", e => {
+      const btn = e.target.closest("button[data-group]");
+      if (!btn || btn.dataset.group === GROUP) return;
+      GROUP = btn.dataset.group;
+      setPressed(e.currentTarget, "group", GROUP);
+      load();                       // andere Gruppierung = neue Daten noetig
+    });
+
+    document.getElementById("metric-switch").addEventListener("click", e => {
+      const btn = e.target.closest("button[data-metric]");
+      if (!btn) return;
+      METRIC = btn.dataset.metric;
+      setPressed(e.currentTarget, "metric", METRIC);
+      if (window.__lastData) render(window.__lastData);   // rein clientseitig
+    });
+
+    setPressed(document.getElementById("group-switch"), "group", GROUP);
+    setPressed(document.getElementById("metric-switch"), "metric", METRIC);
+    load();
+  </script>
+</body>
+</html>

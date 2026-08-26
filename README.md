@@ -433,12 +433,22 @@ Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
 | `first-fight.html` | Survival-% mit Sparkline | `range` |
 | `session-summary.html` | Vollformat Stream-Ending | `hideMaps=1`, `hideMates=1` |
 | `career-card.html` | Lifetime-Anzeige | `player`, `mode=all\|squad-fpp\|...` |
+| `performance-history.html` | K/D-Verlauf pro Session / Tag / Monat | `groupBy=session\|day\|month`, `metric`, `limit`, `player` |
 | `news-ticker.html` | Marquee-Bar mit rotierenden Snippets | `rotateMs` |
 | `squad-compare.html` | Vergleich über die letzten **gemeinsamen** Squad-Matches | `players=A,B,C,D`, `matches` |
 | `chat-stats-popup.html` | Streamer.bot-driven Pop-up | `player`, `duration` (Sek) |
 
 Cross-Player-Web-View: `http://localhost:8080/widgets/pubg/coplayer.html?player=NAME`
 (alte URL `overlays/stats.html?player=NAME` leitet weiter)
+
+**performance-history** zeichnet den Verlauf über die eigenen Matches — K/D (Default),
+Win-Rate, Ø DMG, Kills oder Matches, gruppiert nach `session`, `day` oder `month`.
+`session` nutzt dieselbe Gap-Regel wie der session-report: eine Pause länger als
+`sessionGapHours` (Default 4h) beginnt eine neue Session, hier aber über die ganze
+Historie statt nur bis zum letzten Cutoff. K/D ist `kills / (matches - wins)`, identisch
+zum session-report. Abgrenzung zu `season-history.html`: das zeigt PUBG-Season-Aggregate
+aus der API, dieses Widget rechnet aus den gespeicherten Match-Zeilen — die beiden
+Grundgesamtheiten sind nicht identisch.
 
 **squad-compare** zeigt die letzten `matches` Partien, in denen **alle** unter `players`
 genannten Spieler gemeinsam in **einem Squad** waren — es sucht dafür so weit zurück wie

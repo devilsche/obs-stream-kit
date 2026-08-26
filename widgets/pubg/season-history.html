@@ -51,7 +51,8 @@
                       letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; }
     .summary .value { color: var(--pubg-gold); font-weight: 700; font-size: 1.1em;
                       font-variant-numeric: tabular-nums; }
-    .tooltip { position: absolute; pointer-events: none; padding: 6px 10px;
+    .tooltip { position: absolute; left: var(--tt-x, 0); top: var(--tt-y, 0);
+               pointer-events: none; padding: 6px 10px;
                background: color-mix(in srgb, var(--theme-surface, #140c1e) 95%, transparent); border: 1px solid var(--pubg-gold);
                border-radius: 4px; font-size: 0.78em; white-space: nowrap;
                opacity: 0; transition: opacity 0.12s; z-index: 10;
@@ -59,6 +60,11 @@
     .tooltip.show { opacity: 1; }
     .tooltip b { color: var(--pubg-gold); }
     .tooltip span { color: var(--pubg-muted); }
+    .tooltip b.tt-active { color: var(--pubg-gold); }
+    .tooltip .tt-sub { color: var(--pubg-muted); font-size: 0.85em; }
+    .chart-svg.is-hidden { display: none; }
+    .summary .value.is-note { font-size: 0.9em; }
+    .summary .value small { color: var(--pubg-muted); font-size: 0.7em; }
   </style>
 </head>
 <body>
@@ -149,105 +155,43 @@
       const all = (data && data.seasons) || [];
       // Empty Seasons rausfiltern (rounds_played=0 → nicht gespielt).
       const seasons = all.filter(s => (s.rounds_played || 0) > 0);
+      const chart = document.getElementById("chart");
       if (seasons.length === 0) {
-        document.getElementById("chart").style.display = "none";
+        chart.classList.add("is-hidden");
         document.getElementById("summary").innerHTML =
-          "<div><span class='label'>Status</span><span class='value' style='font-size:0.9em'>" +
+          "<div><span class='label'>Status</span><span class='value is-note'>" +
           "No season data — run backfill first</span></div>";
         return;
       }
-      document.getElementById("chart").style.display = "";
+      chart.classList.remove("is-hidden");
 
       const def = METRICS[METRIC] || METRICS.kd;
-      const values = seasons.map(s => def.get(s) || 0);
-      const min = Math.min(...values);
-      const max = Math.max(...values);
-      const range = (max - min) || 1;
-      // Sympathischeres Y-Range: 10% Padding oben/unten.
-      const yMin = Math.max(0, min - range * 0.1);
-      const yMax = max + range * 0.1;
-
-      const w = 720, h = 280;
-      const padL = 42, padR = 18, padT = 16, padB = 32;
-      const innerW = w - padL - padR;
-      const innerH = h - padT - padB;
-      const stepX = seasons.length > 1 ? innerW / (seasons.length - 1) : 0;
-
-      const xOf = i => padL + i * stepX;
-      const yOf = v => padT + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
-
-      // Grid + Y-Labels (5 ticks).
-      const grid = document.getElementById("grid");
-      const yLabels = document.getElementById("y-labels");
-      grid.innerHTML = "";
-      yLabels.innerHTML = "";
-      for (let t = 0; t <= 4; t++) {
-        const v = yMin + (yMax - yMin) * (t / 4);
-        const y = yOf(v);
-        grid.innerHTML += `<line class="grid-line" x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}"/>`;
-        yLabels.innerHTML += `<text class="axis-label" x="${padL-6}" y="${y+3}" text-anchor="end">${def.fmt(v)}</text>`;
-      }
-
-      // X-Labels — bei vielen Seasons jeden N-ten.
-      const xLabels = document.getElementById("x-labels");
-      xLabels.innerHTML = "";
-      const skipEvery = Math.max(1, Math.ceil(seasons.length / 12));
-      seasons.forEach((s, i) => {
-        if (i % skipEvery === 0 || i === seasons.length - 1) {
-          xLabels.innerHTML += `<text class="axis-label" x="${xOf(i)}" y="${h-padB+18}" text-anchor="middle">${shortSeason(s.season_id)}</text>`;
-        }
+      PubgUI.lineChart({
+        svg: chart,
+        tooltip: document.getElementById("tooltip"),
+        fmtY: def.fmt,
+        activeRow: def.label,
+        points: seasons.map((s, i) => ({
+          x: shortSeason(s.season_id),
+          y: def.get(s) || 0,
+          title: shortSeason(s.season_id),
+          sub: approxSeasonRange(i, seasons.length),
+          // Alle Metriken IMMER zeigen — kein Doppel-Label wenn der gewaehlte
+          // Metric mit der Default-Liste kollidiert.
+          rows: [
+            ["K/D",     METRICS.kd.fmt(s.kd_ratio || 0)],
+            ["Win %",   METRICS.winrate.fmt(s.win_rate || 0)],
+            ["Ø DMG",   METRICS.dmg.fmt(s.avg_damage || 0)],
+            ["Kills",   METRICS.kills.fmt(s.kills || 0)],
+            ["Matches", METRICS.matches.fmt(s.rounds_played || 0)],
+          ],
+        })),
       });
 
-      // Polyline + Area.
-      const points = seasons.map((s, i) => `${xOf(i)},${yOf(def.get(s) || 0)}`);
-      document.getElementById("line").setAttribute("points", points.join(" "));
-      const areaPath = `M ${xOf(0)},${yOf(yMin)} L ${points.join(" L ")} L ${xOf(seasons.length-1)},${yOf(yMin)} Z`;
-      document.getElementById("area").setAttribute("d", areaPath);
-
-      // Dots + Tooltip.
-      const dots = document.getElementById("dots");
-      dots.innerHTML = "";
-      const tt = document.getElementById("tooltip");
-      seasons.forEach((s, i) => {
-        const cx = xOf(i), cy = yOf(def.get(s) || 0);
-        const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        c.setAttribute("cx", cx);
-        c.setAttribute("cy", cy);
-        c.setAttribute("r", 4);
-        c.setAttribute("class", "dot");
-        c.addEventListener("mouseenter", e => {
-          const range = approxSeasonRange(i, seasons.length);
-          // Alle Metriken IMMER zeigen — kein Doppel-Label mehr wenn der
-          // gewaehlte Metric mit der Default-Liste kollidiert.
-          const rows = [
-            ["K/D",      METRICS.kd.fmt(s.kd_ratio || 0)],
-            ["Win %",    METRICS.winrate.fmt(s.win_rate || 0)],
-            ["Ø DMG",    METRICS.dmg.fmt(s.avg_damage || 0)],
-            ["Kills",    METRICS.kills.fmt(s.kills || 0)],
-            ["Matches",  METRICS.matches.fmt(s.rounds_played || 0)],
-          ];
-          tt.innerHTML =
-            `<b>${shortSeason(s.season_id)}</b> <span style="color:var(--pubg-muted);font-size:0.85em">${range}</span><br>` +
-            rows.map(([l, v]) =>
-              `<span>${l}:</span> <b style="color:${l === def.label ? "var(--pubg-gold)" : "inherit"}">${v}</b>`
-            ).join(" · ");
-          // Tooltip relativ zum chart-wrap (parent .chart-wrap).
-          const wrap = c.closest(".chart-wrap").getBoundingClientRect();
-          const dotR = c.getBoundingClientRect();
-          tt.style.left = (dotR.left + dotR.width/2 - wrap.left) + "px";
-          tt.style.top  = (dotR.top - wrap.top) + "px";
-          tt.classList.add("show");
-        });
-        c.addEventListener("mouseleave", () => tt.classList.remove("show"));
-        dots.appendChild(c);
-      });
-
-      // Summary: total matches, total kills, best/worst K/D-Season.
+      // Summary: total matches, total kills, best K/D-Season.
       const totalMatches = seasons.reduce((a, s) => a + (s.rounds_played || 0), 0);
       const totalKills   = seasons.reduce((a, s) => a + (s.kills || 0), 0);
-      const sortedKd = [...seasons].sort((a, b) => (b.kd_ratio || 0) - (a.kd_ratio || 0));
-      const bestKd  = sortedKd[0];
-      const worstKd = sortedKd[sortedKd.length - 1];
+      const bestKd = [...seasons].sort((a, b) => (b.kd_ratio || 0) - (a.kd_ratio || 0))[0];
       document.getElementById("summary").innerHTML = `
         <div><span class="label">Seasons</span>
              <span class="value">${seasons.length}</span></div>
@@ -256,7 +200,7 @@
         <div><span class="label">Kills Σ</span>
              <span class="value">${totalKills.toLocaleString("en-US")}</span></div>
         <div><span class="label">Best K/D</span>
-             <span class="value">${(bestKd.kd_ratio || 0).toFixed(2)} <small style="color:var(--pubg-muted);font-size:0.7em">${shortSeason(bestKd.season_id)}</small></span></div>
+             <span class="value">${(bestKd.kd_ratio || 0).toFixed(2)} <small>${shortSeason(bestKd.season_id)}</small></span></div>
       `;
     }
 

@@ -22,6 +22,7 @@ WIDGET_PREVIEW_SIZES = {
     "pubg/first-fight.html":        (400, 320),
     "pubg/weapon-stats.html":       (380, 420),
     "pubg/season-history.html":     (480, 480),
+    "pubg/performance-history.html": (800, 520),
     "pubg/trend-indicator.html":    (240,  80),
     # PUBG Mates
     "pubg/mates.html":              (400,  90),
@@ -140,6 +141,7 @@ WIDGET_META = [
     ("PUBG · Stats", "First Fight Rate",     "How often you win the first fight.",                                   "pubg/first-fight.html"),
     ("PUBG · Stats", "Weapon Stats",         "Damage and kill distribution by weapon.",                              "pubg/weapon-stats.html"),
     ("PUBG · Stats", "Season History",       "Career-history across seasons.",                                       "pubg/season-history.html"),
+    ("PUBG · Stats", "Performance History", "K/D-Verlauf pro Session, Tag oder Monat.",                            "pubg/performance-history.html"),
     ("PUBG · Stats", "Trend Indicator",      "Trend arrow (improving/dropping).",                                    "pubg/trend-indicator.html"),
 
     ("PUBG · Mates",  "Mates Carousel",      "Squad-mates carousel for the gameplay overlay.",                       "pubg/mates.html"),

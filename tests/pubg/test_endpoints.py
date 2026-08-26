@@ -301,3 +301,29 @@ def test_landing_heatmap_requires_map():
     reg = _registry(conn)
     body, code, _ = reg.dispatch("GET", "/api/pubg/landing-heatmap", b"", {})
     assert code == 400
+
+
+def test_performance_history_endpoint_defaults_to_session():
+    conn = _setup()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/performance-history", b"", {})
+    assert code == 200
+    payload = json.loads(body)
+    assert payload["groupBy"] == "session"
+    assert payload["groups"] == []
+
+
+def test_performance_history_endpoint_rejects_bad_groupby():
+    conn = _setup()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET",
+        "/api/pubg/performance-history?groupBy=century", b"", {})
+    assert code == 400
+
+
+def test_performance_history_endpoint_unknown_player():
+    conn = _setup()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET",
+        "/api/pubg/performance-history?player=GibtsNicht", b"", {})
+    assert code == 404

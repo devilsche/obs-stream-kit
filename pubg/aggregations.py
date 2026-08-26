@@ -51,7 +51,7 @@ def _session_filter(conn, tenant_id: int):
     if started_at and started_at > "1970-01-02":
         return started_at
 
-    gap_hours = float(get_setting(conn.raw, tenant_id, "sessionGapHours", "4"))
+    gap_hours = _session_gap_hours(conn, tenant_id)
     rows = conn.execute(
         "SELECT played_at FROM matches WHERE tenant_id = ? ORDER BY played_at DESC LIMIT 200",
         (tenant_id,)
@@ -70,6 +70,16 @@ def _session_filter(conn, tenant_id: int):
                 return last_ts.strftime("%Y-%m-%dT%H:%M:%SZ")
         last_ts = cur
     return rows[-1]["played_at"]
+
+
+def _session_gap_hours(conn, tenant_id: int) -> float:
+    """Pausen-Schwelle die eine Session beendet. Gemeinsame Quelle fuer
+    _session_filter (aktuelle Session) und compute_performance_history
+    (alle Sessions) — sonst laufen Verlauf und session-report auseinander."""
+    try:
+        return float(get_setting(conn.raw, tenant_id, "sessionGapHours", "4"))
+    except (TypeError, ValueError):
+        return 4.0
 
 
 def _range_filter(conn, tenant_id: int, range_key):
@@ -6279,6 +6289,96 @@ def compute_chickens_together(conn, tenant_id: int, my_account_id, min_wins=1, m
         "sharedMatches": r["shared_matches"],
         "winRate": r["win_rate"],
     } for r in rows]
+
+
+#: Obergrenze fuer den Verlauf — schuetzt vor unbegrenztem Wachstum, ohne
+#: dass die Gruppierung ihre Grundgesamtheit stillschweigend beschneidet
+#: (bei ~1000 Matches pro Jahr reicht das fuer mehrere Jahre).
+PERF_HISTORY_MAX_MATCHES = 5000
+
+
+def _perf_group_key(ts_iso: str, group_by: str):
+    """Label fuer tag-/monatsweise Gruppierung — direkt aus dem ISO-Praefix,
+    also in UTC wie alle played_at-Werte in der DB."""
+    if group_by == "month":
+        return ts_iso[:7]     # YYYY-MM
+    return ts_iso[:10]        # YYYY-MM-DD
+
+
+def compute_performance_history(conn, tenant_id: int, account_id: str,
+                                group_by: str = "session", limit: int = 20) -> dict:
+    """Leistungs-Verlauf ueber die Zeit, gruppiert nach Session, Tag oder Monat.
+
+    group_by:
+      session — Gap-Segmentierung ueber die GANZE Historie: eine Pause laenger
+                als sessionGapHours (default 4h) beendet die Session. Dieselbe
+                Regel wie _session_filter, die aber nur die letzte Session sucht.
+      day/month — Kalendergruppierung nach UTC (played_at ist durchgaengig UTC).
+
+    KD ist kills / (matches - wins), identisch zu compute_session_stats — im
+    BR stirbt man in jedem Match ausser bei place=1. Ein kills/matches waere
+    K/M und wuerde vom session-report abweichen.
+
+    Returns {"groupBy":..., "groups":[{label, from, to, matches, kills, wins,
+    kd, winrate, avgDmg}, ...]} — chronologisch aufsteigend, auf die letzten
+    `limit` Gruppen beschnitten.
+    """
+    rows = conn.execute(f"""
+        SELECT m.played_at, pa.kills, pa.place, pa.damage_dealt
+        FROM matches m
+        JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
+        WHERE m.tenant_id = ? AND pa.account_id = ?
+        ORDER BY m.played_at DESC LIMIT {int(PERF_HISTORY_MAX_MATCHES)}
+    """, (tenant_id, account_id)).fetchall()
+    if not rows:
+        return {"groupBy": group_by, "groups": []}
+    rows = list(reversed(rows))       # chronologisch aufsteigend gruppieren
+
+    buckets = []                      # [(label, [row, ...]), ...]
+    if group_by == "session":
+        gap_secs = _session_gap_hours(conn, tenant_id) * 3600
+        prev = None
+        for r in rows:
+            cur = _parse_iso(r["played_at"])
+            # Unparsbarer Timestamp: an die laufende Session haengen statt das
+            # Match zu verlieren — sonst faelscht ein Datenfehler die Zahlen.
+            new_session = (not buckets or
+                           (cur is not None and prev is not None
+                            and (cur - prev).total_seconds() > gap_secs))
+            if new_session:
+                buckets.append((r["played_at"], []))
+            buckets[-1][1].append(r)
+            if cur is not None:
+                prev = cur
+    else:
+        for r in rows:
+            key = _perf_group_key(r["played_at"], group_by)
+            if not buckets or buckets[-1][0] != key:
+                buckets.append((key, []))
+            buckets[-1][1].append(r)
+
+    if limit and limit > 0:
+        buckets = buckets[-limit:]
+
+    groups = []
+    for label, items in buckets:
+        n = len(items)
+        kills = sum(i["kills"] or 0 for i in items)
+        wins = sum(1 for i in items if i["place"] == 1)
+        dmg = sum(i["damage_dealt"] or 0 for i in items)
+        groups.append({
+            "label": (label[:16].replace("T", " ") if group_by == "session"
+                      else label),
+            "from": items[0]["played_at"],
+            "to": items[-1]["played_at"],
+            "matches": n,
+            "kills": kills,
+            "wins": wins,
+            "kd": kills / max(n - wins, 1),
+            "winrate": wins / n * 100,
+            "avgDmg": dmg / n,
+        })
+    return {"groupBy": group_by, "groups": groups}
 
 
 def compute_squad_compare(conn, tenant_id: int, my_account_id, player_names, last_n=5):

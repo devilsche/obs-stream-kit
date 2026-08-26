@@ -7,6 +7,7 @@ from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_top_mates, compute_co_player,
                                 compute_mates, compute_map_distribution,
                                 compute_first_fight_rate, compute_squad_compare,
+                                compute_performance_history,
                                 compute_chickens_together, compute_session_report,
                                 compute_sessions_index, compute_best_worst_map,
                                 compute_map_performance, compute_lobby_avg_kd,
@@ -295,6 +296,8 @@ class EndpointRegistry:
             return self._first_fight(qs)
         if route == ("GET", "/api/pubg/first-fight-debug"):
             return self._first_fight_debug(qs)
+        if route == ("GET", "/api/pubg/performance-history"):
+            return self._performance_history(qs)
         if route == ("GET", "/api/pubg/squad-compare"):
             return self._squad_compare(qs)
         if route == ("GET", "/api/pubg/chickens-together"):
@@ -2609,6 +2612,29 @@ class EndpointRegistry:
             "careerLifetime": agg,
             "modesLifetime": modes if agg else {},
         }
+
+    def _performance_history(self, qs):
+        group_by = (qs.get("groupBy") or "session").strip()
+        if group_by not in ("session", "day", "month"):
+            return _err(400, "groupBy must be one of: session, day, month")
+        try:
+            limit = int(qs.get("limit", 20))
+        except ValueError:
+            return _err(400, "limit must be a number")
+        limit = max(1, min(limit, 200))
+        conn = self.get_conn()
+        account_id = self.my_account_id
+        player = (qs.get("player") or "").strip()
+        if player:
+            row = conn.execute(
+                "SELECT account_id FROM players "
+                "WHERE tenant_id = ? AND (name = ? OR account_id = ?) LIMIT 1",
+                (self.tenant_id, player, player)).fetchone()
+            if not row:
+                return _err(404, f"unknown player: {player}")
+            account_id = row["account_id"]
+        return _ok(compute_performance_history(conn, self.tenant_id, account_id,
+                                               group_by, limit))
 
     def _squad_compare(self, qs):
         names = (qs.get("players") or "").split(",")

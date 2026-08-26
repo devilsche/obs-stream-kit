@@ -628,5 +628,94 @@
     }
   };
 
+  // ── Linien-Chart ────────────────────────────────────────────────────
+  // Gemeinsam genutzt von season-history (Verlauf ueber Seasons) und
+  // performance-history (ueber Sessions/Tage/Monate). Erwartet im SVG die
+  // Gruppen #grid, #y-labels, #x-labels sowie #area, #line, #dots und
+  // daneben ein Tooltip-Element — das Markup steht im jeweiligen Widget.
+  //
+  // opts:
+  //   svg        — SVG-Element
+  //   tooltip    — Tooltip-Element (Position via CSS-Custom-Props, kein
+  //                Inline-Style: --tt-x / --tt-y)
+  //   points     — [{ x, y, title, sub, rows:[[label, value], ...] }]
+  //                x = X-Achsen-Label, y = numerischer Wert
+  //   fmtY       — Formatter fuer Y-Achse und Ticks
+  //   activeRow  — Label aus rows das im Tooltip hervorgehoben wird
+  //   maxXLabels — X-Labels ausduennen (default 12)
+  PubgUI.lineChart = function(opts) {
+    const svg = opts.svg, tt = opts.tooltip, pts = opts.points || [];
+    const fmtY = opts.fmtY || (v => String(Math.round(v || 0)));
+    const q = id => svg.querySelector("#" + id);
+    const grid = q("grid"), yLabels = q("y-labels"), xLabels = q("x-labels");
+    const line = q("line"), area = q("area"), dots = q("dots");
+    [grid, yLabels, xLabels, dots].forEach(el => { if (el) el.innerHTML = ""; });
+    if (!pts.length) {
+      if (line) line.setAttribute("points", "");
+      if (area) area.setAttribute("d", "");
+      return;
+    }
+
+    const values = pts.map(p => Number(p.y) || 0);
+    const min = Math.min(...values), max = Math.max(...values);
+    const span = (max - min) || 1;
+    // 10% Luft oben/unten, aber nie unter 0 — negative K/D gibt es nicht.
+    const yMin = Math.max(0, min - span * 0.1), yMax = max + span * 0.1;
+
+    const vb = (svg.getAttribute("viewBox") || "0 0 720 280").split(/\s+/).map(Number);
+    const w = vb[2], h = vb[3];
+    const padL = 42, padR = 18, padT = 16, padB = 32;
+    const innerW = w - padL - padR, innerH = h - padT - padB;
+    const stepX = pts.length > 1 ? innerW / (pts.length - 1) : 0;
+    const xOf = i => padL + (pts.length > 1 ? i * stepX : innerW / 2);
+    const yOf = v => padT + innerH - ((v - yMin) / (yMax - yMin || 1)) * innerH;
+
+    for (let t = 0; t <= 4; t++) {
+      const v = yMin + (yMax - yMin) * (t / 4), y = yOf(v);
+      grid.innerHTML += `<line class="grid-line" x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}"/>`;
+      yLabels.innerHTML +=
+        `<text class="axis-label" x="${padL - 6}" y="${y + 3}" text-anchor="end">${fmtY(v)}</text>`;
+    }
+
+    const skipEvery = Math.max(1, Math.ceil(pts.length / (opts.maxXLabels || 12)));
+    pts.forEach((p, i) => {
+      if (i % skipEvery === 0 || i === pts.length - 1) {
+        xLabels.innerHTML +=
+          `<text class="axis-label" x="${xOf(i)}" y="${h - padB + 18}" text-anchor="middle">${p.x}</text>`;
+      }
+    });
+
+    const coords = pts.map((p, i) => `${xOf(i)},${yOf(Number(p.y) || 0)}`);
+    line.setAttribute("points", coords.join(" "));
+    area.setAttribute("d",
+      `M ${xOf(0)},${yOf(yMin)} L ${coords.join(" L ")} L ${xOf(pts.length - 1)},${yOf(yMin)} Z`);
+
+    pts.forEach((p, i) => {
+      const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      c.setAttribute("cx", xOf(i));
+      c.setAttribute("cy", yOf(Number(p.y) || 0));
+      c.setAttribute("r", 4);
+      c.setAttribute("class", "dot");
+      if (tt) {
+        c.addEventListener("mouseenter", () => {
+          const rows = (p.rows || []).map(([l, v]) =>
+            `<span>${l}:</span> <b class="${l === opts.activeRow ? "tt-active" : ""}">${v}</b>`
+          ).join(" · ");
+          tt.innerHTML = `<b>${p.title || p.x}</b>` +
+            (p.sub ? ` <span class="tt-sub">${p.sub}</span>` : "") +
+            (rows ? "<br>" + rows : "");
+          // Position ueber Custom-Props statt Inline-Style (siehe .tooltip-CSS).
+          const wrap = c.closest(".chart-wrap").getBoundingClientRect();
+          const r = c.getBoundingClientRect();
+          tt.style.setProperty("--tt-x", (r.left + r.width / 2 - wrap.left) + "px");
+          tt.style.setProperty("--tt-y", (r.top - wrap.top) + "px");
+          tt.classList.add("show");
+        });
+        c.addEventListener("mouseleave", () => tt.classList.remove("show"));
+      }
+      dots.appendChild(c);
+    });
+  };
+
   global.PubgUI = PubgUI;
 })(window);
