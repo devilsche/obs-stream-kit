@@ -126,6 +126,40 @@ def test_even_trade_is_its_own_result():
     assert ps.build_fights(events, SQUAD, TEAM_OF)[0]["result"] == "trade"
 
 
+def test_the_same_victim_counts_once_across_fights():
+    """Knock im ersten Gefecht, Finisher zwei Minuten spaeter im zweiten:
+    das ist EIN erledigter Gegner, kein zweiter."""
+    events = [
+        ev("TakeDamage", 10, "account.me", "account.foe1"),
+        ev("Knock", 12, "account.me", "account.foe1"),
+        ev("TakeDamage", 180, "account.me", "account.foe1"),
+        ev("Kill", 182, "account.me", "account.foe1"),
+    ]
+    fights = ps.build_fights(events, SQUAD, TEAM_OF)
+    assert len(fights) == 2
+    assert sum(f["theirDowns"] for f in fights) == 1
+
+
+def test_kill_without_a_knock_still_counts():
+    """Der letzte Gegner eines Teams geht ohne DBNO direkt zu Boden — gemessen
+    betrifft das rund ein Viertel aller Kills."""
+    events = [
+        ev("TakeDamage", 10, "account.me", "account.foe1"),
+        ev("Kill", 12, "account.me", "account.foe1"),
+    ]
+    assert ps.build_fights(events, SQUAD, TEAM_OF)[0]["theirDowns"] == 1
+
+
+def test_a_revived_enemy_can_go_down_again():
+    events = [
+        ev("TakeDamage", 10, "account.me", "account.foe1"),
+        ev("Knock", 12, "account.me", "account.foe1"),
+        ev("Revive", 20, "account.foe2", "account.foe1"),
+        ev("Knock", 30, "account.me", "account.foe1"),
+    ]
+    assert ps.build_fights(events, SQUAD, TEAM_OF)[0]["theirDowns"] == 2
+
+
 def test_downs_after_the_last_shot_still_count():
     """Der Knock kommt oft Sekunden nach dem letzten Schadensereignis."""
     events = [

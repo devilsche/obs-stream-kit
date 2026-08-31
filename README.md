@@ -513,9 +513,13 @@ Zwei Tabellen je Squad-Mate über `?range=session|day|week|all`, dazu
 Eröffnung**, Trefferquote (Anteil der Eröffnungen, bei denen überhaupt jemand
 fällt), gewonnen / verloren / wirkungslos, Median-Distanz beim ersten Treffer.
 Ein Gefecht ist „unser Squad gegen ein gegnerisches Team"; nach 45 s Ruhe beginnt
-gegen dasselbe Team ein neues. Gezählt werden **eindeutige Opfer**, nicht Events —
-Knock und späterer Kill desselben Gegners sind ein Down. Bots bleiben per Vorgabe
-draußen, sonst schönen Bot-Kills jede Quote.
+gegen dasselbe Team ein neues. Ein Down ist **ein umgelegter Spieler**, nicht ein
+Event: Knock und der spätere Finisher sind derselbe Vorgang, auch wenn Minuten und
+ein Gefechtswechsel dazwischen liegen. Ein `Revive` stellt den Gegner wieder hin —
+dann zählt der nächste Knock erneut. Ein Kill ohne vorherigen Knock zählt normal,
+denn der letzte Spieler eines Teams stirbt ohne DBNO; das sind an Prod-Daten
+gemessen rund 27 % aller Kills. Bots bleiben per Vorgabe draußen, sonst schönen
+Bot-Kills jede Quote.
 
 *Spielstil* — Loot-Tempo (Pickups je Lebensminute), Lebenszeit, Median-Abstand zum
 nächsten Mate, Zeitanteil über 100 m weg, Abstand zum Team beim eigenen Knock

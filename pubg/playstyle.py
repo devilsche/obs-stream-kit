@@ -37,6 +37,7 @@ EARLY_LOOT_MS = 300_000
 CM_PER_M = 100.0
 DAMAGE_EVENTS = ("TakeDamage",)
 DOWN_EVENTS = ("Knock", "Kill")
+REVIVE_EVENTS = ("Revive",)
 PICKUP_EVENTS = ("ItemPickup", "ItemPickupBox")
 
 
@@ -94,8 +95,10 @@ def build_fights(events, squad, team_of, *, include_bots=False,
       engagedBy   — Mate, der als erster von uns Schaden gemacht hat (auch
                     wenn der Gegner eroeffnet hat)
       openDist    — Distanz beim eroeffnenden Treffer, in Metern
-      ourDowns / theirDowns — GETROFFENE SPIELER je Seite (nicht Events:
-                    Knock + Kill desselben Opfers ist ein Down)
+      ourDowns / theirDowns — umgelegte Spieler je Seite. Knock und der
+                    spaetere Finisher sind EIN Down, auch ueber Gefechts-
+                    grenzen hinweg; nach einem Revive zaehlt der naechste
+                    Knock wieder (siehe counting_downs)
       result      — won | lost | trade | pointless
     """
     squad_ids = set(squad)
@@ -146,11 +149,9 @@ def build_fights(events, squad, team_of, *, include_bots=False,
                 if cur["engagedBy"] is None and item[1] == "us":
                     cur["engagedBy"] = item[2]
 
-    # 2) Downs zuordnen: eindeutige Opfer je Seite im Zeitfenster
-    downed = {id(f): {"ours": set(), "theirs": set()} for f in fights}
-    for e in events:
-        if _g(e, "event_type") not in DOWN_EVENTS:
-            continue
+    # 2) Downs zuordnen — nur die Ereignisse, die wirklich jemanden umlegen
+    downed = {id(f): {"ours": 0, "theirs": 0} for f in fights}
+    for e in counting_downs(events):
         ts = _g(e, "timestamp_ms")
         actor, target = _g(e, "actor_account"), _g(e, "target_account")
         if ts is None or not target:
@@ -165,15 +166,46 @@ def build_fights(events, squad, team_of, *, include_bots=False,
             continue
         for f in fights:
             if f["foeTeam"] == ft and f["startTs"] <= ts <= f["lastTs"] + tail_ms:
-                downed[id(f)][side].add(victim)
+                downed[id(f)][side] += 1
                 break
 
     for f in fights:
-        f["ourDowns"] = len(downed[id(f)]["ours"])
-        f["theirDowns"] = len(downed[id(f)]["theirs"])
+        f["ourDowns"] = downed[id(f)]["ours"]
+        f["theirDowns"] = downed[id(f)]["theirs"]
         f["result"] = _result(f["theirDowns"], f["ourDowns"])
     fights.sort(key=lambda f: f["startTs"])
     return fights
+
+
+def counting_downs(events):
+    """Down-Ereignisse, die wirklich EINEN erledigten Spieler bedeuten.
+
+    Knock und der spaetere Finisher-Kill sind derselbe Vorgang — auch wenn
+    Minuten und ein Gefechtswechsel dazwischen liegen. Gezaehlt wird deshalb
+    nur, wer gerade steht: ein Knock legt ihn, ein `Revive` stellt ihn wieder
+    hin (dann zaehlt der naechste Knock erneut), ein Kill legt ihn endgueltig.
+
+    Ein Kill OHNE vorherigen Knock zaehlt normal — der letzte Spieler eines
+    Teams stirbt ohne DBNO, das sind an Prod-Daten gemessen rund 27 % aller
+    Kills.
+
+    Returns die Teilmenge der Events, die als Down zaehlt.
+    """
+    down_now = set()
+    counted = []
+    for e in sorted(events, key=lambda r: (_g(r, "timestamp_ms") or 0)):
+        et = _g(e, "event_type")
+        victim = _g(e, "target_account")
+        if not victim:
+            continue
+        if et in REVIVE_EVENTS:
+            down_now.discard(victim)
+        elif et in DOWN_EVENTS:
+            if victim in down_now:
+                continue            # liegt schon — derselbe Vorgang
+            down_now.add(victim)
+            counted.append(e)
+    return counted
 
 
 def _set_opening(fight, item):
