@@ -117,6 +117,10 @@ ALTER TABLE match_team_mapping ADD COLUMN IF NOT EXISTS slot INTEGER;
 ALTER TABLE match_team_mapping ADD COLUMN IF NOT EXISTS assists INTEGER;
 CREATE INDEX IF NOT EXISTS idx_mtm_tenant_match
     ON match_team_mapping(tenant_id, match_id);
+-- "Wie oft haben wir diesen Spieler gesehen?" fragt das Clan-Enrichment fuer
+-- jeden Lobby-Spieler; ohne Index ist das ein Scan ueber die ganze Tabelle.
+CREATE INDEX IF NOT EXISTS idx_mtm_account
+    ON match_team_mapping(account_id);
 
 -- Waffen-Kennzahlen je Match/Spieler/Waffe, aus der Roh-Telemetrie berechnet.
 -- Beantwortet Fragen, fuer die man sonst jedes Mal alle Matches neu durch-

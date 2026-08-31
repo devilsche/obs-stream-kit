@@ -1241,12 +1241,11 @@ def clan_queue_prune(root: str, args=None) -> int:
         rest = conn.execute("""
             SELECT COUNT(*) AS n FROM player_clans pc
             WHERE pc.updated_at = ?
-              AND (EXISTS (SELECT 1 FROM participants p
-                           WHERE p.account_id = pc.account_id)
-                   OR EXISTS (SELECT 1 FROM match_team_mapping mtm
-                              WHERE mtm.account_id = pc.account_id
-                              GROUP BY mtm.account_id
-                              HAVING COUNT(DISTINCT mtm.match_id) >= ?))
+              AND pc.account_id IN (
+                SELECT account_id FROM participants
+                UNION
+                SELECT account_id FROM match_team_mapping
+                GROUP BY account_id HAVING COUNT(DISTINCT match_id) >= ?)
         """, (QUEUE_SENTINEL, min_seen)).fetchone()["n"]
         print(f"--dry-run: {offen - rest} wuerden geloescht, {rest} blieben")
         raw.close()

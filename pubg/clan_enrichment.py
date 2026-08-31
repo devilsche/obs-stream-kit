@@ -226,9 +226,15 @@ def prune_queue(conn, min_seen: int = MIN_SEEN_MATCHES) -> int:
     before = conn.execute(
         "SELECT COUNT(*) AS n FROM player_clans WHERE updated_at = ?",
         (QUEUE_SENTINEL,)).fetchone()
+    # Eine Mengen-Operation, keine Subquery je Zeile: bei 50.730 offenen
+    # Eintraegen lief die korrelierte Variante minutenlang.
     conn.execute(
-        "DELETE FROM player_clans pc WHERE pc.updated_at = ? AND NOT ("
-        + _RELEVANT_SQL.format(col="pc.account_id") + ")",
+        "DELETE FROM player_clans pc WHERE pc.updated_at = ? "
+        "AND pc.account_id NOT IN ("
+        "  SELECT account_id FROM participants"
+        "  UNION"
+        "  SELECT account_id FROM match_team_mapping"
+        "  GROUP BY account_id HAVING COUNT(DISTINCT match_id) >= ?)",
         (QUEUE_SENTINEL, min_seen))
     after = conn.execute(
         "SELECT COUNT(*) AS n FROM player_clans WHERE updated_at = ?",
