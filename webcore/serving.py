@@ -56,10 +56,23 @@ def inject_theme(html: str, theme: str) -> str:
 # jeden Kontrast verlieren.
 _IMPERSONATION_CSS = """
 <style>
+/* Seiten wie der Achievement-Browser geben dem body ein eigenes padding —
+   das Banner soll trotzdem randlos oben sitzen. Full-Bleed ueber 100vw statt
+   negativer Margins, weil die Groesse des Paddings hier nicht bekannt ist;
+   overflow-x: clip fangt den Scrollbalken ab, den 100vw sonst erzeugt (clip
+   und nicht hidden: hidden wuerde den body zum Scroll-Container machen und
+   das sticky-Verhalten brechen). */
+body:has(> .obs-impersonation) {
+  padding-top: 0;
+  overflow-x: clip;
+}
 .obs-impersonation {
   position: sticky;
   top: 0;
-  z-index: 9999;
+  z-index: 10000;
+  width: 100vw;
+  margin: 0 calc(50% - 50vw) 16px;
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   align-items: center;

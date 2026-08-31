@@ -106,3 +106,17 @@ def test_banner_uses_no_inline_styles():
         "<html><head></head><body></body></html>",
         {"id": 2, "slug": "h3", "display_name": "H3"}, "/app/")
     assert 'style="' not in out
+
+
+def test_banner_survives_a_page_with_body_padding():
+    """Der Achievement-Browser gibt dem body padding — das Banner soll
+    trotzdem randlos oben sitzen, nicht eingerueckt im Inhalt schweben."""
+    out = inject_impersonation_banner(
+        "<html><head></head><body></body></html>",
+        {"id": 2, "slug": "h3", "display_name": "H3"}, "/app/")
+    assert "body:has(> .obs-impersonation)" in out
+    assert "padding-top: 0" in out
+    # 100vw braucht clip statt hidden: hidden macht den body zum
+    # Scroll-Container und bricht damit position: sticky.
+    assert "overflow-x: clip" in out
+    assert "width: 100vw" in out

@@ -655,8 +655,10 @@
         } else {
           url = (window.__SERVE_BASE__||"/") + `api/steam/replay-achievements?appId=${encodeURIComponent(appId)}&apiName=${encodeURIComponent(apiName)}&limit=1`;
         }
-        const r = await fetch(url, { cache: "no-store" });
-        const j = await r.json();
+        // Ueber PubgUI.fetchJson statt fetch(): nur so haengt die
+        // Admin-Fremdsicht (?asTenant=...) am Call — ein roher fetch
+        // triggerte das Achievement stumm im eigenen Tenant.
+        const j = await PubgUI.fetchJson(url, 20000);
         if (j.reset > 0) {
           tileEl.classList.add("fresh-triggered");
           setTimeout(() => tileEl.classList.remove("fresh-triggered"), 1300);

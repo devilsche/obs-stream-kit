@@ -446,7 +446,13 @@ Cross-Player-Web-View: `http://localhost:8080/widgets/pubg/coplayer.html?player=
 anderen Tenants öffnen — `?asTenant=2` oder `?asTenant=<slug>`. Der Parameter wird von
 `_pubg.js` an alle API-Calls angehängt. Datei-servierte Tools bekommen dabei ein
 Banner „Viewing as … (Tenant #N)" mit Rücksprung-Link (die Dashboard-Seiten haben es
-über `base.html` schon); der Link behält alle übrigen Query-Parameter. OBS-Sources über
+über `base.html` schon); der Link behält alle übrigen Query-Parameter. Damit das
+Banner auch auf Seiten mit eigenem `body`-Padding randlos oben sitzt, läuft es
+über `100vw` + `overflow-x: clip`.
+
+Voraussetzung für die Fremdsicht: die Seite muss ihre API-Calls über
+`PubgUI.fetchJson` schicken — nur dort wird `asTenant` angehängt. Ein roher
+`fetch()` landet stumm im eigenen Tenant. OBS-Sources über
 `/s/<token>/` sind davon nicht betroffen — dort gibt es keine Impersonation und
 entsprechend kein Banner im Stream.
 
