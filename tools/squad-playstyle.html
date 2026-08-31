@@ -79,6 +79,22 @@
     .scroll { overflow-x: auto; }
     .legend { color: var(--theme-text-dim); font-size: 0.72em; margin-top: 8px;
               line-height: 1.5; }
+    th .unit { display: block; font-weight: 400; opacity: 0.65;
+               letter-spacing: 0; text-transform: none; }
+    th.sortable { white-space: normal; max-width: 120px; }
+    .howto { margin-top: 6px; font-size: 0.78em; color: var(--theme-text-dim); }
+    .howto summary { cursor: pointer; padding: 4px 0; min-height: 24px;
+                     color: var(--theme-accent); }
+    .howto summary:focus-visible { outline: 2px solid var(--theme-accent);
+                                   outline-offset: 2px; }
+    .howto dl { margin: 6px 0 0; display: grid; grid-template-columns: max-content 1fr;
+                gap: 4px 14px; align-items: baseline; }
+    .howto dt { color: var(--theme-text); font-weight: 700; }
+    .howto dd { margin: 0; line-height: 1.5; }
+    @media (max-width: 720px) {
+      .howto dl { grid-template-columns: 1fr; }
+      .howto dd { margin-bottom: 6px; }
+    }
     .err { color: var(--theme-warn); }
   </style>
 </head>
@@ -124,14 +140,32 @@
         <tbody id="fightRows"></tbody>
       </table>
     </div>
-    <div class="legend">
-      <b>Down/Eröffn.</b> — wie viele Gegner im Schnitt runtergehen, wenn er
-      aufmacht. <b>trifft%</b> — Anteil der Eröffnungen, bei denen überhaupt
-      jemand fällt. <b>wirkungslos%</b> — geschossen, niemand am Boden, auf
-      keiner Seite. <b>gewonnen/verloren</b> — mehr bzw. weniger Gegner unten
-      als eigene Leute. Ein Gefecht ist „unser Squad gegen ein Team", neue
-      Runde nach 45 s Ruhe; Bots zählen per Vorgabe nicht mit.
-    </div>
+    <p class="legend">
+      Ein Kampf ist „unser Squad gegen ein gegnerisches Team“ — Spalten-Titel
+      antippen erklärt jede Zahl.
+    </p>
+    <details class="howto">
+      <summary>Wie wird ein Kampf gezählt?</summary>
+      <dl>
+        <dt>Ein Kampf</dt>
+        <dd>Alles, was zwischen uns und einem gegnerischen Team passiert, bis
+            45 Sekunden lang nicht mehr geschossen wird. Danach beginnt gegen
+            dasselbe Team ein neuer.</dd>
+        <dt>Angefangen</dt>
+        <dd>Wer den ersten Treffer setzt, hat den Kampf angefangen. Schießt
+            der Gegner zuerst, taucht der Kampf hier gar nicht auf.</dd>
+        <dt>Ein Gegner „unten“</dt>
+        <dd>Ein umgelegter Spieler, nicht ein Ereignis: Knock und der spätere
+            Todesstoß sind derselbe Vorgang. Wird er wiederbelebt und fällt
+            erneut, zählt das wieder.</dd>
+        <dt>Bots</dt>
+        <dd>Zählen nicht mit, sonst sähen alle Quoten besser aus als sie sind.
+            Über den Schalter oben lassen sie sich dazuholen.</dd>
+        <dt>Blasse Zeilen</dt>
+        <dd>Weniger als fünf angefangene Kämpfe — zu wenig, um daraus etwas zu
+            schließen. Sie bekommen auch keine Markierung.</dd>
+      </dl>
+    </details>
   </div>
 
   <div class="t-card" id="styleCard" hidden>
@@ -142,15 +176,29 @@
         <tbody id="styleRows"></tbody>
       </table>
     </div>
-    <div class="legend">
-      <b>Loot/min</b> — Pickups je Lebensminute. <b>Team m</b> — Median-Abstand
-      zum nächsten Mate, <b>&gt;100 m</b> der Zeitanteil weiter weg.
-      <b>Tod m</b> — Abstand zum Team im Moment des eigenen Knocks (gemessen aus
-      den 25 s davor, sonst misst man den Mate, der zur Rettung rennt).
-      <b>erster%</b> — Anteil der Matches, in denen er als Erster des Squads
-      runterging. <b>steht spät%</b> — Standzeit in der zweiten Lebenshälfte;
-      frühes Stehen ist Looten, spätes ist Halten.
-    </div>
+    <p class="legend">
+      Spalten-Titel antippen erklärt jede Zahl.
+    </p>
+    <details class="howto">
+      <summary>Woher kommen diese Zahlen?</summary>
+      <dl>
+        <dt>Abstand zum Team</dt>
+        <dd>Alle zehn Sekunden wird gemessen, wie weit der nächste Mate weg
+            ist; die Spalte zeigt den typischen Wert.</dd>
+        <dt>Abstand beim Sterben</dt>
+        <dd>Gemessen aus den 25 Sekunden vor dem Knock. Nimmt man ein Fenster
+            um den Knock herum, misst man den Mate, der zur Rettung rennt —
+            und alles sieht harmlos aus.</dd>
+        <dt>Steht rum</dt>
+        <dd>Weniger als fünf Meter Versatz zwischen zwei Messpunkten gilt als
+            Stehen. Nur die zweite Lebenshälfte zählt, weil frühes Stehen
+            Looten ist.</dd>
+        <dt>Was fehlt</dt>
+        <dd>Die Datenbank speichert Positionen nur fürs eigene Squad. Für
+            Gegner gibt es keine Bewegungsdaten, also auch keinen Vergleich
+            mit ihnen.</dd>
+      </dl>
+    </details>
   </div>
 
   <script src="/widgets-static/pubg/_pubg.js"></script>
@@ -172,42 +220,77 @@
 
     // Spalten: key, Titel, Formatierer, optional flag(row) für Hervorhebung
     const FIGHT_COLS = [
-      { key: "name", label: "Mate", fmt: (r) => esc(r.name), text: true },
-      { key: "matches", label: "M", fmt: (r) => r.matches },
-      { key: "opened", label: "eröffnet", fmt: (r) => r.opened },
-      { key: "openedPerMatch", label: "/Match", fmt: (r) => n1(r.openedPerMatch) },
-      { key: "downsPerOpen", label: "Down/Eröffn.", fmt: (r) => n2(r.downsPerOpen),
+      { key: "name", label: "Spieler", fmt: (r) => esc(r.name), text: true,
+        help: "Squad-Mate. Der eigene Name ist hervorgehoben." },
+      { key: "matches", label: "Matches", fmt: (r) => r.matches,
+        help: "Matches im gewählten Zeitraum, in denen er dabei war." },
+      { key: "opened", label: "Kämpfe angefangen", fmt: (r) => r.opened,
+        help: "Wie oft er als Erster auf ein gegnerisches Team geschossen hat." },
+      { key: "openedPerMatch", label: "pro Match", fmt: (r) => n1(r.openedPerMatch),
+        help: "Angefangene Kämpfe geteilt durch Matches — das Maß für „macht ständig auf“." },
+      { key: "downsPerOpen", label: "Gegner je Kampf", unit: "Ø",
+        fmt: (r) => n2(r.downsPerOpen),
+        help: "Wie viele Gegner im Schnitt umfallen, wenn er einen Kampf anfängt. Über 1,0 heißt: es lohnt sich.",
         flag: (r, all) => isTop(r, all, "downsPerOpen", "opened"),
-        why: "bester Wert im Squad" },
-      { key: "openHitPct", label: "trifft%", fmt: (r) => n0(r.openHitPct) },
-      { key: "wonPct", label: "gewonnen%", fmt: (r) => n0(r.wonPct) },
-      { key: "lostPct", label: "verloren%", fmt: (r) => n0(r.lostPct) },
-      { key: "pointlessPct", label: "wirkungslos%", fmt: (r) => n0(r.pointlessPct),
+        why: "holt am meisten aus seinen Kämpfen" },
+      { key: "openHitPct", label: "mit Wirkung", unit: "%",
+        fmt: (r) => n0(r.openHitPct),
+        help: "Anteil seiner angefangenen Kämpfe, in denen überhaupt ein Gegner umfällt." },
+      { key: "wonPct", label: "gewonnen", unit: "%", fmt: (r) => n0(r.wonPct),
+        help: "Kämpfe, in denen mehr Gegner am Boden lagen als eigene Leute." },
+      { key: "lostPct", label: "verloren", unit: "%", fmt: (r) => n0(r.lostPct),
+        help: "Kämpfe, in denen es das Squad schlimmer erwischt hat als den Gegner." },
+      { key: "pointlessPct", label: "ohne Wirkung", unit: "%",
+        fmt: (r) => n0(r.pointlessPct),
+        help: "Geschossen, aber niemand ging zu Boden — weder drüben noch hier. Das ist „Krach machen und Aufmerksamkeit ziehen“.",
         flag: (r, all) => isTop(r, all, "pointlessPct", "opened"),
-        why: "schießt am häufigsten ohne Wirkung" },
-      { key: "openDist", label: "Ø Dist m", fmt: (r) => n0(r.openDist) },
-      { key: "downsFor", label: "Downs +", fmt: (r) => r.downsFor },
-      { key: "downsAgainst", label: "Downs −", fmt: (r) => r.downsAgainst },
+        why: "schießt am häufigsten ins Leere" },
+      { key: "openDist", label: "Distanz", unit: "m", fmt: (r) => n0(r.openDist),
+        help: "Wie weit der Gegner beim ersten Treffer weg war (Mittelwert der Kämpfe)." },
+      { key: "downsFor", label: "Gegner unten", fmt: (r) => r.downsFor,
+        help: "Gegner, die in seinen angefangenen Kämpfen zu Boden gingen." },
+      { key: "downsAgainst", label: "eigene unten", fmt: (r) => r.downsAgainst,
+        help: "Eigene Leute, die in seinen angefangenen Kämpfen zu Boden gingen." },
     ];
 
     const STYLE_COLS = [
-      { key: "name", label: "Mate", fmt: (r) => esc(r.name), text: true },
-      { key: "matches", label: "M", fmt: (r) => r.matches },
-      { key: "pickupsPerMin", label: "Loot/min", fmt: (r) => n1(r.pickupsPerMin) },
-      { key: "pickupsEarly", label: "Loot ≤5min", fmt: (r) => n0(r.pickupsEarly) },
-      { key: "aliveMin", label: "Lebenszeit", fmt: (r) => n1(r.aliveMin) },
-      { key: "teamDist", label: "Team m", fmt: (r) => n0(r.teamDist),
+      { key: "name", label: "Spieler", fmt: (r) => esc(r.name), text: true,
+        help: "Squad-Mate. Der eigene Name ist hervorgehoben." },
+      { key: "matches", label: "Matches", fmt: (r) => r.matches,
+        help: "Matches im gewählten Zeitraum, in denen er dabei war." },
+      { key: "pickupsPerMin", label: "Loot pro Minute",
+        fmt: (r) => n1(r.pickupsPerMin),
+        help: "Aufgesammelte Gegenstände je Lebensminute. Hoch = hektisch am Boden wühlen, niedrig = ruhig unterwegs." },
+      { key: "pickupsEarly", label: "Loot erste 5 min",
+        fmt: (r) => n0(r.pickupsEarly),
+        help: "Gegenstände, die er in den ersten fünf Minuten nach der Landung eingesammelt hat." },
+      { key: "aliveMin", label: "Lebenszeit", unit: "min",
+        fmt: (r) => n1(r.aliveMin),
+        help: "Von der Landung bis zum eigenen Knock, im Schnitt." },
+      { key: "teamDist", label: "Abstand zum Team", unit: "m",
+        fmt: (r) => n0(r.teamDist),
+        help: "Wie weit der nächste Mate typischerweise weg ist. Klein = klebt am Team, groß = macht sein eigenes Ding.",
         flag: (r, all) => isTop(r, all, "teamDist"),
-        why: "hängt am weitesten vom Team weg" },
-      { key: "farShare", label: ">100 m%", fmt: (r) => n0(r.farShare) },
-      { key: "distAtDown", label: "Tod m", fmt: (r) => n0(r.distAtDown) },
-      { key: "distAtDownMax", label: "Tod max", fmt: (r) => n0(r.distAtDownMax) },
-      { key: "firstDownPct", label: "erster%", fmt: (r) => n0(r.firstDownPct),
+        why: "spielt am weitesten weg vom Team" },
+      { key: "farShare", label: "allein unterwegs", unit: "%",
+        fmt: (r) => n0(r.farShare),
+        help: "Anteil der Spielzeit, in der kein Mate näher als 100 m war." },
+      { key: "distAtDown", label: "Abstand beim Sterben", unit: "m",
+        fmt: (r) => n0(r.distAtDown),
+        help: "Wie weit das Team weg war, als es ihn erwischt hat. Groß heißt: keiner konnte helfen." },
+      { key: "distAtDownMax", label: "schlimmster Fall", unit: "m",
+        fmt: (r) => n0(r.distAtDownMax),
+        help: "Der größte gemessene Abstand zum Team im Moment eines eigenen Knocks." },
+      { key: "firstDownPct", label: "zuerst tot", unit: "%",
+        fmt: (r) => n0(r.firstDownPct),
+        help: "Anteil der Matches, in denen er als Erster des Squads zu Boden ging.",
         flag: (r, all) => isTop(r, all, "firstDownPct"),
-        why: "geht am häufigsten als Erster runter" },
-      { key: "stillLateShare", label: "steht spät%", fmt: (r) => n0(r.stillLateShare),
+        why: "fällt am häufigsten als Erster" },
+      { key: "stillLateShare", label: "steht rum (spät)", unit: "%",
+        fmt: (r) => n0(r.stillLateShare),
+        help: "Standzeit in der zweiten Lebenshälfte. Frühes Stehen ist Looten, spätes Stehen ist Halten oder Campen.",
         flag: (r, all) => isTop(r, all, "stillLateShare"),
-        why: "steht in der zweiten Lebenshälfte am längsten" },
+        why: "steht spät im Match am längsten still" },
     ];
 
     // Markiert den Spitzenreiter einer Spalte — ob das Lob oder Vorwurf ist,
@@ -233,9 +316,15 @@
         const active = sort.key === c.key;
         const arrow = active
           ? `<span class="sort-arrow">${sort.dir < 0 ? "▼" : "▲"}</span>` : "";
+        const unit = c.unit ? `<span class="unit">${esc(c.unit)}</span>` : "";
+        // Die Erklärung steckt am Kopf jeder Spalte statt in einer Legende
+        // unter der Tabelle — dort sucht sie niemand. title für die Maus,
+        // aria-label für Tastatur und Screenreader.
+        const help = c.help ? esc(c.help) : "";
         return `<th class="sortable${c.text ? "" : " num"}${active ? " active" : ""}"
                     data-sort="${c.key}" tabindex="0" role="button"
-                    aria-label="Nach ${c.label} sortieren">${c.label}${arrow}</th>`;
+                    title="${help}"
+                    aria-label="${esc(c.label)}${c.unit ? " in " + esc(c.unit) : ""}. ${help} Aktivieren zum Sortieren.">${c.label}${unit}${arrow}</th>`;
       }).join("");
 
       const sorted = [...rows].sort((a, b) => {
