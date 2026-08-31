@@ -13,7 +13,9 @@ from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_mates, compute_map_distribution,
                                 compute_first_fight_rate, compute_squad_compare,
                                 compute_performance_history,
-                                compute_strongest_opponent)
+                                compute_strongest_opponent,
+                                compute_top_scorer,
+                                compute_top_scorers_by_match)
 
 
 CONN = None
@@ -688,3 +690,95 @@ def test_strongest_opponent_falls_back_to_account_id():
     r = compute_strongest_opponent(conn, T, "account.A", match_ids=["so5"])
     assert r["kills"] == 7
     assert r["name"]
+
+
+def _ts_mapping(conn, match_id, rows):
+    """rows: [(account_id, team_id, kills, assists)] -> Lobby-Mapping."""
+    db_pg.insert_team_mapping(conn.raw, T, match_id, [
+        {"account_id": a, "team_id": t, "kills": k, "assists": ass,
+         "place": 5, "time_survived": 1200} for a, t, k, ass in rows])
+
+
+def test_top_scorer_includes_own_squad():
+    """TopScorer ist der Beste der GANZEN Lobby — im Gegensatz zum
+    staerksten Gegner darf das auch ein Mate oder man selbst sein."""
+    conn = _setup()
+    upsert_player(conn, "account.MATE", "MateA", "steam", False)
+    upsert_player(conn, "account.OPP", "BadGuy", "steam", False)
+    insert_match(conn, "ts1", "Erangel_Main", "squad-fpp", False, 1800,
+                 "2026-05-01T18:00:00Z", None)
+    insert_participants(conn, "ts1", [_sc_part("account.A", "PEX_LuCKoR", 1)])
+    _ts_mapping(conn, "ts1", [("account.A", 1, 12, 1),
+                              ("account.MATE", 1, 16, 3),
+                              ("account.OPP", 4, 9, 0)])
+    r = compute_top_scorers_by_match(conn, T, ["ts1"])["ts1"]
+    assert r["name"] == "MateA"
+    assert (r["kills"], r["assists"]) == (16, 3)
+
+
+def test_top_scorer_per_match_not_only_the_maximum():
+    """Jedes Match hat seinen eigenen TopScorer — nicht nur die Session."""
+    conn = _setup()
+    upsert_player(conn, "account.O1", "Gegner1", "steam", False)
+    upsert_player(conn, "account.O2", "Gegner2", "steam", False)
+    for mid, ts, k1, k2 in (("ts2", "2026-05-01T18:00:00Z", 3, 7),
+                            ("ts3", "2026-05-01T19:00:00Z", 11, 2)):
+        insert_match(conn, mid, "Erangel_Main", "squad-fpp", False, 1800, ts, None)
+        insert_participants(conn, mid, [_sc_part("account.A", "PEX_LuCKoR", 1)])
+        _ts_mapping(conn, mid, [("account.A", 1, 5, 0),
+                                ("account.O1", 2, k1, 0),
+                                ("account.O2", 3, k2, 0)])
+    per_match = compute_top_scorers_by_match(conn, T, ["ts2", "ts3"])
+    assert per_match["ts2"]["name"] == "Gegner2"
+    assert per_match["ts3"]["name"] == "Gegner1"
+    best = compute_top_scorer(conn, T, ["ts2", "ts3"])
+    assert (best["name"], best["kills"], best["matchId"]) == ("Gegner1", 11, "ts3")
+
+
+def test_top_scorer_tie_is_broken_by_assists():
+    conn = _setup()
+    upsert_player(conn, "account.O1", "Gleich1", "steam", False)
+    upsert_player(conn, "account.O2", "Gleich2", "steam", False)
+    insert_match(conn, "ts4", "Erangel_Main", "squad-fpp", False, 1800,
+                 "2026-05-01T18:00:00Z", None)
+    insert_participants(conn, "ts4", [_sc_part("account.A", "PEX_LuCKoR", 1)])
+    _ts_mapping(conn, "ts4", [("account.O1", 2, 8, 1), ("account.O2", 3, 8, 4)])
+    assert compute_top_scorers_by_match(conn, T, ["ts4"])["ts4"]["name"] == "Gleich2"
+
+
+def test_top_scorer_without_assists_column_data_is_none():
+    """Altbestand hat keine Assists — dann nur Kills, kein 0 erfinden."""
+    conn = _setup()
+    upsert_player(conn, "account.O1", "Alt", "steam", False)
+    insert_match(conn, "ts5", "Erangel_Main", "squad-fpp", False, 1800,
+                 "2026-05-01T18:00:00Z", None)
+    insert_participants(conn, "ts5", [_sc_part("account.A", "PEX_LuCKoR", 1)])
+    db_pg.insert_team_mapping(conn.raw, T, "ts5", [
+        {"account_id": "account.O1", "team_id": 2, "kills": 6, "place": 5,
+         "time_survived": 900}])
+    r = compute_top_scorers_by_match(conn, T, ["ts5"])["ts5"]
+    assert r["kills"] == 6
+    assert r["assists"] is None
+
+
+def test_top_scorer_reingest_keeps_known_assists():
+    """Ein Re-Ingest ohne assists-Feld darf einen vorhandenen Wert nicht
+    auf NULL zuruecksetzen."""
+    conn = _setup()
+    upsert_player(conn, "account.O1", "Wieder", "steam", False)
+    insert_match(conn, "ts6", "Erangel_Main", "squad-fpp", False, 1800,
+                 "2026-05-01T18:00:00Z", None)
+    _ts_mapping(conn, "ts6", [("account.O1", 2, 6, 3)])
+    db_pg.insert_team_mapping(conn.raw, T, "ts6", [
+        {"account_id": "account.O1", "team_id": 2, "kills": 6, "place": 5,
+         "time_survived": 900}])
+    assert compute_top_scorers_by_match(conn, T, ["ts6"])["ts6"]["assists"] == 3
+
+
+def test_top_scorer_without_lobby_mapping_is_absent():
+    conn = _setup()
+    insert_match(conn, "ts7", "Erangel_Main", "squad-fpp", False, 1800,
+                 "2026-05-01T18:00:00Z", None)
+    insert_participants(conn, "ts7", [_sc_part("account.A", "PEX_LuCKoR", 1)])
+    assert compute_top_scorers_by_match(conn, T, ["ts7"]) == {}
+    assert compute_top_scorer(conn, T, ["ts7"]) is None

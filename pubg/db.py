@@ -279,7 +279,8 @@ def init_schema(conn: sqlite3.Connection) -> None:
     """)
     # Migrationen für bestehende DBs
     for col, typ in [("kills", "INTEGER"), ("place", "INTEGER"),
-                     ("time_survived", "INTEGER"), ("slot", "INTEGER")]:
+                     ("time_survived", "INTEGER"), ("slot", "INTEGER"),
+                     ("assists", "INTEGER")]:
         try:
             conn.execute(f"ALTER TABLE match_team_mapping ADD COLUMN {col} {typ}")
         except sqlite3.OperationalError:
@@ -447,7 +448,7 @@ def insert_participants(conn, match_id, rows):
 
 
 def insert_team_mapping(conn, match_id: str, mapping_rows) -> None:
-    """Schreibt account_id → team_id+kills+place+time_survived Lookup für
+    """Schreibt account_id → team_id+kills+assists+place+time_survived Lookup für
     die gesamte Lobby. Idempotent via INSERT OR REPLACE auf
     (match_id, account_id)."""
     for r in mapping_rows:
@@ -455,10 +456,11 @@ def insert_team_mapping(conn, match_id: str, mapping_rows) -> None:
             continue
         conn.execute(
             "INSERT OR REPLACE INTO match_team_mapping"
-            "(match_id, account_id, team_id, kills, place, time_survived) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "(match_id, account_id, team_id, kills, assists, place, "
+            "time_survived) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (match_id, r["account_id"], r.get("team_id"),
-             r.get("kills"), r.get("place"), r.get("time_survived")),
+             r.get("kills"), r.get("assists"), r.get("place"),
+             r.get("time_survived")),
         )
     conn.commit()
 

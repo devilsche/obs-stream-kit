@@ -88,7 +88,7 @@
        zwischen Zeilen sichtbar. */
     .matches-list .m {
       display: grid;
-      grid-template-columns: 240px 60px 1fr 80px 70px 70px 90px 90px;
+      grid-template-columns: 240px 60px 1fr 80px 70px 70px 90px 90px 150px;
       gap: 10px;
       padding: 6px 8px;
       border-radius: 3px;
@@ -100,7 +100,7 @@
     .matches-list .m.expanded { background: rgba(94, 42, 121, 0.25); }
     .matches-list .header-row {
       display: grid;
-      grid-template-columns: 240px 60px 1fr 80px 70px 70px 90px 90px;
+      grid-template-columns: 240px 60px 1fr 80px 70px 70px 90px 90px 150px;
       gap: 10px;
       padding: 2px 8px 4px;
       font-size: 0.85em;
@@ -145,6 +145,24 @@
     }
     .matches-list .stat b {
       color: var(--pubg-text);
+    }
+    /* TopScorer: Name gedimmt, Score in Textfarbe — der Name ist Kontext,
+       die Zahl ist die Aussage. Lange Namen werden gekuerzt statt die
+       Spalte zu sprengen. */
+    .matches-list .top-scorer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+      align-items: baseline;
+      overflow: hidden;
+    }
+    .matches-list .top-scorer__name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .matches-list .header-row .col-right {
+      text-align: right;
     }
     .squad-detail {
       padding: 8px 14px 12px 28px;
@@ -3265,6 +3283,15 @@
       return `${m}:${String(s).padStart(2,"0")}`;
     }
 
+    // TopScorer-Score: "16K / 3A". Assists fehlen bei Matches, die vor der
+    // assists-Spalte eingelesen wurden — dann nur die Kills, keine erfundene 0.
+    function fmtScore(sc) {
+      if (!sc) return "";
+      return sc.assists == null
+        ? `${sc.kills}K`
+        : `${sc.kills}K / ${sc.assists}A`;
+    }
+
     function fmtMatchRow(m, idx, matchNum) {
       const startIso = PubgUI.matchStartIso(m.matchEnd, m.durationSec);
       const mySurv = m.timeSurvived || 0;
@@ -3299,6 +3326,11 @@
           <span class="stat"><b>${m.kills}</b> K${m.myStats && m.myStats.botKills ? ` <span class="bot-kills">(${m.myStats.botKills})</span>` : ""}</span>
           <span class="stat"><b>${Math.round(m.damage||0)}</b> DMG</span>
           <span class="stat"><b>${fmtSurv(mySurv)}</b></span>
+          <span class="stat top-scorer" title="Bester Spieler der ganzen Lobby in diesem Match">${
+            m.topScorer
+              ? `<span class="top-scorer__name">${PubgUI.esc(m.topScorer.name)}</span><b>${fmtScore(m.topScorer)}</b>`
+              : "<span>—</span>"
+          }</span>
         </div>
 `;
     }
@@ -3387,7 +3419,7 @@
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.kd)}</span><span class="pubg-stat-label">K/D</span></div>
           ${t.tdm ? `<div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.tdm.kd)}</span><span class="pubg-stat-label">TDM K/D</span></div>` : ""}
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.squadKd || 0)}</span><span class="pubg-stat-label">Squad K/D</span></div>
-          ${t.strongestOpponent ? `<div class="cell"><span class="pubg-stat-value">${t.strongestOpponent.kills}</span><span class="pubg-stat-label">Stärkster Gegner · ${PubgUI.esc(t.strongestOpponent.name)}</span></div>` : ""}
+          ${t.topScorer ? `<div class="cell"><span class="pubg-stat-value">${fmtScore(t.topScorer)}</span><span class="pubg-stat-label">TopScorer · ${PubgUI.esc(t.topScorer.name)}</span></div>` : ""}
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.avgKills)}</span><span class="pubg-stat-label">Ø My Kills/Match</span></div>
           <div class="cell"><span class="pubg-stat-value">${(t.squadKillsPerMatch || 0).toFixed(1)}</span><span class="pubg-stat-label">Ø Squad Kills/Match</span></div>
           <div class="cell"><span class="pubg-stat-value">${Math.round(t.avgDamage)}</span><span class="pubg-stat-label">Ø Damage/Match</span></div>
@@ -3443,7 +3475,7 @@
               <span><b>${s.wins}</b> Wins</span>
               <span><b>${PubgUI.fmtKD(s.kd)}</b> K/D</span>
               ${(s.squadMatchesWithMapping||0) > 0 ? `<span><b>${PubgUI.fmtKD(s.squadKd||0)}</b> Squad K/D</span>` : ""}
-              ${s.strongestOpponent ? `<span><b>${s.strongestOpponent.kills}</b> Kills · stärkster Gegner (${PubgUI.esc(s.strongestOpponent.name)})</span>` : ""}
+              ${s.topScorer ? `<span><b>${fmtScore(s.topScorer)}</b> · TopScorer (${PubgUI.esc(s.topScorer.name)})</span>` : ""}
               <span><b>${Math.round(s.avgDamage)}</b> Ø DMG</span>
               <span><b>${fmtDuration(Math.round(s.avgSurvivedSec))}</b> Ø Surv</span>
               <span><b>#${s.avgPlace.toFixed(1)}</b> Avg #</span>
@@ -3456,6 +3488,7 @@
                 <span style="text-align:right">Kills</span>
                 <span style="text-align:right">Damage</span>
                 <span style="text-align:right">Survived</span>
+                <span class="col-right" title="Bester Spieler der Lobby">TopScorer</span>
               </div>
               ${ph.matches.map((m, i) => fmtMatchRow(m, `${ph.coreSquad.join('-')}-${i}`, matchNumMap.get(m.matchEnd))).join("")}
             </div>

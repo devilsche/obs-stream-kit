@@ -3372,6 +3372,65 @@ def compute_strongest_opponent(conn, tenant_id: int, my_account_id,
     }
 
 
+def compute_top_scorers_by_match(conn, tenant_id: int, match_ids) -> dict:
+    """Bester Einzelspieler je Match — ueber die GANZE Lobby, eigener Squad
+    eingeschlossen.
+
+    Anders als compute_strongest_opponent (Gegner-Ausreisser ueber einen
+    Zeitraum) ist das eine Pro-Match-Zahl: wer in diesem Match am meisten
+    gerissen hat, egal in welchem Team. Sortiert nach Kills, bei Gleichstand
+    entscheiden Assists, dann der Name (stabile Ausgabe).
+
+    `assists` gibt es erst seit der Spalten-Erweiterung — fuer aeltere Matches
+    steht dort NULL, der Aufrufer zeigt dann nur die Kills.
+
+    Liefert {match_id: {name, accountId, kills, assists}} — Matches ohne
+    Lobby-Mapping fehlen im Dict.
+    """
+    match_ids = [m for m in (match_ids or []) if m]
+    if not match_ids:
+        return {}
+    ph = ",".join("?" * len(match_ids))
+    rows = conn.execute(f"""
+        SELECT o.match_id, o.account_id, o.kills, o.assists, p.name
+        FROM match_team_mapping o
+        LEFT JOIN players p
+          ON p.tenant_id = o.tenant_id AND p.account_id = o.account_id
+        WHERE o.tenant_id = ? AND o.match_id IN ({ph})
+          AND o.kills IS NOT NULL
+        ORDER BY o.match_id ASC, o.kills DESC,
+                 COALESCE(o.assists, -1) DESC, p.name ASC
+    """, [tenant_id] + list(match_ids)).fetchall()
+    out = {}
+    for r in rows:
+        # Erste Zeile je Match ist dank ORDER BY der Spitzenreiter.
+        if r["match_id"] in out:
+            continue
+        out[r["match_id"]] = {
+            "name": r["name"] or (r["account_id"] or "")[:12],
+            "accountId": r["account_id"],
+            "kills": r["kills"],
+            "assists": r["assists"],
+        }
+    return out
+
+
+def compute_top_scorer(conn, tenant_id: int, match_ids) -> dict:
+    """Der beste Einzelspieler ueber mehrere Matches (Session/Phase).
+
+    Ein Maximum, kein Mittelwert — siehe compute_strongest_opponent zur
+    Begruendung. Enthaelt zusaetzlich matchId, damit die Anzeige auf das
+    Match zeigen kann.
+    """
+    per_match = compute_top_scorers_by_match(conn, tenant_id, match_ids)
+    best = None
+    for mid, sc in per_match.items():
+        key = (sc["kills"] or 0, sc["assists"] or 0)
+        if best is None or key > (best["kills"] or 0, best["assists"] or 0):
+            best = dict(sc, matchId=mid)
+    return best
+
+
 def compute_trend_deltas(conn, tenant_id: int, my_account_id, from_iso=None, to_iso=None,
                           gap_hours=4):
     """Vergleich gewählte Session vs. die direkt davor liegende Session.
@@ -5708,6 +5767,23 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         d["squadTimeSurvived"] = _squad_last_survived(m["match_id"])
         enriched.append(d)
 
+    # TopScorer je Match einmal fuer die ganze Range — Session-Totals und
+    # Phasen leiten ihr Maximum daraus ab, statt die Lobby erneut zu queryen.
+    top_scorer_by_match = compute_top_scorers_by_match(
+        conn, tenant_id, [x["match_id"] for x in enriched])
+
+    def _top_scorer_over(match_ids):
+        """Maximum ueber die vorberechneten Pro-Match-TopScorer."""
+        best = None
+        for mid in match_ids or []:
+            sc = top_scorer_by_match.get(mid)
+            if not sc:
+                continue
+            if best is None or (sc["kills"] or 0, sc["assists"] or 0) > \
+                    (best["kills"] or 0, best["assists"] or 0):
+                best = dict(sc, matchId=mid)
+        return best
+
     # Event-Matches: PUBG-API liefert participants.kills/damage_dealt = 0
     # weil ihr System in Event-Modi keine Player-Stats trackt. Wir holen
     # echte Kills + Damage aus telemetry_events und packen sie in
@@ -5793,9 +5869,10 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         out = {"squadKills": 0, "squadKd": 0, "squadKillsPerMatch": 0,
                "squadMatchesWithMapping": 0,
                "lobbyKd": 0, "lobbyMatchesWithMapping": 0,
-               "strongestOpponent": None}
+               "strongestOpponent": None, "topScorer": None}
         if not match_ids:
             return out
+        out["topScorer"] = _top_scorer_over(match_ids)
         # Staerkster einzelner Gegner statt eines Lobby-Durchschnitts: Mittelwerte
         # ueber die Lobby sind auf Phasen-Ebene praktisch konstant (~5-9 Kills,
         # 10% Streuung), der Spitzenwert streut dagegen ueber 30%.
@@ -6244,6 +6321,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         }
         return {
             "matchId": m["match_id"],
+            "topScorer": top_scorer_by_match.get(m["match_id"]),
             "map": m["map_name"],
             "mode": m["game_mode"],
             "isEvent": not is_br_mode(m["game_mode"]),

@@ -432,6 +432,7 @@ Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
 | `map-distribution.html` | Map-Häufigkeits-Bars | `range=session\|day\|week\|all` |
 | `first-fight.html` | Survival-% mit Sparkline | `range` |
 | `session-summary.html` | Vollformat Stream-Ending | `hideMaps=1`, `hideMates=1` |
+| `session-report.html` | After-Session-Report mit Phasen, Match-Liste und Match-Detail | `from`, `to` (ISO, sonst laufende Session) |
 | `career-card.html` | Lifetime-Anzeige | `player`, `mode=all\|squad-fpp\|...` |
 | `performance-history.html` | K/D-Verlauf pro Session / Tag / Monat | `groupBy=session\|day\|month`, `metric`, `limit`, `player` |
 | `news-ticker.html` | Marquee-Bar mit rotierenden Snippets | `rotateMs` |
@@ -440,6 +441,16 @@ Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
 
 Cross-Player-Web-View: `http://localhost:8080/widgets/pubg/coplayer.html?player=NAME`
 (alte URL `overlays/stats.html?player=NAME` leitet weiter)
+
+**TopScorer** im `session-report` ist der beste Einzelspieler der **ganzen Lobby** —
+eigener Squad eingeschlossen, im Gegensatz zum "Stärksten Gegner" in
+`session-lobbies.html`. Er steht jetzt in drei Auflösungen da: je Match (eigene
+Spalte in der Match-Liste), je Phase und für die Session als Ganzes. Format
+`16K / 3A` (Kills / Assists); bei Gleichstand in den Kills entscheiden die
+Assists. Die Assists der Lobby kamen erst mit der `assists`-Spalte in
+`match_team_mapping` dazu — Matches, die vorher eingelesen wurden, zeigen nur
+`16K`. Nachrüsten geht nicht: die Match-Payloads der PUBG-API sind nach rund
+14 Tagen weg.
 
 **performance-history** zeichnet den Verlauf über die eigenen Matches — K/D (Default),
 Win-Rate, Ø DMG, Kills oder Matches, gruppiert nach `session`, `day` oder `month`.

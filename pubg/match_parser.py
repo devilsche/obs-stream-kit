@@ -58,7 +58,7 @@ def parse_match_response(match_payload, my_account_id):
     parts = idx.get("participant", {})
 
     squad = []
-    team_mapping = []  # gesamte Lobby: account_id, team_id, kills, place, slot
+    team_mapping = []  # gesamte Lobby: account_id, team_id, kills, assists, place, slot
     for r in rosters.values():
         team_id = r["attributes"]["stats"].get("teamId")
         # Roster-Slot 1..N in API-Reihenfolge = In-Game Slot/Plate-Reihenfolge
@@ -76,6 +76,7 @@ def parse_match_response(match_payload, my_account_id):
                     "team_id": team_id,
                     "slot": slot_idx,
                     "kills": stats.get("kills"),
+                    "assists": stats.get("assists"),
                     "place": stats.get("winPlace"),
                     "time_survived": stats.get("timeSurvived"),
                 })

@@ -104,12 +104,17 @@ CREATE TABLE IF NOT EXISTS match_team_mapping (
     team_id      INTEGER,
     slot         INTEGER,
     kills        INTEGER,
+    assists      INTEGER,
     place        INTEGER,
     time_survived INTEGER,
     PRIMARY KEY (tenant_id, match_id, account_id)
 );
 -- Additiv: slot wurde nach v3 hinzugefuegt, alte Datensaetze haben NULL.
 ALTER TABLE match_team_mapping ADD COLUMN IF NOT EXISTS slot INTEGER;
+-- Additiv: assists fuer den TopScorer je Match. Nur neu eingelesene Matches
+-- haben Werte — die Match-Payloads der API sind nach ~14 Tagen weg, ein
+-- Backfill fuer den Altbestand ist damit nicht moeglich.
+ALTER TABLE match_team_mapping ADD COLUMN IF NOT EXISTS assists INTEGER;
 CREATE INDEX IF NOT EXISTS idx_mtm_tenant_match
     ON match_team_mapping(tenant_id, match_id);
 
@@ -621,7 +626,7 @@ def insert_participants(conn, tenant_id: int, match_id: str, rows) -> None:
 
 def insert_team_mapping(conn, tenant_id: int, match_id: str,
                         mapping_rows) -> None:
-    """account_id -> team_id+kills+place+time_survived Lookup fuer die
+    """account_id -> team_id+kills+assists+place+time_survived Lookup fuer die
     Lobby. Idempotent via ON CONFLICT DO UPDATE (im Gegensatz zu
     participants — Team-Mapping wird gerne nachtraeglich enriched)."""
     if not mapping_rows:
@@ -632,7 +637,7 @@ def insert_team_mapping(conn, tenant_id: int, match_id: str,
             continue
         values.append((
             tenant_id, match_id, r["account_id"], r.get("team_id"),
-            r.get("slot"), r.get("kills"), r.get("place"),
+            r.get("slot"), r.get("kills"), r.get("assists"), r.get("place"),
             r.get("time_survived"),
         ))
     if not values:
@@ -641,11 +646,14 @@ def insert_team_mapping(conn, tenant_id: int, match_id: str,
         execute_values(
             cur,
             "INSERT INTO match_team_mapping "
-            "(tenant_id, match_id, account_id, team_id, slot, kills, place, "
-            "time_survived) VALUES %s "
+            "(tenant_id, match_id, account_id, team_id, slot, kills, assists, "
+            "place, time_survived) VALUES %s "
             "ON CONFLICT (tenant_id, match_id, account_id) DO UPDATE SET "
             "team_id=EXCLUDED.team_id, slot=EXCLUDED.slot, "
             "kills=EXCLUDED.kills, "
+            # Ein Re-Ingest darf einen vorhandenen Wert nicht mit NULL
+            # ueberschreiben: alte Payload-Parses hatten kein assists-Feld.
+            "assists=COALESCE(EXCLUDED.assists, match_team_mapping.assists), "
             "place=EXCLUDED.place, time_survived=EXCLUDED.time_survived",
             values,
         )
