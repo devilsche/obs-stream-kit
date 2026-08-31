@@ -18,7 +18,12 @@ class RateLimitError(Exception):
 
 
 class ApiError(Exception):
-    pass
+    """HTTP-Fehler der PUBG-API. `status` traegt den Code — der Aufrufer muss
+    4xx (endgueltig) von 429/5xx (spaeter nochmal) unterscheiden koennen."""
+
+    def __init__(self, message: str, status: int = None):
+        super().__init__(message)
+        self.status = status
 
 
 class RateLimiter:
@@ -142,7 +147,7 @@ class PubgClient:
                     "PUBG-Rate-Limit erreicht",
                     retry_after=_retry_after_secs(e.headers),
                 ) from e
-            raise ApiError(f"HTTP {e.code}: {e.reason}") from e
+            raise ApiError(f"HTTP {e.code}: {e.reason}", status=e.code) from e
         except urllib.error.URLError as e:
             if _obs_ctx is not None:
                 _obs_ctx.set_status("url_error")

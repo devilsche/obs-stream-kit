@@ -27,6 +27,12 @@ def _now_iso() -> str:
     return _dt.datetime.now(_dt.UTC).isoformat().replace("+00:00", "Z")
 
 
+def is_bot(account_id) -> bool:
+    """Bot-Accounts (`ai.`-Praefix) kennt die PUBG-API nicht: jede Abfrage
+    darauf kostet ein Rate-Limit-Budget und kommt als 400 zurueck."""
+    return isinstance(account_id, str) and account_id.startswith("ai.")
+
+
 def _is_stale(updated_at: str | None) -> bool:
     if not updated_at:
         return True
@@ -63,6 +69,8 @@ def ensure_player_clan(conn, client, account_id: str,
                         force_refresh: bool = False) -> str | None:
     """Liefert die clan_id fuer einen Player. Cached 7d. Returns None wenn
     der Spieler in keinem Clan ist."""
+    if is_bot(account_id):
+        return None
     cur_clan, updated_at = get_cached_player_clan(conn, account_id)
     if not force_refresh and not _is_stale(updated_at):
         return cur_clan
@@ -70,7 +78,15 @@ def ensure_player_clan(conn, client, account_id: str,
         return cur_clan  # kein Client → stale Wert lieber als nichts
     try:
         data = client.get_player_by_id(account_id)
-    except Exception:
+    except Exception as e:
+        # 4xx heisst: den Account gibt es so nicht (geloescht, Bot, falsche
+        # Plattform). Ohne Vermerk bliebe er in der Warteschlange und wuerde
+        # in JEDEM Tick erneut abgefragt — das frisst das Budget, das der
+        # Match-Poller braucht. 429 und 5xx sind voruebergehend und bleiben
+        # in der Schlange.
+        status = getattr(e, "status", None)
+        if isinstance(status, int) and 400 <= status < 500 and status != 429:
+            _mark_unresolvable(conn, account_id)
         return cur_clan
     attrs = ((data.get("data") or {}).get("attributes")) or {}
     new_clan_id = attrs.get("clanId") or None
@@ -86,6 +102,20 @@ def ensure_player_clan(conn, client, account_id: str,
     except Exception:
         pass
     return new_clan_id
+
+
+def _mark_unresolvable(conn, account_id: str) -> None:
+    """Account als "kein Clan, heute geprueft" ablegen — er faellt damit aus
+    der Warteschlange und wird erst nach der Cache-Frist wieder angefasst."""
+    conn.execute(
+        "INSERT INTO player_clans (account_id, clan_id, updated_at) "
+        "VALUES (?, NULL, ?) "
+        "ON CONFLICT (account_id) DO UPDATE SET updated_at = EXCLUDED.updated_at",
+        (account_id, _now_iso()))
+    try:
+        conn.commit()
+    except Exception:
+        pass
 
 
 def ensure_clan(conn, client, clan_id: str,
@@ -136,7 +166,7 @@ def enqueue_unknown(conn, account_ids) -> int:
     Returns Anzahl neu enqueued."""
     n = 0
     for acc in account_ids:
-        if not acc:
+        if not acc or is_bot(acc):
             continue
         conn.execute(
             "INSERT INTO player_clans (account_id, clan_id, updated_at) "
@@ -173,7 +203,7 @@ def process_queue(conn, client, max_count: int = 3) -> int:
         "    AND m.tenant_id = mtm.tenant_id "
         "  GROUP BY mtm.account_id"
         ") lp ON lp.account_id = pc.account_id "
-        "WHERE pc.updated_at = ? "
+        "WHERE pc.updated_at = ? AND pc.account_id NOT LIKE 'ai.%' "
         "ORDER BY lp.last_seen DESC NULLS LAST "
         "LIMIT ?",
         (QUEUE_SENTINEL, max_count)).fetchall()
