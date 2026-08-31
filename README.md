@@ -501,6 +501,34 @@ auf das Backend; kein Streaming nötig.
 | `tools/g1r-database.html` | Vollständiger G1R-Item-Katalog aus dem Object-Dump (Nah-/Fernkampf, Runen, Schriftrollen) mit Live-Suche | Browser-Tab (admin) |
 | `tools/match-analysis.html` | Telemetrie-Auswertung eines Matches: Accuracy, Trefferzonen, Kill-Timeline, Auffälligkeiten | Browser-Tab |
 | `tools/weapon-performance.html` | Dieselben Kennzahlen über einen **Zeitraum** — je Waffe oder je Spieler | Browser-Tab |
+| `tools/squad-playstyle.html` | Spielstil je Squad-Mate: wer eröffnet die Gefechte, wie gehen sie aus, wer hängt zu weit weg | Browser-Tab |
+
+#### tools/squad-playstyle.html
+
+Zwei Tabellen je Squad-Mate über `?range=session|day|week|all`, dazu
+`players=A,B,C` (nur Matches, in denen **alle** Genannten dabei waren),
+`minMatches=` und `includeBots=1`.
+
+*Gefechte* — je Mate, der ein Gefecht eröffnet: Eröffnungen pro Match, **Downs je
+Eröffnung**, Trefferquote (Anteil der Eröffnungen, bei denen überhaupt jemand
+fällt), gewonnen / verloren / wirkungslos, Median-Distanz beim ersten Treffer.
+Ein Gefecht ist „unser Squad gegen ein gegnerisches Team"; nach 45 s Ruhe beginnt
+gegen dasselbe Team ein neues. Gezählt werden **eindeutige Opfer**, nicht Events —
+Knock und späterer Kill desselben Gegners sind ein Down. Bots bleiben per Vorgabe
+draußen, sonst schönen Bot-Kills jede Quote.
+
+*Spielstil* — Loot-Tempo (Pickups je Lebensminute), Lebenszeit, Median-Abstand zum
+nächsten Mate, Zeitanteil über 100 m weg, Abstand zum Team beim eigenen Knock
+(aus den 25 s davor gemessen — mit einem Fenster um den Knock herum misst man den
+Mate, der zur Rettung rennt), Anteil der Matches als Erster unten, Standzeit in der
+zweiten Lebenshälfte.
+
+Datenquelle ist `telemetry_events`, also rückwirkend für alles in der DB und ohne
+Roh-Blob. Zu beachten: Position-Events liegen dort **nur fürs eigene Squad**, und
+Schadensereignisse nur mit Squad-Beteiligung — für eine Squad-Auswertung reicht das
+genau, für Aussagen über fremde Teams untereinander nicht. Werte aus weniger als
+fünf Matches bzw. Eröffnungen zeigt die Ansicht blass und nimmt sie von den
+Spitzenreiter-Markierungen aus.
 
 #### tools/match-replay.html
 

@@ -177,13 +177,13 @@
       { key: "opened", label: "eröffnet", fmt: (r) => r.opened },
       { key: "openedPerMatch", label: "/Match", fmt: (r) => n1(r.openedPerMatch) },
       { key: "downsPerOpen", label: "Down/Eröffn.", fmt: (r) => n2(r.downsPerOpen),
-        flag: (r, all) => isTop(r, all, "downsPerOpen"),
+        flag: (r, all) => isTop(r, all, "downsPerOpen", "opened"),
         why: "bester Wert im Squad" },
       { key: "openHitPct", label: "trifft%", fmt: (r) => n0(r.openHitPct) },
       { key: "wonPct", label: "gewonnen%", fmt: (r) => n0(r.wonPct) },
       { key: "lostPct", label: "verloren%", fmt: (r) => n0(r.lostPct) },
       { key: "pointlessPct", label: "wirkungslos%", fmt: (r) => n0(r.pointlessPct),
-        flag: (r, all) => isTop(r, all, "pointlessPct"),
+        flag: (r, all) => isTop(r, all, "pointlessPct", "opened"),
         why: "schießt am häufigsten ohne Wirkung" },
       { key: "openDist", label: "Ø Dist m", fmt: (r) => n0(r.openDist) },
       { key: "downsFor", label: "Downs +", fmt: (r) => r.downsFor },
@@ -211,12 +211,18 @@
     ];
 
     // Markiert den Spitzenreiter einer Spalte — ob das Lob oder Vorwurf ist,
-    // sagt der Tooltip der Spalte, nicht die Markierung. Nur wenn es
-    // überhaupt etwas zu vergleichen gibt.
-    function isTop(row, all, key) {
-      const vals = all.map(r => r[key]).filter(v => v != null);
-      if (vals.length < 2 || row[key] == null) return false;
-      return row[key] === Math.max(...vals);
+    // sagt der Tooltip der Spalte, nicht die Markierung.
+    //
+    // Nur Zeilen mit belastbarer Stichprobe dürfen gewinnen: sonst zeigt der
+    // Punkt auf "2,50 Downs je Eröffnung" aus zwei Gefechten, und das ist
+    // Zufall, keine Aussage.
+    const MIN_SAMPLE = 5;
+    function isTop(row, all, key, sampleKey = "matches") {
+      const solid = all.filter(r => (r[sampleKey] || 0) >= MIN_SAMPLE
+                                 && r[key] != null);
+      if (solid.length < 2) return false;
+      if ((row[sampleKey] || 0) < MIN_SAMPLE || row[key] == null) return false;
+      return row[key] === Math.max(...solid.map(r => r[key]));
     }
 
     function renderTable(which, cols, rows) {
@@ -245,7 +251,8 @@
         const mine = r.accountId === DATA.myAccountId;
         return `<tr>` + cols.map(c => {
           const flag = c.flag && c.flag(r, rows);
-          const weak = r.matches < 5 && !c.text;
+          const sample = which === "fight" ? (r.opened || 0) : (r.matches || 0);
+          const weak = sample < MIN_SAMPLE && !c.text;
           const cls = [c.text ? "" : "num", flag ? "flag" : "",
                        weak ? "weak" : ""].filter(Boolean).join(" ");
           const title = flag ? ` title="${esc(c.why || "auffällig")}"` : "";
