@@ -359,6 +359,18 @@ def test_squad_playstyle_reports_rows_per_mate():
     assert me["downsPerOpen"] == 1.0
 
 
+def test_squad_playstyle_session_range_resolves_the_cutoff():
+    """range=all umgeht die Zeitraum-Aufloesung — der Session-Zweig muss
+    eigenstaendig getestet werden, sonst faellt ein fehlender Import erst
+    live auf."""
+    conn = _setup()
+    set_setting(conn, "sessionStartedAt", "1970-01-01T00:00:00Z")
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch(
+        "GET", "/api/pubg/squad-playstyle?range=session", b"", {})
+    assert code == 200, body
+
+
 def test_squad_playstyle_players_filter_needs_everyone_in_the_match():
     """Mit players=X zaehlen nur Matches, in denen X wirklich dabei war."""
     conn = _setup()

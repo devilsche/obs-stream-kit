@@ -2822,6 +2822,7 @@ class EndpointRegistry:
         Teuer (Events je Match), daher gecached und auf `limit` gedeckelt.
         """
         from pubg.playstyle import compute_squad_playstyle
+        from pubg.aggregations import _range_filter
 
         conn = self.get_conn()
         range_key = qs.get("range", "session")
