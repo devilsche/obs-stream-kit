@@ -509,9 +509,12 @@ Zwei Tabellen je Squad-Mate über `?range=session|day|week|all`, dazu
 `players=A,B,C` (nur Matches, in denen **alle** Genannten dabei waren),
 `minMatches=` und `includeBots=1`.
 
-*Gefechte* — je Mate, der ein Gefecht eröffnet: Eröffnungen pro Match, **Downs je
-Eröffnung**, Trefferquote (Anteil der Eröffnungen, bei denen überhaupt jemand
-fällt), gewonnen / verloren / wirkungslos, Median-Distanz beim ersten Treffer.
+*Fights* — je Mate, der ein Gefecht eröffnet: Eröffnungen pro Match, **Target down %**
+(er trifft zuerst — geht genau dieser Gegner zu Boden?), davon selbst erledigt,
+Eröffnungsdistanz, „Any down" (irgendwer aus dem gegnerischen Team fällt),
+gewonnen / verloren / wirkungslos, Downs je Eröffnung für das ganze Squad und davon
+selbst, eigene Verluste je Eröffnung. Die Oberfläche ist englisch wie die übrigen
+Widgets.
 Ein Gefecht ist „unser Squad gegen ein gegnerisches Team"; nach 45 s Ruhe beginnt
 gegen dasselbe Team ein neues. Ein Down ist **ein umgelegter Spieler**, nicht ein
 Event: Knock und der spätere Finisher sind derselbe Vorgang, auch wenn Minuten und

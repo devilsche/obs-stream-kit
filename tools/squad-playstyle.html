@@ -16,10 +16,10 @@
 
   Browser-Tool, KEINE OBS-Source.
 -->
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>PUBG Squad-Spielstil</title>
+  <title>PUBG Squad Playstyle</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/widgets-static/_theme.css">
   <link rel="stylesheet" href="/widgets-static/_blocks.css">
@@ -99,41 +99,41 @@
   </style>
 </head>
 <body>
-  <h1 class="t-title">PUBG Squad-Spielstil</h1>
-  <div class="t-subtitle">Wer macht auf, wie geht es aus, und wer spielt wie</div>
+  <h1 class="t-title">PUBG Squad Playstyle</h1>
+  <div class="t-subtitle">Who opens the fights, how they end, and how everyone plays</div>
 
   <div class="t-card">
     <div class="bar">
       <div>
-        <span class="legend">Zeitraum</span>
-        <div class="switch" id="rangeSwitch" role="group" aria-label="Zeitraum">
+        <span class="legend">Range</span>
+        <div class="switch" id="rangeSwitch" role="group" aria-label="Time range">
           <button type="button" data-range="session" aria-pressed="true">Session</button>
-          <button type="button" data-range="day" aria-pressed="false">Heute</button>
-          <button type="button" data-range="week" aria-pressed="false">7 Tage</button>
-          <button type="button" data-range="all" aria-pressed="false">Alles</button>
+          <button type="button" data-range="day" aria-pressed="false">Today</button>
+          <button type="button" data-range="week" aria-pressed="false">7 days</button>
+          <button type="button" data-range="all" aria-pressed="false">All</button>
         </div>
       </div>
-      <label for="fPlayers">Squad-Auswahl
+      <label for="fPlayers">Squad filter
         <input id="fPlayers" type="text"
-               placeholder="z.B. hacker_luke, SleepAtWar — leer = alle Mates"
+               placeholder="e.g. hacker_luke, SleepAtWar — empty = all mates"
                aria-describedby="playersNote">
       </label>
-      <label for="fMin">Min. Matches
+      <label for="fMin">Min. matches
         <input id="fMin" type="number" min="1" max="99" value="3">
       </label>
       <label class="check" for="fBots">
-        <input id="fBots" type="checkbox"> Bot-Gefechte mitzählen
+        <input id="fBots" type="checkbox"> Count bot fights
       </label>
     </div>
     <div class="legend" id="playersNote">
-      Mit Squad-Auswahl zählen nur Matches, in denen <b>alle</b> genannten dabei
-      waren — sonst mischen sich Zufalls-Mates in die Quoten.
+      With a squad filter only matches count in which <b>all</b> named players
+      were present — otherwise random mates blur the numbers.
     </div>
-    <div class="legend" id="status">Lade …</div>
+    <div class="legend" id="status">Loading …</div>
   </div>
 
   <div class="t-card" id="fightCard" hidden>
-    <h2>Gefechte — wer macht auf</h2>
+    <h2>Fights — who opens</h2>
     <div class="scroll">
       <table>
         <thead id="fightHead"><tr></tr></thead>
@@ -141,41 +141,40 @@
       </table>
     </div>
     <p class="legend">
-      Ein Kampf ist „unser Squad gegen ein gegnerisches Team“ — Spalten-Titel
-      antippen erklärt jede Zahl.
+      A fight is “our squad against one enemy team” — hover a column title for
+      what the number means.
     </p>
     <details class="howto">
-      <summary>Wie wird ein Kampf gezählt?</summary>
+      <summary>How a fight is counted</summary>
       <dl>
-        <dt>Ein Kampf</dt>
-        <dd>Alles, was zwischen uns und einem gegnerischen Team passiert, bis
-            45 Sekunden lang nicht mehr geschossen wird. Danach beginnt gegen
-            dasselbe Team ein neuer.</dd>
-        <dt>Angefangen</dt>
-        <dd>Wer den ersten Treffer setzt, hat den Kampf angefangen. Schießt
-            der Gegner zuerst, taucht der Kampf hier gar nicht auf.</dd>
-        <dt>Wem wird was zugerechnet?</dt>
-        <dd>Die Zeile gehört dem, der den Kampf angefangen hat. „Gegner je
-            Kampf“ ist das Ergebnis des ganzen Squads danach, „davon er
-            selbst“ nur seine eigenen Treffer. Wer viel aufmacht, aber wenig
-            selbst umlegt, holt die anderen in den Kampf — ob das gut ist,
-            zeigt die Spalte „eigene Verluste je Kampf“.</dd>
-        <dt>Ein Gegner „unten“</dt>
-        <dd>Ein umgelegter Spieler, nicht ein Ereignis: Knock und der spätere
-            Todesstoß sind derselbe Vorgang. Wird er wiederbelebt und fällt
-            erneut, zählt das wieder.</dd>
+        <dt>One fight</dt>
+        <dd>Everything between us and one enemy team until 45 seconds pass
+            without a hit. After that, the next exchange with the same team is
+            a new fight.</dd>
+        <dt>Opened</dt>
+        <dd>Whoever lands the first hit opened the fight. If the enemy shoots
+            first, the fight does not appear in this table at all.</dd>
+        <dt>Who gets credited</dt>
+        <dd>The row belongs to whoever opened. “Enemies per fight” is what the
+            whole squad achieves afterwards, “by himself” only his own work.
+            Opening a lot but downing little means he pulls the others in —
+            whether that pays off shows in “own losses per fight”.</dd>
+        <dt>An enemy “down”</dt>
+        <dd>One player put on the floor, not one event: a knock and the later
+            finishing blow are the same thing. If he gets revived and drops
+            again, that counts anew.</dd>
         <dt>Bots</dt>
-        <dd>Zählen nicht mit, sonst sähen alle Quoten besser aus als sie sind.
-            Über den Schalter oben lassen sie sich dazuholen.</dd>
-        <dt>Blasse Zeilen</dt>
-        <dd>Weniger als fünf angefangene Kämpfe — zu wenig, um daraus etwas zu
-            schließen. Sie bekommen auch keine Markierung.</dd>
+        <dd>Excluded by default — otherwise every rate looks better than it is.
+            The switch above pulls them back in.</dd>
+        <dt>Faded rows</dt>
+        <dd>Fewer than five opened fights: too little to conclude anything.
+            Those rows get no highlight either.</dd>
       </dl>
     </details>
   </div>
 
   <div class="t-card" id="styleCard" hidden>
-    <h2>Spielstil</h2>
+    <h2>Playstyle</h2>
     <div class="scroll">
       <table>
         <thead id="styleHead"><tr></tr></thead>
@@ -183,26 +182,25 @@
       </table>
     </div>
     <p class="legend">
-      Spalten-Titel antippen erklärt jede Zahl.
+      Hover a column title for what the number means.
     </p>
     <details class="howto">
-      <summary>Woher kommen diese Zahlen?</summary>
+      <summary>Where these numbers come from</summary>
       <dl>
-        <dt>Abstand zum Team</dt>
-        <dd>Alle zehn Sekunden wird gemessen, wie weit der nächste Mate weg
-            ist; die Spalte zeigt den typischen Wert.</dd>
-        <dt>Abstand beim Sterben</dt>
-        <dd>Gemessen aus den 25 Sekunden vor dem Knock. Nimmt man ein Fenster
-            um den Knock herum, misst man den Mate, der zur Rettung rennt —
-            und alles sieht harmlos aus.</dd>
-        <dt>Steht rum</dt>
-        <dd>Weniger als fünf Meter Versatz zwischen zwei Messpunkten gilt als
-            Stehen. Nur die zweite Lebenshälfte zählt, weil frühes Stehen
-            Looten ist.</dd>
-        <dt>Was fehlt</dt>
-        <dd>Die Datenbank speichert Positionen nur fürs eigene Squad. Für
-            Gegner gibt es keine Bewegungsdaten, also auch keinen Vergleich
-            mit ihnen.</dd>
+        <dt>Distance to team</dt>
+        <dd>Every ten seconds the distance to the nearest mate is measured;
+            the column shows the typical value.</dd>
+        <dt>Distance when downed</dt>
+        <dd>Taken from the 25 seconds before the knock. Measure around the
+            knock instead and you measure the mate running in to revive —
+            everything then looks harmless.</dd>
+        <dt>Standing still</dt>
+        <dd>Less than five metres between two samples counts as standing. Only
+            the second half of a life is counted, because standing early is
+            looting.</dd>
+        <dt>What is missing</dt>
+        <dd>The database keeps positions for our own squad only. There are no
+            movement traces for enemies, so no comparison against them.</dd>
       </dl>
     </details>
   </div>
@@ -226,98 +224,99 @@
 
     // Spalten: key, Titel, Formatierer, optional flag(row) für Hervorhebung
     const FIGHT_COLS = [
-      { key: "name", label: "Spieler", fmt: (r) => esc(r.name), text: true,
-        help: "Squad-Mate. Der eigene Name ist hervorgehoben." },
+      { key: "name", label: "Player", fmt: (r) => esc(r.name), text: true,
+        help: "Squad mate. Your own name is highlighted." },
       { key: "matches", label: "Matches", fmt: (r) => r.matches,
-        help: "Matches im gewählten Zeitraum, in denen er dabei war." },
-      { key: "opened", label: "Kämpfe angefangen", fmt: (r) => r.opened,
-        help: "Wie oft er als Erster auf ein gegnerisches Team geschossen hat." },
-      { key: "openedPerMatch", label: "pro Match", fmt: (r) => n1(r.openedPerMatch),
-        help: "Angefangene Kämpfe geteilt durch Matches — das Maß für „macht ständig auf“." },
-      { key: "downsPerOpen", label: "Gegner je Kampf", unit: "Ø · ganzes Team",
-        fmt: (r) => n2(r.downsPerOpen),
-        help: "Wie viele Gegner im Schnitt umfallen, nachdem er aufgemacht hat — egal wer sie umlegt. Das ist das Ergebnis des Squads, nicht seine persönliche Leistung.",
-        flag: (r, all) => isTop(r, all, "downsPerOpen", "opened"),
-        why: "aus seinen Kämpfen holt das Squad am meisten" },
-      { key: "selfDownsPerOpen", label: "davon er selbst", unit: "Ø",
-        fmt: (r) => n2(r.selfDownsPerOpen),
-        help: "Davon hat er selbst umgelegt. Ist der Wert deutlich kleiner als die Spalte links, macht er auf und das Team räumt auf." },
-      { key: "squadLossPerOpen", label: "eigene Verluste je Kampf", unit: "Ø",
-        fmt: (r) => n2(r.squadLossPerOpen),
-        help: "Wie viele aus dem eigenen Squad im Schnitt zu Boden gehen, wenn er einen Kampf anfängt. Genau die Zahl für „sein Aufmachen kostet uns Leute“.",
-        flag: (r, all) => isTop(r, all, "squadLossPerOpen", "opened"),
-        why: "seine Kämpfe kosten das Squad am meisten" },
-      { key: "openTargetDownPct", label: "Ziel geht um", unit: "%",
+        help: "Matches in the selected range he took part in." },
+      { key: "opened", label: "Fights opened", fmt: (r) => r.opened,
+        help: "How often he landed the first hit on an enemy team." },
+      { key: "openedPerMatch", label: "per match", fmt: (r) => n1(r.openedPerMatch),
+        help: "Opened fights divided by matches — the measure for “always starts something”." },
+      { key: "openTargetDownPct", label: "Target down", unit: "%",
         fmt: (r) => n0(r.openTargetDownPct),
-        help: "Er trifft als Erster — und genau dieser Gegner geht in dem Kampf zu Boden. Egal wer ihn am Ende umlegt.",
+        help: "He hits first — and that exact enemy goes down during the fight. No matter who finishes him.",
         flag: (r, all) => isTop(r, all, "openTargetDownPct", "opened"),
-        why: "wen er anschießt, der fällt am zuverlässigsten" },
-      { key: "openTargetDownBySelfPct", label: "davon er selbst", unit: "%",
+        why: "whoever he hits first drops most reliably" },
+      { key: "openTargetDownBySelfPct", label: "by himself", unit: "%",
         fmt: (r) => n0(r.openTargetDownBySelfPct),
-        help: "Anteil der angefangenen Kämpfe, in denen er den zuerst getroffenen Gegner auch selbst umlegt." },
-      { key: "openHitPct", label: "irgendwer fällt", unit: "%",
+        help: "Share of opened fights where he also puts his first target down himself." },
+      { key: "openDist", label: "Opening distance", unit: "m",
+        fmt: (r) => n0(r.openDist),
+        help: "How far away the enemy was on the first hit (median across his fights). Long range is safer but harder to finish." },
+      { key: "openHitPct", label: "Any down", unit: "%",
         fmt: (r) => n0(r.openHitPct),
-        help: "Anteil seiner angefangenen Kämpfe, in denen überhaupt jemand aus dem gegnerischen Team umfällt — nicht unbedingt der, den er getroffen hat." },
-      { key: "wonPct", label: "gewonnen", unit: "%", fmt: (r) => n0(r.wonPct),
-        help: "Kämpfe, in denen mehr Gegner am Boden lagen als eigene Leute." },
-      { key: "lostPct", label: "verloren", unit: "%", fmt: (r) => n0(r.lostPct),
-        help: "Kämpfe, in denen es das Squad schlimmer erwischt hat als den Gegner." },
-      { key: "pointlessPct", label: "ohne Wirkung", unit: "%",
+        help: "Share of his opened fights where anyone from the enemy team goes down — not necessarily the one he hit." },
+      { key: "wonPct", label: "Won", unit: "%", fmt: (r) => n0(r.wonPct),
+        help: "Fights where more enemies were on the floor than own players." },
+      { key: "lostPct", label: "Lost", unit: "%", fmt: (r) => n0(r.lostPct),
+        help: "Fights where the squad came off worse than the enemy team." },
+      { key: "pointlessPct", label: "No effect", unit: "%",
         fmt: (r) => n0(r.pointlessPct),
-        help: "Geschossen, aber niemand ging zu Boden — weder drüben noch hier. Das ist „Krach machen und Aufmerksamkeit ziehen“.",
+        help: "Shots fired, nobody down — on either side. Noise that only draws attention.",
         flag: (r, all) => isTop(r, all, "pointlessPct", "opened"),
-        why: "schießt am häufigsten ins Leere" },
-      { key: "openDist", label: "Distanz", unit: "m", fmt: (r) => n0(r.openDist),
-        help: "Wie weit der Gegner beim ersten Treffer weg war (Mittelwert der Kämpfe)." },
-      { key: "downsFor", label: "Gegner unten", unit: "gesamt",
+        why: "fires into the void most often" },
+      { key: "downsPerOpen", label: "Enemies per fight", unit: "avg · whole team",
+        fmt: (r) => n2(r.downsPerOpen),
+        help: "How many enemies drop on average after he opened — regardless of who downs them. Squad result, not his personal work.",
+        flag: (r, all) => isTop(r, all, "downsPerOpen", "opened"),
+        why: "the squad gets the most out of his fights" },
+      { key: "selfDownsPerOpen", label: "of that himself", unit: "avg",
+        fmt: (r) => n2(r.selfDownsPerOpen),
+        help: "How much of that he downed himself. Much lower than the column on the left means he opens and the team cleans up." },
+      { key: "squadLossPerOpen", label: "Own losses per fight", unit: "avg",
+        fmt: (r) => n2(r.squadLossPerOpen),
+        help: "How many of our own go down on average when he starts a fight. The number for “his opening costs us people”.",
+        flag: (r, all) => isTop(r, all, "squadLossPerOpen", "opened"),
+        why: "his fights cost the squad the most" },
+      { key: "downsFor", label: "Enemies down", unit: "total",
         fmt: (r) => r.downsFor,
-        help: "Gegner, die in seinen angefangenen Kämpfen zu Boden gingen — Arbeit des ganzen Squads." },
-      { key: "downsAgainst", label: "eigene unten", unit: "gesamt",
+        help: "Enemies who went down in the fights he opened — work of the whole squad." },
+      { key: "downsAgainst", label: "Own down", unit: "total",
         fmt: (r) => r.downsAgainst,
-        help: "Eigene Leute, die in seinen angefangenen Kämpfen zu Boden gingen." },
-      { key: "downsMade", label: "selbst umgelegt", unit: "gesamt",
+        help: "Own players who went down in the fights he opened." },
+      { key: "downsMade", label: "Downed himself", unit: "total",
         fmt: (r) => r.downsMade,
-        help: "Alle Gegner, die er persönlich umgelegt hat — auch in Kämpfen, die jemand anderes angefangen hat." },
+        help: "Every enemy he personally put down — including fights someone else opened." },
     ];
 
     const STYLE_COLS = [
-      { key: "name", label: "Spieler", fmt: (r) => esc(r.name), text: true,
-        help: "Squad-Mate. Der eigene Name ist hervorgehoben." },
+      { key: "name", label: "Player", fmt: (r) => esc(r.name), text: true,
+        help: "Squad mate. Your own name is highlighted." },
       { key: "matches", label: "Matches", fmt: (r) => r.matches,
-        help: "Matches im gewählten Zeitraum, in denen er dabei war." },
-      { key: "pickupsPerMin", label: "Loot pro Minute",
+        help: "Matches in the selected range he took part in." },
+      { key: "pickupsPerMin", label: "Loot per minute",
         fmt: (r) => n1(r.pickupsPerMin),
-        help: "Aufgesammelte Gegenstände je Lebensminute. Hoch = hektisch am Boden wühlen, niedrig = ruhig unterwegs." },
-      { key: "pickupsEarly", label: "Loot erste 5 min",
+        help: "Items picked up per minute alive. High means frantic looting, low means calm." },
+      { key: "pickupsEarly", label: "Loot first 5 min",
         fmt: (r) => n0(r.pickupsEarly),
-        help: "Gegenstände, die er in den ersten fünf Minuten nach der Landung eingesammelt hat." },
-      { key: "aliveMin", label: "Lebenszeit", unit: "min",
+        help: "Items picked up within five minutes of landing." },
+      { key: "aliveMin", label: "Time alive", unit: "min",
         fmt: (r) => n1(r.aliveMin),
-        help: "Von der Landung bis zum eigenen Knock, im Schnitt." },
-      { key: "teamDist", label: "Abstand zum Team", unit: "m",
+        help: "From landing to his own knock, on average." },
+      { key: "teamDist", label: "Distance to team", unit: "m",
         fmt: (r) => n0(r.teamDist),
-        help: "Wie weit der nächste Mate typischerweise weg ist. Klein = klebt am Team, groß = macht sein eigenes Ding.",
+        help: "How far the nearest mate typically is. Small means glued to the team, large means doing his own thing.",
         flag: (r, all) => isTop(r, all, "teamDist"),
-        why: "spielt am weitesten weg vom Team" },
-      { key: "farShare", label: "allein unterwegs", unit: "%",
+        why: "plays farthest from the team" },
+      { key: "farShare", label: "On his own", unit: "%",
         fmt: (r) => n0(r.farShare),
-        help: "Anteil der Spielzeit, in der kein Mate näher als 100 m war." },
-      { key: "distAtDown", label: "Abstand beim Sterben", unit: "m",
+        help: "Share of playtime with no mate closer than 100 m." },
+      { key: "distAtDown", label: "Distance when downed", unit: "m",
         fmt: (r) => n0(r.distAtDown),
-        help: "Wie weit das Team weg war, als es ihn erwischt hat. Groß heißt: keiner konnte helfen." },
-      { key: "distAtDownMax", label: "schlimmster Fall", unit: "m",
+        help: "How far the team was when he got knocked. Large means nobody could help." },
+      { key: "distAtDownMax", label: "worst case", unit: "m",
         fmt: (r) => n0(r.distAtDownMax),
-        help: "Der größte gemessene Abstand zum Team im Moment eines eigenen Knocks." },
-      { key: "firstDownPct", label: "zuerst tot", unit: "%",
+        help: "The largest measured distance to the team at one of his own knocks." },
+      { key: "firstDownPct", label: "First to drop", unit: "%",
         fmt: (r) => n0(r.firstDownPct),
-        help: "Anteil der Matches, in denen er als Erster des Squads zu Boden ging.",
+        help: "Share of matches in which he was the first of the squad to go down.",
         flag: (r, all) => isTop(r, all, "firstDownPct"),
-        why: "fällt am häufigsten als Erster" },
-      { key: "stillLateShare", label: "steht rum (spät)", unit: "%",
+        why: "drops first most often" },
+      { key: "stillLateShare", label: "Standing (late)", unit: "%",
         fmt: (r) => n0(r.stillLateShare),
-        help: "Standzeit in der zweiten Lebenshälfte. Frühes Stehen ist Looten, spätes Stehen ist Halten oder Campen.",
+        help: "Standing still during the second half of his life. Standing early is looting, standing late is holding — or camping.",
         flag: (r, all) => isTop(r, all, "stillLateShare"),
-        why: "steht spät im Match am längsten still" },
+        why: "stands still the longest late in a match" },
     ];
 
     // Markiert den Spitzenreiter einer Spalte — ob das Lob oder Vorwurf ist,
@@ -351,7 +350,7 @@
         return `<th class="sortable${c.text ? "" : " num"}${active ? " active" : ""}"
                     data-sort="${c.key}" tabindex="0" role="button"
                     title="${help}"
-                    aria-label="${esc(c.label)}${c.unit ? " in " + esc(c.unit) : ""}. ${help} Aktivieren zum Sortieren.">${c.label}${unit}${arrow}</th>`;
+                    aria-label="${esc(c.label)}${c.unit ? " in " + esc(c.unit) : ""}. ${help} Activate to sort.">${c.label}${unit}${arrow}</th>`;
       }).join("");
 
       const sorted = [...rows].sort((a, b) => {
@@ -392,7 +391,7 @@
     async function load() {
       const st = document.getElementById("status");
       st.classList.remove("err");
-      st.textContent = "Lade …";
+      st.textContent = "Loading …";
       const params = new URLSearchParams({ range: RANGE, minMatches: String(MIN) });
       if (PLAYERS.trim()) params.set("players", PLAYERS.trim());
       if (BOTS) params.set("includeBots", "1");
@@ -400,15 +399,15 @@
         DATA = await PubgUI.fetchJson(
           BASE + "api/pubg/squad-playstyle?" + params, 120000);
         const rows = DATA.rows || [];
-        st.textContent = `${DATA.matchesWithEvents} von ${DATA.matches} Matches `
-          + `mit Telemetrie · ${rows.length} Spieler ab ${MIN} Matches`
+        st.textContent = `${DATA.matchesWithEvents} of ${DATA.matches} matches `
+          + `with telemetry · ${rows.length} players with ${MIN}+ matches`
           + (DATA.players && DATA.players.length
-             ? ` · Squad: ${DATA.players.join(", ")}` : "")
-          + (rows.length ? "" : " — nichts gefunden, Zeitraum weiten?");
+             ? ` · squad: ${DATA.players.join(", ")}` : "")
+          + (rows.length ? "" : " — nothing found, widen the range?");
         render();
       } catch (e) {
         st.classList.add("err");
-        st.textContent = "Konnte nicht laden: " + (e && e.message || e);
+        st.textContent = "Could not load: " + (e && e.message || e);
         document.getElementById("fightCard").hidden = true;
         document.getElementById("styleCard").hidden = true;
       }
