@@ -1205,6 +1205,118 @@ def hidrive_refill_pg(root: str, only_match: str = None) -> int:
     return 0
 
 
+def assists_backfill(root: str, args=None) -> int:
+    """Holt die Match-Payloads der letzten Tage neu und schreibt die
+    Lobby-Assists in match_team_mapping nach.
+
+    Die assists-Spalte kam nach dem Ingest der meisten Matches dazu — der
+    TopScorer zeigt fuer die deshalb nur Kills. Nachladen geht nur, solange
+    die API den Match-Payload noch vorhaelt (rund 14 Tage), danach ist die
+    Information endgueltig weg.
+
+    /matches/{id} laeuft ohne Rate-Limit-Budget (rate_limited=False im
+    Client), der Lauf braucht also keine Drosselung.
+
+    Nutzung:
+        python -m pubg.cli assists-backfill [--tenant N|--all] [--days 14]
+                                            [--limit N] [--force]
+
+    --force holt auch Matches, deren Mapping schon Assists hat.
+    """
+    import time
+    from core import credentials
+    from core.db import connect
+    from core.db_compat import SqliteCompatConn
+    from pubg import db_pg
+    from pubg.api_client import PubgClient
+    from pubg.match_parser import parse_match_response
+
+    args = args or []
+    def _opt(name, default=None):
+        if name in args:
+            i = args.index(name)
+            return args[i + 1] if i + 1 < len(args) else default
+        return default
+    days = int(_opt("--days", "14"))
+    limit = int(_opt("--limit", "100000"))
+    force = "--force" in args
+    all_tenants = "--all" in args
+    tenant_arg = _opt("--tenant")
+
+    raw = connect()
+    conn = SqliteCompatConn(raw)
+    cutoff = time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                           time.gmtime(time.time() - days * 86400))
+    if all_tenants:
+        with raw.cursor() as cur:
+            cur.execute("SELECT id FROM tenants ORDER BY id")
+            tenant_ids = [r["id"] for r in cur.fetchall()]
+    else:
+        tenant_ids = [int(tenant_arg or 1)]
+
+    total_ok = total_skip = 0
+    for tenant_id in tenant_ids:
+        creds = credentials.get(conn, tenant_id)
+        if not creds.pubg_api_key:
+            print(f"Tenant {tenant_id}: kein PUBG-API-Key — uebersprungen")
+            continue
+        client = PubgClient(api_key=creds.pubg_api_key,
+                            platform=creds.pubg_platform or "steam")
+        # Nur Matches mit Lobby-Mapping: ohne Mapping gibt es keine Zeile,
+        # in die die Assists geschrieben werden koennten — das ist Sache des
+        # normalen Ingests, nicht dieses Nachlaufs.
+        having = "" if force else """
+              AND EXISTS (SELECT 1 FROM match_team_mapping x
+                          WHERE x.tenant_id = m.tenant_id
+                            AND x.match_id = m.match_id
+                            AND x.assists IS NULL)"""
+        with raw.cursor() as cur:
+            cur.execute(f"""
+                SELECT m.match_id FROM matches m
+                WHERE m.tenant_id = %s AND m.played_at >= %s
+                  AND EXISTS (SELECT 1 FROM match_team_mapping y
+                              WHERE y.tenant_id = m.tenant_id
+                                AND y.match_id = m.match_id)
+                  {having}
+                ORDER BY m.played_at DESC LIMIT %s
+            """, (tenant_id, cutoff, limit))
+            todo = [r["match_id"] for r in cur.fetchall()]
+        print(f"Tenant {tenant_id}: {len(todo)} Matches ohne Assists "
+              f"(seit {cutoff})")
+        ok = skipped = 0
+        t0 = time.time()
+        for i, mid in enumerate(todo, 1):
+            try:
+                payload = client.get_match(mid)
+                # my_account_id ist hier irrelevant: team_mapping deckt die
+                # ganze Lobby ab, nur die Squad-Sicht haengt daran.
+                parsed = parse_match_response(payload, None)
+                rows = [r for r in parsed.get("team_mapping") or []
+                        if r.get("assists") is not None]
+                if not rows:
+                    skipped += 1
+                    continue
+                db_pg.insert_team_mapping(raw, tenant_id, mid,
+                                          parsed["team_mapping"])
+                ok += 1
+            except Exception as e:
+                skipped += 1
+                if skipped <= 5:
+                    print(f"  uebersprungen {mid[:8]}: "
+                          f"{type(e).__name__}: {str(e)[:80]}")
+            if i % 25 == 0:
+                rate = i / max(time.time() - t0, 0.001)
+                print(f"  {i}/{len(todo)}  ok={ok} skip={skipped}  "
+                      f"{rate:.1f}/s")
+        print(f"Tenant {tenant_id} fertig: {ok} nachgeladen, "
+              f"{skipped} uebersprungen, {time.time()-t0:.0f}s")
+        total_ok += ok
+        total_skip += skipped
+    print(f"\nGesamt: {total_ok} nachgeladen, {total_skip} uebersprungen")
+    raw.close()
+    return 0
+
+
 def weapon_stats_backfill(root: str, args=None) -> int:
     """Rechnet match_weapon_stats fuer Matches nach, die noch keine haben.
 
@@ -1535,6 +1647,8 @@ if __name__ == "__main__":
         sys.exit(purge_before(root, date_arg))
     elif len(sys.argv) > 1 and sys.argv[1] == "weapon-stats-backfill":
         sys.exit(weapon_stats_backfill(root, sys.argv[2:]))
+    elif len(sys.argv) > 1 and sys.argv[1] == "assists-backfill":
+        sys.exit(assists_backfill(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-backfill":
         sys.exit(hidrive_backfill(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "backfill-pcts":
@@ -1568,4 +1682,5 @@ if __name__ == "__main__":
               "diagnose | detect-achievements | rebuild-achievements | "
               "reset-milestones <id1> [<id2> ...] | "
               "list-milestones [pattern] | "
+              "weapon-stats-backfill | assists-backfill | "
               "purge-before YYYY-MM-DD")

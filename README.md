@@ -449,8 +449,15 @@ Spalte in der Match-Liste), je Phase und für die Session als Ganzes. Format
 `16K / 3A` (Kills / Assists); bei Gleichstand in den Kills entscheiden die
 Assists. Die Assists der Lobby kamen erst mit der `assists`-Spalte in
 `match_team_mapping` dazu — Matches, die vorher eingelesen wurden, zeigen nur
-`16K`. Nachrüsten geht nicht: die Match-Payloads der PUBG-API sind nach rund
-14 Tagen weg.
+`16K`. Für alles, was noch im API-Fenster liegt, lädt
+
+```bash
+python -m pubg.cli assists-backfill [--tenant N|--all] [--days 14] [--limit N]
+```
+
+die Match-Payloads erneut und schreibt die Assists nach — `/matches/{id}` zählt nicht
+gegen das Rate-Limit, der Lauf braucht also keine Drosselung. Ältere Matches bleiben
+ohne Assists: die Payloads sind nach rund 14 Tagen endgültig weg.
 
 **performance-history** zeichnet den Verlauf über die eigenen Matches — K/D (Default),
 Win-Rate, Ø DMG, Kills oder Matches, gruppiert nach `session`, `day` oder `month`.
