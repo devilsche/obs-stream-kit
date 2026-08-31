@@ -222,6 +222,18 @@
           + (DATA.weapon ? ` · weapon ${DATA.weapon}` : "")
           + ` · ${DATA.player || pl ? who : "own account"}`;
         renderChips();
+        // Eine leere laufende Session ist der Normalfall zwischen Streams —
+        // dann zeigt die Seite ohne diesen Rueckfall nur "No data" und sieht
+        // kaputt aus. Einmalig auf 7 Tage weiten und das sagen.
+        if (!(DATA.rows || []).length && RANGE === "session"
+            && !PubgUI.qs("range", "")) {
+          RANGE = "week";
+          press(document.getElementById("rangeSwitch"), "range", RANGE);
+          await load();
+          document.getElementById("status").textContent +=
+            " · Session war leer, zeige 7 Tage";
+          return;
+        }
         render();
       } catch (e) {
         st.classList.add("err");

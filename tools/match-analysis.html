@@ -688,12 +688,18 @@
 
     loadMatchList().then(() => {
       const q = PubgUI.qs("matchId", "");
+      const sel = document.getElementById("matchSelect");
       if (q) {
-        const sel = document.getElementById("matchSelect");
         if (MATCH_ITEMS.some(it => it.matchId === q)) sel.value = q;
         else document.getElementById("mid").value = q;
         run();
+        return;
       }
+      // Ohne ?matchId lief bisher nichts: die Liste stand da, die Seite blieb
+      // leer, und das im Dropdown schon vorausgewaehlte Match liess sich auch
+      // nicht per Auswahl starten (change feuert nicht auf den bestehenden
+      // Wert). Also das jüngste Match direkt analysieren.
+      if (sel.value) run();
     });
   </script>
 </body>
