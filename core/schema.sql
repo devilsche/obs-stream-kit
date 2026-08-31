@@ -29,8 +29,15 @@ CREATE TABLE IF NOT EXISTS tenant_credentials (
     steam_id                   TEXT,
     steam_api_key_enc          BYTEA,
     ftp_config_enc             BYTEA,
+    -- Eigenes Telemetrie-Archiv (SFTP) je Tenant. Bewusst getrennt von
+    -- ftp_config_enc: das ist die Ablage der DB-Dumps (scripts/backup_pg.py),
+    -- ein anderer Zweck und ein anderer Pfad. JSON:
+    -- {"host":…, "port":22, "user":…, "password":…, "path":"/pubg/telemetry"}
+    telemetry_archive_enc      BYTEA,
     updated_at                 TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE tenant_credentials
+    ADD COLUMN IF NOT EXISTS telemetry_archive_enc BYTEA;
 
 CREATE TABLE IF NOT EXISTS widget_tokens (
     token        TEXT PRIMARY KEY,

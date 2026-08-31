@@ -42,29 +42,25 @@ PLAYER_FILTER_MAX = 10
 
 def maybe_archive_telemetry(conn, tenant_id: int, match_id: str,
                              telemetry_url: str) -> None:
-    """Telemetrie-Upload-Gate: nur fuer Tenants, deren Owner-User
-    `is_admin = TRUE` hat. Andere Tenants ueberspringen den FTP-Upload
-    (Cost-/Storage-Gate auf dem geteilten HiDrive-Bucket).
+    """Telemetrie-Upload-Gate: archiviert wird, wer ein Ziel hat.
+
+    Das ist entweder der eigene SFTP-Zugang des Tenants (aus /app/settings)
+    oder — nur fuer Admin-Tenants — der geteilte Zugang aus `.secrets`. Die
+    Entscheidung liegt komplett in pubg/archive_config.py.
 
     `conn` darf ein psycopg2-RealDict-Conn oder SqliteCompatConn sein —
     wir greifen nur ueber den Standard-cursor()-Pfad zu.
     """
+    from pubg.archive_config import archive_cfg_for_tenant
     raw_conn = conn.raw if isinstance(conn, SqliteCompatConn) else conn
-    with raw_conn.cursor() as cur:
-        cur.execute("""
-            SELECT u.is_admin
-            FROM tenants t
-            JOIN users u ON u.id = t.owner_user_id
-            WHERE t.id = %s
-        """, (tenant_id,))
-        row = cur.fetchone()
-    if not row or not row["is_admin"]:
+    cfg = archive_cfg_for_tenant(raw_conn, tenant_id)
+    if not cfg:
         return
-    _ftp_upload_telemetry(tenant_id, match_id, telemetry_url)
+    _ftp_upload_telemetry(tenant_id, match_id, telemetry_url, cfg=cfg)
 
 
 def _ftp_upload_telemetry(tenant_id: int, match_id: str,
-                          telemetry_url: str) -> None:
+                          telemetry_url: str, cfg=None) -> None:
     """Telemetrie vom PUBG-CDN ziehen und auf HiDrive ablegen.
 
     Verwendet die bestehende hidrive_telemetry.upload_raw()-Logik.
@@ -97,7 +93,7 @@ def _ftp_upload_telemetry(tenant_id: int, match_id: str,
         return
     try:
         from pubg import hidrive_telemetry
-        hidrive_telemetry.upload_raw(match_id, raw)
+        hidrive_telemetry.upload_raw(match_id, raw, cfg=cfg)
     except Exception as e:
         print(f"[archive] tenant {tenant_id} match {match_id[:16]}: "
               f"HiDrive-Upload fehlgeschlagen: {e}")
@@ -613,23 +609,19 @@ def _process_one_telemetry(conn, tenant_id: int, client, my_account_id, row):
         mark_telemetry_fetched(conn, tenant_id, row["match_id"])
         raise RuntimeError(f"telemetry {row['match_id']}: {e}")
 
-    # Raw-Blob auf HiDrive archivieren — nur fuer Admin-Tenants.
-    # Wir haben raw bereits im Speicher, daher den Upload direkt
-    # statt ueber maybe_archive_telemetry() (das wuerde nochmal CDN-fetchen).
+    # Raw-Blob archivieren — in das Archiv DIESES Tenants (eigener SFTP-
+    # Zugang, oder der geteilte fuer Admin-Tenants). Wir haben raw bereits im
+    # Speicher, daher der Upload direkt statt ueber maybe_archive_telemetry()
+    # (das wuerde nochmal CDN-fetchen).
     try:
         raw_conn = conn.raw if isinstance(conn, SqliteCompatConn) else conn
-        with raw_conn.cursor() as cur:
-            cur.execute("""
-                SELECT u.is_admin
-                FROM tenants t JOIN users u ON u.id = t.owner_user_id
-                WHERE t.id = %s
-            """, (tenant_id,))
-            adm_row = cur.fetchone()
-        if adm_row and adm_row["is_admin"]:
+        from pubg.archive_config import archive_cfg_for_tenant
+        arch_cfg = archive_cfg_for_tenant(raw_conn, tenant_id)
+        if arch_cfg:
             from pubg.hidrive_telemetry import upload_raw as _hd_upload
-            _hd_upload(row["match_id"], raw)
+            _hd_upload(row["match_id"], raw, cfg=arch_cfg)
     except Exception:
-        pass  # HiDrive/Admin-Check-Fehler duerfen Fetch nicht blockieren
+        pass  # Archiv-Fehler duerfen den Fetch nicht blockieren
 
     # my_account_id darf eine ID oder eine Liste eigener IDs sein.
     own_ids = ({my_account_id} if isinstance(my_account_id, str)

@@ -44,8 +44,13 @@ def _default_client(secrets_path: str = ".secrets"):
 
 def load_telemetry(match_id: str, telemetry_url: str = None,
                    archive=None, client=None,
-                   secrets_path: str = ".secrets") -> TelemetryResult:
+                   secrets_path: str = ".secrets",
+                   archive_cfg=None) -> TelemetryResult:
     """Holt die Roh-Events eines Matches. Siehe Modul-Docstring.
+
+    `archive_cfg` = SFTP-Zugang dieses Tenants (pubg/archive_config.py). Ohne
+    Angabe gilt der geteilte Zugang aus `.secrets` — der gehoert aber nur dem
+    Betreiber, Tenant-Aufrufe sollten ihren eigenen mitgeben.
 
     Wirft TelemetryUnavailable, wenn beide Quellen nichts liefern.
     """
@@ -54,7 +59,8 @@ def load_telemetry(match_id: str, telemetry_url: str = None,
 
     # 1) Archiv — billigste Quelle, kein Rate-Limit, keine Retention.
     try:
-        events = archive.download_raw(match_id, secrets_path=secrets_path)
+        events = archive.download_raw(match_id, secrets_path=secrets_path,
+                                      cfg=archive_cfg)
         if events:
             return TelemetryResult(events, "hidrive", False)
         reasons.append("nicht im Archiv")
@@ -82,7 +88,8 @@ def load_telemetry(match_id: str, telemetry_url: str = None,
     #    der Upload ist Beiwerk, nicht der Zweck des Aufrufs.
     archived = False
     try:
-        archive.upload_raw(match_id, events, secrets_path=secrets_path)
+        archive.upload_raw(match_id, events, secrets_path=secrets_path,
+                           cfg=archive_cfg)
         archived = True
     except Exception:
         pass

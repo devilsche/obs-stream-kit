@@ -102,3 +102,110 @@ def test_first_added_account_becomes_primary_and_credential(pg_conn_test_setup):
     rows = db_pg.list_tracked_players(conn, tid)
     assert [(r["name"], r["is_primary"]) for r in rows] == [("Erster", True)]
     assert core_creds.get(conn, tid).pubg_name == "Erster"
+
+
+# ── Telemetrie-Archiv (SFTP) ────────────────────────────────────────────────
+
+def _client(conn, sid):
+    app = create_app(testing=True)
+    app.config["_PG_CONN_FACTORY"] = lambda: conn
+    c = app.test_client()
+    c.set_cookie("obskit_sid", sid, domain="localhost")
+    return c
+
+
+def test_archive_form_saves_encrypted_config(pg_conn_test_setup):
+    conn, tenant_id, _, sid = pg_conn_test_setup
+    c = _client(conn, sid)
+    resp = c.post("/app/settings/archive", data={
+        "archive_host": "sftp.example", "archive_port": "2222",
+        "archive_user": "user1", "archive_password": "geheim",
+        "archive_path": "/eigenes/archiv"})
+    assert resp.status_code == 302
+    assert "archive=saved" in resp.headers["Location"]
+    from core import credentials
+    from pubg.archive_config import parse_config
+    cfg = parse_config(credentials.get(conn, tenant_id).telemetry_archive)
+    assert cfg["host"] == "sftp.example"
+    assert cfg["port"] == 2222
+    assert cfg["path"] == "/eigenes/archiv"
+    # In der DB darf das Passwort nicht im Klartext liegen
+    with conn.cursor() as cur:
+        cur.execute("SELECT telemetry_archive_enc FROM tenant_credentials "
+                    "WHERE tenant_id=%s", (tenant_id,))
+        blob = bytes(cur.fetchone()["telemetry_archive_enc"])
+    assert b"geheim" not in blob
+
+
+def test_archive_form_keeps_password_when_left_empty(pg_conn_test_setup):
+    """Sonst muesste man das Passwort bei jeder Pfad-Korrektur neu eintippen."""
+    conn, tenant_id, _, sid = pg_conn_test_setup
+    c = _client(conn, sid)
+    c.post("/app/settings/archive", data={
+        "archive_host": "sftp.example", "archive_user": "user1",
+        "archive_password": "geheim", "archive_path": "/a"})
+    c.post("/app/settings/archive", data={
+        "archive_host": "sftp.example", "archive_user": "user1",
+        "archive_password": "", "archive_path": "/b"})
+    from core import credentials
+    from pubg.archive_config import parse_config
+    cfg = parse_config(credentials.get(conn, tenant_id).telemetry_archive)
+    assert cfg["path"] == "/b"
+    assert cfg["password"] == "geheim"
+
+
+def test_archive_form_rejects_incomplete_input(pg_conn_test_setup):
+    conn, tenant_id, _, sid = pg_conn_test_setup
+    c = _client(conn, sid)
+    resp = c.post("/app/settings/archive", data={
+        "archive_host": "sftp.example", "archive_user": "",
+        "archive_password": "x"})
+    assert "archive=incomplete" in resp.headers["Location"]
+    from core import credentials
+    assert credentials.get(conn, tenant_id).telemetry_archive is None
+
+
+def test_archive_can_be_removed(pg_conn_test_setup):
+    conn, tenant_id, _, sid = pg_conn_test_setup
+    c = _client(conn, sid)
+    c.post("/app/settings/archive", data={
+        "archive_host": "h", "archive_user": "u", "archive_password": "p"})
+    resp = c.post("/app/settings/archive", data={"action": "delete"})
+    assert "archive=removed" in resp.headers["Location"]
+    from core import credentials
+    assert credentials.get(conn, tenant_id).telemetry_archive is None
+
+
+def test_archive_test_endpoint_reports_failure_without_connecting(pg_conn_test_setup):
+    conn, _, _, sid = pg_conn_test_setup
+    c = _client(conn, sid)
+    r = c.post("/app/settings/archive/test", data={
+        "archive_host": "", "archive_user": "", "archive_password": ""})
+    assert r.status_code == 200
+    assert r.get_json()["ok"] is False
+
+
+def test_archive_test_endpoint_uses_the_form_values(pg_conn_test_setup):
+    """Testen soll VOR dem Speichern moeglich sein."""
+    from unittest import mock
+    conn, _, _, sid = pg_conn_test_setup
+    c = _client(conn, sid)
+    with mock.patch("pubg.hidrive_telemetry.check_connection",
+                    return_value={"ok": True, "error": None,
+                                   "path": "/x", "files": 3}) as chk:
+        r = c.post("/app/settings/archive/test", data={
+            "archive_host": "neu.example", "archive_user": "u",
+            "archive_password": "p", "archive_path": "/x"})
+    assert r.get_json() == {"ok": True, "error": None, "path": "/x", "files": 3}
+    assert chk.call_args.args[0]["host"] == "neu.example"
+
+
+def test_settings_page_never_shows_the_password(pg_conn_test_setup):
+    conn, _, _, sid = pg_conn_test_setup
+    c = _client(conn, sid)
+    c.post("/app/settings/archive", data={
+        "archive_host": "sftp.example", "archive_user": "u",
+        "archive_password": "streng-geheim", "archive_path": "/a"})
+    body = c.get("/app/settings").get_data(as_text=True)
+    assert "sftp.example" in body
+    assert "streng-geheim" not in body

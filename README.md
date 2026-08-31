@@ -506,8 +506,13 @@ auf das Backend; kein Streaming nötig.
 
 Quellen-Kette für die Roh-Telemetrie, in dieser Reihenfolge:
 
-1. **HiDrive-Archiv** — das Blob ändert sich nie, der Griff ins Archiv spart jeden
-   externen Call. Gefüllt wird es nur für Admin-Tenants.
+1. **SFTP-Archiv** — das Blob ändert sich nie, der Griff ins Archiv spart jeden
+   externen Call. Jeder Tenant kann unter `/app/settings` seinen **eigenen**
+   SFTP-Speicher hinterlegen (Host/Port/User/Passwort/Verzeichnis, verschlüsselt
+   im Vault, mit „Verbindung testen"-Knopf); ohne eigenen Zugang gilt der
+   geteilte aus `.secrets` — und der nur für Admin-Tenants, sonst würden fremde
+   Streamer in den Bucket des Betreibers schreiben. Ist ein Archiv hinterlegt,
+   lädt der Poller jedes neue Match dorthin.
 2. **PUBG-CDN** über `matches.telemetry_url` — kein API-Key nötig, reicht rund
    14 Tage zurück. Fehlt die URL in der DB, wird das Match einmal frisch von
    `/matches/{id}` geholt (nicht rate-limitiert) und die URL daraus genommen.

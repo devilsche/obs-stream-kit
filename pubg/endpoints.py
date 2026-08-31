@@ -846,9 +846,13 @@ class EndpointRegistry:
         def _build():
             from pubg.telemetry_source import load_telemetry, TelemetryUnavailable
             from pubg.telemetry_analysis import analyse, flag_anomalies
+            from pubg.archive_config import archive_cfg_for_tenant
             url = row["telemetry_url"] if row else None
             try:
-                res = load_telemetry(match_id, telemetry_url=url)
+                res = load_telemetry(
+                    match_id, telemetry_url=url,
+                    archive_cfg=archive_cfg_for_tenant(
+                        conn.raw, self.tenant_id))
             except TelemetryUnavailable as e:
                 return {"error": str(e)}
             data = analyse(res.events)
@@ -941,7 +945,11 @@ class EndpointRegistry:
         # Raw-Telemetrie von HiDrive — Single Source of Truth
         here = os.path.dirname(os.path.abspath(__file__))
         secrets = os.path.join(os.path.dirname(here), ".secrets")
-        raw = hidrive_telemetry.download_raw(match_id, secrets)
+        # Archiv dieses Tenants (eigener SFTP-Zugang, sonst der geteilte fuer
+        # Admin-Tenants) — nicht blind der Bucket des Betreibers.
+        from pubg.archive_config import archive_cfg_for_tenant
+        arch_cfg = archive_cfg_for_tenant(conn.raw, self.tenant_id, secrets)
+        raw = hidrive_telemetry.download_raw(match_id, secrets, cfg=arch_cfg)
         replay_source = "hidrive"
         # Fallback 1: HiDrive hat das Blob nicht (nie archiviert / HiDrive nicht
         # konfiguriert) → direkt vom PUBG-Telemetrie-CDN laden. Die telemetry_url

@@ -17,12 +17,12 @@ class FakeArchive:
         self.fail = fail
         self.uploaded = {}
 
-    def download_raw(self, match_id, secrets_path=".secrets"):
+    def download_raw(self, match_id, secrets_path=".secrets", cfg=None):
         if self.fail:
             raise OSError("SFTP kaputt")
         return self.stored.get(match_id)
 
-    def upload_raw(self, match_id, events, secrets_path=".secrets"):
+    def upload_raw(self, match_id, events, secrets_path=".secrets", cfg=None):
         if self.fail:
             raise OSError("SFTP kaputt")
         self.uploaded[match_id] = events

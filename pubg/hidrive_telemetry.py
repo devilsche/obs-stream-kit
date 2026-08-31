@@ -66,6 +66,16 @@ def _get_hd_cfg(secrets_path: str = ".secrets") -> dict | None:
     return cfg
 
 
+def _cfg_or_secrets(cfg, secrets_path: str):
+    """Uebergebene Konfiguration gewinnt, sonst der Zugang aus `.secrets`.
+
+    So bekommt jeder Tenant sein eigenes Archiv (cfg aus dem Vault, siehe
+    pubg/archive_config.py), waehrend die alten Aufrufe ohne cfg unveraendert
+    den geteilten Zugang nutzen.
+    """
+    return cfg if cfg else _get_hd_cfg(secrets_path)
+
+
 def _sftp_connect(hd_cfg):
     try:
         import paramiko
@@ -97,11 +107,11 @@ def _ensure_dir(sftp, remote_dir: str):
 # ── Upload ────────────────────────────────────────────────────────────────
 
 def upload_raw(match_id: str, raw_events: list,
-               secrets_path: str = ".secrets") -> bool:
+               secrets_path: str = ".secrets", cfg=None) -> bool:
     """Komprimiert + uploadet rohe Telemetrie-Events auf HiDrive.
     Returns True bei Erfolg.
     """
-    ftp_cfg = _get_hd_cfg(secrets_path)
+    ftp_cfg = _cfg_or_secrets(cfg, secrets_path)
     if not ftp_cfg:
         return False
     gz_data = gzip.compress(
@@ -123,7 +133,8 @@ def upload_raw(match_id: str, raw_events: list,
 
 
 def upload_reconstructed_from_db(conn, match_id: str,
-                                   secrets_path: str = ".secrets") -> bool:
+                                   secrets_path: str = ".secrets",
+                                   cfg=None) -> bool:
     """Rekonstruiert Telemetrie-Events aus SQLite payload_json und
     uploadet sie als 'reconstructed'-Blob auf HiDrive.
     Fuer Altmatches wo das PUBG-CDN die Daten nicht mehr hat (>14d).
@@ -153,16 +164,17 @@ def upload_reconstructed_from_db(conn, match_id: str,
     events.append({"_T": "_meta", "_reconstructed": True,
                     "_source": "sqlite_payload_json",
                     "_match_id": match_id})
-    return upload_raw(match_id, events, secrets_path)
+    return upload_raw(match_id, events, secrets_path, cfg=cfg)
 
 
 # ── Download ──────────────────────────────────────────────────────────────
 
-def download_raw(match_id: str, secrets_path: str = ".secrets") -> list | None:
+def download_raw(match_id: str, secrets_path: str = ".secrets",
+                 cfg=None) -> list | None:
     """Lädt Telemetrie-Blob von HiDrive und gibt list[dict] zurück.
     Returns None wenn nicht vorhanden oder Fehler.
     """
-    ftp_cfg = _get_hd_cfg(secrets_path)
+    ftp_cfg = _cfg_or_secrets(cfg, secrets_path)
     if not ftp_cfg:
         return None
     remote = _remote_path(ftp_cfg.get("path", ""), match_id)
@@ -179,9 +191,9 @@ def download_raw(match_id: str, secrets_path: str = ".secrets") -> list | None:
         return None
 
 
-def exists(match_id: str, secrets_path: str = ".secrets") -> bool:
+def exists(match_id: str, secrets_path: str = ".secrets", cfg=None) -> bool:
     """Prüft ob ein Match-Blob auf HiDrive existiert."""
-    ftp_cfg = _get_hd_cfg(secrets_path)
+    ftp_cfg = _cfg_or_secrets(cfg, secrets_path)
     if not ftp_cfg:
         return False
     remote = _remote_path(ftp_cfg.get("path", ""), match_id)
@@ -195,9 +207,9 @@ def exists(match_id: str, secrets_path: str = ".secrets") -> bool:
         return False
 
 
-def list_archived(secrets_path: str = ".secrets") -> list[str]:
+def list_archived(secrets_path: str = ".secrets", cfg=None) -> list[str]:
     """Listet alle archivierten Match-IDs (ohne .json.gz-Suffix)."""
-    ftp_cfg = _get_hd_cfg(secrets_path)
+    ftp_cfg = _cfg_or_secrets(cfg, secrets_path)
     if not ftp_cfg:
         return []
     base = ftp_cfg.get("path", "/pubg/telemetry").rstrip("/")
@@ -210,6 +222,52 @@ def list_archived(secrets_path: str = ".secrets") -> list[str]:
     except Exception as e:
         print(f"[hidrive] list failed: {e}")
         return []
+
+
+def check_connection(cfg) -> dict:
+    """Zugangsdaten pruefen, ohne den Nutzer raten zu lassen.
+
+    Schreibt eine winzige Testdatei ins Zielverzeichnis, liest sie zurueck und
+    loescht sie wieder — nur so ist belegt, dass Login, Pfad UND Schreibrecht
+    stimmen (ein reines listdir wuerde ein read-only-Konto durchgehen lassen).
+
+    Returns {"ok": bool, "error": str|None, "path": str, "files": int}.
+    """
+    if not cfg:
+        return {"ok": False, "error": "keine Zugangsdaten", "path": None,
+                "files": 0}
+    base = (cfg.get("path") or "/pubg/telemetry").rstrip("/") or "/"
+    probe = f"{base}/.obskit-write-test"
+    sftp = transport = None
+    try:
+        sftp, transport = _sftp_connect(cfg)
+        _ensure_dir(sftp, base)
+        payload = b"obs-stream-kit"
+        with sftp.open(probe, "wb") as f:
+            f.write(payload)
+        with sftp.open(probe, "rb") as f:
+            back = f.read()
+        try:
+            sftp.remove(probe)
+        except Exception:
+            pass          # Aufraeumen ist Kuer, der Test ist schon bestanden
+        if back != payload:
+            return {"ok": False, "error": "Datei kam anders zurueck als "
+                                           "geschrieben", "path": base,
+                    "files": 0}
+        archived = [f for f in sftp.listdir(base) if f.endswith(".json.gz")]
+        return {"ok": True, "error": None, "path": base,
+                "files": len(archived)}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}",
+                "path": base, "files": 0}
+    finally:
+        for c in (sftp, transport):
+            try:
+                if c:
+                    c.close()
+            except Exception:
+                pass
 
 
 # ── Bulk-Backfill für Altmatches ──────────────────────────────────────────

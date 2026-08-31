@@ -1352,6 +1352,10 @@ def weapon_stats_backfill(root: str, args=None) -> int:
 
     raw = connect()
     conn = SqliteCompatConn(raw)
+    # Archiv dieses Tenants — sonst laeuft der Backfill fuer Fremd-Tenants
+    # gegen den Bucket des Betreibers (und findet dort nichts).
+    from pubg.archive_config import archive_cfg_for_tenant
+    arch_cfg = archive_cfg_for_tenant(raw, tenant_id)
     if force:
         with raw.cursor() as cur:
             cur.execute("""
@@ -1368,7 +1372,8 @@ def weapon_stats_backfill(root: str, args=None) -> int:
     for i, row in enumerate(todo, 1):
         mid = row["match_id"]
         try:
-            res = load_telemetry(mid, telemetry_url=row.get("telemetry_url"))
+            res = load_telemetry(mid, telemetry_url=row.get("telemetry_url"),
+                                 archive_cfg=arch_cfg)
             rows = to_db_rows(analyse(res.events))
             if rows:
                 db_pg.upsert_weapon_stats(raw, tenant_id, mid, rows)

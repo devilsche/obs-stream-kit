@@ -215,10 +215,15 @@ def settings():
         api_token = None
 
     base_url = request.url_root.rstrip("/")
+    # Telemetrie-Archiv: nur die Anzeige-Felder, niemals das Passwort.
+    from pubg.archive_config import parse_config, redacted
+    archive = redacted(parse_config(creds.telemetry_archive))
     return render_template("settings.html",
                            user=g.user, creds=creds, prefs=prefs,
                            tracked=tracked,
                            saved=request.args.get("saved"),
+                           archive=archive,
+                           archive_msg=request.args.get("archive"),
                            api_token=api_token, base_url=base_url)
 
 
@@ -262,6 +267,72 @@ def settings_accounts():
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()
     return redirect("/app/settings?saved=1")
+
+
+def _archive_cfg_from_form(conn, form):
+    """Formular → JSON-Konfiguration. Ein leeres Passwort-Feld heisst
+    "unveraendert" — sonst muesste man es bei jeder Pfad-Korrektur neu
+    eintippen (und Browser-Autofill wuerde es reihenweise leeren)."""
+    import json
+    from pubg.archive_config import parse_config
+    password = form.get("archive_password") or ""
+    if not password:
+        old = parse_config(core_creds.get(conn, g.tenant_id).telemetry_archive)
+        password = (old or {}).get("password") or ""
+    cfg = {
+        "host": (form.get("archive_host") or "").strip(),
+        "port": (form.get("archive_port") or "22").strip(),
+        "user": (form.get("archive_user") or "").strip(),
+        "password": password,
+        "path": (form.get("archive_path") or "/pubg/telemetry").strip(),
+    }
+    parsed = parse_config(json.dumps(cfg))
+    return parsed, json.dumps(cfg)
+
+
+@bp_app.route("/app/settings/archive", methods=["POST"])
+@require_session
+def settings_archive():
+    """Eigenes Telemetrie-Archiv (SFTP) speichern oder entfernen.
+
+    Eigener Endpoint wie settings_accounts: HTML kann keine verschachtelten
+    Forms, und ein Archiv-Eintrag soll nicht die uebrigen Einstellungen
+    mitspeichern.
+    """
+    conn = _get_conn()
+    try:
+        if request.form.get("action") == "delete":
+            core_creds.set_telemetry_archive(conn, g.tenant_id, None)
+            return redirect("/app/settings?archive=removed")
+        parsed, config_json = _archive_cfg_from_form(conn, request.form)
+        if not parsed:
+            return redirect("/app/settings?archive=incomplete")
+        core_creds.set_telemetry_archive(conn, g.tenant_id, config_json)
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            conn.close()
+    return redirect("/app/settings?archive=saved")
+
+
+@bp_app.route("/app/settings/archive/test", methods=["POST"])
+@require_session
+def settings_archive_test():
+    """Zugang pruefen, bevor der Poller stundenlang stumm scheitert.
+
+    Nimmt die Formularwerte (noch ungespeichert testen zu koennen ist der
+    halbe Sinn) und schreibt/liest/loescht eine Testdatei.
+    """
+    conn = _get_conn()
+    try:
+        parsed, _ = _archive_cfg_from_form(conn, request.form)
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            conn.close()
+    if not parsed:
+        return jsonify({"ok": False,
+                        "error": "Host, Benutzer und Passwort sind Pflicht"})
+    from pubg.hidrive_telemetry import check_connection
+    return jsonify(check_connection(parsed))
 
 
 @bp_app.route("/app/api-docs")

@@ -21,7 +21,8 @@ class CredBundle:
     twitch_client_secret: Optional[str] = None
     steam_id: Optional[str] = None
     steam_api_key: Optional[str] = None
-    ftp_config: Optional[str] = None  # JSON-String
+    ftp_config: Optional[str] = None  # JSON-String (DB-Dump-Ablage)
+    telemetry_archive: Optional[str] = None  # JSON-String (Telemetrie-Archiv)
 
 
 def get(conn, tenant_id: int) -> CredBundle:
@@ -47,6 +48,8 @@ def get(conn, tenant_id: int) -> CredBundle:
         steam_id=row["steam_id"],
         steam_api_key=dec(row["steam_api_key_enc"]),
         ftp_config=dec(row["ftp_config_enc"]),
+        telemetry_archive=dec(row["telemetry_archive_enc"])
+        if "telemetry_archive_enc" in row else None,
     )
 
 
@@ -114,6 +117,25 @@ def set_steam(conn, tenant_id: int, *, steam_id=None, api_key=None):
                 updated_at = now()
             WHERE tenant_id = %s
         """, (steam_id, enc, tenant_id))
+        if cur.rowcount == 0:
+            raise LookupError(f"Keine tenant_credentials fuer tenant_id={tenant_id}")
+    conn.commit()
+
+
+def set_telemetry_archive(conn, tenant_id: int, config_json) -> None:
+    """SFTP-Zugang fuer das eigene Telemetrie-Archiv setzen.
+
+    `config_json` = JSON-String, oder None zum Loeschen (anders als set_pubg
+    kein COALESCE: der Nutzer muss den Zugang auch wieder wegnehmen koennen).
+    """
+    key = crypto.load_master_key()
+    enc = crypto.encrypt(config_json, key) if config_json else None
+    with conn.cursor() as cur:
+        cur.execute("""
+            UPDATE tenant_credentials
+            SET telemetry_archive_enc = %s, updated_at = now()
+            WHERE tenant_id = %s
+        """, (enc, tenant_id))
         if cur.rowcount == 0:
             raise LookupError(f"Keine tenant_credentials fuer tenant_id={tenant_id}")
     conn.commit()

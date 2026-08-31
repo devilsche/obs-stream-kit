@@ -135,8 +135,77 @@
       <button class="dn-btn ghost" type="reset">Eingaben verwerfen</button>
     </div>
 
-    <div class="dn-pro">[ Pro / Advanced ] — externe DB &amp; eigener FTP-Storage pro Tenant. <b>admin-only, später.</b></div>
+    <div class="dn-pro">[ Pro / Advanced ] — externe DB pro Tenant. <b>admin-only, später.</b></div>
   </form>
+
+  <div class="dn-simple">
+    <p class="sec">// Telemetrie-Archiv (SFTP)</p>
+    <p class="dn-note">
+      Die PUBG-API hält Roh-Telemetrie nur rund 14 Tage vor. Mit eigenem
+      SFTP-Speicher wird jedes Match beim Einlesen dorthin archiviert und
+      bleibt für Replay und Match-Analyse dauerhaft auswertbar. Ohne Archiv
+      bleibt nach dem Fenster nur das eingeschränkte Replay aus der Datenbank.
+    </p>
+    {% if archive_msg == 'saved' %}
+      <p class="archive-flash ok" role="status">Zugang gespeichert.</p>
+    {% elif archive_msg == 'removed' %}
+      <p class="archive-flash ok" role="status">Zugang entfernt — ab jetzt wird nicht mehr archiviert.</p>
+    {% elif archive_msg == 'incomplete' %}
+      <p class="archive-flash err" role="status">Host, Benutzer und Passwort sind Pflicht — nichts gespeichert.</p>
+    {% endif %}
+    <p class="archive-state" role="status">
+      {% if archive.host %}
+        Aktiv: <b>{{ archive.user }}@{{ archive.host }}:{{ archive.port }}</b>
+        unter <code>{{ archive.path }}</code>
+      {% else %}
+        Kein eigenes Archiv hinterlegt.
+      {% endif %}
+    </p>
+    <form method="post" action="/app/settings/archive" id="archiveForm">
+      <div class="dn-fgrid">
+        <div class="dn-field">
+          <label for="archive_host">SFTP-Host</label>
+          <input id="archive_host" name="archive_host" type="text"
+                 autocomplete="off" value="{{ archive.host or '' }}">
+          <div class="dn-note">z.B. <code>sftp.hidrive.strato.com</code></div>
+        </div>
+        <div class="dn-field">
+          <label for="archive_port">Port</label>
+          <input id="archive_port" name="archive_port" type="number" min="1"
+                 max="65535" value="{{ archive.port or 22 }}">
+        </div>
+        <div class="dn-field">
+          <label for="archive_user">Benutzer</label>
+          <input id="archive_user" name="archive_user" type="text"
+                 autocomplete="off" value="{{ archive.user or '' }}">
+        </div>
+        <div class="dn-field">
+          <label for="archive_password">Passwort</label>
+          <input id="archive_password" name="archive_password" type="password"
+                 autocomplete="new-password"
+                 aria-describedby="archive_password_note">
+          <div class="dn-note" id="archive_password_note">
+            {% if archive.host %}Leer lassen = unverändert.{% else %}Wird verschlüsselt gespeichert.{% endif %}
+          </div>
+        </div>
+        <div class="dn-field">
+          <label for="archive_path">Verzeichnis</label>
+          <input id="archive_path" name="archive_path" type="text"
+                 value="{{ archive.path or '/pubg/telemetry' }}">
+          <div class="dn-note">Wird angelegt, falls es fehlt. Ein Match belegt rund 1–3 MB.</div>
+        </div>
+      </div>
+      <div class="dn-actions">
+        <button class="dn-btn" type="submit">Archiv speichern</button>
+        <button class="dn-btn ghost" type="button" id="archiveTest">Verbindung testen</button>
+        {% if archive.host %}
+        <button class="dn-btn danger" type="submit" name="action" value="delete"
+                formnovalidate>Zugang entfernen</button>
+        {% endif %}
+      </div>
+      <p class="archive-result" id="archiveResult" role="status" aria-live="polite"></p>
+    </form>
+  </div>
 
   <div class="dn-simple">
     <p class="sec">// Twitch-Account</p>
@@ -187,4 +256,34 @@
   </div>
   {% endif %}
 </main>
+<script>
+  // Verbindungstest gegen die AKTUELL im Formular stehenden Werte — man soll
+  // pruefen koennen, bevor man speichert.
+  (function () {
+    const btn = document.getElementById("archiveTest");
+    const out = document.getElementById("archiveResult");
+    const form = document.getElementById("archiveForm");
+    if (!btn || !out || !form) return;
+    btn.addEventListener("click", async () => {
+      out.className = "archive-result";
+      out.textContent = "Teste Verbindung …";
+      btn.disabled = true;
+      try {
+        const res = await fetch("/app/settings/archive/test",
+                                { method: "POST", body: new FormData(form) });
+        const d = await res.json();
+        out.classList.add(d.ok ? "ok" : "err");
+        out.textContent = d.ok
+          ? `Verbindung steht — ${d.path} ist beschreibbar, `
+            + `${d.files} Match${d.files === 1 ? "" : "es"} liegen dort.`
+          : `Fehlgeschlagen: ${d.error || "unbekannter Fehler"}`;
+      } catch (e) {
+        out.classList.add("err");
+        out.textContent = "Test nicht möglich: " + (e.message || e);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  })();
+</script>
 {% endblock %}
