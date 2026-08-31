@@ -166,8 +166,11 @@
   // wieder auf das eigene Tenant des Admins.
   const _AS_TENANT = (() => {
     try {
-      const m = (window.location.search || "").match(/[?&]asTenant=(\d+)/);
-      return m ? m[1] : null;
+      // Das Backend akzeptiert ID ODER Slug (?asTenant=originalhat3) — hier
+      // nur Ziffern zu matchen liess die Seite mit Slug laden, aber alle
+      // API-Calls stumm auf das eigene Tenant zurueckfallen.
+      const m = (window.location.search || "").match(/[?&]asTenant=([^&]+)/);
+      return m ? decodeURIComponent(m[1]) : null;
     } catch (_) { return null; }
   })();
   PubgUI._AS_TENANT = _AS_TENANT;
