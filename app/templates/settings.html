@@ -141,10 +141,13 @@
   <div class="dn-simple">
     <p class="sec">// Telemetrie-Archiv (SFTP)</p>
     <p class="dn-note">
-      Die PUBG-API hält Roh-Telemetrie nur rund 14 Tage vor. Mit eigenem
-      SFTP-Speicher wird jedes Match beim Einlesen dorthin archiviert und
-      bleibt für Replay und Match-Analyse dauerhaft auswertbar. Ohne Archiv
-      bleibt nach dem Fenster nur das eingeschränkte Replay aus der Datenbank.
+      Die PUBG-API gibt die Roh-Daten eines Matches nur etwa 14 Tage lang
+      heraus, danach sind sie dort gelöscht. Mit eigenem SFTP-Speicher wird
+      jedes Match beim Einlesen dorthin kopiert und bleibt für Replay und
+      Match-Analyse dauerhaft vollständig. Ohne eigenen Speicher lassen sich
+      Matches, die älter als zwei Wochen sind, nur noch eingeschränkt aus der
+      Datenbank abspielen: eigenes Squad, keine Gegner-Bewegung, keine
+      Bluezone.
     </p>
     {% if archive_msg == 'saved' %}
       <p class="archive-flash ok" role="status">Zugang gespeichert.</p>
