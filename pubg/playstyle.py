@@ -510,6 +510,11 @@ def aggregate(match_analyses):
             "openTargetDown": d["openTargetDown"],
             "openTargetDownPct": _pct(d["openTargetDown"], opened),
             "openTargetDownBySelfPct": _pct(d["openTargetDownBySelf"], opened),
+            # Anteil an den Faellen, in denen das Ziel tatsaechlich fiel —
+            # die Lesart, nach der man beim Vergleich der beiden Prozentwerte
+            # sucht ("63 und 63, also immer selbst?").
+            "openTargetFinishedSelfPct": _pct(d["openTargetDownBySelf"],
+                                              d["openTargetDown"]),
             "openDist": _median(d["openDist"]),
         })
     rows.sort(key=lambda r: (-r["matches"], r["name"]))

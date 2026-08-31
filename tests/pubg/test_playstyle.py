@@ -379,3 +379,14 @@ def test_aggregate_reports_the_first_victim_rate():
     assert me["openTargetDown"] == 2
     assert me["openTargetDownPct"] == pytest.approx(50.0)
     assert me["openTargetDownBySelfPct"] == pytest.approx(25.0)
+    # Bezogen auf die Faelle, in denen das Ziel WIRKLICH fiel: einer von
+    # zweien war er selbst.
+    assert me["openTargetFinishedSelfPct"] == pytest.approx(50.0)
+
+
+def test_finished_self_is_none_without_a_single_downed_target():
+    a = ps.analyse_match([ev("TakeDamage", 10, "account.me", "account.foe1")],
+                          SQUAD, TEAM_OF)
+    me = next(r for r in ps.aggregate([a]) if r["accountId"] == "account.me")
+    assert me["openTargetDown"] == 0
+    assert me["openTargetFinishedSelfPct"] is None
