@@ -294,3 +294,38 @@ def test_opening_success_rate_counts_fights_with_a_downed_enemy():
     assert me["openHitPct"] == pytest.approx(200 / 3)
     # Downs je Eroeffnung: 1 + 1 + 0 auf drei Eroeffnungen
     assert me["downsPerOpen"] == pytest.approx(2 / 3)
+
+
+# ── Eigene Leistung vs. Team-Ergebnis ───────────────────────────────────────
+
+def test_fight_records_who_did_the_downing():
+    """Wer aufmacht, muss nicht der sein, der trifft — beides gehoert
+    getrennt ausgewiesen."""
+    events = [
+        ev("TakeDamage", 10, "account.me", "account.foe1"),
+        ev("Knock", 12, "account.mate", "account.foe1"),
+        ev("Knock", 14, "account.me", "account.foe2"),
+        ev("Knock", 16, "account.foe2", "account.mate"),
+    ]
+    f = ps.build_fights(events, SQUAD, TEAM_OF)[0]
+    assert f["theirDowns"] == 2
+    assert f["ourDowns"] == 1
+    assert f["downsBy"]["account.me"] == 1      # einen selbst umgelegt
+    assert f["downsBy"]["account.mate"] == 1
+    assert f["lostBy"] == ["account.mate"]      # wen es bei uns erwischt hat
+
+
+def test_aggregate_separates_own_downs_from_team_result():
+    a = ps.analyse_match([
+        ev("TakeDamage", 10, "account.me", "account.foe1"),
+        ev("Knock", 12, "account.mate", "account.foe1"),   # Mate macht die Arbeit
+        ev("Knock", 20, "account.foe2", "account.mate"),   # kostet uns den Mate
+    ], SQUAD, TEAM_OF)
+    me = next(r for r in ps.aggregate([a]) if r["accountId"] == "account.me")
+    assert me["opened"] == 1
+    assert me["downsFor"] == 1          # Team-Ergebnis
+    assert me["downsBySelf"] == 0       # er selbst hat niemanden umgelegt
+    assert me["downsAgainst"] == 1      # ein eigener Mann unten
+    assert me["squadLossPerOpen"] == pytest.approx(1.0)
+    mate = next(r for r in ps.aggregate([a]) if r["accountId"] == "account.mate")
+    assert mate["downsMade"] == 1       # zaehlt auch ausserhalb eigener Kaempfe

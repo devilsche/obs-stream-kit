@@ -154,6 +154,12 @@
         <dt>Angefangen</dt>
         <dd>Wer den ersten Treffer setzt, hat den Kampf angefangen. Schießt
             der Gegner zuerst, taucht der Kampf hier gar nicht auf.</dd>
+        <dt>Wem wird was zugerechnet?</dt>
+        <dd>Die Zeile gehört dem, der den Kampf angefangen hat. „Gegner je
+            Kampf“ ist das Ergebnis des ganzen Squads danach, „davon er
+            selbst“ nur seine eigenen Treffer. Wer viel aufmacht, aber wenig
+            selbst umlegt, holt die anderen in den Kampf — ob das gut ist,
+            zeigt die Spalte „eigene Verluste je Kampf“.</dd>
         <dt>Ein Gegner „unten“</dt>
         <dd>Ein umgelegter Spieler, nicht ein Ereignis: Knock und der spätere
             Todesstoß sind derselbe Vorgang. Wird er wiederbelebt und fällt
@@ -228,11 +234,19 @@
         help: "Wie oft er als Erster auf ein gegnerisches Team geschossen hat." },
       { key: "openedPerMatch", label: "pro Match", fmt: (r) => n1(r.openedPerMatch),
         help: "Angefangene Kämpfe geteilt durch Matches — das Maß für „macht ständig auf“." },
-      { key: "downsPerOpen", label: "Gegner je Kampf", unit: "Ø",
+      { key: "downsPerOpen", label: "Gegner je Kampf", unit: "Ø · ganzes Team",
         fmt: (r) => n2(r.downsPerOpen),
-        help: "Wie viele Gegner im Schnitt umfallen, wenn er einen Kampf anfängt. Über 1,0 heißt: es lohnt sich.",
+        help: "Wie viele Gegner im Schnitt umfallen, nachdem er aufgemacht hat — egal wer sie umlegt. Das ist das Ergebnis des Squads, nicht seine persönliche Leistung.",
         flag: (r, all) => isTop(r, all, "downsPerOpen", "opened"),
-        why: "holt am meisten aus seinen Kämpfen" },
+        why: "aus seinen Kämpfen holt das Squad am meisten" },
+      { key: "selfDownsPerOpen", label: "davon er selbst", unit: "Ø",
+        fmt: (r) => n2(r.selfDownsPerOpen),
+        help: "Davon hat er selbst umgelegt. Ist der Wert deutlich kleiner als die Spalte links, macht er auf und das Team räumt auf." },
+      { key: "squadLossPerOpen", label: "eigene Verluste je Kampf", unit: "Ø",
+        fmt: (r) => n2(r.squadLossPerOpen),
+        help: "Wie viele aus dem eigenen Squad im Schnitt zu Boden gehen, wenn er einen Kampf anfängt. Genau die Zahl für „sein Aufmachen kostet uns Leute“.",
+        flag: (r, all) => isTop(r, all, "squadLossPerOpen", "opened"),
+        why: "seine Kämpfe kosten das Squad am meisten" },
       { key: "openHitPct", label: "mit Wirkung", unit: "%",
         fmt: (r) => n0(r.openHitPct),
         help: "Anteil seiner angefangenen Kämpfe, in denen überhaupt ein Gegner umfällt." },
@@ -247,10 +261,15 @@
         why: "schießt am häufigsten ins Leere" },
       { key: "openDist", label: "Distanz", unit: "m", fmt: (r) => n0(r.openDist),
         help: "Wie weit der Gegner beim ersten Treffer weg war (Mittelwert der Kämpfe)." },
-      { key: "downsFor", label: "Gegner unten", fmt: (r) => r.downsFor,
-        help: "Gegner, die in seinen angefangenen Kämpfen zu Boden gingen." },
-      { key: "downsAgainst", label: "eigene unten", fmt: (r) => r.downsAgainst,
+      { key: "downsFor", label: "Gegner unten", unit: "gesamt",
+        fmt: (r) => r.downsFor,
+        help: "Gegner, die in seinen angefangenen Kämpfen zu Boden gingen — Arbeit des ganzen Squads." },
+      { key: "downsAgainst", label: "eigene unten", unit: "gesamt",
+        fmt: (r) => r.downsAgainst,
         help: "Eigene Leute, die in seinen angefangenen Kämpfen zu Boden gingen." },
+      { key: "downsMade", label: "selbst umgelegt", unit: "gesamt",
+        fmt: (r) => r.downsMade,
+        help: "Alle Gegner, die er persönlich umgelegt hat — auch in Kämpfen, die jemand anderes angefangen hat." },
     ];
 
     const STYLE_COLS = [

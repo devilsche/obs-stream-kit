@@ -149,8 +149,11 @@ def build_fights(events, squad, team_of, *, include_bots=False,
                 if cur["engagedBy"] is None and item[1] == "us":
                     cur["engagedBy"] = item[2]
 
-    # 2) Downs zuordnen — nur die Ereignisse, die wirklich jemanden umlegen
-    downed = {id(f): {"ours": 0, "theirs": 0} for f in fights}
+    # 2) Downs zuordnen — nur die Ereignisse, die wirklich jemanden umlegen.
+    #    Dabei festhalten, WER umgelegt hat: wer einen Kampf anfaengt, ist
+    #    nicht zwangslaeufig der, der trifft.
+    downed = {id(f): {"ours": 0, "theirs": 0, "by": defaultdict(int),
+                      "lost": []} for f in fights}
     for e in counting_downs(events):
         ts = _g(e, "timestamp_ms")
         actor, target = _g(e, "actor_account"), _g(e, "target_account")
@@ -167,11 +170,17 @@ def build_fights(events, squad, team_of, *, include_bots=False,
         for f in fights:
             if f["foeTeam"] == ft and f["startTs"] <= ts <= f["lastTs"] + tail_ms:
                 downed[id(f)][side] += 1
+                if side == "theirs" and actor:
+                    downed[id(f)]["by"][actor] += 1
+                elif side == "ours":
+                    downed[id(f)]["lost"].append(victim)
                 break
 
     for f in fights:
         f["ourDowns"] = downed[id(f)]["ours"]
         f["theirDowns"] = downed[id(f)]["theirs"]
+        f["downsBy"] = dict(downed[id(f)]["by"])
+        f["lostBy"] = downed[id(f)]["lost"]
         f["result"] = _result(f["theirDowns"], f["ourDowns"])
     fights.sort(key=lambda f: f["startTs"])
     return fights
@@ -389,6 +398,7 @@ def aggregate(match_analyses):
         "name": None, "matches": 0, "downs": 0, "firstDowns": 0,
         "opened": 0, "openedWon": 0, "openedLost": 0, "openedTrade": 0,
         "openedPointless": 0, "openedWithDown": 0, "openDist": [], "engaged": 0,
+        "downsMade": 0, "downsBySelfInOpened": 0,
         "ourDownsInOpened": 0, "theirDownsInOpened": 0,
         "aliveMin": [], "pickups": [], "pickupsEarly": [], "pickupsLate": [],
         "pickupsPerMin": [], "stillShare": [], "stillLateShare": [],
@@ -419,6 +429,10 @@ def aggregate(match_analyses):
                     d[target].append(v)
 
         for f in a.get("fights") or []:
+            # Umgelegte Gegner zaehlen dem zu, der sie umgelegt hat — egal
+            # wer den Kampf angefangen hat.
+            for acc, cnt in (f.get("downsBy") or {}).items():
+                acc_data[acc]["downsMade"] += cnt
             opener = f.get("opener")
             if f.get("engagedBy"):
                 acc_data[f["engagedBy"]]["engaged"] += 1
@@ -435,6 +449,7 @@ def aggregate(match_analyses):
             d["openedWithDown"] += f["theirDowns"] > 0
             d["ourDownsInOpened"] += f["ourDowns"]
             d["theirDownsInOpened"] += f["theirDowns"]
+            d["downsBySelfInOpened"] += (f.get("downsBy") or {}).get(opener, 0)
             if f.get("openDist") is not None:
                 d["openDist"].append(f["openDist"])
 
@@ -473,6 +488,12 @@ def aggregate(match_analyses):
             "downsPerOpen": (d["theirDownsInOpened"] / opened) if opened else None,
             "downsFor": d["theirDownsInOpened"],
             "downsAgainst": d["ourDownsInOpened"],
+            "downsBySelf": d["downsBySelfInOpened"],
+            "selfDownsPerOpen": (d["downsBySelfInOpened"] / opened)
+                                if opened else None,
+            "squadLossPerOpen": (d["ourDownsInOpened"] / opened)
+                                if opened else None,
+            "downsMade": d["downsMade"],
             "openDist": _median(d["openDist"]),
         })
     rows.sort(key=lambda r: (-r["matches"], r["name"]))
