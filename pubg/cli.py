@@ -1205,6 +1205,58 @@ def hidrive_refill_pg(root: str, only_match: str = None) -> int:
     return 0
 
 
+def clan_queue_prune(root: str, args=None) -> int:
+    """Raeumt die Clan-Warteschlange auf Squad + Stammgaeste zusammen.
+
+    Historisch landete die komplette Lobby jedes Matches in der Schlange —
+    auf prod 50.730 offene Accounts, abgearbeitet mit 3 pro Minute. Das sind
+    Wochen Dauerlast auf einem Budget von 10 API-Calls je Minute, das der
+    Match-Poller braucht.
+
+    Nutzung:
+        python -m pubg.cli clan-queue-prune [--min-seen 5] [--dry-run]
+    """
+    from core.db import connect
+    from core.db_compat import SqliteCompatConn
+    from pubg.clan_enrichment import (MIN_SEEN_MATCHES, QUEUE_SENTINEL,
+                                      prune_queue)
+
+    args = args or []
+    def _opt(name, default=None):
+        if name in args:
+            i = args.index(name)
+            return args[i + 1] if i + 1 < len(args) else default
+        return default
+    min_seen = int(_opt("--min-seen", str(MIN_SEEN_MATCHES)))
+    dry = "--dry-run" in args
+
+    raw = connect()
+    conn = SqliteCompatConn(raw)
+    offen = conn.execute(
+        "SELECT COUNT(*) AS n FROM player_clans WHERE updated_at = ?",
+        (QUEUE_SENTINEL,)).fetchone()["n"]
+    print(f"Offene Warteschlange: {offen} Accounts (Schwelle: ab {min_seen} "
+          f"gesehenen Matches oder eigener Squad)")
+    if dry:
+        rest = conn.execute("""
+            SELECT COUNT(*) AS n FROM player_clans pc
+            WHERE pc.updated_at = ?
+              AND (EXISTS (SELECT 1 FROM participants p
+                           WHERE p.account_id = pc.account_id)
+                   OR EXISTS (SELECT 1 FROM match_team_mapping mtm
+                              WHERE mtm.account_id = pc.account_id
+                              GROUP BY mtm.account_id
+                              HAVING COUNT(DISTINCT mtm.match_id) >= ?))
+        """, (QUEUE_SENTINEL, min_seen)).fetchone()["n"]
+        print(f"--dry-run: {offen - rest} wuerden geloescht, {rest} blieben")
+        raw.close()
+        return 0
+    removed = prune_queue(conn, min_seen=min_seen)
+    print(f"Geloescht: {removed} — es bleiben {offen - removed}")
+    raw.close()
+    return 0
+
+
 def assists_backfill(root: str, args=None) -> int:
     """Holt die Match-Payloads der letzten Tage neu und schreibt die
     Lobby-Assists in match_team_mapping nach.
@@ -1652,6 +1704,8 @@ if __name__ == "__main__":
         sys.exit(purge_before(root, date_arg))
     elif len(sys.argv) > 1 and sys.argv[1] == "weapon-stats-backfill":
         sys.exit(weapon_stats_backfill(root, sys.argv[2:]))
+    elif len(sys.argv) > 1 and sys.argv[1] == "clan-queue-prune":
+        sys.exit(clan_queue_prune(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "assists-backfill":
         sys.exit(assists_backfill(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-backfill":
@@ -1688,4 +1742,5 @@ if __name__ == "__main__":
               "reset-milestones <id1> [<id2> ...] | "
               "list-milestones [pattern] | "
               "weapon-stats-backfill | assists-backfill | "
+              "clan-queue-prune | "
               "purge-before YYYY-MM-DD")

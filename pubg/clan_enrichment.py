@@ -22,6 +22,27 @@ CACHE_TTL_DAYS = 7
 # (= im Queue). Schema-Constraint NOT NULL → echtes NULL geht nicht.
 QUEUE_SENTINEL = "1970-01-01T00:00:00Z"
 
+#: Ab wie vielen gesehenen Matches ein fremder Lobby-Spieler es wert ist,
+#: aufgeloest zu werden. Gemessen an den Prod-Daten: 76.416 Spieler wurden
+#: genau EINMAL gesehen, 15.972 mindestens dreimal, 4.186 mindestens fuenfmal.
+#: Jeder davon kostet einen API-Call aus einem Budget von 10 pro Minute, das
+#: sich der Match-Poller teilt — die Warteschlange stand bei 50.730 Accounts
+#: und damit auf Wochen Dauerlast. Wer fuenfmal in unserer Lobby war, ist ein
+#: Stammgast; der Rest bringt ein Clan-Tag, das nie jemand sieht.
+MIN_SEEN_MATCHES = 5
+
+#: Spieler, die wir aufloesen: eigener Squad (steht in participants) oder oft
+#: genug gesehen. Als Sub-Query formuliert, damit Aufrufer sie in ihr eigenes
+#: Statement einsetzen koennen.
+_RELEVANT_SQL = """
+    EXISTS (SELECT 1 FROM participants p
+            WHERE p.account_id = {col})
+    OR EXISTS (SELECT 1 FROM match_team_mapping mtm
+               WHERE mtm.account_id = {col}
+               GROUP BY mtm.account_id
+               HAVING COUNT(DISTINCT mtm.match_id) >= ?)
+"""
+
 
 def _now_iso() -> str:
     return _dt.datetime.now(_dt.UTC).isoformat().replace("+00:00", "Z")
@@ -159,14 +180,21 @@ def ensure_clan(conn, client, clan_id: str,
     return row
 
 
-def enqueue_unknown(conn, account_ids) -> int:
-    """Schreibt NULL-Rows in player_clans fuer noch unbekannte Accounts.
-    Diese werden vom Background-Worker (process_queue) abgearbeitet.
+def enqueue_unknown(conn, account_ids, min_seen: int = MIN_SEEN_MATCHES) -> int:
+    """Reiht Accounts zur Clan-Aufloesung ein — aber nur die, die es wert sind.
+
+    Frueher landete die komplette Lobby (93 Spieler je Match) in der Schlange;
+    die meisten davon sieht man nie wieder. Jetzt kommt rein, wer im eigenen
+    Squad war oder mindestens `min_seen` Matches lang aufgetaucht ist.
+
     Idempotent via ON CONFLICT DO NOTHING — vorhandene Mappings bleiben.
-    Returns Anzahl neu enqueued."""
+    Returns Anzahl neu eingereihter Accounts.
+    """
     n = 0
     for acc in account_ids:
         if not acc or is_bot(acc):
+            continue
+        if not _is_relevant(conn, acc, min_seen):
             continue
         conn.execute(
             "INSERT INTO player_clans (account_id, clan_id, updated_at) "
@@ -181,7 +209,39 @@ def enqueue_unknown(conn, account_ids) -> int:
     return n
 
 
-def process_queue(conn, client, max_count: int = 3) -> int:
+def _is_relevant(conn, account_id: str, min_seen: int) -> bool:
+    row = conn.execute(
+        "SELECT 1 AS ok WHERE " + _RELEVANT_SQL.format(col="?"),
+        (account_id, account_id, min_seen)).fetchone()
+    return bool(row)
+
+
+def prune_queue(conn, min_seen: int = MIN_SEEN_MATCHES) -> int:
+    """Raeumt die OFFENE Warteschlange: alles raus, was weder Squad noch
+    Stammgast ist. Schon aufgeloeste Eintraege bleiben — die sind bezahlte
+    API-Calls und werden nicht weggeworfen.
+
+    Returns Anzahl geloeschter Zeilen.
+    """
+    before = conn.execute(
+        "SELECT COUNT(*) AS n FROM player_clans WHERE updated_at = ?",
+        (QUEUE_SENTINEL,)).fetchone()
+    conn.execute(
+        "DELETE FROM player_clans pc WHERE pc.updated_at = ? AND NOT ("
+        + _RELEVANT_SQL.format(col="pc.account_id") + ")",
+        (QUEUE_SENTINEL, min_seen))
+    after = conn.execute(
+        "SELECT COUNT(*) AS n FROM player_clans WHERE updated_at = ?",
+        (QUEUE_SENTINEL,)).fetchone()
+    try:
+        conn.commit()
+    except Exception:
+        pass
+    return int((before or {"n": 0})["n"]) - int((after or {"n": 0})["n"])
+
+
+def process_queue(conn, client, max_count: int = 3,
+                  min_seen: int = MIN_SEEN_MATCHES) -> int:
     """Drip-feed Worker: pickt max_count noch-nie-aufgeloeste Accounts
     aus player_clans (updated_at IS NULL) und fetched player+clan-Info.
 
@@ -196,17 +256,20 @@ def process_queue(conn, client, max_count: int = 3) -> int:
     # NULLS LAST: Accounts ohne Match-Reference ans Ende.
     rows = conn.execute(
         "SELECT pc.account_id FROM player_clans pc "
-        "LEFT JOIN ("
-        "  SELECT mtm.account_id, MAX(m.played_at) AS last_seen "
+        "JOIN ("
+        "  SELECT mtm.account_id, MAX(m.played_at) AS last_seen, "
+        "         COUNT(DISTINCT mtm.match_id) AS seen "
         "  FROM match_team_mapping mtm "
         "  JOIN matches m ON m.match_id = mtm.match_id "
         "    AND m.tenant_id = mtm.tenant_id "
         "  GROUP BY mtm.account_id"
         ") lp ON lp.account_id = pc.account_id "
         "WHERE pc.updated_at = ? AND pc.account_id NOT LIKE 'ai.%' "
-        "ORDER BY lp.last_seen DESC NULLS LAST "
+        "  AND (lp.seen >= ? OR EXISTS (SELECT 1 FROM participants p "
+        "                               WHERE p.account_id = pc.account_id)) "
+        "ORDER BY lp.last_seen DESC "
         "LIMIT ?",
-        (QUEUE_SENTINEL, max_count)).fetchall()
+        (QUEUE_SENTINEL, min_seen, max_count)).fetchall()
     accs = [r["account_id"] for r in rows]
     if not accs:
         return 0

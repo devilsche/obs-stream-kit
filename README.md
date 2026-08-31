@@ -574,6 +574,17 @@ Dazu Filter `player=` und `weapon=`. Also etwa `range=session&player=Nipplz` fü
 von Nipplz" oder `range=all&weapon=Kar98k&groupBy=player` für „was macht die Kar98k, über alle
 Spieler". Ein Klick auf eine Zeile setzt den passenden Filter und dreht die Sicht um.
 
+Clan-Tags der Lobby holt ein Hintergrund-Worker nach (`player_clans`), aber nur für
+Spieler, die es wert sind: eigener Squad oder mindestens fünf gesehene Matches. Die
+PUBG-API erlaubt 10 Requests pro Minute — geteilt mit dem Match-Polling —, und von
+76.416 einmal gesehenen Lobby-Spielern bringt ein Clan-Tag nichts. Altbestand räumt
+
+```bash
+python -m pubg.cli clan-queue-prune [--min-seen 5] [--dry-run]
+```
+
+auf; schon aufgelöste Einträge bleiben.
+
 Datenquelle ist die Tabelle `match_weapon_stats`, gefüllt beim Telemetrie-Fetch. Für die Historie:
 
 ```bash
