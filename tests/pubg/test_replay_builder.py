@@ -323,3 +323,6 @@ def test_build_replay_from_db_declares_its_gaps():
     out = build_replay_from_db([], "m2", "Baltic_Main", 8.0, {}, {})
     assert out["coverage"]["positions"] == "squad-only"
     assert out["coverage"]["zones"] is False
+    # Flugroute haengt an hoch-z-Positionen: mal da, mal nicht → gemessen,
+    # nicht behauptet.
+    assert out["coverage"]["flightPath"] is False

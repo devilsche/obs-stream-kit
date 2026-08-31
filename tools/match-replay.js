@@ -117,7 +117,8 @@ function showSourceNote(replay) {
     el.innerHTML = "<b>Eingeschränktes Replay</b> — aus der Datenbank "
       + "rekonstruiert, weil die Roh-Telemetrie nicht mehr verfügbar ist: "
       + "Bewegungsspuren nur für das eigene Squad, Gegner erscheinen an "
-      + "Lande- und Kampfpunkten, keine Bluezone.";
+      + "Lande- und Kampfpunkten, keine Bluezone"
+      + (cov.flightPath === false ? ", keine Flugroute" : "") + ".";
   } else {
     el.textContent = "";
   }

@@ -442,5 +442,9 @@ def build_replay_from_db(rows, match_id, map_name, mapKm,
         "positions": "squad-only",   # Gegner nur an Kampf-/Landepunkten
         "zones": False,              # LogGameStatePeriodic ist nicht in der DB
         "hits": "squad-only",        # TakeDamage nur mit Squad-Beteiligung
+        # Die Flugroute haengt an Position-Events oberhalb 150000 cm. Ob die in
+        # der DB liegen, unterscheidet sich je Match — an prod-Daten gemessen
+        # gibt es Matches mit und ohne. Also pruefen statt behaupten.
+        "flightPath": bool(result.get("flightPath")),
     }
     return result

@@ -520,7 +520,9 @@ Stufe 3 ist bewusst ein Teil-Replay: `telemetry_events` speichert Position-Event
 also an ihren Lande-, Knock- und Kill-Punkten, haben aber keine Bewegungsspur, und
 es gibt keine Bluezone. Das Ergebnis sagt das selbst: `replaySource` ist `hidrive`,
 `api`, `api-live` oder `db-squad`, und `coverage` nennt die Lücken
-(`positions: squad-only|all`, `zones: true|false`, `hits: squad-only|all`). Das Tool
+(`positions: squad-only|all`, `zones: true|false`, `hits: squad-only|all`,
+`flightPath: true|false` — die Flugroute hängt an Position-Events oberhalb
+150000 cm, die je Match in der DB liegen oder nicht). Das Tool
 zeigt daraufhin einen Hinweis und sperrt den Bluezone-Schalter.
 
 #### tools/weapon-performance.html

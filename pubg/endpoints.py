@@ -1048,7 +1048,8 @@ class EndpointRegistry:
         result = build_replay(
             raw, match_id, map_name, mapKm, team_mapping, names)
         result["replaySource"] = replay_source  # hidrive | api | api-live
-        result["coverage"] = {"positions": "all", "zones": True, "hits": "all"}
+        result["coverage"] = {"positions": "all", "zones": True, "hits": "all",
+                              "flightPath": bool(result.get("flightPath"))}
         # Hero-Account + Team (eigener Spieler, is_self=1 in DB)
         from pubg.db_pg import get_self_player
         self_row = get_self_player(conn.raw, self.tenant_id)
