@@ -140,8 +140,9 @@ def build_fights(events, squad, team_of, *, include_bots=False,
             if cur is None or ts - cur["lastTs"] > gap_ms:
                 cur = {"foeTeam": ft, "startTs": ts, "lastTs": ts,
                        "opener": None, "openedByUs": False, "engagedBy": None,
-                       "openDist": None, "ourDowns": 0, "theirDowns": 0,
-                       "result": "pointless"}
+                       "openDist": None, "openTarget": None,
+                       "openTargetDown": False, "openTargetDownBySelf": False,
+                       "ourDowns": 0, "theirDowns": 0, "result": "pointless"}
                 fights.append(cur)
                 _set_opening(cur, item)
             else:
@@ -170,8 +171,12 @@ def build_fights(events, squad, team_of, *, include_bots=False,
         for f in fights:
             if f["foeTeam"] == ft and f["startTs"] <= ts <= f["lastTs"] + tail_ms:
                 downed[id(f)][side] += 1
-                if side == "theirs" and actor:
-                    downed[id(f)]["by"][actor] += 1
+                if side == "theirs":
+                    if actor:
+                        downed[id(f)]["by"][actor] += 1
+                    if victim and victim == f.get("openTarget"):
+                        f["openTargetDown"] = True
+                        f["openTargetDownBySelf"] = (actor == f.get("opener"))
                 elif side == "ours":
                     downed[id(f)]["lost"].append(victim)
                 break
@@ -223,6 +228,9 @@ def _set_opening(fight, item):
         fight["opener"] = actor
         fight["openedByUs"] = True
         fight["engagedBy"] = actor
+        # Wen er zuerst getroffen hat — die Frage "ich treffe zuerst, geht der
+        # um?" meint genau diesen Spieler, nicht irgendeinen aus dem Team.
+        fight["openTarget"] = target
         fight["openDist"] = _dist_m(_g(raw, "actor_x"), _g(raw, "actor_y"),
                                     _g(raw, "victim_x"), _g(raw, "victim_y"))
 
@@ -399,6 +407,7 @@ def aggregate(match_analyses):
         "opened": 0, "openedWon": 0, "openedLost": 0, "openedTrade": 0,
         "openedPointless": 0, "openedWithDown": 0, "openDist": [], "engaged": 0,
         "downsMade": 0, "downsBySelfInOpened": 0,
+        "openTargetDown": 0, "openTargetDownBySelf": 0,
         "ourDownsInOpened": 0, "theirDownsInOpened": 0,
         "aliveMin": [], "pickups": [], "pickupsEarly": [], "pickupsLate": [],
         "pickupsPerMin": [], "stillShare": [], "stillLateShare": [],
@@ -450,6 +459,8 @@ def aggregate(match_analyses):
             d["ourDownsInOpened"] += f["ourDowns"]
             d["theirDownsInOpened"] += f["theirDowns"]
             d["downsBySelfInOpened"] += (f.get("downsBy") or {}).get(opener, 0)
+            d["openTargetDown"] += bool(f.get("openTargetDown"))
+            d["openTargetDownBySelf"] += bool(f.get("openTargetDownBySelf"))
             if f.get("openDist") is not None:
                 d["openDist"].append(f["openDist"])
 
@@ -494,6 +505,11 @@ def aggregate(match_analyses):
             "squadLossPerOpen": (d["ourDownsInOpened"] / opened)
                                 if opened else None,
             "downsMade": d["downsMade"],
+            # "Ich treffe zuerst — geht der um?" Nenner sind die eroeffneten
+            # Kaempfe, Zaehler nur der zuerst getroffene Gegner.
+            "openTargetDown": d["openTargetDown"],
+            "openTargetDownPct": _pct(d["openTargetDown"], opened),
+            "openTargetDownBySelfPct": _pct(d["openTargetDownBySelf"], opened),
             "openDist": _median(d["openDist"]),
         })
     rows.sort(key=lambda r: (-r["matches"], r["name"]))

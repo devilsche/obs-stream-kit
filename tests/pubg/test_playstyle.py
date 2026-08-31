@@ -329,3 +329,53 @@ def test_aggregate_separates_own_downs_from_team_result():
     assert me["squadLossPerOpen"] == pytest.approx(1.0)
     mate = next(r for r in ps.aggregate([a]) if r["accountId"] == "account.mate")
     assert mate["downsMade"] == 1       # zaehlt auch ausserhalb eigener Kaempfe
+
+
+# ── "Ich treffe zuerst — geht der um?" ──────────────────────────────────────
+
+def test_fight_tracks_the_first_victim_and_whether_he_goes_down():
+    events = [
+        ev("TakeDamage", 10, "account.me", "account.foe1"),   # erster Treffer
+        ev("TakeDamage", 12, "account.me", "account.foe2"),
+        ev("Knock", 20, "account.me", "account.foe1"),
+    ]
+    f = ps.build_fights(events, SQUAD, TEAM_OF)[0]
+    assert f["openTarget"] == "account.foe1"
+    assert f["openTargetDown"] is True
+    assert f["openTargetDownBySelf"] is True
+
+
+def test_first_victim_who_gets_away_counts_as_not_down():
+    """Angeschossen, aber weggekommen — genau der Fall, um den es geht."""
+    events = [
+        ev("TakeDamage", 10, "account.me", "account.foe1"),
+        ev("Knock", 20, "account.me", "account.foe2"),        # ein ANDERER faellt
+    ]
+    f = ps.build_fights(events, SQUAD, TEAM_OF)[0]
+    assert f["openTarget"] == "account.foe1"
+    assert f["openTargetDown"] is False
+
+
+def test_first_victim_downed_by_a_mate_counts_but_not_as_own():
+    events = [
+        ev("TakeDamage", 10, "account.me", "account.foe1"),
+        ev("Knock", 20, "account.mate", "account.foe1"),
+    ]
+    f = ps.build_fights(events, SQUAD, TEAM_OF)[0]
+    assert f["openTargetDown"] is True
+    assert f["openTargetDownBySelf"] is False
+
+
+def test_aggregate_reports_the_first_victim_rate():
+    def fight(down_by=None):
+        evs = [ev("TakeDamage", 10, "account.me", "account.foe1")]
+        if down_by:
+            evs.append(ev("Knock", 20, down_by, "account.foe1"))
+        return ps.analyse_match(evs, SQUAD, TEAM_OF)
+    rows = ps.aggregate([fight("account.me"), fight("account.mate"),
+                         fight(None), fight(None)])
+    me = next(r for r in rows if r["accountId"] == "account.me")
+    assert me["opened"] == 4
+    assert me["openTargetDown"] == 2
+    assert me["openTargetDownPct"] == pytest.approx(50.0)
+    assert me["openTargetDownBySelfPct"] == pytest.approx(25.0)
