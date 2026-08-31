@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<!--
+  PUBG Squad-Spielstil
+  ────────────────────────────────────────────────────────────────────
+  Wer eröffnet die Gefechte, gehen die aus wie erhofft, und wer spielt wie —
+  je Squad-Mate über einen Zeitraum. Quelle ist telemetry_events, also auch
+  rückwirkend für alles, was in der DB liegt.
+
+  Zwei Tabellen:
+    Gefechte   — je Mate, der ein Gefecht eröffnet hat: wie oft der Gegner
+                 dabei runtergeht, wie die Gefechte ausgehen
+    Spielstil  — Loot-Tempo, Abstand zum Team, wer zuerst umfällt, Standzeit
+
+  Filter: Zeitraum, Squad-Auswahl (nur Matches mit genau diesen Leuten),
+  Mindest-Matches, Bots ein/aus.
+
+  Browser-Tool, KEINE OBS-Source.
+-->
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Squad-Spielstil</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/widgets-static/_theme.css">
+  <link rel="stylesheet" href="/widgets-static/_blocks.css">
+  <link rel="stylesheet" href="/widgets-static/pubg/_pubg.css">
+  <style>
+    body { padding: 20px; max-width: 1280px; margin: 0 auto;
+           background: var(--theme-bg); color: var(--theme-text); }
+    .t-card { padding: 16px 18px; margin-bottom: 16px; }
+    .bar { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;
+           margin-bottom: 12px; }
+    label { display: flex; flex-direction: column; gap: 4px;
+            color: var(--theme-text-dim); font-size: 0.72em; font-weight: 700;
+            letter-spacing: 0.08em; text-transform: uppercase; }
+    input[type="text"], input[type="number"] {
+            background: var(--theme-surface);
+            border: 1px solid color-mix(in srgb, var(--theme-text) 15%, transparent);
+            color: var(--theme-text); padding: 7px 9px; border-radius: 3px;
+            font-family: inherit; font-size: 0.9rem; min-height: 24px; }
+    input[type="text"] { min-width: 240px; }
+    input[type="number"] { width: 90px; }
+    input:focus-visible { outline: 2px solid var(--theme-accent); outline-offset: 2px; }
+    .check { flex-direction: row; align-items: center; gap: 7px;
+             text-transform: none; letter-spacing: 0; font-size: 0.8em; }
+    .check input { min-width: 24px; min-height: 24px; }
+    .switch { display: flex; gap: 6px; flex-wrap: wrap; }
+    .switch button { background: transparent;
+                     border: 1px solid color-mix(in srgb, var(--theme-text) 15%, transparent);
+                     color: var(--theme-text-dim); padding: 7px 12px;
+                     border-radius: 3px; cursor: pointer; font-family: inherit;
+                     letter-spacing: 0.06em; text-transform: uppercase;
+                     font-size: 11px; font-weight: 700; min-height: 24px; }
+    .switch button:hover { color: var(--theme-text); }
+    .switch button:focus-visible { outline: 2px solid var(--theme-accent);
+                                   outline-offset: 2px; }
+    .switch button[aria-pressed="true"] {
+      background: color-mix(in srgb, var(--theme-accent) 15%, transparent);
+      border-color: var(--theme-accent); color: var(--theme-accent); }
+    h2 { font-size: 1em; letter-spacing: 0.06em; text-transform: uppercase;
+         color: var(--theme-accent); margin: 0 0 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.86em; }
+    th, td { padding: 5px 8px; text-align: left;
+             border-bottom: 1px solid color-mix(in srgb, var(--theme-text) 8%, transparent); }
+    th { font-size: 0.72em; color: var(--theme-text-dim); text-transform: uppercase;
+         letter-spacing: 0.08em; font-weight: 700; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    th.sortable:hover, th.sortable.active { color: var(--theme-accent); }
+    th.sortable:focus-visible { outline: 2px solid var(--theme-accent);
+                                outline-offset: -2px; }
+    .sort-arrow { font-size: 0.7em; margin-left: 2px; opacity: 0.7; }
+    .me { color: var(--theme-accent); font-weight: 700; }
+    /* Auffällige Werte markieren — nie über Farbe allein: die Zelle bekommt
+       zusätzlich einen Titel, der sagt, warum sie markiert ist. */
+    td.flag { font-weight: 700; }
+    td.flag::after { content: " ●"; font-size: 0.7em; }
+    td.weak { opacity: 0.45; font-style: italic; }
+    .scroll { overflow-x: auto; }
+    .legend { color: var(--theme-text-dim); font-size: 0.72em; margin-top: 8px;
+              line-height: 1.5; }
+    .err { color: var(--theme-warn); }
+  </style>
+</head>
+<body>
+  <h1 class="t-title">PUBG Squad-Spielstil</h1>
+  <div class="t-subtitle">Wer macht auf, wie geht es aus, und wer spielt wie</div>
+
+  <div class="t-card">
+    <div class="bar">
+      <div>
+        <span class="legend">Zeitraum</span>
+        <div class="switch" id="rangeSwitch" role="group" aria-label="Zeitraum">
+          <button type="button" data-range="session" aria-pressed="true">Session</button>
+          <button type="button" data-range="day" aria-pressed="false">Heute</button>
+          <button type="button" data-range="week" aria-pressed="false">7 Tage</button>
+          <button type="button" data-range="all" aria-pressed="false">Alles</button>
+        </div>
+      </div>
+      <label for="fPlayers">Squad-Auswahl
+        <input id="fPlayers" type="text"
+               placeholder="z.B. hacker_luke, SleepAtWar — leer = alle Mates"
+               aria-describedby="playersNote">
+      </label>
+      <label for="fMin">Min. Matches
+        <input id="fMin" type="number" min="1" max="99" value="3">
+      </label>
+      <label class="check" for="fBots">
+        <input id="fBots" type="checkbox"> Bot-Gefechte mitzählen
+      </label>
+    </div>
+    <div class="legend" id="playersNote">
+      Mit Squad-Auswahl zählen nur Matches, in denen <b>alle</b> genannten dabei
+      waren — sonst mischen sich Zufalls-Mates in die Quoten.
+    </div>
+    <div class="legend" id="status">Lade …</div>
+  </div>
+
+  <div class="t-card" id="fightCard" hidden>
+    <h2>Gefechte — wer macht auf</h2>
+    <div class="scroll">
+      <table>
+        <thead id="fightHead"><tr></tr></thead>
+        <tbody id="fightRows"></tbody>
+      </table>
+    </div>
+    <div class="legend">
+      <b>Down/Eröffn.</b> — wie viele Gegner im Schnitt runtergehen, wenn er
+      aufmacht. <b>trifft%</b> — Anteil der Eröffnungen, bei denen überhaupt
+      jemand fällt. <b>wirkungslos%</b> — geschossen, niemand am Boden, auf
+      keiner Seite. <b>gewonnen/verloren</b> — mehr bzw. weniger Gegner unten
+      als eigene Leute. Ein Gefecht ist „unser Squad gegen ein Team", neue
+      Runde nach 45 s Ruhe; Bots zählen per Vorgabe nicht mit.
+    </div>
+  </div>
+
+  <div class="t-card" id="styleCard" hidden>
+    <h2>Spielstil</h2>
+    <div class="scroll">
+      <table>
+        <thead id="styleHead"><tr></tr></thead>
+        <tbody id="styleRows"></tbody>
+      </table>
+    </div>
+    <div class="legend">
+      <b>Loot/min</b> — Pickups je Lebensminute. <b>Team m</b> — Median-Abstand
+      zum nächsten Mate, <b>&gt;100 m</b> der Zeitanteil weiter weg.
+      <b>Tod m</b> — Abstand zum Team im Moment des eigenen Knocks (gemessen aus
+      den 25 s davor, sonst misst man den Mate, der zur Rettung rennt).
+      <b>erster%</b> — Anteil der Matches, in denen er als Erster des Squads
+      runterging. <b>steht spät%</b> — Standzeit in der zweiten Lebenshälfte;
+      frühes Stehen ist Looten, spätes ist Halten.
+    </div>
+  </div>
+
+  <script src="/widgets-static/pubg/_pubg.js"></script>
+  <script>
+    const BASE = window.__SERVE_BASE__ || "/";
+    const esc = PubgUI.esc;
+
+    let RANGE = PubgUI.qs("range", "session");
+    let PLAYERS = PubgUI.qs("players", "");
+    let MIN = parseInt(PubgUI.qs("minMatches", "3"), 10) || 3;
+    let BOTS = PubgUI.qs("includeBots", "") === "1";
+    let DATA = null;
+    let SORT = { fight: { key: "opened", dir: -1 },
+                 style: { key: "matches", dir: -1 } };
+
+    const n1 = (v) => v == null ? "—" : v.toFixed(1);
+    const n0 = (v) => v == null ? "—" : Math.round(v).toString();
+    const n2 = (v) => v == null ? "—" : v.toFixed(2);
+
+    // Spalten: key, Titel, Formatierer, optional flag(row) für Hervorhebung
+    const FIGHT_COLS = [
+      { key: "name", label: "Mate", fmt: (r) => esc(r.name), text: true },
+      { key: "matches", label: "M", fmt: (r) => r.matches },
+      { key: "opened", label: "eröffnet", fmt: (r) => r.opened },
+      { key: "openedPerMatch", label: "/Match", fmt: (r) => n1(r.openedPerMatch) },
+      { key: "downsPerOpen", label: "Down/Eröffn.", fmt: (r) => n2(r.downsPerOpen),
+        flag: (r, all) => isTop(r, all, "downsPerOpen"),
+        why: "bester Wert im Squad" },
+      { key: "openHitPct", label: "trifft%", fmt: (r) => n0(r.openHitPct) },
+      { key: "wonPct", label: "gewonnen%", fmt: (r) => n0(r.wonPct) },
+      { key: "lostPct", label: "verloren%", fmt: (r) => n0(r.lostPct) },
+      { key: "pointlessPct", label: "wirkungslos%", fmt: (r) => n0(r.pointlessPct),
+        flag: (r, all) => isTop(r, all, "pointlessPct"),
+        why: "schießt am häufigsten ohne Wirkung" },
+      { key: "openDist", label: "Ø Dist m", fmt: (r) => n0(r.openDist) },
+      { key: "downsFor", label: "Downs +", fmt: (r) => r.downsFor },
+      { key: "downsAgainst", label: "Downs −", fmt: (r) => r.downsAgainst },
+    ];
+
+    const STYLE_COLS = [
+      { key: "name", label: "Mate", fmt: (r) => esc(r.name), text: true },
+      { key: "matches", label: "M", fmt: (r) => r.matches },
+      { key: "pickupsPerMin", label: "Loot/min", fmt: (r) => n1(r.pickupsPerMin) },
+      { key: "pickupsEarly", label: "Loot ≤5min", fmt: (r) => n0(r.pickupsEarly) },
+      { key: "aliveMin", label: "Lebenszeit", fmt: (r) => n1(r.aliveMin) },
+      { key: "teamDist", label: "Team m", fmt: (r) => n0(r.teamDist),
+        flag: (r, all) => isTop(r, all, "teamDist"),
+        why: "hängt am weitesten vom Team weg" },
+      { key: "farShare", label: ">100 m%", fmt: (r) => n0(r.farShare) },
+      { key: "distAtDown", label: "Tod m", fmt: (r) => n0(r.distAtDown) },
+      { key: "distAtDownMax", label: "Tod max", fmt: (r) => n0(r.distAtDownMax) },
+      { key: "firstDownPct", label: "erster%", fmt: (r) => n0(r.firstDownPct),
+        flag: (r, all) => isTop(r, all, "firstDownPct"),
+        why: "geht am häufigsten als Erster runter" },
+      { key: "stillLateShare", label: "steht spät%", fmt: (r) => n0(r.stillLateShare),
+        flag: (r, all) => isTop(r, all, "stillLateShare"),
+        why: "steht in der zweiten Lebenshälfte am längsten" },
+    ];
+
+    // Markiert den Spitzenreiter einer Spalte — ob das Lob oder Vorwurf ist,
+    // sagt der Tooltip der Spalte, nicht die Markierung. Nur wenn es
+    // überhaupt etwas zu vergleichen gibt.
+    function isTop(row, all, key) {
+      const vals = all.map(r => r[key]).filter(v => v != null);
+      if (vals.length < 2 || row[key] == null) return false;
+      return row[key] === Math.max(...vals);
+    }
+
+    function renderTable(which, cols, rows) {
+      const head = document.getElementById(which + "Head").querySelector("tr");
+      const body = document.getElementById(which + "Rows");
+      const sort = SORT[which];
+      head.innerHTML = cols.map(c => {
+        const active = sort.key === c.key;
+        const arrow = active
+          ? `<span class="sort-arrow">${sort.dir < 0 ? "▼" : "▲"}</span>` : "";
+        return `<th class="sortable${c.text ? "" : " num"}${active ? " active" : ""}"
+                    data-sort="${c.key}" tabindex="0" role="button"
+                    aria-label="Nach ${c.label} sortieren">${c.label}${arrow}</th>`;
+      }).join("");
+
+      const sorted = [...rows].sort((a, b) => {
+        const va = a[sort.key], vb = b[sort.key];
+        if (va == null && vb == null) return 0;
+        if (va == null) return 1;
+        if (vb == null) return -1;
+        if (typeof va === "string") return sort.dir * va.localeCompare(vb);
+        return sort.dir * (va - vb);
+      });
+
+      body.innerHTML = sorted.map(r => {
+        const mine = r.accountId === DATA.myAccountId;
+        return `<tr>` + cols.map(c => {
+          const flag = c.flag && c.flag(r, rows);
+          const weak = r.matches < 5 && !c.text;
+          const cls = [c.text ? "" : "num", flag ? "flag" : "",
+                       weak ? "weak" : ""].filter(Boolean).join(" ");
+          const title = flag ? ` title="${esc(c.why || "auffällig")}"` : "";
+          const val = c.text && mine
+            ? `<span class="me">${c.fmt(r)}</span>` : c.fmt(r);
+          return `<td class="${cls}"${title}>${val}</td>`;
+        }).join("") + `</tr>`;
+      }).join("");
+    }
+
+    function render() {
+      if (!DATA) return;
+      const rows = DATA.rows || [];
+      const fighters = rows.filter(r => r.opened > 0);
+      renderTable("fight", FIGHT_COLS, fighters);
+      renderTable("style", STYLE_COLS, rows);
+      document.getElementById("fightCard").hidden = fighters.length === 0;
+      document.getElementById("styleCard").hidden = rows.length === 0;
+    }
+
+    async function load() {
+      const st = document.getElementById("status");
+      st.classList.remove("err");
+      st.textContent = "Lade …";
+      const params = new URLSearchParams({ range: RANGE, minMatches: String(MIN) });
+      if (PLAYERS.trim()) params.set("players", PLAYERS.trim());
+      if (BOTS) params.set("includeBots", "1");
+      try {
+        DATA = await PubgUI.fetchJson(
+          BASE + "api/pubg/squad-playstyle?" + params, 120000);
+        const rows = DATA.rows || [];
+        st.textContent = `${DATA.matchesWithEvents} von ${DATA.matches} Matches `
+          + `mit Telemetrie · ${rows.length} Spieler ab ${MIN} Matches`
+          + (DATA.players && DATA.players.length
+             ? ` · Squad: ${DATA.players.join(", ")}` : "")
+          + (rows.length ? "" : " — nichts gefunden, Zeitraum weiten?");
+        render();
+      } catch (e) {
+        st.classList.add("err");
+        st.textContent = "Konnte nicht laden: " + (e && e.message || e);
+        document.getElementById("fightCard").hidden = true;
+        document.getElementById("styleCard").hidden = true;
+      }
+    }
+
+    function press(container, attr, value) {
+      [...container.querySelectorAll("button")].forEach(b =>
+        b.setAttribute("aria-pressed", String(b.dataset[attr] === value)));
+    }
+
+    document.getElementById("rangeSwitch").addEventListener("click", e => {
+      const b = e.target.closest("button[data-range]");
+      if (!b || b.dataset.range === RANGE) return;
+      RANGE = b.dataset.range;
+      press(e.currentTarget, "range", RANGE);
+      load();
+    });
+    document.getElementById("fPlayers").addEventListener("keydown", e => {
+      if (e.key !== "Enter") return;
+      PLAYERS = e.target.value;
+      load();
+    });
+    document.getElementById("fPlayers").addEventListener("change", e => {
+      PLAYERS = e.target.value;
+      load();
+    });
+    document.getElementById("fMin").addEventListener("change", e => {
+      MIN = Math.max(1, parseInt(e.target.value, 10) || 1);
+      load();
+    });
+    document.getElementById("fBots").addEventListener("change", e => {
+      BOTS = e.target.checked;
+      load();
+    });
+
+    ["fight", "style"].forEach(which => {
+      const head = document.getElementById(which + "Head");
+      const onSort = (th) => {
+        const key = th.dataset.sort;
+        if (!key) return;
+        const s = SORT[which];
+        if (s.key === key) s.dir *= -1;
+        else { s.key = key; s.dir = key === "name" ? 1 : -1; }
+        render();
+        const again = head.querySelector(`th[data-sort="${key}"]`);
+        if (again) again.focus();
+      };
+      head.addEventListener("click", e => {
+        const th = e.target.closest("th[data-sort]");
+        if (th) onSort(th);
+      });
+      head.addEventListener("keydown", e => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        const th = e.target.closest("th[data-sort]");
+        if (th) { e.preventDefault(); onSort(th); }
+      });
+    });
+
+    press(document.getElementById("rangeSwitch"), "range", RANGE);
+    document.getElementById("fPlayers").value = PLAYERS;
+    document.getElementById("fMin").value = MIN;
+    document.getElementById("fBots").checked = BOTS;
+    load();
+  </script>
+</body>
+</html>

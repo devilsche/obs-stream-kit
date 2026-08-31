@@ -316,6 +316,68 @@ def test_match_replay_404_stays_when_the_db_is_empty_too():
     assert code == 404
 
 
+def test_squad_playstyle_rejects_a_bad_range():
+    conn = _setup()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch(
+        "GET", "/api/pubg/squad-playstyle?range=epoch", b"", {})
+    assert code == 400
+
+
+def test_squad_playstyle_reports_rows_per_mate():
+    conn = _setup()
+    upsert_player(conn, "account.MATE", "MateA", "steam", False)
+    for i, mid in enumerate(("ps1", "ps2", "ps3")):
+        _insert_match(conn, mid, f"2026-05-2{i}T18:00:00Z")
+        _insert_participant(conn, mid, "account.A", "PEX_LuCKoR", team_id=1)
+        _insert_participant(conn, mid, "account.MATE", "MateA", team_id=1)
+        _insert_team_mapping(conn, mid, "account.A", 1)
+        _insert_team_mapping(conn, mid, "account.MATE", 1)
+        _insert_team_mapping(conn, mid, "account.FOE", 7)
+        base = 1_700_000_000_000 + i * 3_600_000
+        db_pg.insert_telemetry_events(conn.raw, mid, [
+            {"event_type": "Landing", "timestamp_ms": base,
+             "actor_account": "account.A", "actor_x": 0.0, "actor_y": 0.0},
+            {"event_type": "TakeDamage", "timestamp_ms": base + 30_000,
+             "actor_account": "account.A", "target_account": "account.FOE",
+             "actor_x": 0.0, "actor_y": 0.0,
+             "victim_x": 5000.0, "victim_y": 0.0},
+            {"event_type": "Knock", "timestamp_ms": base + 32_000,
+             "actor_account": "account.A", "target_account": "account.FOE"},
+        ])
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch(
+        "GET", "/api/pubg/squad-playstyle?range=all&minMatches=1", b"", {})
+    assert code == 200
+    data = json.loads(body)
+    me = next(r for r in data["rows"] if r["accountId"] == "account.A")
+    assert me["matches"] == 3
+    assert me["opened"] == 3
+    assert me["openedWithDown"] == 3
+    assert me["openHitPct"] == 100.0
+    assert me["downsPerOpen"] == 1.0
+
+
+def test_squad_playstyle_players_filter_needs_everyone_in_the_match():
+    """Mit players=X zaehlen nur Matches, in denen X wirklich dabei war."""
+    conn = _setup()
+    upsert_player(conn, "account.MATE", "MateA", "steam", False)
+    _insert_match(conn, "ps9", "2026-05-20T18:00:00Z")
+    _insert_participant(conn, "ps9", "account.A", "PEX_LuCKoR", team_id=1)
+    _insert_team_mapping(conn, "ps9", "account.A", 1)
+    db_pg.insert_telemetry_events(conn.raw, "ps9", [
+        {"event_type": "Landing", "timestamp_ms": 1_700_000_000_000,
+         "actor_account": "account.A", "actor_x": 0.0, "actor_y": 0.0}])
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch(
+        "GET", "/api/pubg/squad-playstyle?range=all&minMatches=1&players=MateA",
+        b"", {})
+    assert code == 200
+    assert json.loads(body)["rows"] == []
+
+
 def test_player_search_matches_prefix():
     conn = _setup()
     upsert_player(conn, "account.B", "Mate1", "steam", False)

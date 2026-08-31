@@ -304,6 +304,8 @@ class EndpointRegistry:
             return self._performance_history(qs)
         if route == ("GET", "/api/pubg/squad-compare"):
             return self._squad_compare(qs)
+        if route == ("GET", "/api/pubg/squad-playstyle"):
+            return self._squad_playstyle(qs)
         if route == ("GET", "/api/pubg/chickens-together"):
             return self._chickens_together(qs)
         if route == ("GET", "/api/pubg/session-report"):
@@ -2809,6 +2811,71 @@ class EndpointRegistry:
         n = int(qs.get("matches", 5))
         conn = self.get_conn()
         return _ok(compute_squad_compare(conn, self.tenant_id, self.my_account_id, names, n))
+
+    def _squad_playstyle(self, qs):
+        """Spielstil + Kampf-Ausgaenge je Squad-Mate.
+
+        `players=A,B,C` grenzt auf Matches ein, in denen ALLE genannten dabei
+        waren — sonst mischen sich Zufallsmates in die Quoten. Ohne Angabe
+        zaehlt jeder, der im Zeitraum mitgespielt hat.
+
+        Teuer (Events je Match), daher gecached und auf `limit` gedeckelt.
+        """
+        from pubg.playstyle import compute_squad_playstyle
+
+        conn = self.get_conn()
+        range_key = qs.get("range", "session")
+        if range_key not in ("session", "day", "week", "all"):
+            return _err(400, "range must be session|day|week|all")
+        from_iso, to_iso = qs.get("from"), qs.get("to")
+        names = [n.strip() for n in (qs.get("players") or "").split(",")
+                 if n.strip()]
+        try:
+            limit = max(1, min(int(qs.get("limit", "200")), 500))
+        except ValueError:
+            limit = 200
+        try:
+            min_matches = max(1, int(qs.get("minMatches", "3")))
+        except ValueError:
+            min_matches = 3
+        include_bots = qs.get("includeBots") == "1"
+
+        cutoff = (from_iso or (_range_filter(conn, self.tenant_id, range_key)
+                               if range_key != "all"
+                               else "1970-01-01T00:00:00Z"))
+        params = [self.tenant_id, self.my_account_id, cutoff]
+        sql = """
+            SELECT m.match_id FROM matches m
+            JOIN participants pa ON pa.match_id = m.match_id
+                                AND pa.tenant_id = m.tenant_id
+            WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?
+        """
+        if to_iso:
+            sql += " AND m.played_at <= ?"
+            params.append(to_iso)
+        # Squad-Auswahl: jeder genannte Name muss in dem Match dabei gewesen sein.
+        for _ in names:
+            sql += """
+              AND EXISTS (SELECT 1 FROM participants px
+                          WHERE px.tenant_id = m.tenant_id
+                            AND px.match_id = m.match_id
+                            AND LOWER(px.name) = LOWER(?))"""
+        params.extend(names)
+        sql += " ORDER BY m.played_at DESC LIMIT ?"
+        params.append(limit)
+        match_ids = [r["match_id"] for r in conn.execute(sql, params).fetchall()]
+
+        cache_key = (f"squad-playstyle:{range_key}:{from_iso or ''}:"
+                     f"{to_iso or ''}:{','.join(sorted(n.lower() for n in names))}:"
+                     f"{limit}:{min_matches}:{int(include_bots)}")
+        data = self.cache.get_or_compute(
+            cache_key,
+            lambda: compute_squad_playstyle(
+                conn, self.tenant_id, self.my_account_id, match_ids,
+                include_bots=include_bots, min_matches=min_matches))
+        return _ok({**data, "range": range_key, "players": names,
+                    "minMatches": min_matches, "includeBots": include_bots,
+                    "myAccountId": self.my_account_id})
 
     def _settings_get(self):
         conn = self.get_conn()
