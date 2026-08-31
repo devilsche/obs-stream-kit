@@ -57,6 +57,21 @@ def test_get_clip_mp4_urls_picks_highest_quality():
     assert "token=" in urls["ClipA"]
 
 
+def test_get_clip_mp4_urls_sends_query_inline_not_persisted_hash():
+    """Twitch rotiert persisted-Query-Hashes — ein veralteter Hash antwortet mit
+    PersistedQueryNotFound, damit fehlt jedem Clip die mp4-URL und die BRB-Szene
+    zeigt "Keine Clips gefunden". Darum die Query im Klartext, mit
+    Operationsnamen (sonst lehnt der Batch-Endpoint sie ab)."""
+    post = mock.Mock(return_value=_resp([_gql_ok("A")]))
+    with mock.patch("webcore.twitch_client.requests.post", post):
+        twitch_client.get_clip_mp4_urls(["A"])
+    op = post.call_args.kwargs["json"][0]
+    assert "extensions" not in op
+    assert op["operationName"] == "VideoAccessToken_Clip"
+    assert op["query"].startswith("query VideoAccessToken_Clip(")
+    assert "playbackAccessToken" in op["query"]
+
+
 def test_get_clip_mp4_urls_batches_all_slugs_in_one_request():
     slugs = ["A", "B", "C"]
     post = mock.Mock(return_value=_resp([_gql_ok(s) for s in slugs]))

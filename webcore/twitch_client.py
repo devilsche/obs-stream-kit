@@ -57,8 +57,21 @@ TWITCH_HELIX = "https://api.twitch.tv/helix"
 # <video>-Element, ohne iframe und ohne Gate.
 GQL_URL = "https://gql.twitch.tv/gql"
 GQL_CLIENT_ID = "kimne78kx3ncx6brgo4mv6wki5h1ko"
-GQL_CLIP_TOKEN_HASH = (
-    "36b89d2507fce29e5ca551df756d27c1cfe079e2609642b4390aa4c35796eb11")
+# Die Query wird im Klartext geschickt statt als persisted-Query-Hash: Twitch
+# rotiert die Hashes, und ein abgelaufener Hash antwortet mit
+# "PersistedQueryNotFound" — dann fehlt jedem Clip die mp4-URL und die Szene
+# zeigt "Keine Clips gefunden". Der Operationsname muss in der Query stehen,
+# sonst lehnt der Batch-Endpoint sie ab ("no operation with name ...").
+GQL_CLIP_TOKEN_QUERY = (
+    "query VideoAccessToken_Clip($slug: ID!) {"
+    " clip(slug: $slug) {"
+    " id"
+    " playbackAccessToken(params: {platform: \"web\","
+    " playerBackend: \"mediaplayer\", playerType: \"site\"})"
+    " { signature value }"
+    " videoQualities { frameRate quality sourceURL }"
+    " } }"
+)
 
 
 # Twitch beantwortet zu grosse GQL-Batches gar nicht mehr — ab etwa 35
@@ -93,9 +106,8 @@ def _clip_mp4_batch(slugs: list) -> dict:
         return {}
     ops = [{
         "operationName": "VideoAccessToken_Clip",
+        "query": GQL_CLIP_TOKEN_QUERY,
         "variables": {"slug": s},
-        "extensions": {"persistedQuery": {
-            "version": 1, "sha256Hash": GQL_CLIP_TOKEN_HASH}},
     } for s in slugs]
     try:
         with observe_external("twitch", "gql_clip_token") as obs:
