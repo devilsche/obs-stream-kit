@@ -112,3 +112,14 @@ def test_empty_archive_entry_is_treated_as_absent():
     res = ts.load_telemetry("m8", telemetry_url="http://x",
                             archive=arch, client=FakeClient(EV))
     assert res.source == "api"
+
+
+def test_default_client_is_constructible_without_api_key():
+    """Der echte Fallback-Client muss ohne .secrets bauen: der
+    Telemetrie-Download laeuft ueber die signierte CDN-URL, ohne Auth.
+    Vorher zeigte _default_client() auf nicht existierende Namen
+    (PubgApiClient/read_api_key) — der ImportError landete im
+    "API-Fehler"-Zweig, der API-Fallback war damit fuer jeden Tenant tot."""
+    c = ts._default_client("/nicht/vorhanden/.secrets")
+    assert hasattr(c, "get_telemetry")
+    assert c.api_key == ""

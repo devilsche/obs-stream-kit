@@ -30,10 +30,16 @@ def _default_archive():
     return hidrive_telemetry
 
 
-def _default_client():
-    from pubg.api_client import PubgApiClient
-    from pubg.config import read_api_key
-    return PubgApiClient(read_api_key())
+def _default_client(secrets_path: str = ".secrets"):
+    """PUBG-Client fuer den CDN-Download.
+
+    Der Telemetrie-Download braucht keinen API-Key — die telemetry_url ist ein
+    signierter CDN-Link ohne Auth. Ein fehlender Key ist daher kein Grund, den
+    Fallback zu verweigern; er wird nur mitgegeben, wenn er da ist.
+    """
+    from pubg.api_client import PubgClient
+    from pubg.config import load_api_key
+    return PubgClient(load_api_key(secrets_path) or "")
 
 
 def load_telemetry(match_id: str, telemetry_url: str = None,
@@ -61,7 +67,7 @@ def load_telemetry(match_id: str, telemetry_url: str = None,
             f"Telemetrie fuer {match_id} nicht verfuegbar "
             f"(keine telemetry_url; {'; '.join(reasons)})")
     try:
-        client = client if client is not None else _default_client()
+        client = client if client is not None else _default_client(secrets_path)
         events = client.get_telemetry(telemetry_url)
     except Exception as e:
         reasons.append(f"API-Fehler: {e}")
