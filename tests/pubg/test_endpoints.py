@@ -256,6 +256,66 @@ def test_match_replay_404_when_no_telemetry():
         assert code == 404
 
 
+def test_match_replay_falls_back_to_db_squad_events():
+    """Kein Roh-Blob mehr (nicht archiviert, kein CDN) — aber telemetry_events
+    steht noch in der DB. Daraus muss ein Replay entstehen statt einer 404."""
+    conn = _setup()
+    _insert_match(conn, "m3", "2026-05-26T10:00:00Z", "Baltic_Main", "squad")
+    _insert_team_mapping(conn, "m3", "account.A", 1)
+    _insert_team_mapping(conn, "m3", "account.B", 2)
+    db_pg.insert_telemetry_events(conn.raw, "m3", [
+        {"event_type": "Landing", "timestamp_ms": 1_700_000_000_000,
+         "actor_account": "account.A", "actor_x": 400000.0,
+         "actor_y": 400000.0, "actor_z": 120.0},
+        {"event_type": "Kill", "timestamp_ms": 1_700_000_060_000,
+         "actor_account": "account.A", "target_account": "account.B",
+         "actor_x": 400000.0, "actor_y": 400000.0,
+         "victim_x": 410000.0, "victim_y": 410000.0,
+         "weapon": "WeapAK47_C", "distance": 90.0},
+    ])
+    conn.commit()
+    reg = _registry(conn)
+    reg.client = None      # kein Live-API-Weg
+    with patch("pubg.hidrive_telemetry.download_raw", return_value=None):
+        body, code, _ = reg.dispatch(
+            "GET", "/api/pubg/match-replay?match=m3", b"", {})
+    assert code == 200
+    payload = json.loads(body)
+    assert payload["replaySource"] == "db-squad"
+    assert any(e["type"] == "kill" for e in payload["events"])
+    # Die Luecken muessen benannt sein, sonst liest das UI sie als Wahrheit.
+    assert payload["coverage"]["zones"] is False
+    assert payload["coverage"]["positions"] == "squad-only"
+
+
+def test_match_replay_from_raw_declares_full_coverage():
+    conn = _setup()
+    _insert_match(conn, "m4", "2026-05-26T10:00:00Z", "Baltic_Main", "squad")
+    _insert_team_mapping(conn, "m4", "account.A", 1)
+    conn.commit()
+    raw = [{"_T": "LogParachuteLanding", "_D": "2026-05-26T10:00:10Z",
+            "character": {"accountId": "account.A",
+                          "location": {"x": 400000, "y": 400000, "z": 100}}}]
+    reg = _registry(conn)
+    with patch("pubg.hidrive_telemetry.download_raw", return_value=raw):
+        body, code, _ = reg.dispatch(
+            "GET", "/api/pubg/match-replay?match=m4", b"", {})
+    assert code == 200
+    assert json.loads(body)["coverage"]["zones"] is True
+
+
+def test_match_replay_404_stays_when_the_db_is_empty_too():
+    conn = _setup()
+    _insert_match(conn, "m5", "2026-05-26T10:00:00Z", "Baltic_Main", "squad")
+    conn.commit()
+    reg = _registry(conn)
+    reg.client = None
+    with patch("pubg.hidrive_telemetry.download_raw", return_value=None):
+        body, code, _ = reg.dispatch(
+            "GET", "/api/pubg/match-replay?match=m5", b"", {})
+    assert code == 404
+
+
 def test_player_search_matches_prefix():
     conn = _setup()
     upsert_player(conn, "account.B", "Mate1", "steam", False)

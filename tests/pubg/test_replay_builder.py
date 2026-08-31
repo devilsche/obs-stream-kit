@@ -214,3 +214,112 @@ def test_extract_events_zone_radius_zero_is_none():
     z = next(e for e in events if e["type"] == "zone")
     assert z["safeR"] is None
     assert z["nextR"] is None
+
+
+# ── DB-Squad-Fallback: flache telemetry_events-Rows → Replay ────────────────
+
+from pubg.replay_builder import db_rows_to_raw_events, build_replay_from_db  # noqa: E402
+
+
+def _row(**kw):
+    base = {"event_type": None, "timestamp_ms": 0, "actor_account": None,
+            "target_account": None, "actor_x": None, "actor_y": None,
+            "actor_z": None, "actor_health": None, "victim_x": None,
+            "victim_y": None, "weapon": None, "distance": None,
+            "damage": None, "seat_index": None}
+    base.update(kw)
+    return base
+
+
+def test_db_rows_landing_becomes_a_landing_event():
+    raw = db_rows_to_raw_events([_row(
+        event_type="Landing", timestamp_ms=1_700_000_000_000,
+        actor_account="account.A", actor_x=400000, actor_y=400000,
+        actor_z=500)])
+    assert raw[0]["_T"] == "LogParachuteLanding"
+    assert raw[0]["character"]["accountId"] == "account.A"
+    assert raw[0]["character"]["location"]["x"] == 400000
+    # _D muss ISO sein, sonst kann extract_events den Timestamp nicht lesen
+    assert raw[0]["_D"].endswith("Z")
+
+
+def test_db_rows_kill_carries_weapon_and_both_positions():
+    raw = db_rows_to_raw_events([_row(
+        event_type="Kill", timestamp_ms=1_700_000_060_000,
+        actor_account="account.A", target_account="account.B",
+        actor_x=100000, actor_y=100000, victim_x=110000, victim_y=110000,
+        weapon="WeapHK416_C", distance=1234.5)])
+    e = raw[0]
+    assert e["_T"] == "LogPlayerKillV2"
+    assert e["killer"]["accountId"] == "account.A"
+    assert e["victim"]["accountId"] == "account.B"
+    assert e["killerDamageInfo"]["damageCauserName"] == "WeapHK416_C"
+    assert e["killerDamageInfo"]["distance"] == 1234.5
+
+
+def test_db_rows_knock_maps_to_make_groggy():
+    raw = db_rows_to_raw_events([_row(
+        event_type="Knock", timestamp_ms=1_700_000_030_000,
+        actor_account="account.A", target_account="account.B",
+        weapon="WeapM16A4_C")])
+    assert raw[0]["_T"] == "LogPlayerMakeGroggy"
+    assert raw[0]["attacker"]["accountId"] == "account.A"
+
+
+def test_db_rows_vehicle_rows_keep_id_and_seat():
+    raw = db_rows_to_raw_events([
+        _row(event_type="VehicleEnter", timestamp_ms=1_700_000_010_000,
+             actor_account="account.A", weapon="BP_Motorbike_04_C_1",
+             seat_index=0, actor_x=1, actor_y=2),
+        _row(event_type="VehicleLeave", timestamp_ms=1_700_000_020_000,
+             actor_account="account.A", weapon="BP_Motorbike_04_C_1",
+             seat_index=0, actor_x=3, actor_y=4),
+    ])
+    assert [e["_T"] for e in raw] == ["LogVehicleRide", "LogVehicleLeave"]
+    assert raw[0]["vehicle"]["vehicleId"] == "BP_Motorbike_04_C_1"
+    assert raw[0]["seatIndex"] == 0
+
+
+def test_db_rows_skip_types_the_replay_cannot_use():
+    """Attack/ItemPickup & Co. tragen nichts zum Replay bei — und Rows ohne
+    Timestamp sind nicht einsortierbar."""
+    raw = db_rows_to_raw_events([
+        _row(event_type="Attack", timestamp_ms=1_700_000_000_000,
+             actor_account="account.A"),
+        _row(event_type="ItemPickup", timestamp_ms=1_700_000_000_000),
+        _row(event_type="Landing", timestamp_ms=None, actor_account="account.A"),
+    ])
+    assert raw == []
+
+
+def test_build_replay_from_db_produces_the_same_shape():
+    rows = [
+        _row(event_type="Position", timestamp_ms=1_700_000_000_000,
+             actor_account="account.A", actor_x=400000, actor_y=400000,
+             actor_z=200),
+        _row(event_type="Landing", timestamp_ms=1_700_000_001_000,
+             actor_account="account.A", actor_x=400000, actor_y=400000,
+             actor_z=150),
+        _row(event_type="Kill", timestamp_ms=1_700_000_060_000,
+             actor_account="account.A", target_account="account.B",
+             actor_x=400000, actor_y=400000, victim_x=410000, victim_y=410000,
+             weapon="WeapHK416_C", distance=100.0),
+    ]
+    out = build_replay_from_db(rows, "m1", "Baltic_Main", 8.0,
+                              {"account.A": 1, "account.B": 2},
+                              {"account.A": "Ich", "account.B": "Gegner"})
+    assert out["matchId"] == "m1"
+    assert {t["teamId"] for t in out["teams"]} == {1, 2}
+    types = [e["type"] for e in out["events"]]
+    assert "landing" in types and "kill" in types and "death" in types
+    # Timestamps normalisiert auf 0 wie bei build_replay
+    assert out["events"][0]["ts"] == 0
+    assert out["durationMs"] == 60_000
+
+
+def test_build_replay_from_db_declares_its_gaps():
+    """Aus der DB gibt es keine Gegner-Positionen und keine Zonen — der
+    Aufrufer muss das im UI sagen koennen."""
+    out = build_replay_from_db([], "m2", "Baltic_Main", 8.0, {}, {})
+    assert out["coverage"]["positions"] == "squad-only"
+    assert out["coverage"]["zones"] is False

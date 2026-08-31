@@ -952,8 +952,11 @@ class EndpointRegistry:
         tele_url = m_row["telemetry_url"] if m_row else None
         if not raw and tele_url:
             try:
-                from pubg.api_client import ApiClient
-                raw = ApiClient(api_key="").get_telemetry(tele_url)
+                # PubgClient, nicht ApiClient — der falsche Name flog als
+                # ImportError in den except-Zweig, damit war dieser Fallback
+                # seit dem Bau nie aktiv. Der CDN-Download braucht keinen Key.
+                from pubg.api_client import PubgClient
+                raw = PubgClient(api_key="").get_telemetry(tele_url)
                 replay_source = "api"
             except Exception as e:
                 api_err = f"CDN: {type(e).__name__}: {e}"
@@ -978,13 +981,44 @@ class EndpointRegistry:
             except Exception as e:
                 api_err = api_err or f"API: {type(e).__name__}: {e}"
 
+        # Fallback 3: kein Roh-Blob mehr zu bekommen — dann das Replay aus
+        # telemetry_events bauen. Das reicht fuer das eigene Squad (Pfade,
+        # Kaempfe, Kills); Gegner-Bewegung und Zonen fehlen, das sagt
+        # `coverage` im Ergebnis. Besser als eine 404 auf ein Match, dessen
+        # Kampfverlauf wir sehr wohl noch haben.
+        if not raw:
+            from pubg.db_pg import get_telemetry_for_match
+            db_rows = get_telemetry_for_match(conn.raw, match_id)
+            if db_rows:
+                from pubg.replay_builder import build_replay_from_db
+                if not map_name:
+                    map_name = "Baltic_Main"
+                team_mapping = get_team_mapping_for_match(
+                    conn.raw, self.tenant_id, match_id)
+                names = {r["account_id"]: r["name"] for r in conn.execute(
+                    "SELECT account_id, name FROM players WHERE tenant_id = ?",
+                    (self.tenant_id,)).fetchall()}
+                result = build_replay_from_db(
+                    db_rows, match_id, map_name, _map_meta(map_name),
+                    team_mapping, names)
+                result["replaySource"] = "db-squad"
+                from pubg.db_pg import get_self_player
+                self_row = get_self_player(conn.raw, self.tenant_id)
+                if self_row:
+                    result["heroAccountId"] = self_row["account_id"]
+                    result["heroTeamId"] = team_mapping.get(
+                        self_row["account_id"])
+                self._replay_cache[match_id] = result
+                return _ok(result)
+
         if not raw:
             # Diagnostische 404 — macht sichtbar, woran es liegt.
             if api_err:
                 return _err(404, f"Telemetrie nicht ladbar: {api_err}")
             return _err(404, "Keine Telemetrie verfuegbar — Match nicht auf "
-                              "HiDrive, keine telemetry_url in der DB, und die "
-                              "PUBG-API liefert nichts dazu (Match-ID korrekt? "
+                              "HiDrive, keine telemetry_url in der DB, keine "
+                              "Events in telemetry_events, und die PUBG-API "
+                              "liefert nichts dazu (Match-ID korrekt? "
                               ">14 Tage alt?).")
 
         # map_name aus Raw extrahieren wenn DB-Row fehlte
@@ -1013,7 +1047,8 @@ class EndpointRegistry:
 
         result = build_replay(
             raw, match_id, map_name, mapKm, team_mapping, names)
-        result["replaySource"] = replay_source  # hidrive | api (Debug/Transparenz)
+        result["replaySource"] = replay_source  # hidrive | api | api-live
+        result["coverage"] = {"positions": "all", "zones": True, "hits": "all"}
         # Hero-Account + Team (eigener Spieler, is_self=1 in DB)
         from pubg.db_pg import get_self_player
         self_row = get_self_player(conn.raw, self.tenant_id)

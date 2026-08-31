@@ -92,6 +92,15 @@
                animation: rs-spin 0.8s linear infinite; }
     @keyframes rs-spin { to { transform: rotate(360deg); } }
     .match-count-dim { color: var(--theme-text-faint); }
+    /* Hinweis, wenn das Replay aus der DB rekonstruiert ist: dann fehlen
+       Gegner-Bewegung und Zonen, und das darf nicht wie Wahrheit aussehen. */
+    .source-note { display: none; margin: 8px 0 2px; padding: 8px 10px;
+               border-left: 3px solid var(--theme-accent);
+               background: color-mix(in srgb, var(--theme-accent) 12%, transparent);
+               color: var(--theme-text); font-size: 12px; line-height: 1.4;
+               border-radius: 3px; }
+    .source-note.show { display: block; }
+    .source-note b { color: var(--theme-accent); }
     @media (prefers-reduced-motion: reduce) {
       .loading .spinner { animation: none; }
     }
@@ -105,6 +114,7 @@
         <input id="matchFilter" type="search" placeholder="Filter: Datum, Map, Platz…"
                aria-label="Match-Liste filtern">
         <select id="matchSelect" aria-label="Match auswählen" size="1"></select>
+        <p class="source-note" id="sourceNote" role="status" aria-live="polite"></p>
       </div>
       <div id="teamList" aria-label="Teamliste"></div>
       <fieldset class="toggles">

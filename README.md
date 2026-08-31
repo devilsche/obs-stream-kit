@@ -502,6 +502,27 @@ auf das Backend; kein Streaming nötig.
 | `tools/match-analysis.html` | Telemetrie-Auswertung eines Matches: Accuracy, Trefferzonen, Kill-Timeline, Auffälligkeiten | Browser-Tab |
 | `tools/weapon-performance.html` | Dieselben Kennzahlen über einen **Zeitraum** — je Waffe oder je Spieler | Browser-Tab |
 
+#### tools/match-replay.html
+
+Quellen-Kette für die Roh-Telemetrie, in dieser Reihenfolge:
+
+1. **HiDrive-Archiv** — das Blob ändert sich nie, der Griff ins Archiv spart jeden
+   externen Call. Gefüllt wird es nur für Admin-Tenants.
+2. **PUBG-CDN** über `matches.telemetry_url` — kein API-Key nötig, reicht rund
+   14 Tage zurück. Fehlt die URL in der DB, wird das Match einmal frisch von
+   `/matches/{id}` geholt (nicht rate-limitiert) und die URL daraus genommen.
+3. **`telemetry_events` aus der DB** — wenn kein Roh-Blob mehr zu bekommen ist.
+   Die flachen Rows werden zu Pseudo-Roh-Events zurückgebaut und durch dieselbe
+   `extract_events()`-Pipeline geschickt, damit es nur einen Renderer gibt.
+
+Stufe 3 ist bewusst ein Teil-Replay: `telemetry_events` speichert Position-Events
+**nur für das eigene Squad** und `LogGameStatePeriodic` gar nicht. Gegner erscheinen
+also an ihren Lande-, Knock- und Kill-Punkten, haben aber keine Bewegungsspur, und
+es gibt keine Bluezone. Das Ergebnis sagt das selbst: `replaySource` ist `hidrive`,
+`api`, `api-live` oder `db-squad`, und `coverage` nennt die Lücken
+(`positions: squad-only|all`, `zones: true|false`, `hits: squad-only|all`). Das Tool
+zeigt daraufhin einen Hinweis und sperrt den Bluezone-Schalter.
+
 #### tools/weapon-performance.html
 
 Waffen-Kennzahlen über einen **Zeitraum** statt über ein einzelnes Match: `?range=session|day|week|all`.

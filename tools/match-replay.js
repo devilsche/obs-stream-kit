@@ -103,6 +103,37 @@ function setLoading(state, text) {
   el.classList.toggle("show", state !== "done");
 }
 
+// Aus der DB rekonstruierte Replays haben nur die Squad-Bewegung und keine
+// Zonen (telemetry_events speichert Position nur fuer den eigenen Squad und
+// LogGameStatePeriodic gar nicht). Ohne Hinweis sieht das aus wie ein Match,
+// in dem die Gegner stillstanden.
+function showSourceNote(replay) {
+  const el = document.getElementById("sourceNote");
+  if (!el) return;
+  const cov = (replay && replay.coverage) || {};
+  const limited = cov.positions === "squad-only" || cov.zones === false;
+  el.classList.toggle("show", !!limited);
+  if (limited) {
+    el.innerHTML = "<b>Eingeschränktes Replay</b> — aus der Datenbank "
+      + "rekonstruiert, weil die Roh-Telemetrie nicht mehr verfügbar ist: "
+      + "Bewegungsspuren nur für das eigene Squad, Gegner erscheinen an "
+      + "Lande- und Kampfpunkten, keine Bluezone.";
+  } else {
+    el.textContent = "";
+  }
+  // Zonen-Schalter abschalten statt ins Leere klicken zu lassen.
+  const tgl = document.getElementById("tglZones");
+  if (tgl) {
+    const noZones = cov.zones === false;
+    tgl.disabled = noZones;
+    if (noZones) tgl.checked = false;
+    const lbl = tgl.closest("label");
+    if (lbl) lbl.title = noZones
+      ? "Für dieses Replay liegen keine Zonen-Daten vor"
+      : "";
+  }
+}
+
 async function loadReplay(matchId) {
   setLoading("show", "Replay wird geladen…");
   try {
@@ -117,6 +148,7 @@ async function loadReplay(matchId) {
     buildTeamList();
     return;
   }
+  showSourceNote(RS.replay);
   RS.cursorMs = 0;
   RS.playing = false;
   RS.focusedTeam = null;

@@ -342,3 +342,105 @@ def build_replay(raw_events, match_id, map_name, mapKm,
         "events": events,
         "flightPath": flight_path,
     }
+
+# ── DB-Squad-Fallback ───────────────────────────────────────────────────────
+#
+# Ist die Roh-Telemetrie nicht mehr zu bekommen (nicht archiviert, aelter als
+# das API-Fenster), bleibt `telemetry_events` in der DB. Die Rows werden hier
+# zu Pseudo-Roh-Events im `_T`-Format zurueckgebaut und durch dieselbe
+# extract_events()-Pipeline geschickt — ein zweiter Renderer waere sonst zum
+# Auseinanderlaufen verurteilt.
+#
+# Was die DB nicht hat (siehe pubg/telemetry.py::filter_squad_events):
+#   * Position-Events NUR fuer den eigenen Squad → Gegner erscheinen an ihren
+#     Kill-/Knock-/Landing-Punkten, haben aber keine Bewegungsspur.
+#   * LogGameStatePeriodic wird nicht gespeichert → keine Blau-/Weisszone.
+#   * TakeDamage nur mit Squad-Beteiligung → Treffer zwischen zwei fremden
+#     Teams fehlen.
+
+#: DB-event_type → (Raw-`_T`, Actor-Key, Victim-Key)
+_DB_EVENT_MAP = {
+    "Landing":      ("LogParachuteLanding", "character", None),
+    "Position":     ("LogPlayerPosition",   "character", None),
+    "Kill":         ("LogPlayerKillV2",     "killer",    "victim"),
+    "Knock":        ("LogPlayerMakeGroggy", "attacker",  "victim"),
+    "TakeDamage":   ("LogPlayerTakeDamage", "attacker",  "victim"),
+    "VehicleEnter": ("LogVehicleRide",      "character", None),
+    "VehicleLeave": ("LogVehicleLeave",     "character", None),
+}
+
+
+def _iso_from_ms(ms):
+    return _dt.datetime.fromtimestamp(ms / 1000.0, _dt.timezone.utc) \
+        .strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
+def _char(account_id, x, y, z=None, health=None):
+    return {"accountId": account_id,
+            "location": {"x": x, "y": y, "z": z},
+            "health": health}
+
+
+def _row_get(row, key):
+    """Feld-Zugriff, der dicts (psycopg2 RealDictRow) und sqlite3.Row
+    gleich behandelt — letztere kennt kein .get()."""
+    try:
+        return row[key]
+    except (KeyError, IndexError):
+        return None
+
+
+def db_rows_to_raw_events(rows):
+    """Flache telemetry_events-Rows → Roh-Event-Dicts im `_T`-Format.
+
+    Nur die Typen, die das Replay zeichnet; alles andere (Attack, ItemPickup,
+    Revive …) faellt raus. Rows ohne timestamp_ms sind nicht einsortierbar und
+    werden ebenfalls verworfen.
+    """
+    out = []
+    for r in rows or []:
+        g = lambda k: _row_get(r, k)          # noqa: E731 — knapp gehalten
+        ts = g("timestamp_ms")
+        mapped = _DB_EVENT_MAP.get(g("event_type"))
+        if ts is None or mapped is None:
+            continue
+        raw_t, actor_key, victim_key = mapped
+        e = {"_T": raw_t, "_D": _iso_from_ms(ts)}
+        e[actor_key] = _char(g("actor_account"), g("actor_x"), g("actor_y"),
+                             g("actor_z"), g("actor_health"))
+        if victim_key:
+            e[victim_key] = _char(g("target_account"), g("victim_x"),
+                                  g("victim_y"))
+        if raw_t == "LogPlayerKillV2":
+            # extract_events liest Waffe/Distanz aus killerDamageInfo.
+            e["killerDamageInfo"] = {"damageCauserName": g("weapon"),
+                                      "distance": g("distance")}
+        elif raw_t in ("LogPlayerMakeGroggy", "LogPlayerTakeDamage"):
+            e["damageCauserName"] = g("weapon")
+            e["distance"] = g("distance")
+            e["damage"] = g("damage")
+        elif raw_t in ("LogVehicleRide", "LogVehicleLeave"):
+            # vehicleId liegt in der DB in der weapon-Spalte (siehe
+            # pubg/telemetry.py::_normalize) — ohne ihn kann die
+            # Shared-Vehicle-Unifikation Enter und Leave nicht paaren.
+            e["vehicle"] = {"vehicleId": g("weapon")}
+            e["seatIndex"] = g("seat_index")
+        out.append(e)
+    return out
+
+
+def build_replay_from_db(rows, match_id, map_name, mapKm,
+                         team_mapping, names, position_interval_ms=1000):
+    """Wie build_replay, aber aus den DB-Rows statt dem Roh-Blob.
+
+    Das Ergebnis hat dieselbe Form; zusaetzlich sagt `coverage`, was fehlt,
+    damit das UI es benennen kann statt Luecken als Wahrheit zu zeigen.
+    """
+    result = build_replay(db_rows_to_raw_events(rows), match_id, map_name,
+                          mapKm, team_mapping, names, position_interval_ms)
+    result["coverage"] = {
+        "positions": "squad-only",   # Gegner nur an Kampf-/Landepunkten
+        "zones": False,              # LogGameStatePeriodic ist nicht in der DB
+        "hits": "squad-only",        # TakeDamage nur mit Squad-Beteiligung
+    }
+    return result
