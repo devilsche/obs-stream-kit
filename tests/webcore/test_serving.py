@@ -53,3 +53,56 @@ def test_serve_asset_rejects_parent_traversal(tmp_path):
     with _ctx():
         with pytest.raises(NotFound):
             serve_asset(str(tmp_path), "widgets", "../secret.txt")
+
+
+# ── Impersonation-Banner ────────────────────────────────────────────────────
+
+from webcore.serving import inject_impersonation_banner  # noqa: E402
+
+
+def test_banner_names_the_foreign_tenant():
+    html = "<html><head></head><body><h1>Tool</h1></body></html>"
+    out = inject_impersonation_banner(
+        html, {"id": 2, "slug": "originalhat3", "display_name": "Hat3"},
+        "/app/tools/match-analysis")
+    assert "Hat3" in out
+    # Direkt nach <body>, damit das Banner nichts ueberdeckt (WCAG 2.4.12).
+    assert out.index("obs-impersonation") < out.index("<h1>")
+
+
+def test_banner_exit_link_drops_the_parameter():
+    out = inject_impersonation_banner(
+        "<html><head></head><body></body></html>",
+        {"id": 2, "slug": "h3", "display_name": "H3"},
+        "/app/tools/weapon-performance?range=week")
+    assert 'href="/app/tools/weapon-performance?range=week"' in out
+
+
+def test_banner_escapes_the_tenant_name():
+    out = inject_impersonation_banner(
+        "<html><head></head><body></body></html>",
+        {"id": 2, "slug": "x", "display_name": '<script>alert(1)</script>'},
+        "/app/")
+    assert "<script>alert(1)</script>" not in out
+    assert "&lt;script&gt;" in out
+
+
+def test_banner_without_impersonation_is_a_noop():
+    html = "<html><head></head><body>x</body></html>"
+    assert inject_impersonation_banner(html, None, "/app/") == html
+
+
+def test_banner_without_body_tag_still_lands_in_the_page():
+    out = inject_impersonation_banner(
+        "<div>kein body-Tag</div>",
+        {"id": 3, "slug": "flip", "display_name": "Flip"}, "/app/")
+    assert "obs-impersonation" in out
+    assert out.index("obs-impersonation") < out.index("kein body-Tag")
+
+
+def test_banner_uses_no_inline_styles():
+    """Projekt-Regel: nichts Visuelles im style-Attribut."""
+    out = inject_impersonation_banner(
+        "<html><head></head><body></body></html>",
+        {"id": 2, "slug": "h3", "display_name": "H3"}, "/app/")
+    assert 'style="' not in out

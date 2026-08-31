@@ -189,7 +189,7 @@ def admin_poi_editor():
     for asset in ("_theme.css", "_blocks.css"):
         for prefix in ("../", ""):
             html = html.replace(f'href="{prefix}{asset}"', f'href="/widgets-static/{asset}"')
-    from webcore.serving import inject_theme
+    from webcore.serving import inject_theme, inject_impersonation_banner
     from pubg.db_pg import get_setting
     conn2 = _get_conn()
     try:
@@ -198,6 +198,10 @@ def admin_poi_editor():
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn2.close()
     html = inject_theme(html, theme)
+    # Diese Editoren SCHREIBEN Daten — in einer Fremdsicht ist der Hinweis
+    # noch wichtiger als in den lesenden Tools.
+    html = inject_impersonation_banner(
+        html, getattr(g, "tenant_impersonating", None), request.full_path)
     inject = (
         '<script>\n'
         'window.__SERVE_BASE__ = "/";\n'
@@ -225,7 +229,7 @@ def admin_icon_crop():
     for asset in ("_pubg.css", "_pubg.js"):
         html = html.replace(f'href="{asset}"', f'href="/widgets-static/pubg/{asset}"')
         html = html.replace(f'src="{asset}"', f'src="/widgets-static/pubg/{asset}"')
-    from webcore.serving import inject_theme
+    from webcore.serving import inject_theme, inject_impersonation_banner
     from pubg.db_pg import get_setting
     conn2 = _get_conn()
     try:
@@ -234,6 +238,10 @@ def admin_icon_crop():
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn2.close()
     html = inject_theme(html, theme)
+    # Diese Editoren SCHREIBEN Daten — in einer Fremdsicht ist der Hinweis
+    # noch wichtiger als in den lesenden Tools.
+    html = inject_impersonation_banner(
+        html, getattr(g, "tenant_impersonating", None), request.full_path)
     inject = '<script>\nwindow.__SERVE_BASE__ = "/";\n</script>'
     html = html.replace("</head>", inject + "\n</head>", 1)
     return html, 200, {"Content-Type": "text/html; charset=utf-8"}

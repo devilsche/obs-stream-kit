@@ -442,6 +442,14 @@ Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
 Cross-Player-Web-View: `http://localhost:8080/widgets/pubg/coplayer.html?player=NAME`
 (alte URL `overlays/stats.html?player=NAME` leitet weiter)
 
+**Fremdsicht (`?asTenant=`)**: Admins können jedes Tool und Widget in der Sicht eines
+anderen Tenants öffnen — `?asTenant=2` oder `?asTenant=<slug>`. Der Parameter wird von
+`_pubg.js` an alle API-Calls angehängt. Datei-servierte Tools bekommen dabei ein
+Banner „Viewing as … (Tenant #N)" mit Rücksprung-Link (die Dashboard-Seiten haben es
+über `base.html` schon); der Link behält alle übrigen Query-Parameter. OBS-Sources über
+`/s/<token>/` sind davon nicht betroffen — dort gibt es keine Impersonation und
+entsprechend kein Banner im Stream.
+
 **TopScorer** im `session-report` ist der beste Einzelspieler der **ganzen Lobby** —
 eigener Squad eingeschlossen, im Gegensatz zum "Stärksten Gegner" in
 `session-lobbies.html`. Er steht jetzt in drei Auflösungen da: je Match (eigene

@@ -44,3 +44,60 @@ def test_unknown_token_404(pg_conn_test_setup, tmp_path):
     app = _make_app(conn, tmp_path)
     resp = app.test_client().get("/s/tok_nope/widgets/pubg/last-match.html")
     assert resp.status_code == 404
+
+
+# ── Impersonation-Banner in datei-servierten Tools ──────────────────────────
+
+def _second_tenant(conn, slug="fremd"):
+    """Zweiter Tenant mit PUBG-Credentials (sonst greift das Creds-Gate)."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO users (display_name, is_admin, is_approved)
+            VALUES ('Fremd', FALSE, TRUE) RETURNING id
+        """)
+        uid = cur.fetchone()["id"]
+        cur.execute("""
+            INSERT INTO tenants (owner_user_id, slug, display_name)
+            VALUES (%s, %s, 'FremdTenant') RETURNING id
+        """, (uid, slug))
+        tid = cur.fetchone()["id"]
+        cur.execute("INSERT INTO tenant_credentials (tenant_id) VALUES (%s)",
+                    (tid,))
+    conn.commit()
+    return tid
+
+
+def _creds_for(conn, tenant_id):
+    """PUBG-Name + Key setzen, damit das Tool nicht am Creds-Gate haengt."""
+    from core import credentials
+    credentials.set_pubg(conn, tenant_id, name="Fremd_Player",
+                         api_key="key-fremd")
+
+
+def test_tool_in_foreign_view_shows_the_banner(pg_conn_test_setup):
+    conn, tenant_id, _, sid = pg_conn_test_setup
+    other = _second_tenant(conn)
+    _creds_for(conn, other)
+    app = create_app(testing=True)
+    app.config["_PG_CONN_FACTORY"] = lambda: conn
+    client = app.test_client()
+    client.set_cookie("obskit_sid", sid, domain="localhost")
+    resp = client.get(f"/app/tools/weapon-performance?asTenant={other}")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "obs-impersonation" in body
+    # Angezeigt wird der Twitch-Anzeigename des Tenant-Owners (wie in base.html)
+    assert "Fremd" in body
+    assert f"#{other}" in body
+
+
+def test_tool_in_own_view_has_no_banner(pg_conn_test_setup):
+    conn, tenant_id, _, sid = pg_conn_test_setup
+    _creds_for(conn, tenant_id)
+    app = create_app(testing=True)
+    app.config["_PG_CONN_FACTORY"] = lambda: conn
+    client = app.test_client()
+    client.set_cookie("obskit_sid", sid, domain="localhost")
+    resp = client.get("/app/tools/weapon-performance")
+    assert resp.status_code == 200
+    assert "obs-impersonation" not in resp.get_data(as_text=True)

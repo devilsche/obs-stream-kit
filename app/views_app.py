@@ -484,7 +484,7 @@ def tools_open(key):
         html = f.read()
     # Theme auf <html data-theme="..."> setzen — ohne das greifen
     # alle html[data-theme="X"]-Selektoren in _theme.css nicht.
-    from webcore.serving import inject_theme
+    from webcore.serving import inject_theme, inject_impersonation_banner
     from pubg.db_pg import get_setting
     conn2 = _get_conn()
     try:
@@ -493,6 +493,10 @@ def tools_open(key):
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn2.close()
     html = inject_theme(html, theme)
+    # Fremdsicht kennzeichnen (?asTenant=...) — an der Seite selbst ist sonst
+    # nicht zu sehen, wessen Daten da stehen.
+    html = inject_impersonation_banner(
+        html, getattr(g, "tenant_impersonating", None), request.full_path)
     # Bei Tools die als widgets/<domain>/*.html liegen (Alt-Bestand:
     # session-report, poi-editor) zeigen die relativen Asset-Pfade
     # (_pubg.css, _pubg.js, _pubg_pois.js) auf das gleiche Verzeichnis.
