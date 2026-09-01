@@ -470,7 +470,7 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
     kd_by_acc = db_pg.get_lifetime_overall(raw, list(accounts))
     names = db_pg.get_player_names(raw, tenant_id, list(accounts))
 
-    out, strongest = [], {}
+    out, strongest, weakest = [], {}, {}
     for mid, e in per_match.items():
         squad = squad_by_match.get(mid, set())
         lobby = [a for a in e["accounts"]
@@ -485,10 +485,14 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
             kd = kd_by_acc.get(a)
             if kd is None:
                 continue
+            entry = {"name": names.get(a) or a[:12], "kd": kd,
+                     "matchId": mid, "playedAt": e["playedAt"]}
             prev = strongest.get(a)
             if prev is None or kd > prev["kd"]:
-                strongest[a] = {"name": names.get(a) or a[:12], "kd": kd,
-                                "matchId": mid, "playedAt": e["playedAt"]}
+                strongest[a] = entry
+            prev = weakest.get(a)
+            if prev is None or kd < prev["kd"]:
+                weakest[a] = entry
     out.sort(key=lambda m: m["playedAt"] or "", reverse=True)
 
     # Nur Matches mit brauchbarer Abdeckung tragen zum Gesamtbild bei.
@@ -510,7 +514,10 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
         "lowAvg": _avg("lowAvg"),
         "max": max((m["max"] for m in solid if m["max"] is not None),
                    default=None),
+        # Namentlich die Extreme der ganzen Phase — der Schnitt sagt nicht,
+        # ob da ein Hai drin sass.
         "strongest": sorted(strongest.values(), key=lambda p: -p["kd"])[:top_n],
+        "weakest": sorted(weakest.values(), key=lambda p: p["kd"])[:top_n],
     }
     return {"matches": out, "totals": totals, "seasonId": season_id,
             "topN": top_n}

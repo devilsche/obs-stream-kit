@@ -3612,7 +3612,8 @@ def compute_payday_stats(conn, tenant_id: int, my_account_id, range_key="all",
         # Account-ID -> Name. Fallback Account-ID-Kuerzung.
         names = {r["account_id"]: r["name"] for r in conn.execute(
             f"SELECT account_id, name FROM players "
-            f"WHERE account_id IN ({ph})", [tenant_id] + squad).fetchall()}
+            f"WHERE tenant_id = ? AND account_id IN ({ph})",
+            [tenant_id] + squad).fetchall()}
         mates = []
         for acc in squad:
             mates.append({

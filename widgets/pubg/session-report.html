@@ -298,6 +298,25 @@
       line-height: 1.5;
     }
     .lobby-modal__empty { color: var(--pubg-muted); }
+
+    /* Scheitert der Report, muss das jemand sehen — vorher landete der
+       Fehler nur in der Konsole und der Platzhalter blieb ewig stehen. */
+    .report-error p { margin: 0 0 10px; }
+    .report-retry {
+      min-height: 32px;
+      padding: 6px 14px;
+      border: 1px solid var(--pubg-gold);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--pubg-gold);
+      font: inherit;
+      cursor: pointer;
+    }
+    .report-retry:hover { background: rgba(242, 183, 5, 0.14); }
+    .report-retry:focus-visible {
+      outline: 2px solid var(--pubg-gold);
+      outline-offset: 2px;
+    }
     @media (prefers-reduced-motion: reduce) {
       .lobby-pending {
         animation: none;
@@ -3466,15 +3485,14 @@
           <h3>Die ${n} stärksten <em>${cov}</em></h3>
           ${lobbyListHtml(isPhase ? src.strongest : src.top, "top", isPhase)}
         </div>
-        ${isPhase ? "" : `
         <div class="lobby-side">
           <h3>Die ${n} schwächsten</h3>
-          ${lobbyListHtml(src.low, "low", false)}
-        </div>`}
+          ${lobbyListHtml(isPhase ? src.weakest : src.low, "low", isPhase)}
+        </div>
         <p class="lobby-modal__note">${isPhase
           ? `Ø, Median und die Ränder mitteln die Match-Werte — sonst wögen
-             volle Lobbys schwerer als kurze Matches. Gelistet sind die
-             stärksten Gegner der ganzen Phase mit ihrer Uhrzeit.`
+             volle Lobbys schwerer als kurze Matches. Namentlich gelistet sind
+             dagegen die Extreme der ganzen Phase, mit ihrer Uhrzeit.`
           : `Eigener Squad und Bots sind draußen. Der Median liegt meist knapp
              unter dem Ø: K/D endet bei 0, ist nach oben aber offen.`}</p>`;
     }
@@ -4292,7 +4310,36 @@
       ((FROM || TO) ? "?" + new URLSearchParams({
         ...(FROM ? {from: FROM} : {}), ...(TO ? {to: TO} : {})
       }).toString() : "");
-    PubgUI.poll(reportUrl, 60000, render, console.error);
+    // 45 s statt der 10 s Standard: der Report ueber den ganzen Bestand
+    // rechnet serverseitig rund 7 s (1070 Matches) und wurde vorher
+    // abgeschnitten — die Seite blieb dann stumm am Platzhalter stehen.
+    let _reportShown = false;
+    PubgUI.poll(reportUrl, 60000, (d) => {
+      _reportShown = true;
+      render(d);
+    }, (err) => {
+      console.error(err);
+      if (_reportShown) return;   // alte Anzeige stehen lassen
+      const host = document.getElementById("report");
+      const aborted = err && (err.name === "AbortError"
+                              || /abort/i.test(String(err.message || "")));
+      host.innerHTML = `<div class="empty report-error">
+          <p>${aborted
+                ? "Der Report hat zu lange gebraucht — bei sehr großen Zeiträumen kann das passieren."
+                : "Report konnte nicht geladen werden: "
+                  + PubgUI.esc(String(err && err.message || err))}</p>
+          <button type="button" class="report-retry" id="reportRetry">
+            Erneut versuchen</button>
+        </div>`;
+      document.getElementById("reportRetry").addEventListener("click", () => {
+        host.innerHTML = `<div class="empty">— wird geladen —</div>`;
+        PubgUI.fetchJson(reportUrl, 45000)
+          .then((d) => { _reportShown = true; render(d); })
+          .catch((e) => { host.innerHTML =
+            `<div class="empty report-error">Klappt weiterhin nicht: `
+            + PubgUI.esc(String(e && e.message || e)) + `</div>`; });
+      });
+    }, 45000);
 
     // Findet Marker unter Maus-Position. Returns {acc, lifeIdx, kind, target}
     // oder null. kind = 'landing' | 'death' | 'kill' | 'revive'

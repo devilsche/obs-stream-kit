@@ -200,7 +200,8 @@
     return out;
   }
 
-  PubgUI.fetchJson = async (url, timeoutMs = 10000) => {
+  PubgUI.fetchJson = async (url, timeoutMs) => {
+    timeoutMs = timeoutMs == null ? 10000 : timeoutMs;
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
@@ -339,12 +340,15 @@
 
   PubgUI.ignoreStale = () => PubgUI.qs("ignoreStale") === "1";
 
-  PubgUI.poll = (url, interval, onData, onError) => {
+  // timeoutMs: grosse Auswertungen (Report ueber den ganzen DB-Bestand)
+  // brauchen serverseitig mehrere Sekunden — mit dem 10-s-Standard bricht
+  // der erste Abruf ab und die Seite bleibt am Platzhalter haengen.
+  PubgUI.poll = (url, interval, onData, onError, timeoutMs) => {
     let stopped = false;
     const tick = async () => {
       if (stopped) return;
       try {
-        onData(await PubgUI.fetchJson(url));
+        onData(await PubgUI.fetchJson(url, timeoutMs));
       } catch (e) {
         if (onError) onError(e);
       }
