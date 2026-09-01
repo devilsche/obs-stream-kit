@@ -524,9 +524,18 @@ denn der letzte Spieler eines Teams stirbt ohne DBNO; das sind an Prod-Daten
 gemessen rund 27 % aller Kills. Bots bleiben per Vorgabe draußen, sonst schönen
 Bot-Kills jede Quote.
 
-*Playstyle* — Loot-Tempo (Pickups je Lebensminute, aus Summen gebildet — nicht als
-Mittelwert von Match-Raten, sonst reißt ein 20-Sekunden-Match den Wert nach oben),
-Loot in den ersten zehn Minuten, **spätes Sammeln ab Minute 15** als eigene Rate
+*Playstyle* — **Loot-Tempo**: Items je Minute, aber der Nenner ist die Zeit IN den
+Loot-Phasen, nicht die Lebenszeit. Pickups werden gebündelt, eine Pause über 20 s
+beginnt eine neue Phase; wer in 20 s dreißig Items nimmt und dann zehn Minuten
+läuft, lootet schnell — über die Lebenszeit gerechnet sähe er aus wie ein Trödler.
+Einzel-Pickups ohne Nachbarn haben keine messbare Dauer und stehen als *grabbed on
+the way* daneben, statt die Rate zu sprengen. Kein pauschaler Zeitaufschlag je
+Item: drei Items in einer Sekunde sind gutes Multi-Pickup und müssen dreimal so
+schnell herauskommen wie drei in drei Sekunden. Daneben die **Loot-Zeit je Match**
+als zweite Achse (schnell UND lang ist der Geier) und das Box-Verhalten getrennt
+(**Sekunden je Leiche**, Items je Leiche — im Endgame ist das Festhängen an der Box
+ein Todesurteil). Alle Raten aus Summen, nicht als Mittelwert von Match-Raten.
+Weiter: Loot in den ersten zehn Minuten, **spätes Sammeln ab Minute 15** als eigene Rate
 (wer da noch wühlt, hält das Squad auf), Lebenszeit, Median-Abstand zum
 nächsten Mate, Zeitanteil über 100 m weg, Abstand zum Team beim eigenen Knock
 (aus den 25 s davor gemessen — mit einem Fenster um den Knock herum misst man den
@@ -569,8 +578,20 @@ Requests je Lobby. Der Poller sammelt pro Tick ein Zehnerpack in
 `player_season_snapshot` (global, nicht pro Tenant — die Zahlen gehören dem
 Spieler); Spieler, die die API im Modus nicht kennt, bekommen einen Negativ-Eintrag,
 damit sie nicht endlos erneut angefragt werden. Die Abdeckung steht an jedem Match,
-und Matches unter 25 % fallen aus dem Gesamtschnitt. Der Wert ist ein Schnappschuss
-von heute, nicht vom Match-Tag — die API hat keine Historie.
+und Matches unter 25 % fallen aus dem Gesamtschnitt. Ebenso Mini-Lobbys unter
+20 echten Gegnern: TDM und Heist haben 13 bzw. 3 Spieler statt 96 und wögen im
+Phasen-Schnitt sonst genauso schwer wie eine volle Runde. Der Wert ist ein
+Schnappschuss von heute, nicht vom Match-Tag — die API hat keine Historie.
+
+**Aufschlüsselung per Klick:** Die Lobby-Zahl in der Match-Zeile und die im
+Phasen-Header sind Buttons; dahinter öffnet ein Dialog mit Ø, Median, härtestem
+Gegner sowie den fünf stärksten und fünf schwächsten Spielern namentlich
+(`/api/pubg/lobby-detail?matches=id1,id2`). Der Median steht daneben, weil K/D
+bei 0 endet und nach oben offen ist — an Prod-Daten sind das allerdings nur 0,05
+bis 0,10 Unterschied zum Ø; die Aussage steckt in Top gegen Low (2,87 gegen 0,32
+in einer typischen Lobby). Beim Phasen-Dialog werden die Match-Werte gemittelt
+statt alle Spieler in einen Topf geworfen: sonst wögen volle Lobbys schwerer als
+kurze Matches, und „die stärksten Fünf" wären immer dieselben Ausreißer.
 
 #### tools/match-replay.html
 

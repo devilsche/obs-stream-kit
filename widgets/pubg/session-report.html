@@ -186,6 +186,118 @@
       vertical-align: -1px;
     }
     @keyframes lobby-spin { to { transform: rotate(360deg); } }
+
+    /* Lobby-Werte sind anklickbar: dahinter steckt die Aufschluesselung.
+       Button statt div, damit Tastatur und Screenreader mitkommen. */
+    .lobby-open {
+      background: none;
+      border: 0;
+      color: inherit;
+      font: inherit;
+      padding: 2px 4px;
+      margin: -2px -4px;
+      min-height: 24px;
+      border-radius: 3px;
+      cursor: pointer;
+      text-decoration: underline dotted rgba(242, 183, 5, 0.55);
+      text-underline-offset: 3px;
+    }
+    .lobby-open:hover { background: rgba(242, 183, 5, 0.12); }
+    .lobby-open:focus-visible {
+      outline: 2px solid var(--pubg-gold);
+      outline-offset: 2px;
+    }
+
+    .lobby-modal {
+      border: 1px solid rgba(242, 183, 5, 0.35);
+      border-radius: 8px;
+      background: #14101c;
+      color: var(--pubg-text);
+      padding: 0;
+      width: min(560px, 94vw);
+      max-height: 86vh;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
+    }
+    .lobby-modal::backdrop { background: rgba(6, 4, 12, 0.72); }
+    .lobby-modal__head {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .lobby-modal__title { margin: 0; font-size: 1.05em; }
+    .lobby-modal__sub {
+      margin: 3px 0 0;
+      font-size: 0.85em;
+      color: var(--pubg-muted);
+    }
+    .lobby-modal__close {
+      margin-left: auto;
+      min-width: 32px;
+      min-height: 32px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--pubg-text);
+      cursor: pointer;
+    }
+    .lobby-modal__close:hover { background: rgba(255, 255, 255, 0.08); }
+    .lobby-modal__close:focus-visible {
+      outline: 2px solid var(--pubg-gold);
+      outline-offset: 2px;
+    }
+    .lobby-modal__body { padding: 12px 16px 18px; overflow-y: auto; max-height: 68vh; }
+    .lobby-kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .lobby-kpi {
+      background: rgba(94, 42, 121, 0.16);
+      border-radius: 5px;
+      padding: 8px 10px;
+    }
+    .lobby-kpi b { display: block; font-size: 1.3em; line-height: 1.2; }
+    .lobby-kpi span { font-size: 0.78em; color: var(--pubg-muted); }
+    .lobby-side + .lobby-side { margin-top: 14px; }
+    .lobby-side h3 {
+      margin: 0 0 6px;
+      font-size: 0.88em;
+      font-weight: 600;
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+    }
+    .lobby-side h3 em {
+      font-style: normal;
+      color: var(--pubg-muted);
+      font-weight: 400;
+    }
+    .lobby-list { list-style: none; margin: 0; padding: 0; }
+    .lobby-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 4px 6px;
+      border-radius: 3px;
+      font-variant-numeric: tabular-nums;
+    }
+    .lobby-list li:nth-child(odd) { background: rgba(255, 255, 255, 0.035); }
+    .lobby-list .kd { font-weight: 600; }
+    .lobby-list--top .kd { color: var(--pubg-gold); }
+    .lobby-list--low .kd { color: var(--pubg-muted); }
+    .lobby-list .where { color: var(--pubg-muted); font-size: 0.82em; }
+    .lobby-modal__note {
+      margin: 14px 0 0;
+      font-size: 0.8em;
+      color: var(--pubg-muted);
+      line-height: 1.5;
+    }
+    .lobby-modal__empty { color: var(--pubg-muted); }
     @media (prefers-reduced-motion: reduce) {
       .lobby-pending {
         animation: none;
@@ -3314,6 +3426,103 @@
       return `${m}:${String(s).padStart(2,"0")}`;
     }
 
+    // ── Lobby-Aufschluesselung (Modal) ──────────────────────────────────
+    // Hinter jeder Lobby-Zahl steht eine Verteilung: 1.33 im Schnitt kann
+    // eine gleichmaessige Lobby sein oder fuenf Haie und dreissig Bots.
+    const _lobbyCache = new Map();
+
+    function lobbyKdStr(v) { return v == null ? "—" : v.toFixed(2); }
+
+    function lobbyListHtml(players, cls, withMatch) {
+      if (!players || !players.length) {
+        return `<p class="lobby-modal__empty">Keine Werte.</p>`;
+      }
+      return `<ul class="lobby-list lobby-list--${cls}">` + players.map(p => `
+        <li><span>${PubgUI.esc(p.name)}${withMatch && p.playedAt
+              ? ` <span class="where">${PubgUI.esc(PubgUI.fmtTime(p.playedAt))}</span>` : ""}</span>
+            <span class="kd">${p.kd.toFixed(2)}</span></li>`).join("") + `</ul>`;
+    }
+
+    function lobbyBodyHtml(d, isPhase) {
+      const src = isPhase ? d.totals : (d.matches && d.matches[0]);
+      if (!src || src.avg == null) {
+        return `<p class="lobby-modal__empty">Für diese Lobby liegen noch
+          keine Alltime-Werte vor — der Sammler ist noch dran.</p>`;
+      }
+      const n = d.topN || 5;
+      const cov = isPhase
+        ? `${src.matchesInAverage} von ${src.matches} Matches gewertet`
+        : `${src.known} von ${src.lobbyPlayers} Gegnern bekannt`
+          + ` (${Math.round(src.coverage)} %)`;
+      return `
+        <div class="lobby-kpis">
+          <div class="lobby-kpi"><b>${lobbyKdStr(src.avg)}</b><span>Ø K/D</span></div>
+          <div class="lobby-kpi"><b>${lobbyKdStr(src.median)}</b><span>Median</span></div>
+          <div class="lobby-kpi"><b>${lobbyKdStr(src.max)}</b><span>Härtester</span></div>
+          <div class="lobby-kpi"><b>${lobbyKdStr(src.topAvg)}</b><span>Top ${n} Ø</span></div>
+          <div class="lobby-kpi"><b>${lobbyKdStr(src.lowAvg)}</b><span>Low ${n} Ø</span></div>
+        </div>
+        <div class="lobby-side">
+          <h3>Die ${n} stärksten <em>${cov}</em></h3>
+          ${lobbyListHtml(isPhase ? src.strongest : src.top, "top", isPhase)}
+        </div>
+        ${isPhase ? "" : `
+        <div class="lobby-side">
+          <h3>Die ${n} schwächsten</h3>
+          ${lobbyListHtml(src.low, "low", false)}
+        </div>`}
+        <p class="lobby-modal__note">${isPhase
+          ? `Ø, Median und die Ränder mitteln die Match-Werte — sonst wögen
+             volle Lobbys schwerer als kurze Matches. Gelistet sind die
+             stärksten Gegner der ganzen Phase mit ihrer Uhrzeit.`
+          : `Eigener Squad und Bots sind draußen. Der Median liegt meist knapp
+             unter dem Ø: K/D endet bei 0, ist nach oben aber offen.`}</p>`;
+    }
+
+    async function openLobbyModal(matchIds, title, sub, isPhase) {
+      const dlg = document.getElementById("lobbyModal");
+      const body = document.getElementById("lobbyModalBody");
+      document.getElementById("lobbyModalTitle").textContent = title;
+      document.getElementById("lobbyModalSub").textContent = sub || "";
+      body.innerHTML = `<p class="lobby-modal__empty">Lade …</p>`;
+      if (typeof dlg.showModal === "function") dlg.showModal();
+      const key = matchIds.join(",");
+      try {
+        let d = _lobbyCache.get(key);
+        if (!d) {
+          d = await PubgUI.fetchJson((window.__SERVE_BASE__ || "/")
+            + "api/pubg/lobby-detail?matches=" + encodeURIComponent(key), 30000);
+          _lobbyCache.set(key, d);
+        }
+        body.innerHTML = lobbyBodyHtml(d, isPhase);
+      } catch (err) {
+        body.innerHTML = `<p class="lobby-modal__empty">Konnte die Lobby nicht
+          laden: ${PubgUI.esc(String(err && err.message || err))}</p>`;
+      }
+    }
+
+    document.getElementById("lobbyModalClose").addEventListener("click", () => {
+      document.getElementById("lobbyModal").close();
+    });
+    // Klick neben den Dialog schliesst ihn — der Backdrop ist Teil des
+    // dialog-Elements, also trifft der Klick es selbst und nicht den Inhalt.
+    document.getElementById("lobbyModal").addEventListener("click", (e) => {
+      if (e.target.id === "lobbyModal") e.target.close();
+    });
+
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest(".lobby-open");
+      if (!btn) return;
+      // Die Match-Zeile selbst klappt das Match-Detail auf — das soll hier
+      // nicht mit passieren.
+      e.preventDefault();
+      e.stopPropagation();
+      const ids = (btn.dataset.matches || "").split(",").filter(Boolean);
+      if (!ids.length) return;
+      openLobbyModal(ids, btn.dataset.title || "Lobby", btn.dataset.sub || "",
+                     btn.dataset.phase === "1");
+    });
+
     // Ab welcher Abdeckung ein Lobby-Wert etwas aussagt. Dieselbe Schwelle
     // benutzt das Backend fuer Phasen- und Session-Schnitt — sonst zeigt die
     // Match-Zeile eine Zahl, die in der Phase darueber fehlt (gemessen:
@@ -3371,7 +3580,12 @@
                 ? (m.lobbyPlayers
                     ? `<span class="lobby-pending" role="img" aria-label="Lobby-Stärke wird gesammelt"></span>`
                     : '<span class="dim">—</span>')
-                : `<b>${m.lobbyKd.toFixed(2)}</b>`}</span>
+                : `<button type="button" class="lobby-open"
+                     data-matches="${PubgUI.esc(m.matchId)}"
+                     data-title="Lobby · ${PubgUI.esc(PubgUI.fmtMap(m.map))}"
+                     data-sub="${PubgUI.esc(PubgUI.fmtDateTime(m.matchEnd))}"
+                     aria-label="Lobby aufschlüsseln: Median, stärkste und schwächste Gegner"
+                   ><b>${m.lobbyKd.toFixed(2)}</b></button>`}</span>
           <span class="stat lobby-kd" title="${
             m.squadKd == null
               ? "Alltime-K/D des eigenen Squads noch nicht bekannt"
@@ -3535,7 +3749,13 @@
               <span><b>${PubgUI.fmtKD(s.kd)}</b> K/D</span>
               ${(s.squadMatchesWithMapping||0) > 0 ? `<span title="K/D des eigenen Squads in DIESER Phase — Kills durch Tode"><b>${PubgUI.fmtKD(s.squadKd||0)}</b> Squad Phase</span>` : ""}
               ${s.lobbyKd != null
-                  ? `<span title="Ø Alltime-K/D der Gegner über ${s.lobbyMatches} Matches dieser Phase"><b>${s.lobbyKd.toFixed(2)}</b> Lobby K/D</span>`
+                  ? `<span title="Ø Alltime-K/D der Gegner über ${s.lobbyMatches} Matches dieser Phase"><button
+                       type="button" class="lobby-open" data-phase="1"
+                       data-matches="${ph.matches.map(x => x.matchId).filter(Boolean).slice(0, 60).join(",")}"
+                       data-title="Lobby · Phase ${i+1}"
+                       data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'Match' : 'Matches'} gewertet"
+                       aria-label="Lobby der Phase aufschlüsseln: Median, härteste Gegner"
+                     ><b>${s.lobbyKd.toFixed(2)}</b> Lobby K/D</button></span>`
                   : (s.lobbyPending
                       ? `<span title="Alltime-K/D der Gegner wird noch gesammelt"><span class="lobby-pending" role="img" aria-label="Lobby-K/D wird gesammelt"></span> Lobby K/D</span>`
                       : "")}
@@ -4374,5 +4594,19 @@
       <div class="md-panel__body" id="mdPanelBody"></div>
     </div>
   </div>
+
+  <dialog id="lobbyModal" class="lobby-modal" aria-labelledby="lobbyModalTitle">
+    <div class="lobby-modal__head">
+      <div>
+        <h2 class="lobby-modal__title" id="lobbyModalTitle">Lobby</h2>
+        <p class="lobby-modal__sub" id="lobbyModalSub"></p>
+      </div>
+      <button type="button" class="lobby-modal__close" id="lobbyModalClose"
+              aria-label="Schließen">
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+      </button>
+    </div>
+    <div class="lobby-modal__body" id="lobbyModalBody"></div>
+  </dialog>
 </body>
 </html>
