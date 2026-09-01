@@ -293,6 +293,8 @@ def collect_lobby_lifetime(conn, tenant_id: int, client, max_calls: int = 2,
     stale_before = (_dt.datetime.now(_dt.UTC)
                     - _dt.timedelta(days=lobby_kd.SNAPSHOT_TTL_DAYS)
                     ).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # match_mode bewusst offen: der Lifetime-Abruf deckt alle Spielmodi ab,
+    # also gibt es keinen Grund, Lobby-Spieler aus Duo-Matches auszulassen.
     missing = db_pg.lobby_accounts_missing_snapshot(
         raw_conn, tenant_id, lobby_kd.LIFETIME_KEY, mode,
         limit=max_calls, stale_before=stale_before)

@@ -1256,6 +1256,9 @@ def lobby_kd_backfill(root: str, args=None) -> int:
     n_matches = int(_opt("--matches", "50"))
     pace = float(_opt("--pace", "25"))
     mode = _opt("--mode", "squad-fpp")
+    # Match-Auswahl standardmaessig ueber ALLE Spielmodi: der Lifetime-Abruf
+    # liefert ohnehin jeden Modus mit, und Duo-Lobbys sind genauso Lobbys.
+    match_mode = _opt("--match-mode")
     # Alltime ist die Hauptzahl der Ansicht; --season holt stattdessen die
     # Season-Werte im Zehnerpack.
     lifetime = "--season-only" not in args
@@ -1281,7 +1284,7 @@ def lobby_kd_backfill(root: str, args=None) -> int:
             SELECT mtm.account_id
             FROM match_team_mapping mtm
             JOIN (SELECT match_id, played_at FROM matches
-                  WHERE tenant_id = %s AND game_mode = %s
+                  WHERE tenant_id = %s AND (%s IS NULL OR game_mode = %s)
                   ORDER BY played_at DESC LIMIT %s) mm
               ON mm.match_id = mtm.match_id
             LEFT JOIN player_season_snapshot s
@@ -1294,7 +1297,8 @@ def lobby_kd_backfill(root: str, args=None) -> int:
             -- vollstaendig, statt dass sich die Abdeckung gleichmaessig duenn
             -- ueber alle 50 Matches verteilt.
             ORDER BY MAX(mm.played_at) DESC
-        """, (tenant_id, mode, n_matches, season_id, mode, tenant_id))
+        """, (tenant_id, match_mode, match_mode, n_matches, season_id, mode,
+              tenant_id))
         missing = [r["account_id"] for r in cur.fetchall()]
 
     if lifetime:

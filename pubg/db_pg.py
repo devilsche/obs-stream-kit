@@ -1034,11 +1034,17 @@ def clear_false_unknown_snapshots(conn) -> int:
 
 def lobby_accounts_missing_snapshot(conn, tenant_id: int, season_id: str,
                                     mode: str, limit: int = 200,
-                                    stale_before: str = None) -> list:
+                                    stale_before: str = None,
+                                    match_mode: str = None) -> list:
     """Lobby-Spieler der juengsten Matches ohne brauchbaren Snapshot.
 
+    `mode` ist der Spielmodus, unter dem der Snapshot abgelegt ist.
+    `match_mode` schraenkt zusaetzlich die MATCHES ein; ohne Angabe zaehlen
+    alle Modi — ein Lifetime-Abruf liefert ohnehin alle Modi mit, und "alle
+    Matches" heisst alle, nicht nur squad-fpp.
+
     Ohne `stale_before` nur Spieler ganz ohne Eintrag; mit gesetztem Wert auch
-    die, deren Zahlen aelter sind — Season-Werte wachsen weiter."""
+    die, deren Zahlen aelter sind — die Werte wachsen weiter."""
     with conn.cursor() as cur:
         cur.execute("""
             SELECT mtm.account_id
@@ -1052,7 +1058,7 @@ def lobby_accounts_missing_snapshot(conn, tenant_id: int, season_id: str,
               AND mtm.account_id NOT LIKE 'ai.%%'
               AND (s.account_id IS NULL
                    OR (%s IS NOT NULL AND s.fetched_at < %s))
-              AND m.game_mode = %s
+              AND (%s IS NULL OR m.game_mode = %s)
             GROUP BY mtm.account_id
             ORDER BY
               -- Der eigene Squad zuerst: das sind vier Leute statt 99, und
@@ -1068,8 +1074,8 @@ def lobby_accounts_missing_snapshot(conn, tenant_id: int, season_id: str,
               -- Danach: juengste Lobbys zuerst.
               MAX(m.played_at) DESC
             LIMIT %s
-        """, (season_id, mode, tenant_id, stale_before, stale_before, mode,
-              tenant_id, limit))
+        """, (season_id, mode, tenant_id, stale_before, stale_before,
+              match_mode, match_mode, tenant_id, limit))
         return [r["account_id"] for r in cur.fetchall()]
 
 
