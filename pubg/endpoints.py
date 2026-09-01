@@ -2762,6 +2762,22 @@ class EndpointRegistry:
             data["totals"]["lobbySquadKd"] = lobby.get("avgSquadKd")
             data["totals"]["lobbyCoverage"] = lobby.get("coverage")
 
+        # Und je Phase — dort steht die Wertung der Spielrunde, in der die
+        # Besetzung gleich blieb. Nur Matches mit brauchbarer Abdeckung
+        # zaehlen, sonst mittelt man die eigene Sammelquote mit.
+        for ph in data.get("phases") or []:
+            solid = [m for m in (ph.get("matches") or [])
+                     if (m.get("lobbyCoverage") or 0) >= 25
+                     and m.get("lobbyKd") is not None]
+            stats = ph.get("stats")
+            if stats is None:
+                continue
+            stats["lobbyKd"] = (sum(m["lobbyKd"] for m in solid) / len(solid)
+                                if solid else None)
+            squad = [m["squadKd"] for m in solid if m.get("squadKd") is not None]
+            stats["lobbySquadKd"] = (sum(squad) / len(squad)) if squad else None
+            stats["lobbyMatches"] = len(solid)
+
     def _sessions_index(self):
         conn = self.get_conn()
         return _ok(self.cache.get_or_compute(

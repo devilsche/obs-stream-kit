@@ -343,6 +343,9 @@ def test_session_report_carries_the_lobby_strength():
     assert m["lobbyKd"] == 1.0          # ohne eigenen Squad gerechnet
     assert m["squadKd"] == 2.0
     assert data["totals"]["lobbyKd"] == 1.0
+    # Auch je Phase, dort steht die Session-Wertung
+    assert data["phases"][0]["stats"]["lobbyKd"] == 1.0
+    assert data["phases"][0]["stats"]["lobbySquadKd"] == 2.0
 
 
 def test_lobby_kd_rejects_a_bad_range():
