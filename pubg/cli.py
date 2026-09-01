@@ -1251,17 +1251,22 @@ def lobby_kd_backfill(root: str, args=None) -> int:
 
     with raw.cursor() as cur:
         cur.execute("""
-            SELECT DISTINCT mtm.account_id
+            SELECT mtm.account_id
             FROM match_team_mapping mtm
-            JOIN (SELECT match_id FROM matches
+            JOIN (SELECT match_id, played_at FROM matches
                   WHERE tenant_id = %s AND game_mode = %s
-                  ORDER BY played_at DESC LIMIT %s) letzte
-              ON letzte.match_id = mtm.match_id
+                  ORDER BY played_at DESC LIMIT %s) mm
+              ON mm.match_id = mtm.match_id
             LEFT JOIN player_season_snapshot s
                    ON s.account_id = mtm.account_id
                   AND s.season_id = %s AND s.mode = %s
             WHERE mtm.tenant_id = %s AND s.account_id IS NULL
               AND mtm.account_id NOT LIKE 'ai.%%'
+            GROUP BY mtm.account_id
+            -- Juengste Lobbys zuerst: so ist die laufende Session als Erstes
+            -- vollstaendig, statt dass sich die Abdeckung gleichmaessig duenn
+            -- ueber alle 50 Matches verteilt.
+            ORDER BY MAX(mm.played_at) DESC
         """, (tenant_id, mode, n_matches, season_id, mode, tenant_id))
         missing = [r["account_id"] for r in cur.fetchall()]
 
