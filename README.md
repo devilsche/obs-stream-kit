@@ -545,7 +545,14 @@ zweiten Lebenshälfte.
 Datenquelle ist `telemetry_events`, also rückwirkend für alles in der DB und ohne
 Roh-Blob. Zu beachten: Position-Events liegen dort **nur fürs eigene Squad**, und
 Schadensereignisse nur mit Squad-Beteiligung — für eine Squad-Auswertung reicht das
-genau, für Aussagen über fremde Teams untereinander nicht. Werte aus weniger als
+genau, für Aussagen über fremde Teams untereinander nicht. Zwei Eingabefelder, die bewusst
+Verschiedenes tun: **Matches with** wählt die *Runden* (nur Matches, in denen alle
+genannten dabei waren), **Show only** wählt die *Zeilen* — die Matchmenge und damit
+alle Nenner bleiben gleich, es wird nur ausgeblendet. Anteile zweier Spieler
+summieren sich deshalb nicht auf 100 %: „First to drop" gehört in einem Vierer-Squad
+dem, der tatsächlich zuerst umkippt, der Rest verteilt sich auf die anderen Mates
+(gemessen über 263 gemeinsame Runden: 37,6 % + 20,2 % für zwei feste Spieler, die
+übrigen 42 % auf dritte und vierte Mitspieler). Werte aus weniger als
 fünf Matches bzw. Eröffnungen zeigt die Ansicht blass und nimmt sie von den
 Spitzenreiter-Markierungen aus.
 

@@ -132,9 +132,14 @@
           <button type="button" data-range="all" aria-pressed="false">All</button>
         </div>
       </div>
-      <label for="fPlayers">Squad filter
+      <label for="fPlayers">Matches with
         <input id="fPlayers" type="text"
-               placeholder="e.g. hacker_luke, SleepAtWar — empty = all mates"
+               placeholder="e.g. hacker_luke, SleepAtWar — empty = all matches"
+               aria-describedby="playersNote">
+      </label>
+      <label for="fShow">Show only
+        <input id="fShow" type="text"
+               placeholder="empty = everyone in those matches"
                aria-describedby="playersNote">
       </label>
       <label for="fMin">Min. matches
@@ -145,8 +150,13 @@
       </label>
     </div>
     <div class="legend" id="playersNote">
-      With a squad filter only matches count in which <b>all</b> named players
-      were present — otherwise random mates blur the numbers.
+      <b>Matches with</b> picks the matches: only rounds in which <b>all</b>
+      named players took part. <b>Show only</b> picks the rows — everyone else
+      is hidden, but the matches stay the same. Both are independent, so you
+      can select rounds by one squad and still look at a single player.
+      Careful when comparing shares: a mate who joined halfway through has a
+      smaller sample, and his percentages rest on a different denominator —
+      the match count next to his name says how many.
     </div>
     <div class="legend" id="status">Loading …</div>
   </div>
@@ -236,6 +246,21 @@
 
     let RANGE = PubgUI.qs("range", "session");
     let PLAYERS = PubgUI.qs("players", "");
+    // Getrennt von PLAYERS: das eine waehlt die MATCHES, das andere die
+    // ZEILEN. Vorher machte ein Feld beides halb — man bekam die Runden
+    // eines Duos, in der Tabelle aber jeden Zufallsmate mit eigener
+    // Match-Zahl daneben.
+    let SHOW = PubgUI.qs("show", "");
+
+    function showFilter() {
+      return SHOW.split(",").map(n => n.trim().toLowerCase()).filter(Boolean);
+    }
+
+    function visibleRows(rows) {
+      const want = showFilter();
+      if (!want.length) return rows;
+      return rows.filter(r => want.includes(String(r.name || "").toLowerCase()));
+    }
     let MIN = parseInt(PubgUI.qs("minMatches", "3"), 10) || 3;
     let BOTS = PubgUI.qs("includeBots", "") === "1";
     let DATA = null;
@@ -359,7 +384,7 @@
         help: "The largest measured distance to the team at one of his own knocks." },
       { key: "firstDownPct", label: "First to drop", unit: "%",
         fmt: (r) => n0(r.firstDownPct),
-        help: "Share of matches in which he was the first of the squad to go down.",
+        help: "Share of HIS matches in which he was the first of the squad to go down. Two players never add up to 100 %: in a four-man squad the first down belongs to whoever actually dropped first, so the rest sits with the other mates — or with nobody, in rounds where the squad never went down. Measured over 263 rounds with two fixed players, 37.6 % and 20.2 % were theirs and the remaining 42 % belonged to third and fourth mates.",
         flag: (r, all) => isTop(r, all, "firstDownPct"),
         why: "drops first most often" },
       { key: "stillLateShare", label: "Standing (late)", unit: "%",
@@ -427,7 +452,8 @@
           if (isBase && r[c.key] === undefined && !c.text) {
             return `<td class="num"></td>`;
           }
-          const flag = !isBase && c.flag && c.flag(r, rows);
+          const flag = !isBase && c.flag
+                       && c.flag(r, (DATA && DATA.rows) || rows);
           // Was "zu duenn" heisst, haengt an der Tabelle: eroeffnete Kaempfe,
           // gespielte Matches — oder bei der Lobby die Abdeckung, ab der ein
           // Match auch aus dem Gesamtschnitt faellt.
@@ -447,7 +473,10 @@
 
     function render() {
       if (!DATA) return;
-      const rows = DATA.rows || [];
+      // Die Markierungen ("auffaelligster Wert") vergleichen gegen ALLE
+      // Mitspieler der Auswahl — sonst waere jeder Einzelne automatisch
+      // sein eigener Spitzenreiter.
+      const rows = visibleRows(DATA.rows || []);
       const fighters = rows.filter(r => r.opened > 0);
       renderTable("fight", FIGHT_COLS, fighters);
       renderTable("style", STYLE_COLS, rows);
@@ -464,16 +493,23 @@
         : "Loading \u2026";
       const params = new URLSearchParams({ range: RANGE, minMatches: String(MIN) });
       if (PLAYERS.trim()) params.set("players", PLAYERS.trim());
+      // SHOW geht bewusst NICHT ans Backend: es waehlt nur die Zeilen, die
+      // Matches (und damit alle Nenner) bleiben unangetastet.
       if (BOTS) params.set("includeBots", "1");
       try {
         DATA = await PubgUI.fetchJson(
           BASE + "api/pubg/squad-playstyle?" + params, 120000);
-        const rows = DATA.rows || [];
+        const all = DATA.rows || [];
+        const rows = visibleRows(all);
+        const hidden = all.length - rows.length;
         st.textContent = `${DATA.matchesWithEvents} of ${DATA.matches} matches `
-          + `with telemetry · ${rows.length} players with ${MIN}+ matches`
+          + `with telemetry · ${all.length} players with ${MIN}+ matches`
           + (DATA.players && DATA.players.length
-             ? ` · squad: ${DATA.players.join(", ")}` : "")
-          + (rows.length ? "" : " — nothing found, widen the range?");
+             ? ` · matches with: ${DATA.players.join(", ")}` : "")
+          + (hidden > 0 ? ` · showing ${rows.length}, ${hidden} hidden` : "")
+          + (rows.length ? "" : (all.length
+              ? " — no one matches “Show only”"
+              : " — nothing found, widen the range?"));
         render();
       } catch (e) {
         st.classList.add("err");
@@ -503,6 +539,29 @@
     document.getElementById("fPlayers").addEventListener("change", e => {
       PLAYERS = e.target.value;
       load();
+    });
+    function applyShow(value) {
+      SHOW = value;
+      const u = new URL(location.href);
+      if (SHOW.trim()) u.searchParams.set("show", SHOW.trim());
+      else u.searchParams.delete("show");
+      history.replaceState(null, "", u);
+      // Kein Nachladen: dieselben Daten, nur weniger Zeilen.
+      if (DATA) {
+        const all = DATA.rows || [];
+        const rows = visibleRows(all);
+        const hidden = all.length - rows.length;
+        const st = document.getElementById("status");
+        st.textContent = st.textContent.replace(/ · showing \d+, \d+ hidden/, "")
+          + (hidden > 0 ? ` · showing ${rows.length}, ${hidden} hidden` : "");
+        render();
+      }
+    }
+    document.getElementById("fShow").addEventListener("keydown", e => {
+      if (e.key === "Enter") applyShow(e.target.value);
+    });
+    document.getElementById("fShow").addEventListener("change", e => {
+      applyShow(e.target.value);
     });
     document.getElementById("fMin").addEventListener("change", e => {
       MIN = Math.max(1, parseInt(e.target.value, 10) || 1);
@@ -538,6 +597,7 @@
 
     press(document.getElementById("rangeSwitch"), "range", RANGE);
     document.getElementById("fPlayers").value = PLAYERS;
+    document.getElementById("fShow").value = SHOW;
     document.getElementById("fMin").value = MIN;
     document.getElementById("fBots").checked = BOTS;
     load();

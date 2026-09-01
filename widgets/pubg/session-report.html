@@ -3532,10 +3532,12 @@
     document.addEventListener("click", (e) => {
       const btn = e.target.closest(".lobby-open");
       if (!btn) return;
-      // Die Match-Zeile selbst klappt das Match-Detail auf — das soll hier
-      // nicht mit passieren.
+      // Die Match-Zeile selbst oeffnet das Match-Detail. Beide Handler
+      // haengen an document, also reicht stopPropagation nicht — es muessen
+      // die weiteren Listener AM SELBEN Knoten gestoppt werden.
       e.preventDefault();
       e.stopPropagation();
+      e.stopImmediatePropagation();
       const ids = (btn.dataset.matches || "").split(",").filter(Boolean);
       if (!ids.length) return;
       openLobbyModal(ids, btn.dataset.title || "Lobby", btn.dataset.sub || "",
@@ -4302,6 +4304,9 @@
     document.addEventListener("click", (e) => {
       const row = e.target.closest(".m[data-idx]");
       if (!row) return;
+      // Der Lobby-Button in der Zeile hat sein eigenes Ziel; unabhaengig von
+      // der Reihenfolge der Listener darf er hier nicht durchschlagen.
+      if (e.target.closest(".lobby-open")) return;
       const mid = row.getAttribute("data-match-id");
       if (!mid) return;
       mdPanelOpen(mid);
