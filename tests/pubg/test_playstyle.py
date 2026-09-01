@@ -431,3 +431,40 @@ def test_baseline_reports_the_same_shape_as_a_player_row():
                 "downsAgainst", "downsPerOpen", "squadLossPerOpen"):
         assert key in b, key
     assert b["downsPerOpen"] == pytest.approx(1.0)
+
+
+# ── Raten aus Summen, nicht Mittelwert von Raten ────────────────────────────
+
+def test_rates_come_from_totals_not_from_averaged_match_rates():
+    """Ein 20-Sekunden-Match mit drei Pickups sind rechnerisch 9 pro Minute.
+    Mittelt man Match-Raten, reisst so ein Ausreisser den Zeitraum-Wert nach
+    oben — an Prod-Daten gemessen bis Faktor 10 (65,6 statt 6,6)."""
+    lang = ps.analyse_match([
+        ev("Landing", 0, "account.me", ax=0, ay=0),
+        *[ev("ItemPickup", 60 + i, "account.me") for i in range(10)],
+        ev("Knock", 600, "account.foe1", "account.me"),     # 10 Minuten
+    ], SQUAD, TEAM_OF)
+    kurz = ps.analyse_match([
+        ev("Landing", 0, "account.me", ax=0, ay=0),
+        ev("ItemPickup", 5, "account.me"),
+        ev("ItemPickup", 8, "account.me"),
+        ev("ItemPickup", 10, "account.me"),
+        ev("Knock", 20, "account.foe1", "account.me"),      # 20 Sekunden
+    ], SQUAD, TEAM_OF)
+    me = next(r for r in ps.aggregate([lang, kurz])
+              if r["accountId"] == "account.me")
+    # 13 Pickups auf 10,33 Minuten
+    assert me["pickupsPerMin"] == pytest.approx(13 / (600 + 20) * 60, rel=0.01)
+
+
+def test_standing_share_is_weighted_by_time():
+    """Ein kurzes Match darf nicht so schwer wiegen wie ein langes."""
+    lang = ps.analyse_match(
+        [ev("Position", t, "account.me", ax=0, ay=0) for t in range(0, 600, 10)],
+        SQUAD, TEAM_OF)                                    # 10 min stehen
+    kurz = ps.analyse_match(
+        [ev("Position", t, "account.me", ax=t * 1000, ay=0) for t in range(0, 30, 10)],
+        SQUAD, TEAM_OF)                                    # 20 s laufen
+    me = next(r for r in ps.aggregate([lang, kurz])
+              if r["accountId"] == "account.me")
+    assert me["stillShare"] > 90        # nicht 50 wie beim Mittelwert

@@ -283,8 +283,7 @@ def player_metrics(events, squad, team_of, *, still_m=STILL_M, far_m=FAR_M):
         picks = [ts for ts in pickups.get(acc, []) if ts >= t_start]
         early = sum(1 for ts in picks if ts - t_start <= EARLY_LOOT_MS)
 
-        still_share, still_late, still_max = _stillness(pts, t_start, t_end,
-                                                        still_m)
+        still = _stillness(pts, t_start, t_end, still_m)
         team_dists = _team_distances(acc, pts, positions)
         out[acc] = {
             "accountId": acc,
@@ -294,12 +293,20 @@ def player_metrics(events, squad, team_of, *, still_m=STILL_M, far_m=FAR_M):
             "pickupsEarly": early,
             "pickupsLate": len(picks) - early,
             "pickupsPerMin": (len(picks) / alive_min) if alive_min else None,
-            "stillShare": still_share,
-            "stillLateShare": still_late,
-            "stillMaxMin": still_max,
+            "stillShare": _pct(still["still_ms"], still["total_ms"]),
+            "stillLateShare": _pct(still["late_still_ms"], still["late_ms"]),
+            "stillMaxMin": still["max_run_ms"] / 60000.0 if still["total_ms"] else None,
+            # Rohzaehler, damit die Aggregation ueber Matches Summen bilden
+            # kann statt Match-Quoten zu mitteln.
+            "stillMs": still["still_ms"],
+            "stillTotalMs": still["total_ms"],
+            "stillLateMs": still["late_still_ms"],
+            "stillLateTotalMs": still["late_ms"],
             "teamDistMedian": _median(team_dists) if team_dists else None,
             "farShare": (_pct(sum(1 for d in team_dists if d > far_m),
                               len(team_dists)) if team_dists else None),
+            "farCount": sum(1 for d in team_dists if d > far_m),
+            "distCount": len(team_dists),
             "wentDown": acc in downs,
             "firstDown": acc == first_down_acc,
             "distAtDown": _dist_at_down(acc, downs, positions),
@@ -308,14 +315,22 @@ def player_metrics(events, squad, team_of, *, still_m=STILL_M, far_m=FAR_M):
 
 
 def _stillness(pts, t_start, t_end, still_m):
-    """(Anteil stehend, Anteil stehend in der zweiten Lebenshaelfte, laengster
-    Block in Minuten). Fruehes Stehen ist Looten, spaetes Stehen ist Halten —
-    darum die zweite Haelfte getrennt."""
+    """Rohzaehler zum Stillstehen: {still_ms, total_ms, late_still_ms,
+    late_ms, max_run_ms}.
+
+    Bewusst Zaehler statt Prozente — ueber mehrere Matches muessen die Anteile
+    aus Summen gebildet werden, sonst wiegt ein 20-Sekunden-Match so schwer
+    wie ein volles.
+
+    Frueh stehen ist Looten, spaet stehen ist Halten — darum die zweite
+    Lebenshaelfte getrennt.
+    """
+    out = {"still_ms": 0, "total_ms": 0, "late_still_ms": 0, "late_ms": 0,
+           "max_run_ms": 0}
     if len(pts) < 2:
-        return None, None, None
+        return out
     half = t_start + (t_end - t_start) / 2.0
-    still = total = late_still = late_total = 0
-    run = best = 0
+    run = 0
     for i in range(1, len(pts)):
         dt = pts[i][0] - pts[i - 1][0]
         if dt <= 0 or dt > 60_000:      # Luecke: nichts behaupten
@@ -323,19 +338,19 @@ def _stillness(pts, t_start, t_end, still_m):
             continue
         d = _dist_m(pts[i - 1][1], pts[i - 1][2], pts[i][1], pts[i][2])
         standing = d is not None and d < still_m
-        total += dt
-        if pts[i][0] >= half:
-            late_total += dt
+        out["total_ms"] += dt
+        late = pts[i][0] >= half
+        if late:
+            out["late_ms"] += dt
         if standing:
-            still += dt
+            out["still_ms"] += dt
             run += dt
-            best = max(best, run)
-            if pts[i][0] >= half:
-                late_still += dt
+            out["max_run_ms"] = max(out["max_run_ms"], run)
+            if late:
+                out["late_still_ms"] += dt
         else:
             run = 0
-    return (_pct(still, total), _pct(late_still, late_total),
-            best / 60000.0 if total else None)
+    return out
 
 
 def _team_distances(acc, pts, positions):
@@ -404,14 +419,16 @@ def aggregate(match_analyses):
     """
     acc_data = defaultdict(lambda: {
         "name": None, "matches": 0, "downs": 0, "firstDowns": 0,
+        "pickTotal": 0, "aliveTotal": 0.0,
+        "stillMs": 0, "stillTotalMs": 0, "stillLateMs": 0, "stillLateTotalMs": 0,
+        "farCount": 0, "distCount": 0,
         "opened": 0, "openedWon": 0, "openedLost": 0, "openedTrade": 0,
         "openedPointless": 0, "openedWithDown": 0, "openDist": [], "engaged": 0,
         "downsMade": 0, "downsBySelfInOpened": 0,
         "openTargetDown": 0, "openTargetDownBySelf": 0,
         "ourDownsInOpened": 0, "theirDownsInOpened": 0,
         "aliveMin": [], "pickups": [], "pickupsEarly": [], "pickupsLate": [],
-        "pickupsPerMin": [], "stillShare": [], "stillLateShare": [],
-        "teamDist": [], "farShare": [], "distAtDown": [],
+        "teamDist": [], "distAtDown": [],
     })
 
     for a in match_analyses:
@@ -427,15 +444,19 @@ def aggregate(match_analyses):
                                 ("pickups", "pickups"),
                                 ("pickupsEarly", "pickupsEarly"),
                                 ("pickupsLate", "pickupsLate"),
-                                ("pickupsPerMin", "pickupsPerMin"),
-                                ("stillShare", "stillShare"),
-                                ("stillLateShare", "stillLateShare"),
                                 ("teamDistMedian", "teamDist"),
-                                ("farShare", "farShare"),
                                 ("distAtDown", "distAtDown")):
                 v = m.get(key)
                 if v is not None:
                     d[target].append(v)
+            # Summen fuer alle Raten und Anteile: ein 20-Sekunden-Match mit
+            # drei Pickups sind rechnerisch 9/min und wuerde als gemittelte
+            # Match-Rate den ganzen Zeitraum verzerren.
+            d["pickTotal"] += m.get("pickups") or 0
+            d["aliveTotal"] += m.get("aliveMin") or 0.0
+            for k in ("stillMs", "stillTotalMs", "stillLateMs",
+                      "stillLateTotalMs", "farCount", "distCount"):
+                d[k] += m.get(k) or 0
 
         for f in a.get("fights") or []:
             # Umgelegte Gegner zaehlen dem zu, der sie umgelegt hat — egal
@@ -472,13 +493,16 @@ def aggregate(match_analyses):
             "name": d["name"] or acc[:12],
             "matches": d["matches"],
             "aliveMin": _mean(d["aliveMin"]),
-            "pickupsPerMin": _mean(d["pickupsPerMin"]),
+            "pickupsPerMin": (d["pickTotal"] / d["aliveTotal"])
+                             if d["aliveTotal"] else None,
             "pickupsEarly": _mean(d["pickupsEarly"]),
             "pickupsLate": _mean(d["pickupsLate"]),
-            "stillShare": _mean(d["stillShare"]),
-            "stillLateShare": _mean(d["stillLateShare"]),
-            "teamDist": _mean(d["teamDist"]),
-            "farShare": _mean(d["farShare"]),
+            "stillShare": _pct(d["stillMs"], d["stillTotalMs"]),
+            "stillLateShare": _pct(d["stillLateMs"], d["stillLateTotalMs"]),
+            # Median der Match-Mediane: robuster als ein Mittelwert, wenn ein
+            # einzelnes Match jemanden quer ueber die Karte schickt.
+            "teamDist": _median(d["teamDist"]),
+            "farShare": _pct(d["farCount"], d["distCount"]),
             "distAtDown": _median(d["distAtDown"]),
             "distAtDownMax": max(d["distAtDown"]) if d["distAtDown"] else None,
             "firstDownPct": _pct(d["firstDowns"], d["matches"]),
