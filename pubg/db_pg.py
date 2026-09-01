@@ -993,7 +993,7 @@ def get_player_names(conn, tenant_id: int, account_ids=None) -> dict:
         cur.execute("SELECT account_id, name FROM players "
                     "WHERE tenant_id = %s AND account_id = ANY(%s)",
                     (tenant_id, ids))
-        return {r[0]: r[1] for r in cur.fetchall()}
+        return {r["account_id"]: r["name"] for r in cur.fetchall()}
 
 
 def get_lifetime_overall(conn, account_ids=None) -> dict:
