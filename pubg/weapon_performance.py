@@ -152,7 +152,8 @@ def to_db_rows(analysis: dict, account_ids: dict = None) -> list:
                    # Nachschuesse auf Liegende: getrennt, damit sie weder
                    # Trefferquote noch Schadensschnitt verfaelschen.
                    "finisher_hits": w.get("finisherHits") or 0,
-                   "finisher_shots": w.get("finisherShots") or 0}
+                   "finisher_shots": w.get("finisherShots") or 0,
+                   "shots_in_fight": w.get("shotsInFight") or 0}
             for z, col in _ZONE_COL.items():
                 row[col] = zones.get(z, 0)
             rows.append(row)
@@ -179,6 +180,13 @@ def db_rows_to_display(rows, group_by: str = "weapon") -> list:
         acc["matches"] = int(r.get("matches") or 0)
         acc["finisherHits"] = int(r.get("finisher_hits") or 0)
         acc["finisherShots"] = int(r.get("finisher_shots") or 0)
+        acc["shotsInFight"] = int(r.get("shots_in_fight") or 0)
+        # Quoten aus den Summen, nicht als Mittel der Einzelmatch-Quoten.
+        acc["idlePct"] = (round(100.0 * (acc["shots"] - acc["shotsInFight"])
+                                / acc["shots"], 1) if acc["shots"] else None)
+        acc["fightAccuracy"] = (round(min(100.0, 100.0 * acc["hitAttacks"]
+                                          / acc["shotsInFight"]), 1)
+                                if acc["shotsInFight"] else None)
         out.append(_finish(acc))
     out.sort(key=lambda r: -r["damage"])
     return out

@@ -222,3 +222,14 @@ def test_db_rows_carry_the_finisher_columns():
     assert row["finisher_hits"] == 2
     assert row["finisher_shots"] == 2
     assert row["shots"] == 16          # ohne die Finisher-Schuesse
+
+
+def test_display_rows_derive_idle_and_fight_accuracy_from_totals():
+    from pubg.weapon_performance import db_rows_to_display
+    row = db_rows_to_display([{
+        "weapon": "M416", "shots": 1000, "hit_attacks": 100, "hits": 100,
+        "damage": 2000.0, "kills": 5, "matches": 10,
+        "shots_in_fight": 800, "finisher_hits": 3, "finisher_shots": 3,
+        "head": 10, "torso": 60, "arm": 10, "leg": 10, "pelvis": 10}])[0]
+    assert row["idlePct"] == 20.0
+    assert row["fightAccuracy"] == 12.5      # 100 Treffer auf 800 Gefechtsschuesse

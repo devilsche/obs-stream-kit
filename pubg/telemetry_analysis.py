@@ -168,6 +168,7 @@ def _new_player():
                                             "hit_attacks": set(), "hits_no_id": 0,
                                             "finisher_hits": 0,
                                             "finisher_shots": 0,
+                                            "shots_in_fight": 0,
                                             "zones": defaultdict(int)}),
             "byDistance": defaultdict(lambda: {"hits": 0, "headshots": 0})}
 
@@ -187,6 +188,9 @@ def _weapon_out(v: dict) -> dict:
         # Trefferquote noch Schaden, stehen aber in Klammern daneben.
         "finisherHits": v.get("finisher_hits", 0),
         "finisherShots": v.get("finisher_shots", 0),
+        # Schuesse, die waehrend eines Gefechts fielen — Grundlage fuer die
+        # Idle-Quote ueber Zeitraeume, ohne jedes Match neu zu rechnen.
+        "shotsInFight": v.get("shots_in_fight", 0),
         "hitAttacks": hit_attacks,         # getroffene Schuesse
         "accuracy": (round(min(100.0, 100.0 * hit_attacks / v["shots"]), 1)
                      if v["shots"] else 0),
@@ -275,11 +279,15 @@ def analyse(events) -> dict:
             p["shots"] += 1
             # Fiel der Schuss waehrend eines Gefechts? Wo die Kugel einschlaegt,
             # weiss die Telemetrie nicht — aber wann Schaden floss, schon.
-            if _in_fight(fight_windows.get(name), _parse_ts(e.get("_D"))):
+            in_fight = _in_fight(fight_windows.get(name),
+                                 _parse_ts(e.get("_D")))
+            if in_fight:
                 p["shots_in_fight"] += 1
             w = normalize_weapon((e.get("weapon") or {}).get("itemId"))
             if w:
                 p["weapons"][w]["shots"] += 1
+                if in_fight:
+                    p["weapons"][w]["shots_in_fight"] += 1
 
         elif t == "LogPlayerTakeDamage":
             attacker = e.get("attacker") or {}
@@ -313,6 +321,7 @@ def analyse(events) -> dict:
                     wf["finisher_hits"] += 1
                     wf["finisher_shots"] += 1
                     wf["shots"] = max(0, wf["shots"] - 1)
+                    wf["shots_in_fight"] = max(0, wf["shots_in_fight"] - 1)
                 continue
             p["hits"] += 1
             # Accuracy braucht SCHUESSE, nicht Einschlaege: eine Schrotladung

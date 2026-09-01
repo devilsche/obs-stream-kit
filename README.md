@@ -611,7 +611,10 @@ ist dabei ein Schuss, nicht neun Einschläge (Deduplizierung über `attackId`).
 Daneben steht in der Match-Analyse `Acc in fight %`: dieselbe Quote, aber nur über
 Schüsse, die **während eines laufenden Gefechts** fielen — also im Zeitfenster von
 ±20 s um ein Schadensereignis, an dem der Spieler beteiligt war (in beide Richtungen:
-zurückschießen zählt). `Idle shots %` ist der Rest.
+zurückschießen zählt). `Idle shots %` ist der Rest. Beides steht auch in der Zeitraum-Ansicht
+(`weapon-performance`): `shots_in_fight` wird beim Telemetrie-Fetch je Waffe
+mitgespeichert, sonst müsste man für eine Quote über Wochen jedes Match neu
+durchrechnen (gemessen: 1.063 Matches = 18 Minuten).
 
 Warum zeitlich und nicht räumlich: `LogPlayerAttack` enthält **weder Richtung noch
 Einschlagpunkt** — nur Schützen-Position, Waffe und `attackId`. Wo eine verfehlte

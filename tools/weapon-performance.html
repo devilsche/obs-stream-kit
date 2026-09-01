@@ -149,6 +149,9 @@
         { key: "shots",    label: "Shots",   num: true, val: r => r.shots },
         { key: "hits",     label: "Impacts", num: true, val: r => r.hits },
         { key: "accuracy", label: "Acc %",   num: true, val: r => r.accuracy },
+        { key: "accfight", label: "Acc in fight %", num: true,
+          val: r => r.fightAccuracy ?? -1 },
+        { key: "idle",     label: "Idle %",  num: true, val: r => r.idlePct ?? -1 },
         { key: "hs",       label: "HS %",    num: true, val: r => r.headshotRate },
         { key: "zone",     label: "Top zone", num: false, val: r => r.topZonePct },
         { key: "avgdmg",   label: "Ø dmg",   num: true, val: r => r.avgDamageEffective },
@@ -190,6 +193,10 @@
           <td class="num" title="${r.finisherHits ? r.finisherHits + " more impacts on downed enemies" : ""}"
               >${r.hits}${r.finisherHits ? ` <span class="finisher">(+${r.finisherHits})</span>` : ""}</td>
           <td class="num">${r.shots ? r.accuracy.toFixed(1) : "—"}</td>
+          <td class="num" title="Treffer je Schuss, der während eines laufenden Gefechts fiel"
+              >${r.fightAccuracy == null ? "—" : r.fightAccuracy.toFixed(1)}</td>
+          <td class="num" title="Anteil der Schüsse außerhalb jedes Gefechts"
+              >${r.idlePct == null ? "—" : r.idlePct.toFixed(0)}</td>
           <td class="num${weak ? " weak-sample" : ""}">${r.hits ? r.headshotRate.toFixed(1) : "—"}</td>
           <td class="${weak ? "weak-sample" : ""}">${zone}</td>
           <td class="num${weak ? " weak-sample" : ""}"
@@ -205,6 +212,8 @@
         `${rows.length} rows · Ø dmg is per hit, for pellet weapons (*) per landed shot.`
         + ` Numbers in brackets are shots and impacts on already downed enemies —`
         + ` the telemetry reports zero damage for those, so they stay out of accuracy and Ø dmg.`
+        + ` "Idle %" are shots fired while no damage was being traded at all;`
+        + ` "Acc in fight %" leaves those out of the denominator.`
         + ` Click a row to filter by it.`
         + (pend ? ` <span class="warn">${pend} match${pend === 1 ? "" : "es"} in this`
                   + ` range not processed yet — run weapon-stats-backfill.</span>` : "");

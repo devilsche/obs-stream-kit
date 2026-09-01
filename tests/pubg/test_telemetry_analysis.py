@@ -897,3 +897,16 @@ def test_finisher_shots_leave_the_fight_shot_count_too():
     ]
     p = analyse(events)["players"]["Ich"]
     assert p["shotsInFight"] <= p["shots"]
+
+
+def test_fight_shots_are_counted_per_weapon_too():
+    """Damit die Quote je Waffe in der DB landen kann statt bei jeder Abfrage
+    aus der Roh-Telemetrie neu gerechnet zu werden."""
+    events = [
+        _attack_at("Ich", 1, t="2026-07-26T23:05:00Z"),    # allein
+        _attack_at("Ich", 2, t="2026-07-26T23:11:58Z"),    # Gefecht
+        _damage("Ich", "Opfer", damage=30.0, aid=2),
+    ]
+    w = analyse(events)["players"]["Ich"]["weapons"]["ACE32"]
+    assert w["shots"] == 2
+    assert w["shotsInFight"] == 1
