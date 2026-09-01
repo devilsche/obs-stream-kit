@@ -442,7 +442,10 @@
     async function load() {
       const st = document.getElementById("status");
       st.classList.remove("err");
-      st.textContent = "Loading …";
+      // Der volle Bestand rechnet ungecached gut 15 s — sagen statt schweigen.
+      st.textContent = RANGE === "all"
+        ? "Loading all matches \u2026 (first run takes a few seconds)"
+        : "Loading \u2026";
       const params = new URLSearchParams({ range: RANGE, minMatches: String(MIN) });
       if (PLAYERS.trim()) params.set("players", PLAYERS.trim());
       if (BOTS) params.set("includeBots", "1");

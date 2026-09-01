@@ -2958,7 +2958,10 @@ class EndpointRegistry:
         waren — sonst mischen sich Zufallsmates in die Quoten. Ohne Angabe
         zaehlt jeder, der im Zeitraum mitgespielt hat.
 
-        Teuer (Events je Match), daher gecached und auf `limit` gedeckelt.
+        Teuer (Events je Match), daher gecached. `limit` deckelt nur nach
+        oben ab — der volle Bestand (rund 1100 Matches) rechnet sich in gut
+        15 s, und ein kuenstlicher 200er-Deckel liess Mates mit wenigen
+        juengsten Matches unter die Mindestzahl fallen.
         """
         from pubg.playstyle import compute_squad_playstyle
         from pubg.aggregations import _range_filter
@@ -2971,9 +2974,9 @@ class EndpointRegistry:
         names = [n.strip() for n in (qs.get("players") or "").split(",")
                  if n.strip()]
         try:
-            limit = max(1, min(int(qs.get("limit", "200")), 500))
+            limit = max(1, min(int(qs.get("limit", "5000")), 5000))
         except ValueError:
-            limit = 200
+            limit = 5000
         try:
             min_matches = max(1, int(qs.get("minMatches", "3")))
         except ValueError:
