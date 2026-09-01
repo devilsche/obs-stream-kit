@@ -1054,12 +1054,22 @@ def lobby_accounts_missing_snapshot(conn, tenant_id: int, season_id: str,
                    OR (%s IS NOT NULL AND s.fetched_at < %s))
               AND m.game_mode = %s
             GROUP BY mtm.account_id
-            -- Juengste Lobbys zuerst: dort schaut man hin, und ein Spieler
-            -- von vor einem halben Jahr taucht kaum noch auf.
-            ORDER BY MAX(m.played_at) DESC
+            ORDER BY
+              -- Der eigene Squad zuerst: das sind vier Leute statt 99, und
+              -- ihre Werte stehen in jeder Match-Zeile. Ohne diese Zeile
+              -- landen sie zufaellig unter den Lobby-Gegnern desselben
+              -- Matches (alle mit demselben Zeitstempel) und fehlen eine
+              -- halbe Stunde lang im Report.
+              -- tenant_id als Parameter, nicht als Spaltenverweis: sie steht
+              -- nicht im GROUP BY, Postgres lehnt sie im ORDER BY sonst ab.
+              (EXISTS (SELECT 1 FROM participants p
+                       WHERE p.tenant_id = %s
+                         AND p.account_id = mtm.account_id)) DESC,
+              -- Danach: juengste Lobbys zuerst.
+              MAX(m.played_at) DESC
             LIMIT %s
         """, (season_id, mode, tenant_id, stale_before, stale_before, mode,
-              limit))
+              tenant_id, limit))
         return [r["account_id"] for r in cur.fetchall()]
 
 
