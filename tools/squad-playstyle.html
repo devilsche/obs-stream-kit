@@ -457,8 +457,13 @@
             return `<td class="num"></td>`;
           }
           const flag = !isBase && c.flag && c.flag(r, rows);
-          const sample = which === "fight" ? (r.opened || 0) : (r.matches || 0);
-          const weak = !isBase && sample < MIN_SAMPLE && !c.text;
+          // Was "zu duenn" heisst, haengt an der Tabelle: eroeffnete Kaempfe,
+          // gespielte Matches — oder bei der Lobby die Abdeckung, ab der ein
+          // Match auch aus dem Gesamtschnitt faellt.
+          const weak = !isBase && !c.text && (
+            which === "fight" ? (r.opened || 0) < MIN_SAMPLE
+            : which === "lobby" ? (r.coverage || 0) < 25
+            : (r.matches || 0) < MIN_SAMPLE);
           const cls = [c.text ? "" : "num", flag ? "flag" : "",
                        weak ? "weak" : ""].filter(Boolean).join(" ");
           const title = flag ? ` title="${esc(c.why || "auffällig")}"` : "";
