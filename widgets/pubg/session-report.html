@@ -179,8 +179,9 @@
     .lobby-pending {
       display: inline-block;
       width: 11px; height: 11px;
-      border: 2px solid color-mix(in srgb, var(--pubg-muted) 45%, transparent);
-      border-top-color: var(--pubg-gold);
+      border: 2px solid color-mix(in srgb,
+                    var(--theme-text-dim, #8a7d99) 45%, transparent);
+      border-top-color: var(--theme-accent, #f2b705);
       border-radius: 50%;
       animation: lobby-spin 0.9s linear infinite;
       vertical-align: -1px;
@@ -188,7 +189,10 @@
     @keyframes lobby-spin { to { transform: rotate(360deg); } }
 
     /* Lobby-Werte sind anklickbar: dahinter steckt die Aufschluesselung.
-       Button statt div, damit Tastatur und Screenreader mitkommen. */
+       Button statt div, damit Tastatur und Screenreader mitkommen.
+       Farben durchgaengig aus den Theme-Tokens mit ECHTEN Literal-Defaults —
+       ein Fallback auf eine andere Variable waere zirkulaer und faellt in
+       OBS auf ungestylt zurueck. */
     .lobby-open {
       background: none;
       border: 0;
@@ -199,38 +203,50 @@
       min-height: 24px;
       border-radius: 3px;
       cursor: pointer;
-      text-decoration: underline dotted rgba(242, 183, 5, 0.55);
+      text-decoration: underline dotted
+        color-mix(in srgb, var(--theme-accent, #f2b705) 55%, transparent);
       text-underline-offset: 3px;
     }
-    .lobby-open:hover { background: rgba(242, 183, 5, 0.12); }
+    .lobby-open:hover {
+      background: color-mix(in srgb, var(--theme-accent, #f2b705) 12%, transparent);
+    }
     .lobby-open:focus-visible {
-      outline: 2px solid var(--pubg-gold);
+      outline: 2px solid var(--theme-accent, #f2b705);
       outline-offset: 2px;
     }
 
     .lobby-modal {
-      border: 1px solid rgba(242, 183, 5, 0.35);
-      border-radius: 8px;
-      background: #14101c;
-      color: var(--pubg-text);
+      border: var(--theme-border-width, 1px) solid
+              var(--theme-border, rgba(94, 42, 121, 0.6));
+      border-radius: var(--theme-radius, 8px);
+      background: var(--theme-surface-2, #1f1430);
+      color: var(--theme-text, #e8e0f0);
+      font-family: var(--theme-font-body, "DM Sans", system-ui, sans-serif);
       padding: 0;
       width: min(560px, 94vw);
       max-height: 86vh;
-      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
+      box-shadow: var(--theme-shadow, 0 14px 40px rgba(0, 0, 0, 0.4));
     }
-    .lobby-modal::backdrop { background: rgba(6, 4, 12, 0.72); }
+    .lobby-modal::backdrop {
+      background: color-mix(in srgb, var(--theme-bg, #0a0510) 78%, transparent);
+    }
     .lobby-modal__head {
       display: flex;
       align-items: flex-start;
       gap: 12px;
       padding: 14px 16px 10px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      border-bottom: 1px solid var(--theme-border, rgba(94, 42, 121, 0.6));
     }
-    .lobby-modal__title { margin: 0; font-size: 1.05em; }
+    .lobby-modal__title {
+      margin: 0;
+      font-size: 1.05em;
+      font-family: var(--theme-font-display, "DM Sans", system-ui, sans-serif);
+      color: var(--theme-accent, #f2b705);
+    }
     .lobby-modal__sub {
       margin: 3px 0 0;
       font-size: 0.85em;
-      color: var(--pubg-muted);
+      color: var(--theme-text-dim, #8a7d99);
     }
     .lobby-modal__close {
       margin-left: auto;
@@ -238,15 +254,17 @@
       min-height: 32px;
       display: grid;
       place-items: center;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 4px;
+      border: 1px solid var(--theme-border, rgba(94, 42, 121, 0.6));
+      border-radius: calc(var(--theme-radius, 8px) / 2);
       background: transparent;
-      color: var(--pubg-text);
+      color: var(--theme-text, #e8e0f0);
       cursor: pointer;
     }
-    .lobby-modal__close:hover { background: rgba(255, 255, 255, 0.08); }
+    .lobby-modal__close:hover {
+      background: color-mix(in srgb, var(--theme-text, #e8e0f0) 10%, transparent);
+    }
     .lobby-modal__close:focus-visible {
-      outline: 2px solid var(--pubg-gold);
+      outline: 2px solid var(--theme-accent, #f2b705);
       outline-offset: 2px;
     }
     .lobby-modal__body { padding: 12px 16px 18px; overflow-y: auto; max-height: 68vh; }
@@ -257,12 +275,17 @@
       margin-bottom: 16px;
     }
     .lobby-kpi {
-      background: rgba(94, 42, 121, 0.16);
-      border-radius: 5px;
+      background: color-mix(in srgb, var(--theme-primary, #5e2a79) 22%, transparent);
+      border-radius: calc(var(--theme-radius, 8px) * 0.65);
       padding: 8px 10px;
     }
-    .lobby-kpi b { display: block; font-size: 1.3em; line-height: 1.2; }
-    .lobby-kpi span { font-size: 0.78em; color: var(--pubg-muted); }
+    .lobby-kpi b {
+      display: block;
+      font-size: 1.3em;
+      line-height: 1.2;
+      font-variant-numeric: tabular-nums;
+    }
+    .lobby-kpi span { font-size: 0.78em; color: var(--theme-text-dim, #8a7d99); }
     .lobby-side + .lobby-side { margin-top: 14px; }
     .lobby-side h3 {
       margin: 0 0 6px;
@@ -271,10 +294,11 @@
       display: flex;
       gap: 8px;
       align-items: baseline;
+      font-family: var(--theme-font-display, "DM Sans", system-ui, sans-serif);
     }
     .lobby-side h3 em {
       font-style: normal;
-      color: var(--pubg-muted);
+      color: var(--theme-text-dim, #8a7d99);
       font-weight: 400;
     }
     .lobby-list { list-style: none; margin: 0; padding: 0; }
@@ -286,18 +310,20 @@
       border-radius: 3px;
       font-variant-numeric: tabular-nums;
     }
-    .lobby-list li:nth-child(odd) { background: rgba(255, 255, 255, 0.035); }
+    .lobby-list li:nth-child(odd) {
+      background: color-mix(in srgb, var(--theme-text, #e8e0f0) 5%, transparent);
+    }
     .lobby-list .kd { font-weight: 600; }
-    .lobby-list--top .kd { color: var(--pubg-gold); }
-    .lobby-list--low .kd { color: var(--pubg-muted); }
-    .lobby-list .where { color: var(--pubg-muted); font-size: 0.82em; }
+    .lobby-list--top .kd { color: var(--theme-accent, #f2b705); }
+    .lobby-list--low .kd { color: var(--theme-text-dim, #8a7d99); }
+    .lobby-list .where { color: var(--theme-text-dim, #8a7d99); font-size: 0.82em; }
     .lobby-modal__note {
       margin: 14px 0 0;
       font-size: 0.8em;
-      color: var(--pubg-muted);
+      color: var(--theme-text-dim, #8a7d99);
       line-height: 1.5;
     }
-    .lobby-modal__empty { color: var(--pubg-muted); }
+    .lobby-modal__empty { color: var(--theme-text-dim, #8a7d99); }
 
     /* Scheitert der Report, muss das jemand sehen — vorher landete der
        Fehler nur in der Konsole und der Platzhalter blieb ewig stehen. */
@@ -305,22 +331,24 @@
     .report-retry {
       min-height: 32px;
       padding: 6px 14px;
-      border: 1px solid var(--pubg-gold);
-      border-radius: 4px;
+      border: 1px solid var(--theme-accent, #f2b705);
+      border-radius: calc(var(--theme-radius, 8px) / 2);
       background: transparent;
-      color: var(--pubg-gold);
+      color: var(--theme-accent, #f2b705);
       font: inherit;
       cursor: pointer;
     }
-    .report-retry:hover { background: rgba(242, 183, 5, 0.14); }
+    .report-retry:hover {
+      background: color-mix(in srgb, var(--theme-accent, #f2b705) 14%, transparent);
+    }
     .report-retry:focus-visible {
-      outline: 2px solid var(--pubg-gold);
+      outline: 2px solid var(--theme-accent, #f2b705);
       outline-offset: 2px;
     }
     @media (prefers-reduced-motion: reduce) {
       .lobby-pending {
         animation: none;
-        border-top-color: var(--pubg-muted);
+        border-top-color: var(--theme-text-dim, #8a7d99);
       }
     }
     .matches-list .lobby-diff { font-size: 0.85em; }
@@ -3449,8 +3477,22 @@
     // Hinter jeder Lobby-Zahl steht eine Verteilung: 1.33 im Schnitt kann
     // eine gleichmaessige Lobby sein oder fuenf Haie und dreissig Bots.
     const _lobbyCache = new Map();
+    // Spiegelt pubg/lobby_kd.py::MIN_KD_ROUNDS — nur fuer den Hinweistext.
+    const MIN_KD_ROUNDS = 20;
 
     function lobbyKdStr(v) { return v == null ? "—" : v.toFixed(2); }
+
+    // Woher der Wert stammt: der gespielte Modus zuerst, sonst dieselbe
+    // Perspektive, zuletzt alles. Das gehört sichtbar dazu — 3.26 aus
+    // squad-fpp ist etwas anderes als 3.26 aus zwei Third-Person-Runden.
+    const BASIS_LABEL = { fpp: "alle FPP", tpp: "alle TPP", all: "alle Modi" };
+
+    function basisHtml(p) {
+      if (!p || !p.basis) return "";
+      const label = BASIS_LABEL[p.basis] || p.basis;
+      const rounds = p.rounds ? `, ${p.rounds} Runden` : "";
+      return ` <span class="where">${PubgUI.esc(label + rounds)}</span>`;
+    }
 
     function lobbyListHtml(players, cls, withMatch) {
       if (!players || !players.length) {
@@ -3458,7 +3500,8 @@
       }
       return `<ul class="lobby-list lobby-list--${cls}">` + players.map(p => `
         <li><span>${PubgUI.esc(p.name)}${withMatch && p.playedAt
-              ? ` <span class="where">${PubgUI.esc(PubgUI.fmtTime(p.playedAt))}</span>` : ""}</span>
+              ? ` <span class="where">${PubgUI.esc(PubgUI.fmtTime(p.playedAt))}</span>` : ""
+            }${basisHtml(p)}</span>
             <span class="kd">${p.kd.toFixed(2)}</span></li>`).join("") + `</ul>`;
     }
 
@@ -3485,11 +3528,13 @@
           <ul class="lobby-list lobby-list--top">${mates.map(m => `
             <li><span>${PubgUI.esc(m.name)}${isPhase && m.matches
                   ? ` <span class="where">${m.matches} ${
-                      m.matches === 1 ? "Match" : "Matches"}</span>` : ""}</span>
+                      m.matches === 1 ? "Match" : "Matches"}</span>` : ""
+                }${basisHtml(m)}</span>
                 <span class="kd">${m.kd == null ? "—" : m.kd.toFixed(2)}</span></li>`
             ).join("")}</ul>
         </div>
-        <p class="lobby-modal__note">Das ist der Karriere-Schnitt der Leute,
+        <p class="lobby-modal__note">Gemessen am Modus dieses Matches, sonst
+          steht die Ersatz-Grundlage dahinter. Das ist der Karriere-Schnitt der Leute,
           nicht ihre Leistung in ${isPhase ? "dieser Phase" : "diesem Match"} —
           dafür steht „Squad Phase" im Kopf der Phase.${isPhase
             ? " Wer nur ein, zwei Runden dabei war, prägt den Schnitt kaum,"
@@ -3528,8 +3573,10 @@
           ? `Ø, Median und die Ränder mitteln die Match-Werte — sonst wögen
              volle Lobbys schwerer als kurze Matches. Namentlich gelistet sind
              dagegen die Extreme der ganzen Phase, mit ihrer Uhrzeit.`
-          : `Eigener Squad und Bots sind draußen. Der Median liegt meist knapp
-             unter dem Ø: K/D endet bei 0, ist nach oben aber offen.`}</p>`;
+          : `Eigener Squad und Bots sind draußen. Gemessen wird am Modus
+             dieses Matches; steht dahinter „alle FPP" oder „alle Modi", hatte
+             der Spieler dort zu wenige Runden. Unter ${MIN_KD_ROUNDS} Runden
+             gibt es gar keinen Wert — 20 Kills aus zwei Runden sagen nichts.`}</p>`;
     }
 
     async function openLobbyModal(matchIds, title, sub, isPhase, view) {

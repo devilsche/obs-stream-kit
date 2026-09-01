@@ -82,6 +82,76 @@ def counts_for_average(match) -> bool:
             and match.get("lobbyKd") is not None)
 
 
+#: Mindest-Runden, ab denen ein K/D etwas aussagt. Darunter ist es Rauschen:
+#: auf prod stand ein Account mit 20 Kills aus ZWEI Solo-Runden als "20er K/D"
+#: an der Spitze einer Lobby — in squad-fpp hatte derselbe Spieler 0,43 aus 49
+#: Runden.
+MIN_KD_ROUNDS = 20
+#: Perspektive schlaegt Modus: First-Person und Third-Person sind zwei
+#: verschiedene Spiele, ein TPP-Wert sagt ueber einen FPP-Gegner wenig.
+FPP_MODES = ("solo-fpp", "duo-fpp", "squad-fpp")
+TPP_MODES = ("solo", "duo", "squad")
+
+
+def _sum_modes(per_mode, modes):
+    kills = losses = rounds = 0
+    for m in modes:
+        st = (per_mode or {}).get(m)
+        if not st:
+            continue
+        kills += st.get("kills") or 0
+        losses += st.get("losses") or 0
+        rounds += st.get("rounds") or 0
+    return kills, losses, rounds
+
+
+def _kd_if_enough(kills, losses, rounds, min_rounds):
+    if rounds < min_rounds:
+        return None
+    return _kd(kills, losses, rounds)
+
+
+def kd_for_mode(per_mode, mode: str, min_rounds: int = MIN_KD_ROUNDS) -> dict:
+    """K/D eines Spielers aus der Sicht des gespielten Modus.
+
+    Drei Stufen, jede erst wenn die vorige zu duenn ist:
+      1. der Modus selbst (squad-fpp gegen squad-fpp)
+      2. dieselbe Perspektive (FPP bzw. TPP zusammengefasst)
+      3. alles zusammen
+
+    Vorher wurde immer sofort alles summiert. Das ergab Werte wie 20,0 aus
+    zwei Solo-Runden, waehrend derselbe Spieler in squad-fpp bei 0,43 stand —
+    und genau in squad-fpp trifft man ihn.
+
+    Returns {"kd", "basis", "rounds"} — `basis` sagt, worauf der Wert beruht
+    (Modusname, "fpp", "tpp", "all" oder None).
+    """
+    group = FPP_MODES if (mode or "").endswith("-fpp") else TPP_MODES
+    steps = ((mode, (mode,)) if mode else (None, ()),
+             ("fpp" if group is FPP_MODES else "tpp", group),
+             ("all", tuple(per_mode or ())))
+    for basis, modes in steps:
+        if not modes:
+            continue
+        kills, losses, rounds = _sum_modes(per_mode, modes)
+        kd = _kd_if_enough(kills, losses, rounds, min_rounds)
+        if kd is not None:
+            return {"kd": kd, "basis": basis, "rounds": rounds}
+    _, _, rounds = _sum_modes(per_mode, tuple(per_mode or ()))
+    return {"kd": None, "basis": None, "rounds": rounds}
+
+
+def kd_by_perspective(per_mode, min_rounds: int = MIN_KD_ROUNDS) -> dict:
+    """{"fpp": {...}, "tpp": {...}, "all": {...}} — zum Nebeneinanderstellen."""
+    out = {}
+    for key, modes in (("fpp", FPP_MODES), ("tpp", TPP_MODES),
+                       ("all", tuple(per_mode or ()))):
+        kills, losses, rounds = _sum_modes(per_mode, modes)
+        out[key] = {"kd": _kd_if_enough(kills, losses, rounds, min_rounds),
+                    "rounds": rounds, "kills": kills, "losses": losses}
+    return out
+
+
 def parse_lifetime(payload) -> dict:
     """Lifetime-Antwort eines Spielers → {mode: stats}.
 
@@ -205,7 +275,9 @@ def overall_kd(per_mode) -> float | None:
 def lobby_breakdown(players, top_n: int = 5) -> dict:
     """Eine Lobby aufgeschluesselt: Median, Maximum und die beiden Raender.
 
-    `players` = [(name, kd), ...]; Unbekannte gehoeren nicht hinein.
+    `players` = [(name, kd)] oder [(name, kd, info)], wobei `info` die
+    Herkunft des Werts traegt (Modus/Perspektive und Rundenzahl). Unbekannte
+    gehoeren nicht hinein.
 
     Der Median steht neben dem Schnitt, weil K/D bei 0 endet und nach oben
     offen ist — der Schnitt haengt an den wenigen Starken. Gemessen an prod
@@ -215,15 +287,22 @@ def lobby_breakdown(players, top_n: int = 5) -> dict:
     Bei wenigen Bekannten werden die Raender gekuerzt, damit sich Top und Low
     nicht ueberlappen und derselbe Spieler nicht auf beiden Seiten steht.
     """
-    vals = sorted(((n, k) for n, k in (players or []) if k is not None),
+    vals = sorted(((p[0], p[1], p[2] if len(p) > 2 else {})
+                   for p in (players or []) if p[1] is not None),
                   key=lambda p: p[1])
     if not vals:
         return {"known": 0, "avg": None, "median": None, "max": None,
                 "top": [], "low": [], "topAvg": None, "lowAvg": None}
-    kds = [k for _, k in vals]
+    kds = [k for _, k, _ in vals]
     n = min(top_n, len(vals) // 2) or (1 if len(vals) == 1 else 0)
-    top = [{"name": nm, "kd": k} for nm, k in reversed(vals[len(vals) - n:])]
-    low = [{"name": nm, "kd": k} for nm, k in vals[:n]]
+
+    def _entry(row):
+        nm, k, info = row
+        return {"name": nm, "kd": k, "basis": (info or {}).get("basis"),
+                "rounds": (info or {}).get("rounds")}
+
+    top = [_entry(r) for r in reversed(vals[len(vals) - n:])]
+    low = [_entry(r) for r in vals[:n]]
     return {
         "known": len(vals),
         "avg": sum(kds) / len(kds),
@@ -328,7 +407,8 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
 
     raw = getattr(conn, "raw", conn)
     rows = conn.execute(
-        "SELECT mtm.match_id, mtm.account_id, m.played_at, m.map_name "
+        "SELECT mtm.match_id, mtm.account_id, m.played_at, m.map_name, "
+        "       m.game_mode "
         "FROM match_team_mapping mtm "
         "JOIN matches m ON m.match_id = mtm.match_id "
         "               AND m.tenant_id = mtm.tenant_id "
@@ -353,20 +433,27 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         entry = per_match.setdefault(mid, {"matchId": mid,
                                             "playedAt": r["played_at"],
                                             "map": r["map_name"],
+                                            "mode": r["game_mode"],
                                             "accounts": []})
         entry["accounts"].append(r["account_id"])
         all_accounts.add(r["account_id"])
 
+    by_mode = {}
     if season_id == LIFETIME_KEY:
-        # Alltime heisst ueber die ganze Karriere, nicht ueber einen Modus:
-        # wer nur Duo spielt, haette in squad-fpp keine Zahl.
-        kd_by_acc = db_pg.get_lifetime_overall(raw, list(all_accounts))
+        # Alltime heisst ueber die ganze Karriere — aber gemessen wird am
+        # Modus, in dem man sich begegnet ist (Rueckfall: gleiche Perspektive,
+        # dann alles). Sonst steht ein Spieler mit 20 Kills aus zwei
+        # Solo-Runden als 20er-K/D in einer squad-fpp-Lobby, wo er 0,43 hat.
+        by_mode = db_pg.get_lifetime_by_mode(raw, list(all_accounts))
+        kd_by_acc = {}
     else:
         snaps = db_pg.get_season_snapshots(raw, season_id, mode,
                                            list(all_accounts))
         kd_by_acc = {a: (v or {}).get("kd") if v else None
                      for a, v in snaps.items()}
     my_kd = kd_by_acc.get(my_account_id)
+    if by_mode and my_account_id:
+        my_kd = kd_for_mode(by_mode.get(my_account_id), None).get("kd")
 
     # Zweiter Satz Zahlen (z.B. Season neben Alltime) — dieselbe Rechnung,
     # nur mit anderem Schluessel; steht in der Ansicht als Zusatzspalte.
@@ -380,6 +467,9 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
     out = []
     for mid, entry in per_match.items():
         squad = squad_by_match.get(mid, set())
+        if by_mode:
+            kd_by_acc = {a: kd_for_mode(by_mode.get(a), entry.get("mode")).get("kd")
+                         for a in set(entry["accounts"]) | set(squad)}
         # Lobby heisst hier: alle ausser uns. Der eigene Squad steckte sonst
         # in beiden Seiten des Vergleichs.
         avg = lobby_average(entry["accounts"], kd_by_acc, exclude=squad)
@@ -445,7 +535,8 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
     raw = getattr(conn, "raw", conn)
     marks = ",".join("?" * len(match_ids))
     rows = conn.execute(
-        "SELECT mtm.match_id, mtm.account_id, m.played_at, m.map_name "
+        "SELECT mtm.match_id, mtm.account_id, m.played_at, m.map_name, "
+        "       m.game_mode "
         "FROM match_team_mapping mtm "
         "JOIN matches m ON m.match_id = mtm.match_id "
         "               AND m.tenant_id = mtm.tenant_id "
@@ -466,12 +557,13 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
     for r in rows:
         e = per_match.setdefault(r["match_id"],
                                  {"playedAt": r["played_at"],
-                                  "map": r["map_name"], "accounts": []})
+                                  "map": r["map_name"],
+                                  "mode": r["game_mode"], "accounts": []})
         e["accounts"].append(r["account_id"])
         accounts.add(r["account_id"])
 
     accounts.update(squad_names)
-    kd_by_acc = db_pg.get_lifetime_overall(raw, list(accounts))
+    by_mode = db_pg.get_lifetime_by_mode(raw, list(accounts))
     names = db_pg.get_player_names(raw, tenant_id, list(accounts))
     names.update({a: n for a, n in squad_names.items() if n})
 
@@ -481,16 +573,26 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
         squad = squad_by_match.get(mid, set())
         lobby = [a for a in e["accounts"]
                  if a not in squad and not is_bot(a)]
-        players = [(names.get(a) or a[:12], kd_by_acc.get(a)) for a in lobby]
+        # Gemessen wird am Modus, in dem man sich begegnet ist — mit Rueckfall
+        # auf dieselbe Perspektive und erst zuletzt auf alles.
+        kd_by_acc = {a: kd_for_mode(by_mode.get(a), e.get("mode"))
+                     for a in set(lobby) | set(squad)}
+        players = [(names.get(a) or a[:12], (kd_by_acc.get(a) or {}).get("kd"),
+                    kd_by_acc.get(a) or {}) for a in lobby]
         b = lobby_breakdown(players, top_n=top_n)
         # Die eigenen Leute mit ihrem Karriere-Wert — dieselbe Frage wie fuer
         # die Lobby, nur andersherum: wer sitzt eigentlich im eigenen Auto.
         mates = []
-        for a in sorted(squad, key=lambda x: -(kd_by_acc.get(x) or -1)):
-            mates.append({"name": names.get(a) or a[:12], "kd": kd_by_acc.get(a),
+        for a in sorted(squad, key=lambda x: -((kd_by_acc.get(x) or {}).get("kd")
+                                               or -1)):
+            info = kd_by_acc.get(a) or {}
+            mates.append({"name": names.get(a) or a[:12], "kd": info.get("kd"),
+                          "basis": info.get("basis"), "rounds": info.get("rounds"),
                           "accountId": a})
             agg = squad_seen.setdefault(a, {"name": names.get(a) or a[:12],
-                                            "kd": kd_by_acc.get(a),
+                                            "kd": info.get("kd"),
+                                            "basis": info.get("basis"),
+                                            "rounds": info.get("rounds"),
                                             "matches": 0})
             agg["matches"] += 1
         known_mates = [m["kd"] for m in mates if m["kd"] is not None]
@@ -503,10 +605,12 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                               if known_mates else None})
         out.append(b)
         for a in lobby:
-            kd = kd_by_acc.get(a)
+            info = kd_by_acc.get(a) or {}
+            kd = info.get("kd")
             if kd is None:
                 continue
             entry = {"name": names.get(a) or a[:12], "kd": kd,
+                     "basis": info.get("basis"), "rounds": info.get("rounds"),
                      "matchId": mid, "playedAt": e["playedAt"]}
             prev = strongest.get(a)
             if prev is None or kd > prev["kd"]:

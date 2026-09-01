@@ -292,3 +292,52 @@ def test_mini_lobbys_zaehlen_nicht_in_den_gesamtschnitt():
     solid = [m for m in matches if lk.counts_for_average(m)]
     assert len(solid) == 1
     assert solid[0]["lobbyKd"] == 1.30
+
+
+# ── K/D nach Perspektive: FPP, TPP, und der gespielte Modus zuerst ──────────
+
+def _stats(k, l, r):
+    return {"kills": k, "losses": l, "rounds": r}
+
+
+def test_kd_for_mode_nimmt_den_gespielten_modus():
+    """Wer in squad-fpp 49 Runden hat, wird daran gemessen — nicht an zwei
+    Solo-Runden mit 20 Kills."""
+    per_mode = {"squad-fpp": _stats(21, 49, 49), "solo-fpp": _stats(20, 1, 2)}
+    r = lk.kd_for_mode(per_mode, "squad-fpp")
+    assert r["kd"] == pytest.approx(21 / 49)
+    assert r["basis"] == "squad-fpp"
+    assert r["rounds"] == 49
+
+
+def test_kd_for_mode_faellt_auf_die_perspektive_zurueck():
+    """Kein squad-fpp, aber genug Duo-FPP: FPP bleibt FPP."""
+    per_mode = {"duo-fpp": _stats(120, 60, 70), "squad": _stats(500, 10, 20)}
+    r = lk.kd_for_mode(per_mode, "squad-fpp")
+    assert r["kd"] == pytest.approx(120 / 60)
+    assert r["basis"] == "fpp"
+
+
+def test_kd_for_mode_nimmt_zuletzt_alles_zusammen():
+    per_mode = {"squad": _stats(300, 100, 150), "duo": _stats(60, 20, 30)}
+    r = lk.kd_for_mode(per_mode, "squad-fpp")
+    assert r["kd"] == pytest.approx(360 / 120)
+    assert r["basis"] == "all"
+
+
+def test_kd_for_mode_ohne_ausreichende_stichprobe():
+    """Zwei Solo-Runden sagen nichts — dann lieber gar kein Wert."""
+    per_mode = {"solo-fpp": _stats(20, 1, 2)}
+    r = lk.kd_for_mode(per_mode, "squad-fpp")
+    assert r["kd"] is None and r["basis"] is None
+
+
+def test_kd_by_perspective_trennt_fpp_und_tpp():
+    per_mode = {"squad-fpp": _stats(290, 89, 98), "squad": _stats(30, 1, 2),
+                "solo": _stats(46, 3, 4), "duo-fpp": _stats(4, 4, 4)}
+    p = lk.kd_by_perspective(per_mode)
+    assert p["fpp"]["kd"] == pytest.approx((290 + 4) / (89 + 4))
+    assert p["fpp"]["rounds"] == 102
+    # TPP hat nur sechs Runden — zu duenn fuer eine eigene Aussage.
+    assert p["tpp"]["kd"] is None
+    assert p["tpp"]["rounds"] == 6

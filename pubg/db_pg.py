@@ -996,12 +996,45 @@ def get_player_names(conn, tenant_id: int, account_ids=None) -> dict:
         return {r["account_id"]: r["name"] for r in cur.fetchall()}
 
 
-def get_lifetime_overall(conn, account_ids=None) -> dict:
-    """{account_id: kd} — Alltime ueber ALLE Spielmodi (Summe Kills / Tode).
+#: Mindest-Rundenzahl, ab der ein Alltime-K/D etwas aussagt. Darunter ist es
+#: Rauschen: gemessen auf prod stand ein Account mit 20 Kills in ZWEI
+#: Solo-Runden als "20er K/D" ganz oben in der Lobby-Spitze, waehrend er in
+#: squad-fpp ueberhaupt keine Zahlen hatte. Betrifft 94 von 12.895 Accounts.
+MIN_KD_ROUNDS = 20
 
-    Der modusspezifische Wert laesst zu viele Spieler leer: wer nur Duo
-    spielt, hat in squad-fpp keine Zahl. Ein Lifetime-Call liefert ohnehin
-    alle Modi, sie stehen also schon in der Tabelle.
+
+def get_lifetime_by_mode(conn, account_ids=None) -> dict:
+    """{account_id: {mode: {"kills","losses","rounds"}}} — ungerechnet.
+
+    Wer die Zahlen nach Perspektive trennen will (FPP gegen TPP) oder den
+    gespielten Modus bevorzugen, braucht die Modus-Zeilen einzeln; die
+    Summe steht in `get_lifetime_stats`.
+    """
+    ids = [a for a in (account_ids or []) if a]
+    if not ids:
+        return {}
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT account_id, mode, kills, losses, rounds
+            FROM player_season_snapshot
+            WHERE season_id = 'lifetime' AND account_id = ANY(%s)
+              AND kills IS NOT NULL
+        """, (ids,))
+        rows = cur.fetchall()
+    out = {}
+    for r in rows:
+        out.setdefault(r["account_id"], {})[r["mode"]] = {
+            "kills": r["kills"] or 0, "losses": r["losses"] or 0,
+            "rounds": r["rounds"] or 0}
+    return out
+
+
+def get_lifetime_stats(conn, account_ids=None, min_rounds: int = MIN_KD_ROUNDS) -> dict:
+    """{account_id: {"kd": float|None, "kills", "losses", "rounds"}}.
+
+    Wie `get_lifetime_overall`, liefert aber die Stichprobe mit — ein Wert aus
+    847 Runden ist etwas anderes als einer aus zweien, und das gehoert in die
+    Anzeige, nicht nur in die Rechnung.
     """
     ids = [a for a in (account_ids or []) if a]
     if not ids:
@@ -1019,13 +1052,25 @@ def get_lifetime_overall(conn, account_ids=None) -> dict:
         rows = cur.fetchall()
     out = {}
     for r in rows:
-        kills, losses, rounds = (r["kills"] or 0), (r["losses"] or 0), (r["rounds"] or 0)
-        if not (kills or losses or rounds):
-            out[r["account_id"]] = None
-            continue
-        out[r["account_id"]] = (kills / losses) if losses else (
-            kills / rounds if rounds else None)
+        kills, losses = (r["kills"] or 0), (r["losses"] or 0)
+        rounds = r["rounds"] or 0
+        kd = None
+        if (kills or losses or rounds) and rounds >= min_rounds:
+            kd = (kills / losses) if losses else (kills / rounds if rounds else None)
+        out[r["account_id"]] = {"kd": kd, "kills": kills, "losses": losses,
+                                "rounds": rounds}
     return out
+
+
+def get_lifetime_overall(conn, account_ids=None) -> dict:
+    """{account_id: kd} — Alltime ueber ALLE Spielmodi (Summe Kills / Tode).
+
+    Der modusspezifische Wert laesst zu viele Spieler leer: wer nur Duo
+    spielt, hat in squad-fpp keine Zahl. Ein Lifetime-Call liefert ohnehin
+    alle Modi, sie stehen also schon in der Tabelle. Unter `MIN_KD_ROUNDS`
+    Runden gilt der Wert als unbekannt — siehe dort.
+    """
+    return {a: v["kd"] for a, v in get_lifetime_stats(conn, account_ids).items()}
 
 
 def clear_false_unknown_snapshots(conn) -> int:
