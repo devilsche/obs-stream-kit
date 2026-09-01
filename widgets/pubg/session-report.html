@@ -3314,6 +3314,12 @@
       return `${m}:${String(s).padStart(2,"0")}`;
     }
 
+    // Ab welcher Abdeckung ein Lobby-Wert etwas aussagt. Dieselbe Schwelle
+    // benutzt das Backend fuer Phasen- und Session-Schnitt — sonst zeigt die
+    // Match-Zeile eine Zahl, die in der Phase darueber fehlt (gemessen:
+    // Matches mit 2 von 95 bekannten Spielern und "1.82" in der Zelle).
+    const MIN_LOBBY_COVERAGE = 25;
+
     // TopScorer-Score: "16K / 3A". Assists fehlen bei Matches, die vor der
     // assists-Spalte eingelesen wurden — dann nur die Kills, keine erfundene 0.
     function fmtScore(sc) {
@@ -3358,10 +3364,10 @@
           <span class="stat"><b>${Math.round(m.damage||0)}</b> DMG</span>
           <span class="stat"><b>${fmtSurv(mySurv)}</b></span>
           <span class="stat lobby-kd" title="${
-            m.lobbyKd == null
-              ? `Alltime-K/D der Gegner wird gesammelt — ${m.lobbyKnown || 0} von ${m.lobbyPlayers || 0} bekannt (rund 15 min je Lobby)`
+            (m.lobbyKd == null || (m.lobbyCoverage || 0) < MIN_LOBBY_COVERAGE)
+              ? `Alltime-K/D der Gegner wird gesammelt — erst ${m.lobbyKnown || 0} von ${m.lobbyPlayers || 0} bekannt, ab ${MIN_LOBBY_COVERAGE} % wird gerechnet`
               : `Ø Alltime-K/D der Gegner, eigener Squad ausgenommen (${m.lobbyKnown}/${m.lobbyPlayers} bekannt)`
-          }">${m.lobbyKd == null
+          }">${(m.lobbyKd == null || (m.lobbyCoverage || 0) < MIN_LOBBY_COVERAGE)
                 ? (m.lobbyPlayers
                     ? `<span class="lobby-pending" role="img" aria-label="Lobby-Stärke wird gesammelt"></span>`
                     : '<span class="dim">—</span>')
@@ -3371,7 +3377,7 @@
               ? "Alltime-K/D des eigenen Squads noch nicht bekannt"
               : "Ø Alltime-K/D des eigenen Squads in diesem Match"
           }">${
-            m.squadKd == null
+            (m.squadKd == null || (m.lobbyCoverage || 0) < MIN_LOBBY_COVERAGE)
               ? (m.lobbyPlayers
                   ? `<span class="lobby-pending" role="img" aria-label="Squad-Stärke wird gesammelt"></span>`
                   : '<span class="dim">—</span>')
