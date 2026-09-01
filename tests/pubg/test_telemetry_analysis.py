@@ -910,3 +910,38 @@ def test_fight_shots_are_counted_per_weapon_too():
     w = analyse(events)["players"]["Ich"]["weapons"]["ACE32"]
     assert w["shots"] == 2
     assert w["shotsInFight"] == 1
+
+
+def test_a_squad_fight_opens_the_window_too():
+    """Wer seinem Team zuarbeitet, waehrend dort Schaden fliesst, ballert
+    nicht ins Leere — besonders auf Distanz, wo ein Fehlschuss gar kein
+    Ereignis erzeugt (Kar98k stand deshalb bei 39 % \"idle\")."""
+    events = [
+        # Mate im Feuergefecht
+        {"_T": "LogPlayerCreate", "character": {"name": "Mate", "teamId": 19,
+                                                 "accountId": "account.Mate"}},
+        {"_T": "LogPlayerCreate", "character": {"name": "Ich", "teamId": 19,
+                                                 "accountId": "account.Ich"}},
+        _damage("Mate", "Feind", damage=30.0, aid=1,
+                t="2026-07-26T23:11:58Z"),
+        # Ich schiesse zeitgleich, treffe aber nichts
+        _attack_at("Ich", 2, t="2026-07-26T23:12:02Z"),
+    ]
+    p = analyse(events)["players"]["Ich"]
+    assert p["shots"] == 1
+    assert p["shotsInFight"] == 1
+    assert p["idleShotPct"] == 0.0
+
+
+def test_a_fight_of_another_team_does_not_open_our_window():
+    events = [
+        {"_T": "LogPlayerCreate", "character": {"name": "Fremd", "teamId": 4,
+                                                 "accountId": "account.Fremd"}},
+        {"_T": "LogPlayerCreate", "character": {"name": "Ich", "teamId": 19,
+                                                 "accountId": "account.Ich"}},
+        _damage("Fremd", "Feind", damage=30.0, aid=1,
+                t="2026-07-26T23:11:58Z"),
+        _attack_at("Ich", 2, t="2026-07-26T23:12:02Z"),
+    ]
+    p = analyse(events)["players"]["Ich"]
+    assert p["shotsInFight"] == 0

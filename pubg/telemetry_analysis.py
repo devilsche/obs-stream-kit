@@ -109,15 +109,23 @@ def _parse_ts(iso):
         return None
 
 
-def _fight_windows(events):
-    """{spielername: [(start, ende), ...]} — Zeitfenster, in denen der Spieler
-    an einem Feuergefecht beteiligt war.
+def _fight_windows(events, team_of=None):
+    """Zeitfenster, in denen gekaempft wurde — je Spieler UND je Team.
 
     Grundlage sind Schadensereignisse in beide Richtungen: wer schiesst und
     trifft, ist im Gefecht; wer beschossen wird, ebenso. Um jedes Ereignis
     liegt FIGHT_WINDOW_S, ueberlappende Fenster verschmelzen.
+
+    Die Team-Fenster sind noetig, weil ein Fehlschuss KEIN Ereignis erzeugt:
+    Wer sein Squad auf Distanz unterstuetzt und dabei nicht trifft, stuende
+    sonst als "ballert ins Leere" da — an Prod-Daten gemessen war das der
+    Grund, warum Kar98k und M24 auf 39 % Idle-Quote kamen.
+
+    Returns (per_player, per_team).
     """
     marks = defaultdict(list)
+    team_marks = defaultdict(list)
+    team_of = team_of or {}
     for e in events or []:
         if e.get("_T") not in ("LogPlayerTakeDamage", "LogPlayerMakeGroggy",
                                 "LogPlayerKillV2"):
@@ -129,11 +137,14 @@ def _fight_windows(events):
             continue
         for key in ("attacker", "victim", "killer"):
             who = (e.get(key) or {}).get("name")
-            if who:
-                marks[who].append(t)
+            if not who:
+                continue
+            marks[who].append(t)
+            tid = (e.get(key) or {}).get("teamId") or team_of.get(who)
+            if tid is not None:
+                team_marks[tid].append(t)
 
-    out = {}
-    for name, times in marks.items():
+    def _merge(times):
         times.sort()
         windows = []
         for t in times:
@@ -142,8 +153,10 @@ def _fight_windows(events):
                 windows[-1] = (windows[-1][0], max(windows[-1][1], end))
             else:
                 windows.append((start, end))
-        out[name] = windows
-    return out
+        return windows
+
+    return ({n: _merge(ts) for n, ts in marks.items()},
+            {tid: _merge(ts) for tid, ts in team_marks.items()})
 
 
 def _in_fight(windows, t) -> bool:
@@ -230,7 +243,6 @@ def analyse(events) -> dict:
     """Wertet die Event-Liste aus. Siehe Modul-Docstring."""
     players = defaultdict(_new_player)
     kills = []
-    fight_windows = _fight_windows(events)
     # LogPlayerCreate ist das vollstaendige Teilnehmer-Roster. Ohne das fehlen
     # Spieler, die nie schiessen, treffen oder sterben — in einem gemessenen
     # Match 3 von 100.
@@ -261,6 +273,9 @@ def analyse(events) -> dict:
             if _is_bot(q) or (q.get("teamId") or 0) >= 200:
                 bot_of[q["name"]] = True
 
+    # Gefechts-Fenster brauchen die Team-Zuordnung — deshalb erst hier.
+    fight_windows, team_windows = _fight_windows(events, team_of)
+
     # Wer gerade am Boden liegt. Treffer auf Liegende melden 0 Schaden und
     # wuerden Trefferquote und Schnitt-Schaden verfaelschen — sie werden
     # getrennt gezaehlt (finisher_*). Ein Revive stellt den Spieler wieder hin.
@@ -279,8 +294,10 @@ def analyse(events) -> dict:
             p["shots"] += 1
             # Fiel der Schuss waehrend eines Gefechts? Wo die Kugel einschlaegt,
             # weiss die Telemetrie nicht — aber wann Schaden floss, schon.
-            in_fight = _in_fight(fight_windows.get(name),
-                                 _parse_ts(e.get("_D")))
+            shot_ts = _parse_ts(e.get("_D"))
+            in_fight = (_in_fight(fight_windows.get(name), shot_ts)
+                        or _in_fight(team_windows.get(team_of.get(name)),
+                                     shot_ts))
             if in_fight:
                 p["shots_in_fight"] += 1
             w = normalize_weapon((e.get("weapon") or {}).get("itemId"))

@@ -610,8 +610,14 @@ jeder Schuss zählt im Nenner, auch Rumballern in die Landschaft. Ein Schrotschu
 ist dabei ein Schuss, nicht neun Einschläge (Deduplizierung über `attackId`).
 Daneben steht in der Match-Analyse `Acc in fight %`: dieselbe Quote, aber nur über
 Schüsse, die **während eines laufenden Gefechts** fielen — also im Zeitfenster von
-±20 s um ein Schadensereignis, an dem der Spieler beteiligt war (in beide Richtungen:
-zurückschießen zählt). `Idle shots %` ist der Rest. Beides steht auch in der Zeitraum-Ansicht
+±20 s um ein Schadensereignis, an dem der Spieler **oder sein Squad** beteiligt war
+(in beide Richtungen: zurückschießen zählt). `Idle shots %` ist der Rest.
+
+Die Squad-Fenster sind nötig, weil ein Fehlschuss **kein Ereignis erzeugt**: Wer sein
+Team auf Distanz unterstützt und dabei nicht trifft, stünde sonst als „ballert ins
+Leere" da. An Prod-Daten gemessen war genau das der Grund, warum Kar98k (39,5 %) und
+M24 (38,7 %) die höchsten Idle-Quoten hatten, während SMGs unter 10 % lagen — ein
+Artefakt der Messung, keine Eigenschaft der Waffe. Beides steht auch in der Zeitraum-Ansicht
 (`weapon-performance`): `shots_in_fight` wird beim Telemetrie-Fetch je Waffe
 mitgespeichert, sonst müsste man für eine Quote über Wochen jedes Match neu
 durchrechnen (gemessen: 1.063 Matches = 18 Minuten).
