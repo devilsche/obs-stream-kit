@@ -938,7 +938,7 @@ def lobby_accounts_missing_snapshot(conn, tenant_id: int, season_id: str,
     existiert — juengste Matches zuerst, dort schaut man zuerst hin."""
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT DISTINCT mtm.account_id
+            SELECT mtm.account_id
             FROM match_team_mapping mtm
             JOIN matches m ON m.match_id = mtm.match_id
                           AND m.tenant_id = mtm.tenant_id
@@ -949,7 +949,10 @@ def lobby_accounts_missing_snapshot(conn, tenant_id: int, season_id: str,
               AND mtm.account_id NOT LIKE 'ai.%%'
               AND s.account_id IS NULL
               AND m.game_mode = %s
-            ORDER BY mtm.account_id
+            GROUP BY mtm.account_id
+            -- Juengste Lobbys zuerst: dort schaut man hin, und ein Spieler
+            -- von vor einem halben Jahr taucht kaum noch auf.
+            ORDER BY MAX(m.played_at) DESC
             LIMIT %s
         """, (season_id, mode, tenant_id, mode, limit))
         return [r["account_id"] for r in cur.fetchall()]
