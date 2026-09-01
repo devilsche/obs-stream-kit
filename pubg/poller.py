@@ -288,9 +288,13 @@ def collect_lobby_kd(conn, tenant_id: int, client, max_batches: int = 1,
     season_id = _current_season_id(client, conn, tenant_id)
     if not season_id:
         return 0
+    import datetime as _dt
+    stale_before = (_dt.datetime.now(_dt.UTC)
+                    - _dt.timedelta(days=lobby_kd.SNAPSHOT_TTL_DAYS)
+                    ).strftime("%Y-%m-%dT%H:%M:%SZ")
     missing = db_pg.lobby_accounts_missing_snapshot(
         raw_conn, tenant_id, season_id, mode,
-        limit=lobby_kd.BATCH_SIZE * max_batches)
+        limit=lobby_kd.BATCH_SIZE * max_batches, stale_before=stale_before)
     if not missing:
         return 0
     store = {}

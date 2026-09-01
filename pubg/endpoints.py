@@ -306,6 +306,8 @@ class EndpointRegistry:
             return self._squad_compare(qs)
         if route == ("GET", "/api/pubg/lobby-kd"):
             return self._lobby_kd(qs)
+        if route == ("GET", "/api/pubg/lobby-kd/refresh"):
+            return self._lobby_kd_refresh(qs)
         if route == ("GET", "/api/pubg/squad-playstyle"):
             return self._squad_playstyle(qs)
         if route == ("GET", "/api/pubg/chickens-together"):
@@ -2861,6 +2863,33 @@ class EndpointRegistry:
                                           season_id, mode,
                                           my_account_id=self.my_account_id))
         return _ok({**data, "range": range_key})
+
+    def _lobby_kd_refresh(self, qs):
+        """Fehlende und veraltete Season-Snapshots nachladen — auf Knopfdruck.
+
+        Der Poller sammelt von selbst, aber ein Zehnerpack je Minute; wer
+        gerade auf die Ansicht schaut, will nicht warten. Das Budget ist
+        gedeckelt, damit ein Klick nicht das Match-Polling aushungert.
+        """
+        from pubg import db_pg, lobby_kd
+        from pubg.poller import collect_lobby_kd
+
+        if self.client is None:
+            return _err(503, "Kein PUBG-Client konfiguriert")
+        try:
+            batches = max(1, min(int(qs.get("batches", "5")), 10))
+        except ValueError:
+            batches = 5
+        mode = qs.get("mode", "squad-fpp")
+        conn = self.get_conn()
+        try:
+            found = collect_lobby_kd(conn, self.tenant_id, self.client,
+                                     max_batches=batches, mode=mode)
+        except Exception as e:
+            return _err(502, f"Nachladen fehlgeschlagen: {e}")
+        # Die Ansicht liest aus dem Cache — nach neuen Zahlen muss der weg.
+        self.cache.invalidate()
+        return _ok({"fetched": found, "batches": batches, "mode": mode})
 
     def _squad_playstyle(self, qs):
         """Spielstil + Kampf-Ausgaenge je Squad-Mate.

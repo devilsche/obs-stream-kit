@@ -82,11 +82,24 @@
     td.flag::after { content: " ●"; font-size: 0.7em; }
     td.weak { opacity: 0.45; font-style: italic; }
     .scroll { overflow-x: auto; }
+    .refresh { background: transparent; min-height: 24px;
+               border: 1px solid var(--theme-accent); color: var(--theme-accent);
+               padding: 7px 12px; border-radius: 3px; cursor: pointer;
+               font-family: inherit; font-size: 11px; font-weight: 700;
+               letter-spacing: 0.06em; text-transform: uppercase; }
+    .refresh:hover { background: color-mix(in srgb, var(--theme-accent) 15%, transparent); }
+    .refresh:focus-visible { outline: 2px solid var(--theme-accent); outline-offset: 2px; }
+    .refresh[disabled] { opacity: 0.5; cursor: default; }
     .legend { color: var(--theme-text-dim); font-size: 0.72em; margin-top: 8px;
               line-height: 1.5; }
     th .unit { display: block; font-weight: 400; opacity: 0.65;
                letter-spacing: 0; text-transform: none; }
-    th.sortable { white-space: normal; max-width: 120px; }
+    /* Titel duerfen umbrechen, aber die Zahlenspalte darunter braucht eine
+       Mindestbreite — sonst quetscht sich "1.78" unter eine dreizeilige
+       Ueberschrift. */
+    th.sortable { white-space: normal; max-width: 130px; }
+    th.num, td.num { min-width: 74px; }
+    th.sortable:first-child, td:first-child { min-width: 130px; }
     .howto { margin-top: 6px; font-size: 0.78em; color: var(--theme-text-dim); }
     .howto summary { cursor: pointer; padding: 4px 0; min-height: 24px;
                      color: var(--theme-accent); }
@@ -223,6 +236,12 @@
         <tbody id="lobbyRows"></tbody>
       </table>
     </div>
+    <div class="bar">
+      <button type="button" class="refresh" id="lobbyRefresh">
+        Fetch more lobby data
+      </button>
+      <span class="legend" id="lobbyRefreshNote" role="status" aria-live="polite"></span>
+    </div>
     <p class="legend" id="lobbyNote"></p>
     <details class="howto">
       <summary>Where the lobby K/D comes from</summary>
@@ -243,9 +262,13 @@
             fetches ten players per minute, so coverage grows over time —
             matches below 25% are left out of the overall average.</dd>
         <dt>It is a snapshot</dt>
-        <dd>The API has no history: the value is where that player stands
-            today, not on the day of the match. Within a running season that
-            is close enough; across seasons it is not.</dd>
+        <dd>The API has no history: the value is where that player stood when
+            we fetched it, not on the day of the match. Within a running
+            season that is close enough; across seasons it is not.</dd>
+        <dt>How current</dt>
+        <dd>A stored value is refetched after 30 days, so season numbers do not
+            slowly drift out of date. “Fetch more lobby data” pulls 50 players
+            right away instead of waiting for the collector.</dd>
       </dl>
     </details>
   </div>
@@ -500,6 +523,28 @@
           + `${cov}% of lobby players known.`;
     }
 
+    const lobbyBtn = () => document.getElementById("lobbyRefresh");
+
+    async function refreshLobby() {
+      const btn = lobbyBtn();
+      const note = document.getElementById("lobbyRefreshNote");
+      if (!btn) return;
+      btn.disabled = true;
+      note.textContent = "Fetching …";
+      try {
+        const r = await PubgUI.fetchJson(
+          BASE + "api/pubg/lobby-kd/refresh?batches=5", 180000);
+        note.textContent = r.fetched
+          ? `${r.fetched} more players known — reloading.`
+          : "Nothing left to fetch for these matches.";
+        if (r.fetched) await loadLobby();
+      } catch (e) {
+        note.textContent = "Could not fetch: " + (e && e.message || e);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
     function render() {
       if (!DATA) return;
       const rows = DATA.rows || [];
@@ -591,6 +636,9 @@
         if (th) { e.preventDefault(); onSort(th); }
       });
     });
+
+    const _lb = lobbyBtn();
+    if (_lb) _lb.addEventListener("click", refreshLobby);
 
     press(document.getElementById("rangeSwitch"), "range", RANGE);
     document.getElementById("fPlayers").value = PLAYERS;

@@ -933,9 +933,12 @@ def upsert_season_snapshots(conn, season_id: str, mode: str, rows: dict,
 
 
 def lobby_accounts_missing_snapshot(conn, tenant_id: int, season_id: str,
-                                    mode: str, limit: int = 200) -> list:
-    """Lobby-Spieler der juengsten Matches, fuer die noch kein Snapshot
-    existiert — juengste Matches zuerst, dort schaut man zuerst hin."""
+                                    mode: str, limit: int = 200,
+                                    stale_before: str = None) -> list:
+    """Lobby-Spieler der juengsten Matches ohne brauchbaren Snapshot.
+
+    Ohne `stale_before` nur Spieler ganz ohne Eintrag; mit gesetztem Wert auch
+    die, deren Zahlen aelter sind — Season-Werte wachsen weiter."""
     with conn.cursor() as cur:
         cur.execute("""
             SELECT mtm.account_id
@@ -947,14 +950,16 @@ def lobby_accounts_missing_snapshot(conn, tenant_id: int, season_id: str,
                   AND s.season_id = %s AND s.mode = %s
             WHERE mtm.tenant_id = %s
               AND mtm.account_id NOT LIKE 'ai.%%'
-              AND s.account_id IS NULL
+              AND (s.account_id IS NULL
+                   OR (%s IS NOT NULL AND s.fetched_at < %s))
               AND m.game_mode = %s
             GROUP BY mtm.account_id
             -- Juengste Lobbys zuerst: dort schaut man hin, und ein Spieler
             -- von vor einem halben Jahr taucht kaum noch auf.
             ORDER BY MAX(m.played_at) DESC
             LIMIT %s
-        """, (season_id, mode, tenant_id, mode, limit))
+        """, (season_id, mode, tenant_id, stale_before, stale_before, mode,
+              limit))
         return [r["account_id"] for r in cur.fetchall()]
 
 

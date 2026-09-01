@@ -18,6 +18,25 @@ Sammel-Takt im Poller.
 #: Der Batch-Endpoint nimmt zehn Spieler-IDs pro Aufruf.
 BATCH_SIZE = 10
 
+#: So lange gilt ein Snapshot als aktuell. Season-Zahlen wachsen mit jedem
+#: Match des Spielers — ein Wert von vor Monaten beschreibt ihn nicht mehr,
+#: taeglich nachzufragen kostet aber Budget, das der Match-Poller braucht.
+SNAPSHOT_TTL_DAYS = 30
+
+
+def is_stale(fetched_at, now=None) -> bool:
+    """Ist ein Snapshot alt genug fuer einen erneuten Abruf?"""
+    import datetime as _dt
+    if not fetched_at:
+        return True
+    try:
+        ts = _dt.datetime.fromisoformat(str(fetched_at).replace("Z", "+00:00"))
+        ref = (_dt.datetime.fromisoformat(str(now).replace("Z", "+00:00"))
+               if now else _dt.datetime.now(_dt.UTC))
+    except (ValueError, TypeError):
+        return True
+    return (ref - ts).days >= SNAPSHOT_TTL_DAYS
+
 
 def is_bot(account_id) -> bool:
     return isinstance(account_id, str) and account_id.startswith("ai.")
