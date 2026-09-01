@@ -71,6 +71,11 @@
                                 outline-offset: -2px; }
     .sort-arrow { font-size: 0.7em; margin-left: 2px; opacity: 0.7; }
     .me { color: var(--theme-accent); font-weight: 700; }
+    /* Vergleichszeile: kein Mitspieler, sondern der Maßstab. */
+    tr.baseline td { border-top: 2px solid var(--theme-accent);
+                     color: var(--theme-text-dim); font-style: italic; }
+    tr.baseline td:first-child { color: var(--theme-text); font-weight: 700;
+                                 font-style: normal; }
     /* Auffällige Werte markieren — nie über Farbe allein: die Zelle bekommt
        zusätzlich einen Titel, der sagt, warum sie markiert ist. */
     td.flag { font-weight: 700; }
@@ -142,7 +147,8 @@
     </div>
     <p class="legend">
       A fight is “our squad against one enemy team” — hover a column title for
-      what the number means.
+      what the number means. The last row, <b>Enemy opens</b>, is the yardstick:
+      the same fights when the enemy shoots first.
     </p>
     <details class="howto">
       <summary>How a fight is counted</summary>
@@ -166,6 +172,10 @@
         <dt>Bots</dt>
         <dd>Excluded by default — otherwise every rate looks better than it is.
             The switch above pulls them back in.</dd>
+        <dt>Enemy opens</dt>
+        <dd>All fights someone else started against us, across every match in
+            range. Read the rows above against it — an opening rate only means
+            something next to what happens when you get jumped.</dd>
         <dt>Faded rows</dt>
         <dd>Fewer than five opened fights: too little to conclude anything.
             Those rows get no highlight either.</dd>
@@ -363,12 +373,24 @@
         return sort.dir * (va - vb);
       });
 
-      body.innerHTML = sorted.map(r => {
+      // Die Vergleichszeile "Enemy opens" haengt fest unten und wandert nicht
+      // mit der Sortierung — sie ist kein Mitspieler, sondern der Massstab,
+      // gegen den man die Zeilen darueber liest.
+      const extra = (which === "fight" && DATA && DATA.baseline)
+        ? [DATA.baseline] : [];
+      body.innerHTML = sorted.concat(extra).map(r => {
         const mine = r.accountId === DATA.myAccountId;
-        return `<tr>` + cols.map(c => {
-          const flag = c.flag && c.flag(r, rows);
+        const isBase = r.accountId === null;
+        return `<tr${isBase ? ' class="baseline"' : ""}>` + cols.map(c => {
+          // Fuer die Vergleichszeile gibt es weder Markierungen noch "zu
+          // kleine Stichprobe"; Spalten, die nur fuer einen Eroeffner Sinn
+          // ergeben, bleiben leer statt zu luegen.
+          if (isBase && r[c.key] === undefined && !c.text) {
+            return `<td class="num"></td>`;
+          }
+          const flag = !isBase && c.flag && c.flag(r, rows);
           const sample = which === "fight" ? (r.opened || 0) : (r.matches || 0);
-          const weak = sample < MIN_SAMPLE && !c.text;
+          const weak = !isBase && sample < MIN_SAMPLE && !c.text;
           const cls = [c.text ? "" : "num", flag ? "flag" : "",
                        weak ? "weak" : ""].filter(Boolean).join(" ");
           const title = flag ? ` title="${esc(c.why || "auffällig")}"` : "";

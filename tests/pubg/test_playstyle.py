@@ -390,3 +390,44 @@ def test_finished_self_is_none_without_a_single_downed_target():
     me = next(r for r in ps.aggregate([a]) if r["accountId"] == "account.me")
     assert me["openTargetDown"] == 0
     assert me["openTargetFinishedSelfPct"] is None
+
+
+# ── Vergleichszeile: der Gegner macht auf ───────────────────────────────────
+
+def test_baseline_counts_only_fights_the_enemy_started():
+    """Ohne diese Zeile fehlt der Massstab: Kaempfe, die uns aufgezwungen
+    werden, gehen deutlich schlechter aus als die selbst begonnenen."""
+    ours = ps.analyse_match([
+        ev("TakeDamage", 10, "account.me", "account.foe1"),
+        ev("Knock", 12, "account.me", "account.foe1"),
+    ], SQUAD, TEAM_OF)
+    theirs = ps.analyse_match([
+        ev("TakeDamage", 10, "account.foe1", "account.me"),
+        ev("Knock", 12, "account.foe1", "account.me"),
+    ], SQUAD, TEAM_OF)
+    b = ps.baseline([ours, theirs])
+    assert b["opened"] == 1              # nur der fremd-eroeffnete Kampf
+    assert b["downsAgainst"] == 1
+    assert b["downsFor"] == 0
+    assert b["lostPct"] == pytest.approx(100.0)
+    assert b["wonPct"] == pytest.approx(0.0)
+
+
+def test_baseline_without_such_fights_is_none():
+    only_ours = ps.analyse_match([
+        ev("TakeDamage", 10, "account.me", "account.foe1"),
+    ], SQUAD, TEAM_OF)
+    assert ps.baseline([only_ours]) is None
+
+
+def test_baseline_reports_the_same_shape_as_a_player_row():
+    """Damit die Zeile in dieselbe Tabelle passt."""
+    theirs = ps.analyse_match([
+        ev("TakeDamage", 10, "account.foe1", "account.me"),
+        ev("Knock", 14, "account.me", "account.foe1"),
+    ], SQUAD, TEAM_OF)
+    b = ps.baseline([theirs])
+    for key in ("opened", "wonPct", "lostPct", "pointlessPct", "downsFor",
+                "downsAgainst", "downsPerOpen", "squadLossPerOpen"):
+        assert key in b, key
+    assert b["downsPerOpen"] == pytest.approx(1.0)

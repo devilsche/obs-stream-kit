@@ -521,6 +521,47 @@ def aggregate(match_analyses):
     return rows
 
 
+def baseline(match_analyses):
+    """Die Kaempfe, die der GEGNER anfaengt — als Vergleichsmassstab.
+
+    Ohne sie fehlt der Bezug: eine Eroeffnungsquote von 44 % sagt nichts, wenn
+    man nicht weiss, wie dieselben Runden ausgehen, wenn man ueberfallen wird.
+    Gemessen an den Prod-Daten ist der Unterschied gross — selbst angefangene
+    Kaempfe stehen deutlich besser da.
+
+    Gleiche Feldnamen wie eine Spieler-Zeile, damit die Ansicht sie in
+    dieselbe Tabelle setzen kann. None, wenn es keine solchen Kaempfe gab.
+    """
+    n = won = lost = trade = pointless = 0
+    downs_for = downs_against = 0
+    for a in match_analyses:
+        for f in a.get("fights") or []:
+            if f.get("openedByUs"):
+                continue
+            n += 1
+            won += f["result"] == "won"
+            lost += f["result"] == "lost"
+            trade += f["result"] == "trade"
+            pointless += f["result"] == "pointless"
+            downs_for += f["theirDowns"]
+            downs_against += f["ourDowns"]
+    if not n:
+        return None
+    return {
+        "accountId": None,
+        "name": "Enemy opens",
+        "opened": n,
+        "wonPct": _pct(won, n),
+        "lostPct": _pct(lost, n),
+        "tradePct": _pct(trade, n),
+        "pointlessPct": _pct(pointless, n),
+        "downsFor": downs_for,
+        "downsAgainst": downs_against,
+        "downsPerOpen": downs_for / n,
+        "squadLossPerOpen": downs_against / n,
+    }
+
+
 # ── DB-Anbindung ────────────────────────────────────────────────────────────
 
 def compute_squad_playstyle(conn, tenant_id: int, my_account_id,
@@ -559,4 +600,5 @@ def compute_squad_playstyle(conn, tenant_id: int, my_account_id,
 
     rows = [r for r in aggregate(analyses) if r["matches"] >= min_matches]
     return {"rows": rows, "matches": len(match_ids),
-            "matchesWithEvents": with_events}
+            "matchesWithEvents": with_events,
+            "baseline": baseline(analyses)}
