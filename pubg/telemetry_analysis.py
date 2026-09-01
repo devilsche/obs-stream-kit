@@ -297,6 +297,12 @@ def analyse(events) -> dict:
                 # gezaehlt — er muss aus dem Accuracy-Nenner wieder raus,
                 # sonst zaehlt der Schuss unten, der Treffer aber nicht oben.
                 p["shots"] = max(0, p["shots"] - 1)
+                # Auch aus der Leerschuss-Pruefung nehmen: der Schuss ging auf
+                # einen Liegenden, der stand als "Gegner in Reichweite" drin.
+                if p["shots_judged"]:
+                    p["shots_judged"] -= 1
+                if p["shots_with_target"]:
+                    p["shots_with_target"] -= 1
                 fw = normalize_weapon(e.get("damageCauserName"))
                 if fw:
                     wf = p["weapons"][fw]
@@ -418,6 +424,12 @@ def analyse(events) -> dict:
             "isBot": bool(bot_of.get(name)),
             "shots": shots,
             "shotsWithTarget": p["shots_with_target"],
+            # Trefferquote nur auf die Schuesse gerechnet, bei denen ueberhaupt
+            # ein Gegner in Reichweite war — die Antwort auf "oder hat er nur
+            # rumgeballert".
+            "accuracyEngaged": (round(min(100.0, 100.0 * hit_attacks
+                                          / p["shots_with_target"]), 1)
+                                if p["shots_with_target"] else None),
             "emptyShotPct": (round(100.0 * (p["shots_judged"] - p["shots_with_target"])
                                    / p["shots_judged"], 1)
                              if p["shots_judged"] else None),

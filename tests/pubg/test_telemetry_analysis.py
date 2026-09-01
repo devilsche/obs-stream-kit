@@ -352,6 +352,22 @@ def _pos(name, team, x, y, t="2026-07-26T23:12:00Z", health=100):
                           "location": {"x": x, "y": y}}}
 
 
+def test_accuracy_against_engaged_shots_is_reported():
+    """Die Frage "war da ueberhaupt jemand" beantwortet erst diese Quote:
+    Treffer je Schuss MIT Gegner in Reichweite."""
+    events = [
+        # health gehoert dazu: ohne sie gilt der Spieler als tot und damit
+        # nicht als Ziel.
+        {"_T": "LogPlayerPosition", "_D": "2026-07-26T23:11:50Z",
+         "character": {"name": "Opfer", "teamId": 4, "accountId": "account.Opfer",
+                       "health": 100.0, "location": {"x": 100.0, "y": 200.0}}},
+        _attack_at("Ich", 1),
+        _damage("Ich", "Opfer", damage=50.0, aid=1),
+        _attack_at("Ich", 2),           # daneben, aber Gegner war da
+    ]
+    p = analyse(events)["players"]["Ich"]
+    assert p["shotsWithTarget"] == 2
+    assert p["accuracyEngaged"] == 50.0
 def _attack_at(name, x, y, t="2026-07-26T23:12:00Z", aid=1):
     e = _attack(name, t=t, aid=aid)
     e["attacker"]["location"] = {"x": x, "y": y}
@@ -877,3 +893,34 @@ def test_killing_a_downed_enemy_still_counts_as_a_kill():
     p = analyse(events)["players"]["Ich"]
     assert p["kills"] == 1
     assert p["finisherHits"] == 1
+
+
+def test_finisher_shots_also_leave_the_empty_shot_check():
+    """Der Nachschuss faellt aus `shots` — dann muss er auch aus der
+    Leerschuss-Pruefung raus, sonst stehen dort mehr Schuesse mit Ziel als
+    Schuesse insgesamt."""
+    events = [
+        # health gehoert dazu: ohne sie gilt der Spieler als tot und damit
+        # nicht als Ziel.
+        {"_T": "LogPlayerPosition", "_D": "2026-07-26T23:11:50Z",
+         "character": {"name": "Opfer", "teamId": 4, "accountId": "account.Opfer",
+                       "health": 100.0, "location": {"x": 100.0, "y": 200.0}}},
+        _attack_at("Ich", 1),
+        _damage("Ich", "Opfer", damage=50.0, aid=1),
+        _groggy("Ich", "Opfer"),
+        _attack_at("Ich", 2),
+        _damage("Ich", "Opfer", damage=0.0, aid=2),
+    ]
+    p = analyse(events)["players"]["Ich"]
+    assert p["shotsWithTarget"] <= p["shots"]
+
+
+def _attack_at(name, aid, x=100.0, y=100.0, t="2026-07-26T23:11:58Z"):
+    """Schuss MIT Schuetzen-Position — ohne die kann die Leerschuss-Pruefung
+    nichts sagen."""
+    e = _attack(name, t=t, aid=aid)
+    e["attacker"]["location"] = {"x": x, "y": y}
+    e["attacker"]["teamId"] = 19
+    return e
+
+

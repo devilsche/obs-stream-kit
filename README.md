@@ -605,6 +605,14 @@ python -m pubg.cli clan-queue-prune [--min-seen 5] [--dry-run]
 
 auf; schon aufgelöste Einträge bleiben.
 
+**Was als Treffer zählt:** `Acc %` ist *getroffene Schüsse / abgegebene Schüsse* —
+jeder Schuss zählt im Nenner, auch Rumballern in die Landschaft. Ein Schrotschuss
+ist dabei ein Schuss, nicht neun Einschläge (Deduplizierung über `attackId`).
+Daneben steht in der Match-Analyse `Acc engaged %`: dieselbe Quote, aber nur über
+Schüsse, bei denen laut Positionsdaten ein lebender Gegner innerhalb von 300 m war.
+Die Differenz zwischen beiden ist die Leerschuss-Quote (`Empty %`) — wer viel ohne
+Ziel feuert, drückt damit seine normale Accuracy.
+
 **Nachschüsse auf liegende Gegner** zählen nicht mit: Die Telemetrie meldet für
 Treffer auf einen Spieler im DBNO **0 Schaden**, weil dort kein normales HP-Konto
 mehr läuft. Zählte man sie mit, sähe jede Sniper-Statistik aus wie ein Fehlschlag —
