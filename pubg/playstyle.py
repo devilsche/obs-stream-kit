@@ -48,10 +48,90 @@ PICKUP_EVENTS = ("ItemPickup", "ItemPickupBox")
 #: er trotzdem nicht.
 NON_LOOT_ITEMS = ("bluechip",)
 
+#: Pause zwischen zwei Pickups, ab der eine neue Loot-Phase beginnt. Im Haus
+#: liegen zwischen zwei Items gut und gerne 10-15 s (Treppe, Raumwechsel) —
+#: das ist noch Looten. Wer 20 s nichts aufhebt, ist unterwegs.
+LOOT_GAP_MS = 20_000
+#: Untergrenze je Phase. Nur gegen Pickups mit identischem Zeitstempel
+#: (Stack-Merges) — sonst waere die Rate unendlich. 2 Items in 0,3 s sind
+#: 400/min; so hoch kommt echtes Looten nie, die Grenze greift also nur da,
+#: wo sie soll.
+LOOT_MIN_PHASE_MS = 300
+
 
 def is_loot(item_id) -> bool:
     low = (item_id or "").lower()
     return not any(marker in low for marker in NON_LOOT_ITEMS)
+
+
+def loot_bursts(timestamps, gap_ms: int = LOOT_GAP_MS,
+                min_phase_ms: int = LOOT_MIN_PHASE_MS) -> dict:
+    """Pickups zu Loot-Phasen buendeln.
+
+    Das Tempo soll beantworten "wie fix greift er zu, WAEHREND er lootet" —
+    nicht "wie viel hat er ueber sein ganzes Leben aufgehoben". Wer in 20 s
+    30 Items einsammelt und dann 10 Minuten laeuft, lootet schnell, auch wenn
+    die Lebenszeit das wegmittelt.
+
+    Phasen mit nur einem Pickup haben keine messbare Dauer und fallen aus
+    Zaehler UND Nenner — das ist Aufheben im Vorbeilaufen, kein Loot-Vorgang.
+    Sie gehen als `singles` mit, damit nichts verschwindet.
+    """
+    ts = sorted(t for t in (timestamps or []) if t is not None)
+    items = active = singles = bursts = 0
+    start = prev = None
+    n = 0
+
+    def close():
+        nonlocal items, active, singles, bursts
+        if n <= 1:
+            singles += n
+            return
+        items += n
+        active += max(prev - start, min_phase_ms)
+        bursts += 1
+
+    for t in ts:
+        if start is None or t - prev > gap_ms:
+            if start is not None:
+                close()
+            start, n = t, 0
+        prev, n = t, n + 1
+    if start is not None:
+        close()
+    return {"items": items, "activeMs": active, "singles": singles,
+            "bursts": bursts}
+
+
+def box_visits(picks) -> dict:
+    """Box-Loot je Besuch: `picks` sind (timestamp_ms, owner_account).
+
+    Eine Box gehoert genau einem Toten, also gruppiert der Owner. Kommt
+    jemand spaeter nochmal an dieselbe Box, trennt dieselbe Luecke wie beim
+    Boden-Loot die Besuche. Anders als dort zaehlen Ein-Item-Besuche mit:
+    "einmal reingegriffen und weiter" ist eine Aussage ueber das Verhalten
+    an der Leiche, und mit 0 s Verweildauer verzerrt es die Sekunden nicht.
+    """
+    by_owner = defaultdict(list)
+    for ts, owner in (picks or []):
+        if ts is not None:
+            by_owner[owner].append(ts)
+    boxes = items = active = 0
+    for stamps in by_owner.values():
+        stamps.sort()
+        start = prev = None
+        for t in stamps:
+            if start is None or t - prev > LOOT_GAP_MS:
+                if start is not None:
+                    boxes += 1
+                    active += prev - start
+                start = t
+            prev = t
+        if start is not None:
+            boxes += 1
+            active += prev - start
+    return {"boxes": boxes, "items": sum(len(v) for v in by_owner.values()),
+            "activeMs": active}
 
 
 def is_bot(account_id) -> bool:
@@ -263,6 +343,7 @@ def player_metrics(events, squad, team_of, *, still_m=STILL_M, far_m=FAR_M):
     squad_ids = set(squad)
     positions = defaultdict(list)      # acc -> [(ts, x, y)]
     pickups = defaultdict(list)
+    ground_picks, box_picks = defaultdict(list), defaultdict(list)
     landing, downs = {}, {}
     last_ts = defaultdict(int)
     first_ts = None
@@ -279,6 +360,12 @@ def player_metrics(events, squad, team_of, *, still_m=STILL_M, far_m=FAR_M):
         elif et in PICKUP_EVENTS and actor in squad_ids:
             if is_loot(_g(e, "weapon")):
                 pickups[actor].append(ts)
+                # Boden und Leiche sind zwei verschiedene Verhalten: am Boden
+                # zaehlt das Tempo, an der Box die Verweildauer.
+                if et == "ItemPickupBox":
+                    box_picks[actor].append((ts, _g(e, "target_account")))
+                else:
+                    ground_picks[actor].append(ts)
             last_ts[actor] = max(last_ts[actor], ts)
         elif et == "Landing" and actor in squad_ids:
             landing.setdefault(actor, ts)
@@ -303,6 +390,11 @@ def player_metrics(events, squad, team_of, *, still_m=STILL_M, far_m=FAR_M):
         late_picks = sum(1 for ts in picks if ts >= late_from)
         late_alive_min = max((t_end - max(t_start, late_from)) / 60000.0, 0.0)
 
+        ground = loot_bursts([ts for ts in ground_picks.get(acc, [])
+                              if ts >= t_start])
+        boxes = box_visits([(ts, own) for ts, own in box_picks.get(acc, [])
+                            if ts >= t_start])
+
         still = _stillness(pts, t_start, t_end, still_m)
         team_dists = _team_distances(acc, pts, positions)
         out[acc] = {
@@ -313,7 +405,15 @@ def player_metrics(events, squad, team_of, *, still_m=STILL_M, far_m=FAR_M):
             "pickupsEarly10": early,
             "pickupsLate15": late_picks,
             "lateAliveMin": late_alive_min,
-            "pickupsPerMin": (len(picks) / alive_min) if alive_min else None,
+            # Rohzaehler fuers Loot-Tempo — die Rate entsteht erst aus den
+            # Summen ueber alle Matches, nie aus gemittelten Match-Raten.
+            "lootItems": ground["items"],
+            "lootActiveMs": ground["activeMs"],
+            "lootBursts": ground["bursts"],
+            "lootSingles": ground["singles"],
+            "boxCount": boxes["boxes"],
+            "boxItems": boxes["items"],
+            "boxActiveMs": boxes["activeMs"],
             "stillShare": _pct(still["still_ms"], still["total_ms"]),
             "stillLateShare": _pct(still["late_still_ms"], still["late_ms"]),
             "stillMaxMin": still["max_run_ms"] / 60000.0 if still["total_ms"] else None,
@@ -443,6 +543,8 @@ def aggregate(match_analyses):
         "pickTotal": 0, "aliveTotal": 0.0,
         "lateePickTotal": 0, "lateAliveTotal": 0.0,
         "stillMs": 0, "stillTotalMs": 0, "stillLateMs": 0, "stillLateTotalMs": 0,
+        "lootItems": 0, "lootActiveMs": 0, "lootBursts": 0, "lootSingles": 0,
+        "boxCount": 0, "boxItems": 0, "boxActiveMs": 0,
         "farCount": 0, "distCount": 0,
         "opened": 0, "openedWon": 0, "openedLost": 0, "openedTrade": 0,
         "openedPointless": 0, "openedWithDown": 0, "openDist": [], "engaged": 0,
@@ -478,7 +580,9 @@ def aggregate(match_analyses):
             d["lateePickTotal"] += m.get("pickupsLate15") or 0
             d["lateAliveTotal"] += m.get("lateAliveMin") or 0.0
             for k in ("stillMs", "stillTotalMs", "stillLateMs",
-                      "stillLateTotalMs", "farCount", "distCount"):
+                      "stillLateTotalMs", "farCount", "distCount",
+                      "lootItems", "lootActiveMs", "lootBursts",
+                      "lootSingles", "boxCount", "boxItems", "boxActiveMs"):
                 d[k] += m.get(k) or 0
 
         for f in a.get("fights") or []:
@@ -516,8 +620,24 @@ def aggregate(match_analyses):
             "name": d["name"] or acc[:12],
             "matches": d["matches"],
             "aliveMin": _mean(d["aliveMin"]),
-            "pickupsPerMin": (d["pickTotal"] / d["aliveTotal"])
-                             if d["aliveTotal"] else None,
+            # Tempo waehrend des Lootens — Nenner ist die Zeit IN den
+            # Loot-Phasen, nicht die Lebenszeit. Wer in 20 s 30 Items nimmt
+            # und dann 10 min laeuft, ist schnell, nicht langsam.
+            "lootTempo": (d["lootItems"] / (d["lootActiveMs"] / 60000.0))
+                         if d["lootActiveMs"] else None,
+            # Und wie lange er insgesamt lootet: die zweite Achse. Schnell
+            # UND ewig ist der Geier, langsam UND kurz ist der Kaempfer.
+            "lootMinPerMatch": (d["lootActiveMs"] / 60000.0 / d["matches"])
+                               if d["matches"] else None,
+            "lootItems": d["lootItems"],
+            "lootSinglesPerMatch": (d["lootSingles"] / d["matches"])
+                                   if d["matches"] else None,
+            # An der Leiche: wie lange haengt er dran, wie viel nimmt er mit.
+            "boxSec": (d["boxActiveMs"] / 1000.0 / d["boxCount"])
+                      if d["boxCount"] else None,
+            "boxItemsPer": (d["boxItems"] / d["boxCount"])
+                           if d["boxCount"] else None,
+            "boxCount": d["boxCount"],
             "pickupsEarly10": _mean(d["pickupsEarly"]),
             # Spätes Sammeln als eigene Rate: nur Zeit zählt, in der er nach
             # Minute 15 überhaupt noch lebte. Wer vorher stirbt, hat hier

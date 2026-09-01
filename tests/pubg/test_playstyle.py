@@ -200,17 +200,39 @@ def test_distance_at_down_uses_positions_before_the_knock():
     assert m["account.me"]["distAtDown"] == pytest.approx(300.0)
 
 
-def test_loot_rate_counts_pickups_per_living_minute():
+def test_loot_metrics_trennen_boden_und_box():
+    """Boden-Tempo und Box-Verweildauer sind zwei verschiedene Aussagen."""
     events = [
         ev("Landing", 0, "account.me", ax=0, ay=0),
         ev("ItemPickup", 30, "account.me"),
-        ev("ItemPickupBox", 60, "account.me"),
+        ev("ItemPickup", 32, "account.me"),
+        ev("ItemPickup", 34, "account.me"),
+        ev("ItemPickupBox", 60, "account.me", "account.foe1"),
+        ev("ItemPickupBox", 65, "account.me", "account.foe1"),
         ev("Knock", 120, "account.foe1", "account.me"),
     ]
     m = ps.player_metrics(events, SQUAD, TEAM_OF)["account.me"]
-    assert m["pickups"] == 2
-    assert m["aliveMin"] == pytest.approx(2.0)
-    assert m["pickupsPerMin"] == pytest.approx(1.0)
+    assert m["pickups"] == 5
+    assert m["lootItems"] == 3            # nur Boden
+    assert m["lootActiveMs"] == 4_000     # 30 s bis 34 s
+    assert m["boxCount"] == 1
+    assert m["boxItems"] == 2
+    assert m["boxActiveMs"] == 5_000
+
+
+def test_loot_tempo_ignoriert_die_laufzeit_zwischen_den_phasen():
+    """Der Kern: 30 Items in 20 s und danach 10 min laufen ist SCHNELL."""
+    events = [
+        ev("Landing", 0, "account.me", ax=0, ay=0),
+        *[ev("ItemPickup", 10 + i * 2, "account.me") for i in range(10)],
+        ev("Knock", 620, "account.foe1", "account.me"),
+    ]
+    m = ps.player_metrics(events, SQUAD, TEAM_OF)["account.me"]
+    assert m["aliveMin"] == pytest.approx(620 / 60.0)
+    assert m["lootActiveMs"] == 18_000                 # 10 s bis 28 s
+    row = next(r for r in ps.aggregate([{"players": {"account.me": m},
+                                         "fights": []}]))
+    assert row["lootTempo"] == pytest.approx(10 / (18 / 60.0))   # 33,3/min
 
 
 def test_standing_still_is_measured_against_moving():
@@ -453,8 +475,9 @@ def test_rates_come_from_totals_not_from_averaged_match_rates():
     ], SQUAD, TEAM_OF)
     me = next(r for r in ps.aggregate([lang, kurz])
               if r["accountId"] == "account.me")
-    # 13 Pickups auf 10,33 Minuten
-    assert me["pickupsPerMin"] == pytest.approx(13 / (600 + 20) * 60, rel=0.01)
+    # 13 Items in 9 s + 5 s Loot-Zeit. Als Mittel der Match-Raten kaeme
+    # (66,7 + 36) / 2 = 51,3 heraus — die Summen sagen 55,7.
+    assert me["lootTempo"] == pytest.approx(13 / (14 / 60.0), rel=0.01)
 
 
 def test_standing_share_is_weighted_by_time():
@@ -541,3 +564,60 @@ def test_late_minutes_are_reported_as_sample_size():
     ], SQUAD, TEAM_OF)
     me = next(r for r in ps.aggregate([a]) if r["accountId"] == "account.me")
     assert me["lateAliveMin"] == pytest.approx(5.0)
+
+
+# ── Loot-Tempo: nur die Zeit, in der wirklich gelootet wird ─────────────────
+
+def test_loot_bursts_trennt_phasen_an_der_luecke():
+    from pubg.playstyle import loot_bursts, LOOT_GAP_MS
+    ts = [0, 3_000, 6_000,
+          6_000 + LOOT_GAP_MS + 1, 6_000 + LOOT_GAP_MS + 4_001]
+    b = loot_bursts(ts)
+    assert b["bursts"] == 2
+    assert b["items"] == 5
+    assert b["singles"] == 0
+    assert b["activeMs"] == 6_000 + 4_000
+
+
+def test_loot_bursts_einzelpickups_zaehlen_nicht_in_die_rate():
+    from pubg.playstyle import loot_bursts, LOOT_GAP_MS
+    ts = [0, 1_000,                      # Phase mit 2 Items
+          100_000,                       # Streu-Pickup
+          300_000]                       # Streu-Pickup
+    assert 100_000 - 1_000 > LOOT_GAP_MS
+    b = loot_bursts(ts)
+    assert b["items"] == 2
+    assert b["singles"] == 2
+    assert b["activeMs"] == 1_000
+
+
+def test_loot_bursts_haelt_schnelles_looten_schnell():
+    """3 Items in 1 s muessen deutlich schneller rauskommen als 3 in 3 s."""
+    from pubg.playstyle import loot_bursts
+    fast = loot_bursts([0, 400, 1_000])
+    slow = loot_bursts([0, 1_500, 3_000])
+    assert fast["items"] / fast["activeMs"] == 3 * slow["items"] / slow["activeMs"]
+
+
+def test_loot_bursts_mindestdauer_gegen_division_durch_null():
+    from pubg.playstyle import loot_bursts, LOOT_MIN_PHASE_MS
+    b = loot_bursts([5_000, 5_000, 5_000])
+    assert b["items"] == 3
+    assert b["activeMs"] == LOOT_MIN_PHASE_MS
+
+
+def test_loot_bursts_leer():
+    from pubg.playstyle import loot_bursts
+    assert loot_bursts([]) == {"items": 0, "activeMs": 0, "singles": 0,
+                               "bursts": 0}
+
+
+def test_box_visits_gruppiert_je_toten_owner():
+    from pubg.playstyle import box_visits, LOOT_GAP_MS
+    picks = [(1_000, "acc.dead1"), (3_000, "acc.dead1"), (4_000, "acc.dead1"),
+             (2_000, "acc.dead2"),
+             (1_000 + LOOT_GAP_MS + 50_000, "acc.dead1")]
+    v = box_visits(picks)
+    assert v["boxes"] == 3          # dead1 zweimal besucht, dead2 einmal
+    assert v["items"] == 5
+    assert v["activeMs"] == 3_000   # 1000→4000, dead2 und der Nachzuegler 0
