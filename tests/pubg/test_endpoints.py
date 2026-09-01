@@ -336,7 +336,8 @@ def test_lobby_kd_reports_coverage_per_match():
     for acc, team in (("account.A", 1), ("account.F1", 7), ("account.F2", 7),
                       ("ai.9", 12)):
         _insert_team_mapping(conn, "lk1", acc, team)
-    db_pg.upsert_season_snapshots(conn.raw, "s1", "squad-fpp", {
+    # Hauptzahl ist Alltime — die Snapshots liegen unter dem lifetime-Schlüssel.
+    db_pg.upsert_season_snapshots(conn.raw, "lifetime", "squad-fpp", {
         "account.A": {"kills": 100, "losses": 50, "rounds": 60, "wins": 5,
                        "damage": 1.0, "kd": 2.0},
         "account.F1": {"kills": 40, "losses": 40, "rounds": 50, "wins": 1,
@@ -346,6 +347,7 @@ def test_lobby_kd_reports_coverage_per_match():
     reg = _registry(conn)
     body, code, _ = reg.dispatch(
         "GET", "/api/pubg/lobby-kd?range=all&season=s1", b"", {})
+    assert json.loads(body)["basis"] == "lifetime"
     assert code == 200
     data = json.loads(body)
     m = data["matches"][0]

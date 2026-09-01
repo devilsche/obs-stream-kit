@@ -1206,7 +1206,7 @@ def hidrive_refill_pg(root: str, only_match: str = None) -> int:
 
 
 def lobby_kd_backfill(root: str, args=None) -> int:
-    """Season-Snapshots fuer die Lobbys der juengsten Matches nachladen.
+    """Lobby-Werte fuer die juengsten Matches nachladen (Alltime, Default).
 
     Der Poller holt nur ein Zehnerpack je Tick — eine Lobby hat 93 Spieler.
     Dieser Lauf fuellt gezielt auf, mit Pacing, damit das Match-Polling sein
@@ -1215,6 +1215,7 @@ def lobby_kd_backfill(root: str, args=None) -> int:
     Nutzung:
         python -m pubg.cli lobby-kd-backfill [--tenant N] [--matches 50]
                                              [--pace 25] [--mode squad-fpp]
+                                             [--season-only]
     """
     import time
     from core.db import connect
@@ -1234,6 +1235,9 @@ def lobby_kd_backfill(root: str, args=None) -> int:
     n_matches = int(_opt("--matches", "50"))
     pace = float(_opt("--pace", "25"))
     mode = _opt("--mode", "squad-fpp")
+    # Alltime ist die Hauptzahl der Ansicht; --season holt stattdessen die
+    # Season-Werte im Zehnerpack.
+    lifetime = "--season-only" not in args
 
     raw = connect()
     conn = SqliteCompatConn(raw)
@@ -1243,7 +1247,9 @@ def lobby_kd_backfill(root: str, args=None) -> int:
         return 1
     client = PubgClient(api_key=creds.pubg_api_key,
                         platform=creds.pubg_platform or "steam")
-    season_id = _opt("--season") or _current_season_id(client, conn, tenant_id)
+    from pubg.lobby_kd import LIFETIME_KEY
+    season_id = (LIFETIME_KEY if lifetime else
+                 (_opt("--season") or _current_season_id(client, conn, tenant_id)))
     if not season_id:
         print("Season nicht bestimmbar (API-Limit?) — mit --season <id> "
               "vorgeben oder spaeter erneut versuchen")
@@ -1269,6 +1275,26 @@ def lobby_kd_backfill(root: str, args=None) -> int:
             ORDER BY MAX(mm.played_at) DESC
         """, (tenant_id, mode, n_matches, season_id, mode, tenant_id))
         missing = [r["account_id"] for r in cur.fetchall()]
+
+    if lifetime:
+        # Alltime gibt es nur einzeln — ein Call je Spieler.
+        print(f"Alltime · {mode}: {len(missing)} Spieler ohne Werte aus den "
+              f"letzten {n_matches} Matches = {len(missing)} Calls "
+              f"(~{len(missing) * pace / 3600:.1f} h bei {pace:.0f}s Pacing)")
+        done = found = 0
+        for acc in missing:
+            store = {}
+            found += lobby_kd.fetch_lifetime(client, [acc], store, max_calls=1)
+            if store:
+                db_pg.upsert_lifetime_snapshots(raw, store, _iso_now())
+            done += 1
+            if done % 25 == 0:
+                print(f"  {done}/{len(missing)} · {found} Spieler bekannt")
+            if done < len(missing):
+                time.sleep(pace)
+        print(f"fertig: {found} von {len(missing)} Spielern haben jetzt Zahlen")
+        raw.close()
+        return 0
 
     batches = lobby_kd.chunk(missing)
     print(f"Season {season_id} · {mode}: {len(missing)} Spieler ohne Snapshot "

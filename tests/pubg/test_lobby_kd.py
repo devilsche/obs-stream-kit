@@ -132,3 +132,61 @@ def test_snapshots_go_stale_after_a_month():
     assert not lk.is_stale("2026-02-20T00:00:00Z", now="2026-03-01T00:00:00Z")
     assert lk.is_stale(None, now="2026-03-01T00:00:00Z")
     assert lk.is_stale("kaputt", now="2026-03-01T00:00:00Z")
+
+
+# ── Lifetime: teuer, aber das ist die Zahl, die gefragt war ─────────────────
+
+def _lifetime_payload(modes):
+    return {"data": {"type": "playerSeason",
+                     "attributes": {"gameModeStats": modes}}}
+
+
+def test_lifetime_payload_is_parsed_per_mode():
+    """Ein Lifetime-Call liefert ALLE Modi mit — die nimmt man alle mit,
+    sonst zahlt man denselben Call spaeter nochmal."""
+    payload = _lifetime_payload({
+        "squad-fpp": {"kills": 900, "losses": 500, "roundsPlayed": 600,
+                       "wins": 60, "damageDealt": 120000.0},
+        "duo-fpp": {"kills": 100, "losses": 100, "roundsPlayed": 110,
+                     "wins": 5, "damageDealt": 15000.0},
+    })
+    rows = lk.parse_lifetime(payload)
+    assert set(rows) == {"squad-fpp", "duo-fpp"}
+    assert rows["squad-fpp"]["kd"] == pytest.approx(1.8)
+    assert rows["duo-fpp"]["kd"] == pytest.approx(1.0)
+
+
+def test_lifetime_ignores_modes_without_rounds():
+    payload = _lifetime_payload({
+        "solo": {"kills": 0, "losses": 0, "roundsPlayed": 0, "wins": 0,
+                  "damageDealt": 0.0}})
+    assert lk.parse_lifetime(payload) == {}
+
+
+def test_fetch_lifetime_asks_once_per_player_and_respects_the_budget():
+    """Lifetime gibt es nur einzeln: ein Call je Spieler, deshalb ein hartes
+    Budget — sonst hungert der Sammler das Match-Polling aus."""
+    client = mock.Mock()
+    client.get_lifetime.return_value = _lifetime_payload({
+        "squad-fpp": {"kills": 10, "losses": 5, "roundsPlayed": 6, "wins": 1,
+                       "damageDealt": 900.0}})
+    store = {}
+    found = lk.fetch_lifetime(client, ["account.a", "account.b", "account.a"],
+                              store, max_calls=2)
+    assert found == 2
+    assert client.get_lifetime.call_count == 2
+    assert store["account.a"]["squad-fpp"]["kd"] == pytest.approx(2.0)
+
+
+def test_fetch_lifetime_marks_unknown_players():
+    client = mock.Mock()
+    client.get_lifetime.side_effect = ValueError("404")
+    store = {}
+    lk.fetch_lifetime(client, ["account.weg"], store, max_calls=1)
+    assert store["account.weg"] is None
+
+
+def test_lifetime_key_is_not_a_season():
+    """Die Snapshots teilen sich die Tabelle — Lifetime bekommt einen eigenen
+    Schluessel, damit beide nebeneinander stehen koennen."""
+    assert lk.LIFETIME_KEY == "lifetime"

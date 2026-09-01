@@ -251,12 +251,13 @@
             own squad is excluded from the lobby side, otherwise you would be
             measuring partly against yourself.</dd>
         <dt>Per player</dt>
-        <dd>Season K/D of every player — kills divided by deaths, taken from
-            the PUBG API for the current season.</dd>
-        <dt>Why season and not lifetime</dt>
-        <dd>Lifetime numbers come one player at a time: 93 requests per match
-            against a budget of ten per minute. Season numbers come ten at a
-            time, so a lobby costs ten requests instead of 93.</dd>
+        <dd>All-time K/D — kills divided by deaths over the player's whole
+            career, taken from the PUBG API.</dd>
+        <dt>Why it fills up slowly</dt>
+        <dd>All-time numbers come one player at a time: 93 requests for one
+            lobby, against a budget of ten per minute shared with match
+            polling. The season column next to it fills faster — those come
+            ten players per request — and is kept as current-form reference.</dd>
         <dt>Coverage</dt>
         <dd>How much of the lobby we already have numbers for. The collector
             fetches ten players per minute, so coverage grows over time —
@@ -266,8 +267,8 @@
             we fetched it, not on the day of the match. Within a running
             season that is close enough; across seasons it is not.</dd>
         <dt>How current</dt>
-        <dd>A stored value is refetched after 30 days, so season numbers do not
-            slowly drift out of date. “Fetch more lobby data” pulls 50 players
+        <dd>A stored value is refetched after 30 days, so the numbers do not
+            slowly drift out of date. “Fetch more lobby data” pulls a batch
             right away instead of waiting for the collector.</dd>
       </dl>
     </details>
@@ -481,17 +482,20 @@
       { key: "map", label: "Map", text: true,
         fmt: (r) => esc(PubgUI.fmtMap(r.map)),
         help: "Map of that match." },
-      { key: "lobbyKd", label: "Lobby K/D", unit: "avg · enemies",
+      { key: "lobbyKd", label: "Lobby K/D", unit: "all-time · enemies",
         fmt: (r) => n2(r.lobbyKd),
-        help: "Average season K/D of everyone in that lobby except your own squad — the tougher the room, the higher." },
-      { key: "squadKd", label: "Squad K/D", unit: "avg",
+        help: "Average all-time K/D of everyone in that lobby except your own squad — the tougher the room, the higher." },
+      { key: "squadKd", label: "Squad K/D", unit: "all-time",
         fmt: (r) => n2(r.squadKd),
-        help: "Average season K/D of your own squad in that match — the people you actually played with, not just you." },
+        help: "Average all-time K/D of your own squad in that match — the people you actually played with, not just you." },
       { key: "diff", label: "Difference", fmt: (r) => n2(r.diff),
         help: "Squad K/D minus lobby K/D. Positive means your squad was stronger than the room." },
-      { key: "myKd", label: "Your K/D", unit: "season",
+      { key: "lobbyKdExtra", label: "Lobby K/D", unit: "this season",
+        fmt: (r) => n2(r.lobbyKdExtra),
+        help: "Same lobby, but only the current season — current form instead of career. Fills up faster because season stats come ten players per request." },
+      { key: "myKd", label: "Your K/D", unit: "all-time",
         fmt: (r) => n2(r.myKd),
-        help: "Your own season K/D in this mode, for reference." },
+        help: "Your own all-time K/D in this mode, for reference." },
       { key: "known", label: "Known", unit: "players",
         fmt: (r) => `${r.known}/${r.lobbyPlayers}`, text: true,
         help: "How many of the lobby we already have season numbers for. Bots are not counted." },
@@ -538,7 +542,7 @@
       note.textContent = "Fetching …";
       try {
         const r = await PubgUI.fetchJson(
-          BASE + "api/pubg/lobby-kd/refresh?batches=5", 180000);
+          BASE + "api/pubg/lobby-kd/refresh?calls=8", 180000);
         note.textContent = r.fetched
           ? `${r.fetched} more players known — reloading.`
           : "Nothing left to fetch for these matches.";

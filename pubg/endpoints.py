@@ -2847,22 +2847,21 @@ class EndpointRegistry:
         """, (self.tenant_id, self.my_account_id, cutoff, mode, limit)).fetchall()
         match_ids = [r["match_id"] for r in rows]
 
-        season_id = qs.get("season")
-        if not season_id and self.client is not None:
-            try:
-                season_id = self.client.extract_current_season_id(
-                    self.client.get_seasons())
-            except Exception:
-                season_id = None
-        if not season_id:
-            return _err(503, "Season nicht bestimmbar")
+        # Alltime ist die Hauptzahl; die laufende Season kommt als Zusatz
+        # daneben, weil sie im Zehnerpack praktisch nichts kostet.
+        from pubg.lobby_kd import LIFETIME_KEY
+        from pubg.poller import _current_season_id
+        season_id = qs.get("season") or _current_season_id(
+            self.client, conn, self.tenant_id)
 
         data = self.cache.get_or_compute(
-            f"lobby-kd:{range_key}:{mode}:{limit}:{season_id}",
+            f"lobby-kd:{range_key}:{mode}:{limit}:{season_id or '-'}",
             lambda: lobby_kd_for_matches(conn, self.tenant_id, match_ids,
-                                          season_id, mode,
-                                          my_account_id=self.my_account_id))
-        return _ok({**data, "range": range_key})
+                                          LIFETIME_KEY, mode,
+                                          my_account_id=self.my_account_id,
+                                          extra_key=season_id))
+        return _ok({**data, "range": range_key, "seasonId": season_id,
+                    "basis": "lifetime"})
 
     def _lobby_kd_refresh(self, qs):
         """Fehlende und veraltete Season-Snapshots nachladen — auf Knopfdruck.
@@ -2871,20 +2870,24 @@ class EndpointRegistry:
         gerade auf die Ansicht schaut, will nicht warten. Das Budget ist
         gedeckelt, damit ein Klick nicht das Match-Polling aushungert.
         """
-        from pubg import db_pg, lobby_kd
-        from pubg.poller import collect_lobby_kd
+        from pubg.poller import collect_lobby_lifetime, collect_lobby_kd
 
         if self.client is None:
             return _err(503, "Kein PUBG-Client konfiguriert")
         try:
-            batches = max(1, min(int(qs.get("batches", "5")), 10))
+            calls = max(1, min(int(qs.get("calls", "8")), 20))
         except ValueError:
-            batches = 5
+            calls = 8
         mode = qs.get("mode", "squad-fpp")
         conn = self.get_conn()
         try:
-            found = collect_lobby_kd(conn, self.tenant_id, self.client,
-                                     max_batches=batches, mode=mode)
+            # Alltime kostet einen Call je Spieler — deshalb das kleine
+            # Budget. Season laeuft im Zehnerpack nebenher mit.
+            found = collect_lobby_lifetime(conn, self.tenant_id, self.client,
+                                           max_calls=calls, mode=mode)
+            collect_lobby_kd(conn, self.tenant_id, self.client,
+                             max_batches=1, mode=mode)
+            batches = calls
         except Exception as e:
             return _err(502, f"Nachladen fehlgeschlagen: {e}")
         # Die Ansicht liest aus dem Cache — nach neuen Zahlen muss der weg.

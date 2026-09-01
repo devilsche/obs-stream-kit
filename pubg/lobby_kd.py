@@ -57,6 +57,70 @@ def _kd(kills, losses, rounds):
     return (kills / rounds) if rounds else None
 
 
+#: Schluessel, unter dem Lifetime-Werte in derselben Tabelle liegen wie die
+#: Season-Snapshots. So stehen beide nebeneinander zur Verfuegung.
+LIFETIME_KEY = "lifetime"
+
+
+def parse_lifetime(payload) -> dict:
+    """Lifetime-Antwort eines Spielers → {mode: stats}.
+
+    Ein Call liefert ALLE Spielmodi mit; die werden alle gespeichert, sonst
+    zahlt man denselben Call fuer den naechsten Modus noch einmal.
+    """
+    stats_by_mode = (((payload or {}).get("data") or {})
+                     .get("attributes") or {}).get("gameModeStats") or {}
+    out = {}
+    for mode, stats in stats_by_mode.items():
+        if not stats:
+            continue
+        kd = _kd(stats.get("kills"), stats.get("losses"),
+                 stats.get("roundsPlayed"))
+        if kd is None:
+            continue
+        out[mode] = {
+            "kills": stats.get("kills") or 0,
+            "losses": stats.get("losses") or 0,
+            "rounds": stats.get("roundsPlayed") or 0,
+            "wins": stats.get("wins") or 0,
+            "damage": float(stats.get("damageDealt") or 0.0),
+            "kd": kd,
+        }
+    return out
+
+
+def fetch_lifetime(client, account_ids, store: dict,
+                   max_calls: int = 2) -> int:
+    """Lifetime-Werte holen — ein Call je Spieler.
+
+    Die PUBG-API kennt keinen Batch fuer Lifetime; bei 93 Spielern je Lobby
+    und einem Budget von zehn Requests pro Minute ist das der teure Weg. Genau
+    deshalb das harte `max_calls`-Budget und der Negativ-Eintrag fuer Spieler,
+    die die API nicht kennt.
+
+    `store` wird in-place gefuellt: {account_id: {mode: stats}} oder None.
+    """
+    seen = set()
+    todo = []
+    for acc in account_ids or []:
+        if not acc or is_bot(acc) or acc in store or acc in seen:
+            continue
+        seen.add(acc)
+        todo.append(acc)
+
+    done = 0
+    for acc in todo[:max_calls]:
+        try:
+            rows = parse_lifetime(client.get_lifetime(acc))
+        except Exception:
+            store[acc] = None
+            done += 1
+            continue
+        store[acc] = rows or None
+        done += 1
+    return done
+
+
 def parse_season_batch(payload, mode: str) -> dict:
     """Antwort des Season-Batch-Endpoints → {account_id: stats}.
 
@@ -154,7 +218,8 @@ def fetch_missing(client, account_ids, season_id: str, mode: str,
 # ── DB-Anbindung ────────────────────────────────────────────────────────────
 
 def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
-                         mode: str = "squad-fpp", my_account_id=None) -> dict:
+                         mode: str = "squad-fpp", my_account_id=None,
+                         extra_key: str = None) -> dict:
     """Je Match: Lobby-Schnitt, eigener Season-K/D, Abdeckung — plus ein
     Gesamtschnitt ueber die Matches, die genug Abdeckung haben.
 
@@ -205,6 +270,15 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
                  for a, v in snaps.items()}
     my_kd = kd_by_acc.get(my_account_id)
 
+    # Zweiter Satz Zahlen (z.B. Season neben Alltime) — dieselbe Rechnung,
+    # nur mit anderem Schluessel; steht in der Ansicht als Zusatzspalte.
+    extra_by_acc = {}
+    if extra_key:
+        extra_snaps = db_pg.get_season_snapshots(raw, extra_key, mode,
+                                                  list(all_accounts))
+        extra_by_acc = {a: (v or {}).get("kd") if v else None
+                        for a, v in extra_snaps.items()}
+
     out = []
     for mid, entry in per_match.items():
         squad = squad_by_match.get(mid, set())
@@ -212,6 +286,8 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         # in beiden Seiten des Vergleichs.
         avg = lobby_average(entry["accounts"], kd_by_acc, exclude=squad)
         squad_avg = lobby_average(sorted(squad), kd_by_acc)
+        extra_avg = (lobby_average(entry["accounts"], extra_by_acc,
+                                    exclude=squad) if extra_key else None)
         out.append({
             "matchId": mid,
             "playedAt": entry["playedAt"],
@@ -224,6 +300,8 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
             "squadKnown": squad_avg["known"],
             "squadPlayers": squad_avg["total"],
             "myKd": my_kd,
+            "lobbyKdExtra": (extra_avg or {}).get("avgKd"),
+            "extraCoverage": (extra_avg or {}).get("coverage"),
             "diff": (squad_avg["avgKd"] - avg["avgKd"])
                     if (squad_avg["avgKd"] is not None
                         and avg["avgKd"] is not None) else None,

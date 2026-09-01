@@ -266,11 +266,43 @@ def run_single_tick_multi(conn, tenant_id: int, client,
     # Spieler je Minute und Tenant klingt wenig, deckt aber eine Lobby in gut
     # neun Minuten ab — und das Polling behaelt Vorfahrt.
     try:
+        # Alltime zuerst — das ist die Zahl, die die Ansicht zeigt. Season
+        # laeuft nebenher als Zusatz, kostet im Zehnerpack kaum etwas.
+        stats["lobbyLifetimeFetched"] = collect_lobby_lifetime(
+            conn, tenant_id, client, max_calls=2)
         stats["lobbyKdFetched"] = collect_lobby_kd(conn, tenant_id, client,
                                                     max_batches=1)
     except Exception as e:
         stats["errors"].append(f"lobby-kd: {e}")
     return stats
+
+
+def collect_lobby_lifetime(conn, tenant_id: int, client, max_calls: int = 2,
+                           mode: str = "squad-fpp") -> int:
+    """Lifetime-K/D der Lobby-Spieler nachladen — ein Call je Spieler.
+
+    Das ist die Zahl, die in der Ansicht zaehlt (Alltime, nicht Season). Sie
+    ist teuer: die API kennt keinen Batch dafuer. Deshalb hier nur ein kleines
+    Budget je Tick; groessere Mengen holt `pubg.cli lobby-kd-backfill`.
+    """
+    from pubg import db_pg, lobby_kd
+    if client is None:
+        return 0
+    raw_conn = conn.raw if isinstance(conn, SqliteCompatConn) else conn
+    import datetime as _dt
+    stale_before = (_dt.datetime.now(_dt.UTC)
+                    - _dt.timedelta(days=lobby_kd.SNAPSHOT_TTL_DAYS)
+                    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+    missing = db_pg.lobby_accounts_missing_snapshot(
+        raw_conn, tenant_id, lobby_kd.LIFETIME_KEY, mode,
+        limit=max_calls, stale_before=stale_before)
+    if not missing:
+        return 0
+    store = {}
+    lobby_kd.fetch_lifetime(client, missing, store, max_calls=max_calls)
+    if store:
+        db_pg.upsert_lifetime_snapshots(raw_conn, store, _iso_utc_now())
+    return sum(1 for v in store.values() if v)
 
 
 def collect_lobby_kd(conn, tenant_id: int, client, max_batches: int = 1,

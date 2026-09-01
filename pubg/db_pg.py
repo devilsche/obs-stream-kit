@@ -932,6 +932,42 @@ def upsert_season_snapshots(conn, season_id: str, mode: str, rows: dict,
     return len(values)
 
 
+def upsert_lifetime_snapshots(conn, store: dict, fetched_at: str) -> int:
+    """store = {account_id: {mode: stats} oder None}.
+
+    Ein Lifetime-Call liefert alle Modi eines Spielers — die landen alle in
+    der Tabelle, damit ein Moduswechsel keinen neuen Call kostet. Spieler ohne
+    Daten bekommen einen Negativ-Eintrag im Hauptmodus, sonst fragt der
+    Sammler sie endlos erneut.
+    """
+    from pubg.lobby_kd import LIFETIME_KEY
+    values = []
+    for acc, modes in (store or {}).items():
+        if not modes:
+            values.append((acc, LIFETIME_KEY, "squad-fpp", None, None, None,
+                           None, None, None, fetched_at))
+            continue
+        for mode, st in modes.items():
+            values.append((acc, LIFETIME_KEY, mode, st.get("kills"),
+                           st.get("losses"), st.get("rounds"), st.get("wins"),
+                           st.get("damage"), st.get("kd"), fetched_at))
+    if not values:
+        return 0
+    with conn.cursor() as cur:
+        execute_values(
+            cur,
+            "INSERT INTO player_season_snapshot (account_id, season_id, mode,"
+            " kills, losses, rounds, wins, damage, kd, fetched_at) VALUES %s "
+            "ON CONFLICT (account_id, season_id, mode) DO UPDATE SET "
+            "kills=EXCLUDED.kills, losses=EXCLUDED.losses, "
+            "rounds=EXCLUDED.rounds, wins=EXCLUDED.wins, "
+            "damage=EXCLUDED.damage, kd=EXCLUDED.kd, "
+            "fetched_at=EXCLUDED.fetched_at",
+            values)
+    conn.commit()
+    return len(values)
+
+
 def lobby_accounts_missing_snapshot(conn, tenant_id: int, season_id: str,
                                     mode: str, limit: int = 200,
                                     stale_before: str = None) -> list:
