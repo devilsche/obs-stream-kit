@@ -3473,7 +3473,7 @@
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.kd)}</span><span class="pubg-stat-label">K/D</span></div>
           ${t.tdm ? `<div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.tdm.kd)}</span><span class="pubg-stat-label">TDM K/D</span></div>` : ""}
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.squadKd || 0)}</span><span class="pubg-stat-label">Squad K/D</span></div>
-          ${t.lobbyKd ? `<div class="cell"><span class="pubg-stat-value">${t.lobbySquadKd ? `${t.lobbySquadKd.toFixed(2)} / ` : ""}${t.lobbyKd.toFixed(2)}</span><span class="pubg-stat-label">Squad / Lobby (Alltime)</span></div>` : ""}
+          ${t.lobbyKd ? `<div class="cell"><span class="pubg-stat-value">${t.lobbySquadKd ? `${t.lobbySquadKd.toFixed(2)} / ` : ""}${t.lobbyKd.toFixed(2)}</span><span class="pubg-stat-label">Squad / Lobby Alltime</span></div>` : ""}
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.avgKills)}</span><span class="pubg-stat-label">Ø My Kills/Match</span></div>
           <div class="cell"><span class="pubg-stat-value">${(t.squadKillsPerMatch || 0).toFixed(1)}</span><span class="pubg-stat-label">Ø Squad Kills/Match</span></div>
           <div class="cell"><span class="pubg-stat-value">${Math.round(t.avgDamage)}</span><span class="pubg-stat-label">Ø Damage/Match</span></div>
@@ -3527,9 +3527,9 @@
               <span><b>${s.kills}</b> Kills</span>
               <span><b>${s.wins}</b> Wins</span>
               <span><b>${PubgUI.fmtKD(s.kd)}</b> K/D</span>
-              ${(s.squadMatchesWithMapping||0) > 0 ? `<span><b>${PubgUI.fmtKD(s.squadKd||0)}</b> Squad K/D</span>` : ""}
-              ${s.lobbyKd != null ? `<span title="Ø Alltime-K/D der Gegner über ${s.lobbyMatches} Matches dieser Phase"><b>${s.lobbyKd.toFixed(2)}</b> Lobby-K/D</span>` : ""}
-              ${s.lobbySquadKd != null ? `<span title="Ø Alltime-K/D des eigenen Squads in dieser Phase"><b>${s.lobbySquadKd.toFixed(2)}</b> Squad-K/D</span>` : ""}
+              ${(s.squadMatchesWithMapping||0) > 0 ? `<span title="Kills durch Tode des Squads in DIESER Phase"><b>${PubgUI.fmtKD(s.squadKd||0)}</b> Squad K/D (Phase)</span>` : ""}
+              ${s.lobbyKd != null ? `<span title="Ø Alltime-K/D der Gegner über ${s.lobbyMatches} Matches dieser Phase"><b>${s.lobbyKd.toFixed(2)}</b> Lobby Alltime</span>` : ""}
+              ${s.lobbySquadKd != null ? `<span title="Ø Alltime-K/D der eigenen Leute — nicht ihre Leistung in dieser Phase, sondern ihr Karriere-Schnitt"><b>${s.lobbySquadKd.toFixed(2)}</b> Squad Alltime</span>` : ""}
               <span><b>${Math.round(s.avgDamage)}</b> Ø DMG</span>
               <span><b>${fmtDuration(Math.round(s.avgSurvivedSec))}</b> Ø Surv</span>
               <span><b>#${s.avgPlace.toFixed(1)}</b> Avg #</span>
@@ -3542,8 +3542,8 @@
                 <span style="text-align:right">Kills</span>
                 <span style="text-align:right">Damage</span>
                 <span style="text-align:right">Survived</span>
-                <span class="col-right" title="Ø Alltime-K/D der Gegner in dieser Lobby (eigener Squad ausgenommen)">Lobby</span>
-                <span class="col-right" title="Ø Alltime-K/D des eigenen Squads in diesem Match">Squad</span>
+                <span class="col-right" title="Ø Alltime-K/D der Gegner in dieser Lobby (eigener Squad ausgenommen)">Lobby Alltime</span>
+                <span class="col-right" title="Ø Alltime-K/D des eigenen Squads — Karriere-Schnitt, nicht die Leistung in diesem Match">Squad Alltime</span>
                 <span class="col-right" title="Bester Spieler der Lobby">TopScorer</span>
               </div>
               ${ph.matches.map((m, i) => fmtMatchRow(m, `${ph.coreSquad.join('-')}-${i}`, matchNumMap.get(m.matchEnd))).join("")}
