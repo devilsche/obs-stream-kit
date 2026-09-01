@@ -546,6 +546,13 @@ als Differenz, in den Totals der Schnitt über die Session. Dort geht man die Ru
 durch — „war die Lobby hart" liest sich neben Platz und Kills, nicht in einem eigenen
 Tool. Der Endpoint `/api/pubg/lobby-kd` bleibt für Abfragen über Zeiträume.
 
+Die Zahl ist die **Alltime-K/D über alle Spielmodi** (Summe Kills / Summe Tode) —
+nicht die des gerade gespielten Modus: wer nur Duo spielt, hätte in `squad-fpp` keine
+Zahl, und ein Lifetime-Abruf liefert ohnehin alle Modi mit. Spieler, die die API
+wirklich nicht kennt, bekommen einen Negativ-Eintrag; ein Rate-Limit (429) oder
+Serverfehler dagegen **nicht** — sonst brennt sich eine Fehlanzeige dauerhaft ein.
+`python -m pubg.cli lobby-kd-reset-unknown` räumt solche Altlasten weg.
+
 Datenbeschaffung (`/api/pubg/lobby-kd`): Season-K/D aller
 Spieler einer Lobby, gemittelt je Match, gegen den Schnitt des **eigenen Squads**
 gehalten. Der eigene Squad ist dabei aus der Lobby-Seite herausgerechnet — sonst

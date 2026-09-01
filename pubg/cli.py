@@ -1205,6 +1205,27 @@ def hidrive_refill_pg(root: str, only_match: str = None) -> int:
     return 0
 
 
+def lobby_kd_reset_unknown(root: str, args=None) -> int:
+    """Falsche Fehlanzeigen aus den Lobby-Snapshots loeschen.
+
+    Ein Rate-Limit-429 wurde als "kennt die API nicht" gespeichert; betroffene
+    Accounts standen dauerhaft ohne Werte da, obwohl die API Zahlen hat
+    (Stichprobe: 959 und 1.935 gespielte Runden). Der Sammler holt sie nach
+    dem Loeschen neu.
+
+    Nutzung:
+        python -m pubg.cli lobby-kd-reset-unknown
+    """
+    from core.db import connect
+    from pubg import db_pg
+
+    raw = connect()
+    n = db_pg.clear_false_unknown_snapshots(raw)
+    print(f"{n} Fehlanzeigen geloescht — werden neu geholt")
+    raw.close()
+    return 0
+
+
 def lobby_kd_backfill(root: str, args=None) -> int:
     """Lobby-Werte fuer die juengsten Matches nachladen (Alltime, Default).
 
@@ -1821,6 +1842,8 @@ if __name__ == "__main__":
         sys.exit(purge_before(root, date_arg))
     elif len(sys.argv) > 1 and sys.argv[1] == "weapon-stats-backfill":
         sys.exit(weapon_stats_backfill(root, sys.argv[2:]))
+    elif len(sys.argv) > 1 and sys.argv[1] == "lobby-kd-reset-unknown":
+        sys.exit(lobby_kd_reset_unknown(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "lobby-kd-backfill":
         sys.exit(lobby_kd_backfill(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "clan-queue-prune":
@@ -1862,4 +1885,5 @@ if __name__ == "__main__":
               "list-milestones [pattern] | "
               "weapon-stats-backfill | assists-backfill | "
               "clan-queue-prune | lobby-kd-backfill | "
+              "lobby-kd-reset-unknown | "
               "purge-before YYYY-MM-DD")

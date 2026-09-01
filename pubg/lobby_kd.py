@@ -113,13 +113,23 @@ def fetch_lifetime(client, account_ids, store: dict,
         seen.add(acc)
         todo.append(acc)
 
+    from pubg.api_client import RateLimitError
+
     done = 0
     for acc in todo[:max_calls]:
         try:
             rows = parse_lifetime(client.get_lifetime(acc))
-        except Exception:
-            store[acc] = None
-            done += 1
+        except RateLimitError:
+            break            # Budget erschoepft: nichts merken, spaeter weiter
+        except Exception as e:
+            status = getattr(e, "status", None)
+            if isinstance(status, int) and 400 <= status < 500 and status != 429:
+                # Nur ein echtes "gibt es nicht" wird vermerkt. Ein 429 oder
+                # ein Serverfehler wuerde den Spieler sonst dauerhaft als
+                # unbekannt einbrennen — genau so entstanden 1.400 falsche
+                # Fehlanzeigen.
+                store[acc] = None
+                done += 1
             continue
         store[acc] = rows or None
         done += 1
@@ -155,6 +165,26 @@ def parse_season_batch(payload, mode: str) -> dict:
             "kd": kd,
         }
     return out
+
+
+def overall_kd(per_mode) -> float | None:
+    """Alltime-K/D ueber ALLE Spielmodi: Summe Kills durch Summe Tode.
+
+    Der modusspezifische Wert laesst zu viele Spieler ohne Zahl — gemessen an
+    einer Session: 493 von 1.839 Lobby-Spielern hatten keine squad-fpp-Werte,
+    382 davon aber Zahlen in einem anderen Modus (die meisten spielen mehr
+    Duo). Und "Alltime" meint ohnehin die ganze Karriere, nicht einen Modus.
+    """
+    kills = losses = rounds = 0
+    for st in (per_mode or {}).values():
+        if not st:
+            continue
+        kills += st.get("kills") or 0
+        losses += st.get("losses") or 0
+        rounds += st.get("rounds") or 0
+    if not (kills or losses or rounds):
+        return None
+    return _kd(kills, losses, rounds)
 
 
 def lobby_average(account_ids, snapshots, exclude=None) -> dict:
@@ -270,9 +300,15 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         entry["accounts"].append(r["account_id"])
         all_accounts.add(r["account_id"])
 
-    snaps = db_pg.get_season_snapshots(raw, season_id, mode, list(all_accounts))
-    kd_by_acc = {a: (v or {}).get("kd") if v else None
-                 for a, v in snaps.items()}
+    if season_id == LIFETIME_KEY:
+        # Alltime heisst ueber die ganze Karriere, nicht ueber einen Modus:
+        # wer nur Duo spielt, haette in squad-fpp keine Zahl.
+        kd_by_acc = db_pg.get_lifetime_overall(raw, list(all_accounts))
+    else:
+        snaps = db_pg.get_season_snapshots(raw, season_id, mode,
+                                           list(all_accounts))
+        kd_by_acc = {a: (v or {}).get("kd") if v else None
+                     for a, v in snaps.items()}
     my_kd = kd_by_acc.get(my_account_id)
 
     # Zweiter Satz Zahlen (z.B. Season neben Alltime) — dieselbe Rechnung,

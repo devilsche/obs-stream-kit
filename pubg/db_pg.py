@@ -980,6 +980,58 @@ def upsert_lifetime_snapshots(conn, store: dict, fetched_at: str) -> int:
     return len(values)
 
 
+def get_lifetime_overall(conn, account_ids=None) -> dict:
+    """{account_id: kd} — Alltime ueber ALLE Spielmodi (Summe Kills / Tode).
+
+    Der modusspezifische Wert laesst zu viele Spieler leer: wer nur Duo
+    spielt, hat in squad-fpp keine Zahl. Ein Lifetime-Call liefert ohnehin
+    alle Modi, sie stehen also schon in der Tabelle.
+    """
+    ids = [a for a in (account_ids or []) if a]
+    if not ids:
+        return {}
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT account_id,
+                   SUM(COALESCE(kills, 0))  AS kills,
+                   SUM(COALESCE(losses, 0)) AS losses,
+                   SUM(COALESCE(rounds, 0)) AS rounds
+            FROM player_season_snapshot
+            WHERE season_id = 'lifetime' AND account_id = ANY(%s)
+            GROUP BY account_id
+        """, (ids,))
+        rows = cur.fetchall()
+    out = {}
+    for r in rows:
+        kills, losses, rounds = (r["kills"] or 0), (r["losses"] or 0), (r["rounds"] or 0)
+        if not (kills or losses or rounds):
+            out[r["account_id"]] = None
+            continue
+        out[r["account_id"]] = (kills / losses) if losses else (
+            kills / rounds if rounds else None)
+    return out
+
+
+def clear_false_unknown_snapshots(conn) -> int:
+    """Fehlanzeigen loeschen, damit die Accounts neu geholt werden.
+
+    Noetig nach dem 429-Bug: ein Rate-Limit wurde als "kennt die API nicht"
+    gespeichert. Betroffen sind Accounts, die in KEINEM Modus Werte haben.
+    """
+    with conn.cursor() as cur:
+        cur.execute("""
+            DELETE FROM player_season_snapshot
+            WHERE season_id = 'lifetime' AND account_id IN (
+                SELECT account_id FROM player_season_snapshot
+                WHERE season_id = 'lifetime'
+                GROUP BY account_id
+                HAVING COUNT(*) FILTER (WHERE kd IS NOT NULL) = 0)
+        """)
+        n = cur.rowcount
+    conn.commit()
+    return n
+
+
 def lobby_accounts_missing_snapshot(conn, tenant_id: int, season_id: str,
                                     mode: str, limit: int = 200,
                                     stale_before: str = None) -> list:

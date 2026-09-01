@@ -179,15 +179,70 @@ def test_fetch_lifetime_asks_once_per_player_and_respects_the_budget():
     assert store["account.a"]["squad-fpp"]["kd"] == pytest.approx(2.0)
 
 
-def test_fetch_lifetime_marks_unknown_players():
+def test_fetch_lifetime_keeps_unclear_errors_open():
+    """Ein Fehler ohne HTTP-Status sagt nichts darueber, ob es den Spieler
+    gibt — also nicht als Fehlanzeige einbrennen."""
     client = mock.Mock()
-    client.get_lifetime.side_effect = ValueError("404")
+    client.get_lifetime.side_effect = ValueError("kaputt")
     store = {}
     lk.fetch_lifetime(client, ["account.weg"], store, max_calls=1)
-    assert store["account.weg"] is None
+    assert store == {}
 
 
 def test_lifetime_key_is_not_a_season():
     """Die Snapshots teilen sich die Tabelle — Lifetime bekommt einen eigenen
     Schluessel, damit beide nebeneinander stehen koennen."""
     assert lk.LIFETIME_KEY == "lifetime"
+
+
+def test_overall_kd_sums_all_modes():
+    """"Alltime-K/D" heisst ueber alles, nicht nur ueber einen Modus — und es
+    hebt die Abdeckung: von 493 Spielern ohne squad-fpp-Werte haben 382
+    Zahlen in einem anderen Modus."""
+    per_mode = {
+        "squad-fpp": {"kills": 0, "losses": 0},
+        "duo-fpp": {"kills": 300, "losses": 200},
+        "solo": {"kills": 100, "losses": 50},
+    }
+    assert lk.overall_kd(per_mode) == pytest.approx(400 / 250)
+
+
+def test_overall_kd_without_any_death_uses_rounds():
+    assert lk.overall_kd({"solo": {"kills": 9, "losses": 0,
+                                    "rounds": 3}}) == pytest.approx(3.0)
+
+
+def test_overall_kd_of_nothing_is_none():
+    assert lk.overall_kd({}) is None
+    assert lk.overall_kd({"solo": {"kills": 0, "losses": 0, "rounds": 0}}) is None
+
+
+def test_rate_limit_does_not_mark_a_player_as_unknown():
+    """Sonst brennt ein 429 den Spieler dauerhaft als "kennt die API nicht"
+    ein — gemessen: 1.400 Accounts standen faelschlich ohne Werte, obwohl
+    zwei Stichproben 959 und 1.935 gespielte Runden hatten."""
+    from pubg.api_client import RateLimitError
+    client = mock.Mock()
+    client.get_lifetime.side_effect = RateLimitError("429")
+    store = {}
+    lk.fetch_lifetime(client, ["account.a"], store, max_calls=1)
+    assert store == {}          # bleibt offen, wird spaeter neu geholt
+
+
+def test_server_errors_do_not_mark_a_player_as_unknown():
+    from pubg.api_client import ApiError
+    err = ApiError("HTTP 503", status=503)
+    client = mock.Mock()
+    client.get_lifetime.side_effect = err
+    store = {}
+    lk.fetch_lifetime(client, ["account.a"], store, max_calls=1)
+    assert store == {}
+
+
+def test_a_real_not_found_is_remembered():
+    from pubg.api_client import ApiError
+    client = mock.Mock()
+    client.get_lifetime.side_effect = ApiError("HTTP 404", status=404)
+    store = {}
+    lk.fetch_lifetime(client, ["account.weg"], store, max_calls=1)
+    assert store["account.weg"] is None
