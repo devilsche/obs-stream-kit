@@ -118,7 +118,8 @@
 </head>
 <body>
   <h1 class="t-title">PUBG Squad Playstyle</h1>
-  <div class="t-subtitle">Who opens the fights, how they end, and how everyone plays</div>
+  <div class="t-subtitle">Who opens the fights, how they end, and how everyone plays
+    — lobby strength per match lives in the session report</div>
 
   <div class="t-card">
     <div class="bar">
@@ -228,52 +229,6 @@
     </details>
   </div>
 
-  <div class="t-card" id="lobbyCard" hidden>
-    <h2>Lobby strength — how tough were the rounds</h2>
-    <div class="scroll">
-      <table>
-        <thead id="lobbyHead"><tr></tr></thead>
-        <tbody id="lobbyRows"></tbody>
-      </table>
-    </div>
-    <div class="bar">
-      <button type="button" class="refresh" id="lobbyRefresh">
-        Fetch more lobby data
-      </button>
-      <span class="legend" id="lobbyRefreshNote" role="status" aria-live="polite"></span>
-    </div>
-    <p class="legend" id="lobbyNote"></p>
-    <details class="howto">
-      <summary>Where the lobby K/D comes from</summary>
-      <dl>
-        <dt>What is compared</dt>
-        <dd>Your squad in that match against everyone else in the lobby — the
-            own squad is excluded from the lobby side, otherwise you would be
-            measuring partly against yourself.</dd>
-        <dt>Per player</dt>
-        <dd>All-time K/D — kills divided by deaths over the player's whole
-            career, taken from the PUBG API.</dd>
-        <dt>Why it fills up slowly</dt>
-        <dd>All-time numbers come one player at a time: 93 requests for one
-            lobby, against a budget of ten per minute shared with match
-            polling. The season column next to it fills faster — those come
-            ten players per request — and is kept as current-form reference.</dd>
-        <dt>Coverage</dt>
-        <dd>How much of the lobby we already have numbers for. The collector
-            fetches ten players per minute, so coverage grows over time —
-            matches below 25% are left out of the overall average.</dd>
-        <dt>It is a snapshot</dt>
-        <dd>The API has no history: the value is where that player stood when
-            we fetched it, not on the day of the match. Within a running
-            season that is close enough; across seasons it is not.</dd>
-        <dt>How current</dt>
-        <dd>A stored value is refetched after 30 days, so the numbers do not
-            slowly drift out of date. “Fetch more lobby data” pulls a batch
-            right away instead of waiting for the collector.</dd>
-      </dl>
-    </details>
-  </div>
-
   <script src="/widgets-static/pubg/_pubg.js"></script>
   <script>
     const BASE = window.__SERVE_BASE__ || "/";
@@ -285,8 +240,7 @@
     let BOTS = PubgUI.qs("includeBots", "") === "1";
     let DATA = null;
     let SORT = { fight: { key: "opened", dir: -1 },
-                 style: { key: "matches", dir: -1 },
-                 lobby: { key: "playedAt", dir: -1 } };
+                 style: { key: "matches", dir: -1 } };
 
     const n1 = (v) => v == null ? "—" : v.toFixed(1);
     const n0 = (v) => v == null ? "—" : Math.round(v).toString();
@@ -475,94 +429,12 @@
       }).join("");
     }
 
-    const LOBBY_COLS = [
-      { key: "playedAt", label: "Match", text: true,
-        fmt: (r) => esc(PubgUI.fmtDate(r.playedAt) + " " + PubgUI.fmtTime(r.playedAt)),
-        help: "When the match was played." },
-      { key: "map", label: "Map", text: true,
-        fmt: (r) => esc(PubgUI.fmtMap(r.map)),
-        help: "Map of that match." },
-      { key: "lobbyKd", label: "Lobby K/D", unit: "all-time · enemies",
-        fmt: (r) => n2(r.lobbyKd),
-        help: "Average all-time K/D of everyone in that lobby except your own squad — the tougher the room, the higher." },
-      { key: "squadKd", label: "Squad K/D", unit: "all-time",
-        fmt: (r) => n2(r.squadKd),
-        help: "Average all-time K/D of your own squad in that match — the people you actually played with, not just you." },
-      { key: "diff", label: "Difference", fmt: (r) => n2(r.diff),
-        help: "Squad K/D minus lobby K/D. Positive means your squad was stronger than the room." },
-      { key: "lobbyKdExtra", label: "Lobby K/D", unit: "this season",
-        fmt: (r) => n2(r.lobbyKdExtra),
-        help: "Same lobby, but only the current season — current form instead of career. Fills up faster because season stats come ten players per request." },
-      { key: "myKd", label: "Your K/D", unit: "all-time",
-        fmt: (r) => n2(r.myKd),
-        help: "Your own all-time K/D in this mode, for reference." },
-      { key: "known", label: "Known", unit: "players",
-        fmt: (r) => `${r.known}/${r.lobbyPlayers}`, text: true,
-        help: "How many of the lobby we already have season numbers for. Bots are not counted." },
-      { key: "coverage", label: "Coverage", unit: "%",
-        fmt: (r) => n0(r.coverage),
-        help: "Share of the lobby covered. Below 25% the match is left out of the overall average." },
-    ];
-
-    let LOBBY = null;
-
-    async function loadLobby() {
-      const params = new URLSearchParams({ range: RANGE, limit: "50" });
-      try {
-        LOBBY = await PubgUI.fetchJson(
-          BASE + "api/pubg/lobby-kd?" + params, 120000);
-      } catch (e) {
-        LOBBY = null;
-      }
-      const card = document.getElementById("lobbyCard");
-      const note = document.getElementById("lobbyNote");
-      const rows = (LOBBY && LOBBY.matches) || [];
-      card.hidden = rows.length === 0;
-      if (!rows.length) return;
-      renderTable("lobby", LOBBY_COLS, rows);
-      const cov = LOBBY.coverage == null ? "—" : Math.round(LOBBY.coverage);
-      const squadAvg = LOBBY.avgSquadKd == null
-        ? "—" : LOBBY.avgSquadKd.toFixed(2);
-      note.textContent = LOBBY.avgKd == null
-        ? `No match has enough coverage yet — the collector is still gathering `
-          + `(${cov}% of lobby players known so far).`
-        : `Across ${LOBBY.matchesInAverage} matches: squad ${squadAvg} `
-          + `vs lobby ${LOBBY.avgKd.toFixed(2)} · your own season K/D `
-          + `${LOBBY.myKd == null ? "—" : LOBBY.myKd.toFixed(2)} · `
-          + `${cov}% of lobby players known.`;
-    }
-
-    const lobbyBtn = () => document.getElementById("lobbyRefresh");
-
-    async function refreshLobby() {
-      const btn = lobbyBtn();
-      const note = document.getElementById("lobbyRefreshNote");
-      if (!btn) return;
-      btn.disabled = true;
-      note.textContent = "Fetching …";
-      try {
-        const r = await PubgUI.fetchJson(
-          BASE + "api/pubg/lobby-kd/refresh?calls=8", 180000);
-        note.textContent = r.fetched
-          ? `${r.fetched} more players known — reloading.`
-          : "Nothing left to fetch for these matches.";
-        if (r.fetched) await loadLobby();
-      } catch (e) {
-        note.textContent = "Could not fetch: " + (e && e.message || e);
-      } finally {
-        btn.disabled = false;
-      }
-    }
-
     function render() {
       if (!DATA) return;
       const rows = DATA.rows || [];
       const fighters = rows.filter(r => r.opened > 0);
       renderTable("fight", FIGHT_COLS, fighters);
       renderTable("style", STYLE_COLS, rows);
-      if (LOBBY && (LOBBY.matches || []).length) {
-        renderTable("lobby", LOBBY_COLS, LOBBY.matches);
-      }
       document.getElementById("fightCard").hidden = fighters.length === 0;
       document.getElementById("styleCard").hidden = rows.length === 0;
     }
@@ -584,7 +456,6 @@
              ? ` · squad: ${DATA.players.join(", ")}` : "")
           + (rows.length ? "" : " — nothing found, widen the range?");
         render();
-        loadLobby();
       } catch (e) {
         st.classList.add("err");
         st.textContent = "Could not load: " + (e && e.message || e);
@@ -623,7 +494,7 @@
       load();
     });
 
-    ["fight", "style", "lobby"].forEach(which => {
+    ["fight", "style"].forEach(which => {
       const head = document.getElementById(which + "Head");
       const onSort = (th) => {
         const key = th.dataset.sort;
@@ -645,9 +516,6 @@
         if (th) { e.preventDefault(); onSort(th); }
       });
     });
-
-    const _lb = lobbyBtn();
-    if (_lb) _lb.addEventListener("click", refreshLobby);
 
     press(document.getElementById("rangeSwitch"), "range", RANGE);
     document.getElementById("fPlayers").value = PLAYERS;

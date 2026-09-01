@@ -540,7 +540,13 @@ genau, für Aussagen über fremde Teams untereinander nicht. Werte aus weniger a
 fünf Matches bzw. Eröffnungen zeigt die Ansicht blass und nimmt sie von den
 Spitzenreiter-Markierungen aus.
 
-**Lobby-Stärke** (dritter Block im Tool, `/api/pubg/lobby-kd`): Season-K/D aller
+**Lobby-Stärke** steht im **Session-Report**: je Match-Zeile der Ø-Alltime-K/D der
+Gegner (eigener Squad herausgerechnet) und dahinter der Vorsprung des eigenen Squads
+als Differenz, in den Totals der Schnitt über die Session. Dort geht man die Runden
+durch — „war die Lobby hart" liest sich neben Platz und Kills, nicht in einem eigenen
+Tool. Der Endpoint `/api/pubg/lobby-kd` bleibt für Abfragen über Zeiträume.
+
+Datenbeschaffung (`/api/pubg/lobby-kd`): Season-K/D aller
 Spieler einer Lobby, gemittelt je Match, gegen den Schnitt des **eigenen Squads**
 gehalten. Der eigene Squad ist dabei aus der Lobby-Seite herausgerechnet — sonst
 misst man sich zum Teil gegen sich selbst.

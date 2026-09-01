@@ -316,6 +316,35 @@ def test_match_replay_404_stays_when_the_db_is_empty_too():
     assert code == 404
 
 
+def test_session_report_carries_the_lobby_strength():
+    """Die Lobby-Staerke gehoert dorthin, wo man die Session durchgeht — nicht
+    in ein eigenes Tool."""
+    from pubg import db_pg
+    conn = _setup()
+    upsert_player(conn, "account.MATE", "MateA", "steam", False)
+    _insert_match(conn, "sr1", "2026-05-20T18:00:00Z", "Baltic_Main", "squad-fpp")
+    _insert_participant(conn, "sr1", "account.A", "PEX_LuCKoR", team_id=1)
+    for acc, team in (("account.A", 1), ("account.F1", 7), ("account.F2", 7)):
+        _insert_team_mapping(conn, "sr1", acc, team)
+    db_pg.upsert_season_snapshots(conn.raw, "lifetime", "squad-fpp", {
+        "account.A": {"kills": 100, "losses": 50, "rounds": 60, "wins": 5,
+                       "damage": 1.0, "kd": 2.0},
+        "account.F1": {"kills": 40, "losses": 40, "rounds": 50, "wins": 1,
+                        "damage": 1.0, "kd": 1.0},
+    }, "2026-05-20T00:00:00Z")
+    set_setting(conn, "sessionStartedAt", "1970-01-01T00:00:00Z")
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/session-report", b"", {})
+    assert code == 200
+    data = json.loads(body)
+    matches = [m for ph in data.get("phases", []) for m in ph.get("matches", [])]
+    m = next(m for m in matches if m["matchId"] == "sr1")
+    assert m["lobbyKd"] == 1.0          # ohne eigenen Squad gerechnet
+    assert m["squadKd"] == 2.0
+    assert data["totals"]["lobbyKd"] == 1.0
+
+
 def test_lobby_kd_rejects_a_bad_range():
     conn = _setup()
     reg = _registry(conn)

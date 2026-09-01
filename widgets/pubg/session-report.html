@@ -88,7 +88,7 @@
        zwischen Zeilen sichtbar. */
     .matches-list .m {
       display: grid;
-      grid-template-columns: 240px 60px 1fr 80px 70px 70px 90px 90px 150px;
+      grid-template-columns: 240px 60px 1fr 80px 70px 70px 90px 90px 150px 96px;
       gap: 10px;
       padding: 6px 8px;
       border-radius: 3px;
@@ -100,7 +100,7 @@
     .matches-list .m.expanded { background: rgba(94, 42, 121, 0.25); }
     .matches-list .header-row {
       display: grid;
-      grid-template-columns: 240px 60px 1fr 80px 70px 70px 90px 90px 150px;
+      grid-template-columns: 240px 60px 1fr 80px 70px 70px 90px 90px 150px 96px;
       gap: 10px;
       padding: 2px 8px 4px;
       font-size: 0.85em;
@@ -164,6 +164,13 @@
     .matches-list .header-row .col-right {
       text-align: right;
     }
+    /* Lobby-Stärke: der Wert selbst gedämpft, der Vorsprung des Squads
+       farblich UND per Vorzeichen — Farbe allein ist kein Signal. */
+    .matches-list .lobby-kd { white-space: nowrap; }
+    .matches-list .lobby-kd .dim { opacity: 0.4; }
+    .matches-list .lobby-diff { font-size: 0.85em; }
+    .matches-list .lobby-diff.up { color: var(--pubg-good, #3cb44b); }
+    .matches-list .lobby-diff.down { color: var(--pubg-warn, #e6194b); }
     .squad-detail {
       padding: 8px 14px 12px 28px;
       margin-bottom: 4px;
@@ -3326,6 +3333,18 @@
           <span class="stat"><b>${m.kills}</b> K${m.myStats && m.myStats.botKills ? ` <span class="bot-kills">(${m.myStats.botKills})</span>` : ""}</span>
           <span class="stat"><b>${Math.round(m.damage||0)}</b> DMG</span>
           <span class="stat"><b>${fmtSurv(mySurv)}</b></span>
+          <span class="stat lobby-kd" title="${
+            m.lobbyKd == null
+              ? "Lobby-Stärke noch nicht bekannt — Alltime-K/D der Gegner wird nachgeladen"
+              : `Ø Alltime-K/D der Gegner (${m.lobbyKnown}/${m.lobbyPlayers} bekannt) · eigener Squad ${m.squadKd == null ? "—" : m.squadKd.toFixed(2)}`
+          }">${
+            m.lobbyKd == null ? "<span class=\"dim\">—</span>"
+              : `<b>${m.lobbyKd.toFixed(2)}</b>${
+                  m.squadKd != null
+                    ? ` <span class="lobby-diff ${m.squadKd >= m.lobbyKd ? "up" : "down"}">${
+                        (m.squadKd - m.lobbyKd >= 0 ? "+" : "")}${(m.squadKd - m.lobbyKd).toFixed(2)}</span>`
+                    : ""}`
+          }</span>
           <span class="stat top-scorer" title="Bester Spieler der ganzen Lobby in diesem Match">${
             m.topScorer
               ? `<span class="top-scorer__name">${PubgUI.esc(m.topScorer.name)}</span><b>${fmtScore(m.topScorer)}</b>`
@@ -3419,6 +3438,7 @@
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.kd)}</span><span class="pubg-stat-label">K/D</span></div>
           ${t.tdm ? `<div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.tdm.kd)}</span><span class="pubg-stat-label">TDM K/D</span></div>` : ""}
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.squadKd || 0)}</span><span class="pubg-stat-label">Squad K/D</span></div>
+          ${t.lobbyKd ? `<div class="cell"><span class="pubg-stat-value">${t.lobbyKd.toFixed(2)}</span><span class="pubg-stat-label">Ø Lobby-K/D${t.lobbySquadKd ? ` · Squad ${t.lobbySquadKd.toFixed(2)}` : ""}</span></div>` : ""}
           ${t.topScorer ? `<div class="cell"><span class="pubg-stat-value">${fmtScore(t.topScorer)}</span><span class="pubg-stat-label">TopScorer · ${PubgUI.esc(t.topScorer.name)}</span></div>` : ""}
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.avgKills)}</span><span class="pubg-stat-label">Ø My Kills/Match</span></div>
           <div class="cell"><span class="pubg-stat-value">${(t.squadKillsPerMatch || 0).toFixed(1)}</span><span class="pubg-stat-label">Ø Squad Kills/Match</span></div>
@@ -3488,6 +3508,7 @@
                 <span style="text-align:right">Kills</span>
                 <span style="text-align:right">Damage</span>
                 <span style="text-align:right">Survived</span>
+                <span class="col-right" title="Ø Alltime-K/D der Gegner in dieser Lobby, dahinter der Vorsprung des eigenen Squads">Lobby</span>
                 <span class="col-right" title="Bester Spieler der Lobby">TopScorer</span>
               </div>
               ${ph.matches.map((m, i) => fmtMatchRow(m, `${ph.coreSquad.join('-')}-${i}`, matchNumMap.get(m.matchEnd))).join("")}

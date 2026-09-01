@@ -2717,9 +2717,50 @@ class EndpointRegistry:
         rf = qs.get("from")
         rt = qs.get("to")
         key = f"session-report:{rf or 'auto'}:{rt or 'now'}"
-        return _ok(self.cache.get_or_compute(
-            key,
-            lambda: compute_session_report(conn, self.tenant_id, self.my_account_id, rf, rt)))
+
+        def _build():
+            data = compute_session_report(conn, self.tenant_id,
+                                          self.my_account_id, rf, rt)
+            self._add_lobby_strength(conn, data)
+            return data
+
+        return _ok(self.cache.get_or_compute(key, _build))
+
+    def _add_lobby_strength(self, conn, data) -> None:
+        """Lobby-Staerke an die Match-Zeilen und die Session-Totals haengen.
+
+        Gehoert in den Report, weil man dort die Session durchgeht: "war die
+        Runde hart oder war das eine Bot-Lobby" liest sich neben Platz und
+        Kills, nicht in einem eigenen Tool. Fehlen Snapshots, bleiben die
+        Felder leer — der Report darf daran nicht scheitern.
+        """
+        from pubg.lobby_kd import lobby_kd_for_matches, LIFETIME_KEY
+
+        matches = [m for ph in (data.get("phases") or [])
+                   for m in (ph.get("matches") or [])]
+        match_ids = [m["matchId"] for m in matches if m.get("matchId")]
+        if not match_ids:
+            return
+        try:
+            lobby = lobby_kd_for_matches(conn, self.tenant_id, match_ids,
+                                          LIFETIME_KEY,
+                                          my_account_id=self.my_account_id)
+        except Exception:
+            return
+        by_id = {m["matchId"]: m for m in lobby.get("matches") or []}
+        for m in matches:
+            info = by_id.get(m.get("matchId"))
+            if not info:
+                continue
+            m["lobbyKd"] = info["lobbyKd"]
+            m["squadKd"] = info["squadKd"]
+            m["lobbyCoverage"] = info["coverage"]
+            m["lobbyKnown"] = info["known"]
+            m["lobbyPlayers"] = info["lobbyPlayers"]
+        if data.get("totals") is not None:
+            data["totals"]["lobbyKd"] = lobby.get("avgKd")
+            data["totals"]["lobbySquadKd"] = lobby.get("avgSquadKd")
+            data["totals"]["lobbyCoverage"] = lobby.get("coverage")
 
     def _sessions_index(self):
         conn = self.get_conn()
