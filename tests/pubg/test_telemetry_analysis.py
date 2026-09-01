@@ -18,9 +18,10 @@ def _attack(name, weapon="Item_Weapon_ACE32_C", t="2026-07-26T23:11:58Z", aid=No
 
 def _damage(attacker, victim, reason="TorsoShot", weapon="WeapACE32_C",
             damage=30.0, wall=False, cat="Damage_Gun",
-            ax=100.0, ay=100.0, vx=100.0, vy=1100.0, victim_acc=None, aid=None):
+            ax=100.0, ay=100.0, vx=100.0, vy=1100.0, victim_acc=None, aid=None,
+            t="2026-07-26T23:11:58Z"):
     return {"_T": "LogPlayerTakeDamage", "damageTypeCategory": cat,
-            "attackId": aid,
+            "_D": t, "attackId": aid,
             "damageReason": reason, "damage": damage,
             "damageCauserName": weapon, "isThroughPenetrableWall": wall,
             "attacker": {"name": attacker, "accountId": "account." + attacker,
@@ -352,64 +353,11 @@ def _pos(name, team, x, y, t="2026-07-26T23:12:00Z", health=100):
                           "location": {"x": x, "y": y}}}
 
 
-def test_accuracy_against_engaged_shots_is_reported():
-    """Die Frage "war da ueberhaupt jemand" beantwortet erst diese Quote:
-    Treffer je Schuss MIT Gegner in Reichweite."""
-    events = [
-        # health gehoert dazu: ohne sie gilt der Spieler als tot und damit
-        # nicht als Ziel.
-        {"_T": "LogPlayerPosition", "_D": "2026-07-26T23:11:50Z",
-         "character": {"name": "Opfer", "teamId": 4, "accountId": "account.Opfer",
-                       "health": 100.0, "location": {"x": 100.0, "y": 200.0}}},
-        _attack_at("Ich", 1),
-        _damage("Ich", "Opfer", damage=50.0, aid=1),
-        _attack_at("Ich", 2),           # daneben, aber Gegner war da
-    ]
-    p = analyse(events)["players"]["Ich"]
-    assert p["shotsWithTarget"] == 2
-    assert p["accuracyEngaged"] == 50.0
 def _attack_at(name, x, y, t="2026-07-26T23:12:00Z", aid=1):
     e = _attack(name, t=t, aid=aid)
     e["attacker"]["location"] = {"x": x, "y": y}
     e["attacker"]["teamId"] = 1
     return e
-
-
-def test_shot_with_enemy_in_range_is_not_empty():
-    ev = [_pos("A", 1, 0.0, 0.0), _pos("Gegner", 2, 5000.0, 0.0),   # 50 m
-          _attack_at("A", 0.0, 0.0)]
-    p = analyse(ev)["players"]["A"]
-    assert p["shotsWithTarget"] == 1
-    assert p["emptyShotPct"] == pytest.approx(0.0)
-
-
-def test_shot_without_any_enemy_nearby_counts_as_empty():
-    """Wer ohne Gegner in Reichweite schiesst, druckt seine Accuracy —
-    das ist selbst ein Signal."""
-    ev = [_pos("A", 1, 0.0, 0.0), _pos("Weit", 2, 500000.0, 0.0),   # 5 km
-          _attack_at("A", 0.0, 0.0)]
-    p = analyse(ev)["players"]["A"]
-    assert p["shotsWithTarget"] == 0
-    assert p["emptyShotPct"] == pytest.approx(100.0)
-
-
-def test_teammates_do_not_count_as_targets():
-    ev = [_pos("A", 1, 0.0, 0.0), _pos("Mate", 1, 5000.0, 0.0),
-          _attack_at("A", 0.0, 0.0)]
-    assert analyse(ev)["players"]["A"]["emptyShotPct"] == pytest.approx(100.0)
-
-
-def test_dead_players_do_not_count_as_targets():
-    ev = [_pos("A", 1, 0.0, 0.0), _pos("Leiche", 2, 5000.0, 0.0, health=0),
-          _attack_at("A", 0.0, 0.0)]
-    assert analyse(ev)["players"]["A"]["emptyShotPct"] == pytest.approx(100.0)
-
-
-def test_without_position_data_no_empty_shot_claim():
-    """Ohne Positions-Events darf niemand als Leerschuetze dastehen."""
-    ev = [_attack("A", aid=1), _damage("A", "B", aid=1)]
-    p = analyse(ev)["players"]["A"]
-    assert p["emptyShotPct"] is None
 
 
 def test_team_id_is_reported_per_player():
@@ -895,26 +843,6 @@ def test_killing_a_downed_enemy_still_counts_as_a_kill():
     assert p["finisherHits"] == 1
 
 
-def test_finisher_shots_also_leave_the_empty_shot_check():
-    """Der Nachschuss faellt aus `shots` — dann muss er auch aus der
-    Leerschuss-Pruefung raus, sonst stehen dort mehr Schuesse mit Ziel als
-    Schuesse insgesamt."""
-    events = [
-        # health gehoert dazu: ohne sie gilt der Spieler als tot und damit
-        # nicht als Ziel.
-        {"_T": "LogPlayerPosition", "_D": "2026-07-26T23:11:50Z",
-         "character": {"name": "Opfer", "teamId": 4, "accountId": "account.Opfer",
-                       "health": 100.0, "location": {"x": 100.0, "y": 200.0}}},
-        _attack_at("Ich", 1),
-        _damage("Ich", "Opfer", damage=50.0, aid=1),
-        _groggy("Ich", "Opfer"),
-        _attack_at("Ich", 2),
-        _damage("Ich", "Opfer", damage=0.0, aid=2),
-    ]
-    p = analyse(events)["players"]["Ich"]
-    assert p["shotsWithTarget"] <= p["shots"]
-
-
 def _attack_at(name, aid, x=100.0, y=100.0, t="2026-07-26T23:11:58Z"):
     """Schuss MIT Schuetzen-Position — ohne die kann die Leerschuss-Pruefung
     nichts sagen."""
@@ -924,3 +852,48 @@ def _attack_at(name, aid, x=100.0, y=100.0, t="2026-07-26T23:11:58Z"):
     return e
 
 
+
+
+# ── Reichweite: was als "Ziel in Reichweite" gilt ───────────────────────────
+
+
+def test_shots_during_a_fight_are_told_apart_from_idle_shooting():
+    """Wo die Kugel einschlaegt, sagt die Telemetrie nicht — sie kennt nur
+    Treffer. Messbar ist dagegen der Zeitpunkt: fiel der Schuss waehrend
+    eines laufenden Gefechts?"""
+    events = [
+        _attack_at("Ich", 1, t="2026-07-26T23:10:00Z"),   # allein im Wald
+        _attack_at("Ich", 2, t="2026-07-26T23:11:58Z"),   # Gefecht
+        _damage("Ich", "Opfer", damage=30.0, aid=2),
+        _attack_at("Ich", 3, t="2026-07-26T23:12:05Z"),   # noch im Gefecht
+    ]
+    p = analyse(events)["players"]["Ich"]
+    assert p["shots"] == 3
+    assert p["shotsInFight"] == 2
+    assert p["idleShotPct"] == pytest.approx(33.3, abs=0.1)
+    assert p["fightAccuracy"] == 50.0     # ein Treffer auf zwei Gefechtsschuesse
+
+
+def test_being_shot_at_also_counts_as_a_fight():
+    """Zurueckschiessen ist kein Rumballern, auch wenn man nichts trifft."""
+    events = [
+        _damage("Feind", "Ich", damage=30.0, aid=7),
+        _attack_at("Ich", 8, t="2026-07-26T23:11:59Z"),
+    ]
+    p = analyse(events)["players"]["Ich"]
+    assert p["shotsInFight"] == 1
+    assert p["idleShotPct"] == 0.0
+
+
+def test_finisher_shots_leave_the_fight_shot_count_too():
+    """Der Nachschuss faellt aus `shots` — dann auch aus den Gefechtsschuessen,
+    sonst stuenden dort mehr Schuesse als insgesamt."""
+    events = [
+        _attack_at("Ich", 1, t="2026-07-26T23:11:58Z"),
+        _damage("Ich", "Opfer", damage=50.0, aid=1),
+        _groggy("Ich", "Opfer"),
+        _attack_at("Ich", 2, t="2026-07-26T23:12:02Z"),
+        _damage("Ich", "Opfer", damage=0.0, aid=2, t="2026-07-26T23:12:02Z"),
+    ]
+    p = analyse(events)["players"]["Ich"]
+    assert p["shotsInFight"] <= p["shots"]

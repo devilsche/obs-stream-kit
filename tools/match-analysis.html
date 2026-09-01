@@ -170,9 +170,11 @@
       <span id="rowCount"></span>
     </div>
     <div class="legend">Click a row for details. "Limb %" = arm, leg and pelvis hits — unavoidable when
-      spraying, suspiciously low with aim assist. "Empty %" = shots with no enemy within
-      300 m, which can be used to deflate one\u2019s own accuracy. The zone distribution is
-      immune to that, it only counts hits.</div>
+      spraying, suspiciously low with aim assist. "Acc in fight %" counts only shots fired
+      while damage was actually being traded, "Idle shots %" is the rest — shooting at
+      nothing deflates plain accuracy, this separates the two. Where a missed bullet lands
+      is not in the telemetry at all, so distance to the target cannot be judged. The zone
+      distribution is immune to all of it, it only counts hits.</div>
   </div>
 
   <dialog class="t-card" id="detailModal">
@@ -251,9 +253,10 @@
       { key: "shots",    label: "Shots",   num: true,  val: (n, p) => p.shots },
       { key: "hits",     label: "Hits",  num: true,  val: (n, p) => p.hitAttacks },
       { key: "accuracy", label: "Acc %",    num: true,  val: (n, p) => p.accuracy },
-      { key: "accEng",   label: "Acc engaged %", num: true,
-        val: (n, p) => p.accuracyEngaged ?? -1 },
-      { key: "empty",    label: "Empty %",   num: true,  val: (n, p) => p.emptyShotPct ?? -1 },
+      { key: "accFight", label: "Acc in fight %", num: true,
+        val: (n, p) => p.fightAccuracy ?? -1 },
+      { key: "idle",     label: "Idle shots %", num: true,
+        val: (n, p) => p.idleShotPct ?? -1 },
       { key: "hs",       label: "HS %",     num: true,  val: (n, p) => p.headshotRate },
       { key: "limb",     label: "Limb %",  num: true,  val: (n, p) => limbPct(p) },
       { key: "kills",    label: "Kills",    num: true,  val: (n, p) => p.kills },
@@ -414,9 +417,10 @@
           <td class="num team">${p.teamId ?? "—"}</td>
           <td class="num">${p.shots}</td>
           <td class="num">${p.hitAttacks}</td><td class="num">${p.accuracy.toFixed(1)}</td>
-          <td class="num" title="Treffer je Schuss, bei dem ein Gegner in 300 m war"
-              >${p.accuracyEngaged == null ? "—" : p.accuracyEngaged.toFixed(1)}</td>
-          <td class="num">${p.emptyShotPct == null ? "—" : p.emptyShotPct.toFixed(0)}</td>
+          <td class="num" title="Treffer je Schuss, der während eines laufenden Gefechts fiel"
+              >${p.fightAccuracy == null ? "—" : p.fightAccuracy.toFixed(1)}</td>
+          <td class="num" title="Anteil der Schüsse außerhalb jedes Gefechts"
+              >${p.idleShotPct == null ? "—" : p.idleShotPct.toFixed(0)}</td>
           <td class="num${p.hits < WEAK_SAMPLE ? " weak-sample" : ""}"
               title="${(p.zones||{}).HeadShot || 0}/${p.hits}">${p.hits ? p.headshotRate.toFixed(1) : "—"}</td>
           <td class="num${p.hits < WEAK_SAMPLE ? " weak-sample" : ""}"
@@ -441,10 +445,11 @@
         ["Accuracy", p.shots
             ? `${p.accuracy.toFixed(1)} % (${p.hitAttacks}/${p.shots})`
             : "—"],
-        ["Accuracy engaged", p.accuracyEngaged == null
+        ["Accuracy in fight", p.fightAccuracy == null
             ? "—"
-            : `${p.accuracyEngaged.toFixed(1)} % (${p.hitAttacks}/${p.shotsWithTarget})`],
-        ["Shots w/o target", p.emptyShotPct == null ? "—" : p.emptyShotPct.toFixed(0) + " %"],
+            : `${p.fightAccuracy.toFixed(1)} % (${p.hitAttacks}/${p.shotsInFight})`],
+        ["Shots outside fights", p.idleShotPct == null
+            ? "—" : p.idleShotPct.toFixed(0) + " %"],
         ["Impacts", p.hits],
         ["Headshots", p.hits
             ? `${p.headshotRate.toFixed(1)} % (${(p.zones || {}).HeadShot || 0}/${p.hits})`

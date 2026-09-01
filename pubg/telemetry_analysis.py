@@ -29,10 +29,14 @@ GUN_CATEGORY = "Damage_Gun"
 #: Ab dieser Distanz (m) ist kein Gegner mehr plausibel treffbar. Ein Schuss
 #: ohne Gegner darin ist ein "Leerschuss" — relevant, weil sich damit die
 #: eigene Accuracy druecken laesst.
-TARGET_RANGE_M = 300.0
+#: Wie weit vor und nach einem Schadensereignis ein Schuss noch zum Gefecht
+#: zaehlt. Die Telemetrie kennt keinen Einschlagpunkt fuer Fehlschuesse — wo
+#: die Kugel landet, steht nirgends. Messbar ist der Zeitpunkt: fiel der
+#: Schuss, waehrend zwischen mir und einem Gegner tatsaechlich Schaden floss?
+#: Das trennt "Feuergefecht" von "allein im Wald ballern", ohne Geometrie zu
+#: raten.
+FIGHT_WINDOW_S = 20.0
 
-#: Positions-Events kommen alle ~10 s. Fuer die Naehe-Pruefung wird deshalb
-#: in 10-s-Faechern gesucht, mit einem Fach Toleranz nach vorn und hinten.
 POS_BUCKET_S = 10
 
 
@@ -105,47 +109,56 @@ def _parse_ts(iso):
         return None
 
 
-def _position_index(events):
-    """{zeit-fach: [(name, teamId, x, y)]} aller LEBENDEN Spieler."""
-    idx = defaultdict(list)
+def _fight_windows(events):
+    """{spielername: [(start, ende), ...]} — Zeitfenster, in denen der Spieler
+    an einem Feuergefecht beteiligt war.
+
+    Grundlage sind Schadensereignisse in beide Richtungen: wer schiesst und
+    trifft, ist im Gefecht; wer beschossen wird, ebenso. Um jedes Ereignis
+    liegt FIGHT_WINDOW_S, ueberlappende Fenster verschmelzen.
+    """
+    marks = defaultdict(list)
     for e in events or []:
-        if e.get("_T") != "LogPlayerPosition":
+        if e.get("_T") not in ("LogPlayerTakeDamage", "LogPlayerMakeGroggy",
+                                "LogPlayerKillV2"):
             continue
-        c = e.get("character") or {}
-        loc = c.get("location") or {}
-        if not c.get("name") or loc.get("x") is None or loc.get("y") is None:
+        if e.get("damageTypeCategory") not in (None, GUN_CATEGORY):
             continue
-        if (c.get("health") or 0) <= 0:
-            continue                       # Tote sind keine Ziele
         t = _parse_ts(e.get("_D"))
         if t is None:
             continue
-        idx[int(t // POS_BUCKET_S)].append(
-            (c["name"], c.get("teamId"), loc["x"], loc["y"]))
-    return idx
+        for key in ("attacker", "victim", "killer"):
+            who = (e.get(key) or {}).get("name")
+            if who:
+                marks[who].append(t)
+
+    out = {}
+    for name, times in marks.items():
+        times.sort()
+        windows = []
+        for t in times:
+            start, end = t - FIGHT_WINDOW_S, t + FIGHT_WINDOW_S
+            if windows and start <= windows[-1][1]:
+                windows[-1] = (windows[-1][0], max(windows[-1][1], end))
+            else:
+                windows.append((start, end))
+        out[name] = windows
+    return out
 
 
-def _enemy_within(idx, t, x, y, shooter, team, max_m=TARGET_RANGE_M):
-    """War zum Schusszeitpunkt ein lebender GEGNER in Reichweite?
-    None = keine Positionsdaten in der Naehe, also keine Aussage moeglich."""
-    if t is None or not idx:
-        return None
-    b = int(t // POS_BUCKET_S)
-    seen = False
-    for bb in (b - 1, b, b + 1):
-        for name, tid, px, py in idx.get(bb, ()):
-            seen = True
-            if name == shooter:
-                continue
-            if team is not None and tid == team:
-                continue          # eigenes Team ist kein Ziel
-            if math.dist((x, y), (px, py)) / 100.0 <= max_m:
-                return True
-    return False if seen else None
+def _in_fight(windows, t) -> bool:
+    if t is None or not windows:
+        return False
+    for start, end in windows:
+        if start <= t <= end:
+            return True
+        if start > t:
+            break            # Fenster sind sortiert
+    return False
 
 
 def _new_player():
-    return {"shots": 0, "shots_with_target": 0, "shots_judged": 0, "hits": 0, "hit_attacks": set(), "hits_no_id": 0,
+    return {"shots": 0, "shots_in_fight": 0, "hits": 0, "hit_attacks": set(), "hits_no_id": 0,
             "damage": 0.0, "kills": 0, "knocks": 0,
             "wallbangs": 0, "hitsOnBots": 0, "hitsOnHumans": 0,
             "zones": defaultdict(int),
@@ -213,7 +226,7 @@ def analyse(events) -> dict:
     """Wertet die Event-Liste aus. Siehe Modul-Docstring."""
     players = defaultdict(_new_player)
     kills = []
-    pos_idx = _position_index(events)
+    fight_windows = _fight_windows(events)
     # LogPlayerCreate ist das vollstaendige Teilnehmer-Roster. Ohne das fehlen
     # Spieler, die nie schiessen, treffen oder sterben — in einem gemessenen
     # Match 3 von 100.
@@ -260,17 +273,10 @@ def analyse(events) -> dict:
                 continue
             p = players[name]
             p["shots"] += 1
-            # Leerschuss-Pruefung: Accuracy laesst sich druecken, indem man
-            # ohne Gegner in Reichweite schiesst. Die Zonenverteilung ist
-            # dagegen immun — sie kennt nur Treffer.
-            loc = (e.get("attacker") or {}).get("location") or {}
-            if loc.get("x") is not None:
-                near = _enemy_within(pos_idx, _parse_ts(e.get("_D")),
-                                     loc["x"], loc["y"], name, team_of.get(name))
-                if near is not None:
-                    p["shots_judged"] += 1
-                    if near:
-                        p["shots_with_target"] += 1
+            # Fiel der Schuss waehrend eines Gefechts? Wo die Kugel einschlaegt,
+            # weiss die Telemetrie nicht — aber wann Schaden floss, schon.
+            if _in_fight(fight_windows.get(name), _parse_ts(e.get("_D"))):
+                p["shots_in_fight"] += 1
             w = normalize_weapon((e.get("weapon") or {}).get("itemId"))
             if w:
                 p["weapons"][w]["shots"] += 1
@@ -297,12 +303,10 @@ def analyse(events) -> dict:
                 # gezaehlt — er muss aus dem Accuracy-Nenner wieder raus,
                 # sonst zaehlt der Schuss unten, der Treffer aber nicht oben.
                 p["shots"] = max(0, p["shots"] - 1)
-                # Auch aus der Leerschuss-Pruefung nehmen: der Schuss ging auf
-                # einen Liegenden, der stand als "Gegner in Reichweite" drin.
-                if p["shots_judged"]:
-                    p["shots_judged"] -= 1
-                if p["shots_with_target"]:
-                    p["shots_with_target"] -= 1
+                # Der Nachschuss faellt komplett raus, also auch aus den
+                # Gefechtsschuessen.
+                if p["shots_in_fight"]:
+                    p["shots_in_fight"] -= 1
                 fw = normalize_weapon(e.get("damageCauserName"))
                 if fw:
                     wf = p["weapons"][fw]
@@ -423,16 +427,15 @@ def analyse(events) -> dict:
             "finisherShots": p["finisher_shots"],
             "isBot": bool(bot_of.get(name)),
             "shots": shots,
-            "shotsWithTarget": p["shots_with_target"],
-            # Trefferquote nur auf die Schuesse gerechnet, bei denen ueberhaupt
-            # ein Gegner in Reichweite war — die Antwort auf "oder hat er nur
-            # rumgeballert".
-            "accuracyEngaged": (round(min(100.0, 100.0 * hit_attacks
-                                          / p["shots_with_target"]), 1)
-                                if p["shots_with_target"] else None),
-            "emptyShotPct": (round(100.0 * (p["shots_judged"] - p["shots_with_target"])
-                                   / p["shots_judged"], 1)
-                             if p["shots_judged"] else None),
+            "shotsInFight": p["shots_in_fight"],
+            # Trefferquote nur ueber Schuesse, die waehrend eines Gefechts
+            # fielen — die Antwort auf "oder hat er nur rumgeballert".
+            "fightAccuracy": (round(min(100.0, 100.0 * hit_attacks
+                                        / p["shots_in_fight"]), 1)
+                              if p["shots_in_fight"] else None),
+            # Anteil der Schuesse ausserhalb jedes Gefechts.
+            "idleShotPct": (round(100.0 * (p["shots"] - p["shots_in_fight"])
+                                  / p["shots"], 1) if p["shots"] else None),
             "hits": hits,                 # Einschlaege — Basis der Zonenverteilung
             "hitAttacks": hit_attacks,    # getroffene Schuesse — Basis der Accuracy
             "accuracy": (round(min(100.0, 100.0 * hit_attacks / shots), 1)

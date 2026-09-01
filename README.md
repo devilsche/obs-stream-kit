@@ -608,10 +608,16 @@ auf; schon aufgelöste Einträge bleiben.
 **Was als Treffer zählt:** `Acc %` ist *getroffene Schüsse / abgegebene Schüsse* —
 jeder Schuss zählt im Nenner, auch Rumballern in die Landschaft. Ein Schrotschuss
 ist dabei ein Schuss, nicht neun Einschläge (Deduplizierung über `attackId`).
-Daneben steht in der Match-Analyse `Acc engaged %`: dieselbe Quote, aber nur über
-Schüsse, bei denen laut Positionsdaten ein lebender Gegner innerhalb von 300 m war.
-Die Differenz zwischen beiden ist die Leerschuss-Quote (`Empty %`) — wer viel ohne
-Ziel feuert, drückt damit seine normale Accuracy.
+Daneben steht in der Match-Analyse `Acc in fight %`: dieselbe Quote, aber nur über
+Schüsse, die **während eines laufenden Gefechts** fielen — also im Zeitfenster von
+±20 s um ein Schadensereignis, an dem der Spieler beteiligt war (in beide Richtungen:
+zurückschießen zählt). `Idle shots %` ist der Rest.
+
+Warum zeitlich und nicht räumlich: `LogPlayerAttack` enthält **weder Richtung noch
+Einschlagpunkt** — nur Schützen-Position, Waffe und `attackId`. Wo eine verfehlte
+Kugel landet, steht nirgends in der Telemetrie. Eine Prüfung „war ein Gegner in X m"
+misst deshalb nur den Abstand *Schütze↔Gegner* und sagt nichts darüber, ob überhaupt
+in seine Richtung gezielt wurde. Der Zeitpunkt ist die einzige belastbare Auskunft.
 
 **Nachschüsse auf liegende Gegner** zählen nicht mit: Die Telemetrie meldet für
 Treffer auf einen Spieler im DBNO **0 Schaden**, weil dort kein normales HP-Konto
