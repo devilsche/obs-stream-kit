@@ -285,7 +285,7 @@ def collect_lobby_kd(conn, tenant_id: int, client, max_batches: int = 1,
     if client is None:
         return 0
     raw_conn = conn.raw if isinstance(conn, SqliteCompatConn) else conn
-    season_id = _current_season_id(client)
+    season_id = _current_season_id(client, conn, tenant_id)
     if not season_id:
         return 0
     missing = db_pg.lobby_accounts_missing_snapshot(
@@ -303,21 +303,50 @@ def collect_lobby_kd(conn, tenant_id: int, client, max_batches: int = 1,
 
 
 _SEASON_CACHE = {"id": None, "at": 0.0}
+SEASON_SETTING_KEY = "pubg.current_season_id"
 
 
-def _current_season_id(client):
-    """Aktuelle Season, eine Stunde lang gecacht — sie wechselt alle paar
-    Monate, jeder Abruf kostet aber ein Rate-Limit-Budget."""
+def _current_season_id(client, conn=None, tenant_id: int = 1):
+    """Aktuelle Season — Prozess-Cache, dann DB, dann API.
+
+    Der Abruf kostet ein Rate-Limit-Budget und faellt aus, sobald das Polling
+    es gerade braucht. Weil die Season nur alle paar Monate wechselt, wird sie
+    persistiert: ein einmal geholter Wert ueberlebt Neustarts und
+    Rate-Limit-Aussetzer.
+    """
     import time
     now = time.time()
     if _SEASON_CACHE["id"] and now - _SEASON_CACHE["at"] < 3600:
         return _SEASON_CACHE["id"]
-    try:
-        sid = client.extract_current_season_id(client.get_seasons())
-    except Exception:
-        return _SEASON_CACHE["id"]
-    if sid:
-        _SEASON_CACHE.update({"id": sid, "at": now})
+
+    stored = None
+    if conn is not None:
+        try:
+            from pubg.db_pg import get_setting
+            raw = conn.raw if isinstance(conn, SqliteCompatConn) else conn
+            stored = get_setting(raw, tenant_id, SEASON_SETTING_KEY)
+        except Exception:
+            stored = None
+
+    sid = None
+    if client is not None:
+        try:
+            sid = client.extract_current_season_id(client.get_seasons())
+        except Exception:
+            sid = None
+    if not sid:
+        if stored:
+            _SEASON_CACHE.update({"id": stored, "at": now})
+        return stored or _SEASON_CACHE["id"]
+
+    _SEASON_CACHE.update({"id": sid, "at": now})
+    if conn is not None and sid != stored:
+        try:
+            from pubg.db_pg import set_setting
+            raw = conn.raw if isinstance(conn, SqliteCompatConn) else conn
+            set_setting(raw, tenant_id, SEASON_SETTING_KEY, sid)
+        except Exception:
+            pass
     return sid
 
 

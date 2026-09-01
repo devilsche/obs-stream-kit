@@ -1243,9 +1243,10 @@ def lobby_kd_backfill(root: str, args=None) -> int:
         return 1
     client = PubgClient(api_key=creds.pubg_api_key,
                         platform=creds.pubg_platform or "steam")
-    season_id = _current_season_id(client)
+    season_id = _opt("--season") or _current_season_id(client, conn, tenant_id)
     if not season_id:
-        print("Season nicht bestimmbar")
+        print("Season nicht bestimmbar (API-Limit?) — mit --season <id> "
+              "vorgeben oder spaeter erneut versuchen")
         return 1
 
     with raw.cursor() as cur:
