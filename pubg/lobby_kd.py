@@ -65,6 +65,9 @@ def _kd(kills, losses, rounds):
 #: Schluessel, unter dem Lifetime-Werte in derselben Tabelle liegen wie die
 #: Season-Snapshots. So stehen beide nebeneinander zur Verfuegung.
 LIFETIME_KEY = "lifetime"
+#: Ab welcher Abdeckung eine Lobby-Zahl etwas ueber die Lobby sagt und nicht
+#: ueber unsere Sammelquote. Dieselbe Schwelle nutzt der Report.
+MIN_COVERAGE_PCT = 25
 
 
 def parse_lifetime(payload) -> dict:
@@ -185,6 +188,48 @@ def overall_kd(per_mode) -> float | None:
     if not (kills or losses or rounds):
         return None
     return _kd(kills, losses, rounds)
+
+
+def lobby_breakdown(players, top_n: int = 5) -> dict:
+    """Eine Lobby aufgeschluesselt: Median, Maximum und die beiden Raender.
+
+    `players` = [(name, kd), ...]; Unbekannte gehoeren nicht hinein.
+
+    Der Median steht neben dem Schnitt, weil K/D bei 0 endet und nach oben
+    offen ist — der Schnitt haengt an den wenigen Starken. Gemessen an prod
+    sind das allerdings nur 0,05 bis 0,10 Unterschied; die Aussage steckt in
+    Top gegen Low (2,45 gegen 0,51 in einer typischen Lobby).
+
+    Bei wenigen Bekannten werden die Raender gekuerzt, damit sich Top und Low
+    nicht ueberlappen und derselbe Spieler nicht auf beiden Seiten steht.
+    """
+    vals = sorted(((n, k) for n, k in (players or []) if k is not None),
+                  key=lambda p: p[1])
+    if not vals:
+        return {"known": 0, "avg": None, "median": None, "max": None,
+                "top": [], "low": [], "topAvg": None, "lowAvg": None}
+    kds = [k for _, k in vals]
+    n = min(top_n, len(vals) // 2) or (1 if len(vals) == 1 else 0)
+    top = [{"name": nm, "kd": k} for nm, k in reversed(vals[len(vals) - n:])]
+    low = [{"name": nm, "kd": k} for nm, k in vals[:n]]
+    return {
+        "known": len(vals),
+        "avg": sum(kds) / len(kds),
+        "median": _median(kds),
+        "max": kds[-1],
+        "top": top,
+        "low": low,
+        "topAvg": (sum(p["kd"] for p in top) / len(top)) if top else None,
+        "lowAvg": (sum(p["kd"] for p in low) / len(low)) if low else None,
+    }
+
+
+def _median(values):
+    vals = sorted(v for v in values if v is not None)
+    if not vals:
+        return None
+    m = len(vals)
+    return vals[m // 2] if m % 2 else (vals[m // 2 - 1] + vals[m // 2]) / 2.0
 
 
 def lobby_average(account_ids, snapshots, exclude=None) -> dict:
@@ -363,3 +408,95 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         "coverage": (sum(m["coverage"] or 0 for m in out) / len(out))
                     if out else None,
     }
+
+
+def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
+                 my_account_id=None, top_n: int = 5) -> dict:
+    """Aufschluesselung der Lobby je Match plus ein Gesamtbild ueber alle.
+
+    Fuer die Detailansicht hinter der Lobby-K/D-Zahl: wer war die Spitze, wie
+    weich war der Boden, wie sah der typische Gegner aus. Eigener Squad und
+    Bots bleiben draussen — der Squad steckte sonst in beiden Seiten des
+    Vergleichs, und Bots haben ohnehin keine Zahlen.
+
+    Der Gesamtwert einer Phase mittelt die MATCH-Werte, statt alle Spieler in
+    einen Topf zu werfen: sonst wiegt eine volle Lobby schwerer als ein kurzes
+    Match, und "die staerksten Fuenf" waeren immer dieselben Ausreisser statt
+    der typischen Spitze.
+    """
+    from pubg import db_pg
+
+    match_ids = [m for m in (match_ids or []) if m]
+    if not match_ids:
+        return {"matches": [], "totals": None}
+
+    raw = getattr(conn, "raw", conn)
+    marks = ",".join("?" * len(match_ids))
+    rows = conn.execute(
+        "SELECT mtm.match_id, mtm.account_id, m.played_at, m.map_name "
+        "FROM match_team_mapping mtm "
+        "JOIN matches m ON m.match_id = mtm.match_id "
+        "               AND m.tenant_id = mtm.tenant_id "
+        f"WHERE mtm.tenant_id = ? AND mtm.match_id IN ({marks})",
+        [tenant_id] + list(match_ids)).fetchall()
+    squad_rows = conn.execute(
+        f"SELECT match_id, account_id FROM participants "
+        f"WHERE tenant_id = ? AND match_id IN ({marks})",
+        [tenant_id] + list(match_ids)).fetchall()
+    squad_by_match = {}
+    for r in squad_rows:
+        squad_by_match.setdefault(r["match_id"], set()).add(r["account_id"])
+
+    per_match, accounts = {}, set()
+    for r in rows:
+        e = per_match.setdefault(r["match_id"],
+                                 {"playedAt": r["played_at"],
+                                  "map": r["map_name"], "accounts": []})
+        e["accounts"].append(r["account_id"])
+        accounts.add(r["account_id"])
+
+    kd_by_acc = db_pg.get_lifetime_overall(raw, list(accounts))
+    names = db_pg.get_player_names(raw, tenant_id, list(accounts))
+
+    out, strongest = [], {}
+    for mid, e in per_match.items():
+        squad = squad_by_match.get(mid, set())
+        lobby = [a for a in e["accounts"]
+                 if a not in squad and not is_bot(a)]
+        players = [(names.get(a) or a[:12], kd_by_acc.get(a)) for a in lobby]
+        b = lobby_breakdown(players, top_n=top_n)
+        b.update({"matchId": mid, "playedAt": e["playedAt"], "map": e["map"],
+                  "lobbyPlayers": len(lobby),
+                  "coverage": (100.0 * b["known"] / len(lobby)) if lobby else None})
+        out.append(b)
+        for a in lobby:
+            kd = kd_by_acc.get(a)
+            if kd is None:
+                continue
+            prev = strongest.get(a)
+            if prev is None or kd > prev["kd"]:
+                strongest[a] = {"name": names.get(a) or a[:12], "kd": kd,
+                                "matchId": mid, "playedAt": e["playedAt"]}
+    out.sort(key=lambda m: m["playedAt"] or "", reverse=True)
+
+    # Nur Matches mit brauchbarer Abdeckung tragen zum Gesamtbild bei.
+    solid = [m for m in out if (m["coverage"] or 0) >= MIN_COVERAGE_PCT
+             and m["avg"] is not None]
+
+    def _avg(key):
+        vals = [m[key] for m in solid if m.get(key) is not None]
+        return (sum(vals) / len(vals)) if vals else None
+
+    totals = {
+        "matches": len(out),
+        "matchesInAverage": len(solid),
+        "avg": _avg("avg"),
+        "median": _avg("median"),
+        "topAvg": _avg("topAvg"),
+        "lowAvg": _avg("lowAvg"),
+        "max": max((m["max"] for m in solid if m["max"] is not None),
+                   default=None),
+        "strongest": sorted(strongest.values(), key=lambda p: -p["kd"])[:top_n],
+    }
+    return {"matches": out, "totals": totals, "seasonId": season_id,
+            "topN": top_n}

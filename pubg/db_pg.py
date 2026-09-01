@@ -980,6 +980,22 @@ def upsert_lifetime_snapshots(conn, store: dict, fetched_at: str) -> int:
     return len(values)
 
 
+def get_player_names(conn, tenant_id: int, account_ids=None) -> dict:
+    """{account_id: name} — jeder, der je in einem Match des Tenants auftauchte.
+
+    `players` fuellt der Poller aus den Match-Rostern, deckt also die ganze
+    Lobby ab und nicht nur das eigene Squad.
+    """
+    ids = [a for a in (account_ids or []) if a]
+    if not ids:
+        return {}
+    with conn.cursor() as cur:
+        cur.execute("SELECT account_id, name FROM players "
+                    "WHERE tenant_id = %s AND account_id = ANY(%s)",
+                    (tenant_id, ids))
+        return {r[0]: r[1] for r in cur.fetchall()}
+
+
 def get_lifetime_overall(conn, account_ids=None) -> dict:
     """{account_id: kd} — Alltime ueber ALLE Spielmodi (Summe Kills / Tode).
 

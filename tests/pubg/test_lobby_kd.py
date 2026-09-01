@@ -246,3 +246,34 @@ def test_a_real_not_found_is_remembered():
     store = {}
     lk.fetch_lifetime(client, ["account.weg"], store, max_calls=1)
     assert store["account.weg"] is None
+
+
+# ── Aufschluesselung fuers Modal ────────────────────────────────────────────
+
+def test_lobby_breakdown_liefert_median_max_und_die_raender():
+    from pubg.lobby_kd import lobby_breakdown
+    players = [("p%d" % i, float(i) / 10) for i in range(1, 22)]   # 0.1 .. 2.1
+    b = lobby_breakdown(players, top_n=5)
+    assert b["known"] == 21
+    assert b["median"] == pytest.approx(1.1)
+    assert b["max"] == pytest.approx(2.1)
+    assert [p["name"] for p in b["top"]] == ["p21", "p20", "p19", "p18", "p17"]
+    assert [p["name"] for p in b["low"]] == ["p1", "p2", "p3", "p4", "p5"]
+    assert b["topAvg"] == pytest.approx((2.1 + 2.0 + 1.9 + 1.8 + 1.7) / 5)
+    assert b["lowAvg"] == pytest.approx((0.1 + 0.2 + 0.3 + 0.4 + 0.5) / 5)
+
+
+def test_lobby_breakdown_ohne_werte():
+    from pubg.lobby_kd import lobby_breakdown
+    b = lobby_breakdown([], top_n=5)
+    assert b["known"] == 0 and b["median"] is None and b["max"] is None
+    assert b["top"] == [] and b["low"] == []
+
+
+def test_lobby_breakdown_kuerzt_die_raender_bei_wenigen_spielern():
+    """Bei 6 Bekannten duerfen sich Top und Low nicht ueberlappen."""
+    from pubg.lobby_kd import lobby_breakdown
+    b = lobby_breakdown([("a", 1.0), ("b", 2.0), ("c", 3.0),
+                         ("d", 4.0), ("e", 5.0), ("f", 6.0)], top_n=5)
+    assert [p["name"] for p in b["top"]] == ["f", "e", "d"]
+    assert [p["name"] for p in b["low"]] == ["a", "b", "c"]

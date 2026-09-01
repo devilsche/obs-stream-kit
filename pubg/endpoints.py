@@ -306,6 +306,8 @@ class EndpointRegistry:
             return self._squad_compare(qs)
         if route == ("GET", "/api/pubg/lobby-kd"):
             return self._lobby_kd(qs)
+        if route == ("GET", "/api/pubg/lobby-detail"):
+            return self._lobby_detail(qs)
         if route == ("GET", "/api/pubg/lobby-kd/refresh"):
             return self._lobby_kd_refresh(qs)
         if route == ("GET", "/api/pubg/squad-playstyle"):
@@ -2925,6 +2927,29 @@ class EndpointRegistry:
                                           extra_key=season_id))
         return _ok({**data, "range": range_key, "seasonId": season_id,
                     "basis": "lifetime"})
+
+    def _lobby_detail(self, qs):
+        """Eine oder mehrere Lobbys aufgeschluesselt — fuer die Detailansicht.
+
+        `matches=id1,id2` — ein Match fuer die Zelle, alle Matches einer Phase
+        fuer den Phasen-Header. Gecached, weil der Aufruf am Klick haengt.
+        """
+        from pubg.lobby_kd import lobby_detail
+
+        ids = [m.strip() for m in (qs.get("matches") or "").split(",")
+               if m.strip()][:60]
+        if not ids:
+            return _err(400, "matches=<matchId>[,<matchId>...] fehlt")
+        try:
+            top_n = max(1, min(int(qs.get("top", "5")), 20))
+        except ValueError:
+            top_n = 5
+        conn = self.get_conn()
+        key = f"lobby-detail:{top_n}:" + ",".join(sorted(ids))
+        return _ok(self.cache.get_or_compute(
+            key, lambda: lobby_detail(conn, self.tenant_id, ids,
+                                      my_account_id=self.my_account_id,
+                                      top_n=top_n)))
 
     def _lobby_kd_refresh(self, qs):
         """Fehlende und veraltete Season-Snapshots nachladen — auf Knopfdruck.
