@@ -3519,13 +3519,14 @@
       }
     }
 
-    document.getElementById("lobbyModalClose").addEventListener("click", () => {
-      document.getElementById("lobbyModal").close();
-    });
-    // Klick neben den Dialog schliesst ihn — der Backdrop ist Teil des
-    // dialog-Elements, also trifft der Klick es selbst und nicht den Inhalt.
-    document.getElementById("lobbyModal").addEventListener("click", (e) => {
-      if (e.target.id === "lobbyModal") e.target.close();
+    // Delegiert statt direkt gebunden: das <dialog> steht im Markup NACH
+    // diesem Script — ein getElementById darauf ist hier null und haette
+    // das ganze Script abgebrochen (und damit den Report nie geladen).
+    document.addEventListener("click", (e) => {
+      const dlg = document.getElementById("lobbyModal");
+      if (!dlg) return;
+      // Klick auf den Backdrop trifft das dialog-Element selbst.
+      if (e.target === dlg || e.target.closest("#lobbyModalClose")) dlg.close();
     });
 
     document.addEventListener("click", (e) => {
