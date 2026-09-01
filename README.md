@@ -541,7 +541,9 @@ fünf Matches bzw. Eröffnungen zeigt die Ansicht blass und nimmt sie von den
 Spitzenreiter-Markierungen aus.
 
 **Lobby-Stärke** (dritter Block im Tool, `/api/pubg/lobby-kd`): Season-K/D aller
-Spieler einer Lobby, gemittelt je Match, plus Vergleich mit dem eigenen Wert.
+Spieler einer Lobby, gemittelt je Match, gegen den Schnitt des **eigenen Squads**
+gehalten. Der eigene Squad ist dabei aus der Lobby-Seite herausgerechnet — sonst
+misst man sich zum Teil gegen sich selbst.
 Lifetime-Zahlen gibt die API nur einzeln heraus — 93 Requests je Match bei einem
 Budget von 10 pro Minute; Season-Zahlen kommen im Zehnerpack
 (`/seasons/{id}/gameMode/{mode}/players?filter[playerIds]=…`), also rund zehn

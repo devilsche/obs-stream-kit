@@ -69,16 +69,19 @@ def parse_season_batch(payload, mode: str) -> dict:
     return out
 
 
-def lobby_average(account_ids, snapshots) -> dict:
+def lobby_average(account_ids, snapshots, exclude=None) -> dict:
     """Durchschnittliches Season-K/D einer Lobby.
 
     `snapshots` = {account_id: kd oder None}. Unbekannte Spieler fliegen aus
     dem Durchschnitt, zaehlen aber im Nenner der Abdeckung: ein Mittelwert
     ueber die halbe Lobby ist brauchbar, muss aber als solcher erkennbar sein.
     Bots bleiben ganz draussen — sie haben keine Season-Stats und wuerden die
-    Lobby kuenstlich schwach aussehen lassen.
+    Lobby kuenstlich schwach aussehen lassen. `exclude` nimmt den eigenen
+    Squad heraus: gegen sich selbst zu vergleichen verwaessert den Wert.
     """
-    real = [a for a in (account_ids or []) if a and not is_bot(a)]
+    skip = set(exclude or ())
+    real = [a for a in (account_ids or []) if a and not is_bot(a)
+            and a not in skip]
     known = [snapshots[a] for a in real
              if snapshots.get(a) is not None]
     return {
@@ -157,6 +160,16 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         f"({','.join('?' * len(match_ids))})",
         [tenant_id] + list(match_ids)).fetchall()
 
+    # Eigener Squad je Match: participants enthaelt nur das eigene Team.
+    squad_rows = conn.execute(
+        "SELECT match_id, account_id FROM participants "
+        f"WHERE tenant_id = ? AND match_id IN "
+        f"({','.join('?' * len(match_ids))})",
+        [tenant_id] + list(match_ids)).fetchall()
+    squad_by_match = {}
+    for r in squad_rows:
+        squad_by_match.setdefault(r["match_id"], set()).add(r["account_id"])
+
     per_match = {}
     all_accounts = set()
     for r in rows:
@@ -175,7 +188,11 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
 
     out = []
     for mid, entry in per_match.items():
-        avg = lobby_average(entry["accounts"], kd_by_acc)
+        squad = squad_by_match.get(mid, set())
+        # Lobby heisst hier: alle ausser uns. Der eigene Squad steckte sonst
+        # in beiden Seiten des Vergleichs.
+        avg = lobby_average(entry["accounts"], kd_by_acc, exclude=squad)
+        squad_avg = lobby_average(sorted(squad), kd_by_acc)
         out.append({
             "matchId": mid,
             "playedAt": entry["playedAt"],
@@ -184,16 +201,23 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
             "known": avg["known"],
             "lobbyPlayers": avg["total"],
             "coverage": avg["coverage"],
+            "squadKd": squad_avg["avgKd"],
+            "squadKnown": squad_avg["known"],
+            "squadPlayers": squad_avg["total"],
             "myKd": my_kd,
-            "diff": (my_kd - avg["avgKd"])
-                    if (my_kd is not None and avg["avgKd"] is not None) else None,
+            "diff": (squad_avg["avgKd"] - avg["avgKd"])
+                    if (squad_avg["avgKd"] is not None
+                        and avg["avgKd"] is not None) else None,
         })
     out.sort(key=lambda m: m["playedAt"] or "", reverse=True)
 
     solid = [m for m in out if (m["coverage"] or 0) >= 25 and m["lobbyKd"]]
+    with_squad = [m for m in solid if m["squadKd"] is not None]
     return {
         "matches": out,
         "avgKd": (sum(m["lobbyKd"] for m in solid) / len(solid)) if solid else None,
+        "avgSquadKd": (sum(m["squadKd"] for m in with_squad) / len(with_squad))
+                      if with_squad else None,
         "matchesInAverage": len(solid),
         "myKd": my_kd,
         "seasonId": season_id,

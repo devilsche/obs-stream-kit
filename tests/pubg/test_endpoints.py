@@ -349,11 +349,13 @@ def test_lobby_kd_reports_coverage_per_match():
     assert code == 200
     data = json.loads(body)
     m = data["matches"][0]
-    assert m["lobbyPlayers"] == 3          # Bot zaehlt nicht mit
-    assert m["known"] == 2
-    assert m["lobbyKd"] == 1.5
-    assert m["myKd"] == 2.0
-    assert m["diff"] == 0.5
+    # "Lobby" heisst: alle ausser uns — der eigene Squad steckte sonst in
+    # beiden Seiten des Vergleichs. Bots zaehlen ohnehin nicht mit.
+    assert m["lobbyPlayers"] == 2
+    assert m["known"] == 1
+    assert m["lobbyKd"] == 1.0
+    assert m["squadKd"] == 2.0
+    assert m["diff"] == 1.0
 
 
 def test_squad_playstyle_rejects_a_bad_range():

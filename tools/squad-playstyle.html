@@ -227,9 +227,13 @@
     <details class="howto">
       <summary>Where the lobby K/D comes from</summary>
       <dl>
+        <dt>What is compared</dt>
+        <dd>Your squad in that match against everyone else in the lobby — the
+            own squad is excluded from the lobby side, otherwise you would be
+            measuring partly against yourself.</dd>
         <dt>Per player</dt>
-        <dd>Season K/D of every player in that lobby — kills divided by
-            deaths, taken from the PUBG API for the current season.</dd>
+        <dd>Season K/D of every player — kills divided by deaths, taken from
+            the PUBG API for the current season.</dd>
         <dt>Why season and not lifetime</dt>
         <dd>Lifetime numbers come one player at a time: 93 requests per match
             against a budget of ten per minute. Season numbers come ten at a
@@ -449,14 +453,17 @@
       { key: "map", label: "Map", text: true,
         fmt: (r) => esc(PubgUI.fmtMap(r.map)),
         help: "Map of that match." },
-      { key: "lobbyKd", label: "Lobby K/D", unit: "avg",
+      { key: "lobbyKd", label: "Lobby K/D", unit: "avg · enemies",
         fmt: (r) => n2(r.lobbyKd),
-        help: "Average season K/D of everyone in that lobby — the tougher the room, the higher." },
+        help: "Average season K/D of everyone in that lobby except your own squad — the tougher the room, the higher." },
+      { key: "squadKd", label: "Squad K/D", unit: "avg",
+        fmt: (r) => n2(r.squadKd),
+        help: "Average season K/D of your own squad in that match — the people you actually played with, not just you." },
+      { key: "diff", label: "Difference", fmt: (r) => n2(r.diff),
+        help: "Squad K/D minus lobby K/D. Positive means your squad was stronger than the room." },
       { key: "myKd", label: "Your K/D", unit: "season",
         fmt: (r) => n2(r.myKd),
-        help: "Your own season K/D in this mode, for comparison." },
-      { key: "diff", label: "Difference", fmt: (r) => n2(r.diff),
-        help: "Your K/D minus the lobby average. Positive means you were above the room." },
+        help: "Your own season K/D in this mode, for reference." },
       { key: "known", label: "Known", unit: "players",
         fmt: (r) => `${r.known}/${r.lobbyPlayers}`, text: true,
         help: "How many of the lobby we already have season numbers for. Bots are not counted." },
@@ -482,11 +489,13 @@
       if (!rows.length) return;
       renderTable("lobby", LOBBY_COLS, rows);
       const cov = LOBBY.coverage == null ? "—" : Math.round(LOBBY.coverage);
+      const squadAvg = LOBBY.avgSquadKd == null
+        ? "—" : LOBBY.avgSquadKd.toFixed(2);
       note.textContent = LOBBY.avgKd == null
         ? `No match has enough coverage yet — the collector is still gathering `
           + `(${cov}% of lobby players known so far).`
-        : `Average lobby K/D across ${LOBBY.matchesInAverage} matches: `
-          + `${LOBBY.avgKd.toFixed(2)} · your season K/D: `
+        : `Across ${LOBBY.matchesInAverage} matches: squad ${squadAvg} `
+          + `vs lobby ${LOBBY.avgKd.toFixed(2)} · your own season K/D `
           + `${LOBBY.myKd == null ? "—" : LOBBY.myKd.toFixed(2)} · `
           + `${cov}% of lobby players known.`;
     }

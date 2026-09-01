@@ -114,3 +114,12 @@ def test_fetch_marks_players_the_api_does_not_know():
                      store, max_batches=1)
     assert store["account.0"]["kd"] == pytest.approx(1.0)
     assert store["account.1"] is None       # Fehlanzeige, aber vermerkt
+
+
+def test_lobby_average_can_exclude_our_own_squad():
+    """Sonst misst man sich zum Teil gegen sich selbst."""
+    snaps = {"account.me": 3.0, "account.mate": 3.0, "account.foe": 1.0}
+    out = lk.lobby_average(["account.me", "account.mate", "account.foe"],
+                           snaps, exclude={"account.me", "account.mate"})
+    assert out["avgKd"] == pytest.approx(1.0)
+    assert out["total"] == 1
