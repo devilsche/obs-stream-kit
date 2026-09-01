@@ -72,6 +72,9 @@
     .legend { color: var(--theme-text-dim); font-size: 0.72em; margin-top: 8px;
               line-height: 1.45; }
     .warn { color: var(--theme-warn); }
+    /* Nachschuesse auf Liegende: sichtbar, aber klar zweitrangig — sie
+       zaehlen weder in Accuracy noch Schaden. */
+    .finisher { color: var(--theme-text-dim); font-size: 0.85em; }
     .err { color: var(--theme-warn); }
   </style>
 </head>
@@ -182,8 +185,10 @@
         return `<tr tabindex="0" data-v="${esc(label)}">
           <td>${esc(label)}</td>
           <td class="num">${r.matches}</td>
-          <td class="num">${r.shots}</td>
-          <td class="num">${r.hits}</td>
+          <td class="num" title="${r.finisherShots ? r.finisherShots + " more shots at already downed enemies — they carry no damage and are kept out of accuracy" : ""}"
+              >${r.shots}${r.finisherShots ? ` <span class="finisher">(+${r.finisherShots})</span>` : ""}</td>
+          <td class="num" title="${r.finisherHits ? r.finisherHits + " more impacts on downed enemies" : ""}"
+              >${r.hits}${r.finisherHits ? ` <span class="finisher">(+${r.finisherHits})</span>` : ""}</td>
           <td class="num">${r.shots ? r.accuracy.toFixed(1) : "—"}</td>
           <td class="num${weak ? " weak-sample" : ""}">${r.hits ? r.headshotRate.toFixed(1) : "—"}</td>
           <td class="${weak ? "weak-sample" : ""}">${zone}</td>
@@ -198,6 +203,8 @@
       const pend = DATA.matchesPending || 0;
       document.getElementById("foot").innerHTML =
         `${rows.length} rows · Ø dmg is per hit, for pellet weapons (*) per landed shot.`
+        + ` Numbers in brackets are shots and impacts on already downed enemies —`
+        + ` the telemetry reports zero damage for those, so they stay out of accuracy and Ø dmg.`
         + ` Click a row to filter by it.`
         + (pend ? ` <span class="warn">${pend} match${pend === 1 ? "" : "es"} in this`
                   + ` range not processed yet — run weapon-stats-backfill.</span>` : "");

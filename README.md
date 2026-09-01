@@ -605,6 +605,15 @@ python -m pubg.cli clan-queue-prune [--min-seen 5] [--dry-run]
 
 auf; schon aufgelöste Einträge bleiben.
 
+**Nachschüsse auf liegende Gegner** zählen nicht mit: Die Telemetrie meldet für
+Treffer auf einen Spieler im DBNO **0 Schaden**, weil dort kein normales HP-Konto
+mehr läuft. Zählte man sie mit, sähe jede Sniper-Statistik aus wie ein Fehlschlag —
+gemessen an einem echten Match: M24, drei Treffer, davon zwei Finisher, Ø-Schaden
+33 statt 100. Sie stehen deshalb getrennt in Klammern hinter Schüssen und
+Einschlägen (`(+2)`), und der zugehörige Schuss fällt auch aus dem
+Accuracy-Nenner — sonst zählte der Schuss unten, der Treffer aber nicht oben.
+Ein `Revive` stellt den Gegner wieder her, danach zählt er normal.
+
 Datenquelle ist die Tabelle `match_weapon_stats`, gefüllt beim Telemetrie-Fetch. Für die Historie:
 
 ```bash

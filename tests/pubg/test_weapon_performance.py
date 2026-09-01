@@ -206,3 +206,19 @@ def test_categories_do_not_overlap_for_the_common_ones():
         for w in weapons_in_category(cat):
             assert w not in seen, f"{w} in {cat} und {seen.get(w)}"
             seen[w] = cat
+
+
+def test_db_rows_carry_the_finisher_columns():
+    """Sonst kann die Ansicht die Nachschuesse nicht in Klammern ausweisen."""
+    from pubg.weapon_performance import to_db_rows
+    analysis = {"players": {"Ich": {"accountId": "account.a", "teamId": 1,
+                                     "weapons": {"M24": {
+                                         "shots": 16, "hits": 1,
+                                         "hitAttacks": 1, "damage": 100.0,
+                                         "kills": 1, "zones": {"HeadShot": 1},
+                                         "finisherHits": 2,
+                                         "finisherShots": 2}}}}}
+    row = to_db_rows(analysis)[0]
+    assert row["finisher_hits"] == 2
+    assert row["finisher_shots"] == 2
+    assert row["shots"] == 16          # ohne die Finisher-Schuesse

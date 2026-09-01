@@ -149,9 +149,12 @@ def _new_player():
             "damage": 0.0, "kills": 0, "knocks": 0,
             "wallbangs": 0, "hitsOnBots": 0, "hitsOnHumans": 0,
             "zones": defaultdict(int),
+            "finisher_hits": 0, "finisher_shots": 0,
             "weapons": defaultdict(lambda: {"shots": 0, "hits": 0, "damage": 0.0,
                                             "kills": 0,
                                             "hit_attacks": set(), "hits_no_id": 0,
+                                            "finisher_hits": 0,
+                                            "finisher_shots": 0,
                                             "zones": defaultdict(int)}),
             "byDistance": defaultdict(lambda: {"hits": 0, "headshots": 0})}
 
@@ -167,6 +170,10 @@ def _weapon_out(v: dict) -> dict:
         "shots": v["shots"],
         "kills": v.get("kills", 0),
         "hits": v["hits"],                 # Einschlaege (Schrot: pro Pellet)
+        # Nachschuesse auf bereits liegende Gegner — zaehlen weder in
+        # Trefferquote noch Schaden, stehen aber in Klammern daneben.
+        "finisherHits": v.get("finisher_hits", 0),
+        "finisherShots": v.get("finisher_shots", 0),
         "hitAttacks": hit_attacks,         # getroffene Schuesse
         "accuracy": (round(min(100.0, 100.0 * hit_attacks / v["shots"]), 1)
                      if v["shots"] else 0),
@@ -237,6 +244,11 @@ def analyse(events) -> dict:
             if _is_bot(q) or (q.get("teamId") or 0) >= 200:
                 bot_of[q["name"]] = True
 
+    # Wer gerade am Boden liegt. Treffer auf Liegende melden 0 Schaden und
+    # wuerden Trefferquote und Schnitt-Schaden verfaelschen — sie werden
+    # getrennt gezaehlt (finisher_*). Ein Revive stellt den Spieler wieder hin.
+    downed = set()
+
     for e in events or []:
         t = e.get("_T")
 
@@ -275,6 +287,23 @@ def analyse(events) -> dict:
             if _is_monster(victim):
                 continue          # Baer & Co. sind keine Zielleistung
             p = players[name]
+            if victim.get("name") in downed:
+                # Nachschuss auf einen Liegenden: die Telemetrie meldet dafuer
+                # 0 Schaden, und der Schuss war kein Zielen unter Gegenwehr.
+                # Getrennt zaehlen statt Quoten kaputtmachen.
+                p["finisher_hits"] += 1
+                p["finisher_shots"] += 1
+                # Der zugehoerige Schuss wurde beim Attack-Event schon
+                # gezaehlt — er muss aus dem Accuracy-Nenner wieder raus,
+                # sonst zaehlt der Schuss unten, der Treffer aber nicht oben.
+                p["shots"] = max(0, p["shots"] - 1)
+                fw = normalize_weapon(e.get("damageCauserName"))
+                if fw:
+                    wf = p["weapons"][fw]
+                    wf["finisher_hits"] += 1
+                    wf["finisher_shots"] += 1
+                    wf["shots"] = max(0, wf["shots"] - 1)
+                continue
             p["hits"] += 1
             # Accuracy braucht SCHUESSE, nicht Einschlaege: eine Schrotladung
             # erzeugt ein TakeDamage-Event pro Pellet (real bis zu 9), alle mit
@@ -325,6 +354,8 @@ def analyse(events) -> dict:
             killer = e.get("killer") or e.get("finisher") or {}
             victim = e.get("victim") or {}
             kname, vname = killer.get("name"), victim.get("name")
+            if vname:
+                downed.add(vname)
             if not kname or not vname or kname == vname:
                 continue     # Suizid/Zonentod hat keinen echten Killer
             if _is_monster(victim):
@@ -355,6 +386,14 @@ def analyse(events) -> dict:
             name = (e.get("attacker") or {}).get("name")
             if name:
                 players[name]["knocks"] += 1
+            vname = (e.get("victim") or {}).get("name")
+            if vname:
+                downed.add(vname)
+
+        elif t == "LogPlayerRevive":
+            vname = (e.get("victim") or {}).get("name")
+            if vname:
+                downed.discard(vname)
 
     kills.sort(key=lambda k: k["time"] or "")
 
@@ -373,6 +412,9 @@ def analyse(events) -> dict:
         out[name] = {
             "accountId": acc_of.get(name),
             "teamId": team_of.get(name),
+            # Nachschuesse auf Liegende: nicht in Quoten, aber sichtbar.
+            "finisherHits": p["finisher_hits"],
+            "finisherShots": p["finisher_shots"],
             "isBot": bool(bot_of.get(name)),
             "shots": shots,
             "shotsWithTarget": p["shots_with_target"],

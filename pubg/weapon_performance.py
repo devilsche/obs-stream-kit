@@ -148,7 +148,11 @@ def to_db_rows(analysis: dict, account_ids: dict = None) -> list:
                    "hit_attacks": w.get("hitAttacks") or 0,
                    "hits": w.get("hits") or 0,
                    "damage": float(w.get("damage") or 0.0),
-                   "kills": w.get("kills") or 0}
+                   "kills": w.get("kills") or 0,
+                   # Nachschuesse auf Liegende: getrennt, damit sie weder
+                   # Trefferquote noch Schadensschnitt verfaelschen.
+                   "finisher_hits": w.get("finisherHits") or 0,
+                   "finisher_shots": w.get("finisherShots") or 0}
             for z, col in _ZONE_COL.items():
                 row[col] = zones.get(z, 0)
             rows.append(row)
@@ -173,6 +177,8 @@ def db_rows_to_display(rows, group_by: str = "weapon") -> list:
         acc["damage"] = float(r.get("damage") or 0.0)
         acc["kills"] = int(r.get("kills") or 0)
         acc["matches"] = int(r.get("matches") or 0)
+        acc["finisherHits"] = int(r.get("finisher_hits") or 0)
+        acc["finisherShots"] = int(r.get("finisher_shots") or 0)
         out.append(_finish(acc))
     out.sort(key=lambda r: -r["damage"])
     return out

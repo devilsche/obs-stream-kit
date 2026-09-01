@@ -799,3 +799,81 @@ def test_zoneless_hits_are_excluded_from_the_zone_share():
     assert p["zonePct"]["TorsoShot"] == pytest.approx(50.0)
     assert p["zonePct"]["ArmShot"] == pytest.approx(50.0)
     assert "NonSpecific" not in p["zonePct"]
+
+
+# ── Schuesse auf bereits liegende Gegner ────────────────────────────────────
+
+def _groggy(attacker, victim, weapon="WeapACE32_C",
+            t="2026-07-26T23:12:00Z"):
+    return {"_T": "LogPlayerMakeGroggy", "_D": t,
+            "damageCauserName": weapon,
+            "attacker": {"name": attacker, "accountId": "account." + attacker},
+            "victim": {"name": victim, "accountId": "account." + victim}}
+
+
+def test_hits_on_a_downed_enemy_do_not_count_as_accuracy():
+    """Ein Nachschuss auf einen Liegenden meldet 0 Schaden und wuerde
+    Trefferquote und Ø-Schaden nach unten ziehen — an echten Daten gemessen:
+    M24, drei Treffer, davon zwei Finisher, Schnitt 33 statt 100."""
+    events = [
+        _attack("Ich", weapon="Item_Weapon_M24_C", aid=1),
+        _damage("Ich", "Opfer", weapon="WeapM24_C", damage=100.0,
+                reason="HeadShot", aid=1),
+        _groggy("Ich", "Opfer"),
+        _attack("Ich", weapon="Item_Weapon_M24_C", aid=2),
+        _damage("Ich", "Opfer", weapon="WeapM24_C", damage=0.0,
+                reason="HeadShot", aid=2),
+    ]
+    p = analyse(events)["players"]["Ich"]
+    assert p["hits"] == 1
+    assert p["hitAttacks"] == 1
+    assert p["damage"] == 100.0
+    # Der Finisher ist nicht verschwunden, er steht nur getrennt.
+    assert p["finisherHits"] == 1
+    assert p["finisherShots"] == 1
+    w = p["weapons"]["M24"]
+    assert w["hits"] == 1
+    assert w["avgDamage"] == 100.0
+    assert w["finisherHits"] == 1
+
+
+def test_shots_at_downed_enemies_leave_the_accuracy_base():
+    """Sonst zaehlt der Schuss im Nenner, der Treffer aber nicht im Zaehler —
+    das waere schlechter als beides zu zaehlen."""
+    events = [
+        _attack("Ich", weapon="Item_Weapon_M24_C", aid=1),
+        _damage("Ich", "Opfer", weapon="WeapM24_C", damage=90.0, aid=1),
+        _groggy("Ich", "Opfer"),
+        _attack("Ich", weapon="Item_Weapon_M24_C", aid=2),
+        _damage("Ich", "Opfer", weapon="WeapM24_C", damage=0.0, aid=2),
+    ]
+    w = analyse(events)["players"]["Ich"]["weapons"]["M24"]
+    assert w["shots"] == 1           # der Finisher-Schuss zaehlt nicht mit
+    assert w["accuracy"] == 100.0
+    assert w["finisherShots"] == 1
+
+
+def test_a_revived_enemy_counts_normally_again():
+    events = [
+        _groggy("Ich", "Opfer"),
+        {"_T": "LogPlayerRevive", "_D": "2026-07-26T23:12:30Z",
+         "reviver": {"name": "Mate", "accountId": "account.Mate"},
+         "victim": {"name": "Opfer", "accountId": "account.Opfer"}},
+        _attack("Ich", aid=3),
+        _damage("Ich", "Opfer", damage=40.0, aid=3),
+    ]
+    p = analyse(events)["players"]["Ich"]
+    assert p["hits"] == 1
+    assert p["finisherHits"] == 0
+
+
+def test_killing_a_downed_enemy_still_counts_as_a_kill():
+    """Nur Treffer und Schaden wandern raus — der Kill bleibt ein Kill."""
+    events = [
+        _groggy("Ich", "Opfer"),
+        _damage("Ich", "Opfer", damage=0.0, aid=9),
+        _kill("Ich", "Opfer"),
+    ]
+    p = analyse(events)["players"]["Ich"]
+    assert p["kills"] == 1
+    assert p["finisherHits"] == 1

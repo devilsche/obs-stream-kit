@@ -141,6 +141,11 @@ CREATE TABLE IF NOT EXISTS match_weapon_stats (
     hits         INTEGER DEFAULT 0,   -- Einschlaege (Schrot: pro Pellet)
     damage       DOUBLE PRECISION DEFAULT 0,
     kills        INTEGER DEFAULT 0,
+    -- Nachschuesse auf bereits liegende Gegner. Die Telemetrie meldet dafuer
+    -- 0 Schaden; wuerden sie mitzaehlen, saehe jede Sniper-Statistik aus wie
+    -- ein Fehlschlag (gemessen: M24 mit 33 statt 100 Schaden je Treffer).
+    finisher_hits  INTEGER DEFAULT 0,
+    finisher_shots INTEGER DEFAULT 0,
     head         INTEGER DEFAULT 0,
     torso        INTEGER DEFAULT 0,
     arm          INTEGER DEFAULT 0,
@@ -148,6 +153,8 @@ CREATE TABLE IF NOT EXISTS match_weapon_stats (
     pelvis       INTEGER DEFAULT 0,
     PRIMARY KEY (tenant_id, match_id, account_id, weapon)
 );
+ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS finisher_hits INTEGER DEFAULT 0;
+ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS finisher_shots INTEGER DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_mws_tenant_account
     ON match_weapon_stats(tenant_id, account_id);
 CREATE INDEX IF NOT EXISTS idx_mws_tenant_weapon
@@ -1002,6 +1009,7 @@ def lobby_accounts_missing_snapshot(conn, tenant_id: int, season_id: str,
 # ── match_weapon_stats ──────────────────────────────────────────────────────
 
 _MWS_COLS = ("account_id", "player_name", "team_id", "is_bot", "weapon",
+            "finisher_hits", "finisher_shots",
              "shots", "hit_attacks", "hits", "damage", "kills",
              "head", "torso", "arm", "leg", "pelvis")
 
@@ -1092,6 +1100,8 @@ def aggregate_weapon_stats(conn, tenant_id: int, since: str,
                    SUM(w.shots) AS shots, SUM(w.hit_attacks) AS hit_attacks,
                    SUM(w.hits) AS hits, SUM(w.damage) AS damage,
                    SUM(w.kills) AS kills, COUNT(DISTINCT w.match_id) AS matches,
+                   SUM(COALESCE(w.finisher_hits, 0)) AS finisher_hits,
+                   SUM(COALESCE(w.finisher_shots, 0)) AS finisher_shots,
                    SUM(w.head) AS head, SUM(w.torso) AS torso, SUM(w.arm) AS arm,
                    SUM(w.leg) AS leg, SUM(w.pelvis) AS pelvis
             FROM match_weapon_stats w
