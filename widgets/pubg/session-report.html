@@ -86,9 +86,14 @@
     /* Match-Row: Spaltenbreiten so dass alles match-übergreifend bündig ist.
        Stats ist Sub-Grid mit fixen Spaltenbreiten — Werte untereinander
        zwischen Zeilen sichtbar. */
+    /* Spaltenbreiten in fr statt Pixel: die erste (Zeitspanne + Match-Nummer)
+       und die letzte (TopScorer mit Namen) brauchen doppelt so viel wie der
+       Rest, und der uebrige Platz verteilt sich gleichmaessig ueber alle
+       Zahlenspalten — mit fixen Pixeln sammelte sich die ganze Luft vor der
+       Lobby-Spalte. minmax haelt die Zahlen einzeilig. */
     .matches-list .m {
       display: grid;
-      grid-template-columns: 240px 60px 1fr 80px 70px 70px 90px 90px 150px 78px 78px;
+      grid-template-columns: 2fr repeat(9, minmax(58px, 1fr)) 2fr;
       gap: 10px;
       padding: 6px 8px;
       border-radius: 3px;
@@ -100,7 +105,7 @@
     .matches-list .m.expanded { background: rgba(94, 42, 121, 0.25); }
     .matches-list .header-row {
       display: grid;
-      grid-template-columns: 240px 60px 1fr 80px 70px 70px 90px 90px 150px 78px 78px;
+      grid-template-columns: 2fr repeat(9, minmax(58px, 1fr)) 2fr;
       gap: 10px;
       padding: 2px 8px 4px;
       font-size: 0.85em;
@@ -168,6 +173,25 @@
        farblich UND per Vorzeichen — Farbe allein ist kein Signal. */
     .matches-list .lobby-kd { white-space: nowrap; }
     .matches-list .lobby-kd .dim { opacity: 0.4; }
+    /* Noch kein Wert, aber die Lobby ist bekannt: der Sammler holt die
+       Alltime-Zahlen der Gegner nach (rund 15 min je frischer Lobby). Ein
+       Strich wuerde "gibt es nicht" heissen, der Ring sagt "kommt noch". */
+    .matches-list .lobby-pending {
+      display: inline-block;
+      width: 11px; height: 11px;
+      border: 2px solid color-mix(in srgb, var(--pubg-muted) 45%, transparent);
+      border-top-color: var(--pubg-gold);
+      border-radius: 50%;
+      animation: lobby-spin 0.9s linear infinite;
+      vertical-align: -1px;
+    }
+    @keyframes lobby-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .matches-list .lobby-pending {
+        animation: none;
+        border-top-color: var(--pubg-muted);
+      }
+    }
     .matches-list .lobby-diff { font-size: 0.85em; }
     .matches-list .lobby-diff.up { color: var(--pubg-good, #3cb44b); }
     .matches-list .lobby-diff.down { color: var(--pubg-warn, #e6194b); }
@@ -3335,16 +3359,22 @@
           <span class="stat"><b>${fmtSurv(mySurv)}</b></span>
           <span class="stat lobby-kd" title="${
             m.lobbyKd == null
-              ? "Lobby-Stärke noch nicht bekannt — Alltime-K/D der Gegner wird nachgeladen"
+              ? `Alltime-K/D der Gegner wird gesammelt — ${m.lobbyKnown || 0} von ${m.lobbyPlayers || 0} bekannt (rund 15 min je Lobby)`
               : `Ø Alltime-K/D der Gegner, eigener Squad ausgenommen (${m.lobbyKnown}/${m.lobbyPlayers} bekannt)`
-          }">${m.lobbyKd == null ? '<span class="dim">—</span>'
+          }">${m.lobbyKd == null
+                ? (m.lobbyPlayers
+                    ? `<span class="lobby-pending" role="img" aria-label="Lobby-Stärke wird gesammelt"></span>`
+                    : '<span class="dim">—</span>')
                 : `<b>${m.lobbyKd.toFixed(2)}</b>`}</span>
           <span class="stat lobby-kd" title="${
             m.squadKd == null
               ? "Alltime-K/D des eigenen Squads noch nicht bekannt"
               : "Ø Alltime-K/D des eigenen Squads in diesem Match"
           }">${
-            m.squadKd == null ? '<span class="dim">—</span>'
+            m.squadKd == null
+              ? (m.lobbyPlayers
+                  ? `<span class="lobby-pending" role="img" aria-label="Squad-Stärke wird gesammelt"></span>`
+                  : '<span class="dim">—</span>')
               : `<b>${m.squadKd.toFixed(2)}</b>${
                   m.lobbyKd != null
                     ? ` <span class="lobby-diff ${m.squadKd >= m.lobbyKd ? "up" : "down"}">${

@@ -540,7 +540,12 @@ genau, für Aussagen über fremde Teams untereinander nicht. Werte aus weniger a
 fünf Matches bzw. Eröffnungen zeigt die Ansicht blass und nimmt sie von den
 Spitzenreiter-Markierungen aus.
 
-**Lobby-Stärke** steht im **Session-Report**: je Match-Zeile der Ø-Alltime-K/D der
+**Lobby-Stärke** steht im **Session-Report** (Spaltenbreiten dort in `fr`, erste und
+letzte Spalte doppelt: mit festen Pixeln sammelte sich der freie Platz vor der
+Lobby-Spalte). Fehlt der Wert noch, zeigt die Zelle einen Ring statt eines Strichs —
+ein Strich hieße „gibt es nicht", tatsächlich sammelt der Hintergrund-Dienst nur noch
+(rund 15 Minuten je frischer Lobby, der Tooltip nennt den Stand). Auf den Report
+wartet dabei nichts: die Werte kommen aus der DB, gemessen 0,7 ms je Match: je Match-Zeile der Ø-Alltime-K/D der
 Gegner (eigener Squad herausgerechnet) und dahinter der Vorsprung des eigenen Squads
 als Differenz, in den Totals der Schnitt über die Session. Dort geht man die Runden
 durch — „war die Lobby hart" liest sich neben Platz und Kills, nicht in einem eigenen
