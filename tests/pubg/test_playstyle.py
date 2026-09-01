@@ -468,3 +468,53 @@ def test_standing_share_is_weighted_by_time():
     me = next(r for r in ps.aggregate([lang, kurz])
               if r["accountId"] == "account.me")
     assert me["stillShare"] > 90        # nicht 50 wie beim Mittelwert
+
+
+# ── Loot-Phasen: Anfang vs. spätes Geiern ───────────────────────────────────
+
+def test_loot_is_split_into_early_and_late_phase():
+    """Die ersten Minuten sind Ausruesten; wer ab Minute 15 noch sammelt,
+    haelt das Squad auf."""
+    events = [
+        # Erstes Ereignis des Matches setzt die Spielzeit-Null — im echten
+        # Datensatz ist das der Flug, nicht die Landung.
+        ev("Position", 0, "account.mate", ax=0, ay=0),
+        ev("Landing", 60, "account.me", ax=0, ay=0),
+        ev("ItemPickup", 120, "account.me"),      # Minute 2
+        ev("ItemPickup", 300, "account.me"),      # Minute 5
+        ev("ItemPickup", 960, "account.me"),      # Minute 16
+        ev("ItemPickup", 1020, "account.me"),     # Minute 17
+        ev("Knock", 1080, "account.foe1", "account.me"),   # Minute 18
+    ]
+    m = ps.player_metrics(events, SQUAD, TEAM_OF)["account.me"]
+    assert m["pickupsEarly10"] == 2
+    assert m["pickupsLate15"] == 2
+    # Ab Minute 15 gelebt: 15:00 bis 18:00 = 3 Minuten
+    assert m["lateAliveMin"] == pytest.approx(3.0)
+
+
+def test_late_loot_rate_ignores_players_who_never_saw_late_game():
+    """Wer vorher stirbt, hat keine späte Loot-Rate — nicht null, sondern
+    keine Aussage."""
+    events = [
+        ev("Landing", 0, "account.me", ax=0, ay=0),
+        ev("ItemPickup", 60, "account.me"),
+        ev("Knock", 300, "account.foe1", "account.me"),    # Minute 5 tot
+    ]
+    m = ps.player_metrics(events, SQUAD, TEAM_OF)["account.me"]
+    assert m["lateAliveMin"] == 0
+    a = ps.analyse_match(events, SQUAD, TEAM_OF)
+    me = next(r for r in ps.aggregate([a]) if r["accountId"] == "account.me")
+    assert me["lateLootPerMin"] is None
+
+
+def test_late_loot_rate_comes_from_totals():
+    def match(late_picks, alive_until_s):
+        evs = [ev("Landing", 0, "account.me", ax=0, ay=0)]
+        evs += [ev("ItemPickup", 900 + 10 * i, "account.me")
+                for i in range(late_picks)]
+        evs.append(ev("Knock", alive_until_s, "account.foe1", "account.me"))
+        return ps.analyse_match(evs, SQUAD, TEAM_OF)
+    rows = ps.aggregate([match(6, 1200), match(0, 1200)])   # je 5 min Spätphase
+    me = next(r for r in rows if r["accountId"] == "account.me")
+    assert me["lateLootPerMin"] == pytest.approx(6 / 10.0)

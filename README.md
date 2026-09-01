@@ -524,7 +524,10 @@ denn der letzte Spieler eines Teams stirbt ohne DBNO; das sind an Prod-Daten
 gemessen rund 27 % aller Kills. Bots bleiben per Vorgabe draußen, sonst schönen
 Bot-Kills jede Quote.
 
-*Spielstil* — Loot-Tempo (Pickups je Lebensminute), Lebenszeit, Median-Abstand zum
+*Playstyle* — Loot-Tempo (Pickups je Lebensminute, aus Summen gebildet — nicht als
+Mittelwert von Match-Raten, sonst reißt ein 20-Sekunden-Match den Wert nach oben),
+Loot in den ersten zehn Minuten, **spätes Sammeln ab Minute 15** als eigene Rate
+(wer da noch wühlt, hält das Squad auf), Lebenszeit, Median-Abstand zum
 nächsten Mate, Zeitanteil über 100 m weg, Abstand zum Team beim eigenen Knock
 (aus den 25 s davor gemessen — mit einem Fenster um den Knock herum misst man den
 Mate, der zur Rettung rennt), Anteil der Matches als Erster unten, Standzeit in der

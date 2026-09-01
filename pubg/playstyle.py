@@ -31,8 +31,11 @@ STILL_M = 5.0
 FAR_M = 100.0
 #: Positionen aus diesem Fenster VOR dem Knock beschreiben die Lage beim Knock.
 DOWN_LOOKBACK_MS = 25_000
-#: Pickups in dieser Zeit nach der Landung sind die erste Loot-Runde.
-EARLY_LOOT_MS = 300_000
+#: Bis hierher (ab Match-Start) ist Sammeln das normale Ausruesten.
+EARLY_LOOT_MS = 600_000
+#: Ab hier ist Sammeln kein Ausruesten mehr, sondern haelt das Squad auf —
+#: die Zone ist laengst klein, es wird gehalten und rotiert.
+LATE_LOOT_MS = 900_000
 
 CM_PER_M = 100.0
 DAMAGE_EVENTS = ("TakeDamage",)
@@ -281,7 +284,13 @@ def player_metrics(events, squad, team_of, *, still_m=STILL_M, far_m=FAR_M):
         alive_min = max((t_end - t_start) / 60000.0, 0.0)
 
         picks = [ts for ts in pickups.get(acc, []) if ts >= t_start]
-        early = sum(1 for ts in picks if ts - t_start <= EARLY_LOOT_MS)
+        # Phasen ab MATCH-Start gerechnet, nicht ab der eigenen Landung: die
+        # Frage ist, was zu welchem Spielzeitpunkt passiert.
+        match_t0 = first_ts or t_start
+        early = sum(1 for ts in picks if ts - match_t0 <= EARLY_LOOT_MS)
+        late_from = match_t0 + LATE_LOOT_MS
+        late_picks = sum(1 for ts in picks if ts >= late_from)
+        late_alive_min = max((t_end - max(t_start, late_from)) / 60000.0, 0.0)
 
         still = _stillness(pts, t_start, t_end, still_m)
         team_dists = _team_distances(acc, pts, positions)
@@ -290,8 +299,9 @@ def player_metrics(events, squad, team_of, *, still_m=STILL_M, far_m=FAR_M):
             "name": squad.get(acc),
             "aliveMin": alive_min or None,
             "pickups": len(picks),
-            "pickupsEarly": early,
-            "pickupsLate": len(picks) - early,
+            "pickupsEarly10": early,
+            "pickupsLate15": late_picks,
+            "lateAliveMin": late_alive_min,
             "pickupsPerMin": (len(picks) / alive_min) if alive_min else None,
             "stillShare": _pct(still["still_ms"], still["total_ms"]),
             "stillLateShare": _pct(still["late_still_ms"], still["late_ms"]),
@@ -420,6 +430,7 @@ def aggregate(match_analyses):
     acc_data = defaultdict(lambda: {
         "name": None, "matches": 0, "downs": 0, "firstDowns": 0,
         "pickTotal": 0, "aliveTotal": 0.0,
+        "lateePickTotal": 0, "lateAliveTotal": 0.0,
         "stillMs": 0, "stillTotalMs": 0, "stillLateMs": 0, "stillLateTotalMs": 0,
         "farCount": 0, "distCount": 0,
         "opened": 0, "openedWon": 0, "openedLost": 0, "openedTrade": 0,
@@ -442,8 +453,7 @@ def aggregate(match_analyses):
                 d["firstDowns"] += 1
             for key, target in (("aliveMin", "aliveMin"),
                                 ("pickups", "pickups"),
-                                ("pickupsEarly", "pickupsEarly"),
-                                ("pickupsLate", "pickupsLate"),
+                                ("pickupsEarly10", "pickupsEarly"),
                                 ("teamDistMedian", "teamDist"),
                                 ("distAtDown", "distAtDown")):
                 v = m.get(key)
@@ -454,6 +464,8 @@ def aggregate(match_analyses):
             # Match-Rate den ganzen Zeitraum verzerren.
             d["pickTotal"] += m.get("pickups") or 0
             d["aliveTotal"] += m.get("aliveMin") or 0.0
+            d["lateePickTotal"] += m.get("pickupsLate15") or 0
+            d["lateAliveTotal"] += m.get("lateAliveMin") or 0.0
             for k in ("stillMs", "stillTotalMs", "stillLateMs",
                       "stillLateTotalMs", "farCount", "distCount"):
                 d[k] += m.get(k) or 0
@@ -495,8 +507,13 @@ def aggregate(match_analyses):
             "aliveMin": _mean(d["aliveMin"]),
             "pickupsPerMin": (d["pickTotal"] / d["aliveTotal"])
                              if d["aliveTotal"] else None,
-            "pickupsEarly": _mean(d["pickupsEarly"]),
-            "pickupsLate": _mean(d["pickupsLate"]),
+            "pickupsEarly10": _mean(d["pickupsEarly"]),
+            # Spätes Sammeln als eigene Rate: nur Zeit zählt, in der er nach
+            # Minute 15 überhaupt noch lebte. Wer vorher stirbt, hat hier
+            # keine Aussage — None statt einer geschönten Null.
+            "lateLootPerMin": (d["lateePickTotal"] / d["lateAliveTotal"])
+                              if d["lateAliveTotal"] else None,
+            "lateLootTotal": d["lateePickTotal"],
             "stillShare": _pct(d["stillMs"], d["stillTotalMs"]),
             "stillLateShare": _pct(d["stillLateMs"], d["stillLateTotalMs"]),
             # Median der Match-Mediane: robuster als ein Mittelwert, wenn ein
