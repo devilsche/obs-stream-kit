@@ -316,6 +316,46 @@ def test_match_replay_404_stays_when_the_db_is_empty_too():
     assert code == 404
 
 
+def test_lobby_detail_endpoint_schluesselt_die_lobby_auf():
+    """Hinter der Lobby-Zahl steckt eine Verteilung — die liefert der Endpoint."""
+    from pubg import db_pg
+    conn = _setup()
+    _insert_match(conn, "ld1", "2026-05-20T18:00:00Z", "Baltic_Main", "squad-fpp")
+    _insert_participant(conn, "ld1", "account.A", "PEX_LuCKoR", team_id=1)
+    _insert_team_mapping(conn, "ld1", "account.A", 1)
+    snaps = {}
+    for i in range(1, 26):
+        acc = f"account.F{i}"
+        upsert_player(conn, acc, f"Foe{i}", "steam", False)
+        _insert_team_mapping(conn, "ld1", acc, 7 + i // 4)
+        # K/D von 0.1 bis 2.5 — die Raender muessen sauber herausfallen.
+        snaps[acc] = {"kills": i, "losses": 10, "rounds": 20, "wins": 0,
+                      "damage": 1.0, "kd": i / 10.0}
+    # Ein Bot in der Lobby: darf weder in den Schnitt noch in die Abdeckung.
+    _insert_team_mapping(conn, "ld1", "ai.bot1", 99)
+    db_pg.upsert_season_snapshots(conn.raw, "lifetime", "squad-fpp", snaps,
+                                   "2026-05-20T00:00:00Z")
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/lobby-detail?matches=ld1",
+                                  b"", {})
+    assert code == 200
+    m = json.loads(body)["matches"][0]
+    assert m["known"] == 25 and m["lobbyPlayers"] == 25   # Bot ist raus
+    assert m["max"] == pytest.approx(2.5)
+    assert m["median"] == pytest.approx(1.3)
+    assert [p["name"] for p in m["top"]] == ["Foe25", "Foe24", "Foe23",
+                                              "Foe22", "Foe21"]
+    assert [p["name"] for p in m["low"]] == ["Foe1", "Foe2", "Foe3",
+                                              "Foe4", "Foe5"]
+
+
+def test_lobby_detail_endpoint_braucht_match_ids():
+    reg = _registry(_setup())
+    _, code, _ = reg.dispatch("GET", "/api/pubg/lobby-detail", b"", {})
+    assert code == 400
+
+
 def test_session_report_carries_the_lobby_strength():
     """Die Lobby-Staerke gehoert dorthin, wo man die Session durchgeht — nicht
     in ein eigenes Tool."""
