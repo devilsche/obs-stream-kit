@@ -3473,8 +3473,7 @@
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.kd)}</span><span class="pubg-stat-label">K/D</span></div>
           ${t.tdm ? `<div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.tdm.kd)}</span><span class="pubg-stat-label">TDM K/D</span></div>` : ""}
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.squadKd || 0)}</span><span class="pubg-stat-label">Squad K/D</span></div>
-          ${t.lobbyKd ? `<div class="cell"><span class="pubg-stat-value">${t.lobbyKd.toFixed(2)}</span><span class="pubg-stat-label">Ø Lobby-K/D (Alltime)</span></div>` : ""}
-          ${t.lobbySquadKd ? `<div class="cell"><span class="pubg-stat-value">${t.lobbySquadKd.toFixed(2)}</span><span class="pubg-stat-label">Squad-K/D (Alltime)${t.lobbyKd ? ` · ${t.lobbySquadKd >= t.lobbyKd ? "+" : ""}${(t.lobbySquadKd - t.lobbyKd).toFixed(2)} vs Lobby` : ""}</span></div>` : ""}
+          ${t.lobbyKd ? `<div class="cell"><span class="pubg-stat-value">${t.lobbySquadKd ? `${t.lobbySquadKd.toFixed(2)} / ` : ""}${t.lobbyKd.toFixed(2)}</span><span class="pubg-stat-label">Squad / Lobby (Alltime)</span></div>` : ""}
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.avgKills)}</span><span class="pubg-stat-label">Ø My Kills/Match</span></div>
           <div class="cell"><span class="pubg-stat-value">${(t.squadKillsPerMatch || 0).toFixed(1)}</span><span class="pubg-stat-label">Ø Squad Kills/Match</span></div>
           <div class="cell"><span class="pubg-stat-value">${Math.round(t.avgDamage)}</span><span class="pubg-stat-label">Ø Damage/Match</span></div>
