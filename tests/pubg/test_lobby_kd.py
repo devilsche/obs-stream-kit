@@ -277,3 +277,18 @@ def test_lobby_breakdown_kuerzt_die_raender_bei_wenigen_spielern():
                          ("d", 4.0), ("e", 5.0), ("f", 6.0)], top_n=5)
     assert [p["name"] for p in b["top"]] == ["f", "e", "d"]
     assert [p["name"] for p in b["low"]] == ["a", "b", "c"]
+
+
+def test_mini_lobbys_zaehlen_nicht_in_den_gesamtschnitt():
+    """Ein Arcade-Match mit vier Spielern darf ein 96er-Match nicht mitteln."""
+    from pubg.lobby_kd import MIN_LOBBY_PLAYERS
+    matches = [
+        {"lobbyKd": 1.30, "coverage": 100.0, "lobbyPlayers": 95,
+         "squadKd": None, "playedAt": "2026-09-01T20:00:00Z"},
+        {"lobbyKd": 4.00, "coverage": 100.0, "lobbyPlayers": 3,
+         "squadKd": None, "playedAt": "2026-09-01T21:00:00Z"},
+    ]
+    assert MIN_LOBBY_PLAYERS > 3
+    solid = [m for m in matches if lk.counts_for_average(m)]
+    assert len(solid) == 1
+    assert solid[0]["lobbyKd"] == 1.30

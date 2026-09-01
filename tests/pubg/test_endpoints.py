@@ -324,14 +324,18 @@ def test_session_report_carries_the_lobby_strength():
     upsert_player(conn, "account.MATE", "MateA", "steam", False)
     _insert_match(conn, "sr1", "2026-05-20T18:00:00Z", "Baltic_Main", "squad-fpp")
     _insert_participant(conn, "sr1", "account.A", "PEX_LuCKoR", team_id=1)
-    for acc, team in (("account.A", 1), ("account.F1", 7), ("account.F2", 7)):
-        _insert_team_mapping(conn, "sr1", acc, team)
-    db_pg.upsert_season_snapshots(conn.raw, "lifetime", "squad-fpp", {
-        "account.A": {"kills": 100, "losses": 50, "rounds": 60, "wins": 5,
-                       "damage": 1.0, "kd": 2.0},
-        "account.F1": {"kills": 40, "losses": 40, "rounds": 50, "wins": 1,
-                        "damage": 1.0, "kd": 1.0},
-    }, "2026-05-20T00:00:00Z")
+    # Echte Lobby-Groesse: unter MIN_LOBBY_PLAYERS zaehlt ein Match nicht in
+    # den Zeitraum-Schnitt (Arcade-Modi haben ein gutes Dutzend Spieler).
+    _insert_team_mapping(conn, "sr1", "account.A", 1)
+    snaps = {"account.A": {"kills": 100, "losses": 50, "rounds": 60,
+                            "wins": 5, "damage": 1.0, "kd": 2.0}}
+    for i in range(1, 25):
+        acc = f"account.F{i}"
+        _insert_team_mapping(conn, "sr1", acc, 7 + i // 4)
+        snaps[acc] = {"kills": 40, "losses": 40, "rounds": 50, "wins": 1,
+                      "damage": 1.0, "kd": 1.0}
+    db_pg.upsert_season_snapshots(conn.raw, "lifetime", "squad-fpp", snaps,
+                                   "2026-05-20T00:00:00Z")
     set_setting(conn, "sessionStartedAt", "1970-01-01T00:00:00Z")
     conn.commit()
     reg = _registry(conn)

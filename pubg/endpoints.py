@@ -2736,7 +2736,8 @@ class EndpointRegistry:
         Kills, nicht in einem eigenen Tool. Fehlen Snapshots, bleiben die
         Felder leer — der Report darf daran nicht scheitern.
         """
-        from pubg.lobby_kd import lobby_kd_for_matches, LIFETIME_KEY
+        from pubg.lobby_kd import (lobby_kd_for_matches, counts_for_average,
+                                   LIFETIME_KEY)
 
         matches = [m for ph in (data.get("phases") or [])
                    for m in (ph.get("matches") or [])]
@@ -2769,8 +2770,9 @@ class EndpointRegistry:
         # zaehlen, sonst mittelt man die eigene Sammelquote mit.
         for ph in data.get("phases") or []:
             solid = [m for m in (ph.get("matches") or [])
-                     if (m.get("lobbyCoverage") or 0) >= 25
-                     and m.get("lobbyKd") is not None]
+                     if counts_for_average({"coverage": m.get("lobbyCoverage"),
+                                            "lobbyPlayers": m.get("lobbyPlayers"),
+                                            "lobbyKd": m.get("lobbyKd")})]
             stats = ph.get("stats")
             if stats is None:
                 continue

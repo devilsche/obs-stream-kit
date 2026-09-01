@@ -68,6 +68,18 @@ LIFETIME_KEY = "lifetime"
 #: Ab welcher Abdeckung eine Lobby-Zahl etwas ueber die Lobby sagt und nicht
 #: ueber unsere Sammelquote. Dieselbe Schwelle nutzt der Report.
 MIN_COVERAGE_PCT = 25
+#: Kleinste Lobby, die im Zeitraum-Schnitt mitzaehlt. Arcade-Modi (Heist,
+#: TDM) haben eine Handvoll Spieler; im Mittel ueber eine Phase wiegt so ein
+#: Match dann genauso schwer wie eine volle Runde mit 96 Gegnern. Beim Match
+#: selbst bleibt der Wert stehen — nur gemittelt wird er nicht.
+MIN_LOBBY_PLAYERS = 20
+
+
+def counts_for_average(match) -> bool:
+    """Taugt dieses Match fuer einen Zeitraum-Schnitt?"""
+    return ((match.get("coverage") or 0) >= MIN_COVERAGE_PCT
+            and (match.get("lobbyPlayers") or 0) >= MIN_LOBBY_PLAYERS
+            and match.get("lobbyKd") is not None)
 
 
 def parse_lifetime(payload) -> dict:
@@ -394,7 +406,7 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         })
     out.sort(key=lambda m: m["playedAt"] or "", reverse=True)
 
-    solid = [m for m in out if (m["coverage"] or 0) >= 25 and m["lobbyKd"]]
+    solid = [m for m in out if counts_for_average(m)]
     with_squad = [m for m in solid if m["squadKd"] is not None]
     return {
         "matches": out,
@@ -480,8 +492,10 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
     out.sort(key=lambda m: m["playedAt"] or "", reverse=True)
 
     # Nur Matches mit brauchbarer Abdeckung tragen zum Gesamtbild bei.
-    solid = [m for m in out if (m["coverage"] or 0) >= MIN_COVERAGE_PCT
-             and m["avg"] is not None]
+    solid = [m for m in out
+             if counts_for_average({"coverage": m["coverage"],
+                                    "lobbyPlayers": m["lobbyPlayers"],
+                                    "lobbyKd": m["avg"]})]
 
     def _avg(key):
         vals = [m[key] for m in solid if m.get(key) is not None]
