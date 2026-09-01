@@ -269,7 +269,7 @@ def run_single_tick_multi(conn, tenant_id: int, client,
         # Alltime zuerst — das ist die Zahl, die die Ansicht zeigt. Season
         # laeuft nebenher als Zusatz, kostet im Zehnerpack kaum etwas.
         stats["lobbyLifetimeFetched"] = collect_lobby_lifetime(
-            conn, tenant_id, client, max_calls=2)
+            conn, tenant_id, client, max_calls=4)
         stats["lobbyKdFetched"] = collect_lobby_kd(conn, tenant_id, client,
                                                     max_batches=1)
     except Exception as e:

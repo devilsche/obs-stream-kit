@@ -125,11 +125,12 @@ def test_lobby_average_can_exclude_our_own_squad():
     assert out["total"] == 1
 
 
-def test_snapshots_go_stale_after_a_month():
-    """Season-Zahlen wachsen weiter — ein Wert von vor drei Monaten beschreibt
-    den Spieler nicht mehr."""
+def test_snapshots_go_stale_after_two_weeks():
+    """Die Zahlen wachsen weiter — ein Wert von vor Monaten beschreibt den
+    Spieler nicht mehr."""
     assert lk.is_stale("2026-01-01T00:00:00Z", now="2026-03-01T00:00:00Z")
-    assert not lk.is_stale("2026-02-20T00:00:00Z", now="2026-03-01T00:00:00Z")
+    assert lk.is_stale("2026-02-10T00:00:00Z", now="2026-03-01T00:00:00Z")
+    assert not lk.is_stale("2026-02-25T00:00:00Z", now="2026-03-01T00:00:00Z")
     assert lk.is_stale(None, now="2026-03-01T00:00:00Z")
     assert lk.is_stale("kaputt", now="2026-03-01T00:00:00Z")
 

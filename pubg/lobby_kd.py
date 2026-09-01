@@ -18,10 +18,15 @@ Sammel-Takt im Poller.
 #: Der Batch-Endpoint nimmt zehn Spieler-IDs pro Aufruf.
 BATCH_SIZE = 10
 
-#: So lange gilt ein Snapshot als aktuell. Season-Zahlen wachsen mit jedem
-#: Match des Spielers — ein Wert von vor Monaten beschreibt ihn nicht mehr,
-#: taeglich nachzufragen kostet aber Budget, das der Match-Poller braucht.
-SNAPSHOT_TTL_DAYS = 30
+#: So lange gilt ein Snapshot als aktuell. Danach holt der Sammler ihn neu.
+#:
+#: Zwei Wochen sind das Machbare: bei rund 53.000 bekannten Lobby-Spielern
+#: sind das etwa 3.800 Auffrischungen pro Tag = 2,7 Requests pro Minute — von
+#: zehn, die sich Sammler und Match-Poller teilen. Weil die Auswahl nach dem
+#: juengsten Auftreten sortiert, treffen die Auffrischungen ausserdem zuerst
+#: die Spieler, die gerade wieder in einer Lobby waren; Karteileichen von vor
+#: Monaten kommen nie dran, solange es aktuellere gibt.
+SNAPSHOT_TTL_DAYS = 14
 
 
 def is_stale(fetched_at, now=None) -> bool:
