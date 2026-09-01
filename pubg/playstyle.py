@@ -42,6 +42,16 @@ DAMAGE_EVENTS = ("TakeDamage",)
 DOWN_EVENTS = ("Knock", "Kill")
 REVIVE_EVENTS = ("Revive",)
 PICKUP_EVENTS = ("ItemPickup", "ItemPickupBox")
+#: Der Comeback-Chip ist Spielmechanik, kein Ausruesten. In der Lobby wird er
+#: massenhaft eingesammelt (102k Ereignisse auf prod); bei den eigenen Leuten
+#: sind es nur ein bis zwei Prozent der spaeten Pickups, aber gezaehlt gehoert
+#: er trotzdem nicht.
+NON_LOOT_ITEMS = ("bluechip",)
+
+
+def is_loot(item_id) -> bool:
+    low = (item_id or "").lower()
+    return not any(marker in low for marker in NON_LOOT_ITEMS)
 
 
 def is_bot(account_id) -> bool:
@@ -267,7 +277,8 @@ def player_metrics(events, squad, team_of, *, still_m=STILL_M, far_m=FAR_M):
             positions[actor].append((ts, _g(e, "actor_x"), _g(e, "actor_y")))
             last_ts[actor] = max(last_ts[actor], ts)
         elif et in PICKUP_EVENTS and actor in squad_ids:
-            pickups[actor].append(ts)
+            if is_loot(_g(e, "weapon")):
+                pickups[actor].append(ts)
             last_ts[actor] = max(last_ts[actor], ts)
         elif et == "Landing" and actor in squad_ids:
             landing.setdefault(actor, ts)
@@ -514,6 +525,9 @@ def aggregate(match_analyses):
             "lateLootPerMin": (d["lateePickTotal"] / d["lateAliveTotal"])
                               if d["lateAliveTotal"] else None,
             "lateLootTotal": d["lateePickTotal"],
+            # Stichprobe zur Rate darueber: eine Zahl aus 78 Minuten ist
+            # etwas anderes als eine aus 312.
+            "lateAliveMin": d["lateAliveTotal"],
             "stillShare": _pct(d["stillMs"], d["stillTotalMs"]),
             "stillLateShare": _pct(d["stillLateMs"], d["stillLateTotalMs"]),
             # Median der Match-Mediane: robuster als ein Mittelwert, wenn ein
@@ -631,7 +645,7 @@ def compute_squad_playstyle(conn, tenant_id: int, my_account_id,
             "WHERE tenant_id = ? AND match_id = ?", (tenant_id, mid)).fetchall()}
         events = conn.execute(
             "SELECT event_type, timestamp_ms, actor_account, target_account, "
-            "actor_x, actor_y, victim_x, victim_y FROM telemetry_events "
+            "actor_x, actor_y, victim_x, victim_y, weapon FROM telemetry_events "
             "WHERE match_id = ? ORDER BY timestamp_ms", (mid,)).fetchall()
         if not events:
             continue

@@ -518,3 +518,26 @@ def test_late_loot_rate_comes_from_totals():
     rows = ps.aggregate([match(6, 1200), match(0, 1200)])   # je 5 min Spätphase
     me = next(r for r in rows if r["accountId"] == "account.me")
     assert me["lateLootPerMin"] == pytest.approx(6 / 10.0)
+
+
+def test_bluechips_are_not_loot():
+    """Der Comeback-Chip ist Spielmechanik, kein Ausruesten — er darf die
+    Loot-Rate nicht aufblaehen."""
+    events = [
+        ev("Landing", 0, "account.me", ax=0, ay=0),
+        dict(ev("ItemPickup", 60, "account.me"), weapon="Item_Bluechip_C"),
+        dict(ev("ItemPickup", 70, "account.me"), weapon="Item_Ammo_556mm_C"),
+        ev("Knock", 120, "account.foe1", "account.me"),
+    ]
+    m = ps.player_metrics(events, SQUAD, TEAM_OF)["account.me"]
+    assert m["pickups"] == 1
+
+
+def test_late_minutes_are_reported_as_sample_size():
+    """Eine Rate aus 78 Minuten ist etwas anderes als eine aus 312."""
+    a = ps.analyse_match([
+        ev("Landing", 0, "account.me", ax=0, ay=0),
+        ev("Knock", 1200, "account.foe1", "account.me"),
+    ], SQUAD, TEAM_OF)
+    me = next(r for r in ps.aggregate([a]) if r["accountId"] == "account.me")
+    assert me["lateAliveMin"] == pytest.approx(5.0)
