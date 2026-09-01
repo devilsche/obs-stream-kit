@@ -3462,6 +3462,41 @@
             <span class="kd">${p.kd.toFixed(2)}</span></li>`).join("") + `</ul>`;
     }
 
+    function squadBodyHtml(d, isPhase) {
+      const src = isPhase ? d.totals : (d.matches && d.matches[0]);
+      const mates = (src && src.squad) || [];
+      if (!mates.length) {
+        return `<p class="lobby-modal__empty">Keine Squad-Daten für diese
+          Auswahl.</p>`;
+      }
+      const known = mates.filter(m => m.kd != null).length;
+      return `
+        <div class="lobby-kpis">
+          <div class="lobby-kpi"><b>${lobbyKdStr(src.squadAvg)}</b><span>Ø Squad K/D</span></div>
+          <div class="lobby-kpi"><b>${mates.length}</b><span>${
+            isPhase ? "Mitspieler" : "im Squad"}</span></div>
+          ${known < mates.length
+            ? `<div class="lobby-kpi"><b>${mates.length - known}</b><span>ohne Wert</span></div>`
+            : ""}
+        </div>
+        <div class="lobby-side">
+          <h3>${isPhase ? "Wer mitgespielt hat" : "Das Squad"}
+            <em>Alltime-K/D über alle Modi</em></h3>
+          <ul class="lobby-list lobby-list--top">${mates.map(m => `
+            <li><span>${PubgUI.esc(m.name)}${isPhase && m.matches
+                  ? ` <span class="where">${m.matches} ${
+                      m.matches === 1 ? "Match" : "Matches"}</span>` : ""}</span>
+                <span class="kd">${m.kd == null ? "—" : m.kd.toFixed(2)}</span></li>`
+            ).join("")}</ul>
+        </div>
+        <p class="lobby-modal__note">Das ist der Karriere-Schnitt der Leute,
+          nicht ihre Leistung in ${isPhase ? "dieser Phase" : "diesem Match"} —
+          dafür steht „Squad Phase" im Kopf der Phase.${isPhase
+            ? " Wer nur ein, zwei Runden dabei war, prägt den Schnitt kaum,"
+              + " taucht hier aber trotzdem auf."
+            : ""}</p>`;
+    }
+
     function lobbyBodyHtml(d, isPhase) {
       const src = isPhase ? d.totals : (d.matches && d.matches[0]);
       if (!src || src.avg == null) {
@@ -3497,7 +3532,7 @@
              unter dem Ø: K/D endet bei 0, ist nach oben aber offen.`}</p>`;
     }
 
-    async function openLobbyModal(matchIds, title, sub, isPhase) {
+    async function openLobbyModal(matchIds, title, sub, isPhase, view) {
       const dlg = document.getElementById("lobbyModal");
       const body = document.getElementById("lobbyModalBody");
       document.getElementById("lobbyModalTitle").textContent = title;
@@ -3512,7 +3547,9 @@
             + "api/pubg/lobby-detail?matches=" + encodeURIComponent(key), 30000);
           _lobbyCache.set(key, d);
         }
-        body.innerHTML = lobbyBodyHtml(d, isPhase);
+        body.innerHTML = view === "squad"
+          ? squadBodyHtml(d, isPhase)
+          : lobbyBodyHtml(d, isPhase);
       } catch (err) {
         body.innerHTML = `<p class="lobby-modal__empty">Konnte die Lobby nicht
           laden: ${PubgUI.esc(String(err && err.message || err))}</p>`;
@@ -3541,7 +3578,7 @@
       const ids = (btn.dataset.matches || "").split(",").filter(Boolean);
       if (!ids.length) return;
       openLobbyModal(ids, btn.dataset.title || "Lobby", btn.dataset.sub || "",
-                     btn.dataset.phase === "1");
+                     btn.dataset.phase === "1", btn.dataset.view || "lobby");
     });
 
     // Ab welcher Abdeckung ein Lobby-Wert etwas aussagt. Dieselbe Schwelle
@@ -3616,11 +3653,16 @@
               ? (m.lobbyPlayers
                   ? `<span class="lobby-pending" role="img" aria-label="Squad-Stärke wird gesammelt"></span>`
                   : '<span class="dim">—</span>')
-              : `<b>${m.squadKd.toFixed(2)}</b>${
+              : `<button type="button" class="lobby-open" data-view="squad"
+                     data-matches="${PubgUI.esc(m.matchId)}"
+                     data-title="Squad · ${PubgUI.esc(PubgUI.fmtMap(m.map))}"
+                     data-sub="${PubgUI.esc(PubgUI.fmtDateTime(m.matchEnd))}"
+                     aria-label="Squad aufschlüsseln: Karriere-K/D der Mitspieler"
+                   ><b>${m.squadKd.toFixed(2)}</b>${
                   m.lobbyKd != null
                     ? ` <span class="lobby-diff ${m.squadKd >= m.lobbyKd ? "up" : "down"}">${
                         m.squadKd - m.lobbyKd >= 0 ? "▲" : "▼"}</span>`
-                    : ""}`
+                    : ""}</button>`
           }</span>
           <span class="stat top-scorer" title="Bester Spieler der ganzen Lobby in diesem Match">${
             m.topScorer
@@ -3781,7 +3823,13 @@
                       ? `<span title="Alltime-K/D der Gegner wird noch gesammelt"><span class="lobby-pending" role="img" aria-label="Lobby-K/D wird gesammelt"></span> Lobby K/D</span>`
                       : "")}
               ${s.lobbySquadKd != null
-                  ? `<span title="Ø Alltime-K/D der eigenen Leute — nicht ihre Leistung in dieser Phase, sondern ihr Karriere-Schnitt"><b>${s.lobbySquadKd.toFixed(2)}</b> Squad K/D</span>`
+                  ? `<span title="Ø Alltime-K/D der eigenen Leute — nicht ihre Leistung in dieser Phase, sondern ihr Karriere-Schnitt"><button
+                       type="button" class="lobby-open" data-phase="1" data-view="squad"
+                       data-matches="${ph.matches.map(x => x.matchId).filter(Boolean).slice(0, 60).join(",")}"
+                       data-title="Squad · Phase ${i+1}"
+                       data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'Match' : 'Matches'} gewertet"
+                       aria-label="Squad der Phase aufschlüsseln: Karriere-K/D der Mitspieler"
+                     ><b>${s.lobbySquadKd.toFixed(2)}</b> Squad K/D</button></span>`
                   : (s.lobbyPending
                       ? `<span title="Alltime-K/D des eigenen Squads wird noch gesammelt"><span class="lobby-pending" role="img" aria-label="Squad-K/D wird gesammelt"></span> Squad K/D</span>`
                       : "")}

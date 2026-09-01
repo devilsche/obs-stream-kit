@@ -637,3 +637,35 @@ def test_weapon_performance_without_matches_is_empty_not_error():
     assert code == 200
     d = json.loads(body)
     assert d["rows"] == [] and d["matchesPending"] == 0
+
+
+def test_lobby_detail_liefert_auch_den_eigenen_squad():
+    """Dieselbe Frage andersherum: wer sitzt im eigenen Auto."""
+    from pubg import db_pg
+    conn = _setup()
+    _insert_match(conn, "sq1", "2026-05-20T18:00:00Z", "Baltic_Main", "squad-fpp")
+    snaps = {}
+    for acc, name, kd in (("account.A", "PEX_LuCKoR", 2.0),
+                          ("account.M1", "MateA", 1.5),
+                          ("account.M2", "MateB", 0.8)):
+        _insert_participant(conn, "sq1", acc, name, team_id=1)
+        _insert_team_mapping(conn, "sq1", acc, 1)
+        snaps[acc] = {"kills": int(kd * 10), "losses": 10, "rounds": 20,
+                      "wins": 0, "damage": 1.0, "kd": kd}
+    for i in range(1, 6):
+        _insert_team_mapping(conn, "sq1", f"account.F{i}", 7)
+    db_pg.upsert_season_snapshots(conn.raw, "lifetime", "squad-fpp", snaps,
+                                   "2026-05-20T00:00:00Z")
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/lobby-detail?matches=sq1",
+                                  b"", {})
+    assert code == 200
+    d = json.loads(body)
+    m = d["matches"][0]
+    # Nach Karriere-K/D sortiert, Gegner sind nicht dabei.
+    assert [p["name"] for p in m["squad"]] == ["PEX_LuCKoR", "MateA", "MateB"]
+    assert m["squadAvg"] == pytest.approx((2.0 + 1.5 + 0.8) / 3)
+    assert [p["name"] for p in d["totals"]["squad"]] == ["PEX_LuCKoR", "MateA",
+                                                          "MateB"]
+    assert all(p["matches"] == 1 for p in d["totals"]["squad"])

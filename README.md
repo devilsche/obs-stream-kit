@@ -596,7 +596,10 @@ Gegner sowie den fünf stärksten und fünf schwächsten Spielern namentlich
 (`/api/pubg/lobby-detail?matches=id1,id2`). Der Median steht daneben, weil K/D
 bei 0 endet und nach oben offen ist — an Prod-Daten sind das allerdings nur 0,05
 bis 0,10 Unterschied zum Ø; die Aussage steckt in Top gegen Low (2,87 gegen 0,32
-in einer typischen Lobby). Beim Phasen-Dialog werden die Match-Werte gemittelt
+in einer typischen Lobby). Dieselbe Mechanik hängt an der **Squad-K/D**-Zahl: dort listet der Dialog die
+eigenen Leute mit ihrem Karriere-Schnitt (im Phasen-Dialog dazu, wer wie viele
+Runden dabei war) — ohne Top/Low, bei vier Leuten wäre das Unsinn. Beim
+Phasen-Dialog werden die Match-Werte gemittelt
 statt alle Spieler in einen Topf geworfen: sonst wögen volle Lobbys schwerer als
 kurze Matches, und „die stärksten Fünf" wären immer dieselben Ausreißer.
 

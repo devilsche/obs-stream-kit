@@ -452,12 +452,15 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
         f"WHERE mtm.tenant_id = ? AND mtm.match_id IN ({marks})",
         [tenant_id] + list(match_ids)).fetchall()
     squad_rows = conn.execute(
-        f"SELECT match_id, account_id FROM participants "
+        f"SELECT match_id, account_id, name FROM participants "
         f"WHERE tenant_id = ? AND match_id IN ({marks})",
         [tenant_id] + list(match_ids)).fetchall()
-    squad_by_match = {}
+    squad_by_match, squad_names = {}, {}
     for r in squad_rows:
         squad_by_match.setdefault(r["match_id"], set()).add(r["account_id"])
+        # participants fuehrt den Namen mit — fuer die eigenen Leute ist das
+        # die verlaesslichere Quelle als der players-Bestand.
+        squad_names[r["account_id"]] = r["name"]
 
     per_match, accounts = {}, set()
     for r in rows:
@@ -467,19 +470,37 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
         e["accounts"].append(r["account_id"])
         accounts.add(r["account_id"])
 
+    accounts.update(squad_names)
     kd_by_acc = db_pg.get_lifetime_overall(raw, list(accounts))
     names = db_pg.get_player_names(raw, tenant_id, list(accounts))
+    names.update({a: n for a, n in squad_names.items() if n})
 
     out, strongest, weakest = [], {}, {}
+    squad_seen = {}
     for mid, e in per_match.items():
         squad = squad_by_match.get(mid, set())
         lobby = [a for a in e["accounts"]
                  if a not in squad and not is_bot(a)]
         players = [(names.get(a) or a[:12], kd_by_acc.get(a)) for a in lobby]
         b = lobby_breakdown(players, top_n=top_n)
+        # Die eigenen Leute mit ihrem Karriere-Wert — dieselbe Frage wie fuer
+        # die Lobby, nur andersherum: wer sitzt eigentlich im eigenen Auto.
+        mates = []
+        for a in sorted(squad, key=lambda x: -(kd_by_acc.get(x) or -1)):
+            mates.append({"name": names.get(a) or a[:12], "kd": kd_by_acc.get(a),
+                          "accountId": a})
+            agg = squad_seen.setdefault(a, {"name": names.get(a) or a[:12],
+                                            "kd": kd_by_acc.get(a),
+                                            "matches": 0})
+            agg["matches"] += 1
+        known_mates = [m["kd"] for m in mates if m["kd"] is not None]
         b.update({"matchId": mid, "playedAt": e["playedAt"], "map": e["map"],
                   "lobbyPlayers": len(lobby),
-                  "coverage": (100.0 * b["known"] / len(lobby)) if lobby else None})
+                  "coverage": (100.0 * b["known"] / len(lobby)) if lobby else None,
+                  "squad": mates,
+                  "squadKnown": len(known_mates),
+                  "squadAvg": (sum(known_mates) / len(known_mates))
+                              if known_mates else None})
         out.append(b)
         for a in lobby:
             kd = kd_by_acc.get(a)
@@ -518,6 +539,12 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
         # ob da ein Hai drin sass.
         "strongest": sorted(strongest.values(), key=lambda p: -p["kd"])[:top_n],
         "weakest": sorted(weakest.values(), key=lambda p: p["kd"])[:top_n],
+        # Ueber die Phase: jeder, der mitgespielt hat, mit seiner Karriere-K/D
+        # und der Zahl der Runden — wer nur zwei Matches dabei war, faellt so
+        # auf, statt den Eindruck zu praegen.
+        "squad": sorted(squad_seen.values(),
+                        key=lambda p: (-(p["kd"] or -1), -p["matches"])),
+        "squadAvg": _avg("squadAvg"),
     }
     return {"matches": out, "totals": totals, "seasonId": season_id,
             "topN": top_n}
