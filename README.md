@@ -540,10 +540,6 @@ genau, für Aussagen über fremde Teams untereinander nicht. Werte aus weniger a
 fünf Matches bzw. Eröffnungen zeigt die Ansicht blass und nimmt sie von den
 Spitzenreiter-Markierungen aus.
 
-Die Match-Liste hatte zwei Bot-Spalten („4/24 Teams" und „12/93 Spieler") — dieselbe
-Aussage, zweimal gezählt. Sie sind zu einer zusammengefasst, die Spielerzahl steht im
-Tooltip der Zelle.
-
 **Lobby-Stärke** steht im **Session-Report** (Spaltenbreiten dort in `fr`, erste und
 letzte Spalte doppelt: mit festen Pixeln sammelte sich der freie Platz vor der
 Lobby-Spalte). Fehlt der Wert noch, zeigt die Zelle einen Ring statt eines Strichs —
