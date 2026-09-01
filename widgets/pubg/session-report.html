@@ -176,7 +176,7 @@
     /* Noch kein Wert, aber die Lobby ist bekannt: der Sammler holt die
        Alltime-Zahlen der Gegner nach (rund 15 min je frischer Lobby). Ein
        Strich wuerde "gibt es nicht" heissen, der Ring sagt "kommt noch". */
-    .matches-list .lobby-pending {
+    .lobby-pending {
       display: inline-block;
       width: 11px; height: 11px;
       border: 2px solid color-mix(in srgb, var(--pubg-muted) 45%, transparent);
@@ -187,7 +187,7 @@
     }
     @keyframes lobby-spin { to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) {
-      .matches-list .lobby-pending {
+      .lobby-pending {
         animation: none;
         border-top-color: var(--pubg-muted);
       }
@@ -3534,8 +3534,16 @@
               <span><b>${s.wins}</b> Wins</span>
               <span><b>${PubgUI.fmtKD(s.kd)}</b> K/D</span>
               ${(s.squadMatchesWithMapping||0) > 0 ? `<span title="K/D des eigenen Squads in DIESER Phase — Kills durch Tode"><b>${PubgUI.fmtKD(s.squadKd||0)}</b> Squad Phase</span>` : ""}
-              ${s.lobbyKd != null ? `<span title="Ø Alltime-K/D der Gegner über ${s.lobbyMatches} Matches dieser Phase"><b>${s.lobbyKd.toFixed(2)}</b> Lobby K/D</span>` : ""}
-              ${s.lobbySquadKd != null ? `<span title="Ø Alltime-K/D der eigenen Leute — nicht ihre Leistung in dieser Phase, sondern ihr Karriere-Schnitt"><b>${s.lobbySquadKd.toFixed(2)}</b> Squad K/D</span>` : ""}
+              ${s.lobbyKd != null
+                  ? `<span title="Ø Alltime-K/D der Gegner über ${s.lobbyMatches} Matches dieser Phase"><b>${s.lobbyKd.toFixed(2)}</b> Lobby K/D</span>`
+                  : (s.lobbyPending
+                      ? `<span title="Alltime-K/D der Gegner wird noch gesammelt"><span class="lobby-pending" role="img" aria-label="Lobby-K/D wird gesammelt"></span> Lobby K/D</span>`
+                      : "")}
+              ${s.lobbySquadKd != null
+                  ? `<span title="Ø Alltime-K/D der eigenen Leute — nicht ihre Leistung in dieser Phase, sondern ihr Karriere-Schnitt"><b>${s.lobbySquadKd.toFixed(2)}</b> Squad K/D</span>`
+                  : (s.lobbyPending
+                      ? `<span title="Alltime-K/D des eigenen Squads wird noch gesammelt"><span class="lobby-pending" role="img" aria-label="Squad-K/D wird gesammelt"></span> Squad K/D</span>`
+                      : "")}
               <span><b>${Math.round(s.avgDamage)}</b> Ø DMG</span>
               <span><b>${fmtDuration(Math.round(s.avgSurvivedSec))}</b> Ø Surv</span>
               <span><b>#${s.avgPlace.toFixed(1)}</b> Avg #</span>

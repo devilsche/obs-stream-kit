@@ -2777,6 +2777,12 @@ class EndpointRegistry:
             squad = [m["squadKd"] for m in solid if m.get("squadKd") is not None]
             stats["lobbySquadKd"] = (sum(squad) / len(squad)) if squad else None
             stats["lobbyMatches"] = len(solid)
+            # Kein Wert, aber die Lobbys sind bekannt: der Sammler ist noch
+            # dran. Das Frontend zeigt dann den Ring statt gar nichts —
+            # sonst liest sich "noch am Rechnen" wie "gibt es nicht".
+            stats["lobbyPending"] = (not solid) and any(
+                (m.get("lobbyPlayers") or 0) > 0
+                for m in (ph.get("matches") or []))
 
     def _sessions_index(self):
         conn = self.get_conn()
