@@ -341,3 +341,19 @@ def test_kd_by_perspective_trennt_fpp_und_tpp():
     # TPP hat nur sechs Runden — zu duenn fuer eine eigene Aussage.
     assert p["tpp"]["kd"] is None
     assert p["tpp"]["rounds"] == 6
+
+
+def test_negativ_eintrag_ueberschreibt_keine_vorhandenen_werte(pg):
+    """Ein Fehlversuch darf einen Spieler, von dem wir Zahlen haben, nicht
+    als 'kennt die API nicht' markieren — sonst fragt ihn niemand mehr ab."""
+    from pubg import db_pg
+    conn, _t1, _t2 = pg
+    db_pg.upsert_lifetime_snapshots(conn, {
+        "account.X": {"solo-fpp": {"kills": 20, "losses": 1, "rounds": 2,
+                                    "wins": 1, "damage": 1.0, "kd": 20.0}},
+    }, "2026-09-01T06:15:43Z")
+    # Zweiter Lauf, diesmal ohne Daten (API-Fehler oder leere Antwort).
+    db_pg.upsert_lifetime_snapshots(conn, {"account.X": None},
+                                     "2026-09-01T06:29:16Z")
+    rows = db_pg.get_lifetime_by_mode(conn, ["account.X"])
+    assert set(rows.get("account.X") or {}) == {"solo-fpp"}

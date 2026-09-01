@@ -953,11 +953,25 @@ def upsert_lifetime_snapshots(conn, store: dict, fetched_at: str) -> int:
     Sammler sie endlos erneut.
     """
     from pubg.lobby_kd import LIFETIME_KEY
+    # Wer schon Zahlen hat, darf keinen Negativ-Eintrag bekommen: gemessen auf
+    # prod stand ein Spieler mit frischen solo-fpp-Werten 14 Minuten spaeter
+    # mit einer Fehlanzeige in squad-fpp da — und wurde danach nie wieder
+    # abgefragt, weil die Zeile ja "existiert".
+    blanks = [a for a, modes in (store or {}).items() if not modes]
+    known = set()
+    if blanks:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT DISTINCT account_id FROM player_season_snapshot "
+                "WHERE season_id = %s AND kills IS NOT NULL "
+                "AND account_id = ANY(%s)", (LIFETIME_KEY, blanks))
+            known = {r["account_id"] for r in cur.fetchall()}
     values = []
     for acc, modes in (store or {}).items():
         if not modes:
-            values.append((acc, LIFETIME_KEY, "squad-fpp", None, None, None,
-                           None, None, None, fetched_at))
+            if acc not in known:
+                values.append((acc, LIFETIME_KEY, "squad-fpp", None, None, None,
+                               None, None, None, fetched_at))
             continue
         for mode, st in modes.items():
             values.append((acc, LIFETIME_KEY, mode, st.get("kills"),
@@ -1077,16 +1091,26 @@ def clear_false_unknown_snapshots(conn) -> int:
     """Fehlanzeigen loeschen, damit die Accounts neu geholt werden.
 
     Noetig nach dem 429-Bug: ein Rate-Limit wurde als "kennt die API nicht"
-    gespeichert. Betroffen sind Accounts, die in KEINEM Modus Werte haben.
+    gespeichert. Zwei Faelle:
+
+    1. Accounts, die in KEINEM Modus Werte haben — die Fehlanzeige kann echt
+       sein, ist aber billig nachzupruefen.
+    2. Eine leere Modus-Zeile bei einem Account, der anderswo Zahlen hat. Die
+       ist immer falsch: ein Spieler mit solo-fpp-Werten "existiert" fuer die
+       API. Genau die blockierte den Sammler dauerhaft.
     """
     with conn.cursor() as cur:
         cur.execute("""
             DELETE FROM player_season_snapshot
-            WHERE season_id = 'lifetime' AND account_id IN (
-                SELECT account_id FROM player_season_snapshot
-                WHERE season_id = 'lifetime'
-                GROUP BY account_id
-                HAVING COUNT(*) FILTER (WHERE kd IS NOT NULL) = 0)
+            WHERE season_id = 'lifetime'
+              AND (account_id IN (
+                     SELECT account_id FROM player_season_snapshot
+                     WHERE season_id = 'lifetime'
+                     GROUP BY account_id
+                     HAVING COUNT(*) FILTER (WHERE kd IS NOT NULL) = 0)
+                   OR (kills IS NULL AND account_id IN (
+                     SELECT account_id FROM player_season_snapshot
+                     WHERE season_id = 'lifetime' AND kills IS NOT NULL)))
         """)
         n = cur.rowcount
     conn.commit()
