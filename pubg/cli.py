@@ -1205,6 +1205,92 @@ def hidrive_refill_pg(root: str, only_match: str = None) -> int:
     return 0
 
 
+def lobby_kd_backfill(root: str, args=None) -> int:
+    """Season-Snapshots fuer die Lobbys der juengsten Matches nachladen.
+
+    Der Poller holt nur ein Zehnerpack je Tick — eine Lobby hat 93 Spieler.
+    Dieser Lauf fuellt gezielt auf, mit Pacing, damit das Match-Polling sein
+    Rate-Limit behaelt (10 Requests/Minute je Key, geteilt).
+
+    Nutzung:
+        python -m pubg.cli lobby-kd-backfill [--tenant N] [--matches 50]
+                                             [--pace 25] [--mode squad-fpp]
+    """
+    import time
+    from core.db import connect
+    from core.db_compat import SqliteCompatConn
+    from core import credentials
+    from pubg import db_pg, lobby_kd
+    from pubg.api_client import PubgClient
+    from pubg.poller import _current_season_id
+
+    args = args or []
+    def _opt(name, default=None):
+        if name in args:
+            i = args.index(name)
+            return args[i + 1] if i + 1 < len(args) else default
+        return default
+    tenant_id = int(_opt("--tenant", "1"))
+    n_matches = int(_opt("--matches", "50"))
+    pace = float(_opt("--pace", "25"))
+    mode = _opt("--mode", "squad-fpp")
+
+    raw = connect()
+    conn = SqliteCompatConn(raw)
+    creds = credentials.get(raw, tenant_id)
+    if not creds.pubg_api_key:
+        print(f"Tenant {tenant_id}: kein PUBG-API-Key")
+        return 1
+    client = PubgClient(api_key=creds.pubg_api_key,
+                        platform=creds.pubg_platform or "steam")
+    season_id = _current_season_id(client)
+    if not season_id:
+        print("Season nicht bestimmbar")
+        return 1
+
+    with raw.cursor() as cur:
+        cur.execute("""
+            SELECT DISTINCT mtm.account_id
+            FROM match_team_mapping mtm
+            JOIN (SELECT match_id FROM matches
+                  WHERE tenant_id = %s AND game_mode = %s
+                  ORDER BY played_at DESC LIMIT %s) letzte
+              ON letzte.match_id = mtm.match_id
+            LEFT JOIN player_season_snapshot s
+                   ON s.account_id = mtm.account_id
+                  AND s.season_id = %s AND s.mode = %s
+            WHERE mtm.tenant_id = %s AND s.account_id IS NULL
+              AND mtm.account_id NOT LIKE 'ai.%%'
+        """, (tenant_id, mode, n_matches, season_id, mode, tenant_id))
+        missing = [r["account_id"] for r in cur.fetchall()]
+
+    batches = lobby_kd.chunk(missing)
+    print(f"Season {season_id} · {mode}: {len(missing)} Spieler ohne Snapshot "
+          f"aus den letzten {n_matches} Matches = {len(batches)} Calls "
+          f"(~{len(batches) * pace / 60:.0f} min bei {pace:.0f}s Pacing)")
+    done = found = 0
+    for batch in batches:
+        store = {}
+        found += lobby_kd.fetch_missing(client, batch, season_id, mode, store,
+                                         max_batches=1)
+        if store:
+            db_pg.upsert_season_snapshots(raw, season_id, mode, store,
+                                          _iso_now())
+        done += 1
+        if done % 10 == 0:
+            print(f"  {done}/{len(batches)} Calls · {found} Spieler bekannt")
+        if done < len(batches):
+            time.sleep(pace)
+    print(f"fertig: {found} von {len(missing)} Spielern haben jetzt Zahlen")
+    raw.close()
+    return 0
+
+
+def _iso_now() -> str:
+    import datetime as _dt
+    return _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def clan_queue_prune(root: str, args=None) -> int:
     """Raeumt die Clan-Warteschlange auf Squad + Stammgaeste zusammen.
 
@@ -1703,6 +1789,8 @@ if __name__ == "__main__":
         sys.exit(purge_before(root, date_arg))
     elif len(sys.argv) > 1 and sys.argv[1] == "weapon-stats-backfill":
         sys.exit(weapon_stats_backfill(root, sys.argv[2:]))
+    elif len(sys.argv) > 1 and sys.argv[1] == "lobby-kd-backfill":
+        sys.exit(lobby_kd_backfill(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "clan-queue-prune":
         sys.exit(clan_queue_prune(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "assists-backfill":
@@ -1741,5 +1829,5 @@ if __name__ == "__main__":
               "reset-milestones <id1> [<id2> ...] | "
               "list-milestones [pattern] | "
               "weapon-stats-backfill | assists-backfill | "
-              "clan-queue-prune | "
+              "clan-queue-prune | lobby-kd-backfill | "
               "purge-before YYYY-MM-DD")
