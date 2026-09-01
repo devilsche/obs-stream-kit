@@ -262,7 +262,63 @@ def run_single_tick_multi(conn, tenant_id: int, client,
         process_queue(conn, client, max_count=3)
     except Exception as e:
         stats["errors"].append(f"clan-queue: {e}")
+    # Lobby-Staerke: pro Tick EIN Zehnerpack Season-Stats nachladen. Zehn
+    # Spieler je Minute und Tenant klingt wenig, deckt aber eine Lobby in gut
+    # neun Minuten ab — und das Polling behaelt Vorfahrt.
+    try:
+        stats["lobbyKdFetched"] = collect_lobby_kd(conn, tenant_id, client,
+                                                    max_batches=1)
+    except Exception as e:
+        stats["errors"].append(f"lobby-kd: {e}")
     return stats
+
+
+def collect_lobby_kd(conn, tenant_id: int, client, max_batches: int = 1,
+                     mode: str = "squad-fpp") -> int:
+    """Season-Snapshots fuer Lobby-Spieler nachladen (Zehnerpacks).
+
+    Ohne Snapshot gibt es keine Lobby-Staerke; mit ihm steht der Spieler
+    danach fuer jedes Match zur Verfuegung, in dem er auftaucht. Deshalb
+    sammelt der Poller kontinuierlich statt on demand.
+    """
+    from pubg import db_pg, lobby_kd
+    if client is None:
+        return 0
+    raw_conn = conn.raw if isinstance(conn, SqliteCompatConn) else conn
+    season_id = _current_season_id(client)
+    if not season_id:
+        return 0
+    missing = db_pg.lobby_accounts_missing_snapshot(
+        raw_conn, tenant_id, season_id, mode,
+        limit=lobby_kd.BATCH_SIZE * max_batches)
+    if not missing:
+        return 0
+    store = {}
+    lobby_kd.fetch_missing(client, missing, season_id, mode, store,
+                           max_batches=max_batches)
+    if store:
+        db_pg.upsert_season_snapshots(raw_conn, season_id, mode, store,
+                                      _iso_utc_now())
+    return sum(1 for v in store.values() if v)
+
+
+_SEASON_CACHE = {"id": None, "at": 0.0}
+
+
+def _current_season_id(client):
+    """Aktuelle Season, eine Stunde lang gecacht — sie wechselt alle paar
+    Monate, jeder Abruf kostet aber ein Rate-Limit-Budget."""
+    import time
+    now = time.time()
+    if _SEASON_CACHE["id"] and now - _SEASON_CACHE["at"] < 3600:
+        return _SEASON_CACHE["id"]
+    try:
+        sid = client.extract_current_season_id(client.get_seasons())
+    except Exception:
+        return _SEASON_CACHE["id"]
+    if sid:
+        _SEASON_CACHE.update({"id": sid, "at": now})
+    return sid
 
 
 def run_single_tick(conn, tenant_id: int, client, my_player_name: str,

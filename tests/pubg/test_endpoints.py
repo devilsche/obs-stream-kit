@@ -316,6 +316,46 @@ def test_match_replay_404_stays_when_the_db_is_empty_too():
     assert code == 404
 
 
+def test_lobby_kd_rejects_a_bad_range():
+    conn = _setup()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/lobby-kd?range=epoch",
+                                  b"", {})
+    assert code == 400
+
+
+def test_lobby_kd_reports_coverage_per_match():
+    """Ohne Abdeckung liest man einen Schnitt aus 2 von 90 Spielern wie einen
+    vollstaendigen."""
+    from pubg import db_pg
+    conn = _setup()
+    # Season-Stats gibt es je Spielmodus — das Match muss zum abgefragten
+    # Modus passen, sonst gäbe es keine vergleichbaren Zahlen.
+    _insert_match(conn, "lk1", "2026-05-20T18:00:00Z", "Baltic_Main", "squad-fpp")
+    _insert_participant(conn, "lk1", "account.A", "PEX_LuCKoR", team_id=1)
+    for acc, team in (("account.A", 1), ("account.F1", 7), ("account.F2", 7),
+                      ("ai.9", 12)):
+        _insert_team_mapping(conn, "lk1", acc, team)
+    db_pg.upsert_season_snapshots(conn.raw, "s1", "squad-fpp", {
+        "account.A": {"kills": 100, "losses": 50, "rounds": 60, "wins": 5,
+                       "damage": 1.0, "kd": 2.0},
+        "account.F1": {"kills": 40, "losses": 40, "rounds": 50, "wins": 1,
+                        "damage": 1.0, "kd": 1.0},
+    }, "2026-05-20T00:00:00Z")
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch(
+        "GET", "/api/pubg/lobby-kd?range=all&season=s1", b"", {})
+    assert code == 200
+    data = json.loads(body)
+    m = data["matches"][0]
+    assert m["lobbyPlayers"] == 3          # Bot zaehlt nicht mit
+    assert m["known"] == 2
+    assert m["lobbyKd"] == 1.5
+    assert m["myKd"] == 2.0
+    assert m["diff"] == 0.5
+
+
 def test_squad_playstyle_rejects_a_bad_range():
     conn = _setup()
     reg = _registry(conn)

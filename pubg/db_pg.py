@@ -158,6 +158,27 @@ CREATE INDEX IF NOT EXISTS idx_mws_tenant_match
     ON match_weapon_stats(tenant_id, match_id);
 
 
+-- Season-Snapshots der Lobby-Spieler: Grundlage fuer die Lobby-Staerke je
+-- Match. GLOBAL wie telemetry_events — die Zahlen gehoeren dem Spieler, nicht
+-- einem Tenant, und zwei Tenants in derselben Lobby sollen sie nicht doppelt
+-- abrufen. `kd IS NULL` heisst: die API kennt den Spieler in diesem Modus
+-- nicht (Negativ-Eintrag, damit der Sammler ihn nicht erneut anfragt).
+CREATE TABLE IF NOT EXISTS player_season_snapshot (
+    account_id  TEXT NOT NULL,
+    season_id   TEXT NOT NULL,
+    mode        TEXT NOT NULL,
+    kills       INTEGER,
+    losses      INTEGER,
+    rounds      INTEGER,
+    wins        INTEGER,
+    damage      DOUBLE PRECISION,
+    kd          DOUBLE PRECISION,
+    fetched_at  TEXT NOT NULL,
+    PRIMARY KEY (account_id, season_id, mode)
+);
+CREATE INDEX IF NOT EXISTS idx_pss_season_mode
+    ON player_season_snapshot(season_id, mode);
+
 -- telemetry_events: GLOBAL (no tenant_id). Wenn zwei Tenants im selben
 -- Match sind, wird die Telemetrie einmal gespeichert. Sichtbarkeit
 -- kommt durch den Join mit matches (das hat tenant_id).
@@ -862,6 +883,76 @@ def mark_telemetry_schema(conn, tenant_id: int, match_id: str,
             (v, tenant_id, match_id),
         )
     conn.commit()
+
+
+# ── player_season_snapshot ──────────────────────────────────────────────────
+
+def get_season_snapshots(conn, season_id: str, mode: str,
+                         account_ids=None) -> dict:
+    """{account_id: {kills, losses, kd, ...} oder None} fuer die genannten
+    Accounts. None steht fuer "die API kennt ihn in diesem Modus nicht"."""
+    ids = [a for a in (account_ids or []) if a]
+    if not ids:
+        return {}
+    out = {}
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT account_id, kills, losses, rounds, wins, damage, kd
+            FROM player_season_snapshot
+            WHERE season_id = %s AND mode = %s AND account_id = ANY(%s)
+        """, (season_id, mode, ids))
+        for r in cur.fetchall():
+            out[r["account_id"]] = (None if r["kd"] is None else dict(r))
+    return out
+
+
+def upsert_season_snapshots(conn, season_id: str, mode: str, rows: dict,
+                            fetched_at: str) -> int:
+    """rows = {account_id: stats-dict oder None}. Idempotent."""
+    if not rows:
+        return 0
+    values = []
+    for acc, st in rows.items():
+        st = st or {}
+        values.append((acc, season_id, mode, st.get("kills"), st.get("losses"),
+                       st.get("rounds"), st.get("wins"), st.get("damage"),
+                       st.get("kd"), fetched_at))
+    with conn.cursor() as cur:
+        execute_values(
+            cur,
+            "INSERT INTO player_season_snapshot (account_id, season_id, mode,"
+            " kills, losses, rounds, wins, damage, kd, fetched_at) VALUES %s "
+            "ON CONFLICT (account_id, season_id, mode) DO UPDATE SET "
+            "kills=EXCLUDED.kills, losses=EXCLUDED.losses, "
+            "rounds=EXCLUDED.rounds, wins=EXCLUDED.wins, "
+            "damage=EXCLUDED.damage, kd=EXCLUDED.kd, "
+            "fetched_at=EXCLUDED.fetched_at",
+            values)
+    conn.commit()
+    return len(values)
+
+
+def lobby_accounts_missing_snapshot(conn, tenant_id: int, season_id: str,
+                                    mode: str, limit: int = 200) -> list:
+    """Lobby-Spieler der juengsten Matches, fuer die noch kein Snapshot
+    existiert — juengste Matches zuerst, dort schaut man zuerst hin."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT DISTINCT mtm.account_id
+            FROM match_team_mapping mtm
+            JOIN matches m ON m.match_id = mtm.match_id
+                          AND m.tenant_id = mtm.tenant_id
+            LEFT JOIN player_season_snapshot s
+                   ON s.account_id = mtm.account_id
+                  AND s.season_id = %s AND s.mode = %s
+            WHERE mtm.tenant_id = %s
+              AND mtm.account_id NOT LIKE 'ai.%%'
+              AND s.account_id IS NULL
+              AND m.game_mode = %s
+            ORDER BY mtm.account_id
+            LIMIT %s
+        """, (season_id, mode, tenant_id, mode, limit))
+        return [r["account_id"] for r in cur.fetchall()]
 
 
 # ── match_weapon_stats ──────────────────────────────────────────────────────

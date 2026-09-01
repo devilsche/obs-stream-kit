@@ -215,6 +215,37 @@
     </details>
   </div>
 
+  <div class="t-card" id="lobbyCard" hidden>
+    <h2>Lobby strength — how tough were the rounds</h2>
+    <div class="scroll">
+      <table>
+        <thead id="lobbyHead"><tr></tr></thead>
+        <tbody id="lobbyRows"></tbody>
+      </table>
+    </div>
+    <p class="legend" id="lobbyNote"></p>
+    <details class="howto">
+      <summary>Where the lobby K/D comes from</summary>
+      <dl>
+        <dt>Per player</dt>
+        <dd>Season K/D of every player in that lobby — kills divided by
+            deaths, taken from the PUBG API for the current season.</dd>
+        <dt>Why season and not lifetime</dt>
+        <dd>Lifetime numbers come one player at a time: 93 requests per match
+            against a budget of ten per minute. Season numbers come ten at a
+            time, so a lobby costs ten requests instead of 93.</dd>
+        <dt>Coverage</dt>
+        <dd>How much of the lobby we already have numbers for. The collector
+            fetches ten players per minute, so coverage grows over time —
+            matches below 25% are left out of the overall average.</dd>
+        <dt>It is a snapshot</dt>
+        <dd>The API has no history: the value is where that player stands
+            today, not on the day of the match. Within a running season that
+            is close enough; across seasons it is not.</dd>
+      </dl>
+    </details>
+  </div>
+
   <script src="/widgets-static/pubg/_pubg.js"></script>
   <script>
     const BASE = window.__SERVE_BASE__ || "/";
@@ -226,7 +257,8 @@
     let BOTS = PubgUI.qs("includeBots", "") === "1";
     let DATA = null;
     let SORT = { fight: { key: "opened", dir: -1 },
-                 style: { key: "matches", dir: -1 } };
+                 style: { key: "matches", dir: -1 },
+                 lobby: { key: "playedAt", dir: -1 } };
 
     const n1 = (v) => v == null ? "—" : v.toFixed(1);
     const n0 = (v) => v == null ? "—" : Math.round(v).toString();
@@ -410,12 +442,64 @@
       }).join("");
     }
 
+    const LOBBY_COLS = [
+      { key: "playedAt", label: "Match", text: true,
+        fmt: (r) => esc(PubgUI.fmtDate(r.playedAt) + " " + PubgUI.fmtTime(r.playedAt)),
+        help: "When the match was played." },
+      { key: "map", label: "Map", text: true,
+        fmt: (r) => esc(PubgUI.fmtMap(r.map)),
+        help: "Map of that match." },
+      { key: "lobbyKd", label: "Lobby K/D", unit: "avg",
+        fmt: (r) => n2(r.lobbyKd),
+        help: "Average season K/D of everyone in that lobby — the tougher the room, the higher." },
+      { key: "myKd", label: "Your K/D", unit: "season",
+        fmt: (r) => n2(r.myKd),
+        help: "Your own season K/D in this mode, for comparison." },
+      { key: "diff", label: "Difference", fmt: (r) => n2(r.diff),
+        help: "Your K/D minus the lobby average. Positive means you were above the room." },
+      { key: "known", label: "Known", unit: "players",
+        fmt: (r) => `${r.known}/${r.lobbyPlayers}`, text: true,
+        help: "How many of the lobby we already have season numbers for. Bots are not counted." },
+      { key: "coverage", label: "Coverage", unit: "%",
+        fmt: (r) => n0(r.coverage),
+        help: "Share of the lobby covered. Below 25% the match is left out of the overall average." },
+    ];
+
+    let LOBBY = null;
+
+    async function loadLobby() {
+      const params = new URLSearchParams({ range: RANGE, limit: "50" });
+      try {
+        LOBBY = await PubgUI.fetchJson(
+          BASE + "api/pubg/lobby-kd?" + params, 120000);
+      } catch (e) {
+        LOBBY = null;
+      }
+      const card = document.getElementById("lobbyCard");
+      const note = document.getElementById("lobbyNote");
+      const rows = (LOBBY && LOBBY.matches) || [];
+      card.hidden = rows.length === 0;
+      if (!rows.length) return;
+      renderTable("lobby", LOBBY_COLS, rows);
+      const cov = LOBBY.coverage == null ? "—" : Math.round(LOBBY.coverage);
+      note.textContent = LOBBY.avgKd == null
+        ? `No match has enough coverage yet — the collector is still gathering `
+          + `(${cov}% of lobby players known so far).`
+        : `Average lobby K/D across ${LOBBY.matchesInAverage} matches: `
+          + `${LOBBY.avgKd.toFixed(2)} · your season K/D: `
+          + `${LOBBY.myKd == null ? "—" : LOBBY.myKd.toFixed(2)} · `
+          + `${cov}% of lobby players known.`;
+    }
+
     function render() {
       if (!DATA) return;
       const rows = DATA.rows || [];
       const fighters = rows.filter(r => r.opened > 0);
       renderTable("fight", FIGHT_COLS, fighters);
       renderTable("style", STYLE_COLS, rows);
+      if (LOBBY && (LOBBY.matches || []).length) {
+        renderTable("lobby", LOBBY_COLS, LOBBY.matches);
+      }
       document.getElementById("fightCard").hidden = fighters.length === 0;
       document.getElementById("styleCard").hidden = rows.length === 0;
     }
@@ -437,6 +521,7 @@
              ? ` · squad: ${DATA.players.join(", ")}` : "")
           + (rows.length ? "" : " — nothing found, widen the range?");
         render();
+        loadLobby();
       } catch (e) {
         st.classList.add("err");
         st.textContent = "Could not load: " + (e && e.message || e);
@@ -475,7 +560,7 @@
       load();
     });
 
-    ["fight", "style"].forEach(which => {
+    ["fight", "style", "lobby"].forEach(which => {
       const head = document.getElementById(which + "Head");
       const onSort = (th) => {
         const key = th.dataset.sort;

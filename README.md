@@ -540,6 +540,18 @@ genau, für Aussagen über fremde Teams untereinander nicht. Werte aus weniger a
 fünf Matches bzw. Eröffnungen zeigt die Ansicht blass und nimmt sie von den
 Spitzenreiter-Markierungen aus.
 
+**Lobby-Stärke** (dritter Block im Tool, `/api/pubg/lobby-kd`): Season-K/D aller
+Spieler einer Lobby, gemittelt je Match, plus Vergleich mit dem eigenen Wert.
+Lifetime-Zahlen gibt die API nur einzeln heraus — 93 Requests je Match bei einem
+Budget von 10 pro Minute; Season-Zahlen kommen im Zehnerpack
+(`/seasons/{id}/gameMode/{mode}/players?filter[playerIds]=…`), also rund zehn
+Requests je Lobby. Der Poller sammelt pro Tick ein Zehnerpack in
+`player_season_snapshot` (global, nicht pro Tenant — die Zahlen gehören dem
+Spieler); Spieler, die die API im Modus nicht kennt, bekommen einen Negativ-Eintrag,
+damit sie nicht endlos erneut angefragt werden. Die Abdeckung steht an jedem Match,
+und Matches unter 25 % fallen aus dem Gesamtschnitt. Der Wert ist ein Schnappschuss
+von heute, nicht vom Match-Tag — die API hat keine Historie.
+
 #### tools/match-replay.html
 
 Quellen-Kette für die Roh-Telemetrie, in dieser Reihenfolge:

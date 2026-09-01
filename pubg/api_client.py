@@ -212,6 +212,20 @@ class PubgClient:
         url = f"{PUBG_BASE}/shards/{self.platform}/seasons"
         return self._get_json(url, rate_limited=True, metric_endpoint="seasons")
 
+    def get_season_batch(self, account_ids: list, season_id: str,
+                         mode: str = "squad-fpp") -> dict:
+        """Season-Stats fuer bis zu zehn Spieler in EINEM Call.
+
+        Der Einzel-Endpoint (/players/{id}/seasons/{id}) kostet einen Request
+        je Spieler; bei 93 Spielern je Lobby und 10 Requests pro Minute ist
+        das nicht zu bezahlen. Dieser hier nimmt zehn IDs auf einmal.
+        """
+        ids = ",".join(a for a in (account_ids or []) if a)[:2000]
+        url = (f"{PUBG_BASE}/shards/{self.platform}/seasons/{season_id}"
+               f"/gameMode/{mode}/players?filter[playerIds]={ids}")
+        return self._get_json(url, rate_limited=True,
+                              metric_endpoint="season_batch")
+
     def get_season(self, account_id: str, season_id: str) -> dict:
         url = (f"{PUBG_BASE}/shards/{self.platform}/players/{account_id}"
                f"/seasons/{season_id}")

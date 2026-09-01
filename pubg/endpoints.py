@@ -304,6 +304,8 @@ class EndpointRegistry:
             return self._performance_history(qs)
         if route == ("GET", "/api/pubg/squad-compare"):
             return self._squad_compare(qs)
+        if route == ("GET", "/api/pubg/lobby-kd"):
+            return self._lobby_kd(qs)
         if route == ("GET", "/api/pubg/squad-playstyle"):
             return self._squad_playstyle(qs)
         if route == ("GET", "/api/pubg/chickens-together"):
@@ -2811,6 +2813,54 @@ class EndpointRegistry:
         n = int(qs.get("matches", 5))
         conn = self.get_conn()
         return _ok(compute_squad_compare(conn, self.tenant_id, self.my_account_id, names, n))
+
+    def _lobby_kd(self, qs):
+        """Lobby-Staerke je Match: Season-K/D aller Lobby-Spieler, gemittelt.
+
+        Die Werte kommen aus `player_season_snapshot`, das der Poller nach und
+        nach fuellt (zehn Spieler je Tick). Fehlende Spieler senken die
+        Abdeckung, die deshalb an jedem Match mitsteht.
+        """
+        from pubg.lobby_kd import lobby_kd_for_matches
+        from pubg.aggregations import _range_filter
+
+        conn = self.get_conn()
+        range_key = qs.get("range", "session")
+        if range_key not in ("session", "day", "week", "all"):
+            return _err(400, "range must be session|day|week|all")
+        mode = qs.get("mode", "squad-fpp")
+        try:
+            limit = max(1, min(int(qs.get("limit", "50")), 500))
+        except ValueError:
+            limit = 50
+        cutoff = (_range_filter(conn, self.tenant_id, range_key)
+                  if range_key != "all" else "1970-01-01T00:00:00Z")
+        rows = conn.execute("""
+            SELECT m.match_id FROM matches m
+            JOIN participants pa ON pa.match_id = m.match_id
+                                AND pa.tenant_id = m.tenant_id
+            WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?
+              AND m.game_mode = ?
+            ORDER BY m.played_at DESC LIMIT ?
+        """, (self.tenant_id, self.my_account_id, cutoff, mode, limit)).fetchall()
+        match_ids = [r["match_id"] for r in rows]
+
+        season_id = qs.get("season")
+        if not season_id and self.client is not None:
+            try:
+                season_id = self.client.extract_current_season_id(
+                    self.client.get_seasons())
+            except Exception:
+                season_id = None
+        if not season_id:
+            return _err(503, "Season nicht bestimmbar")
+
+        data = self.cache.get_or_compute(
+            f"lobby-kd:{range_key}:{mode}:{limit}:{season_id}",
+            lambda: lobby_kd_for_matches(conn, self.tenant_id, match_ids,
+                                          season_id, mode,
+                                          my_account_id=self.my_account_id))
+        return _ok({**data, "range": range_key})
 
     def _squad_playstyle(self, qs):
         """Spielstil + Kampf-Ausgaenge je Squad-Mate.
