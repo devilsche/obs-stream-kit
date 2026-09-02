@@ -567,11 +567,29 @@ als Differenz, in den Totals der Schnitt über die Session. Dort geht man die Ru
 durch — „war die Lobby hart" liest sich neben Platz und Kills, nicht in einem eigenen
 Tool. Der Endpoint `/api/pubg/lobby-kd` bleibt für Abfragen über Zeiträume.
 
-Die Zahl ist die **Alltime-K/D über alle Spielmodi** (Summe Kills / Summe Tode) —
-nicht die des gerade gespielten Modus: wer nur Duo spielt, hätte in `squad-fpp` keine
-Zahl, und ein Lifetime-Abruf liefert ohnehin alle Modi mit. Spieler, die die API
+Die Zahl ist die **Alltime-K/D, gemessen am Modus des Matches** — in drei Stufen,
+jede erst wenn die vorige zu dünn ist: der Modus selbst, dann dieselbe Perspektive
+(alle FPP bzw. alle TPP), zuletzt die ganze Karriere. Eine Stufe zählt nur ab
+**50 Runden** und wenn sie mindestens **10 % der gespielten Runden** ausmacht; reicht
+auch die letzte Stufe nicht, gibt es keinen Wert statt eines erfundenen. Der Dialog
+schreibt hinter jeden Wert, worauf er beruht.
+
+Vorher wurde immer sofort über alle Modi summiert. Das erzeugte Zerrbilder in beide
+Richtungen: ein Account mit 20 Kills aus **zwei** Solo-Runden stand als „20er K/D" an
+der Spitze einer squad-fpp-Lobby (dort hatte derselbe Spieler 0,43 aus 49 Runden), und
+im eigenen Solo-Match fiel die Rechnung auf 25 Third-Person-Runden zurück (4,74),
+obwohl daneben 10.663 Runden squad-fpp mit 1,50 lagen. Gemessen an 40 Prod-Matches
+stammen jetzt 76 % der Rand-Werte direkt aus dem gespielten Modus, 18 % aus derselben
+Perspektive, 6 % aus der Gesamtkarriere — bei 96,5 % Abdeckung.
+
+Der Grund für die Rückfall-Stufen bleibt bestehen: wer nur Duo spielt, hätte in
+`squad-fpp` keine Zahl, und ein Lifetime-Abruf liefert ohnehin alle Modi mit. Spieler, die die API
 wirklich nicht kennt, bekommen einen Negativ-Eintrag; ein Rate-Limit (429) oder
 Serverfehler dagegen **nicht** — sonst brennt sich eine Fehlanzeige dauerhaft ein.
+Ebenso wenig bekommt einen Negativ-Eintrag, wer irgendwo schon Zahlen hat: auf prod
+stand ein Spieler mit frischen `solo-fpp`-Werten 14 Minuten später mit einer leeren
+`squad-fpp`-Zeile da und galt dem Sammler danach als erledigt — die API kannte ihn
+sehr wohl (21 Kills, 49 Tode, 49 Runden).
 `python -m pubg.cli lobby-kd-reset-unknown` räumt solche Altlasten weg.
 
 Datenbeschaffung (`/api/pubg/lobby-kd`): Season-K/D aller
@@ -589,6 +607,11 @@ und Matches unter 25 % fallen aus dem Gesamtschnitt. Ebenso Mini-Lobbys unter
 20 echten Gegnern: TDM und Heist haben 13 bzw. 3 Spieler statt 96 und wögen im
 Phasen-Schnitt sonst genauso schwer wie eine volle Runde. Der Wert ist ein
 Schnappschuss von heute, nicht vom Match-Tag — die API hat keine Historie.
+
+**Harte Lobbys sind markiert:** Maßstab ist der Schnitt der stärksten Fünf, nicht der
+Gesamtschnitt — der liegt fast immer um 1,3 und sagt nichts darüber, ob oben Haie
+sassen. Ab 3,0 bekommt die Zahl den Highlight-Effekt, ab 4,0 deutlicher; in der
+Match-Zeile wie im Phasen-Kopf.
 
 **Aufschlüsselung per Klick:** Die Lobby-Zahl in der Match-Zeile und die im
 Phasen-Header sind Buttons; dahinter öffnet ein Dialog mit Ø, Median, härtestem
