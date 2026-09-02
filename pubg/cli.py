@@ -1306,7 +1306,7 @@ def lobby_kd_backfill(root: str, args=None) -> int:
         params = [for_tenant, for_tenant, match_mode, match_mode, n_matches,
                   season_id, mode, for_tenant, for_tenant]
         if max_age_days:
-            params.insert(0, str(max_age_days))
+            params.append(str(max_age_days))
         with raw.cursor() as cur:
             cur.execute(f"""
                 SELECT mtm.account_id
