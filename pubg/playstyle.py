@@ -274,12 +274,32 @@ def build_fights(events, squad, team_of, *, include_bots=False,
                     downed[id(f)]["lost"].append(victim)
                 break
 
+    # Kumulativer Down-Index: wer war vor Kampf-Start bereits down?
+    # Ergibt die Alive-Groesse beider Seiten beim Kampfbeginn, damit
+    # _result Survival-Ratios statt rohe Zaehler vergleichen kann.
+    down_timeline = sorted(             # (ts, acc) aller Down-Events
+        (((_g(e, "timestamp_ms") or 0), _g(e, "target_account"))
+         for e in counting_downs(events)
+         if _g(e, "target_account")),
+        key=lambda x: x[0])
+    team_members = defaultdict(set)     # team_id -> {account_id}
+    for acc, tid in team_of.items():
+        team_members[tid].add(acc)
+    our_team_size = len(squad_ids)
+
     for f in fights:
         f["ourDowns"] = downed[id(f)]["ours"]
         f["theirDowns"] = downed[id(f)]["theirs"]
         f["downsBy"] = dict(downed[id(f)]["by"])
         f["lostBy"] = downed[id(f)]["lost"]
-        f["result"] = _result(f["theirDowns"], f["ourDowns"])
+        # Alive-Groesse beim Kampf-Start aus kumulativen Downs
+        pre_down = {acc for ts, acc in down_timeline if ts < f["startTs"]}
+        our_alive = max(our_team_size - len(pre_down & squad_ids), 1)
+        foe_members = team_members.get(f["foeTeam"], set())
+        their_alive = max(len(foe_members) - len(pre_down & foe_members), 1) \
+                      if foe_members else None
+        f["result"] = _result(f["theirDowns"], f["ourDowns"],
+                              our_alive, their_alive)
     fights.sort(key=lambda f: f["startTs"])
     return fights
 
@@ -328,7 +348,27 @@ def _set_opening(fight, item):
                                     _g(raw, "victim_x"), _g(raw, "victim_y"))
 
 
-def _result(their_downs, our_downs):
+def _result(their_downs, our_downs, our_alive=None, their_alive=None):
+    """Fight-Ausgang als Survival-Ratio, sofern Teamgroessen bekannt.
+
+    Vergleicht nicht rohe Downs, sondern den prozentualen Verlust je Seite:
+    1:1 in einem 3v4 ist fuer das 3er-Team schlechter (33 % vs 25 %).
+    Sind die Teamgroessen unbekannt, faellt es auf den einfachen Vergleich
+    zurueck.
+    """
+    if their_downs == 0 and our_downs == 0:
+        return "pointless"
+    if our_alive and their_alive:
+        # Survival-Ratio: wer hat nach dem Fight noch einen groesseren Anteil
+        # seines Teams stehen?
+        our_surv  = (our_alive   - our_downs)   / our_alive
+        their_surv = (their_alive - their_downs) / their_alive
+        if their_surv < our_surv - 0.01:
+            return "won"
+        if our_surv < their_surv - 0.01:
+            return "lost"
+        return "trade"
+    # Fallback ohne Teamgroessen
     if their_downs > our_downs:
         return "won"
     if our_downs > their_downs:
