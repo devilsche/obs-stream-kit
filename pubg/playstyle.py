@@ -274,32 +274,36 @@ def build_fights(events, squad, team_of, *, include_bots=False,
                     downed[id(f)]["lost"].append(victim)
                 break
 
-    # Kumulativer Down-Index: wer war vor Kampf-Start bereits down?
-    # Ergibt die Alive-Groesse beider Seiten beim Kampfbeginn, damit
-    # _result Survival-Ratios statt rohe Zaehler vergleichen kann.
-    down_timeline = sorted(             # (ts, acc) aller Down-Events
-        (((_g(e, "timestamp_ms") or 0), _g(e, "target_account"))
-         for e in counting_downs(events)
-         if _g(e, "target_account")),
+    # Kill-Timeline: (ts, acc) nur fuer endgueltige Kills (kein Revive mehr).
+    # Davon haengt der Wipe-Check ab: wer ist nach dem Fight wirklich weg?
+    kill_timeline = sorted(
+        ((_g(e, "timestamp_ms") or 0, _g(e, "target_account"))
+         for e in events if _g(e, "event_type") == "Kill"
+         and _g(e, "target_account")),
         key=lambda x: x[0])
     team_members = defaultdict(set)     # team_id -> {account_id}
     for acc, tid in team_of.items():
         team_members[tid].add(acc)
-    our_team_size = len(squad_ids)
 
     for f in fights:
         f["ourDowns"] = downed[id(f)]["ours"]
         f["theirDowns"] = downed[id(f)]["theirs"]
         f["downsBy"] = dict(downed[id(f)]["by"])
         f["lostBy"] = downed[id(f)]["lost"]
-        # Alive-Groesse beim Kampf-Start aus kumulativen Downs
-        pre_down = {acc for ts, acc in down_timeline if ts < f["startTs"]}
-        our_alive = max(our_team_size - len(pre_down & squad_ids), 1)
+        # Wipe-Check: wer ist bis fight.lastTs + WIPE_TAIL_MS endgueltig tot?
+        cutoff = f["lastTs"] + WIPE_TAIL_MS
+        killed_by_cutoff = {acc for ts, acc in kill_timeline if ts <= cutoff}
         foe_members = team_members.get(f["foeTeam"], set())
-        their_alive = max(len(foe_members) - len(pre_down & foe_members), 1) \
-                      if foe_members else None
-        f["result"] = _result(f["theirDowns"], f["ourDowns"],
-                              our_alive, their_alive)
+        if foe_members:
+            their_wiped = foe_members.issubset(killed_by_cutoff)
+            our_wiped   = squad_ids.issubset(killed_by_cutoff)
+        else:
+            their_wiped = our_wiped = None   # Fallback auf Down-Vergleich
+        f["result"] = _result(their_wiped, our_wiped,
+                              f["theirDowns"], f["ourDowns"])
+        # openTarget endgueltig gekillt (nicht nur geknocked)?
+        ot = f.get("openTarget")
+        f["openTargetKilled"] = bool(ot and ot in killed_by_cutoff)
     fights.sort(key=lambda f: f["startTs"])
     return fights
 
@@ -348,27 +352,32 @@ def _set_opening(fight, item):
                                     _g(raw, "victim_x"), _g(raw, "victim_y"))
 
 
-def _result(their_downs, our_downs, our_alive=None, their_alive=None):
-    """Fight-Ausgang als Survival-Ratio, sofern Teamgroessen bekannt.
+# Wie lange nach dem letzten Fight-Event ein Kill noch zum Wipe zaehlt —
+# deckt ab: Knock im Fight, jemand anderes gibt den Finisher 45 s spaeter.
+WIPE_TAIL_MS = 60_000
 
-    Vergleicht nicht rohe Downs, sondern den prozentualen Verlust je Seite:
-    1:1 in einem 3v4 ist fuer das 3er-Team schlechter (33 % vs 25 %).
-    Sind die Teamgroessen unbekannt, faellt es auf den einfachen Vergleich
-    zurueck.
+def _result(their_wiped, our_wiped, their_downs, our_downs):
+    """Fight-Ausgang: wurde ein Team im erweiterten Fenster vollstaendig gewiped?
+
+    Primaer: Wipe-Status nach Fight + Nachlaufzeit (WIPE_TAIL_MS).
+    - Feind gewiped, wir nicht  -> won
+    - Wir gewiped, Feind nicht  -> lost
+    - Beide gewiped             -> trade (sehr selten)
+    - Beide haben Ueberlebende  -> pointless (kein Wipe auf keiner Seite)
+
+    Falls Wipe-Info fehlt (leere Teamliste), Fallback auf rohen Down-Vergleich.
     """
+    if their_wiped is not None:
+        if their_wiped and not our_wiped:
+            return "won"
+        if our_wiped and not their_wiped:
+            return "lost"
+        if their_wiped and our_wiped:
+            return "trade"
+        return "pointless"
+    # Fallback: Teamgroessen unbekannt
     if their_downs == 0 and our_downs == 0:
         return "pointless"
-    if our_alive and their_alive:
-        # Survival-Ratio: wer hat nach dem Fight noch einen groesseren Anteil
-        # seines Teams stehen?
-        our_surv  = (our_alive   - our_downs)   / our_alive
-        their_surv = (their_alive - their_downs) / their_alive
-        if their_surv < our_surv - 0.01:
-            return "won"
-        if our_surv < their_surv - 0.01:
-            return "lost"
-        return "trade"
-    # Fallback ohne Teamgroessen
     if their_downs > our_downs:
         return "won"
     if our_downs > their_downs:
@@ -601,7 +610,7 @@ def aggregate(match_analyses):
         "opened": 0, "openedWon": 0, "openedLost": 0, "openedTrade": 0,
         "openedPointless": 0, "openedWithDown": 0, "openDist": [], "engaged": 0,
         "downsMade": 0, "downsBySelfInOpened": 0,
-        "openTargetDown": 0, "openTargetDownBySelf": 0,
+        "openTargetDown": 0, "openTargetDownBySelf": 0, "openTargetKilled": 0,
         "ourDownsInOpened": 0, "theirDownsInOpened": 0,
         "aliveMin": [], "pickups": [], "pickupsEarly": [], "pickupsLate": [],
         "teamDist": [], "distAtDown": [],
@@ -675,6 +684,7 @@ def aggregate(match_analyses):
             d["downsBySelfInOpened"] += (f.get("downsBy") or {}).get(opener, 0)
             d["openTargetDown"] += bool(f.get("openTargetDown"))
             d["openTargetDownBySelf"] += bool(f.get("openTargetDownBySelf"))
+            d["openTargetKilled"] += bool(f.get("openTargetKilled"))
             if f.get("openDist") is not None:
                 d["openDist"].append(f["openDist"])
 
@@ -758,10 +768,8 @@ def aggregate(match_analyses):
             # Kaempfe, Zaehler nur der zuerst getroffene Gegner.
             "openTargetDown": d["openTargetDown"],
             "openTargetDownPct": _pct(d["openTargetDown"], opened),
+            "openTargetKilledPct": _pct(d["openTargetKilled"], opened),
             "openTargetDownBySelfPct": _pct(d["openTargetDownBySelf"], opened),
-            # Anteil an den Faellen, in denen das Ziel tatsaechlich fiel —
-            # die Lesart, nach der man beim Vergleich der beiden Prozentwerte
-            # sucht ("63 und 63, also immer selbst?").
             "openTargetFinishedSelfPct": _pct(d["openTargetDownBySelf"],
                                               d["openTargetDown"]),
             "openDist": _median(d["openDist"]),
