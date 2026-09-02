@@ -474,6 +474,12 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         # in beiden Seiten des Vergleichs.
         avg = lobby_average(entry["accounts"], kd_by_acc, exclude=squad)
         squad_avg = lobby_average(sorted(squad), kd_by_acc)
+        # Die Spitze der Lobby als eigener Wert: der Schnitt sagt nicht, ob
+        # oben fuenf Haie sassen. Der Report markiert damit harte Runden.
+        top_kds = sorted((kd_by_acc.get(a) for a in entry["accounts"]
+                          if a not in squad and not is_bot(a)
+                          and kd_by_acc.get(a) is not None), reverse=True)[:5]
+        top5 = (sum(top_kds) / len(top_kds)) if top_kds else None
         extra_avg = (lobby_average(entry["accounts"], extra_by_acc,
                                     exclude=squad) if extra_key else None)
         out.append({
@@ -481,6 +487,7 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
             "playedAt": entry["playedAt"],
             "map": entry["map"],
             "lobbyKd": avg["avgKd"],
+            "lobbyTop5": top5,
             "known": avg["known"],
             "lobbyPlayers": avg["total"],
             "coverage": avg["coverage"],

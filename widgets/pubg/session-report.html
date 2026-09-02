@@ -194,6 +194,7 @@
        ein Fallback auf eine andere Variable waere zirkulaer und faellt in
        OBS auf ungestylt zurueck. */
     .lobby-open {
+      display: inline;
       background: none;
       border: 0;
       color: inherit;
@@ -3477,6 +3478,15 @@
     // Hinter jeder Lobby-Zahl steht eine Verteilung: 1.33 im Schnitt kann
     // eine gleichmaessige Lobby sein oder fuenf Haie und dreissig Bots.
     const _lobbyCache = new Map();
+    // Harte Lobby: Maßstab ist der Schnitt der stärksten Fünf, nicht der
+    // Gesamtschnitt — der liegt fast immer bei 1,3 und sagt nichts darüber,
+    // ob oben Haie sassen. Ab 3,0 markiert, ab 4,0 deutlicher.
+    const LOBBY_HOT = [3.0, 4.0, 5.0];
+
+    function hotLobby(top5, formatted) {
+      return top5 == null ? formatted : PubgUI.hot(top5, LOBBY_HOT, formatted);
+    }
+
     // Spiegelt pubg/lobby_kd.py::MIN_KD_ROUNDS — nur fuer den Hinweistext.
     const MIN_KD_ROUNDS = 20;
 
@@ -3690,7 +3700,7 @@
                      data-title="Lobby · ${PubgUI.esc(PubgUI.fmtMap(m.map))}"
                      data-sub="${PubgUI.esc(PubgUI.fmtDateTime(m.matchEnd))}"
                      aria-label="Lobby aufschlüsseln: Median, stärkste und schwächste Gegner"
-                   ><b>${m.lobbyKd.toFixed(2)}</b></button>`}</span>
+                   >${hotLobby(m.lobbyTop5, `<b>${m.lobbyKd.toFixed(2)}</b>`)}</button>`}</span>
           <span class="stat lobby-kd" title="${
             m.squadKd == null
               ? "Alltime-K/D des eigenen Squads noch nicht bekannt"
@@ -3859,13 +3869,14 @@
               <span><b>${PubgUI.fmtKD(s.kd)}</b> K/D</span>
               ${(s.squadMatchesWithMapping||0) > 0 ? `<span title="K/D des eigenen Squads in DIESER Phase — Kills durch Tode"><b>${PubgUI.fmtKD(s.squadKd||0)}</b> Squad Phase</span>` : ""}
               ${s.lobbyKd != null
-                  ? `<span title="Ø Alltime-K/D der Gegner über ${s.lobbyMatches} Matches dieser Phase"><button
+                  ? `<span title="Ø Alltime-K/D der Gegner über ${s.lobbyMatches} Matches dieser Phase${
+                       s.lobbyTop5 != null ? ` · stärkste Fünf im Schnitt ${s.lobbyTop5.toFixed(2)}` : ""}"><button
                        type="button" class="lobby-open" data-phase="1"
                        data-matches="${ph.matches.map(x => x.matchId).filter(Boolean).slice(0, 60).join(",")}"
                        data-title="Lobby · Phase ${i+1}"
                        data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'Match' : 'Matches'} gewertet"
                        aria-label="Lobby der Phase aufschlüsseln: Median, härteste Gegner"
-                     ><b>${s.lobbyKd.toFixed(2)}</b> Lobby K/D</button></span>`
+                     >${hotLobby(s.lobbyTop5, `<b>${s.lobbyKd.toFixed(2)}</b>`)}</button> Lobby K/D</span>`
                   : (s.lobbyPending
                       ? `<span title="Alltime-K/D der Gegner wird noch gesammelt"><span class="lobby-pending" role="img" aria-label="Lobby-K/D wird gesammelt"></span> Lobby K/D</span>`
                       : "")}
@@ -3876,7 +3887,7 @@
                        data-title="Squad · Phase ${i+1}"
                        data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'Match' : 'Matches'} gewertet"
                        aria-label="Squad der Phase aufschlüsseln: Karriere-K/D der Mitspieler"
-                     ><b>${s.lobbySquadKd.toFixed(2)}</b> Squad K/D</button></span>`
+                     ><b>${s.lobbySquadKd.toFixed(2)}</b></button> Squad K/D</span>`
                   : (s.lobbyPending
                       ? `<span title="Alltime-K/D des eigenen Squads wird noch gesammelt"><span class="lobby-pending" role="img" aria-label="Squad-K/D wird gesammelt"></span> Squad K/D</span>`
                       : "")}

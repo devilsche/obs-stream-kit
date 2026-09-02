@@ -2756,6 +2756,7 @@ class EndpointRegistry:
             if not info:
                 continue
             m["lobbyKd"] = info["lobbyKd"]
+            m["lobbyTop5"] = info.get("lobbyTop5")
             m["squadKd"] = info["squadKd"]
             m["lobbyCoverage"] = info["coverage"]
             m["lobbyKnown"] = info["known"]
@@ -2780,6 +2781,8 @@ class EndpointRegistry:
                                 if solid else None)
             squad = [m["squadKd"] for m in solid if m.get("squadKd") is not None]
             stats["lobbySquadKd"] = (sum(squad) / len(squad)) if squad else None
+            tops = [m["lobbyTop5"] for m in solid if m.get("lobbyTop5") is not None]
+            stats["lobbyTop5"] = (sum(tops) / len(tops)) if tops else None
             stats["lobbyMatches"] = len(solid)
             # Kein Wert, aber die Lobbys sind bekannt: der Sammler ist noch
             # dran. Das Frontend zeigt dann den Ring statt gar nichts —
