@@ -1233,10 +1233,16 @@ def lobby_kd_backfill(root: str, args=None) -> int:
     Dieser Lauf fuellt gezielt auf, mit Pacing, damit das Match-Polling sein
     Rate-Limit behaelt (10 Requests/Minute je Key, geteilt).
 
+    Ist der eigene Tenant durch, arbeitet der Lauf fuer die anderen weiter:
+    `player_season_snapshot` ist global, ein Account gehoert niemandem. Jeder
+    Tenant hat einen eigenen API-Key mit eigenem Rate-Limit — ein Key, der
+    nichts mehr zu tun hat, waere sonst verschenkt. `--no-share` schaltet das
+    ab.
+
     Nutzung:
         python -m pubg.cli lobby-kd-backfill [--tenant N] [--matches 50]
                                              [--pace 25] [--mode squad-fpp]
-                                             [--season-only]
+                                             [--season-only] [--no-share]
     """
     import time
     from core.db import connect
@@ -1262,6 +1268,9 @@ def lobby_kd_backfill(root: str, args=None) -> int:
     # Alltime ist die Hauptzahl der Ansicht; --season holt stattdessen die
     # Season-Werte im Zehnerpack.
     lifetime = "--season-only" not in args
+    # Ein freier Key soll nicht stillstehen: Snapshots sind global, also
+    # sammelt jeder Lauf nach seinem eigenen Tenant fuer die anderen weiter.
+    share = "--no-share" not in args
 
     raw = connect()
     conn = SqliteCompatConn(raw)
@@ -1279,45 +1288,71 @@ def lobby_kd_backfill(root: str, args=None) -> int:
               "vorgeben oder spaeter erneut versuchen")
         return 1
 
-    with raw.cursor() as cur:
-        cur.execute("""
-            SELECT mtm.account_id
-            FROM match_team_mapping mtm
-            JOIN (SELECT match_id, played_at FROM matches
-                  WHERE tenant_id = %s AND (%s IS NULL OR game_mode = %s)
-                  ORDER BY played_at DESC LIMIT %s) mm
-              ON mm.match_id = mtm.match_id
-            LEFT JOIN player_season_snapshot s
-                   ON s.account_id = mtm.account_id
-                  AND s.season_id = %s AND s.mode = %s
-            WHERE mtm.tenant_id = %s AND s.account_id IS NULL
-              AND mtm.account_id NOT LIKE 'ai.%%'
-            GROUP BY mtm.account_id
-            -- Juengste Lobbys zuerst: so ist die laufende Session als Erstes
-            -- vollstaendig, statt dass sich die Abdeckung gleichmaessig duenn
-            -- ueber alle 50 Matches verteilt.
-            ORDER BY MAX(mm.played_at) DESC
-        """, (tenant_id, match_mode, match_mode, n_matches, season_id, mode,
-              tenant_id))
-        missing = [r["account_id"] for r in cur.fetchall()]
+    def _missing(for_tenant):
+        """Offene Accounts — fuer einen Tenant, oder (None) fuer alle."""
+        with raw.cursor() as cur:
+            cur.execute("""
+                SELECT mtm.account_id
+                FROM match_team_mapping mtm
+                JOIN (SELECT match_id, played_at FROM matches
+                      WHERE (%s IS NULL OR tenant_id = %s)
+                        AND (%s IS NULL OR game_mode = %s)
+                      ORDER BY played_at DESC LIMIT %s) mm
+                  ON mm.match_id = mtm.match_id
+                LEFT JOIN player_season_snapshot s
+                       ON s.account_id = mtm.account_id
+                      AND s.season_id = %s AND s.mode = %s
+                WHERE (%s IS NULL OR mtm.tenant_id = %s)
+                  AND s.account_id IS NULL
+                  AND mtm.account_id NOT LIKE 'ai.%%'
+                GROUP BY mtm.account_id
+                -- Juengste Lobbys zuerst: so ist die laufende Session als
+                -- Erstes vollstaendig, statt dass sich die Abdeckung
+                -- gleichmaessig duenn ueber alle Matches verteilt.
+                ORDER BY MAX(mm.played_at) DESC
+            """, (for_tenant, for_tenant, match_mode, match_mode, n_matches,
+                  season_id, mode, for_tenant, for_tenant))
+            return [r["account_id"] for r in cur.fetchall()]
+
+    missing = _missing(tenant_id)
 
     if lifetime:
         # Alltime gibt es nur einzeln — ein Call je Spieler.
         print(f"Alltime · {mode}: {len(missing)} Spieler ohne Werte aus den "
               f"letzten {n_matches} Matches = {len(missing)} Calls "
               f"(~{len(missing) * pace / 3600:.1f} h bei {pace:.0f}s Pacing)")
-        done = found = 0
-        for acc in missing:
-            store = {}
-            found += lobby_kd.fetch_lifetime(client, [acc], store, max_calls=1)
-            if store:
-                db_pg.upsert_lifetime_snapshots(raw, store, _iso_now())
-            done += 1
-            if done % 25 == 0:
-                print(f"  {done}/{len(missing)} · {found} Spieler bekannt")
-            if done < len(missing):
-                time.sleep(pace)
-        print(f"fertig: {found} von {len(missing)} Spielern haben jetzt Zahlen")
+        seen, total_done, total_found = set(), 0, 0
+        for label, accounts in (("eigene Lobbys", missing),
+                                ("fremde Lobbys", None)):
+            if accounts is None:
+                if not share:
+                    break
+                # Frisch holen: waehrend des eigenen Laufs haben die anderen
+                # Tenants weitergesammelt.
+                accounts = [a for a in _missing(None) if a not in seen]
+                if not accounts:
+                    break
+                print(f"eigener Tenant ist durch — weiter mit {len(accounts)} "
+                      f"Spielern aus den Lobbys der anderen "
+                      f"(~{len(accounts) * pace / 3600:.1f} h)")
+            done = found = 0
+            for acc in accounts:
+                seen.add(acc)
+                store = {}
+                found += lobby_kd.fetch_lifetime(client, [acc], store,
+                                                 max_calls=1)
+                if store:
+                    db_pg.upsert_lifetime_snapshots(raw, store, _iso_now())
+                done += 1
+                if done % 25 == 0:
+                    print(f"  {label}: {done}/{len(accounts)} · "
+                          f"{found} Spieler bekannt")
+                if done < len(accounts):
+                    time.sleep(pace)
+            total_done += done
+            total_found += found
+        print(f"fertig: {total_found} von {total_done} Spielern haben jetzt "
+              f"Zahlen")
         raw.close()
         return 0
 

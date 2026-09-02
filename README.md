@@ -592,6 +592,13 @@ stand ein Spieler mit frischen `solo-fpp`-Werten 14 Minuten später mit einer le
 sehr wohl (21 Kills, 49 Tode, 49 Runden).
 `python -m pubg.cli lobby-kd-reset-unknown` räumt solche Altlasten weg.
 
+Der Langläufer `lobby-kd-backfill` läuft als Template-Unit **je Tenant**
+(`obs-lobby-backfill@1`, `@2`, …): jeder Tenant hat einen eigenen PUBG-API-Key mit
+eigenem Rate-Limit, vier Läufe konkurrieren also nicht miteinander. Ist der eigene
+Tenant durch, sammelt der Lauf für die anderen weiter — `player_season_snapshot` ist
+global, ein Account gehört niemandem, und ein untätiger Key wäre verschenktes Budget
+(`--no-share` schaltet das ab).
+
 Datenbeschaffung (`/api/pubg/lobby-kd`): Season-K/D aller
 Spieler einer Lobby, gemittelt je Match, gegen den Schnitt des **eigenen Squads**
 gehalten. Der eigene Squad ist dabei aus der Lobby-Seite herausgerechnet — sonst
