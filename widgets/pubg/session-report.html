@@ -2522,17 +2522,16 @@
       let tooltipAttr = "";
       if (acc && playerKds) {
         const snap = playerKds[acc];
-        if (snap !== undefined) {
-          const modeLabel = {"squad-fpp":"Squad FPP","squad-tpp":"Squad TPP",
-            "duo-fpp":"Duo FPP","duo-tpp":"Duo TPP",
-            "solo-fpp":"Solo FPP","solo-tpp":"Solo TPP",
-            "fpp":"FPP gesamt","tpp":"TPP gesamt","all":"Allzeit"}[snap && snap.mode] || (snap && snap.mode) || "Allzeit";
-          const tip = snap
-            ? `K/D ${snap.kd.toFixed(2)} · ${snap.rounds} Runden (${modeLabel})`
-            : "K/D wird noch geladen";
-          tooltipAttr = ` data-kd-tip="${PubgUI.esc(tip)}"`;
-        }
+        const MODE = {"squad-fpp":"Squad FPP","squad-tpp":"Squad TPP",
+          "duo-fpp":"Duo FPP","duo-tpp":"Duo TPP",
+          "solo-fpp":"Solo FPP","solo-tpp":"Solo TPP",
+          "fpp":"FPP gesamt","tpp":"TPP gesamt","all":"Allzeit"};
+        const tip = (snap && snap.kd != null)
+          ? `K/D ${snap.kd.toFixed(2)} · ${snap.rounds} Runden (${MODE[snap.mode] || snap.mode || "Allzeit"})`
+          : "K/D wird noch geladen";
+        tooltipAttr = ` data-kd-tip="${PubgUI.esc(tip)}"`;
       }
+
       return `${clanPrefix}<b class="${cls} md-tl-name"${tooltipAttr}>${name}</b>${teamSpan}`;
     }
 
