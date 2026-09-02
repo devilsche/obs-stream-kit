@@ -373,6 +373,7 @@ def player_metrics(events, squad, team_of, *, still_m=STILL_M, far_m=FAR_M):
             downs.setdefault(target, ts)
 
     first_down_acc = min(downs.items(), key=lambda kv: kv[1])[0] if downs else None
+    first_land_acc = min(landing.items(), key=lambda kv: kv[1])[0] if landing else None
 
     out = {}
     for acc in squad_ids:
@@ -438,6 +439,7 @@ def player_metrics(events, squad, team_of, *, still_m=STILL_M, far_m=FAR_M):
             "distCount": len(team_dists),
             "wentDown": acc in downs,
             "firstDown": acc == first_down_acc,
+            "firstLand": acc == first_land_acc,
             "distAtDown": _dist_at_down(acc, downs, positions),
         }
     return out
@@ -547,7 +549,7 @@ def aggregate(match_analyses):
     testbar bleibt und der Aufrufer Matches beliebig filtern kann.
     """
     acc_data = defaultdict(lambda: {
-        "name": None, "matches": 0, "downs": 0, "firstDowns": 0,
+        "name": None, "matches": 0, "downs": 0, "firstDowns": 0, "firstLands": 0,
         "pickTotal": 0, "aliveTotal": 0.0, "aliveMs": 0.0,
         "lateePickTotal": 0, "lateAliveTotal": 0.0,
         "stillMs": 0, "stillTotalMs": 0, "stillLateMs": 0, "stillLateTotalMs": 0,
@@ -584,6 +586,8 @@ def aggregate(match_analyses):
                 d["downs"] += 1
             if m.get("firstDown"):
                 d["firstDowns"] += 1
+            if m.get("firstLand"):
+                d["firstLands"] += 1
             for key, target in (("aliveMin", "aliveMin"),
                                 ("pickups", "pickups"),
                                 ("pickupsEarly10", "pickupsEarly"),
@@ -686,6 +690,7 @@ def aggregate(match_analyses):
             "distAtDown": _median(d["distAtDown"]),
             "distAtDownMax": max(d["distAtDown"]) if d["distAtDown"] else None,
             "firstDownPct": _pct(d["firstDowns"], d["matches"]),
+            "firstLandPct": _pct(d["firstLands"], d["matches"]),
             "downs": d["downs"],
             "opened": opened,
             "openedPerMatch": (opened / d["matches"]) if d["matches"] else None,
