@@ -2852,8 +2852,10 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                      "mode": res["basis"]}
                     if res["kd"] is not None else None
                 )
-    except Exception:
-        pass  # nie den Match-Detail-Load brechen
+    except Exception as _kd_err:
+        import traceback as _tb
+        print(f"[match-detail] playerKds-Fehler: {_kd_err}")
+        _tb.print_exc()
 
     return {
         "matchId":      match_id,
