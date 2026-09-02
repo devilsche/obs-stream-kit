@@ -1689,7 +1689,13 @@
     const _mdCache = new Map();
     async function mdLoad(matchId) {
       if (!matchId) return null;
-      if (_mdCache.has(matchId)) return _mdCache.get(matchId);
+      if (_mdCache.has(matchId)) {
+        const c = _mdCache.get(matchId);
+        // Stale-Check: Eintraege ohne playerKds stammen von vor dem
+        // Feature-Deploy und werden einmalig neu abgerufen.
+        if ('playerKds' in c) return c;
+        _mdCache.delete(matchId);
+      }
       let d = null;
       try {
         d = await PubgUI.fetchJson(
@@ -1710,7 +1716,9 @@
             : MD_COLORS[i % MD_COLORS.length];
         });
       }
-      const cached = { detail: d, colorByAcc, playerKds: d.playerKds || {} };
+      const cached = { detail: d, colorByAcc, playerKds: d.playerKds ?? {} };
+      // playerKds: immer als eigenes Feld speichern — 'playerKds' in cached
+      // dient als Frische-Marker fuer den Stale-Check oben.
       _mdCache.set(matchId, cached);
       return cached;
     }
