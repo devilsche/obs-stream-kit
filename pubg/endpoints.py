@@ -3051,7 +3051,8 @@ class EndpointRegistry:
             cache_key,
             lambda: compute_squad_playstyle(
                 conn, self.tenant_id, self.my_account_id, match_ids,
-                include_bots=include_bots, min_matches=min_matches))
+                include_bots=include_bots, min_matches=min_matches,
+                group_names=names or None))
         return _ok({**data, "range": range_key, "players": names,
                     "minMatches": min_matches, "includeBots": include_bots,
                     "myAccountId": self.my_account_id})

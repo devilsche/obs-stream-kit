@@ -392,6 +392,11 @@ def player_metrics(events, squad, team_of, *, still_m=STILL_M, far_m=FAR_M):
 
         ground = loot_bursts([ts for ts in ground_picks.get(acc, [])
                               if ts >= t_start])
+        # Loot in der zweiten Lebenshaelfte — Nenner fuer lateLootSharePct.
+        half_point = t_start + (t_end - t_start) / 2.0
+        late_alive_ms = max(t_end - half_point, 0.0)
+        ground_late = loot_bursts([ts for ts in ground_picks.get(acc, [])
+                                   if ts >= half_point])
         boxes = box_visits([(ts, own) for ts, own in box_picks.get(acc, [])
                             if ts >= t_start])
 
@@ -409,6 +414,9 @@ def player_metrics(events, squad, team_of, *, still_m=STILL_M, far_m=FAR_M):
             # Summen ueber alle Matches, nie aus gemittelten Match-Raten.
             "lootItems": ground["items"],
             "lootActiveMs": ground["activeMs"],
+            "lootLateActiveMs": ground_late["activeMs"],
+            "lootLateAliveMs": late_alive_ms,
+            "aliveMs": max(t_end - t_start, 0.0),
             "lootBursts": ground["bursts"],
             "lootSingles": ground["singles"],
             "boxCount": boxes["boxes"],
@@ -540,10 +548,12 @@ def aggregate(match_analyses):
     """
     acc_data = defaultdict(lambda: {
         "name": None, "matches": 0, "downs": 0, "firstDowns": 0,
-        "pickTotal": 0, "aliveTotal": 0.0,
+        "pickTotal": 0, "aliveTotal": 0.0, "aliveMs": 0.0,
         "lateePickTotal": 0, "lateAliveTotal": 0.0,
         "stillMs": 0, "stillTotalMs": 0, "stillLateMs": 0, "stillLateTotalMs": 0,
-        "lootItems": 0, "lootActiveMs": 0, "lootBursts": 0, "lootSingles": 0,
+        "lootItems": 0, "lootActiveMs": 0, "lootLateActiveMs": 0,
+        "lootLateAliveMs": 0.0,
+        "lootBursts": 0, "lootSingles": 0,
         "boxCount": 0, "boxItems": 0, "boxActiveMs": 0,
         "farCount": 0, "distCount": 0,
         "opened": 0, "openedWon": 0, "openedLost": 0, "openedTrade": 0,
@@ -553,13 +563,23 @@ def aggregate(match_analyses):
         "ourDownsInOpened": 0, "theirDownsInOpened": 0,
         "aliveMin": [], "pickups": [], "pickupsEarly": [], "pickupsLate": [],
         "teamDist": [], "distAtDown": [],
+        "squadAliveShares": [],
     })
 
     for a in match_analyses:
-        for acc, m in (a.get("players") or {}).items():
+        # Squad-Alive-Anteil je Match vorberechnen.
+        players_in_match = a.get("players") or {}
+        total_alive_ms = sum(
+            (m.get("aliveMs") or 0.0) for m in players_in_match.values()
+        )
+        for acc, m in players_in_match.items():
             d = acc_data[acc]
             d["name"] = m.get("name") or d["name"]
             d["matches"] += 1
+            if total_alive_ms > 0:
+                d["squadAliveShares"].append(
+                    (m.get("aliveMs") or 0.0) / total_alive_ms
+                )
             if m.get("wentDown"):
                 d["downs"] += 1
             if m.get("firstDown"):
@@ -577,11 +597,13 @@ def aggregate(match_analyses):
             # Match-Rate den ganzen Zeitraum verzerren.
             d["pickTotal"] += m.get("pickups") or 0
             d["aliveTotal"] += m.get("aliveMin") or 0.0
+            d["aliveMs"] += m.get("aliveMs") or 0.0
             d["lateePickTotal"] += m.get("pickupsLate15") or 0
             d["lateAliveTotal"] += m.get("lateAliveMin") or 0.0
             for k in ("stillMs", "stillTotalMs", "stillLateMs",
                       "stillLateTotalMs", "farCount", "distCount",
-                      "lootItems", "lootActiveMs", "lootBursts",
+                      "lootItems", "lootActiveMs", "lootLateActiveMs",
+                      "lootLateAliveMs", "lootBursts",
                       "lootSingles", "boxCount", "boxItems", "boxActiveMs"):
                 d[k] += m.get(k) or 0
 
@@ -620,6 +642,13 @@ def aggregate(match_analyses):
             "name": d["name"] or acc[:12],
             "matches": d["matches"],
             "aliveMin": _mean(d["aliveMin"]),
+            # Anteil der Lebenszeit, den er lootet (0..100).
+            "lootSharePct": _pct(d["lootActiveMs"], d["aliveMs"]),
+            # Dasselbe, aber nur fuer die zweite Lebenshaelfte.
+            "lateLootSharePct": _pct(d["lootLateActiveMs"], d["lootLateAliveMs"]),
+            # Wie gross sein Anteil an der Gesamtlebenszeit des Squads ist.
+            "squadAliveSharePct": (round(_mean(d["squadAliveShares"]) * 100)
+                                   if d["squadAliveShares"] else None),
             # Tempo waehrend des Lootens — Nenner ist die Zeit IN den
             # Loot-Phasen, nicht die Lebenszeit. Wer in 20 s 30 Items nimmt
             # und dann 10 min laeuft, ist schnell, nicht langsam.
@@ -741,7 +770,7 @@ def baseline(match_analyses):
 
 def compute_squad_playstyle(conn, tenant_id: int, my_account_id,
                             match_ids, *, include_bots=False,
-                            min_matches=1):
+                            min_matches=1, group_names=None):
     """Zeilen je Squad-Mate ueber die genannten Matches.
 
     Laedt je Match Squad (participants), Lobby-Teams (match_team_mapping) und
@@ -758,6 +787,10 @@ def compute_squad_playstyle(conn, tenant_id: int, my_account_id,
         squad = {r["account_id"]: r["name"] for r in conn.execute(
             "SELECT account_id, name FROM participants "
             "WHERE tenant_id = ? AND match_id = ?", (tenant_id, mid)).fetchall()}
+        if group_names:
+            lower = {n.lower() for n in group_names}
+            squad = {acc: name for acc, name in squad.items()
+                     if (name or "").lower() in lower}
         if not squad:
             continue
         team_of = {r["account_id"]: r["team_id"] for r in conn.execute(

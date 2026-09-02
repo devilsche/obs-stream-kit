@@ -114,12 +114,27 @@
       .howto dd { margin-bottom: 6px; }
     }
     .err { color: var(--theme-warn); }
+    .col-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+    .col-chips button {
+      background: transparent;
+      border: 1px solid color-mix(in srgb, var(--theme-text) 20%, transparent);
+      color: var(--theme-text-dim); padding: 3px 9px; border-radius: 20px;
+      cursor: pointer; font-family: inherit; font-size: 11px; font-weight: 600;
+      letter-spacing: 0.04em; min-height: 24px; }
+    .col-chips button:hover { color: var(--theme-text); }
+    .col-chips button:focus-visible { outline: 2px solid var(--theme-accent); outline-offset: 2px; }
+    .col-chips button[aria-pressed="true"] {
+      background: color-mix(in srgb, var(--theme-accent) 18%, transparent);
+      border-color: var(--theme-accent); color: var(--theme-accent); }
+    .col-chips .chip-reset {
+      border-color: color-mix(in srgb, var(--theme-text) 12%, transparent);
+      color: var(--theme-text-dim); font-size: 10px; opacity: 0.7; }
+    .col-chips .chip-reset:hover { opacity: 1; }
   </style>
 </head>
 <body>
-  <h1 class="t-title">PUBG Squad Playstyle</h1>
-  <div class="t-subtitle">Who opens the fights, how they end, and how everyone plays
-    — lobby strength per match lives in the session report</div>
+  <h1 class="t-title">PUBG Squad Spielstil</h1>
+  <div class="t-subtitle">Wer eröffnet Fights, wie enden sie, wie spielt jeder — Lobby-Stärke pro Match im Session-Report</div>
 
   <div class="t-card">
     <div class="bar">
@@ -132,17 +147,12 @@
           <button type="button" data-range="all" aria-pressed="false">All</button>
         </div>
       </div>
-      <label for="fPlayers">Matches with
+      <label for="fPlayers">Gruppe
         <input id="fPlayers" type="text"
-               placeholder="e.g. hacker_luke, SleepAtWar — empty = all matches"
+               placeholder="z. B. hacker_luke, SleepAtWar — leer = alle"
                aria-describedby="playersNote">
       </label>
-      <label for="fShow">Show only
-        <input id="fShow" type="text"
-               placeholder="empty = everyone in those matches"
-               aria-describedby="playersNote">
-      </label>
-      <label for="fMin">Min. matches
+      <label for="fMin">Min. Matches
         <input id="fMin" type="number" min="1" max="99" value="3">
       </label>
       <label class="check" for="fBots">
@@ -150,19 +160,16 @@
       </label>
     </div>
     <div class="legend" id="playersNote">
-      <b>Matches with</b> picks the matches: only rounds in which <b>all</b>
-      named players took part. <b>Show only</b> picks the rows — everyone else
-      is hidden, but the matches stay the same. Both are independent, so you
-      can select rounds by one squad and still look at a single player.
-      Careful when comparing shares: a mate who joined halfway through has a
-      smaller sample, and his percentages rest on a different denominator —
-      the match count next to his name says how many.
+      <b>Gruppe</b> bestimmt beides: nur Matches in denen <b>alle</b> genannten
+      im Squad waren, und alle Prozentwerte nur auf diese Personen bezogen.
+      Leer = alle Mitspieler, alle Matches.
     </div>
     <div class="legend" id="status">Loading …</div>
   </div>
 
   <div class="t-card" id="fightCard" hidden>
-    <h2>Fights — who opens</h2>
+    <h2>Fights — wer eröffnet</h2>
+    <div id="fightChips" class="col-chips" role="group" aria-label="Sichtbare Spalten Fights"></div>
     <div class="scroll">
       <table>
         <thead id="fightHead"><tr></tr></thead>
@@ -208,7 +215,8 @@
   </div>
 
   <div class="t-card" id="styleCard" hidden>
-    <h2>Playstyle</h2>
+    <h2>Spielstil</h2>
+    <div id="styleChips" class="col-chips" role="group" aria-label="Sichtbare Spalten Spielstil"></div>
     <div class="scroll">
       <table>
         <thead id="styleHead"><tr></tr></thead>
@@ -246,186 +254,255 @@
 
     let RANGE = PubgUI.qs("range", "session");
     let PLAYERS = PubgUI.qs("players", "");
-    // Getrennt von PLAYERS: das eine waehlt die MATCHES, das andere die
-    // ZEILEN. Vorher machte ein Feld beides halb — man bekam die Runden
-    // eines Duos, in der Tabelle aber jeden Zufallsmate mit eigener
-    // Match-Zahl daneben.
-    let SHOW = PubgUI.qs("show", "");
-
-    function showFilter() {
-      return SHOW.split(",").map(n => n.trim().toLowerCase()).filter(Boolean);
-    }
-
-    function visibleRows(rows) {
-      const want = showFilter();
-      if (!want.length) return rows;
-      return rows.filter(r => want.includes(String(r.name || "").toLowerCase()));
-    }
     let MIN = parseInt(PubgUI.qs("minMatches", "3"), 10) || 3;
     let BOTS = PubgUI.qs("includeBots", "") === "1";
     let DATA = null;
     let SORT = { fight: { key: "opened", dir: -1 },
                  style: { key: "matches", dir: -1 } };
 
-    const n1 = (v) => v == null ? "—" : v.toFixed(1);
-    const n0 = (v) => v == null ? "—" : Math.round(v).toString();
-    const n2 = (v) => v == null ? "—" : v.toFixed(2);
+    const n1 = (v) => v == null ? "\u2014" : v.toFixed(1);
+    const n0 = (v) => v == null ? "\u2014" : Math.round(v).toString();
+    const n2 = (v) => v == null ? "\u2014" : v.toFixed(2);
 
-    // Spalten: key, Titel, Formatierer, optional flag(row) für Hervorhebung
+    // chip: true = per Chip ein-/ausblendbar; chipDefault: true = standardm\u00e4ssig sichtbar
     const FIGHT_COLS = [
-      { key: "name", label: "Player", fmt: (r) => esc(r.name), text: true,
-        help: "Squad mate. Your own name is highlighted." },
+      { key: "name", label: "Spieler", fmt: (r) => esc(r.name), text: true,
+        help: "Squad-Mate. Eigener Name ist hervorgehoben." },
       { key: "matches", label: "Matches", fmt: (r) => r.matches,
-        help: "Matches in the selected range he took part in." },
-      { key: "opened", label: "Fights opened", fmt: (r) => r.opened,
-        help: "How often he landed the first hit on an enemy team." },
-      { key: "openedPerMatch", label: "per match", fmt: (r) => n1(r.openedPerMatch),
-        help: "Opened fights divided by matches — the measure for “always starts something”." },
-      { key: "openTargetDownPct", label: "Target down", unit: "%",
+        help: "Matches im gew\u00e4hlten Zeitraum." },
+      { key: "opened", label: "Fights er\u00f6ffnet", fmt: (r) => r.opened,
+        chip: true, chipDefault: true,
+        help: "Wie oft er als Erster einen Feind trifft." },
+      { key: "openedPerMatch", label: "pro Match", fmt: (r) => n1(r.openedPerMatch),
+        chip: true, chipDefault: true,
+        help: "Er\u00f6ffnete Fights / Matches \u2014 Ma\u00df f\u00fcr \"f\u00e4ngt immer was an\"." },
+      { key: "openTargetDownPct", label: "Ziel geht down", unit: "%",
         fmt: (r) => n0(r.openTargetDownPct),
-        help: "He hits first — and that exact enemy goes down during the fight. No matter who finishes him.",
+        chip: true, chipDefault: true,
         flag: (r, all) => isTop(r, all, "openTargetDownPct", "opened"),
-        why: "whoever he hits first drops most reliably" },
-      { key: "openTargetFinishedSelfPct", label: "finished himself",
-        unit: "% of those",
-        fmt: (r) => n0(r.openTargetFinishedSelfPct),
-        help: "Of the targets that actually went down: how many he finished himself instead of the team cleaning up. 100% means every target he hit first, he also put down." },
-      { key: "openDist", label: "Opening distance", unit: "m",
-        fmt: (r) => n0(r.openDist),
-        help: "How far away the enemy was on the first hit (median across his fights). Long range is safer but harder to finish." },
-      { key: "openHitPct", label: "Any down", unit: "%",
-        fmt: (r) => n0(r.openHitPct),
-        help: "Share of his opened fights where anyone from the enemy team goes down — not necessarily the one he hit." },
-      { key: "wonPct", label: "Won", unit: "%", fmt: (r) => n0(r.wonPct),
-        help: "Fights where more enemies were on the floor than own players." },
-      { key: "lostPct", label: "Lost", unit: "%", fmt: (r) => n0(r.lostPct),
-        help: "Fights where the squad came off worse than the enemy team." },
-      { key: "pointlessPct", label: "No effect", unit: "%",
+        why: "Getroffen = am zuverl\u00e4ssigsten weg",
+        help: "Er trifft zuerst \u2014 und genau dieser Feind geht im Fight down. Egal wer ihn beendet." },
+      { key: "wonPct", label: "Gewonnen", unit: "%", fmt: (r) => n0(r.wonPct),
+        chip: true, chipDefault: true,
+        help: "Fights, in denen mehr Feinde als eigene Spieler am Boden lagen." },
+      { key: "lostPct", label: "Verloren", unit: "%", fmt: (r) => n0(r.lostPct),
+        chip: true, chipDefault: true,
+        help: "Fights, in denen das Squad schlechter abschnitt als der Feind." },
+      { key: "pointlessPct", label: "Kein Effekt", unit: "%",
         fmt: (r) => n0(r.pointlessPct),
-        help: "Shots fired, nobody down — on either side. Noise that only draws attention.",
+        chip: true, chipDefault: true,
         flag: (r, all) => isTop(r, all, "pointlessPct", "opened"),
-        why: "fires into the void most often" },
-      { key: "downsPerOpen", label: "Enemies per fight", unit: "avg · whole team",
-        fmt: (r) => n2(r.downsPerOpen),
-        help: "How many enemies drop on average after he opened — regardless of who downs them. Squad result, not his personal work.",
-        flag: (r, all) => isTop(r, all, "downsPerOpen", "opened"),
-        why: "the squad gets the most out of his fights" },
-      { key: "selfDownsPerOpen", label: "of that himself", unit: "avg",
-        fmt: (r) => n2(r.selfDownsPerOpen),
-        help: "How much of that he downed himself. Much lower than the column on the left means he opens and the team cleans up." },
-      { key: "squadLossPerOpen", label: "Own losses per fight", unit: "avg",
+        why: "Schie\u00dft am h\u00e4ufigsten ins Leere",
+        help: "Sch\u00fcsse, niemand down \u2014 auf keiner Seite. L\u00e4rm, der nur aufmerksam macht." },
+      { key: "openDist", label: "Er\u00f6ffnungsdistanz", unit: "m",
+        fmt: (r) => n0(r.openDist),
+        chip: true, chipDefault: true,
+        help: "Wie weit der Feind beim ersten Treffer war (Median). Weit = sicherer, aber schwerer zu Ende zu bringen." },
+      { key: "squadLossPerOpen", label: "Eigene Verluste/Fight", unit: "avg",
         fmt: (r) => n2(r.squadLossPerOpen),
-        help: "How many of our own go down on average when he starts a fight. The number for “his opening costs us people”.",
+        chip: true, chipDefault: true,
         flag: (r, all) => isTop(r, all, "squadLossPerOpen", "opened"),
-        why: "his fights cost the squad the most" },
-      { key: "downsFor", label: "Enemies down", unit: "total",
+        why: "Seine Fights kosten das Squad am meisten",
+        help: "Wie viele Eigene im Schnitt fallen, wenn er er\u00f6ffnet." },
+      { key: "openTargetFinishedSelfPct", label: "Selbst beendet", unit: "% davon",
+        fmt: (r) => n0(r.openTargetFinishedSelfPct),
+        chip: true, chipDefault: false,
+        help: "Von den Zielen, die tats\u00e4chlich down gingen: wie viele er selbst beendet hat statt das Team." },
+      { key: "openHitPct", label: "Irgendwer down", unit: "%",
+        fmt: (r) => n0(r.openHitPct),
+        chip: true, chipDefault: false,
+        help: "Anteil seiner Fights, in denen irgendein Feind down geht \u2014 nicht zwingend sein Ziel." },
+      { key: "downsPerOpen", label: "Feinde/Fight", unit: "avg",
+        fmt: (r) => n2(r.downsPerOpen),
+        chip: true, chipDefault: false,
+        flag: (r, all) => isTop(r, all, "downsPerOpen", "opened"),
+        why: "Squad holt aus seinen Fights das Meiste raus",
+        help: "Wie viele Feinde im Schnitt nach seiner Er\u00f6ffnung fallen \u2014 ganzes Squad, nicht er allein." },
+      { key: "selfDownsPerOpen", label: "davon selbst", unit: "avg",
+        fmt: (r) => n2(r.selfDownsPerOpen),
+        chip: true, chipDefault: false,
+        help: "Wie viel davon er selbst erzielt hat. Viel kleiner als die Spalte links = er er\u00f6ffnet, das Team r\u00e4umt auf." },
+      { key: "downsFor", label: "Feinde down", unit: "total",
         fmt: (r) => r.downsFor,
-        help: "Enemies who went down in the fights he opened — work of the whole squad." },
-      { key: "downsAgainst", label: "Own down", unit: "total",
+        chip: true, chipDefault: false,
+        help: "Feinde die in seinen Fights down gingen \u2014 Teamleistung." },
+      { key: "downsAgainst", label: "Eigene down", unit: "total",
         fmt: (r) => r.downsAgainst,
-        help: "Own players who went down in the fights he opened." },
-      { key: "downsMade", label: "Downed himself", unit: "total",
+        chip: true, chipDefault: false,
+        help: "Eigene Spieler die in seinen Fights down gingen." },
+      { key: "downsMade", label: "Selbst gedownt", unit: "total",
         fmt: (r) => r.downsMade,
-        help: "Every enemy he personally put down — including fights someone else opened." },
+        chip: true, chipDefault: false,
+        help: "Alle Feinde die er pers\u00f6nlich gedownt hat \u2014 auch in Fights die andere er\u00f6ffnet haben." },
     ];
 
     const STYLE_COLS = [
-      { key: "name", label: "Player", fmt: (r) => esc(r.name), text: true,
-        help: "Squad mate. Your own name is highlighted." },
+      { key: "name", label: "Spieler", fmt: (r) => esc(r.name), text: true,
+        help: "Squad-Mate. Eigener Name hervorgehoben." },
       { key: "matches", label: "Matches", fmt: (r) => r.matches,
-        help: "Matches in the selected range he took part in." },
-      { key: "lootTempo", label: "Loot speed", unit: "items/min",
-        fmt: (r) => n0(r.lootTempo),
-        help: "How fast he grabs things WHILE looting. Pickups are grouped into looting phases (a gap of more than 20 s starts a new one); the denominator is the time inside those phases, not his time alive. So 30 items in 20 s followed by ten quiet minutes reads as fast — because it is. Single pickups with no neighbour have no measurable duration and sit in the “on the way” column instead.",
-        flag: (r, all) => isTop(r, all, "lootTempo"),
-        why: "grabs loot the fastest" },
-      { key: "lootMinPerMatch", label: "Time spent looting", unit: "min/match",
-        fmt: (r) => n1(r.lootMinPerMatch),
-        help: "Minutes per match he actually spends looting, summed over all looting phases. This is the other axis: fast AND long is the vulture, slow AND short is the fighter." },
-      { key: "lootSinglesPerMatch", label: "Grabbed on the way", unit: "per match",
-        fmt: (r) => n1(r.lootSinglesPerMatch),
-        help: "Pickups with no other pickup within 20 s — ammo off the road, a med after a fight. Not a looting run, so they stay out of the speed above." },
-      { key: "boxSec", label: "Seconds per box", unit: "s",
-        fmt: (r) => n1(r.boxSec),
-        help: "How long he hangs on a dead player's box, per visit. Late in the match that is where people get killed.",
-        flag: (r, all) => isTop(r, all, "boxSec"),
-        why: "lingers on death boxes the longest" },
-      { key: "boxItemsPer", label: "Items per box",
-        fmt: (r) => n1(r.boxItemsPer),
-        help: "Items taken per box visit — does he clear it out or just grab ammo?" },
-      { key: "pickupsEarly10", label: "Loot first 10 min",
-        fmt: (r) => n0(r.pickupsEarly10),
-        help: "Items picked up during the first ten minutes of the match — that is gearing up, per match on average." },
-      { key: "lateLootPerMin", label: "Still looting after 15 min",
-        unit: "per min",
-        fmt: (r) => n1(r.lateLootPerMin),
-        help: "Items picked up per minute alive after minute 15 — each pickup is one stack, so 30 rounds of ammo count once. By then the circle is small and the squad wants to rotate. Empty means he rarely lives that long.",
-        flag: (r, all) => isTop(r, all, "lateLootPerMin"),
-        why: "keeps looting the longest late in the match" },
-      { key: "lateAliveMin", label: "late minutes", unit: "sample",
-        fmt: (r) => n0(r.lateAliveMin),
-        help: "Minutes he was alive after minute 15 across the range — the sample the rate on the left rests on. A rate from 78 minutes is worth less than one from 312." },
-      { key: "aliveMin", label: "Time alive", unit: "min",
-        fmt: (r) => n1(r.aliveMin),
-        help: "From landing to his own knock, on average." },
-      { key: "teamDist", label: "Distance to team", unit: "m",
-        fmt: (r) => n0(r.teamDist),
-        help: "How far the nearest mate typically is. Small means glued to the team, large means doing his own thing.",
-        flag: (r, all) => isTop(r, all, "teamDist"),
-        why: "plays farthest from the team" },
-      { key: "farShare", label: "On his own", unit: "%",
-        fmt: (r) => n0(r.farShare),
-        help: "Share of playtime with no mate closer than 100 m." },
-      { key: "distAtDown", label: "Distance when downed", unit: "m",
-        fmt: (r) => n0(r.distAtDown),
-        help: "How far the team was when he got knocked. Large means nobody could help." },
-      { key: "distAtDownMax", label: "worst case", unit: "m",
-        fmt: (r) => n0(r.distAtDownMax),
-        help: "The largest measured distance to the team at one of his own knocks." },
-      { key: "firstDownPct", label: "First to drop", unit: "%",
+        help: "Matches im gew\u00e4hlten Zeitraum." },
+      { key: "squadAliveSharePct", label: "Squad-Lebensanteil", unit: "%",
+        fmt: (r) => n0(r.squadAliveSharePct),
+        chip: true, chipDefault: true,
+        flag: (r, all) => isTop(r, all, "squadAliveSharePct"),
+        why: "Lebt den gr\u00f6\u00dften Anteil der Squad-Gesamtzeit",
+        help: "Seine Lebenszeit / Summe aller Squad-Lebenszeiten je Match, gemittelt. 25\u202f% im 4er Squad = immer als Erster down, 40\u202f% = \u00fcberlebt die anderen regelm\u00e4\u00dfig." },
+      { key: "firstDownPct", label: "Erster down", unit: "%",
         fmt: (r) => n0(r.firstDownPct),
-        help: "Share of HIS matches in which he was the first of the squad to go down. Two players never add up to 100 %: in a four-man squad the first down belongs to whoever actually dropped first, so the rest sits with the other mates — or with nobody, in rounds where the squad never went down. Measured over 263 rounds with two fixed players, 37.6 % and 20.2 % were theirs and the remaining 42 % belonged to third and fourth mates.",
+        chip: true, chipDefault: true,
         flag: (r, all) => isTop(r, all, "firstDownPct"),
-        why: "drops first most often" },
-      { key: "stillLateShare", label: "Standing (late)", unit: "%",
+        why: "Geht am h\u00e4ufigsten als Erster down",
+        help: "Anteil seiner Matches in denen er der Erste aus der Gruppe war der fiel." },
+      { key: "lootSharePct", label: "Loot-Anteil", unit: "%",
+        fmt: (r) => n0(r.lootSharePct),
+        chip: true, chipDefault: true,
+        flag: (r, all) => isTop(r, all, "lootSharePct"),
+        why: "Verbringt den gr\u00f6\u00dften Teil seiner Lebenszeit mit Looten",
+        help: "Aktive Loot-Zeit / gesamte Lebenszeit. 5 von 6 Minuten lootet = 83\u202f%, 8 von 30 Minuten = 27\u202f%." },
+      { key: "lootTempo", label: "Loot-Tempo", unit: "Items/min",
+        fmt: (r) => n0(r.lootTempo),
+        chip: true, chipDefault: true,
+        flag: (r, all) => isTop(r, all, "lootTempo"),
+        why: "Greift am schnellsten zu",
+        help: "Wie schnell er greift W\u00c4HREND er lootet. Nenner ist die Zeit in Loot-Phasen, nicht die Lebenszeit." },
+      { key: "lateLootSharePct", label: "Loot (2. H\u00e4lfte)", unit: "%",
+        fmt: (r) => n0(r.lateLootSharePct),
+        chip: true, chipDefault: true,
+        flag: (r, all) => isTop(r, all, "lateLootSharePct"),
+        why: "Lootet in der zweiten Lebenshalfte am meisten",
+        help: "Loot-Aktivzeit in der zweiten Lebenshalfte / Lebenszeit in der zweiten H\u00e4lfte. Normiert automatisch auf Match-L\u00e4nge und Respawns." },
+      { key: "pickupsEarly10", label: "Loot erste 10 min",
+        fmt: (r) => n0(r.pickupsEarly10),
+        chip: true, chipDefault: true,
+        help: "Items in den ersten 10 Matchminuten aufgehoben \u2014 das Ausr\u00fcsten, im Schnitt pro Match." },
+      { key: "lootSinglesPerMatch", label: "Unterwegs gegriffen", unit: "/Match",
+        fmt: (r) => n1(r.lootSinglesPerMatch),
+        chip: true, chipDefault: false,
+        help: "Pickups ohne Nachbarn innerhalb 20\u202fs \u2014 Muni vom Weg, Med nach einem Fight." },
+      { key: "boxSec", label: "Sek. pro Box", unit: "s",
+        fmt: (r) => n1(r.boxSec),
+        chip: true, chipDefault: false,
+        flag: (r, all) => isTop(r, all, "boxSec"),
+        why: "H\u00e4ngt am l\u00e4ngsten an Leichen-Boxen",
+        help: "First-to-last-Pickup an einer Box, pro Besuch." },
+      { key: "boxItemsPer", label: "Items pro Box",
+        fmt: (r) => n1(r.boxItemsPer),
+        chip: true, chipDefault: false,
+        help: "Items pro Box-Besuch \u2014 r\u00e4umt er sie leer oder greift er nur kurz rein?" },
+      { key: "aliveMin", label: "Lebenszeit", unit: "min",
+        fmt: (r) => n1(r.aliveMin),
+        chip: true, chipDefault: false,
+        help: "Von der Landung bis zum eigenen Knock, im Schnitt." },
+      { key: "teamDist", label: "Distanz zum Team", unit: "m",
+        fmt: (r) => n0(r.teamDist),
+        chip: true, chipDefault: false,
+        flag: (r, all) => isTop(r, all, "teamDist"),
+        why: "Spielt am weitesten vom Team entfernt",
+        help: "Wie weit der n\u00e4chste Mitspieler typischerweise ist." },
+      { key: "farShare", label: "Allein", unit: "%",
+        fmt: (r) => n0(r.farShare),
+        chip: true, chipDefault: false,
+        help: "Anteil der Spielzeit ohne Mitspieler in 100\u202fm Radius." },
+      { key: "distAtDown", label: "Distanz beim Knock", unit: "m",
+        fmt: (r) => n0(r.distAtDown),
+        chip: true, chipDefault: false,
+        help: "Wie weit das Team war als er geknocked wurde." },
+      { key: "distAtDownMax", label: "schlimmster Fall", unit: "m",
+        fmt: (r) => n0(r.distAtDownMax),
+        chip: true, chipDefault: false,
+        help: "Gr\u00f6\u00dfte gemessene Team-Distanz bei einem seiner Knocks." },
+      { key: "stillLateShare", label: "Stillstand (sp\u00e4t)", unit: "%",
         fmt: (r) => n0(r.stillLateShare),
-        help: "Standing still during the second half of his life. Standing early is looting, standing late is holding — or camping.",
+        chip: true, chipDefault: false,
         flag: (r, all) => isTop(r, all, "stillLateShare"),
-        why: "stands still the longest late in a match" },
+        why: "Steht sp\u00e4t im Match am l\u00e4ngsten still",
+        help: "Stillstand in der zweiten Lebenshalfte. Fr\u00fch stehen ist Looten, sp\u00e4t stehen ist Halten \u2014 oder Campen." },
     ];
 
-    // Markiert den Spitzenreiter einer Spalte — ob das Lob oder Vorwurf ist,
-    // sagt der Tooltip der Spalte, nicht die Markierung.
-    //
-    // Nur Zeilen mit belastbarer Stichprobe dürfen gewinnen: sonst zeigt der
-    // Punkt auf "2,50 Downs je Eröffnung" aus zwei Gefechten, und das ist
-    // Zufall, keine Aussage.
+    // Chip-State aus localStorage lesen/schreiben
+    const CHIP_KEY = { fight: "playstyle-chips-fight", style: "playstyle-chips-style" };
+
+    function loadChipState(which, cols) {
+      try {
+        const stored = localStorage.getItem(CHIP_KEY[which]);
+        if (stored) {
+          const on = new Set(JSON.parse(stored));
+          cols.forEach(c => { if (c.chip) c._vis = on.has(c.key); });
+          return;
+        }
+      } catch (_) { /* ignore */ }
+      cols.forEach(c => { if (c.chip) c._vis = c.chipDefault; });
+    }
+
+    function saveChipState(which, cols) {
+      try {
+        const on = cols.filter(c => c.chip && c._vis).map(c => c.key);
+        localStorage.setItem(CHIP_KEY[which], JSON.stringify(on));
+      } catch (_) { /* ignore */ }
+    }
+
+    function visibleCols(cols) {
+      return cols.filter(c => !c.chip || c._vis);
+    }
+
+    function renderChips(which, cols) {
+      const container = document.getElementById(which + "Chips");
+      if (!container) return;
+      const chipCols = cols.filter(c => c.chip);
+      container.innerHTML = chipCols.map(c =>
+        `<button type="button" data-chip="${c.key}" aria-pressed="${c._vis ? "true" : "false"}">${c.label}</button>`
+      ).join("") + `<button type="button" class="chip-reset" data-chipreset="${which}">Reset</button>`;
+    }
+
+    document.addEventListener("click", e => {
+      const btn = e.target.closest("[data-chip]");
+      if (btn) {
+        const key = btn.dataset.chip;
+        const chipContainer = btn.closest("[id$=\"Chips\"]");
+        const which = chipContainer ? chipContainer.id.replace("Chips", "") : null;
+        const colSet = which === "fight" ? FIGHT_COLS : STYLE_COLS;
+        const col = colSet.find(c => c.key === key);
+        if (col) {
+          col._vis = !col._vis;
+          btn.setAttribute("aria-pressed", String(col._vis));
+          saveChipState(which, colSet);
+          render();
+        }
+        return;
+      }
+      const reset = e.target.closest("[data-chipreset]");
+      if (reset) {
+        const which = reset.dataset.chipreset;
+        const colSet = which === "fight" ? FIGHT_COLS : STYLE_COLS;
+        colSet.forEach(c => { if (c.chip) c._vis = c.chipDefault; });
+        saveChipState(which, colSet);
+        renderChips(which, colSet);
+        render();
+      }
+    });
+
     const MIN_SAMPLE = 5;
     function isTop(row, all, key, sampleKey = "matches") {
-      const solid = all.filter(r => (r[sampleKey] || 0) >= MIN_SAMPLE
-                                 && r[key] != null);
+      const solid = all.filter(r => (r[sampleKey] || 0) >= MIN_SAMPLE && r[key] != null);
       if (solid.length < 2) return false;
       if ((row[sampleKey] || 0) < MIN_SAMPLE || row[key] == null) return false;
       return row[key] === Math.max(...solid.map(r => r[key]));
     }
 
-    function renderTable(which, cols, rows) {
+    function renderTable(which, allCols, rows) {
+      const cols = visibleCols(allCols);
       const head = document.getElementById(which + "Head").querySelector("tr");
       const body = document.getElementById(which + "Rows");
       const sort = SORT[which];
       head.innerHTML = cols.map(c => {
         const active = sort.key === c.key;
-        const arrow = active
-          ? `<span class="sort-arrow">${sort.dir < 0 ? "▼" : "▲"}</span>` : "";
+        const arrow = active ? `<span class="sort-arrow">${sort.dir < 0 ? "\u25bc" : "\u25b2"}</span>` : "";
         const unit = c.unit ? `<span class="unit">${esc(c.unit)}</span>` : "";
-        // Die Erklärung steckt am Kopf jeder Spalte statt in einer Legende
-        // unter der Tabelle — dort sucht sie niemand. title für die Maus,
-        // aria-label für Tastatur und Screenreader.
         const help = c.help ? esc(c.help) : "";
         return `<th class="sortable${c.text ? "" : " num"}${active ? " active" : ""}"
                     data-sort="${c.key}" tabindex="0" role="button"
                     title="${help}"
-                    aria-label="${esc(c.label)}${c.unit ? " in " + esc(c.unit) : ""}. ${help} Activate to sort.">${c.label}${unit}${arrow}</th>`;
+                    aria-label="${esc(c.label)}${c.unit ? " in " + esc(c.unit) : ""}. ${help} Sortieren.">${c.label}${unit}${arrow}</th>`;
       }).join("");
 
       const sorted = [...rows].sort((a, b) => {
@@ -437,35 +514,18 @@
         return sort.dir * (va - vb);
       });
 
-      // Die Vergleichszeile "Enemy opens" haengt fest unten und wandert nicht
-      // mit der Sortierung — sie ist kein Mitspieler, sondern der Massstab,
-      // gegen den man die Zeilen darueber liest.
-      const extra = (which === "fight" && DATA && DATA.baseline)
-        ? [DATA.baseline] : [];
+      const extra = (which === "fight" && DATA && DATA.baseline) ? [DATA.baseline] : [];
       body.innerHTML = sorted.concat(extra).map(r => {
         const mine = r.accountId === DATA.myAccountId;
         const isBase = r.accountId === null;
         return `<tr${isBase ? ' class="baseline"' : ""}>` + cols.map(c => {
-          // Fuer die Vergleichszeile gibt es weder Markierungen noch "zu
-          // kleine Stichprobe"; Spalten, die nur fuer einen Eroeffner Sinn
-          // ergeben, bleiben leer statt zu luegen.
-          if (isBase && r[c.key] === undefined && !c.text) {
-            return `<td class="num"></td>`;
-          }
-          const flag = !isBase && c.flag
-                       && c.flag(r, (DATA && DATA.rows) || rows);
-          // Was "zu duenn" heisst, haengt an der Tabelle: eroeffnete Kaempfe,
-          // gespielte Matches — oder bei der Lobby die Abdeckung, ab der ein
-          // Match auch aus dem Gesamtschnitt faellt.
+          if (isBase && r[c.key] === undefined && !c.text) return `<td class="num"></td>`;
+          const flag = !isBase && c.flag && c.flag(r, (DATA && DATA.rows) || rows);
           const weak = !isBase && !c.text && (
-            which === "fight" ? (r.opened || 0) < MIN_SAMPLE
-            : which === "lobby" ? (r.coverage || 0) < 25
-            : (r.matches || 0) < MIN_SAMPLE);
-          const cls = [c.text ? "" : "num", flag ? "flag" : "",
-                       weak ? "weak" : ""].filter(Boolean).join(" ");
-          const title = flag ? ` title="${esc(c.why || "auffällig")}"` : "";
-          const val = c.text && mine
-            ? `<span class="me">${c.fmt(r)}</span>` : c.fmt(r);
+            which === "fight" ? (r.opened || 0) < MIN_SAMPLE : (r.matches || 0) < MIN_SAMPLE);
+          const cls = [c.text ? "" : "num", flag ? "flag" : "", weak ? "weak" : ""].filter(Boolean).join(" ");
+          const title = flag ? ` title="${esc(c.why || "auff\u00e4llig")}"` : "";
+          const val = c.text && mine ? `<span class="me">${c.fmt(r)}</span>` : c.fmt(r);
           return `<td class="${cls}"${title}>${val}</td>`;
         }).join("") + `</tr>`;
       }).join("");
@@ -473,11 +533,10 @@
 
     function render() {
       if (!DATA) return;
-      // Die Markierungen ("auffaelligster Wert") vergleichen gegen ALLE
-      // Mitspieler der Auswahl — sonst waere jeder Einzelne automatisch
-      // sein eigener Spitzenreiter.
-      const rows = visibleRows(DATA.rows || []);
+      const rows = DATA.rows || [];
       const fighters = rows.filter(r => r.opened > 0);
+      renderChips("fight", FIGHT_COLS);
+      renderChips("style", STYLE_COLS);
       renderTable("fight", FIGHT_COLS, fighters);
       renderTable("style", STYLE_COLS, rows);
       document.getElementById("fightCard").hidden = fighters.length === 0;
@@ -487,33 +546,23 @@
     async function load() {
       const st = document.getElementById("status");
       st.classList.remove("err");
-      // Der volle Bestand rechnet ungecached gut 15 s — sagen statt schweigen.
       st.textContent = RANGE === "all"
-        ? "Loading all matches \u2026 (first run takes a few seconds)"
-        : "Loading \u2026";
+        ? "Lade alle Matches \u2026 (erster Durchlauf dauert einige Sekunden)"
+        : "Lade \u2026";
       const params = new URLSearchParams({ range: RANGE, minMatches: String(MIN) });
       if (PLAYERS.trim()) params.set("players", PLAYERS.trim());
-      // SHOW geht bewusst NICHT ans Backend: es waehlt nur die Zeilen, die
-      // Matches (und damit alle Nenner) bleiben unangetastet.
       if (BOTS) params.set("includeBots", "1");
       try {
-        DATA = await PubgUI.fetchJson(
-          BASE + "api/pubg/squad-playstyle?" + params, 120000);
-        const all = DATA.rows || [];
-        const rows = visibleRows(all);
-        const hidden = all.length - rows.length;
-        st.textContent = `${DATA.matchesWithEvents} of ${DATA.matches} matches `
-          + `with telemetry · ${all.length} players with ${MIN}+ matches`
-          + (DATA.players && DATA.players.length
-             ? ` · matches with: ${DATA.players.join(", ")}` : "")
-          + (hidden > 0 ? ` · showing ${rows.length}, ${hidden} hidden` : "")
-          + (rows.length ? "" : (all.length
-              ? " — no one matches “Show only”"
-              : " — nothing found, widen the range?"));
+        DATA = await PubgUI.fetchJson(BASE + "api/pubg/squad-playstyle?" + params, 120000);
+        const rows = DATA.rows || [];
+        st.textContent = `${DATA.matchesWithEvents} von ${DATA.matches} Matches `
+          + `mit Telemetrie \u00b7 ${rows.length} Spieler mit ${MIN}+ Matches`
+          + (DATA.players && DATA.players.length ? ` \u00b7 Gruppe: ${DATA.players.join(", ")}` : "")
+          + (rows.length ? "" : " \u2014 nichts gefunden, Zeitraum erweitern?");
         render();
       } catch (e) {
         st.classList.add("err");
-        st.textContent = "Could not load: " + (e && e.message || e);
+        st.textContent = "Fehler: " + (e && e.message || e);
         document.getElementById("fightCard").hidden = true;
         document.getElementById("styleCard").hidden = true;
       }
@@ -531,46 +580,10 @@
       press(e.currentTarget, "range", RANGE);
       load();
     });
-    document.getElementById("fPlayers").addEventListener("keydown", e => {
-      if (e.key !== "Enter") return;
-      PLAYERS = e.target.value;
-      load();
-    });
-    document.getElementById("fPlayers").addEventListener("change", e => {
-      PLAYERS = e.target.value;
-      load();
-    });
-    function applyShow(value) {
-      SHOW = value;
-      const u = new URL(location.href);
-      if (SHOW.trim()) u.searchParams.set("show", SHOW.trim());
-      else u.searchParams.delete("show");
-      history.replaceState(null, "", u);
-      // Kein Nachladen: dieselben Daten, nur weniger Zeilen.
-      if (DATA) {
-        const all = DATA.rows || [];
-        const rows = visibleRows(all);
-        const hidden = all.length - rows.length;
-        const st = document.getElementById("status");
-        st.textContent = st.textContent.replace(/ · showing \d+, \d+ hidden/, "")
-          + (hidden > 0 ? ` · showing ${rows.length}, ${hidden} hidden` : "");
-        render();
-      }
-    }
-    document.getElementById("fShow").addEventListener("keydown", e => {
-      if (e.key === "Enter") applyShow(e.target.value);
-    });
-    document.getElementById("fShow").addEventListener("change", e => {
-      applyShow(e.target.value);
-    });
-    document.getElementById("fMin").addEventListener("change", e => {
-      MIN = Math.max(1, parseInt(e.target.value, 10) || 1);
-      load();
-    });
-    document.getElementById("fBots").addEventListener("change", e => {
-      BOTS = e.target.checked;
-      load();
-    });
+    document.getElementById("fPlayers").addEventListener("change", e => { PLAYERS = e.target.value; load(); });
+    document.getElementById("fPlayers").addEventListener("keydown", e => { if (e.key === "Enter") { PLAYERS = e.target.value; load(); } });
+    document.getElementById("fMin").addEventListener("change", e => { MIN = Math.max(1, parseInt(e.target.value, 10) || 1); load(); });
+    document.getElementById("fBots").addEventListener("change", e => { BOTS = e.target.checked; load(); });
 
     ["fight", "style"].forEach(which => {
       const head = document.getElementById(which + "Head");
@@ -584,20 +597,17 @@
         const again = head.querySelector(`th[data-sort="${key}"]`);
         if (again) again.focus();
       };
-      head.addEventListener("click", e => {
-        const th = e.target.closest("th[data-sort]");
-        if (th) onSort(th);
-      });
+      head.addEventListener("click", e => { const th = e.target.closest("th[data-sort]"); if (th) onSort(th); });
       head.addEventListener("keydown", e => {
         if (e.key !== "Enter" && e.key !== " ") return;
         const th = e.target.closest("th[data-sort]");
         if (th) { e.preventDefault(); onSort(th); }
       });
+      loadChipState(which, which === "fight" ? FIGHT_COLS : STYLE_COLS);
     });
 
     press(document.getElementById("rangeSwitch"), "range", RANGE);
     document.getElementById("fPlayers").value = PLAYERS;
-    document.getElementById("fShow").value = SHOW;
     document.getElementById("fMin").value = MIN;
     document.getElementById("fBots").checked = BOTS;
     load();
