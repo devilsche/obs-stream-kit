@@ -86,7 +86,12 @@ def counts_for_average(match) -> bool:
 #: auf prod stand ein Account mit 20 Kills aus ZWEI Solo-Runden als "20er K/D"
 #: an der Spitze einer Lobby — in squad-fpp hatte derselbe Spieler 0,43 aus 49
 #: Runden.
-MIN_KD_ROUNDS = 20
+MIN_KD_ROUNDS = 50
+#: Zusaetzlich muss eine Stufe einen nennenswerten Teil der Karriere abdecken.
+#: Ohne das schlaegt eine Handvoll Third-Person-Runden die Haupt-Bilanz: bei
+#: einem Solo-Match fiel die Rechnung auf 25 TPP-Runden zurueck (4,74),
+#: obwohl daneben 10.663 Runden squad-fpp mit 1,50 standen.
+MIN_KD_SHARE = 0.10
 #: Perspektive schlaegt Modus: First-Person und Third-Person sind zwei
 #: verschiedene Spiele, ein TPP-Wert sagt ueber einen FPP-Gegner wenig.
 FPP_MODES = ("solo-fpp", "duo-fpp", "squad-fpp")
@@ -105,8 +110,10 @@ def _sum_modes(per_mode, modes):
     return kills, losses, rounds
 
 
-def _kd_if_enough(kills, losses, rounds, min_rounds):
+def _kd_if_enough(kills, losses, rounds, min_rounds, total_rounds=0):
     if rounds < min_rounds:
+        return None
+    if total_rounds and rounds < total_rounds * MIN_KD_SHARE:
         return None
     return _kd(kills, losses, rounds)
 
@@ -127,14 +134,19 @@ def kd_for_mode(per_mode, mode: str, min_rounds: int = MIN_KD_ROUNDS) -> dict:
     (Modusname, "fpp", "tpp", "all" oder None).
     """
     group = FPP_MODES if (mode or "").endswith("-fpp") else TPP_MODES
+    all_modes = tuple(per_mode or ())
+    _, _, total = _sum_modes(per_mode, all_modes)
     steps = ((mode, (mode,)) if mode else (None, ()),
              ("fpp" if group is FPP_MODES else "tpp", group),
-             ("all", tuple(per_mode or ())))
+             ("all", all_modes))
     for basis, modes in steps:
         if not modes:
             continue
         kills, losses, rounds = _sum_modes(per_mode, modes)
-        kd = _kd_if_enough(kills, losses, rounds, min_rounds)
+        # Die letzte Stufe ist die ganze Karriere — dort greift die
+        # Anteils-Regel nicht, sie waere immer 100 %.
+        kd = _kd_if_enough(kills, losses, rounds, min_rounds,
+                           0 if basis == "all" else total)
         if kd is not None:
             return {"kd": kd, "basis": basis, "rounds": rounds}
     _, _, rounds = _sum_modes(per_mode, tuple(per_mode or ()))

@@ -1014,7 +1014,7 @@ def get_player_names(conn, tenant_id: int, account_ids=None) -> dict:
 #: Rauschen: gemessen auf prod stand ein Account mit 20 Kills in ZWEI
 #: Solo-Runden als "20er K/D" ganz oben in der Lobby-Spitze, waehrend er in
 #: squad-fpp ueberhaupt keine Zahlen hatte. Betrifft 94 von 12.895 Accounts.
-MIN_KD_ROUNDS = 20
+MIN_KD_ROUNDS = 50
 
 
 def get_lifetime_by_mode(conn, account_ids=None) -> dict:
