@@ -193,27 +193,33 @@
        Farben durchgaengig aus den Theme-Tokens mit ECHTEN Literal-Defaults —
        ein Fallback auf eine andere Variable waere zirkulaer und faellt in
        OBS auf ungestylt zurueck. */
+    /* Fliesst wie Text: kein Kasten, kein eigenes Padding, keine Mindest-
+       hoehe — sonst verschiebt der Button die Ausrichtung der Zahl in der
+       Spalte. Als inline-Element im Textfluss greift die Ausnahme von
+       WCAG 2.5.3, die Zielgroesse muss nicht 24 px sein. */
     .lobby-open {
       display: inline;
       background: none;
       border: 0;
+      padding: 0;
+      margin: 0;
       color: inherit;
       font: inherit;
-      padding: 2px 4px;
-      margin: -2px -4px;
-      min-height: 24px;
-      border-radius: 3px;
+      line-height: inherit;
+      vertical-align: baseline;
       cursor: pointer;
       text-decoration: underline dotted
         color-mix(in srgb, var(--theme-accent, #f2b705) 55%, transparent);
       text-underline-offset: 3px;
     }
     .lobby-open:hover {
-      background: color-mix(in srgb, var(--theme-accent, #f2b705) 12%, transparent);
+      color: var(--theme-accent, #f2b705);
+      text-decoration-color: var(--theme-accent, #f2b705);
     }
     .lobby-open:focus-visible {
       outline: 2px solid var(--theme-accent, #f2b705);
-      outline-offset: 2px;
+      outline-offset: 1px;
+      border-radius: 2px;
     }
 
     .lobby-modal {
