@@ -5720,7 +5720,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
     # Aggregat-Totals werden nur fuer BR-Matches gerechnet (siehe unten).
     matches = conn.execute(f"""
         SELECT m.match_id, m.map_name, m.game_mode, m.played_at,
-               m.duration_secs,
+               m.duration_secs, m.is_ranked,
                pa.kills, pa.headshot_kills, pa.assists, pa.dbnos,
                pa.damage_dealt, pa.place, pa.time_survived,
                pa.longest_kill
@@ -6325,6 +6325,9 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             "topScorer": top_scorer_by_match.get(m["match_id"]),
             "map": m["map_name"],
             "mode": m["game_mode"],
+            # matchType == "competitive" aus der API. Rueckwirkend nicht zu
+            # rekonstruieren: die Match-Payloads sind nach ~14 Tagen weg.
+            "isRanked": bool(m["is_ranked"]),
             "isEvent": not is_br_mode(m["game_mode"]),
             "matchEnd": m["played_at"],
             "durationSec": m["duration_secs"],

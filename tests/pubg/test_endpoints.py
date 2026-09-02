@@ -670,3 +670,23 @@ def test_lobby_detail_liefert_auch_den_eigenen_squad():
     assert [p["name"] for p in d["totals"]["squad"]] == ["PEX_LuCKoR", "MateA",
                                                           "MateB"]
     assert all(p["matches"] == 1 for p in d["totals"]["squad"])
+
+
+def test_session_report_markiert_ranked_matches():
+    """matchType 'competitive' landet als isRanked in der Match-Zeile."""
+    conn = _setup()
+    _insert_match(conn, "rk1", "2026-05-20T18:00:00Z", "Baltic_Main", "squad-fpp")
+    _insert_participant(conn, "rk1", "account.A", "PEX_LuCKoR", team_id=1)
+    _insert_match(conn, "rk2", "2026-05-20T19:00:00Z", "Baltic_Main", "squad-fpp")
+    _insert_participant(conn, "rk2", "account.A", "PEX_LuCKoR", team_id=1)
+    with conn.raw.cursor() as cur:
+        cur.execute("UPDATE matches SET is_ranked = 1 WHERE match_id = 'rk2'")
+    set_setting(conn, "sessionStartedAt", "1970-01-01T00:00:00Z")
+    conn.commit()
+    body, code, _ = _registry(conn).dispatch(
+        "GET", "/api/pubg/session-report", b"", {})
+    assert code == 200
+    matches = {m["matchId"]: m for ph in json.loads(body)["phases"]
+               for m in ph["matches"]}
+    assert matches["rk1"]["isRanked"] is False
+    assert matches["rk2"]["isRanked"] is True

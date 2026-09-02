@@ -746,6 +746,22 @@
     .matches-list .m .map { color: var(--pubg-text); }
     .matches-list .m .stats { color: var(--pubg-muted); text-align: right; }
     .matches-list .m .stats b { color: var(--pubg-text); }
+    /* Ranked: nur wenn es zutrifft. Ein "Normal"-Label an jedem zweiten
+       Match waere Rauschen — die Abwesenheit des Abzeichens ist die Aussage. */
+    .ranked-badge {
+      display: inline-block;
+      margin-left: 5px;
+      vertical-align: -2px;
+      color: var(--theme-accent, #f2b705);
+    }
+    .sr-only {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
     .hot-drop-badge {
       display: inline-block;
       margin-left: 6px;
@@ -3687,7 +3703,11 @@
         <div class="m ${isWin && !isEvent ? 'win' : ''}${isEvent ? ' is-event' : ''}" data-idx="${idx}" data-match-id="${m.matchId || ''}"${dimAttr}>
           <span class="time-range">${numStr}<b>${startTimeStr}</b> → <b>${outTimeStr}</b></span>
           ${placeCell}
-          <span class="map">${PubgUI.fmtMap(m.map)}<span class="hot-drop-badge" data-hd-slot></span></span>
+          <span class="map">${PubgUI.fmtMap(m.map)}${m.isRanked
+            ? `<span class="ranked-badge" title="Ranked-Match (matchType: competitive)"><span
+                 class="material-symbols-outlined icon-sm" aria-hidden="true">military_tech</span><span
+                 class="sr-only">Ranked</span></span>`
+            : ""}<span class="hot-drop-badge" data-hd-slot></span></span>
           <span class="stat bot-teams" title="Bot-Teams / Teams gesamt in der Lobby"><b>${m.botTeamsInLobby || 0}/${m.totalTeamsInLobby || 0}</b> Teams</span>
           <span class="stat bot-teams" title="Bot-Spieler / Spieler gesamt in der Lobby"><b>${m.botPlayersInLobby || 0}/${m.totalPlayersInLobby || 0}</b> <span class="material-symbols-outlined icon-sm" aria-hidden="true">smart_toy</span></span>
           <span class="stat"><b>${m.kills}</b> K${m.myStats && m.myStats.botKills ? ` <span class="bot-kills">(${m.myStats.botKills})</span>` : ""}</span>

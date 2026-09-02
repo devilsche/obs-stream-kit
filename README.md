@@ -608,6 +608,12 @@ und Matches unter 25 % fallen aus dem Gesamtschnitt. Ebenso Mini-Lobbys unter
 Phasen-Schnitt sonst genauso schwer wie eine volle Runde. Der Wert ist ein
 Schnappschuss von heute, nicht vom Match-Tag — die API hat keine Historie.
 
+**Ranked-Matches** tragen ein Abzeichen hinter dem Map-Namen (`is_ranked` aus
+`matchType == "competitive"`). Normal-Matches bleiben unmarkiert — ein „Normal"-Label
+an jedem zweiten Match wäre Rauschen. Rückwirkend lässt sich das nicht nachtragen: die
+Match-Payloads der API sind nach rund 14 Tagen weg, ältere Matches stehen deshalb alle
+auf „nicht ranked".
+
 **Harte Lobbys sind markiert:** Maßstab ist der Schnitt der stärksten Fünf, nicht der
 Gesamtschnitt — der liegt fast immer um 1,3 und sagt nichts darüber, ob oben Haie
 sassen. Ab 3,0 bekommt die Zahl den Highlight-Effekt, ab 4,0 deutlicher; in der
