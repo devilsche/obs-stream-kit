@@ -301,9 +301,13 @@ def build_fights(events, squad, team_of, *, include_bots=False,
             their_wiped = our_wiped = None   # Fallback auf Down-Vergleich
         f["result"] = _result(their_wiped, our_wiped,
                               f["theirDowns"], f["ourDowns"])
-        # openTarget endgueltig gekillt (nicht nur geknocked)?
+        # openTarget endgueltig gekillt — nur wenn er auch im Fight geknocked
+        # wurde. Sonst zaehlt ein Kill in einem Folge-Fight oder ein direkter
+        # Kill eines anderen Targets als False Positive.
         ot = f.get("openTarget")
-        f["openTargetKilled"] = bool(ot and ot in killed_by_cutoff)
+        f["openTargetKilled"] = bool(
+            ot and f.get("openTargetDown") and ot in killed_by_cutoff
+        )
     fights.sort(key=lambda f: f["startTs"])
     return fights
 
