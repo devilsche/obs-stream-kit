@@ -2830,6 +2830,12 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         from pubg.db_pg import get_lifetime_by_mode
         from pubg.lobby_kd import kd_for_mode, MIN_KD_ROUNDS
         ev_accounts = set()
+        # Squad-Members immer einschliessen — auch wenn sie in keinem Event
+        # als Actor auftauchen (kein Kill, Tod durch Zone/Fall).
+        for m in out_members:
+            a = m.get("accountId")
+            if a and not a.startswith("ai."):
+                ev_accounts.add(a)
         for ev in events_out:
             for role in ("actorAccount", "targetAccount", "knockerAccount"):
                 a = ev.get(role)
