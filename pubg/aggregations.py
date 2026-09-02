@@ -2823,6 +2823,38 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
 
     events_out.sort(key=lambda x: x["tsMs"] or 0)
 
+    # Alle Accounts aus Events sammeln und deren Lifetime-K/D anhängen.
+    # Liefert playerKds = {accountId: {kd, rounds, mode} | null}.
+    player_kds = {}
+    try:
+        from pubg.db_pg import get_lifetime_by_mode
+        from pubg.lobby_kd import kd_for_mode, MIN_KD_ROUNDS
+        ev_accounts = set()
+        for ev in events_out:
+            for role in ("actorAccount", "targetAccount", "knockerAccount"):
+                a = ev.get(role)
+                if a and not a.startswith("ai."):
+                    ev_accounts.add(a)
+        if ev_accounts:
+            per_mode = get_lifetime_by_mode(conn, list(ev_accounts))
+            game_mode = conn.execute(
+                "SELECT game_mode FROM matches WHERE match_id = ?",
+                (match_id,)).fetchone()
+            mode_hint = (game_mode["game_mode"] if game_mode else None) or "squad-fpp"
+            for acc in ev_accounts:
+                modes = per_mode.get(acc)
+                if not modes:
+                    player_kds[acc] = None
+                    continue
+                res = kd_for_mode(modes, mode_hint, MIN_KD_ROUNDS)
+                player_kds[acc] = (
+                    {"kd": round(res["kd"], 2), "rounds": res["rounds"],
+                     "mode": res["basis"]}
+                    if res["kd"] is not None else None
+                )
+    except Exception:
+        pass  # nie den Match-Detail-Load brechen
+
     return {
         "matchId":      match_id,
         "mapName":      map_name,
@@ -2830,6 +2862,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         "takeoffMs":    takeoff_ms,
         "members":      out_members,
         "events":       events_out,
+        "playerKds":    player_kds,
     }
 
 
