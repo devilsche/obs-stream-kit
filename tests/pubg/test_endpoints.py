@@ -329,7 +329,8 @@ def test_lobby_detail_endpoint_schluesselt_die_lobby_auf():
         upsert_player(conn, acc, f"Foe{i}", "steam", False)
         _insert_team_mapping(conn, "ld1", acc, 7 + i // 4)
         # K/D von 0.1 bis 2.5 — die Raender muessen sauber herausfallen.
-        snaps[acc] = {"kills": i, "losses": 10, "rounds": 20, "wins": 0,
+        # Rundenzahl ueber MIN_KD_ROUNDS, sonst gilt der Wert als Rauschen.
+        snaps[acc] = {"kills": i * 10, "losses": 100, "rounds": 120, "wins": 0,
                       "damage": 1.0, "kd": i / 10.0}
     # Ein Bot in der Lobby: darf weder in den Schnitt noch in die Abdeckung.
     _insert_team_mapping(conn, "ld1", "ai.bot1", 99)
@@ -650,7 +651,7 @@ def test_lobby_detail_liefert_auch_den_eigenen_squad():
                           ("account.M2", "MateB", 0.8)):
         _insert_participant(conn, "sq1", acc, name, team_id=1)
         _insert_team_mapping(conn, "sq1", acc, 1)
-        snaps[acc] = {"kills": int(kd * 10), "losses": 10, "rounds": 20,
+        snaps[acc] = {"kills": int(kd * 100), "losses": 100, "rounds": 120,
                       "wins": 0, "damage": 1.0, "kd": kd}
     for i in range(1, 6):
         _insert_team_mapping(conn, "sq1", f"account.F{i}", 7)
