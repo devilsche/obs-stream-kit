@@ -1271,6 +1271,9 @@ def lobby_kd_backfill(root: str, args=None) -> int:
     # Ein freier Key soll nicht stillstehen: Snapshots sind global, also
     # sammelt jeder Lauf nach seinem eigenen Tenant fuer die anderen weiter.
     share = "--no-share" not in args
+    # Maximales Alter eines Snapshots in Tagen bevor er als stale gilt.
+    # None = nie erneuern (nur fehlende holen).
+    max_age_days = int(_opt("--max-age-days", "0")) or None
 
     raw = connect()
     conn = SqliteCompatConn(raw)
@@ -1289,9 +1292,23 @@ def lobby_kd_backfill(root: str, args=None) -> int:
         return 1
 
     def _missing(for_tenant):
-        """Offene Accounts — fuer einen Tenant, oder (None) fuer alle."""
+        """Fehlende oder stale Accounts.
+
+        Stale = kein Snapshot ODER fetched_at aelter als max_age_days.
+        """
+        stale_clause = (
+            "AND (s.account_id IS NULL OR s.fetched_at < "
+            "TO_CHAR((NOW() AT TIME ZONE 'UTC') - (%s || ' days')::INTERVAL,"
+            " 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'))"
+            if max_age_days else
+            "AND s.account_id IS NULL"
+        )
+        params = [for_tenant, for_tenant, match_mode, match_mode, n_matches,
+                  season_id, mode, for_tenant, for_tenant]
+        if max_age_days:
+            params.insert(0, str(max_age_days))
         with raw.cursor() as cur:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT mtm.account_id
                 FROM match_team_mapping mtm
                 JOIN (SELECT match_id, played_at FROM matches
@@ -1303,22 +1320,22 @@ def lobby_kd_backfill(root: str, args=None) -> int:
                        ON s.account_id = mtm.account_id
                       AND s.season_id = %s AND s.mode = %s
                 WHERE (%s IS NULL OR mtm.tenant_id = %s)
-                  AND s.account_id IS NULL
+                  {stale_clause}
                   AND mtm.account_id NOT LIKE 'ai.%%'
                 GROUP BY mtm.account_id
                 -- Juengste Lobbys zuerst: so ist die laufende Session als
                 -- Erstes vollstaendig, statt dass sich die Abdeckung
                 -- gleichmaessig duenn ueber alle Matches verteilt.
                 ORDER BY MAX(mm.played_at) DESC
-            """, (for_tenant, for_tenant, match_mode, match_mode, n_matches,
-                  season_id, mode, for_tenant, for_tenant))
+            """, params)
             return [r["account_id"] for r in cur.fetchall()]
 
     missing = _missing(tenant_id)
 
     if lifetime:
         # Alltime gibt es nur einzeln — ein Call je Spieler.
-        print(f"Alltime · {mode}: {len(missing)} Spieler ohne Werte aus den "
+        age_hint = f" oder aelter als {max_age_days}d" if max_age_days else ""
+        print(f"Alltime · {mode}: {len(missing)} Spieler ohne/stale Werte{age_hint} aus den "
               f"letzten {n_matches} Matches = {len(missing)} Calls "
               f"(~{len(missing) * pace / 3600:.1f} h bei {pace:.0f}s Pacing)")
         seen, total_done, total_found = set(), 0, 0
