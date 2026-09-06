@@ -2609,7 +2609,10 @@
         parts.push(distStr);
       }
       // Fahrzeug-Kontext: Opfer war im Auto oder Schuetze schoss aus Auto
-      if (ev.victimVehicleLabel) parts.push(`· victim in <b>${ev.victimVehicleLabel}</b>`);
+      if (ev.victimVehicleLabel) {
+        const prep = ev.victimVehicleLabel === "Emergency Pickup" ? "on" : "in";
+        parts.push(`· victim ${prep} <b>${ev.victimVehicleLabel}</b>`);
+      }
       if (ev.shooterVehicleLabel) parts.push(`· from <b>${ev.shooterVehicleLabel}</b>`);
       return parts.length ? " " + parts.join(" ") : "";
     }

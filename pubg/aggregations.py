@@ -417,6 +417,7 @@ _VEHICLE_PATTERNS = [
     ("Tukshai",       "Tukshai"),
     ("Lava_Mtb",      "Mountain Bike"),
     ("Scooter",       "Scooter"),
+    ("EmergencyPickup", "Emergency Pickup"),
 ]
 
 # Environment / Misc — Brand/Bombe/Care-Package-Drop etc.
