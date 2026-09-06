@@ -143,9 +143,11 @@ def kd_for_mode(per_mode, mode: str, min_rounds: int = MIN_KD_ROUNDS) -> dict:
         if not modes:
             continue
         kills, losses, rounds = _sum_modes(per_mode, modes)
-        # Die letzte Stufe ist die ganze Karriere — dort greift die
-        # Anteils-Regel nicht, sie waere immer 100 %.
-        kd = _kd_if_enough(kills, losses, rounds, min_rounds,
+        # Die letzte Stufe ist die ganze Karriere — dort greift weder die
+        # Anteils-Regel noch die Mindestrunden-Schwelle: wer irgendeine Runde
+        # gespielt hat, bekommt eine K/D statt ein leeres Feld.
+        effective_min = 1 if basis == "all" else min_rounds
+        kd = _kd_if_enough(kills, losses, rounds, effective_min,
                            0 if basis == "all" else total)
         if kd is not None:
             return {"kd": kd, "basis": basis, "rounds": rounds}
