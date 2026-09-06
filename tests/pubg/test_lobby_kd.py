@@ -405,10 +405,21 @@ def test_kd_alltime_faellt_auf_season_wenn_lifetime_fehlt():
     """Der gemeldete Fall: Snapshot da, aber keine lifetime-Zeile. Frueher
     galt der Spieler als unbekannt, jetzt zaehlt seine Season."""
     seas = {"duo-fpp": _stats(120, 60, 70)}
-    r = lk.kd_alltime(None, seas, "duo-fpp")
+    r = lk.kd_alltime(None, seas, "duo-fpp",
+                      season_id="division.bro.official.pc-2018-42")
     assert r["kd"] == pytest.approx(120 / 60)
     assert r["source"] == "season"
     assert r["basis"] == "duo-fpp"
+    # Die Season gehoert an den Wert — sonst steht dort eine Zahl ohne
+    # Zeitraum, die wie ein Karriere-K/D aussieht.
+    assert r["seasonId"] == "division.bro.official.pc-2018-42"
+
+
+def test_kd_alltime_lifetime_traegt_keine_season_id():
+    life = {"duo-fpp": _stats(100, 50, 60)}
+    r = lk.kd_alltime(life, None, "duo-fpp", season_id="pc-2018-42")
+    assert r["source"] == "lifetime"
+    assert r["seasonId"] is None
 
 
 def test_kd_alltime_season_nutzt_dieselbe_modus_kette():

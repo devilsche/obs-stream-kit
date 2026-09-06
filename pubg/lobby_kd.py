@@ -198,7 +198,7 @@ def kd_with_fallback(season_per_mode, lifetime_per_mode, mode: str,
 
 
 def kd_alltime(lifetime_per_mode, season_per_mode, mode: str,
-               min_rounds: int = MIN_KD_ROUNDS) -> dict:
+               min_rounds: int = MIN_KD_ROUNDS, season_id: str = None) -> dict:
     """Alltime-K/D mit Season als Ersatzquelle.
 
     Nicht jeder Lobby-Spieler hat eine `lifetime`-Zeile im Snapshot — die
@@ -211,9 +211,10 @@ def kd_alltime(lifetime_per_mode, season_per_mode, mode: str,
     zu holen ist, zaehlt die Season. Innerhalb jeder Quelle gilt dieselbe
     Kette wie sonst: gespielter Modus > gleiche Perspektive > alles.
 
-    Returns {"kd", "basis", "rounds", "source"}; `source` ist "lifetime",
-    "season" oder None und gehoert sichtbar an den Wert — ein Season-K/D
-    ist etwas anderes als ein Karriere-K/D.
+    Returns {"kd", "basis", "rounds", "source", "seasonId"}; `source` ist
+    "lifetime", "season" oder None und gehoert sichtbar an den Wert — ein
+    Season-K/D ist etwas anderes als ein Karriere-K/D. `seasonId` steht nur
+    am Season-Wert, damit der Zeitraum mit angezeigt werden kann.
     """
     for source, per_mode in (("lifetime", lifetime_per_mode),
                              ("season",   season_per_mode)):
@@ -221,14 +222,16 @@ def kd_alltime(lifetime_per_mode, season_per_mode, mode: str,
             continue
         res = kd_for_mode(per_mode, mode, min_rounds)
         if res["kd"] is not None:
-            return {**res, "source": source}
+            return {**res, "source": source,
+                    "seasonId": season_id if source == "season" else None}
     rounds = 0
     for per_mode in (lifetime_per_mode, season_per_mode):
         if per_mode:
             _, _, rounds = _sum_modes(per_mode, tuple(per_mode))
             if rounds:
                 break
-    return {"kd": None, "basis": None, "rounds": rounds, "source": None}
+    return {"kd": None, "basis": None, "rounds": rounds,
+            "source": None, "seasonId": None}
 
 
 def kd_by_perspective(per_mode, min_rounds: int = MIN_KD_ROUNDS) -> dict:
@@ -390,7 +393,8 @@ def lobby_breakdown(players, top_n: int = 5) -> dict:
         nm, k, info = row
         return {"name": nm, "kd": k, "basis": (info or {}).get("basis"),
                 "rounds": (info or {}).get("rounds"),
-                "source": (info or {}).get("source")}
+                "source": (info or {}).get("source"),
+                "seasonId": (info or {}).get("seasonId")}
 
     top = [_entry(r) for r in reversed(vals[len(vals) - n:])]
     low = [_entry(r) for r in vals[:n]]
@@ -532,7 +536,7 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
     # Lifetime immer laden — als letzter Fallback wenn Season-Daten fehlen.
     lifetime_by_mode = db_pg.get_lifetime_by_mode(raw, list(all_accounts))
     # Ersatzquelle fuer alle ohne Lifetime-Zeile (siehe kd_alltime).
-    latest_season_by_mode = db_pg.get_latest_season_by_mode(
+    latest_season_by_mode, latest_season_id = db_pg.get_latest_season_by_mode(
         raw, [a for a in all_accounts if a not in lifetime_by_mode])
 
     by_mode = {}
@@ -574,7 +578,8 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
                 l_data = lifetime_by_mode.get(a)
                 if season_id == LIFETIME_KEY:
                     kd_by_acc[a] = kd_alltime(
-                        l_data, latest_season_by_mode.get(a), m_hint)["kd"]
+                        l_data, latest_season_by_mode.get(a), m_hint,
+                        season_id=latest_season_id.get(a))["kd"]
                 else:
                     kd_by_acc[a] = kd_with_fallback(
                         by_mode.get(a), l_data, m_hint)["kd"]
@@ -681,7 +686,7 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
     by_mode = db_pg.get_lifetime_by_mode(raw, list(accounts))
     # Wer keine Lifetime-Zeile hat, wird mit seiner Season gemessen statt
     # als unbekannt zu gelten — die Herkunft steht als `source` am Wert.
-    season_by_mode = db_pg.get_latest_season_by_mode(
+    season_by_mode, season_id_by_acc = db_pg.get_latest_season_by_mode(
         raw, [a for a in accounts if a not in by_mode])
     names = db_pg.get_player_names(raw, tenant_id, list(accounts))
     names.update({a: n for a, n in squad_names.items() if n})
@@ -695,7 +700,8 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
         # Gemessen wird am Modus, in dem man sich begegnet ist — mit Rueckfall
         # auf dieselbe Perspektive und erst zuletzt auf alles.
         kd_by_acc = {a: kd_alltime(by_mode.get(a), season_by_mode.get(a),
-                                   e.get("mode"))
+                                   e.get("mode"),
+                                   season_id=season_id_by_acc.get(a))
                      for a in set(lobby) | set(squad)}
         players = [(names.get(a) or a[:12], (kd_by_acc.get(a) or {}).get("kd"),
                     kd_by_acc.get(a) or {}) for a in lobby]
@@ -708,12 +714,14 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
             info = kd_by_acc.get(a) or {}
             mates.append({"name": names.get(a) or a[:12], "kd": info.get("kd"),
                           "basis": info.get("basis"), "rounds": info.get("rounds"),
-                          "source": info.get("source"), "accountId": a})
+                          "source": info.get("source"),
+                          "seasonId": info.get("seasonId"), "accountId": a})
             agg = squad_seen.setdefault(a, {"name": names.get(a) or a[:12],
                                             "kd": info.get("kd"),
                                             "basis": info.get("basis"),
                                             "rounds": info.get("rounds"),
                                             "source": info.get("source"),
+                                            "seasonId": info.get("seasonId"),
                                             "matches": 0})
             agg["matches"] += 1
         known_mates = [m["kd"] for m in mates if m["kd"] is not None]
@@ -733,6 +741,7 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
             entry = {"name": names.get(a) or a[:12], "kd": kd,
                      "basis": info.get("basis"), "rounds": info.get("rounds"),
                      "source": info.get("source"),
+                     "seasonId": info.get("seasonId"),
                      "matchId": mid, "playedAt": e["playedAt"]}
             prev = strongest.get(a)
             if prev is None or kd > prev["kd"]:

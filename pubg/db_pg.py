@@ -1053,26 +1053,33 @@ def get_latest_season_by_mode(conn, account_ids=None) -> dict:
 
     Je Account zaehlt nur die hoechste season_id — Season-Werte ueber
     mehrere Seasons zu summieren waere weder Season noch Alltime.
+
+    Returns (by_mode, season_by_account): die season_id gehoert an den
+    Wert, sonst steht im Report eine Zahl ohne Zeitraum.
     """
     ids = [a for a in (account_ids or []) if a]
     if not ids:
-        return {}
+        return {}, {}
     with conn.cursor() as cur:
         cur.execute("""
             SELECT DISTINCT ON (account_id, mode)
-                   account_id, mode, kills, losses, rounds
+                   account_id, mode, season_id, kills, losses, rounds
             FROM player_season_snapshot
             WHERE season_id <> 'lifetime' AND account_id = ANY(%s)
               AND kills IS NOT NULL
             ORDER BY account_id, mode, season_id DESC
         """, (ids,))
         rows = cur.fetchall()
-    out = {}
+    out, seasons = {}, {}
     for r in rows:
-        out.setdefault(r["account_id"], {})[r["mode"]] = {
+        acc = r["account_id"]
+        out.setdefault(acc, {})[r["mode"]] = {
             "kills": r["kills"] or 0, "losses": r["losses"] or 0,
             "rounds": r["rounds"] or 0}
-    return out
+        # Hoechste season_id des Accounts gewinnt (ORDER BY season_id DESC).
+        if r["season_id"] > seasons.get(acc, ""):
+            seasons[acc] = r["season_id"]
+    return out, seasons
 
 
 def get_lifetime_by_mode(conn, account_ids=None) -> dict:

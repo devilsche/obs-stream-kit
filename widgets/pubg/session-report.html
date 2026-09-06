@@ -332,19 +332,6 @@
     .lobby-list--top .kd { color: var(--theme-accent, #f2b705); }
     .lobby-list--low .kd { color: var(--theme-text-dim, #8a7d99); }
     .lobby-list .where { color: var(--theme-text-dim, #8a7d99); font-size: 0.82em; }
-    /* Season-Ersatzquelle: sichtbar abgesetzt, damit ein Season-Wert nicht
-       fuer einen Karriere-Wert gehalten wird. Farbe allein traegt die
-       Bedeutung nicht — der Text sagt es aus. */
-    .lobby-list .where--season {
-      color: var(--theme-accent, #f2b705);
-      border: 1px solid currentColor;
-      border-radius: 3px;
-      padding: 0 4px;
-      font-size: 0.72em;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
     .lobby-modal__note {
       margin: 14px 0 0;
       font-size: 0.8em;
@@ -3645,16 +3632,24 @@
     // squad-fpp ist etwas anderes als 3.26 aus zwei Third-Person-Runden.
     const BASIS_LABEL = { fpp: "alle FPP", tpp: "alle TPP", all: "alle Modi" };
 
+    // Season-IDs kommen als "division.bro.official.pc-2018-42" — im Report
+    // interessiert nur der Zeitraum am Ende.
+    function seasonShort(id) {
+      const m = String(id || "").match(/(\d{4}-\d+)$/);
+      return m ? m[1] : (id || "").replace(/^.*\./, "");
+    }
+
     function basisHtml(p) {
       if (!p || !p.basis) return "";
       const label = BASIS_LABEL[p.basis] || p.basis;
+      // Quelle direkt an den Modus haengen statt in eine eigene Zeile: ein
+      // Season-Wert ist etwas anderes als ein Karriere-Wert, und das muss
+      // an der Zahl stehen, nicht daneben.
+      const src = p.source === "season"
+        ? `-season-${seasonShort(p.seasonId) || "aktuell"}`
+        : (p.source === "lifetime" ? "-lifetime" : "");
       const rounds = p.rounds ? `, ${p.rounds} Runden` : "";
-      // Ohne Lifetime-Zeile zaehlt die laufende Season. Das ist kein
-      // Karriere-Wert und wird deshalb als solcher ausgewiesen.
-      const season = p.source === "season"
-        ? `<span class="where where--season" title="Kein Karriere-Wert vorhanden — gerechnet aus der laufenden Season">Season</span> `
-        : "";
-      return ` ${season}<span class="where">${PubgUI.esc(label + rounds)}</span>`;
+      return ` <span class="where">${PubgUI.esc(label + src + rounds)}</span>`;
     }
 
     function lobbyListHtml(players, cls, withMatch) {
