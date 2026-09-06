@@ -1250,15 +1250,18 @@ class EndpointRegistry:
             date_filter = ""
             params = [self.tenant_id]
             if from_iso:
-                date_filter += " AND played_at >= %s"
+                date_filter += " AND played_at >= ?"
                 params.append(from_iso)
             if to_iso:
-                date_filter += " AND played_at <= %s"
+                date_filter += " AND played_at <= ?"
                 params.append(to_iso)
+            # conn.execute() erwartet sqlite-Style '?' — der Compat-Layer
+            # (core/db_compat._to_pg_sql) uebersetzt nach %s und escaped
+            # literale % zu %%. Direktes %s hier waere ein Syntax-Fehler.
             db_rows = conn.execute(
                 f"SELECT achievement_id, label, icon, match_id, played_at "
-                f"FROM obs.pubg_achievements_seen "
-                f"WHERE tenant_id=%s{date_filter} "
+                f"FROM pubg_achievements_seen "
+                f"WHERE tenant_id=?{date_filter} "
                 f"ORDER BY played_at ASC",
                 params).fetchall()
             print(f"[session-achievements] tenant={self.tenant_id} "

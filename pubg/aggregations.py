@@ -4699,17 +4699,17 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
         # BP_EmergencyPickupVehicle_C = Ballon+Seilwinde via Heli.
         ep_kills_raw = conn.execute("""
             SELECT target_account, timestamp_ms FROM telemetry_events
-            WHERE match_id=%s AND actor_account=%s
+            WHERE match_id=? AND actor_account=?
               AND event_type IN ('Kill','Knock')
         """, (mid, my_account_id)).fetchall()
         if ep_kills_raw:
             ep_cands = list({r["target_account"] for r in ep_kills_raw
                              if r["target_account"]})
-            _ph_ep = ",".join(["%s"] * len(ep_cands))
+            _ph_ep = ",".join(["?"] * len(ep_cands))
             ep_veh = conn.execute(f"""
                 SELECT actor_account, event_type, timestamp_ms
                 FROM telemetry_events
-                WHERE match_id=%s AND event_type IN ('VehicleEnter','VehicleLeave')
+                WHERE match_id=? AND event_type IN ('VehicleEnter','VehicleLeave')
                   AND weapon='BP_EmergencyPickupVehicle_C'
                   AND actor_account IN ({_ph_ep})
                 ORDER BY timestamp_ms ASC
