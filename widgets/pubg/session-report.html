@@ -2647,7 +2647,13 @@
       // Fallback auf Frontend-Map fuer aeltere Daten.
       const _sqKnocks = ev.squadKnocksCount
         || (ctx.squadKnockedBy || new Map()).get(ev.targetAccount) || 0;
-      const _multiFight = (_sqKnocks >= 1 && !ev.targetIsSquad)
+      // Nur wenn ein FREMDES Team zuschlaegt — schlagen wir selbst zurueck,
+      // sieht man das ohnehin an der Zeile drueber.
+      const _thirdParty = ev.thirdPartyHit !== undefined
+        ? ev.thirdPartyHit
+        : (!ev.actorIsSquad && ev.actorTeamId != null
+           && ev.actorTeamId !== ev.targetTeamId);
+      const _multiFight = (_sqKnocks >= 1 && !ev.targetIsSquad && _thirdParty)
         ? ` <span class="md-tl-multifight" title="${ev.targetName || "This enemy"} knocked ${_sqKnocks} of your squad">${T} had knocked ${_sqKnocks} mate${_sqKnocks > 1 ? "s" : ""}</span>`
         : "";
 
@@ -2660,7 +2666,7 @@
           if (!ev.actorName && ev.weaponName) {
             return `${T} was knocked by <b>${ev.weaponName}</b>`;
           }
-          return `${A} knocked ${T}${meta}`;
+          return `${A} knocked ${T}${meta}${_multiFight}`;
         case "kill":
           if (!ev.actorName && ev.weaponName) {
             return `${T} was killed by <b>${ev.weaponName}</b>`;
@@ -2799,7 +2805,8 @@
       // Hinweis "had knocked N squad mate(s)" anhaengen kann.
       const squadKnockedBy = new Map();
       for (const ev of (events || [])) {
-        if (ev.type === "knock" && !ev.actorIsSquad && ev.targetIsSquad && ev.actorAccount) {
+        const _hitsSquad = ev.type === "knock" || ev.type.startsWith("kill");
+        if (_hitsSquad && !ev.actorIsSquad && ev.targetIsSquad && ev.actorAccount) {
           squadKnockedBy.set(ev.actorAccount, (squadKnockedBy.get(ev.actorAccount) || 0) + 1);
         }
       }

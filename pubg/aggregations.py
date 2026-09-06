@@ -2135,13 +2135,24 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             currently_knocked_by_squad.discard(target)
         elif et == "Kill":
             currently_knocked_by_squad.discard(target)
+            # Enemy killt Squad-Mitglied → zaehlt wie ein Knock
+            if actor and actor not in sq_set and target and target in sq_set:
+                knocked_our_squad[actor] = knocked_our_squad.get(actor, 0) + 1
 
-        # Scope: Squad-involved ODER chained-enemy (target gerade von uns
-        # geknockt) ODER Enemy der unsere Squad knockte (Multi-Fight-Kontext).
+        # Multi-Fight: ein FREMDES Team greift einen Gegner an, der zuvor
+        # unsere Squad geknockt/gekillt hat. Nur dann relevant — wenn wir
+        # selbst zurueckschlagen, sieht man das ohnehin in der Timeline.
+        third_party = (
+            et in ("Kill", "Knock")
+            and target in knocked_our_squad
+            and actor and actor not in sq_set
+            and team_by_acc.get(actor) != team_by_acc.get(target)
+        )
+
         in_scope = (
             (actor in sq_set) or (target in sq_set)
             or (target in currently_knocked_by_squad)
-            or (et == "Kill" and target in knocked_our_squad)
+            or third_party
         )
 
         if not in_scope:
@@ -2317,12 +2328,16 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                         if knock_ev["distance"] else None)
             last_knock_by_target.pop(target, None)
             knock_pos_by_target.pop(target, None)
-            # Multi-Fight-Kontext: wie viele Squad-Mitglieder hat dieser
-            # Enemy geknockt? Backend weiss es sicher (auch wenn die
-            # Knock-Events selbst nicht in scope waren).
+
+        # Multi-Fight-Kontext: wie viele Squad-Mitglieder hat dieser Enemy
+        # geknockt/gekillt? Backend weiss es sicher (auch wenn die Knock-
+        # Events selbst nicht in scope waren). Gilt fuer Kill UND Knock —
+        # ein fremdes Team das ihn nur knockt ist genauso interessant.
+        if et in ("Kill", "Knock") and target not in sq_set:
             sq_kn = knocked_our_squad.get(target, 0)
             if sq_kn:
                 row["squadKnocksCount"] = sq_kn
+                row["thirdPartyHit"] = bool(third_party)
 
         events_out.append(row)
 
