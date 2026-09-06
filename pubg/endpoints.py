@@ -1261,6 +1261,9 @@ class EndpointRegistry:
                 f"WHERE tenant_id=%s{date_filter} "
                 f"ORDER BY played_at ASC",
                 params).fetchall()
+            print(f"[session-achievements] tenant={self.tenant_id} "
+                  f"from={from_iso} to={to_iso} live_ids={sorted(seen_ids)} "
+                  f"db_rows={[dict(r) for r in db_rows]}", flush=True)
             for r in db_rows:
                 aid = r["achievement_id"]
                 if aid not in seen_ids:
@@ -1272,8 +1275,11 @@ class EndpointRegistry:
                         "playedAt": r["played_at"],
                     }]
                     seen_ids.add(aid)
-        except Exception:
-            pass
+        except Exception as exc:
+            import traceback
+            print("[session-achievements] DB-Merge fehlgeschlagen:",
+                  repr(exc), flush=True)
+            traceback.print_exc()
 
         # Enrich: PNG-Icon-URL, lokalisierter Canonical + Label fuer den Report.
         # Original-icon (Emoji) bleibt als Fallback drin.
