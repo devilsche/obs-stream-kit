@@ -2636,7 +2636,7 @@
       const _sqKnocks = ev.squadKnocksCount
         || (ctx.squadKnockedBy || new Map()).get(ev.targetAccount) || 0;
       const _multiFight = (_sqKnocks >= 1 && !ev.targetIsSquad)
-        ? ` <span class="md-tl-multifight" title="${ev.targetName || "This enemy"} knocked ${_sqKnocks} of your squad">· ${T} had knocked ${_sqKnocks} squad mate${_sqKnocks > 1 ? "s" : ""}</span>`
+        ? ` <span class="md-tl-multifight" title="${ev.targetName || "This enemy"} knocked ${_sqKnocks} of your squad">${T} had knocked ${_sqKnocks} mate${_sqKnocks > 1 ? "s" : ""}</span>`
         : "";
 
       switch (ev.type) {
