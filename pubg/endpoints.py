@@ -1257,7 +1257,7 @@ class EndpointRegistry:
                 params.append(to_iso)
             db_rows = conn.execute(
                 f"SELECT achievement_id, label, icon, match_id, played_at "
-                f"FROM pubg_achievements_seen "
+                f"FROM obs.pubg_achievements_seen "
                 f"WHERE tenant_id=%s{date_filter} "
                 f"ORDER BY played_at ASC",
                 params).fetchall()
