@@ -4592,6 +4592,53 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
                             "matchId": mid, "playedAt": played,
                         })
 
+            # --- Kill while target hangs on Emergency Pickup balloon ---
+            # BP_EmergencyPickupVehicle_C = Ballon+Seil-Rettung via Heli.
+            # Sehr selten — Highlight-Milestone.
+            if my_kill_events:
+                ep_target_accs = list({r["target_account"] for r in my_kill_events
+                                       if r["target_account"]})
+                if ep_target_accs:
+                    _ph2 = ",".join("?" * len(ep_target_accs))
+                    ep_rows = conn.execute(f"""
+                        SELECT actor_account, event_type, timestamp_ms
+                        FROM telemetry_events
+                        WHERE match_id=? AND event_type IN ('VehicleEnter','VehicleLeave')
+                          AND weapon='BP_EmergencyPickupVehicle_C'
+                          AND actor_account IN ({_ph2})
+                        ORDER BY timestamp_ms ASC
+                    """, [mid] + ep_target_accs).fetchall()
+                    if ep_rows:
+                        ep_ivs_by_acc: dict = {}
+                        for v in ep_rows:
+                            ep_ivs_by_acc.setdefault(v["actor_account"], []).append(v)
+                        ep_intervals: dict = {}
+                        for acc, evs in ep_ivs_by_acc.items():
+                            _ep_enter = None
+                            _ep_ivs = []
+                            for v in evs:
+                                if v["event_type"] == "VehicleEnter":
+                                    _ep_enter = v["timestamp_ms"]
+                                elif v["event_type"] == "VehicleLeave" and _ep_enter:
+                                    _ep_ivs.append((_ep_enter, v["timestamp_ms"]))
+                                    _ep_enter = None
+                            if _ep_enter:
+                                _ep_ivs.append((_ep_enter, 10**15))
+                            ep_intervals[acc] = _ep_ivs
+                        ep_kill_n = sum(
+                            1 for r in my_kill_events
+                            if r["target_account"] and r["timestamp_ms"] and
+                               _in_veh_interval(r["timestamp_ms"],
+                                                ep_intervals.get(r["target_account"], []))
+                        )
+                        if ep_kill_n > 0:
+                            out.append({
+                                "id": "em_pickup_kill",
+                                "label": f"Sky Snipe · {ep_kill_n}×",
+                                "icon": "🎈",
+                                "matchId": mid, "playedAt": played,
+                            })
+
             # --- Got killed/knocked while IN a vehicle (self) ---
             self_in_veh = conn.execute("""
                 SELECT event_type, timestamp_ms FROM telemetry_events
@@ -4661,6 +4708,7 @@ PUBG_RARE_ACHIEVEMENTS = {
     "first_hot_drop_survived",       # legacy alias (Pre-Counter-Migration)
     "longest_kill_400",              # ≥400m
     "chicken_streak",                # ≥2 Chickens in Folge
+    "em_pickup_kill",                # Kill waehrend Gegner am EP-Ballon haengt
 }
 
 
