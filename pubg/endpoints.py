@@ -1635,6 +1635,8 @@ class EndpointRegistry:
     # first_hot_drop, first_hot_drop_survived) zeigen auf die neuen
     # Tier-IDs.
     PUBG_ICON_URLS = {
+        # Sky Snipe
+        "em_pickup_kill":          "/widgets-static/pubg/icons/sky_snipe.png",
         # BR Opener
         "first_chicken":           "/widgets-static/pubg/icons/first_chicken.png",
         "chicken":                 "/widgets-static/pubg/icons/first_chicken.png",
