@@ -392,6 +392,13 @@ WEAPON_NAMES = {
 }
 
 
+# Wie lange nach dem letzten direkten Kontakt mit unserer Squad ein Gegner
+# noch als "Teil unseres Fights" gilt. Danach ist sein Schicksal irrelevant
+# fuer die Timeline — was er 5 Minuten spaeter woanders treibt, gehoert
+# nicht in den Match-Report.
+_MULTIFIGHT_WINDOW_MS = 90_000
+
+
 # Vehicle-Pattern → Klartext-Name. Mehrere Skins/Varianten desselben
 # Modells werden zusammengefasst (Mirado_A_02 / Mirado_A_03_Esports / ...
 # alle → 'Mirado').
@@ -1938,6 +1945,10 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     # Team sie erledigt — damit der Kontext "er hatte X von euch geknockt"
     # sichtbar wird.
     knocked_our_squad: dict = {}  # account → Anzahl Knocks auf Squad
+    # account → timestamp_ms des letzten direkten Kontakts mit unserer Squad.
+    # Begrenzt den Multi-Fight-Kontext auf den laufenden Fight: was ein
+    # Gegner Minuten spaeter woanders treibt, gehoert nicht in die Timeline.
+    last_squad_contact_ms: dict = {}
 
     # 3) Team-ID-Lookup fuer die ganze Lobby
     team_rows = conn.execute("""
@@ -2139,14 +2150,26 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             if actor and actor not in sq_set and target and target in sq_set:
                 knocked_our_squad[actor] = knocked_our_squad.get(actor, 0) + 1
 
+        # Direkter Kontakt Squad ↔ Gegner: haelt das Multi-Fight-Fenster offen.
+        if actor and target:
+            if actor in sq_set and target not in sq_set:
+                last_squad_contact_ms[target] = ts
+            elif target in sq_set and actor not in sq_set:
+                last_squad_contact_ms[actor] = ts
+
         # Multi-Fight: ein FREMDES Team greift einen Gegner an, der zuvor
         # unsere Squad geknockt/gekillt hat. Nur dann relevant — wenn wir
         # selbst zurueckschlagen, sieht man das ohnehin in der Timeline.
+        # Zusaetzlich zeitlich begrenzt: nur solange der Fight mit uns noch
+        # laeuft, nicht was der Gegner Minuten spaeter woanders macht.
+        _contact_ts = last_squad_contact_ms.get(target)
         third_party = (
             et in ("Kill", "Knock")
             and target in knocked_our_squad
             and actor and actor not in sq_set
             and team_by_acc.get(actor) != team_by_acc.get(target)
+            and _contact_ts is not None
+            and (ts - _contact_ts) <= _MULTIFIGHT_WINDOW_MS
         )
 
         in_scope = (
