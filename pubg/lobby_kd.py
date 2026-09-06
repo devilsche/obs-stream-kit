@@ -92,6 +92,13 @@ MIN_KD_ROUNDS = 50
 #: einem Solo-Match fiel die Rechnung auf 25 TPP-Runden zurueck (4,74),
 #: obwohl daneben 10.663 Runden squad-fpp mit 1,50 standen.
 MIN_KD_SHARE = 0.10
+#: Untergrenze fuer die letzte Stufe (alle Modi zusammen). Die lag auf 1 —
+#: "lieber irgendein Wert als ein leeres Feld". Das kippt bei Neulingen: ein
+#: Spieler mit EINER Runde (0 Kills, 1 Tod) stand mit K/D 0,00 in der Lobby
+#: und zog den Schnitt runter, obwohl eine Runde ueber niemanden etwas sagt.
+#: Bei 10 Runden ist der Wert wenigstens kein Muenzwurf mehr. In einer
+#: gemessenen 96er-Lobby betraf das 6 Spieler.
+MIN_KD_ROUNDS_TOTAL = 10
 #: Perspektive schlaegt Modus: First-Person und Third-Person sind zwei
 #: verschiedene Spiele, ein TPP-Wert sagt ueber einen FPP-Gegner wenig.
 FPP_MODES = ("solo-fpp", "duo-fpp", "squad-fpp")
@@ -143,10 +150,11 @@ def kd_for_mode(per_mode, mode: str, min_rounds: int = MIN_KD_ROUNDS) -> dict:
         if not modes:
             continue
         kills, losses, rounds = _sum_modes(per_mode, modes)
-        # Die letzte Stufe ist die ganze Karriere — dort greift weder die
-        # Anteils-Regel noch die Mindestrunden-Schwelle: wer irgendeine Runde
-        # gespielt hat, bekommt eine K/D statt ein leeres Feld.
-        effective_min = 1 if basis == "all" else min_rounds
+        # Die letzte Stufe ist die ganze Karriere — dort greift die
+        # Anteils-Regel nicht, wohl aber eine eigene Untergrenze: unter
+        # MIN_KD_ROUNDS_TOTAL Runden ist der Wert Rauschen (siehe dort).
+        effective_min = (MIN_KD_ROUNDS_TOTAL if basis == "all"
+                         else min_rounds)
         kd = _kd_if_enough(kills, losses, rounds, effective_min,
                            0 if basis == "all" else total)
         if kd is not None:
@@ -165,8 +173,8 @@ def kd_with_fallback(season_per_mode, lifetime_per_mode, mode: str,
       2. Lifetime  gleicher Modus
       3. Season   gleiche Perspektive (FPP oder TPP)
       4. Lifetime  gleiche Perspektive
-      5. Season   alle Modes (ab 1 Runde)
-      6. Lifetime  alle Modes (ab 1 Runde)
+      5. Season   alle Modes (ab MIN_KD_ROUNDS_TOTAL Runden)
+      6. Lifetime  alle Modes (ab MIN_KD_ROUNDS_TOTAL Runden)
     """
     group = FPP_MODES if (mode or "").endswith("-fpp") else TPP_MODES
 
@@ -176,7 +184,7 @@ def kd_with_fallback(season_per_mode, lifetime_per_mode, mode: str,
         _, _, total = _sum_modes(per_mode, tuple(per_mode))
         kills, losses, rounds = _sum_modes(per_mode, modes)
         kd = _kd_if_enough(kills, losses, rounds, eff_min,
-                            0 if eff_min == 1 else total)
+                            0 if eff_min == MIN_KD_ROUNDS_TOTAL else total)
         return {"kd": kd, "basis": None, "rounds": rounds} if kd is not None else None
 
     s_all = tuple(season_per_mode or ())
@@ -186,8 +194,8 @@ def kd_with_fallback(season_per_mode, lifetime_per_mode, mode: str,
         (lifetime_per_mode, (mode,) if mode else (), min_rounds),
         (season_per_mode,   group,                   min_rounds),
         (lifetime_per_mode, group,                   min_rounds),
-        (season_per_mode,   s_all,                   1),
-        (lifetime_per_mode, l_all,                   1),
+        (season_per_mode,   s_all,   MIN_KD_ROUNDS_TOTAL),
+        (lifetime_per_mode, l_all,   MIN_KD_ROUNDS_TOTAL),
     ]
     for per_mode, modes, eff_min in steps:
         res = _try(per_mode, modes, eff_min)

@@ -435,3 +435,32 @@ def test_kd_alltime_ohne_jede_quelle_bleibt_unbekannt():
     r = lk.kd_alltime(None, None, "duo-fpp")
     assert r["kd"] is None
     assert r["source"] is None
+
+
+# ── Letzte Fallback-Stufe braucht auch eine Untergrenze ─────────────────────
+
+def test_eine_einzige_runde_ergibt_keinen_wert():
+    """Der Fall WARWAR556: eine squad-fpp-Runde, 0 Kills, 1 Tod. Vorher
+    stand er mit K/D 0,00 in der Lobby und zog den Schnitt runter — obwohl
+    eine Runde ueber niemanden etwas aussagt."""
+    per_mode = {"squad-fpp": _stats(0, 1, 1)}
+    r = lk.kd_for_mode(per_mode, "duo-fpp")
+    assert r["kd"] is None
+    assert r["basis"] is None
+
+
+def test_zehn_runden_reichen_fuer_die_gesamtstufe():
+    """Die Grenze liegt bei MIN_KD_ROUNDS_TOTAL, nicht bei einer Runde."""
+    per_mode = {"solo-fpp": _stats(12, 10, 10)}
+    r = lk.kd_for_mode(per_mode, "duo-fpp")
+    assert r["basis"] == "all"
+    assert r["kd"] == pytest.approx(12 / 10)
+
+
+def test_viele_runden_im_nebenmodus_schlagen_den_duennen_hauptmodus():
+    """Eine squad-fpp-Runde neben 500 duo-fpp-Runden: gemessen wird an den
+    500, nicht an der einen."""
+    per_mode = {"squad-fpp": _stats(0, 1, 1), "duo-fpp": _stats(700, 350, 500)}
+    r = lk.kd_for_mode(per_mode, "squad-fpp")
+    assert r["kd"] == pytest.approx(700 / 351)
+    assert r["basis"] == "fpp"
