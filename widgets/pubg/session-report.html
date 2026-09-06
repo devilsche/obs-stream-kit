@@ -2536,7 +2536,9 @@
           "fpp":"FPP gesamt","tpp":"TPP gesamt","all":"Allzeit"};
         const tip = (snap && snap.kd != null)
           ? `K/D ${snap.kd.toFixed(2)} · ${snap.rounds} Runden (${MODE[snap.mode] || snap.mode || "Allzeit"})`
-          : "K/D wird noch geladen";
+          : snap === null
+            ? "K/D N/A · keine API-Daten"
+            : "K/D wird noch geladen";
         tooltipAttr = ` data-kd-tip="${PubgUI.esc(tip)}"`;
       }
 
@@ -3606,7 +3608,7 @@
                   ? ` <span class="where">${m.matches} ${
                       m.matches === 1 ? "Match" : "Matches"}</span>` : ""
                 }${basisHtml(m)}</span>
-                <span class="kd">${m.kd == null ? "—" : m.kd.toFixed(2)}</span></li>`
+                <span class="kd">${m.kd == null ? "N/A" : m.kd.toFixed(2)}</span></li>`
             ).join("")}</ul>
         </div>
         <p class="lobby-modal__note">Gemessen am Modus dieses Matches, sonst
