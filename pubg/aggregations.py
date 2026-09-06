@@ -3059,17 +3059,25 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
         # Vehicle-Intervalle pro Squad-Member (fuer 'taken')
         intervals_by = {}
         for acc in squad:
-            intervals_by[acc] = _build_intervals(events, acc)
+            intervals_by[acc] = [
+                iv for iv in _build_intervals(events, acc)
+                if "EmergencyPickup" not in (iv[2] or "")
+            ]
             _ensure(acc)["matches"] += 1
         # Vehicle-Intervalle pro Gegner — nur fuer Accounts mit Enter
         # im Match, on-demand. (Caching ueber das Match-Loop hinweg
         # waere overkill — Squad-Matches haben ~20 Vehicle-Accounts max.)
         opp_intervals = {}
         for e in events:
-            if e["type"] == "VehicleEnter" and e["actor"] and e["actor"] not in squad:
+            if (e["type"] == "VehicleEnter" and e["actor"]
+                    and e["actor"] not in squad
+                    and e.get("weapon") != "BP_EmergencyPickupVehicle_C"):
                 opp_intervals.setdefault(e["actor"], None)
         for acc in list(opp_intervals.keys()):
-            opp_intervals[acc] = _build_intervals(events, acc)
+            opp_intervals[acc] = [
+                iv for iv in _build_intervals(events, acc)
+                if "EmergencyPickup" not in (iv[2] or "")
+            ]
 
         # Helper: was zwischen ts und einem zukuenftigen Kill-Event,
         # gabs ein Revive fuer das Target?
@@ -4653,17 +4661,17 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
         # BP_EmergencyPickupVehicle_C = Ballon+Seilwinde via Heli.
         ep_kills_raw = conn.execute("""
             SELECT target_account, timestamp_ms FROM telemetry_events
-            WHERE match_id=? AND actor_account=?
+            WHERE match_id=%s AND actor_account=%s
               AND event_type IN ('Kill','Knock')
         """, (mid, my_account_id)).fetchall()
         if ep_kills_raw:
             ep_cands = list({r["target_account"] for r in ep_kills_raw
                              if r["target_account"]})
-            _ph_ep = ",".join("?" * len(ep_cands))
+            _ph_ep = ",".join(["%s"] * len(ep_cands))
             ep_veh = conn.execute(f"""
                 SELECT actor_account, event_type, timestamp_ms
                 FROM telemetry_events
-                WHERE match_id=? AND event_type IN ('VehicleEnter','VehicleLeave')
+                WHERE match_id=%s AND event_type IN ('VehicleEnter','VehicleLeave')
                   AND weapon='BP_EmergencyPickupVehicle_C'
                   AND actor_account IN ({_ph_ep})
                 ORDER BY timestamp_ms ASC
