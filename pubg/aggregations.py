@@ -387,6 +387,8 @@ WEAPON_NAMES = {
     "WeapPanProjectile_C":     ("Pfanne (Wurf)", "melee"),
     "WeapSickle_C":            ("Sichel",        "melee"),
     "WeapSickleProjectile_C":  ("Sichel (Wurf)", "melee"),
+    "WeapCowbarProjectile_C":  ("Brechstange (Wurf)","melee"),
+    "WeapPickaxe_C":           ("Spitzhacke",    "melee"),
     "WeapPickaxeProjectile_C": ("Spitzhacke (Wurf)","melee"),
     "WeapCrossbow_1_C":        ("Armbrust",      "other"),
 }
@@ -535,6 +537,8 @@ _WEAPON_ALIASES = {
     "weapc4_c":                     "ProjC4_C",
     "weapstickygrenade_c":          "ProjStickyGrenade_C",
     "weappanzerfaust100m_c":        "PanzerFaust100M_Projectile_C",
+    # Variante die im TakeDamage bei Selbst-Treffern auftaucht (…M1_C).
+    "weappanzerfaust100m1_c":       "PanzerFaust100M_Projectile_C",
 }
 
 
