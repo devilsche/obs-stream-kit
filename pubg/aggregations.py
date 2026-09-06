@@ -2235,6 +2235,22 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                         and _is_vehicle_weapon(d["weapon"])):
                     continue
                 recent_other_damage = d  # latest non-self damage wins
+
+            # Selbst zugefuegter Schaden kurz vor dem Tod (Panzerfaust in
+            # die eigene Wand, Granate zu kurz geworfen, ...). PUBG liefert
+            # solche Kills OHNE Killer — die Waffe steht nur im TakeDamage.
+            recent_self_damage = None
+            for d in dmg_by_target.get(target, []):
+                d_ts = d["timestamp_ms"]
+                if d_ts >= ts:
+                    break
+                if (ts - d_ts) > 2000:
+                    continue
+                if d["actor_account"] != target:
+                    continue
+                if (d["damage"] or 0) <= 0:
+                    continue
+                recent_self_damage = d  # latest self damage wins
             # Bleed-Out: wenn vorher ein Knock UND in den letzten 2s
             # KEIN non-self damage → ausgeblutet.
             bled_out = bool(knock_ev) and recent_other_damage is None
@@ -2272,8 +2288,16 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             if env_type:
                 row["type"] = env_type
             elif not actor:
-                # Kein Akteur und kein Waffen-Marker — generisches "died".
-                row["type"] = "kill_self"
+                # Kein Akteur: entweder der Spieler hat sich selbst
+                # erledigt (Self-Damage kurz vorher) oder es bleibt beim
+                # generischen "died".
+                if recent_self_damage:
+                    row["type"] = "kill_self_inflicted"
+                    row["selfWeapon"] = recent_self_damage["weapon"]
+                    row["selfWeaponName"] = _weapon_label(
+                        recent_self_damage["weapon"])[0]
+                else:
+                    row["type"] = "kill_self"
             else:
                 # Real-Finisher-Detection: wenn actor==knocker UND es einen
                 # non-self Damager in den letzten 2s gab (der NICHT der

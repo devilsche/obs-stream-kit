@@ -839,6 +839,11 @@
     .special-ach-icon img { width: 32px; height: 32px; object-fit: contain; }
     .special-ach-text { flex: 1; display: flex; flex-direction: column; gap: 1px; }
     .special-ach-label { font-weight: 700; color: var(--pubg-gold); }
+    .special-ach-ctx {
+      font-size: 0.82em; color: var(--pubg-muted, #9aa0aa);
+      letter-spacing: 0.02em;
+    }
+    .special-ach-ctx b { color: var(--pubg-text, #e6e8ec); font-weight: 600; }
     .special-ach-desc { font-size: 0.85em; color: var(--pubg-muted); }
     .special-ach-when { color: var(--pubg-muted); font-size: 0.82em; white-space: nowrap; }
     .ve-member { margin-bottom: 8px; }
@@ -2741,6 +2746,11 @@
           return `${T} died in the Red Zone`;
         case "kill_drown":
           return `${T} drowned`;
+        case "kill_self_inflicted": {
+          const w = ev.selfWeaponName
+            ? ` with <b>${ev.selfWeaponName}</b>` : "";
+          return `${T} killed themselves${w}`;
+        }
         case "kill_self":
           return `${T} died`;
         default:
@@ -3960,6 +3970,11 @@
       // Globaler Cache fuer evRows (Vehicle-Events) — damit dort die
       // korrekte Session-Match-Nummer angezeigt wird, nicht die lokale.
       window._matchNumByMatchId = matchNumByMatchId;
+      // Match-Meta (Map, Start) fuer Sektionen die nur eine matchId haben
+      // — z.B. Special-Action-Achievements.
+      window._matchMetaByMatchId = new Map(
+        _sorted.filter(m => m.matchId)
+               .map(m => [m.matchId, m]));
       // Modal-Navigation braucht die chrono Liste der Match-IDs
       window._allMatchIds = _sorted
         .map(m => m.matchId || "").filter(Boolean);
@@ -4336,6 +4351,19 @@
         }
 
         if (specialAchs.length) {
+          // Kontext wie bei Vehicle-Action: wer, welches Match, welche Map.
+          const numByMid  = window._matchNumByMatchId  || new Map();
+          const metaByMid = window._matchMetaByMatchId || new Map();
+          const ctxLine = (a) => {
+            const bits = [];
+            if (a.playerName) bits.push(`<b>${a.playerName}</b>`);
+            const n = numByMid.get(a.matchId);
+            if (n) bits.push(`Match #${n}`);
+            const m = metaByMid.get(a.matchId);
+            if (m && m.map) bits.push(PubgUI.fmtMap(m.map));
+            return bits.length
+              ? `<span class="special-ach-ctx">${bits.join(" · ")}</span>` : "";
+          };
           specialHtml = `<h3 class="extras-h">Special Action</h3>
             <div class="special-ach-list">
               ${specialAchs.map(a => `
@@ -4343,6 +4371,7 @@
                   <span class="special-ach-icon">${iconHtml(a)}</span>
                   <span class="special-ach-text">
                     <span class="special-ach-label">${a.label || a.id}</span>
+                    ${ctxLine(a)}
                     ${a.description ? `<span class="special-ach-desc">${a.description}</span>` : ""}
                   </span>
                   <span class="special-ach-when">${PubgUI.fmtTime(a.playedAt)}</span>

@@ -1287,14 +1287,25 @@ class EndpointRegistry:
         # Enrich: PNG-Icon-URL, lokalisierter Canonical + Label fuer den Report.
         # Original-icon (Emoji) bleibt als Fallback drin.
         lang = self._current_lang()
+        # Name des Accounts auf den sich die Achievements beziehen — das
+        # Frontend hat den sonst nirgends (Special-Action-Sektion zeigt ihn).
+        player_name = None
+        try:
+            for t in self._tracked():
+                if t["account_id"] == self.my_account_id:
+                    player_name = t["name"]
+                    break
+        except Exception:
+            pass
         enriched = []
         for a in items:
             aid = a.get("id")
             enriched.append({
                 **a,
-                "label":     self._localize_label(a.get("label"), aid, lang),
-                "iconUrl":   self.PUBG_ICON_URLS.get(aid),
-                "canonical": self._localized_prefix(aid, lang),
+                "label":      self._localize_label(a.get("label"), aid, lang),
+                "iconUrl":    self.PUBG_ICON_URLS.get(aid),
+                "canonical":  self._localized_prefix(aid, lang),
+                "playerName": player_name,
             })
         return _ok(enriched)
 
