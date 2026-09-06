@@ -452,22 +452,28 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         entry["accounts"].append(r["account_id"])
         all_accounts.add(r["account_id"])
 
+    # Lifetime immer laden — als letzter Fallback wenn Season-Daten fehlen.
+    lifetime_by_mode = db_pg.get_lifetime_by_mode(raw, list(all_accounts))
+
     by_mode = {}
     if season_id == LIFETIME_KEY:
         # Alltime heisst ueber die ganze Karriere — aber gemessen wird am
         # Modus, in dem man sich begegnet ist (Rueckfall: gleiche Perspektive,
         # dann alles). Sonst steht ein Spieler mit 20 Kills aus zwei
         # Solo-Runden als 20er-K/D in einer squad-fpp-Lobby, wo er 0,43 hat.
-        by_mode = db_pg.get_lifetime_by_mode(raw, list(all_accounts))
+        by_mode = lifetime_by_mode
         kd_by_acc = {}
     else:
-        snaps = db_pg.get_season_snapshots(raw, season_id, mode,
-                                           list(all_accounts))
-        kd_by_acc = {a: (v or {}).get("kd") if v else None
-                     for a, v in snaps.items()}
-    my_kd = kd_by_acc.get(my_account_id)
-    if by_mode and my_account_id:
-        my_kd = kd_for_mode(by_mode.get(my_account_id), None).get("kd")
+        # Alle Modes der Season laden — kd_for_mode macht dann den Fallback:
+        # gleicher Modus > gleiche Perspektive > Gesamt-Season > Lifetime.
+        by_mode = db_pg.get_season_by_mode(raw, season_id, list(all_accounts))
+        kd_by_acc = {}
+    my_kd = None
+    if my_account_id:
+        res = kd_for_mode(by_mode.get(my_account_id), mode)
+        if res["kd"] is None and season_id != LIFETIME_KEY:
+            res = kd_for_mode(lifetime_by_mode.get(my_account_id), mode)
+        my_kd = res["kd"]
 
     # Zweiter Satz Zahlen (z.B. Season neben Alltime) — dieselbe Rechnung,
     # nur mit anderem Schluessel; steht in der Ansicht als Zusatzspalte.
@@ -481,9 +487,14 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
     out = []
     for mid, entry in per_match.items():
         squad = squad_by_match.get(mid, set())
-        if by_mode:
-            kd_by_acc = {a: kd_for_mode(by_mode.get(a), entry.get("mode")).get("kd")
-                         for a in set(entry["accounts"]) | set(squad)}
+        if by_mode is not None:
+            m_hint = entry.get("mode")
+            kd_by_acc = {}
+            for a in set(entry["accounts"]) | set(squad):
+                res = kd_for_mode(by_mode.get(a), m_hint)
+                if res["kd"] is None and season_id != LIFETIME_KEY:
+                    res = kd_for_mode(lifetime_by_mode.get(a), m_hint)
+                kd_by_acc[a] = res["kd"]
         # Lobby heisst hier: alle ausser uns. Der eigene Squad steckte sonst
         # in beiden Seiten des Vergleichs.
         avg = lobby_average(entry["accounts"], kd_by_acc, exclude=squad)

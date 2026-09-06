@@ -1017,6 +1017,32 @@ def get_player_names(conn, tenant_id: int, account_ids=None) -> dict:
 MIN_KD_ROUNDS = 50
 
 
+def get_season_by_mode(conn, season_id: str, account_ids=None) -> dict:
+    """{account_id: {mode: {"kills","losses","rounds"}}} fuer eine Season.
+
+    Wie get_lifetime_by_mode, aber fuer eine bestimmte Season — damit
+    kd_for_mode den vollen Fallback (Modus > Perspektive > Allgemein)
+    auch fuer saisonale Snapshots durchfuehren kann.
+    """
+    ids = [a for a in (account_ids or []) if a]
+    if not ids:
+        return {}
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT account_id, mode, kills, losses, rounds
+            FROM player_season_snapshot
+            WHERE season_id = %s AND account_id = ANY(%s)
+              AND kills IS NOT NULL
+        """, (season_id, ids))
+        rows = cur.fetchall()
+    out = {}
+    for r in rows:
+        out.setdefault(r["account_id"], {})[r["mode"]] = {
+            "kills": r["kills"] or 0, "losses": r["losses"] or 0,
+            "rounds": r["rounds"] or 0}
+    return out
+
+
 def get_lifetime_by_mode(conn, account_ids=None) -> dict:
     """{account_id: {mode: {"kills","losses","rounds"}}} — ungerechnet.
 
