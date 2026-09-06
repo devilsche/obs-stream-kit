@@ -829,6 +829,18 @@
       letter-spacing: 0.1em;
     }
     .vehicle-events { font-size: 0.9em; }
+    .special-ach-list { font-size: 0.9em; display: flex; flex-direction: column; gap: 6px; }
+    .special-ach-item {
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(242,183,5,.06); border: 1px solid rgba(242,183,5,.2);
+      border-radius: 6px; padding: 7px 10px;
+    }
+    .special-ach-icon { font-size: 1.5em; line-height: 1; flex-shrink: 0; }
+    .special-ach-icon img { width: 32px; height: 32px; object-fit: contain; }
+    .special-ach-text { flex: 1; display: flex; flex-direction: column; gap: 1px; }
+    .special-ach-label { font-weight: 700; color: var(--pubg-gold); }
+    .special-ach-desc { font-size: 0.85em; color: var(--pubg-muted); }
+    .special-ach-when { color: var(--pubg-muted); font-size: 0.82em; white-space: nowrap; }
     .ve-member { margin-bottom: 8px; }
     .ve-name { color: var(--pubg-text); font-weight: 700; margin-bottom: 3px; }
     details.ve { margin-left: 8px; }
@@ -4280,29 +4292,56 @@
           ${streakItem("Kills ≥ 2", kd2Cur, kd2Best)}
         </div>`;
 
+      // IDs die eine eigene "Special Actions"-Sektion bekommen statt
+      // nur im Achievements-Aufklapp zu landen.
+      const SPECIAL_ACH_IDS = new Set(["em_pickup_kill"]);
+
       let achievementsHtml = "";
+      let specialHtml = "";
       if (achievements && achievements.length) {
         const isEmoji = (s) => s && !s.startsWith("/") && !s.startsWith("http");
         const iconHtml = (a) => a.iconUrl
           ? `<img src="${a.iconUrl}" alt="">`
           : (isEmoji(a.icon) ? a.icon : "");
-        achievementsHtml = `
-          <details class="ach-details">
-            <summary class="extras-h ach-summary">
-              Achievements <span class="ach-count">(${achievements.length})</span>
-            </summary>
-            <div class="ach-list">
-              ${achievements.map(a => `
-                <div class="ach-item">
-                  <span class="ach-icon">${iconHtml(a)}</span>
-                  <span class="ach-text">
-                    ${a.canonical ? `<span class="ach-canonical">${a.canonical}</span>` : ""}
-                    <span class="ach-label">${a.label || a.id}</span>
+
+        // Special-Achievements abzweigen
+        const specialAchs = achievements.filter(a => SPECIAL_ACH_IDS.has(a.id));
+        const normalAchs  = achievements.filter(a => !SPECIAL_ACH_IDS.has(a.id));
+
+        if (normalAchs.length) {
+          achievementsHtml = `
+            <details class="ach-details">
+              <summary class="extras-h ach-summary">
+                Achievements <span class="ach-count">(${normalAchs.length})</span>
+              </summary>
+              <div class="ach-list">
+                ${normalAchs.map(a => `
+                  <div class="ach-item">
+                    <span class="ach-icon">${iconHtml(a)}</span>
+                    <span class="ach-text">
+                      ${a.canonical ? `<span class="ach-canonical">${a.canonical}</span>` : ""}
+                      <span class="ach-label">${a.label || a.id}</span>
+                    </span>
+                    <span class="ach-when">${PubgUI.fmtTime(a.playedAt)}</span>
+                  </div>`).join("")}
+              </div>
+            </details>`;
+        }
+
+        if (specialAchs.length) {
+          specialHtml = `<h3 class="extras-h">Special Action</h3>
+            <div class="special-ach-list">
+              ${specialAchs.map(a => `
+                <div class="special-ach-item">
+                  <span class="special-ach-icon">${iconHtml(a)}</span>
+                  <span class="special-ach-text">
+                    <span class="special-ach-label">${a.label || a.id}</span>
+                    ${a.description ? `<span class="special-ach-desc">${a.description}</span>` : ""}
                   </span>
-                  <span class="ach-when">${PubgUI.fmtTime(a.playedAt)}</span>
+                  <span class="special-ach-when">${PubgUI.fmtTime(a.playedAt)}</span>
                 </div>`).join("")}
-            </div>
-          </details>`;
+            </div>`;
+        }
       }
 
       // PAYDAY/Event-Stats werden jetzt INLINE im jeweiligen Match-Detail-
@@ -4489,7 +4528,7 @@
         }
       }
 
-      placeholder.innerHTML = trendHtml + streaksHtml + achievementsHtml + vehicleHtml;
+      placeholder.innerHTML = trendHtml + streaksHtml + achievementsHtml + specialHtml + vehicleHtml;
       // Skeleton-Reserve-Hoehe entfernen, sobald echter Content drin ist —
       // sonst klebt 450px Leerraum unten an wenn der Content kuerzer ist.
       placeholder.classList.add("extras-placeholder--filled");

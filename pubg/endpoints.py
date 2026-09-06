@@ -1241,6 +1241,40 @@ class EndpointRegistry:
                 conn, self.tenant_id, self.my_account_id,
                 from_iso=from_iso, to_iso=to_iso),
         )
+
+        # Merge: Achievements die in pubg_achievements_seen stehen aber
+        # von compute_session_achievements nicht live erkannt wurden
+        # (z.B. em_pickup_kill bei manuellem Insert oder live-Fehler).
+        try:
+            seen_ids = {a.get("id") for a in items}
+            date_filter = ""
+            params = [self.tenant_id]
+            if from_iso:
+                date_filter += " AND played_at >= %s"
+                params.append(from_iso)
+            if to_iso:
+                date_filter += " AND played_at <= %s"
+                params.append(to_iso)
+            db_rows = conn.execute(
+                f"SELECT achievement_id, label, icon, match_id, played_at "
+                f"FROM pubg_achievements_seen "
+                f"WHERE tenant_id=%s{date_filter} "
+                f"ORDER BY played_at ASC",
+                params).fetchall()
+            for r in db_rows:
+                aid = r["achievement_id"]
+                if aid not in seen_ids:
+                    items = list(items) + [{
+                        "id":       aid,
+                        "label":    r["label"],
+                        "icon":     r["icon"],
+                        "matchId":  r["match_id"],
+                        "playedAt": r["played_at"],
+                    }]
+                    seen_ids.add(aid)
+        except Exception:
+            pass
+
         # Enrich: PNG-Icon-URL, lokalisierter Canonical + Label fuer den Report.
         # Original-icon (Emoji) bleibt als Fallback drin.
         lang = self._current_lang()
