@@ -155,6 +155,48 @@ def kd_for_mode(per_mode, mode: str, min_rounds: int = MIN_KD_ROUNDS) -> dict:
     return {"kd": None, "basis": None, "rounds": rounds}
 
 
+
+def kd_with_fallback(season_per_mode, lifetime_per_mode, mode: str,
+                     min_rounds: int = MIN_KD_ROUNDS) -> dict:
+    """K/D mit verschraenkter Season-/Lifetime-Fallback-Kette.
+
+    Reihenfolge:
+      1. Season   gleicher Modus
+      2. Lifetime  gleicher Modus
+      3. Season   gleiche Perspektive (FPP oder TPP)
+      4. Lifetime  gleiche Perspektive
+      5. Season   alle Modes (ab 1 Runde)
+      6. Lifetime  alle Modes (ab 1 Runde)
+    """
+    group = FPP_MODES if (mode or "").endswith("-fpp") else TPP_MODES
+
+    def _try(per_mode, modes, eff_min):
+        if not per_mode or not modes:
+            return None
+        _, _, total = _sum_modes(per_mode, tuple(per_mode))
+        kills, losses, rounds = _sum_modes(per_mode, modes)
+        kd = _kd_if_enough(kills, losses, rounds, eff_min,
+                            0 if eff_min == 1 else total)
+        return {"kd": kd, "basis": None, "rounds": rounds} if kd is not None else None
+
+    s_all = tuple(season_per_mode or ())
+    l_all = tuple(lifetime_per_mode or ())
+    steps = [
+        (season_per_mode,   (mode,) if mode else (), min_rounds),
+        (lifetime_per_mode, (mode,) if mode else (), min_rounds),
+        (season_per_mode,   group,                   min_rounds),
+        (lifetime_per_mode, group,                   min_rounds),
+        (season_per_mode,   s_all,                   1),
+        (lifetime_per_mode, l_all,                   1),
+    ]
+    for per_mode, modes, eff_min in steps:
+        res = _try(per_mode, modes, eff_min)
+        if res:
+            return res
+    _, _, rounds = _sum_modes(lifetime_per_mode, l_all)
+    return {"kd": None, "basis": None, "rounds": rounds}
+
+
 def kd_by_perspective(per_mode, min_rounds: int = MIN_KD_ROUNDS) -> dict:
     """{"fpp": {...}, "tpp": {...}, "all": {...}} — zum Nebeneinanderstellen."""
     out = {}
@@ -470,9 +512,9 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         kd_by_acc = {}
     my_kd = None
     if my_account_id:
-        res = kd_for_mode(by_mode.get(my_account_id), mode)
-        if res["kd"] is None and season_id != LIFETIME_KEY:
-            res = kd_for_mode(lifetime_by_mode.get(my_account_id), mode)
+        s_data = by_mode.get(my_account_id) if season_id != LIFETIME_KEY else None
+        l_data = lifetime_by_mode.get(my_account_id)
+        res = kd_with_fallback(s_data, l_data, mode)
         my_kd = res["kd"]
 
     # Zweiter Satz Zahlen (z.B. Season neben Alltime) — dieselbe Rechnung,
@@ -491,10 +533,9 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
             m_hint = entry.get("mode")
             kd_by_acc = {}
             for a in set(entry["accounts"]) | set(squad):
-                res = kd_for_mode(by_mode.get(a), m_hint)
-                if res["kd"] is None and season_id != LIFETIME_KEY:
-                    res = kd_for_mode(lifetime_by_mode.get(a), m_hint)
-                kd_by_acc[a] = res["kd"]
+                s_data = by_mode.get(a) if season_id != LIFETIME_KEY else None
+                l_data = lifetime_by_mode.get(a)
+                kd_by_acc[a] = kd_with_fallback(s_data, l_data, m_hint)["kd"]
         # Lobby heisst hier: alle ausser uns. Der eigene Squad steckte sonst
         # in beiden Seiten des Vergleichs.
         avg = lobby_average(entry["accounts"], kd_by_acc, exclude=squad)
