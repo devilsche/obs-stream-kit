@@ -3632,10 +3632,12 @@
     // squad-fpp ist etwas anderes als 3.26 aus zwei Third-Person-Runden.
     const BASIS_LABEL = { fpp: "alle FPP", tpp: "alle TPP", all: "alle Modi" };
 
-    // Season-IDs kommen als "division.bro.official.pc-2018-42" — im Report
-    // interessiert nur der Zeitraum am Ende.
+    // Season-IDs kommen als "division.bro.official.pc-2018-42". Das "2018"
+    // ist ein festes Praefix aus PUBGs Namensschema, kein Jahr — es steht
+    // seit Jahren still, waehrend nur die hintere Zahl hochzaehlt (die
+    // Asset-Liste endet bei 19, live laeuft 42). Also nur die Nummer.
     function seasonShort(id) {
-      const m = String(id || "").match(/(\d{4}-\d+)$/);
+      const m = String(id || "").match(/-(\d+)$/);
       return m ? m[1] : (id || "").replace(/^.*\./, "");
     }
 
