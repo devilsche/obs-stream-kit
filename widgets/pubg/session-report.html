@@ -208,6 +208,14 @@
       line-height: inherit;
       vertical-align: baseline;
       cursor: pointer;
+      /* Buttons erben vom UA-Stylesheet text-align:center. In den
+         Phase-Stats ist der Container ein flex-column, der Button wird
+         dadurch block-level und fuellt die Spalte — der Wert stand
+         zentriert statt buendig, und zentrierter Text springt bei
+         minimaler Breitenaenderung (Hover) um 1px. Beides faellt weg
+         wenn der Button linksbuendig und nur inhaltsbreit ist. */
+      text-align: left;
+      align-self: start;
       text-decoration: underline dotted
         color-mix(in srgb, var(--theme-accent, #f2b705) 55%, transparent);
       text-underline-offset: 3px;
