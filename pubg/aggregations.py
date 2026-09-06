@@ -1933,6 +1933,12 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     sq_set = set(squad_accs)
     currently_knocked_by_squad = set()
 
+    # Enemies die mindestens ein Squad-Mitglied geknockt haben (kumulativ,
+    # nie raus). Ihr Kill-Event kommt in die Timeline auch wenn ein anderes
+    # Team sie erledigt — damit der Kontext "er hatte X von euch geknockt"
+    # sichtbar wird.
+    knocked_our_squad: dict = {}  # account → Anzahl Knocks auf Squad
+
     # 3) Team-ID-Lookup fuer die ganze Lobby
     team_rows = conn.execute("""
         SELECT account_id, team_id FROM match_team_mapping
@@ -2110,13 +2116,6 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             last_knock_by_target.pop(infer_who, None)
             knock_pos_by_target.pop(infer_who, None)
 
-        # Scope: Squad-involved ODER chained-enemy (target ist gerade von
-        # uns geknockt und noch nicht revived/gekillt).
-        in_scope = (
-            (actor in sq_set) or (target in sq_set)
-            or (target in currently_knocked_by_squad)
-        )
-
         # Knock-State pflegen AUCH wenn nicht in scope (Lobby-Knocks
         # koennen spaeter relevant werden bei stole-the-knock).
         revive_fallback_pos = None
@@ -2125,6 +2124,9 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             knock_pos_by_target[target] = (e["victim_x"], e["victim_y"])
             if actor in sq_set and target and target not in sq_set:
                 currently_knocked_by_squad.add(target)
+            # Enemy knockt Squad-Mitglied → in knocked_our_squad aufnehmen
+            if actor and actor not in sq_set and target and target in sq_set:
+                knocked_our_squad[actor] = knocked_our_squad.get(actor, 0) + 1
         elif et == "Revive":
             # Position-Fallback fuer Revive (alte Daten ohne victim_x/y):
             # die Position des Knock-Events verwenden.
@@ -2133,6 +2135,14 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             currently_knocked_by_squad.discard(target)
         elif et == "Kill":
             currently_knocked_by_squad.discard(target)
+
+        # Scope: Squad-involved ODER chained-enemy (target gerade von uns
+        # geknockt) ODER Enemy der unsere Squad knockte (Multi-Fight-Kontext).
+        in_scope = (
+            (actor in sq_set) or (target in sq_set)
+            or (target in currently_knocked_by_squad)
+            or (et == "Kill" and target in knocked_our_squad)
+        )
 
         if not in_scope:
             continue
@@ -2307,6 +2317,12 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                         if knock_ev["distance"] else None)
             last_knock_by_target.pop(target, None)
             knock_pos_by_target.pop(target, None)
+            # Multi-Fight-Kontext: wie viele Squad-Mitglieder hat dieser
+            # Enemy geknockt? Backend weiss es sicher (auch wenn die
+            # Knock-Events selbst nicht in scope waren).
+            sq_kn = knocked_our_squad.get(target, 0)
+            if sq_kn:
+                row["squadKnocksCount"] = sq_kn
 
         events_out.append(row)
 

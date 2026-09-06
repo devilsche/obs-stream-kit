@@ -2630,9 +2630,11 @@
       const T = mdTlNameSpan(ev, "target", cba, kds);
       const meta = mdTlWeaponMeta(ev);
 
-      // Multi-Fight-Badge: wenn der Target vor seinem Tod Squad-Mitglieder
-      // geknockt hatte, sichtbar machen.
-      const _sqKnocks = (ctx.squadKnockedBy || new Map()).get(ev.targetAccount) || 0;
+      // Multi-Fight-Badge: Enemy hatte Squad-Mitglieder geknockt bevor er starb.
+      // Primär aus Backend-Feld squadKnocksCount (kennt auch nicht-scope Knocks),
+      // Fallback auf Frontend-Map fuer aeltere Daten.
+      const _sqKnocks = ev.squadKnocksCount
+        || (ctx.squadKnockedBy || new Map()).get(ev.targetAccount) || 0;
       const _multiFight = (_sqKnocks >= 1 && !ev.targetIsSquad)
         ? ` <span class="md-tl-multifight" title="This enemy knocked ${_sqKnocks} of your squad">· had knocked ${_sqKnocks} squad mate${_sqKnocks > 1 ? "s" : ""}</span>`
         : "";
