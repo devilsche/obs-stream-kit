@@ -386,3 +386,41 @@ def test_kd_for_mode_nimmt_die_perspektive_wenn_sie_wirklich_gespielt_wurde():
     per_mode = {"squad": _stats(900, 600, 700), "squad-fpp": _stats(100, 90, 95)}
     r = lk.kd_for_mode(per_mode, "solo")
     assert r["basis"] == "tpp"
+
+
+# ── Alltime mit Season-Ersatz: wer keine Lifetime-Zeile hat, ist nicht ───────
+#    unbekannt, solange Season-Daten vorliegen.
+
+def test_kd_alltime_nimmt_lifetime_wenn_vorhanden():
+    """Lifetime schlaegt Season — der Wert heisst schliesslich Alltime."""
+    life = {"duo-fpp": _stats(100, 50, 60)}
+    seas = {"duo-fpp": _stats(10, 40, 55)}
+    r = lk.kd_alltime(life, seas, "duo-fpp")
+    assert r["kd"] == pytest.approx(100 / 50)
+    assert r["source"] == "lifetime"
+    assert r["basis"] == "duo-fpp"
+
+
+def test_kd_alltime_faellt_auf_season_wenn_lifetime_fehlt():
+    """Der gemeldete Fall: Snapshot da, aber keine lifetime-Zeile. Frueher
+    galt der Spieler als unbekannt, jetzt zaehlt seine Season."""
+    seas = {"duo-fpp": _stats(120, 60, 70)}
+    r = lk.kd_alltime(None, seas, "duo-fpp")
+    assert r["kd"] == pytest.approx(120 / 60)
+    assert r["source"] == "season"
+    assert r["basis"] == "duo-fpp"
+
+
+def test_kd_alltime_season_nutzt_dieselbe_modus_kette():
+    """Kein duo-fpp in der Season, aber genug FPP: Perspektive greift auch
+    im Season-Zweig."""
+    seas = {"squad-fpp": _stats(120, 60, 70), "squad": _stats(500, 5, 6)}
+    r = lk.kd_alltime(None, seas, "duo-fpp")
+    assert r["basis"] == "fpp"
+    assert r["source"] == "season"
+
+
+def test_kd_alltime_ohne_jede_quelle_bleibt_unbekannt():
+    r = lk.kd_alltime(None, None, "duo-fpp")
+    assert r["kd"] is None
+    assert r["source"] is None

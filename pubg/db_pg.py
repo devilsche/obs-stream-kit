@@ -1043,6 +1043,38 @@ def get_season_by_mode(conn, season_id: str, account_ids=None) -> dict:
     return out
 
 
+def get_latest_season_by_mode(conn, account_ids=None) -> dict:
+    """{account_id: {mode: {...}}} aus der jeweils neuesten Season je Account.
+
+    Ersatzquelle fuer Spieler ohne `lifetime`-Zeile: die kommt aus einem
+    eigenen API-Call, der oft noch aussteht, waehrend Season-Snapshots beim
+    Match-Import mitlaufen. Ohne diesen Rueckfall gelten solche Spieler in
+    der Lobby-Auswertung als unbekannt, obwohl Zahlen vorliegen.
+
+    Je Account zaehlt nur die hoechste season_id — Season-Werte ueber
+    mehrere Seasons zu summieren waere weder Season noch Alltime.
+    """
+    ids = [a for a in (account_ids or []) if a]
+    if not ids:
+        return {}
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT DISTINCT ON (account_id, mode)
+                   account_id, mode, kills, losses, rounds
+            FROM player_season_snapshot
+            WHERE season_id <> 'lifetime' AND account_id = ANY(%s)
+              AND kills IS NOT NULL
+            ORDER BY account_id, mode, season_id DESC
+        """, (ids,))
+        rows = cur.fetchall()
+    out = {}
+    for r in rows:
+        out.setdefault(r["account_id"], {})[r["mode"]] = {
+            "kills": r["kills"] or 0, "losses": r["losses"] or 0,
+            "rounds": r["rounds"] or 0}
+    return out
+
+
 def get_lifetime_by_mode(conn, account_ids=None) -> dict:
     """{account_id: {mode: {"kills","losses","rounds"}}} — ungerechnet.
 

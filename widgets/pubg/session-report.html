@@ -332,6 +332,19 @@
     .lobby-list--top .kd { color: var(--theme-accent, #f2b705); }
     .lobby-list--low .kd { color: var(--theme-text-dim, #8a7d99); }
     .lobby-list .where { color: var(--theme-text-dim, #8a7d99); font-size: 0.82em; }
+    /* Season-Ersatzquelle: sichtbar abgesetzt, damit ein Season-Wert nicht
+       fuer einen Karriere-Wert gehalten wird. Farbe allein traegt die
+       Bedeutung nicht — der Text sagt es aus. */
+    .lobby-list .where--season {
+      color: var(--theme-accent, #f2b705);
+      border: 1px solid currentColor;
+      border-radius: 3px;
+      padding: 0 4px;
+      font-size: 0.72em;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
     .lobby-modal__note {
       margin: 14px 0 0;
       font-size: 0.8em;
@@ -3636,7 +3649,12 @@
       if (!p || !p.basis) return "";
       const label = BASIS_LABEL[p.basis] || p.basis;
       const rounds = p.rounds ? `, ${p.rounds} Runden` : "";
-      return ` <span class="where">${PubgUI.esc(label + rounds)}</span>`;
+      // Ohne Lifetime-Zeile zaehlt die laufende Season. Das ist kein
+      // Karriere-Wert und wird deshalb als solcher ausgewiesen.
+      const season = p.source === "season"
+        ? `<span class="where where--season" title="Kein Karriere-Wert vorhanden — gerechnet aus der laufenden Season">Season</span> `
+        : "";
+      return ` ${season}<span class="where">${PubgUI.esc(label + rounds)}</span>`;
     }
 
     function lobbyListHtml(players, cls, withMatch) {
