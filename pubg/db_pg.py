@@ -1043,43 +1043,54 @@ def get_season_by_mode(conn, season_id: str, account_ids=None) -> dict:
     return out
 
 
-def get_latest_season_by_mode(conn, account_ids=None) -> dict:
-    """{account_id: {mode: {...}}} aus der jeweils neuesten Season je Account.
+def get_season_split_by_mode(conn, account_ids=None, current_season_id=None):
+    """Season-Snapshots getrennt nach aktueller Season und den aelteren.
 
-    Ersatzquelle fuer Spieler ohne `lifetime`-Zeile: die kommt aus einem
-    eigenen API-Call, der oft noch aussteht, waehrend Season-Snapshots beim
-    Match-Import mitlaufen. Ohne diesen Rueckfall gelten solche Spieler in
-    der Lobby-Auswertung als unbekannt, obwohl Zahlen vorliegen.
+    Die Auswertung braucht sie nebeneinander (siehe lobby_kd.kd_resolved):
+    Stufe 1 nimmt die laufende Season, Stufe 2 geht rueckwaerts durch die
+    aelteren, bis eine im Modus genug Runden hat. Ueber Seasons zu summieren
+    waere weder Season noch Alltime, deshalb bleiben sie getrennt.
 
-    Je Account zaehlt nur die hoechste season_id — Season-Werte ueber
-    mehrere Seasons zu summieren waere weder Season noch Alltime.
+    `current_season_id` benennt die laufende Season. Fehlt sie, gilt die
+    hoechste vorhandene season_id als aktuell.
 
-    Returns (by_mode, season_by_account): die season_id gehoert an den
-    Wert, sonst steht im Report eine Zahl ohne Zeitraum.
+    Returns (current_by_mode, older_by_account):
+      current_by_mode   {account_id: {mode: stats}}
+      older_by_account  {account_id: [(season_id, {mode: stats}), ...]}
+                        absteigend sortiert, ohne die aktuelle Season.
     """
     ids = [a for a in (account_ids or []) if a]
     if not ids:
         return {}, {}
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT DISTINCT ON (account_id, mode)
-                   account_id, mode, season_id, kills, losses, rounds
+            SELECT account_id, mode, season_id, kills, losses, rounds
             FROM player_season_snapshot
             WHERE season_id <> 'lifetime' AND account_id = ANY(%s)
               AND kills IS NOT NULL
-            ORDER BY account_id, mode, season_id DESC
+            ORDER BY account_id, season_id DESC, mode
         """, (ids,))
         rows = cur.fetchall()
-    out, seasons = {}, {}
+
+    # {account: {season_id: {mode: stats}}}
+    by_acc_season = {}
     for r in rows:
-        acc = r["account_id"]
-        out.setdefault(acc, {})[r["mode"]] = {
-            "kills": r["kills"] or 0, "losses": r["losses"] or 0,
-            "rounds": r["rounds"] or 0}
-        # Hoechste season_id des Accounts gewinnt (ORDER BY season_id DESC).
-        if r["season_id"] > seasons.get(acc, ""):
-            seasons[acc] = r["season_id"]
-    return out, seasons
+        stats = {"kills": r["kills"] or 0, "losses": r["losses"] or 0,
+                 "rounds": r["rounds"] or 0}
+        by_acc_season.setdefault(r["account_id"], {}) \
+                     .setdefault(r["season_id"], {})[r["mode"]] = stats
+
+    current, older = {}, {}
+    for acc, seasons in by_acc_season.items():
+        sids = sorted(seasons, reverse=True)
+        cur_sid = current_season_id if current_season_id in seasons else (
+            sids[0] if not current_season_id else None)
+        if cur_sid:
+            current[acc] = seasons[cur_sid]
+        rest = [(sid, seasons[sid]) for sid in sids if sid != cur_sid]
+        if rest:
+            older[acc] = rest
+    return current, older
 
 
 def get_lifetime_by_mode(conn, account_ids=None) -> dict:

@@ -252,6 +252,115 @@ def kd_with_fallback(season_per_mode, lifetime_per_mode, mode: str,
     return {"kd": None, "basis": None, "rounds": rounds}
 
 
+def _newest_season_id(raw_conn):
+    """Hoechste bekannte season_id — gilt als die laufende Season.
+
+    Die API-Abfrage der aktuellen Season kostet Rate-Limit; die hoechste
+    gesammelte season_id ist derselbe Wert, solange ueberhaupt gesammelt
+    wird. Faellt auf None zurueck, dann behandelt kd_resolved schlicht
+    die neueste vorhandene je Account als aktuell.
+    """
+    try:
+        with raw_conn.cursor() as cur:
+            cur.execute("SELECT MAX(season_id) AS sid "
+                        "FROM player_season_snapshot "
+                        "WHERE season_id <> 'lifetime'")
+            row = cur.fetchone()
+        return (row["sid"] if row and "sid" in row.keys() else None) or None
+    except Exception:
+        return None
+
+
+def kd_resolved(mode: str, current_season=None, last_seasons=None,
+                lifetime=None, min_rounds: int = MIN_KD_ROUNDS,
+                current_season_id: str = None) -> dict:
+    """K/D eines Spielers — feste Quellen-Reihenfolge (Stand 2026-09-07).
+
+    `mode` ist die Spielart des Matches inklusive Perspektive, also
+    "squad-fpp", "duo-fpp", "solo" usw. POV meint die zugehoerige Gruppe:
+    alle FPP-Modi bzw. alle TPP-Modi.
+
+      1. aktueller Modus, aktuelle Season
+      2. aktueller Modus, letzte bekannte Season — und wenn die zu duenn
+         ist, weiter rueckwaerts, bis eine Season im Modus genug Runden
+         hat. Reicht keine, geht es zu Stufe 3.
+      3. aktueller Modus, Lifetime
+      4. POV,             aktuelle Season
+      5. POV,             Lifetime
+      6. alle Modi,       Lifetime
+
+    Modus-Genauigkeit geht also vor Aktualitaet: der exakte Modus aus
+    Lifetime (3) schlaegt die POV-Summe der laufenden Season (4).
+
+    Auf POV-Ebene wird die letzte Season bewusst NICHT geprueft, und
+    "alle Modi" gibt es nur aus Lifetime — so festgelegt.
+
+    Vorher hatte Lifetime durchgaengig Vorrang und Season war blosse
+    Ersatzquelle; eine "letzte bekannte Season" gab es nicht.
+
+    `last_seasons` ist eine absteigend sortierte Liste von
+    (season_id, per_mode)-Paaren — alle Seasons ausser der aktuellen.
+
+    Returns {"kd", "basis", "rounds", "source", "seasonId"}. `source` ist
+    "season", "lifetime" oder None; `seasonId` steht nur an Season-Werten.
+    """
+    group = FPP_MODES if (mode or "").endswith("-fpp") else TPP_MODES
+    mode_tuple = (mode,) if mode else ()
+
+    # (Quelle, Daten, Modus-Auswahl, Mindestrunden, Anteilsregel?, season_id)
+    steps = [
+        ("season",   current_season, mode_tuple, min_rounds, True,
+         current_season_id),
+    ]
+    # Stufe 2: rueckwaerts durch die aelteren Seasons, bis eine traegt.
+    for _sid, _data in (last_seasons or []):
+        steps.append(("season", _data, mode_tuple, min_rounds, True, _sid))
+    steps += [
+        ("lifetime", lifetime,       mode_tuple, min_rounds, True, None),
+        ("season",   current_season, group,      min_rounds, True,
+         current_season_id),
+        ("lifetime", lifetime,       group,      min_rounds, True, None),
+        ("lifetime", lifetime,       None,       MIN_KD_ROUNDS_TOTAL, False,
+         None),
+    ]
+
+    for source, per_mode, modes, eff_min, use_share, sid in steps:
+        if not per_mode:
+            continue
+        # None = alle Modi, die der Datensatz kennt.
+        sel = tuple(per_mode) if modes is None else modes
+        if not sel:
+            continue
+        kills, losses, rounds = _sum_modes(per_mode, sel)
+        total = 0
+        if use_share:
+            _, _, total = _sum_modes(per_mode, tuple(per_mode))
+        kd = _kd_if_enough(kills, losses, rounds, eff_min, total)
+        if kd is None:
+            continue
+        basis = mode if modes is mode_tuple and mode else (
+            "all" if modes is None else
+            ("fpp" if group is FPP_MODES else "tpp"))
+        return {
+            "kd":       kd,
+            "basis":    _narrow_basis(per_mode, sel, basis),
+            "rounds":   rounds,
+            "source":   source,
+            "seasonId": sid if source == "season" else None,
+        }
+
+    rounds = 0
+    for per_mode in ([current_season]
+                     + [d for _, d in (last_seasons or [])]
+                     + [lifetime]):
+        if per_mode:
+            _, _, rounds = _sum_modes(per_mode, tuple(per_mode))
+            if rounds:
+                break
+    return {"kd": None, "basis": None, "rounds": rounds,
+            "source": None, "seasonId": None}
+
+
 def kd_alltime(lifetime_per_mode, season_per_mode, mode: str,
                min_rounds: int = MIN_KD_ROUNDS, season_id: str = None) -> dict:
     """Alltime-K/D mit Season als Ersatzquelle.
@@ -588,11 +697,15 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         entry["accounts"].append(r["account_id"])
         all_accounts.add(r["account_id"])
 
-    # Lifetime immer laden — als letzter Fallback wenn Season-Daten fehlen.
+    # Alle drei Quellen fuer ALLE Accounts laden — kd_resolved braucht sie
+    # nebeneinander. Season vorher nur fuer Accounts ohne Lifetime-Zeile zu
+    # holen war eine Luecke: wer eine duenne Lifetime-Zeile hatte, blieb
+    # unbekannt, obwohl Season-Werte vorlagen.
     lifetime_by_mode = db_pg.get_lifetime_by_mode(raw, list(all_accounts))
-    # Ersatzquelle fuer alle ohne Lifetime-Zeile (siehe kd_alltime).
-    latest_season_by_mode, latest_season_id = db_pg.get_latest_season_by_mode(
-        raw, [a for a in all_accounts if a not in lifetime_by_mode])
+    cur_season_id = _newest_season_id(raw)
+    cur_season_by_mode, older_seasons_by_acc = (
+        db_pg.get_season_split_by_mode(raw, list(all_accounts),
+                                        current_season_id=cur_season_id))
 
     by_mode = {}
     if season_id == LIFETIME_KEY:
@@ -609,10 +722,12 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         kd_by_acc = {}
     my_kd = None
     if my_account_id:
-        s_data = by_mode.get(my_account_id) if season_id != LIFETIME_KEY else None
-        l_data = lifetime_by_mode.get(my_account_id)
-        res = kd_with_fallback(s_data, l_data, mode)
-        my_kd = res["kd"]
+        my_kd = kd_resolved(
+            mode,
+            current_season=cur_season_by_mode.get(my_account_id),
+            last_seasons=older_seasons_by_acc.get(my_account_id),
+            lifetime=lifetime_by_mode.get(my_account_id),
+            current_season_id=cur_season_id)["kd"]
 
     # Zweiter Satz Zahlen (z.B. Season neben Alltime) — dieselbe Rechnung,
     # nur mit anderem Schluessel; steht in der Ansicht als Zusatzspalte.
@@ -630,14 +745,12 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
             m_hint = entry.get("mode")
             kd_by_acc = {}
             for a in set(entry["accounts"]) | set(squad):
-                l_data = lifetime_by_mode.get(a)
-                if season_id == LIFETIME_KEY:
-                    kd_by_acc[a] = kd_alltime(
-                        l_data, latest_season_by_mode.get(a), m_hint,
-                        season_id=latest_season_id.get(a))["kd"]
-                else:
-                    kd_by_acc[a] = kd_with_fallback(
-                        by_mode.get(a), l_data, m_hint)["kd"]
+                kd_by_acc[a] = kd_resolved(
+                    m_hint,
+                    current_season=cur_season_by_mode.get(a),
+                    last_seasons=older_seasons_by_acc.get(a),
+                    lifetime=lifetime_by_mode.get(a),
+                    current_season_id=cur_season_id)["kd"]
         # Lobby heisst hier: alle ausser uns. Der eigene Squad steckte sonst
         # in beiden Seiten des Vergleichs.
         avg = lobby_average(entry["accounts"], kd_by_acc, exclude=squad)
@@ -741,8 +854,10 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
     by_mode = db_pg.get_lifetime_by_mode(raw, list(accounts))
     # Wer keine Lifetime-Zeile hat, wird mit seiner Season gemessen statt
     # als unbekannt zu gelten — die Herkunft steht als `source` am Wert.
-    season_by_mode, season_id_by_acc = db_pg.get_latest_season_by_mode(
-        raw, [a for a in accounts if a not in by_mode])
+    _cur_sid = _newest_season_id(raw)
+    cur_season_by_mode, older_by_acc = (
+        db_pg.get_season_split_by_mode(raw, list(accounts),
+                                        current_season_id=_cur_sid))
     names = db_pg.get_player_names(raw, tenant_id, list(accounts))
     names.update({a: n for a, n in squad_names.items() if n})
 
@@ -754,9 +869,12 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                  if a not in squad and not is_bot(a)]
         # Gemessen wird am Modus, in dem man sich begegnet ist — mit Rueckfall
         # auf dieselbe Perspektive und erst zuletzt auf alles.
-        kd_by_acc = {a: kd_alltime(by_mode.get(a), season_by_mode.get(a),
-                                   e.get("mode"),
-                                   season_id=season_id_by_acc.get(a))
+        kd_by_acc = {a: kd_resolved(
+                            e.get("mode"),
+                            current_season=cur_season_by_mode.get(a),
+                            last_seasons=older_by_acc.get(a),
+                            lifetime=by_mode.get(a),
+                            current_season_id=_cur_sid)
                      for a in set(lobby) | set(squad)}
         players = [(names.get(a) or a[:12], (kd_by_acc.get(a) or {}).get("kd"),
                     kd_by_acc.get(a) or {}) for a in lobby]
