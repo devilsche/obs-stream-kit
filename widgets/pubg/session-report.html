@@ -3679,12 +3679,17 @@
     // ob oben Haie sassen. Ab 3,0 markiert, ab 4,0 deutlicher.
     const LOBBY_HOT = [3.0, 4.0, 5.0];
 
-    function hotLobby(top5, formatted) {
-      return top5 == null ? formatted : PubgUI.hot(top5, LOBBY_HOT, formatted);
+    // Der Effekt gehoert an den Wert, der ihn ausloest. Vorher hing er an
+    // der Lobby-K/D, richtete sich aber nach dem Top-5-Schnitt — eine Lobby
+    // mit K/D 1,13 glomm, weil oben fuenf Haie sassen. Jetzt entscheidet
+    // jeder Wert fuer sich, und die Spitze hat ihre eigene Kachel.
+    function hotLobby(value, formatted) {
+      return value == null ? formatted : PubgUI.hot(value, LOBBY_HOT, formatted);
     }
 
     // Spiegelt pubg/lobby_kd.py::MIN_KD_ROUNDS — nur fuer den Hinweistext.
-    const MIN_KD_ROUNDS = 50;
+    // Stand 2026-09-07 dort von 50 auf 20 gesenkt.
+    const MIN_KD_ROUNDS = 20;
 
     function lobbyKdStr(v) { return v == null ? "—" : v.toFixed(2); }
 
@@ -3928,7 +3933,7 @@
                      data-title="Lobby · ${PubgUI.esc(PubgUI.fmtMap(m.map))}"
                      data-sub="${PubgUI.esc(PubgUI.fmtDateTime(m.matchEnd))}"
                      aria-label="Break down the lobby: median, strongest and weakest opponents"
-                   >${hotLobby(m.lobbyTop5, `<b>${m.lobbyKd.toFixed(2)}</b>`)}</button>`}</span>
+                   >${hotLobby(m.lobbyKd, `<b>${m.lobbyKd.toFixed(2)}</b>`)}</button>`}</span>
           <span class="stat lobby-kd" title="${
             m.squadKd == null
               ? "Squad K/D not known yet"
@@ -4085,8 +4090,12 @@
         ${t.lobbyKd ? `<div class="totals-group">
           <h4 class="totals-h">Lobby</h4>
           <div class="totals">
-            ${cell(t.lobbyKd.toFixed(2), "Lobby K/D",
+            ${cell(hotLobby(t.lobbyKd, t.lobbyKd.toFixed(2)), "Lobby K/D",
                    "Average K/D of the opponents in the mode played — my own squad excluded")}
+            ${t.lobbyTop5 != null
+                ? cell(hotLobby(t.lobbyTop5, t.lobbyTop5.toFixed(2)), "Top 5 Avg",
+                       "Average K/D of the five strongest opponents of the whole session — each counted once, however many matches they played")
+                : ""}
           </div>
         </div>` : ""}`;
 
@@ -4166,10 +4175,13 @@
                        data-title="Lobby · Phase ${i+1}"
                        data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'match' : 'matches'} counted"
                        aria-label="Break down the lobby of this phase: median and toughest opponents"
-                     >${hotLobby(s.lobbyTop5, `<b>${s.lobbyKd.toFixed(2)}</b>`)}</button> Lobby K/D</span>`
+                     >${hotLobby(s.lobbyKd, `<b>${s.lobbyKd.toFixed(2)}</b>`)}</button> Lobby K/D</span>`
                   : (s.lobbyPending
                       ? `<span title="Opponent K/D is still being collected"><span class="lobby-pending" role="img" aria-label="Opponent K/D is still being collected"></span> Lobby K/D</span>`
                       : "")}
+              ${s.lobbyTop5 != null
+                  ? `<span title="Average K/D of the five strongest opponents in this phase — each of them counted once, however many matches they played"><b>${hotLobby(s.lobbyTop5, s.lobbyTop5.toFixed(2))}</b> Top 5 Avg</span>`
+                  : ""}
             </div>
             <div class="matches-list">
               <div class="header-row">

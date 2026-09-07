@@ -2842,6 +2842,15 @@ class EndpointRegistry:
             data["totals"]["lobbyKd"] = lobby.get("avgKd")
             data["totals"]["lobbySquadKd"] = lobby.get("avgSquadKd")
             data["totals"]["lobbyCoverage"] = lobby.get("coverage")
+            # Top-5 auch fuer die ganze Session: die staerksten Spieler
+            # ueber ALLE Matches, nicht das Mittel der Match-Mittel.
+            _all_solid = [m for m in matches
+                          if counts_for_average(
+                              {"coverage": m.get("lobbyCoverage"),
+                               "lobbyPlayers": m.get("lobbyPlayers"),
+                               "lobbyKd": m.get("lobbyKd")})]
+            data["totals"]["lobbyTop5"] = phase_top5(
+                [m.get("_lobbyTopPlayers") or [] for m in _all_solid])
 
         # Und je Phase — dort steht die Wertung der Spielrunde, in der die
         # Besetzung gleich blieb. Nur Matches mit brauchbarer Abdeckung
