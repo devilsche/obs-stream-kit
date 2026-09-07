@@ -30,8 +30,25 @@
       gap: 14px;
       margin-bottom: 22px;
     }
-    .totals .cell { display: flex; flex-direction: column; }
-    .totals .cell .pubg-stat-value { font-size: 1.4em; }
+    /* Nur direkte Kinder — sonst greift die Regel auch in verschachtelte
+       Highlight-Wrapper (t-hot) und skaliert dort mehrfach. */
+    .totals > .cell { display: flex; flex-direction: column; }
+    .totals > .cell .pubg-stat-value { font-size: 1.4em; }
+
+    /* Gruppen ME / TEAM / LOBBY: die Zuordnung soll aus dem Layout
+       hervorgehen, nicht erst aus einem Tooltip. */
+    .totals-group { margin-bottom: 4px; }
+    .totals-group .totals { margin-bottom: 14px; }
+    .totals-h {
+      font-size: 0.68em;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--theme-text-dim, #8a7d99);
+      margin: 0 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--theme-border, rgba(94, 42, 121, 0.35));
+      font-weight: 600;
+    }
 
     .phase {
       margin-bottom: 18px;
@@ -72,6 +89,21 @@
       text-transform: uppercase;
       line-height: 1.2;
     }
+    /* Gruppen-Marker im dichten Raster: eigene volle Zeile, damit ME /
+       TEAM / LOBBY die Kacheln sichtbar trennen. */
+    .phase-stats > span.ps-group {
+      grid-column: 1 / -1;
+      display: block;
+      font-size: 0.62em;
+      letter-spacing: 0.16em;
+      color: var(--theme-text-dim, #8a7d99);
+      border-bottom: 1px solid var(--theme-border, rgba(94, 42, 121, 0.3));
+      padding-bottom: 3px;
+      margin-top: 2px;
+      font-weight: 600;
+    }
+    .phase-stats > span.ps-group:first-child { margin-top: 0; }
+
     .phase-stats > span b {
       color: var(--pubg-text);
       font-variant-numeric: tabular-nums;
@@ -3984,26 +4016,57 @@
       const startIso = PubgUI.matchStartIso(t.startTime, 0);  // approx
       const subtitle = `${PubgUI.fmtDate(t.startTime)} · ${PubgUI.fmtTime(d.sessionStartedAt)} – ${PubgUI.fmtTime(t.endTime)} · ${fmtDuration(t.totalSurvivedSec)} active playtime`;
 
+      // Drei Gruppen, damit ohne Tooltip ablesbar ist, wessen Zahl es ist:
+      // ME (nur ich) · TEAM (mein Squad) · LOBBY (die Gegner). Vorher stand
+      // alles in einer Reihe und "Squad Session" sah aus wie eine Variante
+      // von "Squad K/D", obwohl das eine die Bilanz des Zeitraums ist und
+      // das andere der Karriere-Schnitt der Mitspieler.
+      const cell = (val, label, title) =>
+        `<div class="cell"${title ? ` title="${title}"` : ""}>`
+        + `<span class="pubg-stat-value">${val}</span>`
+        + `<span class="pubg-stat-label">${label}</span></div>`;
+
       const totalsHtml = `
-        <div class="totals">
-          <div class="cell"><span class="pubg-stat-value">${t.matches}</span><span class="pubg-stat-label">Matches</span></div>
-          <div class="cell"><span class="pubg-stat-value">${t.wins}</span><span class="pubg-stat-label">CHICKEN Wins</span></div>
-          <div class="cell"><span class="pubg-stat-value">${t.kills}</span><span class="pubg-stat-label">Kills</span></div>
-          <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.kd)}</span><span class="pubg-stat-label">K/D</span></div>
-          ${t.tdm ? `<div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.tdm.kd)}</span><span class="pubg-stat-label">TDM K/D</span></div>` : ""}
-          <div class="cell" title="K/D des eigenen Squads in DIESER Session — Kills durch Tode"><span class="pubg-stat-value">${PubgUI.fmtKD(t.squadKd || 0)}</span><span class="pubg-stat-label">Squad Session</span></div>
-          ${t.lobbySquadKd ? `<div class="cell" title="Ø K/D der eigenen Leute im gespielten Modus — bevorzugt aus der laufenden Season, nicht die Leistung in dieser Session"><span class="pubg-stat-value">${t.lobbySquadKd.toFixed(2)}</span><span class="pubg-stat-label">Squad K/D</span></div>` : ""}
-          ${t.lobbyKd ? `<div class="cell" title="Ø K/D der Gegner im gespielten Modus, eigener Squad ausgenommen"><span class="pubg-stat-value">${t.lobbyKd.toFixed(2)}</span><span class="pubg-stat-label">Lobby K/D</span></div>` : ""}
-          <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.avgKills)}</span><span class="pubg-stat-label">Ø My Kills/Match</span></div>
-          <div class="cell"><span class="pubg-stat-value">${(t.squadKillsPerMatch || 0).toFixed(1)}</span><span class="pubg-stat-label">Ø Squad Kills/Match</span></div>
-          <div class="cell"><span class="pubg-stat-value">${Math.round(t.avgDamage)}</span><span class="pubg-stat-label">Ø Damage/Match</span></div>
-          <div class="cell"><span class="pubg-stat-value">${fmtDuration(Math.round(t.avgSurvivedSec))}</span><span class="pubg-stat-label">Ø Survive</span></div>
-          <div class="cell"><span class="pubg-stat-value">#${t.avgPlace.toFixed(1)}</span><span class="pubg-stat-label">Ø Place</span></div>
-          <div class="cell"><span class="pubg-stat-value">${t.headshots}</span><span class="pubg-stat-label">Headshots</span></div>
-          <div class="cell"><span class="pubg-stat-value">${t.dbnos}</span><span class="pubg-stat-label">Knocks</span></div>
-          <div class="cell"><span class="pubg-stat-value">${PubgUI.hotIf(t.longestKill, 300, Math.round(t.longestKill) + "m")}</span><span class="pubg-stat-label">Longest</span></div>
-          <div class="cell"><span class="pubg-stat-value">${t.uniqueMaps}</span><span class="pubg-stat-label">Maps</span></div>
-        </div>`;
+        <div class="totals-group">
+          <h4 class="totals-h">Me</h4>
+          <div class="totals">
+            ${cell(t.matches, "Matches")}
+            ${cell(t.wins, "Chicken Wins")}
+            ${cell(t.kills, "Kills")}
+            ${cell(PubgUI.fmtKD(t.kd), "K/D",
+                   "My kills per lost match (kills / matches - wins)")}
+            ${t.tdm ? cell(PubgUI.fmtKD(t.tdm.kd), "TDM K/D") : ""}
+            ${cell(PubgUI.fmtKD(t.avgKills), "Kills/Match", "My kills per match")}
+            ${cell(Math.round(t.avgDamage), "Damage/Match", "My damage per match")}
+            ${cell(fmtDuration(Math.round(t.avgSurvivedSec)), "Survival")}
+            ${cell("#" + t.avgPlace.toFixed(1), "Placement")}
+            ${cell(t.headshots, "Headshots")}
+            ${cell(t.dbnos, "Knocks")}
+            ${cell(PubgUI.hotIf(t.longestKill, 300, Math.round(t.longestKill) + "m"),
+                   "Longest Kill")}
+            ${cell(t.uniqueMaps, "Maps")}
+          </div>
+        </div>
+        <div class="totals-group">
+          <h4 class="totals-h">Team</h4>
+          <div class="totals">
+            ${cell(PubgUI.fmtKD(t.squadKd || 0), "Squad Record",
+                   "Kills per death of the whole squad this session, myself included")}
+            ${t.lobbySquadKd
+                ? cell(t.lobbySquadKd.toFixed(2), "Mates K/D",
+                       "Average career K/D of my teammates in the mode played — my own value excluded")
+                : ""}
+            ${cell((t.squadKillsPerMatch || 0).toFixed(1), "Squad Kills/Match",
+                   "Kills per match of the whole squad, myself included")}
+          </div>
+        </div>
+        ${t.lobbyKd ? `<div class="totals-group">
+          <h4 class="totals-h">Lobby</h4>
+          <div class="totals">
+            ${cell(t.lobbyKd.toFixed(2), "Lobby K/D",
+                   "Average K/D of the opponents in the mode played — my own squad excluded")}
+          </div>
+        </div>` : ""}`;
 
       // Chronologische Match-Nummer ueber alle Phases (key = matchEnd
        // Iso-String). Robust gegen interne Sortierung der phases.
@@ -4049,36 +4112,39 @@
             <h2><span class="num">Phase ${i+1}</span> ${startStr} → ${endStr} · ${s.matches} ${s.matches===1?'Match':'Matches'}</h2>
             <div class="squad">Stamm: ${core}${fillersStr}</div>
             <div class="phase-stats">
+              <span class="ps-group">Me</span>
               <span><b>${s.kills}</b> Kills</span>
               <span><b>${s.wins}</b> Wins</span>
               <span><b>${PubgUI.fmtKD(s.kd)}</b> K/D</span>
-              ${(s.squadMatchesWithMapping||0) > 0 ? `<span title="K/D des eigenen Squads in DIESER Phase — Kills durch Tode"><b>${PubgUI.fmtKD(s.squadKd||0)}</b> Squad Phase</span>` : ""}
-              ${s.lobbyKd != null
-                  ? `<span title="Ø K/D der Gegner über ${s.lobbyMatches} Matches dieser Phase${
-                       s.lobbyTop5 != null ? ` · stärkste Fünf im Schnitt ${s.lobbyTop5.toFixed(2)}` : ""}"><button
-                       type="button" class="lobby-open" data-phase="1"
-                       data-matches="${ph.matches.map(x => x.matchId).filter(Boolean).slice(0, 60).join(",")}"
-                       data-title="Lobby · Phase ${i+1}"
-                       data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'Match' : 'Matches'} gewertet"
-                       aria-label="Lobby der Phase aufschlüsseln: Median, härteste Gegner"
-                     >${hotLobby(s.lobbyTop5, `<b>${s.lobbyKd.toFixed(2)}</b>`)}</button> Lobby K/D</span>`
-                  : (s.lobbyPending
-                      ? `<span title="K/D der Gegner wird noch gesammelt"><span class="lobby-pending" role="img" aria-label="Lobby-K/D wird gesammelt"></span> Lobby K/D</span>`
-                      : "")}
+              <span><b>${Math.round(s.avgDamage)}</b> Damage</span>
+              <span><b>${fmtDuration(Math.round(s.avgSurvivedSec))}</b> Survival</span>
+              <span><b>#${s.avgPlace.toFixed(1)}</b> Placement</span>
+              <span class="ps-group">Team</span>
+              ${(s.squadMatchesWithMapping||0) > 0 ? `<span title="Kills per death of the whole squad in this phase, myself included"><b>${PubgUI.fmtKD(s.squadKd||0)}</b> Squad Record</span>` : ""}
               ${s.lobbySquadKd != null
-                  ? `<span title="Ø K/D der eigenen Leute im gespielten Modus — nicht ihre Leistung in dieser Phase"><button
+                  ? `<span title="Average career K/D of my teammates in the mode played — my own value excluded"><button
                        type="button" class="lobby-open" data-phase="1" data-view="squad"
                        data-matches="${ph.matches.map(x => x.matchId).filter(Boolean).slice(0, 60).join(",")}"
                        data-title="Squad · Phase ${i+1}"
-                       data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'Match' : 'Matches'} gewertet"
-                       aria-label="Squad der Phase aufschlüsseln: Karriere-K/D der Mitspieler"
-                     ><b>${s.lobbySquadKd.toFixed(2)}</b></button> Squad K/D</span>`
+                       data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'match' : 'matches'} counted"
+                       aria-label="Break down the squad of this phase: career K/D of my teammates"
+                     ><b>${s.lobbySquadKd.toFixed(2)}</b></button> Mates K/D</span>`
                   : (s.lobbyPending
-                      ? `<span title="K/D des eigenen Squads wird noch gesammelt"><span class="lobby-pending" role="img" aria-label="Squad-K/D wird gesammelt"></span> Squad K/D</span>`
+                      ? `<span title="Teammate K/D is still being collected"><span class="lobby-pending" role="img" aria-label="Teammate K/D is still being collected"></span> Mates K/D</span>`
                       : "")}
-              <span><b>${Math.round(s.avgDamage)}</b> Ø DMG</span>
-              <span><b>${fmtDuration(Math.round(s.avgSurvivedSec))}</b> Ø Surv</span>
-              <span><b>#${s.avgPlace.toFixed(1)}</b> Avg #</span>
+              <span class="ps-group">Lobby</span>
+              ${s.lobbyKd != null
+                  ? `<span title="Average K/D of the opponents across ${s.lobbyMatches} matches of this phase${
+                       s.lobbyTop5 != null ? ` · top five average ${s.lobbyTop5.toFixed(2)}` : ""}"><button
+                       type="button" class="lobby-open" data-phase="1"
+                       data-matches="${ph.matches.map(x => x.matchId).filter(Boolean).slice(0, 60).join(",")}"
+                       data-title="Lobby · Phase ${i+1}"
+                       data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'match' : 'matches'} counted"
+                       aria-label="Break down the lobby of this phase: median and toughest opponents"
+                     >${hotLobby(s.lobbyTop5, `<b>${s.lobbyKd.toFixed(2)}</b>`)}</button> Lobby K/D</span>`
+                  : (s.lobbyPending
+                      ? `<span title="Opponent K/D is still being collected"><span class="lobby-pending" role="img" aria-label="Opponent K/D is still being collected"></span> Lobby K/D</span>`
+                      : "")}
             </div>
             <div class="matches-list">
               <div class="header-row">

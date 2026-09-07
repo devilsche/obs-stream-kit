@@ -2833,7 +2833,8 @@ class EndpointRegistry:
             m["lobbyKd"] = info["lobbyKd"]
             m["lobbyTop5"] = info.get("lobbyTop5")
             m["_lobbyTopPlayers"] = info.get("lobbyTopPlayers") or []
-            m["squadKd"] = info["squadKd"]
+            m["squadKd"] = info["squadKd"]              # Match Row: mit mir
+            m["_squadKdMates"] = info.get("squadKdMates")  # Header: ohne mich
             m["lobbyCoverage"] = info["coverage"]
             m["lobbyKnown"] = info["known"]
             m["lobbyPlayers"] = info["lobbyPlayers"]
@@ -2855,7 +2856,8 @@ class EndpointRegistry:
                 continue
             stats["lobbyKd"] = (sum(m["lobbyKd"] for m in solid) / len(solid)
                                 if solid else None)
-            squad = [m["squadKd"] for m in solid if m.get("squadKd") is not None]
+            squad = [m["_squadKdMates"] for m in solid
+                     if m.get("_squadKdMates") is not None]
             stats["lobbySquadKd"] = (sum(squad) / len(squad)) if squad else None
             # Die fuenf staerksten Spieler DIESER PHASE, nicht das Mittel
             # der Match-Mittel: letzteres ergab 3,27 fuer eine Phase, in der
@@ -2874,6 +2876,7 @@ class EndpointRegistry:
         # und wuerde den Payload je Match um fuenf Account-IDs aufblaehen.
         for m in matches:
             m.pop("_lobbyTopPlayers", None)
+            m.pop("_squadKdMates", None)
 
     def _sessions_index(self):
         conn = self.get_conn()

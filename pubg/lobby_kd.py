@@ -741,11 +741,14 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         # Lobby heisst hier: alle ausser uns. Der eigene Squad steckte sonst
         # in beiden Seiten des Vergleichs.
         avg = lobby_average(entry["accounts"], kd_by_acc, exclude=squad)
-        # Ohne den eigenen Account: der steht im Report direkt daneben, und
-        # "wie stark sind meine Mitspieler" ist die Frage, die dieser Wert
-        # beantworten soll. Gemessen zog der eigene Wert den Schnitt von
-        # 1,476 auf 1,523.
-        squad_avg = lobby_average(sorted(squad), kd_by_acc,
+        # Zwei Bezugsgruppen, zwei Werte:
+        #   squadKd      Team INKLUSIVE mir  -> Match Row
+        #   squadKdMates nur die Mitspieler  -> Phase- und Session-Header
+        # Ein einziger Wert fuer beide ging nicht: in der Match Row gehoert
+        # der eigene Anteil dazu, im Header beantwortet erst "ohne mich"
+        # die Frage, wie stark die Mitspieler sind.
+        squad_avg = lobby_average(sorted(squad), kd_by_acc)
+        mates_avg = lobby_average(sorted(squad), kd_by_acc,
                                    exclude={my_account_id} if my_account_id
                                    else None)
         # Die Spitze der Lobby als eigener Wert: der Schnitt sagt nicht, ob
@@ -775,6 +778,8 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
             "squadKd": squad_avg["avgKd"],
             "squadKnown": squad_avg["known"],
             "squadPlayers": squad_avg["total"],
+            "squadKdMates": mates_avg["avgKd"],
+            "squadMatesKnown": mates_avg["known"],
             "myKd": my_kd,
             "lobbyKdExtra": (extra_avg or {}).get("avgKd"),
             "extraCoverage": (extra_avg or {}).get("coverage"),
@@ -785,12 +790,13 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
     out.sort(key=lambda m: m["playedAt"] or "", reverse=True)
 
     solid = [m for m in out if counts_for_average(m)]
-    with_squad = [m for m in solid if m["squadKd"] is not None]
+    with_squad = [m for m in solid if m["squadKdMates"] is not None]
     return {
         "matches": out,
         "avgKd": (sum(m["lobbyKd"] for m in solid) / len(solid)) if solid else None,
-        "avgSquadKd": (sum(m["squadKd"] for m in with_squad) / len(with_squad))
-                      if with_squad else None,
+        # Session-Schnitt ueber die Mitspieler-Werte (ohne mich).
+        "avgSquadKd": (sum(m["squadKdMates"] for m in with_squad)
+                       / len(with_squad)) if with_squad else None,
         "matchesInAverage": len(solid),
         "myKd": my_kd,
         "seasonId": season_id,
