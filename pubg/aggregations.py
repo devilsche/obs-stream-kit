@@ -6087,6 +6087,35 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         return (end - _dt.timedelta(seconds=m["duration_secs"] or 0)) \
             .strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    def _head_hits_for(match_ids):
+        """Kopftreffer-Quote aus der Telemetrie.
+
+        `participants.headshot_kills` zaehlt nur Kills, deren letzter
+        Schuss in den Kopf ging — gemessen 1 von 15 Kills, was als
+        "Headshots" gelesen wie ein Fehler aussieht. Die eigentliche
+        Trefferquote steckt in match_weapon_stats: 10 von 72 Treffern
+        (13,9 %) fuer dieselbe Session.
+        """
+        out = {"headHits": 0, "totalHits": 0, "headshotPct": None}
+        if not match_ids:
+            return out
+        ph = ",".join("?" * len(match_ids))
+        row = conn.execute(f"""
+            SELECT COALESCE(SUM(head), 0)  AS head,
+                   COALESCE(SUM(hits), 0)  AS hits
+            FROM match_weapon_stats
+            WHERE tenant_id = ? AND account_id = ?
+              AND match_id IN ({ph})
+        """, [tenant_id, my_account_id] + list(match_ids)).fetchone()
+        if not row:
+            return out
+        head = row["head"] or 0
+        hits = row["hits"] or 0
+        out["headHits"] = head
+        out["totalHits"] = hits
+        out["headshotPct"] = (100.0 * head / hits) if hits else None
+        return out
+
     def _squad_lobby_for(match_ids):
         """Squad-K/D + Lobby-K/D für eine Match-ID-Liste.
         Squad = my_team_id pro Match. Squad-K/D = SUM(team_kills) /
@@ -6183,6 +6212,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         total_damage = sum(x["damage_dealt"] or 0 for x in br_ms)
         total_surv = sum(x["time_survived"] or 0 for x in br_ms)
         squad_lobby = _squad_lobby_for([x["match_id"] for x in br_ms])
+        head_hits = _head_hits_for([x["match_id"] for x in br_ms])
         ph["stats"] = {
             "matches": n,
             "eventMatches": len(ev_ms),
@@ -6198,6 +6228,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             "startTime": _match_start(ms[0]),
             "endTime": ms[-1]["played_at"],
             **squad_lobby,
+            **head_hits,
         }
 
     # Total-Aggregate — NUR Battle-Royale. TDM/Event-Matches dürfen in der
@@ -6232,6 +6263,8 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         "uniqueMaps": len({x["map_name"] for x in br_ms}),
         # Squad+Lobby-Aggregate (basiert auf match_team_mapping)
         **totals_squad_lobby,
+        # Kopftreffer-Quote aus der Telemetrie (nicht headshot_kills)
+        **_head_hits_for([x["match_id"] for x in br_ms]),
     }
 
     # TDM-Block (eigener K/D, getrennt von BR). Kills aus participants (TDM

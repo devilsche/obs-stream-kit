@@ -48,10 +48,11 @@
       font-size: 0.68em;
       letter-spacing: 0.14em;
       text-transform: uppercase;
-      color: var(--theme-text-dim, #8a7d99);
+      color: var(--theme-accent, #f2b705);
       margin: 0 0 8px;
       padding-bottom: 4px;
-      border-bottom: 1px solid var(--theme-border, rgba(94, 42, 121, 0.35));
+      border-bottom: 1px solid
+        color-mix(in srgb, var(--theme-accent, #f2b705) 45%, transparent);
       font-weight: 600;
     }
 
@@ -103,8 +104,9 @@
       display: block;
       font-size: 0.62em;
       letter-spacing: 0.16em;
-      color: var(--theme-text-dim, #8a7d99);
-      border-bottom: 1px solid var(--theme-border, rgba(94, 42, 121, 0.3));
+      color: var(--theme-accent, #f2b705);
+      border-bottom: 1px solid
+        color-mix(in srgb, var(--theme-accent, #f2b705) 45%, transparent);
       padding-bottom: 3px;
       margin-top: 2px;
       font-weight: 600;
@@ -4051,6 +4053,10 @@
             ${cell("#" + t.avgPlace.toFixed(1), "Placement")}
             ${cell(t.headshots, "Headshot Kills",
                    "Kills where the finishing shot was a headshot — not the number of head hits")}
+            ${t.headshotPct != null
+                ? cell(t.headshotPct.toFixed(1) + "%", "Head Hit Rate",
+                       `${t.headHits} of ${t.totalHits} hits landed on the head`)
+                : ""}
             ${cell(t.dbnos, "Knocks")}
             ${cell(PubgUI.hotIf(t.longestKill, 300, Math.round(t.longestKill) + "m"),
                    "Longest Kill")}
@@ -4129,6 +4135,9 @@
               <span><b>${Math.round(s.avgDamage)}</b> Damage</span>
               <span><b>${fmtDuration(Math.round(s.avgSurvivedSec))}</b> Survival</span>
               <span><b>#${s.avgPlace.toFixed(1)}</b> Placement</span>
+              ${s.headshotPct != null
+                  ? `<span title="${s.headHits} of ${s.totalHits} hits landed on the head"><b>${s.headshotPct.toFixed(1)}%</b> Head Hits</span>`
+                  : ""}
               <span class="ps-group">Team</span>
               ${(s.squadMatchesWithMapping||0) > 0 ? `<span title="Kills per death of the whole squad in this phase, myself included"><b>${PubgUI.fmtKD(s.squadKd||0)}</b> Squad Record</span>` : ""}
               ${s.lobbySquadKd != null
