@@ -50,6 +50,24 @@
        hervorgehen, nicht erst aus einem Tooltip. */
     .totals-group { margin-bottom: 4px; }
     .totals-group .totals { margin-bottom: 14px; }
+    /* Kennzeichnung im Phasen-Kopf: Ranked und Event-Phasen sind eigene
+       Phasen, das soll man dort sehen und nicht erst an den Kacheln. */
+    .phase-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.6em;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      vertical-align: 2px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      border: 1px solid currentColor;
+      color: var(--theme-text-dim, #8a7d99);
+      font-weight: 600;
+    }
+    .phase-tag--ranked { color: var(--theme-accent, #f2b705); }
+
     .totals-h {
       font-size: 0.68em;
       letter-spacing: 0.14em;
@@ -4275,8 +4293,14 @@
           : `${endD} ${PubgUI.fmtTime(s.endTime)}`;
         return `
           <div class="phase">
-            <h2><span class="num">Phase ${i+1}</span> ${startStr} → ${endStr} · ${s.matches} ${s.matches===1?'Match':'Matches'}</h2>
-            <div class="squad">Stamm: ${core}${fillersStr}</div>
+            <h2><span class="num">Phase ${i+1}</span>${s.isRanked
+              ? ` <span class="phase-tag phase-tag--ranked" title="Ranked matches are kept in their own phase — different lobby strength, not comparable to unranked"><span class="material-symbols-outlined icon-sm" aria-hidden="true">military_tech</span> Ranked</span>`
+              : ""}${s.isEventPhase
+              ? ` <span class="phase-tag">${(s.eventModes || []).join(" / ").toUpperCase()}</span>`
+              : ""} ${startStr} → ${endStr} · ${
+              s.isEventPhase ? s.eventMatches : s.matches} ${
+              (s.isEventPhase ? s.eventMatches : s.matches) === 1 ? 'match' : 'matches'}</h2>
+            <div class="squad">Core: ${core}${fillersStr}</div>
             <div class="phase-stats">
               ${s.isEventPhase ? `
               <span class="ps-group">${(s.eventModes || []).join(" / ").toUpperCase() || "Event"}</span>

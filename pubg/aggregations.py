@@ -6063,29 +6063,39 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             x["effective_deaths"] = 0
 
     # Phase = aufeinanderfolgende Matches deren Squad-Sets sich überlappen.
-    # Der "Stamm" der Phase ist die Schnittmenge aller Squads in der Phase
+    # Der Stamm ("core") der Phase ist die Schnittmenge aller Squads
     # (die Mates die in JEDEM Match dieser Phase dabei waren).
     # Random-Filler die nur in einzelnen Matches mitliefen werden separat geführt.
     phases = []
     cur_phase = None
     for m in enriched:
         cur_set = m["squadSet"]
-        # Event-Modi (TDM, Heist) gehoeren nie in eine Phase mit BR-Matches:
-        # sie haben kein Placement, keine Survival-Zeit und ihre Kills
-        # kommen aus einer anderen Quelle. Gemischt blieben die
-        # BR-Kennzahlen der Phase leer (gemessen bei Tenant 3 am 3.9.:
-        # eine Phase mit nur einem TDM-Match zeigte ueberall 0).
+        # Zwei Dinge brechen eine Phase unabhaengig von der Besetzung:
+        #
+        # Event-Modi (TDM, Heist) haben kein Placement, keine Survival-Zeit
+        # und ihre Kills kommen aus einer anderen Quelle. Gemischt blieben
+        # die BR-Kennzahlen leer (gemessen bei Tenant 3 am 3.9.: eine Phase
+        # mit einem TDM-Match zeigte ueberall 0).
+        #
+        # Ranked und Unranked sind zwar beide BR, aber nicht vergleichbar —
+        # andere Lobby-Staerke, anderer Einsatz. Zusammengerechnet sagt der
+        # Schnitt ueber keine der beiden etwas.
         m_is_event = not is_br_mode(m.get("game_mode"))
-        if cur_phase is not None and cur_phase.get("isEvent") != m_is_event:
+        m_is_ranked = bool(m.get("is_ranked"))
+        if cur_phase is not None and (
+                cur_phase.get("isEvent") != m_is_event
+                or cur_phase.get("isRanked") != m_is_ranked):
             cur_phase = {"core": set(cur_set), "allMembers": set(cur_set),
-                          "matches": [], "isEvent": m_is_event}
+                          "matches": [], "isEvent": m_is_event,
+                          "isRanked": m_is_ranked}
             phases.append(cur_phase)
             cur_phase["matches"].append(m)
             continue
         if cur_phase is None:
             cur_phase = {"core": set(cur_set),
                           "allMembers": set(cur_set),
-                          "matches": [], "isEvent": m_is_event}
+                          "matches": [], "isEvent": m_is_event,
+                          "isRanked": m_is_ranked}
             phases.append(cur_phase)
         else:
             new_core = cur_phase["core"] & cur_set
@@ -6093,14 +6103,16 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                 # Stamm-Crew komplett weg → neue Phase
                 cur_phase = {"core": set(cur_set),
                               "allMembers": set(cur_set),
-                              "matches": [], "isEvent": m_is_event}
+                              "matches": [], "isEvent": m_is_event,
+                              "isRanked": m_is_ranked}
                 phases.append(cur_phase)
             elif not cur_set:
                 # Solo-Match — bricht Phase nur wenn vorher Squad da war
                 if cur_phase["core"]:
                     cur_phase = {"core": set(),
                                   "allMembers": set(),
-                                  "matches": [], "isEvent": m_is_event}
+                                  "matches": [], "isEvent": m_is_event,
+                                  "isRanked": m_is_ranked}
                     phases.append(cur_phase)
             else:
                 cur_phase["core"] = new_core
@@ -6257,6 +6269,9 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             "totalSurvivedSec": total_surv,
             "startTime": _match_start(ms[0]),
             "endTime": ms[-1]["played_at"],
+            # Ranked bricht die Phase (siehe oben) — das Frontend
+            # kennzeichnet sie damit im Kopf.
+            "isRanked": bool(ph.get("isRanked")),
             **squad_lobby,
             **head_hits,
         }
