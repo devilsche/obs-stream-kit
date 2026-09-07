@@ -4267,6 +4267,16 @@
             <h2><span class="num">Phase ${i+1}</span> ${startStr} → ${endStr} · ${s.matches} ${s.matches===1?'Match':'Matches'}</h2>
             <div class="squad">Stamm: ${core}${fillersStr}</div>
             <div class="phase-stats">
+              ${s.isEventPhase ? `
+              <span class="ps-group">${(s.eventModes || []).join(" / ").toUpperCase() || "Event"}</span>
+              <span><b>${s.matches + s.eventMatches}</b> Matches</span>
+              <span><b>${s.eventKills}</b> Kills</span>
+              <span><b>${s.eventDeaths}</b> Deaths</span>
+              <span title="Kills divided by deaths — event modes have no placement, so there is no win rate"><b>${
+                s.eventKd == null ? "—" : s.eventKd.toFixed(2)}</b> K/D</span>
+              <span><b>${Math.round(s.eventAvgKills)}</b> Kills/Match</span>
+              <span><b>${Math.round(s.eventAvgDamage)}</b> Damage/Match</span>
+              ` : `
               <span class="ps-group">Me</span>
               <span><b>${s.kills}</b> Kills</span>
               <span><b>${s.wins}</b> Wins</span>
@@ -4318,11 +4328,12 @@
                        aria-label="Break down the lobby of this phase: strongest and weakest opponents"
                      >${hotLobby(s.lobbyTop5, `<b>${s.lobbyTop5.toFixed(2)}</b>`)}</button> Top 5 Avg</span>`
                   : ""}
+              `}
             </div>
             <div class="matches-list">
               <div class="header-row">
                 <span>Squad in Match</span><span>Place</span><span>Map</span>
-                <span style="text-align:right" title="Bot-Teams / Teams gesamt">Botteams</span>
+                <span style="text-align:right" title="Bot teams / total teams">Bot teams</span>
                 <span style="text-align:right" title="Bot players / total players">Bots</span>
                 <span style="text-align:right">Kills</span>
                 <span style="text-align:right">Damage</span>
