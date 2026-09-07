@@ -2874,6 +2874,13 @@ class EndpointRegistry:
             stats["lobbyTop5"] = phase_top5(
                 [m.get("_lobbyTopPlayers") or [] for m in solid])
             stats["lobbyMatches"] = len(solid)
+            # Mittlere Abdeckung der gewerteten Matches — das Frontend
+            # entscheidet daran, ob der Sammel-Spinner neben dem Wert
+            # bleibt. Ohne dieses Feld lief er im Phasen-Kopf dauerhaft.
+            _covs = [m.get("lobbyCoverage") for m in solid
+                     if m.get("lobbyCoverage") is not None]
+            stats["lobbyCoverage"] = ((sum(_covs) / len(_covs))
+                                      if _covs else None)
             # Kein Wert, aber die Lobbys sind bekannt: der Sammler ist noch
             # dran. Das Frontend zeigt dann den Ring statt gar nichts —
             # sonst liest sich "noch am Rechnen" wie "gibt es nicht".

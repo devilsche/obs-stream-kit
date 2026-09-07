@@ -270,6 +270,15 @@
       vertical-align: -1px;
     }
     @keyframes lobby-spin { to { transform: rotate(360deg); } }
+    /* Neben einer bereits sichtbaren Zahl: kleiner und zurueckhaltender —
+       er sagt "wird noch genauer", nicht "gibt es noch nicht". */
+    .lobby-pending--inline {
+      width: 8px; height: 8px;
+      border-width: 1.5px;
+      opacity: 0.75;
+      margin-left: 3px;
+      vertical-align: 0;
+    }
 
     /* Lobby-Werte sind anklickbar: dahinter steckt die Aufschluesselung.
        Button statt div, damit Tastatur und Screenreader mitkommen.
@@ -4021,6 +4030,22 @@
     // Match-Zeile eine Zahl, die in der Phase darueber fehlt (gemessen:
     // Matches mit 2 von 95 bekannten Spielern und "1.82" in der Zelle).
     const MIN_LOBBY_COVERAGE = 25;
+    // Ab hier gilt die Sammlung als abgeschlossen. Zwischen den beiden
+    // Schwellen steht die Zahl MIT Spinner: sie ist belastbar genug zum
+    // Anzeigen, wandert aber noch. Der Sprung von "nichts" direkt auf
+    // "fertige Zahl" verschwieg das.
+    const FULL_LOBBY_COVERAGE = 75;
+
+    // Zahl + Spinner, solange noch gesammelt wird.
+    function lobbyPendingMark(coverage) {
+      // Ohne bekannte Abdeckung KEIN Spinner: sonst laeuft er dauerhaft,
+      // wo das Feld fehlt, und behauptet eine Sammlung, die niemand kennt.
+      if (coverage == null) return "";
+      return coverage < FULL_LOBBY_COVERAGE
+        ? ` <span class="lobby-pending lobby-pending--inline" role="img"`
+          + ` aria-label="still collecting"></span>`
+        : "";
+    }
 
     // TopScorer-Score: "16K / 3A". Assists fehlen bei Matches, die vor der
     // assists-Spalte eingelesen wurden — dann nur die Kills, keine erfundene 0.
@@ -4072,7 +4097,9 @@
           <span class="stat lobby-kd" title="${
             (m.lobbyKd == null || (m.lobbyCoverage || 0) < MIN_LOBBY_COVERAGE)
               ? `Opponent K/D is still being collected — only ${m.lobbyKnown || 0} of ${m.lobbyPlayers || 0} known so far, calculated from ${MIN_LOBBY_COVERAGE} % on`
-              : `Average opponent K/D for the mode of this match, my own squad excluded (${m.lobbyKnown}/${m.lobbyPlayers} known)`
+              : `Average opponent K/D for the mode of this match, my own squad excluded (${m.lobbyKnown}/${m.lobbyPlayers} known, ${Math.round(m.lobbyCoverage || 0)} %)${
+                  (m.lobbyCoverage || 0) < FULL_LOBBY_COVERAGE
+                    ? " — still collecting, the value will keep moving" : ""}`
           }">${(m.lobbyKd == null || (m.lobbyCoverage || 0) < MIN_LOBBY_COVERAGE)
                 ? (m.lobbyPlayers
                     ? `<span class="lobby-pending" role="img" aria-label="Lobby strength is still being collected"></span>`
@@ -4082,7 +4109,8 @@
                      data-title="Lobby · ${PubgUI.esc(PubgUI.fmtMap(m.map))}"
                      data-sub="${PubgUI.esc(PubgUI.fmtDateTime(m.matchEnd))}"
                      aria-label="Break down the lobby: median, strongest and weakest opponents"
-                   >${hotLobby(m.lobbyKd, `<b>${m.lobbyKd.toFixed(2)}</b>`)}</button>`}</span>
+                   >${hotLobby(m.lobbyKd, `<b>${m.lobbyKd.toFixed(2)}</b>`)}</button>${
+                     lobbyPendingMark(m.lobbyCoverage)}`}</span>
           <span class="stat lobby-kd" title="${
             m.squadKd == null
               ? "Squad K/D not known yet"
@@ -4379,7 +4407,8 @@
                        data-title="Lobby · Phase ${i+1}"
                        data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'match' : 'matches'} counted"
                        aria-label="Break down the lobby of this phase: median and toughest opponents"
-                     >${hotLobby(s.lobbyKd, `<b>${s.lobbyKd.toFixed(2)}</b>`)}</button> Lobby K/D</span>`
+                     >${hotLobby(s.lobbyKd, `<b>${s.lobbyKd.toFixed(2)}</b>`)}</button>${
+                       lobbyPendingMark(s.lobbyCoverage)} Lobby K/D</span>`
                   : (s.lobbyPending
                       ? `<span title="Opponent K/D is still being collected"><span class="lobby-pending" role="img" aria-label="Opponent K/D is still being collected"></span> Lobby K/D</span>`
                       : "")}
