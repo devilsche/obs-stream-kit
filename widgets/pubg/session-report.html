@@ -59,12 +59,26 @@
       font-size: 0.6em;
       letter-spacing: 0.12em;
       text-transform: uppercase;
-      vertical-align: 2px;
+      /* inline-flex nimmt die Baseline des ersten Flex-Items. Beim
+         Ranked-Tag ist das das Icon, beim Event-Tag der Text — dadurch
+         sassen die beiden auf unterschiedlicher Hoehe. vertical-align
+         bezieht sich hier auf die Box, nicht auf den Inhalt, also
+         sitzen beide gleich. */
+      vertical-align: -3px;
+      margin: 0 4px;
       padding: 1px 6px;
       border-radius: 3px;
       border: 1px solid currentColor;
       color: var(--theme-text-dim, #8a7d99);
       font-weight: 600;
+      line-height: 1.5;
+      white-space: nowrap;
+    }
+    /* Icon auf die Textzeile zwingen, damit es die Tag-Hoehe nicht
+       aufzieht. */
+    .phase-tag .material-symbols-outlined {
+      font-size: 1.15em;
+      line-height: 1;
     }
     .phase-tag--ranked { color: var(--theme-accent, #f2b705); }
 
