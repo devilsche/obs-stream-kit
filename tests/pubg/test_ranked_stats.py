@@ -27,8 +27,9 @@ def test_parse_liest_ranked_modi():
     assert sq["kills"] == 300
     assert sq["rounds"] == 160
     assert sq["wins"] == 12
-    # Nenner ist rounds - wins, wie bei den Normal-Werten
-    assert sq["kd"] == pytest.approx(300 / 148)
+    # Nenner sind die echten Tode (deaths), nicht rounds - wins:
+    # in Ranked kann deaths die Rundenzahl uebersteigen.
+    assert sq["kd"] == pytest.approx(300 / 150)
 
 
 def test_parse_uebernimmt_deaths_als_losses():
@@ -117,3 +118,40 @@ def test_unranked_ohne_flag_bleibt_wie_vorher():
                        current_season_id="pc-2018-42")
     assert r["basis"] == "squad-fpp"
     assert r.get("isRankedValue") is False
+
+
+# ── Nenner: Ranked zaehlt echte Tode ────────────────────────────────────────
+
+def test_ranked_nutzt_deaths_als_nenner():
+    """Gemessen an echten Daten (Tenant 3, Season 42, squad-fpp):
+    45 Kills, 33 deaths, 32 roundsPlayed, 2 wins.
+
+    `deaths` ist GROESSER als `roundsPlayed` — in Ranked stirbt man pro
+    Runde mehrfach, weil ein Revive den Tod nicht aufhebt. `rounds - wins`
+    (= 30) waere hier der falsche Nenner und ergaebe 1,50 statt 1,36.
+    """
+    rows = lk.parse_ranked(_payload({
+        "squad-fpp": {"kills": 45, "deaths": 33, "roundsPlayed": 32,
+                       "wins": 2}}))
+    assert rows["squad-fpp-ranked"]["kd"] == pytest.approx(45 / 33)
+
+
+def test_ranked_kette_rechnet_ebenfalls_ueber_deaths():
+    """Auch nach der Summierung in kd_resolved bleibt der Nenner deaths."""
+    r = lk.kd_resolved(
+        "squad-fpp", is_ranked=True,
+        current_season={"squad-fpp-ranked": {"kills": 45, "losses": 33,
+                                              "rounds": 32, "wins": 2}},
+        current_season_id="pc-2018-42")
+    assert r["isRankedValue"] is True
+    assert r["kd"] == pytest.approx(45 / 33)
+
+
+def test_unranked_bleibt_bei_rounds_minus_wins():
+    """Die Normal-Werte rechnen unveraendert nach op.gg-Konvention."""
+    r = lk.kd_resolved(
+        "squad-fpp",
+        current_season={"squad-fpp": {"kills": 595, "losses": 369,
+                                       "rounds": 390, "wins": 32}},
+        current_season_id="pc-2018-42")
+    assert r["kd"] == pytest.approx(595 / 358)

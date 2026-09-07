@@ -53,8 +53,14 @@ def chunk(items, size=BATCH_SIZE):
     return [items[i:i + size] for i in range(0, len(items), size)]
 
 
-def _kd(kills, losses, rounds, wins=0):
+def _kd(kills, losses, rounds, wins=0, use_deaths=False):
     """Kills je nicht gewonnener Runde — die op.gg-Konvention.
+
+    `use_deaths=True` nimmt stattdessen `losses` direkt als Nenner. Das
+    gilt fuer Ranked: dort zaehlt die API echte Tode, und die koennen die
+    Rundenzahl uebersteigen (ein Revive hebt den Tod nicht auf — gemessen
+    45 Kills, 33 deaths bei 32 Runden). `rounds - wins` waere dort zu
+    klein und die K/D zu hoch.
 
     In jeder Runde, die man nicht gewinnt, stirbt man genau einmal; der
     Nenner ist also `rounds - wins`. Das API-Feld `losses` bleibt bewusst
@@ -70,6 +76,9 @@ def _kd(kills, losses, rounds, wins=0):
     ein Spieler ohne Niederlage rechnerisch unendlich gut.
     """
     kills = kills or 0
+    if use_deaths:
+        return (kills / losses) if losses else (
+            (kills / rounds) if rounds else None)
     denom = (rounds or 0) - (wins or 0)
     if denom > 0:
         return kills / denom
@@ -202,12 +211,13 @@ def _sum_modes(per_mode, modes):
     return kills, losses, rounds, wins
 
 
-def _kd_if_enough(kills, losses, rounds, min_rounds, total_rounds=0, wins=0):
+def _kd_if_enough(kills, losses, rounds, min_rounds, total_rounds=0, wins=0,
+                  use_deaths=False):
     if rounds < min_rounds:
         return None
     if total_rounds and rounds < total_rounds * MIN_KD_SHARE:
         return None
-    return _kd(kills, losses, rounds, wins)
+    return _kd(kills, losses, rounds, wins, use_deaths)
 
 
 def _narrow_basis(per_mode, modes, basis):
@@ -374,7 +384,11 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
         total = 0
         if use_share:
             _, _, total, _ = _sum_modes(per_mode, tuple(per_mode))
-        kd = _kd_if_enough(kills, losses, rounds, eff_min, total, wins)
+        # Ranked-Modi rechnen ueber die echten Tode (siehe _kd) — dort kann
+        # deaths die Rundenzahl uebersteigen.
+        _is_rk = any(str(m).endswith(RANKED_SUFFIX) for m in sel)
+        kd = _kd_if_enough(kills, losses, rounds, eff_min, total, wins,
+                           use_deaths=_is_rk)
         if kd is None:
             continue
         basis = mode if modes is mode_tuple and mode else (
@@ -387,7 +401,6 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
         lt_sel = tuple(lifetime or ()) if modes is ALL_MODES else sel
         _, _, lifetime_rounds, _ = _sum_modes(lifetime, lt_sel)
         _basis = _narrow_basis(per_mode, sel, basis)
-        _is_rk = any(str(m).endswith(RANKED_SUFFIX) for m in sel)
         return {
             "kd":             kd,
             "basis":          _basis,
@@ -457,7 +470,8 @@ def parse_ranked(payload) -> dict:
         if not stats:
             continue
         kd = _kd(stats.get("kills"), stats.get("deaths"),
-                 stats.get("roundsPlayed"), stats.get("wins"))
+                 stats.get("roundsPlayed"), stats.get("wins"),
+                 use_deaths=True)
         if kd is None:
             continue
         tier = stats.get("currentTier") or {}
