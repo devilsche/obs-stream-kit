@@ -741,7 +741,13 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         # Lobby heisst hier: alle ausser uns. Der eigene Squad steckte sonst
         # in beiden Seiten des Vergleichs.
         avg = lobby_average(entry["accounts"], kd_by_acc, exclude=squad)
-        squad_avg = lobby_average(sorted(squad), kd_by_acc)
+        # Ohne den eigenen Account: der steht im Report direkt daneben, und
+        # "wie stark sind meine Mitspieler" ist die Frage, die dieser Wert
+        # beantworten soll. Gemessen zog der eigene Wert den Schnitt von
+        # 1,476 auf 1,523.
+        squad_avg = lobby_average(sorted(squad), kd_by_acc,
+                                   exclude={my_account_id} if my_account_id
+                                   else None)
         # Die Spitze der Lobby als eigener Wert: der Schnitt sagt nicht, ob
         # oben fuenf Haie sassen. Der Report markiert damit harte Runden.
         top_pairs = sorted(
@@ -893,7 +899,12 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                                             "seasonId": info.get("seasonId"),
                                             "matches": 0})
             agg["matches"] += 1
-        known_mates = [m["kd"] for m in mates if m["kd"] is not None]
+        # Die Liste zeigt alle inklusive mir — zum Vergleichen. Der Schnitt
+        # laesst den eigenen Account weg, sonst vergleicht man sich mit sich
+        # selbst.
+        known_mates = [m["kd"] for m in mates
+                       if m["kd"] is not None
+                       and m.get("accountId") != my_account_id]
         b.update({"matchId": mid, "playedAt": e["playedAt"], "map": e["map"],
                   "lobbyPlayers": len(lobby),
                   "coverage": (100.0 * b["known"] / len(lobby)) if lobby else None,
