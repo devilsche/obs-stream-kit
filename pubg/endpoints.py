@@ -1242,42 +1242,50 @@ class EndpointRegistry:
                 from_iso=from_iso, to_iso=to_iso),
         )
 
-        # Merge: Achievements die in pubg_achievements_seen stehen aber
-        # von compute_session_achievements nicht live erkannt wurden
-        # (z.B. em_pickup_kill bei manuellem Insert oder live-Fehler).
+        # Merge aus pubg_achievements_seen — NUR fuer die IDs in
+        # PUBG_DB_ONLY_ACH. Alles andere rechnet compute_session_achievements
+        # live; wuerde man die DB generell dazumischen, kaeme die gesamte
+        # Historie mit: ohne from/to standen so 45 Achievements in einer
+        # Session, die live 19 hat.
+        #
+        # Zweite Bedingung ist der Zeitraum. Fehlt from/to (Frontend fragt
+        # die laufende Session ohne Parameter ab), wird er aus den
+        # Live-Treffern abgeleitet statt weggelassen — sonst gilt der
+        # Filter fuer die ganze DB.
         try:
             seen_ids = {a.get("id") for a in items}
-            date_filter = ""
-            params = [self.tenant_id]
-            if from_iso:
-                date_filter += " AND played_at >= ?"
-                params.append(from_iso)
-            if to_iso:
-                date_filter += " AND played_at <= ?"
-                params.append(to_iso)
-            # conn.execute() erwartet sqlite-Style '?' — der Compat-Layer
-            # (core/db_compat._to_pg_sql) uebersetzt nach %s und escaped
-            # literale % zu %%. Direktes %s hier waere ein Syntax-Fehler.
-            db_rows = conn.execute(
-                f"SELECT achievement_id, label, icon, match_id, played_at "
-                f"FROM pubg_achievements_seen "
-                f"WHERE tenant_id=?{date_filter} "
-                f"ORDER BY played_at ASC",
-                params).fetchall()
-            print(f"[session-achievements] tenant={self.tenant_id} "
-                  f"from={from_iso} to={to_iso} live_ids={sorted(seen_ids)} "
-                  f"db_rows={[dict(r) for r in db_rows]}", flush=True)
-            for r in db_rows:
-                aid = r["achievement_id"]
-                if aid not in seen_ids:
-                    items = list(items) + [{
-                        "id":       aid,
-                        "label":    r["label"],
-                        "icon":     r["icon"],
-                        "matchId":  r["match_id"],
-                        "playedAt": r["played_at"],
-                    }]
-                    seen_ids.add(aid)
+            missing = self.PUBG_DB_ONLY_ACH - seen_ids
+            if missing:
+                played = sorted(a.get("playedAt") for a in items
+                                if a.get("playedAt"))
+                lo = from_iso or (played[0] if played else None)
+                hi = to_iso or (played[-1] if played else None)
+                if lo and hi:
+                    # conn.execute() erwartet sqlite-Style '?' — der
+                    # Compat-Layer (core/db_compat._to_pg_sql) uebersetzt
+                    # nach %s. Direktes %s waere hier ein Syntax-Fehler.
+                    marks = ",".join("?" * len(missing))
+                    db_rows = conn.execute(
+                        f"SELECT achievement_id, label, icon, match_id, "
+                        f"       played_at "
+                        f"FROM pubg_achievements_seen "
+                        f"WHERE tenant_id=? AND achievement_id IN ({marks}) "
+                        f"  AND played_at >= ? AND played_at <= ? "
+                        f"ORDER BY played_at ASC",
+                        [self.tenant_id] + sorted(missing) + [lo, hi]
+                    ).fetchall()
+                    for r in db_rows:
+                        aid = r["achievement_id"]
+                        if aid in seen_ids:
+                            continue
+                        items = list(items) + [{
+                            "id":       aid,
+                            "label":    r["label"],
+                            "icon":     r["icon"],
+                            "matchId":  r["match_id"],
+                            "playedAt": r["played_at"],
+                        }]
+                        seen_ids.add(aid)
         except Exception as exc:
             import traceback
             print("[session-achievements] DB-Merge fehlgeschlagen:",
@@ -1688,6 +1696,16 @@ class EndpointRegistry:
     # nach Sprite-Editor-Workflow generiert. Legacy-IDs (five_kill_match,
     # first_hot_drop, first_hot_drop_survived) zeigen auf die neuen
     # Tier-IDs.
+    #: Achievements, die NUR aus pubg_achievements_seen kommen duerfen.
+    #: Alles andere rechnet compute_session_achievements live; ein
+    #: genereller DB-Merge zieht sonst die komplette Historie in jede
+    #: Session (gemessen: 45 statt 19 Eintraege).
+    #: em_pickup_kill (Sky Snipe) steht hier, weil die Live-Erkennung den
+    #: Kill am Emergency-Pickup-Ballon nicht findet — der Eintrag stammt
+    #: aus einem manuellen Insert. Sobald die Live-Erkennung greift, kann
+    #: die ID hier raus.
+    PUBG_DB_ONLY_ACH = {"em_pickup_kill"}
+
     PUBG_ICON_URLS = {
         # Sky Snipe
         "em_pickup_kill":          "/widgets-static/pubg/icons/sky_snipe.png",
