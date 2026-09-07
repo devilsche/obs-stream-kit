@@ -266,24 +266,23 @@ def run_single_tick_multi(conn, tenant_id: int, client,
     # Spieler je Minute und Tenant klingt wenig, deckt aber eine Lobby in gut
     # neun Minuten ab — und das Polling behaelt Vorfahrt.
     try:
-        # Reihenfolge nach Knappheit, nicht nach Wichtigkeit:
+        # Reihenfolge: was die laufende Session braucht, zuerst. Das
+        # Match-Polling weiter oben hat ohnehin Vorfahrt; danach Lifetime
+        # und Season, weil sie in jeder Match-Zeile stehen.
         #
-        # Ranked zuerst. Es ist der einzige Abruf ohne Batch (ein Call je
-        # Spieler) und betrifft nur Tenants mit Ranked-Matches — wer keine
-        # hat, verliert hier nichts, weil es dann keine Kandidaten gibt.
-        # Stand hinten in der Kette, kam bei 10 Requests/Minute praktisch
-        # nie dran: gemessen 1,3 Spieler pro Minute, also 17 Stunden fuer
-        # zweitausend.
-        #
-        # Lifetime danach mit kleinem Budget. Das ist ein Dauerlauf ueber
-        # zehntausende Accounts, den ohnehin `pubg.cli lobby-kd-backfill`
-        # abarbeitet; ein Tick mehr oder weniger aendert dort nichts.
-        stats["rankedFetched"] = collect_ranked(conn, tenant_id, client,
-                                                 max_calls=6)
+        # Ranked zuletzt und mit kleinem Budget. Es ist der einzige Abruf
+        # ohne Batch (ein Call je Spieler) und wuerde bei knappem
+        # Key-Limit alles andere aushungern — gemessen gibt Tenant 3s Key
+        # effektiv rund zwei Requests pro Minute her, da bleibt fuer
+        # Matches nichts, wenn Ranked vorne steht. Fuer einen Nachlauf
+        # ueber tausende Spieler ist `pubg.cli ranked-backfill` da; der
+        # laeuft, wenn niemand spielt.
         stats["lobbyLifetimeFetched"] = collect_lobby_lifetime(
-            conn, tenant_id, client, max_calls=2)
+            conn, tenant_id, client, max_calls=4)
         stats["lobbyKdFetched"] = collect_lobby_kd(conn, tenant_id, client,
                                                     max_batches=1)
+        stats["rankedFetched"] = collect_ranked(conn, tenant_id, client,
+                                                 max_calls=1)
     except Exception as e:
         stats["errors"].append(f"lobby-kd: {e}")
     return stats
