@@ -153,8 +153,9 @@ def test_lifetime_payload_is_parsed_per_mode():
     })
     rows = lk.parse_lifetime(payload)
     assert set(rows) == {"squad-fpp", "duo-fpp"}
-    assert rows["squad-fpp"]["kd"] == pytest.approx(1.8)
-    assert rows["duo-fpp"]["kd"] == pytest.approx(1.0)
+    # Nenner ist rounds - wins: 600-60 bzw. 110-5
+    assert rows["squad-fpp"]["kd"] == pytest.approx(900 / 540)
+    assert rows["duo-fpp"]["kd"] == pytest.approx(100 / 105)
 
 
 def test_lifetime_ignores_modes_without_rounds():
@@ -305,7 +306,7 @@ def test_kd_for_mode_nimmt_den_gespielten_modus():
     Solo-Runden mit 20 Kills."""
     per_mode = {"squad-fpp": _stats(90, 210, 220), "solo-fpp": _stats(20, 1, 2)}
     r = lk.kd_for_mode(per_mode, "squad-fpp")
-    assert r["kd"] == pytest.approx(90 / 210)
+    assert r["kd"] == pytest.approx(90 / 220)   # Nenner = rounds - wins
     assert r["basis"] == "squad-fpp"
     assert r["rounds"] == 220
 
@@ -319,7 +320,7 @@ def test_kd_for_mode_49_runden_im_hauptmodus_reichen_jetzt():
     per_mode = {"squad-fpp": _stats(21, 49, 49), "solo-fpp": _stats(20, 1, 2)}
     r = lk.kd_for_mode(per_mode, "squad-fpp")
     assert r["basis"] == "squad-fpp"
-    assert r["kd"] == pytest.approx(21 / 49)
+    assert r["kd"] == pytest.approx(21 / 49)   # rounds == losses hier
 
 
 def test_kd_for_mode_unter_20_runden_faellt_weiter_auf_die_perspektive():
@@ -327,7 +328,7 @@ def test_kd_for_mode_unter_20_runden_faellt_weiter_auf_die_perspektive():
     per_mode = {"squad-fpp": _stats(8, 15, 15), "duo-fpp": _stats(40, 30, 35)}
     r = lk.kd_for_mode(per_mode, "squad-fpp")
     assert r["basis"] == "fpp"
-    assert r["kd"] == pytest.approx(48 / 45)
+    assert r["kd"] == pytest.approx(48 / 50)   # 15 + 35 Runden
 
 
 def test_kd_for_mode_faellt_auf_die_perspektive_zurueck():
@@ -336,7 +337,7 @@ def test_kd_for_mode_faellt_auf_die_perspektive_zurueck():
     'alle FPP' waere eine Zusammenfassung von genau einem Modus."""
     per_mode = {"duo-fpp": _stats(120, 60, 70), "squad": _stats(500, 5, 6)}
     r = lk.kd_for_mode(per_mode, "squad-fpp")
-    assert r["kd"] == pytest.approx(120 / 60)
+    assert r["kd"] == pytest.approx(120 / 70)   # 70 Runden duo-fpp
     assert r["basis"] == "duo-fpp"
 
 
@@ -344,7 +345,7 @@ def test_kd_for_mode_nimmt_zuletzt_alles_zusammen():
     """Nur TPP gespielt, das Match war FPP: dann zaehlt die ganze Karriere."""
     per_mode = {"squad": _stats(300, 100, 150), "duo": _stats(60, 20, 30)}
     r = lk.kd_for_mode(per_mode, "squad-fpp")
-    assert r["kd"] == pytest.approx(360 / 120)
+    assert r["kd"] == pytest.approx(360 / 180)   # 150 + 30 Runden
     assert r["basis"] == "all"
 
 
@@ -359,7 +360,7 @@ def test_kd_by_perspective_trennt_fpp_und_tpp():
     per_mode = {"squad-fpp": _stats(290, 89, 98), "squad": _stats(30, 1, 2),
                 "solo": _stats(46, 3, 4), "duo-fpp": _stats(40, 40, 40)}
     p = lk.kd_by_perspective(per_mode)
-    assert p["fpp"]["kd"] == pytest.approx((290 + 40) / (89 + 40))
+    assert p["fpp"]["kd"] == pytest.approx((290 + 40) / (98 + 40))
     assert p["fpp"]["rounds"] == 138
     # TPP hat nur sechs Runden — zu duenn fuer eine eigene Aussage.
     assert p["tpp"]["kd"] is None
@@ -391,7 +392,7 @@ def test_kd_for_mode_verwirft_eine_stufe_die_kaum_gespielt_wurde():
                 "duo-fpp": _stats(10052, 6474, 6723)}
     r = lk.kd_for_mode(per_mode, "solo")
     assert r["basis"] == "all"
-    assert r["kd"] == pytest.approx(25440 / 16716, rel=0.01)
+    assert r["kd"] == pytest.approx(25440 / 17386, rel=0.01)
 
 
 def test_kd_for_mode_nimmt_die_perspektive_wenn_sie_wirklich_gespielt_wurde():
@@ -427,7 +428,7 @@ def test_viele_runden_im_nebenmodus_schlagen_den_duennen_hauptmodus():
     500, nicht an der einen."""
     per_mode = {"squad-fpp": _stats(0, 1, 1), "duo-fpp": _stats(700, 350, 500)}
     r = lk.kd_for_mode(per_mode, "squad-fpp")
-    assert r["kd"] == pytest.approx(700 / 351)
+    assert r["kd"] == pytest.approx(700 / 501)   # 1 + 500 Runden
     assert r["basis"] == "fpp"
 
 

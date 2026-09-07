@@ -53,13 +53,31 @@ def chunk(items, size=BATCH_SIZE):
     return [items[i:i + size] for i in range(0, len(items), size)]
 
 
-def _kd(kills, losses, rounds):
-    """Kills je Tod. Ohne Tode zaehlen die gespielten Runden als Nenner —
-    sonst waere ein Spieler ohne Tod rechnerisch unendlich gut."""
+def _kd(kills, losses, rounds, wins=0):
+    """Kills je nicht gewonnener Runde — die op.gg-Konvention.
+
+    In jeder Runde, die man nicht gewinnt, stirbt man genau einmal; der
+    Nenner ist also `rounds - wins`. Das API-Feld `losses` bleibt bewusst
+    ungenutzt: es ist unstimmig. Fuer PEX_LuCKoR in squad-fpp Season 42
+    standen 595 Kills, 369 losses, 390 Runden, 32 Wins — 32 + 369 = 401
+    Ergebnisse bei nur 390 Runden. Der Nenner war zu gross, die K/D rund
+    3 % zu niedrig (1,61 statt der 1,66, die op.gg zeigt).
+
+    `losses` bleibt in der Signatur, damit die Aufrufer unveraendert
+    bleiben und der Wert weiter gespeichert wird.
+
+    Ohne Niederlage zaehlen die gespielten Runden als Nenner — sonst waere
+    ein Spieler ohne Niederlage rechnerisch unendlich gut.
+    """
     kills = kills or 0
+    denom = (rounds or 0) - (wins or 0)
+    if denom > 0:
+        return kills / denom
+    if rounds:
+        return kills / rounds      # jede Runde gewonnen
     if losses:
-        return kills / losses
-    return (kills / rounds) if rounds else None
+        return kills / losses      # Datensatz ohne Runden-Angabe
+    return None
 
 
 #: Schluessel, unter dem Lifetime-Werte in derselben Tabelle liegen wie die
@@ -138,7 +156,12 @@ def rotating_season_mode(tenant_id: int, minute: int = None) -> str:
 
 
 def _sum_modes(per_mode, modes):
-    kills = losses = rounds = 0
+    """Summiert kills/losses/rounds/wins ueber die gegebenen Modi.
+
+    `wins` gehoert dazu, weil der Nenner der K/D `rounds - wins` ist
+    (siehe _kd).
+    """
+    kills = losses = rounds = wins = 0
     for m in modes:
         st = (per_mode or {}).get(m)
         if not st:
@@ -146,15 +169,16 @@ def _sum_modes(per_mode, modes):
         kills += st.get("kills") or 0
         losses += st.get("losses") or 0
         rounds += st.get("rounds") or 0
-    return kills, losses, rounds
+        wins += st.get("wins") or 0
+    return kills, losses, rounds, wins
 
 
-def _kd_if_enough(kills, losses, rounds, min_rounds, total_rounds=0):
+def _kd_if_enough(kills, losses, rounds, min_rounds, total_rounds=0, wins=0):
     if rounds < min_rounds:
         return None
     if total_rounds and rounds < total_rounds * MIN_KD_SHARE:
         return None
-    return _kd(kills, losses, rounds)
+    return _kd(kills, losses, rounds, wins)
 
 
 def _narrow_basis(per_mode, modes, basis):
@@ -188,25 +212,25 @@ def kd_for_mode(per_mode, mode: str, min_rounds: int = MIN_KD_ROUNDS) -> dict:
     """
     group = FPP_MODES if (mode or "").endswith("-fpp") else TPP_MODES
     all_modes = tuple(per_mode or ())
-    _, _, total = _sum_modes(per_mode, all_modes)
+    _, _, total, _ = _sum_modes(per_mode, all_modes)
     steps = ((mode, (mode,)) if mode else (None, ()),
              ("fpp" if group is FPP_MODES else "tpp", group),
              ("all", all_modes))
     for basis, modes in steps:
         if not modes:
             continue
-        kills, losses, rounds = _sum_modes(per_mode, modes)
+        kills, losses, rounds, wins = _sum_modes(per_mode, modes)
         # Die letzte Stufe ist die ganze Karriere — dort greift die
         # Anteils-Regel nicht, wohl aber eine eigene Untergrenze: unter
         # MIN_KD_ROUNDS_TOTAL Runden ist der Wert Rauschen (siehe dort).
         effective_min = (MIN_KD_ROUNDS_TOTAL if basis == "all"
                          else min_rounds)
         kd = _kd_if_enough(kills, losses, rounds, effective_min,
-                           0 if basis == "all" else total)
+                           0 if basis == "all" else total, wins)
         if kd is not None:
             return {"kd": kd, "basis": _narrow_basis(per_mode, modes, basis),
                     "rounds": rounds}
-    _, _, rounds = _sum_modes(per_mode, tuple(per_mode or ()))
+    _, _, rounds, _ = _sum_modes(per_mode, tuple(per_mode or ()))
     return {"kd": None, "basis": None, "rounds": rounds}
 
 
@@ -266,7 +290,7 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
     mode_tuple = (mode,) if mode else ()
     # Karriere-Gesamtrunden als Bezugsgroesse: 230 Season-Runden von 7000
     # Alltime sagen mehr aus als 230 allein.
-    _, _, lifetime_rounds = _sum_modes(lifetime, tuple(lifetime or ()))
+    _, _, lifetime_rounds, _ = _sum_modes(lifetime, tuple(lifetime or ()))
 
     # (Quelle, Daten, Modus-Auswahl, Mindestrunden, Anteilsregel?, season_id)
     steps = [
@@ -292,11 +316,11 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
         sel = tuple(per_mode) if modes is None else modes
         if not sel:
             continue
-        kills, losses, rounds = _sum_modes(per_mode, sel)
+        kills, losses, rounds, wins = _sum_modes(per_mode, sel)
         total = 0
         if use_share:
-            _, _, total = _sum_modes(per_mode, tuple(per_mode))
-        kd = _kd_if_enough(kills, losses, rounds, eff_min, total)
+            _, _, total, _ = _sum_modes(per_mode, tuple(per_mode))
+        kd = _kd_if_enough(kills, losses, rounds, eff_min, total, wins)
         if kd is None:
             continue
         basis = mode if modes is mode_tuple and mode else (
@@ -316,7 +340,7 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
                      + [d for _, d in (last_seasons or [])]
                      + [lifetime]):
         if per_mode:
-            _, _, rounds = _sum_modes(per_mode, tuple(per_mode))
+            _, _, rounds, _ = _sum_modes(per_mode, tuple(per_mode))
             if rounds:
                 break
     return {"kd": None, "basis": None, "rounds": rounds,
@@ -329,8 +353,9 @@ def kd_by_perspective(per_mode, min_rounds: int = MIN_KD_ROUNDS) -> dict:
     out = {}
     for key, modes in (("fpp", FPP_MODES), ("tpp", TPP_MODES),
                        ("all", tuple(per_mode or ()))):
-        kills, losses, rounds = _sum_modes(per_mode, modes)
-        out[key] = {"kd": _kd_if_enough(kills, losses, rounds, min_rounds),
+        kills, losses, rounds, wins = _sum_modes(per_mode, modes)
+        out[key] = {"kd": _kd_if_enough(kills, losses, rounds, min_rounds,
+                                        0, wins),
                     "rounds": rounds, "kills": kills, "losses": losses}
     return out
 
@@ -348,7 +373,7 @@ def parse_lifetime(payload) -> dict:
         if not stats:
             continue
         kd = _kd(stats.get("kills"), stats.get("losses"),
-                 stats.get("roundsPlayed"))
+                 stats.get("roundsPlayed"), stats.get("wins"))
         if kd is None:
             continue
         out[mode] = {
@@ -421,7 +446,7 @@ def parse_season_batch(payload, mode: str) -> dict:
         if not acc or not stats:
             continue
         kd = _kd(stats.get("kills"), stats.get("losses"),
-                 stats.get("roundsPlayed"))
+                 stats.get("roundsPlayed"), stats.get("wins"))
         if kd is None:
             continue
         out[acc] = {

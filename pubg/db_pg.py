@@ -1029,7 +1029,7 @@ def get_season_by_mode(conn, season_id: str, account_ids=None) -> dict:
         return {}
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT account_id, mode, kills, losses, rounds
+            SELECT account_id, mode, kills, losses, rounds, wins
             FROM player_season_snapshot
             WHERE season_id = %s AND account_id = ANY(%s)
               AND kills IS NOT NULL
@@ -1039,7 +1039,7 @@ def get_season_by_mode(conn, season_id: str, account_ids=None) -> dict:
     for r in rows:
         out.setdefault(r["account_id"], {})[r["mode"]] = {
             "kills": r["kills"] or 0, "losses": r["losses"] or 0,
-            "rounds": r["rounds"] or 0}
+            "rounds": r["rounds"] or 0, "wins": r["wins"] or 0}
     return out
 
 
@@ -1064,7 +1064,7 @@ def get_season_split_by_mode(conn, account_ids=None, current_season_id=None):
         return {}, {}
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT account_id, mode, season_id, kills, losses, rounds
+            SELECT account_id, mode, season_id, kills, losses, rounds, wins
             FROM player_season_snapshot
             WHERE season_id <> 'lifetime' AND account_id = ANY(%s)
               AND kills IS NOT NULL
@@ -1076,7 +1076,7 @@ def get_season_split_by_mode(conn, account_ids=None, current_season_id=None):
     by_acc_season = {}
     for r in rows:
         stats = {"kills": r["kills"] or 0, "losses": r["losses"] or 0,
-                 "rounds": r["rounds"] or 0}
+                 "rounds": r["rounds"] or 0, "wins": r["wins"] or 0}
         by_acc_season.setdefault(r["account_id"], {}) \
                      .setdefault(r["season_id"], {})[r["mode"]] = stats
 
@@ -1105,7 +1105,7 @@ def get_lifetime_by_mode(conn, account_ids=None) -> dict:
         return {}
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT account_id, mode, kills, losses, rounds
+            SELECT account_id, mode, kills, losses, rounds, wins
             FROM player_season_snapshot
             WHERE season_id = 'lifetime' AND account_id = ANY(%s)
               AND kills IS NOT NULL
@@ -1115,7 +1115,7 @@ def get_lifetime_by_mode(conn, account_ids=None) -> dict:
     for r in rows:
         out.setdefault(r["account_id"], {})[r["mode"]] = {
             "kills": r["kills"] or 0, "losses": r["losses"] or 0,
-            "rounds": r["rounds"] or 0}
+            "rounds": r["rounds"] or 0, "wins": r["wins"] or 0}
     return out
 
 

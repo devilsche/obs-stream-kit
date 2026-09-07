@@ -27,7 +27,7 @@ def test_1_aktuelle_season_im_modus_schlaegt_alles():
         last_seasons=[("pc-2018-41", {"duo-fpp": _s(1, 50, 60)})],
         lifetime={"duo-fpp": _s(2, 50, 60)},
         current_season_id="pc-2018-42")
-    assert r["kd"] == pytest.approx(100 / 50)
+    assert r["kd"] == pytest.approx(100 / 60)   # Nenner = rounds - wins
     assert r["source"] == "season"
     assert r["seasonId"] == "pc-2018-42"
     assert r["basis"] == "duo-fpp"
@@ -44,7 +44,7 @@ def test_2_letzte_season_kommt_vor_lifetime():
         last_seasons=[("pc-2018-41", {"duo-fpp": _s(80, 40, 45)})],
         lifetime={"duo-fpp": _s(2, 50, 60)},
         current_season_id="pc-2018-42")
-    assert r["kd"] == pytest.approx(80 / 40)
+    assert r["kd"] == pytest.approx(80 / 45)
     assert r["source"] == "season"
     assert r["seasonId"] == "pc-2018-41"
 
@@ -55,7 +55,7 @@ def test_3_lifetime_im_modus_wenn_keine_season_daten():
     r = lk.kd_resolved(
         "duo-fpp",
         lifetime={"duo-fpp": _s(60, 30, 35)})
-    assert r["kd"] == pytest.approx(60 / 30)
+    assert r["kd"] == pytest.approx(60 / 35)
     assert r["source"] == "lifetime"
     assert r["seasonId"] is None
 
@@ -81,7 +81,7 @@ def test_4_pov_aus_der_aktuellen_season():
         current_season={"squad-fpp": _s(120, 60, 70)},
         lifetime={"squad": _s(500, 5, 6)},
         current_season_id="pc-2018-42")
-    assert r["kd"] == pytest.approx(120 / 60)
+    assert r["kd"] == pytest.approx(120 / 70)
     assert r["source"] == "season"
     assert r["basis"] == "squad-fpp"   # Gruppe besteht nur daraus
 
@@ -106,7 +106,7 @@ def test_5_pov_aus_lifetime():
         lifetime={"squad-fpp": _s(90, 45, 50), "solo-fpp": _s(30, 15, 20)})
     assert r["source"] == "lifetime"
     assert r["basis"] == "fpp"
-    assert r["kd"] == pytest.approx(120 / 60)
+    assert r["kd"] == pytest.approx(120 / 70)   # 50 + 20 Runden
 
 
 # ── Stufe 6: alle Modi, Lifetime ────────────────────────────────────────────
@@ -167,7 +167,7 @@ def test_2_geht_rueckwaerts_bis_eine_season_genug_runden_hat():
         ],
         lifetime={"duo-fpp": _s(1, 100, 100)},
         current_season_id="pc-2018-42")
-    assert r["kd"] == pytest.approx(90 / 45)
+    assert r["kd"] == pytest.approx(90 / 50)
     assert r["source"] == "season"
     assert r["seasonId"] == "pc-2018-40"
 
@@ -184,7 +184,7 @@ def test_2_wenn_keine_season_reicht_kommt_lifetime():
         lifetime={"duo-fpp": _s(60, 30, 35)},
         current_season_id="pc-2018-42")
     assert r["source"] == "lifetime"
-    assert r["kd"] == pytest.approx(60 / 30)
+    assert r["kd"] == pytest.approx(60 / 35)
     assert r["seasonId"] is None
 
 
