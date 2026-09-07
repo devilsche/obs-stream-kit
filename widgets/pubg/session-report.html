@@ -397,7 +397,11 @@
       line-height: 1.2;
       font-variant-numeric: tabular-nums;
     }
-    .lobby-kpi span { font-size: 0.78em; color: var(--theme-text-dim, #8a7d99); }
+    /* NUR das direkte Label-span: hotKd() wickelt den Wert in
+       <span class="t-hot"><span class="pubg-hot">, und als
+       Nachfahren-Selektor traf 0.78em auch diese Wrapper — die Zahl
+       schrumpfte auf 61 % (0.78 x 0.78), sobald sie hervorgehoben war. */
+    .lobby-kpi > span { font-size: 0.78em; color: var(--theme-text-dim, #8a7d99); }
     .lobby-side + .lobby-side { margin-top: 14px; }
     .lobby-side h3 {
       margin: 0 0 6px;
