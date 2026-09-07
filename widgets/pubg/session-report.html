@@ -3761,11 +3761,18 @@
           selection.</p>`;
       }
       const known = mates.filter(m => m.kd != null).length;
+      // Der angezeigte Schnitt muss zu der Zahl passen, auf die geklickt
+      // wurde: aus der Match Row kommt der Wert MIT mir, aus dem
+      // Phasen-Header der ohne mich. Nur im Phasen-Fall wird der eigene
+      // Eintrag deshalb abgesetzt.
+      const avg = isPhase ? src.squadAvgMates : src.squadAvg;
+      const dimMe = isPhase;
       return `
         <div class="lobby-kpis">
-          <div class="lobby-kpi"><b>${lobbyKdStr(src.squadAvg)}</b><span>Ø Squad K/D</span></div>
+          <div class="lobby-kpi"><b>${lobbyKdStr(avg)}</b><span>${
+            isPhase ? "Ø Mates K/D" : "Ø Squad K/D"}</span></div>
           <div class="lobby-kpi"><b>${mates.length}</b><span>${
-            isPhase ? "Mitspieler" : "im Squad"}</span></div>
+            isPhase ? "teammates" : "in the squad"}</span></div>
           ${known < mates.length
             ? `<div class="lobby-kpi"><b>${mates.length - known}</b><span>no value</span></div>`
             : ""}
@@ -3777,7 +3784,7 @@
             // Der eigene Eintrag steht in der Liste, geht aber NICHT in den
             // Schnitt ein — ohne Kennzeichnung sieht das wie ein Rechenfehler
             // aus (Liste mit drei Namen, Mittel aus zwei).
-            const isMe = !!m.isMe;
+            const isMe = dimMe && !!m.isMe;
             return `
             <li${isMe ? ' class="is-me"' : ''}><span>${PubgUI.esc(m.name)}${isMe
                   ? ` <span class="where where--me">not counted</span>` : ""}${isPhase && m.matches

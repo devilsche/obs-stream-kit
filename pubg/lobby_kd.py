@@ -909,19 +909,24 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                                             "isMe": a == my_account_id,
                                             "matches": 0})
             agg["matches"] += 1
-        # Die Liste zeigt alle inklusive mir — zum Vergleichen. Der Schnitt
-        # laesst den eigenen Account weg, sonst vergleicht man sich mit sich
-        # selbst.
+        # Zwei Schnitte, weil das Modal aus zwei Kontexten kommt:
+        #   squadAvg      mit mir   -> aufgerufen aus der Match Row
+        #   squadAvgMates ohne mich -> aufgerufen aus dem Phasen-Header
+        # Ein einziger Wert wuerde in einem der beiden Faelle nicht zu der
+        # Zahl passen, auf die geklickt wurde.
+        all_kds = [m["kd"] for m in mates if m["kd"] is not None]
         known_mates = [m["kd"] for m in mates
-                       if m["kd"] is not None
-                       and m.get("accountId") != my_account_id]
+                       if m["kd"] is not None and not m.get("isMe")]
         b.update({"matchId": mid, "playedAt": e["playedAt"], "map": e["map"],
                   "lobbyPlayers": len(lobby),
                   "coverage": (100.0 * b["known"] / len(lobby)) if lobby else None,
                   "squad": mates,
-                  "squadKnown": len(known_mates),
-                  "squadAvg": (sum(known_mates) / len(known_mates))
-                              if known_mates else None})
+                  "squadKnown": len(all_kds),
+                  "squadAvg": (sum(all_kds) / len(all_kds))
+                              if all_kds else None,
+                  "squadMatesKnown": len(known_mates),
+                  "squadAvgMates": (sum(known_mates) / len(known_mates))
+                                   if known_mates else None})
         out.append(b)
         for a in lobby:
             info = kd_by_acc.get(a) or {}
@@ -981,6 +986,7 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
         "squad": sorted(squad_seen.values(),
                         key=lambda p: (-(p["kd"] or -1), -p["matches"])),
         "squadAvg": _avg("squadAvg"),
+        "squadAvgMates": _avg("squadAvgMates"),
     }
     return {"matches": out, "totals": totals, "seasonId": season_id,
             "topN": top_n}
