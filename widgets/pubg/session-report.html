@@ -4193,10 +4193,10 @@
         <div class="totals-group">
           <h4 class="totals-h">Team</h4>
           <div class="totals">
-            ${cell(lobbyBtn(PubgUI.fmtKD(t.squadKd || 0), "record"), "Mates Record",
+            ${cell(lobbyBtn(hotLobby(t.squadKd, PubgUI.fmtKD(t.squadKd || 0)), "record"), "Mates Record",
                    "Kills per death of my teammates this session — my own numbers excluded")}
             ${t.lobbySquadKd
-                ? cell(lobbyBtn(t.lobbySquadKd.toFixed(2), "squad"), "Mates K/D",
+                ? cell(lobbyBtn(hotLobby(t.lobbySquadKd, t.lobbySquadKd.toFixed(2)), "squad"), "Mates K/D",
                        "Average career K/D of my teammates in the mode played — my own value excluded")
                 : ""}
             ${cell((t.squadKillsPerMatch || 0).toFixed(1), "Squad Kills/Match",
@@ -4276,7 +4276,7 @@
                        data-title="Mates Record · Phase ${i+1}"
                        data-sub="${s.matches} ${s.matches === 1 ? 'match' : 'matches'}"
                        aria-label="Break down the squad record of this phase: kills and deaths per player"
-                     ><b>${PubgUI.fmtKD(s.squadKd||0)}</b></button> Mates Record</span>` : ""}
+                     >${hotLobby(s.squadKd, `<b>${PubgUI.fmtKD(s.squadKd||0)}</b>`)}</button> Mates Record</span>` : ""}
               ${s.lobbySquadKd != null
                   ? `<span title="Average career K/D of my teammates in the mode played — my own value excluded"><button
                        type="button" class="lobby-open" data-phase="1" data-view="squad"
@@ -4284,7 +4284,7 @@
                        data-title="Squad · Phase ${i+1}"
                        data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'match' : 'matches'} counted"
                        aria-label="Break down the squad of this phase: career K/D of my teammates"
-                     ><b>${s.lobbySquadKd.toFixed(2)}</b></button> Mates K/D</span>`
+                     >${hotLobby(s.lobbySquadKd, `<b>${s.lobbySquadKd.toFixed(2)}</b>`)}</button> Mates K/D</span>`
                   : (s.lobbyPending
                       ? `<span title="Teammate K/D is still being collected"><span class="lobby-pending" role="img" aria-label="Teammate K/D is still being collected"></span> Mates K/D</span>`
                       : "")}
