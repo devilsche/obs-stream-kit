@@ -4061,7 +4061,7 @@
                    "Kills where the finishing shot was a headshot — not the number of head hits")}
             ${t.headshotPct != null
                 ? cell(t.headshotPct.toFixed(1) + "%", "Head Hit Rate",
-                       `${t.headHits} of ${t.totalHits} hits landed on the head`)
+                       `${t.headHits} of ${t.totalHits} landed hits went to the head — share of hits, not of shots fired`)
                 : ""}
             ${cell(t.dbnos, "Knocks")}
             ${cell(PubgUI.hotIf(t.longestKill, 300, Math.round(t.longestKill) + "m"),
@@ -4142,7 +4142,7 @@
               <span><b>${fmtDuration(Math.round(s.avgSurvivedSec))}</b> Survival</span>
               <span><b>#${s.avgPlace.toFixed(1)}</b> Placement</span>
               ${s.headshotPct != null
-                  ? `<span title="${s.headHits} of ${s.totalHits} hits landed on the head"><b>${s.headshotPct.toFixed(1)}%</b> Head Hits</span>`
+                  ? `<span title="${s.headHits} of ${s.totalHits} landed hits went to the head — share of hits, not of shots fired"><b>${s.headshotPct.toFixed(1)}%</b> Head Hits</span>`
                   : ""}
               <span class="ps-group">Team</span>
               ${(s.squadMatchesWithMapping||0) > 0 ? `<span title="Kills per death of the whole squad in this phase, myself included"><b>${PubgUI.fmtKD(s.squadKd||0)}</b> Squad Record</span>` : ""}
