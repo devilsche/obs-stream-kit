@@ -4029,6 +4029,30 @@ LONGEST_KILL_TIERS = [
 ]
 
 
+#: Ueber dieser Grenze kann kein Longest-Kill in Metern liegen — dann
+#: stehen Telemetrie-Einheiten in der Spalte (100 = 1 m).
+_LONGEST_KILL_CM_THRESHOLD = 2000
+
+
+def _longest_kill_meters(longest):
+    """Longest-Kill in Metern.
+
+    `participants.longest_kill` kommt aus der PUBG-API und ist METER.
+    Die fruehere Heuristik (`longest if longest < 50 else longest / 100`)
+    hat jeden Wert ab 50 m durch 100 geteilt: aus 619,7 m wurden 6,2 m,
+    weshalb longest_kill_400 und _600 in 1104 Matches nie ausgeloest
+    haben, obwohl 12 Kills ueber 400 m und einer ueber 600 m lagen.
+
+    Die Umrechnung bleibt als Schutz fuer Werte, die doch in
+    Telemetrie-Einheiten gespeichert wurden — aber erst ab einer Grenze,
+    die kein echter Meter-Wert erreicht.
+    """
+    longest = longest or 0
+    if longest > _LONGEST_KILL_CM_THRESHOLD:
+        return longest / 100
+    return longest
+
+
 def _emit_tier_cascade(out, seen, tiers, value, value_label_fn,
                        match_id, played):
     """Emittiert ALLE erreichten Tiers fuer einen Wert (Kills, DMG,
@@ -4185,8 +4209,7 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
         longest = m["longestKill"] or 0
         played = m["playedAt"]
 
-        # 100 Einheiten = 1 Meter (Telemetry/PUBG-Welt)
-        longest_m = longest if longest < 50 else longest / 100  # Fallback
+        longest_m = _longest_kill_meters(longest)
 
         # Jedes Chicken bekommt einen eigenen Milestone — jeder Win ist
         # das Highlight der Runde. PK (achievement_id, match_id) stellt
