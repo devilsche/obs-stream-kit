@@ -53,17 +53,13 @@
     /* Kennzeichnung im Phasen-Kopf: Ranked und Event-Phasen sind eigene
        Phasen, das soll man dort sehen und nicht erst an den Kacheln. */
     .phase-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
+      display: inline-block;
       font-size: 0.6em;
       letter-spacing: 0.12em;
       text-transform: uppercase;
-      /* inline-flex nimmt die Baseline des ersten Flex-Items. Beim
-         Ranked-Tag ist das das Icon, beim Event-Tag der Text — dadurch
-         sassen die beiden auf unterschiedlicher Hoehe. vertical-align
-         bezieht sich hier auf die Box, nicht auf den Inhalt, also
-         sitzen beide gleich. */
+      /* Ohne Icon: reiner Text in beiden Tags, damit Ranked und Event
+         auf derselben Hoehe sitzen. Das Medaillen-Icon zog den
+         Ranked-Tag ueber die inline-flex-Baseline nach oben. */
       vertical-align: -3px;
       margin: 0 4px;
       padding: 1px 6px;
@@ -73,12 +69,6 @@
       font-weight: 600;
       line-height: 1.5;
       white-space: nowrap;
-    }
-    /* Icon auf die Textzeile zwingen, damit es die Tag-Hoehe nicht
-       aufzieht. */
-    .phase-tag .material-symbols-outlined {
-      font-size: 1.15em;
-      line-height: 1;
     }
     .phase-tag--ranked { color: var(--theme-accent, #f2b705); }
 
@@ -4308,9 +4298,9 @@
         return `
           <div class="phase">
             <h2><span class="num">Phase ${i+1}</span>${s.isRanked
-              ? ` <span class="phase-tag phase-tag--ranked" title="Ranked matches are kept in their own phase — different lobby strength, not comparable to unranked"><span class="material-symbols-outlined icon-sm" aria-hidden="true">military_tech</span> Ranked</span>`
+              ? `<span class="phase-tag phase-tag--ranked" title="Ranked matches are kept in their own phase — different lobby strength, not comparable to unranked">Ranked</span>`
               : ""}${s.isEventPhase
-              ? ` <span class="phase-tag">${(s.eventModes || []).join(" / ").toUpperCase()}</span>`
+              ? `<span class="phase-tag">${(s.eventModes || []).join(" / ").toUpperCase()}</span>`
               : ""} ${startStr} → ${endStr} · ${
               s.isEventPhase ? s.eventMatches : s.matches} ${
               (s.isEventPhase ? s.eventMatches : s.matches) === 1 ? 'match' : 'matches'}</h2>
