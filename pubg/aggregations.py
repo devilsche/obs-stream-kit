@@ -6038,13 +6038,29 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             f"WHERE event_type='TakeDamage' AND actor_account=? "
             f"AND match_id IN ({ph}) GROUP BY match_id",
             [my_account_id, *event_match_ids]).fetchall()}
+    # Tode in Event-Matches: dort gibt es kein Placement und kein
+    # time_survived-Signal, der Tod steckt nur als Kill-Event mit mir als
+    # Ziel in der Telemetrie. Einmal je Match geholt, damit jede Phase
+    # summieren kann statt eigener Query.
+    ev_deaths_by_match = {}
+    if event_match_ids:
+        _phd = ",".join("?" * len(event_match_ids))
+        ev_deaths_by_match = {
+            r["match_id"]: r["d"] or 0
+            for r in conn.execute(
+                f"SELECT match_id, COUNT(*) AS d FROM telemetry_events "
+                f"WHERE event_type='Kill' AND target_account=? "
+                f"AND match_id IN ({_phd}) GROUP BY match_id",
+                [my_account_id, *event_match_ids]).fetchall()}
     for x in enriched:
         if not is_br_mode(x.get("game_mode")):
             x["effective_kills"]  = kills_by_match.get(x["match_id"], 0)
             x["effective_damage"] = dmg_by_match.get(x["match_id"], 0.0)
+            x["effective_deaths"] = ev_deaths_by_match.get(x["match_id"], 0)
         else:
             x["effective_kills"]  = x["kills"] or 0
             x["effective_damage"] = x["damage_dealt"] or 0
+            x["effective_deaths"] = 0
 
     # Phase = aufeinanderfolgende Matches deren Squad-Sets sich überlappen.
     # Der "Stamm" der Phase ist die Schnittmenge aller Squads in der Phase
@@ -6054,10 +6070,22 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
     cur_phase = None
     for m in enriched:
         cur_set = m["squadSet"]
+        # Event-Modi (TDM, Heist) gehoeren nie in eine Phase mit BR-Matches:
+        # sie haben kein Placement, keine Survival-Zeit und ihre Kills
+        # kommen aus einer anderen Quelle. Gemischt blieben die
+        # BR-Kennzahlen der Phase leer (gemessen bei Tenant 3 am 3.9.:
+        # eine Phase mit nur einem TDM-Match zeigte ueberall 0).
+        m_is_event = not is_br_mode(m.get("game_mode"))
+        if cur_phase is not None and cur_phase.get("isEvent") != m_is_event:
+            cur_phase = {"core": set(cur_set), "allMembers": set(cur_set),
+                          "matches": [], "isEvent": m_is_event}
+            phases.append(cur_phase)
+            cur_phase["matches"].append(m)
+            continue
         if cur_phase is None:
             cur_phase = {"core": set(cur_set),
                           "allMembers": set(cur_set),
-                          "matches": []}
+                          "matches": [], "isEvent": m_is_event}
             phases.append(cur_phase)
         else:
             new_core = cur_phase["core"] & cur_set
@@ -6065,14 +6093,14 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                 # Stamm-Crew komplett weg → neue Phase
                 cur_phase = {"core": set(cur_set),
                               "allMembers": set(cur_set),
-                              "matches": []}
+                              "matches": [], "isEvent": m_is_event}
                 phases.append(cur_phase)
             elif not cur_set:
                 # Solo-Match — bricht Phase nur wenn vorher Squad da war
                 if cur_phase["core"]:
                     cur_phase = {"core": set(),
                                   "allMembers": set(),
-                                  "matches": []}
+                                  "matches": [], "isEvent": m_is_event}
                     phases.append(cur_phase)
             else:
                 cur_phase["core"] = new_core
@@ -6232,6 +6260,27 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             **squad_lobby,
             **head_hits,
         }
+        # Reine Event-Phase (TDM, Heist): die BR-Kennzahlen oben sind alle
+        # 0, weil br_ms leer ist. Statt einen leeren Kopf zu zeigen, kommen
+        # hier die Zahlen, die es in diesem Modus wirklich gibt — Kills und
+        # Schaden aus der Telemetrie, Tode aus den Kill-Events auf mich.
+        if ev_ms and not br_ms:
+            ev_kills = sum(x.get("effective_kills") or 0 for x in ev_ms)
+            ev_damage = sum(x.get("effective_damage") or 0 for x in ev_ms)
+            ev_deaths = sum(x.get("effective_deaths") or 0 for x in ev_ms)
+            ne = len(ev_ms)
+            ph["stats"].update({
+                "isEventPhase": True,
+                "eventModes": sorted({(x.get("game_mode") or "")
+                                      for x in ev_ms}),
+                "eventKills": ev_kills,
+                "eventDeaths": ev_deaths,
+                "eventDamage": ev_damage,
+                "eventAvgKills": ev_kills / ne,
+                "eventAvgDamage": ev_damage / ne,
+                "eventKd": (ev_kills / ev_deaths) if ev_deaths
+                           else (float(ev_kills) or None),
+            })
 
     # Total-Aggregate — NUR Battle-Royale. TDM/Event-Matches dürfen in der
     # Match-Liste auftauchen, verfälschen aber NICHT die BR-K/D (TDM hat echte
