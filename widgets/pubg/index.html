@@ -230,11 +230,11 @@
 
     <a class="tile" href="/widgets/pubg/weapon-stats.html?range=all" target="_blank">
       <div class="tile-title"><h3>weapon-stats.html</h3><span class="ext">open</span></div>
-      <div class="tile-desc">Pro Waffe: Kills, Ø Distanz, Max-Distanz, Kills-pro-Match. Spalten sortierbar (Header-Klick), Filter nach Kategorie (AR / DMR / Sniper / SMG / ...). Optional auch Squad-Mate-Stats via ?player=Name. Quelle: telemetry_events.Kill.</div>
+      <div class="tile-desc">Per weapon: kills, average distance, max distance, kills per match. Sortable columns (click a header), filter by category (AR / DMR / Sniper / SMG / ...). Optionally squad-mate stats via ?player=Name. Source: telemetry_events.Kill.</div>
       <span class="tile-size"><b>540×420</b></span>
       <ul class="tile-params">
         <li><code>range</code><span>session / week / all (default all)</span></li>
-        <li><code>minKills</code><span>Mindest-Kills um angezeigt zu werden (default 3)</span></li>
+        <li><code>minKills</code><span>minimum kills required to show up (default 3)</span></li>
         <li><code>player</code><span>Squad-Mate-Name (empty = self)</span></li>
       </ul>
     </a>
@@ -244,8 +244,8 @@
       <div class="tile-title"><h3>payday-stats.html</h3><span class="ext">open</span></div>
       <div class="tile-desc">PAYDAY / Event-Mode stats from telemetry — kills, damage, loot
         counter (Money Bags, Gold Bricks, Jewelry Boxes...), windows + doors.
-        PUBG-Match-Summary liefert in Events 0/0, deshalb echte Daten aus
-        telemetry_events rekonstruiert.</div>
+        The PUBG match summary reports 0/0 for events, so the real numbers
+        are reconstructed from telemetry_events.</div>
       <span class="tile-size"><b>520×360</b></span>
       <ul class="tile-params">
         <li><code>range</code><span>session / day / week / all</span></li>
@@ -328,14 +328,14 @@
 
     <a class="tile" href="/widgets/pubg/milestone-celebrate.html" target="_blank">
       <div class="tile-title"><h3>milestone-celebrate.html</h3><span class="ext">open</span></div>
-      <div class="tile-desc">Vollbild-Celebration fuer einen Wins-Meilenstein. Liest lifetime.wins automatisch und feiert NUR wenn eine neue 100er-Marke seit dem letzten Aufruf erreicht wurde — sonst still + transparent (kein Sound bei OBS-Start). Marker liegt in localStorage.</div>
+      <div class="tile-desc">Full-screen celebration for a wins milestone. Reads lifetime.wins automatically and only celebrates when a new multiple of 100 has been reached since the last run — otherwise silent + transparent (no sound on OBS start). The marker is kept in localStorage.</div>
       <span class="tile-size"><b>1920×1080</b></span>
       <ul class="tile-params">
-        <li><code>n</code><span>Ziel-Zahl manuell ueberschreiben (umgeht Gate)</span></li>
-        <li><code>force</code><span>1 = trotz bekannter Marke feiern (Test)</span></li>
-        <li><code>reset</code><span>1 = localStorage-Marker loeschen</span></li>
-        <li><code>wait</code><span>Sekunden bis fade-out (default 15)</span></li>
-        <li><code>mute</code><span>1 = ohne Fanfare</span></li>
+        <li><code>n</code><span>override the target number manually (bypasses the gate)</span></li>
+        <li><code>force</code><span>1 = celebrate even for an already seen milestone (test)</span></li>
+        <li><code>reset</code><span>1 = clear the localStorage marker</span></li>
+        <li><code>wait</code><span>seconds until fade-out (default 15)</span></li>
+        <li><code>mute</code><span>1 = without fanfare</span></li>
         <li><code>player</code><span>anderer Spieler (default = self)</span></li>
       </ul>
     </a>
@@ -430,7 +430,7 @@
 
     <a class="tile" href="/admin/poi-editor" target="_blank">
       <div class="tile-title"><h3>poi-editor (admin)</h3><span class="ext">open</span></div>
-      <div class="tile-desc">Map-Region-Editor — zeichnet Rechtecke / Polygone auf die 9 PUBG-Maps und benennt sie. Liegt jetzt unter <code>tools/poi-editor.html</code> und ist admin-only via <code>/admin/poi-editor</code>. Output landet in <code>data/pubg-pois.json</code> und wird vom Hot-Drop-Tooltip im Report verwendet.</div>
+      <div class="tile-desc">Map region editor — draws rectangles / polygons onto the 9 PUBG maps and names them. Now lives at <code>tools/poi-editor.html</code> and is admin-only via <code>/admin/poi-editor</code>. Output goes to <code>data/pubg-pois.json</code> and is used by the hot-drop tooltip in the report.</div>
       <span class="tile-size"><b>responsive</b></span>
       <ul class="tile-params"><li><code>—</code><span>no params</span></li></ul>
     </a>
@@ -446,19 +446,19 @@
 
     <a class="tile" href="/tools/match-replay.html" target="_blank">
       <div class="tile-title"><h3>match-replay.html</h3><span class="ext">open · tools/</span></div>
-      <div class="tile-desc">Animierter Replay aller Teams eines Matches auf der Karte. Spieler-Pins (Teamnummer + Teamfarbe), Kill/Knock-Marker, Bullet-Streaks. Sidebar mit Match-Dropdown und Teamliste — Klick fokussiert ein Team. Toggles für Kills/Knocks/Streaks/Namen. Play/Pause, Timeline-Scrubber, Speed 0,5×–8×. Zoom + Pan. Lädt Telemetrie on-demand von HiDrive (Server-Memory-Cache).</div>
+      <div class="tile-desc">Animated replay of every team in a match on the map. Player pins (team number + team colour), kill/knock markers, bullet streaks. Sidebar with match dropdown and team list — clicking focuses a team. Toggles for kills/knocks/streaks/names. Play/pause, timeline scrubber, speed 0.5×–8×. Zoom + pan. Loads telemetry on demand from HiDrive (server memory cache).</div>
       <span class="tile-size"><b>Browser-Tab</b></span>
       <ul class="tile-params">
-        <li><code>match</code><span>PUBG Match-ID — öffnet direkt das angegebene Match</span></li>
+        <li><code>match</code><span>PUBG match ID — opens the given match directly</span></li>
       </ul>
     </a>
 
     <a class="tile" href="/tools/landing-spots.html" target="_blank">
       <div class="tile-title"><h3>landing-spots.html</h3><span class="ext">open · tools/</span></div>
-      <div class="tile-desc">Heatmap + per-Spieler-Scatter der Landeorte pro Karte. Karten-Selektor + 4 Spieler-Felder mit Autocomplete (leer = beliebig; alle ausgefüllten müssen im selben Squad gewesen sein). Optionaler Flugrouten-Filter (≤ 1,5 km Querdistanz). POI-Liste rechts mit per-Spieler-Aufschlüsselung. Player-Chips schalten Scatter-Punkte ein/aus.</div>
+      <div class="tile-desc">Heatmap + per-player scatter of landing spots per map. Map selector + 4 player fields with autocomplete (empty = any; all filled ones must have been in the same squad). Optional flight-path filter (≤ 1.5 km lateral distance). POI list on the right with a per-player breakdown. Player chips toggle the scatter points.</div>
       <span class="tile-size"><b>Browser-Tab / 1920×1080</b></span>
       <ul class="tile-params">
-        <li><code>—</code><span>alles über UI steuerbar, keine URL-Parameter</span></li>
+        <li><code>—</code><span>everything is controlled through the UI, no URL parameters</span></li>
       </ul>
     </a>
 

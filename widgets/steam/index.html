@@ -208,15 +208,15 @@
         <span class="ext">open</span>
       </div>
       <div class="tile-desc">
-        Tool-Page (nicht für OBS): Übersicht ALLER in der DB
-        gespeicherten Achievements. Filter pro Game, Suche, Sort nach
-        Datum/Rarität. <b>Klick triggert Replay</b> — Popup-Widget
-        feuert das gewählte Achievement neu mit Sound. Zeigt
-        Unlock-Datum + globalPct pro Eintrag.
+        Tool page (not for OBS): overview of ALL achievements stored in the
+        database. Filter per game, search, sort by date/rarity.
+        <b>Clicking triggers a replay</b> — the popup widget
+        replays the selected achievement with sound. Shows
+        unlock date + globalPct per entry.
       </div>
-      <span class="tile-size"><b>Tool</b> · im Browser-Fenster</span>
+      <span class="tile-size"><b>Tool</b> · in a browser window</span>
       <ul class="tile-params">
-        <li><code>—</code><span>kein URL-Param, alles via UI</span></li>
+        <li><code>—</code><span>no URL parameters, everything through the UI</span></li>
       </ul>
     </a>
 
@@ -321,10 +321,10 @@
     <button data-fetch="/api/pubg/detect-achievements">▶ Detect PUBG Session Milestones</button>
     <button data-fetch="/api/pubg/backfill-achievements?gapHours=6">▶ Backfill PUBG (History, silent)</button>
     <button data-fetch="/api/pubg/refetch-telemetry">▶ Refetch PUBG Telemetry (Schema-Catchup)</button>
-    <button data-fetch="/api/steam/replay-achievements?limit=5">▶ Replay last 5 (Sound-Test)</button>
+    <button data-fetch="/api/steam/replay-achievements?limit=5">▶ Replay last 5 (sound test)</button>
     <button data-fetch="/api/steam/replay-achievements?limit=10&onlyRare=1">▶ Replay last 10 RARE</button>
     <button class="secondary" data-fetch="/api/steam/sync-all-achievements">Sync ALL games (silent backfill)</button>
-    <button class="secondary" data-fetch="/api/steam/sync-all-achievements?popup=1">Sync ALL + popups (Achtung: lange)</button>
+    <button class="secondary" data-fetch="/api/steam/sync-all-achievements?popup=1">Sync ALL + popups (warning: slow)</button>
     <span class="out" id="triggerOut">—</span>
   </div>
 
