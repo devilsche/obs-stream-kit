@@ -431,6 +431,13 @@
       background: color-mix(in srgb, var(--theme-text, #e8e0f0) 5%, transparent);
     }
     .lobby-list .kd { font-weight: 600; }
+    /* Highlight im Modal: Glow und Icon ja, schwirrende Partikel nein —
+       die Spalte ist schmal und sie wuerden ueber die Kante in die
+       Nachbarspalte fliegen (Rand-Regel). */
+    .lobby-list .kd .t-hot-mark i,
+    .lobby-kpi .t-hot-mark i { display: none; }
+    .lobby-list .kd .t-hot-mark,
+    .lobby-kpi .t-hot-mark { font-size: 0.8em; margin-left: 2px; }
     .lobby-list--top .kd { color: var(--theme-accent, #f2b705); }
     .lobby-list--low .kd { color: var(--theme-text-dim, #8a7d99); }
     .lobby-list .where { color: var(--theme-text-dim, #8a7d99); font-size: 0.82em; }
@@ -3782,6 +3789,12 @@
     const MIN_KD_ROUNDS = 20;
 
     function lobbyKdStr(v) { return v == null ? "—" : v.toFixed(2); }
+    // Wie im Report-Kopf: der Effekt haengt am Wert, nicht am Ort. Im Modal
+    // stehen die haertesten Gegner — dort gehoert er hin, sonst sieht eine
+    // 6er-K/D in der Liste aus wie jede andere Zahl.
+    function hotKd(v) {
+      return v == null ? "—" : hotLobby(v, v.toFixed(2));
+    }
 
     // Woher der Wert stammt: der gespielte Modus zuerst, sonst dieselbe
     // Perspektive, zuletzt alles. Das gehört sichtbar dazu — 3.26 aus
@@ -3834,7 +3847,7 @@
               ? ` <span class="where">${PubgUI.esc(PubgUI.fmtTime(p.playedAt))}</span>` : ""
             }</span>
             <span class="li-basis">${basisHtml(p)}</span>
-            <span class="kd">${p.kd.toFixed(2)}</span></li>`).join("") + `</ul>`;
+            <span class="kd">${hotKd(p.kd)}</span></li>`).join("") + `</ul>`;
     }
 
     // Squad Record: was in DIESEN Matches passiert ist — Kills durch Tode.
@@ -3853,10 +3866,10 @@
         (b.recKd ?? -1) - (a.recKd ?? -1));
       return `
         <div class="lobby-kpis">
-          <div class="lobby-kpi"><b>${kdStr(src.recordKdMates)}</b><span>Mates Record</span></div>
+          <div class="lobby-kpi"><b>${hotKd(src.recordKdMates)}</b><span>Mates Record</span></div>
           <div class="lobby-kpi"><b>${src.recordKillsMates}</b><span>Mate Kills</span></div>
           <div class="lobby-kpi"><b>${src.recordDeathsMates}</b><span>Mate Deaths</span></div>
-          <div class="lobby-kpi"><b>${kdStr(src.recordKd)}</b><span>Incl. me</span></div>
+          <div class="lobby-kpi"><b>${hotKd(src.recordKd)}</b><span>Incl. me</span></div>
         </div>
         <div class="lobby-side">
           <h3>Who did what <em>kills and deaths in ${
@@ -3867,7 +3880,7 @@
                   ? ` <span class="where where--me">me</span>` : ""}</span>
                 <span class="li-basis"><span class="where">${m.recKills} kills · ${
                   m.recDeaths} ${m.recDeaths === 1 ? "death" : "deaths"}</span></span>
-                <span class="kd">${kdStr(m.recKd)}</span></li>`).join("")}</ul>
+                <span class="kd">${hotKd(m.recKd)}</span></li>`).join("")}</ul>
         </div>
         <p class="lobby-modal__note">Kills divided by deaths, summed over
           ${isPhase ? "all matches of the phase" : "this match"} &mdash; not an
@@ -3894,7 +3907,7 @@
       const dimMe = isPhase;
       return `
         <div class="lobby-kpis">
-          <div class="lobby-kpi"><b>${lobbyKdStr(avg)}</b><span>${
+          <div class="lobby-kpi"><b>${hotKd(avg)}</b><span>${
             isPhase ? "Ø Mates K/D" : "Ø Squad K/D"}</span></div>
           <div class="lobby-kpi"><b>${mates.length}</b><span>${
             isPhase ? "teammates" : "in the squad"}</span></div>
@@ -3919,7 +3932,7 @@
                       m.matches === 1 ? "match" : "matches"}</span>` : ""
                 }</span>
                 <span class="li-basis">${basisHtml(m)}</span>
-                <span class="kd">${m.kd == null ? "N/A" : m.kd.toFixed(2)}</span></li>`;
+                <span class="kd">${m.kd == null ? "N/A" : hotKd(m.kd)}</span></li>`;
             }).join("")}</ul>
         </div>
         <p class="lobby-modal__note">${isPhase
@@ -3949,8 +3962,8 @@
         <div class="lobby-kpis">
           <div class="lobby-kpi"><b>${lobbyKdStr(src.avg)}</b><span>Ø K/D</span></div>
           <div class="lobby-kpi"><b>${lobbyKdStr(src.median)}</b><span>Median</span></div>
-          <div class="lobby-kpi"><b>${lobbyKdStr(src.max)}</b><span>Toughest</span></div>
-          <div class="lobby-kpi"><b>${lobbyKdStr(src.topAvg)}</b><span>Top ${n} Ø</span></div>
+          <div class="lobby-kpi"><b>${hotKd(src.max)}</b><span>Toughest</span></div>
+          <div class="lobby-kpi"><b>${hotKd(src.topAvg)}</b><span>Top ${n} Ø</span></div>
           <div class="lobby-kpi"><b>${lobbyKdStr(src.lowAvg)}</b><span>Low ${n} Ø</span></div>
         </div>
         <div class="lobby-side">
