@@ -268,13 +268,18 @@
          wenn der Button linksbuendig und nur inhaltsbreit ist. */
       text-align: left;
       align-self: start;
-      text-decoration: underline dotted
+      /* border statt text-decoration: der Highlight-Wrapper (.t-hot) ist
+         inline-FLEX, und ein Flex-Container malt die text-decoration seines
+         Elternteils nicht auf die Kinder. Genau die hervorgehobenen Werte
+         verloren dadurch die gepunktete Linie. Eine Border haengt an der
+         Button-Box selbst und ist davon unabhaengig. */
+      border-bottom: 1px dotted
         color-mix(in srgb, var(--theme-accent, #f2b705) 55%, transparent);
-      text-underline-offset: 3px;
+      padding-bottom: 1px;
     }
     .lobby-open:hover {
       color: var(--theme-accent, #f2b705);
-      text-decoration-color: var(--theme-accent, #f2b705);
+      border-bottom-color: var(--theme-accent, #f2b705);
     }
     .lobby-open:focus-visible {
       outline: 2px solid var(--theme-accent, #f2b705);
