@@ -4182,6 +4182,13 @@
           }).toString()
         : "";
       const _SB = window.__SERVE_BASE__||"/";
+      // fetchJson bricht sonst nach 10s ab. Ueber alle Sessions gerechnet
+      // brauchen vehicle-stats 7,7s und session-achievements 6,0s; der
+      // Server arbeitet die parallelen Requests hintereinander ab, also
+      // lief achievements in den Abort — der Server antwortete mit 200,
+      // das .catch() machte daraus stillschweigend eine leere Liste, und
+      // der Report zeigte Vehicle-Action ohne Achievements.
+      const EXTRAS_TIMEOUT_MS = 60000;
       const matchesUrl = (FROM || TO)
         ? _SB + `api/pubg/session-matches${fromTo}`
         : _SB + `api/pubg/session-matches?range=session`;
@@ -4195,12 +4202,12 @@
         ? _SB + `api/pubg/vehicle-stats${fromTo}`
         : _SB + `api/pubg/vehicle-stats?range=session`;
       const [trend, achievements, matches, hotDrop, payday, vehicle] = await Promise.all([
-        PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/trend-deltas${fromTo}`).catch(() => null),
-        PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/session-achievements${fromTo}`).catch(() => []),
-        PubgUI.fetchJson(matchesUrl).catch(() => []),
-        PubgUI.fetchJson(hotDropUrl).catch(() => null),
-        PubgUI.fetchJson(paydayUrl).catch(() => null),
-        PubgUI.fetchJson(vehicleUrl).catch(() => null),
+        PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/trend-deltas${fromTo}`, EXTRAS_TIMEOUT_MS).catch(() => null),
+        PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/session-achievements${fromTo}`, EXTRAS_TIMEOUT_MS).catch(() => []),
+        PubgUI.fetchJson(matchesUrl, EXTRAS_TIMEOUT_MS).catch(() => []),
+        PubgUI.fetchJson(hotDropUrl, EXTRAS_TIMEOUT_MS).catch(() => null),
+        PubgUI.fetchJson(paydayUrl, EXTRAS_TIMEOUT_MS).catch(() => null),
+        PubgUI.fetchJson(vehicleUrl, EXTRAS_TIMEOUT_MS).catch(() => null),
       ]);
 
       // POI-Lookup-Tabelle muss da sein bevor wir Tooltips bauen.
