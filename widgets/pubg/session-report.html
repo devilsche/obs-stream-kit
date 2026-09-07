@@ -3779,7 +3779,9 @@
         </div>
         <div class="lobby-side">
           <h3>${isPhase ? "Who played along" : "The squad"}
-            <em>K/D for the mode of this match</em></h3>
+            <em>${isPhase
+              ? "K/D measured per match, for the mode each was played in"
+              : "K/D for the mode of this match"}</em></h3>
           <ul class="lobby-list lobby-list--top">${mates.map(m => {
             // Der eigene Eintrag steht in der Liste, geht aber NICHT in den
             // Schnitt ein — ohne Kennzeichnung sieht das wie ein Rechenfehler
@@ -3794,9 +3796,10 @@
                 <span class="kd">${m.kd == null ? "N/A" : m.kd.toFixed(2)}</span></li>`;
             }).join("")}</ul>
         </div>
-        <p class="lobby-modal__note">Measured for the mode of this match,
-          taken from the current season first — that says more about current
-          form. If the season is too thin, an older one counts, and only then
+        <p class="lobby-modal__note">${isPhase
+            ? "Measured per match, for the mode each one was played in — a phase can mix duo and squad"
+            : "Measured for the mode of this match"}, taken from the current
+          season first — that says more about current form. If the season is too thin, an older one counts, and only then
           the career value; the basis used is shown behind every name. In no
           case is this their performance in ${isPhase ? "this phase" : "this match"} —
           that is what &bdquo;Squad Record&ldquo; in the phase header shows.${isPhase
@@ -3833,10 +3836,11 @@
           ${lobbyListHtml(isPhase ? src.weakest : src.low, "low", isPhase)}
         </div>
         <p class="lobby-modal__note">${isPhase
-          ? `Average, median and the edges are means of the per-match
-             values &mdash; otherwise full lobbies would outweigh short
-             matches. The names, in contrast, are the extremes of the whole
-             phase, with the time they occurred.`
+          ? `Average and median are means of the per-match values &mdash;
+             otherwise full lobbies would outweigh short matches. Top and
+             bottom, in contrast, are the extremes of the whole phase, each
+             player counted once. Every value is measured for the mode of the
+             match it came from, so a phase mixing duo and squad mixes both.`
           : `My own squad and bots are excluded. Measured for the mode of this
              match; if it says &bdquo;all FPP&ldquo; or &bdquo;all
              modes&ldquo;, that player had too few rounds in the mode itself.
