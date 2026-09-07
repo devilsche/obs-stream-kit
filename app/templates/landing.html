@@ -1,14 +1,12 @@
 {% extends "base.html" %}
-{% block title %}stats-overlay.info — PUBG &amp; Steam Stats für Twitch{% endblock %}
+{% block title %}stats-overlay.info — PUBG &amp; Steam stats for Twitch{% endblock %}
 {% block body %}
 <main id="main-content" class="landing" tabindex="-1">
   <header class="landing-hero">
     <div class="landing-logo" aria-hidden="true"></div>
     <h1>stats-overlay.info</h1>
     <p class="tagline">
-      Live PUBG- und Steam-Statistiken für deinen Twitch-Stream —
-      Browser-Source-Widgets, Match-Replay, Achievement-Feeds, alles
-      automatisch aus deinem PUBG- und Steam-Account.
+      Live PUBG and Steam stats for your Twitch stream — browser source widgets, match replay, achievement feeds, all pulled automatically from your PUBG and Steam account.
     </p>
     <a class="btn-twitch" href="/app/login">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"
@@ -18,8 +16,7 @@
       Sign in with Twitch
     </a>
     <p class="hint">
-      Anmeldung via Twitch. Nach Freischaltung durch den Admin trägst du
-      deinen PUBG- und Steam-API-Key ein — der Rest läuft automatisch.
+      Sign in with Twitch. Once an admin approves you, enter your PUBG and Steam API key — everything else runs on its own.
     </p>
   </header>
 
@@ -27,7 +24,7 @@
     <h2 id="h-widgets"><span class="material-symbols-outlined icon-lg icon-gold" aria-hidden="true">my_location</span> OBS Browser-Source Widgets</h2>
     <div class="feature-grid">
       <article class="feature">
-        <h3>Live während Match</h3>
+        <h3>Live during a match</h3>
         <ul>
           <li><strong>Live Bar</strong> — Kills, Damage, Platz live</li>
           <li><strong>Mates Carousel / Flyout</strong> — Squad-Stats nebenbei</li>
@@ -39,7 +36,7 @@
         <h3>Statistik &amp; Trends</h3>
         <ul>
           <li><strong>Career Card</strong> — K/D, Wins, Top10 (Season)</li>
-          <li><strong>Season History</strong> — Verlauf über Seasons</li>
+          <li><strong>Season History</strong> — history across seasons</li>
           <li><strong>Map Performance</strong> — pro Map (Place, K/D, DMG)</li>
           <li><strong>Trend Indicator</strong> — Form-Pfeil</li>
           <li><strong>Weapon Stats</strong> — Waffen-Verteilung</li>
@@ -49,7 +46,7 @@
         <h3>Squad &amp; Mates</h3>
         <ul>
           <li><strong>Top Mates / Slider</strong> — beste Synergie</li>
-          <li><strong>Anti-Mates</strong> — mit wem läuft's schlecht</li>
+          <li><strong>Anti-Mates</strong> — who you play worst with</li>
           <li><strong>Chicken Together</strong> — geteilte Wins</li>
           <li><strong>Squad Compare</strong> — Stat-Vergleich</li>
           <li><strong>Coplayer</strong> — wer war dabei</li>
@@ -58,7 +55,7 @@
       <article class="feature">
         <h3>Match &amp; Session</h3>
         <ul>
-          <li><strong>Post-Match Card</strong> — direkt nach dem Match</li>
+          <li><strong>Post-Match Card</strong> — right after the match</li>
           <li><strong>Session Summary / Goal / Lobbies</strong></li>
           <li><strong>Payday Stats</strong> — Damage per Fraktion</li>
           <li><strong>Map Distribution</strong> — wie oft welche Map</li>
@@ -68,7 +65,7 @@
         <h3>Achievements &amp; Popups</h3>
         <ul>
           <li><strong>Milestone Celebrate</strong> — Big-Win-Animation</li>
-          <li><strong>Session Achievements</strong> — Unlocks der Session</li>
+          <li><strong>Session Achievements</strong> — unlocks of the session</li>
           <li><strong>Steam Achievement Feed / Popup</strong></li>
           <li><strong>Combined Popup</strong> — Now-Playing + Achievement</li>
         </ul>
@@ -78,7 +75,7 @@
         <ul>
           <li><strong>Lookup</strong> — Spieler via Chat-Command</li>
           <li><strong>Chat Stats Popup</strong> — Stats per Trigger</li>
-          <li><strong>News Ticker</strong> — Stat-Highlights als Banner</li>
+          <li><strong>News Ticker</strong> — stat highlights as a banner</li>
           <li>Streamer.bot-kompatible URLs</li>
         </ul>
       </article>
@@ -87,7 +84,7 @@
         <ul>
           <li><strong>Now Playing</strong> — aktuelles Steam-Spiel</li>
           <li><strong>Games Ticker</strong> — Owned-Games-Strip</li>
-          <li><strong>Achievement Feed</strong> — letzte Unlocks rotieren</li>
+          <li><strong>Achievement Feed</strong> — rotates recent unlocks</li>
         </ul>
       </article>
     </div>
@@ -105,21 +102,18 @@
       </article>
       <article class="feature">
         <h3>Match Replay</h3>
-        <p>Vollständiger Match-Replay mit allen 100 Spielern, Teams,
+        <p>Full match replay with all 100 players, teams,
         Flugroute, Bluezone, Kill-/Knock-Markern, Schusslinien. 1×/2×/4×/
-        8×/16× Speed. Team-Focus mit Zoom. Filter über alle gespeicherten
+        8×/16× speed. Team focus with zoom. Filter across all stored
         Matches.</p>
       </article>
       <article class="feature">
         <h3>Landing Spots</h3>
-        <p>Heatmap der Landungs-Positionen über alle Matches — eigene
-        und Squad-Mates filterbar pro Map.</p>
+        <p>Heatmap of landing spots across all matches — yours and your squad mates, filterable per map.</p>
       </article>
       <article class="feature">
         <h3>Achievement Browser</h3>
-        <p>Vollbild-Browser durch alle Steam &amp; PUBG-Achievements.
-        Filterbar nach Spiel, Sortierung Datum/Rarität/Name. Click-to-
-        Replay triggert das Popup-Widget für Stream-Recaps.</p>
+        <p>Full-screen browser through all Steam &amp; PUBG achievements. Filter by game, sort by date/rarity/name. Click-to-replay triggers the popup widget for stream recaps.</p>
       </article>
     </div>
   </section>
@@ -127,17 +121,13 @@
   <section class="landing-section" aria-labelledby="h-tech">
     <h2 id="h-tech"><span class="material-symbols-outlined icon-lg icon-gold" aria-hidden="true">settings</span> Wie es funktioniert</h2>
     <ol class="how-list">
-      <li>Login per Twitch (OAuth) — Admin schaltet deinen Account frei.</li>
-      <li>In den Settings deinen <strong>PUBG-API-Key</strong> (kostenlos,
-        <a href="https://developer.pubg.com" target="_blank" rel="noopener">developer.pubg.com</a>)
-        und deinen <strong>Steam-API-Key</strong>
+      <li>Log in with Twitch (OAuth) — an admin approves your account.</li>
+      <li>In the settings, enter your <strong>PUBG-API-Key</strong> (kostenlos,
+        <a href="https://developer.pubg.com" target="_blank" rel="noopener">developer.pubg.com</a>) and your <strong>Steam-API-Key</strong>
         (<a href="https://steamcommunity.com/dev" target="_blank" rel="noopener">steamcommunity.com/dev</a>) hinterlegen.</li>
-      <li>Der Server pollt im Hintergrund alle 10 s deine PUBG- und
-        Steam-Daten ab und befüllt deine DB-Tabellen.</li>
-      <li>Auf <code>/app/urls</code> findest du für jedes Widget eine
-        Token-URL die du als OBS Browser-Source einfügst.</li>
-      <li>Tools liegen unter <code>/app/tools</code> (Dashboard, kein
-        OBS-Browser-Source).</li>
+      <li>The server polls your PUBG and Steam data every 10 s in the background and fills your database tables.</li>
+      <li>Auf <code>/app/urls</code> you get a token URL for every widget that you paste into OBS as a browser source.</li>
+      <li>Tools liegen unter <code>/app/tools</code> (dashboard, not an OBS browser source).</li>
     </ol>
   </section>
 </main>

@@ -52,14 +52,14 @@
       <h2>All tenants · global · admin-only</h2>
       <div class="dn-pad dn-gstats">
         <div class="dn-gstat"><span class="gn">{{ admin_stats.tenants }}</span><span class="gl">Tenants</span></div>
-        <div class="dn-gstat"><span class="gn">{{ admin_stats.db_size }}</span><span class="gl">DB-Größe</span></div>
+        <div class="dn-gstat"><span class="gn">{{ admin_stats.db_size }}</span><span class="gl">DB size</span></div>
       </div>
     </article>
     {% endif %}
 
     {% if cred_status.any_missing %}
     <article class="dn-ccard dn-c12"><span class="corner" aria-hidden="true"></span>
-      <h2>Konfiguration unvollständig</h2>
+      <h2>Configuration incomplete</h2>
       <div class="dn-pad">
         {% if not cred_status.pubg_ready %}<div class="dn-kv"><span class="lbl"><span class="dn-led x" aria-hidden="true"></span>PUBG API-Key + In-Game-Name fehlen</span><a class="v x" href="/app/settings">einrichten →</a></div>{% endif %}
         {% if not cred_status.steam_ready %}<div class="dn-kv"><span class="lbl"><span class="dn-led x" aria-hidden="true"></span>Steam API-Key + Steam-ID fehlen</span><a class="v x" href="/app/settings">einrichten →</a></div>{% endif %}
@@ -69,6 +69,6 @@
 
   </div>
 
-  <p class="dn-legend">Cockpit · weitere Live-Kacheln (Poller-Takt, Matches heute, Quellen-Zähler, Tenant-Stats) folgen.</p>
+  <p class="dn-legend">Cockpit · more live tiles (poller interval, matches today, source counters, tenant stats) to follow.</p>
 </main>
 {% endblock %}

@@ -12,8 +12,7 @@
 
   <section class="dn-simple" aria-labelledby="acc-head">
     <p class="sec" id="acc-head">// PUBG-Accounts</p>
-    <p class="dn-note">Alle gelisteten Accounts werden gepollt. Der primäre Account
-      ist die Standardquelle für Widgets ohne <code>account</code>-Parameter.</p>
+    <p class="dn-note">All listed accounts are polled. The primary account is the default source for widgets without an <code>account</code>-Parameter.</p>
 
     {% if tracked %}
     <ul class="dn-acclist">
@@ -22,14 +21,14 @@
         <span class="dn-accname">{{ t.name }}</span>
         {% if t.is_primary %}
         <span class="dn-accbadge">
-          <span class="material-symbols-outlined icon-sm" aria-hidden="true">star</span>Primär
+          <span class="material-symbols-outlined icon-sm" aria-hidden="true">star</span>Primary
         </span>
         {% else %}
         <form method="POST" action="/app/settings/accounts" class="dn-accform">
           <input type="hidden" name="action" value="primary">
           <input type="hidden" name="name" value="{{ t.name }}">
           <button type="submit" class="dn-btn ghost"
-                  aria-label="{{ t.name }} als primären Account setzen">Als primär</button>
+                  aria-label="Make {{ t.name }} the primary account">Make primary</button>
         </form>
         <form method="POST" action="/app/settings/accounts" class="dn-accform">
           <input type="hidden" name="action" value="remove">
@@ -46,14 +45,12 @@
     <form method="POST" action="/app/settings/accounts" class="dn-accadd">
       <input type="hidden" name="action" value="add">
       <div class="dn-field">
-        <label for="new_account">Weiteren Account hinzufügen</label>
+        <label for="new_account">Add another account</label>
         <input id="new_account" name="name" type="text" autocomplete="off" required
                aria-describedby="new_account_hint">
-        <p class="dn-note" id="new_account_hint">In-game name, z.B. PEX_LuCKoR.
-          Matches der letzten 14 Tage werden nachgeladen, ältere sind bei PUBG
-          nicht mehr abrufbar.</p>
+        <p class="dn-note" id="new_account_hint">In-game name, e.g. PEX_LuCKoR. Matches from the last 14 days are fetched; anything older is no longer available from PUBG.</p>
       </div>
-      <button type="submit" class="dn-btn accent">Hinzufügen</button>
+      <button type="submit" class="dn-btn accent">Add</button>
     </form>
   </section>
 
@@ -63,7 +60,7 @@
       <div class="dn-field">
         <label for="pubg_platform">Platform</label>
         <select id="pubg_platform" name="pubg_platform">
-          <option value="">— wählen —</option>
+          <option value="">— select —</option>
           <option value="steam" {% if creds.pubg_platform == 'steam' %}selected{% endif %}>Steam</option>
           <option value="kakao" {% if creds.pubg_platform == 'kakao' %}selected{% endif %}>Kakao</option>
           <option value="psn" {% if creds.pubg_platform == 'psn' %}selected{% endif %}>PlayStation</option>
@@ -73,7 +70,7 @@
       <div class="dn-field">
         <label for="pubg_api_key">API key</label>
         <input id="pubg_api_key" name="pubg_api_key" type="password" autocomplete="new-password"
-               placeholder="{% if creds.pubg_api_key %}(gespeichert — leer lassen zum Behalten){% else %}von developer.pubg.com{% endif %}">
+               placeholder="{% if creds.pubg_api_key %}(saved — leave empty to keep){% else %}von developer.pubg.com{% endif %}">
       </div>
     </div>
 
@@ -87,7 +84,7 @@
       <div class="dn-field">
         <label for="steam_api_key">API key</label>
         <input id="steam_api_key" name="steam_api_key" type="password" autocomplete="new-password"
-               placeholder="{% if creds.steam_api_key %}(gespeichert — leer lassen zum Behalten){% else %}von steamcommunity.com/dev{% endif %}">
+               placeholder="{% if creds.steam_api_key %}(saved — leave empty to keep){% else %}von steamcommunity.com/dev{% endif %}">
       </div>
     </div>
 
@@ -104,10 +101,10 @@
           <option value="editorial" {% if prefs.theme == 'editorial' %}selected{% endif %}>Editorial — Warm/Serif</option>
           <option value="swiss"     {% if prefs.theme == 'swiss' %}selected{% endif %}>Swiss — Ultramarin/Brutalist</option>
           <option value="oldcamp"   {% if prefs.theme == 'oldcamp' %}selected{% endif %}>Old Camp — Leder/Bronze (Mittelalter)</option>
-          <option value="barrier"   {% if prefs.theme == 'barrier' %}selected{% endif %}>Barrier — Schwefelgrün/Magie (Mittelalter)</option>
+          <option value="barrier"   {% if prefs.theme == 'barrier' %}selected{% endif %}>Barrier — sulphur green/magic (medieval)</option>
           <option value="sect"      {% if prefs.theme == 'sect' %}selected{% endif %}>Sect Camp — Obsidian/Feuer (Mittelalter)</option>
         </select>
-        <div class="dn-note">Gilt für dein ganzes Konto — alle Overlays, Widgets, Tools und das Dashboard.</div>
+        <div class="dn-note">Applies to your whole account — every overlay, widget, tool and the dashboard.</div>
       </div>
 
       <div class="dn-field">
@@ -116,17 +113,17 @@
           <option value="clips"       {% if prefs.highlight_source == 'clips' %}selected{% endif %}>Twitch-Clips</option>
           <option value="steam_media" {% if prefs.highlight_source == 'steam_media' %}selected{% endif %}>Steam-Media des laufenden Spiels (Trailer + Screenshots)</option>
         </select>
-        <div class="dn-note">Steam-Media greift nur, wenn ein Spiel läuft — sonst automatisch Twitch-Clips.</div>
+        <div class="dn-note">Steam media only kicks in while a game is running — otherwise Twitch clips are used automatically.</div>
       </div>
 
       <div class="dn-field">
-        <label for="default_range">Default-Range für Widgets</label>
+        <label for="default_range">Default range for widgets</label>
         <select id="default_range" name="default_range">
           <option value="session" {% if prefs.default_range == 'session' %}selected{% endif %}>Session (aktuell/letzte)</option>
           <option value="week"    {% if prefs.default_range == 'week'    %}selected{% endif %}>Letzte 7 Tage</option>
           <option value="all"     {% if prefs.default_range == 'all'     %}selected{% endif %}>All-time (volle DB)</option>
         </select>
-        <div class="dn-note">Greift für Widgets mit <code>?range=</code> — wenn die URL keinen Range setzt.</div>
+        <div class="dn-note">Applies to widgets with <code>?range=</code> — when the URL sets no range.</div>
       </div>
     </div>
 
@@ -135,26 +132,25 @@
       <button class="dn-btn ghost" type="reset">Eingaben verwerfen</button>
     </div>
 
-    <div class="dn-pro">[ Pro / Advanced ] — externe DB pro Tenant. <b>admin-only, später.</b></div>
+    <div class="dn-pro">[ Pro / Advanced ] — externe DB pro Tenant. <b>admin-only, later.</b></div>
   </form>
 
   <div class="dn-simple">
-    <p class="sec">// Telemetrie-Archiv (SFTP)</p>
+    <p class="sec">// Telemetry archive (SFTP)</p>
     <p class="dn-note">
-      Die PUBG-API gibt die Roh-Daten eines Matches nur etwa 14 Tage lang
-      heraus, danach sind sie dort gelöscht. Mit eigenem SFTP-Speicher wird
-      jedes Match beim Einlesen dorthin kopiert und bleibt für Replay und
-      Match-Analyse dauerhaft vollständig. Ohne eigenen Speicher lassen sich
-      Matches, die älter als zwei Wochen sind, nur noch eingeschränkt aus der
-      Datenbank abspielen: eigenes Squad, keine Gegner-Bewegung, keine
-      Bluezone.
+      The PUBG API only serves the raw data of a match for about 14 days;
+      after that it is gone. With your own SFTP storage every match is
+      copied there as it is imported and stays complete for replay and
+      match analysis. Without it, matches older than two weeks can only be
+      replayed from the database in a limited way: your own squad only, no
+      opponent movement, no blue zone.
     </p>
     {% if archive_msg == 'saved' %}
-      <p class="archive-flash ok" role="status">Zugang gespeichert.</p>
+      <p class="archive-flash ok" role="status">Access saved.</p>
     {% elif archive_msg == 'removed' %}
-      <p class="archive-flash ok" role="status">Zugang entfernt — ab jetzt wird nicht mehr archiviert.</p>
+      <p class="archive-flash ok" role="status">Access removed — nothing will be archived from now on.</p>
     {% elif archive_msg == 'incomplete' %}
-      <p class="archive-flash err" role="status">Host, Benutzer und Passwort sind Pflicht — nichts gespeichert.</p>
+      <p class="archive-flash err" role="status">Host, user and password are required — nothing was saved.</p>
     {% endif %}
     <p class="archive-state" role="status">
       {% if archive.host %}
@@ -188,14 +184,14 @@
                  autocomplete="new-password"
                  aria-describedby="archive_password_note">
           <div class="dn-note" id="archive_password_note">
-            {% if archive.host %}Leer lassen = unverändert.{% else %}Wird verschlüsselt gespeichert.{% endif %}
+            {% if archive.host %}Leave empty = unchanged.{% else %}Stored encrypted.{% endif %}
           </div>
         </div>
         <div class="dn-field">
           <label for="archive_path">Verzeichnis</label>
           <input id="archive_path" name="archive_path" type="text"
                  value="{{ archive.path or '/pubg/telemetry' }}">
-          <div class="dn-note">Wird angelegt, falls es fehlt. Ein Match belegt rund 1–3 MB.</div>
+          <div class="dn-note">Created if missing. One match takes about 1–3 MB.</div>
         </div>
       </div>
       <div class="dn-actions">
@@ -282,7 +278,7 @@
           : `Fehlgeschlagen: ${d.error || "unbekannter Fehler"}`;
       } catch (e) {
         out.classList.add("err");
-        out.textContent = "Test nicht möglich: " + (e.message || e);
+        out.textContent = "Test not possible: " + (e.message || e);
       } finally {
         btn.disabled = false;
       }

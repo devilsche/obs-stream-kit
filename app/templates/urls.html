@@ -31,7 +31,7 @@
     {% if not token %}
     <div class="url-crumb">URLs</div>
     <h1 class="url-title">OBS Browser-Sources</h1>
-    <div class="card"><p class="url-danger">Kein Token gefunden — der Admin muss deinen Tenant noch einrichten.</p></div>
+    <div class="card"><p class="url-danger">No token found — an admin still has to set up your tenant.</p></div>
     {% else %}
 
     {# ══ URLS-Übersicht: Crumb + Titel + Sub-Tabs + Card-Grids ══ #}
@@ -47,15 +47,15 @@
 
       {# ── Ein Grid — alle Karten mit data-tab ── #}
       <div class="url-grid" id="urlGrid">
-        {% if not pubg_ready %}<div class="url-credhint" data-tab="pubg" hidden><span class="material-symbols-outlined" aria-hidden="true">key_off</span> PUBG-API-Key fehlt — unter <a href="/app/settings">Settings</a> eintragen, damit die PUBG-Widgets Daten zeigen. Die URLs funktionieren, bleiben aber leer/offline.</div>{% endif %}
-        {% if not steam_ready %}<div class="url-credhint" data-tab="steam" hidden><span class="material-symbols-outlined" aria-hidden="true">key_off</span> Steam-Key + ID fehlen — unter <a href="/app/settings">Settings</a> eintragen, damit die Steam-Widgets Daten zeigen.</div>{% endif %}
+        {% if not pubg_ready %}<div class="url-credhint" data-tab="pubg" hidden><span class="material-symbols-outlined" aria-hidden="true">key_off</span> PUBG-API-Key fehlt — unter <a href="/app/settings">Settings</a> so the PUBG widgets show data. The URLs work either way but stay empty/offline.</div>{% endif %}
+        {% if not steam_ready %}<div class="url-credhint" data-tab="steam" hidden><span class="material-symbols-outlined" aria-hidden="true">key_off</span> Steam-Key + ID fehlen — unter <a href="/app/settings">Settings</a> so the Steam widgets show data.</div>{% endif %}
         {# ── Gothic 1: Setup-Block (.env zum Kopieren für das Prod-Forwarding) ── #}
         <div class="url-g1r-setup" data-tab="g1r" hidden>
           <div class="url-g1r-setup__head">
             <span class="material-symbols-outlined" aria-hidden="true">terminal</span>
             <b>Gothic-Live-Daten — Setup</b>
           </div>
-          <p class="url-g1r-setup__txt">Datei <code>.env</code> in den Ordner <code>g1r-local/</code> legen (neben <code>server.py</code>) und das hier einfügen — <code>server.py</code> liest sie beim Start automatisch. Danach <code>server.py</code> neu starten; im Log muss <code>Prod-Forwarding aktiv</code> erscheinen.</p>
+          <p class="url-g1r-setup__txt">Datei <code>.env</code> into the folder <code>g1r-local/</code> legen (neben <code>server.py</code>) and paste this — <code>server.py</code> liest sie beim Start automatisch. Danach <code>server.py</code> neu starten; im Log muss <code>Prod-Forwarding aktiv</code> erscheinen.</p>
           <pre class="url-g1r-setup__env" id="g1rEnv"><code>G1R_INGEST_URL={{ base_url }}/s/{{ token }}/api/g1r/ingest
 G1R_STEAM_NAME=</code></pre>
           <div class="url-g1r-setup__foot">
@@ -112,7 +112,7 @@ G1R_STEAM_NAME=</code></pre>
     <section class="url-view url-detailview" id="urlDetailView" aria-label="Source-Detail" hidden>
       <button type="button" class="url-back" id="urlBack">
         <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
-        Zurück zu <span id="urlBackTo">Overlays</span></button>
+        Back to <span id="urlBackTo">Overlays</span></button>
       <div class="url-crumb">URLs / <span id="urlDCat">Overlay</span> / <b id="urlDName">—</b></div>
       <div class="url-detail-grid" id="urlDetailContent"></div>
     </section>
@@ -125,7 +125,7 @@ G1R_STEAM_NAME=</code></pre>
 <dialog class="dn-modal" id="previewModal" aria-label="Widget-Vorschau">
   <div class="dn-modal__head">
     <h2 id="previewModalTitle">Vorschau</h2>
-    <button type="button" class="dn-modal__close" id="previewClose" aria-label="Vorschau schließen"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
+    <button type="button" class="dn-modal__close" id="previewClose" aria-label="Close preview"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
   </div>
   <div class="dn-modal__body"><iframe id="previewFrame" title="Widget-Vorschau" loading="lazy"></iframe></div>
 </dialog>
@@ -195,7 +195,7 @@ G1R_STEAM_NAME=</code></pre>
         controls = `<input type="text" class="sw-input sw-input--wide${isImg ? " sw-img-input" : ""}"
                            value="${escapeAttr(sw.default || "")}"
                            placeholder="${escapeAttr(sw.placeholder || "")}">` +
-          (isImg ? `<label class="sw-upload-btn" title="Bild hochladen + als WebP speichern">
+          (isImg ? `<label class="sw-upload-btn" title="Upload image + save as WebP">
             <span class="material-symbols-outlined" aria-hidden="true">upload</span>
             <input type="file" class="sw-upload-file" accept="image/*" aria-label="Bild hochladen">
           </label>
@@ -263,12 +263,12 @@ G1R_STEAM_NAME=</code></pre>
     } else if (params.length) {
       tag = "Parameter";
       body = `<div class="url-param url-param--info">
-          <p>Diese Source liest ihre Werte direkt aus der URL — typischerweise von <b>Streamer.bot</b> beim Triggern gesetzt (z.&nbsp;B. <code>?${escapeHtml(params[0])}=…</code>):</p>
+          <p>This source reads its values straight from the URL — typically from <b>Streamer.bot</b> beim Triggern gesetzt (z.&nbsp;B. <code>?${escapeHtml(params[0])}=…</code>):</p>
           <ul class="url-paramlist">${params.map(p => `<li><code>${escapeHtml(p)}</code></li>`).join("")}</ul>
         </div>`;
     } else {
       tag = "OBS-Source";
-      body = `<div class="url-param url-param--info">Keine Parameter — URL einfach als Browser-Source einsetzen.</div>`;
+      body = `<div class="url-param url-param--info">No parameters — just use the URL as a browser source.</div>`;
     }
     const chromeHtml = hasChromePreview ? `
       <div class="url-dbox url-chrome-preview">
@@ -309,7 +309,7 @@ G1R_STEAM_NAME=</code></pre>
           <div class="url-dactions">
             <button type="button" class="url-act" id="btnCopy"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span> Kopieren</button>
             <button type="button" class="url-act ghost" id="btnPreview"><span class="material-symbols-outlined" aria-hidden="true">visibility</span> Preview</button>
-            ${switches.length ? `<button type="button" class="url-act ghost" id="btnReset" title="Gespeicherte Einstellungen zurücksetzen"><span class="material-symbols-outlined" aria-hidden="true">restart_alt</span></button>` : ""}
+            ${switches.length ? `<button type="button" class="url-act ghost" id="btnReset" title="Reset saved settings"><span class="material-symbols-outlined" aria-hidden="true">restart_alt</span></button>` : ""}
             <span class="url-copied" id="urlCopyStatus" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -544,7 +544,7 @@ G1R_STEAM_NAME=</code></pre>
           if (!file) return;
           const status = fileInput.closest(".sw-group").querySelector(".sw-upload-status");
           const textInp = fileInput.closest(".sw-group").querySelector(".sw-img-input");
-          status.textContent = "Lädt…";
+          status.textContent = "Loading…";
           status.className = "sw-upload-status";
           const fd = new FormData();
           fd.append("image", file);

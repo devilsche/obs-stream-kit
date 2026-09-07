@@ -29,9 +29,9 @@
     </article>
 
     <article class="dn-ccard a dn-c4"><span class="corner" aria-hidden="true"></span>
-      <h2>Datenbank</h2>
+      <h2>Database</h2>
       <div class="dn-pad">
-        <div class="dn-kv"><span class="lbl">DB-Größe</span><span class="v n">{{ stats.db_size }}</span></div>
+        <div class="dn-kv"><span class="lbl">DB size</span><span class="v n">{{ stats.db_size }}</span></div>
         <div class="dn-kv"><span class="lbl">Steam Achievements</span><span class="v n">{{ stats.steam_achievements }}</span></div>
       </div>
     </article>
@@ -57,7 +57,7 @@
           <div class="dn-kv"><span class="lbl x">Fehler</span><span class="v x">{{ pubg_status.errors | join(", ") }}</span></div>
           {% endif %}
         {% else %}
-          <div class="dn-kv"><span class="lbl x">Status</span><span class="v x">nicht gestartet</span></div>
+          <div class="dn-kv"><span class="lbl x">Status</span><span class="v x">not running</span></div>
         {% endif %}
       </div>
     </article>
@@ -76,7 +76,7 @@
           <div class="dn-kv"><span class="lbl">Letzter Sync</span><span class="v">{{ s.get("lastCheck") or "—" }}</span></div>
           {% endfor %}
         {% else %}
-          <div class="dn-kv"><span class="lbl x">Status</span><span class="v x">nicht gestartet</span></div>
+          <div class="dn-kv"><span class="lbl x">Status</span><span class="v x">not running</span></div>
         {% endif %}
       </div>
     </article>
