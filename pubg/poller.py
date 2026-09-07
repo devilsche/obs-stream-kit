@@ -266,24 +266,24 @@ def run_single_tick_multi(conn, tenant_id: int, client,
     # Spieler je Minute und Tenant klingt wenig, deckt aber eine Lobby in gut
     # neun Minuten ab — und das Polling behaelt Vorfahrt.
     try:
-        # Alltime zuerst — das ist die Zahl, die die Ansicht zeigt. Season
-        # laeuft nebenher als Zusatz, kostet im Zehnerpack kaum etwas.
+        # Reihenfolge nach Knappheit, nicht nach Wichtigkeit:
+        #
+        # Ranked zuerst. Es ist der einzige Abruf ohne Batch (ein Call je
+        # Spieler) und betrifft nur Tenants mit Ranked-Matches — wer keine
+        # hat, verliert hier nichts, weil es dann keine Kandidaten gibt.
+        # Stand hinten in der Kette, kam bei 10 Requests/Minute praktisch
+        # nie dran: gemessen 1,3 Spieler pro Minute, also 17 Stunden fuer
+        # zweitausend.
+        #
+        # Lifetime danach mit kleinem Budget. Das ist ein Dauerlauf ueber
+        # zehntausende Accounts, den ohnehin `pubg.cli lobby-kd-backfill`
+        # abarbeitet; ein Tick mehr oder weniger aendert dort nichts.
+        stats["rankedFetched"] = collect_ranked(conn, tenant_id, client,
+                                                 max_calls=6)
         stats["lobbyLifetimeFetched"] = collect_lobby_lifetime(
-            conn, tenant_id, client, max_calls=4)
+            conn, tenant_id, client, max_calls=2)
         stats["lobbyKdFetched"] = collect_lobby_kd(conn, tenant_id, client,
                                                     max_batches=1)
-        # Ranked ist der teuerste Abruf — ein Call je Spieler, kein Batch.
-        # Das Budget ist absichtlich das letzte in der Kette: was Matches,
-        # Lifetime und Season uebrig lassen, geht hier rein. Laeuft
-        # parallel ein lobby-kd-backfill auf demselben Key, bleibt davon
-        # wenig; dann lohnt es, den Backfill fuer diesen Tenant zu
-        # pausieren (siehe reference-lobby-backfill-units).
-        # Klein halten: der Tick laeuft jede Minute und will davor schon
-        # Match-Polling, Lifetime (4) und Season — bei 10 Requests/Minute
-        # ist mehr nicht drin. Fuer einen Nachlauf ueber tausende Spieler
-        # ist `pubg.cli ranked-backfill` da, der nimmt sich den Key allein.
-        stats["rankedFetched"] = collect_ranked(conn, tenant_id, client,
-                                                 max_calls=2)
     except Exception as e:
         stats["errors"].append(f"lobby-kd: {e}")
     return stats
