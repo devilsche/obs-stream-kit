@@ -3789,10 +3789,10 @@
         (b.recKd ?? -1) - (a.recKd ?? -1));
       return `
         <div class="lobby-kpis">
-          <div class="lobby-kpi"><b>${kdStr(src.recordKd)}</b><span>Squad Record</span></div>
-          <div class="lobby-kpi"><b>${src.recordKills}</b><span>Kills</span></div>
-          <div class="lobby-kpi"><b>${src.recordDeaths}</b><span>Deaths</span></div>
-          <div class="lobby-kpi"><b>${kdStr(src.recordKdMates)}</b><span>Mates only</span></div>
+          <div class="lobby-kpi"><b>${kdStr(src.recordKdMates)}</b><span>Mates Record</span></div>
+          <div class="lobby-kpi"><b>${src.recordKillsMates}</b><span>Mate Kills</span></div>
+          <div class="lobby-kpi"><b>${src.recordDeathsMates}</b><span>Mate Deaths</span></div>
+          <div class="lobby-kpi"><b>${kdStr(src.recordKd)}</b><span>Incl. me</span></div>
         </div>
         <div class="lobby-side">
           <h3>Who did what <em>kills and deaths in ${
@@ -3809,9 +3809,9 @@
           ${isPhase ? "all matches of the phase" : "this match"} &mdash; not an
           average of per-match ratios, so a match with ten kills weighs more
           than one with a single kill. A death counts when the player died
-          before the match ended. &bdquo;Mates only&ldquo; leaves my own
-          numbers out; the headline figure includes them, because it is the
-          record of the whole team.</p>`;
+          before the match ended. The headline figure leaves my own numbers
+          out, same as the header; &bdquo;Incl. me&ldquo; is the record of the
+          whole team for comparison.</p>`;
     }
 
     function squadBodyHtml(d, isPhase) {
@@ -4188,8 +4188,8 @@
         <div class="totals-group">
           <h4 class="totals-h">Team</h4>
           <div class="totals">
-            ${cell(lobbyBtn(PubgUI.fmtKD(t.squadKd || 0), "record"), "Squad Record",
-                   "Kills per death of the whole squad this session, myself included")}
+            ${cell(lobbyBtn(PubgUI.fmtKD(t.squadKd || 0), "record"), "Mates Record",
+                   "Kills per death of my teammates this session — my own numbers excluded")}
             ${t.lobbySquadKd
                 ? cell(lobbyBtn(t.lobbySquadKd.toFixed(2), "squad"), "Mates K/D",
                        "Average career K/D of my teammates in the mode played — my own value excluded")
@@ -4265,13 +4265,13 @@
                   ? `<span title="${s.headHits} of ${s.totalHits} landed hits went to the head — share of hits, not of shots fired"><b>${s.headshotPct.toFixed(1)}%</b> Head Hits</span>`
                   : ""}
               <span class="ps-group">Team</span>
-              ${(s.squadMatchesWithMapping||0) > 0 ? `<span title="Kills per death of the whole squad in this phase, myself included"><button
+              ${(s.squadMatchesWithMapping||0) > 0 ? `<span title="Kills per death of my teammates in this phase — my own numbers excluded"><button
                        type="button" class="lobby-open" data-phase="1" data-view="record"
                        data-matches="${ph.matches.map(x => x.matchId).filter(Boolean).slice(0, 60).join(",")}"
-                       data-title="Squad Record · Phase ${i+1}"
+                       data-title="Mates Record · Phase ${i+1}"
                        data-sub="${s.matches} ${s.matches === 1 ? 'match' : 'matches'}"
                        aria-label="Break down the squad record of this phase: kills and deaths per player"
-                     ><b>${PubgUI.fmtKD(s.squadKd||0)}</b></button> Squad Record</span>` : ""}
+                     ><b>${PubgUI.fmtKD(s.squadKd||0)}</b></button> Mates Record</span>` : ""}
               ${s.lobbySquadKd != null
                   ? `<span title="Average career K/D of my teammates in the mode played — my own value excluded"><button
                        type="button" class="lobby-open" data-phase="1" data-view="squad"

@@ -6157,11 +6157,13 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                               AND mt.team_id = mtm.team_id
             JOIN matches m   ON m.match_id  = mtm.match_id AND m.tenant_id = mtm.tenant_id
             WHERE mtm.tenant_id = ? AND mtm.kills IS NOT NULL
-            -- MIT mir: das ist die Bilanz des Teams in diesem Zeitraum,
-            -- und ich gehoere zum Team. Nur der Karriere-Schnitt der
-            -- Mitspieler (squadKdMates) laesst mich weg.
+              -- OHNE mich: der eigene K/D steht im ME-Block daneben, und
+              -- gefragt ist die Bilanz der Mitspieler. Im Squad-Record-Modal
+              -- stehen beide Werte nebeneinander (recordKd / recordKdMates).
+              AND mtm.account_id <> ?
             GROUP BY mtm.match_id, m.duration_secs
-        """, [tenant_id, my_account_id] + match_ids + [tenant_id]).fetchall()
+        """, [tenant_id, my_account_id] + match_ids
+             + [tenant_id, my_account_id]).fetchall()
         sq_kills = 0
         sq_deaths = 0
         for r in sq_rows:
