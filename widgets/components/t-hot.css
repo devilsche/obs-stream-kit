@@ -15,6 +15,22 @@
   content:var(--theme-hot-icon,"local_fire_department");font-size:18px;color:var(--theme-accent);
   display:inline-block;text-shadow:0 0 12px var(--theme-accent);animation:hot-pulse 2s ease-in-out infinite}
 @keyframes hot-pulse{0%,100%{text-shadow:0 0 8px currentColor}50%{text-shadow:0 0 20px currentColor}}
+
+/* Stufe 3 bekommt ein EIGENES Symbol. Vorher trugen Stufe 2 und 3 dasselbe
+   Icon und unterschieden sich nur in der Animation — der Sprung von K/D 4
+   auf 5 war damit praktisch unsichtbar. Die Rakete macht die Spitze als
+   solche erkennbar; Form UND Bewegung tragen die Bedeutung, nicht Farbe
+   allein. */
+.t-hot--3 .t-hot-mark::before{content:var(--theme-hot-icon-3,"rocket_launch");
+  animation:hot-rocket 1.6s ease-in-out infinite}
+@keyframes hot-rocket{0%,100%{transform:translateY(0) rotate(45deg);
+    text-shadow:0 0 10px var(--theme-accent)}
+  40%{transform:translateY(-2px) rotate(45deg);
+    text-shadow:0 0 22px var(--theme-accent),0 0 8px var(--theme-accent-2)}
+  70%{transform:translateY(.5px) rotate(45deg);
+    text-shadow:0 0 14px var(--theme-accent)}}
+@media (prefers-reduced-motion: reduce){
+  .t-hot--3 .t-hot-mark::before{animation:none;transform:rotate(45deg)}}
 @keyframes hot-flame{0%,100%{opacity:1;transform:scale(1);text-shadow:0 0 10px var(--theme-accent)}
   45%{opacity:.82;transform:scale(.93) translateY(1px);text-shadow:0 0 16px var(--theme-accent)}
   70%{opacity:1;transform:scale(1.05);text-shadow:0 0 26px var(--theme-accent),0 0 9px var(--theme-accent-2)}}
