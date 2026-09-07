@@ -895,7 +895,10 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                           "basis": info.get("basis"), "rounds": info.get("rounds"),
                           "source": info.get("source"),
                           "lifetimeRounds": info.get("lifetimeRounds"),
-                          "seasonId": info.get("seasonId"), "accountId": a})
+                          "seasonId": info.get("seasonId"), "accountId": a,
+                          # Der eigene Eintrag zaehlt nicht in squadAvg —
+                          # das Frontend setzt ihn deshalb sichtbar ab.
+                          "isMe": a == my_account_id})
             agg = squad_seen.setdefault(a, {"name": names.get(a) or a[:12],
                                             "kd": info.get("kd"),
                                             "basis": info.get("basis"),
@@ -903,6 +906,7 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                                             "source": info.get("source"),
                                             "lifetimeRounds": info.get("lifetimeRounds"),
                                             "seasonId": info.get("seasonId"),
+                                            "isMe": a == my_account_id,
                                             "matches": 0})
             agg["matches"] += 1
         # Die Liste zeigt alle inklusive mir — zum Vergleichen. Der Schnitt

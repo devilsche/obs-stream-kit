@@ -384,6 +384,19 @@
     .lobby-list--top .kd { color: var(--theme-accent, #f2b705); }
     .lobby-list--low .kd { color: var(--theme-text-dim, #8a7d99); }
     .lobby-list .where { color: var(--theme-text-dim, #8a7d99); font-size: 0.82em; }
+    /* Eigener Eintrag: sichtbar abgesetzt, weil er NICHT in den Schnitt
+       eingeht. Nicht nur blasser — der Text sagt es auch, Farbe allein
+       traegt die Bedeutung nicht. */
+    .lobby-list li.is-me { opacity: 0.62; }
+    .lobby-list .where--me {
+      border: 1px solid currentColor;
+      border-radius: 3px;
+      padding: 0 4px;
+      text-transform: uppercase;
+      font-size: 0.72em;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
     .lobby-modal__note {
       margin: 14px 0 0;
       font-size: 0.8em;
@@ -3760,13 +3773,19 @@
         <div class="lobby-side">
           <h3>${isPhase ? "Who played along" : "The squad"}
             <em>K/D for the mode of this match</em></h3>
-          <ul class="lobby-list lobby-list--top">${mates.map(m => `
-            <li><span>${PubgUI.esc(m.name)}${isPhase && m.matches
+          <ul class="lobby-list lobby-list--top">${mates.map(m => {
+            // Der eigene Eintrag steht in der Liste, geht aber NICHT in den
+            // Schnitt ein — ohne Kennzeichnung sieht das wie ein Rechenfehler
+            // aus (Liste mit drei Namen, Mittel aus zwei).
+            const isMe = !!m.isMe;
+            return `
+            <li${isMe ? ' class="is-me"' : ''}><span>${PubgUI.esc(m.name)}${isMe
+                  ? ` <span class="where where--me">not counted</span>` : ""}${isPhase && m.matches
                   ? ` <span class="where">${m.matches} ${
                       m.matches === 1 ? "match" : "matches"}</span>` : ""
                 }${basisHtml(m)}</span>
-                <span class="kd">${m.kd == null ? "N/A" : m.kd.toFixed(2)}</span></li>`
-            ).join("")}</ul>
+                <span class="kd">${m.kd == null ? "N/A" : m.kd.toFixed(2)}</span></li>`;
+            }).join("")}</ul>
         </div>
         <p class="lobby-modal__note">Measured for the mode of this match,
           taken from the current season first — that says more about current
@@ -4048,6 +4067,23 @@
         + `<span class="pubg-stat-value">${val}</span>`
         + `<span class="pubg-stat-label">${label}</span></div>`;
 
+      // Match-IDs der ganzen Session fuer die Lobby-Modals im Header.
+      // window._allMatchIds wird erst weiter unten gesetzt, hier also
+      // direkt aus den Phasen geholt.
+      const _sessionMids = (d.phases || [])
+        .flatMap(ph => ph.matches || [])
+        .map(x => x.matchId).filter(Boolean).slice(0, 60).join(",");
+      // Wie im Phasen-Header: der Wert wird zum Button, der das
+      // Lobby-Modal oeffnet.
+      const lobbyBtn = (formatted, view) =>
+        `<button type="button" class="lobby-open" data-phase="1"`
+        + (view ? ` data-view="${view}"` : "")
+        + ` data-matches="${_sessionMids}"`
+        + ` data-title="${view === "squad" ? "Squad" : "Lobby"} · Session"`
+        + ` data-sub="${t.matches} ${t.matches === 1 ? "match" : "matches"}"`
+        + ` aria-label="Break down the ${view === "squad" ? "squad" : "lobby"} of this session">`
+        + `${formatted}</button>`;
+
       const totalsHtml = `
         <div class="totals-group">
           <h4 class="totals-h">Me</h4>
@@ -4080,7 +4116,7 @@
             ${cell(PubgUI.fmtKD(t.squadKd || 0), "Squad Record",
                    "Kills per death of the whole squad this session, myself included")}
             ${t.lobbySquadKd
-                ? cell(t.lobbySquadKd.toFixed(2), "Mates K/D",
+                ? cell(lobbyBtn(t.lobbySquadKd.toFixed(2), "squad"), "Mates K/D",
                        "Average career K/D of my teammates in the mode played — my own value excluded")
                 : ""}
             ${cell((t.squadKillsPerMatch || 0).toFixed(1), "Squad Kills/Match",
@@ -4090,10 +4126,10 @@
         ${t.lobbyKd ? `<div class="totals-group">
           <h4 class="totals-h">Lobby</h4>
           <div class="totals">
-            ${cell(hotLobby(t.lobbyKd, t.lobbyKd.toFixed(2)), "Lobby K/D",
+            ${cell(lobbyBtn(hotLobby(t.lobbyKd, t.lobbyKd.toFixed(2))), "Lobby K/D",
                    "Average K/D of the opponents in the mode played — my own squad excluded")}
             ${t.lobbyTop5 != null
-                ? cell(hotLobby(t.lobbyTop5, t.lobbyTop5.toFixed(2)), "Top 5 Avg",
+                ? cell(lobbyBtn(hotLobby(t.lobbyTop5, t.lobbyTop5.toFixed(2))), "Top 5 Avg",
                        "Average K/D of the five strongest opponents of the whole session — each counted once, however many matches they played")
                 : ""}
           </div>
@@ -4180,7 +4216,13 @@
                       ? `<span title="Opponent K/D is still being collected"><span class="lobby-pending" role="img" aria-label="Opponent K/D is still being collected"></span> Lobby K/D</span>`
                       : "")}
               ${s.lobbyTop5 != null
-                  ? `<span title="Average K/D of the five strongest opponents in this phase — each of them counted once, however many matches they played"><b>${hotLobby(s.lobbyTop5, s.lobbyTop5.toFixed(2))}</b> Top 5 Avg</span>`
+                  ? `<span title="Average K/D of the five strongest opponents in this phase — each of them counted once, however many matches they played"><button
+                       type="button" class="lobby-open" data-phase="1"
+                       data-matches="${ph.matches.map(x => x.matchId).filter(Boolean).slice(0, 60).join(",")}"
+                       data-title="Lobby · Phase ${i+1}"
+                       data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'match' : 'matches'} counted"
+                       aria-label="Break down the lobby of this phase: strongest and weakest opponents"
+                     >${hotLobby(s.lobbyTop5, `<b>${s.lobbyTop5.toFixed(2)}</b>`)}</button> Top 5 Avg</span>`
                   : ""}
             </div>
             <div class="matches-list">
