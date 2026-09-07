@@ -306,6 +306,9 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
     """
     group = FPP_MODES if (mode or "").endswith("-fpp") else TPP_MODES
     mode_tuple = (mode,) if mode else ()
+    # Karriere-Gesamtrunden als Bezugsgroesse: 230 Season-Runden von 7000
+    # Alltime sagen mehr aus als 230 allein.
+    _, _, lifetime_rounds = _sum_modes(lifetime, tuple(lifetime or ()))
 
     # (Quelle, Daten, Modus-Auswahl, Mindestrunden, Anteilsregel?, season_id)
     steps = [
@@ -342,11 +345,12 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
             "all" if modes is None else
             ("fpp" if group is FPP_MODES else "tpp"))
         return {
-            "kd":       kd,
-            "basis":    _narrow_basis(per_mode, sel, basis),
-            "rounds":   rounds,
-            "source":   source,
-            "seasonId": sid if source == "season" else None,
+            "kd":             kd,
+            "basis":          _narrow_basis(per_mode, sel, basis),
+            "rounds":         rounds,
+            "lifetimeRounds": lifetime_rounds,
+            "source":         source,
+            "seasonId":       sid if source == "season" else None,
         }
 
     rounds = 0
@@ -358,6 +362,7 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
             if rounds:
                 break
     return {"kd": None, "basis": None, "rounds": rounds,
+            "lifetimeRounds": lifetime_rounds,
             "source": None, "seasonId": None}
 
 
@@ -557,6 +562,7 @@ def lobby_breakdown(players, top_n: int = 5) -> dict:
         nm, k, info = row
         return {"name": nm, "kd": k, "basis": (info or {}).get("basis"),
                 "rounds": (info or {}).get("rounds"),
+                "lifetimeRounds": (info or {}).get("lifetimeRounds"),
                 "source": (info or {}).get("source"),
                 "seasonId": (info or {}).get("seasonId")}
 
@@ -888,12 +894,14 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
             mates.append({"name": names.get(a) or a[:12], "kd": info.get("kd"),
                           "basis": info.get("basis"), "rounds": info.get("rounds"),
                           "source": info.get("source"),
+                          "lifetimeRounds": info.get("lifetimeRounds"),
                           "seasonId": info.get("seasonId"), "accountId": a})
             agg = squad_seen.setdefault(a, {"name": names.get(a) or a[:12],
                                             "kd": info.get("kd"),
                                             "basis": info.get("basis"),
                                             "rounds": info.get("rounds"),
                                             "source": info.get("source"),
+                                            "lifetimeRounds": info.get("lifetimeRounds"),
                                             "seasonId": info.get("seasonId"),
                                             "matches": 0})
             agg["matches"] += 1
@@ -914,6 +922,7 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
             entry = {"name": names.get(a) or a[:12], "kd": kd,
                      "basis": info.get("basis"), "rounds": info.get("rounds"),
                      "source": info.get("source"),
+                     "lifetimeRounds": info.get("lifetimeRounds"),
                      "seasonId": info.get("seasonId"),
                      "matchId": mid, "playedAt": e["playedAt"]}
             prev = strongest.get(a)

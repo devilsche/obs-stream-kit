@@ -3650,7 +3650,16 @@
       const src = p.source === "season"
         ? `-season-${seasonShort(p.seasonId) || "aktuell"}`
         : (p.source === "lifetime" ? "-lifetime" : "");
-      const rounds = p.rounds ? `, ${p.rounds} Runden` : "";
+      // Stichprobe im Verhaeltnis zur Karriere: "230/7000 Runden" zeigt,
+      // dass der Season-Wert aus 230 von insgesamt 7000 Runden stammt.
+      // Ohne Bezugsgroesse sagt "230 Runden" wenig darueber, wie
+      // repraesentativ die Zahl ist.
+      const lt = p.lifetimeRounds || 0;
+      const rounds = p.rounds
+        ? (lt && lt !== p.rounds
+             ? `, ${p.rounds}/${lt} Runden`
+             : `, ${p.rounds} Runden`)
+        : "";
       return ` <span class="where">${PubgUI.esc(label + src + rounds)}</span>`;
     }
 
