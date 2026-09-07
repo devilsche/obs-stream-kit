@@ -4348,6 +4348,14 @@
       //   kills_20              0,27   0,16   0,21   20-Bomb
       //   ultra_chicken         0,45   0,47   1,49   Chicken 10+ Kills
       //   chicken_streak        0,63   0,31   0,11   Dinner Spree
+      //   longest_kill_600      0,09   0,00   0,00   Sniper Elite (ab 600m)
+      //   longest_kill_800         —      —      —   nie erreicht
+      //   longest_kill_1000        —      —      —   nie erreicht
+      //
+      // longest_kill_400 bleibt draussen: ~1 % und Einstiegsstufe der
+      // Staffel, wie kills_7. Die Tiers standen bis 2026-09-07 bei 0 %,
+      // weil der API-Meter-Wert durch 100 geteilt wurde — deshalb waren
+      // sie vorher nicht als Kandidaten sichtbar.
       //
       // burning_hell_survivor stand hier und ist am 2026-09-07 raus:
       // 6,88 / 2,82 / 12,00 % — bei Tenant 3 jedes achte Match. Damit
@@ -4364,6 +4372,7 @@
       const SPECIAL_ACH_IDS = new Set([
         "em_pickup_kill", "god_mode_chicken", "damage_2000", "kills_20",
         "ultra_chicken", "chicken_streak",
+        "longest_kill_600", "longest_kill_800", "longest_kill_1000",
       ]);
 
       let achievementsHtml = "";
