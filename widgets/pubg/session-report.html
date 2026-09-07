@@ -3773,6 +3773,47 @@
             <span class="kd">${p.kd.toFixed(2)}</span></li>`).join("") + `</ul>`;
     }
 
+    // Squad Record: was in DIESEN Matches passiert ist — Kills durch Tode.
+    // Bewusst getrennt vom Karriere-K/D im Squad-Modal: das eine sagt, wie
+    // gut jemand ueblicherweise ist, das andere, was in diesem Zeitraum
+    // herauskam.
+    function recordBodyHtml(d, isPhase) {
+      const src = isPhase ? d.totals : (d.matches && d.matches[0]);
+      const mates = (src && src.squad) || [];
+      if (!mates.length || !src) {
+        return `<p class="lobby-modal__empty">No squad data for this
+          selection.</p>`;
+      }
+      const kdStr = (v) => v == null ? "—" : v.toFixed(2);
+      const rows = [...mates].sort((a, b) =>
+        (b.recKd ?? -1) - (a.recKd ?? -1));
+      return `
+        <div class="lobby-kpis">
+          <div class="lobby-kpi"><b>${kdStr(src.recordKd)}</b><span>Squad Record</span></div>
+          <div class="lobby-kpi"><b>${src.recordKills}</b><span>Kills</span></div>
+          <div class="lobby-kpi"><b>${src.recordDeaths}</b><span>Deaths</span></div>
+          <div class="lobby-kpi"><b>${kdStr(src.recordKdMates)}</b><span>Mates only</span></div>
+        </div>
+        <div class="lobby-side">
+          <h3>Who did what <em>kills and deaths in ${
+            isPhase ? "this phase" : "this match"}</em></h3>
+          <ul class="lobby-list lobby-list--top">${rows.map(m => `
+            <li${m.isMe ? ' class="is-me"' : ''}><span class="li-name">${
+                PubgUI.esc(m.name)}${m.isMe
+                  ? ` <span class="where where--me">me</span>` : ""}</span>
+                <span class="li-basis"><span class="where">${m.recKills} kills · ${
+                  m.recDeaths} ${m.recDeaths === 1 ? "death" : "deaths"}</span></span>
+                <span class="kd">${kdStr(m.recKd)}</span></li>`).join("")}</ul>
+        </div>
+        <p class="lobby-modal__note">Kills divided by deaths, summed over
+          ${isPhase ? "all matches of the phase" : "this match"} &mdash; not an
+          average of per-match ratios, so a match with ten kills weighs more
+          than one with a single kill. A death counts when the player died
+          before the match ended. &bdquo;Mates only&ldquo; leaves my own
+          numbers out; the headline figure includes them, because it is the
+          record of the whole team.</p>`;
+    }
+
     function squadBodyHtml(d, isPhase) {
       const src = isPhase ? d.totals : (d.matches && d.matches[0]);
       const mates = (src && src.squad) || [];
@@ -3884,12 +3925,14 @@
             + "api/pubg/lobby-detail?matches=" + encodeURIComponent(key), 30000);
           _lobbyCache.set(key, d);
         }
-        body.innerHTML = view === "squad"
-          ? squadBodyHtml(d, isPhase)
-          : lobbyBodyHtml(d, isPhase);
+        body.innerHTML = view === "record"
+          ? recordBodyHtml(d, isPhase)
+          : view === "squad"
+            ? squadBodyHtml(d, isPhase)
+            : lobbyBodyHtml(d, isPhase);
       } catch (err) {
-        body.innerHTML = `<p class="lobby-modal__empty">Konnte die Lobby nicht
-          laden: ${PubgUI.esc(String(err && err.message || err))}</p>`;
+        body.innerHTML = `<p class="lobby-modal__empty">Could not load the
+          lobby: ${PubgUI.esc(String(err && err.message || err))}</p>`;
       }
     }
 
@@ -4145,7 +4188,7 @@
         <div class="totals-group">
           <h4 class="totals-h">Team</h4>
           <div class="totals">
-            ${cell(PubgUI.fmtKD(t.squadKd || 0), "Squad Record",
+            ${cell(lobbyBtn(PubgUI.fmtKD(t.squadKd || 0), "record"), "Squad Record",
                    "Kills per death of the whole squad this session, myself included")}
             ${t.lobbySquadKd
                 ? cell(lobbyBtn(t.lobbySquadKd.toFixed(2), "squad"), "Mates K/D",
@@ -4222,7 +4265,13 @@
                   ? `<span title="${s.headHits} of ${s.totalHits} landed hits went to the head — share of hits, not of shots fired"><b>${s.headshotPct.toFixed(1)}%</b> Head Hits</span>`
                   : ""}
               <span class="ps-group">Team</span>
-              ${(s.squadMatchesWithMapping||0) > 0 ? `<span title="Kills per death of the whole squad in this phase, myself included"><b>${PubgUI.fmtKD(s.squadKd||0)}</b> Squad Record</span>` : ""}
+              ${(s.squadMatchesWithMapping||0) > 0 ? `<span title="Kills per death of the whole squad in this phase, myself included"><button
+                       type="button" class="lobby-open" data-phase="1" data-view="record"
+                       data-matches="${ph.matches.map(x => x.matchId).filter(Boolean).slice(0, 60).join(",")}"
+                       data-title="Squad Record · Phase ${i+1}"
+                       data-sub="${s.matches} ${s.matches === 1 ? 'match' : 'matches'}"
+                       aria-label="Break down the squad record of this phase: kills and deaths per player"
+                     ><b>${PubgUI.fmtKD(s.squadKd||0)}</b></button> Squad Record</span>` : ""}
               ${s.lobbySquadKd != null
                   ? `<span title="Average career K/D of my teammates in the mode played — my own value excluded"><button
                        type="button" class="lobby-open" data-phase="1" data-view="squad"
@@ -4770,16 +4819,16 @@
           const absT = fmtAbsClock(ev.playedAt, ev.tsMs);
           const where = poi ? `<span class="ve-poi">${poi}</span>` : "";
           const KIND_LABELS = {
-            eject_knock: "rausgeschossen (knock)",
-            eject_kill:  "rausgeschossen (kill)",
-            driveby_knock: "Drive-By (knock)",
-            driveby_kill:  "Drive-By (kill)",
-            knock_died: "knocked→tot",
+            eject_knock: "shot out (knock)",
+            eject_kill:  "shot out (kill)",
+            driveby_knock: "drive-by (knock)",
+            driveby_kill:  "drive-by (kill)",
+            knock_died: "knocked → died",
             kill: "kill",
           };
           const kindLbl = KIND_LABELS[ev.kind] || ev.kind || "kill";
           const verb = role === "dealt"
-            ? `→ ${opp}` : `durch ${opp}`;
+            ? `→ ${opp}` : `by ${opp}`;
           // Match-Header beim Wechsel der matchId davorhängen
           const matchN = matchNumByMid.get(ev.matchId);
           let header = "";
@@ -4816,18 +4865,18 @@
             const nEject   = evDealt.filter(e => (e.kind||"").startsWith("eject")).length;
             const nDriveby = evDealt.filter(e => (e.kind||"").startsWith("driveby")).length;
             const parts2 = [];
-            if (nEject)   parts2.push(`<b>${nEject}</b> rausgeschossen`);
-            if (nDriveby) parts2.push(`<b>${nDriveby}</b> beim Fahren abgeknallt`);
-            const summary = parts2.join(", ") || `<b>${dealt}</b> Vehicle-Kill`;
+            if (nEject)   parts2.push(`<b>${nEject}</b> shot out of a vehicle`);
+            if (nDriveby) parts2.push(`<b>${nDriveby}</b> gunned down while driving`);
+            const summary = parts2.join(", ") || `<b>${dealt}</b> vehicle kills`;
             blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span> ${summary}</summary>${evRows(evDealt, "dealt")}</details>`);
           }
           if (taken > 0) {
-            blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm" aria-hidden="true">skull</span> wurde <b>${taken}</b> mal rausgeschossen</summary>${evRows(m.eventsTaken || [], "taken")}</details>`);
+            blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm" aria-hidden="true">skull</span> was shot out <b>${taken}</b> ${taken === 1 ? "time" : "times"}</summary>${evRows(m.eventsTaken || [], "taken")}</details>`);
           }
           parts.push(`<div class="ve-member"><div class="ve-name">${who}</div>${blocks.join("")}</div>`);
         }
         if (parts.length) {
-          vehicleHtml = `<h3 class="extras-h">Vehicle-Action</h3>
+          vehicleHtml = `<h3 class="extras-h">Vehicle Action</h3>
             <div class="vehicle-events">${parts.join("")}</div>`;
         }
       }
