@@ -2812,7 +2812,7 @@ class EndpointRegistry:
         Felder leer — der Report darf daran nicht scheitern.
         """
         from pubg.lobby_kd import (lobby_kd_for_matches, counts_for_average,
-                                   LIFETIME_KEY)
+                                   phase_top5, LIFETIME_KEY)
 
         matches = [m for ph in (data.get("phases") or [])
                    for m in (ph.get("matches") or [])]
@@ -2832,6 +2832,7 @@ class EndpointRegistry:
                 continue
             m["lobbyKd"] = info["lobbyKd"]
             m["lobbyTop5"] = info.get("lobbyTop5")
+            m["_lobbyTopPlayers"] = info.get("lobbyTopPlayers") or []
             m["squadKd"] = info["squadKd"]
             m["lobbyCoverage"] = info["coverage"]
             m["lobbyKnown"] = info["known"]
@@ -2856,8 +2857,11 @@ class EndpointRegistry:
                                 if solid else None)
             squad = [m["squadKd"] for m in solid if m.get("squadKd") is not None]
             stats["lobbySquadKd"] = (sum(squad) / len(squad)) if squad else None
-            tops = [m["lobbyTop5"] for m in solid if m.get("lobbyTop5") is not None]
-            stats["lobbyTop5"] = (sum(tops) / len(tops)) if tops else None
+            # Die fuenf staerksten Spieler DIESER PHASE, nicht das Mittel
+            # der Match-Mittel: letzteres ergab 3,27 fuer eine Phase, in der
+            # die fuenf staerksten Gegner alle ueber 5,0 lagen.
+            stats["lobbyTop5"] = phase_top5(
+                [m.get("_lobbyTopPlayers") or [] for m in solid])
             stats["lobbyMatches"] = len(solid)
             # Kein Wert, aber die Lobbys sind bekannt: der Sammler ist noch
             # dran. Das Frontend zeigt dann den Ring statt gar nichts —
@@ -2865,6 +2869,11 @@ class EndpointRegistry:
             stats["lobbyPending"] = (not solid) and any(
                 (m.get("lobbyPlayers") or 0) > 0
                 for m in (ph.get("matches") or []))
+
+        # Hilfsschluessel wieder entfernen: er dient nur der Phasen-Rechnung
+        # und wuerde den Payload je Match um fuenf Account-IDs aufblaehen.
+        for m in matches:
+            m.pop("_lobbyTopPlayers", None)
 
     def _sessions_index(self):
         conn = self.get_conn()

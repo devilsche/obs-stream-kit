@@ -541,6 +541,34 @@ def _median(values):
     return vals[m // 2] if m % 2 else (vals[m // 2 - 1] + vals[m // 2]) / 2.0
 
 
+def phase_top5(per_match_top, top_n: int = 5):
+    """Mittel der `top_n` staerksten Spieler einer Phase.
+
+    `per_match_top` ist eine Liste je Match mit (account_id, kd)-Paaren —
+    es genuegen die jeweils staerksten eines Matches, denn wer die Phase
+    anfuehrt, fuehrt auch sein eigenes Match an.
+
+    Vorher wurde je Match ein Top-5-Mittel gebildet und diese Mittel
+    gemittelt. Das ergab 3,27 fuer eine Phase, in der die fuenf staerksten
+    Gegner alle ueber 5,0 lagen: jeder tauchte nur in einem Match auf und
+    wurde dort mit vier Schwaecheren verrechnet.
+
+    Ein Spieler zaehlt einmal, auch wenn er in mehreren Matches sass. Bei
+    mehreren Werten (gemischte Modi in einer Phase) gilt der hoechste.
+    """
+    best = {}
+    for rows in per_match_top or []:
+        for acc, kd in rows or []:
+            if acc is None or kd is None:
+                continue
+            if acc not in best or kd > best[acc]:
+                best[acc] = kd
+    if not best:
+        return None
+    top = sorted(best.values(), reverse=True)[:top_n]
+    return sum(top) / len(top)
+
+
 def lobby_average(account_ids, snapshots, exclude=None) -> dict:
     """Durchschnittliches Season-K/D einer Lobby.
 
@@ -716,9 +744,12 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         squad_avg = lobby_average(sorted(squad), kd_by_acc)
         # Die Spitze der Lobby als eigener Wert: der Schnitt sagt nicht, ob
         # oben fuenf Haie sassen. Der Report markiert damit harte Runden.
-        top_kds = sorted((kd_by_acc.get(a) for a in entry["accounts"]
-                          if a not in squad and not is_bot(a)
-                          and kd_by_acc.get(a) is not None), reverse=True)[:5]
+        top_pairs = sorted(
+            ((a, kd_by_acc.get(a)) for a in entry["accounts"]
+             if a not in squad and not is_bot(a)
+             and kd_by_acc.get(a) is not None),
+            key=lambda p: -p[1])[:5]
+        top_kds = [kd for _, kd in top_pairs]
         top5 = (sum(top_kds) / len(top_kds)) if top_kds else None
         extra_avg = (lobby_average(entry["accounts"], extra_by_acc,
                                     exclude=squad) if extra_key else None)
@@ -728,6 +759,10 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
             "map": entry["map"],
             "lobbyKd": avg["avgKd"],
             "lobbyTop5": top5,
+            # Die staerksten fuenf mit Account-ID, damit ein Phasen-Wert
+            # ueber Matches hinweg gebildet werden kann (phase_top5) statt
+            # Match-Mittel zu mitteln.
+            "lobbyTopPlayers": top_pairs,
             "known": avg["known"],
             "lobbyPlayers": avg["total"],
             "coverage": avg["coverage"],
