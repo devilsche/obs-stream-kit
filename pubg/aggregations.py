@@ -4770,8 +4770,15 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
                         "icon": "🎈",
                         "matchId": mid, "playedAt": played,
                     })
-    except Exception:
-        pass
+    except Exception as exc:
+        # NICHT stillschweigend schlucken: dieser try umfasst rund 240
+        # Zeilen mit sechs Achievement-Typen. Ein Fehler im ersten
+        # unterdrueckt alle folgenden — genau daran fehlte Sky Snipe,
+        # ohne dass irgendwo etwas davon zu sehen war.
+        import traceback
+        print(f"[session-achievements] Milestone-Block abgebrochen "
+              f"bei match={mid}: {exc!r}", flush=True)
+        traceback.print_exc()
 
     out.sort(key=lambda a: a.get("playedAt") or "")
     return out
