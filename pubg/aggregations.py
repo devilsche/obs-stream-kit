@@ -6321,6 +6321,26 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
     # TDM-Block (eigener K/D, getrennt von BR). Kills aus participants (TDM
     # trackt das eigene Team echt), Deaths aus der Telemetrie (Kill-Event mit
     # target_account=ich). Nur gesetzt, wenn TDM-Matches in der Range sind.
+    # Event-Block fuer die Session: alle Nicht-BR-Matches zusammen. Kills
+    # und Schaden aus der Telemetrie (effective_*), Tode aus den Kill-Events
+    # auf mich — Event-Modi haben kein Placement und kein time_survived.
+    ev_all = [x for x in enriched if not is_br_mode(x.get("game_mode"))]
+    if ev_all:
+        _ek = sum(x.get("effective_kills") or 0 for x in ev_all)
+        _ed = sum(x.get("effective_deaths") or 0 for x in ev_all)
+        _edmg = sum(x.get("effective_damage") or 0 for x in ev_all)
+        _ne = len(ev_all)
+        totals["event"] = {
+            "modes": sorted({(x.get("game_mode") or "") for x in ev_all}),
+            "matches": _ne,
+            "kills": _ek,
+            "deaths": _ed,
+            "damage": _edmg,
+            "avgKills": _ek / _ne,
+            "avgDamage": _edmg / _ne,
+            "kd": (_ek / _ed) if _ed else (float(_ek) or None),
+        }
+
     tdm_ms = [x for x in enriched if (x.get("game_mode") or "") == "tdm"]
     if tdm_ms:
         tdm_kills = sum(x["kills"] or 0 for x in tdm_ms)

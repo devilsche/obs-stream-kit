@@ -4181,7 +4181,6 @@
             ${cell(t.kills, "Kills")}
             ${cell(PubgUI.fmtKD(t.kd), "K/D",
                    "My kills per lost match (kills / matches - wins)")}
-            ${t.tdm ? cell(PubgUI.fmtKD(t.tdm.kd), "TDM K/D") : ""}
             ${cell(PubgUI.fmtKD(t.avgKills), "Kills/Match", "My kills per match")}
             ${cell(Math.round(t.avgDamage), "Damage/Match", "My damage per match")}
             ${cell(fmtDuration(Math.round(t.avgSurvivedSec)), "Survival")}
@@ -4211,6 +4210,18 @@
                    "Kills per match of the whole squad, myself included")}
           </div>
         </div>
+        ${t.event ? `<div class="totals-group">
+          <h4 class="totals-h">${(t.event.modes || []).join(" / ").toUpperCase() || "Event"}</h4>
+          <div class="totals">
+            ${cell(t.event.matches, "Matches")}
+            ${cell(t.event.kills, "Kills")}
+            ${cell(t.event.deaths, "Deaths")}
+            ${cell(t.event.kd == null ? "—" : t.event.kd.toFixed(2), "K/D",
+                   "Kills divided by deaths — event modes have no placement, so there is no win rate")}
+            ${cell(Math.round(t.event.avgKills), "Kills/Match")}
+            ${cell(Math.round(t.event.avgDamage), "Damage/Match")}
+          </div>
+        </div>` : ""}
         ${t.lobbyKd ? `<div class="totals-group">
           <h4 class="totals-h">Lobby</h4>
           <div class="totals">
