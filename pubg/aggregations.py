@@ -4722,54 +4722,54 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
                             "matchId": mid, "playedAt": played,
                         })
 
-        # --- Sky Snipe: Kill waehrend Gegner am EP-Ballon haengt ---
-        # Voellig separat von normalen Fahrzeug-Milestones.
-        # BP_EmergencyPickupVehicle_C = Ballon+Seilwinde via Heli.
-        ep_kills_raw = conn.execute("""
-            SELECT target_account, timestamp_ms FROM telemetry_events
-            WHERE match_id=? AND actor_account=?
-              AND event_type IN ('Kill','Knock')
-        """, (mid, my_account_id)).fetchall()
-        if ep_kills_raw:
-            ep_cands = list({r["target_account"] for r in ep_kills_raw
-                             if r["target_account"]})
-            _ph_ep = ",".join(["?"] * len(ep_cands))
-            ep_veh = conn.execute(f"""
-                SELECT actor_account, event_type, timestamp_ms
-                FROM telemetry_events
-                WHERE match_id=? AND event_type IN ('VehicleEnter','VehicleLeave')
-                  AND weapon='BP_EmergencyPickupVehicle_C'
-                  AND actor_account IN ({_ph_ep})
-                ORDER BY timestamp_ms ASC
-            """, [mid] + ep_cands).fetchall()
-            if ep_veh:
-                ep_ivs_b: dict = {}
-                for v in ep_veh:
-                    ep_ivs_b.setdefault(v["actor_account"], []).append(v)
-                ep_iv_map: dict = {}
-                for acc, evs in ep_ivs_b.items():
-                    _en = None; _ep = []
-                    for v in evs:
-                        if v["event_type"] == "VehicleEnter":
-                            _en = v["timestamp_ms"]
-                        elif v["event_type"] == "VehicleLeave" and _en:
-                            _ep.append((_en, v["timestamp_ms"])); _en = None
-                    if _en:
-                        _ep.append((_en, 10**15))
-                    ep_iv_map[acc] = _ep
-                ep_n = sum(
-                    1 for r in ep_kills_raw
-                    if r["target_account"] and r["timestamp_ms"] and
-                       _in_veh_interval(r["timestamp_ms"],
-                                        ep_iv_map.get(r["target_account"], []))
-                )
-                if ep_n > 0:
-                    out.append({
-                        "id": "em_pickup_kill",
-                        "label": f"Sky Snipe · {ep_n}×",
-                        "icon": "🎈",
-                        "matchId": mid, "playedAt": played,
-                    })
+            # --- Sky Snipe: Kill waehrend Gegner am EP-Ballon haengt ---
+            # Voellig separat von normalen Fahrzeug-Milestones.
+            # BP_EmergencyPickupVehicle_C = Ballon+Seilwinde via Heli.
+            ep_kills_raw = conn.execute("""
+                SELECT target_account, timestamp_ms FROM telemetry_events
+                WHERE match_id=? AND actor_account=?
+                  AND event_type IN ('Kill','Knock')
+            """, (mid, my_account_id)).fetchall()
+            if ep_kills_raw:
+                ep_cands = list({r["target_account"] for r in ep_kills_raw
+                                 if r["target_account"]})
+                _ph_ep = ",".join(["?"] * len(ep_cands))
+                ep_veh = conn.execute(f"""
+                    SELECT actor_account, event_type, timestamp_ms
+                    FROM telemetry_events
+                    WHERE match_id=? AND event_type IN ('VehicleEnter','VehicleLeave')
+                      AND weapon='BP_EmergencyPickupVehicle_C'
+                      AND actor_account IN ({_ph_ep})
+                    ORDER BY timestamp_ms ASC
+                """, [mid] + ep_cands).fetchall()
+                if ep_veh:
+                    ep_ivs_b: dict = {}
+                    for v in ep_veh:
+                        ep_ivs_b.setdefault(v["actor_account"], []).append(v)
+                    ep_iv_map: dict = {}
+                    for acc, evs in ep_ivs_b.items():
+                        _en = None; _ep = []
+                        for v in evs:
+                            if v["event_type"] == "VehicleEnter":
+                                _en = v["timestamp_ms"]
+                            elif v["event_type"] == "VehicleLeave" and _en:
+                                _ep.append((_en, v["timestamp_ms"])); _en = None
+                        if _en:
+                            _ep.append((_en, 10**15))
+                        ep_iv_map[acc] = _ep
+                    ep_n = sum(
+                        1 for r in ep_kills_raw
+                        if r["target_account"] and r["timestamp_ms"] and
+                           _in_veh_interval(r["timestamp_ms"],
+                                            ep_iv_map.get(r["target_account"], []))
+                    )
+                    if ep_n > 0:
+                        out.append({
+                            "id": "em_pickup_kill",
+                            "label": f"Sky Snipe · {ep_n}×",
+                            "icon": "🎈",
+                            "matchId": mid, "playedAt": played,
+                        })
     except Exception as exc:
         # NICHT stillschweigend schlucken: dieser try umfasst rund 240
         # Zeilen mit sechs Achievement-Typen. Ein Fehler im ersten
