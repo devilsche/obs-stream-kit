@@ -286,7 +286,8 @@ def _newest_season_id(raw_conn):
 
 def kd_resolved(mode: str, current_season=None, last_seasons=None,
                 lifetime=None, min_rounds: int = MIN_KD_ROUNDS,
-                current_season_id: str = None) -> dict:
+                current_season_id: str = None,
+                is_ranked: bool = False) -> dict:
     """K/D eines Spielers — feste Quellen-Reihenfolge (Stand 2026-09-07).
 
     `mode` ist die Spielart des Matches inklusive Perspektive, also
@@ -324,10 +325,29 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
     _, _, lifetime_rounds, _ = _sum_modes(lifetime, tuple(lifetime or ()))
 
     # (Quelle, Daten, Modus-Auswahl, Mindestrunden, Anteilsregel?, season_id)
-    steps = [
-        ("season",   current_season, mode_tuple, min_rounds, True,
-         current_season_id),
-    ]
+    steps = []
+
+    # Ranked-Match: zuerst die Ranked-Werte, und zwar komplett durch
+    # (Modus, dann Perspektive), bevor die Normal-Werte ueberhaupt dran
+    # sind. Ranked und Unranked sind nicht vergleichbar — andere
+    # Lobby-Staerke, anderer Einsatz. Fehlen Ranked-Daten, gilt der
+    # Normal-Wert, aber gekennzeichnet (rankedFallback).
+    if is_ranked and mode:
+        rk_mode = (ranked_mode(mode),)
+        rk_group = tuple(ranked_mode(m) for m in (group or ()))
+        steps.append(("season", current_season, rk_mode, min_rounds, True,
+                      current_season_id))
+        for _sid, _data in (last_seasons or []):
+            steps.append(("season", _data, rk_mode, min_rounds, True, _sid))
+        steps.append(("lifetime", lifetime, rk_mode, min_rounds, True, None))
+        if rk_group:
+            steps.append(("season", current_season, rk_group, min_rounds,
+                          True, current_season_id))
+            steps.append(("lifetime", lifetime, rk_group, min_rounds, True,
+                          None))
+
+    steps.append(("season", current_season, mode_tuple, min_rounds, True,
+                  current_season_id))
     # Stufe 2: rueckwaerts durch die aelteren Seasons, bis eine traegt.
     for _sid, _data in (last_seasons or []):
         steps.append(("season", _data, mode_tuple, min_rounds, True, _sid))
@@ -366,13 +386,20 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
         # wie viel der Modus-Erfahrung aus dieser Season stammt.
         lt_sel = tuple(lifetime or ()) if modes is ALL_MODES else sel
         _, _, lifetime_rounds, _ = _sum_modes(lifetime, lt_sel)
+        _basis = _narrow_basis(per_mode, sel, basis)
+        _is_rk = any(str(m).endswith(RANKED_SUFFIX) for m in sel)
         return {
             "kd":             kd,
-            "basis":          _narrow_basis(per_mode, sel, basis),
+            "basis":          _basis,
             "rounds":         rounds,
             "lifetimeRounds": lifetime_rounds,
             "source":         source,
             "seasonId":       sid if source == "season" else None,
+            # Steht der Wert wirklich auf Ranked-Daten?
+            "isRankedValue":  _is_rk,
+            # Ranked-Match, aber nur Normal-Werte vorhanden — der Wert
+            # gilt, muss aber als Ersatz erkennbar sein.
+            "rankedFallback": bool(is_ranked) and not _is_rk,
         }
 
     rounds = 0
@@ -386,7 +413,8 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
     _, _, lifetime_rounds, _ = _sum_modes(lifetime, tuple(lifetime or ()))
     return {"kd": None, "basis": None, "rounds": rounds,
             "lifetimeRounds": lifetime_rounds,
-            "source": None, "seasonId": None}
+            "source": None, "seasonId": None,
+            "isRankedValue": False, "rankedFallback": False}
 
 
 def kd_by_perspective(per_mode, min_rounds: int = MIN_KD_ROUNDS) -> dict:
@@ -398,6 +426,54 @@ def kd_by_perspective(per_mode, min_rounds: int = MIN_KD_ROUNDS) -> dict:
         out[key] = {"kd": _kd_if_enough(kills, losses, rounds, min_rounds,
                                         0, wins),
                     "rounds": rounds, "kills": kills, "losses": losses}
+    return out
+
+
+#: Suffix, unter dem Ranked-Werte in derselben Snapshot-Tabelle liegen.
+#: Bewusst ein Modus-Suffix statt einer neuen Spalte: kein Schema-Eingriff
+#: auf prod, und die vorhandene Rechen-Kette greift unveraendert.
+RANKED_SUFFIX = "-ranked"
+
+
+def ranked_mode(mode):
+    """Modus-Schluessel der Ranked-Variante ("squad-fpp" -> …-ranked)."""
+    if not mode:
+        return None
+    return mode if mode.endswith(RANKED_SUFFIX) else mode + RANKED_SUFFIX
+
+
+def parse_ranked(payload) -> dict:
+    """Ranked-Antwort eines Spielers → {mode-ranked: stats}.
+
+    Die API nennt den Nenner hier `deaths`; intern bleibt das Feld
+    `losses`, damit dieselbe Rechen-Kette greift. Gerechnet wird trotzdem
+    ueber rounds - wins (siehe _kd) — bei Ranked stimmen die beiden
+    Angaben ueberein, aber die Formel bleibt so an einer Stelle.
+    """
+    stats_by_mode = (((payload or {}).get("data") or {})
+                     .get("attributes") or {}).get("rankedGameModeStats") or {}
+    out = {}
+    for mode, stats in stats_by_mode.items():
+        if not stats:
+            continue
+        kd = _kd(stats.get("kills"), stats.get("deaths"),
+                 stats.get("roundsPlayed"), stats.get("wins"))
+        if kd is None:
+            continue
+        tier = stats.get("currentTier") or {}
+        out[ranked_mode(mode)] = {
+            "kills": stats.get("kills") or 0,
+            "losses": stats.get("deaths") or 0,
+            "rounds": stats.get("roundsPlayed") or 0,
+            "wins": stats.get("wins") or 0,
+            "damage": float(stats.get("damageDealt") or 0.0),
+            "kd": kd,
+            # Nur zur Anzeige — Tier und RP sagen mehr ueber die Lobby als
+            # eine K/D allein.
+            "tier": (f"{tier.get('tier')} {tier.get('subTier')}".strip()
+                     if tier.get("tier") else None),
+            "rankPoint": stats.get("currentRankPoint") or 0,
+        }
     return out
 
 
@@ -462,6 +538,48 @@ def fetch_lifetime(client, account_ids, store: dict,
                 # ein Serverfehler wuerde den Spieler sonst dauerhaft als
                 # unbekannt einbrennen — genau so entstanden 1.400 falsche
                 # Fehlanzeigen.
+                store[acc] = None
+                done += 1
+            continue
+        store[acc] = rows or None
+        done += 1
+    return done
+
+
+def fetch_ranked(client, account_ids, season_id: str, store: dict,
+                 max_calls: int = 2) -> int:
+    """Ranked-Werte holen — ein Call je Spieler.
+
+    Fuer Ranked gibt es keinen Batch-Endpoint, anders als bei den normalen
+    Season-Werten (dort zehn Spieler je Call). Deshalb das harte
+    `max_calls`-Budget und der Negativ-Eintrag: wen die API in Ranked
+    nicht kennt, fragt der Sammler nicht erneut.
+
+    `store` wird in-place gefuellt: {account_id: {mode-ranked: stats}}
+    oder None.
+    """
+    seen, todo = set(), []
+    for acc in account_ids or []:
+        if not acc or is_bot(acc) or acc in store or acc in seen:
+            continue
+        seen.add(acc)
+        todo.append(acc)
+    if not todo:
+        return 0
+
+    from pubg.api_client import RateLimitError
+
+    done = 0
+    for acc in todo[:max_calls]:
+        try:
+            rows = parse_ranked(client.get_ranked(acc, season_id))
+        except RateLimitError:
+            break            # Budget erschoepft: nichts merken, spaeter weiter
+        except Exception as e:
+            status = getattr(e, "status", None)
+            if isinstance(status, int) and 400 <= status < 500 and status != 429:
+                # Echtes "gibt es nicht" — vermerken, damit der Sammler
+                # denselben Account nicht in jeder Runde erneut anfragt.
                 store[acc] = None
                 done += 1
             continue
@@ -551,7 +669,9 @@ def lobby_breakdown(players, top_n: int = 5) -> dict:
                 "rounds": (info or {}).get("rounds"),
                 "lifetimeRounds": (info or {}).get("lifetimeRounds"),
                 "source": (info or {}).get("source"),
-                "seasonId": (info or {}).get("seasonId")}
+                "seasonId": (info or {}).get("seasonId"),
+                "isRankedValue": (info or {}).get("isRankedValue"),
+                "rankedFallback": (info or {}).get("rankedFallback")}
 
     top = [_entry(r) for r in reversed(vals[len(vals) - n:])]
     low = [_entry(r) for r in vals[:n]]
@@ -688,7 +808,7 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
     raw = getattr(conn, "raw", conn)
     rows = conn.execute(
         "SELECT mtm.match_id, mtm.account_id, m.played_at, m.map_name, "
-        "       m.game_mode "
+        "       m.game_mode, m.is_ranked "
         "FROM match_team_mapping mtm "
         "JOIN matches m ON m.match_id = mtm.match_id "
         "               AND m.tenant_id = mtm.tenant_id "
@@ -714,6 +834,7 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
                                             "playedAt": r["played_at"],
                                             "map": r["map_name"],
                                             "mode": r["game_mode"],
+                                            "isRanked": bool(r["is_ranked"]),
                                             "accounts": []})
         entry["accounts"].append(r["account_id"])
         all_accounts.add(r["account_id"])
@@ -771,7 +892,8 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
                     current_season=cur_season_by_mode.get(a),
                     last_seasons=older_seasons_by_acc.get(a),
                     lifetime=lifetime_by_mode.get(a),
-                    current_season_id=cur_season_id)["kd"]
+                    current_season_id=cur_season_id,
+                    is_ranked=bool(entry.get("isRanked")))["kd"]
         # Lobby heisst hier: alle ausser uns. Der eigene Squad steckte sonst
         # in beiden Seiten des Vergleichs.
         avg = lobby_average(entry["accounts"], kd_by_acc, exclude=squad)
@@ -905,7 +1027,7 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
     marks = ",".join("?" * len(match_ids))
     rows = conn.execute(
         "SELECT mtm.match_id, mtm.account_id, m.played_at, m.map_name, "
-        "       m.game_mode "
+        "       m.game_mode, m.is_ranked "
         "FROM match_team_mapping mtm "
         "JOIN matches m ON m.match_id = mtm.match_id "
         "               AND m.tenant_id = mtm.tenant_id "
@@ -927,7 +1049,9 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
         e = per_match.setdefault(r["match_id"],
                                  {"playedAt": r["played_at"],
                                   "map": r["map_name"],
-                                  "mode": r["game_mode"], "accounts": []})
+                                  "mode": r["game_mode"],
+                                  "isRanked": bool(r["is_ranked"]),
+                                  "accounts": []})
         e["accounts"].append(r["account_id"])
         accounts.add(r["account_id"])
 
@@ -990,7 +1114,8 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                             current_season=cur_season_by_mode.get(a),
                             last_seasons=older_by_acc.get(a),
                             lifetime=by_mode.get(a),
-                            current_season_id=_cur_sid)
+                            current_season_id=_cur_sid,
+                            is_ranked=bool(e.get("isRanked")))
                      for a in set(lobby) | set(squad)}
         players = [(names.get(a) or a[:12], (kd_by_acc.get(a) or {}).get("kd"),
                     kd_by_acc.get(a) or {}) for a in lobby]
@@ -1006,6 +1131,8 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                           "source": info.get("source"),
                           "lifetimeRounds": info.get("lifetimeRounds"),
                           "seasonId": info.get("seasonId"), "accountId": a,
+                          "isRankedValue": info.get("isRankedValue"),
+                          "rankedFallback": info.get("rankedFallback"),
                           # Der eigene Eintrag zaehlt nicht in squadAvg —
                           # das Frontend setzt ihn deshalb sichtbar ab.
                           "isMe": a == my_account_id,
@@ -1018,6 +1145,8 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                                             "source": info.get("source"),
                                             "lifetimeRounds": info.get("lifetimeRounds"),
                                             "seasonId": info.get("seasonId"),
+                                            "isRankedValue": info.get("isRankedValue"),
+                                            "rankedFallback": info.get("rankedFallback"),
                                             "isMe": a == my_account_id,
                                             **_record_fields(
                                                 record_by_acc.get(a)),
@@ -1052,6 +1181,8 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                      "source": info.get("source"),
                      "lifetimeRounds": info.get("lifetimeRounds"),
                      "seasonId": info.get("seasonId"),
+                     "isRankedValue": info.get("isRankedValue"),
+                     "rankedFallback": info.get("rankedFallback"),
                      "matchId": mid, "playedAt": e["playedAt"]}
             prev = strongest.get(a)
             if prev is None or kd > prev["kd"]:

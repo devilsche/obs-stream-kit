@@ -994,6 +994,59 @@ def upsert_lifetime_snapshots(conn, store: dict, fetched_at: str) -> int:
     return len(values)
 
 
+def upsert_ranked_snapshots(conn, season_id: str, store: dict,
+                            fetched_at: str) -> int:
+    """store = {account_id: {mode-ranked: stats} oder None}.
+
+    Ranked-Werte liegen in derselben Tabelle wie die normalen Season-Werte,
+    unterschieden nur durch das Modus-Suffix "-ranked" (siehe
+    lobby_kd.RANKED_SUFFIX) — kein Schema-Eingriff, dieselbe Rechen-Kette.
+
+    Ein Call liefert alle Ranked-Modi eines Spielers, die landen alle in
+    der Tabelle. Wer in Ranked keine Zahlen hat, bekommt einen
+    Negativ-Eintrag, sonst fragt der Sammler ihn endlos erneut — aber nur,
+    wenn nicht schon Ranked-Werte fuer ihn stehen.
+    """
+    from pubg.lobby_kd import ranked_mode
+    blanks = [a for a, modes in (store or {}).items() if not modes]
+    known = set()
+    if blanks:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT DISTINCT account_id FROM player_season_snapshot "
+                "WHERE season_id = %s AND kills IS NOT NULL "
+                "AND mode LIKE '%%-ranked' AND account_id = ANY(%s)",
+                (season_id, blanks))
+            known = {r["account_id"] for r in cur.fetchall()}
+    values = []
+    for acc, modes in (store or {}).items():
+        if not modes:
+            if acc not in known:
+                values.append((acc, season_id, ranked_mode("squad-fpp"),
+                               None, None, None, None, None, None,
+                               fetched_at))
+            continue
+        for mode, st in modes.items():
+            values.append((acc, season_id, mode, st.get("kills"),
+                           st.get("losses"), st.get("rounds"), st.get("wins"),
+                           st.get("damage"), st.get("kd"), fetched_at))
+    if not values:
+        return 0
+    with conn.cursor() as cur:
+        execute_values(
+            cur,
+            "INSERT INTO player_season_snapshot (account_id, season_id, mode,"
+            " kills, losses, rounds, wins, damage, kd, fetched_at) VALUES %s "
+            "ON CONFLICT (account_id, season_id, mode) DO UPDATE SET "
+            "kills=EXCLUDED.kills, losses=EXCLUDED.losses, "
+            "rounds=EXCLUDED.rounds, wins=EXCLUDED.wins, "
+            "damage=EXCLUDED.damage, kd=EXCLUDED.kd, "
+            "fetched_at=EXCLUDED.fetched_at",
+            values)
+    conn.commit()
+    return len(values)
+
+
 def get_player_names(conn, tenant_id: int, account_ids=None) -> dict:
     """{account_id: name} — jeder, der je in einem Match des Tenants auftauchte.
 
@@ -1237,6 +1290,51 @@ def lobby_accounts_missing_snapshot(conn, tenant_id: int, season_id: str,
             LIMIT %s
         """, (season_id, mode, tenant_id, stale_before, stale_before,
               match_mode, match_mode, tenant_id, limit))
+        return [r["account_id"] for r in cur.fetchall()]
+
+
+def ranked_accounts_missing_snapshot(conn, tenant_id: int, season_id: str,
+                                     limit: int = 20,
+                                     stale_before: str = None) -> list:
+    """Spieler aus RANKED-Matches ohne Ranked-Snapshot.
+
+    Zwei Unterschiede zu `lobby_accounts_missing_snapshot`:
+
+    Nur Ranked-Matches zaehlen — in einer unranked Lobby braucht niemand
+    Ranked-Werte, und der Abruf ist der teuerste im Haus (ein Call je
+    Spieler, kein Batch).
+
+    Geprueft wird gegen JEDEN Modus mit "-ranked"-Suffix, nicht gegen
+    einen bestimmten: ein Ranked-Call liefert alle Modi des Spielers mit,
+    also ist er versorgt, sobald irgendeine Ranked-Zeile steht.
+
+    Reihenfolge wie beim Lifetime-Sammler: eigene Mitspieler zuerst, dann
+    die juengsten Lobbys.
+    """
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT mtm.account_id
+            FROM match_team_mapping mtm
+            JOIN matches m ON m.match_id = mtm.match_id
+                          AND m.tenant_id = mtm.tenant_id
+            LEFT JOIN player_season_snapshot s
+                   ON s.account_id = mtm.account_id
+                  AND s.season_id = %s
+                  AND s.mode LIKE '%%-ranked'
+            WHERE mtm.tenant_id = %s
+              AND mtm.account_id NOT LIKE 'ai.%%'
+              AND COALESCE(m.is_ranked, 0) = 1
+              AND (s.account_id IS NULL
+                   OR (%s IS NOT NULL AND s.fetched_at < %s))
+            GROUP BY mtm.account_id
+            ORDER BY
+              (EXISTS (SELECT 1 FROM participants p
+                       WHERE p.tenant_id = %s
+                         AND p.account_id = mtm.account_id)) DESC,
+              MAX(m.played_at) DESC
+            LIMIT %s
+        """, (season_id, tenant_id, stale_before, stale_before,
+              tenant_id, limit))
         return [r["account_id"] for r in cur.fetchall()]
 
 

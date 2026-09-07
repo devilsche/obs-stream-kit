@@ -272,9 +272,48 @@ def run_single_tick_multi(conn, tenant_id: int, client,
             conn, tenant_id, client, max_calls=4)
         stats["lobbyKdFetched"] = collect_lobby_kd(conn, tenant_id, client,
                                                     max_batches=1)
+        # Ranked ist der teuerste Abruf (ein Call je Spieler) und laeuft
+        # deshalb mit kleinem Budget hinter den anderen.
+        stats["rankedFetched"] = collect_ranked(conn, tenant_id, client,
+                                                 max_calls=2)
     except Exception as e:
         stats["errors"].append(f"lobby-kd: {e}")
     return stats
+
+
+def collect_ranked(conn, tenant_id: int, client, max_calls: int = 2) -> int:
+    """Ranked-Werte nachladen — ein Call je Spieler, kein Batch.
+
+    Fuer Ranked gibt es keinen Zehnerpack-Endpoint, deshalb ist das der
+    teuerste Sammler. Die Reihenfolge kommt aus
+    `ranked_accounts_missing_snapshot`: eigene Mitspieler zuerst, danach
+    die Lobby-Gegner der jueng­sten Ranked-Matches. Ohne diese Werte
+    rechnet der Report Ranked-Lobbys mit Unranked-Zahlen (im Modal als
+    "unranked data" gekennzeichnet).
+    """
+    from pubg import db_pg, lobby_kd
+    if client is None:
+        return 0
+    raw_conn = conn.raw if isinstance(conn, SqliteCompatConn) else conn
+    season_id = _current_season_id(client, conn, tenant_id)
+    if not season_id:
+        return 0
+    import datetime as _dt
+    stale_before = (_dt.datetime.now(_dt.UTC)
+                    - _dt.timedelta(days=lobby_kd.SNAPSHOT_TTL_DAYS)
+                    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+    missing = db_pg.ranked_accounts_missing_snapshot(
+        raw_conn, tenant_id, season_id, limit=max_calls,
+        stale_before=stale_before)
+    if not missing:
+        return 0
+    store = {}
+    lobby_kd.fetch_ranked(client, missing, season_id, store,
+                          max_calls=max_calls)
+    if store:
+        db_pg.upsert_ranked_snapshots(raw_conn, season_id, store,
+                                      _iso_utc_now())
+    return sum(1 for v in store.values() if v)
 
 
 def collect_lobby_lifetime(conn, tenant_id: int, client, max_calls: int = 2,

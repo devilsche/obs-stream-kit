@@ -208,6 +208,22 @@ class PubgClient:
                f"/seasons/lifetime")
         return self._get_json(url, rate_limited=True, metric_endpoint="lifetime")
 
+    def get_ranked(self, account_id: str, season_id: str) -> dict:
+        """Ranked-Stats eines Spielers fuer eine Season.
+
+        Anders als die normalen Season-Werte gibt es hierfuer KEINEN
+        Batch-Endpoint — ein Call je Spieler. Bei 94 Lobby-Spielern also
+        94 Requests statt zehn; der Sammler priorisiert deshalb die
+        eigenen Mitspieler.
+
+        Die Antwort liegt unter attributes.rankedGameModeStats und nutzt
+        `deaths` statt `losses`.
+        """
+        url = (f"{PUBG_BASE}/shards/{self.platform}/players/{account_id}"
+               f"/seasons/{season_id}/ranked")
+        return self._get_json(url, rate_limited=True,
+                              metric_endpoint="ranked")
+
     def get_seasons(self) -> dict:
         url = f"{PUBG_BASE}/shards/{self.platform}/seasons"
         return self._get_json(url, rate_limited=True, metric_endpoint="seasons")
