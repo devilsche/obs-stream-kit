@@ -58,6 +58,47 @@ def test_sum_modes_summiert_auch_wins():
     assert (kills, rounds, wins) == (300, 160, 17)
 
 
+# ── Runden-Bezug: gleiche Ebene, nicht die Gesamtkarriere ──────────────────
+
+def test_lifetime_runden_beziehen_sich_auf_denselben_modus():
+    """"duo-fpp-season-42, 30/90 Runden" heisst: 30 Runden in der Season,
+    90 Runden lifetime IN DUO-FPP — nicht die Karriere ueber alle Modi."""
+    r = lk.kd_resolved(
+        "duo-fpp",
+        current_season={"duo-fpp": _s(40, 20, 30, 3)},
+        lifetime={"duo-fpp": _s(120, 60, 90, 9),
+                  "squad-fpp": _s(900, 400, 700, 60)},
+        current_season_id="pc-2018-42")
+    assert r["source"] == "season"
+    assert r["rounds"] == 30
+    assert r["lifetimeRounds"] == 90      # nur duo-fpp, nicht 790
+
+
+def test_pov_stufe_bezieht_sich_auf_die_pov_runden():
+    """Auf POV-Ebene gilt die Lifetime-Summe derselben Perspektive."""
+    r = lk.kd_resolved(
+        "duo-fpp",
+        current_season={"squad-fpp": _s(120, 60, 70, 5)},
+        lifetime={"squad-fpp": _s(300, 150, 200, 20),
+                  "solo-fpp":  _s(100, 50, 80, 5),
+                  "squad":     _s(999, 1, 500, 400)},
+        current_season_id="pc-2018-42")
+    assert r["source"] == "season"
+    assert r["basis"] == "squad-fpp"
+    assert r["lifetimeRounds"] == 280     # 200 + 80 FPP, ohne die 500 TPP
+
+
+def test_bei_lifetime_quelle_sind_beide_zahlen_gleich():
+    """Dann zeigt der Report nur eine Zahl."""
+    r = lk.kd_resolved(
+        "duo-fpp",
+        lifetime={"duo-fpp": _s(120, 60, 90, 9),
+                  "squad-fpp": _s(900, 400, 700, 60)})
+    assert r["source"] == "lifetime"
+    assert r["rounds"] == 90
+    assert r["lifetimeRounds"] == 90
+
+
 def test_kd_resolved_nutzt_die_neue_formel():
     r = lk.kd_resolved(
         "squad-fpp",

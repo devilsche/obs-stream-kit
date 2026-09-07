@@ -326,6 +326,12 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
         basis = mode if modes is mode_tuple and mode else (
             "all" if modes is None else
             ("fpp" if group is FPP_MODES else "tpp"))
+        # Bezugsgroesse ist die Lifetime-Summe DERSELBEN Ebene: bei einem
+        # Season-Wert im Modus duo-fpp also die Lifetime-Runden in duo-fpp,
+        # nicht die Karriere ueber alle Modi. "30/90 Runden" sagt damit,
+        # wie viel der Modus-Erfahrung aus dieser Season stammt.
+        lt_sel = tuple(lifetime or ()) if modes is None else sel
+        _, _, lifetime_rounds, _ = _sum_modes(lifetime, lt_sel)
         return {
             "kd":             kd,
             "basis":          _narrow_basis(per_mode, sel, basis),
@@ -343,6 +349,7 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
             _, _, rounds, _ = _sum_modes(per_mode, tuple(per_mode))
             if rounds:
                 break
+    _, _, lifetime_rounds, _ = _sum_modes(lifetime, tuple(lifetime or ()))
     return {"kd": None, "basis": None, "rounds": rounds,
             "lifetimeRounds": lifetime_rounds,
             "source": None, "seasonId": None}

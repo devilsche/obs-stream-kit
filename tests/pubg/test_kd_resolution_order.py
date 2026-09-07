@@ -191,9 +191,9 @@ def test_2_wenn_keine_season_reicht_kommt_lifetime():
 # ── Stichprobe im Verhaeltnis zur Karriere ──────────────────────────────────
 
 def test_lifetime_runden_werden_mitgeliefert():
-    """Damit im Report "230/7000 Runden" stehen kann: die Runden der
-    verwendeten Stufe neben der gesamten Karriere. 230 Season-Runden von
-    7000 Alltime sagen mehr als 230 allein."""
+    """Damit im Report "230/4000 Runden" stehen kann: die Runden der
+    verwendeten Stufe neben den Lifetime-Runden DERSELBEN Ebene — hier
+    also duo-fpp, nicht die Karriere ueber alle Modi."""
     r = lk.kd_resolved(
         "duo-fpp",
         current_season={"duo-fpp": _s(300, 200, 230)},
@@ -202,7 +202,7 @@ def test_lifetime_runden_werden_mitgeliefert():
         current_season_id="pc-2018-42")
     assert r["source"] == "season"
     assert r["rounds"] == 230
-    assert r["lifetimeRounds"] == 7000
+    assert r["lifetimeRounds"] == 4000
 
 
 def test_lifetime_runden_auch_bei_lifetime_quelle():
@@ -212,7 +212,7 @@ def test_lifetime_runden_auch_bei_lifetime_quelle():
                   "squad-fpp": _s(2000, 1500, 3000)})
     assert r["source"] == "lifetime"
     assert r["rounds"] == 4000
-    assert r["lifetimeRounds"] == 7000
+    assert r["lifetimeRounds"] == 4000
 
 
 def test_lifetime_runden_null_ohne_lifetime_daten():
