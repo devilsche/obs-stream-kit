@@ -931,19 +931,29 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
         vals = [m[key] for m in solid if m.get(key) is not None]
         return (sum(vals) / len(vals)) if vals else None
 
+    # Die Extreme der PHASE, nicht das Mittel der Match-Mittel: letzteres
+    # ergab 3,3 fuer Phasen, deren fuenf staerkste Gegner alle ueber 4,7
+    # lagen — jeder tauchte nur in einem Match auf und wurde dort mit vier
+    # Schwaecheren verrechnet. `strongest`/`weakest` sind bereits je Account
+    # dedupliziert, also genau die richtige Grundlage.
+    _strong = sorted(strongest.values(), key=lambda p: -p["kd"])[:top_n]
+    _weak = sorted(weakest.values(), key=lambda p: p["kd"])[:top_n]
+
     totals = {
         "matches": len(out),
         "matchesInAverage": len(solid),
         "avg": _avg("avg"),
         "median": _avg("median"),
-        "topAvg": _avg("topAvg"),
-        "lowAvg": _avg("lowAvg"),
+        "topAvg": ((sum(p["kd"] for p in _strong) / len(_strong))
+                   if _strong else None),
+        "lowAvg": ((sum(p["kd"] for p in _weak) / len(_weak))
+                   if _weak else None),
         "max": max((m["max"] for m in solid if m["max"] is not None),
                    default=None),
         # Namentlich die Extreme der ganzen Phase — der Schnitt sagt nicht,
         # ob da ein Hai drin sass.
-        "strongest": sorted(strongest.values(), key=lambda p: -p["kd"])[:top_n],
-        "weakest": sorted(weakest.values(), key=lambda p: p["kd"])[:top_n],
+        "strongest": _strong,
+        "weakest": _weak,
         # Ueber die Phase: jeder, der mitgespielt hat, mit seiner Karriere-K/D
         # und der Zahl der Runden — wer nur zwei Matches dabei war, faellt so
         # auf, statt den Eindruck zu praegen.
