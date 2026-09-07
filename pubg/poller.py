@@ -272,10 +272,14 @@ def run_single_tick_multi(conn, tenant_id: int, client,
             conn, tenant_id, client, max_calls=4)
         stats["lobbyKdFetched"] = collect_lobby_kd(conn, tenant_id, client,
                                                     max_batches=1)
-        # Ranked ist der teuerste Abruf (ein Call je Spieler) und laeuft
-        # deshalb mit kleinem Budget hinter den anderen.
+        # Ranked ist der teuerste Abruf — ein Call je Spieler, kein Batch.
+        # Das Budget ist absichtlich das letzte in der Kette: was Matches,
+        # Lifetime und Season uebrig lassen, geht hier rein. Laeuft
+        # parallel ein lobby-kd-backfill auf demselben Key, bleibt davon
+        # wenig; dann lohnt es, den Backfill fuer diesen Tenant zu
+        # pausieren (siehe reference-lobby-backfill-units).
         stats["rankedFetched"] = collect_ranked(conn, tenant_id, client,
-                                                 max_calls=2)
+                                                 max_calls=8)
     except Exception as e:
         stats["errors"].append(f"lobby-kd: {e}")
     return stats
