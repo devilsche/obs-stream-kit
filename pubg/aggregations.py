@@ -2925,19 +2925,33 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 if a and not a.startswith("ai."):
                     ev_accounts.add(a)
         if ev_accounts:
+            # Dieselbe Quellen-Reihenfolge wie im Report (kd_resolved):
+            # aktueller Modus/aktuelle Season zuerst, dann aeltere Seasons,
+            # dann Lifetime. Vorher lud die Timeline nur Lifetime und
+            # rechnete einquellig — die Namen zeigten damit andere Werte
+            # als das Lobby-Modal fuer dasselbe Match.
+            from pubg.lobby_kd import kd_resolved, _newest_season_id
+            from pubg.db_pg import get_season_split_by_mode
+            _raw = getattr(conn, "raw", conn)
             per_mode = get_lifetime_by_mode(conn, list(ev_accounts))
+            _cur_sid = _newest_season_id(_raw)
+            _cur_season, _older = get_season_split_by_mode(
+                _raw, list(ev_accounts), current_season_id=_cur_sid)
             game_mode = conn.execute(
                 "SELECT game_mode FROM matches WHERE match_id = ?",
                 (match_id,)).fetchone()
             mode_hint = (game_mode["game_mode"] if game_mode else None) or "squad-fpp"
             for acc in ev_accounts:
-                modes = per_mode.get(acc)
-                if not modes:
-                    player_kds[acc] = None
-                    continue
-                res = kd_for_mode(modes, mode_hint, MIN_KD_ROUNDS)
+                res = kd_resolved(
+                    mode_hint,
+                    current_season=_cur_season.get(acc),
+                    last_seasons=_older.get(acc),
+                    lifetime=per_mode.get(acc),
+                    current_season_id=_cur_sid)
                 player_kds[acc] = (
                     {"kd": round(res["kd"], 2), "rounds": res["rounds"],
+                     "lifetimeRounds": res["lifetimeRounds"],
+                     "source": res["source"], "seasonId": res["seasonId"],
                      "mode": res["basis"]}
                     if res["kd"] is not None else None
                 )

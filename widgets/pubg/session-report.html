@@ -2570,8 +2570,17 @@
           "duo-fpp":"Duo FPP","duo-tpp":"Duo TPP",
           "solo-fpp":"Solo FPP","solo-tpp":"Solo TPP",
           "fpp":"FPP gesamt","tpp":"TPP gesamt","all":"Allzeit"};
+        // Herkunft und Runden-Verhaeltnis wie im Lobby-Modal, damit
+        // derselbe Spieler ueberall dieselbe Auskunft bekommt.
+        const _src = snap && snap.source === "season"
+          ? `Season ${seasonShort(snap.seasonId) || ""}`.trim()
+          : (snap && snap.source === "lifetime" ? "Lifetime" : null);
+        const _rds = (snap && snap.lifetimeRounds
+                      && snap.lifetimeRounds !== snap.rounds)
+          ? `${snap.rounds}/${snap.lifetimeRounds} Runden`
+          : `${snap && snap.rounds} Runden`;
         const tip = (snap && snap.kd != null)
-          ? `K/D ${snap.kd.toFixed(2)} · ${snap.rounds} Runden (${MODE[snap.mode] || snap.mode || "Allzeit"})`
+          ? `K/D ${snap.kd.toFixed(2)} · ${_rds} (${MODE[snap.mode] || snap.mode || "Allzeit"}${_src ? ", " + _src : ""})`
           : snap === null
             ? "K/D N/A · keine API-Daten"
             : "K/D wird noch geladen";
