@@ -310,14 +310,24 @@ def test_kd_for_mode_nimmt_den_gespielten_modus():
     assert r["rounds"] == 220
 
 
-def test_kd_for_mode_kleiner_hauptmodus_faellt_auf_die_perspektive():
-    """Der Fall Emikonn: 49 Runden squad-fpp reichen allein nicht, zusammen
-    mit den zwei Solo-FPP-Runden aber schon — und das Ergebnis liegt bei 0,8
-    statt bei den 20,0, die vorher aus zwei Runden entstanden."""
+def test_kd_for_mode_49_runden_im_hauptmodus_reichen_jetzt():
+    """Der Fall Emikonn: 49 Runden squad-fpp. Mit MIN_KD_ROUNDS=50 fiel das
+    auf die FPP-Summe zurueck und ergab 0,82 — dort steckten aber die zwei
+    Solo-Runden mit 20 Kills drin, die den Wert nach oben zogen. Seit der
+    Senkung auf 20 gewinnt der Hauptmodus: 0,43 aus 49 sauberen
+    squad-fpp-Runden ist die ehrlichere Zahl."""
     per_mode = {"squad-fpp": _stats(21, 49, 49), "solo-fpp": _stats(20, 1, 2)}
     r = lk.kd_for_mode(per_mode, "squad-fpp")
+    assert r["basis"] == "squad-fpp"
+    assert r["kd"] == pytest.approx(21 / 49)
+
+
+def test_kd_for_mode_unter_20_runden_faellt_weiter_auf_die_perspektive():
+    """Die Schwelle greift weiterhin — nur eben bei 20 statt bei 50."""
+    per_mode = {"squad-fpp": _stats(8, 15, 15), "duo-fpp": _stats(40, 30, 35)}
+    r = lk.kd_for_mode(per_mode, "squad-fpp")
     assert r["basis"] == "fpp"
-    assert r["kd"] == pytest.approx(41 / 50)
+    assert r["kd"] == pytest.approx(48 / 45)
 
 
 def test_kd_for_mode_faellt_auf_die_perspektive_zurueck():

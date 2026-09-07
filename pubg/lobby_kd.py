@@ -82,11 +82,19 @@ def counts_for_average(match) -> bool:
             and match.get("lobbyKd") is not None)
 
 
-#: Mindest-Runden, ab denen ein K/D etwas aussagt. Darunter ist es Rauschen:
-#: auf prod stand ein Account mit 20 Kills aus ZWEI Solo-Runden als "20er K/D"
-#: an der Spitze einer Lobby — in squad-fpp hatte derselbe Spieler 0,43 aus 49
-#: Runden.
-MIN_KD_ROUNDS = 50
+#: Mindest-Runden, ab denen eine Stufe der Fallback-Kette gilt. Darunter ist
+#: der Wert Rauschen: auf prod stand ein Account mit 20 Kills aus ZWEI
+#: Solo-Runden als "20er K/D" an der Spitze einer Lobby — in squad-fpp hatte
+#: derselbe Spieler 0,43 aus 49 Runden.
+#:
+#: Stand 2026-09-07 von 50 auf 20 gesenkt. Wirkung auf die Abdeckung ist
+#: gering (gemessen 292 von 82.404 Accounts liegen zwischen 20 und 49
+#: Runden), aber der engere Modus gewinnt damit oefter gegen die
+#: Perspektiv-Summe — und 0,43 aus 49 squad-fpp-Runden ist die praezisere
+#: Auskunft als 0,82 aus 51 Runden, in denen zwei Solo-Ausreisser stecken.
+#: MIN_KD_SHARE haelt weiter dagegen, dass eine Handvoll Runden die
+#: Haupt-Bilanz schlaegt.
+MIN_KD_ROUNDS = 20
 #: Zusaetzlich muss eine Stufe einen nennenswerten Teil der Karriere abdecken.
 #: Ohne das schlaegt eine Handvoll Third-Person-Runden die Haupt-Bilanz: bei
 #: einem Solo-Match fiel die Rechnung auf 25 TPP-Runden zurueck (4,74),
