@@ -60,8 +60,6 @@
       /* Ohne Icon: reiner Text in beiden Tags, damit Ranked und Event
          auf derselben Hoehe sitzen. Das Medaillen-Icon zog den
          Ranked-Tag ueber die inline-flex-Baseline nach oben. */
-      vertical-align: -3px;
-      margin: 0 4px;
       padding: 1px 6px;
       border-radius: 3px;
       border: 1px solid currentColor;
@@ -91,12 +89,23 @@
       border-left: 3px solid var(--pubg-purple);
       border-radius: 6px;
     }
+    /* Flex mit align-items:center richtet alles in der Zeile aneinander
+       aus — Nummer, Tags, Datum. Vorher hing die Ausrichtung an einem
+       vertical-align-Pixelwert je Element, der bei jedem Inhalt anders
+       passte. */
     .phase h2 {
       margin: 0 0 4px;
       font-size: 1em;
       letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0 6px;
     }
-    .phase h2 .num { color: var(--pubg-gold); margin-right: 8px; }
+    .phase h2 .num { color: var(--pubg-gold); }
+    /* Datum als eigenes Element statt loser Textknoten: im Flex-Kontext
+       waere der fuehrende Leerraum sonst zusaetzlich zum gap sichtbar. */
+    .phase h2 .phase-when { font-weight: 400; }
     .phase .squad {
       color: var(--pubg-muted);
       font-size: 0.85em;
@@ -4301,9 +4310,9 @@
               ? `<span class="phase-tag phase-tag--ranked" title="Ranked matches are kept in their own phase — different lobby strength, not comparable to unranked">Ranked</span>`
               : ""}${s.isEventPhase
               ? `<span class="phase-tag">${(s.eventModes || []).join(" / ").toUpperCase()}</span>`
-              : ""} ${startStr} → ${endStr} · ${
+              : ""}<span class="phase-when">${startStr} → ${endStr} · ${
               s.isEventPhase ? s.eventMatches : s.matches} ${
-              (s.isEventPhase ? s.eventMatches : s.matches) === 1 ? 'match' : 'matches'}</h2>
+              (s.isEventPhase ? s.eventMatches : s.matches) === 1 ? 'match' : 'matches'}</span></h2>
             <div class="squad">Core: ${core}${fillersStr}</div>
             <div class="phase-stats">
               ${s.isEventPhase ? `
