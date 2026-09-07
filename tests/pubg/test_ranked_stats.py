@@ -155,3 +155,24 @@ def test_unranked_bleibt_bei_rounds_minus_wins():
                                        "rounds": 390, "wins": 32}},
         current_season_id="pc-2018-42")
     assert r["kd"] == pytest.approx(595 / 358)
+
+
+def test_anteilsregel_vergleicht_ranked_nur_mit_ranked():
+    """MIN_KD_SHARE verlangt, dass eine Stufe einen nennenswerten Teil der
+    Erfahrung abdeckt. Der Datensatz enthaelt Normal- UND Ranked-Modi
+    nebeneinander; gemessen gegen die Gesamtsumme fiel eine echte
+    Ranked-Stufe durch (32 Ranked-Runden neben 900 Normal-Runden = 3 %)
+    und der Report zeigte 'unranked data', obwohl Ranked-Werte vorlagen.
+    """
+    r = lk.kd_resolved(
+        "squad-fpp", is_ranked=True,
+        current_season={
+            "squad-fpp":        {"kills": 900, "losses": 500, "rounds": 900,
+                                  "wins": 50},
+            "squad-fpp-ranked": {"kills": 45, "losses": 33, "rounds": 32,
+                                  "wins": 2},
+        },
+        current_season_id="pc-2018-42")
+    assert r["isRankedValue"] is True
+    assert r["basis"] == "squad-fpp-ranked"
+    assert r["kd"] == pytest.approx(45 / 33)

@@ -381,12 +381,20 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
         if not sel:
             continue
         kills, losses, rounds, wins = _sum_modes(per_mode, sel)
-        total = 0
-        if use_share:
-            _, _, total, _ = _sum_modes(per_mode, tuple(per_mode))
         # Ranked-Modi rechnen ueber die echten Tode (siehe _kd) — dort kann
         # deaths die Rundenzahl uebersteigen.
         _is_rk = any(str(m).endswith(RANKED_SUFFIX) for m in sel)
+        total = 0
+        if use_share:
+            # Die Anteils-Regel misst gegen die Erfahrung DERSELBEN Art:
+            # der Datensatz enthaelt Normal- und Ranked-Modi nebeneinander,
+            # und 32 Ranked-Runden neben 900 Normal-Runden waeren 3 % —
+            # eine echte Ranked-Stufe fiel damit durch und der Report zeigte
+            # "unranked data", obwohl Ranked-Werte vorlagen.
+            _same_kind = tuple(
+                m for m in per_mode
+                if str(m).endswith(RANKED_SUFFIX) == _is_rk)
+            _, _, total, _ = _sum_modes(per_mode, _same_kind)
         kd = _kd_if_enough(kills, losses, rounds, eff_min, total, wins,
                            use_deaths=_is_rk)
         if kd is None:
