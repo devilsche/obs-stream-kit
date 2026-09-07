@@ -130,6 +130,35 @@ MIN_KD_ROUNDS_TOTAL = 10
 FPP_MODES = ("solo-fpp", "duo-fpp", "squad-fpp")
 TPP_MODES = ("solo", "duo", "squad")
 
+#: Event-Modi, deren Perspektive nicht am Namen ablesbar ist. TDM/Arena
+#: gibt es in PUBG nur in First Person; ohne diesen Eintrag landete es
+#: ueber `endswith("-fpp")` in der TPP-Gruppe und fiel von dort auf "all
+#: modes" durch — im Report stand hinter einem TDM-Wert "all modes
+#: lifetime". Was hier fehlt, bekommt bewusst KEINE Perspektive: eine
+#: falsche Gruppe ist schlechter als direkt die Gesamtstufe.
+EVENT_PERSPECTIVE = {"tdm": FPP_MODES}
+
+
+#: Sentinel fuer "alle Modi des Datensatzes". Vorher stand dafuer None —
+#: das kollidierte mit einer fehlenden Perspektiv-Gruppe, die ebenfalls
+#: None ist, und haette eine Event-Runde als Gesamtstufe gewertet.
+ALL_MODES = object()
+
+
+def perspective_modes(mode):
+    """Perspektiv-Gruppe eines Modus — FPP_MODES, TPP_MODES oder None."""
+    if not mode:
+        return None
+    if mode in FPP_MODES:
+        return FPP_MODES
+    if mode in TPP_MODES:
+        return TPP_MODES
+    if mode in EVENT_PERSPECTIVE:
+        return EVENT_PERSPECTIVE[mode]
+    if mode.endswith("-fpp"):
+        return FPP_MODES
+    return None
+
 
 #: Alle Modi, die es als Season-Snapshot geben kann. Der Season-Endpoint
 #: nimmt den Modus im Pfad (`/gameMode/{mode}/players`), holt also je Call
@@ -210,12 +239,14 @@ def kd_for_mode(per_mode, mode: str, min_rounds: int = MIN_KD_ROUNDS) -> dict:
     Returns {"kd", "basis", "rounds"} — `basis` sagt, worauf der Wert beruht
     (Modusname, "fpp", "tpp", "all" oder None).
     """
-    group = FPP_MODES if (mode or "").endswith("-fpp") else TPP_MODES
+    group = perspective_modes(mode)
     all_modes = tuple(per_mode or ())
     _, _, total, _ = _sum_modes(per_mode, all_modes)
-    steps = ((mode, (mode,)) if mode else (None, ()),
-             ("fpp" if group is FPP_MODES else "tpp", group),
-             ("all", all_modes))
+    steps = [(mode, (mode,)) if mode else (None, ())]
+    # Ohne bekannte Perspektive (z.B. heistroyale) direkt zur Gesamtstufe.
+    if group:
+        steps.append(("fpp" if group is FPP_MODES else "tpp", group))
+    steps.append(("all", all_modes))
     for basis, modes in steps:
         if not modes:
             continue
@@ -286,7 +317,7 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
     Returns {"kd", "basis", "rounds", "source", "seasonId"}. `source` ist
     "season", "lifetime" oder None; `seasonId` steht nur an Season-Werten.
     """
-    group = FPP_MODES if (mode or "").endswith("-fpp") else TPP_MODES
+    group = perspective_modes(mode)
     mode_tuple = (mode,) if mode else ()
     # Karriere-Gesamtrunden als Bezugsgroesse: 230 Season-Runden von 7000
     # Alltime sagen mehr aus als 230 allein.
@@ -300,20 +331,23 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
     # Stufe 2: rueckwaerts durch die aelteren Seasons, bis eine traegt.
     for _sid, _data in (last_seasons or []):
         steps.append(("season", _data, mode_tuple, min_rounds, True, _sid))
-    steps += [
-        ("lifetime", lifetime,       mode_tuple, min_rounds, True, None),
-        ("season",   current_season, group,      min_rounds, True,
-         current_season_id),
-        ("lifetime", lifetime,       group,      min_rounds, True, None),
-        ("lifetime", lifetime,       None,       MIN_KD_ROUNDS_TOTAL, False,
-         None),
-    ]
+    steps.append(("lifetime", lifetime, mode_tuple, min_rounds, True, None))
+    # Perspektiv-Stufen nur wenn der Modus eine hat. Ein Modus ohne
+    # bekannte Perspektive (heistroyale) springt direkt zur Gesamtstufe —
+    # `None` bedeutet dort "alle Modi", eine leere Gruppe waere also als
+    # Gesamtstufe missverstanden worden.
+    if group:
+        steps.append(("season", current_season, group, min_rounds, True,
+                      current_season_id))
+        steps.append(("lifetime", lifetime, group, min_rounds, True, None))
+    steps.append(("lifetime", lifetime, ALL_MODES, MIN_KD_ROUNDS_TOTAL,
+                  False, None))
 
     for source, per_mode, modes, eff_min, use_share, sid in steps:
         if not per_mode:
             continue
-        # None = alle Modi, die der Datensatz kennt.
-        sel = tuple(per_mode) if modes is None else modes
+        # ALL_MODES = alle Modi, die der Datensatz kennt.
+        sel = tuple(per_mode) if modes is ALL_MODES else modes
         if not sel:
             continue
         kills, losses, rounds, wins = _sum_modes(per_mode, sel)
@@ -324,13 +358,13 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
         if kd is None:
             continue
         basis = mode if modes is mode_tuple and mode else (
-            "all" if modes is None else
+            "all" if modes is ALL_MODES else
             ("fpp" if group is FPP_MODES else "tpp"))
         # Bezugsgroesse ist die Lifetime-Summe DERSELBEN Ebene: bei einem
         # Season-Wert im Modus duo-fpp also die Lifetime-Runden in duo-fpp,
         # nicht die Karriere ueber alle Modi. "30/90 Runden" sagt damit,
         # wie viel der Modus-Erfahrung aus dieser Season stammt.
-        lt_sel = tuple(lifetime or ()) if modes is None else sel
+        lt_sel = tuple(lifetime or ()) if modes is ALL_MODES else sel
         _, _, lifetime_rounds, _ = _sum_modes(lifetime, lt_sel)
         return {
             "kd":             kd,
