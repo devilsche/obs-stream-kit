@@ -52,7 +52,7 @@
         // als Grund sichtbar sein, sonst sieht es aus wie "nie zusammen gespielt".
         document.getElementById("body").innerHTML =
           `<tr><td class="pubg-error" colspan="${d.players.length + 1}">` +
-          `Unbekannte Spieler: ${unknown.map(esc).join(", ")}</td></tr>`;
+          `Unknown players: ${unknown.map(esc).join(", ")}</td></tr>`;
         return;
       }
       const body = d.matchTable.map(row => {

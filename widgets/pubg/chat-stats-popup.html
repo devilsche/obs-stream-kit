@@ -131,7 +131,7 @@
         .then(d => {
           if (d.error || !d.careerLifetime) {
             document.getElementById("name").textContent =
-              `${playerName} — nicht auf PUBG gefunden`;
+              `${playerName} — not found on PUBG`;
             return reveal();
           }
           renderCareerOnly(d.name || playerName, d.careerLifetime, ribbonLabel);
@@ -153,7 +153,7 @@
           if (d.error) {
             // Nicht in DB → Live-Lookup über PUBG-API mit Hinweis
             return liveLookupAndShow(PLAYER,
-              "Noch kein Match zusammen — Career");
+              "No shared match yet — career");
           }
 
           if (d.isSelf) {

@@ -241,7 +241,7 @@
     <div class="panel-section mode-calibrate">
       <h3>Calibration</h3>
       <div class="panel-buttons">
-        <button id="calBtn" class="secondary" title="Calibration-Mode: Kill/Death-Events verschieben zur Map-Cal-Berechnung"><span class="material-symbols-outlined icon-sm" aria-hidden="true">my_location</span> Cal</button>
+        <button id="calBtn" class="secondary" title="Calibration mode: drag kill/death events to compute the map calibration"><span class="material-symbols-outlined icon-sm" aria-hidden="true">my_location</span> Cal</button>
         <button id="modeBtn" class="secondary" title="Which calibration the inputs control: pin or grid">Cal-Mode: PIN</button>
         <button id="flipXBtn" class="secondary" title="X-Achse spiegeln (Ost/West)">↔ FlipX</button>
         <button id="flipYBtn" class="secondary" title="Y-Achse spiegeln (Nord/Sued)">↕ FlipY</button>
@@ -397,7 +397,7 @@ async function loadMap(mapId) {
   mapImage.onerror = () => {
     mapImage.onerror = () => {
       mapImage.onerror = () => {
-        statusEl.textContent = `⚠ Map ${mapId}.{_hd.webp|webp|png} nicht gefunden`;
+        statusEl.textContent = `⚠ Map ${mapId}.{_hd.webp|webp|png} not found`;
         render();
       };
       mapImage.src = `${_staticBase}pubg/maps/${mapId}.png`;
@@ -1810,7 +1810,7 @@ function renderCalList() {
         calSelectedEvent = sortedVis.find(ev => _calEventId(ev) === eid);
         if (calSelectedEvent) {
           statusEl.textContent =
-            `Event ${eid} ausgewaehlt — klicke auf der Karte die echte Stelle`;
+            `Event ${eid} selected — click the real spot on the map`;
           renderCalList();
           render();
         }
@@ -1983,7 +1983,7 @@ canvas.addEventListener("click", (e) => {
     if (best) {
       calSelectedEvent = best;
       statusEl.textContent =
-        `${best.type} ausgewaehlt (${best.actorName||"?"}→${best.targetName||"?"}) — klicke jetzt die echte Stelle`;
+        `${best.type} selected (${best.actorName||"?"}→${best.targetName||"?"}) — now click the real spot`;
       renderCalList();
       render();
     } else {

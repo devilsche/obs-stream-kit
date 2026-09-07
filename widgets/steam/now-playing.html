@@ -268,13 +268,13 @@
         tooltip: "How often to refresh the now-playing card." },
       { key: "heroDim", label: "Hero dim (%)", type: "range",
         min: 0, max: 95, default: 70,
-        tooltip: "Wie stark das Game-Hero-Bild als Card-Background " +
-                 "abgedunkelt wird. 0 = original, 95 = fast schwarz." },
+        tooltip: "How strongly the game hero image is darkened as the card " +
+                 "background. 0 = original, 95 = almost black." },
       { key: "avatarVariant", label: "Avatar variant", type: "select",
         default: "large",
         options: [["large","image_large"], ["small","image_small"]],
         tooltip: "Steam liefert animated_avatar als zwei URLs. Bei " +
-                 "den meisten Items ist image_large das animierte APNG, " +
+                 "most items image_large is the animated APNG, " +
                  "bei manchen image_small. Falls dein Avatar statisch " +
                  "wirkt, hier flippen." },
       { key: "livePlayers", label: "Live players", type: "select",
@@ -285,11 +285,11 @@
         min: 30000, max: 300000, default: 60000,
         tooltip: "How often to refresh the live player count." },
       { key: "mock", label: "Demo-Ansicht", type: "select", default: "0",
-        options: [["0", "Live"], ["1", "Demo (kein API-Call)"]],
-        tooltip: "Demo-Modus zeigt Beispieldaten ohne Steam-API — ideal fuer die Vorschau." },
+        options: [["0", "Live"], ["1", "Demo (no API call)"]],
+        tooltip: "Demo mode shows sample data without the Steam API — ideal for previewing." },
       { key: "fakeAppId", label: "Preview App-ID", type: "text", default: "",
         placeholder: "z.B. 578080 (PUBG)",
-        tooltip: "Steam App-ID fuer Preview — zeigt dieses Spiel statt des aktuell laufenden." },
+        tooltip: "Steam app ID for preview — shows this game instead of the one currently running." },
     ]);
 
     function fmtHours(min) {

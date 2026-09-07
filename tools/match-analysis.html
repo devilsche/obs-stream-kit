@@ -620,7 +620,7 @@
         });
         renderOptions("");
       } catch (e) {
-        sel.innerHTML = `<option value="">Liste nicht ladbar: ${esc(e.message || e)}</option>`;
+        sel.innerHTML = `<option value="">Could not load list: ${esc(e.message || e)}</option>`;
       }
     }
 

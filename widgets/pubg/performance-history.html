@@ -227,8 +227,8 @@
     function showError(err) {
       console.error(err);
       const msg = String((err && err.message) || err).includes("404")
-        ? (PLAYER ? `Spieler "${PLAYER}" nicht gefunden` : "Keine Daten gefunden")
-        : "Daten konnten nicht geladen werden";
+        ? (PLAYER ? `Player "${PLAYER}" not found` : "Keine Daten gefunden")
+        : "Could not load data";
       document.getElementById("chart").classList.add("is-hidden");
       document.getElementById("summary").innerHTML =
         `<div><span class="label">Error</span><span class="value is-note"></span></div>`;

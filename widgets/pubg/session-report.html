@@ -26,7 +26,12 @@
 
     .totals {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      /* auto-FILL, nicht auto-fit: auto-fit kollabiert leere Spuren und
+         streckt die vorhandenen auf die volle Breite. Bei 13 Kacheln (ME)
+         faellt das nicht auf, bei 3 (TEAM) standen sie mit riesigen
+         Luecken quer durch die Zeile. auto-fill haelt die Spurbreite, also
+         sind die Kacheln in allen Gruppen gleich gross und beginnen links. */
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
       gap: 14px;
       margin-bottom: 22px;
     }
@@ -71,7 +76,9 @@
     .phase .squad b { color: var(--pubg-text); }
     .phase-stats {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      /* auto-fill wie bei .totals — sonst zieht eine Gruppe mit wenigen
+         Kacheln diese ueber die ganze Zeile auseinander. */
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
       gap: 10px 14px;
       margin-bottom: 12px;
     }
@@ -212,7 +219,7 @@
     .matches-list .lobby-kd .dim { opacity: 0.4; }
     /* Noch kein Wert, aber die Lobby ist bekannt: der Sammler holt die
        Alltime-Zahlen der Gegner nach (rund 15 min je frischer Lobby). Ein
-       Strich wuerde "gibt es nicht" heissen, der Ring sagt "kommt noch". */
+       Strich wuerde "does not exist" heissen, der Ring sagt "coming soon". */
     .lobby-pending {
       display: inline-block;
       width: 11px; height: 11px;
@@ -2254,13 +2261,13 @@
             const vehLbl = life.death.victimVehicleLabel
                         || life.death.knockVictimVehicleLabel;
             const vehTag = vehLbl
-              ? ` <span class="md-veh">aus <b>${vehLbl}</b> <span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_bus</span></span>`
+              ? ` <span class="md-veh">from <b>${vehLbl}</b> <span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_bus</span></span>`
               : "";
             if (causeLbl) {
               const verb = life.death.causeLabel ? "gestorben" : "geknockt+gestorben";
               row += ` <span class="md-died">— ${verb} in <b>${deathP || "?"}</b> — <b>${causeLbl}</b>${vehTag}</span>`;
             } else {
-              row += ` <span class="md-died">— gestorben in <b>${deathP || "?"}</b> durch <b>${killer}</b> mit <b>${wn}</b>${dist}${vehTag}</span>`;
+              row += ` <span class="md-died">— died in <b>${deathP || "?"}</b>, killed by <b>${killer}</b> with <b>${wn}</b>${dist}${vehTag}</span>`;
             }
           } else if (m.lives.length > 1) {
             row += ` <span class="md-survived">— survived</span>`;
@@ -2367,7 +2374,7 @@
           <td title="How often this player was revived">${m.revivesReceived || 0}</td>
           <td title="How often this player revived squadmates">${m.revivesGiven || 0}</td>
           <td>${Math.round(m.damageDealt || 0)}</td>
-          <td title="Match-Zeit bis zum tatsaechlichen Tod (Bleed-Out/Finisher); fuer Survivor PUBG's time_survived">${survCell}</td>
+          <td title="Match time until the actual death (bleed-out/finisher); for survivors PUBG's time_survived">${survCell}</td>
         </tr>`;
       }).join("");
       return `<table class="md-squad-table">
@@ -2609,13 +2616,13 @@
           : (snap && snap.source === "lifetime" ? "Lifetime" : null);
         const _rds = (snap && snap.lifetimeRounds
                       && snap.lifetimeRounds !== snap.rounds)
-          ? `${snap.rounds}/${snap.lifetimeRounds} Runden`
-          : `${snap && snap.rounds} Runden`;
+          ? `${snap.rounds}/${snap.lifetimeRounds} rounds`
+          : `${snap && snap.rounds} rounds`;
         const tip = (snap && snap.kd != null)
           ? `K/D ${snap.kd.toFixed(2)} · ${_rds} (${MODE[snap.mode] || snap.mode || "Allzeit"}${_src ? ", " + _src : ""})`
           : snap === null
-            ? "K/D N/A · keine API-Daten"
-            : "K/D wird noch geladen";
+            ? "K/D N/A · no API data"
+            : "K/D is still loading";
         tooltipAttr = ` data-kd-tip="${PubgUI.esc(tip)}"`;
       }
 
@@ -3073,7 +3080,7 @@
       if (!anyPath) {
         const banner = document.createElement("div");
         banner.className = "md-warning";
-        banner.textContent = "Kein Bewegungspfad in der Telemetrie. "
+        banner.textContent = "No movement path in the telemetry. "
           + "Eventuell historischer Match — 'python -m pubg.cli hidrive-refill' "
           + "fuellt fehlende Position-Events nach.";
         host.querySelector(".md-mapcol").appendChild(banner);
@@ -3902,8 +3909,8 @@
           <span class="stat"><b>${fmtSurv(mySurv)}</b></span>
           <span class="stat lobby-kd" title="${
             (m.lobbyKd == null || (m.lobbyCoverage || 0) < MIN_LOBBY_COVERAGE)
-              ? `K/D der Gegner wird gesammelt — erst ${m.lobbyKnown || 0} von ${m.lobbyPlayers || 0} bekannt, ab ${MIN_LOBBY_COVERAGE} % wird gerechnet`
-              : `Ø K/D der Gegner im Modus dieses Matches, eigener Squad ausgenommen (${m.lobbyKnown}/${m.lobbyPlayers} bekannt)`
+              ? `Opponent K/D is still being collected — only ${m.lobbyKnown || 0} of ${m.lobbyPlayers || 0} known so far, calculated from ${MIN_LOBBY_COVERAGE} % on`
+              : `Average opponent K/D for the mode of this match, my own squad excluded (${m.lobbyKnown}/${m.lobbyPlayers} known)`
           }">${(m.lobbyKd == null || (m.lobbyCoverage || 0) < MIN_LOBBY_COVERAGE)
                 ? (m.lobbyPlayers
                     ? `<span class="lobby-pending" role="img" aria-label="Lobby strength is still being collected"></span>`
@@ -3916,8 +3923,8 @@
                    >${hotLobby(m.lobbyTop5, `<b>${m.lobbyKd.toFixed(2)}</b>`)}</button>`}</span>
           <span class="stat lobby-kd" title="${
             m.squadKd == null
-              ? "K/D des eigenen Squads noch nicht bekannt"
-              : "Ø K/D des eigenen Squads im Modus dieses Matches"
+              ? "Squad K/D not known yet"
+              : "Average K/D of my squad for the mode of this match, myself included"
           }">${
             (m.squadKd == null || (m.lobbyCoverage || 0) < MIN_LOBBY_COVERAGE)
               ? (m.lobbyPlayers
@@ -4042,7 +4049,8 @@
             ${cell(Math.round(t.avgDamage), "Damage/Match", "My damage per match")}
             ${cell(fmtDuration(Math.round(t.avgSurvivedSec)), "Survival")}
             ${cell("#" + t.avgPlace.toFixed(1), "Placement")}
-            ${cell(t.headshots, "Headshots")}
+            ${cell(t.headshots, "Headshot Kills",
+                   "Kills where the finishing shot was a headshot — not the number of head hits")}
             ${cell(t.dbnos, "Knocks")}
             ${cell(PubgUI.hotIf(t.longestKill, 300, Math.round(t.longestKill) + "m"),
                    "Longest Kill")}
@@ -4193,7 +4201,7 @@
               const kdCell = (m.deaths === 0 && (m.brMatches || 0) > 0)
                 ? '<span title="Keine Deaths" style="color:var(--pubg-gold)">Perfekt</span>'
                 : (isEvent && m.deaths === 0)
-                  ? '<span title="Event ohne DIED" style="color:var(--pubg-gold)">Perfekt</span>'
+                  ? '<span title="event without DIED" style="color:var(--pubg-gold)">Perfekt</span>'
                   : m.kd.toFixed(2);
               const placeCell = isEvent ? '—' : `#${m.avgPlace.toFixed(1)}`;
               // Event-Badge: lila Text auf transparentem Hintergrund. Bei

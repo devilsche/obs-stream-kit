@@ -267,7 +267,7 @@
     // chip: true = per Chip ein-/ausblendbar; chipDefault: true = standardm\u00e4ssig sichtbar
     const FIGHT_COLS = [
       { key: "name", label: "Spieler", fmt: (r) => esc(r.name), text: true,
-        help: "Squad-Mate. Eigener Name ist hervorgehoben." },
+        help: "Squad mate. Your own name is highlighted." },
       { key: "matches", label: "Matches", fmt: (r) => r.matches,
         help: "Matches im gew\u00e4hlten Zeitraum." },
       { key: "opened", label: "First contact", fmt: (r) => r.opened,
@@ -570,8 +570,8 @@
       try {
         DATA = await PubgUI.fetchJson(BASE + "api/pubg/squad-playstyle?" + params, 120000);
         const rows = DATA.rows || [];
-        st.textContent = `${DATA.matchesWithEvents} von ${DATA.matches} Matches `
-          + `mit Telemetrie \u00b7 ${rows.length} Spieler mit ${MIN}+ Matches`
+        st.textContent = `${DATA.matchesWithEvents} of ${DATA.matches} matches `
+          + `mit Telemetrie \u00b7 ${rows.length} players with ${MIN}+ matches`
           + (DATA.players && DATA.players.length ? ` \u00b7 Gruppe: ${DATA.players.join(", ")}` : "")
           + (rows.length ? "" : " \u2014 nichts gefunden, Zeitraum erweitern?");
         render();
