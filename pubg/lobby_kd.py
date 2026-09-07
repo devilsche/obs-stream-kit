@@ -105,6 +105,30 @@ FPP_MODES = ("solo-fpp", "duo-fpp", "squad-fpp")
 TPP_MODES = ("solo", "duo", "squad")
 
 
+#: Alle Modi, die es als Season-Snapshot geben kann. Der Season-Endpoint
+#: nimmt den Modus im Pfad (`/gameMode/{mode}/players`), holt also je Call
+#: nur einen — anders als der Lifetime-Abruf, der alle sechs mitbringt.
+SEASON_MODES = FPP_MODES + TPP_MODES
+
+
+def rotating_season_mode(tenant_id: int, minute: int = None) -> str:
+    """Welchen Modus dieser Tenant gerade sammelt.
+
+    Fest auf squad-fpp verdrahtet blieben die anderen fuenf Modi leer: ein
+    Gegner aus einem Duo-Match hatte dann squad-Werte oder gar keine. Die
+    Rotation kostet nichts extra — es ist derselbe eine Call je Tick, nur
+    abwechselnd fuer einen anderen Modus.
+
+    Der Tenant-Versatz sorgt dafuer, dass die Keys nicht alle gleichzeitig
+    denselben Modus holen: Snapshots sind global, doppelte Arbeit waere
+    verschenkte Kapazitaet.
+    """
+    if minute is None:
+        import datetime as _dt
+        minute = _dt.datetime.now(_dt.UTC).minute
+    return SEASON_MODES[(minute + (tenant_id or 0)) % len(SEASON_MODES)]
+
+
 def _sum_modes(per_mode, modes):
     kills = losses = rounds = 0
     for m in modes:

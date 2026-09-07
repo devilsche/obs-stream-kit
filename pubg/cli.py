@@ -1261,6 +1261,11 @@ def lobby_kd_backfill(root: str, args=None) -> int:
     tenant_id = int(_opt("--tenant", "1"))
     n_matches = int(_opt("--matches", "50"))
     pace = float(_opt("--pace", "25"))
+    # Gilt nur fuer --season-only: der Season-Endpoint liefert je Call nur
+    # den angefragten Modus. Fuer die anderen fuenf jeweils erneut aufrufen —
+    # im Dauerbetrieb rotiert der Poller ohnehin durch alle (lobby_kd.
+    # rotating_season_mode). Der Lifetime-Abruf braucht das nicht, der
+    # bringt alle Modi in einer Antwort.
     mode = _opt("--mode", "squad-fpp")
     # Match-Auswahl standardmaessig ueber ALLE Spielmodi: der Lifetime-Abruf
     # liefert ohnehin jeden Modus mit, und Duo-Lobbys sind genauso Lobbys.

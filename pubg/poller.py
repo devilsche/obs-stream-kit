@@ -308,16 +308,22 @@ def collect_lobby_lifetime(conn, tenant_id: int, client, max_calls: int = 2,
 
 
 def collect_lobby_kd(conn, tenant_id: int, client, max_batches: int = 1,
-                     mode: str = "squad-fpp") -> int:
+                     mode: str = None) -> int:
     """Season-Snapshots fuer Lobby-Spieler nachladen (Zehnerpacks).
 
     Ohne Snapshot gibt es keine Lobby-Staerke; mit ihm steht der Spieler
     danach fuer jedes Match zur Verfuegung, in dem er auftaucht. Deshalb
     sammelt der Poller kontinuierlich statt on demand.
+
+    Ohne `mode` rotiert der Modus je Tick (siehe rotating_season_mode): der
+    Season-Endpoint liefert nur einen Modus je Call, fest auf squad-fpp
+    blieben die anderen fuenf dauerhaft leer.
     """
     from pubg import db_pg, lobby_kd
     if client is None:
         return 0
+    if mode is None:
+        mode = lobby_kd.rotating_season_mode(tenant_id)
     raw_conn = conn.raw if isinstance(conn, SqliteCompatConn) else conn
     season_id = _current_season_id(client, conn, tenant_id)
     if not season_id:

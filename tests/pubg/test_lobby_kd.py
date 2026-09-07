@@ -498,3 +498,26 @@ def test_gesamtstufe_mit_nur_einem_modus_nennt_diesen_modus():
     per_mode = {"squad": _stats(15, 12, 12)}
     r = lk.kd_for_mode(per_mode, "duo-fpp")
     assert r["basis"] == "squad"
+
+
+# ── Modus-Rotation beim Season-Sammeln ──────────────────────────────────────
+
+def test_rotating_mode_deckt_alle_modi_ab():
+    """Der Season-Endpoint kann nur einen Modus je Call. Fest auf squad-fpp
+    verdrahtet fehlten allen anderen Modi die Snapshots — ein Duo-Gegner
+    hatte dann nur squad-Werte oder gar keine."""
+    seen = {lk.rotating_season_mode(1, minute=m) for m in range(60)}
+    assert seen == set(lk.SEASON_MODES)
+
+
+def test_rotating_mode_versetzt_die_tenants():
+    """Snapshots sind global und jeder Tenant hat einen eigenen Key. Wenn
+    alle gleichzeitig denselben Modus holen, ist die Kapazitaet verschenkt."""
+    at_same_minute = {lk.rotating_season_mode(t, minute=0)
+                      for t in range(1, 7)}
+    assert len(at_same_minute) == 6
+
+
+def test_rotating_mode_ist_deterministisch():
+    assert (lk.rotating_season_mode(2, minute=13)
+            == lk.rotating_season_mode(2, minute=13))
