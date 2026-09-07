@@ -375,9 +375,14 @@
     }
     .lobby-list { list-style: none; margin: 0; padding: 0; }
     .lobby-list li {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
+      /* Drei Spalten: Name links, Herkunft rechtsbuendig davor, K/D rechts.
+         Vorher klebten Modus, Season und Runden direkt am Namen und die
+         Zeilen liefen unterschiedlich weit — nichts war untereinander
+         lesbar. */
+      display: grid;
+      grid-template-columns: minmax(0, auto) 1fr max-content;
+      align-items: baseline;
+      gap: 4px 14px;
       padding: 4px 6px;
       border-radius: 3px;
       font-variant-numeric: tabular-nums;
@@ -389,6 +394,15 @@
     .lobby-list--top .kd { color: var(--theme-accent, #f2b705); }
     .lobby-list--low .kd { color: var(--theme-text-dim, #8a7d99); }
     .lobby-list .where { color: var(--theme-text-dim, #8a7d99); font-size: 0.82em; }
+    /* Herkunfts-Spalte: rechtsbuendig an die K/D geschoben, damit die
+       Zahlenspalte frei steht. */
+    .lobby-list .li-basis {
+      text-align: right;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .lobby-list .li-name { min-width: 0; overflow-wrap: anywhere; }
     /* Eigener Eintrag: sichtbar abgesetzt, weil er NICHT in den Schnitt
        eingeht. Nicht nur blasser — der Text sagt es auch, Farbe allein
        traegt die Bedeutung nicht. */
@@ -2277,7 +2291,7 @@
           let row = `${prefix}landete <b>${landP || "?"}</b>`;
           if (life.death) {
             const deathP = poi(life.death.x, life.death.y, mapName);
-            const killer = life.death.killerName || "Gegner";
+            const killer = life.death.killerName || "an opponent";
             const wn = life.death.weaponName || "?";
             const dist = life.death.distanceM
               ? ` auf <b>${life.death.distanceM.toFixed(0)}m</b>` : "";
@@ -3714,7 +3728,7 @@
     // Woher der Wert stammt: der gespielte Modus zuerst, sonst dieselbe
     // Perspektive, zuletzt alles. Das gehört sichtbar dazu — 3.26 aus
     // squad-fpp ist etwas anderes als 3.26 aus zwei Third-Person-Runden.
-    const BASIS_LABEL = { fpp: "alle FPP", tpp: "alle TPP", all: "alle Modi" };
+    const BASIS_LABEL = { fpp: "all FPP", tpp: "all TPP", all: "all modes" };
 
     // Season-IDs kommen als "division.bro.official.pc-2018-42". Das "2018"
     // ist ein festes Praefix aus PUBGs Namensschema, kein Jahr — es steht
@@ -3752,9 +3766,10 @@
         return `<p class="lobby-modal__empty">No values.</p>`;
       }
       return `<ul class="lobby-list lobby-list--${cls}">` + players.map(p => `
-        <li><span>${PubgUI.esc(p.name)}${withMatch && p.playedAt
+        <li><span class="li-name">${PubgUI.esc(p.name)}${withMatch && p.playedAt
               ? ` <span class="where">${PubgUI.esc(PubgUI.fmtTime(p.playedAt))}</span>` : ""
-            }${basisHtml(p)}</span>
+            }</span>
+            <span class="li-basis">${basisHtml(p)}</span>
             <span class="kd">${p.kd.toFixed(2)}</span></li>`).join("") + `</ul>`;
     }
 
@@ -3793,11 +3808,12 @@
             // aus (Liste mit drei Namen, Mittel aus zwei).
             const isMe = dimMe && !!m.isMe;
             return `
-            <li${isMe ? ' class="is-me"' : ''}><span>${PubgUI.esc(m.name)}${isMe
+            <li${isMe ? ' class="is-me"' : ''}><span class="li-name">${PubgUI.esc(m.name)}${isMe
                   ? ` <span class="where where--me">not counted</span>` : ""}${isPhase && m.matches
                   ? ` <span class="where">${m.matches} ${
                       m.matches === 1 ? "match" : "matches"}</span>` : ""
-                }${basisHtml(m)}</span>
+                }</span>
+                <span class="li-basis">${basisHtml(m)}</span>
                 <span class="kd">${m.kd == null ? "N/A" : m.kd.toFixed(2)}</span></li>`;
             }).join("")}</ul>
         </div>
@@ -4749,7 +4765,7 @@
           const mapName = ev.mapName || "";
           const poi = poiOfV(mapName, ev.x, ev.y);
           const veh = fmtVeh(ev.vehicle);
-          const opp = ev.opponent ? `<b>${ev.opponent}</b>` : "Gegner";
+          const opp = ev.opponent ? `<b>${ev.opponent}</b>` : "an opponent";
           const matchT = fmtMatchTime(ev.tsMs);
           const absT = fmtAbsClock(ev.playedAt, ev.tsMs);
           const where = poi ? `<span class="ve-poi">${poi}</span>` : "";
@@ -4877,7 +4893,7 @@
         PubgUI.fetchJson(reportUrl, 45000)
           .then((d) => { _reportShown = true; render(d); })
           .catch((e) => { host.innerHTML =
-            `<div class="empty report-error">Klappt weiterhin nicht: `
+            `<div class="empty report-error">Still failing: `
             + PubgUI.esc(String(e && e.message || e)) + `</div>`; });
       });
     }, 45000);
@@ -5036,7 +5052,7 @@
         const k = life.kills.find(kk => kk.tsMs === hit.tsMs);
         const wn = (k && k.weaponName) ? k.weaponName
                  : (k && k.weapon ? k.weapon.replace("Weap_", "").replace("_C", "") : "Kill");
-        const victim = k && k.victimName ? k.victimName : "Gegner";
+        const victim = k && k.victimName ? k.victimName : "an opponent";
         const dist = k && k.distanceM != null ? ` · ${Math.round(k.distanceM)}m` : "";
         txt = `${memberName} • ${wn}${dist} → ${victim}`;
       }
