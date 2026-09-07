@@ -278,8 +278,12 @@ def run_single_tick_multi(conn, tenant_id: int, client,
         # parallel ein lobby-kd-backfill auf demselben Key, bleibt davon
         # wenig; dann lohnt es, den Backfill fuer diesen Tenant zu
         # pausieren (siehe reference-lobby-backfill-units).
+        # Klein halten: der Tick laeuft jede Minute und will davor schon
+        # Match-Polling, Lifetime (4) und Season — bei 10 Requests/Minute
+        # ist mehr nicht drin. Fuer einen Nachlauf ueber tausende Spieler
+        # ist `pubg.cli ranked-backfill` da, der nimmt sich den Key allein.
         stats["rankedFetched"] = collect_ranked(conn, tenant_id, client,
-                                                 max_calls=8)
+                                                 max_calls=2)
     except Exception as e:
         stats["errors"].append(f"lobby-kd: {e}")
     return stats
