@@ -136,6 +136,55 @@ jede neue Lobby einmal, danach nie wieder für dasselbe Match.
 Die Modus-Rotation (`rotating_season_mode`, versetzt je Tenant) bleibt und
 greift hier unverändert.
 
+### 5. Sammel-Strategie: bedarfsgetrieben statt spekulativ
+
+Entscheidend ist, dass die beiden API-Endpoints unterschiedlich teuer sind:
+
+| | Endpoint | Modi je Call | Spieler je Call |
+|---|---|---|---|
+| Lifetime | `/players/{id}/seasons/lifetime` | **alle 6** | 1 |
+| Season | `/seasons/{id}/gameMode/{mode}/players` | **1** | 10 |
+
+Bei Lifetime kommen alle Modi in einer Antwort — dort gibt es nichts zu
+selektieren. **Die folgende Regel gilt nur für Season-Snapshots**, wo jeder
+Modus einen eigenen Call kostet.
+
+Geholt wird nur, was gebraucht wird:
+
+1. **Nur der begegnete Modus.** Wer einem Gegner ausschließlich in
+   `duo-fpp` begegnet, braucht von ihm auch nur `duo-fpp`. Kandidat ist
+   also das Paar (Account, `matches.game_mode`) — nicht der Account allein.
+2. **Neuer Modus erst bei neuer Begegnung.** Taucht derselbe Gegner
+   irgendwann in einem Squad-Match auf, wird *dann* `squad-fpp` geholt,
+   nicht vorher.
+3. **Erneut holen nur bei neuem Kontakt mit zu altem Stand.** Begegnet man
+   ihm zwei Monate später wieder im Duo, ist der alte Duo-Snapshot für
+   dieses Match zu weit weg → frischen holen (das ist Regel 4 oben, nur
+   auf den Modus bezogen).
+4. **Eskalation statt Vorratshaltung.** Reichen die Werte des begegneten
+   Modus für keine Aussage (unter `MIN_KD_ROUNDS`, siehe die Kette in
+   `kd_for_mode`), wird der nächste Modus derselben Perspektive
+   nachgeholt — und erst danach die übrigen. Die Lese-Fallback-Kette
+   steuert also, was das Sammeln als Nächstes tut.
+
+Der Unterschied ist erheblich (gemessen 2026-09-07):
+
+| Strategie | benötigte Season-Snapshots |
+|---|---|
+| Spekulativ, alle 6 Modi je Account | 708.798 |
+| Bedarfsgetrieben, nur begegnete Modi | **129.472** |
+
+Faktor 5,5. Auf 118.133 Accounts kommen 129.472 (Account, Modus)-Paare —
+im Schnitt **1,1 Modi je Gegner**. Die Annahme, dass man denselben Spieler
+meist im selben Modus trifft, hält also der Messung stand.
+
+**Folge für den aktuellen Stand:** Die am 2026-09-07 deployte
+`rotating_season_mode()` (Modus rotiert je Tick, versetzt je Tenant) ist
+genau die spekulative Variante. Sie war die richtige Sofortmaßnahme gegen
+das fest verdrahtete `squad-fpp`, wird durch diese Regel aber ersetzt. Bis
+dahin bleibt sie drin — sie füllt zwar Modi, die niemand braucht, aber sie
+kostet keinen zusätzlichen Call pro Tick.
+
 ## Wachstum
 
 Gemessen am 2026-09-07:
@@ -156,6 +205,10 @@ wenn sie zwischen zwei Kontakten tatsächlich gespielt haben (Regel 2).
 
 Grobe Schätzung für ein Jahr: eine Verdopplung bis Verdreifachung, also
 300–400 MB. Unkritisch.
+
+Die bedarfsgetriebene Sammlung (Abschnitt 5) bremst das zusätzlich: Es
+entstehen Zeilen nur für tatsächlich begegnete (Account, Modus)-Paare, also
+für rund 129.000 statt 709.000 Kombinationen.
 
 Falls es je klemmt, ist die naheliegende Grenze eine Aufbewahrungsregel:
 Snapshots, die zu keinem Match mehr als „passend" ausgewählt werden,
@@ -184,8 +237,10 @@ löschen.
 3. `lobby_kd`: `kd_alltime`/`kd_for_mode` bekommen den Match-Zeitpunkt
    durchgereicht; Rückgabe um `snapshotAt`/`snapshotAge`/
    `snapshotDirection` erweitert
-4. `poller`/`cli`: Kandidaten-Query auf Match-Kontakt umstellen,
-   `--max-age-days` entfernen
+4. `poller`/`cli`: Kandidaten-Query auf das Paar (Account, Match-Modus)
+   umstellen, `--max-age-days` entfernen, `rotating_season_mode` durch die
+   bedarfsgetriebene Auswahl ersetzen (Abschnitt 5); Eskalation auf weitere
+   Modi nur, wenn die Lese-Kette keinen Wert liefert
 5. Frontend: `basisHtml` um den Stand-Hinweis erweitern
 6. Tests: Auswahl vor/nach Match, Fallback-Kennzeichnung, keine
    Doppel-Zeile bei unveränderten Werten
