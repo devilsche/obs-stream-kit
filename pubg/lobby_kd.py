@@ -210,48 +210,6 @@ def kd_for_mode(per_mode, mode: str, min_rounds: int = MIN_KD_ROUNDS) -> dict:
     return {"kd": None, "basis": None, "rounds": rounds}
 
 
-
-def kd_with_fallback(season_per_mode, lifetime_per_mode, mode: str,
-                     min_rounds: int = MIN_KD_ROUNDS) -> dict:
-    """K/D mit verschraenkter Season-/Lifetime-Fallback-Kette.
-
-    Reihenfolge:
-      1. Season   gleicher Modus
-      2. Lifetime  gleicher Modus
-      3. Season   gleiche Perspektive (FPP oder TPP)
-      4. Lifetime  gleiche Perspektive
-      5. Season   alle Modes (ab MIN_KD_ROUNDS_TOTAL Runden)
-      6. Lifetime  alle Modes (ab MIN_KD_ROUNDS_TOTAL Runden)
-    """
-    group = FPP_MODES if (mode or "").endswith("-fpp") else TPP_MODES
-
-    def _try(per_mode, modes, eff_min):
-        if not per_mode or not modes:
-            return None
-        _, _, total = _sum_modes(per_mode, tuple(per_mode))
-        kills, losses, rounds = _sum_modes(per_mode, modes)
-        kd = _kd_if_enough(kills, losses, rounds, eff_min,
-                            0 if eff_min == MIN_KD_ROUNDS_TOTAL else total)
-        return {"kd": kd, "basis": None, "rounds": rounds} if kd is not None else None
-
-    s_all = tuple(season_per_mode or ())
-    l_all = tuple(lifetime_per_mode or ())
-    steps = [
-        (season_per_mode,   (mode,) if mode else (), min_rounds),
-        (lifetime_per_mode, (mode,) if mode else (), min_rounds),
-        (season_per_mode,   group,                   min_rounds),
-        (lifetime_per_mode, group,                   min_rounds),
-        (season_per_mode,   s_all,   MIN_KD_ROUNDS_TOTAL),
-        (lifetime_per_mode, l_all,   MIN_KD_ROUNDS_TOTAL),
-    ]
-    for per_mode, modes, eff_min in steps:
-        res = _try(per_mode, modes, eff_min)
-        if res:
-            return res
-    _, _, rounds = _sum_modes(lifetime_per_mode, l_all)
-    return {"kd": None, "basis": None, "rounds": rounds}
-
-
 def _newest_season_id(raw_conn):
     """Hoechste bekannte season_id — gilt als die laufende Season.
 
@@ -363,43 +321,6 @@ def kd_resolved(mode: str, current_season=None, last_seasons=None,
                 break
     return {"kd": None, "basis": None, "rounds": rounds,
             "lifetimeRounds": lifetime_rounds,
-            "source": None, "seasonId": None}
-
-
-def kd_alltime(lifetime_per_mode, season_per_mode, mode: str,
-               min_rounds: int = MIN_KD_ROUNDS, season_id: str = None) -> dict:
-    """Alltime-K/D mit Season als Ersatzquelle.
-
-    Nicht jeder Lobby-Spieler hat eine `lifetime`-Zeile im Snapshot — die
-    kommt aus einem eigenen API-Call, der oft noch aussteht. Season-Werte
-    liegen dagegen fast immer vor. Ohne diesen Rueckfall galten solche
-    Spieler als unbekannt: in einem gemessenen Duo-Match hatten 52 von 96
-    eine Lifetime-Zeile, die uebrigen 44 aber zusammen 1.969 Season-Runden.
-
-    Lifetime hat Vorrang — der Wert heisst Alltime. Erst wenn dort nichts
-    zu holen ist, zaehlt die Season. Innerhalb jeder Quelle gilt dieselbe
-    Kette wie sonst: gespielter Modus > gleiche Perspektive > alles.
-
-    Returns {"kd", "basis", "rounds", "source", "seasonId"}; `source` ist
-    "lifetime", "season" oder None und gehoert sichtbar an den Wert — ein
-    Season-K/D ist etwas anderes als ein Karriere-K/D. `seasonId` steht nur
-    am Season-Wert, damit der Zeitraum mit angezeigt werden kann.
-    """
-    for source, per_mode in (("lifetime", lifetime_per_mode),
-                             ("season",   season_per_mode)):
-        if not per_mode:
-            continue
-        res = kd_for_mode(per_mode, mode, min_rounds)
-        if res["kd"] is not None:
-            return {**res, "source": source,
-                    "seasonId": season_id if source == "season" else None}
-    rounds = 0
-    for per_mode in (lifetime_per_mode, season_per_mode):
-        if per_mode:
-            _, _, rounds = _sum_modes(per_mode, tuple(per_mode))
-            if rounds:
-                break
-    return {"kd": None, "basis": None, "rounds": rounds,
             "source": None, "seasonId": None}
 
 

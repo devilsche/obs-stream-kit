@@ -3693,7 +3693,7 @@
         </div>
         <div class="lobby-side">
           <h3>${isPhase ? "Wer mitgespielt hat" : "Das Squad"}
-            <em>Alltime-K/D über alle Modi</em></h3>
+            <em>K/D im Modus dieses Matches</em></h3>
           <ul class="lobby-list lobby-list--top">${mates.map(m => `
             <li><span>${PubgUI.esc(m.name)}${isPhase && m.matches
                   ? ` <span class="where">${m.matches} ${
@@ -3702,9 +3702,11 @@
                 <span class="kd">${m.kd == null ? "N/A" : m.kd.toFixed(2)}</span></li>`
             ).join("")}</ul>
         </div>
-        <p class="lobby-modal__note">Gemessen am Modus dieses Matches, sonst
-          steht die Ersatz-Grundlage dahinter. Das ist der Karriere-Schnitt der Leute,
-          nicht ihre Leistung in ${isPhase ? "dieser Phase" : "diesem Match"} —
+        <p class="lobby-modal__note">Gemessen am Modus dieses Matches, zuerst
+          aus der laufenden Season — die sagt mehr über die aktuelle Form.
+          Reicht sie nicht, greift eine ältere Season und erst danach der
+          Karriere-Wert; welche Grundlage es war, steht hinter jedem Namen.
+          Es ist in keinem Fall die Leistung in ${isPhase ? "dieser Phase" : "diesem Match"} —
           dafür steht „Squad Phase" im Kopf der Phase.${isPhase
             ? " Wer nur ein, zwei Runden dabei war, prägt den Schnitt kaum,"
               + " taucht hier aber trotzdem auf."
@@ -3715,7 +3717,7 @@
       const src = isPhase ? d.totals : (d.matches && d.matches[0]);
       if (!src || src.avg == null) {
         return `<p class="lobby-modal__empty">Für diese Lobby liegen noch
-          keine Alltime-Werte vor — der Sammler ist noch dran.</p>`;
+          noch keine Werte vor — der Sammler ist noch dran.</p>`;
       }
       const n = d.topN || 5;
       const cov = isPhase
@@ -3852,8 +3854,8 @@
           <span class="stat"><b>${fmtSurv(mySurv)}</b></span>
           <span class="stat lobby-kd" title="${
             (m.lobbyKd == null || (m.lobbyCoverage || 0) < MIN_LOBBY_COVERAGE)
-              ? `Alltime-K/D der Gegner wird gesammelt — erst ${m.lobbyKnown || 0} von ${m.lobbyPlayers || 0} bekannt, ab ${MIN_LOBBY_COVERAGE} % wird gerechnet`
-              : `Ø Alltime-K/D der Gegner, eigener Squad ausgenommen (${m.lobbyKnown}/${m.lobbyPlayers} bekannt)`
+              ? `K/D der Gegner wird gesammelt — erst ${m.lobbyKnown || 0} von ${m.lobbyPlayers || 0} bekannt, ab ${MIN_LOBBY_COVERAGE} % wird gerechnet`
+              : `Ø K/D der Gegner im Modus dieses Matches, eigener Squad ausgenommen (${m.lobbyKnown}/${m.lobbyPlayers} bekannt)`
           }">${(m.lobbyKd == null || (m.lobbyCoverage || 0) < MIN_LOBBY_COVERAGE)
                 ? (m.lobbyPlayers
                     ? `<span class="lobby-pending" role="img" aria-label="Lobby-Stärke wird gesammelt"></span>`
@@ -3866,8 +3868,8 @@
                    >${hotLobby(m.lobbyTop5, `<b>${m.lobbyKd.toFixed(2)}</b>`)}</button>`}</span>
           <span class="stat lobby-kd" title="${
             m.squadKd == null
-              ? "Alltime-K/D des eigenen Squads noch nicht bekannt"
-              : "Ø Alltime-K/D des eigenen Squads in diesem Match"
+              ? "K/D des eigenen Squads noch nicht bekannt"
+              : "Ø K/D des eigenen Squads im Modus dieses Matches"
           }">${
             (m.squadKd == null || (m.lobbyCoverage || 0) < MIN_LOBBY_COVERAGE)
               ? (m.lobbyPlayers
@@ -3976,8 +3978,8 @@
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.kd)}</span><span class="pubg-stat-label">K/D</span></div>
           ${t.tdm ? `<div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.tdm.kd)}</span><span class="pubg-stat-label">TDM K/D</span></div>` : ""}
           <div class="cell" title="K/D des eigenen Squads in DIESER Session — Kills durch Tode"><span class="pubg-stat-value">${PubgUI.fmtKD(t.squadKd || 0)}</span><span class="pubg-stat-label">Squad Session</span></div>
-          ${t.lobbySquadKd ? `<div class="cell" title="Ø Alltime-K/D der eigenen Leute — Karriere-Schnitt, nicht die Leistung in dieser Session"><span class="pubg-stat-value">${t.lobbySquadKd.toFixed(2)}</span><span class="pubg-stat-label">Squad K/D</span></div>` : ""}
-          ${t.lobbyKd ? `<div class="cell" title="Ø Alltime-K/D der Gegner, eigener Squad ausgenommen"><span class="pubg-stat-value">${t.lobbyKd.toFixed(2)}</span><span class="pubg-stat-label">Lobby K/D</span></div>` : ""}
+          ${t.lobbySquadKd ? `<div class="cell" title="Ø K/D der eigenen Leute im gespielten Modus — bevorzugt aus der laufenden Season, nicht die Leistung in dieser Session"><span class="pubg-stat-value">${t.lobbySquadKd.toFixed(2)}</span><span class="pubg-stat-label">Squad K/D</span></div>` : ""}
+          ${t.lobbyKd ? `<div class="cell" title="Ø K/D der Gegner im gespielten Modus, eigener Squad ausgenommen"><span class="pubg-stat-value">${t.lobbyKd.toFixed(2)}</span><span class="pubg-stat-label">Lobby K/D</span></div>` : ""}
           <div class="cell"><span class="pubg-stat-value">${PubgUI.fmtKD(t.avgKills)}</span><span class="pubg-stat-label">Ø My Kills/Match</span></div>
           <div class="cell"><span class="pubg-stat-value">${(t.squadKillsPerMatch || 0).toFixed(1)}</span><span class="pubg-stat-label">Ø Squad Kills/Match</span></div>
           <div class="cell"><span class="pubg-stat-value">${Math.round(t.avgDamage)}</span><span class="pubg-stat-label">Ø Damage/Match</span></div>
@@ -4038,7 +4040,7 @@
               <span><b>${PubgUI.fmtKD(s.kd)}</b> K/D</span>
               ${(s.squadMatchesWithMapping||0) > 0 ? `<span title="K/D des eigenen Squads in DIESER Phase — Kills durch Tode"><b>${PubgUI.fmtKD(s.squadKd||0)}</b> Squad Phase</span>` : ""}
               ${s.lobbyKd != null
-                  ? `<span title="Ø Alltime-K/D der Gegner über ${s.lobbyMatches} Matches dieser Phase${
+                  ? `<span title="Ø K/D der Gegner über ${s.lobbyMatches} Matches dieser Phase${
                        s.lobbyTop5 != null ? ` · stärkste Fünf im Schnitt ${s.lobbyTop5.toFixed(2)}` : ""}"><button
                        type="button" class="lobby-open" data-phase="1"
                        data-matches="${ph.matches.map(x => x.matchId).filter(Boolean).slice(0, 60).join(",")}"
@@ -4047,10 +4049,10 @@
                        aria-label="Lobby der Phase aufschlüsseln: Median, härteste Gegner"
                      >${hotLobby(s.lobbyTop5, `<b>${s.lobbyKd.toFixed(2)}</b>`)}</button> Lobby K/D</span>`
                   : (s.lobbyPending
-                      ? `<span title="Alltime-K/D der Gegner wird noch gesammelt"><span class="lobby-pending" role="img" aria-label="Lobby-K/D wird gesammelt"></span> Lobby K/D</span>`
+                      ? `<span title="K/D der Gegner wird noch gesammelt"><span class="lobby-pending" role="img" aria-label="Lobby-K/D wird gesammelt"></span> Lobby K/D</span>`
                       : "")}
               ${s.lobbySquadKd != null
-                  ? `<span title="Ø Alltime-K/D der eigenen Leute — nicht ihre Leistung in dieser Phase, sondern ihr Karriere-Schnitt"><button
+                  ? `<span title="Ø K/D der eigenen Leute im gespielten Modus — nicht ihre Leistung in dieser Phase"><button
                        type="button" class="lobby-open" data-phase="1" data-view="squad"
                        data-matches="${ph.matches.map(x => x.matchId).filter(Boolean).slice(0, 60).join(",")}"
                        data-title="Squad · Phase ${i+1}"
@@ -4058,7 +4060,7 @@
                        aria-label="Squad der Phase aufschlüsseln: Karriere-K/D der Mitspieler"
                      ><b>${s.lobbySquadKd.toFixed(2)}</b></button> Squad K/D</span>`
                   : (s.lobbyPending
-                      ? `<span title="Alltime-K/D des eigenen Squads wird noch gesammelt"><span class="lobby-pending" role="img" aria-label="Squad-K/D wird gesammelt"></span> Squad K/D</span>`
+                      ? `<span title="K/D des eigenen Squads wird noch gesammelt"><span class="lobby-pending" role="img" aria-label="Squad-K/D wird gesammelt"></span> Squad K/D</span>`
                       : "")}
               <span><b>${Math.round(s.avgDamage)}</b> Ø DMG</span>
               <span><b>${fmtDuration(Math.round(s.avgSurvivedSec))}</b> Ø Surv</span>
@@ -4072,8 +4074,8 @@
                 <span style="text-align:right">Kills</span>
                 <span style="text-align:right">Damage</span>
                 <span style="text-align:right">Survived</span>
-                <span class="col-right" title="Ø Alltime-K/D der Gegner in dieser Lobby (eigener Squad ausgenommen)">Lobby K/D</span>
-                <span class="col-right" title="Ø Alltime-K/D des eigenen Squads — Karriere-Schnitt, nicht die Leistung in diesem Match">Squad K/D</span>
+                <span class="col-right" title="Ø K/D der Gegner in dieser Lobby, im gespielten Modus (eigener Squad ausgenommen)">Lobby K/D</span>
+                <span class="col-right" title="Ø K/D des eigenen Squads im gespielten Modus — nicht die Leistung in diesem Match">Squad K/D</span>
                 <span class="col-right" title="Bester Spieler der Lobby">TopScorer</span>
               </div>
               ${ph.matches.map((m, i) => fmtMatchRow(m, `${ph.coreSquad.join('-')}-${i}`, matchNumMap.get(m.matchEnd))).join("")}
