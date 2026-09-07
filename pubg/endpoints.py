@@ -1697,14 +1697,11 @@ class EndpointRegistry:
     # first_hot_drop, first_hot_drop_survived) zeigen auf die neuen
     # Tier-IDs.
     #: Achievements, die NUR aus pubg_achievements_seen kommen duerfen.
-    #: Alles andere rechnet compute_session_achievements live; ein
-    #: genereller DB-Merge zieht sonst die komplette Historie in jede
-    #: Session (gemessen: 45 statt 19 Eintraege).
-    #: em_pickup_kill (Sky Snipe) steht hier, weil die Live-Erkennung den
-    #: Kill am Emergency-Pickup-Ballon nicht findet — der Eintrag stammt
-    #: aus einem manuellen Insert. Sobald die Live-Erkennung greift, kann
-    #: die ID hier raus.
-    PUBG_DB_ONLY_ACH = {"em_pickup_kill"}
+    #: Leer, seit Sky Snipe live erkannt wird (der Block lag ausserhalb
+    #: der Match-Schleife). Ein genereller DB-Merge ist keine Option: er
+    #: zieht ohne Zeitgrenze die komplette Historie in jede Session —
+    #: gemessen 45 statt 20 Eintraegen.
+    PUBG_DB_ONLY_ACH: set = set()
 
     PUBG_ICON_URLS = {
         # Sky Snipe
