@@ -58,7 +58,12 @@
       gap: 10px 14px;
       margin-bottom: 12px;
     }
-    .phase-stats span {
+    /* NUR direkte Kinder: hotLobby() wickelt den Wert bei einem Highlight
+       in <span class="t-hot"><span class="pubg-hot">. Als Nachfahren-
+       Selektor traf font-size:0.7em auch diese Wrapper und multiplizierte
+       sich — die anklickbare K/D stand dann deutlich kleiner da als die
+       Werte ohne Highlight. */
+    .phase-stats > span {
       display: flex;
       flex-direction: column;
       color: var(--pubg-muted);
@@ -67,7 +72,7 @@
       text-transform: uppercase;
       line-height: 1.2;
     }
-    .phase-stats span b {
+    .phase-stats > span b {
       color: var(--pubg-text);
       font-variant-numeric: tabular-nums;
       font-size: 1.7em;
