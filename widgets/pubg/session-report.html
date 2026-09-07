@@ -4338,9 +4338,19 @@
           ${streakItem("Kills ≥ 2", kd2Cur, kd2Best)}
         </div>`;
 
-      // IDs die eine eigene "Special Actions"-Sektion bekommen statt
-      // nur im Achievements-Aufklapp zu landen.
-      const SPECIAL_ACH_IDS = new Set(["em_pickup_kill"]);
+      // Seltene Achievements, die zusaetzlich eine eigene Karte bekommen.
+      // Die Prozente sind gemessene Match-Anteile (2026-09-07, 1104 Matches)
+      // — Kriterium ist Seltenheit plus Erzaehlwert.
+      //   em_pickup_kill         0,09 %  Sky Snipe
+      //   god_mode_chicken       0,09 %  Chicken mit 15+ Kills
+      //   kills_20               0,27 %  20-Bomb
+      //   ultra_chicken          0,45 %  Chicken mit 10+ Kills
+      //   chicken_streak         0,63 %  Dinner Spree
+      //   burning_hell_survivor  6,88 %  auf Wunsch dabei, deutlich haeufiger
+      const SPECIAL_ACH_IDS = new Set([
+        "em_pickup_kill", "god_mode_chicken", "kills_20", "ultra_chicken",
+        "chicken_streak", "burning_hell_survivor",
+      ]);
 
       let achievementsHtml = "";
       let specialHtml = "";
@@ -4350,9 +4360,11 @@
           ? `<img src="${a.iconUrl}" alt="">`
           : (isEmoji(a.icon) ? a.icon : "");
 
-        // Special-Achievements abzweigen
+        // Specials werden hervorgehoben, aber NICHT aus der Liste
+        // entfernt: sonst fehlt z.B. Sky Snipe im Achievement-Aufklapp
+        // und man sucht es dort vergeblich.
         const specialAchs = achievements.filter(a => SPECIAL_ACH_IDS.has(a.id));
-        const normalAchs  = achievements.filter(a => !SPECIAL_ACH_IDS.has(a.id));
+        const normalAchs  = achievements;
 
         if (normalAchs.length) {
           achievementsHtml = `
@@ -4388,7 +4400,7 @@
             return bits.length
               ? `<span class="special-ach-ctx">${bits.join(" · ")}</span>` : "";
           };
-          specialHtml = `<h3 class="extras-h">Special Action</h3>
+          specialHtml = `<h3 class="extras-h">Special Achievements</h3>
             <div class="special-ach-list">
               ${specialAchs.map(a => `
                 <div class="special-ach-item">
