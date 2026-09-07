@@ -38,7 +38,13 @@
     /* Nur direkte Kinder — sonst greift die Regel auch in verschachtelte
        Highlight-Wrapper (t-hot) und skaliert dort mehrfach. */
     .totals > .cell { display: flex; flex-direction: column; }
-    .totals > .cell .pubg-stat-value { font-size: 1.4em; }
+    /* Werte in Textfarbe wie im Phasen-Header — Gold ist hier den
+       Gruppen-Ueberschriften ME/TEAM/LOBBY vorbehalten, sonst konkurrieren
+       Ueberschrift und Zahl um dieselbe Betonung. */
+    .totals > .cell .pubg-stat-value {
+      font-size: 1.4em;
+      color: var(--pubg-text);
+    }
 
     /* Gruppen ME / TEAM / LOBBY: die Zuordnung soll aus dem Layout
        hervorgehen, nicht erst aus einem Tooltip. */
