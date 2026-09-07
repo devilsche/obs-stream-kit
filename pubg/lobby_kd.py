@@ -806,6 +806,47 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
     }
 
 
+def _record_fields(rec):
+    """Bilanz-Felder eines Spielers fuer die Modal-Liste."""
+    rec = rec or {}
+    kills = rec.get("kills") or 0
+    deaths = rec.get("deaths") or 0
+    return {
+        "recKills": kills,
+        "recDeaths": deaths,
+        # Ohne Tod zaehlen die Kills selbst — sonst waere die Quote unendlich.
+        "recKd": (kills / deaths) if deaths else (float(kills) or None),
+    }
+
+
+def _record_totals(record_by_acc, my_account_id):
+    """Squad Record: Kills und Tode summiert, mit und ohne mich.
+
+    Summiert wird ueber alle Matches, nicht je Match gemittelt — sonst
+    wiegt ein Match mit einem Kill so viel wie eines mit zehn.
+    """
+    def _sum(skip_me):
+        k = d = 0
+        for acc, rec in (record_by_acc or {}).items():
+            if skip_me and acc == my_account_id:
+                continue
+            k += rec.get("kills") or 0
+            d += rec.get("deaths") or 0
+        return k, d
+
+    k_all, d_all = _sum(False)
+    k_mates, d_mates = _sum(True)
+    return {
+        "recordKills": k_all,
+        "recordDeaths": d_all,
+        "recordKd": (k_all / d_all) if d_all else (float(k_all) or None),
+        "recordKillsMates": k_mates,
+        "recordDeathsMates": d_mates,
+        "recordKdMates": ((k_mates / d_mates) if d_mates
+                          else (float(k_mates) or None)),
+    }
+
+
 def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                  my_account_id=None, top_n: int = 5) -> dict:
     """Aufschluesselung der Lobby je Match plus ein Gesamtbild ueber alle.
@@ -857,6 +898,41 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
         accounts.add(r["account_id"])
 
     accounts.update(squad_names)
+
+    # Squad-Bilanz je Mitspieler: Kills und echte Tode in genau diesen
+    # Matches. Der Karriere-K/D daneben sagt, wie gut jemand ueblicherweise
+    # ist — das hier sagt, was in diesem Zeitraum passiert ist. Ein Tod
+    # zaehlt, wenn time_survived vor dem Match-Ende liegt (5 s Toleranz);
+    # fehlt die Angabe, gilt "tot, wenn nicht gewonnen".
+    rec_rows = conn.execute(
+        f"""
+        WITH my_teams AS (
+          SELECT match_id, team_id FROM match_team_mapping
+          WHERE tenant_id = ? AND account_id = ? AND match_id IN ({marks})
+        )
+        SELECT mtm.account_id,
+               SUM(COALESCE(mtm.kills, 0))            AS kills,
+               SUM(CASE WHEN mtm.time_survived IS NULL
+                          THEN (CASE WHEN mtm.place = 1 THEN 0 ELSE 1 END)
+                        WHEN mtm.time_survived < m.duration_secs - 5
+                          THEN 1 ELSE 0 END)          AS deaths,
+               COUNT(*)                               AS matches
+        FROM match_team_mapping mtm
+        JOIN my_teams mt ON mt.match_id = mtm.match_id
+                          AND mt.team_id = mtm.team_id
+        JOIN matches m ON m.match_id = mtm.match_id
+                        AND m.tenant_id = mtm.tenant_id
+        WHERE mtm.tenant_id = ? AND mtm.kills IS NOT NULL
+        GROUP BY mtm.account_id
+        """,
+        [tenant_id, my_account_id] + list(match_ids) + [tenant_id]).fetchall()
+    record_by_acc = {
+        r["account_id"]: {"kills": r["kills"] or 0,
+                          "deaths": r["deaths"] or 0,
+                          "matches": r["matches"] or 0}
+        for r in rec_rows
+    }
+
     by_mode = db_pg.get_lifetime_by_mode(raw, list(accounts))
     # Wer keine Lifetime-Zeile hat, wird mit seiner Season gemessen statt
     # als unbekannt zu gelten — die Herkunft steht als `source` am Wert.
@@ -898,7 +974,9 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                           "seasonId": info.get("seasonId"), "accountId": a,
                           # Der eigene Eintrag zaehlt nicht in squadAvg —
                           # das Frontend setzt ihn deshalb sichtbar ab.
-                          "isMe": a == my_account_id})
+                          "isMe": a == my_account_id,
+                          # Bilanz in genau diesen Matches (Squad Record).
+                          **_record_fields(record_by_acc.get(a))})
             agg = squad_seen.setdefault(a, {"name": names.get(a) or a[:12],
                                             "kd": info.get("kd"),
                                             "basis": info.get("basis"),
@@ -907,6 +985,8 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                                             "lifetimeRounds": info.get("lifetimeRounds"),
                                             "seasonId": info.get("seasonId"),
                                             "isMe": a == my_account_id,
+                                            **_record_fields(
+                                                record_by_acc.get(a)),
                                             "matches": 0})
             agg["matches"] += 1
         # Zwei Schnitte, weil das Modal aus zwei Kontexten kommt:
@@ -987,6 +1067,9 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                         key=lambda p: (-(p["kd"] or -1), -p["matches"])),
         "squadAvg": _avg("squadAvg"),
         "squadAvgMates": _avg("squadAvgMates"),
+        # Squad Record ueber den ganzen Zeitraum: Kills und Tode des Teams
+        # summiert, nicht ein Mittel von Match-Quotienten.
+        **_record_totals(record_by_acc, my_account_id),
     }
     return {"matches": out, "totals": totals, "seasonId": season_id,
             "topN": top_n}
