@@ -33,7 +33,18 @@ Modul-Docstring von `pubg/lobby_kd.py`:
 Verschärfend liefen bis 2026-09-07 vier Dauerläufer (einer je Tenant) mit
 `--max-age-days 28`. Die haben Snapshots **altersbasiert** erneuert, ohne
 dass ein neues Match mit dem Gegner stattgefunden hatte — also genau die
-Werte überschrieben, die zu einem alten Match gehörten. Gestoppt.
+Werte überschrieben, die zu einem alten Match gehörten.
+
+Es waren systemd-Units (`obs-lobby-backfill@{1,2,3,5}.service`) mit
+`Restart=always`; am 2026-09-07 gestoppt **und disabled**, weil ein blosses
+Beenden nach `RestartSec=300` wirkungslos gewesen wäre.
+
+Wichtig für die Wiederinbetriebnahme: Diese Units machten den
+**Lifetime**-Abruf, und der ist wertvoll — ein Call bringt alle sechs Modi
+und füllt genau die Lücken vom Typ WARWAR556/Radarik. Falsch war
+ausschliesslich das Flag `--max-age-days 28`. Ohne dieses Flag holt der
+Lauf nur **fehlende** Snapshots und entspricht damit Regel 4 unten. Die
+Units gehören also nicht abgeschafft, sondern um das Flag bereinigt.
 
 ## Harte Grenze: keine Rückwirkung
 
@@ -214,19 +225,25 @@ Falls es je klemmt, ist die naheliegende Grenze eine Aufbewahrungsregel:
 Snapshots, die zu keinem Match mehr als „passend" ausgewählt werden,
 löschen.
 
-## Offene Entscheidungen
+## Entschieden
 
-1. **Fallback-Richtung** — soll ein Snapshot *nach* dem Match verwendet
-   werden, wenn kein früherer existiert? Empfehlung: ja, gekennzeichnet.
-   Sonst verlieren alle 2.696 bestehenden Matches ihren Lobby-Wert.
-2. **Zuordnung persistieren?** — die Lese-Query löst es zur Laufzeit über
+1. **Fallback-Richtung: den späteren nehmen, markiert.** Existiert kein
+   Snapshot vor dem Match, gilt der früheste danach — sichtbar als
+   „Stand nach dem Match". Ohne das verlieren alle 2.696 bestehenden
+   Matches ihren Lobby-Wert, und das wäre eine Verschlechterung.
+   *(entschieden 2026-09-07)*
+2. **Alt-Werte werden gekennzeichnet.** Folgt direkt aus 1: die 479.972
+   vorhandenen Zeilen tragen ein heutiges `fetched_at` und sind für jedes
+   Alt-Match ein Nachher-Wert. Genau das sichtbar zu machen ist der Zweck
+   der Übung. *(entschieden 2026-09-07)*
+
+## Offen (Implementierungsdetail)
+
+3. **Zuordnung persistieren?** — die Lese-Query löst es zur Laufzeit über
    den Zeitstempel. Eine Tabelle `match_player_snapshot` wäre schneller
-   und stabiler, ist aber Redundanz. Empfehlung: erst zur Laufzeit, eine
-   Zuordnungstabelle nur, wenn es messbar zu langsam wird.
-3. **Alt-Werte kennzeichnen** — die 479.972 vorhandenen Zeilen haben ein
-   `fetched_at` von heute und sind für Alt-Matches Fallbacks. Sollen sie
-   im Modal sichtbar als „Stand nach dem Match" markiert werden?
-   Empfehlung: ja, das ist der ganze Punkt der Übung.
+   und stabiler, ist aber Redundanz. Vorgehen: erst zur Laufzeit, eine
+   Zuordnungstabelle nur, wenn es messbar zu langsam wird. Entscheidbar
+   am Code, nicht vorab.
 
 ## Umsetzungsschritte
 
