@@ -321,11 +321,13 @@ def test_kd_for_mode_kleiner_hauptmodus_faellt_auf_die_perspektive():
 
 
 def test_kd_for_mode_faellt_auf_die_perspektive_zurueck():
-    """Kein squad-fpp, aber genug Duo-FPP: FPP bleibt FPP."""
+    """Kein squad-fpp, aber genug Duo-FPP: gerechnet wird auf FPP-Ebene.
+    Benannt wird es nach duo-fpp — die FPP-Gruppe besteht hier nur daraus,
+    'alle FPP' waere eine Zusammenfassung von genau einem Modus."""
     per_mode = {"duo-fpp": _stats(120, 60, 70), "squad": _stats(500, 5, 6)}
     r = lk.kd_for_mode(per_mode, "squad-fpp")
     assert r["kd"] == pytest.approx(120 / 60)
-    assert r["basis"] == "fpp"
+    assert r["basis"] == "duo-fpp"
 
 
 def test_kd_for_mode_nimmt_zuletzt_alles_zusammen():
@@ -385,7 +387,9 @@ def test_kd_for_mode_verwirft_eine_stufe_die_kaum_gespielt_wurde():
 def test_kd_for_mode_nimmt_die_perspektive_wenn_sie_wirklich_gespielt_wurde():
     per_mode = {"squad": _stats(900, 600, 700), "squad-fpp": _stats(100, 90, 95)}
     r = lk.kd_for_mode(per_mode, "solo")
-    assert r["basis"] == "tpp"
+    # TPP wird gewaehlt (nicht die FPP-Zeile), heisst aber "squad": das ist
+    # der einzige TPP-Modus mit Runden.
+    assert r["basis"] == "squad"
 
 
 # ── Alltime mit Season-Ersatz: wer keine Lifetime-Zeile hat, ist nicht ───────
@@ -427,7 +431,8 @@ def test_kd_alltime_season_nutzt_dieselbe_modus_kette():
     im Season-Zweig."""
     seas = {"squad-fpp": _stats(120, 60, 70), "squad": _stats(500, 5, 6)}
     r = lk.kd_alltime(None, seas, "duo-fpp")
-    assert r["basis"] == "fpp"
+    # FPP-Ebene, benannt nach dem einzigen FPP-Modus mit Runden.
+    assert r["basis"] == "squad-fpp"
     assert r["source"] == "season"
 
 
@@ -453,7 +458,7 @@ def test_zehn_runden_reichen_fuer_die_gesamtstufe():
     """Die Grenze liegt bei MIN_KD_ROUNDS_TOTAL, nicht bei einer Runde."""
     per_mode = {"solo-fpp": _stats(12, 10, 10)}
     r = lk.kd_for_mode(per_mode, "duo-fpp")
-    assert r["basis"] == "all"
+    assert r["basis"] == "solo-fpp"
     assert r["kd"] == pytest.approx(12 / 10)
 
 
@@ -464,3 +469,32 @@ def test_viele_runden_im_nebenmodus_schlagen_den_duennen_hauptmodus():
     r = lk.kd_for_mode(per_mode, "squad-fpp")
     assert r["kd"] == pytest.approx(700 / 351)
     assert r["basis"] == "fpp"
+
+
+# ── Basis nennt den Modus, wenn die Gruppe nur aus einem besteht ────────────
+
+def test_gruppe_mit_nur_einem_modus_nennt_diesen_modus():
+    """Der Fall Radarik: 67 Runden squad-fpp, sonst nichts. In einem
+    duo-fpp-Match faellt die Rechnung auf die FPP-Gruppe zurueck — aber
+    'alle FPP' behauptet eine Zusammenfassung, die es nicht gibt. Wenn nur
+    ein Modus Runden beisteuert, wird der genannt."""
+    per_mode = {"squad-fpp": _stats(23, 67, 67)}
+    r = lk.kd_for_mode(per_mode, "duo-fpp")
+    assert r["kd"] == pytest.approx(23 / 67)
+    assert r["basis"] == "squad-fpp"
+
+
+def test_gruppe_aus_mehreren_modi_bleibt_die_gruppe():
+    """Sobald wirklich mehrere Modi zusammenkommen, ist 'fpp' die ehrliche
+    Auskunft."""
+    per_mode = {"squad-fpp": _stats(20, 40, 40), "duo-fpp": _stats(30, 30, 35)}
+    r = lk.kd_for_mode(per_mode, "solo-fpp")
+    assert r["basis"] == "fpp"
+
+
+def test_gesamtstufe_mit_nur_einem_modus_nennt_diesen_modus():
+    """Gleiches gilt fuer die letzte Stufe: ein einzelner TPP-Modus heisst
+    nicht 'alle Modi'."""
+    per_mode = {"squad": _stats(15, 12, 12)}
+    r = lk.kd_for_mode(per_mode, "duo-fpp")
+    assert r["basis"] == "squad"

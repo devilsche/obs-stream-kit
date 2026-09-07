@@ -125,6 +125,20 @@ def _kd_if_enough(kills, losses, rounds, min_rounds, total_rounds=0):
     return _kd(kills, losses, rounds)
 
 
+def _narrow_basis(per_mode, modes, basis):
+    """Sammelbasis auf den einen Modus zurueckfuehren, der sie ausmacht.
+
+    "alle FPP" behauptet eine Zusammenfassung. Steuert faktisch nur ein
+    Modus Runden bei, ist das eine falsche Auskunft: ein Spieler mit 67
+    Runden squad-fpp und sonst nichts stand in einem duo-fpp-Match als
+    "alle FPP" da. Dann wird der Modus genannt, der es wirklich ist.
+    """
+    if basis not in ("fpp", "tpp", "all"):
+        return basis
+    used = [m for m in modes if ((per_mode or {}).get(m) or {}).get("rounds")]
+    return used[0] if len(used) == 1 else basis
+
+
 def kd_for_mode(per_mode, mode: str, min_rounds: int = MIN_KD_ROUNDS) -> dict:
     """K/D eines Spielers aus der Sicht des gespielten Modus.
 
@@ -158,7 +172,8 @@ def kd_for_mode(per_mode, mode: str, min_rounds: int = MIN_KD_ROUNDS) -> dict:
         kd = _kd_if_enough(kills, losses, rounds, effective_min,
                            0 if basis == "all" else total)
         if kd is not None:
-            return {"kd": kd, "basis": basis, "rounds": rounds}
+            return {"kd": kd, "basis": _narrow_basis(per_mode, modes, basis),
+                    "rounds": rounds}
     _, _, rounds = _sum_modes(per_mode, tuple(per_mode or ()))
     return {"kd": None, "basis": None, "rounds": rounds}
 
