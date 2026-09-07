@@ -1226,6 +1226,79 @@ def lobby_kd_reset_unknown(root: str, args=None) -> int:
     return 0
 
 
+def ranked_backfill(root: str, args=None) -> int:
+    """Ranked-Snapshots nachladen — ein Call je Spieler.
+
+    Der Poller sammelt Ranked nur mit Restbudget: pro Minuten-Tick gehen
+    zuerst Match-Polling, Lifetime und Season durch, und bei 10 Requests
+    pro Minute bleiben fuer Ranked ein bis drei. Fuer einen Nachlauf von
+    zweitausend Spielern ist das zu langsam — dieser Lauf nimmt sich den
+    Key allein.
+
+    Reihenfolge kommt aus ranked_accounts_missing_snapshot: eigene
+    Mitspieler zuerst, dann die Lobby-Gegner der jueng­sten Ranked-Matches.
+
+    Nutzung:
+        python -m pubg.cli ranked-backfill [--tenant N] [--pace 7]
+                                           [--limit 5000]
+    """
+    import time
+    from core.db import connect
+    from core.db_compat import SqliteCompatConn
+    from core import credentials
+    from pubg import db_pg, lobby_kd
+    from pubg.api_client import PubgClient
+    from pubg.poller import _current_season_id
+
+    args = args or []
+    def _opt(name, default=None):
+        if name in args:
+            i = args.index(name)
+            return args[i + 1] if i + 1 < len(args) else default
+        return default
+    tenant_id = int(_opt("--tenant", "1"))
+    pace = float(_opt("--pace", "7"))
+    limit = int(_opt("--limit", "5000"))
+
+    raw = connect()
+    conn = SqliteCompatConn(raw)
+    creds = credentials.get(raw, tenant_id)
+    if not creds.pubg_api_key:
+        print(f"Tenant {tenant_id}: kein PUBG-API-Key")
+        return 1
+    client = PubgClient(api_key=creds.pubg_api_key,
+                        platform=creds.pubg_platform or "steam")
+    season_id = _current_season_id(client, conn, tenant_id)
+    if not season_id:
+        print("Season nicht bestimmbar (API-Limit?) — spaeter erneut")
+        return 1
+
+    missing = db_pg.ranked_accounts_missing_snapshot(
+        raw, tenant_id, season_id, limit=limit)
+    if not missing:
+        print(f"Tenant {tenant_id}: keine fehlenden Ranked-Snapshots")
+        raw.close()
+        return 0
+    print(f"Ranked {season_id}: {len(missing)} Spieler ohne Snapshot "
+          f"(~{len(missing) * pace / 3600:.1f} h bei {pace:.0f}s Pacing)")
+
+    done = found = 0
+    for acc in missing:
+        store = {}
+        found += lobby_kd.fetch_ranked(client, [acc], season_id, store,
+                                       max_calls=1)
+        if store:
+            db_pg.upsert_ranked_snapshots(raw, season_id, store, _iso_now())
+        done += 1
+        if done % 25 == 0:
+            print(f"  {done}/{len(missing)} · {found} mit Ranked-Werten")
+        if done < len(missing):
+            time.sleep(pace)
+    print(f"fertig: {found} von {len(missing)} haben Ranked-Werte")
+    raw.close()
+    return 0
+
+
 def lobby_kd_backfill(root: str, args=None) -> int:
     """Lobby-Werte fuer die juengsten Matches nachladen (Alltime, Default).
 
@@ -1907,6 +1980,8 @@ if __name__ == "__main__":
         sys.exit(lobby_kd_reset_unknown(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "lobby-kd-backfill":
         sys.exit(lobby_kd_backfill(root, sys.argv[2:]))
+    elif len(sys.argv) > 1 and sys.argv[1] == "ranked-backfill":
+        sys.exit(ranked_backfill(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "clan-queue-prune":
         sys.exit(clan_queue_prune(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "assists-backfill":
