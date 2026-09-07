@@ -4145,9 +4145,14 @@
       // Match-IDs der ganzen Session fuer die Lobby-Modals im Header.
       // window._allMatchIds wird erst weiter unten gesetzt, hier also
       // direkt aus den Phasen geholt.
-      const _sessionMids = (d.phases || [])
-        .flatMap(ph => ph.matches || [])
+      // NUR Battle-Royale-Matches: die Header-Zahlen rechnen ueber
+      // is_br_mode, TDM und Event-Modi sind dort ausgenommen. Gingen sie
+      // ins Modal mit, stand oben eine andere K/D als darin.
+      const brMids = (ms) => (ms || [])
+        .filter(x => !x.isEvent && (x.mode || "") !== "tdm")
         .map(x => x.matchId).filter(Boolean).slice(0, 60).join(",");
+      const _sessionMids = brMids((d.phases || [])
+        .flatMap(ph => ph.matches || []));
       // Wie im Phasen-Header: der Wert wird zum Button, der das
       // Lobby-Modal oeffnet.
       const lobbyBtn = (formatted, view) =>
@@ -4267,7 +4272,7 @@
               <span class="ps-group">Team</span>
               ${(s.squadMatchesWithMapping||0) > 0 ? `<span title="Kills per death of my teammates in this phase — my own numbers excluded"><button
                        type="button" class="lobby-open" data-phase="1" data-view="record"
-                       data-matches="${ph.matches.map(x => x.matchId).filter(Boolean).slice(0, 60).join(",")}"
+                       data-matches="${brMids(ph.matches)}"
                        data-title="Mates Record · Phase ${i+1}"
                        data-sub="${s.matches} ${s.matches === 1 ? 'match' : 'matches'}"
                        aria-label="Break down the squad record of this phase: kills and deaths per player"
@@ -4275,7 +4280,7 @@
               ${s.lobbySquadKd != null
                   ? `<span title="Average career K/D of my teammates in the mode played — my own value excluded"><button
                        type="button" class="lobby-open" data-phase="1" data-view="squad"
-                       data-matches="${ph.matches.map(x => x.matchId).filter(Boolean).slice(0, 60).join(",")}"
+                       data-matches="${brMids(ph.matches)}"
                        data-title="Squad · Phase ${i+1}"
                        data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'match' : 'matches'} counted"
                        aria-label="Break down the squad of this phase: career K/D of my teammates"
@@ -4288,7 +4293,7 @@
                   ? `<span title="Average K/D of the opponents across ${s.lobbyMatches} matches of this phase${
                        s.lobbyTop5 != null ? ` · top five average ${s.lobbyTop5.toFixed(2)}` : ""}"><button
                        type="button" class="lobby-open" data-phase="1"
-                       data-matches="${ph.matches.map(x => x.matchId).filter(Boolean).slice(0, 60).join(",")}"
+                       data-matches="${brMids(ph.matches)}"
                        data-title="Lobby · Phase ${i+1}"
                        data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'match' : 'matches'} counted"
                        aria-label="Break down the lobby of this phase: median and toughest opponents"
@@ -4299,7 +4304,7 @@
               ${s.lobbyTop5 != null
                   ? `<span title="Average K/D of the five strongest opponents in this phase — each of them counted once, however many matches they played"><button
                        type="button" class="lobby-open" data-phase="1"
-                       data-matches="${ph.matches.map(x => x.matchId).filter(Boolean).slice(0, 60).join(",")}"
+                       data-matches="${brMids(ph.matches)}"
                        data-title="Lobby · Phase ${i+1}"
                        data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'match' : 'matches'} counted"
                        aria-label="Break down the lobby of this phase: strongest and weakest opponents"
