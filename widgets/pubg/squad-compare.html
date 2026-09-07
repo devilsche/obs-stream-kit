@@ -65,7 +65,7 @@
         return `<tr><td>${PubgUI.fmtMap(row.map)} · ${PubgUI.fmtDate(row.playedAt)} ${PubgUI.fmtTime(row.playedAt)}</td>${cells}</tr>`;
       }).join("");
       document.getElementById("body").innerHTML = body ||
-        `<tr><td colspan="${d.players.length + 1}">Keine gemeinsamen Matches gefunden</td></tr>`;
+        `<tr><td colspan="${d.players.length + 1}">No shared matches found</td></tr>`;
     }
 
     if (PLAYERS.length) {

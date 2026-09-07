@@ -134,10 +134,10 @@
         <tr>
           <th class="name-h" data-sort="name"><span class="hdr">Waffe</span></th>
           <th data-sort="kills"><span class="hdr">Kills</span></th>
-          <th data-sort="usedInMatches" title="In wie vielen Matches die Waffe min. 1 Kill hatte"><span class="hdr">Matches</span></th>
+          <th data-sort="usedInMatches" title="Matches in which this weapon got at least one kill"><span class="hdr">Matches</span></th>
           <th data-sort="avgDist"><span class="hdr">Ø m</span></th>
           <th data-sort="maxDist"><span class="hdr">Max m</span></th>
-          <th data-sort="killsPerMatch" title="Kills pro Match in dem die Waffe einen Kill hatte"><span class="hdr">K/M</span></th>
+          <th data-sort="killsPerMatch" title="Kills per match in which this weapon got a kill"><span class="hdr">K/M</span></th>
         </tr>
       </thead>
       <tbody id="wsBody">
@@ -241,7 +241,7 @@
 
       if (!view.length) {
         body.innerHTML =
-          `<tr><td colspan="6" class="empty">— keine Waffen im Filter —</td></tr>`;
+          `<tr><td colspan="6" class="empty">— no weapons match the filter —</td></tr>`;
         meta.textContent = "";
         return;
       }

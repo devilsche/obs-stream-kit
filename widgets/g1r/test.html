@@ -157,7 +157,7 @@
       pair('HP', s.hp, s.hpMax); pair('Mana', s.mana, s.manaMax); add('Kreis', s.magicCircle);
       add('Feuer', s.resFire); add('Eis', s.resIce); add('Schnitt', s.resEdge);
       add('Stich', s.resPoint); add('Wucht', s.resBlunt); add('Energie', s.resEnergy); add('Wind', s.resWind);
-      statsEl.innerHTML = out.length ? out.join('') : '<span class="offline">keine Stats</span>';
+      statsEl.innerHTML = out.length ? out.join('') : '<span class="offline">no stats</span>';
     }
 
     function renderSession(s) {
@@ -193,7 +193,7 @@
           '<span><span class="axis">Y</span><b>' + Math.round(d.pos.y) + '</b></span>' +
           '<span><span class="axis">Z</span><b>' + Math.round(d.pos.z) + '</b></span>';
       } else {
-        posEl.innerHTML = '<span class="offline">keine Position</span>';
+        posEl.innerHTML = '<span class="offline">no position</span>';
       }
       if (d.distanceM !== undefined) {
         distEl.innerHTML =

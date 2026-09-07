@@ -417,9 +417,9 @@
           <td class="num team">${p.teamId ?? "—"}</td>
           <td class="num">${p.shots}</td>
           <td class="num">${p.hitAttacks}</td><td class="num">${p.accuracy.toFixed(1)}</td>
-          <td class="num" title="Treffer je Schuss, der während eines laufenden Gefechts fiel"
+          <td class="num" title="Hits per shot fired during an active fight"
               >${p.fightAccuracy == null ? "—" : p.fightAccuracy.toFixed(1)}</td>
-          <td class="num" title="Anteil der Schüsse außerhalb jedes Gefechts"
+          <td class="num" title="Share of shots fired outside any fight"
               >${p.idleShotPct == null ? "—" : p.idleShotPct.toFixed(0)}</td>
           <td class="num${p.hits < WEAK_SAMPLE ? " weak-sample" : ""}"
               title="${(p.zones||{}).HeadShot || 0}/${p.hits}">${p.hits ? p.headshotRate.toFixed(1) : "—"}</td>
@@ -506,7 +506,7 @@
           <td>${esc(k.weapon || "?")}</td>
           <td class="num">${k.distanceM == null ? "—" : k.distanceM.toFixed(0) + " m"}</td>
           <td>${esc(ZONE_LABEL[k.zone] || k.zone || "?")}</td></tr>`).join("")
-        : `<tr><td colspan="5">Keine Kills</td></tr>`;
+        : `<tr><td colspan="5">No kills</td></tr>`;
 
       const noData = p.shots === 0 && p.hits === 0 && p.kills === 0 && p.knocks === 0;
       const weakNote = noData
@@ -609,7 +609,7 @@
       try {
         const list = await PubgUI.fetchJson(BASE + "api/pubg/matches-list?limit=2000");
         if (!Array.isArray(list) || !list.length) {
-          sel.innerHTML = `<option value="">keine Matches in der DB</option>`;
+          sel.innerHTML = `<option value="">no matches in the database</option>`;
           return;
         }
         MATCH_ITEMS = list.map(m => {

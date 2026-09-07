@@ -68,7 +68,7 @@
   <div class="pubg-header" id="pubgHeader"></div>
   <div class="pubg-card panel pubg-fade-in">
     <div class="sub" id="meta"></div>
-    <div id="content"><div class="empty">— wird geladen —</div></div>
+    <div id="content"><div class="empty">— loading —</div></div>
   </div>
   <script src="_pubg.js"></script>
   <script>
@@ -131,7 +131,7 @@
       const root = document.getElementById("content");
       if (rows && rows.length) _rowsCache = rows;
       if (!_rowsCache || !_rowsCache.length) {
-        root.innerHTML = `<div class="empty">— keine Matches in diesem Range —</div>`;
+        root.innerHTML = `<div class="empty">— no matches in this range —</div>`;
         document.getElementById("meta").textContent = "";
         return;
       }

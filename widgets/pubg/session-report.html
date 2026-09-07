@@ -1717,7 +1717,7 @@
   <div id="picker" class="session-picker"
        role="tabpanel" aria-labelledby="tabSessions" style="display:none"></div>
   <div class="pubg-card report pubg-fade-in" id="report">
-    <div class="empty">— wird geladen —</div>
+    <div class="empty">— loading —</div>
   </div>
 
   <script src="_pubg.js"></script>
@@ -2364,8 +2364,8 @@
           <td>${m.headshotKills || 0}</td>
           <td>${m.assists || 0}</td>
           <td>${m.dbnos || 0}</td>
-          <td title="Wie oft wurde dieser Spieler wiederbelebt">${m.revivesReceived || 0}</td>
-          <td title="Wie oft hat dieser Spieler Squadmates wiederbelebt">${m.revivesGiven || 0}</td>
+          <td title="How often this player was revived">${m.revivesReceived || 0}</td>
+          <td title="How often this player revived squadmates">${m.revivesGiven || 0}</td>
           <td>${Math.round(m.damageDealt || 0)}</td>
           <td title="Match-Zeit bis zum tatsaechlichen Tod (Bleed-Out/Finisher); fuer Survivor PUBG's time_survived">${survCell}</td>
         </tr>`;
@@ -2377,9 +2377,9 @@
           <th>K</th>
           <th title="Headshot Kills">HS</th>
           <th title="Assists">Ass</th>
-          <th title="DBNOs gegeben (Knocks auf Gegner)">DBNO</th>
-          <th title="Wie oft wurde dieser Spieler knocked-out und revived (ohne Tod dazwischen)">KO</th>
-          <th title="Wie oft hat dieser Spieler Squadmates wiederbelebt">REV</th>
+          <th title="DBNOs dealt (knocks on opponents)">DBNO</th>
+          <th title="How often this player was knocked and revived without dying in between">KO</th>
+          <th title="How often this player revived squadmates">REV</th>
           <th>DMG</th>
           <th>Surv</th>
         </tr></thead>
@@ -2931,7 +2931,7 @@
       host.innerHTML = `
         <div class="md-grid">
           <div class="md-mapcol">
-            <div class="md-matchid" title="Klick = Match-ID kopieren">${matchId}</div>
+            <div class="md-matchid" title="Click to copy the match ID">${matchId}</div>
             <div class="md-mapwrap">
               <canvas class="md-basemap"></canvas>
               <canvas class="md-overlay"></canvas>
@@ -2967,7 +2967,7 @@
       const s = mdGetState(host);
       if (!md || !md.detail) {
         host.querySelector(".md-cards").innerHTML =
-          `<div class="md-empty md-card">— keine Telemetrie verfuegbar —</div>`;
+          `<div class="md-empty md-card">— no telemetry available —</div>`;
         return;
       }
       s.detail = md.detail;
@@ -3546,7 +3546,7 @@
       };
       if (!months.length) {
         document.getElementById("sessionList").innerHTML =
-          `<div class="empty">Keine Sessions im Zeitraum.</div>`;
+          `<div class="empty">No sessions in this range.</div>`;
         return;
       }
       const currentMonth = months[0];  // hoechster Key = neuester Monat
@@ -3608,11 +3608,11 @@
     }
 
     function _monthLabel(monthKey) {
-      // monthKey: "YYYY-MM" → "Monat-Name YYYY" auf Deutsch
+      // monthKey: "YYYY-MM" -> "Month YYYY"
       const [y, m] = monthKey.split("-");
-      const months = ["Januar", "Februar", "März", "April", "Mai", "Juni",
-                      "Juli", "August", "September", "Oktober",
-                      "November", "Dezember"];
+      const months = ["January", "February", "March", "April", "May", "June",
+                      "July", "August", "September", "October",
+                      "November", "December"];
       const idx = parseInt(m, 10) - 1;
       return `${months[idx] || m} ${y}`;
     }
@@ -3703,15 +3703,15 @@
       const lt = p.lifetimeRounds || 0;
       const rounds = p.rounds
         ? (lt && lt !== p.rounds
-             ? `, ${p.rounds}/${lt} Runden`
-             : `, ${p.rounds} Runden`)
+             ? `, ${p.rounds}/${lt} rounds`
+             : `, ${p.rounds} rounds`)
         : "";
       return ` <span class="where">${PubgUI.esc(label + src + rounds)}</span>`;
     }
 
     function lobbyListHtml(players, cls, withMatch) {
       if (!players || !players.length) {
-        return `<p class="lobby-modal__empty">Keine Werte.</p>`;
+        return `<p class="lobby-modal__empty">No values.</p>`;
       }
       return `<ul class="lobby-list lobby-list--${cls}">` + players.map(p => `
         <li><span>${PubgUI.esc(p.name)}${withMatch && p.playedAt
@@ -3724,8 +3724,8 @@
       const src = isPhase ? d.totals : (d.matches && d.matches[0]);
       const mates = (src && src.squad) || [];
       if (!mates.length) {
-        return `<p class="lobby-modal__empty">Keine Squad-Daten für diese
-          Auswahl.</p>`;
+        return `<p class="lobby-modal__empty">No squad data for this
+          selection.</p>`;
       }
       const known = mates.filter(m => m.kd != null).length;
       return `
@@ -3734,66 +3734,68 @@
           <div class="lobby-kpi"><b>${mates.length}</b><span>${
             isPhase ? "Mitspieler" : "im Squad"}</span></div>
           ${known < mates.length
-            ? `<div class="lobby-kpi"><b>${mates.length - known}</b><span>ohne Wert</span></div>`
+            ? `<div class="lobby-kpi"><b>${mates.length - known}</b><span>no value</span></div>`
             : ""}
         </div>
         <div class="lobby-side">
-          <h3>${isPhase ? "Wer mitgespielt hat" : "Das Squad"}
-            <em>K/D im Modus dieses Matches</em></h3>
+          <h3>${isPhase ? "Who played along" : "The squad"}
+            <em>K/D for the mode of this match</em></h3>
           <ul class="lobby-list lobby-list--top">${mates.map(m => `
             <li><span>${PubgUI.esc(m.name)}${isPhase && m.matches
                   ? ` <span class="where">${m.matches} ${
-                      m.matches === 1 ? "Match" : "Matches"}</span>` : ""
+                      m.matches === 1 ? "match" : "matches"}</span>` : ""
                 }${basisHtml(m)}</span>
                 <span class="kd">${m.kd == null ? "N/A" : m.kd.toFixed(2)}</span></li>`
             ).join("")}</ul>
         </div>
-        <p class="lobby-modal__note">Gemessen am Modus dieses Matches, zuerst
-          aus der laufenden Season — die sagt mehr über die aktuelle Form.
-          Reicht sie nicht, greift eine ältere Season und erst danach der
-          Karriere-Wert; welche Grundlage es war, steht hinter jedem Namen.
-          Es ist in keinem Fall die Leistung in ${isPhase ? "dieser Phase" : "diesem Match"} —
-          dafür steht „Squad Phase" im Kopf der Phase.${isPhase
-            ? " Wer nur ein, zwei Runden dabei war, prägt den Schnitt kaum,"
-              + " taucht hier aber trotzdem auf."
+        <p class="lobby-modal__note">Measured for the mode of this match,
+          taken from the current season first — that says more about current
+          form. If the season is too thin, an older one counts, and only then
+          the career value; the basis used is shown behind every name. In no
+          case is this their performance in ${isPhase ? "this phase" : "this match"} —
+          that is what &bdquo;Squad Record&ldquo; in the phase header shows.${isPhase
+            ? " Anyone who only joined for a round or two barely moves the"
+              + " average but still shows up here."
             : ""}</p>`;
     }
 
     function lobbyBodyHtml(d, isPhase) {
       const src = isPhase ? d.totals : (d.matches && d.matches[0]);
       if (!src || src.avg == null) {
-        return `<p class="lobby-modal__empty">Für diese Lobby liegen noch
-          noch keine Werte vor — der Sammler ist noch dran.</p>`;
+        return `<p class="lobby-modal__empty">No values for this lobby yet
+          &mdash; the collector is still working on it.</p>`;
       }
       const n = d.topN || 5;
       const cov = isPhase
-        ? `${src.matchesInAverage} von ${src.matches} Matches gewertet`
+        ? `${src.matchesInAverage} of ${src.matches} matches counted`
         : `${src.known} von ${src.lobbyPlayers} Gegnern bekannt`
           + ` (${Math.round(src.coverage)} %)`;
       return `
         <div class="lobby-kpis">
           <div class="lobby-kpi"><b>${lobbyKdStr(src.avg)}</b><span>Ø K/D</span></div>
           <div class="lobby-kpi"><b>${lobbyKdStr(src.median)}</b><span>Median</span></div>
-          <div class="lobby-kpi"><b>${lobbyKdStr(src.max)}</b><span>Härtester</span></div>
+          <div class="lobby-kpi"><b>${lobbyKdStr(src.max)}</b><span>Toughest</span></div>
           <div class="lobby-kpi"><b>${lobbyKdStr(src.topAvg)}</b><span>Top ${n} Ø</span></div>
           <div class="lobby-kpi"><b>${lobbyKdStr(src.lowAvg)}</b><span>Low ${n} Ø</span></div>
         </div>
         <div class="lobby-side">
-          <h3>Die ${n} stärksten <em>${cov}</em></h3>
+          <h3>Top ${n} <em>${cov}</em></h3>
           ${lobbyListHtml(isPhase ? src.strongest : src.top, "top", isPhase)}
         </div>
         <div class="lobby-side">
-          <h3>Die ${n} schwächsten</h3>
+          <h3>Bottom ${n}</h3>
           ${lobbyListHtml(isPhase ? src.weakest : src.low, "low", isPhase)}
         </div>
         <p class="lobby-modal__note">${isPhase
-          ? `Ø, Median und die Ränder mitteln die Match-Werte — sonst wögen
-             volle Lobbys schwerer als kurze Matches. Namentlich gelistet sind
-             dagegen die Extreme der ganzen Phase, mit ihrer Uhrzeit.`
-          : `Eigener Squad und Bots sind draußen. Gemessen wird am Modus
-             dieses Matches; steht dahinter „alle FPP" oder „alle Modi", hatte
-             der Spieler dort zu wenige Runden. Unter ${MIN_KD_ROUNDS} Runden
-             gibt es gar keinen Wert — 20 Kills aus zwei Runden sagen nichts.`}</p>`;
+          ? `Average, median and the edges are means of the per-match
+             values &mdash; otherwise full lobbies would outweigh short
+             matches. The names, in contrast, are the extremes of the whole
+             phase, with the time they occurred.`
+          : `My own squad and bots are excluded. Measured for the mode of this
+             match; if it says &bdquo;all FPP&ldquo; or &bdquo;all
+             modes&ldquo;, that player had too few rounds in the mode itself.
+             Below ${MIN_KD_ROUNDS} rounds there is no value at all &mdash; 20
+             kills from two rounds mean nothing.`}</p>`;
     }
 
     async function openLobbyModal(matchIds, title, sub, isPhase, view) {
@@ -3893,8 +3895,8 @@
                  class="material-symbols-outlined icon-sm" aria-hidden="true">military_tech</span><span
                  class="sr-only">Ranked</span></span>`
             : ""}<span class="hot-drop-badge" data-hd-slot></span></span>
-          <span class="stat bot-teams" title="Bot-Teams / Teams gesamt in der Lobby"><b>${m.botTeamsInLobby || 0}/${m.totalTeamsInLobby || 0}</b> Teams</span>
-          <span class="stat bot-teams" title="Bot-Spieler / Spieler gesamt in der Lobby"><b>${m.botPlayersInLobby || 0}/${m.totalPlayersInLobby || 0}</b> <span class="material-symbols-outlined icon-sm" aria-hidden="true">smart_toy</span></span>
+          <span class="stat bot-teams" title="Bot teams / total teams in the lobby"><b>${m.botTeamsInLobby || 0}/${m.totalTeamsInLobby || 0}</b> Teams</span>
+          <span class="stat bot-teams" title="Bot players / total players in the lobby"><b>${m.botPlayersInLobby || 0}/${m.totalPlayersInLobby || 0}</b> <span class="material-symbols-outlined icon-sm" aria-hidden="true">smart_toy</span></span>
           <span class="stat"><b>${m.kills}</b> K${m.myStats && m.myStats.botKills ? ` <span class="bot-kills">(${m.myStats.botKills})</span>` : ""}</span>
           <span class="stat"><b>${Math.round(m.damage||0)}</b> DMG</span>
           <span class="stat"><b>${fmtSurv(mySurv)}</b></span>
@@ -3904,13 +3906,13 @@
               : `Ø K/D der Gegner im Modus dieses Matches, eigener Squad ausgenommen (${m.lobbyKnown}/${m.lobbyPlayers} bekannt)`
           }">${(m.lobbyKd == null || (m.lobbyCoverage || 0) < MIN_LOBBY_COVERAGE)
                 ? (m.lobbyPlayers
-                    ? `<span class="lobby-pending" role="img" aria-label="Lobby-Stärke wird gesammelt"></span>`
+                    ? `<span class="lobby-pending" role="img" aria-label="Lobby strength is still being collected"></span>`
                     : '<span class="dim">—</span>')
                 : `<button type="button" class="lobby-open"
                      data-matches="${PubgUI.esc(m.matchId)}"
                      data-title="Lobby · ${PubgUI.esc(PubgUI.fmtMap(m.map))}"
                      data-sub="${PubgUI.esc(PubgUI.fmtDateTime(m.matchEnd))}"
-                     aria-label="Lobby aufschlüsseln: Median, stärkste und schwächste Gegner"
+                     aria-label="Break down the lobby: median, strongest and weakest opponents"
                    >${hotLobby(m.lobbyTop5, `<b>${m.lobbyKd.toFixed(2)}</b>`)}</button>`}</span>
           <span class="stat lobby-kd" title="${
             m.squadKd == null
@@ -3919,20 +3921,20 @@
           }">${
             (m.squadKd == null || (m.lobbyCoverage || 0) < MIN_LOBBY_COVERAGE)
               ? (m.lobbyPlayers
-                  ? `<span class="lobby-pending" role="img" aria-label="Squad-Stärke wird gesammelt"></span>`
+                  ? `<span class="lobby-pending" role="img" aria-label="Squad strength is still being collected"></span>`
                   : '<span class="dim">—</span>')
               : `<button type="button" class="lobby-open" data-view="squad"
                      data-matches="${PubgUI.esc(m.matchId)}"
                      data-title="Squad · ${PubgUI.esc(PubgUI.fmtMap(m.map))}"
                      data-sub="${PubgUI.esc(PubgUI.fmtDateTime(m.matchEnd))}"
-                     aria-label="Squad aufschlüsseln: Karriere-K/D der Mitspieler"
+                     aria-label="Break down the squad: career K/D of my teammates"
                    ><b>${m.squadKd.toFixed(2)}</b>${
                   m.lobbyKd != null
                     ? ` <span class="lobby-diff ${m.squadKd >= m.lobbyKd ? "up" : "down"}">${
                         m.squadKd - m.lobbyKd >= 0 ? "▲" : "▼"}</span>`
                     : ""}</button>`
           }</span>
-          <span class="stat top-scorer" title="Bester Spieler der ganzen Lobby in diesem Match">${
+          <span class="stat top-scorer" title="Best player in the entire lobby this match">${
             m.topScorer
               ? `<span class="top-scorer__name">${PubgUI.esc(m.topScorer.name)}</span><b>${fmtScore(m.topScorer)}</b>`
               : "<span>—</span>"
@@ -4150,13 +4152,13 @@
               <div class="header-row">
                 <span>Squad in Match</span><span>Place</span><span>Map</span>
                 <span style="text-align:right" title="Bot-Teams / Teams gesamt">Botteams</span>
-                <span style="text-align:right" title="Bot-Spieler / Spieler gesamt">Bots</span>
+                <span style="text-align:right" title="Bot players / total players">Bots</span>
                 <span style="text-align:right">Kills</span>
                 <span style="text-align:right">Damage</span>
                 <span style="text-align:right">Survived</span>
-                <span class="col-right" title="Ø K/D der Gegner in dieser Lobby, im gespielten Modus (eigener Squad ausgenommen)">Lobby K/D</span>
-                <span class="col-right" title="Ø K/D des eigenen Squads im gespielten Modus — nicht die Leistung in diesem Match">Squad K/D</span>
-                <span class="col-right" title="Bester Spieler der Lobby">TopScorer</span>
+                <span class="col-right" title="Average opponent K/D in this lobby for the mode played — my own squad excluded">Lobby K/D</span>
+                <span class="col-right" title="Average career K/D of my squad for the mode played — not their performance this match">Squad K/D</span>
+                <span class="col-right" title="Best player in the lobby">TopScorer</span>
               </div>
               ${ph.matches.map((m, i) => fmtMatchRow(m, `${ph.coreSquad.join('-')}-${i}`, matchNumMap.get(m.matchEnd))).join("")}
             </div>
@@ -4771,14 +4773,14 @@
                               || /abort/i.test(String(err.message || "")));
       host.innerHTML = `<div class="empty report-error">
           <p>${aborted
-                ? "Der Report hat zu lange gebraucht — bei sehr großen Zeiträumen kann das passieren."
-                : "Report konnte nicht geladen werden: "
+                ? "The report took too long &mdash; that can happen for very large date ranges."
+                : "Could not load the report: "
                   + PubgUI.esc(String(err && err.message || err))}</p>
           <button type="button" class="report-retry" id="reportRetry">
             Erneut versuchen</button>
         </div>`;
       document.getElementById("reportRetry").addEventListener("click", () => {
-        host.innerHTML = `<div class="empty">— wird geladen —</div>`;
+        host.innerHTML = `<div class="empty">— loading —</div>`;
         PubgUI.fetchJson(reportUrl, 45000)
           .then((d) => { _reportShown = true; render(d); })
           .catch((e) => { host.innerHTML =
@@ -4980,7 +4982,7 @@
       body.innerHTML = `
         <div class="md-host" data-match-id="${matchId}" data-map=""></div>
         <section class="md-timeline" id="mdTimelineSection" hidden></section>`;
-      title.textContent = "Match-Detail · lädt …";
+      title.textContent = "Match detail · loading …";
       const host = body.querySelector(".md-host");
       mdMount(host);
       panel.hidden = false;
@@ -5080,7 +5082,7 @@
       <header class="md-panel__header">
         <h2 id="mdPanelTitle" class="md-panel__title">Match-Detail</h2>
         <button class="md-panel__close" data-md-close type="button"
-                aria-label="Match-Detail schließen">
+                aria-label="Close match detail">
           <span class="material-symbols-outlined" aria-hidden="true">close</span>
         </button>
       </header>
@@ -5095,7 +5097,7 @@
         <p class="lobby-modal__sub" id="lobbyModalSub"></p>
       </div>
       <button type="button" class="lobby-modal__close" id="lobbyModalClose"
-              aria-label="Schließen">
+              aria-label="Close">
         <span class="material-symbols-outlined" aria-hidden="true">close</span>
       </button>
     </div>
