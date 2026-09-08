@@ -634,6 +634,102 @@ function spotHeadHtml() {
   }).join("") + "</tr>";
 }
 
+/** Kindnamen ohne den Stamm des Containers.
+ *
+ * "Bootyard - Warehouses" unter "Bootyard" liest sich als Wiederholung —
+ * die Zugehoerigkeit steht schon in der Einrueckung bzw. im
+ * Container-Hinweis. Gekuerzt wird nur, wenn der Name wirklich mit dem
+ * Containernamen anfaengt: "Hospital" unter "Georgopol" bleibt ganz, und
+ * "Gatka" unter "Gatka Neighborhood" auch (dort ist das Kind der kuerzere
+ * Name). Der volle Name bleibt in data-poi und im title.
+ */
+function shortSpotName(name, parent) {
+  if (!parent) return name;
+  const cut = (n, pre) => {
+    if (!n.startsWith(pre)) return null;
+    const rest = n.slice(pre.length).replace(/^\s*-\s*|^\s+/, "");
+    return rest || null;
+  };
+  // Erst der ganze Containername — greift ueber alle Stufen hinweg:
+  // "Georgopol - South" unter "Georgopol" wird "South", darunter
+  // "Georgopol - South Apartments" wird "Apartments".
+  const direct = cut(name, parent);
+  if (direct) return direct;
+  // Sonst der Stamm des Containers bis zu seinem letzten " - ": so
+  // verliert "Sosnovka Island - Port" unter "Sosnovka Island - South"
+  // auch seinen Stamm, obwohl es nicht mit dem Containernamen anfaengt.
+  const i = parent.lastIndexOf(" - ");
+  if (i > 0) {
+    const stem = cut(name, parent.slice(0, i));
+    if (stem) return stem;
+  }
+  return name;
+}
+
+//: Additive Spalten — die darf man aufsummieren.
+const ROLLUP_SUM = ["lobby", "drops"];
+//: Raten und Mittelwerte, gewichtet mit der Spalte dahinter. Eine
+//: ungewichtete Mittelung waere falsch: ein Unterbereich mit 1 Landung
+//: zaehlte dann so viel wie einer mit 57.
+const ROLLUP_AVG = {
+  squadHeldPct: "drops", earlyDeathPct: "drops", diedAlonePct: "drops",
+  survivalMin: "drops", avgPlace: "drops", diff: "drops",
+  lobbyEarlyPct: "lobby",
+};
+//: Ab so vielen eigenen Landungen traegt eine Zeile ihre Raten — dieselbe
+//: Schwelle wie RELIABLE_POI_DROPS im Backend.
+const RELIABLE_DROPS = 20;
+
+/** Container tragen die Summe ihrer Unterbereiche.
+ *
+ * match_poi zaehlt eine Landung immer beim KLEINSTEN umschliessenden POI,
+ * ein Container bekommt also nur, was in keinem Kind liegt: "Bootyard"
+ * stand auf 3 eigenen Drops, waehrend in der Gegend 86 gelandet wurden.
+ * Die Zeile bildete damit nicht ab, was der Ort ist.
+ *
+ * Gerechnet wird auf der VOLLEN Liste, bevor gefiltert wird — sonst
+ * aendert sich die Summe eines Containers, je nachdem welcher Scope
+ * gerade aktiv ist.
+ */
+function rollUpFamilies(rows) {
+  const byName = new Map(rows.map(r => [r.name, r]));
+  const kidsOf = new Map();
+  for (const r of rows) {
+    if (!r.family || !byName.has(r.family)) continue;
+    const l = kidsOf.get(r.family) || kidsOf.set(r.family, []).get(r.family);
+    l.push(r);
+  }
+  const done = new Set();
+  const roll = (r) => {
+    if (done.has(r.name)) return r;
+    done.add(r.name);                       // vor der Rekursion: Zyklusschutz
+    const kids = (kidsOf.get(r.name) || []).map(roll);
+    if (!kids.length) return r;
+    r.own = { ...r };                       // eigene Zahlen bleiben ablesbar
+    // ALLE Nachkommen, nicht nur die direkten Kinder: die Summe umfasst
+    // den ganzen Zweig, "Georgopol" traegt 8 Unterbereiche und nicht 3.
+    r.kidCount = kids.reduce((n, k) => n + 1 + (k.kidCount || 0), 0);
+    r.rolledUp = true;
+    for (const k of ROLLUP_SUM) {
+      const vals = [r.own[k], ...kids.map(x => x[k])].filter(v => v != null);
+      r[k] = vals.length ? vals.reduce((a, b) => a + b, 0) : null;
+    }
+    for (const [k, wKey] of Object.entries(ROLLUP_AVG)) {
+      let num = 0, den = 0;
+      for (const src of [r.own, ...kids]) {
+        const v = src[k], w = src[wKey];
+        if (v == null || !w) continue;
+        num += v * w; den += w;
+      }
+      r[k] = den ? num / den : null;
+    }
+    r.reliable = (r.drops || 0) >= RELIABLE_DROPS;
+    return r;
+  };
+  for (const r of rows) roll(r);
+}
+
+
 function renderSpotTable() {
   const head = document.getElementById("spotHead");
   const body = document.getElementById("spotRows");
@@ -641,6 +737,7 @@ function renderSpotTable() {
   head.innerHTML = spotHeadHtml();
 
   let rows = spotRows();
+  rollUpFamilies(rows);
   // Landungen der Kinder je Container aufsummieren. match_poi zaehlt eine
   // Landung immer beim KLEINSTEN umschliessenden POI — ein Container
   // bekommt also nur, was in keinem Kind liegt, und sieht ohne diese
@@ -766,7 +863,10 @@ function renderSpotTable() {
       // wird immer gezeigt, nur der Sprung braucht die Zeile.
       const ref = r.family || null;
       const refRow = ref ? rows.some(o => o.name === ref) : false;
-      let nameCell = PubgUI.esc(r.name);
+      const shown = shortSpotName(r.name, ref);
+      let nameCell = shown === r.name
+        ? PubgUI.esc(r.name)
+        : `<span title="${PubgUI.esc(r.name)}">${PubgUI.esc(shown)}</span>`;
       if (ref && refRow && grouped) {
         nameCell = `<span class="in-parent">↳</span> ` + nameCell
           + ` <button type="button" class="parent-ref"
@@ -781,17 +881,23 @@ function renderSpotTable() {
                  : " — nobody landed in " + PubgUI.esc(ref)
                    + " itself in this range, so it has no row."}"
                >in ${PubgUI.esc(ref)}</span>`;
-      } else if (r.kids && grouped) {
-        nameCell += ` <span class="kids-note" title="Landings inside the
-            ${r.kids.n} spots within this one. They count there, not here."
-            >+${num0(r.kids.mine)} in ${r.kids.n} inner spot${
-            r.kids.n === 1 ? "" : "s"}</span>`;
+      } else if (r.rolledUp) {
+        // Die Zeile traegt jetzt die Summe der Gegend. Ohne diesen Marker
+        // waere nicht zu sehen, dass die Zahlen weiter unten noch einmal
+        // einzeln stehen.
+        nameCell += ` <span class="kids-note" title="Totals for the whole
+            area: this spot plus the ${r.kidCount} spot${
+            r.kidCount === 1 ? "" : "s"} inside it (${num0(r.own.drops || 0)
+            } of your landings fall outside all of them). Those spots also
+            have their own rows."
+            >incl. ${r.kidCount} inner spot${r.kidCount === 1 ? "" : "s"}</span>`;
       }
       if (r.drops != null && !r.reliable) {
         nameCell += ' <span class="bot-mark">thin</span>';
       }
       return `<tr data-poi="${PubgUI.esc(r.name)}"
                   data-depth="${Math.min(r.depth || 0, 3)}"
+                  data-role="${r.rolledUp ? "parent" : (ref ? "child" : "solo")}"
                   class="${r.drops == null ? "nodata" : ""}${
                     LS._selected === r.name ? " sel" : ""}">
         <td>${nameCell}</td>
@@ -820,8 +926,11 @@ function renderSpotTable() {
     + "landing and inside the spot; <b>Squad held</b> is the share of rounds "
     + "where the squad was not wiped in that window. A high <b>Died alone</b> "
     + "next to a high <b>Squad held</b> is the clearest signal here: the spot "
-    + "works, you are the one losing it. Sub-areas without own landings point "
-    + "at the parent spot, where they are counted. "
+    + "works, you are the one losing it. Rows for a whole area (lighter "
+    + "text, marked <i>incl. N inner spots</i>) carry the totals of "
+    + "everything inside them, with rates weighted by landings; the inner "
+    + "spots also appear on their own lines, so do not add the two up. "
+    + "Sort by <b>Spot</b> to see them grouped under their area. "
     + (LS.playerMode === "any"
        ? "<b>Any of them</b>: every match with at least one of the named "
          + "players, their landings added up — they need not have played "
