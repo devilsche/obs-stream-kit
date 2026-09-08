@@ -67,6 +67,18 @@
     #spotRows tr[data-role="parent"] td { color: var(--theme-text, #f4f0f8); }
     #spotRows tr[data-role="parent"] td:first-child { font-weight: 600; }
     #spotRows tr[data-role="child"] td { color: var(--theme-text-dim, #a99cb8); }
+    /* Rate mit zu kleinem Nenner: lesbar, aber nicht als Befund. Kursiv
+       plus Sekundaerfarbe statt Transparenz — opacity haette den
+       Textkontrast unter die WCAG-Grenze gedrueckt, und Kursiv traegt die
+       Aussage auch ohne Farbe (1.4.1). Der Tooltip nennt den Nenner. */
+    #spotRows td.thin-rate {
+      font-style: italic;
+      color: var(--theme-text-dim, #a99cb8);
+    }
+    /* Auch in einer Container-Zeile, die sonst hell gesetzt ist. */
+    #spotRows tr[data-role="parent"] td.thin-rate {
+      color: var(--theme-text-dim, #a99cb8);
+    }
     /* Einrueckung nach Hierarchie-Tiefe. Erangel ist dreistufig:
        Georgopol > Georgopol - South > Georgopol - South Apartments. */
     #spotRows tr[data-depth="1"] td:first-child { padding-left: 1.1rem; }

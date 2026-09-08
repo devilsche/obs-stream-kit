@@ -613,6 +613,11 @@ function spotRows() {
         survivalMin: s ? s.survivalMin : null,
         avgPlace: s ? s.avgPlace : null,
         reliable: s ? s.reliable : false,
+        // Nenner der Raten. Ohne sie ist "0 %" nicht von "0 von 2" zu
+        // unterscheiden — und genau das war der Fall, ueber den man
+        // stolpert: bei 7 Tagen hat kein Platz mehr als 11 Runden.
+        lobbyDrops: s ? s.lobbyDrops : null,
+        squadRounds: s ? s.squadRounds : null,
         family,
       };
     });
@@ -667,14 +672,15 @@ function shortSpotName(name, parent) {
 }
 
 //: Additive Spalten — die darf man aufsummieren.
-const ROLLUP_SUM = ["lobby", "drops"];
+const ROLLUP_SUM = ["lobby", "drops", "lobbyDrops", "squadRounds"];
 //: Raten und Mittelwerte, gewichtet mit der Spalte dahinter. Eine
 //: ungewichtete Mittelung waere falsch: ein Unterbereich mit 1 Landung
 //: zaehlte dann so viel wie einer mit 57.
 const ROLLUP_AVG = {
-  squadHeldPct: "drops", earlyDeathPct: "drops", diedAlonePct: "drops",
-  survivalMin: "drops", avgPlace: "drops", diff: "drops",
-  lobbyEarlyPct: "lobby",
+  squadHeldPct: "squadRounds", diedAlonePct: "squadRounds",
+  earlyDeathPct: "drops", survivalMin: "drops", avgPlace: "drops",
+  diff: "drops",
+  lobbyEarlyPct: "lobbyDrops",
 };
 //: Ab so vielen eigenen Landungen traegt eine Zeile ihre Raten — dieselbe
 //: Schwelle wie RELIABLE_POI_DROPS im Backend.
@@ -727,6 +733,26 @@ function rollUpFamilies(rows) {
     return r;
   };
   for (const r of rows) roll(r);
+}
+
+
+/** Raten-Zelle mit ihrem Nenner.
+ *
+ * "0 %" allein ist nicht zu deuten: bei 7 Tagen hat kein Platz mehr als
+ * 11 eigene Runden, und "0 % died alone" aus 2 Runden sieht genauso aus
+ * wie aus 200. Unter RELIABLE_DROPS steht der Wert deshalb gedimmt — die
+ * Zahl bleibt lesbar, gibt sich aber nicht als Befund aus.
+ */
+function rateCell(value, denom, unit, cls) {
+  if (value == null) return `<td class="${cls}">—</td>`;
+  const n = denom || 0;
+  const thin = n > 0 && n < RELIABLE_DROPS;
+  const title = n > 0
+    ? `${value.toFixed(1)} % of ${num0(n)} ${unit}`
+      + (thin ? ` — too few to read as a result` : "")
+    : `${value.toFixed(1)} %`;
+  return `<td class="${cls}${thin ? " thin-rate" : ""}" title="${title}">`
+    + `${pct1(value)}</td>`;
 }
 
 
@@ -903,10 +929,10 @@ function renderSpotTable() {
         <td>${nameCell}</td>
         <td>${num0(r.lobby)}</td>
         <td>${r.drops == null ? "—" : num0(r.drops)}</td>
-        <td class="${heldCls}">${pct1(r.squadHeldPct)}</td>
-        <td>${pct1(r.earlyDeathPct)}</td>
-        <td class="${aloneCls}">${pct1(r.diedAlonePct)}</td>
-        <td>${pct1(r.lobbyEarlyPct)}</td>
+        ${rateCell(r.squadHeldPct, r.squadRounds, "rounds with a squad", heldCls)}
+        ${rateCell(r.earlyDeathPct, r.drops, "own landings", "")}
+        ${rateCell(r.diedAlonePct, r.squadRounds, "rounds with a squad", aloneCls)}
+        ${rateCell(r.lobbyEarlyPct, r.lobbyDrops, "lobby landings", "")}
         <td class="${diffCls}">${sign}</td>
         <td>${num1(r.survivalMin)}</td>
         <td>${num1(r.avgPlace)}</td>
@@ -931,6 +957,8 @@ function renderSpotTable() {
     + "everything inside them, with rates weighted by landings; the inner "
     + "spots also appear on their own lines, so do not add the two up. "
     + "Sort by <b>Spot</b> to see them grouped under their area. "
+    + "A rate in <i>italics</i> rests on fewer than "
+    + RELIABLE_DROPS + " observations — hover it for the count. "
     + (LS.playerMode === "any"
        ? "<b>Any of them</b>: every match with at least one of the named "
          + "players, their landings added up — they need not have played "
