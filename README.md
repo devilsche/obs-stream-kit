@@ -535,8 +535,22 @@ fällt aus dem Vergleich, sonst schlägt man sich selbst.
 (early < 5 min, mid 5–15 min, late > 15 min). Eine Trefferquote, die zur späten
 Phase hin abfällt, zeigt auf Feuerdisziplin auf Distanz, nicht auf das Zielen.
 
-*Deaths* — wann in der Runde, auf welche Distanz, durch welche Waffe und durch
-wen. Quelle sind `Kill`-Events mit `target_account = ich`.
+*Deaths* — wann in der Runde, auf welche Distanz, durch welche **Waffenklasse**
+(trennt „ich sterbe an SMGs im Nahkampf" von „ich werde gesnipert") und durch
+welche Waffe. Quelle sind `Kill`-Events mit `target_account = ich`.
+
+„Durch wen" ist bewusst keine Kachel: von 1099 Gegnern, die den Nutzer erledigt
+haben, kamen 1083 auf genau einen Kill und 16 auf zwei — keiner auf drei. Eine
+nach Häufigkeit sortierte Namensliste liest sich wie „das sind deine
+Angstgegner", zeigt aber nur, wer alphabetisch vorne steht. Wiederholungstäter ab
+`REPEAT_KILLER_MIN` (3) Toden stehen als Fußnote; gibt es keine, sagt die Zeile
+genau das.
+
+**Datenlage wird ausgewiesen, nicht verschwiegen.** Unter 20 Matches mit
+Telemetrie erscheint eine *Thin data*-Warnung (die Trefferquote ist dann vom
+Zufall einzelner Gefechte dominiert), unter 10 Referenzspielern eine
+*Small reference group*-Warnung. Tenant 2 hat etwa 640 Matches, aber nur 95 mit
+archivierter Telemetrie — die Schusswerte ruhen auf diesen 95.
 
 *Cohort bands* — Mittelwerte je K/D-Band, die eigene Zeile nach K/D
 einsortiert. Bewusst über den ganzen Bestand statt über den gewählten Zeitraum,

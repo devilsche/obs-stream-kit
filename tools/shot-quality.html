@@ -270,6 +270,19 @@
     const step5 = (v) => Math.max(0, Math.min(100,
       Math.round((v || 0) / 5) * 5));
 
+    // Unter so vielen Matches mit Telemetrie ist eine Trefferquote vom
+    // Zufall einzelner Gefechte dominiert — dann muss die Seite das sagen
+    // statt die Zahl als belastbar auszugeben.
+    const THIN_TELEMETRY = 20;
+
+    function thinNote(me) {
+      const n = me.telemetryMatches;
+      if (n == null || n >= THIN_TELEMETRY) return "";
+      return `<b>Thin data:</b> the shot metrics rest on ${n} match${n === 1 ? "" : "es"}
+              with telemetry — too few for a reliable rate. Treat every
+              percentile below as a hint, not a measurement.`;
+    }
+
     const PHASE_LABEL = { early: "Early (&lt;5 min)", mid: "Mid (5–15 min)",
                           late: "Late (&gt;15 min)" };
     // Keys wie in WEAPON_NAMES (pubg/aggregations.py) — dort heisst die
@@ -353,9 +366,11 @@
       document.getElementById("kpiSub").textContent = DATA.isSelf
         ? "Your own numbers for the selected range."
         : `${DATA.playerName || DATA.accountId} — selected range.`;
-      document.getElementById("kpiFoot").innerHTML = w20
-        ? `Deltas compare your last 20 matches with the 20 before them, so they do not move with the range switch.`
-        : `No delta yet — fewer than 40 matches with telemetry on record.`;
+      const thin = thinNote(me);
+      document.getElementById("kpiFoot").innerHTML = (thin ? thin + "<br>" : "")
+        + (w20
+           ? `Deltas compare your last 20 matches with the 20 before them, so they do not move with the range switch.`
+           : `No delta yet — fewer than 40 matches with telemetry on record.`);
       document.getElementById("kpiCard").hidden = false;
     }
 
@@ -381,6 +396,7 @@
       }
 
       const rk = DATA.ranks || {};
+      const nRef = REF === "lobby" ? rk.lobbyPlayers : (DATA.cohort || {}).players;
       document.getElementById("rankSub").innerHTML = REF === "lobby"
         ? `Against <b>${n0(rk.lobbyPlayers)}</b> opponents you have actually met,
            with at least ${rk.lobbyMinMatches} matches each. Broad, but shot metrics only —
@@ -388,9 +404,17 @@
         : `Against your squad and regulars with at least ${(DATA.cohort || {}).minMatches}
            matches: <b>${n0((DATA.cohort || {}).players)}</b> players. Small group, but the
            full picture including K/D, survival and consumables.`;
-      document.getElementById("rankFoot").textContent =
-        "Percentile = share of the reference group that is worse than you. "
-        + "For \"Deaths before 5 min\" a lower value counts as better.";
+      const thinR = thinNote(DATA.me || {});
+      const smallRef = (nRef != null && nRef < 10)
+        ? `<b>Small reference group:</b> only ${nRef} player${nRef === 1 ? "" : "s"}
+           qualify — a percentile over so few peers moves by large steps. `
+        : "";
+      document.getElementById("rankFoot").innerHTML = (thinR ? thinR + "<br>" : "")
+        + smallRef
+        + "Percentile = share of the reference group that is worse than you. "
+        + "For \"Deaths before 5 min\" a lower value counts as better. "
+        + "Your own lifetime profile is compared, not the selected range — "
+        + "otherwise a single session would be measured against career totals.";
       document.getElementById("rankCard").hidden = false;
     }
 
