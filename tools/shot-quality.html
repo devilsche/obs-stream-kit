@@ -43,9 +43,8 @@
     .bar > div, .bar > label { display: flex; flex-direction: column; gap: 4px; }
     .legend { font-size: 0.78em; color: var(--theme-text-dim, #8a7d99);
               letter-spacing: 0.04em; }
-    .poi-min { display: inline-flex; flex-direction: column; gap: 4px;
-               margin-left: 22px; vertical-align: bottom; }
-    .poi-min input { background: var(--theme-surface, #201a28);
+    .minrow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .minrow input { background: var(--theme-surface, #201a28);
                      color: var(--theme-text);
                      border: 1px solid var(--theme-line, #372c47);
                      border-radius: 4px; padding: 5px 8px; font: inherit;
@@ -288,9 +287,20 @@
         <button type="button" data-top="0" aria-pressed="false">All</button>
       </div>
     </div>
-    <label class="poi-min" for="fPoiMin">Min. landings
-      <input id="fPoiMin" type="number" min="1" max="99" value="1">
-    </label>
+    <div>
+      <span class="legend">Min. landings</span>
+      <div class="minrow">
+        <div class="switch" id="minSwitch" role="group"
+             aria-label="Minimum landings per spot">
+          <button type="button" data-min="1" aria-pressed="false">1</button>
+          <button type="button" data-min="5" aria-pressed="false">5</button>
+          <button type="button" data-min="20" aria-pressed="false">20</button>
+          <button type="button" data-min="50" aria-pressed="false">50</button>
+        </div>
+        <input id="fPoiMin" type="number" min="1" max="999" value="1"
+               aria-label="Minimum landings, exact value">
+      </div>
+    </div>
     <div class="scroll">
       <table>
         <thead id="poiHead"><tr></tr></thead>
@@ -331,7 +341,22 @@
     // Mindestzahl eigener Landungen, damit ein Platz in der Tabelle steht.
     // Rein clientseitig: die Daten liegen schon da, ein Reload waere
     // Verschwendung und der Filter soll sofort reagieren.
-    let POIMIN = Math.max(1, parseInt(PubgUI.qs("poiMin", "1"), 10) || 1);
+    //
+    // Ohne Vorgabe leitet sich die Schwelle aus der Zahl der Matches im
+    // gewaehlten Zeitraum ab: ein Platz zaehlt, wenn er mindestens diesen
+    // Anteil der Runden traegt. Bei 11 Matches sind das 1, bei 80 dann 4.
+    // Sobald der Nutzer eingreift, bleibt sein Wert stehen — auch beim
+    // Wechsel des Zeitraums.
+    const POIMIN_SHARE = 0.05;
+    // Deckel, weil die Matches sich über bis zu neun Karten verteilen: 5 %
+    // ALLER Runden erreicht bei 1113 Matches (Schwelle 56) nur noch 2 von
+    // 133 Plätzen auf 2 von 9 Karten. Ab RELIABLE_POI_DROPS ist eine Zeile
+    // ohnehin belastbar — mehr Schwelle bringt keine Qualität, nur Verlust.
+    const POIMIN_CAP = 20;
+    const autoMin = (matches) => Math.min(POIMIN_CAP,
+      Math.max(1, Math.round((matches || 0) * POIMIN_SHARE)));
+    let POIMIN = parseInt(PubgUI.qs("poiMin", ""), 10) || null;
+    let POIMIN_AUTO = !POIMIN;
     let DATA   = null;
 
     const n0 = (v) => v == null ? "—" : Math.round(v).toLocaleString("en-US");
@@ -818,8 +843,11 @@
         + `landings matched to a named spot, lobby reference from `
         + `<b>${n0(d.assigned)}</b> landings by all players. Rows under `
         + `${d.reliableDrops} drops are marked <b>thin</b> — their difference `
-        + `to the lobby swings by tens of points — raise <b>Min. landings</b> `
-        + `to hide them. Sub-areas count separately: "Cavala - Warehouses" `
+        + `to the lobby swings by tens of points. <b>Min. landings</b> starts `
+        + `at ${Math.round(POIMIN_SHARE * 100)} % of the matches in range, `
+        + `capped at ${POIMIN_CAP}`
+        + `${POIMIN_AUTO ? ` — ${n0(POIMIN)} here` : ""}, and stays where `
+        + `you put it once you change it. Sub-areas count separately: "Cavala - Warehouses" `
         + `is its own row, not part of "Cavala".`;
       document.getElementById("poiFoot").innerHTML =
         "<b>You died</b> counts one thing only: <b>you personally dead</b> — "
@@ -898,6 +926,14 @@
              id => document.getElementById(id).hidden = true);
           return;
         }
+        if (POIMIN_AUTO) {
+          POIMIN = autoMin(me.matches);
+          if (POIMIN) {
+      document.getElementById("fPoiMin").value = POIMIN;
+      press(document.getElementById("minSwitch"), "min", String(POIMIN));
+    }
+          press(document.getElementById("minSwitch"), "min", String(POIMIN));
+        }
         st.innerHTML = `<b>${n0(me.matches)}</b> matches`
           + (me.telemetryMatches != null && me.telemetryMatches !== me.matches
              ? ` · ${n0(me.telemetryMatches)} with telemetry` : "")
@@ -920,8 +956,22 @@
       press(e.currentTarget, "range", RANGE);
       load();
     });
+    document.getElementById("minSwitch").addEventListener("click", e => {
+      const b = e.target.closest("button[data-min]");
+      if (!b) return;
+      POIMIN = Number(b.dataset.min);
+      POIMIN_AUTO = false;
+      if (POIMIN) {
+      document.getElementById("fPoiMin").value = POIMIN;
+      press(document.getElementById("minSwitch"), "min", String(POIMIN));
+    }
+      press(e.currentTarget, "min", String(POIMIN));
+      if (DATA) renderPois();
+    });
     document.getElementById("fPoiMin").addEventListener("input", e => {
       POIMIN = Math.max(1, parseInt(e.target.value, 10) || 1);
+      POIMIN_AUTO = false;
+      press(document.getElementById("minSwitch"), "min", String(POIMIN));
       if (DATA) renderPois();
     });
     document.getElementById("poiHead").addEventListener("click", e => {
@@ -964,7 +1014,10 @@
     press(document.getElementById("rangeSwitch"), "range", RANGE);
     press(document.getElementById("refSwitch"), "ref", REF);
     press(document.getElementById("topSwitch"), "top", String(TOPN));
-    document.getElementById("fPoiMin").value = POIMIN;
+    if (POIMIN) {
+      document.getElementById("fPoiMin").value = POIMIN;
+      press(document.getElementById("minSwitch"), "min", String(POIMIN));
+    }
     load();
   </script>
 </body>
