@@ -759,13 +759,15 @@ function renderSpotTable() {
       const sign = r.diff == null ? "—"
         : (r.diff > 0 ? "+" : "\u2212") + Math.abs(r.diff).toFixed(1);
       // Kinder verweisen nach oben, Container zeigen was in ihnen steckt.
-      // Jedes Kind wird eingerueckt und verweist auf seinen Container —
-      // unabhaengig davon, ob es eigene Zahlen hat. Der Container ist im
-      // mine-Filter garantiert vorhanden, der Sprung trifft also immer.
-      const ref = r.family && rows.some(o => o.name === r.family)
-        ? r.family : null;
+      // Der Container-Name steht im Payload, auch wenn seine Zeile fehlt:
+      // bei range=session ist in "Georgopol" niemand gelandet, also gibt
+      // es dort keine Georgopol-Zeile — "Hospital" stand deshalb ohne
+      // jeden Bezug da, obwohl die Zugehoerigkeit bekannt ist. Der Name
+      // wird immer gezeigt, nur der Sprung braucht die Zeile.
+      const ref = r.family || null;
+      const refRow = ref ? rows.some(o => o.name === ref) : false;
       let nameCell = PubgUI.esc(r.name);
-      if (ref && grouped) {
+      if (ref && refRow && grouped) {
         nameCell = `<span class="in-parent">↳</span> ` + nameCell
           + ` <button type="button" class="parent-ref"
                data-jump="${PubgUI.esc(ref)}"
@@ -774,8 +776,10 @@ function renderSpotTable() {
                >in ${PubgUI.esc(ref)}</button>`;
       } else if (ref) {
         nameCell += ` <span class="in-note"
-               title="Lies inside ${PubgUI.esc(ref)}. Sort by name to see
-                      the spots grouped."
+               title="Lies inside ${PubgUI.esc(ref)}${refRow
+                 ? ". Sort by name to see the spots grouped."
+                 : " — nobody landed in " + PubgUI.esc(ref)
+                   + " itself in this range, so it has no row."}"
                >in ${PubgUI.esc(ref)}</span>`;
       } else if (r.kids && grouped) {
         nameCell += ` <span class="kids-note" title="Landings inside the
