@@ -617,10 +617,10 @@
       const solid = sorted.filter(r => r.reliable && r.diff != null);
       const worst = solid.sort((a, b) => b.diff - a.diff)[0];
       const lead = (worst && worst.diff > 3)
-        ? `Biggest outlier: <b>${esc(worst.poi)}</b> — `
-          + `${pct(worst.earlyDeathPct)} of your ${n0(worst.drops)} rounds from`
-          + ` there end before minute 5, the lobby there `
-          + `${pct(worst.lobbyEarlyPct)}. `
+        ? `Biggest reliable outlier: <b>${esc(worst.poi)}</b> — you lose the`
+          + ` landing fight in ${pct(worst.earlyDeathPct)} of your`
+          + ` ${n0(worst.drops)} rounds from there, the lobby at the same spot`
+          + ` in ${pct(worst.lobbyEarlyPct)}. `
         : "";
       document.getElementById("poiSub").innerHTML = lead
         + `<b>${n0(d.ownDrops)}</b> of your landings matched to a spot, `
