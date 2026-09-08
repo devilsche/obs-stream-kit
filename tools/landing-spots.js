@@ -21,6 +21,11 @@ const LS = {
   //: Auswertung aus /api/pubg/shot-quality, indexiert nach POI-Name der
   //: aktuellen Karte. null = noch nicht geladen, {} = keine Daten.
   stats: null,
+  //: "mine" zeigt nur Plaetze mit eigenen Landungen (rund 25 von 100) —
+  //: sonst besteht die Tabelle zu drei Vierteln aus Zeilen ohne eigene
+  //: Daten. "all" holt die ganze Lobby-Liste dazu.
+  scope: "mine",
+  _selected: null,
 };
 const SCATTER_COLORS = ["#f2b705", "#3cb44b", "#46f0f0", "#f032e6"];
 //: Abstand des POI-Namens vom Ortsmarker, in Bildschirm-Pixeln. Klein
@@ -186,7 +191,7 @@ async function refresh() {
     LS.data.totalMatches + " matches";
   await ensureMapImage();
   buildPlayersBar();
-  renderPoiList();
+  renderSpotTable();
   renderHeatmap();
 }
 
@@ -197,27 +202,6 @@ document.getElementById("rangeSwitch").addEventListener("click", e => {
   [...e.currentTarget.querySelectorAll("button")].forEach(x =>
     x.setAttribute("aria-pressed", String(x.dataset.range === LS.range)));
   refresh();
-});
-
-// Klick auf einen Landeplatz in der Liste zentriert ihn auf der Karte —
-// das war der fehlende Weg zwischen Zahlen und Ort.
-document.getElementById("poiList").addEventListener("click", e => {
-  const el = e.target.closest(".poi");
-  if (!el || !LS.data) return;
-  const poi = LS.data.pois.find(p => p.name === el.dataset.poi);
-  if (!poi || poi.cx == null) return;
-  // poi.cx/cy kommen schon normalisiert (0-1) aus dem Backend — genau das,
-  // was projXY erwartet. Hier wird dessen Formel invertiert: gesucht ist
-  // das Pan, bei dem der Ort in der Bildmitte landet.
-  const cnv = document.getElementById("heat");
-  const base = Math.min(cnv.width, cnv.height);
-  const offX = (cnv.width - base) / 2, offY = (cnv.height - base) / 2;
-  LS.view.zoom = Math.max(LS.view.zoom, 3);   // schon naeher? dann so lassen
-  const z = LS.view.zoom;
-  const px = offX + poi.cx * base, py = offY + poi.cy * base;
-  LS.view.panX = cnv.width / 2 - ((px - cnv.width / 2) * z + cnv.width / 2);
-  LS.view.panY = cnv.height / 2 - ((py - cnv.height / 2) * z + cnv.height / 2);
-  renderHeatmap();
 });
 
 // ---------------------------------------------------------------------------
@@ -412,41 +396,9 @@ function buildPlayersBar() {
 // Task 11: POI-Liste mit per-Spieler-Aufschlüsselung + Hover-Verknüpfung
 // ---------------------------------------------------------------------------
 
-function renderPoiList() {
-  const host = document.getElementById("poiList");
-  if (!LS.data || !LS.data.pois.length) {
-    host.innerHTML = `<p>No landings for this selection.</p>`;
-    return;
-  }
-  const intens = (p) => (p.landings != null ? p.landings : p.total);
-  const maxTotal = Math.max(1, ...LS.data.pois.map(intens));
-  // Ausgewählte Spieler → Orte mit deren Landings sollen aufgeklappt starten.
-  const selectedAccs = LS.players.filter(Boolean).map(p => p.accountId);
-  host.innerHTML = LS.data.pois.map(poi => {
-    const players = Object.entries(poi.byPlayer)
-      .sort((a, b) => b[1].count - a[1].count)
-      .map(([acc, v]) =>
-        `<div class="poi-player"><span>${v.name}${botMark(acc)}</span>`
-        + `<span>${v.count}× · ${v.pct}%</span></div>`).join("");
-    const w = Math.round(intens(poi) / maxTotal * 100);
-    const open = selectedAccs.length && selectedAccs.some(a => poi.byPlayer[a]);
-    return `
-      <details class="poi" data-poi="${poi.name}"${open ? " open" : ""}>
-        <summary>
-          <div class="poi-head">
-            <span>${poi.name}</span><span>${intens(poi)}×</span>
-          </div>
-          <div class="bar" style="--w:${w}%" role="presentation"></div>
-        </summary>
-        <div class="poi-players">${players}</div>
-        ${poiStatsHtml(poi.name)}
-      </details>`;
-  }).join("");
-}
-
 //: Analyse je Landeplatz dazuholen. Eigener Endpoint, eigener Aufruf: die
-//: Heatmap kommt aus landing-heatmap (alle Spieler der Lobby, eine Karte),
-//: die Bewertung aus shot-quality (eigener Account, alle Karten). Beide
+//: Heatmap kommt aus landing-heatmap (Lobby-Intensitaet, eine Karte), die
+//: Bewertung aus shot-quality (eigener Account, alle Karten). Beide
 //: bekommen denselben `range`.
 async function loadStats() {
   LS.stats = null;
@@ -465,65 +417,180 @@ async function loadStats() {
   }
 }
 
-function pct1(v) { return v == null ? "—" : v.toFixed(1) + " %"; }
+const pct1 = (v) => v == null ? "—" : v.toFixed(1) + " %";
+const num0 = (v) => v == null ? "—" : Math.round(v).toLocaleString("en-US");
+const num1 = (v) => v == null ? "—" : v.toFixed(1);
 
-//: Zahlenblock unter einem Landeplatz. Bewusst dieselben Groessen und
-//: Richtungen wie im Shot-Quality-Tool, damit man nicht zwei Sprachen
-//: lernen muss.
-function poiStatsHtml(name) {
-  if (LS.stats === null) return "";
-  const s = LS.stats[name];
-  if (!s) {
-    // Kein eigener Drop hier. Wenn der Ort ein Unterbereich ist
-    // ("Bootyard - Warehouses") und der Oberplatz Zahlen hat, dann liegen
-    // die Daten dort — das muss dastehen. "Nichts hier" ist in dem Fall
-    // schlicht falsch: gelandet wurde, nur eine Polygon-Grenze weiter.
-    const base = name.split(" - ")[0];
-    const parent = base !== name ? LS.stats[base] : null;
-    if (parent) {
-      return `<p class="poi-nostats">Your landings here are counted under
-              <button type="button" class="poi-jump" data-jump="${base}">
-              ${PubgUI.esc(base)}</button> — ${parent.drops} drop${
-              parent.drops === 1 ? "" : "s"} there.</p>`;
-    }
-    // Umgekehrt: Oberplatz ohne eigene Drops, aber Unterbereiche mit.
-    const kids = Object.keys(LS.stats)
-      .filter(k => k.startsWith(name + " - "));
-    if (kids.length) {
-      return `<p class="poi-nostats">Your landings are counted under `
-        + kids.map(k => `<button type="button" class="poi-jump"
-            data-jump="${k}">${PubgUI.esc(k.split(" - ").slice(1).join(" - "))}</button>`
-            + ` (${LS.stats[k].drops})`).join(", ")
-        + `.</p>`;
-    }
-    return `<p class="poi-nostats">No own landing here in this range —
-            the bar above counts every player in the lobby.</p>`;
+//: Spalten der Spot-Tabelle. `good` sagt, welche Richtung besser ist —
+//: die Tabelle mischt zwangslaeufig beide, und ohne Marker muss man jede
+//: Spalte einzeln durchdenken.
+const SPOT_COLS = [
+  { key: "name", label: "Spot", text: true },
+  { key: "lobby", label: "Lobby", help: "Landings by everyone in the lobby" },
+  { key: "drops", label: "Mine", help: "Your own landings here" },
+  { key: "squadHeldPct", label: "Squad held", good: "up",
+    help: "Share of rounds where your squad was NOT wiped within 5 min of your landing" },
+  { key: "earlyDeathPct", label: "You died", good: "down",
+    help: "Share of your rounds where YOU die within 5 min of landing, inside the spot" },
+  { key: "diedAlonePct", label: "Died alone", good: "down",
+    help: "You dead, squad still standing — the spot works and you are losing it" },
+  { key: "lobbyEarlyPct", label: "Lobby died", good: "down",
+    help: "Same measure for everyone who lands here" },
+  { key: "diff", label: "Diff", good: "down",
+    help: "Your death rate minus the lobby rate at the same spot" },
+  { key: "survivalMin", label: "\u00d8 Surv", good: "up" },
+  { key: "avgPlace", label: "\u00d8 Place", good: "down" },
+];
+let SPOT_SORT = "lobby";
+let SPOT_DIR = -1;
+
+function spotRows() {
+  if (!LS.data) return [];
+  const intens = (p) => (p.landings != null ? p.landings : p.total);
+  return LS.data.pois
+    .filter(p => p.name !== "—")
+    .map(p => {
+      const s = (LS.stats || {})[p.name] || null;
+      // Kein eigener Drop hier? Dann liegen die Daten vielleicht beim
+      // Oberplatz — "nichts hier" waere falsch, gelandet wurde, nur eine
+      // Polygon-Grenze weiter.
+      const base = p.name.split(" - ")[0];
+      const parent = (!s && base !== p.name && (LS.stats || {})[base])
+        ? base : null;
+      return {
+        name: p.name, poi: p, lobby: intens(p), parent,
+        drops: s ? s.drops : null,
+        squadHeldPct: s ? s.squadHeldPct : null,
+        earlyDeathPct: s ? s.earlyDeathPct : null,
+        diedAlonePct: s ? s.diedAlonePct : null,
+        lobbyEarlyPct: s ? s.lobbyEarlyPct : null,
+        diff: s ? s.diff : null,
+        survivalMin: s ? s.survivalMin : null,
+        avgPlace: s ? s.avgPlace : null,
+        reliable: s ? s.reliable : false,
+      };
+    });
+}
+
+function spotHeadHtml() {
+  return "<tr>" + SPOT_COLS.map(c => {
+    const active = c.key === SPOT_SORT;
+    const arrow = active ? (SPOT_DIR < 0 ? "\u25bc" : "\u25b2") : "";
+    const aria = active ? (SPOT_DIR < 0 ? "descending" : "ascending") : "none";
+    const dir = c.good ? `<span class="goal" aria-hidden="true">${
+      c.good === "up" ? "\u2191" : "\u2193"}</span>` : "";
+    const note = c.good ? ` (${c.good === "up" ? "higher" : "lower"} is better)` : "";
+    return `<th data-sort="${c.key}" tabindex="0" aria-sort="${aria}"`
+      + ` class="${active ? "active" : ""}"`
+      + ` title="${PubgUI.esc((c.help || c.label) + note)}">`
+      + `${PubgUI.esc(c.label)}${dir}`
+      + `<span class="sort-arrow">${arrow}</span></th>`;
+  }).join("") + "</tr>";
+}
+
+function renderSpotTable() {
+  const head = document.getElementById("spotHead");
+  const body = document.getElementById("spotRows");
+  if (!head || !body) return;
+  head.innerHTML = spotHeadHtml();
+
+  let rows = spotRows();
+  const total = rows.length;
+  if (LS.scope === "mine") rows = rows.filter(r => r.drops != null || r.parent);
+
+  const col = SPOT_COLS.find(c => c.key === SPOT_SORT) || SPOT_COLS[1];
+  rows.sort((a, b) => {
+    const va = a[SPOT_SORT], vb = b[SPOT_SORT];
+    if (col.text) return String(va || "").localeCompare(String(vb || "")) * SPOT_DIR;
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;      // Leere immer nach unten
+    if (vb == null) return -1;
+    return (va - vb) * SPOT_DIR;
+  });
+
+  document.getElementById("spotCount").textContent =
+    `${rows.length} of ${total} spots`;
+
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="${SPOT_COLS.length}">`
+      + `No spot with own landings in this range — switch to All spots `
+      + `or widen the range.</td></tr>`;
+  } else {
+    body.innerHTML = rows.map(r => {
+      const cls = (k, v, bad, good) => {
+        if (v == null) return "";
+        return bad(v) ? "bad" : (good && good(v) ? "good" : "");
+      };
+      const diffCls = cls("diff", r.diff, v => v > 3, v => v < -3);
+      const heldCls = cls("h", r.squadHeldPct, v => v < 50, v => v >= 75);
+      const aloneCls = (r.diedAlonePct != null && r.diedAlonePct >= 15
+                        && (r.squadHeldPct ?? 0) >= 50) ? "bad" : "";
+      const sign = r.diff == null ? "—"
+        : (r.diff > 0 ? "+" : "\u2212") + Math.abs(r.diff).toFixed(1);
+      const nameCell = r.parent
+        ? `${PubgUI.esc(r.name)} <button type="button" class="parent-ref"
+             data-jump="${PubgUI.esc(r.parent)}">→ ${PubgUI.esc(r.parent)}</button>`
+        : PubgUI.esc(r.name) + (r.drops != null && !r.reliable
+            ? ' <span class="bot-mark">thin</span>' : "");
+      return `<tr data-poi="${PubgUI.esc(r.name)}"
+                  class="${r.drops == null ? "nodata" : ""}${
+                    LS._selected === r.name ? " sel" : ""}">
+        <td>${nameCell}</td>
+        <td>${num0(r.lobby)}</td>
+        <td>${r.drops == null ? "—" : num0(r.drops)}</td>
+        <td class="${heldCls}">${pct1(r.squadHeldPct)}</td>
+        <td>${pct1(r.earlyDeathPct)}</td>
+        <td class="${aloneCls}">${pct1(r.diedAlonePct)}</td>
+        <td>${pct1(r.lobbyEarlyPct)}</td>
+        <td class="${diffCls}">${sign}</td>
+        <td>${num1(r.survivalMin)}</td>
+        <td>${num1(r.avgPlace)}</td>
+      </tr>`;
+    }).join("");
   }
-  const diffCls = s.diff == null ? ""
-    : (s.diff > 3 ? "bad" : (s.diff < -3 ? "good" : ""));
-  const heldCls = s.squadHeldPct == null ? ""
-    : (s.squadHeldPct >= 75 ? "good" : (s.squadHeldPct < 50 ? "bad" : ""));
-  const aloneCls = (s.diedAlonePct != null && s.diedAlonePct >= 15
-                    && (s.squadHeldPct ?? 0) >= 50) ? "bad" : "";
-  const sign = s.diff == null ? "—"
-    : (s.diff > 0 ? "+" : "\u2212") + Math.abs(s.diff).toFixed(1);
-  return `
-    <div class="poi-stats">
-      <div><span class="k">Your drops</span><span class="v">${s.drops}</span></div>
-      <div><span class="k">Squad held</span>
-           <span class="v ${heldCls}">${pct1(s.squadHeldPct)}</span></div>
-      <div><span class="k">You died</span><span class="v">${pct1(s.earlyDeathPct)}</span></div>
-      <div><span class="k">Died alone</span>
-           <span class="v ${aloneCls}">${pct1(s.diedAlonePct)}</span></div>
-      <div><span class="k">Lobby</span><span class="v">${pct1(s.lobbyEarlyPct)}</span></div>
-      <div><span class="k">Diff</span><span class="v ${diffCls}">${sign}</span></div>
-      <div><span class="k">\u00d8 Survival</span>
-           <span class="v">${s.survivalMin == null ? "—" : s.survivalMin.toFixed(1) + " min"}</span></div>
-      <div><span class="k">\u00d8 Place</span>
-           <span class="v">${s.avgPlace == null ? "—" : s.avgPlace.toFixed(1)}</span></div>
-    </div>
-    ${s.reliable ? "" : `<p class="poi-thin">thin sample — ${s.drops} own
-      landing${s.drops === 1 ? "" : "s"}</p>`}`;
+
+  document.getElementById("spotFoot").innerHTML =
+    "Click a row to centre that spot on the map. <b>Lobby</b> counts every "
+    + "landing there, <b>Mine</b> only yours. <b>You died</b> means you "
+    + "personally dead — not knocked-and-revived — within 5 min of your own "
+    + "landing and inside the spot; <b>Squad held</b> is the share of rounds "
+    + "where the squad was not wiped in that window. A high <b>Died alone</b> "
+    + "next to a high <b>Squad held</b> is the clearest signal here: the spot "
+    + "works, you are the one losing it. Sub-areas without own landings point "
+    + "at the parent spot, where they are counted.";
+}
+
+function onSpotSort(th) {
+  const key = th.dataset.sort;
+  const col = SPOT_COLS.find(c => c.key === key);
+  if (SPOT_SORT === key) SPOT_DIR *= -1;
+  else { SPOT_SORT = key; SPOT_DIR = col && col.text ? 1 : -1; }
+  renderSpotTable();
+  const again = document.querySelector(`#spotHead th[data-sort="${key}"]`);
+  if (again) again.focus();
+}
+
+//: Ort auf der Karte zentrieren. Invertiert die projXY-Formel; poi.cx/cy
+//: kommen schon normalisiert (0-1) aus dem Backend.
+function centreOnPoi(poi) {
+  if (!poi || poi.cx == null) return;
+  const cnv = document.getElementById("heat");
+  const base = Math.min(cnv.width, cnv.height);
+  const offX = (cnv.width - base) / 2, offY = (cnv.height - base) / 2;
+  LS.view.zoom = Math.max(LS.view.zoom, 3);
+  const z = LS.view.zoom;
+  const px = offX + poi.cx * base, py = offY + poi.cy * base;
+  LS.view.panX = cnv.width / 2 - ((px - cnv.width / 2) * z + cnv.width / 2);
+  LS.view.panY = cnv.height / 2 - ((py - cnv.height / 2) * z + cnv.height / 2);
+}
+
+function selectSpot(name) {
+  LS._selected = name;
+  LS._hoverPoi = name;
+  const poi = (LS.data && LS.data.pois.find(p => p.name === name)) || null;
+  centreOnPoi(poi);
+  renderSpotTable();
+  renderHeatmap();
 }
 
 function highlightPoi(name) {
@@ -531,25 +598,35 @@ function highlightPoi(name) {
   renderHeatmap();
 }
 
-// Sprung zum Ort, unter dem die eigenen Landungen gezaehlt werden.
-document.getElementById("poiList").addEventListener("click", e => {
-  const btn = e.target.closest(".poi-jump");
-  if (!btn) return;
-  e.stopPropagation();          // nicht zusaetzlich die Karte zentrieren
-  const target = document.querySelector(
-    `.poi[data-poi="${btn.dataset.jump.replace(/"/g, '\\"')}"]`);
-  if (!target) return;
-  target.open = true;
-  target.scrollIntoView({ block: "center" });
-  highlightPoi(btn.dataset.jump);
+document.getElementById("spotRows").addEventListener("click", e => {
+  const jump = e.target.closest(".parent-ref");
+  if (jump) { selectSpot(jump.dataset.jump); return; }
+  const tr = e.target.closest("tr[data-poi]");
+  if (tr) selectSpot(tr.dataset.poi);
 });
-
-document.getElementById("poiList").addEventListener("mouseover", e => {
-  const el = e.target.closest(".poi");
-  if (el) highlightPoi(el.dataset.poi);
+document.getElementById("spotRows").addEventListener("mouseover", e => {
+  const tr = e.target.closest("tr[data-poi]");
+  if (tr && tr.dataset.poi !== LS._hoverPoi) highlightPoi(tr.dataset.poi);
 });
-document.getElementById("poiList").addEventListener("mouseout", e => {
-  if (e.target.closest(".poi")) highlightPoi(null);
+document.getElementById("spotRows").addEventListener("mouseout", e => {
+  if (e.target.closest("tr[data-poi]")) highlightPoi(LS._selected || null);
+});
+document.getElementById("spotHead").addEventListener("click", e => {
+  const th = e.target.closest("th[data-sort]");
+  if (th) onSpotSort(th);
+});
+document.getElementById("spotHead").addEventListener("keydown", e => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const th = e.target.closest("th[data-sort]");
+  if (th) { e.preventDefault(); onSpotSort(th); }
+});
+document.getElementById("scopeSwitch").addEventListener("click", e => {
+  const b = e.target.closest("button[data-scope]");
+  if (!b || b.dataset.scope === LS.scope) return;
+  LS.scope = b.dataset.scope;
+  [...e.currentTarget.querySelectorAll("button")].forEach(x =>
+    x.setAttribute("aria-pressed", String(x.dataset.scope === LS.scope)));
+  renderSpotTable();
 });
 
 // ---------------------------------------------------------------------------
