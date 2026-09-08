@@ -949,13 +949,6 @@
              id => document.getElementById(id).hidden = true);
           return;
         }
-        if (POIMIN_AUTO) {
-          POIMIN = autoMin(me.matches);
-          document.getElementById("fPoiMin").value = POIMIN || "";
-    press(document.getElementById("minSwitch"), "min",
-          POIMIN ? String(POIMIN) : "auto");
-          press(document.getElementById("minSwitch"), "min", String(POIMIN));
-        }
         st.innerHTML = `<b>${n0(me.matches)}</b> matches`
           + (me.telemetryMatches != null && me.telemetryMatches !== me.matches
              ? ` · ${n0(me.telemetryMatches)} with telemetry` : "")
@@ -981,18 +974,17 @@
     document.getElementById("minSwitch").addEventListener("click", e => {
       const b = e.target.closest("button[data-min]");
       if (!b) return;
-      POIMIN = Number(b.dataset.min);
-      POIMIN_AUTO = false;
+      // null = Auto, also 5 % je Karte im Renderer
+      POIMIN = b.dataset.min === "auto" ? null : Number(b.dataset.min);
       document.getElementById("fPoiMin").value = POIMIN || "";
-    press(document.getElementById("minSwitch"), "min",
-          POIMIN ? String(POIMIN) : "auto");
-      press(e.currentTarget, "min", String(POIMIN));
+      press(e.currentTarget, "min", POIMIN ? String(POIMIN) : "auto");
       if (DATA) renderPois();
     });
     document.getElementById("fPoiMin").addEventListener("input", e => {
-      POIMIN = Math.max(1, parseInt(e.target.value, 10) || 1);
-      POIMIN_AUTO = false;
-      press(document.getElementById("minSwitch"), "min", String(POIMIN));
+      const v = parseInt(e.target.value, 10);
+      POIMIN = v > 0 ? v : null;   // leeres Feld heisst zurueck auf Auto
+      press(document.getElementById("minSwitch"), "min",
+            POIMIN ? String(POIMIN) : "auto");
       if (DATA) renderPois();
     });
     document.getElementById("poiHead").addEventListener("click", e => {
