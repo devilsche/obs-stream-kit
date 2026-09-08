@@ -6,12 +6,14 @@
   ich damit" — nicht "wie viele Kills habe ich". Quelle sind
   match_weapon_stats, participants und telemetry_events.
 
-  Fuenf Sektionen:
+  Sieben Sektionen:
     1. Shot quality    — Trefferquote, Schaden/100 Schuss, Anteil im Gefecht
     2. Where you rank  — Perzentil gegen Squad- und Lobby-Referenz
     3. By round phase  — dieselben Werte je Rundenphase (early/mid/late)
     4. Deaths          — wann, wodurch, durch wen
     5. Cohort bands    — Mittelwerte je K/D-Band, eigene Zeile eingereiht
+    6. Landing spots   — eigene Landeplaetze gegen die Lobby am selben Ort
+    7. Trend           — letzte 20/50/100 Matches gegen die davor
 
   Der Trend ist bewusst NICHT an den Range gekoppelt: eine Session hat zu
   wenige Matches, um eine Trefferquote zu tragen. Er vergleicht immer die
@@ -123,6 +125,10 @@
     tbody tr.me > td:first-child { font-weight: 700; }
     tbody tr.floor > * { color: var(--theme-text-dim, #8a7d99); font-style: italic; }
     td.hi { color: var(--theme-accent, #f2b705); font-weight: 500; }
+    /* Diff-Spalte: Vorzeichen traegt die Aussage, nicht nur die Farbe —
+       deshalb steht das + bzw. − immer mit im Text. */
+    td.diff-bad  { color: var(--theme-danger, #e57b7b); font-weight: 500; }
+    td.diff-good { color: var(--theme-ok, #6cc294); font-weight: 500; }
     td.lo { color: var(--theme-danger, #e57b7b); }
 
     .dists { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
@@ -231,6 +237,24 @@
       </table>
     </div>
     <p class="foot" id="cohortFoot"></p>
+  </div>
+
+  <div class="t-card" id="poiCard" hidden>
+    <h2>Landing spots</h2>
+    <p class="sub" id="poiSub"></p>
+    <div class="scroll">
+      <table>
+        <thead><tr>
+          <th>Landing spot</th><th>Map</th><th>Your drops</th>
+          <th title="Share of your rounds from here that end before minute 5">Dead &lt;5min</th>
+          <th title="Same figure for everyone who lands here">Lobby</th>
+          <th title="Your rate minus the lobby rate at the same spot">Diff</th>
+          <th>Ø Survival</th><th>Ø Kills</th><th>Ø Damage</th><th>Ø Place</th>
+        </tr></thead>
+        <tbody id="poiRows"></tbody>
+      </table>
+    </div>
+    <p class="foot" id="poiFoot"></p>
   </div>
 
   <div class="t-card" id="trendCard" hidden>
@@ -546,6 +570,64 @@
         + "are the more reliable figure.";
     }
 
+    // ── Landing spots ───────────────────────────────────────────────────────
+    const MAP_LABEL = {
+      Baltic_Main: "Erangel", Erangel_Main: "Erangel", Desert_Main: "Miramar",
+      Savage_Main: "Sanhok", DihorOtok_Main: "Vikendi", Tiger_Main: "Taego",
+      Kiki_Main: "Deston", Neon_Main: "Rondo", Summerland_Main: "Karakin",
+      Chimera_Main: "Paramo", Heaven_Main: "Haven", Range_Main: "Camp Jackal",
+    };
+
+    function renderPois() {
+      const d = DATA.landings || {};
+      const rows = d.byPoi || [];
+      document.getElementById("poiCard").hidden = !rows.length;
+      if (!rows.length) return;
+
+      // Nach Auffälligkeit sortieren, nicht nach Häufigkeit: der Platz mit
+      // der größten Differenz zur Lobby ist der, der etwas zu sagen hat.
+      const sorted = rows.slice().sort((a, b) =>
+        (b.diff ?? -99) - (a.diff ?? -99));
+
+      document.getElementById("poiRows").innerHTML = sorted.map(r => {
+        const cls = r.diff == null ? ""
+          : (r.diff > 3 ? "diff-bad" : (r.diff < -3 ? "diff-good" : ""));
+        const sign = r.diff == null ? "—"
+          : (r.diff > 0 ? "+" : "\u2212") + Math.abs(r.diff).toFixed(1);
+        return `<tr>
+          <td>${esc(r.poi)}</td>
+          <td>${esc(MAP_LABEL[r.map] || r.map)}</td>
+          <td>${n0(r.drops)}</td>
+          <td>${pct(r.earlyDeathPct)}</td>
+          <td>${r.lobbyEarlyPct == null ? "—" : pct(r.lobbyEarlyPct)
+                + `<span class="d"> (${n0(r.lobbyDrops)})</span>`}</td>
+          <td class="${cls}">${sign}</td>
+          <td>${n1(r.survivalMin)}</td>
+          <td>${n2(r.avgKills)}</td>
+          <td>${n0(r.avgDamage)}</td>
+          <td>${n1(r.avgPlace)}</td>
+        </tr>`;
+      }).join("");
+
+      const worst = sorted[0];
+      const lead = (worst && worst.diff != null && worst.diff > 3)
+        ? `Biggest outlier: <b>${esc(worst.poi)}</b> — `
+          + `${pct(worst.earlyDeathPct)} of your ${n0(worst.drops)} rounds from`
+          + ` there end before minute 5, the lobby there `
+          + `${pct(worst.lobbyEarlyPct)}. `
+        : "";
+      document.getElementById("poiSub").innerHTML = lead
+        + `<b>${n0(d.ownDrops)}</b> of your landings matched to a spot, `
+        + `lobby reference from <b>${n0(d.assigned)}</b> landings by all `
+        + `players. Spots with at least ${d.minDrops} of your own drops.`;
+      document.getElementById("poiFoot").innerHTML =
+        "<b>Diff</b> is your early-death rate minus the rate of everyone who "
+        + "lands at the same spot — that separates \"tough spot\" from \"I "
+        + "lose the landing fight here\". A death only counts when it happens "
+        + "within 5 minutes of landing AND inside the landing spot itself; "
+        + "rotating out and dying elsewhere is not a lost landing fight.";
+    }
+
     // ── Trend ───────────────────────────────────────────────────────────────
     function renderTrend() {
       const rows = DATA.trend || [];
@@ -581,6 +663,7 @@
       renderPhases();
       renderDeaths();
       renderCohort();
+      renderPois();
       renderTrend();
     }
 
@@ -599,7 +682,8 @@
         if (!me.matches) {
           st.textContent = "No BR matches in this range — widen it?";
           ["kpiCard", "rankCard", "phaseCard", "deathCard", "cohortCard",
-           "trendCard"].forEach(id => document.getElementById(id).hidden = true);
+           "poiCard", "trendCard"].forEach(
+             id => document.getElementById(id).hidden = true);
           return;
         }
         st.innerHTML = `<b>${n0(me.matches)}</b> matches`
@@ -612,7 +696,8 @@
         st.classList.add("err");
         st.textContent = "Error: " + (e && e.message || e);
         ["kpiCard", "rankCard", "phaseCard", "deathCard", "cohortCard",
-         "trendCard"].forEach(id => document.getElementById(id).hidden = true);
+         "poiCard", "trendCard"].forEach(
+           id => document.getElementById(id).hidden = true);
       }
     }
 

@@ -510,7 +510,7 @@ Beantwortet „wie gut sitzt jede Kugel, wann sterbe ich, und wo stehe ich damit
 nicht „wie viele Kills habe ich". Parameter: `?range=session|day|week|all`,
 `player=` (Default: eigener Account), `minMatches=` (Kohorten-Schwelle, Default 20).
 
-Sechs Sektionen:
+Sieben Sektionen:
 
 *Shot quality* — Trefferquote, **Schaden je 100 Schuss** (bündelt Quote und
 Trefferwucht in eine Zahl), **Anteil der Schüsse im Gefecht**, Kopftreffer-Anteil,
@@ -555,6 +555,25 @@ archivierter Telemetrie — die Schusswerte ruhen auf diesen 95.
 *Cohort bands* — Mittelwerte je K/D-Band, die eigene Zeile nach K/D
 einsortiert. Bewusst über den ganzen Bestand statt über den gewählten Zeitraum,
 damit die Referenz beim Range-Wechsel nicht springt.
+
+*Landing spots* — eigene Landeplätze gegen die Lobby **am selben Ort**. Die
+eigene Frühtod-Quote allein sagt nur, ob ein Platz umkämpft ist; erst die
+Differenz zur Lobby-Quote desselben POI trennt „schwieriger Platz" von „ich
+verliere hier den Landefight". Sortiert nach dieser Differenz, nicht nach
+Häufigkeit — der auffällige Platz steht oben.
+
+Ein Tod zählt nur, wenn er **binnen fünf Minuten nach der Landung UND im
+Landeplatz selbst** passiert. Beide Bezugspunkte sind bewusst gewählt: die
+Landezeit statt des Rundenstarts, damit die eigene und die Lobby-Quote
+dasselbe messen, und die Ortsbindung, weil wer wegrotiert und woanders fällt
+den Landefight nicht dort verloren hat.
+
+Geometrie aus `data/pubg-pois.json` über `pubg/poi_match.py` — dieselbe Quelle
+wie POI-Editor und Landing-Heatmap, keine zweite Wahrheit. Läuft komplett live:
+die Bounding-Box-Vorfilterung ordnet 139.000 Landungen aller Karten in unter
+einer Sekunde zu, eine vorberechnete Tabelle wäre unnötiger Ballast. Erangel
+heißt in der Telemetrie teils `Erangel_Main` und in der POI-Datei
+`Baltic_Main`; `MAP_ALIASES` gleicht das ab.
 
 *Trend* — die letzten 20 / 50 / 100 Matches gegen die gleich langen davor.
 **Nicht** an `range` gekoppelt: eine Session hat zu wenige Matches, um eine

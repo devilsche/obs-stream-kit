@@ -401,6 +401,171 @@ def test_compute_shot_quality_returns_all_sections(pg_compat):
     out = sq.compute_shot_quality(conn, t1, "account.me",
                                   cutoff="1970-01-01T00:00:00Z",
                                   min_matches=1)
-    for key in ("me", "byPhase", "deaths", "cohort", "ranks", "trend"):
+    for key in ("me", "byPhase", "deaths", "cohort", "ranks", "trend",
+                "landings"):
         assert key in out, f"Sektion {key} fehlt"
     assert out["me"]["matches"] == 4
+
+
+# ── POI-Zuordnung ───────────────────────────────────────────────────────────
+
+SQUARE = [[1000, 1000], [2000, 1000], [2000, 2000], [1000, 2000]]
+POIS = {"Baltic_Main": {"mapKm": 8, "regions": [
+    {"name": "Testville", "points": SQUARE},
+    {"name": "Nachbar", "points": [[3000, 3000], [4000, 3000],
+                                   [4000, 4000], [3000, 4000]]},
+]}}
+
+
+def test_poi_boxes_carry_bounding_box_for_prefilter():
+    boxes = sq.poi_boxes(POIS)
+    entry = next(b for b in boxes["Baltic_Main"] if b[0] == "Testville")
+    assert entry[1:5] == (1000, 2000, 1000, 2000)
+
+
+def test_poi_at_finds_the_containing_region():
+    boxes = sq.poi_boxes(POIS)
+    assert sq.poi_at(boxes, "Baltic_Main", 1500, 1500) == "Testville"
+    assert sq.poi_at(boxes, "Baltic_Main", 3500, 3500) == "Nachbar"
+
+
+def test_poi_at_returns_none_outside_every_region():
+    boxes = sq.poi_boxes(POIS)
+    assert sq.poi_at(boxes, "Baltic_Main", 9000, 9000) is None
+
+
+def test_poi_at_tolerates_unknown_map_and_missing_coords():
+    boxes = sq.poi_boxes(POIS)
+    assert sq.poi_at(boxes, "Unknown_Main", 1500, 1500) is None
+    assert sq.poi_at(boxes, "Baltic_Main", None, 1500) is None
+
+
+def test_poi_at_maps_erangel_alias():
+    """Die Telemetrie nennt Erangel teils Erangel_Main, die POI-Datei
+    Baltic_Main — der Endpoint gleicht das schon ab, hier auch."""
+    boxes = sq.poi_boxes(POIS)
+    assert sq.poi_at(boxes, "Erangel_Main", 1500, 1500) == "Testville"
+
+
+def test_first_landing_per_player_keeps_the_earliest():
+    rows = [
+        {"match_id": "m1", "actor_account": "a", "timestamp_ms": 500,
+         "actor_x": 1, "actor_y": 1, "map_name": "M"},
+        {"match_id": "m1", "actor_account": "a", "timestamp_ms": 100,
+         "actor_x": 2, "actor_y": 2, "map_name": "M"},
+        {"match_id": "m1", "actor_account": "b", "timestamp_ms": 300,
+         "actor_x": 3, "actor_y": 3, "map_name": "M"},
+    ]
+    got = sq.first_landings(rows)
+    assert got[("m1", "a")]["timestamp_ms"] == 100
+    assert got[("m1", "b")]["timestamp_ms"] == 300
+
+
+def test_summarise_landings_computes_diff_to_lobby():
+    """Der Kern der POI-Auswertung: eigene Fruehtod-Quote je POI GEGEN die
+    Lobby-Quote am selben Ort. Das trennt schwieriger Platz von
+    verlorenem Landefight."""
+    own = [
+        {"poi": "Testville", "map": "Baltic_Main", "earlyDeath": True,
+         "timeSurvived": 120, "kills": 0, "damage": 50, "place": 40},
+        {"poi": "Testville", "map": "Baltic_Main", "earlyDeath": False,
+         "timeSurvived": 900, "kills": 3, "damage": 400, "place": 5},
+    ]
+    lobby = {("Baltic_Main", "Testville"): {"drops": 100, "early": 25}}
+    out = sq.summarise_landings(own, lobby, min_drops=1)
+    row = out[0]
+    assert row["poi"] == "Testville"
+    assert row["drops"] == 2
+    assert row["earlyDeathPct"] == pytest.approx(50.0)
+    assert row["lobbyEarlyPct"] == pytest.approx(25.0)
+    assert row["diff"] == pytest.approx(25.0)
+    assert row["lobbyDrops"] == 100
+    assert row["avgKills"] == pytest.approx(1.5)
+
+
+def test_summarise_landings_hides_pois_below_min_drops():
+    own = [{"poi": "Rar", "map": "M", "earlyDeath": False, "timeSurvived": 100,
+            "kills": 0, "damage": 0, "place": 10}]
+    assert sq.summarise_landings(own, {}, min_drops=5) == []
+
+
+def test_summarise_landings_without_lobby_reference_leaves_diff_none():
+    own = [{"poi": "X", "map": "M", "earlyDeath": True, "timeSurvived": 10,
+            "kills": 0, "damage": 0, "place": 1}]
+    row = sq.summarise_landings(own, {}, min_drops=1)[0]
+    assert row["lobbyEarlyPct"] is None
+    assert row["diff"] is None
+
+
+def test_summarise_landings_sorts_by_drops():
+    own = ([{"poi": "Wenig", "map": "M", "earlyDeath": False,
+             "timeSurvived": 1, "kills": 0, "damage": 0, "place": 1}]
+           + [{"poi": "Viel", "map": "M", "earlyDeath": False,
+               "timeSurvived": 1, "kills": 0, "damage": 0, "place": 1}] * 3)
+    out = sq.summarise_landings(own, {}, min_drops=1)
+    assert [r["poi"] for r in out] == ["Viel", "Wenig"]
+
+
+def test_landing_stats_scopes_to_tenant(pg_compat):
+    """Landing-Events haengen an telemetry_events (ohne tenant_id) — der
+    Filter muss ueber matches laufen."""
+    conn, t1, t2 = pg_compat
+    for tenant, mid in ((t1, "match.mine"), (t2, "match.other")):
+        _seed(conn, tenant, "account.me", mid, survived=120)
+        conn.execute(
+            "INSERT INTO telemetry_events (match_id, event_type,"
+            " actor_account, actor_x, actor_y, timestamp_ms)"
+            " VALUES (?, 'Landing', 'account.me', 1500, 1500, 1000)", (mid,))
+    conn.commit()
+
+    out = sq.landing_stats(conn, t1, "account.me", "1970-01-01T00:00:00Z",
+                           pois=POIS, min_drops=1)
+    assert len(out["byPoi"]) == 1
+    assert out["byPoi"][0]["drops"] == 1
+    assert out["byPoi"][0]["poi"] == "Testville"
+
+
+def test_landing_stats_counts_lobby_drops_and_deaths(pg_compat):
+    conn, t1, _ = pg_compat
+    _seed(conn, t1, "account.me", "match.a", survived=120)
+    # Ein Gegner landet am selben POI und stirbt dort binnen 5 min
+    conn.execute(
+        "INSERT INTO telemetry_events (match_id, event_type, actor_account,"
+        " actor_x, actor_y, timestamp_ms)"
+        " VALUES ('match.a', 'Landing', 'account.foe', 1500, 1500, 1000)")
+    conn.execute(
+        "INSERT INTO telemetry_events (match_id, event_type, actor_account,"
+        " target_account, victim_x, victim_y, timestamp_ms)"
+        " VALUES ('match.a', 'Kill', 'account.me', 'account.foe',"
+        " 1600, 1600, 60000)")
+    conn.execute(
+        "INSERT INTO telemetry_events (match_id, event_type, actor_account,"
+        " actor_x, actor_y, timestamp_ms)"
+        " VALUES ('match.a', 'Landing', 'account.me', 1500, 1500, 1000)")
+    conn.commit()
+
+    out = sq.landing_stats(conn, t1, "account.me", "1970-01-01T00:00:00Z",
+                           pois=POIS, min_drops=1)
+    row = out["byPoi"][0]
+    assert row["lobbyDrops"] == 2          # ich + der Gegner
+    assert row["lobbyEarlyPct"] == pytest.approx(50.0)   # einer von zwei tot
+
+
+def test_landing_stats_ignores_deaths_after_the_window(pg_compat):
+    conn, t1, _ = pg_compat
+    _seed(conn, t1, "account.me", "match.a", survived=1200)
+    conn.execute(
+        "INSERT INTO telemetry_events (match_id, event_type, actor_account,"
+        " actor_x, actor_y, timestamp_ms)"
+        " VALUES ('match.a', 'Landing', 'account.me', 1500, 1500, 1000)")
+    # Tod 6 Minuten nach der Landung — kein Landefight mehr
+    conn.execute(
+        "INSERT INTO telemetry_events (match_id, event_type, actor_account,"
+        " target_account, victim_x, victim_y, timestamp_ms)"
+        " VALUES ('match.a', 'Kill', 'account.foe', 'account.me',"
+        " 1600, 1600, 361000)")
+    conn.commit()
+
+    out = sq.landing_stats(conn, t1, "account.me", "1970-01-01T00:00:00Z",
+                           pois=POIS, min_drops=1)
+    assert out["byPoi"][0]["lobbyEarlyPct"] == pytest.approx(0.0)

@@ -30,6 +30,7 @@ sind direkt testbar, das DB-Holen sitzt darunter.
 import statistics
 
 from pubg.aggregations import _br_filter, _weapon_label
+from pubg.poi_match import point_in_poly
 
 #: Grenzen der Rundenphasen in Sekunden Ueberlebenszeit. Die frueh/mitte-
 #: Grenze bei 5 Minuten trennt den Landefight vom Rest, die mitte/spaet-
@@ -58,6 +59,19 @@ KD_BANDS = (
 #: Ab so vielen Matches zaehlt ein Spieler fuer die Kohorte. Unter 20 wird
 #: die Trefferquote vom Zufall einzelner Gefechte dominiert.
 MIN_COHORT_MATCHES = 20
+
+#: Die Telemetrie nennt Erangel teils Erangel_Main, die POI-Datei
+#: Baltic_Main. Ohne den Abgleich fallen alle Erangel-Landungen durch.
+MAP_ALIASES = {"Erangel_Main": "Baltic_Main"}
+
+#: Ab so vielen eigenen Landungen taucht ein POI in der Auswertung auf.
+#: Darunter sagt eine Fruehtod-Quote nichts.
+MIN_POI_DROPS = 5
+
+#: Fenster nach der eigenen Landung, in dem ein Tod als verlorener
+#: Landefight gilt. Bewusst relativ zur Landung und nicht zum Rundenstart:
+#: nur so messen die eigene und die Lobby-Quote dasselbe.
+LANDING_FIGHT_MS = 300_000
 
 #: Fenstergroessen fuer den Eigen-Trend, in Matches. Jedes Fenster wird
 #: gegen die gleich langen Matches davor verglichen.
@@ -319,6 +333,95 @@ def rank_me(me, peers):
                                      lower_is_better=not higher_is_better),
             "peers": len(usable),
         }
+    return out
+
+
+# ── POI-Geometrie ───────────────────────────────────────────────────────────
+
+def poi_boxes(pois):
+    """Baut je Karte eine Liste (Name, x0, x1, y0, y1, Punkte).
+
+    Die Bounding-Box ist ein Vorfilter: ohne sie laeuft jeder Punkt gegen
+    jedes Polygon, mit ihr sind 140.000 Landungen in Bruchteilen einer
+    Sekunde zugeordnet."""
+    out = {}
+    for map_name, blob in (pois or {}).items():
+        entries = []
+        for reg in (blob or {}).get("regions", []):
+            pts = reg.get("points") or []
+            name = reg.get("name")
+            if not name or len(pts) < 3:
+                continue
+            xs = [p[0] for p in pts]
+            ys = [p[1] for p in pts]
+            entries.append((name, min(xs), max(xs), min(ys), max(ys), pts))
+        out[map_name] = entries
+    return out
+
+
+def poi_at(boxes, map_name, x, y):
+    """Name des POI, in dem der Punkt liegt — oder None fuer Gelaende."""
+    if x is None or y is None:
+        return None
+    entries = boxes.get(map_name)
+    if entries is None:
+        entries = boxes.get(MAP_ALIASES.get(map_name, ""), None)
+    if not entries:
+        return None
+    for name, x0, x1, y0, y1, pts in entries:
+        if x0 <= x <= x1 and y0 <= y <= y1 and point_in_poly(x, y, pts):
+            return name
+    return None
+
+
+def first_landings(rows):
+    """Erste Landung je (Match, Spieler).
+
+    Spaetere Landing-Events sind Umzuege oder Wiedereinstiege; wer sie
+    mitzaehlt, verwaescht die Platzwahl."""
+    out = {}
+    for r in rows:
+        key = (r["match_id"], r["actor_account"])
+        prev = out.get(key)
+        if prev is None or r["timestamp_ms"] < prev["timestamp_ms"]:
+            out[key] = r
+    return out
+
+
+def summarise_landings(own, lobby, min_drops=MIN_POI_DROPS):
+    """Eigene Landungen je POI, mit der Lobby-Quote am selben Ort.
+
+    `own` sind eigene Landungen mit Matchergebnis, `lobby` ein Dict
+    (map, poi) -> {"drops": n, "early": n}."""
+    grouped = {}
+    for r in own:
+        grouped.setdefault((r["map"], r["poi"]), []).append(r)
+
+    out = []
+    for (map_name, poi), rows in grouped.items():
+        n = len(rows)
+        if n < min_drops:
+            continue
+        early = sum(1 for r in rows if r["earlyDeath"])
+        my_pct = 100.0 * early / n
+        ref = lobby.get((map_name, poi)) or {}
+        lob_drops = ref.get("drops") or 0
+        lob_pct = (100.0 * ref["early"] / lob_drops) if lob_drops else None
+        out.append({
+            "map": map_name,
+            "poi": poi,
+            "drops": n,
+            "earlyDeaths": early,
+            "earlyDeathPct": my_pct,
+            "lobbyDrops": lob_drops,
+            "lobbyEarlyPct": lob_pct,
+            "diff": (my_pct - lob_pct) if lob_pct is not None else None,
+            "survivalMin": (_avg(r["timeSurvived"] for r in rows) or 0) / 60.0,
+            "avgKills": _avg(r["kills"] for r in rows),
+            "avgDamage": _avg(r["damage"] for r in rows),
+            "avgPlace": _avg(r["place"] for r in rows),
+        })
+    out.sort(key=lambda d: (-d["drops"], d["poi"]))
     return out
 
 
@@ -626,6 +729,121 @@ def lobby_reference(conn, tenant_id, min_matches=5, cutoff="1970-01-01T00:00:00Z
     return profiles
 
 
+def load_pois(path=None):
+    """POI-Geometrie aus data/pubg-pois.json.
+
+    Dieselbe Datei, die der POI-Editor schreibt (tools/poi-editor.html) und
+    die landing-heatmap nutzt — bewusst keine zweite Quelle."""
+    import json
+    import os
+    if path is None:
+        here = os.path.dirname(os.path.abspath(__file__))
+        path = os.path.join(os.path.dirname(here), "data", "pubg-pois.json")
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return {}
+
+
+def landing_stats(conn, tenant_id, account_id, cutoff, to_iso=None,
+                  pois=None, min_drops=MIN_POI_DROPS):
+    """Landeplaetze mit eigenem Ergebnis und der Lobby-Quote am selben POI.
+
+    Der Lobby-Vergleich ist der Punkt der Uebung: eine eigene Fruehtod-Quote
+    allein sagt nur, ob der Platz umkaempft ist. Erst die Differenz zur
+    Lobby am selben Ort trennt "schwieriger Platz" von "ich verliere hier
+    den Landefight".
+
+    Laeuft komplett live — die Bounding-Box-Vorfilterung ordnet die
+    Landungen aller Karten eines Tenants in unter einer Sekunde zu, eine
+    vorberechnete Tabelle waere unnoetiger Ballast. Kosten stecken im
+    Laden der Events, nicht in der Geometrie.
+
+    `telemetry_events` fuehrt keine tenant_id — der Filter laeuft ueber
+    matches."""
+    boxes = poi_boxes(pois if pois is not None else load_pois())
+    if not boxes:
+        return {"byPoi": [], "ownDrops": 0, "assigned": 0, "minDrops": min_drops}
+
+    br_where, br_params = _br_filter("m")
+    time_filter = " AND m.played_at <= ?" if to_iso else ""
+    extra = [to_iso] if to_iso else []
+
+    landings = conn.execute(f"""
+        SELECT m.map_name, e.match_id, e.actor_account, e.actor_x, e.actor_y,
+               e.timestamp_ms
+        FROM telemetry_events e
+        JOIN matches m ON m.match_id = e.match_id
+        WHERE m.tenant_id = ? AND e.event_type = 'Landing'
+          AND e.actor_x IS NOT NULL
+          AND m.played_at >= ? AND {br_where}{time_filter}
+    """, [tenant_id, cutoff, *br_params, *extra]).fetchall()
+
+    first = first_landings(landings)
+    # (match, acc) -> (map, poi, landezeit)
+    where = {}
+    for key, r in first.items():
+        poi = poi_at(boxes, r["map_name"], r["actor_x"], r["actor_y"])
+        if poi:
+            where[key] = (r["map_name"], poi, r["timestamp_ms"])
+
+    lobby = {}
+    for (map_name, poi, _ts) in where.values():
+        ref = lobby.setdefault((map_name, poi), {"drops": 0, "early": 0})
+        ref["drops"] += 1
+
+    kills = conn.execute(f"""
+        SELECT m.map_name, e.match_id, e.target_account, e.victim_x,
+               e.victim_y, e.timestamp_ms
+        FROM telemetry_events e
+        JOIN matches m ON m.match_id = e.match_id
+        WHERE m.tenant_id = ? AND e.event_type = 'Kill'
+          AND e.victim_x IS NOT NULL AND e.target_account IS NOT NULL
+          AND m.played_at >= ? AND {br_where}{time_filter}
+    """, [tenant_id, cutoff, *br_params, *extra]).fetchall()
+
+    for r in kills:
+        landed = where.get((r["match_id"], r["target_account"]))
+        if not landed:
+            continue
+        if r["timestamp_ms"] - landed[2] >= LANDING_FIGHT_MS:
+            continue
+        poi = poi_at(boxes, r["map_name"], r["victim_x"], r["victim_y"])
+        # Nur Tode IM Landeplatz zaehlen — wer wegrotiert und woanders
+        # faellt, hat den Landefight nicht dort verloren.
+        if poi and poi == landed[1]:
+            lobby[(landed[0], poi)]["early"] += 1
+
+    part = {(r["match_id"], account_id): r
+            for r in _participant_rows(conn, tenant_id, account_id, cutoff,
+                                       to_iso)}
+    own = []
+    for (mid, acc), (map_name, poi, _ts) in where.items():
+        if acc != account_id:
+            continue
+        pr = part.get((mid, acc))
+        if not pr:
+            continue
+        own.append({
+            "map": map_name, "poi": poi,
+            "earlyDeath": (pr["time_survived"] or 0) < PHASE_EARLY_SECS,
+            "timeSurvived": pr["time_survived"],
+            "kills": pr["kills"],
+            "damage": pr["damage_dealt"],
+            "place": pr["place"],
+        })
+
+    return {
+        "byPoi": summarise_landings(own, lobby, min_drops),
+        "ownDrops": len(own),
+        "assigned": len(where),
+        "minDrops": min_drops,
+    }
+
+
 def trend(conn, tenant_id, account_id):
     """Eigen-Trend: jedes Fenster gegen die gleich langen Matches davor.
 
@@ -700,5 +918,7 @@ def compute_shot_quality(conn, tenant_id, account_id, cutoff,
             "lobbyPlayers": len(lobby),
             "lobbyMinMatches": lobby_min_matches,
         },
+        "landings": landing_stats(conn, tenant_id, account_id, cutoff,
+                                  to_iso=to_iso),
         "trend": trend(conn, tenant_id, account_id),
     }
