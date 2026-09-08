@@ -6928,9 +6928,16 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
                   waere schlimmer als zwei getrennte Tools.
 
     Returns:
-      { "pois": [{name, cx, cy, total, byPlayer:{acc:{name,count,pct}}}],
+      { "pois": [{name, cx, cy, total, landings,
+                  byPlayer:{acc:{name,count,pct}}}],
         "scatterPoints": [{accountId, x, y, matchId}],
         "totalMatches": int }
+
+    `total` ist die Zahl der MATCHES mit Landung dort, `landings` die der
+    Landungen (bei 100 Lobby-Spielern in einem Match: total 1, landings 100).
+    `byPlayer` und `scatterPoints` enthalten NUR die in player_accs
+    genannten Spieler — ohne diese Begrenzung listete der Endpoint an
+    Prod-Daten 32.018 Namen und 34.776 Punkte, zusammen 8 MB.
     """
     from pubg.poi_match import (match_poi, poly_area, perp_distance_to_route,
                                 apply_pin_cal)
@@ -7004,14 +7011,16 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
     #    Best-Touchdown: fruehestes Landing mit z<80000 + health>0 pro
     #    (match, actor). Vereinfachte Variante der _landings-Heuristik.
     ph = ",".join("?" * len(match_ids))
+    # Bewusst OHNE Spieler-Filter in der Abfrage: die Heatmap-Intensitaet
+    # soll die LOBBY sein, auch wenn nur die eigenen Punkte als Scatter
+    # erscheinen. Der Filter greift weiter unten, bei byPlayer und scatter —
+    # sonst listet der Endpoint jeden Lobby-Spieler namentlich auf. An
+    # Prod-Daten waren das 32.018 Namen und 34.776 Punkte, zusammen 8 MB,
+    # und der Browser fror beim Rendern ein.
     acc_clause = ""
     # Telemetrie ist global — keine tenant_id-Filter. Players join filtert
     # auf tenant_id damit der Name aus der eigenen DB kommt.
     params = list(match_ids) + [tenant_id]
-    if player_accs:
-        acc_ph = ",".join("?" * len(player_accs))
-        acc_clause = f"AND te.actor_account IN ({acc_ph})"
-        params += player_accs
     rows = conn.execute(f"""
         WITH best AS (
           SELECT match_id, actor_account, MIN(timestamp_ms) AS ts
@@ -7058,43 +7067,60 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
                 max(0.0, min(1.0, ey / span)))
 
     scatter = []
-    poi_acc = {}      # poi_name → {acc → count}
+    poi_acc = {}      # poi_name → {acc → count}, NUR fuer die Auswahl
+    poi_total = {}    # poi_name → Landungen ALLER Spieler (Intensitaet)
     poi_matches = {}  # poi_name → set of match_ids (für distinct-Match-Zählung)
+    selected = set(player_accs)
     for r in rows:
         x, y = r["actor_x"], r["actor_y"]
         acc = r["actor_account"]
-        dx, dy = _disp(x, y)
-        scatter.append({
-            "accountId": acc,
-            "x": dx,
-            "y": dy,
-            "matchId": r["match_id"],
-        })
         name = match_poi(x, y, regions) or "—"
-        poi_acc.setdefault(name, {})
-        poi_acc[name][acc] = poi_acc[name].get(acc, 0) + 1
+        poi_total[name] = poi_total.get(name, 0) + 1
+        # Punkte und Namen nur fuer die gewaehlten Spieler — ohne Auswahl
+        # bleibt es bei der reinen Intensitaet.
+        if acc in selected:
+            dx, dy = _disp(x, y)
+            scatter.append({
+                "accountId": acc,
+                "x": dx,
+                "y": dy,
+                "matchId": r["match_id"],
+            })
+            poi_acc.setdefault(name, {})
+            poi_acc[name][acc] = poi_acc[name].get(acc, 0) + 1
         poi_matches.setdefault(name, set())
         poi_matches[name].add(r["match_id"])
 
-    # Namens-Lookup
+    # Namens-Lookup nur fuer die Auswahl — fuer die Lobby braucht es keine
+    # Namen, nur die Zahl.
     name_of = {r["actor_account"]: (r["player_name"] or r["actor_account"][:8])
-               for r in rows}
+               for r in rows if r["actor_account"] in selected}
 
     pois_out = []
-    for name, accmap in poi_acc.items():
-        total = len(poi_matches.get(name, set()))
+    # Ueber ALLE Plaetze laufen, an denen gelandet wurde — nicht nur ueber
+    # die der Auswahl. Sonst verschwindet die halbe Karte, sobald ein
+    # Spieler gefiltert ist.
+    for name in poi_matches:
+        total = len(poi_matches[name])
+        accmap = poi_acc.get(name, {})
         cx, cy = poi_centroid.get(name, (None, None))
         dcx, dcy = _disp(cx, cy) if cx is not None else (None, None)
         by = {}
         for acc, cnt in accmap.items():
             by[acc] = {"name": name_of.get(acc, acc[:8]),
                        "count": cnt,
-                       "pct": round(cnt / total * 100)}
+                       "pct": round(cnt / total * 100) if total else 0}
         pois_out.append({
             "name": name,
             "cx": dcx,
             "cy": dcy,
+            # Wie bisher: Zahl der MATCHES mit Landung hier, nicht der
+            # Landungen — bei 100 Lobby-Spielern in einem Match ist das 1.
             "total": total,
+            # Neu: Landungen insgesamt. Das ist die eigentliche
+            # Heatmap-Intensitaet und war vorher nur implizit ueber die
+            # Laenge von byPlayer ablesbar.
+            "landings": poi_total.get(name, 0),
             "byPlayer": by,
         })
     pois_out.sort(key=lambda p: p["total"], reverse=True)

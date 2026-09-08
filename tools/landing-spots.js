@@ -15,8 +15,9 @@ const LS = {
   view: { zoom: 1, panX: 0, panY: 0 },
   //: Zeitraum fuer BEIDE Quellen. Ohne gemeinsame Auswahl zeigte die
   //: Karte den ganzen Bestand und die Bewertung die Session — irrefuehrender
-  //: als zwei getrennte Tools.
-  range: "all",
+  //: als zwei getrennte Tools. Default bewusst "session": mit "all" startet
+  //: das Tool auf dem ganzen Bestand und war damit der langsamste Fall.
+  range: "session",
   //: Auswertung aus /api/pubg/shot-quality, indexiert nach POI-Name der
   //: aktuellen Karte. null = noch nicht geladen, {} = keine Daten.
   stats: null,
@@ -47,6 +48,8 @@ async function loadMaps() {
     refresh();
   });
   LS.mapName = sel.value || maps[0];
+  // Vorauswahl VOR dem ersten refresh, sonst laedt das Tool zweimal
+  await preselectMe();
   if (LS.mapName) { sel.value = LS.mapName; refresh(); }
 }
 
@@ -138,6 +141,28 @@ function setPlayer(idx, player) {
 [0, 1, 2, 3].forEach(wireAutocomplete);
 document.getElementById("routeFilter")
   .addEventListener("change", refresh);
+
+//: Eigenen Account in P1 vorbelegen. Ohne Auswahl liefert der Endpoint nur
+//: die Lobby-Intensitaet und keine eigenen Punkte — man startete also auf
+//: einer Karte ohne sich selbst darauf.
+async function preselectMe() {
+  try {
+    const me = await PubgUI.getMyName();
+    if (!me || me === "Streamer") return null;
+    const hits = await PubgUI.fetchJson(
+      "/api/pubg/player-search?q=" + encodeURIComponent(me));
+    const exact = (hits || []).find(h => h.name === me) || (hits || [])[0];
+    if (!exact) return null;
+    const input = document.getElementById("p0");
+    input.value = exact.name;
+    setPlayer(0, { accountId: exact.accountId, name: exact.name });
+    LS.activeScatter.add(exact.accountId);
+    return exact;
+  } catch (e) {
+    console.warn("Vorauswahl fehlgeschlagen:", e && e.message);
+    return null;
+  }
+}
 
 async function refresh() {
   if (!LS.mapName) return;
@@ -255,11 +280,14 @@ function renderHeatmap() {
   if (!LS.data) return;
 
   // Heatmap-Blobs pro POI (Radius ~ total, Farbe Gold→Lila nach Intensität)
-  const maxTotal = Math.max(1, ...LS.data.pois.map(p => p.total));
+  // Intensitaet ueber die LANDUNGEN, nicht die Match-Zahl: bei 100
+  // Lobby-Spielern in einem Match ist total 1 und landings 100.
+  const intens = (p) => (p.landings != null ? p.landings : p.total);
+  const maxTotal = Math.max(1, ...LS.data.pois.map(intens));
   for (const poi of LS.data.pois) {
     if (poi.cx == null) continue;
     const [px, py] = projXY(poi.cx, poi.cy);
-    const intensity = poi.total / maxTotal;
+    const intensity = intens(poi) / maxTotal;
     const radius = 20 + intensity * 60;
     const grad = ctx.createRadialGradient(px, py, 0, px, py, radius);
     grad.addColorStop(0, `rgba(94,42,121,${0.25 + intensity * 0.45})`);
@@ -281,7 +309,7 @@ function renderHeatmap() {
     ctx.font = "bold 12px DM Sans";
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
-    const label = poi.name + " " + poi.total + "×";
+    const label = poi.name + " " + intens(poi) + "×";
     // Umriss, damit der Text auch ueber hellen Kartenteilen lesbar ist —
     // dicht am Marker liegt er jetzt oefter auf dem Blob.
     ctx.lineWidth = 3;
@@ -390,7 +418,8 @@ function renderPoiList() {
     host.innerHTML = `<p>No landings for this selection.</p>`;
     return;
   }
-  const maxTotal = Math.max(1, ...LS.data.pois.map(p => p.total));
+  const intens = (p) => (p.landings != null ? p.landings : p.total);
+  const maxTotal = Math.max(1, ...LS.data.pois.map(intens));
   // Ausgewählte Spieler → Orte mit deren Landings sollen aufgeklappt starten.
   const selectedAccs = LS.players.filter(Boolean).map(p => p.accountId);
   host.innerHTML = LS.data.pois.map(poi => {
@@ -399,13 +428,13 @@ function renderPoiList() {
       .map(([acc, v]) =>
         `<div class="poi-player"><span>${v.name}${botMark(acc)}</span>`
         + `<span>${v.count}× · ${v.pct}%</span></div>`).join("");
-    const w = Math.round(poi.total / maxTotal * 100);
+    const w = Math.round(intens(poi) / maxTotal * 100);
     const open = selectedAccs.length && selectedAccs.some(a => poi.byPlayer[a]);
     return `
       <details class="poi" data-poi="${poi.name}"${open ? " open" : ""}>
         <summary>
           <div class="poi-head">
-            <span>${poi.name}</span><span>${poi.total}×</span>
+            <span>${poi.name}</span><span>${intens(poi)}×</span>
           </div>
           <div class="bar" style="--w:${w}%" role="presentation"></div>
         </summary>

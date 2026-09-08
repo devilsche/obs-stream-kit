@@ -973,3 +973,70 @@ def test_deaths_by_map_early_share_can_exceed_no_bound_issue():
     out = sq.deaths_by_map(deaths, {"M": 2})
     assert out[0]["deathsPerMatch"] == pytest.approx(1.5)
     assert out[0]["earlyDeathPct"] == pytest.approx(100.0)
+
+
+# ── Payload-Groesse der Landing-Heatmap ─────────────────────────────────────
+
+def _seed_landing(conn, tenant, mid, acc, x, y, played_at="2026-09-01T12:00:00Z",
+                  team=1):
+    conn.execute(
+        "INSERT INTO matches (tenant_id, match_id, game_mode, map_name,"
+        " played_at, duration_secs) VALUES (?, ?, 'squad-fpp', 'Baltic_Main',"
+        " ?, 1800) ON CONFLICT DO NOTHING", (tenant, mid, played_at))
+    conn.execute(
+        "INSERT INTO telemetry_events (match_id, event_type, actor_account,"
+        " actor_x, actor_y, actor_z, timestamp_ms)"
+        " VALUES (?, 'Landing', ?, ?, ?, 1000, 1000)", (mid, acc, x, y))
+    # Der Konstellations-Filter loest player_accs ueber match_team_mapping
+    # auf — ohne die Zeile findet er das Match nicht.
+    conn.execute(
+        "INSERT INTO match_team_mapping (tenant_id, match_id, account_id,"
+        " team_id) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
+        (tenant, mid, acc, team))
+
+
+def test_landing_spots_limits_scatter_and_players_to_the_selection(pg_compat):
+    """Ohne Begrenzung listete byPlayer JEDEN Lobby-Spieler je Platz — an
+    Prod-Daten 32.018 Eintraege und 34.776 Scatter-Punkte, zusammen 8 MB
+    Payload. Der Browser fror beim Rendern ein."""
+    from pubg.aggregations import compute_landing_spots
+    conn, t1, _ = pg_compat
+    for i in range(30):
+        _seed_landing(conn, t1, "match.a", f"account.foe{i}", 1500, 1500)
+    _seed_landing(conn, t1, "match.a", "account.me", 1500, 1500)
+    conn.commit()
+    blob = {"mapKm": 8, "regions": POIS["Baltic_Main"]["regions"]}
+
+    full = compute_landing_spots(conn, t1, "Baltic_Main", [], pois_blob=blob)
+    poi = full["pois"][0]
+    # total = Matches mit Landung hier (alle 31 landen im selben Match),
+    # landings = die Landungen selbst. Die Intensitaet bleibt erhalten.
+    assert poi["total"] == 1
+    assert poi["landings"] == 31
+    # ... aber nicht 31 Namen und 31 Punkte
+    assert poi["byPlayer"] == {}
+    assert full["scatterPoints"] == []
+
+    mine = compute_landing_spots(conn, t1, "Baltic_Main", ["account.me"],
+                                 pois_blob=blob)
+    poi = mine["pois"][0]
+    assert set(poi["byPlayer"]) == {"account.me"}
+    assert [p["accountId"] for p in mine["scatterPoints"]] == ["account.me"]
+
+
+def test_landing_spots_keeps_lobby_total_when_filtering_players(pg_compat):
+    """Der Spieler-Filter darf die Lobby-Zahl nicht kleinrechnen: die
+    Heatmap-Intensitaet ist die Lobby, nicht die Auswahl."""
+    from pubg.aggregations import compute_landing_spots
+    conn, t1, _ = pg_compat
+    for i in range(10):
+        _seed_landing(conn, t1, "match.a", f"account.foe{i}", 1500, 1500)
+    _seed_landing(conn, t1, "match.a", "account.me", 1500, 1500)
+    conn.commit()
+    blob = {"mapKm": 8, "regions": POIS["Baltic_Main"]["regions"]}
+
+    out = compute_landing_spots(conn, t1, "Baltic_Main", ["account.me"],
+                                pois_blob=blob)
+    # Lobby-Intensitaet bleibt vollstaendig, obwohl nur ein Spieler gewaehlt
+    assert out["pois"][0]["landings"] == 11
+    assert out["pois"][0]["byPlayer"]["account.me"]["count"] == 1
