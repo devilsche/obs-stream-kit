@@ -168,6 +168,16 @@ def weapon_label(weapon_id):
     return _weapon_label(weapon_id)[0]
 
 
+def weapon_class(weapon_id):
+    """Waffenklasse (ar / smg / dmr / sr / shotgun / envir / …).
+
+    Sagt beim Todesbild mehr als der Waffenname: "ich sterbe an SMGs im
+    Nahkampf" ist eine andere Diagnose als "ich werde gesnipert"."""
+    if not weapon_id or weapon_id == "None":
+        return "unknown"
+    return _weapon_label(weapon_id)[1] or "other"
+
+
 def aggregate_weapon_rows(rows):
     """Summiert Waffenzeilen zu einem Schussprofil.
 
@@ -210,14 +220,18 @@ def summarise_deaths(deaths):
     Gruppierung heraus, statt eine Kategorie zu erfinden."""
     total = len(deaths)
     if not total:
-        return {"total": 0, "byWeapon": [], "byDistance": [], "byPhase": [],
+        return {"total": 0, "byWeapon": [], "byWeaponClass": [],
+                "byDistance": [], "byPhase": [],
                 "medianSurvivalSecs": None, "medianDistanceM": None}
 
-    weapons, distances, phases = {}, {}, {}
+    weapons, classes, distances, phases = {}, {}, {}, {}
     surv, dists = [], []
     for d in deaths:
         label = weapon_label(d.get("weapon"))
         weapons[label] = weapons.get(label, 0) + 1
+
+        cls = weapon_class(d.get("weapon"))
+        classes[cls] = classes.get(cls, 0) + 1
 
         bucket = distance_bucket(d.get("distance"))
         if bucket:
@@ -239,6 +253,7 @@ def summarise_deaths(deaths):
     return {
         "total": total,
         "byWeapon": _share_list(weapons, total, "label"),
+        "byWeaponClass": _share_list(classes, total, "cls"),
         "byDistance": by_distance,
         "byPhase": by_phase,
         "medianSurvivalSecs": statistics.median(surv) if surv else None,
@@ -448,8 +463,19 @@ def death_rows(conn, tenant_id, account_id, cutoff, to_iso=None):
     return [dict(r) for r in conn.execute(sql, params).fetchall()]
 
 
-def killer_names(conn, tenant_id, account_id, cutoff, limit=8):
-    """Wer hat einen am haeufigsten erledigt."""
+#: Ab so vielen Toden durch dieselbe Person ist es kein Zufall mehr. An
+#: Prod-Daten gemessen erreicht das praktisch niemand: von 1099 Gegnern, die
+#: den Nutzer erledigt haben, kamen 1083 auf genau einen Kill und 16 auf zwei.
+REPEAT_KILLER_MIN = 3
+
+
+def repeat_killers(conn, tenant_id, account_id, cutoff, limit=8):
+    """Gegner, die einen mehrfach erledigt haben.
+
+    Bewusst mit Untergrenze: eine nach Haeufigkeit sortierte Killer-Liste
+    ohne Schwelle liest sich wie "das sind deine Angstgegner", zeigt aber
+    nur, welcher Einmal-Killer alphabetisch vorne steht. In einer Lobby
+    trifft man denselben Gegner so gut wie nie wieder."""
     br_where, br_params = _br_filter("m")
     sql = f"""
         SELECT COALESCE(pl.name, e.actor_account) AS name,
@@ -461,9 +487,11 @@ def killer_names(conn, tenant_id, account_id, cutoff, limit=8):
         WHERE m.tenant_id = ? AND e.target_account = ?
           AND e.event_type = 'Kill' AND e.actor_account IS NOT NULL
           AND m.played_at >= ? AND {br_where}
-        GROUP BY 1 ORDER BY n DESC, name LIMIT ?
+        GROUP BY 1 HAVING COUNT(*) >= ?
+        ORDER BY n DESC, name LIMIT ?
     """
-    params = [tenant_id, account_id, cutoff, *br_params, limit]
+    params = [tenant_id, account_id, cutoff, *br_params,
+              REPEAT_KILLER_MIN, limit]
     return [{"name": r["name"], "n": r["n"]}
             for r in conn.execute(sql, params).fetchall()]
 
@@ -657,7 +685,9 @@ def compute_shot_quality(conn, tenant_id, account_id, cutoff,
         "byPhase": phase_breakdown(conn, tenant_id, account_id, cutoff, to_iso),
         "deaths": {
             **summarise_deaths(deaths),
-            "topKillers": killer_names(conn, tenant_id, account_id, cutoff),
+            "repeatKillers": repeat_killers(conn, tenant_id,
+                                            account_id, cutoff),
+            "repeatKillerMin": REPEAT_KILLER_MIN,
         },
         "cohort": {
             "bands": build_cohort_bands(squad),

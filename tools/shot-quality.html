@@ -272,6 +272,12 @@
 
     const PHASE_LABEL = { early: "Early (&lt;5 min)", mid: "Mid (5–15 min)",
                           late: "Late (&gt;15 min)" };
+    const CLASS_LABEL = {
+      ar: "Assault rifle", smg: "SMG", dmr: "DMR", sr: "Sniper rifle",
+      lmg: "LMG", shotgun: "Shotgun", pistol: "Pistol", melee: "Melee",
+      throwable: "Throwable", vehicle: "Vehicle", envir: "Environment",
+      other: "Other", unknown: "Unknown",
+    };
     const BAND_LABEL = { under_1_2: "under 1.2", "1_2_to_1_6": "1.2 – 1.6",
                          "1_6_to_2_2": "1.6 – 2.2", over_2_2: "over 2.2" };
 
@@ -403,7 +409,7 @@
     }
 
     // ── Deaths ──────────────────────────────────────────────────────────────
-    function barList(items, keyField, labelFn, total) {
+    function barList(items, labelFn) {
       if (!items || !items.length) return `<li class="n">no data</li>`;
       const max = Math.max(...items.map(i => i.n), 1);
       return items.map(i => `
@@ -419,37 +425,39 @@
       document.getElementById("deathCard").hidden = !d.total;
       if (!d.total) return;
 
+      // "By whom" ist bewusst KEINE Kachel: von den Gegnern, die dich
+      // erledigt haben, kommt praktisch jeder auf genau einen Kill. Eine
+      // nach Häufigkeit sortierte Namensliste liest sich wie "Angstgegner",
+      // zeigt aber nur, wer alphabetisch vorne steht. Wiederholungstäter
+      // ab 3 Toden stehen als Fußnote darunter.
       const blocks = [
-        ["When in the round", barList(d.byPhase, "phase",
+        ["When in the round", barList(d.byPhase,
           (i) => PHASE_LABEL[i.phase] || esc(i.phase))],
-        ["At what distance", barList(d.byDistance, "bucket",
+        ["At what distance", barList(d.byDistance,
           (i) => esc(i.bucket))],
-        ["By which weapon", barList((d.byWeapon || []).slice(0, 8), "label",
+        ["By weapon class", barList((d.byWeaponClass || []).slice(0, 8),
+          (i) => CLASS_LABEL[i.cls] || esc(i.cls))],
+        ["By which weapon", barList((d.byWeapon || []).slice(0, 8),
           (i) => esc(i.label))],
-        ["By whom", (d.topKillers || []).length
-          ? barListKillers(d.topKillers, d.total)
-          : `<li class="n">no data</li>`],
       ];
       document.getElementById("dists").innerHTML = blocks.map(
         ([title, inner]) => `<div class="dist"><h3>${title}</h3><ul>${inner}</ul></div>`
       ).join("");
 
       const med = d.medianSurvivalSecs;
+      const rep = d.repeatKillers || [];
+      const repNote = rep.length
+        ? ` · repeat killers (${d.repeatKillerMin}+ deaths): `
+          + rep.map(k => `<b>${esc(k.name)}</b> ${k.n}×`).join(", ")
+        : ` · no opponent killed you ${d.repeatKillerMin}+ times — in a lobby
+            you almost never meet the same player twice, so there is no
+            "nemesis" to show`;
       document.getElementById("deathSub").innerHTML =
         `<b>${n0(d.total)}</b> deaths in range · median survival
          <b>${med == null ? "—" : (med / 60).toFixed(1) + " min"}</b>
          · median killer distance
-         <b>${d.medianDistanceM == null ? "—" : n0(d.medianDistanceM) + " m"}</b>`;
-    }
-
-    function barListKillers(killers, total) {
-      const max = Math.max(...killers.map(k => k.n), 1);
-      return killers.map(k => `
-        <li>
-          <span>${esc(k.name)}</span>
-          <span class="track"><span class="fill" data-w="${step5(100 * k.n / max)}"></span></span>
-          <span class="n">${k.n}×</span>
-        </li>`).join("");
+         <b>${d.medianDistanceM == null ? "—" : n0(d.medianDistanceM) + " m"}</b>`
+        + repNote;
     }
 
     // ── Cohort ──────────────────────────────────────────────────────────────

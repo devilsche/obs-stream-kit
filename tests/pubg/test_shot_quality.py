@@ -174,6 +174,22 @@ def test_aggregate_weapon_rows_counts_each_match_once():
 
 # ── Todesbild ───────────────────────────────────────────────────────────────
 
+def test_weapon_class_maps_to_category():
+    assert sq.weapon_class("WeapHK416_C") == "ar"
+    assert sq.weapon_class(None) == "unknown"
+
+
+def test_summarise_deaths_groups_by_weapon_class():
+    deaths = [
+        {"weapon": "WeapHK416_C", "distance": 1000, "time_survived": 400},
+        {"weapon": "WeapUZI_C", "distance": 500, "time_survived": 400},
+    ]
+    out = sq.summarise_deaths(deaths)
+    classes = dict((c["cls"], c["n"]) for c in out["byWeaponClass"])
+    assert classes.get("ar") == 1
+    assert sum(classes.values()) == 2
+
+
 def test_summarise_deaths_groups_by_weapon_distance_and_phase():
     deaths = [
         {"weapon": "WeapHK416_C", "distance": 4800, "time_survived": 200},
@@ -352,6 +368,29 @@ def test_cohort_players_needs_min_matches(pg_compat):
     players = sq.cohort_players(conn, t1, min_matches=5)
     ids = {p["accountId"] for p in players}
     assert ids == {"account.many"}
+
+
+def test_repeat_killers_needs_more_than_one_kill(pg_compat):
+    """Eine ungefilterte Killer-Liste liest sich wie "Angstgegner", zeigt
+    aber nur Einmal-Killer in alphabetischer Reihenfolge."""
+    conn, t1, _ = pg_compat
+    _seed(conn, t1, "account.me", "match.a")
+    _seed(conn, t1, "account.me", "match.b")
+    _seed(conn, t1, "account.me", "match.c")
+    # 'account.once' killt einmal, 'account.often' dreimal
+    for mid, foe in (("match.a", "account.once"),
+                     ("match.a", "account.often"),
+                     ("match.b", "account.often"),
+                     ("match.c", "account.often")):
+        conn.execute(
+            "INSERT INTO telemetry_events (match_id, event_type,"
+            " actor_account, target_account, weapon, distance, timestamp_ms)"
+            " VALUES (?, 'Kill', ?, 'account.me', 'WeapHK416_C', 4800,"
+            " 1788000000000)", (mid, foe))
+    conn.commit()
+
+    got = sq.repeat_killers(conn, t1, "account.me", "1970-01-01T00:00:00Z")
+    assert [k["name"] for k in got] == ["account.often"]
 
 
 def test_compute_shot_quality_returns_all_sections(pg_compat):
