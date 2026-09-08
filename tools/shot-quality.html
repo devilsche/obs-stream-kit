@@ -124,6 +124,8 @@
     tbody tr.me > * { background: color-mix(in srgb, var(--theme-primary, #7b3a9c) 22%, transparent); }
     tbody tr.me > td:first-child { font-weight: 700; }
     tbody tr.floor > * { color: var(--theme-text-dim, #8a7d99); font-style: italic; }
+    tbody tr.thin > * { color: var(--theme-text-dim, #8a7d99); }
+    tbody tr.thin > td.diff-bad, tbody tr.thin > td.diff-good { font-weight: 400; }
     td.hi { color: var(--theme-accent, #f2b705); font-weight: 500; }
     /* Diff-Spalte: Vorzeichen traegt die Aussage, nicht nur die Farbe —
        deshalb steht das + bzw. − immer mit im Text. */
@@ -584,18 +586,19 @@
       document.getElementById("poiCard").hidden = !rows.length;
       if (!rows.length) return;
 
-      // Nach Auffälligkeit sortieren, nicht nach Häufigkeit: der Platz mit
-      // der größten Differenz zur Lobby ist der, der etwas zu sagen hat.
-      const sorted = rows.slice().sort((a, b) =>
-        (b.diff ?? -99) - (a.diff ?? -99));
+      // Nach Häufigkeit sortieren, NICHT nach Differenz. Die Differenz
+      // streut bei kleinen Stichproben heftig — an Prod-Daten führten
+      // 5-Drop-Plätze die Liste mit +30 an, während der eine wirklich
+      // auffällige Platz (86 Drops, +3,5) darunter verschwand.
+      const sorted = rows.slice().sort((a, b) => b.drops - a.drops);
 
       document.getElementById("poiRows").innerHTML = sorted.map(r => {
         const cls = r.diff == null ? ""
           : (r.diff > 3 ? "diff-bad" : (r.diff < -3 ? "diff-good" : ""));
         const sign = r.diff == null ? "—"
           : (r.diff > 0 ? "+" : "\u2212") + Math.abs(r.diff).toFixed(1);
-        return `<tr>
-          <td>${esc(r.poi)}</td>
+        return `<tr class="${r.reliable ? "" : "thin"}">
+          <td>${esc(r.poi)}${r.reliable ? "" : ' <span class="tag">thin</span>'}</td>
           <td>${esc(MAP_LABEL[r.map] || r.map)}</td>
           <td>${n0(r.drops)}</td>
           <td>${pct(r.earlyDeathPct)}</td>
@@ -609,8 +612,11 @@
         </tr>`;
       }).join("");
 
-      const worst = sorted[0];
-      const lead = (worst && worst.diff != null && worst.diff > 3)
+      // Der Aufmacher nur aus belastbaren Zeilen — sonst meldet er einen
+      // Zufallsausschlag als größten Fund.
+      const solid = sorted.filter(r => r.reliable && r.diff != null);
+      const worst = solid.sort((a, b) => b.diff - a.diff)[0];
+      const lead = (worst && worst.diff > 3)
         ? `Biggest outlier: <b>${esc(worst.poi)}</b> — `
           + `${pct(worst.earlyDeathPct)} of your ${n0(worst.drops)} rounds from`
           + ` there end before minute 5, the lobby there `
@@ -619,7 +625,9 @@
       document.getElementById("poiSub").innerHTML = lead
         + `<b>${n0(d.ownDrops)}</b> of your landings matched to a spot, `
         + `lobby reference from <b>${n0(d.assigned)}</b> landings by all `
-        + `players. Spots with at least ${d.minDrops} of your own drops.`;
+        + `players. Spots with at least ${d.minDrops} of your own drops; `
+        + `rows under ${d.reliableDrops} are marked <b>thin</b> — their `
+        + `difference to the lobby swings by tens of points.`;
       document.getElementById("poiFoot").innerHTML =
         "<b>Diff</b> is your early-death rate minus the rate of everyone who "
         + "lands at the same spot — that separates \"tough spot\" from \"I "

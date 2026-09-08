@@ -483,6 +483,18 @@ def test_summarise_landings_computes_diff_to_lobby():
     assert row["avgKills"] == pytest.approx(1.5)
 
 
+def test_summarise_landings_flags_thin_samples():
+    """Unter RELIABLE_POI_DROPS ist die Differenz nicht belastbar — das
+    Flag haelt sie aus der Rangliste des Tools heraus."""
+    few = [{"poi": "Selten", "map": "M", "earlyDeath": False,
+            "timeSurvived": 100, "kills": 0, "damage": 0, "place": 10}] * 6
+    many = [{"poi": "Oft", "map": "M", "earlyDeath": False,
+             "timeSurvived": 100, "kills": 0, "damage": 0, "place": 10}] * 25
+    out = {r["poi"]: r for r in sq.summarise_landings(few + many, {}, min_drops=5)}
+    assert out["Selten"]["reliable"] is False
+    assert out["Oft"]["reliable"] is True
+
+
 def test_summarise_landings_hides_pois_below_min_drops():
     own = [{"poi": "Rar", "map": "M", "earlyDeath": False, "timeSurvived": 100,
             "kills": 0, "damage": 0, "place": 10}]

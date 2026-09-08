@@ -65,8 +65,14 @@ MIN_COHORT_MATCHES = 20
 MAP_ALIASES = {"Erangel_Main": "Baltic_Main"}
 
 #: Ab so vielen eigenen Landungen taucht ein POI in der Auswertung auf.
-#: Darunter sagt eine Fruehtod-Quote nichts.
+#: Darunter sagt eine Quote nichts.
 MIN_POI_DROPS = 5
+
+#: Ab so vielen eigenen Landungen gilt die Differenz zur Lobby als
+#: belastbar. Darunter streut sie heftig: an Prod-Daten fuehrten
+#: 5-Drop-POIs die Rangliste mit +30 Punkten an, waehrend der einzige
+#: wirklich auffaellige Platz (86 Drops, +3,5) darunter verschwand.
+RELIABLE_POI_DROPS = 20
 
 #: Fenster nach der eigenen Landung, in dem ein Tod als verlorener
 #: Landefight gilt. Bewusst relativ zur Landung und nicht zum Rundenstart:
@@ -416,6 +422,7 @@ def summarise_landings(own, lobby, min_drops=MIN_POI_DROPS):
             "lobbyDrops": lob_drops,
             "lobbyEarlyPct": lob_pct,
             "diff": (my_pct - lob_pct) if lob_pct is not None else None,
+            "reliable": n >= RELIABLE_POI_DROPS,
             "survivalMin": (_avg(r["timeSurvived"] for r in rows) or 0) / 60.0,
             "avgKills": _avg(r["kills"] for r in rows),
             "avgDamage": _avg(r["damage"] for r in rows),
@@ -848,6 +855,7 @@ def landing_stats(conn, tenant_id, account_id, cutoff, to_iso=None,
         "ownDrops": len(own),
         "assigned": len(where),
         "minDrops": min_drops,
+        "reliableDrops": RELIABLE_POI_DROPS,
     }
 
 
