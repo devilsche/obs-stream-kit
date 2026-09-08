@@ -11,7 +11,20 @@ from pubg.db_pg import get_setting
 #: Bis zu diesem Abstand (Zentrum zu Zentrum, in cm) gilt ein umschlossener
 #: POI als Unterbereich des groesseren. Darueber liegt er nur geografisch
 #: drin — siehe die Begruendung in compute_landing_spots.
-POI_PARENT_MAX_CM = 35000     # 350 m
+POI_PARENT_MAX_CM = 60000     # 600 m
+
+#: POIs, die NIE Unterbereich werden, egal wie nah ihr Container liegt.
+#: Der Zentrumsabstand kann diese Faelle nicht trennen: "Hospital" liegt
+#: 574 m von Georgopols Mitte und soll dazugehoeren, "Mylta" nur 481 m von
+#: "Mylta - Neighbourhood" und soll eigenstaendig bleiben — es gibt keinen
+#: Schwellwert dazwischen. Auch das Flaechenverhaeltnis trennt sie nicht
+#: (Hospital 5,6 % von Georgopol, Mylta 5,4 % von Neighbourhood). Grosse
+#: gestreckte "Neighbourhood"-Polygone umschliessen Orte, die ihre eigene
+#: Adresse haben; die stehen hier.
+POI_PARENT_STANDALONE = frozenset((
+    "Mylta",
+    "Chop Sticks",
+))
 
 BATTLE_ROYALE_MODES = (
     "solo", "solo-fpp",
@@ -7091,6 +7104,8 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
     # deshalb leerer aus als die Gegend tatsaechlich bespielt ist.
     poi_parent = {}
     for nm, (cx0, cy0) in poi_centroid.items():
+        if nm in POI_PARENT_STANDALONE:
+            continue
         own = poi_area.get(nm, 0.0)
         best, best_area = None, float("inf")
         for other, pts in poi_points.items():
@@ -7104,13 +7119,14 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
             # Enthaltensein allein reicht nicht. Grosse, gestreckte Regionen
             # umschliessen Orte, die nichts miteinander zu tun haben:
             # "Mylta - Power" liegt in "Mylta - Neighbourhood", aber 862 m
-            # von dessen Mitte und 1.304 m von "Mylta" — das ist das
-            # Kraftwerk, kein Stadtteil. Gemessen an Prod-Daten liegen die
-            # echten Unterbereiche unter 350 m: Pochinki - Ibi 161 m,
-            # Gatka North 199 m, Gatka South 277 m, Pochinki - C 294 m,
-            # Ruins Revive 327 m. Darueber beginnt "liegt geografisch
-            # drin", nicht "gehoert dazu" — der naechste Kandidat waere
-            # Georgopol - Containers mit 368 m.
+            # von dessen Mitte — das ist das Kraftwerk, kein Stadtteil.
+            # 600 m gemessen an Prod-Daten: bis dahin sind alle 73 Paare
+            # echte Unterbereiche (Georgopol - Containers 368 m, Hospital
+            # 574 m, Sisnovka Island - West Compound 575 m), darueber
+            # beginnen die Brueckenkoepfe und Aussenposten von Sosnovka
+            # Island (903 m bis 1.702 m). Die zwei Faelle, die in diesem
+            # Fenster liegen und trotzdem eigenstaendig bleiben sollen,
+            # stehen in POI_PARENT_STANDALONE.
             ox, oy = poi_centroid[other]
             if math.hypot(cx0 - ox, cy0 - oy) > POI_PARENT_MAX_CM:
                 continue

@@ -1251,3 +1251,40 @@ def test_poi_boxes_carry_the_area_for_the_smallest_rule():
     # (name, x0, x1, y0, y1, pts, area)
     assert len(entry) == 7
     assert entry[6] == pytest.approx(10000.0)
+
+
+def test_landing_spots_standalone_pois_never_get_a_parent(pg_compat):
+    """Der Zentrumsabstand kann zwei Faelle nicht trennen: "Hospital" liegt
+    574 m von Georgopols Mitte und soll dazugehoeren, "Mylta" nur 481 m von
+    "Mylta - Neighbourhood" und soll eigenstaendig bleiben. Das
+    Flaechenverhaeltnis trennt sie auch nicht (5,6 % gegen 5,4 %). Darum
+    eine explizite Liste — hier gegen dieselbe Geometrie geprueft, damit
+    nur der Name den Unterschied macht."""
+    from pubg.aggregations import compute_landing_spots
+    conn, t1, _ = pg_compat
+    blob = {"mapKm": 8, "regions": [
+        {"name": "Mylta - Neighbourhood", "points": [[0, 0], [40000, 0],
+                                                     [40000, 40000], [0, 40000]]},
+        # Beide gleich weit vom Container-Zentrum (20000/20000) entfernt und
+        # gleich gross. Nur der Name entscheidet.
+        {"name": "Mylta", "points": [[1000, 19000], [4000, 19000],
+                                     [4000, 22000], [1000, 22000]]},
+        {"name": "Hospital", "points": [[36000, 19000], [39000, 19000],
+                                        [39000, 22000], [36000, 22000]]},
+    ]}
+    _seed_landing(conn, t1, "match.a", "account.me", 2500, 20500)
+    _seed_landing(conn, t1, "match.b", "account.me", 37500, 20500)
+    conn.commit()
+
+    out = compute_landing_spots(conn, t1, "Baltic_Main", [], pois_blob=blob)
+    parent = {p["name"]: p["parent"] for p in out["pois"]}
+    assert parent["Hospital"] == "Mylta - Neighbourhood"
+    assert parent["Mylta"] is None
+
+
+def test_standalone_list_holds_exactly_the_intended_pois():
+    """Die Liste ist eine Ausnahme von der Geometrie und soll klein
+    bleiben — waechst sie unbemerkt, ist die Schwelle falsch gewaehlt."""
+    from pubg.aggregations import POI_PARENT_STANDALONE, POI_PARENT_MAX_CM
+    assert POI_PARENT_STANDALONE == frozenset(("Mylta", "Chop Sticks"))
+    assert POI_PARENT_MAX_CM == 60000
