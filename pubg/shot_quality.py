@@ -812,10 +812,13 @@ def landing_stats(conn, tenant_id, account_id, cutoff, to_iso=None,
           AND m.played_at >= ? AND {br_where}{time_filter}
     """, [tenant_id, cutoff, *br_params, *extra]).fetchall()
 
-    # Verlorener Landefight = Tod binnen LANDING_FIGHT_MS nach der eigenen
-    # Landung UND im Landeplatz selbst. Beides gilt fuer die Lobby und fuer
-    # den eigenen Wert GLEICH — sonst vergleicht man zwei verschiedene
-    # Uhren. `participants.time_survived` laeuft ab Rundenstart und ist
+    # Gezaehlt wird der TOD DER EINZELPERSON, nicht der Ausgang des
+    # Gefechts fuers Squad: ein Kill-Event mit dem Spieler als Opfer,
+    # binnen LANDING_FIGHT_MS nach SEINER Landung und im Landeplatz selbst.
+    # Ein Knock mit Revive zaehlt nicht (nur Kill-Events), und ob die Mates
+    # den Fight danach gewinnen, spielt keine Rolle. Fuer die Lobby gilt
+    # dasselbe je Spieler, jeder gegen seine eigene Landezeit — sonst
+    # vergleicht man zwei verschiedene Uhren. `participants.time_survived` laeuft ab Rundenstart und ist
     # deshalb hier NICHT verwendbar: die Landung liegt rund zweieinhalb
     # Minuten spaeter, das Fenster waere fuer die eigene Quote enger als
     # fuer die Lobby und die Differenz kippte ins Gegenteil.

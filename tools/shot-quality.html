@@ -34,6 +34,10 @@
   <style>
     body { padding: 20px; max-width: 1180px; margin: 0 auto;
            background: var(--theme-bg); color: var(--theme-text); }
+    /* Ohne das kleben die Karten aneinander — dieselbe Regel wie in
+       squad-playstyle und weapon-performance. */
+    .t-card { padding: 16px 18px; margin-bottom: 16px; }
+    .t-card > h2 { margin-bottom: 3px; }
 
     .bar { display: flex; flex-wrap: wrap; gap: 12px 22px; align-items: flex-end; }
     .bar > div, .bar > label { display: flex; flex-direction: column; gap: 4px; }
@@ -121,22 +125,43 @@
                color: var(--theme-text-dim, #8a7d99); font-weight: 500;
                border-bottom: 1px solid var(--theme-line, #372c47); }
     tbody tr + tr > * { border-top: 1px solid var(--theme-line, #372c47); }
+    /* Gruppenzeile trägt die Trennung selbst, keine doppelte Linie */
+    tbody tr + tr.map-head > * { border-top: 0; }
     tbody tr.me > * { background: color-mix(in srgb, var(--theme-primary, #7b3a9c) 22%, transparent); }
     tbody tr.me > td:first-child { font-weight: 700; }
     tbody tr.floor > * { color: var(--theme-text-dim, #8a7d99); font-style: italic; }
     tbody tr.thin > * { color: var(--theme-text-dim, #8a7d99); }
+    tr.map-head > th {
+      text-align: left; padding: 14px 9px 5px; font-size: 0.74em;
+      letter-spacing: 0.09em; text-transform: uppercase; font-weight: 500;
+      color: var(--theme-accent, #f2b705); }
+    tr.map-head > th > .mh-n {
+      color: var(--theme-text-dim, #8a7d99); letter-spacing: 0.03em;
+      text-transform: none; font-size: 0.94em; }
     tbody tr.thin > td.diff-bad, tbody tr.thin > td.diff-good { font-weight: 400; }
     td.hi { color: var(--theme-accent, #f2b705); font-weight: 500; }
     /* Diff-Spalte: Vorzeichen traegt die Aussage, nicht nur die Farbe —
        deshalb steht das + bzw. − immer mit im Text. */
+    th.sortable { cursor: pointer; user-select: none; }
+    th.sortable:hover, th.sortable.active { color: var(--theme-accent, #f2b705); }
+    th.sortable:focus-visible { outline: 2px solid var(--theme-accent, #f2b705);
+                                outline-offset: -2px; }
+    .sort-arrow { font-size: 0.8em; margin-left: 2px; opacity: 0.75; }
     td.diff-bad  { color: var(--theme-danger, #e57b7b); font-weight: 500; }
     td.diff-good { color: var(--theme-ok, #6cc294); font-weight: 500; }
     td.lo { color: var(--theme-danger, #e57b7b); }
 
-    .dists { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-             gap: 18px; }
+    .dists { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+             gap: 12px; }
+    /* Eigene Kartenoptik: mit blossem gap flossen die vier Bloecke optisch
+       ineinander, weil sie nur aus Ueberschrift und Liste bestehen. */
+    .dist { background: var(--theme-surface, #201a28); border-radius: 5px;
+            border: 1px solid var(--theme-line, #372c47);
+            padding: 11px 13px 13px; }
     .dist h3 { font-size: 0.76em; letter-spacing: 0.09em; text-transform: uppercase;
-               color: var(--theme-text-dim, #8a7d99); margin: 0 0 7px; font-weight: 500; }
+               color: var(--theme-text-dim, #8a7d99); margin: 0 0 9px; font-weight: 500;
+               padding-bottom: 7px;
+               border-bottom: 1px solid var(--theme-line, #372c47); }
     .dist ul { list-style: none; margin: 0; padding: 0;
                display: flex; flex-direction: column; gap: 4px; }
     .dist li { display: grid; grid-template-columns: 6.5rem 1fr 3.4rem;
@@ -244,15 +269,17 @@
   <div class="t-card" id="poiCard" hidden>
     <h2>Landing spots</h2>
     <p class="sub" id="poiSub"></p>
+    <div>
+      <span class="legend">Per map</span>
+      <div class="switch" id="topSwitch" role="group" aria-label="Spots per map">
+        <button type="button" data-top="3" aria-pressed="false">Top 3</button>
+        <button type="button" data-top="5" aria-pressed="true">Top 5</button>
+        <button type="button" data-top="0" aria-pressed="false">All</button>
+      </div>
+    </div>
     <div class="scroll">
       <table>
-        <thead><tr>
-          <th>Landing spot</th><th>Map</th><th>Your drops</th>
-          <th title="Share of your rounds from here where you die within 5 min of landing, inside the spot">Lost fight</th>
-          <th title="Same measure for everyone who lands here">Lobby</th>
-          <th title="Your rate minus the lobby rate at the same spot">Diff</th>
-          <th>Ø Survival</th><th>Ø Kills</th><th>Ø Damage</th><th>Ø Place</th>
-        </tr></thead>
+        <thead id="poiHead"><tr></tr></thead>
         <tbody id="poiRows"></tbody>
       </table>
     </div>
@@ -285,6 +312,8 @@
     let PLAYER = PubgUI.qs("player", "");
     let MIN    = parseInt(PubgUI.qs("minMatches", "20"), 10) || 20;
     let REF    = PubgUI.qs("ref", "lobby");
+    let TOPN   = parseInt(PubgUI.qs("top", "5"), 10);
+    if (![0, 3, 5].includes(TOPN)) TOPN = 5;
     let DATA   = null;
 
     const n0 = (v) => v == null ? "—" : Math.round(v).toLocaleString("en-US");
@@ -580,19 +609,93 @@
       Chimera_Main: "Paramo", Heaven_Main: "Haven", Range_Main: "Camp Jackal",
     };
 
+    // Spalten der POI-Tabelle: key zum Sortieren, fmt zum Anzeigen.
+    // `text: true` sortiert alphabetisch aufsteigend, alles andere
+    // numerisch absteigend — der interessante Wert steht dann oben.
+    const POI_COLS = [
+      { key: "poi", label: "Landing spot", text: true },
+      { key: "map", label: "Map", text: true },
+      { key: "drops", label: "Your drops",
+        help: "How often you landed here" },
+      { key: "earlyDeathPct", label: "You died",
+        help: "Share of your rounds from here where YOU die (not knocked, not the squad) within 5 min of your landing, inside the spot itself" },
+      { key: "lobbyEarlyPct", label: "Lobby",
+        help: "The same, per player, for everyone who lands here — each measured against their own landing" },
+      { key: "diff", label: "Diff",
+        help: "Your rate minus the lobby rate at the same spot" },
+      { key: "survivalMin", label: "\u00d8 Survival" },
+      { key: "avgKills", label: "\u00d8 Kills" },
+      { key: "avgDamage", label: "\u00d8 Damage" },
+      { key: "avgPlace", label: "\u00d8 Place",
+        help: "Lower is better" },
+    ];
+    let POI_SORT = "drops";
+    let POI_DIR = -1;
+
+    function poiHeadHtml() {
+      return "<tr>" + POI_COLS.map(c => {
+        const active = c.key === POI_SORT;
+        const arrow = active ? (POI_DIR < 0 ? "\u25bc" : "\u25b2") : "";
+        const aria = active ? (POI_DIR < 0 ? "descending" : "ascending") : "none";
+        return `<th data-sort="${c.key}" tabindex="0" aria-sort="${aria}"`
+          + ` class="sortable${active ? " active" : ""}"`
+          + (c.help ? ` title="${esc(c.help)}"` : "")
+          + `>${esc(c.label)}<span class="sort-arrow">${arrow}</span></th>`;
+      }).join("") + "</tr>";
+    }
+
+    function poiCompare(a, b) {
+      const col = POI_COLS.find(c => c.key === POI_SORT) || POI_COLS[2];
+      const va = a[POI_SORT], vb = b[POI_SORT];
+      if (col.text) return String(va || "").localeCompare(String(vb || "")) * POI_DIR;
+      // Fehlende Werte immer nach unten, egal in welche Richtung sortiert
+      // wird — sonst fuehren leere Zellen die Tabelle an.
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      return (va - vb) * POI_DIR;
+    }
+
+    function onPoiSort(th) {
+      const key = th.dataset.sort;
+      const col = POI_COLS.find(c => c.key === key);
+      if (POI_SORT === key) POI_DIR *= -1;
+      else { POI_SORT = key; POI_DIR = col && col.text ? 1 : -1; }
+      renderPois();
+      const again = document.querySelector(`#poiHead th[data-sort="${key}"]`);
+      if (again) again.focus();
+    }
+
     function renderPois() {
       const d = DATA.landings || {};
       const rows = d.byPoi || [];
       document.getElementById("poiCard").hidden = !rows.length;
       if (!rows.length) return;
+      document.getElementById("poiHead").innerHTML = poiHeadHtml();
 
       // Nach Häufigkeit sortieren, NICHT nach Differenz. Die Differenz
       // streut bei kleinen Stichproben heftig — an Prod-Daten führten
       // 5-Drop-Plätze die Liste mit +30 an, während der eine wirklich
       // auffällige Platz (86 Drops, +3,5) darunter verschwand.
-      const sorted = rows.slice().sort((a, b) => b.drops - a.drops);
+      const sorted = rows.slice().sort(poiCompare);
 
-      document.getElementById("poiRows").innerHTML = sorted.map(r => {
+      // Nach Karte gruppieren: sonst verdrängt die meistgespielte Karte
+      // alle anderen aus der Liste. Die Sortierung wirkt INNERHALB jeder
+      // Karte — die Gruppierung bleibt also erhalten, egal welche Spalte
+      // sortiert. Kartenreihenfolge immer nach eigenen Drops.
+      const groups = new Map();
+      for (const r of sorted) {
+        if (!groups.has(r.map)) groups.set(r.map, []);
+        groups.get(r.map).push(r);
+      }
+      const byMap = [...groups.entries()]
+        .map(([map, rs]) => ({
+          map, rows: rs,
+          total: rs.reduce((s, r) => s + r.drops, 0),
+        }))
+        .sort((a, b) => b.total - a.total);
+
+      const rowHtml = (r) => {
         const cls = r.diff == null ? ""
           : (r.diff > 3 ? "diff-bad" : (r.diff < -3 ? "diff-good" : ""));
         const sign = r.diff == null ? "—"
@@ -610,17 +713,32 @@
           <td>${n0(r.avgDamage)}</td>
           <td>${n1(r.avgPlace)}</td>
         </tr>`;
+      };
+
+      // Gruppenzeilen in EINEM tbody, nicht mehrere tbody per outerHTML:
+      // outerHTML ersetzt #poiRows selbst, dann findet der nächste Render
+      // (Top-N-Wechsel) das Element nicht mehr.
+      document.getElementById("poiRows").innerHTML = byMap.map(g => {
+        const shown = TOPN > 0 ? g.rows.slice(0, TOPN) : g.rows;
+        const rest = g.rows.length - shown.length;
+        return `<tr class="map-head"><th colspan="10">
+            ${esc(MAP_LABEL[g.map] || g.map)}
+            <span class="mh-n">· ${n0(g.total)} drops on ${g.rows.length}
+              spot${g.rows.length === 1 ? "" : "s"}${rest > 0
+                ? `, ${rest} more not shown` : ""}</span>
+          </th></tr>`
+          + shown.map(rowHtml).join("");
       }).join("");
 
       // Der Aufmacher nur aus belastbaren Zeilen — sonst meldet er einen
       // Zufallsausschlag als größten Fund.
-      const solid = sorted.filter(r => r.reliable && r.diff != null);
-      const worst = solid.sort((a, b) => b.diff - a.diff)[0];
+      const solid = rows.filter(r => r.reliable && r.diff != null);
+      const worst = solid.slice().sort((a, b) => b.diff - a.diff)[0];
       const lead = (worst && worst.diff > 3)
-        ? `Biggest reliable outlier: <b>${esc(worst.poi)}</b> — you lose the`
-          + ` landing fight in ${pct(worst.earlyDeathPct)} of your`
-          + ` ${n0(worst.drops)} rounds from there, the lobby at the same spot`
-          + ` in ${pct(worst.lobbyEarlyPct)}. `
+        ? `Biggest reliable outlier: <b>${esc(worst.poi)}</b> — you die there`
+          + ` in ${pct(worst.earlyDeathPct)} of your ${n0(worst.drops)} rounds,`
+          + ` the average player who lands there in`
+          + ` ${pct(worst.lobbyEarlyPct)}. `
         : "";
       document.getElementById("poiSub").innerHTML = lead
         + `<b>${n0(d.ownDrops)}</b> of your landings matched to a spot, `
@@ -629,11 +747,14 @@
         + `rows under ${d.reliableDrops} are marked <b>thin</b> — their `
         + `difference to the lobby swings by tens of points.`;
       document.getElementById("poiFoot").innerHTML =
-        "<b>Diff</b> is your early-death rate minus the rate of everyone who "
-        + "lands at the same spot — that separates \"tough spot\" from \"I "
-        + "lose the landing fight here\". A death only counts when it happens "
-        + "within 5 minutes of landing AND inside the landing spot itself; "
-        + "rotating out and dying elsewhere is not a lost landing fight.";
+        "<b>You died</b> counts one thing only: <b>you personally dead</b> — "
+        + "not knocked-and-revived, and regardless of how the squad fought. "
+        + "A round counts when the kill lands within 5 minutes of your own "
+        + "landing AND inside the spot itself; rotating out and dying "
+        + "elsewhere does not count. <b>Lobby</b> is the same measure applied "
+        + "per player to everyone who lands there, each against their own "
+        + "landing time. <b>Diff</b> is the difference — that separates "
+        + "\"tough spot\" from \"I lose the fight here\".";
     }
 
     // ── Trend ───────────────────────────────────────────────────────────────
@@ -716,6 +837,22 @@
       press(e.currentTarget, "range", RANGE);
       load();
     });
+    document.getElementById("poiHead").addEventListener("click", e => {
+      const th = e.target.closest("th[data-sort]");
+      if (th) onPoiSort(th);
+    });
+    document.getElementById("poiHead").addEventListener("keydown", e => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const th = e.target.closest("th[data-sort]");
+      if (th) { e.preventDefault(); onPoiSort(th); }
+    });
+    document.getElementById("topSwitch").addEventListener("click", e => {
+      const b = e.target.closest("button[data-top]");
+      if (!b || Number(b.dataset.top) === TOPN) return;
+      TOPN = Number(b.dataset.top);
+      press(e.currentTarget, "top", String(TOPN));
+      if (DATA) renderPois();
+    });
     document.getElementById("refSwitch").addEventListener("click", e => {
       const b = e.target.closest("button[data-ref]");
       if (!b || b.dataset.ref === REF) return;
@@ -739,6 +876,7 @@
     document.getElementById("fMin").value = MIN;
     press(document.getElementById("rangeSwitch"), "range", RANGE);
     press(document.getElementById("refSwitch"), "ref", REF);
+    press(document.getElementById("topSwitch"), "top", String(TOPN));
     load();
   </script>
 </body>
