@@ -277,6 +277,13 @@
         <button type="button" data-top="0" aria-pressed="false">All</button>
       </div>
     </div>
+    <div>
+      <span class="legend">Sub-areas</span>
+      <div class="switch" id="subSwitch" role="group" aria-label="Sub-areas">
+        <button type="button" data-sub="0" aria-pressed="true">Separate</button>
+        <button type="button" data-sub="1" aria-pressed="false">Merged</button>
+      </div>
+    </div>
     <div class="scroll">
       <table>
         <thead id="poiHead"><tr></tr></thead>
@@ -314,6 +321,7 @@
     let REF    = PubgUI.qs("ref", "lobby");
     let TOPN   = parseInt(PubgUI.qs("top", "5"), 10);
     if (![0, 3, 5].includes(TOPN)) TOPN = 5;
+    let SUBS   = PubgUI.qs("groupSubareas", "0") === "1";
     let DATA   = null;
 
     const n0 = (v) => v == null ? "—" : Math.round(v).toLocaleString("en-US");
@@ -712,7 +720,9 @@
         const sign = r.diff == null ? "—"
           : (r.diff > 0 ? "+" : "\u2212") + Math.abs(r.diff).toFixed(1);
         return `<tr class="${r.reliable ? "" : "thin"}">
-          <td>${esc(r.poi)}${r.reliable ? "" : ' <span class="tag">thin</span>'}</td>
+          <td>${esc(r.poi)}${r.subAreas > 1
+              ? ` <span class="tag">${r.subAreas} areas</span>` : ""}${
+              r.reliable ? "" : ' <span class="tag">thin</span>'}</td>
           <td>${esc(MAP_LABEL[r.map] || r.map)}</td>
           <td>${n0(r.drops)}</td>
           <td>${pct(r.earlyDeathPct)}</td>
@@ -771,8 +781,14 @@
         + `landings matched to a named spot, lobby reference from `
         + `<b>${n0(d.assigned)}</b> landings by all players. Rows under `
         + `${d.reliableDrops} drops are marked <b>thin</b> — their difference `
-        + `to the lobby swings by tens of points. Use the switch above to `
-        + `show more spots per map.`;
+        + `to the lobby swings by tens of points. `
+        + (d.groupSubareas
+           ? `Sub-areas are <b>merged</b>: "Cavala - Warehouses" counts as `
+             + `"Cavala", on both sides of the comparison.`
+           : `Sub-areas are <b>separate</b> — "Cavala - Warehouses" is its `
+             + `own row. Merging them builds a bigger sample per spot, but `
+             + `hides real differences: on Taego, Fishing Camp - Crossings `
+             + `and - South have 56 % and 41 % lobby risk.`);
       document.getElementById("poiFoot").innerHTML =
         "<b>You died</b> counts one thing only: <b>you personally dead</b> — "
         + "not knocked-and-revived, and regardless of how the squad fought. "
@@ -837,6 +853,7 @@
         ? "Loading all matches … (the first run takes a few seconds)"
         : "Loading …";
       const params = new URLSearchParams({ range: RANGE, minMatches: String(MIN) });
+      if (SUBS) params.set("groupSubareas", "1");
       if (PLAYER.trim()) params.set("player", PLAYER.trim());
       try {
         DATA = await PubgUI.fetchJson(
@@ -870,6 +887,13 @@
       RANGE = b.dataset.range;
       press(e.currentTarget, "range", RANGE);
       load();
+    });
+    document.getElementById("subSwitch").addEventListener("click", e => {
+      const b = e.target.closest("button[data-sub]");
+      if (!b || (b.dataset.sub === "1") === SUBS) return;
+      SUBS = b.dataset.sub === "1";
+      press(e.currentTarget, "sub", SUBS ? "1" : "0");
+      load();   // Serverseitig gruppiert, inklusive Lobby-Referenz
     });
     document.getElementById("poiHead").addEventListener("click", e => {
       const th = e.target.closest("th[data-sort]");
@@ -911,6 +935,7 @@
     press(document.getElementById("rangeSwitch"), "range", RANGE);
     press(document.getElementById("refSwitch"), "ref", REF);
     press(document.getElementById("topSwitch"), "top", String(TOPN));
+    press(document.getElementById("subSwitch"), "sub", SUBS ? "1" : "0");
     load();
   </script>
 </body>

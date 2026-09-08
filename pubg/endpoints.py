@@ -3200,13 +3200,16 @@ class EndpointRegistry:
                   or (_range_filter(conn, self.tenant_id, range_key)
                       if range_key != "all" else "1970-01-01T00:00:00Z"))
 
+        group_sub = qs.get("groupSubareas") == "1"
+
         cache_key = (f"shot-quality:{account_id}:{range_key}:{from_iso or ''}:"
-                     f"{to_iso or ''}:{min_matches}")
+                     f"{to_iso or ''}:{min_matches}:{int(group_sub)}")
         data = self.cache.get_or_compute(
             cache_key,
             lambda: compute_shot_quality(
                 conn, self.tenant_id, account_id, cutoff,
-                to_iso=to_iso, min_matches=min_matches),
+                to_iso=to_iso, min_matches=min_matches,
+                group_subareas=group_sub),
             ttl=300)
         return _ok({**data, "range": range_key, "from": cutoff,
                     "accountId": account_id,

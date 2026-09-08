@@ -795,3 +795,81 @@ def test_landing_stats_default_min_drops_keeps_rare_spots(pg_compat):
                            pois=POIS)
     assert len(out["byPoi"]) == 1
     assert out["byPoi"][0]["reliable"] is False
+
+
+# ── Unterbereiche zusammenfassen ────────────────────────────────────────────
+
+def test_base_poi_strips_the_subarea():
+    assert sq.base_poi("Cavala - Warehouses") == "Cavala"
+    assert sq.base_poi("Fishing Camp - South") == "Fishing Camp"
+    assert sq.base_poi("Bootyard") == "Bootyard"
+    # Kein Trenner-Fehlalarm bei Bindestrich im Namen
+    assert sq.base_poi("Das-Flip") == "Das-Flip"
+
+
+def test_summarise_landings_can_merge_subareas():
+    """Cavala, Cavala - Apartments und Cavala - Warehouses sind derselbe
+    Absprung-Entschluss. Zusammengefasst tragen sie ein Sample, getrennt
+    zeigen sie Unterschiede — deshalb umschaltbar."""
+    own = [
+        {"poi": "Cavala", "map": "M", "earlyDeath": True, "timeSurvived": 100,
+         "kills": 0, "damage": 0, "place": 30},
+        {"poi": "Cavala - Warehouses", "map": "M", "earlyDeath": False,
+         "timeSurvived": 900, "kills": 2, "damage": 200, "place": 5},
+        {"poi": "Cavala - Apartments", "map": "M", "earlyDeath": False,
+         "timeSurvived": 800, "kills": 1, "damage": 150, "place": 8},
+    ]
+    lobby = {
+        ("M", "Cavala"): {"drops": 100, "early": 40},
+        ("M", "Cavala - Warehouses"): {"drops": 50, "early": 10},
+        ("M", "Cavala - Apartments"): {"drops": 50, "early": 20},
+    }
+    sep = sq.summarise_landings(own, lobby, min_drops=1)
+    assert len(sep) == 3
+
+    merged = sq.summarise_landings(own, lobby, min_drops=1,
+                                   group_subareas=True)
+    assert len(merged) == 1
+    row = merged[0]
+    assert row["poi"] == "Cavala"
+    assert row["drops"] == 3
+    assert row["earlyDeathPct"] == pytest.approx(100.0 / 3)
+    # Lobby MUSS mitgruppiert werden, sonst vergleicht man 3 eigene Drops
+    # gegen nur einen der drei Unterbereiche
+    assert row["lobbyDrops"] == 200
+    assert row["lobbyEarlyPct"] == pytest.approx(35.0)
+    assert row["subAreas"] == 3
+
+
+def test_summarise_landings_marks_single_area_without_subareas():
+    own = [{"poi": "Bootyard", "map": "M", "earlyDeath": False,
+            "timeSurvived": 900, "kills": 0, "damage": 0, "place": 5}]
+    row = sq.summarise_landings(own, {}, min_drops=1, group_subareas=True)[0]
+    assert row["subAreas"] == 1
+
+
+def test_landing_stats_passes_grouping_through(pg_compat):
+    conn, t1, _ = pg_compat
+    pois = {"Baltic_Main": {"regions": [
+        {"name": "Ort", "points": [[1000, 1000], [1500, 1000],
+                                    [1500, 1500], [1000, 1500]]},
+        {"name": "Ort - Lager", "points": [[1600, 1000], [2000, 1000],
+                                            [2000, 1500], [1600, 1500]]},
+    ]}}
+    for i, x in enumerate((1200, 1800)):
+        _seed(conn, t1, "account.me", f"match.{i}", survived=900)
+        conn.execute(
+            "INSERT INTO telemetry_events (match_id, event_type,"
+            " actor_account, actor_x, actor_y, timestamp_ms)"
+            " VALUES (?, 'Landing', 'account.me', ?, 1200, 1000)",
+            (f"match.{i}", x))
+    conn.commit()
+
+    sep = sq.landing_stats(conn, t1, "account.me", "1970-01-01T00:00:00Z",
+                           pois=pois, min_drops=1)
+    assert len(sep["byPoi"]) == 2
+
+    merged = sq.landing_stats(conn, t1, "account.me", "1970-01-01T00:00:00Z",
+                              pois=pois, min_drops=1, group_subareas=True)
+    assert len(merged["byPoi"]) == 1
+    assert merged["byPoi"][0]["drops"] == 2

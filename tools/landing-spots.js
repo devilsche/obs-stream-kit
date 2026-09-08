@@ -15,6 +15,11 @@ const LS = {
   view: { zoom: 1, panX: 0, panY: 0 },
 };
 const SCATTER_COLORS = ["#f2b705", "#3cb44b", "#46f0f0", "#f032e6"];
+//: Abstand des POI-Namens vom Ortsmarker, in Bildschirm-Pixeln. Klein
+//: halten: der Wert ist zoomabhaengig in Kartenmetern, und ein grosser
+//: Offset laesst den Namen bei herausgezoomter Ansicht wie einen eigenen,
+//: weit entfernten Spot aussehen.
+const POI_LABEL_OFFSET_PX = 9;
 const isBotAcc = (acc) => typeof acc === "string" && acc.startsWith("ai.");
 const botMark = (acc) => isBotAcc(acc) ? " <span class=\"bot-mark\">·BOT</span>" : "";
 
@@ -216,11 +221,29 @@ function renderHeatmap() {
     grad.addColorStop(1, "rgba(242,183,5,0)");
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(px, py, radius, 0, Math.PI * 2); ctx.fill();
-    // POI-Label
-    ctx.fillStyle = "#fff";
+
+    // Mittelpunkt-Marker: der Blob ist weich und sein Radius haengt an der
+    // Intensitaet, nicht am Ort — ohne Marker ist nicht ablesbar, wo der
+    // Spot wirklich liegt.
+    ctx.fillStyle = "#f2b705";
+    ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fill();
+
+    // Label dicht am Marker, mit FESTEM kleinem Offset. Vorher hing der
+    // Offset am Blob-Radius (20-80 px, zoom-invariant): bei Zoom 1 sass das
+    // Label damit bis zu 960 m ueber dem echten Ort und sah aus wie ein
+    // eigener Spot weit im Norden. Der Offset bleibt zoomabhaengig — 9 px
+    // sind bei Zoom 1 rund 100 m — aber der Marker darunter ist eindeutig.
     ctx.font = "bold 12px DM Sans";
     ctx.textAlign = "center";
-    ctx.fillText(poi.name + " " + poi.total + "×", px, py - radius - 4);
+    ctx.textBaseline = "alphabetic";
+    const label = poi.name + " " + poi.total + "×";
+    // Umriss, damit der Text auch ueber hellen Kartenteilen lesbar ist —
+    // dicht am Marker liegt er jetzt oefter auf dem Blob.
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(0,0,0,0.75)";
+    ctx.strokeText(label, px, py - POI_LABEL_OFFSET_PX);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(label, px, py - POI_LABEL_OFFSET_PX);
   }
 
   // Scatter-Punkte nur für aktive Spieler

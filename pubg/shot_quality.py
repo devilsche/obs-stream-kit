@@ -398,14 +398,44 @@ def first_landings(rows):
     return out
 
 
-def summarise_landings(own, lobby, min_drops=MIN_POI_DROPS):
+#: Trenner, mit dem die POI-Datei Unterbereiche eines Ortes benennt:
+#: "Cavala - Warehouses", "Fishing Camp - South". 83 der 308 Regionen sind
+#: so aufgebaut. Bewusst MIT Leerzeichen — sonst zerlegt es Namen wie
+#: "Das-Flip".
+SUBAREA_SEP = " - "
+
+
+def base_poi(name):
+    """Ortsname ohne Unterbereich."""
+    return str(name or "").split(SUBAREA_SEP)[0]
+
+
+def summarise_landings(own, lobby, min_drops=MIN_POI_DROPS,
+                       group_subareas=False):
     """Eigene Landungen je POI, mit der Lobby-Quote am selben Ort.
 
     `own` sind eigene Landungen mit Matchergebnis, `lobby` ein Dict
     (map, poi) -> {"drops": n, "early": n}."""
+    # Zusammenfassen ist eine Abwaegung, keine Verbesserung: gruppiert
+    # traegt ein Ort ein grosses Sample (Fishing Camp 63 statt 38 und 25),
+    # getrennt zeigt er echte Unterschiede — dieselben zwei Unterbereiche
+    # haben 56 % und 41 % Lobby-Risiko. Deshalb umschaltbar.
+    key_of = base_poi if group_subareas else (lambda n: n)
+
     grouped = {}
     for r in own:
-        grouped.setdefault((r["map"], r["poi"]), []).append(r)
+        grouped.setdefault((r["map"], key_of(r["poi"])), []).append(r)
+
+    # Die Lobby-Referenz MUSS mitgruppiert werden, sonst stehen die
+    # zusammengefassten eigenen Drops gegen nur einen Unterbereich.
+    if group_subareas:
+        folded = {}
+        for (map_name, poi), ref in lobby.items():
+            acc = folded.setdefault((map_name, base_poi(poi)),
+                                    {"drops": 0, "early": 0})
+            acc["drops"] += ref.get("drops") or 0
+            acc["early"] += ref.get("early") or 0
+        lobby = folded
 
     out = []
     for (map_name, poi), rows in grouped.items():
@@ -443,6 +473,7 @@ def summarise_landings(own, lobby, min_drops=MIN_POI_DROPS):
             "lobbyDrops": lob_drops,
             "lobbyEarlyPct": lob_pct,
             "diff": (my_pct - lob_pct) if lob_pct is not None else None,
+            "subAreas": len({r["poi"] for r in rows}),
             "squadRounds": sn,
             "squadWipedPct": squad_pct,
             # Der interessante Fall: ich tot, Squad haelt den Platz. Dann
@@ -782,7 +813,7 @@ def load_pois(path=None):
 
 
 def landing_stats(conn, tenant_id, account_id, cutoff, to_iso=None,
-                  pois=None, min_drops=MIN_POI_DROPS):
+                  pois=None, min_drops=MIN_POI_DROPS, group_subareas=False):
     """Landeplaetze mit eigenem Ergebnis und der Lobby-Quote am selben POI.
 
     Der Lobby-Vergleich ist der Punkt der Uebung: eine eigene Fruehtod-Quote
@@ -799,7 +830,9 @@ def landing_stats(conn, tenant_id, account_id, cutoff, to_iso=None,
     matches."""
     boxes = poi_boxes(pois if pois is not None else load_pois())
     if not boxes:
-        return {"byPoi": [], "ownDrops": 0, "assigned": 0, "minDrops": min_drops}
+        return {"byPoi": [], "perMap": [], "ownDrops": 0, "assigned": 0,
+                "minDrops": min_drops, "reliableDrops": RELIABLE_POI_DROPS,
+                "groupSubareas": group_subareas}
 
     br_where, br_params = _br_filter("m")
     time_filter = " AND m.played_at <= ?" if to_iso else ""
@@ -936,14 +969,15 @@ def landing_stats(conn, tenant_id, account_id, cutoff, to_iso=None,
         entry["landings"] += 1
         if (mid, acc) in where:
             entry["assigned"] += 1
-    for row in summarise_landings(own, lobby, 1):
+    for row in summarise_landings(own, lobby, 1, group_subareas):
         entry = per_map.get(row["map"])
         if entry is not None:
             entry["spots"] = entry.get("spots", 0) + 1
 
     return {
-        "byPoi": summarise_landings(own, lobby, min_drops),
+        "byPoi": summarise_landings(own, lobby, min_drops, group_subareas),
         "perMap": sorted(per_map.values(), key=lambda d: -d["landings"]),
+        "groupSubareas": group_subareas,
         "ownDrops": len(own),
         "assigned": len(where),
         "minDrops": min_drops,
@@ -991,7 +1025,7 @@ def trend(conn, tenant_id, account_id):
 
 def compute_shot_quality(conn, tenant_id, account_id, cutoff,
                          to_iso=None, min_matches=MIN_COHORT_MATCHES,
-                         lobby_min_matches=5):
+                         lobby_min_matches=5, group_subareas=False):
     """Alles in einem Aufruf — so bleibt es ein Endpoint-Call."""
     me = own_metrics(conn, tenant_id, account_id, cutoff, to_iso)
     squad = cohort_players(conn, tenant_id, min_matches)
@@ -1026,6 +1060,7 @@ def compute_shot_quality(conn, tenant_id, account_id, cutoff,
             "lobbyMinMatches": lobby_min_matches,
         },
         "landings": landing_stats(conn, tenant_id, account_id, cutoff,
-                                  to_iso=to_iso),
+                                  to_iso=to_iso,
+                                  group_subareas=group_subareas),
         "trend": trend(conn, tenant_id, account_id),
     }
