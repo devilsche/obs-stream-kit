@@ -46,6 +46,20 @@
        liest die Elternbox, und die waere dann leer. */
     .mapwrap { position: relative; min-height: 22rem; min-width: 0; }
     canvas { display: block; width: 100%; height: 100%; }
+    /* Tooltip am Zeiger: der Name der Region unter der Maus. Ohne ihn sieht
+       man Punkte und Blobs, aber weiss nicht, wo man ist. */
+    .map-tip { position: absolute; top: 10px; left: 10px;
+               pointer-events: none; z-index: 3;
+               background: color-mix(in srgb, var(--theme-surface) 94%, transparent);
+               border: 1px solid var(--theme-primary);
+               border-radius: var(--theme-radius);
+               padding: 6px 9px; font-size: 0.78em; line-height: 1.45;
+               max-width: 17rem; }
+    .map-tip b { color: var(--theme-accent); }
+    .map-tip .mt-sub { color: var(--theme-text-dim); font-size: 0.92em; }
+    .in-parent { color: var(--theme-text-faint, #6b5f7a); }
+    .kids-note { font-size: 0.88em; color: var(--theme-text-dim);
+                 white-space: nowrap; }
     .players-bar { position: absolute; bottom: 10px; left: 10px;
                    display: flex; gap: 8px; }
     .pchip { display: flex; align-items: center; gap: 6px; padding: 4px 10px;
@@ -232,6 +246,7 @@
       </section>
       <div class="mapwrap">
         <canvas id="heat" role="img" aria-label="Landing heatmap"></canvas>
+        <div class="map-tip" id="mapTip" role="status" aria-live="polite" hidden></div>
         <div class="players-bar" id="playersBar"
              aria-label="Toggle player scatter"></div>
       </div>

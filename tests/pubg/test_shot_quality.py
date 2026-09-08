@@ -1115,3 +1115,109 @@ def test_landing_spots_unknown_mode_falls_back_to_squad(pg_compat):
                                 ["account.me", "account.mate"],
                                 pois_blob=blob, player_mode="quatsch")
     assert out["totalMatches"] == 0
+
+
+# ── POI-Hierarchie aus der Geometrie ────────────────────────────────────────
+
+NESTED = {"Baltic_Main": {"mapKm": 8, "regions": [
+    # Grosser Container
+    {"name": "Gatka Neighborhood", "points": [[0, 0], [4000, 0],
+                                              [4000, 4000], [0, 4000]]},
+    # Zwei Kinder darin
+    {"name": "Gatka", "points": [[500, 500], [1500, 500],
+                                 [1500, 1500], [500, 1500]]},
+    {"name": "Gatka North", "points": [[2000, 2000], [2600, 2000],
+                                       [2600, 2600], [2000, 2600]]},
+    # Gleichnamiger Anfang, aber weit weg — kein Elternteil
+    {"name": "Gatka Far", "points": [[9000, 9000], [9500, 9000],
+                                     [9500, 9500], [9000, 9500]]},
+]}}
+
+
+def test_landing_spots_derives_parent_from_geometry_not_names(pg_compat):
+    """Namen truegen in beide Richtungen: "Gatka" liegt IN "Gatka
+    Neighborhood", der laengere Name ist also der Container. Und ein
+    gemeinsamer Namensanfang bedeutet gar nichts, wenn der Ort weit weg
+    liegt."""
+    from pubg.aggregations import compute_landing_spots
+    conn, t1, _ = pg_compat
+    for i, (x, y) in enumerate([(1000, 1000), (2300, 2300), (9200, 9200),
+                                (3500, 500)]):
+        _seed_landing(conn, t1, f"match.{i}", "account.me", x, y)
+    conn.commit()
+
+    out = compute_landing_spots(conn, t1, "Baltic_Main", [],
+                                pois_blob=NESTED["Baltic_Main"])
+    parent = {p["name"]: p["parent"] for p in out["pois"]}
+    assert parent["Gatka"] == "Gatka Neighborhood"
+    assert parent["Gatka North"] == "Gatka Neighborhood"
+    assert parent["Gatka Neighborhood"] is None
+    assert parent.get("Gatka Far") is None
+
+
+def test_landing_spots_parent_is_the_smallest_container(pg_compat):
+    """Bei mehreren Containern gewinnt der kleinste — sonst landet alles
+    unter der groessten Region der Karte."""
+    from pubg.aggregations import compute_landing_spots
+    conn, t1, _ = pg_compat
+    blob = {"mapKm": 8, "regions": [
+        {"name": "Huge", "points": [[0, 0], [8000, 0], [8000, 8000], [0, 8000]]},
+        {"name": "Medium", "points": [[0, 0], [4000, 0], [4000, 4000], [0, 4000]]},
+        {"name": "Small", "points": [[500, 500], [1500, 500],
+                                     [1500, 1500], [500, 1500]]},
+    ]}
+    _seed_landing(conn, t1, "match.a", "account.me", 1000, 1000)
+    _seed_landing(conn, t1, "match.b", "account.me", 3000, 3000)
+    _seed_landing(conn, t1, "match.c", "account.me", 6000, 6000)
+    conn.commit()
+
+    out = compute_landing_spots(conn, t1, "Baltic_Main", [], pois_blob=blob)
+    parent = {p["name"]: p["parent"] for p in out["pois"]}
+    assert parent["Small"] == "Medium"
+    assert parent["Medium"] == "Huge"
+    assert parent["Huge"] is None
+
+
+def test_landing_spots_ships_the_outline_for_the_hover_border(pg_compat):
+    """Der Hover soll die echten Raender zeigen, nicht einen Kreis mit
+    festem Radius — die POIs sind zwischen 150 m und 1,8 km breit."""
+    from pubg.aggregations import compute_landing_spots
+    conn, t1, _ = pg_compat
+    _seed_landing(conn, t1, "match.a", "account.me", 1000, 1000)
+    conn.commit()
+    out = compute_landing_spots(conn, t1, "Baltic_Main", [],
+                                pois_blob=NESTED["Baltic_Main"])
+    poi = next(p for p in out["pois"] if p["name"] == "Gatka")
+    assert len(poi["shape"]) == 4
+    # normalisiert wie cx/cy, damit das Frontend nur projizieren muss
+    assert all(0.0 <= v <= 1.0 for pt in poi["shape"] for v in pt)
+    assert out["mapKm"] == 8
+
+
+def test_landing_spots_parent_needs_proximity_not_just_containment(pg_compat):
+    """Grosse, gestreckte Regionen umschliessen Orte, die nichts
+    miteinander zu tun haben: "Mylta - Power" liegt in "Mylta -
+    Neighbourhood", aber 862 m von dessen Mitte — das ist das Kraftwerk,
+    kein Stadtteil."""
+    from pubg.aggregations import compute_landing_spots, POI_PARENT_MAX_CM
+    conn, t1, _ = pg_compat
+    far = POI_PARENT_MAX_CM * 2
+    blob = {"mapKm": 8, "regions": [
+        # Gestreckter Container ueber die ganze Breite
+        {"name": "Neighbourhood", "points": [[0, 0], [far * 2, 0],
+                                             [far * 2, 2000], [0, 2000]]},
+        # Nah am Container-Zentrum -> Unterbereich
+        {"name": "Near", "points": [[far - 200, 900], [far + 200, 900],
+                                    [far + 200, 1100], [far - 200, 1100]]},
+        # Weit weg, trotzdem enthalten -> eigener Ort
+        {"name": "PowerPlant", "points": [[100, 900], [500, 900],
+                                          [500, 1100], [100, 1100]]},
+    ]}
+    _seed_landing(conn, t1, "match.a", "account.me", far, 1000)
+    _seed_landing(conn, t1, "match.b", "account.me", 300, 1000)
+    conn.commit()
+
+    out = compute_landing_spots(conn, t1, "Baltic_Main", [], pois_blob=blob)
+    parent = {p["name"]: p["parent"] for p in out["pois"]}
+    assert parent["Near"] == "Neighbourhood"
+    assert parent["PowerPlant"] is None

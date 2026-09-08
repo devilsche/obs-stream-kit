@@ -255,6 +255,35 @@ function fitCanvas() {
   cnv.height = Math.floor(r.height);
 }
 
+//: Eckenradius des Hover-Umrisses in Pixeln. Wird pro Ecke auf die halbe
+//: kuerzere Kantenlaenge begrenzt, sonst ueberschlagen sich die Bogen bei
+//: kleinen Polygonen.
+const POLY_CORNER_R = 14;
+
+//: Legt einen abgerundeten Pfad entlang der uebergebenen Bildschirmpunkte.
+//: arcTo statt Bezier, weil es den Radius direkt nimmt und bei stumpfen
+//: Winkeln sauber laeuft.
+function roundedPolyPath(ctx, pts) {
+  const n = pts.length;
+  if (n < 3) return;
+  const len = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+  // Startpunkt: Mitte der ersten Kante — von dort laesst sich jede Ecke
+  // gleich behandeln, ohne Sonderfall am Anfang.
+  const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  ctx.beginPath();
+  const [sx, sy] = mid(pts[0], pts[1]);
+  ctx.moveTo(sx, sy);
+  for (let i = 1; i <= n; i++) {
+    const cur = pts[i % n];
+    const next = pts[(i + 1) % n];
+    const prev = pts[i - 1];
+    const r = Math.min(POLY_CORNER_R,
+                       len(prev, cur) / 2, len(cur, next) / 2);
+    ctx.arcTo(cur[0], cur[1], next[0], next[1], r);
+  }
+  ctx.closePath();
+}
+
 // normalisiert (0-1) → Canvas-Pixel (Map quadratisch zentriert, + Zoom/Pan)
 function projXY(nx, ny) {
   const cnv = document.getElementById("heat");
@@ -351,10 +380,18 @@ function renderHeatmap() {
     ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
   }
 
-  // Hover-Highlight (Task 11 — ausgeführt wenn _hoverPoi gesetzt)
+  // Hover-Highlight: die echten Polygon-Raender, abgerundet. Ein Kreis
+  // mit festem Radius sagte nichts darueber, wie weit der Ort reicht —
+  // die POIs sind zwischen 150 m und 1,8 km breit.
   if (LS._hoverPoi && LS.data) {
     const poi = LS.data.pois.find(p => p.name === LS._hoverPoi);
-    if (poi && poi.cx != null) {
+    if (poi && poi.shape && poi.shape.length >= 3) {
+      ctx.strokeStyle = "#f2b705";
+      ctx.lineWidth = 3;
+      roundedPolyPath(ctx, poi.shape.map(([nx, ny]) => projXY(nx, ny)));
+      ctx.stroke();
+    } else if (poi && poi.cx != null) {
+      // Kein Umriss vorhanden (aeltere Payload): Kreis als Rueckfall
       const [px, py] = projXY(poi.cx, poi.cy);
       ctx.strokeStyle = "#f2b705";
       ctx.lineWidth = 3;
@@ -398,6 +435,74 @@ window.addEventListener("mouseup", () => {
   _lsDrag = null;
   heatEl().style.cursor = "";
 });
+//: Region unter dem Zeiger finden. Kleinster umschliessender POI gewinnt —
+//: dieselbe Regel wie match_poi im Backend, sonst zeigt der Tooltip einen
+//: anderen Ort an als die Tabelle zaehlt.
+function poiAtScreen(sx, sy) {
+  if (!LS.data) return null;
+  const inside = (pt, shape) => {
+    let hit = false;
+    for (let i = 0, j = shape.length - 1; i < shape.length; j = i++) {
+      const [xi, yi] = shape[i], [xj, yj] = shape[j];
+      if (((yi > pt[1]) !== (yj > pt[1]))
+          && (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi)) hit = !hit;
+    }
+    return hit;
+  };
+  const area = (shape) => {
+    let a = 0;
+    for (let i = 0, j = shape.length - 1; i < shape.length; j = i++) {
+      a += shape[j][0] * shape[i][1] - shape[i][0] * shape[j][1];
+    }
+    return Math.abs(a / 2);
+  };
+  let best = null, bestArea = Infinity;
+  for (const poi of LS.data.pois) {
+    if (!poi.shape || poi.shape.length < 3) continue;
+    const scr = poi.shape.map(([nx, ny]) => projXY(nx, ny));
+    if (!inside([sx, sy], scr)) continue;
+    const a = area(scr);
+    if (a < bestArea) { bestArea = a; best = poi; }
+  }
+  return best;
+}
+
+heatEl().addEventListener("mousemove", e => {
+  if (_lsDrag) return;                 // beim Ziehen kein Tooltip
+  const box = heatEl().getBoundingClientRect();
+  const poi = poiAtScreen(e.clientX - box.left, e.clientY - box.top);
+  const tip = document.getElementById("mapTip");
+  if (!poi) {
+    tip.hidden = true;
+    if (LS._hoverPoi !== (LS._selected || null)) highlightPoi(LS._selected || null);
+    return;
+  }
+  const s = (LS.stats || {})[poi.name];
+  const mine = Object.values(poi.byPlayer || {})
+    .reduce((a, v) => a + (v.count || 0), 0);
+  const lobby = poi.landings != null ? poi.landings : poi.total;
+  const bits = [`${num0(lobby)} lobby landing${lobby === 1 ? "" : "s"}`];
+  if (mine) bits.push(`<b>${num0(mine)} yours</b>`);
+  if (poi.parent) bits.push(`in ${PubgUI.esc(poi.parent)}`);
+  tip.innerHTML = `<b>${PubgUI.esc(poi.name)}</b><br>`
+    + `<span class="mt-sub">${bits.join(" · ")}</span>`
+    + (s ? `<br><span class="mt-sub">you died ${
+        s.earlyDeathPct == null ? "—" : s.earlyDeathPct.toFixed(0) + " %"
+      } · lobby ${
+        s.lobbyEarlyPct == null ? "—" : s.lobbyEarlyPct.toFixed(0) + " %"
+      }</span>` : "");
+  tip.hidden = false;
+  // Feste Ecke statt am Zeiger: eine Mausposition liesse sich nur ueber
+  // JS-.style setzen, und das ist im Projekt nicht erlaubt. Fest gesetzt
+  // springt der Kasten ausserdem nicht und verdeckt nie den Ort, den man
+  // gerade anschaut — der ist durch den Umriss markiert.
+  if (LS._hoverPoi !== poi.name) highlightPoi(poi.name);
+});
+heatEl().addEventListener("mouseleave", () => {
+  document.getElementById("mapTip").hidden = true;
+  highlightPoi(LS._selected || null);
+});
+
 heatEl().addEventListener("dblclick", () => {
   LS.view.zoom = 1; LS.view.panX = 0; LS.view.panY = 0;
   renderHeatmap();
@@ -490,9 +595,12 @@ function spotRows() {
       // Kein eigener Drop hier? Dann liegen die Daten vielleicht beim
       // Oberplatz — "nichts hier" waere falsch, gelandet wurde, nur eine
       // Polygon-Grenze weiter.
-      const base = p.name.split(" - ")[0];
-      const parent = (!s && base !== p.name && (LS.stats || {})[base])
-        ? base : null;
+      // Elternschaft kommt aus der GEOMETRIE (Backend): kleinster POI, der
+      // diesen umschliesst. Namen truegen — "Gatka" liegt IN "Gatka
+      // Neighborhood", der laengere Name ist der Container.
+      const family = p.parent || null;
+      const parent = (!s && family && (LS.stats || {})[family])
+        ? family : null;
       return {
         name: p.name, poi: p,
         lobby: (p.landings != null ? p.landings : p.total), parent,
@@ -505,6 +613,7 @@ function spotRows() {
         survivalMin: s ? s.survivalMin : null,
         avgPlace: s ? s.avgPlace : null,
         reliable: s ? s.reliable : false,
+        family,
       };
     });
 }
@@ -532,8 +641,29 @@ function renderSpotTable() {
   head.innerHTML = spotHeadHtml();
 
   let rows = spotRows();
+  // Landungen der Kinder je Container aufsummieren. match_poi zaehlt eine
+  // Landung immer beim KLEINSTEN umschliessenden POI — ein Container
+  // bekommt also nur, was in keinem Kind liegt, und sieht ohne diese
+  // Summe leerer aus als die Gegend bespielt ist.
+  const kidsOf = {};
+  for (const r of rows) {
+    if (!r.family) continue;
+    const k = kidsOf[r.family] || (kidsOf[r.family] = { lobby: 0, mine: 0, n: 0 });
+    k.lobby += r.lobby || 0;
+    k.mine += r.drops || 0;
+    k.n += 1;
+  }
+  for (const r of rows) r.kids = kidsOf[r.name] || null;
   const total = rows.length;
-  if (LS.scope === "mine") rows = rows.filter(r => r.drops != null || r.parent);
+  if (LS.scope === "mine") {
+    // Sichtbar bleibt, wer eigene Drops hat, auf den Oberplatz verweist,
+    // oder zu einer Familie gehoert, in der irgendwo gelandet wurde.
+    const famWithData = new Set(rows.filter(r => r.drops != null)
+      .flatMap(r => [r.name, r.family].filter(Boolean)));
+    rows = rows.filter(r => r.drops != null || r.parent
+      || (r.family && famWithData.has(r.family))
+      || famWithData.has(r.name));
+  }
 
   const col = SPOT_COLS.find(c => c.key === SPOT_SORT) || SPOT_COLS[1];
   rows.sort((a, b) => {
@@ -570,11 +700,25 @@ function renderSpotTable() {
                         && (r.squadHeldPct ?? 0) >= 50) ? "bad" : "";
       const sign = r.diff == null ? "—"
         : (r.diff > 0 ? "+" : "\u2212") + Math.abs(r.diff).toFixed(1);
-      const nameCell = r.parent
-        ? `${PubgUI.esc(r.name)} <button type="button" class="parent-ref"
-             data-jump="${PubgUI.esc(r.parent)}">→ ${PubgUI.esc(r.parent)}</button>`
-        : PubgUI.esc(r.name) + (r.drops != null && !r.reliable
-            ? ' <span class="bot-mark">thin</span>' : "");
+      // Kinder verweisen nach oben, Container zeigen was in ihnen steckt.
+      const ref = r.parent || (r.drops == null ? r.family : null);
+      let nameCell = PubgUI.esc(r.name);
+      if (r.family) {
+        nameCell = `<span class="in-parent">↳</span> ` + nameCell
+          + ` <button type="button" class="parent-ref"
+               data-jump="${PubgUI.esc(r.family)}"
+               title="Part of ${PubgUI.esc(r.family)} — landings count at the
+                      smallest matching spot, so they show up here, not there"
+               >in ${PubgUI.esc(r.family)}</button>`;
+      } else if (r.kids) {
+        nameCell += ` <span class="kids-note" title="Landings inside the
+            ${r.kids.n} spots within this one. They count there, not here."
+            >+${num0(r.kids.mine)} in ${r.kids.n} inner spot${
+            r.kids.n === 1 ? "" : "s"}</span>`;
+      }
+      if (r.drops != null && !r.reliable) {
+        nameCell += ' <span class="bot-mark">thin</span>';
+      }
       return `<tr data-poi="${PubgUI.esc(r.name)}"
                   class="${r.drops == null ? "nodata" : ""}${
                     LS._selected === r.name ? " sel" : ""}">

@@ -1,4 +1,5 @@
 import datetime
+import math
 from pubg.db_pg import get_setting
 
 
@@ -7,6 +8,11 @@ from pubg.db_pg import get_setting
 # Esports) gilt als 'Event' und wird aus K/D / Win-Rate / Streak /
 # Achievement-Detection ausgenommen. Allow-List: robust gegen neue
 # Event-Modes die PUBG einfuehrt.
+#: Bis zu diesem Abstand (Zentrum zu Zentrum, in cm) gilt ein umschlossener
+#: POI als Unterbereich des groesseren. Darueber liegt er nur geografisch
+#: drin — siehe die Begruendung in compute_landing_spots.
+POI_PARENT_MAX_CM = 35000     # 350 m
+
 BATTLE_ROYALE_MODES = (
     "solo", "solo-fpp",
     "duo",  "duo-fpp",
@@ -6947,7 +6953,7 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
     Prod-Daten 32.018 Namen und 34.776 Punkte, zusammen 8 MB.
     """
     from pubg.poi_match import (match_poi, poly_area, perp_distance_to_route,
-                                apply_pin_cal)
+                                apply_pin_cal, point_in_poly)
     player_accs = [a for a in (player_accs or []) if a]
 
     # 1) Matches der Map bestimmen, die den Konstellations-Filter erfuellen
@@ -7058,6 +7064,8 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
     regions = (pois_blob or {}).get("regions") or []
     # POI-Zentren vorberechnen (Vertex-Mittel) + Flaeche fuer Sortier-Stabilitaet
     poi_centroid = {}
+    poi_points = {}
+    poi_area = {}
     for r in regions:
         nm = r.get("name")
         if not nm:
@@ -7067,6 +7075,48 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
             sx = sum(p[0] for p in pts) / len(pts)
             sy = sum(p[1] for p in pts) / len(pts)
             poi_centroid[nm] = (sx, sy)
+            poi_points[nm] = pts
+            poi_area[nm] = abs(poly_area(pts))
+
+    # Elternschaft aus der GEOMETRIE, nicht aus Namen. Namen truegen in
+    # beide Richtungen: "Gatka" liegt IN "Gatka Neighborhood" (also ist der
+    # laengere Name der Container), "Stalber" in "Stalber - Mountain", und
+    # "Cube G2" liegt trotz gemeinsamem Anfang 2,3 km von "Cube" entfernt
+    # in gar nichts. An Prod-Daten liegen 47 der 101 Erangel-POIs in einem
+    # groesseren.
+    #
+    # Wichtig fuer die Deutung: match_poi ordnet eine Landung dem KLEINSTEN
+    # umschliessenden POI zu. Ein Container bekommt also nur die Landungen,
+    # die in keinem seiner Kinder liegen — ohne die Hierarchie sieht er
+    # deshalb leerer aus als die Gegend tatsaechlich bespielt ist.
+    poi_parent = {}
+    for nm, (cx0, cy0) in poi_centroid.items():
+        own = poi_area.get(nm, 0.0)
+        best, best_area = None, float("inf")
+        for other, pts in poi_points.items():
+            if other == nm:
+                continue
+            a = poi_area.get(other, 0.0)
+            if a <= own or a >= best_area:
+                continue
+            if not point_in_poly(cx0, cy0, pts):
+                continue
+            # Enthaltensein allein reicht nicht. Grosse, gestreckte Regionen
+            # umschliessen Orte, die nichts miteinander zu tun haben:
+            # "Mylta - Power" liegt in "Mylta - Neighbourhood", aber 862 m
+            # von dessen Mitte und 1.304 m von "Mylta" — das ist das
+            # Kraftwerk, kein Stadtteil. Gemessen an Prod-Daten liegen die
+            # echten Unterbereiche unter 350 m: Pochinki - Ibi 161 m,
+            # Gatka North 199 m, Gatka South 277 m, Pochinki - C 294 m,
+            # Ruins Revive 327 m. Darueber beginnt "liegt geografisch
+            # drin", nicht "gehoert dazu" — der naechste Kandidat waere
+            # Georgopol - Containers mit 368 m.
+            ox, oy = poi_centroid[other]
+            if math.hypot(cx0 - ox, cy0 - oy) > POI_PARENT_MAX_CM:
+                continue
+            best, best_area = other, a
+        if best:
+            poi_parent[nm] = best
 
     mapKm = (pois_blob or {}).get("mapKm") or 8
     span = mapKm * 100000.0
@@ -7124,10 +7174,18 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
             by[acc] = {"name": name_of.get(acc, acc[:8]),
                        "count": cnt,
                        "pct": round(cnt / total * 100) if total else 0}
+        # Umriss in denselben normalisierten Anzeige-Koordinaten wie cx/cy,
+        # damit das Frontend die echten Raender zeichnen kann statt eines
+        # Kreises. Vier Punkte je Rechteck — die Payload-Kosten sind
+        # gegenueber byPlayer vernachlaessigbar.
+        shape = [list(_disp(px, py)) for px, py in poi_points.get(name, ())]
         pois_out.append({
             "name": name,
             "cx": dcx,
             "cy": dcy,
+            "shape": shape,
+            # Kleinster POI, der diesen hier umschliesst — oder None.
+            "parent": poi_parent.get(name),
             # Wie bisher: Zahl der MATCHES mit Landung hier, nicht der
             # Landungen — bei 100 Lobby-Spielern in einem Match ist das 1.
             "total": total,
@@ -7140,4 +7198,9 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
     pois_out.sort(key=lambda p: p["total"], reverse=True)
 
     return {"pois": pois_out, "scatterPoints": scatter,
+            # Kantenlaenge der Karte in km. Das Frontend braucht sie, um aus
+            # den normalisierten Koordinaten echte Meter zu rechnen — etwa
+            # fuer die Frage, ob "School Apartments" noch zu "School"
+            # gehoert (82 m) oder "Cube G2" zu "Cube" (2351 m).
+            "mapKm": mapKm,
             "totalMatches": len(match_ids)}
