@@ -655,7 +655,11 @@ def test_landing_stats_ignores_deaths_after_the_window(pg_compat):
 
 def test_summarise_landings_splits_own_death_from_squad_wipe():
     """Der Fall, um den es geht: das Squad haelt den Platz, ich sterbe
-    trotzdem. Dann ist der Platz nicht das Problem."""
+    trotzdem. Dann ist der Platz nicht das Problem.
+
+    squadHeldPct ist die HALTEQUOTE (hoch = gut), nicht die Wipe-Quote —
+    die Frage am Landeplatz ist "taugt der Platz", und darauf antwortet ein
+    hoher Wert mit ja."""
     own = [
         # ich tot, Squad lebt weiter — mein Fehler, nicht der des Platzes
         {"poi": "P", "map": "M", "earlyDeath": True, "squadWiped": False,
@@ -671,9 +675,9 @@ def test_summarise_landings_splits_own_death_from_squad_wipe():
     ]
     row = sq.summarise_landings(own, {}, min_drops=1)[0]
     assert row["earlyDeathPct"] == pytest.approx(75.0)
-    assert row["squadWipedPct"] == pytest.approx(25.0)
+    assert row["squadHeldPct"] == pytest.approx(75.0)
     # ich tot, Squad aber nicht ausgeloescht: 2 von 4
-    assert row["diedSquadAlivePct"] == pytest.approx(50.0)
+    assert row["diedAlonePct"] == pytest.approx(50.0)
 
 
 def test_summarise_landings_ignores_solo_rounds_for_squad_wipe():
@@ -687,15 +691,15 @@ def test_summarise_landings_ignores_solo_rounds_for_squad_wipe():
     ]
     row = sq.summarise_landings(own, {}, min_drops=1)
     assert row[0]["squadRounds"] == 1
-    assert row[0]["squadWipedPct"] == pytest.approx(0.0)
+    assert row[0]["squadHeldPct"] == pytest.approx(100.0)
 
 
 def test_summarise_landings_without_squad_data_leaves_squad_none():
     own = [{"poi": "P", "map": "M", "earlyDeath": True, "timeSurvived": 100,
             "kills": 0, "damage": 0, "place": 10}]
     row = sq.summarise_landings(own, {}, min_drops=1)[0]
-    assert row["squadWipedPct"] is None
-    assert row["diedSquadAlivePct"] is None
+    assert row["squadHeldPct"] is None
+    assert row["diedAlonePct"] is None
 
 
 def test_landing_stats_reports_squad_survived_while_i_died(pg_compat):
@@ -724,8 +728,8 @@ def test_landing_stats_reports_squad_survived_while_i_died(pg_compat):
     row = sq.landing_stats(conn, t1, "account.me", "1970-01-01T00:00:00Z",
                            pois=POIS, min_drops=1)["byPoi"][0]
     assert row["earlyDeathPct"] == pytest.approx(100.0)
-    assert row["squadWipedPct"] == pytest.approx(0.0)
-    assert row["diedSquadAlivePct"] == pytest.approx(100.0)
+    assert row["squadHeldPct"] == pytest.approx(100.0)
+    assert row["diedAlonePct"] == pytest.approx(100.0)
 
 
 def test_landing_stats_reports_squad_wipe(pg_compat):
@@ -752,8 +756,8 @@ def test_landing_stats_reports_squad_wipe(pg_compat):
 
     row = sq.landing_stats(conn, t1, "account.me", "1970-01-01T00:00:00Z",
                            pois=POIS, min_drops=1)["byPoi"][0]
-    assert row["squadWipedPct"] == pytest.approx(100.0)
-    assert row["diedSquadAlivePct"] == pytest.approx(0.0)
+    assert row["squadHeldPct"] == pytest.approx(0.0)
+    assert row["diedAlonePct"] == pytest.approx(0.0)
 
 
 def test_landing_stats_reports_untruncated_totals_per_map(pg_compat):

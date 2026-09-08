@@ -147,6 +147,10 @@
     th.sortable:focus-visible { outline: 2px solid var(--theme-accent, #f2b705);
                                 outline-offset: -2px; }
     .sort-arrow { font-size: 0.8em; margin-left: 2px; opacity: 0.75; }
+    /* Zielrichtung der Spalte — die Tabelle mischt hoch-ist-gut und
+       niedrig-ist-gut, das muss ablesbar sein ohne Nachdenken. */
+    .goal { font-size: 0.9em; margin-left: 3px; opacity: 0.5;
+            font-weight: 400; }
     td.diff-bad  { color: var(--theme-danger, #e57b7b); font-weight: 500; }
     td.diff-good { color: var(--theme-ok, #6cc294); font-weight: 500; }
     td.lo { color: var(--theme-danger, #e57b7b); }
@@ -620,26 +624,28 @@
     // Spalten der POI-Tabelle: key zum Sortieren, fmt zum Anzeigen.
     // `text: true` sortiert alphabetisch aufsteigend, alles andere
     // numerisch absteigend — der interessante Wert steht dann oben.
+    // `good` sagt, welche Richtung die bessere ist — die Tabelle mischt
+    // zwangsläufig beide (Überlebenszeit hoch, Platzierung niedrig), und
+    // ohne Marker muss der Leser jede Spalte einzeln durchdenken.
     const POI_COLS = [
       { key: "poi", label: "Landing spot", text: true },
       { key: "map", label: "Map", text: true },
       { key: "drops", label: "Your drops",
         help: "How often you landed here" },
-      { key: "earlyDeathPct", label: "You died",
+      { key: "squadHeldPct", label: "Squad held", good: "up",
+        help: "Share of rounds where your squad was NOT wiped within 5 min of your landing. High = the spot works for your team. Solo rounds excluded — there it would just mirror \u201cyou died\u201d" },
+      { key: "earlyDeathPct", label: "You died", good: "down",
         help: "Share of your rounds from here where YOU die (not knocked, not the squad) within 5 min of your landing, inside the spot itself" },
-      { key: "lobbyEarlyPct", label: "Lobby",
-        help: "The same, per player, for everyone who lands here — each measured against their own landing" },
-      { key: "diff", label: "Diff",
-        help: "Your rate minus the lobby rate at the same spot" },
-      { key: "squadWipedPct", label: "Squad wiped",
-        help: "Share of rounds where EVERY squad member is dead within 5 min of your landing. Solo rounds excluded — there it would just repeat \u201cYou died\u201d" },
-      { key: "diedSquadAlivePct", label: "You died, squad held",
-        help: "You are dead but the squad is not wiped. A high value with a low wipe rate means the spot is playable and you are the one losing it" },
-      { key: "survivalMin", label: "\u00d8 Survival" },
-      { key: "avgKills", label: "\u00d8 Kills" },
-      { key: "avgDamage", label: "\u00d8 Damage" },
-      { key: "avgPlace", label: "\u00d8 Place",
-        help: "Lower is better" },
+      { key: "diedAlonePct", label: "Died alone", good: "down",
+        help: "You are dead while the squad held the spot. High next to a high \u201cSquad held\u201d means the spot is fine and you are the one losing it" },
+      { key: "lobbyEarlyPct", label: "Lobby", good: "down",
+        help: "\u201cYou died\u201d measured per player for everyone who lands here, each against their own landing" },
+      { key: "diff", label: "Diff", good: "down",
+        help: "Your death rate minus the lobby rate at the same spot. Negative = you do better here than the average player who lands here" },
+      { key: "survivalMin", label: "\u00d8 Survival", good: "up" },
+      { key: "avgKills", label: "\u00d8 Kills", good: "up" },
+      { key: "avgDamage", label: "\u00d8 Damage", good: "up" },
+      { key: "avgPlace", label: "\u00d8 Place", good: "down" },
     ];
     let POI_SORT = "drops";
     let POI_DIR = -1;
@@ -649,10 +655,16 @@
         const active = c.key === POI_SORT;
         const arrow = active ? (POI_DIR < 0 ? "\u25bc" : "\u25b2") : "";
         const aria = active ? (POI_DIR < 0 ? "descending" : "ascending") : "none";
+        const dir = c.good
+          ? `<span class="goal" aria-hidden="true">${
+              c.good === "up" ? "\u2191" : "\u2193"}</span>` : "";
+        const goalNote = c.good
+          ? ` (${c.good === "up" ? "higher" : "lower"} is better)` : "";
         return `<th data-sort="${c.key}" tabindex="0" aria-sort="${aria}"`
           + ` class="sortable${active ? " active" : ""}"`
-          + (c.help ? ` title="${esc(c.help)}"` : "")
-          + `>${esc(c.label)}<span class="sort-arrow">${arrow}</span></th>`;
+          + ` title="${esc((c.help || c.label) + goalNote)}"`
+          + `>${esc(c.label)}${dir}`
+          + `<span class="sort-arrow">${arrow}</span></th>`;
       }).join("") + "</tr>";
     }
 
@@ -711,12 +723,15 @@
         const cls = r.diff == null ? ""
           : (r.diff > 3 ? "diff-bad" : (r.diff < -3 ? "diff-good" : ""));
         // Ich tot, Squad hält den Platz: der Fall, in dem nicht der Platz
-        // das Problem ist. Ab 40 % markiert, wenn die Wipe-Rate klar
-        // darunter liegt.
-        const solo = r.diedSquadAlivePct;
-        const soloCls = (solo != null && solo >= 40
-                         && (r.squadWipedPct ?? 100) < solo - 15)
-          ? "diff-bad" : "";
+        // das Problem ist. Markiert, sobald das in mindestens 15 % der
+        // Runden passiert und das Squad mehrheitlich stand.
+        const solo = r.diedAlonePct;
+        const soloCls = (solo != null && solo >= 15
+                         && (r.squadHeldPct ?? 0) >= 50) ? "diff-bad" : "";
+        // Haltequote grün, wenn das Squad den Platz klar behauptet.
+        const heldCls = r.squadHeldPct == null ? ""
+          : (r.squadHeldPct >= 75 ? "diff-good"
+             : (r.squadHeldPct < 50 ? "diff-bad" : ""));
         const sign = r.diff == null ? "—"
           : (r.diff > 0 ? "+" : "\u2212") + Math.abs(r.diff).toFixed(1);
         return `<tr class="${r.reliable ? "" : "thin"}">
@@ -725,14 +740,15 @@
               r.reliable ? "" : ' <span class="tag">thin</span>'}</td>
           <td>${esc(MAP_LABEL[r.map] || r.map)}</td>
           <td>${n0(r.drops)}</td>
+          <td class="${heldCls}">${r.squadHeldPct == null ? "—"
+              : pct(r.squadHeldPct)
+                + `<span class="d"> (${n0(r.squadRounds)})</span>`}</td>
           <td>${pct(r.earlyDeathPct)}</td>
+          <td class="${soloCls}">${r.diedAlonePct == null ? "—"
+              : pct(r.diedAlonePct)}</td>
           <td>${r.lobbyEarlyPct == null ? "—" : pct(r.lobbyEarlyPct)
                 + `<span class="d"> (${n0(r.lobbyDrops)})</span>`}</td>
           <td class="${cls}">${sign}</td>
-          <td>${r.squadWipedPct == null ? "—" : pct(r.squadWipedPct)}</td>
-          <td class="${soloCls}">${r.diedSquadAlivePct == null ? "—"
-              : pct(r.diedSquadAlivePct)
-                + `<span class="d"> (${n0(r.squadRounds)})</span>`}</td>
           <td>${n1(r.survivalMin)}</td>
           <td>${n2(r.avgKills)}</td>
           <td>${n0(r.avgDamage)}</td>
@@ -798,13 +814,14 @@
         + "per player to everyone who lands there, each against their own "
         + "landing time. <b>Diff</b> is the difference — that separates "
         + "\"tough spot\" from \"I lose the fight here\". "
-        + "<b>Squad wiped</b> means every member of your squad is dead inside "
-        + "your own 5-minute window — measured against YOUR landing, because "
-        + "the question is how this fight went, and this fight is yours. The "
-        + "count in brackets is the rounds with a squad (solo rounds are left "
-        + "out). A high <b>You died, squad held</b> next to a low <b>Squad "
-        + "wiped</b> is the clearest signal on this page: the spot works, you "
-        + "are the one losing it.";
+        + "<b>Squad held</b> is the share of rounds where your squad was NOT "
+        + "wiped inside your own 5-minute window — measured against YOUR "
+        + "landing, because the question is how this fight went, and this "
+        + "fight is yours. The count in brackets is the rounds with a squad "
+        + "(solo rounds are left out). A high <b>Squad held</b> next to a "
+        + "high <b>Died alone</b> is the clearest signal on this page: the "
+        + "spot works for the team, and you are the one losing it. The arrow "
+        + "in each header shows which direction is better.";
     }
 
     // ── Trend ───────────────────────────────────────────────────────────────

@@ -456,7 +456,11 @@ def summarise_landings(own, lobby, min_drops=MIN_POI_DROPS,
             wiped = sum(1 for r in squad_rows if r["squadWiped"])
             solo_death = sum(1 for r in squad_rows
                              if r["earlyDeath"] and not r["squadWiped"])
-            squad_pct = 100.0 * wiped / sn
+            # Als HALTEQUOTE, nicht als Wipe-Quote: die Frage am Landeplatz
+            # ist "taugt der Platz fuer mein Squad", und darauf antwortet
+            # ein hoher Wert mit ja. Die Wipe-Quote hiess dasselbe, liess
+            # aber jeden erst 100 minus X rechnen.
+            squad_pct = 100.0 * (sn - wiped) / sn
             alive_pct = 100.0 * solo_death / sn
         else:
             squad_pct = alive_pct = None
@@ -475,10 +479,12 @@ def summarise_landings(own, lobby, min_drops=MIN_POI_DROPS,
             "diff": (my_pct - lob_pct) if lob_pct is not None else None,
             "subAreas": len({r["poi"] for r in rows}),
             "squadRounds": sn,
-            "squadWipedPct": squad_pct,
-            # Der interessante Fall: ich tot, Squad haelt den Platz. Dann
-            # ist nicht der Platz das Problem.
-            "diedSquadAlivePct": alive_pct,
+            # Anteil der Runden, in denen NICHT das ganze Squad fiel.
+            # Hoch = der Platz ist spielbar.
+            "squadHeldPct": squad_pct,
+            # Und der Diagnose-Wert: ich tot, Squad haelt. Hoch = nicht der
+            # Platz ist das Problem, sondern ich.
+            "diedAlonePct": alive_pct,
             "reliable": n >= RELIABLE_POI_DROPS,
             "survivalMin": (_avg(r["timeSurvived"] for r in rows) or 0) / 60.0,
             "avgKills": _avg(r["kills"] for r in rows),
