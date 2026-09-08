@@ -58,6 +58,11 @@
     .map-tip b { color: var(--theme-accent); }
     .map-tip .mt-sub { color: var(--theme-text-dim); font-size: 0.92em; }
     .in-parent { color: var(--theme-text-faint, #6b5f7a); }
+    /* Einrueckung nach Hierarchie-Tiefe. Erangel ist dreistufig:
+       Georgopol > Georgopol - South > Georgopol - South Apartments. */
+    #spotRows tr[data-depth="1"] td:first-child { padding-left: 1.1rem; }
+    #spotRows tr[data-depth="2"] td:first-child { padding-left: 2.2rem; }
+    #spotRows tr[data-depth="3"] td:first-child { padding-left: 3.3rem; }
     .kids-note { font-size: 0.88em; color: var(--theme-text-dim);
                  white-space: nowrap; }
     .players-bar { position: absolute; bottom: 10px; left: 10px;

@@ -656,24 +656,73 @@ function renderSpotTable() {
   for (const r of rows) r.kids = kidsOf[r.name] || null;
   const total = rows.length;
   if (LS.scope === "mine") {
-    // Sichtbar bleibt, wer eigene Drops hat, auf den Oberplatz verweist,
-    // oder zu einer Familie gehoert, in der irgendwo gelandet wurde.
-    const famWithData = new Set(rows.filter(r => r.drops != null)
-      .flatMap(r => [r.name, r.family].filter(Boolean)));
-    rows = rows.filter(r => r.drops != null || r.parent
-      || (r.family && famWithData.has(r.family))
-      || famWithData.has(r.name));
+    // Sichtbar bleibt, wer eigene Drops hat, oder zu einer Familie gehoert,
+    // in der irgendwo gelandet wurde. Der Container kommt IMMER mit, auch
+    // ohne eigene Landung: ein Verweis "gehoert zu Georgopol" ist wertlos,
+    // wenn Georgopol nicht in der Liste steht — man kann nicht hinspringen
+    // und die Einrueckung haengt in der Luft.
+    const fam = new Set();
+    for (const r of rows) {
+      if (r.drops == null) continue;
+      fam.add(r.name);
+      if (r.family) fam.add(r.family);      // Container des eigenen Spots
+    }
+    // Zwei Ebenen: der Container eines Containers gehoert auch dazu.
+    for (const r of rows) if (fam.has(r.name) && r.family) fam.add(r.family);
+    rows = rows.filter(r => fam.has(r.name)
+      || (r.family && fam.has(r.family)));
   }
 
   const col = SPOT_COLS.find(c => c.key === SPOT_SORT) || SPOT_COLS[1];
-  rows.sort((a, b) => {
+  const cmp = (a, b) => {
     const va = a[SPOT_SORT], vb = b[SPOT_SORT];
     if (col.text) return String(va || "").localeCompare(String(vb || "")) * SPOT_DIR;
     if (va == null && vb == null) return 0;
     if (va == null) return 1;      // Leere immer nach unten
     if (vb == null) return -1;
     return (va - vb) * SPOT_DIR;
-  });
+  };
+
+  // Familien bleiben zusammen. Flach sortieren und Kinder nur einruecken
+  // reicht nicht: eine mit "\u21b3" markierte Zeile, die die Sortierung
+  // irgendwohin wirft, liest sich als Unterbereich der Zeile darueber —
+  // "\u21b3 Bootyard - Warehouses" direkt unter Lipovka behauptet eine
+  // Zugehoerigkeit, die es nicht gibt. Sortiert wird darum die FAMILIE,
+  // Kinder stehen immer direkt unter ihrem Container.
+  // Die Hierarchie ist mehrstufig: "Georgopol - South Apartments" liegt in
+  // "Georgopol - South" liegt in "Georgopol". Eine einstufige Gruppierung
+  // reisst das auseinander, weil Enkel und Vater in verschiedenen Toepfen
+  // landen — also echter Baum, Tiefensuche beim Ausgeben.
+  const byName = new Map(rows.map(r => [r.name, r]));
+  const childrenOf = new Map();
+  const roots = [];
+  for (const r of rows) {
+    const up = r.family && byName.has(r.family) ? r.family : null;
+    r.depth = 0;
+    if (up) (childrenOf.get(up) || childrenOf.set(up, []).get(up)).push(r);
+    else roots.push(r);
+  }
+  // Tiefe fuer die Einrueckung, ueber die Kette nach oben gezaehlt.
+  for (const r of rows) {
+    let d = 0, cur = r;
+    while (cur.family && byName.has(cur.family) && d < 8) {
+      cur = byName.get(cur.family); d += 1;
+    }
+    r.depth = d;
+  }
+  // Ein Zweig steht so hoch wie seine staerkste Zeile — sonst versteckt ein
+  // duenner Container (Bootyard: 3 eigene Drops) die 57 seines Kindes.
+  const rankCache = new Map();
+  const rank = r => {
+    if (rankCache.has(r.name)) return rankCache.get(r.name);
+    const best = [r, ...(childrenOf.get(r.name) || []).map(rank)].sort(cmp)[0];
+    rankCache.set(r.name, best);
+    return best;
+  };
+  const flatten = (list) => list
+    .sort((a, b) => cmp(rank(a), rank(b)))
+    .flatMap(r => [r, ...flatten(childrenOf.get(r.name) || [])]);
+  rows = flatten(roots);
 
   // Die Lobby-Gesamtsicht bleibt immer ablesbar, auch wenn die Tabelle auf
   // die eigenen Plaetze gefiltert ist.
@@ -701,15 +750,19 @@ function renderSpotTable() {
       const sign = r.diff == null ? "—"
         : (r.diff > 0 ? "+" : "\u2212") + Math.abs(r.diff).toFixed(1);
       // Kinder verweisen nach oben, Container zeigen was in ihnen steckt.
-      const ref = r.parent || (r.drops == null ? r.family : null);
+      // Jedes Kind wird eingerueckt und verweist auf seinen Container —
+      // unabhaengig davon, ob es eigene Zahlen hat. Der Container ist im
+      // mine-Filter garantiert vorhanden, der Sprung trifft also immer.
+      const ref = r.family && rows.some(o => o.name === r.family)
+        ? r.family : null;
       let nameCell = PubgUI.esc(r.name);
-      if (r.family) {
+      if (ref) {
         nameCell = `<span class="in-parent">↳</span> ` + nameCell
           + ` <button type="button" class="parent-ref"
-               data-jump="${PubgUI.esc(r.family)}"
-               title="Part of ${PubgUI.esc(r.family)} — landings count at the
+               data-jump="${PubgUI.esc(ref)}"
+               title="Part of ${PubgUI.esc(ref)} — landings count at the
                       smallest matching spot, so they show up here, not there"
-               >in ${PubgUI.esc(r.family)}</button>`;
+               >in ${PubgUI.esc(ref)}</button>`;
       } else if (r.kids) {
         nameCell += ` <span class="kids-note" title="Landings inside the
             ${r.kids.n} spots within this one. They count there, not here."
@@ -720,6 +773,7 @@ function renderSpotTable() {
         nameCell += ' <span class="bot-mark">thin</span>';
       }
       return `<tr data-poi="${PubgUI.esc(r.name)}"
+                  data-depth="${Math.min(r.depth || 0, 3)}"
                   class="${r.drops == null ? "nodata" : ""}${
                     LS._selected === r.name ? " sel" : ""}">
         <td>${nameCell}</td>

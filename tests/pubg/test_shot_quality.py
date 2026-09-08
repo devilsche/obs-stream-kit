@@ -1221,3 +1221,33 @@ def test_landing_spots_parent_needs_proximity_not_just_containment(pg_compat):
     parent = {p["name"]: p["parent"] for p in out["pois"]}
     assert parent["Near"] == "Neighbourhood"
     assert parent["PowerPlant"] is None
+
+
+def test_poi_at_picks_the_smallest_containing_region():
+    """Dieselbe Regel wie match_poi in aggregations: der KLEINSTE
+    umschliessende POI gewinnt. Vorher gewann der erste Treffer in
+    Dateireihenfolge — an Prod-Daten landeten dadurch alle 86
+    Bootyard-Landungen im Ober-POI, waehrend die Heatmap sie korrekt auf
+    Bootyard (3), Boatyard - Apartments (57) und Bootyard - Warehouses (26)
+    verteilte. Zwei Endpoints, zwei Antworten fuer denselben Punkt."""
+    pois = {"Baltic_Main": {"regions": [
+        # Container steht ZUERST in der Datei — genau der Fall, der vorher kippte
+        {"name": "Bootyard", "points": [[0, 0], [3000, 0],
+                                        [3000, 3000], [0, 3000]]},
+        {"name": "Bootyard - Warehouses", "points": [[1000, 1000], [1600, 1000],
+                                                     [1600, 1600], [1000, 1600]]},
+    ]}}
+    boxes = sq.poi_boxes(pois)
+    assert sq.poi_at(boxes, "Baltic_Main", 1300, 1300) == "Bootyard - Warehouses"
+    # Ausserhalb des Kindes bleibt der Container
+    assert sq.poi_at(boxes, "Baltic_Main", 2500, 2500) == "Bootyard"
+
+
+def test_poi_boxes_carry_the_area_for_the_smallest_rule():
+    pois = {"M": {"regions": [
+        {"name": "Big", "points": [[0, 0], [100, 0], [100, 100], [0, 100]]},
+    ]}}
+    entry = sq.poi_boxes(pois)["M"][0]
+    # (name, x0, x1, y0, y1, pts, area)
+    assert len(entry) == 7
+    assert entry[6] == pytest.approx(10000.0)

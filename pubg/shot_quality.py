@@ -30,7 +30,7 @@ sind direkt testbar, das DB-Holen sitzt darunter.
 import statistics
 
 from pubg.aggregations import _br_filter, _weapon_label
-from pubg.poi_match import point_in_poly
+from pubg.poi_match import point_in_poly, poly_area
 
 #: Grenzen der Rundenphasen in Sekunden Ueberlebenszeit. Die frueh/mitte-
 #: Grenze bei 5 Minuten trennt den Landefight vom Rest, die mitte/spaet-
@@ -385,11 +385,12 @@ def rank_me(me, peers):
 # ── POI-Geometrie ───────────────────────────────────────────────────────────
 
 def poi_boxes(pois):
-    """Baut je Karte eine Liste (Name, x0, x1, y0, y1, Punkte).
+    """Baut je Karte eine Liste (Name, x0, x1, y0, y1, Punkte, Flaeche).
 
     Die Bounding-Box ist ein Vorfilter: ohne sie laeuft jeder Punkt gegen
     jedes Polygon, mit ihr sind 140.000 Landungen in Bruchteilen einer
-    Sekunde zugeordnet."""
+    Sekunde zugeordnet. Die Flaeche braucht poi_at, um bei verschachtelten
+    POIs den kleinsten zu waehlen."""
     out = {}
     for map_name, blob in (pois or {}).items():
         entries = []
@@ -400,7 +401,8 @@ def poi_boxes(pois):
                 continue
             xs = [p[0] for p in pts]
             ys = [p[1] for p in pts]
-            entries.append((name, min(xs), max(xs), min(ys), max(ys), pts))
+            entries.append((name, min(xs), max(xs), min(ys), max(ys), pts,
+                            abs(poly_area(pts))))
         out[map_name] = entries
     return out
 
@@ -414,10 +416,20 @@ def poi_at(boxes, map_name, x, y):
         entries = boxes.get(MAP_ALIASES.get(map_name, ""), None)
     if not entries:
         return None
-    for name, x0, x1, y0, y1, pts in entries:
+    # KLEINSTER umschliessender POI gewinnt — dieselbe Regel wie
+    # match_poi in aggregations. Der erste Treffer in Dateireihenfolge
+    # waere willkuerlich: an Prod-Daten landeten so alle 86
+    # Bootyard-Landungen im Ober-POI, weil der in der JSON-Datei vor
+    # seinen Unterbereichen steht, waehrend die Heatmap sie korrekt auf
+    # Bootyard (3), Boatyard - Apartments (57) und Bootyard - Warehouses
+    # (26) verteilte. Zwei Endpoints, zwei Antworten fuer denselben Punkt.
+    best, best_area = None, float("inf")
+    for name, x0, x1, y0, y1, pts, area in entries:
+        if area >= best_area:
+            continue
         if x0 <= x <= x1 and y0 <= y <= y1 and point_in_poly(x, y, pts):
-            return name
-    return None
+            best, best_area = name, area
+    return best
 
 
 def first_landings(rows):
