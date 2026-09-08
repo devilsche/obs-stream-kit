@@ -6912,7 +6912,8 @@ def compute_squad_compare(conn, tenant_id: int, my_account_id, player_names, las
 
 
 def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob=None,
-                          route_filter=False, from_iso=None, to_iso=None):
+                          route_filter=False, from_iso=None, to_iso=None,
+                          player_mode="squad"):
     """Aggregiert Landings auf einer Map, gefiltert auf Matches in denen
     ALLE player_accs im selben Squad waren (Konstellations-Filter).
     Leere player_accs-Liste → alle Matches der Map.
@@ -6920,6 +6921,12 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
     pois_blob: {mapKm, regions:[...]} der Map (fuer POI-Zuordnung).
     route_filter: nur Matches wo der Landing-POI <=1.5km Querdistanz zur
                   Flugroute hatte (siehe Task 6 — hier noch ignoriert).
+    player_mode: "squad" (Vorgabe) nimmt nur Matches, in denen ALLE
+                  player_accs im selben Team waren — die Squad-Sicht.
+                  "any" nimmt jedes Match, in dem mindestens einer von
+                  ihnen dabei war, und zaehlt deren Landungen kumuliert;
+                  gedacht fuer "zeig mir die Plaetze dieser Leute, egal ob
+                  zusammen gespielt".
     from_iso/to_iso: Zeitraum. Ohne Angabe der ganze Bestand — so war es
                   vorher und so bleibt es fuer bestehende Aufrufer. Der
                   Filter existiert, damit Karte und POI-Auswertung im
@@ -6960,11 +6967,18 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
         if not player_accs:
             match_ids.append(mid)
             continue
-        # Alle player_accs muessen im selben team_id dieses Matches sein
         rows = conn.execute(
             "SELECT account_id, team_id FROM match_team_mapping "
             "WHERE tenant_id = ? AND match_id = ?", (tenant_id, mid,)).fetchall()
         team_of = {r["account_id"]: r["team_id"] for r in rows}
+        if player_mode == "any":
+            # Mindestens einer dabei — die Landungen werden dann kumuliert.
+            if any(team_of.get(a) is not None for a in player_accs):
+                match_ids.append(mid)
+            continue
+        # Vorgabe "squad": alle im selben team_id. Ein unbekannter Modus
+        # faellt bewusst hierher zurueck und filtert streng, statt
+        # versehentlich den ganzen Bestand aufzumachen.
         teams = {team_of.get(a) for a in player_accs}
         if None in teams or len(teams) != 1:
             continue

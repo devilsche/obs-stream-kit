@@ -655,11 +655,18 @@ class EndpointRegistry:
         pois = self._load_pois()
         alias = "Baltic_Main" if map_name == "Erangel_Main" else map_name
         blob = pois.get(alias) or pois.get(map_name) or {"mapKm": 8, "regions": []}
+        # squad = nur Matches mit allen Genannten im selben Team,
+        # any = jedes Match mit mindestens einem, Landungen kumuliert.
+        player_mode = (qs.get("playerMode") or "squad").strip()
+        if player_mode not in ("squad", "any"):
+            return _err(400, "playerMode must be squad|any")
+
         result = compute_landing_spots(
             conn, self.tenant_id, map_name, accs, pois_blob=blob,
             route_filter=route_filter, from_iso=from_iso,
-            to_iso=qs.get("to"))
-        return _ok({**result, "range": range_key or "all", "from": from_iso})
+            to_iso=qs.get("to"), player_mode=player_mode)
+        return _ok({**result, "range": range_key or "all", "from": from_iso,
+                    "playerMode": player_mode})
 
     POIS_FILE = "data/pubg-pois.json"
 

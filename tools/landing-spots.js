@@ -25,6 +25,9 @@ const LS = {
   //: sonst besteht die Tabelle zu drei Vierteln aus Zeilen ohne eigene
   //: Daten. "all" holt die ganze Lobby-Liste dazu.
   scope: "mine",
+  //: "squad" = nur Matches mit allen Genannten im selben Team,
+  //: "any" = jedes Match mit mindestens einem, Landungen kumuliert.
+  playerMode: "squad",
   _selected: null,
 };
 const SCATTER_COLORS = ["#f2b705", "#3cb44b", "#46f0f0", "#f032e6"];
@@ -55,6 +58,7 @@ async function loadMaps() {
   LS.mapName = sel.value || maps[0];
   // Vorauswahl VOR dem ersten refresh, sonst laedt das Tool zweimal
   await preselectMe();
+  syncControls();
   if (LS.mapName) { sel.value = LS.mapName; refresh(); }
 }
 
@@ -141,6 +145,23 @@ function wireAutocomplete(idx) {
 
 function setPlayer(idx, player) {
   LS.players[idx] = player;  // kann null sein
+  syncControls();
+}
+
+//: Schalter aus- und einblenden, je nachdem ob sie ueberhaupt etwas
+//: aendern. Die Leiste hatte sieben Elemente, von denen zwei je nach
+//: Auswahl wirkungslos waren — das liest sich als Auswahlmoeglichkeit,
+//: obwohl nichts passiert.
+function syncControls() {
+  const n = LS.players.filter(Boolean).length;
+  // Squad-vs-kumuliert unterscheidet sich erst ab zwei Spielern. Bei einem
+  // liefern beide Modi dasselbe (ein Test haelt das fest).
+  const mode = document.getElementById("modeWrap");
+  if (mode) mode.hidden = n < 2;
+  // Der Flugrouten-Filter braucht einen Referenzspieler — ohne Auswahl
+  // ignoriert ihn der Rechenkern stillschweigend.
+  const route = document.getElementById("routeWrap");
+  if (route) route.hidden = n < 1;
 }
 
 [0, 1, 2, 3].forEach(wireAutocomplete);
@@ -179,6 +200,7 @@ async function refresh() {
   if (document.getElementById("routeFilter").checked)
     params.set("routeFilter", "1");
   params.set("range", LS.range);
+  params.set("playerMode", LS.playerMode);
   // Beide Quellen parallel und mit demselben Zeitraum. shot-quality ist der
   // teurere Aufruf (rund 2,5 s auf dem vollen Bestand), deshalb nicht
   // hintereinander.
@@ -508,8 +530,14 @@ function renderSpotTable() {
     return (va - vb) * SPOT_DIR;
   });
 
-  document.getElementById("spotCount").textContent =
-    `${rows.length} of ${total} spots`;
+  // Die Lobby-Gesamtsicht bleibt immer ablesbar, auch wenn die Tabelle auf
+  // die eigenen Plaetze gefiltert ist.
+  const lobbyTotal = spotRows().reduce((s, r) => s + (r.lobby || 0), 0);
+  const mineTotal = spotRows().reduce((s, r) => s + (r.drops || 0), 0);
+  document.getElementById("spotCount").innerHTML =
+    `<b>${rows.length}</b> of ${total} spots · `
+    + `${num0(lobbyTotal)} lobby landings · `
+    + `<b>${num0(mineTotal)}</b> yours`;
 
   if (!rows.length) {
     body.innerHTML = `<tr><td colspan="${SPOT_COLS.length}">`
@@ -557,7 +585,14 @@ function renderSpotTable() {
     + "where the squad was not wiped in that window. A high <b>Died alone</b> "
     + "next to a high <b>Squad held</b> is the clearest signal here: the spot "
     + "works, you are the one losing it. Sub-areas without own landings point "
-    + "at the parent spot, where they are counted.";
+    + "at the parent spot, where they are counted. "
+    + (LS.playerMode === "any"
+       ? "<b>Any of them</b>: every match with at least one of the named "
+         + "players, their landings added up — they need not have played "
+         + "together."
+       : "<b>Same squad</b>: only matches where all named players were in "
+         + "one team. Switch to <b>Any of them</b> to add up their landings "
+         + "regardless of who played with whom.");
 }
 
 function onSpotSort(th) {
@@ -619,6 +654,14 @@ document.getElementById("spotHead").addEventListener("keydown", e => {
   if (e.key !== "Enter" && e.key !== " ") return;
   const th = e.target.closest("th[data-sort]");
   if (th) { e.preventDefault(); onSpotSort(th); }
+});
+document.getElementById("modeSwitch").addEventListener("click", e => {
+  const b = e.target.closest("button[data-mode]");
+  if (!b || b.dataset.mode === LS.playerMode) return;
+  LS.playerMode = b.dataset.mode;
+  [...e.currentTarget.querySelectorAll("button")].forEach(x =>
+    x.setAttribute("aria-pressed", String(x.dataset.mode === LS.playerMode)));
+  refresh();     // Serverseitig — der Modus aendert die Match-Auswahl
 });
 document.getElementById("scopeSwitch").addEventListener("click", e => {
   const b = e.target.closest("button[data-scope]");

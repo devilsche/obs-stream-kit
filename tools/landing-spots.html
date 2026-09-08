@@ -173,7 +173,17 @@
         <div class="ac-list" id="ac3" role="listbox"
              aria-label="Suggestions for player 4"></div>
       </span>
-      <label class="route-label">
+      <span class="rwrap" id="modeWrap" hidden>
+        <span class="rlabel">Players</span>
+        <span class="switch" id="modeSwitch" role="group"
+              aria-label="How the named players are combined">
+          <button type="button" data-mode="squad" aria-pressed="true"
+                  title="Only matches where ALL named players were in the same team">Same squad</button>
+          <button type="button" data-mode="any" aria-pressed="false"
+                  title="Every match with at least one of them — their landings added up, whether they played together or not">Any of them</button>
+        </span>
+      </span>
+      <label class="route-label" id="routeWrap" hidden>
         <input type="checkbox" id="routeFilter">
         Flight path filter (≤1.5&thinsp;km)
       </label>

@@ -1040,3 +1040,78 @@ def test_landing_spots_keeps_lobby_total_when_filtering_players(pg_compat):
     # Lobby-Intensitaet bleibt vollstaendig, obwohl nur ein Spieler gewaehlt
     assert out["pois"][0]["landings"] == 11
     assert out["pois"][0]["byPlayer"]["account.me"]["count"] == 1
+
+
+# ── Spieler-Auswahl: Squad gegen kumuliert ──────────────────────────────────
+
+def test_landing_spots_squad_mode_needs_them_in_one_team(pg_compat):
+    """Vorgabe-Verhalten: nur Matches, in denen ALLE Genannten im selben
+    Team waren."""
+    from pubg.aggregations import compute_landing_spots
+    conn, t1, _ = pg_compat
+    # match.together: beide in Team 1
+    _seed_landing(conn, t1, "match.together", "account.me", 1500, 1500, team=1)
+    _seed_landing(conn, t1, "match.together", "account.mate", 1500, 1600, team=1)
+    # match.apart: verschiedene Teams
+    _seed_landing(conn, t1, "match.apart", "account.me", 1500, 1500, team=1)
+    _seed_landing(conn, t1, "match.apart", "account.mate", 1500, 1600, team=7)
+    conn.commit()
+    blob = {"mapKm": 8, "regions": POIS["Baltic_Main"]["regions"]}
+
+    out = compute_landing_spots(conn, t1, "Baltic_Main",
+                                ["account.me", "account.mate"],
+                                pois_blob=blob, player_mode="squad")
+    assert out["totalMatches"] == 1
+
+
+def test_landing_spots_any_mode_takes_every_match_with_one_of_them(pg_compat):
+    """Kumuliert: alle Landungen der Genannten, egal ob zusammen gespielt."""
+    from pubg.aggregations import compute_landing_spots
+    conn, t1, _ = pg_compat
+    _seed_landing(conn, t1, "match.together", "account.me", 1500, 1500, team=1)
+    _seed_landing(conn, t1, "match.together", "account.mate", 1500, 1600, team=1)
+    _seed_landing(conn, t1, "match.apart", "account.me", 1500, 1500, team=1)
+    _seed_landing(conn, t1, "match.apart", "account.mate", 1500, 1600, team=7)
+    # Match ohne die Genannten — darf auch im kumulierten Modus nicht zaehlen
+    _seed_landing(conn, t1, "match.other", "account.foe", 1500, 1500, team=3)
+    conn.commit()
+    blob = {"mapKm": 8, "regions": POIS["Baltic_Main"]["regions"]}
+
+    out = compute_landing_spots(conn, t1, "Baltic_Main",
+                                ["account.me", "account.mate"],
+                                pois_blob=blob, player_mode="any")
+    assert out["totalMatches"] == 2
+    poi = out["pois"][0]
+    assert set(poi["byPlayer"]) == {"account.me", "account.mate"}
+    # Vier eigene Landungen ueber zwei Matches
+    assert sum(v["count"] for v in poi["byPlayer"].values()) == 4
+
+
+def test_landing_spots_any_mode_with_single_player_equals_squad(pg_compat):
+    """Bei einem Spieler gibt es keinen Unterschied — die Modi duerfen
+    dort nicht auseinanderlaufen."""
+    from pubg.aggregations import compute_landing_spots
+    conn, t1, _ = pg_compat
+    _seed_landing(conn, t1, "match.a", "account.me", 1500, 1500, team=1)
+    _seed_landing(conn, t1, "match.a", "account.foe", 1500, 1600, team=7)
+    conn.commit()
+    blob = {"mapKm": 8, "regions": POIS["Baltic_Main"]["regions"]}
+    kw = dict(pois_blob=blob)
+    a = compute_landing_spots(conn, t1, "Baltic_Main", ["account.me"],
+                              player_mode="squad", **kw)
+    b = compute_landing_spots(conn, t1, "Baltic_Main", ["account.me"],
+                              player_mode="any", **kw)
+    assert a["totalMatches"] == b["totalMatches"] == 1
+
+
+def test_landing_spots_unknown_mode_falls_back_to_squad(pg_compat):
+    from pubg.aggregations import compute_landing_spots
+    conn, t1, _ = pg_compat
+    _seed_landing(conn, t1, "match.apart", "account.me", 1500, 1500, team=1)
+    _seed_landing(conn, t1, "match.apart", "account.mate", 1500, 1600, team=7)
+    conn.commit()
+    blob = {"mapKm": 8, "regions": POIS["Baltic_Main"]["regions"]}
+    out = compute_landing_spots(conn, t1, "Baltic_Main",
+                                ["account.me", "account.mate"],
+                                pois_blob=blob, player_mode="quatsch")
+    assert out["totalMatches"] == 0
