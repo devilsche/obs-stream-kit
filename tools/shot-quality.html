@@ -266,13 +266,16 @@
     <div class="dists" id="dists"></div>
     <h3 class="sub-h">By map</h3>
     <p class="sub">Raw death counts only say where you play a lot — Erangel
-      always tops that list. The rate per match is what separates "played
-      often" from "goes badly here".</p>
+      always tops that list. <b>Dead &lt;5min</b> and <b>median survival</b>
+      are what separate the maps: across your history they range from 6.7 to
+      13.0 minutes. <b>Per match</b> sits near 1.0 everywhere (comeback rounds
+      push it above 1) and carries little on its own.</p>
     <div class="scroll">
       <table>
         <thead><tr>
           <th>Map</th><th>Matches</th><th>Deaths</th>
-          <th title="Deaths per 100 matches on that map">Deaths/match</th>
+          <th title="Deaths divided by matches. Above 1 is normal — comeback rounds let you die more than once per match">Per match</th>
+          <th title="Share of matches on that map where you die before minute 5">Dead &lt;5min</th>
           <th>Median survival</th>
         </tr></thead>
         <tbody id="mapRows"></tbody>
@@ -627,22 +630,26 @@
       const rows = (DATA.deaths || {}).byMap || [];
       const host = document.getElementById("mapRows");
       if (!rows.length) { host.innerHTML = ""; return; }
-      // Die schlechteste Rate markieren, aber nur wo genug Matches liegen —
-      // bei drei Runden auf einer Karte ist die Rate Rauschen.
-      const solid = rows.filter(r => (r.matches || 0) >= 20 && r.deathRate != null);
+      // Beste und schlechteste Karte markieren, aber nur wo genug Matches
+      // liegen — bei drei Runden ist die Quote Rauschen.
+      const solid = rows.filter(r => (r.matches || 0) >= 20
+                                     && r.earlyDeathPct != null);
       const worst = solid.length
-        ? solid.reduce((a, b) => a.deathRate >= b.deathRate ? a : b) : null;
+        ? solid.reduce((a, b) => a.earlyDeathPct >= b.earlyDeathPct ? a : b) : null;
+      const best = solid.length
+        ? solid.reduce((a, b) => a.earlyDeathPct <= b.earlyDeathPct ? a : b) : null;
       host.innerHTML = rows.map(r => {
         const thin = (r.matches || 0) < 20;
         const med = r.medianSurvivalSecs;
+        const cls = r === worst ? "diff-bad" : (r === best ? "diff-good" : "");
         return `<tr class="${thin ? "thin" : ""}">
           <td>${esc(MAP_LABEL[r.map] || r.map)}${thin
               ? ' <span class="tag">thin</span>' : ""}</td>
           <td>${n0(r.matches)}</td>
           <td>${n0(r.deaths)}</td>
-          <td class="${r === worst ? "diff-bad" : ""}">${
-              r.deathRate == null ? "—" : r.deathRate.toFixed(0) + " %"}</td>
-          <td>${med == null ? "—" : (med / 60).toFixed(1) + " min"}</td>
+          <td>${r.deathsPerMatch == null ? "—" : r.deathsPerMatch.toFixed(2)}</td>
+          <td class="${cls}">${pct(r.earlyDeathPct)}</td>
+          <td class="${cls}">${med == null ? "—" : (med / 60).toFixed(1) + " min"}</td>
         </tr>`;
       }).join("");
     }

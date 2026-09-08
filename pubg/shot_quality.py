@@ -301,11 +301,20 @@ def deaths_by_map(deaths, matches_per_map):
         rows = grouped.get(map_name, [])
         n = matches_per_map.get(map_name)
         surv = [r["timeSurvived"] for r in rows if r.get("timeSurvived")]
+        early = sum(1 for r in rows
+                    if (r.get("timeSurvived") or 0) < PHASE_EARLY_SECS)
         out.append({
             "map": map_name,
             "matches": n,
             "deaths": len(rows),
-            "deathRate": (100.0 * len(rows) / n) if n else None,
+            # Tode JE MATCH, nicht in Prozent: durch Comeback-Runden kann
+            # man pro Match mehrfach sterben, an Prod-Daten liegt der Wert
+            # zwischen 0,97 und 1,08. Als Prozentzahl sah das nach einem
+            # Rechenfehler aus, und die Aussage ist ohnehin duenn — jeder
+            # stirbt in fast jedem Match.
+            "deathsPerMatch": (len(rows) / n) if n else None,
+            # Das ist die Groesse, die zwischen Karten trennt.
+            "earlyDeathPct": (100.0 * early / n) if n else None,
             "medianSurvivalSecs": statistics.median(surv) if surv else None,
         })
     out.sort(key=lambda d: (-(d["matches"] or 0), d["map"]))

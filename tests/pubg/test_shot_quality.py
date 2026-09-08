@@ -921,9 +921,10 @@ def test_landing_spots_without_range_keeps_the_full_history(pg_compat):
 
 # ── Tode je Karte (Karten-Ebene, nicht POI) ─────────────────────────────────
 
-def test_deaths_by_map_relates_deaths_to_matches():
-    """Rohe Todeszahlen je Karte sagen nur, wo man viel spielt. Erst die
-    Rate pro Match trennt "viel gespielt" von "laeuft schlecht"."""
+def test_deaths_by_map_counts_deaths_per_match_not_percent():
+    """Tode JE MATCH, nicht in Prozent: durch Comeback-Runden kann man pro
+    Match mehrfach sterben, an Prod-Daten liegt der Wert zwischen 0,97 und
+    1,08 — als Prozentzahl sah das nach einem Rechenfehler aus."""
     deaths = [
         {"map": "Baltic_Main", "timeSurvived": 300},
         {"map": "Baltic_Main", "timeSurvived": 600},
@@ -934,8 +935,10 @@ def test_deaths_by_map_relates_deaths_to_matches():
     by = {r["map"]: r for r in out}
     assert by["Baltic_Main"]["deaths"] == 2
     assert by["Baltic_Main"]["matches"] == 4
-    assert by["Baltic_Main"]["deathRate"] == pytest.approx(50.0)
-    assert by["Desert_Main"]["deathRate"] == pytest.approx(25.0)
+    assert by["Baltic_Main"]["deathsPerMatch"] == pytest.approx(0.5)
+    assert by["Desert_Main"]["deathsPerMatch"] == pytest.approx(0.25)
+    # Tod vor Minute 5: nur der 300-s-Fall auf Baltic
+    assert by["Baltic_Main"]["earlyDeathPct"] == pytest.approx(0.0)
     assert by["Baltic_Main"]["medianSurvivalSecs"] == pytest.approx(450)
 
 
@@ -943,7 +946,7 @@ def test_deaths_by_map_lists_maps_played_without_deaths():
     """Eine Karte ohne Tod ist eine Aussage, keine Leerstelle."""
     out = sq.deaths_by_map([], {"Baltic_Main": 3})
     assert out[0]["deaths"] == 0
-    assert out[0]["deathRate"] == pytest.approx(0.0)
+    assert out[0]["deathsPerMatch"] == pytest.approx(0.0)
     assert out[0]["medianSurvivalSecs"] is None
 
 
@@ -956,4 +959,17 @@ def test_deaths_by_map_tolerates_unknown_map_in_deaths():
     # Tod auf einer Karte ohne Match-Zahl darf nicht durch Division sterben
     out = sq.deaths_by_map([{"map": "X", "timeSurvived": 10}], {})
     assert out[0]["deaths"] == 1
-    assert out[0]["deathRate"] is None
+    assert out[0]["deathsPerMatch"] is None
+
+
+def test_deaths_by_map_early_share_can_exceed_no_bound_issue():
+    """Mehrfachtode pro Match (Comeback) duerfen deathsPerMatch ueber 1
+    treiben, ohne dass die Fruehtod-Quote dadurch kaputtgeht."""
+    deaths = [
+        {"map": "M", "timeSurvived": 100},
+        {"map": "M", "timeSurvived": 200},   # zweiter Tod im selben Match
+        {"map": "M", "timeSurvived": 800},
+    ]
+    out = sq.deaths_by_map(deaths, {"M": 2})
+    assert out[0]["deathsPerMatch"] == pytest.approx(1.5)
+    assert out[0]["earlyDeathPct"] == pytest.approx(100.0)
