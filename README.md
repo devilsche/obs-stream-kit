@@ -497,7 +497,7 @@ auf das Backend; kein Streaming nötig.
 | Datei | Zweck | Größe |
 |---|---|---|
 | `tools/match-replay.html` | Animierter Replay eines PUBG-Matches auf der Karte | Browser-Tab |
-| `tools/landing-spots.html` | **Landing Spot Analyzer**: Heatmap + Scatter der Landeorte, dazu je Platz das eigene Ergebnis gegen die Lobby | Browser-Tab / 1920×1080 |
+| `tools/landing-spots.html` | **Landing Spot Analyzer**: Tabelle je Landeplatz mit eigenem Ergebnis gegen die Lobby, Karte auf Klick | Browser-Tab |
 | `tools/g1r-database.html` | Vollständiger G1R-Item-Katalog aus dem Object-Dump (Nah-/Fernkampf, Runen, Schriftrollen) mit Live-Suche | Browser-Tab (admin) |
 | `tools/match-analysis.html` | Telemetrie-Auswertung eines Matches: Accuracy, Trefferzonen, Kill-Timeline, Auffälligkeiten | Browser-Tab |
 | `tools/weapon-performance.html` | Dieselben Kennzahlen über einen **Zeitraum** — je Waffe oder je Spieler | Browser-Tab |
@@ -506,12 +506,29 @@ auf das Backend; kein Streaming nötig.
 
 #### tools/landing-spots.html — Landing Spot Analyzer
 
-Karte und Bewertung an einem Ort. Links Heatmap, Scatter je Spieler und
-Flugrouten-Filter wie bisher; rechts in der Landeplatz-Liste jetzt
-zusätzlich das eigene Ergebnis pro Platz — Drops, *Squad held*, *You died*,
-*Died alone*, Lobby-Quote, Differenz, Überlebenszeit, Platzierung. Dieselben
-Größen und Richtungen wie in `shot-quality`, damit man nicht zwei Sprachen
-lernt.
+Karte und Bewertung an einem Ort. **Links die Tabelle** — eine Zeile je
+Landeplatz mit Lobby-Landungen, eigenen Drops, *Squad held*, *You died*,
+*Died alone*, Lobby-Quote, Differenz, Überlebenszeit und Platzierung, alle
+zehn Spalten sortierbar mit Richtungspfeil. **Rechts die Karte** mit Heatmap
+und Scatter je Spieler. Dieselben Größen und Richtungen wie in
+`shot-quality`, damit man nicht zwei Sprachen lernt.
+
+Umschalter **My spots / All spots**: Vorgabe sind die Plätze mit eigenen
+Landungen (44 von 99 auf Erangel), sonst besteht die Tabelle mehrheitlich
+aus Zeilen ohne eigene Daten. Die Lobby-Gesamtsicht bleibt trotzdem immer
+ablesbar — die Zeile über der Tabelle nennt beides, dazu die Lobby-Spalte je
+Zeile und die Heatmap-Intensität.
+
+Spieler-Modi: **Same squad** nimmt nur Matches, in denen alle Genannten im
+selben Team waren, **Any of them** jedes Match mit mindestens einem und
+zählt deren Landungen kumuliert. An echten Daten: mit `PEX_LuCKoR` und
+`original_Hat3` sind das 118 gegen 349 Matches und 236 gegen 468 Landungen.
+Der Schalter erscheint erst ab zwei Spielern, weil beide Modi bei einem
+dasselbe liefern; der Flugrouten-Filter erst mit mindestens einem, weil er
+ohne Referenzspieler stillschweigend ignoriert wird.
+
+Kein festes 1920×1080 mehr — das Tool füllt das Fenster. Unter 68 rem
+rutscht die Karte unter die Tabelle und die Seite darf scrollen.
 
 Hat ein Unterbereich keine eigenen Landungen, aber der Oberplatz welche,
 steht dort **nicht** „nichts hier", sondern ein Verweis: „Your landings here
