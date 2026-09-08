@@ -50,6 +50,46 @@
     }
     .matches th { color: var(--pubg-muted); font-size: 0.75em;
                   text-transform: uppercase; letter-spacing: 0.08em; }
+    /* Eigene Werte in denselben Matches — erst sichtbar, wenn welche
+       vorliegen. Klasse statt Inline-Style, damit nichts per JS an
+       style= geschrieben wird. */
+    .mine-wrap.is-hidden { display: none; }
+    .mine-wrap {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--pubg-border, rgba(94, 42, 121, 0.5));
+    }
+    .mine-h { margin: 0 0 8px; }
+    /* Unterscheidet die beiden Bloecke: wessen Zahlen stehen hier. */
+    h3 .sub {
+      font-style: normal;
+      font-size: 0.72em;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--pubg-muted, #8a7d99);
+      margin-left: 6px;
+    }
+    /* Richtung des Vergleichs — Vorzeichen traegt die Bedeutung, die
+       Farbe unterstuetzt sie nur. */
+    .diff-up   { color: var(--theme-accent, #f2b705); }
+    .diff-down { color: var(--pubg-muted, #8a7d99); }
+
+    /* Aus Inline-Styles hierher gezogen (Projektregel: kein style= im
+       Markup, auch nicht per JS gesetzt). */
+    .vehicle-evict {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--pubg-border, rgba(94, 42, 121, 0.5));
+      font-size: 0.92em;
+      color: var(--pubg-muted, #8a7d99);
+      line-height: 1.7;
+    }
+    .vehicle-evict.is-hidden { display: none; }
+    .error-pad { padding: 20px; }
+    /* Career-Block wird versteckt, wenn die API keine Lifetime-Werte
+       liefert — ebenfalls per Klasse statt style=. */
+    #careerSection.is-hidden { display: none; }
+    .hl { color: var(--pubg-gold, #f2b705); }
   </style>
 </head>
 <body>
@@ -60,7 +100,7 @@
     </div>
 
     <div class="pubg-card section">
-      <h3>Played With You</h3>
+      <h3>Played With You <em class="sub">their numbers</em></h3>
       <div class="grid">
         <div class="cell"><span class="pubg-stat-value" id="sm">—</span><span class="pubg-stat-label">Matches</span></div>
         <div class="cell"><span class="pubg-stat-value" id="skd">—</span><span class="pubg-stat-label">K/D</span></div>
@@ -68,7 +108,19 @@
         <div class="cell"><span class="pubg-stat-value" id="swin">—</span><span class="pubg-stat-label">Win %</span></div>
         <div class="cell"><span class="pubg-stat-value" id="sdmg">—</span><span class="pubg-stat-label">Ø Damage</span></div>
       </div>
-      <div class="vehicle-evict" id="evictRow" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--pubg-border);font-size:0.92em;color:var(--pubg-muted);line-height:1.7"></div>
+      <!-- Meine eigenen Werte in denselben Matches: die Frage "wie spiele
+           ICH mit dem" liess sich hier bisher nicht beantworten, obwohl
+           der Endpoint sh.kd/sh.avgDmg schon mitliefert. -->
+      <div id="mineWrap" class="mine-wrap is-hidden">
+        <h3 class="mine-h">You With Them <em class="sub">your numbers in the same matches</em></h3>
+        <div class="grid">
+          <div class="cell"><span class="pubg-stat-value" id="mkd">—</span><span class="pubg-stat-label">K/D</span></div>
+          <div class="cell"><span class="pubg-stat-value" id="mdmg">—</span><span class="pubg-stat-label">Ø Damage</span></div>
+          <div class="cell"><span class="pubg-stat-value" id="mkills">—</span><span class="pubg-stat-label">Kills</span></div>
+          <div class="cell"><span class="pubg-stat-value" id="mdiff">—</span><span class="pubg-stat-label">K/D vs them</span></div>
+        </div>
+      </div>
+      <div class="vehicle-evict is-hidden" id="evictRow"></div>
     </div>
 
     <div class="pubg-card section" id="careerSection">
@@ -97,7 +149,7 @@
 
     if (!PLAYER) {
       document.querySelector(".container").innerHTML =
-        '<div class="pubg-error" style="padding:20px">Missing parameter ?player=NAME</div>';
+        '<div class="pubg-error error-pad">Missing parameter ?player=NAME</div>';
     } else {
       document.getElementById("playerName").textContent = PLAYER;
       PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/co-player/${encodeURIComponent(PLAYER)}`)
@@ -118,18 +170,34 @@
           document.getElementById("swin").textContent = PubgUI.fmtPct(sh.winRate);
           document.getElementById("swins").textContent = PubgUI.fmtNum(sh.wins);
 
+          // Meine eigenen Werte in denselben Matches. sh.kd/sh.avgDmg
+          // liefert der Endpoint schon, sie wurden nur nie angezeigt.
+          if (sh.kd != null || sh.myKills != null) {
+            document.getElementById("mineWrap").classList.remove("is-hidden");
+            document.getElementById("mkd").textContent = PubgUI.fmtKD(sh.kd);
+            document.getElementById("mdmg").textContent =
+              PubgUI.fmtNum(Math.round(sh.avgDmg || 0));
+            document.getElementById("mkills").textContent =
+              PubgUI.fmtNum(sh.myKills);
+            // Vorzeichen zeigt die Richtung: + heisst, ich liege vorn.
+            const diff = (sh.kd || 0) - (sh.mateKd || 0);
+            const el = document.getElementById("mdiff");
+            el.textContent = (diff >= 0 ? "+" : "") + diff.toFixed(2);
+            el.classList.add(diff >= 0 ? "diff-up" : "diff-down");
+          }
+
           // Vehicle-Eviction Zeilen — nur zeigen wenn relevant.
           const ed = sh.vehicleEvictionsDealt || 0;
           const et = sh.vehicleEvictionsTaken || 0;
           if (ed > 0 || et > 0) {
             const lines = [];
             if (ed > 0) lines.push(
-              `<span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span> shot <b style="color:var(--pubg-gold)">${ed}</b> ${ed === 1 ? "player" : "players"} out of a vehicle`);
+              `<span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span> shot <b class="hl">${ed}</b> ${ed === 1 ? "player" : "players"} out of a vehicle`);
             if (et > 0) lines.push(
-              `<span class="material-symbols-outlined icon-sm" aria-hidden="true">skull</span> got shot out of a vehicle <b style="color:var(--pubg-gold)">${et}</b> ${et === 1 ? "time" : "times"}`);
+              `<span class="material-symbols-outlined icon-sm" aria-hidden="true">skull</span> got shot out of a vehicle <b class="hl">${et}</b> ${et === 1 ? "time" : "times"}`);
             const er = document.getElementById("evictRow");
             er.innerHTML = lines.join("<br>");
-            er.style.display = "block";
+            er.classList.remove("is-hidden");
           }
 
           const cl = d.careerLifetime;
@@ -140,7 +208,7 @@
             document.getElementById("cwinpct").textContent = PubgUI.fmtPct(cl.win_rate);
             document.getElementById("cdmg").textContent = PubgUI.fmtNum(Math.round(cl.avg_damage||0));
           } else {
-            document.getElementById("careerSection").style.display = "none";
+            document.getElementById("careerSection").classList.add("is-hidden");
           }
 
           document.getElementById("last5").innerHTML =

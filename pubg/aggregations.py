@@ -926,6 +926,12 @@ def compute_co_player(conn, tenant_id: int, my_account_id: str, name_or_id: str)
         my_avg_dmg = sum(r["my_damage"] or 0.0 for r in shared) / n
         mate_avg_dmg = sum(r["mate_damage"] or 0.0 for r in shared) / n
         avg_place = sum(r["place"] for r in shared if r["place"]) / n
+        # Nenner wie ueberall sonst: Matches minus Wins (op.gg-Konvention,
+        # siehe reference-kd-formeln). Echte Tode aus time_survived waeren
+        # bei einer gefilterten Auswahl genauer — gemessen 19 statt 15 bei
+        # den 21 Matches mit Nimbelwimbel —, aber dann rechnete dieses eine
+        # Widget anders als der Rest und die Zahlen liessen sich nicht
+        # mehr vergleichen.
         deaths = max(n - wins, 1)
         map_dist = {}
         for r in shared:
@@ -936,6 +942,8 @@ def compute_co_player(conn, tenant_id: int, my_account_id: str, name_or_id: str)
             "mateKd": mate_kills / deaths,     # MATE-K/D in shared matches
             "avgDmg": my_avg_dmg,              # MEINER avg dmg
             "mateAvgDmg": mate_avg_dmg,        # MATE avg dmg
+            "myKills": my_kills,               # absolute Kills, beide Seiten
+            "mateKills": mate_kills,
             "avgPlace": avg_place,
             "winRate": (wins / n) * 100,
             "wins": wins,
