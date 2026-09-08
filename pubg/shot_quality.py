@@ -65,8 +65,12 @@ MIN_COHORT_MATCHES = 20
 MAP_ALIASES = {"Erangel_Main": "Baltic_Main"}
 
 #: Ab so vielen eigenen Landungen taucht ein POI in der Auswertung auf.
-#: Darunter sagt eine Quote nichts.
-MIN_POI_DROPS = 5
+#: Bewusst 1: die Top-N-Begrenzung je Karte im Tool filtert schon, und eine
+#: Schwelle hier verschluckt ganze Karten. Bei 5 fielen auf Deston 24 von 35
+#: zugeordneten Landungen weg (12 Plaetze, nur 2 ueber der Schwelle) — die
+#: Kartenzeile las sich dann wie "du hast 11 Deston-Landungen". Belastbar
+#: oder nicht entscheidet RELIABLE_POI_DROPS, sichtbar oder nicht das Tool.
+MIN_POI_DROPS = 1
 
 #: Ab so vielen eigenen Landungen gilt die Differenz zur Lobby als
 #: belastbar. Darunter streut sie heftig: an Prod-Daten fuehrten
@@ -918,8 +922,28 @@ def landing_stats(conn, tenant_id, account_id, cutoff, to_iso=None,
             "place": pr["place"],
         })
 
+    # Je Karte die ungefilterte Wahrheit: wie viele eigene Landungen es gab
+    # und wie viele davon in einem benannten POI lagen. Ohne das kann die
+    # Kartenzeile im Tool nur die Summe der gezeigten Zeilen nennen — und
+    # die liest sich wie die Gesamtzahl.
+    per_map = {}
+    for (mid, acc), r in first.items():
+        if acc != account_id:
+            continue
+        entry = per_map.setdefault(r["map_name"],
+                                   {"map": r["map_name"], "landings": 0,
+                                    "assigned": 0})
+        entry["landings"] += 1
+        if (mid, acc) in where:
+            entry["assigned"] += 1
+    for row in summarise_landings(own, lobby, 1):
+        entry = per_map.get(row["map"])
+        if entry is not None:
+            entry["spots"] = entry.get("spots", 0) + 1
+
     return {
         "byPoi": summarise_landings(own, lobby, min_drops),
+        "perMap": sorted(per_map.values(), key=lambda d: -d["landings"]),
         "ownDrops": len(own),
         "assigned": len(where),
         "minDrops": min_drops,

@@ -733,14 +733,23 @@
       // Gruppenzeilen in EINEM tbody, nicht mehrere tbody per outerHTML:
       // outerHTML ersetzt #poiRows selbst, dann findet der nächste Render
       // (Top-N-Wechsel) das Element nicht mehr.
+      // Die Kartenzeile nennt die ECHTE Zahl der Landungen auf dieser
+      // Karte, nicht die Summe der gezeigten Zeilen — sonst liest sie sich
+      // wie die Gesamtzahl und untertreibt teils um das Dreifache.
+      const mapInfo = new Map((d.perMap || []).map(m => [m.map, m]));
       document.getElementById("poiRows").innerHTML = byMap.map(g => {
         const shown = TOPN > 0 ? g.rows.slice(0, TOPN) : g.rows;
         const rest = g.rows.length - shown.length;
+        const info = mapInfo.get(g.map);
+        const total = info ? info.landings : g.total;
+        const terrain = info ? info.landings - info.assigned : 0;
+        const bits = [`${n0(total)} landing${total === 1 ? "" : "s"}`,
+                      `${g.rows.length} spot${g.rows.length === 1 ? "" : "s"}`];
+        if (rest > 0) bits.push(`${rest} spot${rest === 1 ? "" : "s"} below`);
+        if (terrain > 0) bits.push(`${n0(terrain)} in open terrain`);
         return `<tr class="map-head"><th colspan="12">
             ${esc(MAP_LABEL[g.map] || g.map)}
-            <span class="mh-n">· ${n0(g.total)} drops on ${g.rows.length}
-              spot${g.rows.length === 1 ? "" : "s"}${rest > 0
-                ? `, ${rest} more not shown` : ""}</span>
+            <span class="mh-n">· ${bits.join(" · ")}</span>
           </th></tr>`
           + shown.map(rowHtml).join("");
       }).join("");
@@ -755,12 +764,15 @@
           + ` the average player who lands there in`
           + ` ${pct(worst.lobbyEarlyPct)}. `
         : "";
+      const totalLandings = (d.perMap || []).reduce(
+        (s, m) => s + m.landings, 0);
       document.getElementById("poiSub").innerHTML = lead
-        + `<b>${n0(d.ownDrops)}</b> of your landings matched to a spot, `
-        + `lobby reference from <b>${n0(d.assigned)}</b> landings by all `
-        + `players. Spots with at least ${d.minDrops} of your own drops; `
-        + `rows under ${d.reliableDrops} are marked <b>thin</b> — their `
-        + `difference to the lobby swings by tens of points.`;
+        + `<b>${n0(d.ownDrops)}</b> of your <b>${n0(totalLandings)}</b> `
+        + `landings matched to a named spot, lobby reference from `
+        + `<b>${n0(d.assigned)}</b> landings by all players. Rows under `
+        + `${d.reliableDrops} drops are marked <b>thin</b> — their difference `
+        + `to the lobby swings by tens of points. Use the switch above to `
+        + `show more spots per map.`;
       document.getElementById("poiFoot").innerHTML =
         "<b>You died</b> counts one thing only: <b>you personally dead</b> — "
         + "not knocked-and-revived, and regardless of how the squad fought. "

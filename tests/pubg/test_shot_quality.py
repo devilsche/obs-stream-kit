@@ -754,3 +754,44 @@ def test_landing_stats_reports_squad_wipe(pg_compat):
                            pois=POIS, min_drops=1)["byPoi"][0]
     assert row["squadWipedPct"] == pytest.approx(100.0)
     assert row["diedSquadAlivePct"] == pytest.approx(0.0)
+
+
+def test_landing_stats_reports_untruncated_totals_per_map(pg_compat):
+    """Die Kartenzeile im Tool darf nicht die Summe der gezeigten Zeilen
+    nennen: auf Deston fielen bei min_drops=5 zwei Drittel der Landungen
+    weg und die Zeile las sich wie die Gesamtzahl."""
+    conn, t1, _ = pg_compat
+    # 3 Landungen im POI, 1 daneben im Gelaende
+    for i, (x, y) in enumerate([(1500, 1500), (1500, 1600), (1500, 1700),
+                                (9000, 9000)]):
+        _seed(conn, t1, "account.me", f"match.{i}", survived=900)
+        conn.execute(
+            "INSERT INTO telemetry_events (match_id, event_type,"
+            " actor_account, actor_x, actor_y, timestamp_ms)"
+            " VALUES (?, 'Landing', 'account.me', ?, ?, 1000)",
+            (f"match.{i}", x, y))
+    conn.commit()
+
+    out = sq.landing_stats(conn, t1, "account.me", "1970-01-01T00:00:00Z",
+                           pois=POIS, min_drops=1)
+    per_map = {m["map"]: m for m in out["perMap"]}
+    assert per_map["Baltic_Main"]["landings"] == 4
+    assert per_map["Baltic_Main"]["assigned"] == 3
+    assert per_map["Baltic_Main"]["spots"] == 1
+
+
+def test_landing_stats_default_min_drops_keeps_rare_spots(pg_compat):
+    conn, t1, _ = pg_compat
+    _seed(conn, t1, "account.me", "match.a", survived=900)
+    conn.execute(
+        "INSERT INTO telemetry_events (match_id, event_type, actor_account,"
+        " actor_x, actor_y, timestamp_ms)"
+        " VALUES ('match.a', 'Landing', 'account.me', 1500, 1500, 1000)")
+    conn.commit()
+
+    # Ohne min_drops-Argument: der Default darf einen Einzel-Drop nicht
+    # verschlucken, sonst verschwinden ganze Karten aus der Auswertung.
+    out = sq.landing_stats(conn, t1, "account.me", "1970-01-01T00:00:00Z",
+                           pois=POIS)
+    assert len(out["byPoi"]) == 1
+    assert out["byPoi"][0]["reliable"] is False
