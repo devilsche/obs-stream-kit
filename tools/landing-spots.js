@@ -955,8 +955,10 @@ function onSpotSort(th) {
 const FIT_FRACTION = 0.6;
 //: Deckel, damit winzige Orte nicht bis zur Unkenntlichkeit aufziehen:
 //: "Bootyard - Shop" ist 53 m breit und wuerde formelgerecht auf Zoom 91
-//: gehen, wo von der Karte nur noch Textur uebrig ist.
-const FIT_ZOOM_MAX = 8;
+//: gehen, wo von der Karte nur noch Textur uebrig ist. 12 zeigt bei einer
+//: 8-km-Karte einen Ausschnitt von 667 m — nah genug fuer ein einzelnes
+//: Gebaeude und noch Luft bis zum Wheel-Maximum von 20.
+const FIT_ZOOM_MAX = 12;
 
 /** Zoom, bei dem der ganze Ort ins Bild passt.
  *
