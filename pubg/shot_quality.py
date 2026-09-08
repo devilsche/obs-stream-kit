@@ -285,6 +285,33 @@ def summarise_deaths(deaths):
     }
 
 
+def deaths_by_map(deaths, matches_per_map):
+    """Tode je Karte, ins Verhaeltnis zu den dort gespielten Matches.
+
+    Rohe Todeszahlen sagen nur, wo man viel spielt — Erangel fuehrt die
+    Liste immer an. Erst die Rate pro Match trennt "viel gespielt" von
+    "laeuft dort schlecht". Karten ohne Tod bleiben in der Liste: dass eine
+    Karte gut laeuft, ist eine Aussage und keine Leerstelle."""
+    grouped = {}
+    for d in deaths:
+        grouped.setdefault(d["map"], []).append(d)
+
+    out = []
+    for map_name in set(grouped) | set(matches_per_map):
+        rows = grouped.get(map_name, [])
+        n = matches_per_map.get(map_name)
+        surv = [r["timeSurvived"] for r in rows if r.get("timeSurvived")]
+        out.append({
+            "map": map_name,
+            "matches": n,
+            "deaths": len(rows),
+            "deathRate": (100.0 * len(rows) / n) if n else None,
+            "medianSurvivalSecs": statistics.median(surv) if surv else None,
+        })
+    out.sort(key=lambda d: (-(d["matches"] or 0), d["map"]))
+    return out
+
+
 def _avg(values):
     vals = [v for v in values if v is not None]
     return (sum(vals) / len(vals)) if vals else None
@@ -608,6 +635,26 @@ def phase_breakdown(conn, tenant_id, account_id, cutoff, to_iso=None):
         entry["phase"] = ph
         out.append(entry)
     return out
+
+
+def matches_per_map(conn, tenant_id, account_id, cutoff, to_iso=None):
+    """Gespielte BR-Matches je Karte — der Nenner fuer die Todesrate."""
+    br_where, br_params = _br_filter("m")
+    sql = f"""
+        SELECT m.map_name, COUNT(*) AS n
+        FROM participants pa
+        JOIN matches m ON m.match_id = pa.match_id
+                      AND m.tenant_id = pa.tenant_id
+        WHERE pa.tenant_id = ? AND pa.account_id = ?
+          AND pa.time_survived > 0
+          AND m.played_at >= ? AND {br_where}
+    """
+    params = [tenant_id, account_id, cutoff, *br_params]
+    if to_iso:
+        sql += " AND m.played_at <= ?"
+        params.append(to_iso)
+    sql += " GROUP BY m.map_name"
+    return {r["map_name"]: r["n"] for r in conn.execute(sql, params).fetchall()}
 
 
 def death_rows(conn, tenant_id, account_id, cutoff, to_iso=None):
@@ -1031,7 +1078,8 @@ def trend(conn, tenant_id, account_id):
 
 def compute_shot_quality(conn, tenant_id, account_id, cutoff,
                          to_iso=None, min_matches=MIN_COHORT_MATCHES,
-                         lobby_min_matches=5, group_subareas=False):
+                         lobby_min_matches=5, group_subareas=False,
+                         with_landings=False):
     """Alles in einem Aufruf — so bleibt es ein Endpoint-Call."""
     me = own_metrics(conn, tenant_id, account_id, cutoff, to_iso)
     squad = cohort_players(conn, tenant_id, min_matches)
@@ -1050,6 +1098,11 @@ def compute_shot_quality(conn, tenant_id, account_id, cutoff,
         "byPhase": phase_breakdown(conn, tenant_id, account_id, cutoff, to_iso),
         "deaths": {
             **summarise_deaths(deaths),
+            "byMap": deaths_by_map(
+                [{"map": d.get("map_name"),
+                  "timeSurvived": d.get("time_survived")} for d in deaths
+                 if d.get("map_name")],
+                matches_per_map(conn, tenant_id, account_id, cutoff, to_iso)),
             "repeatKillers": repeat_killers(conn, tenant_id,
                                             account_id, cutoff),
             "repeatKillerMin": REPEAT_KILLER_MIN,
@@ -1065,8 +1118,12 @@ def compute_shot_quality(conn, tenant_id, account_id, cutoff,
             "lobbyPlayers": len(lobby),
             "lobbyMinMatches": lobby_min_matches,
         },
-        "landings": landing_stats(conn, tenant_id, account_id, cutoff,
-                                  to_iso=to_iso,
-                                  group_subareas=group_subareas),
+        # Nur auf Anforderung: das Shot-Quality-Tool zeigt Landeplaetze
+        # nicht mehr (dafuer gibt es den Analyzer), und der Aufruf kostet
+        # rund zwei Sekunden.
+        "landings": (landing_stats(conn, tenant_id, account_id, cutoff,
+                                   to_iso=to_iso,
+                                   group_subareas=group_subareas)
+                     if with_landings else None),
         "trend": trend(conn, tenant_id, account_id),
     }

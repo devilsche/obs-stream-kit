@@ -424,7 +424,7 @@ async function loadStats() {
   try {
     const d = await PubgUI.fetchJson(
       "/api/pubg/shot-quality?range=" + encodeURIComponent(LS.range)
-      + "&poiMin=1", 120000);
+      + "&withLandings=1", 120000);
     const rows = ((d.landings || {}).byPoi || [])
       .filter(r => r.map === LS.mapName
                 || (LS.mapName === "Erangel_Main" && r.map === "Baltic_Main")
@@ -445,6 +445,28 @@ function poiStatsHtml(name) {
   if (LS.stats === null) return "";
   const s = LS.stats[name];
   if (!s) {
+    // Kein eigener Drop hier. Wenn der Ort ein Unterbereich ist
+    // ("Bootyard - Warehouses") und der Oberplatz Zahlen hat, dann liegen
+    // die Daten dort — das muss dastehen. "Nichts hier" ist in dem Fall
+    // schlicht falsch: gelandet wurde, nur eine Polygon-Grenze weiter.
+    const base = name.split(" - ")[0];
+    const parent = base !== name ? LS.stats[base] : null;
+    if (parent) {
+      return `<p class="poi-nostats">Your landings here are counted under
+              <button type="button" class="poi-jump" data-jump="${base}">
+              ${PubgUI.esc(base)}</button> — ${parent.drops} drop${
+              parent.drops === 1 ? "" : "s"} there.</p>`;
+    }
+    // Umgekehrt: Oberplatz ohne eigene Drops, aber Unterbereiche mit.
+    const kids = Object.keys(LS.stats)
+      .filter(k => k.startsWith(name + " - "));
+    if (kids.length) {
+      return `<p class="poi-nostats">Your landings are counted under `
+        + kids.map(k => `<button type="button" class="poi-jump"
+            data-jump="${k}">${PubgUI.esc(k.split(" - ").slice(1).join(" - "))}</button>`
+            + ` (${LS.stats[k].drops})`).join(", ")
+        + `.</p>`;
+    }
     return `<p class="poi-nostats">No own landing here in this range —
             the bar above counts every player in the lobby.</p>`;
   }
@@ -479,6 +501,19 @@ function highlightPoi(name) {
   LS._hoverPoi = name;
   renderHeatmap();
 }
+
+// Sprung zum Ort, unter dem die eigenen Landungen gezaehlt werden.
+document.getElementById("poiList").addEventListener("click", e => {
+  const btn = e.target.closest(".poi-jump");
+  if (!btn) return;
+  e.stopPropagation();          // nicht zusaetzlich die Karte zentrieren
+  const target = document.querySelector(
+    `.poi[data-poi="${btn.dataset.jump.replace(/"/g, '\\"')}"]`);
+  if (!target) return;
+  target.open = true;
+  target.scrollIntoView({ block: "center" });
+  highlightPoi(btn.dataset.jump);
+});
 
 document.getElementById("poiList").addEventListener("mouseover", e => {
   const el = e.target.closest(".poi");

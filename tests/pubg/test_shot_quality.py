@@ -917,3 +917,43 @@ def test_landing_spots_without_range_keeps_the_full_history(pg_compat):
     blob = {"mapKm": 8, "regions": POIS["Baltic_Main"]["regions"]}
     assert compute_landing_spots(
         conn, t1, "Baltic_Main", [], pois_blob=blob)["totalMatches"] == 3
+
+
+# ── Tode je Karte (Karten-Ebene, nicht POI) ─────────────────────────────────
+
+def test_deaths_by_map_relates_deaths_to_matches():
+    """Rohe Todeszahlen je Karte sagen nur, wo man viel spielt. Erst die
+    Rate pro Match trennt "viel gespielt" von "laeuft schlecht"."""
+    deaths = [
+        {"map": "Baltic_Main", "timeSurvived": 300},
+        {"map": "Baltic_Main", "timeSurvived": 600},
+        {"map": "Desert_Main", "timeSurvived": 900},
+    ]
+    matches = {"Baltic_Main": 4, "Desert_Main": 4}
+    out = sq.deaths_by_map(deaths, matches)
+    by = {r["map"]: r for r in out}
+    assert by["Baltic_Main"]["deaths"] == 2
+    assert by["Baltic_Main"]["matches"] == 4
+    assert by["Baltic_Main"]["deathRate"] == pytest.approx(50.0)
+    assert by["Desert_Main"]["deathRate"] == pytest.approx(25.0)
+    assert by["Baltic_Main"]["medianSurvivalSecs"] == pytest.approx(450)
+
+
+def test_deaths_by_map_lists_maps_played_without_deaths():
+    """Eine Karte ohne Tod ist eine Aussage, keine Leerstelle."""
+    out = sq.deaths_by_map([], {"Baltic_Main": 3})
+    assert out[0]["deaths"] == 0
+    assert out[0]["deathRate"] == pytest.approx(0.0)
+    assert out[0]["medianSurvivalSecs"] is None
+
+
+def test_deaths_by_map_sorts_by_matches():
+    out = sq.deaths_by_map([], {"A": 2, "B": 9, "C": 5})
+    assert [r["map"] for r in out] == ["B", "C", "A"]
+
+
+def test_deaths_by_map_tolerates_unknown_map_in_deaths():
+    # Tod auf einer Karte ohne Match-Zahl darf nicht durch Division sterben
+    out = sq.deaths_by_map([{"map": "X", "timeSurvived": 10}], {})
+    assert out[0]["deaths"] == 1
+    assert out[0]["deathRate"] is None

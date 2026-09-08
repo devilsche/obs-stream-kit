@@ -6,14 +6,17 @@
   ich damit" — nicht "wie viele Kills habe ich". Quelle sind
   match_weapon_stats, participants und telemetry_events.
 
-  Sieben Sektionen:
+  Sechs Sektionen:
     1. Shot quality    — Trefferquote, Schaden/100 Schuss, Anteil im Gefecht
     2. Where you rank  — Perzentil gegen Squad- und Lobby-Referenz
     3. By round phase  — dieselben Werte je Rundenphase (early/mid/late)
     4. Deaths          — wann, wodurch, durch wen
     5. Cohort bands    — Mittelwerte je K/D-Band, eigene Zeile eingereiht
-    6. Landing spots   — eigene Landeplaetze gegen die Lobby am selben Ort
-    7. Trend           — letzte 20/50/100 Matches gegen die davor
+    6. Trend           — letzte 20/50/100 Matches gegen die davor
+
+  Das Todesbild enthaelt auch die KARTEN-Ebene (wo stirbt man, Rate je
+  Match). Einzelne Landeplaetze bewusst nicht — die gehoeren zum Landing
+  Spot Analyzer, wo die Karte danebensteht.
 
   Der Trend ist bewusst NICHT an den Range gekoppelt: eine Session hat zu
   wenige Matches, um eine Trefferquote zu tragen. Er vergleicht immer die
@@ -181,6 +184,9 @@
     .dist .track > .fill { background: var(--theme-danger, #e57b7b); }
 
     h2 { font-size: 1.02em; margin: 0 0 3px; }
+    .sub-h { font-size: 0.76em; letter-spacing: 0.09em; text-transform: uppercase;
+             color: var(--theme-text-dim, #8a7d99); font-weight: 500;
+             margin: 20px 0 3px; }
     .sub { font-size: 0.82em; color: var(--theme-text-dim, #8a7d99); margin: 0 0 13px; }
     .foot { font-size: 0.8em; color: var(--theme-text-dim, #8a7d99); margin-top: 11px; }
     .err { color: var(--theme-danger, #e57b7b); }
@@ -258,6 +264,20 @@
     <h2>Deaths — when, how, by whom</h2>
     <p class="sub" id="deathSub"></p>
     <div class="dists" id="dists"></div>
+    <h3 class="sub-h">By map</h3>
+    <p class="sub">Raw death counts only say where you play a lot — Erangel
+      always tops that list. The rate per match is what separates "played
+      often" from "goes badly here".</p>
+    <div class="scroll">
+      <table>
+        <thead><tr>
+          <th>Map</th><th>Matches</th><th>Deaths</th>
+          <th title="Deaths per 100 matches on that map">Deaths/match</th>
+          <th>Median survival</th>
+        </tr></thead>
+        <tbody id="mapRows"></tbody>
+      </table>
+    </div>
   </div>
 
   <div class="t-card" id="cohortCard" hidden>
@@ -274,46 +294,6 @@
       </table>
     </div>
     <p class="foot" id="cohortFoot"></p>
-  </div>
-
-  <div class="t-card" id="poiCard" hidden>
-    <h2>Landing spots</h2>
-    <p class="sub">Numbers only. For these spots <em>on the map</em> —
-      heatmap, scatter per player, flight-path filter — open the
-      <a href="../landing-spots">Landing Spot Analyzer</a>; it shows the same
-      verdict next to each spot.</p>
-    <p class="sub" id="poiSub"></p>
-    <div>
-      <span class="legend">Per map</span>
-      <div class="switch" id="topSwitch" role="group" aria-label="Spots per map">
-        <button type="button" data-top="3" aria-pressed="false">Top 3</button>
-        <button type="button" data-top="5" aria-pressed="true">Top 5</button>
-        <button type="button" data-top="0" aria-pressed="false">All</button>
-      </div>
-    </div>
-    <div>
-      <span class="legend">Min. landings</span>
-      <div class="minrow">
-        <div class="switch" id="minSwitch" role="group"
-             aria-label="Minimum landings per spot">
-          <button type="button" data-min="auto" aria-pressed="true"
-                  title="5 % of your landings on that map — per map, so small maps stay visible">Auto</button>
-          <button type="button" data-min="1" aria-pressed="false">1</button>
-          <button type="button" data-min="5" aria-pressed="false">5</button>
-          <button type="button" data-min="20" aria-pressed="false">20</button>
-          <button type="button" data-min="50" aria-pressed="false">50</button>
-        </div>
-        <input id="fPoiMin" type="number" min="1" max="999" placeholder="auto"
-               aria-label="Minimum landings, exact value">
-      </div>
-    </div>
-    <div class="scroll">
-      <table>
-        <thead id="poiHead"><tr></tr></thead>
-        <tbody id="poiRows"></tbody>
-      </table>
-    </div>
-    <p class="foot" id="poiFoot"></p>
   </div>
 
   <div class="t-card" id="trendCard" hidden>
@@ -342,31 +322,6 @@
     let PLAYER = PubgUI.qs("player", "");
     let MIN    = parseInt(PubgUI.qs("minMatches", "20"), 10) || 20;
     let REF    = PubgUI.qs("ref", "lobby");
-    let TOPN   = parseInt(PubgUI.qs("top", "5"), 10);
-    if (![0, 3, 5].includes(TOPN)) TOPN = 5;
-    // Mindestzahl eigener Landungen, damit ein Platz in der Tabelle steht.
-    // Rein clientseitig: die Daten liegen schon da, ein Reload waere
-    // Verschwendung und der Filter soll sofort reagieren.
-    //
-    // Ohne Vorgabe leitet sich die Schwelle aus der Zahl der Matches im
-    // gewaehlten Zeitraum ab: ein Platz zaehlt, wenn er mindestens diesen
-    // Anteil der Runden traegt. Bei 11 Matches sind das 1, bei 80 dann 4.
-    // Sobald der Nutzer eingreift, bleibt sein Wert stehen — auch beim
-    // Wechsel des Zeitraums.
-    const POIMIN_SHARE = 0.05;
-    // Deckel: 5 % von 400 Landungen sind schon 20, und ab
-    // RELIABLE_POI_DROPS ist eine Zeile ohnehin belastbar — mehr Schwelle
-    // bringt keine Qualität, nur Verlust.
-    const POIMIN_CAP = 20;
-    // Die Schwelle rechnet je KARTE, nicht über alle Matches. Über alle
-    // gerechnet wäre sie bei 1113 Matches 56, und Deston mit insgesamt 36
-    // Landungen fiele komplett heraus — die Karte, auf der man am
-    // gestreutesten landet, verschwindet dann als erste. Je Karte ergibt
-    // Erangel 17 (349 Landungen) und Deston 2 (36).
-    const autoMin = (landings) => Math.min(POIMIN_CAP,
-      Math.max(1, Math.round((landings || 0) * POIMIN_SHARE)));
-    // null = Auto je Karte, Zahl = derselbe Wert für alle Karten
-    let POIMIN = parseInt(PubgUI.qs("poiMin", ""), 10) || null;
     let DATA   = null;
 
     const n0 = (v) => v == null ? "—" : Math.round(v).toLocaleString("en-US");
@@ -654,7 +609,9 @@
         + "are the more reliable figure.";
     }
 
-    // ── Landing spots ───────────────────────────────────────────────────────
+    // Kartennamen fuer die Todes-Aufschluesselung. Landeplaetze zeigt
+    // dieses Tool nicht mehr — dafuer gibt es den Landing Spot Analyzer,
+    // wo Karte und Bewertung zusammenstehen.
     const MAP_LABEL = {
       Baltic_Main: "Erangel", Erangel_Main: "Erangel", Desert_Main: "Miramar",
       Savage_Main: "Sanhok", DihorOtok_Main: "Vikendi", Tiger_Main: "Taego",
@@ -665,234 +622,29 @@
     // Spalten der POI-Tabelle: key zum Sortieren, fmt zum Anzeigen.
     // `text: true` sortiert alphabetisch aufsteigend, alles andere
     // numerisch absteigend — der interessante Wert steht dann oben.
-    // `good` sagt, welche Richtung die bessere ist — die Tabelle mischt
-    // zwangsläufig beide (Überlebenszeit hoch, Platzierung niedrig), und
-    // ohne Marker muss der Leser jede Spalte einzeln durchdenken.
-    const POI_COLS = [
-      { key: "poi", label: "Landing spot", text: true },
-      { key: "map", label: "Map", text: true },
-      { key: "drops", label: "Your drops",
-        help: "How often you landed here" },
-      { key: "squadHeldPct", label: "Squad held", good: "up",
-        help: "Share of rounds where your squad was NOT wiped within 5 min of your landing. High = the spot works for your team. Solo rounds excluded — there it would just mirror \u201cyou died\u201d" },
-      { key: "earlyDeathPct", label: "You died", good: "down",
-        help: "Share of your rounds from here where YOU die (not knocked, not the squad) within 5 min of your landing, inside the spot itself" },
-      { key: "diedAlonePct", label: "Died alone", good: "down",
-        help: "You are dead while the squad held the spot. High next to a high \u201cSquad held\u201d means the spot is fine and you are the one losing it" },
-      { key: "lobbyEarlyPct", label: "Lobby", good: "down",
-        help: "\u201cYou died\u201d measured per player for everyone who lands here, each against their own landing" },
-      { key: "diff", label: "Diff", good: "down",
-        help: "Your death rate minus the lobby rate at the same spot. Negative = you do better here than the average player who lands here" },
-      { key: "survivalMin", label: "\u00d8 Survival", good: "up" },
-      { key: "avgKills", label: "\u00d8 Kills", good: "up" },
-      { key: "avgDamage", label: "\u00d8 Damage", good: "up" },
-      { key: "avgPlace", label: "\u00d8 Place", good: "down" },
-    ];
-    let POI_SORT = "drops";
-    let POI_DIR = -1;
-
-    function poiHeadHtml() {
-      return "<tr>" + POI_COLS.map(c => {
-        const active = c.key === POI_SORT;
-        const arrow = active ? (POI_DIR < 0 ? "\u25bc" : "\u25b2") : "";
-        const aria = active ? (POI_DIR < 0 ? "descending" : "ascending") : "none";
-        const dir = c.good
-          ? `<span class="goal" aria-hidden="true">${
-              c.good === "up" ? "\u2191" : "\u2193"}</span>` : "";
-        const goalNote = c.good
-          ? ` (${c.good === "up" ? "higher" : "lower"} is better)` : "";
-        return `<th data-sort="${c.key}" tabindex="0" aria-sort="${aria}"`
-          + ` class="sortable${active ? " active" : ""}"`
-          + ` title="${esc((c.help || c.label) + goalNote)}"`
-          + `>${esc(c.label)}${dir}`
-          + `<span class="sort-arrow">${arrow}</span></th>`;
-      }).join("") + "</tr>";
-    }
-
-    function poiCompare(a, b) {
-      const col = POI_COLS.find(c => c.key === POI_SORT) || POI_COLS[2];
-      const va = a[POI_SORT], vb = b[POI_SORT];
-      if (col.text) return String(va || "").localeCompare(String(vb || "")) * POI_DIR;
-      // Fehlende Werte immer nach unten, egal in welche Richtung sortiert
-      // wird — sonst fuehren leere Zellen die Tabelle an.
-      if (va == null && vb == null) return 0;
-      if (va == null) return 1;
-      if (vb == null) return -1;
-      return (va - vb) * POI_DIR;
-    }
-
-    function onPoiSort(th) {
-      const key = th.dataset.sort;
-      const col = POI_COLS.find(c => c.key === key);
-      if (POI_SORT === key) POI_DIR *= -1;
-      else { POI_SORT = key; POI_DIR = col && col.text ? 1 : -1; }
-      renderPois();
-      const again = document.querySelector(`#poiHead th[data-sort="${key}"]`);
-      if (again) again.focus();
-    }
-
-    function renderPois() {
-      const d = DATA.landings || {};
-      const all = d.byPoi || [];
-      document.getElementById("poiCard").hidden = !all.length;
-      if (!all.length) return;
-      document.getElementById("poiHead").innerHTML = poiHeadHtml();
-
-      // Schwelle je Karte auflösen: fester Wert, oder 5 % der eigenen
-      // Landungen auf genau dieser Karte.
-      const mapInfo = new Map((d.perMap || []).map(m => [m.map, m]));
-      const minFor = (map) => POIMIN
-        || autoMin((mapInfo.get(map) || {}).landings);
-
-      // Nach Häufigkeit sortieren, NICHT nach Differenz. Die Differenz
-      // streut bei kleinen Stichproben heftig — an Prod-Daten führten
-      // 5-Drop-Plätze die Liste mit +30 an, während der eine wirklich
-      // auffällige Platz (86 Drops, +3,5) darunter verschwand.
-      const sorted = all.slice().sort(poiCompare);
-
-      // Nach Karte gruppieren: sonst verdrängt die meistgespielte Karte
-      // alle anderen aus der Liste. Die Sortierung wirkt INNERHALB jeder
-      // Karte — die Gruppierung bleibt also erhalten, egal welche Spalte
-      // sortiert. Kartenreihenfolge immer nach eigenen Drops.
-      const groups = new Map();
-      for (const r of sorted) {
-        if (!groups.has(r.map)) groups.set(r.map, []);
-        groups.get(r.map).push(r);
-      }
-      const byMap = [...groups.entries()]
-        .map(([map, rs]) => {
-          const thr = minFor(map);
-          const kept = rs.filter(r => r.drops >= thr);
-          return { map, rows: kept, threshold: thr,
-                   dropped: rs.length - kept.length,
-                   total: rs.reduce((s, r) => s + r.drops, 0) };
-        })
-        .filter(g => g.rows.length)
-        .sort((a, b) => b.total - a.total);
-
-      if (!byMap.length) {
-        document.getElementById("poiRows").innerHTML =
-          `<tr><td colspan="12">No spot reaches the minimum — lower it.</td></tr>`;
-        document.getElementById("poiSub").innerHTML =
-          `All ${n0(all.length)} spots filtered out by the minimum.`;
-        document.getElementById("poiFoot").textContent = "";
-        return;
-      }
-
-      const rowHtml = (r) => {
-        const cls = r.diff == null ? ""
-          : (r.diff > 3 ? "diff-bad" : (r.diff < -3 ? "diff-good" : ""));
-        // Ich tot, Squad hält den Platz: der Fall, in dem nicht der Platz
-        // das Problem ist. Markiert, sobald das in mindestens 15 % der
-        // Runden passiert und das Squad mehrheitlich stand.
-        const solo = r.diedAlonePct;
-        const soloCls = (solo != null && solo >= 15
-                         && (r.squadHeldPct ?? 0) >= 50) ? "diff-bad" : "";
-        // Haltequote grün, wenn das Squad den Platz klar behauptet.
-        const heldCls = r.squadHeldPct == null ? ""
-          : (r.squadHeldPct >= 75 ? "diff-good"
-             : (r.squadHeldPct < 50 ? "diff-bad" : ""));
-        const sign = r.diff == null ? "—"
-          : (r.diff > 0 ? "+" : "\u2212") + Math.abs(r.diff).toFixed(1);
-        return `<tr class="${r.reliable ? "" : "thin"}">
-          <td>${esc(r.poi)}${r.subAreas > 1
-              ? ` <span class="tag">${r.subAreas} areas</span>` : ""}${
-              r.reliable ? "" : ' <span class="tag">thin</span>'}</td>
-          <td>${esc(MAP_LABEL[r.map] || r.map)}</td>
-          <td>${n0(r.drops)}</td>
-          <td class="${heldCls}">${r.squadHeldPct == null ? "—"
-              : pct(r.squadHeldPct)
-                + `<span class="d"> (${n0(r.squadRounds)})</span>`}</td>
-          <td>${pct(r.earlyDeathPct)}</td>
-          <td class="${soloCls}">${r.diedAlonePct == null ? "—"
-              : pct(r.diedAlonePct)}</td>
-          <td>${r.lobbyEarlyPct == null ? "—" : pct(r.lobbyEarlyPct)
-                + `<span class="d"> (${n0(r.lobbyDrops)})</span>`}</td>
-          <td class="${cls}">${sign}</td>
-          <td>${n1(r.survivalMin)}</td>
-          <td>${n2(r.avgKills)}</td>
-          <td>${n0(r.avgDamage)}</td>
-          <td>${n1(r.avgPlace)}</td>
+    // ── Tode je Karte ───────────────────────────────────────────────────────
+    function renderDeathMaps() {
+      const rows = (DATA.deaths || {}).byMap || [];
+      const host = document.getElementById("mapRows");
+      if (!rows.length) { host.innerHTML = ""; return; }
+      // Die schlechteste Rate markieren, aber nur wo genug Matches liegen —
+      // bei drei Runden auf einer Karte ist die Rate Rauschen.
+      const solid = rows.filter(r => (r.matches || 0) >= 20 && r.deathRate != null);
+      const worst = solid.length
+        ? solid.reduce((a, b) => a.deathRate >= b.deathRate ? a : b) : null;
+      host.innerHTML = rows.map(r => {
+        const thin = (r.matches || 0) < 20;
+        const med = r.medianSurvivalSecs;
+        return `<tr class="${thin ? "thin" : ""}">
+          <td>${esc(MAP_LABEL[r.map] || r.map)}${thin
+              ? ' <span class="tag">thin</span>' : ""}</td>
+          <td>${n0(r.matches)}</td>
+          <td>${n0(r.deaths)}</td>
+          <td class="${r === worst ? "diff-bad" : ""}">${
+              r.deathRate == null ? "—" : r.deathRate.toFixed(0) + " %"}</td>
+          <td>${med == null ? "—" : (med / 60).toFixed(1) + " min"}</td>
         </tr>`;
-      };
-
-      // Gruppenzeilen in EINEM tbody, nicht mehrere tbody per outerHTML:
-      // outerHTML ersetzt #poiRows selbst, dann findet der nächste Render
-      // (Top-N-Wechsel) das Element nicht mehr.
-      // Die Kartenzeile nennt die ECHTE Zahl der Landungen auf dieser
-      // Karte, nicht die Summe der gezeigten Zeilen — sonst liest sie sich
-      // wie die Gesamtzahl und untertreibt teils um das Dreifache.
-      document.getElementById("poiRows").innerHTML = byMap.map(g => {
-        const shown = TOPN > 0 ? g.rows.slice(0, TOPN) : g.rows;
-        const rest = g.rows.length - shown.length;
-        const info = mapInfo.get(g.map);
-        const total = info ? info.landings : g.total;
-        const terrain = info ? info.landings - info.assigned : 0;
-        const allSpots = g.rows.length + g.dropped;
-        const bits = [`${n0(total)} landing${total === 1 ? "" : "s"}`,
-                      `${allSpots} spot${allSpots === 1 ? "" : "s"}`];
-        if (rest > 0) bits.push(`${rest} spot${rest === 1 ? "" : "s"} below`);
-        // Was der Mindestfilter geschluckt hat, muss dastehen — sonst
-        // sieht die Karte aus wie weniger bespielt als sie ist. Und die
-        // Schwelle gehört dazu, weil sie je Karte anders ausfällt.
-        if (g.dropped > 0) bits.push(`${g.dropped} under ${g.threshold}`);
-        if (terrain > 0) bits.push(`${n0(terrain)} in open terrain`);
-        return `<tr class="map-head"><th colspan="12">
-            ${esc(MAP_LABEL[g.map] || g.map)}
-            <span class="mh-n">· ${bits.join(" · ")}</span>
-          </th></tr>`
-          + shown.map(rowHtml).join("");
       }).join("");
-
-      // Der Aufmacher nur aus belastbaren Zeilen — sonst meldet er einen
-      // Zufallsausschlag als größten Fund.
-      // Aus ALLEN Zeilen, nicht nur den sichtbaren: der Aufmacher soll den
-      // groessten belastbaren Fund nennen, auch wenn die Schwelle gerade
-      // hochgedreht ist.
-      const solid = all.filter(r => r.reliable && r.diff != null);
-      const worst = solid.slice().sort((a, b) => b.diff - a.diff)[0];
-      const lead = (worst && worst.diff > 3)
-        ? `Biggest reliable outlier: <b>${esc(worst.poi)}</b> — you die there`
-          + ` in ${pct(worst.earlyDeathPct)} of your ${n0(worst.drops)} rounds,`
-          + ` the average player who lands there in`
-          + ` ${pct(worst.lobbyEarlyPct)}. `
-        : "";
-      const totalLandings = (d.perMap || []).reduce(
-        (s, m) => s + m.landings, 0);
-      const minNote = POIMIN
-        ? `<b>Min. landings</b> is fixed at ${n0(POIMIN)} on every map — `
-          + `clear the field or press Auto for per-map.`
-        : `<b>Min. landings</b> on Auto is `
-          + `${Math.round(POIMIN_SHARE * 100)} % of your landings on `
-          + `<em>that</em> map, capped at ${POIMIN_CAP}. Per map, so a map you `
-          + `rarely play does not vanish behind the ones you play most — `
-          + `each map row names its own threshold.`;
-      document.getElementById("poiSub").innerHTML = lead
-        + `<b>${n0(d.ownDrops)}</b> of your <b>${n0(totalLandings)}</b> `
-        + `landings matched to a named spot, lobby reference from `
-        + `<b>${n0(d.assigned)}</b> landings by all players. Rows under `
-        + `${d.reliableDrops} drops are marked <b>thin</b> — their difference `
-        + `to the lobby swings by tens of points. `
-        + minNote;
-      document.getElementById("poiFoot").innerHTML =
-        "<b>You died</b> counts one thing only: <b>you personally dead</b> — "
-        + "not knocked-and-revived, and regardless of how the squad fought. "
-        + "A round counts when the kill lands within 5 minutes of your own "
-        + "landing AND inside the spot itself; rotating out and dying "
-        + "elsewhere does not count. <b>Lobby</b> is the same measure applied "
-        + "per player to everyone who lands there, each against their own "
-        + "landing time. <b>Diff</b> is the difference — that separates "
-        + "\"tough spot\" from \"I lose the fight here\". "
-        + "<b>Squad held</b> is the share of rounds where your squad was NOT "
-        + "wiped inside your own 5-minute window — measured against YOUR "
-        + "landing, because the question is how this fight went, and this "
-        + "fight is yours. The count in brackets is the rounds with a squad "
-        + "(solo rounds are left out). A high <b>Squad held</b> next to a "
-        + "high <b>Died alone</b> is the clearest signal on this page: the "
-        + "spot works for the team, and you are the one losing it. The arrow "
-        + "in each header shows which direction is better. Sub-areas count "
-        + "separately: \"Cavala - Warehouses\" is its own row, not part of "
-        + "\"Cavala\".";
     }
 
     // ── Trend ───────────────────────────────────────────────────────────────
@@ -930,7 +682,7 @@
       renderPhases();
       renderDeaths();
       renderCohort();
-      renderPois();
+      renderDeathMaps();
       renderTrend();
     }
 
@@ -948,8 +700,8 @@
         const me = DATA.me || {};
         if (!me.matches) {
           st.textContent = "No BR matches in this range — widen it?";
-          ["kpiCard", "rankCard", "phaseCard", "deathCard", "cohortCard",
-           "poiCard", "trendCard"].forEach(
+          ["kpiCard", "rankCard", "phaseCard",
+           "deathCard", "cohortCard", "trendCard"].forEach(
              id => document.getElementById(id).hidden = true);
           return;
         }
@@ -962,8 +714,8 @@
       } catch (e) {
         st.classList.add("err");
         st.textContent = "Error: " + (e && e.message || e);
-        ["kpiCard", "rankCard", "phaseCard", "deathCard", "cohortCard",
-         "poiCard", "trendCard"].forEach(
+        ["kpiCard", "rankCard", "phaseCard",
+         "deathCard", "cohortCard", "trendCard"].forEach(
            id => document.getElementById(id).hidden = true);
       }
     }
@@ -975,46 +727,6 @@
       press(e.currentTarget, "range", RANGE);
       load();
     });
-    document.getElementById("minSwitch").addEventListener("click", e => {
-      const b = e.target.closest("button[data-min]");
-      if (!b) return;
-      // null = Auto, also 5 % je Karte im Renderer
-      POIMIN = b.dataset.min === "auto" ? null : Number(b.dataset.min);
-      document.getElementById("fPoiMin").value = POIMIN || "";
-      press(e.currentTarget, "min", POIMIN ? String(POIMIN) : "auto");
-      if (DATA) renderPois();
-    });
-    document.getElementById("fPoiMin").addEventListener("input", e => {
-      const v = parseInt(e.target.value, 10);
-      POIMIN = v > 0 ? v : null;   // leeres Feld heisst zurueck auf Auto
-      press(document.getElementById("minSwitch"), "min",
-            POIMIN ? String(POIMIN) : "auto");
-      if (DATA) renderPois();
-    });
-    document.getElementById("poiHead").addEventListener("click", e => {
-      const th = e.target.closest("th[data-sort]");
-      if (th) onPoiSort(th);
-    });
-    document.getElementById("poiHead").addEventListener("keydown", e => {
-      if (e.key !== "Enter" && e.key !== " ") return;
-      const th = e.target.closest("th[data-sort]");
-      if (th) { e.preventDefault(); onPoiSort(th); }
-    });
-    document.getElementById("topSwitch").addEventListener("click", e => {
-      const b = e.target.closest("button[data-top]");
-      if (!b || Number(b.dataset.top) === TOPN) return;
-      TOPN = Number(b.dataset.top);
-      press(e.currentTarget, "top", String(TOPN));
-      if (DATA) renderPois();
-    });
-    document.getElementById("refSwitch").addEventListener("click", e => {
-      const b = e.target.closest("button[data-ref]");
-      if (!b || b.dataset.ref === REF) return;
-      REF = b.dataset.ref;
-      press(e.currentTarget, "ref", REF);
-      if (DATA) renderRanks();
-    });
-
     let _t;
     document.getElementById("fPlayer").addEventListener("input", e => {
       PLAYER = e.target.value;
@@ -1030,10 +742,6 @@
     document.getElementById("fMin").value = MIN;
     press(document.getElementById("rangeSwitch"), "range", RANGE);
     press(document.getElementById("refSwitch"), "ref", REF);
-    press(document.getElementById("topSwitch"), "top", String(TOPN));
-    document.getElementById("fPoiMin").value = POIMIN || "";
-    press(document.getElementById("minSwitch"), "min",
-          POIMIN ? String(POIMIN) : "auto");
     load();
   </script>
 </body>

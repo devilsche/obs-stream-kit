@@ -3217,15 +3217,20 @@ class EndpointRegistry:
                       if range_key != "all" else "1970-01-01T00:00:00Z"))
 
         group_sub = qs.get("groupSubareas") == "1"
+        # Landeplaetze kosten rund zwei Sekunden und werden nur vom
+        # Landing-Spot-Analyzer gebraucht — das Shot-Quality-Tool zeigt sie
+        # nicht mehr, dort steht die Karten-Ebene im Todesbild.
+        with_landings = qs.get("withLandings") == "1"
 
         cache_key = (f"shot-quality:{account_id}:{range_key}:{from_iso or ''}:"
-                     f"{to_iso or ''}:{min_matches}:{int(group_sub)}")
+                     f"{to_iso or ''}:{min_matches}:{int(group_sub)}:"
+                     f"{int(with_landings)}")
         data = self.cache.get_or_compute(
             cache_key,
             lambda: compute_shot_quality(
                 conn, self.tenant_id, account_id, cutoff,
                 to_iso=to_iso, min_matches=min_matches,
-                group_subareas=group_sub),
+                group_subareas=group_sub, with_landings=with_landings),
             ttl=300)
         return _ok({**data, "range": range_key, "from": cutoff,
                     "accountId": account_id,

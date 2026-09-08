@@ -513,6 +513,13 @@ zusätzlich das eigene Ergebnis pro Platz — Drops, *Squad held*, *You died*,
 Größen und Richtungen wie in `shot-quality`, damit man nicht zwei Sprachen
 lernt.
 
+Hat ein Unterbereich keine eigenen Landungen, aber der Oberplatz welche,
+steht dort **nicht** „nichts hier", sondern ein Verweis: „Your landings here
+are counted under **Bootyard** — 86 drops there", als Knopf, der hinspringt
+und den Ort auf der Karte hervorhebt. Auf Erangel betrifft das 21 der 100
+Regionen (`Bootyard - Warehouses`, `Bootyard - Shop`, `Pochinki - B` …) —
+ohne den Verweis las sich eine Polygon-Grenze wie „hier war ich nie".
+
 **Klick auf einen Landeplatz zentriert ihn auf der Karte** (Zoom mindestens
 3×, eine höhere bleibt erhalten) — das war der fehlende Weg zwischen Zahl
 und Ort. Hover hebt ihn wie zuvor nur hervor.
@@ -582,61 +589,17 @@ archivierter Telemetrie — die Schusswerte ruhen auf diesen 95.
 einsortiert. Bewusst über den ganzen Bestand statt über den gewählten Zeitraum,
 damit die Referenz beim Range-Wechsel nicht springt.
 
-*Landing spots* — eigene Landeplätze gegen die Lobby **am selben Ort**. Die
-eigene Frühtod-Quote allein sagt nur, ob ein Platz umkämpft ist; erst die
-Differenz zur Lobby-Quote desselben POI trennt „schwieriger Platz" von „ich
-verliere hier den Landefight". Sortiert nach dieser Differenz, nicht nach
-Häufigkeit — der auffällige Platz steht oben.
+*Deaths* enthält auch die **Karten-Ebene**: Matches, Tode und Todesrate je
+Karte. Rohe Todeszahlen sagen nur, wo man viel spielt — Erangel führt die
+Liste immer an; erst die Rate pro Match trennt „viel gespielt" von „läuft
+dort schlecht". Karten unter 20 Matches sind als `thin` markiert und aus der
+Markierung der schlechtesten Rate ausgenommen.
 
-Ein Tod zählt nur, wenn er **binnen fünf Minuten nach der Landung UND im
-Landeplatz selbst** passiert. Beide Bezugspunkte sind bewusst gewählt: die
-Landezeit statt des Rundenstarts, damit die eigene und die Lobby-Quote
-dasselbe messen, und die Ortsbindung, weil wer wegrotiert und woanders fällt
-den Landefight nicht dort verloren hat.
-
-Gruppiert nach Karte (Karten nach eigenen Landungen), je Karte umschaltbar
-Top 3 / Top 5 / alle, dazu **Min. landings** als Schwelle — Plätze mit
-weniger eigenen Landungen fallen raus, und die Kartenzeile weist aus wie
-viele. Auf **Auto** ist die Schwelle **5 % der eigenen Landungen auf genau
-dieser Karte**, gedeckelt bei 20 — je Karte, nicht über alle Matches.
-Erangel bekommt so 17 (349 Landungen), Deston 2 (36), Karakin 1 (15), und
-alle neun Karten bleiben sichtbar.
-
-Über alle Matches gerechnet wäre die Schwelle bei 1113 Matches 56 gewesen
-und hätte 2 von 133 Plätzen auf 2 von 9 Karten übrig gelassen: die Karten,
-auf denen man am gestreutesten landet, verschwinden dabei als erste — also
-genau die, wo die Auswertung am meisten zu sagen hätte. Der Deckel bei 20
-greift, weil ab `RELIABLE_POI_DROPS` eine Zeile ohnehin belastbar ist.
-
-Vorauswahl Auto / 1 / 5 / 20 / 50 plus Eingabefeld für einen festen Wert
-über alle Karten; leeres Feld heißt zurück auf Auto. Jede Kartenzeile nennt
-die für sie geltende Schwelle. Sortierbar über alle Spalten; die Sortierung wirkt innerhalb jeder
-Kartengruppe, die Gruppierung bleibt stehen. Jede Wertspalte trägt einen
-Pfeil für die bessere Richtung, weil die Tabelle beide mischt.
-
-**Squad held** ist die Haltequote: Anteil der Runden, in denen das Squad
-*nicht* ausgelöscht wurde, gemessen im Fenster nach der **eigenen**
-Landung — die Frage ist der Ausgang dieses Gefechts, und das ist das
-eigene. Solo-Runden fallen aus dem Nenner. **Died alone** ist der
-Diagnosewert: ich tot, Squad hält. Ein hoher Wert neben hohem *Squad held*
-ist das klarste Signal der Seite — der Platz funktioniert, der Spieler
-verliert ihn. An Prod-Daten trifft das Bootyard und Mylta mit je 16,3 %,
-während Fishing Camp South bei 0 % liegt.
-
-Unterbereiche (`"Cavala - Warehouses"`) zählen getrennt. Zusammenfassen am
-`" - "`-Trenner kann `landing_stats(group_subareas=True)` bzw. der
-URL-Parameter `?groupSubareas=1` — im UI gibt es dafür keinen Schalter,
-weil der Effekt zu klein ist: über alle Karten 133 statt 127 Zeilen, auf
-Erangel keine einzige Zusammenfassung. Beim Gruppieren wird die
-Lobby-Referenz mitgefaltet, sonst stehen zusammengefasste eigene Drops
-gegen nur einen Unterbereich.
-
-Geometrie aus `data/pubg-pois.json` über `pubg/poi_match.py` — dieselbe Quelle
-wie POI-Editor und Landing-Heatmap, keine zweite Wahrheit. Läuft komplett live:
-die Bounding-Box-Vorfilterung ordnet 139.000 Landungen aller Karten in unter
-einer Sekunde zu, eine vorberechnete Tabelle wäre unnötiger Ballast. Erangel
-heißt in der Telemetrie teils `Erangel_Main` und in der POI-Datei
-`Baltic_Main`; `MAP_ALIASES` gleicht das ab.
+Einzelne **Landeplätze zeigt dieses Tool nicht** — die gehören zum
+[Landing Spot Analyzer](#toolslanding-spotshtml--landing-spot-analyzer), wo
+die Karte danebensteht. `landing_stats` bleibt im Modul und wird über
+`?withLandings=1` geliefert; ohne den Parameter entfällt der Aufruf und
+`shot-quality` spart die rund zwei Sekunden.
 
 *Trend* — die letzten 20 / 50 / 100 Matches gegen die gleich langen davor.
 **Nicht** an `range` gekoppelt: eine Session hat zu wenige Matches, um eine
