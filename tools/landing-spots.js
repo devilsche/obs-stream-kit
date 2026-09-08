@@ -950,6 +950,43 @@ function onSpotSort(th) {
   if (again) again.focus();
 }
 
+//: Anteil der kurzen Canvas-Kante, den ein angeklickter Ort hoechstens
+//: einnimmt — der Rest ist Rand, damit die Umgebung mit im Bild ist.
+const FIT_FRACTION = 0.6;
+//: Deckel, damit winzige Orte nicht bis zur Unkenntlichkeit aufziehen:
+//: "Bootyard - Shop" ist 53 m breit und wuerde formelgerecht auf Zoom 91
+//: gehen, wo von der Karte nur noch Textur uebrig ist.
+const FIT_ZOOM_MAX = 8;
+
+/** Zoom, bei dem der ganze Ort ins Bild passt.
+ *
+ * Vorher stand hier ein festes Math.max(zoom, 3). Das zoomte grosse Orte
+ * ueber den Rand hinaus — "Sosnovka Island" ist 3.475 m breit und braucht
+ * Zoom 1,4 — und liess einen vorher hoeheren Zoom einfach stehen, sodass
+ * der Sprung von einem kleinen zu einem grossen Ort viel zu nah blieb.
+ */
+function poiBox(poi) {
+  const sh = poi && poi.shape;
+  if (!sh || sh.length < 3) return null;
+  let x0 = 1, x1 = 0, y0 = 1, y1 = 0;
+  for (const [x, y] of sh) {
+    if (x < x0) x0 = x;
+    if (x > x1) x1 = x;
+    if (y < y0) y0 = y;
+    if (y > y1) y1 = y;
+  }
+  return { x0, x1, y0, y1,
+           cx: (x0 + x1) / 2, cy: (y0 + y1) / 2,
+           extent: Math.max(x1 - x0, y1 - y0) };
+}
+
+function fitZoom(poi) {
+  const b = poiBox(poi);
+  if (!b) return 3;                           // ohne Umriss wie bisher
+  if (!(b.extent > 0)) return FIT_ZOOM_MAX;
+  return Math.max(1, Math.min(FIT_ZOOM_MAX, FIT_FRACTION / b.extent));
+}
+
 //: Ort auf der Karte zentrieren. Invertiert die projXY-Formel; poi.cx/cy
 //: kommen schon normalisiert (0-1) aus dem Backend.
 function centreOnPoi(poi) {
@@ -957,9 +994,14 @@ function centreOnPoi(poi) {
   const cnv = document.getElementById("heat");
   const base = Math.min(cnv.width, cnv.height);
   const offX = (cnv.width - base) / 2, offY = (cnv.height - base) / 2;
-  LS.view.zoom = Math.max(LS.view.zoom, 3);
+  LS.view.zoom = fitZoom(poi);
   const z = LS.view.zoom;
-  const px = offX + poi.cx * base, py = offY + poi.cy * base;
+  // Mitte der Ausdehnung, nicht der Schwerpunkt: bei gestreckten oder
+  // L-foermigen Umrissen liegt der Schwerpunkt weit ausserhalb der
+  // Boxmitte, und der Ort ragte trotz passendem Zoom aus dem Bild.
+  const b = poiBox(poi);
+  const ncx = b ? b.cx : poi.cx, ncy = b ? b.cy : poi.cy;
+  const px = offX + ncx * base, py = offY + ncy * base;
   LS.view.panX = cnv.width / 2 - ((px - cnv.width / 2) * z + cnv.width / 2);
   LS.view.panY = cnv.height / 2 - ((py - cnv.height / 2) * z + cnv.height / 2);
 }
