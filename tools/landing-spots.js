@@ -689,10 +689,14 @@ function renderSpotTable() {
   // "\u21b3 Bootyard - Warehouses" direkt unter Lipovka behauptet eine
   // Zugehoerigkeit, die es nicht gibt. Sortiert wird darum die FAMILIE,
   // Kinder stehen immer direkt unter ihrem Container.
-  // Die Hierarchie ist mehrstufig: "Georgopol - South Apartments" liegt in
-  // "Georgopol - South" liegt in "Georgopol". Eine einstufige Gruppierung
-  // reisst das auseinander, weil Enkel und Vater in verschiedenen Toepfen
-  // landen — also echter Baum, Tiefensuche beim Ausgeben.
+  // Gruppiert wird NUR bei Sortierung nach Namen. Bei jeder Zahlenspalte
+  // will man ein Ranking, und die Familie ueberstimmt es: "Hospital" mit 6
+  // eigenen Drops verschwindet unter "Georgopol" mit 0, weil der Zweig
+  // nach seiner staerksten Zeile rankt. Flach sortiert steht jede Zeile
+  // auf ihrem Wert — der Container kommt dann als Text in die Zelle statt
+  // als Einrueckung, die sonst eine Zugehoerigkeit zur Zeile darueber
+  // behauptet.
+  const grouped = SPOT_SORT === "name";
   const byName = new Map(rows.map(r => [r.name, r]));
   const childrenOf = new Map();
   const roots = [];
@@ -719,10 +723,15 @@ function renderSpotTable() {
     rankCache.set(r.name, best);
     return best;
   };
-  const flatten = (list) => list
-    .sort((a, b) => cmp(rank(a), rank(b)))
-    .flatMap(r => [r, ...flatten(childrenOf.get(r.name) || [])]);
-  rows = flatten(roots);
+  if (grouped) {
+    const flatten = (list) => list
+      .sort((a, b) => cmp(rank(a), rank(b)))
+      .flatMap(r => [r, ...flatten(childrenOf.get(r.name) || [])]);
+    rows = flatten(roots);
+  } else {
+    for (const r of rows) r.depth = 0;   // keine Einrueckung ohne Gruppen
+    rows.sort(cmp);
+  }
 
   // Die Lobby-Gesamtsicht bleibt immer ablesbar, auch wenn die Tabelle auf
   // die eigenen Plaetze gefiltert ist.
@@ -756,14 +765,19 @@ function renderSpotTable() {
       const ref = r.family && rows.some(o => o.name === r.family)
         ? r.family : null;
       let nameCell = PubgUI.esc(r.name);
-      if (ref) {
+      if (ref && grouped) {
         nameCell = `<span class="in-parent">↳</span> ` + nameCell
           + ` <button type="button" class="parent-ref"
                data-jump="${PubgUI.esc(ref)}"
                title="Part of ${PubgUI.esc(ref)} — landings count at the
                       smallest matching spot, so they show up here, not there"
                >in ${PubgUI.esc(ref)}</button>`;
-      } else if (r.kids) {
+      } else if (ref) {
+        nameCell += ` <span class="in-note"
+               title="Lies inside ${PubgUI.esc(ref)}. Sort by name to see
+                      the spots grouped."
+               >in ${PubgUI.esc(ref)}</span>`;
+      } else if (r.kids && grouped) {
         nameCell += ` <span class="kids-note" title="Landings inside the
             ${r.kids.n} spots within this one. They count there, not here."
             >+${num0(r.kids.mine)} in ${r.kids.n} inner spot${
