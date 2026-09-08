@@ -476,8 +476,8 @@ def _death_cause_label(death_ev, victim_acc, weapon_id, weapon_name,
             if e["actor_account"] != victim_acc: continue
             ets = e["timestamp_ms"] or 0
             if 0 < (death_ts - ets) < 5000:  # innerhalb 5 s vor Tod
-                return "aus Fahrzeug gesprungen"
-        return "unbekannter Selbsttod"
+                return "jumped from vehicle"
+        return "unknown self-inflicted"
 
     if not weapon_id:
         return None
@@ -492,15 +492,15 @@ def _death_cause_label(death_ev, victim_acc, weapon_id, weapon_name,
                 if e["actor_account"] != victim_acc: continue
                 ets = e["timestamp_ms"] or 0
                 if 0 < (death_ts - ets) < 5000:
-                    return "aus Fahrzeug gesprungen"
-        return "Sturz"
+                    return "jumped from vehicle"
+        return "Fall"
 
     # Ragdoll-Sprung (direkt vom Weapon-Field)
     if "RagdollPhysics" in wid or "Damage_HelpMeGroundFall" in wid:
-        return "aus Fahrzeug gesprungen" if is_self else "Ragdoll-Impact"
+        return "jumped from vehicle" if is_self else "ragdoll impact"
     # Fall-Damage
     if "Damage_Falling" in wid or "Damage_Instant_Fall" in wid:
-        return "Sturz"
+        return "Fall"
     # Zone
     if "BattleRoyaleModeController" in wid:
         return "Blue Zone"
@@ -508,13 +508,13 @@ def _death_cause_label(death_ev, victim_acc, weapon_id, weapon_name,
         return "Red Zone"
     # Ertrinken
     if "DecreaseBreathInApnea" in wid or "Drown" in wid:
-        return "ertrunken"
+        return "Drowned"
     # Vehicle-Crash als Selbst-Kill (Spieler hat eigenes Auto geschrottet)
     if is_self:
         for needle, label in _VEHICLE_PATTERNS:
             if needle in wid:
-                return f"Selbst-Crash ({label})"
-        return "Selbsttod"
+                return f"Self-crash ({label})"
+        return "Self-inflicted"
     return None
 
 
@@ -558,7 +558,7 @@ def _weapon_label(weapon_id):
         return ("Unknown", "other")
     # Punch / Melee mit Faust — PUBG kodiert das ueber den Player-Mesh
     if weapon_id in ("PlayerFemale_A_C", "PlayerMale_A_C"):
-        return ("Faust", "melee")
+        return ("Fists", "melee")
     # Explizite Lookups zuerst — case-insensitiv, siehe _weapon_ci_lookup.
     hit = _weapon_ci_lookup(weapon_id)
     if hit:

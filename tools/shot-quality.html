@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<!--
+  PUBG Shot Quality
+  ────────────────────────────────────────────────────────────────────
+  Beantwortet "wie gut sitzt jede Kugel, wann sterbe ich, und wo stehe
+  ich damit" — nicht "wie viele Kills habe ich". Quelle sind
+  match_weapon_stats, participants und telemetry_events.
+
+  Fuenf Sektionen:
+    1. Shot quality    — Trefferquote, Schaden/100 Schuss, Anteil im Gefecht
+    2. Where you rank  — Perzentil gegen Squad- und Lobby-Referenz
+    3. By round phase  — dieselben Werte je Rundenphase (early/mid/late)
+    4. Deaths          — wann, wodurch, durch wen
+    5. Cohort bands    — Mittelwerte je K/D-Band, eigene Zeile eingereiht
+
+  Der Trend ist bewusst NICHT an den Range gekoppelt: eine Session hat zu
+  wenige Matches, um eine Trefferquote zu tragen. Er vergleicht immer die
+  letzten 20/50/100 Matches gegen die gleich langen davor.
+
+  Browser-Tool, KEINE OBS-Source.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Shot Quality</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+  <link rel="stylesheet" href="/widgets-static/_theme.css">
+  <link rel="stylesheet" href="/widgets-static/_blocks.css">
+  <link rel="stylesheet" href="/widgets-static/pubg/_pubg.css">
+  <style>
+    body { padding: 20px; max-width: 1180px; margin: 0 auto;
+           background: var(--theme-bg); color: var(--theme-text); }
+
+    .bar { display: flex; flex-wrap: wrap; gap: 12px 22px; align-items: flex-end; }
+    .bar > div, .bar > label { display: flex; flex-direction: column; gap: 4px; }
+    .legend { font-size: 0.78em; color: var(--theme-text-dim, #8a7d99);
+              letter-spacing: 0.04em; }
+    .bar input { background: var(--theme-surface, #201a28);
+                 color: var(--theme-text); border: 1px solid var(--theme-line, #372c47);
+                 border-radius: 4px; padding: 5px 8px; font: inherit; min-width: 15em; }
+
+    .switch { display: flex; gap: 4px; flex-wrap: wrap; }
+    .switch button { background: var(--theme-surface, #201a28);
+                     color: var(--theme-text-dim, #8a7d99); font: inherit;
+                     border: 1px solid var(--theme-line, #372c47);
+                     border-radius: 4px; padding: 5px 11px; cursor: pointer;
+                     min-height: 30px; }
+    .switch button[aria-pressed="true"] { color: var(--theme-accent, #f2b705);
+                                          border-color: var(--theme-accent, #f2b705); }
+    .switch button:hover { color: var(--theme-text); }
+
+    .kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+            gap: 10px; }
+    .kpi { background: var(--theme-surface, #201a28); border-radius: 5px;
+           border: 1px solid var(--theme-line, #372c47);
+           padding: 11px 13px 12px; display: flex; flex-direction: column; gap: 2px; }
+    .kpi > .k { font-size: 0.7em; letter-spacing: 0.09em; text-transform: uppercase;
+                color: var(--theme-text-dim, #8a7d99); }
+    .kpi > .v { font-size: 1.45em; font-weight: 700; font-variant-numeric: tabular-nums;
+                line-height: 1.15; }
+    .kpi > .d { font-size: 0.8em; font-variant-numeric: tabular-nums; }
+    .kpi > .s { font-size: 0.76em; color: var(--theme-text-dim, #8a7d99); }
+    .kpi--weak { border-left: 3px solid var(--theme-danger, #e57b7b); }
+    .kpi--good { border-left: 3px solid var(--theme-ok, #6cc294); }
+    .up   { color: var(--theme-ok, #6cc294); }
+    .down { color: var(--theme-danger, #e57b7b); }
+
+    .ranks { display: flex; flex-direction: column; gap: 1px; }
+    .rank-row { display: grid; grid-template-columns: minmax(8rem, 13rem) 1fr 4.4rem 3.6rem;
+                gap: 6px 12px; align-items: center; padding: 5px 2px;
+                border-bottom: 1px solid var(--theme-line, #372c47); }
+    .rank-row:last-child { border-bottom: 0; }
+    .rank-row > .rk { font-size: 0.9em; }
+    .rank-row > .rv, .rank-row > .rp { font-variant-numeric: tabular-nums;
+                                       text-align: right; font-size: 0.86em; }
+    .rank-row > .rp { font-weight: 500; }
+    .track { position: relative; height: 10px; border-radius: 2px;
+             background: var(--theme-line, #2e2439); overflow: hidden; }
+    .track > .fill { position: absolute; inset: 0 auto 0 0; border-radius: 2px;
+                     background: var(--theme-primary, #7b3a9c); }
+    .rank-row[data-tier="low"]  > .track > .fill { background: var(--theme-danger, #e57b7b); }
+    .rank-row[data-tier="mid"]  > .track > .fill { background: var(--theme-text-dim, #8a7d99); }
+    .rank-row[data-tier="high"] > .track > .fill { background: var(--theme-accent, #f2b705); }
+    /* Balkenbreite ist ein Datenwert und muss pro Element variieren.
+       Projektregel: kein style-Attribut und kein JS-.style — deshalb
+       data-w in 5-%-Stufen und die Breiten hier im Stylesheet. */
+    .track > .fill[data-w="0"] { width: 0%; }
+    .track > .fill[data-w="5"] { width: 5%; }
+    .track > .fill[data-w="10"] { width: 10%; }
+    .track > .fill[data-w="15"] { width: 15%; }
+    .track > .fill[data-w="20"] { width: 20%; }
+    .track > .fill[data-w="25"] { width: 25%; }
+    .track > .fill[data-w="30"] { width: 30%; }
+    .track > .fill[data-w="35"] { width: 35%; }
+    .track > .fill[data-w="40"] { width: 40%; }
+    .track > .fill[data-w="45"] { width: 45%; }
+    .track > .fill[data-w="50"] { width: 50%; }
+    .track > .fill[data-w="55"] { width: 55%; }
+    .track > .fill[data-w="60"] { width: 60%; }
+    .track > .fill[data-w="65"] { width: 65%; }
+    .track > .fill[data-w="70"] { width: 70%; }
+    .track > .fill[data-w="75"] { width: 75%; }
+    .track > .fill[data-w="80"] { width: 80%; }
+    .track > .fill[data-w="85"] { width: 85%; }
+    .track > .fill[data-w="90"] { width: 90%; }
+    .track > .fill[data-w="95"] { width: 95%; }
+    .track > .fill[data-w="100"] { width: 100%; }
+
+    .rank-row[data-tier="low"]  > .rp { color: var(--theme-danger, #e57b7b); }
+    .rank-row[data-tier="high"] > .rp { color: var(--theme-accent, #f2b705); }
+
+    .scroll { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+    th, td { padding: 6px 9px; text-align: right; white-space: nowrap; font-size: 0.88em; }
+    th:first-child, td:first-child { text-align: left; }
+    thead th { font-size: 0.7em; letter-spacing: 0.07em; text-transform: uppercase;
+               color: var(--theme-text-dim, #8a7d99); font-weight: 500;
+               border-bottom: 1px solid var(--theme-line, #372c47); }
+    tbody tr + tr > * { border-top: 1px solid var(--theme-line, #372c47); }
+    tbody tr.me > * { background: color-mix(in srgb, var(--theme-primary, #7b3a9c) 22%, transparent); }
+    tbody tr.me > td:first-child { font-weight: 700; }
+    tbody tr.floor > * { color: var(--theme-text-dim, #8a7d99); font-style: italic; }
+    td.hi { color: var(--theme-accent, #f2b705); font-weight: 500; }
+    td.lo { color: var(--theme-danger, #e57b7b); }
+
+    .dists { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+             gap: 18px; }
+    .dist h3 { font-size: 0.76em; letter-spacing: 0.09em; text-transform: uppercase;
+               color: var(--theme-text-dim, #8a7d99); margin: 0 0 7px; font-weight: 500; }
+    .dist ul { list-style: none; margin: 0; padding: 0;
+               display: flex; flex-direction: column; gap: 4px; }
+    .dist li { display: grid; grid-template-columns: 6.5rem 1fr 3.4rem;
+               gap: 9px; align-items: center; font-size: 0.86em; }
+    .dist li > .n { text-align: right; font-variant-numeric: tabular-nums;
+                    color: var(--theme-text-dim, #8a7d99); font-size: 0.94em; }
+    .dist .track > .fill { background: var(--theme-danger, #e57b7b); }
+
+    h2 { font-size: 1.02em; margin: 0 0 3px; }
+    .sub { font-size: 0.82em; color: var(--theme-text-dim, #8a7d99); margin: 0 0 13px; }
+    .foot { font-size: 0.8em; color: var(--theme-text-dim, #8a7d99); margin-top: 11px; }
+    .err { color: var(--theme-danger, #e57b7b); }
+    .icon-sm { font-size: 1em; vertical-align: -2px; }
+
+    @media (max-width: 40rem) {
+      .rank-row { grid-template-columns: 1fr 4.2rem 3.4rem; }
+      .rank-row > .track { grid-column: 1 / -1; grid-row: 2; }
+    }
+  </style>
+</head>
+<body>
+  <h1 class="t-title">PUBG Shot Quality</h1>
+  <div class="t-subtitle">How well each bullet lands, when you die, and where that puts you</div>
+
+  <div class="t-card">
+    <div class="bar">
+      <div>
+        <span class="legend">Range</span>
+        <div class="switch" id="rangeSwitch" role="group" aria-label="Time range">
+          <button type="button" data-range="session" aria-pressed="true">Session</button>
+          <button type="button" data-range="day" aria-pressed="false">Today</button>
+          <button type="button" data-range="week" aria-pressed="false">7 days</button>
+          <button type="button" data-range="all" aria-pressed="false">All</button>
+        </div>
+      </div>
+      <label for="fPlayer">Player
+        <input id="fPlayer" type="text" placeholder="empty = me">
+      </label>
+      <label for="fMin">Cohort min. matches
+        <input id="fMin" type="number" min="1" max="200" value="20">
+      </label>
+    </div>
+    <div class="legend" id="status">Loading …</div>
+  </div>
+
+  <div class="t-card" id="kpiCard" hidden>
+    <h2>Shot quality</h2>
+    <p class="sub" id="kpiSub"></p>
+    <div class="kpis" id="kpis"></div>
+    <p class="foot" id="kpiFoot"></p>
+  </div>
+
+  <div class="t-card" id="rankCard" hidden>
+    <h2>Where you rank</h2>
+    <p class="sub" id="rankSub"></p>
+    <div>
+      <span class="legend">Reference group</span>
+      <div class="switch" id="refSwitch" role="group" aria-label="Reference group">
+        <button type="button" data-ref="lobby" aria-pressed="true">Lobby</button>
+        <button type="button" data-ref="squad" aria-pressed="false">Squad &amp; regulars</button>
+      </div>
+    </div>
+    <div class="ranks" id="ranks"></div>
+    <p class="foot" id="rankFoot"></p>
+  </div>
+
+  <div class="t-card" id="phaseCard" hidden>
+    <h2>By round phase</h2>
+    <p class="sub">Early = died before 5 min · Mid = 5–15 min · Late = over 15 min.
+      A hit rate that falls off toward the late phase points at trigger discipline
+      at range, not at aim.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr>
+          <th>Phase</th><th>Matches</th><th>Hit rate</th><th>Dmg/100</th>
+          <th>In fight</th><th>Head</th><th>Shots/match</th>
+        </tr></thead>
+        <tbody id="phaseRows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="t-card" id="deathCard" hidden>
+    <h2>Deaths — when, how, by whom</h2>
+    <p class="sub" id="deathSub"></p>
+    <div class="dists" id="dists"></div>
+  </div>
+
+  <div class="t-card" id="cohortCard" hidden>
+    <h2>Cohort bands</h2>
+    <p class="sub" id="cohortSub"></p>
+    <div class="scroll">
+      <table>
+        <thead><tr>
+          <th>K/D band</th><th>Players</th><th>K/D</th><th>Hit rate</th>
+          <th>Dmg/100</th><th>In fight</th><th>Shots/match</th><th>Damage</th>
+          <th>Survival</th><th>Dead &lt;5min</th><th>Heals</th><th>Boosts</th>
+        </tr></thead>
+        <tbody id="cohortRows"></tbody>
+      </table>
+    </div>
+    <p class="foot" id="cohortFoot"></p>
+  </div>
+
+  <div class="t-card" id="trendCard" hidden>
+    <h2>Trend</h2>
+    <p class="sub">Each window against the same number of matches before it —
+      independent of the range above, because a single session carries too few
+      matches for a hit rate.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr>
+          <th>Window</th><th>Hit rate</th><th>Dmg/100</th><th>In fight</th>
+          <th>Shots/match</th><th>Head</th>
+        </tr></thead>
+        <tbody id="trendRows"></tbody>
+      </table>
+    </div>
+    <p class="foot" id="trendFoot"></p>
+  </div>
+
+  <script src="/widgets-static/pubg/_pubg.js"></script>
+  <script>
+    const BASE = window.__SERVE_BASE__ || "/";
+    const esc = PubgUI.esc;
+
+    let RANGE  = PubgUI.qs("range", "session");
+    let PLAYER = PubgUI.qs("player", "");
+    let MIN    = parseInt(PubgUI.qs("minMatches", "20"), 10) || 20;
+    let REF    = PubgUI.qs("ref", "lobby");
+    let DATA   = null;
+
+    const n0 = (v) => v == null ? "—" : Math.round(v).toLocaleString("en-US");
+    const n1 = (v) => v == null ? "—" : v.toFixed(1);
+    const n2 = (v) => v == null ? "—" : v.toFixed(2);
+    const pct = (v) => v == null ? "—" : v.toFixed(1) + " %";
+    // Balkenbreiten laufen ueber data-w + Stylesheet (keine Inline-Styles),
+    // deshalb auf die dort definierten 5-%-Stufen runden.
+    const step5 = (v) => Math.max(0, Math.min(100,
+      Math.round((v || 0) / 5) * 5));
+
+    const PHASE_LABEL = { early: "Early (&lt;5 min)", mid: "Mid (5–15 min)",
+                          late: "Late (&gt;15 min)" };
+    const BAND_LABEL = { under_1_2: "under 1.2", "1_2_to_1_6": "1.2 – 1.6",
+                         "1_6_to_2_2": "1.6 – 2.2", over_2_2: "over 2.2" };
+
+    // Reihenfolge = Aussagekraft, nicht Alphabet: erst was jede Kugel
+    // wert ist, dann Volumen, dann das Drumherum.
+    const RANK_METRICS = [
+      ["hitRate",        "Hit rate",           pct],
+      ["dmgPer100",      "Damage per 100 shots", n0],
+      ["inFightShare",   "Shots inside a fight", pct],
+      ["headShare",      "Head hit share",     pct],
+      ["shotsPerMatch",  "Shots per match",    n0],
+      ["kd",             "K/D",                n2],
+      ["damagePerMatch", "Damage per match",   n0],
+      ["survivalMin",    "Survival (min)",     n1],
+      ["earlyDeathPct",  "Deaths before 5 min", pct],
+      ["healsPerMatch",  "Heals per match",    n2],
+      ["boostsPerMatch", "Boosts per match",   n2],
+      ["weaponsPerMatch", "Weapons picked up", n2],
+    ];
+
+    function tierOf(p) {
+      if (p == null) return "";
+      if (p < 40) return "low";
+      if (p < 65) return "mid";
+      return "high";
+    }
+
+    function ordinal(p) {
+      if (p == null) return "—";
+      const n = Math.round(p);
+      const s = ["th", "st", "nd", "rd"][(n % 100 - n % 10 !== 10) * 1 && n % 10 < 4 ? n % 10 : 0];
+      return n + s;
+    }
+
+    function deltaHtml(v, invert) {
+      if (v == null) return "";
+      const good = invert ? v < 0 : v > 0;
+      const cls = Math.abs(v) < 0.5 ? "" : (good ? "up" : "down");
+      const sign = v > 0 ? "+" : "";
+      return `<span class="${cls}">${sign}${v.toFixed(1)} %</span>`;
+    }
+
+    // ── Shot quality ────────────────────────────────────────────────────────
+    function renderKpis() {
+      const me = DATA.me || {};
+      const w20 = (DATA.trend || []).find(t => t.window === 20);
+      const d = (w20 && w20.delta) || {};
+      const cells = [
+        ["Hit rate",        pct(me.hitRate),      d.hitRate,      false, "of all shots fired"],
+        ["Damage per 100",  n0(me.dmgPer100),     d.dmgPer100,    false, "hit rate × hit weight"],
+        ["Shots in fight",  pct(me.inFightShare), d.inFightShare, false, "rest is fired at nothing"],
+        ["Head hit share",  pct(me.headShare),    d.headShare,    false, "of landed hits"],
+        ["Shots per match", n0(me.shotsPerMatch), d.shotsPerMatch, false, "engagement volume"],
+        ["Damage per match", n0(me.damagePerMatch), null,         false, ""],
+        ["K/D",             n2(me.kd),            null,           false, "kills ÷ (matches − wins)"],
+        ["Matches",         n0(me.matches),       null,           false,
+         me.telemetryMatches != null ? `${n0(me.telemetryMatches)} with telemetry` : ""],
+      ];
+      document.getElementById("kpis").innerHTML = cells.map(
+        ([k, v, delta, invert, sub]) => `
+        <div class="kpi">
+          <span class="k">${k}</span>
+          <span class="v">${v}</span>
+          ${delta != null ? `<span class="d">${deltaHtml(delta, invert)} vs previous 20</span>` : ""}
+          ${sub ? `<span class="s">${sub}</span>` : ""}
+        </div>`).join("");
+
+      document.getElementById("kpiSub").textContent = DATA.isSelf
+        ? "Your own numbers for the selected range."
+        : `${DATA.playerName || DATA.accountId} — selected range.`;
+      document.getElementById("kpiFoot").innerHTML = w20
+        ? `Deltas compare your last 20 matches with the 20 before them, so they do not move with the range switch.`
+        : `No delta yet — fewer than 40 matches with telemetry on record.`;
+      document.getElementById("kpiCard").hidden = false;
+    }
+
+    // ── Where you rank ──────────────────────────────────────────────────────
+    function renderRanks() {
+      const ranks = (DATA.ranks || {})[REF] || {};
+      const host = document.getElementById("ranks");
+      const rows = RANK_METRICS
+        .map(([key, label, fmt]) => [key, label, fmt, ranks[key]])
+        .filter(([, , , r]) => r && r.value != null && r.percentile != null)
+        .sort((a, b) => b[3].percentile - a[3].percentile);
+
+      if (!rows.length) {
+        host.innerHTML = `<p class="sub">No reference data for this group yet.</p>`;
+      } else {
+        host.innerHTML = rows.map(([key, label, fmt, r]) => `
+          <div class="rank-row" data-tier="${tierOf(r.percentile)}">
+            <span class="rk">${label}</span>
+            <span class="track"><span class="fill" data-w="${step5(r.percentile)}"></span></span>
+            <span class="rv">${fmt(r.value)}</span>
+            <span class="rp">${ordinal(r.percentile)}</span>
+          </div>`).join("");
+      }
+
+      const rk = DATA.ranks || {};
+      document.getElementById("rankSub").innerHTML = REF === "lobby"
+        ? `Against <b>${n0(rk.lobbyPlayers)}</b> opponents you have actually met,
+           with at least ${rk.lobbyMinMatches} matches each. Broad, but shot metrics only —
+           the lobby is not in <code>participants</code>, so no K/D or survival.`
+        : `Against your squad and regulars with at least ${(DATA.cohort || {}).minMatches}
+           matches: <b>${n0((DATA.cohort || {}).players)}</b> players. Small group, but the
+           full picture including K/D, survival and consumables.`;
+      document.getElementById("rankFoot").textContent =
+        "Percentile = share of the reference group that is worse than you. "
+        + "For „Deaths before 5 min“ a lower value counts as better.";
+      document.getElementById("rankCard").hidden = false;
+    }
+
+    // ── Round phases ────────────────────────────────────────────────────────
+    function renderPhases() {
+      const rows = DATA.byPhase || [];
+      document.getElementById("phaseCard").hidden = !rows.length;
+      if (!rows.length) return;
+      const worst = rows.reduce((a, b) =>
+        (a.hitRate ?? 99) <= (b.hitRate ?? 99) ? a : b, rows[0]);
+      document.getElementById("phaseRows").innerHTML = rows.map(p => `
+        <tr>
+          <td>${PHASE_LABEL[p.phase] || esc(p.phase)}</td>
+          <td>${n0(p.matches)}</td>
+          <td class="${p === worst ? "lo" : ""}">${pct(p.hitRate)}</td>
+          <td>${n0(p.dmgPer100)}</td>
+          <td>${pct(p.inFightShare)}</td>
+          <td>${pct(p.headShare)}</td>
+          <td>${n0(p.shotsPerMatch)}</td>
+        </tr>`).join("");
+    }
+
+    // ── Deaths ──────────────────────────────────────────────────────────────
+    function barList(items, keyField, labelFn, total) {
+      if (!items || !items.length) return `<li class="n">no data</li>`;
+      const max = Math.max(...items.map(i => i.n), 1);
+      return items.map(i => `
+        <li>
+          <span>${labelFn(i)}</span>
+          <span class="track"><span class="fill" data-w="${step5(100 * i.n / max)}"></span></span>
+          <span class="n">${i.n} · ${i.share.toFixed(0)}%</span>
+        </li>`).join("");
+    }
+
+    function renderDeaths() {
+      const d = DATA.deaths || {};
+      document.getElementById("deathCard").hidden = !d.total;
+      if (!d.total) return;
+
+      const blocks = [
+        ["When in the round", barList(d.byPhase, "phase",
+          (i) => PHASE_LABEL[i.phase] || esc(i.phase))],
+        ["At what distance", barList(d.byDistance, "bucket",
+          (i) => esc(i.bucket))],
+        ["By which weapon", barList((d.byWeapon || []).slice(0, 8), "label",
+          (i) => esc(i.label))],
+        ["By whom", (d.topKillers || []).length
+          ? barListKillers(d.topKillers, d.total)
+          : `<li class="n">no data</li>`],
+      ];
+      document.getElementById("dists").innerHTML = blocks.map(
+        ([title, inner]) => `<div class="dist"><h3>${title}</h3><ul>${inner}</ul></div>`
+      ).join("");
+
+      const med = d.medianSurvivalSecs;
+      document.getElementById("deathSub").innerHTML =
+        `<b>${n0(d.total)}</b> deaths in range · median survival
+         <b>${med == null ? "—" : (med / 60).toFixed(1) + " min"}</b>
+         · median killer distance
+         <b>${d.medianDistanceM == null ? "—" : n0(d.medianDistanceM) + " m"}</b>`;
+    }
+
+    function barListKillers(killers, total) {
+      const max = Math.max(...killers.map(k => k.n), 1);
+      return killers.map(k => `
+        <li>
+          <span>${esc(k.name)}</span>
+          <span class="track"><span class="fill" data-w="${step5(100 * k.n / max)}"></span></span>
+          <span class="n">${k.n}×</span>
+        </li>`).join("");
+    }
+
+    // ── Cohort ──────────────────────────────────────────────────────────────
+    function renderCohort() {
+      const c = DATA.cohort || {};
+      const bands = c.bands || [];
+      document.getElementById("cohortCard").hidden = !bands.length;
+      if (!bands.length) return;
+
+      const me = DATA.me || {};
+      // Eigene Zeile nach K/D einsortieren, damit der Vergleich sofort
+      // sichtbar ist statt am Tabellenende zu haengen.
+      const mine = {
+        band: "__me__", players: null, kd: me.kd, hitRate: me.hitRate,
+        dmgPer100: me.dmgPer100, inFightShare: me.inFightShare,
+        shotsPerMatch: me.shotsPerMatch, damagePerMatch: me.damagePerMatch,
+        survivalMin: me.survivalMin, earlyDeathPct: me.earlyDeathPct,
+        healsPerMatch: me.healsPerMatch, boostsPerMatch: me.boostsPerMatch,
+      };
+      const rows = bands.concat([mine]).sort((a, b) => (a.kd ?? 0) - (b.kd ?? 0));
+      const top = bands[bands.length - 1];
+
+      document.getElementById("cohortRows").innerHTML = rows.map(r => {
+        const isMe = r.band === "__me__";
+        const isFloor = !isMe && r === bands[0];
+        const label = isMe
+          ? `${esc(DATA.playerName || "you")}`
+          : `${BAND_LABEL[r.band] || esc(r.band)}`;
+        const cls = isMe ? "me" : (isFloor ? "floor" : "");
+        const mark = (metric) => {
+          if (isMe || !top || r !== top) return "";
+          return "hi";
+        };
+        return `<tr class="${cls}">
+          <td>${label}${isFloor ? " (floor)" : ""}${r === top ? " (target)" : ""}</td>
+          <td>${r.players == null ? "—" : n0(r.players)}</td>
+          <td>${n2(r.kd)}</td>
+          <td class="${mark()}">${pct(r.hitRate)}</td>
+          <td class="${mark()}">${n0(r.dmgPer100)}</td>
+          <td class="${mark()}">${pct(r.inFightShare)}</td>
+          <td class="${mark()}">${n0(r.shotsPerMatch)}</td>
+          <td>${n0(r.damagePerMatch)}</td>
+          <td>${n1(r.survivalMin)}</td>
+          <td>${pct(r.earlyDeathPct)}</td>
+          <td class="${mark()}">${n2(r.healsPerMatch)}</td>
+          <td class="${mark()}">${n2(r.boostsPerMatch)}</td>
+        </tr>`;
+      }).join("");
+
+      document.getElementById("cohortSub").innerHTML =
+        `Squad and regulars with at least <b>${c.minMatches}</b> BR matches,
+         grouped by K/D — <b>${n0(c.players)}</b> players. Your own row is
+         slotted in by K/D.`;
+      document.getElementById("cohortFoot").textContent =
+        "Band averages over a small group are directional, not precise. "
+        + "The percentiles above are computed across all players at once and "
+        + "are the more reliable figure.";
+    }
+
+    // ── Trend ───────────────────────────────────────────────────────────────
+    function renderTrend() {
+      const rows = DATA.trend || [];
+      document.getElementById("trendCard").hidden = !rows.length;
+      if (!rows.length) return;
+      document.getElementById("trendRows").innerHTML = rows.map(t => {
+        const r = t.recent || {}, d = t.delta || {};
+        const cell = (val, key, invert) =>
+          `<td>${val}<br><span class="d">${deltaHtml(d[key], invert) || "—"}</span></td>`;
+        return `<tr>
+          <td>last ${t.window}${t.priorMatches ? ` vs ${t.priorMatches}` : ""}</td>
+          ${cell(pct(r.hitRate), "hitRate")}
+          ${cell(n0(r.dmgPer100), "dmgPer100")}
+          ${cell(pct(r.inFightShare), "inFightShare")}
+          ${cell(n0(r.shotsPerMatch), "shotsPerMatch")}
+          ${cell(pct(r.headShare), "headShare")}
+        </tr>`;
+      }).join("");
+      document.getElementById("trendFoot").textContent =
+        "Hit rate swings a lot per match — a 20-match window is the minimum "
+        + "that carries a readable signal.";
+    }
+
+    // ── Laden ───────────────────────────────────────────────────────────────
+    function press(container, attr, value) {
+      [...container.querySelectorAll("button")].forEach(b =>
+        b.setAttribute("aria-pressed", String(b.dataset[attr] === value)));
+    }
+
+    function render() {
+      renderKpis();
+      renderRanks();
+      renderPhases();
+      renderDeaths();
+      renderCohort();
+      renderTrend();
+    }
+
+    async function load() {
+      const st = document.getElementById("status");
+      st.classList.remove("err");
+      st.textContent = RANGE === "all"
+        ? "Loading all matches … (the first run takes a few seconds)"
+        : "Loading …";
+      const params = new URLSearchParams({ range: RANGE, minMatches: String(MIN) });
+      if (PLAYER.trim()) params.set("player", PLAYER.trim());
+      try {
+        DATA = await PubgUI.fetchJson(
+          BASE + "api/pubg/shot-quality?" + params, 120000);
+        const me = DATA.me || {};
+        if (!me.matches) {
+          st.textContent = "No BR matches in this range — widen it?";
+          ["kpiCard", "rankCard", "phaseCard", "deathCard", "cohortCard",
+           "trendCard"].forEach(id => document.getElementById(id).hidden = true);
+          return;
+        }
+        st.innerHTML = `<b>${n0(me.matches)}</b> matches`
+          + (me.telemetryMatches != null && me.telemetryMatches !== me.matches
+             ? ` · ${n0(me.telemetryMatches)} with telemetry` : "")
+          + ` · ${n0(me.shots)} shots`
+          + (DATA.isSelf ? "" : ` · ${esc(DATA.playerName || "")}`);
+        render();
+      } catch (e) {
+        st.classList.add("err");
+        st.textContent = "Error: " + (e && e.message || e);
+        ["kpiCard", "rankCard", "phaseCard", "deathCard", "cohortCard",
+         "trendCard"].forEach(id => document.getElementById(id).hidden = true);
+      }
+    }
+
+    document.getElementById("rangeSwitch").addEventListener("click", e => {
+      const b = e.target.closest("button[data-range]");
+      if (!b || b.dataset.range === RANGE) return;
+      RANGE = b.dataset.range;
+      press(e.currentTarget, "range", RANGE);
+      load();
+    });
+    document.getElementById("refSwitch").addEventListener("click", e => {
+      const b = e.target.closest("button[data-ref]");
+      if (!b || b.dataset.ref === REF) return;
+      REF = b.dataset.ref;
+      press(e.currentTarget, "ref", REF);
+      if (DATA) renderRanks();
+    });
+
+    let _t;
+    document.getElementById("fPlayer").addEventListener("input", e => {
+      PLAYER = e.target.value;
+      clearTimeout(_t);
+      _t = setTimeout(load, 500);
+    });
+    document.getElementById("fMin").addEventListener("change", e => {
+      MIN = Math.max(1, parseInt(e.target.value, 10) || 20);
+      load();
+    });
+
+    document.getElementById("fPlayer").value = PLAYER;
+    document.getElementById("fMin").value = MIN;
+    press(document.getElementById("rangeSwitch"), "range", RANGE);
+    press(document.getElementById("refSwitch"), "ref", REF);
+    load();
+  </script>
+</body>
+</html>

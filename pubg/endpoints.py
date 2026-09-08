@@ -312,6 +312,8 @@ class EndpointRegistry:
             return self._lobby_kd_refresh(qs)
         if route == ("GET", "/api/pubg/squad-playstyle"):
             return self._squad_playstyle(qs)
+        if route == ("GET", "/api/pubg/shot-quality"):
+            return self._shot_quality(qs)
         if route == ("GET", "/api/pubg/chickens-together"):
             return self._chickens_together(qs)
         if route == ("GET", "/api/pubg/session-report"):
@@ -3159,6 +3161,57 @@ class EndpointRegistry:
         return _ok({**data, "range": range_key, "players": names,
                     "minMatches": min_matches, "includeBots": include_bots,
                     "myAccountId": self.my_account_id})
+
+    def _shot_quality(self, qs):
+        """Schussqualitaet, Todesbild und Kohorten-Rang.
+
+        Teuer: die Lobby-Referenz gruppiert `match_weapon_stats` ueber alle
+        begegneten Gegner (fuenfstellig). Deshalb gecached und mit einem
+        eigenen, laengeren TTL — die Referenz aendert sich pro Match kaum,
+        und der Nutzer schaltet die Zeitraeume durch.
+        """
+        from pubg.shot_quality import compute_shot_quality, MIN_COHORT_MATCHES
+        from pubg.aggregations import _range_filter
+
+        conn = self.get_conn()
+        range_key = qs.get("range", "session")
+        if range_key not in ("session", "day", "week", "all"):
+            return _err(400, "range must be session|day|week|all")
+        from_iso, to_iso = qs.get("from"), qs.get("to")
+        try:
+            min_matches = max(1, int(qs.get("minMatches",
+                                            str(MIN_COHORT_MATCHES))))
+        except ValueError:
+            min_matches = MIN_COHORT_MATCHES
+
+        account_id = self.my_account_id
+        player_name = None
+        player = (qs.get("player") or "").strip()
+        if player:
+            row = conn.execute(
+                "SELECT account_id, name FROM players "
+                "WHERE tenant_id = ? AND (name = ? OR account_id = ?) LIMIT 1",
+                (self.tenant_id, player, player)).fetchone()
+            if not row:
+                return _err(404, f"unknown player: {player}")
+            account_id, player_name = row["account_id"], row["name"]
+
+        cutoff = (from_iso
+                  or (_range_filter(conn, self.tenant_id, range_key)
+                      if range_key != "all" else "1970-01-01T00:00:00Z"))
+
+        cache_key = (f"shot-quality:{account_id}:{range_key}:{from_iso or ''}:"
+                     f"{to_iso or ''}:{min_matches}")
+        data = self.cache.get_or_compute(
+            cache_key,
+            lambda: compute_shot_quality(
+                conn, self.tenant_id, account_id, cutoff,
+                to_iso=to_iso, min_matches=min_matches),
+            ttl=300)
+        return _ok({**data, "range": range_key, "from": cutoff,
+                    "accountId": account_id,
+                    "playerName": player_name,
+                    "isSelf": account_id == self.my_account_id})
 
     def _settings_get(self):
         conn = self.get_conn()

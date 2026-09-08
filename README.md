@@ -502,6 +502,53 @@ auf das Backend; kein Streaming nötig.
 | `tools/match-analysis.html` | Telemetrie-Auswertung eines Matches: Accuracy, Trefferzonen, Kill-Timeline, Auffälligkeiten | Browser-Tab |
 | `tools/weapon-performance.html` | Dieselben Kennzahlen über einen **Zeitraum** — je Waffe oder je Spieler | Browser-Tab |
 | `tools/squad-playstyle.html` | Spielstil je Squad-Mate: wer eröffnet die Gefechte, wie gehen sie aus, wer hängt zu weit weg | Browser-Tab |
+| `tools/shot-quality.html` | Schussqualität, Todesbild und Perzentil-Rang gegen Lobby und Squad | Browser-Tab |
+
+#### tools/shot-quality.html
+
+Beantwortet „wie gut sitzt jede Kugel, wann sterbe ich, und wo stehe ich damit" —
+nicht „wie viele Kills habe ich". Parameter: `?range=session|day|week|all`,
+`player=` (Default: eigener Account), `minMatches=` (Kohorten-Schwelle, Default 20).
+
+Sechs Sektionen:
+
+*Shot quality* — Trefferquote, **Schaden je 100 Schuss** (bündelt Quote und
+Trefferwucht in eine Zahl), **Anteil der Schüsse im Gefecht**, Kopftreffer-Anteil,
+Schüsse und Schaden je Match. Jeder Wert mit dem Delta der letzten 20 Matches
+gegen die 20 davor.
+
+*Where you rank* — Perzentil je Metrik gegen zwei Referenzgruppen, umschaltbar:
+
+* **Lobby** — jeder Gegner, dem man begegnet ist, aus `match_weapon_stats`
+  (fünfstellig viele Accounts, davon rund 800 mit ≥ 5 Matches). Breit, aber nur
+  Schuss-Metriken: Fremde stehen nicht in `participants`, also gibt es dort kein
+  K/D und keine Überlebenszeit.
+* **Squad & regulars** — eigene Accounts und Mates aus `participants`
+  (Größenordnung 25 Spieler mit ≥ 20 Matches). Klein, dafür mit vollem Bild
+  inklusive K/D, Überlebenszeit, Heals und Boosts.
+
+Perzentil heißt „Anteil der Referenzgruppe, der schlechter ist als du"; bei
+*Deaths before 5 min* zählt ein niedriger Wert als besser. Der eigene Account
+fällt aus dem Vergleich, sonst schlägt man sich selbst.
+
+*By round phase* — dieselben Schusswerte getrennt nach Überlebenszeit
+(early < 5 min, mid 5–15 min, late > 15 min). Eine Trefferquote, die zur späten
+Phase hin abfällt, zeigt auf Feuerdisziplin auf Distanz, nicht auf das Zielen.
+
+*Deaths* — wann in der Runde, auf welche Distanz, durch welche Waffe und durch
+wen. Quelle sind `Kill`-Events mit `target_account = ich`.
+
+*Cohort bands* — Mittelwerte je K/D-Band, die eigene Zeile nach K/D
+einsortiert. Bewusst über den ganzen Bestand statt über den gewählten Zeitraum,
+damit die Referenz beim Range-Wechsel nicht springt.
+
+*Trend* — die letzten 20 / 50 / 100 Matches gegen die gleich langen davor.
+**Nicht** an `range` gekoppelt: eine Session hat zu wenige Matches, um eine
+Trefferquote zu tragen; 20 Matches sind das Minimum für ein lesbares Signal.
+
+Zur Tenant-Trennung: `telemetry_events` führt **keine** `tenant_id`. Jede Abfrage
+dort joint auf `matches` und filtert erst da — ein direkter Zugriff würde Tode aus
+fremden Tenants mitziehen. `tests/pubg/test_shot_quality.py` hält das fest.
 
 #### tools/squad-playstyle.html
 
