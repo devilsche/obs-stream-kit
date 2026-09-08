@@ -649,3 +649,108 @@ def test_landing_stats_ignores_deaths_after_the_window(pg_compat):
     out = sq.landing_stats(conn, t1, "account.me", "1970-01-01T00:00:00Z",
                            pois=POIS, min_drops=1)
     assert out["byPoi"][0]["lobbyEarlyPct"] == pytest.approx(0.0)
+
+
+# ── Squad gegen Einzelperson am Landeplatz ──────────────────────────────────
+
+def test_summarise_landings_splits_own_death_from_squad_wipe():
+    """Der Fall, um den es geht: das Squad haelt den Platz, ich sterbe
+    trotzdem. Dann ist der Platz nicht das Problem."""
+    own = [
+        # ich tot, Squad lebt weiter — mein Fehler, nicht der des Platzes
+        {"poi": "P", "map": "M", "earlyDeath": True, "squadWiped": False,
+         "squadSize": 4, "timeSurvived": 100, "kills": 0, "damage": 0, "place": 30},
+        {"poi": "P", "map": "M", "earlyDeath": True, "squadWiped": False,
+         "squadSize": 4, "timeSurvived": 110, "kills": 0, "damage": 0, "place": 28},
+        # Squad komplett weg — da war der Platz zu heiss
+        {"poi": "P", "map": "M", "earlyDeath": True, "squadWiped": True,
+         "squadSize": 4, "timeSurvived": 90, "kills": 0, "damage": 0, "place": 40},
+        # alles gut
+        {"poi": "P", "map": "M", "earlyDeath": False, "squadWiped": False,
+         "squadSize": 4, "timeSurvived": 900, "kills": 2, "damage": 300, "place": 4},
+    ]
+    row = sq.summarise_landings(own, {}, min_drops=1)[0]
+    assert row["earlyDeathPct"] == pytest.approx(75.0)
+    assert row["squadWipedPct"] == pytest.approx(25.0)
+    # ich tot, Squad aber nicht ausgeloescht: 2 von 4
+    assert row["diedSquadAlivePct"] == pytest.approx(50.0)
+
+
+def test_summarise_landings_ignores_solo_rounds_for_squad_wipe():
+    """Bei Squad-Groesse 1 ist "Squad wiped" dasselbe wie "ich tot" und
+    traegt keine eigene Aussage — solche Runden bleiben aus dem Nenner."""
+    own = [
+        {"poi": "P", "map": "M", "earlyDeath": True, "squadWiped": True,
+         "squadSize": 1, "timeSurvived": 100, "kills": 0, "damage": 0, "place": 40},
+        {"poi": "P", "map": "M", "earlyDeath": False, "squadWiped": False,
+         "squadSize": 3, "timeSurvived": 900, "kills": 1, "damage": 90, "place": 6},
+    ]
+    row = sq.summarise_landings(own, {}, min_drops=1)
+    assert row[0]["squadRounds"] == 1
+    assert row[0]["squadWipedPct"] == pytest.approx(0.0)
+
+
+def test_summarise_landings_without_squad_data_leaves_squad_none():
+    own = [{"poi": "P", "map": "M", "earlyDeath": True, "timeSurvived": 100,
+            "kills": 0, "damage": 0, "place": 10}]
+    row = sq.summarise_landings(own, {}, min_drops=1)[0]
+    assert row["squadWipedPct"] is None
+    assert row["diedSquadAlivePct"] is None
+
+
+def test_landing_stats_reports_squad_survived_while_i_died(pg_compat):
+    conn, t1, _ = pg_compat
+    _seed(conn, t1, "account.me", "match.a", survived=120)
+    # Mate im selben Team (team_id 1, wie in _seed)
+    conn.execute(
+        "INSERT INTO participants (tenant_id, match_id, account_id, name,"
+        " place, kills, damage_dealt, time_survived, dbnos, assists, revives,"
+        " heals, boosts, weapons_acquired, walk_distance, ride_distance,"
+        " headshot_kills, team_id, longest_kill, swim_distance, team_kills)"
+        " VALUES (?, 'match.a', 'account.mate', 'Mate', 3, 4, 500, 1500,"
+        " 2, 1, 0, 3, 2, 8, 2000, 500, 1, 1, 200, 0, 0)", (t1,))
+    conn.execute(
+        "INSERT INTO telemetry_events (match_id, event_type, actor_account,"
+        " actor_x, actor_y, timestamp_ms)"
+        " VALUES ('match.a', 'Landing', 'account.me', 1500, 1500, 1000)")
+    # nur ICH sterbe, der Mate nicht
+    conn.execute(
+        "INSERT INTO telemetry_events (match_id, event_type, actor_account,"
+        " target_account, victim_x, victim_y, timestamp_ms)"
+        " VALUES ('match.a', 'Kill', 'account.foe', 'account.me',"
+        " 1600, 1600, 60000)")
+    conn.commit()
+
+    row = sq.landing_stats(conn, t1, "account.me", "1970-01-01T00:00:00Z",
+                           pois=POIS, min_drops=1)["byPoi"][0]
+    assert row["earlyDeathPct"] == pytest.approx(100.0)
+    assert row["squadWipedPct"] == pytest.approx(0.0)
+    assert row["diedSquadAlivePct"] == pytest.approx(100.0)
+
+
+def test_landing_stats_reports_squad_wipe(pg_compat):
+    conn, t1, _ = pg_compat
+    _seed(conn, t1, "account.me", "match.a", survived=120)
+    conn.execute(
+        "INSERT INTO participants (tenant_id, match_id, account_id, name,"
+        " place, kills, damage_dealt, time_survived, dbnos, assists, revives,"
+        " heals, boosts, weapons_acquired, walk_distance, ride_distance,"
+        " headshot_kills, team_id, longest_kill, swim_distance, team_kills)"
+        " VALUES (?, 'match.a', 'account.mate', 'Mate', 30, 0, 40, 130,"
+        " 0, 0, 0, 1, 0, 3, 300, 0, 0, 1, 0, 0, 0)", (t1,))
+    conn.execute(
+        "INSERT INTO telemetry_events (match_id, event_type, actor_account,"
+        " actor_x, actor_y, timestamp_ms)"
+        " VALUES ('match.a', 'Landing', 'account.me', 1500, 1500, 1000)")
+    for victim in ("account.me", "account.mate"):
+        conn.execute(
+            "INSERT INTO telemetry_events (match_id, event_type,"
+            " actor_account, target_account, victim_x, victim_y, timestamp_ms)"
+            " VALUES ('match.a', 'Kill', 'account.foe', ?, 1600, 1600, 60000)",
+            (victim,))
+    conn.commit()
+
+    row = sq.landing_stats(conn, t1, "account.me", "1970-01-01T00:00:00Z",
+                           pois=POIS, min_drops=1)["byPoi"][0]
+    assert row["squadWipedPct"] == pytest.approx(100.0)
+    assert row["diedSquadAlivePct"] == pytest.approx(0.0)

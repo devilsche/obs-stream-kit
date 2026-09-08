@@ -623,6 +623,10 @@
         help: "The same, per player, for everyone who lands here — each measured against their own landing" },
       { key: "diff", label: "Diff",
         help: "Your rate minus the lobby rate at the same spot" },
+      { key: "squadWipedPct", label: "Squad wiped",
+        help: "Share of rounds where EVERY squad member is dead within 5 min of your landing. Solo rounds excluded — there it would just repeat \u201cYou died\u201d" },
+      { key: "diedSquadAlivePct", label: "You died, squad held",
+        help: "You are dead but the squad is not wiped. A high value with a low wipe rate means the spot is playable and you are the one losing it" },
       { key: "survivalMin", label: "\u00d8 Survival" },
       { key: "avgKills", label: "\u00d8 Kills" },
       { key: "avgDamage", label: "\u00d8 Damage" },
@@ -698,6 +702,13 @@
       const rowHtml = (r) => {
         const cls = r.diff == null ? ""
           : (r.diff > 3 ? "diff-bad" : (r.diff < -3 ? "diff-good" : ""));
+        // Ich tot, Squad hält den Platz: der Fall, in dem nicht der Platz
+        // das Problem ist. Ab 40 % markiert, wenn die Wipe-Rate klar
+        // darunter liegt.
+        const solo = r.diedSquadAlivePct;
+        const soloCls = (solo != null && solo >= 40
+                         && (r.squadWipedPct ?? 100) < solo - 15)
+          ? "diff-bad" : "";
         const sign = r.diff == null ? "—"
           : (r.diff > 0 ? "+" : "\u2212") + Math.abs(r.diff).toFixed(1);
         return `<tr class="${r.reliable ? "" : "thin"}">
@@ -708,6 +719,10 @@
           <td>${r.lobbyEarlyPct == null ? "—" : pct(r.lobbyEarlyPct)
                 + `<span class="d"> (${n0(r.lobbyDrops)})</span>`}</td>
           <td class="${cls}">${sign}</td>
+          <td>${r.squadWipedPct == null ? "—" : pct(r.squadWipedPct)}</td>
+          <td class="${soloCls}">${r.diedSquadAlivePct == null ? "—"
+              : pct(r.diedSquadAlivePct)
+                + `<span class="d"> (${n0(r.squadRounds)})</span>`}</td>
           <td>${n1(r.survivalMin)}</td>
           <td>${n2(r.avgKills)}</td>
           <td>${n0(r.avgDamage)}</td>
@@ -721,7 +736,7 @@
       document.getElementById("poiRows").innerHTML = byMap.map(g => {
         const shown = TOPN > 0 ? g.rows.slice(0, TOPN) : g.rows;
         const rest = g.rows.length - shown.length;
-        return `<tr class="map-head"><th colspan="10">
+        return `<tr class="map-head"><th colspan="12">
             ${esc(MAP_LABEL[g.map] || g.map)}
             <span class="mh-n">· ${n0(g.total)} drops on ${g.rows.length}
               spot${g.rows.length === 1 ? "" : "s"}${rest > 0
@@ -754,7 +769,14 @@
         + "elsewhere does not count. <b>Lobby</b> is the same measure applied "
         + "per player to everyone who lands there, each against their own "
         + "landing time. <b>Diff</b> is the difference — that separates "
-        + "\"tough spot\" from \"I lose the fight here\".";
+        + "\"tough spot\" from \"I lose the fight here\". "
+        + "<b>Squad wiped</b> means every member of your squad is dead inside "
+        + "your own 5-minute window — measured against YOUR landing, because "
+        + "the question is how this fight went, and this fight is yours. The "
+        + "count in brackets is the rounds with a squad (solo rounds are left "
+        + "out). A high <b>You died, squad held</b> next to a low <b>Squad "
+        + "wiped</b> is the clearest signal on this page: the spot works, you "
+        + "are the one losing it.";
     }
 
     // ── Trend ───────────────────────────────────────────────────────────────

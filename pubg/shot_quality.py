@@ -410,6 +410,23 @@ def summarise_landings(own, lobby, min_drops=MIN_POI_DROPS):
             continue
         early = sum(1 for r in rows if r["earlyDeath"])
         my_pct = 100.0 * early / n
+
+        # Squad-Sicht nur ueber Runden, in denen es ein Squad gab: bei
+        # Squad-Groesse 1 ist "Squad ausgeloescht" dasselbe wie "ich tot"
+        # und traegt keine eigene Aussage.
+        squad_rows = [r for r in rows
+                      if r.get("squadWiped") is not None
+                      and (r.get("squadSize") or 1) > 1]
+        sn = len(squad_rows)
+        if sn:
+            wiped = sum(1 for r in squad_rows if r["squadWiped"])
+            solo_death = sum(1 for r in squad_rows
+                             if r["earlyDeath"] and not r["squadWiped"])
+            squad_pct = 100.0 * wiped / sn
+            alive_pct = 100.0 * solo_death / sn
+        else:
+            squad_pct = alive_pct = None
+
         ref = lobby.get((map_name, poi)) or {}
         lob_drops = ref.get("drops") or 0
         lob_pct = (100.0 * ref["early"] / lob_drops) if lob_drops else None
@@ -422,6 +439,11 @@ def summarise_landings(own, lobby, min_drops=MIN_POI_DROPS):
             "lobbyDrops": lob_drops,
             "lobbyEarlyPct": lob_pct,
             "diff": (my_pct - lob_pct) if lob_pct is not None else None,
+            "squadRounds": sn,
+            "squadWipedPct": squad_pct,
+            # Der interessante Fall: ich tot, Squad haelt den Platz. Dann
+            # ist nicht der Platz das Problem.
+            "diedSquadAlivePct": alive_pct,
             "reliable": n >= RELIABLE_POI_DROPS,
             "survivalMin": (_avg(r["timeSurvived"] for r in rows) or 0) / 60.0,
             "avgKills": _avg(r["kills"] for r in rows),
@@ -823,20 +845,55 @@ def landing_stats(conn, tenant_id, account_id, cutoff, to_iso=None,
     # Minuten spaeter, das Fenster waere fuer die eigene Quote enger als
     # fuer die Lobby und die Differenz kippte ins Gegenteil.
     lost_fight = set()
+    # Zweiter Index fuer die Squad-Sicht: Tode gemessen im Fenster nach
+    # MEINER Landung. Ein Mate, der spaeter landet, hat ein anderes eigenes
+    # Fenster — fuer "haelt das Squad diesen Platz" zaehlt aber mein
+    # Gefecht, nicht seines.
+    my_landing = {mid: ts for (mid, acc), (_m, _p, ts) in where.items()
+                  if acc == account_id}
+    lost_fight_any = set()
     for r in kills:
+        poi_hit = None
         landed = where.get((r["match_id"], r["target_account"]))
-        if not landed:
-            continue
-        if r["timestamp_ms"] - landed[2] >= LANDING_FIGHT_MS:
-            continue
-        poi = poi_at(boxes, r["map_name"], r["victim_x"], r["victim_y"])
-        if poi and poi == landed[1]:
-            lobby[(landed[0], poi)]["early"] += 1
-            lost_fight.add((r["match_id"], r["target_account"]))
+        if landed and r["timestamp_ms"] - landed[2] < LANDING_FIGHT_MS:
+            poi_hit = poi_at(boxes, r["map_name"], r["victim_x"],
+                             r["victim_y"])
+            if poi_hit and poi_hit == landed[1]:
+                lobby[(landed[0], poi_hit)]["early"] += 1
+                lost_fight.add((r["match_id"], r["target_account"]))
+
+        my_ts = my_landing.get(r["match_id"])
+        if my_ts is not None and r["timestamp_ms"] - my_ts < LANDING_FIGHT_MS:
+            lost_fight_any.add((r["match_id"], r["target_account"]))
 
     part = {(r["match_id"], account_id): r
             for r in _participant_rows(conn, tenant_id, account_id, cutoff,
                                        to_iso)}
+
+    # Squad-Roster je Match. `participants` enthaelt nur eigene Accounts und
+    # Mates, also genau das eigene Team — Gegnerteams stehen nicht drin und
+    # koennen den Roster nicht verwaessern.
+    br_where2, br_params2 = _br_filter("m")
+    squad = {}
+    if part:
+        mids = list({mid for (mid, _a) in part})
+        marks = ", ".join("?" for _ in mids)
+        my_team = {}
+        rows = conn.execute(f"""
+            SELECT pa.match_id, pa.account_id, pa.team_id
+            FROM participants pa
+            JOIN matches m ON m.match_id = pa.match_id
+                          AND m.tenant_id = pa.tenant_id
+            WHERE pa.tenant_id = ? AND pa.match_id IN ({marks})
+              AND pa.time_survived > 0 AND {br_where2}
+        """, [tenant_id, *mids, *br_params2]).fetchall()
+        for r in rows:
+            if r["account_id"] == account_id:
+                my_team[r["match_id"]] = r["team_id"]
+        for r in rows:
+            if my_team.get(r["match_id"]) == r["team_id"]:
+                squad.setdefault(r["match_id"], set()).add(r["account_id"])
+
     own = []
     for (mid, acc), (map_name, poi, _ts) in where.items():
         if acc != account_id:
@@ -844,9 +901,17 @@ def landing_stats(conn, tenant_id, account_id, cutoff, to_iso=None,
         pr = part.get((mid, acc))
         if not pr:
             continue
+        mates = squad.get(mid) or {acc}
+        # Squad ausgeloescht = JEDER im Team hat im Fenster nach MEINER
+        # Landung einen Tod im Landeplatz. Bewusst mein Fenster fuer alle,
+        # nicht jedes Mitglied gegen seine eigene Landung: gefragt ist der
+        # Ausgang DIESES Gefechts, und das ist meines.
+        wiped = all((mid, m) in lost_fight_any for m in mates)
         own.append({
             "map": map_name, "poi": poi,
             "earlyDeath": (mid, acc) in lost_fight,
+            "squadWiped": wiped,
+            "squadSize": len(mates),
             "timeSurvived": pr["time_survived"],
             "kills": pr["kills"],
             "damage": pr["damage_dealt"],
