@@ -272,8 +272,10 @@
 
     const PHASE_LABEL = { early: "Early (&lt;5 min)", mid: "Mid (5–15 min)",
                           late: "Late (&gt;15 min)" };
+    // Keys wie in WEAPON_NAMES (pubg/aggregations.py) — dort heisst die
+    // Scharfschuetzen-Klasse "sniper", nicht "sr".
     const CLASS_LABEL = {
-      ar: "Assault rifle", smg: "SMG", dmr: "DMR", sr: "Sniper rifle",
+      ar: "Assault rifle", smg: "SMG", dmr: "DMR", sniper: "Sniper rifle",
       lmg: "LMG", shotgun: "Shotgun", pistol: "Pistol", melee: "Melee",
       throwable: "Throwable", vehicle: "Vehicle", envir: "Environment",
       other: "Other", unknown: "Unknown",
@@ -308,8 +310,11 @@
     function ordinal(p) {
       if (p == null) return "—";
       const n = Math.round(p);
-      const s = ["th", "st", "nd", "rd"][(n % 100 - n % 10 !== 10) * 1 && n % 10 < 4 ? n % 10 : 0];
-      return n + s;
+      // 11., 12., 13. sind Ausnahmen: "11th", nicht "11st".
+      const teens = n % 100 >= 11 && n % 100 <= 13;
+      const suffix = teens ? "th"
+        : ({ 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th");
+      return n + suffix;
     }
 
     function deltaHtml(v, invert) {
@@ -385,7 +390,7 @@
            full picture including K/D, survival and consumables.`;
       document.getElementById("rankFoot").textContent =
         "Percentile = share of the reference group that is worse than you. "
-        + "For „Deaths before 5 min“ a lower value counts as better.";
+        + "For \"Deaths before 5 min\" a lower value counts as better.";
       document.getElementById("rankCard").hidden = false;
     }
 
