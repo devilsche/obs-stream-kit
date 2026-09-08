@@ -1,5 +1,6 @@
 """Streamer-Routes."""
 import os
+import re
 
 from flask import (
     Blueprint, render_template, g, jsonify, request, redirect, current_app,
@@ -530,6 +531,27 @@ def tools_index():
     return render_template("tools.html", user=g.user, tools=_visible_tools())
 
 
+#: Cache-Buster fuer Tool-Assets. Der Server schickt zwar no-cache mit
+#: ETag, aber sobald eine gecachte HTML-Seite die alte URL enthaelt,
+#: revalidiert der Browser die falsche Datei. Mit ?v=<mtime> wechselt die
+#: URL bei jedem Deploy, und "ich sehe den Fix nicht" hoert auf, eine
+#: mogliche Erklaerung zu sein.
+_STATIC_REF = re.compile(r'(src|href)="(/(?:tools|widgets)-static/[^"?]+)"')
+
+
+def _bust_static_urls(html: str, root: str) -> str:
+    def repl(m):
+        attr, url = m.group(1), m.group(2)
+        rel = url.lstrip("/")
+        prefix, _, tail = rel.partition("/")
+        sub = "tools" if prefix == "tools-static" else "widgets"
+        full = os.path.normpath(os.path.join(root, sub, tail))
+        if not full.startswith(root) or not os.path.exists(full):
+            return m.group(0)
+        return f'{attr}="{url}?v={int(os.path.getmtime(full))}"'
+    return _STATIC_REF.sub(repl, html)
+
+
 @bp_app.route("/app/tools/<key>")
 @require_session
 def tools_open(key):
@@ -614,4 +636,10 @@ def tools_open(key):
         html = html.replace("</head>", inject + "\n</head>", 1)
     else:
         html = inject + "\n" + html
-    return html, 200, {"Content-Type": "text/html; charset=utf-8"}
+    html = _bust_static_urls(html, root)
+    # Ohne no-cache haelt der Browser diese Seite beliebig lange und laedt
+    # damit auch die alten Asset-URLs weiter — ein Deploy kommt dann nicht
+    # an, ohne dass jemand hart neu laedt. serve_html_or_asset macht das
+    # fuer Widgets schon so, hier fehlte es.
+    return html, 200, {"Content-Type": "text/html; charset=utf-8",
+                       "Cache-Control": "no-cache, must-revalidate"}
