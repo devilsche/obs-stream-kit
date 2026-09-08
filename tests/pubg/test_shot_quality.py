@@ -551,6 +551,74 @@ def test_landing_stats_counts_lobby_drops_and_deaths(pg_compat):
     assert row["lobbyEarlyPct"] == pytest.approx(50.0)   # einer von zwei tot
 
 
+def test_landing_stats_measures_own_and_lobby_on_the_same_clock(pg_compat):
+    """Der eigene Wert darf NICHT aus time_survived kommen: das laeuft ab
+    Rundenstart, das Lobby-Fenster ab der Landung. Gemischt kippt die
+    Differenz ins Gegenteil — an Prod-Daten von +9,0 auf -10,5."""
+    conn, t1, _ = pg_compat
+    # time_survived 120 s waere "Fruehtod ab Rundenstart", aber der Kill
+    # faellt 6 Minuten NACH der Landung — also kein Landefight.
+    _seed(conn, t1, "account.me", "match.a", survived=120)
+    conn.execute(
+        "INSERT INTO telemetry_events (match_id, event_type, actor_account,"
+        " actor_x, actor_y, timestamp_ms)"
+        " VALUES ('match.a', 'Landing', 'account.me', 1500, 1500, 1000)")
+    conn.execute(
+        "INSERT INTO telemetry_events (match_id, event_type, actor_account,"
+        " target_account, victim_x, victim_y, timestamp_ms)"
+        " VALUES ('match.a', 'Kill', 'account.foe', 'account.me',"
+        " 1600, 1600, 361000)")
+    conn.commit()
+
+    row = sq.landing_stats(conn, t1, "account.me", "1970-01-01T00:00:00Z",
+                           pois=POIS, min_drops=1)["byPoi"][0]
+    assert row["earlyDeathPct"] == pytest.approx(0.0)
+    assert row["lobbyEarlyPct"] == pytest.approx(0.0)
+
+
+def test_landing_stats_counts_own_lost_landing_fight(pg_compat):
+    conn, t1, _ = pg_compat
+    _seed(conn, t1, "account.me", "match.a", survived=900)
+    conn.execute(
+        "INSERT INTO telemetry_events (match_id, event_type, actor_account,"
+        " actor_x, actor_y, timestamp_ms)"
+        " VALUES ('match.a', 'Landing', 'account.me', 1500, 1500, 1000)")
+    # Tod 2 Minuten nach der Landung, im Landeplatz
+    conn.execute(
+        "INSERT INTO telemetry_events (match_id, event_type, actor_account,"
+        " target_account, victim_x, victim_y, timestamp_ms)"
+        " VALUES ('match.a', 'Kill', 'account.foe', 'account.me',"
+        " 1600, 1600, 121000)")
+    conn.commit()
+
+    row = sq.landing_stats(conn, t1, "account.me", "1970-01-01T00:00:00Z",
+                           pois=POIS, min_drops=1)["byPoi"][0]
+    assert row["earlyDeathPct"] == pytest.approx(100.0)
+    assert row["lobbyEarlyPct"] == pytest.approx(100.0)
+    assert row["diff"] == pytest.approx(0.0)
+
+
+def test_landing_stats_does_not_count_death_outside_the_landing_spot(pg_compat):
+    """Wegrotiert und woanders gefallen ist kein verlorener Landefight."""
+    conn, t1, _ = pg_compat
+    _seed(conn, t1, "account.me", "match.a", survived=900)
+    conn.execute(
+        "INSERT INTO telemetry_events (match_id, event_type, actor_account,"
+        " actor_x, actor_y, timestamp_ms)"
+        " VALUES ('match.a', 'Landing', 'account.me', 1500, 1500, 1000)")
+    # Tod rechtzeitig, aber im Nachbar-POI
+    conn.execute(
+        "INSERT INTO telemetry_events (match_id, event_type, actor_account,"
+        " target_account, victim_x, victim_y, timestamp_ms)"
+        " VALUES ('match.a', 'Kill', 'account.foe', 'account.me',"
+        " 3500, 3500, 121000)")
+    conn.commit()
+
+    row = sq.landing_stats(conn, t1, "account.me", "1970-01-01T00:00:00Z",
+                           pois=POIS, min_drops=1)["byPoi"][0]
+    assert row["earlyDeathPct"] == pytest.approx(0.0)
+
+
 def test_landing_stats_ignores_deaths_after_the_window(pg_compat):
     conn, t1, _ = pg_compat
     _seed(conn, t1, "account.me", "match.a", survived=1200)

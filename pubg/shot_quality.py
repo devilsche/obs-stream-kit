@@ -805,6 +805,14 @@ def landing_stats(conn, tenant_id, account_id, cutoff, to_iso=None,
           AND m.played_at >= ? AND {br_where}{time_filter}
     """, [tenant_id, cutoff, *br_params, *extra]).fetchall()
 
+    # Verlorener Landefight = Tod binnen LANDING_FIGHT_MS nach der eigenen
+    # Landung UND im Landeplatz selbst. Beides gilt fuer die Lobby und fuer
+    # den eigenen Wert GLEICH — sonst vergleicht man zwei verschiedene
+    # Uhren. `participants.time_survived` laeuft ab Rundenstart und ist
+    # deshalb hier NICHT verwendbar: die Landung liegt rund zweieinhalb
+    # Minuten spaeter, das Fenster waere fuer die eigene Quote enger als
+    # fuer die Lobby und die Differenz kippte ins Gegenteil.
+    lost_fight = set()
     for r in kills:
         landed = where.get((r["match_id"], r["target_account"]))
         if not landed:
@@ -812,10 +820,9 @@ def landing_stats(conn, tenant_id, account_id, cutoff, to_iso=None,
         if r["timestamp_ms"] - landed[2] >= LANDING_FIGHT_MS:
             continue
         poi = poi_at(boxes, r["map_name"], r["victim_x"], r["victim_y"])
-        # Nur Tode IM Landeplatz zaehlen — wer wegrotiert und woanders
-        # faellt, hat den Landefight nicht dort verloren.
         if poi and poi == landed[1]:
             lobby[(landed[0], poi)]["early"] += 1
+            lost_fight.add((r["match_id"], r["target_account"]))
 
     part = {(r["match_id"], account_id): r
             for r in _participant_rows(conn, tenant_id, account_id, cutoff,
@@ -829,7 +836,7 @@ def landing_stats(conn, tenant_id, account_id, cutoff, to_iso=None,
             continue
         own.append({
             "map": map_name, "poi": poi,
-            "earlyDeath": (pr["time_survived"] or 0) < PHASE_EARLY_SECS,
+            "earlyDeath": (mid, acc) in lost_fight,
             "timeSurvived": pr["time_survived"],
             "kills": pr["kills"],
             "damage": pr["damage_dealt"],
