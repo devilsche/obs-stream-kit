@@ -62,7 +62,7 @@
 </head>
 <body>
   <div class="pubg-card popup" id="popup">
-    <span class="ribbon">Mit mir gespielt</span>
+    <span class="ribbon">Played with me</span>
     <div class="name">
       <span id="name">—</span>
       <span class="chickens" id="chickens"></span>
@@ -145,7 +145,7 @@
     }
 
     if (!PLAYER) {
-      document.getElementById("name").textContent = "?player= fehlt";
+      document.getElementById("name").textContent = "?player= missing";
       reveal();
     } else {
       PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/co-player/${encodeURIComponent(PLAYER)}`)
@@ -157,7 +157,7 @@
           }
 
           if (d.isSelf) {
-            renderCareerOnly(d.name, d.careerLifetime, "Career — du selbst");
+            renderCareerOnly(d.name, d.careerLifetime, "Career — yourself");
             return reveal();
           }
 

@@ -113,7 +113,7 @@
         </div>`).join("");
 
       document.getElementById("summary").innerHTML =
-        `<span>Total</span><span><b>${totalWins}</b> Win${totalWins === 1 ? "" : "s"} aus <b>${totalGames}</b> Matches</span>`;
+        `<span>Total</span><span><b>${totalWins}</b> Win${totalWins === 1 ? "" : "s"} from <b>${totalGames}</b> matches</span>`;
     }
 
     PubgUI.poll((window.__SERVE_BASE__||"/") + `api/pubg/map-distribution?range=${RANGE}`,

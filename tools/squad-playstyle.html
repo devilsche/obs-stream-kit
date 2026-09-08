@@ -133,8 +133,8 @@
   </style>
 </head>
 <body>
-  <h1 class="t-title">PUBG Squad Spielstil</h1>
-  <div class="t-subtitle">Wer eröffnet Fights, wie enden sie, wie spielt jeder — Lobby-Stärke pro Match im Session-Report</div>
+  <h1 class="t-title">PUBG Squad Playstyle</h1>
+  <div class="t-subtitle">Who opens fights, how they end, how everyone plays — lobby strength per match in the session report</div>
 
   <div class="t-card">
     <div class="bar">
@@ -147,9 +147,9 @@
           <button type="button" data-range="all" aria-pressed="false">All</button>
         </div>
       </div>
-      <label for="fPlayers">Gruppe
+      <label for="fPlayers">Group
         <input id="fPlayers" type="text"
-               placeholder="z. B. hacker_luke, SleepAtWar — leer = alle"
+               placeholder="e.g. hacker_luke, SleepAtWar — empty = everyone"
                aria-describedby="playersNote">
       </label>
       <label for="fMin">Min. Matches
@@ -160,16 +160,16 @@
       </label>
     </div>
     <div class="legend" id="playersNote">
-      <b>Gruppe</b> bestimmt beides: nur Matches in denen <b>alle</b> genannten
-      im Squad waren, und alle Prozentwerte nur auf diese Personen bezogen.
-      Leer = alle Mitspieler, alle Matches.
+      <b>Group</b> controls both: only matches where <b>all</b> the named players
+      were in the squad, and every percentage refers to those players only.
+      Empty = all mates, all matches.
     </div>
     <div class="legend" id="status">Loading …</div>
   </div>
 
   <div class="t-card" id="fightCard" hidden>
-    <h2>Fights — wer eröffnet</h2>
-    <div id="fightChips" class="col-chips" role="group" aria-label="Sichtbare Spalten Fights"></div>
+    <h2>Fights — who opens</h2>
+    <div id="fightChips" class="col-chips" role="group" aria-label="Visible fight columns"></div>
     <div class="scroll">
       <table>
         <thead id="fightHead"><tr></tr></thead>
@@ -215,8 +215,8 @@
   </div>
 
   <div class="t-card" id="styleCard" hidden>
-    <h2>Spielstil</h2>
-    <div id="styleChips" class="col-chips" role="group" aria-label="Sichtbare Spalten Spielstil"></div>
+    <h2>Playstyle</h2>
+    <div id="styleChips" class="col-chips" role="group" aria-label="Visible playstyle columns"></div>
     <div class="scroll">
       <table>
         <thead id="styleHead"><tr></tr></thead>
@@ -266,10 +266,10 @@
 
     // chip: true = per Chip ein-/ausblendbar; chipDefault: true = standardm\u00e4ssig sichtbar
     const FIGHT_COLS = [
-      { key: "name", label: "Spieler", fmt: (r) => esc(r.name), text: true,
+      { key: "name", label: "Player", fmt: (r) => esc(r.name), text: true,
         help: "Squad mate. Your own name is highlighted." },
       { key: "matches", label: "Matches", fmt: (r) => r.matches,
-        help: "Matches im gew\u00e4hlten Zeitraum." },
+        help: "Matches in the selected range." },
       { key: "opened", label: "First contact", fmt: (r) => r.opened,
         chip: true, chipDefault: true,
         help: "How often he was the first in the squad to deal damage to an enemy \u2014 and that enemy was subsequently knocked or killed (by him or a teammate) within the fight window." },
@@ -346,10 +346,10 @@
     ];
 
     const STYLE_COLS = [
-      { key: "name", label: "Spieler", fmt: (r) => esc(r.name), text: true,
-        help: "Squad-Mate. Eigener Name hervorgehoben." },
+      { key: "name", label: "Player", fmt: (r) => esc(r.name), text: true,
+        help: "Squad mate. Your own name is highlighted." },
       { key: "matches", label: "Matches", fmt: (r) => r.matches,
-        help: "Matches im gew\u00e4hlten Zeitraum." },
+        help: "Matches in the selected range." },
       { key: "squadAliveSharePct", label: "Squad alive share", unit: "%",
         fmt: (r) => n0(r.squadAliveSharePct),
         chip: true, chipDefault: true,
@@ -539,7 +539,7 @@
           const weak = !isBase && !c.text && (
             which === "fight" ? (r.opened || 0) < MIN_SAMPLE : (r.matches || 0) < MIN_SAMPLE);
           const cls = [c.text ? "" : "num", flag ? "flag" : "", weak ? "weak" : ""].filter(Boolean).join(" ");
-          const title = flag ? ` title="${esc(c.why || "auff\u00e4llig")}"` : "";
+          const title = flag ? ` title="${esc(c.why || "notable")}"` : "";
           const val = c.text && mine ? `<span class="me">${c.fmt(r)}</span>` : c.fmt(r);
           return `<td class="${cls}"${title}>${val}</td>`;
         }).join("") + `</tr>`;
@@ -562,8 +562,8 @@
       const st = document.getElementById("status");
       st.classList.remove("err");
       st.textContent = RANGE === "all"
-        ? "Lade alle Matches \u2026 (erster Durchlauf dauert einige Sekunden)"
-        : "Lade \u2026";
+        ? "Loading all matches \u2026 (the first run takes a few seconds)"
+        : "Loading \u2026";
       const params = new URLSearchParams({ range: RANGE, minMatches: String(MIN) });
       if (PLAYERS.trim()) params.set("players", PLAYERS.trim());
       if (BOTS) params.set("includeBots", "1");
@@ -571,13 +571,13 @@
         DATA = await PubgUI.fetchJson(BASE + "api/pubg/squad-playstyle?" + params, 120000);
         const rows = DATA.rows || [];
         st.textContent = `${DATA.matchesWithEvents} of ${DATA.matches} matches `
-          + `mit Telemetrie \u00b7 ${rows.length} players with ${MIN}+ matches`
-          + (DATA.players && DATA.players.length ? ` \u00b7 Gruppe: ${DATA.players.join(", ")}` : "")
-          + (rows.length ? "" : " \u2014 nichts gefunden, Zeitraum erweitern?");
+          + `with telemetry \u00b7 ${rows.length} players with ${MIN}+ matches`
+          + (DATA.players && DATA.players.length ? ` \u00b7 Group: ${DATA.players.join(", ")}` : "")
+          + (rows.length ? "" : " \u2014 nothing found, widen the range?");
         render();
       } catch (e) {
         st.classList.add("err");
-        st.textContent = "Fehler: " + (e && e.message || e);
+        st.textContent = "Error: " + (e && e.message || e);
         document.getElementById("fightCard").hidden = true;
         document.getElementById("styleCard").hidden = true;
       }

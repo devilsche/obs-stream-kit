@@ -75,10 +75,10 @@
   <div class="pubg-card card pubg-fade-in">
     <h1>First-Fight · Debug View</h1>
     <div class="hint">
-      Liest <code>/api/pubg/first-fight-debug</code> live. Zeigt pro Match,
-      ob die Detection einen "echten" Fight findet, ob's nur ein
-      isoliertes Event war (Disengage), oder ob das Match keine
-      Squad-Combat-Events hat.
+      Reads <code>/api/pubg/first-fight-debug</code> live. Shows, per match,
+      whether detection finds a "real" fight, whether it was just an
+      isolated event (disengage), or whether the match has no
+      squad combat events at all.
     </div>
     <div class="controls">
       <label>Range</label>
@@ -92,11 +92,11 @@
     </div>
     <div id="tbl"><div class="muted">— fetching —</div></div>
     <div class="legend">
-      <b>Verdict-Spalte:</b><br>
-      <span class="v-real">REAL FIGHT</span> = mind. 1 Kill im Cluster, definitiver Outcome.<br>
-      <span class="v-fled">FLED</span> = Cluster ohne Kill (egal wie viele Damage/Knocks). Reines Stalemate/Disengage.<br>
-      <span class="v-savedbyteam">TEAM SAVED</span> = du gekillt, mind. 1 Squad-Member überlebt.<br>
-      <span class="v-died">DIED</span> = alle aus deinem Squad im Fight gefallen.
+      <b>Verdict column:</b><br>
+      <span class="v-real">REAL FIGHT</span> = at least 1 kill in the cluster, definite outcome.<br>
+      <span class="v-fled">FLED</span> = cluster without a kill (no matter how much damage or how many knocks). Pure stalemate/disengage.<br>
+      <span class="v-savedbyteam">TEAM SAVED</span> = you died, at least 1 squad member survived.<br>
+      <span class="v-died">DIED</span> = everyone in your squad went down in the fight.
     </div>
   </div>
 
@@ -192,7 +192,7 @@
         render(data);
       } catch (e) {
         document.getElementById("tbl").innerHTML =
-          `<div class="pubg-error">Fehler: ${e}</div>`;
+          `<div class="pubg-error">Error: ${e}</div>`;
       }
     }
 

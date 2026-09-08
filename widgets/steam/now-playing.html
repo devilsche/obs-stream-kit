@@ -273,10 +273,10 @@
       { key: "avatarVariant", label: "Avatar variant", type: "select",
         default: "large",
         options: [["large","image_large"], ["small","image_small"]],
-        tooltip: "Steam liefert animated_avatar als zwei URLs. Bei " +
+        tooltip: "Steam serves animated_avatar as two URLs. For " +
                  "most items image_large is the animated APNG, " +
-                 "bei manchen image_small. Falls dein Avatar statisch " +
-                 "wirkt, hier flippen." },
+                 "for some it is image_small. If your avatar looks " +
+                 "static, flip this." },
       { key: "livePlayers", label: "Live players", type: "select",
         default: "1",
         options: [["1","Show"], ["0","Hide"]],
@@ -284,7 +284,7 @@
       { key: "playersPollMs", label: "Players poll (ms)", type: "range",
         min: 30000, max: 300000, default: 60000,
         tooltip: "How often to refresh the live player count." },
-      { key: "mock", label: "Demo-Ansicht", type: "select", default: "0",
+      { key: "mock", label: "Demo view", type: "select", default: "0",
         options: [["0", "Live"], ["1", "Demo (no API call)"]],
         tooltip: "Demo mode shows sample data without the Steam API — ideal for previewing." },
       { key: "fakeAppId", label: "Preview App-ID", type: "text", default: "",

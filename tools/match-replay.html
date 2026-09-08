@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <title>PUBG Match Replay</title>
@@ -111,24 +111,24 @@
     <aside class="sidebar" aria-label="Teams and controls">
       <div class="match-picker">
         <label for="matchSelect">Select match <span id="matchCount" class="match-count-dim"></span></label>
-        <input id="matchFilter" type="search" placeholder="Filter: Datum, Map, Platz…"
-               aria-label="Match-Liste filtern">
+        <input id="matchFilter" type="search" placeholder="Filter: date, map, placement…"
+               aria-label="Filter match list">
         <select id="matchSelect" aria-label="Select match" size="1"></select>
         <p class="source-note" id="sourceNote" role="status" aria-live="polite"></p>
       </div>
-      <div id="teamList" aria-label="Teamliste"></div>
+      <div id="teamList" aria-label="Team list"></div>
       <fieldset class="toggles">
-        <legend>Anzeige</legend>
+        <legend>Display</legend>
         <label><input type="checkbox" id="tglKills" checked> Kills</label>
         <label><input type="checkbox" id="tglKnocks" checked> Knocks</label>
         <label><input type="checkbox" id="tglStreaks" checked> Bullet Streaks</label>
         <label><input type="checkbox" id="tglZones" checked> Bluezone</label>
-        <label><input type="checkbox" id="tglNames" checked> Namen</label>
+        <label><input type="checkbox" id="tglNames" checked> Names</label>
         <label><input type="checkbox" id="tglKillfeed" checked> Killfeed</label>
-        <label><input type="checkbox" id="tglGrid"> Raster 8×8 (Kalibrierung)</label>
+        <label><input type="checkbox" id="tglGrid"> Grid 8×8 (calibration)</label>
       </fieldset>
     </aside>
-    <section class="stage" aria-label="Karte">
+    <section class="stage" aria-label="Map">
       <canvas id="map"></canvas>
       <!-- Killfeed wie im Spiel: oben rechts, blendet nach KILLFEED_MS aus. -->
       <div class="killfeed" id="killfeed" aria-live="polite" aria-label="Killfeed"></div>
@@ -139,12 +139,12 @@
       </div>
     </section>
     <div class="controls">
-      <button id="playPause" aria-label="Abspielen/Pause">▶</button>
+      <button id="playPause" aria-label="Play/pause">▶</button>
       <input class="timeline" id="scrubber" type="range" min="0" max="1000"
-             value="0" aria-label="Zeitleiste">
+             value="0" aria-label="Timeline">
       <span class="clock" id="clock">0:00 / 0:00</span>
-      <label class="sr-only" for="speedSelect">Geschwindigkeit</label>
-      <select id="speedSelect" aria-label="Geschwindigkeit">
+      <label class="sr-only" for="speedSelect">Speed</label>
+      <select id="speedSelect" aria-label="Speed">
         <option value="1" selected>1×</option>
         <option value="2">2×</option>
         <option value="4">4×</option>

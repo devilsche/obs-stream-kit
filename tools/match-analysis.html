@@ -349,9 +349,9 @@
         return `<tr>
           <td>${esc(r.weapon)}</td>
           <td class="num">${r.users}</td>
-          <td class="num" title="${r.finisherShots ? r.finisherShots + " Schuss auf bereits liegende Gegner — melden 0 Schaden und bleiben aus der Trefferquote" : ""}"
+          <td class="num" title="${r.finisherShots ? r.finisherShots + " shots at already-downed enemies — they report 0 damage and stay out of the hit rate" : ""}"
               >${r.shots}${r.finisherShots ? ` <span class="finisher">(+${r.finisherShots})</span>` : ""}</td>
-          <td class="num" title="${r.finisherHits ? r.finisherHits + " Treffer auf liegende Gegner" : ""}"
+          <td class="num" title="${r.finisherHits ? r.finisherHits + " hits on downed enemies" : ""}"
               >${r.hits}${r.finisherHits ? ` <span class="finisher">(+${r.finisherHits})</span>` : ""}</td>
           <td class="num">${r.shots ? r.accuracy.toFixed(1) : "—"}</td>
           <td class="num${weak ? " weak-sample" : ""}">${r.hits ? r.headshotRate.toFixed(1) : "—"}</td>
@@ -424,7 +424,7 @@
           <td class="num${p.hits < WEAK_SAMPLE ? " weak-sample" : ""}"
               title="${(p.zones||{}).HeadShot || 0}/${p.hits}">${p.hits ? p.headshotRate.toFixed(1) : "—"}</td>
           <td class="num${p.hits < WEAK_SAMPLE ? " weak-sample" : ""}"
-              title="${p.hits} Treffer">${p.hits ? limbPct(p).toFixed(1) : "—"}</td>
+              title="${p.hits} hits">${p.hits ? limbPct(p).toFixed(1) : "—"}</td>
           <td class="num">${p.kills}</td><td class="num">${Math.round(p.damage)}</td>
           <td>${badge}</td></tr>`;
       }).join("");
@@ -639,8 +639,8 @@
       try {
         DATA = await PubgUI.fetchJson(
           BASE + "api/pubg/match-analysis?matchId=" + encodeURIComponent(mid), 120000);
-        st.textContent = `${DATA.eventCount.toLocaleString("en-US")} Events · Quelle: `
-          + (DATA.source === "hidrive" ? "HiDrive archive" : "PUBG-API")
+        st.textContent = `${DATA.eventCount.toLocaleString("en-US")} events · source: `
+          + (DATA.source === "hidrive" ? "HiDrive archive" : "PUBG API")
           + (DATA.map ? ` · ${PubgUI.fmtMap(DATA.map)}` : "")
           + (DATA.playedAt ? ` · ${PubgUI.fmtDate(DATA.playedAt)} ${PubgUI.fmtTime(DATA.playedAt)}` : "");
         // Eigenes Team aus dem injizierten Tenant-Namen ableiten, damit die

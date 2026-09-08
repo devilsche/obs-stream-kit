@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=420, height=540" />
@@ -59,41 +59,41 @@
     <div class="head">
       <span class="title">Gothic 1 — Live</span>
       <span class="clock" id="clock"></span>
-      <span class="dot" id="dot" title="Verbindung"></span>
+      <span class="dot" id="dot" title="Connection"></span>
     </div>
 
     <div>
-      <div class="label">Gilde</div>
+      <div class="label">Guild</div>
       <div class="guild" id="guild"><span class="offline">—</span></div>
     </div>
 
     <div>
-      <div class="label">Waffen (dabei)</div>
+      <div class="label">Weapons (carried)</div>
       <div class="guild" id="weapon"><span class="offline">—</span></div>
     </div>
 
     <div>
-      <div class="label">Schlag</div>
+      <div class="label">Attack</div>
       <div class="guild" id="attack"><span class="offline">—</span></div>
     </div>
 
     <div>
-      <div class="label">Zauber / Runen (dabei)</div>
+      <div class="label">Spells / runes (carried)</div>
       <div class="guild" id="spell"><span class="offline">—</span></div>
     </div>
 
     <div>
       <div class="label">Position (cm)</div>
-      <div class="pos" id="pos"><span class="offline">— warte auf G1R —</span></div>
+      <div class="pos" id="pos"><span class="offline">— waiting for G1R —</span></div>
     </div>
 
     <div>
-      <div class="label">Strecke (diese Session)</div>
+      <div class="label">Distance (this session)</div>
       <div class="pos" id="dist"><span class="offline">—</span></div>
     </div>
 
     <div>
-      <div class="label">Diese Session</div>
+      <div class="label">This session</div>
       <div class="statgrid" id="session"><span class="offline">—</span></div>
     </div>
 
@@ -103,7 +103,7 @@
     </div>
 
     <div class="items">
-      <div class="label">Inventar (<span id="itemCount">0</span>)</div>
+      <div class="label">Inventory (<span id="itemCount">0</span>)</div>
       <ul id="items"></ul>
     </div>
   </div>
@@ -129,7 +129,7 @@
 
     function setOffline(msg) {
       dot.classList.remove('live');
-      posEl.innerHTML = '<span class="offline">' + (msg || '— warte auf G1R —') + '</span>';
+      posEl.innerHTML = '<span class="offline">' + (msg || '— waiting for G1R —') + '</span>';
       guildEl.innerHTML = '<span class="offline">—</span>';
       spellEl.innerHTML = '<span class="offline">—</span>';
       weaponEl.innerHTML = '<span class="offline">—</span>';
@@ -152,11 +152,11 @@
         if (v === undefined) return;
         out.push('<span class="s">' + label + '<b>' + Math.round(v) + (vMax !== undefined ? '/' + Math.round(vMax) : '') + '</b></span>');
       }
-      add('Level', s.level); add('XP', s.xp); add('Lernpkt', s.learnPts);
-      add('STR', s.strength); add('GES', s.dexterity);
-      pair('HP', s.hp, s.hpMax); pair('Mana', s.mana, s.manaMax); add('Kreis', s.magicCircle);
-      add('Feuer', s.resFire); add('Eis', s.resIce); add('Schnitt', s.resEdge);
-      add('Stich', s.resPoint); add('Wucht', s.resBlunt); add('Energie', s.resEnergy); add('Wind', s.resWind);
+      add('Level', s.level); add('XP', s.xp); add('Learn pts', s.learnPts);
+      add('STR', s.strength); add('DEX', s.dexterity);
+      pair('HP', s.hp, s.hpMax); pair('Mana', s.mana, s.manaMax); add('Circle', s.magicCircle);
+      add('Fire', s.resFire); add('Ice', s.resIce); add('Edge', s.resEdge);
+      add('Point', s.resPoint); add('Blunt', s.resBlunt); add('Energy', s.resEnergy); add('Wind', s.resWind);
       statsEl.innerHTML = out.length ? out.join('') : '<span class="offline">no stats</span>';
     }
 
@@ -166,26 +166,26 @@
       function add(label, val) {
         out.push('<span class="s">' + label + '<b>' + Math.round(val || 0) + '</b></span>');
       }
-      add('Schaden', s.damageTaken); add('HP regen.', s.healthRegen);
-      add('Mana verbr.', s.manaSpent); add('Mana regen.', s.manaRegen);
-      add('XP', s.xpGained); add('Schritte', s.steps);
+      add('Damage taken', s.damageTaken); add('HP regen', s.healthRegen);
+      add('Mana used', s.manaSpent); add('Mana regen', s.manaRegen);
+      add('XP', s.xpGained); add('Steps', s.steps);
       sessionEl.innerHTML = out.join('');
     }
 
     function render(d) {
       dot.classList.add('live');
-      guildEl.textContent = d.guild || 'Keine Gilde';
+      guildEl.textContent = d.guild || 'No guild';
       // Zauber/Runen crashfrei aus dem Inventar (ItAr_ = Runen + Schriftrollen).
       var spells = (d.items || []).filter(function (it) { return /^ItAr_/.test(it.name || ''); });
       spellEl.textContent = spells.length
         ? spells.map(function (it) { return it.display || it.name; }).join(', ')
-        : 'keine dabei';
+        : 'none carried';
       // Waffen crashfrei aus dem Inventar filtern (ItMw_=Nahkampf, ItRw_=Fernkampf).
       // Der direkte Engine-Weg (GetEquipedWeaponDefinition) crasht, die Items sind sicher.
       var weapons = (d.items || []).filter(function (it) { return /^It[MR]w_/.test(it.name || ''); });
       weaponEl.textContent = weapons.length
         ? weapons.map(function (it) { return it.display || it.name; }).join(', ')
-        : 'keine Waffe dabei';
+        : 'no weapon carried';
       attackEl.textContent = d.attackDisplay || d.attack || '—';
       if (d.pos) {
         posEl.innerHTML =
@@ -198,7 +198,7 @@
       if (d.distanceM !== undefined) {
         distEl.innerHTML =
           '<span><b>' + d.distanceM.toFixed(1) + '</b> m</span>' +
-          '<span><span class="axis">~</span><b>' + (d.steps || 0) + '</b> Schritte</span>';
+          '<span><span class="axis">~</span><b>' + (d.steps || 0) + '</b> steps</span>';
       }
       renderStats(d.stats);
       renderSession(d.session);
@@ -219,9 +219,9 @@
         .then(function (r) { return r.json(); })
         .then(function (d) {
           if (d && d.ok) render(d);
-          else setOffline(d && d.reason === 'stale' ? '— Spiel pausiert —' : '— warte auf G1R —');
+          else setOffline(d && d.reason === 'stale' ? '— game paused —' : '— waiting for G1R —');
         })
-        .catch(function () { setOffline('— lokaler Proxy nicht erreichbar —'); });
+        .catch(function () { setOffline('— local proxy unreachable —'); });
     }
 
     poll();

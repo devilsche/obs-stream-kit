@@ -174,8 +174,8 @@
       console.error(e);
       document.getElementById("content").innerHTML =
         `<div class="empty" style="color:var(--theme-danger,#e57b7b)"><span class="material-symbols-outlined icon-sm" aria-hidden="true">error</span> API error: ${e.message || e}<br>` +
-        `<small style="opacity:0.7">Endpoint /api/pubg/map-performance erreichbar? ` +
-        `Server ggf. neu starten falls gerade gepullt.</small></div>`;
+        `<small style="opacity:0.7">Is /api/pubg/map-performance reachable? ` +
+        `Restart the server if you just pulled.</small></div>`;
     }
     PubgUI.poll((window.__SERVE_BASE__||"/") + `api/pubg/map-performance?range=${RANGE}`, 60000, render, showError);
   </script>

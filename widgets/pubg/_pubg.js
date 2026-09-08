@@ -614,7 +614,7 @@
 
     const hint = document.createElement("span");
     hint.className = "hint";
-    hint.textContent = "?filter=0 versteckt";
+    hint.textContent = "?filter=0 hides this";
     bar.appendChild(hint);
 
     document.body.insertBefore(bar, document.body.firstChild);

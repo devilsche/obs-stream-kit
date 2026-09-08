@@ -342,15 +342,15 @@
       if (!unlockedAt) return "";
       const nowS = Date.now() / 1000;
       const delta = Math.max(0, nowS - unlockedAt);
-      if (delta < 60)    return `vor ${Math.round(delta)}s`;
-      if (delta < 3600)  return `vor ${Math.round(delta / 60)} Min.`;
-      if (delta < 86400) return `vor ${Math.round(delta / 3600)} Std.`;
+      if (delta < 60)    return `${Math.round(delta)}s ago`;
+      if (delta < 3600)  return `${Math.round(delta / 60)} min ago`;
+      if (delta < 86400) return `${Math.round(delta / 3600)} h ago`;
       const days = Math.round(delta / 86400);
-      if (days < 30)  return days === 1   ? "vor 1 Tag"   : `vor ${days} Tagen`;
+      if (days < 30)  return days === 1   ? "1 day ago"   : `${days} days ago`;
       const months = Math.round(days / 30.44);
-      if (months < 12) return months === 1 ? "vor 1 Monat" : `vor ${months} Monaten`;
+      if (months < 12) return months === 1 ? "1 month ago" : `${months} months ago`;
       const years = Math.round(days / 365.25);
-      return years === 1 ? "vor 1 Jahr" : `vor ${years} Jahren`;
+      return years === 1 ? "1 year ago" : `${years} years ago`;
     }
 
     // Show / Hide / Queue-Processing ────────────────────────────────────

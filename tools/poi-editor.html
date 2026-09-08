@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>PUBG POI-Editor</title>
@@ -198,9 +198,9 @@
     <button id="tabCalibrate" class="tab" data-mode="calibrate"><span class="material-symbols-outlined icon-sm" aria-hidden="true">my_location</span> Calibrate</button>
   </div>
   <button id="zoomResetBtn" class="secondary"><span class="material-symbols-outlined icon-sm" aria-hidden="true">search</span> 100%</button>
-  <button id="imgGridBtn" class="secondary" title="Bildbasiertes 8x8-Raster (Referenz, fix am Kartenbild)">▦ Raster</button>
-  <button id="pinsBtn" class="secondary"><span class="material-symbols-outlined icon-sm" aria-hidden="true">location_on</span> Pins laden</button>
-  <button id="saveBtn" class="save"><span class="material-symbols-outlined icon-sm" aria-hidden="true">save</span> Speichern</button>
+  <button id="imgGridBtn" class="secondary" title="Image-based 8x8 grid (reference, fixed to the map image)">▦ Grid</button>
+  <button id="pinsBtn" class="secondary"><span class="material-symbols-outlined icon-sm" aria-hidden="true">location_on</span> Load pins</button>
+  <button id="saveBtn" class="save"><span class="material-symbols-outlined icon-sm" aria-hidden="true">save</span> Save</button>
   <span id="status" style="color:#8a7d99; font-size:0.8em"></span>
 </div>
 <div class="wrap">
@@ -212,28 +212,28 @@
     <!-- ─── Regions-Panel ─────────────────────────────────────────────── -->
     <div class="panel-section mode-regions">
       <div class="panel-buttons">
-        <button id="rectBtn">▭ Rechteck</button>
+        <button id="rectBtn">▭ Rectangle</button>
         <button id="polyBtn">⬠ Polygon</button>
       </div>
-      <h3>Regionen <select id="sortSel" style="float:right;font-size:0.78em;padding:2px 6px">
-        <option value="area">Fläche ↓</option>
+      <h3>Regions <select id="sortSel" style="float:right;font-size:0.78em;padding:2px 6px">
+        <option value="area">Area ↓</option>
         <option value="name">Name A–Z</option>
       </select></h3>
       <div class="hint">
-        <b>▭ Rechteck:</b> click+drag<br>
-        <b>⬠ Polygon:</b> klicken um Punkte zu setzen, doppel-klick zum Schließen<br>
-        <b>Drag</b> Vertex-Handle zum Verschieben &nbsp;·&nbsp; <b>Shift+Click</b> auf Kante = neuer Vertex &nbsp;·&nbsp; <b>Alt+Click</b> oder <b>Delete</b> über Vertex = löschen<br>
-        <b>Mausrad</b> = Zoom &nbsp;·&nbsp; <b>Rechtsklick-Drag</b> = Pan
+        <b>▭ Rectangle:</b> click+drag<br>
+        <b>⬠ Polygon:</b> click to place points, double-click to close<br>
+        <b>Drag</b> a vertex handle to move it &nbsp;·&nbsp; <b>Shift+Click</b> on an edge = new vertex &nbsp;·&nbsp; <b>Alt+Click</b> or <b>Delete</b> over a vertex = remove<br>
+        <b>Scroll wheel</b> = zoom &nbsp;·&nbsp; <b>Right-click drag</b> = pan
       </div>
       <div id="regionList"></div>
       <div class="edit-block" id="editBlock" style="display:none">
-        <h3 style="margin-top:0">Region bearbeiten</h3>
-        <label>Name (leer = ohne Label)</label>
+        <h3 style="margin-top:0">Edit region</h3>
+        <label>Name (empty = no label)</label>
         <input id="ed_name" type="text">
         <div class="stat-line" id="kmStat"></div>
         <div style="margin-top:8px; display:flex; gap:6px">
-          <button id="dupBtn" class="secondary">Duplizieren</button>
-          <button id="delBtn" class="danger">Löschen</button>
+          <button id="dupBtn" class="secondary">Duplicate</button>
+          <button id="delBtn" class="danger">Delete</button>
         </div>
       </div>
     </div>
@@ -243,10 +243,10 @@
       <div class="panel-buttons">
         <button id="calBtn" class="secondary" title="Calibration mode: drag kill/death events to compute the map calibration"><span class="material-symbols-outlined icon-sm" aria-hidden="true">my_location</span> Cal</button>
         <button id="modeBtn" class="secondary" title="Which calibration the inputs control: pin or grid">Cal-Mode: PIN</button>
-        <button id="flipXBtn" class="secondary" title="X-Achse spiegeln (Ost/West)">↔ FlipX</button>
-        <button id="flipYBtn" class="secondary" title="Y-Achse spiegeln (Nord/Sued)">↕ FlipY</button>
-        <button id="rotBtn" class="secondary" title="90° drehen">⟳ 0°</button>
-        <button id="calResetBtn" class="secondary" title="Calibration zuruecksetzen">↹ Pins 0/0</button>
+        <button id="flipXBtn" class="secondary" title="Mirror the X axis (east/west)">↔ FlipX</button>
+        <button id="flipYBtn" class="secondary" title="Mirror the Y axis (north/south)">↕ FlipY</button>
+        <button id="rotBtn" class="secondary" title="Rotate 90°">⟳ 0°</button>
+        <button id="calResetBtn" class="secondary" title="Reset calibration">↹ Pins 0/0</button>
       </div>
       <div class="cal-grid">
         <label class="cal-row-full">Map-Size (km)
@@ -438,10 +438,10 @@ async function loadMap(mapId) {
         scaleY:  blob.gridCalibration.scaleY  || 1.0,
       };
     }
-    statusEl.textContent = `${regions.length} Regionen geladen`;
+    statusEl.textContent = `${regions.length} regions loaded`;
     updateCalLabel();
   } catch (e) {
-    statusEl.textContent = `⚠ Lade-Fehler: ${e}`;
+    statusEl.textContent = `⚠ Load error: ${e}`;
     regions = [];
   }
   renderAll();
@@ -858,7 +858,7 @@ function renderList() {
     const r = regions[selectedIdx];
     editBlock.style.display = "";
     nameIn.value = r.name || "";
-    kmStat.textContent = `${r.points.length} Punkte · ${(polyArea(r.points)/1e10).toFixed(3)} km²`;
+    kmStat.textContent = `${r.points.length} points · ${(polyArea(r.points)/1e10).toFixed(3)} km²`;
   } else {
     editBlock.style.display = "none";
   }
@@ -999,8 +999,8 @@ function showPinTooltip(p, clientX, clientY) {
     <div class="row"><span class="lbl">Player</span><b>${p.name || "?"}</b></div>
     ${dateStr ? `<div class="row"><span class="lbl">Match</span><span>${dateStr}</span></div>` : ""}
     <div class="row"><span class="lbl">Match-ID</span><span>${(p.matchId || "").slice(0, 12)}…</span></div>
-    <div class="row"><span class="lbl">Welt-cm</span><span>(${p.x|0}, ${p.y|0})</span></div>
-    <div class="row"><span class="lbl">rel. zur Mitte</span><b>${relRawX.toFixed(2)} / ${relRawY.toFixed(2)} km</b></div>
+    <div class="row"><span class="lbl">World cm</span><span>(${p.x|0}, ${p.y|0})</span></div>
+    <div class="row"><span class="lbl">rel. to centre</span><b>${relRawX.toFixed(2)} / ${relRawY.toFixed(2)} km</b></div>
     <div class="row"><span class="lbl">POI</span><b>${poi || "<i style='color:#666'>no region</i>"}</b></div>
   `;
   tip.style.display = "block";
@@ -1460,13 +1460,13 @@ document.getElementById("pinsBtn").addEventListener("click", async () => {
     statusEl.textContent = `${pins.length} Landings`;
     render();
   } catch (e) {
-    statusEl.textContent = `⚠ Fehler: ${e}`;
+    statusEl.textContent = `⚠ Error: ${e}`;
   }
 });
 
 // ─── Save ──────────────────────────────────────────────────────────────────
 document.getElementById("saveBtn").addEventListener("click", async () => {
-  statusEl.textContent = "Speichere…";
+  statusEl.textContent = "Saving…";
   try {
     const r = await fetch((window.__SERVE_BASE__||"/") + "api/pubg/pois", {
       method: "POST",
@@ -1483,9 +1483,9 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
     });
     const j = await r.json();
     if (j.error) throw new Error(j.error);
-    statusEl.textContent = `✓ Gespeichert (${regions.length} Regionen)`;
+    statusEl.textContent = `✓ Saved (${regions.length} regions)`;
   } catch (e) {
-    statusEl.textContent = `⚠ Speicher-Fehler: ${e}`;
+    statusEl.textContent = `⚠ Save error: ${e}`;
   }
 });
 
@@ -1519,7 +1519,7 @@ async function loadCalEvents() {
     ]);
     calEvents = er.events || [];
     calCorrections = cr.corrections || [];
-    statusEl.textContent = `${calEvents.length} Squad-Events, ${calCorrections.length} Korrekturen`;
+    statusEl.textContent = `${calEvents.length} squad events, ${calCorrections.length} corrections`;
     renderCalList();
     render();
   } catch (e) {
@@ -1570,12 +1570,12 @@ function showCalTooltip(hit, clientX, clientY) {
     const drift = Math.hypot(c.fixedX - c.origX, c.fixedY - c.origY) / 100;
     const actLbl = c.type === "Knock" ? "Knocked by" : "Killed by";
     tip.innerHTML = `
-      <div class="row"><span class="lbl">Korrektur</span><b style="color:#48c878">#${hit.index}</b></div>
+      <div class="row"><span class="lbl">Correction</span><b style="color:#48c878">#${hit.index}</b></div>
       <div class="row"><span class="lbl">Event</span><b style="color:${c.type==="Kill"?"#e74c3c":"#ffa028"}">${c.type || "?"}</b></div>
       <div class="row"><span class="lbl">${actLbl}</span><b>${c.actorName || "?"}</b></div>
-      <div class="row"><span class="lbl">Opfer</span><b>${c.targetName || "?"}</b></div>
+      <div class="row"><span class="lbl">Victim</span><b>${c.targetName || "?"}</b></div>
       <div class="row"><span class="lbl">Drift</span><b>${drift.toFixed(0)} m</b></div>
-      <div class="row"><span class="lbl">Gesetzt</span><span>${(c.savedAt||"").slice(0,16).replace("T"," ")}</span></div>
+      <div class="row"><span class="lbl">Set</span><span>${(c.savedAt||"").slice(0,16).replace("T"," ")}</span></div>
     `;
     tip.style.display = "block";
     _positionTip(tip, clientX, clientY);
@@ -1597,12 +1597,12 @@ function showCalTooltip(hit, clientX, clientY) {
   }
   const actLbl = ev.type === "Knock" ? "Knocked by" : "Killed by";
   tip.innerHTML = `
-    <div class="row"><span class="lbl">Event</span><b style="color:${ev.type==="Kill"?"#e74c3c":"#ffa028"}">${ev.type}</b>${isSel?" <span style='color:#f2b705'>● SELECT</span>":""}${isCorrected?" <span style='color:#48c878'>✓ korrigiert</span>":""}</div>
+    <div class="row"><span class="lbl">Event</span><b style="color:${ev.type==="Kill"?"#e74c3c":"#ffa028"}">${ev.type}</b>${isSel?" <span style='color:#f2b705'>● SELECT</span>":""}${isCorrected?" <span style='color:#48c878'>✓ corrected</span>":""}</div>
     <div class="row"><span class="lbl">${actLbl}</span><b>${ev.actorName || "?"}</b></div>
-    <div class="row"><span class="lbl">Opfer</span><b>${ev.targetName || "?"}</b></div>
+    <div class="row"><span class="lbl">Victim</span><b>${ev.targetName || "?"}</b></div>
     ${dateStr ? `<div class="row"><span class="lbl">Match</span><span>${dateStr}</span></div>` : ""}
-    <div class="row"><span class="lbl">Match-Zeit</span><span>${_shortTime(ev.tsMs)}</span></div>
-    ${ev.weapon ? `<div class="row"><span class="lbl">Waffe</span><span>${ev.weapon}</span></div>` : ""}
+    <div class="row"><span class="lbl">Match time</span><span>${_shortTime(ev.tsMs)}</span></div>
+    ${ev.weapon ? `<div class="row"><span class="lbl">Weapon</span><span>${ev.weapon}</span></div>` : ""}
   `;
   tip.style.display = "block";
   _positionTip(tip, clientX, clientY);
@@ -1672,7 +1672,7 @@ function renderCalList() {
     return (b.playedAt || "").localeCompare(a.playedAt || "");
   });
   // Match-Dropdown — Eintraege mit 4-Quadranten-Coverage golden markiert
-  const opts = [`<option value="">— neuestes Match —</option>`]
+  const opts = [`<option value="">— latest match —</option>`]
     .concat(matchSpread.map(m => {
       const date = (m.playedAt || "").slice(0, 16).replace("T", " ");
       const sel = (m.matchId === calSelectedMatch) ? "selected" : "";
@@ -1702,8 +1702,8 @@ function renderCalList() {
       <div style="display:grid;grid-template-columns:24px 1fr;gap:3px 8px;margin-bottom:6px;font-size:0.9em">
         <span style="color:#e74c3c;font-weight:700;text-align:center">✕</span><span>Kill</span>
         <span style="color:#ffa028;font-weight:700;text-align:center">✕</span><span>Knock</span>
-        <span style="color:#f2b705;font-weight:700;text-align:center">✕</span><span>ausgewaehlt — naechster Klick = Korrektur-Ziel</span>
-        <span style="text-align:center"><span style="color:#e74c3c">✕</span><span style="color:#48c878">→●</span></span><span>bereits korrigiert (Telem→Fix)</span>
+        <span style="color:#f2b705;font-weight:700;text-align:center">✕</span><span>selected — next click sets the corrected spot</span>
+        <span style="text-align:center"><span style="color:#e74c3c">✕</span><span style="color:#48c878">→●</span></span><span>already corrected (telemetry→fix)</span>
       </div>
       <select id="calMatchSel" style="width:100%;padding:4px;font-size:0.95em">
         ${opts.join("")}
@@ -1711,7 +1711,7 @@ function renderCalList() {
       <div style="display:flex;gap:4px;margin-top:6px">
         <button id="calFitBtn" ${canFit ? "" : "disabled"}
                 style="flex:1;padding:5px;font-size:0.85em;background:${canFit?"#5e2a79":"#2a1d3f"};color:${canFit?"#f2b705":"#666"};border:1px solid ${canFit?"#f2b705":"#444"};border-radius:3px;cursor:${canFit?"pointer":"not-allowed"}">
-          <span class="material-symbols-outlined icon-sm" aria-hidden="true">straighten</span> Cal aus ${calCorrections.length} Korrekturen
+          <span class="material-symbols-outlined icon-sm" aria-hidden="true">straighten</span> Fit from ${calCorrections.length} corrections
         </button>
         <button id="calClearBtn" title="Delete all corrections" aria-label="Delete all corrections"
                 style="padding:5px 8px;font-size:0.85em;background:#3a1818;color:#e57b7b;border:1px solid #5a2828;border-radius:3px;cursor:pointer">
@@ -1719,14 +1719,14 @@ function renderCalList() {
         </button>
       </div>
       <div style="font-size:0.75em;color:#8a7d99;margin-top:4px">
-        ${sortedVis.length} sichtbar · ${calCorrections.length} korrigiert
+        ${sortedVis.length} visible · ${calCorrections.length} corrected
       </div>
     </div>
     ${rows.join("")}
     ${calCorrections.length ? `
       <div style="margin-top:14px;padding-top:8px;border-top:1px solid #2a1d3f">
         <div style="font-size:0.75em;color:#8a7d99;letter-spacing:0.05em;margin-bottom:4px">
-          KORREKTUREN (${calCorrections.length})
+          CORRECTIONS (${calCorrections.length})
         </div>
         ${calCorrections.slice().sort((a,b)=>(b.savedAt||"").localeCompare(a.savedAt||"")).map(c => {
           const drift = Math.hypot(c.fixedX - c.origX, c.fixedY - c.origY) / 100;
@@ -1738,7 +1738,7 @@ function renderCalList() {
             </span>
             <button class="corr-del-btn" data-corr-id="${c.id}"
                     style="background:transparent;border:0;color:#e57b7b;cursor:pointer;font-size:1.1em;padding:0 4px"
-                    title="Diese Korrektur loeschen">×</button>
+                    title="Delete this correction">×</button>
           </div>`;
         }).join("")}
       </div>
@@ -1754,7 +1754,7 @@ function renderCalList() {
     fitBtn.addEventListener("click", computeAndApplyFit);
   }
   document.getElementById("calClearBtn").addEventListener("click", async () => {
-    if (!confirm(`Alle ${calCorrections.length} Korrekturen fuer diese Map loeschen?`)) return;
+    if (!confirm(`Delete all ${calCorrections.length} corrections for this map?`)) return;
     try {
       await fetch((window.__SERVE_BASE__||"/") + "api/pubg/calibration-corrections", {
         method: "DELETE",
@@ -1762,7 +1762,7 @@ function renderCalList() {
         body: JSON.stringify({ map: currentDataKey, clearAll: true }),
       });
       calCorrections = [];
-      statusEl.textContent = "Alle Korrekturen geloescht";
+      statusEl.textContent = "All corrections deleted";
       renderCalList();
       render();
     } catch (e) { statusEl.textContent = `⚠ ${e}`; }
@@ -1779,7 +1779,7 @@ function renderCalList() {
           body: JSON.stringify({ map: currentDataKey, id }),
         });
         calCorrections = calCorrections.filter(c => c.id !== id);
-        statusEl.textContent = `Korrektur entfernt (${calCorrections.length} verbleibend)`;
+        statusEl.textContent = `Correction removed (${calCorrections.length} left)`;
         renderCalList();
         render();
       } catch (err) { statusEl.textContent = `⚠ ${err}`; }
@@ -1867,7 +1867,7 @@ function _linfit(xs, ys) {
 
 function computeAndApplyFit() {
   if (calCorrections.length < 3) {
-    statusEl.textContent = "Brauche mindestens 3 Korrekturen";
+    statusEl.textContent = "Need at least 3 corrections";
     return;
   }
   const mc = mapKm * 100000 / 2;
@@ -1888,14 +1888,14 @@ function computeAndApplyFit() {
   const sX = fitX.a, oX = fitX.b, sY = fitY.a, oY = fitY.b;
   const ok = isFinite(sX) && isFinite(sY) && isFinite(oX) && isFinite(oY);
   if (!ok) {
-    statusEl.textContent = "⚠ Fit hat NaN/Infinity geliefert — Korrekturen ueberpruefen";
+    statusEl.textContent = "⚠ Fit returned NaN/Infinity — check the corrections";
     return;
   }
   const msg = `Fit (n=${calCorrections.length}): ` +
     `scaleX=${sX.toFixed(4)} (R²=${fitX.r2.toFixed(3)}) · ` +
     `scaleY=${sY.toFixed(4)} (R²=${fitY.r2.toFixed(3)}) · ` +
     `offsetX=${(oX/100).toFixed(1)}m · offsetY=${(oY/100).toFixed(1)}m`;
-  if (!confirm(`${msg}\n\nUebernehmen + Speichern?`)) return;
+  if (!confirm(`${msg}\n\nApply and save?`)) return;
   pinCal.scaleX = sX;
   pinCal.scaleY = sY;
   pinCal.offsetX = oX;
@@ -1935,11 +1935,11 @@ async function saveCorrection(fixedX, fixedY) {
     calCorrections = calCorrections.filter(c => c.id !== corr.id);
     calCorrections.push(corr);
     calSelectedEvent = null;
-    statusEl.textContent = `✓ Korrektur gespeichert (${calCorrections.length} total)`;
+    statusEl.textContent = `✓ Correction saved (${calCorrections.length} total)`;
     renderCalList();
     render();
   } catch (e) {
-    statusEl.textContent = `⚠ Korrektur-Speicher: ${e}`;
+    statusEl.textContent = `⚠ Correction save: ${e}`;
   }
 }
 
@@ -1987,7 +1987,7 @@ canvas.addEventListener("click", (e) => {
       renderCalList();
       render();
     } else {
-      statusEl.textContent = "Kein Event in Klick-Naehe — bitte direkt auf ein X klicken";
+      statusEl.textContent = "No event near the click — click directly on an X";
     }
     return;
   }

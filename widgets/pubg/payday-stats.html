@@ -159,7 +159,7 @@ const POLL_MS = parseInt(PubgUI.qs("pollMs", "15000"), 10);
 PubgUI.buildFilter([
   { key: "range", label: "Range", type: "choice",
     choices: [["session","Session"],["day","Day"],["week","Week"],["all","All"]] },
-  { key: "pollMs", label: "Poll-Intervall (ms)", type: "range",
+  { key: "pollMs", label: "Poll interval (ms)", type: "range",
     min: 5000, max: 60000, step: 5000 },
 ]);
 

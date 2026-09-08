@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Icon Crop Editor</title>
@@ -92,7 +92,7 @@
         Open image
       </button>
       <label style="margin-top:8px">or URL</label>
-      <input type="text" id="urlInput" placeholder="https://... oder /widgets-static/...">
+      <input type="text" id="urlInput" placeholder="https://... or /widgets-static/...">
       <button class="btn" style="margin-top:6px" onclick="loadFromUrl()">Load URL</button>
     </div>
 
@@ -378,7 +378,7 @@ async function saveIcon() {
     const j = await res.json();
     if (j.error) showMsg(j.error, "err");
     else { showMsg(`Saved: ${j.path}`, "ok"); await loadExisting(); }
-  } catch(e) { showMsg("Fehler: " + e.message, "err"); }
+  } catch(e) { showMsg("Error: " + e.message, "err"); }
 }
 
 let _toastTimer;

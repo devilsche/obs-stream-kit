@@ -37,7 +37,7 @@ async function loadMatchList() {
     return;
   }
   if (list.length === 0) {
-    if (sel) sel.innerHTML = `<option>⚠ keine Matches in der DB</option>`;
+    if (sel) sel.innerHTML = `<option>⚠ no matches in the database</option>`;
     return;
   }
   // Optionen-Texte vorberechnen (case-insensitive Filter spaeter)
@@ -114,11 +114,11 @@ function showSourceNote(replay) {
   const limited = cov.positions === "squad-only" || cov.zones === false;
   el.classList.toggle("show", !!limited);
   if (limited) {
-    el.innerHTML = "<b>Eingeschränktes Replay</b> — aus der Datenbank "
-      + "rekonstruiert, weil die Roh-Telemetrie nicht mehr verfügbar ist: "
-      + "Bewegungsspuren nur für das eigene Squad, Gegner erscheinen an "
-      + "Lande- und Kampfpunkten, keine Bluezone"
-      + (cov.flightPath === false ? ", keine Flugroute" : "") + ".";
+    el.innerHTML = "<b>Limited replay</b> — reconstructed from the database "
+      + "because the raw telemetry is no longer available: "
+      + "movement trails for your own squad only, enemies appear at "
+      + "landing and combat points, no bluezone"
+      + (cov.flightPath === false ? ", no flight path" : "") + ".";
   } else {
     el.textContent = "";
   }
@@ -130,21 +130,21 @@ function showSourceNote(replay) {
     if (noZones) tgl.checked = false;
     const lbl = tgl.closest("label");
     if (lbl) lbl.title = noZones
-      ? "Für dieses Replay liegen keine Zonen-Daten vor"
+      ? "No zone data available for this replay"
       : "";
   }
 }
 
 async function loadReplay(matchId) {
-  setLoading("show", "Replay wird geladen…");
+  setLoading("show", "Loading replay…");
   try {
     RS.replay = await PubgUI.fetchJson(
       "/api/pubg/match-replay?match=" + encodeURIComponent(matchId), 60000);
   } catch (e) {
     RS.replay = null;
     const msg = (e && /404/.test(String(e.message || e)))
-      ? "Keine Telemetrie für dieses Match verfügbar."
-      : "Replay konnte nicht geladen werden.";
+      ? "No telemetry available for this match."
+      : "Could not load the replay.";
     setLoading("error", msg);
     buildTeamList();
     return;
@@ -178,7 +178,7 @@ function buildTeamList() {
       const botLbl = isBotAcc(p.accountId) ? " ·BOT" : "";
       return `<div class="player" data-acc="${p.accountId}">`
            + `<span class="pname">${p.name}${botLbl}</span>`
-           + `<span class="pkills" title="Kills bis Cursor-Zeitpunkt">`
+           + `<span class="pkills" title="Kills up to the cursor position">`
            + `0<small>K</small></span>`
            + `</div>`;
     }).join("");

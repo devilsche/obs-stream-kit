@@ -1805,7 +1805,7 @@
   </style>
 </head>
 <body>
-  <div class="view-tabs" role="tablist" aria-label="Report-Auswahl">
+  <div class="view-tabs" role="tablist" aria-label="Report selection">
     <button type="button" class="view-tab" role="tab"
             data-view="sessions" id="tabSessions"
             aria-controls="picker" aria-selected="true">Sessions</button>
@@ -2354,16 +2354,16 @@
         }
         // Lives-Detail (eine Zeile pro Leben)
         const livesHtml = (m.lives || []).map((life, idx) => {
-          const prefix = m.lives.length > 1 ? `Leben ${life.lifeIndex}: ` : "";
+          const prefix = m.lives.length > 1 ? `Life ${life.lifeIndex}: ` : "";
           const landP = life.landing
             ? poi(life.landing.x, life.landing.y, mapName) : null;
-          let row = `${prefix}landete <b>${landP || "?"}</b>`;
+          let row = `${prefix}landed at <b>${landP || "?"}</b>`;
           if (life.death) {
             const deathP = poi(life.death.x, life.death.y, mapName);
             const killer = life.death.killerName || "an opponent";
             const wn = life.death.weaponName || "?";
             const dist = life.death.distanceM
-              ? ` auf <b>${life.death.distanceM.toFixed(0)}m</b>` : "";
+              ? ` at <b>${life.death.distanceM.toFixed(0)}m</b>` : "";
             // Cause-Label-Prioritaet: death > knock > Standard
             const causeLbl = life.death.causeLabel || life.death.knockCauseLabel;
             // Fahrzeug-Kontext: war Opfer beim Tod (oder beim Knock) im Fahrzeug
@@ -2373,7 +2373,7 @@
               ? ` <span class="md-veh">from <b>${vehLbl}</b> <span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_bus</span></span>`
               : "";
             if (causeLbl) {
-              const verb = life.death.causeLabel ? "gestorben" : "geknockt+gestorben";
+              const verb = life.death.causeLabel ? "died" : "knocked + died";
               row += ` <span class="md-died">— ${verb} in <b>${deathP || "?"}</b> — <b>${causeLbl}</b>${vehTag}</span>`;
             } else {
               row += ` <span class="md-died">— died in <b>${deathP || "?"}</b>, killed by <b>${killer}</b> with <b>${wn}</b>${dist}${vehTag}</span>`;
@@ -2433,7 +2433,7 @@
       if (!btn) return;
       const anyHidden = s.hiddenAccs && s.hiddenAccs.size > 0;
       btn.classList.toggle("solo-active", anyHidden);
-      btn.textContent = anyHidden ? "↺ Alle anzeigen" : "● Alle sichtbar";
+      btn.textContent = anyHidden ? "↺ Show all" : "● All visible";
     }
 
     function _fmtSurvSec(secs) {
@@ -2489,7 +2489,7 @@
       return `<table class="md-squad-table">
         <thead><tr>
           <th>Member</th>
-          <th title="Platzierung">#</th>
+          <th title="Placement">#</th>
           <th>K</th>
           <th title="Headshot Kills">HS</th>
           <th title="Assists">Ass</th>
@@ -3070,7 +3070,7 @@
           <div class="md-rightcol">
             <div class="squad-table-wrap" id="mdSquadTableWrap_${matchId}"></div>
             <div class="md-allebar">
-              <button class="md-allebtn">● Alle sichtbar</button>
+              <button class="md-allebtn">● All visible</button>
             </div>
             <div class="md-cards"></div>
           </div>
@@ -3632,9 +3632,9 @@
           <select id="sortBy">
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
-            <option value="wins">Meiste CHICKEN Wins</option>
-            <option value="matches">Meiste Matches</option>
-            <option value="kills">Meiste Kills</option>
+            <option value="wins">Most CHICKEN wins</option>
+            <option value="matches">Most matches</option>
+            <option value="kills">Most kills</option>
           </select>
           <span class="summary" id="sessionSummary"></span>
         </div>
@@ -4483,9 +4483,9 @@
               // KD: in Event-Only-Maps wenn keine Deaths → 'Perfekt'.
               // Auch in BR ohne Deaths → 'Perfekt'.
               const kdCell = (m.deaths === 0 && (m.brMatches || 0) > 0)
-                ? '<span title="Keine Deaths" style="color:var(--pubg-gold)">Perfekt</span>'
+                ? '<span title="No deaths" style="color:var(--pubg-gold)">Perfect</span>'
                 : (isEvent && m.deaths === 0)
-                  ? '<span title="event without DIED" style="color:var(--pubg-gold)">Perfekt</span>'
+                  ? '<span title="event without DIED" style="color:var(--pubg-gold)">Perfect</span>'
                   : m.kd.toFixed(2);
               const placeCell = isEvent ? '—' : `#${m.avgPlace.toFixed(1)}`;
               // Event-Badge: lila Text auf transparentem Hintergrund. Bei
@@ -5069,7 +5069,7 @@
                 : "Could not load the report: "
                   + PubgUI.esc(String(err && err.message || err))}</p>
           <button type="button" class="report-retry" id="reportRetry">
-            Erneut versuchen</button>
+            Try again</button>
         </div>`;
       document.getElementById("reportRetry").addEventListener("click", () => {
         host.innerHTML = `<div class="empty">— loading —</div>`;

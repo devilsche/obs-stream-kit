@@ -292,7 +292,7 @@ function buildPlayersBar() {
   bar.innerHTML = active.map(({ p, i }) => `
     <div class="pchip" role="button" tabindex="0" data-acc="${p.accountId}"
          aria-pressed="${LS.activeScatter.has(p.accountId) ? "true" : "false"}"
-         aria-label="Scatter ${p.name} umschalten">
+         aria-label="Toggle scatter for ${p.name}">
       <span class="dot" style="background:${SCATTER_COLORS[i]}"></span>
       <span>${p.name}${botMark(p.accountId)}</span>
     </div>`).join("");
@@ -319,7 +319,7 @@ function buildPlayersBar() {
 function renderPoiList() {
   const host = document.getElementById("poiList");
   if (!LS.data || !LS.data.pois.length) {
-    host.innerHTML = `<p>Keine Landings für diese Auswahl.</p>`;
+    host.innerHTML = `<p>No landings for this selection.</p>`;
     return;
   }
   const maxTotal = Math.max(1, ...LS.data.pois.map(p => p.total));

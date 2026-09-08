@@ -132,7 +132,7 @@
     <table class="ws" id="wsTable">
       <thead>
         <tr>
-          <th class="name-h" data-sort="name"><span class="hdr">Waffe</span></th>
+          <th class="name-h" data-sort="name"><span class="hdr">Weapon</span></th>
           <th data-sort="kills"><span class="hdr">Kills</span></th>
           <th data-sort="usedInMatches" title="Matches in which this weapon got at least one kill"><span class="hdr">Matches</span></th>
           <th data-sort="avgDist"><span class="hdr">Ø m</span></th>
@@ -168,12 +168,12 @@
       { key: "minKills", label: "Min Kills", type: "number", default: "3",
         tooltip: "Minimum kills with this weapon, otherwise filtered out." },
       { key: "player", label: "Player", type: "text", placeholder: "empty = self",
-        tooltip: "Squad-Mate-Name eintragen um dessen Weapon-Stats zu sehen." },
+        tooltip: "Enter a squad mate's name to see their weapon stats." },
     ]);
 
     // Category-Filter — null = alle
     const CATS = [
-      ["all",       "Alle"],
+      ["all",       "All"],
       ["ar",        "AR"],
       ["dmr",       "DMR"],
       ["sniper",    "Sniper"],
