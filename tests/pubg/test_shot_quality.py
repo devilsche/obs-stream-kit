@@ -877,3 +877,43 @@ def test_landing_stats_passes_grouping_through(pg_compat):
                               pois=pois, min_drops=1, group_subareas=True)
     assert len(merged["byPoi"]) == 1
     assert merged["byPoi"][0]["drops"] == 2
+
+
+# ── Zeitfilter der Landing-Heatmap ──────────────────────────────────────────
+
+def test_landing_spots_honours_the_time_range(pg_compat):
+    """Karte und POI-Tabelle im Analyzer muessen denselben Zeitraum zeigen —
+    eine Heatmap aus allen Matches neben einer Tabelle aus der Session waere
+    schlimmer als zwei getrennte Tools."""
+    from pubg.aggregations import compute_landing_spots
+    conn, t1, _ = pg_compat
+    _seed(conn, t1, "account.me", "match.old", played_at="2026-01-01T10:00:00Z")
+    _seed(conn, t1, "account.me", "match.new", played_at="2026-09-01T10:00:00Z")
+    for mid in ("match.old", "match.new"):
+        conn.execute(
+            "INSERT INTO telemetry_events (match_id, event_type,"
+            " actor_account, actor_x, actor_y, timestamp_ms)"
+            " VALUES (?, 'Landing', 'account.me', 1500, 1500, 1000)", (mid,))
+    conn.commit()
+    blob = {"mapKm": 8, "regions": POIS["Baltic_Main"]["regions"]}
+
+    both = compute_landing_spots(conn, t1, "Baltic_Main", [], pois_blob=blob)
+    assert both["totalMatches"] == 2
+
+    recent = compute_landing_spots(conn, t1, "Baltic_Main", [], pois_blob=blob,
+                                   from_iso="2026-06-01T00:00:00Z")
+    assert recent["totalMatches"] == 1
+
+
+def test_landing_spots_without_range_keeps_the_full_history(pg_compat):
+    """Bestehende Aufrufer (landing-spots ohne range) duerfen sich nicht
+    aendern."""
+    from pubg.aggregations import compute_landing_spots
+    conn, t1, _ = pg_compat
+    for i in range(3):
+        _seed(conn, t1, "account.me", f"match.{i}",
+              played_at=f"202{i}-01-01T10:00:00Z")
+    conn.commit()
+    blob = {"mapKm": 8, "regions": POIS["Baltic_Main"]["regions"]}
+    assert compute_landing_spots(
+        conn, t1, "Baltic_Main", [], pois_blob=blob)["totalMatches"] == 3

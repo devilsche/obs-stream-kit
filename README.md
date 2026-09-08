@@ -497,12 +497,38 @@ auf das Backend; kein Streaming nötig.
 | Datei | Zweck | Größe |
 |---|---|---|
 | `tools/match-replay.html` | Animierter Replay eines PUBG-Matches auf der Karte | Browser-Tab |
-| `tools/landing-spots.html` | Heatmap + Scatter der Landeorte pro Karte und Spieler-Konstellation | Browser-Tab / 1920×1080 |
+| `tools/landing-spots.html` | **Landing Spot Analyzer**: Heatmap + Scatter der Landeorte, dazu je Platz das eigene Ergebnis gegen die Lobby | Browser-Tab / 1920×1080 |
 | `tools/g1r-database.html` | Vollständiger G1R-Item-Katalog aus dem Object-Dump (Nah-/Fernkampf, Runen, Schriftrollen) mit Live-Suche | Browser-Tab (admin) |
 | `tools/match-analysis.html` | Telemetrie-Auswertung eines Matches: Accuracy, Trefferzonen, Kill-Timeline, Auffälligkeiten | Browser-Tab |
 | `tools/weapon-performance.html` | Dieselben Kennzahlen über einen **Zeitraum** — je Waffe oder je Spieler | Browser-Tab |
 | `tools/squad-playstyle.html` | Spielstil je Squad-Mate: wer eröffnet die Gefechte, wie gehen sie aus, wer hängt zu weit weg | Browser-Tab |
 | `tools/shot-quality.html` | Schussqualität, Todesbild und Perzentil-Rang gegen Lobby und Squad | Browser-Tab |
+
+#### tools/landing-spots.html — Landing Spot Analyzer
+
+Karte und Bewertung an einem Ort. Links Heatmap, Scatter je Spieler und
+Flugrouten-Filter wie bisher; rechts in der Landeplatz-Liste jetzt
+zusätzlich das eigene Ergebnis pro Platz — Drops, *Squad held*, *You died*,
+*Died alone*, Lobby-Quote, Differenz, Überlebenszeit, Platzierung. Dieselben
+Größen und Richtungen wie in `shot-quality`, damit man nicht zwei Sprachen
+lernt.
+
+**Klick auf einen Landeplatz zentriert ihn auf der Karte** (Zoom mindestens
+3×, eine höhere bleibt erhalten) — das war der fehlende Weg zwischen Zahl
+und Ort. Hover hebt ihn wie zuvor nur hervor.
+
+Zwei Quellen, ein Zeitraum: die Heatmap kommt aus
+`/api/pubg/landing-heatmap` (alle Spieler der Lobby, eine Karte), die
+Bewertung aus `/api/pubg/shot-quality` (eigener Account, alle Karten).
+Beide bekommen denselben `range`, und dafür hat `landing-heatmap` einen
+`range`-Parameter bekommen — ohne Angabe weiterhin der ganze Bestand, damit
+bestehende Aufrufe unverändert bleiben. Eine Karte aus allen Matches neben
+einer Tabelle aus der Session wäre schlimmer als zwei getrennte Tools. Die
+beiden Aufrufe laufen parallel, weil `shot-quality` auf dem vollen Bestand
+rund 2,5 s braucht.
+
+Fällt `shot-quality` aus, bleibt die Karte nutzbar und die Zahlen fehlen
+still — die Heatmap ist die Hauptsache des Tools.
 
 #### tools/shot-quality.html
 

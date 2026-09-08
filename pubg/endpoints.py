@@ -630,7 +630,13 @@ class EndpointRegistry:
                     for r in rows if r["name"]])
 
     def _landing_heatmap(self, qs):
-        from pubg.aggregations import compute_landing_spots
+        """Landungen einer Karte als Heatmap, Scatter und POI-Liste.
+
+        `range` ist optional und war es auch: ohne Angabe der ganze
+        Bestand, wie bisher. Der Analyzer braucht ihn, damit Karte und
+        POI-Tabelle denselben Zeitraum zeigen.
+        """
+        from pubg.aggregations import compute_landing_spots, _range_filter
         conn = self.get_conn()
         map_name = (qs.get("map") or "").strip()
         if not map_name:
@@ -638,12 +644,22 @@ class EndpointRegistry:
         accs = [qs.get(k) for k in ("p0", "p1", "p2", "p3")]
         accs = [a for a in accs if a]
         route_filter = qs.get("routeFilter") == "1"
+
+        range_key = (qs.get("range") or "").strip()
+        if range_key and range_key not in ("session", "day", "week", "all"):
+            return _err(400, "range must be session|day|week|all")
+        from_iso = qs.get("from")
+        if not from_iso and range_key and range_key != "all":
+            from_iso = _range_filter(conn, self.tenant_id, range_key)
+
         pois = self._load_pois()
         alias = "Baltic_Main" if map_name == "Erangel_Main" else map_name
         blob = pois.get(alias) or pois.get(map_name) or {"mapKm": 8, "regions": []}
         result = compute_landing_spots(
-            conn, self.tenant_id, map_name, accs, pois_blob=blob, route_filter=route_filter)
-        return _ok(result)
+            conn, self.tenant_id, map_name, accs, pois_blob=blob,
+            route_filter=route_filter, from_iso=from_iso,
+            to_iso=qs.get("to"))
+        return _ok({**result, "range": range_key or "all", "from": from_iso})
 
     POIS_FILE = "data/pubg-pois.json"
 

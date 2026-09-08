@@ -6912,7 +6912,7 @@ def compute_squad_compare(conn, tenant_id: int, my_account_id, player_names, las
 
 
 def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob=None,
-                          route_filter=False):
+                          route_filter=False, from_iso=None, to_iso=None):
     """Aggregiert Landings auf einer Map, gefiltert auf Matches in denen
     ALLE player_accs im selben Squad waren (Konstellations-Filter).
     Leere player_accs-Liste → alle Matches der Map.
@@ -6920,6 +6920,12 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
     pois_blob: {mapKm, regions:[...]} der Map (fuer POI-Zuordnung).
     route_filter: nur Matches wo der Landing-POI <=1.5km Querdistanz zur
                   Flugroute hatte (siehe Task 6 — hier noch ignoriert).
+    from_iso/to_iso: Zeitraum. Ohne Angabe der ganze Bestand — so war es
+                  vorher und so bleibt es fuer bestehende Aufrufer. Der
+                  Filter existiert, damit Karte und POI-Auswertung im
+                  Analyzer denselben Zeitraum zeigen koennen; eine Karte
+                  aus allen Matches neben einer Tabelle aus der Session
+                  waere schlimmer als zwei getrennte Tools.
 
     Returns:
       { "pois": [{name, cx, cy, total, byPlayer:{acc:{name,count,pct}}}],
@@ -6931,9 +6937,16 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
     player_accs = [a for a in (player_accs or []) if a]
 
     # 1) Matches der Map bestimmen, die den Konstellations-Filter erfuellen
-    match_rows = conn.execute(
-        "SELECT match_id FROM matches WHERE tenant_id = ? AND map_name = ?",
-        (tenant_id, map_name,)).fetchall()
+    sql = ("SELECT match_id FROM matches "
+           "WHERE tenant_id = ? AND map_name = ?")
+    params = [tenant_id, map_name]
+    if from_iso:
+        sql += " AND played_at >= ?"
+        params.append(from_iso)
+    if to_iso:
+        sql += " AND played_at <= ?"
+        params.append(to_iso)
+    match_rows = conn.execute(sql, params).fetchall()
     match_ids = []
     for mr in match_rows:
         mid = mr["match_id"]

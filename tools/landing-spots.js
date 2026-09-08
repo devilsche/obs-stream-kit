@@ -13,6 +13,13 @@ const LS = {
   _imgName: null,
   _hoverPoi: null,
   view: { zoom: 1, panX: 0, panY: 0 },
+  //: Zeitraum fuer BEIDE Quellen. Ohne gemeinsame Auswahl zeigte die
+  //: Karte den ganzen Bestand und die Bewertung die Session — irrefuehrender
+  //: als zwei getrennte Tools.
+  range: "all",
+  //: Auswertung aus /api/pubg/shot-quality, indexiert nach POI-Name der
+  //: aktuellen Karte. null = noch nicht geladen, {} = keine Daten.
+  stats: null,
 };
 const SCATTER_COLORS = ["#f2b705", "#3cb44b", "#46f0f0", "#f032e6"];
 //: Abstand des POI-Namens vom Ortsmarker, in Bildschirm-Pixeln. Klein
@@ -141,14 +148,52 @@ async function refresh() {
   });
   if (document.getElementById("routeFilter").checked)
     params.set("routeFilter", "1");
-  LS.data = await PubgUI.fetchJson("/api/pubg/landing-heatmap?" + params);
+  params.set("range", LS.range);
+  // Beide Quellen parallel und mit demselben Zeitraum. shot-quality ist der
+  // teurere Aufruf (rund 2,5 s auf dem vollen Bestand), deshalb nicht
+  // hintereinander.
+  const [heat] = await Promise.all([
+    PubgUI.fetchJson("/api/pubg/landing-heatmap?" + params, 120000),
+    loadStats(),
+  ]);
+  LS.data = heat;
   document.getElementById("matchCount").textContent =
-    LS.data.totalMatches + " Matches";
+    LS.data.totalMatches + " matches";
   await ensureMapImage();
   buildPlayersBar();
   renderPoiList();
   renderHeatmap();
 }
+
+document.getElementById("rangeSwitch").addEventListener("click", e => {
+  const b = e.target.closest("button[data-range]");
+  if (!b || b.dataset.range === LS.range) return;
+  LS.range = b.dataset.range;
+  [...e.currentTarget.querySelectorAll("button")].forEach(x =>
+    x.setAttribute("aria-pressed", String(x.dataset.range === LS.range)));
+  refresh();
+});
+
+// Klick auf einen Landeplatz in der Liste zentriert ihn auf der Karte —
+// das war der fehlende Weg zwischen Zahlen und Ort.
+document.getElementById("poiList").addEventListener("click", e => {
+  const el = e.target.closest(".poi");
+  if (!el || !LS.data) return;
+  const poi = LS.data.pois.find(p => p.name === el.dataset.poi);
+  if (!poi || poi.cx == null) return;
+  // poi.cx/cy kommen schon normalisiert (0-1) aus dem Backend — genau das,
+  // was projXY erwartet. Hier wird dessen Formel invertiert: gesucht ist
+  // das Pan, bei dem der Ort in der Bildmitte landet.
+  const cnv = document.getElementById("heat");
+  const base = Math.min(cnv.width, cnv.height);
+  const offX = (cnv.width - base) / 2, offY = (cnv.height - base) / 2;
+  LS.view.zoom = Math.max(LS.view.zoom, 3);   // schon naeher? dann so lassen
+  const z = LS.view.zoom;
+  const px = offX + poi.cx * base, py = offY + poi.cy * base;
+  LS.view.panX = cnv.width / 2 - ((px - cnv.width / 2) * z + cnv.width / 2);
+  LS.view.panY = cnv.height / 2 - ((py - cnv.height / 2) * z + cnv.height / 2);
+  renderHeatmap();
+});
 
 // ---------------------------------------------------------------------------
 // Task 10: Heatmap + Scatter rendern
@@ -365,8 +410,69 @@ function renderPoiList() {
           <div class="bar" style="--w:${w}%" role="presentation"></div>
         </summary>
         <div class="poi-players">${players}</div>
+        ${poiStatsHtml(poi.name)}
       </details>`;
   }).join("");
+}
+
+//: Analyse je Landeplatz dazuholen. Eigener Endpoint, eigener Aufruf: die
+//: Heatmap kommt aus landing-heatmap (alle Spieler der Lobby, eine Karte),
+//: die Bewertung aus shot-quality (eigener Account, alle Karten). Beide
+//: bekommen denselben `range`.
+async function loadStats() {
+  LS.stats = null;
+  try {
+    const d = await PubgUI.fetchJson(
+      "/api/pubg/shot-quality?range=" + encodeURIComponent(LS.range)
+      + "&poiMin=1", 120000);
+    const rows = ((d.landings || {}).byPoi || [])
+      .filter(r => r.map === LS.mapName
+                || (LS.mapName === "Erangel_Main" && r.map === "Baltic_Main")
+                || (LS.mapName === "Baltic_Main" && r.map === "Erangel_Main"));
+    LS.stats = Object.fromEntries(rows.map(r => [r.poi, r]));
+  } catch (e) {
+    LS.stats = {};       // Karte bleibt nutzbar, nur ohne Bewertung
+    console.warn("shot-quality nicht erreichbar:", e && e.message);
+  }
+}
+
+function pct1(v) { return v == null ? "—" : v.toFixed(1) + " %"; }
+
+//: Zahlenblock unter einem Landeplatz. Bewusst dieselben Groessen und
+//: Richtungen wie im Shot-Quality-Tool, damit man nicht zwei Sprachen
+//: lernen muss.
+function poiStatsHtml(name) {
+  if (LS.stats === null) return "";
+  const s = LS.stats[name];
+  if (!s) {
+    return `<p class="poi-nostats">No own landing here in this range —
+            the bar above counts every player in the lobby.</p>`;
+  }
+  const diffCls = s.diff == null ? ""
+    : (s.diff > 3 ? "bad" : (s.diff < -3 ? "good" : ""));
+  const heldCls = s.squadHeldPct == null ? ""
+    : (s.squadHeldPct >= 75 ? "good" : (s.squadHeldPct < 50 ? "bad" : ""));
+  const aloneCls = (s.diedAlonePct != null && s.diedAlonePct >= 15
+                    && (s.squadHeldPct ?? 0) >= 50) ? "bad" : "";
+  const sign = s.diff == null ? "—"
+    : (s.diff > 0 ? "+" : "\u2212") + Math.abs(s.diff).toFixed(1);
+  return `
+    <div class="poi-stats">
+      <div><span class="k">Your drops</span><span class="v">${s.drops}</span></div>
+      <div><span class="k">Squad held</span>
+           <span class="v ${heldCls}">${pct1(s.squadHeldPct)}</span></div>
+      <div><span class="k">You died</span><span class="v">${pct1(s.earlyDeathPct)}</span></div>
+      <div><span class="k">Died alone</span>
+           <span class="v ${aloneCls}">${pct1(s.diedAlonePct)}</span></div>
+      <div><span class="k">Lobby</span><span class="v">${pct1(s.lobbyEarlyPct)}</span></div>
+      <div><span class="k">Diff</span><span class="v ${diffCls}">${sign}</span></div>
+      <div><span class="k">\u00d8 Survival</span>
+           <span class="v">${s.survivalMin == null ? "—" : s.survivalMin.toFixed(1) + " min"}</span></div>
+      <div><span class="k">\u00d8 Place</span>
+           <span class="v">${s.avgPlace == null ? "—" : s.avgPlace.toFixed(1)}</span></div>
+    </div>
+    ${s.reliable ? "" : `<p class="poi-thin">thin sample — ${s.drops} own
+      landing${s.drops === 1 ? "" : "s"}</p>`}`;
 }
 
 function highlightPoi(name) {
