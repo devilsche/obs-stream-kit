@@ -292,12 +292,14 @@
       <div class="minrow">
         <div class="switch" id="minSwitch" role="group"
              aria-label="Minimum landings per spot">
+          <button type="button" data-min="auto" aria-pressed="true"
+                  title="5 % of your landings on that map — per map, so small maps stay visible">Auto</button>
           <button type="button" data-min="1" aria-pressed="false">1</button>
           <button type="button" data-min="5" aria-pressed="false">5</button>
           <button type="button" data-min="20" aria-pressed="false">20</button>
           <button type="button" data-min="50" aria-pressed="false">50</button>
         </div>
-        <input id="fPoiMin" type="number" min="1" max="999" value="1"
+        <input id="fPoiMin" type="number" min="1" max="999" placeholder="auto"
                aria-label="Minimum landings, exact value">
       </div>
     </div>
@@ -348,15 +350,19 @@
     // Sobald der Nutzer eingreift, bleibt sein Wert stehen — auch beim
     // Wechsel des Zeitraums.
     const POIMIN_SHARE = 0.05;
-    // Deckel, weil die Matches sich über bis zu neun Karten verteilen: 5 %
-    // ALLER Runden erreicht bei 1113 Matches (Schwelle 56) nur noch 2 von
-    // 133 Plätzen auf 2 von 9 Karten. Ab RELIABLE_POI_DROPS ist eine Zeile
-    // ohnehin belastbar — mehr Schwelle bringt keine Qualität, nur Verlust.
+    // Deckel: 5 % von 400 Landungen sind schon 20, und ab
+    // RELIABLE_POI_DROPS ist eine Zeile ohnehin belastbar — mehr Schwelle
+    // bringt keine Qualität, nur Verlust.
     const POIMIN_CAP = 20;
-    const autoMin = (matches) => Math.min(POIMIN_CAP,
-      Math.max(1, Math.round((matches || 0) * POIMIN_SHARE)));
+    // Die Schwelle rechnet je KARTE, nicht über alle Matches. Über alle
+    // gerechnet wäre sie bei 1113 Matches 56, und Deston mit insgesamt 36
+    // Landungen fiele komplett heraus — die Karte, auf der man am
+    // gestreutesten landet, verschwindet dann als erste. Je Karte ergibt
+    // Erangel 17 (349 Landungen) und Deston 2 (36).
+    const autoMin = (landings) => Math.min(POIMIN_CAP,
+      Math.max(1, Math.round((landings || 0) * POIMIN_SHARE)));
+    // null = Auto je Karte, Zahl = derselbe Wert für alle Karten
     let POIMIN = parseInt(PubgUI.qs("poiMin", ""), 10) || null;
-    let POIMIN_AUTO = !POIMIN;
     let DATA   = null;
 
     const n0 = (v) => v == null ? "—" : Math.round(v).toLocaleString("en-US");
@@ -724,25 +730,21 @@
     function renderPois() {
       const d = DATA.landings || {};
       const all = d.byPoi || [];
-      const rows = all.filter(r => r.drops >= POIMIN);
       document.getElementById("poiCard").hidden = !all.length;
       if (!all.length) return;
       document.getElementById("poiHead").innerHTML = poiHeadHtml();
-      if (!rows.length) {
-        document.getElementById("poiRows").innerHTML =
-          `<tr><td colspan="12">No spot with ${POIMIN}+ landings — `
-          + `lower the minimum.</td></tr>`;
-        document.getElementById("poiSub").innerHTML =
-          `All ${n0(all.length)} spots filtered out by the minimum.`;
-        document.getElementById("poiFoot").textContent = "";
-        return;
-      }
+
+      // Schwelle je Karte auflösen: fester Wert, oder 5 % der eigenen
+      // Landungen auf genau dieser Karte.
+      const mapInfo = new Map((d.perMap || []).map(m => [m.map, m]));
+      const minFor = (map) => POIMIN
+        || autoMin((mapInfo.get(map) || {}).landings);
 
       // Nach Häufigkeit sortieren, NICHT nach Differenz. Die Differenz
       // streut bei kleinen Stichproben heftig — an Prod-Daten führten
       // 5-Drop-Plätze die Liste mit +30 an, während der eine wirklich
       // auffällige Platz (86 Drops, +3,5) darunter verschwand.
-      const sorted = rows.slice().sort(poiCompare);
+      const sorted = all.slice().sort(poiCompare);
 
       // Nach Karte gruppieren: sonst verdrängt die meistgespielte Karte
       // alle anderen aus der Liste. Die Sortierung wirkt INNERHALB jeder
@@ -754,11 +756,24 @@
         groups.get(r.map).push(r);
       }
       const byMap = [...groups.entries()]
-        .map(([map, rs]) => ({
-          map, rows: rs,
-          total: rs.reduce((s, r) => s + r.drops, 0),
-        }))
+        .map(([map, rs]) => {
+          const thr = minFor(map);
+          const kept = rs.filter(r => r.drops >= thr);
+          return { map, rows: kept, threshold: thr,
+                   dropped: rs.length - kept.length,
+                   total: rs.reduce((s, r) => s + r.drops, 0) };
+        })
+        .filter(g => g.rows.length)
         .sort((a, b) => b.total - a.total);
+
+      if (!byMap.length) {
+        document.getElementById("poiRows").innerHTML =
+          `<tr><td colspan="12">No spot reaches the minimum — lower it.</td></tr>`;
+        document.getElementById("poiSub").innerHTML =
+          `All ${n0(all.length)} spots filtered out by the minimum.`;
+        document.getElementById("poiFoot").textContent = "";
+        return;
+      }
 
       const rowHtml = (r) => {
         const cls = r.diff == null ? ""
@@ -803,21 +818,20 @@
       // Die Kartenzeile nennt die ECHTE Zahl der Landungen auf dieser
       // Karte, nicht die Summe der gezeigten Zeilen — sonst liest sie sich
       // wie die Gesamtzahl und untertreibt teils um das Dreifache.
-      const mapInfo = new Map((d.perMap || []).map(m => [m.map, m]));
       document.getElementById("poiRows").innerHTML = byMap.map(g => {
         const shown = TOPN > 0 ? g.rows.slice(0, TOPN) : g.rows;
         const rest = g.rows.length - shown.length;
         const info = mapInfo.get(g.map);
         const total = info ? info.landings : g.total;
         const terrain = info ? info.landings - info.assigned : 0;
+        const allSpots = g.rows.length + g.dropped;
         const bits = [`${n0(total)} landing${total === 1 ? "" : "s"}`,
-                      `${g.rows.length} spot${g.rows.length === 1 ? "" : "s"}`];
+                      `${allSpots} spot${allSpots === 1 ? "" : "s"}`];
         if (rest > 0) bits.push(`${rest} spot${rest === 1 ? "" : "s"} below`);
         // Was der Mindestfilter geschluckt hat, muss dastehen — sonst
-        // sieht die Karte aus wie weniger bespielt als sie ist.
-        const filtered = (info && info.spots ? info.spots : g.rows.length)
-                         - g.rows.length;
-        if (filtered > 0) bits.push(`${filtered} under ${POIMIN}`);
+        // sieht die Karte aus wie weniger bespielt als sie ist. Und die
+        // Schwelle gehört dazu, weil sie je Karte anders ausfällt.
+        if (g.dropped > 0) bits.push(`${g.dropped} under ${g.threshold}`);
         if (terrain > 0) bits.push(`${n0(terrain)} in open terrain`);
         return `<tr class="map-head"><th colspan="12">
             ${esc(MAP_LABEL[g.map] || g.map)}
@@ -828,7 +842,10 @@
 
       // Der Aufmacher nur aus belastbaren Zeilen — sonst meldet er einen
       // Zufallsausschlag als größten Fund.
-      const solid = rows.filter(r => r.reliable && r.diff != null);
+      // Aus ALLEN Zeilen, nicht nur den sichtbaren: der Aufmacher soll den
+      // groessten belastbaren Fund nennen, auch wenn die Schwelle gerade
+      // hochgedreht ist.
+      const solid = all.filter(r => r.reliable && r.diff != null);
       const worst = solid.slice().sort((a, b) => b.diff - a.diff)[0];
       const lead = (worst && worst.diff > 3)
         ? `Biggest reliable outlier: <b>${esc(worst.poi)}</b> — you die there`
@@ -838,17 +855,21 @@
         : "";
       const totalLandings = (d.perMap || []).reduce(
         (s, m) => s + m.landings, 0);
+      const minNote = POIMIN
+        ? `<b>Min. landings</b> is fixed at ${n0(POIMIN)} on every map — `
+          + `clear the field or press Auto for per-map.`
+        : `<b>Min. landings</b> on Auto is `
+          + `${Math.round(POIMIN_SHARE * 100)} % of your landings on `
+          + `<em>that</em> map, capped at ${POIMIN_CAP}. Per map, so a map you `
+          + `rarely play does not vanish behind the ones you play most — `
+          + `each map row names its own threshold.`;
       document.getElementById("poiSub").innerHTML = lead
         + `<b>${n0(d.ownDrops)}</b> of your <b>${n0(totalLandings)}</b> `
         + `landings matched to a named spot, lobby reference from `
         + `<b>${n0(d.assigned)}</b> landings by all players. Rows under `
         + `${d.reliableDrops} drops are marked <b>thin</b> — their difference `
-        + `to the lobby swings by tens of points. <b>Min. landings</b> starts `
-        + `at ${Math.round(POIMIN_SHARE * 100)} % of the matches in range, `
-        + `capped at ${POIMIN_CAP}`
-        + `${POIMIN_AUTO ? ` — ${n0(POIMIN)} here` : ""}, and stays where `
-        + `you put it once you change it. Sub-areas count separately: "Cavala - Warehouses" `
-        + `is its own row, not part of "Cavala".`;
+        + `to the lobby swings by tens of points. `
+        + minNote;
       document.getElementById("poiFoot").innerHTML =
         "<b>You died</b> counts one thing only: <b>you personally dead</b> — "
         + "not knocked-and-revived, and regardless of how the squad fought. "
@@ -865,7 +886,9 @@
         + "(solo rounds are left out). A high <b>Squad held</b> next to a "
         + "high <b>Died alone</b> is the clearest signal on this page: the "
         + "spot works for the team, and you are the one losing it. The arrow "
-        + "in each header shows which direction is better.";
+        + "in each header shows which direction is better. Sub-areas count "
+        + "separately: \"Cavala - Warehouses\" is its own row, not part of "
+        + "\"Cavala\".";
     }
 
     // ── Trend ───────────────────────────────────────────────────────────────
@@ -928,10 +951,9 @@
         }
         if (POIMIN_AUTO) {
           POIMIN = autoMin(me.matches);
-          if (POIMIN) {
-      document.getElementById("fPoiMin").value = POIMIN;
-      press(document.getElementById("minSwitch"), "min", String(POIMIN));
-    }
+          document.getElementById("fPoiMin").value = POIMIN || "";
+    press(document.getElementById("minSwitch"), "min",
+          POIMIN ? String(POIMIN) : "auto");
           press(document.getElementById("minSwitch"), "min", String(POIMIN));
         }
         st.innerHTML = `<b>${n0(me.matches)}</b> matches`
@@ -961,10 +983,9 @@
       if (!b) return;
       POIMIN = Number(b.dataset.min);
       POIMIN_AUTO = false;
-      if (POIMIN) {
-      document.getElementById("fPoiMin").value = POIMIN;
-      press(document.getElementById("minSwitch"), "min", String(POIMIN));
-    }
+      document.getElementById("fPoiMin").value = POIMIN || "";
+    press(document.getElementById("minSwitch"), "min",
+          POIMIN ? String(POIMIN) : "auto");
       press(e.currentTarget, "min", String(POIMIN));
       if (DATA) renderPois();
     });
@@ -1014,10 +1035,9 @@
     press(document.getElementById("rangeSwitch"), "range", RANGE);
     press(document.getElementById("refSwitch"), "ref", REF);
     press(document.getElementById("topSwitch"), "top", String(TOPN));
-    if (POIMIN) {
-      document.getElementById("fPoiMin").value = POIMIN;
-      press(document.getElementById("minSwitch"), "min", String(POIMIN));
-    }
+    document.getElementById("fPoiMin").value = POIMIN || "";
+    press(document.getElementById("minSwitch"), "min",
+          POIMIN ? String(POIMIN) : "auto");
     load();
   </script>
 </body>

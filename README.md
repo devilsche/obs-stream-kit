@@ -571,14 +571,20 @@ den Landefight nicht dort verloren hat.
 Gruppiert nach Karte (Karten nach eigenen Landungen), je Karte umschaltbar
 Top 3 / Top 5 / alle, dazu **Min. landings** als Schwelle — Plätze mit
 weniger eigenen Landungen fallen raus, und die Kartenzeile weist aus wie
-viele. Die Schwelle startet bei **5 % der Matches im Zeitraum**, gedeckelt
-bei 20: bei 11 Matches also 1, bei 80 dann 4. Der Deckel ist nötig, weil
-sich die Matches über bis zu neun Karten verteilen — 5 % *aller* Runden
-wären bei 1113 Matches eine Schwelle von 56 und ließen nur 2 von 133
-Plätzen auf 2 von 9 Karten übrig. Ab 20 ist eine Zeile ohnehin belastbar
-(`RELIABLE_POI_DROPS`), mehr Schwelle bringt keine Qualität. Vorauswahl
-1 / 5 / 20 / 50 plus Eingabefeld; sobald man eingreift, bleibt der eigene
-Wert stehen, auch beim Wechsel des Zeitraums. Sortierbar über alle Spalten; die Sortierung wirkt innerhalb jeder
+viele. Auf **Auto** ist die Schwelle **5 % der eigenen Landungen auf genau
+dieser Karte**, gedeckelt bei 20 — je Karte, nicht über alle Matches.
+Erangel bekommt so 17 (349 Landungen), Deston 2 (36), Karakin 1 (15), und
+alle neun Karten bleiben sichtbar.
+
+Über alle Matches gerechnet wäre die Schwelle bei 1113 Matches 56 gewesen
+und hätte 2 von 133 Plätzen auf 2 von 9 Karten übrig gelassen: die Karten,
+auf denen man am gestreutesten landet, verschwinden dabei als erste — also
+genau die, wo die Auswertung am meisten zu sagen hätte. Der Deckel bei 20
+greift, weil ab `RELIABLE_POI_DROPS` eine Zeile ohnehin belastbar ist.
+
+Vorauswahl Auto / 1 / 5 / 20 / 50 plus Eingabefeld für einen festen Wert
+über alle Karten; leeres Feld heißt zurück auf Auto. Jede Kartenzeile nennt
+die für sie geltende Schwelle. Sortierbar über alle Spalten; die Sortierung wirkt innerhalb jeder
 Kartengruppe, die Gruppierung bleibt stehen. Jede Wertspalte trägt einen
 Pfeil für die bessere Richtung, weil die Tabelle beide mischt.
 
