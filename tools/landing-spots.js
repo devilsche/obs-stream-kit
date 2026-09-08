@@ -40,6 +40,97 @@ const isBotAcc = (acc) => typeof acc === "string" && acc.startsWith("ai.");
 const botMark = (acc) => isBotAcc(acc) ? " <span class=\"bot-mark\">·BOT</span>" : "";
 
 // ---------------------------------------------------------------------------
+// Auswahl ueber den Reload hinweg
+// ---------------------------------------------------------------------------
+
+//: Was gemerkt wird. Bewusst nicht der Kartenausschnitt (Zoom/Pan): der
+//: haengt an der Fenstergroesse und laesst die Seite auf einem anderen
+//: Bildschirm verschoben starten.
+const LS_STORE_KEY = "landingSpots.v1";
+
+function saveState() {
+  try {
+    localStorage.setItem(LS_STORE_KEY, JSON.stringify({
+      map: LS.mapName,
+      range: LS.range,
+      scope: LS.scope,
+      playerMode: LS.playerMode,
+      route: !!(document.getElementById("routeFilter") || {}).checked,
+      players: LS.players.map(p => p ? { accountId: p.accountId, name: p.name } : null),
+      sort: SPOT_SORT,
+      dir: SPOT_DIR,
+      selected: LS._selected || null,
+    }));
+  } catch (e) {
+    // Privates Fenster, geblockte Site-Data — das Tool bleibt benutzbar.
+  }
+}
+
+function readState() {
+  try {
+    const raw = localStorage.getItem(LS_STORE_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    return (s && typeof s === "object") ? s : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function clearState() {
+  try { localStorage.removeItem(LS_STORE_KEY); } catch (e) { /* egal */ }
+}
+
+//: Nur Werte uebernehmen, die es noch gibt. Ein gemerkter Zeitraum oder
+//: eine Sortierspalte, die inzwischen weg ist, wuerde das Tool sonst in
+//: einen Zustand setzen, den keine Schaltflaeche wieder verlaesst.
+function applyState(s) {
+  if (!s) return false;
+  let used = false;
+  const pressGroup = (id, attr, value) => {
+    const box = document.getElementById(id);
+    if (!box) return false;
+    const btns = [...box.querySelectorAll("button")];
+    if (!btns.some(b => b.dataset[attr] === value)) return false;
+    btns.forEach(b => b.setAttribute("aria-pressed",
+                                    String(b.dataset[attr] === value)));
+    return true;
+  };
+  if (s.range && pressGroup("rangeSwitch", "range", s.range)) {
+    LS.range = s.range; used = true;
+  }
+  if (s.scope && pressGroup("scopeSwitch", "scope", s.scope)) {
+    LS.scope = s.scope; used = true;
+  }
+  if (s.playerMode && pressGroup("modeSwitch", "mode", s.playerMode)) {
+    LS.playerMode = s.playerMode; used = true;
+  }
+  const route = document.getElementById("routeFilter");
+  if (route && typeof s.route === "boolean") { route.checked = s.route; used = true; }
+  if (s.sort && SPOT_COLS.some(c => c.key === s.sort)) {
+    SPOT_SORT = s.sort;
+    SPOT_DIR = s.dir === 1 ? 1 : -1;
+    used = true;
+  }
+  if (Array.isArray(s.players)) {
+    s.players.slice(0, 4).forEach((pl, i) => {
+      if (!pl || !pl.accountId) return;
+      LS.players[i] = { accountId: pl.accountId, name: pl.name || pl.accountId };
+      const input = document.getElementById("p" + i);
+      if (input) input.value = pl.name || "";
+      used = true;
+    });
+  }
+  if (s.selected) { LS._selected = s.selected; LS._hoverPoi = s.selected; }
+  return used;
+}
+
+function resetState() {
+  clearState();
+  location.reload();
+}
+
+// ---------------------------------------------------------------------------
 // Task 8: Karten-Selektor
 // ---------------------------------------------------------------------------
 
@@ -53,11 +144,18 @@ async function loadMaps() {
   sel.addEventListener("change", () => {
     LS.mapName = sel.value;
     LS.view = { zoom: 1, panX: 0, panY: 0 };
+    LS._selected = null;        // Ort einer anderen Karte gibt es hier nicht
+    saveState();
     refresh();
   });
   LS.mapName = sel.value || maps[0];
-  // Vorauswahl VOR dem ersten refresh, sonst laedt das Tool zweimal
-  await preselectMe();
+  // Gemerkte Auswahl VOR preselectMe: sonst ueberschreibt die Vorauswahl
+  // den gemerkten Spieler in P1. Und beides VOR dem ersten refresh, sonst
+  // laedt das Tool zweimal.
+  const saved = readState();
+  const hadState = applyState(saved);
+  if (saved && saved.map && maps.includes(saved.map)) LS.mapName = saved.map;
+  if (!hadState || !LS.players.some(Boolean)) await preselectMe();
   syncControls();
   if (LS.mapName) { sel.value = LS.mapName; refresh(); }
 }
@@ -146,6 +244,7 @@ function wireAutocomplete(idx) {
 function setPlayer(idx, player) {
   LS.players[idx] = player;  // kann null sein
   syncControls();
+  saveState();
 }
 
 //: Schalter aus- und einblenden, je nachdem ob sie ueberhaupt etwas
@@ -166,7 +265,7 @@ function syncControls() {
 
 [0, 1, 2, 3].forEach(wireAutocomplete);
 document.getElementById("routeFilter")
-  .addEventListener("change", refresh);
+  .addEventListener("change", () => { saveState(); refresh(); });
 
 //: Eigenen Account in P1 vorbelegen. Ohne Auswahl liefert der Endpoint nur
 //: die Lobby-Intensitaet und keine eigenen Punkte — man startete also auf
@@ -214,6 +313,13 @@ async function refresh() {
   await ensureMapImage();
   buildPlayersBar();
   renderSpotTable();
+  // Gemerkten Ort erst jetzt zentrieren — vor dem Laden gibt es die
+  // Umrisse noch nicht, und ohne die kennt fitZoom keine Ausdehnung.
+  if (LS._selected) {
+    const poi = LS.data.pois.find(p => p.name === LS._selected);
+    if (poi) centreOnPoi(poi);
+    else { LS._selected = null; LS._hoverPoi = null; saveState(); }
+  }
   renderHeatmap();
 }
 
@@ -223,6 +329,7 @@ document.getElementById("rangeSwitch").addEventListener("click", e => {
   LS.range = b.dataset.range;
   [...e.currentTarget.querySelectorAll("button")].forEach(x =>
     x.setAttribute("aria-pressed", String(x.dataset.range === LS.range)));
+  saveState();
   refresh();
 });
 
@@ -973,6 +1080,7 @@ function onSpotSort(th) {
   const col = SPOT_COLS.find(c => c.key === key);
   if (SPOT_SORT === key) SPOT_DIR *= -1;
   else { SPOT_SORT = key; SPOT_DIR = col && col.text ? 1 : -1; }
+  saveState();
   renderSpotTable();
   const again = document.querySelector(`#spotHead th[data-sort="${key}"]`);
   if (again) again.focus();
@@ -1039,6 +1147,7 @@ function centreOnPoi(poi) {
 function selectSpot(name) {
   LS._selected = name;
   LS._hoverPoi = name;
+  saveState();
   const poi = (LS.data && LS.data.pois.find(p => p.name === name)) || null;
   centreOnPoi(poi);
   renderSpotTable();
@@ -1078,6 +1187,7 @@ document.getElementById("modeSwitch").addEventListener("click", e => {
   LS.playerMode = b.dataset.mode;
   [...e.currentTarget.querySelectorAll("button")].forEach(x =>
     x.setAttribute("aria-pressed", String(x.dataset.mode === LS.playerMode)));
+  saveState();
   refresh();     // Serverseitig — der Modus aendert die Match-Auswahl
 });
 document.getElementById("scopeSwitch").addEventListener("click", e => {
@@ -1086,9 +1196,12 @@ document.getElementById("scopeSwitch").addEventListener("click", e => {
   LS.scope = b.dataset.scope;
   [...e.currentTarget.querySelectorAll("button")].forEach(x =>
     x.setAttribute("aria-pressed", String(x.dataset.scope === LS.scope)));
+  saveState();
   renderSpotTable();
   renderHeatmap();   // die Karte faerbt nach derselben Sicht
 });
+
+document.getElementById("resetView").addEventListener("click", resetState);
 
 // ---------------------------------------------------------------------------
 // Init

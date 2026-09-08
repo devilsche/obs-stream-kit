@@ -61,6 +61,22 @@
     /* Container als Text, wenn nach einer Zahlenspalte sortiert ist und
        die Zeilen darum nicht gruppiert stehen. */
     .in-note { color: var(--theme-text-faint, #6b5f7a); font-size: .82em; }
+    /* Reset der gemerkten Auswahl. Steht am Ende der Kopfzeile, weil es
+       nichts filtert — es raeumt auf. */
+    .reset-btn {
+      margin-left: auto;
+      min-height: 24px; padding: 3px 10px;
+      font: inherit; font-size: .85em;
+      background: var(--theme-surface, #241a2e);
+      color: var(--theme-text-dim, #a99cb8);
+      border: 1px solid var(--theme-border, #3a2c48);
+      border-radius: 4px; cursor: pointer;
+    }
+    .reset-btn:hover { color: var(--theme-text, #f4f0f8); }
+    .reset-btn:focus-visible {
+      outline: 2px solid var(--theme-accent, #f2b705);
+      outline-offset: 2px;
+    }
     /* Container tragen die Summe ihrer Gegend und stehen deshalb heller —
        ohne den Kontrast liest man die Summenzeile als weitere Einzelzeile
        und zaehlt doppelt. */
@@ -250,6 +266,9 @@
         </span>
       </span>
       <span id="matchCount" aria-live="polite" aria-atomic="true"></span>
+      <button type="button" id="resetView" class="reset-btn"
+              title="Forget the remembered selection and start over">
+        Reset</button>
     </header>
     <div class="body">
       <section class="spot-wrap" aria-label="Landing spot table">
