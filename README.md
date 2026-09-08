@@ -568,6 +568,30 @@ Landezeit statt des Rundenstarts, damit die eigene und die Lobby-Quote
 dasselbe messen, und die Ortsbindung, weil wer wegrotiert und woanders fällt
 den Landefight nicht dort verloren hat.
 
+Gruppiert nach Karte (Karten nach eigenen Landungen), je Karte umschaltbar
+Top 3 / Top 5 / alle, dazu **Min. landings** als Schwelle — Plätze mit
+weniger eigenen Landungen fallen raus, und die Kartenzeile weist aus wie
+viele. Sortierbar über alle Spalten; die Sortierung wirkt innerhalb jeder
+Kartengruppe, die Gruppierung bleibt stehen. Jede Wertspalte trägt einen
+Pfeil für die bessere Richtung, weil die Tabelle beide mischt.
+
+**Squad held** ist die Haltequote: Anteil der Runden, in denen das Squad
+*nicht* ausgelöscht wurde, gemessen im Fenster nach der **eigenen**
+Landung — die Frage ist der Ausgang dieses Gefechts, und das ist das
+eigene. Solo-Runden fallen aus dem Nenner. **Died alone** ist der
+Diagnosewert: ich tot, Squad hält. Ein hoher Wert neben hohem *Squad held*
+ist das klarste Signal der Seite — der Platz funktioniert, der Spieler
+verliert ihn. An Prod-Daten trifft das Bootyard und Mylta mit je 16,3 %,
+während Fishing Camp South bei 0 % liegt.
+
+Unterbereiche (`"Cavala - Warehouses"`) zählen getrennt. Zusammenfassen am
+`" - "`-Trenner kann `landing_stats(group_subareas=True)` bzw. der
+URL-Parameter `?groupSubareas=1` — im UI gibt es dafür keinen Schalter,
+weil der Effekt zu klein ist: über alle Karten 133 statt 127 Zeilen, auf
+Erangel keine einzige Zusammenfassung. Beim Gruppieren wird die
+Lobby-Referenz mitgefaltet, sonst stehen zusammengefasste eigene Drops
+gegen nur einen Unterbereich.
+
 Geometrie aus `data/pubg-pois.json` über `pubg/poi_match.py` — dieselbe Quelle
 wie POI-Editor und Landing-Heatmap, keine zweite Wahrheit. Läuft komplett live:
 die Bounding-Box-Vorfilterung ordnet 139.000 Landungen aller Karten in unter

@@ -43,6 +43,13 @@
     .bar > div, .bar > label { display: flex; flex-direction: column; gap: 4px; }
     .legend { font-size: 0.78em; color: var(--theme-text-dim, #8a7d99);
               letter-spacing: 0.04em; }
+    .poi-min { display: inline-flex; flex-direction: column; gap: 4px;
+               margin-left: 22px; vertical-align: bottom; }
+    .poi-min input { background: var(--theme-surface, #201a28);
+                     color: var(--theme-text);
+                     border: 1px solid var(--theme-line, #372c47);
+                     border-radius: 4px; padding: 5px 8px; font: inherit;
+                     width: 6rem; }
     .bar input { background: var(--theme-surface, #201a28);
                  color: var(--theme-text); border: 1px solid var(--theme-line, #372c47);
                  border-radius: 4px; padding: 5px 8px; font: inherit; min-width: 15em; }
@@ -281,13 +288,9 @@
         <button type="button" data-top="0" aria-pressed="false">All</button>
       </div>
     </div>
-    <div>
-      <span class="legend">Sub-areas</span>
-      <div class="switch" id="subSwitch" role="group" aria-label="Sub-areas">
-        <button type="button" data-sub="0" aria-pressed="true">Separate</button>
-        <button type="button" data-sub="1" aria-pressed="false">Merged</button>
-      </div>
-    </div>
+    <label class="poi-min" for="fPoiMin">Min. landings
+      <input id="fPoiMin" type="number" min="1" max="99" value="1">
+    </label>
     <div class="scroll">
       <table>
         <thead id="poiHead"><tr></tr></thead>
@@ -325,7 +328,10 @@
     let REF    = PubgUI.qs("ref", "lobby");
     let TOPN   = parseInt(PubgUI.qs("top", "5"), 10);
     if (![0, 3, 5].includes(TOPN)) TOPN = 5;
-    let SUBS   = PubgUI.qs("groupSubareas", "0") === "1";
+    // Mindestzahl eigener Landungen, damit ein Platz in der Tabelle steht.
+    // Rein clientseitig: die Daten liegen schon da, ein Reload waere
+    // Verschwendung und der Filter soll sofort reagieren.
+    let POIMIN = Math.max(1, parseInt(PubgUI.qs("poiMin", "1"), 10) || 1);
     let DATA   = null;
 
     const n0 = (v) => v == null ? "—" : Math.round(v).toLocaleString("en-US");
@@ -692,10 +698,20 @@
 
     function renderPois() {
       const d = DATA.landings || {};
-      const rows = d.byPoi || [];
-      document.getElementById("poiCard").hidden = !rows.length;
-      if (!rows.length) return;
+      const all = d.byPoi || [];
+      const rows = all.filter(r => r.drops >= POIMIN);
+      document.getElementById("poiCard").hidden = !all.length;
+      if (!all.length) return;
       document.getElementById("poiHead").innerHTML = poiHeadHtml();
+      if (!rows.length) {
+        document.getElementById("poiRows").innerHTML =
+          `<tr><td colspan="12">No spot with ${POIMIN}+ landings — `
+          + `lower the minimum.</td></tr>`;
+        document.getElementById("poiSub").innerHTML =
+          `All ${n0(all.length)} spots filtered out by the minimum.`;
+        document.getElementById("poiFoot").textContent = "";
+        return;
+      }
 
       // Nach Häufigkeit sortieren, NICHT nach Differenz. Die Differenz
       // streut bei kleinen Stichproben heftig — an Prod-Daten führten
@@ -772,6 +788,11 @@
         const bits = [`${n0(total)} landing${total === 1 ? "" : "s"}`,
                       `${g.rows.length} spot${g.rows.length === 1 ? "" : "s"}`];
         if (rest > 0) bits.push(`${rest} spot${rest === 1 ? "" : "s"} below`);
+        // Was der Mindestfilter geschluckt hat, muss dastehen — sonst
+        // sieht die Karte aus wie weniger bespielt als sie ist.
+        const filtered = (info && info.spots ? info.spots : g.rows.length)
+                         - g.rows.length;
+        if (filtered > 0) bits.push(`${filtered} under ${POIMIN}`);
         if (terrain > 0) bits.push(`${n0(terrain)} in open terrain`);
         return `<tr class="map-head"><th colspan="12">
             ${esc(MAP_LABEL[g.map] || g.map)}
@@ -797,14 +818,9 @@
         + `landings matched to a named spot, lobby reference from `
         + `<b>${n0(d.assigned)}</b> landings by all players. Rows under `
         + `${d.reliableDrops} drops are marked <b>thin</b> — their difference `
-        + `to the lobby swings by tens of points. `
-        + (d.groupSubareas
-           ? `Sub-areas are <b>merged</b>: "Cavala - Warehouses" counts as `
-             + `"Cavala", on both sides of the comparison.`
-           : `Sub-areas are <b>separate</b> — "Cavala - Warehouses" is its `
-             + `own row. Merging them builds a bigger sample per spot, but `
-             + `hides real differences: on Taego, Fishing Camp - Crossings `
-             + `and - South have 56 % and 41 % lobby risk.`);
+        + `to the lobby swings by tens of points — raise <b>Min. landings</b> `
+        + `to hide them. Sub-areas count separately: "Cavala - Warehouses" `
+        + `is its own row, not part of "Cavala".`;
       document.getElementById("poiFoot").innerHTML =
         "<b>You died</b> counts one thing only: <b>you personally dead</b> — "
         + "not knocked-and-revived, and regardless of how the squad fought. "
@@ -870,7 +886,6 @@
         ? "Loading all matches … (the first run takes a few seconds)"
         : "Loading …";
       const params = new URLSearchParams({ range: RANGE, minMatches: String(MIN) });
-      if (SUBS) params.set("groupSubareas", "1");
       if (PLAYER.trim()) params.set("player", PLAYER.trim());
       try {
         DATA = await PubgUI.fetchJson(
@@ -905,12 +920,9 @@
       press(e.currentTarget, "range", RANGE);
       load();
     });
-    document.getElementById("subSwitch").addEventListener("click", e => {
-      const b = e.target.closest("button[data-sub]");
-      if (!b || (b.dataset.sub === "1") === SUBS) return;
-      SUBS = b.dataset.sub === "1";
-      press(e.currentTarget, "sub", SUBS ? "1" : "0");
-      load();   // Serverseitig gruppiert, inklusive Lobby-Referenz
+    document.getElementById("fPoiMin").addEventListener("input", e => {
+      POIMIN = Math.max(1, parseInt(e.target.value, 10) || 1);
+      if (DATA) renderPois();
     });
     document.getElementById("poiHead").addEventListener("click", e => {
       const th = e.target.closest("th[data-sort]");
@@ -952,7 +964,7 @@
     press(document.getElementById("rangeSwitch"), "range", RANGE);
     press(document.getElementById("refSwitch"), "ref", REF);
     press(document.getElementById("topSwitch"), "top", String(TOPN));
-    press(document.getElementById("subSwitch"), "sub", SUBS ? "1" : "0");
+    document.getElementById("fPoiMin").value = POIMIN;
     load();
   </script>
 </body>
