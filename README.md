@@ -513,11 +513,16 @@ zehn Spalten sortierbar mit Richtungspfeil. **Rechts die Karte** mit Heatmap
 und Scatter je Spieler. Dieselben Größen und Richtungen wie in
 `shot-quality`, damit man nicht zwei Sprachen lernt.
 
-Umschalter **My spots / All spots**: Vorgabe sind die Plätze mit eigenen
-Landungen (44 von 99 auf Erangel), sonst besteht die Tabelle mehrheitlich
-aus Zeilen ohne eigene Daten. Die Lobby-Gesamtsicht bleibt trotzdem immer
-ablesbar — die Zeile über der Tabelle nennt beides, dazu die Lobby-Spalte je
-Zeile und die Heatmap-Intensität.
+Umschalter **View: Mine / Lobby** steuert Tabelle **und** Karte gemeinsam.
+Bei *Mine* färbt die Heatmap nach den Landungen der gewählten Spieler und
+Plätze ohne eigene Landung verschwinden ganz (auf Erangel 40 statt 100
+Blobs, 350 statt 34.776 Landungen) — vorher standen dort Marker und Namen
+ohne Inhalt. Bei *Lobby* färbt sie nach allen und die Tabelle listet jeden
+Platz.
+
+Die Lobby-Gesamtsicht bleibt in beiden Fällen ablesbar: die Zeile über der
+Tabelle nennt immer beides („44 of 99 spots · 31.966 lobby landings · 344
+yours"), und die Lobby-Spalte je Zeile ändert sich nicht mit dem Schalter.
 
 Spieler-Modi: **Same squad** nimmt nur Matches, in denen alle Genannten im
 selben Team waren, **Any of them** jedes Match mit mindestens einem und

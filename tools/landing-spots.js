@@ -270,6 +270,18 @@ function projXY(nx, ny) {
   ];
 }
 
+//: Landungen je Platz — Lobby oder nur die Auswahl, je nach LS.scope.
+//: Dieselbe Funktion fuer Karte und Tabelle, damit beide dasselbe zeigen.
+//: Vorher faerbte die Karte immer nach der Lobby, auch wenn die Tabelle
+//: auf die eigenen Plaetze gefiltert war.
+function poiIntensity(p) {
+  if (LS.scope === "mine") {
+    const by = p.byPlayer || {};
+    return Object.values(by).reduce((s, v) => s + (v.count || 0), 0);
+  }
+  return p.landings != null ? p.landings : p.total;
+}
+
 function renderHeatmap() {
   fitCanvas();
   const cnv = document.getElementById("heat");
@@ -288,10 +300,13 @@ function renderHeatmap() {
   // Heatmap-Blobs pro POI (Radius ~ total, Farbe Gold→Lila nach Intensität)
   // Intensitaet ueber die LANDUNGEN, nicht die Match-Zahl: bei 100
   // Lobby-Spielern in einem Match ist total 1 und landings 100.
-  const intens = (p) => (p.landings != null ? p.landings : p.total);
+  const intens = poiIntensity;
   const maxTotal = Math.max(1, ...LS.data.pois.map(intens));
   for (const poi of LS.data.pois) {
     if (poi.cx == null) continue;
+    // In der eigenen Sicht Plaetze ohne eigene Landung weglassen — sonst
+    // stehen dort Marker und Namen ohne Inhalt.
+    if (intens(poi) <= 0) continue;
     const [px, py] = projXY(poi.cx, poi.cy);
     const intensity = intens(poi) / maxTotal;
     const radius = 20 + intensity * 60;
@@ -468,7 +483,6 @@ let SPOT_DIR = -1;
 
 function spotRows() {
   if (!LS.data) return [];
-  const intens = (p) => (p.landings != null ? p.landings : p.total);
   return LS.data.pois
     .filter(p => p.name !== "—")
     .map(p => {
@@ -480,7 +494,8 @@ function spotRows() {
       const parent = (!s && base !== p.name && (LS.stats || {})[base])
         ? base : null;
       return {
-        name: p.name, poi: p, lobby: intens(p), parent,
+        name: p.name, poi: p,
+        lobby: (p.landings != null ? p.landings : p.total), parent,
         drops: s ? s.drops : null,
         squadHeldPct: s ? s.squadHeldPct : null,
         earlyDeathPct: s ? s.earlyDeathPct : null,
@@ -578,7 +593,12 @@ function renderSpotTable() {
   }
 
   document.getElementById("spotFoot").innerHTML =
-    "Click a row to centre that spot on the map. <b>Lobby</b> counts every "
+    (LS.scope === "mine"
+      ? "<b>Mine</b>: table and map show only the selected players' "
+        + "landings — spots nobody of them dropped at are hidden on the map. "
+      : "<b>Lobby</b>: the map is shaded by everyone's landings and the "
+        + "table lists all spots. Your own numbers stay in the columns. ")
+    + "Click a row to centre that spot on the map. <b>Lobby</b> counts every "
     + "landing there, <b>Mine</b> only yours. <b>You died</b> means you "
     + "personally dead — not knocked-and-revived — within 5 min of your own "
     + "landing and inside the spot; <b>Squad held</b> is the share of rounds "
@@ -670,6 +690,7 @@ document.getElementById("scopeSwitch").addEventListener("click", e => {
   [...e.currentTarget.querySelectorAll("button")].forEach(x =>
     x.setAttribute("aria-pressed", String(x.dataset.scope === LS.scope)));
   renderSpotTable();
+  renderHeatmap();   // die Karte faerbt nach derselben Sicht
 });
 
 // ---------------------------------------------------------------------------

@@ -214,10 +214,13 @@
     <div class="body">
       <section class="spot-wrap" aria-label="Landing spot table">
         <div class="spot-tools">
+          <span class="rlabel">View</span>
           <span class="switch" id="scopeSwitch" role="group"
-                aria-label="Which spots to show">
-            <button type="button" data-scope="mine" aria-pressed="true">My spots</button>
-            <button type="button" data-scope="all" aria-pressed="false">All spots</button>
+                aria-label="Whose landings to show">
+            <button type="button" data-scope="mine" aria-pressed="true"
+                    title="Table and map show only the selected players">Mine</button>
+            <button type="button" data-scope="all" aria-pressed="false"
+                    title="Map shaded by the whole lobby, table lists every spot">Lobby</button>
           </span>
           <span class="rlabel" id="spotCount" aria-live="polite"></span>
         </div>
