@@ -690,3 +690,31 @@ def test_session_report_markiert_ranked_matches():
                for m in ph["matches"]}
     assert matches["rk1"]["isRanked"] is False
     assert matches["rk2"]["isRanked"] is True
+
+
+def test_lobby_detail_reports_when_it_truncates():
+    """Die Kuerzung darf nicht stillschweigend passieren: der Report
+    zeigte den Top-5-Schnitt ueber alle 220 Matches (14,10), das Modal
+    daneben ueber die ersten 60 (11,28) — bei identischer Rechnung, nur
+    ueber weniger Matches. Ohne Rueckmeldung ist das nicht erklaerbar."""
+    import json
+    reg = _registry(_setup())
+    ids = ",".join(f"match-{i:04d}" for i in range(300))
+    body, code, _ = reg.dispatch(
+        "GET", "/api/pubg/lobby-detail?matches=" + ids, b"", {})
+    assert code == 200
+    d = json.loads(body)
+    assert d["matchesRequested"] == 300
+    assert d["matchesUsed"] == 250          # MAX_DETAIL_MATCHES
+    assert d["matchesUsed"] < d["matchesRequested"]
+
+
+def test_lobby_detail_reports_no_truncation_when_it_fits():
+    import json
+    reg = _registry(_setup())
+    ids = ",".join(f"match-{i:04d}" for i in range(10))
+    body, code, _ = reg.dispatch(
+        "GET", "/api/pubg/lobby-detail?matches=" + ids, b"", {})
+    assert code == 200
+    d = json.loads(body)
+    assert d["matchesRequested"] == d["matchesUsed"] == 10

@@ -3893,6 +3893,17 @@
             + "api/pubg/lobby-detail?matches=" + encodeURIComponent(key), 30000);
           _lobbyCache.set(key, d);
         }
+        // Hat der Server gekuerzt, muss das in der Kopfzeile stehen:
+        // sonst zeigt das Modal einen anderen Top-5-Schnitt als der
+        // Report daneben, bei identischer Rechnung — nur ueber weniger
+        // Matches.
+        if (d.matchesRequested && d.matchesUsed
+            && d.matchesUsed < d.matchesRequested) {
+          document.getElementById("lobbyModalSub").textContent =
+            `${sub || ""}${sub ? " · " : ""}only the newest `
+            + `${d.matchesUsed} of ${d.matchesRequested} matches `
+            + `(URL length limit) — values differ from the totals above`;
+        }
         body.innerHTML = view === "record"
           ? recordBodyHtml(d, isPhase)
           : view === "squad"
@@ -4135,11 +4146,26 @@
       // NUR Battle-Royale-Matches: die Header-Zahlen rechnen ueber
       // is_br_mode, TDM und Event-Modi sind dort ausgenommen. Gingen sie
       // ins Modal mit, stand oben eine andere K/D als darin.
-      const brMids = (ms) => (ms || [])
+      //: Obergrenze fuer die Match-Ids im Modal-Aufruf. Muss zur Grenze
+      //: im Endpoint passen (MAX_DETAIL_MATCHES = 250); der Grund ist die
+      //: URL-Laenge — eine Id ist 37 Zeichen, 250 sind 9 KB.
+      //:
+      //: Vorher standen hier 60, und zwar unsichtbar: der Report zeigte
+      //: den Top-5-Schnitt ueber alle 220 Matches von 30 Tagen (14,10),
+      //: das Modal daneben ueber die ersten 60 (11,28). Die Rechnung war
+      //: identisch, nur die Menge nicht.
+      const MODAL_MATCH_LIMIT = 250;
+      const brIds = (ms) => (ms || [])
         .filter(x => !x.isEvent && (x.mode || "") !== "tdm")
-        .map(x => x.matchId).filter(Boolean).slice(0, 60).join(",");
-      const _sessionMids = brMids((d.phases || [])
-        .flatMap(ph => ph.matches || []));
+        .map(x => x.matchId).filter(Boolean);
+      const brMids = (ms) => brIds(ms).slice(0, MODAL_MATCH_LIMIT).join(",");
+      //: Wie viele Matches der Aufruf auslaesst — fuer die Kopfzeile des
+      //: Modals. Eine gekuerzte Menge ohne Hinweis ist der Grund, warum
+      //: zwei Zahlen nebeneinander nicht zusammenpassten.
+      const brDropped = (ms) => Math.max(0, brIds(ms).length - MODAL_MATCH_LIMIT);
+      const _sessionMatches = (d.phases || []).flatMap(ph => ph.matches || []);
+      const _sessionMids = brMids(_sessionMatches);
+      const _sessionDropped = brDropped(_sessionMatches);
       // Wie im Phasen-Header: der Wert wird zum Button, der das
       // Lobby-Modal oeffnet.
       const lobbyBtn = (formatted, view) =>
@@ -4147,7 +4173,10 @@
         + (view ? ` data-view="${view}"` : "")
         + ` data-matches="${_sessionMids}"`
         + ` data-title="${view === "squad" ? "Squad" : "Lobby"} · Session"`
-        + ` data-sub="${t.matches} ${t.matches === 1 ? "match" : "matches"}"`
+        + ` data-sub="${brIds(_sessionMatches).length}`
+        + `${brIds(_sessionMatches).length === 1 ? " match" : " matches"}`
+        + `${_sessionDropped ? ` · only the newest ${MODAL_MATCH_LIMIT}`
+             + ` counted, ${_sessionDropped} left out (URL length)` : ""}"`
         + ` aria-label="Break down the ${view === "squad" ? "squad" : "lobby"} of this session">`
         + `${formatted}</button>`;
 
@@ -4296,7 +4325,9 @@
                        type="button" class="lobby-open" data-phase="1" data-view="squad"
                        data-matches="${brMids(ph.matches)}"
                        data-title="Squad · Phase ${i+1}"
-                       data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'match' : 'matches'} counted"
+                       data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'match' : 'matches'} counted${
+                         brDropped(ph.matches) ? ` · only the newest ${MODAL_MATCH_LIMIT} of ${
+                           brIds(ph.matches).length} sent (URL length)` : ''}"
                        aria-label="Break down the squad of this phase: career K/D of my teammates"
                      >${hotLobby(s.lobbySquadKd, `<b>${s.lobbySquadKd.toFixed(2)}</b>`)}</button> Mates K/D</span>`
                   : (s.lobbyPending
@@ -4309,7 +4340,9 @@
                        type="button" class="lobby-open" data-phase="1"
                        data-matches="${brMids(ph.matches)}"
                        data-title="Lobby · Phase ${i+1}"
-                       data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'match' : 'matches'} counted"
+                       data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'match' : 'matches'} counted${
+                         brDropped(ph.matches) ? ` · only the newest ${MODAL_MATCH_LIMIT} of ${
+                           brIds(ph.matches).length} sent (URL length)` : ''}"
                        aria-label="Break down the lobby of this phase: median and toughest opponents"
                      >${hotLobby(s.lobbyKd, `<b>${s.lobbyKd.toFixed(2)}</b>`)}</button>${
                        lobbyPendingMark(s.lobbyCoverage)} Lobby K/D</span>`
@@ -4321,7 +4354,9 @@
                        type="button" class="lobby-open" data-phase="1"
                        data-matches="${brMids(ph.matches)}"
                        data-title="Lobby · Phase ${i+1}"
-                       data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'match' : 'matches'} counted"
+                       data-sub="${s.lobbyMatches} ${s.lobbyMatches === 1 ? 'match' : 'matches'} counted${
+                         brDropped(ph.matches) ? ` · only the newest ${MODAL_MATCH_LIMIT} of ${
+                           brIds(ph.matches).length} sent (URL length)` : ''}"
                        aria-label="Break down the lobby of this phase: strongest and weakest opponents"
                      >${hotLobby(s.lobbyTop5, `<b>${s.lobbyTop5.toFixed(2)}</b>`)}</button> Top 5 Avg</span>`
                   : ""}

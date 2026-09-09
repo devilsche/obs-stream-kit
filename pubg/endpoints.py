@@ -3069,8 +3069,17 @@ class EndpointRegistry:
         """
         from pubg.lobby_kd import lobby_detail
 
-        ids = [m.strip() for m in (qs.get("matches") or "").split(",")
-               if m.strip()][:60]
+        #: Obergrenze fuer die Zahl der Match-IDs. Der Grund ist die
+        #: URL-Laenge, nicht die Laufzeit: eine Id ist 37 Zeichen, 250
+        #: sind 9 KB, und 220 Matches (30 Tage) rechnen in 1,1 s. Vorher
+        #: standen hier 60, und die Kuerzung war unsichtbar — der Report
+        #: zeigte den Top-5-Schnitt ueber alle 220 Matches (14,10), das
+        #: Modal daneben ueber die ersten 60 (11,28), bei identischer
+        #: Rechnung.
+        MAX_DETAIL_MATCHES = 250
+        wanted = [m.strip() for m in (qs.get("matches") or "").split(",")
+                  if m.strip()]
+        ids = wanted[:MAX_DETAIL_MATCHES]
         if not ids:
             return _err(400, "matches=<matchId>[,<matchId>...] fehlt")
         try:
@@ -3079,10 +3088,15 @@ class EndpointRegistry:
             top_n = 5
         conn = self.get_conn()
         key = f"lobby-detail:{top_n}:" + ",".join(sorted(ids))
-        return _ok(self.cache.get_or_compute(
+        data = self.cache.get_or_compute(
             key, lambda: lobby_detail(conn, self.tenant_id, ids,
                                       my_account_id=self.my_account_id,
-                                      top_n=top_n)))
+                                      top_n=top_n))
+        # Gekuerzt wird nur ausgewiesen, nicht verschwiegen: sonst steht
+        # neben dem Report ein anderer Wert ohne erkennbaren Grund.
+        return _ok({**data,
+                    "matchesRequested": len(wanted),
+                    "matchesUsed": len(ids)})
 
     def _lobby_kd_refresh(self, qs):
         """Fehlende und veraltete Season-Snapshots nachladen — auf Knopfdruck.
