@@ -3885,12 +3885,20 @@
       document.getElementById("lobbyModalSub").textContent = sub || "";
       body.innerHTML = `<p class="lobby-modal__empty">Lade …</p>`;
       if (typeof dlg.showModal === "function") dlg.showModal();
-      const key = matchIds.join(",");
+      // Zeitraum statt Id-Liste, wo einer bekannt ist: 1134 Ids waeren
+      // 41 KB URL, und genau deshalb wurde vorher still auf 60 gekuerzt.
+      // matchIds bleibt fuer einzelne Zellen und Phasen.
+      const params = (matchIds && matchIds.range)
+        ? new URLSearchParams(Object.fromEntries(
+            Object.entries({from: matchIds.range.from,
+                            to: matchIds.range.to}).filter(([, v]) => v)))
+        : new URLSearchParams({matches: (matchIds || []).join(",")});
+      const key = params.toString();
       try {
         let d = _lobbyCache.get(key);
         if (!d) {
           d = await PubgUI.fetchJson((window.__SERVE_BASE__ || "/")
-            + "api/pubg/lobby-detail?matches=" + encodeURIComponent(key), 30000);
+            + "api/pubg/lobby-detail?" + params, 30000);
           _lobbyCache.set(key, d);
         }
         // Hat der Server gekuerzt, muss das in der Kopfzeile stehen:
@@ -3934,9 +3942,13 @@
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
-      const ids = (btn.dataset.matches || "").split(",").filter(Boolean);
-      if (!ids.length) return;
-      openLobbyModal(ids, btn.dataset.title || "Lobby", btn.dataset.sub || "",
+      // data-from/data-to gewinnen: dann sucht der Server die Matches und
+      // die URL bleibt kurz. Ohne Zeitraum die Id-Liste wie bisher.
+      const arg = btn.dataset.from || btn.dataset.to
+        ? { range: { from: btn.dataset.from || "", to: btn.dataset.to || "" } }
+        : (btn.dataset.matches || "").split(",").filter(Boolean);
+      if (!arg.range && !arg.length) return;
+      openLobbyModal(arg, btn.dataset.title || "Lobby", btn.dataset.sub || "",
                      btn.dataset.phase === "1", btn.dataset.view || "lobby");
     });
 
@@ -4165,18 +4177,20 @@
       const brDropped = (ms) => Math.max(0, brIds(ms).length - MODAL_MATCH_LIMIT);
       const _sessionMatches = (d.phases || []).flatMap(ph => ph.matches || []);
       const _sessionMids = brMids(_sessionMatches);
-      const _sessionDropped = brDropped(_sessionMatches);
       // Wie im Phasen-Header: der Wert wird zum Button, der das
       // Lobby-Modal oeffnet.
+      //: Der Report kennt seinen effektiven Zeitraum — den schickt der
+      //: Totals-Button statt der Id-Liste. Damit zaehlt das Modal
+      //: dieselbe Menge wie die Zahl darueber, ohne Kuerzung.
+      const _rangeFrom = d.sessionStartedAt || "";
+      const _rangeTo = d.rangeTo || "";
       const lobbyBtn = (formatted, view) =>
         `<button type="button" class="lobby-open" data-phase="1"`
         + (view ? ` data-view="${view}"` : "")
-        + ` data-matches="${_sessionMids}"`
+        + ` data-from="${PubgUI.esc(_rangeFrom)}" data-to="${PubgUI.esc(_rangeTo)}"`
         + ` data-title="${view === "squad" ? "Squad" : "Lobby"} · Session"`
         + ` data-sub="${brIds(_sessionMatches).length}`
-        + `${brIds(_sessionMatches).length === 1 ? " match" : " matches"}`
-        + `${_sessionDropped ? ` · only the newest ${MODAL_MATCH_LIMIT}`
-             + ` counted, ${_sessionDropped} left out (URL length)` : ""}"`
+        + `${brIds(_sessionMatches).length === 1 ? " match" : " matches"}"`
         + ` aria-label="Break down the ${view === "squad" ? "squad" : "lobby"} of this session">`
         + `${formatted}</button>`;
 

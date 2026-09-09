@@ -718,3 +718,51 @@ def test_lobby_detail_reports_no_truncation_when_it_fits():
     assert code == 200
     d = json.loads(body)
     assert d["matchesRequested"] == d["matchesUsed"] == 10
+
+
+def test_lobby_detail_accepts_a_range_instead_of_ids():
+    """Ein Zeitraum statt der Id-Liste: 1134 Ids waeren 41 KB URL, und die
+    stille Kuerzung auf 60 war der Grund, warum das Modal einen anderen
+    Top-5-Schnitt zeigte als der Report daneben."""
+    import json
+    conn = _setup()
+    _insert_match(conn, "r1", "2026-05-20T18:00:00Z", "Baltic_Main", "squad-fpp")
+    _insert_match(conn, "r2", "2026-05-21T18:00:00Z", "Baltic_Main", "squad-fpp")
+    _insert_match(conn, "r3", "2026-06-01T18:00:00Z", "Baltic_Main", "squad-fpp")
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch(
+        "GET", "/api/pubg/lobby-detail?from=2026-05-01T00:00:00Z"
+               "&to=2026-05-31T23:59:59Z", b"", {})
+    assert code == 200
+    d = json.loads(body)
+    assert d["byRange"] is True
+    # Nur die zwei Matches im Fenster, und nichts gekuerzt.
+    assert d["matchesUsed"] == 2
+    assert d["matchesRequested"] == 2
+
+
+def test_lobby_detail_range_needs_at_least_one_match():
+    conn = _setup()
+    reg = _registry(conn)
+    _, code, _ = reg.dispatch(
+        "GET", "/api/pubg/lobby-detail?from=2030-01-01T00:00:00Z", b"", {})
+    assert code == 400
+
+
+def test_lobby_detail_range_has_no_id_limit():
+    """Der Zeitraum-Weg kennt MAX_DETAIL_MATCHES nicht — genau das ist
+    sein Zweck."""
+    import json
+    conn = _setup()
+    for i in range(300):
+        _insert_match(conn, f"m{i:04d}", f"2026-05-{(i % 28) + 1:02d}T12:00:00Z",
+                      "Baltic_Main", "squad-fpp")
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch(
+        "GET", "/api/pubg/lobby-detail?from=2026-05-01T00:00:00Z", b"", {})
+    assert code == 200
+    d = json.loads(body)
+    assert d["matchesUsed"] == 300
+    assert d["matchesUsed"] == d["matchesRequested"]

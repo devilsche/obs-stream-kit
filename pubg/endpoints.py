@@ -3064,30 +3064,56 @@ class EndpointRegistry:
     def _lobby_detail(self, qs):
         """Eine oder mehrere Lobbys aufgeschluesselt — fuer die Detailansicht.
 
-        `matches=id1,id2` — ein Match fuer die Zelle, alle Matches einer Phase
-        fuer den Phasen-Header. Gecached, weil der Aufruf am Klick haengt.
+        Zwei Wege, dieselbe Auswertung:
+
+        * `matches=id1,id2` — fuer eine einzelne Zelle oder eine Phase.
+          Begrenzt auf MAX_DETAIL_MATCHES, weil die Ids in der URL stehen.
+        * `from=`/`to=` (ISO) — fuer einen Zeitraum. Der Server sucht die
+          Matches selbst, damit die URL kurz bleibt und keine Kuerzung
+          noetig ist: 1134 Ids waeren 41 KB, und die stille Kuerzung auf
+          60 war der Grund, warum das Modal einen anderen Top-5-Schnitt
+          zeigte als der Report daneben.
+
+        Gecached, weil der Aufruf am Klick haengt.
         """
         from pubg.lobby_kd import lobby_detail
+        from pubg.aggregations import _br_filter
 
-        #: Obergrenze fuer die Zahl der Match-IDs. Der Grund ist die
-        #: URL-Laenge, nicht die Laufzeit: eine Id ist 37 Zeichen, 250
-        #: sind 9 KB, und 220 Matches (30 Tage) rechnen in 1,1 s. Vorher
-        #: standen hier 60, und die Kuerzung war unsichtbar — der Report
-        #: zeigte den Top-5-Schnitt ueber alle 220 Matches (14,10), das
-        #: Modal daneben ueber die ersten 60 (11,28), bei identischer
-        #: Rechnung.
+        #: Obergrenze, wenn der Aufrufer Match-Ids schickt. Der Grund ist
+        #: die URL-Laenge: eine Id ist 37 Zeichen, 250 sind 9 KB, 1134
+        #: waeren 41 KB. Mit `from`/`to` entfaellt die Grenze — dann
+        #: sucht der Server die Matches selbst und die URL bleibt kurz.
         MAX_DETAIL_MATCHES = 250
-        wanted = [m.strip() for m in (qs.get("matches") or "").split(",")
-                  if m.strip()]
-        ids = wanted[:MAX_DETAIL_MATCHES]
+        conn = self.get_conn()
+        rf, rt = qs.get("from"), qs.get("to")
+        wanted, ids, by_range = [], [], False
+        if rf or rt:
+            # Zeitraum statt Id-Liste: dieselbe Menge, die der Report
+            # zaehlt (BR-Modi, dieser Tenant), ohne Umweg ueber die URL.
+            by_range = True
+            where, params = _br_filter("m")
+            sql = (f"SELECT m.match_id FROM matches m "
+                   f"WHERE m.tenant_id = ? AND {where}")
+            args = [self.tenant_id, *params]
+            if rf:
+                sql += " AND m.played_at >= ?"; args.append(rf)
+            if rt:
+                sql += " AND m.played_at <= ?"; args.append(rt)
+            sql += " ORDER BY m.played_at DESC"
+            ids = [r["match_id"] for r in conn.execute(sql, args).fetchall()]
+            wanted = ids
+        else:
+            wanted = [m.strip() for m in (qs.get("matches") or "").split(",")
+                      if m.strip()]
+            ids = wanted[:MAX_DETAIL_MATCHES]
         if not ids:
-            return _err(400, "matches=<matchId>[,<matchId>...] fehlt")
+            return _err(400, "matches=<matchId>[,...] oder from=/to= fehlt")
         try:
             top_n = max(1, min(int(qs.get("top", "5")), 20))
         except ValueError:
             top_n = 5
-        conn = self.get_conn()
-        key = f"lobby-detail:{top_n}:" + ",".join(sorted(ids))
+        key = (f"lobby-detail:{top_n}:range:{rf or ''}:{rt or ''}" if by_range
+               else f"lobby-detail:{top_n}:" + ",".join(sorted(ids)))
         data = self.cache.get_or_compute(
             key, lambda: lobby_detail(conn, self.tenant_id, ids,
                                       my_account_id=self.my_account_id,
@@ -3096,7 +3122,8 @@ class EndpointRegistry:
         # neben dem Report ein anderer Wert ohne erkennbaren Grund.
         return _ok({**data,
                     "matchesRequested": len(wanted),
-                    "matchesUsed": len(ids)})
+                    "matchesUsed": len(ids),
+                    "byRange": by_range})
 
     def _lobby_kd_refresh(self, qs):
         """Fehlende und veraltete Season-Snapshots nachladen — auf Knopfdruck.

@@ -509,6 +509,32 @@ transparent)`, `rgba(…, 0.1)`) gelten als „Fläche darunter": ohne diese
 Unterscheidung meldet der Check jeden korrekten Akzent-Knopf als Fehler — bei
 der ersten Fassung waren es 933 Treffer, davon der Großteil falsch.
 
+#### Lobby-Modal: Zeitraum statt Match-IDs
+
+`/api/pubg/lobby-detail` nimmt zwei Wege:
+
+* `matches=id1,id2` — für eine einzelne Zelle oder eine Phase, begrenzt auf
+  250 IDs, weil sie in der URL stehen.
+* `from=`/`to=` (ISO) — für einen Zeitraum. Der Server sucht die Matches
+  selbst (BR-Modi, dieser Tenant), die URL bleibt kurz und **es wird nicht
+  gekürzt**.
+
+Der zweite Weg entstand aus einem Widerspruch: der Report zeigte für 30 Tage
+einen Top-5-Schnitt von 14,10, das Modal daneben 11,28. Die Rechnung war
+identisch (`phase_top5` und `totals.topAvg` liefern denselben Wert), nur die
+Menge nicht — gekürzt wurde an **zwei** Stellen, im Frontend mit
+`slice(0, 60)` und im Endpoint mit `[:60]`, und die Kopfzeile schrieb dazu
+die ungekürzte Zahl.
+
+Gemessen: 60 IDs ergeben 11,28, 120 ergeben 11,50, alle 220 ergeben 14,10. Der
+Grund für die Grenze war nicht die Laufzeit (220 Matches rechnen in 1,1 s),
+sondern die URL-Länge — eine Match-ID ist 37 Zeichen, 1134 wären 41 KB.
+
+Der Endpoint liefert `matchesRequested`, `matchesUsed` und `byRange`, damit
+eine Kürzung nie unbemerkt bleibt. Die Phasen-Buttons nutzen weiter ID-Listen
+(eine Phase hat selten mehr als 250 Matches) und weisen eine Kürzung in der
+Kopfzeile aus.
+
 #### Auswahl im session-report
 
 Zeitraum und Session stehen in **einer Leiste**, mit demselben `switch`-Element
