@@ -456,6 +456,25 @@ Voraussetzung für die Fremdsicht: die Seite muss ihre API-Calls über
 `/s/<token>/` sind davon nicht betroffen — dort gibt es keine Impersonation und
 entsprechend kein Banner im Stream.
 
+#### Kontrast prüfen (scripts/check_contrast.py)
+
+```
+python3 scripts/check_contrast.py [--min 4.5] [--all] [pfad …]
+```
+
+Rechnet jede `color:`-Deklaration in `widgets/`, `tools/` und `app/static/`
+gegen **alle zehn Themes** und meldet, was unter WCAG 1.4.3 fällt. Die Fehler
+tauchen nicht beim Schreiben auf, sondern erst wenn jemand ein helles Theme
+wählt: ein festes Hell-Grün sieht auf dem dunklen Standard gut aus und ist auf
+`editorial` mit Kontrast 1,5 unsichtbar. Niemand testet acht Themes von Hand.
+
+Der Check liest den **eigenen Hintergrund derselben Regel** — ein Badge, das
+`background: var(--theme-primary)` setzt, wird gegen primary geprüft, nicht
+gegen die Karte. Durchscheinende Gründe (`transparent`, `color-mix(… 10%,
+transparent)`, `rgba(…, 0.1)`) gelten als „Fläche darunter": ohne diese
+Unterscheidung meldet der Check jeden korrekten Akzent-Knopf als Fehler — bei
+der ersten Fassung waren es 933 Treffer, davon der Großteil falsch.
+
 #### Auswahl im session-report
 
 Zeitraum und Session stehen in **einer Leiste**, mit demselben `switch`-Element
