@@ -77,13 +77,13 @@
       line-height: 1.5;
       white-space: nowrap;
     }
-    .phase-tag--ranked { color: var(--theme-accent, #f2b705); }
+    .phase-tag--ranked { color: var(--theme-accent-text, #f2b705); }
 
     .totals-h {
       font-size: 0.68em;
       letter-spacing: 0.14em;
       text-transform: uppercase;
-      color: var(--theme-accent, #f2b705);
+      color: var(--theme-accent-text, #f2b705);
       margin: 0 0 8px;
       padding-bottom: 4px;
       border-bottom: 1px solid
@@ -150,7 +150,7 @@
       display: block;
       font-size: 0.62em;
       letter-spacing: 0.16em;
-      color: var(--theme-accent, #f2b705);
+      color: var(--theme-accent-text, #f2b705);
       border-bottom: 1px solid
         color-mix(in srgb, var(--theme-accent, #f2b705) 45%, transparent);
       padding-bottom: 3px;
@@ -327,7 +327,7 @@
       padding-bottom: 1px;
     }
     .lobby-open:hover {
-      color: var(--theme-accent, #f2b705);
+      color: var(--theme-accent-text, #f2b705);
       border-bottom-color: var(--theme-accent, #f2b705);
     }
     .lobby-open:focus-visible {
@@ -362,7 +362,7 @@
       margin: 0;
       font-size: 1.05em;
       font-family: var(--theme-font-display, "DM Sans", system-ui, sans-serif);
-      color: var(--theme-accent, #f2b705);
+      color: var(--theme-accent-text, #f2b705);
     }
     .lobby-modal__sub {
       margin: 3px 0 0;
@@ -451,7 +451,7 @@
     .lobby-kpi .t-hot-mark i { display: none; }
     .lobby-list .kd .t-hot-mark,
     .lobby-kpi .t-hot-mark { font-size: 0.8em; margin-left: 2px; }
-    .lobby-list--top .kd { color: var(--theme-accent, #f2b705); }
+    .lobby-list--top .kd { color: var(--theme-accent-text, #f2b705); }
     .lobby-list--low .kd { color: var(--theme-text-dim, #8a7d99); }
     .lobby-list .where { color: var(--theme-text-dim, #8a7d99); font-size: 0.82em; }
     /* Herkunfts-Spalte: rechtsbuendig an die K/D geschoben, damit die
@@ -475,7 +475,7 @@
       text-transform: uppercase;
       letter-spacing: 0.04em;
       white-space: nowrap;
-      color: var(--theme-accent-2, var(--theme-text-dim, #8a7d99));
+      color: var(--theme-accent-2-text, var(--theme-text-dim, #8a7d99));
     }
     .lobby-list .where--me {
       border: 1px solid currentColor;
@@ -503,7 +503,7 @@
       border: 1px solid var(--theme-accent, #f2b705);
       border-radius: calc(var(--theme-radius, 8px) / 2);
       background: transparent;
-      color: var(--theme-accent, #f2b705);
+      color: var(--theme-accent-text, #f2b705);
       font: inherit;
       cursor: pointer;
     }
@@ -845,10 +845,10 @@
       color: var(--pubg-muted);
     }
     .md-card .md-badge.alive { color: var(--pubg-gold); }
-    .md-card .md-badge.died  { color: var(--theme-danger, #e57b7b); }
+    .md-card .md-badge.died  { color: var(--theme-danger-text, #e57b7b); }
     .md-card .md-life { padding-left: 4px; font-size: 0.93em; color: var(--pubg-muted); }
     .md-card .md-life b { color: var(--pubg-text); }
-    .md-card .md-life .md-died { color: var(--theme-danger, #e57b7b); }
+    .md-card .md-life .md-died { color: var(--theme-danger-text, #e57b7b); }
     .md-card .md-life .md-veh {
       color: var(--pubg-muted);
       font-size: 0.92em;
@@ -862,7 +862,7 @@
     .md-warning {
       background: rgba(229,123,123,0.12);
       border: 1px solid rgba(229,123,123,0.4);
-      color: var(--theme-danger, #e57b7b);
+      color: var(--theme-danger-text, #e57b7b);
       padding: 6px 10px;
       border-radius: 4px;
       font-size: 0.82em;
@@ -922,7 +922,7 @@
       display: inline-block;
       margin-left: 5px;
       vertical-align: -2px;
-      color: var(--theme-accent, #f2b705);
+      color: var(--theme-accent-text, #f2b705);
     }
     .sr-only {
       position: absolute;
@@ -1104,8 +1104,8 @@
        hellen Theme wie editorial war das Kontrast 1,50 und damit
        unlesbar. --theme-ok und --theme-danger wandern mit: editorial
        liefert dort ein dunkles Gruen (4,50). */
-    .delta-pos { color: var(--theme-ok, #7be57b); font-weight: 600; }
-    .delta-neg { color: var(--theme-danger, #e57b7b); font-weight: 600; }
+    .delta-pos { color: var(--theme-ok-text, #7be57b); font-weight: 600; }
+    .delta-neg { color: var(--theme-danger-text, #e57b7b); font-weight: 600; }
     .delta-zero { color: var(--theme-text-dim, #8a7d99); }
     .streaks-grid {
       display: grid;
@@ -1350,7 +1350,7 @@
     .pick-combo .pick-meta { color: var(--theme-text-dim, #a99cb8); font-size: 0.86em; }
     .pick-combo .pick-chev { color: var(--theme-text-faint, #6b5f7a); }
     .pick-count { font-size: 0.8rem; color: var(--theme-text-faint, #6b5f7a); }
-    .pick-live { color: var(--theme-accent, #f2b705); font-size: 0.8em; }
+    .pick-live { color: var(--theme-accent-text, #f2b705); font-size: 0.8em; }
     .pick-custom { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     .pick-custom[hidden] { display: none; }
     .pick-custom label {
@@ -1392,7 +1392,7 @@
     }
     .pick-opt .pick-day { min-width: 116px; }
     .pick-opt .pick-num { min-width: 74px; color: var(--theme-text-dim, #a99cb8); }
-    .pick-opt .pick-win { min-width: 46px; color: var(--theme-accent, #f2b705); }
+    .pick-opt .pick-win { min-width: 46px; color: var(--theme-accent-text, #f2b705); }
     .pick-empty {
       padding: 10px; font-size: 0.87rem; color: var(--theme-text-faint, #6b5f7a);
     }
@@ -1522,9 +1522,9 @@
        3,80 noch unter der Grenze fuer normalen Text; --theme-text-dim
        liegt in JEDEM Theme ueber 5,2 und sagt zudem das Richtige:
        Event-Zeilen sind nachrangig, keine Hervorhebung. */
-    .map-row--win { color: var(--theme-accent, #f2b705); }
+    .map-row--win { color: var(--theme-accent-text, #f2b705); }
     .map-row--event { color: var(--theme-text-dim, #c8b3e3); }
-    .map-perfect { color: var(--theme-accent, #f2b705); }
+    .map-perfect { color: var(--theme-accent-text, #f2b705); }
     .md-slot-1 { color: var(--md-slot-1) !important; }
     .md-slot-2 { color: var(--md-slot-2) !important; }
     .md-slot-3 { color: var(--md-slot-3) !important; }

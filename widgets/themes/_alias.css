@@ -15,3 +15,26 @@
   --pubg-page-bg:   var(--theme-page-bg);
 }
 /* Bausteine (t-*) inkl. Highlight-Marker + Eigenbewegung je Theme: siehe _blocks.css. */
+
+/* ── Text-Varianten der semantischen Tokens ───────────────────────────────
+   Die Basiswerte (--theme-accent und Co.) sind fuer FLAECHEN gewaehlt:
+   Raender, Balken, Fuellungen. Als Textfarbe auf der Karte tragen sie in
+   hellen Themes nicht — swiss hat mit accent #4be39a auf Weiss einen
+   Kontrast von 1,37, und ein knalliger Akzent laesst sich in einem hellen
+   Theme nicht lesbar machen, ohne seinen Charakter zu verlieren.
+
+   Darum zwei Werte je Bedeutung: der knallige fuer Flaechen, ein
+   abgedunkelter fuer Text. Wo beide gleich taugen (die dunklen Themes),
+   faellt die Text-Variante per Default auf den Basiswert zurueck — dann
+   gibt es keinen Unterschied zu pflegen.
+
+   Regel fuer neuen Code: `color:` nimmt die -text-Variante, alles andere
+   (background, border, fill) den Basiswert. */
+:root {
+  --theme-accent-text:   var(--theme-accent);
+  --theme-accent-2-text: var(--theme-accent-2);
+  --theme-ok-text:       var(--theme-ok);
+  --theme-danger-text:   var(--theme-danger);
+  --theme-warn-text:     var(--theme-warn);
+  --theme-primary-text:  var(--theme-primary);
+}

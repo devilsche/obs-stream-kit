@@ -1,12 +1,19 @@
 html[data-theme="barrier"] {
   /* Sumpflager / Die Barriere — Wassermagier: Lagune & Magie, mystisches Blau. */
-  --theme-primary:#2f8fcf; --theme-accent:#5fcdef; --theme-accent-2:#3f93c2; --theme-on-primary:#06101a;
+  --theme-primary:#2f8fcf; --theme-accent:#5fcdef; --theme-accent-2:#2f6f93; --theme-on-primary:#06101a;
   --theme-bg:#070c12; --theme-surface:#0f1a24; --theme-surface-2:#15242f; --theme-border:#356a82;
   --theme-text:#d6e8f2; --theme-text-dim:#8fa9b8; --theme-text-faint:#778f9b;
-  --theme-ok:#3fc2a8; --theme-warn:#d8b84a; --theme-danger:#d96b53;
+  --theme-ok:#3fc2a8; --theme-warn:#d8b84a; --theme-danger:#d4553a;
   --theme-font-display:"MedievalSharp",serif; --theme-font-body:"IM Fell English",serif; --theme-font-mono:"JetBrains Mono",monospace;
   --theme-stinger-font:"MedievalSharp",serif;
   --theme-radius:3px; --theme-border-width:2px; --theme-shadow:0 0 24px rgba(47,143,207,.20),0 14px 40px rgba(0,0,0,.6);
+  --theme-primary-text:#3391d1;
+  /* Text-Varianten: dieselben Farbtoene, dunkel genug fuer
+     Text auf jeder Flaeche dieses Themes (WCAG 1.4.3). Die
+     Basiswerte darueber bleiben knallig — sie sind fuer
+     Flaechen, Raender und Balken. */
+  --theme-accent-2-text:#3f93c2;
+  --theme-danger-text:#da6b54;
   --theme-hot-icon:"water_drop";
   --theme-page-bg:radial-gradient(1000px 700px at 70% -10%,rgba(47,143,207,.30),#070c12 62%);
   --theme-frame:url("/widgets-static/assets/frames/barrier-frame.svg") 34 / 17px / 0 stretch;

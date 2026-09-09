@@ -13,6 +13,7 @@
   --theme-font-display:"DM Sans",system-ui,sans-serif; --theme-font-body:"DM Sans",system-ui,sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
   --theme-stinger-font:"Orbitron",sans-serif;
   --theme-radius:8px; --theme-border-width:1px; --theme-shadow:0 14px 40px rgba(0,0,0,.4);
+  --theme-primary-text:#aa6acb;
   --theme-hot-icon:"local_fire_department";
   --theme-page-bg:linear-gradient(180deg,#1a0d2a 0%,#0a0510 100%);
   /* Ornament-Tokens — Default none; nur die Gothic-Themes setzen echte Werte.

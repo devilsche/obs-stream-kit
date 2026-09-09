@@ -9,6 +9,7 @@ html[data-theme="aurora"] {
   --theme-font-display:"Syne",sans-serif; --theme-font-body:"Onest",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
   --theme-stinger-font:"Teko",sans-serif;
   --theme-radius:18px; --theme-border-width:1px; --theme-shadow:0 18px 50px rgba(0,0,0,.45);
+  --theme-primary-text:#a248ff;
   --theme-hot-icon:"auto_awesome";
   --theme-page-bg:radial-gradient(900px 600px at 70% -10%,rgba(94,42,121,.55),#0c0916 60%);
 }

@@ -1,4 +1,4 @@
-.t-hot .t-value{color:var(--theme-accent)}
+.t-hot .t-value{color:var(--theme-accent-text)}
 
 /* Highlight im dichten Raster: Icon in Originalgroesse + Glow, aber KEINE
    schwirrenden Partikel — die wuerden ueber die schmale Zellen-Kante in die
@@ -12,7 +12,7 @@
 /* Marker NACH dem Wert (Abstand links statt rechts). */
 .t-hot-mark--after{margin-right:0;margin-left:4px}
 .t-hot-mark::before{font-family:"Material Symbols Outlined";font-style:normal;font-synthesis:none;
-  content:var(--theme-hot-icon,"local_fire_department");font-size:18px;color:var(--theme-accent);
+  content:var(--theme-hot-icon,"local_fire_department");font-size:18px;color:var(--theme-accent-text);
   display:inline-block;text-shadow:0 0 12px var(--theme-accent);animation:hot-pulse 2s ease-in-out infinite}
 @keyframes hot-pulse{0%,100%{text-shadow:0 0 8px currentColor}50%{text-shadow:0 0 20px currentColor}}
 
@@ -57,7 +57,7 @@ html[data-theme="terminal"] .t-hot-mark::before,html[data-theme="midnight"] .t-h
 /* Azure-Sonder: echter SVG-Tacho mit rotierender Nadel (Gasstoss-Gefuehl).
    hotWrap fuegt das SVG + Klasse --gauge ein; das Font-Icon (::before) entfaellt dann. */
 .t-hot-mark--gauge::before{display:none}
-.t-gauge{width:19px;height:19px;display:block;color:var(--theme-accent);overflow:visible;
+.t-gauge{width:19px;height:19px;display:block;color:var(--theme-accent-text);overflow:visible;
   filter:drop-shadow(0 0 6px var(--theme-accent))}
 .t-gauge .needle{transform-box:view-box;transform-origin:12px 18px;animation:gauge-rev 3s ease-in-out infinite}
 @keyframes gauge-rev{0%,55%,100%{transform:rotate(-48deg)}68%{transform:rotate(52deg)}

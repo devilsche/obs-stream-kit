@@ -55,9 +55,20 @@ def contrast(a, b):
     return (hi + 0.05) / (lo + 0.05)
 
 
+#: Bedeutungs-Tokens mit eigener Text-Variante. `color:` nimmt die
+#: -text-Form, alles andere den Basiswert — siehe _alias.css.
+TEXT_VARIANT_BASE = ("accent", "accent-2", "ok", "danger",
+                     "warn", "primary")
+
+
 def load_themes():
     """{theme: {token: hexwert}} — nur echte Hex-Werte, Gradienten
-    tragen keinen einzelnen Kontrast."""
+    tragen keinen einzelnen Kontrast.
+
+    Die -text-Varianten fallen auf ihren Basiswert zurueck, wo ein Theme
+    keine eigene braucht (so macht es der Default in _alias.css). Ohne
+    diese Aufloesung uebersieht der Check die dunklen Themes ganz.
+    """
     out = {}
     for f in sorted(THEME_DIR.glob("*.css")):
         if f.stem in ("master", "_alias"):
@@ -65,6 +76,10 @@ def load_themes():
         css = f.read_text(encoding="utf-8")
         tokens = dict(re.findall(
             r"--theme-([a-zA-Z0-9-]+)\s*:\s*(#[0-9a-fA-F]{3,8})", css))
+        for base in TEXT_VARIANT_BASE:
+            key = base + "-text"
+            if key not in tokens and base in tokens:
+                tokens[key] = tokens[base]
         if tokens.get("surface") or tokens.get("bg"):
             out[f.stem] = tokens
     return out
@@ -99,6 +114,14 @@ def rule_background(decls):
     # meldet jeden korrekten Akzent-Knopf als Fehler.
     if re.search(r"\btransparent\b|\bnone\b", val):
         return None
+    # color-mix mit kleinem Anteil: die ZWEITE Farbe traegt. Ein
+    # "color-mix(in srgb, var(--theme-ok) 15%, var(--theme-surface))" ist
+    # eine leicht getoente Karte, keine gruene Flaeche — dagegen zu
+    # pruefen ergab 1,00 und meldete jeden korrekten Toast als Fehler.
+    mix = re.match(r"color-mix\([^,]+,\s*(.+?)\s+(\d+)%\s*,\s*(.+?)\s*\)$",
+                   val.strip())
+    if mix and int(mix.group(2)) <= 50:
+        val = mix.group(3)
     if val.startswith("rgba") and re.search(r",\s*0?\.\d+\s*\)$", val):
         return None
     tok = re.search(r"--theme-([a-zA-Z0-9-]+)", val)
@@ -181,6 +204,13 @@ def main(argv=None):
                 continue
             if own_bg and own_bg[0] == "opaque":
                 skipped += 1     # Gradient/rgba: Grund nicht bestimmbar
+                continue
+            # Ein Bedeutungs-Token als Textfarbe auf der Karte gehoert in
+            # seiner -text-Form dorthin. Das ist unabhaengig vom Kontrast
+            # ein Befund, weil es sonst beim naechsten hellen Theme kippt.
+            if token in TEXT_VARIANT_BASE and not own_bg:
+                problems.append((0.0, "alle", "nimm die -text-Variante",
+                                 str(f), line, sel, color))
                 continue
             for theme, tk in themes.items():
                 fg = tk.get(token) if token else color

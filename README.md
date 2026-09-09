@@ -456,6 +456,40 @@ Voraussetzung für die Fremdsicht: die Seite muss ihre API-Calls über
 `/s/<token>/` sind davon nicht betroffen — dort gibt es keine Impersonation und
 entsprechend kein Banner im Stream.
 
+#### Zwei Werte je Bedeutung: Fläche und Text
+
+Die Tokens `--theme-accent`, `--theme-accent-2`, `--theme-ok`,
+`--theme-danger`, `--theme-warn` und `--theme-primary` sind für **Flächen**
+gewählt: Ränder, Balken, Füllungen. Als Textfarbe tragen sie in hellen Themes
+nicht — `swiss` hat mit `accent: #4be39a` auf Weiß einen Kontrast von 1,37,
+und ein knalliger Akzent lässt sich in einem hellen Theme nicht lesbar machen,
+ohne seinen Charakter zu verlieren.
+
+Darum hat jedes dieser Tokens eine **`-text`-Variante**:
+
+```css
+.foo  { color: var(--theme-accent-text); }   /* Text auf der Karte  */
+.bar  { border-color: var(--theme-accent); } /* Fläche, Rand, Balken */
+```
+
+Wo beide gleich taugen — alle dunklen Themes — fällt die Text-Variante per
+Default in `themes/_alias.css` auf den Basiswert zurück; dort gibt es keinen
+Unterschied zu pflegen. Eigene Werte haben nur `barrier`, `editorial`,
+`oldcamp`, `sect` und `swiss`, zusammen 20 Definitionen.
+
+**Regel für neuen Code:** `color:` nimmt die `-text`-Form, alles andere den
+Basiswert. `scripts/check_contrast.py` meldet jeden Verstoß, auch wenn der
+Kontrast im aktuellen Theme zufällig reicht — sonst kippt es beim nächsten
+hellen Theme.
+
+Ausnahme sind Regeln, die ihren **eigenen** Hintergrund einfärben: dort gehört
+`--theme-on-primary` hin, nicht die Text-Variante. `color-mix(… 15%,
+var(--theme-surface))` zählt dabei nicht als eigener Grund — das ist eine
+leicht getönte Karte.
+
+`--theme-text-faint` ist dagegen von Haus aus eine Textfarbe und wurde direkt
+angehoben: sie lag in allen acht Themes unter 4,5 (2,46 bis 3,69).
+
 #### Kontrast prüfen (scripts/check_contrast.py)
 
 ```

@@ -14,6 +14,6 @@ html[data-theme="barrier"] .t-ticker-wrap,
 html[data-theme="sect"] .t-ticker-wrap{padding:6px 36px}
 /* Marquee-Inhalt (eine .run-Zeile, 2x im Track fuer nahtlosen Loop). */
 .t-ticker .run{color:var(--theme-text);font-size:.92rem;white-space:nowrap;padding-right:48px}
-.t-ticker .run b{color:var(--theme-accent);font-variant-numeric:tabular-nums}
+.t-ticker .run b{color:var(--theme-accent-text);font-variant-numeric:tabular-nums}
 .t-ticker .run .dot{color:var(--theme-text-dim);margin:0 10px}
 .t-ticker .run .offline{color:var(--theme-text-dim)}

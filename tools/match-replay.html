@@ -40,7 +40,7 @@
     .team-players .player .pname { overflow: hidden; text-overflow: ellipsis;
                                     white-space: nowrap; }
     .team-players .player .pkills {
-      color: var(--theme-accent); font-variant-numeric: tabular-nums; font-weight: 700;
+      color: var(--theme-accent-text); font-variant-numeric: tabular-nums; font-weight: 700;
       flex-shrink: 0;
     }
     .team-players .player .pkills small { color: var(--theme-text-faint); font-weight: 400;
@@ -85,7 +85,7 @@
     .loading { position: absolute; inset: 0; display: none;
                align-items: center; justify-content: center; flex-direction: column;
                gap: 14px; background: color-mix(in srgb,var(--theme-bg) 80%,transparent);
-               z-index: 20; color: var(--theme-accent); font-weight: 700; }
+               z-index: 20; color: var(--theme-accent-text); font-weight: 700; }
     .loading.show { display: flex; }
     .loading .spinner { width: 48px; height: 48px; border-radius: 50%;
                border: 5px solid var(--theme-primary); border-top-color: var(--theme-accent);
@@ -100,7 +100,7 @@
                color: var(--theme-text); font-size: 12px; line-height: 1.4;
                border-radius: 3px; }
     .source-note.show { display: block; }
-    .source-note b { color: var(--theme-accent); }
+    .source-note b { color: var(--theme-accent-text); }
     @media (prefers-reduced-motion: reduce) {
       .loading .spinner { animation: none; }
     }

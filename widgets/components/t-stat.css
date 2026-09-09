@@ -13,11 +13,11 @@
 
 html[data-theme="terminal"] .t-label{text-transform:uppercase}
 
-html[data-theme="aurora"] .t-value{color:var(--theme-accent)}
+html[data-theme="aurora"] .t-value{color:var(--theme-accent-text)}
 
 html[data-theme="editorial"] .t-value{font-weight:500;font-variant-numeric:oldstyle-nums}
 
-html[data-theme="entry"] .t-value{color:var(--theme-accent)}
+html[data-theme="entry"] .t-value{color:var(--theme-accent-text)}
 
 html[data-theme="swiss"] .t-value{font-weight:900;font-size:54px;letter-spacing:-.03em}
 html[data-theme="swiss"] .t-stat-grid--compact .t-value{font-size:30px}

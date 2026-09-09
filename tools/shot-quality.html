@@ -62,7 +62,7 @@
                      border: 1px solid var(--theme-border, #372c47);
                      border-radius: 4px; padding: 5px 11px; cursor: pointer;
                      min-height: 30px; }
-    .switch button[aria-pressed="true"] { color: var(--theme-accent, #f2b705);
+    .switch button[aria-pressed="true"] { color: var(--theme-accent-text, #f2b705);
                                           border-color: var(--theme-accent, #f2b705); }
     .switch button:hover { color: var(--theme-text); }
 
@@ -79,8 +79,8 @@
     .kpi > .s { font-size: 0.76em; color: var(--theme-text-dim, #8a7d99); }
     .kpi--weak { border-left: 3px solid var(--theme-danger, #e57b7b); }
     .kpi--good { border-left: 3px solid var(--theme-ok, #6cc294); }
-    .up   { color: var(--theme-ok, #6cc294); }
-    .down { color: var(--theme-danger, #e57b7b); }
+    .up   { color: var(--theme-ok-text, #6cc294); }
+    .down { color: var(--theme-danger-text, #e57b7b); }
 
     .ranks { display: flex; flex-direction: column; gap: 1px; }
     .rank-row { display: grid; grid-template-columns: minmax(8rem, 13rem) 1fr 4.4rem 3.6rem;
@@ -123,8 +123,8 @@
     .track > .fill[data-w="95"] { width: 95%; }
     .track > .fill[data-w="100"] { width: 100%; }
 
-    .rank-row[data-tier="low"]  > .rp { color: var(--theme-danger, #e57b7b); }
-    .rank-row[data-tier="high"] > .rp { color: var(--theme-accent, #f2b705); }
+    .rank-row[data-tier="low"]  > .rp { color: var(--theme-danger-text, #e57b7b); }
+    .rank-row[data-tier="high"] > .rp { color: var(--theme-accent-text, #f2b705); }
 
     .scroll { overflow-x: auto; }
     table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
@@ -143,16 +143,16 @@
     tr.map-head > th {
       text-align: left; padding: 14px 9px 5px; font-size: 0.74em;
       letter-spacing: 0.09em; text-transform: uppercase; font-weight: 500;
-      color: var(--theme-accent, #f2b705); }
+      color: var(--theme-accent-text, #f2b705); }
     tr.map-head > th > .mh-n {
       color: var(--theme-text-dim, #8a7d99); letter-spacing: 0.03em;
       text-transform: none; font-size: 0.94em; }
     tbody tr.thin > td.diff-bad, tbody tr.thin > td.diff-good { font-weight: 400; }
-    td.hi { color: var(--theme-accent, #f2b705); font-weight: 500; }
+    td.hi { color: var(--theme-accent-text, #f2b705); font-weight: 500; }
     /* Diff-Spalte: Vorzeichen traegt die Aussage, nicht nur die Farbe —
        deshalb steht das + bzw. − immer mit im Text. */
     th.sortable { cursor: pointer; user-select: none; }
-    th.sortable:hover, th.sortable.active { color: var(--theme-accent, #f2b705); }
+    th.sortable:hover, th.sortable.active { color: var(--theme-accent-text, #f2b705); }
     th.sortable:focus-visible { outline: 2px solid var(--theme-accent, #f2b705);
                                 outline-offset: -2px; }
     .sort-arrow { font-size: 0.8em; margin-left: 2px; opacity: 0.75; }
@@ -167,9 +167,9 @@
     td.thin-rate { font-style: italic; color: var(--theme-text-dim, #a99cb8); }
     /* Pool-Wert direkt hinter dem eigenen, ohne eigene Spalte. */
     .sub-inline { color: var(--theme-text-dim, #a99cb8); font-size: 0.85em; }
-    td.diff-bad  { color: var(--theme-danger, #e57b7b); font-weight: 500; }
-    td.diff-good { color: var(--theme-ok, #6cc294); font-weight: 500; }
-    td.lo { color: var(--theme-danger, #e57b7b); }
+    td.diff-bad  { color: var(--theme-danger-text, #e57b7b); font-weight: 500; }
+    td.diff-good { color: var(--theme-ok-text, #6cc294); font-weight: 500; }
+    td.lo { color: var(--theme-danger-text, #e57b7b); }
 
     .dists { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
              gap: 12px; }
@@ -196,7 +196,7 @@
              margin: 20px 0 3px; }
     .sub { font-size: 0.82em; color: var(--theme-text-dim, #8a7d99); margin: 0 0 13px; }
     .foot { font-size: 0.8em; color: var(--theme-text-dim, #8a7d99); margin-top: 11px; }
-    .err { color: var(--theme-danger, #e57b7b); }
+    .err { color: var(--theme-danger-text, #e57b7b); }
     .icon-sm { font-size: 1em; vertical-align: -2px; }
 
     @media (max-width: 40rem) {

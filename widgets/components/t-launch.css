@@ -12,7 +12,7 @@ html.fonts-ready .t-launch .rocket,
 html.fonts-ready .t-launch .flame,
 html.fonts-ready .t-launch .smoke{animation-play-state:running}
 .t-launch .rocket{position:absolute;left:50%;bottom:2px;font-family:"Material Symbols Outlined";font-style:normal;
-  font-size:30px;color:var(--theme-accent);text-shadow:0 0 12px var(--theme-accent);will-change:transform,opacity;
+  font-size:30px;color:var(--theme-accent-text);text-shadow:0 0 12px var(--theme-accent);will-change:transform,opacity;
   transform:translateX(-50%);animation:rocket-fly 4.5s ease-in-out infinite}
 .t-launch .rocket::after{content:"rocket"}
 .t-launch .flame{position:absolute;left:50%;bottom:-2px;width:8px;height:13px;
