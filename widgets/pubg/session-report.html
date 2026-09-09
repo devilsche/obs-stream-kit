@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <title>PUBG After-Session Report</title>
@@ -12,9 +12,24 @@
     body {
       min-height: 100vh;
       padding: 16px;
-      background: linear-gradient(180deg, rgba(20,12,30,0.6), rgba(10,5,16,0.6));
+      /* Deckend ueber --theme-page-bg. Vorher stand hier ein Gradient mit
+         0.6 Deckkraft: als OBS-Overlay gedacht, aber der Report ist ein
+         Tool im Browser-Tab, und dort schien der Browser-Default durch —
+         das war der graue Eindruck. */
+      background: var(--theme-page-bg, #0a0510);
+      background-attachment: fixed;
+      color: var(--theme-text, #f4f0f8);
     }
-    .report { max-width: 1280px; margin: 0 auto; padding: 22px 32px; }
+    /* Der Report sitzt jetzt in einer Karte wie die Panels der
+       Tools-Uebersicht, damit die Seiten zusammengehoerig aussehen. */
+    .report {
+      max-width: 1280px; margin: 0 auto; padding: 22px 32px;
+      background: var(--theme-surface, rgba(20,12,30,.95));
+      border: var(--theme-border-width, 1px) solid
+              var(--theme-border, rgba(94,42,121,.6));
+      border-radius: var(--theme-radius, 8px);
+      box-shadow: var(--theme-shadow, 0 14px 40px rgba(0,0,0,.4));
+    }
     .report h1 {
       margin: 0 0 6px;
       color: var(--pubg-gold);
@@ -1330,7 +1345,7 @@
     .pick-combo .pick-meta { color: var(--theme-text-dim, #a99cb8); font-size: 0.86em; }
     .pick-combo .pick-chev { color: var(--theme-text-faint, #6b5f7a); }
     .pick-count { font-size: 0.8rem; color: var(--theme-text-faint, #6b5f7a); }
-    .pick-live { color: var(--theme-gold, var(--pubg-gold, #f2b705)); font-size: 0.8em; }
+    .pick-live { color: var(--theme-accent, #f2b705); font-size: 0.8em; }
     .pick-custom { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     .pick-custom[hidden] { display: none; }
     .pick-custom label {
@@ -1371,7 +1386,7 @@
     }
     .pick-opt .pick-day { min-width: 116px; }
     .pick-opt .pick-num { min-width: 74px; color: var(--theme-text-dim, #a99cb8); }
-    .pick-opt .pick-win { min-width: 46px; color: var(--theme-gold, var(--pubg-gold, #f2b705)); }
+    .pick-opt .pick-win { min-width: 46px; color: var(--theme-accent, #f2b705); }
     .pick-empty {
       padding: 10px; font-size: 0.87rem; color: var(--theme-text-faint, #6b5f7a);
     }
@@ -1380,7 +1395,7 @@
     .pick-step:focus-visible, .pick-combo:focus-visible,
     .pick-opt:focus-visible, .pick-apply:focus-visible,
     .pick-custom input:focus-visible {
-      outline: 2px solid var(--theme-gold, var(--pubg-gold, #f2b705));
+      outline: 2px solid var(--theme-accent, #f2b705);
       outline-offset: 2px;
     }
     [role="tabpanel"][hidden] { display: none !important; }
@@ -1618,7 +1633,7 @@
       left: 50%;
       transform: translateX(-50%);
       white-space: nowrap;
-      background: var(--theme-bg2, #1a1a2e);
+      background: var(--theme-surface-2, #1f1430);
       color: var(--theme-text, #e0daf5);
       border: 1px solid var(--theme-accent, #5e2a79);
       border-radius: 5px;

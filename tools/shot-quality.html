@@ -49,17 +49,17 @@
     .minrow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
     .minrow input { background: var(--theme-surface, #201a28);
                      color: var(--theme-text);
-                     border: 1px solid var(--theme-line, #372c47);
+                     border: 1px solid var(--theme-border, #372c47);
                      border-radius: 4px; padding: 5px 8px; font: inherit;
                      width: 6rem; }
     .bar input { background: var(--theme-surface, #201a28);
-                 color: var(--theme-text); border: 1px solid var(--theme-line, #372c47);
+                 color: var(--theme-text); border: 1px solid var(--theme-border, #372c47);
                  border-radius: 4px; padding: 5px 8px; font: inherit; min-width: 15em; }
 
     .switch { display: flex; gap: 4px; flex-wrap: wrap; }
     .switch button { background: var(--theme-surface, #201a28);
                      color: var(--theme-text-dim, #8a7d99); font: inherit;
-                     border: 1px solid var(--theme-line, #372c47);
+                     border: 1px solid var(--theme-border, #372c47);
                      border-radius: 4px; padding: 5px 11px; cursor: pointer;
                      min-height: 30px; }
     .switch button[aria-pressed="true"] { color: var(--theme-accent, #f2b705);
@@ -69,7 +69,7 @@
     .kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
             gap: 10px; }
     .kpi { background: var(--theme-surface, #201a28); border-radius: 5px;
-           border: 1px solid var(--theme-line, #372c47);
+           border: 1px solid var(--theme-border, #372c47);
            padding: 11px 13px 12px; display: flex; flex-direction: column; gap: 2px; }
     .kpi > .k { font-size: 0.7em; letter-spacing: 0.09em; text-transform: uppercase;
                 color: var(--theme-text-dim, #8a7d99); }
@@ -85,14 +85,14 @@
     .ranks { display: flex; flex-direction: column; gap: 1px; }
     .rank-row { display: grid; grid-template-columns: minmax(8rem, 13rem) 1fr 4.4rem 3.6rem;
                 gap: 6px 12px; align-items: center; padding: 5px 2px;
-                border-bottom: 1px solid var(--theme-line, #372c47); }
+                border-bottom: 1px solid var(--theme-border, #372c47); }
     .rank-row:last-child { border-bottom: 0; }
     .rank-row > .rk { font-size: 0.9em; }
     .rank-row > .rv, .rank-row > .rp { font-variant-numeric: tabular-nums;
                                        text-align: right; font-size: 0.86em; }
     .rank-row > .rp { font-weight: 500; }
     .track { position: relative; height: 10px; border-radius: 2px;
-             background: var(--theme-line, #2e2439); overflow: hidden; }
+             background: var(--theme-surface-2, #2e2439); overflow: hidden; }
     .track > .fill { position: absolute; inset: 0 auto 0 0; border-radius: 2px;
                      background: var(--theme-primary, #7b3a9c); }
     .rank-row[data-tier="low"]  > .track > .fill { background: var(--theme-danger, #e57b7b); }
@@ -132,8 +132,8 @@
     th:first-child, td:first-child { text-align: left; }
     thead th { font-size: 0.7em; letter-spacing: 0.07em; text-transform: uppercase;
                color: var(--theme-text-dim, #8a7d99); font-weight: 500;
-               border-bottom: 1px solid var(--theme-line, #372c47); }
-    tbody tr + tr > * { border-top: 1px solid var(--theme-line, #372c47); }
+               border-bottom: 1px solid var(--theme-border, #372c47); }
+    tbody tr + tr > * { border-top: 1px solid var(--theme-border, #372c47); }
     /* Gruppenzeile trägt die Trennung selbst, keine doppelte Linie */
     tbody tr + tr.map-head > * { border-top: 0; }
     tbody tr.me > * { background: color-mix(in srgb, var(--theme-primary, #7b3a9c) 22%, transparent); }
@@ -176,12 +176,12 @@
     /* Eigene Kartenoptik: mit blossem gap flossen die vier Bloecke optisch
        ineinander, weil sie nur aus Ueberschrift und Liste bestehen. */
     .dist { background: var(--theme-surface, #201a28); border-radius: 5px;
-            border: 1px solid var(--theme-line, #372c47);
+            border: 1px solid var(--theme-border, #372c47);
             padding: 11px 13px 13px; }
     .dist h3 { font-size: 0.76em; letter-spacing: 0.09em; text-transform: uppercase;
                color: var(--theme-text-dim, #8a7d99); margin: 0 0 9px; font-weight: 500;
                padding-bottom: 7px;
-               border-bottom: 1px solid var(--theme-line, #372c47); }
+               border-bottom: 1px solid var(--theme-border, #372c47); }
     .dist ul { list-style: none; margin: 0; padding: 0;
                display: flex; flex-direction: column; gap: 4px; }
     .dist li { display: grid; grid-template-columns: 6.5rem 1fr 3.4rem;
