@@ -37,31 +37,41 @@ GUN_CATEGORY = "Damage_Gun"
 GUN_CATEGORY_PREFIX = "Damage_Gun"
 
 
-#: Schaden aus Wurfgeraeten. Gemessen ueber 12 Prod-Matches sind das die
-#: Kategorien, die einem geworfenen oder abgeschossenen Sprengmittel
-#: gehoeren. Bewusst NICHT dabei: Blauzone, Rotzone, Fahrzeug, Benzinkanister
-#: und Gaspumpe — die richtet die Umgebung an, nicht ein Spieler, und der
-#: Kanister explodiert auch, wenn ihn jemand anders anschiesst.
-THROWN_CATEGORIES = frozenset((
-    "Damage_Explosion_Grenade",
-    "Damage_Explosion_C4",
-    "Damage_Explosion_StickyGrenade",
-    "Damage_Explosion_PanzerFaustWarhead",
-    "Damage_Explosion_PanzerFaustBackBlast",
-    "Damage_Molotov",
-    "Damage_BlueZoneGrenade",
-    "Damage_MeleeThrow",
-))
+#: Kategorien, die IMMER einem Wurfgeraet gehoeren, egal wer sie meldet.
+#: Molotov-Schaden laeuft ueberwiegend ueber BP_FireEffectController_C, das
+#: als "Fire" eine eigene Waffenzeile hat und darum nicht ueber die Klasse
+#: des Verursachers erkennbar ist.
+THROWN_ALWAYS = frozenset(("Damage_Molotov", "Damage_MeleeThrow"))
+
+#: Praefix der Explosions-Kategorien. Ob eine Explosion einem Spieler
+#: gehoert, entscheidet die KLASSE des Verursachers, nicht eine Liste von
+#: Kategorienamen: eine solche Liste veraltet bei jeder neuen Waffe, und
+#: genau das ist passiert — geraten war "Damage_Explosion_StickyGrenade",
+#: die Klebebombe meldet "Damage_Explosion_StickyBomb", also standen 33
+#: Wuerfe mit null Treffern in der Tabelle.
+EXPLOSION_PREFIX = "Damage_Explosion"
+
+#: Waffenklassen, die ein Spieler wirft oder abschiesst. Alles andere
+#: (Blauzone, Rotzone, Benzinkanister, Gaspumpe, Fahrzeug) richtet die
+#: Umgebung an und gehoert keinem Spieler — der Kanister explodiert auch,
+#: wenn ihn jemand anders anschiesst.
+THROWN_CLASSES = frozenset(("throwable", "melee"))
 
 
-def is_thrown_damage(category):
+def is_thrown_damage(category, causer=None):
     """True fuer Schaden aus einem geworfenen oder abgeschossenen
     Sprengmittel.
 
     Muss disjunkt zu is_gun_damage sein, sonst zaehlt ein Treffer doppelt.
-    Ein Test haelt beides gegen alle 16 gemessenen Kategorien fest.
     """
-    return category in THROWN_CATEGORIES
+    if category in THROWN_ALWAYS:
+        return True
+    if not str(category or "").startswith(EXPLOSION_PREFIX):
+        return False
+    if not causer:
+        return False            # Explosion ohne Verursacher: Umgebung
+    from pubg.burst_analysis import class_of_weapon_name
+    return class_of_weapon_name(normalize_weapon(causer)) in THROWN_CLASSES
 
 
 def is_gun_damage(category):
@@ -366,7 +376,8 @@ def analyse(events) -> dict:
                 # Granate, die drei Gegner erwischt, waere sonst ein Schuss
                 # mit drei Treffern und wuerde die Trefferquote verzerren.
                 # Die Aim-Auswertungen filtern die Zeilen ueber is_thrown.
-                if (is_thrown_damage(cat) and not _is_monster(victim)
+                if (is_thrown_damage(cat, e.get("damageCauserName"))
+                        and not _is_monster(victim)
                         and victim.get("name") not in downed):
                     tw = normalize_weapon(e.get("damageCauserName"))
                     if tw:

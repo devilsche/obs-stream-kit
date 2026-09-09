@@ -747,30 +747,52 @@ def test_compare_to_pool_reports_the_follow_up_rate():
 
 # ── Wurfgeraete ────────────────────────────────────────────────────────────
 
-def test_is_thrown_damage_accepts_explosives_and_fire():
-    """Granaten, Molotov, C4 und Panzerfaust richten Schaden an, tragen
-    aber keine Gun-Kategorie — deshalb standen sie mit Wuerfen und null
+def test_is_thrown_damage_accepts_what_a_player_throws():
+    """Die KLASSE des Verursachers entscheidet, nicht eine Liste von
+    Kategorienamen: eine solche Liste veraltet bei jeder neuen Waffe, und
+    genau das ist passiert — geraten war
+    "Damage_Explosion_StickyGrenade", die Klebebombe meldet
+    "Damage_Explosion_StickyBomb", also standen 33 Wuerfe mit null
     Treffern in der Tabelle."""
     from pubg.telemetry_analysis import is_thrown_damage
-    for cat in ("Damage_Explosion_Grenade", "Damage_Molotov",
-                "Damage_Explosion_C4", "Damage_Explosion_PanzerFaustWarhead",
-                "Damage_MeleeThrow", "Damage_BlueZoneGrenade"):
-        assert is_thrown_damage(cat) is True, cat
+    for cat, causer in (
+            ("Damage_Explosion_Grenade", "ProjGrenade_C"),
+            ("Damage_Explosion_StickyBomb", "ProjStickyGrenade_C"),
+            ("Damage_Explosion_C4", "ProjC4_C"),
+            ("Damage_Explosion_PanzerFaustWarhead",
+             "PanzerFaust100M_Projectile_C"),
+            ("Damage_MeleeThrow", "WeapPanProjectile_C"),
+            # Molotov-Schaden laeuft ueberwiegend ueber den
+            # Feuer-Controller, der als "Fire" eine eigene Zeile hat und
+            # darum nicht ueber die Klasse erkennbar ist.
+            ("Damage_Molotov", "BP_FireEffectController_C"),
+            ("Damage_Molotov", "BP_MolotovFireDebuff_C")):
+        assert is_thrown_damage(cat, causer) is True, (cat, causer)
 
 
 def test_is_thrown_damage_rejects_gun_and_environment():
     """Muss disjunkt zu is_gun_damage sein, sonst zaehlt ein Treffer
-    doppelt — und Umgebungsschaden gehoert keinem Spieler."""
+    doppelt — und Umgebungsschaden gehoert keinem Spieler: der
+    Benzinkanister explodiert auch, wenn ihn jemand anders anschiesst."""
     from pubg.telemetry_analysis import is_thrown_damage, is_gun_damage
     for cat in ("Damage_Gun", "Damage_Gun_Penetrate_BRDM"):
-        assert is_thrown_damage(cat) is False, cat
+        assert is_thrown_damage(cat, "WeapHK416_C") is False, cat
         assert is_gun_damage(cat) is True
-    for cat in ("Damage_BlueZone", "Damage_Instant_Fall", "Damage_Drown",
-                "Damage_VehicleCrashHit", "Damage_VehicleHit",
-                "Damage_Explosion_RedZone", "Damage_Explosion_Vehicle",
-                "Damage_Explosion_GasPump", "Damage_Explosion_JerryCan",
-                "Damage_DBNO", "Damage_Punch", "Damage_Melee"):
-        assert is_thrown_damage(cat) is False, cat
+    for cat, causer in (
+            ("Damage_BlueZone", "TslGameModeBase_BattleRoyaleBP_C"),
+            ("Damage_Instant_Fall", "PlayerMale_A_C"),
+            ("Damage_Drown", "Buff_DecreaseBreathInApnea_C"),
+            ("Damage_VehicleCrashHit", "Dacia_A_03_v2_Esports_C"),
+            ("Damage_VehicleHit", "Uaz_B_01_C"),
+            ("Damage_Explosion_RedZone", "RedZoneBombingField_Def_C"),
+            ("Damage_Explosion_Vehicle", None),
+            ("Damage_Explosion_GasPump", "BP_Baltic_GasPump_C"),
+            ("Damage_Explosion_JerryCan", "JerrycanFire"),
+            ("Damage_BlueZoneGrenade", "Bluezonebomb_EffectActor_C"),
+            ("Damage_DBNO", "PlayerFemale_A_C"),
+            ("Damage_Punch", "PlayerMale_A_C"),
+            ("Damage_Melee", "WeapPan_C")):
+        assert is_thrown_damage(cat, causer) is False, (cat, causer)
         assert is_gun_damage(cat) is False, cat
 
 
