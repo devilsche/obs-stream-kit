@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="entry">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session picker — three sketches</title>
+<link rel="stylesheet" href="/widgets-static/_theme.css">
+<style>
+  /* Skizze fuer die Range/Session-Auswahl im Session Report. Drei
+     Varianten mit den ECHTEN 89 Sessions des Bestands, damit die
+     Enge und die Luecken realistisch sind. Kein Inline-Style. */
+  :root {
+    --sk-bg: var(--theme-bg, #140d1c);
+    --sk-surface: var(--theme-surface, #241a2e);
+    --sk-border: var(--theme-border, #3a2c48);
+    --sk-text: var(--theme-text, #f4f0f8);
+    --sk-dim: var(--theme-text-dim, #a99cb8);
+    --sk-faint: var(--theme-text-faint, #6b5f7a);
+    --sk-accent: var(--theme-accent, #f2b705);
+    --sk-purple: var(--theme-primary, #5e2a79);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    background: var(--sk-bg); color: var(--sk-text);
+    font-family: "DM Sans", system-ui, sans-serif;
+    line-height: 1.5;
+  }
+  .skip {
+    position: absolute; left: -9999px;
+    background: var(--sk-accent); color: #1a1020;
+    padding: 8px 14px; border-radius: 4px; z-index: 10;
+  }
+  .skip:focus { left: 12px; top: 12px; }
+  h1 { font-size: 1.35rem; margin: 0 0 4px; }
+  h2 { font-size: 1.05rem; margin: 0 0 2px; }
+  .lede { color: var(--sk-dim); max-width: 62ch; margin: 0 0 28px; }
+  .card {
+    background: var(--sk-surface); border: 1px solid var(--sk-border);
+    border-radius: 8px; padding: 18px; margin-bottom: 22px;
+  }
+  .card > p.why { color: var(--sk-dim); margin: 2px 0 16px; max-width: 74ch; }
+  .demo {
+    background: var(--sk-bg); border: 1px solid var(--sk-border);
+    border-radius: 6px; padding: 14px;
+  }
+  .note { color: var(--sk-faint); font-size: .85rem; margin: 12px 0 0; }
+  .note b { color: var(--sk-dim); font-weight: 600; }
+
+  /* ── gemeinsame Bedienelemente, wie in shot-quality / landing-spots ── */
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .bar + .bar { margin-top: 10px; }
+  .rlabel {
+    color: var(--sk-dim); font-size: .82rem; min-width: 58px;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .switch { display: inline-flex; border: 1px solid var(--sk-border);
+            border-radius: 5px; overflow: hidden; }
+  .switch button {
+    font: inherit; font-size: .88rem; min-height: 28px; padding: 4px 11px;
+    background: transparent; color: var(--sk-dim);
+    border: 0; border-right: 1px solid var(--sk-border); cursor: pointer;
+  }
+  .switch button:last-child { border-right: 0; }
+  .switch button[aria-pressed="true"] {
+    background: var(--sk-purple); color: var(--sk-text); font-weight: 600;
+  }
+  .switch button:hover { color: var(--sk-text); }
+  .switch button:focus-visible,
+  .step:focus-visible, .combo:focus-visible, .opt:focus-visible,
+  .tl-bar:focus-visible, .filter:focus-visible {
+    outline: 2px solid var(--sk-accent); outline-offset: 2px;
+  }
+  .step {
+    font: inherit; min-width: 30px; min-height: 28px; cursor: pointer;
+    background: transparent; color: var(--sk-dim);
+    border: 1px solid var(--sk-border); border-radius: 5px;
+  }
+  .step:hover:not(:disabled) { color: var(--sk-text); }
+  .step:disabled { color: var(--sk-faint); cursor: default; }
+  .combo {
+    font: inherit; font-size: .9rem; min-height: 28px;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 3px 10px; cursor: pointer; text-align: left;
+    background: var(--sk-surface); color: var(--sk-text);
+    border: 1px solid var(--sk-border); border-radius: 5px;
+  }
+  .combo .meta { color: var(--sk-dim); font-size: .86em; }
+  .combo .chev { color: var(--sk-faint); }
+  .live { color: var(--sk-accent); font-size: .8em; }
+
+  /* ── Dropdown-Liste (A und C) ── */
+  .pop {
+    position: relative; margin-top: 8px;
+    border: 1px solid var(--sk-border); border-radius: 6px;
+    background: var(--sk-surface); max-height: 230px; overflow-y: auto;
+  }
+  .pop[hidden] { display: none; }
+  .filter {
+    font: inherit; font-size: .88rem; width: 100%; min-height: 30px;
+    padding: 5px 10px; background: var(--sk-bg); color: var(--sk-text);
+    border: 0; border-bottom: 1px solid var(--sk-border);
+  }
+  .mhead {
+    padding: 5px 10px; font-size: .76rem; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--sk-faint);
+    background: var(--sk-bg); position: sticky; top: 0;
+  }
+  .opt {
+    display: flex; gap: 10px; align-items: baseline; width: 100%;
+    font: inherit; font-size: .88rem; text-align: left; cursor: pointer;
+    padding: 5px 10px; background: transparent; color: var(--sk-text);
+    border: 0; border-top: 1px solid transparent;
+  }
+  .opt:hover { background: var(--sk-purple); }
+  .opt[aria-selected="true"] { background: var(--sk-purple); font-weight: 600; }
+  .opt .day { min-width: 92px; }
+  .opt .num { color: var(--sk-dim); min-width: 64px; }
+  .opt .win { color: var(--sk-accent); min-width: 44px; }
+  .empty { padding: 10px; color: var(--sk-faint); font-size: .88rem; }
+
+  /* ── Custom-Range-Ausklapper ── */
+  .custom { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+            margin-top: 10px; }
+  .custom[hidden] { display: none; }
+  .custom label { color: var(--sk-dim); font-size: .82rem; }
+  .custom input {
+    font: inherit; font-size: .86rem; min-height: 28px; padding: 3px 7px;
+    background: var(--sk-surface); color: var(--sk-text);
+    border: 1px solid var(--sk-border); border-radius: 4px;
+  }
+  .custom .apply {
+    font: inherit; font-size: .86rem; min-height: 28px; padding: 3px 12px;
+    background: var(--sk-purple); color: var(--sk-text); cursor: pointer;
+    border: 1px solid var(--sk-border); border-radius: 4px;
+  }
+
+  /* ── Zeitleiste (B) ── */
+  .tl { display: flex; align-items: flex-end; gap: 1px; height: 62px;
+        padding: 0; margin: 0; list-style: none; }
+  .tl li { display: flex; flex-direction: column; justify-content: flex-end;
+           flex: 1 1 0; min-width: 0; height: 100%; }
+  .tl-bar {
+    width: 100%; min-height: 3px; padding: 0; cursor: pointer;
+    background: var(--sk-purple); border: 0; border-radius: 2px 2px 0 0;
+  }
+  .tl-bar:hover { background: var(--sk-dim); }
+  .tl-bar[aria-pressed="true"] { background: var(--sk-accent); }
+  /* Hoehe in Stufen — kein Inline-Style, der Wert kommt aus data-h. */
+  .tl-bar[data-h="1"] { height: 14%; }
+  .tl-bar[data-h="2"] { height: 26%; }
+  .tl-bar[data-h="3"] { height: 38%; }
+  .tl-bar[data-h="4"] { height: 50%; }
+  .tl-bar[data-h="5"] { height: 62%; }
+  .tl-bar[data-h="6"] { height: 74%; }
+  .tl-bar[data-h="7"] { height: 86%; }
+  .tl-bar[data-h="8"] { height: 100%; }
+  /* Monatsmarke haengt am ERSTEN Balken ihres Monats. Proportionale
+     Breiten waeren nur mit gerechneten Werten zu haben, und die gehoeren
+     nicht per JS in ein style-Attribut. */
+  .tl { padding-bottom: 20px; position: relative; }
+  .tl li { position: relative; }
+  .tl li[data-month]::after {
+    content: attr(data-month);
+    position: absolute; top: 100%; left: 0;
+    padding-top: 5px; font-size: .76rem; color: var(--sk-faint);
+    white-space: nowrap; pointer-events: none;
+  }
+  .tl li[data-month]::before {
+    content: ""; position: absolute; top: 0; bottom: -4px; left: 0;
+    border-left: 1px solid var(--sk-border);
+  }
+  .tl-read { margin: 10px 0 0; font-size: .9rem; }
+  .tl-read .meta { color: var(--sk-dim); }
+
+  table.cmp { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  table.cmp th, table.cmp td {
+    text-align: left; padding: 7px 10px;
+    border-bottom: 1px solid var(--sk-border); vertical-align: top;
+  }
+  table.cmp th { color: var(--sk-dim); font-weight: 600; }
+  table.cmp td:first-child { white-space: nowrap; }
+</style>
+</head>
+<body>
+<a class="skip" href="#a">Skip to the sketches</a>
+<h1>Session picker — three sketches</h1>
+<p class="lede">The range and session controls in the session report, redrawn
+  with the real 89 sessions in the database (1&nbsp;134 matches, 81 chicken
+  dinners). Every sketch is clickable. Today the report has two tabs plus
+  month accordions; all three sketches replace that with one bar built from
+  the same <code>switch</code> element that shot-quality and landing-spots
+  already use.</p>
+
+<div class="card" id="a">
+  <h2>A · One bar, like the other tools</h2>
+  <p class="why">The range switch is the same element as in the other tools,
+    so it reads the same way. Underneath, one line for the session with
+    arrows to the neighbours — stepping to the session before is the most
+    common move and costs one click instead of opening a month and
+    scrolling.</p>
+  <div class="demo">
+    <div class="bar">
+      <span class="rlabel" id="lblA">Range</span>
+      <span class="switch" role="group" aria-labelledby="lblA" id="swA">
+        <button type="button" data-r="current" aria-pressed="true">Current</button>
+        <button type="button" data-r="today" aria-pressed="false">Today</button>
+        <button type="button" data-r="7" aria-pressed="false">7 days</button>
+        <button type="button" data-r="30" aria-pressed="false">30 days</button>
+        <button type="button" data-r="all" aria-pressed="false">All</button>
+        <button type="button" data-r="custom" aria-pressed="false">Custom…</button>
+      </span>
+    </div>
+    <div class="bar">
+      <span class="rlabel" id="lblAs">Session</span>
+      <button type="button" class="step" id="aPrev" aria-label="Previous session">◀</button>
+      <button type="button" class="combo" id="aCombo" aria-expanded="false"
+              aria-haspopup="listbox" aria-controls="aPop"></button>
+      <button type="button" class="step" id="aNext" aria-label="Next session">▶</button>
+    </div>
+    <div class="custom" id="aCustom" hidden>
+      <label for="aFrom">From</label>
+      <input type="date" id="aFrom" value="2026-09-01">
+      <input type="time" id="aFromT" value="00:00" step="60" aria-label="From time">
+      <label for="aTo">To</label>
+      <input type="date" id="aTo" value="2026-09-08">
+      <input type="time" id="aToT" value="23:59" step="60" aria-label="To time">
+      <button type="button" class="apply">Apply</button>
+    </div>
+    <div class="pop" id="aPop" role="listbox" aria-label="Sessions" hidden></div>
+  </div>
+  <p class="note"><b>Gone:</b> the two tabs, the month accordions, the sort
+    dropdown. <b>Kept:</b> every preset, now as switch buttons.
+    <b>Trade-off:</b> the list still needs scrolling for older sessions.</p>
+</div>
+
+<div class="card" id="b">
+  <h2>B · Sessions as a timeline</h2>
+  <p class="why">Same bar, but the session picker is a strip of bars — one per
+    session, height by match count. All 89 fit without scrolling, and the gaps
+    are visible as what they are: days you did not play. Arrow keys step
+    through it.</p>
+  <div class="demo">
+    <div class="bar">
+      <span class="rlabel" id="lblB">Range</span>
+      <span class="switch" role="group" aria-labelledby="lblB" id="swB">
+        <button type="button" data-r="current" aria-pressed="true">Current</button>
+        <button type="button" data-r="today" aria-pressed="false">Today</button>
+        <button type="button" data-r="7" aria-pressed="false">7 days</button>
+        <button type="button" data-r="all" aria-pressed="false">All</button>
+        <button type="button" data-r="custom" aria-pressed="false">Custom…</button>
+      </span>
+    </div>
+    <ul class="tl" id="bTl" aria-label="Sessions, oldest to newest"></ul>
+      <p class="tl-read" id="bRead" aria-live="polite"></p>
+  </div>
+  <p class="note"><b>Extra:</b> playing patterns and breaks are readable at a
+    glance. <b>Trade-off:</b> bars get thin as the record grows — at 500
+    sessions this needs paging or zoom, and it is the most work to build.</p>
+</div>
+
+<div class="card" id="c">
+  <h2>C · One field with a filter</h2>
+  <p class="why">Same bar, but the session list carries a filter and month
+    headers as separators instead of accordions — nothing to unfold. Typing
+    beats scrolling once the record spans years.</p>
+  <div class="demo">
+    <div class="bar">
+      <span class="rlabel" id="lblC">Range</span>
+      <span class="switch" role="group" aria-labelledby="lblC" id="swC">
+        <button type="button" data-r="current" aria-pressed="true">Current</button>
+        <button type="button" data-r="today" aria-pressed="false">Today</button>
+        <button type="button" data-r="7" aria-pressed="false">7 days</button>
+        <button type="button" data-r="all" aria-pressed="false">All</button>
+        <button type="button" data-r="custom" aria-pressed="false">Custom…</button>
+      </span>
+    </div>
+    <div class="bar">
+      <span class="rlabel" id="lblCs">Session</span>
+      <button type="button" class="combo" id="cCombo" aria-expanded="false"
+              aria-haspopup="listbox" aria-controls="cPop"></button>
+    </div>
+    <div class="pop" id="cPop" hidden>
+      <input type="search" class="filter" id="cFilter"
+             placeholder="filter by date, matches or wins" aria-label="Filter sessions">
+      <div id="cList" role="listbox" aria-label="Sessions"></div>
+    </div>
+  </div>
+  <p class="note"><b>Extra:</b> scales to years, one control instead of two.
+    <b>Trade-off:</b> the list is hidden until clicked, and stepping to the
+    previous session takes two clicks unless the arrows from A are added.</p>
+</div>
+
+<div class="card">
+  <h2>What the presets should become</h2>
+  <table class="cmp">
+    <thead><tr><th>Today</th><th>Suggestion</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>▶ Current</td><td>keep in the switch</td>
+          <td>The default view. Not a session in the list, because it is still
+              growing.</td></tr>
+      <tr><td>Today</td><td>keep in the switch</td>
+          <td>Overlaps with the newest session on a play day, but differs
+              after midnight — a session can span it.</td></tr>
+      <tr><td>Yesterday</td><td><b>drop</b></td>
+          <td>That is one concrete session and already in the list. Two places
+              for the same thing is what makes the current picker
+              confusing.</td></tr>
+      <tr><td>Last 7 days</td><td>keep, plus 30 days</td>
+          <td>Same wording as the other tools, where it is the middle
+              step.</td></tr>
+      <tr><td>All (DB)</td><td>keep as “All”</td>
+          <td>The suffix explained a distinction that no longer exists.</td></tr>
+      <tr><td>Sort dropdown<br>(5 options)</td><td><b>drop</b></td>
+          <td>Sorting a list you filter or step through is a leftover from the
+              accordion tree. Newest first is the only order anyone
+              wants.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+const SESSIONS = [{"d":"2026-09-08","n":19,"w":0},{"d":"2026-09-07","n":11,"w":1},{"d":"2026-09-06","n":7,"w":2},{"d":"2026-09-05","n":8,"w":1},{"d":"2026-09-03","n":19,"w":2},{"d":"2026-09-01","n":15,"w":4},{"d":"2026-08-31","n":21,"w":1},{"d":"2026-08-30","n":13,"w":2},{"d":"2026-08-27","n":11,"w":1},{"d":"2026-08-25","n":24,"w":2},{"d":"2026-08-24","n":8,"w":2},{"d":"2026-08-23","n":17,"w":2},{"d":"2026-08-22","n":8,"w":0},{"d":"2026-08-21","n":10,"w":0},{"d":"2026-08-18","n":5,"w":1},{"d":"2026-08-17","n":7,"w":0},{"d":"2026-08-16","n":1,"w":0},{"d":"2026-08-11","n":11,"w":0},{"d":"2026-08-10","n":5,"w":1},{"d":"2026-08-09","n":17,"w":1},{"d":"2026-08-08","n":2,"w":0},{"d":"2026-08-07","n":15,"w":3},{"d":"2026-08-06","n":8,"w":1},{"d":"2026-08-03","n":14,"w":0},{"d":"2026-08-02","n":11,"w":0},{"d":"2026-07-31","n":15,"w":1},{"d":"2026-07-30","n":14,"w":0},{"d":"2026-07-29","n":2,"w":0},{"d":"2026-07-28","n":6,"w":1},{"d":"2026-07-27","n":6,"w":0},{"d":"2026-07-26","n":33,"w":4},{"d":"2026-07-25","n":7,"w":0},{"d":"2026-07-24","n":24,"w":1},{"d":"2026-07-23","n":15,"w":0},{"d":"2026-07-22","n":20,"w":0},{"d":"2026-07-21","n":29,"w":2},{"d":"2026-07-20","n":20,"w":2},{"d":"2026-07-19","n":10,"w":0},{"d":"2026-07-14","n":9,"w":2},{"d":"2026-07-12","n":7,"w":0},{"d":"2026-07-07","n":6,"w":1},{"d":"2026-07-06","n":9,"w":1},{"d":"2026-06-18","n":10,"w":1},{"d":"2026-06-16","n":10,"w":2},{"d":"2026-06-15","n":10,"w":1},{"d":"2026-06-14","n":8,"w":1},{"d":"2026-06-13","n":6,"w":1},{"d":"2026-06-09","n":6,"w":3},{"d":"2026-06-08","n":9,"w":0},{"d":"2026-06-07","n":15,"w":2},{"d":"2026-06-04","n":19,"w":0},{"d":"2026-06-02","n":13,"w":0},{"d":"2026-06-01","n":9,"w":0},{"d":"2026-05-31","n":14,"w":1},{"d":"2026-05-30","n":5,"w":0},{"d":"2026-05-28","n":13,"w":0},{"d":"2026-05-27","n":8,"w":1},{"d":"2026-05-26","n":15,"w":0},{"d":"2026-05-25","n":27,"w":2},{"d":"2026-05-24","n":21,"w":3},{"d":"2026-05-23","n":17,"w":0},{"d":"2026-05-22","n":10,"w":1},{"d":"2026-05-21","n":9,"w":0},{"d":"2026-05-20","n":11,"w":1},{"d":"2026-05-19","n":17,"w":0},{"d":"2026-05-18","n":16,"w":1},{"d":"2026-05-17","n":19,"w":0},{"d":"2026-05-16","n":22,"w":3},{"d":"2026-05-15","n":16,"w":2},{"d":"2026-05-14","n":30,"w":2},{"d":"2026-05-13","n":5,"w":0},{"d":"2026-05-10","n":12,"w":1},{"d":"2026-05-09","n":18,"w":1},{"d":"2026-05-07","n":6,"w":0},{"d":"2026-05-06","n":16,"w":0},{"d":"2026-05-04","n":15,"w":0},{"d":"2026-05-03","n":32,"w":2},{"d":"2026-05-02","n":18,"w":2},{"d":"2026-04-30","n":12,"w":1},{"d":"2026-04-29","n":7,"w":0},{"d":"2026-04-28","n":6,"w":0},{"d":"2026-04-27","n":14,"w":1},{"d":"2026-04-26","n":22,"w":0},{"d":"2026-04-25","n":7,"w":0},{"d":"2026-04-24","n":1,"w":0},{"d":"2026-04-23","n":4,"w":1},{"d":"2026-04-22","n":12,"w":0},{"d":"2026-04-21","n":13,"w":1},{"d":"2026-04-20","n":10,"w":1}];
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAY = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const fmt = (s) => {
+  const d = new Date(s.d + "T12:00:00Z");
+  return `${DAY[d.getUTCDay()]} ${String(d.getUTCDate()).padStart(2,"0")} `
+       + `${MON[d.getUTCMonth()]}`;
+};
+const label = (s, i) => `${fmt(s)} · ${s.n} match${s.n===1?"":"es"}`
+  + (s.w ? ` · ${s.w} W` : "")
+  + (i === 0 ? ' <span class="live">▶ live</span>' : "");
+const monthKey = (s) => {
+  const d = new Date(s.d + "T12:00:00Z");
+  return `${MON[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+};
+
+function wireSwitch(id, onCustom) {
+  const box = document.getElementById(id);
+  box.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-r]");
+    if (!b) return;
+    [...box.querySelectorAll("button")].forEach(x =>
+      x.setAttribute("aria-pressed", String(x === b)));
+    if (onCustom) onCustom(b.dataset.r === "custom");
+  });
+}
+
+/* ── A ─────────────────────────────────────────────────────────────────── */
+let aSel = 0;
+const aCombo = document.getElementById("aCombo");
+const aPop = document.getElementById("aPop");
+function aPaint() {
+  aCombo.innerHTML = `<span>${label(SESSIONS[aSel], aSel)}</span>`
+    + `<span class="chev" aria-hidden="true">▾</span>`;
+  document.getElementById("aPrev").disabled = aSel >= SESSIONS.length - 1;
+  document.getElementById("aNext").disabled = aSel <= 0;
+  let html = "", last = null;
+  SESSIONS.forEach((s, i) => {
+    const k = monthKey(s);
+    if (k !== last) { html += `<div class="mhead">${k}</div>`; last = k; }
+    html += `<button type="button" class="opt" role="option" data-i="${i}"`
+      + ` aria-selected="${i === aSel}">`
+      + `<span class="day">${fmt(s)}</span>`
+      + `<span class="num">${s.n} matches</span>`
+      + `<span class="win">${s.w ? s.w + " W" : ""}</span>`
+      + `${i === 0 ? '<span class="live">▶ live</span>' : ""}</button>`;
+  });
+  aPop.innerHTML = html;
+}
+aCombo.addEventListener("click", () => {
+  const open = aPop.hidden;
+  aPop.hidden = !open;
+  aCombo.setAttribute("aria-expanded", String(open));
+  if (open) { const s = aPop.querySelector('[aria-selected="true"]');
+              if (s) s.scrollIntoView({block: "nearest"}); }
+});
+aPop.addEventListener("click", (e) => {
+  const o = e.target.closest("[data-i]");
+  if (!o) return;
+  aSel = +o.dataset.i; aPaint();
+  aPop.hidden = true; aCombo.setAttribute("aria-expanded", "false");
+  aCombo.focus();
+});
+document.getElementById("aPrev").addEventListener("click", () => {
+  if (aSel < SESSIONS.length - 1) { aSel++; aPaint(); } });
+document.getElementById("aNext").addEventListener("click", () => {
+  if (aSel > 0) { aSel--; aPaint(); } });
+wireSwitch("swA", (on) => { document.getElementById("aCustom").hidden = !on; });
+aPaint();
+
+/* ── B ─────────────────────────────────────────────────────────────────── */
+const OLD_FIRST = [...SESSIONS].reverse();
+const maxN = Math.max(...SESSIONS.map(s => s.n));
+let bSel = OLD_FIRST.length - 1;
+const bTl = document.getElementById("bTl");
+function bPaint() {
+  let lastMon = null;
+  bTl.innerHTML = OLD_FIRST.map((s, i) => {
+    const h = Math.max(1, Math.round(8 * s.n / maxN));
+    const mon = monthKey(s).split(" ")[0];
+    const mark = mon !== lastMon ? ` data-month="${mon}"` : "";
+    lastMon = mon;
+    return `<li${mark}><button type="button" class="tl-bar" data-h="${h}"`
+      + ` data-i="${i}" aria-pressed="${i === bSel}"`
+      + ` aria-label="${fmt(s)}, ${s.n} matches, ${s.w} wins"></button></li>`;
+  }).join("");
+  const s = OLD_FIRST[bSel];
+  document.getElementById("bRead").innerHTML =
+    `<b>${fmt(s)}</b> <span class="meta">· ${s.n} matches · ${s.w} chicken`
+    + ` · ${bSel === OLD_FIRST.length - 1 ? "live" : "closed"}</span>`;
+}
+bTl.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-i]");
+  if (b) { bSel = +b.dataset.i; bPaint(); }
+});
+bTl.addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+  e.preventDefault();
+  bSel = Math.max(0, Math.min(OLD_FIRST.length - 1,
+                              bSel + (e.key === "ArrowRight" ? 1 : -1)));
+  bPaint();
+  const f = bTl.querySelector(`[data-i="${bSel}"]`);
+  if (f) f.focus();
+});
+wireSwitch("swB");
+bPaint();
+
+/* ── C ─────────────────────────────────────────────────────────────────── */
+let cSel = 0, cQuery = "";
+const cCombo = document.getElementById("cCombo");
+const cPop = document.getElementById("cPop");
+function cPaint() {
+  cCombo.innerHTML = `<span>${label(SESSIONS[cSel], cSel)}</span>`
+    + `<span class="chev" aria-hidden="true">▾</span>`;
+  const q = cQuery.trim().toLowerCase();
+  const hit = SESSIONS.filter((s, i) => !q
+    || (fmt(s) + " " + s.d + " " + s.n + " matches " + s.w + " w")
+       .toLowerCase().includes(q));
+  let html = "", last = null;
+  hit.forEach((s) => {
+    const i = SESSIONS.indexOf(s);
+    const k = monthKey(s);
+    if (k !== last) { html += `<div class="mhead">${k}</div>`; last = k; }
+    html += `<button type="button" class="opt" role="option" data-i="${i}"`
+      + ` aria-selected="${i === cSel}">`
+      + `<span class="day">${fmt(s)}</span>`
+      + `<span class="num">${s.n} matches</span>`
+      + `<span class="win">${s.w ? s.w + " W" : ""}</span>`
+      + `${i === 0 ? '<span class="live">▶ live</span>' : ""}</button>`;
+  });
+  document.getElementById("cList").innerHTML = html
+    || `<p class="empty">No session matches “${cQuery}”.</p>`;
+}
+cCombo.addEventListener("click", () => {
+  const open = cPop.hidden;
+  cPop.hidden = !open;
+  cCombo.setAttribute("aria-expanded", String(open));
+  if (open) document.getElementById("cFilter").focus();
+});
+document.getElementById("cFilter").addEventListener("input", (e) => {
+  cQuery = e.target.value; cPaint();
+});
+document.getElementById("cList").addEventListener("click", (e) => {
+  const o = e.target.closest("[data-i]");
+  if (!o) return;
+  cSel = +o.dataset.i; cQuery = "";
+  document.getElementById("cFilter").value = "";
+  cPaint(); cPop.hidden = true;
+  cCombo.setAttribute("aria-expanded", "false"); cCombo.focus();
+});
+wireSwitch("swC");
+cPaint();
+</script>
+</body>
+</html>
