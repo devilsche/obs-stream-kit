@@ -1288,3 +1288,76 @@ def test_standalone_list_holds_exactly_the_intended_pois():
     from pubg.aggregations import POI_PARENT_STANDALONE, POI_PARENT_MAX_CM
     assert POI_PARENT_STANDALONE == frozenset(("Mylta", "Chop Sticks"))
     assert POI_PARENT_MAX_CM == 60000
+
+
+def test_ranks_follow_the_selected_range(pg_compat):
+    """Perzentile und Referenz kommen aus demselben Fenster. Vorher wurde
+    immer das Lifetime-Profil verglichen, waehrend die Kennzahlen darueber
+    dem Zeitraum folgten — die Sektion aenderte sich beim Umschalten nicht
+    und widersprach der eigenen Thin-data-Warnung."""
+    from pubg import shot_quality as sq
+    conn, t1, _ = pg_compat
+    # Alt: schlechte Quote, Neu: gute Quote
+    for mid, when, shots, hits in (("old", "2026-01-01T12:00:00Z", 1000, 20),
+                                   ("new", "2026-09-01T12:00:00Z", 1000, 200)):
+        conn.execute("INSERT INTO matches (tenant_id, match_id, map_name, "
+                     "game_mode, played_at) VALUES (?, ?, ?, ?, ?)",
+                     (t1, mid, "Baltic_Main", "squad", when))
+        conn.execute(
+            "INSERT INTO match_weapon_stats (tenant_id, match_id, account_id, "
+            "weapon, is_bot, shots, hit_attacks, hits, damage) "
+            "VALUES (?, ?, ?, 'M416', false, ?, ?, ?, 100)",
+            (t1, mid, "account.me", shots, hits, hits))
+        # Ein Gegner mit mittlerer Quote in beiden Zeitraeumen
+        conn.execute(
+            "INSERT INTO match_weapon_stats (tenant_id, match_id, account_id, "
+            "weapon, is_bot, shots, hit_attacks, hits, damage) "
+            "VALUES (?, ?, 'enemy', 'M416', false, 1000, 100, 100, 100)",
+            (t1, mid))
+    conn.commit()
+
+    # Zwei gescopte Fenster, damit beide dieselbe Referenzschwelle haben:
+    # ueber alles greift die Lifetime-Schwelle und die Gruppe waere leer.
+    early = sq.compute_shot_quality(conn, t1, "account.me",
+                                    "2025-12-01T00:00:00Z",
+                                    to_iso="2026-06-01T00:00:00Z")
+    late = sq.compute_shot_quality(conn, t1, "account.me",
+                                   "2026-06-01T00:00:00Z")
+    # Eigene Quote: 2 % im fruehen, 20 % im spaeten Fenster
+    assert round(early["me"]["hitRate"]) == 2
+    assert round(late["me"]["hitRate"]) == 20
+    # Und das Perzentil folgt: unter dem Gegner (10 %) bzw. darueber
+    a = early["ranks"]["lobby"]["hitRate"]["percentile"]
+    b = late["ranks"]["lobby"]["hitRate"]["percentile"]
+    assert a is not None and b is not None
+    assert b > a
+
+
+def test_ranks_lower_the_reference_threshold_for_a_scoped_range(pg_compat):
+    """Mit den Lifetime-Schwellen blieb bei einer Session fast niemand
+    uebrig — gemessen 5 Lobby-Spieler statt 850. Die Schwelle wandert
+    darum mit, und die Antwort sagt welche galt."""
+    from pubg import shot_quality as sq
+    conn, t1, _ = pg_compat
+    conn.execute("INSERT INTO matches (tenant_id, match_id, map_name, "
+                 "game_mode, played_at) VALUES (?, ?, ?, ?, ?)",
+                 (t1, "m1", "Baltic_Main", "squad", "2026-09-01T12:00:00Z"))
+    for acc in ("account.me", "e1", "e2", "e3"):
+        conn.execute(
+            "INSERT INTO match_weapon_stats (tenant_id, match_id, account_id, "
+            "weapon, is_bot, shots, hit_attacks, hits, damage) "
+            "VALUES (?, 'm1', ?, 'M416', false, 100, 10, 10, 100)",
+            (t1, acc))
+    conn.commit()
+
+    scoped = sq.compute_shot_quality(conn, t1, "account.me",
+                                     "2026-08-01T00:00:00Z")
+    assert scoped["ranks"]["scoped"] is True
+    assert scoped["ranks"]["lobbyMinMatches"] == 1
+    assert scoped["ranks"]["lobbyPlayers"] == 3     # ohne mich
+
+    life = sq.compute_shot_quality(conn, t1, "account.me",
+                                   "1970-01-01T00:00:00Z")
+    assert life["ranks"]["scoped"] is False
+    assert life["ranks"]["lobbyMinMatches"] == 5
+    assert life["ranks"]["lobbyPlayers"] == 0       # keiner hat 5 Matches

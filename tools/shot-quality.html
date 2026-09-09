@@ -530,15 +530,16 @@
 
       const rk = DATA.ranks || {};
       const nRef = REF === "lobby" ? rk.lobbyPlayers : (DATA.cohort || {}).players;
-      //: Der Zeitraum-Hinweis MUSS hier stehen. Ohne ihn wechselt man
-      //: oben den Zeitraum, sieht die Kennzahlen sich aendern und die
-      //: Perzentile nicht — das liest sich als Fehler, obwohl es die
-      //: bewusste Entscheidung aus shot_quality.py ist.
-      const rangeNote = RANGE === "all" ? ""
-        : ` <b>Always your lifetime profile</b>, independent of the range
-            above: the reference groups are lifetime totals too, and a
-            session's few hundred shots against players with a hundred
-            thousand would not be a comparison.`;
+      //: Die Referenz folgt dem Zeitraum, und die Schwelle wandert mit:
+      //: mit der Lifetime-Schwelle blieb bei einer Session fast niemand
+      //: uebrig. Das muss sichtbar sein, sonst vergleicht man
+      //: unbemerkt gegen eine Handvoll Leute.
+      const rangeNote = !rk.scoped ? ""
+        : ` Both your numbers and the reference come from the selected
+            range, so the group is anyone you met in it — with at least
+            ${rk.lobbyMinMatches} match${rk.lobbyMinMatches === 1 ? "" : "es"}
+            instead of the lifetime threshold, which would leave almost
+            nobody.`;
       document.getElementById("rankSub").innerHTML = (REF === "lobby"
         ? `Against <b>${n0(rk.lobbyPlayers)}</b> opponents you have actually met,
            with at least ${rk.lobbyMinMatches} matches each. Broad, but shot metrics only —
@@ -555,8 +556,8 @@
         + smallRef
         + "Percentile = share of the reference group that is worse than you. "
         + "For \"Deaths before 5 min\" a lower value counts as better. "
-        + "Your own lifetime profile is compared, not the selected range — "
-        + "otherwise a single session would be measured against career totals.";
+        + "Your own account is left out of the group, otherwise you would "
+        + "beat yourself.";
       document.getElementById("rankCard").hidden = false;
     }
 

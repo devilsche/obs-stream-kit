@@ -586,13 +586,27 @@ Perzentil heißt „Anteil der Referenzgruppe, der schlechter ist als du"; bei
 *Deaths before 5 min* zählt ein niedriger Wert als besser. Der eigene Account
 fällt aus dem Vergleich, sonst schlägt man sich selbst.
 
-**Diese Sektion ignoriert den Zeitraum** und rechnet immer mit dem
-Lifetime-Profil. Die Referenzgruppen sind selbst Lifetime-Aggregate — eine
-Session mit dreihundert Schüssen gegen Spieler mit hunderttausend zu stellen
-wäre kein Vergleich. Der Untertitel sagt das, sobald ein anderer Zeitraum als
-*All* gewählt ist: ohne den Hinweis wechselt man oben den Zeitraum, sieht die
-Kennzahlen sich ändern und die Perzentile nicht, und das liest sich als
-Fehler.
+**Eigene Werte und Referenz kommen aus demselben Fenster.** Wird ein Zeitraum
+gewählt, wandert die Referenz mit — sonst landet ein Session-Ausschlag zu weit
+außen, weil Lifetime-Werte fremder Spieler über hunderte Matches gemittelt
+sind und darum viel enger streuen als Session-Werte.
+
+Die **Mindest-Matchzahl** muss dafür mitwandern. Mit den Lifetime-Schwellen
+bliebe bei einer Session fast niemand übrig; gemessen an Prod-Daten:
+
+| Zeitraum | ≥ 1 Match | ≥ 2 | ≥ 5 |
+|---|---|---|---|
+| Session (19 Matches) | 1.533 | 73 | 5 |
+| 7 Tage (64 Matches) | 4.930 | 438 | 11 |
+| alltime (1.132) | 53.467 | 13.435 | 850 |
+
+Bei gewähltem Zeitraum gilt darum **ein** Match, sonst die Lifetime-Schwelle.
+Welche galt, steht im Untertitel und als `scoped` bzw. `lobbyMinMatches` in
+der Antwort — sonst vergleicht man unbemerkt gegen eine Handvoll Leute.
+
+Die Gruppengrößen zählen den **eigenen Account nicht mit**: `rank_me` lässt
+ihn aus dem Vergleich, also darf die Anzeige ihn nicht mitzählen. Bei 850
+Spielern fällt das nicht auf, bei drei schon.
 
 *By round phase* — dieselben Schusswerte getrennt nach Überlebenszeit
 (early < 5 min, mid 5–15 min, late > 15 min). Eine Trefferquote, die zur späten

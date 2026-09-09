@@ -742,8 +742,9 @@ def cohort_players(conn, tenant_id, min_matches=MIN_COHORT_MATCHES,
                    cutoff="1970-01-01T00:00:00Z"):
     """Squad-Kohorte: Accounts aus `participants` mit genug BR-Matches.
 
-    Bewusst ueber den ganzen Bestand (nicht den gewaehlten Zeitraum), damit
-    die Referenz stabil bleibt und nicht mit jedem Range-Wechsel springt."""
+    `cutoff` grenzt den Zeitraum ein. Der Aufrufer entscheidet: fuer die
+    Perzentile wandert er mit dem gewaehlten Zeitraum mit, damit eigene
+    Werte und Referenz aus demselben Fenster kommen."""
     br_where, br_params = _br_filter("m")
     rows = conn.execute(f"""
         SELECT pa.account_id, COALESCE(pl.name, pa.name) AS name,
@@ -1229,16 +1230,24 @@ def compute_shot_quality(conn, tenant_id, account_id, cutoff,
                          with_landings=False, with_bursts=False):
     """Alles in einem Aufruf — so bleibt es ein Endpoint-Call."""
     me = own_metrics(conn, tenant_id, account_id, cutoff, to_iso)
-    squad = cohort_players(conn, tenant_id, min_matches)
-    lobby = lobby_reference(conn, tenant_id, lobby_min_matches)
     deaths = death_rows(conn, tenant_id, account_id, cutoff, to_iso)
 
-    # Fuer den Perzentil-Vergleich zaehlt das Lifetime-Profil, nicht der
-    # gewaehlte Zeitraum — sonst vergleicht man eine Session gegen Bestaende.
-    me_lifetime = (me if cutoff <= "1970-01-02"
-                   else own_metrics(conn, tenant_id, account_id,
-                                    "1970-01-01T00:00:00Z"))
-    me_lifetime = dict(me_lifetime, accountId=account_id)
+    # Der Perzentil-Vergleich folgt dem gewaehlten Zeitraum, und die
+    # REFERENZ wird mitgefiltert. Beides gehoert zusammen: ein
+    # Session-Wert gegen Lifetime-Verteilungen gestellt landete zu weit
+    # aussen, weil Lifetime-Werte fremder Spieler ueber hunderte Matches
+    # gemittelt sind und darum viel enger streuen als Session-Werte.
+    #
+    # Die Mindest-Matchzahl muss dafuer mitwandern. Mit den
+    # Lifetime-Schwellen bliebe bei einer Session fast niemand uebrig
+    # (gemessen: 5 Lobby-Spieler statt 850); mit einem Match sind es 1533,
+    # bei sieben Tagen 4930. Welche Schwelle galt, steht in der Antwort.
+    scoped = cutoff > "1970-01-02" or to_iso
+    ref_min = 1 if scoped else min_matches
+    ref_lobby_min = 1 if scoped else lobby_min_matches
+    squad = cohort_players(conn, tenant_id, ref_min, cutoff=cutoff)
+    lobby = lobby_reference(conn, tenant_id, ref_lobby_min, cutoff=cutoff)
+    me_ranked = dict(me, accountId=account_id)
 
     return {
         "me": me,
@@ -1254,16 +1263,25 @@ def compute_shot_quality(conn, tenant_id, account_id, cutoff,
                                             account_id, cutoff),
             "repeatKillerMin": REPEAT_KILLER_MIN,
         },
+        # Gruppengroessen OHNE den eigenen Account: rank_me laesst ihn aus
+        # dem Vergleich, also darf die Anzeige ihn nicht mitzaehlen. Bei
+        # 850 Spielern faellt das nicht auf, bei drei schon.
         "cohort": {
             "bands": build_cohort_bands(squad),
-            "players": len(squad),
-            "minMatches": min_matches,
+            "players": sum(1 for r in squad
+                           if r.get("accountId") != account_id),
+            "minMatches": ref_min,
         },
         "ranks": {
-            "squad": rank_me(me_lifetime, squad),
-            "lobby": rank_me(me_lifetime, lobby),
-            "lobbyPlayers": len(lobby),
-            "lobbyMinMatches": lobby_min_matches,
+            "squad": rank_me(me_ranked, squad),
+            "lobby": rank_me(me_ranked, lobby),
+            "lobbyPlayers": sum(1 for r in lobby
+                                if r.get("accountId") != account_id),
+            "lobbyMinMatches": ref_lobby_min,
+            # Damit die Anzeige sagen kann, worauf die Gruppe beruht:
+            # bei einem gewaehlten Zeitraum sind die Schwellen niedriger,
+            # sonst waere die Gruppe leer.
+            "scoped": bool(scoped),
         },
         # Nur auf Anforderung: das Shot-Quality-Tool zeigt Landeplaetze
         # nicht mehr (dafuer gibt es den Analyzer), und der Aufruf kostet
