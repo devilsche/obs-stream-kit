@@ -20,16 +20,9 @@
       background-attachment: fixed;
       color: var(--theme-text, #f4f0f8);
     }
-    /* Der Report sitzt jetzt in einer Karte wie die Panels der
-       Tools-Uebersicht, damit die Seiten zusammengehoerig aussehen. */
-    .report {
-      max-width: 1280px; margin: 0 auto; padding: 22px 32px;
-      background: var(--theme-surface, rgba(20,12,30,.95));
-      border: var(--theme-border-width, 1px) solid
-              var(--theme-border, rgba(94,42,121,.6));
-      border-radius: var(--theme-radius, 8px);
-      box-shadow: var(--theme-shadow, 0 14px 40px rgba(0,0,0,.4));
-    }
+    /* .pubg-card traegt Flaeche, Rand, Radius und die Ornament-Ecken —
+       hier nur Breite und das weitere Innenmass. */
+    .report { max-width: 1280px; margin: 0 auto; padding: 22px 32px; }
     .report h1 {
       margin: 0 0 6px;
       color: var(--pubg-gold);
@@ -579,7 +572,7 @@
       text-align: center;
     }
     .event-stat .v {
-      color: #e0c8ff;
+      color: var(--theme-text, #e0c8ff);
       font-size: 1.1em;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
@@ -851,10 +844,10 @@
       color: var(--pubg-muted);
     }
     .md-card .md-badge.alive { color: var(--pubg-gold); }
-    .md-card .md-badge.died  { color: #e57b7b; }
+    .md-card .md-badge.died  { color: var(--theme-danger, #e57b7b); }
     .md-card .md-life { padding-left: 4px; font-size: 0.93em; color: var(--pubg-muted); }
     .md-card .md-life b { color: var(--pubg-text); }
-    .md-card .md-life .md-died { color: #e57b7b; }
+    .md-card .md-life .md-died { color: var(--theme-danger, #e57b7b); }
     .md-card .md-life .md-veh {
       color: var(--pubg-muted);
       font-size: 0.92em;
@@ -868,7 +861,7 @@
     .md-warning {
       background: rgba(229,123,123,0.12);
       border: 1px solid rgba(229,123,123,0.4);
-      color: #e57b7b;
+      color: var(--theme-danger, #e57b7b);
       padding: 6px 10px;
       border-radius: 4px;
       font-size: 0.82em;
@@ -1106,9 +1099,13 @@
       font-size: 0.95em;
       font-variant-numeric: tabular-nums;
     }
-    .delta-pos { color: #7be57b; }
-    .delta-neg { color: #e57b7b; }
-    .delta-zero { color: var(--pubg-muted); }
+    /* Die Deltas standen auf festem Hell-Gruen und Hell-Rot — auf einem
+       hellen Theme wie editorial war das Kontrast 1,50 und damit
+       unlesbar. --theme-ok und --theme-danger wandern mit: editorial
+       liefert dort ein dunkles Gruen (4,50). */
+    .delta-pos { color: var(--theme-ok, #7be57b); font-weight: 600; }
+    .delta-neg { color: var(--theme-danger, #e57b7b); font-weight: 600; }
+    .delta-zero { color: var(--theme-text-dim, #8a7d99); }
     .streaks-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -1223,7 +1220,7 @@
       flex-direction: column;
       gap: 2px;
     }
-    .payday-cell .pubg-stat-value { color: #e0c8ff; font-size: 1.4em; font-weight: 700; }
+    .payday-cell .pubg-stat-value { color: var(--theme-text, #e0c8ff); font-size: 1.4em; font-weight: 700; }
     .payday-cell .pubg-stat-label {
       color: var(--pubg-muted); font-size: 0.7em;
       text-transform: uppercase; letter-spacing: 0.06em;
@@ -1244,7 +1241,7 @@
       border-radius: 12px;
       font-size: 0.82em;
     }
-    .loot-badge b { color: #e0c8ff; }
+    .loot-badge b { color: var(--theme-text, #e0c8ff); }
     .payday-matches {
       width: 100%;
       border-collapse: collapse;
@@ -1300,13 +1297,18 @@
        Eine Leiste statt zwei Tabs. Die Elemente sind bewusst dieselben
        wie in shot-quality und landing-spots: wer das eine Tool kennt,
        muss das andere nicht neu lernen. */
-    .pick-bar {
-      display: flex; flex-direction: column; gap: 8px;
-      margin: 0 0 14px; padding: 12px 14px;
-      background: var(--theme-surface, #241a2e);
-      border: 1px solid var(--theme-border, #3a2c48);
-      border-radius: 8px;
-    }
+    /* Nur Layout. Flaeche, Textur, Rand, Radius und die Ornament-Ecken
+       kommen aus .pubg-card — derselbe Container wie der Report selbst,
+       damit beide dieselbe Eckengroesse und Textur tragen. Ein
+       handgemachter Nachbau sah in Gothic-Themes anders aus als die
+       Karte darunter. */
+    /* Bündig mit dem Report darunter, nicht mit dem Fenster: die Leiste
+       lief ueber die Kante der Karte hinaus. Die anderen Tools loesen das
+       ueber ein max-width am body und merken es deshalb nicht — hier
+       traegt die Karte selbst die Breite. */
+    .pick-bar { display: flex; flex-direction: column; gap: 8px;
+                max-width: 1280px; margin: 0 auto 14px;
+                padding: 12px 14px; }
     .pick-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     .pick-label {
       min-width: 58px; font-size: 0.78rem; letter-spacing: 0.04em;
@@ -1492,10 +1494,37 @@
     .md-squad-table tr.self td { font-weight: 700; background: rgba(242,183,5,0.06); }
     /* Slot-Farben (1..4) statisch — JS-Inject ist unzuverlaessig
        wenn CSS-Cascade-Reihenfolge eine Rolle spielt. */
-    .md-slot-1 { color: #f2b705 !important; }  /* Slot 1 — gelb */
-    .md-slot-2 { color: #ff5a3d !important; }  /* Slot 2 — rot/orange */
-    .md-slot-3 { color: #4ec9ff !important; }  /* Slot 3 — blau */
-    .md-slot-4 { color: #3dd668 !important; }  /* Slot 4 — gruen */
+    /* Squad-Plate-Farben aus dem Spiel: Slot 1 gelb, 2 rot, 3 blau,
+       4 gruen. Die Zuordnung ist Bedeutung und darf nicht mit dem Theme
+       wechseln — auf hellem Grund waren die Originaltoene aber
+       unlesbar (Kontrast 1,7 bis 2,9). Darum dieselben Farbtoene,
+       abgedunkelt bis 4,6:1. */
+    :root {
+      --md-slot-1: #f2b705;  /* gelb  */
+      --md-slot-2: #ff5a3d;  /* rot   */
+      --md-slot-3: #4ec9ff;  /* blau  */
+      --md-slot-4: #3dd668;  /* gruen */
+    }
+    html[data-theme="editorial"] {
+      --md-slot-1: #8f6c03; --md-slot-2: #dd2100;
+      --md-slot-3: #0078ad; --md-slot-4: #1b8138;
+    }
+    html[data-theme="swiss"] {
+      --md-slot-1: #916e03; --md-slot-2: #e42200;
+      --md-slot-3: #007bb0; --md-slot-4: #1c863a;
+    }
+    /* Zeilen der Karten-Tabelle. Der frueher feste Lila-Ton (#c8b3e3)
+       hatte auf editorial Kontrast 1,81. --theme-accent-2 waere dort mit
+       3,80 noch unter der Grenze fuer normalen Text; --theme-text-dim
+       liegt in JEDEM Theme ueber 5,2 und sagt zudem das Richtige:
+       Event-Zeilen sind nachrangig, keine Hervorhebung. */
+    .map-row--win { color: var(--theme-accent, #f2b705); }
+    .map-row--event { color: var(--theme-text-dim, #c8b3e3); }
+    .map-perfect { color: var(--theme-accent, #f2b705); }
+    .md-slot-1 { color: var(--md-slot-1) !important; }
+    .md-slot-2 { color: var(--md-slot-2) !important; }
+    .md-slot-3 { color: var(--md-slot-3) !important; }
+    .md-slot-4 { color: var(--md-slot-4) !important; }
     .md-muted-color { color: var(--pubg-muted); }
     .md-squad-table .md-dot {
       display: inline-block; width: 10px; height: 10px;
@@ -1550,7 +1579,7 @@
     .md-timeline__chip:hover { color: var(--pubg-text); }
     .md-timeline__chip.is-active {
       background: var(--pubg-purple);
-      color: #fff;
+      color: var(--theme-on-primary, #fff);
       border-color: var(--pubg-purple);
     }
     .md-timeline__chip:focus-visible {
@@ -1696,7 +1725,7 @@
        und landing-spots, darunter die Session mit Pfeilen zu den
        Nachbarn. Der Sprung zur Session davor war die haeufigste Aktion
        und kostete vorher Monat-aufklappen plus Scrollen. -->
-  <div class="pick-bar">
+  <div class="pubg-card pick-bar">
     <div class="pick-row">
       <span class="pick-label" id="lblRange">Range</span>
       <span class="switch" role="group" aria-labelledby="lblRange" id="rangeSwitch">
@@ -1752,12 +1781,19 @@
     ];
     // PUBG-In-Game Squad-Plate-Farben — index = slot-1 (Roster-Slot 1..4).
     // Reihenfolge per User-Vorgabe: Slot 1 gelb, 2 rot/orange, 3 blau, 4 grün.
-    const MD_SLOT_COLORS = [
-      "#f2b705",  // Slot 1 — gelb (PUBG-Gold)
-      "#ff5a3d",  // Slot 2 — rot/orange
-      "#4ec9ff",  // Slot 3 — blau
-      "#3dd668",  // Slot 4 — grün
-    ];
+    //: Aus den CSS-Tokens gelesen, damit Karte und Text dieselbe Farbe
+    //: tragen — auf hellen Themes sind das die abgedunkelten Varianten.
+    //: Fallback auf die Originaltoene, falls das Stylesheet fehlt.
+    const MD_SLOT_FALLBACK = ["#f2b705", "#ff5a3d", "#4ec9ff", "#3dd668"];
+    const MD_SLOT_COLORS = (() => {
+      try {
+        const cs = getComputedStyle(document.documentElement);
+        return MD_SLOT_FALLBACK.map((def, i) =>
+          (cs.getPropertyValue(`--md-slot-${i + 1}`) || "").trim() || def);
+      } catch (e) {
+        return MD_SLOT_FALLBACK.slice();
+      }
+    })();
     // Canvas-Display-Size (px). devicePixelRatio wird in mdRenderBasemap
     // separat angewendet, damit das Bitmap-Buffer hoeher aufgeloest ist
     // als die CSS-Box — fuer scharfe HD-Maps auch auf Retina-Screens.
@@ -4324,15 +4360,17 @@
               const isEvent = !!m.isEvent;
               // Event-Rows nicht gold faerben — in Events ist 'place=1'
               // immer fuer alle gesetzt → 'wins' ist hier kein echter Win.
-              const rowStyle = (m.wins && !isEvent)
-                ? 'style="color:var(--pubg-gold)"'
-                : isEvent ? 'style="color:#c8b3e3"' : '';
+              // Klassen statt style-Attribute: der feste Lila-Ton war auf
+              // hellen Themes unlesbar (Kontrast 1,81), und Inline-Styles
+              // koennen kein Theme tragen.
+              const rowStyle = (m.wins && !isEvent) ? 'class="map-row--win"'
+                : isEvent ? 'class="map-row--event"' : '';
               // KD: in Event-Only-Maps wenn keine Deaths → 'Perfekt'.
               // Auch in BR ohne Deaths → 'Perfekt'.
               const kdCell = (m.deaths === 0 && (m.brMatches || 0) > 0)
-                ? '<span title="No deaths" style="color:var(--pubg-gold)">Perfect</span>'
+                ? '<span title="No deaths" class="map-perfect">Perfect</span>'
                 : (isEvent && m.deaths === 0)
-                  ? '<span title="event without DIED" style="color:var(--pubg-gold)">Perfect</span>'
+                  ? '<span title="event without DIED" class="map-perfect">Perfect</span>'
                   : m.kd.toFixed(2);
               const placeCell = isEvent ? '—' : `#${m.avgPlace.toFixed(1)}`;
               // Event-Badge: lila Text auf transparentem Hintergrund. Bei
