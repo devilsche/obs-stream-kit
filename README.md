@@ -456,6 +456,35 @@ Voraussetzung für die Fremdsicht: die Seite muss ihre API-Calls über
 `/s/<token>/` sind davon nicht betroffen — dort gibt es keine Impersonation und
 entsprechend kein Banner im Stream.
 
+#### Auswahl im session-report
+
+Zeitraum und Session stehen in **einer Leiste**, mit demselben `switch`-Element
+wie in `shot-quality` und `landing-spots`:
+
+```
+Range    [Current][Today][7 days][30 days][All][Custom…]
+Session  ◀  Sat 06 Sep 21:14 · 19 matches · 3 W  ▾  ▶     89 sessions
+```
+
+Vorher waren es zwei Tabs — *Sessions* mit Monats-Akkordeons und *Custom
+Range* mit fünf Presets. Zwei Wege zum selben Ziel, und „Yesterday" stand als
+Knopf **und** als Session in der Liste. Der Sprung zur Session davor, die
+häufigste Aktion, kostete Monat-aufklappen plus Scrollen; jetzt ist es ein
+Klick auf `◀`.
+
+Weggefallen: die Tabs, die Monats-Akkordeons samt ihrem localStorage-Zustand,
+das Sortier-Dropdown (fünf Optionen — ein Überrest aus dem Akkordeon-Baum) und
+das Preset *Yesterday*. Dazugekommen: *30 days* und die Pfeile. Der
+`view`-URL-Parameter steuerte die Tabs und wird beim Wechsel entfernt.
+
+Die Monatsköpfe in der Liste sind **Trenner**, keine Akkordeons — nichts zum
+Aufklappen. Ein gewählter Zeitraum, der keiner Session entspricht, lässt den
+Schalter auf *Custom* und die Session-Zeile sagt das ausdrücklich, statt eine
+fremde Session als gewählt auszugeben.
+
+Die drei verworfenen Entwürfe stehen als klickbares Mockup in
+`docs/design-proposals/session-picker.html` (mit den echten 89 Sessions).
+
 **TopScorer** im `session-report` ist der beste Einzelspieler der **ganzen Lobby** —
 eigener Squad eingeschlossen, im Gegensatz zum "Stärksten Gegner" in
 `session-lobbies.html`. Er steht jetzt in drei Auflösungen da: je Match (eigene

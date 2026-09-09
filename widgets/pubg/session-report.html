@@ -1281,197 +1281,109 @@
     }
     /* Tab-Switch zwischen Session-Picker und Custom-Range. Nur einer
        von beiden ist sichtbar. Persistenz via URL-Param `view`. */
-    .view-tabs {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 12px;
-      border-bottom: 1px solid var(--pubg-border);
+    /* ── Auswahl-Leiste ──────────────────────────────────────────────
+       Eine Leiste statt zwei Tabs. Die Elemente sind bewusst dieselben
+       wie in shot-quality und landing-spots: wer das eine Tool kennt,
+       muss das andere nicht neu lernen. */
+    .pick-bar {
+      display: flex; flex-direction: column; gap: 8px;
+      margin: 0 0 14px; padding: 12px 14px;
+      background: var(--theme-surface, #241a2e);
+      border: 1px solid var(--theme-border, #3a2c48);
+      border-radius: 8px;
     }
-    .view-tab {
-      background: transparent;
-      border: 1px solid transparent;
-      border-bottom: none;
-      /* Inaktiv: heller als --pubg-muted fuer ausreichenden Kontrast
-         gegen body-Hintergrund (WCAG 4.5:1). Aktiv = gold. */
-      color: var(--pubg-text);
-      opacity: 0.75;
-      padding: 8px 18px;
-      font: inherit;
-      font-size: 0.95em;
-      font-weight: 500;
+    .pick-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .pick-label {
+      min-width: 58px; font-size: 0.78rem; letter-spacing: 0.04em;
+      text-transform: uppercase; color: var(--theme-text-dim, #a99cb8);
+    }
+    .pick-bar .switch {
+      display: inline-flex; border-radius: 5px; overflow: hidden;
+      border: 1px solid var(--theme-border, #3a2c48);
+    }
+    .pick-bar .switch button {
+      font: inherit; font-size: 0.86rem; min-height: 28px; padding: 4px 11px;
+      background: transparent; color: var(--theme-text-dim, #a99cb8);
+      border: 0; border-right: 1px solid var(--theme-border, #3a2c48);
       cursor: pointer;
-      border-top-left-radius: 6px;
-      border-top-right-radius: 6px;
-      margin-bottom: -1px;
-      min-height: 32px;
-      transition: opacity 0.12s, background-color 0.12s;
     }
-    .view-tab:hover { opacity: 1; background: rgba(94,42,121,0.15); }
-    .view-tab[aria-selected="true"] {
-      color: var(--pubg-gold);
-      opacity: 1;
-      background: rgba(0,0,0,0.3);
-      border-color: var(--pubg-border);
-      border-bottom-color: rgba(0,0,0,0.3);
-      font-weight: 600;
+    .pick-bar .switch button:last-child { border-right: 0; }
+    .pick-bar .switch button[aria-pressed="true"] {
+      background: var(--theme-primary, #5e2a79);
+      color: var(--theme-text, #f4f0f8); font-weight: 600;
     }
-    .view-tab:focus-visible {
-      outline: 2px solid var(--pubg-gold);
+    .pick-bar .switch button:hover { color: var(--theme-text, #f4f0f8); }
+    .pick-step {
+      font: inherit; min-width: 30px; min-height: 28px; cursor: pointer;
+      background: transparent; color: var(--theme-text-dim, #a99cb8);
+      border: 1px solid var(--theme-border, #3a2c48); border-radius: 5px;
+    }
+    .pick-step:hover:not(:disabled) { color: var(--theme-text, #f4f0f8); }
+    .pick-step:disabled { color: var(--theme-text-faint, #6b5f7a); cursor: default; }
+    .pick-combo {
+      font: inherit; font-size: 0.9rem; min-height: 28px; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 8px; text-align: left;
+      padding: 3px 10px;
+      background: var(--theme-bg, #140d1c); color: var(--theme-text, #f4f0f8);
+      border: 1px solid var(--theme-border, #3a2c48); border-radius: 5px;
+    }
+    .pick-combo .pick-meta { color: var(--theme-text-dim, #a99cb8); font-size: 0.86em; }
+    .pick-combo .pick-chev { color: var(--theme-text-faint, #6b5f7a); }
+    .pick-count { font-size: 0.8rem; color: var(--theme-text-faint, #6b5f7a); }
+    .pick-live { color: var(--theme-gold, var(--pubg-gold, #f2b705)); font-size: 0.8em; }
+    .pick-custom { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .pick-custom[hidden] { display: none; }
+    .pick-custom label {
+      font-size: 0.78rem; color: var(--theme-text-dim, #a99cb8);
+    }
+    .pick-custom input {
+      font: inherit; font-size: 0.84rem; min-height: 28px; padding: 3px 7px;
+      background: var(--theme-bg, #140d1c); color: var(--theme-text, #f4f0f8);
+      border: 1px solid var(--theme-border, #3a2c48); border-radius: 4px;
+    }
+    .pick-apply {
+      font: inherit; font-size: 0.84rem; min-height: 28px; padding: 3px 12px;
+      cursor: pointer;
+      background: var(--theme-primary, #5e2a79); color: var(--theme-text, #f4f0f8);
+      border: 1px solid var(--theme-border, #3a2c48); border-radius: 4px;
+    }
+    .pick-pop {
+      max-height: 260px; overflow-y: auto;
+      background: var(--theme-bg, #140d1c);
+      border: 1px solid var(--theme-border, #3a2c48); border-radius: 6px;
+    }
+    .pick-pop[hidden] { display: none; }
+    .pick-mhead {
+      position: sticky; top: 0; padding: 5px 10px;
+      font-size: 0.74rem; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--theme-text-faint, #6b5f7a);
+      background: var(--theme-surface, #241a2e);
+    }
+    .pick-opt {
+      display: flex; gap: 10px; align-items: baseline; width: 100%;
+      font: inherit; font-size: 0.87rem; text-align: left; cursor: pointer;
+      padding: 5px 10px; border: 0; background: transparent;
+      color: var(--theme-text, #f4f0f8);
+    }
+    .pick-opt:hover { background: var(--theme-primary, #5e2a79); }
+    .pick-opt[aria-selected="true"] {
+      background: var(--theme-primary, #5e2a79); font-weight: 600;
+    }
+    .pick-opt .pick-day { min-width: 116px; }
+    .pick-opt .pick-num { min-width: 74px; color: var(--theme-text-dim, #a99cb8); }
+    .pick-opt .pick-win { min-width: 46px; color: var(--theme-gold, var(--pubg-gold, #f2b705)); }
+    .pick-empty {
+      padding: 10px; font-size: 0.87rem; color: var(--theme-text-faint, #6b5f7a);
+    }
+    /* Fokus sichtbar auf allen neuen Bedienelementen (WCAG 2.4.11). */
+    .pick-bar .switch button:focus-visible,
+    .pick-step:focus-visible, .pick-combo:focus-visible,
+    .pick-opt:focus-visible, .pick-apply:focus-visible,
+    .pick-custom input:focus-visible {
+      outline: 2px solid var(--theme-gold, var(--pubg-gold, #f2b705));
       outline-offset: 2px;
     }
     [role="tabpanel"][hidden] { display: none !important; }
-    .range-picker {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 12px;
-      padding: 10px 14px;
-      background: rgba(0,0,0,0.3);
-      border: 1px solid var(--pubg-border);
-      border-radius: 6px;
-      flex-wrap: wrap;
-    }
-    .range-picker label {
-      color: var(--pubg-muted);
-      font-size: 0.78em;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-    .range-picker input[type=date],
-    .range-picker input[type=time] {
-      background: rgba(0,0,0,0.4);
-      color: var(--pubg-text);
-      border: 1px solid var(--pubg-border);
-      padding: 4px 6px;
-      border-radius: 3px;
-      font-family: inherit;
-      font-size: inherit;
-      color-scheme: dark;
-    }
-    .range-picker .presets {
-      display: flex; gap: 4px;
-      margin-left: auto;
-    }
-    .range-picker .preset {
-      padding: 4px 10px;
-      background: rgba(94,42,121,0.18);
-      border: 1px solid transparent;
-      border-radius: 3px;
-      cursor: pointer;
-      font-size: 0.85em;
-      color: var(--pubg-text);
-      font-family: inherit;
-    }
-    .range-picker .preset:hover { background: rgba(94,42,121,0.4); }
-    .range-picker button.apply {
-      background: var(--pubg-gold);
-      color: #1a0d2a;
-      border: none;
-      padding: 5px 14px;
-      border-radius: 3px;
-      font-weight: 700;
-      cursor: pointer;
-      font-family: inherit;
-    }
-    .session-picker {
-      margin-bottom: 18px;
-      padding: 12px 14px;
-      background: rgba(0,0,0,0.3);
-      border: 1px solid var(--pubg-border);
-      border-radius: 6px;
-    }
-    .session-picker .controls {
-      display: flex; gap: 10px; align-items: center;
-      margin-bottom: 10px;
-      flex-wrap: wrap;
-    }
-    .session-picker .controls select {
-      background: rgba(0,0,0,0.4);
-      color: var(--pubg-text);
-      border: 1px solid var(--pubg-border);
-      padding: 5px 8px;
-      border-radius: 3px;
-      font-family: inherit;
-      cursor: pointer;
-    }
-    .session-picker .controls .month-tabs {
-      display: flex; gap: 4px; flex-wrap: wrap; flex: 1;
-    }
-    .session-picker .controls .month-tab {
-      padding: 4px 10px;
-      background: rgba(94,42,121,0.18);
-      border: 1px solid transparent;
-      border-radius: 3px;
-      cursor: pointer;
-      font-size: 0.78em;
-      color: var(--pubg-text);
-      font-family: inherit;
-    }
-    .session-picker .controls .month-tab:hover { background: rgba(94,42,121,0.4); }
-    .session-picker .controls .month-tab.active {
-      background: var(--pubg-purple);
-      border-color: var(--pubg-gold);
-    }
-    .session-picker .summary {
-      color: var(--pubg-muted);
-      font-size: 0.8em;
-      letter-spacing: 0.04em;
-    }
-    .session-picker .toggle-all {
-      background: rgba(94,42,121,0.3);
-      border: 1px solid var(--pubg-border);
-      padding: 4px 10px;
-      border-radius: 3px;
-      font-size: 0.78em;
-      color: var(--pubg-text);
-      cursor: pointer;
-      font-family: inherit;
-    }
-    .session-picker .month-header {
-      color: var(--pubg-gold);
-      font-size: 0.85em;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      margin: 12px 0 6px;
-      padding-bottom: 3px;
-      border-bottom: 1px solid var(--pubg-border);
-    }
-    .session-picker .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-      gap: 6px;
-    }
-    .session-picker .item {
-      padding: 6px 10px;
-      background: rgba(94,42,121,0.18);
-      border: 1px solid transparent;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.78em;
-      transition: all 0.15s;
-    }
-    .session-picker .item:hover {
-      background: rgba(94,42,121,0.4);
-    }
-    .session-picker .item.active {
-      background: var(--pubg-purple);
-      border-color: var(--pubg-gold);
-      color: var(--pubg-text);
-    }
-    .session-picker .item .label {
-      color: var(--pubg-gold); font-weight: 700;
-      display: block;
-      margin-bottom: 2px;
-      font-size: 1.05em;
-    }
-    .session-picker .item .meta {
-      color: var(--pubg-muted);
-      font-variant-numeric: tabular-nums;
-    }
-    .session-picker .item.current {
-      background: rgba(242,183,5,0.15);
-      border-color: rgba(242,183,5,0.4);
-    }
 
     /* ─── Slide-In Match-Detail Panel ───────────────────────────────────── */
     .md-panel {
@@ -1741,23 +1653,6 @@
       .md-tl-poi { grid-column: 1 / -1; padding-left: 74px; font-size: 0.82em; }
       .md-tl-text { grid-column: 1 / -1; padding-left: 74px; }
     }
-
-    /* ─── Monats-Gruppen in der Session-Picker-Liste ────────────────────── */
-    .month-group {
-      border: 1px solid var(--pubg-border);
-      border-radius: var(--pubg-radius);
-      margin-bottom: 8px;
-      background: rgba(20, 12, 30, 0.4);
-    }
-    .month-group > summary.month-group__head {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 14px;
-      cursor: pointer;
-      list-style: none;
-      user-select: none;
-      min-height: 44px;
-    }
-    .month-group > summary.month-group__head::-webkit-details-marker { display: none; }
     .month-group__name {
       flex: 1;
       color: var(--pubg-gold);
@@ -1773,65 +1668,56 @@
       color: var(--pubg-muted);
       transition: transform 180ms ease;
     }
-    .month-group[open] > summary .month-group__chev { transform: rotate(180deg); }
     .month-group__body {
       padding: 0 10px 10px;
-    }
-    .month-group > summary:focus-visible {
-      outline: 2px solid var(--pubg-gold);
-      outline-offset: -2px;
     }
     @media (prefers-reduced-motion: reduce) {
       .month-group__chev { transition: none; }
     }
-    /* Item-Inhalte in den Monats-Gruppen (Date oben, Meta darunter) */
-    .session-picker .item .item-date {
-      color: var(--pubg-gold);
-      font-weight: 700;
-      display: block;
-      margin-bottom: 2px;
-      font-size: 1.05em;
-    }
-    .session-picker .item .item-meta {
-      color: var(--pubg-muted);
-      font-variant-numeric: tabular-nums;
-      font-size: 0.9em;
-    }
-    .session-picker .item .item-live {
-      color: var(--pubg-gold);
-      font-size: 0.85em;
-      margin-left: 4px;
-    }
   </style>
 </head>
 <body>
-  <div class="view-tabs" role="tablist" aria-label="Report selection">
-    <button type="button" class="view-tab" role="tab"
-            data-view="sessions" id="tabSessions"
-            aria-controls="picker" aria-selected="true">Sessions</button>
-    <button type="button" class="view-tab" role="tab"
-            data-view="range" id="tabRange"
-            aria-controls="rangePicker" aria-selected="false">Custom Range</button>
-  </div>
-  <div class="range-picker" id="rangePicker"
-       role="tabpanel" aria-labelledby="tabRange" hidden>
-    <label for="dateFrom">From</label>
-    <input type="date" id="dateFrom">
-    <input type="time" id="timeFrom" value="00:00" step="60">
-    <label for="dateTo">To</label>
-    <input type="date" id="dateTo">
-    <input type="time" id="timeTo" value="23:59" step="60">
-    <button class="apply" id="applyRange">Apply</button>
-    <div class="presets">
-      <button class="preset" data-preset="current">▶ Current</button>
-      <button class="preset" data-preset="today">Today</button>
-      <button class="preset" data-preset="yesterday">Yesterday</button>
-      <button class="preset" data-preset="last7">Last 7 days</button>
-      <button class="preset" data-preset="all">All (DB)</button>
+  <!-- Eine Leiste statt zwei Tabs: derselbe switch wie in shot-quality
+       und landing-spots, darunter die Session mit Pfeilen zu den
+       Nachbarn. Der Sprung zur Session davor war die haeufigste Aktion
+       und kostete vorher Monat-aufklappen plus Scrollen. -->
+  <div class="pick-bar">
+    <div class="pick-row">
+      <span class="pick-label" id="lblRange">Range</span>
+      <span class="switch" role="group" aria-labelledby="lblRange" id="rangeSwitch">
+        <button type="button" data-r="current" aria-pressed="true">Current</button>
+        <button type="button" data-r="today" aria-pressed="false">Today</button>
+        <button type="button" data-r="7" aria-pressed="false">7 days</button>
+        <button type="button" data-r="30" aria-pressed="false">30 days</button>
+        <button type="button" data-r="all" aria-pressed="false">All</button>
+        <button type="button" data-r="custom" aria-pressed="false">Custom&hellip;</button>
+      </span>
     </div>
+    <div class="pick-row" id="sessionRow">
+      <span class="pick-label" id="lblSession">Session</span>
+      <button type="button" class="pick-step" id="sessPrev"
+              aria-label="Previous session">&#9664;</button>
+      <button type="button" class="pick-combo" id="sessCombo"
+              aria-expanded="false" aria-haspopup="listbox"
+              aria-controls="sessPop">&mdash;</button>
+      <button type="button" class="pick-step" id="sessNext"
+              aria-label="Next session">&#9654;</button>
+      <span class="pick-count" id="sessCount"></span>
+    </div>
+    <div class="pick-custom" id="customRow" hidden>
+      <label for="dateFrom">From</label>
+      <input type="date" id="dateFrom">
+      <input type="time" id="timeFrom" value="00:00" step="60"
+             aria-label="From time">
+      <label for="dateTo">To</label>
+      <input type="date" id="dateTo">
+      <input type="time" id="timeTo" value="23:59" step="60"
+             aria-label="To time">
+      <button type="button" class="pick-apply" id="applyRange">Apply</button>
+    </div>
+    <div class="pick-pop" id="sessPop" role="listbox"
+         aria-label="Sessions" hidden></div>
   </div>
-  <div id="picker" class="session-picker"
-       role="tabpanel" aria-labelledby="tabSessions" style="display:none"></div>
   <div class="pubg-card report pubg-fade-in" id="report">
     <div class="empty">— loading —</div>
   </div>
@@ -3514,57 +3400,61 @@
       document.getElementById("timeTo").value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
     }
 
-    // ── Tab-Switch: Sessions ↔ Custom Range ──────────────────────────
-    // Aktiver Tab kommt aus URL-Param `view` (Default abhaengig davon
-    // ob FROM/TO gesetzt sind: Custom Range wenn ja, sonst Sessions).
-    const _viewFromUrl = PubgUI.qs("view", "");
-    const _initialView = _viewFromUrl || ((FROM || TO) ? "range" : "sessions");
-    function setActiveView(v, persist) {
-      const isRange = (v === "range");
-      const tabRange    = document.getElementById("tabRange");
-      const tabSessions = document.getElementById("tabSessions");
-      const panelRange  = document.getElementById("rangePicker");
-      const panelPicker = document.getElementById("picker");
-      tabRange.setAttribute("aria-selected", isRange ? "true" : "false");
-      tabSessions.setAttribute("aria-selected", isRange ? "false" : "true");
-      panelRange.hidden = !isRange;
-      // Session-Picker hat altes inline display-handling; bleibt
-      // erhalten, wir steuern Sichtbarkeit aber via hidden-Attribut.
-      panelPicker.hidden = isRange;
-      if (persist) {
-        const u = new URL(location.href);
-        u.searchParams.set("view", v);
-        history.replaceState(null, "", u.toString());
-      }
+    // ── Auswahl-Leiste ───────────────────────────────────────────────
+    // Vorher zwei Tabs (Sessions / Custom Range) mit fuenf Presets im
+    // einen und Monats-Akkordeons im anderen — zwei Wege zum selben
+    // Ziel, und "Yesterday" stand als Knopf UND als Session in der
+    // Liste. Jetzt ein switch fuer gerundete Zeitraeume, eine Zeile fuer
+    // die konkrete Session.
+    let allSessions = [];
+
+    function monthKey(iso) {
+      const d = new Date(iso);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     }
-    setActiveView(_initialView, false);
-    document.querySelectorAll(".view-tab").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const v = btn.dataset.view;
-        // Wenn user auf Sessions zurueckklickt waehrend from/to noch in
-        // der URL haengen (vorher Custom Range gewaehlt), dann beide
-        // raus + reload — sonst zeigt der Report verwirrend gefilterte
-        // Daten obwohl der Sessions-Tab aktiv ist.
-        if (v === "sessions" && (FROM || TO)) {
-          const u = new URL(location.href);
-          u.searchParams.delete("from");
-          u.searchParams.delete("to");
-          u.searchParams.set("view", "sessions");
-          location.href = u.toString();
-          return;
-        }
-        setActiveView(v, true);
-      });
-      btn.addEventListener("keydown", (e) => {
-        // Pfeiltasten zwischen Tabs wechseln (WCAG-konform).
-        if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-          e.preventDefault();
-          const next = btn.dataset.view === "sessions" ? "range" : "sessions";
-          setActiveView(next, true);
-          document.getElementById(next === "range" ? "tabRange" : "tabSessions").focus();
-        }
-      });
-    });
+
+    function _monthLabel(k) {
+      const [y, m] = k.split("-");
+      const names = ["January", "February", "March", "April", "May", "June",
+                     "July", "August", "September", "October",
+                     "November", "December"];
+      return `${names[parseInt(m, 10) - 1] || m} ${y}`;
+    }
+
+    //: Zeitraum eines Presets. Rein rechnend, damit derselbe Code den
+    //: aktiven Knopf erkennen und ihn setzen kann — sonst laufen
+    //: Anzeige und Wirkung auseinander.
+    function presetRange(p, now) {
+      const day = new Date(now); day.setHours(0, 0, 0, 0);
+      if (p === "current") return { from: "", to: "" };
+      if (p === "today") {
+        const e = new Date(day); e.setHours(23, 59, 59, 0);
+        return { from: day.toISOString(), to: e.toISOString() };
+      }
+      if (p === "7" || p === "30") {
+        const s = new Date(day); s.setDate(s.getDate() - parseInt(p, 10));
+        return { from: s.toISOString(), to: "" };   // to leer = bis jetzt
+      }
+      if (p === "all") return { from: "1970-01-01T00:00:00Z", to: "" };
+      return null;                                   // custom
+    }
+
+    //: Welcher Knopf gehoert zum aktuellen from/to? Eine gewaehlte
+    //: Session ist KEIN Preset — dann bleibt der switch auf "custom"
+    //: und die Session-Zeile zeigt, was gilt.
+    function activePreset(from, to, sessions, now) {
+      if (!from && !to) return "current";
+      for (const p of ["today", "7", "30", "all"]) {
+        const r = presetRange(p, now);
+        if (r && r.from === from && (r.to || "") === (to || "")) return p;
+      }
+      return "custom";
+    }
+
+    function sessionIndex(from, to, sessions) {
+      if (!from) return 0;            // kein Filter = laufende Session
+      return (sessions || []).findIndex(s => s.from === from);
+    }
 
     function applyRange(fromIso, toIso) {
       const u = new URL(location.href);
@@ -3572,191 +3462,133 @@
       else u.searchParams.delete("from");
       if (toIso) u.searchParams.set("to", toIso);
       else u.searchParams.delete("to");
+      // Der alte view-Parameter steuerte die Tabs, die es nicht mehr gibt.
+      u.searchParams.delete("view");
       location.href = u.toString();
     }
+
+    function sessLabel(s, idx) {
+      if (!s) return "&mdash;";
+      const time = PubgUI.fmtTime ? PubgUI.fmtTime(s.from) : "";
+      const win = s.wins ? ` &middot; ${s.wins} W` : "";
+      const live = idx === 0 ? ' <span class="pick-live">&#9654; live</span>' : "";
+      return `<span>${PubgUI.fmtDate(s.from)}${time ? " " + time : ""}</span>`
+        + `<span class="pick-meta">${s.matches || 0} matches${win}</span>`
+        + live;
+    }
+
+    function paintPicker() {
+      const now = new Date();
+      const preset = activePreset(FROM, TO, allSessions, now);
+      const box = document.getElementById("rangeSwitch");
+      [...box.querySelectorAll("button")].forEach(b =>
+        b.setAttribute("aria-pressed", String(b.dataset.r === preset)));
+      document.getElementById("customRow").hidden = preset !== "custom"
+        || sessionIndex(FROM, TO, allSessions) >= 0;
+
+      const idx = sessionIndex(FROM, TO, allSessions);
+      const combo = document.getElementById("sessCombo");
+      const row = document.getElementById("sessionRow");
+      if (!allSessions.length) { row.hidden = true; return; }
+      row.hidden = false;
+      // Kein Treffer heisst: der Zeitraum ist keine Session (Preset oder
+      // eigenes Fenster). Dann sagt die Zeile das, statt eine fremde
+      // Session als gewaehlt auszugeben.
+      combo.innerHTML = idx >= 0 ? sessLabel(allSessions[idx], idx)
+        : `<span class="pick-meta">not a single session &mdash; pick one</span>`
+          + `<span class="pick-chev" aria-hidden="true">&#9662;</span>`;
+      if (idx >= 0) combo.innerHTML += `<span class="pick-chev" aria-hidden="true">&#9662;</span>`;
+      document.getElementById("sessPrev").disabled = idx < 0
+        || idx >= allSessions.length - 1;
+      document.getElementById("sessNext").disabled = idx <= 0;
+      document.getElementById("sessCount").textContent =
+        `${allSessions.length} sessions`;
+
+      let html = "", last = null;
+      allSessions.forEach((s, i) => {
+        const k = monthKey(s.from);
+        if (k !== last) { html += `<div class="pick-mhead">${_monthLabel(k)}</div>`; last = k; }
+        const time = PubgUI.fmtTime ? PubgUI.fmtTime(s.from) : "";
+        html += `<button type="button" class="pick-opt" role="option"`
+          + ` data-i="${i}" aria-selected="${i === idx}">`
+          + `<span class="pick-day">${PubgUI.fmtDate(s.from)}${time ? " " + time : ""}</span>`
+          + `<span class="pick-num">${s.matches || 0} matches</span>`
+          + `<span class="pick-win">${s.wins ? s.wins + " W" : ""}</span>`
+          + (s.kills != null ? `<span class="pick-meta">${s.kills} K</span>` : "")
+          + (i === 0 ? `<span class="pick-live">&#9654; live</span>` : "")
+          + `</button>`;
+      });
+      document.getElementById("sessPop").innerHTML = html
+        || `<p class="pick-empty">No sessions yet.</p>`;
+    }
+
+    function gotoSession(i) {
+      const s = allSessions[i];
+      if (!s) return;
+      if (i === 0) applyRange("", "");        // laufende Session = kein Filter
+      else applyRange(s.from, s.to);
+    }
+
+    document.getElementById("rangeSwitch").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-r]");
+      if (!b) return;
+      const r = presetRange(b.dataset.r, new Date());
+      if (!r) {
+        // Custom: Felder zeigen, nicht sofort laden.
+        [...e.currentTarget.querySelectorAll("button")].forEach(x =>
+          x.setAttribute("aria-pressed", String(x === b)));
+        const row = document.getElementById("customRow");
+        row.hidden = false;
+        document.getElementById("dateFrom").focus();
+        return;
+      }
+      applyRange(r.from, r.to);
+    });
 
     document.getElementById("applyRange").addEventListener("click", () => {
       const df = document.getElementById("dateFrom").value;
       const tf = document.getElementById("timeFrom").value || "00:00";
       const dt = document.getElementById("dateTo").value;
       const tt = document.getElementById("timeTo").value || "23:59";
-      const from = df ? new Date(`${df}T${tf}:00`).toISOString() : "";
-      const to = dt ? new Date(`${dt}T${tt}:00`).toISOString() : "";
-      applyRange(from, to);
+      applyRange(df ? new Date(`${df}T${tf}:00`).toISOString() : "",
+                 dt ? new Date(`${dt}T${tt}:00`).toISOString() : "");
     });
 
-    document.querySelectorAll(".preset").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const p = btn.dataset.preset;
-        const now = new Date();
-        const today = new Date(now); today.setHours(0,0,0,0);
-        let from = "", to = "";
-        if (p === "current") {
-          // alles leer = aktuelle Session
-        } else if (p === "today") {
-          from = today.toISOString();
-          const e = new Date(today); e.setHours(23,59,59,0);
-          to = e.toISOString();
-        } else if (p === "yesterday") {
-          const ys = new Date(today); ys.setDate(ys.getDate() - 1);
-          from = ys.toISOString();
-          const ye = new Date(ys); ye.setHours(23,59,59,0);
-          to = ye.toISOString();
-        } else if (p === "last7") {
-          const s = new Date(today); s.setDate(s.getDate() - 7);
-          from = s.toISOString();
-          // to leer = jetzt
-        } else if (p === "all") {
-          from = "1970-01-01T00:00:00Z";
-        }
-        applyRange(from, to);
-      });
-    });
-
-    // Sessions-Picker: Monats-Tabs + Sort-Dropdown.
-    // Default: aktueller Monat, sortiert nach neueste-zuerst.
-    let allSessions = [];
-    let sortBy = "newest";
-
-    function monthKey(iso) {
-      const d = new Date(iso);
-      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-    }
-    function buildPickerShell() {
-      const picker = document.getElementById("picker");
-      if (!allSessions.length) { picker.style.display = "none"; return; }
-      picker.style.display = "block";
-
-      picker.innerHTML = `
-        <div class="controls">
-          <select id="sortBy">
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-            <option value="wins">Most CHICKEN wins</option>
-            <option value="matches">Most matches</option>
-            <option value="kills">Most kills</option>
-          </select>
-          <span class="summary" id="sessionSummary"></span>
-        </div>
-        <div class="session-picker__header">
-          <span id="monthCounter" class="session-picker__counter">—</span>
-        </div>
-        <div id="sessionList"></div>
-      `;
-      document.getElementById("sortBy").value = sortBy;
-      document.getElementById("sortBy").addEventListener("change", (e) => {
-        sortBy = e.target.value;
-        renderItems();
-      });
-    }
-
-    function renderItems() {
-      const months = [...new Set(allSessions.map(s => monthKey(s.from)))]
-        .sort().reverse();
-      const sortFns = {
-        newest:  (a, b) => b.from.localeCompare(a.from),
-        oldest:  (a, b) => a.from.localeCompare(b.from),
-        wins:    (a, b) => (b.wins||0) - (a.wins||0) || b.from.localeCompare(a.from),
-        matches: (a, b) => (b.matches||0) - (a.matches||0) || b.from.localeCompare(a.from),
-        kills:   (a, b) => (b.kills||0) - (a.kills||0) || b.from.localeCompare(a.from),
-      };
-      if (!months.length) {
-        document.getElementById("sessionList").innerHTML =
-          `<div class="empty">No sessions in this range.</div>`;
-        return;
+    const _pop = document.getElementById("sessPop");
+    document.getElementById("sessCombo").addEventListener("click", (e) => {
+      const open = _pop.hidden;
+      _pop.hidden = !open;
+      e.currentTarget.setAttribute("aria-expanded", String(open));
+      if (open) {
+        const sel = _pop.querySelector('[aria-selected="true"]');
+        if (sel) sel.scrollIntoView({ block: "nearest" });
       }
-      const currentMonth = months[0];  // hoechster Key = neuester Monat
-      const html = months.map(k => {
-        const inMonth = allSessions.filter(s => monthKey(s.from) === k);
-        const sorted = [...inMonth].sort(sortFns[sortBy] || sortFns.newest);
-        const totalMatches = inMonth.reduce((n, s) => n + (s.matches || 0), 0);
-        // LocalStorage: Default = aktueller Monat offen, andere zu
-        const lsKey = "obs.month." + k + ".open";
-        let openLs = localStorage.getItem(lsKey);
-        if (openLs === null) openLs = (k === currentMonth) ? "1" : "0";
-        const isOpen = openLs === "1";
-        const items = sorted.map(s => {
-          const origIdx = allSessions.indexOf(s);
-          const isCurrent = origIdx === 0 && !FROM;
-          const cls = "item" + (isCurrent ? " current" : "");
-          const timeStr = PubgUI.fmtTime ? PubgUI.fmtTime(s.from) : "";
-          const playMarker = isCurrent ? ' <span class="item-live">&#9654;</span>' : '';
-          const kills = (s.kills != null) ? ` · ${s.kills} K` : "";
-          return `<div class="${cls}" data-from="${s.from}" data-to="${s.to}"
-                       data-idx="${origIdx}">
-            <div class="item-date">${PubgUI.fmtDate(s.from)}${timeStr ? " · " + timeStr : ""}${playMarker}</div>
-            <div class="item-meta">${s.matches || 0} Matches · ${s.wins || 0} W${kills}</div>
-          </div>`;
-        }).join("");
-        const monthLabelStr = _monthLabel(k);
-        return `<details class="month-group" data-month-key="${k}"${isOpen ? " open" : ""}>
-          <summary class="month-group__head">
-            <span class="month-group__name">${monthLabelStr}</span>
-            <span class="month-group__count">${inMonth.length} Sessions · ${totalMatches} Matches</span>
-            <span class="material-symbols-outlined month-group__chev" aria-hidden="true">expand_more</span>
-          </summary>
-          <div class="month-group__body">${items}</div>
-        </details>`;
-      }).join("");
-      document.getElementById("sessionList").innerHTML = html;
-      document.getElementById("monthCounter").textContent =
-        `${months.length} Monate · ${allSessions.length} Sessions gesamt`;
-      // LocalStorage-Persistenz: erfolgt via globalem 'toggle'-Delegate
-      // (siehe _ensureMonthGroupToggleListener), wird einmalig installiert.
-      _ensureMonthGroupToggleListener();
-    }
-
-    let _monthGroupToggleInstalled = false;
-    function _ensureMonthGroupToggleListener() {
-      if (_monthGroupToggleInstalled) return;
-      _monthGroupToggleInstalled = true;
-      // 'toggle' bubbelt nicht. Listener wird per Capture-Phase auf
-      // document gebunden — damit ein einziger Listener alle aktuellen
-      // und zukuenftigen .month-group-Toggles auffaengt.
-      document.addEventListener("toggle", (e) => {
-        const el = e.target;
-        if (!el || !el.classList || !el.classList.contains("month-group")) return;
-        const k = el.getAttribute("data-month-key");
-        if (!k) return;
-        localStorage.setItem("obs.month." + k + ".open",
-                              el.open ? "1" : "0");
-      }, true);
-    }
-
-    function _monthLabel(monthKey) {
-      // monthKey: "YYYY-MM" -> "Month YYYY"
-      const [y, m] = monthKey.split("-");
-      const months = ["January", "February", "March", "April", "May", "June",
-                      "July", "August", "September", "October",
-                      "November", "December"];
-      const idx = parseInt(m, 10) - 1;
-      return `${months[idx] || m} ${y}`;
-    }
-
-    function renderPicker() {
-      buildPickerShell();
-      renderItems();
-    }
-
-    PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/sessions").then(sessions => {
-      allSessions = sessions || [];
-      renderPicker();
-    }).catch(() => {});
-
-    // Click-Handler delegiert auf body
-    document.addEventListener("click", (e) => {
-      const it = e.target.closest(".session-picker .item");
-      if (!it) return;
-      const u = new URL(location.href);
-      if (it.classList.contains("current")) {
-        u.searchParams.delete("from");
-        u.searchParams.delete("to");
-      } else {
-        u.searchParams.set("from", it.dataset.from);
-        u.searchParams.set("to", it.dataset.to);
-      }
-      location.href = u.toString();
     });
+    _pop.addEventListener("click", (e) => {
+      const o = e.target.closest("[data-i]");
+      if (o) gotoSession(parseInt(o.dataset.i, 10));
+    });
+    // Escape schliesst die Liste, ohne die Auswahl zu aendern.
+    _pop.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      _pop.hidden = true;
+      const c = document.getElementById("sessCombo");
+      c.setAttribute("aria-expanded", "false");
+      c.focus();
+    });
+    document.getElementById("sessPrev").addEventListener("click", () => {
+      const i = sessionIndex(FROM, TO, allSessions);
+      if (i >= 0) gotoSession(i + 1);
+    });
+    document.getElementById("sessNext").addEventListener("click", () => {
+      const i = sessionIndex(FROM, TO, allSessions);
+      if (i > 0) gotoSession(i - 1);
+    });
+
+    PubgUI.fetchJson((window.__SERVE_BASE__ || "/") + "api/pubg/sessions")
+      .then(sessions => { allSessions = sessions || []; paintPicker(); })
+      .catch(() => { paintPicker(); });
+    paintPicker();
 
     function fmtDuration(secs) {
       if (!secs) return "0min";
