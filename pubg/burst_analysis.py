@@ -182,3 +182,129 @@ def first_shot_pct(hit_bursts, first_shot_hits):
 def avg_hit_index(hit_bursts, hit_index_sum):
     """Der wievielte Schuss traf im Schnitt zuerst. Niedriger ist besser."""
     return (hit_index_sum / hit_bursts) if hit_bursts else None
+
+
+# ---------------------------------------------------------------------------
+# Auswertung: Klassen falten und gegen die Lobby stellen
+# ---------------------------------------------------------------------------
+
+#: Ab so vielen Treffer-Stoessen traegt eine Zeile ihre Quote. Darunter
+#: bleibt sie sichtbar, aber als duenn markiert — dieselbe Haltung wie bei
+#: den Landing Spots: die Zahl verschweigen hilft nicht, sie als Befund
+#: auszugeben auch nicht.
+RELIABLE_HIT_BURSTS = 20
+
+#: Mindestzahl fuer einen Spieler in der Perzentil-Gruppe. Bewusst
+#: niedriger als RELIABLE_HIT_BURSTS: Rauschen im Einzelwert verbreitert
+#: die Verteilung, verschiebt den Median aber kaum — und eine strenge
+#: Schwelle liess nur Stammmates uebrig, weil ein fremder Gegner nach zwei
+#: Minuten tot ist.
+POOL_MIN_HIT_BURSTS = 10
+
+
+def class_of_weapon_name(name):
+    """Klarname -> Waffenklasse.
+
+    In `match_weapon_stats` steht der normalisierte Name ("M416"), die
+    Kategorie haengt in WEAPON_NAMES aber an der Roh-Id ("WeapHK416_C").
+    Ohne diese Umkehrung fiele jede Waffe auf "other", und der Vergleich
+    mischte Sniper mit SMG — bei Basiswerten von 100 % gegen 20 % ist das
+    kein Vergleich mehr.
+    """
+    if not name:
+        return "other"
+    global _CLASS_OF_NAME
+    try:
+        cache = _CLASS_OF_NAME
+    except NameError:
+        cache = None
+    if cache is None:
+        from pubg.aggregations import WEAPON_NAMES
+        cache = {}
+        for label, cat in WEAPON_NAMES.values():
+            if label:
+                cache.setdefault(label, cat or "other")
+        _CLASS_OF_NAME = cache
+    return cache.get(name, "other")
+
+
+_CLASS_OF_NAME = None
+
+
+def fold_bursts_by_class(rows):
+    """DB-Zeilen -> {(account_id, klasse): {rolle: Kennzahlen}}.
+
+    Zeilen ohne einen einzigen Feuerstoss fallen weg: der Grossteil der
+    Tabelle stammt aus Matches vor dem Backfill und wuerde sonst
+    Klassen-Eintraege mit Nenner 0 erzeugen.
+    """
+    out = {}
+    for r in rows or []:
+        total = ((r.get("bursts_init") or 0) + (r.get("bursts_react") or 0))
+        if not total:
+            continue
+        key = (r.get("account_id"), class_of_weapon_name(r.get("weapon")))
+        slot = out.setdefault(key, {role: _blank() for role in ROLES})
+        for role, cols in ROW_FIELDS.items():
+            for field, col in cols.items():
+                slot[role][field] += int(r.get(col) or 0)
+    return out
+
+
+def compare_to_pool(folded, account_id, min_hit_bursts=POOL_MIN_HIT_BURSTS):
+    """Eigene Werte, Pool-Referenz und Perzentil je Klasse und Rolle.
+
+    Der **Pool** wirft die Feuerstoesse aller anderen zusammen und nutzt
+    damit den ganzen Bestand. Das **Perzentil** braucht dagegen Werte je
+    Person und damit eine Mindestzahl — beides steht in der Antwort, weil
+    der Pool robust und das Perzentil einordnend ist.
+    """
+    classes = sorted({cls for (acc, cls) in folded if acc == account_id})
+    out = []
+    for cls in classes:
+        for role in ROLES:
+            me = (folded.get((account_id, cls)) or {}).get(role) or _blank()
+            if not me["bursts"]:
+                continue
+            pool = _blank()
+            per_player = []
+            for (acc, c), stat in folded.items():
+                if c != cls or acc == account_id:
+                    continue
+                s = stat.get(role) or _blank()
+                if not s["hitBursts"]:
+                    continue
+                for k in pool:
+                    pool[k] += s[k]
+                if s["hitBursts"] >= min_hit_bursts:
+                    per_player.append(first_shot_pct(s["hitBursts"],
+                                                     s["firstShotHits"]))
+            my_pct = first_shot_pct(me["hitBursts"], me["firstShotHits"])
+            pool_pct = first_shot_pct(pool["hitBursts"], pool["firstShotHits"])
+            vals = sorted(v for v in per_player if v is not None)
+            pctl = None
+            if vals and my_pct is not None:
+                pctl = 100.0 * sum(1 for v in vals if v < my_pct) / len(vals)
+            out.append({
+                "class": cls,
+                "role": role,
+                "bursts": me["bursts"],
+                "hitBursts": me["hitBursts"],
+                "firstShotPct": my_pct,
+                "avgHitIndex": avg_hit_index(me["hitBursts"],
+                                             me["hitIndexSum"]),
+                "poolFirstShotPct": pool_pct,
+                "poolAvgHitIndex": avg_hit_index(pool["hitBursts"],
+                                                 pool["hitIndexSum"]),
+                "poolHitBursts": pool["hitBursts"],
+                # Zahl der Spieler HINTER dem Perzentil, nicht im Pool:
+                # der Pool zaehlt jeden mit, das Perzentil nur die mit
+                # genug eigenen Stoessen.
+                "poolPlayers": len(vals),
+                "diff": (my_pct - pool_pct)
+                        if (my_pct is not None and pool_pct is not None)
+                        else None,
+                "percentile": pctl,
+                "reliable": me["hitBursts"] >= RELIABLE_HIT_BURSTS,
+            })
+    return out

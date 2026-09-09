@@ -1059,6 +1059,60 @@ def landing_stats(conn, tenant_id, account_id, cutoff, to_iso=None,
     }
 
 
+
+def burst_discipline(conn, tenant_id, account_id, cutoff="1970-01-01T00:00:00Z",
+                     to_iso=None):
+    """Feuerstoss-Disziplin je Waffenklasse, gegen die Lobby.
+
+    Beantwortet die Frage, die die Trefferquote offen laesst: sitzt der
+    ERSTE Schuss eines Stosses, oder wird nachgezogen? Siehe
+    `pubg/burst_analysis.py` fuer die Metrik und den Rollen-Bias.
+
+    Die Zahlen liegen in `match_weapon_stats` und damit fuer die ganze
+    Lobby vor — anders als alles aus `telemetry_events`, das nur
+    Squad-Events kennt. Bots bleiben draussen: sie schiessen nach anderen
+    Regeln und wuerden den Pool nach unten ziehen.
+    """
+    from pubg.burst_analysis import fold_bursts_by_class, compare_to_pool
+    br_where, br_params = _br_filter("m")
+    upper, upper_params = ("AND m.played_at < ?", [to_iso]) if to_iso else ("", [])
+    rows = conn.execute(f"""
+        SELECT w.account_id, w.weapon,
+               SUM(w.bursts_init) AS bursts_init,
+               SUM(w.hit_bursts_init) AS hit_bursts_init,
+               SUM(w.first_shot_init) AS first_shot_init,
+               SUM(w.hit_index_sum_init) AS hit_index_sum_init,
+               SUM(w.bursts_react) AS bursts_react,
+               SUM(w.hit_bursts_react) AS hit_bursts_react,
+               SUM(w.first_shot_react) AS first_shot_react,
+               SUM(w.hit_index_sum_react) AS hit_index_sum_react
+        FROM match_weapon_stats w
+        JOIN matches m ON m.match_id = w.match_id
+                      AND m.tenant_id = w.tenant_id
+        WHERE w.tenant_id = ? AND w.is_bot = false
+          AND m.played_at >= ? {upper} AND {br_where}
+          AND (w.bursts_init + w.bursts_react) > 0
+        GROUP BY w.account_id, w.weapon
+    """, [tenant_id, cutoff, *upper_params, *br_params]).fetchall()
+
+    folded = fold_bursts_by_class([dict(r) for r in rows])
+    out = compare_to_pool(folded, account_id)
+    # Deckung ausweisen: ohne Backfill stehen die Spalten auf 0, und eine
+    # leere Tabelle waere nicht von "keine Daten" zu unterscheiden.
+    matches = conn.execute(f"""
+        SELECT COUNT(DISTINCT w.match_id) AS n
+        FROM match_weapon_stats w
+        JOIN matches m ON m.match_id = w.match_id
+                      AND m.tenant_id = w.tenant_id
+        WHERE w.tenant_id = ? AND m.played_at >= ? {upper} AND {br_where}
+          AND (w.bursts_init + w.bursts_react) > 0
+    """, [tenant_id, cutoff, *upper_params, *br_params]).fetchone()
+    return {
+        "rows": out,
+        "matches": (matches or {}).get("n") or 0,
+        "players": len({acc for (acc, _cls) in folded}),
+    }
+
 def trend(conn, tenant_id, account_id):
     """Eigen-Trend: jedes Fenster gegen die gleich langen Matches davor.
 
@@ -1100,7 +1154,7 @@ def trend(conn, tenant_id, account_id):
 def compute_shot_quality(conn, tenant_id, account_id, cutoff,
                          to_iso=None, min_matches=MIN_COHORT_MATCHES,
                          lobby_min_matches=5, group_subareas=False,
-                         with_landings=False):
+                         with_landings=False, with_bursts=False):
     """Alles in einem Aufruf — so bleibt es ein Endpoint-Call."""
     me = own_metrics(conn, tenant_id, account_id, cutoff, to_iso)
     squad = cohort_players(conn, tenant_id, min_matches)
@@ -1146,5 +1200,8 @@ def compute_shot_quality(conn, tenant_id, account_id, cutoff,
                                    to_iso=to_iso,
                                    group_subareas=group_subareas)
                      if with_landings else None),
+        "bursts": (burst_discipline(conn, tenant_id, account_id, cutoff,
+                                    to_iso=to_iso)
+                   if with_bursts else None),
         "trend": trend(conn, tenant_id, account_id),
     }

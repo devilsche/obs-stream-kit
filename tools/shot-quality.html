@@ -160,6 +160,13 @@
        niedrig-ist-gut, das muss ablesbar sein ohne Nachdenken. */
     .goal { font-size: 0.9em; margin-left: 3px; opacity: 0.5;
             font-weight: 400; }
+    /* Rate mit zu kleinem Nenner: lesbar, aber nicht als Befund. Kursiv
+       plus Sekundaerfarbe statt Transparenz — opacity haette den
+       Textkontrast unter die WCAG-Grenze gedrueckt, und Kursiv traegt die
+       Aussage auch ohne Farbe (1.4.1). Der Tooltip nennt den Nenner. */
+    td.thin-rate { font-style: italic; color: var(--theme-text-dim, #a99cb8); }
+    /* Pool-Wert direkt hinter dem eigenen, ohne eigene Spalte. */
+    .sub-inline { color: var(--theme-text-dim, #a99cb8); font-size: 0.85em; }
     td.diff-bad  { color: var(--theme-danger, #e57b7b); font-weight: 500; }
     td.diff-good { color: var(--theme-ok, #6cc294); font-weight: 500; }
     td.lo { color: var(--theme-danger, #e57b7b); }
@@ -281,6 +288,33 @@
         <tbody id="mapRows"></tbody>
       </table>
     </div>
+  </div>
+
+  <div class="t-card" id="burstCard" hidden>
+    <h2>Burst discipline</h2>
+    <p class="sub" id="burstSub"></p>
+    <div class="scroll">
+      <table>
+        <thead><tr>
+          <th>Weapon class</th>
+          <th title="Whether you opened the exchange or answered one">Role</th>
+          <th title="Bursts you fired with this class">Bursts</th>
+          <th title="Bursts where at least one shot connected — the base for
+                     the columns to the right">With hit</th>
+          <th title="Share of connecting bursts where the FIRST shot already
+                     landed. Higher is better.">1st shot lands<span
+                class="goal" aria-hidden="true">↑</span></th>
+          <th title="Same measure for every other player in your lobbies,
+                     all their bursts pooled">Lobby</th>
+          <th title="Yours minus the lobby">Diff</th>
+          <th title="Share of comparable players you beat">Pctl</th>
+          <th title="Which shot of a burst landed first, on average. Lower is
+                     better.">Ø shot<span class="goal" aria-hidden="true">↓</span></th>
+        </tr></thead>
+        <tbody id="burstRows"></tbody>
+      </table>
+    </div>
+    <p class="foot" id="burstFoot"></p>
   </div>
 
   <div class="t-card" id="cohortCard" hidden>
@@ -556,6 +590,86 @@
     }
 
     // ── Cohort ──────────────────────────────────────────────────────────────
+    //: Reihenfolge der Waffenklassen. Feste Liste statt Sortierung nach
+    //: Menge, damit die Tabelle zwischen zwei Zeitraeumen nicht springt.
+    const BURST_CLASSES = [
+      ["ar", "AR"], ["dmr", "DMR"], ["sniper", "Sniper"], ["smg", "SMG"],
+      ["lmg", "LMG"], ["shotgun", "Shotgun"], ["pistol", "Pistol"],
+      ["other", "Other"],
+    ];
+    const ROLE_LABEL = {
+      initiated: "opened",
+      reacting: "answered",
+    };
+    const ROLE_HELP = {
+      initiated: "You fired without having taken fire in the 10 s before",
+      reacting: "You had taken fire in the 10 s before this burst",
+    };
+
+    function renderBursts() {
+      const card = document.getElementById("burstCard");
+      const b = DATA.bursts;
+      const rows = (b && b.rows) || [];
+      if (!b || !rows.length) {
+        card.hidden = true;
+        return;
+      }
+      card.hidden = false;
+      const order = new Map(BURST_CLASSES.map(([k], i) => [k, i]));
+      const sorted = rows.slice().sort((x, y) =>
+        (order.has(x.class) ? order.get(x.class) : 99)
+        - (order.has(y.class) ? order.get(y.class) : 99)
+        || (x.role === "initiated" ? -1 : 1) - (y.role === "initiated" ? -1 : 1));
+
+      const label = k => (BURST_CLASSES.find(c => c[0] === k) || [k, k])[1];
+      let lastClass = null;
+      document.getElementById("burstRows").innerHTML = sorted.map(r => {
+        const first = r.class !== lastClass;
+        lastClass = r.class;
+        const thin = !r.reliable ? " thin-rate" : "";
+        const cell = (v, unit, decimals) => v == null ? "—"
+          : v.toFixed(decimals == null ? 1 : decimals) + (unit || "");
+        const diffCls = r.diff == null ? ""
+          : (r.diff <= -3 ? " diff-bad" : (r.diff >= 3 ? " diff-good" : ""));
+        const sign = r.diff == null ? "—"
+          : (r.diff > 0 ? "+" : "") + r.diff.toFixed(1);
+        return `<tr>
+          <td>${first ? esc(label(r.class)) : ""}</td>
+          <td title="${esc(ROLE_HELP[r.role] || "")}">${esc(ROLE_LABEL[r.role] || r.role)}</td>
+          <td>${n0(r.bursts)}</td>
+          <td>${n0(r.hitBursts)}</td>
+          <td class="${thin.trim()}" title="${cell(r.firstShotPct, " %")} of ${
+            n0(r.hitBursts)} connecting bursts${r.reliable ? ""
+            : " — too few to read as a result"}">${cell(r.firstShotPct, " %")}</td>
+          <td title="${r.poolHitBursts ? n0(r.poolHitBursts)
+            + " connecting bursts from other players" : "no comparable data"}"
+            >${cell(r.poolFirstShotPct, " %")}</td>
+          <td class="${diffCls.trim()}">${sign}</td>
+          <td title="${r.poolPlayers ? "against " + n0(r.poolPlayers)
+            + " players with enough bursts of their own"
+            : "no player had enough bursts to rank against"}"
+            >${r.percentile == null ? "—" : Math.round(r.percentile)}</td>
+          <td>${cell(r.avgHitIndex, "", 2)}<span class="sub-inline"> vs ${
+            cell(r.poolAvgHitIndex, "", 2)}</span></td>
+        </tr>`;
+      }).join("");
+
+      document.getElementById("burstSub").innerHTML =
+        "Where in a burst your first hit lands. Two players with the same hit "
+        + "rate can aim very differently: one puts the opening shot on target, "
+        + "the other walks three shots onto it — that difference is crosshair "
+        + "placement, and the hit rate cannot see it.";
+      document.getElementById("burstFoot").innerHTML =
+        `Based on <b>${n0(b.matches)}</b> matches with burst data and `
+        + `<b>${n0(b.players)}</b> players. `
+        + "<b>Role</b> matters: whoever opens an exchange has an easier first "
+        + "shot than whoever answers one, so both are counted separately — the "
+        + "gap between your two rows says more than either number alone. "
+        + "A rate in <i>italics</i> rests on fewer than 20 connecting bursts. "
+        + "Classes are not comparable with each other: a single-shot sniper "
+        + "lands its first shot almost always, full-auto SMG fire rarely.";
+    }
+
     function renderCohort() {
       const c = DATA.cohort || {};
       const bands = c.bands || [];
@@ -688,6 +802,7 @@
       renderRanks();
       renderPhases();
       renderDeaths();
+      renderBursts();
       renderCohort();
       renderDeathMaps();
       renderTrend();
@@ -699,7 +814,8 @@
       st.textContent = RANGE === "all"
         ? "Loading all matches … (the first run takes a few seconds)"
         : "Loading …";
-      const params = new URLSearchParams({ range: RANGE, minMatches: String(MIN) });
+      const params = new URLSearchParams({ range: RANGE, minMatches: String(MIN),
+                                          withBursts: "1" });
       if (PLAYER.trim()) params.set("player", PLAYER.trim());
       try {
         DATA = await PubgUI.fetchJson(
@@ -707,8 +823,8 @@
         const me = DATA.me || {};
         if (!me.matches) {
           st.textContent = "No BR matches in this range — widen it?";
-          ["kpiCard", "rankCard", "phaseCard",
-           "deathCard", "cohortCard", "trendCard"].forEach(
+          ["kpiCard", "rankCard", "phaseCard", "deathCard",
+           "burstCard", "cohortCard", "trendCard"].forEach(
              id => document.getElementById(id).hidden = true);
           return;
         }
@@ -721,8 +837,8 @@
       } catch (e) {
         st.classList.add("err");
         st.textContent = "Error: " + (e && e.message || e);
-        ["kpiCard", "rankCard", "phaseCard",
-         "deathCard", "cohortCard", "trendCard"].forEach(
+        ["kpiCard", "rankCard", "phaseCard", "deathCard",
+         "burstCard", "cohortCard", "trendCard"].forEach(
            id => document.getElementById(id).hidden = true);
       }
     }

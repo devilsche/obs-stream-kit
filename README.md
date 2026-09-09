@@ -565,7 +565,7 @@ Beantwortet „wie gut sitzt jede Kugel, wann sterbe ich, und wo stehe ich damit
 nicht „wie viele Kills habe ich". Parameter: `?range=session|day|week|all`,
 `player=` (Default: eigener Account), `minMatches=` (Kohorten-Schwelle, Default 20).
 
-Sieben Sektionen:
+Acht Sektionen:
 
 *Shot quality* — Trefferquote, **Schaden je 100 Schuss** (bündelt Quote und
 Trefferwucht in eine Zahl), **Anteil der Schüsse im Gefecht**, Kopftreffer-Anteil,
@@ -606,6 +606,42 @@ Telemetrie erscheint eine *Thin data*-Warnung (die Trefferquote ist dann vom
 Zufall einzelner Gefechte dominiert), unter 10 Referenzspielern eine
 *Small reference group*-Warnung. Tenant 2 hat etwa 640 Matches, aber nur 95 mit
 archivierter Telemetrie — die Schusswerte ruhen auf diesen 95.
+
+*Burst discipline* — der **Index des ersten Treffers im Feuerstoß**, je
+Waffenklasse. Die Trefferquote sagt, wie viele Schüsse ankommen, aber nicht wann:
+zwei Spieler mit derselben Quote können sehr verschieden zielen — einer setzt den
+Eröffnungsschuss ins Ziel, der andere zieht drei Schüsse lang nach. Das ist der
+messbare Anteil von Crosshair-Placement.
+
+Getrennt nach **Rolle**, weil die Zahl sonst mindestens so viel Spielweise misst
+wie Zielverhalten: wer aus dem Hinterhalt eröffnet, hat den Erstschuss-Treffer
+leichter als wer auf einen schon schießenden Gegner antwortet. Ein Stoß gilt als
+*answered*, wenn in den 10 s davor Feuerschaden eintraf, sonst als *opened*. Die
+Lücke zwischen beiden Zeilen sagt mehr als jede einzeln.
+
+Waffenklassen sind **nicht untereinander vergleichbar**: eine Repetierbüchse
+trifft mit dem ersten Schuss fast immer, SMG-Dauerfeuer fast nie (gemessen: 98 %
+gegen 20 %). Verglichen wird darum nur innerhalb der Klasse, gegen zwei Größen —
+den **Pool** (alle Feuerstöße aller anderen zusammengeworfen, robust) und ein
+**Perzentil** (nur Spieler mit ≥ 10 eigenen Treffer-Stößen, einordnend). Raten
+unter 20 Treffer-Stößen stehen kursiv.
+
+Die Zahlen kommen aus acht Spalten in `match_weapon_stats`, berechnet in
+`pubg/burst_analysis.py` aus der **rohen** Telemetrie im Poller — an derselben
+Stelle wie die Accuracy und aus demselben Grund: `telemetry_events` enthält nur
+Squad-Events (siehe `filter_squad_events`) und damit rund zwei Schützen je Match,
+die Rohtelemetrie alle ~90. Rückwirkend trägt `scripts/backfill_bursts.py` sie
+aus dem SFTP-Archiv nach:
+
+```
+python3 scripts/backfill_bursts.py --tenant 1 [--limit N] [--dry-run] [--redo]
+```
+
+Nicht jedes Archiv-File ist roh — ältere wurden aus der DB rekonstruiert und
+haben wieder nur Squad-Events. Die erkennt das Skript an der Zahl verschiedener
+Schützen und lässt sie aus, statt Zahlen zu schreiben, die aus zwei Spielern
+statt neunzig kommen. Angefasst werden ausschließlich die acht Spalten. Der
+Endpoint liefert den Block nur mit `withBursts=1`, weil er die ganze Lobby liest.
 
 *Cohort bands* — Mittelwerte je K/D-Band, die eigene Zeile nach K/D
 einsortiert. Bewusst über den ganzen Bestand statt über den gewählten Zeitraum,

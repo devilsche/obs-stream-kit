@@ -3228,16 +3228,20 @@ class EndpointRegistry:
         # Landing-Spot-Analyzer gebraucht — das Shot-Quality-Tool zeigt sie
         # nicht mehr, dort steht die Karten-Ebene im Todesbild.
         with_landings = qs.get("withLandings") == "1"
+        # Feuerstoss-Disziplin liest match_weapon_stats fuer die ganze
+        # Lobby und ist damit der teuerste Block — nur auf Anforderung.
+        with_bursts = qs.get("withBursts") == "1"
 
         cache_key = (f"shot-quality:{account_id}:{range_key}:{from_iso or ''}:"
                      f"{to_iso or ''}:{min_matches}:{int(group_sub)}:"
-                     f"{int(with_landings)}")
+                     f"{int(with_landings)}:{int(with_bursts)}")
         data = self.cache.get_or_compute(
             cache_key,
             lambda: compute_shot_quality(
                 conn, self.tenant_id, account_id, cutoff,
                 to_iso=to_iso, min_matches=min_matches,
-                group_subareas=group_sub, with_landings=with_landings),
+                group_subareas=group_sub, with_landings=with_landings,
+                with_bursts=with_bursts),
             ttl=300)
         return _ok({**data, "range": range_key, "from": cutoff,
                     "accountId": account_id,

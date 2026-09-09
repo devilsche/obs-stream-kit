@@ -331,3 +331,239 @@ def test_backfill_columns_match_the_analysis_fields():
     from scripts.backfill_bursts import BURST_COLS
     from pubg.burst_analysis import to_row_fields
     assert set(BURST_COLS) == set(to_row_fields({}).keys())
+
+
+# ── Auswertung: Klassen falten und vergleichen ─────────────────────────────
+
+def test_class_of_weapon_name_inverts_weapon_names():
+    """In match_weapon_stats steht der Klarname ("M416"), die Kategorie
+    haengt aber an der Roh-Id ("WeapHK416_C"). Ohne die Umkehrung fiele
+    jede Waffe auf "other" und der Vergleich mischte Sniper mit SMG."""
+    from pubg.burst_analysis import class_of_weapon_name
+    assert class_of_weapon_name("M416") == "ar"
+    assert class_of_weapon_name("Kar98k") == "sniper"
+    assert class_of_weapon_name("UMP45") == "smg"
+    assert class_of_weapon_name("Mini 14") == "dmr"
+    assert class_of_weapon_name("gibtsnicht") == "other"
+    assert class_of_weapon_name(None) == "other"
+
+
+def test_fold_bursts_by_class_sums_per_account_and_class():
+    from pubg.burst_analysis import fold_bursts_by_class
+    rows = [
+        {"account_id": "a", "weapon": "M416", "bursts_init": 10,
+         "hit_bursts_init": 4, "first_shot_init": 2, "hit_index_sum_init": 9,
+         "bursts_react": 5, "hit_bursts_react": 2, "first_shot_react": 0,
+         "hit_index_sum_react": 6},
+        {"account_id": "a", "weapon": "Beryl", "bursts_init": 6,
+         "hit_bursts_init": 2, "first_shot_init": 1, "hit_index_sum_init": 5,
+         "bursts_react": 0, "hit_bursts_react": 0, "first_shot_react": 0,
+         "hit_index_sum_react": 0},
+        {"account_id": "b", "weapon": "Kar98k", "bursts_init": 3,
+         "hit_bursts_init": 3, "first_shot_init": 3, "hit_index_sum_init": 3,
+         "bursts_react": 0, "hit_bursts_react": 0, "first_shot_react": 0,
+         "hit_index_sum_react": 0},
+    ]
+    out = fold_bursts_by_class(rows)
+    ar = out[("a", "ar")]
+    assert ar["initiated"]["bursts"] == 16
+    assert ar["initiated"]["hitBursts"] == 6
+    assert ar["initiated"]["firstShotHits"] == 3
+    assert ar["initiated"]["hitIndexSum"] == 14
+    assert ar["reacting"]["bursts"] == 5
+    assert out[("b", "sniper")]["initiated"]["firstShotHits"] == 3
+    assert ("a", "sniper") not in out
+
+
+def test_fold_bursts_skips_rows_without_any_burst():
+    """Der Grossteil der Tabelle stammt aus Matches vor dem Backfill —
+    ohne diesen Filter erzeugen sie Klassen-Eintraege mit Nenner 0."""
+    from pubg.burst_analysis import fold_bursts_by_class
+    rows = [{"account_id": "a", "weapon": "M416", "bursts_init": 0,
+             "hit_bursts_init": 0, "first_shot_init": 0,
+             "hit_index_sum_init": 0, "bursts_react": 0,
+             "hit_bursts_react": 0, "first_shot_react": 0,
+             "hit_index_sum_react": 0}]
+    assert fold_bursts_by_class(rows) == {}
+
+
+def test_compare_to_pool_reports_own_pool_and_percentile():
+    from pubg.burst_analysis import compare_to_pool
+    folded = {
+        ("me", "ar"): {"initiated": {"bursts": 100, "hitBursts": 40,
+                                     "firstShotHits": 10, "hitIndexSum": 120},
+                       "reacting": {"bursts": 0, "hitBursts": 0,
+                                    "firstShotHits": 0, "hitIndexSum": 0}},
+    }
+    # Neun Gegner, alle besser als ich (50 %)
+    for i in range(9):
+        folded[(f"p{i}", "ar")] = {
+            "initiated": {"bursts": 100, "hitBursts": 40,
+                          "firstShotHits": 20, "hitIndexSum": 80},
+            "reacting": {"bursts": 0, "hitBursts": 0, "firstShotHits": 0,
+                         "hitIndexSum": 0}}
+    out = compare_to_pool(folded, "me", min_hit_bursts=10)
+    ar = next(r for r in out if r["class"] == "ar" and r["role"] == "initiated")
+    assert ar["firstShotPct"] == 25.0            # 10 von 40
+    assert ar["poolFirstShotPct"] == 50.0        # 9x 20 von 9x 40
+    assert ar["poolPlayers"] == 9
+    assert ar["percentile"] == 0.0               # alle besser
+    assert ar["avgHitIndex"] == 3.0              # 120/40
+    assert ar["poolAvgHitIndex"] == 2.0
+
+
+def test_compare_to_pool_leaves_out_classes_the_player_never_used():
+    from pubg.burst_analysis import compare_to_pool
+    folded = {("p0", "smg"): {"initiated": {"bursts": 50, "hitBursts": 20,
+                                            "firstShotHits": 5,
+                                            "hitIndexSum": 40},
+                              "reacting": {"bursts": 0, "hitBursts": 0,
+                                           "firstShotHits": 0,
+                                           "hitIndexSum": 0}}}
+    assert compare_to_pool(folded, "me") == []
+
+
+def test_compare_to_pool_marks_a_thin_own_sample():
+    """Unter der Schwelle bleibt die Zeile sichtbar, aber als duenn
+    markiert — genauso wie bei den Landing Spots."""
+    from pubg.burst_analysis import compare_to_pool, RELIABLE_HIT_BURSTS
+    folded = {("me", "ar"): {"initiated": {"bursts": 5, "hitBursts": 3,
+                                           "firstShotHits": 1,
+                                           "hitIndexSum": 7},
+                             "reacting": {"bursts": 0, "hitBursts": 0,
+                                          "firstShotHits": 0,
+                                          "hitIndexSum": 0}}}
+    row = compare_to_pool(folded, "me")[0]
+    assert row["hitBursts"] == 3
+    assert row["reliable"] is False
+    assert RELIABLE_HIT_BURSTS > 3
+
+
+def test_compare_to_pool_returns_none_percentile_without_a_pool():
+    """Eine Zahl ohne Vergleichsgruppe darf nicht wie ein Perzentil
+    aussehen."""
+    from pubg.burst_analysis import compare_to_pool
+    folded = {("me", "ar"): {"initiated": {"bursts": 100, "hitBursts": 50,
+                                           "firstShotHits": 20,
+                                           "hitIndexSum": 100},
+                             "reacting": {"bursts": 0, "hitBursts": 0,
+                                          "firstShotHits": 0,
+                                          "hitIndexSum": 0}}}
+    row = compare_to_pool(folded, "me")[0]
+    assert row["percentile"] is None
+    assert row["poolPlayers"] == 0
+    assert row["poolFirstShotPct"] is None
+
+
+def test_compare_to_pool_role_gap_shows_the_bias():
+    """Der Punkt der Rollen-Trennung: die Luecke zwischen eroeffnen und
+    reagieren ist selbst die Aussage."""
+    from pubg.burst_analysis import compare_to_pool
+    folded = {("me", "ar"): {
+        "initiated": {"bursts": 100, "hitBursts": 50, "firstShotHits": 25,
+                      "hitIndexSum": 100},
+        "reacting": {"bursts": 100, "hitBursts": 50, "firstShotHits": 5,
+                     "hitIndexSum": 150}}}
+    rows = {r["role"]: r for r in compare_to_pool(folded, "me")}
+    assert rows["initiated"]["firstShotPct"] == 50.0
+    assert rows["reacting"]["firstShotPct"] == 10.0
+
+
+# ── DB-Layer ───────────────────────────────────────────────────────────────
+
+def test_burst_discipline_reads_the_whole_lobby(pg_compat):
+    """Der Punkt der acht Spalten: die Referenz kommt aus
+    match_weapon_stats und damit von allen Lobby-Spielern, nicht aus
+    telemetry_events mit seinen zwei Squad-Schuetzen."""
+    from pubg import shot_quality as sq
+    conn, t1, _ = pg_compat
+    conn.execute("INSERT INTO matches (tenant_id, match_id, map_name, "
+                 "game_mode, played_at) VALUES (?, ?, ?, ?, ?)",
+                 (t1, "m1", "Baltic_Main", "squad", "2026-09-01T12:00:00Z"))
+    def add(acc, weapon, bi, hbi, fsi, hisi):
+        conn.execute(
+            "INSERT INTO match_weapon_stats (tenant_id, match_id, account_id, "
+            "weapon, is_bot, shots, bursts_init, hit_bursts_init, "
+            "first_shot_init, hit_index_sum_init) "
+            "VALUES (?, ?, ?, ?, false, 1, ?, ?, ?, ?)",
+            (t1, "m1", acc, weapon, bi, hbi, fsi, hisi))
+    add("account.me", "M416", 50, 20, 5, 60)          # 25 %
+    for i in range(12):
+        add(f"enemy{i}", "M416", 40, 20, 10, 40)      # 50 %
+    conn.commit()
+
+    out = sq.burst_discipline(conn, t1, "account.me")
+    assert out["matches"] == 1
+    row = next(r for r in out["rows"]
+               if r["class"] == "ar" and r["role"] == "initiated")
+    assert row["firstShotPct"] == 25.0
+    assert row["poolFirstShotPct"] == 50.0
+    assert row["poolPlayers"] == 12
+    assert row["percentile"] == 0.0
+    assert row["reliable"] is True
+
+
+def test_burst_discipline_keeps_bots_out_of_the_pool(pg_compat):
+    """Bots schiessen nach anderen Regeln und wuerden den Pool druecken."""
+    from pubg import shot_quality as sq
+    conn, t1, _ = pg_compat
+    conn.execute("INSERT INTO matches (tenant_id, match_id, map_name, "
+                 "game_mode, played_at) VALUES (?, ?, ?, ?, ?)",
+                 (t1, "m1", "Baltic_Main", "squad", "2026-09-01T12:00:00Z"))
+    conn.execute(
+        "INSERT INTO match_weapon_stats (tenant_id, match_id, account_id, "
+        "weapon, is_bot, shots, bursts_init, hit_bursts_init, "
+        "first_shot_init, hit_index_sum_init) "
+        "VALUES (?, ?, ?, ?, false, 1, 10, 10, 5, 20)",
+        (t1, "m1", "account.me", "M416"))
+    conn.execute(
+        "INSERT INTO match_weapon_stats (tenant_id, match_id, account_id, "
+        "weapon, is_bot, shots, bursts_init, hit_bursts_init, "
+        "first_shot_init, hit_index_sum_init) "
+        "VALUES (?, ?, ?, ?, true, 1, 10, 10, 0, 40)",
+        (t1, "m1", "ai.bot", "M416"))
+    conn.commit()
+    out = sq.burst_discipline(conn, t1, "account.me")
+    row = out["rows"][0]
+    assert row["poolHitBursts"] == 0
+    assert row["poolFirstShotPct"] is None
+
+
+def test_burst_discipline_honours_the_time_range(pg_compat):
+    from pubg import shot_quality as sq
+    conn, t1, _ = pg_compat
+    for mid, when in (("old", "2026-01-01T12:00:00Z"),
+                      ("new", "2026-09-01T12:00:00Z")):
+        conn.execute("INSERT INTO matches (tenant_id, match_id, map_name, "
+                     "game_mode, played_at) VALUES (?, ?, ?, ?, ?)",
+                     (t1, mid, "Baltic_Main", "squad", when))
+        conn.execute(
+            "INSERT INTO match_weapon_stats (tenant_id, match_id, account_id, "
+            "weapon, is_bot, shots, bursts_init, hit_bursts_init, "
+            "first_shot_init, hit_index_sum_init) "
+            "VALUES (?, ?, ?, ?, false, 1, 10, 10, 5, 20)",
+            (t1, mid, "account.me", "M416"))
+    conn.commit()
+    assert sq.burst_discipline(conn, t1, "account.me")["matches"] == 2
+    late = sq.burst_discipline(conn, t1, "account.me",
+                               cutoff="2026-06-01T00:00:00Z")
+    assert late["matches"] == 1
+    assert late["rows"][0]["bursts"] == 10
+
+
+def test_burst_discipline_is_empty_before_the_backfill(pg_compat):
+    """Ohne Backfill stehen die Spalten auf 0 — dann darf die Antwort
+    leer sein, aber die Deckung muss das ausweisen."""
+    from pubg import shot_quality as sq
+    conn, t1, _ = pg_compat
+    conn.execute("INSERT INTO matches (tenant_id, match_id, map_name, "
+                 "game_mode, played_at) VALUES (?, ?, ?, ?, ?)",
+                 (t1, "m1", "Baltic_Main", "squad", "2026-09-01T12:00:00Z"))
+    conn.execute(
+        "INSERT INTO match_weapon_stats (tenant_id, match_id, account_id, "
+        "weapon, is_bot, shots) VALUES (?, ?, ?, ?, false, 100)",
+        (t1, "m1", "account.me", "M416"))
+    conn.commit()
+    out = sq.burst_discipline(conn, t1, "account.me")
+    assert out["rows"] == []
+    assert out["matches"] == 0
