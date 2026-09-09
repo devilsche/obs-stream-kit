@@ -530,13 +530,22 @@
 
       const rk = DATA.ranks || {};
       const nRef = REF === "lobby" ? rk.lobbyPlayers : (DATA.cohort || {}).players;
-      document.getElementById("rankSub").innerHTML = REF === "lobby"
+      //: Der Zeitraum-Hinweis MUSS hier stehen. Ohne ihn wechselt man
+      //: oben den Zeitraum, sieht die Kennzahlen sich aendern und die
+      //: Perzentile nicht — das liest sich als Fehler, obwohl es die
+      //: bewusste Entscheidung aus shot_quality.py ist.
+      const rangeNote = RANGE === "all" ? ""
+        : ` <b>Always your lifetime profile</b>, independent of the range
+            above: the reference groups are lifetime totals too, and a
+            session's few hundred shots against players with a hundred
+            thousand would not be a comparison.`;
+      document.getElementById("rankSub").innerHTML = (REF === "lobby"
         ? `Against <b>${n0(rk.lobbyPlayers)}</b> opponents you have actually met,
            with at least ${rk.lobbyMinMatches} matches each. Broad, but shot metrics only —
            the lobby is not in <code>participants</code>, so no K/D or survival.`
         : `Against your squad and regulars with at least ${(DATA.cohort || {}).minMatches}
            matches: <b>${n0((DATA.cohort || {}).players)}</b> players. Small group, but the
-           full picture including K/D, survival and consumables.`;
+           full picture including K/D, survival and consumables.`) + rangeNote;
       const thinR = thinNote(DATA.me || {});
       const smallRef = (nRef != null && nRef < 10)
         ? `<b>Small reference group:</b> only ${nRef} player${nRef === 1 ? "" : "s"}

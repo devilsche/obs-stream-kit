@@ -586,6 +586,14 @@ Perzentil heißt „Anteil der Referenzgruppe, der schlechter ist als du"; bei
 *Deaths before 5 min* zählt ein niedriger Wert als besser. Der eigene Account
 fällt aus dem Vergleich, sonst schlägt man sich selbst.
 
+**Diese Sektion ignoriert den Zeitraum** und rechnet immer mit dem
+Lifetime-Profil. Die Referenzgruppen sind selbst Lifetime-Aggregate — eine
+Session mit dreihundert Schüssen gegen Spieler mit hunderttausend zu stellen
+wäre kein Vergleich. Der Untertitel sagt das, sobald ein anderer Zeitraum als
+*All* gewählt ist: ohne den Hinweis wechselt man oben den Zeitraum, sieht die
+Kennzahlen sich ändern und die Perzentile nicht, und das liest sich als
+Fehler.
+
 *By round phase* — dieselben Schusswerte getrennt nach Überlebenszeit
 (early < 5 min, mid 5–15 min, late > 15 min). Eine Trefferquote, die zur späten
 Phase hin abfällt, zeigt auf Feuerdisziplin auf Distanz, nicht auf das Zielen.
