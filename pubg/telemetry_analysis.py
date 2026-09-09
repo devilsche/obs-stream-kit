@@ -374,8 +374,13 @@ def analyse(events) -> dict:
                         twp["hits"] += 1
                         twp["damage"] += e.get("damage") or 0.0
                         aid = e.get("attackId")
-                        if aid is not None and aid != -1:
-                            twp.setdefault("hit_attack_ids", set()).add(aid)
+                        if aid is None or aid == -1:
+                            twp["hits_no_id"] += 1
+                        else:
+                            # Dieselbe Menge wie bei Schusswaffen: eine
+                            # Granate erzeugt ein Ereignis je getroffenem
+                            # Gegner, aber sie war EIN Wurf.
+                            twp["hit_attacks"].add(aid)
                 continue
             if _is_monster(victim):
                 continue          # Baer & Co. sind keine Zielleistung

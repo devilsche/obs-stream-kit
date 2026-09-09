@@ -901,3 +901,60 @@ def test_full_rows_uses_the_same_chain_as_the_poller():
     gren = rows["Granate"]
     assert gren["hits"] == 1 and gren["damage"] == 70.0
     assert gren["is_thrown"] is True
+
+
+def test_thrown_hits_count_as_landed_throws():
+    """Eine Granate erzeugt ein Schadensereignis je getroffenem Gegner,
+    war aber EIN Wurf — die getroffenen Wuerfe sind der Nenner, den die
+    Anzeige braucht. Zuvor blieb er auf 0, weil in einen Schluessel
+    geschrieben wurde, den die Auswertung nie liest."""
+    from pubg.telemetry_analysis import analyse
+    ev = lambda t, typ, **kw: {"_T": typ,
+                               "_D": f"2026-09-08T20:00:{t:06.3f}Z", **kw}
+    events = [
+        {"_T": "LogPlayerCreate",
+         "character": {"name": "me", "accountId": "account.me", "teamId": 1}},
+        ev(1.0, "LogPlayerAttack", attackType="Weapon",
+           attacker={"name": "me"}, weapon={"itemId": "Item_Weapon_Grenade_C"}),
+        # Ein Wurf, drei Getroffene, dieselbe attackId
+        ev(2.0, "LogPlayerTakeDamage", attacker={"name": "me"},
+           victim={"name": "a"}, damageCauserName="ProjGrenade_C",
+           damageTypeCategory="Damage_Explosion_Grenade", damage=50.0,
+           attackId=77),
+        ev(2.0, "LogPlayerTakeDamage", attacker={"name": "me"},
+           victim={"name": "b"}, damageCauserName="ProjGrenade_C",
+           damageTypeCategory="Damage_Explosion_Grenade", damage=40.0,
+           attackId=77),
+        ev(2.0, "LogPlayerTakeDamage", attacker={"name": "me"},
+           victim={"name": "c"}, damageCauserName="ProjGrenade_C",
+           damageTypeCategory="Damage_Explosion_Grenade", damage=30.0,
+           attackId=77),
+    ]
+    w = analyse(events)["players"]["me"]["weapons"]["Granate"]
+    assert w["shots"] == 1
+    assert w["hitAttacks"] == 1        # EIN Wurf traf
+    assert w["hits"] == 3              # drei Gegner erwischt
+    assert w["damage"] == 120.0
+
+
+def test_miss_burst_pool_includes_players_who_never_hit():
+    """Wer nie traf, ist bei dieser Kennzahl der Kern der Frage. Ohne ihn
+    sah die Lobby aus, als traefe sie viel oefter irgendwas."""
+    from pubg.burst_analysis import compare_to_pool
+    def stat(b, hb):
+        return {"initiated": {"bursts": b, "hitBursts": hb,
+                              "firstShotHits": hb, "hitIndexSum": hb,
+                              "shotsAfterHit": 0, "hitsAfterHit": 0},
+                "reacting": {"bursts": 0, "hitBursts": 0, "firstShotHits": 0,
+                             "hitIndexSum": 0, "shotsAfterHit": 0,
+                             "hitsAfterHit": 0}}
+    folded = {("me", "ar"): stat(100, 50)}
+    for i in range(5):
+        folded[(f"hit{i}", "ar")] = stat(100, 80)     # treffen viel
+    for i in range(5):
+        folded[(f"miss{i}", "ar")] = stat(100, 0)     # treffen nie
+    row = compare_to_pool(folded, "me")[0]
+    # 10 Spieler x 100 Stoesse, 400 mit Treffer -> 60 % ohne
+    assert row["poolMissBurstPct"] == 60.0
+    # Die Quoten-Pools bleiben auf den Spielern mit Treffern
+    assert row["poolFirstShotPct"] == 100.0

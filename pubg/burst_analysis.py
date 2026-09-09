@@ -325,6 +325,13 @@ def compare_to_pool(folded, account_id, min_hit_bursts=POOL_MIN_HIT_BURSTS):
             if not me["hitBursts"]:
                 continue
             pool = _blank()
+            # Eigener Zaehler fuer "Stoesse ohne Treffer": der Pool unten
+            # laesst Spieler ohne einen einzigen Treffer weg, weil ihre
+            # Quoten keinen Nenner haetten. Fuer DIESE Kennzahl sind sie
+            # aber der Kern der Frage — ohne sie sah die Lobby aus, als
+            # traefe sie viel oefter irgendwas (AR reacting: 23,5 statt
+            # 41,7 %).
+            all_bursts = all_hit_bursts = 0
             per_player = []
             for (acc, c), stat in folded.items():
                 if c != cls or acc == account_id:
@@ -332,6 +339,8 @@ def compare_to_pool(folded, account_id, min_hit_bursts=POOL_MIN_HIT_BURSTS):
                 raw = stat.get(role) or {}
                 s = _blank()
                 s.update({k: raw.get(k, 0) for k in s})
+                all_bursts += s["bursts"]
+                all_hit_bursts += s["hitBursts"]
                 if not s["hitBursts"]:
                     continue
                 for k in pool:
@@ -375,8 +384,8 @@ def compare_to_pool(folded, account_id, min_hit_bursts=POOL_MIN_HIT_BURSTS):
                 # steckt in bursts und hitBursts.
                 "missBurstPct": (100.0 * (me["bursts"] - me["hitBursts"])
                                  / me["bursts"]) if me["bursts"] else None,
-                "poolMissBurstPct": (100.0 * (pool["bursts"] - pool["hitBursts"])
-                                     / pool["bursts"]) if pool["bursts"] else None,
+                "poolMissBurstPct": (100.0 * (all_bursts - all_hit_bursts)
+                                     / all_bursts) if all_bursts else None,
                 "poolHitBursts": pool["hitBursts"],
                 # Zahl der Spieler HINTER dem Perzentil, nicht im Pool:
                 # der Pool zaehlt jeden mit, das Perzentil nur die mit
