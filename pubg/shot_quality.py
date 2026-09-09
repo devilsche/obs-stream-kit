@@ -1120,6 +1120,71 @@ def burst_discipline(conn, tenant_id, account_id, cutoff="1970-01-01T00:00:00Z",
         "players": len({acc for (acc, _cls) in folded}),
     }
 
+
+def thrown_stats(conn, tenant_id, account_id, cutoff="1970-01-01T00:00:00Z",
+                 to_iso=None):
+    """Wurfgeraete: eigene Zahlen und die der Lobby, je Geraet.
+
+    Getrennt von den Schusswaffen, weil die Kennzahlen andere sind. Der
+    aussagekraeftige Wert ist **Schaden je getroffenem Wurf** — er trennt
+    Wirkung von Wurfgenauigkeit, waehrend Schaden je Wurf beides mischt
+    und damit weder das eine noch das andere zeigt. Genau wie bei den
+    Schusswaffen, wo dafuer avgDamagePerLandedShot steht.
+
+    Nenner ist der getroffene WURF, nicht der getroffene Gegner: eine
+    Granate in eine Dreiergruppe ist ein guter Wurf, kein dreifacher.
+    """
+    br_where, br_params = _br_filter("m")
+    upper, upper_params = ("AND m.played_at < ?", [to_iso]) if to_iso else ("", [])
+    sql = f"""
+        SELECT w.weapon, w.account_id = ? AS mine,
+               SUM(w.shots) AS throws, SUM(w.hit_attacks) AS landed,
+               SUM(w.hits) AS enemies, SUM(w.damage) AS damage,
+               SUM(w.kills) AS kills
+        FROM match_weapon_stats w
+        JOIN matches m ON m.match_id = w.match_id
+                      AND m.tenant_id = w.tenant_id
+        WHERE w.tenant_id = ? AND COALESCE(w.is_thrown, false)
+          AND w.is_bot = false
+          AND m.played_at >= ? {upper} AND {br_where}
+        GROUP BY w.weapon, w.account_id = ?
+        HAVING SUM(w.shots) > 0
+    """
+    rows = conn.execute(sql, [account_id, tenant_id, cutoff, *upper_params,
+                              *br_params, account_id]).fetchall()
+    mine, pool = {}, {}
+    for r in rows:
+        (mine if r["mine"] else pool)[r["weapon"]] = dict(r)
+
+    def rate(num, den):
+        return (num / den) if den else None
+
+    out = []
+    for weapon, m in mine.items():
+        p = pool.get(weapon) or {}
+        thr, land = m["throws"] or 0, m["landed"] or 0
+        pthr, pland = p.get("throws") or 0, p.get("landed") or 0
+        out.append({
+            "weapon": weapon,
+            "throws": thr,
+            "landed": land,
+            "landedPct": rate(100.0 * land, thr),
+            # Der Kernwert: Wirkung eines Wurfs, der sein Ziel fand.
+            "dmgPerLanded": rate(m["damage"] or 0.0, land),
+            "enemiesPerLanded": rate(m["enemies"] or 0, land),
+            "kills": m["kills"] or 0,
+            "killsPer100": rate(100.0 * (m["kills"] or 0), thr),
+            "poolThrows": pthr,
+            "poolLandedPct": rate(100.0 * pland, pthr),
+            "poolDmgPerLanded": rate(p.get("damage") or 0.0, pland),
+            "poolKillsPer100": rate(100.0 * (p.get("kills") or 0), pthr),
+            # Unter zehn getroffenen Wuerfen keine Quote als Befund:
+            # dieselbe Haltung wie bei den Feuerstoessen.
+            "reliable": land >= 10,
+        })
+    out.sort(key=lambda r: -r["throws"])
+    return out
+
 def trend(conn, tenant_id, account_id):
     """Eigen-Trend: jedes Fenster gegen die gleich langen Matches davor.
 
@@ -1209,6 +1274,9 @@ def compute_shot_quality(conn, tenant_id, account_id, cutoff,
                      if with_landings else None),
         "bursts": (burst_discipline(conn, tenant_id, account_id, cutoff,
                                     to_iso=to_iso)
+                   if with_bursts else None),
+        "thrown": (thrown_stats(conn, tenant_id, account_id, cutoff,
+                                to_iso=to_iso)
                    if with_bursts else None),
         "trend": trend(conn, tenant_id, account_id),
     }

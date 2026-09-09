@@ -565,7 +565,7 @@ Beantwortet „wie gut sitzt jede Kugel, wann sterbe ich, und wo stehe ich damit
 nicht „wie viele Kills habe ich". Parameter: `?range=session|day|week|all`,
 `player=` (Default: eigener Account), `minMatches=` (Kohorten-Schwelle, Default 20).
 
-Acht Sektionen:
+Neun Sektionen:
 
 *Shot quality* — Trefferquote, **Schaden je 100 Schuss** (bündelt Quote und
 Trefferwucht in eine Zahl), **Anteil der Schüsse im Gefecht**, Kopftreffer-Anteil,
@@ -659,13 +659,35 @@ messen:
 Unter fünf Treffer-Stößen wird **keine Quote** gebildet, sondern die Rohzahl
 gezeigt: „1 von 1" ergäbe 100 % und läse sich als Befund.
 
-**Wurfgeräte** zählen mit — Granaten, Molotov, C4 und Panzerfaust richten
-echten Schaden an und standen vorher mit Würfen und null Treffern in der
-Tabelle, weil ihr Schaden keine Gun-Kategorie trägt. Sie werden über
-`is_thrown` gekennzeichnet und aus **allen** Ziel-Metriken gefiltert: eine
-Granate, die drei Gegner erwischt, wäre sonst ein Schuss mit drei Treffern.
-Blauzone, Rotzone, Fahrzeug und Benzinkanister bleiben ganz draußen — die
-richtet die Umgebung an, nicht ein Spieler.
+*Utility* — Wurfgeräte, getrennt von den Schusswaffen, weil die Kennzahlen
+andere sind. Granaten, Molotov, C4 und Panzerfaust richten echten Schaden an
+und standen vorher mit Würfen und null Treffern in der Tabelle, weil ihr
+Schaden keine Gun-Kategorie trägt.
+
+Der aussagekräftige Wert ist **Schaden je getroffenem Wurf**: er trennt die
+Wirkung eines guten Wurfs davon, wie oft einer gelingt, während Schaden je
+Wurf beides mischt und damit weder das eine noch das andere zeigt — genau wie
+bei den Schusswaffen, wo dafür `avgDamagePerLandedShot` steht. Nenner ist der
+getroffene **Wurf**, nicht der getroffene Gegner: eine Granate in eine
+Dreiergruppe ist ein guter Wurf, kein dreifacher. Die getroffenen Gegner
+stehen als eigene Spalte daneben.
+
+Ob ein Schadensereignis einem Wurfgerät gehört, entscheidet die **Waffenklasse
+des Verursachers** (`throwable` oder `melee`), nicht eine Liste von
+Kategorienamen. Eine solche Liste veraltet bei jeder neuen Waffe, und genau das
+ist passiert: geraten war `Damage_Explosion_StickyGrenade`, die Klebebombe
+meldet `Damage_Explosion_StickyBomb` — 927 Würfe lobbyweit standen mit null
+Treffern da, bei 0,5 Kills je 100 Würfen. Zwei Kategorien bleiben explizit
+(`Damage_Molotov`, `Damage_MeleeThrow`), weil Molotov-Schaden überwiegend über
+den Feuer-Controller läuft, der als eigene Waffenzeile geführt wird.
+
+Blauzone, Rotzone, Fahrzeug, Benzinkanister und Gaspumpe bleiben ganz draußen:
+das richtet die Umgebung an, nicht ein Spieler — der Kanister explodiert auch,
+wenn ihn jemand anders anschießt.
+
+Wurfgeräte tragen `is_thrown` und werden aus **allen** Ziel-Metriken
+gefiltert: eine Granate, die drei Gegner erwischt, wäre sonst ein Schuss mit
+drei Treffern.
 
 *Cohort bands* — Mittelwerte je K/D-Band, die eigene Zeile nach K/D
 einsortiert. Bewusst über den ganzen Bestand statt über den gewählten Zeitraum,

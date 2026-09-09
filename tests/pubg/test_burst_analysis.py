@@ -980,3 +980,76 @@ def test_miss_burst_pool_includes_players_who_never_hit():
     assert row["poolMissBurstPct"] == 60.0
     # Die Quoten-Pools bleiben auf den Spielern mit Treffern
     assert row["poolFirstShotPct"] == 100.0
+
+
+# ── Wurfgeraet-Auswertung ──────────────────────────────────────────────────
+
+def test_thrown_stats_rates_damage_per_landed_throw(pg_compat):
+    """Schaden je getroffenem WURF trennt Wirkung von Wurfgenauigkeit.
+    Schaden je Wurf mischt beides und zeigt damit weder das eine noch das
+    andere — genau wie bei Schusswaffen, wo dafuer der Schaden je
+    gelandetem Schuss steht."""
+    from pubg import shot_quality as sq
+    conn, t1, _ = pg_compat
+    conn.execute("INSERT INTO matches (tenant_id, match_id, map_name, "
+                 "game_mode, played_at) VALUES (?, ?, ?, ?, ?)",
+                 (t1, "m1", "Baltic_Main", "squad", "2026-09-01T12:00:00Z"))
+    def add(acc, weapon, throws, landed, enemies, dmg, kills):
+        conn.execute(
+            "INSERT INTO match_weapon_stats (tenant_id, match_id, account_id, "
+            "weapon, is_bot, is_thrown, shots, hit_attacks, hits, damage, "
+            "kills) VALUES (?, ?, ?, ?, false, true, ?, ?, ?, ?, ?)",
+            (t1, "m1", acc, weapon, throws, landed, enemies, dmg, kills))
+    # 20 Wuerfe, 10 trafen, 400 Schaden -> 40 je Treffer, 20 je Wurf
+    add("account.me", "Granate", 20, 10, 14, 400.0, 3)
+    add("enemy1", "Granate", 100, 50, 60, 2500.0, 10)
+    conn.commit()
+
+    rows = sq.thrown_stats(conn, t1, "account.me")
+    g = next(r for r in rows if r["weapon"] == "Granate")
+    assert g["throws"] == 20
+    assert g["landed"] == 10
+    assert g["landedPct"] == 50.0
+    assert g["dmgPerLanded"] == 40.0
+    assert g["enemiesPerLanded"] == 1.4
+    assert g["killsPer100"] == 15.0
+    assert g["poolLandedPct"] == 50.0
+    assert g["poolDmgPerLanded"] == 50.0
+    assert g["poolKillsPer100"] == 10.0
+    assert g["reliable"] is True
+
+
+def test_thrown_stats_leaves_gun_rows_out(pg_compat):
+    from pubg import shot_quality as sq
+    conn, t1, _ = pg_compat
+    conn.execute("INSERT INTO matches (tenant_id, match_id, map_name, "
+                 "game_mode, played_at) VALUES (?, ?, ?, ?, ?)",
+                 (t1, "m1", "Baltic_Main", "squad", "2026-09-01T12:00:00Z"))
+    conn.execute(
+        "INSERT INTO match_weapon_stats (tenant_id, match_id, account_id, "
+        "weapon, is_bot, is_thrown, shots, hit_attacks, damage) "
+        "VALUES (?, ?, ?, 'M416', false, false, 100, 10, 800)",
+        (t1, "m1", "account.me"))
+    conn.commit()
+    assert sq.thrown_stats(conn, t1, "account.me") == []
+
+
+def test_thrown_stats_marks_a_thin_sample(pg_compat):
+    """33 Wuerfe ohne einen Treffer sind eine Aussage, 1 Treffer aus 2
+    Wuerfen keine."""
+    from pubg import shot_quality as sq
+    conn, t1, _ = pg_compat
+    conn.execute("INSERT INTO matches (tenant_id, match_id, map_name, "
+                 "game_mode, played_at) VALUES (?, ?, ?, ?, ?)",
+                 (t1, "m1", "Baltic_Main", "squad", "2026-09-01T12:00:00Z"))
+    conn.execute(
+        "INSERT INTO match_weapon_stats (tenant_id, match_id, account_id, "
+        "weapon, is_bot, is_thrown, shots, hit_attacks, hits, damage, kills) "
+        "VALUES (?, ?, ?, 'Klebebombe', false, true, 33, 0, 0, 0, 0)",
+        (t1, "m1", "account.me"))
+    conn.commit()
+    row = sq.thrown_stats(conn, t1, "account.me")[0]
+    assert row["throws"] == 33
+    assert row["landedPct"] == 0.0        # eine echte Aussage
+    assert row["dmgPerLanded"] is None    # ohne Treffer keine Wirkung
+    assert row["reliable"] is False

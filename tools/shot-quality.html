@@ -324,6 +324,32 @@
     <p class="foot" id="burstFoot"></p>
   </div>
 
+  <div class="t-card" id="thrownCard" hidden>
+    <h2>Utility</h2>
+    <p class="sub" id="thrownSub"></p>
+    <div class="scroll">
+      <table>
+        <thead><tr>
+          <th>Item</th>
+          <th title="Times you threw or fired it">Thrown</th>
+          <th title="Throws that hit at least one enemy">Landed</th>
+          <th title="Share of throws that landed. Higher is better."
+              >Hit rate<span class="goal" aria-hidden="true">↑</span></th>
+          <th title="Damage per throw that landed — the effect of a good
+                     throw, separate from how often you land one. Higher is
+                     better.">Dmg/landed<span class="goal"
+                aria-hidden="true">↑</span></th>
+          <th title="Enemies caught per throw that landed">Enemies</th>
+          <th title="Kills per 100 throws. Higher is better."
+              >Kills/100<span class="goal" aria-hidden="true">↑</span></th>
+          <th title="Kills in total">Kills</th>
+        </tr></thead>
+        <tbody id="thrownRows"></tbody>
+      </table>
+    </div>
+    <p class="foot" id="thrownFoot"></p>
+  </div>
+
   <div class="t-card" id="cohortCard" hidden>
     <h2>Cohort bands</h2>
     <p class="sub" id="cohortSub"></p>
@@ -694,6 +720,50 @@
         + "lands its first shot almost always, full-auto SMG fire rarely.";
     }
 
+    function renderThrown() {
+      const card = document.getElementById("thrownCard");
+      const rows = DATA.thrown || [];
+      if (!rows.length) { card.hidden = true; return; }
+      card.hidden = false;
+      const val = (v, unit, dec) => v == null ? "—"
+        : v.toFixed(dec == null ? 1 : dec) + (unit || "");
+      const cmp = (mine, pool, unit, dec) => {
+        if (mine == null) return "—";
+        const s = val(mine, unit, dec);
+        return pool == null ? s
+          : `${s}<span class="sub-inline"> vs ${val(pool, unit, dec)}</span>`;
+      };
+      document.getElementById("thrownRows").innerHTML = rows.map(r => {
+        const thin = r.reliable ? "" : " thin-rate";
+        return `<tr>
+          <td>${esc(r.weapon)}</td>
+          <td>${n0(r.throws)}</td>
+          <td>${n0(r.landed)}</td>
+          <td class="${thin.trim()}" title="${n0(r.landed)} of ${
+            n0(r.throws)} throws landed${r.reliable ? ""
+            : " — too few landed throws to read the columns to the right"}"
+            >${cmp(r.landedPct, r.poolLandedPct, " %")}</td>
+          <td class="${thin.trim()}">${cmp(r.dmgPerLanded, r.poolDmgPerLanded, "", 1)}</td>
+          <td class="${thin.trim()}">${val(r.enemiesPerLanded, "", 2)}</td>
+          <td>${cmp(r.killsPer100, r.poolKillsPer100, "", 1)}</td>
+          <td>${n0(r.kills)}</td>
+        </tr>`;
+      }).join("");
+      document.getElementById("thrownSub").innerHTML =
+        "Grenades, molotovs, C4 and the panzerfaust, kept apart from the guns "
+        + "because the numbers mean different things. The telling one is "
+        + "<b>Dmg/landed</b>: it separates the effect of a good throw from how "
+        + "often you land one, while damage per throw mixes both and shows "
+        + "neither.";
+      document.getElementById("thrownFoot").innerHTML =
+        "The denominator is the landed <b>throw</b>, not the enemy hit: a "
+        + "grenade into a group of three is one good throw, not three. "
+        + "<b>Enemies</b> shows that separately. Utility never counts toward "
+        + "the hit rate above — one throw catching three enemies would read as "
+        + "a shot with three hits. Values in <i>italics</i> rest on fewer "
+        + "than 10 landed throws.";
+    }
+
     function renderCohort() {
       const c = DATA.cohort || {};
       const bands = c.bands || [];
@@ -827,6 +897,7 @@
       renderPhases();
       renderDeaths();
       renderBursts();
+      renderThrown();
       renderCohort();
       renderDeathMaps();
       renderTrend();
@@ -848,7 +919,7 @@
         if (!me.matches) {
           st.textContent = "No BR matches in this range — widen it?";
           ["kpiCard", "rankCard", "phaseCard", "deathCard",
-           "burstCard", "cohortCard", "trendCard"].forEach(
+           "burstCard", "thrownCard", "cohortCard", "trendCard"].forEach(
              id => document.getElementById(id).hidden = true);
           return;
         }
@@ -862,7 +933,7 @@
         st.classList.add("err");
         st.textContent = "Error: " + (e && e.message || e);
         ["kpiCard", "rankCard", "phaseCard", "deathCard",
-         "burstCard", "cohortCard", "trendCard"].forEach(
+         "burstCard", "thrownCard", "cohortCard", "trendCard"].forEach(
            id => document.getElementById(id).hidden = true);
       }
     }
