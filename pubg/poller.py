@@ -820,7 +820,11 @@ def _process_one_telemetry(conn, tenant_id: int, client, my_account_id, row):
         from pubg.telemetry_analysis import analyse as _analyse
         from pubg.weapon_performance import to_db_rows as _to_rows
         from pubg.db_pg import upsert_weapon_stats as _upsert_ws
-        _rows = _to_rows(_analyse(raw))
+        from pubg.burst_analysis import analyse_bursts as _bursts
+        # Feuerstoss-Kennzahlen muessen genauso hier entstehen: sie
+        # brauchen die Schuss-Zeitstempel ALLER Lobby-Spieler, und das
+        # gefilterte Set unten hat nur die des Squads.
+        _rows = _to_rows(_analyse(raw), bursts=_bursts(raw))
         if _rows:
             _upsert_ws(conn.raw if isinstance(conn, SqliteCompatConn) else conn,
                        tenant_id, row["match_id"], _rows)

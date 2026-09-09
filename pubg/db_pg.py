@@ -155,11 +155,35 @@ CREATE TABLE IF NOT EXISTS match_weapon_stats (
     arm          INTEGER DEFAULT 0,
     leg          INTEGER DEFAULT 0,
     pelvis       INTEGER DEFAULT 0,
+    -- Feuerstoss-Kennzahlen (pubg/burst_analysis.py): wie oft schon der
+    -- erste Schuss eines Stosses traf. Das ist der messbare Anteil von
+    -- Crosshair-Placement, den die Trefferquote nicht zeigt — zwei
+    -- Spieler mit derselben Quote koennen sehr verschieden zielen.
+    -- Getrennt nach Rolle, weil wer aus dem Hinterhalt eroeffnet den
+    -- Erstschuss-Treffer leichter hat als wer auf einen schon
+    -- schiessenden Gegner antwortet; ohne die Trennung misst die Zahl
+    -- mindestens so viel Spielweise wie Zielverhalten.
+    bursts_init          INTEGER DEFAULT 0,
+    hit_bursts_init      INTEGER DEFAULT 0,
+    first_shot_init      INTEGER DEFAULT 0,
+    hit_index_sum_init   INTEGER DEFAULT 0,
+    bursts_react         INTEGER DEFAULT 0,
+    hit_bursts_react     INTEGER DEFAULT 0,
+    first_shot_react     INTEGER DEFAULT 0,
+    hit_index_sum_react  INTEGER DEFAULT 0,
     PRIMARY KEY (tenant_id, match_id, account_id, weapon)
 );
 ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS finisher_hits INTEGER DEFAULT 0;
 ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS finisher_shots INTEGER DEFAULT 0;
 ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS shots_in_fight INTEGER DEFAULT 0;
+ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS bursts_init INTEGER DEFAULT 0;
+ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS hit_bursts_init INTEGER DEFAULT 0;
+ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS first_shot_init INTEGER DEFAULT 0;
+ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS hit_index_sum_init INTEGER DEFAULT 0;
+ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS bursts_react INTEGER DEFAULT 0;
+ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS hit_bursts_react INTEGER DEFAULT 0;
+ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS first_shot_react INTEGER DEFAULT 0;
+ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS hit_index_sum_react INTEGER DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_mws_tenant_account
     ON match_weapon_stats(tenant_id, account_id);
 CREATE INDEX IF NOT EXISTS idx_mws_tenant_weapon
@@ -1343,7 +1367,10 @@ def ranked_accounts_missing_snapshot(conn, tenant_id: int, season_id: str,
 _MWS_COLS = ("account_id", "player_name", "team_id", "is_bot", "weapon",
             "finisher_hits", "finisher_shots", "shots_in_fight",
              "shots", "hit_attacks", "hits", "damage", "kills",
-             "head", "torso", "arm", "leg", "pelvis")
+             "head", "torso", "arm", "leg", "pelvis",
+             "bursts_init", "hit_bursts_init", "first_shot_init",
+             "hit_index_sum_init", "bursts_react", "hit_bursts_react",
+             "first_shot_react", "hit_index_sum_react")
 
 
 def upsert_weapon_stats(conn, tenant_id: int, match_id: str, rows) -> None:

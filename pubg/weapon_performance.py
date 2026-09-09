@@ -123,13 +123,19 @@ _ZONE_COL = {"HeadShot": "head", "TorsoShot": "torso", "ArmShot": "arm",
              "LegShot": "leg", "PelvisShot": "pelvis"}
 
 
-def to_db_rows(analysis: dict, account_ids: dict = None) -> list:
+def to_db_rows(analysis: dict, account_ids: dict = None,
+               bursts: dict = None) -> list:
     """Flacht eine Match-Analyse zu Zeilen fuer match_weapon_stats auf:
     eine Zeile je Spieler UND Waffe.
 
     `account_ids` ueberschreibt die IDs aus der Analyse (fuer Tests und
     Altbestand). Ohne Account-Id gibt es keinen Primaerschluessel — solche
     Zeilen fallen weg, statt eine kaputte Zeile zu schreiben.
+
+    `bursts` ist die Ausgabe von burst_analysis.analyse_bursts, also
+    {Name: {Waffe: {Rolle: Kennzahlen}}}. Fehlt sie, bleiben die acht
+    Feuerstoss-Spalten auf 0 — so bleiben Altbestand und Tests, die die
+    Rohevents nicht haben, weiter gueltig.
     """
     rows = []
     for name, p in ((analysis or {}).get("players") or {}).items():
@@ -154,6 +160,9 @@ def to_db_rows(analysis: dict, account_ids: dict = None) -> list:
                    "finisher_hits": w.get("finisherHits") or 0,
                    "finisher_shots": w.get("finisherShots") or 0,
                    "shots_in_fight": w.get("shotsInFight") or 0}
+            from pubg.burst_analysis import to_row_fields
+            row.update(to_row_fields(
+                ((bursts or {}).get(name) or {}).get(weapon)))
             for z, col in _ZONE_COL.items():
                 row[col] = zones.get(z, 0)
             rows.append(row)
