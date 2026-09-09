@@ -26,6 +26,24 @@ PELLET_RATIO = 1.5
 #: Fahrzeug und Molotov sagen nichts ueber Aim aus.
 GUN_CATEGORY = "Damage_Gun"
 
+#: Praefix statt Gleichheit: PUBG haengt bei durchschlagender Munition
+#: einen Zusatz an. Die Lynx AMR meldet "Damage_Gun_Penetrate_BRDM"
+#: (.50-Kaliber, geht durch Fahrzeugpanzerung) — mit exaktem Vergleich
+#: fiel damit JEDER Lynx-Treffer weg: an Prod-Daten 2.129 Schuesse ueber
+#: 859 Matches mit null Treffern, null Schaden und leeren Trefferzonen.
+#: Gemessen ist "Damage_Gun_Penetrate_BRDM" die einzige weitere Variante
+#: und kommt nur von WeapL6_C; Molotov, Explosion und Melee tragen andere
+#: Praefixe und bleiben draussen.
+GUN_CATEGORY_PREFIX = "Damage_Gun"
+
+
+def is_gun_damage(category):
+    """True fuer echten Waffenschaden. None gilt als Waffenschaden, weil
+    aeltere Events die Kategorie nicht fuehren."""
+    if category is None:
+        return True
+    return str(category).startswith(GUN_CATEGORY_PREFIX)
+
 #: Ab dieser Distanz (m) ist kein Gegner mehr plausibel treffbar. Ein Schuss
 #: ohne Gegner darin ist ein "Leerschuss" — relevant, weil sich damit die
 #: eigene Accuracy druecken laesst.
@@ -130,7 +148,7 @@ def _fight_windows(events, team_of=None):
         if e.get("_T") not in ("LogPlayerTakeDamage", "LogPlayerMakeGroggy",
                                 "LogPlayerKillV2"):
             continue
-        if e.get("damageTypeCategory") not in (None, GUN_CATEGORY):
+        if not is_gun_damage(e.get("damageTypeCategory")):
             continue
         t = _parse_ts(e.get("_D"))
         if t is None:
@@ -313,7 +331,7 @@ def analyse(events) -> dict:
             # Selbstschaden wuerde die Trefferquote schoenen bzw. verfaelschen.
             if not name or name == victim.get("name"):
                 continue
-            if e.get("damageTypeCategory") != GUN_CATEGORY:
+            if not is_gun_damage(e.get("damageTypeCategory")):
                 continue
             if _is_monster(victim):
                 continue          # Baer & Co. sind keine Zielleistung

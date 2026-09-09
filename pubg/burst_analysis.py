@@ -21,7 +21,7 @@ REACT_WINDOW_S kein Feuerschaden genommen) oder `reacting`.
 """
 from collections import defaultdict
 
-from pubg.telemetry_analysis import (GUN_CATEGORY, _parse_ts,
+from pubg.telemetry_analysis import (_parse_ts, is_gun_damage,
                                      normalize_weapon)
 
 #: Pause, ab der ein neuer Feuerstoss beginnt. Darunter liegt
@@ -128,7 +128,7 @@ def analyse_bursts(events):
             # Zonenschaden und Sturz sind keine Treffer und markieren auch
             # keine Reaktion — sonst gilt jeder Stoss nach einem
             # Blue-Zone-Tick als Antwort auf Feindfeuer.
-            if e.get("damageTypeCategory") not in (None, GUN_CATEGORY):
+            if not is_gun_damage(e.get("damageTypeCategory")):
                 continue
             t = _parse_ts(e.get("_D"))
             if t is None:

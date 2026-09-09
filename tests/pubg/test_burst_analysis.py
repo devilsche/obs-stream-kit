@@ -610,3 +610,47 @@ def test_compare_to_pool_drops_classes_without_a_single_hit_burst():
                                "firstShotHits": 0, "hitIndexSum": 0}}}
     out = compare_to_pool(folded, "me")
     assert [(r["class"], r["role"]) for r in out] == [("ar", "initiated")]
+
+
+# ── Durchschlagende Munition ───────────────────────────────────────────────
+
+def test_is_gun_damage_accepts_penetrating_variants():
+    """Die Lynx AMR meldet "Damage_Gun_Penetrate_BRDM" (.50-Kaliber, geht
+    durch Fahrzeugpanzerung). Mit exaktem Vergleich fiel damit JEDER
+    Lynx-Treffer weg: an Prod-Daten 2.129 Schuesse ueber 859 Matches mit
+    null Treffern, null Schaden und leeren Trefferzonen."""
+    from pubg.telemetry_analysis import is_gun_damage
+    assert is_gun_damage("Damage_Gun") is True
+    assert is_gun_damage("Damage_Gun_Penetrate_BRDM") is True
+    assert is_gun_damage(None) is True        # aeltere Events ohne Kategorie
+
+
+def test_is_gun_damage_still_rejects_everything_else():
+    """Der Praefix darf nicht zum Scheunentor werden — Blauzone, Sturz,
+    Fahrzeug und Molotov sagen nichts ueber Zielen aus."""
+    from pubg.telemetry_analysis import is_gun_damage
+    for cat in ("Damage_BlueZone", "Damage_Molotov", "Damage_Instant_Fall",
+                "Damage_Explosion_Grenade", "Damage_VehicleCrashHit",
+                "Damage_Punch", "Damage_Melee", "Damage_MeleeThrow",
+                "Damage_DBNO", "Damage_Drown", "Damage_BlueZoneGrenade",
+                "Damage_Explosion_C4", "Damage_Explosion_RedZone",
+                "Damage_Explosion_JerryCan", "Damage_Explosion_Vehicle",
+                "Damage_Explosion_PanzerFaustWarhead"):
+        assert is_gun_damage(cat) is False, cat
+
+
+def test_bursts_count_a_penetrating_hit(pg_compat=None):
+    """Ende zu Ende: ein Lynx-Treffer muss seinen Schuss finden."""
+    from pubg import burst_analysis as ba
+    ev = lambda t, typ, **kw: {"_T": typ,
+                               "_D": f"2026-09-08T20:00:{t:06.3f}Z", **kw}
+    events = [
+        ev(1.0, "LogPlayerAttack", attacker={"name": "me"},
+           weapon={"itemId": "Item_Weapon_L6_C"}),
+        ev(1.4, "LogPlayerTakeDamage", attacker={"name": "me"},
+           victim={"name": "them"}, damageCauserName="WeapL6_C",
+           damageTypeCategory="Damage_Gun_Penetrate_BRDM"),
+    ]
+    out = ba.analyse_bursts(events)
+    assert out["me"]["Lynx AMR"]["initiated"]["hitBursts"] == 1
+    assert out["me"]["Lynx AMR"]["initiated"]["firstShotHits"] == 1
