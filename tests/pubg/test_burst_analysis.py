@@ -203,20 +203,24 @@ def test_analyse_bursts_handles_an_empty_list():
 
 def test_to_row_fields_flattens_both_roles():
     stat = {"initiated": {"bursts": 5, "hitBursts": 3, "firstShotHits": 2,
-                          "hitIndexSum": 7},
+                          "hitIndexSum": 7, "shotsAfterHit": 9,
+                          "hitsAfterHit": 4},
             "reacting": {"bursts": 4, "hitBursts": 1, "firstShotHits": 0,
-                         "hitIndexSum": 3}}
+                         "hitIndexSum": 3, "shotsAfterHit": 2,
+                         "hitsAfterHit": 1}}
     row = ba.to_row_fields(stat)
     assert row == {"bursts_init": 5, "hit_bursts_init": 3,
                    "first_shot_init": 2, "hit_index_sum_init": 7,
+                   "shots_after_hit_init": 9, "hits_after_hit_init": 4,
                    "bursts_react": 4, "hit_bursts_react": 1,
-                   "first_shot_react": 0, "hit_index_sum_react": 3}
+                   "first_shot_react": 0, "hit_index_sum_react": 3,
+                   "shots_after_hit_react": 2, "hits_after_hit_react": 1}
 
 
 def test_to_row_fields_defaults_missing_roles_to_zero():
     row = ba.to_row_fields({})
     assert set(row.values()) == {0}
-    assert len(row) == 8
+    assert len(row) == 12
 
 
 # ── Kennzahlen ─────────────────────────────────────────────────────────────
@@ -654,3 +658,246 @@ def test_bursts_count_a_penetrating_hit(pg_compat=None):
     out = ba.analyse_bursts(events)
     assert out["me"]["Lynx AMR"]["initiated"]["hitBursts"] == 1
     assert out["me"]["Lynx AMR"]["initiated"]["firstShotHits"] == 1
+
+
+# ── Quote AB dem ersten Treffer ────────────────────────────────────────────
+# Trennt "Ziel finden" von "Ziel halten": bis zum ersten Treffer entscheidet
+# die Visierlage, danach Rueckstosskontrolle und Nachfuehren.
+
+def test_hits_after_first_counts_the_rest_of_the_burst():
+    from pubg.burst_analysis import hits_after_first
+    # 5 Schuesse, Treffer bei Schuss 2, 4 und 5
+    burst = [10.0, 10.1, 10.2, 10.3, 10.4]
+    hits = [10.15, 10.35, 10.45]
+    shots_after, hits_after = hits_after_first(burst, hits)
+    assert shots_after == 3          # Schuesse 3, 4, 5
+    assert hits_after == 2           # die bei 10.35 und 10.45
+
+
+def test_hits_after_first_is_zero_for_a_single_shot_burst():
+    from pubg.burst_analysis import hits_after_first
+    assert hits_after_first([10.0], [10.05]) == (0, 0)
+
+
+def test_hits_after_first_is_zero_without_any_hit():
+    from pubg.burst_analysis import hits_after_first
+    assert hits_after_first([10.0, 10.1], [99.0]) == (0, 0)
+
+
+def test_hits_after_first_ignores_hits_beyond_the_burst():
+    from pubg.burst_analysis import hits_after_first
+    burst = [10.0, 10.1]
+    # Treffer bei Schuss 1, dann einer lange nach dem Stoss
+    shots_after, hits_after = hits_after_first(burst, [10.05, 30.0])
+    assert shots_after == 1
+    assert hits_after == 0
+
+
+def test_analyse_bursts_reports_the_follow_up_columns():
+    from pubg import burst_analysis as ba
+    ev = lambda t, typ, **kw: {"_T": typ,
+                               "_D": f"2026-09-08T20:00:{t:06.3f}Z", **kw}
+    events = [
+        ev(1.0, "LogPlayerAttack", attacker={"name": "me"},
+           weapon={"itemId": "Item_Weapon_HK416_C"}),
+        ev(1.1, "LogPlayerAttack", attacker={"name": "me"},
+           weapon={"itemId": "Item_Weapon_HK416_C"}),
+        ev(1.2, "LogPlayerAttack", attacker={"name": "me"},
+           weapon={"itemId": "Item_Weapon_HK416_C"}),
+        ev(1.05, "LogPlayerTakeDamage", attacker={"name": "me"},
+           victim={"name": "them"}, damageCauserName="WeapHK416_C",
+           damageTypeCategory="Damage_Gun"),
+        ev(1.25, "LogPlayerTakeDamage", attacker={"name": "me"},
+           victim={"name": "them"}, damageCauserName="WeapHK416_C",
+           damageTypeCategory="Damage_Gun"),
+    ]
+    s = ba.analyse_bursts(events)["me"]["M416"]["initiated"]
+    assert s["firstShotHits"] == 1
+    assert s["shotsAfterHit"] == 2       # Schuesse 2 und 3
+    assert s["hitsAfterHit"] == 1        # der bei 1.25
+
+
+def test_follow_up_rate_needs_shots():
+    from pubg.burst_analysis import follow_up_pct
+    assert follow_up_pct(0, 0) is None
+    assert follow_up_pct(8, 2) == 25.0
+
+
+def test_row_fields_include_the_follow_up_columns():
+    from pubg.burst_analysis import to_row_fields
+    row = to_row_fields({})
+    for col in ("shots_after_hit_init", "hits_after_hit_init",
+                "shots_after_hit_react", "hits_after_hit_react"):
+        assert col in row, col
+    assert len(row) == 12
+
+
+def test_compare_to_pool_reports_the_follow_up_rate():
+    from pubg.burst_analysis import compare_to_pool
+    folded = {("me", "ar"): {
+        "initiated": {"bursts": 10, "hitBursts": 10, "firstShotHits": 5,
+                      "hitIndexSum": 15, "shotsAfterHit": 40,
+                      "hitsAfterHit": 8},
+        "reacting": {"bursts": 0, "hitBursts": 0, "firstShotHits": 0,
+                     "hitIndexSum": 0, "shotsAfterHit": 0,
+                     "hitsAfterHit": 0}}}
+    row = compare_to_pool(folded, "me")[0]
+    assert row["followUpPct"] == 20.0        # 8 von 40
+
+
+# ── Wurfgeraete ────────────────────────────────────────────────────────────
+
+def test_is_thrown_damage_accepts_explosives_and_fire():
+    """Granaten, Molotov, C4 und Panzerfaust richten Schaden an, tragen
+    aber keine Gun-Kategorie — deshalb standen sie mit Wuerfen und null
+    Treffern in der Tabelle."""
+    from pubg.telemetry_analysis import is_thrown_damage
+    for cat in ("Damage_Explosion_Grenade", "Damage_Molotov",
+                "Damage_Explosion_C4", "Damage_Explosion_PanzerFaustWarhead",
+                "Damage_MeleeThrow", "Damage_BlueZoneGrenade"):
+        assert is_thrown_damage(cat) is True, cat
+
+
+def test_is_thrown_damage_rejects_gun_and_environment():
+    """Muss disjunkt zu is_gun_damage sein, sonst zaehlt ein Treffer
+    doppelt — und Umgebungsschaden gehoert keinem Spieler."""
+    from pubg.telemetry_analysis import is_thrown_damage, is_gun_damage
+    for cat in ("Damage_Gun", "Damage_Gun_Penetrate_BRDM"):
+        assert is_thrown_damage(cat) is False, cat
+        assert is_gun_damage(cat) is True
+    for cat in ("Damage_BlueZone", "Damage_Instant_Fall", "Damage_Drown",
+                "Damage_VehicleCrashHit", "Damage_VehicleHit",
+                "Damage_Explosion_RedZone", "Damage_Explosion_Vehicle",
+                "Damage_Explosion_GasPump", "Damage_Explosion_JerryCan",
+                "Damage_DBNO", "Damage_Punch", "Damage_Melee"):
+        assert is_thrown_damage(cat) is False, cat
+        assert is_gun_damage(cat) is False, cat
+
+
+def test_thrown_weapons_are_flagged_in_db_rows():
+    """Ohne die Kennzeichnung landen Wurfgeraete in der Trefferquote: eine
+    Granate, die drei Gegner erwischt, waere ein Schuss mit drei
+    Treffern."""
+    from pubg.weapon_performance import to_db_rows
+    analysis = {"players": {"me": {"accountId": "account.me", "weapons": {
+        "Granate": {"shots": 4, "hits": 3, "damage": 210.0, "kills": 1},
+        "M416": {"shots": 30, "hits": 9, "damage": 260.0, "kills": 0}}}}}
+    rows = {r["weapon"]: r for r in to_db_rows(analysis)}
+    assert rows["Granate"]["is_thrown"] is True
+    assert rows["M416"]["is_thrown"] is False
+
+
+def test_no_rate_from_a_single_hit_burst():
+    """"1 von 1 Stoessen traf mit dem ersten Schuss" ergibt 100 % und liest
+    sich als Befund, obwohl es eine einzige Beobachtung ist. Die Rohzahl
+    sagt dasselbe, ohne etwas zu behaupten."""
+    from pubg.burst_analysis import compare_to_pool
+    folded = {("me", "dmr"): {
+        "initiated": {"bursts": 0, "hitBursts": 0, "firstShotHits": 0,
+                      "hitIndexSum": 0, "shotsAfterHit": 0, "hitsAfterHit": 0},
+        "reacting": {"bursts": 4, "hitBursts": 1, "firstShotHits": 1,
+                     "hitIndexSum": 1, "shotsAfterHit": 2,
+                     "hitsAfterHit": 1}}}
+    row = compare_to_pool(folded, "me")[0]
+    assert row["bursts"] == 4
+    assert row["hitBursts"] == 1
+    assert row["firstShotHits"] == 1
+    assert row["ratedEnough"] is False
+    assert row["firstShotPct"] is None
+    assert row["avgHitIndex"] is None
+    assert row["followUpPct"] is None
+    # Der Anteil der Stoesse OHNE Treffer hat den groesseren Nenner und
+    # bleibt darum ablesbar — 3 von 4 trafen nichts.
+    assert row["missBurstPct"] == 75.0
+
+
+def test_rate_appears_at_the_threshold():
+    from pubg.burst_analysis import compare_to_pool, MIN_RATE_HIT_BURSTS
+    n = MIN_RATE_HIT_BURSTS
+    folded = {("me", "ar"): {
+        "initiated": {"bursts": n, "hitBursts": n, "firstShotHits": n,
+                      "hitIndexSum": n, "shotsAfterHit": 0, "hitsAfterHit": 0},
+        "reacting": {"bursts": 0, "hitBursts": 0, "firstShotHits": 0,
+                     "hitIndexSum": 0, "shotsAfterHit": 0, "hitsAfterHit": 0}}}
+    row = compare_to_pool(folded, "me")[0]
+    assert row["ratedEnough"] is True
+    assert row["firstShotPct"] == 100.0
+
+
+def test_thrown_rows_stay_out_of_the_aim_metrics(pg_compat):
+    """Eine Granate, die drei Gegner erwischt, waere ein Schuss mit drei
+    Treffern — ohne den Filter zeigte die Trefferquote 300 %."""
+    from pubg import shot_quality as sq
+    conn, t1, _ = pg_compat
+    conn.execute("INSERT INTO matches (tenant_id, match_id, map_name, "
+                 "game_mode, played_at) VALUES (?, ?, ?, ?, ?)",
+                 (t1, "m1", "Baltic_Main", "squad", "2026-09-01T12:00:00Z"))
+    conn.execute(
+        "INSERT INTO match_weapon_stats (tenant_id, match_id, account_id, "
+        "weapon, is_bot, is_thrown, shots, hit_attacks, hits, damage) "
+        "VALUES (?, ?, ?, 'M416', false, false, 100, 10, 12, 800)",
+        (t1, "m1", "account.me"))
+    conn.execute(
+        "INSERT INTO match_weapon_stats (tenant_id, match_id, account_id, "
+        "weapon, is_bot, is_thrown, shots, hit_attacks, hits, damage) "
+        "VALUES (?, ?, ?, 'Granate', false, true, 1, 1, 3, 210)",
+        (t1, "m1", "account.me"))
+    conn.commit()
+    me = sq.own_metrics(conn, t1, "account.me", "1970-01-01T00:00:00Z")
+    assert me["shots"] == 100          # der Wurf zaehlt nicht als Schuss
+    assert me["hits"] == 12            # und die drei Getroffenen nicht als Treffer
+    assert round(me["hitRate"], 1) == 10.0
+
+
+def test_burst_discipline_selects_the_follow_up_columns(pg_compat):
+    """Eine Spalte, die im Schema steht aber nicht im SELECT, bleibt
+    stumm auf 0 und faellt erst in der Anzeige auf."""
+    from pubg import shot_quality as sq
+    conn, t1, _ = pg_compat
+    conn.execute("INSERT INTO matches (tenant_id, match_id, map_name, "
+                 "game_mode, played_at) VALUES (?, ?, ?, ?, ?)",
+                 (t1, "m1", "Baltic_Main", "squad", "2026-09-01T12:00:00Z"))
+    conn.execute(
+        "INSERT INTO match_weapon_stats (tenant_id, match_id, account_id, "
+        "weapon, is_bot, shots, bursts_init, hit_bursts_init, "
+        "first_shot_init, hit_index_sum_init, shots_after_hit_init, "
+        "hits_after_hit_init) "
+        "VALUES (?, ?, ?, 'M416', false, 1, 30, 25, 10, 50, 60, 15)",
+        (t1, "m1", "account.me"))
+    conn.commit()
+    row = sq.burst_discipline(conn, t1, "account.me")["rows"][0]
+    assert row["followUpPct"] == 25.0        # 15 von 60
+
+
+def test_full_rows_uses_the_same_chain_as_the_poller():
+    """Backfill und Ingest muessen dieselbe Kette laufen, sonst driften
+    die Zahlen je nachdem, wer die Zeile geschrieben hat."""
+    from scripts.backfill_bursts import full_rows_for_match
+    ev = lambda t, typ, **kw: {"_T": typ,
+                               "_D": f"2026-09-08T20:00:{t:06.3f}Z", **kw}
+    events = [
+        {"_T": "LogPlayerCreate",
+         "character": {"name": "me", "accountId": "account.me", "teamId": 1}},
+        ev(1.0, "LogPlayerAttack", attackType="Weapon",
+           attacker={"name": "me", "accountId": "account.me"},
+           weapon={"itemId": "Item_Weapon_L6_C"}),
+        # Lynx-Treffer mit durchschlagender Munition
+        ev(1.4, "LogPlayerTakeDamage", attacker={"name": "me"},
+           victim={"name": "them"}, damageCauserName="WeapL6_C",
+           damageTypeCategory="Damage_Gun_Penetrate_BRDM", damage=90.0),
+        # Granatenwurf mit Treffer
+        ev(20.0, "LogPlayerAttack", attackType="Weapon",
+           attacker={"name": "me", "accountId": "account.me"},
+           weapon={"itemId": "Item_Weapon_Grenade_C"}),
+        ev(21.0, "LogPlayerTakeDamage", attacker={"name": "me"},
+           victim={"name": "them"}, damageCauserName="ProjGrenade_C",
+           damageTypeCategory="Damage_Explosion_Grenade", damage=70.0),
+    ]
+    rows = {r["weapon"]: r for r in full_rows_for_match(events)}
+    lynx = rows["Lynx AMR"]
+    assert lynx["hits"] == 1 and lynx["damage"] == 90.0
+    assert lynx["is_thrown"] is False
+    assert lynx["hit_bursts_init"] == 1
+    gren = rows["Granate"]
+    assert gren["hits"] == 1 and gren["damage"] == 70.0
+    assert gren["is_thrown"] is True

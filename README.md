@@ -640,8 +640,32 @@ python3 scripts/backfill_bursts.py --tenant 1 [--limit N] [--dry-run] [--redo]
 Nicht jedes Archiv-File ist roh — ältere wurden aus der DB rekonstruiert und
 haben wieder nur Squad-Events. Die erkennt das Skript an der Zahl verschiedener
 Schützen und lässt sie aus, statt Zahlen zu schreiben, die aus zwei Spielern
-statt neunzig kommen. Angefasst werden ausschließlich die acht Spalten. Der
-Endpoint liefert den Block nur mit `withBursts=1`, weil er die ganze Lobby liest.
+statt neunzig kommen. Standard tastet nur die Feuerstoß-Spalten an; `--rebuild`
+schreibt die ganze Zeile neu und wird für Korrekturen außerhalb dieser Spalten
+gebraucht. Der Endpoint liefert den Block nur mit `withBursts=1`, weil er die
+ganze Lobby liest.
+
+Drei Zahlen stehen in der Sektion nebeneinander, weil sie verschiedene Dinge
+messen:
+
+* **Hit nothing** — Anteil der Feuerstöße, die überhaupt nichts trafen. Die
+  Signatur wahllosen Feuers, mit dem größten Nenner (alle Stöße).
+* **1st shot lands** — Visierlage. Nenner sind nur die Stöße *mit* Treffer:
+  ein Stoß ohne jeden Treffer sagt nichts darüber, wo das Visier stand.
+* **After 1st hit** — Trefferquote der Schüsse *nach* dem ersten Treffer. Das
+  Ziel ist gefunden und im Visier; was hier fehlt, ist Rückstoßkontrolle und
+  Nachführen, nicht Zielen.
+
+Unter fünf Treffer-Stößen wird **keine Quote** gebildet, sondern die Rohzahl
+gezeigt: „1 von 1" ergäbe 100 % und läse sich als Befund.
+
+**Wurfgeräte** zählen mit — Granaten, Molotov, C4 und Panzerfaust richten
+echten Schaden an und standen vorher mit Würfen und null Treffern in der
+Tabelle, weil ihr Schaden keine Gun-Kategorie trägt. Sie werden über
+`is_thrown` gekennzeichnet und aus **allen** Ziel-Metriken gefiltert: eine
+Granate, die drei Gegner erwischt, wäre sonst ein Schuss mit drei Treffern.
+Blauzone, Rotzone, Fahrzeug und Benzinkanister bleiben ganz draußen — die
+richtet die Umgebung an, nicht ein Spieler.
 
 *Cohort bands* — Mittelwerte je K/D-Band, die eigene Zeile nach K/D
 einsortiert. Bewusst über den ganzen Bestand statt über den gewählten Zeitraum,

@@ -44,10 +44,14 @@ ROLES = ("initiated", "reacting")
 ROW_FIELDS = {
     "initiated": {"bursts": "bursts_init", "hitBursts": "hit_bursts_init",
                   "firstShotHits": "first_shot_init",
-                  "hitIndexSum": "hit_index_sum_init"},
+                  "hitIndexSum": "hit_index_sum_init",
+                  "shotsAfterHit": "shots_after_hit_init",
+                  "hitsAfterHit": "hits_after_hit_init"},
     "reacting": {"bursts": "bursts_react", "hitBursts": "hit_bursts_react",
                  "firstShotHits": "first_shot_react",
-                 "hitIndexSum": "hit_index_sum_react"},
+                 "hitIndexSum": "hit_index_sum_react",
+                 "shotsAfterHit": "shots_after_hit_react",
+                 "hitsAfterHit": "hits_after_hit_react"},
 }
 
 
@@ -87,6 +91,28 @@ def first_hit_index(burst, hit_times, lag=HIT_LAG_S):
     return None
 
 
+def hits_after_first(burst, hit_times, lag=HIT_LAG_S):
+    """(Schuesse nach dem ersten Treffer, Treffer darunter).
+
+    Trennt zwei Faehigkeiten, die die Trefferquote zusammenwirft: bis zum
+    ersten Treffer entscheidet die Visierlage, danach Rueckstosskontrolle
+    und Nachfuehren. Ein Spieler kann das Ziel schlecht finden und gut
+    halten — oder umgekehrt.
+    """
+    idx = first_hit_index(burst, hit_times, lag)
+    if idx is None or not burst:
+        return (0, 0)
+    rest = burst[idx:]
+    if not rest:
+        return (0, 0)
+    lo, hi = rest[0], burst[-1] + lag
+    got = sum(1 for h in (hit_times or [])
+              if h is not None and lo <= h <= hi)
+    # Nie mehr Treffer als Schuesse: bei Schrot meldet die Telemetrie ein
+    # Ereignis je Pellet, das wuerde sonst ueber 100 % ergeben.
+    return (len(rest), min(got, len(rest)))
+
+
 def role_of(burst_start, damage_taken, window=REACT_WINDOW_S):
     """`reacting`, wenn der Spieler kurz vor dem Stoss Feuerschaden nahm.
 
@@ -102,7 +128,8 @@ def role_of(burst_start, damage_taken, window=REACT_WINDOW_S):
 
 
 def _blank():
-    return {"bursts": 0, "hitBursts": 0, "firstShotHits": 0, "hitIndexSum": 0}
+    return {"bursts": 0, "hitBursts": 0, "firstShotHits": 0, "hitIndexSum": 0,
+            "shotsAfterHit": 0, "hitsAfterHit": 0}
 
 
 def analyse_bursts(events):
@@ -156,6 +183,9 @@ def analyse_bursts(events):
             slot["hitIndexSum"] += idx
             if idx == 1:
                 slot["firstShotHits"] += 1
+            sa, ha = hits_after_first(burst, hit_times)
+            slot["shotsAfterHit"] += sa
+            slot["hitsAfterHit"] += ha
     return out
 
 
@@ -184,6 +214,16 @@ def avg_hit_index(hit_bursts, hit_index_sum):
     return (hit_index_sum / hit_bursts) if hit_bursts else None
 
 
+def follow_up_pct(shots_after_hit, hits_after_hit):
+    """Trefferquote der Schuesse NACH dem ersten Treffer.
+
+    Das Ziel ist gefunden und steht im Visier — was hier fehlt, ist
+    Rueckstosskontrolle und Nachfuehren, nicht Visierlage.
+    """
+    return ((100.0 * hits_after_hit / shots_after_hit)
+            if shots_after_hit else None)
+
+
 # ---------------------------------------------------------------------------
 # Auswertung: Klassen falten und gegen die Lobby stellen
 # ---------------------------------------------------------------------------
@@ -193,6 +233,12 @@ def avg_hit_index(hit_bursts, hit_index_sum):
 #: den Landing Spots: die Zahl verschweigen hilft nicht, sie als Befund
 #: auszugeben auch nicht.
 RELIABLE_HIT_BURSTS = 20
+
+#: Unter so wenigen Treffer-Stoessen wird KEINE Quote gebildet. "1 von 1
+#: Stoessen traf mit dem ersten Schuss" ergibt 100 % und liest sich als
+#: Befund, obwohl es eine einzige Beobachtung ist. Die Rohzahl sagt
+#: dasselbe, ohne etwas zu behaupten.
+MIN_RATE_HIT_BURSTS = 5
 
 #: Mindestzahl fuer einen Spieler in der Perzentil-Gruppe. Bewusst
 #: niedriger als RELIABLE_HIT_BURSTS: Rauschen im Einzelwert verbreitert
@@ -263,7 +309,9 @@ def compare_to_pool(folded, account_id, min_hit_bursts=POOL_MIN_HIT_BURSTS):
     out = []
     for cls in classes:
         for role in ROLES:
-            me = (folded.get((account_id, cls)) or {}).get(role) or _blank()
+            raw_me = (folded.get((account_id, cls)) or {}).get(role) or {}
+            me = _blank()
+            me.update({k: raw_me.get(k, 0) for k in me})
             if not me["bursts"]:
                 continue
             # Ohne einen einzigen Treffer-Stoss gibt es keine Visierlage zu
@@ -281,7 +329,9 @@ def compare_to_pool(folded, account_id, min_hit_bursts=POOL_MIN_HIT_BURSTS):
             for (acc, c), stat in folded.items():
                 if c != cls or acc == account_id:
                     continue
-                s = stat.get(role) or _blank()
+                raw = stat.get(role) or {}
+                s = _blank()
+                s.update({k: raw.get(k, 0) for k in s})
                 if not s["hitBursts"]:
                     continue
                 for k in pool:
@@ -289,7 +339,11 @@ def compare_to_pool(folded, account_id, min_hit_bursts=POOL_MIN_HIT_BURSTS):
                 if s["hitBursts"] >= min_hit_bursts:
                     per_player.append(first_shot_pct(s["hitBursts"],
                                                      s["firstShotHits"]))
-            my_pct = first_shot_pct(me["hitBursts"], me["firstShotHits"])
+            # Quote erst ab MIN_RATE_HIT_BURSTS; darunter traegt die Zeile
+            # nur ihre Rohzahlen, und die Anzeige zeigt "1/1" statt 100 %.
+            enough = me["hitBursts"] >= MIN_RATE_HIT_BURSTS
+            my_pct = (first_shot_pct(me["hitBursts"], me["firstShotHits"])
+                      if enough else None)
             pool_pct = first_shot_pct(pool["hitBursts"], pool["firstShotHits"])
             vals = sorted(v for v in per_player if v is not None)
             pctl = None
@@ -301,11 +355,28 @@ def compare_to_pool(folded, account_id, min_hit_bursts=POOL_MIN_HIT_BURSTS):
                 "bursts": me["bursts"],
                 "hitBursts": me["hitBursts"],
                 "firstShotPct": my_pct,
-                "avgHitIndex": avg_hit_index(me["hitBursts"],
-                                             me["hitIndexSum"]),
+                # Rohzahlen, damit eine Zeile unter der Schwelle nicht leer
+                # aussieht: "1/1" ist ablesbar, 100 % waere irrefuehrend.
+                "firstShotHits": me["firstShotHits"],
+                "ratedEnough": enough,
+                "avgHitIndex": (avg_hit_index(me["hitBursts"],
+                                              me["hitIndexSum"])
+                                if enough else None),
                 "poolFirstShotPct": pool_pct,
                 "poolAvgHitIndex": avg_hit_index(pool["hitBursts"],
                                                  pool["hitIndexSum"]),
+                "followUpPct": (follow_up_pct(me["shotsAfterHit"],
+                                              me["hitsAfterHit"])
+                                if enough else None),
+                "poolFollowUpPct": follow_up_pct(pool["shotsAfterHit"],
+                                                 pool["hitsAfterHit"]),
+                # Anteil der Stoesse, die ueberhaupt nichts trafen — die
+                # Signatur wahllosen Feuers. Braucht keine eigene Spalte,
+                # steckt in bursts und hitBursts.
+                "missBurstPct": (100.0 * (me["bursts"] - me["hitBursts"])
+                                 / me["bursts"]) if me["bursts"] else None,
+                "poolMissBurstPct": (100.0 * (pool["bursts"] - pool["hitBursts"])
+                                     / pool["bursts"]) if pool["bursts"] else None,
                 "poolHitBursts": pool["hitBursts"],
                 # Zahl der Spieler HINTER dem Perzentil, nicht im Pool:
                 # der Pool zaehlt jeden mit, das Perzentil nur die mit

@@ -37,6 +37,33 @@ GUN_CATEGORY = "Damage_Gun"
 GUN_CATEGORY_PREFIX = "Damage_Gun"
 
 
+#: Schaden aus Wurfgeraeten. Gemessen ueber 12 Prod-Matches sind das die
+#: Kategorien, die einem geworfenen oder abgeschossenen Sprengmittel
+#: gehoeren. Bewusst NICHT dabei: Blauzone, Rotzone, Fahrzeug, Benzinkanister
+#: und Gaspumpe — die richtet die Umgebung an, nicht ein Spieler, und der
+#: Kanister explodiert auch, wenn ihn jemand anders anschiesst.
+THROWN_CATEGORIES = frozenset((
+    "Damage_Explosion_Grenade",
+    "Damage_Explosion_C4",
+    "Damage_Explosion_StickyGrenade",
+    "Damage_Explosion_PanzerFaustWarhead",
+    "Damage_Explosion_PanzerFaustBackBlast",
+    "Damage_Molotov",
+    "Damage_BlueZoneGrenade",
+    "Damage_MeleeThrow",
+))
+
+
+def is_thrown_damage(category):
+    """True fuer Schaden aus einem geworfenen oder abgeschossenen
+    Sprengmittel.
+
+    Muss disjunkt zu is_gun_damage sein, sonst zaehlt ein Treffer doppelt.
+    Ein Test haelt beides gegen alle 16 gemessenen Kategorien fest.
+    """
+    return category in THROWN_CATEGORIES
+
+
 def is_gun_damage(category):
     """True fuer echten Waffenschaden. None gilt als Waffenschaden, weil
     aeltere Events die Kategorie nicht fuehren."""
@@ -331,7 +358,24 @@ def analyse(events) -> dict:
             # Selbstschaden wuerde die Trefferquote schoenen bzw. verfaelschen.
             if not name or name == victim.get("name"):
                 continue
-            if not is_gun_damage(e.get("damageTypeCategory")):
+            cat = e.get("damageTypeCategory")
+            if not is_gun_damage(cat):
+                # Wurfgeraete richten echten Schaden an und standen bisher
+                # mit Wuerfen und null Treffern in der Tabelle. Sie zaehlen
+                # NUR auf der Waffenzeile, nie in den Spielersummen: eine
+                # Granate, die drei Gegner erwischt, waere sonst ein Schuss
+                # mit drei Treffern und wuerde die Trefferquote verzerren.
+                # Die Aim-Auswertungen filtern die Zeilen ueber is_thrown.
+                if (is_thrown_damage(cat) and not _is_monster(victim)
+                        and victim.get("name") not in downed):
+                    tw = normalize_weapon(e.get("damageCauserName"))
+                    if tw:
+                        twp = players[name]["weapons"][tw]
+                        twp["hits"] += 1
+                        twp["damage"] += e.get("damage") or 0.0
+                        aid = e.get("attackId")
+                        if aid is not None and aid != -1:
+                            twp.setdefault("hit_attack_ids", set()).add(aid)
                 continue
             if _is_monster(victim):
                 continue          # Baer & Co. sind keine Zielleistung

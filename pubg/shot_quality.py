@@ -554,6 +554,7 @@ def _weapon_rows(conn, tenant_id, account_id, cutoff, to_iso=None):
         JOIN matches m ON m.match_id = w.match_id
                       AND m.tenant_id = w.tenant_id
         WHERE w.tenant_id = ? AND w.account_id = ?
+          AND NOT COALESCE(w.is_thrown, false)
           AND m.played_at >= ? AND {br_where}
     """
     params = [tenant_id, account_id, cutoff, *br_params]
@@ -814,7 +815,8 @@ def _weapon_totals_for(conn, tenant_id, account_ids, cutoff):
         FROM match_weapon_stats w
         JOIN matches m ON m.match_id = w.match_id
                       AND m.tenant_id = w.tenant_id
-        WHERE w.tenant_id = ? AND w.account_id IN ({marks})
+        WHERE w.tenant_id = ? AND NOT COALESCE(w.is_thrown, false)
+          AND w.account_id IN ({marks})
           AND m.played_at >= ? AND {br_where}
         GROUP BY w.account_id
     """, [tenant_id, *account_ids, cutoff, *br_params]).fetchall()
@@ -848,6 +850,7 @@ def lobby_reference(conn, tenant_id, min_matches=5, cutoff="1970-01-01T00:00:00Z
         JOIN matches m ON m.match_id = w.match_id
                       AND m.tenant_id = w.tenant_id
         WHERE w.tenant_id = ? AND w.is_bot = false
+          AND NOT COALESCE(w.is_thrown, false)
           AND m.played_at >= ? AND {br_where}
         GROUP BY w.account_id
         HAVING COUNT(DISTINCT w.match_id) >= ? AND SUM(w.shots) > 0
@@ -1085,7 +1088,11 @@ def burst_discipline(conn, tenant_id, account_id, cutoff="1970-01-01T00:00:00Z",
                SUM(w.bursts_react) AS bursts_react,
                SUM(w.hit_bursts_react) AS hit_bursts_react,
                SUM(w.first_shot_react) AS first_shot_react,
-               SUM(w.hit_index_sum_react) AS hit_index_sum_react
+               SUM(w.hit_index_sum_react) AS hit_index_sum_react,
+               SUM(w.shots_after_hit_init) AS shots_after_hit_init,
+               SUM(w.hits_after_hit_init) AS hits_after_hit_init,
+               SUM(w.shots_after_hit_react) AS shots_after_hit_react,
+               SUM(w.hits_after_hit_react) AS hits_after_hit_react
         FROM match_weapon_stats w
         JOIN matches m ON m.match_id = w.match_id
                       AND m.tenant_id = w.tenant_id

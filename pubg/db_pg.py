@@ -171,6 +171,17 @@ CREATE TABLE IF NOT EXISTS match_weapon_stats (
     hit_bursts_react     INTEGER DEFAULT 0,
     first_shot_react     INTEGER DEFAULT 0,
     hit_index_sum_react  INTEGER DEFAULT 0,
+    -- Schuesse und Treffer NACH dem ersten Treffer eines Stosses. Trennt
+    -- zwei Faehigkeiten, die die Trefferquote zusammenwirft: bis zum
+    -- ersten Treffer entscheidet die Visierlage, danach
+    -- Rueckstosskontrolle und Nachfuehren.
+    shots_after_hit_init  INTEGER DEFAULT 0,
+    hits_after_hit_init   INTEGER DEFAULT 0,
+    shots_after_hit_react INTEGER DEFAULT 0,
+    hits_after_hit_react  INTEGER DEFAULT 0,
+    -- Wurfgeraet? Eine Granate, die drei Gegner erwischt, waere sonst ein
+    -- Schuss mit drei Treffern und wuerde jede Trefferquote verzerren.
+    is_thrown    BOOLEAN DEFAULT FALSE,
     PRIMARY KEY (tenant_id, match_id, account_id, weapon)
 );
 ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS finisher_hits INTEGER DEFAULT 0;
@@ -184,6 +195,11 @@ ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS bursts_react INTEGER DEF
 ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS hit_bursts_react INTEGER DEFAULT 0;
 ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS first_shot_react INTEGER DEFAULT 0;
 ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS hit_index_sum_react INTEGER DEFAULT 0;
+ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS shots_after_hit_init INTEGER DEFAULT 0;
+ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS hits_after_hit_init INTEGER DEFAULT 0;
+ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS shots_after_hit_react INTEGER DEFAULT 0;
+ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS hits_after_hit_react INTEGER DEFAULT 0;
+ALTER TABLE match_weapon_stats ADD COLUMN IF NOT EXISTS is_thrown BOOLEAN DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS idx_mws_tenant_account
     ON match_weapon_stats(tenant_id, account_id);
 CREATE INDEX IF NOT EXISTS idx_mws_tenant_weapon
@@ -1370,7 +1386,9 @@ _MWS_COLS = ("account_id", "player_name", "team_id", "is_bot", "weapon",
              "head", "torso", "arm", "leg", "pelvis",
              "bursts_init", "hit_bursts_init", "first_shot_init",
              "hit_index_sum_init", "bursts_react", "hit_bursts_react",
-             "first_shot_react", "hit_index_sum_react")
+             "first_shot_react", "hit_index_sum_react",
+             "shots_after_hit_init", "hits_after_hit_init",
+             "shots_after_hit_react", "hits_after_hit_react", "is_thrown")
 
 
 def upsert_weapon_stats(conn, tenant_id: int, match_id: str, rows) -> None:

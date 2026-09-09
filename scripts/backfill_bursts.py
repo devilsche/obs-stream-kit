@@ -12,11 +12,16 @@ und enthalten damit wieder nur die Squad-Events. Solche Matches erkennt
 das Skript an der Zahl verschiedener Schuetzen und laesst sie aus, statt
 Zahlen zu schreiben, die aus zwei Spielern statt neunzig kommen.
 
-Angefasst werden ausschliesslich die acht Feuerstoss-Spalten. Der Rest
-von `match_weapon_stats` bleibt, wie der Ingest ihn geschrieben hat —
-ein Backfill soll nichts stillschweigend neu berechnen.
+**Zwei Modi.** Standard tastet nur die zwoelf Feuerstoss-Spalten an; der
+Rest bleibt, wie der Ingest ihn geschrieben hat — ein Backfill soll
+nichts stillschweigend neu berechnen. Mit `--rebuild` wird die ganze
+Zeile neu erzeugt. Das braucht es fuer Korrekturen, die ausserhalb der
+Feuerstoss-Spalten liegen: die durchschlagende Munition der Lynx AMR
+(Treffer galten als kein Waffenschaden) und der Wurfgeraet-Schaden samt
+`is_thrown`-Kennzeichnung.
 
     python3 scripts/backfill_bursts.py --tenant 1 [--limit N] [--dry-run]
+    python3 scripts/backfill_bursts.py --tenant 1 --rebuild --redo
 """
 import argparse
 import os
@@ -34,7 +39,9 @@ RAW_MIN_SHOOTERS = 20
 
 BURST_COLS = ("bursts_init", "hit_bursts_init", "first_shot_init",
               "hit_index_sum_init", "bursts_react", "hit_bursts_react",
-              "first_shot_react", "hit_index_sum_react")
+              "first_shot_react", "hit_index_sum_react",
+              "shots_after_hit_init", "hits_after_hit_init",
+              "shots_after_hit_react", "hits_after_hit_react")
 
 
 def shooter_count(raw):
@@ -42,6 +49,18 @@ def shooter_count(raw):
            for e in raw or [] if e.get("_T") == "LogPlayerAttack"}
     ids.discard(None)
     return len(ids)
+
+
+def full_rows_for_match(raw):
+    """Komplette match_weapon_stats-Zeilen aus einer Rohtelemetrie.
+
+    Dieselbe Kette wie im Poller, damit Backfill und Ingest nicht
+    auseinanderlaufen.
+    """
+    from pubg.burst_analysis import analyse_bursts
+    from pubg.telemetry_analysis import analyse
+    from pubg.weapon_performance import to_db_rows
+    return to_db_rows(analyse(raw), bursts=analyse_bursts(raw))
 
 
 def rows_for_match(raw):
@@ -76,6 +95,10 @@ def main(argv=None):
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--redo", action="store_true",
                     help="auch Matches, die schon Werte haben")
+    ap.add_argument("--rebuild", action="store_true",
+                    help="ganze Zeile neu schreiben statt nur die "
+                         "Feuerstoss-Spalten (fuer Korrekturen an Treffern, "
+                         "Schaden oder is_thrown)")
     args = ap.parse_args(argv)
 
     from pubg.archive_config import archive_cfg_for_tenant
@@ -126,6 +149,21 @@ def main(argv=None):
             stats["reconstructed"] += 1
             continue
         stats["raw"] += 1
+        if args.rebuild:
+            full = full_rows_for_match(blob)
+            if args.dry_run:
+                stats["rows"] += len(full)
+            else:
+                from pubg.db_pg import upsert_weapon_stats
+                upsert_weapon_stats(raw_conn, args.tenant, mid, full)
+                raw_conn.commit()
+                stats["rows"] += len(full)
+            if i % 25 == 0 or i == len(todo):
+                el = time.time() - t0
+                print(f"  [{i}/{len(todo)}] {el:.0f}s, {el/i:.1f}s/Match, "
+                      f"roh {stats['raw']}, rekonstruiert "
+                      f"{stats['reconstructed']}, Zeilen {stats['rows']}")
+            continue
         rows = rows_for_match(blob)
         if args.dry_run:
             stats["rows"] += len(rows)

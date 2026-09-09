@@ -160,9 +160,15 @@ def to_db_rows(analysis: dict, account_ids: dict = None,
                    "finisher_hits": w.get("finisherHits") or 0,
                    "finisher_shots": w.get("finisherShots") or 0,
                    "shots_in_fight": w.get("shotsInFight") or 0}
-            from pubg.burst_analysis import to_row_fields
+            from pubg.burst_analysis import (to_row_fields,
+                                             class_of_weapon_name)
             row.update(to_row_fields(
                 ((bursts or {}).get(name) or {}).get(weapon)))
+            # Wurfgeraete kennzeichnen: eine Granate, die drei Gegner
+            # erwischt, waere sonst ein Schuss mit drei Treffern und
+            # wuerde jede Trefferquote verzerren. Die Zeile bleibt, die
+            # Aim-Auswertungen filtern darauf.
+            row["is_thrown"] = class_of_weapon_name(weapon) == "throwable"
             for z, col in _ZONE_COL.items():
                 row[col] = zones.get(z, 0)
             rows.append(row)

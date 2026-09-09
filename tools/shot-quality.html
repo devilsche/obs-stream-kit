@@ -301,6 +301,9 @@
           <th title="Bursts you fired with this class">Bursts</th>
           <th title="Bursts where at least one shot connected — the base for
                      the columns to the right">With hit</th>
+          <th title="Bursts that hit nothing at all — the signature of
+                     spraying. Lower is better.">Hit nothing<span
+                class="goal" aria-hidden="true">↓</span></th>
           <th title="Share of connecting bursts where the FIRST shot already
                      landed. Higher is better.">1st shot lands<span
                 class="goal" aria-hidden="true">↑</span></th>
@@ -310,6 +313,10 @@
           <th title="Share of comparable players you beat">Pctl</th>
           <th title="Which shot of a burst landed first, on average. Lower is
                      better.">Ø shot<span class="goal" aria-hidden="true">↓</span></th>
+          <th title="Hit rate of the shots AFTER the first hit — the target is
+                     found and in your sights, so this is recoil control and
+                     tracking, not crosshair placement. Higher is better."
+              >After 1st hit<span class="goal" aria-hidden="true">↑</span></th>
         </tr></thead>
         <tbody id="burstRows"></tbody>
       </table>
@@ -638,9 +645,22 @@
           <td title="${esc(ROLE_HELP[r.role] || "")}">${esc(ROLE_LABEL[r.role] || r.role)}</td>
           <td>${n0(r.bursts)}</td>
           <td>${n0(r.hitBursts)}</td>
-          <td class="${thin.trim()}" title="${cell(r.firstShotPct, " %")} of ${
-            n0(r.hitBursts)} connecting bursts${r.reliable ? ""
-            : " — too few to read as a result"}">${cell(r.firstShotPct, " %")}</td>
+          <td class="${r.bursts >= 20 ? "" : "thin-rate"}" title="${
+            n0(r.bursts - r.hitBursts)} of ${n0(r.bursts)} bursts landed nothing${
+            r.poolMissBurstPct == null ? ""
+            : " · lobby " + cell(r.poolMissBurstPct, " %")}"
+            >${cell(r.missBurstPct, " %")}<span class="sub-inline"> vs ${
+            cell(r.poolMissBurstPct, " %")}</span></td>
+          ${r.ratedEnough
+            ? `<td class="${thin.trim()}" title="${cell(r.firstShotPct, " %")} of ${
+                n0(r.hitBursts)} connecting bursts${r.reliable ? ""
+                : " — too few to read as a result"}">${cell(r.firstShotPct, " %")}</td>`
+            /* Unter fuenf Treffer-Stoessen keine Quote: "1 von 1" ergaebe
+               100 % und laese sich als Befund. Die Rohzahl sagt dasselbe,
+               ohne etwas zu behaupten. */
+            : `<td class="thin-rate" title="only ${n0(r.hitBursts)} connecting burst${
+                r.hitBursts === 1 ? "" : "s"} — too few for a rate">${
+                n0(r.firstShotHits)}/${n0(r.hitBursts)}</td>`}
           <td title="${r.poolHitBursts ? n0(r.poolHitBursts)
             + " connecting bursts from other players" : "no comparable data"}"
             >${cell(r.poolFirstShotPct, " %")}</td>
@@ -651,6 +671,8 @@
             >${r.percentile == null ? "—" : Math.round(r.percentile)}</td>
           <td>${cell(r.avgHitIndex, "", 2)}<span class="sub-inline"> vs ${
             cell(r.poolAvgHitIndex, "", 2)}</span></td>
+          <td class="${thin.trim()}">${cell(r.followUpPct, " %")}<span
+            class="sub-inline"> vs ${cell(r.poolFollowUpPct, " %")}</span></td>
         </tr>`;
       }).join("");
 
@@ -665,7 +687,9 @@
         + "<b>Role</b> matters: whoever opens an exchange has an easier first "
         + "shot than whoever answers one, so both are counted separately — the "
         + "gap between your two rows says more than either number alone. "
-        + "A rate in <i>italics</i> rests on fewer than 20 connecting bursts. "
+        + "A rate in <i>italics</i> rests on fewer than 20 connecting bursts; "
+        + "below five you see the raw count instead, because \"1 of 1\" "
+        + "would read as 100 %. "
         + "Classes are not comparable with each other: a single-shot sniper "
         + "lands its first shot almost always, full-auto SMG fire rarely.";
     }
