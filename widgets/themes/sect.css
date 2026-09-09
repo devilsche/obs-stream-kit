@@ -1,9 +1,9 @@
 html[data-theme="sect"] {
   /* Schlaefer-Tempel / Sekte — Sumpfkraut & Obsidian: archaisch-hartes Gruen. */
-  --theme-primary:#4f9b3c; --theme-accent:#8fd24a; --theme-accent-2:#3a6b35; --theme-on-primary:#0a140a;
+  --theme-primary:#4f9b3c; --theme-accent:#8fd24a; --theme-accent-2:#549b4d; --theme-on-primary:#0a140a;
   --theme-bg:#0a0f09; --theme-surface:#141b12; --theme-surface-2:#1d251a; --theme-border:#496e3a;
-  --theme-text:#dde9d2; --theme-text-dim:#97aa8c; --theme-text-faint:#647760;
-  --theme-ok:#6fcf5f; --theme-warn:#cfe04a; --theme-danger:#c0322a;
+  --theme-text:#dde9d2; --theme-text-dim:#97aa8c; --theme-text-faint:#7b9176;
+  --theme-ok:#6fcf5f; --theme-warn:#cfe04a; --theme-danger:#dc6761;
   --theme-font-display:"Cinzel Decorative",serif; --theme-font-body:"Marcellus",serif; --theme-font-mono:"JetBrains Mono",monospace;
   --theme-stinger-font:"Cinzel Decorative",serif;
   --theme-radius:0px; --theme-border-width:2px; --theme-shadow:0 0 22px rgba(79,155,60,.16),0 14px 44px rgba(0,0,0,.7);

@@ -110,20 +110,37 @@ def rule_background(decls):
     return ("opaque", None)      # Gradient und Aehnliches: unbestimmt
 
 
+def style_blocks(path):
+    """(text, zeilenversatz) je CSS-Quelle in der Datei.
+
+    Bei HTML nur der Inhalt der <style>-Bloecke: laeuft der Regex ueber
+    das ganze Dokument, matcht er Attribute und Skript-Fragmente als
+    CSS-Regeln und meldet Zeilennummern, an denen kein CSS steht.
+    """
+    txt = path.read_text(encoding="utf-8", errors="replace")
+    if path.suffix == ".css":
+        return [(txt, 0)]
+    out = []
+    for m in re.finditer(r"<style[^>]*>([\s\S]*?)</style>", txt, re.I):
+        out.append((m.group(1), txt[:m.start(1)].count("\n")))
+    return out
+
+
 def find_colors(path):
     """(selektor, farbe, eigener_grund, zeile) je color-Deklaration."""
-    txt = path.read_text(encoding="utf-8", errors="replace")
     out = []
-    for m in re.finditer(
-            r"([^\n{};]*)\{([^}]*)\}", txt):
-        sel = m.group(1).strip().splitlines()[-1].strip() if m.group(1).strip() else "?"
-        decls = m.group(2)
-        c = re.search(r"(?<![-\w])color\s*:\s*"
-                      r"(#[0-9a-fA-F]{3,8}|var\(\s*--theme-[a-zA-Z0-9-]+)", decls)
-        if not c:
-            continue
-        line = txt[:m.start()].count("\n") + 1
-        out.append((sel, c.group(1), rule_background(decls), line))
+    for txt, offset in style_blocks(path):
+        for m in re.finditer(r"([^\n{};]*)\{([^}]*)\}", txt):
+            sel = (m.group(1).strip().splitlines()[-1].strip()
+                   if m.group(1).strip() else "?")
+            decls = m.group(2)
+            c = re.search(r"(?<![-\w])color\s*:\s*"
+                          r"(#[0-9a-fA-F]{3,8}|var\(\s*--theme-[a-zA-Z0-9-]+)",
+                          decls)
+            if not c:
+                continue
+            line = offset + txt[:m.start()].count("\n") + 1
+            out.append((sel, c.group(1), rule_background(decls), line))
     return out
 
 

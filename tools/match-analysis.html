@@ -24,7 +24,7 @@
     /* Nur Seiten-Layout und das, was die t-*-Bausteine nicht abdecken
        (Tabellen, Zonen-Balken). Karten, Ueberschriften und Stat-Bloecke
        kommen aus widgets/components/ ueber _blocks.css. */
-    body { padding: 20px; max-width: 1180px; margin: 0 auto;
+    body { padding: 20px; max-width: var(--t-page-max, 1280px); margin: 0 auto;
            background: var(--theme-bg); color: var(--theme-text); }
     .t-card { padding: 16px 18px; margin-bottom: 16px; }
     .bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;

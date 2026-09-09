@@ -22,7 +22,8 @@
     }
     /* .pubg-card traegt Flaeche, Rand, Radius und die Ornament-Ecken —
        hier nur Breite und das weitere Innenmass. */
-    .report { max-width: 1280px; margin: 0 auto; padding: 22px 32px; }
+    .report { max-width: var(--t-page-max, 1280px); margin: 0 auto;
+              padding: 22px 32px; }
     .report h1 {
       margin: 0 0 6px;
       color: var(--pubg-gold);
@@ -1307,7 +1308,7 @@
        ueber ein max-width am body und merken es deshalb nicht — hier
        traegt die Karte selbst die Breite. */
     .pick-bar { display: flex; flex-direction: column; gap: 8px;
-                max-width: 1280px; margin: 0 auto 14px;
+                max-width: var(--t-page-max, 1280px); margin: 0 auto 14px;
                 padding: 12px 14px; }
     .pick-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     .pick-label {
@@ -1327,7 +1328,9 @@
     .pick-bar .switch button:last-child { border-right: 0; }
     .pick-bar .switch button[aria-pressed="true"] {
       background: var(--theme-primary, #5e2a79);
-      color: var(--theme-text, #f4f0f8); font-weight: 600;
+      /* on-primary, nicht text: auf einem hellen Theme ist die
+         Textfarbe dunkel und stand auf dunklem primary (Kontrast 1,03). */
+      color: var(--theme-on-primary, #fff); font-weight: 600;
     }
     .pick-bar .switch button:hover { color: var(--theme-text, #f4f0f8); }
     .pick-step {
@@ -1361,7 +1364,8 @@
     .pick-apply {
       font: inherit; font-size: 0.84rem; min-height: 28px; padding: 3px 12px;
       cursor: pointer;
-      background: var(--theme-primary, #5e2a79); color: var(--theme-text, #f4f0f8);
+      background: var(--theme-primary, #5e2a79);
+      color: var(--theme-on-primary, #fff);
       border: 1px solid var(--theme-border, #3a2c48); border-radius: 4px;
     }
     .pick-pop {

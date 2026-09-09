@@ -1,0 +1,14 @@
+/* Seitenbreite der Tools an EINER Stelle.
+
+   Vorher stand sie in jedem Tool einzeln: drei auf 1180 px, zwei auf
+   1280 px. Der Unterschied faellt genau dann auf, wenn man zwei Tools
+   nebeneinander offen hat — und niemand denkt daran, alle fuenf zu
+   aendern. 1280, weil die Tabellen bis zu zehn Spalten tragen.
+
+   Nicht fuer Tools mit Vollbild-Inhalt (landing-spots mit seiner Karte)
+   und nicht fuer schmale Textseiten (g1r-diag): dort ist eine andere
+   Breite die richtige Antwort, keine Abweichung. */
+:root { --t-page-max: 1280px; }
+
+/* Als Klasse fuer Container, die selbst die Breite tragen. */
+.t-page { max-width: var(--t-page-max); margin-inline: auto; }

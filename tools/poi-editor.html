@@ -73,7 +73,9 @@
   select option:checked,
   select option:hover {
     background: var(--theme-primary);
-    color: var(--theme-accent);
+    /* accent waere hier falsch: in editorial ist accent derselbe Wert wie
+       primary, die Zeile waere unsichtbar. */
+    color: var(--theme-on-primary, #fff);
   }
   button:hover { background: color-mix(in srgb,var(--theme-primary) 85%,transparent); cursor: pointer; }
   button.secondary { color: var(--theme-text-dim); }
