@@ -567,3 +567,46 @@ def test_burst_discipline_is_empty_before_the_backfill(pg_compat):
     out = sq.burst_discipline(conn, t1, "account.me")
     assert out["rows"] == []
     assert out["matches"] == 0
+
+
+# ── Waffen-Mapping ─────────────────────────────────────────────────────────
+
+def test_attack_and_damage_ids_normalise_to_the_same_name():
+    """Attack meldet "Item_Weapon_X_C", TakeDamage "WeapX_C". Fallen die
+    auf verschiedene Namen, findet kein Treffer seinen Schuss und die
+    Waffe steht mit Stoessen und null Treffern da — an Prod-Daten
+    gemessen bei Lynx AMR (2.129 Stoesse, 0 Treffer) und Crossbow."""
+    from pubg.telemetry_analysis import normalize_weapon
+    from pubg.aggregations import WEAPON_NAMES
+    mismatched = []
+    for raw in WEAPON_NAMES:
+        if not raw.startswith("Weap") or not raw.endswith("_C"):
+            continue
+        stem = raw[len("Weap"):-len("_C")]
+        item = f"Item_Weapon_{stem}_C"
+        a, b = normalize_weapon(item), normalize_weapon(raw)
+        if a and b and a != b:
+            mismatched.append((raw, b, item, a))
+    assert not mismatched, (
+        "Attack- und Schadensform normalisieren verschieden: "
+        + "; ".join(f"{r}->{rb!r} vs {i}->{ia!r}"
+                    for r, rb, i, ia in mismatched[:8]))
+
+
+def test_compare_to_pool_drops_classes_without_a_single_hit_burst():
+    """Rauchgranaten, Schneebaelle und Flares erzeugen Attack-Events, aber
+    keinen Schusswaffenschaden — an Prod-Daten 27 % aller Stoesse. Ohne
+    Treffer-Stoss gibt es keine Visierlage zu messen."""
+    from pubg.burst_analysis import compare_to_pool
+    folded = {("me", "throwable"): {
+                  "initiated": {"bursts": 1163, "hitBursts": 0,
+                                "firstShotHits": 0, "hitIndexSum": 0},
+                  "reacting": {"bursts": 104, "hitBursts": 0,
+                               "firstShotHits": 0, "hitIndexSum": 0}},
+              ("me", "ar"): {
+                  "initiated": {"bursts": 100, "hitBursts": 40,
+                                "firstShotHits": 10, "hitIndexSum": 120},
+                  "reacting": {"bursts": 0, "hitBursts": 0,
+                               "firstShotHits": 0, "hitIndexSum": 0}}}
+    out = compare_to_pool(folded, "me")
+    assert [(r["class"], r["role"]) for r in out] == [("ar", "initiated")]

@@ -266,6 +266,16 @@ def compare_to_pool(folded, account_id, min_hit_bursts=POOL_MIN_HIT_BURSTS):
             me = (folded.get((account_id, cls)) or {}).get(role) or _blank()
             if not me["bursts"]:
                 continue
+            # Ohne einen einzigen Treffer-Stoss gibt es keine Visierlage zu
+            # messen. Das trifft vor allem Wurfgeraete und Werkzeug:
+            # Rauchgranaten, Schneebaelle, Aepfel und Flares erzeugen
+            # Attack-Events, aber keinen Schusswaffenschaden — an
+            # Prod-Daten 27 % aller Stoesse in Zeilen, die nichts aussagen.
+            # Der Filter ueber den Nenner trifft sie alle, ohne eine
+            # Klassen-Blacklist zu pflegen (die bei jeder neuen Waffe
+            # veralten wuerde).
+            if not me["hitBursts"]:
+                continue
             pool = _blank()
             per_player = []
             for (acc, c), stat in folded.items():
