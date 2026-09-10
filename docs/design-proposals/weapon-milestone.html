@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="entry">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weapon Milestone — mockup</title>
+<link rel="stylesheet" href="/widgets-static/_theme.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined">
+<style>
+  /* Vorschau fuer das Waffen-Milestone-Overlay. Der Rahmen ist ein
+     Werkzeug (Umschalter, Erklaerung), die Buehne darin zeigt das
+     1920x1080-Overlay auf 0.5 skaliert. Echte Zahlen aus dem Bestand,
+     damit Stellenzahl und Zeilenlaenge stimmen: eine 1.481.980 bricht
+     anders als eine 1.000. */
+  :root { --st: 0.5; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 22px;
+    background: var(--theme-page-bg, #0a0510);
+    color: var(--theme-text, #f4f0f8);
+    font-family: "DM Sans", system-ui, sans-serif; line-height: 1.5;
+  }
+  .skip { position: absolute; left: -9999px; background: var(--theme-accent, #f2b705);
+          color: #1a1020; padding: 8px 14px; border-radius: 4px; z-index: 20; }
+  .skip:focus { left: 12px; top: 12px; }
+  h1 { font-size: 1.3rem; margin: 0 0 4px; }
+  .lede { color: var(--theme-text-dim, #a99cb8); max-width: 66ch; margin: 0 0 20px; }
+  .panel {
+    background: var(--theme-surface, #241a2e);
+    border: 1px solid var(--theme-border, #3a2c48);
+    border-radius: var(--theme-radius, 8px);
+    padding: 14px 16px; margin-bottom: 18px;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .row + .row { margin-top: 10px; }
+  .rlabel { min-width: 74px; font-size: .78rem; letter-spacing: .04em;
+            text-transform: uppercase; color: var(--theme-text-dim, #a99cb8); }
+  .switch { display: inline-flex; border: 1px solid var(--theme-border, #3a2c48);
+            border-radius: 5px; overflow: hidden; }
+  .switch button {
+    font: inherit; font-size: .86rem; min-height: 28px; padding: 4px 11px;
+    background: transparent; color: var(--theme-text-dim, #a99cb8);
+    border: 0; border-right: 1px solid var(--theme-border, #3a2c48); cursor: pointer;
+  }
+  .switch button:last-child { border-right: 0; }
+  .switch button[aria-pressed="true"] {
+    background: var(--theme-primary, #5e2a79);
+    color: var(--theme-on-primary, #fff); font-weight: 600;
+  }
+  .switch button:hover { color: var(--theme-text, #f4f0f8); }
+  .switch button:focus-visible, .replay:focus-visible {
+    outline: 2px solid var(--theme-accent, #f2b705); outline-offset: 2px;
+  }
+  .replay {
+    font: inherit; font-size: .86rem; min-height: 28px; padding: 4px 12px;
+    background: var(--theme-primary, #5e2a79); color: var(--theme-on-primary, #fff);
+    border: 1px solid var(--theme-border, #3a2c48); border-radius: 5px; cursor: pointer;
+  }
+  .url { font-family: ui-monospace, monospace; font-size: .82rem;
+         color: var(--theme-accent-text, #f2b705); word-break: break-all; }
+
+  /* ── Buehne: 1920x1080 skaliert ───────────────────────────────────── */
+  .stage {
+    position: relative; width: calc(1920px * var(--st));
+    height: calc(1080px * var(--st)); max-width: 100%;
+    margin: 0 auto; overflow: hidden; border-radius: 6px;
+    border: 1px solid var(--theme-border, #3a2c48);
+    background: #05030a;
+  }
+  .canvas {
+    position: absolute; top: 0; left: 0; width: 1920px; height: 1080px;
+    transform: scale(var(--st)); transform-origin: top left;
+  }
+  /* Der Overlay-Inhalt selbst — bewusst dieselben Groessen wie im
+     bestehenden milestone-celebrate.html, damit der Look sitzt. */
+  .mc-bg {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center,
+      color-mix(in srgb, var(--theme-primary, #5e2a79) 85%, transparent) 0%,
+      color-mix(in srgb, #0a0510 92%, transparent) 45%,
+      color-mix(in srgb, #0a0510 98%, transparent) 90%);
+  }
+  .beam { position: absolute; left: 0; right: 0; height: 6px;
+          background: linear-gradient(90deg, transparent,
+            var(--theme-accent, #f2b705) 30%,
+            var(--theme-accent, #f2b705) 70%, transparent);
+          box-shadow: 0 0 24px color-mix(in srgb, var(--theme-accent, #f2b705) 70%, transparent); }
+  .beam.top { top: 60px; } .beam.bot { bottom: 60px; }
+  .icon {
+    position: absolute; left: 50%; top: 170px; transform: translateX(-50%);
+    font-size: 130px; color: var(--theme-accent, #f2b705);
+    filter: drop-shadow(0 0 30px color-mix(in srgb, var(--theme-accent, #f2b705) 80%, transparent));
+  }
+  .num {
+    position: absolute; left: 50%; top: 300px; transform: translateX(-50%);
+    font-size: 300px; font-weight: 900; letter-spacing: -8px; line-height: 1;
+    white-space: nowrap; color: var(--theme-text, #f4f0f8);
+    text-shadow: 0 0 60px color-mix(in srgb, var(--theme-accent, #f2b705) 45%, transparent);
+  }
+  /* Lange Zahlen kleiner: 1.500.000 ist doppelt so breit wie 1.000. */
+  .num[data-len="7"] { font-size: 210px; letter-spacing: -6px; }
+  .num[data-len="6"] { font-size: 240px; }
+  .num[data-len="5"] { font-size: 270px; }
+  .sub {
+    position: absolute; left: 0; right: 0; top: 700px; text-align: center;
+    font-size: 58px; font-weight: 700; letter-spacing: 2px;
+    color: var(--theme-accent, #f2b705); text-transform: uppercase;
+  }
+  .ctx {
+    position: absolute; left: 0; right: 0; top: 776px; text-align: center;
+    font-size: 30px; color: #cbbfd8; letter-spacing: 1px;
+  }
+  .stats {
+    position: absolute; left: 50%; top: 856px; transform: translateX(-50%);
+    display: grid; grid-template-columns: repeat(4, auto); gap: 10px 64px;
+  }
+  .stat { text-align: center; }
+  .stat .v { font-size: 46px; font-weight: 700; color: var(--theme-text, #f4f0f8); }
+  .stat .k { font-size: 20px; letter-spacing: 2px; text-transform: uppercase;
+             color: #9d90ab; }
+  .conf { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .c { position: absolute; width: 14px; height: 22px; border-radius: 2px;
+       animation: fall 2.6s linear infinite; }
+  @keyframes fall {
+    0%   { transform: translateY(-40px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(1140px) rotate(720deg); opacity: .2; }
+  }
+  @media (prefers-reduced-motion: reduce) { .c { animation: none; opacity: .35; } }
+
+
+  /* Konfetti: Position und Farbe ueber data-Attribute, damit weder ein
+     style-Attribut im Markup noch eine .style-Zuweisung im JS noetig ist.
+     20 Spalten und 26 Verzoegerungen reichen fuer 60 Schnipsel. */
+  .c[data-col="0"] { background: var(--theme-accent, #f2b705); }
+  .c[data-col="1"] { background: var(--theme-primary, #5e2a79); }
+  .c[data-col="2"] { background: var(--theme-accent-2, #c9a0dc); }
+  .c[data-x="0"] { left: 0%; }
+  .c[data-x="2"] { left: 2%; }
+  .c[data-x="3"] { left: 3%; }
+  .c[data-x="6"] { left: 6%; }
+  .c[data-x="7"] { left: 7%; }
+  .c[data-x="9"] { left: 9%; }
+  .c[data-x="10"] { left: 10%; }
+  .c[data-x="11"] { left: 11%; }
+  .c[data-x="13"] { left: 13%; }
+  .c[data-x="14"] { left: 14%; }
+  .c[data-x="17"] { left: 17%; }
+  .c[data-x="18"] { left: 18%; }
+  .c[data-x="21"] { left: 21%; }
+  .c[data-x="22"] { left: 22%; }
+  .c[data-x="24"] { left: 24%; }
+  .c[data-x="25"] { left: 25%; }
+  .c[data-x="28"] { left: 28%; }
+  .c[data-x="29"] { left: 29%; }
+  .c[data-x="32"] { left: 32%; }
+  .c[data-x="33"] { left: 33%; }
+  .c[data-x="35"] { left: 35%; }
+  .c[data-x="36"] { left: 36%; }
+  .c[data-x="37"] { left: 37%; }
+  .c[data-x="39"] { left: 39%; }
+  .c[data-x="40"] { left: 40%; }
+  .c[data-x="43"] { left: 43%; }
+  .c[data-x="44"] { left: 44%; }
+  .c[data-x="46"] { left: 46%; }
+  .c[data-x="47"] { left: 47%; }
+  .c[data-x="48"] { left: 48%; }
+  .c[data-x="50"] { left: 50%; }
+  .c[data-x="51"] { left: 51%; }
+  .c[data-x="54"] { left: 54%; }
+  .c[data-x="55"] { left: 55%; }
+  .c[data-x="58"] { left: 58%; }
+  .c[data-x="59"] { left: 59%; }
+  .c[data-x="61"] { left: 61%; }
+  .c[data-x="62"] { left: 62%; }
+  .c[data-x="65"] { left: 65%; }
+  .c[data-x="66"] { left: 66%; }
+  .c[data-x="69"] { left: 69%; }
+  .c[data-x="70"] { left: 70%; }
+  .c[data-x="72"] { left: 72%; }
+  .c[data-x="73"] { left: 73%; }
+  .c[data-x="74"] { left: 74%; }
+  .c[data-x="76"] { left: 76%; }
+  .c[data-x="77"] { left: 77%; }
+  .c[data-x="80"] { left: 80%; }
+  .c[data-x="81"] { left: 81%; }
+  .c[data-x="83"] { left: 83%; }
+  .c[data-x="84"] { left: 84%; }
+  .c[data-x="85"] { left: 85%; }
+  .c[data-x="87"] { left: 87%; }
+  .c[data-x="88"] { left: 88%; }
+  .c[data-x="91"] { left: 91%; }
+  .c[data-x="92"] { left: 92%; }
+  .c[data-x="95"] { left: 95%; }
+  .c[data-x="96"] { left: 96%; }
+  .c[data-x="98"] { left: 98%; }
+  .c[data-x="99"] { left: 99%; }
+  .c[data-d="0"] { animation-delay: 0.0s; }
+  .c[data-d="13"] { animation-delay: 1.3s; }
+  table.cmp { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  table.cmp th, table.cmp td { text-align: left; padding: 6px 10px;
+    border-bottom: 1px solid var(--theme-border, #3a2c48); vertical-align: top; }
+  table.cmp th { color: var(--theme-text-dim, #a99cb8); font-weight: 600; }
+  table.cmp td.n { text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<a class="skip" href="#stage">Skip to the preview</a>
+<h1>Weapon Milestone — mockup</h1>
+<p class="lede">Vollbild-Overlay fuer Waffen- und Wurf-Meilensteine, im Look
+  des bestehenden <code>milestone-celebrate.html</code>. Die Buehne zeigt
+  1920&times;1080 auf die Haelfte skaliert. Alle Zahlen sind echt: M416-Werte
+  aus <code>weapon_mastery</code> der PUBG-API, Wurf-Werte aus der
+  Telemetrie.</p>
+
+<div class="panel">
+  <div class="row">
+    <span class="rlabel" id="lblCase">Anlass</span>
+    <span class="switch" role="group" aria-labelledby="lblCase" id="caseSwitch"></span>
+  </div>
+  <div class="row">
+    <span class="rlabel">URL</span>
+    <span class="url" id="url"></span>
+    <button type="button" class="replay" id="replay">Animation neu</button>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <div class="canvas" id="canvas"></div>
+</div>
+
+<div class="panel">
+  <h2 class="pt">Was als naechstes faellt</h2>
+  <table class="cmp">
+    <thead><tr><th>Meilenstein</th><th class="n">Stand</th><th class="n">Rest</th>
+      <th>Quelle</th></tr></thead>
+    <tbody id="soon"></tbody>
+  </table>
+</div>
+<script>
+// Echte Werte: M416/Mini 14 aus weapon_mastery (PUBG-API, alltime),
+// Wurf-Werte aus match_weapon_stats (Telemetrie, 96 % der Matches).
+const CASES = [
+  { key: "dmg",   label: "Waffen-Schaden",
+    icon: "local_fire_department", n: 250000,
+    sub: "M416 Damage", ctx: "235.336 → 250.000 · Level 99 · Tier 6",
+    url: "?weapon=M416&metric=damage&n=250000",
+    stats: [["1.451", "Kills"], ["2.059", "Defeats"], ["1.059", "Headshots"],
+            ["440 m", "Longest"]] },
+  { key: "kills", label: "Waffen-Kills",
+    icon: "target", n: 1500,
+    sub: "M416 Kills", ctx: "1.451 → 1.500 · beste Waffe deiner Karriere",
+    url: "?weapon=M416&metric=kills&n=1500",
+    stats: [["235.336", "Damage"], ["1.299", "Knocks"], ["73 %", "Headshot/Kill"],
+            ["6", "Best match"]] },
+  { key: "throws", label: "Würfe",
+    icon: "sports_baseball", n: 1000,
+    sub: "Grenades thrown", ctx: "889 → 1.000 · in 447 Matches · 47 Kills",
+    url: "?weapon=Granate&metric=throws&n=1000",
+    stats: [["140", "Landed"], ["12,4 %", "Hit rate"], ["6.068", "Damage"],
+            ["43,3", "Dmg/hit"]] },
+  { key: "total", label: "Gesamt-Schaden",
+    icon: "military_tech", n: 1500000,
+    sub: "Lifetime weapon damage", ctx: "1.481.980 → 1.500.000 · über 61 Waffen",
+    url: "?metric=damage&n=1500000",
+    stats: [["M416", "Top weapon"], ["235.336", "with M416"],
+            ["6.243", "Kills total"], ["61", "Weapons"]] },
+  { key: "record", label: "Persönlicher Rekord",
+    icon: "trending_up", n: 1114,
+    sub: "New record · Mini 14", ctx: "bester Match-Schaden mit einer Waffe · vorher 1.089",
+    url: "?weapon=Mini%2014&metric=record&n=1114",
+    stats: [["7", "Kills"], ["609 m", "Longest"], ["902", "Headshots"],
+            ["196.243", "Lifetime"]] },
+];
+
+const SOON = [
+  ["M416-Schaden 250.000", "235.336", "14.664", "API"],
+  ["Mini 14 auf 200.000", "196.243", "3.757", "API"],
+  ["M416-Kills 1.500", "1.451", "49", "API"],
+  ["Granaten geworfen 1.000", "889", "111", "Telemetrie"],
+  ["Granaten-Schaden 10.000", "6.068", "3.932", "Telemetrie"],
+  ["Gesamt-Waffenschaden 1.500.000", "1.481.980", "18.020", "API"],
+];
+
+const fmt = (n) => n.toLocaleString("de-DE");
+let active = CASES[0].key;
+
+function paintSwitch() {
+  document.getElementById("caseSwitch").innerHTML = CASES.map(c =>
+    `<button type="button" data-k="${c.key}"`
+    + ` aria-pressed="${c.key === active}">${c.label}</button>`).join("");
+}
+
+function confetti() {
+  // Konfetti in Theme-Farben, feste Positionen statt Zufall — ein Mockup
+  // soll bei jedem Blick gleich aussehen.
+  const cols = ["--theme-accent", "--theme-primary", "--theme-accent-2"];
+  let out = "";
+  for (let i = 0; i < 60; i++) {
+    const left = (i * 37) % 100;
+    const delay = ((i * 13) % 26) / 10;
+    const col = cols[i % cols.length];
+    out += `<i class="c" data-i="${i}"></i>`;
+  }
+  return `<div class="conf">${out}</div>`;
+}
+
+function paintStage() {
+  const c = CASES.find(x => x.key === active) || CASES[0];
+  const num = fmt(c.n);
+  document.getElementById("canvas").innerHTML =
+    `<div class="mc-bg"></div>`
+    + `<div class="beam top"></div><div class="beam bot"></div>`
+    + confetti()
+    + `<div class="icon"><span class="material-symbols-outlined"`
+    + ` aria-hidden="true">${c.icon}</span></div>`
+    + `<div class="num" data-len="${String(c.n).length}">${num}</div>`
+    + `<div class="sub">${c.sub}</div>`
+    + `<div class="ctx">${c.ctx}</div>`
+    + `<div class="stats">` + c.stats.map(([v, k]) =>
+        `<div class="stat"><div class="v">${v}</div>`
+        + `<div class="k">${k}</div></div>`).join("") + `</div>`;
+  document.getElementById("url").textContent =
+    "/widgets/pubg/weapon-milestone.html" + c.url + "&wait=15";
+  // Konfetti-Positionen und -Farben ueber data-Attribute, damit kein
+  // style-Attribut im Markup landet.
+  [...document.querySelectorAll(".c")].forEach((el, i) => {
+    el.setAttribute("data-col", i % 3);
+    el.setAttribute("data-x", (i * 37) % 100);
+    el.setAttribute("data-d", ((i * 13) % 26));
+  });
+}
+
+document.getElementById("caseSwitch").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-k]");
+  if (!b) return;
+  active = b.dataset.k;
+  paintSwitch(); paintStage();
+});
+document.getElementById("replay").addEventListener("click", paintStage);
+
+document.getElementById("soon").innerHTML = SOON.map(
+  ([m, s, r, q]) => `<tr><td>${m}</td><td class="n">${s}</td>`
+  + `<td class="n">${r}</td><td>${q}</td></tr>`).join("");
+
+paintSwitch();
+paintStage();
+</script>
+</body>
+</html>
