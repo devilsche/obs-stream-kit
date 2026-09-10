@@ -435,8 +435,17 @@
               title="${(p.zones||{}).HeadShot || 0}/${p.hits}">${p.hits ? p.headshotRate.toFixed(1) : "—"}</td>
           <td class="num${p.hits < WEAK_SAMPLE ? " weak-sample" : ""}"
               title="${p.hits} hits">${p.hits ? limbPct(p).toFixed(1) : "—"}</td>
-          <td class="num">${p.kills}</td><td class="num">${Math.round(p.damage)}</td>
-          <td>${badge}</td></tr>`;
+          <td class="num">${p.kills}</td>`
+          /* damageTotal, nicht damage: die Spalte soll zeigen, was PUBG
+             und op.gg zeigen. "damage" ist die Grundlage der Quoten
+             links und laesst Wurfschaden bewusst aus. Faellt das Feld
+             (aelterer Cache-Eintrag), traegt damage weiter. */
+          + `<td class="num" title="Guns plus utility, as PUBG counts it"
+                 >${Math.round(p.damageTotal != null ? p.damageTotal : p.damage)}</td>`
+          + `<td class="num${p.thrownDamage ? "" : " weak-sample"}"
+                 title="${p.thrownHits || 0} throws landed"
+                 >${p.thrownDamage ? Math.round(p.thrownDamage) : "—"}</td>`
+          + `<td>${badge}</td></tr>`;
       }).join("");
       document.getElementById("tableCard").hidden = false;
     }
