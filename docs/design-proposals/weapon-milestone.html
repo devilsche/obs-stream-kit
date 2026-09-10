@@ -340,6 +340,119 @@
   .canvas[data-design="b"] .ctx { top: 802px; }
   .canvas[data-design="b"] .stats { top: 888px; }
 
+
+  /* ── Design D: die grosse Stufe ────────────────────────────────────────
+     Fuer halbe und ganze Millionen. Ein 100k-Schritt und die erste
+     Million duerfen nicht gleich aussehen — sonst ist das Besondere
+     nicht besonders.
+
+     Drei Unterschiede zu B: die Zahl steht in Millionen-Schreibweise
+     ("2,5" statt "2.500.000", weil ein Zaehlerstand kein Meilenstein
+     ist), der Untertitel nennt die Groessenordnung in Worten, und es
+     gibt einen zweiten Konfetti-Burst nach 1,5 s. */
+  .canvas[data-design="d"] .icon { display: none; }
+  .canvas[data-design="d"] .bigwrap {
+    position: absolute; left: 50%; top: 250px;
+    transform: translate(-50%, 90px) scale(.45);
+    display: flex; align-items: baseline; gap: 28px;
+    opacity: 0;
+    animation: popIn 1s cubic-bezier(.2,1.7,.32,1) .8s forwards;
+  }
+  .canvas[data-design="d"] .bignum {
+    font-size: 380px; font-weight: 900; letter-spacing: -14px; line-height: .92;
+    color: var(--theme-text, #f4f0f8);
+    text-shadow: 0 0 90px color-mix(in srgb, var(--theme-accent, #f2b705) 60%, transparent);
+  }
+  .canvas[data-design="d"] .bigunit {
+    font-size: 118px; font-weight: 900; letter-spacing: 10px;
+    text-transform: uppercase; color: var(--theme-accent, #f2b705);
+  }
+  .canvas[data-design="d"] .words {
+    position: absolute; left: 0; right: 0; top: 690px; text-align: center;
+    font-size: 74px; font-weight: 900; letter-spacing: 12px;
+    text-transform: uppercase; color: var(--theme-accent, #f2b705);
+    opacity: 0; transform: translateY(24px);
+    animation: riseIn .7s ease-out 1.6s forwards;
+  }
+  .canvas[data-design="d"] .sub { top: 800px; font-size: 40px;
+                                  color: #cbbfd8; letter-spacing: 4px; }
+  .canvas[data-design="d"] .ctx { display: none; }
+  .canvas[data-design="d"] .stats { top: 884px; }
+  .canvas[data-design="d"] .num, .canvas[data-design="d"] .wtag { display: none; }
+  /* Ein Lichtring, der einmal aufgeht — nur hier, damit die Stufe
+     auch ohne die Zahl erkennbar ist. */
+  .canvas[data-design="d"] .ring {
+    position: absolute; left: 50%; top: 430px;
+    width: 520px; height: 520px; margin: -260px 0 0 -260px;
+    border: 5px solid color-mix(in srgb, var(--theme-accent, #f2b705) 70%, transparent);
+    border-radius: 50%; opacity: 0;
+    animation: ringOut 1.6s cubic-bezier(.15,.8,.3,1) .9s forwards;
+  }
+  @keyframes ringOut {
+    0%   { transform: scale(.2); opacity: 0; }
+    25%  { opacity: .9; }
+    100% { transform: scale(2.6); opacity: 0; }
+  }
+  /* Zweiter Burst */
+  .c2 { position: absolute; left: 50%; top: 40%; width: 15px; height: 23px;
+        border-radius: 2px; opacity: 0;
+        animation: burst 1.8s cubic-bezier(.12,.8,.3,1) forwards; }
+  .c2[data-b2="0"] { --dx: 516px; --dy: 44px; --rot: 540deg; animation-delay: 1.50s; }
+  .c2[data-b2="1"] { --dx: 612px; --dy: 113px; --rot: 713deg; animation-delay: 1.55s; }
+  .c2[data-b2="2"] { --dx: 688px; --dy: 201px; --rot: 886deg; animation-delay: 1.60s; }
+  .c2[data-b2="3"] { --dx: 740px; --dy: 305px; --rot: 1059deg; animation-delay: 1.65s; }
+  .c2[data-b2="4"] { --dx: 763px; --dy: 422px; --rot: 1232deg; animation-delay: 1.70s; }
+  .c2[data-b2="5"] { --dx: 433px; --dy: 315px; --rot: 1405deg; animation-delay: 1.75s; }
+  .c2[data-b2="6"] { --dx: 434px; --dy: 418px; --rot: 1578deg; animation-delay: 1.50s; }
+  .c2[data-b2="7"] { --dx: 402px; --dy: 525px; --rot: 671deg; animation-delay: 1.55s; }
+  .c2[data-b2="8"] { --dx: 336px; --dy: 633px; --rot: 844deg; animation-delay: 1.60s; }
+  .c2[data-b2="9"] { --dx: 134px; --dy: 422px; --rot: 1017deg; animation-delay: 1.65s; }
+  .c2[data-b2="10"] { --dx: 60px; --dy: 509px; --rot: 1190deg; animation-delay: 1.70s; }
+  .c2[data-b2="11"] { --dx: -45px; --dy: 589px; --rot: 1363deg; animation-delay: 1.75s; }
+  .c2[data-b2="12"] { --dx: -181px; --dy: 657px; --rot: 1536deg; animation-delay: 1.50s; }
+  .c2[data-b2="13"] { --dx: -196px; --dy: 404px; --rot: 629deg; animation-delay: 1.55s; }
+  .c2[data-b2="14"] { --dx: -323px; --dy: 452px; --rot: 802deg; animation-delay: 1.60s; }
+  .c2[data-b2="15"] { --dx: -472px; --dy: 482px; --rot: 975deg; animation-delay: 1.65s; }
+  .c2[data-b2="16"] { --dx: -637px; --dy: 491px; --rot: 1148deg; animation-delay: 1.70s; }
+  .c2[data-b2="17"] { --dx: -461px; --dy: 270px; --rot: 1321deg; animation-delay: 1.75s; }
+  .c2[data-b2="18"] { --dx: -605px; --dy: 266px; --rot: 1494deg; animation-delay: 1.50s; }
+  .c2[data-b2="19"] { --dx: -754px; --dy: 238px; --rot: 587deg; animation-delay: 1.55s; }
+  .c2[data-b2="20"] { --dx: -901px; --dy: 187px; --rot: 760deg; animation-delay: 1.60s; }
+  .c2[data-b2="21"] { --dx: -586px; --dy: 62px; --rot: 933deg; animation-delay: 1.65s; }
+  .c2[data-b2="22"] { --dx: -706px; --dy: 7px; --rot: 1106deg; animation-delay: 1.70s; }
+  .c2[data-b2="23"] { --dx: -813px; --dy: -70px; --rot: 1279deg; animation-delay: 1.75s; }
+  .c2[data-b2="24"] { --dx: -901px; --dy: -167px; --rot: 1452deg; animation-delay: 1.50s; }
+  .c2[data-b2="25"] { --dx: -540px; --dy: -158px; --rot: 545deg; animation-delay: 1.55s; }
+  .c2[data-b2="26"] { --dx: -602px; --dy: -248px; --rot: 718deg; animation-delay: 1.60s; }
+  .c2[data-b2="27"] { --dx: -636px; --dy: -352px; --rot: 891deg; animation-delay: 1.65s; }
+  .c2[data-b2="28"] { --dx: -640px; --dy: -466px; --rot: 1064deg; animation-delay: 1.70s; }
+  .c2[data-b2="29"] { --dx: -340px; --dy: -327px; --rot: 1237deg; animation-delay: 1.75s; }
+  .c2[data-b2="30"] { --dx: -326px; --dy: -426px; --rot: 1410deg; animation-delay: 1.50s; }
+  .c2[data-b2="31"] { --dx: -280px; --dy: -527px; --rot: 1583deg; animation-delay: 1.55s; }
+  .c2[data-b2="32"] { --dx: -199px; --dy: -626px; --rot: 676deg; animation-delay: 1.60s; }
+  .c2[data-b2="33"] { --dx: -47px; --dy: -397px; --rot: 849deg; animation-delay: 1.65s; }
+  .c2[data-b2="34"] { --dx: 37px; --dy: -477px; --rot: 1022deg; animation-delay: 1.70s; }
+  .c2[data-b2="35"] { --dx: 151px; --dy: -546px; --rot: 1195deg; animation-delay: 1.75s; }
+  .c2[data-b2="36"] { --dx: 292px; --dy: -602px; --rot: 1368deg; animation-delay: 1.50s; }
+  .c2[data-b2="37"] { --dx: 251px; --dy: -351px; --rot: 1541deg; animation-delay: 1.55s; }
+  .c2[data-b2="38"] { --dx: 381px; --dy: -389px; --rot: 634deg; animation-delay: 1.60s; }
+  .c2[data-b2="39"] { --dx: 529px; --dy: -408px; --rot: 807deg; animation-delay: 1.65s; }
+  .c2[data-b2="40"] { --dx: 690px; --dy: -405px; --rot: 980deg; animation-delay: 1.70s; }
+  .c2[data-b2="41"] { --dx: 468px; --dy: -206px; --rot: 1153deg; animation-delay: 1.75s; }
+  .c2[data-b2="42"] { --dx: 607px; --dy: -192px; --rot: 1326deg; animation-delay: 1.50s; }
+  .c2[data-b2="43"] { --dx: 747px; --dy: -155px; --rot: 1499deg; animation-delay: 1.55s; }
+  .c2[data-b2="44"] { --dx: 882px; --dy: -94px; --rot: 592deg; animation-delay: 1.60s; }
+  .c2[data-b2="45"] { --dx: 545px; --dy: -6px; --rot: 765deg; animation-delay: 1.65s; }
+  @media (prefers-reduced-motion: reduce) {
+    .canvas[data-design="d"] .bigwrap, .canvas[data-design="d"] .words {
+      animation: none; opacity: 1; transform: translateX(-50%);
+    }
+    .canvas[data-design="d"] .words { transform: none; }
+    .canvas[data-design="d"] .ring { animation: none; opacity: .3;
+                                      transform: scale(1.4); }
+    .c2 { animation: none; opacity: .3; }
+  }
+
   /* ── Design C: Leiste unten, kein Vollbild ────────────────────────────
      Fuer Meilensteine, die oft fallen. Ein Vollbild-Overlay bei jedem
      1000er Schaden wuerde den Stream zudecken; diese Leiste laeuft
@@ -465,6 +578,20 @@ const CASES = [
     url: "?metric=damage&n=1500000",
     stats: [["M416", "Top weapon"], ["6.243", "Kills"],
             ["61", "Weapons"], ["1.152", "Matches"]] },
+  { key: "million", label: "Million", icon: "workspace_premium",
+    n: 2500000, big: "2,5", unit: "Mio", words: "two and a half million",
+    weapon: null, sub: "Lifetime weapon damage · guns and utility",
+    metric: "Lifetime weapon damage", ctx: "über 61 Waffen · 14.958 Kills",
+    url: "?metric=damage&n=2500000&tier=big",
+    stats: [["2.491.246", "Official"], ["20.531", "Ranked"],
+            ["M416", "Top weapon"], ["61", "Weapons"]] },
+  { key: "half", label: "Halbe Million", icon: "military_tech",
+    n: 500000, big: "500", unit: "K", words: "half a million",
+    weapon: "M416", sub: "M416 damage · guns only",
+    metric: "M416 damage", ctx: "Level 99 · 3.156 Kills",
+    url: "?weapon=M416&metric=damage&n=500000&tier=big",
+    stats: [["432.503", "Official"], ["3.156", "Kills"],
+            ["2.201", "Headshots"], ["10", "Best match"]] },
   // Der einzige Fall mit Vorher-Wert.
   { key: "record", metric: "New match record", label: "Match-Rekord", icon: "trending_up",
     n: 1114, prev: 1089, weapon: "Mini 14", sub: "New record · Mini 14",
@@ -482,6 +609,7 @@ const DESIGNS = [
   { key: "a", label: "A · Zahl mittig" },
   { key: "b", label: "B · Waffe + Zahl" },
   { key: "c", label: "C · Leiste unten" },
+  { key: "d", label: "D · Groß (Million)" },
 ];
 
 const SOON = [
@@ -543,6 +671,21 @@ function paintStage() {
       + `<span class="bar-num">${num}</span>`
       + `<span class="bar-txt"><span class="bar-sub">${c.sub}</span>`
       + `<span class="bar-ctx">${ctx}</span></span></div>`;
+  } else if (design === "d") {
+    // Millionen-Schreibweise: "2,5 Mio" liest sich als Meilenstein,
+    // "2.500.000" als Zaehlerstand. Faellt der Anlass ohne big-Feld
+    // hierher, bleibt die normale Zahl.
+    const big = c.big || fmt(c.n), unit = c.unit || "";
+    inner += `<div class="ring"></div>`
+      + Array.from({length: 46}, (_, i) =>
+          `<i class="c2" data-b2="${i}" data-col="${i % 4}"></i>`).join("")
+      + `<div class="bigwrap"><span class="bignum">${big}</span>`
+      + (unit ? `<span class="bigunit">${unit}</span>` : "") + `</div>`
+      + (c.words ? `<div class="words">${c.words}</div>` : "")
+      + `<div class="sub">${c.sub}</div>`
+      + `<div class="stats">` + c.stats.map(([v, k]) =>
+          `<div class="stat"><div class="v">${v}</div>`
+          + `<div class="k">${k}</div></div>`).join("") + `</div>`;
   } else if (design === "b") {
     // Zahl mittig in einem Wrapper, damit das Waffen-Schild relativ
     // dazu sitzen kann. Der Untertitel nennt nur die Metrik — die Waffe
@@ -576,7 +719,8 @@ function paintStage() {
   document.getElementById("url").textContent =
     "/widgets/pubg/weapon-milestone.html" + c.url
     + (design === "a" ? "" : `&design=${design}`)
-    + (design === "b" && tag !== "plain" ? `&tag=${tag}` : "") + "&wait=15";
+    + (design === "b" && tag !== "plain" ? `&tag=${tag}` : "")
+    + (design === "d" ? "&wait=25" : "&wait=15");
 }
 
 document.getElementById("caseSwitch").addEventListener("click", (e) => {
