@@ -57,6 +57,8 @@
     background: var(--theme-primary, #5e2a79); color: var(--theme-on-primary, #fff);
     border: 1px solid var(--theme-border, #3a2c48); border-radius: 5px; cursor: pointer;
   }
+  .note-c { color: var(--theme-text-dim, #a99cb8); font-size: .86rem;
+            max-width: 60ch; }
   .url { font-family: ui-monospace, monospace; font-size: .82rem;
          color: var(--theme-accent-text, #f2b705); word-break: break-all; }
 
@@ -119,84 +121,209 @@
   .stat .v { font-size: 46px; font-weight: 700; color: var(--theme-text, #f4f0f8); }
   .stat .k { font-size: 20px; letter-spacing: 2px; text-transform: uppercase;
              color: #9d90ab; }
+
+  /* ── Konfetti ──────────────────────────────────────────────────────────
+     Zwei Lagen: ein Burst aus der Mitte im Moment des Aufploppens, danach
+     ein Nachregen mit seitlichem Drift. Vorher fielen die Schnipsel in
+     einer Reihe senkrecht herunter — das sah nach Ladebalken aus, nicht
+     nach Feier. Richtung, Weite und Drehung stehen als data-Attribute in
+     CSS-Regeln, damit kein style-Attribut ins Markup muss. */
   .conf { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-  .c { position: absolute; width: 14px; height: 22px; border-radius: 2px;
-       animation: fall 2.6s linear infinite; }
-  @keyframes fall {
-    0%   { transform: translateY(-40px) rotate(0deg); opacity: 1; }
-    100% { transform: translateY(1140px) rotate(720deg); opacity: .2; }
+  .c, .r { position: absolute; border-radius: 2px; opacity: 0; }
+  .c { left: 50%; top: 44%; width: 13px; height: 20px;
+       animation: burst 1.5s cubic-bezier(.15,.75,.35,1) forwards; }
+  .r { top: -30px; width: 11px; height: 17px;
+       animation: rain 3s linear infinite; }
+  @keyframes burst {
+    0%   { transform: translate(-50%, -50%) rotate(0deg) scale(.4); opacity: 0; }
+    12%  { opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--dx)),
+                                calc(-50% + var(--dy)))
+                      rotate(var(--rot)) scale(1); opacity: 0; }
   }
-  @media (prefers-reduced-motion: reduce) { .c { animation: none; opacity: .35; } }
+  @keyframes rain {
+    0%   { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+    8%   { opacity: 1; }
+    100% { transform: translate(var(--drift), 1160px) rotate(var(--rot));
+           opacity: .15; }
+  }
+  .c[data-col="0"], .r[data-col="0"] { background: var(--theme-accent, #f2b705); }
+  .c[data-col="1"], .r[data-col="1"] { background: var(--theme-accent-2, #c9a0dc); }
+  .c[data-col="2"], .r[data-col="2"] { background: #fff; }
+  .c[data-col="3"], .r[data-col="3"] { background: var(--theme-primary, #5e2a79); }
+  .c[data-b="0"] { --dx: 380px; --dy: 0px; --rot: 360deg; animation-delay: 0.00s; }
+  .c[data-b="1"] { --dx: 469px; --dy: 64px; --rot: 497deg; animation-delay: 0.04s; }
+  .c[data-b="2"] { --dx: 535px; --dy: 150px; --rot: 634deg; animation-delay: 0.09s; }
+  .c[data-b="3"] { --dx: 631px; --dy: 165px; --rot: 771deg; animation-delay: 0.14s; }
+  .c[data-b="4"] { --dx: 661px; --dy: 282px; --rot: 908deg; animation-delay: 0.18s; }
+  .c[data-b="5"] { --dx: 334px; --dy: 212px; --rot: 1045deg; animation-delay: 0.22s; }
+  .c[data-b="6"] { --dx: 415px; --dy: 251px; --rot: 1182deg; animation-delay: 0.27s; }
+  .c[data-b="7"] { --dx: 405px; --dy: 356px; --rot: 419deg; animation-delay: 0.00s; }
+  .c[data-b="8"] { --dx: 353px; --dy: 465px; --rot: 556deg; animation-delay: 0.04s; }
+  .c[data-b="9"] { --dx: 207px; --dy: 258px; --rot: 693deg; animation-delay: 0.09s; }
+  .c[data-b="10"] { --dx: 169px; --dy: 346px; --rot: 830deg; animation-delay: 0.14s; }
+  .c[data-b="11"] { --dx: 91px; --dy: 432px; --rot: 967deg; animation-delay: 0.18s; }
+  .c[data-b="12"] { --dx: 122px; --dy: 499px; --rot: 1104deg; animation-delay: 0.22s; }
+  .c[data-b="13"] { --dx: -4px; --dy: 274px; --rot: 1241deg; animation-delay: 0.27s; }
+  .c[data-b="14"] { --dx: -94px; --dy: 337px; --rot: 478deg; animation-delay: 0.00s; }
+  .c[data-b="15"] { --dx: -100px; --dy: 408px; --rot: 615deg; animation-delay: 0.04s; }
+  .c[data-b="16"] { --dx: -237px; --dy: 453px; --rot: 752deg; animation-delay: 0.09s; }
+  .c[data-b="17"] { --dx: -400px; --dy: 473px; --rot: 889deg; animation-delay: 0.14s; }
+  .c[data-b="18"] { --dx: -223px; --dy: 278px; --rot: 1026deg; animation-delay: 0.18s; }
+  .c[data-b="19"] { --dx: -354px; --dy: 297px; --rot: 1163deg; animation-delay: 0.22s; }
+  .c[data-b="20"] { --dx: -500px; --dy: 288px; --rot: 400deg; animation-delay: 0.27s; }
+  .c[data-b="21"] { --dx: -565px; --dy: 341px; --rot: 537deg; animation-delay: 0.00s; }
+  .c[data-b="22"] { --dx: -361px; --dy: 146px; --rot: 674deg; animation-delay: 0.04s; }
+  .c[data-b="23"] { --dx: -484px; --dy: 118px; --rot: 811deg; animation-delay: 0.09s; }
+  .c[data-b="24"] { --dx: -571px; --dy: 150px; --rot: 948deg; animation-delay: 0.14s; }
+  .c[data-b="25"] { --dx: -696px; --dy: 82px; --rot: 1085deg; animation-delay: 0.18s; }
+  .c[data-b="26"] { --dx: -382px; --dy: -6px; --rot: 1222deg; animation-delay: 0.22s; }
+  .c[data-b="27"] { --dx: -479px; --dy: 0px; --rot: 459deg; animation-delay: 0.27s; }
+  .c[data-b="28"] { --dx: -566px; --dy: -77px; --rot: 596deg; animation-delay: 0.00s; }
+  .c[data-b="29"] { --dx: -627px; --dy: -176px; --rot: 733deg; animation-delay: 0.04s; }
+  .c[data-b="30"] { --dx: -724px; --dy: -190px; --rot: 870deg; animation-delay: 0.09s; }
+  .c[data-b="31"] { --dx: -384px; --dy: -164px; --rot: 1007deg; animation-delay: 0.14s; }
+  .c[data-b="32"] { --dx: -408px; --dy: -259px; --rot: 1144deg; animation-delay: 0.18s; }
+  .c[data-b="33"] { --dx: -491px; --dy: -297px; --rot: 381deg; animation-delay: 0.22s; }
+  .c[data-b="34"] { --dx: -468px; --dy: -411px; --rot: 518deg; animation-delay: 0.27s; }
+  .c[data-b="35"] { --dx: -199px; --dy: -262px; --rot: 655deg; animation-delay: 0.00s; }
+  .c[data-b="36"] { --dx: -256px; --dy: -319px; --rot: 792deg; animation-delay: 0.04s; }
+  .c[data-b="37"] { --dx: -202px; --dy: -414px; --rot: 929deg; animation-delay: 0.09s; }
+  .c[data-b="38"] { --dx: -106px; --dy: -503px; --rot: 1066deg; animation-delay: 0.14s; }
+  .c[data-b="39"] { --dx: -67px; --dy: -272px; --rot: 1203deg; animation-delay: 0.18s; }
+  .c[data-b="40"] { --dx: 6px; --dy: -346px; --rot: 440deg; animation-delay: 0.22s; }
+  .c[data-b="41"] { --dx: 113px; --dy: -407px; --rot: 577deg; animation-delay: 0.27s; }
+  .c[data-b="42"] { --dx: 117px; --dy: -478px; --rot: 714deg; animation-delay: 0.00s; }
+  .c[data-b="43"] { --dx: 272px; --dy: -519px; --rot: 851deg; animation-delay: 0.04s; }
+  .c[data-b="44"] { --dx: 233px; --dy: -276px; --rot: 988deg; animation-delay: 0.09s; }
+  .c[data-b="45"] { --dx: 273px; --dy: -340px; --rot: 1125deg; animation-delay: 0.14s; }
+  .c[data-b="46"] { --dx: 418px; --dy: -351px; --rot: 362deg; animation-delay: 0.18s; }
+  .c[data-b="47"] { --dx: 577px; --dy: -332px; --rot: 499deg; animation-delay: 0.22s; }
+  .c[data-b="48"] { --dx: 319px; --dy: -193px; --rot: 636deg; animation-delay: 0.27s; }
+  .c[data-b="49"] { --dx: 447px; --dy: -181px; --rot: 773deg; animation-delay: 0.00s; }
+  .c[data-b="50"] { --dx: 578px; --dy: -141px; --rot: 910deg; animation-delay: 0.04s; }
+  .c[data-b="51"] { --dx: 664px; --dy: -174px; --rot: 1047deg; animation-delay: 0.09s; }
+  .c[data-b="52"] { --dx: 379px; --dy: -45px; --rot: 1184deg; animation-delay: 0.14s; }
+  .c[data-b="53"] { --dx: 481px; --dy: 8px; --rot: 421deg; animation-delay: 0.18s; }
+  .r[data-r="0"] { left: 0%; --drift: -140px; --rot: 420deg; animation-delay: 0.90s; animation-duration: 2.6s; }
+  .r[data-r="1"] { left: 53%; --drift: -69px; --rot: 631deg; animation-delay: 1.12s; animation-duration: 3.1s; }
+  .r[data-r="2"] { left: 6%; --drift: 2px; --rot: 842deg; animation-delay: 1.34s; animation-duration: 3.6s; }
+  .r[data-r="3"] { left: 59%; --drift: 73px; --rot: 1053deg; animation-delay: 1.56s; animation-duration: 4.1s; }
+  .r[data-r="4"] { left: 12%; --drift: -136px; --rot: 1264deg; animation-delay: 1.78s; animation-duration: 4.6s; }
+  .r[data-r="5"] { left: 65%; --drift: -65px; --rot: 1475deg; animation-delay: 2.00s; animation-duration: 2.6s; }
+  .r[data-r="6"] { left: 18%; --drift: 6px; --rot: 486deg; animation-delay: 2.22s; animation-duration: 3.1s; }
+  .r[data-r="7"] { left: 71%; --drift: 77px; --rot: 697deg; animation-delay: 2.44s; animation-duration: 3.6s; }
+  .r[data-r="8"] { left: 24%; --drift: -132px; --rot: 908deg; animation-delay: 2.66s; animation-duration: 4.1s; }
+  .r[data-r="9"] { left: 77%; --drift: -61px; --rot: 1119deg; animation-delay: 2.88s; animation-duration: 4.6s; }
+  .r[data-r="10"] { left: 30%; --drift: 10px; --rot: 1330deg; animation-delay: 3.10s; animation-duration: 2.6s; }
+  .r[data-r="11"] { left: 83%; --drift: 81px; --rot: 1541deg; animation-delay: 3.32s; animation-duration: 3.1s; }
+  .r[data-r="12"] { left: 36%; --drift: -128px; --rot: 552deg; animation-delay: 3.54s; animation-duration: 3.6s; }
+  .r[data-r="13"] { left: 89%; --drift: -57px; --rot: 763deg; animation-delay: 0.90s; animation-duration: 4.1s; }
+  .r[data-r="14"] { left: 42%; --drift: 14px; --rot: 974deg; animation-delay: 1.12s; animation-duration: 4.6s; }
+  .r[data-r="15"] { left: 95%; --drift: 85px; --rot: 1185deg; animation-delay: 1.34s; animation-duration: 2.6s; }
+  .r[data-r="16"] { left: 48%; --drift: -124px; --rot: 1396deg; animation-delay: 1.56s; animation-duration: 3.1s; }
+  .r[data-r="17"] { left: 1%; --drift: -53px; --rot: 1607deg; animation-delay: 1.78s; animation-duration: 3.6s; }
+  .r[data-r="18"] { left: 54%; --drift: 18px; --rot: 618deg; animation-delay: 2.00s; animation-duration: 4.1s; }
+  .r[data-r="19"] { left: 7%; --drift: 89px; --rot: 829deg; animation-delay: 2.22s; animation-duration: 4.6s; }
+  .r[data-r="20"] { left: 60%; --drift: -120px; --rot: 1040deg; animation-delay: 2.44s; animation-duration: 2.6s; }
+  .r[data-r="21"] { left: 13%; --drift: -49px; --rot: 1251deg; animation-delay: 2.66s; animation-duration: 3.1s; }
+  .r[data-r="22"] { left: 66%; --drift: 22px; --rot: 1462deg; animation-delay: 2.88s; animation-duration: 3.6s; }
+  .r[data-r="23"] { left: 19%; --drift: 93px; --rot: 473deg; animation-delay: 3.10s; animation-duration: 4.1s; }
+  .r[data-r="24"] { left: 72%; --drift: -116px; --rot: 684deg; animation-delay: 3.32s; animation-duration: 4.6s; }
+  .r[data-r="25"] { left: 25%; --drift: -45px; --rot: 895deg; animation-delay: 3.54s; animation-duration: 2.6s; }
+  .r[data-r="26"] { left: 78%; --drift: 26px; --rot: 1106deg; animation-delay: 0.90s; animation-duration: 3.1s; }
+  .r[data-r="27"] { left: 31%; --drift: 97px; --rot: 1317deg; animation-delay: 1.12s; animation-duration: 3.6s; }
+  .r[data-r="28"] { left: 84%; --drift: -112px; --rot: 1528deg; animation-delay: 1.34s; animation-duration: 4.1s; }
+  .r[data-r="29"] { left: 37%; --drift: -41px; --rot: 539deg; animation-delay: 1.56s; animation-duration: 4.6s; }
+  .r[data-r="30"] { left: 90%; --drift: 30px; --rot: 750deg; animation-delay: 1.78s; animation-duration: 2.6s; }
+  .r[data-r="31"] { left: 43%; --drift: 101px; --rot: 961deg; animation-delay: 2.00s; animation-duration: 3.1s; }
+  .r[data-r="32"] { left: 96%; --drift: -108px; --rot: 1172deg; animation-delay: 2.22s; animation-duration: 3.6s; }
+  .r[data-r="33"] { left: 49%; --drift: -37px; --rot: 1383deg; animation-delay: 2.44s; animation-duration: 4.1s; }
+  .r[data-r="34"] { left: 2%; --drift: 34px; --rot: 1594deg; animation-delay: 2.66s; animation-duration: 4.6s; }
+  .r[data-r="35"] { left: 55%; --drift: 105px; --rot: 605deg; animation-delay: 2.88s; animation-duration: 2.6s; }
+  .r[data-r="36"] { left: 8%; --drift: -104px; --rot: 816deg; animation-delay: 3.10s; animation-duration: 3.1s; }
+  .r[data-r="37"] { left: 61%; --drift: -33px; --rot: 1027deg; animation-delay: 3.32s; animation-duration: 3.6s; }
+  .r[data-r="38"] { left: 14%; --drift: 38px; --rot: 1238deg; animation-delay: 3.54s; animation-duration: 4.1s; }
+  .r[data-r="39"] { left: 67%; --drift: 109px; --rot: 1449deg; animation-delay: 0.90s; animation-duration: 4.6s; }
+
+  /* ── Einblenden, gestuft wie im bestehenden Milestone-Overlay ────────── */
+  .mc-bg   { opacity: 0; animation: fadeIn .6s ease-out forwards; }
+  .beam    { opacity: 0; animation: fadeIn .5s ease-out .4s forwards; }
+  .icon    { opacity: 0; transform: translate(-50%, 40px) scale(.4);
+             animation: popIn .7s cubic-bezier(.22,1.6,.36,1) .7s forwards; }
+  .num     { opacity: 0; transform: translate(-50%, 80px) scale(.5);
+             animation: popIn .8s cubic-bezier(.22,1.6,.36,1) 1.0s forwards; }
+  .sub     { opacity: 0; transform: translateY(20px);
+             animation: riseIn .6s ease-out 1.5s forwards; }
+  .ctx     { opacity: 0; transform: translateY(16px);
+             animation: riseIn .6s ease-out 1.7s forwards; }
+  .stats   { opacity: 0; transform: translate(-50%, 20px);
+             animation: popUp .6s ease-out 1.9s forwards; }
+  @keyframes fadeIn { to { opacity: 1; } }
+  @keyframes popIn  { to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+  @keyframes riseIn { to { opacity: 1; transform: translateY(0); } }
+  @keyframes popUp  { to { opacity: 1; transform: translate(-50%, 0); } }
+  @media (prefers-reduced-motion: reduce) {
+    .mc-bg, .beam, .icon, .num, .sub, .ctx, .stats {
+      animation: none; opacity: 1; transform: none;
+    }
+    .icon, .num { transform: translateX(-50%); }
+    .stats { transform: translateX(-50%); }
+    .c, .r { animation: none; opacity: .3; }
+  }
 
 
-  /* Konfetti: Position und Farbe ueber data-Attribute, damit weder ein
-     style-Attribut im Markup noch eine .style-Zuweisung im JS noetig ist.
-     20 Spalten und 26 Verzoegerungen reichen fuer 60 Schnipsel. */
-  .c[data-col="0"] { background: var(--theme-accent, #f2b705); }
-  .c[data-col="1"] { background: var(--theme-primary, #5e2a79); }
-  .c[data-col="2"] { background: var(--theme-accent-2, #c9a0dc); }
-  .c[data-x="0"] { left: 0%; }
-  .c[data-x="2"] { left: 2%; }
-  .c[data-x="3"] { left: 3%; }
-  .c[data-x="6"] { left: 6%; }
-  .c[data-x="7"] { left: 7%; }
-  .c[data-x="9"] { left: 9%; }
-  .c[data-x="10"] { left: 10%; }
-  .c[data-x="11"] { left: 11%; }
-  .c[data-x="13"] { left: 13%; }
-  .c[data-x="14"] { left: 14%; }
-  .c[data-x="17"] { left: 17%; }
-  .c[data-x="18"] { left: 18%; }
-  .c[data-x="21"] { left: 21%; }
-  .c[data-x="22"] { left: 22%; }
-  .c[data-x="24"] { left: 24%; }
-  .c[data-x="25"] { left: 25%; }
-  .c[data-x="28"] { left: 28%; }
-  .c[data-x="29"] { left: 29%; }
-  .c[data-x="32"] { left: 32%; }
-  .c[data-x="33"] { left: 33%; }
-  .c[data-x="35"] { left: 35%; }
-  .c[data-x="36"] { left: 36%; }
-  .c[data-x="37"] { left: 37%; }
-  .c[data-x="39"] { left: 39%; }
-  .c[data-x="40"] { left: 40%; }
-  .c[data-x="43"] { left: 43%; }
-  .c[data-x="44"] { left: 44%; }
-  .c[data-x="46"] { left: 46%; }
-  .c[data-x="47"] { left: 47%; }
-  .c[data-x="48"] { left: 48%; }
-  .c[data-x="50"] { left: 50%; }
-  .c[data-x="51"] { left: 51%; }
-  .c[data-x="54"] { left: 54%; }
-  .c[data-x="55"] { left: 55%; }
-  .c[data-x="58"] { left: 58%; }
-  .c[data-x="59"] { left: 59%; }
-  .c[data-x="61"] { left: 61%; }
-  .c[data-x="62"] { left: 62%; }
-  .c[data-x="65"] { left: 65%; }
-  .c[data-x="66"] { left: 66%; }
-  .c[data-x="69"] { left: 69%; }
-  .c[data-x="70"] { left: 70%; }
-  .c[data-x="72"] { left: 72%; }
-  .c[data-x="73"] { left: 73%; }
-  .c[data-x="74"] { left: 74%; }
-  .c[data-x="76"] { left: 76%; }
-  .c[data-x="77"] { left: 77%; }
-  .c[data-x="80"] { left: 80%; }
-  .c[data-x="81"] { left: 81%; }
-  .c[data-x="83"] { left: 83%; }
-  .c[data-x="84"] { left: 84%; }
-  .c[data-x="85"] { left: 85%; }
-  .c[data-x="87"] { left: 87%; }
-  .c[data-x="88"] { left: 88%; }
-  .c[data-x="91"] { left: 91%; }
-  .c[data-x="92"] { left: 92%; }
-  .c[data-x="95"] { left: 95%; }
-  .c[data-x="96"] { left: 96%; }
-  .c[data-x="98"] { left: 98%; }
-  .c[data-x="99"] { left: 99%; }
-  .c[data-d="0"] { animation-delay: 0.0s; }
-  .c[data-d="13"] { animation-delay: 1.3s; }
+  /* ── Design B: Waffe links, Zahl rechts ───────────────────────────────
+     Fuer Meilensteine, bei denen die WAFFE die Nachricht ist. Die Zahl
+     bleibt gross, bekommt aber einen Namen daneben statt darunter. */
+  .canvas[data-design="b"] .icon { left: 620px; top: 430px; font-size: 190px; }
+  .canvas[data-design="b"] .num  { left: auto; right: 300px; top: 400px;
+                                   transform: translateY(80px) scale(.5);
+                                   text-align: right; }
+  .canvas[data-design="b"] .wname {
+    position: absolute; left: 0; right: 0; top: 300px; text-align: center;
+    font-size: 76px; font-weight: 900; letter-spacing: 4px;
+    text-transform: uppercase; color: var(--theme-accent, #f2b705);
+    opacity: 0; animation: riseIn .6s ease-out 1.2s forwards;
+  }
+  .canvas[data-design="b"] .sub { top: 660px; font-size: 44px; }
+  .canvas[data-design="b"] .ctx { top: 724px; }
+  .canvas[data-design="b"] .stats { top: 812px; }
+  @keyframes popInRight { to { opacity: 1; transform: translateY(0) scale(1); } }
+  .canvas[data-design="b"] .num { animation-name: popInRight; }
+
+  /* ── Design C: Leiste unten, kein Vollbild ────────────────────────────
+     Fuer Meilensteine, die oft fallen. Ein Vollbild-Overlay bei jedem
+     1000er Schaden wuerde den Stream zudecken; diese Leiste laeuft
+     nebenher und blockiert nichts. */
+  .canvas[data-design="c"] .mc-bg,
+  .canvas[data-design="c"] .beam,
+  .canvas[data-design="c"] .conf .r { display: none; }
+  .canvas[data-design="c"] .bar {
+    position: absolute; left: 50%; bottom: 90px; transform: translate(-50%, 40px);
+    display: flex; align-items: center; gap: 30px;
+    padding: 26px 54px 26px 40px; border-radius: 14px;
+    background: color-mix(in srgb, var(--theme-surface, #241a2e) 94%, transparent);
+    border: 2px solid var(--theme-accent, #f2b705);
+    box-shadow: 0 20px 60px rgba(0,0,0,.5),
+                0 0 40px color-mix(in srgb, var(--theme-accent, #f2b705) 30%, transparent);
+    opacity: 0; animation: popUp .6s cubic-bezier(.22,1.4,.36,1) .3s forwards;
+  }
+  .canvas[data-design="c"] .icon,
+  .canvas[data-design="c"] .num,
+  .canvas[data-design="c"] .sub,
+  .canvas[data-design="c"] .ctx,
+  .canvas[data-design="c"] .stats,
+  .canvas[data-design="c"] .wname { display: none; }
+  .bar-icon { font-size: 76px; color: var(--theme-accent, #f2b705); }
+  .bar-num { font-size: 92px; font-weight: 900; line-height: 1;
+             letter-spacing: -2px; color: var(--theme-text, #f4f0f8); }
+  .bar-txt { display: flex; flex-direction: column; gap: 4px; }
+  .bar-sub { font-size: 34px; font-weight: 700; letter-spacing: 2px;
+             text-transform: uppercase; color: var(--theme-accent, #f2b705); }
+  .bar-ctx { font-size: 24px; color: #cbbfd8; }
+  .canvas[data-design="c"] .c { top: 62%; }
+
   table.cmp { border-collapse: collapse; width: 100%; font-size: .9rem; }
   table.cmp th, table.cmp td { text-align: left; padding: 6px 10px;
     border-bottom: 1px solid var(--theme-border, #3a2c48); vertical-align: top; }
@@ -207,11 +334,17 @@
 <body>
 <a class="skip" href="#stage">Skip to the preview</a>
 <h1>Weapon Milestone — mockup</h1>
-<p class="lede">Vollbild-Overlay fuer Waffen- und Wurf-Meilensteine, im Look
-  des bestehenden <code>milestone-celebrate.html</code>. Die Buehne zeigt
-  1920&times;1080 auf die Haelfte skaliert. Alle Zahlen sind echt: M416-Werte
-  aus <code>weapon_mastery</code> der PUBG-API, Wurf-Werte aus der
+<p class="lede">Overlay fuer Waffen- und Wurf-Meilensteine, im Look des
+  bestehenden <code>milestone-celebrate.html</code>. Die Buehne zeigt
+  1920&times;1080 auf die Haelfte skaliert und spielt die Einblendung; mit
+  <b>Animation neu</b> laeuft sie erneut. Alle Zahlen sind echt: M416 und
+  Mini 14 aus <code>weapon_mastery</code> der PUBG-API, Wurf-Werte aus der
   Telemetrie.</p>
+<p class="lede"><b>Der Vorher-Wert steht nur beim Match-Rekord.</b> Bei einer
+  Schwelle wurde er gerade ueberschritten und beantwortet eine Frage, die
+  niemand stellt; beim Rekord ist er die Nachricht &mdash; erst er macht den
+  neuen Wert zum Rekord. <code>MostDamagePlayerInAGame</code> liefert genau
+  das, pro Waffe.</p>
 
 <div class="panel">
   <div class="row">
@@ -219,9 +352,19 @@
     <span class="switch" role="group" aria-labelledby="lblCase" id="caseSwitch"></span>
   </div>
   <div class="row">
+    <span class="rlabel" id="lblDesign">Design</span>
+    <span class="switch" role="group" aria-labelledby="lblDesign" id="designSwitch"></span>
+  </div>
+  <div class="row">
     <span class="rlabel">URL</span>
     <span class="url" id="url"></span>
     <button type="button" class="replay" id="replay">Animation neu</button>
+  </div>
+  <div class="row">
+    <span class="rlabel">Hinweis</span>
+    <span class="note-c">Design C ist fuer Meilensteine gedacht, die oft
+      fallen &mdash; ein Vollbild-Overlay bei jedem 1000er Schaden wuerde
+      den Stream zudecken.</span>
   </div>
 </div>
 
@@ -238,39 +381,50 @@
   </table>
 </div>
 <script>
-// Echte Werte: M416/Mini 14 aus weapon_mastery (PUBG-API, alltime),
+// Echte Werte: M416 und Mini 14 aus weapon_mastery (PUBG-API, alltime),
 // Wurf-Werte aus match_weapon_stats (Telemetrie, 96 % der Matches).
+//
+// "prev" gibt es NUR bei Rekorden. Bei einer Schwelle ist der Wert von
+// vorher belanglos — er wurde ja gerade ueberschritten, und "235.336 →
+// 250.000" beantwortet eine Frage, die niemand stellt. Bei einem Rekord
+// ist der alte Wert die Nachricht: erst er macht den neuen zum Rekord.
 const CASES = [
-  { key: "dmg",   label: "Waffen-Schaden",
-    icon: "local_fire_department", n: 250000,
-    sub: "M416 Damage", ctx: "235.336 → 250.000 · Level 99 · Tier 6",
+  { key: "dmg", label: "Waffen-Schaden", icon: "local_fire_department",
+    n: 250000, weapon: "M416", sub: "M416 Damage",
+    ctx: "Level 99 · Tier 6 · 1.451 Kills",
     url: "?weapon=M416&metric=damage&n=250000",
-    stats: [["1.451", "Kills"], ["2.059", "Defeats"], ["1.059", "Headshots"],
-            ["440 m", "Longest"]] },
-  { key: "kills", label: "Waffen-Kills",
-    icon: "target", n: 1500,
-    sub: "M416 Kills", ctx: "1.451 → 1.500 · beste Waffe deiner Karriere",
+    stats: [["1.451", "Kills"], ["2.059", "Defeats"],
+            ["1.059", "Headshots"], ["440 m", "Longest"]] },
+  { key: "kills", label: "Waffen-Kills", icon: "target",
+    n: 1500, weapon: "M416", sub: "M416 Kills",
+    ctx: "deine meistgenutzte Waffe · 235.336 Schaden",
     url: "?weapon=M416&metric=kills&n=1500",
-    stats: [["235.336", "Damage"], ["1.299", "Knocks"], ["73 %", "Headshot/Kill"],
-            ["6", "Best match"]] },
-  { key: "throws", label: "Würfe",
-    icon: "sports_baseball", n: 1000,
-    sub: "Grenades thrown", ctx: "889 → 1.000 · in 447 Matches · 47 Kills",
+    stats: [["235.336", "Damage"], ["1.299", "Knocks"],
+            ["73 %", "HS per kill"], ["6", "Best match"]] },
+  { key: "throws", label: "Würfe", icon: "sports_baseball",
+    n: 1000, weapon: "Granate", sub: "Grenades thrown",
+    ctx: "in 447 Matches · 47 Kills · 6.068 Schaden",
     url: "?weapon=Granate&metric=throws&n=1000",
-    stats: [["140", "Landed"], ["12,4 %", "Hit rate"], ["6.068", "Damage"],
-            ["43,3", "Dmg/hit"]] },
-  { key: "total", label: "Gesamt-Schaden",
-    icon: "military_tech", n: 1500000,
-    sub: "Lifetime weapon damage", ctx: "1.481.980 → 1.500.000 · über 61 Waffen",
+    stats: [["140", "Landed"], ["12,4 %", "Hit rate"],
+            ["6.068", "Damage"], ["43,3", "Dmg/hit"]] },
+  { key: "total", label: "Gesamt-Schaden", icon: "military_tech",
+    n: 1500000, weapon: null, sub: "Lifetime weapon damage",
+    ctx: "über 61 Waffen · M416 führt mit 235.336",
     url: "?metric=damage&n=1500000",
-    stats: [["M416", "Top weapon"], ["235.336", "with M416"],
-            ["6.243", "Kills total"], ["61", "Weapons"]] },
-  { key: "record", label: "Persönlicher Rekord",
-    icon: "trending_up", n: 1114,
-    sub: "New record · Mini 14", ctx: "bester Match-Schaden mit einer Waffe · vorher 1.089",
-    url: "?weapon=Mini%2014&metric=record&n=1114",
-    stats: [["7", "Kills"], ["609 m", "Longest"], ["902", "Headshots"],
-            ["196.243", "Lifetime"]] },
+    stats: [["M416", "Top weapon"], ["6.243", "Kills"],
+            ["61", "Weapons"], ["1.152", "Matches"]] },
+  // Der einzige Fall mit Vorher-Wert.
+  { key: "record", label: "Match-Rekord", icon: "trending_up",
+    n: 1114, prev: 1089, weapon: "Mini 14", sub: "New record · Mini 14",
+    ctx: null, url: "?weapon=Mini%2014&metric=record&n=1114",
+    stats: [["7", "Kills in match"], ["609 m", "Longest"],
+            ["196.243", "Lifetime dmg"], ["902", "Headshots"]] },
+];
+
+const DESIGNS = [
+  { key: "a", label: "A · Zahl mittig" },
+  { key: "b", label: "B · Waffe + Zahl" },
+  { key: "c", label: "C · Leiste unten" },
 ];
 
 const SOON = [
@@ -283,59 +437,79 @@ const SOON = [
 ];
 
 const fmt = (n) => n.toLocaleString("de-DE");
-let active = CASES[0].key;
+let active = CASES[0].key, design = "a";
 
-function paintSwitch() {
+function paintSwitches() {
   document.getElementById("caseSwitch").innerHTML = CASES.map(c =>
     `<button type="button" data-k="${c.key}"`
     + ` aria-pressed="${c.key === active}">${c.label}</button>`).join("");
+  document.getElementById("designSwitch").innerHTML = DESIGNS.map(d =>
+    `<button type="button" data-d="${d.key}"`
+    + ` aria-pressed="${d.key === design}">${d.label}</button>`).join("");
 }
 
+//: Burst aus der Mitte plus Nachregen. Die Streuung steckt in den
+//: data-Attributen, die passenden CSS-Regeln stehen im Stylesheet.
 function confetti() {
-  // Konfetti in Theme-Farben, feste Positionen statt Zufall — ein Mockup
-  // soll bei jedem Blick gleich aussehen.
-  const cols = ["--theme-accent", "--theme-primary", "--theme-accent-2"];
   let out = "";
-  for (let i = 0; i < 60; i++) {
-    const left = (i * 37) % 100;
-    const delay = ((i * 13) % 26) / 10;
-    const col = cols[i % cols.length];
-    out += `<i class="c" data-i="${i}"></i>`;
-  }
+  for (let i = 0; i < 54; i++)
+    out += `<i class="c" data-b="${i}" data-col="${i % 4}"></i>`;
+  for (let i = 0; i < 40; i++)
+    out += `<i class="r" data-r="${i}" data-col="${(i + 1) % 4}"></i>`;
   return `<div class="conf">${out}</div>`;
+}
+
+function ctxLine(c) {
+  // Rekorde zeigen den alten Wert, Schwellen nicht.
+  if (c.prev != null)
+    return `bisher <b>${fmt(c.prev)}</b> — jetzt <b>${fmt(c.n)}</b>`;
+  return c.ctx || "";
 }
 
 function paintStage() {
   const c = CASES.find(x => x.key === active) || CASES[0];
+  const canvas = document.getElementById("canvas");
   const num = fmt(c.n);
-  document.getElementById("canvas").innerHTML =
-    `<div class="mc-bg"></div>`
+  const ctx = ctxLine(c);
+  let inner = `<div class="mc-bg"></div>`
     + `<div class="beam top"></div><div class="beam bot"></div>`
-    + confetti()
-    + `<div class="icon"><span class="material-symbols-outlined"`
-    + ` aria-hidden="true">${c.icon}</span></div>`
-    + `<div class="num" data-len="${String(c.n).length}">${num}</div>`
-    + `<div class="sub">${c.sub}</div>`
-    + `<div class="ctx">${c.ctx}</div>`
-    + `<div class="stats">` + c.stats.map(([v, k]) =>
-        `<div class="stat"><div class="v">${v}</div>`
-        + `<div class="k">${k}</div></div>`).join("") + `</div>`;
+    + confetti();
+  if (design === "c") {
+    inner += `<div class="bar">`
+      + `<span class="material-symbols-outlined bar-icon"`
+      + ` aria-hidden="true">${c.icon}</span>`
+      + `<span class="bar-num">${num}</span>`
+      + `<span class="bar-txt"><span class="bar-sub">${c.sub}</span>`
+      + `<span class="bar-ctx">${ctx}</span></span></div>`;
+  } else {
+    inner += `<div class="icon"><span class="material-symbols-outlined"`
+      + ` aria-hidden="true">${c.icon}</span></div>`
+      + (design === "b" && c.weapon
+          ? `<div class="wname">${c.weapon}</div>` : "")
+      + `<div class="num" data-len="${String(c.n).length}">${num}</div>`
+      + `<div class="sub">${c.sub}</div>`
+      + `<div class="ctx">${ctx}</div>`
+      + `<div class="stats">` + c.stats.map(([v, k]) =>
+          `<div class="stat"><div class="v">${v}</div>`
+          + `<div class="k">${k}</div></div>`).join("") + `</div>`;
+  }
+  // Neu setzen, damit die Animationen von vorn laufen.
+  canvas.setAttribute("data-design", design);
+  canvas.innerHTML = inner;
   document.getElementById("url").textContent =
-    "/widgets/pubg/weapon-milestone.html" + c.url + "&wait=15";
-  // Konfetti-Positionen und -Farben ueber data-Attribute, damit kein
-  // style-Attribut im Markup landet.
-  [...document.querySelectorAll(".c")].forEach((el, i) => {
-    el.setAttribute("data-col", i % 3);
-    el.setAttribute("data-x", (i * 37) % 100);
-    el.setAttribute("data-d", ((i * 13) % 26));
-  });
+    "/widgets/pubg/weapon-milestone.html" + c.url
+    + (design === "a" ? "" : `&design=${design}`) + "&wait=15";
 }
 
 document.getElementById("caseSwitch").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-k]");
   if (!b) return;
-  active = b.dataset.k;
-  paintSwitch(); paintStage();
+  active = b.dataset.k; paintSwitches(); paintStage();
+});
+document.getElementById("designSwitch").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-d]");
+  if (!b) return;
+  design = b.dataset.d; paintSwitches(); paintStage();
 });
 document.getElementById("replay").addEventListener("click", paintStage);
 
@@ -343,7 +517,7 @@ document.getElementById("soon").innerHTML = SOON.map(
   ([m, s, r, q]) => `<tr><td>${m}</td><td class="n">${s}</td>`
   + `<td class="n">${r}</td><td>${q}</td></tr>`).join("");
 
-paintSwitch();
+paintSwitches();
 paintStage();
 </script>
 </body>
