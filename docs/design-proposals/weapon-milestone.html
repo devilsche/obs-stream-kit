@@ -105,16 +105,19 @@
   .num[data-len="6"] { font-size: 240px; }
   .num[data-len="5"] { font-size: 270px; }
   .sub {
-    position: absolute; left: 0; right: 0; top: 700px; text-align: center;
+    /* 720 statt 660: bei einer 300-px-Zahl auf top 300 endet die Box bei
+       600. 120 px Boxabstand lesen sich als knapp 180, weil die Ziffern
+       schon an der Grundlinie bei ~540 enden. */
+    position: absolute; left: 0; right: 0; top: 720px; text-align: center;
     font-size: 58px; font-weight: 700; letter-spacing: 2px;
     color: var(--theme-accent, #f2b705); text-transform: uppercase;
   }
   .ctx {
-    position: absolute; left: 0; right: 0; top: 776px; text-align: center;
+    position: absolute; left: 0; right: 0; top: 804px; text-align: center;
     font-size: 30px; color: #cbbfd8; letter-spacing: 1px;
   }
   .stats {
-    position: absolute; left: 50%; top: 856px; transform: translateX(-50%);
+    position: absolute; left: 50%; top: 890px; transform: translateX(-50%);
     display: grid; grid-template-columns: repeat(4, auto); gap: 10px 64px;
   }
   .stat { text-align: center; }
@@ -273,24 +276,48 @@
   }
 
 
-  /* ── Design B: Waffe links, Zahl rechts ───────────────────────────────
-     Fuer Meilensteine, bei denen die WAFFE die Nachricht ist. Die Zahl
-     bleibt gross, bekommt aber einen Namen daneben statt darunter. */
-  .canvas[data-design="b"] .icon { left: 620px; top: 430px; font-size: 190px; }
-  .canvas[data-design="b"] .num  { left: auto; right: 300px; top: 400px;
-                                   transform: translateY(80px) scale(.5);
-                                   text-align: right; }
-  .canvas[data-design="b"] .wname {
-    position: absolute; left: 0; right: 0; top: 300px; text-align: center;
-    font-size: 76px; font-weight: 900; letter-spacing: 4px;
-    text-transform: uppercase; color: var(--theme-accent, #f2b705);
-    opacity: 0; animation: riseIn .6s ease-out 1.2s forwards;
+  /* ── Design B: Zahl mittig, Waffenname als Schild an der Zahl ────────
+     Vorher stand die Zahl rechts und das Icon links — die Zahl ist aber
+     die Nachricht und gehoert in die Mitte. Der Waffenname sitzt jetzt
+     als Schild oben an der Zahl, statt als eigene Zeile darueber: so
+     bleibt der Blick auf einer Achse.
+
+     Die Abstaende sind nachgerechnet. Bei line-height 1 ist die Zahl so
+     hoch wie ihre Schriftgroesse: eine 300-px-Zahl auf top 400 endete
+     bei 700 — genau dort sass der Untertitel, und das war die
+     Ueberlappung, kein Umbruch. Jetzt endet die Box bei 590 und der
+     Untertitel beginnt bei 720. */
+  .canvas[data-design="b"] .icon { display: none; }
+  .canvas[data-design="b"] .numwrap {
+    position: absolute; left: 50%; top: 290px;
+    transform: translate(-50%, 80px) scale(.5);
+    opacity: 0;
+    animation: popIn .8s cubic-bezier(.22,1.6,.36,1) .8s forwards;
   }
-  .canvas[data-design="b"] .sub { top: 660px; font-size: 44px; }
-  .canvas[data-design="b"] .ctx { top: 724px; }
-  .canvas[data-design="b"] .stats { top: 812px; }
-  @keyframes popInRight { to { opacity: 1; transform: translateY(0) scale(1); } }
-  .canvas[data-design="b"] .num { animation-name: popInRight; }
+  .canvas[data-design="b"] .num {
+    position: static; left: auto; top: auto; transform: none;
+    opacity: 1; animation: none; display: block;
+  }
+  /* Schild oben rechts, halb ueber der Zahl. */
+  .canvas[data-design="b"] .wtag {
+    position: absolute; right: -28px; top: -46px;
+    display: inline-flex; align-items: center; gap: 14px;
+    padding: 12px 26px; border-radius: 10px;
+    background: var(--theme-primary, #5e2a79);
+    border: 2px solid var(--theme-accent, #f2b705);
+    box-shadow: 0 10px 30px rgba(0,0,0,.45);
+    font-size: 46px; font-weight: 900; letter-spacing: 3px;
+    text-transform: uppercase; color: var(--theme-on-primary, #fff);
+    white-space: nowrap;
+  }
+  .canvas[data-design="b"] .wtag .material-symbols-outlined {
+    font-size: 52px; color: var(--theme-accent, #f2b705);
+  }
+  /* 300 px Zahl endet bei 590, Untertitel auf 700 laesst 110 px Luft —
+     plus die Reserve unter der Grundlinie wirkt es wie 150. */
+  .canvas[data-design="b"] .sub { top: 720px; font-size: 54px; }
+  .canvas[data-design="b"] .ctx { top: 802px; }
+  .canvas[data-design="b"] .stats { top: 888px; }
 
   /* ── Design C: Leiste unten, kein Vollbild ────────────────────────────
      Fuer Meilensteine, die oft fallen. Ein Vollbild-Overlay bei jedem
@@ -389,32 +416,32 @@
 // 250.000" beantwortet eine Frage, die niemand stellt. Bei einem Rekord
 // ist der alte Wert die Nachricht: erst er macht den neuen zum Rekord.
 const CASES = [
-  { key: "dmg", label: "Waffen-Schaden", icon: "local_fire_department",
+  { key: "dmg", metric: "Weapon damage", label: "Waffen-Schaden", icon: "local_fire_department",
     n: 250000, weapon: "M416", sub: "M416 Damage",
     ctx: "Level 99 · Tier 6 · 1.451 Kills",
     url: "?weapon=M416&metric=damage&n=250000",
     stats: [["1.451", "Kills"], ["2.059", "Defeats"],
             ["1.059", "Headshots"], ["440 m", "Longest"]] },
-  { key: "kills", label: "Waffen-Kills", icon: "target",
+  { key: "kills", metric: "Weapon kills", label: "Waffen-Kills", icon: "target",
     n: 1500, weapon: "M416", sub: "M416 Kills",
     ctx: "deine meistgenutzte Waffe · 235.336 Schaden",
     url: "?weapon=M416&metric=kills&n=1500",
     stats: [["235.336", "Damage"], ["1.299", "Knocks"],
             ["73 %", "HS per kill"], ["6", "Best match"]] },
-  { key: "throws", label: "Würfe", icon: "sports_baseball",
+  { key: "throws", metric: "Grenades thrown", label: "Würfe", icon: "sports_baseball",
     n: 1000, weapon: "Granate", sub: "Grenades thrown",
     ctx: "in 447 Matches · 47 Kills · 6.068 Schaden",
     url: "?weapon=Granate&metric=throws&n=1000",
     stats: [["140", "Landed"], ["12,4 %", "Hit rate"],
             ["6.068", "Damage"], ["43,3", "Dmg/hit"]] },
-  { key: "total", label: "Gesamt-Schaden", icon: "military_tech",
+  { key: "total", metric: "Lifetime weapon damage", label: "Gesamt-Schaden", icon: "military_tech",
     n: 1500000, weapon: null, sub: "Lifetime weapon damage",
     ctx: "über 61 Waffen · M416 führt mit 235.336",
     url: "?metric=damage&n=1500000",
     stats: [["M416", "Top weapon"], ["6.243", "Kills"],
             ["61", "Weapons"], ["1.152", "Matches"]] },
   // Der einzige Fall mit Vorher-Wert.
-  { key: "record", label: "Match-Rekord", icon: "trending_up",
+  { key: "record", metric: "New match record", label: "Match-Rekord", icon: "trending_up",
     n: 1114, prev: 1089, weapon: "Mini 14", sub: "New record · Mini 14",
     ctx: null, url: "?weapon=Mini%2014&metric=record&n=1114",
     stats: [["7", "Kills in match"], ["609 m", "Longest"],
@@ -481,11 +508,25 @@ function paintStage() {
       + `<span class="bar-num">${num}</span>`
       + `<span class="bar-txt"><span class="bar-sub">${c.sub}</span>`
       + `<span class="bar-ctx">${ctx}</span></span></div>`;
+  } else if (design === "b") {
+    // Zahl mittig in einem Wrapper, damit das Waffen-Schild relativ
+    // dazu sitzen kann. Der Untertitel nennt nur die Metrik — die Waffe
+    // steht schon im Schild und waere sonst doppelt.
+    inner += `<div class="numwrap">`
+      + (c.weapon
+          ? `<span class="wtag"><span class="material-symbols-outlined"`
+            + ` aria-hidden="true">${c.icon}</span>${c.weapon}</span>`
+          : "")
+      + `<div class="num" data-len="${String(c.n).length}">${num}</div>`
+      + `</div>`
+      + `<div class="sub">${c.metric || c.sub}</div>`
+      + `<div class="ctx">${ctx}</div>`
+      + `<div class="stats">` + c.stats.map(([v, k]) =>
+          `<div class="stat"><div class="v">${v}</div>`
+          + `<div class="k">${k}</div></div>`).join("") + `</div>`;
   } else {
     inner += `<div class="icon"><span class="material-symbols-outlined"`
       + ` aria-hidden="true">${c.icon}</span></div>`
-      + (design === "b" && c.weapon
-          ? `<div class="wname">${c.weapon}</div>` : "")
       + `<div class="num" data-len="${String(c.n).length}">${num}</div>`
       + `<div class="sub">${c.sub}</div>`
       + `<div class="ctx">${ctx}</div>`
