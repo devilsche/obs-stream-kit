@@ -298,21 +298,35 @@
     position: static; left: auto; top: auto; transform: none;
     opacity: 1; animation: none; display: block;
   }
-  /* Schild oben rechts, halb ueber der Zahl. */
+  /* Waffenname ohne Kasten. Ein umrandetes Schild mit Fuellung liest
+     sich als Abzeichen und konkurriert mit der Zahl — hier soll der Name
+     die Zahl beschriften, nicht neben ihr um Aufmerksamkeit werben.
+     Zwei Fassungen zur Wahl, umschaltbar. */
+
+  /* B1: reine Schrift, gesperrt, halb ueber der oberen Kante der Zahl. */
   .canvas[data-design="b"] .wtag {
-    position: absolute; right: -28px; top: -46px;
-    display: inline-flex; align-items: center; gap: 14px;
-    padding: 12px 26px; border-radius: 10px;
-    background: var(--theme-primary, #5e2a79);
-    border: 2px solid var(--theme-accent, #f2b705);
-    box-shadow: 0 10px 30px rgba(0,0,0,.45);
-    font-size: 46px; font-weight: 900; letter-spacing: 3px;
-    text-transform: uppercase; color: var(--theme-on-primary, #fff);
-    white-space: nowrap;
+    position: absolute; left: 50%; top: -18px; transform: translateX(-50%);
+    display: inline-flex; align-items: center; gap: 16px;
+    font-size: 52px; font-weight: 700; letter-spacing: 10px;
+    text-transform: uppercase; white-space: nowrap;
+    color: var(--theme-accent, #f2b705);
+    text-shadow: 0 4px 24px rgba(0,0,0,.7);
   }
   .canvas[data-design="b"] .wtag .material-symbols-outlined {
-    font-size: 52px; color: var(--theme-accent, #f2b705);
+    font-size: 56px; letter-spacing: 0;
   }
+  /* B2: der Name als grosses, blasses Wasserzeichen HINTER der Zahl. */
+  .canvas[data-design="b"][data-tag="ghost"] .wtag {
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 200px; font-weight: 900; letter-spacing: 24px;
+    color: transparent; z-index: 0;
+    -webkit-text-stroke: 2px color-mix(in srgb,
+      var(--theme-accent, #f2b705) 38%, transparent);
+    text-shadow: none;
+  }
+  .canvas[data-design="b"][data-tag="ghost"] .wtag
+    .material-symbols-outlined { display: none; }
+  .canvas[data-design="b"] .num { position: relative; z-index: 1; }
   /* 300 px Zahl endet bei 590, Untertitel auf 700 laesst 110 px Luft —
      plus die Reserve unter der Grundlinie wirkt es wie 150. */
   .canvas[data-design="b"] .sub { top: 720px; font-size: 54px; }
@@ -382,6 +396,10 @@
     <span class="rlabel" id="lblDesign">Design</span>
     <span class="switch" role="group" aria-labelledby="lblDesign" id="designSwitch"></span>
   </div>
+  <div class="row" id="tagRow">
+    <span class="rlabel" id="lblTag">Waffenname</span>
+    <span class="switch" role="group" aria-labelledby="lblTag" id="tagSwitch"></span>
+  </div>
   <div class="row">
     <span class="rlabel">URL</span>
     <span class="url" id="url"></span>
@@ -448,6 +466,11 @@ const CASES = [
             ["196.243", "Lifetime dmg"], ["902", "Headshots"]] },
 ];
 
+const TAGS = [
+  { key: "plain", label: "über der Zahl" },
+  { key: "ghost", label: "Wasserzeichen" },
+];
+
 const DESIGNS = [
   { key: "a", label: "A · Zahl mittig" },
   { key: "b", label: "B · Waffe + Zahl" },
@@ -464,7 +487,7 @@ const SOON = [
 ];
 
 const fmt = (n) => n.toLocaleString("de-DE");
-let active = CASES[0].key, design = "a";
+let active = CASES[0].key, design = "a", tag = "plain";
 
 function paintSwitches() {
   document.getElementById("caseSwitch").innerHTML = CASES.map(c =>
@@ -473,6 +496,11 @@ function paintSwitches() {
   document.getElementById("designSwitch").innerHTML = DESIGNS.map(d =>
     `<button type="button" data-d="${d.key}"`
     + ` aria-pressed="${d.key === design}">${d.label}</button>`).join("");
+  document.getElementById("tagSwitch").innerHTML = TAGS.map(x =>
+    `<button type="button" data-t="${x.key}"`
+    + ` aria-pressed="${x.key === tag}">${x.label}</button>`).join("");
+  // Die Fassung betrifft nur Design B.
+  document.getElementById("tagRow").hidden = design !== "b";
 }
 
 //: Burst aus der Mitte plus Nachregen. Die Streuung steckt in den
@@ -536,10 +564,12 @@ function paintStage() {
   }
   // Neu setzen, damit die Animationen von vorn laufen.
   canvas.setAttribute("data-design", design);
+  canvas.setAttribute("data-tag", tag);
   canvas.innerHTML = inner;
   document.getElementById("url").textContent =
     "/widgets/pubg/weapon-milestone.html" + c.url
-    + (design === "a" ? "" : `&design=${design}`) + "&wait=15";
+    + (design === "a" ? "" : `&design=${design}`)
+    + (design === "b" && tag !== "plain" ? `&tag=${tag}` : "") + "&wait=15";
 }
 
 document.getElementById("caseSwitch").addEventListener("click", (e) => {
@@ -551,6 +581,11 @@ document.getElementById("designSwitch").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-d]");
   if (!b) return;
   design = b.dataset.d; paintSwitches(); paintStage();
+});
+document.getElementById("tagSwitch").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-t]");
+  if (!b) return;
+  tag = b.dataset.t; paintSwitches(); paintStage();
 });
 document.getElementById("replay").addEventListener("click", paintStage);
 
