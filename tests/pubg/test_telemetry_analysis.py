@@ -976,3 +976,34 @@ def test_damage_on_a_downed_enemy_counts_when_it_hurts():
     w = p["weapons"]["M416"]
     assert w["damage"] == 40.0
     assert w["finisherHits"] == 1
+
+
+def test_thrown_damage_is_separate_but_part_of_the_total():
+    """Die PUBG-API zaehlt Wurfschaden im Gesamtschaden. Die Quoten
+    duerfen ihn nicht sehen — eine Granate, die drei Gegner erwischt,
+    waere ein Schuss mit drei Treffern. An Match cbf76ca3 fehlten Nipplz
+    dadurch 164 von 1.162,9 in der Anzeige."""
+    from pubg.telemetry_analysis import analyse
+    ev = lambda t, **kw: {"_T": t, "_D": "2026-09-08T20:00:01.000Z", **kw}
+    events = [
+        {"_T": "LogPlayerCreate",
+         "character": {"name": "me", "accountId": "a"}},
+        ev("LogPlayerAttack", attackType="Weapon", attacker={"name": "me"},
+           weapon={"itemId": "Item_Weapon_HK416_C"}),
+        ev("LogPlayerTakeDamage", attacker={"name": "me"},
+           victim={"name": "x"}, damageCauserName="WeapHK416_C",
+           damageTypeCategory="Damage_Gun", damage=40.0, attackId=1),
+        ev("LogPlayerAttack", attackType="Weapon", attacker={"name": "me"},
+           weapon={"itemId": "Item_Weapon_Grenade_C"}),
+        ev("LogPlayerTakeDamage", attacker={"name": "me"},
+           victim={"name": "y"}, damageCauserName="ProjGrenade_C",
+           damageTypeCategory="Damage_Explosion_Grenade", damage=70.0,
+           attackId=2),
+    ]
+    p = analyse(events)["players"]["me"]
+    assert p["damageTotal"] == 110.0     # was PUBG zeigt
+    assert p["damage"] == 40.0           # Grundlage der Quoten
+    assert p["thrownDamage"] == 70.0
+    assert p["thrownHits"] == 1
+    # Und die Quote bleibt bei einem Treffer aus zwei "Schuessen"
+    assert p["hits"] == 1

@@ -260,7 +260,17 @@
       { key: "hs",       label: "HS %",     num: true,  val: (n, p) => p.headshotRate },
       { key: "limb",     label: "Limb %",  num: true,  val: (n, p) => limbPct(p) },
       { key: "kills",    label: "Kills",    num: true,  val: (n, p) => p.kills },
-      { key: "damage",   label: "Damage",  num: true,  val: (n, p) => p.damage },
+      //: damageTotal, nicht damage: die Spalte soll zeigen, was PUBG und
+      //: op.gg zeigen, und dort zaehlt Wurfgeraet-Schaden mit. "damage"
+      //: ist die Grundlage der Quoten links und laesst ihn bewusst aus —
+      //: an einem gemessenen Match fehlten Nipplz dadurch 164 von 1.163.
+      { key: "damage",   label: "Damage",  num: true,
+        val: (n, p) => p.damageTotal != null ? p.damageTotal : p.damage,
+        help: "Total damage as PUBG counts it, guns plus utility" },
+      { key: "util",     label: "Utility", num: true,
+        val: (n, p) => p.thrownDamage || 0,
+        help: "Damage from grenades, molotovs, C4 and the panzerfaust — "
+              + "part of Damage, kept out of the rates on the left" },
       { key: "flags",    label: "Flags", num: false,
         val: (n, p, an) => ((an[n] && an[n].flags) || []).length },
     ];

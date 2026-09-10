@@ -228,6 +228,11 @@ def _in_fight(windows, t) -> bool:
 def _new_player():
     return {"shots": 0, "shots_in_fight": 0, "hits": 0, "hit_attacks": set(), "hits_no_id": 0,
             "damage": 0.0, "kills": 0, "knocks": 0,
+            # Wurfgeraet-Schaden getrennt: er gehoert in die
+            # Gesamtsumme (die PUBG-API zaehlt ihn), darf aber nicht in
+            # Trefferquote und Schaden-je-Schuss — eine Granate, die drei
+            # Gegner erwischt, waere ein Schuss mit drei Treffern.
+            "thrown_damage": 0.0, "thrown_hits": 0,
             "wallbangs": 0, "hitsOnBots": 0, "hitsOnHumans": 0,
             "zones": defaultdict(int),
             "finisher_hits": 0, "finisher_shots": 0,
@@ -381,7 +386,10 @@ def analyse(events) -> dict:
                         and victim.get("name") not in downed):
                     tw = normalize_weapon(e.get("damageCauserName"))
                     if tw:
-                        twp = players[name]["weapons"][tw]
+                        pl = players[name]
+                        pl["thrown_damage"] += e.get("damage") or 0.0
+                        pl["thrown_hits"] += 1
+                        twp = pl["weapons"][tw]
                         twp["hits"] += 1
                         twp["damage"] += e.get("damage") or 0.0
                         aid = e.get("attackId")
@@ -554,6 +562,12 @@ def analyse(events) -> dict:
             "accuracy": (round(min(100.0, 100.0 * hit_attacks / shots), 1)
                          if shots else 0.0),
             "damage": round(p["damage"], 1),
+            # Was die PUBG-API als Schaden meldet: Schusswaffen plus
+            # Wurfgeraete. Die Quoten oben rechnen weiter nur mit
+            # "damage", sonst zaehlt ein Wurf als Schuss.
+            "damageTotal": round(p["damage"] + p["thrown_damage"], 1),
+            "thrownDamage": round(p["thrown_damage"], 1),
+            "thrownHits": p["thrown_hits"],
             "kills": p["kills"],
             "knocks": p["knocks"],
             "wallbangs": p["wallbangs"],
