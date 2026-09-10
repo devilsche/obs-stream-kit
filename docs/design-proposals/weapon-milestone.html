@@ -289,7 +289,9 @@
      Untertitel beginnt bei 720. */
   .canvas[data-design="b"] .icon { display: none; }
   .canvas[data-design="b"] .numwrap {
-    position: absolute; left: 50%; top: 290px;
+    /* 320 statt 290: der Name sitzt 74 px darueber und braucht Luft zum
+       oberen Strahl bei 60 px. */
+    position: absolute; left: 50%; top: 320px;
     transform: translate(-50%, 80px) scale(.5);
     opacity: 0;
     animation: popIn .8s cubic-bezier(.22,1.6,.36,1) .8s forwards;
@@ -303,9 +305,12 @@
      die Zahl beschriften, nicht neben ihr um Aufmerksamkeit werben.
      Zwei Fassungen zur Wahl, umschaltbar. */
 
-  /* B1: reine Schrift, gesperrt, halb ueber der oberen Kante der Zahl. */
+  /* B1: reine Schrift, gesperrt, ueber der Zahl und LINKS an ihrer
+     Anfangskante. Der Wrapper ist so breit wie die Zahl, also setzt
+     left:0 den Namen genau dort, wo die erste Ziffer beginnt — mittig
+     zentriert wirkte er wie eine eigene Zeile. */
   .canvas[data-design="b"] .wtag {
-    position: absolute; left: 50%; top: -18px; transform: translateX(-50%);
+    position: absolute; left: 0; top: -74px; transform: none;
     display: inline-flex; align-items: center; gap: 16px;
     font-size: 52px; font-weight: 700; letter-spacing: 10px;
     text-transform: uppercase; white-space: nowrap;
@@ -318,6 +323,8 @@
   /* B2: der Name als grosses, blasses Wasserzeichen HINTER der Zahl. */
   .canvas[data-design="b"][data-tag="ghost"] .wtag {
     top: 50%; left: 50%; transform: translate(-50%, -50%);
+    /* Das Wasserzeichen bleibt mittig — es liegt hinter der Zahl und
+       hat keine Anfangskante, an der es sich ausrichten koennte. */
     font-size: 200px; font-weight: 900; letter-spacing: 24px;
     color: transparent; z-index: 0;
     -webkit-text-stroke: 2px color-mix(in srgb,

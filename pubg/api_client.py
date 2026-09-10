@@ -208,6 +208,23 @@ class PubgClient:
                f"/seasons/lifetime")
         return self._get_json(url, rate_limited=True, metric_endpoint="lifetime")
 
+    def get_weapon_mastery(self, account_id: str) -> dict:
+        """Waffen-Mastery eines Spielers: ALLTIME-Werte je Waffe.
+
+        Die einzige Quelle fuer Schaden, Kills, Kopftreffer, weiteste
+        Toetung und Match-Rekorde pro Waffe ueber die ganze Karriere —
+        `participants` kennt keine Waffen, und die Telemetrie deckt nur
+        die Matches ab, deren Events wir geladen haben.
+
+        Achtung bei Wurfgeraeten: die liefert der Endpoint mit Nullen
+        (Granate hat Level und XP, aber DamagePlayer 0). Wurf-Zahlen
+        muessen aus `match_weapon_stats` kommen.
+        """
+        url = (f"{PUBG_BASE}/shards/{self.platform}/players/{account_id}"
+               f"/weapon_mastery")
+        return self._get_json(url, rate_limited=True,
+                              metric_endpoint="weapon_mastery")
+
     def get_ranked(self, account_id: str, season_id: str) -> dict:
         """Ranked-Stats eines Spielers fuer eine Season.
 

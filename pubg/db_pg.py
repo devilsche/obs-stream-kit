@@ -350,6 +350,40 @@ CREATE TABLE IF NOT EXISTS settings (
     PRIMARY KEY (tenant_id, key)
 );
 
+-- Waffen-Mastery je Spieler und Waffe, wie sie zuletzt gesehen wurde.
+-- Grundlage der Waffen-Meilensteine: erst der Vergleich mit dem
+-- vorherigen Stand sagt, ob eine Schwelle GERADE ueberschritten wurde.
+-- Ohne Snapshot wuesste man nur, dass ein Wert hoch ist, nicht dass er
+-- eben gestiegen ist.
+--
+-- GLOBAL wie telemetry_events waere falsch: die Werte gehoeren zwar dem
+-- Spieler, aber welche Schwellen gelten und was schon gefeiert wurde,
+-- entscheidet der Tenant.
+CREATE TABLE IF NOT EXISTS weapon_mastery_snapshot (
+    tenant_id   INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    account_id  TEXT NOT NULL,
+    weapon      TEXT NOT NULL,          -- rohe Id, z.B. Item_Weapon_HK416_C
+    -- Alltime-Werte aus StatsTotal. Nullen bei Wurfgeraeten sind echt,
+    -- nicht "fehlt" — der Endpoint fuehrt sie so.
+    damage      DOUBLE PRECISION DEFAULT 0,
+    kills       INTEGER DEFAULT 0,
+    defeats     INTEGER DEFAULT 0,
+    groggies    INTEGER DEFAULT 0,
+    headshots   INTEGER DEFAULT 0,
+    longest     DOUBLE PRECISION DEFAULT 0,
+    -- Match-Rekorde: die interessantesten Meilensteine, weil sie an
+    -- einer Leistung haengen und nicht an einer runden Zahl.
+    best_damage DOUBLE PRECISION DEFAULT 0,
+    best_kills  INTEGER DEFAULT 0,
+    level       INTEGER DEFAULT 0,
+    tier        INTEGER DEFAULT 0,
+    xp          BIGINT DEFAULT 0,
+    updated_at  BIGINT NOT NULL,
+    PRIMARY KEY (tenant_id, account_id, weapon)
+);
+CREATE INDEX IF NOT EXISTS idx_wms_tenant_acc
+    ON weapon_mastery_snapshot (tenant_id, account_id);
+
 CREATE TABLE IF NOT EXISTS pubg_achievements_seen (
     tenant_id       INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     achievement_id  TEXT NOT NULL,
