@@ -945,3 +945,34 @@ def test_a_fight_of_another_team_does_not_open_our_window():
     ]
     p = analyse(events)["players"]["Ich"]
     assert p["shotsInFight"] == 0
+
+
+def test_damage_on_a_downed_enemy_counts_when_it_hurts():
+    """Die Annahme "Nachschuss auf Liegende meldet 0 Schaden" gilt nicht
+    immer: wer am Boden liegt, nimmt weiter Schaden, und die PUBG-API
+    zaehlt ihn. An Match cbf76ca3 fehlten dadurch 83,5 von 1.220,8
+    Schaden — der Report zeigte den API-Wert, der Match-Analyzer den
+    gefilterten."""
+    from pubg.telemetry_analysis import analyse
+    ev = lambda t, **kw: {"_T": t, "_D": "2026-09-08T20:00:01.000Z", **kw}
+    events = [
+        {"_T": "LogPlayerCreate",
+         "character": {"name": "me", "accountId": "account.me"}},
+        # Gegner wird geknockt …
+        ev("LogPlayerMakeGroggy", attacker={"name": "me"},
+           victim={"name": "foe"}),
+        # … und liegend weiter beschossen, MIT Wirkung
+        ev("LogPlayerTakeDamage", attacker={"name": "me"},
+           victim={"name": "foe"}, damageCauserName="WeapHK416_C",
+           damageTypeCategory="Damage_Gun", damage=40.0, attackId=1),
+        # … dazu ein wirkungsloser Nachschuss
+        ev("LogPlayerTakeDamage", attacker={"name": "me"},
+           victim={"name": "foe"}, damageCauserName="WeapHK416_C",
+           damageTypeCategory="Damage_Gun", damage=0.0, attackId=2),
+    ]
+    p = analyse(events)["players"]["me"]
+    assert p["damage"] == 40.0          # der wirksame Treffer zaehlt
+    assert p["finisherHits"] == 1      # nur der wirkungslose ist Nachschuss
+    w = p["weapons"]["M416"]
+    assert w["damage"] == 40.0
+    assert w["finisherHits"] == 1

@@ -396,10 +396,19 @@ def analyse(events) -> dict:
             if _is_monster(victim):
                 continue          # Baer & Co. sind keine Zielleistung
             p = players[name]
-            if victim.get("name") in downed:
-                # Nachschuss auf einen Liegenden: die Telemetrie meldet dafuer
-                # 0 Schaden, und der Schuss war kein Zielen unter Gegenwehr.
-                # Getrennt zaehlen statt Quoten kaputtmachen.
+            # Nur SCHADENSFREIE Treffer auf Liegende gelten als Nachschuss.
+            # Die Annahme "die Telemetrie meldet dafuer 0 Schaden" gilt
+            # nicht immer: wer am Boden liegt, nimmt weiter Schaden, und
+            # die PUBG-API zaehlt ihn mit. An einem gemessenen Match
+            # fehlten deshalb 83,5 von 1.220,8 Schaden (Nipplz 88,6 von
+            # 1.162,9) — der Report zeigte den API-Wert, der
+            # Match-Analyzer den gefilterten, und beide Zahlen standen
+            # unerklaerlich nebeneinander.
+            if victim.get("name") in downed and not (e.get("damage") or 0):
+                # Nachschuss ohne Wirkung: kein Zielen unter Gegenwehr,
+                # und ohne diese Trennung sah jede Sniper-Statistik aus
+                # wie ein Fehlschlag (M24 mit 33 statt 100 Schaden je
+                # Treffer). Getrennt zaehlen statt Quoten kaputtmachen.
                 p["finisher_hits"] += 1
                 p["finisher_shots"] += 1
                 # Der zugehoerige Schuss wurde beim Attack-Event schon
