@@ -3425,7 +3425,12 @@ def compute_lobby_avg_kd(conn, tenant_id: int, my_account_id, range_key="session
         ) AND m.played_at >= ?
           AND mtm.kills IS NOT NULL
           AND {br_where}
-        GROUP BY m.match_id
+        -- `m.played_at` muss mit in die Gruppe: der Primaerschluessel von
+        -- `matches` ist zusammengesetzt (tenant_id, match_id), weshalb
+        -- Postgres die funktionale Abhaengigkeit nicht erkennt. Unter
+        -- SQLite lief das als bare column durch — ein Rest der Migration,
+        -- der den Endpoint in JEDEM Range mit HTTP 500 beantwortete.
+        GROUP BY m.match_id, m.played_at
         HAVING COUNT(mtm.account_id) > 4   -- nur Matches mit echtem Lobby-Mapping
         ORDER BY m.played_at ASC
     """, (tenant_id, tenant_id, my_account_id, cutoff, *br_params)).fetchall()
