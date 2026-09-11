@@ -412,12 +412,19 @@ html, body {
 .canvas[data-design="c"] .conf .r { display: none; }
 .canvas[data-design="c"] .bar {
   position: absolute; left: 50%; bottom: 90px; transform: translate(-50%, 40px);
-  display: flex; align-items: center; gap: 30px;
-  padding: 26px 54px 26px 40px; border-radius: 14px;
+  display: flex; align-items: center; gap: 24px;
+  /* Geometrie und Schrift sind gegenueber dem ersten Entwurf um ein
+     Fuenftel geschrumpft: mit 92-px-Ziffern lief "22,000 km" aus dem
+     Rahmen und die Leiste brach um. Sie darf ruhig zurueckhaltend
+     sein — sie laeuft nebenher, waehrend gespielt wird. */
+  padding: 21px 43px 21px 32px; border-radius: 12px;
+  /* Nie ueber die Leinwand hinaus, sonst bricht der Text statt zu
+     schrumpfen. */
+  max-width: 1720px;
   background: color-mix(in srgb, var(--theme-surface, #241a2e) 94%, transparent);
   border: 2px solid var(--theme-accent, #f2b705);
-  box-shadow: 0 20px 60px rgba(0,0,0,.5),
-              0 0 40px color-mix(in srgb, var(--theme-accent, #f2b705) 30%, transparent);
+  box-shadow: 0 16px 48px rgba(0,0,0,.5),
+              0 0 32px color-mix(in srgb, var(--theme-accent, #f2b705) 30%, transparent);
   opacity: 0; animation: popUp .6s cubic-bezier(.22,1.4,.36,1) .3s forwards;
 }
 .canvas[data-design="c"] .icon,
@@ -426,12 +433,25 @@ html, body {
 .canvas[data-design="c"] .ctx,
 .canvas[data-design="c"] .stats,
 .canvas[data-design="c"] .wname { display: none; }
-.bar-icon { font-size: 76px; color: var(--theme-accent, #f2b705); }
-.bar-num { font-size: 92px; font-weight: 900; line-height: 1;
-           letter-spacing: -2px; color: var(--theme-text, #f4f0f8); }
-.bar-txt { display: flex; flex-direction: column; gap: 4px; }
-.bar-sub { font-size: 34px; font-weight: 700; letter-spacing: 2px;
-           text-transform: uppercase; color: var(--theme-accent, #f2b705); }
-.bar-ctx { font-size: 24px; color: #cbbfd8; }
+.bar-icon { font-size: 56px; color: var(--theme-accent, #f2b705);
+            flex: 0 0 auto; }
+.bar-num { font-size: 66px; font-weight: 900; line-height: 1;
+           letter-spacing: -2px; color: var(--theme-text, #f4f0f8);
+           /* Umbrechen darf die Zahl nie — lieber kleiner werden. */
+           white-space: nowrap; flex: 0 0 auto;
+           font-variant-numeric: tabular-nums; }
+/* Der Umbruch bei "22,000 km" kam vom Leerzeichen vor der Einheit, nicht
+   von der Breite — dagegen hilft `nowrap` oben. Die Staffelung greift
+   deshalb erst bei Zahlen, die selbst mit nowrap zu breit wuerden:
+   neun Zeichen brauchen bei 66 px rund 350 px, die Leiste hat 1.720. */
+.bar-num[data-len="10"] { font-size: 58px; letter-spacing: -1px; }
+.bar-num[data-len="11"] { font-size: 52px; letter-spacing: -1px; }
+.bar-num[data-len="12"] { font-size: 46px; letter-spacing: 0; }
+.bar-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.bar-sub { font-size: 26px; font-weight: 700; letter-spacing: 1.6px;
+           text-transform: uppercase; color: var(--theme-accent, #f2b705);
+           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-ctx { font-size: 19px; color: #cbbfd8;
+           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .canvas[data-design="c"] .c { top: 62%; }
 

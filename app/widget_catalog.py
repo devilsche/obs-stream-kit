@@ -134,9 +134,12 @@ WIDGET_SWITCHES = {
          "options": [["", "From the tier"], ["b", "Number + weapon"],
                      ["d", "Big (millions)"]],
          "tooltip": "Normally the server decides: a huge milestone gets the big layout."},
-        {"key": "demo", "label": "Demo", "type": "select", "default": "0",
-         "options": [["0", "Normal"], ["1", "Celebrate once now"]],
-         "tooltip": "Shows one example celebration — for placing the source in OBS."},
+        {"key": "demo", "label": "Preview", "type": "select",
+         "default": "0", "options": "_MILESTONE_DEMO_BIG",
+         "tooltip": "Celebrates the chosen occasion once, using the mark that would really fall next. A preview is not queued, so it blocks no real milestone."},
+        {"key": "subject", "label": "Weapon (preview)", "type": "text",
+         "default": "", "placeholder": "e.g. Mk12",
+         "tooltip": "Only for the preview — otherwise the weapon closest to its next mark is used."},
     ],
     "pubg/weapon-milestone-bar.html": [
         {"key": "wait", "label": "Wait (s)", "type": "number", "default": "8",
@@ -149,8 +152,12 @@ WIDGET_SWITCHES = {
         {"key": "confetti", "label": "Confetti", "type": "select",
          "default": "1", "options": [["1", "With confetti"], ["0", "Bar only"]],
          "tooltip": "Off for occasions that land several times per session."},
-        {"key": "demo", "label": "Demo", "type": "select", "default": "0",
-         "options": [["0", "Normal"], ["1", "Show once now"]]},
+        {"key": "demo", "label": "Preview", "type": "select",
+         "default": "0", "options": "_MILESTONE_DEMO_BAR",
+         "tooltip": "Shows the chosen occasion once, using the mark that would really fall next."},
+        {"key": "subject", "label": "Weapon (preview)", "type": "text",
+         "default": "", "placeholder": "e.g. Granate",
+         "tooltip": "Only for the preview."},
     ],
     "pubg/lookup.html": [
         {"key": "player", "label": "Player", "type": "text", "default": "",
@@ -541,6 +548,25 @@ _DOCK_SW = {
 }
 
 
+def _milestone_demo_options(widget: str):
+    """Demo-Auswahl fuer die Meilenstein-Sources.
+
+    Direkt aus der Anlass-Registry, damit ein neuer Anlass im Code hier
+    nicht nachgetragen werden muss. Gezeigt werden nur die Anlaesse,
+    die fuer diese Fassung bestimmt sind — das Vollbild soll nicht
+    etwas vorfuehren, was im Betrieb nur in der Leiste erscheint.
+    """
+    try:
+        from pubg.weapon_milestones import OCCASIONS
+    except Exception:                       # Registry nicht importierbar
+        return [["0", "Normal"], ["1", "Show one now"]]
+    opts = [["0", "Normal"], ["all", "Play all of them"]]
+    for oid, o in OCCASIONS.items():
+        if (o.get("widget") or "bar") in (widget, "both"):
+            opts.append([oid, o.get("label") or oid])
+    return opts
+
+
 def build(project_root: str) -> list:
     """Liest pro Widget die buildFilter-Schemas + liefert die fuer urls.html
     aufbereitete Liste:  (kategorie, label, desc, pfad, switches[])"""
@@ -561,6 +587,12 @@ def build(project_root: str) -> list:
             except Exception:
                 switches = list(WIDGET_SWITCHES.get(path, []))
         switches = _normalize_switches(switches, content)
+        # Platzhalter fuer die aus der Registry erzeugten Auswahllisten.
+        for s in switches:
+            if s.get("options") == "_MILESTONE_DEMO_BIG":
+                s["options"] = _milestone_demo_options("big")
+            elif s.get("options") == "_MILESTONE_DEMO_BAR":
+                s["options"] = _milestone_demo_options("bar")
         # Dock-Switch automatisch anhaengen: alle Widgets die _pubg.js laden,
         # ausser reine Overlays. Kein Duplikat wenn bereits manuell gesetzt.
         if ("_pubg.js" in content and path not in _NO_DOCK

@@ -22,7 +22,10 @@
     ?poll=15     Abfrage-Takt in Sekunden
     ?pos=top     an den oberen Rand statt an den unteren
     ?confetti=0  ohne Konfetti, nur die Leiste
-    ?demo=1      einmal mit Beispielwerten zeigen
+    ?demo=<anlass>  einmal diesen Anlass zeigen, z.B. ?demo=thrown_count.
+                    ?demo=1 nimmt den ersten Anlass dieser Fassung,
+                    ?demo=all spielt alle der Reihe nach durch.
+    ?value=, ?subject=  Wert bzw. Waffe fuer die Vorschau erzwingen
 -->
 <link rel="stylesheet" href="../_theme.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;900&display=swap">
@@ -65,7 +68,10 @@
       + '<div class="bar">'
       + '<span class="material-symbols-outlined bar-icon"'
       + ' aria-hidden="true">' + M.iconFor(m) + "</span>"
-      + '<span class="bar-num">' + M.esc(num) + "</span>"
+      // Zeichenzahl inklusive Einheit: "22,000 km" braucht weniger
+      // Groesse als "1,000", und das entscheidet das Stylesheet.
+      + '<span class="bar-num" data-len="' + Math.min(12, num.length) + '">'
+      + M.esc(num) + "</span>"
       + '<span class="bar-txt"><span class="bar-sub">'
       + M.esc(M.subline(m, true)) + "</span>"
       + '<span class="bar-ctx">' + M.esc(M.ctxline(m)) + "</span>"
@@ -80,12 +86,24 @@
     });
   }
 
-  if (Q.get("demo") === "1") {
-    celebrate({
-      key: "demo", occasion: "weapon_damage", subject: "M416",
-      display: "M416", label: "Weapon Damage", unit: "damage",
-      value: 450000, prevValue: 449000, tier: "small"
-    });
+  var DEMO = Q.get("demo");
+  if (DEMO) {
+    var mine = function (o) {
+      return o.widget === "bar" || o.widget === "both";
+    };
+    if (DEMO === "all") {
+      M.demoAll(celebrate, mine);
+    } else if (DEMO === "1") {
+      M.occasions().then(function (list) {
+        var first = list.filter(mine)[0];
+        if (first) return M.demo(first.id).then(celebrate);
+      });
+    } else {
+      M.demo(DEMO, { value: Q.get("value"), subject: Q.get("subject"),
+                     tier: Q.get("tier") }).then(function (m) {
+        if (m) celebrate(m);
+      });
+    }
     return;
   }
 

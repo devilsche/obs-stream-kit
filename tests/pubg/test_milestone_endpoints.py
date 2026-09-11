@@ -231,3 +231,91 @@ def test_zustand_beachtet_die_eigene_schrittweite():
     d = _data(_call("GET", "/api/pubg/milestone-state")[0])
     row = [r for r in d["state"] if r["occasion"] == "career_damage"][0]
     assert row["next"] == 5000000
+
+
+# ── Vorschau am Widget selbst (?demo=) ──────────────────────────────────────
+
+def test_demo_reiht_nichts_ein():
+    # Sonst blockierte jedes Ansehen einen echten Meilenstein und liesse
+    # sich nur einmal wiederholen.
+    d = _data(_call("GET", "/api/pubg/milestone-demo",
+                    qs={"occasion": "weapon_damage"})[0])
+    assert d["milestone"]["occasion"] == "weapon_damage"
+    assert db_pg.recent_milestones(CONN.raw, T) == []
+
+
+def test_demo_nimmt_die_naechste_echte_marke():
+    db_pg.save_milestone_snapshot(CONN.raw, T, "account.A", {
+        "weapons": {"M416": {"damage": 432503}}})
+    CONN.raw.commit()
+    d = _data(_call("GET", "/api/pubg/milestone-demo",
+                    qs={"occasion": "weapon_damage"})[0])
+    m = d["milestone"]
+    # 432.503 bei 25.000er Schritten → 450.000, nicht eine erfundene Zahl.
+    assert m["value"] == 450000
+    assert m["subject"] == "M416"
+    assert m["prevValue"] == 432503
+
+
+def test_demo_waehlt_die_waffe_mit_dem_hoechsten_stand():
+    # Bei ihr faellt die naechste Marke wirklich als naechste.
+    db_pg.save_milestone_snapshot(CONN.raw, T, "account.A", {
+        "weapons": {"AKM": {"kills": 45}, "M416": {"kills": 3179}}})
+    CONN.raw.commit()
+    d = _data(_call("GET", "/api/pubg/milestone-demo",
+                    qs={"occasion": "weapon_kills"})[0])
+    assert d["milestone"]["subject"] == "M416"
+
+
+def test_demo_ohne_stand_liefert_trotzdem_etwas():
+    # Frische Installation: ohne Snapshot muss die Vorschau laufen,
+    # sonst liesse sich die Source in OBS nicht platzieren.
+    d = _data(_call("GET", "/api/pubg/milestone-demo",
+                    qs={"occasion": "weapon_mastered"})[0])
+    assert d["milestone"]["value"] == 100
+    assert d["milestone"]["subject"] == "M416"
+
+
+def test_demo_erlaubt_erzwungene_werte():
+    d = _data(_call("GET", "/api/pubg/milestone-demo",
+                    qs={"occasion": "weapon_damage", "subject": "Mk12",
+                        "value": "1000000", "tier": "huge"})[0])
+    m = d["milestone"]
+    assert (m["subject"], m["value"], m["tier"]) == ("Mk12", 1000000, "huge")
+
+
+def test_demo_lehnt_unbekannten_anlass_ab():
+    # Ein vertippter Name soll nicht stumm ins Leere laufen.
+    _, code = _call("GET", "/api/pubg/milestone-demo",
+                    qs={"occasion": "weapon_dmg"})
+    assert code == 400
+
+
+def test_anlass_liste_nennt_die_zielfassung():
+    # Damit ?demo=1 und ?demo=all nur zeigen, was fuer die jeweilige
+    # Fassung bestimmt ist.
+    d = _data(_call("GET", "/api/pubg/milestone-occasions")[0])
+    ids = {o["id"]: o for o in d["occasions"]}
+    assert set(ids) == set(OCCASIONS)
+    assert ids["weapon_mastered"]["widget"] == "big"
+    assert ids["weapon_damage"]["widget"] == "bar"
+
+
+def test_probelauf_nimmt_ebenfalls_die_naechste_marke():
+    # Test und Vorschau teilen den Aufbau; nur das Einreihen trennt sie.
+    db_pg.save_milestone_snapshot(CONN.raw, T, "account.A", {
+        "career": {"damage": 4041616}})
+    CONN.raw.commit()
+    d = _data(_call("POST", "/api/pubg/milestone-test",
+                    {"occasion": "career_damage"})[0])
+    assert d["queued"]["value"] == 4100000
+
+
+def test_zwei_vorschauen_im_selben_moment_kollidieren_nicht():
+    # Der Schluessel traegt Millisekunden; bei Sekunden waere die zweite
+    # Vorschau derselbe Eintrag und wuerde verworfen.
+    for _ in range(3):
+        _call("POST", "/api/pubg/milestone-test",
+              {"occasion": "weapon_damage", "widget": "bar"})
+    rows = db_pg.recent_milestones(CONN.raw, T)
+    assert len(rows) == 3

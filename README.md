@@ -439,8 +439,8 @@ Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
 | `squad-compare.html` | Vergleich über die letzten **gemeinsamen** Squad-Matches | `players=A,B,C,D`, `matches` |
 | `chat-stats-popup.html` | Streamer.bot-driven Pop-up | `player`, `duration` (Sek) |
 | `milestone-celebrate.html` | Vollbild-Feier bei jedem 100. Career-Win | `n`, `wait`, `force`, `mute` |
-| `weapon-milestone.html` | Vollbild-Feier für Waffen- und Karriere-Meilensteine | `wait`, `poll`, `tag=plain\|ghost`, `design=b\|d`, `demo=1` |
-| `weapon-milestone-bar.html` | Dieselben Meilensteine als Leiste am Bildrand | `wait`, `poll`, `pos=bottom\|top`, `confetti=0`, `demo=1` |
+| `weapon-milestone.html` | Vollbild-Feier für Waffen- und Karriere-Meilensteine | `wait`, `poll`, `tag=plain\|ghost`, `design=b\|d`, `demo=<anlass>\|1\|all`, `value`, `subject` |
+| `weapon-milestone-bar.html` | Dieselben Meilensteine als Leiste am Bildrand | `wait`, `poll`, `pos=bottom\|top`, `confetti=0`, `demo=<anlass>\|1\|all`, `value`, `subject` |
 
 Cross-Player-Web-View: `http://localhost:8080/widgets/pubg/coplayer.html?player=NAME`
 (alte URL `overlays/stats.html?player=NAME` leitet weiter)
@@ -546,12 +546,26 @@ auf einmal fällig. Erkannte Meilensteine landen in `pubg_milestones_seen`; der
 Schlüssel trägt den Wert (`weapon_damage:M416:450000`), womit dieselbe Marke
 nie zweimal gefeiert wird.
 
-**Ohne Wartezeit ansehen**: „Preview" im Tool legt einen Probelauf in dieselbe
-Warteschlange — die Feier läuft also über denselben Weg wie im Betrieb und
-nicht über einen Sonderpfad, der im Ernstfall ungetestet wäre. Vorbelegt ist
-die nächste echte Marke. Probeläufe sind getrennt geführt und lassen sich mit
-einem Knopf wieder wegwerfen. Zum Platzieren der Source in OBS gibt es
-zusätzlich `?demo=1`.
+**Ohne Wartezeit ansehen**, auf zwei Wegen:
+
+* **`?demo=<anlass>` an der Source** — z. B. `?demo=weapon_mastered`. Der Wert
+  kommt aus dem letzten Stand, die gezeigte Marke ist also die, die wirklich
+  als nächste fällt; bei Waffen-Anlässen wird die Waffe genommen, die ihrer
+  nächsten Marke am nächsten ist. `?demo=1` nimmt den ersten Anlass, der zu
+  dieser Fassung gehört, `?demo=all` spielt alle der Reihe nach durch.
+  `?value=` und `?subject=` erzwingen Wert bzw. Waffe. Eine Vorschau wird
+  **nicht eingereiht** und blockiert daher keinen echten Meilenstein — sie
+  lässt sich beliebig wiederholen. In der Widget-Übersicht steht die
+  Anlass-Liste als Auswahlfeld, direkt aus der Registry erzeugt.
+* **„Preview" im Config-Tool** — legt einen Probelauf in dieselbe
+  Warteschlange, die auch der Poller benutzt. Das testet den ganzen Weg
+  einschließlich Marker und Quittierung, nicht nur die Darstellung.
+  Probeläufe sind über `is_test` getrennt und mit einem Knopf wegwerfbar.
+
+Die Leiste ist gegenüber dem ersten Entwurf um ein Fünftel geschrumpft: mit
+92-px-Ziffern brach sie bei „22,000 km" um — nicht wegen der Breite, sondern
+am Leerzeichen vor der Einheit. Dagegen hilft `white-space: nowrap`; die
+Staffelung nach Zeichenzahl greift erst ab zehn Zeichen.
 
 #### Zwei Werte je Bedeutung: Fläche und Text
 

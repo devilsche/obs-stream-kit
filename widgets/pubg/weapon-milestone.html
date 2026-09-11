@@ -30,11 +30,18 @@
     ?tag=ghost       Waffenname als blasses Wasserzeichen hinter der
                      Zahl statt als Zeile darueber
     ?design=b|d      Layout erzwingen, statt es aus dem tier zu nehmen
-    ?demo=1          einmal mit Beispielwerten feiern (Einrichtung in
-                     OBS, ohne auf einen echten Meilenstein zu warten)
+    ?demo=<anlass>   einmal diesen Anlass feiern, ohne auf ihn zu
+                     warten — z.B. ?demo=weapon_mastered. Die Werte
+                     kommen aus dem letzten Stand, die gezeigte Marke
+                     ist also die, die wirklich als naechste faellt.
+                     ?demo=1 nimmt den ersten Anlass dieser Fassung,
+                     ?demo=all spielt alle der Reihe nach durch.
+    ?value=450000    Wert fuer die Vorschau erzwingen
+    ?subject=Mk12    Waffe fuer die Vorschau erzwingen
 
-  Ausprobieren ohne Wartezeit: im Config-Tool (/app/tools/milestones)
-  legt "Preview" einen Probelauf in dieselbe Warteschlange.
+  Eine Vorschau wird NICHT eingereiht und blockiert daher keinen echten
+  Meilenstein. Wer den ganzen Weg einschliesslich Warteschlange testen
+  will, nimmt "Preview" im Config-Tool (/app/tools/milestones).
 -->
 <link rel="stylesheet" href="../_theme.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;900&display=swap">
@@ -141,12 +148,26 @@
     });
   }
 
-  if (Q.get("demo") === "1") {
-    celebrate({
-      key: "demo", occasion: "career_damage", subject: "",
-      display: "", label: "Career Damage", unit: "damage",
-      value: 4000000, prevValue: 3900000, tier: "huge"
-    });
+  var DEMO = Q.get("demo");
+  if (DEMO) {
+    // Nur Anlaesse, die fuer diese Fassung bestimmt sind — sonst zeigt
+    // das Vollbild etwas, das im Betrieb nur in der Leiste erscheint.
+    var mine = function (o) {
+      return o.widget === "big" || o.widget === "both";
+    };
+    if (DEMO === "all") {
+      M.demoAll(celebrate, mine);
+    } else if (DEMO === "1") {
+      M.occasions().then(function (list) {
+        var first = list.filter(mine)[0];
+        if (first) return M.demo(first.id).then(celebrate);
+      });
+    } else {
+      M.demo(DEMO, { value: Q.get("value"), subject: Q.get("subject"),
+                     tier: Q.get("tier") }).then(function (m) {
+        if (m) celebrate(m);
+      });
+    }
     return;
   }
 

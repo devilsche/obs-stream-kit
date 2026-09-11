@@ -294,6 +294,10 @@ class EndpointRegistry:
             return self._milestone_config_post(body)
         if route == ("GET", "/api/pubg/milestone-state"):
             return self._milestone_state(qs)
+        if route == ("GET", "/api/pubg/milestone-demo"):
+            return self._milestone_demo(qs)
+        if route == ("GET", "/api/pubg/milestone-occasions"):
+            return self._milestone_occasions(qs)
         if route == ("POST", "/api/pubg/milestone-test"):
             return self._milestone_test(body)
         if route == ("POST", "/api/pubg/milestone-purge-tests"):
@@ -2623,62 +2627,141 @@ class EndpointRegistry:
                        for r in recent_milestones(conn, self.tenant_id, 30)],
         })
 
-    def _milestone_test(self, body):
-        """Eine Feier ansehen, ohne die Marke erreicht zu haben.
+    def _milestone_build(self, spec):
+        """Einen Meilenstein-Eintrag aus einer Anlass-Angabe bauen.
 
-        Der Probelauf geht durch dieselbe Warteschlange wie ein echter
-        Meilenstein — sonst wuerde das Tool einen Weg testen, den es im
-        Betrieb nicht gibt. Der Schluessel traegt einen eigenen Zusatz,
-        damit ein Probelauf keinen echten Eintrag blockiert.
+        Gemeinsam genutzt vom Probelauf im Tool und von der Vorschau am
+        Widget selbst. Fehlt ein Wert, wird die naechste echte Marke aus
+        dem letzten Stand genommen — eine erfundene Zahl wuerde zeigen,
+        was es nie geben wird.
+
+        Liefert (item, fehler); genau eines von beiden ist gesetzt.
         """
         import time
 
-        from pubg.db_pg import queue_milestones
+        from pubg.db_pg import get_milestone_snapshot
         from pubg.weapon_milestones import (OCCASIONS, display_name,
-                                            merge_config)
-        b = self._milestone_body(body)
-        oid = b.get("occasion")
+                                            merge_config, tier_for)
+        oid = spec.get("occasion")
         occ = OCCASIONS.get(oid)
         if not occ:
-            return _err(400, f"unbekannter Anlass: {oid}")
+            return None, _err(400, f"unbekannter Anlass: {oid}")
         cfg = merge_config(self._stored_milestone_config())
         c = {**occ, **(cfg.get(oid) or {})}
-        subject = b.get("subject") or ""
-        if occ["scope"] == "weapon" and not subject:
-            subject = "M416"
+        metric = occ["metric"]
+
+        snap = get_milestone_snapshot(self.get_conn(), self.tenant_id,
+                                      self.my_account_id) or {}
+        weapons = snap.get("weapons") or {}
+        career = snap.get("career") or {}
+
+        subject = spec.get("subject") or ""
+        stand = 0.0
+        if occ["scope"] == "career":
+            stand = float(career.get(metric) or 0)
+        else:
+            if not subject:
+                # Die Waffe mit dem hoechsten Stand in dieser Kennzahl —
+                # bei ihr faellt die naechste Marke wirklich als
+                # naechste, und ohne Stand bleibt es bei der M416.
+                best = sorted(((float(v.get(metric) or 0), n)
+                               for n, v in weapons.items()), reverse=True)
+                subject = best[0][1] if best and best[0][0] > 0 else "M416"
+            stand = float((weapons.get(subject) or {}).get(metric) or 0)
+
         try:
-            value = float(b.get("value"))
+            value = float(spec.get("value"))
         except (TypeError, ValueError):
-            value = float(c.get("at") or c.get("step") or c.get("min") or 1)
-        tier = b.get("tier") or None
+            value = 0.0
+        if value <= 0:
+            step = c.get("step") or 0
+            if occ["kind"] == "step" and step:
+                value = (int(stand // step) + 1) * step
+            elif occ["kind"] == "at":
+                value = float(c.get("at") or 1)
+            else:
+                # Rekord: ein Stueck ueber dem bisherigen Besten, sonst
+                # die Untergrenze.
+                value = round(stand * 1.05) if stand else float(
+                    c.get("min") or 1)
+
+        tier = spec.get("tier")
         if tier not in ("small", "big", "huge"):
             tier = None
-        widget = b.get("widget") if b.get("widget") in ("big", "bar",
-                                                        "both") else None
+        widget = spec.get("widget") if spec.get("widget") in (
+            "big", "bar", "both") else None
+        prev = spec.get("prevValue")
+        if prev is None:
+            prev = stand
 
-        from pubg.weapon_milestones import tier_for
-        item = {
-            # Der Zeitstempel macht wiederholte Probelaeufe unterscheidbar.
-            "key": f"test:{oid}:{subject}:{int(time.time())}",
+        return {
+            # Der Zeitstempel macht wiederholte Probelaeufe
+            # unterscheidbar — sonst liesse sich dieselbe Feier nur
+            # einmal ansehen.
+            "key": f"test:{oid}:{subject}:{int(time.time() * 1000)}",
             "occasion": oid, "subject": subject,
             "display": display_name(subject) if subject else "",
             "label": occ.get("label") or oid,
             "unit": occ.get("unit") or "",
             "value": value,
-            "prev_value": b.get("prevValue") or 0,
+            "prev_value": float(prev or 0),
             "tier": tier or tier_for(c, value),
             "widget": widget or c.get("widget") or "bar",
-        }
+        }, None
+
+    def _as_payload(self, item):
+        import time
+        return self._milestone_payload({
+            "milestone_key": item["key"], "occasion": item["occasion"],
+            "subject": item["subject"], "label": item["label"],
+            "unit": item["unit"], "value": item["value"],
+            "prev_value": item["prev_value"], "tier": item["tier"],
+            "widget": item["widget"], "is_test": True,
+            "detected_at": int(time.time()),
+        })
+
+    def _milestone_test(self, body):
+        """Eine Feier ansehen, ohne die Marke erreicht zu haben.
+
+        Der Probelauf geht durch dieselbe Warteschlange wie ein echter
+        Meilenstein — sonst wuerde das Tool einen Weg testen, den es im
+        Betrieb nicht gibt.
+        """
+        from pubg.db_pg import queue_milestones
+        item, err = self._milestone_build(self._milestone_body(body))
+        if err:
+            return err
         conn = self.get_conn()
         queue_milestones(conn, self.tenant_id, [item], is_test=True)
         conn.commit()
-        return _ok({"queued": self._milestone_payload({
-            "milestone_key": item["key"], "occasion": oid,
-            "subject": subject, "label": item["label"],
-            "unit": item["unit"], "value": value,
-            "prev_value": item["prev_value"], "tier": item["tier"],
-            "is_test": True, "detected_at": int(time.time()),
-        }), "widget": item["widget"]})
+        return _ok({"queued": self._as_payload(item),
+                    "widget": item["widget"]})
+
+    def _milestone_demo(self, qs):
+        """Denselben Eintrag, aber ohne ihn einzureihen.
+
+        Dafuer gedacht, dass eine Source sich per `?demo=<anlass>` selbst
+        etwas anzeigt — zum Platzieren in OBS und zum Durchsehen aller
+        Anlaesse. Weil nichts eingereiht wird, blockiert die Vorschau
+        keinen echten Meilenstein und laesst sich beliebig wiederholen.
+        """
+        spec = {"occasion": qs.get("occasion"),
+                "subject": qs.get("subject"),
+                "value": qs.get("value"),
+                "tier": qs.get("tier")}
+        item, err = self._milestone_build(spec)
+        if err:
+            return err
+        return _ok({"milestone": self._as_payload(item)})
+
+    def _milestone_occasions(self, qs=None):
+        """Nur die Anlass-Liste — fuer Auswahlfelder."""
+        from pubg.weapon_milestones import OCCASIONS
+        return _ok({"occasions": [
+            {"id": oid, "label": o.get("label") or oid,
+             "scope": o["scope"], "kind": o["kind"],
+             "unit": o.get("unit") or "", "widget": o.get("widget")}
+            for oid, o in OCCASIONS.items()]})
 
     def _stored_milestone_config(self):
         from pubg.poller import _milestone_config

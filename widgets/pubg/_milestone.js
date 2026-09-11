@@ -189,7 +189,59 @@
     return once;
   }
 
+  /* Vorschau: den Meilenstein zu einem Anlass holen, ohne ihn
+   * einzureihen. `?demo=1` nimmt den ersten Anlass, der zur Fassung
+   * passt; `?demo=<anlass>` genau diesen. Werte kommen vom Server aus
+   * dem letzten Stand, also ist die gezeigte Marke die, die wirklich
+   * als naechste fallen wuerde.
+   */
+  function demo(occasion, extra) {
+    var base = (global.__SERVE_BASE__ || "/") + "api/pubg/milestone-demo";
+    var q = new URLSearchParams();
+    q.set("occasion", occasion);
+    Object.keys(extra || {}).forEach(function (k) {
+      if (extra[k]) q.set(k, extra[k]);
+    });
+    return fetch(base + "?" + q.toString(), { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var body = (d && d.data) || d || {};
+        return body.milestone || null;
+      });
+  }
+
+  /* Die Anlass-Liste, damit `?demo=1` etwas Sinnvolles waehlen kann und
+   * ein falsch geschriebener Name nicht stumm ins Leere laeuft.
+   */
+  function occasions() {
+    var base = (global.__SERVE_BASE__ || "/") + "api/pubg/milestone-occasions";
+    return fetch(base, { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var body = (d && d.data) || d || {};
+        return body.occasions || [];
+      })
+      .catch(function () { return []; });
+  }
+
+  /* Alle Anlaesse der Reihe nach zeigen — `?demo=all`. Zum Durchsehen,
+   * ohne die URL zwei Dutzend Mal von Hand zu aendern.
+   */
+  function demoAll(celebrate, filter) {
+    return occasions().then(function (list) {
+      var todo = list.filter(filter || function () { return true; });
+      return todo.reduce(function (chain, o) {
+        return chain.then(function () {
+          return demo(o.id).then(function (m) {
+            return m ? celebrate(m) : null;
+          });
+        });
+      }, Promise.resolve()).then(function () { return todo.length; });
+    });
+  }
+
   global.Milestone = {
+    demo: demo, demoAll: demoAll, occasions: occasions,
     ICONS: ICONS, SHOW_PREV: SHOW_PREV, NUM: NUM,
     shown: shown, bigForm: bigForm, subline: subline, ctxline: ctxline,
     confetti: confetti, secondBurst: secondBurst, iconFor: iconFor,
