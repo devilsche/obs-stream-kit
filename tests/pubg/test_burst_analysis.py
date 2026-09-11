@@ -1006,7 +1006,9 @@ def test_thrown_stats_rates_damage_per_landed_throw(pg_compat):
     conn.commit()
 
     rows = sq.thrown_stats(conn, t1, "account.me")
-    g = next(r for r in rows if r["weapon"] == "Granate")
+    # Ausgeliefert wird der englische Anzeigename; der deutsche
+    # bleibt der Schluessel in match_weapon_stats.
+    g = next(r for r in rows if r["weapon"] == "Frag Grenade")
     assert g["throws"] == 20
     assert g["landed"] == 10
     assert g["landedPct"] == 50.0

@@ -619,6 +619,42 @@ WEAPON_DISPLAY_EN = {
 }
 
 
+def participants_global(conn, match_ids, accounts=None):
+    """Teilnehmer-Zeilen eines Matches aus den Daten **aller** Tenants.
+
+    Ein Match ist ein Match: was jemand darin geleistet hat, haengt nicht
+    daran, wessen Poller die Runde geholt hat. `participants` traegt aber
+    nur, was der eigene Poller sah — gemessen weichen **72 von 508**
+    geteilten Matches ab, immer zu Lasten des Tenants ohne eigenes
+    Co-Player-Tracking.
+
+    Der sichtbare Schaden: im Match-Detail standen die Mitspieler mit
+    lauter Nullen. Ein Spieler mit 2 Kills und 199 Schaden erschien aus
+    der anderen Perspektive mit 0 Kills, 0 Schaden und ohne Platzierung.
+
+    Bei geteilten Matches sind die Zeilen inhaltlich gleich, deshalb
+    genuegt eine je Account. Sortiert wird nach Schaden, damit eine
+    spaeter nachgetragene Leerzeile nicht gewinnt.
+    """
+    ids = [m for m in (match_ids or []) if m]
+    if not ids:
+        return []
+    marks = ",".join("?" * len(ids))
+    where = f"WHERE match_id IN ({marks})"
+    params = list(ids)
+    if accounts:
+        a_marks = ",".join("?" * len(accounts))
+        where += f" AND account_id IN ({a_marks})"
+        params += list(accounts)
+    return conn.execute(
+        f"""
+        SELECT DISTINCT ON (match_id, account_id) *
+        FROM participants {where}
+        ORDER BY match_id, account_id,
+                 COALESCE(damage_dealt, 0) DESC, COALESCE(kills, 0) DESC
+        """, params).fetchall()
+
+
 def weapon_display(name):
     """Waffenname fuer die Oberflaeche.
 
@@ -1388,13 +1424,9 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     # Squad-Stats-Batch — Participants-Tabelle + Telemetrie-Counter
     # (revives received/given, bot-kills). Wird in out_members reingemergt.
     _ph_sq = ",".join(["?"] * len(squad_accs))
-    parts_rows = conn.execute(
-        f"""SELECT account_id, kills, headshot_kills, assists, dbnos,
-                   damage_dealt, time_survived, place
-            FROM participants
-            WHERE tenant_id = ? AND match_id = ?
-              AND account_id IN ({_ph_sq})""",
-        (tenant_id, match_id, *squad_accs)).fetchall()
+    # Tenant-uebergreifend: der eigene Poller kennt die Mitspieler nicht
+    # immer, und dann stuenden sie hier mit lauter Nullen.
+    parts_rows = participants_global(conn, [match_id], squad_accs)
     parts_by_acc = {r["account_id"]: r for r in parts_rows}
     # Clan-Info pro Squad-Member (one shot join statt n+1 in der Loop)
     _clan_by_acc = {}
@@ -4151,9 +4183,9 @@ def _compute_top10_reached_at(conn, tenant_id: int, match_id, my_account_id):
     (= 10. Squad eliminiert wurde, also nur noch 10 Squads im Spiel).
     Falls Telemetry fehlt oder Match < 11 Squads: None.
     """
-    parts = conn.execute("""
-        SELECT account_id, team_id FROM participants WHERE tenant_id = ? AND match_id = ?
-    """, (tenant_id, match_id,)).fetchall()
+    # Ohne alle Teilnehmer laesst sich die Zahl der Squads nicht
+    # bestimmen; mit nur einer Zeile lieferte die Funktion nichts.
+    parts = participants_global(conn, [match_id])
     if not parts:
         return None
     acc_to_team = {p["account_id"]: p["team_id"] for p in parts}

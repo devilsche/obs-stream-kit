@@ -97,3 +97,65 @@ def test_squad_faellt_aus_der_lobby(geteilt):
         squad = squad_per_match(conn, t, [MID])[MID]
         lobby = alle - squad
         assert lobby == {GEGNER}, f"Tenant {t}: Lobby war {lobby}"
+
+
+# ── Teilnehmer-Zeilen tenant-übergreifend ───────────────────────────────────
+
+def test_teilnehmer_kommen_aus_allen_tenants(geteilt):
+    # Der sichtbare Schaden war: im Match-Detail standen die Mitspieler
+    # mit lauter Nullen — 2 Kills und 199 Schaden erschienen aus der
+    # anderen Perspektive als 0 und 0.
+    from pubg.aggregations import participants_global
+    conn, _, _ = geteilt
+    rows = participants_global(conn, [MID])
+    accs = {r["account_id"] for r in rows}
+    assert accs == {ICH, MATE}
+
+
+def test_je_account_nur_eine_zeile(geteilt):
+    # Beide Tenants führen dieselbe Person; doppelt gezählt wäre der
+    # Schaden verdoppelt.
+    from pubg.aggregations import participants_global
+    conn, _, _ = geteilt
+    rows = participants_global(conn, [MID])
+    accs = [r["account_id"] for r in rows]
+    assert len(accs) == len(set(accs))
+
+
+def test_auf_bestimmte_accounts_einschraenkbar(geteilt):
+    from pubg.aggregations import participants_global
+    conn, _, _ = geteilt
+    rows = participants_global(conn, [MID], [ICH])
+    assert [r["account_id"] for r in rows] == [ICH]
+
+
+def test_die_vollstaendigste_zeile_gewinnt(pg_compat):
+    # Eine später nachgetragene Leerzeile darf die Zahlen nicht
+    # überschreiben.
+    from pubg.aggregations import participants_global
+    conn, t1, t2 = pg_compat
+    for t in (t1, t2):
+        db_pg.insert_match(conn.raw, t, MID, "Baltic_Main", "squad-fpp",
+                           False, 1800, "2026-04-28T12:00:00Z", None)
+    def _p(dmg, kills):
+        return {"account_id": ICH, "name": "PEX_LuCKoR", "team_id": 7,
+                "place": 8, "kills": kills, "headshot_kills": 0,
+                "assists": 0, "dbnos": 0, "revives": 0,
+                "damage_dealt": dmg, "longest_kill": 0.0,
+                "time_survived": 900, "walk_distance": 0.0,
+                "ride_distance": 0.0, "swim_distance": 0.0,
+                "weapons_acquired": 1, "heals": 0, "boosts": 0,
+                "team_kills": 0}
+    db_pg.insert_participants(conn.raw, t1, MID, [_p(199.1, 2)])
+    db_pg.insert_participants(conn.raw, t2, MID, [_p(0.0, 0)])
+    conn.raw.commit()
+    rows = participants_global(conn, [MID])
+    assert len(rows) == 1
+    assert rows[0]["kills"] == 2
+    assert float(rows[0]["damage_dealt"]) == pytest.approx(199.1)
+
+
+def test_ohne_matches_keine_abfrage(geteilt):
+    from pubg.aggregations import participants_global
+    conn, _, _ = geteilt
+    assert participants_global(conn, []) == []

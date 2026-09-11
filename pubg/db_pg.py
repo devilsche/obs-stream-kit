@@ -364,6 +364,32 @@ CREATE TABLE IF NOT EXISTS settings (
 -- weil die Registry in pubg/weapon_milestones.py waechst — ein neuer
 -- Anlass wie "1000 km zu Fuss" soll keine Migration kosten. Gelesen
 -- wird nur der Vergleich Vorher/Nachher, nie einzelne Felder per SQL.
+-- Waffenzeilen ohne Tenant-Dopplung: je Match, Spieler und Waffe die
+-- **beste** Zeile.
+--
+-- Dieselbe Runde liegt bei jedem Tenant, der sie gespielt hat, einmal
+-- vor — die Zeilen sind aber nicht gleich gut. Wer ein Telemetrie-
+-- Archiv hat, laesst den Rebuild laufen und traegt die korrigierten
+-- Werte (Lynx-Durchschuesse, Wurfschaden, Finisher) samt
+-- Feuerstoss-Spalten; die anderen haben den Stand des normalen Ingests.
+-- Gemessen: 90,9 % der Zeilen von Tenant 1 tragen Feuerstoss-Daten,
+-- bei Tenant 2 sind es 5,8 %, und eine Lynx AMR steht dort mit 0
+-- Schaden statt 350.
+--
+-- Ohne diese Sicht sieht ein Tenant nur, was sein eigener Poller holte:
+-- fuer dieselben Matches 8.054 statt 33.984 bekannte Lobby-Spieler.
+-- Der Tenant-Bezug bleibt trotzdem gewahrt — welche MATCHES zaehlen,
+-- entscheidet weiterhin `matches.tenant_id`.
+CREATE OR REPLACE VIEW match_weapon_stats_best AS
+SELECT DISTINCT ON (match_id, account_id, weapon) *
+FROM match_weapon_stats
+ORDER BY match_id, account_id, weapon,
+         -- Zeilen mit Feuerstoss-Daten stammen aus der Rohtelemetrie
+         -- und sind die vollstaendigeren.
+         (bursts_init + bursts_react) DESC,
+         COALESCE(damage, 0) DESC,
+         COALESCE(shots, 0) DESC;
+
 CREATE TABLE IF NOT EXISTS pubg_milestone_snapshot (
     tenant_id   INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     account_id  TEXT NOT NULL,

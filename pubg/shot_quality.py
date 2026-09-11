@@ -550,10 +550,9 @@ def _weapon_rows(conn, tenant_id, account_id, cutoff, to_iso=None):
     sql = f"""
         SELECT w.match_id, w.shots, w.hits, w.hit_attacks, w.head,
                w.damage, w.shots_in_fight
-        FROM match_weapon_stats w
+        FROM match_weapon_stats_best w
         JOIN matches m ON m.match_id = w.match_id
-                      AND m.tenant_id = w.tenant_id
-        WHERE w.tenant_id = ? AND w.account_id = ?
+        WHERE m.tenant_id = ? AND w.account_id = ?
           AND NOT COALESCE(w.is_thrown, false)
           AND m.played_at >= ? AND {br_where}
     """
@@ -813,10 +812,9 @@ def _weapon_totals_for(conn, tenant_id, account_ids, cutoff):
                SUM(w.damage) AS damage,
                SUM(w.shots_in_fight) AS in_fight,
                COUNT(DISTINCT w.match_id) AS matches
-        FROM match_weapon_stats w
+        FROM match_weapon_stats_best w
         JOIN matches m ON m.match_id = w.match_id
-                      AND m.tenant_id = w.tenant_id
-        WHERE w.tenant_id = ? AND NOT COALESCE(w.is_thrown, false)
+        WHERE m.tenant_id = ? AND NOT COALESCE(w.is_thrown, false)
           AND w.account_id IN ({marks})
           AND m.played_at >= ? AND {br_where}
         GROUP BY w.account_id
@@ -847,10 +845,9 @@ def lobby_reference(conn, tenant_id, min_matches=5, cutoff="1970-01-01T00:00:00Z
                SUM(w.hits) AS hits, SUM(w.head) AS head,
                SUM(w.damage) AS damage, SUM(w.shots_in_fight) AS in_fight,
                COUNT(DISTINCT w.match_id) AS matches, w.account_id
-        FROM match_weapon_stats w
+        FROM match_weapon_stats_best w
         JOIN matches m ON m.match_id = w.match_id
-                      AND m.tenant_id = w.tenant_id
-        WHERE w.tenant_id = ? AND w.is_bot = false
+        WHERE m.tenant_id = ? AND w.is_bot = false
           AND NOT COALESCE(w.is_thrown, false)
           AND m.played_at >= ? AND {br_where}
         GROUP BY w.account_id
@@ -1094,10 +1091,9 @@ def burst_discipline(conn, tenant_id, account_id, cutoff="1970-01-01T00:00:00Z",
                SUM(w.hits_after_hit_init) AS hits_after_hit_init,
                SUM(w.shots_after_hit_react) AS shots_after_hit_react,
                SUM(w.hits_after_hit_react) AS hits_after_hit_react
-        FROM match_weapon_stats w
+        FROM match_weapon_stats_best w
         JOIN matches m ON m.match_id = w.match_id
-                      AND m.tenant_id = w.tenant_id
-        WHERE w.tenant_id = ? AND w.is_bot = false
+        WHERE m.tenant_id = ? AND w.is_bot = false
           AND m.played_at >= ? {upper} AND {br_where}
           AND (w.bursts_init + w.bursts_react) > 0
         GROUP BY w.account_id, w.weapon
@@ -1109,10 +1105,9 @@ def burst_discipline(conn, tenant_id, account_id, cutoff="1970-01-01T00:00:00Z",
     # leere Tabelle waere nicht von "keine Daten" zu unterscheiden.
     matches = conn.execute(f"""
         SELECT COUNT(DISTINCT w.match_id) AS n
-        FROM match_weapon_stats w
+        FROM match_weapon_stats_best w
         JOIN matches m ON m.match_id = w.match_id
-                      AND m.tenant_id = w.tenant_id
-        WHERE w.tenant_id = ? AND m.played_at >= ? {upper} AND {br_where}
+        WHERE m.tenant_id = ? AND m.played_at >= ? {upper} AND {br_where}
           AND (w.bursts_init + w.bursts_react) > 0
     """, [tenant_id, cutoff, *upper_params, *br_params]).fetchone()
     return {
@@ -1142,10 +1137,9 @@ def thrown_stats(conn, tenant_id, account_id, cutoff="1970-01-01T00:00:00Z",
                SUM(w.shots) AS throws, SUM(w.hit_attacks) AS landed,
                SUM(w.hits) AS enemies, SUM(w.damage) AS damage,
                SUM(w.kills) AS kills
-        FROM match_weapon_stats w
+        FROM match_weapon_stats_best w
         JOIN matches m ON m.match_id = w.match_id
-                      AND m.tenant_id = w.tenant_id
-        WHERE w.tenant_id = ? AND COALESCE(w.is_thrown, false)
+        WHERE m.tenant_id = ? AND COALESCE(w.is_thrown, false)
           AND w.is_bot = false
           AND m.played_at >= ? {upper} AND {br_where}
         GROUP BY w.weapon, w.account_id = ?
