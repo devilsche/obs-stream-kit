@@ -330,7 +330,8 @@ def test_lobby_detail_endpoint_schluesselt_die_lobby_auf():
         _insert_team_mapping(conn, "ld1", acc, 7 + i // 4)
         # K/D von 0.1 bis 2.5 — die Raender muessen sauber herausfallen.
         # Rundenzahl ueber MIN_KD_ROUNDS, sonst gilt der Wert als Rauschen.
-        snaps[acc] = {"kills": i * 10, "losses": 100, "rounds": 120, "wins": 0,
+        # Nenner der K/D ist `rounds - wins`, nicht `losses`.
+        snaps[acc] = {"kills": i * 10, "losses": 100, "rounds": 100, "wins": 0,
                       "damage": 1.0, "kd": i / 10.0}
     # Ein Bot in der Lobby: darf weder in den Schnitt noch in die Abdeckung.
     _insert_team_mapping(conn, "ld1", "ai.bot1", 99)
@@ -368,12 +369,21 @@ def test_session_report_carries_the_lobby_strength():
     # Echte Lobby-Groesse: unter MIN_LOBBY_PLAYERS zaehlt ein Match nicht in
     # den Zeitraum-Schnitt (Arcade-Modi haben ein gutes Dutzend Spieler).
     _insert_team_mapping(conn, "sr1", "account.A", 1)
-    snaps = {"account.A": {"kills": 100, "losses": 50, "rounds": 60,
-                            "wins": 5, "damage": 1.0, "kd": 2.0}}
+    # Der Mitspieler gehoert ins Team, sonst prueft der Test die
+    # Unterscheidung gar nicht: `lobbySquadKd` mittelt die Werte der
+    # MITSPIELER, also ohne mich — mit einem Squad aus nur mir bleibt es
+    # None. Er wurde oben angelegt, aber nie ins Match gesetzt.
+    _insert_team_mapping(conn, "sr1", "account.MATE", 1)
+    # Nenner der K/D ist `rounds - wins`, nicht `losses`.
+    snaps = {"account.A": {"kills": 100, "losses": 50, "rounds": 50,
+                            "wins": 0, "damage": 1.0, "kd": 2.0},
+             "account.MATE": {"kills": 100, "losses": 50, "rounds": 50,
+                               "wins": 0, "damage": 1.0, "kd": 2.0}}
     for i in range(1, 25):
         acc = f"account.F{i}"
         _insert_team_mapping(conn, "sr1", acc, 7 + i // 4)
-        snaps[acc] = {"kills": 40, "losses": 40, "rounds": 50, "wins": 1,
+        # Nenner der K/D ist `rounds - wins`, nicht `losses`.
+        snaps[acc] = {"kills": 40, "losses": 40, "rounds": 40, "wins": 0,
                       "damage": 1.0, "kd": 1.0}
     db_pg.upsert_season_snapshots(conn.raw, "lifetime", "squad-fpp", snaps,
                                    "2026-05-20T00:00:00Z")
@@ -386,10 +396,11 @@ def test_session_report_carries_the_lobby_strength():
     matches = [m for ph in data.get("phases", []) for m in ph.get("matches", [])]
     m = next(m for m in matches if m["matchId"] == "sr1")
     assert m["lobbyKd"] == 1.0          # ohne eigenen Squad gerechnet
-    assert m["squadKd"] == 2.0
+    assert m["squadKd"] == 2.0          # beide auf 2,0, also auch der Schnitt
     assert data["totals"]["lobbyKd"] == 1.0
     # Auch je Phase, dort steht die Session-Wertung
     assert data["phases"][0]["stats"]["lobbyKd"] == 1.0
+    # Ohne mich gerechnet — hier der Wert des Mitspielers.
     assert data["phases"][0]["stats"]["lobbySquadKd"] == 2.0
 
 
@@ -415,9 +426,13 @@ def test_lobby_kd_reports_coverage_per_match():
         _insert_team_mapping(conn, "lk1", acc, team)
     # Hauptzahl ist Alltime — die Snapshots liegen unter dem lifetime-Schlüssel.
     db_pg.upsert_season_snapshots(conn.raw, "lifetime", "squad-fpp", {
-        "account.A": {"kills": 100, "losses": 50, "rounds": 60, "wins": 5,
+        "account.A": {"kills": 100, "losses": 50, "rounds": 50, "wins": 0,
                        "damage": 1.0, "kd": 2.0},
-        "account.F1": {"kills": 40, "losses": 40, "rounds": 50, "wins": 1,
+        # K/D rechnet Kills je NICHT GEWONNENER Runde (op.gg-Konvention,
+        # siehe `_kd` in lobby_kd.py) — das API-Feld `losses` ist
+        # unstimmig und bleibt ungenutzt. Damit 40 Kills hier 1,0
+        # ergeben, muss `rounds - wins` gleich 40 sein.
+        "account.F1": {"kills": 40, "losses": 40, "rounds": 40, "wins": 0,
                         "damage": 1.0, "kd": 1.0},
     }, "2026-05-20T00:00:00Z")
     conn.commit()
@@ -651,7 +666,8 @@ def test_lobby_detail_liefert_auch_den_eigenen_squad():
                           ("account.M2", "MateB", 0.8)):
         _insert_participant(conn, "sq1", acc, name, team_id=1)
         _insert_team_mapping(conn, "sq1", acc, 1)
-        snaps[acc] = {"kills": int(kd * 100), "losses": 100, "rounds": 120,
+        # Nenner der K/D ist `rounds - wins`, nicht `losses`.
+        snaps[acc] = {"kills": int(kd * 100), "losses": 100, "rounds": 100,
                       "wins": 0, "damage": 1.0, "kd": kd}
     for i in range(1, 6):
         _insert_team_mapping(conn, "sq1", f"account.F{i}", 7)

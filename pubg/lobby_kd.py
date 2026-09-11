@@ -902,13 +902,16 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
     # taugt dafuer nicht: dort steht nur, was der eigene Poller geholt
     # hat, und bei manchen Tenants ist das nur der eigene Account.
     squad_by_match = squad_per_match(conn, tenant_id, match_ids)
-    if not squad_by_match:
-        # Alte Matches ohne Team-Zuordnung.
+    # Rueckfall **je Match**, nicht fuer alle zusammen: ein einziges
+    # Match mit Team-Zuordnung wuerde sonst alle anderen um ihren Squad
+    # bringen.
+    fehlend = [m for m in match_ids if m not in squad_by_match]
+    if fehlend:
         squad_rows = conn.execute(
             "SELECT match_id, account_id FROM participants "
             f"WHERE tenant_id = ? AND match_id IN "
-            f"({','.join('?' * len(match_ids))})",
-            [tenant_id] + list(match_ids)).fetchall()
+            f"({','.join('?' * len(fehlend))})",
+            [tenant_id] + fehlend).fetchall()
         for r in squad_rows:
             squad_by_match.setdefault(r["match_id"], set()).add(
                 r["account_id"])
@@ -1124,12 +1127,14 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
     # `participants` (dort verlaesslicher als im players-Bestand).
     squad_by_match = squad_per_match(conn, tenant_id, match_ids)
     squad_names = squad_names_per_match(conn, match_ids)
-    if not squad_by_match:
-        # Alte Matches ohne Team-Zuordnung: dann bleibt participants.
+    # Rueckfall je Match — siehe `lobby_kd_for_matches`.
+    fehlend = [m for m in match_ids if m not in squad_by_match]
+    if fehlend:
+        f_marks = ",".join("?" * len(fehlend))
         for r in conn.execute(
                 f"SELECT match_id, account_id FROM participants "
-                f"WHERE tenant_id = ? AND match_id IN ({marks})",
-                [tenant_id] + list(match_ids)).fetchall():
+                f"WHERE tenant_id = ? AND match_id IN ({f_marks})",
+                [tenant_id] + fehlend).fetchall():
             squad_by_match.setdefault(r["match_id"], set()).add(
                 r["account_id"])
 

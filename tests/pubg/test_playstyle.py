@@ -96,7 +96,28 @@ def test_fight_is_won_when_more_enemies_go_down():
     assert f["result"] == "won"
 
 
-def test_fight_is_lost_when_we_lose_more_people():
+def test_fight_is_lost_when_our_squad_gets_wiped():
+    """Verloren heisst gewiped, nicht bloss "mehr Leute verloren".
+
+    Knock allein reicht nicht: wer wieder aufgestellt wird, hat den
+    Kampf nicht verloren. Erst die Finisher auf beide Mates machen
+    daraus eine Niederlage.
+    """
+    events = [
+        ev("TakeDamage", 10, "account.me", "account.foe1"),
+        ev("Knock", 13, "account.foe1", "account.me"),
+        ev("Knock", 15, "account.foe2", "account.mate"),
+        ev("Kill", 17, "account.foe1", "account.me"),
+        ev("Kill", 19, "account.foe2", "account.mate"),
+    ]
+    f = ps.build_fights(events, SQUAD, TEAM_OF)[0]
+    # Knock und Finisher sind EIN Down je Mate, keine vier.
+    assert f["ourDowns"] == 2
+    assert f["result"] == "lost"
+
+
+def test_two_knocks_without_finisher_are_not_a_loss():
+    """Die Gegenprobe: dieselben zwei Downs, aber beide stehen wieder auf."""
     events = [
         ev("TakeDamage", 10, "account.me", "account.foe1"),
         ev("Knock", 13, "account.foe1", "account.me"),
@@ -104,7 +125,7 @@ def test_fight_is_lost_when_we_lose_more_people():
     ]
     f = ps.build_fights(events, SQUAD, TEAM_OF)[0]
     assert f["ourDowns"] == 2
-    assert f["result"] == "lost"
+    assert f["result"] == "pointless"
 
 
 def test_fight_without_any_down_counts_as_pointless():
@@ -118,10 +139,13 @@ def test_fight_without_any_down_counts_as_pointless():
 
 
 def test_even_trade_is_its_own_result():
+    """Trade = beide Teams sind hinterher komplett weg. Selten, aber echt."""
     events = [
         ev("TakeDamage", 10, "account.me", "account.foe1"),
-        ev("Knock", 12, "account.me", "account.foe1"),
-        ev("Knock", 13, "account.foe2", "account.me"),
+        ev("Kill", 12, "account.me", "account.foe1"),
+        ev("Kill", 13, "account.mate", "account.foe2"),
+        ev("Kill", 14, "account.foe1", "account.me"),
+        ev("Kill", 15, "account.foe2", "account.mate"),
     ]
     assert ps.build_fights(events, SQUAD, TEAM_OF)[0]["result"] == "trade"
 
@@ -269,6 +293,9 @@ def test_aggregate_merges_matches_into_one_row_per_player():
         ev("ItemPickup", 10, "account.me"),
         ev("TakeDamage", 30, "account.me", "account.foe1"),
         ev("Kill", 35, "account.me", "account.foe1"),
+        # Team 7 hat zwei Mann — gewonnen ist der Kampf erst, wenn auch
+        # der zweite liegt.
+        ev("Kill", 40, "account.mate", "account.foe2"),
         ev("Knock", 200, "account.foe2", "account.me"),   # lange danach
     ], SQUAD, TEAM_OF)
     a2 = ps.analyse_match([
@@ -426,10 +453,13 @@ def test_baseline_counts_only_fights_the_enemy_started():
     theirs = ps.analyse_match([
         ev("TakeDamage", 10, "account.foe1", "account.me"),
         ev("Knock", 12, "account.foe1", "account.me"),
+        # Erst der Wipe macht den Kampf zur Niederlage.
+        ev("Kill", 14, "account.foe1", "account.me"),
+        ev("Kill", 16, "account.foe1", "account.mate"),
     ], SQUAD, TEAM_OF)
     b = ps.baseline([ours, theirs])
     assert b["opened"] == 1              # nur der fremd-eroeffnete Kampf
-    assert b["downsAgainst"] == 1
+    assert b["downsAgainst"] == 2        # beide Mates gefallen
     assert b["downsFor"] == 0
     assert b["lostPct"] == pytest.approx(100.0)
     assert b["wonPct"] == pytest.approx(0.0)

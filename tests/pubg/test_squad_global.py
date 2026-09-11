@@ -159,3 +159,31 @@ def test_ohne_matches_keine_abfrage(geteilt):
     from pubg.aggregations import participants_global
     conn, _, _ = geteilt
     assert participants_global(conn, []) == []
+
+
+def test_rueckfall_greift_je_match_nicht_global(geteilt):
+    """Ein Match ohne Team-Zuordnung darf die anderen nicht mitreißen.
+
+    Der Rückfall auf `participants` lief zuerst nur, wenn **gar kein**
+    Match eine Team-Zuordnung hatte. Ein einziges Match mit Zuordnung
+    brachte damit alle anderen um ihren Squad.
+    """
+    from pubg.lobby_kd import squad_per_match
+    conn, t1, _ = geteilt
+    # Ein zweites Match, nur mit participants und ohne Team-Zuordnung.
+    db_pg.insert_match(conn.raw, t1, "m2", "Baltic_Main", "squad-fpp",
+                       False, 1800, "2026-04-29T12:00:00Z", None)
+    db_pg.insert_participants(conn.raw, t1, "m2", [{
+        "account_id": ICH, "name": "PEX_LuCKoR", "team_id": 3, "place": 5,
+        "kills": 1, "headshot_kills": 0, "assists": 0, "dbnos": 0,
+        "revives": 0, "damage_dealt": 50.0, "longest_kill": 0.0,
+        "time_survived": 600, "walk_distance": 0.0, "ride_distance": 0.0,
+        "swim_distance": 0.0, "weapons_acquired": 1, "heals": 0,
+        "boosts": 0, "team_kills": 0}])
+    conn.raw.commit()
+    d = squad_per_match(conn, t1, [MID, "m2"])
+    # Das Match mit Zuordnung bleibt vollständig …
+    assert d[MID] == {ICH, MATE}
+    # … und das ohne taucht hier gar nicht auf, der Rückfall im Aufrufer
+    # muss es abfangen.
+    assert "m2" not in d
