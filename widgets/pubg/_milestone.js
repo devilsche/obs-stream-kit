@@ -42,11 +42,21 @@
   //: Wert zum Rekord.
   var SHOW_PREV = {
     weapon_best_damage: 1, weapon_best_kills: 1, weapon_longest: 1,
-    career_longest_kill: 1, career_most_kills: 1
+    career_longest_kill: 1, career_most_kills: 1,
+    career_hardest_lobby: 1
   };
 
   var NUM = function (n) {
     return Math.round(n).toLocaleString("en-US");
+  };
+
+  //: Kennzahlen, bei denen die Nachkommastelle die Aussage traegt. Eine
+  //: Lobby-K/D von 2,46 auf "2" gerundet waere keine Nachricht mehr.
+  var DECIMALS = { "lobby K/D": 2 };
+
+  var NUMD = function (n, dec) {
+    return Number(n).toLocaleString("en-US", {
+      minimumFractionDigits: dec, maximumFractionDigits: dec });
   };
 
   /* Wert und Einheit fuer die Anzeige.
@@ -58,6 +68,8 @@
    */
   function shown(m) {
     var v = Number(m.value) || 0, u = m.unit || "";
+    if (DECIMALS[u])
+      return { num: NUMD(v, DECIMALS[u]), unit: "", raw: v };
     var isDistanceTotal = m.occasion === "career_walk"
                        || m.occasion === "career_ride";
     if (u === "metres" && isDistanceTotal)
@@ -114,6 +126,8 @@
     if (m.unit === "level")
       return { big: s.num, unit: "level",
                words: v >= MAX_LEVEL_IN_TIER ? "tier complete" : null };
+    if (DECIMALS[m.unit])
+      return { big: s.num, unit: "", words: null };
     if (m.unit === "tier")
       return v >= MAX_TIER
         ? { big: "MASTER", unit: "", words: "top of the mastery tree" }
@@ -165,6 +179,8 @@
     // Kontoweite Anlaesse haben kein Subjekt; ohne diese Zeile blieben
     // sie ohne Einordnung und man wuesste nicht, worauf sich die Zahl
     // bezieht.
+    if (m.occasion === "career_hardest_lobby")
+      return "average career K/D of everyone in the lobby";
     if (m.occasion.indexOf("career_") === 0)
       return "across every mode";
     return "";

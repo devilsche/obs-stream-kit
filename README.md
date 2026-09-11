@@ -459,6 +459,39 @@ Voraussetzung für die Fremdsicht: die Seite muss ihre API-Calls über
 `/s/<token>/` sind davon nicht betroffen — dort gibt es keine Impersonation und
 entsprechend kein Banner im Stream.
 
+#### Anlass „Hardest Lobby"
+
+`career_hardest_lobby` feiert eine Lobby, die härter war als jede zuvor —
+gemessen an der **Karriere-K/D der Mitspieler**, nicht an der Todesrate der
+Runde. Quelle ist `pubg/lobby_kd.py`, dieselbe Zahl, die der Session-Report je
+Match zeigt.
+
+Eine eigene Rechnung wäre falsch und war es auch: das Modul nimmt den
+**modusspezifischen** Wert mit einer Fallback-Kette (gleicher Modus → gleiche
+Perspektive → Season → Lifetime). Wer stattdessen über alle Modi und Seasons
+summiert, landet deutlich zu niedrig — 1,83 statt 2,46 als Bestwert.
+
+Drei Fallstricke, alle im Code festgehalten:
+
+* **Untergrenze 1,8.** Der Median liegt bei 1,35; darunter ist jede Runde
+  gewöhnlich. Bei 2,0 wäre der bisherige Bestwert von 2,46 knapp über der
+  Schwelle und der Anlass praktisch tot.
+* **Beim ersten Mal werden alle Matches gerechnet**, danach nur die jüngsten
+  25 (`LOBBY_RECORD_WINDOW`). Wer immer nur das Fenster ansieht, hält das
+  Maximum der letzten Woche für den Alltime-Rekord und feiert beim nächsten
+  guten Match einen Rekord, der keiner ist.
+* **`counts_for_average` filtert mit**: mindestens 20 Spieler und 25 %
+  Abdeckung. Ohne das gewinnt eine Arcade-Runde mit vier Spielern und K/D 8,3.
+  Achtung, `coverage` ist ein **Prozentwert**, kein Anteil.
+
+Die Kennzahl trägt zwei Dezimalstellen (`decimals: 2`) — auf eine ganze Zahl
+gerundet wäre aus 2,46 eine 2 und damit keine Nachricht mehr. Der
+Meilenstein-Schlüssel behält sie ebenfalls, sonst gälten 2,46 und 2,44 als
+derselbe Meilenstein.
+
+Stand: Bestwert **2,46** (03.05., Rondo, 80 von 80 Spielern bekannt), eigene
+K/D 1,66 — in 11 % der Matches war die Lobby stärker.
+
 #### Waffennamen: deutscher Schlüssel, englische Anzeige
 
 `WEAPON_NAMES` in `pubg/aggregations.py` ist **deutsch gepflegt und ist der

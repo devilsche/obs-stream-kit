@@ -371,3 +371,55 @@ def test_ausgelevelt_ist_nicht_einstellbar():
     cfg = merge_config({"weapon_mastered": {"at": 100}})
     assert cfg["weapon_mastered"].get("at") is None
     assert OCCASIONS["weapon_mastered"]["at"] == MAX_TIER
+
+
+# ── Härteste Lobby ──────────────────────────────────────────────────────────
+
+def test_haertere_lobby_ist_ein_rekord():
+    prev = _state(career={"hardest_lobby": 2.34})
+    cur = _state(career={"hardest_lobby": 2.46})
+    hit = [m for m in detect(prev, cur)
+           if m["occasion"] == "career_hardest_lobby"][0]
+    assert hit["value"] == 2.46
+    assert hit["prev_value"] == 2.34
+    assert hit["tier"] == "huge"
+
+
+def test_gewoehnliche_lobby_ist_kein_rekord():
+    # Der Median liegt bei 1,35; alles darunter ist eine normale Runde.
+    prev = _state(career={"hardest_lobby": 1.2})
+    cur = _state(career={"hardest_lobby": 1.5})
+    assert [m for m in detect(prev, cur)
+            if m["occasion"] == "career_hardest_lobby"] == []
+
+
+def test_erster_lobby_wert_feiert_nicht():
+    # prev == 0 heißt: noch nie gemessen. Sonst wäre der erste Lauf ein
+    # "Rekord", obwohl er nur der erste bekannte Wert ist.
+    prev = _state(career={"hardest_lobby": 0})
+    cur = _state(career={"hardest_lobby": 2.46})
+    assert [m for m in detect(prev, cur)
+            if m["occasion"] == "career_hardest_lobby"] == []
+
+
+def test_gleiche_lobby_feiert_nicht_erneut():
+    prev = _state(career={"hardest_lobby": 2.46})
+    cur = _state(career={"hardest_lobby": 2.46})
+    assert [m for m in detect(prev, cur)
+            if m["occasion"] == "career_hardest_lobby"] == []
+
+
+def test_der_anlass_traegt_zwei_dezimalstellen():
+    # Auf eine ganze Zahl gerundet wäre aus 2,46 eine 2 — keine
+    # Nachricht mehr.
+    assert OCCASIONS["career_hardest_lobby"]["decimals"] == 2
+    assert OCCASIONS["career_hardest_lobby"]["unit"] == "lobby K/D"
+
+
+def test_schluessel_haelt_die_dezimalstellen():
+    # Ein auf die Ganzzahl gekürzter Schlüssel würde 2,46 und 2,44 als
+    # denselben Meilenstein behandeln — der zweite verfiele.
+    a = milestone_key("career_hardest_lobby", "", 2.46)
+    b = milestone_key("career_hardest_lobby", "", 2.44)
+    assert a != b
+    assert "2.46" in a

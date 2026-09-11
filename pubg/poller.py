@@ -910,15 +910,78 @@ def _db_weapon_extras(conn, tenant_id: int, account_id: str) -> dict:
     return out
 
 
-def collect_milestone_state(conn, tenant_id: int, client,
-                            account_id: str) -> dict:
-    """Aktueller Stand aus allen drei Quellen, wie `detect` ihn erwartet."""
+#: Wie viele der jüngsten Matches je Lauf auf einen Lobby-Rekord
+#: geprueft werden. Der Poller laeuft nach jedem Match, also genuegt
+#: eine kleine Zahl; sie deckt auch eine Sitzung ab, die der Sammler
+#: verschlafen hat.
+LOBBY_RECORD_WINDOW = 25
+
+
+def hardest_lobby(conn, tenant_id: int, account_id: str, bekannt=0.0):
+    """Haerteste Lobby, an der Karriere-K/D der Mitspieler gemessen.
+
+    Quelle ist `pubg/lobby_kd.py` — dieselbe Zahl, die der Report je
+    Match zeigt. Eine eigene Rechnung waere falsch: das Modul nimmt den
+    modusspezifischen Wert mit einer Fallback-Kette (gleicher Modus >
+    gleiche Perspektive > Season > Lifetime), und ohne die kommt ein
+    deutlich zu niedriger Wert heraus.
+
+    Ohne bekannten Vorwert werden **alle** Matches gerechnet, sonst nur
+    die jüngsten. Das ist der Unterschied zwischen einem echten
+    Alltime-Rekord und dem Maximum der letzten Woche: wer nur das
+    Fenster ansieht, feiert beim naechsten guten Match einen "Rekord",
+    der keiner ist.
+
+    Nur Lobbys, die `counts_for_average` besteht — sonst gewinnt eine
+    Arcade-Runde mit vier Spielern und K/D 8,3.
+    """
+    from pubg import lobby_kd as L
+
+    grenze = "" if not bekannt else f"LIMIT {LOBBY_RECORD_WINDOW}"
+    rows = conn.execute(f"""
+        SELECT m.match_id FROM matches m
+        JOIN participants p ON p.tenant_id = m.tenant_id
+                           AND p.match_id = m.match_id
+        WHERE m.tenant_id = ? AND p.account_id = ?
+          AND (m.game_mode LIKE 'solo%' OR m.game_mode LIKE 'duo%'
+               OR m.game_mode LIKE 'squad%')
+        ORDER BY m.played_at DESC {grenze}
+    """, (tenant_id, account_id)).fetchall()
+    mids = [r["match_id"] for r in rows]
+    if not mids:
+        return float(bekannt or 0.0)
+    try:
+        d = L.lobby_kd_for_matches(conn, tenant_id, mids, L.LIFETIME_KEY,
+                                   mode="squad-fpp",
+                                   my_account_id=account_id)
+    except Exception:
+        # Die Lobby-Zahlen sind Beiwerk; ohne sie laufen alle anderen
+        # Anlaesse weiter.
+        return float(bekannt or 0.0)
+    werte = [m["lobbyKd"] for m in (d.get("matches") or [])
+             if L.counts_for_average(m)]
+    return max([float(bekannt or 0.0)] + werte) if werte else float(
+        bekannt or 0.0)
+
+
+def collect_milestone_state(conn, tenant_id: int, client, account_id: str,
+                            vorher: float = 0.0) -> dict:
+    """Aktueller Stand aus allen Quellen, wie `detect` ihn erwartet.
+
+    `vorher` ist der bisher bekannte Lobby-Rekord. Fehlt er, rechnet
+    `hardest_lobby` alle Matches durch — einmalig teuer, dafuer ein
+    echter Alltime-Wert.
+    """
     from pubg.weapon_milestones import career_from_payload, parse_mastery
     weapons = parse_mastery(client.get_weapon_mastery(account_id))
     career = career_from_payload(client.get_lifetime(account_id))
     for name, extra in _db_weapon_extras(conn, tenant_id,
                                          account_id).items():
         weapons.setdefault(name, {}).update(extra)
+    # Der Lobby-Rekord traegt sich selbst fort: der bisherige Wert ist
+    # die Untergrenze, und nur die jüngsten Matches kommen dazu.
+    career["hardest_lobby"] = hardest_lobby(conn, tenant_id, account_id,
+                                            bekannt=vorher)
     return {"weapons": weapons, "career": career}
 
 
@@ -957,8 +1020,11 @@ def refresh_milestones(conn, tenant_id: int, client, account_id: str = None,
             return {"skipped": f"frisch ({age_min:.0f} min)"}
 
     prev = get_milestone_snapshot(conn, tenant_id, account_id)
+    bekannt = float(((prev or {}).get("career") or {})
+                    .get("hardest_lobby") or 0.0)
     try:
-        cur = collect_milestone_state(conn, tenant_id, client, account_id)
+        cur = collect_milestone_state(conn, tenant_id, client, account_id,
+                                      vorher=bekannt)
     except Exception as exc:                       # Netz, Rate-Limit, 404
         return {"error": str(exc)}
 

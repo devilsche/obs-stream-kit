@@ -286,6 +286,20 @@ OCCASIONS = {
     # Kontoweite Rekorde. Anders als die Waffen-Rekorde kommen diese aus
     # der API und gelten damit fuer die ganze Karriere, nicht nur fuer
     # die Matches, deren Telemetrie wir haben.
+    # Die haerteste Lobby, die man je erwischt hat — gemessen an der
+    # K/D der Mitspieler, nicht an der Todesrate der Runde. Quelle ist
+    # `pubg/lobby_kd.py`, dieselbe Zahl, die der Report je Match zeigt.
+    #
+    # Untergrenze 1,8: der Median liegt bei 1,35, und alles darunter ist
+    # eine gewoehnliche Runde. Bei 2,0 waere der bisherige Bestwert von
+    # 2,46 knapp ueber der Schwelle und der Anlass praktisch tot.
+    "career_hardest_lobby": {
+        "scope": "career", "metric": "hardest_lobby", "kind": "record",
+        "min": 1.8, "unit": "lobby K/D", "decimals": 2,
+        "label": "Hardest Lobby", "widget": "big", "enabled": True,
+        "tier": "huge",
+        "hint": "A lobby tougher than any you have played before",
+    },
     "career_longest_kill": {
         "scope": "career", "metric": "longest_kill", "kind": "record",
         "min": 300, "unit": "metres",
@@ -476,6 +490,11 @@ CAREER_FIELDS = {
 }
 
 
+#: Kennzahlen, die nicht aus dem Lifetime-Payload kommen, aber im
+#: Karriere-Satz mitlaufen. Der Poller fuellt sie aus eigenen Quellen.
+CAREER_EXTRA = ("hardest_lobby",)
+
+
 def career_from_payload(payload) -> dict:
     """Kontoweite Summen aus der Lifetime-Antwort.
 
@@ -486,6 +505,7 @@ def career_from_payload(payload) -> dict:
     modes = (((payload or {}).get("data") or {}).get("attributes")
              or {}).get("gameModeStats") or {}
     out = {k: 0.0 for k in CAREER_FIELDS}
+    out.update({k: 0.0 for k in CAREER_EXTRA})
     for s in modes.values():
         for name, (field, how) in CAREER_FIELDS.items():
             v = s.get(field) or 0
