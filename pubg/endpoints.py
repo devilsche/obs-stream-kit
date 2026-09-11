@@ -68,6 +68,21 @@ class _AccountScopedCache:
         return getattr(self._inner, item)
 
 
+def _as_json(v):
+    """JSONB kommt je nach Treiber als dict oder als Text.
+
+    Freie Funktion und keine Methode: die Aufrufer sind `staticmethod`
+    und haben kein `self`.
+    """
+    if v is None or isinstance(v, dict):
+        return v
+    import json
+    try:
+        return json.loads(v)
+    except (TypeError, ValueError):
+        return None
+
+
 class EndpointRegistry:
     def __init__(self, get_conn, my_account_id, platform, cache,
                  client, poller_status, tenant_id: int,
@@ -2567,6 +2582,9 @@ class EndpointRegistry:
             "widget": m.get("widget") or "bar",
             "shownBigAt": m.get("shown_big_at"),
             "shownBarAt": m.get("shown_bar_at"),
+            # Begleitzahlen zum Moment des Meilensteins, sofern der
+            # Anlass welche mitliefert.
+            "extra": _as_json(m.get("extra")),
         }
 
     def _milestone_config_get(self, qs=None):
@@ -2763,6 +2781,10 @@ class EndpointRegistry:
             "prev_value": float(prev or 0),
             "tier": tier or tier_for(c, value),
             "widget": widget or c.get("widget") or "bar",
+            # Fuer die Vorschau: die Begleitzahlen des letzten echten
+            # Rekords, damit die Reihe nicht leer bleibt.
+            "extra": ((snap.get("extra") or {}).get(metric)
+                      if isinstance(snap, dict) else None),
         }, None
 
     def _as_payload(self, item):
@@ -2773,6 +2795,7 @@ class EndpointRegistry:
             "unit": item["unit"], "value": item["value"],
             "prev_value": item["prev_value"], "tier": item["tier"],
             "widget": item["widget"], "is_test": True,
+            "extra": item.get("extra"),
             "detected_at": int(time.time()),
         })
 

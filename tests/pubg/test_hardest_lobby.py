@@ -5,6 +5,9 @@ Matches gerechnet werden (sonst ist der „Rekord" nur das Maximum der
 letzten Woche, und das nächste gute Match feiert einen Rekord, der
 keiner ist), und winzige Arcade-Lobbys dürfen nicht gewinnen — eine
 Runde mit vier Spielern stand auf prod bei K/D 8,3.
+
+`hardest_lobby` liefert `(wert, match_id)` — die Id nur, wenn ein neuer
+Bestwert dabei ist, denn nur dann gibt es Begleitzahlen festzuhalten.
 """
 from unittest.mock import patch
 
@@ -58,7 +61,8 @@ def test_ohne_vorwert_werden_alle_matches_gerechnet(matches):
         return _antwort([(mids[0], 2.46, 90)])
 
     with patch("pubg.lobby_kd.lobby_kd_for_matches", side_effect=fake):
-        assert hardest_lobby(conn, t1, ME, bekannt=0.0) == 2.46
+        wert, _ = hardest_lobby(conn, t1, ME, bekannt=0.0)
+    assert wert == 2.46
     # Alle 40, nicht nur das Fenster — sonst wäre es kein Alltime-Wert.
     assert gesehen["n"] == 40
 
@@ -81,7 +85,7 @@ def test_der_vorwert_ist_die_untergrenze(matches):
     conn, t1 = matches
     with patch("pubg.lobby_kd.lobby_kd_for_matches",
                return_value=_antwort([("m00", 1.4, 90)])):
-        assert hardest_lobby(conn, t1, ME, bekannt=2.46) == 2.46
+        assert hardest_lobby(conn, t1, ME, bekannt=2.46)[0] == 2.46
 
 
 def test_winzige_lobby_gewinnt_nicht(matches):
@@ -90,7 +94,7 @@ def test_winzige_lobby_gewinnt_nicht(matches):
     with patch("pubg.lobby_kd.lobby_kd_for_matches",
                return_value=_antwort([("m00", 8.3, 4),
                                       ("m01", 1.9, 90)])):
-        assert hardest_lobby(conn, t1, ME, bekannt=0.0) == 1.9
+        assert hardest_lobby(conn, t1, ME, bekannt=0.0)[0] == 1.9
 
 
 def test_lobby_ohne_abdeckung_gewinnt_nicht(matches):
@@ -103,7 +107,7 @@ def test_lobby_ohne_abdeckung_gewinnt_nicht(matches):
         {"matchId": "m01", "lobbyKd": 2.0, "lobbyPlayers": 90, "known": 90,
          "coverage": 100.0, "playedAt": "2026-08-02T12:00:00Z"}]}
     with patch("pubg.lobby_kd.lobby_kd_for_matches", return_value=schlecht):
-        assert hardest_lobby(conn, t1, ME, bekannt=0.0) == 2.0
+        assert hardest_lobby(conn, t1, ME, bekannt=0.0)[0] == 2.0
 
 
 def test_ein_fehler_laesst_den_rekord_stehen(matches):
@@ -112,11 +116,82 @@ def test_ein_fehler_laesst_den_rekord_stehen(matches):
     conn, t1 = matches
     with patch("pubg.lobby_kd.lobby_kd_for_matches",
                side_effect=RuntimeError("API weg")):
-        assert hardest_lobby(conn, t1, ME, bekannt=2.46) == 2.46
+        assert hardest_lobby(conn, t1, ME, bekannt=2.46) == (2.46, None)
 
 
 def test_ohne_matches_bleibt_der_vorwert(pg_compat):
     conn, t1, _ = pg_compat
     db_pg.upsert_player(conn.raw, t1, ME, "PEX_LuCKoR", "steam", 1)
     conn.raw.commit()
-    assert hardest_lobby(conn, t1, ME, bekannt=1.7) == 1.7
+    assert hardest_lobby(conn, t1, ME, bekannt=1.7) == (1.7, None)
+
+
+# ── Begleitzahlen zum Rekord ────────────────────────────────────────────────
+
+def test_die_kennzahlen_kommen_aus_lobby_detail(matches):
+    # Nicht nachbauen: lobby_detail liefert Median, beide Ränder und den
+    # eigenen Squad bereits — dieselbe Funktion, hinter der im Report die
+    # Lobby-Zahl hängt.
+    from pubg.poller import lobby_begleitzahlen
+    conn, t1 = matches
+    antwort = {"matches": [{
+        "matchId": "m00", "avg": 2.46, "median": 1.31, "max": 8.16,
+        "topAvg": 6.02, "lowAvg": 0.41, "squadKdMates": 1.9,
+        "known": 80, "lobbyPlayers": 80, "map": "Neon_Main",
+        "playedAt": "2026-05-03T12:00:00Z",
+        "top": [{"name": "Hai", "kd": 8.16}]}]}
+    with patch("pubg.lobby_kd.lobby_detail", return_value=antwort):
+        d = lobby_begleitzahlen(conn, t1, "m00", ME)
+    assert d["topAvg"] == 6.02
+    assert d["lowAvg"] == 0.41
+    assert d["squadKd"] == 1.9
+    assert d["median"] == 1.31
+    assert d["topName"] == "Hai"
+
+
+def test_ohne_lobby_detail_bleibt_der_rekord_ohne_beiwerk(matches):
+    from pubg.poller import lobby_begleitzahlen
+    conn, t1 = matches
+    with patch("pubg.lobby_kd.lobby_detail",
+               side_effect=RuntimeError("weg")):
+        assert lobby_begleitzahlen(conn, t1, "m00", ME) is None
+
+
+def test_rekord_liefert_die_match_id_mit(matches):
+    # Nur wenn ein neuer Bestwert dabei ist — sonst gäbe es nichts
+    # festzuhalten.
+    conn, t1 = matches
+    with patch("pubg.lobby_kd.lobby_kd_for_matches",
+               return_value=_antwort([("m00", 2.46, 90)])):
+        wert, mid = hardest_lobby(conn, t1, ME, bekannt=0.0)
+    assert (wert, mid) == (2.46, "m00")
+
+
+def test_ohne_neuen_bestwert_keine_match_id(matches):
+    conn, t1 = matches
+    with patch("pubg.lobby_kd.lobby_kd_for_matches",
+               return_value=_antwort([("m00", 1.4, 90)])):
+        wert, mid = hardest_lobby(conn, t1, ME, bekannt=2.46)
+    assert wert == 2.46 and mid is None
+
+
+def test_begleitzahlen_erreichen_den_meilenstein():
+    # Der ganze Weg: Zustand mit extra -> detect -> Eintrag.
+    from pubg.weapon_milestones import detect
+    prev = {"weapons": {}, "career": {"hardest_lobby": 2.34}}
+    cur = {"weapons": {}, "career": {"hardest_lobby": 2.46},
+           "extra": {"hardest_lobby": {"topAvg": 6.02, "lowAvg": 0.41,
+                                       "median": 1.31, "squadKd": 1.9}}}
+    m = [x for x in detect(prev, cur)
+         if x["occasion"] == "career_hardest_lobby"][0]
+    assert m["extra"]["topAvg"] == 6.02
+    assert m["extra"]["squadKd"] == 1.9
+
+
+def test_anlaesse_ohne_begleitzahlen_bleiben_leer():
+    from pubg.weapon_milestones import detect
+    prev = {"weapons": {"M416": {"best_damage": 900}}, "career": {}}
+    cur = {"weapons": {"M416": {"best_damage": 976}}, "career": {}}
+    m = [x for x in detect(prev, cur)
+         if x["occasion"] == "weapon_best_damage"][0]
+    assert m["extra"] is None

@@ -393,6 +393,11 @@ CREATE TABLE IF NOT EXISTS pubg_milestones_seen (
     -- die Marke erreicht zu haben. Getrennt gefuehrt, damit sich die
     -- Probeläufe wieder wegwerfen lassen.
     is_test       BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Begleitzahlen zum Moment des Meilensteins. Bei der haertesten
+    -- Lobby sind das Median, Top- und Bodenschnitt und der eigene
+    -- Squad — spaeter geholt waeren es andere Werte, weil die
+    -- Karriere-K/D der Mitspieler weiterlaeuft.
+    extra         JSONB,
     detected_at   BIGINT NOT NULL,
     shown_big_at  BIGINT,
     shown_bar_at  BIGINT,
@@ -1604,6 +1609,7 @@ def queue_milestones(conn, tenant_id: int, items, is_test: bool = False,
     Meilenstein derselbe Eintrag, egal wie oft der Poller laeuft.
     Ein Probelauf ueberschreibt einen echten Eintrag nicht.
     """
+    import json
     import time
     ts = int(now_ts if now_ts is not None else time.time())
     n = 0
@@ -1613,13 +1619,14 @@ def queue_milestones(conn, tenant_id: int, items, is_test: bool = False,
                 INSERT INTO pubg_milestones_seen
                        (tenant_id, milestone_key, occasion, subject, label,
                         unit, value, prev_value, tier, widget, is_test,
-                        detected_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        extra, detected_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT (tenant_id, milestone_key) DO NOTHING
             """, (tenant_id, m["key"], m["occasion"], m.get("subject") or "",
                   m.get("label"), m.get("unit"), float(m["value"]),
                   float(m.get("prev_value") or 0), m.get("tier") or "small",
-                  m.get("widget") or "bar", bool(is_test), ts))
+                  m.get("widget") or "bar", bool(is_test),
+                  json.dumps(m["extra"]) if m.get("extra") else None, ts))
             n += cur.rowcount or 0
     return n
 
@@ -1642,7 +1649,7 @@ def pending_milestones(conn, tenant_id: int, widget: str, limit: int = 1):
     with conn.cursor() as cur:
         cur.execute(f"""
             SELECT milestone_key, occasion, subject, label, unit, value,
-                   prev_value, tier, widget, is_test, detected_at
+                   prev_value, tier, widget, is_test, extra, detected_at
             FROM pubg_milestones_seen
             WHERE tenant_id = %s AND {col} IS NULL
               AND widget IN (%s, 'both')
@@ -1682,7 +1689,7 @@ def recent_milestones(conn, tenant_id: int, limit: int = 40):
     with conn.cursor() as cur:
         cur.execute("""
             SELECT milestone_key, occasion, subject, label, unit, value,
-                   prev_value, tier, widget, is_test, detected_at,
+                   prev_value, tier, widget, is_test, extra, detected_at,
                    shown_big_at, shown_bar_at
             FROM pubg_milestones_seen
             WHERE tenant_id = %s

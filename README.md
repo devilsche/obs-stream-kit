@@ -489,6 +489,16 @@ gerundet wäre aus 2,46 eine 2 und damit keine Nachricht mehr. Der
 Meilenstein-Schlüssel behält sie ebenfalls, sonst gälten 2,46 und 2,44 als
 derselbe Meilenstein.
 
+**Die Feier zeigt die Verteilung, nicht nur den Schnitt**: Top-5-Ø, Median,
+Bottom-5-Ø und die K/D des eigenen Squads. Erst beide Ränder trennen „fünf Haie
+oben, fünf Anfänger unten" von einem durchgehend starken Feld — der Mittelwert
+ist in beiden Fällen derselbe.
+
+Diese Zahlen kommen aus **`lobby_detail`**, derselben Funktion, hinter der im
+Report das Lobby-Modal hängt; nachgebaut wäre doppelt und würde abweichen. Sie
+werden **im Moment des Rekords** in der Spalte `extra` festgehalten: später
+geholt wären es andere Werte, weil die Karriere-K/D der Mitspieler weiterläuft.
+
 Stand: Bestwert **2,46** (03.05., Rondo, 80 von 80 Spielern bekannt), eigene
 K/D 1,66 — in 11 % der Matches war die Lobby stärker.
 

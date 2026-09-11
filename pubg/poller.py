@@ -926,6 +926,9 @@ def hardest_lobby(conn, tenant_id: int, account_id: str, bekannt=0.0):
     gleiche Perspektive > Season > Lifetime), und ohne die kommt ein
     deutlich zu niedriger Wert heraus.
 
+    Liefert `(wert, match_id)`; die Match-Id ist gesetzt, wenn ein neuer
+    Bestwert dabei ist — daran haengen die Begleitzahlen.
+
     Ohne bekannten Vorwert werden **alle** Matches gerechnet, sonst nur
     die jüngsten. Das ist der Unterschied zwischen einem echten
     Alltime-Rekord und dem Maximum der letzten Woche: wer nur das
@@ -949,7 +952,7 @@ def hardest_lobby(conn, tenant_id: int, account_id: str, bekannt=0.0):
     """, (tenant_id, account_id)).fetchall()
     mids = [r["match_id"] for r in rows]
     if not mids:
-        return float(bekannt or 0.0)
+        return float(bekannt or 0.0), None
     try:
         d = L.lobby_kd_for_matches(conn, tenant_id, mids, L.LIFETIME_KEY,
                                    mode="squad-fpp",
@@ -957,11 +960,55 @@ def hardest_lobby(conn, tenant_id: int, account_id: str, bekannt=0.0):
     except Exception:
         # Die Lobby-Zahlen sind Beiwerk; ohne sie laufen alle anderen
         # Anlaesse weiter.
-        return float(bekannt or 0.0)
-    werte = [m["lobbyKd"] for m in (d.get("matches") or [])
-             if L.counts_for_average(m)]
-    return max([float(bekannt or 0.0)] + werte) if werte else float(
-        bekannt or 0.0)
+        return float(bekannt or 0.0), None
+    tauglich = [m for m in (d.get("matches") or [])
+                if L.counts_for_average(m)]
+    if not tauglich:
+        return float(bekannt or 0.0), None
+    bester = max(tauglich, key=lambda m: m["lobbyKd"])
+    if float(bekannt or 0.0) >= bester["lobbyKd"]:
+        return float(bekannt), None
+    return float(bester["lobbyKd"]), bester["matchId"]
+
+
+def lobby_begleitzahlen(conn, tenant_id: int, match_id: str, account_id: str):
+    """Die Kennzahlen zur Rekord-Lobby, wie das Modal sie zeigt.
+
+    Quelle ist `lobby_detail` — dieselbe Funktion, hinter der im Report
+    die Lobby-Zahl haengt. Sie liefert Median, haertesten Gegner, beide
+    Raender und den eigenen Squad; nachzubauen waere doppelt und wuerde
+    abweichen.
+
+    Festgehalten wird im Moment des Rekords: spaeter geholt waeren es
+    andere Zahlen, weil die Karriere-K/D der Mitspieler weiterlaeuft.
+    """
+    from pubg import lobby_kd as L
+    try:
+        d = L.lobby_detail(conn, tenant_id, [match_id],
+                           my_account_id=account_id)
+    except Exception:
+        return None
+    ms = d.get("matches") or []
+    if not ms:
+        return None
+    m = ms[0]
+    spitze = (m.get("top") or [{}])[0]
+    return {
+        "matchId": match_id,
+        "avg": m.get("avg"),
+        "median": m.get("median"),
+        "max": m.get("max"),
+        "topAvg": m.get("topAvg"),
+        "lowAvg": m.get("lowAvg"),
+        "topName": spitze.get("name"),
+        # Der eigene Squad ohne mich: die Frage "wer sass im eigenen
+        # Auto" gehoert neben die Lobby-Zahl.
+        "squadKd": m.get("squadKdMates"),
+        "known": m.get("known"),
+        "players": m.get("lobbyPlayers"),
+        "map": m.get("map"),
+        "playedAt": m.get("playedAt"),
+    }
 
 
 def collect_milestone_state(conn, tenant_id: int, client, account_id: str,
@@ -980,9 +1027,16 @@ def collect_milestone_state(conn, tenant_id: int, client, account_id: str,
         weapons.setdefault(name, {}).update(extra)
     # Der Lobby-Rekord traegt sich selbst fort: der bisherige Wert ist
     # die Untergrenze, und nur die jüngsten Matches kommen dazu.
-    career["hardest_lobby"] = hardest_lobby(conn, tenant_id, account_id,
-                                            bekannt=vorher)
-    return {"weapons": weapons, "career": career}
+    wert, rekord_match = hardest_lobby(conn, tenant_id, account_id,
+                                       bekannt=vorher)
+    career["hardest_lobby"] = wert
+    extra = {}
+    if rekord_match:
+        begleit = lobby_begleitzahlen(conn, tenant_id, rekord_match,
+                                      account_id)
+        if begleit:
+            extra["hardest_lobby"] = begleit
+    return {"weapons": weapons, "career": career, "extra": extra}
 
 
 def refresh_milestones(conn, tenant_id: int, client, account_id: str = None,

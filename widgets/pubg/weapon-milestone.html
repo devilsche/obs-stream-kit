@@ -73,7 +73,39 @@
    * derselben Waffe, und die holt der Zustands-Endpoint sowieso.
    * Faellt er aus, bleibt die Reihe leer statt die Feier zu verhindern.
    */
+  /* Kennzahlen, die der Meilenstein selbst mitbringt.
+   *
+   * Bei der haertesten Lobby sind das Median, die beiden Raender und
+   * der eigene Squad — im Moment des Rekords festgehalten. Sie spaeter
+   * zu holen waere falsch: die Karriere-K/D der Mitspieler laeuft
+   * weiter.
+   */
+  var EXTRA_ROWS = {
+    career_hardest_lobby: [
+      ["topAvg", "top 5"],
+      ["median", "median"],
+      ["lowAvg", "bottom 5"],
+      ["squadKd", "your squad"]
+    ]
+  };
+
+  function extraStats(m) {
+    var plan = EXTRA_ROWS[m.occasion];
+    var e = m.extra;
+    if (!plan || !e) return null;
+    var out = [];
+    plan.forEach(function (pair) {
+      var v = e[pair[0]];
+      if (v == null) return;
+      out.push([Number(v).toFixed(2), pair[1]]);
+    });
+    return out.length ? out : null;
+  }
+
   function statsFor(m) {
+    // Eigene Begleitzahlen gehen vor: sie gehoeren zum Moment.
+    var eigen = extraStats(m);
+    if (eigen) return Promise.resolve(eigen);
     var base = (window.__SERVE_BASE__ || "/") + "api/pubg/milestone-state";
     return fetch(base, { cache: "no-store" })
       .then(function (r) { return r.ok ? r.json() : null; })

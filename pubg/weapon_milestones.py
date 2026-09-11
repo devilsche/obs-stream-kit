@@ -553,7 +553,7 @@ def milestone_key(occasion, subject, value):
     return f"{occasion}:{subject}:{v}"
 
 
-def _emit(occasion, occ, subject, value, prev):
+def _emit(occasion, occ, subject, value, prev, extra=None):
     return {
         "key": milestone_key(occasion, subject, value),
         "occasion": occasion,
@@ -565,6 +565,9 @@ def _emit(occasion, occ, subject, value, prev):
         "prev_value": prev,
         "tier": tier_for(occ, value),
         "widget": occ.get("widget") or "bar",
+        # Begleitzahlen zum Moment — steht nur bei Anlaessen, die
+        # welche mitliefern.
+        "extra": extra,
     }
 
 
@@ -582,6 +585,8 @@ def detect(prev: dict, cur: dict, cfg=None) -> list:
     if not prev or not (prev.get("weapons") or prev.get("career")):
         return []
     cfg = cfg or default_config()
+    # Begleitzahlen des aktuellen Stands, je Metrik.
+    extras = (cur.get("extra") or {}) if isinstance(cur, dict) else {}
     found = []
     for oid, occ in OCCASIONS.items():
         c = cfg.get(oid) or {}
@@ -623,7 +628,8 @@ def detect(prev: dict, cur: dict, cfg=None) -> list:
             elif kind == "record":
                 floor = c.get("min", occ.get("min")) or 0
                 if v > p and v >= floor and p > 0:
-                    found.append(_emit(oid, {**occ, **c}, subject, v, p))
+                    found.append(_emit(oid, {**occ, **c}, subject, v, p,
+                                       extras.get(metric)))
             elif kind == "at":
                 target = c.get("at", occ.get("at")) or 0
                 if p < target <= v:
