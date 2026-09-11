@@ -300,8 +300,39 @@
     });
   }
 
+  /* Buehne ausblenden und danach wegnehmen.
+   *
+   * Die Dauer steht im Stylesheet (`--ms-fade`); hier wird sie nur
+   * ausgelesen, damit JS und CSS nicht auseinanderlaufen. Wer
+   * Bewegung abbestellt hat, bekommt kein Ausblenden — dann ist die
+   * Buehne sofort weg, statt eine Sekunde reglos stehenzubleiben.
+   */
+  function fadeOut(canvas) {
+    var dauer = 0;
+    try {
+      var roh = getComputedStyle(canvas).getPropertyValue("--ms-fade");
+      dauer = parseFloat(roh) || 0;
+      if (/ms\s*$/.test(roh) === false && dauer < 50) dauer *= 1000;
+    } catch (e) { dauer = 1200; }
+    var ruhig = false;
+    try {
+      ruhig = global.matchMedia
+           && global.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    } catch (e) { /* aeltere Browser */ }
+    if (ruhig) dauer = 0;
+    return new Promise(function (done) {
+      if (dauer > 0) canvas.setAttribute("data-leaving", "1");
+      setTimeout(function () {
+        canvas.hidden = true;
+        canvas.removeAttribute("data-leaving");
+        canvas.innerHTML = "";
+        done();
+      }, dauer);
+    });
+  }
+
   global.Milestone = {
-    demo: demo, demoAll: demoAll, occasions: occasions,
+    demo: demo, demoAll: demoAll, occasions: occasions, fadeOut: fadeOut,
     ICONS: ICONS, SHOW_PREV: SHOW_PREV, NUM: NUM,
     shown: shown, bigForm: bigForm, subline: subline, ctxline: ctxline,
     confetti: confetti, secondBurst: secondBurst, iconFor: iconFor,

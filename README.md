@@ -739,6 +739,15 @@ Die Leiste ist gegenüber dem ersten Entwurf um ein Fünftel geschrumpft: mit
 am Leerzeichen vor der Einheit. Dagegen hilft `white-space: nowrap`; die
 Staffelung nach Zeichenzahl greift erst ab zehn Zeichen.
 
+**Am Ende wird ausgeblendet, nicht abgerissen.** Die Dauer steht als
+`--ms-fade` im Stylesheet (1.200 ms im Vollbild, 600 ms in der Leiste, die nur
+wenige Sekunden steht); das JS setzt lediglich `data-leaving` und wartet
+dieselbe Spanne ab. So bleibt der Wert an einer Stelle und es braucht kein
+`style`-Attribut — die bestehende Career-Wins-Feier löst dasselbe über
+`style.setProperty`, was hier nicht erlaubt ist. Wer `prefers-reduced-motion`
+gesetzt hat, bekommt kein Ausblenden: dann wäre die Bühne eine Sekunde reglos
+sichtbar, was schlechter ist als ein sofortiges Ende.
+
 #### Zwei Werte je Bedeutung: Fläche und Text
 
 Die Tokens `--theme-accent`, `--theme-accent-2`, `--theme-ok`,

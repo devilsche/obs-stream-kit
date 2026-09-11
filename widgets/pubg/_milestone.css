@@ -23,8 +23,22 @@ html, body {
    beim Laden schon etwas zeigt, feiert beim Szenenwechsel mit. */
 .canvas {
   position: absolute; top: 0; left: 0; width: 1920px; height: 1080px;
+  /* Ausblenden statt abreissen. Die Dauer steht hier und nicht im JS,
+     damit nichts per style-Attribut gesetzt werden muss; das JS setzt
+     nur `data-leaving` und wartet dieselbe Spanne ab. */
+  --ms-fade: 1200ms;
+  opacity: 1;
+  transition: opacity var(--ms-fade) ease-in;
 }
+.canvas[data-leaving="1"] { opacity: 0; }
 .canvas[hidden] { display: none; }
+/* Die Leiste steht nur wenige Sekunden; ein langes Ausblenden waere
+   dort ein Drittel der Standzeit. */
+.canvas[data-design="c"] { --ms-fade: 600ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas { transition: none; }
+}
 
 .mc-bg {
   position: absolute; inset: 0;

@@ -81,9 +81,7 @@
     canvas.hidden = false;
     return new Promise(function (done) {
       setTimeout(function () {
-        canvas.hidden = true;
-        canvas.innerHTML = "";
-        done();
+        M.fadeOut(canvas).then(done);
       }, WAIT_S * 1000);
     });
   }

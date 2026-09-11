@@ -141,9 +141,7 @@
       var wait = (design === "d" ? WAIT_HUGE : WAIT_SMALL) * 1000;
       return new Promise(function (done) {
         setTimeout(function () {
-          canvas.hidden = true;
-          canvas.innerHTML = "";
-          done();
+          M.fadeOut(canvas).then(done);
         }, wait);
       });
     });
