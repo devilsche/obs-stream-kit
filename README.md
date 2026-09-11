@@ -489,10 +489,17 @@ mit (`LogCarePackageLand`, `LogItemPickupFromCarepackage`,
 Rohtelemetrie und kommt daher **auch für alte Matches** an die Zahlen; die
 Achievements brauchen neue Matches.
 
-Eine Einschränkung steht in der Fußzeile des Tools: `carePackageUniqueId` ist
-in allen gemessenen Daten `0`, die Zuordnung läuft deshalb über den Pakettyp.
-Fallen zwei Pakete desselben Typs, stimmt die Zahl der Besucher, ihre
-Aufteilung auf die beiden Pakete nicht.
+**Zugeordnet wird über die Position**, nicht über eine Paket-Id:
+`carePackageUniqueId` steht in den gemessenen Daten auf 0 oder 1, nicht je
+Paket verschieden. Der Pakettyp allein ist zu grob — ein Match hatte 44
+Landungen bei einer Handvoll Typen, wodurch jede Entnahme an drei Pakete
+gleichzeitig gezählt wurde. Wer ein Paket ausräumt, steht daran: die
+gemessenen Abstände liegen bei einem bis zwei Metern, die Toleranz bei 50 m.
+
+Als „erwähnenswert" gelten nicht nur die Drop-Waffen, sondern auch Level-3-
+Ausrüstung und die großen Visiere — sonst stand bei einem Paket mit Weste Lv3
+und 8×-Visier „nichts Besonderes", obwohl das der häufigste Inhalt überhaupt
+ist und der Grund, warum Leute hinlaufen.
 
 #### Red Zone: drei Achievements (Stand 2026-09-11)
 

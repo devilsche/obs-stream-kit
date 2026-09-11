@@ -305,3 +305,81 @@ def test_beide_sind_vollstaendig_registriert():
         assert aid in R.PUBG_ICON_URLS, aid
         for lang in ("english", "german"):
             assert aid in R.PUBG_ACH_DESCRIPTIONS[lang], f"{aid}/{lang}"
+
+
+# ── Airdrop-Zuordnung über die Position ─────────────────────────────────────
+
+def _land(ts, x, y, items, typ="Carapackage_RedBox_C"):
+    return {"_T": "LogCarePackageLand", "_D": ts,
+            "itemPackage": {"itemPackageId": typ,
+                            "location": {"x": x, "y": y},
+                            "items": [{"itemId": i} for i in items]}}
+
+
+def _take(ts, name, x, y, item, typ="Carapackage_RedBox_C"):
+    return {"_T": "LogItemPickupFromCarepackage", "_D": ts,
+            "character": {"accountId": name, "name": name,
+                          "location": {"x": x, "y": y}},
+            "item": {"itemId": item}, "carePackageName": typ}
+
+
+def test_zwei_pakete_desselben_typs_werden_getrennt():
+    # Der eigentliche Fehler: über den Pakettyp allein zählte jede
+    # Entnahme an jedes Paket des Typs. Ein echtes Match hatte 44
+    # Landungen bei einer Handvoll Typen.
+    from pubg.telemetry_analysis import airdrops
+    evs = [_land("t0", 0.0, 0.0, ["Item_Weapon_AWM_C"]),
+           _land("t1", 500000.0, 500000.0, ["Item_Weapon_Groza_C"]),
+           _take("t2", "A", 100.0, 100.0, "Item_Weapon_AWM_C"),
+           _take("t3", "B", 499900.0, 500100.0, "Item_Weapon_Groza_C")]
+    d = airdrops(evs)
+    assert [[t["name"] for t in x["takenBy"]] for x in d] == [["A"], ["B"]]
+
+
+def test_entnahme_weit_weg_wird_keinem_paket_zugerechnet():
+    # Wer ein Paket ausräumt, steht daran — gemessen ein bis zwei Meter.
+    from pubg.telemetry_analysis import airdrops
+    evs = [_land("t0", 0.0, 0.0, ["Item_Weapon_AWM_C"]),
+           _take("t1", "C", 900000.0, 900000.0, "Item_Weapon_AWM_C")]
+    d = airdrops(evs)
+    assert d[0]["takenBy"] == [] and d[0]["touched"] is False
+
+
+def test_ausruestung_zaehlt_auch_als_highlight():
+    # Vorher stand bei einem Paket mit Level-3-Weste und 8x-Visier
+    # "nichts Besonderes" — gemessen der häufigste Inhalt überhaupt.
+    from pubg.telemetry_analysis import airdrops
+    d = airdrops([_land("t0", 0.0, 0.0, [
+        "Item_Ammo_556mm_C", "Item_Head_G_01_Lv3_C",
+        "Item_Attach_Weapon_Upper_CQBSS_C"])])
+    assert set(d[0]["highlights"]) == {"Helm Lv3", "8x"}
+
+
+def test_munition_ist_kein_highlight():
+    from pubg.telemetry_analysis import airdrops
+    d = airdrops([_land("t0", 0.0, 0.0,
+                        ["Item_Ammo_556mm_C", "Item_Heal_FirstAid_C"])])
+    assert d[0]["highlights"] == []
+    assert d[0]["itemCount"] == 2
+
+
+def test_ohne_landung_dient_der_spawn_als_notnagel():
+    # Alte Aufzeichnungen haben nur Spawn-Ereignisse.
+    from pubg.telemetry_analysis import airdrops
+    d = airdrops([{"_T": "LogCarePackageSpawn", "_D": "t0",
+                   "itemPackage": {"itemPackageId": "Carapackage_RedBox_C",
+                                   "location": {"x": 1.0, "y": 2.0},
+                                   "items": [{"itemId": "Item_Weapon_AWM_C"}]}}])
+    assert len(d) == 1 and d[0]["highlights"] == ["AWM"]
+
+
+def test_landung_gewinnt_gegen_spawn():
+    # Beides für dasselbe Paket: der Spawn nennt den Abwurfpunkt in der
+    # Luft, erst die Landung den Punkt am Boden.
+    from pubg.telemetry_analysis import airdrops
+    evs = [{"_T": "LogCarePackageSpawn", "_D": "t0",
+            "itemPackage": {"itemPackageId": "Carapackage_RedBox_C",
+                            "location": {"x": 9.0, "y": 9.0}, "items": []}},
+           _land("t1", 1.0, 2.0, ["Item_Weapon_AWM_C"])]
+    d = airdrops(evs)
+    assert len(d) == 1 and (d[0]["x"], d[0]["y"]) == (1.0, 2.0)

@@ -603,8 +603,13 @@ def _binom_cdf(k: int, n: int, p: float) -> float:
     return sum(math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(k + 1))
 
 
-#: Waffen, die es nur im Abwurf gibt. Sie entscheiden, ob ein Paket
-#: erwaehnenswert war — der Rest ist Munition und Westen.
+#: Abstand, bis zu dem eine Entnahme einem Paket zugerechnet wird, in
+#: Zentimetern. Gemessen liegen die echten Abstaende bei 1 bis 2 Metern —
+#: man steht am Paket, wenn man es ausraeumt. 50 m sind reichlich
+#: Spielraum und immer noch weit unter dem Abstand zweier Pakete.
+DROP_NEAR_CM = 5000
+
+#: Waffen, die es nur im Abwurf gibt.
 DROP_WEAPON_LABELS = {
     "Item_Weapon_AWM_C": "AWM",
     "Item_Weapon_MK14_C": "Mk14 EBR",
@@ -630,6 +635,30 @@ PACKAGE_LABELS = {
     "Carapackage_SmallPackage_DihorOtok_C": "Small (Vikendi)",
     "Carapackage_SmallPackage_Savage_C": "Small (Sanhok)",
 }
+
+
+#: Was ausser Waffen einen Abwurf lohnend macht. Ohne diese Liste stand
+#: bei einem Paket mit Level-3-Weste und 8x-Visier "nichts Besonderes" —
+#: gemessen der haeufigste Inhalt ueberhaupt, und der Grund, warum
+#: Leute hinlaufen.
+DROP_GEAR_LABELS = {
+    "Item_Head_G_01_Lv3_C": "Helm Lv3",
+    "Item_Armor_C_01_Lv3_C": "Weste Lv3",
+    "Item_Armor_D_01_Lv3_C": "Weste Lv3",
+    "Item_Back_BlueBlocker_Lv3": "Rucksack Lv3",
+    "Item_Back_C_01_Lv3_C": "Rucksack Lv3",
+    "Item_Attach_Weapon_Upper_CQBSS_C": "8x",
+    "Item_Attach_Weapon_Upper_PM2_01_C": "15x",
+    "Item_Weapon_TraumaBag_C": "Trauma Bag",
+    "Item_Boost_AdrenalineSyringe_C": "Adrenalin",
+    "Item_Ghillie_01_C": "Ghillie",
+}
+
+
+def _highlight(item_id):
+    """Der Anzeigename, wenn das Stueck erwaehnenswert ist — sonst None."""
+    s = str(item_id or "")
+    return DROP_WEAPON_LABELS.get(s) or DROP_GEAR_LABELS.get(s)
 
 
 def _pkg_label(pid):
@@ -661,12 +690,15 @@ def airdrops(events) -> list:
     aus der Rohtelemetrie, weshalb die Auswertung auch fuer alte Matches
     funktioniert.
 
-    Die Zuordnung laeuft ueber den Pakettyp und nicht ueber eine Id: die
-    Entnahme nennt `carePackageName`, und `carePackageUniqueId` steht in
-    den gemessenen Daten durchgehend auf 0. Fallen zwei Pakete desselben
-    Typs, sind deren Entnahmen daher nicht sicher trennbar — die Zahl
-    der Besucher stimmt, die Aufteilung auf zwei gleiche Pakete nicht.
+    **Zugeordnet wird ueber die Position.** `carePackageUniqueId` taugt
+    nicht: der Wert steht in den gemessenen Daten auf 0 oder 1, nicht je
+    Paket verschieden. Und der Pakettyp allein ist zu grob — ein Match
+    hatte 44 Landungen bei einer Handvoll Typen, wodurch jede Entnahme
+    an drei Pakete gleichzeitig gezaehlt wurde. Wer ein Paket ausraeumt,
+    steht daran: die gemessenen Abstaende liegen bei einem bis zwei
+    Metern.
     """
+    import math
     pakete, entnahmen = [], []
     for e in events or []:
         et = e.get("_T")
@@ -684,11 +716,13 @@ def airdrops(events) -> list:
             })
         elif et == "LogItemPickupFromCarepackage":
             ch = e.get("character") or {}
+            loc = ch.get("location") or {}
             entnahmen.append({
                 "name": ch.get("name"),
                 "acc": ch.get("accountId"),
                 "typ": e.get("carePackageName"),
                 "item": (e.get("item") or {}).get("itemId"),
+                "x": loc.get("x"), "y": loc.get("y"),
             })
 
     # Die Landung ist die bessere Quelle; ein Spawn ohne Landung bleibt
@@ -696,23 +730,33 @@ def airdrops(events) -> list:
     gelandet = [p for p in pakete if p["landed"]]
     genutzt = gelandet or pakete
 
-    # Entnahmen nach Pakettyp bündeln.
-    nach_typ = {}
+    # Jede Entnahme dem naechstgelegenen Paket zuordnen — gleicher Typ
+    # und in Reichweite. Ohne die Entfernung zaehlte sie an jedes Paket
+    # des Typs.
+    zuordnung = {i: [] for i in range(len(genutzt))}
     for g in entnahmen:
-        nach_typ.setdefault(str(g["typ"] or ""), []).append(g)
+        beste, abstand = None, None
+        for i, p in enumerate(genutzt):
+            if str(p["typ"] or "") != str(g["typ"] or ""):
+                continue
+            if None in (g.get("x"), g.get("y"), p.get("x"), p.get("y")):
+                continue
+            d = math.dist((g["x"], g["y"]), (p["x"], p["y"]))
+            if abstand is None or d < abstand:
+                beste, abstand = i, d
+        if beste is not None and abstand is not None and abstand <= DROP_NEAR_CM:
+            zuordnung[beste].append(g)
 
     out = []
-    for p in genutzt:
-        typ = str(p["typ"] or "")
-        g = nach_typ.get(typ, [])
+    for i, p in enumerate(genutzt):
+        g = zuordnung[i]
         besucher = {}
         for x in g:
             besucher.setdefault(x["name"] or "?", []).append(
                 _item_label(x["item"]))
-        highlights = [DROP_WEAPON_LABELS[i] for i in p["items"]
-                      if i in DROP_WEAPON_LABELS]
+        highlights = [h for h in (_highlight(i2) for i2 in p["items"]) if h]
         out.append({
-            "package": _pkg_label(typ),
+            "package": _pkg_label(p["typ"]),
             "at": p["ts"],
             "x": p["x"], "y": p["y"],
             "itemCount": len(p["items"]),
