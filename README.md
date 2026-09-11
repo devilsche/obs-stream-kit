@@ -557,10 +557,17 @@ nie zweimal gefeiert wird.
   **nicht eingereiht** und blockiert daher keinen echten Meilenstein — sie
   lässt sich beliebig wiederholen. In der Widget-Übersicht steht die
   Anlass-Liste als Auswahlfeld, direkt aus der Registry erzeugt.
-* **„Preview" im Config-Tool** — legt einen Probelauf in dieselbe
-  Warteschlange, die auch der Poller benutzt. Das testet den ganzen Weg
-  einschließlich Marker und Quittierung, nicht nur die Darstellung.
+* **Im Config-Tool** stehen pro Anlass zwei Knöpfe: **Queue** legt einen
+  Probelauf in dieselbe Warteschlange, die auch der Poller benutzt — das
+  testet den ganzen Weg einschließlich Marker und Quittierung, nicht nur
+  die Darstellung; eine laufende Source greift ihn innerhalb eines
+  Poll-Takts. **Open** öffnet die Source direkt mit `?demo=<anlass>`.
   Probeläufe sind über `is_test` getrennt und mit einem Knopf wegwerfbar.
+
+Die angezeigten Source-URLs tragen den Widget-Token (`/s/<token>/widgets/...`).
+Ohne ihn antwortet die Widget-Route mit **404** — eine URL ohne Token sieht
+richtig aus und ist unbrauchbar, deshalb reicht `_serve_tool` den Token als
+`window.__WIDGET_TOKEN__` an Tools durch, die Source-URLs zum Kopieren zeigen.
 
 Die Leiste ist gegenüber dem ersten Entwurf um ein Fünftel geschrumpft: mit
 92-px-Ziffern brach sie bei „22,000 km" um — nicht wegen der Breite, sondern

@@ -137,6 +137,22 @@
     .urls div + div { margin-top: 4px; }
     .empty { color: var(--theme-text-dim, #8a7d99); font-style: italic; }
     .wrap { overflow-x: auto; }
+
+    .prev { white-space: nowrap; }
+    /* Mindestens 24px hoch, damit der Link als Ziel so gut treffbar
+       ist wie der Knopf daneben. */
+    .open {
+      display: inline-flex; align-items: center; min-height: 24px;
+      padding: 2px 8px; border-radius: 4px;
+      color: var(--theme-accent-text, #f2b705);
+      border: 1px solid var(--theme-border, #3a2c48);
+      text-decoration: none; font-size: .84rem;
+    }
+    .open:hover { border-color: var(--theme-accent, #f2b705);
+                  text-decoration: underline; }
+    .open:focus-visible {
+      outline: 2px solid var(--theme-accent, #f2b705); outline-offset: 2px;
+    }
   </style>
 </head>
 <body>
@@ -170,6 +186,12 @@
     every n-th mark to the big version — so the first million does not
     look like the next hundred thousand. Records instead use a floor, so
     a weapon you just picked up does not celebrate its first hit.</p>
+  <p class="lede"><b>Queue</b> puts a test milestone into the same queue
+    the poller uses, so a running source picks it up within one poll
+    cycle — that exercises the whole path including the shown-marker.
+    <b>Open</b> loads the source in a new tab and plays that one occasion
+    straight away, without queueing anything. Both use the mark that
+    would really fall next.</p>
   <div class="wrap">
     <table>
       <caption class="hint">Current stand and next mark come from the
@@ -185,7 +207,7 @@
           <th>Shown in</th>
           <th class="n">Stand</th>
           <th class="n">Next</th>
-          <th>Preview</th>
+          <th>Try it</th>
         </tr>
       </thead>
       <tbody id="rows"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
@@ -349,9 +371,25 @@
               + (lead.toGo != null ? "<span class=\"hint\">"
                   + fmtUnit(oid, lead.toGo) + " to go</span>" : "")
             : "—") + "</td>"
-        + "<td><button type=\"button\" data-preview=\"" + oid + "\">"
-        + "Preview</button></td>"
-        + "</tr>";
+        + "<td class=\"prev\">"
+        + "<button type=\"button\" data-preview=\"" + oid + "\">"
+        + "Queue</button>"
+        + (function () {
+            // Direktaufruf der Source mit genau diesem Anlass — wer die
+            // Feier nur ansehen will, braucht die Warteschlange nicht.
+            var w = (c.widget || o.widget) === "bar"
+                  ? "weapon-milestone-bar.html" : "weapon-milestone.html";
+            // Ohne `subject`: der Server nimmt die Waffe mit dem
+            // hoechsten Stand in dieser Kennzahl. Der kuerzeste
+            // Restweg waere korrekt, wirkt in einer Vorschau aber
+            // willkuerlich — eine Dragunov kurz vor ihrer Marke sagt
+            // weniger als die M416.
+            var u = sourceUrl(w, {demo: oid});
+            return u ? " <a class=\"open\" href=\"" + M.esc(u)
+                     + "\" target=\"_blank\" rel=\"noopener\">Open</a>"
+                     : "";
+          }())
+        + "</td></tr>";
     }).join("");
   }
 
@@ -467,12 +505,32 @@
     });
   }
 
+  /* Die Source-URL braucht den Token: ohne `/s/<token>/` antwortet die
+   * Widget-Route mit 404, und eine URL ohne Token sieht richtig aus,
+   * ist aber unbrauchbar.
+   */
+  function sourceUrl(file, params) {
+    var token = window.__WIDGET_TOKEN__ || "";
+    if (!token) return null;
+    var q = "";
+    if (params) {
+      var sp = new URLSearchParams();
+      Object.keys(params).forEach(function (k) {
+        if (params[k]) sp.set(k, params[k]);
+      });
+      var s = sp.toString();
+      if (s) q = "?" + s;
+    }
+    return location.origin + "/s/" + token + "/widgets/pubg/" + file + q;
+  }
+
   function paintUrls() {
-    var origin = location.origin;
-    document.getElementById("urlBig").textContent =
-      origin + "/widgets/pubg/weapon-milestone.html";
-    document.getElementById("urlBar").textContent =
-      origin + "/widgets/pubg/weapon-milestone-bar.html";
+    var big = sourceUrl("weapon-milestone.html");
+    var bar = sourceUrl("weapon-milestone-bar.html");
+    var note = "No widget token set up yet — an admin has to create one"
+             + " before these can run in OBS.";
+    document.getElementById("urlBig").textContent = big || note;
+    document.getElementById("urlBar").textContent = bar || note;
   }
 
   function load(quiet) {

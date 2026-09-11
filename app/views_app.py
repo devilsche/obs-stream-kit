@@ -1,4 +1,5 @@
 """Streamer-Routes."""
+import json
 import os
 import re
 
@@ -631,10 +632,35 @@ def tools_open(key):
                     f'src="/widgets-static/{asset}"')
     # Tools laufen cookie-authenticated, kein Token — alle /api/-Calls
     # gehen direkt an die Cookie-Routes mit g.tenant_id aus der Session.
+    #
+    # Der Widget-Token kommt trotzdem mit: ein Tool, das eine
+    # OBS-Source-URL zum Kopieren anzeigt, braucht ihn. Ohne
+    # `/s/<token>/` antwortet die Widget-Route mit 404, und eine
+    # angezeigte URL ohne Token ist schlimmer als keine — sie sieht
+    # richtig aus. Der Token steht ohnehin auf der Uebersichtsseite;
+    # hier entsteht kein neues Geheimnis.
+    widget_token = ""
+    try:
+        conn3 = _get_conn()
+        try:
+            with conn3.cursor() as cur:
+                cur.execute(
+                    "SELECT token FROM widget_tokens WHERE tenant_id = %s "
+                    "AND revoked_at IS NULL ORDER BY created_at LIMIT 1",
+                    (g.tenant_id,))
+                row = cur.fetchone()
+                widget_token = (row["token"] if row else "") or ""
+        finally:
+            if "_PG_CONN_FACTORY" not in current_app.config:
+                conn3.close()
+    except Exception:                    # kein Token eingerichtet
+        widget_token = ""
     inject = (
         '<script>\n'
         'window.__SERVE_BASE__ = "/";\n'
         'window.__STATIC_BASE__ = "/widgets-static/";\n'
+        'window.__WIDGET_TOKEN__ = '
+        + json.dumps(widget_token) + ';\n'
         '</script>'
     )
     if "</head>" in html:
