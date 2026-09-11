@@ -18,12 +18,22 @@
   Ein Rekord-Celebrate auf Basis der API wuerde also bei einer Marke
   ausloesen, die laengst ueberboten ist.
 
-**Zwei Fallen in den API-Feldern.** `LevelCurrent` ist zaehlt ab null —
-der Hoechstwert im Konto ist 99, ingame steht dort 100; hier wird
-deshalb +1 gerechnet. `TierCurrent` ist als Rang unbrauchbar: Tier 0
-umfasst Level 2 bis 98, Tier 1 die Level 54 bis 97. Nur Tier 6 ist
-eindeutig und traegt genau die ausgelevelten Waffen — als Rang wird
-das Feld nicht benutzt, das Tier leitet sich aus dem Level ab.
+**Zwei Fallen in den API-Feldern.**
+
+`LevelCurrent` ist *nicht* nullbasiert, bleibt aber bei 99 stehen, wo
+das Spiel 100 anzeigt. Belegt an zwei Enden: die VSS liefert roh 98 und
+zeigt ingame 98, die M416 liefert 99 und zeigt 100. Der Unterschied ist
+die XP-Summe — M416, Mini 14 und Mk12 sitzen alle auf genau 952.500,
+also dem Deckel, die VSS auf 927.359. Nur am Deckel wird aufgerundet;
+eine pauschale +1 waere fuer jede andere Waffe falsch.
+
+`TierCurrent` haengt an den **Kills**, nicht am Level: Tier 0 reicht
+ueber die Level 3 bis 99 (0 bis 154 Kills), Tier 5 beginnt bei Level 14
+(ab 682 Kills), Tier 6 traegt die drei Waffen mit 844 bis 3.179 Kills.
+Die Spannen ueberlappen, ein Schwellenwert je Tier laesst sich daraus
+nicht ableiten. Verlaesslich sind nur die Enden: Tier 0 heisst ingame
+"Basic" (kein Rang), Tier 6 "Master". Der Wert steigt je Waffe monoton,
+taugt also als Anlass — aber nicht als Rang-Anzeige neben dem Level.
 """
 from pubg.aggregations import _weapon_ci_lookup
 
@@ -31,8 +41,22 @@ from pubg.aggregations import _weapon_ci_lookup
 #: davor der Schluessel in WEAPON_NAMES: Item_Weapon_HK416_C → WeapHK416_C.
 MASTERY_PREFIX = "Item_Weapon_"
 
-#: Level, ab dem eine Waffe als ausgelevelt gilt (nach der +1-Korrektur).
+#: Level, bei dem eine Waffe ausgelevelt ist. Ingame heisst der Rang
+#: dort "Master".
 MASTERED_LEVEL = 100
+
+#: Hoechstes Level, das die API vergibt. Sie bleibt bei 99 stehen,
+#: waehrend das Spiel dort 100 anzeigt.
+API_MAX_LEVEL = 99
+
+#: Die gedeckelte XP-Summe. Nur Waffen mit genau diesem Wert sind
+#: ausgelevelt — daran haengt die Unterscheidung zu einer Waffe, die
+#: schlicht auf Level 99 steht.
+MASTERED_XP = 952500
+
+#: Hoechstes Mastery-Tier. Ingame "Master"; Tier 0 ist "Basic", also
+#: gar kein Rang.
+MAX_TIER = 6
 
 #: Wurfgeraete, wie `match_weapon_stats.weapon` sie fuehrt.
 #:
@@ -93,6 +117,17 @@ OCCASIONS = {
         "label": "Weapon Mastered", "widget": "big", "enabled": True,
         "tier": "huge",
         "hint": "A weapon reaches level 100",
+    },
+    # Der Tier-Wechsel ist ein eigener Anlass, aber ein leiser: er
+    # faellt je Waffe hoechstens sechsmal im Leben und haengt an den
+    # Kills, nicht am Level. Vorbelegt nur fuer die Leiste — ein
+    # Vollbild dafuer waere zu viel.
+    "weapon_tier": {
+        "scope": "weapon", "metric": "tier", "kind": "record",
+        "min": 1, "unit": "tier",
+        "label": "Mastery Tier", "widget": "bar", "enabled": True,
+        "tier": "big",
+        "hint": "A weapon climbs to the next mastery tier",
     },
     "weapon_best_damage": {
         "scope": "weapon", "metric": "best_damage", "kind": "record",
@@ -331,6 +366,7 @@ def parse_mastery(payload) -> dict:
         cur = out.setdefault(name, {
             "damage": 0.0, "kills": 0, "headshots": 0, "groggies": 0,
             "longest": 0.0, "best_kills": 0, "level": 0, "xp": 0,
+            "tier": 0,
         })
         cur["damage"] += _stat_sum(w, "DamagePlayer")
         cur["kills"] += int(_stat_sum(w, "Kills"))
@@ -340,10 +376,15 @@ def parse_mastery(payload) -> dict:
                              _stat_max(w, "LongestKill", "LongestDefeat"))
         cur["best_kills"] = max(cur["best_kills"],
                                 int(_stat_max(w, "MostKillsInAGame")))
-        # LevelCurrent zaehlt ab null, ingame steht eins mehr.
+        # Am XP-Deckel liefert die API 99, das Spiel zeigt 100. Sonst
+        # ist der gelieferte Wert schon der richtige.
         lvl = int(w.get("LevelCurrent") or w.get("Level") or 0)
-        cur["level"] = max(cur["level"], lvl + 1 if lvl else 0)
-        cur["xp"] = max(cur["xp"], int(w.get("XPTotal") or w.get("XP") or 0))
+        xp = int(w.get("XPTotal") or w.get("XP") or 0)
+        if lvl >= API_MAX_LEVEL and xp >= MASTERED_XP:
+            lvl = MASTERED_LEVEL
+        cur["level"] = max(cur["level"], lvl)
+        cur["xp"] = max(cur["xp"], xp)
+        cur["tier"] = max(cur["tier"], int(w.get("TierCurrent") or 0))
     return out
 
 

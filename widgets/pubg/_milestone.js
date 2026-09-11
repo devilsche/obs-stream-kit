@@ -64,7 +64,14 @@
       return { num: NUM(v / 1000), unit: "km", raw: v };
     if (u === "metres") return { num: NUM(v), unit: "m", raw: v };
     if (u === "seconds") return { num: NUM(v / 3600), unit: "h", raw: v };
-    if (u === "level") return { num: NUM(v), unit: "", raw: v };
+    // Eine nackte 100 sagt nichts. Ingame steht dort "Level 100" und
+    // der Rang "Master" — beides gehoert in die Feier.
+    if (u === "level") return { num: NUM(v), unit: "", raw: v,
+                                prefix: "level" };
+    // "Tier 5" — die Rangnamen zwischen Basic und Master sind nicht
+    // bekannt, die Zahl ist die ehrliche Auskunft.
+    if (u === "tier") return { num: NUM(v), unit: "", raw: v,
+                               prefix: "tier" };
     return { num: NUM(v), unit: "", raw: v };
   }
 
@@ -79,9 +86,24 @@
     4500000: "four and a half million", 5000000: "five million"
   };
 
+  //: Der hoechste Rang der Waffen-Mastery. Aus dem Level abgeleitet:
+  //: `TierCurrent` aus der API taugt dafuer nicht, dort umfasst Tier 0
+  //: die Level 2 bis 98. Belegt ist nur Tier 6 bei Level 100 —
+  //: ingame "Master".
+  var MASTER_LEVEL = 100;
+
+  //: Hoechstes Mastery-Tier; ingame "Master". Tier 0 ist "Basic".
+  var MAX_TIER = 6;
+
   function bigForm(m) {
     var s = shown(m), v = s.raw;
-    if (m.unit === "metres" || m.unit === "seconds" || m.unit === "level")
+    if (m.unit === "level")
+      return { big: s.num, unit: "level",
+               words: v >= MASTER_LEVEL ? "master tier" : null };
+    if (m.unit === "tier")
+      return { big: s.num, unit: "tier",
+               words: v >= MAX_TIER ? "master" : null };
+    if (m.unit === "metres" || m.unit === "seconds")
       return { big: s.num, unit: s.unit, words: null };
     if (v >= 1000000) {
       var mio = v / 1000000;
@@ -116,7 +138,13 @@
            + " · now " + n.num + (n.unit ? " " + n.unit : "");
     }
     if (m.occasion === "weapon_mastered")
-      return "max level reached";
+      return (m.value >= MASTER_LEVEL ? "master tier · " : "")
+           + "max level reached";
+    if (m.occasion === "weapon_tier") {
+      var from = m.prevValue ? "tier " + NUM(m.prevValue) : "basic";
+      return from + " → tier " + NUM(m.value)
+           + (m.value >= MAX_TIER ? " · master" : "");
+    }
     if (m.display) return m.display;
     // Kontoweite Anlaesse haben kein Subjekt; ohne diese Zeile blieben
     // sie ohne Einordnung und man wuesste nicht, worauf sich die Zahl
@@ -227,12 +255,12 @@
   /* Alle Anlaesse der Reihe nach zeigen — `?demo=all`. Zum Durchsehen,
    * ohne die URL zwei Dutzend Mal von Hand zu aendern.
    */
-  function demoAll(celebrate, filter) {
+  function demoAll(celebrate, filter, loud) {
     return occasions().then(function (list) {
       var todo = list.filter(filter || function () { return true; });
       return todo.reduce(function (chain, o) {
         return chain.then(function () {
-          return demo(o.id).then(function (m) {
+          return demo(o.id, { loud: loud }).then(function (m) {
             return m ? celebrate(m) : null;
           });
         });

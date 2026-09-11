@@ -50,9 +50,26 @@ def test_stats_total_bleibt_draussen():
     assert parse_mastery(p)["M416"]["kills"] == 105
 
 
-def test_level_wird_um_eins_erhoeht():
-    # LevelCurrent zaehlt ab null; ingame steht bei 99 die 100.
+def test_level_am_xp_deckel_wird_zu_hundert():
+    # Die API bleibt bei 99 stehen, wo das Spiel 100 anzeigt — erkennbar
+    # an der gedeckelten XP-Summe von 952.500.
     assert parse_mastery(_payload())["M416"]["level"] == 100
+
+
+def test_level_unter_dem_deckel_bleibt_wie_geliefert():
+    # Die VSS liefert roh 98 und zeigt ingame 98. Eine pauschale +1
+    # waere hier falsch — genau das war der Fehler.
+    p = {"data": {"attributes": {"weaponSummaries": {
+        "Item_Weapon_VSS_C": {"LevelCurrent": 98, "XPTotal": 927359,
+                              "TierCurrent": 0}}}}}
+    assert parse_mastery(p)["VSS"]["level"] == 98
+
+
+def test_level_99_ohne_deckel_bleibt_99():
+    # 99 allein reicht nicht; es braucht die gedeckelte XP-Summe.
+    p = {"data": {"attributes": {"weaponSummaries": {
+        "Item_Weapon_VSS_C": {"LevelCurrent": 99, "XPTotal": 930000}}}}}
+    assert parse_mastery(p)["VSS"]["level"] == 99
 
 
 def test_longest_nimmt_das_maximum_nicht_die_summe():

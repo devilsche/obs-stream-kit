@@ -113,7 +113,8 @@
 
   function renderNum(m, pairs) {
     var s = M.shown(m);
-    var num = s.num + (s.unit ? " " + s.unit : "");
+    var num = (s.prefix ? s.prefix.toUpperCase() + " " : "")
+            + s.num + (s.unit ? " " + s.unit : "");
     return '<div class="numwrap">'
       + (m.display
           ? '<span class="wtag"><span class="material-symbols-outlined"'
@@ -156,7 +157,7 @@
       return o.widget === "big" || o.widget === "both";
     };
     if (DEMO === "all") {
-      M.demoAll(celebrate, mine);
+      M.demoAll(celebrate, mine, Q.get("loud"));
     } else if (DEMO === "1") {
       M.occasions().then(function (list) {
         var first = list.filter(mine)[0];
@@ -164,7 +165,8 @@
       });
     } else {
       M.demo(DEMO, { value: Q.get("value"), subject: Q.get("subject"),
-                     tier: Q.get("tier") }).then(function (m) {
+                     tier: Q.get("tier"), loud: Q.get("loud") })
+        .then(function (m) {
         if (m) celebrate(m);
       });
     }

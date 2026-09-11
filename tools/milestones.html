@@ -54,10 +54,12 @@
     .actions { display: flex; gap: 8px; flex-wrap: wrap; }
     button {
       font: inherit; font-size: .88rem; min-height: 32px; padding: 5px 13px;
+      display: inline-flex; align-items: center; justify-content: center;
       background: var(--theme-surface-2, #2a1f3a);
       color: var(--theme-text, #e8e0f0);
       border: 1px solid var(--theme-border, #3a2c48);
-      border-radius: 5px; cursor: pointer;
+      border-radius: 5px; cursor: pointer; text-decoration: none;
+      vertical-align: middle;
     }
     button:hover { border-color: var(--theme-accent, #f2b705); }
     button:focus-visible {
@@ -132,27 +134,60 @@
     .wait { color: var(--theme-text-dim, #8a7d99); }
     .note { color: var(--theme-text-dim, #8a7d99); font-size: .86rem;
             margin: 10px 0 0; max-width: 76ch; }
-    .urls { font-family: ui-monospace, monospace; font-size: .82rem;
-            color: var(--theme-accent-text, #f2b705); word-break: break-all; }
-    .urls div + div { margin-top: 4px; }
+    .urlrow { display: flex; flex-wrap: wrap; gap: 8px 12px;
+              align-items: center; margin-top: 8px; }
+    .urlcap { min-width: 82px; font-size: .76rem; letter-spacing: .05em;
+              text-transform: uppercase;
+              color: var(--theme-text-dim, #8a7d99); }
+    .urls { flex: 1 1 24ch; font-family: ui-monospace, monospace;
+            font-size: .82rem; color: var(--theme-accent-text, #f2b705);
+            word-break: break-all; }
+    .urlacts { display: flex; gap: 6px; flex-wrap: wrap; }
+    /* Knopf und Link stehen als Paar und muessen gleich hoch sein. */
+    .act {
+      font: inherit; font-size: .82rem; min-height: 30px; padding: 4px 11px;
+      display: inline-flex; align-items: center; gap: 5px;
+      background: var(--theme-surface-2, #2a1f3a);
+      color: var(--theme-text, #e8e0f0);
+      border: 1px solid var(--theme-border, #3a2c48);
+      border-radius: 5px; cursor: pointer; text-decoration: none;
+    }
+    .act.ghost { background: transparent;
+                 color: var(--theme-accent-text, #f2b705); }
+    .act:hover { border-color: var(--theme-accent, #f2b705); }
+    .act:focus-visible {
+      outline: 2px solid var(--theme-accent, #f2b705); outline-offset: 2px;
+    }
+    .act .material-symbols-outlined { font-size: 17px; }
+    .act[hidden] { display: none; }
     .empty { color: var(--theme-text-dim, #8a7d99); font-style: italic; }
     .wrap { overflow-x: auto; }
 
-    .prev { white-space: nowrap; }
-    /* Mindestens 24px hoch, damit der Link als Ziel so gut treffbar
-       ist wie der Knopf daneben. */
-    .open {
-      display: inline-flex; align-items: center; min-height: 24px;
-      padding: 2px 8px; border-radius: 4px;
-      color: var(--theme-accent-text, #f2b705);
-      border: 1px solid var(--theme-border, #3a2c48);
-      text-decoration: none; font-size: .84rem;
+    .prev button { padding: 4px 11px; font-size: .84rem;
+                   min-height: 30px; }
+
+    .row { display: flex; flex-wrap: wrap; gap: 8px 12px;
+           align-items: center; margin: 0 0 12px; }
+    .rlabel { font-size: .76rem; letter-spacing: .05em;
+              text-transform: uppercase;
+              color: var(--theme-text-dim, #8a7d99); }
+    .switch { display: inline-flex;
+              border: 1px solid var(--theme-border, #3a2c48);
+              border-radius: 5px; overflow: hidden; }
+    .switch button {
+      font-size: .84rem; min-height: 30px; padding: 4px 12px;
+      background: transparent; color: var(--theme-text-dim, #8a7d99);
+      border: 0; border-right: 1px solid var(--theme-border, #3a2c48);
+      border-radius: 0;
     }
-    .open:hover { border-color: var(--theme-accent, #f2b705);
-                  text-decoration: underline; }
-    .open:focus-visible {
-      outline: 2px solid var(--theme-accent, #f2b705); outline-offset: 2px;
+    .switch button:last-child { border-right: 0; }
+    /* Nicht nur die Farbe traegt die Auswahl — aria-pressed sagt es
+       ebenso, und das Gewicht macht sie ohne Farbsehen erkennbar. */
+    .switch button[aria-pressed="true"] {
+      background: var(--theme-primary, #5e2a79);
+      color: var(--theme-on-primary, #fff); font-weight: 600;
     }
+    .switch button:hover { color: var(--theme-text, #e8e0f0); }
   </style>
 </head>
 <body>
@@ -174,10 +209,31 @@
       <button type="button" id="save" data-kind="primary">Save</button>
     </div>
   </div>
-  <div class="urls">
-    <div>Full screen: <span id="urlBig"></span></div>
-    <div>Bar: <span id="urlBar"></span></div>
+  <div class="urlrow">
+    <span class="urlcap">Full screen</span>
+    <span class="urls" id="urlBig"></span>
+    <span class="urlacts">
+      <button type="button" class="act" data-copy="urlBig">
+        <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+        Copy</button>
+      <a class="act ghost" id="openBig" target="_blank" rel="noopener">
+        <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+        Preview</a>
+    </span>
   </div>
+  <div class="urlrow">
+    <span class="urlcap">Bar</span>
+    <span class="urls" id="urlBar"></span>
+    <span class="urlacts">
+      <button type="button" class="act" data-copy="urlBar">
+        <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+        Copy</button>
+      <a class="act ghost" id="openBar" target="_blank" rel="noopener">
+        <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+        Preview</a>
+    </span>
+  </div>
+  <p class="note" id="urlNote"></p>
 </div>
 
 <div class="t-card" id="occasions">
@@ -186,12 +242,24 @@
     every n-th mark to the big version — so the first million does not
     look like the next hundred thousand. Records instead use a floor, so
     a weapon you just picked up does not celebrate its first hit.</p>
-  <p class="lede"><b>Queue</b> puts a test milestone into the same queue
-    the poller uses, so a running source picks it up within one poll
-    cycle — that exercises the whole path including the shown-marker.
-    <b>Open</b> loads the source in a new tab and plays that one occasion
-    straight away, without queueing anything. Both use the mark that
-    would really fall next.</p>
+  <p class="lede"><b>Preview</b> puts a test milestone into the same queue
+    the poller uses — a running source picks it up within one poll cycle.
+    That exercises the whole path including the shown-marker, not just
+    the drawing. It uses the settings as they stand in the form, so you
+    can try a changed step without saving it first. Test entries are
+    kept apart and can be thrown away below.</p>
+  <div class="row">
+    <span class="rlabel" id="lblLoud">Preview at</span>
+    <span class="switch" role="group" aria-labelledby="lblLoud" id="loudSw">
+      <button type="button" data-at="current" aria-pressed="false">
+        Current value</button>
+      <button type="button" data-at="next" aria-pressed="true">
+        Next mark</button>
+      <button type="button" data-at="loud" aria-pressed="false">
+        Next loud one</button>
+    </span>
+    <span class="hint" id="loudNote"></span>
+  </div>
   <div class="wrap">
     <table>
       <caption class="hint">Current stand and next mark come from the
@@ -207,7 +275,7 @@
           <th>Shown in</th>
           <th class="n">Stand</th>
           <th class="n">Next</th>
-          <th>Try it</th>
+          <th>Preview</th>
         </tr>
       </thead>
       <tbody id="rows"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
@@ -246,6 +314,19 @@
   var BASE = (window.__SERVE_BASE__ || "/") + "api/pubg/";
   var M = window.Milestone;
   var CFG = {}, OCC = {}, STATE = [], HAS_SNAP = false;
+  /* Welchen Wert die Vorschau nimmt:
+   *   current — den Stand, wie er jetzt ist
+   *   next    — die Marke, die als naechste faellt
+   *   loud    — die naechste Marke, die die grosse Fassung bekommt
+   * Ohne die dritte Stufe bekaeme man die grosse Fassung nie zu sehen,
+   * denn die naechste echte Marke ist fast immer eine gewoehnliche.
+   */
+  var AT = "next";
+  try {
+    var stored = localStorage.getItem("milestonePreviewAt");
+    if (stored === "current" || stored === "next" || stored === "loud")
+      AT = stored;
+  } catch (e) { /* privates Fenster */ }
 
   //: Welche Quelle den Anlass traegt. Steht in der Zeile, weil die
   //: Reichweite sich unterscheidet: die API kennt die ganze Karriere,
@@ -373,23 +454,7 @@
             : "—") + "</td>"
         + "<td class=\"prev\">"
         + "<button type=\"button\" data-preview=\"" + oid + "\">"
-        + "Queue</button>"
-        + (function () {
-            // Direktaufruf der Source mit genau diesem Anlass — wer die
-            // Feier nur ansehen will, braucht die Warteschlange nicht.
-            var w = (c.widget || o.widget) === "bar"
-                  ? "weapon-milestone-bar.html" : "weapon-milestone.html";
-            // Ohne `subject`: der Server nimmt die Waffe mit dem
-            // hoechsten Stand in dieser Kennzahl. Der kuerzeste
-            // Restweg waere korrekt, wirkt in einer Vorschau aber
-            // willkuerlich — eine Dragunov kurz vor ihrer Marke sagt
-            // weniger als die M416.
-            var u = sourceUrl(w, {demo: oid});
-            return u ? " <a class=\"open\" href=\"" + M.esc(u)
-                     + "\" target=\"_blank\" rel=\"noopener\">Open</a>"
-                     : "";
-          }())
-        + "</td></tr>";
+        + "Preview</button></td></tr>";
     }).join("");
   }
 
@@ -452,6 +517,52 @@
     CFG[oid][field] = v;
   }
 
+  /* Nur die Verlaufstabelle neu holen. Die Einstellungen darueber
+   * bleiben stehen, samt allem, was noch nicht gespeichert ist.
+   */
+  function refreshRecent() {
+    return get("milestone-state").then(function (st) {
+      STATE = (st && st.state) || STATE;
+      paintRecent((st && st.recent) || []);
+    }).catch(function () { /* Verlauf ist Beiwerk */ });
+  }
+
+  var AT_NOTE = {
+    current: "Shows the value as it stands right now.",
+    next: "Uses the mark that would really fall next.",
+    loud: "Jumps to the next mark that gets the big version."
+  };
+
+  function paintAt() {
+    document.querySelectorAll("#loudSw button").forEach(function (b) {
+      b.setAttribute("aria-pressed",
+                     b.dataset.at === AT ? "true" : "false");
+    });
+    document.getElementById("loudNote").textContent = AT_NOTE[AT] || "";
+    // Die Vorschau-Links oben spielen dieselbe Stufe. "current" gibt es
+    // dort nicht — eine Source kennt den Stand nicht, sie zeigt nur,
+    // was der Server ihr gibt.
+    ["openBig", "openBar"].forEach(function (id) {
+      var a = document.getElementById(id);
+      if (!a || !a.getAttribute("href")) return;
+      var base = a.getAttribute("href").split("&loud=")[0];
+      a.setAttribute("href", base + (AT === "loud" ? "&loud=1" : ""));
+    });
+  }
+
+  function bindAt() {
+    document.getElementById("loudSw").addEventListener("click",
+      function (e) {
+        var b = e.target.closest("button[data-at]");
+        if (!b) return;
+        AT = b.dataset.at;
+        try {
+          localStorage.setItem("milestonePreviewAt", AT);
+        } catch (err) { /* privates Fenster */ }
+        paintAt();
+      });
+  }
+
   function bind() {
     document.getElementById("rows").addEventListener("change", function (e) {
       if (e.target.dataset && e.target.dataset.oid) readField(e.target);
@@ -463,19 +574,31 @@
       var lead = leadFor(oid);
       // Die naechste echte Marke als Wert, damit die Vorschau zeigt,
       // was spaeter wirklich kommt — nicht eine erfundene Zahl.
-      var body = { occasion: oid };
-      if (lead) {
-        if (lead.next != null) body.value = lead.next;
-        else if (lead.value) body.value = lead.value;
-        if (lead.subject) body.subject = lead.subject;
-        if (lead.value) body.prevValue = lead.value;
+      // Die Einstellungen aus dem Formular gehen mit, ohne gespeichert
+      // zu werden — eine geaenderte Schrittweite soll sich ansehen
+      // lassen, ohne sie gleich festzuschreiben.
+      var body = { occasion: oid, config: CFG };
+      if (lead && lead.subject) body.subject = lead.subject;
+      if (AT === "loud") {
+        body.loud = 1;
+      } else if (lead) {
+        // Beim aktuellen Stand ist der Vorher-Wert derselbe; die
+        // Vorher-Zeile zeigt ohnehin nur bei Rekorden etwas an.
+        var v = AT === "current" ? lead.value
+                                 : (lead.next != null ? lead.next
+                                                      : lead.value);
+        if (v) body.value = v;
+        if (lead.value && AT !== "current") body.prevValue = lead.value;
       }
       b.disabled = true;
       post("milestone-test", body).then(function (d) {
         msg("Queued for the " + ((d && d.widget) || "bar")
             + " source — it shows within one poll cycle.", true);
         b.disabled = false;
-        return load(true);
+        // Nur den Verlauf nachziehen. Ein vollstaendiges Neuladen
+        // wuerde die Tabelle neu zeichnen und damit alles verwerfen,
+        // was noch nicht gespeichert ist.
+        return refreshRecent();
       }).catch(function () {
         msg("Could not queue the preview.", false);
         b.disabled = false;
@@ -500,7 +623,7 @@
     document.getElementById("purge").addEventListener("click", function () {
       post("milestone-purge-tests", {}).then(function (d) {
         msg("Deleted " + ((d && d.deleted) || 0) + " test entries.", true);
-        return load(true);
+        return refreshRecent();
       }).catch(function () { msg("Could not delete.", false); });
     });
   }
@@ -525,12 +648,48 @@
   }
 
   function paintUrls() {
-    var big = sourceUrl("weapon-milestone.html");
-    var bar = sourceUrl("weapon-milestone-bar.html");
-    var note = "No widget token set up yet — an admin has to create one"
-             + " before these can run in OBS.";
-    document.getElementById("urlBig").textContent = big || note;
-    document.getElementById("urlBar").textContent = bar || note;
+    var pairs = [["urlBig", "openBig", "weapon-milestone.html"],
+                 ["urlBar", "openBar", "weapon-milestone-bar.html"]];
+    var ok = true;
+    pairs.forEach(function (pair) {
+      var url = sourceUrl(pair[2]);
+      document.getElementById(pair[0]).textContent = url || "—";
+      var a = document.getElementById(pair[1]);
+      if (url) {
+        // Die Vorschau spielt alle Anlaesse dieser Fassung der Reihe
+        // nach durch — genau das, was man beim Einrichten sehen will.
+        a.href = url + "?demo=all";
+      } else {
+        a.hidden = true;
+        ok = false;
+      }
+    });
+    document.getElementById("urlNote").textContent = ok
+      ? "Preview plays every occasion of that version in turn, without"
+        + " queueing anything."
+      : "No widget token set up yet — an admin has to create one before"
+        + " these can run in OBS.";
+    document.querySelectorAll("button[data-copy]").forEach(function (b) {
+      if (!ok) b.hidden = true;
+    });
+  }
+
+  function bindCopy() {
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-copy]");
+      if (!b) return;
+      var text = (document.getElementById(b.dataset.copy) || {}).textContent;
+      if (!text || text === "—") return;
+      var done = function () {
+        var keep = b.innerHTML;
+        b.innerHTML = '<span class="material-symbols-outlined"'
+          + ' aria-hidden="true">check</span> Copied';
+        setTimeout(function () { b.innerHTML = keep; }, 1500);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () {});
+      }
+    });
   }
 
   function load(quiet) {
@@ -559,6 +718,9 @@
   }
 
   paintUrls();
+  paintAt();
+  bindCopy();
+  bindAt();
   bind();
   load();
 }());

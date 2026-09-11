@@ -529,10 +529,20 @@ Zwei Eigenheiten der API, die im Code festgehalten sind:
   — am Konto belegt an der M416 (3156 + 23 = 3179) und der Mk12 (1962 + 11 =
   1973). Der dritte Block `StatsTotal` ist eine ältere, eigene Zählung und
   *keine* Teilmenge; er bleibt außen vor.
-* **`LevelCurrent` zählt ab null** (höchster Wert im Konto ist 99, ingame steht
-  dort 100), und **`TierCurrent` ist als Rang unbrauchbar**: Tier 0 umfasst die
-  Level 2 bis 98, Tier 1 die Level 54 bis 97. Nur Tier 6 ist eindeutig und
-  trägt genau die ausgelevelten Waffen.
+* **`LevelCurrent` ist *nicht* nullbasiert**, bleibt aber bei 99 stehen, wo das
+  Spiel 100 anzeigt. Belegt an zwei Enden: die VSS liefert roh 98 und zeigt
+  ingame 98, die M416 liefert 99 und zeigt 100. Der Unterschied ist die
+  XP-Summe — M416, Mini 14 und Mk12 sitzen alle auf genau 952.500, also dem
+  Deckel. Nur dort wird aufgerundet; eine pauschale +1 wäre für jede andere
+  Waffe falsch.
+* **`TierCurrent` hängt an den Kills, nicht am Level**: Tier 0 reicht über die
+  Level 3 bis 99 (0–154 Kills), Tier 5 beginnt bei Level 14 (ab 682 Kills),
+  Tier 6 trägt die drei Waffen mit 844–3.179 Kills. Die Spannen überlappen,
+  ein Schwellenwert je Tier lässt sich daraus nicht ableiten. Verlässlich sind
+  nur die Enden: Tier 0 heißt ingame „Basic" (kein Rang), Tier 6 „Master".
+  Der Wert steigt je Waffe monoton und taugt damit als Anlass
+  (`weapon_tier`, vorbelegt nur für die Leiste) — aber nicht als
+  Rang-Anzeige neben dem Level.
 
 Der Match-Schadensrekord kommt bewusst aus der eigenen Aufzeichnung: die API
 führt `MostDamagePlayerInAGame` nur im alten Block und meldet dort 682 Schaden
@@ -557,12 +567,18 @@ nie zweimal gefeiert wird.
   **nicht eingereiht** und blockiert daher keinen echten Meilenstein — sie
   lässt sich beliebig wiederholen. In der Widget-Übersicht steht die
   Anlass-Liste als Auswahlfeld, direkt aus der Registry erzeugt.
-* **Im Config-Tool** stehen pro Anlass zwei Knöpfe: **Queue** legt einen
-  Probelauf in dieselbe Warteschlange, die auch der Poller benutzt — das
-  testet den ganzen Weg einschließlich Marker und Quittierung, nicht nur
-  die Darstellung; eine laufende Source greift ihn innerhalb eines
-  Poll-Takts. **Open** öffnet die Source direkt mit `?demo=<anlass>`.
-  Probeläufe sind über `is_test` getrennt und mit einem Knopf wegwerfbar.
+* **„Preview" im Config-Tool** legt einen Probelauf in dieselbe
+  Warteschlange, die auch der Poller benutzt — das testet den ganzen Weg
+  einschließlich Marker und Quittierung, nicht nur die Darstellung; eine
+  laufende Source greift ihn innerhalb eines Poll-Takts. Die Einstellungen
+  gehen **aus dem Formular** mit, ohne gespeichert zu werden: eine geänderte
+  Schrittweite lässt sich so ausprobieren, ohne sie festzuschreiben. Der
+  Umschalter **„Preview at"** wählt den Wert — *Current value*, *Next mark*
+  oder *Next loud one*; ohne die dritte Stufe bekäme man die große Fassung
+  nie zu sehen, denn die nächste echte Marke ist fast immer eine
+  gewöhnliche. Probeläufe sind über `is_test` getrennt und wegwerfbar.
+  Oben an jeder Source-URL stehen **Copy** und **Preview** (letzteres
+  öffnet sie mit `?demo=all`).
 
 Die angezeigten Source-URLs tragen den Widget-Token (`/s/<token>/widgets/...`).
 Ohne ihn antwortet die Widget-Route mit **404** — eine URL ohne Token sieht

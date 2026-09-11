@@ -2532,6 +2532,12 @@ class EndpointRegistry:
             "tier": m.get("tier") or "small",
             "isTest": bool(m.get("is_test")),
             "detectedAt": m.get("detected_at"),
+            # Zielfassung und die beiden Anzeige-Marker: ohne sie kann
+            # der Verlauf im Tool weder sagen, wohin ein Meilenstein
+            # ging, noch ob er schon gezeigt wurde.
+            "widget": m.get("widget") or "bar",
+            "shownBigAt": m.get("shown_big_at"),
+            "shownBarAt": m.get("shown_bar_at"),
         }
 
     def _milestone_config_get(self, qs=None):
@@ -2646,7 +2652,13 @@ class EndpointRegistry:
         occ = OCCASIONS.get(oid)
         if not occ:
             return None, _err(400, f"unbekannter Anlass: {oid}")
-        cfg = merge_config(self._stored_milestone_config())
+        # Eine mitgeschickte Konfiguration gewinnt gegen die
+        # gespeicherte: sonst muesste man im Tool erst speichern, um
+        # eine geaenderte Schrittweite ausprobieren zu koennen — und
+        # damit eine Einstellung festschreiben, die man gerade nur
+        # ansehen wollte.
+        cfg = merge_config(spec.get("config")
+                           or self._stored_milestone_config())
         c = {**occ, **(cfg.get(oid) or {})}
         metric = occ["metric"]
 
@@ -2673,8 +2685,16 @@ class EndpointRegistry:
             value = float(spec.get("value"))
         except (TypeError, ValueError):
             value = 0.0
+        # `loud` springt auf die naechste LAUTE Marke. Ohne das sieht man
+        # in einer Vorschau fast nur die leise Fassung: die naechste
+        # echte Marke ist meist eine gewoehnliche (475.000 statt der
+        # halben Million), und die grosse Fassung bekaeme man nie zu
+        # Gesicht.
+        loud = str(spec.get("loud") or "").lower() in ("1", "true", "yes")
         if value <= 0:
             step = c.get("step") or 0
+            if loud and occ["kind"] == "step" and c.get("huge_every"):
+                step = c["huge_every"]
             if occ["kind"] == "step" and step:
                 value = (int(stand // step) + 1) * step
             elif occ["kind"] == "at":
@@ -2748,7 +2768,10 @@ class EndpointRegistry:
         spec = {"occasion": qs.get("occasion"),
                 "subject": qs.get("subject"),
                 "value": qs.get("value"),
-                "tier": qs.get("tier")}
+                "tier": qs.get("tier"),
+                "loud": qs.get("loud")}
+        # Ueber die URL laesst sich keine ganze Konfiguration
+        # mitschicken; die Source nutzt immer die gespeicherte.
         item, err = self._milestone_build(spec)
         if err:
             return err

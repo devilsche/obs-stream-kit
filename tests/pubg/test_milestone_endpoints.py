@@ -319,3 +319,117 @@ def test_zwei_vorschauen_im_selben_moment_kollidieren_nicht():
               {"occasion": "weapon_damage", "widget": "bar"})
     rows = db_pg.recent_milestones(CONN.raw, T)
     assert len(rows) == 3
+
+
+# ── Laute Stufe in der Vorschau ─────────────────────────────────────────────
+
+def test_vorschau_springt_auf_die_laute_marke():
+    # Ohne das bekommt man die grosse Fassung nie zu sehen: die naechste
+    # echte Marke ist fast immer eine gewoehnliche.
+    db_pg.save_milestone_snapshot(CONN.raw, T, "account.A", {
+        "weapons": {"M416": {"damage": 432503}}})
+    CONN.raw.commit()
+    leise = _data(_call("GET", "/api/pubg/milestone-demo",
+                        qs={"occasion": "weapon_damage"})[0])["milestone"]
+    laut = _data(_call("GET", "/api/pubg/milestone-demo",
+                       qs={"occasion": "weapon_damage",
+                           "loud": "1"})[0])["milestone"]
+    # 25.000er Schritte → 450.000 (leise); huge_every 250.000 → 500.000.
+    assert (leise["value"], leise["tier"]) == (450000, "small")
+    assert (laut["value"], laut["tier"]) == (500000, "huge")
+
+
+def test_laute_marke_wirkt_auch_kontoweit():
+    db_pg.save_milestone_snapshot(CONN.raw, T, "account.A", {
+        "career": {"damage": 4041616}})
+    CONN.raw.commit()
+    laut = _data(_call("GET", "/api/pubg/milestone-demo",
+                       qs={"occasion": "career_damage",
+                           "loud": "1"})[0])["milestone"]
+    # 500.000er Stufe → 4.500.000, und das ist eine halbe Million.
+    assert (laut["value"], laut["tier"]) == (4500000, "huge")
+
+
+def test_laut_aendert_nichts_bei_rekorden():
+    # Ein Rekord hat keine Stufen; seine Stufe steht fest.
+    db_pg.save_milestone_snapshot(CONN.raw, T, "account.A", {
+        "weapons": {"Mk12": {"longest": 631}}})
+    CONN.raw.commit()
+    a = _data(_call("GET", "/api/pubg/milestone-demo",
+                    qs={"occasion": "weapon_longest"})[0])["milestone"]
+    b = _data(_call("GET", "/api/pubg/milestone-demo",
+                    qs={"occasion": "weapon_longest",
+                        "loud": "1"})[0])["milestone"]
+    assert a["value"] == b["value"] and b["tier"] == "big"
+
+
+def test_probelauf_nimmt_die_laute_marke_mit():
+    db_pg.save_milestone_snapshot(CONN.raw, T, "account.A", {
+        "career": {"damage": 4041616}})
+    CONN.raw.commit()
+    d = _data(_call("POST", "/api/pubg/milestone-test",
+                    {"occasion": "career_damage", "loud": 1})[0])
+    assert d["queued"]["tier"] == "huge"
+
+
+# ── Tier-Wechsel ────────────────────────────────────────────────────────────
+
+def test_tier_wechsel_ist_ein_anlass_nur_fuer_die_leiste():
+    d = _data(_call("GET", "/api/pubg/milestone-occasions")[0])
+    row = [o for o in d["occasions"] if o["id"] == "weapon_tier"][0]
+    assert row["widget"] == "bar"
+    assert row["kind"] == "record"
+
+
+def test_tier_wechsel_feiert_den_aufstieg():
+    from pubg.weapon_milestones import detect
+    prev = {"weapons": {"Beryl": {"tier": 4}}, "career": {}}
+    cur = {"weapons": {"Beryl": {"tier": 5}}, "career": {}}
+    hit = [m for m in detect(prev, cur) if m["occasion"] == "weapon_tier"][0]
+    assert (hit["value"], hit["prev_value"]) == (5, 4)
+
+
+def test_gleiches_tier_feiert_nicht():
+    from pubg.weapon_milestones import detect
+    prev = {"weapons": {"Beryl": {"tier": 5}}, "career": {}}
+    cur = {"weapons": {"Beryl": {"tier": 5}}, "career": {}}
+    assert [m for m in detect(prev, cur)
+            if m["occasion"] == "weapon_tier"] == []
+
+
+def test_verlauf_nennt_zielfassung_und_anzeige_stand():
+    # Ohne diese Felder stand im Tool bei jedem Eintrag "-" als Ziel und
+    # "waiting" als Status, auch nach dem Zeigen.
+    _call("POST", "/api/pubg/milestone-test",
+          {"occasion": "weapon_damage", "widget": "both"})
+    d = _data(_call("GET", "/api/pubg/milestone-state")[0])
+    r = d["recent"][0]
+    assert r["widget"] == "both"
+    assert r["shownBigAt"] is None and r["shownBarAt"] is None
+
+    _call("GET", "/api/pubg/milestone-pending",
+          qs={"widget": "bar", "markShown": "1"})
+    r2 = _data(_call("GET", "/api/pubg/milestone-state")[0])["recent"][0]
+    assert r2["shownBarAt"] and r2["shownBigAt"] is None
+
+
+def test_probelauf_nimmt_mitgeschickte_konfiguration():
+    # Sonst muesste man erst speichern, um eine geaenderte
+    # Schrittweite ausprobieren zu koennen.
+    db_pg.save_milestone_snapshot(CONN.raw, T, "account.A", {
+        "weapons": {"M416": {"damage": 432503}}})
+    CONN.raw.commit()
+    d = _data(_call("POST", "/api/pubg/milestone-test",
+                    {"occasion": "weapon_damage",
+                     "config": {"weapon_damage": {"step": 100000}}})[0])
+    # 432.503 bei 100.000er Schritten → 500.000, nicht 450.000.
+    assert d["queued"]["value"] == 500000
+
+
+def test_mitgeschickte_konfiguration_wird_nicht_gespeichert():
+    _call("POST", "/api/pubg/milestone-test",
+          {"occasion": "weapon_damage",
+           "config": {"weapon_damage": {"step": 100000}}})
+    stored = _data(_call("GET", "/api/pubg/milestone-config")[0])
+    assert stored["config"]["weapon_damage"]["step"] == \
+        OCCASIONS["weapon_damage"]["step"]
