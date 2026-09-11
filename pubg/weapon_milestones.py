@@ -304,7 +304,15 @@ OCCASIONS = {
 }
 
 #: Was das Config-Tool ueberschreiben darf. Alles andere ist Code.
-CONFIG_FIELDS = ("enabled", "step", "widget", "huge_every", "min", "at")
+#:
+#: `at` steht bewusst NICHT darin: der einzige Anlass dieser Art ist
+#: "ausgelevelt", und das ist Tier 6 — eine Tatsache des Spiels, keine
+#: Einstellung. Als einstellbares Feld hat es bereits Schaden
+#: angerichtet: eine Konfiguration, die noch die alte Fassung
+#: (Level 100) gespeichert hatte, ueberschrieb den korrigierten Wert
+#: und liess den Anlass auf einen Tier-Wert 100 zeigen, den es nicht
+#: gibt.
+CONFIG_FIELDS = ("enabled", "step", "widget", "huge_every", "min")
 
 #: Zielwidgets. `both` liefert denselben Meilenstein an beide.
 WIDGETS = ("big", "bar", "both")

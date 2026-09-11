@@ -361,3 +361,13 @@ def test_level_hundert_gibt_es_nur_im_master_tier():
     assert lvl(98, 0) == LEVEL_PER_TIER
     # Und im Master-Tier eine Stufe darueber.
     assert lvl(99, 6) == MAX_LEVEL_IN_TIER
+
+
+def test_ausgelevelt_ist_nicht_einstellbar():
+    # Eine gespeicherte Konfiguration aus einer aelteren Fassung hatte
+    # hier "at": 100 stehen und liess den Anlass auf einen Tier-Wert
+    # zeigen, den es nicht gibt. Tier 6 ist eine Tatsache des Spiels.
+    from pubg.weapon_milestones import MAX_TIER
+    cfg = merge_config({"weapon_mastered": {"at": 100}})
+    assert cfg["weapon_mastered"].get("at") is None
+    assert OCCASIONS["weapon_mastered"]["at"] == MAX_TIER
