@@ -2342,7 +2342,14 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 env_type = "kill_fall"
             elif "BattleRoyale" in wid:
                 env_type = "kill_bluezone"
-            elif "Bluezonebomb" in wid:
+            # Die Zonen-Bombardierung, fuer Daten ohne damage_reason.
+            # `Bluezonebomb_EffectActor_C` stand hier vorher und ist
+            # falsch: das ist die GEWORFENE Blauzonen-Granate, also ein
+            # Waffentod mit einem Werfer dahinter. Als Umgebungstod
+            # gezaehlt verlor er seinen Verursacher und erschien als
+            # Red Zone, die ihn nie verursacht hat.
+            elif ("RedZoneBombingField" in wid
+                  or "BlackZoneBombingField" in wid):
                 env_type = "kill_redzone"
             elif "Drown" in wid or "Apnea" in wid:
                 env_type = "kill_drown"
@@ -4626,25 +4633,79 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
             mid   = m["matchId"]
             played = m["playedAt"]
 
-            # --- Killed by Red Zone ---
-            # LogPlayerKillV2 mit weapon LIKE '%RedZone%' oder '%Bomb%'
-            # und actor_account IS NULL (kein echter Killer-Account)
-            rz = (conn.execute("""
-                SELECT COUNT(*) AS c FROM telemetry_events
-                WHERE match_id=? AND event_type='Kill'
-                  AND target_account=?
-                  AND (actor_account IS NULL OR actor_account='')
-                  AND (weapon LIKE '%RedZone%'
-                       OR weapon LIKE '%Bomb%'
-                       OR weapon LIKE '%bomb%')
-            """, (mid, my_account_id)).fetchone() or {}).get("c", 0)
-            if rz > 0:
-                out.append({
-                    "id": "redzone_death",
-                    "label": "Red Zone Victim",
-                    "icon": "💥",
-                    "matchId": mid, "playedAt": played,
-                })
+            # --- Von der Red Zone erwischt ---
+            #
+            # Zwei getrennte Anlaesse: zu Fuss und im Fahrzeug. Das
+            # Fahrzeug ist der seltenere und eindruecklichere Fall —
+            # wer faehrt, sieht die Bombardierung zu spaet und kommt
+            # nicht mehr raus.
+            #
+            # **Knock zaehlt mit.** Die Bedingung lautete nur
+            # `event_type='Kill'`, und die Red Zone hat in unseren
+            # Daten noch nie einen Kill erzeugt: 74 Ereignisse, alle
+            # als Knock. Das Achievement konnte also nie ausloesen.
+            # Im Squad wird man niedergestreckt und stirbt danach an
+            # etwas anderem; der Ausloeser bleibt die Bombe.
+            #
+            # **Die Waffe wird genau geprueft**, nicht ueber `%Bomb%`:
+            # dieses Muster traf auch `Bluezonebomb_EffectActor_C`,
+            # also die geworfene Blauzonen-Granate, die nichts mit der
+            # Zonen-Bombardierung zu tun hat.
+            rz_hits = conn.execute("""
+                SELECT event_type, timestamp_ms FROM telemetry_events
+                WHERE match_id = ? AND target_account = ?
+                  AND event_type IN ('Kill', 'Knock')
+                  AND (weapon LIKE 'RedZoneBombingField%'
+                       OR weapon LIKE 'BlackZoneBombingField%')
+            """, (mid, my_account_id)).fetchall()
+            if rz_hits:
+                # Fahrzeug-Intervalle des eigenen Accounts; dieselbe
+                # Quelle, aus der auch 'Ejected' seine Faelle nimmt.
+                rz_veh = conn.execute("""
+                    SELECT event_type, timestamp_ms FROM telemetry_events
+                    WHERE match_id = ? AND actor_account = ?
+                      AND event_type IN ('VehicleEnter', 'VehicleLeave')
+                    ORDER BY timestamp_ms ASC
+                """, (mid, my_account_id)).fetchall()
+                _rz_en, rz_ivs = None, []
+                for v in rz_veh:
+                    if v["event_type"] == "VehicleEnter":
+                        _rz_en = v["timestamp_ms"]
+                    elif v["event_type"] == "VehicleLeave" and _rz_en:
+                        rz_ivs.append((_rz_en, v["timestamp_ms"]))
+                        _rz_en = None
+                if _rz_en:
+                    rz_ivs.append((_rz_en, 10**15))
+                # Drei Faelle, jeder Treffer zaehlt in genau einen —
+                # zwei Meldungen fuer dasselbe Ereignis waeren Laerm.
+                # Im Fahrzeug wird nicht weiter nach Kill und Knock
+                # getrennt: dort ist das Fahren der Anlass.
+                in_veh = foot_kill = foot_knock = 0
+                for h in rz_hits:
+                    if _in_veh_interval(h["timestamp_ms"], rz_ivs):
+                        in_veh += 1
+                    elif h["event_type"] == "Kill":
+                        foot_kill += 1
+                    else:
+                        foot_knock += 1
+
+                def _rz(aid, label, n):
+                    out.append({
+                        "id": aid,
+                        "label": label if n == 1 else f"{label} · {n}×",
+                        "icon": "💥",
+                        "matchId": mid, "playedAt": played,
+                    })
+
+                if in_veh:
+                    _rz("redzone_vehicle_death", "Bombed While Driving",
+                        in_veh)
+                # Zu Fuss erschlagen zu werden ist der seltenste der
+                # drei: die Bombe streckt meist nur nieder.
+                if foot_kill:
+                    _rz("redzone_death", "Red Zone Victim", foot_kill)
+                if foot_knock:
+                    _rz("redzone_knock", "Red Zone Shockwave", foot_knock)
 
             # --- Killed a player WITH a vehicle (run over) ---
             # damageCauserName = Fahrzeug-Klasse (BP_Buggy_C etc.)
@@ -4905,6 +4966,8 @@ PUBG_RARE_ACHIEVEMENTS = {
     "longest_kill_400",              # ≥400m
     "chicken_streak",                # ≥2 Chickens in Folge
     "em_pickup_kill",                # Kill waehrend Gegner am EP-Ballon haengt
+    "redzone_vehicle_death",         # Im Fahrzeug von der Red Zone erwischt
+    "redzone_death",                 # Von der Red Zone zu Fuss erschlagen
 }
 
 
@@ -6537,14 +6600,17 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                         r["target_account"] if is_actor else r["actor_account"],
                 }
 
-            # Redzone-Tode (Kill ohne actor + Bomb/RedZone-Waffe)
+            # Von der Zonen-Bombardierung erwischt. Knock zaehlt mit —
+            # die Red Zone erzeugt in unseren Daten ausschliesslich
+            # Knocks, nie einen Kill. Und die Waffe wird genau geprueft
+            # statt ueber `%Bomb%`, weil das Muster auch die geworfene
+            # Blauzonen-Granate (`Bluezonebomb_EffectActor_C`) traf.
             for r in conn.execute(f"""
                 SELECT * FROM telemetry_events
-                WHERE match_id=? AND event_type='Kill'
+                WHERE match_id=? AND event_type IN ('Kill','Knock')
                   AND target_account IN ({ph})
-                  AND (actor_account IS NULL OR actor_account='')
-                  AND (weapon LIKE '%RedZone%' OR weapon LIKE '%Bomb%'
-                       OR weapon LIKE '%bomb%')
+                  AND (weapon LIKE 'RedZoneBombingField%'
+                       OR weapon LIKE 'BlackZoneBombingField%')
             """, [match_id] + list(acc_ids)).fetchall():
                 target = r["target_account"]
                 if target in result:

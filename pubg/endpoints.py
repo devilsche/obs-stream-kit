@@ -1405,7 +1405,9 @@ class EndpointRegistry:
             "ghost_operative":         "Heist with 0 kills, 0 damage, 10+ loot",
             "window_smasher":          "Smashed 30+ windows in a heist",
             "em_pickup_kill":          "Shot an enemy hanging from an Emergency Pickup balloon",
-            "redzone_death":           "Killed by the red zone bomb",
+            "redzone_death":           "Killed outright by a red zone bomb — rare, it usually only knocks you down",
+            "redzone_knock":           "Knocked down by a red zone bomb",
+            "redzone_vehicle_death":   "Caught by a red zone bomb while in a vehicle — you see it too late to get out",
             "vehicle_kill":            "Ran over and killed an enemy",
             "vehicle_death":           "Got run over by a vehicle",
             "vehicle_gunkill":         "Killed or knocked an enemy while you were driving",
@@ -1461,7 +1463,9 @@ class EndpointRegistry:
             "ghost_operative":         "Heist mit 0 Kills, 0 DMG, 10+ Loot",
             "window_smasher":          "30+ Fenster im Heist eingeschlagen",
             "em_pickup_kill":          "Gegner abgeschossen während er am Emergency-Pickup-Ballon hing",
-            "redzone_death":           "Von der Roten Zone bombardiert",
+            "redzone_death":           "Von einer Bombe der Roten Zone direkt erschlagen — selten, sie streckt meist nur nieder",
+            "redzone_knock":           "Von einer Bombe der Roten Zone niedergestreckt",
+            "redzone_vehicle_death":   "Im Fahrzeug von der Roten Zone erwischt — im Fahren sieht man es zu spaet",
             "vehicle_kill":            "Gegner überfahren",
             "vehicle_death":           "Von Fahrzeug überfahren worden",
             "vehicle_gunkill":         "Gegner erschossen oder geknockt während du fährst",
@@ -1663,7 +1667,9 @@ class EndpointRegistry:
         "first_hot_drop_survived": 51,  # legacy
         # Sonder-Milestones (locker am Ende)
         "em_pickup_kill":          20,  # Sky Snipe — Highlight, frueh anzeigen
-        "redzone_death":           60,
+        "redzone_vehicle_death":   58,
+        "redzone_death":           59,
+        "redzone_knock":           60,
         "vehicle_kill":            61,
         "vehicle_death":           62,
         "vehicle_gunkill":         63,
@@ -1726,6 +1732,8 @@ class EndpointRegistry:
         # Sonder-Milestones
         "em_pickup_kill":          "Sky Snipe",
         "redzone_death":           "Red Zone Victim",
+        "redzone_knock":            "Red Zone Shockwave",
+        "redzone_vehicle_death":    "Bombed While Driving",
         "vehicle_kill":            "Road Rage",
         "vehicle_death":           "Speed Bump",
         "vehicle_gunkill":         "Drive-By",
@@ -1807,8 +1815,12 @@ class EndpointRegistry:
         "silent_heist":            "/widgets-static/pubg/icons/silent_heist.png",
         "ghost_operative":         "/widgets-static/pubg/icons/ghost_operative.png",
         "window_smasher":          "/widgets-static/pubg/icons/window_smasher.png",
-        # Sonder-Milestones: Redzone, Fahrzeug
+        # Sonder-Milestones: Redzone, Fahrzeug.
+        # Die drei Redzone-Bilder stehen noch aus; None heisst
+        # "kein Bild", nicht "fehlt versehentlich".
         "redzone_death":           None,
+        "redzone_knock":           None,
+        "redzone_vehicle_death":   None,
         "vehicle_kill":            "/widgets-static/pubg/assets/achievements/vehicle_kill.png",
         "vehicle_death":           "/widgets-static/pubg/assets/achievements/vehicle_death.png",
         "vehicle_gunkill":         "/widgets-static/pubg/assets/achievements/vehicle_gunkill.png",

@@ -459,6 +459,39 @@ Voraussetzung für die Fremdsicht: die Seite muss ihre API-Calls über
 `/s/<token>/` sind davon nicht betroffen — dort gibt es keine Impersonation und
 entsprechend kein Banner im Stream.
 
+#### Red Zone: drei Achievements (Stand 2026-09-11)
+
+Von der Zonen-Bombardierung erwischt zu werden ist jetzt ein Highlight — in
+drei getrennten Fällen, weil sie sich deutlich unterscheiden:
+
+| ID | Label | wann | rare |
+|---|---|---|---|
+| `redzone_vehicle_death` | Bombed While Driving | im Fahrzeug erwischt | ja |
+| `redzone_death` | Red Zone Victim | zu Fuß **getötet** | ja |
+| `redzone_knock` | Red Zone Shockwave | zu Fuß niedergestreckt | nein |
+
+Jeder Treffer zählt in genau einen der drei — zwei Meldungen für dasselbe
+Ereignis wären Lärm. Im Fahrzeug wird nicht weiter nach Kill und Knock
+getrennt: dort ist das Fahren der Anlass, und man sieht die Bombardierung zu
+spät, um noch auszusteigen.
+
+**`redzone_death` war jahrelang blind.** Die Bedingung lautete nur
+`event_type='Kill'`, und die Red Zone erzeugt in den Daten **ausschließlich
+Knocks** — 74 Ereignisse über alle Tenants, kein einziger Kill. Das Achievement
+war vollständig registriert (Label, Priorität, Icon-Platzhalter) und konnte
+trotzdem nie auslösen.
+
+**Zweiter Fehler, zweimal an verschiedenen Stellen:** das Waffen-Muster
+`LIKE '%Bomb%'` fing auch `Bluezonebomb_EffectActor_C` ein — die *geworfene*
+Blauzonen-Granate, die mit der Zonen-Bombardierung nichts zu tun hat (siehe
+oben). In der Todesursachen-Zuordnung des Match-Details stand sie sogar
+namentlich als `kill_redzone`, während die echte Bombardierung
+(`RedZoneBombingField_*`) im Waffen-Fallback gar nicht vorkam. Als
+Umgebungstod gezählt verlor die Granate außerdem ihren Verursacher.
+
+Die drei Icons stehen noch aus; `None` in `PUBG_ICON_URLS` heißt „kein Bild",
+nicht „fehlt versehentlich".
+
 #### Wurfgeräte: vier fehlende Mappings (Stand 2026-09-11)
 
 Vier Wurfgeräte tragen `Item_Weapon_`-Präfix statt `Proj` und fehlten
