@@ -132,11 +132,16 @@ def test_die_kennzahlen_kommen_aus_lobby_detail(matches):
     # Nicht nachbauen: lobby_detail liefert Median, beide Ränder und den
     # eigenen Squad bereits — dieselbe Funktion, hinter der im Report die
     # Lobby-Zahl hängt.
+    #
+    # Der Squad heißt dort `squadAvgMates`, in `lobby_kd_for_matches`
+    # dagegen `squadKdMates`. Mit dem falschen Namen stand überall 0,00;
+    # dieser Test hält den richtigen fest.
     from pubg.poller import lobby_begleitzahlen
     conn, t1 = matches
     antwort = {"matches": [{
         "matchId": "m00", "avg": 2.46, "median": 1.31, "max": 8.16,
-        "topAvg": 6.02, "lowAvg": 0.41, "squadKdMates": 1.9,
+        "topAvg": 6.02, "lowAvg": 0.41, "squadAvgMates": 1.9,
+        "squadMatesKnown": 2,
         "known": 80, "lobbyPlayers": 80, "map": "Neon_Main",
         "playedAt": "2026-05-03T12:00:00Z",
         "top": [{"name": "Hai", "kd": 8.16}]}]}
@@ -145,6 +150,7 @@ def test_die_kennzahlen_kommen_aus_lobby_detail(matches):
     assert d["topAvg"] == 6.02
     assert d["lowAvg"] == 0.41
     assert d["squadKd"] == 1.9
+    assert d["squadKnown"] == 2
     assert d["median"] == 1.31
     assert d["topName"] == "Hai"
 

@@ -1003,7 +1003,12 @@ def lobby_begleitzahlen(conn, tenant_id: int, match_id: str, account_id: str):
         "topName": spitze.get("name"),
         # Der eigene Squad ohne mich: die Frage "wer sass im eigenen
         # Auto" gehoert neben die Lobby-Zahl.
-        "squadKd": m.get("squadKdMates"),
+        #
+        # Achtung, `lobby_detail` nennt das Feld anders als
+        # `lobby_kd_for_matches`: dort heisst es `squadKdMates`, hier
+        # `squadAvgMates`. Mit dem falschen Namen stand ueberall 0,00.
+        "squadKd": m.get("squadAvgMates"),
+        "squadKnown": m.get("squadMatesKnown"),
         "known": m.get("known"),
         "players": m.get("lobbyPlayers"),
         "map": m.get("map"),
