@@ -637,20 +637,21 @@ PACKAGE_LABELS = {
 }
 
 
-#: Was ausser Waffen einen Abwurf lohnend macht. Ohne diese Liste stand
-#: bei einem Paket mit Level-3-Weste und 8x-Visier "nichts Besonderes" —
+#: Was ausser Waffen einen Abwurf lohnend macht. Die Namen sind
+#: englisch, weil sie im Werkzeug sichtbar werden. Ohne diese Liste
+#: stand bei einem Paket mit Level-3-Weste und 8x-Visier nichts —
 #: gemessen der haeufigste Inhalt ueberhaupt, und der Grund, warum
 #: Leute hinlaufen.
 DROP_GEAR_LABELS = {
-    "Item_Head_G_01_Lv3_C": "Helm Lv3",
-    "Item_Armor_C_01_Lv3_C": "Weste Lv3",
-    "Item_Armor_D_01_Lv3_C": "Weste Lv3",
-    "Item_Back_BlueBlocker_Lv3": "Rucksack Lv3",
-    "Item_Back_C_01_Lv3_C": "Rucksack Lv3",
+    "Item_Head_G_01_Lv3_C": "Helmet Lv3",
+    "Item_Armor_C_01_Lv3_C": "Vest Lv3",
+    "Item_Armor_D_01_Lv3_C": "Vest Lv3",
+    "Item_Back_BlueBlocker_Lv3": "Backpack Lv3",
+    "Item_Back_C_01_Lv3_C": "Backpack Lv3",
     "Item_Attach_Weapon_Upper_CQBSS_C": "8x",
     "Item_Attach_Weapon_Upper_PM2_01_C": "15x",
     "Item_Weapon_TraumaBag_C": "Trauma Bag",
-    "Item_Boost_AdrenalineSyringe_C": "Adrenalin",
+    "Item_Boost_AdrenalineSyringe_C": "Adrenaline",
     "Item_Ghillie_01_C": "Ghillie",
 }
 

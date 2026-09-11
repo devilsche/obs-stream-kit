@@ -591,6 +591,55 @@ _WEAPON_ALIASES = {
 }
 
 
+#: Anzeigenamen fuer die Oberflaeche. WEAPON_NAMES ist deutsch gepflegt
+#: und dient als **Datenschluessel** — die Werte stehen so in
+#: `match_weapon_stats.weapon`, also aendert sich dort nichts. Uebersetzt
+#: wird erst beim Ausliefern.
+#:
+#: Ohne diese Schicht stand im Shot-Quality-Tool "Rauchbombe",
+#: "Blendgranate" und "Blauzonen-Granate" — deutsche Labels in einer
+#: durchgehend englischen Oberflaeche.
+WEAPON_DISPLAY_EN = {
+    "Granate": "Frag Grenade",
+    "Klebebombe": "Sticky Bomb",
+    "Rauchbombe": "Smoke Grenade",
+    "Blendgranate": "Flash Grenade",
+    "Taser": "Stun Gun",
+    "Blauzonen-Granate": "Blue Zone Grenade",
+    "Moerser": "Mortar",
+    "Pfanne": "Pan",
+    "Pfanne (Wurf)": "Pan (thrown)",
+    "Machete (Wurf)": "Machete (thrown)",
+    "Sichel": "Sickle",
+    "Sichel (Wurf)": "Sickle (thrown)",
+    "Brechstange": "Crowbar",
+    "Brechstange (Wurf)": "Crowbar (thrown)",
+    "Spitzhacke": "Pickaxe",
+    "Spitzhacke (Wurf)": "Pickaxe (thrown)",
+}
+
+
+def weapon_display(name):
+    """Waffenname fuer die Oberflaeche.
+
+    Alles, was aus `match_weapon_stats.weapon` ans Frontend geht, laeuft
+    hier durch. Namen ohne Eintrag bleiben, wie sie sind — die meisten
+    Waffen heissen ohnehin gleich ("M416", "Beryl").
+    """
+    return WEAPON_DISPLAY_EN.get(name, name)
+
+
+def weapon_name_en(weapon_id):
+    """Roh-Id direkt zum englischen Anzeigenamen.
+
+    Kurzform fuer `weapon_display(_weapon_label(id)[0])`. Wichtig ist,
+    dass `_weapon_label` selbst **nicht** uebersetzt: sein Rueckgabewert
+    ist auch der Schluessel in `match_weapon_stats.weapon`, und den zu
+    aendern hiesse migrieren.
+    """
+    return weapon_display(_weapon_label(weapon_id)[0])
+
+
 def _weapon_ci_lookup(weapon_id):
     global _WEAPON_NAMES_CI
     if _WEAPON_NAMES_CI is None:
@@ -1593,7 +1642,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                     "victimY": e["victim_y"],
                     "tsMs":    e["timestamp_ms"],
                     "weapon":  e["weapon"],
-                    "weaponName": wlabel,
+                    "weaponName": weapon_display(wlabel),
                     "distanceM":  dist_m,
                     "victimName": vrow["n"] if vrow else None,
                 })
@@ -1669,7 +1718,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                     "tsMs":        death_ev["timestamp_ms"],
                     "killerName":  kn,
                     "weaponId":    wid,
-                    "weaponName":  weapon_name,
+                    "weaponName":  weapon_display(weapon_name),
                     "causeLabel":  cause_label,
                     "knockCauseLabel": knock_cause_label,
                     "victimVehicleLabel":      victim_vehicle_label,
@@ -2186,7 +2235,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             "targetIsSquad": target_row in sq_set,
             "targetClan":    _clan_of(target_row),
             "weapon":        weapon_row,
-            "weaponName":    wn,
+            "weaponName":    weapon_display(wn),
             "distanceM":     dist_m_local,
             "victimX":       vx,
             "victimY":       vy,
@@ -2442,7 +2491,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                     rod = recent_other_damage
                     if rod["weapon"]:
                         row["weapon"]     = rod["weapon"]
-                        row["weaponName"] = _weapon_label(rod["weapon"])[0]
+                        row["weaponName"] = weapon_name_en(rod["weapon"])
                     if (rod["actor_x"] is not None
                             and rod["victim_x"] is not None):
                         _dx = (rod["actor_x"] - rod["victim_x"]) / 100.0
@@ -6709,7 +6758,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                 return {
                     "tsMs":       r["timestamp_ms"],
                     "weapon":     wid,
-                    "weaponName": wn,
+                    "weaponName": weapon_display(wn),
                     "x":          r["victim_x"],
                     "y":          r["victim_y"],
                     "distanceM":  (round((r["distance"] or 0) / 100.0, 1)
@@ -6738,7 +6787,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                     result[target]["redzone"].append({
                         "tsMs":       r["timestamp_ms"],
                         "weapon":     r["weapon"],
-                        "weaponName": _weapon_label(r["weapon"])[0]
+                        "weaponName": weapon_name_en(r["weapon"])
                                       if r["weapon"] else "Red Zone",
                         "x":          r["victim_x"],
                         "y":          r["victim_y"],
@@ -6791,7 +6840,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                     result[acc]["driveby"].append({
                         "tsMs":       ts,
                         "weapon":     k["weapon"],
-                        "weaponName": wn,
+                        "weaponName": weapon_display(wn),
                         "victimName": _name(k["target_account"]),
                         "victimAcc":  k["target_account"],
                         "x":          k["victim_x"],

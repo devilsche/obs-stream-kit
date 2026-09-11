@@ -94,23 +94,13 @@ THROWABLES = tuple(sorted({
     "Rauchbombe", "Blendgranate", "Taser", "Blauzonen-Granate",
 }))
 
-#: Anzeigenamen fuer die Wurfgeraete. WEAPON_NAMES ist deutsch
-#: gepflegt und dient als Datenschluessel; die Oberflaeche ist englisch.
-DISPLAY_NAMES = {
-    "Granate": "Frag Grenade",
-    "Klebebombe": "Sticky Bomb",
-    "Rauchbombe": "Smoke Grenade",
-    "Blendgranate": "Flash Grenade",
-    "Taser": "Stun Gun",
-    "Blauzonen-Granate": "Blue Zone Grenade",
-    "Moerser": "Mortar",
-    "Panzerfaust": "Panzerfaust",
-}
-
-
+#: Anzeigenamen kommen zentral aus `pubg.aggregations` — dieselbe
+#: Tabelle, die auch das Shot-Quality-Tool benutzt. Zwei Listen waeren
+#: zwei Wahrheiten.
 def display_name(weapon: str) -> str:
-    """Englischer Anzeigename; Waffennamen selbst sind sprachneutral."""
-    return DISPLAY_NAMES.get(weapon, weapon)
+    """Englischer Anzeigename; die meisten Waffen heissen ohnehin gleich."""
+    from pubg.aggregations import weapon_display
+    return weapon_display(weapon)
 
 
 def progress(tier: int, level: int) -> int:

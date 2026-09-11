@@ -459,6 +459,25 @@ Voraussetzung für die Fremdsicht: die Seite muss ihre API-Calls über
 `/s/<token>/` sind davon nicht betroffen — dort gibt es keine Impersonation und
 entsprechend kein Banner im Stream.
 
+#### Waffennamen: deutscher Schlüssel, englische Anzeige
+
+`WEAPON_NAMES` in `pubg/aggregations.py` ist **deutsch gepflegt und ist der
+Datenschlüssel** — die Werte stehen so in `match_weapon_stats.weapon`. Daran
+wird nichts geändert; eine Umbenennung hieße migrieren (siehe oben, 51.553
+Zeilen).
+
+Übersetzt wird deshalb **erst beim Ausliefern**, über `weapon_display(name)`
+und `weapon_name_en(roh_id)`. Ohne diese Schicht stand in der durchgehend
+englischen Oberfläche „Rauchbombe", „Blendgranate", „Blauzonen-Granate" und
+„Pfanne (Wurf)". Betroffen waren zwei Anzeige-Pfade — `thrown[].weapon` im
+Shot-Quality-Tool und `weaponName` im Match-Detail. `_weapon_label` selbst
+übersetzt **nicht**, weil sein Rückgabewert der DB-Schlüssel ist.
+
+Prüfen lässt sich das nur live: die deutschen Namen stehen an vielen Stellen
+auch als Objekt*schlüssel* im JSON, was kein Anzeigefehler ist. Ein reiner
+Textvergleich meldet deshalb falsche Treffer — es braucht den Abgleich der
+JSON-Pfade.
+
 #### Visiere, Leuchtpistole, Airdrops (Stand 2026-09-11)
 
 **Visier-Sektion im Shot-Quality-Tool.** Quelle ist `attachments` bei

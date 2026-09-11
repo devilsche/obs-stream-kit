@@ -29,7 +29,7 @@ sind direkt testbar, das DB-Holen sitzt darunter.
 """
 import statistics
 
-from pubg.aggregations import _br_filter, _weapon_label
+from pubg.aggregations import _br_filter, _weapon_label, weapon_display
 from pubg.poi_match import point_in_poly, poly_area
 
 #: Grenzen der Rundenphasen in Sekunden Ueberlebenszeit. Die frueh/mitte-
@@ -1166,7 +1166,9 @@ def thrown_stats(conn, tenant_id, account_id, cutoff="1970-01-01T00:00:00Z",
         thr, land = m["throws"] or 0, m["landed"] or 0
         pthr, pland = p.get("throws") or 0, p.get("landed") or 0
         out.append({
-            "weapon": weapon,
+            # Der Schluessel bleibt deutsch (so steht er in der DB),
+            # die Anzeige ist englisch wie die ganze Oberflaeche.
+            "weapon": weapon_display(weapon),
             "throws": thr,
             "landed": land,
             "landedPct": rate(100.0 * land, thr),
@@ -1281,8 +1283,8 @@ def scope_breakdown(conn, tenant_id, account_id, cutoff, to_iso=None):
     dort die komplette Aufsatzliste der Waffe ab. Sie liegt seit Monaten
     in der Datenbank, ohne dass sie jemand ausgewertet haette.
 
-    Die Zeile ohne Visier ist nicht zusammenwerfbar mit der ohne
-    Angabe: erstere heisst Kimme und Korn, letztere fehlende Daten.
+    Die Zeile "no sight" ist nicht zusammenwerfbar mit fehlenden
+    Angaben: erstere heisst Kimme und Korn, letztere keine Daten.
     """
     rows = conn.execute("""
         SELECT e.attachments, e.distance
@@ -1317,7 +1319,9 @@ def scope_breakdown(conn, tenant_id, account_id, cutoff, to_iso=None):
             continue
         ds = b["dist"]
         out.append({
-            "scope": "ohne Visier" if label == "none" else label,
+            # Sichtbarer Text ist englisch, auch wenn der Code
+            # deutsch kommentiert ist.
+            "scope": "no sight" if label == "none" else label,
             "kills": b["kills"],
             # Meter, nicht Zentimeter: die Telemetrie rechnet in cm.
             "avgDistance": round(sum(ds) / len(ds) / 100, 1) if ds else None,

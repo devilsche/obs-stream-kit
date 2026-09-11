@@ -159,7 +159,7 @@ def test_kills_ohne_aufsatzdaten_stehen_getrennt(sess):
     ])
     d = scope_breakdown(conn, t1, ME, "1970-01-01")
     assert d["unknown"] == 1
-    assert [r["scope"] for r in d["byScope"]] == ["ohne Visier"]
+    assert [r["scope"] for r in d["byScope"]] == ["no sight"]
 
 
 def test_fremde_kills_zaehlen_nicht(sess):
@@ -352,7 +352,7 @@ def test_ausruestung_zaehlt_auch_als_highlight():
     d = airdrops([_land("t0", 0.0, 0.0, [
         "Item_Ammo_556mm_C", "Item_Head_G_01_Lv3_C",
         "Item_Attach_Weapon_Upper_CQBSS_C"])])
-    assert set(d[0]["highlights"]) == {"Helm Lv3", "8x"}
+    assert set(d[0]["highlights"]) == {"Helmet Lv3", "8x"}
 
 
 def test_munition_ist_kein_highlight():
@@ -383,3 +383,55 @@ def test_landung_gewinnt_gegen_spawn():
            _land("t1", 1.0, 2.0, ["Item_Weapon_AWM_C"])]
     d = airdrops(evs)
     assert len(d) == 1 and (d[0]["x"], d[0]["y"]) == (1.0, 2.0)
+
+
+# ── Englische Oberfläche ────────────────────────────────────────────────────
+
+def test_wurfgeraete_werden_englisch_ausgeliefert():
+    # WEAPON_NAMES ist deutsch gepflegt und ist der Schlüssel in
+    # match_weapon_stats — geändert wird nichts daran, übersetzt wird
+    # erst beim Ausliefern. Ohne diese Schicht stand im
+    # Shot-Quality-Tool "Rauchbombe" und "Blendgranate".
+    from pubg.aggregations import weapon_display
+    assert weapon_display("Rauchbombe") == "Smoke Grenade"
+    assert weapon_display("Blendgranate") == "Flash Grenade"
+    assert weapon_display("Blauzonen-Granate") == "Blue Zone Grenade"
+    assert weapon_display("Taser") == "Stun Gun"
+    assert weapon_display("Pfanne (Wurf)") == "Pan (thrown)"
+
+
+def test_schusswaffen_bleiben_unveraendert():
+    from pubg.aggregations import weapon_display
+    for n in ("M416", "Beryl", "Mk12", "AWM"):
+        assert weapon_display(n) == n
+
+
+def test_rohe_id_direkt_zum_englischen_namen():
+    from pubg.aggregations import weapon_name_en
+    assert weapon_name_en("Item_Weapon_SmokeBomb_C") == "Smoke Grenade"
+    assert weapon_name_en("Bluezonebomb_EffectActor_C") == "Blue Zone Grenade"
+    assert weapon_name_en("WeapHK416_C") == "M416"
+
+
+def test_der_datenschluessel_bleibt_deutsch():
+    # _weapon_label darf NICHT übersetzen: sein Rückgabewert ist auch
+    # der Schlüssel in match_weapon_stats.weapon. Eine Übersetzung dort
+    # hieße migrieren.
+    from pubg.aggregations import _weapon_label
+    assert _weapon_label("Item_Weapon_SmokeBomb_C")[0] == "Rauchbombe"
+    assert _weapon_label("ProjGrenade_C")[0] == "Granate"
+
+
+def test_kein_deutsches_label_in_der_visier_ausgabe():
+    from pubg.shot_quality import scope_breakdown  # noqa: F401
+    from pubg.shot_quality import SCOPE_ORDER
+    # "none" wird beim Ausliefern zu "no sight", nicht "ohne Visier".
+    assert "ohne Visier" not in SCOPE_ORDER
+
+
+def test_ausruestung_im_airdrop_ist_englisch():
+    from pubg.telemetry_analysis import DROP_GEAR_LABELS
+    werte = set(DROP_GEAR_LABELS.values())
+    for d in ("Helm Lv3", "Weste Lv3", "Rucksack Lv3", "Adrenalin"):
+        assert d not in werte, d
+    assert "Helmet Lv3" in werte and "Vest Lv3" in werte
