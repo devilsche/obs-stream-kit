@@ -324,6 +324,25 @@
     <p class="foot" id="burstFoot"></p>
   </div>
 
+  <div class="t-card" id="scopeCard" hidden>
+    <h2>Sights</h2>
+    <p class="sub" id="scopeSub"></p>
+    <div class="scroll">
+      <table>
+        <thead><tr>
+          <th>Sight</th>
+          <th title="Kills made with this sight mounted">Kills</th>
+          <th title="Share of all your kills">Share</th>
+          <th title="Average distance of those kills">Ø distance</th>
+          <th title="Longest kill with this sight">Longest</th>
+          <th title="Share of those kills beyond 200 m">Long shots</th>
+        </tr></thead>
+        <tbody id="scopeRows"></tbody>
+      </table>
+    </div>
+    <p class="foot" id="scopeFoot"></p>
+  </div>
+
   <div class="t-card" id="thrownCard" hidden>
     <h2>Utility</h2>
     <p class="sub" id="thrownSub"></p>
@@ -730,6 +749,52 @@
         + "lands its first shot almost always, full-auto SMG fire rarely.";
     }
 
+    /* Visiere: woher die eigenen Toetungen kommen.
+     *
+     * Quelle ist die Aufsatzliste, die die Telemetrie bei jedem
+     * Kill-Ereignis mitliefert. Die Zeile "no sight" meint Kimme und
+     * Korn und ist nicht dasselbe wie fehlende Daten — die stehen als
+     * Hinweis unter der Tabelle.
+     */
+    function renderScopes() {
+      const card = document.getElementById("scopeCard");
+      const d = DATA.scopes;
+      const rows = (d && d.byScope) || [];
+      if (!rows.length) { card.hidden = true; return; }
+      card.hidden = false;
+      const gesamt = rows.reduce((s, r) => s + r.kills, 0);
+      document.getElementById("scopeRows").innerHTML = rows.map(r => {
+        // Eine Distanz aus wenigen Kills schwankt stark; kursiv statt
+        // still danebenstehen.
+        const thin = r.reliable ? "" : "thin-rate";
+        return `<tr>
+          <td>${esc(r.scope)}</td>
+          <td>${n0(r.kills)}</td>
+          <td>${gesamt ? (100 * r.kills / gesamt).toFixed(1) + " %" : "—"}</td>
+          <td class="${thin}" title="${r.reliable ? ""
+            : "fewer than " + d.reliableMin + " kills — the average moves a "
+              + "lot with a single close-range kill"}">${
+            r.avgDistance == null ? "—" : r.avgDistance.toFixed(0) + " m"}</td>
+          <td>${r.maxDistance == null ? "—" : n0(r.maxDistance) + " m"}</td>
+          <td class="${thin}">${
+            r.longShare == null ? "—" : r.longShare.toFixed(1) + " %"}</td>
+        </tr>`;
+      }).join("");
+      document.getElementById("scopeSub").innerHTML =
+        "Which sight was on the gun when a kill landed, and at what range. "
+        + "Read it as a check on your loadout: if a magnified sight sits at "
+        + "the same distance as your red dot, it is carrying weight it does "
+        + "not earn.";
+      const fehlt = d.unknown
+        ? ` ${n0(d.unknown)} kills carry no attachment data and are left out.`
+        : "";
+      document.getElementById("scopeFoot").innerHTML =
+        "<b>Long shots</b> are kills beyond " + d.longShotM + " m. "
+        + "\"No sight\" means iron sights, which is not the same as missing "
+        + "data." + fehlt + " Distances in <i>italics</i> rest on fewer than "
+        + d.reliableMin + " kills.";
+    }
+
     function renderThrown() {
       const card = document.getElementById("thrownCard");
       const rows = DATA.thrown || [];
@@ -908,6 +973,7 @@
       renderDeaths();
       renderBursts();
       renderThrown();
+      renderScopes();
       renderCohort();
       renderDeathMaps();
       renderTrend();
@@ -929,7 +995,8 @@
         if (!me.matches) {
           st.textContent = "No BR matches in this range — widen it?";
           ["kpiCard", "rankCard", "phaseCard", "deathCard",
-           "burstCard", "thrownCard", "cohortCard", "trendCard"].forEach(
+           "burstCard", "thrownCard", "scopeCard", "cohortCard",
+           "trendCard"].forEach(
              id => document.getElementById(id).hidden = true);
           return;
         }
@@ -943,7 +1010,8 @@
         st.classList.add("err");
         st.textContent = "Error: " + (e && e.message || e);
         ["kpiCard", "rankCard", "phaseCard", "deathCard",
-         "burstCard", "thrownCard", "cohortCard", "trendCard"].forEach(
+         "burstCard", "thrownCard", "scopeCard", "cohortCard",
+         "trendCard"].forEach(
            id => document.getElementById(id).hidden = true);
       }
     }

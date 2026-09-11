@@ -603,6 +603,130 @@ def _binom_cdf(k: int, n: int, p: float) -> float:
     return sum(math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(k + 1))
 
 
+#: Waffen, die es nur im Abwurf gibt. Sie entscheiden, ob ein Paket
+#: erwaehnenswert war — der Rest ist Munition und Westen.
+DROP_WEAPON_LABELS = {
+    "Item_Weapon_AWM_C": "AWM",
+    "Item_Weapon_MK14_C": "Mk14 EBR",
+    "Item_Weapon_Mk14_C": "Mk14 EBR",
+    "Item_Weapon_Groza_C": "Groza",
+    "Item_Weapon_AUG_C": "AUG A3",
+    "Item_Weapon_MG3_C": "MG3",
+    "Item_Weapon_M249_C": "M249",
+    "Item_Weapon_Mk12_C": "Mk12",
+    "Item_Weapon_FNFal_C": "FN FAL",
+    "Item_Weapon_DesertEagle_C": "Deagle",
+    "Item_Weapon_Railgun_C": "Railgun",
+    "Item_Weapon_ItemGhillieSuit_C": "Ghillie",
+}
+
+#: Pakettypen in lesbar. Der BlueChip-Abwurf wird durch einen
+#: Chip-Upload gerufen und ist etwas anderes als die rote Kiste.
+PACKAGE_LABELS = {
+    "Carapackage_RedBox_C": "Red Box",
+    "Carapackage_SmallPackage_C": "Small",
+    "Carapackage_SmallPackage_NoParachute_C": "Small (no chute)",
+    "Carepackage_SmallPackage_NoParachute_Bluechip_C": "BlueChip",
+    "Carapackage_SmallPackage_DihorOtok_C": "Small (Vikendi)",
+    "Carapackage_SmallPackage_Savage_C": "Small (Sanhok)",
+}
+
+
+def _pkg_label(pid):
+    s = str(pid or "")
+    return PACKAGE_LABELS.get(s, s.replace("Carapackage_", "")
+                                  .replace("Carepackage_", "")
+                                  .replace("_C", "").replace("_", " ")
+                              or "Package")
+
+
+def _item_label(iid):
+    s = str(iid or "")
+    if s in DROP_WEAPON_LABELS:
+        return DROP_WEAPON_LABELS[s]
+    return (s.replace("Item_Weapon_", "").replace("Item_Attach_Weapon_", "")
+             .replace("Item_", "").replace("_C", "").replace("_", " ")
+            or "?")
+
+
+def airdrops(events) -> list:
+    """Die Abwuerfe eines Matches: was drin war und wer dran war.
+
+    Zwei Ereignisse tragen das: die **Landung** nennt Pakettyp, Punkt am
+    Boden und den kompletten Inhalt, die **Entnahme** nennt Spieler und
+    Stueck. Erst zusammen ergibt das "wer war an welchem Paket" — der
+    Spawn allein sagt nur, dass eines gefallen ist.
+
+    Beide Ereignisse werden vom Import verworfen; hier laufen sie direkt
+    aus der Rohtelemetrie, weshalb die Auswertung auch fuer alte Matches
+    funktioniert.
+
+    Die Zuordnung laeuft ueber den Pakettyp und nicht ueber eine Id: die
+    Entnahme nennt `carePackageName`, und `carePackageUniqueId` steht in
+    den gemessenen Daten durchgehend auf 0. Fallen zwei Pakete desselben
+    Typs, sind deren Entnahmen daher nicht sicher trennbar — die Zahl
+    der Besucher stimmt, die Aufteilung auf zwei gleiche Pakete nicht.
+    """
+    pakete, entnahmen = [], []
+    for e in events or []:
+        et = e.get("_T")
+        if et in ("LogCarePackageLand", "LogCarePackageSpawn"):
+            pkg = e.get("itemPackage") or {}
+            loc = pkg.get("location") or {}
+            items = [i.get("itemId") for i in (pkg.get("items") or [])
+                     if i.get("itemId")]
+            pakete.append({
+                "typ": pkg.get("itemPackageId"),
+                "landed": et == "LogCarePackageLand",
+                "x": loc.get("x"), "y": loc.get("y"),
+                "items": items,
+                "ts": e.get("_D"),
+            })
+        elif et == "LogItemPickupFromCarepackage":
+            ch = e.get("character") or {}
+            entnahmen.append({
+                "name": ch.get("name"),
+                "acc": ch.get("accountId"),
+                "typ": e.get("carePackageName"),
+                "item": (e.get("item") or {}).get("itemId"),
+            })
+
+    # Die Landung ist die bessere Quelle; ein Spawn ohne Landung bleibt
+    # als Notnagel, damit alte Aufzeichnungen nicht leer ausgehen.
+    gelandet = [p for p in pakete if p["landed"]]
+    genutzt = gelandet or pakete
+
+    # Entnahmen nach Pakettyp bündeln.
+    nach_typ = {}
+    for g in entnahmen:
+        nach_typ.setdefault(str(g["typ"] or ""), []).append(g)
+
+    out = []
+    for p in genutzt:
+        typ = str(p["typ"] or "")
+        g = nach_typ.get(typ, [])
+        besucher = {}
+        for x in g:
+            besucher.setdefault(x["name"] or "?", []).append(
+                _item_label(x["item"]))
+        highlights = [DROP_WEAPON_LABELS[i] for i in p["items"]
+                      if i in DROP_WEAPON_LABELS]
+        out.append({
+            "package": _pkg_label(typ),
+            "at": p["ts"],
+            "x": p["x"], "y": p["y"],
+            "itemCount": len(p["items"]),
+            # Nur die Abwurf-Waffen: die volle Liste ist ein Dutzend
+            # Munitionsstapel und sagt nichts.
+            "highlights": sorted(set(highlights)),
+            "items": [_item_label(i) for i in p["items"]],
+            "takenBy": [{"name": n, "items": sorted(set(it))}
+                        for n, it in sorted(besucher.items())],
+            "touched": bool(g),
+        })
+    return out
+
+
 def flag_anomalies(analysis: dict, min_hits: int = MIN_HITS_FOR_JUDGEMENT) -> dict:
     """Sucht Spieler, deren TREFFERMUSTER nicht zu menschlichem Zielen passt.
 

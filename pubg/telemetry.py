@@ -226,6 +226,42 @@ def _normalize(event):
         item_ids = [i.get("itemId") for i in items if i.get("itemId")]
         if item_ids:
             base["attachments"] = json.dumps(item_ids)
+    elif et == "LogCarePackageLand":
+        # Wo das Paket aufsetzt. Der Spawn-Eintrag nennt den Abwurfpunkt
+        # in der Luft; erst die Landung sagt, wohin man laufen muss —
+        # und nur damit ist die Entfernung zum Paket messbar.
+        base["event_type"] = "CarePackageLand"
+        pkg = event.get("itemPackage") or {}
+        base["weapon"] = pkg.get("itemPackageId")
+        loc = pkg.get("location") or {}
+        base["actor_x"], base["actor_y"] = loc.get("x"), loc.get("y")
+        base["actor_z"] = loc.get("z")
+        items = pkg.get("items") or []
+        ids = [i.get("itemId") for i in items if i.get("itemId")]
+        if ids:
+            base["attachments"] = json.dumps(ids)
+    elif et == "LogItemPickupFromCarepackage":
+        # Wer sich was aus dem Paket genommen hat. Ohne diesen Eintrag
+        # laesst sich nicht sagen, an welchem Drop man wirklich war:
+        # `CarePackageSpawn` nennt nur, dass eines gefallen ist.
+        base["event_type"] = "CarePackagePickup"
+        base["actor_account"] = (event.get("character") or {}).get("accountId")
+        base["weapon"] = (event.get("item") or {}).get("itemId")
+        # Der Pakettyp gehoert dazu — eine AWM aus der rote Kiste ist
+        # etwas anderes als eine aus dem BlueChip-Abwurf.
+        base["attachments"] = event.get("carePackageName")
+        base["actor_x"], base["actor_y"] = _loc(event, "character")
+    elif et == "LogPlayerUseFlareGun":
+        # Leuchtpistole abgefeuert. Sehr selten (zwei je Match in der
+        # ganzen Lobby) und immer eine Geschichte wert.
+        base["event_type"] = "FlareGun"
+        base["actor_account"] = (event.get("attacker")
+                                 or event.get("character") or {}).get("accountId")
+        base["weapon"] = ((event.get("weapon") or {}).get("itemId")
+                          or "Item_Weapon_FlareGun_C")
+        base["actor_x"], base["actor_y"] = (
+            _loc(event, "attacker") if event.get("attacker")
+            else _loc(event, "character"))
     elif et == "LogObjectInteraction":
         # PAYDAY: Tueren oeffnen/schliessen, Tresore knacken
         base["event_type"] = "ObjectInteraction"
@@ -335,6 +371,13 @@ ALWAYS_KEEP_EVENTS = {
     # Tower-Detection. Nur Bluechip-Variante ist fuer uns relevant,
     # aber wir behalten alle Carepackage-Spawns (paar pro Match, billig).
     "CarePackageSpawn",
+    # Die Landung ebenfalls system-weit: erst sie nennt den Punkt am
+    # Boden, und ohne den ist die Entfernung zum Paket nicht messbar.
+    # 23 Eintraege je Match.
+    "CarePackageLand",
+    # Leuchtpistole: zwei je Match in der ganzen Lobby. Auch fremde
+    # behalten — wer eine abfeuert, zieht die halbe Karte an.
+    "FlareGun",
 }
 
 # Position-Events fluten die DB (firet alle ~10s pro Spieler). Wir
@@ -366,7 +409,7 @@ def filter_squad_events(events, squad_account_ids):
             continue
         # PAYDAY-relevante Events: nur Squad behalten, alle Phasen
         if norm["event_type"] in ("ItemPickup", "ObjectInteraction",
-                                    "ObjectDestroy"):
+                                    "ObjectDestroy", "CarePackagePickup"):
             if norm["actor_account"] in squad_account_ids:
                 yield norm
             continue

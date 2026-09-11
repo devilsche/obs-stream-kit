@@ -459,6 +459,41 @@ Voraussetzung für die Fremdsicht: die Seite muss ihre API-Calls über
 `/s/<token>/` sind davon nicht betroffen — dort gibt es keine Impersonation und
 entsprechend kein Banner im Stream.
 
+#### Visiere, Leuchtpistole, Airdrops (Stand 2026-09-11)
+
+**Visier-Sektion im Shot-Quality-Tool.** Quelle ist `attachments` bei
+Kill-Ereignissen — die Telemetrie legt dort die komplette Aufsatzliste ab,
+184.847 Zeilen lagen dafür ungenutzt in der Datenbank.
+
+Die internen Namen täuschen, und das ist die eigentliche Falle:
+**`CQBSS` ist das 8×**, nicht das 4× — das heißt `ACOG_01`. Das 15× läuft als
+`PM2_01`, das 2× als `Aimpoint`. Ein `Scope4x` oder `Scope8x` existiert
+**nicht**; wer darauf filtert, verliert beide und beschriftet das 8× als 4×.
+Die Zuordnung steht als `SCOPES` in `pubg/shot_quality.py`, ein Test hält jeden
+einzelnen Namen fest.
+
+Gemessen am eigenen Konto: Red Dot 782 Kills auf Ø 25 m, 8× 199 auf Ø 161 m
+(27,6 % davon jenseits 200 m), 4× 123 auf Ø 117 m, 15× nur 5. „Ohne Visier"
+meint Kimme und Korn und ist nicht dasselbe wie fehlende Daten — die stehen
+getrennt als Hinweis.
+
+**Drei neue Anlässe.** `flare_gun` (selten, mit der Waffe aus dem gerufenen
+Paket im Label), `airdrop_looted` und `career_suicides` („Own Goals", alle 25).
+Die Leuchtpistole sucht das Paket im Zeitfenster von zwei Minuten nach dem
+Schuss — ohne das wäre jedes Paket des Matches ein Kandidat.
+
+**Airdrop-Sektion im Match-Analysis-Tool**: welches Paket fiel, was lag drin,
+wer war dran. Dafür liest der Import jetzt drei bisher verworfene Log-Typen
+mit (`LogCarePackageLand`, `LogItemPickupFromCarepackage`,
+`LogPlayerUseFlareGun`). Das Tool selbst arbeitet ohnehin auf der
+Rohtelemetrie und kommt daher **auch für alte Matches** an die Zahlen; die
+Achievements brauchen neue Matches.
+
+Eine Einschränkung steht in der Fußzeile des Tools: `carePackageUniqueId` ist
+in allen gemessenen Daten `0`, die Zuordnung läuft deshalb über den Pakettyp.
+Fallen zwei Pakete desselben Typs, stimmt die Zahl der Besucher, ihre
+Aufteilung auf die beiden Pakete nicht.
+
 #### Red Zone: drei Achievements (Stand 2026-09-11)
 
 Von der Zonen-Bombardierung erwischt zu werden ist jetzt ein Highlight — in

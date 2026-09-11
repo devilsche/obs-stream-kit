@@ -1224,6 +1224,117 @@ def trend(conn, tenant_id, account_id):
     return out
 
 
+#: Visiere, von schwach nach stark. Links das Stueck der Roh-Id, das
+#: eindeutig ist, rechts der Anzeigename.
+#:
+#: **Die internen Namen taeuschen.** `CQBSS` ist das 8x, nicht das 4x —
+#: das heisst `ACOG_01`. Das 15x laeuft als `PM2_01`, das 2x als
+#: `Aimpoint`. Es gibt kein `Scope4x` und kein `Scope8x`; wer darauf
+#: filtert, verliert 8x und 4x komplett und beschriftet das 8x als 4x.
+SCOPES = (
+    ("PM2_01", "15x"),
+    ("CQBSS", "8x"),
+    ("Scope6x", "6x"),
+    ("ACOG_01", "4x"),
+    ("DualOptic_4x1x", "4x/1x"),
+    ("Scope3x", "3x"),
+    ("Aimpoint", "2x"),
+    ("Holosight", "Holo"),
+    ("DotSight_01", "Red Dot"),
+)
+
+#: Reihenfolge fuer die Anzeige: die Vergroesserung aufsteigend, damit die
+#: Distanz-Spalte eine Treppe bildet. "ohne" ganz vorn.
+SCOPE_ORDER = ("none", "Red Dot", "Holo", "2x", "3x", "4x/1x", "4x",
+               "6x", "8x", "15x")
+
+#: Ab so vielen Kills gilt die Durchschnittsdistanz eines Visiers als
+#: belastbar. Darunter schwankt sie stark — das 15x steht bei fuenf
+#: Kills, und ein einzelner Nahkampf verschiebt den Mittelwert um
+#: dreissig Meter.
+RELIABLE_SCOPE_KILLS = 15
+
+#: Ab dieser Distanz gilt ein Kill als weit, in Zentimetern.
+LONG_SHOT_CM = 20000
+
+
+def scope_of(attachments):
+    """Anzeigename des Visiers aus der Aufsatzliste, oder None.
+
+    Die Liste steht als JSON-Text in `telemetry_events.attachments`; ein
+    Teilstring-Vergleich genuegt und ist billiger als JSON zu parsen.
+    Die Reihenfolge in SCOPES entscheidet bei Mehrfachtreffern — die gibt
+    es bei der 4x/1x-Dualoptik, die beide Kennungen traegt.
+    """
+    if not attachments:
+        return None
+    for needle, label in SCOPES:
+        if needle in attachments:
+            return label
+    return "none"
+
+
+def scope_breakdown(conn, tenant_id, account_id, cutoff, to_iso=None):
+    """Kills je Visier, mit Distanz — woher die eigenen Toetungen kommen.
+
+    Quelle ist `attachments` bei Kill-Ereignissen: die Telemetrie legt
+    dort die komplette Aufsatzliste der Waffe ab. Sie liegt seit Monaten
+    in der Datenbank, ohne dass sie jemand ausgewertet haette.
+
+    Die Zeile ohne Visier ist nicht zusammenwerfbar mit der ohne
+    Angabe: erstere heisst Kimme und Korn, letztere fehlende Daten.
+    """
+    rows = conn.execute("""
+        SELECT e.attachments, e.distance
+        FROM telemetry_events e
+        JOIN matches m ON m.match_id = e.match_id
+                      AND m.tenant_id = ?
+        WHERE e.event_type = 'Kill'
+          AND e.actor_account = ?
+          AND m.played_at >= ?
+          AND (? IS NULL OR m.played_at <= ?)
+    """, (tenant_id, account_id, cutoff, to_iso, to_iso)).fetchall()
+
+    eimer = {}
+    ohne_angabe = 0
+    for r in rows:
+        s = scope_of(r["attachments"])
+        if s is None:
+            ohne_angabe += 1
+            continue
+        b = eimer.setdefault(s, {"kills": 0, "dist": [], "long": 0})
+        b["kills"] += 1
+        d = r["distance"]
+        if d is not None:
+            b["dist"].append(float(d))
+            if d > LONG_SHOT_CM:
+                b["long"] += 1
+
+    out = []
+    for label in SCOPE_ORDER:
+        b = eimer.get(label)
+        if not b:
+            continue
+        ds = b["dist"]
+        out.append({
+            "scope": "ohne Visier" if label == "none" else label,
+            "kills": b["kills"],
+            # Meter, nicht Zentimeter: die Telemetrie rechnet in cm.
+            "avgDistance": round(sum(ds) / len(ds) / 100, 1) if ds else None,
+            "maxDistance": round(max(ds) / 100) if ds else None,
+            "longShare": (round(100.0 * b["long"] / b["kills"], 1)
+                          if b["kills"] else None),
+            "reliable": b["kills"] >= RELIABLE_SCOPE_KILLS,
+        })
+    return {
+        "byScope": out,
+        "kills": sum(b["kills"] for b in eimer.values()),
+        "unknown": ohne_angabe,
+        "reliableMin": RELIABLE_SCOPE_KILLS,
+        "longShotM": LONG_SHOT_CM // 100,
+    }
+
+
 def compute_shot_quality(conn, tenant_id, account_id, cutoff,
                          to_iso=None, min_matches=MIN_COHORT_MATCHES,
                          lobby_min_matches=5, group_subareas=False,
@@ -1295,6 +1406,9 @@ def compute_shot_quality(conn, tenant_id, account_id, cutoff,
                    if with_bursts else None),
         "thrown": (thrown_stats(conn, tenant_id, account_id, cutoff,
                                 to_iso=to_iso)
+                   if with_bursts else None),
+        "scopes": (scope_breakdown(conn, tenant_id, account_id, cutoff,
+                                   to_iso=to_iso)
                    if with_bursts else None),
         "trend": trend(conn, tenant_id, account_id),
     }

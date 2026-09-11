@@ -894,7 +894,8 @@ class EndpointRegistry:
 
         def _build():
             from pubg.telemetry_source import load_telemetry, TelemetryUnavailable
-            from pubg.telemetry_analysis import analyse, flag_anomalies
+            from pubg.telemetry_analysis import (airdrops, analyse,
+                                                 flag_anomalies)
             from pubg.archive_config import archive_cfg_for_tenant
             url = row["telemetry_url"] if row else None
             try:
@@ -906,6 +907,9 @@ class EndpointRegistry:
                 return {"error": str(e)}
             data = analyse(res.events)
             data["anomalies"] = flag_anomalies(data)
+            # Abwuerfe: beide Quell-Ereignisse verwirft der Import, hier
+            # kommen sie direkt aus der Rohtelemetrie.
+            data["airdrops"] = airdrops(res.events)
             data["matchId"] = match_id
             data["source"] = res.source
             data["eventCount"] = len(res.events)
@@ -1408,6 +1412,8 @@ class EndpointRegistry:
             "redzone_death":           "Killed outright by a red zone bomb — rare, it usually only knocks you down",
             "redzone_knock":           "Knocked down by a red zone bomb",
             "redzone_vehicle_death":   "Caught by a red zone bomb while in a vehicle — you see it too late to get out",
+            "flare_gun":               "Fired a flare gun and called in a drop of your own",
+            "airdrop_looted":          "Took something out of an airdrop — you were actually there, not just nearby",
             "vehicle_kill":            "Ran over and killed an enemy",
             "vehicle_death":           "Got run over by a vehicle",
             "vehicle_gunkill":         "Killed or knocked an enemy while you were driving",
@@ -1466,6 +1472,8 @@ class EndpointRegistry:
             "redzone_death":           "Von einer Bombe der Roten Zone direkt erschlagen — selten, sie streckt meist nur nieder",
             "redzone_knock":           "Von einer Bombe der Roten Zone niedergestreckt",
             "redzone_vehicle_death":   "Im Fahrzeug von der Roten Zone erwischt — im Fahren sieht man es zu spaet",
+            "flare_gun":               "Leuchtpistole abgefeuert und einen eigenen Abwurf gerufen",
+            "airdrop_looted":          "Etwas aus einem Airdrop geholt — selbst dran gewesen, nicht nur in der Naehe",
             "vehicle_kill":            "Gegner überfahren",
             "vehicle_death":           "Von Fahrzeug überfahren worden",
             "vehicle_gunkill":         "Gegner erschossen oder geknockt während du fährst",
@@ -1667,6 +1675,8 @@ class EndpointRegistry:
         "first_hot_drop_survived": 51,  # legacy
         # Sonder-Milestones (locker am Ende)
         "em_pickup_kill":          20,  # Sky Snipe — Highlight, frueh anzeigen
+        "flare_gun":               21,
+        "airdrop_looted":          22,
         "redzone_vehicle_death":   58,
         "redzone_death":           59,
         "redzone_knock":           60,
@@ -1734,6 +1744,8 @@ class EndpointRegistry:
         "redzone_death":           "Red Zone Victim",
         "redzone_knock":            "Red Zone Shockwave",
         "redzone_vehicle_death":    "Bombed While Driving",
+        "flare_gun":                "Flare Fired",
+        "airdrop_looted":           "Airdrop Looted",
         "vehicle_kill":            "Road Rage",
         "vehicle_death":           "Speed Bump",
         "vehicle_gunkill":         "Drive-By",
@@ -1821,6 +1833,9 @@ class EndpointRegistry:
         "redzone_death":           None,
         "redzone_knock":           None,
         "redzone_vehicle_death":   None,
+        # Bilder stehen noch aus, wie bei den Redzone-Anlaessen.
+        "flare_gun":               None,
+        "airdrop_looted":          None,
         "vehicle_kill":            "/widgets-static/pubg/assets/achievements/vehicle_kill.png",
         "vehicle_death":           "/widgets-static/pubg/assets/achievements/vehicle_death.png",
         "vehicle_gunkill":         "/widgets-static/pubg/assets/achievements/vehicle_gunkill.png",

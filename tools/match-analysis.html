@@ -123,6 +123,24 @@
     .modal-close { position: absolute; top: 8px; right: 8px; padding: 4px 10px;
                    min-width: 24px; min-height: 24px; }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+    /* Abwuerfe: je Paket eine Zeile, Inhalt darunter. */
+    .drop { padding: 9px 0; border-bottom: 1px solid var(--theme-border, #3a2c48); }
+    .drop:last-child { border-bottom: 0; }
+    .drop-head { display: flex; flex-wrap: wrap; gap: 8px;
+                 align-items: baseline; }
+    .drop-pkg { font-weight: 600; }
+    .drop-hl { font-size: .82rem; padding: 1px 7px; border-radius: 3px;
+               border: 1px solid var(--theme-accent, #f2b705);
+               color: var(--theme-accent-text, #f2b705); }
+    .drop-meta { font-size: .84rem; color: var(--theme-text-dim, #8a7d99); }
+    .drop-taken { margin-top: 4px; font-size: .88rem; }
+    .drop-taken b { font-weight: 600; }
+    /* Ein Paket, an dem niemand war, tritt zurueck — aber die Deckkraft
+       ist nicht der einzige Hinweis, der Text sagt es auch. */
+    .drop[data-touched="0"] .drop-meta,
+    .drop[data-touched="0"] .drop-pkg { opacity: .62; }
+    .drop-mine { color: var(--theme-accent-text, #f2b705); }
   </style>
 </head>
 <body>
@@ -147,6 +165,12 @@
   <div class="t-card" id="anomalyCard" hidden>
     <div class="t-section-label">Anomalies</div>
     <div id="anomalies"></div>
+  </div>
+
+  <div class="t-card" id="dropCard" hidden>
+    <div class="t-section-label">Airdrops</div>
+    <div id="drops"></div>
+    <p class="legend" id="dropFoot"></p>
   </div>
 
   <div class="t-card" id="tableCard" hidden>
@@ -218,6 +242,52 @@
       const z = p.zones || {};
       const l = (z.ArmShot || 0) + (z.LegShot || 0) + (z.PelvisShot || 0);
       return p.hits ? (100 * l / p.hits) : 0;
+    }
+
+    /* Abwuerfe: welches Paket fiel, was lag drin, wer war dran.
+     *
+     * Quelle sind die Landungs- und Entnahme-Ereignisse der
+     * Rohtelemetrie; der Import verwirft beide, dieses Werkzeug liest
+     * aber ohnehin die Rohdaten und kommt deshalb auch fuer alte
+     * Matches an die Zahlen.
+     */
+    function renderDrops() {
+      const card = document.getElementById("dropCard");
+      const rows = DATA.airdrops || [];
+      if (!rows.length) { card.hidden = true; return; }
+      card.hidden = false;
+      const mich = DATA.myName;
+      const angefasst = rows.filter(r => r.touched).length;
+      const meine = rows.filter(
+        r => (r.takenBy || []).some(t => t.name === mich)).length;
+
+      document.getElementById("drops").innerHTML = rows.map(r => {
+        const hl = (r.highlights || []).map(
+          h => `<span class="drop-hl">${esc(h)}</span>`).join(" ");
+        const taken = (r.takenBy || []).length
+          ? `<div class="drop-taken">` + r.takenBy.map(t =>
+              `<b class="${t.name === mich ? "drop-mine" : ""}">${
+                esc(t.name)}</b> ${esc(t.items.join(", "))}`).join(" · ")
+            + `</div>`
+          : `<div class="drop-taken drop-meta">nobody took anything from it</div>`;
+        return `<div class="drop" data-touched="${r.touched ? 1 : 0}">
+          <div class="drop-head">
+            <span class="drop-pkg">${esc(r.package)}</span>
+            ${hl}
+            <span class="drop-meta">${r.itemCount} items${
+              r.at ? " · " + esc(String(r.at).slice(11, 19)) : ""}</span>
+          </div>
+          ${taken}
+        </div>`;
+      }).join("");
+
+      document.getElementById("dropFoot").innerHTML =
+        `${rows.length} drop${rows.length === 1 ? "" : "s"} in this match, `
+        + `${angefasst} of them touched`
+        + (mich ? `, ${meine} by you` : "")
+        + ". Highlighted are the weapons you only get from a drop. "
+        + "Two drops of the same type cannot be told apart — the game "
+        + "reports no usable package id, so their visitors are pooled.";
     }
 
     function renderAnomalies() {
@@ -667,6 +737,7 @@
         const me = DATA.myName || "";
         MY_TEAM = (me && DATA.players[me]) ? DATA.players[me].teamId : null;
         renderAnomalies();
+        renderDrops();
         renderCurrentView();
         const pre = PubgUI.qs("player", "");
         if (pre && DATA.players[pre]) openDetail(pre);

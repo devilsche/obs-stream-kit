@@ -278,6 +278,15 @@ OCCASIONS = {
         "label": "Vehicles Destroyed", "widget": "bar", "enabled": False,
         "hint": "Cars, bikes and boats you blew up",
     },
+    # Kein Erfolg, sondern eine Marke mit Selbstironie: Granate zu
+    # frueh, Auto vor den Baum, Sprung ohne Fallschirm. Bei 123 in
+    # 17.606 Runden faellt sie selten genug, um witzig zu bleiben.
+    "career_suicides": {
+        "scope": "career", "metric": "suicides", "kind": "step",
+        "step": 25, "huge_every": 100, "unit": "own goals",
+        "label": "Own Goals", "widget": "bar", "enabled": True,
+        "hint": "Ways to die that nobody else gets credit for",
+    },
     "career_roadkills": {
         "scope": "career", "metric": "road_kills", "kind": "step",
         "step": 25, "huge_every": 100, "unit": "road kills",
@@ -469,6 +478,7 @@ CAREER_FIELDS = {
     "vehicle_destroys": ("vehicleDestroys", "sum"),
     "road_kills": ("roadKills", "sum"),
     "headshot_kills": ("headshotKills", "sum"),
+    "suicides": ("suicides", "sum"),
     # Rekorde: das Maximum ueber die Modi, nicht deren Summe.
     "longest_kill": ("longestKill", "max"),
     "most_kills": ("roundMostKills", "max"),

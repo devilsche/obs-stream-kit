@@ -721,6 +721,62 @@ def _merge_veh_intervals(intervals):
     return [tuple(m) for m in merged]
 
 
+#: Fenster nach dem Leuchtpistolen-Schuss, in dem das zugehoerige Paket
+#: landet. Zwei Minuten: der Abwurf braucht in PUBG rund eine halbe
+#: Minute, und ein zweites Paket faellt in der Zeit selten.
+FLARE_WINDOW_MS = 120_000
+
+#: Waffen, die es nur im Abwurf gibt. Nur sie taugen als Aufhaenger im
+#: Label — eine Level-3-Weste ist kein Erzaehlstoff.
+DROP_WEAPONS = {
+    "Item_Weapon_AWM_C": "AWM",
+    "Item_Weapon_MK14_C": "Mk14 EBR",
+    "Item_Weapon_Mk14_C": "Mk14 EBR",
+    "Item_Weapon_Groza_C": "Groza",
+    "Item_Weapon_AUG_C": "AUG A3",
+    "Item_Weapon_MG3_C": "MG3",
+    "Item_Weapon_M249_C": "M249",
+    "Item_Weapon_Mk12_C": "Mk12",
+    "Item_Weapon_FNFal_C": "FN FAL",
+    "Item_Weapon_DesertEagle_C": "Deagle",
+    "Item_Weapon_Railgun_C": "Railgun",
+    "Item_Weapon_ItemGhillieSuit_C": "Ghillie",
+}
+
+
+def _ist_drop_waffe(item_id):
+    return str(item_id or "") in DROP_WEAPONS
+
+
+def _item_label(item_id):
+    """Lesbarer Name eines Abwurf-Items, sonst die gekuerzte Id."""
+    s = str(item_id or "")
+    if s in DROP_WEAPONS:
+        return DROP_WEAPONS[s]
+    return (s.replace("Item_Weapon_", "").replace("Item_", "")
+             .replace("_C", "").replace("_", " ")) or "?"
+
+
+def _bestes_item(attachments_json):
+    """Das erzaehlenswerteste Stueck aus einer Paket-Inhaltsliste.
+
+    Ein Paket enthaelt ein Dutzend Dinge, die meisten davon Munition
+    und Westen. Genannt wird die Waffe, die es nur im Abwurf gibt —
+    sonst nichts, denn "Flare Fired · 5.56 Ammo" ist keine Nachricht.
+    """
+    import json as _json
+    try:
+        items = _json.loads(attachments_json or "[]")
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(items, list):
+        return None
+    for i in items:
+        if _ist_drop_waffe(i):
+            return DROP_WEAPONS[str(i)]
+    return None
+
+
 def _in_veh_interval(ts, intervals, slack=VEH_EJECT_SLACK_MS):
     """True wenn ts innerhalb eines VehicleEnter/Leave-Intervalls liegt.
     slack=100ms fängt die Race-Condition ab bei der VehicleLeave durch
@@ -4633,6 +4689,70 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
             mid   = m["matchId"]
             played = m["playedAt"]
 
+            # --- Leuchtpistole abgefeuert ---
+            # Zwei je Match in der ganzen Lobby; selbst eine abzufeuern
+            # ist entsprechend selten. Was im Abwurf lag, kommt aus dem
+            # Paket, das danach gelandet ist — der Spawn traegt die
+            # Item-Liste.
+            flare = conn.execute("""
+                SELECT timestamp_ms FROM telemetry_events
+                WHERE match_id = ? AND actor_account = ?
+                  AND event_type = 'FlareGun'
+                ORDER BY timestamp_ms ASC
+            """, (mid, my_account_id)).fetchall()
+            if flare:
+                # Das Paket, das der Leuchtpistole folgte: die naechste
+                # Landung nach dem Schuss. Ohne Zeitfenster waere jedes
+                # Paket des Matches ein Kandidat.
+                beute = conn.execute("""
+                    SELECT attachments FROM telemetry_events
+                    WHERE match_id = ? AND event_type = 'CarePackageLand'
+                      AND timestamp_ms BETWEEN ? AND ?
+                    ORDER BY timestamp_ms ASC LIMIT 1
+                """, (mid, flare[0]["timestamp_ms"],
+                      (flare[0]["timestamp_ms"] or 0) + FLARE_WINDOW_MS)
+                ).fetchone()
+                label = "Flare Fired"
+                if beute and beute["attachments"]:
+                    top = _bestes_item(beute["attachments"])
+                    if top:
+                        label = f"Flare Fired · {top}"
+                if len(flare) > 1:
+                    label += f" · {len(flare)}x"
+                out.append({
+                    "id": "flare_gun",
+                    "label": label,
+                    "icon": "🔫",
+                    "matchId": mid, "playedAt": played,
+                })
+
+            # --- Aus dem Airdrop geholt ---
+            # Nicht "ein Paket ist gefallen", sondern "ich war dran":
+            # CarePackagePickup entsteht nur, wenn jemand etwas
+            # herausnimmt.
+            drops = conn.execute("""
+                SELECT weapon, attachments FROM telemetry_events
+                WHERE match_id = ? AND actor_account = ?
+                  AND event_type = 'CarePackagePickup'
+            """, (mid, my_account_id)).fetchall()
+            if drops:
+                pakete = len({r["attachments"] for r in drops
+                              if r["attachments"]}) or 1
+                waffen = [_item_label(r["weapon"]) for r in drops
+                          if r["weapon"] and _ist_drop_waffe(r["weapon"])]
+                if waffen:
+                    label = "Airdrop · " + ", ".join(
+                        sorted(set(waffen))[:2])
+                else:
+                    label = ("Airdrop Looted" if pakete == 1
+                             else f"Airdrop Looted · {pakete}x")
+                out.append({
+                    "id": "airdrop_looted",
+                    "label": label,
+                    "icon": "📦",
+                    "matchId": mid, "playedAt": played,
+                })
+
             # --- Von der Red Zone erwischt ---
             #
             # Zwei getrennte Anlaesse: zu Fuss und im Fahrzeug. Das
@@ -4968,6 +5088,7 @@ PUBG_RARE_ACHIEVEMENTS = {
     "em_pickup_kill",                # Kill waehrend Gegner am EP-Ballon haengt
     "redzone_vehicle_death",         # Im Fahrzeug von der Red Zone erwischt
     "redzone_death",                 # Von der Red Zone zu Fuss erschlagen
+    "flare_gun",                     # Leuchtpistole abgefeuert
 }
 
 
