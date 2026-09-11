@@ -1,0 +1,233 @@
+"""Meilenstein-Endpoints: Konfiguration, Abholen, Probelauf.
+
+Der Rundlauf ist der eigentliche Gegenstand: Probelauf einreihen →
+Widget holt ab → quittiert → zweites Abholen liefert nichts mehr.
+Bricht eines der Glieder, feiert das Overlay entweder gar nicht oder
+bei jedem Takt erneut.
+"""
+import json
+from unittest.mock import MagicMock
+
+import pytest
+
+from pubg import db_pg
+from pubg.cache import TTLCache
+from pubg.endpoints import EndpointRegistry
+from pubg.weapon_milestones import OCCASIONS
+
+CONN = None
+T = None
+T2 = None
+
+
+@pytest.fixture(autouse=True)
+def _bind(pg_compat):
+    global CONN, T, T2
+    CONN, T, T2 = pg_compat[0], pg_compat[1], pg_compat[2]
+    db_pg.upsert_player(CONN.raw, T, "account.A", "PEX_LuCKoR", "steam", 1)
+    db_pg.upsert_player(CONN.raw, T2, "account.B", "original_hat3", "steam", 1)
+    CONN.raw.commit()
+    yield
+    CONN, T, T2 = None, None, None
+
+
+def _reg(tenant_id=None, account_id="account.A"):
+    return EndpointRegistry(
+        get_conn=lambda: CONN.raw,
+        my_account_id=account_id,
+        platform="steam",
+        cache=TTLCache(ttl_secs=30),
+        client=MagicMock(),
+        poller_status=lambda: {"polling": "ok"},
+        tenant_id=tenant_id if tenant_id is not None else T,
+    )
+
+
+def _call(method, path, body=None, qs=None, tenant_id=None,
+          account_id="account.A"):
+    # Der Query-String gehoert in den Pfad — das vierte Argument von
+    # dispatch sind die Header, nicht die Parameter.
+    from urllib.parse import urlencode
+    if qs:
+        path = path + "?" + urlencode(qs)
+    raw = json.dumps(body).encode() if body is not None else b""
+    out, code, _ = _reg(tenant_id, account_id).dispatch(method, path, raw, {})
+    return json.loads(out), code
+
+
+def _data(payload):
+    return payload.get("data", payload)
+
+
+# ── Konfiguration ───────────────────────────────────────────────────────────
+
+def test_config_liefert_alle_anlaesse_und_die_registry():
+    d, code = _call("GET", "/api/pubg/milestone-config")
+    assert code == 200
+    d = _data(d)
+    assert set(d["config"]) == set(OCCASIONS)
+    # Die Registry kommt mit, damit das Tool Beschriftungen nicht
+    # doppelt pflegen muss.
+    assert d["occasions"]["weapon_damage"]["label"] == "Weapon Damage"
+    assert "step" in d["editable"] and "both" in d["widgets"]
+
+
+def test_gespeicherte_konfiguration_kommt_zurueck():
+    _call("POST", "/api/pubg/milestone-config",
+          {"config": {"weapon_damage": {"step": 50000, "enabled": False,
+                                        "widget": "big"}}})
+    d = _data(_call("GET", "/api/pubg/milestone-config")[0])
+    assert d["config"]["weapon_damage"]["step"] == 50000
+    assert d["config"]["weapon_damage"]["enabled"] is False
+    assert d["config"]["weapon_damage"]["widget"] == "big"
+
+
+def test_unsinn_in_der_konfiguration_faellt_auf_den_default_zurueck():
+    _call("POST", "/api/pubg/milestone-config",
+          {"config": {"weapon_damage": {"step": -1, "widget": "haus"}}})
+    d = _data(_call("GET", "/api/pubg/milestone-config")[0])
+    assert d["config"]["weapon_damage"]["step"] == \
+        OCCASIONS["weapon_damage"]["step"]
+    assert d["config"]["weapon_damage"]["widget"] == "bar"
+
+
+def test_leere_konfiguration_setzt_zurueck():
+    _call("POST", "/api/pubg/milestone-config",
+          {"config": {"weapon_damage": {"enabled": False}}})
+    d = _data(_call("POST", "/api/pubg/milestone-config", {"config": {}})[0])
+    assert d["config"]["weapon_damage"]["enabled"] is True
+
+
+def test_konfiguration_ist_pro_tenant_getrennt():
+    _call("POST", "/api/pubg/milestone-config",
+          {"config": {"weapon_damage": {"step": 7777}}})
+    other = _data(_call("GET", "/api/pubg/milestone-config",
+                        tenant_id=T2, account_id="account.B")[0])
+    assert other["config"]["weapon_damage"]["step"] == \
+        OCCASIONS["weapon_damage"]["step"]
+
+
+# ── Abholen ─────────────────────────────────────────────────────────────────
+
+def test_ohne_meilenstein_kommt_null():
+    d, code = _call("GET", "/api/pubg/milestone-pending", qs={"widget": "big"})
+    assert code == 200 and _data(d)["milestone"] is None
+
+
+def test_fassung_muss_angegeben_sein():
+    _, code = _call("GET", "/api/pubg/milestone-pending",
+                    qs={"widget": "vollbild"})
+    assert code == 400
+
+
+# ── Rundlauf: Probelauf → Abholen → quittiert ───────────────────────────────
+
+def test_probelauf_wird_genau_einmal_geliefert():
+    d = _data(_call("POST", "/api/pubg/milestone-test",
+                    {"occasion": "weapon_damage", "subject": "M416",
+                     "value": 450000, "widget": "big"})[0])
+    assert d["queued"]["value"] == 450000
+    assert d["widget"] == "big"
+
+    first = _data(_call("GET", "/api/pubg/milestone-pending",
+                        qs={"widget": "big", "markShown": "1"})[0])
+    assert first["milestone"]["subject"] == "M416"
+    assert first["milestone"]["isTest"] is True
+
+    # Zweites Abholen: leer. Sonst feierte das Overlay bei jedem Takt.
+    second = _data(_call("GET", "/api/pubg/milestone-pending",
+                         qs={"widget": "big", "markShown": "1"})[0])
+    assert second["milestone"] is None
+
+
+def test_ohne_markshown_bleibt_der_meilenstein_liegen():
+    # Das Overlay quittiert erst, wenn die Feier auch laeuft.
+    _call("POST", "/api/pubg/milestone-test",
+          {"occasion": "weapon_kills", "widget": "bar"})
+    for _ in range(2):
+        d = _data(_call("GET", "/api/pubg/milestone-pending",
+                        qs={"widget": "bar"})[0])
+        assert d["milestone"] is not None
+
+
+def test_probelauf_erbt_die_stufe_des_anlasses():
+    d = _data(_call("POST", "/api/pubg/milestone-test",
+                    {"occasion": "weapon_mastered", "subject": "Mk12"})[0])
+    assert d["queued"]["tier"] == "huge"
+
+
+def test_probelauf_auf_grosser_marke_wird_laut():
+    d = _data(_call("POST", "/api/pubg/milestone-test",
+                    {"occasion": "career_damage", "value": 4000000})[0])
+    assert d["queued"]["tier"] == "huge"
+
+
+def test_probelauf_auf_gewoehnlicher_marke_bleibt_leise():
+    d = _data(_call("POST", "/api/pubg/milestone-test",
+                    {"occasion": "career_damage", "value": 4100000})[0])
+    assert d["queued"]["tier"] == "small"
+
+
+def test_unbekannter_anlass_wird_abgelehnt():
+    _, code = _call("POST", "/api/pubg/milestone-test",
+                    {"occasion": "gibtsnicht"})
+    assert code == 400
+
+
+def test_zwei_probelaeufe_desselben_anlasses_blockieren_sich_nicht():
+    # Der Schluessel traegt einen Zeitstempel, damit man mehrmals
+    # hintereinander ansehen kann, wie es aussieht.
+    for _ in range(2):
+        d, code = _call("POST", "/api/pubg/milestone-test",
+                        {"occasion": "weapon_damage", "widget": "bar"})
+        assert code == 200
+    rows = db_pg.recent_milestones(CONN.raw, T)
+    assert len([r for r in rows if r["is_test"]]) >= 1
+
+
+def test_probelaeufe_aufraeumen():
+    _call("POST", "/api/pubg/milestone-test", {"occasion": "weapon_damage"})
+    d = _data(_call("POST", "/api/pubg/milestone-purge-tests")[0])
+    assert d["deleted"] >= 1
+    assert db_pg.recent_milestones(CONN.raw, T) == []
+
+
+def test_probelauf_eines_tenants_erreicht_den_anderen_nicht():
+    _call("POST", "/api/pubg/milestone-test",
+          {"occasion": "weapon_damage", "widget": "big"})
+    d = _data(_call("GET", "/api/pubg/milestone-pending",
+                    qs={"widget": "big"}, tenant_id=T2,
+                    account_id="account.B")[0])
+    assert d["milestone"] is None
+
+
+# ── Zustand ─────────────────────────────────────────────────────────────────
+
+def test_zustand_ohne_snapshot_meldet_das():
+    d = _data(_call("GET", "/api/pubg/milestone-state")[0])
+    assert d["hasSnapshot"] is False
+
+
+def test_zustand_nennt_die_naechste_marke():
+    db_pg.save_milestone_snapshot(CONN.raw, T, "account.A", {
+        "weapons": {"M416": {"damage": 432503, "kills": 3179}},
+        "career": {"damage": 4041616, "kills": 25709}})
+    CONN.raw.commit()
+    d = _data(_call("GET", "/api/pubg/milestone-state")[0])
+    assert d["hasSnapshot"] is True
+    dmg = [r for r in d["state"]
+           if r["occasion"] == "weapon_damage" and r["subject"] == "M416"][0]
+    # 432.503 bei 25.000er Schritten → naechste Marke 450.000.
+    assert dmg["next"] == 450000
+    assert dmg["toGo"] == pytest.approx(17497)
+
+
+def test_zustand_beachtet_die_eigene_schrittweite():
+    db_pg.save_milestone_snapshot(CONN.raw, T, "account.A",
+                                  {"career": {"damage": 4041616}})
+    CONN.raw.commit()
+    _call("POST", "/api/pubg/milestone-config",
+          {"config": {"career_damage": {"step": 1000000}}})
+    d = _data(_call("GET", "/api/pubg/milestone-state")[0])
+    row = [r for r in d["state"] if r["occasion"] == "career_damage"][0]
+    assert row["next"] == 5000000

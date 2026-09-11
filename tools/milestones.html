@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<!--
+  PUBG Milestone Celebrations — Konfiguration
+  ────────────────────────────────────────────────────────────────────
+  Legt fest, welche Anlaesse gefeiert werden, ab welcher Marke, und in
+  welcher Fassung: Vollbild (weapon-milestone.html) oder Leiste
+  (weapon-milestone-bar.html).
+
+  Drei Quellen stehen dahinter, und welche es ist, steht in jeder Zeile:
+    * weapon_mastery (API) — Alltime je Waffe. Die ingame sichtbare Zahl
+      ist Official + Competitive; der alte StatsTotal-Block bleibt aussen
+      vor, er ist eine eigene, kleinere Zaehlung.
+    * seasons/lifetime (API) — kontoweit, ueber ALLE Modi summiert.
+    * match_weapon_stats (unsere DB) — Match-Rekorde und Wurfzahlen.
+      Die API fuehrt `MostDamagePlayerInAGame` nur im alten Block und
+      meldet dort 682 Schaden fuer die M416, wo unsere Zeilen 976
+      belegen — ein Rekord-Celebrate darauf triggerte an einer laengst
+      ueberbotenen Marke. Die Wurfzahl gilt ab Beginn der Aufzeichnung,
+      nicht fuer die ganze Karriere; alltime gibt es sie nirgends.
+
+  "Preview" legt einen Probelauf in dieselbe Warteschlange, die auch
+  der Poller benutzt — die Feier laeuft also ueber denselben Weg wie im
+  Betrieb und nicht ueber einen Sonderpfad, der im Ernstfall ungetestet
+  waere. Die Source muss dafuer laufen (in OBS oder im Browser-Tab).
+
+  Browser-Tool, KEINE OBS-Source.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PUBG Milestone Celebrations</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+  <link rel="stylesheet" href="/widgets-static/_theme.css">
+  <link rel="stylesheet" href="/widgets-static/_blocks.css">
+  <link rel="stylesheet" href="/widgets-static/pubg/_pubg.css">
+  <style>
+    body { padding: 20px; max-width: var(--t-page-max, 1280px); margin: 0 auto;
+           background: var(--theme-bg); color: var(--theme-text); }
+    .t-card { padding: 16px 18px; margin-bottom: 16px; }
+    .t-card > h2 { margin-bottom: 3px; }
+    .lede { color: var(--theme-text-dim, #8a7d99); margin: 0 0 14px;
+            max-width: 76ch; font-size: .92rem; }
+
+    .skip { position: absolute; left: -9999px;
+            background: var(--theme-accent, #f2b705); color: #1a1020;
+            padding: 8px 14px; border-radius: 4px; z-index: 30; }
+    .skip:focus { left: 12px; top: 12px; }
+
+    /* ── Kopfzeile mit Speichern ──────────────────────────────────── */
+    .head { display: flex; flex-wrap: wrap; gap: 12px;
+            align-items: baseline; justify-content: space-between; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    button {
+      font: inherit; font-size: .88rem; min-height: 32px; padding: 5px 13px;
+      background: var(--theme-surface-2, #2a1f3a);
+      color: var(--theme-text, #e8e0f0);
+      border: 1px solid var(--theme-border, #3a2c48);
+      border-radius: 5px; cursor: pointer;
+    }
+    button:hover { border-color: var(--theme-accent, #f2b705); }
+    button:focus-visible {
+      outline: 2px solid var(--theme-accent, #f2b705); outline-offset: 2px;
+    }
+    button[data-kind="primary"] {
+      background: var(--theme-primary, #5e2a79);
+      color: var(--theme-on-primary, #fff); font-weight: 600;
+      border-color: var(--theme-primary, #5e2a79);
+    }
+    button[disabled] { opacity: .45; cursor: default; }
+    .saved { color: var(--theme-ok-text, #4caf50); font-size: .86rem; }
+    .failed { color: var(--theme-danger-text, #e5534b); font-size: .86rem; }
+
+    /* ── Anlass-Tabelle ───────────────────────────────────────────── */
+    table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+    th, td { text-align: left; padding: 7px 9px; vertical-align: middle;
+             border-bottom: 1px solid var(--theme-border, #3a2c48); }
+    th { color: var(--theme-text-dim, #8a7d99); font-weight: 600;
+         font-size: .78rem; text-transform: uppercase; letter-spacing: .04em;
+         white-space: nowrap; }
+    td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+    tbody tr:hover { background: color-mix(in srgb,
+      var(--theme-surface-2, #2a1f3a) 55%, transparent); }
+    /* Ein abgeschalteter Anlass bleibt lesbar, tritt aber zurueck.
+       Die Deckkraft ist nicht der einzige Hinweis — das Haekchen sagt
+       es genauso, und darauf laesst sich auch ohne Farbsehen zugreifen. */
+    tr[data-off="1"] td:not(.cell-on) { opacity: .5; }
+
+    .name { font-weight: 600; }
+    .hint { display: block; color: var(--theme-text-dim, #8a7d99);
+            font-size: .8rem; font-weight: 400; margin-top: 1px; }
+    .src { font-size: .74rem; letter-spacing: .03em; text-transform: uppercase;
+           color: var(--theme-text-faint, #6b6078); white-space: nowrap; }
+
+    input[type="number"] {
+      font: inherit; font-size: .88rem; width: 8.5em; min-height: 30px;
+      padding: 3px 7px; text-align: right;
+      background: var(--theme-bg, #0a0510); color: var(--theme-text, #e8e0f0);
+      border: 1px solid var(--theme-border, #3a2c48); border-radius: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+    input[type="number"]:focus-visible, select:focus-visible,
+    input[type="checkbox"]:focus-visible {
+      outline: 2px solid var(--theme-accent, #f2b705); outline-offset: 1px;
+    }
+    input[type="number"][aria-invalid="true"] {
+      border-color: var(--theme-danger, #e5534b);
+    }
+    select {
+      font: inherit; font-size: .88rem; min-height: 30px; padding: 3px 6px;
+      background: var(--theme-bg, #0a0510); color: var(--theme-text, #e8e0f0);
+      border: 1px solid var(--theme-border, #3a2c48); border-radius: 4px;
+    }
+    /* 24x24 als Mindestmass fuer Zeigegeraete. */
+    input[type="checkbox"] { width: 24px; height: 24px; cursor: pointer;
+                             accent-color: var(--theme-primary, #5e2a79); }
+    .cell-on { width: 40px; }
+    .err { color: var(--theme-danger-text, #e5534b); font-size: .78rem;
+           display: block; margin-top: 2px; }
+
+    /* ── Stand und Verlauf ────────────────────────────────────────── */
+    .tier { font-size: .72rem; letter-spacing: .05em; text-transform: uppercase;
+            padding: 2px 7px; border-radius: 3px; white-space: nowrap;
+            border: 1px solid currentColor; }
+    .tier[data-t="huge"] { color: var(--theme-accent-text, #f2b705); }
+    .tier[data-t="big"] { color: var(--theme-accent-2-text, #c9a0dc); }
+    .tier[data-t="small"] { color: var(--theme-text-dim, #8a7d99); }
+    .pill { font-size: .74rem; padding: 2px 7px; border-radius: 3px;
+            border: 1px solid var(--theme-border, #3a2c48);
+            color: var(--theme-text-dim, #8a7d99); white-space: nowrap; }
+    .wait { color: var(--theme-text-dim, #8a7d99); }
+    .note { color: var(--theme-text-dim, #8a7d99); font-size: .86rem;
+            margin: 10px 0 0; max-width: 76ch; }
+    .urls { font-family: ui-monospace, monospace; font-size: .82rem;
+            color: var(--theme-accent-text, #f2b705); word-break: break-all; }
+    .urls div + div { margin-top: 4px; }
+    .empty { color: var(--theme-text-dim, #8a7d99); font-style: italic; }
+    .wrap { overflow-x: auto; }
+  </style>
+</head>
+<body>
+<a class="skip" href="#occasions">Skip to the occasion list</a>
+
+<div class="t-card">
+  <div class="head">
+    <div>
+      <h2 class="t-title">Milestone Celebrations</h2>
+      <p class="lede">Which milestones get a celebration, from which
+        mark, and in which of the two sources. The full-screen version
+        suits rare occasions; the bar suits ones that land often — a
+        full-screen overlay on every 25,000 damage would cover the
+        stream.</p>
+    </div>
+    <div class="actions">
+      <span id="msg" aria-live="polite"></span>
+      <button type="button" id="reset">Reset to defaults</button>
+      <button type="button" id="save" data-kind="primary">Save</button>
+    </div>
+  </div>
+  <div class="urls">
+    <div>Full screen: <span id="urlBig"></span></div>
+    <div>Bar: <span id="urlBar"></span></div>
+  </div>
+</div>
+
+<div class="t-card" id="occasions">
+  <h2 class="t-title">Occasions</h2>
+  <p class="lede">"Every" is the spacing of the marks. "Loud one" lifts
+    every n-th mark to the big version — so the first million does not
+    look like the next hundred thousand. Records instead use a floor, so
+    a weapon you just picked up does not celebrate its first hit.</p>
+  <div class="wrap">
+    <table>
+      <caption class="hint">Current stand and next mark come from the
+        last poll; the preview button queues a test celebration.</caption>
+      <thead>
+        <tr>
+          <th class="cell-on"><span aria-hidden="true">On</span>
+            <span class="skip">Enabled</span></th>
+          <th>Occasion</th>
+          <th>Source</th>
+          <th class="n">Every / floor</th>
+          <th class="n">Loud one</th>
+          <th>Shown in</th>
+          <th class="n">Stand</th>
+          <th class="n">Next</th>
+          <th>Preview</th>
+        </tr>
+      </thead>
+      <tbody id="rows"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <p class="note" id="snapNote"></p>
+</div>
+
+<div class="t-card">
+  <div class="head">
+    <h2 class="t-title">Detected so far</h2>
+    <div class="actions">
+      <button type="button" id="purge">Delete test entries</button>
+    </div>
+  </div>
+  <p class="lede">The queue. A milestone stays here after it was shown —
+    each source has its own marker, so a milestone can be waiting for one
+    and done for the other.</p>
+  <div class="wrap">
+    <table>
+      <thead>
+        <tr><th>When</th><th>Occasion</th><th>Subject</th>
+          <th class="n">Value</th><th>Tier</th><th>Target</th>
+          <th>Status</th></tr>
+      </thead>
+      <tbody id="recent"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="/widgets-static/pubg/_pubg.js"></script>
+<script src="/widgets-static/pubg/_milestone.js"></script>
+<script>
+(function () {
+  "use strict";
+  var BASE = (window.__SERVE_BASE__ || "/") + "api/pubg/";
+  var M = window.Milestone;
+  var CFG = {}, OCC = {}, STATE = [], HAS_SNAP = false;
+
+  //: Welche Quelle den Anlass traegt. Steht in der Zeile, weil die
+  //: Reichweite sich unterscheidet: die API kennt die ganze Karriere,
+  //: unsere Aufzeichnung nur die geladenen Matches.
+  var SOURCE = {
+    weapon_damage: "mastery", weapon_kills: "mastery",
+    weapon_mastered: "mastery", weapon_longest: "mastery",
+    weapon_best_kills: "mastery", weapon_best_damage: "telemetry",
+    thrown_count: "telemetry"
+  };
+  function sourceOf(oid) {
+    return SOURCE[oid] || (oid.indexOf("career_") === 0 ? "lifetime"
+                                                        : "mastery");
+  }
+  var SOURCE_LABEL = { mastery: "weapon mastery", lifetime: "lifetime",
+                       telemetry: "own recording" };
+
+  function fmt(n) {
+    if (n == null) return "—";
+    return Math.round(Number(n)).toLocaleString("en-US");
+  }
+
+  //: Stand und Marke in der Einheit des Anlasses, damit in der Tabelle
+  //: nicht 1.000.000 steht, wo 1.000 km gemeint sind.
+  function fmtUnit(oid, v) {
+    if (v == null) return "—";
+    var o = OCC[oid] || {};
+    var s = M.shown({ value: v, unit: o.unit, occasion: oid });
+    return s.num + (s.unit ? " " + s.unit : "");
+  }
+
+  function msg(text, ok) {
+    var el = document.getElementById("msg");
+    el.textContent = text || "";
+    el.className = text ? (ok ? "saved" : "failed") : "";
+    if (text) setTimeout(function () {
+      if (el.textContent === text) { el.textContent = ""; el.className = ""; }
+    }, 4000);
+  }
+
+  function get(path) {
+    return fetch(BASE + path, { cache: "no-store" })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.status);
+        return r.json();
+      })
+      .then(function (d) { return (d && d.data) || d; });
+  }
+
+  function post(path, body) {
+    return fetch(BASE + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {})
+    }).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    }).then(function (d) { return (d && d.data) || d; });
+  }
+
+  /* Der Stand je Anlass. Waffen-Anlaesse haben mehrere Subjekte; in der
+   * Uebersicht steht das weiteste, weil das die naechste Feier ist. */
+  function leadFor(oid) {
+    var mine = STATE.filter(function (r) { return r.occasion === oid; });
+    if (!mine.length) return null;
+    var withNext = mine.filter(function (r) { return r.toGo != null; });
+    if (!withNext.length) return mine[0];
+    return withNext.reduce(function (a, b) {
+      return (a.toGo <= b.toGo) ? a : b;
+    });
+  }
+
+  function numCell(oid, field, value, label) {
+    if (value == null) return "<td class=\"n\">—</td>";
+    return "<td class=\"n\"><label class=\"skip\" for=\"f-" + oid + "-"
+      + field + "\">" + label + "</label>"
+      + "<input type=\"number\" id=\"f-" + oid + "-" + field + "\""
+      + " data-oid=\"" + oid + "\" data-field=\"" + field + "\""
+      + " min=\"1\" step=\"1\" value=\"" + value + "\""
+      + " aria-describedby=\"e-" + oid + "-" + field + "\">"
+      + "<span class=\"err\" id=\"e-" + oid + "-" + field + "\"></span></td>";
+  }
+
+  function paintRows() {
+    var ids = Object.keys(OCC);
+    document.getElementById("rows").innerHTML = ids.map(function (oid) {
+      var o = OCC[oid], c = CFG[oid] || {};
+      var lead = leadFor(oid);
+      var on = c.enabled !== false;
+      var stepField = o.kind === "record" ? "min"
+                    : (o.kind === "at" ? "at" : "step");
+      var stepLabel = o.kind === "record" ? "Floor"
+                    : (o.kind === "at" ? "Target" : "Every");
+      var stepVal = c[stepField] != null ? c[stepField] : o[stepField];
+      var subj = lead && lead.display ? lead.display : "";
+      return "<tr data-off=\"" + (on ? "0" : "1") + "\">"
+        + "<td class=\"cell-on\"><input type=\"checkbox\" data-oid=\"" + oid
+        + "\" data-field=\"enabled\"" + (on ? " checked" : "")
+        + " aria-label=\"Celebrate " + M.esc(o.label || oid) + "\"></td>"
+        + "<td><span class=\"name\">" + M.esc(o.label || oid) + "</span>"
+        + "<span class=\"hint\">" + M.esc(o.hint || "") + "</span></td>"
+        + "<td><span class=\"src\">"
+        + M.esc(SOURCE_LABEL[sourceOf(oid)]) + "</span></td>"
+        + numCell(oid, stepField, stepVal, stepLabel)
+        + numCell(oid, "huge_every", c.huge_every != null ? c.huge_every
+                                                          : o.huge_every,
+                  "Loud one every")
+        + "<td><label class=\"skip\" for=\"w-" + oid + "\">Shown in</label>"
+        + "<select id=\"w-" + oid + "\" data-oid=\"" + oid
+        + "\" data-field=\"widget\">"
+        + ["big", "bar", "both"].map(function (w) {
+            var lbl = w === "big" ? "Full screen"
+                    : (w === "bar" ? "Bar" : "Both");
+            return "<option value=\"" + w + "\""
+              + ((c.widget || o.widget) === w ? " selected" : "") + ">"
+              + lbl + "</option>";
+          }).join("") + "</select></td>"
+        + "<td class=\"n\">" + (lead ? fmtUnit(oid, lead.value) : "—")
+        + (subj ? "<span class=\"hint\">" + M.esc(subj) + "</span>" : "")
+        + "</td>"
+        + "<td class=\"n\">" + (lead && lead.next != null
+            ? fmtUnit(oid, lead.next)
+              + (lead.toGo != null ? "<span class=\"hint\">"
+                  + fmtUnit(oid, lead.toGo) + " to go</span>" : "")
+            : "—") + "</td>"
+        + "<td><button type=\"button\" data-preview=\"" + oid + "\">"
+        + "Preview</button></td>"
+        + "</tr>";
+    }).join("");
+  }
+
+  function statusOf(r) {
+    var big = r.shownBigAt || r.shown_big_at;
+    var bar = r.shownBarAt || r.shown_bar_at;
+    var parts = [];
+    if (big) parts.push("full screen shown");
+    if (bar) parts.push("bar shown");
+    return parts.length ? parts.join(", ") : "waiting";
+  }
+
+  function paintRecent(rows) {
+    var body = document.getElementById("recent");
+    if (!rows.length) {
+      body.innerHTML = "<tr><td colspan=\"7\" class=\"empty\">"
+        + "Nothing detected yet. The first poll after a match records the"
+        + " starting point without celebrating — otherwise your whole"
+        + " career would be due at once.</td></tr>";
+      return;
+    }
+    body.innerHTML = rows.map(function (r) {
+      var when = r.detectedAt
+        ? new Date(r.detectedAt * 1000).toLocaleString("en-GB")
+        : "—";
+      var o = OCC[r.occasion] || {};
+      return "<tr><td class=\"wait\">" + M.esc(when) + "</td>"
+        + "<td>" + M.esc(o.label || r.occasion)
+        + (r.isTest ? " <span class=\"pill\">test</span>" : "") + "</td>"
+        + "<td>" + M.esc(r.display || r.subject || "—") + "</td>"
+        + "<td class=\"n\">" + fmtUnit(r.occasion, r.value) + "</td>"
+        + "<td><span class=\"tier\" data-t=\"" + M.esc(r.tier) + "\">"
+        + M.esc(r.tier) + "</span></td>"
+        + "<td><span class=\"pill\">" + M.esc(r.widget || "—")
+        + "</span></td>"
+        + "<td class=\"wait\">" + M.esc(statusOf(r)) + "</td></tr>";
+    }).join("");
+  }
+
+  function readField(el) {
+    var oid = el.dataset.oid, field = el.dataset.field;
+    if (!oid || !field) return;
+    CFG[oid] = CFG[oid] || {};
+    if (field === "enabled") {
+      CFG[oid].enabled = el.checked;
+      var tr = el.closest("tr");
+      if (tr) tr.setAttribute("data-off", el.checked ? "0" : "1");
+      return;
+    }
+    if (field === "widget") { CFG[oid].widget = el.value; return; }
+    var err = document.getElementById("e-" + oid + "-" + field);
+    var v = parseFloat(el.value);
+    if (!isFinite(v) || v <= 0) {
+      el.setAttribute("aria-invalid", "true");
+      if (err) err.textContent = "Must be a number above zero.";
+      return;
+    }
+    el.removeAttribute("aria-invalid");
+    if (err) err.textContent = "";
+    CFG[oid][field] = v;
+  }
+
+  function bind() {
+    document.getElementById("rows").addEventListener("change", function (e) {
+      if (e.target.dataset && e.target.dataset.oid) readField(e.target);
+    });
+    document.getElementById("rows").addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-preview]");
+      if (!b) return;
+      var oid = b.dataset.preview;
+      var lead = leadFor(oid);
+      // Die naechste echte Marke als Wert, damit die Vorschau zeigt,
+      // was spaeter wirklich kommt — nicht eine erfundene Zahl.
+      var body = { occasion: oid };
+      if (lead) {
+        if (lead.next != null) body.value = lead.next;
+        else if (lead.value) body.value = lead.value;
+        if (lead.subject) body.subject = lead.subject;
+        if (lead.value) body.prevValue = lead.value;
+      }
+      b.disabled = true;
+      post("milestone-test", body).then(function (d) {
+        msg("Queued for the " + ((d && d.widget) || "bar")
+            + " source — it shows within one poll cycle.", true);
+        b.disabled = false;
+        return load(true);
+      }).catch(function () {
+        msg("Could not queue the preview.", false);
+        b.disabled = false;
+      });
+    });
+    document.getElementById("save").addEventListener("click", function () {
+      post("milestone-config", { config: CFG }).then(function (d) {
+        CFG = (d && d.config) || CFG;
+        msg("Saved.", true);
+        paintRows();
+      }).catch(function () { msg("Save failed.", false); });
+    });
+    document.getElementById("reset").addEventListener("click", function () {
+      // Leere Konfiguration speichern: der Server legt die
+      // Registry-Vorgaben darueber und gibt sie zurueck.
+      post("milestone-config", { config: {} }).then(function (d) {
+        CFG = (d && d.config) || {};
+        msg("Back to defaults.", true);
+        paintRows();
+      }).catch(function () { msg("Reset failed.", false); });
+    });
+    document.getElementById("purge").addEventListener("click", function () {
+      post("milestone-purge-tests", {}).then(function (d) {
+        msg("Deleted " + ((d && d.deleted) || 0) + " test entries.", true);
+        return load(true);
+      }).catch(function () { msg("Could not delete.", false); });
+    });
+  }
+
+  function paintUrls() {
+    var origin = location.origin;
+    document.getElementById("urlBig").textContent =
+      origin + "/widgets/pubg/weapon-milestone.html";
+    document.getElementById("urlBar").textContent =
+      origin + "/widgets/pubg/weapon-milestone-bar.html";
+  }
+
+  function load(quiet) {
+    return Promise.all([get("milestone-config"), get("milestone-state")])
+      .then(function (res) {
+        var cfg = res[0] || {}, st = res[1] || {};
+        CFG = cfg.config || {};
+        OCC = cfg.occasions || {};
+        STATE = st.state || [];
+        HAS_SNAP = !!st.hasSnapshot;
+        paintRows();
+        paintRecent(st.recent || []);
+        document.getElementById("snapNote").textContent = HAS_SNAP
+          ? ""
+          : "No stand recorded yet. The first poll after a match writes"
+            + " the starting point without celebrating, so the columns"
+            + " above stay empty until then. Preview works regardless.";
+      })
+      .catch(function () {
+        if (!quiet) {
+          document.getElementById("rows").innerHTML =
+            "<tr><td colspan=\"9\" class=\"failed\">Could not load the"
+            + " configuration.</td></tr>";
+        }
+      });
+  }
+
+  paintUrls();
+  bind();
+  load();
+}());
+</script>
+</body>
+</html>

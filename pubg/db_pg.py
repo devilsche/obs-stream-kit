@@ -359,30 +359,49 @@ CREATE TABLE IF NOT EXISTS settings (
 -- GLOBAL wie telemetry_events waere falsch: die Werte gehoeren zwar dem
 -- Spieler, aber welche Schwellen gelten und was schon gefeiert wurde,
 -- entscheidet der Tenant.
-CREATE TABLE IF NOT EXISTS weapon_mastery_snapshot (
+-- Letzter bekannter Stand fuer die Meilenstein-Erkennung: einmal je
+-- Konto, Waffen und Karriere als JSON. Ein JSON-Feld statt Spalten,
+-- weil die Registry in pubg/weapon_milestones.py waechst — ein neuer
+-- Anlass wie "1000 km zu Fuss" soll keine Migration kosten. Gelesen
+-- wird nur der Vergleich Vorher/Nachher, nie einzelne Felder per SQL.
+CREATE TABLE IF NOT EXISTS pubg_milestone_snapshot (
     tenant_id   INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     account_id  TEXT NOT NULL,
-    weapon      TEXT NOT NULL,          -- rohe Id, z.B. Item_Weapon_HK416_C
-    -- Alltime-Werte aus StatsTotal. Nullen bei Wurfgeraeten sind echt,
-    -- nicht "fehlt" — der Endpoint fuehrt sie so.
-    damage      DOUBLE PRECISION DEFAULT 0,
-    kills       INTEGER DEFAULT 0,
-    defeats     INTEGER DEFAULT 0,
-    groggies    INTEGER DEFAULT 0,
-    headshots   INTEGER DEFAULT 0,
-    longest     DOUBLE PRECISION DEFAULT 0,
-    -- Match-Rekorde: die interessantesten Meilensteine, weil sie an
-    -- einer Leistung haengen und nicht an einer runden Zahl.
-    best_damage DOUBLE PRECISION DEFAULT 0,
-    best_kills  INTEGER DEFAULT 0,
-    level       INTEGER DEFAULT 0,
-    tier        INTEGER DEFAULT 0,
-    xp          BIGINT DEFAULT 0,
+    stats       JSONB NOT NULL,
     updated_at  BIGINT NOT NULL,
-    PRIMARY KEY (tenant_id, account_id, weapon)
+    PRIMARY KEY (tenant_id, account_id)
 );
-CREATE INDEX IF NOT EXISTS idx_wms_tenant_acc
-    ON weapon_mastery_snapshot (tenant_id, account_id);
+
+-- Erkannte Meilensteine, die auf ihre Feier warten.
+--
+-- Zwei Anzeige-Marker statt einem: die grosse Vollbild-Fassung und die
+-- Leiste sind eigene Browser-Sources und koennen beide laufen. Ein
+-- gemeinsamer Marker haette bedeutet, dass die zuerst pollende Source
+-- den Eintrag der anderen wegnimmt.
+CREATE TABLE IF NOT EXISTS pubg_milestones_seen (
+    tenant_id     INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    milestone_key TEXT NOT NULL,
+    occasion      TEXT NOT NULL,
+    subject       TEXT NOT NULL DEFAULT '',
+    label         TEXT,
+    unit          TEXT,
+    value         DOUBLE PRECISION NOT NULL,
+    prev_value    DOUBLE PRECISION,
+    tier          TEXT NOT NULL DEFAULT 'small',
+    widget        TEXT NOT NULL DEFAULT 'bar',
+    -- Per Knopf im Config-Tool erzeugt, um eine Feier anzusehen, ohne
+    -- die Marke erreicht zu haben. Getrennt gefuehrt, damit sich die
+    -- Probeläufe wieder wegwerfen lassen.
+    is_test       BOOLEAN NOT NULL DEFAULT FALSE,
+    detected_at   BIGINT NOT NULL,
+    shown_big_at  BIGINT,
+    shown_bar_at  BIGINT,
+    PRIMARY KEY (tenant_id, milestone_key)
+);
+CREATE INDEX IF NOT EXISTS idx_pubg_ms_open_big
+    ON pubg_milestones_seen (tenant_id, shown_big_at);
+CREATE INDEX IF NOT EXISTS idx_pubg_ms_open_bar
+    ON pubg_milestones_seen (tenant_id, shown_bar_at);
 
 CREATE TABLE IF NOT EXISTS pubg_achievements_seen (
     tenant_id       INT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -1524,3 +1543,149 @@ def aggregate_weapon_stats(conn, tenant_id: int, since: str,
             LIMIT %s
         """, params)
         return [dict(r) for r in cur.fetchall()]
+
+
+# ── Meilensteine (pubg/weapon_milestones.py) ───────────────────────────────
+
+def _as_dict(row, cur):
+    """Zeile als dict, unabhaengig von der Cursor-Fabrik.
+
+    Der Produktivbetrieb nutzt RealDictCursor, also sind Zeilen schon
+    Dicts; ein `zip` ueber `cur.description` wuerde dort Spaltennamen
+    mit Spaltennamen paaren statt mit Werten.
+    """
+    if isinstance(row, dict):
+        return dict(row)
+    return dict(zip([d[0] for d in cur.description], row))
+
+
+def get_milestone_snapshot(conn, tenant_id: int, account_id: str):
+    """Letzter gespeicherter Stand, oder None beim ersten Mal.
+
+    None ist bedeutungstragend: die Erkennung feiert dann nichts,
+    sondern legt nur den Ausgangsstand an.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SELECT stats FROM pubg_milestone_snapshot "
+                    "WHERE tenant_id=%s AND account_id=%s",
+                    (tenant_id, account_id))
+        row = cur.fetchone()
+    if not row:
+        return None
+    stats = row[0] if not isinstance(row, dict) else row["stats"]
+    if isinstance(stats, str):
+        import json
+        stats = json.loads(stats)
+    return stats
+
+
+def save_milestone_snapshot(conn, tenant_id: int, account_id: str,
+                            stats: dict, now_ts: int = None) -> None:
+    import json
+    import time
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO pubg_milestone_snapshot
+                   (tenant_id, account_id, stats, updated_at)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (tenant_id, account_id) DO UPDATE
+               SET stats = EXCLUDED.stats,
+                   updated_at = EXCLUDED.updated_at
+        """, (tenant_id, account_id, json.dumps(stats),
+              int(now_ts if now_ts is not None else time.time())))
+
+
+def queue_milestones(conn, tenant_id: int, items, is_test: bool = False,
+                     now_ts: int = None) -> int:
+    """Erkannte Meilensteine einreihen; liefert die Zahl der neuen.
+
+    `DO NOTHING` auf den Schluessel ist die einzige Sperre gegen
+    Doppelfeiern — der Schluessel traegt den Wert, also ist derselbe
+    Meilenstein derselbe Eintrag, egal wie oft der Poller laeuft.
+    Ein Probelauf ueberschreibt einen echten Eintrag nicht.
+    """
+    import time
+    ts = int(now_ts if now_ts is not None else time.time())
+    n = 0
+    with conn.cursor() as cur:
+        for m in items or []:
+            cur.execute("""
+                INSERT INTO pubg_milestones_seen
+                       (tenant_id, milestone_key, occasion, subject, label,
+                        unit, value, prev_value, tier, widget, is_test,
+                        detected_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (tenant_id, milestone_key) DO NOTHING
+            """, (tenant_id, m["key"], m["occasion"], m.get("subject") or "",
+                  m.get("label"), m.get("unit"), float(m["value"]),
+                  float(m.get("prev_value") or 0), m.get("tier") or "small",
+                  m.get("widget") or "bar", bool(is_test), ts))
+            n += cur.rowcount or 0
+    return n
+
+
+#: Welche Spalte den Marker fuehrt. `both` gibt es hier nicht — ein
+#: Widget fragt immer fuer sich, `both` steuert nur, wer angesprochen wird.
+_MS_SHOWN_COL = {"big": "shown_big_at", "bar": "shown_bar_at"}
+
+
+def pending_milestones(conn, tenant_id: int, widget: str, limit: int = 1):
+    """Offene Meilensteine fuer ein Widget, das Lauteste zuerst.
+
+    Geliefert wird, was fuer dieses Widget bestimmt ist oder fuer
+    `both`. Die Sortierung nach Stufe stellt sicher, dass eine
+    ausgelevelte Waffe nicht hinter drei Schadensmarken wartet.
+    """
+    col = _MS_SHOWN_COL.get(widget)
+    if not col:
+        return []
+    with conn.cursor() as cur:
+        cur.execute(f"""
+            SELECT milestone_key, occasion, subject, label, unit, value,
+                   prev_value, tier, widget, is_test, detected_at
+            FROM pubg_milestones_seen
+            WHERE tenant_id = %s AND {col} IS NULL
+              AND widget IN (%s, 'both')
+            ORDER BY CASE tier WHEN 'huge' THEN 0 WHEN 'big' THEN 1
+                               ELSE 2 END,
+                     detected_at ASC
+            LIMIT %s
+        """, (tenant_id, widget, int(limit)))
+        return [_as_dict(r, cur) for r in cur.fetchall()]
+
+
+def mark_milestone_shown(conn, tenant_id: int, keys, widget: str,
+                         now_ts: int = None) -> int:
+    col = _MS_SHOWN_COL.get(widget)
+    if not col or not keys:
+        return 0
+    import time
+    ts = int(now_ts if now_ts is not None else time.time())
+    with conn.cursor() as cur:
+        cur.execute(f"UPDATE pubg_milestones_seen SET {col} = %s "
+                    "WHERE tenant_id = %s AND milestone_key = ANY(%s) "
+                    f"AND {col} IS NULL",
+                    (ts, tenant_id, list(keys)))
+        return cur.rowcount or 0
+
+
+def purge_test_milestones(conn, tenant_id: int) -> int:
+    """Probelaeufe wegwerfen. Echte Meilensteine bleiben unberuehrt."""
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM pubg_milestones_seen "
+                    "WHERE tenant_id = %s AND is_test", (tenant_id,))
+        return cur.rowcount or 0
+
+
+def recent_milestones(conn, tenant_id: int, limit: int = 40):
+    """Verlauf fuer das Config-Tool: was wurde erkannt und schon gezeigt."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT milestone_key, occasion, subject, label, unit, value,
+                   prev_value, tier, widget, is_test, detected_at,
+                   shown_big_at, shown_bar_at
+            FROM pubg_milestones_seen
+            WHERE tenant_id = %s
+            ORDER BY detected_at DESC LIMIT %s
+        """, (tenant_id, int(limit)))
+        return [_as_dict(r, cur) for r in cur.fetchall()]

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="entry">
+<head>
+<meta charset="utf-8">
+<title>Weapon Milestone Bar</title>
+<!--
+  PUBG Waffen- und Karriere-Meilensteine — Leiste am unteren Rand.
+
+  Die kleine Fassung fuer Anlaesse, die oft fallen. Ein Vollbild-Overlay
+  bei jedem 25.000er Waffenschaden wuerde den Stream zudecken; diese
+  Leiste laeuft nebenher und verdeckt nur ihren eigenen Streifen.
+
+  OBS-Browser-Source, 1920x1080, transparenter Hintergrund — die Leiste
+  sitzt darin unten mittig. Wer sie woanders haben will, verschiebt die
+  Source in OBS oder nutzt `?pos=top`.
+
+  Quelle: /api/pubg/milestone-pending?widget=bar. Eigener Anzeige-Marker,
+  also nimmt die Leiste der Vollbild-Fassung keinen Anlass weg.
+
+  URL-Parameter:
+    ?wait=8      Sekunden, die die Leiste steht (Standard 8)
+    ?poll=15     Abfrage-Takt in Sekunden
+    ?pos=top     an den oberen Rand statt an den unteren
+    ?confetti=0  ohne Konfetti, nur die Leiste
+    ?demo=1      einmal mit Beispielwerten zeigen
+-->
+<link rel="stylesheet" href="../_theme.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined">
+<link rel="stylesheet" href="_milestone.css">
+<style>
+  /* Nur was die Leiste zusaetzlich braucht: die obere Position und die
+     etwas ruhigere Konfetti-Lage. Das Aussehen selbst steht in
+     _milestone.css unter data-design="c". */
+  .canvas[data-pos="top"] .bar { bottom: auto; top: 90px; }
+  .canvas[data-pos="top"] .c { top: 12%; }
+  /* Ohne Konfetti bleibt die Leiste allein — fuer Anlaesse, die
+     mehrfach in einer Session fallen. */
+  .canvas[data-confetti="0"] .conf { display: none; }
+</style>
+</head>
+<body>
+<div class="canvas" id="canvas" data-design="c" hidden></div>
+<script src="_pubg.js"></script>
+<script src="_milestone.js"></script>
+<script>
+(function () {
+  "use strict";
+  var M = window.Milestone;
+  var Q = new URLSearchParams(location.search);
+  var POLL_S = Math.max(5, parseInt(Q.get("poll"), 10) || 15);
+  var WAIT_S = Math.max(3, parseInt(Q.get("wait"), 10) || 8);
+  var POS = Q.get("pos") === "top" ? "top" : "bottom";
+  var CONF = Q.get("confetti") === "0" ? "0" : "1";
+  var canvas = document.getElementById("canvas");
+
+  function celebrate(m) {
+    var s = M.shown(m);
+    var num = s.num + (s.unit ? " " + s.unit : "");
+    canvas.setAttribute("data-pos", POS);
+    canvas.setAttribute("data-confetti", CONF);
+    // Kein Nachregen: der laeuft drei Sekunden laenger als die Leiste
+    // steht und wuerde nach ihrem Verschwinden weiterfallen.
+    canvas.innerHTML = M.confetti(false)
+      + '<div class="bar">'
+      + '<span class="material-symbols-outlined bar-icon"'
+      + ' aria-hidden="true">' + M.iconFor(m) + "</span>"
+      + '<span class="bar-num">' + M.esc(num) + "</span>"
+      + '<span class="bar-txt"><span class="bar-sub">'
+      + M.esc(M.subline(m, true)) + "</span>"
+      + '<span class="bar-ctx">' + M.esc(M.ctxline(m)) + "</span>"
+      + "</span></div>";
+    canvas.hidden = false;
+    return new Promise(function (done) {
+      setTimeout(function () {
+        canvas.hidden = true;
+        canvas.innerHTML = "";
+        done();
+      }, WAIT_S * 1000);
+    });
+  }
+
+  if (Q.get("demo") === "1") {
+    celebrate({
+      key: "demo", occasion: "weapon_damage", subject: "M416",
+      display: "M416", label: "Weapon Damage", unit: "damage",
+      value: 450000, prevValue: 449000, tier: "small"
+    });
+    return;
+  }
+
+  M.poller({ widget: "bar", intervalMs: POLL_S * 1000,
+             celebrate: celebrate });
+}());
+</script>
+</body>
+</html>

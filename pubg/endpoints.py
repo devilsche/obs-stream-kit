@@ -286,6 +286,18 @@ class EndpointRegistry:
         if u.path.startswith("/api/pubg/co-player/"):
             name = u.path[len("/api/pubg/co-player/"):]
             return self._co_player(name)
+        if route == ("GET", "/api/pubg/milestone-pending"):
+            return self._milestone_pending(qs)
+        if route == ("GET", "/api/pubg/milestone-config"):
+            return self._milestone_config_get(qs)
+        if route == ("POST", "/api/pubg/milestone-config"):
+            return self._milestone_config_post(body)
+        if route == ("GET", "/api/pubg/milestone-state"):
+            return self._milestone_state(qs)
+        if route == ("POST", "/api/pubg/milestone-test"):
+            return self._milestone_test(body)
+        if route == ("POST", "/api/pubg/milestone-purge-tests"):
+            return self._milestone_purge_tests()
         if route == ("GET", "/api/pubg/career-lifetime"):
             return self._career_lifetime(qs)
         if route == ("GET", "/api/pubg/season-stats"):
@@ -2473,6 +2485,211 @@ class EndpointRegistry:
             lambda: compute_co_player(conn, self.tenant_id, self.my_account_id, name),
         )
         return _ok(result)
+
+    # ── Meilensteine ───────────────────────────────────────────────────
+
+    def _milestone_pending(self, qs):
+        """Der naechste offene Meilenstein fuer ein Widget.
+
+        `?widget=big|bar` ist Pflicht, weil beide Fassungen eigene
+        Browser-Sources sind und getrennte Anzeige-Marker fuehren.
+        `&markShown=1` quittiert die Feier — dasselbe Verfahren wie
+        beim Achievement-Popup.
+        """
+        from pubg.db_pg import mark_milestone_shown, pending_milestones
+        widget = (qs.get("widget") or "big").lower()
+        if widget not in ("big", "bar"):
+            return _err(400, "widget muss big oder bar sein")
+        conn = self.get_conn()
+        rows = pending_milestones(conn, self.tenant_id, widget, limit=1)
+        if not rows:
+            return _ok({"milestone": None})
+        m = rows[0]
+        if qs.get("markShown") == "1":
+            mark_milestone_shown(conn, self.tenant_id,
+                                 [m["milestone_key"]], widget)
+            conn.commit()
+        return _ok({"milestone": self._milestone_payload(m)})
+
+    @staticmethod
+    def _milestone_payload(m):
+        """DB-Zeile → was die Widgets erwarten."""
+        from pubg.weapon_milestones import display_name
+        subject = m.get("subject") or ""
+        return {
+            "key": m["milestone_key"],
+            "occasion": m["occasion"],
+            "subject": subject,
+            "display": display_name(subject) if subject else "",
+            "label": m.get("label") or m["occasion"],
+            "unit": m.get("unit") or "",
+            "value": float(m["value"] or 0),
+            "prevValue": float(m.get("prev_value") or 0),
+            "tier": m.get("tier") or "small",
+            "isTest": bool(m.get("is_test")),
+            "detectedAt": m.get("detected_at"),
+        }
+
+    def _milestone_config_get(self, qs=None):
+        """Konfiguration plus die Anlass-Registry fuers Tool.
+
+        Die Registry kommt mit, damit das Tool Beschriftungen und
+        Einheiten nicht doppelt pflegen muss — ein neuer Anlass im
+        Code erscheint dort ohne Anpassung.
+        """
+        from pubg.poller import _milestone_config
+        from pubg.weapon_milestones import (CONFIG_FIELDS, OCCASIONS,
+                                            WIDGETS, merge_config)
+        conn = self.get_conn()
+        cfg = merge_config(_milestone_config(conn, self.tenant_id))
+        return _ok({
+            "config": cfg,
+            "occasions": {oid: {k: v for k, v in o.items()
+                                if k not in ("enabled",)}
+                          for oid, o in OCCASIONS.items()},
+            "editable": list(CONFIG_FIELDS),
+            "widgets": list(WIDGETS),
+        })
+
+    @staticmethod
+    def _milestone_body(body):
+        """Request-Body als dict. Der Dispatch liefert rohe Bytes."""
+        import json
+        if isinstance(body, dict):
+            return body
+        try:
+            out = json.loads(body or b"{}")
+        except (ValueError, TypeError):
+            return {}
+        return out if isinstance(out, dict) else {}
+
+    def _milestone_config_post(self, body):
+        import json
+
+        from pubg.db_pg import set_setting
+        from pubg.poller import MILESTONE_CONFIG_KEY
+        from pubg.weapon_milestones import merge_config
+        cfg = merge_config(self._milestone_body(body).get("config") or {})
+        conn = self.get_conn()
+        set_setting(conn, self.tenant_id, MILESTONE_CONFIG_KEY,
+                    json.dumps(cfg))
+        conn.commit()
+        return _ok({"config": cfg, "saved": True})
+
+    def _milestone_state(self, qs=None):
+        """Aktueller Stand je Anlass plus die naechste Marke.
+
+        Das Tool zeigt damit, wie weit die naechste Feier weg ist —
+        ohne diese Vorschau waere eine Schrittweite blind geraten.
+        """
+        from pubg.db_pg import get_milestone_snapshot, recent_milestones
+        from pubg.poller import _milestone_config
+        from pubg.weapon_milestones import (OCCASIONS, display_name,
+                                            merge_config)
+        conn = self.get_conn()
+        cfg = merge_config(_milestone_config(conn, self.tenant_id))
+        snap = get_milestone_snapshot(conn, self.tenant_id,
+                                      self.my_account_id) or {}
+        weapons = snap.get("weapons") or {}
+        career = snap.get("career") or {}
+
+        rows = []
+        for oid, occ in OCCASIONS.items():
+            c = {**occ, **(cfg.get(oid) or {})}
+            metric = occ["metric"]
+            if occ["scope"] == "career":
+                subjects = [("", career.get(metric) or 0)]
+            else:
+                subjects = sorted(
+                    ((n, (v.get(metric) or 0)) for n, v in weapons.items()
+                     if (v.get(metric) or 0) > 0),
+                    key=lambda kv: -kv[1])[:8]
+            for subject, value in subjects:
+                nxt = None
+                if occ["kind"] == "step" and c.get("step"):
+                    nxt = (int(value // c["step"]) + 1) * c["step"]
+                elif occ["kind"] == "at":
+                    nxt = c.get("at")
+                rows.append({
+                    "occasion": oid, "subject": subject,
+                    "display": display_name(subject) if subject else "",
+                    "value": value, "next": nxt,
+                    "toGo": (nxt - value) if nxt and nxt > value else None,
+                })
+        return _ok({
+            "hasSnapshot": bool(snap),
+            "state": rows,
+            "recent": [self._milestone_payload(r)
+                       for r in recent_milestones(conn, self.tenant_id, 30)],
+        })
+
+    def _milestone_test(self, body):
+        """Eine Feier ansehen, ohne die Marke erreicht zu haben.
+
+        Der Probelauf geht durch dieselbe Warteschlange wie ein echter
+        Meilenstein — sonst wuerde das Tool einen Weg testen, den es im
+        Betrieb nicht gibt. Der Schluessel traegt einen eigenen Zusatz,
+        damit ein Probelauf keinen echten Eintrag blockiert.
+        """
+        import time
+
+        from pubg.db_pg import queue_milestones
+        from pubg.weapon_milestones import (OCCASIONS, display_name,
+                                            merge_config)
+        b = self._milestone_body(body)
+        oid = b.get("occasion")
+        occ = OCCASIONS.get(oid)
+        if not occ:
+            return _err(400, f"unbekannter Anlass: {oid}")
+        cfg = merge_config(self._stored_milestone_config())
+        c = {**occ, **(cfg.get(oid) or {})}
+        subject = b.get("subject") or ""
+        if occ["scope"] == "weapon" and not subject:
+            subject = "M416"
+        try:
+            value = float(b.get("value"))
+        except (TypeError, ValueError):
+            value = float(c.get("at") or c.get("step") or c.get("min") or 1)
+        tier = b.get("tier") or None
+        if tier not in ("small", "big", "huge"):
+            tier = None
+        widget = b.get("widget") if b.get("widget") in ("big", "bar",
+                                                        "both") else None
+
+        from pubg.weapon_milestones import tier_for
+        item = {
+            # Der Zeitstempel macht wiederholte Probelaeufe unterscheidbar.
+            "key": f"test:{oid}:{subject}:{int(time.time())}",
+            "occasion": oid, "subject": subject,
+            "display": display_name(subject) if subject else "",
+            "label": occ.get("label") or oid,
+            "unit": occ.get("unit") or "",
+            "value": value,
+            "prev_value": b.get("prevValue") or 0,
+            "tier": tier or tier_for(c, value),
+            "widget": widget or c.get("widget") or "bar",
+        }
+        conn = self.get_conn()
+        queue_milestones(conn, self.tenant_id, [item], is_test=True)
+        conn.commit()
+        return _ok({"queued": self._milestone_payload({
+            "milestone_key": item["key"], "occasion": oid,
+            "subject": subject, "label": item["label"],
+            "unit": item["unit"], "value": value,
+            "prev_value": item["prev_value"], "tier": item["tier"],
+            "is_test": True, "detected_at": int(time.time()),
+        }), "widget": item["widget"]})
+
+    def _stored_milestone_config(self):
+        from pubg.poller import _milestone_config
+        return _milestone_config(self.get_conn(), self.tenant_id)
+
+    def _milestone_purge_tests(self):
+        from pubg.db_pg import purge_test_milestones
+        conn = self.get_conn()
+        n = purge_test_milestones(conn, self.tenant_id)
+        conn.commit()
+        return _ok({"deleted": n})
 
     def _career_lifetime(self, qs):
         player = qs.get("player")

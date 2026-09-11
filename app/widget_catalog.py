@@ -48,6 +48,8 @@ WIDGET_PREVIEW_SIZES = {
     "pubg/deathmatch-stats.html":   (440, 300),
     # PUBG Achievements
     "pubg/milestone-celebrate.html":(1920,1080),
+    "pubg/weapon-milestone.html":   (1920,1080),
+    "pubg/weapon-milestone-bar.html":(1920,1080),
     "pubg/session-achievements.html":(400, 360),
     # PUBG News
     "pubg/news-ticker.html":        (920,  44),
@@ -118,6 +120,38 @@ WIDGET_SWITCHES = {
         {"key": "mute",  "label": "Sound",      "type": "select", "default": "0",
          "options": [["0", "Sound on"], ["1", "Muted"]]},
     ],
+    "pubg/weapon-milestone.html": [
+        {"key": "wait", "label": "Wait (s)", "type": "number", "default": "15",
+         "min": 3,
+         "tooltip": "How long the celebration stays. The big tier takes 25 s by default — it has a second confetti burst at 1.5 s."},
+        {"key": "poll", "label": "Poll (s)", "type": "number", "default": "15",
+         "min": 5},
+        {"key": "tag", "label": "Weapon name", "type": "select",
+         "default": "plain",
+         "options": [["plain", "Above the number"], ["ghost", "Watermark behind"]],
+         "tooltip": "Where the weapon name sits relative to the number."},
+        {"key": "design", "label": "Layout", "type": "select", "default": "",
+         "options": [["", "From the tier"], ["b", "Number + weapon"],
+                     ["d", "Big (millions)"]],
+         "tooltip": "Normally the server decides: a huge milestone gets the big layout."},
+        {"key": "demo", "label": "Demo", "type": "select", "default": "0",
+         "options": [["0", "Normal"], ["1", "Celebrate once now"]],
+         "tooltip": "Shows one example celebration — for placing the source in OBS."},
+    ],
+    "pubg/weapon-milestone-bar.html": [
+        {"key": "wait", "label": "Wait (s)", "type": "number", "default": "8",
+         "min": 3},
+        {"key": "poll", "label": "Poll (s)", "type": "number", "default": "15",
+         "min": 5},
+        {"key": "pos", "label": "Position", "type": "select",
+         "default": "bottom",
+         "options": [["bottom", "Bottom"], ["top", "Top"]]},
+        {"key": "confetti", "label": "Confetti", "type": "select",
+         "default": "1", "options": [["1", "With confetti"], ["0", "Bar only"]],
+         "tooltip": "Off for occasions that land several times per session."},
+        {"key": "demo", "label": "Demo", "type": "select", "default": "0",
+         "options": [["0", "Normal"], ["1", "Show once now"]]},
+    ],
     "pubg/lookup.html": [
         {"key": "player", "label": "Player", "type": "text", "default": "",
          "placeholder": "e.g. PEX_LuCKoR", "tooltip": "Pre-fills the search field"},
@@ -167,6 +201,8 @@ WIDGET_META = [
     ("PUBG · Match",  "Deathmatch Stats",    "Team-Deathmatch (TDM) leaderboard — kills, deaths, K/D, damage.",       "pubg/deathmatch-stats.html"),
 
     ("PUBG · Achievements", "Milestone Celebrate",   "Big celebration overlay — fires only after a fresh chicken-dinner crossing a 100-mark.", "pubg/milestone-celebrate.html"),
+    ("PUBG · Achievements", "Weapon Milestone",      "Full-screen celebration for weapon and career milestones — damage, kills, records, mastery. Configure the occasions under Tools.", "pubg/weapon-milestone.html"),
+    ("PUBG · Achievements", "Weapon Milestone Bar",  "The same milestones as a bar at the screen edge — for occasions that land often and should not cover the stream.", "pubg/weapon-milestone-bar.html"),
     ("PUBG · Achievements", "Session Achievements",  "Achievements unlocked in the current session.",                "pubg/session-achievements.html"),
 
     ("PUBG · News",   "News Ticker",        "Bottom-bar news + stats highlights.",                                  "pubg/news-ticker.html"),
@@ -476,6 +512,8 @@ WIDGET_HINTS = {
     "pubg/weapon-stats.html":         "Hides when no active session is running. Shows weapon stats for the current session only.",
     # Event-triggered / one-shot animations
     "pubg/milestone-celebrate.html":  "One-shot animation — fires automatically when a new chicken dinner crosses a 100-mark. Uses localStorage to prevent double-triggers.",
+    "pubg/weapon-milestone.html":     "Fires when the server detects a milestone the poller found after a match. Which occasions count, and from which mark, is set in the Milestone Celebrations tool — as is whether an occasion goes here or to the bar. Both sources keep their own shown-marker, so running both is fine.",
+    "pubg/weapon-milestone-bar.html": "Same queue as the full-screen version, own shown-marker. Meant for the frequent occasions — weapon damage every 25,000, throwables every 100.",
     "pubg/chat-stats-popup.html":     "Triggered by a chat command or Streamer.bot with ?player= — disappears after a configurable duration (default 12 s).",
     "steam/achievement-popup.html":   "One-shot animation per achievement — polls every 5 s, plays unlocks sequentially (8 s each). Rare achievements trigger stronger effects.",
     "steam/popup.html":               "Combines Now-Playing and Achievement popup with a priority queue — an incoming achievement interrupts the running Now-Playing.",
@@ -489,6 +527,7 @@ WIDGET_HINTS = {
 _NO_DOCK = {
     "pubg/live-bar.html", "pubg/streak-counter.html", "pubg/mates.html",
     "pubg/milestone-celebrate.html", "pubg/news-ticker.html",
+    "pubg/weapon-milestone.html", "pubg/weapon-milestone-bar.html",
     "pubg/post-match-card.html", "pubg/trend-indicator.html",
     "pubg/top-mates-slider.html", "pubg/flyout-full.html",
     "pubg/chat-stats-popup.html",

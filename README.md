@@ -438,6 +438,9 @@ Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
 | `news-ticker.html` | Marquee-Bar mit rotierenden Snippets | `rotateMs` |
 | `squad-compare.html` | Vergleich über die letzten **gemeinsamen** Squad-Matches | `players=A,B,C,D`, `matches` |
 | `chat-stats-popup.html` | Streamer.bot-driven Pop-up | `player`, `duration` (Sek) |
+| `milestone-celebrate.html` | Vollbild-Feier bei jedem 100. Career-Win | `n`, `wait`, `force`, `mute` |
+| `weapon-milestone.html` | Vollbild-Feier für Waffen- und Karriere-Meilensteine | `wait`, `poll`, `tag=plain\|ghost`, `design=b\|d`, `demo=1` |
+| `weapon-milestone-bar.html` | Dieselben Meilensteine als Leiste am Bildrand | `wait`, `poll`, `pos=bottom\|top`, `confetti=0`, `demo=1` |
 
 Cross-Player-Web-View: `http://localhost:8080/widgets/pubg/coplayer.html?player=NAME`
 (alte URL `overlays/stats.html?player=NAME` leitet weiter)
@@ -455,6 +458,62 @@ Voraussetzung für die Fremdsicht: die Seite muss ihre API-Calls über
 `fetch()` landet stumm im eigenen Tenant. OBS-Sources über
 `/s/<token>/` sind davon nicht betroffen — dort gibt es keine Impersonation und
 entsprechend kein Banner im Stream.
+
+#### Meilenstein-Feiern (Waffen und Karriere)
+
+Zwei Browser-Sources feiern erreichte Marken, eingestellt wird das im Tool
+**Milestone Celebrations** (`/app/tools/milestones`):
+
+* `weapon-milestone.html` — Vollbild, für seltene Anlässe. Bei einem als
+  `huge` gemeldeten Meilenstein schaltet es auf die große Fassung um:
+  Größenordnung statt Zählerstand („2.5 M"), die Zahl in Worten, Lichtring
+  und ein zweiter Konfetti-Burst.
+* `weapon-milestone-bar.html` — eine Leiste am Bildrand, für Anlässe die oft
+  fallen. Ein Vollbild-Overlay bei jedem 25.000er Waffenschaden würde den
+  Stream zudecken.
+
+Beide fragen `/api/pubg/milestone-pending?widget=big|bar` und führen **je
+einen eigenen Anzeige-Marker**. Deshalb können beide gleichzeitig laufen,
+ohne sich Anlässe wegzunehmen; welcher Anlass wohin geht (`big`, `bar` oder
+`both`), steht in der Konfiguration.
+
+**Drei Datenquellen, je nach Anlass:**
+
+| Quelle | was sie liefert | Reichweite |
+|---|---|---|
+| `weapon_mastery` (API) | Schaden, Kills, Kopftreffer, weiteste Tötung, Match-Kill-Rekord und Level je Waffe | ganze Karriere |
+| `seasons/lifetime` (API) | kontoweite Summen über **alle** Modi, plus Strecke, Zeit, Heilung und die Karriere-Rekorde | ganze Karriere |
+| `match_weapon_stats` (DB) | Match-Schadensrekord je Waffe und Wurfzahlen je Wurfgerät | ab Beginn der Aufzeichnung |
+
+Zwei Eigenheiten der API, die im Code festgehalten sind:
+
+* Die **ingame sichtbare Zahl ist `OfficialStatsTotal` + `CompetitiveStatsTotal`**
+  — am Konto belegt an der M416 (3156 + 23 = 3179) und der Mk12 (1962 + 11 =
+  1973). Der dritte Block `StatsTotal` ist eine ältere, eigene Zählung und
+  *keine* Teilmenge; er bleibt außen vor.
+* **`LevelCurrent` zählt ab null** (höchster Wert im Konto ist 99, ingame steht
+  dort 100), und **`TierCurrent` ist als Rang unbrauchbar**: Tier 0 umfasst die
+  Level 2 bis 98, Tier 1 die Level 54 bis 97. Nur Tier 6 ist eindeutig und
+  trägt genau die ausgelevelten Waffen.
+
+Der Match-Schadensrekord kommt bewusst aus der eigenen Aufzeichnung: die API
+führt `MostDamagePlayerInAGame` nur im alten Block und meldet dort 682 Schaden
+für die M416, wo `match_weapon_stats` 976 belegt — ein Rekord-Celebrate darauf
+löste an einer längst überbotenen Marke aus.
+
+**Erkennung** läuft im Poller (`refresh_milestones`), aber nur nach neuen
+Matches — die Mastery-Werte bewegen sich sonst nicht. Der **erste Lauf legt den
+Ausgangsstand an und feiert nichts**, sonst wäre die ganze bisherige Karriere
+auf einmal fällig. Erkannte Meilensteine landen in `pubg_milestones_seen`; der
+Schlüssel trägt den Wert (`weapon_damage:M416:450000`), womit dieselbe Marke
+nie zweimal gefeiert wird.
+
+**Ohne Wartezeit ansehen**: „Preview" im Tool legt einen Probelauf in dieselbe
+Warteschlange — die Feier läuft also über denselben Weg wie im Betrieb und
+nicht über einen Sonderpfad, der im Ernstfall ungetestet wäre. Vorbelegt ist
+die nächste echte Marke. Probeläufe sind getrennt geführt und lassen sich mit
+einem Knopf wieder wegwerfen. Zum Platzieren der Source in OBS gibt es
+zusätzlich `?demo=1`.
 
 #### Zwei Werte je Bedeutung: Fläche und Text
 

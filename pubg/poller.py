@@ -862,6 +862,122 @@ def process_telemetry_backlog(conn, tenant_id: int, client, my_account_id,
     return {"processed": processed, "errors": errors}
 
 
+#: Wie lange ein Meilenstein-Abgleich vorhaelt. Die Mastery-Werte
+#: aendern sich nur nach einem Match, ein knapper Takt kostet also nur
+#: Rate-Limit. Zwei Calls je Lauf (Mastery + Lifetime).
+MILESTONE_MAX_AGE_MINUTES = 20
+
+
+def _db_weapon_extras(conn, tenant_id: int, account_id: str) -> dict:
+    """Match-Rekorde und Wurfzahlen aus der eigenen Aufzeichnung.
+
+    Beides fehlt in der API brauchbar: `MostDamagePlayerInAGame` steht
+    nur im alten `StatsTotal`-Block und meldet fuer die M416 682
+    Schaden, wo unsere Zeilen 976 belegen — ein Rekord-Celebrate auf
+    dieser Grundlage wuerde bei einer laengst ueberbotenen Marke
+    ausloesen. Wurfgeraete fuehrt die Mastery ganz mit Nullen.
+
+    Die Wurfzahl deckt damit nur die aufgezeichneten Matches ab, nicht
+    die ganze Karriere. Fuer eine Marke wie "alle 100 Wuerfe" ist das
+    richtig — sie zaehlt ab dem Beginn der Aufzeichnung weiter.
+    """
+    from pubg.weapon_milestones import THROWABLES
+    rows = conn.execute("""
+        SELECT weapon, MAX(damage) AS best_damage, SUM(shots) AS shots
+        FROM match_weapon_stats
+        WHERE tenant_id = ? AND account_id = ?
+        GROUP BY weapon
+    """, (tenant_id, account_id)).fetchall()
+    out = {}
+    for r in rows:
+        name = r["weapon"]
+        vals = {"best_damage": float(r["best_damage"] or 0)}
+        if name in THROWABLES:
+            vals["throws"] = int(r["shots"] or 0)
+        out[name] = vals
+    return out
+
+
+def collect_milestone_state(conn, tenant_id: int, client,
+                            account_id: str) -> dict:
+    """Aktueller Stand aus allen drei Quellen, wie `detect` ihn erwartet."""
+    from pubg.weapon_milestones import career_from_payload, parse_mastery
+    weapons = parse_mastery(client.get_weapon_mastery(account_id))
+    career = career_from_payload(client.get_lifetime(account_id))
+    for name, extra in _db_weapon_extras(conn, tenant_id,
+                                         account_id).items():
+        weapons.setdefault(name, {}).update(extra)
+    return {"weapons": weapons, "career": career}
+
+
+def refresh_milestones(conn, tenant_id: int, client, account_id: str = None,
+                       max_age_minutes: int = None) -> dict:
+    """Meilensteine des eigenen Kontos erkennen und einreihen.
+
+    Nur das Hauptkonto: bei mehreren eigenen Accounts waere sonst
+    unklar, wessen M416 gerade die Marke gerissen hat, und die Widgets
+    zeigen ohnehin dieses eine Konto.
+
+    Der erste Lauf legt den Ausgangsstand an und feiert nichts —
+    sonst waere die ganze bisherige Karriere auf einmal faellig.
+    """
+    import time
+
+    from core import credentials
+    from pubg.db_pg import (get_milestone_snapshot, queue_milestones,
+                            save_milestone_snapshot)
+    from pubg.weapon_milestones import detect, merge_config
+
+    if not account_id:
+        account_id = getattr(credentials.get(conn, tenant_id),
+                             "pubg_account_id", None)
+    if not account_id:
+        return {"skipped": "kein Hauptkonto konfiguriert"}
+
+    max_age = (MILESTONE_MAX_AGE_MINUTES if max_age_minutes is None
+               else max_age_minutes)
+    row = conn.execute("SELECT updated_at FROM pubg_milestone_snapshot "
+                       "WHERE tenant_id = ? AND account_id = ?",
+                       (tenant_id, account_id)).fetchone()
+    if row and row["updated_at"]:
+        age_min = (time.time() - float(row["updated_at"])) / 60.0
+        if age_min < max_age:
+            return {"skipped": f"frisch ({age_min:.0f} min)"}
+
+    prev = get_milestone_snapshot(conn, tenant_id, account_id)
+    try:
+        cur = collect_milestone_state(conn, tenant_id, client, account_id)
+    except Exception as exc:                       # Netz, Rate-Limit, 404
+        return {"error": str(exc)}
+
+    found = detect(prev, cur, merge_config(_milestone_config(conn,
+                                                             tenant_id)))
+    queued = queue_milestones(conn, tenant_id, found) if found else 0
+    save_milestone_snapshot(conn, tenant_id, account_id, cur)
+    conn.commit()
+    return {"first_run": prev is None, "detected": len(found),
+            "queued": queued,
+            "keys": [m["key"] for m in found][:10]}
+
+
+#: Schluessel, unter dem die Anlass-Konfiguration in den Tenant-Settings
+#: liegt. Kein File unter data/, damit jeder Tenant seine eigene hat.
+MILESTONE_CONFIG_KEY = "pubg_milestone_config"
+
+
+def _milestone_config(conn, tenant_id: int):
+    import json
+
+    from pubg.db_pg import get_setting
+    raw = get_setting(conn, tenant_id, MILESTONE_CONFIG_KEY)
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError):
+        return {}
+
+
 def run_bulk_match_schema_upgrade(conn, tenant_id: int, client, my_account_id,
                                     pacing_ms: int = 100,
                                     progress_cb=None) -> dict:
@@ -1000,6 +1116,21 @@ def poll_tenant(conn, tenant_id: int, client_factory,
             except Exception as e:
                 detect_errors.append(f"achievement-detect {acc[:12]}: {e}")
 
+    # Waffen- und Karriere-Meilensteine. Nur nach neuen Matches, denn die
+    # Mastery-Werte bewegen sich sonst nicht — das haelt die zwei
+    # zusaetzlichen API-Calls an der Zahl der Matches statt an der Zahl
+    # der Ticks. Fehler bleiben lokal: eine ausgefallene Feier darf den
+    # Tick nicht abbrechen.
+    ms_stats = {}
+    if m_stats["new_matches"] > 0:
+        try:
+            ms_stats = refresh_milestones(conn, tenant_id, client,
+                                          my_account_id)
+            if ms_stats.get("error"):
+                detect_errors.append(f"milestones: {ms_stats['error']}")
+        except Exception as e:
+            detect_errors.append(f"milestones: {e}")
+
     all_errors = (m_stats["errors"] + l_stats["errors"] + s_stats["errors"]
                   + b_stats["errors"] + t_stats["errors"] + detect_errors)
     return {
@@ -1013,6 +1144,7 @@ def poll_tenant(conn, tenant_id: int, client_factory,
         "currentSeasonId": s_stats.get("seasonId"),
         "telemetryProcessed": t_stats["processed"],
         "achievementsDetected": ach_detected,
+        "milestonesQueued": ms_stats.get("queued", 0),
     }
 
 

@@ -1,0 +1,437 @@
+/* Waffen- und Karriere-Meilensteine — gemeinsames Aussehen der beiden
+   Fassungen.
+
+   `weapon-milestone.html` ist die Vollbild-Feier (Design B, und fuer
+   die grossen Stufen D), `weapon-milestone-bar.html` die Leiste am
+   unteren Rand (Design C). Beide sind eigene Browser-Sources und
+   koennen gleichzeitig laufen; welcher Anlass wohin geht, entscheidet
+   das Config-Tool.
+
+   Die Groessen sind aus `milestone-celebrate.html` uebernommen, damit
+   die neue Feier neben der bestehenden Career-Wins-Feier nicht fremd
+   wirkt. Alle Streuwerte des Konfettis stehen als data-Attribute in
+   CSS-Regeln — im Markup darf kein style-Attribut stehen, und per JS
+   gesetzte Stile sind genauso ausgeschlossen. */
+
+html, body {
+  margin: 0; padding: 0; width: 1920px; height: 1080px;
+  overflow: hidden; background: transparent;
+  font-family: "DM Sans", system-ui, sans-serif;
+  color: var(--theme-text, #f4f0f8);
+}
+/* Die Buehne bleibt bis zum Trigger unsichtbar. Ein OBS-Overlay, das
+   beim Laden schon etwas zeigt, feiert beim Szenenwechsel mit. */
+.canvas {
+  position: absolute; top: 0; left: 0; width: 1920px; height: 1080px;
+}
+.canvas[hidden] { display: none; }
+
+.mc-bg {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center,
+    color-mix(in srgb, var(--theme-primary, #5e2a79) 85%, transparent) 0%,
+    color-mix(in srgb, #0a0510 92%, transparent) 45%,
+    color-mix(in srgb, #0a0510 98%, transparent) 90%);
+}
+.beam { position: absolute; left: 0; right: 0; height: 6px;
+        background: linear-gradient(90deg, transparent,
+          var(--theme-accent, #f2b705) 30%,
+          var(--theme-accent, #f2b705) 70%, transparent);
+        box-shadow: 0 0 24px color-mix(in srgb, var(--theme-accent, #f2b705) 70%, transparent); }
+.beam.top { top: 60px; } .beam.bot { bottom: 60px; }
+.icon {
+  position: absolute; left: 50%; top: 170px; transform: translateX(-50%);
+  font-size: 130px; color: var(--theme-accent, #f2b705);
+  filter: drop-shadow(0 0 30px color-mix(in srgb, var(--theme-accent, #f2b705) 80%, transparent));
+}
+.num {
+  position: absolute; left: 50%; top: 300px; transform: translateX(-50%);
+  font-size: 300px; font-weight: 900; letter-spacing: -8px; line-height: 1;
+  white-space: nowrap; color: var(--theme-text, #f4f0f8);
+  text-shadow: 0 0 60px color-mix(in srgb, var(--theme-accent, #f2b705) 45%, transparent);
+}
+/* Lange Zahlen kleiner: 1.500.000 ist doppelt so breit wie 1.000. */
+.num[data-len="7"] { font-size: 210px; letter-spacing: -6px; }
+.num[data-len="6"] { font-size: 240px; }
+.num[data-len="5"] { font-size: 270px; }
+.sub {
+  /* 720 statt 660: bei einer 300-px-Zahl auf top 300 endet die Box bei
+     600. 120 px Boxabstand lesen sich als knapp 180, weil die Ziffern
+     schon an der Grundlinie bei ~540 enden. */
+  position: absolute; left: 0; right: 0; top: 720px; text-align: center;
+  font-size: 58px; font-weight: 700; letter-spacing: 2px;
+  color: var(--theme-accent, #f2b705); text-transform: uppercase;
+}
+.ctx {
+  position: absolute; left: 0; right: 0; top: 804px; text-align: center;
+  font-size: 30px; color: #cbbfd8; letter-spacing: 1px;
+}
+.stats {
+  position: absolute; left: 50%; top: 890px; transform: translateX(-50%);
+  display: grid; grid-template-columns: repeat(4, auto); gap: 10px 64px;
+}
+.stat { text-align: center; }
+.stat .v { font-size: 46px; font-weight: 700; color: var(--theme-text, #f4f0f8); }
+.stat .k { font-size: 20px; letter-spacing: 2px; text-transform: uppercase;
+           color: #9d90ab; }
+
+/* ── Konfetti ──────────────────────────────────────────────────────────
+   Zwei Lagen: ein Burst aus der Mitte im Moment des Aufploppens, danach
+   ein Nachregen mit seitlichem Drift. Vorher fielen die Schnipsel in
+   einer Reihe senkrecht herunter — das sah nach Ladebalken aus, nicht
+   nach Feier. Richtung, Weite und Drehung stehen als data-Attribute in
+   CSS-Regeln, damit kein style-Attribut ins Markup muss. */
+.conf { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.c, .r { position: absolute; border-radius: 2px; opacity: 0; }
+.c { left: 50%; top: 44%; width: 13px; height: 20px;
+     animation: burst 1.5s cubic-bezier(.15,.75,.35,1) forwards; }
+.r { top: -30px; width: 11px; height: 17px;
+     animation: rain 3s linear infinite; }
+@keyframes burst {
+  0%   { transform: translate(-50%, -50%) rotate(0deg) scale(.4); opacity: 0; }
+  12%  { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)),
+                              calc(-50% + var(--dy)))
+                    rotate(var(--rot)) scale(1); opacity: 0; }
+}
+@keyframes rain {
+  0%   { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  8%   { opacity: 1; }
+  100% { transform: translate(var(--drift), 1160px) rotate(var(--rot));
+         opacity: .15; }
+}
+.c[data-col="0"], .r[data-col="0"] { background: var(--theme-accent, #f2b705); }
+.c[data-col="1"], .r[data-col="1"] { background: var(--theme-accent-2, #c9a0dc); }
+.c[data-col="2"], .r[data-col="2"] { background: #fff; }
+.c[data-col="3"], .r[data-col="3"] { background: var(--theme-primary, #5e2a79); }
+.c[data-b="0"] { --dx: 380px; --dy: 0px; --rot: 360deg; animation-delay: 0.00s; }
+.c[data-b="1"] { --dx: 469px; --dy: 64px; --rot: 497deg; animation-delay: 0.04s; }
+.c[data-b="2"] { --dx: 535px; --dy: 150px; --rot: 634deg; animation-delay: 0.09s; }
+.c[data-b="3"] { --dx: 631px; --dy: 165px; --rot: 771deg; animation-delay: 0.14s; }
+.c[data-b="4"] { --dx: 661px; --dy: 282px; --rot: 908deg; animation-delay: 0.18s; }
+.c[data-b="5"] { --dx: 334px; --dy: 212px; --rot: 1045deg; animation-delay: 0.22s; }
+.c[data-b="6"] { --dx: 415px; --dy: 251px; --rot: 1182deg; animation-delay: 0.27s; }
+.c[data-b="7"] { --dx: 405px; --dy: 356px; --rot: 419deg; animation-delay: 0.00s; }
+.c[data-b="8"] { --dx: 353px; --dy: 465px; --rot: 556deg; animation-delay: 0.04s; }
+.c[data-b="9"] { --dx: 207px; --dy: 258px; --rot: 693deg; animation-delay: 0.09s; }
+.c[data-b="10"] { --dx: 169px; --dy: 346px; --rot: 830deg; animation-delay: 0.14s; }
+.c[data-b="11"] { --dx: 91px; --dy: 432px; --rot: 967deg; animation-delay: 0.18s; }
+.c[data-b="12"] { --dx: 122px; --dy: 499px; --rot: 1104deg; animation-delay: 0.22s; }
+.c[data-b="13"] { --dx: -4px; --dy: 274px; --rot: 1241deg; animation-delay: 0.27s; }
+.c[data-b="14"] { --dx: -94px; --dy: 337px; --rot: 478deg; animation-delay: 0.00s; }
+.c[data-b="15"] { --dx: -100px; --dy: 408px; --rot: 615deg; animation-delay: 0.04s; }
+.c[data-b="16"] { --dx: -237px; --dy: 453px; --rot: 752deg; animation-delay: 0.09s; }
+.c[data-b="17"] { --dx: -400px; --dy: 473px; --rot: 889deg; animation-delay: 0.14s; }
+.c[data-b="18"] { --dx: -223px; --dy: 278px; --rot: 1026deg; animation-delay: 0.18s; }
+.c[data-b="19"] { --dx: -354px; --dy: 297px; --rot: 1163deg; animation-delay: 0.22s; }
+.c[data-b="20"] { --dx: -500px; --dy: 288px; --rot: 400deg; animation-delay: 0.27s; }
+.c[data-b="21"] { --dx: -565px; --dy: 341px; --rot: 537deg; animation-delay: 0.00s; }
+.c[data-b="22"] { --dx: -361px; --dy: 146px; --rot: 674deg; animation-delay: 0.04s; }
+.c[data-b="23"] { --dx: -484px; --dy: 118px; --rot: 811deg; animation-delay: 0.09s; }
+.c[data-b="24"] { --dx: -571px; --dy: 150px; --rot: 948deg; animation-delay: 0.14s; }
+.c[data-b="25"] { --dx: -696px; --dy: 82px; --rot: 1085deg; animation-delay: 0.18s; }
+.c[data-b="26"] { --dx: -382px; --dy: -6px; --rot: 1222deg; animation-delay: 0.22s; }
+.c[data-b="27"] { --dx: -479px; --dy: 0px; --rot: 459deg; animation-delay: 0.27s; }
+.c[data-b="28"] { --dx: -566px; --dy: -77px; --rot: 596deg; animation-delay: 0.00s; }
+.c[data-b="29"] { --dx: -627px; --dy: -176px; --rot: 733deg; animation-delay: 0.04s; }
+.c[data-b="30"] { --dx: -724px; --dy: -190px; --rot: 870deg; animation-delay: 0.09s; }
+.c[data-b="31"] { --dx: -384px; --dy: -164px; --rot: 1007deg; animation-delay: 0.14s; }
+.c[data-b="32"] { --dx: -408px; --dy: -259px; --rot: 1144deg; animation-delay: 0.18s; }
+.c[data-b="33"] { --dx: -491px; --dy: -297px; --rot: 381deg; animation-delay: 0.22s; }
+.c[data-b="34"] { --dx: -468px; --dy: -411px; --rot: 518deg; animation-delay: 0.27s; }
+.c[data-b="35"] { --dx: -199px; --dy: -262px; --rot: 655deg; animation-delay: 0.00s; }
+.c[data-b="36"] { --dx: -256px; --dy: -319px; --rot: 792deg; animation-delay: 0.04s; }
+.c[data-b="37"] { --dx: -202px; --dy: -414px; --rot: 929deg; animation-delay: 0.09s; }
+.c[data-b="38"] { --dx: -106px; --dy: -503px; --rot: 1066deg; animation-delay: 0.14s; }
+.c[data-b="39"] { --dx: -67px; --dy: -272px; --rot: 1203deg; animation-delay: 0.18s; }
+.c[data-b="40"] { --dx: 6px; --dy: -346px; --rot: 440deg; animation-delay: 0.22s; }
+.c[data-b="41"] { --dx: 113px; --dy: -407px; --rot: 577deg; animation-delay: 0.27s; }
+.c[data-b="42"] { --dx: 117px; --dy: -478px; --rot: 714deg; animation-delay: 0.00s; }
+.c[data-b="43"] { --dx: 272px; --dy: -519px; --rot: 851deg; animation-delay: 0.04s; }
+.c[data-b="44"] { --dx: 233px; --dy: -276px; --rot: 988deg; animation-delay: 0.09s; }
+.c[data-b="45"] { --dx: 273px; --dy: -340px; --rot: 1125deg; animation-delay: 0.14s; }
+.c[data-b="46"] { --dx: 418px; --dy: -351px; --rot: 362deg; animation-delay: 0.18s; }
+.c[data-b="47"] { --dx: 577px; --dy: -332px; --rot: 499deg; animation-delay: 0.22s; }
+.c[data-b="48"] { --dx: 319px; --dy: -193px; --rot: 636deg; animation-delay: 0.27s; }
+.c[data-b="49"] { --dx: 447px; --dy: -181px; --rot: 773deg; animation-delay: 0.00s; }
+.c[data-b="50"] { --dx: 578px; --dy: -141px; --rot: 910deg; animation-delay: 0.04s; }
+.c[data-b="51"] { --dx: 664px; --dy: -174px; --rot: 1047deg; animation-delay: 0.09s; }
+.c[data-b="52"] { --dx: 379px; --dy: -45px; --rot: 1184deg; animation-delay: 0.14s; }
+.c[data-b="53"] { --dx: 481px; --dy: 8px; --rot: 421deg; animation-delay: 0.18s; }
+.r[data-r="0"] { left: 0%; --drift: -140px; --rot: 420deg; animation-delay: 0.90s; animation-duration: 2.6s; }
+.r[data-r="1"] { left: 53%; --drift: -69px; --rot: 631deg; animation-delay: 1.12s; animation-duration: 3.1s; }
+.r[data-r="2"] { left: 6%; --drift: 2px; --rot: 842deg; animation-delay: 1.34s; animation-duration: 3.6s; }
+.r[data-r="3"] { left: 59%; --drift: 73px; --rot: 1053deg; animation-delay: 1.56s; animation-duration: 4.1s; }
+.r[data-r="4"] { left: 12%; --drift: -136px; --rot: 1264deg; animation-delay: 1.78s; animation-duration: 4.6s; }
+.r[data-r="5"] { left: 65%; --drift: -65px; --rot: 1475deg; animation-delay: 2.00s; animation-duration: 2.6s; }
+.r[data-r="6"] { left: 18%; --drift: 6px; --rot: 486deg; animation-delay: 2.22s; animation-duration: 3.1s; }
+.r[data-r="7"] { left: 71%; --drift: 77px; --rot: 697deg; animation-delay: 2.44s; animation-duration: 3.6s; }
+.r[data-r="8"] { left: 24%; --drift: -132px; --rot: 908deg; animation-delay: 2.66s; animation-duration: 4.1s; }
+.r[data-r="9"] { left: 77%; --drift: -61px; --rot: 1119deg; animation-delay: 2.88s; animation-duration: 4.6s; }
+.r[data-r="10"] { left: 30%; --drift: 10px; --rot: 1330deg; animation-delay: 3.10s; animation-duration: 2.6s; }
+.r[data-r="11"] { left: 83%; --drift: 81px; --rot: 1541deg; animation-delay: 3.32s; animation-duration: 3.1s; }
+.r[data-r="12"] { left: 36%; --drift: -128px; --rot: 552deg; animation-delay: 3.54s; animation-duration: 3.6s; }
+.r[data-r="13"] { left: 89%; --drift: -57px; --rot: 763deg; animation-delay: 0.90s; animation-duration: 4.1s; }
+.r[data-r="14"] { left: 42%; --drift: 14px; --rot: 974deg; animation-delay: 1.12s; animation-duration: 4.6s; }
+.r[data-r="15"] { left: 95%; --drift: 85px; --rot: 1185deg; animation-delay: 1.34s; animation-duration: 2.6s; }
+.r[data-r="16"] { left: 48%; --drift: -124px; --rot: 1396deg; animation-delay: 1.56s; animation-duration: 3.1s; }
+.r[data-r="17"] { left: 1%; --drift: -53px; --rot: 1607deg; animation-delay: 1.78s; animation-duration: 3.6s; }
+.r[data-r="18"] { left: 54%; --drift: 18px; --rot: 618deg; animation-delay: 2.00s; animation-duration: 4.1s; }
+.r[data-r="19"] { left: 7%; --drift: 89px; --rot: 829deg; animation-delay: 2.22s; animation-duration: 4.6s; }
+.r[data-r="20"] { left: 60%; --drift: -120px; --rot: 1040deg; animation-delay: 2.44s; animation-duration: 2.6s; }
+.r[data-r="21"] { left: 13%; --drift: -49px; --rot: 1251deg; animation-delay: 2.66s; animation-duration: 3.1s; }
+.r[data-r="22"] { left: 66%; --drift: 22px; --rot: 1462deg; animation-delay: 2.88s; animation-duration: 3.6s; }
+.r[data-r="23"] { left: 19%; --drift: 93px; --rot: 473deg; animation-delay: 3.10s; animation-duration: 4.1s; }
+.r[data-r="24"] { left: 72%; --drift: -116px; --rot: 684deg; animation-delay: 3.32s; animation-duration: 4.6s; }
+.r[data-r="25"] { left: 25%; --drift: -45px; --rot: 895deg; animation-delay: 3.54s; animation-duration: 2.6s; }
+.r[data-r="26"] { left: 78%; --drift: 26px; --rot: 1106deg; animation-delay: 0.90s; animation-duration: 3.1s; }
+.r[data-r="27"] { left: 31%; --drift: 97px; --rot: 1317deg; animation-delay: 1.12s; animation-duration: 3.6s; }
+.r[data-r="28"] { left: 84%; --drift: -112px; --rot: 1528deg; animation-delay: 1.34s; animation-duration: 4.1s; }
+.r[data-r="29"] { left: 37%; --drift: -41px; --rot: 539deg; animation-delay: 1.56s; animation-duration: 4.6s; }
+.r[data-r="30"] { left: 90%; --drift: 30px; --rot: 750deg; animation-delay: 1.78s; animation-duration: 2.6s; }
+.r[data-r="31"] { left: 43%; --drift: 101px; --rot: 961deg; animation-delay: 2.00s; animation-duration: 3.1s; }
+.r[data-r="32"] { left: 96%; --drift: -108px; --rot: 1172deg; animation-delay: 2.22s; animation-duration: 3.6s; }
+.r[data-r="33"] { left: 49%; --drift: -37px; --rot: 1383deg; animation-delay: 2.44s; animation-duration: 4.1s; }
+.r[data-r="34"] { left: 2%; --drift: 34px; --rot: 1594deg; animation-delay: 2.66s; animation-duration: 4.6s; }
+.r[data-r="35"] { left: 55%; --drift: 105px; --rot: 605deg; animation-delay: 2.88s; animation-duration: 2.6s; }
+.r[data-r="36"] { left: 8%; --drift: -104px; --rot: 816deg; animation-delay: 3.10s; animation-duration: 3.1s; }
+.r[data-r="37"] { left: 61%; --drift: -33px; --rot: 1027deg; animation-delay: 3.32s; animation-duration: 3.6s; }
+.r[data-r="38"] { left: 14%; --drift: 38px; --rot: 1238deg; animation-delay: 3.54s; animation-duration: 4.1s; }
+.r[data-r="39"] { left: 67%; --drift: 109px; --rot: 1449deg; animation-delay: 0.90s; animation-duration: 4.6s; }
+
+/* ── Einblenden, gestuft wie im bestehenden Milestone-Overlay ────────── */
+.mc-bg   { opacity: 0; animation: fadeIn .6s ease-out forwards; }
+.beam    { opacity: 0; animation: fadeIn .5s ease-out .4s forwards; }
+.icon    { opacity: 0; transform: translate(-50%, 40px) scale(.4);
+           animation: popIn .7s cubic-bezier(.22,1.6,.36,1) .7s forwards; }
+.num     { opacity: 0; transform: translate(-50%, 80px) scale(.5);
+           animation: popIn .8s cubic-bezier(.22,1.6,.36,1) 1.0s forwards; }
+.sub     { opacity: 0; transform: translateY(20px);
+           animation: riseIn .6s ease-out 1.5s forwards; }
+.ctx     { opacity: 0; transform: translateY(16px);
+           animation: riseIn .6s ease-out 1.7s forwards; }
+.stats   { opacity: 0; transform: translate(-50%, 20px);
+           animation: popUp .6s ease-out 1.9s forwards; }
+@keyframes fadeIn { to { opacity: 1; } }
+@keyframes popIn  { to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+@keyframes riseIn { to { opacity: 1; transform: translateY(0); } }
+@keyframes popUp  { to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) {
+  .mc-bg, .beam, .icon, .num, .sub, .ctx, .stats {
+    animation: none; opacity: 1; transform: none;
+  }
+  .icon, .num { transform: translateX(-50%); }
+  .stats { transform: translateX(-50%); }
+  .c, .r { animation: none; opacity: .3; }
+}
+
+
+/* ── Design B: Zahl mittig, Waffenname als Schild an der Zahl ────────
+   Vorher stand die Zahl rechts und das Icon links — die Zahl ist aber
+   die Nachricht und gehoert in die Mitte. Der Waffenname sitzt jetzt
+   als Schild oben an der Zahl, statt als eigene Zeile darueber: so
+   bleibt der Blick auf einer Achse.
+
+   Die Abstaende sind nachgerechnet. Bei line-height 1 ist die Zahl so
+   hoch wie ihre Schriftgroesse: eine 300-px-Zahl auf top 400 endete
+   bei 700 — genau dort sass der Untertitel, und das war die
+   Ueberlappung, kein Umbruch. Jetzt endet die Box bei 590 und der
+   Untertitel beginnt bei 720. */
+.canvas[data-design="b"] .icon { display: none; }
+.canvas[data-design="b"] .numwrap {
+  /* 320 statt 290: der Name sitzt 74 px darueber und braucht Luft zum
+     oberen Strahl bei 60 px. */
+  position: absolute; left: 50%; top: 320px;
+  transform: translate(-50%, 80px) scale(.5);
+  opacity: 0;
+  animation: popIn .8s cubic-bezier(.22,1.6,.36,1) .8s forwards;
+}
+.canvas[data-design="b"] .num {
+  position: static; left: auto; top: auto; transform: none;
+  opacity: 1; animation: none; display: block;
+}
+/* Waffenname ohne Kasten. Ein umrandetes Schild mit Fuellung liest
+   sich als Abzeichen und konkurriert mit der Zahl — hier soll der Name
+   die Zahl beschriften, nicht neben ihr um Aufmerksamkeit werben.
+   Zwei Fassungen zur Wahl, umschaltbar. */
+
+/* B1: reine Schrift, gesperrt, ueber der Zahl und LINKS an ihrer
+   Anfangskante. Der Wrapper ist so breit wie die Zahl, also setzt
+   left:0 den Namen genau dort, wo die erste Ziffer beginnt — mittig
+   zentriert wirkte er wie eine eigene Zeile. */
+.canvas[data-design="b"] .wtag {
+  position: absolute; left: 0; top: -74px; transform: none;
+  display: inline-flex; align-items: center; gap: 16px;
+  font-size: 52px; font-weight: 700; letter-spacing: 10px;
+  text-transform: uppercase; white-space: nowrap;
+  color: var(--theme-accent, #f2b705);
+  text-shadow: 0 4px 24px rgba(0,0,0,.7);
+}
+.canvas[data-design="b"] .wtag .material-symbols-outlined {
+  font-size: 56px; letter-spacing: 0;
+}
+/* B2: der Name als grosses, blasses Wasserzeichen HINTER der Zahl. */
+.canvas[data-design="b"][data-tag="ghost"] .wtag {
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  /* Das Wasserzeichen bleibt mittig — es liegt hinter der Zahl und
+     hat keine Anfangskante, an der es sich ausrichten koennte. */
+  font-size: 200px; font-weight: 900; letter-spacing: 24px;
+  color: transparent; z-index: 0;
+  -webkit-text-stroke: 2px color-mix(in srgb,
+    var(--theme-accent, #f2b705) 38%, transparent);
+  text-shadow: none;
+}
+.canvas[data-design="b"][data-tag="ghost"] .wtag
+  .material-symbols-outlined { display: none; }
+.canvas[data-design="b"] .num { position: relative; z-index: 1; }
+/* 300 px Zahl endet bei 590, Untertitel auf 700 laesst 110 px Luft —
+   plus die Reserve unter der Grundlinie wirkt es wie 150. */
+.canvas[data-design="b"] .sub { top: 720px; font-size: 54px; }
+.canvas[data-design="b"] .ctx { top: 802px; }
+.canvas[data-design="b"] .stats { top: 888px; }
+
+
+/* ── Design D: die grosse Stufe ────────────────────────────────────────
+   Fuer halbe und ganze Millionen. Ein 100k-Schritt und die erste
+   Million duerfen nicht gleich aussehen — sonst ist das Besondere
+   nicht besonders.
+
+   Drei Unterschiede zu B: die Zahl steht in Millionen-Schreibweise
+   ("2,5" statt "2.500.000", weil ein Zaehlerstand kein Meilenstein
+   ist), der Untertitel nennt die Groessenordnung in Worten, und es
+   gibt einen zweiten Konfetti-Burst nach 1,5 s. */
+.canvas[data-design="d"] .icon { display: none; }
+.canvas[data-design="d"] .bigwrap {
+  position: absolute; left: 50%; top: 250px;
+  transform: translate(-50%, 90px) scale(.45);
+  display: flex; align-items: baseline; gap: 28px;
+  opacity: 0;
+  animation: popIn 1s cubic-bezier(.2,1.7,.32,1) .8s forwards;
+}
+.canvas[data-design="d"] .bignum {
+  font-size: 380px; font-weight: 900; letter-spacing: -14px; line-height: .92;
+  color: var(--theme-text, #f4f0f8);
+  text-shadow: 0 0 90px color-mix(in srgb, var(--theme-accent, #f2b705) 60%, transparent);
+}
+.canvas[data-design="d"] .bigunit {
+  font-size: 118px; font-weight: 900; letter-spacing: 10px;
+  text-transform: uppercase; color: var(--theme-accent, #f2b705);
+}
+.canvas[data-design="d"] .words {
+  position: absolute; left: 0; right: 0; top: 690px; text-align: center;
+  font-size: 74px; font-weight: 900; letter-spacing: 12px;
+  text-transform: uppercase; color: var(--theme-accent, #f2b705);
+  opacity: 0; transform: translateY(24px);
+  animation: riseIn .7s ease-out 1.6s forwards;
+}
+.canvas[data-design="d"] .sub { top: 800px; font-size: 40px;
+                                color: #cbbfd8; letter-spacing: 4px; }
+.canvas[data-design="d"] .ctx { display: none; }
+.canvas[data-design="d"] .stats { top: 884px; }
+.canvas[data-design="d"] .num, .canvas[data-design="d"] .wtag { display: none; }
+/* Ein Lichtring, der einmal aufgeht — nur hier, damit die Stufe
+   auch ohne die Zahl erkennbar ist. */
+.canvas[data-design="d"] .ring {
+  position: absolute; left: 50%; top: 430px;
+  width: 520px; height: 520px; margin: -260px 0 0 -260px;
+  border: 5px solid color-mix(in srgb, var(--theme-accent, #f2b705) 70%, transparent);
+  border-radius: 50%; opacity: 0;
+  animation: ringOut 1.6s cubic-bezier(.15,.8,.3,1) .9s forwards;
+}
+@keyframes ringOut {
+  0%   { transform: scale(.2); opacity: 0; }
+  25%  { opacity: .9; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+/* Zweiter Burst */
+.c2 { position: absolute; left: 50%; top: 40%; width: 15px; height: 23px;
+      border-radius: 2px; opacity: 0;
+      animation: burst 1.8s cubic-bezier(.12,.8,.3,1) forwards; }
+.c2[data-b2="0"] { --dx: 516px; --dy: 44px; --rot: 540deg; animation-delay: 1.50s; }
+.c2[data-b2="1"] { --dx: 612px; --dy: 113px; --rot: 713deg; animation-delay: 1.55s; }
+.c2[data-b2="2"] { --dx: 688px; --dy: 201px; --rot: 886deg; animation-delay: 1.60s; }
+.c2[data-b2="3"] { --dx: 740px; --dy: 305px; --rot: 1059deg; animation-delay: 1.65s; }
+.c2[data-b2="4"] { --dx: 763px; --dy: 422px; --rot: 1232deg; animation-delay: 1.70s; }
+.c2[data-b2="5"] { --dx: 433px; --dy: 315px; --rot: 1405deg; animation-delay: 1.75s; }
+.c2[data-b2="6"] { --dx: 434px; --dy: 418px; --rot: 1578deg; animation-delay: 1.50s; }
+.c2[data-b2="7"] { --dx: 402px; --dy: 525px; --rot: 671deg; animation-delay: 1.55s; }
+.c2[data-b2="8"] { --dx: 336px; --dy: 633px; --rot: 844deg; animation-delay: 1.60s; }
+.c2[data-b2="9"] { --dx: 134px; --dy: 422px; --rot: 1017deg; animation-delay: 1.65s; }
+.c2[data-b2="10"] { --dx: 60px; --dy: 509px; --rot: 1190deg; animation-delay: 1.70s; }
+.c2[data-b2="11"] { --dx: -45px; --dy: 589px; --rot: 1363deg; animation-delay: 1.75s; }
+.c2[data-b2="12"] { --dx: -181px; --dy: 657px; --rot: 1536deg; animation-delay: 1.50s; }
+.c2[data-b2="13"] { --dx: -196px; --dy: 404px; --rot: 629deg; animation-delay: 1.55s; }
+.c2[data-b2="14"] { --dx: -323px; --dy: 452px; --rot: 802deg; animation-delay: 1.60s; }
+.c2[data-b2="15"] { --dx: -472px; --dy: 482px; --rot: 975deg; animation-delay: 1.65s; }
+.c2[data-b2="16"] { --dx: -637px; --dy: 491px; --rot: 1148deg; animation-delay: 1.70s; }
+.c2[data-b2="17"] { --dx: -461px; --dy: 270px; --rot: 1321deg; animation-delay: 1.75s; }
+.c2[data-b2="18"] { --dx: -605px; --dy: 266px; --rot: 1494deg; animation-delay: 1.50s; }
+.c2[data-b2="19"] { --dx: -754px; --dy: 238px; --rot: 587deg; animation-delay: 1.55s; }
+.c2[data-b2="20"] { --dx: -901px; --dy: 187px; --rot: 760deg; animation-delay: 1.60s; }
+.c2[data-b2="21"] { --dx: -586px; --dy: 62px; --rot: 933deg; animation-delay: 1.65s; }
+.c2[data-b2="22"] { --dx: -706px; --dy: 7px; --rot: 1106deg; animation-delay: 1.70s; }
+.c2[data-b2="23"] { --dx: -813px; --dy: -70px; --rot: 1279deg; animation-delay: 1.75s; }
+.c2[data-b2="24"] { --dx: -901px; --dy: -167px; --rot: 1452deg; animation-delay: 1.50s; }
+.c2[data-b2="25"] { --dx: -540px; --dy: -158px; --rot: 545deg; animation-delay: 1.55s; }
+.c2[data-b2="26"] { --dx: -602px; --dy: -248px; --rot: 718deg; animation-delay: 1.60s; }
+.c2[data-b2="27"] { --dx: -636px; --dy: -352px; --rot: 891deg; animation-delay: 1.65s; }
+.c2[data-b2="28"] { --dx: -640px; --dy: -466px; --rot: 1064deg; animation-delay: 1.70s; }
+.c2[data-b2="29"] { --dx: -340px; --dy: -327px; --rot: 1237deg; animation-delay: 1.75s; }
+.c2[data-b2="30"] { --dx: -326px; --dy: -426px; --rot: 1410deg; animation-delay: 1.50s; }
+.c2[data-b2="31"] { --dx: -280px; --dy: -527px; --rot: 1583deg; animation-delay: 1.55s; }
+.c2[data-b2="32"] { --dx: -199px; --dy: -626px; --rot: 676deg; animation-delay: 1.60s; }
+.c2[data-b2="33"] { --dx: -47px; --dy: -397px; --rot: 849deg; animation-delay: 1.65s; }
+.c2[data-b2="34"] { --dx: 37px; --dy: -477px; --rot: 1022deg; animation-delay: 1.70s; }
+.c2[data-b2="35"] { --dx: 151px; --dy: -546px; --rot: 1195deg; animation-delay: 1.75s; }
+.c2[data-b2="36"] { --dx: 292px; --dy: -602px; --rot: 1368deg; animation-delay: 1.50s; }
+.c2[data-b2="37"] { --dx: 251px; --dy: -351px; --rot: 1541deg; animation-delay: 1.55s; }
+.c2[data-b2="38"] { --dx: 381px; --dy: -389px; --rot: 634deg; animation-delay: 1.60s; }
+.c2[data-b2="39"] { --dx: 529px; --dy: -408px; --rot: 807deg; animation-delay: 1.65s; }
+.c2[data-b2="40"] { --dx: 690px; --dy: -405px; --rot: 980deg; animation-delay: 1.70s; }
+.c2[data-b2="41"] { --dx: 468px; --dy: -206px; --rot: 1153deg; animation-delay: 1.75s; }
+.c2[data-b2="42"] { --dx: 607px; --dy: -192px; --rot: 1326deg; animation-delay: 1.50s; }
+.c2[data-b2="43"] { --dx: 747px; --dy: -155px; --rot: 1499deg; animation-delay: 1.55s; }
+.c2[data-b2="44"] { --dx: 882px; --dy: -94px; --rot: 592deg; animation-delay: 1.60s; }
+.c2[data-b2="45"] { --dx: 545px; --dy: -6px; --rot: 765deg; animation-delay: 1.65s; }
+@media (prefers-reduced-motion: reduce) {
+  .canvas[data-design="d"] .bigwrap, .canvas[data-design="d"] .words {
+    animation: none; opacity: 1; transform: translateX(-50%);
+  }
+  .canvas[data-design="d"] .words { transform: none; }
+  .canvas[data-design="d"] .ring { animation: none; opacity: .3;
+                                    transform: scale(1.4); }
+  .c2 { animation: none; opacity: .3; }
+}
+
+/* ── Design C: Leiste unten, kein Vollbild ────────────────────────────
+   Fuer Meilensteine, die oft fallen. Ein Vollbild-Overlay bei jedem
+   1000er Schaden wuerde den Stream zudecken; diese Leiste laeuft
+   nebenher und blockiert nichts. */
+.canvas[data-design="c"] .mc-bg,
+.canvas[data-design="c"] .beam,
+.canvas[data-design="c"] .conf .r { display: none; }
+.canvas[data-design="c"] .bar {
+  position: absolute; left: 50%; bottom: 90px; transform: translate(-50%, 40px);
+  display: flex; align-items: center; gap: 30px;
+  padding: 26px 54px 26px 40px; border-radius: 14px;
+  background: color-mix(in srgb, var(--theme-surface, #241a2e) 94%, transparent);
+  border: 2px solid var(--theme-accent, #f2b705);
+  box-shadow: 0 20px 60px rgba(0,0,0,.5),
+              0 0 40px color-mix(in srgb, var(--theme-accent, #f2b705) 30%, transparent);
+  opacity: 0; animation: popUp .6s cubic-bezier(.22,1.4,.36,1) .3s forwards;
+}
+.canvas[data-design="c"] .icon,
+.canvas[data-design="c"] .num,
+.canvas[data-design="c"] .sub,
+.canvas[data-design="c"] .ctx,
+.canvas[data-design="c"] .stats,
+.canvas[data-design="c"] .wname { display: none; }
+.bar-icon { font-size: 76px; color: var(--theme-accent, #f2b705); }
+.bar-num { font-size: 92px; font-weight: 900; line-height: 1;
+           letter-spacing: -2px; color: var(--theme-text, #f4f0f8); }
+.bar-txt { display: flex; flex-direction: column; gap: 4px; }
+.bar-sub { font-size: 34px; font-weight: 700; letter-spacing: 2px;
+           text-transform: uppercase; color: var(--theme-accent, #f2b705); }
+.bar-ctx { font-size: 24px; color: #cbbfd8; }
+.canvas[data-design="c"] .c { top: 62%; }
+

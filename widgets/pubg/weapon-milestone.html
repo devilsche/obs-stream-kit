@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="entry">
+<head>
+<meta charset="utf-8">
+<title>Weapon Milestone</title>
+<!--
+  PUBG Waffen- und Karriere-Meilensteine — Vollbild-Feier.
+
+  OBS-Browser-Source, 1920x1080, transparenter Hintergrund. Zeigt
+  nichts, bis der Server einen Meilenstein liefert; danach laeuft die
+  Feier einmal und die Buehne verschwindet wieder.
+
+  Zwei Fassungen des Layouts:
+    * `b` (Standard) — die Zahl mittig, der Waffenname als Beschriftung
+      an ihrer oberen Kante.
+    * `d` — fuer die grossen Stufen: Groessenordnung statt Zaehlerstand
+      ("2.5 M"), die Zahl in Worten, ein Lichtring und ein zweiter
+      Konfetti-Burst. Wird automatisch genommen, wenn der Server den
+      Meilenstein als `tier: "huge"` meldet.
+
+  Quelle: /api/pubg/milestone-pending?widget=big — der Server fuehrt
+  einen eigenen Anzeige-Marker fuer diese Fassung, die Leiste
+  (weapon-milestone-bar.html) hat ihren eigenen. Beide koennen also
+  gleichzeitig laufen, ohne sich Anlaesse wegzunehmen.
+
+  URL-Parameter:
+    ?wait=15         Sekunden, die die Feier stehen bleibt (Standard 15,
+                     bei tier=huge 25)
+    ?poll=15         Abfrage-Takt in Sekunden
+    ?tag=ghost       Waffenname als blasses Wasserzeichen hinter der
+                     Zahl statt als Zeile darueber
+    ?design=b|d      Layout erzwingen, statt es aus dem tier zu nehmen
+    ?demo=1          einmal mit Beispielwerten feiern (Einrichtung in
+                     OBS, ohne auf einen echten Meilenstein zu warten)
+
+  Ausprobieren ohne Wartezeit: im Config-Tool (/app/tools/milestones)
+  legt "Preview" einen Probelauf in dieselbe Warteschlange.
+-->
+<link rel="stylesheet" href="../_theme.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined">
+<link rel="stylesheet" href="_milestone.css">
+</head>
+<body>
+<div class="canvas" id="canvas" hidden></div>
+<script src="_pubg.js"></script>
+<script src="_milestone.js"></script>
+<script>
+(function () {
+  "use strict";
+  var M = window.Milestone;
+  var Q = new URLSearchParams(location.search);
+  var POLL_S = Math.max(5, parseInt(Q.get("poll"), 10) || 15);
+  //: Wie lange die Feier steht. Die grosse Stufe braucht laenger: sie
+  //: hat einen zweiten Burst bei 1,5 s und den Ring danach.
+  var WAIT_SMALL = parseInt(Q.get("wait"), 10) || 15;
+  var WAIT_HUGE = parseInt(Q.get("wait"), 10) || 25;
+  var TAG = Q.get("tag") === "ghost" ? "ghost" : "plain";
+  var FORCE_DESIGN = (Q.get("design") || "").toLowerCase();
+  var canvas = document.getElementById("canvas");
+
+  /* Die vier Kennzahlen unter der Zahl.
+   *
+   * Sie stehen bewusst nicht in der Meilenstein-Antwort: was neben
+   * einem Waffen-Schaden interessant ist, sind die anderen Werte
+   * derselben Waffe, und die holt der Zustands-Endpoint sowieso.
+   * Faellt er aus, bleibt die Reihe leer statt die Feier zu verhindern.
+   */
+  function statsFor(m) {
+    var base = (window.__SERVE_BASE__ || "/") + "api/pubg/milestone-state";
+    return fetch(base, { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var rows = (d && (d.state || (d.data && d.data.state))) || [];
+        var mine = rows.filter(function (r) {
+          return r.subject === (m.subject || "");
+        });
+        return mine.slice(0, 4).map(function (r) {
+          var s = M.shown({ value: r.value, unit: "", occasion: r.occasion });
+          return [s.num, (r.occasion || "").replace(/^(weapon|career)_/, "")
+                                          .replace(/_/g, " ")];
+        });
+      })
+      .catch(function () { return []; });
+  }
+
+  function statsHtml(pairs) {
+    if (!pairs.length) return "";
+    return '<div class="stats">' + pairs.map(function (p) {
+      return '<div class="stat"><div class="v">' + M.esc(p[0])
+           + '</div><div class="k">' + M.esc(p[1]) + "</div></div>";
+    }).join("") + "</div>";
+  }
+
+  function renderBig(m, pairs) {
+    var b = M.bigForm(m);
+    return '<div class="ring"></div>' + M.secondBurst()
+      + '<div class="bigwrap"><span class="bignum">' + M.esc(b.big)
+      + "</span>"
+      + (b.unit ? '<span class="bigunit">' + M.esc(b.unit) + "</span>" : "")
+      + "</div>"
+      + (b.words ? '<div class="words">' + M.esc(b.words) + "</div>" : "")
+      + '<div class="sub">' + M.esc(M.subline(m, true)) + "</div>"
+      + statsHtml(pairs);
+  }
+
+  function renderNum(m, pairs) {
+    var s = M.shown(m);
+    var num = s.num + (s.unit ? " " + s.unit : "");
+    return '<div class="numwrap">'
+      + (m.display
+          ? '<span class="wtag"><span class="material-symbols-outlined"'
+            + ' aria-hidden="true">' + M.iconFor(m) + "</span>"
+            + M.esc(m.display) + "</span>"
+          : "")
+      + '<div class="num" data-len="' + String(s.num).replace(/\D/g, "").length
+      + '">' + M.esc(num) + "</div></div>"
+      + '<div class="sub">' + M.esc(M.subline(m, !m.display)) + "</div>"
+      + '<div class="ctx">' + M.esc(M.ctxline(m)) + "</div>"
+      + statsHtml(pairs);
+  }
+
+  function celebrate(m) {
+    var design = FORCE_DESIGN || (m.tier === "huge" ? "d" : "b");
+    return statsFor(m).then(function (pairs) {
+      canvas.setAttribute("data-design", design);
+      canvas.setAttribute("data-tag", TAG);
+      canvas.innerHTML = '<div class="mc-bg"></div>'
+        + '<div class="beam top"></div><div class="beam bot"></div>'
+        + M.confetti()
+        + (design === "d" ? renderBig(m, pairs) : renderNum(m, pairs));
+      canvas.hidden = false;
+      var wait = (design === "d" ? WAIT_HUGE : WAIT_SMALL) * 1000;
+      return new Promise(function (done) {
+        setTimeout(function () {
+          canvas.hidden = true;
+          canvas.innerHTML = "";
+          done();
+        }, wait);
+      });
+    });
+  }
+
+  if (Q.get("demo") === "1") {
+    celebrate({
+      key: "demo", occasion: "career_damage", subject: "",
+      display: "", label: "Career Damage", unit: "damage",
+      value: 4000000, prevValue: 3900000, tier: "huge"
+    });
+    return;
+  }
+
+  M.poller({ widget: "big", intervalMs: POLL_S * 1000,
+             celebrate: celebrate });
+}());
+</script>
+</body>
+</html>
