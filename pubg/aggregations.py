@@ -398,6 +398,16 @@ WEAPON_NAMES = {
     "ProjC4_C":                   ("C4",           "throwable"),
     "PanzerFaust100M_Projectile_C": ("Panzerfaust","throwable"),
     "Mortar_Projectile_C":        ("Moerser",      "throwable"),
+    # Diese vier tragen `Item_Weapon_`-Praefix statt `Proj` und fehlten
+    # deshalb im Mapping. Folge: Klasse "other", `is_thrown` blieb false,
+    # und sie tauchten in keiner Wurf-Wertung auf — obwohl die Rauchbombe
+    # mit 1.560 Wuerfen das meistgeworfene Geraet ueberhaupt ist.
+    # Rauch, Blendgranate und Stungun richten keinen Schaden an; das ist
+    # echt und kein fehlender Wert.
+    "Item_Weapon_SmokeBomb_C":    ("Rauchbombe",   "throwable"),
+    "Item_Weapon_FlashBang_C":    ("Blendgranate", "throwable"),
+    "Item_Weapon_StunGun_C":      ("Taser",        "throwable"),
+    "Item_Weapon_BluezoneGrenade_C": ("Blauzonen-Granate", "throwable"),
     # Melee
     "WeapCowbar_C":            ("Brechstange",   "melee"),
     "WeapMachete_C":           ("Machete",       "melee"),
@@ -454,7 +464,14 @@ _ENVIR_NAMES = {
     "BP_CarePackageDrop_nonDest_C": "Care Package",
     "BP_FireEffectController_C":    "Fire",
     "BP_MolotovFireDebuff_C":       "Molotov Fire",
-    "Bluezonebomb_EffectActor_C":   "Red Zone",
+    # Der Effekt-Aktor der geworfenen BLAUZONEN-GRANATE, nicht die Red
+    # Zone (die heisst RedZoneBombingField_*). Die Granate selbst taucht
+    # nur in Attack-Events auf; Schaden und Toetung laufen ueber diesen
+    # Aktor mit damage_reason Damage_BlueZoneGrenade — dieselbe Trennung
+    # wie beim Molotov, wo das Feuer und nicht der Aufschlag toetet.
+    # Als "Red Zone" beschriftet landeten eigene Granaten-Kills in der
+    # Umgebungs-Spalte statt bei der Waffe.
+    "Bluezonebomb_EffectActor_C":   "Blauzonen-Granate",
     "Jerrycan":                     "Jerry Can (Boom)",
     "JerrycanFire":                 "Jerry Can (Fire)",
     # PUBG-System-Actor (kein echter Spieler):
@@ -523,8 +540,10 @@ def _death_cause_label(death_ev, victim_acc, weapon_id, weapon_name,
     # Zone
     if "BattleRoyaleModeController" in wid:
         return "Blue Zone"
+    # Geworfene Blauzonen-Granate, keine Zonen-Mechanik — siehe
+    # _ENVIR_NAMES. Ein Tod dadurch ist ein Waffentod.
     if "Bluezonebomb" in wid:
-        return "Red Zone"
+        return "Blue Zone Grenade"
     # Ertrinken
     if "DecreaseBreathInApnea" in wid or "Drown" in wid:
         return "Drowned"
@@ -553,6 +572,17 @@ _WEAPON_ALIASES = {
     # Der Molotov toetet ueber das Feuer, nicht ueber den Aufschlag —
     # getrennt gefuehrt stand er bei 13 statt 253 Kills.
     "bp_molotovfiredebuff_c":       "ProjMolotov_C",
+    # Dieselbe Trennung bei der Blauzonen-Granate: unter ihrem eigenen
+    # Namen stehen nur Attack-Events (175 Wuerfe), Schaden und Toetung
+    # laufen ueber den Effekt-Aktor. Ohne diesen Alias stand sie bei 175
+    # Wuerfen und null Kills, und die Toetungen landeten als "Red Zone"
+    # in der Umgebungs-Spalte.
+    "bluezonebomb_effectactor_c":   "Item_Weapon_BluezoneGrenade_C",
+    # Die Wurf-Variante, die im Attack-Event auftaucht.
+    "weapbluezonegrenade_c":        "Item_Weapon_BluezoneGrenade_C",
+    "weapsmokebomb_c":              "Item_Weapon_SmokeBomb_C",
+    "weapflashbang_c":              "Item_Weapon_FlashBang_C",
+    "weapstungun_c":                "Item_Weapon_StunGun_C",
     "weapc4_c":                     "ProjC4_C",
     "weapstickygrenade_c":          "ProjStickyGrenade_C",
     "weappanzerfaust100m_c":        "PanzerFaust100M_Projectile_C",

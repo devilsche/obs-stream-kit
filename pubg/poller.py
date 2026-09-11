@@ -880,13 +880,25 @@ def _db_weapon_extras(conn, tenant_id: int, account_id: str) -> dict:
     Die Wurfzahl deckt damit nur die aufgezeichneten Matches ab, nicht
     die ganze Karriere. Fuer eine Marke wie "alle 100 Wuerfe" ist das
     richtig — sie zaehlt ab dem Beginn der Aufzeichnung weiter.
+
+    Event-Modi bleiben aussen vor. Im Heist-Modus kommt eine UMP45 auf
+    15.584 Schaden in einem Match, wo dieselbe Waffe im Battle Royale
+    1.833 schafft — ein solcher "Rekord" waere mit nichts vergleichbar,
+    wuerde nie wieder ueberboten und haette obendrein jede echte Feier
+    verdraengt, weil die Warteschlange nach Hoehe sortiert. Die
+    Mastery-API fuehrt diese Waffen ebenfalls nicht.
     """
     from pubg.weapon_milestones import THROWABLES
     rows = conn.execute("""
-        SELECT weapon, MAX(damage) AS best_damage, SUM(shots) AS shots
-        FROM match_weapon_stats
-        WHERE tenant_id = ? AND account_id = ?
-        GROUP BY weapon
+        SELECT w.weapon, MAX(w.damage) AS best_damage,
+               SUM(w.shots) AS shots
+        FROM match_weapon_stats w
+        JOIN matches m ON m.tenant_id = w.tenant_id
+                      AND m.match_id = w.match_id
+        WHERE w.tenant_id = ? AND w.account_id = ?
+          AND (m.game_mode LIKE 'solo%' OR m.game_mode LIKE 'duo%'
+               OR m.game_mode LIKE 'squad%')
+        GROUP BY w.weapon
     """, (tenant_id, account_id)).fetchall()
     out = {}
     for r in rows:

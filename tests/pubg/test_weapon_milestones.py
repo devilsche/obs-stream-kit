@@ -254,3 +254,52 @@ def test_merge_config_verwirft_unsinn():
     assert cfg["weapon_damage"]["step"] == OCCASIONS["weapon_damage"]["step"]
     assert cfg["weapon_damage"]["widget"] == "bar"
     assert "gibtsnicht" not in cfg
+
+
+# ── Wurfgeraete, die im Mapping fehlten ─────────────────────────────────────
+
+def test_alle_wurfgeraete_gelten_als_wurfgeraet():
+    # Rauch, Blendgranate, Taser und Blauzonen-Granate tragen
+    # `Item_Weapon_`-Praefix statt `Proj` und fehlten deshalb im
+    # Mapping: Klasse "other", is_thrown false, in keiner Wurf-Wertung
+    # sichtbar — obwohl die Rauchbombe mit 1.560 Wuerfen das
+    # meistgeworfene Geraet ueberhaupt ist.
+    from pubg.burst_analysis import class_of_weapon_name
+    from pubg.weapon_milestones import THROWABLES
+    for name in THROWABLES:
+        assert class_of_weapon_name(name) == "throwable", name
+
+
+def test_blauzonen_granate_ist_kein_umgebungstod():
+    # Der Effekt-Aktor war als "Red Zone" beschriftet; eigene
+    # Granaten-Kills landeten damit in der Umgebungs-Spalte statt bei
+    # der Waffe.
+    from pubg.aggregations import _weapon_ci_lookup
+    hit = _weapon_ci_lookup("Bluezonebomb_EffectActor_C")
+    assert hit == ("Blauzonen-Granate", "throwable")
+
+
+def test_wurf_und_wirkung_der_blauzonen_granate_fallen_zusammen():
+    # Unter ihrem eigenen Namen stehen nur Attack-Events (175 Wuerfe),
+    # Schaden und Toetung laufen ueber den Effekt-Aktor — dieselbe
+    # Trennung wie beim Molotov.
+    from pubg.aggregations import _weapon_ci_lookup
+    assert (_weapon_ci_lookup("Item_Weapon_BluezoneGrenade_C")
+            == _weapon_ci_lookup("Bluezonebomb_EffectActor_C"))
+
+
+def test_echte_red_zone_bleibt_umgebung():
+    # Die Zonen-Bombardierung ist keine Waffe und darf nicht
+    # mitrutschen, nur weil der Name aehnlich klingt.
+    from pubg.aggregations import _weapon_ci_lookup
+    assert _weapon_ci_lookup("RedZoneBombingField_Def_C") is None
+
+
+def test_anzeigenamen_sind_englisch():
+    # WEAPON_NAMES ist deutsch gepflegt und Datenschluessel; die
+    # Oberflaeche ist englisch.
+    from pubg.weapon_milestones import display_name
+    assert display_name("Rauchbombe") == "Smoke Grenade"
+    assert display_name("Blauzonen-Granate") == "Blue Zone Grenade"
+    # Eine Schusswaffe bleibt, wie sie heisst.
+    assert display_name("M416") == "M416"

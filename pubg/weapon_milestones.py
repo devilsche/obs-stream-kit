@@ -34,21 +34,25 @@ MASTERY_PREFIX = "Item_Weapon_"
 #: Level, ab dem eine Waffe als ausgelevelt gilt (nach der +1-Korrektur).
 MASTERED_LEVEL = 100
 
-#: Wurfgeraete, wie `match_weapon_stats.weapon` sie fuehrt. Die
-#: `is_thrown`-Spalte taugt dafuer nicht: sie entsteht aus der
-#: Schadenskategorie, weshalb Rauch und Blendgranate dort `false`
-#: stehen — die machen keinen Schaden, geworfen werden sie trotzdem.
-THROWABLES = ("Granate", "Molotov", "Klebebombe", "C4", "SmokeBomb",
-              "FlashBang", "StunGrenade", "Panzerfaust", "Moerser")
+#: Wurfgeraete, wie `match_weapon_stats.weapon` sie fuehrt.
+#:
+#: Die Liste kommt aus WEAPON_NAMES und nicht aus der
+#: `is_thrown`-Spalte: die steht in Zeilen bis August 2026 noch auf
+#: false, weil die Spalte erst danach mitgeschrieben wurde.
+THROWABLES = tuple(sorted({
+    "Granate", "Molotov", "Klebebombe", "C4", "Panzerfaust", "Moerser",
+    "Rauchbombe", "Blendgranate", "Taser", "Blauzonen-Granate",
+}))
 
 #: Anzeigenamen fuer die Wurfgeraete. WEAPON_NAMES ist deutsch
 #: gepflegt und dient als Datenschluessel; die Oberflaeche ist englisch.
 DISPLAY_NAMES = {
     "Granate": "Frag Grenade",
     "Klebebombe": "Sticky Bomb",
-    "SmokeBomb": "Smoke Grenade",
-    "FlashBang": "Flash Grenade",
-    "StunGrenade": "Stun Grenade",
+    "Rauchbombe": "Smoke Grenade",
+    "Blendgranate": "Flash Grenade",
+    "Taser": "Stun Gun",
+    "Blauzonen-Granate": "Blue Zone Grenade",
     "Moerser": "Mortar",
     "Panzerfaust": "Panzerfaust",
 }

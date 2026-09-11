@@ -459,6 +459,44 @@ Voraussetzung für die Fremdsicht: die Seite muss ihre API-Calls über
 `/s/<token>/` sind davon nicht betroffen — dort gibt es keine Impersonation und
 entsprechend kein Banner im Stream.
 
+#### Wurfgeräte: vier fehlende Mappings (Stand 2026-09-11)
+
+Vier Wurfgeräte tragen `Item_Weapon_`-Präfix statt `Proj` und fehlten
+deshalb in `WEAPON_NAMES`. Folge: Klasse „other", `is_thrown = false`, und
+sie tauchten in **keiner** Wurf-Wertung auf — obwohl die Rauchbombe mit
+1.560 Würfen das meistgeworfene Gerät überhaupt ist.
+
+| rohe Id | Name | Zeilen (alle Tenants) |
+|---|---|---|
+| `Item_Weapon_SmokeBomb_C` | Rauchbombe | 30.179 |
+| `Item_Weapon_FlashBang_C` | Blendgranate | 14.266 |
+| `Item_Weapon_BluezoneGrenade_C` | Blauzonen-Granate | 6.155 |
+| `Item_Weapon_StunGun_C` | Taser | 677 |
+
+**Die Blauzonen-Granate war zweifach falsch.** Unter ihrem eigenen Namen
+stehen nur die Würfe; Schaden und Tötung laufen über den Effekt-Aktor
+`Bluezonebomb_EffectActor_C`, und der war als **„Red Zone"** beschriftet.
+Eigene Granaten-Kills landeten damit in der Umgebungs-Spalte statt bei der
+Waffe — 302 Kills bei null Würfen in derselben Zeile. Das ist dieselbe
+Trennung wie beim Molotov, wo das Feuer tötet und nicht der Aufschlag, und
+wird mit demselben Mittel gelöst: einem Alias in `_WEAPON_ALIASES`.
+
+Dass es Granaten-Kills sein *müssen*, folgt aus der Spielmechanik: die echte
+Red Zone (`RedZoneBombingField_*`) schreibt niemandem einen Kill zu und
+steht gar nicht in `match_weapon_stats`.
+
+**`is_thrown` war zusätzlich in 67.712 Zeilen falsch** — die Spalte wurde
+erst ab August 2026 mitgeschrieben, obwohl ihr Wert eine reine Funktion des
+Waffennamens ist (`class_of_weapon_name(...) == "throwable"`).
+
+Korrigiert wird das mit `scripts/remap_throwables.py --apply`. Es **legt
+zusammen statt umzubenennen**: ein Match hat oft beide Zeilen (Würfe unter
+`BluezoneGrenade`, Kills unter `Red Zone`), ein reines `UPDATE` liefe in den
+Primärschlüssel. Ein Re-Backfill wäre der sauberere Weg — `upsert_weapon_stats`
+ersetzt den kompletten Satz eines Matches —, erreicht aber nur Matches mit
+vorliegender Telemetrie; die Lobby-Referenz umfasst 23.000 Spieler, deren
+Zeilen über Monate gewachsen sind.
+
 #### Meilenstein-Feiern (Waffen und Karriere)
 
 Zwei Browser-Sources feiern erreichte Marken, eingestellt wird das im Tool
