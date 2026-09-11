@@ -810,6 +810,66 @@ def fetch_missing(client, account_ids, season_id: str, mode: str,
 
 # ── DB-Anbindung ────────────────────────────────────────────────────────────
 
+def squad_per_match(conn, tenant_id, match_ids):
+    """Eigenes Team je Match, aus den Daten **aller** Tenants.
+
+    Ein Match ist ein Match: wer in welchem Team sass, haengt nicht
+    daran, wessen Poller die Runde geholt hat. Gemessen an 508 Matches,
+    die sich mehrere Tenants teilen, ist `match_team_mapping` bei allen
+    **zeilengleich** — die Daten sind identisch, nur dupliziert.
+
+    `participants` dagegen traegt nur, was der eigene Poller geholt hat,
+    und weicht in **72 dieser 508 Matches** ab: Tenant 1 hatte vier
+    Zeilen, Tenant 2 eine, bei identischem Team. Die Folge war doppelt —
+    der Squad-Schnitt blieb leer, und die eigenen Mitspieler zaehlten als
+    **Gegner** in die Lobby-K/D.
+
+    Deshalb: das eigene Team ueber den eigenen Account bestimmen (der
+    ist tenant-gebunden), die Mitglieder dann ohne Tenant-Filter
+    einsammeln.
+    """
+    if not match_ids:
+        return {}
+    marks = ",".join("?" * len(match_ids))
+    rows = conn.execute(
+        f"""
+        WITH mein_team AS (
+            SELECT DISTINCT tm.match_id, tm.team_id
+            FROM match_team_mapping tm
+            JOIN players p ON p.account_id = tm.account_id
+                          AND p.tenant_id = tm.tenant_id
+            WHERE tm.tenant_id = ? AND tm.match_id IN ({marks})
+              AND p.is_self = 1
+        )
+        SELECT DISTINCT tm.match_id, tm.account_id
+        FROM match_team_mapping tm
+        JOIN mein_team mt ON mt.match_id = tm.match_id
+                         AND mt.team_id = tm.team_id
+        """,
+        [tenant_id] + list(match_ids)).fetchall()
+    out = {}
+    for r in rows:
+        out.setdefault(r["match_id"], set()).add(r["account_id"])
+    return out
+
+
+def squad_names_per_match(conn, match_ids):
+    """Namen der eigenen Leute, aus den Daten aller Tenants.
+
+    `participants` fuehrt den Namen mit und ist dafuer verlaesslicher
+    als der `players`-Bestand — aber nur, wenn man alle Tenants liest:
+    der eigene traegt bei geteilten Matches oft nur sich selbst.
+    """
+    if not match_ids:
+        return {}
+    marks = ",".join("?" * len(match_ids))
+    rows = conn.execute(
+        f"SELECT DISTINCT account_id, name FROM participants "
+        f"WHERE match_id IN ({marks}) AND name IS NOT NULL",
+        list(match_ids)).fetchall()
+    return {r["account_id"]: r["name"] for r in rows}
+
+
 def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
                          mode: str = "squad-fpp", my_account_id=None,
                          extra_key: str = None) -> dict:
@@ -838,15 +898,20 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         f"({','.join('?' * len(match_ids))})",
         [tenant_id] + list(match_ids)).fetchall()
 
-    # Eigener Squad je Match: participants enthaelt nur das eigene Team.
-    squad_rows = conn.execute(
-        "SELECT match_id, account_id FROM participants "
-        f"WHERE tenant_id = ? AND match_id IN "
-        f"({','.join('?' * len(match_ids))})",
-        [tenant_id] + list(match_ids)).fetchall()
-    squad_by_match = {}
-    for r in squad_rows:
-        squad_by_match.setdefault(r["match_id"], set()).add(r["account_id"])
+    # Eigener Squad je Match aus der Team-Zuordnung. `participants`
+    # taugt dafuer nicht: dort steht nur, was der eigene Poller geholt
+    # hat, und bei manchen Tenants ist das nur der eigene Account.
+    squad_by_match = squad_per_match(conn, tenant_id, match_ids)
+    if not squad_by_match:
+        # Alte Matches ohne Team-Zuordnung.
+        squad_rows = conn.execute(
+            "SELECT match_id, account_id FROM participants "
+            f"WHERE tenant_id = ? AND match_id IN "
+            f"({','.join('?' * len(match_ids))})",
+            [tenant_id] + list(match_ids)).fetchall()
+        for r in squad_rows:
+            squad_by_match.setdefault(r["match_id"], set()).add(
+                r["account_id"])
 
     per_match = {}
     all_accounts = set()
@@ -1055,16 +1120,18 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
         "               AND m.tenant_id = mtm.tenant_id "
         f"WHERE mtm.tenant_id = ? AND mtm.match_id IN ({marks})",
         [tenant_id] + list(match_ids)).fetchall()
-    squad_rows = conn.execute(
-        f"SELECT match_id, account_id, name FROM participants "
-        f"WHERE tenant_id = ? AND match_id IN ({marks})",
-        [tenant_id] + list(match_ids)).fetchall()
-    squad_by_match, squad_names = {}, {}
-    for r in squad_rows:
-        squad_by_match.setdefault(r["match_id"], set()).add(r["account_id"])
-        # participants fuehrt den Namen mit — fuer die eigenen Leute ist das
-        # die verlaesslichere Quelle als der players-Bestand.
-        squad_names[r["account_id"]] = r["name"]
+    # Das Team aus der Team-Zuordnung (vollstaendig), die Namen aus
+    # `participants` (dort verlaesslicher als im players-Bestand).
+    squad_by_match = squad_per_match(conn, tenant_id, match_ids)
+    squad_names = squad_names_per_match(conn, match_ids)
+    if not squad_by_match:
+        # Alte Matches ohne Team-Zuordnung: dann bleibt participants.
+        for r in conn.execute(
+                f"SELECT match_id, account_id FROM participants "
+                f"WHERE tenant_id = ? AND match_id IN ({marks})",
+                [tenant_id] + list(match_ids)).fetchall():
+            squad_by_match.setdefault(r["match_id"], set()).add(
+                r["account_id"])
 
     per_match, accounts = {}, set()
     for r in rows:
