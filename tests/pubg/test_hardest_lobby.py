@@ -201,3 +201,23 @@ def test_anlaesse_ohne_begleitzahlen_bleiben_leer():
     m = [x for x in detect(prev, cur)
          if x["occasion"] == "weapon_best_damage"][0]
     assert m["extra"] is None
+
+
+def test_fehlender_squad_ist_nicht_null(matches):
+    # Eine 0,00 hieße „Squad mit K/D 0" und nicht „kein Squad". Wenn
+    # kein Mitspieler eine bekannte K/D hat, bleibt das Feld leer und
+    # das Widget rückt den härtesten Gegner nach.
+    from pubg.poller import lobby_begleitzahlen
+    conn, t1 = matches
+    antwort = {"matches": [{
+        "matchId": "m00", "avg": 2.14, "median": 1.68, "max": 9.21,
+        "topAvg": 6.08, "lowAvg": 0.54, "squadAvgMates": None,
+        "squadMatesKnown": 0, "known": 87, "lobbyPlayers": 91,
+        "map": "Baltic_Main", "playedAt": "2026-04-28T12:00:00Z",
+        "top": [{"name": "Twitch_Smeerkees", "kd": 9.21}]}]}
+    with patch("pubg.lobby_kd.lobby_detail", return_value=antwort):
+        d = lobby_begleitzahlen(conn, t1, "m00", ME)
+    assert d["squadKd"] is None
+    assert d["squadKnown"] == 0
+    # Der Ersatz muss vorhanden sein, sonst bliebe die Reihe kurz.
+    assert d["max"] == 9.21 and d["topName"] == "Twitch_Smeerkees"

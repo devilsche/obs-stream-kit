@@ -80,14 +80,26 @@
    * zu holen waere falsch: die Karriere-K/D der Mitspieler laeuft
    * weiter.
    */
+  //: Kandidaten fuer die Kennzahlenreihe, in dieser Reihenfolge. Genommen
+  //: werden die ersten vier, die einen Wert haben — fehlt einer, rueckt
+  //: der naechste nach, statt eine Luecke zu lassen.
+  //:
+  //: Der eigene Squad fehlt, wenn man allein unterwegs war oder kein
+  //: Mitspieler eine bekannte K/D hat; dann tritt der haerteste Gegner
+  //: an seine Stelle. Eine Null waere dort falsch: sie hiesse "Squad mit
+  //: K/D 0" und nicht "kein Squad".
   var EXTRA_ROWS = {
     career_hardest_lobby: [
       ["topAvg", "top 5"],
       ["median", "median"],
       ["lowAvg", "bottom 5"],
-      ["squadKd", "your squad"]
+      ["squadKd", "your squad"],
+      ["max", "toughest"]
     ]
   };
+
+  //: Wie viele Kennzahlen unter der Zahl Platz haben.
+  var EXTRA_MAX = 4;
 
   function extraStats(m) {
     var plan = EXTRA_ROWS[m.occasion];
@@ -95,9 +107,14 @@
     if (!plan || !e) return null;
     var out = [];
     plan.forEach(function (pair) {
+      if (out.length >= EXTRA_MAX) return;
       var v = e[pair[0]];
       if (v == null) return;
-      out.push([Number(v).toFixed(2), pair[1]]);
+      // Beim haertesten Gegner steht der Name darunter, sonst die
+      // Bezeichnung der Kennzahl.
+      var label = pair[1];
+      if (pair[0] === "max" && e.topName) label = esc(e.topName);
+      out.push([Number(v).toFixed(2), label]);
     });
     return out.length ? out : null;
   }

@@ -490,7 +490,10 @@ Meilenstein-Schlüssel behält sie ebenfalls, sonst gälten 2,46 und 2,44 als
 derselbe Meilenstein.
 
 **Die Feier zeigt die Verteilung, nicht nur den Schnitt**: Top-5-Ø, Median,
-Bottom-5-Ø und die K/D des eigenen Squads. Erst beide Ränder trennen „fünf Haie
+Bottom-5-Ø und die K/D des eigenen Squads. Fehlt der Squad-Wert — solo
+unterwegs, oder kein Mitspieler mit bekannter K/D —, rückt der härteste Gegner
+mit Namen nach. Eine **0,00 wäre dort falsch**: sie hieße „Squad mit K/D 0"
+statt „kein Squad". Erst beide Ränder trennen „fünf Haie
 oben, fünf Anfänger unten" von einem durchgehend starken Feld — der Mittelwert
 ist in beiden Fällen derselbe.
 
