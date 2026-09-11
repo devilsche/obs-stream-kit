@@ -589,14 +589,30 @@ def detect(prev: dict, cur: dict, cfg=None) -> list:
             continue
         metric = occ["metric"]
         kind = occ["kind"]
+        # **Ein fehlender Vorwert ist keine Null.** Wenn eine Metrik im
+        # alten Stand gar nicht vorkommt — weil der Anlass neu ist oder
+        # seine Metrik gewechselt hat —, dann ist der Abstand zum jetzt
+        # gemessenen Wert kein Fortschritt, sondern eine Bestandsaufnahme.
+        #
+        # Gemessen an echten Daten: `career_suicides` kam neu dazu und
+        # feierte 150 Selbsttode auf einmal; `weapon_mastered` wechselte
+        # von Level auf Tier und meldete sieben Waffen gleichzeitig als
+        # frisch gemeistert. Die Rekord-Anlaesse blieben still, weil sie
+        # schon einen Vorwert ueber null verlangen — bei Stufen fehlte
+        # diese Sperre.
         if occ["scope"] == "career":
-            pairs = [("", (prev.get("career") or {}).get(metric, 0) or 0,
-                      (cur.get("career") or {}).get(metric, 0) or 0)]
+            pc, cc = prev.get("career") or {}, cur.get("career") or {}
+            if metric not in pc:
+                continue
+            pairs = [("", pc.get(metric) or 0, cc.get(metric) or 0)]
         else:
             pw, cw = prev.get("weapons") or {}, cur.get("weapons") or {}
-            pairs = [(name, (pw.get(name) or {}).get(metric, 0) or 0,
-                      (vals.get(metric, 0) or 0))
-                     for name, vals in sorted(cw.items())]
+            pairs = [(name, (pw.get(name) or {}).get(metric) or 0,
+                      (vals.get(metric) or 0))
+                     for name, vals in sorted(cw.items())
+                     # Eine Waffe, die im alten Stand diese Metrik nicht
+                     # trug, ist neu in der Messung — nicht im Erfolg.
+                     if metric in (pw.get(name) or {})]
         for subject, p, v in pairs:
             if kind == "step":
                 step = c.get("step", occ.get("step")) or 0

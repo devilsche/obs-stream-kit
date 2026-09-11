@@ -2730,9 +2730,16 @@ class EndpointRegistry:
                 value = float(c.get("at") or 1)
             else:
                 # Rekord: ein Stueck ueber dem bisherigen Besten, sonst
-                # die Untergrenze.
-                value = round(stand * 1.05) if stand else float(
-                    c.get("min") or 1)
+                # die Untergrenze. Bei Kennzahlen mit Nachkommastellen
+                # darf nicht auf die Ganzzahl gerundet werden — aus 2,58
+                # wuerde sonst eine 3, und die Vorschau zeigte einen
+                # Wert, den es so nie gibt.
+                dez = int(c.get("decimals") or 0)
+                if stand:
+                    value = round(stand * 1.05, dez) if dez else round(
+                        stand * 1.05)
+                else:
+                    value = float(c.get("min") or 1)
 
         tier = spec.get("tier")
         if tier not in ("small", "big", "huge"):

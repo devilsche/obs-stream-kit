@@ -423,3 +423,50 @@ def test_schluessel_haelt_die_dezimalstellen():
     b = milestone_key("career_hardest_lobby", "", 2.44)
     assert a != b
     assert "2.46" in a
+
+
+# ── Neue Anlässe holen nichts nach ──────────────────────────────────────────
+
+def test_neuer_karriere_anlass_feiert_den_bestand_nicht():
+    # Gemessen an echten Daten: career_suicides kam dazu und feierte
+    # 150 Selbsttode auf einmal, weil der alte Stand die Metrik nicht
+    # kannte und als 0 gelesen wurde.
+    prev = _state(career={"kills": 25709})          # ohne "suicides"
+    cur = _state(career={"kills": 25709, "suicides": 150})
+    assert [m for m in detect(prev, cur)
+            if m["occasion"] == "career_suicides"] == []
+
+
+def test_gewechselte_metrik_feiert_nicht_nach():
+    # weapon_mastered hing erst am Level, dann am Tier. Ohne diese
+    # Sperre meldete es sieben Waffen gleichzeitig als frisch gemeistert.
+    prev = _state({"Mk12": {"level": 100}})          # ohne "tier"
+    cur = _state({"Mk12": {"level": 100, "tier": 6}})
+    assert [m for m in detect(prev, cur)
+            if m["occasion"] == "weapon_mastered"] == []
+
+
+def test_neue_waffe_feiert_ihren_bestand_nicht():
+    prev = _state({"M416": {"damage": 400000}})
+    cur = _state({"M416": {"damage": 400000},
+                  "AWM": {"damage": 120000}})
+    assert [m for m in detect(prev, cur)
+            if m["subject"] == "AWM"] == []
+
+
+def test_bekannte_metrik_feiert_weiterhin():
+    # Die Sperre darf den Normalfall nicht treffen.
+    prev = _state(career={"suicides": 120})
+    cur = _state(career={"suicides": 126})
+    hit = [m for m in detect(prev, cur)
+           if m["occasion"] == "career_suicides"][0]
+    assert hit["value"] == 125
+
+
+def test_vorwert_null_bei_bekannter_metrik_feiert_weiterhin():
+    # Ein echter Stand von 0 ist etwas anderes als ein fehlender.
+    prev = _state(career={"suicides": 0})
+    cur = _state(career={"suicides": 30})
+    hit = [m for m in detect(prev, cur)
+           if m["occasion"] == "career_suicides"][0]
+    assert hit["value"] == 25

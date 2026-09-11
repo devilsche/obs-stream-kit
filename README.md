@@ -690,6 +690,14 @@ führt `MostDamagePlayerInAGame` nur im alten Block und meldet dort 682 Schaden
 für die M416, wo `match_weapon_stats` 976 belegt — ein Rekord-Celebrate darauf
 löste an einer längst überbotenen Marke aus.
 
+**Ein fehlender Vorwert ist keine Null.** Kommt eine Metrik im alten Stand gar
+nicht vor — weil der Anlass neu ist oder seine Metrik gewechselt hat —, wird
+sie übernommen und **nicht** gefeiert. Ohne diese Sperre holt jeder neue Anlass
+den gesamten Bestand nach: `career_suicides` feierte 150 Selbsttode auf einmal,
+und `weapon_mastered` meldete nach dem Wechsel von Level auf Tier sieben Waffen
+gleichzeitig als frisch gemeistert. Die Rekord-Anlässe waren nie betroffen, weil
+sie schon immer einen Vorwert über null verlangen — bei den Stufen fehlte das.
+
 **Erkennung** läuft im Poller (`refresh_milestones`), aber nur nach neuen
 Matches — die Mastery-Werte bewegen sich sonst nicht. Der **erste Lauf legt den
 Ausgangsstand an und feiert nichts**, sonst wäre die ganze bisherige Karriere

@@ -434,3 +434,16 @@ def test_mitgeschickte_konfiguration_wird_nicht_gespeichert():
     stored = _data(_call("GET", "/api/pubg/milestone-config")[0])
     assert stored["config"]["weapon_damage"]["step"] == \
         OCCASIONS["weapon_damage"]["step"]
+
+
+def test_vorschau_behaelt_die_dezimalstellen():
+    # Bei 2,4584 als Stand ergab round(x*1.05) eine 3 — ein Wert, den
+    # es bei einer Lobby-K/D so nie gibt.
+    db_pg.save_milestone_snapshot(CONN.raw, T, "account.A", {
+        "career": {"hardest_lobby": 2.4584}})
+    CONN.raw.commit()
+    d = _data(_call("GET", "/api/pubg/milestone-demo",
+                    qs={"occasion": "career_hardest_lobby"})[0])
+    m = d["milestone"]
+    assert m["value"] == pytest.approx(2.58, abs=0.01)
+    assert m["prevValue"] == pytest.approx(2.4584, abs=0.001)
