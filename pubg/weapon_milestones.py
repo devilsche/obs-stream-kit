@@ -18,22 +18,36 @@
   Ein Rekord-Celebrate auf Basis der API wuerde also bei einer Marke
   ausloesen, die laengst ueberboten ist.
 
-**Zwei Fallen in den API-Feldern.**
+**Wie Level und Tier zusammenhaengen.** Das Level laeuft *innerhalb*
+eines Tiers von 1 bis 99; ist es voll, beginnt das naechste Tier wieder
+bei 1. `LevelCurrent` und `XPTotal` beziehen sich also auf das aktuelle
+Tier, nicht auf die ganze Laufbahn.
 
-`LevelCurrent` ist *nicht* nullbasiert, bleibt aber bei 99 stehen, wo
-das Spiel 100 anzeigt. Belegt an zwei Enden: die VSS liefert roh 98 und
-zeigt ingame 98, die M416 liefert 99 und zeigt 100. Der Unterschied ist
-die XP-Summe — M416, Mini 14 und Mk12 sitzen alle auf genau 952.500,
-also dem Deckel, die VSS auf 927.359. Nur am Deckel wird aufgerundet;
-eine pauschale +1 waere fuer jede andere Waffe falsch.
+Am Konto belegt: bei **gleichem Level steht dieselbe XP-Summe, egal in
+welchem Tier** — Level 13 kommt in Tier 2 und Tier 5 vor (40.259 gegen
+42.337 XP), Level 60 in Tier 0 und Tier 5 (435.027 gegen 442.079). Und
+umgekehrt sitzt die ACE32 in Tier 5 bei Level 13 auf nur 42.337 XP,
+waehrend die Kar98k in Tier 1 bei Level 97 916.013 traegt. Waere die XP
+kumulativ, muesste es andersherum sein.
 
-`TierCurrent` haengt an den **Kills**, nicht am Level: Tier 0 reicht
-ueber die Level 3 bis 99 (0 bis 154 Kills), Tier 5 beginnt bei Level 14
-(ab 682 Kills), Tier 6 traegt die drei Waffen mit 844 bis 3.179 Kills.
-Die Spannen ueberlappen, ein Schwellenwert je Tier laesst sich daraus
-nicht ableiten. Verlaesslich sind nur die Enden: Tier 0 heisst ingame
-"Basic" (kein Rang), Tier 6 "Master". Der Wert steigt je Waffe monoton,
-taugt also als Anlass — aber nicht als Rang-Anzeige neben dem Level.
+**Das Level allein sagt darum nichts.** Eine Waffe in Tier 5 bei Level
+13 ist weiter als eine in Tier 1 bei Level 97 — was die Kills
+bestaetigen (1.344 gegen 143). Wer zwei Staende vergleichen will, nimmt
+`progress()`: Tier zuerst, Level darin.
+
+**Das Level zaehlt in der API ab null**, und es endet bei ingame 99:
+danach steigt man ins naechste Tier auf. Level 100 gibt es nur in
+Tier 6, weil dort kein Aufstieg mehr moeglich ist. Die Messwerte
+bestaetigen das von der anderen Seite — rohe 99 kommt ausschliesslich
+in Tier 6 vor, sonst ist 98 der Hoechstwert. Der volle Stand heisst
+also "Master, Level 100", mit exakt 952.500 XP bei allen drei Waffen
+und Streuung null. Ausgelevelt ist `Tier == 6`, nicht ein bestimmtes
+Level.
+
+**Und darunter noch eine Ebene**: innerhalb eines Levels zaehlt das
+Spiel den Fortschritt zum naechsten mit (ingame etwa "9.334/12.500" bei
+Level 70). `XPTotal` ist die Summe darueber, also die XP im laufenden
+Tier — nicht die des laufenden Levels und nicht die der Laufbahn.
 """
 from pubg.aggregations import _weapon_ci_lookup
 
@@ -41,22 +55,34 @@ from pubg.aggregations import _weapon_ci_lookup
 #: davor der Schluessel in WEAPON_NAMES: Item_Weapon_HK416_C → WeapHK416_C.
 MASTERY_PREFIX = "Item_Weapon_"
 
-#: Level, bei dem eine Waffe ausgelevelt ist. Ingame heisst der Rang
-#: dort "Master".
-MASTERED_LEVEL = 100
+#: Level, bei dem ein Tier voll ist: danach steigt man auf und beginnt
+#: wieder bei 1. Faktisch ist 99 damit das Ende jedes Tiers.
+LEVEL_PER_TIER = 99
 
-#: Hoechstes Level, das die API vergibt. Sie bleibt bei 99 stehen,
-#: waehrend das Spiel dort 100 anzeigt.
-API_MAX_LEVEL = 99
+#: Level 100 gibt es nur in Tier 6. Dort kann man nicht weiter
+#: aufsteigen, also zaehlt das Level einen Schritt weiter, statt in ein
+#: Tier 7 zu wechseln, das es nicht gibt.
+MAX_LEVEL_IN_TIER = 100
 
-#: Die gedeckelte XP-Summe. Nur Waffen mit genau diesem Wert sind
-#: ausgelevelt — daran haengt die Unterscheidung zu einer Waffe, die
-#: schlicht auf Level 99 steht.
-MASTERED_XP = 952500
+#: Die API zaehlt das Level innerhalb des Tiers ab null. Das passt zu
+#: den Messwerten: rohe 99 kommt ausschliesslich in Tier 6 vor, in
+#: allen anderen Tiers ist 98 der Hoechstwert — also ingame 99, das
+#: Ende eines Tiers.
+LEVEL_OFFSET = 1
 
-#: Hoechstes Mastery-Tier. Ingame "Master"; Tier 0 ist "Basic", also
-#: gar kein Rang.
+#: Hoechstes Tier. Ohne Tier heisst es ingame "Basic", Tier 6 "Master"
+#: — hoeher geht es nicht, ein Tier 7 gibt es nicht. Der hoechste
+#: erreichbare Stand ist damit "Master, Level 100".
 MAX_TIER = 6
+
+#: Rangnamen, soweit belegt. Die Stufen zwischen Basic und Master sind
+#: namentlich nicht bekannt und werden als Zahl gezeigt.
+TIER_NAMES = {0: "Basic", MAX_TIER: "Master"}
+
+#: Die XP-Summe fuer ein volles Tier. Am Ende (Tier 6, Level 99) bleibt
+#: der Wert dort stehen: alle drei ausgelevelten Waffen tragen exakt
+#: diese Zahl, Streuung null.
+XP_PER_TIER = 952500
 
 #: Wurfgeraete, wie `match_weapon_stats.weapon` sie fuehrt.
 #:
@@ -87,6 +113,20 @@ def display_name(weapon: str) -> str:
     return DISPLAY_NAMES.get(weapon, weapon)
 
 
+def progress(tier: int, level: int) -> int:
+    """Vergleichbarer Gesamtstand aus Tier und Level.
+
+    Das Level allein taugt dafuer nicht: es laeuft in jedem Tier neu bis
+    100, weshalb Tier 5 Level 14 weiter ist als Tier 1 Level 98.
+    """
+    return int(tier or 0) * MAX_LEVEL_IN_TIER + int(level or 0)
+
+
+def tier_label(tier: int) -> str:
+    """Rangname, wo bekannt — sonst die Zahl."""
+    return TIER_NAMES.get(int(tier or 0), f"Tier {int(tier or 0)}")
+
+
 # ── Anlaesse ────────────────────────────────────────────────────────────────
 
 #: Die feierbaren Anlaesse.
@@ -111,12 +151,14 @@ OCCASIONS = {
         "label": "Weapon Kills", "widget": "bar", "enabled": True,
         "hint": "Total kills with one weapon",
     },
+    # Ausgelevelt heisst Tier 6, nicht ein bestimmtes Level: das Level
+    # beginnt in jedem Tier neu, und ein "Level 100" gibt es nicht.
     "weapon_mastered": {
-        "scope": "weapon", "metric": "level", "kind": "at",
-        "at": MASTERED_LEVEL, "unit": "level",
+        "scope": "weapon", "metric": "tier", "kind": "at",
+        "at": MAX_TIER, "unit": "tier",
         "label": "Weapon Mastered", "widget": "big", "enabled": True,
         "tier": "huge",
-        "hint": "A weapon reaches level 100",
+        "hint": "A weapon reaches the master tier",
     },
     # Der Tier-Wechsel ist ein eigener Anlass, aber ein leiser: er
     # faellt je Waffe hoechstens sechsmal im Leben und haengt an den
@@ -366,7 +408,7 @@ def parse_mastery(payload) -> dict:
         cur = out.setdefault(name, {
             "damage": 0.0, "kills": 0, "headshots": 0, "groggies": 0,
             "longest": 0.0, "best_kills": 0, "level": 0, "xp": 0,
-            "tier": 0,
+            "tier": 0, "progress": 0,
         })
         cur["damage"] += _stat_sum(w, "DamagePlayer")
         cur["kills"] += int(_stat_sum(w, "Kills"))
@@ -376,15 +418,19 @@ def parse_mastery(payload) -> dict:
                              _stat_max(w, "LongestKill", "LongestDefeat"))
         cur["best_kills"] = max(cur["best_kills"],
                                 int(_stat_max(w, "MostKillsInAGame")))
-        # Am XP-Deckel liefert die API 99, das Spiel zeigt 100. Sonst
-        # ist der gelieferte Wert schon der richtige.
+        # Das Level gilt innerhalb des Tiers und zaehlt ab null: die
+        # 99 der API ist ingame die 100.
         lvl = int(w.get("LevelCurrent") or w.get("Level") or 0)
+        lvl += LEVEL_OFFSET
+        tier = int(w.get("TierCurrent") or 0)
         xp = int(w.get("XPTotal") or w.get("XP") or 0)
-        if lvl >= API_MAX_LEVEL and xp >= MASTERED_XP:
-            lvl = MASTERED_LEVEL
-        cur["level"] = max(cur["level"], lvl)
+        # Bei Skin-Varianten gewinnt der weitere Stand als Ganzes, nicht
+        # das hoehere Level: Tier 5 Level 13 steht ueber Tier 1 Level 97.
+        if progress(tier, lvl) >= progress(cur["tier"], cur["level"]):
+            cur["level"] = lvl
+            cur["tier"] = tier
         cur["xp"] = max(cur["xp"], xp)
-        cur["tier"] = max(cur["tier"], int(w.get("TierCurrent") or 0))
+        cur["progress"] = progress(cur["tier"], cur["level"])
     return out
 
 

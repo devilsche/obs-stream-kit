@@ -272,7 +272,8 @@ def test_demo_ohne_stand_liefert_trotzdem_etwas():
     # sonst liesse sich die Source in OBS nicht platzieren.
     d = _data(_call("GET", "/api/pubg/milestone-demo",
                     qs={"occasion": "weapon_mastered"})[0])
-    assert d["milestone"]["value"] == 100
+    # Ausgelevelt ist Tier 6, nicht ein Level.
+    assert d["milestone"]["value"] == 6
     assert d["milestone"]["subject"] == "M416"
 
 

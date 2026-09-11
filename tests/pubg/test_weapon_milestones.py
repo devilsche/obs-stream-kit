@@ -50,26 +50,39 @@ def test_stats_total_bleibt_draussen():
     assert parse_mastery(p)["M416"]["kills"] == 105
 
 
-def test_level_am_xp_deckel_wird_zu_hundert():
-    # Die API bleibt bei 99 stehen, wo das Spiel 100 anzeigt — erkennbar
-    # an der gedeckelten XP-Summe von 952.500.
+def test_level_zaehlt_ab_null():
+    # Die API zaehlt das Level innerhalb des Tiers ab null: ihre 99 ist
+    # ingame die 100. Der volle Stand heisst "Master, Level 100".
     assert parse_mastery(_payload())["M416"]["level"] == 100
 
 
-def test_level_unter_dem_deckel_bleibt_wie_geliefert():
-    # Die VSS liefert roh 98 und zeigt ingame 98. Eine pauschale +1
-    # waere hier falsch — genau das war der Fehler.
-    p = {"data": {"attributes": {"weaponSummaries": {
-        "Item_Weapon_VSS_C": {"LevelCurrent": 98, "XPTotal": 927359,
-                              "TierCurrent": 0}}}}}
-    assert parse_mastery(p)["VSS"]["level"] == 98
+def test_rangnamen_nur_wo_belegt():
+    from pubg.weapon_milestones import tier_label
+    assert tier_label(0) == "Basic"
+    assert tier_label(6) == "Master"
+    # Die Stufen dazwischen sind namentlich nicht bekannt.
+    assert tier_label(3) == "Tier 3"
 
 
-def test_level_99_ohne_deckel_bleibt_99():
-    # 99 allein reicht nicht; es braucht die gedeckelte XP-Summe.
+def test_tier_und_level_ergeben_den_vergleichbaren_stand():
+    # Das Level allein taugt nicht: es beginnt in jedem Tier neu. Am
+    # Konto belegt — Tier 5 Level 13 hat 1.344 Kills, Tier 1 Level 97
+    # nur 143.
+    from pubg.weapon_milestones import MAX_LEVEL_IN_TIER, progress
+    assert progress(5, 14) > progress(1, 98)
+    assert progress(6, MAX_LEVEL_IN_TIER) == max(
+        progress(t, MAX_LEVEL_IN_TIER) for t in range(7))
+
+
+def test_skin_variante_mit_weiterem_stand_gewinnt():
+    # Nicht das hoehere Level, sondern der weitere Stand als Ganzes.
     p = {"data": {"attributes": {"weaponSummaries": {
-        "Item_Weapon_VSS_C": {"LevelCurrent": 99, "XPTotal": 930000}}}}}
-    assert parse_mastery(p)["VSS"]["level"] == 99
+        "Item_Weapon_HK416_C": {"LevelCurrent": 97, "TierCurrent": 1},
+        "Item_Weapon_DuncansHK416_C": {"LevelCurrent": 13,
+                                       "TierCurrent": 5}}}}}
+    m = parse_mastery(p)["M416"]
+    # Level ab null gezaehlt: API 13 ist ingame 14.
+    assert (m["tier"], m["level"]) == (5, 14)
 
 
 def test_longest_nimmt_das_maximum_nicht_die_summe():
@@ -206,18 +219,28 @@ def test_rekord_einer_erstmals_benutzten_waffe_bleibt_still():
             if m["occasion"] == "weapon_best_damage"] == []
 
 
-def test_ausgelevelte_waffe_ist_ein_grosser_anlass():
-    prev = _state({"Mk12": {"level": 99}})
-    cur = _state({"Mk12": {"level": 100}})
+def test_ausgelevelt_haengt_am_tier_nicht_am_level():
+    # Tier 6 ist die Endstation; ein bestimmtes Level bedeutet nichts,
+    # weil es in jedem Tier neu beginnt.
+    prev = _state({"Mk12": {"tier": 5, "level": 98}})
+    cur = _state({"Mk12": {"tier": 6, "level": 1}})
     hit = [m for m in detect(prev, cur)
            if m["occasion"] == "weapon_mastered"][0]
     assert hit["tier"] == "huge"
-    assert hit["value"] == 100
+    assert hit["value"] == 6
+
+
+def test_hohes_level_im_falschen_tier_ist_nicht_ausgelevelt():
+    # Der alte Fehler: Level 99 in Tier 0 galt als gemeistert.
+    prev = _state({"VSS": {"tier": 0, "level": 90}})
+    cur = _state({"VSS": {"tier": 0, "level": 100}})
+    assert [m for m in detect(prev, cur)
+            if m["occasion"] == "weapon_mastered"] == []
 
 
 def test_bereits_ausgelevelt_feiert_nicht_erneut():
-    prev = _state({"Mk12": {"level": 100}})
-    cur = _state({"Mk12": {"level": 100}})
+    prev = _state({"Mk12": {"tier": 6, "level": 100}})
+    cur = _state({"Mk12": {"tier": 6, "level": 100}})
     assert [m for m in detect(prev, cur)
             if m["occasion"] == "weapon_mastered"] == []
 
@@ -225,8 +248,8 @@ def test_bereits_ausgelevelt_feiert_nicht_erneut():
 # ── Sortierung, Schluessel, Konfiguration ───────────────────────────────────
 
 def test_lautester_meilenstein_steht_vorn():
-    prev = _state({"M416": {"damage": 424000, "level": 99}})
-    cur = _state({"M416": {"damage": 425100, "level": 100}})
+    prev = _state({"M416": {"damage": 424000, "tier": 5}})
+    cur = _state({"M416": {"damage": 425100, "tier": 6}})
     assert detect(prev, cur)[0]["occasion"] == "weapon_mastered"
 
 
@@ -320,3 +343,21 @@ def test_anzeigenamen_sind_englisch():
     assert display_name("Blauzonen-Granate") == "Blue Zone Grenade"
     # Eine Schusswaffe bleibt, wie sie heisst.
     assert display_name("M416") == "M416"
+
+
+def test_level_hundert_gibt_es_nur_im_master_tier():
+    # In Tier 0 bis 5 endet das Level bei 99 und man steigt auf; nur in
+    # Tier 6 zaehlt es weiter, weil es kein Tier 7 gibt. Belegt durch
+    # die Messung: rohe 99 kommt ausschliesslich in Tier 6 vor.
+    from pubg.weapon_milestones import LEVEL_PER_TIER, MAX_LEVEL_IN_TIER
+
+    def lvl(raw, tier):
+        p = {"data": {"attributes": {"weaponSummaries": {
+            "Item_Weapon_VSS_C": {"LevelCurrent": raw,
+                                  "TierCurrent": tier}}}}}
+        return parse_mastery(p)["VSS"]["level"]
+
+    # Hoechstwert unterhalb von Master: roh 98 → ingame 99.
+    assert lvl(98, 0) == LEVEL_PER_TIER
+    # Und im Master-Tier eine Stufe darueber.
+    assert lvl(99, 6) == MAX_LEVEL_IN_TIER

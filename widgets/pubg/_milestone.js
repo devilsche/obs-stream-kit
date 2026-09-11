@@ -68,10 +68,13 @@
     // der Rang "Master" — beides gehoert in die Feier.
     if (u === "level") return { num: NUM(v), unit: "", raw: v,
                                 prefix: "level" };
-    // "Tier 5" — die Rangnamen zwischen Basic und Master sind nicht
-    // bekannt, die Zahl ist die ehrliche Auskunft.
-    if (u === "tier") return { num: NUM(v), unit: "", raw: v,
-                               prefix: "tier" };
+    // Tier 6 heisst ingame "Master", Tier 0 "Basic". Die Raenge
+    // dazwischen sind namentlich nicht bekannt, deshalb die Zahl.
+    if (u === "tier")
+      return v >= MAX_TIER ? { num: "MASTER", unit: "", raw: v }
+                           : (v <= 0 ? { num: "BASIC", unit: "", raw: v }
+                                     : { num: NUM(v), unit: "", raw: v,
+                                         prefix: "tier" });
     return { num: NUM(v), unit: "", raw: v };
   }
 
@@ -90,19 +93,31 @@
   //: `TierCurrent` aus der API taugt dafuer nicht, dort umfasst Tier 0
   //: die Level 2 bis 98. Belegt ist nur Tier 6 bei Level 100 —
   //: ingame "Master".
-  var MASTER_LEVEL = 100;
+  //: Hoechstes Level innerhalb eines Tiers, wie das Spiel zaehlt.
+  var MAX_LEVEL_IN_TIER = 100;
 
-  //: Hoechstes Mastery-Tier; ingame "Master". Tier 0 ist "Basic".
+  //: Hoechstes Mastery-Tier; ingame "Master". Ohne Tier heisst es
+  //: "Basic". Das Level laeuft in JEDEM Tier bis 100 und beginnt beim
+  //: Aufstieg neu — der volle Stand ist "Master, Level 100".
   var MAX_TIER = 6;
+
+  //: Rangnamen, soweit belegt. Die Stufen dazwischen sind namentlich
+  //: nicht bekannt und werden als Zahl gezeigt.
+  var TIER_NAMES = { 0: "basic", 6: "master" };
+
+  function tierLabel(v) {
+    return TIER_NAMES[v] || ("tier " + v);
+  }
 
   function bigForm(m) {
     var s = shown(m), v = s.raw;
     if (m.unit === "level")
       return { big: s.num, unit: "level",
-               words: v >= MASTER_LEVEL ? "master tier" : null };
+               words: v >= MAX_LEVEL_IN_TIER ? "tier complete" : null };
     if (m.unit === "tier")
-      return { big: s.num, unit: "tier",
-               words: v >= MAX_TIER ? "master" : null };
+      return v >= MAX_TIER
+        ? { big: "MASTER", unit: "", words: "top of the mastery tree" }
+        : { big: s.num, unit: "tier", words: null };
     if (m.unit === "metres" || m.unit === "seconds")
       return { big: s.num, unit: s.unit, words: null };
     if (v >= 1000000) {
@@ -137,13 +152,14 @@
       return "previous best " + p.num + (p.unit ? " " + p.unit : "")
            + " · now " + n.num + (n.unit ? " " + n.unit : "");
     }
+    // Der Weg dorthin fuehrt durch sieben Tiers mit je 99 Leveln —
+    // das Level allein sagt nichts, weil es in jedem Tier neu beginnt.
+    // Der Weg dorthin fuehrt durch sieben Raenge mit je hundert
+    // Leveln; hoeher als Master geht es nicht.
     if (m.occasion === "weapon_mastered")
-      return (m.value >= MASTER_LEVEL ? "master tier · " : "")
-           + "max level reached";
+      return "level 100 · highest tier there is";
     if (m.occasion === "weapon_tier") {
-      var from = m.prevValue ? "tier " + NUM(m.prevValue) : "basic";
-      return from + " → tier " + NUM(m.value)
-           + (m.value >= MAX_TIER ? " · master" : "");
+      return tierLabel(m.prevValue || 0) + " → " + tierLabel(m.value);
     }
     if (m.display) return m.display;
     // Kontoweite Anlaesse haben kein Subjekt; ohne diese Zeile blieben

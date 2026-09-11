@@ -529,20 +529,34 @@ Zwei Eigenheiten der API, die im Code festgehalten sind:
   — am Konto belegt an der M416 (3156 + 23 = 3179) und der Mk12 (1962 + 11 =
   1973). Der dritte Block `StatsTotal` ist eine ältere, eigene Zählung und
   *keine* Teilmenge; er bleibt außen vor.
-* **`LevelCurrent` ist *nicht* nullbasiert**, bleibt aber bei 99 stehen, wo das
-  Spiel 100 anzeigt. Belegt an zwei Enden: die VSS liefert roh 98 und zeigt
-  ingame 98, die M416 liefert 99 und zeigt 100. Der Unterschied ist die
-  XP-Summe — M416, Mini 14 und Mk12 sitzen alle auf genau 952.500, also dem
-  Deckel. Nur dort wird aufgerundet; eine pauschale +1 wäre für jede andere
-  Waffe falsch.
-* **`TierCurrent` hängt an den Kills, nicht am Level**: Tier 0 reicht über die
-  Level 3 bis 99 (0–154 Kills), Tier 5 beginnt bei Level 14 (ab 682 Kills),
-  Tier 6 trägt die drei Waffen mit 844–3.179 Kills. Die Spannen überlappen,
-  ein Schwellenwert je Tier lässt sich daraus nicht ableiten. Verlässlich sind
-  nur die Enden: Tier 0 heißt ingame „Basic" (kein Rang), Tier 6 „Master".
-  Der Wert steigt je Waffe monoton und taugt damit als Anlass
-  (`weapon_tier`, vorbelegt nur für die Leiste) — aber nicht als
-  Rang-Anzeige neben dem Level.
+* **Level, Tier und XP sind drei Ebenen.** Das Level läuft innerhalb eines Tiers
+  und endet bei 99 — danach steigt man ins nächste Tier auf und beginnt wieder
+  bei 1. **Level 100 gibt es nur in Tier 6 („Master")**, weil dort kein Aufstieg
+  mehr möglich ist. Ohne Tier heißt es ingame „Basic". Innerhalb eines Levels
+  zählt das Spiel den Fortschritt zum nächsten mit (etwa „9.334/12.500" bei
+  Level 70), und jedes Level hat seinen eigenen, mit dem Level wachsenden Bedarf.
+
+  `LevelCurrent` zählt **ab null**: roh 99 ist ingame 100. Die Messwerte
+  bestätigen das von der anderen Seite — rohe 99 kommt ausschließlich in Tier 6
+  vor, in allen anderen Tiers ist 98 der Höchstwert.
+
+* **`XPTotal` ist die XP im laufenden Tier**, nicht die der Laufbahn. Belegt
+  daran, dass bei *gleichem Level dieselbe XP-Summe* steht, egal in welchem Tier:
+  Level 13 kommt in Tier 2 und Tier 5 vor (40.259 gegen 42.337 XP), Level 60 in
+  Tier 0 und Tier 5 (435.027 gegen 442.079). Ein voller Satz kostet **952.500 XP**
+  — exakt der Wert, auf dem alle ausgelevelten Waffen sitzen, Streuung null.
+
+  Gegenprobe über den XP-Verbrauch pro Kill, der nicht von der Waffe abhängen
+  darf: mit dieser Rechnung streuen die Werte um Faktor 9, bei kumulativer XP um
+  Faktor 72 (MP5K 202 gegen Vector 14.591 XP/Kill).
+
+* **Das Level allein sagt deshalb nichts.** Eine Waffe in Tier 5 auf Level 14 ist
+  weiter als eine in Tier 1 auf Level 98 — was die Kills bestätigen (1.344 gegen
+  143). Zum Vergleichen gibt es `progress(tier, level)`. **Ausgelevelt ist
+  `Tier == 6`**, nicht ein bestimmtes Level; darauf triggert `weapon_mastered`.
+  Der Tier-Aufstieg ist ein eigener Anlass (`weapon_tier`), vorbelegt nur für die
+  Leiste. Die Rangnamen zwischen Basic und Master sind nicht bekannt und werden
+  als Zahl gezeigt.
 
 Der Match-Schadensrekord kommt bewusst aus der eigenen Aufzeichnung: die API
 führt `MostDamagePlayerInAGame` nur im alten Block und meldet dort 682 Schaden
