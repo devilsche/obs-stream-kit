@@ -372,6 +372,26 @@ Modulares PUBG-Stats-Set mit lokaler SQLite-Persistenz und Live-Polling der offi
 PUBG-Developer-API. Always-on-Backend (`serve.py` + `pubg/`-Modul) liefert JSON-Endpoints,
 HTML-Widgets als Browser-Sources rendern.
 
+### Der `range`-Parameter
+
+Alle Zeitraum-Endpoints kennen genau vier Werte:
+
+| Wert | Zeitraum |
+|---|---|
+| `session` | seit Session-Start (automatisch erkannt oder per `sessionStartedAt` gesetzt) |
+| `day` | seit heute 00:00 UTC |
+| `week` | letzte 7 Tage |
+| `all` | alles |
+
+Alles andere wird mit **HTTP 400** `range must be session|day|week|all`
+abgelehnt. Das ist wichtiger, als es klingt: Intern faellt ein
+unbekannter Wert auf den Stichtag 1970 zurueck — ein Tippfehler wie
+`range=month` haette also nicht etwa nichts geliefert, sondern
+**alles**, ohne dass es jemandem auffaellt.
+
+Ein paar Endpoints nehmen zusaetzlich `from=`/`to=` als ISO-Zeitstempel;
+wo beides gesetzt ist, gewinnt `from`/`to`.
+
 ### Setup
 
 1. **API-Key** unter [developer.pubg.com](https://developer.pubg.com) holen (kostenlos, 10 RPM Default).

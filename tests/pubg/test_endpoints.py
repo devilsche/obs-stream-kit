@@ -782,3 +782,56 @@ def test_lobby_detail_range_has_no_id_limit():
     d = json.loads(body)
     assert d["matchesUsed"] == 300
     assert d["matchesUsed"] == d["matchesRequested"]
+
+
+# Alle Routen, die einen `range`-Parameter auswerten. Ein unbekannter Wert
+# faellt in `_range_filter` still auf 1970 zurueck — der Aufrufer bekaeme
+# also nicht etwa nichts, sondern ALLES, und merkt den Tippfehler nie.
+# `lobby-kd` zieht die Season sonst ueber den (gemockten) API-Client —
+# darum hier fest vorgegeben, wie im Test darueber.
+RANGE_ROUTES = [
+    "/api/pubg/session",
+    "/api/pubg/session?account=all",   # eigener Handler, kein eigener Pfad
+    "/api/pubg/session-matches",
+    "/api/pubg/lobby-avg-kd",
+    "/api/pubg/lobby-kd?season=s1",
+    "/api/pubg/squad-kd",
+    "/api/pubg/strongest-opponent",
+    "/api/pubg/streaks",
+    "/api/pubg/payday-stats",
+    "/api/pubg/deathmatch-stats",
+    "/api/pubg/weapon-stats",
+    "/api/pubg/vehicle-stats",
+    "/api/pubg/hot-drop",
+    "/api/pubg/mates",
+    "/api/pubg/map-distribution",
+    "/api/pubg/first-fight-rate",
+    "/api/pubg/first-fight-debug",
+    "/api/pubg/best-worst-map",
+    "/api/pubg/map-performance",
+    "/api/pubg/squad-playstyle",
+    "/api/pubg/shot-quality",
+]
+
+
+def _amp(route):
+    """Route bringt schon einen Parameter mit? Dann anhaengen, nicht neu."""
+    return "&" if "?" in route else "?"
+
+
+@pytest.mark.parametrize("route", RANGE_ROUTES)
+def test_unbekannter_range_wird_abgelehnt(route):
+    conn = _setup()
+    reg = _registry(conn)
+    _, code, _ = reg.dispatch("GET", f"{route}{_amp(route)}range=month", b"", {})
+    assert code == 400, f"{route} nimmt 'month' stillschweigend an"
+
+
+@pytest.mark.parametrize("route", RANGE_ROUTES)
+@pytest.mark.parametrize("gueltig", ["session", "day", "week", "all"])
+def test_gueltige_ranges_bleiben_erlaubt(route, gueltig):
+    """Die Gegenprobe — die Validierung darf nichts Bestehendes abwuergen."""
+    conn = _setup()
+    reg = _registry(conn)
+    _, code, _ = reg.dispatch("GET", f"{route}{_amp(route)}range={gueltig}", b"", {})
+    assert code != 400, f"{route} lehnt gueltiges '{gueltig}' ab"

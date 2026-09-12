@@ -38,6 +38,23 @@ def _err(code, msg):
     return json.dumps({"error": msg}).encode("utf-8"), code, "application/json"
 
 
+RANGE_KEYS = ("session", "day", "week", "all")
+
+
+def _bad_range(range_key, *, allow_empty=False):
+    """400-Antwort bei unbekanntem `range`, sonst None.
+
+    Noetig, weil `_range_filter` alles Unbekannte still auf 1970 setzt:
+    ein Tippfehler liefert dann nicht etwa nichts, sondern ALLES — und
+    faellt niemandem auf.
+    """
+    if allow_empty and not range_key:
+        return None
+    if range_key in RANGE_KEYS:
+        return None
+    return _err(400, "range must be " + "|".join(RANGE_KEYS))
+
+
 class _AccountScopedCache:
     """Legt Cache-Eintraege eines Nicht-Primaer-Accounts unter eigenem Key ab.
 
@@ -166,6 +183,9 @@ class EndpointRegistry:
     def _session_all_accounts(self, qs):
         conn = self.get_conn()
         range_key = (qs or {}).get("range", "session")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         accounts = [t["account_id"] for t in self._tracked() if t["account_id"]]
         if not accounts:
             return _err(409, "keine aufgeloesten Accounts")
@@ -443,6 +463,9 @@ class EndpointRegistry:
     def _session(self, qs=None):
         conn = self.get_conn()
         range_key = (qs or {}).get("range", "session")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         return _ok(self.cache.get_or_compute(
             f"session:{range_key}",
             lambda: compute_session_stats(conn, self.tenant_id, self.my_account_id, range_key),
@@ -476,6 +499,9 @@ class EndpointRegistry:
     def _lobby_avg_kd(self, qs):
         conn = self.get_conn()
         range_key = qs.get("range", "session")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         return _ok(self.cache.get_or_compute(
             f"lobby-avg-kd:{range_key}",
             lambda: compute_lobby_avg_kd(conn, self.tenant_id, self.my_account_id, range_key),
@@ -484,6 +510,9 @@ class EndpointRegistry:
     def _squad_kd(self, qs):
         conn = self.get_conn()
         range_key = qs.get("range", "session")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         return _ok(self.cache.get_or_compute(
             f"squad-kd:{range_key}",
             lambda: compute_squad_kd(conn, self.tenant_id, self.my_account_id, range_key),
@@ -492,6 +521,9 @@ class EndpointRegistry:
     def _strongest_opponent(self, qs):
         conn = self.get_conn()
         range_key = qs.get("range", "session")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         return _ok(self.cache.get_or_compute(
             f"strongest-opponent:{range_key}",
             lambda: compute_strongest_opponent(
@@ -501,6 +533,9 @@ class EndpointRegistry:
     def _streaks(self, qs):
         conn = self.get_conn()
         range_key = qs.get("range", "session")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         return _ok(self.cache.get_or_compute(
             f"streaks:{range_key}",
             lambda: compute_streaks(conn, self.tenant_id, self.my_account_id, range_key),
@@ -520,6 +555,9 @@ class EndpointRegistry:
     def _session_matches(self, qs):
         conn = self.get_conn()
         range_key = qs.get("range", "session")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         from_iso = qs.get("from")
         to_iso = qs.get("to")
         cache_key = f"session-matches:{range_key}:{from_iso or ''}:{to_iso or ''}"
@@ -677,8 +715,10 @@ class EndpointRegistry:
         route_filter = qs.get("routeFilter") == "1"
 
         range_key = (qs.get("range") or "").strip()
-        if range_key and range_key not in ("session", "day", "week", "all"):
-            return _err(400, "range must be session|day|week|all")
+        # Leer ist hier zulaessig und heisst "all".
+        bad = _bad_range(range_key, allow_empty=True)
+        if bad:
+            return bad
         from_iso = qs.get("from")
         if not from_iso and range_key and range_key != "all":
             from_iso = _range_filter(conn, self.tenant_id, range_key)
@@ -796,6 +836,9 @@ class EndpointRegistry:
         from pubg.aggregations import compute_payday_stats
         conn = self.get_conn()
         range_key = qs.get("range", "session")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         from_iso = qs.get("from")
         to_iso = qs.get("to")
         cache_key = f"payday-stats:{range_key}:{from_iso or ''}:{to_iso or ''}"
@@ -812,6 +855,9 @@ class EndpointRegistry:
         from pubg.aggregations import compute_deathmatch_stats
         conn = self.get_conn()
         range_key = qs.get("range", "session")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         from_iso = qs.get("from")
         to_iso = qs.get("to")
         cache_key = f"deathmatch-stats:{range_key}:{from_iso or ''}:{to_iso or ''}"
@@ -840,8 +886,9 @@ class EndpointRegistry:
         from pubg import db_pg
 
         range_key = (qs.get("range") or "session").strip()
-        if range_key not in ("session", "day", "week", "all"):
-            return _err(400, "range must be one of: session, day, week, all")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         group_by = (qs.get("groupBy") or "weapon").strip()
         if group_by not in ("weapon", "player"):
             return _err(400, "groupBy must be one of: weapon, player")
@@ -1139,6 +1186,9 @@ class EndpointRegistry:
     def _weapon_stats(self, qs):
         conn = self.get_conn()
         range_key = qs.get("range", "all")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         from_iso = qs.get("from")
         to_iso = qs.get("to")
         player = (qs.get("player") or "").strip()
@@ -1171,6 +1221,9 @@ class EndpointRegistry:
     def _vehicle_stats(self, qs):
         conn = self.get_conn()
         range_key = qs.get("range", "session")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         from_iso = qs.get("from")
         to_iso = qs.get("to")
         # Debug-Mode: ?debug=1 listet pro Match die rohen Event-Counts
@@ -1203,7 +1256,7 @@ class EndpointRegistry:
             if to_iso:
                 params.append(to_iso)
         else:
-            cutoff = (_range_filter(conn, range_key)
+            cutoff = (_range_filter(conn, self.tenant_id, range_key)
                       if range_key != "all" else "1970-01-01T00:00:00Z")
             end_filter = ""
             params = [self.tenant_id, self.my_account_id, cutoff]
@@ -1277,6 +1330,9 @@ class EndpointRegistry:
     def _hot_drop(self, qs):
         conn = self.get_conn()
         range_key = qs.get("range", "session")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         from_iso = qs.get("from")
         to_iso = qs.get("to")
         cache_key = f"hot-drop:{range_key}:{from_iso or ''}:{to_iso or ''}"
@@ -2933,6 +2989,9 @@ class EndpointRegistry:
     def _mates(self, qs):
         conn = self.get_conn()
         range_key = qs.get("range", "session")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         min_matches = int(qs.get("minMatches", 1))   # Range-Filter
         min_total = int(qs.get("minTotal", 1))       # Lifetime-Filter (optional)
         key = f"mates:{range_key}:{min_matches}:{min_total}"
@@ -2943,6 +3002,9 @@ class EndpointRegistry:
 
     def _map_dist(self, qs):
         range_key = qs.get("range", "session")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         conn = self.get_conn()
         return _ok(self.cache.get_or_compute(
             f"map:{range_key}",
@@ -2950,6 +3012,9 @@ class EndpointRegistry:
 
     def _first_fight(self, qs):
         range_key = qs.get("range", "session")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         # ?excludeHotDrop=1 → 'silent drop & loot then fight' Variante:
         # nur Matches OHNE Hot-Drop, dann First-Fight-Rate berechnen.
         exclude_hot = qs.get("excludeHotDrop") == "1"
@@ -2971,8 +3036,11 @@ class EndpointRegistry:
         """
         from pubg.aggregations import _detect_first_fight, _range_filter
         range_key = qs.get("range", "session")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         conn = self.get_conn()
-        cutoff = (_range_filter(conn, range_key)
+        cutoff = (_range_filter(conn, self.tenant_id, range_key)
                   if range_key != "all" else "1970-01-01T00:00:00Z")
         matches = conn.execute("""
             SELECT m.match_id, m.played_at, m.duration_secs, m.telemetry_fetched,
@@ -3309,6 +3377,9 @@ class EndpointRegistry:
 
     def _best_worst_map(self, qs):
         range_key = qs.get("range", "all")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         min_m = int(qs.get("minMatches", 3))
         conn = self.get_conn()
         return _ok(self.cache.get_or_compute(
@@ -3318,6 +3389,9 @@ class EndpointRegistry:
 
     def _map_perf(self, qs):
         range_key = qs.get("range", "all")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         conn = self.get_conn()
         return _ok(self.cache.get_or_compute(
             f"map-perf:{range_key}",
@@ -3408,8 +3482,9 @@ class EndpointRegistry:
 
         conn = self.get_conn()
         range_key = qs.get("range", "session")
-        if range_key not in ("session", "day", "week", "all"):
-            return _err(400, "range must be session|day|week|all")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         mode = qs.get("mode", "squad-fpp")
         try:
             limit = max(1, min(int(qs.get("limit", "50")), 500))
@@ -3555,8 +3630,9 @@ class EndpointRegistry:
 
         conn = self.get_conn()
         range_key = qs.get("range", "session")
-        if range_key not in ("session", "day", "week", "all"):
-            return _err(400, "range must be session|day|week|all")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         from_iso, to_iso = qs.get("from"), qs.get("to")
         names = [n.strip() for n in (qs.get("players") or "").split(",")
                  if n.strip()]
@@ -3621,8 +3697,9 @@ class EndpointRegistry:
 
         conn = self.get_conn()
         range_key = qs.get("range", "session")
-        if range_key not in ("session", "day", "week", "all"):
-            return _err(400, "range must be session|day|week|all")
+        bad = _bad_range(range_key)
+        if bad:
+            return bad
         from_iso, to_iso = qs.get("from"), qs.get("to")
         try:
             min_matches = max(1, int(qs.get("minMatches",
