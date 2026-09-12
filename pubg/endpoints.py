@@ -3170,13 +3170,13 @@ class EndpointRegistry:
                            k.weapon, p.name AS killer_name
                     FROM telemetry_events k
                     LEFT JOIN participants p ON p.match_id = k.match_id
-                                              AND p.tenant_id = k.tenant_id
+                                              AND p.tenant_id = ?
                                               AND p.account_id = k.actor_account
-                    WHERE k.tenant_id = ? AND k.match_id = ?
+                    WHERE k.match_id = ?
                       AND k.event_type = 'Kill'
                       AND k.target_account IN ({placeholders})
                     ORDER BY k.timestamp_ms ASC
-                """, (mid, *squad_ids)).fetchall()
+                """, (self.tenant_id, mid, *squad_ids)).fetchall()
                 # Killer-Landung-Position holen (alle distinct killer)
                 killer_ids = list({r["killer"] for r in kill_rows if r["killer"]})
                 killer_landing_map = {}
@@ -3197,7 +3197,7 @@ class EndpointRegistry:
                 victim_name_rows = conn.execute(f"""
                     SELECT account_id, name FROM participants
                     WHERE tenant_id = ? AND match_id = ? AND account_id IN ({placeholders})
-                """, (mid, *squad_ids)).fetchall()
+                """, (self.tenant_id, mid, *squad_ids)).fetchall()
                 victim_name_map = {r["account_id"]: r["name"] for r in victim_name_rows}
                 # Distanzen berechnen
                 for r in kill_rows:

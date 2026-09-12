@@ -835,3 +835,52 @@ def test_gueltige_ranges_bleiben_erlaubt(route, gueltig):
     reg = _registry(conn)
     _, code, _ = reg.dispatch("GET", f"{route}{_amp(route)}range={gueltig}", b"", {})
     assert code != 400, f"{route} lehnt gueltiges '{gueltig}' ab"
+
+
+def test_first_fight_debug_laeuft_mit_echtem_squad_durch():
+    """Der Squad-Zweig war nie getestet — und dauerhaft kaputt.
+
+    Die Abfrage der Squad-Tode filterte auf `k.tenant_id`, obwohl
+    `telemetry_events` gar keine tenant_id hat (Telemetrie ist global,
+    ein Match wird nur einmal geholt). Der Parameter fehlte ausserdem in
+    der Liste, weshalb schon die Bindung mit `IndexError` abbrach. In
+    den Tests fiel das nie auf, weil ohne Telemetrie-Daten `squad_ids`
+    leer bleibt und der ganze Block uebersprungen wird.
+    """
+    from pubg import db_pg
+    conn = _setup()
+    _insert_match(conn, "ffd1", "2026-05-04T10:00:00Z")
+    _insert_participant(conn, "ffd1", "account.A", "PEX_LuCKoR", team_id=1)
+    _insert_participant(conn, "ffd1", "account.M", "Mate", team_id=1)
+    _insert_participant(conn, "ffd1", "account.X", "Gegner", team_id=7)
+    _insert_team_mapping(conn, "ffd1", "account.A", 1)
+    _insert_team_mapping(conn, "ffd1", "account.M", 1)
+    db_pg.insert_telemetry_events(conn.raw, "ffd1", [
+        {"event_type": "Landing", "timestamp_ms": 0,
+         "actor_account": "account.A", "actor_x": 1.0, "actor_y": 2.0,
+         "actor_z": 0.0, "payload_json": "{}"},
+        {"event_type": "Landing", "timestamp_ms": 0,
+         "actor_account": "account.X", "actor_x": 9.0, "actor_y": 9.0,
+         "actor_z": 0.0, "payload_json": "{}"},
+        # Der Gegner legt einen Squad-Mate — genau die Zeile, die den
+        # kaputten Query ausgeloest hat.
+        {"event_type": "Kill", "timestamp_ms": 60_000,
+         "actor_account": "account.X", "target_account": "account.M",
+         "weapon": "M416", "distance": 5000.0, "damage": 100.0,
+         "victim_x": 3.0, "victim_y": 4.0, "payload_json": "{}"},
+    ])
+    conn.raw.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch(
+        "GET", "/api/pubg/first-fight-debug?range=all", b"", {})
+    assert code == 200, body
+    data = json.loads(body)
+    match = next(m for m in data["matches"] if m["matchId"] == "ffd1")
+    assert match["squadSize"] == 2
+    tote = match["squadDeaths"]
+    # Beide Namen kommen aus participants — genau die zwei Abfragen, die
+    # vorher an der fehlenden tenant_id scheiterten.
+    assert [d["victim"] for d in tote] == ["Mate"]
+    assert tote[0]["killer"] == "Gegner"
+    assert tote[0]["killerIsSelf"] is False
+    assert tote[0]["shotDistanceM"] == 50.0      # 5000 cm
