@@ -953,6 +953,81 @@ def insert_telemetry_events(conn, match_id: str, events: list) -> None:
     conn.commit()
 
 
+#: Die drei Ereignisse rund um Abwuerfe. Sie kamen erst spaeter in die
+#: gespeicherten Typen — aeltere Matches haben Telemetrie, aber keine
+#: dieser Zeilen.
+DROP_EVENT_TYPES = ("CarePackageLand", "CarePackagePickup", "FlareGun")
+
+
+def matches_missing_drop_events(conn, cutoff_iso: str, limit: int = 0):
+    """Matches mit Telemetrie, aber ohne Airdrop-Zeilen.
+
+    `cutoff_iso` grenzt auf das ein, was das PUBG-CDN noch vorhaelt —
+    fuer aeltere Matches gibt es die Rohdaten nicht mehr, die Luecke
+    bleibt dort bestehen.
+
+    Ohne `telemetry_url` ist nichts zu holen; solche Matches hat der
+    Poller ohnehin nie verarbeitet.
+    """
+    marks = ",".join(["%s"] * len(DROP_EVENT_TYPES))
+    sql = f"""
+        SELECT DISTINCT ON (m.match_id) m.match_id, m.telemetry_url,
+               m.played_at
+        FROM matches m
+        WHERE m.played_at >= %s
+          AND m.telemetry_url IS NOT NULL AND m.telemetry_url <> ''
+          AND EXISTS (SELECT 1 FROM telemetry_events t
+                      WHERE t.match_id = m.match_id)
+          AND NOT EXISTS (SELECT 1 FROM telemetry_events t
+                          WHERE t.match_id = m.match_id
+                            AND t.event_type IN ({marks}))
+        ORDER BY m.match_id, m.played_at DESC
+    """
+    params = [cutoff_iso, *DROP_EVENT_TYPES]
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+    rows = sorted(rows, key=lambda r: r["played_at"] or "", reverse=True)
+    return rows[:limit] if limit else rows
+
+
+def append_telemetry_events(conn, match_id: str, events: list) -> int:
+    """Events an ein Match anhaengen, das schon welche hat.
+
+    Der Gegenpart zu `insert_telemetry_events`, das bei vorhandener
+    Telemetrie komplett abbricht — hier ist genau das der Normalfall:
+    die alten Zeilen bleiben, die fehlenden kommen dazu. Der Aufrufer
+    muss sicherstellen, dass er nichts einfuegt, was schon da ist.
+    """
+    if not events:
+        return 0
+    rows = [(
+        match_id, e["event_type"], e.get("timestamp_ms"),
+        e.get("actor_account"), e.get("target_account"),
+        e.get("actor_x"), e.get("actor_y"), e.get("actor_z"),
+        e.get("actor_health"),
+        e.get("victim_x"), e.get("victim_y"),
+        e.get("weapon"), e.get("distance"), e.get("damage"),
+        e.get("damage_reason"),
+        e.get("seat_index"),
+        e.get("attachments"),
+        e.get("payload_json", "{}"),
+    ) for e in events]
+    with conn.cursor() as cur:
+        execute_values(
+            cur,
+            "INSERT INTO telemetry_events "
+            "(match_id, event_type, timestamp_ms, actor_account, "
+            "target_account, actor_x, actor_y, actor_z, actor_health, "
+            "victim_x, victim_y, weapon, distance, damage, damage_reason, "
+            "seat_index, attachments, payload_json) "
+            "VALUES %s",
+            rows,
+        )
+    conn.commit()
+    return len(rows)
+
+
 def has_telemetry_for_match(conn, match_id: str) -> bool:
     """Check if telemetry already exists globally for this match.
     Used by fetch-jobs to short-circuit before hitting the PUBG API."""

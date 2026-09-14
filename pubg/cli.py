@@ -1299,6 +1299,127 @@ def ranked_backfill(root: str, args=None) -> int:
     return 0
 
 
+def _drop_events_nachtragen(conn, match_id, client, url, squad_ids):
+    """Airdrop-Zeilen eines Matches aus der Roh-Telemetrie nachtragen.
+
+    Holt die Rohdaten vom CDN und legt NUR die drei Abwurf-Typen ab —
+    alles andere haengt schon in der DB und waere doppelt. Gibt die Zahl
+    der eingefuegten Zeilen zurueck.
+
+    Fremde Pickups bleiben draussen: in einer 100er-Lobby raeumt fast
+    jeder irgendein Paket aus, und was andere mitnehmen, wertet nichts
+    aus. Die systemweiten Ereignisse (Paket faellt, Leuchtpistole) kommen
+    dagegen vollstaendig rein — die Landung nennt erst den Punkt, an dem
+    das Paket liegt, und ohne den gibt es keinen Inhalt zum Anzeigen.
+    """
+    from pubg.telemetry import _normalize
+    from pubg.db_pg import append_telemetry_events
+
+    roh = client.get_telemetry(url)
+    neu = []
+    for e in roh:
+        norm = _normalize(e)
+        if not norm:
+            continue
+        et = norm.get("event_type")
+        if et in ("CarePackageLand", "FlareGun"):
+            neu.append(norm)
+        elif et == "CarePackagePickup":
+            if norm.get("actor_account") in squad_ids:
+                neu.append(norm)
+    raw_conn = getattr(conn, "raw", conn)
+    return append_telemetry_events(raw_conn, match_id, neu)
+
+
+def drop_backfill(root: str, args=None) -> int:
+    """Airdrop-Zeilen fuer Matches nachtragen, die vor ihrer Einfuehrung liefen.
+
+    `CarePackageLand`, `CarePackagePickup` und `FlareGun` wurden erst ab
+    dem 11.09.2026 gespeichert. Aeltere Matches haben Telemetrie, aber
+    keine dieser Zeilen — entsprechend zeigt der Report dort null Drops,
+    obwohl welche gelootet wurden.
+
+    Nachholbar ist das nur, solange das PUBG-CDN die Rohdaten vorhaelt:
+    14 Tage, hier mit einem Tag Sicherheitsabstand. Was aelter ist,
+    bleibt eine Luecke.
+
+    Der Abruf braucht keinen API-Key (reiner CDN-Download) und faellt
+    damit nicht unter das Rate-Limit des Match-Pollings. Trotzdem mit
+    Pause zwischen den Matches, um das CDN nicht zu treten.
+
+    Nutzung:
+        python -m pubg.cli drop-backfill [--matches 50] [--pace 0.5]
+                                         [--days 13] [--dry-run]
+    """
+    import time
+    from core.db import connect
+    from core.db_compat import SqliteCompatConn
+    from pubg.db_pg import matches_missing_drop_events
+    from pubg.api_client import PubgClient
+
+    args = args or []
+    def _opt(name, default=None):
+        if name in args:
+            i = args.index(name)
+            return args[i + 1] if i + 1 < len(args) else default
+        return default
+
+    n_max = int(_opt("--matches", "0"))
+    pace = float(_opt("--pace", "0.5"))
+    days = int(_opt("--days", "13"))
+    trocken = "--dry-run" in args
+
+    raw = connect()
+    conn = SqliteCompatConn(raw)
+    cutoff = (datetime.datetime.now(datetime.timezone.utc)
+              - datetime.timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    offen = matches_missing_drop_events(raw, cutoff, limit=n_max)
+    print(f"=== drop-backfill (ab {cutoff}) ===")
+    print(f"{len(offen)} Matches ohne Airdrop-Zeilen")
+    if trocken or not offen:
+        for r in offen[:20]:
+            print(f"   {r['played_at']}  {r['match_id']}")
+        if trocken and len(offen) > 20:
+            print(f"   ... und {len(offen) - 20} weitere")
+        return 0
+
+    # Squad-Accounts je Match: nur unsere eigenen Pickups sollen rein.
+    # Ueber alle Tenants, denn die Telemetrie gehoert keinem einzelnen —
+    # wer das Match gespielt hat, steht in match_team_mapping.
+    squad_sql = """
+        SELECT DISTINCT mtm2.account_id
+        FROM match_team_mapping mtm
+        JOIN match_team_mapping mtm2
+          ON mtm2.match_id = mtm.match_id AND mtm2.team_id = mtm.team_id
+         AND mtm2.tenant_id = mtm.tenant_id
+        JOIN players p ON p.account_id = mtm.account_id
+                      AND p.tenant_id = mtm.tenant_id AND p.is_self = 1
+        WHERE mtm.match_id = ?
+    """
+    client = PubgClient(api_key="", platform="steam")
+    ok = fehler = zeilen = 0
+    for i, r in enumerate(offen, 1):
+        mid = r["match_id"]
+        squad = {row["account_id"] for row in
+                 conn.execute(squad_sql, (mid,)).fetchall()}
+        try:
+            n = _drop_events_nachtragen(conn, mid, client,
+                                        r["telemetry_url"], squad)
+            zeilen += n
+            ok += 1
+            print(f"[{i}/{len(offen)}] {mid[:8]} {r['played_at'][:10]}  "
+                  f"+{n} Zeilen")
+        except Exception as e:
+            fehler += 1
+            # 404 heisst: das CDN hat die Rohdaten doch schon geloescht.
+            print(f"[{i}/{len(offen)}] {mid[:8]} FEHLER: {e}")
+        if pace:
+            time.sleep(pace)
+    print(f"\nfertig: {ok} Matches nachgetragen ({zeilen} Zeilen), "
+          f"{fehler} Fehler")
+    return 0
+
+
 def lobby_kd_backfill(root: str, args=None) -> int:
     """Lobby-Werte fuer die juengsten Matches nachladen (Alltime, Default).
 
@@ -2007,6 +2128,8 @@ if __name__ == "__main__":
     elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-refill-pg":
         mid = sys.argv[3] if len(sys.argv) > 3 and sys.argv[2] == "--match" else None
         sys.exit(hidrive_refill_pg(root, only_match=mid))
+    elif len(sys.argv) > 1 and sys.argv[1] == "drop-backfill":
+        sys.exit(drop_backfill(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "refresh-maps":
         sys.exit(refresh_maps(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "refresh-assets":
@@ -2020,6 +2143,6 @@ if __name__ == "__main__":
               "reset-milestones <id1> [<id2> ...] | "
               "list-milestones [pattern] | "
               "weapon-stats-backfill | assists-backfill | "
-              "clan-queue-prune | lobby-kd-backfill | "
+              "clan-queue-prune | lobby-kd-backfill | drop-backfill | "
               "lobby-kd-reset-unknown | "
               "purge-before YYYY-MM-DD")
