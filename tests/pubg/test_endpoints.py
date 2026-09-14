@@ -884,3 +884,68 @@ def test_first_fight_debug_laeuft_mit_echtem_squad_durch():
     assert tote[0]["killer"] == "Gegner"
     assert tote[0]["killerIsSelf"] is False
     assert tote[0]["shotDistanceM"] == 50.0      # 5000 cm
+
+
+def _drop_event(et, ts, actor=None, weapon=None, attachments=None,
+                x=5000.0, y=5000.0):
+    return {"event_type": et, "timestamp_ms": ts, "actor_account": actor,
+            "target_account": None, "actor_x": x, "actor_y": y,
+            "actor_z": 100.0, "actor_health": 100.0, "victim_x": None,
+            "victim_y": None, "weapon": weapon, "distance": None,
+            "damage": None, "damage_reason": None,
+            "attachments": attachments, "payload_json": None}
+
+
+def test_session_report_zaehlt_angeforderte_und_gelootete_drops():
+    """Drops gehoeren als Squad-Zahl in die Totals, nicht als Achievement.
+
+    Zweimal "Airdrop Looted" untereinander in den Highlights sagt
+    nichts; interessant ist, wie oft das Squad ueberhaupt an einem Paket
+    war und wie viele davon es selbst gerufen hat.
+    """
+    from pubg import db_pg
+    conn = _setup()
+    upsert_player(conn, "account.MATE", "MateA", "steam", False)
+    _insert_match(conn, "dr1", "2026-05-20T18:00:00Z", "Baltic_Main",
+                  "squad-fpp")
+    _insert_participant(conn, "dr1", "account.A", "PEX_LuCKoR", team_id=1)
+    _insert_participant(conn, "dr1", "account.MATE", "MateA", team_id=1)
+    _insert_team_mapping(conn, "dr1", "account.A", 1)
+    _insert_team_mapping(conn, "dr1", "account.MATE", 1)
+    db_pg.insert_telemetry_events(conn.raw, "dr1", [
+        # Ich rufe einen Drop — der Mate holt etwas heraus.
+        _drop_event("FlareGun", 100000, actor="account.A",
+                    weapon="Item_Weapon_FlareGun_C"),
+        _drop_event("CarePackagePickup", 130000, actor="account.MATE",
+                    weapon="Item_Head_G_01_Lv3_C",
+                    attachments="Carapackage_FlareGun_C"),
+        # Dazu ein regulaerer Drop an anderer Stelle.
+        _drop_event("CarePackagePickup", 200000, actor="account.A",
+                    weapon="Item_Weapon_Groza_C",
+                    attachments="Carapackage_RedBox_C", x=80000.0, y=80000.0),
+    ])
+    set_setting(conn, "sessionStartedAt", "1970-01-01T00:00:00Z")
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/session-report", b"", {})
+    assert code == 200
+    t = json.loads(body)["totals"]
+    assert t["dropsCalled"] == 1
+    # Beide Pakete zaehlen — squad-weit, nicht nur meine eigenen.
+    assert t["dropsLooted"] == 2
+
+
+def test_ohne_airdrops_bleiben_die_zahlen_bei_null():
+    """`dropsLooted` wird auch bei 0 angezeigt und darf nicht fehlen."""
+    conn = _setup()
+    _insert_match(conn, "dr2", "2026-05-20T18:00:00Z", "Baltic_Main",
+                  "squad-fpp")
+    _insert_participant(conn, "dr2", "account.A", "PEX_LuCKoR", team_id=1)
+    _insert_team_mapping(conn, "dr2", "account.A", 1)
+    set_setting(conn, "sessionStartedAt", "1970-01-01T00:00:00Z")
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/session-report", b"", {})
+    t = json.loads(body)["totals"]
+    assert t["dropsCalled"] == 0
+    assert t["dropsLooted"] == 0

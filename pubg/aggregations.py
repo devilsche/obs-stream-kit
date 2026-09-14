@@ -850,10 +850,19 @@ def _ist_drop_waffe(item_id):
 
 
 def _item_label(item_id):
-    """Lesbarer Name eines Abwurf-Items, sonst die gekuerzte Id."""
+    """Lesbarer Name eines Abwurf-Items, sonst die gekuerzte Id.
+
+    Ruestung, Helm und die grossen Visiere stehen schon in
+    `telemetry_analysis` — von dort geholt statt hier ein zweites Mal
+    gepflegt, sonst heisst derselbe Helm an zwei Stellen anders.
+    """
     s = str(item_id or "")
     if s in DROP_WEAPONS:
         return DROP_WEAPONS[s]
+    from pubg.telemetry_analysis import DROP_GEAR_LABELS, DROP_WEAPON_LABELS
+    treffer = DROP_WEAPON_LABELS.get(s) or DROP_GEAR_LABELS.get(s)
+    if treffer:
+        return treffer
     return (s.replace("Item_Weapon_", "").replace("Item_", "")
              .replace("_C", "").replace("_", " ")) or "?"
 
@@ -3170,6 +3179,91 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 cr["type"] = "chip_upload"
             events_out.append(cr)
 
+    # ── Airdrops: angefordert und ausgeraeumt ────────────────────────
+    #
+    # Der Inhalt steht NUR im Land-Event; das Pickup-Event traegt das
+    # einzelne Item und im attachments-Feld den Pakettyp. Deshalb hier
+    # beide Quellen: was drin lag kommt vom Paket, wer drin war vom
+    # Pickup. Interessant ist gerade auch, was liegen blieb — man nimmt
+    # ja nicht alles mit.
+    #
+    # `Carapackage_FlareGun_C` heisst angefordert, `Carapackage_RedBox_C`
+    # regulaerer Drop. Das steht so im Event, also braucht es keine
+    # Schaetzung ueber Ort und Zeit des Flare-Schusses.
+    drop_rows = conn.execute("""
+        SELECT event_type, timestamp_ms, actor_account, weapon,
+               actor_x, actor_y, attachments
+        FROM telemetry_events
+        WHERE match_id = ?
+          AND event_type IN ('CarePackageLand', 'CarePackagePickup',
+                             'FlareGun')
+        ORDER BY timestamp_ms ASC
+    """, (match_id,)).fetchall()
+
+    # Inhalt je Paket ueber die Landeposition. Pakete stehen weit
+    # auseinander, ein grobes Raster reicht zur Unterscheidung.
+    def _ort(x, y):
+        if x is None or y is None:
+            return None
+        return (round(x / 1000.0), round(y / 1000.0))
+
+    inhalt_am_ort = {}
+    for r in drop_rows:
+        if r["event_type"] != "CarePackageLand":
+            continue
+        o = _ort(r["actor_x"], r["actor_y"])
+        if not o or not r["attachments"]:
+            continue
+        try:
+            import json as _json_drop
+            items = _json_drop.loads(r["attachments"])
+        except Exception:
+            continue
+        if isinstance(items, list):
+            inhalt_am_ort[o] = [_item_label(i) for i in items if i]
+
+    for r in drop_rows:
+        acc = r["actor_account"]
+        if not acc or acc not in sq_set:
+            continue
+        ts_d = r["timestamp_ms"]
+        if r["event_type"] == "FlareGun":
+            fr = _row_skeleton("FlareGun", ts_d, acc, None,
+                               r["actor_x"], r["actor_y"])
+            fr["type"] = "flare_fired"
+            events_out.append(fr)
+        elif r["event_type"] == "CarePackagePickup":
+            typ = r["attachments"] or ""
+            dr = _row_skeleton("CarePackagePickup", ts_d, acc, None,
+                               r["actor_x"], r["actor_y"])
+            dr["type"] = "airdrop_looted"
+            dr["dropCalled"] = "FlareGun" in typ
+            dr["takenItem"] = _item_label(r["weapon"]) if r["weapon"] else None
+            dr["dropContents"] = inhalt_am_ort.get(
+                _ort(r["actor_x"], r["actor_y"])) or []
+            events_out.append(dr)
+
+    # Mehrere Items aus DEMSELBEN Paket sind eine Zeile, keine vier:
+    # das Paket ist das Ereignis, nicht der einzelne Griff hinein.
+    gesehen = {}
+    gefiltert = []
+    for ev in events_out:
+        if ev.get("type") != "airdrop_looted":
+            gefiltert.append(ev)
+            continue
+        schluessel = (ev.get("actorAccount"),
+                      _ort(ev.get("victimX"), ev.get("victimY")))
+        vorher = gesehen.get(schluessel)
+        if vorher is None:
+            gesehen[schluessel] = len(gefiltert)
+            ev["takenItems"] = [ev["takenItem"]] if ev.get("takenItem") else []
+            gefiltert.append(ev)
+        else:
+            erste = gefiltert[vorher]
+            if ev.get("takenItem"):
+                erste.setdefault("takenItems", []).append(ev["takenItem"])
+    events_out = gefiltert
+
     events_out.sort(key=lambda x: x["tsMs"] or 0)
 
     # Alle Accounts aus Events sammeln und deren Lifetime-K/D anhängen.
@@ -4913,23 +5007,21 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
                 WHERE match_id = ? AND actor_account = ?
                   AND event_type = 'CarePackagePickup'
             """, (mid, my_account_id)).fetchall()
+            # Nur noch, wenn eine Drop-Waffe dabei war: "Airdrop Looted"
+            # zweimal untereinander ist keine Auszeichnung. Dass man an
+            # einem Paket war, steht jetzt im Timelog und als Squad-Zahl
+            # in den Totals.
             if drops:
-                pakete = len({r["attachments"] for r in drops
-                              if r["attachments"]}) or 1
                 waffen = [_item_label(r["weapon"]) for r in drops
                           if r["weapon"] and _ist_drop_waffe(r["weapon"])]
                 if waffen:
-                    label = "Airdrop · " + ", ".join(
-                        sorted(set(waffen))[:2])
-                else:
-                    label = ("Airdrop Looted" if pakete == 1
-                             else f"Airdrop Looted · {pakete}x")
-                out.append({
-                    "id": "airdrop_looted",
-                    "label": label,
-                    "icon": "📦",
-                    "matchId": mid, "playedAt": played,
-                })
+                    out.append({
+                        "id": "airdrop_looted",
+                        "label": "Airdrop · " + ", ".join(
+                            sorted(set(waffen))[:2]),
+                        "icon": "📦",
+                        "matchId": mid, "playedAt": played,
+                    })
 
             # --- Von der Red Zone erwischt ---
             #
@@ -6575,6 +6667,49 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         out["headshotPct"] = (100.0 * head / hits) if hits else None
         return out
 
+    def _drops_fuer(match_ids):
+        """Abwuerfe des ganzen Squads: gerufen und ausgeraeumt.
+
+        Gezaehlt wird squad-weit, weil ein Paket dem Team gehoert —
+        wer die Leuchtpistole abfeuert, ist Zufall der Rolle.
+
+        `dropsCalled` sind die Flare-Schuesse selbst, nicht die
+        Pakete: eine Leuchtpistole liefert mal ein Paket, mal ein
+        BRDM, und gefragt ist, wie oft das Squad einen Drop gerufen
+        hat.
+        """
+        leer = {"dropsCalled": 0, "dropsLooted": 0}
+        if not match_ids:
+            return leer
+        from pubg.lobby_kd import squad_per_match
+        squads = squad_per_match(conn, tenant_id, match_ids)
+        if not squads:
+            return leer
+        ph_d = ",".join("?" * len(match_ids))
+        rows = conn.execute(f"""
+            SELECT match_id, event_type, actor_account, actor_x, actor_y
+            FROM telemetry_events
+            WHERE match_id IN ({ph_d})
+              AND event_type IN ('FlareGun', 'CarePackagePickup')
+        """, list(match_ids)).fetchall()
+        flares = 0
+        pakete = set()
+        for r in rows:
+            acc = r["actor_account"]
+            if not acc or acc not in (squads.get(r["match_id"]) or set()):
+                continue
+            if r["event_type"] == "FlareGun":
+                flares += 1
+            else:
+                # Vier Griffe in dasselbe Paket sind EIN Paket. Pakete
+                # liegen weit auseinander, ein grobes Ortsraster trennt
+                # sie zuverlaessig.
+                x, y = r["actor_x"], r["actor_y"]
+                pakete.add((r["match_id"],
+                            round(x / 1000.0) if x is not None else None,
+                            round(y / 1000.0) if y is not None else None))
+        return {"dropsCalled": flares, "dropsLooted": len(pakete)}
+
     def _squad_lobby_for(match_ids):
         """Squad-K/D + Lobby-K/D für eine Match-ID-Liste.
         Squad = my_team_id pro Match. Squad-K/D = SUM(team_kills) /
@@ -6586,9 +6721,11 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         out = {"squadKills": 0, "squadKd": 0, "squadKillsPerMatch": 0,
                "squadMatchesWithMapping": 0,
                "lobbyKd": 0, "lobbyMatchesWithMapping": 0,
-               "strongestOpponent": None, "topScorer": None}
+               "strongestOpponent": None, "topScorer": None,
+               "dropsCalled": 0, "dropsLooted": 0}
         if not match_ids:
             return out
+        out.update(_drops_fuer(match_ids))
         out["topScorer"] = _top_scorer_over(match_ids)
         # Staerkster einzelner Gegner statt eines Lobby-Durchschnitts: Mittelwerte
         # ueber die Lobby sind auf Phasen-Ebene praktisch konstant (~5-9 Kills,

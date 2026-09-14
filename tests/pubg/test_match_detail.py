@@ -4,6 +4,8 @@ Frueher gegen pubg/db.py (SQLite) — seit der PG-Migration deprecated.
 Die Schreib-Helfer binden die tenant_id, damit die Testkoerper
 unveraendert bleiben konnten.
 """
+import json
+
 import pytest
 
 from pubg import db_pg
@@ -438,3 +440,66 @@ def test_fahrer_und_beifahrer_fahren_dieselbe_strecke():
     fahrer = _strecke("PEX_LuCKoR")
     assert len(fahrer) >= 6, "schon der Fahrer hat die Strecke nicht"
     assert _strecke("Mate1") == fahrer
+
+
+def _drop_match(conn, mid="md1", mit_flare=True):
+    """Ein Match mit Airdrop: gelandetes Paket + Pickup daraus."""
+    _basic_match(conn, mid)
+    evs = []
+    for acc in ("account.A", "account.B"):
+        e = _ev("Position", 5000, actor=acc)
+        e["actor_z"] = 160000.0
+        evs.append(e)
+        evs.append(_ev("Landing", 60000, actor=acc))
+    typ = "Carapackage_FlareGun_C" if mit_flare else "Carapackage_RedBox_C"
+    if mit_flare:
+        evs.append(_ev("FlareGun", 100000, actor="account.A",
+                       weapon="Item_Weapon_FlareGun_C"))
+    # Das Paket landet — hier steht der VOLLE Inhalt drin.
+    land = _ev("CarePackageLand", 120000, weapon=typ)
+    land["actor_x"], land["actor_y"] = 5000.0, 5000.0
+    land["attachments"] = json.dumps([
+        "Item_Weapon_Groza_C", "Item_Armor_C_01_Lv3_C",
+        "Item_Head_G_01_Lv3_C", "Item_Ammo_762mm_C"])
+    evs.append(land)
+    # Ich nehme nur den Helm mit — die Groza bleibt liegen.
+    pick = _ev("CarePackagePickup", 130000, actor="account.A",
+               weapon="Item_Head_G_01_Lv3_C")
+    pick["actor_x"], pick["actor_y"] = 5000.0, 5000.0
+    pick["attachments"] = typ
+    evs.append(pick)
+    insert_telemetry_events(conn, mid, evs)
+    return mid
+
+
+def test_timelog_zeigt_den_ganzen_drop_inhalt():
+    """Was drin lag zaehlt, nicht nur was ich mitgenommen habe.
+
+    Der Inhalt steht im Land-Event; das Pickup-Event traegt nur das
+    einzelne Item und den Pakettyp.
+    """
+    conn = _setup()
+    mid = _drop_match(conn)
+    d = compute_match_detail(conn, T, "account.A", mid) or {}
+    ev = next(e for e in d["events"] if e["type"] == "airdrop_looted")
+    assert ev["actorName"] == "PEX_LuCKoR"
+    assert ev["dropCalled"] is True          # per Flare angefordert
+    # Die Groza lag drin, obwohl ich sie nicht genommen habe.
+    assert "Groza" in " ".join(ev["dropContents"])
+    assert ev["takenItem"] == "Helmet Lv3"
+
+
+def test_regulaerer_drop_ist_nicht_angefordert():
+    conn = _setup()
+    mid = _drop_match(conn, "md2", mit_flare=False)
+    d = compute_match_detail(conn, T, "account.A", mid) or {}
+    ev = next(e for e in d["events"] if e["type"] == "airdrop_looted")
+    assert ev["dropCalled"] is False
+
+
+def test_flare_taucht_als_eigene_zeile_auf():
+    conn = _setup()
+    mid = _drop_match(conn)
+    d = compute_match_detail(conn, T, "account.A", mid) or {}
+    ev = next(e for e in d["events"] if e["type"] == "flare_fired")
+    assert ev["actorName"] == "PEX_LuCKoR"

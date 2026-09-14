@@ -257,17 +257,25 @@ def test_entnahme_aus_dem_paket_zaehlt(sess):
     assert _labels(conn, t1, "airdrop_looted") == ["Airdrop · Groza"]
 
 
-def test_nur_munition_geholt_bleibt_schlicht(sess):
+def test_nur_munition_geholt_ist_kein_highlight(sess):
+    """Munition aus einem Paket ist keine Auszeichnung.
+
+    Frueher stand dafuer "Airdrop Looted" in den Highlights — bei zwei
+    Matches zweimal untereinander, ohne jede Aussage. Dass man an einem
+    Paket war, steht jetzt im Timelog und als Squad-Zahl in den Totals;
+    hier bleibt nur, was eine Drop-Waffe hergibt.
+    """
     conn, t1 = sess
     _match(conn, t1)
     db_pg.insert_telemetry_events(conn.raw, "m1", [{
         "event_type": "CarePackagePickup", "timestamp_ms": 700000,
         "actor_account": ME, "weapon": "Item_Ammo_762mm_C",
         "attachments": "Carapackage_RedBox_C"}])
-    assert _labels(conn, t1, "airdrop_looted") == ["Airdrop Looted"]
+    assert "airdrop_looted" not in _ids(conn, t1)
 
 
-def test_zwei_pakete_werden_gezaehlt(sess):
+def test_zwei_pakete_ohne_waffe_bleiben_still(sess):
+    """Auch mehrere Pakete werden nicht dadurch zum Highlight."""
     conn, t1 = sess
     _match(conn, t1)
     db_pg.insert_telemetry_events(conn.raw, "m1", [
@@ -278,7 +286,7 @@ def test_zwei_pakete_werden_gezaehlt(sess):
          "actor_account": ME, "weapon": "Item_Ammo_556mm_C",
          "attachments": "Carepackage_SmallPackage_NoParachute_Bluechip_C"},
     ])
-    assert _labels(conn, t1, "airdrop_looted") == ["Airdrop Looted · 2x"]
+    assert "airdrop_looted" not in _ids(conn, t1)
 
 
 def test_gefallenes_paket_ohne_entnahme_loest_nichts_aus(sess):

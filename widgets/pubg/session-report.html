@@ -2460,6 +2460,7 @@
                               "kill_squad_wiped", "kill_run_over",
                               "kill_self_eject", "kill_fall", "kill_bluezone",
                               "kill_redzone", "kill_drown", "kill_self"]],
+      ["drops",   "Drops",   ["flare_fired", "airdrop_looted"]],
       ["revives", "Revives", ["revive", "revive_inferred", "redeploy",
                                 "comeback", "chip_pickup", "chip_drop",
                                 "chip_upload", "chip_upload_comeback",
@@ -2826,6 +2827,20 @@
             : `${A} used the revive antenna`;
         case "comeback":
           return `${A} dropped back in via Comeback Heli`;
+        case "flare_fired":
+          return `${A} called in an airdrop`;
+        case "airdrop_looted": {
+          const genommen = (ev.takenItems || []).filter(Boolean);
+          const nahm = genommen.length
+            ? ` and took <b>${genommen.join(", ")}</b>` : "";
+          // Was drin lag, auch wenn es liegen blieb — man nimmt ja nicht
+          // alles mit, und die Groza im Paket ist die Nachricht.
+          const drin = (ev.dropContents || []).filter(Boolean);
+          const inhalt = drin.length
+            ? ` <span class="md-dim">(${drin.join(", ")})</span>` : "";
+          const art = ev.dropCalled ? "their own airdrop" : "an airdrop";
+          return `${A} looted ${art}${nahm}${inhalt}`;
+        }
         case "chip_pickup": {
           const n = ev.chipCount || 1;
           const chipLbl = (n > 1) ? `${n} BlueChips` : "the BlueChip";
@@ -4244,6 +4259,12 @@
                 : ""}
             ${cell((t.squadKillsPerMatch || 0).toFixed(1), "Squad Kills/Match",
                    "Kills per match of the whole squad, myself included")}
+            ${cell(t.dropsLooted || 0, "Drops Looted",
+                   "Airdrops the squad took something out of — counted per package, however many items were grabbed")}
+            ${t.dropsCalled
+                ? cell(t.dropsCalled, "Drops Called",
+                       "Flare guns fired by the squad. A flare brings a package or a BRDM, so this counts the calls, not the packages")
+                : ""}
           </div>
         </div>
         ${t.event ? `<div class="totals-group">
