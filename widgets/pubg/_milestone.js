@@ -43,7 +43,8 @@
   var SHOW_PREV = {
     weapon_best_damage: 1, weapon_best_kills: 1, weapon_longest: 1,
     career_longest_kill: 1, career_most_kills: 1,
-    career_hardest_lobby: 1
+    career_hardest_lobby: 1,
+    career_top_speed: 1
   };
 
   var NUM = function (n) {
@@ -181,6 +182,15 @@
     // bezieht.
     if (m.occasion === "career_hardest_lobby")
       return "average career K/D of everyone in the lobby";
+    // Ohne Fahrzeug und Karte bliebe von einem Fahr-Rekord nur eine
+    // nackte Zahl uebrig.
+    if (m.occasion === "career_top_speed") {
+      var v = m.extra || {};
+      if (v.vehicleName) {
+        return v.vehicleName + (v.mapName ? " \u00b7 " + v.mapName : "");
+      }
+      return "at the wheel, not in the passenger seat";
+    }
     if (m.occasion.indexOf("career_") === 0)
       return "across every mode";
     return "";

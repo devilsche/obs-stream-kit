@@ -1221,17 +1221,28 @@ class EndpointRegistry:
         })
 
     def _top_speed(self, qs):
-        """Hoechstgeschwindigkeit — meine und die der Lobby, getrennt.
+        """Hoechstgeschwindigkeit — meine und die der Lobby.
 
-        Kein `range`: ein Rekord gilt fuer immer, nicht fuer eine
-        Session.
+        Mit Zeitraum fuer den Report (dort zaehlt die gewaehlte
+        Session), ohne fuer den Meilenstein (dort der Bestwert
+        ueberhaupt).
         """
-        from pubg.aggregations import compute_top_speed
+        from pubg.aggregations import compute_top_speed, _range_filter
         conn = self.get_conn()
+        range_key = qs.get("range")
+        bad = _bad_range(range_key, allow_empty=True) if range_key else None
+        if bad:
+            return bad
+        from_iso = qs.get("from")
+        to_iso = qs.get("to")
+        if not from_iso and range_key and range_key != "all":
+            from_iso = _range_filter(conn, self.tenant_id, range_key)
+        key = f"top-speed:{from_iso or 'all'}:{to_iso or 'now'}"
         return _ok(self.cache.get_or_compute(
-            "top-speed",
+            key,
             lambda: compute_top_speed(conn, self.tenant_id,
-                                      self.my_account_id)))
+                                      self.my_account_id,
+                                      from_iso=from_iso, to_iso=to_iso)))
 
     def _vehicle_stats(self, qs):
         conn = self.get_conn()

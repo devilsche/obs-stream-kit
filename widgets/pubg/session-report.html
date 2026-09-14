@@ -1106,6 +1106,15 @@
       padding: 2px 0;
     }
     .ts-sub b { font-variant-numeric: tabular-nums; }
+    .ts-best {
+      color: var(--pubg-muted);
+      font-size: 0.85em;
+      font-variant-numeric: tabular-nums;
+      min-width: 90px;
+      text-align: right;
+    }
+    .ts-lead { color: var(--pubg-gold, #f2b705); }
+    .ts-me { color: var(--pubg-gold, #f2b705); }
     .ve-dealt { color: var(--pubg-good, #3cb44b); }
     .ve-taken { color: var(--pubg-warn, #e6194b); }
     .ve-wpn {
@@ -4618,9 +4627,12 @@
         PubgUI.fetchJson(hotDropUrl, EXTRAS_TIMEOUT_MS).catch(() => null),
         PubgUI.fetchJson(paydayUrl, EXTRAS_TIMEOUT_MS).catch(() => null),
         PubgUI.fetchJson(vehicleUrl, EXTRAS_TIMEOUT_MS).catch(() => null),
-        // Ohne Zeitraum: ein Bestwert gilt fuer immer, nicht fuer die
-        // gewaehlte Phase.
-        PubgUI.fetchJson(_SB + "api/pubg/top-speed", EXTRAS_TIMEOUT_MS).catch(() => null),
+        // MIT Zeitraum: im Report zaehlt die gewaehlte Session. Der
+        // Bestwert ueberhaupt gehoert zum Meilenstein, nicht hierher.
+        PubgUI.fetchJson((FROM || TO)
+          ? _SB + `api/pubg/top-speed${fromTo}`
+          : _SB + "api/pubg/top-speed?range=session",
+          EXTRAS_TIMEOUT_MS).catch(() => null),
       ]);
 
       // POI-Lookup-Tabelle muss da sein bevor wir Tooltips bauen.
@@ -5040,28 +5052,45 @@
       let speedHtml = "";
       if (speed && speed.overall) {
         const o = speed.overall;
-        const a2 = speed.allPlayers;
-        const istMeiner = a2 && Math.abs(a2.kmh - o.kmh) < 0.05;
+        const lo = speed.lobby;
+        // Die Lobby-Wertung zaehlt mich mit — fuehre ich, steht dort
+        // mein eigener Name, und genau das ist die Nachricht.
+        const fuehreIch = lo && lo.isMe;
         const zeile = (v, was) => `<div class="ts-row">
             <span class="ts-kmh">${v.kmh.toFixed(1)}<span class="ts-unit">km/h</span></span>
             <span class="ts-what">${was}</span>
             <span class="ts-where">${v.vehicleName} · ${PubgUI.fmtMap(v.mapName)}</span>
           </div>`;
-        const proFz = (speed.perVehicle || []).slice(0, 6).map(v =>
-          `<div class="ts-sub"><span>${v.vehicleName}</span>
-             <b>${v.kmh.toFixed(1)}</b></div>`).join("");
-        const proMap = (speed.perMap || []).map(v =>
-          `<div class="ts-sub"><span>${PubgUI.fmtMap(v.mapName)}</span>
-             <b>${v.kmh.toFixed(1)}</b></div>`).join("");
+        // Je Fahrzeug und Karte beides: mein Bestwert und der der
+        // Lobby. Steht dort mein Name, war ich der Schnellste.
+        const wer = v => v.isMe
+          ? `<b class="ts-me">${v.driverName}</b>` : v.driverName;
+        const spalte = (meine, lobby, titel, schluessel) => {
+          const lobbyBy = new Map((lobby || []).map(v => [v[schluessel], v]));
+          return (meine || []).slice(0, 6).map(v => {
+            const l = lobbyBy.get(v[schluessel]);
+            const best = (l && l.kmh > v.kmh)
+              ? `<span class="ts-best">${l.kmh.toFixed(1)} ${wer(l)}</span>`
+              : `<span class="ts-best ts-lead">you lead</span>`;
+            const name = schluessel === "mapName"
+              ? PubgUI.fmtMap(v.mapName) : v.vehicleName;
+            return `<div class="ts-sub"><span>${name}</span>
+                      <b>${v.kmh.toFixed(1)}</b>${best}</div>`;
+          }).join("");
+        };
         speedHtml = `<h3 class="extras-h">Top Speed</h3>
           <div class="ts-box">
-            ${zeile(o, "my record")}
-            ${a2 && !istMeiner ? zeile(a2, "best in lobby") : ""}
-            ${istMeiner ? `<div class="ts-note">Nobody in any of your
-               lobbies has ever driven faster.</div>` : ""}
+            ${zeile(o, "my best")}
+            ${lo && !fuehreIch ? zeile(lo, "best in lobby") : ""}
+            ${fuehreIch ? `<div class="ts-note">Fastest in the lobby —
+               that is your own name up there.</div>` : ""}
             <div class="ts-cols">
-              <div><h4 class="ts-h">By vehicle</h4>${proFz}</div>
-              <div><h4 class="ts-h">By map</h4>${proMap}</div>
+              <div><h4 class="ts-h">By vehicle · mine / lobby</h4>
+                ${spalte(speed.perVehicle, speed.lobbyPerVehicle,
+                         "vehicle", "vehicleName")}</div>
+              <div><h4 class="ts-h">By map · mine / lobby</h4>
+                ${spalte(speed.perMap, speed.lobbyPerMap,
+                         "map", "mapName")}</div>
             </div>
           </div>`;
       }

@@ -93,7 +93,7 @@ def test_fremde_fahrten_zaehlen_nicht_zu_meinem_rekord():
     CONN.raw.commit()
     d = compute_top_speed(CONN, T, ICH)
     assert round(d["overall"]["kmh"]) == 90
-    assert round(d["allPlayers"]["kmh"]) == 150
+    assert round(d["lobby"]["kmh"]) == 150
 
 
 def test_als_beifahrer_ist_es_nicht_meine_leistung():
@@ -114,6 +114,7 @@ def test_ohne_fahrten_bleibt_es_leer():
     d = compute_top_speed(CONN, T, ICH)
     assert d["overall"] is None
     assert d["perVehicle"] == [] and d["perMap"] == []
+    assert d["lobby"] is None
 
 
 def test_jedes_gesehene_fahrzeug_hat_einen_namen():
@@ -241,3 +242,50 @@ def test_event_modi_zaehlen_nicht():
     CONN.raw.commit()
     d = compute_top_speed(CONN, T, ICH)
     assert d["overall"] is None
+
+
+def test_lobby_wertung_nennt_den_fahrer():
+    """Die Lobby-Bestenliste zaehlt ALLE mit, mich eingeschlossen — dann
+    steht bei einem eigenen Rekord der eigene Name da."""
+    _match("ts12")
+    db_pg.insert_telemetry_events(CONN.raw, "ts12", [
+        _fahrt("ts12", 1000, 162.1, "BP_Mirado_A_01_C"),
+        _fahrt("ts12", 2000, 161.9, "BP_Mirado_A_02_C", acc="account.X"),
+    ])
+    CONN.raw.commit()
+    d = compute_top_speed(CONN, T, ICH)
+    assert round(d["lobby"]["kmh"], 1) == 162.1
+    assert d["lobby"]["driverName"] == "PEX_LuCKoR"
+    assert d["lobby"]["isMe"] is True
+
+
+def test_lobby_bestenliste_je_fahrzeug_und_karte():
+    _match("ts13", "Baltic_Main")
+    db_pg.insert_telemetry_events(CONN.raw, "ts13", [
+        _fahrt("ts13", 1000, 130.0, "Dacia_A_01_v2_C"),
+        _fahrt("ts13", 2000, 151.0, "Dacia_A_02_v2_C", acc="account.X"),
+    ])
+    CONN.raw.commit()
+    d = compute_top_speed(CONN, T, ICH)
+    # Meine Liste kennt nur meine 130 …
+    assert [round(v["kmh"]) for v in d["perVehicle"]] == [130]
+    # … die Lobby-Liste den Bestwert des Fahrzeugs ueberhaupt.
+    assert round(d["lobbyPerVehicle"][0]["kmh"]) == 151
+    assert d["lobbyPerVehicle"][0]["isMe"] is False
+    assert round(d["lobbyPerMap"][0]["kmh"]) == 151
+
+
+def test_zeitraum_grenzt_den_report_ein():
+    """Im Report zaehlt der gewaehlte Zeitraum — alltime gehoert zum
+    Meilenstein, nicht in eine Session-Auswertung."""
+    _match("ts14", "Baltic_Main", played_at="2026-06-01T18:00:00Z")
+    _match("ts15", "Baltic_Main", played_at="2026-09-14T18:00:00Z")
+    db_pg.insert_telemetry_events(CONN.raw, "ts14", [
+        _fahrt("ts14", 1000, 160.0, "BP_Mirado_A_01_C")])
+    db_pg.insert_telemetry_events(CONN.raw, "ts15", [
+        _fahrt("ts15", 1000, 121.0, "Dacia_A_01_v2_C")])
+    CONN.raw.commit()
+    alles = compute_top_speed(CONN, T, ICH)
+    assert round(alles["overall"]["kmh"]) == 160
+    eng = compute_top_speed(CONN, T, ICH, from_iso="2026-09-01T00:00:00Z")
+    assert round(eng["overall"]["kmh"]) == 121

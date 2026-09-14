@@ -3733,8 +3733,8 @@ _CMS_ZU_KMH = 0.036
 
 
 def compute_top_speed(conn, tenant_id: int, my_account_id,
-                      limit_vehicles: int = 12):
-    """Hoechstgeschwindigkeit: insgesamt, je Fahrzeug, je Karte.
+                      from_iso=None, to_iso=None, limit_vehicles: int = 12):
+    """Hoechstgeschwindigkeit: meine und die der Lobby, je Fahrzeug und Karte.
 
     Quelle ist das `velocity`-Feld, das PUBG an jedes Event des Spielers
     haengt, der gerade im Fahrzeug sitzt — auch an die Positionen, die
@@ -3742,28 +3742,37 @@ def compute_top_speed(conn, tenant_id: int, my_account_id,
 
     Nur **selbst gefahren** (Sitz 0): der Beifahrer ist genauso schnell
     unterwegs, gelenkt hat er aber nicht. Und nur, was am Boden faehrt —
-    die Transportmaschine haengt an den Positionen jedes Spielers,
-    solange er drin sitzt, und waere mit 1000+ km/h jedes Mal der
-    Rekordhalter.
+    die Transportmaschine und das Rettungsfahrzeug haengen an den
+    Positionen jedes Spielers, solange er drin sitzt, und waeren mit
+    260+ km/h jedes Mal der Rekordhalter.
 
-    `allPlayers` steht bewusst daneben statt mit drin: das ist der
-    Bestwert der ganzen Lobby, nicht meiner.
+    `from_iso`/`to_iso` grenzen auf einen Zeitraum ein. Der Report
+    zeigt damit die gewaehlte Session; der Meilenstein fragt ohne
+    Zeitraum und bekommt den Bestwert ueberhaupt.
+
+    Die Lobby-Wertung zaehlt **alle** mit, mich eingeschlossen, und
+    nennt den Fahrer — bei einem eigenen Rekord steht da der eigene
+    Name.
     """
     from pubg.telemetry import _KEINE_LANDFAHRZEUGE
 
     eigene = ([my_account_id] if isinstance(my_account_id, str)
               else [a for a in (my_account_id or []) if a])
+    leer = {"overall": None, "perVehicle": [], "perMap": [],
+            "lobby": None, "lobbyPerVehicle": [], "lobbyPerMap": []}
     if not eigene:
-        return {"overall": None, "perVehicle": [], "perMap": [],
-                "allPlayers": None}
+        return leer
 
-    # Flugzeuge und Gleiter raus, direkt in der Abfrage.
     nicht_land = " ".join(
         f"AND e.vehicle_id NOT LIKE '%{n}%'" for n in _KEINE_LANDFAHRZEUGE)
-    # Nur Battle Royale — Deathmatch und Heist sind ein anderes Spiel.
-    # Die Schiessanlage laeuft als "solo" und faellt damit nicht unter
-    # den Modus-Filter; als Karte im Rekord ist sie trotzdem sinnlos.
     br_where, br_params = _br_filter("m")
+    zeit, zeit_params = "", []
+    if from_iso:
+        zeit += " AND m.played_at >= ?"
+        zeit_params.append(from_iso)
+    if to_iso:
+        zeit += " AND m.played_at <= ?"
+        zeit_params.append(to_iso)
     basis = f"""
         FROM telemetry_events e
         JOIN matches m ON m.match_id = e.match_id AND m.tenant_id = ?
@@ -3771,64 +3780,71 @@ def compute_top_speed(conn, tenant_id: int, my_account_id,
           AND e.seat_index = 0
           AND {br_where}
           AND m.map_name NOT IN ('Range_Main', 'Heaven_Main')
-          {nicht_land}
+          {nicht_land}{zeit}
     """
+    grund = [tenant_id] + br_params + zeit_params
+    marks = ",".join("?" * len(eigene))
+    eigen_filter = f" AND e.actor_account IN ({marks})"
+
+    namen = {}
+
+    def _name(acc):
+        if acc in namen:
+            return namen[acc]
+        r = conn.execute(
+            "SELECT name FROM players WHERE tenant_id = ? AND account_id = ? "
+            "UNION ALL SELECT name FROM participants WHERE account_id = ? "
+            "LIMIT 1", (tenant_id, acc, acc)).fetchone()
+        namen[acc] = (r["name"] if r else None) or "?"
+        return namen[acc]
 
     def _zeile(r):
         if not r or r["v"] is None:
             return None
+        acc = r["actor_account"]
         return {"kmh": round((r["v"] or 0) * _CMS_ZU_KMH, 1),
                 "vehicleId": r["vehicle_id"],
                 "vehicleName": _fahrzeug_label(r["vehicle_id"]),
                 "mapName": r["map_name"],
                 "matchId": r["match_id"],
-                "playedAt": r["played_at"]}
+                "playedAt": r["played_at"],
+                "driverName": _name(acc),
+                "isMe": acc in set(eigene)}
 
-    marks = ",".join("?" * len(eigene))
-    meine = conn.execute(f"""
-        SELECT e.velocity AS v, e.vehicle_id, m.map_name, m.match_id,
-               m.played_at
-        {basis} AND e.actor_account IN ({marks})
-        ORDER BY e.velocity DESC LIMIT 1
-    """, [tenant_id] + br_params + eigene).fetchone()
+    felder = ("e.velocity AS v, e.vehicle_id, e.actor_account, "
+              "m.map_name, m.match_id, m.played_at")
 
-    alle = conn.execute(f"""
-        SELECT e.velocity AS v, e.vehicle_id, m.map_name, m.match_id,
-               m.played_at
-        {basis}
-        ORDER BY e.velocity DESC LIMIT 1
-    """, [tenant_id] + br_params).fetchone()
+    def _bester(nur_eigene):
+        f = eigen_filter if nur_eigene else ""
+        pr = grund + (eigene if nur_eigene else [])
+        return _zeile(conn.execute(
+            f"SELECT {felder} {basis}{f} ORDER BY e.velocity DESC LIMIT 1",
+            pr).fetchone())
 
-    # Alle Fahrten, die schnellste zuerst — nach Anzeigename gruppiert
-    # wird unten. Dacia hat vier Spawn-Varianten, die untereinander wie
-    # vier verschiedene Autos aussaehen.
-    je_fahrzeug = conn.execute(f"""
-        SELECT DISTINCT ON (e.vehicle_id)
-               e.velocity AS v, e.vehicle_id, m.map_name, m.match_id,
-               m.played_at
-        {basis} AND e.actor_account IN ({marks})
-        ORDER BY e.vehicle_id, e.velocity DESC
-    """, [tenant_id] + br_params + eigene).fetchall()
+    def _je(spalte, nur_eigene):
+        f = eigen_filter if nur_eigene else ""
+        pr = grund + (eigene if nur_eigene else [])
+        rows = conn.execute(
+            f"SELECT DISTINCT ON ({spalte}) {felder} {basis}{f} "
+            f"ORDER BY {spalte}, e.velocity DESC", pr).fetchall()
+        # Nach Anzeigename zusammenfassen: Dacia hat vier Spawn-
+        # Varianten, die untereinander wie vier Autos aussaehen.
+        best = {}
+        for r in rows:
+            z = _zeile(r)
+            schluessel = (z["vehicleName"] if spalte == "e.vehicle_id"
+                          else z["mapName"])
+            if schluessel not in best or z["kmh"] > best[schluessel]["kmh"]:
+                best[schluessel] = z
+        aus = sorted(best.values(), key=lambda x: -x["kmh"])
+        return aus[:limit_vehicles] if spalte == "e.vehicle_id" else aus
 
-    je_karte = conn.execute(f"""
-        SELECT DISTINCT ON (m.map_name)
-               e.velocity AS v, e.vehicle_id, m.map_name, m.match_id,
-               m.played_at
-        {basis} AND e.actor_account IN ({marks})
-        ORDER BY m.map_name, e.velocity DESC
-    """, [tenant_id] + br_params + eigene).fetchall()
-
-    bester_je_name = {}
-    for r in je_fahrzeug:
-        z = _zeile(r)
-        vorher = bester_je_name.get(z["vehicleName"])
-        if vorher is None or z["kmh"] > vorher["kmh"]:
-            bester_je_name[z["vehicleName"]] = z
-    fz = sorted(bester_je_name.values(),
-                key=lambda x: -x["kmh"])[:limit_vehicles]
-    km = sorted((_zeile(r) for r in je_karte), key=lambda x: -x["kmh"])
-    return {"overall": _zeile(meine), "perVehicle": fz, "perMap": km,
-            "allPlayers": _zeile(alle)}
+    return {"overall": _bester(True),
+            "perVehicle": _je("e.vehicle_id", True),
+            "perMap": _je("m.map_name", True),
+            "lobby": _bester(False),
+            "lobbyPerVehicle": _je("e.vehicle_id", False),
+            "lobbyPerMap": _je("m.map_name", False)}
 
 
 def compute_lobby_avg_kd(conn, tenant_id: int, my_account_id, range_key="session"):

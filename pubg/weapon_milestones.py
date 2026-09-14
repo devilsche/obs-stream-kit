@@ -312,6 +312,17 @@ OCCASIONS = {
         "hint": "Faster than you have ever driven before — at the wheel, "
                 "not in the passenger seat",
     },
+    # Ein fester Anlass neben dem Rekord: 150 ist im Spiel die Marke,
+    # ab der nur noch die schnellsten Autos mitkommen — Dacia schafft
+    # sie knapp, Mirado und die Sportwagen sicher. Anders als der Rekord
+    # feiert er jedes Mal, wenn man sie knackt.
+    "career_speed_150": {
+        "scope": "career", "metric": "top_speed", "kind": "at",
+        "at": 150, "unit": "km/h", "decimals": 1,
+        "label": "Speed Demon", "widget": "big", "enabled": True,
+        "tier": "huge",
+        "hint": "Crossed 150 km/h at the wheel",
+    },
     "career_longest_kill": {
         "scope": "career", "metric": "longest_kill", "kind": "record",
         "min": 300, "unit": "metres",
