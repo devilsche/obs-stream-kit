@@ -4905,6 +4905,8 @@
             driveby_knock: "drive-by (knock)",
             driveby_kill:  "drive-by (kill)",
             knock_died: "knocked → died",
+            run_over: "run over",
+            run_over_dealt: "ran over",
             kill: "kill",
           };
           const kindLbl = KIND_LABELS[ev.kind] || ev.kind || "kill";
@@ -4945,14 +4947,22 @@
             const evDealt = m.eventsDealt || [];
             const nEject   = evDealt.filter(e => (e.kind||"").startsWith("eject")).length;
             const nDriveby = evDealt.filter(e => (e.kind||"").startsWith("driveby")).length;
+            const nRanOver = evDealt.filter(e => e.kind === "run_over_dealt").length;
             const parts2 = [];
             if (nEject)   parts2.push(`<b>${nEject}</b> shot out of a vehicle`);
             if (nDriveby) parts2.push(`<b>${nDriveby}</b> gunned down while driving`);
+            if (nRanOver) parts2.push(`<b>${nRanOver}</b> run over`);
             const summary = parts2.join(", ") || `<b>${dealt}</b> vehicle kills`;
             blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span> ${summary}</summary>${evRows(evDealt, "dealt")}</details>`);
           }
           if (taken > 0) {
-            blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm" aria-hidden="true">skull</span> was shot out <b>${taken}</b> ${taken === 1 ? "time" : "times"}</summary>${evRows(m.eventsTaken || [], "taken")}</details>`);
+            const evTaken  = m.eventsTaken || [];
+            const nOver    = evTaken.filter(e => e.kind === "run_over").length;
+            const nShotOut = taken - nOver;
+            const t2 = [];
+            if (nShotOut) t2.push(`was shot out <b>${nShotOut}</b> ${nShotOut === 1 ? "time" : "times"}`);
+            if (nOver)    t2.push(`run over <b>${nOver}</b> ${nOver === 1 ? "time" : "times"}`);
+            blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm" aria-hidden="true">skull</span> ${t2.join(", ")}</summary>${evRows(evTaken, "taken")}</details>`);
           }
           parts.push(`<div class="ve-member"><div class="ve-name">${who}</div>${blocks.join("")}</div>`);
         }

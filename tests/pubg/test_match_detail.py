@@ -361,3 +361,80 @@ def test_ausbluten_bleibt_ausbluten_solange_wer_lebt():
     ])
     ev = _typ_of(conn, mid, "PEX_LuCKoR")
     assert ev["type"] == "kill_bleedout"
+
+
+def _fahrt_match(conn, mid="mf1"):
+    """Zwei Mates in EINEM Auto: account.A faehrt, account.B sitzt daneben.
+
+    Die Kurve ist absichtlich keine Gerade — nur so faellt auf, ob der
+    Beifahrer die echte Strecke bekommt oder quer ueber die Karte
+    abgekuerzt wird.
+    """
+    _basic_match(conn, mid)
+    evs = []
+    # Ohne Flughoehe (z >= 150000) erkennt der Code kein Leben und
+    # verwirft das ganze Segment.
+    for acc in ("account.A", "account.B"):
+        e = _ev("Position", 5000, actor=acc)
+        e["actor_z"] = 160000.0
+        evs.append(e)
+    evs += [_ev("Landing", 60000, actor="account.A"),
+            _ev("Landing", 60000, actor="account.B")]
+    # Beide steigen ein: Sitz 0 = Fahrer.
+    for acc, seat in (("account.A", 0), ("account.B", 1)):
+        e = _ev("VehicleEnter", 100000, actor=acc, weapon="Uaz_B_01_C")
+        e["seat_index"] = seat
+        evs.append(e)
+    # Fahrtstrecke als Bogen. Der Fahrer loggt bei geraden, der
+    # Beifahrer bei ungeraden Sekunden — zusammen ergibt das die dichte
+    # Spur, die beide teilen.
+    kurve = [(1000.0, 1000.0), (2000.0, 1200.0), (3000.0, 1800.0),
+             (3500.0, 2800.0), (3400.0, 3900.0), (2900.0, 4800.0)]
+    for i, (x, y) in enumerate(kurve):
+        acc = "account.A" if i % 2 == 0 else "account.B"
+        e = _ev("Position", 110000 + i * 10000, actor=acc)
+        e["actor_x"], e["actor_y"] = x, y
+        evs.append(e)
+    for acc in ("account.A", "account.B"):
+        e = _ev("VehicleLeave", 180000, actor=acc, weapon="Uaz_B_01_C")
+        e["actor_x"], e["actor_y"] = 2900.0, 4800.0
+        evs.append(e)
+    insert_telemetry_events(conn, mid, evs)
+    return mid
+
+
+def _pfad(conn, mid, name):
+    d = compute_match_detail(conn, T, "account.A", mid) or {}
+    mem = next(m for m in d["members"] if m["name"] == name)
+    return mem["lives"][0]["groundPath"]
+
+
+def test_beifahrer_bekommt_die_echte_fahrstrecke():
+    """Der Beifahrer war im selben Auto — also auf derselben Strecke.
+
+    Vorher liess der Code Mitfahrern bewusst eine Luecke, damit auf der
+    Karte nur die Fahrerlinie erscheint. Auf der Karte wurde daraus aber
+    keine Luecke, sondern eine schnurgerade Linie quer durch die
+    Landschaft: die Verbindung der beiden Punkte VOR und NACH der Fahrt.
+    """
+    conn = _setup()
+    mid = _fahrt_match(conn)
+    fahrt = [p for p in _pfad(conn, mid, "Mate1") if 100000 <= p[2] <= 180000]
+    # Alle sechs Kurvenpunkte, nicht nur die eigenen drei.
+    assert len(fahrt) >= 6, f"Beifahrer hat nur {len(fahrt)} Punkte"
+    knick = (3500.0, 2800.0)
+    assert any(abs(p[0] - knick[0]) < 1 and abs(p[1] - knick[1]) < 1
+               for p in fahrt), "der Scheitel der Kurve fehlt"
+
+
+def test_fahrer_und_beifahrer_fahren_dieselbe_strecke():
+    """Gleiches Auto, gleiche Strecke — die Spuren muessen sich decken."""
+    conn = _setup()
+    mid = _fahrt_match(conn)
+    def _strecke(name):
+        return sorted((round(p[0], 1), round(p[1], 1))
+                      for p in _pfad(conn, mid, name)
+                      if 100000 <= p[2] <= 180000)
+    fahrer = _strecke("PEX_LuCKoR")
+    assert len(fahrer) >= 6, "schon der Fahrer hat die Strecke nicht"
+    assert _strecke("Mate1") == fahrer

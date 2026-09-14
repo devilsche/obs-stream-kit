@@ -1961,11 +1961,16 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 "points": pts,
             })
 
-    # Pro Member: groundPath in jeder Life rewriten.
-    # - Fahrer: Unified-Points im Shared-Intervall einsetzen (eigene Punkte
-    #   sind im Intervall ohnehin schon raus, weil wir sie filtern).
-    # - Passagier: KEINE Punkte im Shared-Intervall (Gap entsteht; auf der
-    #   Map wird so nur die Fahrer-Linie sichtbar).
+    # Pro Member: groundPath in jeder Life rewriten. JEDER Mitfahrer
+    # bekommt die Unified-Points der Episode — wer im selben Auto sitzt,
+    # ist am selben Ort.
+    #
+    # Passagiere bekamen hier frueher bewusst gar nichts, damit auf der
+    # Karte nur eine Linie je Fahrzeug liegt. Aus der Luecke wurde im
+    # Frontend aber keine Luecke, sondern eine schnurgerade Verbindung
+    # der Punkte vor und nach der Fahrt — quer durch die Landschaft,
+    # Strasse hin oder her. Deckungsgleiche Linien sind das kleinere
+    # Uebel als eine Linie, die es so nie gab.
     for mem in out_members:
         acc_u = mem["accountId"]
         my_eps = sorted(
@@ -1993,8 +1998,6 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             life_t0 = gp_sorted_orig[0][2] if gp_sorted_orig else None
             life_t1 = gp_sorted_orig[-1][2] if gp_sorted_orig else None
             for ep in my_eps:
-                if ep.get("driver") != acc_u:
-                    continue  # Passagier: kein Pfad
                 if life_t0 is None:
                     break
                 seg_s = max(ep["start"], life_t0)
@@ -3298,7 +3301,8 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
     ev_rows = conn.execute(f"""
         SELECT match_id, event_type, timestamp_ms,
                actor_account, target_account,
-               actor_x, actor_y, victim_x, victim_y, weapon
+               actor_x, actor_y, victim_x, victim_y, weapon,
+               damage_reason
         FROM telemetry_events
         WHERE match_id IN ({ph})
           AND event_type IN ('VehicleEnter','VehicleLeave',
@@ -3319,6 +3323,7 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
             "ax": r["actor_x"],  "ay": r["actor_y"],
             "vx": r["victim_x"], "vy": r["victim_y"],
             "weapon": r["weapon"],
+            "reason": r["damage_reason"],
         })
 
     # Opponent-Name-Cache fuer Pretty-Print im Detail
@@ -3435,9 +3440,12 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
                 actor_veh  = _vehicle_in_intervals(ts, actor_ivals)   # Drive-By
                 target_veh = _vehicle_in_intervals(ts, target_ivals)  # Eject-Kill
                 veh = target_veh or actor_veh
+                ueberfahren = e.get("reason") == "Damage_VehicleHit"
                 if veh is None: pass
                 elif t == "Kill":
-                    kind = "eject_kill" if target_veh else "driveby_kill"
+                    kind = ("run_over_dealt" if ueberfahren
+                            else "eject_kill" if target_veh
+                            else "driveby_kill")
                     _ensure(actor)["evictionsDealt"] += 1
                     _add_event(actor, "eventsDealt", kind, mid, e, target, veh)
                 elif t == "Knock":
@@ -3449,7 +3457,15 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
             if target in squad:
                 m_ivals = intervals_by[target]
                 veh = _vehicle_in_intervals(ts, m_ivals)
-                if t == "Kill" and veh is not None:
+                # Ueberfahren werden: hier sitzt der GEGNER im Auto, nicht
+                # ich. Die Abfrage oben findet deshalb nichts — der Fall
+                # fiel bisher komplett durch die Zaehlung.
+                if (t == "Kill" and veh is None
+                        and e.get("reason") == "Damage_VehicleHit"):
+                    _ensure(target)["evictionsTaken"] += 1
+                    _add_event(target, "eventsTaken", "run_over",
+                                mid, e, actor, e.get("weapon"))
+                elif t == "Kill" and veh is not None:
                     _ensure(target)["evictionsTaken"] += 1
                     _add_event(target, "eventsTaken", "kill",
                                 mid, e, actor, veh)
